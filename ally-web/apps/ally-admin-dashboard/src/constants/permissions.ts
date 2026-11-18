@@ -44,15 +44,27 @@ export enum Permissions {
   // No delete — a session is cancelled, never removed, because its PRs outlive it.
   VIEW_BUILDER = "view:admin:builder",
   EDIT_BUILDER = "edit:admin:builder",
+  // Context Library. VIEW browses and searches; EDIT adds documents and entries, edits,
+  // archives and changes which use case reads which collection (Settings).
+  VIEW_CONTEXT_LIBRARY = "view:admin:context-library",
+  EDIT_CONTEXT_LIBRARY = "edit:admin:context-library",
   // Course Copilot. Gated on toggle AND EDIT everywhere (one gate — a view-only session list has
   // nothing to show without the chat), but both grants exist so the backend can tier them later.
   VIEW_COURSE_COPILOT = "view:admin:course-copilot",
   EDIT_COURSE_COPILOT = "edit:admin:course-copilot",
+  // AI Chatbots: onboarding (/assistants/new) needs the edit grant, as ally-be checks it.
+  EDIT_WHATSAPP_BOT = "edit:whatsapp-bot",
   // Ally guide (Ally Console + org Ally tab). Transcripts need their own
   // permission AND the per-person ally_guide_transcripts toggle.
   VIEW_ALLY_GUIDE = "view:admin:ally-guide",
   EDIT_ALLY_GUIDE = "edit:admin:ally-guide",
   REVIEW_ALLY_GUIDE_TRANSCRIPTS = "review:admin:ally-guide-transcripts",
+  // Debrief expert review: the Debrief Console's Expert review tab (with the Analytics toggle).
+  REVIEW_DEBRIEFS = "review:admin:debriefs",
+  // Debriefs console roles (CONSOLE_API.md "Roles"): the platform tier is the Ally team, and the
+  // owner holds the debrief settings. Read through pages/Debriefs/debriefAccess.ts only.
+  SYSTEM_ACCESS = "system:access",
+  MANAGE_DEBRIEF_SETTINGS = "manage:admin:debrief-settings",
   // Per-user preferences (e.g. the saved admin sidebar order). Held by every
   // platform-tier group — PLATFORM_ADMIN inherited both from SUPER_DUPER_ADMIN
   // in the role-collapse migration — but NOT by a plain tenant ADMIN or a
@@ -101,8 +113,14 @@ export const SIDEBAR_ITEMS = {
   TRANSLATIONS: "translations",
   TOOLTIPS: "tooltips",
   ANALYTICS: "analytics",
+  CONVERSATION_DRIFT: "conversation-drift",
+  DEBRIEFS: "debriefs",
   AGENT_TEST_CASES: "agent-test-cases",
   PRODUCT_ROADMAP: "product-roadmap",
+  /** Roadmap v2, shown only while `roadmap_v2` is on (GET /v1/roadmap/me/role succeeds). */
+  ROADMAP_V2: "roadmap-v2",
+  /** User Interviews, its own entry while `roadmap_v2` is on (D14); inside the old board before. */
+  USER_INTERVIEWS: "user-interviews",
   COMPETENCIES: "competencies",
   ROLEPLAY_SESSION_LOGS: "roleplay-session-logs",
   BLOG: "blog",
@@ -113,7 +131,9 @@ export const SIDEBAR_ITEMS = {
   MOBILE_RELEASES: "mobile-releases",
   WHATSAPP_BOT: "whatsapp-bot",
   BUG_HUNTER: "bug-hunter",
+  PM_AGENT: "pm-agent",
   BUILDER: "builder",
+  CONTEXT_LIBRARY: "context-library",
   COURSE_COPILOT: "course-copilot",
   ALLY_GUIDE: "ally-guide",
   COMPONENT_LIBRARY: "component-library",

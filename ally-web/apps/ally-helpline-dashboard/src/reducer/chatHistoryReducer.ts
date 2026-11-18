@@ -6,6 +6,11 @@ export interface HistorySessionState {
   messages: ChatMessagePayload[];
   error: boolean;
   lastFailedMessage: string | null;
+  /**
+   * Ask Ally stopped taking questions: its last reply was the limit message
+   * (`done.limit`), for this debrief (`session`) or for now (`month`).
+   */
+  replyLimit?: "session" | "month" | null;
 }
 
 export interface ChatHistoryState {
@@ -64,6 +69,13 @@ const chatHistorySlice = createSlice({
         lastFailedMessage: null,
       };
     },
+    setReplyLimit: (
+      state,
+      action: PayloadAction<{ sessionId: string; limit: "session" | "month" }>,
+    ) => {
+      const session = getOrCreateHistorySession(state, action.payload.sessionId);
+      session.replyLimit = action.payload.limit;
+    },
     clearSession: (state, action: PayloadAction<string>) => {
       delete state.sessions[action.payload];
     },
@@ -76,6 +88,7 @@ export const {
   clearError,
   commitStreamingMessage,
   initSession,
+  setReplyLimit,
   clearSession,
 } = chatHistorySlice.actions;
 

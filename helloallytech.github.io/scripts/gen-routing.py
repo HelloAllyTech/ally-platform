@@ -41,7 +41,7 @@ NOT_FOR_TASKS = {
 }
 
 SECTIONS = [
-    ("Product practice — DEPRECATED 2026-08-07, superseded by the Stacks MCP; history only", ("product/",)),
+    ("Product practice — DEPRECATED 2026-08-07, superseded by the Context Library; history only", ("product/",)),
     ("Platform & architecture", ("platform/",)),
     ("Per-repo pages", ("repos/",)),
     ("Contributing & setup", ("contributing/",)),

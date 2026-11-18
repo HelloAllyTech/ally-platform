@@ -22,7 +22,7 @@ interface PreviewMonologueRunsProps {
  *
  * Carries when, who, which language and whether it was a draft version —
  * the axes a curator actually varies between previews, so two runs can be told
- * apart without opening both (Stacks: "Compare Prompt Variations Using Batch
+ * apart without opening both ("Compare Prompt Variations Using Batch
  * Run Visualization"). Turn count doubles as the honest signal of a run that
  * produced nothing.
  */

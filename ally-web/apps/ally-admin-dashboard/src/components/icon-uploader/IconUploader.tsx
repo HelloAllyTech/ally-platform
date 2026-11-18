@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 
 import axios from "axios";
 import { toast } from "sonner";
@@ -28,6 +28,12 @@ export const IconUploader: React.FC<IconUploaderProps> = ({
   const [previewUrl, setPreviewUrl] = useState<string>(imageUrl);
   const [isUploading, setIsUploading] = useState(false);
   const [previousUrl, setPreviousUrl] = useState<string>(imageUrl);
+
+  // Show an icon set from outside (e.g. a generated one). An upload's own
+  // blob preview is replaced by its real URL here too.
+  useEffect(() => {
+    if (imageUrl) setPreviewUrl(imageUrl);
+  }, [imageUrl]);
 
   const validateAspectRatio = useCallback((file: File): Promise<boolean> => {
     return new Promise(resolve => {

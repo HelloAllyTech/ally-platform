@@ -99,6 +99,22 @@ export class CharacterInterviewController {
     return this.sessionService.getSessionWithMessages(sessionId, user.id);
   }
 
+  @Post('sessions/:sessionId/abandon')
+  @RequireFeatureToggle(FeatureToggleKey.CHARACTER_LIBRARY, {
+    tenantPreference: PreferenceName.CHARACTER_LIBRARY_ENABLED,
+    permissions: [PERMISSIONS.CREATE_SCENARIO_CHARACTER],
+  })
+  @ApiOperation({
+    summary:
+      'Abandon an interview (Leave / Start over) so it stops counting toward the tenant in-progress cap',
+  })
+  abandonSession(
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @CurrentUser() user: TokenUser,
+  ) {
+    return this.sessionService.abandonSession(sessionId, user.id);
+  }
+
   @Post('sessions/:sessionId/messages/stream')
   @RequireFeatureToggle(FeatureToggleKey.CHARACTER_LIBRARY, {
     tenantPreference: PreferenceName.CHARACTER_LIBRARY_ENABLED,

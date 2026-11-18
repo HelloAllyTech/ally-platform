@@ -5,6 +5,7 @@ export * from "./BuildView";
 export * from "./ChatComposer";
 export * from "./ChatMessage";
 export * from "./CollapsibleAside";
+export * from "./DecisionCard";
 export * from "./ConfirmCancelDialog";
 export * from "./designGate";
 export * from "./DiffBlock";

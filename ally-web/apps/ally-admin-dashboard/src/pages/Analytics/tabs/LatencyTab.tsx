@@ -1,13 +1,12 @@
 import { useMemo, useState } from "react";
 
-import { LineChart, SimpleBarChart, StackedBarChart } from "@carbon/charts-react";
-
 import {
   useGetAgentJoinReliabilityQuery,
   useGetFillerQualityQuery,
   useGetStartLatencyQuery,
   useGetVoiceLatencyQuery,
 } from "@api";
+import { LineChart, SimpleBarChart, StackedBarChart } from "@components/charts";
 import { AnalyticsBucket, AnalyticsGrain } from "@types";
 
 import { AnalyticsTabFilters, asOf, windowLabel } from "../analyticsFilters";

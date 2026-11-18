@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
 
-import { ComboChart, LineChart, SimpleBarChart, StackedBarChart } from "@carbon/charts-react";
-
 import { useGetQualityDistributionQuery, useGetQualitySentimentQuery } from "@api";
+import { ComboChart, LineChart, SimpleBarChart, StackedBarChart } from "@components/charts";
 
 import { AnalyticsTabFilters, windowLabel } from "../analyticsFilters";
 import {

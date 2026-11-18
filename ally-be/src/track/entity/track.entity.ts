@@ -83,6 +83,17 @@ export class Track extends BaseWithoutTenantEntity {
   @Column({ type: 'jsonb', nullable: true })
   guideNotes?: TrackGuideNotes | null;
 
+  // Image Studio: the course's visual style (an id from
+  // src/image-studio/constants/image-styles.constants.ts) and its style
+  // example (a generated_images id), so every image generated inside the
+  // course starts in one look. NULL = not chosen; generators use each slot's
+  // default style.
+  @Column({ type: 'varchar', length: 48, nullable: true })
+  imageStyleId?: string | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  imageStyleAnchorId?: string | null;
+
   @DeleteDateColumn()
   deletedAt?: Date;
 }

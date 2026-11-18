@@ -71,16 +71,14 @@ describe('BugHunterProtectionDriftService', () => {
       'ally-web': protection(0, ['Vitest']),
       'ally-ai': protection(1, ['gitleaks']),
       'ally-ai-learn': protection(0, ['pytest']),
-      'ally-mobile': protection(0, ['Jest']),
     };
     const first = build(live, null);
     const drifts = await first.service.run();
     expect(drifts.filter((d) => d.problems.length).map((d) => d.repo)).toEqual([
       'ally-be',
       'ally-web',
-      'ally-mobile',
     ]);
-    expect(first.notify).toHaveBeenCalledTimes(3);
+    expect(first.notify).toHaveBeenCalledTimes(2);
     expect(first.notify).toHaveBeenCalledWith(
       expect.objectContaining({
         level: BugHunterNotificationLevel.PROBLEM,

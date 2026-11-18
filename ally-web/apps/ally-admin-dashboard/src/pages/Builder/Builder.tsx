@@ -9,7 +9,9 @@ import { AutoExpandableTextarea } from "@ally-ui-mono/ui-shared";
 import {
   useArchiveBuilderSessionMutation,
   useCreateBuilderSessionMutation,
+  useGetBuilderSettingsQuery,
   useGetArchivedBuilderSessionsQuery,
+  useGetBuilderDecisionsQuery,
   useGetBuilderSessionsQuery,
   useUnarchiveBuilderSessionMutation,
 } from "@api";
@@ -19,13 +21,13 @@ import { FilterChipProps } from "@components/types";
 import { en, ROUTES } from "@constants";
 import { BuilderSession, BuilderSessionStatus } from "@types";
 
+import { sessionTitleFrom, startErrorMessage } from "./builderStart";
 import {
   BUILDER_STATUS_TAG_TYPE,
   builderTransition,
   prefersReducedMotion,
   staggerDelayMs,
-} from "./builderMotion";
-import { sessionTitleFrom, startErrorMessage } from "./builderStart";
+} from "../../motion/builderMotion";
 
 /** Sessions the agent cannot move forward without a person. */
 const NEEDS_YOU: BuilderSessionStatus[] = ["WAITING_FOR_INPUT", "PRD_READY", "FAILED"];
@@ -98,6 +100,14 @@ const SessionCard: React.FC<{
           {session.createdByName && (
             <p className="mt-0.5 truncate text-xs text-typography-500">
               {strings.startedBy(session.createdByName)}
+            </p>
+          )}
+          {session.requestedBy && strings.requestedFor[session.requestedBy] && (
+            <p
+              className="mt-0.5 truncate text-xs text-typography-500"
+              data-testid="builder-session-requested-for"
+            >
+              {strings.requestedFor[session.requestedBy]}
             </p>
           )}
         </div>
@@ -200,6 +210,17 @@ export const Builder: React.FC = () => {
     { skip: !showArchived },
   );
   const [createSession, { isLoading: isCreating }] = useCreateBuilderSessionMutation();
+  // Retired once plans start on the roadmap: new work is filed as an idea there.
+  const { data: builderSettings } = useGetBuilderSettingsQuery();
+  const startsOnRoadmap = builderSettings?.builderDirectInterviewEnabled === false;
+  // The decision feed's count rides the same poll cadence as the list: a
+  // decision that arrived while this page was open should show here too.
+  const { data: decisionFeed } = useGetBuilderDecisionsQuery(undefined, {
+    pollingInterval: 15000,
+    skipPollingIfUnfocused: true,
+    skip: showArchived,
+  });
+  const pendingDecisions = decisionFeed?.count ?? 0;
   const [archiveSession] = useArchiveBuilderSessionMutation();
   const [unarchiveSession] = useUnarchiveBuilderSessionMutation();
 
@@ -324,6 +345,14 @@ export const Builder: React.FC = () => {
             <p className="mt-1 text-sm text-typography-600">{strings.heroSubtitle}</p>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-1">
+            <Button kind="ghost" size="sm" onClick={() => navigate(ROUTES.BUILDER_DECISIONS)}>
+              {strings.decisions.link}
+              {pendingDecisions > 0 && (
+                <span className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary-600 px-1.5 text-xs font-semibold text-white">
+                  {pendingDecisions}
+                </span>
+              )}
+            </Button>
             <Button
               kind="ghost"
               size="sm"
@@ -375,31 +404,45 @@ export const Builder: React.FC = () => {
             <BuilderNotificationBell />
           </div>
         </div>
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
-          <AutoExpandableTextarea
-            id="builder-hero"
-            value={heroValue}
-            onChange={setHeroValue}
-            placeholder={strings.heroPlaceholder}
-            maxLines={4}
-            disabled={isCreating}
-            onKeyDown={(event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                void start();
-              }
-            }}
-          />
-          <Button
-            kind="primary"
-            size="md"
-            className="max-sm:!w-full max-sm:!max-w-none"
-            disabled={!heroValue.trim() || isCreating}
-            onClick={() => void start()}
-          >
-            {strings.heroSubmit}
-          </Button>
-        </div>
+        {startsOnRoadmap ? (
+          <p className="mt-3 text-sm">
+            New builds now start on the Product Roadmap: file an idea there, and once it has a PRD
+            its plan comes here to build.{" "}
+            <button
+              type="button"
+              className="underline"
+              onClick={() => navigate(`${ROUTES.PRODUCT_ROADMAP}?tab=my-ideas`)}
+            >
+              Go to My ideas
+            </button>
+          </p>
+        ) : (
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
+            <AutoExpandableTextarea
+              id="builder-hero"
+              value={heroValue}
+              onChange={setHeroValue}
+              placeholder={strings.heroPlaceholder}
+              maxLines={4}
+              disabled={isCreating}
+              onKeyDown={(event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  void start();
+                }
+              }}
+            />
+            <Button
+              kind="primary"
+              size="md"
+              className="max-sm:!w-full max-sm:!max-w-none"
+              disabled={!heroValue.trim() || isCreating}
+              onClick={() => void start()}
+            >
+              {strings.heroSubmit}
+            </Button>
+          </div>
+        )}
       </header>
 
       <div className="mb-4 flex flex-col gap-4">
@@ -496,6 +539,17 @@ export const Builder: React.FC = () => {
         )
       ) : visibleSessions.length ? (
         <>
+          {/* The feed is where decisions get made fast; this is the nudge towards it. */}
+          {pendingDecisions > 0 && !showArchived && (
+            <div className="mb-6 flex flex-wrap items-center gap-3 rounded border border-primary-200 bg-primary-50 px-4 py-3">
+              <p className="flex-1 text-sm text-typography-900">
+                {strings.decisions.banner(pendingDecisions)}
+              </p>
+              <Button kind="primary" size="sm" onClick={() => navigate(ROUTES.BUILDER_DECISIONS)}>
+                {strings.decisions.bannerCta}
+              </Button>
+            </div>
+          )}
           {renderGroup(strings.needsYouHeading, needsYou, 0)}
           {renderGroup(strings.activeHeading, active, needsYou.length)}
           {renderGroup(strings.recentHeading, recent, needsYou.length + active.length)}

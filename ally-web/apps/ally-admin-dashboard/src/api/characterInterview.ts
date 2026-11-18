@@ -23,6 +23,19 @@ const characterInterviewAPI = baseAPI.injectEndpoints({
       }),
     }),
 
+    /**
+     * Leave / Start over. The server stops counting the session toward the
+     * org's in-progress cap at once; left ACTIVE, it would block a colleague's
+     * new interview for the rest of the idle window.
+     */
+    abandonCharacterInterviewSession: builder.mutation<CharacterInterviewSession, string>({
+      query: sessionId => ({
+        url: ApiEndpoints.CHARACTERS.INTERVIEW_SESSION_ABANDON(sessionId),
+        method: HttpMethod.POST,
+        body: {},
+      }),
+    }),
+
     /** One session with its full transcript — the resume path. */
     getCharacterInterviewSession: builder.query<CharacterInterviewSession, string>({
       query: sessionId => ({
@@ -45,6 +58,7 @@ const characterInterviewAPI = baseAPI.injectEndpoints({
 });
 
 export const {
+  useAbandonCharacterInterviewSessionMutation,
   useCreateCharacterInterviewSessionMutation,
   useLazyGetCharacterInterviewSessionQuery,
   useLazyGetCharacterInterviewSessionsQuery,

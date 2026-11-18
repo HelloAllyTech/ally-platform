@@ -77,6 +77,28 @@ vi.mock("@constants", () => ({
 
 import { FileUpload } from "../FileUpload";
 
+// Image Studio's Generate control, stubbed: the modal and its API have their own tests.
+const imageSourceProps = vi.hoisted(() => ({ current: null as any }));
+vi.mock("../../image-studio/ImageSourceField", () => ({
+  ImageSourceField: (props: any) => {
+    imageSourceProps.current = props;
+    return (
+      <button
+        type="button"
+        onClick={() =>
+          props.onAccept({
+            url: "https://bucket.s3.amazonaws.com/image-studio/gen-1.webp",
+            altText: "A woman on a park bench",
+            imageId: "gen-1",
+          })
+        }
+      >
+        Use generated image
+      </button>
+    );
+  },
+}));
+
 vi.mock("@assets", async importOriginal => {
   const actual = await importOriginal<typeof import("@assets")>();
   return {
@@ -116,7 +138,6 @@ const getCoverImageUrlMock = vi.fn();
 const deleteCoverImageMock = vi.fn();
 const getCoverVideoUrlMock = vi.fn();
 const deleteCoverVideoMock = vi.fn();
-const generateCoverImageMock = vi.fn();
 vi.mock("@api", async importOriginal => {
   const actual: any = await importOriginal();
   return {
@@ -142,12 +163,6 @@ vi.mock("@api", async importOriginal => {
         unwrap: () => deleteCoverVideoMock(),
       }),
     ],
-    useStartCoverImageJobMutation: () => [
-      () => ({
-        unwrap: () => generateCoverImageMock(),
-      }),
-    ],
-    useLazyGetCoverImageJobQuery: () => [() => ({ unwrap: vi.fn() })],
   };
 });
 
@@ -229,9 +244,15 @@ describe("FileUpload", () => {
     });
   });
 
-  describe("Generate with AI", () => {
-    const renderWithAi = () => {
-      valueStore = { title: "Difficult Feedback", name: "Amit" };
+  describe("Image Studio (Generate)", () => {
+    const renderWithAi = (props: Record<string, unknown> = {}) => {
+      valueStore = {
+        title: "Difficult Feedback",
+        description: "A manager gives hard feedback.",
+        name: "Amit",
+        age: 34,
+        profession: "  ",
+      };
       render(
         <FileUpload
           id={id}
@@ -239,47 +260,93 @@ describe("FileUpload", () => {
           isMandatory={false}
           label="Cover"
           enableAiGeneration
+          {...props}
         />,
       );
     };
 
-    it("starts a background job and puts the finished image in the form", async () => {
-      generateCoverImageMock.mockResolvedValue({
-        jobId: "job-1",
-        status: "succeeded",
-        imageUrl: "https://cdn/generated.png",
-        startedAt: "2026-10-20T00:00:00Z",
-      });
+    beforeEach(() => {
+      imageSourceProps.current = null;
+    });
+
+    it("offers Generate as a roleplay cover, with the form's title, description and persona as context", () => {
       renderWithAi();
 
-      fireEvent.click(screen.getByRole("button", { name: "Generate with AI" }));
+      expect(screen.getByRole("button", { name: "Use generated image" })).toBeInTheDocument();
+      expect(imageSourceProps.current.slotKind).toBe("roleplay_cover");
+      expect(imageSourceProps.current.slotKey).toContain("coverImage");
+      // Blank persona fields are left out.
+      expect(imageSourceProps.current.context).toEqual({
+        title: "Difficult Feedback",
+        text: "A manager gives hard feedback.",
+        persona: { name: "Amit", age: "34" },
+      });
+    });
 
-      await waitFor(() =>
-        expect(setValue).toHaveBeenCalledWith(id, "https://cdn/generated.png", {
-          shouldValidate: true,
-          shouldDirty: true,
-        }),
+    it("takes the slot kind and key the caller gives", () => {
+      renderWithAi({ imageSlotKind: "case_cover", imageSlotKey: "case:7:cover" });
+
+      expect(imageSourceProps.current.slotKind).toBe("case_cover");
+      expect(imageSourceProps.current.slotKey).toBe("case:7:cover");
+    });
+
+    it("puts an accepted image straight into the form, without the upload checks", async () => {
+      renderWithAi();
+
+      fireEvent.click(screen.getByRole("button", { name: "Use generated image" }));
+
+      expect(setValue).toHaveBeenCalledWith(
+        id,
+        "https://bucket.s3.amazonaws.com/image-studio/gen-1.webp",
+        { shouldValidate: true, shouldDirty: true },
       );
+      expect(clearErrors).toHaveBeenCalledWith(id);
+      // Nothing was uploaded, and no 16:9 check ran.
+      expect(getCoverImageUrlMock).not.toHaveBeenCalled();
+      expect(putSpy).not.toHaveBeenCalled();
+      expect(setError).not.toHaveBeenCalled();
       expect(toastSuccess).toHaveBeenCalledWith("Image generated");
     });
 
-    it("shows the job's own failure wording, not a generic one", async () => {
-      generateCoverImageMock.mockResolvedValue({
-        jobId: "job-2",
-        status: "failed",
-        error: "Image generation is busy right now. Try again in a minute.",
-        startedAt: "2026-10-20T00:00:00Z",
-      });
-      renderWithAi();
-
-      fireEvent.click(screen.getByRole("button", { name: "Generate with AI" }));
-
-      await waitFor(() =>
-        expect(toastError).toHaveBeenCalledWith(
-          "Image generation is busy right now. Try again in a minute.",
-        ),
+    it("never deletes a generated image from the cover-image bucket", async () => {
+      // A saved cover first, so the generated one is a replacement (the case
+      // the delete path would otherwise clean up).
+      valueStore[id] = "https://cdn/saved.jpg";
+      const renderField = () => (
+        <FileUpload
+          id={id}
+          formMethods={makeFormMethods()}
+          isMandatory={false}
+          label="Cover"
+          enableAiGeneration
+        />
       );
-      expect(setValue).not.toHaveBeenCalled();
+      const { rerender } = render(renderField());
+      fireEvent.click(screen.getByRole("button", { name: "Use generated image" }));
+      rerender(renderField());
+
+      fireEvent.click(screen.getByTestId("trash-icon").closest("button")!);
+
+      await waitFor(() => expect(setValue).toHaveBeenLastCalledWith(id, null));
+      expect(deleteCoverImageMock).not.toHaveBeenCalled();
+    });
+
+    it("is not offered without enableAiGeneration, or on a video slot", () => {
+      render(
+        <FileUpload id={id} formMethods={makeFormMethods()} isMandatory={false} label="Cover" />,
+      );
+      render(
+        <FileUpload
+          id="coverVideoUrl"
+          formMethods={makeFormMethods()}
+          isMandatory={false}
+          label="Video"
+          fileType="video"
+          enableAiGeneration
+        />,
+      );
+
+      expect(screen.queryByRole("button", { name: "Use generated image" })).not.toBeInTheDocument();
     });
   });
 

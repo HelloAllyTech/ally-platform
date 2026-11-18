@@ -1,9 +1,8 @@
 import { useMemo, useState } from "react";
 
-import { StackedBarChart } from "@carbon/charts-react";
-
 import { CarbonDropdown as Dropdown } from "@ally-ui-mono/ui-shared";
 import { useGetUsageLevelsQuery } from "@api";
+import { StackedBarChart } from "@components/charts";
 
 import { ChartDetailModal } from "./ChartDetailModal";
 import { ChartCard, ScrollableChart, buildSource, stackedBarOpts } from "./chartKit";

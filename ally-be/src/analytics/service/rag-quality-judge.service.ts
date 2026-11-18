@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import axios from 'axios';
 import { randomUUID } from 'crypto';
 import { AppConfigService } from '../../config/config.service';
+import { KbRetrievalConsumer } from '../../knowledge-base/enum/knowledge-base.enum';
 import { LoggerService } from '../../logger/logger.service';
 import { RedisService } from '../../redis/service/redis.service';
 import {
@@ -29,9 +30,9 @@ interface JudgeResult {
 /**
  * Max candidate passages sent for one retrieval, highest-ranked first.
  *
- * Not a quality limit — a cost one. A two-pass retrieval can record forty candidates and a
- * character-corpus chunk is 800 tokens, so judging every candidate of every retrieval is a
- * 30k-token call per row over a backlog. Twelve covers everything that reached the consumer
+ * Not a quality limit — a cost one. A retrieval can record dozens of candidates of up to 600
+ * tokens each, so judging every candidate of every retrieval is a large call per row over a
+ * backlog. Twelve covers everything that reached the consumer
  * (the limit is 8) plus the first few discards, which is where the shaping rules are actually
  * in question. The rest of the discards ranked below passages already labelled, so their
  * marginal information is the smallest in the row.
@@ -43,9 +44,9 @@ const MAX_JUDGED_PASSAGES = 12;
  * log was built to be joined against.
  *
  * `kb_retrievals` records what came back and at what similarity; a similarity is not a measure
- * of usefulness, and in production it demonstrably was not one — the character corpus returned
- * nothing for "how specific should a character be" against a document whose section was titled
- * "Specific beats representative, every time". This supplies the missing half: a relevance
+ * of usefulness, and in production it demonstrably was not one — the (since retired) character
+ * corpus returned nothing for "how specific should a character be" against a document whose
+ * section was titled "Specific beats representative, every time". This supplies the missing half: a relevance
  * label per passage, and a sufficiency verdict per retrieval.
  *
  * Same division as the other four judge families: ally-be selects, assembles and persists;
@@ -130,18 +131,18 @@ export class RagQualityJudgeService {
   }
 
   /**
-   * Select a BALANCED batch across consumers rather than the newest rows outright.
+   * Select a batch from the consumers that still write retrievals, split evenly between them.
    *
-   * The admin retrieval preview and the interview agent are different populations, and the
-   * preview's is the one an operator can generate hundreds of on a single afternoon of
-   * threshold-probing. Taken newest-first, that afternoon becomes the entire measurement, and
-   * the number it produces describes the operator rather than the corpus. Splitting the chunk
-   * between consumers keeps the agent's traffic in every batch — sampling across the variation
-   * that exists is the cheapest guard against reading one population as another (Stacks:
-   * "Mitigate false negatives by recruiting participant variation").
+   * Taken newest-first across every consumer, one noisy population can become the entire
+   * measurement — the admin retrieval preview once could, when an operator probed thresholds
+   * for an afternoon. Splitting the batch between live consumers keeps each one's traffic in
+   * every batch ("Mitigate false negatives by recruiting participant variation").
    *
-   * A consumer with nothing eligible simply contributes nothing; its share is not redistributed,
-   * because a batch that silently becomes single-consumer again is the thing being avoided.
+   * Only consumers still writing are listed. The admin preview stopped writing when its route
+   * was removed and the character interview moved to the Context Library (which has its own
+   * judge), so the WhatsApp bot is the only one left. Reserving half a batch for a consumer that
+   * no longer writes would leave that half unjudged on every run. A consumer added later goes
+   * in this list.
    */
   private async selectBalanced(
     sinceDays: number,
@@ -154,7 +155,7 @@ export class RagQualityJudgeService {
     if (!limit) {
       return this.repo.selectRetrievals({ sinceDays, unjudgedForVersion });
     }
-    const consumers = ['interview_agent', 'admin_preview'];
+    const consumers: string[] = [KbRetrievalConsumer.WHATSAPP_BOT];
     const share = Math.max(1, Math.floor(limit / consumers.length));
     const batches = await Promise.all(
       consumers.map((consumer) =>

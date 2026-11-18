@@ -1,30 +1,34 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import {
-  BugReportIcon,
-  LightbulbGuidedIcon,
-  QuickAddIcon,
-  RoadmapSettingsIcon,
-  TriangleIcon,
-} from "@icons";
+import { BugReportIcon, LightbulbGuidedIcon, RoadmapSettingsIcon, TriangleIcon } from "@icons";
 import { useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
 
 import { CarbonDropdown, Tabs, Tooltip } from "@ally-ui-mono/ui-shared";
 import {
   useGetBugFindingsQuery,
   useGetRoadmapBoardQuery,
   useGetRoadmapVoteBudgetQuery,
+  useGetRoadmapBreadthQuery,
   useGetRoadmapFacetsQuery,
+  useGetRoadmapIdeaDraftsQuery,
   useGetRoadmapInterviewNotesQuery,
   useGetRoadmapOpportunitiesQuery,
   useGetRoadmapProductGoalsQuery,
+  useGetPlanSettingsQuery,
+  productRoadmapAPI,
+  useGetRoadmapEligibleOwnersQuery,
+  useGetRoadmapRankWeightsQuery,
 } from "@api";
 import { Permissions } from "@constants";
 import { useUser } from "@hooks";
+import { store } from "@store";
 import {
   RoadmapBoardGroupBy,
   RoadmapBoardLayout,
   RoadmapBoardQuery,
+  RoadmapIdeaDraft,
+  RoadmapOpportunity,
   RoadmapOpportunitiesQuery,
   RoadmapOpportunitySource,
   RoadmapOpportunityStage,
@@ -32,32 +36,62 @@ import {
   RoadmapViewState,
 } from "@types";
 
+import { BreadthBadge, BreadthReadout } from "./BreadthBadge";
+import { BreadthPanel } from "./BreadthPanel";
 import { BugsTab } from "./BugsTab";
 import { BuilderSessionDrawer } from "./BuilderSessionDrawer";
+import { IdeaDraftsTab } from "./IdeaDraftsTab";
 import { InterviewsTab } from "./InterviewsTab";
 import { MonthBoard } from "./MonthBoard";
+import { NewToYouChip } from "./NewToYouChip";
 import { OpportunitiesBoard } from "./OpportunitiesBoard";
 import { OpportunitiesListView } from "./OpportunitiesListView";
 import { OpportunityDrawer } from "./OpportunityDrawer";
 import { OpportunityInterviewDrawer } from "./OpportunityInterviewDrawer";
-import { QuickAddOpportunityModal } from "./QuickAddOpportunityModal";
+import { RowEditor } from "./OpportunityListCard";
+import { OpportunityPeek } from "./OpportunityPeek";
+import { LeadQueueTab } from "./plans/LeadQueueTab";
+import { MyPlansTab } from "./plans/MyPlansTab";
+import { PlanDrawer } from "./plans/PlanDrawer";
+import { SignalsTab } from "./plans/SignalsTab";
+import { RankExplainContext } from "./RankWhy";
+import { RejectReasonBar } from "./RejectReasonBar";
 import { ReportBugModal } from "./ReportBugModal";
 import { RoadmapSettingsDrawer } from "./RoadmapSettingsDrawer";
+import { RoadmapShortcutSheet } from "./RoadmapShortcutSheet";
 import { RoadmapSortControl } from "./RoadmapSortControl";
 import { SavedViewTabs } from "./SavedViewTabs";
+import { useDebouncedValue } from "./useDebouncedValue";
 import { useProductRoadmapRealtime } from "./useProductRoadmapRealtime";
+import { useRoadmapShortcuts } from "./useRoadmapShortcuts";
+import { useRoadmapTriage } from "./useRoadmapTriage";
 import { useSavedViews } from "./useSavedViews";
-import { canManageRoadmap, canOpenRoadmapBuilder, canQuickAddRoadmap } from "./utils/access";
+import {
+  canFileIdeas,
+  canLeadRoadmapPlans,
+  canManageRoadmap,
+  canOpenRoadmapBuilder,
+} from "./utils/access";
 import { seedForHandle } from "./utils/builder";
 import { EMPTY_ADVANCED_FILTERS, RoadmapAdvancedFilterValues } from "./utils/filters";
 import { RoadmapEffortFilterValue } from "./utils/filterSelection";
 import { monthKeyOf, shiftMonthKey } from "./utils/monthBoard";
+import { expandStageFilter } from "./utils/stages";
+import { RejectReasonId, acceptTarget } from "./utils/triage";
+import { overlayUrlState, parseUrlState, writeUrlState } from "./utils/urlState";
 import {
+  INBOX_VIEW_ID,
   QUEUE_VIEW_ID,
   QUEUE_VIEW_STATE,
+  isPipelineViewId,
   normaliseSortField,
+  normaliseStageFilter,
   normaliseTypeFilter,
+  pseudoViewState,
 } from "./utils/views";
+
+/** An absent `?view=` lands on the Queue, so it counts as Queue here too. */
+const isPipelineLanding = (view: string | null) => view === null || isPipelineViewId(view);
 
 /** One page of the TABLE layout, which walks `offset`. */
 const PAGE_SIZE = 50;
@@ -74,6 +108,9 @@ const PAGE_SIZE = 50;
  * silently — 200 sits inside it and reaches the ceiling in two more presses.
  */
 const FEED_PAGE_SIZE = 200;
+
+/** How long typing must pause before the search reaches the server. */
+const SEARCH_DEBOUNCE_MS = 300;
 
 /**
  * Default month window: one back, four forward. Mirrors ROADMAP_BOARD_DEFAULTS in ally-be — the
@@ -128,10 +165,24 @@ enum RoadmapTab {
    * `?tab=opportunities&view=queue`.
    */
   QUEUE = "queue",
+  /**
+   * The landing tab: Ideas that need a decision. Derived from `?view=inbox` exactly as QUEUE is
+   * derived from `?view=queue`, for the same one-source-of-truth reason.
+   */
+  INBOX = "inbox",
   OPPORTUNITIES = "opportunities",
   INTERVIEWS = "interviews",
   /** Bug Hunter's table, read-only. See BugsTab for why it is mirrored here. */
   BUGS = "bugs",
+  /** The viewer's own saved raw ideas (see IdeaDraftsTab). Needs VOTE: the endpoints do. */
+  DRAFTS = "drafts",
+  /**
+   * Planning (plans/roadmap-owns-planning rev 5.2), shown only while planning is switched on.
+   * My ideas replaces My drafts; Needs a lead and Signals are for Product Planning Leads.
+   */
+  MY_IDEAS = "my-ideas",
+  NEEDS_A_LEAD = "needs-a-lead",
+  SIGNALS = "signals",
 }
 
 /**
@@ -157,8 +208,22 @@ enum RoadmapTab {
 export const ProductRoadmap: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { permissions, features, user } = useUser();
+  /** An org-restricted admin is a Viewer at most: the filing and lead doors stay shut. */
+  const restricted = user?.restrictedTenantIds != null;
 
   const canVote = !!permissions?.includes(Permissions.VOTE_PRODUCT_ROADMAP);
+  // Breadth multiplier. `enabled` comes from the server so the UI and the flag can't disagree;
+  // while it is loading (or off, or failed) none of the badge renders — a skeleton here would
+  // flash on every load for the people the flag is still off for.
+  const {
+    data: breadth,
+    isError: isBreadthError,
+    refetch: refetchBreadth,
+  } = useGetRoadmapBreadthQuery();
+  const isBreadthOn = canVote && !!breadth?.enabled;
+  const [isBreadthPanelOpen, setIsBreadthPanelOpen] = useState(false);
+  // Page-level shortcut, not a saved-view filter — see NewToYouChip.
+  const [newToMe, setNewToMe] = useState(false);
   /**
    * The permission AND the `product_roadmap_manage` toggle — see canManageRoadmap for why the
    * permission alone stopped meaning anything, and for the fail-closed rule.
@@ -166,11 +231,22 @@ export const ProductRoadmap: React.FC = () => {
   const canManage = canManageRoadmap(permissions, features);
   /** Builder access, independent of canManage — see canOpenRoadmapBuilder. */
   const canOpenBuilder = canOpenRoadmapBuilder(permissions, features);
+  /** The guided-interview door: VOTE plus the Idea role (canFileIdeas). */
+  const canFile = canFileIdeas(permissions, features, restricted);
   /**
-   * The header's second filing door — a plain form with no readiness check, for the named few
-   * who hold the quick-add toggle. Independent of canManage — see canQuickAddRoadmap.
+   * Planning is on server-side (builder_settings.planningEnabled). While it is off the plan
+   * routes answer 404 and none of the plan tabs or drawers render, so the roadmap is unchanged.
    */
-  const canQuickAdd = canQuickAddRoadmap(permissions, features);
+  const { data: planSettings } = useGetPlanSettingsQuery();
+  const planningOn = !!planSettings?.enabled;
+  const canLeadPlans = planningOn && canLeadRoadmapPlans(permissions, features, restricted);
+  const openPlanId = searchParams.get("plan");
+  const openPlan = (id: string | null) => {
+    const next = new URLSearchParams(searchParams);
+    if (id) next.set("plan", id);
+    else next.delete("plan");
+    setSearchParams(next, { replace: true });
+  };
   /**
    * Whether the Bugs tab exists for this reader.
    *
@@ -188,6 +264,11 @@ export const ProductRoadmap: React.FC = () => {
    */
   const canViewBugs = !!permissions?.includes(Permissions.VIEW_PRODUCT_ROADMAP);
 
+  /** Archived rows are hidden by default; this is the "Show archived" toggle. */
+  const [showArchived, setShowArchived] = useState(false);
+  const viewParam = searchParams.get("view");
+  /** Inbox and Queue define their own stages, so "Show archived" does not apply to them. */
+  const isPipelineView = isPipelineViewId(viewParam);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<RoadmapOpportunityType[]>([]);
   const [stageFilter, setStageFilter] = useState<RoadmapOpportunityStage[]>([]);
@@ -209,8 +290,9 @@ export const ProductRoadmap: React.FC = () => {
   const [order, setOrder] = useState<"ASC" | "DESC">("DESC");
   /** The guided interview — the way to file an opportunity from this page, for almost everyone. */
   const [isInterviewOpen, setIsInterviewOpen] = useState(false);
+  /** Set when the interview was opened from a saved draft, so it opens seeded with those words. */
+  const [interviewDraft, setInterviewDraft] = useState<RoadmapIdeaDraft | null>(null);
   /** The quick-add form — the other way, for holders of the quick-add toggle only. */
-  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [isReportBugOpen, setIsReportBugOpen] = useState(false);
   /**
    * The one admin surface: product goals, strategy & ranking and merge, as tabs in a drawer.
@@ -282,16 +364,23 @@ export const ProductRoadmap: React.FC = () => {
    */
   const isList = layout === RoadmapBoardLayout.LIST;
 
+  /**
+   * The input shows `search` instantly; the QUERY waits for typing to pause. Without this every
+   * keystroke was a server ILIKE round trip and a flash of the loading skeleton.
+   */
+  const debouncedSearch = useDebouncedValue(search, SEARCH_DEBOUNCE_MS);
+
   const listArgs = useMemo<RoadmapOpportunitiesQuery>(
     () => ({
-      search: search.trim() || undefined,
+      search: debouncedSearch.trim() || undefined,
       type: typeFilter.length ? typeFilter : undefined,
-      stage: stageFilter.length ? stageFilter : undefined,
+      stage: expandStageFilter(stageFilter, showArchived && !isPipelineView),
       source: sourceFilter.length ? sourceFilter : undefined,
       effort: effortFilter.length ? effortFilter : undefined,
       productGoal: goalFilter.length ? goalFilter : undefined,
       owner: ownerFilter.length ? ownerFilter : undefined,
       createdBy: advanced.createdBy.length ? advanced.createdBy : undefined,
+      newToMe: newToMe && isBreadthOn ? true : undefined,
       // Empty string means "no bound" — sending it would fail @IsISO8601 / @IsInt.
       dateFrom: advanced.dateFrom || undefined,
       dateTo: advanced.dateTo || undefined,
@@ -308,14 +397,18 @@ export const ProductRoadmap: React.FC = () => {
       offset: isList ? 0 : offset,
     }),
     [
-      search,
+      debouncedSearch,
       typeFilter,
       stageFilter,
+      showArchived,
+      isPipelineView,
       sourceFilter,
       effortFilter,
       goalFilter,
       ownerFilter,
       advanced,
+      newToMe,
+      isBreadthOn,
       sortBy,
       order,
       isList,
@@ -343,16 +436,21 @@ export const ProductRoadmap: React.FC = () => {
 
   const isBoard = layout === RoadmapBoardLayout.BOARD;
 
-  const { data, isLoading, isFetching } = useGetRoadmapOpportunitiesQuery(listArgs, {
-    // Don't hold a subscription to the layout that isn't on screen: it would refetch the table on
-    // every socket invalidation while the user is looking at the board. Table and List share this
-    // one subscription — they are the same query, just rendered differently.
-    skip: isBoard,
-  });
+  const { data, isLoading, isFetching, isError, refetch } = useGetRoadmapOpportunitiesQuery(
+    listArgs,
+    {
+      // Don't hold a subscription to the layout that isn't on screen: it would refetch the table on
+      // every socket invalidation while the user is looking at the board. Table and List share this
+      // one subscription — they are the same query, just rendered differently.
+      skip: isBoard,
+    },
+  );
   const {
     data: boardData,
     isLoading: isBoardLoading,
     isFetching: isBoardFetching,
+    isError: isBoardError,
+    refetch: refetchBoard,
   } = useGetRoadmapBoardQuery(boardArgs, { skip: !isBoard });
 
   const boardCount = boardData ? boardData.lanes.reduce((sum, lane) => sum + lane.total, 0) : 0;
@@ -361,6 +459,7 @@ export const ProductRoadmap: React.FC = () => {
   const { data: facets } = useGetRoadmapFacetsQuery();
   // Counts only — the tab bodies own their own data. Cheap, and the tab strip needs them.
   const { data: interviews } = useGetRoadmapInterviewNotesQuery({ limit: 1 });
+  const { data: ideaDrafts } = useGetRoadmapIdeaDraftsQuery(undefined, { skip: !canVote });
   /**
    * Count only, and skipped entirely without the toggle — the same shape as the
    * two above. `limit: 1` rather than the table's `limit: 100`: this fires on
@@ -388,12 +487,23 @@ export const ProductRoadmap: React.FC = () => {
     stage: QUEUE_VIEW_STATE.stageFilter,
     limit: 1,
   });
-  const { data: opportunitiesTotal } = useGetRoadmapOpportunitiesQuery({ limit: 1 });
+  const { data: opportunitiesTotal } = useGetRoadmapOpportunitiesQuery({
+    stage: expandStageFilter([], false),
+    limit: 1,
+  });
+  /** The Inbox badge: Ideas that still need an owner or a size, not every Idea. */
+  const { data: inboxTotal } = useGetRoadmapOpportunitiesQuery({
+    stage: [RoadmapOpportunityStage.NEW],
+    needsTriage: true,
+    limit: 1,
+  });
 
   const openOpportunityId = searchParams.get("opportunity");
-  const activeViewId = searchParams.get("view");
+  const activeViewId = viewParam;
   /** Queue is a pseudo-view (see QUEUE_VIEW_ID) that is defined as a list, not a filter preset. */
   const isQueueView = activeViewId === QUEUE_VIEW_ID;
+  /** Inbox is the other one — the landing view. See INBOX_VIEW_STATE. */
+  const isInboxView = activeViewId === INBOX_VIEW_ID;
   /**
    * The Builder session on screen, in the URL for the same reason the opportunity drawer is:
    * a refresh or a shared link should land back on the conversation.
@@ -437,6 +547,7 @@ export const ProductRoadmap: React.FC = () => {
       searchQuery: search.trim() || undefined,
       typeFilter,
       stageFilter,
+      showArchived: showArchived || undefined,
       sourceFilter,
       effortFilter,
       goalFilter,
@@ -460,6 +571,7 @@ export const ProductRoadmap: React.FC = () => {
       search,
       typeFilter,
       stageFilter,
+      showArchived,
       sourceFilter,
       effortFilter,
       goalFilter,
@@ -477,7 +589,11 @@ export const ProductRoadmap: React.FC = () => {
     // board may filter to `["bug"]`, which now matches nothing. See
     // normaliseTypeFilter — the view self-heals on its next autosave.
     setTypeFilter(normaliseTypeFilter(state.typeFilter) as RoadmapOpportunityType[]);
-    setStageFilter((state.stageFilter ?? []) as RoadmapOpportunityStage[]);
+    // Folded into the three visible stages — see normaliseStageFilter. A view saved with Archived
+    // picked comes back with the "Show archived" toggle on instead.
+    const { stages, archived } = normaliseStageFilter(state.stageFilter);
+    setStageFilter(stages as RoadmapOpportunityStage[]);
+    setShowArchived(!!state.showArchived || archived);
     // Absent on every view saved before this filter existed — undefined must mean "no filter",
     // not "leave whatever was previously selected", or applying an old view would leave a stale
     // source filter from whatever the user had picked before switching views.
@@ -529,9 +645,9 @@ export const ProductRoadmap: React.FC = () => {
    * is how the tab stops being a queue. Leaving the tab and coming back lands on List again —
    * the board is a way of looking at the queue, not a new definition of it.
    */
-  const layoutToggle = (
+  const layoutSwitch = (
     <div className="border-border-light flex items-center border text-sm">
-      {(isQueueView
+      {(isPipelineView
         ? [
             { id: RoadmapBoardLayout.LIST, label: "List" },
             { id: RoadmapBoardLayout.BOARD, label: "Board" },
@@ -556,6 +672,34 @@ export const ProductRoadmap: React.FC = () => {
           {option.label}
         </button>
       ))}
+    </div>
+  );
+
+  /**
+   * Archived is a hidden state, not a visible stage: rejecting an idea archives it, and it stays
+   * out of every list until this is ticked. Not offered on Inbox/Queue — their stages are their
+   * definition, and an archived row is neither waiting nor ranked.
+   */
+  const archivedToggle = isPipelineView ? null : (
+    <Tooltip
+      label="Archived ideas are hidden by default. Tick to list them, so you can restore one."
+      align="bottom"
+    >
+      <label className="text-typography-secondary flex cursor-pointer items-center gap-1.5 text-sm">
+        <input
+          type="checkbox"
+          checked={showArchived}
+          onChange={event => withPagingReset(setShowArchived)(event.target.checked)}
+        />
+        Show archived
+      </label>
+    </Tooltip>
+  );
+
+  const layoutToggle = (
+    <div className="flex flex-wrap items-center gap-3">
+      {layoutSwitch}
+      {archivedToggle}
     </div>
   );
 
@@ -614,17 +758,15 @@ export const ProductRoadmap: React.FC = () => {
    * so filtering to one goal shows #3, #14, #57 — their standing in the queue — rather than
    * renumbering them 1, 2, 3 as though the filtered set were the queue.
    */
-  const queueToolbar = isQueueView ? (
-    <RoadmapSortControl
-      sortBy={sortBy}
-      order={order}
-      onChange={(nextSortBy, nextOrder) => {
-        setSortBy(nextSortBy);
-        setOrder(nextOrder);
-        resetPaging();
-      }}
-    />
-  ) : null;
+  const changeSort = (
+    nextSortBy: NonNullable<RoadmapOpportunitiesQuery["sortBy"]>,
+    nextOrder: "ASC" | "DESC",
+  ) => {
+    setSortBy(nextSortBy);
+    setOrder(nextOrder);
+    resetPaging();
+  };
+  const sortToolbar = <RoadmapSortControl sortBy={sortBy} order={order} onChange={changeSort} />;
 
   const groupByPicker = isBoard ? (
     /*
@@ -654,9 +796,51 @@ export const ProductRoadmap: React.FC = () => {
     enabled: !!permissions?.includes(Permissions.VIEW_PRODUCT_ROADMAP),
   });
 
+  /**
+   * What the URL said when the page opened — captured once, before anything has a chance to write
+   * over it. The landing view is applied on first render (see useSavedViews), and a shared link's
+   * filters have to be laid on top of that, not lost to it.
+   */
+  const initialUrlState = useRef<RoadmapViewState | null>(null);
+  if (initialUrlState.current === null) initialUrlState.current = parseUrlState(searchParams);
+  const hasOverlaidUrl = useRef(false);
+  const applyLandingView = useCallback(
+    (state: RoadmapViewState) => {
+      if (hasOverlaidUrl.current) {
+        applyViewState(state);
+        return;
+      }
+      hasOverlaidUrl.current = true;
+      const url = { ...(initialUrlState.current ?? {}) };
+      // The Queue is a list or a board, never the table, and its stage is its definition.
+      if (isPipelineLanding(searchParams.get("view")) && url.layout === RoadmapBoardLayout.TABLE) {
+        delete url.layout;
+      }
+      applyViewState(
+        overlayUrlState(state, url, { ignoreStage: isPipelineLanding(searchParams.get("view")) }),
+      );
+    },
+    // applyViewState only calls setters and resetPaging, all of which are stable in effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [searchParams],
+  );
+
+  /** True when anything on screen differs from the bare board: a filter, a search or a sort. */
+  const hasAnyFilter =
+    !!search.trim() ||
+    typeFilter.length > 0 ||
+    stageFilter.length > 0 ||
+    sourceFilter.length > 0 ||
+    effortFilter.length > 0 ||
+    goalFilter.length > 0 ||
+    ownerFilter.length > 0 ||
+    showArchived ||
+    sortBy !== "composite" ||
+    order !== "DESC";
+
   const savedViews = useSavedViews({
     current: currentViewState,
-    onApply: applyViewState,
+    onApply: applyLandingView,
     activeViewId,
     setActiveViewId,
     canVote,
@@ -672,10 +856,16 @@ export const ProductRoadmap: React.FC = () => {
     // `?tab=queue` is therefore an unrecognised tab and falls back to Opportunities, the same
     // way the retired `?tab=release-notes` does.
     tab !== RoadmapTab.QUEUE &&
+    tab !== RoadmapTab.INBOX &&
     // A pasted `?tab=bugs` from someone who holds the toggle must fall back for
     // someone who doesn't, rather than selecting a tab with no strip entry —
     // which would render the page with no tab underlined and no body.
-    (tab !== RoadmapTab.BUGS || canViewBugs);
+    (tab !== RoadmapTab.BUGS || canViewBugs) &&
+    // Drafts are private to the author and the endpoints need VOTE, so a viewer without it
+    // falls back instead of landing on a tab that can only 403.
+    (tab !== RoadmapTab.DRAFTS || (canVote && !planningOn)) &&
+    (tab !== RoadmapTab.MY_IDEAS || planningOn) &&
+    ((tab !== RoadmapTab.NEEDS_A_LEAD && tab !== RoadmapTab.SIGNALS) || canLeadPlans);
   /**
    * Queue and Opportunities are the same `?tab=` value split into two strip entries by which
    * view is applied. Queue-ness only overrides Opportunities — a reader on Bugs or User
@@ -684,10 +874,27 @@ export const ProductRoadmap: React.FC = () => {
    */
   const baseTab = isTabAvailable(requestedTab) ? requestedTab : RoadmapTab.OPPORTUNITIES;
   const activeTab =
-    baseTab === RoadmapTab.OPPORTUNITIES && isQueueView ? RoadmapTab.QUEUE : baseTab;
+    baseTab === RoadmapTab.OPPORTUNITIES
+      ? isQueueView
+        ? RoadmapTab.QUEUE
+        : isInboxView
+          ? RoadmapTab.INBOX
+          : baseTab
+      : baseTab;
   /** Both strip entries render the same body; only the applied view differs. */
   const isOpportunitiesTab =
-    activeTab === RoadmapTab.OPPORTUNITIES || activeTab === RoadmapTab.QUEUE;
+    activeTab === RoadmapTab.OPPORTUNITIES ||
+    activeTab === RoadmapTab.QUEUE ||
+    activeTab === RoadmapTab.INBOX;
+
+  /** Mirror the board's filters, sort and layout into the URL, so refresh and paste both work. */
+  useEffect(() => {
+    if (!hasOverlaidUrl.current || !isOpportunitiesTab) return;
+    const next = writeUrlState(searchParams, currentViewState, { omitStage: isPipelineView });
+    if (next.toString() !== searchParams.toString()) setSearchParams(next, { replace: true });
+    // searchParams is read but not a trigger: the write is a function of the board state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentViewState, isPipelineView, isOpportunitiesTab]);
 
   const setTab = (id: string) => {
     const next = new URLSearchParams(searchParams);
@@ -701,17 +908,19 @@ export const ProductRoadmap: React.FC = () => {
      * happens once, here, and applyViewState is called directly for the half selectView does
      * that this cannot: applying the filters, layout and sort.
      */
-    if (id === RoadmapTab.QUEUE || id === RoadmapTab.OPPORTUNITIES) {
-      const toQueue = id === RoadmapTab.QUEUE;
+    if (id === RoadmapTab.QUEUE || id === RoadmapTab.INBOX || id === RoadmapTab.OPPORTUNITIES) {
+      const pseudoId =
+        id === RoadmapTab.QUEUE ? QUEUE_VIEW_ID : id === RoadmapTab.INBOX ? INBOX_VIEW_ID : null;
       next.set("tab", RoadmapTab.OPPORTUNITIES);
-      if (toQueue) next.set("view", QUEUE_VIEW_ID);
+      if (pseudoId) next.set("view", pseudoId);
       // Leaving Queue lands on "All" — the sibling default in the strip below — rather than on
       // whichever saved view happened to be applied last, which the reader cannot see from here.
       else next.delete("view");
       next.delete("opportunity");
+      next.delete("peek");
       next.delete("bug");
       setSearchParams(next, { replace: true });
-      applyViewState(toQueue ? QUEUE_VIEW_STATE : {});
+      applyViewState(pseudoViewState(pseudoId) ?? {});
       return;
     }
     next.set("tab", id);
@@ -719,6 +928,7 @@ export const ProductRoadmap: React.FC = () => {
     // switch is confusing. `bug` is the Bugs tab's equivalent of `opportunity`
     // — BugFindingsTable reads it out of this same query string.
     next.delete("opportunity");
+    next.delete("peek");
     next.delete("bug");
     setSearchParams(next, { replace: true });
   };
@@ -742,49 +952,203 @@ export const ProductRoadmap: React.FC = () => {
     resetPaging();
   };
 
+  // ── peek ──────────────────────────────────────────────────────────────────
+  /** The non-modal side panel's row, in the URL like the drawer's — a link lands on it. */
+  const peekId = searchParams.get("peek");
+  const setPeek = (id: string | null) => {
+    const next = new URLSearchParams(searchParams);
+    if (id) next.set("peek", id);
+    else next.delete("peek");
+    setSearchParams(next, { replace: true });
+  };
+  /** The deep-work drawer. Replaces the peek rather than stacking over it. */
+  const openFull = (id: string) => {
+    const next = new URLSearchParams(searchParams);
+    next.set("opportunity", id);
+    next.delete("peek");
+    setSearchParams(next, { replace: true });
+  };
+
+  // ── merge from the peek ───────────────────────────────────────────────────
+  /** Rows to pre-pick when the settings drawer opens on Merge. */
+  const [mergeSeed, setMergeSeed] = useState<RoadmapOpportunity[] | undefined>(undefined);
+  /**
+   * Fetch the rows, then open Merge with them picked. They come through the same detail query the
+   * peek uses, so a row already on screen is a cache hit; one that is not is fetched, and a
+   * failure says so rather than opening an empty merge tab.
+   */
+  const requestMerge = async (ids: string[]) => {
+    try {
+      const rows = await Promise.all(
+        ids.map(id =>
+          store.dispatch(productRoadmapAPI.endpoints.getRoadmapOpportunity.initiate(id)).unwrap(),
+        ),
+      );
+      setMergeSeed(rows);
+      setPeek(null);
+      setIsSettingsOpen(true);
+    } catch {
+      toast.error("Could not load those opportunities to merge.");
+    }
+  };
+
+  // ── keyboard cursor ───────────────────────────────────────────────────────
+  const [cursorId, setCursorId] = useState<string | null>(null);
+  const [isShortcutSheetOpen, setIsShortcutSheetOpen] = useState(false);
+  /** The row a Reject is waiting on a reason for (see RejectReasonBar). */
+  const [rejecting, setRejecting] = useState<RoadmapOpportunity | null>(null);
+  const triage = useRoadmapTriage(user?.id);
+  /** The rank explainer's inputs. VIEW can read the weights, so no manager gate here. */
+  const { data: rankWeights } = useGetRoadmapRankWeightsQuery();
+  const rankExplain = useMemo(
+    () => (rankWeights ? { weights: rankWeights, maxScore: data?.maxScore } : null),
+    [rankWeights, data?.maxScore],
+  );
+  // Only managers can edit, and only they need the owner list; skipping it spares everyone else
+  // a request they could not use.
+  const { data: eligibleOwners } = useGetRoadmapEligibleOwnersQuery(undefined, {
+    skip: !canManage,
+  });
+  /** The rows j/k can walk: the table and the list share one query; the board has none. */
+  const cursorRowIds = useMemo(
+    () => (isOpportunitiesTab && !isBoard ? (data?.items ?? []).map(item => item.id) : []),
+    [isOpportunitiesTab, isBoard, data],
+  );
+  // A cursor on a row that left the list (accepted, filtered away) would leave the keys with
+  // nothing to act on and no visible ring, so it falls back to "no cursor".
+  useEffect(() => {
+    if (cursorId && !cursorRowIds.includes(cursorId)) setCursorId(null);
+  }, [cursorId, cursorRowIds]);
+  /** Anything modal over the page owns the keyboard, and so does a tab with no list. */
+  const isKeyboardFree =
+    isOpportunitiesTab &&
+    !isBoard &&
+    !openOpportunityId &&
+    !openBuilderSessionId &&
+    !isSettingsOpen &&
+    !isInterviewOpen &&
+    !isReportBugOpen &&
+    !isShortcutSheetOpen &&
+    !rejecting &&
+    !isBreadthPanelOpen;
+  /**
+   * The cursor, and the peek that follows it. Moving with j/k, clicking a row, or auto-advancing
+   * after a decision all land here, so an open peek always shows the row the cursor is on.
+   */
+  const moveCursorTo = (id: string | null) => {
+    setCursorId(id);
+    if (id && peekId && id !== peekId) setPeek(id);
+  };
+  const rowById = (id: string) => data?.items.find(item => item.id === id);
+  /**
+   * After a decision the row usually leaves the list (an accepted Idea is no longer in the Inbox),
+   * so move the cursor to the neighbour first — the next row, or the previous at the end — or the
+   * next keypress would start from nothing and the reader would lose their place.
+   */
+  const advanceFrom = (id: string) => {
+    const index = cursorRowIds.indexOf(id);
+    moveCursorTo(cursorRowIds[index + 1] ?? cursorRowIds[index - 1] ?? null);
+  };
+  const acceptRow = async (row: RoadmapOpportunity) => {
+    if (!acceptTarget(row.stage)) return;
+    advanceFrom(row.id);
+    await triage.accept(row);
+  };
+  const rejectWithReason = async (reason?: RejectReasonId) => {
+    const row = rejecting;
+    setRejecting(null);
+    if (!row) return;
+    advanceFrom(row.id);
+    await triage.reject(row, reason);
+  };
+  /** Decisions exist only for managers; everyone else gets no decision keys and no buttons. */
+  const rowEditor: RowEditor | undefined = canManage
+    ? {
+        goals: (goals ?? []).map(goal => goal.name),
+        owners: (eligibleOwners ?? []).map(owner => ({
+          id: owner.id,
+          name: owner.name || owner.email,
+        })),
+        showOwnerNudge: isInboxView,
+        onSetEffort: (row, effort) => void triage.setField(row, { effort }, "effort"),
+        onSetGoal: (row, goal) => void triage.setField(row, { productGoal: goal }, "goal"),
+        onSetOwner: (row, ownerUserId) => void triage.setField(row, { ownerUserId }, "owner"),
+        onAccept: row => void acceptRow(row),
+        onReject: row => setRejecting(row),
+      }
+    : undefined;
+  useRoadmapShortcuts(isKeyboardFree, {
+    onAccept: canManage ? id => void (rowById(id) && acceptRow(rowById(id)!)) : undefined,
+    onReject: canManage ? id => setRejecting(rowById(id) ?? null) : undefined,
+    onAssignToMe: canManage
+      ? id => void (rowById(id) && triage.assignToMe(rowById(id)!))
+      : undefined,
+    onUndo: canManage ? () => void triage.undoLast() : undefined,
+    rowIds: cursorRowIds,
+    cursorId,
+    onCursor: moveCursorTo,
+    // Enter/o: peek first, then the full drawer from the peek.
+    onOpen: id => (peekId === id ? openFull(id) : (setCursorId(id), setPeek(id))),
+    onEscape: () => {
+      if (!peekId) return false;
+      setPeek(null);
+      return true;
+    },
+    onSearch: () =>
+      document
+        .querySelector<HTMLInputElement>('input[placeholder="Search opportunities"]')
+        ?.focus(),
+    onHelp: () => setIsShortcutSheetOpen(true),
+  });
+
   return (
-    <div className="flex flex-col gap-4 md:p-6">
-      {/* The title row carries the vote balance inline. It used to spend four lines on a bordered
+    <RankExplainContext.Provider value={rankExplain}>
+      <div
+        className={`flex flex-col gap-4 md:p-6 ${peekId && isOpportunitiesTab ? "md:pr-[27rem]" : ""}`}
+      >
+        {/* The title row carries the vote balance inline. It used to spend four lines on a bordered
           card plus a two-line paragraph explaining the vote economy — standing instructions that
           every returning voter has already read, above a board where the first row of data started
           roughly 900px down the page. The rule that actually has a consequence (unused votes
           lapse) is not deleted, just moved into the help tooltip, per the tooltip convention in
           ally-web/CLAUDE.md. */}
-      <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h1 className="text-typography-primary text-2xl font-primary">Product Roadmap</h1>
-        {/* items-CENTER, not baseline. This row is a vote icon and three buttons; an icon has no
+        <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <h1 className="text-typography-primary text-2xl font-primary">Product Roadmap</h1>
+          {/* items-CENTER, not baseline. This row is a vote icon and three buttons; an icon has no
             baseline to align to, so baseline alignment left the (now 40px) badge sitting off
             from the buttons beside it. Centring is what a row of controls wants anyway. */}
-        <div className="-ml-2.5 flex flex-wrap items-center gap-x-1 gap-y-1 md:ml-0 md:gap-x-4">
-          {/* The vote budget, collapsed to its icon.
+          <div className="-ml-2.5 flex flex-wrap items-center gap-x-1 gap-y-1 md:ml-0 md:gap-x-4">
+            {/* The vote budget, collapsed to its icon.
               It expands IN PLACE rather than into a popover: the numbers push the two buttons
               along rather than covering anything, so nothing is hidden behind it and there is
               no dismiss behaviour to get wrong.
 
               The icon keeps its tooltip while collapsed, so the control is not a mystery glyph
               — hovering says what it is, clicking shows the numbers. */}
-          {budget && (
-            <div className="text-typography-secondary flex items-center gap-1.5 text-sm">
-              <Tooltip
-                label={
-                  isBudgetOpen
-                    ? `Your available votes. Use them on what matters most — votes go to new opportunities only. You get 50 at the start of each month plus 5 every day, and each of those expires 30 days after it's issued if unused.`
-                    : `${budget.available} votes available. Click for detail.`
-                }
-                align="bottom"
-              >
-                <button
-                  type="button"
-                  onClick={() => setIsBudgetOpen(open => !open)}
-                  aria-expanded={isBudgetOpen}
-                  aria-label={`Vote budget: ${budget.available} available`}
-                  // Bare, and sized by its glyph — the SAME className the two icon buttons to
-                  // the right carry, so the three read as one row of icons. It used to be a
-                  // 40px outlined square, which made the leftmost of three peers the only one
-                  // with a box around it and set it a size apart from the other two.
-                  className="text-typography-secondary hover:text-primary-500 inline-flex h-10 w-10 cursor-pointer items-center justify-center md:h-auto md:w-auto"
+            {budget && (
+              <div className="text-typography-secondary flex max-w-full flex-wrap items-center gap-1.5 text-sm">
+                <Tooltip
+                  label={
+                    isBudgetOpen
+                      ? `Your available votes. Use them on what matters most — votes go to new opportunities only. You get 50 at the start of each month plus 5 every day, and each of those expires 30 days after it's issued if unused.`
+                      : isBreadthOn && breadth
+                        ? `${budget.available} votes available · Breadth ×${breadth.multiplier}. Click for detail.`
+                        : `${budget.available} votes available. Click for detail.`
+                  }
+                  align="bottom"
                 >
-                  {/* An outlined triangle — see TriangleIcon in @icons for why the underlying
+                  <button
+                    type="button"
+                    onClick={() => setIsBudgetOpen(open => !open)}
+                    aria-expanded={isBudgetOpen}
+                    aria-label={`Vote budget: ${budget.available} available`}
+                    // Bare, and sized by its glyph — the SAME className the two icon buttons to
+                    // the right carry, so the three read as one row of icons. It used to be a
+                    // 40px outlined square, which made the leftmost of three peers the only one
+                    // with a box around it and set it a size apart from the other two.
+                    className="text-typography-secondary hover:text-primary-500 inline-flex h-10 w-10 cursor-pointer items-center justify-center md:h-auto md:w-auto"
+                  >
+                    {/* An outlined triangle — see TriangleIcon in @icons for why the underlying
                       Material Symbol is called "change_history" and why it is not the solid
                       "arrow_drop_up".
 
@@ -819,28 +1183,49 @@ export const ProductRoadmap: React.FC = () => {
                       motion-reduce:animate-none is not optional. This is indefinitely blinking
                       content, which WCAG 2.2.2 treats as something the user must be able to
                       stop — honouring the OS reduced-motion setting is that mechanism. */}
-                  <TriangleIcon
-                    size={20}
-                    className={`text-primary-500 ${
-                      shouldNudgeVotes ? "animate-fadeInOut motion-reduce:animate-none" : ""
-                    }`}
+                    <TriangleIcon
+                      size={20}
+                      className={`text-primary-500 ${
+                        shouldNudgeVotes ? "animate-fadeInOut motion-reduce:animate-none" : ""
+                      }`}
+                    />
+                  </button>
+                </Tooltip>
+
+                {isBreadthOn && (
+                  <BreadthBadge
+                    breadth={breadth}
+                    availableVotes={budget.available}
+                    onClick={() => setIsBudgetOpen(open => !open)}
                   />
-                </button>
-              </Tooltip>
+                )}
 
-              {isBudgetOpen && (
-                <span className="text-typography-primary tabular-nums text-base">
-                  {budget.available}
-                  <span className="text-typography-secondary whitespace-nowrap">
-                    {" "}
-                    votes available
+                {isBudgetOpen && (
+                  <span className="text-typography-primary tabular-nums text-base">
+                    {budget.available}
+                    <span className="text-typography-secondary whitespace-nowrap">
+                      {" "}
+                      votes available
+                    </span>
                   </span>
-                </span>
-              )}
-            </div>
-          )}
+                )}
 
-          {/*
+                {isBudgetOpen && canVote && (breadth?.enabled || isBreadthError) && (
+                  // Its own line: the readout is a short paragraph, and inline beside four icons it
+                  // squeezed the whole header into a narrow wrapped column.
+                  <div className="basis-full pt-1">
+                    <BreadthReadout
+                      breadth={breadth}
+                      isError={isBreadthError}
+                      onRetry={() => refetchBreadth()}
+                      onSeeEveryone={() => setIsBreadthPanelOpen(true)}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/*
             Both header actions are ICONS now, matching the coin readout beside them and the
             goal-taxonomy flag by the title — this header is a row of icons, and two filled
             buttons in it were carrying more weight than "file a thing" and "report a thing"
@@ -861,59 +1246,41 @@ export const ProductRoadmap: React.FC = () => {
             without the filer doing the reframing alone, and two doors to one act made people
             pick before they knew which they needed.
           */}
-          {canVote && (
-            <Tooltip label="New opportunity" align="bottom">
-              <button
-                type="button"
-                aria-label="New opportunity"
-                onClick={() => setIsInterviewOpen(true)}
-                className="text-typography-secondary hover:text-primary-500 inline-flex h-10 w-10 cursor-pointer items-center justify-center md:h-auto md:w-auto"
-              >
-                {/* A bulb, not a plus: every opportunity is badged "Idea", and the plus said
+            {canFile && (
+              <Tooltip label="New opportunity" align="bottom">
+                <button
+                  type="button"
+                  aria-label="New opportunity"
+                  onClick={() => setIsInterviewOpen(true)}
+                  className="text-typography-secondary hover:text-primary-500 inline-flex h-10 w-10 cursor-pointer items-center justify-center md:h-auto md:w-auto"
+                >
+                  {/* A bulb, not a plus: every opportunity is badged "Idea", and the plus said
                     "add a row" where this says what kind of thing gets added. The spark on it is
                     the interview — the only way to file one now that the blank form is gone.
 
                     The Material Symbol rather than Carbon's `Idea`. Carbon icons are filled
                     paths with no weight to turn down, so beside a `wght 100` symbol they read
                     as a heavier family — which is exactly what this row looked like. */}
-                <LightbulbGuidedIcon size={20} />
-              </button>
-            </Tooltip>
-          )}
+                  <LightbulbGuidedIcon size={20} />
+                </button>
+              </Tooltip>
+            )}
 
-          {/* The exception to "ONE new-opportunity door" above, and a narrow one: a plain form
-              that files with no readiness check, shown only to holders of the quick-add toggle
-              (the server refuses everyone else, so there is nothing for a hidden button to
-              leak). Right beside the bulb because it is the same act — add an opportunity — for
-              someone who does not need the help. See QuickAddOpportunityModal. */}
-          {canQuickAdd && (
-            <Tooltip label="Quick add (no readiness check)" align="bottom">
+            <Tooltip label="Report a bug" align="bottom">
               <button
                 type="button"
-                aria-label="Quick add an opportunity, skipping the readiness check"
-                onClick={() => setIsQuickAddOpen(true)}
+                aria-label="Report a bug"
+                onClick={() => setIsReportBugOpen(true)}
                 className="text-typography-secondary hover:text-primary-500 inline-flex h-10 w-10 cursor-pointer items-center justify-center md:h-auto md:w-auto"
               >
-                <QuickAddIcon size={20} />
-              </button>
-            </Tooltip>
-          )}
-
-          <Tooltip label="Report a bug" align="bottom">
-            <button
-              type="button"
-              aria-label="Report a bug"
-              onClick={() => setIsReportBugOpen(true)}
-              className="text-typography-secondary hover:text-primary-500 inline-flex h-10 w-10 cursor-pointer items-center justify-center md:h-auto md:w-auto"
-            >
-              {/* Material Symbols DOES ship a bug glyph, so this is `bug_report` rather than the
+                {/* Material Symbols DOES ship a bug glyph, so this is `bug_report` rather than the
                   Carbon stand-in `Debug` the note in @icons describes — and it matches the weight
                   of the two symbols beside it, which the Carbon one could not. */}
-              <BugReportIcon size={20} />
-            </button>
-          </Tooltip>
+                <BugReportIcon size={20} />
+              </button>
+            </Tooltip>
 
-          {/* ONE gear for the four admin jobs — product goals, strategy & ranking, merge, split
+            {/* ONE gear for the four admin jobs — product goals, strategy & ranking, merge, split
               — which are tabs inside it now. See RoadmapSettingsDrawer for why they are tabs
               rather than one form, and why one entry point beats three header glyphs plus a
               permanent Split column on the table.
@@ -938,319 +1305,412 @@ export const ProductRoadmap: React.FC = () => {
               Icon-only means it MUST carry both a tooltip and an aria-label, per the tooltip
               convention in ally-web/CLAUDE.md. align="bottom" like every tooltip in this row,
               because one pointing up from the page header renders off-screen. */}
-          {canManage && (
-            <Tooltip label="Roadmap settings" align="bottom">
-              <button
-                type="button"
-                aria-label="Roadmap settings: vision and strategy, product goals, strategy and ranking, merge, split"
-                onClick={() => setIsSettingsOpen(true)}
-                className="text-typography-secondary hover:text-primary-500 inline-flex h-10 w-10 cursor-pointer items-center justify-center md:h-auto md:w-auto"
-              >
-                <RoadmapSettingsIcon size={20} />
-              </button>
-            </Tooltip>
-          )}
-        </div>
-      </header>
+            {canManage && (
+              <Tooltip label="Roadmap settings" align="bottom">
+                <button
+                  type="button"
+                  aria-label="Roadmap settings: vision and strategy, product goals, strategy and ranking, merge, split"
+                  onClick={() => setIsSettingsOpen(true)}
+                  className="text-typography-secondary hover:text-primary-500 inline-flex h-10 w-10 cursor-pointer items-center justify-center md:h-auto md:w-auto"
+                >
+                  <RoadmapSettingsIcon size={20} />
+                </button>
+              </Tooltip>
+            )}
+          </div>
+        </header>
 
-      <Tabs
-        items={[
-          // FIRST. The queue is the pipeline people come here to work through; "All
-          // opportunities" — every row, shipped and archived included — is the reference behind
-          // it.
-          // Promoted out of the saved-view strip below, where it sat as a pseudo-view.
-          {
-            id: RoadmapTab.QUEUE,
-            label: "Queue",
-            count: activeTab === RoadmapTab.QUEUE ? (data?.count ?? 0) : (queueTotal?.count ?? 0),
-          },
-          {
-            id: RoadmapTab.OPPORTUNITIES,
-            // "All opportunities", not "Opportunities": with the Queue promoted alongside it,
-            // the bare noun read as the section both tabs belong to rather than as the sibling
-            // of the Queue — and the distinction that matters between them is scope. The Queue
-            // is the working subset; this is every row, shipped and archived included.
-            label: "All opportunities",
-            // While THIS tab is the active one the count reflects what is on screen: on the board
-            // the sum of the lane totals, which is exactly the number of cards the board shows
-            // across the current window plus Unscheduled — not the whole table's count, because
-            // the board deliberately only covers a month window. Standing anywhere else, `data`
-            // belongs to another tab's query, so fall back to this tab's own total.
-            count:
-              activeTab === RoadmapTab.OPPORTUNITIES
-                ? isBoard
-                  ? boardCount
-                  : (data?.count ?? 0)
-                : (opportunitiesTotal?.count ?? 0),
-          },
-          // SECOND, and conditional. Second because what is broken is read as often as what is
-          // planned — the two together are the picture someone deciding next month needs, and
-          // burying bugs behind research put the least-visited tab in the more reachable slot.
-          // (This was deliberately last once, on the argument that bugs are context rather than
-          // a kind of roadmap item. That ordering lost; the reachability argument won.)
-          ...(canViewBugs
-            ? [
-                {
-                  id: RoadmapTab.BUGS,
-                  label: "Bugs",
-                  count: bugs?.count ?? 0,
-                },
-              ]
-            : []),
-          {
-            id: RoadmapTab.INTERVIEWS,
-            label: "User Interviews",
-            count: interviews?.count ?? 0,
-          },
-        ]}
-        activeId={activeTab}
-        onChange={setTab}
-      />
+        <Tabs
+          items={[
+            // FIRST. The queue is the pipeline people come here to work through; "All
+            // opportunities" — every row, shipped and archived included — is the reference behind
+            // it.
+            // Promoted out of the saved-view strip below, where it sat as a pseudo-view.
+            // Inbox is first and the landing tab: Ideas still waiting on an owner or a size. The
+            // badge counts THOSE, not every Idea — 181 Ideas is a backlog, "12 need a decision" is
+            // an inbox.
+            {
+              id: RoadmapTab.INBOX,
+              label: "Inbox",
+              count: inboxTotal?.count ?? 0,
+            },
+            {
+              id: RoadmapTab.QUEUE,
+              label: "Queue",
+              count: activeTab === RoadmapTab.QUEUE ? (data?.count ?? 0) : (queueTotal?.count ?? 0),
+            },
+            {
+              id: RoadmapTab.OPPORTUNITIES,
+              // "All opportunities", not "Opportunities": with the Queue promoted alongside it,
+              // the bare noun read as the section both tabs belong to rather than as the sibling
+              // of the Queue — and the distinction that matters between them is scope. The Queue
+              // is the working subset; this is every row, shipped and archived included.
+              label: "All opportunities",
+              // While THIS tab is the active one the count reflects what is on screen: on the board
+              // the sum of the lane totals, which is exactly the number of cards the board shows
+              // across the current window plus Unscheduled — not the whole table's count, because
+              // the board deliberately only covers a month window. Standing anywhere else, `data`
+              // belongs to another tab's query, so fall back to this tab's own total.
+              count:
+                activeTab === RoadmapTab.OPPORTUNITIES
+                  ? isBoard
+                    ? boardCount
+                    : (data?.count ?? 0)
+                  : (opportunitiesTotal?.count ?? 0),
+            },
+            // SECOND, and conditional. Second because what is broken is read as often as what is
+            // planned — the two together are the picture someone deciding next month needs, and
+            // burying bugs behind research put the least-visited tab in the more reachable slot.
+            // (This was deliberately last once, on the argument that bugs are context rather than
+            // a kind of roadmap item. That ordering lost; the reachability argument won.)
+            ...(canViewBugs
+              ? [
+                  {
+                    id: RoadmapTab.BUGS,
+                    label: "Bugs",
+                    count: bugs?.count ?? 0,
+                  },
+                ]
+              : []),
+            // The viewer's own parked ideas. Only for those who can file, since only they can save one.
+            ...(planningOn
+              ? [{ id: RoadmapTab.MY_IDEAS, label: "My ideas" }]
+              : canVote
+                ? [{ id: RoadmapTab.DRAFTS, label: "My drafts", count: ideaDrafts?.count ?? 0 }]
+                : []),
+            ...(canLeadPlans
+              ? [
+                  { id: RoadmapTab.NEEDS_A_LEAD, label: "Needs a lead" },
+                  { id: RoadmapTab.SIGNALS, label: "Signals" },
+                ]
+              : []),
+            {
+              id: RoadmapTab.INTERVIEWS,
+              label: "User Interviews",
+              count: interviews?.count ?? 0,
+            },
+          ]}
+          activeId={activeTab}
+          onChange={setTab}
+        />
 
-      {activeTab === RoadmapTab.INTERVIEWS && (
-        <InterviewsTab canVote={canVote} canManage={canManage} currentUserId={user?.id} />
-      )}
+        {activeTab === RoadmapTab.MY_IDEAS && planningOn && (
+          <MyPlansTab canFile={canFile} onOpen={openPlan} />
+        )}
+        {activeTab === RoadmapTab.NEEDS_A_LEAD && canLeadPlans && (
+          <LeadQueueTab onOpen={openPlan} />
+        )}
+        {activeTab === RoadmapTab.SIGNALS && canLeadPlans && <SignalsTab onOpen={openPlan} />}
+        {planningOn && openPlanId && (
+          <PlanDrawer planId={openPlanId} onClose={() => openPlan(null)} />
+        )}
 
-      {/* `canViewBugs` is already folded into `activeTab`, so this cannot mount
+        {activeTab === RoadmapTab.DRAFTS && canVote && !planningOn && (
+          <IdeaDraftsTab
+            onContinue={draft => {
+              setInterviewDraft(draft);
+              setIsInterviewOpen(true);
+            }}
+          />
+        )}
+
+        {activeTab === RoadmapTab.INTERVIEWS && (
+          <InterviewsTab canVote={canVote} canManage={canManage} currentUserId={user?.id} />
+        )}
+
+        {/* `canViewBugs` is already folded into `activeTab`, so this cannot mount
           without the toggle — but the table polls every 15s once mounted, so
           the guard is worth being explicit about rather than implied. */}
-      {activeTab === RoadmapTab.BUGS && canViewBugs && <BugsTab />}
+        {activeTab === RoadmapTab.BUGS && canViewBugs && <BugsTab />}
 
-      {/* Saved-view sub-tabs sit between the top-level strip and the board, so the hierarchy
+        {/* Saved-view sub-tabs sit between the top-level strip and the board, so the hierarchy
           reads top-down: section → view → rows.
 
           NOT rendered on the Queue. The Queue is one fixed view with no alternatives to offer, so
           a strip whose only purpose is switching between views would sit there with nothing in it
           that applies — and "All" one row under a Queue tab invites the reading that it means
           "all of the queue". */}
-      {activeTab === RoadmapTab.OPPORTUNITIES && (
-        <SavedViewTabs
-          views={savedViews.views}
-          activeViewId={activeViewId}
-          isDirty={savedViews.isDirty}
-          isOwner={savedViews.isOwner}
-          canReorder={savedViews.canReorder}
-          canPin={savedViews.canPin}
-          canSave={canVote}
-          onSelect={savedViews.selectView}
-          onCreateView={savedViews.createNewView}
-          onRename={savedViews.renameView}
-          onTogglePinned={savedViews.togglePinned}
-          onDelete={savedViews.removeView}
-          onReorder={savedViews.reorderViews}
-        />
-      )}
+        {activeTab === RoadmapTab.OPPORTUNITIES && (
+          <SavedViewTabs
+            views={savedViews.views}
+            activeViewId={activeViewId}
+            isDirty={savedViews.isDirty}
+            isOwner={savedViews.isOwner}
+            canReorder={savedViews.canReorder}
+            canPin={savedViews.canPin}
+            canSave={canVote}
+            onSelect={savedViews.selectView}
+            onCreateView={savedViews.createNewView}
+            hasCurrentFilters={hasAnyFilter}
+            onRename={savedViews.renameView}
+            onTogglePinned={savedViews.togglePinned}
+            onDelete={savedViews.removeView}
+            onReorder={savedViews.reorderViews}
+          />
+        )}
 
-      {isOpportunitiesTab && isBoard && (
-        <MonthBoard
-          showFilters
-          stageLocked={isQueueView}
-          groupBy={groupBy}
-          boardArgs={boardArgs}
-          data={boardData}
-          isLoading={isBoardLoading}
-          isFetching={isBoardFetching}
-          budget={budget}
-          goals={goals ?? []}
-          facets={facets}
-          search={search}
-          onSearchChange={withPagingReset(setSearch)}
-          typeFilter={typeFilter}
-          onTypeFilterChange={withPagingReset(setTypeFilter)}
-          stageFilter={stageFilter}
-          onStageFilterChange={withPagingReset(setStageFilter)}
-          sourceFilter={sourceFilter}
-          onSourceFilterChange={withPagingReset(setSourceFilter)}
-          effortFilter={effortFilter}
-          onEffortFilterChange={withPagingReset(setEffortFilter)}
-          goalFilter={goalFilter}
-          onGoalFilterChange={withPagingReset(setGoalFilter)}
-          ownerFilter={ownerFilter}
-          onOwnerFilterChange={withPagingReset(setOwnerFilter)}
-          advanced={advanced}
-          onAdvancedChange={withPagingReset(setAdvanced)}
-          canVote={canVote}
-          canManage={canManage}
-          onOpenOpportunity={openOpportunity}
-          onAddClick={() => setIsInterviewOpen(true)}
-          window={monthWindow}
-          onWindowChange={setMonthWindow}
-          layoutToggle={
-            <div className="flex flex-wrap items-center gap-3">
-              {layoutToggle}
-              {groupByPicker}
-            </div>
-          }
-        />
-      )}
+        {isOpportunitiesTab && isBreadthOn && (
+          <div className="flex flex-col gap-1">
+            <NewToYouChip active={newToMe} onToggle={() => withPagingReset(setNewToMe)(!newToMe)} />
+          </div>
+        )}
 
-      {isOpportunitiesTab && layout === RoadmapBoardLayout.TABLE && (
-        <OpportunitiesBoard
-          showFilters
-          listArgs={listArgs}
-          data={data}
-          isLoading={isLoading}
-          isFetching={isFetching}
-          budget={budget}
-          goals={goals ?? []}
-          facets={facets}
-          search={search}
-          onSearchChange={withPagingReset(setSearch)}
-          typeFilter={typeFilter}
-          onTypeFilterChange={withPagingReset(setTypeFilter)}
-          stageFilter={stageFilter}
-          onStageFilterChange={withPagingReset(setStageFilter)}
-          sourceFilter={sourceFilter}
-          onSourceFilterChange={withPagingReset(setSourceFilter)}
-          effortFilter={effortFilter}
-          onEffortFilterChange={withPagingReset(setEffortFilter)}
-          goalFilter={goalFilter}
-          onGoalFilterChange={withPagingReset(setGoalFilter)}
-          ownerFilter={ownerFilter}
-          onOwnerFilterChange={withPagingReset(setOwnerFilter)}
-          advanced={advanced}
-          onAdvancedChange={withPagingReset(setAdvanced)}
-          sortBy={sortBy}
-          order={order}
-          onToggleSort={toggleSort}
-          canVote={canVote}
-          canManage={canManage}
-          onOpenOpportunity={openOpportunity}
-          onAddClick={() => setIsInterviewOpen(true)}
-          offset={offset}
-          pageSize={PAGE_SIZE}
-          layoutToggle={layoutToggle}
-          onOffsetChange={setOffset}
-        />
-      )}
+        {isOpportunitiesTab && isBoard && (
+          <MonthBoard
+            showFilters
+            stageLocked={isPipelineView}
+            groupBy={groupBy}
+            boardArgs={boardArgs}
+            data={boardData}
+            isLoading={isBoardLoading}
+            isFetching={isBoardFetching}
+            isError={isBoardError}
+            onRetry={() => refetchBoard()}
+            budget={budget}
+            goals={goals ?? []}
+            facets={facets}
+            search={search}
+            onSearchChange={withPagingReset(setSearch)}
+            typeFilter={typeFilter}
+            onTypeFilterChange={withPagingReset(setTypeFilter)}
+            stageFilter={stageFilter}
+            onStageFilterChange={withPagingReset(setStageFilter)}
+            sourceFilter={sourceFilter}
+            onSourceFilterChange={withPagingReset(setSourceFilter)}
+            effortFilter={effortFilter}
+            onEffortFilterChange={withPagingReset(setEffortFilter)}
+            goalFilter={goalFilter}
+            onGoalFilterChange={withPagingReset(setGoalFilter)}
+            ownerFilter={ownerFilter}
+            onOwnerFilterChange={withPagingReset(setOwnerFilter)}
+            advanced={advanced}
+            onAdvancedChange={withPagingReset(setAdvanced)}
+            canVote={canVote}
+            canManage={canManage}
+            onOpenOpportunity={openOpportunity}
+            onAddClick={() => setIsInterviewOpen(true)}
+            window={monthWindow}
+            onWindowChange={setMonthWindow}
+            layoutToggle={
+              <div className="flex flex-wrap items-center gap-3">
+                {layoutToggle}
+                {groupByPicker}
+              </div>
+            }
+          />
+        )}
 
-      {/* Same query/pagination as the table, no drag and no merge-select — see
+        {isOpportunitiesTab && layout === RoadmapBoardLayout.TABLE && (
+          <OpportunitiesBoard
+            showFilters
+            listArgs={listArgs}
+            data={data}
+            isLoading={isLoading}
+            isFetching={isFetching}
+            isError={isError}
+            onRetry={() => refetch()}
+            budget={budget}
+            goals={goals ?? []}
+            facets={facets}
+            search={search}
+            onSearchChange={withPagingReset(setSearch)}
+            typeFilter={typeFilter}
+            onTypeFilterChange={withPagingReset(setTypeFilter)}
+            stageFilter={stageFilter}
+            onStageFilterChange={withPagingReset(setStageFilter)}
+            sourceFilter={sourceFilter}
+            onSourceFilterChange={withPagingReset(setSourceFilter)}
+            effortFilter={effortFilter}
+            onEffortFilterChange={withPagingReset(setEffortFilter)}
+            goalFilter={goalFilter}
+            onGoalFilterChange={withPagingReset(setGoalFilter)}
+            ownerFilter={ownerFilter}
+            onOwnerFilterChange={withPagingReset(setOwnerFilter)}
+            advanced={advanced}
+            onAdvancedChange={withPagingReset(setAdvanced)}
+            sortBy={sortBy}
+            order={order}
+            onToggleSort={toggleSort}
+            onSortChange={changeSort}
+            canVote={canVote}
+            canManage={canManage}
+            onOpenOpportunity={id => (setCursorId(id), setPeek(id))}
+            onAddClick={() => setIsInterviewOpen(true)}
+            cursorId={cursorId}
+            onCursor={moveCursorTo}
+            offset={offset}
+            pageSize={PAGE_SIZE}
+            layoutToggle={layoutToggle}
+            onOffsetChange={setOffset}
+          />
+        )}
+
+        {/* Same query/pagination as the table, no drag and no merge-select — see
           OpportunitiesListView's docblock for why those are table/board-only. */}
-      {isOpportunitiesTab && isList && (
-        <OpportunitiesListView
-          // No sort gating: the rank is computed server-side over the whole queue, so it stays
-          // correct when the feed is ordered by date. That is the point of moving it to the
-          // backend — a client-side position could only ever describe the current ordering.
-          isQueue={isQueueView}
-          leading={queueToolbar}
-          showFilters
-          listArgs={listArgs}
-          data={data}
-          isLoading={isLoading}
-          isFetching={isFetching}
-          budget={budget}
-          goals={goals ?? []}
-          facets={facets}
-          search={search}
-          onSearchChange={withPagingReset(setSearch)}
-          typeFilter={typeFilter}
-          onTypeFilterChange={withPagingReset(setTypeFilter)}
-          stageFilter={stageFilter}
-          onStageFilterChange={withPagingReset(setStageFilter)}
-          sourceFilter={sourceFilter}
-          onSourceFilterChange={withPagingReset(setSourceFilter)}
-          effortFilter={effortFilter}
-          onEffortFilterChange={withPagingReset(setEffortFilter)}
-          goalFilter={goalFilter}
-          onGoalFilterChange={withPagingReset(setGoalFilter)}
-          ownerFilter={ownerFilter}
-          onOwnerFilterChange={withPagingReset(setOwnerFilter)}
-          advanced={advanced}
-          onAdvancedChange={withPagingReset(setAdvanced)}
-          canVote={canVote}
-          canManage={canManage}
-          onOpenOpportunity={openOpportunity}
-          onAddClick={() => setIsInterviewOpen(true)}
-          loaded={data?.items.length ?? 0}
-          onLoadMore={() => setListLoaded(current => current + FEED_PAGE_SIZE)}
-          layoutToggle={layoutToggle}
-        />
-      )}
+        {isOpportunitiesTab && isList && (
+          <OpportunitiesListView
+            // No sort gating: the rank is computed server-side over the whole queue, so it stays
+            // correct when the feed is ordered by date. That is the point of moving it to the
+            // backend — a client-side position could only ever describe the current ordering.
+            isQueue={isPipelineView}
+            isInbox={isInboxView}
+            leading={sortToolbar}
+            showFilters
+            listArgs={listArgs}
+            data={data}
+            isLoading={isLoading}
+            isFetching={isFetching}
+            isError={isError}
+            onRetry={() => refetch()}
+            budget={budget}
+            goals={goals ?? []}
+            facets={facets}
+            search={search}
+            onSearchChange={withPagingReset(setSearch)}
+            typeFilter={typeFilter}
+            onTypeFilterChange={withPagingReset(setTypeFilter)}
+            stageFilter={stageFilter}
+            onStageFilterChange={withPagingReset(setStageFilter)}
+            sourceFilter={sourceFilter}
+            onSourceFilterChange={withPagingReset(setSourceFilter)}
+            effortFilter={effortFilter}
+            onEffortFilterChange={withPagingReset(setEffortFilter)}
+            goalFilter={goalFilter}
+            onGoalFilterChange={withPagingReset(setGoalFilter)}
+            ownerFilter={ownerFilter}
+            onOwnerFilterChange={withPagingReset(setOwnerFilter)}
+            advanced={advanced}
+            onAdvancedChange={withPagingReset(setAdvanced)}
+            canVote={canVote}
+            canManage={canManage}
+            onOpenOpportunity={id => (setCursorId(id), setPeek(id))}
+            onAddClick={() => setIsInterviewOpen(true)}
+            cursorId={cursorId}
+            onCursor={moveCursorTo}
+            editor={rowEditor}
+            loaded={data?.items.length ?? 0}
+            onLoadMore={() => setListLoaded(current => current + FEED_PAGE_SIZE)}
+            layoutToggle={layoutToggle}
+          />
+        )}
 
-      {/* Gated here as well as on the gear that opens it: the drawer holds three write surfaces,
+        {/* Gated here as well as on the gear that opens it: the drawer holds three write surfaces,
           and a read-only voter should not be able to mount it by any route. */}
-      {isSettingsOpen && canManage && (
-        <RoadmapSettingsDrawer
-          goals={goals ?? []}
-          areGoalsLoading={!goals}
-          onClose={() => setIsSettingsOpen(false)}
-          onMerged={primaryId => {
-            setIsSettingsOpen(false);
-            // Straight into the merged opportunity: stage, goal, owner, planned month and PRD are
-            // all editable there, so "then do all the settings" is the existing editor rather
-            // than a second copy of it inside the merge form.
-            openOpportunity(primaryId);
-          }}
-          // The original survives a split carrying its comments and shared links, so it is the
-          // part worth landing on — same handoff as merge.
-          onSplit={originalId => {
-            setIsSettingsOpen(false);
-            openOpportunity(originalId);
-          }}
-        />
-      )}
+        {isBreadthPanelOpen && isBreadthOn && (
+          <BreadthPanel currentUserId={user?.id} onClose={() => setIsBreadthPanelOpen(false)} />
+        )}
 
-      {/*
+        {isSettingsOpen && canManage && (
+          <RoadmapSettingsDrawer
+            mergeSeed={mergeSeed}
+            goals={goals ?? []}
+            areGoalsLoading={!goals}
+            onClose={() => {
+              setIsSettingsOpen(false);
+              setMergeSeed(undefined);
+            }}
+            onMerged={primaryId => {
+              setIsSettingsOpen(false);
+              // Straight into the merged opportunity: stage, goal, owner, planned month and PRD are
+              // all editable there, so "then do all the settings" is the existing editor rather
+              // than a second copy of it inside the merge form.
+              openOpportunity(primaryId);
+            }}
+            // The original survives a split carrying its comments and shared links, so it is the
+            // part worth landing on — same handoff as merge.
+            onSplit={originalId => {
+              setIsSettingsOpen(false);
+              openOpportunity(originalId);
+            }}
+          />
+        )}
+
+        {/*
         The interview hands over by FILING, then closing itself and opening the normal drawer on
         what it filed — which is where review and editing happen, because that drawer already
         autosaves. There is deliberately no third "review" UI in between: a second editor over
         the same row would be a second set of save semantics to keep honest.
       */}
-      {isInterviewOpen && (
-        <OpportunityInterviewDrawer
-          onClose={() => setIsInterviewOpen(false)}
-          onCreated={id => {
-            setIsInterviewOpen(false);
-            openOpportunity(id);
-          }}
-          onOpenExisting={id => {
-            setIsInterviewOpen(false);
-            openOpportunity(id);
-          }}
-        />
-      )}
+        {isInterviewOpen && (
+          <OpportunityInterviewDrawer
+            seed={interviewDraft?.rawText}
+            draftId={interviewDraft?.id}
+            onClose={() => {
+              setIsInterviewOpen(false);
+              setInterviewDraft(null);
+            }}
+            onCreated={id => {
+              setIsInterviewOpen(false);
+              setInterviewDraft(null);
+              openOpportunity(id);
+            }}
+            onOpenExisting={id => {
+              setIsInterviewOpen(false);
+              setInterviewDraft(null);
+              openOpportunity(id);
+            }}
+          />
+        )}
 
-      {/* Hands over exactly as the interview does: file, close, open the drawer on the row. */}
-      {isQuickAddOpen && canQuickAdd && (
-        <QuickAddOpportunityModal
-          goals={goals ?? []}
-          onClose={() => setIsQuickAddOpen(false)}
-          onCreated={id => {
-            setIsQuickAddOpen(false);
-            openOpportunity(id);
-          }}
-        />
-      )}
+        {peekId && isOpportunitiesTab && !openOpportunityId && (
+          <OpportunityPeek
+            opportunityId={peekId}
+            canManage={canManage}
+            onClose={() => setPeek(null)}
+            onOpenFull={() => openFull(peekId)}
+            onAccept={row => void acceptRow(row)}
+            onReject={row => setRejecting(row)}
+            onRestore={row => void triage.restore(row)}
+            onOpenOther={id => (setCursorId(id), setPeek(id))}
+            onMerge={(id, otherId) => void requestMerge([id, otherId])}
+          />
+        )}
 
-      {isReportBugOpen && <ReportBugModal onClose={() => setIsReportBugOpen(false)} />}
+        {isShortcutSheetOpen && (
+          <RoadmapShortcutSheet
+            canDecide={canManage}
+            onClose={() => setIsShortcutSheetOpen(false)}
+          />
+        )}
 
-      {openOpportunityId && (
-        <OpportunityDrawer
-          opportunityId={openOpportunityId}
-          goals={goals ?? []}
-          budget={budget}
-          canVote={canVote}
-          canManage={canManage}
-          hasBuilderAccess={canOpenBuilder}
-          onOpenBuilderSession={handle =>
-            openBuilderSession(handle.sessionId, seedForHandle(handle))
-          }
-          onClose={() => openOpportunity(null)}
-        />
-      )}
+        {rejecting && (
+          <RejectReasonBar
+            code={rejecting.code}
+            onChoose={reason => void rejectWithReason(reason)}
+            onCancel={() => setRejecting(null)}
+          />
+        )}
 
-      {/*
+        {isReportBugOpen && <ReportBugModal onClose={() => setIsReportBugOpen(false)} />}
+
+        {openOpportunityId && (
+          <OpportunityDrawer
+            opportunityId={openOpportunityId}
+            goals={goals ?? []}
+            budget={budget}
+            canVote={canVote}
+            canManage={canManage}
+            hasBuilderAccess={canOpenBuilder}
+            onOpenBuilderSession={handle =>
+              openBuilderSession(handle.sessionId, seedForHandle(handle))
+            }
+            onClose={() => openOpportunity(null)}
+          />
+        )}
+
+        {/*
         A SIBLING of the opportunity drawer, not a child. Both can be open at once — the
         opportunity behind, the agent in front — and closing the agent returns you to the row
         you briefed it from rather than to the bare board.
       */}
-      {openBuilderSessionId && (
-        <BuilderSessionDrawer
-          sessionId={openBuilderSessionId}
-          openingMessage={builderSeed}
-          onClose={() => openBuilderSession(null)}
-        />
-      )}
-    </div>
+        {openBuilderSessionId && (
+          <BuilderSessionDrawer
+            sessionId={openBuilderSessionId}
+            openingMessage={builderSeed}
+            onClose={() => openBuilderSession(null)}
+          />
+        )}
+      </div>
+    </RankExplainContext.Provider>
   );
 };

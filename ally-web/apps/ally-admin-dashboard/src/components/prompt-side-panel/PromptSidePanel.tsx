@@ -30,11 +30,14 @@ import { ButtonVariant } from "@components/types";
 import {
   en,
   MAIN_AGENT_PROMPT_VARIABLE_CATALOG,
+  LEGACY_VARIABLE_NAMES,
+  VARIABLES_USED_OUTSIDE_THE_PROMPT,
   PROMPT_LLM_MODEL_OPTIONS,
   PROMPT_TEMPERATURE_DEFAULT,
   providerForModel,
   ROUTES,
 } from "@constants";
+import { promptTestCopy } from "@constants/providers";
 import { useCreatePortal } from "@hooks";
 import {
   Prompt,
@@ -45,6 +48,7 @@ import {
 } from "@types";
 import { getErrorMessage } from "@utils/errorMessage";
 
+import { PromptTestRunner } from "./PromptTestRunner";
 import PromptTranslationsSection from "./PromptTranslationsSection";
 import PromptVersionsSection, {
   pinnedReason,
@@ -1460,6 +1464,15 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
               />
             </Field>
 
+            {selectedPrompt?.id && (
+              <Field label={promptTestCopy.title}>
+                <PromptTestRunner
+                  promptText={formData.prompt ?? ""}
+                  currentModel={formData.model}
+                />
+              </Field>
+            )}
+
             <Field label="LLM Model">
               <LlmModelDropdown
                 value={formData.model ?? ""}
@@ -1632,18 +1645,39 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
                     })),
                   ]
                     .sort((a, b) => a.name.localeCompare(b.name))
-                    .map(chip => (
-                      <span
-                        key={chip.name}
-                        className={
-                          chip.isUsed
-                            ? "inline-flex items-center gap-1 px-2 py-0.5 rounded text-sm bg-neutral-100 text-typography-700 font-mono"
-                            : "inline-flex items-center gap-1 px-2 py-0.5 rounded text-sm bg-neutral-50 border border-dashed border-border-light text-typography-500 font-mono"
-                        }
-                      >
-                        <span>{`{${chip.name}}`}</span>
-                      </span>
-                    ))}
+                    .map(chip => {
+                      const newName = LEGACY_VARIABLE_NAMES[chip.name];
+                      const note = newName
+                        ? `Old name for {${newName}}. It still works; use {${newName}} in new text.`
+                        : VARIABLES_USED_OUTSIDE_THE_PROMPT[chip.name];
+                      return (
+                        <span
+                          key={chip.name}
+                          className={
+                            chip.isUsed
+                              ? "inline-flex items-center gap-1 px-2 py-0.5 rounded text-sm bg-neutral-100 text-typography-700 font-mono"
+                              : "inline-flex items-center gap-1 px-2 py-0.5 rounded text-sm bg-neutral-50 border border-dashed border-border-light text-typography-500 font-mono"
+                          }
+                        >
+                          <span>{`{${chip.name}}`}</span>
+                          {note && (
+                            // font-sans: the chip is monospace for the
+                            // placeholder name, not for the explanation.
+                            <span className="font-sans inline-flex">
+                              <Tooltip label={note} align="top">
+                                <button
+                                  type="button"
+                                  aria-label={note}
+                                  className="cursor-pointer inline-flex items-center"
+                                >
+                                  <TooltipIcon />
+                                </button>
+                              </Tooltip>
+                            </span>
+                          )}
+                        </span>
+                      );
+                    })}
                 </div>
               </Field>
             )}

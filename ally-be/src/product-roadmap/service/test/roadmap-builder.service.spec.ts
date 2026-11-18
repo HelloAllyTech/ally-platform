@@ -1,6 +1,7 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { IsNull } from 'typeorm';
 
+import { RoadmapOpportunityStage } from '../../enum/roadmap-opportunity.enum';
 import { RoadmapBuilderService } from '../roadmap-builder.service';
 import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
 
@@ -89,6 +90,7 @@ describe('RoadmapBuilderService', () => {
       builderSessions as never,
       permissions as never,
       toggles as never,
+      { reconcile: jest.fn() } as never,
     );
   });
 
@@ -103,6 +105,32 @@ describe('RoadmapBuilderService', () => {
     expect(repository.update).toHaveBeenCalledWith(
       { id: OPP, builderSessionId: IsNull() },
       expect.objectContaining({ builderSessionId: SESSION }),
+    );
+  });
+
+  it('accepts an Idea to Prioritised when a session starts, never to a retired stage', async () => {
+    repository.findOne = reads(
+      opportunity({ stage: RoadmapOpportunityStage.NEW }),
+    );
+
+    await service.openSession(USER, OPP);
+
+    expect(repository.update).toHaveBeenCalledWith(
+      { id: OPP },
+      expect.objectContaining({ stage: RoadmapOpportunityStage.PRIORITISED }),
+    );
+  });
+
+  it('leaves an already-Prioritised opportunity alone when a session starts', async () => {
+    repository.findOne = reads(
+      opportunity({ stage: RoadmapOpportunityStage.PRIORITISED }),
+    );
+
+    await service.openSession(USER, OPP);
+
+    expect(repository.update).not.toHaveBeenCalledWith(
+      { id: OPP },
+      expect.objectContaining({ stage: expect.anything() }),
     );
   });
 

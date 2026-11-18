@@ -27,6 +27,7 @@ vi.mock("@api", async importOriginal => ({
   useListEligiblePlatformAdminsQuery: () => ({ data: undefined, isFetching: false }),
   useAssignPlatformAdminMutation: () => [vi.fn()],
   useRemovePlatformAdminMutation: () => [vi.fn()],
+  useListClinicalAdvisorsQuery: () => ({ data: undefined, isLoading: false }),
   useGetUserFeatureTogglesQuery: () => ({ data: undefined, isLoading: false }),
   useSetUserFeatureTogglesMutation: () => [vi.fn()],
   useGetTenantsQuery: () => ({ data: undefined }),
@@ -34,6 +35,17 @@ vi.mock("@api", async importOriginal => ({
 
 // Mock components
 vi.mock("@components", () => ({
+  useConfirm: () => ({ confirm: vi.fn().mockResolvedValue(true), dialog: null }),
+  BulkActionBar: ({ count, actions }: any) =>
+    count > 0 ? (
+      <div data-testid="bulk-bar">
+        {actions.map((a: any) => (
+          <button key={a.label} onClick={a.onClick}>
+            {a.label}
+          </button>
+        ))}
+      </div>
+    ) : null,
   cellTypes: {
     editableText: "editableText",
     dropdown: "dropdown",
@@ -727,6 +739,54 @@ describe("UserManagement", () => {
     });
   });
 
+  // Debrief access (formerly Clinical advisors) moved into Ally admins as per-person switches.
+  describe("Debrief access", () => {
+    const withToggle = () =>
+      mockUserState(
+        [Permissions.EDIT_USER],
+        [FeatureToggleKey.USERS, FeatureToggleKey.ADMIN_USER_MANAGEMENT],
+      );
+
+    it("is no tab of its own: Debrief roles are switches on an Ally admin's page", () => {
+      withToggle();
+      renderUserManagement(["/"]);
+      const tabs = screen.getAllByRole("button").map(b => b.textContent ?? "");
+      expect(tabs.some(t => t.startsWith("Ally admins"))).toBe(true);
+      expect(tabs.some(t => t.startsWith("Debrief access"))).toBe(false);
+    });
+
+    it("opens Ally admins from the old Debrief access and Clinical advisors links", () => {
+      for (const id of [TabType.DEBRIEF_ACCESS, TabType.CLINICAL_ADVISORS]) {
+        withToggle();
+        const { unmount } = renderUserManagement([`/?tab=${id}`]);
+        // The open tab is the one with the underline.
+        expect(screen.getByTestId("tab-super-admins").querySelector("span")).not.toBeNull();
+        expect(screen.getByTestId("tab-users").querySelector("span")).toBeNull();
+        unmount();
+      }
+    });
+  });
+
+  // A1: custom logins are made from Ally admins, so only holders of Admin User Management (the
+  // super admins) see the screen; ally-be refuses its three routes to everyone else.
+  describe("Create a custom login", () => {
+    it("is offered on Ally admins with Admin User Management", () => {
+      mockUserState(
+        [Permissions.EDIT_USER],
+        [FeatureToggleKey.USERS, FeatureToggleKey.ADMIN_USER_MANAGEMENT],
+      );
+      renderUserManagement([`/?tab=${TabType.SUPER_ADMINS}`]);
+      expect(screen.getByTestId("custom-login-create")).toBeInTheDocument();
+    });
+
+    it("is hidden from anyone without it", () => {
+      mockUserState([Permissions.EDIT_USER, Permissions.VIEW_USERS], [FeatureToggleKey.USERS]);
+      renderUserManagement([`/?tab=${TabType.SUPER_ADMINS}`]);
+      expect(screen.queryByTestId("custom-login-create")).not.toBeInTheDocument();
+      expect(screen.queryByText(/^Ally admins/)).not.toBeInTheDocument();
+    });
+  });
+
   // With the Users toggle off, an admin who holds Admin User Management still
   // reaches the page — for the Ally admins list — and nothing else on it.
   describe("with the Users toggle off", () => {
@@ -818,7 +878,7 @@ describe("UserManagement", () => {
       expect(roleSection).toHaveTextContent("LEARNER");
     });
 
-    it("shows no extra content for an ordinary account's change-role modal", () => {
+    it("shows the role descriptions but no platform note for an ordinary account's change-role modal", () => {
       vi.mocked(useUserManagementHook.useUserManagement).mockReturnValue({
         ...mockUserManagementHook,
         selectedOption: "Change role",
@@ -827,7 +887,8 @@ describe("UserManagement", () => {
 
       renderUserManagement();
 
-      expect(screen.queryByTestId("modal-extra-content")).not.toBeInTheDocument();
+      expect(screen.getByText("What each role can do")).toBeInTheDocument();
+      expect(screen.queryByText(/platform/i)).not.toBeInTheDocument();
     });
 
     // The picker can't show the tier, so without this note the modal reads as

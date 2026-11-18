@@ -3,7 +3,10 @@ import { In, IsNull } from 'typeorm';
 
 import { GithubActionsService } from 'src/github/service/github-actions.service';
 import { LoggerService } from 'src/logger/logger.service';
-import { RELEASE_TARGETS } from 'src/release/constants/release-targets.constants';
+import {
+  RELEASE_TARGETS,
+  shippedApp,
+} from 'src/release/constants/release-targets.constants';
 
 import {
   ProductUpdateSource,
@@ -33,7 +36,7 @@ const HISTORY_LIMIT_MS = 90 * DAY_MS;
  */
 const HISTORY_WORKFLOWS: Record<
   ReleaseHistoryKey,
-  { repo: string; workflow: string }
+  { repo: string; workflow: string; inputs?: Readonly<Record<string, string>> }
 > = {
   'ally-be': RELEASE_TARGETS['ally-be'],
   'ally-ai': RELEASE_TARGETS['ally-ai'],
@@ -224,7 +227,7 @@ export class ProductUpdateLivenessService {
     }
     await Promise.all(
       keys.map(async (key) => {
-        const { repo, workflow } = HISTORY_WORKFLOWS[key];
+        const { repo, workflow, inputs } = HISTORY_WORKFLOWS[key];
         const runs = await this.github.listSuccessfulRuns({
           repo,
           workflow,
@@ -234,10 +237,12 @@ export class ProductUpdateLivenessService {
           unreadable.push(key);
           return;
         }
-        history[key] = runs.map((run) => ({
-          startedAt: run.startedAt,
-          finishedAt: run.finishedAt,
-        }));
+        history[key] = runs
+          .filter((run) => shippedApp(run.title, inputs?.apps))
+          .map((run) => ({
+            startedAt: run.startedAt,
+            finishedAt: run.finishedAt,
+          }));
       }),
     );
     if (unreadable.length) {

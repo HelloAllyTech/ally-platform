@@ -218,11 +218,7 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
     reuseWhen:
       'A request wants a new chart, metric or dashboard for admins. Add a chart to the registry ' +
       'and an endpoint; do not build a separate dashboard page.',
-    modules: [
-      'ally-be:src/analytics',
-      'ally-be:src/analytics-agent',
-      'ally-be:src/analytics-suggestions',
-    ],
+    modules: ['ally-be:src/analytics', 'ally-be:src/analytics-agent'],
     adminRoute: '/analytics',
     keywords: ['chart', 'dashboard', 'metric', 'report', 'analytics', 'kpi'],
   },
@@ -320,6 +316,36 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
     ],
   },
   {
+    id: 'context-library',
+    name: 'Context Library',
+    whatItIs:
+      'The central library every agent retrieves context from: documents distilled into short ' +
+      'chunks (the files are never kept), entries admins write or bulk-upload, and lessons agents ' +
+      'write, in collections that each use case may only read when granted. One retrieval pipeline ' +
+      '(keyword + two vectors, fused, re-ranked) with usage-driven learning loops.',
+    reuseWhen:
+      'A feature needs an agent to look things up before it acts — guidance, protocols, examples, ' +
+      'lessons — or wants a new kind of reference material searchable by an agent.',
+    extendVia:
+      'A collection profile in src/context-library/profiles/ plus a migration for its row, and a ' +
+      'use case in context-use-cases.constants.ts; agents read it through ContextToolsService.',
+    modules: [
+      'ally-be:src/context-library',
+      'ally-ai:app/core/context_library',
+    ],
+    adminRoute: '/context-library',
+    keywords: [
+      'context library',
+      'first principles',
+      'principles',
+      'knowledge',
+      'rag',
+      'retrieval',
+      'search guidance',
+      'lessons',
+    ],
+  },
+  {
     id: 'course-copilot',
     name: 'Course Copilot',
     whatItIs:
@@ -329,6 +355,36 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
     docs: ['ally-be:docs/course-copilot.md'],
     adminRoute: '/course-copilot',
     keywords: ['course copilot', 'author course', 'generate course'],
+  },
+  {
+    id: 'debrief-agent',
+    name: 'Debrief agent and its Debrief PM agent (admin Debriefs)',
+    whatItIs:
+      'Writes the debrief a learner reads after a roleplay by following a recipe of steps ' +
+      '(Safety reader, Analyst, Progress reader, Guidance lookup, Writer, rule checks, Evaluator, ' +
+      'Reviser) under a budget and deadline, with a fallback ladder; runs in shadow beside ' +
+      "today's debrief and live for organisations switched on. The Debrief PM agent reads aggregate " +
+      'signals daily, proposes prompt and setting changes, tries them on test sets built from ' +
+      'real sessions, and a person approves each new release. Runs on the agent harness ' +
+      '(agentKey debrief).',
+    reuseWhen:
+      'A request is about post-roleplay feedback or debriefs: what learners read after a session, ' +
+      'its quality, safety (risk cues, learner distress), cost, language, or making it better over ' +
+      'time. Extend a recipe or a step rather than adding a separate feedback generator.',
+    extendVia:
+      'A new step: a stateless ally-ai endpoint under /debrief plus a DebriefStep in the release ' +
+      'bundle. A new kind of session: a new recipe, not a new agent.',
+    modules: ['ally-be:src/debrief', 'ally-ai:app/core/debrief'],
+    adminRoute: '/debriefs',
+    keywords: [
+      'debrief',
+      'feedback after roleplay',
+      'post-session feedback',
+      'pm agent',
+      'improver',
+      'risk cue',
+      'important moment',
+    ],
   },
   {
     id: 'ally-guide',
@@ -489,6 +545,26 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
     keywords: ['image', 'cover', 'generate image', 'illustration'],
   },
   {
+    id: 'image-studio',
+    name: 'Image Studio',
+    whatItIs:
+      'AI image generation behind every authoring image slot: a style gallery, AI-drafted ' +
+      'descriptions, reference images that keep characters and places consistent across scenes, ' +
+      'a vision check, durable jobs and a per-image history with cost.',
+    reuseWhen:
+      'A feature lets an author set an image anywhere. Add a slot kind and use the shared ' +
+      'Generate modal rather than a new generator; new styles go in the style registry.',
+    modules: ['ally-be:src/image-studio'],
+    keywords: [
+      'image studio',
+      'generate image',
+      'style gallery',
+      'scene image',
+      'character consistency',
+      'cast sheet',
+    ],
+  },
+  {
     id: 'bug-hunter',
     name: 'Bug Hunter',
     whatItIs:
@@ -516,10 +592,16 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
     name: 'Product roadmap, votes and the opportunity copilot',
     whatItIs:
       'Roadmap opportunities with votes, the copilot that interviews someone into a filed ' +
-      'opportunity, and the hand-off that opens a Builder session from one.',
+      'opportunity, the hand-off that opens a Builder session from one, and the plan ' +
+      'foundations (who may plan, the plan event log and the plan spend ledger).',
     reuseWhen:
-      'A request concerns filing, prioritising or voting on product work.',
-    modules: ['ally-be:src/product-roadmap', 'ally-be:src/public-roadmap'],
+      'A request concerns filing, prioritising or voting on product work, or planning an ' +
+      'idea through PRD, design and outcome.',
+    modules: [
+      'ally-be:src/product-roadmap',
+      'ally-be:src/public-roadmap',
+      'ally-be:src/product-planning',
+    ],
     adminRoute: '/product-roadmap',
     keywords: [
       'roadmap',
@@ -543,14 +625,47 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
   },
   {
     id: 'whatsapp',
-    name: 'WhatsApp bot',
+    name: 'AI chatbots (WhatsApp and other channels)',
     whatItIs:
-      'The WhatsApp Q&A bot over a knowledge-base corpus, with number and identity gating.',
+      'Configurable AI chatbots — instructions, model, picked knowledge-base documents, quick replies, ' +
+      'who can chat and a dashboard team — reached through connectors (a WhatsApp number today), ' +
+      'with a channel-agnostic engine and a Preview console.',
     reuseWhen:
-      'A request wants to reach users on WhatsApp or answer questions there.',
-    modules: ['ally-be:src/whatsapp'],
-    adminRoute: '/whatsapp-bot',
-    keywords: ['whatsapp', 'chat bot', 'messaging'],
+      'A request wants a bot that answers questions from documents, or to reach users on WhatsApp ' +
+      'or another messaging channel.',
+    modules: ['ally-be:src/chatbot', 'ally-be:src/whatsapp'],
+    adminRoute: '/assistants',
+    keywords: [
+      'whatsapp',
+      'chatbot',
+      'chat bot',
+      'faq bot',
+      'messaging',
+      'connector',
+    ],
+  },
+  {
+    id: 'assistant-onboarding',
+    name: 'New assistant setup (onboarding)',
+    whatItIs:
+      'A guided setup that reads a business website or documents, shows what it learned with ' +
+      'sources, turns on a safety pack, asks only about gaps, offers designs, builds the assistant ' +
+      'and publishes its bot page. A builder in ally-ai proposes changes; the draft service applies them.',
+    reuseWhen:
+      'A request wants to create an assistant from a website, or a guided, step-by-step way for a ' +
+      'business owner to set one up.',
+    extendVia:
+      'The draft step machine and BotDraftService (later steps are added, not forked).',
+    modules: ['ally-be:src/bot-draft', 'ally-ai:app/core/builder'],
+    adminRoute: '/assistants/new',
+    keywords: [
+      'onboarding',
+      'new assistant',
+      'setup',
+      'website',
+      'crawl',
+      'safety pack',
+    ],
   },
   {
     id: 'file-storage',
@@ -562,22 +677,23 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
     keywords: ['upload', 'file', 's3', 'attachment', 'media'],
   },
   {
-    id: 'agent-memory',
-    name: 'Agent memory (the agents’ notebook)',
+    id: 'agent-lessons',
+    name: 'Agent lessons and notes (Context Library)',
     whatItIs:
-      'A shared notebook where an internal AI agent keeps short lessons (600 characters each) so ' +
-      'its next run does not rediscover them: searched by meaning, tidied hourly by a curator, ' +
-      'and editable by admins who can add, retire and restore entries. Bug Hunter writes to it ' +
-      'today.',
+      'Where an internal AI agent keeps short lessons (600 characters each) so its next run does ' +
+      'not rediscover them: Builder Lessons and Bug Hunter Notes, two Context Library collections. ' +
+      'Agents write candidates, an hourly curator folds them in (agree, edit, add, remove), runs ' +
+      'report which ones they applied, and lessons that never help are retired. Admins add, edit, ' +
+      'pin and archive them in the Context Library.',
     reuseWhen:
       'An internal agent or copilot should remember what it learned last time, keep lessons or ' +
       'gotchas, or have a memory people can edit and retire. Do not build another memory table.',
     extendVia:
-      'Add a value to AgentMemoryAgent (and its CHECK constraint); each agent exposes the ' +
-      'endpoints on its own surface.',
-    modules: ['ally-be:src/agent-memory'],
-    docs: ['ally-be:docs/bug-hunter-memory-adr.md'],
-    adminRoute: '/bug-hunter',
+      'A collection profile with `agentCuration` in src/context-library/profiles/ plus a ' +
+      'migration for its row and grants; the agent writes through ' +
+      'ContextAgentChunkService.writeAgentChunk and reads with its use case.',
+    modules: ['ally-be:src/context-library'],
+    adminRoute: '/context-library',
     keywords: [
       'agent memory',
       'notebook',
@@ -997,6 +1113,29 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
       'writing its own client.',
     modules: ['ally-be:src/github'],
     keywords: ['github', 'workflow', 'pull request', 'release tag'],
+  },
+  {
+    id: 'pm-agent',
+    name: 'PM Agent (AI product manager)',
+    whatItIs:
+      'An admin feed of at most N recommendation or question cards drafted from analytics, code ' +
+      'and strategy; accepting a recommendation compiles it into a Builder session that builds, ' +
+      'merges and releases it.',
+    reuseWhen:
+      'A request wants the platform to suggest what to build next, to queue cards for an admin ' +
+      'to accept or reject, or to hand an accepted idea to Builder automatically.',
+    extendVia:
+      'PM_AGENT_RUN_TRIGGER (the generation pipeline) and PmAgentCardRepository for new cards.',
+    modules: ['ally-be:src/pm-agent'],
+    docs: ['ally-be:docs/pm-agent.md'],
+    adminRoute: '/pm-agent',
+    keywords: [
+      'pm agent',
+      'product manager',
+      'recommendation',
+      'suggestion',
+      'what to build',
+    ],
   },
 ];
 

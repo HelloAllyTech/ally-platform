@@ -6,10 +6,13 @@ import {
   RoadmapBugReportBody,
   RoadmapBugReportResponse,
   RoadmapVoteBudget,
+  RoadmapBreadth,
+  RoadmapBreadthRow,
   RoadmapVoter,
   RoadmapComment,
   RoadmapDuplicateMatch,
   RoadmapFacets,
+  RoadmapIdeaDraft,
   RoadmapInterviewMessage,
   RoadmapInterviewNote,
   RoadmapListEnvelope,
@@ -30,6 +33,7 @@ import {
   RoadmapOpportunityStage,
   RoadmapStrategyGoal,
   RoadmapStrategyGoalsResponse,
+  RoadmapProdDirector,
   RoadmapRankWeights,
   RoadmapGoalImpactVerdict,
   RoadmapBulkAssessResult,
@@ -209,41 +213,28 @@ export const productRoadmapAPI = baseAPI.injectEndpoints({
       providesTags: [TAG_TYPES.PRODUCT_ROADMAP_VOTE_BUDGET],
     }),
 
+    getRoadmapBreadth: builder.query<RoadmapBreadth, void>({
+      query: () => ({
+        url: ApiEndpoints.PRODUCT_ROADMAP.MY_BREADTH,
+        method: HttpMethod.GET,
+      }),
+      providesTags: [TAG_TYPES.PRODUCT_ROADMAP_BREADTH],
+    }),
+
+    getRoadmapBreadthEveryone: builder.query<RoadmapBreadthRow[], void>({
+      query: () => ({
+        url: ApiEndpoints.PRODUCT_ROADMAP.BREADTH_EVERYONE,
+        method: HttpMethod.GET,
+      }),
+      providesTags: [TAG_TYPES.PRODUCT_ROADMAP_BREADTH],
+    }),
+
     getRoadmapFacets: builder.query<RoadmapFacets, void>({
       query: () => ({
         url: ApiEndpoints.PRODUCT_ROADMAP.FACETS,
         method: HttpMethod.GET,
       }),
       providesTags: [TAG_TYPES.PRODUCT_ROADMAP_FACETS],
-    }),
-
-    /**
-     * Quick add: file straight onto the board with no readiness token and no brief. Same
-     * response and the same cache invalidation as createRoadmapOpportunity, so the new row shows
-     * up wherever an interviewed one would. Only shown to holders of the quick-add toggle — see
-     * canQuickAddRoadmap.
-     */
-    quickAddRoadmapOpportunity: builder.mutation<
-      RoadmapOpportunity,
-      {
-        description: string;
-        type: string;
-        productGoal: string;
-        effort?: RoadmapOpportunityEffort | null;
-        /** Only sent by a filer who can manage the roadmap — 403 otherwise, as on create. */
-        ownerUserId?: number | null;
-        referenceImages?: RoadmapReferenceImage[];
-      }
-    >({
-      query: body => ({
-        url: ApiEndpoints.PRODUCT_ROADMAP.OPPORTUNITIES_QUICK,
-        method: HttpMethod.POST,
-        body,
-      }),
-      invalidatesTags: [
-        { type: TAG_TYPES.PRODUCT_ROADMAP_OPPORTUNITIES, id: "LIST" },
-        TAG_TYPES.PRODUCT_ROADMAP_FACETS,
-      ],
     }),
 
     createRoadmapOpportunity: builder.mutation<
@@ -678,6 +669,40 @@ export const productRoadmapAPI = baseAPI.injectEndpoints({
       ],
     }),
 
+    getRoadmapProdDirector: builder.query<RoadmapProdDirector, void>({
+      query: () => ({
+        url: ApiEndpoints.PRODUCT_ROADMAP.PROD_DIRECTOR,
+        method: HttpMethod.GET,
+      }),
+      providesTags: [TAG_TYPES.PRODUCT_ROADMAP_RANK_WEIGHTS],
+    }),
+
+    setRoadmapProdDirector: builder.mutation<{ userId: number | null }, { userId: number | null }>({
+      query: body => ({
+        url: ApiEndpoints.PRODUCT_ROADMAP.PROD_DIRECTOR,
+        method: HttpMethod.PUT,
+        body,
+      }),
+      // The director's own cards gain or lose the star icon, so the list refetches.
+      invalidatesTags: [
+        TAG_TYPES.PRODUCT_ROADMAP_RANK_WEIGHTS,
+        { type: TAG_TYPES.PRODUCT_ROADMAP_OPPORTUNITIES, id: "LIST" },
+      ],
+    }),
+
+    setRoadmapDirectorStar: builder.mutation<RoadmapOpportunity, { id: string; starred: boolean }>({
+      query: ({ id, starred }) => ({
+        url: ApiEndpoints.PRODUCT_ROADMAP.OPPORTUNITY_DIRECTOR_STAR(id),
+        method: HttpMethod.PUT,
+        body: { starred },
+      }),
+      // A star re-ranks the whole queue, not just this card.
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: TAG_TYPES.PRODUCT_ROADMAP_OPPORTUNITIES, id },
+        { type: TAG_TYPES.PRODUCT_ROADMAP_OPPORTUNITIES, id: "LIST" },
+      ],
+    }),
+
     getRoadmapGoalImpact: builder.query<RoadmapGoalImpactVerdict[], string>({
       query: id => ({
         url: ApiEndpoints.PRODUCT_ROADMAP.OPPORTUNITY_GOAL_IMPACT(id),
@@ -741,6 +766,53 @@ export const productRoadmapAPI = baseAPI.injectEndpoints({
         TAG_TYPES.PRODUCT_ROADMAP_OWNERS,
         { type: TAG_TYPES.PRODUCT_ROADMAP_OPPORTUNITIES, id: "LIST" },
       ],
+    }),
+
+    // ── idea drafts (private, pre-interview) ──────────────────────────────────
+    getRoadmapIdeaDrafts: builder.query<RoadmapListEnvelope<RoadmapIdeaDraft>, void>({
+      query: () => ({ url: ApiEndpoints.PRODUCT_ROADMAP.IDEA_DRAFTS, method: HttpMethod.GET }),
+      providesTags: [TAG_TYPES.PRODUCT_ROADMAP_IDEA_DRAFTS],
+    }),
+
+    createRoadmapIdeaDraft: builder.mutation<
+      RoadmapIdeaDraft,
+      { rawText: string; captureMode?: "voice" | "typed" }
+    >({
+      query: body => ({
+        url: ApiEndpoints.PRODUCT_ROADMAP.IDEA_DRAFTS,
+        method: HttpMethod.POST,
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.PRODUCT_ROADMAP_IDEA_DRAFTS],
+    }),
+
+    updateRoadmapIdeaDraft: builder.mutation<
+      RoadmapIdeaDraft,
+      { id: string; body: { rawText?: string; captureMode?: "voice" | "typed" } }
+    >({
+      query: ({ id, body }) => ({
+        url: ApiEndpoints.PRODUCT_ROADMAP.IDEA_DRAFT_BY_ID(id),
+        method: HttpMethod.PATCH,
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.PRODUCT_ROADMAP_IDEA_DRAFTS],
+    }),
+
+    /** One spoken clip from idea capture, as text. Saves nothing. Body: FormData with `audio`. */
+    transcribeRoadmapIdea: builder.mutation<{ text: string }, FormData>({
+      query: body => ({
+        url: ApiEndpoints.PRODUCT_ROADMAP.IDEA_TRANSCRIBE,
+        method: HttpMethod.POST,
+        body,
+      }),
+    }),
+
+    deleteRoadmapIdeaDraft: builder.mutation<void, string>({
+      query: id => ({
+        url: ApiEndpoints.PRODUCT_ROADMAP.IDEA_DRAFT_BY_ID(id),
+        method: HttpMethod.DELETE,
+      }),
+      invalidatesTags: [TAG_TYPES.PRODUCT_ROADMAP_IDEA_DRAFTS],
     }),
 
     // ── interview notes ───────────────────────────────────────────────────────
@@ -928,9 +1000,10 @@ export const {
   useMoveRoadmapOpportunityMutation,
   useGetRoadmapOpportunityQuery,
   useGetRoadmapVoteBudgetQuery,
+  useGetRoadmapBreadthQuery,
+  useGetRoadmapBreadthEveryoneQuery,
   useGetRoadmapFacetsQuery,
   useCreateRoadmapOpportunityMutation,
-  useQuickAddRoadmapOpportunityMutation,
   useCreateRoadmapBugReportMutation,
   useUpdateRoadmapOpportunityMutation,
   useDeleteRoadmapOpportunityMutation,
@@ -956,6 +1029,9 @@ export const {
   useDeleteRoadmapStrategyGoalMutation,
   useGetRoadmapRankWeightsQuery,
   useUpdateRoadmapRankWeightsMutation,
+  useGetRoadmapProdDirectorQuery,
+  useSetRoadmapProdDirectorMutation,
+  useSetRoadmapDirectorStarMutation,
   useGetRoadmapOpportunityBriefQuery,
   useGetRoadmapStrategyContextQuery,
   useUpdateRoadmapStrategyContextMutation,
@@ -965,6 +1041,11 @@ export const {
   useCreateRoadmapOwnerMutation,
   useRenameRoadmapOwnerMutation,
   useDeleteRoadmapOwnerMutation,
+  useGetRoadmapIdeaDraftsQuery,
+  useCreateRoadmapIdeaDraftMutation,
+  useUpdateRoadmapIdeaDraftMutation,
+  useDeleteRoadmapIdeaDraftMutation,
+  useTranscribeRoadmapIdeaMutation,
   useGetRoadmapInterviewNotesQuery,
   useCreateRoadmapInterviewNoteMutation,
   useUpdateRoadmapInterviewNoteMutation,

@@ -1,3 +1,4 @@
+import { SCENARIO_SESSION_DEBRIEF_READY_EVENT } from '../../constants/scenario-session-events.constants';
 import { CohortVisibilityService } from 'src/cohort/service/cohort-visibility.service';
 import { TenantFeatureService } from 'src/authorization/service/tenant-feature.service';
 import { ScenarioInteractionMode } from '../../enum/scenario-interaction-mode.enum';
@@ -30,7 +31,10 @@ import {
   ScenarioSessionEventStatus,
   ScenarioSessionStatus,
 } from 'src/learn/enum/scenario-session-status.enum';
-import { ScenarioSessionLeaderboardEvent } from 'src/learn/type/scenario-session-leaderboard-event.type';
+import {
+  ScenarioSessionCompletionEvent,
+  ScenarioSessionLeaderboardEvent,
+} from 'src/learn/type/scenario-session-leaderboard-event.type';
 import { BehaviorInstructionCategory } from 'src/learn/enum/behavior-instruction.enum';
 import { LlmTask } from 'src/learn/enum/llm-task.enum';
 import {
@@ -572,6 +576,7 @@ describe('ScenarioSessionService', () => {
           useValue: {
             validateRoleplayStart: jest.fn(),
             handleRoleplayEnd: jest.fn(),
+            handleRoleplayLaunch: jest.fn(),
           },
         },
         {
@@ -2437,6 +2442,21 @@ describe('ScenarioSessionService', () => {
       );
     });
 
+    it('announces the completed session even when no practice minutes were recorded', () => {
+      const emit = (service as any).eventEmitter.emit as jest.Mock;
+      emit.mockClear();
+      (service as any).emitLeaderboardPracticeMinutes(
+        { ...mockScenarioSession, id: 's-zero', tenantId: 't-1' },
+        0,
+        new Date(),
+      );
+      expect(emit).toHaveBeenCalledTimes(1);
+      expect(emit).toHaveBeenCalledWith(
+        ScenarioSessionCompletionEvent.SCENARIO_SESSION_COMPLETED,
+        { scenarioSessionId: 's-zero', tenantId: 't-1' },
+      );
+    });
+
     it('does not re-charge credits or rewrite the duration the end flow already recorded', async () => {
       const row = abandonedRow();
       updateAgainst(row);
@@ -3371,6 +3391,258 @@ describe('ScenarioSessionService', () => {
       await expect(
         service.startScenarioSession(1, startDto as any),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('hands a track roleplay launch to the progression engine (Participation only completes here)', async () => {
+      const startDto = {
+        scenarioId: mockScenarioId,
+        ttl: 3600,
+        languageId: 1,
+        trackItemProgressId: 'tip-1',
+      };
+      const progression = (service as any).trackProgressService;
+      (service as any).getPreviousTrackMemory = jest
+        .fn()
+        .mockResolvedValue(null);
+      const mockStateInstructions = [
+        {
+          stateId: '1',
+          name: 'Resistant',
+          instruction: 'Express mild doubt about if talking is helping',
+          dialogues: [
+            'I highly doubt if this is helping',
+            'I think we should stop talking',
+          ],
+        },
+        {
+          stateId: '2',
+          name: 'Engaged',
+          instruction: 'Show more engagement',
+          dialogues: ['Tell me more', 'I understand'],
+        },
+      ];
+      // Expected formatted stateInstructions with score ranges from stateConfig
+      const expectedFormattedStateInstructions = [
+        {
+          stateId: '1',
+          name: 'Resistant',
+          instruction: 'Express mild doubt about if talking is helping',
+          dialogues: [
+            'I highly doubt if this is helping',
+            'I think we should stop talking',
+          ],
+          scoreUpper: -50,
+          scoreLower: undefined,
+        },
+        {
+          stateId: '2',
+          name: 'Engaged',
+          instruction: 'Show more engagement',
+          dialogues: ['Tell me more', 'I understand'],
+          scoreUpper: 20,
+          scoreLower: -50,
+        },
+      ];
+      const mockScenarioWithMetadata = {
+        ...mockScenario,
+        difficultyLevel: ScenarioDifficultyLevel.EASY,
+        metadata: {
+          title: 'Test Scenario',
+          description: 'Test Description',
+          voiceId: 'test-voice',
+          languageVoices: { 1: 'voice-123' },
+          stateInstructions: mockStateInstructions,
+        },
+        isGlobal: false,
+      };
+      const mockVoice = {
+        id: 'voice-123',
+        name: 'Test Voice',
+        voiceId: 'openai-voice-id',
+        provider: 'openai',
+      };
+      const mockCreatedSession = {
+        ...mockScenarioSession,
+        id: 'new-session-id',
+        roomId: 'new-room-id',
+      };
+      const mockTokenResponse = {
+        token: 'access-token-123',
+        roomName: 'new-room-id',
+        serverUrl: 'https://livekit.example.com',
+      };
+      scenarioService.getAdminScenario.mockResolvedValue(
+        mockScenarioWithMetadata as any,
+      );
+      scenarioService.getScenarioVoice.mockResolvedValue(mockVoice as any);
+      scenarioTenantService.getScenarioTenant.mockResolvedValue({
+        id: 1,
+        scenarioId: mockScenarioId,
+        tenantId: mockTenantId,
+      } as any);
+      sessionEventSharedService.getSessionEventsByScenarioId.mockResolvedValue(
+        mockSessionEvents,
+      );
+      sessionEventTranslationService.getSessionEventsTranslationsByScenarioId.mockResolvedValue(
+        mockSessionEvents,
+      );
+      sessionEventSharedService.findByIds.mockResolvedValue([]);
+      scenarioSessionRepository.getScenarioSessions.mockResolvedValue([]);
+      simulationCreditsService.getSimulationCredits.mockResolvedValue({
+        consumedCredits: 0,
+        creditLimit: 100,
+      } as any);
+      scenarioSessionRepository.createScenarioSession.mockResolvedValue(
+        mockCreatedSession,
+      );
+      scenarioSharedService.createRoomMetadata.mockResolvedValue({
+        scenario: {
+          ...mockScenarioWithMetadata,
+          stateInstructions: expectedFormattedStateInstructions,
+        },
+      } as any);
+      livekitService.createRoom.mockResolvedValue({} as any);
+      livekitService.generateAccessToken.mockResolvedValue(mockTokenResponse);
+
+      const result = await service.startScenarioSession(
+        mockCounselorId,
+        startDto as any,
+      );
+
+      expect(result.scenarioSession).toEqual(mockCreatedSession);
+      expect(progression.validateRoleplayStart).toHaveBeenCalled();
+      expect(progression.handleRoleplayLaunch).toHaveBeenCalledWith('tip-1');
+      // Called once the session row exists, so a launch that fails to create
+      // a session never completes the item.
+      expect(
+        scenarioSessionRepository.createScenarioSession.mock
+          .invocationCallOrder[0],
+      ).toBeLessThan(
+        progression.handleRoleplayLaunch.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('still starts the session when participation completion throws', async () => {
+      const progression = (service as any).trackProgressService;
+      progression.handleRoleplayLaunch.mockRejectedValueOnce(
+        new Error('db down'),
+      );
+      const startDto = {
+        scenarioId: mockScenarioId,
+        ttl: 3600,
+        languageId: 1,
+        trackItemProgressId: 'tip-1',
+      };
+      (service as any).getPreviousTrackMemory = jest
+        .fn()
+        .mockResolvedValue(null);
+      const mockStateInstructions = [
+        {
+          stateId: '1',
+          name: 'Resistant',
+          instruction: 'Express mild doubt about if talking is helping',
+          dialogues: [
+            'I highly doubt if this is helping',
+            'I think we should stop talking',
+          ],
+        },
+        {
+          stateId: '2',
+          name: 'Engaged',
+          instruction: 'Show more engagement',
+          dialogues: ['Tell me more', 'I understand'],
+        },
+      ];
+      // Expected formatted stateInstructions with score ranges from stateConfig
+      const expectedFormattedStateInstructions = [
+        {
+          stateId: '1',
+          name: 'Resistant',
+          instruction: 'Express mild doubt about if talking is helping',
+          dialogues: [
+            'I highly doubt if this is helping',
+            'I think we should stop talking',
+          ],
+          scoreUpper: -50,
+          scoreLower: undefined,
+        },
+        {
+          stateId: '2',
+          name: 'Engaged',
+          instruction: 'Show more engagement',
+          dialogues: ['Tell me more', 'I understand'],
+          scoreUpper: 20,
+          scoreLower: -50,
+        },
+      ];
+      const mockScenarioWithMetadata = {
+        ...mockScenario,
+        difficultyLevel: ScenarioDifficultyLevel.EASY,
+        metadata: {
+          title: 'Test Scenario',
+          description: 'Test Description',
+          voiceId: 'test-voice',
+          languageVoices: { 1: 'voice-123' },
+          stateInstructions: mockStateInstructions,
+        },
+        isGlobal: false,
+      };
+      const mockVoice = {
+        id: 'voice-123',
+        name: 'Test Voice',
+        voiceId: 'openai-voice-id',
+        provider: 'openai',
+      };
+      const mockCreatedSession = {
+        ...mockScenarioSession,
+        id: 'new-session-id',
+        roomId: 'new-room-id',
+      };
+      const mockTokenResponse = {
+        token: 'access-token-123',
+        roomName: 'new-room-id',
+        serverUrl: 'https://livekit.example.com',
+      };
+      scenarioService.getAdminScenario.mockResolvedValue(
+        mockScenarioWithMetadata as any,
+      );
+      scenarioService.getScenarioVoice.mockResolvedValue(mockVoice as any);
+      scenarioTenantService.getScenarioTenant.mockResolvedValue({
+        id: 1,
+        scenarioId: mockScenarioId,
+        tenantId: mockTenantId,
+      } as any);
+      sessionEventSharedService.getSessionEventsByScenarioId.mockResolvedValue(
+        mockSessionEvents,
+      );
+      sessionEventTranslationService.getSessionEventsTranslationsByScenarioId.mockResolvedValue(
+        mockSessionEvents,
+      );
+      sessionEventSharedService.findByIds.mockResolvedValue([]);
+      scenarioSessionRepository.getScenarioSessions.mockResolvedValue([]);
+      simulationCreditsService.getSimulationCredits.mockResolvedValue({
+        consumedCredits: 0,
+        creditLimit: 100,
+      } as any);
+      scenarioSessionRepository.createScenarioSession.mockResolvedValue(
+        mockCreatedSession,
+      );
+      scenarioSharedService.createRoomMetadata.mockResolvedValue({
+        scenario: {
+          ...mockScenarioWithMetadata,
+          stateInstructions: expectedFormattedStateInstructions,
+        },
+      } as any);
+      livekitService.createRoom.mockResolvedValue({} as any);
+      livekitService.generateAccessToken.mockResolvedValue(mockTokenResponse);
+
+      const result = await service.startScenarioSession(
+        mockCounselorId,
+        startDto as any,
+      );
+
+      expect(result.scenarioSession).toEqual(mockCreatedSession);
+      expect(progression.handleRoleplayLaunch).toHaveBeenCalledWith('tip-1');
     });
 
     it('should successfully start scenario session', async () => {
@@ -4856,6 +5128,56 @@ describe('ScenarioSessionService', () => {
 
     const persistedSummary = () =>
       upsert.mock.calls.map(([row]) => row.summary).find(Boolean);
+
+    // v9 FR-4: in an organisation switched on for the Debrief agent, the
+    // learner reads the agent's debrief, so the "debrief ready" event (and the
+    // supervisor memory) come from it; today's debrief only hands back.
+    describe('when the organisation is switched on for the Debrief agent', () => {
+      const liveFor = (live: boolean) =>
+        (dataSource.query as jest.Mock).mockImplementation(
+          async (sql: string) =>
+            String(sql).includes('agent_config_overrides') && live
+              ? [{ x: 1 }]
+              : [],
+        );
+      const emitted = () =>
+        ((service as any).eventEmitter.emit as jest.Mock).mock.calls.map(
+          (c: any[]) => c[0],
+        );
+
+      it('announces the debrief as before when the organisation is not switched on', async () => {
+        liveFor(false);
+        await service.endScenarioSession(
+          mockScenarioSessionId,
+          mockCounselorId,
+        );
+        await flush();
+        expect(emitted()).toContain(SCENARIO_SESSION_DEBRIEF_READY_EVENT);
+      });
+
+      it('does not run today’s debrief, and only records the call duration', async () => {
+        liveFor(true);
+        const detailsUpsert =
+          scenarioSessionDetailsRepository.upsert as jest.Mock;
+        detailsUpsert.mockResolvedValue(undefined);
+        await service.endScenarioSession(
+          mockScenarioSessionId,
+          mockCounselorId,
+        );
+        await flush();
+        expect(aiService.getScenarioSessionEvaluation).not.toHaveBeenCalled();
+        expect(scenarioSessionMessagesRepository.find).not.toHaveBeenCalled();
+        expect(persistedSummary()).toBeUndefined();
+        expect(detailsUpsert).toHaveBeenCalledWith(
+          expect.not.objectContaining({ summary: expect.anything() }),
+          { conflictPaths: ['scenarioSessionId'] },
+        );
+        expect(emitted()).not.toContain(SCENARIO_SESSION_DEBRIEF_READY_EVENT);
+        expect(
+          (service as any).learnerSupervisorMemoryService.recordFromEvaluation,
+        ).not.toHaveBeenCalled();
+      });
+    });
 
     it('a second end while the first evaluation is in flight pays for nothing', async () => {
       let finish!: (value: any) => void;

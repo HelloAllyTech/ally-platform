@@ -17,6 +17,13 @@ export interface ExtractInput {
   text?: string;
   sourceUrl?: string;
   /**
+   * Pasted text only: start each section AT its heading line, so the heading is chunked with the
+   * text it introduces. Agents v2 chunk 20a-2: off for every document except an onboarded
+   * assistant's, so v1 bots' documents chunk exactly as before (see `headingAware` in
+   * KbIngestService).
+   */
+  headingsInSections?: boolean;
+  /**
    * Test seam only: overrides how pdfjs is loaded. Jest cannot load ESM without
    * --experimental-vm-modules, so unit tests inject a fake here; production always uses the
    * default loader.
@@ -40,7 +47,7 @@ export async function extractDocument(
 async function runExtractor(input: ExtractInput): Promise<ExtractedDocument> {
   switch (input.sourceType) {
     case KbDocumentSourceType.PASTE:
-      return extractPastedText(input.text ?? '');
+      return extractPastedText(input.text ?? '', input.headingsInSections);
 
     case KbDocumentSourceType.PDF:
       return extractPdf(requireBuffer(input, 'PDF'), input.loadPdfjs);
@@ -83,7 +90,10 @@ function requireBuffer(input: ExtractInput, label: string): Buffer {
  * false heading costs a slightly odd `section_path` on one chunk, while over-eager detection would
  * chop prose into single-sentence sections and destroy chunk coherence.
  */
-function extractPastedText(text: string): ExtractedDocument {
+function extractPastedText(
+  text: string,
+  headingsInSections = false,
+): ExtractedDocument {
   const trimmed = text.trim();
   if (!trimmed) {
     throw new BadRequestException('The document text is empty.');
@@ -106,7 +116,9 @@ function extractPastedText(text: string): ExtractedDocument {
       if (sections.length) sections[sections.length - 1].end = offset;
       sections.push({
         path: candidate,
-        start: offset + line.length,
+        // Off: the section starts after its heading, so a page's first heading becomes a chunk
+        // of its own ("Greenfield Meadows") that matches any question naming the business.
+        start: headingsInSections ? offset : offset + line.length,
         end: trimmed.length,
       });
     }

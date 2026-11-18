@@ -26,7 +26,7 @@ export interface AddReferenceDocumentResponse {
   tenant_id: string;
 }
 
-export interface SearchReferenceDocumentResult {
+interface SearchReferenceDocumentResult {
   id: string;
   heading: string;
   content: string;
@@ -78,7 +78,7 @@ export interface ScenarioEvaluationEmotionalMovementItem {
   start_time?: number;
 }
 
-export interface ScenarioEvaluationAreaOfImprovementItem {
+interface ScenarioEvaluationAreaOfImprovementItem {
   improvement: string;
   recommendation: string;
 }
@@ -121,28 +121,6 @@ export interface RoadmapOpportunityUpsertResponse {
   embedding_model: string;
 }
 
-export interface AgentMemoryUpsertResponse {
-  memory_id: string;
-  text_hash: string;
-  embedding_model: string;
-}
-
-export interface AgentMemoryMatch {
-  memory_id: string;
-  agent: string;
-  /** Cosine similarity in [0, 1]. */
-  similarity: number;
-}
-
-export interface AgentMemorySearchResponse {
-  matches: AgentMemoryMatch[];
-}
-
-export interface AgentMemoryDeleteResponse {
-  memory_id: string;
-  deleted: boolean;
-}
-
 export interface RoadmapOpportunityBulkUpsertResponse {
   succeeded: RoadmapOpportunityUpsertResponse[];
   /** Per-item failures. The caller must surface these — a partially-failed batch that reports
@@ -151,7 +129,7 @@ export interface RoadmapOpportunityBulkUpsertResponse {
   failed: { opportunity_id: string; error: string }[];
 }
 
-export interface RoadmapSimilarOpportunityMatch {
+interface RoadmapSimilarOpportunityMatch {
   opportunity_id: string;
   product_goal: string;
   /** Cosine similarity in [0, 1]. */

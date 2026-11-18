@@ -16,7 +16,11 @@ const receipt = (overrides: Partial<BuilderTurnReceipt> = {}): BuilderTurnReceip
 });
 
 const busy = receipt({
-  read: ["ally-be/src/builder/x.ts", "wiki/platform/architecture.md", "Stacks: 2 chunks"],
+  read: [
+    "ally-be/src/builder/x.ts",
+    "wiki/platform/architecture.md",
+    'Principles search "empty state"',
+  ],
   searched: ['Code search "debrief rating" — 4 matches', 'Docs search "XP" — 1 match'],
   changed: ["Requirements: added R4; revised R2", "Repo plan: ally-be"],
   prdVersion: { from: 7, to: 9 },

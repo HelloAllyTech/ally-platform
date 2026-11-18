@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import {
+  useAbandonCharacterInterviewSessionMutation,
   useCreateCharacterInterviewSessionMutation,
   useLazyGetCharacterInterviewSessionQuery,
 } from "@api";
@@ -23,6 +24,7 @@ import {
 } from "@constants";
 import { useCanViewCharacterLibrary, useCharacterInterviewStream } from "@hooks";
 import { CharacterData } from "@types";
+import { parseHelplineError } from "@utils/helplineErrors";
 
 // Import AccessDenied from its leaf module (not the @pages barrel) — same
 // import-cycle avoidance as CharacterLibrary.tsx.
@@ -56,6 +58,7 @@ export const CharacterInterview: React.FC = () => {
 
   const [createSession] = useCreateCharacterInterviewSessionMutation();
   const [getSession] = useLazyGetCharacterInterviewSessionQuery();
+  const [abandonSession] = useAbandonCharacterInterviewSessionMutation();
 
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isBooting, setIsBooting] = useState(true);
@@ -63,6 +66,11 @@ export const CharacterInterview: React.FC = () => {
   // three skeleton bubbles just sat there with no way out but a manual
   // reload, on top of the toast that already fired once.
   const [bootFailed, setBootFailed] = useState(false);
+  // The server's own reason when it refused to start one — the per-org
+  // interview cap says exactly what to do ("finish or discard one of your
+  // open interviews"), and this screen used to throw that away for
+  // "something went wrong reaching the character library".
+  const [bootFailureReason, setBootFailureReason] = useState<string | null>(null);
   const [draftCharacter, setDraftCharacter] = useState<CharacterData | null>(null);
   const [isReviewOpen, setIsReviewOpen] = useState(false);
   const [isExitConfirmOpen, setIsExitConfirmOpen] = useState(false);
@@ -80,12 +88,27 @@ export const CharacterInterview: React.FC = () => {
       const session = await createSession().unwrap();
       localStorage.setItem(sessionStorageKey, session.id);
       setSessionId(session.id);
+      setBootFailureReason(null);
       return session.id;
-    } catch {
-      toast.error(strings.startFailed);
+    } catch (error) {
+      const { message } = parseHelplineError(error);
+      setBootFailureReason(message ?? null);
+      toast.error(message ?? strings.startFailed);
       return null;
     }
   }, [createSession]);
+
+  /**
+   * Tells the server the interview is over without a draft. Fire-and-forget:
+   * the page has already moved on, and a failure only means the slot frees
+   * itself after the idle window instead of now.
+   */
+  const abandonCurrentSession = useCallback(() => {
+    if (!sessionId) return;
+    void abandonSession(sessionId)
+      .unwrap()
+      .catch(() => undefined);
+  }, [abandonSession, sessionId]);
 
   /** Opens a finished draft for review — live, recovered, or resumed. */
   const openDraft = useCallback((draft: Partial<CharacterData>) => {
@@ -235,6 +258,7 @@ export const CharacterInterview: React.FC = () => {
     // visit resumed the same stuck conversation.
     setIsExitConfirmOpen(false);
     stop();
+    abandonCurrentSession();
     localStorage.removeItem(sessionStorageKey);
     navigate(ROUTES.CHARACTER_LIBRARY);
   };
@@ -242,6 +266,7 @@ export const CharacterInterview: React.FC = () => {
   const confirmStartOver = async () => {
     setIsStartOverConfirmOpen(false);
     stop();
+    abandonCurrentSession();
     localStorage.removeItem(sessionStorageKey);
     setDraftCharacter(null);
     setIsReviewOpen(false);
@@ -296,7 +321,7 @@ export const CharacterInterview: React.FC = () => {
             <FallbackUI
               icon={<NoResults />}
               mainMessage={strings.startFailed}
-              description={characterLibraryStrings.errorDescription}
+              description={bootFailureReason ?? characterLibraryStrings.errorDescription}
               button={{
                 text: characterLibraryStrings.retry,
                 onClick: () => void handleRetryBoot(),

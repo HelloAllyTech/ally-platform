@@ -49,11 +49,12 @@ describe('CourseCopilotOrchestratorService', () => {
         listLanguages: jest.fn().mockResolvedValue([]),
         listTriggerWarnings: jest.fn().mockResolvedValue([]),
         listCoverImages: jest.fn().mockResolvedValue([]),
-        search: jest
-          .fn()
-          .mockResolvedValue([{ id: 's-1', title: 'Listening basics' }]),
+        search: jest.fn().mockResolvedValue({
+          hits: [{ id: 's-1', title: 'Listening basics' }],
+          noConfidentMatch: false,
+        }),
       } as any,
-      { search: jest.fn(), getChunks: jest.fn() } as any,
+      { runSearch: jest.fn(), runGet: jest.fn() } as any,
       editTools as any,
     );
     let seq = 0;

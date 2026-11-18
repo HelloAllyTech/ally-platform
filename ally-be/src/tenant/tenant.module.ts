@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Tenant } from './entity/tenant.entity';
 import { TenantService } from './service/tenant.service';
 import { TenantController } from './controller/tenant.controller';
+import { TenantPublicController } from './controller/tenant-public.controller';
 import { TenantsRepository } from './repository/tenant.repository';
 import { UserModule } from 'src/user/user.module';
 import { TenantScenarioSharedService } from './service/tenant-scenario-shared';
@@ -31,7 +32,7 @@ import { AuditModule } from 'src/audit/audit.module';
     TenantDashboardSharedService,
     TenantCaseSharedService,
   ],
-  controllers: [TenantController],
+  controllers: [TenantController, TenantPublicController],
   exports: [TenantService, TenantsRepository],
 })
 export class TenantModule {}

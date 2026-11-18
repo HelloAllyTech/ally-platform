@@ -1,13 +1,12 @@
 import { useMemo, useState } from "react";
 
-import { LineChart, SimpleBarChart } from "@carbon/charts-react";
-
 import { CarbonDropdown as Dropdown } from "@ally-ui-mono/ui-shared";
 import {
   useGetOrgEngagementQuery,
   useGetOrgHealthQuery,
   useGetOrgSessionDistributionQuery,
 } from "@api";
+import { LineChart, SimpleBarChart } from "@components/charts";
 
 import { asOfStamp, PLATFORM_WIDE_NOTE } from "../analyticsFilters";
 import { ChartDetailModal } from "../ChartDetailModal";

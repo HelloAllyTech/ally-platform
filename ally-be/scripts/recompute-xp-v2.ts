@@ -405,7 +405,7 @@ function report(learners: LearnerRow[], dayCount: number): void {
     `                           ${percentile(projected, 0.5)} / ${percentile(projected, 0.9)} / ${projected[projected.length - 1] ?? 0}`,
   );
   console.log('');
-  console.log(`level 10 needs             ${LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1]} XP`);
+  console.log(`top level needs            ${LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1]} XP`);
   console.log(
     `learners who would reach   ${learners.filter((l) => resolveLevel(l.projectedXp).isMaxLevel).length}`,
   );

@@ -7,9 +7,12 @@ import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 import { IS_PUBLIC_KEY } from '../decorators/auth.metadata';
 import { Observable } from 'rxjs';
+import { LoggerService } from 'src/logger/logger.service';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
+  private readonly logger = LoggerService.getInstance(JwtAuthGuard.name);
+
   constructor(private reflector: Reflector) {
     super();
   }
@@ -33,13 +36,20 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       if (info.message === 'jwt expired') {
         throw new UnauthorizedException('Token expired');
       } else {
+        this.logger.warn(`JWT error: ${info.message}`, info);
         throw new UnauthorizedException(info.message);
       }
     }
     if (info instanceof Error) {
+      this.logger.warn(`Auth error: ${info.message}`, info);
       throw new UnauthorizedException(info.message);
     }
     if (err || !user) {
+      this.logger.warn(
+        `Unauthorized access attempt: err=${String(err)}, info=${JSON.stringify(
+          info,
+        )}`,
+      );
       throw err || new UnauthorizedException();
     }
     return user;

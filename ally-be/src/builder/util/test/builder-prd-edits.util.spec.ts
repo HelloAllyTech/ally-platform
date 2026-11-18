@@ -120,12 +120,12 @@ describe('PRD edits by id', () => {
     it('upserts a repo plan by repo name, and refuses one Builder cannot work in', () => {
       const added = applyPrdEdit(draft(), {
         kind: 'set_repo_plan',
-        repo: 'ALLY-MOBILE',
+        repo: 'ALLY-AI',
         changesMd: '(R1) the button on DebriefTab',
       });
       expect(added.technicalPlan.repos.map((plan) => plan.repo)).toEqual([
         'ally-web',
-        'ally-mobile',
+        'ally-ai',
       ]);
       const replaced = applyPrdEdit(added, {
         kind: 'set_repo_plan',

@@ -1,1 +1,0 @@
-export {CourseOverviewScreen} from './CourseOverviewScreen';

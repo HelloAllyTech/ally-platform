@@ -358,16 +358,22 @@ class TestCollectionBinding:
 
     def test_binds_to_the_collection_it_is_given(self, vector_db, embedding_service):
         service = KnowledgeChunkService(
-            vector_db, embedding_service, VectorDBCollectionNames.CHARACTER_CHUNKS
+            vector_db,
+            embedding_service,
+            VectorDBCollectionNames.DEBRIEF_KNOWLEDGE_CHUNKS,
         )
-        assert service.collection_name == VectorDBCollectionNames.CHARACTER_CHUNKS
+        assert (
+            service.collection_name == VectorDBCollectionNames.DEBRIEF_KNOWLEDGE_CHUNKS
+        )
 
     @pytest.mark.asyncio
     async def test_every_read_and_write_goes_to_the_bound_collection(
         self, vector_db, embedding_service
     ):
         service = KnowledgeChunkService(
-            vector_db, embedding_service, VectorDBCollectionNames.CHARACTER_CHUNKS
+            vector_db,
+            embedding_service,
+            VectorDBCollectionNames.DEBRIEF_KNOWLEDGE_CHUNKS,
         )
         embedding_service.embed.return_value = [0.1]
         embedding_service.embed_batch.return_value = [[0.1]]
@@ -385,15 +391,15 @@ class TestCollectionBinding:
 
         assert (
             vector_db.near_vector_search.call_args.kwargs["collection_name"]
-            == VectorDBCollectionNames.CHARACTER_CHUNKS
+            == VectorDBCollectionNames.DEBRIEF_KNOWLEDGE_CHUNKS
         )
         assert (
             vector_db.delete_by_filter.call_args.args[0]
-            == VectorDBCollectionNames.CHARACTER_CHUNKS
+            == VectorDBCollectionNames.DEBRIEF_KNOWLEDGE_CHUNKS
         )
         assert (
             vector_db.list_document_ids.call_args.args[0]
-            == VectorDBCollectionNames.CHARACTER_CHUNKS
+            == VectorDBCollectionNames.DEBRIEF_KNOWLEDGE_CHUNKS
         )
 
 

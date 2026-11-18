@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { LoggerService } from 'src/logger/logger.service';
 
 import { RoadmapAllocation } from '../entity/roadmap-allocation.entity';
@@ -67,6 +67,7 @@ export class RoadmapSplitMergeService {
     const weights = parts.map((p) => p.weight);
 
     const partIds = await this.dataSource.transaction(async (manager) => {
+      await this.allowReshape(manager);
       // Lock the source so two concurrent splits cannot both read the same allocations and
       // each redistribute them.
       const source = await manager.findOne(RoadmapOpportunity, {
@@ -156,6 +157,16 @@ export class RoadmapSplitMergeService {
               opportunityId: ids[index],
               periodKey: row.periodKey,
               votes,
+              // Weight follows the votes in proportion, so a split never changes what the
+              // voter's influence was worth in total.
+              weightedVotes: String(
+                row.votes > 0
+                  ? Math.round(
+                      Number(row.weightedVotes) * (votes / row.votes) * 1000,
+                    ) / 1000
+                  : 0,
+              ),
+              lastIncreasedAt: row.lastIncreasedAt,
             }),
           );
         }
@@ -198,6 +209,7 @@ export class RoadmapSplitMergeService {
     }
 
     await this.dataSource.transaction(async (manager) => {
+      await this.allowReshape(manager);
       const primary = await manager.findOne(RoadmapOpportunity, {
         where: { id: dto.primaryId },
         lock: { mode: 'pessimistic_write' },
@@ -235,11 +247,24 @@ export class RoadmapSplitMergeService {
         .addOrderBy('a."periodKey"', 'ASC')
         .getMany();
 
-      const rollup = new Map<string, number>();
+      const rollup = new Map<
+        string,
+        { votes: number; weighted: number; last: Date | null }
+      >();
       let totalBefore = 0;
       for (const row of rows) {
         const key = `${row.userId}|${row.periodKey}`;
-        rollup.set(key, (rollup.get(key) ?? 0) + row.votes);
+        const prev = rollup.get(key) ?? { votes: 0, weighted: 0, last: null };
+        rollup.set(key, {
+          votes: prev.votes + row.votes,
+          weighted: prev.weighted + Number(row.weightedVotes),
+          last:
+            prev.last && row.lastIncreasedAt
+              ? new Date(
+                  Math.max(prev.last.getTime(), row.lastIncreasedAt.getTime()),
+                )
+              : (prev.last ?? row.lastIncreasedAt),
+        });
         totalBefore += row.votes;
       }
 
@@ -251,7 +276,7 @@ export class RoadmapSplitMergeService {
       );
 
       let totalAfter = 0;
-      for (const [key, votes] of rollup) {
+      for (const [key, { votes, weighted, last }] of rollup) {
         const [userIdRaw, periodKey] = key.split('|');
 
         // No fixed-cap sanity check here anymore: under the vote-grant ledger a user's
@@ -266,6 +291,8 @@ export class RoadmapSplitMergeService {
             opportunityId: dto.primaryId,
             periodKey,
             votes,
+            weightedVotes: String(Math.round(weighted * 1000) / 1000),
+            lastIncreasedAt: last,
           }),
         );
       }
@@ -309,6 +336,19 @@ export class RoadmapSplitMergeService {
       `[ROADMAP] Merged ${sourceIds.length} opportunities into ${dto.primaryId} by user ${actingUserId}`,
     );
     return { primaryId: dto.primaryId };
+  }
+
+  /**
+   * Tell the vote-grant balance trigger that this transaction only MOVES votes.
+   *
+   * The trigger treats each allocation INSERT as new spend and compares it with the voter's
+   * unspent grants. Re-inserting a voter's existing votes onto the survivor (or the parts) is not
+   * spending, but for anyone who has used most of their balance it looks like an overdraft and
+   * the trigger raised — surfacing as a 500 on every merge. `set_config(..., true)` is local to
+   * this transaction, so every other writer is still checked. Conservation is asserted below.
+   */
+  private async allowReshape(manager: EntityManager): Promise<void> {
+    await manager.query(`SELECT set_config('app.roadmap_reshape', 'on', true)`);
   }
 
   /**

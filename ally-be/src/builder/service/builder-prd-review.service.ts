@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Optional } from '@nestjs/common';
 import { LoggerService } from 'src/logger/logger.service';
 import { LlmTask } from 'src/learn/enum/llm-task.enum';
 import { LlmCompletionService } from 'src/llm-agent/service/llm-completion.service';
@@ -29,6 +29,7 @@ import { loadPromptTemplate } from 'src/common/util/prompt-template.util';
 import { PromptSharedService } from 'src/prompt/service/prompt-shared.service';
 import { BUILDER_AI_TASKS } from '../constants/builder.constants';
 import { BuilderEvidenceLogService } from './builder-evidence-log.service';
+import { BuilderPrinciplesService } from './builder-principles.service';
 import { BuilderCatalogService } from './builder-catalog.service';
 
 /** Output room for the reviewer. gpt-5-family caps count reasoning tokens too. */
@@ -226,6 +227,8 @@ export class BuilderPrdReviewService {
      * default; with no text at all the pass fails like any other failed call.
      */
     private readonly prompts: PromptSharedService,
+    /** First Principles relevant to the draft, for the "breaks or ignores" check. Optional. */
+    @Optional() private readonly principles?: BuilderPrinciplesService,
   ) {}
 
   /**
@@ -241,12 +244,15 @@ export class BuilderPrdReviewService {
     const previous = doc.review ?? null;
     let review: BuilderPrdReview;
     try {
-      const [template, messages, evidence, systems] = await Promise.all([
-        loadPromptTemplate(this.prompts, BUILDER_PRD_REVIEW_SYSTEM.code),
-        this.messageRepository.listBySession(sessionId),
-        this.evidenceLog.renderForPrompt(sessionId, 120),
-        Promise.resolve(renderSystemsForReview(this.catalog)),
-      ]);
+      const [template, messages, evidence, systems, principles] =
+        await Promise.all([
+          loadPromptTemplate(this.prompts, BUILDER_PRD_REVIEW_SYSTEM.code),
+          this.messageRepository.listBySession(sessionId),
+          this.evidenceLog.renderForPrompt(sessionId, 120),
+          Promise.resolve(renderSystemsForReview(this.catalog)),
+          this.principles?.prdCheckBlock(sessionId, doc.draft as any) ??
+            Promise.resolve(null),
+        ]);
       const result = await this.llmCompletion.complete({
         taskId: BUILDER_AI_TASKS.PRD_REVIEW,
         task: LlmTask.BUILDER_PRD_REVIEW,
@@ -280,6 +286,17 @@ export class BuilderPrdReviewService {
           '<reusable_systems>',
           systems || '(not available)',
           '</reusable_systems>',
+          ...(principles
+            ? [
+                '',
+                '<principles>',
+                'Principles relevant to this draft. Where the PRD breaks one or leaves it unaddressed ' +
+                  '(compare against its warning sign), raise a finding that names the code, e.g. ' +
+                  '"Scope has no empty state [FP-0142]". Do not raise findings for principles that do not apply.',
+                principles,
+                '</principles>',
+              ]
+            : []),
         ].join('\n'),
       });
       if (result.stopReason === 'max_tokens') {

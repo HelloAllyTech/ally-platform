@@ -298,7 +298,7 @@ const Editor: FC<{ saved: AllyGuideNotes; canDraft: boolean }> = ({ saved, canDr
       <ConfirmDialog
         isOpen={pendingDraft !== null}
         title={strings.draftReplace}
-        cancelLabel={en.allyConsole.library.archiveDialog.cancel}
+        cancelLabel={strings.keepWhatIsThere}
         confirmLabel={strings.draft}
         onConfirm={() => {
           if (pendingDraft) applyDraft(pendingDraft);

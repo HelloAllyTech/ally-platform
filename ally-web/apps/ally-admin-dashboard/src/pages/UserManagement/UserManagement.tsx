@@ -17,6 +17,8 @@ import {
   ActionConfirmationPopup,
   StatusBadge,
   AssignedOrganizations,
+  BulkActionBar,
+  useConfirm,
 } from "@components";
 import { ButtonVariant, FilterValues } from "@components/types";
 import {
@@ -47,6 +49,7 @@ import { TabType } from "@types";
 import { formatCapitalizedEnum, hasFeature } from "@utils";
 
 import { PhoneMappingsTab } from "./PhoneMappings";
+import { RoleDescriptions } from "./RoleDescriptions";
 import { useOrganizationManagement } from "./useOrganizationManagement";
 import { useUserManagement } from "./useUserManagement";
 import { SuperAdmins } from "../SuperAdmins/SuperAdmins";
@@ -90,9 +93,15 @@ export const UserManagement: FC = () => {
   // the Ally admins list, so that is where they land instead.
   const canSeeUsersAndOrgs = hasFeature(features, FeatureToggleKey.USERS);
   const fallbackTab = canSeeUsersAndOrgs ? TabType.USERS : TabType.SUPER_ADMINS;
-  const requestedTab = (searchParams.get("tab") as TabType) || fallbackTab;
-  // The Ally admins tab is gated; a deep link to it from anyone else falls
-  // back to Users (the backing endpoints would 403 anyway).
+  const tabParam = searchParams.get("tab") as TabType | null;
+  // Debrief roles are switches on an Ally admin's page now (2026-11-17): the old Debrief
+  // access and Clinical advisors links open Ally admins.
+  const requestedTab =
+    (tabParam === TabType.CLINICAL_ADVISORS || tabParam === TabType.DEBRIEF_ACCESS
+      ? TabType.SUPER_ADMINS
+      : tabParam) || fallbackTab;
+  // The Ally admins tab is gated; a deep link to it from anyone else falls back to Users
+  // (the backing endpoints would 403 anyway).
   const activeTab =
     (requestedTab === TabType.SUPER_ADMINS && !canManagePlatformAdmins) ||
     (requestedTab === TabType.PHONE_MAPPINGS && !canManagePhoneMappings) ||
@@ -119,6 +128,22 @@ export const UserManagement: FC = () => {
     onCloseOrganizationEditModal,
     logoUpload,
   } = useOrganizationManagement();
+
+  const { confirm: confirmBulk, dialog: bulkConfirmDialog } = useConfirm();
+  const bulkStatus = async (status: string) => {
+    const n = rowSelection?.count ?? 0;
+    const suspend = status === userStatus.SUSPENDED;
+    const ok = await confirmBulk({
+      title: suspend
+        ? en.userManagement.bulkSuspendTitle(n)
+        : en.userManagement.bulkActivateTitle(n),
+      consequence: suspend
+        ? en.userManagement.bulkSuspendConsequence
+        : en.userManagement.bulkActivateConsequence,
+      confirmLabel: suspend ? en.userManagement.bulkSuspend : en.userManagement.bulkActivate,
+    });
+    if (ok) await handleBulkStatus(status);
+  };
 
   // User management hook (depends on tenants)
   const {
@@ -158,6 +183,9 @@ export const UserManagement: FC = () => {
     handleUserAddClick,
     handleAddCredit,
     includePlatformAdmins,
+    allTenants,
+    rowSelection,
+    handleBulkStatus,
   } = useUserManagement(tenants, canListPlatformAdmins, canSeeUsersAndOrgs);
 
   const watchedRoles = userMethods.watch("roles") || [];
@@ -313,17 +341,20 @@ export const UserManagement: FC = () => {
             formMethods={userMethods}
             handleClick={handleChangeRole}
             extraContent={
-              platformRolesNote || isMultiTenantAdmin ? (
-                <div className="flex flex-col gap-3">
-                  {platformRolesNote}
-                  {isMultiTenantAdmin && (
-                    <AssignedOrganizations
-                      userId={selectedUser?.id as number}
-                      canEdit={canEditMultiTenantAdmins}
-                    />
-                  )}
-                </div>
-              ) : undefined
+              <div className="flex flex-col gap-3">
+                <RoleDescriptions />
+                {platformRolesNote || isMultiTenantAdmin ? (
+                  <div className="flex flex-col gap-3">
+                    {platformRolesNote}
+                    {isMultiTenantAdmin && (
+                      <AssignedOrganizations
+                        userId={selectedUser?.id as number}
+                        canEdit={canEditMultiTenantAdmins}
+                      />
+                    )}
+                  </div>
+                ) : null}
+              </div>
             }
           />
         );
@@ -482,12 +513,15 @@ export const UserManagement: FC = () => {
               formMethods={userMethods}
               handleClick={handleAddUser}
               extraContent={
-                isMultiTenantAdmin ? (
-                  <div className="text-sm text-typography-600 bg-background-secondary p-3 rounded-lg border border-border-light italic">
-                    {en.userManagement.noAssignedOrganizations}. Organizations can be assigned after
-                    the user is created.
-                  </div>
-                ) : undefined
+                <div className="flex flex-col gap-3">
+                  <RoleDescriptions />
+                  {isMultiTenantAdmin ? (
+                    <div className="text-sm text-typography-600 bg-background-secondary p-3 rounded-lg border border-border-light italic">
+                      {en.userManagement.noAssignedOrganizations}. Organizations can be assigned
+                      after the user is created.
+                    </div>
+                  ) : null}
+                </div>
               }
             />
 
@@ -527,7 +561,10 @@ export const UserManagement: FC = () => {
                 {
                   id: "organizations",
                   label: FilterDropdownOptions.ORGANIZATION,
-                  options: tenants.map(org => ({ label: org.name, value: org.name })),
+                  // Every organisation, once each by name (the filter sends the matching ids).
+                  options: Array.from(new Set((allTenants ?? tenants).map(org => org.name)))
+                    .sort((a, b) => a.localeCompare(b))
+                    .map(name => ({ label: name, value: name })),
                 },
                 {
                   id: "statuses",
@@ -556,11 +593,30 @@ export const UserManagement: FC = () => {
                 formatDate={formatDate}
                 onOptionSelect={handleOptionSelect}
                 canEditUser={canEditUser}
+                selection={canEditUser ? rowSelection : undefined}
                 renderFooter={() =>
                   renderFooter(loadUsers, isUsersFetching, usersCount > users.length)
                 }
               />
             )}
+
+            {canEditUser && rowSelection && (
+              <BulkActionBar
+                count={rowSelection.count}
+                onClear={rowSelection.clear}
+                actions={[
+                  {
+                    label: en.userManagement.bulkSuspend,
+                    onClick: () => void bulkStatus(userStatus.SUSPENDED),
+                  },
+                  {
+                    label: en.userManagement.bulkActivate,
+                    onClick: () => void bulkStatus(userStatus.ACTIVE),
+                  },
+                ]}
+              />
+            )}
+            {bulkConfirmDialog}
 
             {selectedOption && renderEditModal()}
           </div>

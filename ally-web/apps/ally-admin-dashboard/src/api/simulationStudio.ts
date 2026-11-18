@@ -15,6 +15,8 @@ import {
   SessionEventResponse,
   GetSimulationsQueryParams,
   GetSimulationsResponse,
+  MapScenarioMemoriesRequest,
+  MapScenarioMemoriesResponse,
   CreateSimulationInput,
   CreateSimulationResponse,
   GetSimulationByIdResponse,
@@ -558,6 +560,18 @@ export const simulationStudioAPI = baseAPI.injectEndpoints({
       query: id => ({
         url: ApiEndpoints.SIMULATION_STUDIO.PREVIEW_LLM_MODEL(id),
         method: HttpMethod.POST,
+      }),
+    }),
+
+    /** Run an edited, unsaved prompt against a sample on a catalog model. */
+    testPrompt: builder.mutation<
+      LlmPreviewResult,
+      { modelId: string; promptText: string; sampleInput?: string; temperature?: number }
+    >({
+      query: body => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.PREVIEW_PROMPT,
+        method: HttpMethod.POST,
+        body,
       }),
     }),
 
@@ -1715,11 +1729,27 @@ export const simulationStudioAPI = baseAPI.injectEndpoints({
         body,
       }),
     }),
+
+    /**
+     * Build the Stage Director prompt's memories from the form's Knowledge
+     * Sources, assigning each to the state where the client is ready to share
+     * it. Called by the editor the first time an author switches a simulation
+     * to a prompt that uses `{memories}`. Writes nothing server-side.
+     */
+    mapScenarioMemories: builder.mutation<MapScenarioMemoriesResponse, MapScenarioMemoriesRequest>({
+      query: body => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.MAP_SCENARIO_MEMORIES,
+        method: HttpMethod.POST,
+        body,
+      }),
+    }),
   }),
 });
 
 export const {
   useGetSimulationsQuery,
+  useLazyGetSimulationsQuery,
+  useMapScenarioMemoriesMutation,
   useLazyGetAdminSimulationByIdQuery,
   useCreateSimulationMutation,
   useUpdateSimulationByIdMutation,
@@ -1752,6 +1782,7 @@ export const {
   useGetAiTasksQuery,
   useGetLlmModelCatalogQuery,
   usePreviewLlmModelMutation,
+  useTestPromptMutation,
   useSyncElevenLabsVoiceMutation,
   useLazyLookupElevenLabsVoiceQuery,
   useBulkSyncElevenLabsVoicesMutation,

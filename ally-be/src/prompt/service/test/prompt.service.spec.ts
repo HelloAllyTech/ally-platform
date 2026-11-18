@@ -24,6 +24,7 @@ import { ExecutionManager } from 'src/common/execution/execution-manager';
 import { DataSource } from 'typeorm';
 import { REMOVED_PROMPT_CODES } from '../../constants/prompt.constants';
 import { UNUSED_PROMPT_CODES } from 'src/database/migrations/1980750000000-RemoveUnusedPrompts';
+import { RETIRED_CURATOR_PROMPT_CODES } from 'src/database/migrations/1981001200000-RemoveRetiredCuratorPrompts';
 
 describe('PromptsService', () => {
   let service: PromptsService;
@@ -676,9 +677,9 @@ describe('PromptsService.syncPrompts — contract default model', () => {
     expect(promptVersionRepository.save).toHaveBeenCalledTimes(1);
   });
 
-  it('refuses exactly the codes RemoveUnusedPrompts deleted', () => {
+  it('refuses exactly the codes the prompt-removal migrations deleted', () => {
     expect([...REMOVED_PROMPT_CODES].sort()).toEqual(
-      [...UNUSED_PROMPT_CODES].sort(),
+      [...UNUSED_PROMPT_CODES, ...RETIRED_CURATOR_PROMPT_CODES].sort(),
     );
   });
 });

@@ -21,8 +21,8 @@ WHAT IT CANNOT SEE, stated because the gap is easy to forget when reading the
 rates. Only passages that ally-ai actually returned are logged, and those are
 by definition already above the floor. So these labels measure PRECISION of
 what got through — never the recall of what the floor rejected. Measuring that
-needs the same queries re-run at a lower floor, which the retrieval preview's
-floor control does by hand and a calibration sweep would do in bulk.
+needs the same queries re-run at a lower floor, which a calibration sweep would
+do in bulk.
 """
 
 from __future__ import annotations

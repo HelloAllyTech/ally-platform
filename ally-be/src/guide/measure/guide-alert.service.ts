@@ -21,7 +21,7 @@ export interface AlertFiring {
   value: Record<string, unknown>;
 }
 
-/** Thresholds (plan §7.12, Appendix A; Stacks: Custom Alert Thresholds for Agent Monitoring). */
+/** Thresholds (plan §7.12, Appendix A; Custom Alert Thresholds for Agent Monitoring). */
 export const ALERT_THRESHOLDS = {
   minTurns: 20,
   failureWarn: 0.05,

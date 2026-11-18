@@ -61,6 +61,10 @@ vi.mock("@api", () => {
     useAddTracksToTenantMutation: mutation,
     useRemoveTracksFromTenantMutation: mutation,
     useLazyGetTenantByIdQuery: () => mockTenantQuery,
+    useLazyGetSimulationsQuery: () => [vi.fn()],
+    useLazyGetScenarioPathsQuery: () => [vi.fn()],
+    useLazyGetScenarioCasesQuery: () => [vi.fn()],
+    useLazyGetTracksQuery: () => [vi.fn()],
   };
 });
 
@@ -77,6 +81,7 @@ vi.mock("@components", () => {
   const stub = (name: string) => () => <div data-testid={`stub-${name}`} />;
   return {
     OrganizationDetailLoader: stub("loader"),
+    BulkAccessBar: stub("bulk-access"),
     SimulationsTab: stub("simulations"),
     PathTab: stub("path"),
     ScribeSettings: stub("scribe"),
@@ -90,6 +95,9 @@ vi.mock("@components", () => {
     ),
     TextHelplineSettings: ({ tenantId }: { tenantId: string }) => (
       <div data-testid="text-helpline-settings">{tenantId}</div>
+    ),
+    BrandingSettings: ({ tenantId }: { tenantId: string }) => (
+      <div data-testid="branding-settings">{tenantId}</div>
     ),
   };
 });
@@ -131,6 +139,26 @@ describe("OrganizationDetail — Text helpline tab", () => {
 
     expect(screen.getByTestId("text-helpline-settings")).toHaveTextContent("acme");
     expect(screen.getByTestId("tab-textHelpline")).toHaveAttribute("aria-pressed", "true");
+  });
+});
+
+describe("OrganizationDetail — Branding tab", () => {
+  it("is labelled from the admin copy", () => {
+    expect(en.orgBranding.tabLabel).toBe("Branding");
+  });
+
+  it("is offered to every platform admin who can open the organization", () => {
+    mockFeatures.current = [];
+    renderAt();
+
+    expect(screen.getByTestId("tab-branding")).toHaveTextContent("Branding");
+    expect(screen.queryByTestId("tab-path")).not.toBeInTheDocument();
+  });
+
+  it("opens from the ?tab= parameter with the organisation id from the route", () => {
+    renderAt("?tab=branding");
+
+    expect(screen.getByTestId("branding-settings")).toHaveTextContent("acme");
   });
 });
 

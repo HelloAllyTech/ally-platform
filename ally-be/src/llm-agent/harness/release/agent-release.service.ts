@@ -273,8 +273,8 @@ export class AgentReleaseService {
         existing ??
         (await createSeed(
           AgentReleaseStatus.DRAFT,
-          'The defaults in code changed; promoted at boot while no release ' +
-            'had been authored or promoted by a person.',
+          'The defaults in code changed; put live on start-up because no ' +
+            'person had written a release or put one live yet.',
         ));
       await repo.update(ga.id, {
         status: AgentReleaseStatus.RETIRED,
@@ -316,9 +316,14 @@ export class AgentReleaseService {
   async createDraft(
     agentKey: string,
     bundle: Record<string, unknown>,
-    userId: number,
+    userId: number | null,
     notes?: string,
   ): Promise<AgentRelease> {
+    // No person: a draft the system made when a change moved on by itself.
+    const actorKind =
+      userId == null
+        ? AgentReleaseAuthorKind.SYSTEM
+        : AgentReleaseAuthorKind.HUMAN;
     return this.dataSource.transaction(async (manager) => {
       const repo = manager.getRepository(AgentRelease);
       const latest = await repo.findOne({
@@ -333,7 +338,7 @@ export class AgentReleaseService {
           bundle,
           contentHash: canonicalHash(bundle),
           parentReleaseId: latest?.id ?? null,
-          authorKind: AgentReleaseAuthorKind.HUMAN,
+          authorKind: actorKind,
           createdBy: userId,
           notes: notes ?? null,
         }),
@@ -342,7 +347,7 @@ export class AgentReleaseService {
         agentKey,
         releaseId: release.id,
         action: AgentReleaseAuditAction.CREATED,
-        actorKind: AgentReleaseAuthorKind.HUMAN,
+        actorKind,
         actorUserId: userId,
         detail: { version: release.version, contentHash: release.contentHash },
       });

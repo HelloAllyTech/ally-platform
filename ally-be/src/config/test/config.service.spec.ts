@@ -77,19 +77,22 @@ describe('AppConfigService', () => {
   });
 
   describe('openai', () => {
-    it('returns dall-e-3 even when the env var is the deprecated gpt-image-1', () => {
-      const service = make({ OPENAI_IMAGE_MODEL: 'gpt-image-1' });
-      expect(service.openai.imageModel).toBe('dall-e-3');
-    });
+    it.each(['gpt-image-1', 'dall-e-2', 'dall-e-3'])(
+      'replaces the retired image model %s from a stale env with gpt-image-1.5',
+      (model) => {
+        const service = make({ OPENAI_IMAGE_MODEL: model });
+        expect(service.openai.imageModel).toBe('gpt-image-1.5');
+      },
+    );
 
     it('returns the default when the env var is not set', () => {
       const service = make({});
-      expect(service.openai.imageModel).toBe('dall-e-3');
+      expect(service.openai.imageModel).toBe('gpt-image-1.5');
     });
 
     it('returns a different model when the env var is set to it', () => {
-      const service = make({ OPENAI_IMAGE_MODEL: 'dall-e-2' });
-      expect(service.openai.imageModel).toBe('dall-e-2');
+      const service = make({ OPENAI_IMAGE_MODEL: 'gpt-image-1-mini' });
+      expect(service.openai.imageModel).toBe('gpt-image-1-mini');
     });
   });
 });

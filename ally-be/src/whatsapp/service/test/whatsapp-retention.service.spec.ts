@@ -9,7 +9,7 @@ import {
   ERASED_PHONE_PREFIX,
   WhatsAppRetentionService,
 } from '../whatsapp-retention.service';
-import { WhatsAppSettingsService } from '../whatsapp-settings.service';
+import { ChatbotSettingsService } from 'src/chatbot/service/chatbot-settings.service';
 
 /**
  * The retention sweep is the bound on how long identifiable data about mental healthcare workers
@@ -76,7 +76,7 @@ describe('WhatsAppRetentionService', () => {
           provide: getRepositoryToken(WaUnansweredQuestion),
           useValue: unansweredRepository,
         },
-        { provide: WhatsAppSettingsService, useValue: settingsService },
+        { provide: ChatbotSettingsService, useValue: settingsService },
       ],
     }).compile();
 

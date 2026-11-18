@@ -12,7 +12,7 @@ import type {
   BuilderEvalSuiteTrigger,
 } from "@types";
 
-import type { BuilderTagType } from "../builderMotion";
+import type { BuilderTagType } from "../../../motion/builderMotion";
 
 /**
  * Pure derivation and formatting for the eval page.

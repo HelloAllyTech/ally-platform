@@ -1,11 +1,12 @@
 import React, { useCallback, useMemo, useState } from "react";
 
-import { ArrowDown, ArrowUp } from "@icons";
+import { ArrowDown, ArrowUp, PauseIcon, PlayIcon, Refresh, TrashCan } from "@icons";
 import { toast } from "sonner";
 
 import { InlineNotification, SkeletonText, Tag, TextInput } from "@ally-ui-mono/ui-shared";
 import {
   useArchiveWaTemplateMutation,
+  useCustomiseWaTemplateMutation,
   useGetWaTemplatesQuery,
   useReorderWaTemplatesMutation,
   useTestWaTemplateMutation,
@@ -19,8 +20,10 @@ import {
 } from "@components";
 import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
-import { WaTemplate, WaTemplateKind, WaTemplateMatchType } from "@types";
+import { WaTemplate, WaTemplateKind, WaTemplateState } from "@types";
 
+import { useChatbotId } from "./chatbotContext";
+import { fill, StatusPill } from "./shared";
 import { TemplatePanel } from "./TemplatePanel";
 
 /**
@@ -48,9 +51,29 @@ const KIND_TAG_TYPE: Record<WaTemplateKind, "red" | "magenta" | "blue" | "gray">
  * each rule inside its own kind band gives the same result and cannot produce an ordering that moves
  * an FAQ rule ahead of a crisis rule.
  */
-export const TemplatesTab: React.FC = () => {
-  const { data, isLoading, isError } = useGetWaTemplatesQuery();
+const STATE_PILL: Record<
+  WaTemplateState,
+  { tone: "neutral" | "success" | "warning"; label: string }
+> = {
+  default: { tone: "neutral", label: en.whatsappBot.templates.stateDefault },
+  customised: { tone: "success", label: en.whatsappBot.templates.stateCustomised },
+  off: { tone: "warning", label: en.whatsappBot.templates.stateOff },
+  own: { tone: "success", label: en.whatsappBot.templates.stateOwn },
+};
+
+/**
+ * `canEdit`: false for a chatbot's viewers, who see the replies and can try the tester but get no
+ * add, edit, reorder, switch-off, remove or reset (the backend refuses those from them).
+ */
+export const TemplatesTab: React.FC<{ canEdit?: boolean }> = ({ canEdit = true }) => {
+  // On one organisation's page the list is what THAT organisation's bot uses: the shared replies
+  // (as they stand for it) plus its own, each labelled with where it comes from.
+  const chatbotId = useChatbotId();
+  const { data, isLoading, isError } = useGetWaTemplatesQuery(
+    chatbotId ? { chatbotId } : undefined,
+  );
   const [archiveTemplate] = useArchiveWaTemplateMutation();
+  const [customiseTemplate] = useCustomiseWaTemplateMutation();
   const [reorderTemplates] = useReorderWaTemplatesMutation();
   const [testTemplate, { data: testResult, isLoading: isTesting, reset: resetTest }] =
     useTestWaTemplateMutation();
@@ -66,7 +89,9 @@ export const TemplatesTab: React.FC = () => {
     async (row: WaTemplate, direction: -1 | 1) => {
       // Reorder within the same KIND only. Swapping across bands would be meaningless — the server
       // renumbers per band, so a cross-band move would silently snap back.
-      const sameKind = templates.filter(t => t.kind === row.kind);
+      // For an organisation only its own replies move; the shared ones keep their places.
+      const movable = chatbotId ? templates.filter(t => t.state === "own") : templates;
+      const sameKind = movable.filter(t => t.kind === row.kind);
       const index = sameKind.findIndex(t => t.id === row.id);
       const target = index + direction;
       if (index < 0 || target < 0 || target >= sameKind.length) return;
@@ -76,25 +101,25 @@ export const TemplatesTab: React.FC = () => {
 
       // Send the whole list with this kind's rules in their new order, so the server's per-band
       // renumber sees a complete picture.
-      const ids = templates
+      const ids = movable
         .filter(t => t.kind !== row.kind)
         .concat(reordered)
         .sort((a, b) => (a.kind === row.kind ? 0 : a.priority - b.priority))
         .map(t => t.id);
 
       try {
-        await reorderTemplates(ids).unwrap();
+        await reorderTemplates(chatbotId ? { ids, chatbotId } : ids).unwrap();
       } catch {
         toast.error(en.whatsappBot.templates.saveFailed);
       }
     },
-    [templates, reorderTemplates],
+    [templates, reorderTemplates, chatbotId],
   );
 
   const handleArchiveConfirmed = useCallback(async () => {
     if (!archiveTarget) return;
     try {
-      await archiveTemplate(archiveTarget.id).unwrap();
+      await archiveTemplate({ id: archiveTarget.id, chatbotId }).unwrap();
       toast.success(en.whatsappBot.templates.archived);
     } catch {
       // A 403 here is the mandatory-template guard, which is the most likely failure.
@@ -102,7 +127,40 @@ export const TemplatesTab: React.FC = () => {
     } finally {
       setArchiveTarget(null);
     }
-  }, [archiveTarget, archiveTemplate]);
+  }, [archiveTarget, archiveTemplate, chatbotId]);
+
+  /** Switch an optional shared reply off (or back on) for this organisation only. */
+  const handleToggle = useCallback(
+    async (row: WaTemplate, active: boolean) => {
+      if (!chatbotId) return;
+      try {
+        await customiseTemplate({
+          id: row.overridesTemplateId ?? row.id,
+          chatbotId,
+          active,
+        }).unwrap();
+        toast.success(
+          active ? en.whatsappBot.templates.turnedOn : en.whatsappBot.templates.turnedOff,
+        );
+      } catch {
+        toast.error(en.whatsappBot.templates.cannotDeactivate);
+      }
+    },
+    [customiseTemplate, chatbotId],
+  );
+
+  /** Drop this organisation's version, so the shared reply applies again. */
+  const handleReset = useCallback(
+    async (row: WaTemplate) => {
+      try {
+        await archiveTemplate({ id: row.id, chatbotId }).unwrap();
+        toast.success(en.whatsappBot.templates.resetDone);
+      } catch {
+        toast.error(en.whatsappBot.templates.saveFailed);
+      }
+    },
+    [archiveTemplate, chatbotId],
+  );
 
   const columns: EntityTableColumn<WaTemplate>[] = useMemo(
     () => [
@@ -113,6 +171,11 @@ export const TemplatesTab: React.FC = () => {
           <div className="flex flex-col gap-1">
             <span className="font-medium flex items-center gap-2">
               {row.name}
+              {row.state && (
+                <StatusPill tone={STATE_PILL[row.state].tone}>
+                  {STATE_PILL[row.state].label}
+                </StatusPill>
+              )}
               {row.mandatory && (
                 <span className="rounded bg-neutral-200 px-1.5 py-0.5 text-xs text-typography-600">
                   {en.whatsappBot.templates.requiredBadge}
@@ -165,24 +228,28 @@ export const TemplatesTab: React.FC = () => {
 
   return (
     <div className="pt-4">
-      <p className="text-sm text-typography-600 pb-4">{en.whatsappBot.templates.subtitle}</p>
+      <p className="text-sm text-typography-600 pb-4">
+        {chatbotId ? en.whatsappBot.templates.orgIntro : en.whatsappBot.templates.subtitle}
+      </p>
 
-      <div className="flex justify-end pb-3">
-        <Button
-          variant={ButtonVariant.PRIMARY}
-          onClick={() => {
-            setEditing(null);
-            setIsPanelOpen(true);
-          }}
-        >
-          {en.whatsappBot.templates.create}
-        </Button>
-      </div>
+      {canEdit && (
+        <div className="flex justify-end pb-3">
+          <Button
+            variant={ButtonVariant.PRIMARY}
+            onClick={() => {
+              setEditing(null);
+              setIsPanelOpen(true);
+            }}
+          >
+            {en.whatsappBot.templates.create}
+          </Button>
+        </div>
+      )}
 
       {isError && (
         <InlineNotification
           kind="error"
-          title={en.whatsappBot.templates.saveFailed}
+          title={en.whatsappBot.templates.loadFailed}
           lowContrast
           hideCloseButton
         />
@@ -203,6 +270,7 @@ export const TemplatesTab: React.FC = () => {
             setEditing(null);
             setIsPanelOpen(true);
           }}
+          hideActionButton={!canEdit}
         />
       )}
 
@@ -211,26 +279,69 @@ export const TemplatesTab: React.FC = () => {
           columns={columns}
           rows={templates}
           rowClassName={row => (row.active ? "" : "opacity-60")}
-          actions={[
-            {
-              key: "up",
-              label: en.whatsappBot.templates.moveUp,
-              icon: <ArrowUp size={16} />,
-              onClick: row => void handleMove(row, -1),
-            },
-            {
-              key: "down",
-              label: en.whatsappBot.templates.moveDown,
-              icon: <ArrowDown size={16} />,
-              onClick: row => void handleMove(row, 1),
-            },
-          ]}
-          onEdit={row => {
-            setEditing(row);
-            setIsPanelOpen(true);
-          }}
-          // A required safety rule has no Delete at all, rather than one that 403s.
-          onDelete={row => (row.mandatory ? undefined : setArchiveTarget(row))}
+          actions={
+            canEdit
+              ? [
+                  {
+                    key: "up",
+                    label: en.whatsappBot.templates.moveUp,
+                    icon: <ArrowUp size={16} />,
+                    hidden: row => Boolean(chatbotId) && row.state !== "own",
+                    onClick: row => void handleMove(row, -1),
+                  },
+                  {
+                    key: "down",
+                    label: en.whatsappBot.templates.moveDown,
+                    icon: <ArrowDown size={16} />,
+                    hidden: row => Boolean(chatbotId) && row.state !== "own",
+                    onClick: row => void handleMove(row, 1),
+                  },
+                  {
+                    key: "turn-off",
+                    label: en.whatsappBot.templates.turnOff,
+                    icon: <PauseIcon size={16} />,
+                    // Required safety replies are never offered "off" — not even as a button that 403s.
+                    hidden: row =>
+                      !chatbotId ||
+                      row.mandatory ||
+                      !(row.state === "default" || row.state === "customised"),
+                    onClick: row => void handleToggle(row, false),
+                  },
+                  {
+                    key: "turn-on",
+                    label: en.whatsappBot.templates.turnOn,
+                    icon: <PlayIcon size={16} />,
+                    hidden: row => !chatbotId || row.state !== "off",
+                    onClick: row => void handleToggle(row, true),
+                  },
+                  {
+                    key: "remove",
+                    label: en.whatsappBot.templates.remove,
+                    icon: <TrashCan size={16} />,
+                    // Shown only where removing works: never on a required safety reply, and on an
+                    // organisation's page only on its OWN replies (a shared one is reset or switched off).
+                    hidden: row => row.mandatory || (Boolean(chatbotId) && row.state !== "own"),
+                    onClick: row => setArchiveTarget(row),
+                  },
+                  {
+                    key: "reset",
+                    label: en.whatsappBot.templates.resetToDefault,
+                    icon: <Refresh size={16} />,
+                    hidden: row =>
+                      !chatbotId || !(row.state === "customised" || row.state === "off"),
+                    onClick: row => void handleReset(row),
+                  },
+                ]
+              : []
+          }
+          onEdit={
+            canEdit
+              ? row => {
+                  setEditing(row);
+                  setIsPanelOpen(true);
+                }
+              : undefined
+          }
         />
       )}
 
@@ -257,7 +368,7 @@ export const TemplatesTab: React.FC = () => {
           <Button
             variant={ButtonVariant.SECONDARY}
             disabled={!testText.trim() || isTesting}
-            onClick={() => void testTemplate({ text: testText.trim() })}
+            onClick={() => void testTemplate({ text: testText.trim(), chatbotId })}
           >
             {en.whatsappBot.templates.testerRun}
           </Button>
@@ -303,6 +414,7 @@ export const TemplatesTab: React.FC = () => {
       <TemplatePanel
         isOpen={isPanelOpen}
         template={editing}
+        chatbotId={chatbotId}
         onClose={() => {
           setIsPanelOpen(false);
           setEditing(null);
@@ -312,10 +424,12 @@ export const TemplatesTab: React.FC = () => {
       <ActionConfirmationPopup
         isOpen={Boolean(archiveTarget)}
         onClose={() => setArchiveTarget(null)}
-        title={`Remove “${archiveTarget?.name ?? ""}”?`}
-        description="The bot will stop using this reply. Messages that matched it will go to the corpus instead."
+        title={fill(en.whatsappBot.templates.removeConfirmTitle, {
+          name: archiveTarget?.name ?? "",
+        })}
+        description={en.whatsappBot.templates.removeConfirmBody}
         primaryButton={{
-          label: en.whatsappBot.templates.archived,
+          label: en.whatsappBot.templates.remove,
           onClick: () => void handleArchiveConfirmed(),
         }}
         secondaryButton={{ label: en.common.cancel, onClick: () => setArchiveTarget(null) }}
@@ -323,6 +437,3 @@ export const TemplatesTab: React.FC = () => {
     </div>
   );
 };
-
-/** Re-exported so the matcher's default is documented next to the UI that sets it. */
-export const DEFAULT_MATCH_TYPE = WaTemplateMatchType.ANY_OF;

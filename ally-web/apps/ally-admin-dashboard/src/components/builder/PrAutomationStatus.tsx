@@ -24,7 +24,7 @@ const dollars = (value: string | number | null | undefined): string | null => {
 /**
  * "Round 2 of 2 · 1h 10m left · $3.41 of $10.00" — how much of a pull
  * request's review-and-fix budget is left, while Builder is still working it.
- * Stacks, "Managing User Expectations in Asynchronous Agent Design": an agent
+ * "Managing User Expectations in Asynchronous Agent Design": an agent
  * loop with a ceiling should show where it is against that ceiling, so a
  * person can tell "still going" from "about to hand this to me". Muted,
  * because it is not an action.

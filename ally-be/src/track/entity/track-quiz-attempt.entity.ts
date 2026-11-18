@@ -1,4 +1,5 @@
 import { BaseWithoutTenantEntity } from 'src/common/entity/base-without-tenant.entity';
+import { numericColumn } from 'src/common/util/numeric-column.transformer';
 import {
   Column,
   DeleteDateColumn,
@@ -34,7 +35,7 @@ export class TrackQuizAttempt extends BaseWithoutTenantEntity {
   @Column({ type: 'jsonb', nullable: true })
   grading?: QuizQuestionGrading[];
 
-  @Column({ type: 'numeric', nullable: true })
+  @Column({ type: 'numeric', nullable: true, transformer: numericColumn })
   scorePct?: number;
 
   @Column({ type: 'boolean', nullable: true })

@@ -140,7 +140,9 @@ vi.mock("@api", () => ({
       isError: false,
     };
   },
+  useGetBuilderDecisionsQuery: () => ({ data: { decisions: [], count: 0 } }),
   useCreateBuilderSessionMutation: () => [vi.fn(), { isLoading: false }],
+  useGetBuilderSettingsQuery: () => ({ data: undefined }),
   useArchiveBuilderSessionMutation: () => [vi.fn(() => ({ unwrap: () => Promise.resolve() }))],
   useUnarchiveBuilderSessionMutation: () => [vi.fn(() => ({ unwrap: () => Promise.resolve() }))],
 }));

@@ -34,7 +34,11 @@ const PAGE_SIZE = 25;
  * from a worker, here it is reference data an admin typed and has to be able to recognise to
  * remove the right row.
  */
-export const PhoneMappingsTab: React.FC = () => {
+/**
+ * `tenantId` narrows the list to one organisation and sends every number to it — how the
+ * WhatsApp page's Workers tab shows one organisation's people.
+ */
+export const PhoneMappingsTab: React.FC<{ tenantId?: string }> = ({ tenantId }) => {
   const [search, setSearch] = useState("");
   const [offset, setOffset] = useState(0);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
@@ -46,6 +50,7 @@ export const PhoneMappingsTab: React.FC = () => {
     limit: PAGE_SIZE,
     offset,
     search: search.trim() || undefined,
+    ...(tenantId ? { tenantId } : {}),
   });
   const [deleteMapping] = useDeleteWaPhoneMappingMutation();
 
@@ -61,7 +66,7 @@ export const PhoneMappingsTab: React.FC = () => {
   const handleRemoveConfirmed = useCallback(async () => {
     if (!removeTarget) return;
     try {
-      await deleteMapping(removeTarget.id).unwrap();
+      await deleteMapping({ id: removeTarget.id, tenantId: removeTarget.tenantId }).unwrap();
       toast.success(en.whatsappBot.phoneMappings.removed);
     } catch {
       toast.error(en.whatsappBot.phoneMappings.saveFailed);
@@ -202,13 +207,18 @@ export const PhoneMappingsTab: React.FC = () => {
       <PhoneMappingPanel
         isOpen={isPanelOpen}
         mapping={editing}
+        fixedTenantId={tenantId}
         onClose={() => {
           setIsPanelOpen(false);
           setEditing(null);
         }}
       />
 
-      <PhoneMappingBulkPanel isOpen={isBulkOpen} onClose={() => setIsBulkOpen(false)} />
+      <PhoneMappingBulkPanel
+        isOpen={isBulkOpen}
+        fixedTenantId={tenantId}
+        onClose={() => setIsBulkOpen(false)}
+      />
 
       {/* Says what removal actually does — the number may still resolve through its owner's
           profile, so "the bot will stop recognising it" would be a promise this cannot keep. */}

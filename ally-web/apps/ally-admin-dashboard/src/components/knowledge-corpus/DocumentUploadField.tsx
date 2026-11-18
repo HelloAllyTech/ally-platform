@@ -22,6 +22,8 @@ interface DocumentUploadFieldProps {
     value: { fileUrl: string; fileName: string; contentType: string; sizeBytes: number } | null,
   ) => void;
   disabled?: boolean;
+  /** The organisation the upload is for, when opened from one organisation's page. */
+  scopeTenantId?: string;
 }
 
 const ACCEPT_BY_SOURCE: Record<UploadableSource, string> = {
@@ -49,6 +51,7 @@ export const DocumentUploadField: React.FC<DocumentUploadFieldProps> = ({
   sourceType,
   value,
   onChange,
+  scopeTenantId,
   disabled,
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -77,6 +80,7 @@ export const DocumentUploadField: React.FC<DocumentUploadFieldProps> = ({
     setIsUploading(true);
     try {
       const { presignedUrl, fileUrl } = await createUploadUrl({
+        ...(scopeTenantId ? { tenantId: scopeTenantId } : {}),
         fileName: file.name,
         fileSize: file.size,
         // Always send the canonical MIME type, not file.type: the browser may report

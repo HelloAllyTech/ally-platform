@@ -244,6 +244,13 @@ export interface AgentStreamRequest {
    * while `tool_choice` is outside the prefix. Ignored in JSON mode.
    */
   toolChoice?: 'auto' | 'none';
+  /**
+   * Gemini 2.x's thinking budget in tokens; 0 turns thinking off where the
+   * model allows it, for a reply whose first words must be fast and whose
+   * output cap thinking would otherwise eat. Gemini 3+ deprecated the budget
+   * and other providers have no such dial: both ignore it.
+   */
+  thinkingBudget?: number;
 }
 
 /**

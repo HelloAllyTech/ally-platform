@@ -115,6 +115,12 @@ class KnowledgeChunkDeleteResponse(BaseModel):
     )
 
 
+class RetiredCollectionDeleteResponse(BaseModel):
+    deleted: bool = Field(
+        ..., description="False when the collection was already gone — not an error."
+    )
+
+
 class AudienceSelector(BaseModel):
     """
     Who a retrieval is being performed for. Maps onto `ChunkAudience` in the service.
@@ -140,9 +146,9 @@ class AudienceSelector(BaseModel):
     unrestricted: bool = Field(
         False,
         description=(
-            "Ignore targeting entirely and search the whole corpus. ADMIN TOOLING ONLY "
-            "— the corpus browser and retrieval preview answer 'what is indexed', not "
-            "'what may this worker see'. Never set on the WhatsApp answering path"
+            "Ignore targeting entirely. Sent for a chatbot that answers from documents "
+            "an admin selected, whose scope is those document_ids. Never set on the "
+            "organisation-targeted answering path"
         ),
     )
 
@@ -173,36 +179,6 @@ class AudienceSelector(BaseModel):
         )
 
 
-class KnowledgeChunkSearchRequest(BaseModel):
-    query: str = Field(..., min_length=1)
-    limit: int = Field(8, ge=1, le=50)
-    min_similarity: float = Field(
-        0.35,
-        ge=0.0,
-        le=1.0,
-        description=(
-            "Cosine SIMILARITY floor (not distance). Deliberately permissive — "
-            "whether the corpus actually covers a question is a separate, higher "
-            "threshold in the agent."
-        ),
-    )
-    document_ids: Optional[List[UUID]] = Field(
-        None, description="Restrict to these documents; None searches the whole corpus"
-    )
-    language: Optional[str] = Field(
-        None, description="Restrict to one passage language"
-    )
-    audience: AudienceSelector = Field(
-        default_factory=lambda: AudienceSelector(unrestricted=True),
-        description=(
-            "Whose documents to search. Defaults to UNRESTRICTED here, unlike the "
-            "answering agent where it is required: this endpoint backs the admin "
-            "retrieval preview, whose job is to show what is actually indexed. Pass a "
-            "tenant_id to preview what one organisation's workers would retrieve"
-        ),
-    )
-
-
 class KnowledgeChunkAudienceRequest(BaseModel):
     """
     Retarget an already-indexed document.
@@ -231,29 +207,6 @@ class KnowledgeChunkAudienceResponse(BaseModel):
             "audience with the chunks on its next ingest"
         ),
     )
-
-
-class KnowledgeChunkPassage(BaseModel):
-    """A retrieved passage, carrying everything a citation needs."""
-
-    chunk_id: UUID
-    document_id: str
-    document_title: str
-    chunk_index: int
-    text: str
-    char_start: int
-    char_end: int
-    page_from: int
-    page_to: int
-    section_path: str
-    source_url: str
-    language: str
-    token_count: int
-    similarity: float = Field(..., description="Cosine similarity in [0, 1]")
-
-
-class KnowledgeChunkSearchResponse(BaseModel):
-    passages: List[KnowledgeChunkPassage] = Field(default_factory=list)
 
 
 class KnowledgeChunkIdsResponse(BaseModel):

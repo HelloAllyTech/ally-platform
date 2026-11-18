@@ -1,1 +1,0 @@
-export {CustomMenuModal} from './CustomMenuModal';

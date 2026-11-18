@@ -5,6 +5,7 @@ import { ExecutionManager } from '../../../common/execution/execution-manager';
 import { Tenant } from '../../../tenant/entity/tenant.entity';
 import { User } from '../../../user/entity/user.entity';
 import { WaPhoneMapping } from '../../entity/wa-phone-mapping.entity';
+import { TenantScopeService } from '../../../authorization/service/tenant-scope.service';
 import { WhatsAppPhoneMappingService } from '../whatsapp-phone-mapping.service';
 
 jest.mock('src/common/execution/execution-manager', () => ({
@@ -37,6 +38,10 @@ describe('WhatsAppPhoneMappingService', () => {
     createQueryBuilder: jest.Mock;
   };
   let tenantRepository: { find: jest.Mock; count: jest.Mock };
+  let tenantScope: {
+    resolveTenantIds: jest.Mock;
+    assertTenantInScope: jest.Mock;
+  };
   let userCandidates: Partial<User>[];
 
   beforeEach(async () => {
@@ -67,9 +72,16 @@ describe('WhatsAppPhoneMappingService', () => {
       getMany: jest.fn(() => Promise.resolve(userCandidates)),
     };
 
+    // Unrestricted by default; the org-restricted cases narrow it.
+    tenantScope = {
+      resolveTenantIds: jest.fn().mockResolvedValue(null),
+      assertTenantInScope: jest.fn().mockResolvedValue(undefined),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         WhatsAppPhoneMappingService,
+        { provide: TenantScopeService, useValue: tenantScope },
         {
           provide: getRepositoryToken(WaPhoneMapping),
           useValue: mappingRepository,
@@ -333,6 +345,71 @@ describe('WhatsAppPhoneMappingService', () => {
 
     it('answers null for an unmapped number', async () => {
       expect(await service.resolve('919876543210')).toBeNull();
+    });
+  });
+
+  describe('for an org-restricted admin', () => {
+    beforeEach(() => {
+      tenantScope.resolveTenantIds.mockResolvedValue([TENANT_A]);
+    });
+
+    it('lists only their organisations', async () => {
+      const listQueryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        offset: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      };
+      mappingRepository.createQueryBuilder.mockReturnValue(listQueryBuilder);
+
+      await service.list({});
+      expect(listQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'm.tenantId IN (:...scope)',
+        { scope: [TENANT_A] },
+      );
+    });
+
+    it('refuses to move a number out of another organisation', async () => {
+      // "Add this number" moves an existing mapping. Across organisations that would let one
+      // organisation take another's worker.
+      mappingRepository.findOne.mockResolvedValue({
+        id: 'map-1',
+        phoneKey: '9876543210',
+        tenantId: TENANT_B,
+      });
+
+      await expect(
+        service.create({ phone: '919876543210', tenantId: TENANT_A }),
+      ).rejects.toThrow('another organisation');
+      expect(mappingRepository.update).not.toHaveBeenCalled();
+    });
+
+    it('never overwrites another organisation in a bulk upload, even when asked', async () => {
+      mappingRepository.find.mockResolvedValue([
+        { id: 'map-1', phoneKey: '9876543210', tenantId: TENANT_B },
+      ]);
+
+      const result = await service.bulkCreate({
+        rows: [bulkRow('919876543210')],
+        defaultTenantId: TENANT_A,
+        overwriteConflicts: true,
+      });
+
+      expect(result.results[0]).toMatchObject({
+        outcome: 'conflict',
+        reason: 'Already mapped to another organisation',
+      });
+      expect(mappingRepository.update).not.toHaveBeenCalled();
+    });
+
+    it('hides a mapping in another organisation', async () => {
+      mappingRepository.findOne.mockResolvedValue({
+        id: 'map-1',
+        tenantId: TENANT_B,
+      });
+      await expect(service.get('map-1')).rejects.toThrow('was not found');
     });
   });
 });

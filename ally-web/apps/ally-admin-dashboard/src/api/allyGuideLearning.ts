@@ -16,19 +16,12 @@ import {
   AllyGuideEvalSuite,
   AllyGuideEvaluatorSummary,
   AllyGuideKappa,
-  AllyGuideLibraryDocument,
-  AllyGuideLibraryList,
-  AllyGuideLibraryListQuery,
-  AllyGuideLibraryScope,
-  AllyGuideLibraryUploadUrl,
-  AllyGuideLibraryUploadUrlBody,
   AllyGuideNotes,
   AllyGuideNotesDraft,
   AllyGuideRedTeamReport,
   AllyGuideReviewDetail,
   AllyGuideReviewList,
   AllyGuideRubric,
-  CreateAllyGuideLibraryDocumentBody,
   ModerateAllyGuideAdviceBody,
   SaveAllyGuideConfigBody,
   SaveAllyGuideEvalCaseBody,
@@ -57,11 +50,6 @@ const configTag = (layer: AllyGuideConfigEditLayer, scopeId: string) => ({
 });
 const CONFIG_LIST = { type: TAG_TYPES.ALLY_GUIDE_CONFIG, id: "list" } as const;
 
-const libraryTag = (scope: AllyGuideLibraryScope, tenantId?: string) => ({
-  type: TAG_TYPES.ALLY_GUIDE_LIBRARY,
-  id: scope === "platform" ? "platform" : `org:${tenantId ?? ""}`,
-});
-
 /** Absent values are left off the URL: the server reads `status=""` as a filter, not as none. */
 const clean = (params: object | void) =>
   Object.fromEntries(
@@ -69,23 +57,6 @@ const clean = (params: object | void) =>
       ([, value]) => value !== undefined && value !== "",
     ),
   );
-
-const libraryUrls = (scope: AllyGuideLibraryScope) =>
-  scope === "platform"
-    ? {
-        documents: ApiEndpoints.ALLY_GUIDE.LIBRARY_DOCUMENTS,
-        uploadUrl: ApiEndpoints.ALLY_GUIDE.LIBRARY_UPLOAD_URL,
-        document: ApiEndpoints.ALLY_GUIDE.LIBRARY_DOCUMENT,
-      }
-    : {
-        documents: ApiEndpoints.ALLY_GUIDE.ORG_LIBRARY_DOCUMENTS,
-        uploadUrl: ApiEndpoints.ALLY_GUIDE.ORG_LIBRARY_UPLOAD_URL,
-        document: ApiEndpoints.ALLY_GUIDE.ORG_LIBRARY_DOCUMENT,
-      };
-
-/** The organisation's library is scoped by the ROUTE and the `tenantId` query, never the body. */
-const tenantParams = (scope: AllyGuideLibraryScope, tenantId?: string) =>
-  scope === "organisation" ? { tenantId } : {};
 
 export const allyGuideLearningAPI = baseAPI.injectEndpoints({
   endpoints: builder => ({
@@ -190,56 +161,6 @@ export const allyGuideLearningAPI = baseAPI.injectEndpoints({
         body: { decision, ...(reason?.trim() ? { reason: reason.trim() } : {}) },
       }),
       invalidatesTags: [TAG_TYPES.ALLY_GUIDE_ADVICE],
-    }),
-
-    // ── Library ─────────────────────────────────────────────────────────────────
-    getAllyGuideLibrary: builder.query<AllyGuideLibraryList, AllyGuideLibraryListQuery>({
-      query: ({ scope, tenantId, ...rest }) => ({
-        url: libraryUrls(scope).documents,
-        method: HttpMethod.GET,
-        params: clean({ ...tenantParams(scope, tenantId), ...rest }),
-      }),
-      providesTags: (_result, _error, { scope, tenantId }) => [libraryTag(scope, tenantId)],
-    }),
-
-    /** Presigned S3 PUT for a pdf, docx or epub. The browser uploads straight to it. */
-    createAllyGuideLibraryUploadUrl: builder.mutation<
-      AllyGuideLibraryUploadUrl,
-      AllyGuideLibraryUploadUrlBody
-    >({
-      query: ({ scope, tenantId, ...body }) => ({
-        url: libraryUrls(scope).uploadUrl,
-        method: HttpMethod.POST,
-        params: tenantParams(scope, tenantId),
-        body,
-      }),
-    }),
-
-    /** Adds a document and queues it for indexing; it answers at `pending`. */
-    createAllyGuideLibraryDocument: builder.mutation<
-      AllyGuideLibraryDocument,
-      CreateAllyGuideLibraryDocumentBody
-    >({
-      query: ({ scope, tenantId, ...body }) => ({
-        url: libraryUrls(scope).documents,
-        method: HttpMethod.POST,
-        params: tenantParams(scope, tenantId),
-        body,
-      }),
-      invalidatesTags: (_result, _error, { scope, tenantId }) => [libraryTag(scope, tenantId)],
-    }),
-
-    /** DELETE archives: Ally stops using the document at once and its rows stay for citations. */
-    archiveAllyGuideLibraryDocument: builder.mutation<
-      AllyGuideLibraryDocument,
-      { scope: AllyGuideLibraryScope; tenantId?: string; id: string }
-    >({
-      query: ({ scope, tenantId, id }) => ({
-        url: libraryUrls(scope).document(id),
-        method: HttpMethod.DELETE,
-        params: tenantParams(scope, tenantId),
-      }),
-      invalidatesTags: (_result, _error, { scope, tenantId }) => [libraryTag(scope, tenantId)],
     }),
 
     // ── Evaluator ───────────────────────────────────────────────────────────────
@@ -468,10 +389,6 @@ export const {
   useGetAllyGuideThreadConfigQuery,
   useGetAllyGuideAdviceQuery,
   useModerateAllyGuideAdviceMutation,
-  useGetAllyGuideLibraryQuery,
-  useCreateAllyGuideLibraryUploadUrlMutation,
-  useCreateAllyGuideLibraryDocumentMutation,
-  useArchiveAllyGuideLibraryDocumentMutation,
   useGetAllyGuideRubricQuery,
   useGetAllyGuideEvaluatorSummaryQuery,
   useGetAllyGuideKappaQuery,

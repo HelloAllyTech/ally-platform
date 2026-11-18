@@ -7,6 +7,7 @@ import { LoggerService } from 'src/logger/logger.service';
 import {
   InboundWhatsAppMessage,
   WhatsAppConnectionCheck,
+  WaNumberCredentials,
   WhatsAppProvider,
 } from '../type/whatsapp-provider.interface';
 
@@ -120,12 +121,15 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
 
   constructor(private readonly config: AppConfigService) {}
 
-  verifyWebhookChallenge(query: Record<string, unknown>): string | null {
+  verifyWebhookChallenge(
+    query: Record<string, unknown>,
+    expectedToken?: string,
+  ): string | null {
     const mode = String(query['hub.mode'] ?? '');
     const token = String(query['hub.verify_token'] ?? '');
     const challenge = query['hub.challenge'];
 
-    const expected = this.config.whatsapp.verifyToken;
+    const expected = expectedToken ?? this.config.whatsapp.verifyToken;
     if (!expected) {
       this.logger.error(
         'WHATSAPP_VERIFY_TOKEN is not configured; refusing the webhook handshake',
@@ -150,8 +154,8 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
    * parsed body cannot work — key order and whitespace differ, so the HMAC never matches — and
    * reading the stream here yields nothing because the body parser already consumed it.
    */
-  verifyRequest(req: Request): boolean {
-    const appSecret = this.config.whatsapp.appSecret;
+  verifyRequest(req: Request, appSecretOverride?: string): boolean {
+    const appSecret = appSecretOverride ?? this.config.whatsapp.appSecret;
     if (!appSecret) {
       // Fail CLOSED. Accepting unsigned webhooks because a secret is missing would let anyone POST
       // arbitrary "worker questions" at the bot.
@@ -210,25 +214,13 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
     };
 
     const out: InboundWhatsAppMessage[] = [];
-    const ownNumberId = this.config.whatsapp.phoneNumberId;
 
     for (const entry of payload?.entry ?? []) {
       for (const change of entry?.changes ?? []) {
-        // One Meta app can hold several numbers — the free test number alongside the real one is
-        // the usual pair during setup — and all of them deliver to this one webhook. A reply always
-        // goes out from WHATSAPP_PHONE_NUMBER_ID, so answering a message sent to a DIFFERENT number
-        // would reach the worker from a number they never wrote to, where Meta refuses free-form
-        // text anyway (no open 24-hour window). Skipped, not answered.
+        // One Meta app can hold several numbers, and all of them deliver to the same webhook. Each
+        // message is tagged with the number it was sent to; the webhook drops the ones no connected
+        // number answers for, so a reply never reaches a worker from a number they never wrote to.
         const addressedTo = change?.value?.metadata?.phone_number_id;
-        if (ownNumberId && addressedTo && addressedTo !== ownNumberId) {
-          if (change?.value?.messages?.length) {
-            this.logger.warn(
-              `Ignoring ${change.value.messages.length} message(s) sent to phone number id ` +
-                `${addressedTo}; this deployment answers for ${ownNumberId} only`,
-            );
-          }
-          continue;
-        }
         for (const message of change?.value?.messages ?? []) {
           if (!message?.id || !message?.from) continue;
 
@@ -250,6 +242,7 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
             timestamp: message.timestamp
               ? new Date(Number(message.timestamp) * 1000)
               : new Date(),
+            ...(addressedTo ? { phoneNumberId: addressedTo } : {}),
           });
         }
       }
@@ -261,9 +254,10 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
   async sendText(
     to: string,
     body: string,
+    creds?: WaNumberCredentials,
   ): Promise<{ providerMessageId: string }> {
-    const { phoneNumberId, accessToken, graphApiVersion } =
-      this.config.whatsapp;
+    const { phoneNumberId, accessToken } = this.creds(creds);
+    const { graphApiVersion } = this.config.whatsapp;
     if (!phoneNumberId || !accessToken) {
       throw new Error(
         'WhatsApp sending is not configured (WHATSAPP_PHONE_NUMBER_ID / WHATSAPP_ACCESS_TOKEN).',
@@ -314,11 +308,16 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
    * guidance is to show typing only when a reply is coming, and a bubble that never resolves reads as
    * being ignored.
    */
-  async showTypingIndicator(providerMessageId: string): Promise<void> {
-    const { phoneNumberId, accessToken } = this.config.whatsapp;
+  async showTypingIndicator(
+    providerMessageId: string,
+    creds?: WaNumberCredentials,
+  ): Promise<void> {
+    const resolved = this.creds(creds);
+    const { phoneNumberId, accessToken } = resolved;
     if (!phoneNumberId || !accessToken) return;
     try {
       await this.graph(
+        resolved,
         'post',
         `${phoneNumberId}/messages`,
         'the typing indicator',
@@ -348,9 +347,11 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
    * dead — a 24-hour token that expired overnight, a number id from the test WABA, a number never
    * registered for the API. This is the call that tells those apart, and it reads only.
    */
-  async checkConnection(): Promise<WhatsAppConnectionCheck> {
-    const { phoneNumberId, accessToken, businessAccountId } =
-      this.config.whatsapp;
+  async checkConnection(
+    creds?: WaNumberCredentials,
+  ): Promise<WhatsAppConnectionCheck> {
+    const resolved = this.creds(creds);
+    const { phoneNumberId, accessToken, businessAccountId } = resolved;
     if (!phoneNumberId || !accessToken) {
       return {
         ok: false,
@@ -366,6 +367,7 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
       let data: Record<string, string | undefined>;
       try {
         data = await this.graph(
+          resolved,
           'get',
           phoneNumberId,
           'the phone number lookup',
@@ -377,6 +379,7 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
         // fields that have always existed, so one stale field name cannot hide a working connection.
         if (error instanceof MetaGraphError && error.code === 100) {
           data = await this.graph(
+            resolved,
             'get',
             phoneNumberId,
             'the phone number lookup',
@@ -408,6 +411,7 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
             whatsapp_business_api_data?: { name?: string; id?: string };
           }[];
         }>(
+          resolved,
           'get',
           `${businessAccountId}/subscribed_apps`,
           'the webhook subscription lookup',
@@ -432,17 +436,27 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
    * Register the number for Cloud API use. Meta requires this once per number before it can send,
    * and the PIN it sets becomes the number's two-step-verification PIN — the admin chooses it.
    */
-  async registerPhoneNumber(pin: string): Promise<void> {
-    const { phoneNumberId, accessToken } = this.config.whatsapp;
+  async registerPhoneNumber(
+    pin: string,
+    creds?: WaNumberCredentials,
+  ): Promise<void> {
+    const resolved = this.creds(creds);
+    const { phoneNumberId, accessToken } = resolved;
     if (!phoneNumberId || !accessToken) {
       throw new Error(
         'WHATSAPP_PHONE_NUMBER_ID and WHATSAPP_ACCESS_TOKEN must both be set first.',
       );
     }
-    await this.graph('post', `${phoneNumberId}/register`, 'the registration', {
-      messaging_product: 'whatsapp',
-      pin,
-    });
+    await this.graph(
+      resolved,
+      'post',
+      `${phoneNumberId}/register`,
+      'the registration',
+      {
+        messaging_product: 'whatsapp',
+        pin,
+      },
+    );
   }
 
   /**
@@ -451,14 +465,16 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
    * Without this the webhook handshake still succeeds and the dashboard looks finished, but Meta
    * never delivers a single message — the quietest way for this setup to fail.
    */
-  async subscribeApp(): Promise<void> {
-    const { businessAccountId, accessToken } = this.config.whatsapp;
+  async subscribeApp(creds?: WaNumberCredentials): Promise<void> {
+    const resolved = this.creds(creds);
+    const { businessAccountId, accessToken } = resolved;
     if (!businessAccountId || !accessToken) {
       throw new Error(
         'WHATSAPP_BUSINESS_ACCOUNT_ID and WHATSAPP_ACCESS_TOKEN must both be set first.',
       );
     }
     await this.graph(
+      resolved,
       'post',
       `${businessAccountId}/subscribed_apps`,
       'the webhook subscription',
@@ -467,13 +483,15 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
 
   /** One authenticated Graph API call, with Meta's error unpacked into a MetaGraphError. */
   private async graph<T = Record<string, string | undefined>>(
+    creds: WaNumberCredentials,
     method: 'get' | 'post',
     path: string,
     action: string,
     body?: unknown,
     options: AxiosRequestConfig = {},
   ): Promise<T> {
-    const { accessToken, graphApiVersion } = this.config.whatsapp;
+    const { accessToken } = creds;
+    const { graphApiVersion } = this.config.whatsapp;
     const url = `https://graph.facebook.com/${graphApiVersion}/${path}`;
     const config: AxiosRequestConfig = {
       timeout: 10_000,
@@ -492,6 +510,18 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
     } catch (error) {
       throw new MetaGraphError(action, error);
     }
+  }
+
+  /**
+   * The number to act as: the one passed in, else the env-configured platform number. A partial
+   * override is never mixed with env values — an organisation's token must not be sent with the
+   * platform's number id, or the other way round.
+   */
+  private creds(creds?: WaNumberCredentials): WaNumberCredentials {
+    if (creds) return creds;
+    const { phoneNumberId, accessToken, businessAccountId } =
+      this.config.whatsapp;
+    return { phoneNumberId, accessToken, businessAccountId };
   }
 
   /** Meta sends E.164 without a '+'; normalise both directions to the bare digits. */

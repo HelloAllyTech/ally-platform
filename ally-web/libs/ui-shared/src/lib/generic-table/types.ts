@@ -109,10 +109,12 @@ export type TableFilter = Array<{ key: string; value: string | string[] }>;
  * @param {FilterPopoverProps} props - The props for the filter popover.
  */
 export interface FilterPopoverProps {
-  anchorEl: HTMLElement | null;
   open: boolean;
   onClose: () => void;
   column: (Column<any> & { filterOptions: { label: string; value: string }[] }) | null;
+  /** Filters the MULTISELECT/SINGLESELECT option list only — TEXT has its
+   * own dedicated value below, so this never doubles as a filter's
+   * committed value the way it once did. */
   searchText: string;
   onSearchTextChange: (text: string) => void;
   selectedValues: string[];
@@ -123,6 +125,9 @@ export interface FilterPopoverProps {
   onDateSelect?: (key: string, value: string[]) => void;
   /** Applies a numeric range filter as a [min, max] string tuple. */
   onNumberSelect?: (key: string, value: string[]) => void;
+  /** TEXT filter type's own draft/committed value. */
+  textValue: string;
+  onTextChange: (text: string) => void;
   anchorOrigin?: { vertical: "top" | "bottom"; horizontal: "left" | "right" };
 }
 

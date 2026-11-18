@@ -38,10 +38,10 @@ const TranslationProgressJob: FC<{
         : "bg-blue-500";
 
   return (
-    <div className="w-80 max-w-full rounded-lg border border-[#EFEFEF] bg-white shadow-lg overflow-hidden">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-[#EFEFEF]">
+    <div className="w-80 max-w-full rounded-lg border border-gray-100 bg-white shadow-lg overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100">
         <div className="flex flex-col min-w-0">
-          <span className="text-sm font-medium text-[#1A1A1A] truncate">
+          <span className="text-sm font-medium text-typography-900 truncate">
             {job.scenarioTitle || "Roleplay"}
           </span>
           <span className="text-xs text-gray-500">{statusLabel(job)}</span>

@@ -26,6 +26,20 @@ export const ROADMAP_VOTE_GRANT_DAILY = 5;
 export const ROADMAP_VOTE_GRANT_EXPIRY_DAYS = 30;
 
 /**
+ * Breadth multiplier — a vote is worth 1.0 to 1.0 + MAX_BONUS of a vote, by how many DIFFERENT
+ * colleagues the voter has backed inside a rolling window. Own opportunities earn nothing.
+ *
+ *   multiplier = 1 + MAX_BONUS * min(1, qualifying / target)
+ *   target     = min(TARGET_AUTHORS, distinct other authors with a votable opportunity), at least 1
+ *
+ * TARGET_AUTHORS is a cap, not a fixed goal: with few colleagues filing, a flat 8 would be
+ * unreachable. All three are product-tunable; nothing else reads them.
+ */
+export const ROADMAP_MULTIPLIER_MAX_BONUS = 0.3;
+export const ROADMAP_MULTIPLIER_TARGET_AUTHORS = 8;
+export const ROADMAP_MULTIPLIER_WINDOW_DAYS = 14;
+
+/**
  * The `productGoal` every bug report is filed under. `productGoal` is a required text
  * FK-by-name into `roadmap_product_goals` (see the entity) and no bug-report form has a
  * goal/category picker (product decision — see CreateBugReportDto), so something has to be
@@ -41,7 +55,7 @@ export const BUG_REPORT_DEFAULT_PRODUCT_GOAL = 'Reliability & Trust';
  * every caller is authenticated) via CustomThrottlerGuard. 8/hour is generous enough for a
  * genuinely frustrated user filing a few reports in a session while still bounding a
  * scripted-spam or retry-loop client — there is no product-defined cadence for this today
- * (Stacks search turned up nothing Ally-specific), so this is a judgement call, easy to
+ * (a guidance search turned up nothing Ally-specific), so this is a judgement call, easy to
  * retune later since it is not read anywhere else.
  *
  * Applies to internal reporters too, now that the admin roadmap's "Report a bug" button
@@ -226,7 +240,6 @@ export const ROADMAP_RANK = {
 export const ROADMAP_QUEUE_STAGES = [
   RoadmapOpportunityStage.NEW,
   RoadmapOpportunityStage.PRIORITISED,
-  RoadmapOpportunityStage.UNDER_DEVELOPMENT,
 ] as const;
 
 export const ROADMAP_LIST_DEFAULTS = {
@@ -324,11 +337,11 @@ export const ROADMAP_PROMPT_CODES = {
  * live in the interview's local state for the length of one conversation and are never
  * persisted against a filed row.)
  *
- * These five apply the team's discovery guidance at the point of filing (Stacks: "Filter
+ * These five apply the team's discovery guidance at the point of filing ("Filter
  * opportunities by specificity and validation criteria"), with three deliberate departures from
  * the strict reading of it:
  *
- * 1. A GAIN COUNTS, not only a pain. Stacks: "Frame customer needs as opportunities, not just
+ * 1. A GAIN COUNTS, not only a pain. "Frame customer needs as opportunities, not just
  *    problems" — the frame has to hold desires and delights, or the checklist quietly rejects
  *    every idea that adds something rather than repairing something.
  * 2. A PROPOSED SOLUTION IS ALLOWED, as long as the goal stands without it. The strict rule
@@ -337,7 +350,7 @@ export const ROADMAP_PROMPT_CODES = {
  *    actually matters is the ORDER: strike the proposed build and there must still be a stated
  *    goal underneath. `goal_before_solution` grades that, and nothing grades solution-mention
  *    on its own.
- * 3. BROAD IS ALLOWED; VAGUE IS NOT. Stacks' specificity rule ("Frame Opportunities with
+ * 3. BROAD IS ALLOWED; VAGUE IS NOT. The specificity rule ("Frame Opportunities with
  *    Specificity, Not Themes") rules out themes, design guidelines and feelings — and counts a
  *    broad need ("finding a show to watch should be easier") among its good examples. The
  *    `specific` gate this replaced (2026-10-20) read it as NARROW — "one situation at one
@@ -392,7 +405,7 @@ export const ROADMAP_READINESS_CRITERIA = [
  * The sizes an opportunity may be filed at: all of them. An opportunity does not have to be
  * narrow to be well defined, so size is information for voters and for the board's ranking
  * (which already scores L and up lower), not a gate. Until 2026-10-20 only S and M could be
- * filed (after Stacks' "Select leaf-node opportunities for iterative value delivery"), which
+ * filed (after "Select leaf-node opportunities for iterative value delivery"), which
  * meant the interview withheld every broad idea and asked which single slice to keep; slicing
  * is now the team's call when they pick it up, not a precondition for putting it on the board.
  *
@@ -413,6 +426,13 @@ export const ROADMAP_FILEABLE_EFFORTS = ['s', 'm', 'l', 'xl', 'xxl'] as const;
  * sized yet" means.
  */
 export const ROADMAP_EFFORT_UNSIZED = 'unsized';
+
+/**
+ * Sentinel the owner FILTER accepts alongside owner names, meaning "nobody owns this" — no linked
+ * user and no legacy owner text. Same idea as ROADMAP_EFFORT_UNSIZED: a filter-only value, never
+ * stored. It exists for the triage Inbox, which needs to find work that has no owner yet.
+ */
+export const ROADMAP_OWNER_UNASSIGNED = 'unassigned';
 
 /**
  * How long a signed readiness verdict stays spendable.
@@ -494,4 +514,5 @@ export const ROADMAP_OWNER_EMAILS: readonly string[] = [
   'ajey@helloally.ai',
   'shubham.bhoite+admin@helloally.ai',
   'gopikrishnan.sasikumar@helloally.ai',
+  'shehbaz.sayed+admin@helloally.ai',
 ] as const;

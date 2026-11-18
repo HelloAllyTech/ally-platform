@@ -17,6 +17,8 @@ interface PhoneMappingPanelProps {
   /** Null = add. */
   mapping: WaPhoneMapping | null;
   onClose: () => void;
+  /** Opened from one organisation's WhatsApp page: every number goes to it, with no picker. */
+  fixedTenantId?: string;
 }
 
 interface TenantOption {
@@ -39,6 +41,7 @@ export const PhoneMappingPanel: React.FC<PhoneMappingPanelProps> = ({
   isOpen,
   mapping,
   onClose,
+  fixedTenantId,
 }) => {
   const isEdit = Boolean(mapping);
 
@@ -58,9 +61,9 @@ export const PhoneMappingPanel: React.FC<PhoneMappingPanelProps> = ({
   useEffect(() => {
     if (!isOpen) return;
     setPhone(mapping?.phoneE164 ?? "");
-    setTenantId(mapping?.tenantId ?? "");
+    setTenantId(mapping?.tenantId ?? fixedTenantId ?? "");
     setLabel(mapping?.label ?? "");
-  }, [isOpen, mapping]);
+  }, [isOpen, mapping, fixedTenantId]);
 
   const validation = useMemo(() => {
     if (!phone.trim()) return en.whatsappBot.phoneMappings.validationPhone;
@@ -121,24 +124,26 @@ export const PhoneMappingPanel: React.FC<PhoneMappingPanelProps> = ({
         />
       </EntityField>
 
-      <EntityField
-        label={en.whatsappBot.phoneMappings.organisationLabel}
-        required
-        help={en.whatsappBot.phoneMappings.organisationHelp}
-      >
-        <CarbonDropdown
-          id="wa-mapping-tenant"
-          titleText=""
-          hideLabel
+      {!fixedTenantId && (
+        <EntityField
           label={en.whatsappBot.phoneMappings.organisationLabel}
-          items={tenantOptions}
-          itemToString={(item: TenantOption | null) => item?.label ?? ""}
-          selectedItem={tenantOptions.find(option => option.id === tenantId) ?? null}
-          onChange={({ selectedItem }: { selectedItem?: TenantOption | null }) =>
-            setTenantId(selectedItem?.id ?? "")
-          }
-        />
-      </EntityField>
+          required
+          help={en.whatsappBot.phoneMappings.organisationHelp}
+        >
+          <CarbonDropdown
+            id="wa-mapping-tenant"
+            titleText=""
+            hideLabel
+            label={en.whatsappBot.phoneMappings.organisationLabel}
+            items={tenantOptions}
+            itemToString={(item: TenantOption | null) => item?.label ?? ""}
+            selectedItem={tenantOptions.find(option => option.id === tenantId) ?? null}
+            onChange={({ selectedItem }: { selectedItem?: TenantOption | null }) =>
+              setTenantId(selectedItem?.id ?? "")
+            }
+          />
+        </EntityField>
+      )}
 
       {/* Shown, not resolved. The mapping wins on purpose — an admin typed it — but an admin
           about to save one that disagrees with a profile should know before, not find out from

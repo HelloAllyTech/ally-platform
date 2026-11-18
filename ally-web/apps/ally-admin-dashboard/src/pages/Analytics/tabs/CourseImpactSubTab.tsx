@@ -60,7 +60,7 @@ const Section = ({
 
 /** A small labelled number. Text carries the meaning; nothing here is colour-only. */
 const Stat = ({ label, value, note }: { label: string; value: string; note: string }) => (
-  <div className="flex flex-col gap-0.5 rounded border border-[#e0e0e0] p-3">
+  <div className="flex flex-col gap-0.5 rounded border border-border-light p-3">
     <span className="text-xs text-typography-500">{label}</span>
     <span className="text-2xl font-semibold tabular-nums text-typography-900">{value}</span>
     <span className="text-xs leading-snug text-typography-500">{note}</span>

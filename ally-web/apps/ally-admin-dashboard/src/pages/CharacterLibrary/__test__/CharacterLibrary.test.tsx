@@ -12,7 +12,6 @@ import * as api from "@api";
 import { CharacterLibrary } from "../CharacterLibrary";
 
 vi.mock("@assets", () => ({
-  Book: () => <span data-testid="book-icon" />,
   Trash: () => <span data-testid="trash-icon" />,
   WandStars: () => <span data-testid="wand-stars-icon" />,
 }));
@@ -129,15 +128,13 @@ vi.mock("@components", () => ({
     ) : null,
 }));
 
-vi.mock("@components/character-corpus", () => ({
-  CharacterCorpusPanel: ({ isOpen, onClose }: any) =>
-    isOpen ? (
-      <div data-testid="character-corpus-panel">
-        <button onClick={onClose} data-testid="corpus-panel-close">
-          Close
-        </button>
-      </div>
-    ) : null,
+// The card gates and counts itself; its own test covers that. Here it only has to be placed.
+vi.mock("@components/character-insights", () => ({
+  CharacterInsightsCard: ({ compact }: any) => (
+    <a href="/context-library?collection=character_insights" data-testid="character-insights-card">
+      {compact ? "compact" : "card"}
+    </a>
+  ),
 }));
 
 vi.mock("@components/types", () => ({
@@ -160,9 +157,6 @@ vi.mock("@constants", () => ({
       createNewCharacter: "Create new character",
       createWithInterviewAgent: "Create with interview agent",
       allyOwnedCharacter: "Ally (global)",
-    },
-    characterCorpus: {
-      trigger: "Reference corpus",
     },
     common: {
       loading: "Loading...",
@@ -206,10 +200,8 @@ const mockPermissions = vi.fn(() => [
   "edit:scenario-character",
   "delete:scenario-character",
 ]);
-const mockCanCurateCorpus = vi.fn(() => true);
 vi.mock("@hooks", () => ({
   useUser: () => ({ permissions: mockPermissions() }),
-  useCanCurateCharacterCorpus: () => mockCanCurateCorpus(),
 }));
 
 const toastSuccess = vi.fn();
@@ -271,7 +263,6 @@ describe("CharacterLibrary", () => {
       "edit:scenario-character",
       "delete:scenario-character",
     ]);
-    mockCanCurateCorpus.mockReturnValue(true);
     mockDeleteCharacter.mockReturnValue({ unwrap: () => Promise.resolve() });
     mockUpdateCharacter.mockReturnValue({ unwrap: () => Promise.resolve() });
     (api.useGetCharactersQuery as ReturnType<typeof vi.fn>).mockReturnValue({
@@ -565,49 +556,29 @@ describe("CharacterLibrary", () => {
     });
   });
 
-  describe("reference corpus", () => {
+  describe("character insights", () => {
     /**
-     * The corpus is a LIBRARY asset — every interview searches the same documents — so its
-     * door belongs on the list. It used to exist only inside the interview page, which boots a
-     * session and fires a hidden kickoff message, so uploading a PDF cost a model call and
-     * left a stray session behind.
+     * What every interview draws on is a LIBRARY asset, so its door is on the list as well as
+     * in the interview. It is managed in the Context Library; the page only summarises it.
      */
-    it("opens the corpus from the list without routing into an interview", () => {
+    it("shows the full summary card beside the title", () => {
       renderCharacterLibrary();
-
-      fireEvent.click(screen.getByTestId("toolbar-tertiary-action"));
-
-      expect(screen.getByTestId("character-corpus-panel")).toBeInTheDocument();
-      // The interview route is the expensive path this button exists to avoid.
-      expect(mockNavigate).not.toHaveBeenCalled();
+      expect(screen.getByTestId("character-insights-card")).toHaveTextContent("card");
+      expect(screen.getByTestId("character-insights-card")).toHaveAttribute(
+        "href",
+        "/context-library?collection=character_insights",
+      );
     });
 
-    it("names the material rather than the mechanism", () => {
-      renderCharacterLibrary();
-      expect(screen.getByTestId("toolbar-tertiary-action")).toHaveTextContent("Reference corpus");
-    });
-
-    it("hides it from anyone who cannot curate", () => {
-      // Same feature toggle and permission the corpus endpoints enforce; a UI-only gate would
-      // be decoration.
-      mockCanCurateCorpus.mockReturnValue(false);
+    it("no longer offers a toolbar action of its own", () => {
       renderCharacterLibrary();
       expect(screen.queryByTestId("toolbar-tertiary-action")).toBeNull();
     });
 
-    it("gives way to the selection toolbar", () => {
-      // With a selection live the toolbar becomes that selection's own; offering the corpus
-      // next to "Delete 3 characters" would read as acting on them.
+    it("stays put while a selection is live, since it acts on nothing", () => {
       renderCharacterLibrary();
       fireEvent.click(screen.getByTestId("trigger-selection-change"));
-      expect(screen.queryByTestId("toolbar-tertiary-action")).toBeNull();
-    });
-
-    it("closes again", () => {
-      renderCharacterLibrary();
-      fireEvent.click(screen.getByTestId("toolbar-tertiary-action"));
-      fireEvent.click(screen.getByTestId("corpus-panel-close"));
-      expect(screen.queryByTestId("character-corpus-panel")).toBeNull();
+      expect(screen.getByTestId("character-insights-card")).toBeInTheDocument();
     });
   });
 });

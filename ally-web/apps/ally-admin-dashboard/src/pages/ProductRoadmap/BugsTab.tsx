@@ -21,7 +21,7 @@ import { KeyboardShortcutSheet } from "../BugHunter/KeyboardShortcutSheet";
  * them, which was right for triage and wrong for planning: the person deciding
  * what next month contains lost the ability to see what is broken without
  * leaving the roadmap for a tab built around a different question. The two
- * readers want the same rows and different verbs — Stacks' *Interface patterns
+ * readers want the same rows and different verbs — *Interface patterns
  * for evolving human roles in agent systems* is the argument for treating them
  * as two readers rather than widening one screen until it serves both.
  *

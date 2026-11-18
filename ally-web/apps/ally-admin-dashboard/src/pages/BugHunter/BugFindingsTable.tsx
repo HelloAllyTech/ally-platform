@@ -257,6 +257,7 @@ const nextStepLabels = (): Record<NextStep, string> => ({
   answer: en.bugHunter.nextStepAnswer,
   retry: en.bugHunter.nextStepRetry,
   merge: en.bugHunter.nextStepMerge,
+  review: en.bugHunter.nextStepReview,
   release: en.bugHunter.nextStepRelease,
 });
 
@@ -941,7 +942,7 @@ export const BugFindingsTable: FC<BugFindingsTableProps> = ({
     <div id={BUG_FINDINGS_TABLE_ANCHOR_ID} className="scroll-mt-4">
       {/* Above the tabs on purpose: the scope changes what every count below
           it counts, so a reader who has not seen this line will read
-          "Backlog 7" as "seven bugs are waiting". Stacks' *Making Agent
+          "Backlog 7" as "seven bugs are waiting". *Making Agent
           Trustworthiness Visible Through Transparency* is the argument for
           spelling out the audit trail rather than quietly narrowing the view. */}
       {run && (
@@ -1038,7 +1039,7 @@ export const BugFindingsTable: FC<BugFindingsTableProps> = ({
         ) : view.matched === 0 ? (
           // An empty tab says what lands in it, so "nothing here" reads as
           // nothing yet rather than as something broken — and the counts on
-          // the tabs above are the way on (Stacks: *The Four-Second Rule:
+          // the tabs above are the way on (*The Four-Second Rule:
           // Confusion Triggers Disengagement*).
           <div
             className="border border-border-light rounded-lg py-10 text-center"
@@ -1304,8 +1305,20 @@ export const BugFindingsTable: FC<BugFindingsTableProps> = ({
                         <TableCell className={`${rowPadding} pr-3 whitespace-nowrap`}>
                           <span className="inline-flex items-center gap-1.5">
                             <BugFindingStatusBadge status={finding.status} />
-                            {isMidFlight(finding.status) && (
-                              <BrailleSpinner className="text-typography-500" />
+                            {/* A plan parked on a person: say which step and
+                                what it needs, and no spinner — nothing is
+                                running on it. */}
+                            {finding.attention ? (
+                              <span className="text-xs text-orange-700">
+                                {(finding.attention.kind === "merge"
+                                  ? en.bugHunter.planAttentionMerge
+                                  : en.bugHunter.planAttentionReview
+                                ).replace("{n}", String(finding.attention.stepIndex + 1))}
+                              </span>
+                            ) : (
+                              isMidFlight(finding.status) && (
+                                <BrailleSpinner className="text-typography-500" />
+                              )
                             )}
                           </span>
                         </TableCell>

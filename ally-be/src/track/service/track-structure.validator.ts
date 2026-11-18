@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import {
   ArticleContent,
+  ArticleExperience,
   ArticleQuestion,
   ArticleResource,
   JournalContent,
@@ -40,10 +41,12 @@ import {
   TrackGameKey,
 } from '../type/game.type';
 import {
+  BranchingExperience,
   BranchingImage,
   BranchingNode,
   BranchingOutcomeTone,
   BranchingScenarioContent,
+  BRANCHING_MAX_IMAGE_CAST,
   branchingEndingScore,
   isBranchingEnding,
 } from '../type/branching.type';
@@ -68,6 +71,9 @@ import {
   TRACK_MAX_ANNOTATION_UNITS,
   TRACK_MAX_ARTICLE_QUESTIONS,
   TRACK_MAX_ARTICLE_RESOURCES,
+  TRACK_MAX_ARTICLE_TAKEAWAYS,
+  TRACK_MAX_ARTICLE_TAKEAWAY_LENGTH,
+  TRACK_MAX_ARTICLE_COVER_ALT_LENGTH,
   TRACK_LIKERT_MAX_SCALE_POINTS,
   TRACK_LIKERT_MAX_STATEMENTS,
   TRACK_LIKERT_MIN_SCALE_POINTS,
@@ -351,6 +357,30 @@ export function validateBranchingContent(
   if (content.intro !== undefined && typeof content.intro !== 'string') {
     fail(`${label}: intro must be text.`);
   }
+  if (
+    content.experience !== undefined &&
+    !Object.values(BranchingExperience).includes(content.experience)
+  ) {
+    fail(`${label}: experience must be classic or story.`);
+  }
+  if (content.imageCast !== undefined) {
+    if (
+      !Array.isArray(content.imageCast) ||
+      content.imageCast.length > BRANCHING_MAX_IMAGE_CAST ||
+      content.imageCast.some(
+        (member) =>
+          !member ||
+          typeof member.characterId !== 'string' ||
+          !member.characterId.trim() ||
+          typeof member.name !== 'string' ||
+          member.name.length > 200,
+      )
+    ) {
+      fail(
+        `${label}: the image cast can have at most ${BRANCHING_MAX_IMAGE_CAST} characters, each with an id and a name.`,
+      );
+    }
+  }
 
   const nodesById = new Map<string, BranchingNode>();
   for (const node of content.nodes) {
@@ -556,6 +586,58 @@ function validateArticleContent(
   }
   validateArticleQuestions(content, title);
   validateArticleResources(content.resources, title);
+  validateArticlePresentation(content, title);
+}
+
+/**
+ * The reading experience, cover photo and key takeaways. The cover URL ends
+ * up in an `<img src>` on two frontends, so it has to be an uploaded https
+ * file, as a branching scene's image does.
+ */
+function validateArticlePresentation(
+  content: ArticleContent,
+  title: string,
+): void {
+  const label = `Article component "${title}"`;
+  if (
+    content.experience !== undefined &&
+    !Object.values(ArticleExperience).includes(content.experience)
+  ) {
+    fail(`${label}: reading experience must be classic, magazine or cards.`);
+  }
+
+  if (content.cover !== undefined && content.cover !== null) {
+    const { url, alt } = content.cover;
+    if (typeof url !== 'string' || !url.trim().startsWith('https://')) {
+      fail(`${label}: the cover photo must be an uploaded file (https link).`);
+    }
+    if (
+      alt !== undefined &&
+      (typeof alt !== 'string' ||
+        alt.length > TRACK_MAX_ARTICLE_COVER_ALT_LENGTH)
+    ) {
+      fail(
+        `${label}: the cover photo description must be ${TRACK_MAX_ARTICLE_COVER_ALT_LENGTH} characters or fewer.`,
+      );
+    }
+  }
+
+  const takeaways = content.takeaways;
+  if (takeaways === undefined || takeaways === null) return;
+  if (!Array.isArray(takeaways)) fail(`${label}: takeaways must be a list.`);
+  if (takeaways.length > TRACK_MAX_ARTICLE_TAKEAWAYS) {
+    fail(`${label}: at most ${TRACK_MAX_ARTICLE_TAKEAWAYS} key takeaways.`);
+  }
+  takeaways.forEach((takeaway, index) => {
+    if (typeof takeaway !== 'string' || !takeaway.trim()) {
+      fail(`${label}: key takeaway ${index + 1} is empty.`);
+    }
+    if (takeaway.trim().length > TRACK_MAX_ARTICLE_TAKEAWAY_LENGTH) {
+      fail(
+        `${label}: key takeaway ${index + 1} must be ${TRACK_MAX_ARTICLE_TAKEAWAY_LENGTH} characters or fewer.`,
+      );
+    }
+  });
 }
 
 /**
@@ -1300,6 +1382,30 @@ function validateOpenEnded(
 }
 
 /**
+ * A roleplay's completion rule — completionLogic, minScore, minDurationSeconds
+ * — is left out of the structural signature, so a trainer can change it on a
+ * course learners are already enrolled in (e.g. turn a trial roleplay that is
+ * trapping learners into "Participation only"). It is safe to change live:
+ * the rule is read fresh when each attempt ends, completion is never undone,
+ * and a learner's stored last-attempt reasons are re-checked against the
+ * current rule before they are shown (TrackEnrollmentService). assessmentMode
+ * stays in: it decides whether a learner may start a second session at all.
+ */
+const ROLEPLAY_LIVE_EDITABLE_CRITERIA = [
+  'completionLogic',
+  'minScore',
+  'minDurationSeconds',
+] as const;
+
+function signatureCriteria(item: UpsertTrackItemDto) {
+  const criteria = item.completionCriteria ?? null;
+  if (item.type !== TrackItemType.ROLEPLAY || !criteria) return criteria;
+  const locked: Record<string, unknown> = { ...criteria };
+  for (const key of ROLEPLAY_LIVE_EDITABLE_CRITERIA) delete locked[key];
+  return Object.keys(locked).length > 0 ? locked : null;
+}
+
+/**
  * Structural signature used to enforce the publish-lock rule: while a track
  * has enrollments, edits that change this signature are rejected (content-safe
  * edits — titles, article html, explanations, prompt text — do not change it).
@@ -1329,7 +1435,7 @@ export function computeStructuralSignature(
           branching: branchingStructuralSignature(item),
           bucketSort: bucketSortStructuralSignature(item),
           video: videoStructuralSignature(item),
-          completionCriteria: item.completionCriteria ?? null,
+          completionCriteria: signatureCriteria(item),
         })),
     }));
   return JSON.stringify(signature);

@@ -1,1 +1,0 @@
-export {DeleteRenameModal} from './DeleteRenameModal';

@@ -22,6 +22,9 @@ export const ANALYTICS_EVENTS = {
   SIMULATION_STARTED: "simulation_started",
   SIMULATION_COMPLETED: "simulation_completed",
   SIMULATION_CREDITS_USED: "simulation_credits_used",
+
+  // Admin: raised a quiz's attempt limit on a published course. Carries trackItemId + maxAttempts.
+  LIVE_QUIZ_ATTEMPTS_INCREASED: "live_quiz_attempts_increased",
   // Diagnostic: how long after the agent joins can the learner actually hear it.
   // Splits the wait into "we were told about the track" vs "we subscribed to it",
   // so a silent-agent report can be attributed instead of guessed at.
@@ -162,6 +165,21 @@ export const ANALYTICS_EVENTS = {
 
   // Admin
   SIDEBAR_INTERACTION: "sidebar_interaction",
+  // Admin usage tracking (which screens/actions the internal team actually uses). No PII:
+  // route is the route PATTERN (ids stripped), never free text.
+  ADMIN_PAGE_VIEWED: "admin_page_viewed",
+  ADMIN_ACTION: "admin_action",
+  ADMIN_SEARCH_USED: "admin_search_used",
+  // Admin idea capture (the header mic-and-bulb). Save rate = draft_saved / session_started,
+  // split by capture_mode. Never send the idea's text.
+  IDEA_CAPTURE_SESSION_STARTED: "idea_capture_session_started",
+  IDEA_CAPTURE_DRAFT_SAVED: "idea_capture_draft_saved",
+  IDEA_CAPTURE_SESSION_ABANDONED: "idea_capture_session_abandoned",
+  // Roadmap v2 time targets (plans §4.16): one started/completed pair per core job, told apart
+  // by `job`. Completed carries `duration_ms`. Both carry `role` (the Roadmap role) and, where
+  // there is one, `item_id` (the idea's code). Never a title, an answer or a name.
+  ROADMAP_JOB_STARTED: "roadmap_job_started",
+  ROADMAP_JOB_COMPLETED: "roadmap_job_completed",
 } as const;
 
 /** `source` values for the /v2 homepage's `home_v2_*` events. */
@@ -310,6 +328,10 @@ export const ANALYTICS_PROPS = {
   QUERY_LENGTH: "query_length",
   RESULT_COUNT: "result_count",
 
+  // Admin usage tracking (screen / action reuse HELPLINE_SCREEN / ACTION)
+  ROUTE: "route",
+  TENANT_TIER: "tenant_tier",
+
   // Upgrade / paywall context
   ORG_ID: "org_id",
   TRIGGER_SOURCE: "trigger_source",
@@ -371,4 +393,13 @@ export const ANALYTICS_PROPS = {
 
   // Sidebar context
   ACTION: "action",
+
+  // Idea capture: "voice" when any of the text was dictated, else "typed"
+  CAPTURE_MODE: "capture_mode",
+
+  // Roadmap v2 job timing (roadmap_job_*): which job, how long, and the Roadmap role
+  // (none | viewer | idea | builder | owner). The idea's code goes in ITEM_ID.
+  ROADMAP_JOB: "job",
+  DURATION_MS: "duration_ms",
+  ROADMAP_ROLE: "role",
 } as const;

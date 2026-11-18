@@ -30,7 +30,7 @@ describe('RoadmapCopilotToolsService', () => {
       interviewNotes as any,
       {} as any,
       githubRead as any,
-      { search: jest.fn(), getChunks: jest.fn() } as any,
+      {} as any,
       evidence as any,
     );
     return { service, evidence, interviewNotes, githubRead };
@@ -58,8 +58,8 @@ describe('RoadmapCopilotToolsService', () => {
       'github_repo_tree',
       'wiki_search',
       'wiki_read',
-      'stacks_search',
-      'stacks_get',
+      'principles_search',
+      'principles_get',
       'submit_turn',
     ]);
   });

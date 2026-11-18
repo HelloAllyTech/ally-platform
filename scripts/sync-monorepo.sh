@@ -32,7 +32,13 @@ REPOS=(
   "ally-web|remote-ally-web|git@github.com:HelloAllyTech/ally-web.git|master|+refs/tags/admin-v*:refs/tags/admin-v* +refs/tags/helpline-v*:refs/tags/helpline-v* +refs/tags/v*:refs/tags/web-v*"
   "ally-ai|remote-ally-ai|git@github.com:HelloAllyTech/ally-ai.git|master|+refs/tags/*:refs/tags/ai-*"
   "ally-ai-learn|remote-ally-ai-learn|git@github.com:HelloAllyTech/ally-ai-learn.git|master|+refs/tags/*:refs/tags/learn-*"
-  "ally-mobile|remote-ally-mobile|git@github.com:HelloAllyTech/ally-mobile.git|master|+refs/tags/*:refs/tags/*"
+  # ally-mobile (RN): archived read-only at the GitHub-org level before the
+  # 2026-11 Flutter rename — nothing left to sync, and its old subdir name
+  # ("ally-mobile") is now Flutter's folder, not this source's. Commented
+  # out rather than repointed: merging into "ally-mobile-rn-archive" would
+  # just resume syncing a repo nobody can push to anymore.
+  # "ally-mobile|remote-ally-mobile|git@github.com:HelloAllyTech/ally-mobile.git|master|+refs/tags/*:refs/tags/*"
+  "ally-mobile|remote-ally-mobile-flutter|git@github.com:HelloAllyTech/ally-mobile-flutter.git|master|+refs/tags/*:refs/tags/*"
   "helloallytech.github.io|remote-wiki|git@github.com:HelloAllyTech/helloallytech.github.io.git|main|"
 )
 

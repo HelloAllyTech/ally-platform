@@ -40,4 +40,17 @@ export class WaConversation extends BaseWithoutTenantEntity {
     nullable: true,
   })
   lastLanguage?: string | null;
+
+  /**
+   * The bot that answered this thread, stamped when it starts. Kept on the thread rather than
+   * derived from the number, so history stays with the bot that answered it when a number is
+   * later moved to another bot.
+   */
+  @Index('idx_wa_conversations_chatbot', ['chatbotId', 'lastMessageAt'])
+  @Column({ type: 'uuid', name: 'chatbot_id', nullable: true })
+  chatbotId?: string | null;
+
+  /** The connector the thread came in through. Null on the platform number. */
+  @Column({ type: 'uuid', name: 'connector_id', nullable: true })
+  connectorId?: string | null;
 }

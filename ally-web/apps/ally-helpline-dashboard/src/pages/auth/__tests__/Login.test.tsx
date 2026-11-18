@@ -22,6 +22,7 @@ import { describe, expect, it, vi, beforeAll, beforeEach, afterAll, afterEach } 
 
 import { useGenerateOTPMutation } from "@api";
 
+import { ALLY_BRANDING, BrandingContext } from "../../../branding";
 import { Login } from "../Login";
 
 // Mock @react-oauth/google
@@ -502,6 +503,57 @@ describe("Login Component", () => {
           <Login />
         </TestWrapper>
       )).not.toThrow();
+    });
+  });
+
+  /**
+   * TEST GROUP: Branded sign-in link
+   *
+   * An org's own sign-in link (`?org=<code>`) resolves, through
+   * BrandingProvider, to that org's branding. The page then greets with the
+   * org's name and welcome line and marks itself "Powered by Ally"; a plain
+   * visit is unchanged. The provider itself is covered in src/branding.
+   */
+  describe("Branded sign-in link", () => {
+    const acme = {
+      ...ALLY_BRANDING,
+      enabled: true,
+      displayName: "Acme Helpline",
+      logoUrl: "https://assets.example/logo.png",
+      welcomeLine: "Welcome to the Acme training space",
+    };
+
+    const renderBranded = (enabled: boolean) =>
+      render(
+        <Provider store={mockStore}>
+          <MemoryRouter initialEntries={["/login"]}>
+            <BrandingContext.Provider value={{ branding: enabled ? acme : ALLY_BRANDING, enabled }}>
+              <Login />
+            </BrandingContext.Provider>
+          </MemoryRouter>
+        </Provider>,
+      );
+
+    it("greets with the org's name, logo and welcome line, and says Powered by Ally", () => {
+      renderBranded(true);
+
+      expect(screen.getByTestId("login-org-greeting")).toHaveTextContent(/Acme Helpline/);
+      expect(screen.getByTestId("login-org-logo")).toHaveAttribute(
+        "src",
+        "https://assets.example/logo.png",
+      );
+      expect(screen.getByText("Welcome to the Acme training space")).toBeInTheDocument();
+      expect(screen.getByText(/powered by ally/i)).toBeInTheDocument();
+    });
+
+    it("keeps the Ally greeting on a plain visit", () => {
+      renderBranded(false);
+
+      expect(screen.queryByTestId("login-org-greeting")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("login-org-logo")).not.toBeInTheDocument();
+      // Two Ally marks on a plain visit: the greeting and the corner link.
+      expect(screen.getAllByTestId("ally-logo")).toHaveLength(2);
+      expect(screen.queryByText(/powered by ally/i)).not.toBeInTheDocument();
     });
   });
 

@@ -38,7 +38,7 @@ export class RoadmapAllocationRepository extends Repository<RoadmapAllocation> {
   /** Sum of every user's votes on one opportunity, across every period — the priority score. */
   async scoreForOpportunity(opportunityId: string): Promise<number> {
     const rows = await this.dataSource.query<{ total: string | null }[]>(
-      `SELECT COALESCE(SUM(votes), 0) AS total
+      `SELECT COALESCE(SUM("weightedVotes"), 0) AS total
          FROM roadmap_allocations WHERE "opportunityId" = $1`,
       [opportunityId],
     );
@@ -52,18 +52,22 @@ export class RoadmapAllocationRepository extends Repository<RoadmapAllocation> {
    */
   async votersForOpportunity(
     opportunityId: string,
-  ): Promise<{ userId: number; votes: number }[]> {
+  ): Promise<{ userId: number; votes: number; weightedVotes: number }[]> {
     const rows = await this.dataSource.query<
-      { userId: number; votes: string }[]
+      { userId: number; votes: string; weighted: string }[]
     >(
-      `SELECT "userId", SUM(votes) AS votes
+      `SELECT "userId", SUM(votes) AS votes, SUM("weightedVotes") AS weighted
          FROM roadmap_allocations
         WHERE "opportunityId" = $1
         GROUP BY "userId"
-        ORDER BY SUM(votes) DESC, "userId" ASC`,
+        ORDER BY SUM("weightedVotes") DESC, "userId" ASC`,
       [opportunityId],
     );
-    return rows.map((r) => ({ userId: r.userId, votes: Number(r.votes) }));
+    return rows.map((r) => ({
+      userId: r.userId,
+      votes: Number(r.votes),
+      weightedVotes: Math.round(Number(r.weighted) * 10) / 10,
+    }));
   }
 
   /**

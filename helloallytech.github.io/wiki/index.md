@@ -11,6 +11,7 @@ Welcome to the **Ally Developer Wiki** catalog. This catalog is parsed by the LL
 - [Architecture & Data Flow](platform/architecture.md) — Services, integrations, queues, storage, HIPAA
 - [Tech Stack](platform/tech-stack.md) — The polyglot stack across all layers
 - [Cross-Repo Agent Guide](platform/agent-guide.md) — Conventions, common tasks, and gotchas for agents
+- [Debrief Agent](platform/debrief-agent.md) — The post-roleplay debrief family (graph, Ask Ally, expert review, orchestrator, PM agent): pieces, releases, measurement, evals
 - [Language-Quality Evaluation & RCA](platform/language-quality-eval.md) — Evaluating and fixing voice-agent language quality via LLM-judge error annotation + single-variable RCA
 - [AI Lab — Prompt Workbench & Human Evaluation](platform/ai-lab.md) — Author prompt skills, run them against LLMs, and collect structured human and LLM-judge evaluations
 - [Scribe Summary Writes — Merge Semantics & Client Rules](platform/scribe-summary-writes.md) — Why scribe notes appeared not to save, the merge-based write contract, and the backend-first deploy rule
@@ -18,11 +19,12 @@ Welcome to the **Ally Developer Wiki** catalog. This catalog is parsed by the LL
 - [Login `allowedRoles` — Client-Supplied Filter & Role-Retirement Test Case](platform/login-allowed-roles.md) — Why auth calls carry a client-sent role list, how retiring a role locked every consumer user out of login, and the regression test that guards it
 - [Builder Agent — From a Sentence to a Merged Pull Request](platform/builder-agent.md) — Describe a change, get pull requests: the run protocol, the reconcile loop that reviews, approves and releases them, and what bounds it
 - [Auto-improve — Rubric-Judged Testing for System Skills](platform/auto-improve.md) — How a System Skill is tested and improved on live traffic: connected skills, the designer/router/judge loop, what the target means, why a loop pauses, Apply, and the known limits
+- [Storage Archive — Aged S3 Objects to a Hetzner Storage Box](platform/storage-archive.md) — The plan and recorded decisions for moving private S3 objects older than 30 days off AWS: scope, PHI risk acceptance, archive-only read-back, rollout
 - [Platform Stats](platform/stats.md) — **Generated.** Current counts of entities, migrations, modules, providers — so prose never has to state a number
 
 ## Product Management — ⚠️ Deprecated (2026-08-07)
 
-Superseded by the **Stacks MCP** — see [Planning with the Stacks MCP](contributing/planning-with-stacks.md). These pages are frozen and kept for history; nothing in them is a gate, and no new principles go here.
+Superseded by Ally's **Context Library** — see [Working with the Context Library](contributing/planning-with-context-library.md). These pages are frozen and kept for history; nothing in them is a gate, and no new principles go here.
 
 - [Product Management Best Practices](product/best-practices.md) — **Hub (deprecated).** The former house rules + subsection index
 - [UI & Interaction](product/ui.md) — *(deprecated)* States before styling, hierarchy, permission-aware UI, latency, accessibility, i18n
@@ -38,17 +40,18 @@ Superseded by the **Stacks MCP** — see [Planning with the Stacks MCP](contribu
 - [ally-ai](repos/ally-ai.md) — AI copilot service (FastAPI + Weaviate)
 - [ally-ai-learn](repos/ally-ai-learn.md) — Voice training agent (LiveKit + LangGraph)
 - [ally-web](repos/ally-web.md) — Web apps (Nx: Next.js + Vite/React)
-- [ally-mobile](repos/ally-mobile.md) — Mobile app (React Native)
+- [ally-mobile](repos/ally-mobile.md) — Mobile app (Flutter)
 - [infra](repos/infra.md) — Infrastructure & dev environment (Ansible + Terraform)
 - [calibrate](repos/calibrate.md) — Voice-agent evaluation framework (open-source, Python)
 - [calibrate-backend](repos/calibrate-backend.md) — Calibrate API service (FastAPI)
 - [calibrate-frontend](repos/calibrate-frontend.md) — Calibrate web UI (Next.js)
+- [ally-archiver](repos/ally-archiver.md) — Weekly S3 → Storage Box archiver (Go + htmx)
 - [ally-changelog](repos/ally-changelog.md) — Auto-written cross-repo changelog journal
 
 ## Contributing
 - [Developer Setup](contributing/dev-setup.md) — Clone repos and run the full local stack
 - [Contributing Guide](contributing/guide.md) — SDLC rules, code standards, PR process
-- [Working with the Stacks MCP](contributing/planning-with-stacks.md) — Run `/stacks:planning_context` whenever a product judgement comes up, while planning and while coding, and cite what you use
+- [Working with the Context Library](contributing/planning-with-context-library.md) — Search the Context Library yourself whenever a product or engineering judgement comes up, while planning and while coding, and cite the codes you use
 - [Release Process](contributing/release-process.md) — Shared production-release process: versioning, pipeline, troubleshooting
 - [Documentation System](contributing/docs-system.md) — How docs are routed, deduplicated, enforced in CI, and kept current
 

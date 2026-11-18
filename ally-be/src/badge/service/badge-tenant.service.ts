@@ -2,6 +2,7 @@ import { EntityManager, In, Repository } from 'typeorm';
 import {
   BadRequestException,
   Injectable,
+  InternalServerErrorException,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
@@ -139,14 +140,14 @@ export class BadgeTenantService {
         await this.badgeTenantRepository.save(badgeTenants);
       }
 
+      //
       this.logger.log(`Badge ${badge.id} assigned to tenants`);
       return finalTenantIds;
     } catch (error) {
-      this.logger.error(
+      this.logger.error(`Failed to assign badge ${badge.id} to tenants`, error);
+      throw new InternalServerErrorException(
         `Failed to assign badge ${badge.id} to tenants`,
-        error.stack,
       );
-      throw error;
     }
   }
 

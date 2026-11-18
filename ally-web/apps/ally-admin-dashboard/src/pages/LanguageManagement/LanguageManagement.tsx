@@ -20,6 +20,9 @@ import {
 } from "@constants";
 import { ScenarioLanguage } from "@types";
 
+import { LanguageReadiness } from "./LanguageReadiness";
+import { PrecedenceExplainer } from "../Providers/PrecedenceExplainer";
+
 export const ScenarioLanguages: React.FC = () => {
   const limit = 30;
   const [offset, setOffset] = useState<number>(0);
@@ -131,7 +134,7 @@ export const ScenarioLanguages: React.FC = () => {
           },
         });
         if (response.error) {
-          toast.error(en.errors.failedToCreateEvent);
+          toast.error(en.errors.failedToUpdateLanguage);
         } else {
           toast.success(en.simulation.languageUpdatedSuccessfully);
           handleSidePanelClose();
@@ -142,14 +145,16 @@ export const ScenarioLanguages: React.FC = () => {
           languages: [languageData],
         });
         if (response.error) {
-          toast.error(en.errors.failedToCreateEvent);
+          toast.error(en.errors.failedToCreateLanguage);
         } else {
           toast.success(en.simulation.languageCreatedSuccessfully);
           handleSidePanelClose();
         }
       }
     } catch {
-      toast.error(en.errors.failedToCreateEvent);
+      toast.error(
+        selectedLanguage?.id ? en.errors.failedToUpdateLanguage : en.errors.failedToCreateLanguage,
+      );
     }
   };
 
@@ -210,7 +215,7 @@ export const ScenarioLanguages: React.FC = () => {
       });
 
       if (response.error) {
-        toast.error(en.errors.failedToCreateEvent);
+        toast.error(en.errors.failedToUpdateLanguage);
         // Revert the local change on error
         setLanguages(prev => {
           const updated = [...prev];
@@ -220,10 +225,24 @@ export const ScenarioLanguages: React.FC = () => {
           return updated;
         });
       } else {
-        toast.success(en.simulation.languageUpdatedSuccessfully);
+        // Saves are instant, so offer the way back: put the previous cell value
+        // back. One toast per language so a run of edits doesn't stack them.
+        toast.success(en.simulation.languageUpdatedSuccessfully, {
+          id: `language-saved-${originalLanguage.id}`,
+          action: {
+            label: "Undo",
+            onClick: () => {
+              void handleTableRowChange({
+                columnId,
+                rowIndex,
+                value: (originalLanguage as any)[columnId] ?? "",
+              });
+            },
+          },
+        });
       }
     } catch {
-      toast.error(en.errors.failedToCreateEvent);
+      toast.error(en.errors.failedToUpdateLanguage);
       // Revert on error
       setLanguages(prev => {
         const updated = [...prev];
@@ -303,6 +322,8 @@ export const ScenarioLanguages: React.FC = () => {
             {en.simulation.scenarioLanguages}
           </h1>
         </div>
+        <PrecedenceExplainer className="mb-4" />
+        <LanguageReadiness languages={languages} />
         <ListToolbar
           searchValue={searchQuery}
           onSearchChange={handleSearchChange}

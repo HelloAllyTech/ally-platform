@@ -32,7 +32,7 @@ export class UserProgressRepository extends Repository<UserProgress> {
       await manager.query(
         `INSERT INTO "user_progress" ` +
           `("userId", "tenant_id", "totalXp", "level", "lastAwardedAt") ` +
-          `VALUES ($1, $2, $3, 1, $4) ` +
+          `VALUES ($1, $2, $3, 0, $4) ` +
           `ON CONFLICT ("userId", "tenant_id") DO UPDATE SET ` +
           `"totalXp" = "user_progress"."totalXp" + EXCLUDED."totalXp", ` +
           `"lastAwardedAt" = EXCLUDED."lastAwardedAt", ` +

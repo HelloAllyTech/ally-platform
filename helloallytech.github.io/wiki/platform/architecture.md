@@ -80,6 +80,7 @@ The client surfaces — the helpline and admin dashboards in [ally-web](../repos
 - **Redis** — caching, cross-replica pub/sub (the message broker behind the sockets), rate-limit counters, and short-lived state such as presence and in-flight job progress.
 - **Weaviate** — vector DB for ally-ai: reference documents, knowledge chunks, roadmap opportunities, agent memories and conversation turns, for semantic search and retrieval.
 - **AWS S3** — audio files, call and session recordings, media assets, dashboard builds, and env files.
+- **Hetzner Storage Box (archive, planned)** — private S3 objects older than 30 days are moved here weekly by [ally-archiver](../repos/ally-archiver.md) and become archive-only; see [Storage Archive](storage-archive.md).
 
 ## HIPAA Compliance
 

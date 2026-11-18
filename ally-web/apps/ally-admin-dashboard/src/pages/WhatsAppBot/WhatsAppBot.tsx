@@ -1,133 +1,359 @@
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
-import { Tabs } from "@ally-ui-mono/ui-shared";
-import { useGetWaUnansweredQuery } from "@api";
-import { en } from "@constants";
-import { WaUnansweredStatus } from "@types";
+import { useGetArchivedChatbotsQuery, useGetChatbotsQuery } from "@api";
+import { EmptyState } from "@components";
+import { Button } from "@components/button";
+import { ButtonVariant } from "@components/types";
+import { en, ROUTES } from "@constants";
+import { Chatbot, ChatbotMemberRole, ChatbotStatus } from "@types";
 
 import { BotSettingsTab } from "./BotSettingsTab";
-import { ConversationsTab } from "./ConversationsTab";
+import { AllConnectorsTab } from "./ConnectorsTab";
 import { CorpusTab } from "./CorpusTab";
+import { fill, LoadError } from "./shared";
 import { TemplatesTab } from "./TemplatesTab";
-import { TestConsoleTab } from "./TestConsoleTab";
-import { UnansweredTab } from "./UnansweredTab";
-import { UsageTab } from "./UsageTab";
+import { HOME } from "../AssistantHome/copy";
+import { day } from "../AssistantHome/dates";
+import { MoreMenu } from "../AssistantHome/ui/Menu";
+import { RemoveDialog } from "../AssistantHome/ui/RemoveDialog";
+import { useRestoreAssistant } from "../AssistantHome/ui/useRestoreAssistant";
+import { Inbox } from "../Inbox";
+import { COPY as ONBOARDING_COPY } from "../Onboarding/copy";
+
+import "../AssistantHome/ui/scale.css";
+import "./list-page.css";
+
+const t = en.whatsappBot.bots;
+
+type HomeTab = "bots" | "inbox" | "archived" | "connectors" | "defaults" | "library";
 
 /**
- * WhatsApp Q&A bot admin.
+ * Chatbots home.
  *
- * Gated in two places, matching every other feature-toggle-gated tab here: the
- * `whatsapp_bot` entry in `buildSidebarItemFeatureKeyMap` (utils/navigation.ts)
- * hides the sidebar entry, and `requiredFeature={FeatureToggleKey.WHATSAPP_BOT}`
- * on the route in RouteLayout blocks direct navigation. There is deliberately
- * no `Permissions` member — Settings, Logs,
- * Tooltips and Badges are all pure role/toggle gates, and adding one would need
- * a backend grant migration for zero extra gating.
+ * Everyone sees the bots they can work on, as cards. Platform admins — who create bots and own
+ * what every bot shares — also get the connectors (every number, and which bot it serves), the
+ * defaults every bot inherits (settings and shared quick replies), and the
+ * knowledge library bots pick their documents from.
  *
- * Known platform inconsistency worth naming: PrivateLayout compares the singular `userData.role`
- * while the repo's own CLAUDE.md says to gate on the `roles` array (the singular is a lossy legacy
- * collapse). This tab follows the existing pattern rather than diverging alone; fixing it is a
- * platform-wide change.
- *
- * All seven sub-tabs are shipped. The Usage tab is a lazy boundary rather than a direct import, so
- * `@carbon/charts` stays out of this route's eager bundle — see UsageTab.tsx.
+ * Gated in two places, matching every other feature-toggle-gated page here: the `whatsapp_bot`
+ * entry in `buildSidebarItemFeatureKeyMap` hides the sidebar entry, and `requiredFeature` on the
+ * route in RouteLayout blocks direct navigation.
  */
-enum WhatsAppBotTab {
-  CORPUS = "corpus",
-  TEMPLATES = "templates",
-  TEST_CONSOLE = "test-console",
-  SETTINGS = "settings",
-  CONVERSATIONS = "conversations",
-  UNANSWERED = "unanswered",
-  USAGE = "usage",
-}
-
-const TAB_ITEMS: { id: WhatsAppBotTab; label: string; count?: number }[] = [
-  { id: WhatsAppBotTab.CORPUS, label: en.whatsappBot.tabs.corpus },
-  { id: WhatsAppBotTab.TEMPLATES, label: en.whatsappBot.tabs.templates },
-  { id: WhatsAppBotTab.TEST_CONSOLE, label: en.whatsappBot.tabs.testConsole },
-  { id: WhatsAppBotTab.SETTINGS, label: en.whatsappBot.tabs.settings },
-  { id: WhatsAppBotTab.CONVERSATIONS, label: en.whatsappBot.tabs.conversations },
-  { id: WhatsAppBotTab.UNANSWERED, label: en.whatsappBot.tabs.unanswered },
-  { id: WhatsAppBotTab.USAGE, label: en.whatsappBot.tabs.usage },
-];
-
-const VALID_TABS = new Set<string>(TAB_ITEMS.map(t => t.id));
-
 export const WhatsAppBot: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { data, isLoading, isError, refetch } = useGetChatbotsQuery();
+  const navigate = useNavigate();
+  const canCreate = Boolean(data?.canCreate);
 
-  // The open-queue size, shown on the tab itself. This is the one number in the whole feature that
-  // an operator needs without opening anything: a corpus gap is work waiting, and a worklist you
-  // have to click into to discover is a worklist that grows unnoticed. `limit: 1` because only the
-  // count is used — the rows come from the tab's own query.
-  const { data: openQueue } = useGetWaUnansweredQuery({
-    limit: 1,
-    status: WaUnansweredStatus.OPEN,
-  });
-
-  /**
-   * The open-queue size goes in the LABEL, not into `count` with `showCount`.
-   *
-   * The shared Tabs renders `showCount ? item.count || "0" : ""` — one flag for the whole strip — so
-   * enabling it to badge a single tab puts a literal "0" after all seven labels. Fixing that in
-   * ui-shared is the better answer but is a shared-surface change needing all three app suites; this
-   * gets the same result with no blast radius.
-   *
-   * Only rendered when something is actually waiting: "Unanswered (0)" is noise, and a badge that
-   * never disappears stops meaning "there is work here".
-   */
-  const tabItems = useMemo(() => {
-    const open = openQueue?.count ?? 0;
-    return TAB_ITEMS.map(item =>
-      item.id === WhatsAppBotTab.UNANSWERED && open > 0
-        ? { ...item, label: `${item.label} (${open})` }
-        : item,
-    );
-  }, [openQueue?.count]);
-
-  const activeTab = useMemo(() => {
-    const requested = searchParams.get("tab");
-    // An unknown ?tab= falls back to the default rather than rendering nothing, so a stale
-    // bookmark or a renamed tab cannot leave the page blank.
-    return requested && VALID_TABS.has(requested) ? requested : WhatsAppBotTab.CORPUS;
-  }, [searchParams]);
-
-  // Changing tabs drops any row-level deep link, so switching to Conversations from a link that
-  // opened one thread does not leave that thread pinned open under a different tab.
-  const handleTabChange = useCallback(
-    (id: string) => setSearchParams({ tab: id }),
+  // The inbox (chunk 11a) is for everyone who can see an assistant: its chats, every channel.
+  const tabItems = useMemo(
+    () =>
+      canCreate
+        ? [
+            { id: "bots", label: t.homeTabs.bots },
+            { id: "inbox", label: t.homeTabs.inbox },
+            { id: "archived", label: t.homeTabs.archived },
+            { id: "connectors", label: t.homeTabs.connectors },
+            { id: "defaults", label: t.homeTabs.defaults },
+            { id: "library", label: t.homeTabs.library },
+          ]
+        : [
+            { id: "bots", label: t.homeTabs.bots },
+            { id: "inbox", label: t.homeTabs.inbox },
+            { id: "archived", label: t.homeTabs.archived },
+          ],
+    [canCreate],
+  );
+  const requested = searchParams.get("tab") ?? "bots";
+  const activeTab = (tabItems.find(tab => tab.id === requested)?.id ?? "bots") as HomeTab;
+  const goToTab = useCallback(
+    (id: string) => setSearchParams(id === "bots" ? {} : { tab: id }),
     [setSearchParams],
   );
 
-  const renderTab = () => {
-    switch (activeTab) {
-      case WhatsAppBotTab.TEMPLATES:
-        return <TemplatesTab />;
-      case WhatsAppBotTab.TEST_CONSOLE:
-        return <TestConsoleTab />;
-      case WhatsAppBotTab.SETTINGS:
-        return <BotSettingsTab />;
-      case WhatsAppBotTab.CONVERSATIONS:
-        return <ConversationsTab />;
-      case WhatsAppBotTab.UNANSWERED:
-        return <UnansweredTab />;
-      case WhatsAppBotTab.USAGE:
-        return <UsageTab />;
-      case WhatsAppBotTab.CORPUS:
-      default:
-        return <CorpusTab />;
-    }
-  };
-
+  // Chunk 20d-2: the page in the v2 look (DESIGN.md), like the assistant's own home.
   return (
-    <div className="py-[2px] font-primary relative">
-      <h1 className="text-2xl text-typography-900 pb-1 font-secondary">{en.whatsappBot.title}</h1>
-      <p className="text-sm text-typography-600 pb-6">{en.whatsappBot.subtitle}</p>
-      <Tabs items={tabItems} activeId={activeTab} onChange={handleTabChange} showCount={false} />
-      {renderTab()}
+    <div className="ally-v2 ally-list-page">
+      <header className="ally-list-page__head">
+        <div className="ally-list-page__title">
+          <h1 className="ally-display">{en.whatsappBot.title}</h1>
+          <p className="ally-small">{en.whatsappBot.subtitle}</p>
+        </div>
+        {/* Onboarding is the only way to make an assistant (chunk 20d). */}
+        <Button
+          variant={ButtonVariant.PRIMARY}
+          type="button"
+          onClick={() => navigate(ROUTES.CHATBOT_NEW)}
+        >
+          {ONBOARDING_COPY.newAssistant}
+        </Button>
+      </header>
+      {tabItems.length > 1 && (
+        <div className="ally-list-page__tabs" role="tablist" data-testid="tabs">
+          {tabItems.map(tab => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              data-testid={`tab-${tab.id}`}
+              aria-selected={tab.id === activeTab}
+              className="ally-list-page__tab"
+              onClick={() => goToTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="ally-list-page__body">
+        {activeTab === "bots" &&
+          (isLoading ? (
+            <div className="ally-list-page__grid" aria-busy="true">
+              {[0, 1, 2].map(n => (
+                <span
+                  key={n}
+                  className="ally-card ally-list-page__card ally-list-page__card--skeleton"
+                />
+              ))}
+            </div>
+          ) : isError ? (
+            <LoadError title={t.loadFailed} onRetry={() => void refetch()} />
+          ) : (
+            <ChatbotGrid
+              bots={data?.chatbots ?? []}
+              canCreate={canCreate}
+              onCreate={() => navigate(ROUTES.CHATBOT_NEW)}
+            />
+          ))}
+        {activeTab === "connectors" && (
+          <AllConnectorsTab
+            bots={data?.chatbots ?? []}
+            onCreateAgent={() => navigate(ROUTES.CHATBOT_NEW)}
+          />
+        )}
+        {activeTab === "inbox" && (
+          // Everything above the panel (the app bar, this title and the tabs) is about 240px.
+          <div style={{ ["--ally-inbox-top" as string]: "240px" }}>
+            <Inbox />
+          </div>
+        )}
+        {activeTab === "archived" && <ArchivedTab />}
+        {activeTab === "defaults" && <DefaultsTab />}
+        {activeTab === "library" && <CorpusTab />}
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Removed assistants, most recent first. Opening one shows its page read-only: what it knew, its
+ * numbers and its conversations, nothing that changes it.
+ */
+const ArchivedTab: React.FC = () => {
+  const { data, isLoading, isError, refetch } = useGetArchivedChatbotsQuery();
+  const navigate = useNavigate();
+  const { restore, restoring } = useRestoreAssistant();
+  if (isLoading) {
+    return (
+      <div className="ally-list-page__grid" aria-busy="true">
+        {[0, 1].map(n => (
+          <span key={n} className="ally-card ally-list-page__card ally-list-page__card--skeleton" />
+        ))}
+      </div>
+    );
+  }
+  if (isError) return <LoadError title={t.archived.loadFailed} onRetry={() => void refetch()} />;
+  const bots = data?.chatbots ?? [];
+  if (!bots.length) {
+    return <EmptyState title={t.archived.empty} subtitle={t.archived.emptyHint} hideActionButton />;
+  }
+  return (
+    <div className="ally-list-page__grid">
+      {bots.map(bot => (
+        <div
+          key={bot.id}
+          className={`ally-list-page__card-wrap${
+            bot.myRole === ChatbotMemberRole.OWNER ? " ally-list-page__card-wrap--menu" : ""
+          }`}
+        >
+          <button
+            type="button"
+            onClick={() => navigate(ROUTES.CHATBOT_DETAIL.replace(":botId", bot.id))}
+            className="ally-card ally-list-page__card ally-list-page__card--archived"
+          >
+            <span className="ally-list-page__card-top">
+              <span className="ally-list-page__name">
+                <span className="ally-list-page__bot">{bot.name}</span>
+                {bot.persona.displayName && bot.persona.displayName !== bot.name && (
+                  <span className="ally-small">{bot.persona.displayName}</span>
+                )}
+              </span>
+              {bot.archivedAt && (
+                <span className="ally-badge ally-badge--muted ally-list-page__status">
+                  {fill(t.archived.removed, { date: day(bot.archivedAt) })}
+                </span>
+              )}
+            </span>
+            {bot.description && (
+              <span className="ally-small ally-list-page__desc">{bot.description}</span>
+            )}
+            <span className="ally-list-page__stats ally-small">
+              <span>{fill(t.cardMessages, { count: bot.stats.messages })}</span>
+              <span>{fill(t.cardPeople, { count: bot.stats.people })}</span>
+              <span className="ally-list-page__role">{t.role[bot.myRole]}</span>
+            </span>
+          </button>
+          {bot.myRole === ChatbotMemberRole.OWNER && (
+            <div className="ally-list-page__menu">
+              <MoreMenu
+                label={fill(HOME.overview.moreFor, { name: bot.name })}
+                items={[
+                  {
+                    label: HOME.archived.restore,
+                    onSelect: () => {
+                      if (!restoring) void restore(bot);
+                    },
+                  },
+                ]}
+              />
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+/**
+ * Defaults: what every agent starts from, split into its two halves so neither page is long —
+ * the settings, and the quick replies every agent shares.
+ */
+const DefaultsTab: React.FC = () => {
+  const [section, setSection] = useState<"settings" | "replies">("settings");
+  return (
+    <div className="flex flex-col gap-6">
+      <p className="text-sm text-typography-600 max-w-3xl">{t.defaults.intro}</p>
+      <div className="inline-flex w-fit rounded-md border border-border-light p-0.5" role="tablist">
+        {(["settings", "replies"] as const).map(id => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={section === id}
+            onClick={() => setSection(id)}
+            className={`px-4 py-1.5 text-sm rounded ${
+              section === id
+                ? "bg-primary-500 text-white"
+                : "text-typography-700 hover:bg-neutral-50"
+            }`}
+          >
+            {id === "settings" ? t.defaults.sectionSettings : t.defaults.sectionReplies}
+          </button>
+        ))}
+      </div>
+      {section === "settings" ? (
+        <BotSettingsTab />
+      ) : (
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-typography-600 max-w-3xl">{t.defaults.repliesIntro}</p>
+          <TemplatesTab />
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ChatbotGrid: React.FC<{ bots: Chatbot[]; canCreate: boolean; onCreate: () => void }> = ({
+  bots,
+  canCreate,
+  onCreate,
+}) => {
+  const navigate = useNavigate();
+  // Owners can remove an assistant they no longer want, finished or not, without opening it.
+  const [removing, setRemoving] = useState<Chatbot | null>(null);
+  if (!bots.length) {
+    return (
+      <EmptyState
+        title={canCreate ? t.listEmpty : t.listEmptyMember}
+        subtitle={canCreate ? t.listEmptyHint : t.listEmptyMemberHint}
+        actionLabel={t.create}
+        onAction={onCreate}
+        hideActionButton={!canCreate}
+      />
+    );
+  }
+  return (
+    <div className="ally-list-page__grid">
+      {bots.map(bot => (
+        <div
+          key={bot.id}
+          className={`ally-list-page__card-wrap${
+            bot.myRole === ChatbotMemberRole.OWNER ? " ally-list-page__card-wrap--menu" : ""
+          }`}
+        >
+          <button
+            type="button"
+            onClick={() =>
+              // An unfinished setup opens where it left off (chunk 20a), not the bot's page.
+              navigate(
+                bot.status === ChatbotStatus.DRAFT && bot.setupDraftId
+                  ? ROUTES.CHATBOT_NEW_SESSION(bot.setupDraftId)
+                  : ROUTES.CHATBOT_DETAIL.replace(":botId", bot.id),
+              )
+            }
+            className="ally-card ally-list-page__card"
+          >
+            <span className="ally-list-page__card-top">
+              <span className="ally-list-page__name">
+                <span className="ally-list-page__bot">{bot.name}</span>
+                {bot.persona.displayName && bot.persona.displayName !== bot.name && (
+                  <span className="ally-small">{bot.persona.displayName}</span>
+                )}
+              </span>
+              <span
+                className={`ally-badge ally-list-page__status ally-list-page__status--${bot.status}`}
+              >
+                {t.status[bot.status]}
+              </span>
+            </span>
+            {bot.description && (
+              <span className="ally-small ally-list-page__desc">{bot.description}</span>
+            )}
+            <span className="ally-list-page__channels">
+              {bot.connectors.length ? (
+                bot.connectors.map(connector => (
+                  <span key={connector.id} className="ally-badge ally-badge--muted">
+                    {connector.typeLabel} {connector.summary?.address ?? ""}
+                  </span>
+                ))
+              ) : (
+                <span className="ally-small">{t.noConnector}</span>
+              )}
+            </span>
+            <span className="ally-list-page__stats ally-small">
+              <span>{fill(t.cardMessages, { count: bot.stats.messages })}</span>
+              <span>{fill(t.cardPeople, { count: bot.stats.people })}</span>
+              {bot.status === ChatbotStatus.DRAFT && bot.setupDraftId && (
+                <span className="ally-list-page__continue">{ONBOARDING_COPY.continueSetup}</span>
+              )}
+              <span className="ally-list-page__role">{t.role[bot.myRole]}</span>
+            </span>
+          </button>
+          {bot.myRole === ChatbotMemberRole.OWNER && (
+            <div className="ally-list-page__menu">
+              <MoreMenu
+                label={fill(HOME.overview.moreFor, { name: bot.name })}
+                items={[
+                  { label: HOME.overview.remove, danger: true, onSelect: () => setRemoving(bot) },
+                ]}
+              />
+            </div>
+          )}
+        </div>
+      ))}
+      {removing && <RemoveDialog bot={removing} onClose={() => setRemoving(null)} />}
     </div>
   );
 };

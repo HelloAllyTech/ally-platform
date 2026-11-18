@@ -36,7 +36,7 @@ const NOTE_MAX_CHARS = 600;
  * The critic pass after a build: one reviewer that did not write the course,
  * reading the outline and the inline content against a fixed rubric.
  *
- * Stacks: "Add Critic Agents to Review Generated Code" — a separate reviewer,
+ * "Add Critic Agents to Review Generated Code" — a separate reviewer,
  * not the writers grading themselves. "Grounding: Aligning Responses to Rubric
  * Criteria" — the reviewer judges against an explicit, ordered rubric (outcome
  * coverage, assessment, progression, reflection, accuracy, duplication,

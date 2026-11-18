@@ -6,7 +6,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { In, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { LoggerService } from 'src/logger/logger.service';
 import { User } from 'src/user/entity/user.entity';
@@ -35,9 +35,11 @@ import {
   RoadmapReferenceImage,
 } from '../entity/roadmap-opportunity.entity';
 import {
+  PM_AGENT_AUTHOR_NAME,
   RoadmapOpportunitySource,
   RoadmapOpportunityStage,
   RoadmapOpportunityType,
+  RoadmapReviewState,
 } from '../enum/roadmap-opportunity.enum';
 import {
   RoadmapOpportunityRepository,
@@ -125,7 +127,7 @@ export class RoadmapOpportunityService {
       rank: await this.strategyGoalService.getRankContext(),
     });
     return {
-      items: await this.toResponseList(result.items),
+      items: await this.toResponseList(result.items, userId),
       count: result.count,
       maxScore: result.maxScore,
       // The client must never derive the period itself — see SetAllocationDto.
@@ -141,7 +143,37 @@ export class RoadmapOpportunityService {
       await this.strategyGoalService.getRankContext(),
     );
     if (!row) throw new NotFoundException(`Opportunity ${id} not found`);
-    return (await this.toResponseList([row]))[0];
+    return (await this.toResponseList([row], userId))[0];
+  }
+
+  /**
+   * Set or clear the Prod Director's star. Only the configured director may; everyone else gets
+   * 403. Raises the opportunity's composite rank by the star weight, so the whole board is
+   * invalidated (other cards' queue positions move too).
+   */
+  async setDirectorStar(
+    userId: number,
+    id: string,
+    starred: boolean,
+  ): Promise<OpportunityResponseDto> {
+    if (!(await this.strategyGoalService.isProdDirector(userId))) {
+      throw new ForbiddenException(
+        'Only the Prod Director can star opportunities.',
+      );
+    }
+    const existing = await this.opportunityRepository.findOne({
+      where: { id },
+    });
+    if (!existing) throw new NotFoundException(`Opportunity ${id} not found`);
+    await this.opportunityRepository.update(id, {
+      directorStarred: starred,
+      // Who gave the star (Roadmap v2, D16). Written beside the flag so the attribution the
+      // P0 migration backfilled stays true until the Owner star replaces this route.
+      starredByUserId: starred ? userId : null,
+      updatedBy: userId,
+    });
+    this.strategyGoalService.invalidate(userId);
+    return this.findOne(userId, id);
   }
 
   /**
@@ -178,6 +210,7 @@ export class RoadmapOpportunityService {
         name: user.name,
         email: user.email,
         votes: r.votes,
+        weightedVotes: r.weightedVotes,
       };
     });
   }
@@ -215,6 +248,12 @@ export class RoadmapOpportunityService {
        * property of the IDEA-filing path, not of this table.
        */
       enforceReadiness?: boolean;
+      /**
+       * Roadmap v2's Submit only: the code its draft was given when New idea created it
+       * (session-first, §4.2), so the idea keeps one code for life. Allocated from the same
+       * sequence as the column default. Everyone else leaves it out and the default fires.
+       */
+      code?: string;
     },
   ): Promise<OpportunityResponseDto> {
     // Assigning at filing time is a MANAGE action on a route gated at the VOTE tier, so it is
@@ -273,6 +312,7 @@ export class RoadmapOpportunityService {
         referenceImages,
         brief,
         interviewTranscript,
+        ...(extra?.code ? { code: extra.code } : {}),
         createdBy: userId,
         updatedBy: userId,
         source: extra?.source ?? RoadmapOpportunitySource.STAFF,
@@ -350,7 +390,8 @@ export class RoadmapOpportunityService {
       this.notifications.emit({
         kind: 'OPPORTUNITY_UPSERTED',
         actorId: userId,
-        opportunity: response,
+        // Broadcast to every client: the star is the director's private view.
+        opportunity: { ...response, directorStarred: null },
       });
     }
     return response;
@@ -414,6 +455,77 @@ export class RoadmapOpportunityService {
         `This opportunity is not ready to file yet (${failed.join(', ')}). ` +
           `Keep the interview going until every item is met.`,
       );
+    }
+  }
+
+  /**
+   * The Roadmap cutover's one filing door (Roadmap v2 P6, plans/roadmap-builder-merge §6): an
+   * idea for an in-flight direct Builder session that never had one, so every live build sits
+   * on the Roadmap from switch-on day.
+   *
+   * A labelled path of its own rather than a flag on `create()`:
+   * - it runs inside the cutover's transaction (`manager`), so the idea, its link to the
+   *   session and the flag commit or fail together;
+   * - the readiness gate does not apply, because the work is already under way and the idea
+   *   records it rather than proposing it — the row says so with
+   *   `source = 'migrated_builder_session'`;
+   * - it is already accepted (`reviewState`), Prioritised (as "Open in Builder Agent" makes a
+   *   linked idea) and linked by `builderSessionId`, the same column every other link uses.
+   *   `UQ_roadmap_opps_builder_session` is the backstop against a second idea for one session.
+   *
+   * The vector index and goal-impact assessment run after the commit, best-effort, through
+   * `afterMigratedFiling` — as `create()` runs them after its own save.
+   */
+  async fileMigratedBuilderSession(
+    manager: EntityManager,
+    input: {
+      sessionId: string;
+      description: string;
+      productGoal: string;
+      /** The session's creator: the idea's author, and its lead. */
+      creatorUserId: number;
+      /** The Owner running the cutover: the reviewer of record. */
+      actorUserId: number;
+    },
+  ): Promise<{ id: string; code: string }> {
+    const repository = manager.getRepository(RoadmapOpportunity);
+    const saved = await repository.save(
+      repository.create({
+        description: input.description,
+        type: RoadmapOpportunityType.IDEA,
+        stage: RoadmapOpportunityStage.PRIORITISED,
+        productGoal: input.productGoal,
+        effort: null,
+        ownerUserId: null,
+        referenceImages: [],
+        builderSessionId: input.sessionId,
+        reviewState: RoadmapReviewState.ACCEPTED,
+        reviewedBy: input.actorUserId,
+        reviewedAt: new Date(),
+        createdBy: input.creatorUserId,
+        updatedBy: input.actorUserId,
+        source: RoadmapOpportunitySource.MIGRATED_BUILDER_SESSION,
+        tenantId: null,
+        reporterContext: null,
+      }),
+    );
+    // `code` comes from the column default; read it back inside the same transaction.
+    const [row] = await manager.query(
+      `SELECT code FROM "roadmap_opportunities" WHERE id = $1`,
+      [saved.id],
+    );
+    return { id: saved.id, code: String(row?.code ?? saved.code ?? '') };
+  }
+
+  /**
+   * What `create()` does after its save, for ideas the cutover filed: index each one for the
+   * duplicate check and score it against the strategy. Both are best-effort and swallow their
+   * own failures, so a model outage never undoes a committed cutover.
+   */
+  async afterMigratedFiling(ids: string[], actorUserId: number): Promise<void> {
+    for (const id of ids) {
+      await this.vectorService.indexQuietly(id);
+      await this.goalImpactService.assessQuietly(id, actorUserId);
     }
   }
 
@@ -556,8 +668,10 @@ export class RoadmapOpportunityService {
     }
 
     if (dto.stage !== undefined) {
-      patch.stage = dto.stage;
-      patch.releasedAt = this.resolveReleasedAt(existing, dto.stage);
+      // A retired stage value never reaches here: the DTO's @IsEnum rejects it with a 400.
+      const nextStage = dto.stage;
+      patch.stage = nextStage;
+      patch.releasedAt = this.resolveReleasedAt(existing, nextStage);
     }
 
     if (
@@ -610,7 +724,8 @@ export class RoadmapOpportunityService {
       this.notifications.emit({
         kind: 'OPPORTUNITY_UPSERTED',
         actorId: userId,
-        opportunity: response,
+        // Broadcast to every client: the star is the director's private view.
+        opportunity: { ...response, directorStarred: null },
       });
     }
     return response;
@@ -693,12 +808,16 @@ export class RoadmapOpportunityService {
    */
   async toResponseList(
     rows: RoadmapOpportunityRow[],
+    viewerId?: number,
   ): Promise<OpportunityResponseDto[]> {
     // Both resolved ONCE for the whole page, not per row: the goal count is the same for every
     // opportunity in a response, and fetching it per row would issue a query per card.
-    const [users, goalsTotal] = await Promise.all([
+    const [users, goalsTotal, viewerIsDirector] = await Promise.all([
       this.resolveUsers(rows.map((r) => r.createdBy)),
       this.strategyGoalService.countGoals(),
+      viewerId === undefined
+        ? Promise.resolve(false)
+        : this.strategyGoalService.isProdDirector(viewerId),
     ]);
     return rows.map((row) => ({
       id: row.id,
@@ -738,15 +857,23 @@ export class RoadmapOpportunityService {
       // 63.33333333333333.
       compositeScore: Math.round(Number(row.compositeScore ?? 0) * 10) / 10,
       voterCount: Number(row.voterCount ?? 0),
+      // Only the Prod Director ever sees the flag; null for everyone else (and for the broadcast).
+      directorStarred: viewerIsDirector ? row.directorStarred === true : null,
       goalsHelped: Number(row.goalsHelped ?? 0),
       goalsAssessed: Number(row.goalsAssessed ?? 0),
       goalsTotal,
+      breadthNew: row.breadthNew === true,
       myVotes: Number(row.myVotes ?? 0),
       commentCount: Number(row.commentCount ?? 0),
       source: row.source,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
-      creator: users.get(row.createdBy) ?? this.unknownUser(row.createdBy),
+      // A PM Agent filing is authored by the agent; `createdBy` (the admin who accepted the
+      // card) stays on the row for audit but is not who the board says posted it.
+      creator:
+        row.source === RoadmapOpportunitySource.PM_AGENT
+          ? { id: row.createdBy, email: '', name: PM_AGENT_AUTHOR_NAME }
+          : (users.get(row.createdBy) ?? this.unknownUser(row.createdBy)),
     }));
   }
 
@@ -824,7 +951,7 @@ export class RoadmapOpportunityService {
    * The shared assets bucket, the same one blog headers and badge icons live in.
    *
    * Resolved per call rather than in the constructor: reading configuration at construction time
-   * is module-load-time work, and this module is imported by AnalyticsSuggestions — a missing
+   * is module-load-time work, and this module is imported by other feature modules — a missing
    * env var would take down suites that never touch an image. Failing here fails only the
    * request that actually needed a bucket.
    */

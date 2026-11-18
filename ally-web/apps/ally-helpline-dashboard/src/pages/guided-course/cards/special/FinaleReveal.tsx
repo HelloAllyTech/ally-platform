@@ -74,7 +74,7 @@ export interface FinaleRevealProps {
  * noticing moments replay; then three doors. Every part is the learner's
  * own words or Ally's noticing, never a score, and a part with nothing
  * behind it is left out. Hushed (heavy material, or a hard moment): the same
- * content, quiet and still (Stacks: "Self-Cheer as Emotional Reward at
+ * content, quiet and still ("Self-Cheer as Emotional Reward at
  * Win-State" — marked deliberately, and only where it fits).
  */
 export const FinaleReveal: FC<FinaleRevealProps> = ({

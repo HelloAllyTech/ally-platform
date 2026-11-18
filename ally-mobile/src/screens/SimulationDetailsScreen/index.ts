@@ -1,1 +1,0 @@
-export {SimulationDetailsScreen} from './SimulationDetailsScreen';

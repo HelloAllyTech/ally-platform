@@ -37,10 +37,29 @@ import {
   LogoUploadRequestDto,
   OrganizationLogoUploadResponseDto,
 } from '../dto/organization-logo-upload.dto';
+import { UpdateTenantBrandingDto } from '../dto/update-tenant-branding.dto';
+import { UpdateTenantBrandingResponseDto } from '../dto/tenant-branding-response.dto';
+import {
+  FaviconUploadRequestDto,
+  FaviconUploadResponseDto,
+} from '../dto/branding-favicon-upload.dto';
 
 import { SuccessResponse } from 'src/common/type/common.type';
 import { DeleteLogoDto } from '../dto/delete-organization-logo.dto';
 import { TenantResponseDto } from '../dto/tenant-response.dto';
+
+/**
+ * Who may use the branding editor routes: a platform admin (EDIT_TENANT,
+ * under the USERS toggle) or a tenant's own ADMIN (EDIT_TENANT_BRANDING, no
+ * toggle — see FeatureToggleOptions.orgAdminPermission). Every route that
+ * takes an org id still runs assertTenantInScope, which for an org admin
+ * resolves to exactly their tenant.
+ */
+const BRANDING_EDITOR_GATE = {
+  permissions: [PERMISSIONS.EDIT_TENANT, PERMISSIONS.EDIT_TENANT_BRANDING],
+  operator: 'OR' as const,
+  orgAdminPermission: PERMISSIONS.EDIT_TENANT_BRANDING,
+};
 
 @ApiTags('Tenant')
 @Controller('v1/tenants')
@@ -207,10 +226,41 @@ export class TenantController {
     return this.tenantService.updateTenant(id, updateTenantDto);
   }
 
+  // Organization branding. Two kinds of caller: a platform admin under the
+  // USERS toggle with EDIT_TENANT (any org in their scope — an assigned
+  // multi-tenant admin brands their own orgs only), and a tenant's own ADMIN
+  // holding EDIT_TENANT_BRANDING, whose scope resolves to exactly their org.
+  // The org-level switch is checked in the service, not here, so the refusal
+  // can name the fix.
+  @ApiOperation({ summary: 'Update organization branding' })
+  @ApiResponse({ status: 200, type: UpdateTenantBrandingResponseDto })
+  @RequireFeatureToggle(FeatureToggleKey.USERS, BRANDING_EDITOR_GATE)
+  @Patch(':id/branding')
+  async updateBranding(
+    @Param('id') id: string,
+    @Body() dto: UpdateTenantBrandingDto,
+  ): Promise<UpdateTenantBrandingResponseDto> {
+    await this.tenantScopeService.assertTenantInScope(id);
+    return this.tenantService.updateBranding(id, dto);
+  }
+
+  @ApiOperation({ summary: 'Get presigned URL for a branding favicon upload' })
+  @RequireFeatureToggle(FeatureToggleKey.USERS, BRANDING_EDITOR_GATE)
+  @Post(':id/branding/favicon-url')
+  async getPresignedUrlForBrandingFavicon(
+    @Param('id') id: string,
+    @Body() dto: FaviconUploadRequestDto,
+  ): Promise<FaviconUploadResponseDto> {
+    await this.tenantScopeService.assertTenantInScope(id);
+    return this.tenantService.getPresignedUrlForBrandingFavicon(id, dto);
+  }
+
+  // The logo is part of branding too, so the branding editor's callers reach
+  // the upload and delete routes as well. Neither names an organization: the
+  // upload is an unreferenced file until a PATCH attaches it, and the delete
+  // checks below that the file is not some out-of-reach org's logo.
   @ApiOperation({ summary: 'Get presigned URL for organization logo upload' })
-  @RequireFeatureToggle(FeatureToggleKey.USERS, {
-    permissions: [PERMISSIONS.EDIT_TENANT],
-  })
+  @RequireFeatureToggle(FeatureToggleKey.USERS, BRANDING_EDITOR_GATE)
   @Post('logo-url')
   async getPresignedUrlForOrganizationLogo(
     @Body() logoUploadRequestDto: LogoUploadRequestDto,
@@ -221,18 +271,17 @@ export class TenantController {
   }
 
   @ApiOperation({ summary: 'Delete organization logo ' })
-  @RequireFeatureToggle(FeatureToggleKey.USERS, {
-    permissions: [PERMISSIONS.EDIT_TENANT],
-  })
+  @RequireFeatureToggle(FeatureToggleKey.USERS, BRANDING_EDITOR_GATE)
   @Delete('logo')
   async deleteOrganizationLogo(
     @Body() deleteLogoDto: DeleteLogoDto,
   ): Promise<SuccessResponse> {
-    // The body names a file, not an organization, so an organization-
-    // restricted admin could otherwise delete any org's logo. Refuse one that
-    // is still some out-of-reach org's logo; an unreferenced upload (replaced
-    // or abandoned) stays theirs to clean up.
-    if (await this.tenantScopeService.isRestricted()) {
+    // The body names a file, not an organization, so a caller whose scope is
+    // bounded (an organization-restricted admin, or a tenant's own admin)
+    // could otherwise delete any org's logo. Refuse one that is still some
+    // out-of-reach org's logo; an unreferenced upload (replaced or abandoned)
+    // stays theirs to clean up.
+    if ((await this.tenantScopeService.resolveTenantIds()) !== null) {
       const owners = await this.tenantService.findTenantIdsUsingLogo(
         deleteLogoDto.logoUrl,
       );

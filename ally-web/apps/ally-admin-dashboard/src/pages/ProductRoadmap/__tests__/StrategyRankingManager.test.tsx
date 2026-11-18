@@ -12,6 +12,7 @@ const weights: RoadmapRankWeights = {
   votersWeight: 3,
   effortWeight: 1,
   goalImpactWeight: 3,
+  starWeight: 3,
 };
 
 vi.mock("@api", () => ({
@@ -24,6 +25,8 @@ vi.mock("@api", () => ({
   useRenameRoadmapStrategyGoalMutation: () => [vi.fn()],
   useDeleteRoadmapStrategyGoalMutation: () => [vi.fn()],
   useUpdateRoadmapRankWeightsMutation: () => [mockUpdateWeights],
+  useGetRoadmapProdDirectorQuery: () => ({ data: { userId: null, candidates: [] } }),
+  useSetRoadmapProdDirectorMutation: () => [vi.fn()],
   useAssessMissingRoadmapGoalImpactMutation: () => [vi.fn(), { isLoading: false }],
 }));
 

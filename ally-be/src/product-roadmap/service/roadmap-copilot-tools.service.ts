@@ -3,7 +3,12 @@ import { LoggerService } from 'src/logger/logger.service';
 import { AiService } from 'src/ai/service/ai.service';
 import { AgentToolDefinition } from 'src/llm-agent/type/agent-llm.type';
 import { BuilderGithubReadService } from 'src/builder/service/builder-github-read.service';
-import { BuilderStacksService } from 'src/builder/service/builder-stacks.service';
+import {
+  ContextToolsService,
+  contextToolDefinitions,
+} from 'src/context-library/service/context-tools.service';
+import { ClUseCase } from 'src/context-library/enum/context-library.enum';
+import { BUILDER_PRINCIPLE_TOOLS } from 'src/builder/constants/builder-principles.constants';
 import { BuilderEvidenceService } from 'src/builder/service/builder-evidence.service';
 import {
   BUILDER_REPO_NAMES,
@@ -93,7 +98,7 @@ export class RoadmapCopilotToolsService {
     private readonly interviewNoteRepository: RoadmapInterviewNoteRepository,
     private readonly aiService: AiService,
     private readonly githubRead: BuilderGithubReadService,
-    private readonly stacks: BuilderStacksService,
+    private readonly principles: ContextToolsService,
     private readonly evidence: BuilderEvidenceService,
   ) {}
 
@@ -101,7 +106,12 @@ export class RoadmapCopilotToolsService {
    * Research tools first, `submit_turn` last — a stable order, because the tool list sits in
    * front of the cached system prefix and any reordering invalidates it.
    */
-  getToolDefinitions(): AgentToolDefinition[] {
+  getToolDefinitions(options?: { checks?: boolean }): AgentToolDefinition[] {
+    const tools = this.baseToolDefinitions();
+    return options?.checks ? withCheckEvidence(tools) : tools;
+  }
+
+  private baseToolDefinitions(): AgentToolDefinition[] {
     return [
       {
         name: 'search_roadmap',
@@ -281,28 +291,12 @@ export class RoadmapCopilotToolsService {
           required: ['path'],
         },
       },
-      {
-        name: 'stacks_search',
-        description:
-          "Search the team's curated product-guidance library — how to judge, size and frame an " +
-          'opportunity, and how features like this one should behave. Specific noun phrases, ' +
-          'not sentences. An empty result is not evidence the library lacks guidance.',
-        input_schema: {
-          type: 'object',
-          properties: { query: { type: 'string' } },
-          required: ['query'],
-        },
-      },
-      {
-        name: 'stacks_get',
-        description:
-          'Fetch the full text of one or two Stacks chunks by id, after a search.',
-        input_schema: {
-          type: 'object',
-          properties: { ids: { type: 'array', items: { type: 'string' } } },
-          required: ['ids'],
-        },
-      },
+      ...contextToolDefinitions({
+        ...BUILDER_PRINCIPLE_TOOLS,
+        when:
+          'Search when judging, sizing or framing an opportunity, and for how features like this ' +
+          'one should behave.',
+      }),
       {
         name: COPILOT_SUBMIT_TOOL,
         description:
@@ -382,7 +376,7 @@ export class RoadmapCopilotToolsService {
                           'roadmap',
                           'codebase',
                           'wiki',
-                          'stacks',
+                          'principles',
                           'strategy',
                         ],
                       },
@@ -458,10 +452,12 @@ export class RoadmapCopilotToolsService {
         return `Searching the wiki for ${q(input?.query)}`;
       case 'wiki_read':
         return `Reading wiki page ${input?.path}`;
-      case 'stacks_search':
-        return `Looking up product guidance on ${q(input?.query)}`;
-      case 'stacks_get':
-        return 'Reading product guidance';
+      case 'principles_search':
+        return `Looking up principles on ${q(
+          Array.isArray(input?.queries) ? input.queries[0] : input?.query,
+        )}`;
+      case 'principles_get':
+        return 'Reading principles';
       default:
         return `Running ${name}`;
     }
@@ -605,19 +601,24 @@ export class RoadmapCopilotToolsService {
           ),
           summary: () => 'Read',
         };
-      case 'stacks_search':
-        return {
-          result: await this.stacks.search(String(input.query ?? ''), 4),
-          summary: (r) =>
-            count(r.results, 'piece of guidance', 'pieces of guidance'),
-        };
-      case 'stacks_get':
-        return {
-          result: await this.stacks.getChunks(
-            Array.isArray(input.ids) ? input.ids.map(String).slice(0, 3) : [],
-          ),
-          summary: (r) => count(r.chunks, 'section', 'sections'),
-        };
+      case 'principles_search': {
+        const out = await this.principles.runSearch(
+          ClUseCase.ROADMAP_COPILOT,
+          BUILDER_PRINCIPLE_TOOLS,
+          input,
+          { sessionId: `roadmap:${ctx.userId}` },
+        );
+        return { result: out.modelResult, summary: () => out.summary };
+      }
+      case 'principles_get': {
+        const out = await this.principles.runGet(
+          ClUseCase.ROADMAP_COPILOT,
+          BUILDER_PRINCIPLE_TOOLS,
+          input,
+          { sessionId: `roadmap:${ctx.userId}` },
+        );
+        return { result: out.modelResult, summary: () => out.summary };
+      }
       default:
         return {
           result: { ok: false, error: `Unknown tool "${name}"` },
@@ -842,3 +843,56 @@ const bound = (serialised: string): string =>
   serialised.length <= ROADMAP_COPILOT.TOOL_RESULT_MAX_CHARS
     ? serialised
     : `${serialised.slice(0, ROADMAP_COPILOT.TOOL_RESULT_MAX_CHARS)}… [truncated — narrow the lookup]`;
+
+/**
+ * Roadmap v2's Check my idea (§4.13, §5.7b): the SAME `submit_turn`, asking
+ * for two more things in the same structured answer — the verbatim words
+ * that met each check, and a goal suggestion — so the draft page shows its
+ * evidence without a second model call. Only the v2 draft page passes
+ * `checks`; every other caller gets the schema exactly as before.
+ */
+function withCheckEvidence(
+  tools: AgentToolDefinition[],
+): AgentToolDefinition[] {
+  return tools.map((tool) => {
+    if (tool.name !== COPILOT_SUBMIT_TOOL) return tool;
+    const schema = tool.input_schema as {
+      properties: Record<string, any>;
+      required?: string[];
+    };
+    const gates = schema.properties.gates;
+    return {
+      ...tool,
+      input_schema: {
+        ...schema,
+        properties: {
+          ...schema.properties,
+          gates: {
+            ...gates,
+            items: {
+              ...gates.items,
+              properties: {
+                ...gates.items.properties,
+                evidence: {
+                  type: 'string',
+                  description:
+                    'For a met criterion: the exact words that meet it, copied verbatim (no ' +
+                    'paraphrase, no ellipsis) from the idea as written or from one of the ' +
+                    "admin's answers — a phrase or one sentence. Empty string when not met.",
+                },
+              },
+            },
+          },
+          suggestedGoal: {
+            type: 'string',
+            nullable: true,
+            description:
+              'The product goal this idea most likely serves — exactly one of the product goal ' +
+              'names, chosen from what is written so far even before the criteria are met — or ' +
+              'null when none fits.',
+          },
+        },
+      },
+    };
+  });
+}

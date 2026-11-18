@@ -1,6 +1,0 @@
-ios/
-**/*.json
-android/
-coverage/
-__mocks__/
-__tests__/

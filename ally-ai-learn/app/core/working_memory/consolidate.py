@@ -258,8 +258,22 @@ async def consolidate(
         logger.warning("[working-memory] updater template resolved empty; skipping")
         return None
 
+    # What the client already told this counsellor in EARLIER sessions (a case
+    # or a track), which ally-be sends as one ready-made sentence. The ledger
+    # starts empty every session, so without it the updater reports last
+    # session's disclosures as new the moment they resurface, and can record a
+    # topic as withheld that the counsellor has already heard.
+    previous_memory = (getattr(prompt_data, "previous_memory", None) or "").strip()
+    earlier_sessions = (
+        "From earlier sessions with this counsellor (already said; never report "
+        "any of it as newly disclosed or as withheld):\n"
+        f"{previous_memory}\n\n"
+        if previous_memory
+        else ""
+    )
+
     user_text = (
-        "Current client state:\n"
+        earlier_sessions + "Current client state:\n"
         f"{_digest(memory)}\n\n"
         "Newest conversation turns:\n"
         f"{turns_text}\n\n"

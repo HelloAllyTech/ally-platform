@@ -1,0 +1,7 @@
+# A local virtualenv (see the root CLAUDE.md: tests run in a Python 3.12 .venv) must
+# never reach the image: `COPY . .` would put it at /app/.venv, Poetry would use it
+# instead of the dependencies installed in the image, and the app fails to import.
+.venv/
+venv/
+__pycache__/
+.pytest_cache/

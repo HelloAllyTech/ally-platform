@@ -1,3 +1,5 @@
+import { ImageStudioModule } from 'src/image-studio/image-studio.module';
+import { StageDirectorMemoriesService } from './service/stage-director-memories.service';
 import { CohortModule } from 'src/cohort/cohort.module';
 import { forwardRef, Module } from '@nestjs/common';
 import { LanguageModule } from '../language/language.module';
@@ -141,6 +143,7 @@ import { BehaviorInstructionTranslationService } from './service/behavior-instru
 import { AutofillService } from './service/autofill.service';
 import { AgentBuilderChainService } from './service/agent-builder-chain.service';
 import { ScenarioTranslationGateway } from './gateway/scenario-translation.gateway';
+import { ScenarioDescriptionAudioService } from './service/scenario-description-audio.service';
 import { ScenarioTranslationNotificationService } from './service/scenario-translation-notification.service';
 
 import { AuditModule } from 'src/audit/audit.module';
@@ -153,6 +156,7 @@ import { SettingsModule } from 'src/settings/settings.module';
 
 @Module({
   imports: [
+    ImageStudioModule,
     // Languages now point at an llm_models catalog row; the resolver needs to
     // read it when assembling session metadata.
     LlmModule,
@@ -234,6 +238,7 @@ import { SettingsModule } from 'src/settings/settings.module';
   ],
   providers: [
     ScenarioService,
+    StageDirectorMemoriesService,
     PreviewMonologueService,
     ScenarioVersionService,
     ScenarioVersionRepository,
@@ -315,6 +320,7 @@ import { SettingsModule } from 'src/settings/settings.module';
     ScenarioSessionRecordingRepository,
     ScenarioSessionRecordingService,
     ScenarioTranslationNotificationService,
+    ScenarioDescriptionAudioService,
     ScenarioTranslationGateway,
   ],
   exports: [
@@ -346,6 +352,9 @@ import { SettingsModule } from 'src/settings/settings.module';
     // Exported for CourseCopilotModule: the interview grounds outcomes and
     // annotation labels in each competency's helpful/unhelpful behaviours.
     CompetencyService,
+    // Exported for DebriefModule: a published live debrief writes the
+    // learner's supervisor memory in place of today's debrief (v9 FR-20).
+    LearnerSupervisorMemoryService,
   ],
 })
 export class LearnModule {}

@@ -77,6 +77,9 @@ export function lastAdminMessageToApply(
   for (let index = messages.length - 1; index >= 0; index--) {
     const message = messages[index];
     if (message.role !== BuilderMessageRole.USER) continue;
+    // Roadmap v2: a comment between people is context, never words the PRD
+    // owes anything to (§4.5a). Answers and choices still count.
+    if (message.metadata?.planPost?.kind === 'comment') continue;
     const text = freeTextOf(message);
     if (!text || isAcknowledgement(text)) return null;
     return { text, at: new Date(message.createdAt) };

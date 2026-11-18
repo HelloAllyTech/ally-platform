@@ -30,6 +30,11 @@ export const TRACK_MAX_ARTICLE_QUESTIONS = 10;
  */
 export const TRACK_MAX_ARTICLE_RESOURCES = 10;
 
+/** Key takeaways per ARTICLE: a handful of points, not a second article. */
+export const TRACK_MAX_ARTICLE_TAKEAWAYS = 5;
+export const TRACK_MAX_ARTICLE_TAKEAWAY_LENGTH = 200;
+export const TRACK_MAX_ARTICLE_COVER_ALT_LENGTH = 300;
+
 /**
  * Likert bounds. A scale needs two points to be a choice and past ten stops
  * being a scale anyone reads point by point; twenty statements is already a
@@ -51,7 +56,8 @@ export const TRACK_DEFAULT_ANNOTATION_FALSE_POSITIVE_PENALTY = 1;
 /** BRANCHING_SCENARIO limits. */
 export const TRACK_DEFAULT_BRANCHING_PASS_SCORE = 70;
 export const TRACK_MAX_BRANCHING_NODES = 100;
-export const TRACK_MIN_BRANCHING_CHOICES = 2;
+/** One choice is a single-button scene (a beat in the story, not a decision). */
+export const TRACK_MIN_BRANCHING_CHOICES = 1;
 export const TRACK_MAX_BRANCHING_CHOICES = 6;
 export const TRACK_MAX_BRANCHING_NODE_TEXT = 1500;
 export const TRACK_MAX_BRANCHING_CHOICE_TEXT = 250;

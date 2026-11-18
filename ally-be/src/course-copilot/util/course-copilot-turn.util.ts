@@ -76,7 +76,9 @@ export function describeCourseCopilotAttempt(
     case 'search_library':
       return `Library search ${quoted(input?.query)}${input?.kind ? ` (${input.kind})` : ''}`;
     case 'design_guidance_search':
-      return `Design guidance search ${quoted(input?.query)}`;
+      return `Design guidance search ${quoted(
+        Array.isArray(input?.queries) ? input.queries[0] : input?.query,
+      )}`;
     case 'design_guidance_get':
       return 'Read design guidance';
     case 'list_competencies':
@@ -110,11 +112,13 @@ export function describeCourseCopilotAttempt(
   }
 }
 
-/** Headings in a Stacks get_chunks answer: the guidance that was read. */
-const chunkTitles = (text: unknown): string[] =>
-  [...String(text ?? '').matchAll(/^##\s+(.+)$/gm)].map((match) =>
-    clipText(match[1], 80),
-  );
+/** The principles a design_guidance_get answer carried: code and statement. */
+const principlesRead = (items: unknown): string[] =>
+  (Array.isArray(items) ? items : [])
+    .filter((item) => item && typeof item === 'object' && item.code)
+    .map((item: any) =>
+      clipText(`${item.code} ${String(item.statement ?? '')}`.trim(), 80),
+    );
 
 const lengthOf = (value: unknown): number =>
   Array.isArray(value) ? value.length : 0;
@@ -125,9 +129,9 @@ export const COURSE_COPILOT_RECEIPT_VOCABULARY: AgentReceiptVocabulary = {
   describeAttempt: describeCourseCopilotAttempt,
   describeRead: (call: AgentReceiptCall) => {
     if (call.name === 'design_guidance_get') {
-      const titles = chunkTitles(call.result?.chunks);
-      return titles.length
-        ? titles.map((title) => `Guidance: ${title}`)
+      const read = principlesRead(call.result?.items);
+      return read.length
+        ? read.map((line) => `Principle: ${line}`)
         : ['Design guidance'];
     }
     if (call.name === 'get_item') {
@@ -146,11 +150,8 @@ export const COURSE_COPILOT_RECEIPT_VOCABULARY: AgentReceiptVocabulary = {
     switch (call.name) {
       case 'search_library':
         return plural(lengthOf(result.hits), 'match', 'matches');
-      case 'design_guidance_search': {
-        const hits =
-          String(result.results ?? '').match(/^\[\d+\]/gm)?.length ?? 0;
-        return plural(hits, 'hit');
-      }
+      case 'design_guidance_search':
+        return plural(lengthOf(result.results), 'principle');
       case 'list_competencies':
         return plural(
           lengthOf(result.competencies),

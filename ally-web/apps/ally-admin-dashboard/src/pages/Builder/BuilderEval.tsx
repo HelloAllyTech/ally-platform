@@ -15,6 +15,7 @@ import { en, ROUTES } from "@constants";
 import type { BuilderEvalFixture } from "@types";
 import { getErrorMessage } from "@utils/errorMessage";
 
+import { useAgentEmbed } from "./agentEmbed";
 import { FromSessionDialog, PasteExportDialog } from "./eval/AddFixtureDialogs";
 import {
   anySuiteRunning,
@@ -44,6 +45,7 @@ type EvalTab = "suites" | "fixtures";
 export const BuilderEval: React.FC = () => {
   const strings = en.builder.eval;
   const navigate = useNavigate();
+  const { embedded, readOnly } = useAgentEmbed();
 
   const [tab, setTab] = useState<EvalTab>("suites");
   const [openFixtureId, setOpenFixtureId] = useState<string | null>(null);
@@ -120,9 +122,11 @@ export const BuilderEval: React.FC = () => {
     // notice above it, instead of letting the page scroll.
     <div className="mx-auto flex h-full max-w-6xl flex-col gap-4 overflow-y-auto md:p-6 [&>*]:shrink-0">
       <header>
-        <Button kind="ghost" size="sm" onClick={() => navigate(ROUTES.BUILDER)}>
-          ← {strings.backToBuilder}
-        </Button>
+        {!embedded && (
+          <Button kind="ghost" size="sm" onClick={() => navigate(ROUTES.BUILDER)}>
+            ← {strings.backToBuilder}
+          </Button>
+        )}
         <h1 className="mt-2 text-xl font-semibold text-typography-900">{strings.title}</h1>
         <p className="mt-1 text-sm text-typography-600">{strings.subtitle}</p>
       </header>
@@ -149,14 +153,16 @@ export const BuilderEval: React.FC = () => {
             <p className="text-sm text-typography-600">
               {running ? strings.suites.polling(EVAL_POLL_MS / 1000) : strings.suites.caption}
             </p>
-            <Button
-              kind="primary"
-              size="md"
-              disabled={fixtureList.length === 0}
-              onClick={() => setRunOpen(true)}
-            >
-              {strings.suites.runSuite}
-            </Button>
+            {!readOnly && (
+              <Button
+                kind="primary"
+                size="md"
+                disabled={fixtureList.length === 0}
+                onClick={() => setRunOpen(true)}
+              >
+                {strings.suites.runSuite}
+              </Button>
+            )}
           </div>
 
           {isSuitesError && (
@@ -197,22 +203,26 @@ export const BuilderEval: React.FC = () => {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-typography-600">{strings.fixtures.caption}</p>
             <div className="flex flex-wrap items-center gap-2">
-              <Button
-                kind="tertiary"
-                size="md"
-                renderIcon={Add}
-                onClick={() => setFromSessionOpen(true)}
-              >
-                {strings.fixtures.fromSession}
-              </Button>
-              <Button
-                kind="tertiary"
-                size="md"
-                renderIcon={Upload}
-                onClick={() => setPasteOpen(true)}
-              >
-                {strings.fixtures.paste}
-              </Button>
+              {!readOnly && (
+                <>
+                  <Button
+                    kind="tertiary"
+                    size="md"
+                    renderIcon={Add}
+                    onClick={() => setFromSessionOpen(true)}
+                  >
+                    {strings.fixtures.fromSession}
+                  </Button>
+                  <Button
+                    kind="tertiary"
+                    size="md"
+                    renderIcon={Upload}
+                    onClick={() => setPasteOpen(true)}
+                  >
+                    {strings.fixtures.paste}
+                  </Button>
+                </>
+              )}
               <Button
                 kind="tertiary"
                 size="md"

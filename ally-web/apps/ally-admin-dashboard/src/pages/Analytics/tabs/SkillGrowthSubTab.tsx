@@ -1,13 +1,12 @@
 import { useMemo, useState } from "react";
 
-import { LineChart, ScatterChart, StackedBarChart } from "@carbon/charts-react";
-
 import { CarbonDropdown as Dropdown } from "@ally-ui-mono/ui-shared";
 import {
   useGetCompetencyMapQuery,
   useGetSkillGrowthLearnersQuery,
   useGetSkillGrowthQuery,
 } from "@api";
+import { LineChart, ScatterChart, StackedBarChart } from "@components/charts";
 import { SkillGrowthLearnersQuery } from "@types";
 
 import { AnalyticsTabFilters, asOfStamp } from "../analyticsFilters";
@@ -370,7 +369,7 @@ export const SkillGrowthSubTab = ({ query }: AnalyticsTabFilters) => {
           {competencyPoints.length > 0 ? (
             <ScatterChart data={competencyPoints} options={competencyOpts} />
           ) : (
-            <div className="flex h-40 items-center justify-center rounded border border-dashed border-[#e0e0e0] text-sm text-typography-500">
+            <div className="flex h-40 items-center justify-center rounded border border-dashed border-border-light text-sm text-typography-500">
               No competency yet has {cmMin} scored slices on its skill
             </div>
           )}
@@ -438,13 +437,13 @@ export const SkillGrowthSubTab = ({ query }: AnalyticsTabFilters) => {
             </thead>
             <tbody>
               {rows.map(r => (
-                <tr key={r.learnerId} className="border-t border-[#e0e0e0]">
+                <tr key={r.learnerId} className="border-t border-border-light">
                   <td className="py-2 pr-3">
                     {/* The named control is the button in the cell, not the row:
                         a role="button" on a <TableRow> yields unnamed buttons. */}
                     <button
                       type="button"
-                      className="cursor-pointer text-left text-[#264D8E] underline-offset-2 hover:underline max-sm:min-h-8"
+                      className="cursor-pointer text-left text-primary-500 underline-offset-2 hover:underline max-sm:min-h-8"
                       onClick={() => setOpenLearner(r.learnerId)}
                     >
                       {learnerName(r)}

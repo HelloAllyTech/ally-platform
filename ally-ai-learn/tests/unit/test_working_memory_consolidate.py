@@ -135,6 +135,34 @@ class TestConsolidate:
         )
         assert out.stance == "partial resolution"
 
+    async def test_earlier_session_memory_reaches_the_updater(self, monkeypatch):
+        monkeypatch.setattr(mod, "load_and_format", lambda *a, **k: "SYS")
+        llm = _llm(ProposedUpdate())
+        await mod.consolidate(
+            memory=ClientWorkingMemory(),
+            new_messages=_turns(),
+            llm_client=llm,
+            prompt_data=SimpleNamespace(
+                previous_memory="You remember from your last session: lost my job."
+            ),
+        )
+        sent = llm.llm_instance.with_structured_output.return_value.ainvoke
+        user_text = sent.call_args.args[0][1].content
+        assert user_text.startswith("From earlier sessions with this counsellor")
+        assert "lost my job" in user_text
+
+    async def test_no_earlier_session_adds_nothing(self, monkeypatch):
+        monkeypatch.setattr(mod, "load_and_format", lambda *a, **k: "SYS")
+        llm = _llm(ProposedUpdate())
+        await mod.consolidate(
+            memory=ClientWorkingMemory(),
+            new_messages=_turns(),
+            llm_client=llm,
+            prompt_data=SimpleNamespace(previous_memory=""),
+        )
+        sent = llm.llm_instance.with_structured_output.return_value.ainvoke
+        assert sent.call_args.args[0][1].content.startswith("Current client state:")
+
     async def test_parse_failure_raises(self, monkeypatch):
         monkeypatch.setattr(mod, "load_and_format", lambda *a, **k: "SYS")
         structured = AsyncMock()

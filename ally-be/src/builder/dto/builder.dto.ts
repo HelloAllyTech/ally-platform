@@ -7,6 +7,7 @@ import {
   IsBoolean,
   IsEnum,
   IsIn,
+  IsInt,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -18,11 +19,7 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
-import {
-  BuilderLessonCategory,
-  BuilderLessonStatus,
-  BuilderSessionStatus,
-} from '../enum/builder.enum';
+import { BuilderSessionStatus } from '../enum/builder.enum';
 import {
   BUILDER_SLUG_MAX_LENGTH,
   BUILDER_TITLE_MAX_LENGTH,
@@ -95,6 +92,112 @@ export class BuilderBriefResponseDto {
   @IsString()
   @MaxLength(4000)
   note?: string;
+}
+
+/**
+ * An answer from the decision feed. The same three fields as
+ * `BuilderAnswerDto`, plus the free text, because a feed card is answered
+ * without a chat composer beside it. Which field means what depends on the
+ * decision's kind — see BuilderDecisionService.answer.
+ */
+export class AnswerBuilderDecisionDto {
+  @ApiPropertyOptional({ type: [String], description: 'Selected option ids' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  @MaxLength(80, { each: true })
+  selectedOptionIds?: string[];
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Free-text answers the admin typed',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @IsString({ each: true })
+  @MaxLength(4000, { each: true })
+  customValues?: string[];
+
+  @ApiPropertyOptional({ description: 'Admin chose "None of these"' })
+  @IsOptional()
+  @IsBoolean()
+  none?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'The answer as one line, when there are no options to pick',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  message?: string;
+
+  @ApiPropertyOptional({
+    enum: ['phone', 'tablet', 'desktop'],
+    description:
+      'Which layout answered, from breakpoint and pointer. Recorded in History so phone answers can be told apart.',
+  })
+  @IsOptional()
+  @IsIn(['phone', 'tablet', 'desktop'])
+  client?: 'phone' | 'tablet' | 'desktop';
+
+  @ApiPropertyOptional({
+    description: 'Milliseconds from the card taking focus to this answer.',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(24 * 60 * 60 * 1000)
+  msToDecide?: number;
+}
+
+/** History search. `who` is relative to the caller. */
+export class ListBuilderHistoryQueryDto {
+  @ApiPropertyOptional({ description: 'Searches what was asked and chosen' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  q?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  sessionId?: string;
+
+  @ApiPropertyOptional({
+    enum: ['decision', 'ask', 'tell', 'start', 'putback'],
+  })
+  @IsOptional()
+  @IsIn(['decision', 'ask', 'tell', 'start', 'putback'])
+  entryType?: 'decision' | 'ask' | 'tell' | 'start' | 'putback';
+
+  @ApiPropertyOptional({ enum: ['you', 'team', 'rule'] })
+  @IsOptional()
+  @IsIn(['you', 'team', 'rule'])
+  who?: 'you' | 'team' | 'rule';
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  ruleId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Cursor: return entries decided before this ISO time',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  before?: string;
+
+  @ApiPropertyOptional({ default: 50 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  @Max(200)
+  limit?: number;
 }
 
 export class CreateBuilderMessageDto {
@@ -233,6 +336,30 @@ export class RaiseBuilderBudgetDto {
   budgetUsd!: number;
 }
 
+/** An Owner-set auto-release window (RoadmapReleaseWindow). */
+export class RoadmapReleaseWindowDto {
+  @ApiProperty({ description: 'First hour releases may start, 0-23' })
+  @IsInt()
+  @Min(0)
+  @Max(23)
+  startHour!: number;
+
+  @ApiProperty({
+    description:
+      'Hour releases stop starting, 1-24, exclusive. Below startHour wraps past midnight.',
+  })
+  @IsInt()
+  @Min(1)
+  @Max(24)
+  endHour!: number;
+
+  @ApiProperty({ description: 'IANA time zone, e.g. Asia/Kolkata' })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(64)
+  timezone!: string;
+}
+
 export class UpdateBuilderSettingsDto {
   @ApiPropertyOptional({
     description:
@@ -248,6 +375,16 @@ export class UpdateBuilderSettingsDto {
   @Min(1)
   @Max(20)
   maxConcurrentBuilds?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'How many sessions you want in progress at once (your attention, not the runner budget)',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(12)
+  inProgressLimit?: number;
 
   @ApiPropertyOptional({
     description: 'Default per-session spend ceiling, USD',
@@ -391,6 +528,107 @@ export class UpdateBuilderSettingsDto {
   @IsOptional()
   @IsBoolean()
   situationBrief?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      "Master switch for the roadmap's plan flow (idea to outcome). Who may use it is the two Product Planning admin toggles.",
+  })
+  @IsOptional()
+  @IsBoolean()
+  planningEnabled?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'One USD ceiling per plan, from the first message to the outcome review, design and build runs included. Warns at 80%, then stops until the lead raises it.',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(1000)
+  planCeilingUsd?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Where the private Idea stage wraps up: at 80% of this the copilot helps the author file or park instead of stopping them.',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0.1)
+  @Max(20)
+  planIdeaCeilingUsd?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Closing a plan as not pursuing when its idea has more votes than this needs a second Lead to confirm.',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1000)
+  planCloseConfirmVotes?: number;
+
+  @ApiPropertyOptional({
+    description:
+      "Builder's own new-session door. Turn it off once plans start on the roadmap; Builder then builds plans.",
+  })
+  @IsOptional()
+  @IsBoolean()
+  builderDirectInterviewEnabled?: boolean;
+
+  // ── Roadmap v2 (plans/roadmap-builder-merge) ───────────────────────────────
+
+  @ApiPropertyOptional({
+    description:
+      'The roadmap_v2 flag: one Roadmap tab for ideas and builds. Off, every /v1/roadmap route answers 404.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  roadmapV2Enabled?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      "The most a lead may raise their idea's spend ceiling to (USD). An Owner may set any amount.",
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(100000)
+  maxLeadCeilingUsd?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Working days an idea may wait for review before triage shows its age in amber.',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(60)
+  awaitingReviewAmberDays?: number;
+
+  @ApiPropertyOptional({
+    description: 'When auto-release may start. Null means any time.',
+    type: () => RoadmapReleaseWindowDto,
+    nullable: true,
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => RoadmapReleaseWindowDto)
+  releaseWindow?: RoadmapReleaseWindowDto | null;
+
+  @ApiPropertyOptional({
+    description:
+      'Globs whose change holds an auto-release for a Release click. Null restores the defaults.',
+    type: [String],
+    nullable: true,
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayMaxSize(50)
+  @IsString({ each: true })
+  @MinLength(1, { each: true })
+  @MaxLength(200, { each: true })
+  autoReleaseHeldPaths?: string[] | null;
 }
 
 export class ListBuilderSessionsQueryDto {
@@ -449,62 +687,6 @@ export class ListBuilderSessionsQueryDto {
   offset?: number = 0;
 }
 
-export class ListBuilderLessonsQueryDto {
-  @ApiPropertyOptional({
-    enum: BuilderLessonStatus,
-    description: 'Defaults to the active set — what runs actually read.',
-  })
-  @IsOptional()
-  @IsEnum(BuilderLessonStatus)
-  status?: BuilderLessonStatus;
-
-  @ApiPropertyOptional({ enum: BuilderLessonCategory })
-  @IsOptional()
-  @IsEnum(BuilderLessonCategory)
-  category?: BuilderLessonCategory;
-
-  @ApiPropertyOptional({ description: 'Only lessons scoped to this repo' })
-  @IsOptional()
-  @IsString()
-  repo?: string;
-}
-
-export class UpdateBuilderLessonDto {
-  @ApiPropertyOptional({ description: 'Rewrite the lesson text' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(2_000)
-  lesson?: string;
-
-  @ApiPropertyOptional({ enum: BuilderLessonCategory })
-  @IsOptional()
-  @IsEnum(BuilderLessonCategory)
-  category?: BuilderLessonCategory;
-
-  @ApiPropertyOptional({
-    enum: BuilderLessonStatus,
-    description:
-      'Activate or retire it by hand. The curator respects a human decision.',
-  })
-  @IsOptional()
-  @IsEnum(BuilderLessonStatus)
-  status?: BuilderLessonStatus;
-
-  @ApiPropertyOptional({
-    description:
-      'Pinned lessons are always in context and the curator may never edit or retire them.',
-  })
-  @IsOptional()
-  @IsBoolean()
-  pinned?: boolean;
-
-  @ApiPropertyOptional({ type: [String] })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  tags?: string[];
-}
-
 export class BuilderResearchDto {
   @ApiPropertyOptional({
     enum: ['technical_plan', 'draft_prd'],
@@ -514,4 +696,121 @@ export class BuilderResearchDto {
   @IsOptional()
   @IsIn(['technical_plan', 'draft_prd'])
   mode?: 'technical_plan' | 'draft_prd';
+}
+
+/* ── The Builder tab: Ask, Tell, Rules ───────────────────────────────────── */
+
+export class AskBuilderDto {
+  @ApiProperty({ description: 'A read-only question; changes nothing' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(2000)
+  question!: string;
+}
+
+export class TellBuilderDto {
+  @ApiProperty({ description: 'An instruction that changes the work' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(4000)
+  instruction!: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Stop the run in flight and restart it with this instruction (costs a run). Default: queue it for the next run.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  applyNow?: boolean;
+}
+
+export class DraftBuilderRuleDto {
+  @ApiProperty({ description: 'The History answer to generalise' })
+  @IsUUID()
+  historyId!: string;
+}
+
+export class PreviewBuilderRuleDto {
+  @ApiProperty()
+  @IsString()
+  @MinLength(8)
+  @MaxLength(1000)
+  statement!: string;
+
+  @ApiProperty({
+    description: 'everywhere, area:<name>, session:<id> or opportunity:<id>',
+  })
+  @IsString()
+  @MaxLength(120)
+  scope!: string;
+
+  @ApiPropertyOptional({
+    description: 'The rule being edited, left out of conflicts',
+  })
+  @IsOptional()
+  @IsUUID()
+  excludeRuleId?: string;
+}
+
+export class BuilderRuleMatchDto {
+  @ApiProperty()
+  @IsString()
+  @MaxLength(24)
+  kind!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(24)
+  questionType?: string | null;
+
+  @ApiProperty()
+  @IsString()
+  @MaxLength(64)
+  optionId!: string;
+}
+
+export class CreateBuilderRuleDto {
+  @ApiProperty()
+  @IsString()
+  @MinLength(8)
+  @MaxLength(1000)
+  statement!: string;
+
+  @ApiProperty()
+  @IsString()
+  @MaxLength(120)
+  scope!: string;
+
+  @ApiPropertyOptional({ enum: ['guide', 'decide'], default: 'guide' })
+  @IsOptional()
+  @IsIn(['guide', 'decide'])
+  effect?: 'guide' | 'decide';
+
+  @ApiPropertyOptional({ type: BuilderRuleMatchDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => BuilderRuleMatchDto)
+  match?: BuilderRuleMatchDto;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  sourceHistoryId?: string;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Rules this replaces (an edit, or the loser of a conflict)',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @IsUUID('all', { each: true })
+  supersedes?: string[];
+}
+
+export class UpdateBuilderRuleDto {
+  @ApiProperty({ description: 'Turn the rule on or off' })
+  @IsBoolean()
+  active!: boolean;
 }

@@ -36,3 +36,28 @@ export function generateAudioStorageKey(params: {
     extension ? `.${extension}` : ''
   }`;
 }
+
+/**
+ * OpenAI's transcription API infers the container from the filename extension, so the
+ * extension is derived from the real MIME type rather than the client-sent filename
+ * (Safari records audio/mp4, Chromium audio/webm). Unknown types fall back to webm.
+ */
+const AUDIO_MIME_EXTENSIONS: Record<string, string> = {
+  'audio/webm': 'webm',
+  'audio/ogg': 'ogg',
+  'audio/mp4': 'mp4',
+  'audio/mpeg': 'mp3',
+  'audio/mp3': 'mp3',
+  'audio/wav': 'wav',
+  'audio/x-wav': 'wav',
+  'audio/wave': 'wav',
+};
+
+/** The bare MIME type (codecs parameter dropped) and the extension a transcriber expects. */
+export function audioUploadType(mimetype: string | undefined): {
+  type: string;
+  ext: string;
+} {
+  const type = (mimetype || 'audio/webm').split(';')[0].trim();
+  return { type, ext: AUDIO_MIME_EXTENSIONS[type.toLowerCase()] ?? 'webm' };
+}

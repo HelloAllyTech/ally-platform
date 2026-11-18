@@ -120,7 +120,8 @@ provision:
       pyenv global 3.12.8
 
       # ── Poetry ──
-      curl -sSL https://install.python-poetry.org | python3 -
+      # From PyPI, pinned: the installer script (install.python-poetry.org) went NOT_FOUND.
+      python3 -m pip install --user "poetry==2.5.1"
       export PATH="$HOME/.local/bin:$PATH"
 
       # ── Pre-commit ──

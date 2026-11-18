@@ -25,7 +25,7 @@ export interface PublishReadinessProps {
  * who only reads the heading still knows what to do next.
  *
  * Publishing stays an explicit act in chat or in the editor — this panel reports, it
- * never publishes (Stacks, "Progressive Delegation: Staged Autonomy Growth": draft first,
+ * never publishes ("Progressive Delegation: Staged Autonomy Growth": draft first,
  * publish only on explicit confirmation).
  */
 export const PublishReadiness: React.FC<PublishReadinessProps> = ({ readiness, onAskCopilot }) => {

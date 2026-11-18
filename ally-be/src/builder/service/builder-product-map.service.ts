@@ -16,7 +16,7 @@ const WIKI_ROUTING_PATH = 'wiki/ROUTING.md';
 
 /**
  * Wiki index sections about working ON the codebase rather than what the product is — the
- * deprecated product-practice pages (Stacks replaced them), contributing, agent memory, the
+ * deprecated product-practice pages (the Context Library replaced them), contributing, agent memory, the
  * skill template, the knowledge base's own meta pages.
  */
 const WIKI_SECTIONS_DROPPED =
@@ -263,7 +263,7 @@ export class BuilderProductMapService {
   /**
    * The wiki's routing index, minus its preamble (fetch instructions for humans), its footer,
    * and the sections about working on the codebase rather than what it is — above all the
-   * DEPRECATED product-practice pages, which Stacks replaced and which would otherwise be
+   * DEPRECATED product-practice pages, which the Context Library replaced and which would otherwise be
    * offered as current guidance. Headings are demoted to sit under this section's own.
    */
   private async wikiIndex(): Promise<MapSection> {

@@ -1,13 +1,13 @@
 import { WaKeywordTemplate } from '../../entity/wa-keyword-template.entity';
 import { WaTemplateKind, WaTemplateMatchType } from '../../enum/whatsapp.enum';
-import { WhatsAppTemplateService } from '../whatsapp-template.service';
+import { ChatbotReplyService } from 'src/chatbot/service/chatbot-reply.service';
 
 /**
  * Template matching is the safety-critical part of the pipeline: the ordering decides whether a
  * crisis reply is sent at all, and the match type decides whether it is sent to the wrong person.
  * Both failures are silent — the bot answers something plausible either way.
  */
-describe('WhatsAppTemplateService', () => {
+describe('ChatbotReplyService', () => {
   const template = (over: Partial<WaKeywordTemplate>): WaKeywordTemplate =>
     ({
       id: over.id ?? 'id',
@@ -29,33 +29,29 @@ describe('WhatsAppTemplateService', () => {
     }) as WaKeywordTemplate;
 
   const serviceWith = (templates: WaKeywordTemplate[]) =>
-    new WhatsAppTemplateService({
+    new ChatbotReplyService({
       find: jest.fn().mockResolvedValue(templates),
     } as never);
 
   describe('normalise', () => {
     it('folds case, punctuation and whitespace', () => {
-      expect(WhatsAppTemplateService.normalise('  HELP!!  me?  ')).toBe(
-        'help me',
-      );
+      expect(ChatbotReplyService.normalise('  HELP!!  me?  ')).toBe('help me');
     });
 
     it('applies NFKC so full-width text folds to canonical form', () => {
       // Without NFKC an IME-typed or pasted keyword silently fails to match.
-      expect(WhatsAppTemplateService.normalise('ＳＴＯＰ')).toBe('stop');
+      expect(ChatbotReplyService.normalise('ＳＴＯＰ')).toBe('stop');
     });
 
     it('keeps non-Latin scripts intact', () => {
       // An ASCII-only strip would erase a Devanagari crisis keyword entirely and match nothing —
       // the bot answers in Hindi, Tamil and Bengali.
-      expect(WhatsAppTemplateService.normalise('आत्महत्या!')).toBe('आत्महत्या');
-      expect(WhatsAppTemplateService.normalise('தற்கொலை?')).toBe('தற்கொலை');
+      expect(ChatbotReplyService.normalise('आत्महत्या!')).toBe('आत्महत्या');
+      expect(ChatbotReplyService.normalise('தற்கொலை?')).toBe('தற்கொலை');
     });
 
     it('keeps digits', () => {
-      expect(WhatsAppTemplateService.normalise('PHQ-9 score')).toBe(
-        'phq 9 score',
-      );
+      expect(ChatbotReplyService.normalise('PHQ-9 score')).toBe('phq 9 score');
     });
   });
 

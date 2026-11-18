@@ -3,8 +3,9 @@ export enum Permissions {
   // Tenant-admin native Organization Metrics dashboard (not Metabase)
   VIEW_ORGANIZATION_METRICS = "view:organization-metrics",
 
-  // Org-admin learner management (e.g. reopening a learner's scenario-quiz attempts)
-  EDIT_USER = "edit:user",
+  // Org-admin learner management: remove a learner from a course, reopen their
+  // scenario-quiz attempts. Not EDIT_USER, which also opens user/role editing.
+  EDIT_LEARNER_PROGRESS = "edit:learner-progress",
 
   // Call related permissions
   START_MICROPHONE_CHAT = "start:microphone-chat",
@@ -63,6 +64,12 @@ export enum Permissions {
   // grants the ADMIN group view/create: 1905000000000-AddTenantScopedCharacterLibrary).
   VIEW_CHARACTER_LIBRARY = "view:scenario-character",
   CREATE_CHARACTER_LIBRARY = "create:scenario-character",
+
+  // Own-organization branding editor (Branding tab). Granted to the tenant
+  // ADMIN group by ally-be migration 1980850000000-AddOrgAdminBrandingPermission;
+  // the tab also needs the org's branding switch on, which only an Ally
+  // platform admin flips — see useCanEditOrgBranding.
+  EDIT_TENANT_BRANDING = "edit:tenant-branding",
 
   // Text helpline (ally-be docs/text-helpline.md §2). LISTENER holds the first
   // eight; HELPLINE_SUPERVISOR adds monitor/whisper/transfer/qa; tenant ADMIN

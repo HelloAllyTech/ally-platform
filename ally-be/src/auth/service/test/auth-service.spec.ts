@@ -12,6 +12,7 @@ import { UserSuspendedException } from '../../exception/login.exception';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { AuthService } from '../auth.service';
+import { Tenant } from 'src/tenant/entity/tenant.entity';
 import { User } from 'src/user/entity/user.entity';
 import { RefreshToken } from 'src/auth/entity/refresh-token.entity';
 import { UserGroup } from 'src/authorization/entity/user-group.entity';
@@ -528,6 +529,126 @@ describe('AuthService', () => {
         '123456',
         300,
       );
+    });
+
+    /**
+     * The sign-in email speaks in the org's name when its branding is on.
+     * The Tenant repository is resolved per call, so these swap it in for
+     * the one call and put the original factory back.
+     */
+    const withTenant = async (
+      tenant: Partial<Tenant> | null,
+      run: () => Promise<void>,
+    ) => {
+      const getRepository = dataSource.getRepository as jest.Mock;
+      const original = getRepository.getMockImplementation();
+      const tenantRepo = { findOne: jest.fn().mockResolvedValue(tenant) };
+      getRepository.mockImplementation((entity: unknown) =>
+        entity === Tenant ? tenantRepo : original?.(entity),
+      );
+      try {
+        await run();
+      } finally {
+        getRepository.mockImplementation(original!);
+      }
+    };
+
+    const lastOtpPayload = () => {
+      const calls = (authService as any).eventEmitter.emitAsync.mock.calls;
+      return calls[calls.length - 1][1];
+    };
+
+    it('names the org in the sign-in email when its branding switch is on', async () => {
+      userRepository.findOne.mockResolvedValue(mockUser);
+      groupService.getUserGroupNames.mockResolvedValue([UserRole.CLIENT]);
+      (AuthUtil.generateOtp as jest.Mock).mockReturnValue('123456');
+      redisService.get.mockResolvedValue(null);
+
+      await withTenant(
+        {
+          id: '1',
+          name: 'Acme',
+          logoUrl: 'https://assets.example/logo.png',
+          settings: {
+            branding: {
+              enabled: true,
+              displayName: 'Acme Helpline',
+              primaryColor: '#8E2626',
+            },
+          },
+        },
+        async () => {
+          await authService.generateOtpV2(mockGenerateOtpDto);
+        },
+      );
+
+      expect(lastOtpPayload()).toEqual(
+        expect.objectContaining({
+          orgName: 'Acme Helpline',
+          orgLogoUrl: 'https://assets.example/logo.png',
+          orgColor: '#8E2626',
+        }),
+      );
+    });
+
+    it('omits the logo key when the branded org has no logo', async () => {
+      userRepository.findOne.mockResolvedValue(mockUser);
+      groupService.getUserGroupNames.mockResolvedValue([UserRole.CLIENT]);
+      (AuthUtil.generateOtp as jest.Mock).mockReturnValue('123456');
+      redisService.get.mockResolvedValue(null);
+
+      await withTenant(
+        {
+          id: '1',
+          name: 'Acme',
+          settings: { branding: { enabled: true } },
+        },
+        async () => {
+          await authService.generateOtpV2(mockGenerateOtpDto);
+        },
+      );
+
+      expect(lastOtpPayload()).toEqual(
+        expect.objectContaining({ orgName: 'Acme', orgColor: '#264D8E' }),
+      );
+      expect(lastOtpPayload()).not.toHaveProperty('orgLogoUrl');
+    });
+
+    it('leaves the org name out while branding is off, and when the lookup fails', async () => {
+      userRepository.findOne.mockResolvedValue(mockUser);
+      groupService.getUserGroupNames.mockResolvedValue([UserRole.CLIENT]);
+      (AuthUtil.generateOtp as jest.Mock).mockReturnValue('123456');
+      redisService.get.mockResolvedValue(null);
+
+      await withTenant(
+        {
+          id: '1',
+          name: 'Acme',
+          settings: {
+            branding: { enabled: false, displayName: 'Acme Helpline' },
+          },
+        },
+        async () => {
+          await authService.generateOtpV2(mockGenerateOtpDto);
+        },
+      );
+      expect(lastOtpPayload()).not.toHaveProperty('orgName');
+
+      // A broken lookup must never stop the code from going out.
+      const getRepository = dataSource.getRepository as jest.Mock;
+      const original = getRepository.getMockImplementation();
+      getRepository.mockImplementation((entity: unknown) =>
+        entity === Tenant
+          ? { findOne: jest.fn().mockRejectedValue(new Error('db down')) }
+          : original?.(entity),
+      );
+      try {
+        const result = await authService.generateOtpV2(mockGenerateOtpDto);
+        expect(result).toEqual({ success: true, expiresIn: 300 });
+        expect(lastOtpPayload()).not.toHaveProperty('orgName');
+      } finally {
+        getRepository.mockImplementation(original!);
+      }
     });
 
     it('should find the user when the submitted email differs only in case/whitespace from the stored email', async () => {

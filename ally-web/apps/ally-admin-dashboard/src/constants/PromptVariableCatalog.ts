@@ -42,7 +42,6 @@ export const MAIN_AGENT_PROMPT_VARIABLE_CATALOG: PromptCatalogEntry[] = [
   // Scenario meta
   { name: "title", label: "Title", group: "scenario" },
   { name: "challenge_description", label: "Challenge Description", group: "scenario" },
-  { name: "competency", label: "Competency", group: "scenario" },
   { name: "role_instructions", label: "Role Instructions", group: "scenario" },
 
   // Persona (identity)
@@ -64,22 +63,20 @@ export const MAIN_AGENT_PROMPT_VARIABLE_CATALOG: PromptCatalogEntry[] = [
   // were originally part of this group (PR #350, Oct 2025) but their UI
   // inputs were removed Jan 2026 ("Remove deprecated simulation step
   // constants") and the BE/runtime plumbing followed in a later cleanup.
-  // The author-facing equivalent is now the free-text
-  // `character_profile_text` field, which captures all of these as one
-  // paragraph and reaches the prompt body.
-  { name: "character_profile_text", label: "Character Profile", group: "character" },
+  // The author-facing equivalent is now the free-text Character Backstory
+  // field, which captures all of these as one paragraph. Its old placeholder
+  // name, `character_profile_text`, still renders (see LEGACY_VARIABLE_NAMES).
+  { name: "character_backstory", label: "Character Backstory", group: "character" },
   // Lifted from previous_memory_block; variants can use {previous_memory}
   // directly instead of the canned "Summary from your previous session: X"
   // wrapper.
   { name: "previous_memory", label: "Previous Memory", group: "character" },
 
-  // Behavior / session
-  //
-  // `session_behavior_guidelines`, `agent_goal`, and `response_length` were
-  // also part of the deprecated simulator-creator inputs and were removed
-  // alongside the character-side fields above. Behaviour Instructions
-  // table + Behavior Rules JSON cover the same runtime intent end-to-end.
-  { name: "opening_statements", label: "Opening Statements", group: "behavior" },
+  // `competency` and `opening_statements` are deliberately absent: both are
+  // scenario fields (the skill being trained; what the client says first),
+  // not actor direction, so they are not offered as prompt variables. So is
+  // `behavior_instructions_json`, which only Prompt #1's legacy per-state
+  // coaching uses; #1's own text still references it.
 
   // System-computed (filled by the prompt builder, not the studio)
   //
@@ -154,12 +151,6 @@ export const MAIN_AGENT_PROMPT_VARIABLE_CATALOG: PromptCatalogEntry[] = [
     systemComputed: true,
   },
   {
-    name: "behavior_instructions_json",
-    label: "Behavior Rules (JSON)",
-    group: "system",
-    systemComputed: true,
-  },
-  {
     name: "state_x_guidelines",
     label: "Active State Guidelines",
     group: "system",
@@ -167,6 +158,48 @@ export const MAIN_AGENT_PROMPT_VARIABLE_CATALOG: PromptCatalogEntry[] = [
     statesOnly: true,
   },
 ];
+
+/**
+ * Old placeholder names that still render, mapped to the name authors should
+ * use now. Live versions written before a rename keep working; the studio
+ * just stops offering the old name.
+ */
+export const LEGACY_VARIABLE_NAMES: Record<string, string> = {
+  character_profile_text: "character_backstory",
+};
+
+/**
+ * Variables whose value the runtime uses even when the prompt text leaves the
+ * placeholder out, and how. Shown as a tooltip on the variable's chip so an
+ * author doesn't take "not in my prompt" to mean "safe to leave empty".
+ * Keyed by placeholder name, not limited to the catalog: the glossary is a
+ * fragment, not a catalog entry, and behaves the same way.
+ */
+export const VARIABLES_USED_OUTSIDE_THE_PROMPT: Record<string, string> = {
+  character_backstory:
+    "Used even if this prompt leaves it out: working memory recalls the client's backstory from it a few facts at a time, and guardrail replies include it.",
+  retrieved_context:
+    "Used even if this prompt leaves it out: retrieved knowledge-source text is added after the conversation every turn, unless the current state turns knowledge retrieval off.",
+  language_glossary:
+    "Used even if this prompt leaves it out: the glossary is added to the end of the prompt when the text doesn't place it.",
+  allowed_fillers:
+    "Used even if this prompt leaves it out: when fillers are on for the simulation, these words are played as spoken fillers before a reply and guide the thinking fillers.",
+  linguistic_samples:
+    "Used even if this prompt leaves it out: thinking fillers are written to match these samples, and guardrail replies include them.",
+  previous_memory:
+    "Used even if this prompt leaves it out: working memory reads it so the client doesn't treat what they said in earlier sessions as new.",
+  state_x_guidelines:
+    "Used even if this prompt leaves it out: the states still set working memory's stage for the client and switch knowledge retrieval on or off per state.",
+  challenge_description:
+    "Used even if this prompt leaves it out: it gives context to thinking fillers, back-channel sounds and interim replies, and working memory falls back on it when recalling backstory.",
+  title:
+    "Used even if this prompt leaves it out: it gives context to thinking fillers, back-channel sounds and interim replies.",
+  name: "Used even if this prompt leaves it out: it gives context to thinking fillers, back-channel sounds and interim replies, and guardrail replies include it.",
+  profession:
+    "Used even if this prompt leaves it out: it gives context to thinking fillers, back-channel sounds and interim replies.",
+  custom_fields_text:
+    "Used even if this prompt leaves it out: event branch instructions can refer to a custom field by name, and session reports score against custom fields.",
+};
 
 /** Human-readable header for a catalog group. */
 export const PROMPT_CATALOG_GROUP_LABELS: Record<PromptCatalogEntry["group"], string> = {

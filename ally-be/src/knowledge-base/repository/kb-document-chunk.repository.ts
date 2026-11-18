@@ -9,21 +9,6 @@ export class KbDocumentChunkRepository extends Repository<KbDocumentChunk> {
     super(KbDocumentChunk, dataSource.createEntityManager());
   }
 
-  /** One page of a document's chunks at the current version, in reading order. */
-  async listForDocument(
-    documentId: string,
-    chunkVersion: number,
-    options: { limit?: number; offset?: number } = {},
-  ): Promise<{ chunks: KbDocumentChunk[]; count: number }> {
-    const [chunks, count] = await this.findAndCount({
-      where: { documentId, chunkVersion },
-      order: { chunkIndex: 'ASC' },
-      take: options.limit ?? 50,
-      skip: options.offset ?? 0,
-    });
-    return { chunks, count };
-  }
-
   /**
    * Chunks still needing to be pushed to the vector index.
    *

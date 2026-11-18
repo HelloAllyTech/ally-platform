@@ -1,0 +1,230 @@
+import "@constants";
+import React from "react";
+
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { Provider } from "react-redux";
+import { MemoryRouter } from "react-router-dom";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { en } from "@constants";
+import { store } from "@store";
+
+import type { RoadmapDraftDetail } from "../../../types/roadmapV2Flow";
+
+const mockTurn = vi.fn();
+const mockReopen = vi.fn();
+const mockSubmit = vi.fn();
+const mockPatch = vi.fn();
+const mockCreate = vi.fn();
+let mockDraft: RoadmapDraftDetail | undefined;
+
+const unwrapOf = (fn: ReturnType<typeof vi.fn>) =>
+  vi.fn((arg: unknown) => ({ unwrap: () => Promise.resolve(fn(arg)) }));
+
+vi.mock("../../../api/roadmapV2Flow", async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useGetRoadmapDraftQuery: () => ({
+    data: mockDraft,
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+  useRoadmapDraftTurnMutation: () => [unwrapOf(mockTurn)],
+  useReopenRoadmapDraftCheckMutation: () => [unwrapOf(mockReopen)],
+  useSubmitRoadmapDraftMutation: () => [unwrapOf(mockSubmit)],
+  usePatchRoadmapDraftMutation: () => [unwrapOf(mockPatch)],
+  useCreateRoadmapDraftMutation: () => [unwrapOf(mockCreate)],
+  useDiscardRoadmapDraftMutation: () => [unwrapOf(vi.fn())],
+  useRestoreRoadmapDraftMutation: () => [unwrapOf(vi.fn())],
+  useSelfCheckRoadmapDraftMutation: () => [unwrapOf(vi.fn())],
+  useAddRoadmapDraftToMutation: () => [unwrapOf(vi.fn())],
+  useGetRoadmapDraftSimilarQuery: () => ({ data: undefined }),
+  useRoadmapDictateMutation: () => [unwrapOf(vi.fn())],
+}));
+vi.mock("@api", async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useGetRoadmapProductGoalsQuery: () => ({
+    data: [{ id: "g1", name: "Learner return", position: 1 }],
+  }),
+}));
+vi.mock("sonner", () => ({
+  toast: { error: vi.fn(), success: vi.fn(), custom: vi.fn(), dismiss: vi.fn() },
+}));
+
+import { setReduceMotionSwitch, __resetReduceMotionForTests } from "../../../motion/roadmapMotion";
+import { DraftView } from "../drafts/DraftView";
+import { __resetDeviceStoreForTests } from "../utils/deviceStore";
+
+const checks = (met: number): RoadmapDraftDetail["checks"] =>
+  (["who_it_affects", "pain_or_gain", "clear_why", "goal_before_solution", "outcome"] as const).map(
+    (id, i) => ({
+      id,
+      label: `Label ${id}`,
+      hint: `Hint ${id}`,
+      met: i < met,
+      source: i < met ? "agent" : null,
+      evidence: i < met ? { quote: "new learners", from: "text" } : null,
+      note: null,
+      reopened: false,
+    }),
+  );
+
+const draft = (met: number, overrides: Partial<RoadmapDraftDetail> = {}): RoadmapDraftDetail => ({
+  code: "OPP-0042",
+  sessionId: "s1",
+  shownStage: "draft",
+  statusParts: { stage: "draft", checksMet: met, checksTotal: 5 },
+  text: "Streak for new learners",
+  title: "Streak for new learners",
+  goal: null,
+  suggestedGoal: { id: "g1", name: "Learner return" },
+  checks: checks(met),
+  checksMet: met,
+  checksTotal: 5,
+  canSubmit: met === 5,
+  selfChecked: false,
+  selfCheckOffered: false,
+  checkedAt: null,
+  conversation: [],
+  version: 3,
+  savedAt: new Date().toISOString(),
+  createdAt: new Date().toISOString(),
+  archivedAt: null,
+  archiveAt: null,
+  purgeAt: null,
+  spend: { spentUsd: 0, ideaCapUsd: 1, wrapUp: false },
+  ...overrides,
+});
+
+const renderDraft = (breakpoint: "desktop" | "phone" = "desktop") =>
+  render(
+    <Provider store={store}>
+      <MemoryRouter>
+        <DraftView code="OPP-0042" breakpoint={breakpoint} />
+      </MemoryRouter>
+    </Provider>,
+  );
+
+beforeEach(() => {
+  [mockTurn, mockReopen, mockSubmit, mockPatch, mockCreate].forEach(fn => fn.mockReset());
+  mockPatch.mockImplementation(() => ({
+    code: "OPP-0042",
+    title: "t",
+    version: 4,
+    savedAt: new Date().toISOString(),
+    checksMet: 3,
+    checksTotal: 5,
+  }));
+});
+afterEach(() => {
+  __resetDeviceStoreForTests();
+  __resetReduceMotionForTests();
+  window.localStorage.clear();
+});
+
+describe("the draft page (§4.2)", () => {
+  it("says it's private and keeps Submit locked below 5 of 5", async () => {
+    mockDraft = draft(3);
+    renderDraft();
+    expect(screen.getByText(en.roadmapV2.draft.privateBanner)).toBeInTheDocument();
+    expect(screen.getByText(en.roadmapV2.draft.checksCountLong(3, 5))).toBeInTheDocument();
+    const panel = () =>
+      within(screen.getByRole("region", { name: en.roadmapV2.draft.checksTitle }));
+    const submit = panel().getByRole("button", { name: en.roadmapV2.draft.submit });
+    expect(submit).toBeDisabled();
+    expect(screen.getByText(en.roadmapV2.draft.submitLocked(3, 5))).toBeInTheDocument();
+    // Each met check quotes its evidence.
+    expect(screen.getAllByText(en.roadmapV2.draft.evidence("new learners")).length).toBe(3);
+  });
+
+  it("at 5 of 5, Submit asks one confirm naming who will see it", async () => {
+    mockDraft = draft(5);
+    mockSubmit.mockReturnValue({ item: { code: "OPP-0042" }, firstSubmit: true });
+    renderDraft();
+    const submit = within(
+      screen.getByRole("region", { name: en.roadmapV2.draft.checksTitle }),
+    ).getByRole("button", { name: en.roadmapV2.draft.submit });
+    expect(submit).toBeEnabled();
+    fireEvent.click(submit);
+    expect(await screen.findByText(en.roadmapV2.draft.submitConfirmBody)).toBeInTheDocument();
+  });
+
+  it("Not quite reopens the check, then asks the agent again", async () => {
+    mockDraft = draft(2);
+    mockReopen.mockReturnValue(draft(1));
+    mockTurn.mockReturnValue(draft(1));
+    renderDraft();
+    fireEvent.click(screen.getAllByRole("button", { name: en.roadmapV2.draft.notQuite })[0]);
+    await waitFor(() =>
+      expect(mockReopen).toHaveBeenCalledWith({ code: "OPP-0042", checkId: "who_it_affects" }),
+    );
+    await waitFor(() => expect(mockTurn).toHaveBeenCalledWith({ code: "OPP-0042" }));
+  });
+
+  it("Check my idea asks the agent with no answer; a 503 says so with Retry", async () => {
+    mockDraft = draft(0);
+    mockTurn.mockImplementation(() => {
+      throw { status: 503, data: { code: "assistant_unavailable", failures: 1 } };
+    });
+    renderDraft();
+    fireEvent.click(screen.getAllByRole("button", { name: en.roadmapV2.draft.checkMyIdea })[0]);
+    expect(await screen.findByText(en.roadmapV2.draft.assistantUnavailable)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: en.roadmapV2.draft.retry })).toBeInTheDocument();
+  });
+
+  it("offers Fill it in yourself after two failed turns (§4.13)", async () => {
+    mockDraft = draft(0);
+    mockTurn.mockImplementation(() => {
+      throw { status: 503, data: { code: "assistant_unavailable" } };
+    });
+    renderDraft();
+    const button = () => screen.getAllByRole("button", { name: en.roadmapV2.draft.checkMyIdea })[0];
+    fireEvent.click(button());
+    await screen.findByText(en.roadmapV2.draft.assistantUnavailable);
+    fireEvent.click(button());
+    expect(await screen.findByText(en.roadmapV2.draft.selfCheckOffer)).toBeInTheDocument();
+  });
+
+  it("autosaves typing to the server with the version it was written on", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mockDraft = draft(3);
+    renderDraft();
+    const box = screen.getByLabelText(en.roadmapV2.draft.textLabel);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(50);
+    });
+    fireEvent.change(box, { target: { value: "Streak for new learners in week one" } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+    await waitFor(() =>
+      expect(mockPatch).toHaveBeenCalledWith({
+        code: "OPP-0042",
+        patch: { text: "Streak for new learners in week one", goalId: null, baseVersion: 3 },
+      }),
+    );
+    vi.useRealTimers();
+  });
+
+  it("phone: a 3 of 5 pill opens the checks, and Submit sits in the sticky bar at 5 of 5", () => {
+    mockDraft = draft(5);
+    renderDraft("phone");
+    expect(
+      screen.getByRole("button", {
+        name: `${en.roadmapV2.draft.showChecks}: ${en.roadmapV2.draft.checksCountLong(5, 5)}`,
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: en.roadmapV2.draft.submit })[0]).toBeEnabled();
+  });
+
+  it("reduced motion lands on the same final state: the same checks drawn, the same count", () => {
+    mockDraft = draft(4);
+    const { container, unmount } = renderDraft();
+    const full = container.querySelectorAll("[data-met]").length;
+    unmount();
+    setReduceMotionSwitch(true);
+    const reduced = renderDraft();
+    expect(reduced.container.querySelectorAll("[data-met]").length).toBe(full);
+    expect(screen.getByText(en.roadmapV2.draft.checksCountLong(4, 5))).toBeInTheDocument();
+  });
+});

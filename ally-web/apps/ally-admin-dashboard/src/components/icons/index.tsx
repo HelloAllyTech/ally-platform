@@ -20,6 +20,7 @@ import type { SVGProps } from "react";
 
 import {
   Add as CAdd,
+  Asleep as CAsleep,
   Alarm as CAlarm,
   Archive as CArchive,
   ArrowLeft as CArrowLeft,
@@ -42,6 +43,7 @@ import {
   Merge as CMerge,
   Bullhorn as CBullhorn,
   Launch as CLaunch,
+  Light as CLight,
   Link as CLink,
   SortAscending as CSortAscending,
   SortDescending as CSortDescending,
@@ -64,6 +66,7 @@ import {
   Filter as CFilter,
   FaceSatisfied as CFaceSatisfied,
   Flag as CFlag,
+  Report as CReport,
   Flash as CFlash,
   FlowConnection as CFlowConnection,
   Globe as CGlobe,
@@ -90,6 +93,8 @@ import {
   Save as CSave,
   Search as CSearch,
   Settings as CSettings,
+  Star as CStarOutline,
+  StarFilled as CStarFilled,
   SkillLevel as CSkillLevel,
   Subtract as CSubtract,
   Terminal as CTerminal,
@@ -199,6 +204,9 @@ export const Currency = createCarbonIcon(CCurrency);
 export const CheckCircle = createCarbonIcon(CCheckmarkOutline);
 export const Close = createCarbonIcon(CClose);
 export const Menu = createCarbonIcon(CMenu);
+/** Top-bar colour-mode switch: the moon offers dark mode, the sun offers light mode. */
+export const Moon = createCarbonIcon(CAsleep);
+export const Sun = createCarbonIcon(CLight);
 export const Compress = createCarbonIcon(CMinimize);
 export const Copy = createCarbonIcon(CCopy);
 export const Delete = createCarbonIcon(CTrashCan);
@@ -263,12 +271,12 @@ export const WarningAlt = createCarbonIcon(CWarningAlt);
 /* Colour variants — same Carbon glyph, original colour preserved via CSS     */
 /* -------------------------------------------------------------------------- */
 
-export const AddBlue = createCarbonIcon(CAdd, { className: "text-[#0957D0]" });
-export const BlueAdd = createCarbonIcon(CAdd, { className: "text-[#0957D0]" });
+export const AddBlue = createCarbonIcon(CAdd, { className: "text-blue-600" });
+export const BlueAdd = createCarbonIcon(CAdd, { className: "text-blue-600" });
 export const CloseRed = createCarbonIcon(CClose, { className: "text-[#F93535]" });
 export const TrashRed = createCarbonIcon(CTrashCan, { className: "text-[#FE6F64]" });
 export const BookWhite = createCarbonIcon(CBook, { className: "text-white" });
-export const BlackTick = createCarbonIcon(CCheckmark, { className: "text-[#212121]" });
+export const BlackTick = createCarbonIcon(CCheckmark, { className: "text-typography-900" });
 export const TickGreenBackground = createCarbonIcon(CCheckmarkFilled, {
   className: "text-[#66BB6A]",
 });
@@ -283,6 +291,7 @@ export const HelpIcon = createCarbonIcon(CHelp);
 export const Languages = createCarbonIcon(CTranslate);
 export const Settings = createCarbonIcon(CSettings);
 export const Flag = createCarbonIcon(CFlag);
+export const Report = createCarbonIcon(CReport);
 export const SkillLevel = createCarbonIcon(CSkillLevel);
 export const Bold = createCarbonIcon(CTextBold);
 export const Italic = createCarbonIcon(CTextItalic);
@@ -296,6 +305,10 @@ export const McqBlock = createCarbonIcon(CRadioButtonChecked);
 export const Minus = createCarbonIcon(CSubtract);
 export const RefreshCw = createCarbonIcon(CRenew);
 export const RotateCcw = createCarbonIcon(CRestart);
+
+/** Carbon line star and filled star — the Prod Director's priority toggle. */
+export const StarOutline = createCarbonIcon(CStarOutline);
+export const StarSolid = createCarbonIcon(CStarFilled);
 export const UploadCloud = createCarbonIcon(CCloudUpload);
 export const Terminal = createCarbonIcon(CTerminal);
 export const Mobile = createCarbonIcon(CMobile);
@@ -426,14 +439,6 @@ export const BuilderAgentIcon = materialSymbol("auto_awesome");
  * warning about the subset is not decoration.
  */
 export const RoadmapSettingsIcon = materialSymbol("settings");
-
-/**
- * The roadmap header's quick-add glyph: a plain plus, beside the guided-interview bulb. The
- * bulb says "file an idea, with help"; the plus says "add a row" — which is exactly what quick
- * add is, so the glyph the bulb's note rejected for the interview is the right one here. Same
- * `wght 100` family as its neighbours. "add" MUST stay in index.html's `icon_names` subset.
- */
-export const QuickAddIcon = materialSymbol("add");
 
 /**
  * Standard tooltip affordance across the admin. Unlike the Carbon icons above

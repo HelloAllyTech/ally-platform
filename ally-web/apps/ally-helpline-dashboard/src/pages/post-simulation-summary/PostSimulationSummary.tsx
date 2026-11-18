@@ -66,6 +66,26 @@ const ANALYTICS_TAB: Record<number, string> = {
   [TAB_IDS.TRANSCRIPT]: ROLEPLAY_SUMMARY_TAB.ANNOTATED_TRANSCRIPT,
 };
 
+/**
+ * PRD §6.3: on desktop (≥ 1024 px) the transcript sits beside the debrief
+ * cards; below that it stays a tab. JS rather than CSS so only one transcript
+ * is ever mounted (it fetches, plays audio and scrolls to quoted moments).
+ */
+const BESIDE_QUERY = "(min-width: 1024px)";
+const useTranscriptBeside = () => {
+  const [matches, setMatches] = useState(
+    () => typeof window !== "undefined" && Boolean(window.matchMedia?.(BESIDE_QUERY)?.matches),
+  );
+  useEffect(() => {
+    const mql = window.matchMedia?.(BESIDE_QUERY);
+    if (!mql?.addEventListener) return undefined;
+    const onChange = () => setMatches(mql.matches);
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
+  return matches;
+};
+
 export const PostSimulationSummary: FC = () => {
   const { sessionId } = useParams();
   const navigate = useNavigate();
@@ -114,10 +134,21 @@ export const PostSimulationSummary: FC = () => {
   const [momentRequest, setMomentRequest] = useState<TranscriptFocusRequest | null>(null);
   const momentRequestCountRef = useRef(0);
 
+  // With the transcript beside the cards there is no tab to switch to: the
+  // request alone scrolls the transcript to the moment.
+  const wideScreen = useTranscriptBeside();
+  const besideRef = useRef(false);
+
   const handleOpenMoment = useCallback((messageId: string) => {
     momentRequestCountRef.current += 1;
     setMomentRequest({ messageId, requestId: momentRequestCountRef.current });
-    setSelectedTab(TAB_IDS.TRANSCRIPT);
+    if (!besideRef.current) setSelectedTab(TAB_IDS.TRANSCRIPT);
+  }, []);
+
+  const handleSeeQuote = useCallback((quote: string) => {
+    momentRequestCountRef.current += 1;
+    setMomentRequest({ quote, requestId: momentRequestCountRef.current });
+    if (!besideRef.current) setSelectedTab(TAB_IDS.TRANSCRIPT);
   }, []);
 
   const { data: availableLanguages } = useGetAvailableLanguagesQuery({});
@@ -157,6 +188,7 @@ export const PostSimulationSummary: FC = () => {
                 // a transcript tab to open; otherwise they render as plain
                 // prose.
                 onOpenMoment={feedbackTabs.transcript ? handleOpenMoment : undefined}
+                onSeeQuote={feedbackTabs.transcript ? handleSeeQuote : undefined}
                 agentName={summary?.scenario?.metadata?.name}
               />
             ),
@@ -182,6 +214,11 @@ export const PostSimulationSummary: FC = () => {
         ]
       : []),
   ];
+
+  // PRD §6.3: desktop ≥ 1024 px shows both at once, the cards (≤ 68
+  // characters wide) with the transcript beside them; phone keeps the tabs.
+  const transcriptBeside = wideScreen && feedbackTabs.debrief && feedbackTabs.transcript;
+  besideRef.current = transcriptBeside;
 
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [rating, setRating] = useState<number | null>(null);
@@ -220,16 +257,20 @@ export const PostSimulationSummary: FC = () => {
     }
   }, [summaryData, isLoading, summary]);
 
+  // With no feedback tabs the learner goes back where they came from: the
+  // course, when the roleplay was played inside one, else the role-play list.
+  const noFeedbackExit = trackContext ? trackHomeRoute(trackContext) : ROUTES.LEARN;
+
   // Feedback-disabled flow: as soon as the scenario config loads, either prompt
-  // for the star rating (if not yet given) or go straight to the role-play list.
+  // for the star rating (if not yet given) or go straight back.
   useEffect(() => {
     if (!summary || feedbackEnabled) return;
     if (summary.hasFeedback) {
-      navigate(ROUTES.LEARN);
+      navigate(noFeedbackExit);
     } else {
       setFeedbackOpen(true);
     }
-  }, [summary, feedbackEnabled, navigate]);
+  }, [summary, feedbackEnabled, navigate, noFeedbackExit]);
 
   const handleCreateReview = async (status: string, note?: string) => {
     const normalizedNote = note?.trim() || null;
@@ -337,14 +378,14 @@ export const PostSimulationSummary: FC = () => {
   }
 
   // Feedback disabled: render only the star-rating dialog; submitting or
-  // dismissing it returns the learner to the role-play list.
+  // dismissing it returns the learner to the course or the role-play list.
   if (summary && !feedbackEnabled) {
     return (
       <div className="flex h-[100dvh] min-h-0 w-full flex-col items-center overflow-hidden bg-white">
         <FeedbackDialog
           open={feedbackOpen}
-          onClose={() => navigate(ROUTES.LEARN)}
-          onSubmitComplete={() => navigate(ROUTES.LEARN)}
+          onClose={() => navigate(noFeedbackExit)}
+          onSubmitComplete={() => navigate(noFeedbackExit)}
           id={sessionId ?? ""}
           sessionType={SessionType.SIMULATION}
           initialRating={summary?.sessionFeedback?.rating}
@@ -371,7 +412,7 @@ export const PostSimulationSummary: FC = () => {
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="relative flex w-full max-w-4xl flex-1 flex-col gap-6 self-center px-4 pb-8 sm:pb-16 sm:px-6 items-center"
+        className={`relative flex w-full ${transcriptBeside ? "max-w-7xl" : "max-w-4xl"} flex-1 flex-col gap-6 self-center px-4 pb-8 sm:pb-16 sm:px-6 items-center`}
       >
         {trackContext && (
           <div className="mt-8 flex w-full shrink-0 items-center gap-2 text-sm text-typography-700 min-w-0">
@@ -466,18 +507,37 @@ export const PostSimulationSummary: FC = () => {
               }}
               tag={t("postSim.titlePrefix")}
             />
-            <Tabs
-              items={tabList.map(tab => ({ id: String(tab.id), label: tab.label }))}
-              activeId={String(selectedTab)}
-              onChange={id => handleTabChange(Number(id))}
-              // Sticky so switching tabs stays reachable once a long note or
-              // transcript has been scrolled past.
-              className="sticky top-0 z-20 w-full shrink-0 border-b border-[#d6cdbe] bg-white font-primary"
-              showCount={false}
-            />
-            <div className="flex w-full flex-1 flex-col" data-testid="post-sim-tab-panel">
-              {getTabContent()}
-            </div>
+            {transcriptBeside ? (
+              <div
+                className="grid w-full flex-1 grid-cols-[minmax(0,68ch)_minmax(0,1fr)] items-start gap-6"
+                data-testid="post-sim-beside"
+              >
+                <div className="flex min-w-0 flex-col" data-testid="post-sim-debrief-column">
+                  {tabList.find(tab => tab.id === TAB_IDS.DEBRIEF)?.content}
+                </div>
+                <div
+                  className="sticky top-4 flex max-h-[calc(100dvh-2rem)] min-w-0 flex-col overflow-y-auto"
+                  data-testid="post-sim-transcript-column"
+                >
+                  {tabList.find(tab => tab.id === TAB_IDS.TRANSCRIPT)?.content}
+                </div>
+              </div>
+            ) : (
+              <>
+                <Tabs
+                  items={tabList.map(tab => ({ id: String(tab.id), label: tab.label }))}
+                  activeId={String(selectedTab)}
+                  onChange={id => handleTabChange(Number(id))}
+                  // Sticky so switching tabs stays reachable once a long note or
+                  // transcript has been scrolled past.
+                  className="sticky top-0 z-20 w-full shrink-0 border-b border-[#d6cdbe] bg-white font-primary"
+                  showCount={false}
+                />
+                <div className="flex w-full flex-1 flex-col" data-testid="post-sim-tab-panel">
+                  {getTabContent()}
+                </div>
+              </>
+            )}
             {!isLoading && trackContext && (
               <div
                 data-testid="post-sim-footer"

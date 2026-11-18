@@ -84,13 +84,7 @@ describe('buildFixSessionPrompt', () => {
     // why it would fail on a protected repo ("... has no admin rights to
     // bypass it with"). The negation sits before the mention in one and after
     // it in the other, so the window spans both sides.
-    for (const repo of [
-      'ally-be',
-      'ally-web',
-      'ally-ai',
-      'ally-ai-learn',
-      'ally-mobile',
-    ]) {
+    for (const repo of ['ally-be', 'ally-web', 'ally-ai', 'ally-ai-learn']) {
       const prompt = build({ repo }, repo);
       const contexts = [
         ...prompt.matchAll(/(.{0,60}gh pr merge --admin.{0,60})/gi),
@@ -159,7 +153,7 @@ describe('buildFixSessionPrompt', () => {
   it('sends a red-CI retry to the same branch with the failing checks, and opens nothing new (2026-10-16)', () => {
     const prompt = buildFixSessionPrompt({
       finding: finding(),
-      repo: 'ally-mobile',
+      repo: 'ally-web',
       runId: 'run-1',
       apiBaseUrl: 'https://api.example.com',
       retry: {
@@ -169,7 +163,7 @@ describe('buildFixSessionPrompt', () => {
         failures: [
           'Tests / Typecheck failed on head feed567. Log tail: error TS2322',
         ],
-        prUrl: 'https://github.com/HelloAllyTech/ally-mobile/pull/115',
+        prUrl: 'https://github.com/HelloAllyTech/ally-web/pull/115',
         decisionId: null,
         at: '2026-10-16T00:00:00.000Z',
       },
@@ -205,12 +199,13 @@ describe('buildFixSessionPrompt', () => {
   });
 
   it('still flags the guarded path on a repo the bot cannot merge to at all', () => {
-    // ally-be, ally-web and ally-ai all have canBotMerge: false, so a
-    // guarded-path finding on any of them hit the "cannot merge here" branch
-    // before ever reaching the guarded-path-specific one — the reviewer got
-    // told the bot has no merge rights but never which sensitive area to look
-    // at, even though the finding genuinely touches one.
-    for (const repo of ['ally-be', 'ally-web', 'ally-ai']) {
+    // ally-be, ally-web, ally-ai and ally-mobile all have canBotMerge: false,
+    // so a guarded-path finding on any of them hit the "cannot merge here"
+    // branch before ever reaching the guarded-path-specific one — the
+    // reviewer got told the bot has no merge rights but never which
+    // sensitive area to look at, even though the finding genuinely touches
+    // one.
+    for (const repo of ['ally-be', 'ally-web', 'ally-ai', 'ally-mobile']) {
       const prompt = build({ touchesGuardedPath: true }, repo);
 
       expect(prompt).toMatch(/Do NOT attempt to merge/i);
@@ -219,22 +214,16 @@ describe('buildFixSessionPrompt', () => {
     }
   });
 
-  it('never merges an ally-mobile fix, guarded path or not', () => {
-    // ally-mobile IS fixable — Bug Hunter opens a PR there — but this pipeline
-    // only runs Jest, which cannot verify the native/on-device behaviour that
-    // actually ships, so a human always merges it.
-    //
-    // ally-mobile also has `canBotMerge: false`, so two rules forbid this
-    // merge. The MOBILE one has to be the reason the agent is given: the
-    // platform reason is permanent product policy, the permissions one could
-    // change tomorrow, and telling the agent the wrong one would invite it to
-    // treat a frozen-build risk as an access problem.
-    const prompt = build({ touchesGuardedPath: false }, 'ally-mobile');
+  // ally-mobile was re-onboarded into BUG_HUNT_REPOS 2026-11-06 (it used to
+  // have no entry at all, since the 2026-11 Flutter rename, and this threw
+  // before the fix prompt's own canBotMerge logic was ever reached) — it now
+  // behaves like any other canBotMerge: false repo, covered by the loop above.
+  it('fixes ally-mobile like any other canBotMerge: false repo', () => {
+    const prompt = build({}, 'ally-mobile');
 
-    expect(prompt).toMatch(/Do NOT merge/);
-    expect(prompt).not.toContain('gh pr merge');
-    expect(prompt).toMatch(/ally-mobile fixes always stay a reviewed PR/i);
-    expect(prompt).not.toMatch(/push access only/i);
+    expect(prompt).toMatch(/flutter test/);
+    expect(prompt).toMatch(/flutter analyze/);
+    expect(prompt).toMatch(/Do NOT attempt to merge/i);
   });
 
   // ── cross-repo guard ─────────────────────────────────────────────────────
@@ -262,7 +251,7 @@ describe('buildFixSessionPrompt', () => {
     it.each([
       ['ally-be', 'ally-be'],
       ['ally-ai', 'ally-ai'],
-      ['ally-mobile', 'ally-mobile'],
+      ['ally-ai-learn', 'ally-ai-learn'],
     ])('names only stages BugHuntEventStage defines — %s', (_label, repo) => {
       const mentioned = stageMentions(build({}, repo));
       expect(mentioned.length).toBeGreaterThan(5);
@@ -815,7 +804,7 @@ describe('buildFixSessionPrompt', () => {
       ['ally-ai-learn', {}],
       ['ally-be', {}],
       ['ally-ai-learn', { touchesGuardedPath: true }],
-      ['ally-mobile', {}],
+      ['ally-web', {}],
     ] as const) {
       const prompt = build(over, repo);
       expect(prompt).toMatch(/git commit --no-verify/);

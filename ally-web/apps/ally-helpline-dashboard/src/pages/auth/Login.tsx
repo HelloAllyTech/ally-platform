@@ -30,6 +30,8 @@ import { useUser } from "@hooks";
 import { RootState } from "@store";
 import { openLinkInNewTab, validateEmail } from "@utils";
 
+import { useBranding } from "../../branding";
+
 const RESEND_CODE_COUNTDOWN = 60; // 2 minutes
 const DEFAULT_EXPIRES_IN = 10; // 10 minutes
 
@@ -38,6 +40,10 @@ export const Login: FunctionComponent = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useSelector((state: RootState) => state.user);
+  // An org's own sign-in link (`?org=<code>`) lands here branded: its logo and
+  // name in the greeting, its welcome line under it. Colours come through the
+  // tokens. Nothing changes for a plain /login.
+  const { branding, enabled: isBranded } = useBranding();
 
   // A same-origin, in-app path only — never follow a returnTo that could
   // redirect off the dashboard (e.g. a `//evil.com` protocol-relative URL
@@ -264,13 +270,30 @@ export const Login: FunctionComponent = () => {
           className="flex flex-col gap-4"
         >
           <div className="flex flex-col text-4xl font-secondary">
+            {isBranded && branding.logoUrl && (
+              <img
+                src={branding.logoUrl}
+                alt=""
+                className="mb-4 h-14 w-14 rounded-md object-contain"
+                referrerPolicy="no-referrer"
+                data-testid="login-org-logo"
+              />
+            )}
             <span>{t("auth.login.greetingLine1")}</span>
             <h1>
-              <span className="inline-flex flex-wrap items-center gap-2 sm:flex-nowrap sm:whitespace-nowrap">
-                {t("auth.login.greetingLine2", { app: "" })} <Ally className="mt-2" />
-              </span>
+              {isBranded ? (
+                <span className="break-words" data-testid="login-org-greeting">
+                  {t("auth.login.greetingLine2", { app: branding.displayName })}
+                </span>
+              ) : (
+                <span className="inline-flex flex-wrap items-center gap-2 sm:flex-nowrap sm:whitespace-nowrap">
+                  {t("auth.login.greetingLine2", { app: "" })} <Ally className="mt-2" />
+                </span>
+              )}
             </h1>
-            <span className="text-2xl mt-[24px]">{t("auth.login.subtitle")}</span>
+            <span className="text-2xl mt-[24px]">
+              {isBranded && branding.welcomeLine ? branding.welcomeLine : t("auth.login.subtitle")}
+            </span>
           </div>
           <div className="flex flex-col gap-1">
             <TextField
@@ -435,7 +458,7 @@ export const Login: FunctionComponent = () => {
           <div className="flex flex-col mr-4 font-secondary">
             <Ally className="w-10 h-10" />
             <span className="text-sm font-medium text-typography-800">
-              {t("auth.login.helloAlly")}
+              {isBranded ? t("common.poweredByAlly") : t("auth.login.helloAlly")}
             </span>
           </div>
           <RedirectIcon

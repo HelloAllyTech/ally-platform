@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { BranchingScenarioContent, TrackItemType } from "@types";
+import { BranchingExperience, BranchingScenarioContent, TrackItemType } from "@types";
 
 import {
   addStep,
@@ -12,9 +12,15 @@ import {
   createEnding,
   endingScore,
   layoutBranching,
+  DEFAULT_BUTTON_TEXT,
   removeChoiceFromNode,
   runResult,
+  sceneMode,
   serializeBranching,
+  setSceneMode,
+  storyPhotoFor,
+  storyPhotoSummary,
+  storyPhotoWarning,
   validateBranching,
 } from "./branchingScenario";
 import { createItemOfType } from "./trackFormUtils";
@@ -115,10 +121,41 @@ describe("validateBranching", () => {
     expect(messages(content).some(m => m.includes("nobody could pass"))).toBe(true);
   });
 
-  it("requires 2 to 6 choices on a decision scene", () => {
+  it("accepts a single-button scene (one choice)", () => {
     const content = filledTemplate();
     content.nodes[0].choices = content.nodes[0].choices!.slice(0, 1);
-    expect(messages(content).some(m => m.includes("2 to 6 choices"))).toBe(true);
+    // The two endings it no longer leads to are now unreachable; nothing else is wrong.
+    expect(messages(content).filter(m => !m.includes("can't be reached"))).toEqual([]);
+    expect(messages(content).some(m => m.includes("choices"))).toBe(false);
+  });
+
+  it("allows at most 6 choices on a scene", () => {
+    const content = filledTemplate();
+    const target = content.nodes[1].id;
+    content.nodes[0].choices = Array.from({ length: 7 }, (_, i) => ({
+      id: `c${i}`,
+      text: `Choice ${i}`,
+      nextNodeId: target,
+    }));
+    expect(messages(content).some(m => m.includes("needs 1 to 6 choices"))).toBe(true);
+  });
+
+  it("accepts Classic, Story or no experience, and rejects anything else", () => {
+    const content = filledTemplate();
+    expect(messages(content)).toEqual([]);
+    content.experience = BranchingExperience.STORY;
+    expect(messages(content)).toEqual([]);
+    content.experience = BranchingExperience.CLASSIC;
+    expect(messages(content)).toEqual([]);
+    content.experience = "CINEMA" as BranchingExperience;
+    expect(messages(content)).toContain("Experience must be Classic or Story.");
+  });
+
+  it("does not block saving a Story scenario that has no photos", () => {
+    const content = filledTemplate();
+    content.experience = BranchingExperience.STORY;
+    expect(content.nodes.some(n => n.image)).toBe(false);
+    expect(messages(content)).toEqual([]);
   });
 });
 
@@ -136,6 +173,22 @@ describe("serializeBranching", () => {
     expect(ending.score).toBe(50);
     expect(ending.takeaway).toBeUndefined();
     expect(out.settings).toEqual({ passScore: 70, maxAttempts: null });
+  });
+
+  it("writes experience only for Story, so Classic content is unchanged", () => {
+    const content = filledTemplate();
+    expect("experience" in serializeBranching(content)).toBe(false);
+    content.experience = BranchingExperience.CLASSIC;
+    expect("experience" in serializeBranching(content)).toBe(false);
+    content.experience = BranchingExperience.STORY;
+    expect(serializeBranching(content).experience).toBe("STORY");
+  });
+
+  it("keeps a single-button scene's one choice", () => {
+    const content = filledTemplate();
+    content.nodes[0].choices = content.nodes[0].choices!.slice(0, 1);
+    const start = serializeBranching(content).nodes[0];
+    expect(start.choices).toEqual([content.nodes[0].choices[0]]);
   });
 });
 
@@ -299,7 +352,164 @@ describe("canvas edits", () => {
     const content = graph("a", [scene("a", "b", "c"), scene("b"), scene("c")]);
     const fewer = removeChoiceFromNode(content, "a", "a-0")!;
     expect(fewer.nodes[0].choices).toHaveLength(1);
-    expect(messages(fewer as BranchingScenarioContent).join(" ")).toMatch(/needs 2 to 6 choices/);
+    // One choice left is a valid single-button scene.
+    expect(messages(fewer as BranchingScenarioContent).join(" ")).not.toMatch(/choices/);
     expect(removeChoiceFromNode(fewer, "a", "a-1")).toBeNull();
+  });
+});
+
+describe("scene mode", () => {
+  it("reads 0 choices as an ending, 1 as one button, 2+ as choose", () => {
+    expect(sceneMode(scene("a"))).toBe("ending");
+    expect(sceneMode(scene("a", "b"))).toBe("oneButton");
+    expect(sceneMode(scene("a", "b", "c"))).toBe("choose");
+    expect(sceneMode({ id: "a", text: "", choices: [] })).toBe("ending");
+  });
+
+  it("choose -> one button keeps the first choice and where it leads, and drops the rest", () => {
+    const content = filledTemplate();
+    const before = content.nodes[0].choices!;
+    const next = setSceneMode(content, content.startNodeId, "oneButton")!;
+    expect(next.nodes).toHaveLength(content.nodes.length);
+    expect(next.nodes[0].choices).toEqual([before[0]]);
+    expect(sceneMode(next.nodes[0])).toBe("oneButton");
+    // The dropped choices' endings are left for the trainer: unreachable, as when deleting a choice.
+    expect(messages(next).filter(m => m.includes("can't be reached"))).toHaveLength(2);
+  });
+
+  it("choose -> one button gives a blank first choice the default button text", () => {
+    const content = graph("a", [scene("a", "b", "c"), scene("b"), scene("c")]);
+    content.nodes[0].choices![0].text = "  ";
+    const next = setSceneMode(content, "a", "oneButton")!;
+    expect(next.nodes[0].choices).toEqual([
+      { id: "a-0", text: DEFAULT_BUTTON_TEXT, nextNodeId: "b" },
+    ]);
+    expect(DEFAULT_BUTTON_TEXT).toBe("Continue");
+  });
+
+  it("ending -> one button adds one new ending scene and a Continue button to it", () => {
+    const content = filledTemplate();
+    const ending = content.nodes.find(n => n.outcome === "POSITIVE")!;
+    const next = setSceneMode(content, ending.id, "oneButton")!;
+    expect(next.nodes).toHaveLength(content.nodes.length + 1);
+    const converted = next.nodes.find(n => n.id === ending.id)!;
+    expect(converted.choices).toHaveLength(1);
+    expect(converted.choices![0].text).toBe("Continue");
+    const added = next.nodes[next.nodes.length - 1];
+    expect(converted.choices![0].nextNodeId).toBe(added.id);
+    expect(sceneMode(added)).toBe("ending");
+    expect(converted.outcome).toBeUndefined();
+    expect(converted.score).toBeUndefined();
+    expect(converted.takeaway).toBeUndefined();
+  });
+
+  it("one button -> choose adds a second choice leading to a new ending", () => {
+    const content = graph("a", [scene("a", "b"), scene("b")]);
+    const next = setSceneMode(content, "a", "choose")!;
+    const choices = next.nodes[0].choices!;
+    expect(choices).toHaveLength(2);
+    expect(choices[0]).toEqual({ id: "a-0", text: "c0", nextNodeId: "b" });
+    expect(next.nodes).toHaveLength(3);
+    expect(choices[1]).toMatchObject({ text: "", nextNodeId: next.nodes[2].id });
+    expect(sceneMode(next.nodes[0])).toBe("choose");
+  });
+
+  it("ending -> choose gives two blank choices, as before", () => {
+    const content = graph("a", [scene("a", "b", "c"), scene("b"), scene("c")]);
+    const next = setSceneMode(content, "b", "choose")!;
+    expect(next.nodes).toHaveLength(3);
+    expect(next.nodes[1].choices).toHaveLength(2);
+    expect(next.nodes[1].choices!.every(c => c.text === "" && c.nextNodeId === "")).toBe(true);
+  });
+
+  it("one button or choose -> ending drops the choices", () => {
+    const content = graph("a", [scene("a", "b"), scene("b", "c", "d"), scene("c"), scene("d")]);
+    expect(setSceneMode(content, "a", "ending")!.nodes[0].choices).toBeUndefined();
+    expect(setSceneMode(content, "b", "ending")!.nodes[1].choices).toBeUndefined();
+  });
+
+  it("leaves the destination to pick when the scenario is full of scenes", () => {
+    const full = graph(
+      "n0",
+      Array.from({ length: 100 }, (_, i) => scene(`n${i}`)),
+    );
+    const next = setSceneMode(full, "n0", "oneButton")!;
+    expect(next.nodes).toHaveLength(100);
+    expect(next.nodes[0].choices).toEqual([
+      expect.objectContaining({ text: "Continue", nextNodeId: "" }),
+    ]);
+  });
+
+  it("returns null for a missing scene or the mode it is already in", () => {
+    const content = graph("a", [scene("a", "b"), scene("b")]);
+    expect(setSceneMode(content, "a", "oneButton")).toBeNull();
+    expect(setSceneMode(content, "b", "ending")).toBeNull();
+    expect(setSceneMode(content, "zzz", "choose")).toBeNull();
+  });
+
+  it("addStep on an ending still makes a two-choice decision; on one button it adds a second", () => {
+    const content = graph("a", [scene("a", "b"), scene("b")]);
+    const fromEnding = addStep(content, "b")!.content;
+    expect(fromEnding.nodes[1].choices).toHaveLength(2);
+    const fromButton = addStep(content, "a")!.content;
+    expect(fromButton.nodes[0].choices).toHaveLength(2);
+    expect(sceneMode(fromButton.nodes[0])).toBe("choose");
+  });
+});
+
+describe("story photos", () => {
+  const photo = (url: string) => ({ url: `https://cdn.test/${url}.jpg` });
+  const withPhotos = (...urls: (string | null)[]): BranchingScenarioContent => {
+    const nodes = urls.map((url, i) => ({
+      ...scene(`n${i}`, ...(i < urls.length - 1 ? [`n${i + 1}`] : [])),
+      ...(url ? { image: photo(url) } : {}),
+    }));
+    return graph("n0", nodes);
+  };
+
+  it("counts scenes without a photo", () => {
+    expect(storyPhotoSummary(withPhotos("a", null, "c", null))).toEqual({
+      total: 4,
+      missing: 2,
+      startMissing: false,
+    });
+    expect(storyPhotoSummary(withPhotos(null, "b")).startMissing).toBe(true);
+  });
+
+  it("warns nothing when every scene has a photo", () => {
+    expect(storyPhotoWarning(withPhotos("a", "b", "c"))).toBeNull();
+  });
+
+  it("says how many scenes will reuse the photo before", () => {
+    expect(storyPhotoWarning(withPhotos("a", null, "c", null))).toBe(
+      "2 of 4 scenes have no photo. In Story mode they'll reuse the photo from the scene before.",
+    );
+    expect(storyPhotoWarning(withPhotos("a", null, "c"))).toBe(
+      "1 of 3 scenes has no photo. In Story mode it'll reuse the photo from the scene before.",
+    );
+  });
+
+  it("asks for photos when there are none", () => {
+    expect(storyPhotoWarning(withPhotos(null, null))).toBe(
+      "Story mode needs photos. Add a photo to at least the first scene.",
+    );
+  });
+
+  it("asks for a first-scene photo, which has nothing earlier to reuse", () => {
+    expect(storyPhotoWarning(withPhotos(null, "b", "c"))).toBe(
+      "Add a photo to the first scene — there is no earlier photo for it to reuse.",
+    );
+    expect(storyPhotoWarning(withPhotos(null, "b", null))).toBe(
+      "2 of 3 scenes have no photo. In Story mode they'll reuse the photo from the scene before. Add a photo to the first scene — there is no earlier photo for it to reuse.",
+    );
+  });
+
+  it("storyPhotoFor uses the scene's own photo, else the latest on the path, else the first", () => {
+    const content = withPhotos(null, "b", null, "d", null);
+    expect(storyPhotoFor(content, ["n0", "n1"])?.url).toContain("b.jpg");
+    expect(storyPhotoFor(content, ["n0", "n1", "n2"])?.url).toContain("b.jpg");
+    expect(storyPhotoFor(content, ["n0", "n1", "n2", "n3", "n4"])?.url).toContain("d.jpg");
+    expect(storyPhotoFor(content, ["n0"])?.url).toContain("b.jpg");
+    expect(storyPhotoFor(withPhotos(null, null), ["n0", "n1"])).toBeUndefined();
   });
 });

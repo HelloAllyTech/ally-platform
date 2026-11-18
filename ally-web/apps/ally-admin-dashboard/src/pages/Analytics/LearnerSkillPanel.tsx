@@ -1,9 +1,8 @@
 import { useMemo } from "react";
 
-import { LineChart } from "@carbon/charts-react";
-
 import { InlineNotification, SidePanel, SkeletonPlaceholder } from "@ally-ui-mono/ui-shared";
 import { useGetSkillGrowthLearnerSeriesQuery } from "@api/analytics";
+import { LineChart } from "@components/charts";
 
 import { useAnalyticsOrgScope } from "./analyticsOrgScope";
 import { CHART_HEIGHT, ScrollableChart, boundedDomainNote, lineOpts } from "./chartKit";
@@ -213,7 +212,7 @@ export const LearnerSkillPanel = ({
                 </thead>
                 <tbody>
                   {data.sessions.map(s => (
-                    <tr key={s.ordinal} className="border-t border-[#e0e0e0]">
+                    <tr key={s.ordinal} className="border-t border-border-light">
                       <td className="py-1 pr-2 text-typography-500">{s.ordinal}</td>
                       <td className="py-1 pr-2">
                         {s.occurredAt ? s.occurredAt.slice(0, 10) : "—"}
@@ -247,7 +246,7 @@ export const LearnerSkillPanel = ({
 };
 
 const EmptyBlock = ({ text }: { text: string }) => (
-  <div className="flex h-24 items-center justify-center rounded border border-dashed border-[#e0e0e0] text-xs text-typography-500">
+  <div className="flex h-24 items-center justify-center rounded border border-dashed border-border-light text-xs text-typography-500">
     {text}
   </div>
 );

@@ -8,7 +8,7 @@ import {
   useMarkAllNotificationsReadMutation,
   useMarkNotificationReadMutation,
 } from "@api";
-import { buildTrackItemDiscussionPostRoute } from "@constants";
+import { buildTrackItemDiscussionPostRoute, ROUTES } from "@constants";
 
 import NotificationItem from "./NotificationItem";
 
@@ -17,6 +17,8 @@ interface NotificationPanelProps {
 }
 
 const COURSE_DISCUSSION_REPLY = "COURSE_DISCUSSION_REPLY";
+/** The Debrief agent: "your debrief is ready" and "Ally updated your debrief". */
+const DEBRIEF_NOTIFICATIONS = new Set(["DEBRIEF_READY", "DEBRIEF_REVIEWED"]);
 
 /**
  * The track-player route a notification deep-links to, or null when it has
@@ -24,6 +26,12 @@ const COURSE_DISCUSSION_REPLY = "COURSE_DISCUSSION_REPLY";
  * checked rather than trusted.
  */
 export const notificationTargetRoute = (notification: NotificationItemType): string | null => {
+  if (DEBRIEF_NOTIFICATIONS.has(notification.type)) {
+    const sessionId = (notification.data ?? {}).scenarioSessionId;
+    return typeof sessionId === "string" && sessionId
+      ? ROUTES.SIMULATION_SUMMARY_FULL.replace(":sessionId", sessionId)
+      : null;
+  }
   if (notification.type !== COURSE_DISCUSSION_REPLY) return null;
   const data = notification.data ?? {};
   const { screen, trackId, itemId, postId } = data as Record<string, unknown>;

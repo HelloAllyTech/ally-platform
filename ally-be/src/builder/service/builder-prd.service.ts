@@ -1,4 +1,6 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Optional } from '@nestjs/common';
+import { ContextCitationService } from 'src/context-library/service/context-citation.service';
+import { ClUseCase } from 'src/context-library/enum/context-library.enum';
 import { DataSource } from 'typeorm';
 import { LoggerService } from 'src/logger/logger.service';
 import { JsonPatchError, JsonPatchOp } from 'src/common/util/json-patch.util';
@@ -91,6 +93,8 @@ export class BuilderPrdService {
   constructor(
     private readonly docRepository: BuilderPrdDocRepository,
     private readonly dataSource: DataSource,
+    // Optional so the eval sandbox and unit tests can build the service without the library.
+    @Optional() private readonly citations?: ContextCitationService,
   ) {}
 
   /**
@@ -280,7 +284,72 @@ export class BuilderPrdService {
     );
   }
 
+  /**
+   * Every write, then citation integrity: principles cited as `[FP-0142]` that this session
+   * was never shown (or that do not exist) are stripped in a follow-up version, and the rest are
+   * checked by a small model in the background — only a pass counts as a verified use. The
+   * model call never sits on the save path.
+   */
   private async persistMutation(
+    doc: BuilderPrdDoc,
+    mutate: (current: BuilderPrdDocument) => BuilderPrdDocument,
+    userId: number,
+    author: BuilderPrdVersionAuthor,
+    changeSummary?: string,
+  ): Promise<BuilderPrdMutationResult> {
+    let previous: BuilderPrdDocument | null = null;
+    const result = await this.persistMutationOnce(
+      doc,
+      (current) => {
+        previous = current;
+        return mutate(current);
+      },
+      userId,
+      author,
+      changeSummary,
+    );
+    if (!this.citations) return result;
+    try {
+      const sessionId = result.doc.sessionId;
+      const text = JSON.stringify(result.doc.draft ?? {});
+      const checked = await this.citations.validate({
+        useCase: ClUseCase.BUILDER_INTERVIEW,
+        sessionId,
+        text,
+        previousText: JSON.stringify(previous ?? {}),
+      });
+      let final = result;
+      if (checked.rejected.length) {
+        const stripped = JSON.parse(checked.text) as BuilderPrdDocument;
+        final = await this.persistMutationOnce(
+          result.doc,
+          () => stripped,
+          userId,
+          author,
+          `Removed citations to principles not shown in this session: ${checked.rejected.join(', ')}`,
+        );
+      }
+      if (checked.valid.length) {
+        void this.citations
+          .verify({
+            useCase: ClUseCase.BUILDER_INTERVIEW,
+            sessionId,
+            text: checked.text,
+            codes: checked.valid,
+          })
+          .catch(() => undefined);
+      }
+      return final;
+    } catch (error) {
+      // Citation bookkeeping must never fail a PRD write.
+      this.logger.warn(
+        `Citation check skipped for doc ${result.doc.id}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return result;
+    }
+  }
+
+  private async persistMutationOnce(
     doc: BuilderPrdDoc,
     mutate: (current: BuilderPrdDocument) => BuilderPrdDocument,
     userId: number,

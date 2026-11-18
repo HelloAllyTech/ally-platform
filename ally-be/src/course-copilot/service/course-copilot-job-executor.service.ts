@@ -655,7 +655,7 @@ export class CourseCopilotJobExecutorService {
   /**
    * The critic pass. Its findings are posted into the chat as one message
    * with action chips, rather than applied: the trainer decides.
-   * Stacks: "Add Critic Agents to Review Generated Code";
+   * "Add Critic Agents to Review Generated Code";
    * "Making Agent Trustworthiness Visible Through Transparency".
    */
   private async courseReview(

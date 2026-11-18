@@ -43,7 +43,7 @@ export class SettingsController {
   })
   @ApiQuery({
     name: 'tenantId',
-    required: false,
+    required: true,
     type: String,
     description: 'Tenant ID',
   })

@@ -92,6 +92,28 @@ export class ProgressEventConsumer {
     });
   }
 
+  @OnEvent(DebriefEngagementEvent.READ_QUALIFIED, { async: true })
+  async handleDebriefReadQualified(
+    event: DebriefThreadQualifiedEventParams,
+  ): Promise<void> {
+    await this.xpAwardService.awardForDebriefRead({
+      userId: event.userId,
+      tenantId: event.tenantId,
+      scenarioSessionId: event.scenarioSessionId,
+    });
+  }
+
+  @OnEvent(DebriefEngagementEvent.REFLECTION_QUALIFIED, { async: true })
+  async handleDebriefReflectionQualified(
+    event: DebriefThreadQualifiedEventParams,
+  ): Promise<void> {
+    await this.xpAwardService.awardForDebriefReflection({
+      userId: event.userId,
+      tenantId: event.tenantId,
+      scenarioSessionId: event.scenarioSessionId,
+    });
+  }
+
   /**
    * A comment on a peer's session review.
    *

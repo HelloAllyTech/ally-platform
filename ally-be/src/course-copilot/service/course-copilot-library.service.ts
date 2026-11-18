@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { Brackets, DataSource, ILike, In, IsNull } from 'typeorm';
+import { isUUID } from 'class-validator';
+import { DataSource, ILike, In, IsNull } from 'typeorm';
 import { LoggerService } from 'src/logger/logger.service';
 import { Competency } from 'src/learn/entity/competency.entity';
 import { TriggerWarnings } from 'src/learn/entity/trigger-warnings.entity';
@@ -9,16 +10,33 @@ import { CompetencyService } from 'src/learn/service/competency.service';
 import { ScenarioService } from 'src/learn/service/scenario.service';
 import { Case } from 'src/case/entity/case.entity';
 import { CaseStatus } from 'src/case/type/cases.type';
-import { ScenarioCharacterService } from 'src/scenario-character/service/scenario-character.service';
+import {
+  CharacterLibraryAccessService,
+  CharacterLibraryScope,
+} from 'src/scenario-character/service/character-library-access.service';
+import { ScenarioCharacter } from 'src/scenario-character/entity/scenario-character.entity';
 import { ScenarioCoverImageLibrary } from 'src/scenario-cover-image-library/entity/scenario-cover-image-library.entity';
 import { TrackComponentTemplate } from 'src/track/entity/track-component-template.entity';
 import { TrackGameKey } from 'src/track/type/game.type';
 import { ContentAccessService } from 'src/authorization/service/content-access.service';
+import { ClChunk } from 'src/context-library/entity/cl-chunk.entity';
+import {
+  ClCollectionId,
+  ClUseCase,
+} from 'src/context-library/enum/context-library.enum';
+import {
+  CatalogueItemKind,
+  catalogueSyncKey,
+  parseCatalogueSyncKey,
+} from 'src/context-library/profiles/content-catalogue.profile';
+import { ContextRetrievalService } from 'src/context-library/service/context-retrieval.service';
 
 /** One line per library hit — never full prompts, which are the size of a turn. */
 export interface LibraryHit {
-  kind: 'roleplay' | 'case' | 'character' | 'template';
+  kind: CatalogueItemKind;
   id: string | number;
+  /** The Content Catalogue code (`CC-0042`), for a citation. */
+  code?: string;
   title: string;
   description?: string;
   competencies?: string[];
@@ -34,6 +52,14 @@ export interface CopilotLanguage {
   voiceCount: number;
 }
 
+/** What to search for when the trainer named neither a topic nor a competency. */
+const CATALOGUE_KIND_QUERY: Record<CatalogueItemKind, string> = {
+  roleplay: 'roleplay practice conversation',
+  case: 'case',
+  character: 'character persona',
+  template: 'component template',
+};
+
 const oneLine = (value: unknown, max = 160): string | undefined => {
   if (typeof value !== 'string') return undefined;
   const flat = value
@@ -47,7 +73,9 @@ const oneLine = (value: unknown, max = 160): string | undefined => {
 /**
  * Read-only catalogues the interview grounds its options in: competencies and
  * their behaviours, languages that have voices, trigger warnings, cover
- * images, and the roleplay / case / character / template libraries.
+ * images, and the roleplay / case / character / template libraries — the last
+ * searched by meaning in the Context Library's Content Catalogue, which is
+ * synced from Studio.
  *
  * Library results are DATA. They are compact on purpose (a title, one line,
  * tags) so a search costs a few hundred tokens, and the system prompt tells the
@@ -63,8 +91,9 @@ export class CourseCopilotLibraryService {
     private readonly dataSource: DataSource,
     private readonly competencyService: CompetencyService,
     private readonly scenarioService: ScenarioService,
-    private readonly characterService: ScenarioCharacterService,
+    private readonly characterAccess: CharacterLibraryAccessService,
     private readonly contentAccessService: ContentAccessService,
+    private readonly retrieval: ContextRetrievalService,
   ) {}
 
   /** Shared (non-custom) competencies — the only ones a course may be tagged with. */
@@ -164,30 +193,119 @@ export class CourseCopilotLibraryService {
     }));
   }
 
-  /** The 20 most recent ACTIVE roleplays, for the cached library-context block. */
+  /**
+   * The 20 most recently changed ACTIVE roleplays, for the cached library-context block. A plain
+   * listing, not a search: finding content by what it is about is `search`'s job.
+   */
   async recentRoleplays(limit = 20): Promise<LibraryHit[]> {
-    return this.searchRoleplays('', undefined, limit);
+    const ownerId = await this.contentAccessService.ownerFilterFor();
+    const rows = await this.dataSource.getRepository(Scenarios).find({
+      where: {
+        status: ScenarioStatus.ACTIVE,
+        deletedAt: IsNull(),
+        ...(ownerId ? { createdBy: ownerId } : {}),
+      },
+      order: { updatedAt: 'DESC' },
+      take: Math.min(Math.max(limit, 1), 50),
+    });
+    return this.roleplayHits(rows);
   }
 
+  /**
+   * `search_library`: existing content by meaning, from the Content Catalogue (PLAN.md §9.5).
+   *
+   * - Searched as the `course_copilot` use case with the trainer's organisation as the audience
+   *   (null for a platform admin: Ally's own content only), and only the kind asked for.
+   * - Competencies boost by meaning: their names are searched alongside the query.
+   * - **Every hit is rechecked at hydration** against who may open its row (`canOpen`): a
+   *   roleplay or case must still be published and in the trainer's view of the library
+   *   (ContentAccessService), a character in their slice of the character library, a template
+   *   must still exist. Hits that fail are dropped before they are shown or counted.
+   * - Hits are built from the source rows, not the chunks, and stay compact.
+   *
+   * Throws when the library cannot be searched; the caller says so rather than "nothing found".
+   */
   async search(
-    kind: 'roleplay' | 'case' | 'character' | 'template',
+    kind: CatalogueItemKind,
     query: string,
-    competencyIds?: string[],
+    competencyIds: string[] | undefined,
     limit = 8,
-  ): Promise<LibraryHit[]> {
-    const capped = Math.min(Math.max(limit, 1), 20);
-    switch (kind) {
-      case 'roleplay':
-        return this.searchRoleplays(query, competencyIds, capped);
-      case 'case':
-        return this.searchCases(query, capped);
-      case 'character':
-        return this.searchCharacters(query, capped);
-      case 'template':
-        return this.searchTemplates(query, capped);
-      default:
-        return [];
+    scope: { sessionId?: string | null; tenantId: string | null } = {
+      tenantId: null,
+    },
+  ): Promise<{ hits: LibraryHit[]; noConfidentMatch: boolean }> {
+    const capped = Math.min(Math.max(Number(limit) || 8, 1), 20);
+    const competencies = [
+      ...(await this.competencyNames(competencyIds ?? [])).values(),
+    ];
+    const queries = [
+      query?.trim(),
+      competencies.length ? competencies.join(', ') : '',
+    ].filter((q): q is string => Boolean(q));
+    if (!queries.length) queries.push(CATALOGUE_KIND_QUERY[kind]);
+
+    const hydrated = new Map<string, LibraryHit>();
+    const response = await this.retrieval.search({
+      useCase: ClUseCase.COURSE_COPILOT,
+      audience: { tenantId: scope.tenantId ?? null },
+      collections: [ClCollectionId.CONTENT_CATALOGUE],
+      queries,
+      facets: { itemKind: kind },
+      strict: true,
+      facetScope: { key: 'itemKind', values: [kind] },
+      limit: capped,
+      sessionId: scope.sessionId ?? null,
+      queryOrigin: 'agent_tool',
+      canOpen: async (chunks) => {
+        const open = await this.openable(chunks);
+        open.forEach((hit, chunkId) => hydrated.set(chunkId, hit));
+        return new Set(open.keys());
+      },
+    });
+    const hits: LibraryHit[] = [];
+    for (const r of response.results) {
+      const hit = hydrated.get(r.chunk.id);
+      if (hit) hits.push({ ...hit, code: r.chunk.code });
     }
+    return { hits, noConfidentMatch: response.noConfidentMatch };
+  }
+
+  /**
+   * The catalogue chunks this trainer may open, each hydrated from its source row (by `sync_key`)
+   * into a compact hit. Keyed by chunk id.
+   */
+  async openable(chunks: ClChunk[]): Promise<Map<string, LibraryHit>> {
+    const ids: Record<CatalogueItemKind, string[]> = {
+      roleplay: [],
+      case: [],
+      character: [],
+      template: [],
+    };
+    const chunkByKey = new Map<string, string>();
+    for (const chunk of chunks) {
+      const key = parseCatalogueSyncKey(chunk.syncKey);
+      if (!key || chunk.collectionId !== ClCollectionId.CONTENT_CATALOGUE)
+        continue;
+      ids[key.kind].push(key.id);
+      chunkByKey.set(chunk.syncKey!, chunk.id);
+    }
+    const out = new Map<string, LibraryHit>();
+    const add = (hits: LibraryHit[]) => {
+      for (const hit of hits) {
+        const chunkId = chunkByKey.get(catalogueSyncKey(hit.kind, hit.id));
+        if (chunkId) out.set(chunkId, hit);
+      }
+    };
+    const scenarioIds = ids.roleplay
+      .map(Number)
+      .filter((n) => Number.isInteger(n) && n > 0);
+    if (scenarioIds.length) {
+      add(await this.roleplayHits(await this.getActiveScenarios(scenarioIds)));
+    }
+    if (ids.case.length) add(await this.caseHits(ids.case));
+    if (ids.character.length) add(await this.characterHits(ids.character));
+    if (ids.template.length) add(await this.templateHits(ids.template));
+    return out;
   }
 
   /*
@@ -221,52 +339,7 @@ export class CourseCopilotLibraryService {
     });
   }
 
-  private async searchRoleplays(
-    query: string,
-    competencyIds: string[] | undefined,
-    limit: number,
-  ): Promise<LibraryHit[]> {
-    const qb = this.dataSource
-      .getRepository(Scenarios)
-      .createQueryBuilder('s')
-      .where('s.status = :status', { status: ScenarioStatus.ACTIVE })
-      .andWhere('s."deletedAt" IS NULL');
-    const ownerId = await this.contentAccessService.ownerFilterFor();
-    if (ownerId) {
-      qb.andWhere('s."createdBy" = :ownerId', { ownerId });
-    }
-    const terms = (query ?? '')
-      .split(/\s+/)
-      .map((term) => term.trim())
-      .filter((term) => term.length > 2)
-      .slice(0, 6);
-    if (terms.length) {
-      qb.andWhere(
-        new Brackets((inner) => {
-          terms.forEach((term, index) => {
-            inner.orWhere(
-              `(s.title ILIKE :t${index} OR s.description ILIKE :t${index})`,
-              { [`t${index}`]: `%${term}%` },
-            );
-          });
-        }),
-      );
-    }
-    if (competencyIds?.length) {
-      qb.andWhere(
-        new Brackets((inner) => {
-          inner
-            .where('s."competencyId" IN (:...competencyIds)', { competencyIds })
-            .orWhere(`s."competencyIds" ?| ARRAY[:...competencyIds]`, {
-              competencyIds,
-            });
-        }),
-      );
-    }
-    const rows = await qb
-      .orderBy('s."updatedAt"', 'DESC')
-      .limit(limit)
-      .getMany();
+  private async roleplayHits(rows: Scenarios[]): Promise<LibraryHit[]> {
     const names = await this.competencyNames(
       rows.flatMap((row) => [
         ...(row.competencyId ? [row.competencyId] : []),
@@ -288,25 +361,22 @@ export class CourseCopilotLibraryService {
         competencies: competencyIdList
           .map((id) => names.get(id))
           .filter((name): name is string => Boolean(name)),
-        difficulty: (row as any).difficultyLevel ?? null,
+        difficulty: row.difficultyLevel ?? null,
         languages: Object.keys(row.metadata?.languageVoices ?? {}),
       };
     });
   }
 
-  private async searchCases(
-    query: string,
-    limit: number,
-  ): Promise<LibraryHit[]> {
+  /** Published cases in the trainer's view (ContentAccessService), by id. */
+  private async caseHits(ids: string[]): Promise<LibraryHit[]> {
     const ownerId = await this.contentAccessService.ownerFilterFor();
     const rows = await this.dataSource.getRepository(Case).find({
       where: {
+        id: In(ids.filter((id) => isUUID(id))),
         status: CaseStatus.ACTIVE,
-        ...(query?.trim() ? { title: ILike(`%${query.trim()}%`) } : {}),
+        deletedAt: IsNull(),
         ...(ownerId ? { createdBy: ownerId } : {}),
       },
-      order: { updatedAt: 'DESC' },
-      take: limit,
     });
     return rows.map((row) => ({
       kind: 'case' as const,
@@ -316,16 +386,35 @@ export class CourseCopilotLibraryService {
     }));
   }
 
-  private async searchCharacters(
-    query: string,
-    limit: number,
-  ): Promise<LibraryHit[]> {
+  /**
+   * Characters in the asker's slice of the character library — the rule the character library's
+   * own screens apply (CharacterLibraryAccessService): a platform admin sees every character, or
+   * global ones plus their organisations' when restricted; anyone else only their own
+   * organisation's. Outside a request there is no slice, and no character is shown.
+   */
+  private async characterHits(ids: string[]): Promise<LibraryHit[]> {
+    let scope: CharacterLibraryScope;
     try {
-      const { characters } = await this.characterService.getScenarioCharacters({
-        search: query?.trim() || undefined,
-        limit,
-      });
-      return (characters ?? []).map((character: any) => ({
+      scope = await this.characterAccess.resolveScope();
+    } catch (error) {
+      this.logger.warn(
+        `Character search unavailable: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return [];
+    }
+    const rows = await this.dataSource.getRepository(ScenarioCharacter).find({
+      where: { id: In(ids.filter((id) => isUUID(id))) },
+    });
+    return rows
+      .filter((character) =>
+        scope.restrictedToTenantIds
+          ? !character.tenantId ||
+            scope.restrictedToTenantIds.includes(character.tenantId)
+          : scope.isPlatform || character.tenantId === scope.tenantId,
+      )
+      .map((character) => ({
         kind: 'character' as const,
         id: character.id,
         title: character.name,
@@ -343,28 +432,12 @@ export class CourseCopilotLibraryService {
           hasVoices: Boolean(Object.keys(character.voices ?? {}).length),
         },
       }));
-    } catch (error) {
-      // Character scope needs a request user; outside one this is empty, not fatal.
-      this.logger.warn(
-        `Character search unavailable: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-      return [];
-    }
   }
 
-  private async searchTemplates(
-    query: string,
-    limit: number,
-  ): Promise<LibraryHit[]> {
+  private async templateHits(ids: string[]): Promise<LibraryHit[]> {
     const rows = await this.dataSource
       .getRepository(TrackComponentTemplate)
-      .find({
-        where: query?.trim() ? { title: ILike(`%${query.trim()}%`) } : {},
-        order: { createdAt: 'DESC' },
-        take: limit,
-      });
+      .find({ where: { id: In(ids.filter((id) => isUUID(id))) } });
     return rows.map((row) => ({
       kind: 'template' as const,
       id: row.id,

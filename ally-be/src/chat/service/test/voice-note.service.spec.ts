@@ -148,6 +148,141 @@ describe('VoiceNoteService', () => {
     });
   });
 
+  describe('WAV chunking for long dictations', () => {
+    /** A minimal, valid mono 16-bit PCM WAV buffer of the given duration. */
+    function buildWav(seconds: number, sampleRate = 16000): Buffer {
+      const blockAlign = 2; // mono, 16-bit
+      const dataLength = Math.round(sampleRate * seconds) * blockAlign;
+      const header = Buffer.alloc(44);
+      header.write('RIFF', 0, 'ascii');
+      header.writeUInt32LE(36 + dataLength, 4);
+      header.write('WAVE', 8, 'ascii');
+      header.write('fmt ', 12, 'ascii');
+      header.writeUInt32LE(16, 16);
+      header.writeUInt16LE(1, 20);
+      header.writeUInt16LE(1, 22);
+      header.writeUInt32LE(sampleRate, 24);
+      header.writeUInt32LE(sampleRate * blockAlign, 28);
+      header.writeUInt16LE(blockAlign, 32);
+      header.writeUInt16LE(16, 34);
+      header.write('data', 36, 'ascii');
+      header.writeUInt32LE(dataLength, 40);
+      return Buffer.concat([header, Buffer.alloc(dataLength)]);
+    }
+
+    beforeEach(() => {
+      settingsService.getScribeVoiceNoteEnabled.mockResolvedValue(true);
+    });
+
+    it('sends one request for a WAV no longer than the chunk size', async () => {
+      const shortWav = {
+        buffer: buildWav(30),
+        mimetype: 'audio/wav',
+        size: 1,
+      } as Express.Multer.File;
+      mockTranscriptionsCreate.mockResolvedValue({ text: 'a short note' });
+
+      const result = await service.generateFromAudio(shortWav, undefined);
+
+      expect(mockTranscriptionsCreate).toHaveBeenCalledTimes(1);
+      expect(result.transcript).toBe('a short note');
+    });
+
+    it('splits a long WAV into multiple transcription requests and stitches the results in order', async () => {
+      // 10 minutes at the 240s chunk size used in the service: 3 chunks (4m, 4m, 2m).
+      const longWav = {
+        buffer: buildWav(600),
+        mimetype: 'audio/wav',
+        size: 100,
+      } as Express.Multer.File;
+      let call = 0;
+      const chunkTexts = ['first part', 'second part', 'third part'];
+      mockTranscriptionsCreate.mockImplementation(async () => ({
+        text: chunkTexts[call++],
+      }));
+
+      const result = await service.generateFromAudio(longWav, undefined);
+
+      expect(mockTranscriptionsCreate).toHaveBeenCalledTimes(3);
+      expect(result.transcript).toBe('first part second part third part');
+    });
+
+    it('transcribes chunks concurrently and stitches them in chunk order even when they resolve out of order', async () => {
+      // A sequential await-per-chunk loop made a long dictation's total
+      // latency scale with its chunk count (each an extra full OpenAI
+      // round-trip) — long enough to exceed the mobile client's receive
+      // timeout and surface as "no summary generated" for exactly the long
+      // dictations this chunking exists to fix.
+      //
+      // This checks concurrency structurally, not by wall clock: a 50ms
+      // elapsed-time bound here took 51ms on a loaded CI runner and failed a
+      // production release. Each request is held open until the next
+      // macrotask, so every request already in flight at that point was
+      // issued without waiting for an earlier one. A concurrent
+      // implementation has all three in flight together; a sequential one
+      // never has more than one. The held requests are then released last
+      // chunk first, so an implementation that stitched results as they
+      // arrive, rather than by chunk position, would reorder the transcript.
+      const longWav = {
+        buffer: buildWav(600),
+        mimetype: 'audio/wav',
+        size: 100,
+      } as Express.Multer.File;
+      const chunkTexts = ['first part', 'second part', 'third part'];
+      const held: Array<{ index: number; resolve: () => void }> = [];
+      const resolvedOrder: number[] = [];
+      let callIndex = 0;
+      let inFlight = 0;
+      let maxInFlight = 0;
+      const releaseHeldLastChunkFirst = () => {
+        held
+          .splice(0)
+          .sort((a, b) => b.index - a.index)
+          .forEach(({ resolve }) => resolve());
+      };
+      mockTranscriptionsCreate.mockImplementation(() => {
+        const index = callIndex++;
+        inFlight++;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        return new Promise((resolve) => {
+          held.push({
+            index,
+            resolve: () => {
+              inFlight--;
+              resolvedOrder.push(index);
+              resolve({ text: chunkTexts[index] });
+            },
+          });
+          setImmediate(releaseHeldLastChunkFirst);
+        });
+      });
+
+      const result = await service.generateFromAudio(longWav, undefined);
+
+      expect(mockTranscriptionsCreate).toHaveBeenCalledTimes(3);
+      expect(maxInFlight).toBe(3);
+      expect(resolvedOrder).toEqual([2, 1, 0]);
+      expect(result.transcript).toBe('first part second part third part');
+    });
+
+    it('does not chunk a long non-WAV (web) recording — a single request, same as before', async () => {
+      // webm has no fixed-rate PCM layout to cut losslessly; chunking is WAV-only.
+      const longWebm = {
+        buffer: Buffer.alloc((30 * 1024 * 1024) / 10), // large, but format is webm
+        mimetype: 'audio/webm',
+        size: 100,
+      } as Express.Multer.File;
+      mockTranscriptionsCreate.mockResolvedValue({
+        text: 'whole thing at once',
+      });
+
+      const result = await service.generateFromAudio(longWebm, undefined);
+
+      expect(mockTranscriptionsCreate).toHaveBeenCalledTimes(1);
+      expect(result.transcript).toBe('whole thing at once');
+    });
+  });
+
   describe('extraction failure', () => {
     const fields = JSON.stringify([
       { id: 'sessionSummary', label: 'Summary', type: 'multiline' },
@@ -302,6 +437,182 @@ describe('VoiceNoteService', () => {
       ).rejects.toMatchObject({
         response: { errorCode: ErrorCode.FEATURE_NOT_ENABLED },
       });
+    });
+  });
+
+  describe('evidence gate', () => {
+    const fields = JSON.stringify([
+      { id: 'sessionSummary', label: 'Summary', type: 'multiline' },
+      {
+        id: 'riskSuicidalThoughts',
+        label: 'Suicidal thoughts',
+        type: 'boolean',
+        options: ['Yes', 'No'],
+      },
+      {
+        id: 'riskSuicidalPlan',
+        label: 'Suicidal plan',
+        type: 'boolean',
+        options: ['Yes', 'No'],
+      },
+      {
+        id: 'assessmentAffect',
+        label: 'Affect',
+        type: 'select',
+        options: ['Congruent', 'Incongruent'],
+      },
+    ]);
+
+    const extractedAs = (body: unknown) =>
+      mockMessagesCreate.mockResolvedValue({
+        content: [{ type: 'text', text: JSON.stringify(body) }],
+      });
+
+    beforeEach(() => {
+      settingsService.getScribeVoiceNoteEnabled.mockResolvedValue(true);
+      mockTranscriptionsCreate.mockResolvedValue({
+        text:
+          'The child shared that she often has thoughts of not being in this ' +
+          'world anymore. Safety planning was completed.',
+      });
+    });
+
+    it('keeps values whose evidence is in the transcript', async () => {
+      extractedAs({
+        sessionSummary: {
+          value: '- Thoughts of not being in this world.',
+          evidence: [
+            'thoughts of not being in this world anymore',
+            'Safety planning was completed',
+          ],
+        },
+        riskSuicidalThoughts: {
+          value: 'Yes',
+          // Case, punctuation and curly quotes do not decide a match.
+          evidence: '“She often has THOUGHTS of not being in this world…”',
+        },
+      });
+
+      const result = await service.generateFromAudio(audio, fields);
+
+      expect(result.values).toEqual([
+        {
+          id: 'sessionSummary',
+          value: '- Thoughts of not being in this world.',
+        },
+        { id: 'riskSuicidalThoughts', value: 'Yes' },
+      ]);
+    });
+
+    it('drops values the counsellor never said', async () => {
+      // The 10-29 pattern: a "No" and an MSE pick with nothing behind them.
+      extractedAs({
+        riskSuicidalThoughts: {
+          value: 'Yes',
+          evidence: 'thoughts of not being in this world',
+        },
+        riskSuicidalPlan: { value: 'No', evidence: 'she denied having a plan' },
+        assessmentAffect: { value: 'Congruent' },
+      });
+
+      const result = await service.generateFromAudio(audio, fields);
+
+      expect(result.values).toEqual([
+        { id: 'riskSuicidalThoughts', value: 'Yes' },
+      ]);
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.stringMatching(/filled=1 unsupported=2 shape=evidence/),
+      );
+    });
+
+    it('rejects a quote too short to mean anything', async () => {
+      extractedAs({ riskSuicidalPlan: { value: 'No', evidence: 'the child' } });
+
+      const result = await service.generateFromAudio(audio, fields);
+
+      expect(result.values).toEqual([]);
+    });
+
+    it('accepts a quote that skips words with an ellipsis', async () => {
+      extractedAs({
+        riskSuicidalThoughts: {
+          value: 'Yes',
+          evidence: 'she often has thoughts ... Safety planning was completed',
+        },
+      });
+
+      const result = await service.generateFromAudio(audio, fields);
+
+      expect(result.values).toEqual([
+        { id: 'riskSuicidalThoughts', value: 'Yes' },
+      ]);
+    });
+
+    it('keeps a long field when one of its quotes is reworded or short', async () => {
+      // 10-29 local run: a 24-quote summary was dropped whole because one
+      // quote was the two-word heading "Objective observations".
+      extractedAs({
+        sessionSummary: {
+          value: '- Thoughts of not being in this world.',
+          evidence: [
+            'The child shared that she often has thoughts',
+            'Safety planning.',
+            'The child said she wants to die',
+          ],
+        },
+      });
+
+      const result = await service.generateFromAudio(audio, fields);
+
+      expect(result.values).toEqual([
+        {
+          id: 'sessionSummary',
+          value: '- Thoughts of not being in this world.',
+        },
+      ]);
+    });
+
+    it('drops a field none of whose quotes is in the transcript', async () => {
+      extractedAs({
+        riskSuicidalPlan: {
+          value: 'No',
+          evidence: ['no plan was reported', 'the child', 'Safety planning'],
+        },
+      });
+
+      const result = await service.generateFromAudio(audio, fields);
+
+      expect(result.values).toEqual([]);
+    });
+
+    it('drops a plain value mixed into an evidence-shaped reply', async () => {
+      extractedAs({
+        riskSuicidalThoughts: {
+          value: 'Yes',
+          evidence: 'thoughts of not being in this world',
+        },
+        riskSuicidalPlan: 'No',
+      });
+
+      const result = await service.generateFromAudio(audio, fields);
+
+      expect(result.values).toEqual([
+        { id: 'riskSuicidalThoughts', value: 'Yes' },
+      ]);
+    });
+
+    it('passes the pre-evidence shape through while that prompt is live', async () => {
+      extractedAs({ riskSuicidalPlan: 'No', assessmentAffect: 'Congruent' });
+
+      const result = await service.generateFromAudio(audio, fields);
+
+      expect(result.values).toEqual([
+        { id: 'riskSuicidalPlan', value: 'No' },
+        { id: 'assessmentAffect', value: 'Congruent' },
+      ]);
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.stringMatching(/unsupported=0 shape=legacy/),
+      );
     });
   });
 });

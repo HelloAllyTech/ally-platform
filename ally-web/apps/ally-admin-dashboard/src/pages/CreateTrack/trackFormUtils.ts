@@ -65,6 +65,7 @@ import {
 } from "@types";
 
 import { unitsToSourceText } from "./annotationSegmentation";
+import { serializeArticlePresentation, validateArticlePresentation } from "./articleExperience";
 import {
   createBranchingTemplate,
   serializeBranching,
@@ -90,6 +91,24 @@ export type QuestionPath =
 /* -------------------------------------------------------------------------- */
 /* Factories                                                                  */
 /* -------------------------------------------------------------------------- */
+
+/** Deep copy of a section with every `localId` regenerated, so the copy is fully independent. */
+export const cloneSectionWithNewIds = (section: TrackSectionFormValue): TrackSectionFormValue => {
+  const fresh = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(fresh);
+    if (value && typeof value === "object") {
+      return Object.fromEntries(
+        Object.entries(value as Record<string, unknown>).map(([k, v]) => [
+          k,
+          k === "localId" ? newId() : fresh(v),
+        ]),
+      );
+    }
+    return value;
+  };
+  const copy = fresh(section) as TrackSectionFormValue;
+  return { ...copy, title: `${section.title || "Section"} (copy)` };
+};
 
 export const createEmptySection = (index: number): TrackSectionFormValue => ({
   localId: newId(),
@@ -579,6 +598,10 @@ const validateItem = (item: TrackItemFormValue): string[] => {
       if (minScore != null && minScore < 0) {
         errors.push("Roleplay: minimum score must be 0 or above");
       }
+      const minDuration = item.completionCriteria?.minDurationSeconds;
+      if (minDuration != null && (minDuration < 0 || !Number.isInteger(minDuration))) {
+        errors.push("Roleplay: minimum duration must be whole minutes and seconds, 0 or above");
+      }
       break;
     }
     case TrackItemType.CASE:
@@ -624,6 +647,7 @@ const validateItem = (item: TrackItemFormValue): string[] => {
           errors.push(`${label}: enter a valid http(s) link`);
         }
       });
+      errors.push(...validateArticlePresentation(item.article));
       break;
     }
     case TrackItemType.VIDEO: {
@@ -840,8 +864,15 @@ export const validateTrackForPublish = (values: TrackFormValues): PublishError[]
 const compactCriteria = (criteria?: CompletionCriteria): CompletionCriteria | undefined => {
   if (!criteria) return undefined;
   const compact: CompletionCriteria = {};
-  if (criteria.minScore != null) compact.minScore = criteria.minScore;
-  if (criteria.minDurationSeconds != null) {
+  // Roleplay: keep only the gates the chosen logic reads, so the stored rule
+  // says exactly what applies. Other types never carry a logic, and read
+  // minScore (CASE) as before.
+  const logic = criteria.completionLogic;
+  if (logic) compact.completionLogic = logic;
+  const scoreGated = !logic || logic === "SCORE" || logic === "SCORE_AND_DURATION";
+  const durationGated = !logic || logic === "DURATION" || logic === "SCORE_AND_DURATION";
+  if (scoreGated && criteria.minScore != null) compact.minScore = criteria.minScore;
+  if (durationGated && criteria.minDurationSeconds != null) {
     compact.minDurationSeconds = criteria.minDurationSeconds;
   }
   if (criteria.watchPct != null) compact.watchPct = criteria.watchPct;
@@ -1003,6 +1034,7 @@ export const serializeItem = (item: TrackItemFormValue, order: number): TrackStr
         ...(imageUrls.length > 0 ? { imageUrls } : {}),
         ...(questions.length > 0 ? { questions } : {}),
         ...(resources.length > 0 ? { resources } : {}),
+        ...serializeArticlePresentation(item.article),
       };
       break;
     }
@@ -1274,6 +1306,12 @@ export const extractTrackMetadata = (values: TrackFormValues): TrackMetadataInpu
   competencyIds: values.competencyIds ?? [],
   // Always sent (null clears it) so emptying the page in the builder empties the stored one.
   landingPage: serializeLandingPage(values.landingPage, values.sections ?? []),
+  // Sent only once the form holds them (loaded from a backend that has the
+  // columns, or set in this session), so an older backend never sees them.
+  ...(values.imageStyleId !== undefined ? { imageStyleId: values.imageStyleId } : {}),
+  ...(values.imageStyleAnchorId !== undefined
+    ? { imageStyleAnchorId: values.imageStyleAnchorId }
+    : {}),
 });
 
 /** GET /tracks/:id response -> builder form values (fresh client localIds). */
@@ -1287,6 +1325,10 @@ export const deserializeTrack = (detail: TrackDetail): TrackFormValues => ({
   competencyIds: detail.competencyIds ?? [],
   // Always a full page, so the Landing page editor never meets a null.
   landingPage: detail.landingPage ? withLandingDefaults(detail.landingPage) : emptyLandingPage(),
+  ...(detail.imageStyleId !== undefined ? { imageStyleId: detail.imageStyleId } : {}),
+  ...(detail.imageStyleAnchorId !== undefined
+    ? { imageStyleAnchorId: detail.imageStyleAnchorId }
+    : {}),
   sections: [...(detail.sections ?? [])]
     .sort((a, b) => a.order - b.order)
     .map(section => ({
@@ -1399,3 +1441,58 @@ export const deserializeTrack = (detail: TrackDetail): TrackFormValues => ({
         }),
     })),
 });
+
+export interface LiveAttemptLimitChange {
+  trackItemId: string;
+  /** Which component carries the limit; both go through the same endpoint. */
+  itemType: TrackItemType.QUIZ | TrackItemType.ANNOTATED_ARTIFACT;
+  /** The new total limit; `null` = unlimited. */
+  maxAttempts: number | null;
+}
+
+/** The component types with an attempt limit, which the server locks once learners enrol. */
+const carriesAttemptLimit = (type: TrackItemType): type is LiveAttemptLimitChange["itemType"] =>
+  type === TrackItemType.QUIZ || type === TrackItemType.ANNOTATED_ARTIFACT;
+
+const storedAttemptLimit = (content: unknown): number | null =>
+  (content as QuizContent | AnnotationContent | null | undefined)?.settings?.maxAttempts ?? null;
+
+const formAttemptLimit = (item: TrackItemFormValue): number | null =>
+  (item.type === TrackItemType.QUIZ
+    ? item.quiz?.settings?.maxAttempts
+    : item.annotation?.settings?.maxAttempts) ?? null;
+
+/**
+ * The quizzes and annotations on a published course whose attempt limit the
+ * admin raised in the form. Compared against what the server holds, not the
+ * form's defaults, so a change is only ever an increase: a numeric limit that
+ * went up, or one that went to unlimited. An already-unlimited item never
+ * appears.
+ */
+export const getLiveAttemptLimitChanges = (
+  saved: TrackDetail,
+  values: TrackFormValues,
+): LiveAttemptLimitChange[] => {
+  const savedLimits = new Map<string, number | null>();
+  for (const section of saved.sections ?? []) {
+    for (const item of section.items ?? []) {
+      if (!carriesAttemptLimit(item.type)) continue;
+      savedLimits.set(item.id, storedAttemptLimit(item.content));
+    }
+  }
+
+  const changes: LiveAttemptLimitChange[] = [];
+  for (const section of values.sections ?? []) {
+    for (const item of section.items ?? []) {
+      if (!item.serverId || !carriesAttemptLimit(item.type)) continue;
+      if (!savedLimits.has(item.serverId)) continue;
+      const current = savedLimits.get(item.serverId) ?? null;
+      const next = formAttemptLimit(item);
+      if (current === null || next === current) continue;
+      if (next === null || next > current) {
+        changes.push({ trackItemId: item.serverId, itemType: item.type, maxAttempts: next });
+      }
+    }
+  }
+  return changes;
+};

@@ -7,7 +7,7 @@ import { BuilderBuildRun } from "@types";
 import { CollapsibleSection } from "./CollapsibleSection";
 import { isIssueRun, issueRunRepo } from "./issueBuild";
 import { formatCostUsd, formatRunDuration, runDidNothing, totalCostUsd } from "./runFormat";
-import { BUILDER_RUN_STATUS_TAG_TYPE } from "../../pages/Builder/builderMotion";
+import { BUILDER_RUN_STATUS_TAG_TYPE } from "../../motion/builderMotion";
 
 interface RunHistoryRailProps {
   runs: BuilderBuildRun[];

@@ -675,6 +675,7 @@ export const CourseCopilotSession: React.FC = () => {
                         onSendSuggestion={handleSendFromPane}
                         onRetry={() => void retryLast()}
                         disabled={isStreaming || isArchived}
+                        citations
                       />
                       {showReceipt && <AgentReceipt receipt={message.receipt} />}
                     </div>
@@ -717,7 +718,7 @@ export const CourseCopilotSession: React.FC = () => {
           {/* State-driven chips above the composer: what is worth asking for changes with the
               session — "just build it" is a dead end once there is a blueprint, "publish" is
               premature before there is a course. Each one sends its message as the next turn.
-              (Stacks: "Communicate Agent Capabilities via Visual Affordances"; "Progressive
+              ("Communicate Agent Capabilities via Visual Affordances"; "Progressive
               Disclosure and Contextual Relevance in Agent Interfaces".) */}
           {chips.length > 0 && !composerDisabled && (
             <div

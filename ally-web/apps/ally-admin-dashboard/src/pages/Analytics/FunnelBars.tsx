@@ -93,10 +93,7 @@ export const FunnelBars = ({ stages, unit = "" }: FunnelBarsProps) => {
               {stage.label}
             </div>
 
-            <div
-              className="relative order-last h-5 basis-full rounded sm:order-none sm:flex-1"
-              style={{ backgroundColor: "#f0f0f0" }}
-            >
+            <div className="relative order-last h-5 basis-full rounded sm:order-none sm:flex-1 bg-gray-100">
               <div
                 className="absolute inset-y-0 left-0 rounded"
                 style={{

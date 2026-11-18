@@ -3,7 +3,6 @@ import { scheduledTaskRegistry } from 'src/scheduler/registry/scheduled-task.reg
 import { BuilderBuildService } from './builder-build.service';
 import { BuilderPullRequestService } from './builder-pull-request.service';
 import { BuilderOutcomeService } from './builder-outcome.service';
-import { BuilderLessonCuratorService } from './builder-lesson-curator.service';
 import { BuilderCorrectionService } from './builder-correction.service';
 import { BuilderEvalService } from '../eval/service/builder-eval.service';
 import {
@@ -11,8 +10,6 @@ import {
   BUILDER_EVAL_RESUME_TASK,
   BUILDER_CORRECTIONS_INTERVAL,
   BUILDER_CORRECTIONS_TASK,
-  BUILDER_CURATE_INTERVAL,
-  BUILDER_CURATE_TASK,
   BUILDER_OUTCOME_INTERVAL,
   BUILDER_OUTCOME_TASK,
   BUILDER_RECONCILE_INTERVAL,
@@ -25,7 +22,6 @@ export class BuilderSchedulerRegistrationService implements OnModuleInit {
     private readonly buildService: BuilderBuildService,
     private readonly pullRequestService: BuilderPullRequestService,
     private readonly outcomeService: BuilderOutcomeService,
-    private readonly curatorService: BuilderLessonCuratorService,
     private readonly correctionService: BuilderCorrectionService,
     private readonly evalService: BuilderEvalService,
   ) {}
@@ -77,17 +73,8 @@ export class BuilderSchedulerRegistrationService implements OnModuleInit {
       () => this.outcomeService.sweep().then(() => undefined),
     );
 
-    // Fold new candidate lessons into the curated set. Separate from the
-    // sweep so a batch harvested by a merge hook is still curated on a
-    // predictable cadence; no-ops on one COUNT when there is nothing new.
-    scheduledTaskRegistry.register(
-      BUILDER_CURATE_INTERVAL,
-      BUILDER_CURATE_TASK,
-      () => this.curatorService.consolidate().then(() => undefined),
-    );
-
     // The learning loop. Each admin correction in an interview becomes a
-    // lesson candidate (folded in by the curator above), drafts for a person
+    // lesson candidate (folded in by the Context Library's agent curator), drafts for a person
     // and an eval case. Daily over a three-day window: corrections arrive at
     // the pace of interviews, and the overlap means a missed day loses nothing.
     scheduledTaskRegistry.register(

@@ -242,6 +242,7 @@ describe("CreateNoteDrawer", () => {
     recorderState.isRecording = false;
     recorderState.blob = null;
     recorderState.error = null;
+    recorderState.durationMs = 0;
     userResult.permissions = [
       "view:settings:summary-fields",
       "edit:call:details",
@@ -415,10 +416,41 @@ describe("CreateNoteDrawer", () => {
     fireEvent.click(screen.getByTestId("voice-generate"));
 
     await waitFor(() =>
-      expect(mockSaveNoteTranscript).toHaveBeenCalledWith({
-        chatId: 123,
-        transcript: "Client felt anxious.",
-      }),
+      expect(mockSaveNoteTranscript).toHaveBeenCalledWith(
+        expect.objectContaining({
+          chatId: 123,
+          transcript: "Client felt anxious.",
+        }),
+      ),
+    );
+  });
+
+  it("sends the recorded session's length as durationSeconds, so the backend can accumulate the real call duration", async () => {
+    // A manual note's startedAt/endedAt are both set to the instant it was
+    // created and never touched again, so the backend's own call-duration
+    // math always computed zero no matter how long the counsellor actually
+    // dictated — this is the recorder's own elapsed-time counter, the only
+    // place that real length is known.
+    mockUseGetSummaryFields.mockReturnValue({ data: ["age"], isLoading: false });
+    mockGenerateNoteFromAudio.mockReturnValue({
+      unwrap: () =>
+        Promise.resolve({
+          transcript: "Client felt anxious.",
+          values: [{ id: "age", value: "18-24" }],
+        }),
+    });
+    recorderState.status = "stopped";
+    recorderState.blob = new Blob(["x"], { type: "audio/webm" });
+    recorderState.durationMs = 125_000;
+
+    render(<CreateNoteDrawer open onClose={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("drawer-header-button-voice-note"));
+    fireEvent.click(screen.getByTestId("voice-generate"));
+
+    await waitFor(() =>
+      expect(mockSaveNoteTranscript).toHaveBeenCalledWith(
+        expect.objectContaining({ durationSeconds: 125 }),
+      ),
     );
   });
 
@@ -436,10 +468,12 @@ describe("CreateNoteDrawer", () => {
 
     await waitFor(() => expect(mockCreateNote).toHaveBeenCalled());
     await waitFor(() =>
-      expect(mockSaveNoteTranscript).toHaveBeenCalledWith({
-        chatId: 123,
-        transcript: "Just some dictation.",
-      }),
+      expect(mockSaveNoteTranscript).toHaveBeenCalledWith(
+        expect.objectContaining({
+          chatId: 123,
+          transcript: "Just some dictation.",
+        }),
+      ),
     );
   });
 
@@ -466,10 +500,12 @@ describe("CreateNoteDrawer", () => {
     fireEvent.click(screen.getByTestId("voice-generate"));
 
     await waitFor(() =>
-      expect(mockSaveNoteTranscript).toHaveBeenCalledWith({
-        chatId: 123,
-        transcript: "Client felt anxious.",
-      }),
+      expect(mockSaveNoteTranscript).toHaveBeenCalledWith(
+        expect.objectContaining({
+          chatId: 123,
+          transcript: "Client felt anxious.",
+        }),
+      ),
     );
     // Reported as a failure, not as "the model found nothing" — the counsellor
     // needs to know retrying could work, and that their words were kept.
@@ -668,10 +704,12 @@ describe("CreateNoteDrawer", () => {
 
       // A minute and a half is slow, not failed. The work lands and is saved.
       await waitFor(() =>
-        expect(mockSaveNoteTranscript).toHaveBeenCalledWith({
-          chatId: 123,
-          transcript: "Client felt anxious.",
-        }),
+        expect(mockSaveNoteTranscript).toHaveBeenCalledWith(
+          expect.objectContaining({
+            chatId: 123,
+            transcript: "Client felt anxious.",
+          }),
+        ),
       );
     });
 

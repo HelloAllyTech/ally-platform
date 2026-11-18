@@ -8,6 +8,7 @@ import { WaMessage } from '../../entity/wa-message.entity';
 import { WaUnansweredQuestion } from '../../entity/wa-unanswered-question.entity';
 import { WaAnalyticsRepository } from '../../repository/wa-analytics.repository';
 import { WhatsAppConversationService } from '../whatsapp-conversation.service';
+import { ChatbotAccessService } from '../../../chatbot/service/chatbot-access.service';
 
 /**
  * Corpus coverage exists so an admin can find dead corpus. Three ways an earlier version of this
@@ -39,6 +40,10 @@ describe('WhatsAppConversationService.corpusCoverage', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         WhatsAppConversationService,
+        {
+          provide: ChatbotAccessService,
+          useValue: { accessibleChatbotIds: async () => null },
+        },
         { provide: getRepositoryToken(WaContact), useValue: noopRepo() },
         { provide: getRepositoryToken(WaConversation), useValue: noopRepo() },
         { provide: getRepositoryToken(WaMessage), useValue: noopRepo() },

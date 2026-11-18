@@ -20,6 +20,8 @@ import { BuilderPrdService } from '../service/builder-prd.service';
 import { BuilderSessionService } from '../service/builder-session.service';
 import { BuilderCatalogService } from '../service/builder-catalog.service';
 import { BuilderEvidenceLogService } from '../service/builder-evidence-log.service';
+import { BuilderAskService } from '../service/builder-ask.service';
+import { BuilderRuleContextService } from '../service/builder-rule-context.service';
 import { renderPrd } from '../constants/builder-build-prompt';
 import { renderPlatformRules } from '../constants/builder-platform-rules';
 import {
@@ -84,6 +86,8 @@ export class BuilderPipelineController {
     private readonly sessionService: BuilderSessionService,
     private readonly catalogService: BuilderCatalogService,
     private readonly evidenceLog: BuilderEvidenceLogService,
+    private readonly askService: BuilderAskService,
+    private readonly ruleContext: BuilderRuleContextService,
   ) {}
 
   /**
@@ -293,12 +297,20 @@ export class BuilderPipelineController {
       'The spec an issue build works from: rules, CI checks, PRD, approved design',
   })
   async getSpec(@Param('runId', ParseUUIDPipe) runId: string): Promise<string> {
-    const { doc, repos } = await this.loadRunContext(runId);
-    const platformRules = await this.knowledgeService.platformRules();
+    const { doc, repos, run } = await this.loadRunContext(runId);
+    const [platformRules, adminRules, told] = await Promise.all([
+      this.knowledgeService.platformRules(),
+      // The admin's rules and their queued instructions: what a person
+      // decided binds the run as much as the PRD does.
+      this.ruleContext.renderRulesBlock(run.sessionId),
+      this.askService.tellsForRun(run.sessionId, run.id),
+    ]);
     return [
       renderPlatformRules(platformRules),
       renderRepoChecks(repos),
       renderPrd(doc.draft),
+      adminRules,
+      told,
     ]
       .filter(Boolean)
       .join('\n\n---\n\n');
@@ -319,7 +331,15 @@ export class BuilderPipelineController {
   async getFixRequest(
     @Param('pullRequestId', ParseUUIDPipe) pullRequestId: string,
   ): Promise<string> {
-    return this.pullRequestService.fixRequestPrompt(pullRequestId);
+    const prompt =
+      await this.pullRequestService.fixRequestPrompt(pullRequestId);
+    // A fix round is the next run a queued instruction can reach once the
+    // pull requests are open.
+    const sessionId = await this.askService.sessionOfPullRequest(pullRequestId);
+    const told = sessionId
+      ? await this.askService.tellsForRun(sessionId, null)
+      : '';
+    return told ? `${prompt}\n\n---\n\n${told}` : prompt;
   }
 
   @Get('runs/:runId/design-review-prompt')
@@ -587,6 +607,8 @@ export function renderRepoChecks(repos: BuilderRepoDefinition[]): string {
     'Run these before you finish and fix what they report. Formatting of the files you changed is applied for you afterwards.',
     '',
     'Docs: the `.docs-map.yml` at the root of this monorepo (one folder up from this service; ignore any copy inside the service folder) maps files to the docs that describe them, including wiki pages under `helloallytech.github.io/wiki/`. When a file you change is mapped, update that doc in this same pull request — the wiki is a folder of this repository, so its page is edited here, not through a separate pull request or a `Wiki-PR:` line. If a mapped page genuinely stays accurate, say which page and why in your summary; a person then waives the check.',
+    '',
+    'Prompts: live prompt text is in the Skills Store, not Git. A prompt\'s `.txt` (e.g. `ally-be/src/prompts/**`) is only its default, so editing it changes nothing that runs, and CI\'s prompt check rejects it. Do not edit prompt `.txt` files, and never edit a prompt contract only to get past that check. Make the code change; if the feature needs a prompt to say something new, write a `## Skills Store follow-up` section in the pull request description naming each prompt and the exact text to add, so a person publishes it after this deploys (see `ally-be/docs/adding-a-prompt.md`, "Changing an existing prompt").',
   );
   return lines.join('\n');
 }

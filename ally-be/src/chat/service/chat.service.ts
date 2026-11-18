@@ -524,6 +524,7 @@ export class ChatService {
     chatId: number,
     userId: number,
     transcript: string,
+    durationSeconds?: number,
   ): Promise<{ success: boolean }> {
     const chat = await this.chatRepository.findOne({
       where: { id: chatId, tenantId: ExecutionManager.getTenantId() },
@@ -538,6 +539,25 @@ export class ChatService {
     }
 
     await this.messageService.replaceDictationTranscript(chat, trimmed);
+
+    // A manual note's startedAt/endedAt are both set to the instant it was
+    // created (ChatService.createNote) and never touched again, so
+    // updateMessageStatistics' normal endedAt-minus-startedAt duration
+    // always computed zero here, no matter how long the counsellor actually
+    // dictated. durationSeconds is the length of the dictation just
+    // recorded (callers re-send the full transcript but only this session's
+    // own duration, since a recorder's own elapsed-time counter resets each
+    // time it starts) — advancing endedAt by it accumulates the true total
+    // across every dictation session on this note, the same way the
+    // transcript itself accumulates, using the existing duration math as-is.
+    if (durationSeconds && durationSeconds > 0) {
+      chat.endedAt = new Date(
+        (chat.endedAt ?? chat.startedAt ?? new Date()).getTime() +
+          durationSeconds * 1000,
+      );
+      await this.chatRepository.update(chatId, { endedAt: chat.endedAt });
+    }
+
     // Rebuild the flat, encrypted call_details.transcript from the messages so
     // it stays in sync with the messages-backed Transcript view.
     await this.callDetailsService.updateMessageStatistics(chat);

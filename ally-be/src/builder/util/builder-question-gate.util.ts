@@ -11,7 +11,7 @@
  * are what catch that.
  *
  * "Explain why clarification is needed" and "reference what was already said"
- * are Stacks, "Sequencing clarification questions to avoid user overwhelm".
+ * are "Sequencing clarification questions to avoid user overwhelm".
  */
 
 export const BUILDER_QUESTION_TYPES = [
@@ -54,6 +54,9 @@ export const QUESTION_GATE_REQUIRED = [
   'basis',
   'whyNotResearch',
 ];
+
+/** At most this many options on a question; "something else" is always there besides. */
+export const BUILDER_QUESTION_MAX_OPTIONS = 3;
 
 /** Appended to ask_admin's description while the protocol is on. */
 export const ASK_ADMIN_GATE_NOTE =
@@ -115,6 +118,21 @@ export function questionGateProblems(
         'of asking.',
       toAdmin:
         "Builder didn't say why it couldn't look this up instead of asking.",
+    });
+  }
+  // Two or three real options plus the admin's own words. A fourth option
+  // is almost always a variant of one of the three, and every extra choice
+  // on a card slows the decision more than it informs it.
+  if (
+    Array.isArray(input?.options) &&
+    input.options.length > BUILDER_QUESTION_MAX_OPTIONS
+  ) {
+    problems.push({
+      key: 'too_many_options',
+      toModel:
+        `Offer at most ${BUILDER_QUESTION_MAX_OPTIONS} options; the admin can always answer in ` +
+        'their own words. Merge the variants, drop the weakest, and ask again.',
+      toAdmin: `Builder offered more than ${BUILDER_QUESTION_MAX_OPTIONS} options.`,
     });
   }
   if (looksLikeACodeQuestion(input?.prompt)) {

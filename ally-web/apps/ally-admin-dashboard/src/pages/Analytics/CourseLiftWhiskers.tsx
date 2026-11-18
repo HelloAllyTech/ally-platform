@@ -74,7 +74,7 @@ export const CourseLiftWhiskers = ({
       <div
         key={r.key}
         className={`${GRID} items-center py-1.5 ${
-          head ? "border-b-2 border-[#e0e0e0]" : "border-t border-[#f0f0f0]"
+          head ? "border-b-2 border-border-light" : "border-t border-gray-100"
         }`}
       >
         <span className="flex flex-col">

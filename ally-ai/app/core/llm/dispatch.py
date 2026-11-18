@@ -30,11 +30,13 @@ An answer that changed because a fallback kicked in must be explainable after th
 from __future__ import annotations
 
 import re
+import time
 from typing import Any, Dict, Optional, Tuple, Type, TypeVar
 
 from pydantic import BaseModel
 
 from app.core.config import settings
+from app.core.llm.capture import call_started, reply_of, usage_reported
 from app.exceptions.custom_exceptions import LLMInvocationFailedException
 from app.utils.logger import get_logger
 
@@ -428,6 +430,7 @@ def _emit_usage(
     `scenario_session_id` ties the cost to the session it was spent on; the
     judges have no room, so without it their spend has no session to land on.
     """
+    usage_reported(usage[0], usage[1])
     try:
         from app.core.llm_usage.emitter import emit_llm_usage_blocking
 
@@ -466,6 +469,8 @@ async def _generate_anthropic(
     max_tokens: Optional[int],
     task: Optional[str],
     scenario_session_id: Optional[str] = None,
+    reasoning_effort: Optional[str] = None,  # OpenAI reasoning models only
+    timeout: Optional[float] = None,
 ) -> TSchema:
     """
     Structured output from Claude, enforced by the API rather than requested in prose.
@@ -518,6 +523,8 @@ async def _generate_anthropic(
         kwargs["temperature"] = temperature
     if system:
         kwargs["system"] = system
+    if timeout:
+        kwargs["timeout"] = timeout
 
     response = await client.messages.create(**kwargs)
 
@@ -575,6 +582,8 @@ async def _generate_gemini(
     max_tokens: Optional[int],
     task: Optional[str],
     scenario_session_id: Optional[str] = None,
+    reasoning_effort: Optional[str] = None,  # OpenAI reasoning models only
+    timeout: Optional[float] = None,
 ) -> TSchema:
     """
     Structured output from Gemini via `response_schema`, as the analytics agent does.
@@ -599,6 +608,8 @@ async def _generate_gemini(
         config_kwargs["max_output_tokens"] = max_tokens
     if system:
         config_kwargs["system_instruction"] = system
+    if timeout:
+        config_kwargs["http_options"] = types.HttpOptions(timeout=int(timeout * 1000))
 
     response = await client.aio.models.generate_content(
         model=model,
@@ -657,6 +668,8 @@ async def _generate_openai(
     max_tokens: Optional[int],
     task: Optional[str],
     scenario_session_id: Optional[str] = None,
+    reasoning_effort: Optional[str] = None,
+    timeout: Optional[float] = None,
 ) -> TSchema:
     """
     Structured output from OpenAI via a json_schema response format.
@@ -698,8 +711,14 @@ async def _generate_openai(
         kwargs["max_completion_tokens"] = max_tokens
     # The reasoning family accepts only the default temperature, and passing one
     # is a 400 rather than something it ignores.
-    if temperature and not re.match(r"^(o\d|gpt-5)", model.strip().lower()):
+    reasoning = bool(re.match(r"^(o\d|gpt-5)", model.strip().lower()))
+    if temperature and not reasoning:
         kwargs["temperature"] = temperature
+    # Only the reasoning family takes it; anything else would reject the field.
+    if reasoning_effort and reasoning:
+        kwargs["reasoning_effort"] = reasoning_effort
+    if timeout:
+        kwargs["timeout"] = timeout
 
     response = await client.chat.completions.create(**kwargs)
 
@@ -783,6 +802,8 @@ async def generate_structured(
     system: Optional[str] = None,
     max_tokens: Optional[int] = DEFAULT_MAX_TOKENS,
     never_fallback: bool = False,
+    reasoning_effort: Optional[str] = None,
+    timeout: Optional[float] = None,
 ) -> Tuple[TSchema, Dict[str, Any]]:
     """
     Generate a validated instance of `schema` from whichever provider is selected.
@@ -813,6 +834,13 @@ async def generate_structured(
             validation failure rather than as "too long". Anthropic has no way
             to express it and gets UNCAPPED_ANTHROPIC_MAX_TOKENS instead.
 
+        reasoning_effort: OpenAI reasoning models (gpt-5, o-series) only:
+            `minimal` / `low` / `medium` / `high`. Ignored for every other
+            model and provider. None sends nothing (the provider default).
+        timeout: Seconds this call may take, across the provider fallback too: the
+            retry gets only what the first attempt left (at least one second). For
+            a caller with a hard deadline, such as an agent run. None leaves the
+            SDK's own timeout, as before.
         never_fallback: Refuse to run anywhere but the selected provider —
             neither substituting for a missing key nor retrying elsewhere after
             a failure; the call fails instead. For a call whose whole point is
@@ -843,8 +871,20 @@ async def generate_structured(
         "model": resolved_model,
         "fell_back_from": fell_back_from,
     }
+    # The debrief's Agent logs: the exact message and the full reply, only
+    # when a caller opened a capture (app/core/llm/capture.py).
+    captured = call_started(
+        prompt=prompt,
+        system=system,
+        task=task,
+        provider=resolved_provider,
+        model=resolved_model,
+    )
+
+    deadline = time.monotonic() + timeout if timeout else None
 
     async def attempt(prov: str, mdl: str) -> TSchema:
+        left = max(deadline - time.monotonic(), 1.0) if deadline else None
         return await _GENERATORS[prov](
             schema=schema,
             prompt=prompt,
@@ -854,10 +894,14 @@ async def generate_structured(
             max_tokens=max_tokens,
             task=task,
             scenario_session_id=scenario_session_id,
+            reasoning_effort=reasoning_effort,
+            timeout=left,
         )
 
     try:
-        parsed = await attempt(resolved_provider, resolved_model)
+        parsed = await _attempt_recorded(
+            attempt, resolved_provider, resolved_model, captured
+        )
     except Exception as e:
         # `resolve_target` only falls back when a key is ABSENT. An expired key
         # is present, so it passes that check and fails here instead — which is
@@ -892,11 +936,27 @@ async def generate_structured(
             retry[0],
             retry[1],
         )
-        parsed = await attempt(*retry)
+        if captured is not None:
+            captured["fell_back_from"] = resolved_model
+            captured["provider"], captured["model"] = retry
+            captured["error"] = None
+        parsed = await _attempt_recorded(attempt, retry[0], retry[1], captured)
         meta["provider"], meta["model"] = retry
         meta["fell_back_from"] = resolved_provider
 
+    if captured is not None:
+        captured["reply"] = reply_of(parsed)
     return parsed, meta
+
+
+async def _attempt_recorded(attempt, provider: str, model: str, captured):
+    """One provider attempt; a failure is noted on the capture, then raised."""
+    try:
+        return await attempt(provider, model)
+    except Exception as e:
+        if captured is not None:
+            captured["error"] = f"{provider}/{model}: {type(e).__name__}: {e}"[:1000]
+        raise
 
 
 _GENERATORS = {

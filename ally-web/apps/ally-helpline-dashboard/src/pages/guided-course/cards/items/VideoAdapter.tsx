@@ -14,6 +14,7 @@ const VideoAdapter: FC<ItemAdapterProps<StartVideoItemPayload>> = ({
   alreadyCompleted,
   onCompleted,
   onPosition,
+  languageCode,
 }) => (
   <VideoItemPlayer
     payload={payload}
@@ -22,6 +23,7 @@ const VideoAdapter: FC<ItemAdapterProps<StartVideoItemPayload>> = ({
     alreadyCompleted={alreadyCompleted}
     onCompleted={onCompleted}
     onPosition={onPosition}
+    languageCode={languageCode}
   />
 );
 

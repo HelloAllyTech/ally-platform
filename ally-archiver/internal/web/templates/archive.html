@@ -1,0 +1,47 @@
+{{define "content"}}
+<h1>Archive</h1>
+<p class="lead">Find an object by its S3 key prefix. Restoring copies it from the Storage Box back to its original key; it stays on the box too.</p>
+<form class="search" hx-get="/archive/results" hx-target="#results" hx-swap="outerHTML">
+  <select name="bucket">
+    <option value="">All buckets</option>
+    {{range .Names}}<option value="{{.}}" {{if eq . $.Bucket}}selected{{end}}>{{.}}</option>{{end}}
+  </select>
+  <input type="search" name="q" value="{{.Q}}" placeholder="Key prefix, e.g. recordings/2026/09/" autofocus>
+  <button class="primary" type="submit">Search</button>
+</form>
+<div id="results" hx-get="/archive/results?bucket={{.Bucket}}&q={{.Q}}" hx-trigger="load" hx-swap="outerHTML"></div>
+{{end}}
+
+{{define "results"}}
+<div id="results">
+{{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
+{{if .FlashErr}}<div class="flash err">{{.FlashErr}}</div>{{end}}
+{{if .Prompt}}
+<p class="muted">Enter a key prefix to search.</p>
+{{else}}
+<div class="scroll">
+<table>
+  <thead><tr><th>Key</th><th>Bucket</th><th>State</th><th class="num">Size</th><th>Copied</th><th>Deleted from S3</th><th></th></tr></thead>
+  <tbody>
+  {{range .Objects}}
+  <tr>
+    <td class="key">{{.Key}}{{if .Error}}<div class="muted">{{.Error}}</div>{{end}}</td>
+    <td class="key">{{.Bucket}}</td>
+    <td>{{if eq .State "failed"}}<span class="badge err">failed</span>{{else if eq .State "deleted"}}<span class="badge on">archived</span>{{else}}<span class="badge">{{.State}}</span>{{end}}</td>
+    <td class="num">{{bytes .Size}}</td>
+    <td>{{when .CopiedAt}}</td>
+    <td>{{when .DeletedAt}}</td>
+    <td>{{if eq .State "deleted"}}<form hx-post="/archive/restore" hx-target="#results" hx-swap="outerHTML" hx-confirm="Restore this object to S3?">
+      <input type="hidden" name="bucket" value="{{.Bucket}}"><input type="hidden" name="key" value="{{.Key}}">
+      <input type="hidden" name="q" value="{{$.Q}}"><input type="hidden" name="filter" value="{{$.Bucket}}">
+      <button type="submit">Restore</button></form>{{end}}</td>
+  </tr>
+  {{else}}
+  <tr><td colspan="7" class="muted">No archived objects match that prefix.</td></tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+{{end}}
+</div>
+{{end}}

@@ -122,7 +122,7 @@ export const hasActiveFilters = (
  * It used to render every option of every facet as a permanently-visible pill: 19 pills plus five
  * group labels wrapping to three lines, which pushed the first table row roughly 900px down the
  * page on a board holding 500+ opportunities. Past a certain density extra controls stop reading as
- * options at all (Stacks: "Signal Overload Creates Noise"), and the saved-view tabs directly above
+ * options at all ("Signal Overload Creates Noise"), and the saved-view tabs directly above
  * — Backlog, Released, Open Bugs, Prioritised, one per owner — were already the one-click paths
  * those pills were meant to be, so the pills were a redundant second layer of the same thing.
  * Collapsing them into the admin app's standard FilterDropdown is what UserManagement,

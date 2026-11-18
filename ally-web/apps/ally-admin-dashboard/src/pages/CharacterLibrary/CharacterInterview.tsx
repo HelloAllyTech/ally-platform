@@ -5,12 +5,13 @@ import { toast } from "sonner";
 
 import { SkeletonPlaceholder } from "@ally-ui-mono/ui-shared";
 import {
+  useAbandonCharacterInterviewSessionMutation,
   useCreateCharacterInterviewSessionMutation,
   useLazyGetCharacterInterviewSessionQuery,
 } from "@api";
 import { ArrowDown } from "@assets";
 import { ActionConfirmationPopup, CharacterSidePanel } from "@components";
-import { CharacterCorpusPanel } from "@components/character-corpus";
+import { CharacterInsightsCard } from "@components/character-insights";
 import {
   CharacterInterviewAnswerPayload,
   ChatComposer,
@@ -19,10 +20,9 @@ import {
 } from "@components/character-interview";
 import { ButtonVariant } from "@components/types";
 import { en, LOCAL_STORAGE_KEYS, ROUTES } from "@constants";
-import { useCanCurateCharacterCorpus } from "@hooks";
 import { useCharacterInterviewStream } from "@hooks/useCharacterInterviewStream";
 import { CharacterData } from "@types";
-import { logger } from "@utils";
+import { getErrorMessage, logger } from "@utils";
 
 const sessionStorageKey = LOCAL_STORAGE_KEYS.CHARACTER_INTERVIEW_SESSION_ID;
 
@@ -52,14 +52,13 @@ export const CharacterInterview: React.FC = () => {
 
   const [createSession] = useCreateCharacterInterviewSessionMutation();
   const [getSession] = useLazyGetCharacterInterviewSessionQuery();
+  const [abandonSession] = useAbandonCharacterInterviewSessionMutation();
 
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isBooting, setIsBooting] = useState(true);
   const [draftCharacter, setDraftCharacter] = useState<CharacterData | null>(null);
   const [isReviewOpen, setIsReviewOpen] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
-  const [corpusOpen, setCorpusOpen] = useState(false);
-  const canCurateCorpus = useCanCurateCharacterCorpus();
   // Set true only for a brand-new session (never on resume) so the next
   // render's effect can fire the hidden kickoff message with a `sendMessage`
   // closure that actually sees the new `sessionId` — calling sendMessage
@@ -78,11 +77,26 @@ export const CharacterInterview: React.FC = () => {
       localStorage.setItem(sessionStorageKey, session.id);
       setSessionId(session.id);
       return session.id;
-    } catch {
-      toast.error(strings.startFailed);
+    } catch (error) {
+      // The per-org interview cap says exactly what to do ("finish or
+      // discard one of your open interviews"); the generic line used to
+      // replace it.
+      toast.error(getErrorMessage(error, strings.startFailed));
       return null;
     }
   }, [createSession, strings.startFailed]);
+
+  /**
+   * Tells the server the interview is over without a draft, so it stops
+   * counting toward the org's in-progress cap now rather than after the idle
+   * window. Fire-and-forget: the page has already moved on.
+   */
+  const abandonCurrentSession = useCallback(() => {
+    if (!sessionId) return;
+    void abandonSession(sessionId)
+      .unwrap()
+      .catch(() => undefined);
+  }, [abandonSession, sessionId]);
 
   const { messages, isStreaming, sendMessage, stop, hydrateMessages, resetMessages } =
     useCharacterInterviewStream({
@@ -164,11 +178,13 @@ export const CharacterInterview: React.FC = () => {
   const handleConfirmExit = () => {
     setShowExitConfirm(false);
     stop();
+    abandonCurrentSession();
     localStorage.removeItem(sessionStorageKey);
     navigate(ROUTES.CHARACTER_LIBRARY);
   };
 
   const handleStartOver = () => {
+    abandonCurrentSession();
     localStorage.removeItem(sessionStorageKey);
     setDraftCharacter(null);
     setIsReviewOpen(false);
@@ -202,25 +218,13 @@ export const CharacterInterview: React.FC = () => {
         <h1 className="text-xl md:text-2xl text-typography-900 font-secondary">{strings.title}</h1>
 
         {/*
-          Curating the corpus lives HERE, next to the interview it grounds, rather than on a
-          settings page — a curator finds out the material is thin by watching a draft come
-          out thin, and this is where they are when that happens.
-
-          Gated on the knowledge-base permissions the corpus endpoints already enforce, so
-          trainers running interviews never see it. Not a new permission: a UI-only gate would
-          be decoration, and a new one would need grants cloned into every future role
-          migration for a panel that has an exact existing analogue.
+          A curator finds out the material is thin by watching a draft come out thin, and this
+          is where they are when that happens — so the way to it sits next to the interview.
+          The material itself is managed in the Context Library.
         */}
-        {canCurateCorpus && (
-          <button
-            type="button"
-            onClick={() => setCorpusOpen(true)}
-            data-testid="character-corpus-trigger"
-            className="ml-auto shrink-0 text-sm text-primary-600 max-md:min-h-10"
-          >
-            {en.characterCorpus.trigger}
-          </button>
-        )}
+        <div className="ml-auto shrink-0">
+          <CharacterInsightsCard compact />
+        </div>
       </div>
 
       <div className="flex-1 min-h-0 flex flex-col max-w-3xl w-full mx-auto">
@@ -273,8 +277,6 @@ export const CharacterInterview: React.FC = () => {
           />
         </div>
       </div>
-
-      <CharacterCorpusPanel isOpen={corpusOpen} onClose={() => setCorpusOpen(false)} />
 
       <CharacterSidePanel
         selectedCharacter={draftCharacter}

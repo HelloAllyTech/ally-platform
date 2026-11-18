@@ -19,6 +19,12 @@ describe('matchFirstPersonRisk', () => {
     ['मला जगायचं नाही', 'mr'],
     ['நான் சாகப் போகிறேன்', 'ta'],
     ['ನನಗೆ ಬದುಕಲು ಇಷ್ಟವಿಲ್ಲ', 'kn'],
+    ["I've been thinking about ending my life", 'en'],
+    ["Lately I'm thinking of ending it all", 'en'],
+    ['i keep thinking about ending my life', 'en'],
+    ['I have thoughts of killing myself', 'en'],
+    ['मैं अपनी ज़िंदगी खत्म करने के बारे में सोच रही हूँ', 'hi'],
+    ['main apni life khatam karne ka soch raha hu', 'hi'],
   ])('catches the learner’s own statement: %s', (text, language) => {
     expect(matchFirstPersonRisk(text)?.language).toBe(language);
   });
@@ -38,6 +44,10 @@ describe('matchFirstPersonRisk', () => {
     'I would die for a coffee right now',
     'This quiz is killing me',
     'therapist rapport building tips',
+    'My client said she is thinking about ending her life. What do I ask?',
+    'How do I ask if someone is thinking about ending their life?',
+    "I'm thinking about suicide prevention training next month",
+    'client ne kaha main apni life khatam karne ka soch raha hu',
   ])('ignores professional or idiomatic talk: %s', (text) => {
     expect(matchFirstPersonRisk(text)).toBeNull();
   });

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 
 import { Navigate } from "react-router-dom";
 
@@ -8,12 +8,15 @@ import {
   useGetUserPreferencesQuery,
   useGetCharacterLibraryEnabledQuery,
   useGetFeatureTogglesQuery,
+  useGetChatbotsQuery,
 } from "@api";
-import { LOCAL_STORAGE_KEYS, ROUTES, OrgToggle } from "@constants";
+import { LOCAL_STORAGE_KEYS, ROUTES, OrgToggle, SIDEBAR_ITEMS, en } from "@constants";
 // Import the specific module rather than the "@utils" barrel: the barrel pulls
 // in Redux-logger and component dependencies that this root-path redirect has no
 // need for, and would otherwise bloat its chunk.
-import { deriveNavigationItems } from "@utils/navigation";
+import { deriveNavigationItems, isChatbotsOnly } from "@utils/navigation";
+
+import { FeatureToggleKey } from "../constants/featureToggles";
 
 /**
  * Resolves the post-login landing route to the current user's FIRST sidebar tab
@@ -61,6 +64,47 @@ export const DefaultRedirect: React.FC = () => {
   const { data: features, isLoading: isFeaturesLoading } = useGetFeatureTogglesQuery(undefined, {
     skip: !isAuthenticated,
   });
+  // The assistants whose team they're on (chunk 6b): someone with nothing else lands on them.
+  const { data: assistants } = useGetChatbotsQuery(undefined, { skip: !isAuthenticated });
+  const onATeam = Boolean(assistants?.chatbots?.length);
+
+  // Post-login, these gates have been seen to never clear (white page at "/",
+  // reported 2026-11-10): rather than render nothing forever, show a spinner
+  // and after 5s proceed with whatever data has arrived — worst case the user
+  // lands on the fallback tab instead of a blank screen. The warn names the
+  // stuck gate so the next report diagnoses itself from the console.
+  const settled =
+    !isUserLoading &&
+    !isPermsLoading &&
+    !isFeaturesLoading &&
+    !isPrefsUninitialized &&
+    !isPrefsLoading;
+  const [forceProceed, setForceProceed] = useState(false);
+  useEffect(() => {
+    if (settled || !isAuthenticated) {
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      // eslint-disable-next-line no-console
+      console.warn("[DefaultRedirect] startup queries did not settle in 5s; proceeding anyway", {
+        isUserLoading,
+        isPermsLoading,
+        isFeaturesLoading,
+        isPrefsUninitialized,
+        isPrefsLoading,
+      });
+      setForceProceed(true);
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [
+    settled,
+    isAuthenticated,
+    isUserLoading,
+    isPermsLoading,
+    isFeaturesLoading,
+    isPrefsUninitialized,
+    isPrefsLoading,
+  ]);
 
   if (!isAuthenticated) {
     return <Navigate to={ROUTES.LOGIN} replace />;
@@ -68,12 +112,21 @@ export const DefaultRedirect: React.FC = () => {
 
   // Never decide while core data is loading — prevents a premature bounce to the
   // fallback before the per-user tab list is known.
-  if (isUserLoading || isPermsLoading || isFeaturesLoading) {
-    return null;
+  if (!settled && !forceProceed) {
+    return (
+      <div
+        className="flex items-center justify-center h-screen"
+        data-testid="default-redirect-loading"
+      >
+        <div className="w-8 h-8 border-2 border-gray-300 border-t-typography-800 rounded-full animate-spin" />
+      </div>
+    );
   }
-  if (isPrefsUninitialized || isPrefsLoading) {
-    return null;
-  }
+
+  // A login whose only feature is Chatbots (a custom login, A1) lands on its assistants, as does
+  // anyone with Chatbots and nothing else in the navigation.
+  const enabledFeatures = features ?? [];
+  if (isChatbotsOnly(enabledFeatures)) return <Navigate to={ROUTES.WHATSAPP_BOT} replace />;
 
   const items = deriveNavigationItems({
     permissions: permissions ?? [],
@@ -83,6 +136,28 @@ export const DefaultRedirect: React.FC = () => {
       [OrgToggle.CHARACTER_LIBRARY]: Boolean(isCharacterLibraryOrgEnabled),
     },
   });
+
+  // Nothing in the navigation but their assistants (chunk 6b): they land on those. With Chatbots
+  // switched on, the assistants page also lets them make one.
+  const onlyAssistants =
+    !items.length || (items.length === 1 && items[0].id === SIDEBAR_ITEMS.WHATSAPP_BOT);
+  if (onlyAssistants && (onATeam || enabledFeatures.includes(FeatureToggleKey.WHATSAPP_BOT))) {
+    return <Navigate to={ROUTES.WHATSAPP_BOT} replace />;
+  }
+
+  // Nothing this account can open (a clinical advisor before their toggle, say): a clear
+  // message, not Simulation Studio's "This page is not accessible" beside an empty sidebar.
+  if (!items.length && (permissions?.length || features?.length)) {
+    return (
+      <div
+        className="flex h-screen items-center justify-center p-6 text-center font-primary text-sm text-typography-700"
+        data-testid="default-redirect-no-access"
+        role="status"
+      >
+        {en.common.noMenuAccess}
+      </div>
+    );
+  }
 
   return <Navigate to={items[0]?.path ?? ROUTES.SIMULATION_STUDIO} replace />;
 };

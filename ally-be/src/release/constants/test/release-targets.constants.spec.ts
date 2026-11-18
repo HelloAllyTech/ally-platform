@@ -72,3 +72,37 @@ describe('resolveMonorepoReleaseTargets', () => {
     ).toEqual([RELEASE_TARGETS['ally-ai-learn']]);
   });
 });
+
+describe('the shared frontends workflow', () => {
+  it('releases one app through its apps input', () => {
+    expect(
+      resolveMonorepoReleaseTargets([
+        'ally-web/apps/ally-admin-dashboard/a.tsx',
+      ]).targets,
+    ).toEqual([RELEASE_TARGETS['ally-web:admin']]);
+    expect(RELEASE_TARGETS['ally-web:admin'].inputs).toEqual({ apps: 'admin' });
+  });
+
+  it('collapses a change to both apps into one apps=both release', () => {
+    expect(
+      resolveMonorepoReleaseTargets([
+        'ally-be/src/a.ts',
+        'ally-web/apps/ally-admin-dashboard/a.tsx',
+        'ally-web/apps/ally-helpline-dashboard/b.tsx',
+      ]),
+    ).toEqual({
+      targets: [
+        RELEASE_TARGETS['ally-be'],
+        RELEASE_TARGETS['ally-web:frontends'],
+      ],
+      unresolved: [],
+      ambiguous: false,
+    });
+  });
+
+  it('keeps admin and helpline apart although they share a workflow', () => {
+    expect(releaseTargetKey(RELEASE_TARGETS['ally-web:helpline'])).toBe(
+      'ally-web:helpline',
+    );
+  });
+});

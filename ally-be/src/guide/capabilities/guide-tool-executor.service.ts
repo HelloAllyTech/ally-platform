@@ -456,7 +456,7 @@ export class GuideToolExecutorService {
   /**
    * The sign-in card (plan §3 stage 2, §5.12). Not as the first reply — an
    * ask before the visitor has had anything of value drives them away
-   * (Stacks: Timing friend invites to First Major Win-State) — and not
+   * (Timing friend invites to First Major Win-State) — and not
    * again within a few turns.
    */
   private async suggestSignIn(
@@ -903,7 +903,7 @@ export class GuideToolExecutorService {
    * The Coach around a roleplay or case (plan §4.4): a pre-brief before it,
    * an after-action review after it — never during, because feedback on a
    * conversation with no single right answer only makes sense once it is
-   * over (Stacks: Retrospective feedback for nonrecurrent problem-solving
+   * over (Retrospective feedback for nonrecurrent problem-solving
    * aspects; After-Action Review Deepens Reflection in Interactive Learning).
    */
   private async consultCoach(

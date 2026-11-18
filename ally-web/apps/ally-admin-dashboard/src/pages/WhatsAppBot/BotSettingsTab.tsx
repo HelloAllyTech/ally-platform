@@ -1,56 +1,51 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 import { toast } from "sonner";
 
 import {
-  AutoExpandableTextarea,
+  CarbonToggle,
   InlineNotification,
   NumberInput,
-  TextInput,
-  CarbonToggle,
   SkeletonText,
+  TextArea,
+  TextInput,
 } from "@ally-ui-mono/ui-shared";
-import {
-  useGetWaProviderHealthQuery,
-  useGetWaSettingsQuery,
-  useUpdateWaSettingsMutation,
-} from "@api";
+import { useGetWaSettingsQuery, useUpdateWaSettingsMutation } from "@api";
 import { Button } from "@components";
 import { TooltipHint } from "@components/app-tooltip";
 import { ButtonVariant } from "@components/types";
 import { en, TooltipLocation } from "@constants";
 import { WaBotSettings } from "@types";
 
-import { ProviderConnectionSection } from "./ProviderConnectionSection";
+import { Card, LoadError } from "./shared";
+
+const t = en.whatsappBot.bots.defaults;
 
 /**
- * Bot settings.
+ * The defaults every agent starts from, as a few small groups that each answer one question —
+ * is it on, what does it say in a crisis, what does it say when it can't help, how much can one
+ * person send — with the retrieval tuning folded away under Advanced.
  *
  * Everything here is read per message by ally-be, so a save takes effect on the next inbound
- * message — the retrieval thresholds in particular are what make tuning possible without a deploy.
- *
- * Two deliberate omissions:
- *  - Provider credentials are shown as present/absent only. They live in the environment, and
- *    returning a secret to prove it is set would put it in the browser and in any screenshot.
- *  - The prompt and answering model are NOT edited here. They belong to the existing Manage Prompts
- *    surface (prompt codes starting `ally_ai_knowledge`), which already handles versioning and the
- *    per-prompt model/temperature. A second prompt editor scoped to two codes would duplicate a
- *    thousand-line panel and give two places to change the same thing.
+ * message. Two deliberate omissions: provider credentials (they live in the environment), and each
+ * agent's instructions and model (they belong to the agent).
  */
 export const BotSettingsTab: React.FC = () => {
-  const { data, isLoading, isError } = useGetWaSettingsQuery();
-  const { data: health } = useGetWaProviderHealthQuery();
+  const { data, isLoading, isError, refetch } = useGetWaSettingsQuery();
   const [updateSettings, { isLoading: isSaving }] = useUpdateWaSettingsMutation();
-
   const [draft, setDraft] = useState<WaBotSettings | null>(null);
 
   useEffect(() => {
     if (data) setDraft(data);
   }, [data]);
 
+  const dirty = useMemo(
+    () => Boolean(data && draft) && JSON.stringify(data) !== JSON.stringify(draft),
+    [data, draft],
+  );
+
   const set = <K extends keyof WaBotSettings>(key: K, value: WaBotSettings[K]) =>
     setDraft(current => (current ? { ...current, [key]: value } : current));
-
   const setRetrieval = <K extends keyof WaBotSettings["retrieval"]>(
     key: K,
     value: WaBotSettings["retrieval"][K],
@@ -58,7 +53,6 @@ export const BotSettingsTab: React.FC = () => {
     setDraft(current =>
       current ? { ...current, retrieval: { ...current.retrieval, [key]: value } } : current,
     );
-
   const setRateLimit = <K extends keyof WaBotSettings["rateLimit"]>(
     key: K,
     value: WaBotSettings["rateLimit"][K],
@@ -71,120 +65,54 @@ export const BotSettingsTab: React.FC = () => {
     if (!draft) return;
     try {
       await updateSettings(draft).unwrap();
-      toast.success(en.whatsappBot.settings.saved);
+      toast.success(t.saved);
     } catch {
-      toast.error(en.whatsappBot.settings.saveFailed);
+      toast.error(t.saveFailed);
     }
   };
 
-  if (isError) {
-    return (
-      <div className="pt-4">
-        <InlineNotification
-          kind="error"
-          title={en.whatsappBot.settings.saveFailed}
-          lowContrast
-          hideCloseButton
-        />
-      </div>
-    );
-  }
-
-  if (isLoading || !draft) {
-    return (
-      <div className="pt-6">
-        <SkeletonText paragraph lineCount={10} />
-      </div>
-    );
-  }
+  if (isError) return <LoadError title={t.loadFailed} onRetry={() => void refetch()} />;
+  if (isLoading || !draft) return <SkeletonText paragraph lineCount={10} />;
 
   return (
-    <div className="pt-4 flex flex-col gap-6 md:gap-8 max-w-3xl">
-      <p className="text-sm text-typography-600">{en.whatsappBot.settings.subtitle}</p>
-
-      {/* The kill switch sits first and alone: it is the one control someone reaches for in an
-          incident, and it should not be buried under thresholds. */}
-      <section className="border border-border-light rounded-md p-4">
-        <CarbonToggle
+    <div className="flex flex-col gap-6 max-w-3xl pb-24">
+      <Card title={t.switchesTitle} subtitle={t.switchesIntro}>
+        <Toggle
           id="wa-enabled"
-          labelText={en.whatsappBot.settings.enabledLabel}
-          size="sm"
-          toggled={draft.enabled}
-          onToggle={(checked: boolean) => set("enabled", checked)}
+          label={t.enabledLabel}
+          help={t.enabledHelp}
+          value={draft.enabled}
+          onChange={value => set("enabled", value)}
         />
-        <p className="text-xs text-typography-500 pt-1">{en.whatsappBot.settings.enabledHelp}</p>
-
-        {/* Sits with the kill switch rather than among the retrieval thresholds: both are safety
-            controls, and burying this one next to topK would frame it as a tuning knob. */}
-        <div className="pt-4 border-t border-border-light mt-4">
-          <CarbonToggle
-            id="wa-crisis-classifier"
-            labelText={en.whatsappBot.settings.crisisClassifier}
-            size="sm"
-            toggled={draft.crisisClassifierEnabled}
-            onToggle={(checked: boolean) => set("crisisClassifierEnabled", checked)}
+        <div className="border-t border-border-light" />
+        <Toggle
+          id="wa-crisis-classifier"
+          label={t.crisisCheckLabel}
+          help={t.crisisCheckHelp}
+          tooltipLocation={TooltipLocation.WA_CRISIS_CLASSIFIER}
+          value={draft.crisisClassifierEnabled}
+          onChange={value => set("crisisClassifierEnabled", value)}
+        />
+        {!draft.crisisClassifierEnabled && (
+          <InlineNotification
+            kind="warning"
+            title={t.crisisClassifierOffWarning}
+            lowContrast
+            hideCloseButton
           />
-          <p className="flex items-center gap-1 text-xs text-typography-500 pt-1">
-            {en.whatsappBot.settings.crisisClassifierHelp}
-            <TooltipHint location={TooltipLocation.WA_CRISIS_CLASSIFIER} />
-          </p>
-          {!draft.crisisClassifierEnabled && (
-            <div className="pt-2">
-              <InlineNotification
-                kind="warning"
-                title={en.whatsappBot.settings.crisisClassifierOffWarning}
-                lowContrast
-                hideCloseButton
-              />
-            </div>
-          )}
-        </div>
-      </section>
+        )}
+        <div className="border-t border-border-light" />
+        <Toggle
+          id="wa-agent-runtime"
+          label={t.agentRuntimeLabel}
+          help={t.agentRuntimeHelp}
+          value={draft.agentRuntimeAllowed}
+          onChange={value => set("agentRuntimeAllowed", value)}
+        />
+      </Card>
 
-      <ProviderConnectionSection health={health} />
-
-      <Section title={en.whatsappBot.settings.messagesSection}>
-        <TextArea
-          label={en.whatsappBot.settings.disclaimerLabel}
-          help={en.whatsappBot.settings.disclaimerHelp}
-          value={draft.disclaimerText}
-          onChange={value => set("disclaimerText", value)}
-        />
-        <TextArea
-          label={en.whatsappBot.settings.crisisLabel}
-          value={draft.crisisEscalationText}
-          onChange={value => set("crisisEscalationText", value)}
-        />
-        <TextArea
-          label={en.whatsappBot.settings.declineLabel}
-          value={draft.declineText}
-          onChange={value => set("declineText", value)}
-        />
-        <TextArea
-          label={en.whatsappBot.settings.fallbackLabel}
-          value={draft.fallbackText}
-          onChange={value => set("fallbackText", value)}
-        />
-        <TextArea
-          label={en.whatsappBot.settings.unsupportedMediaLabel}
-          value={draft.unsupportedMediaText}
-          onChange={value => set("unsupportedMediaText", value)}
-        />
-        <TextArea
-          label={en.whatsappBot.settings.unrecognisedNumberLabel}
-          help={en.whatsappBot.settings.unrecognisedNumberHelp}
-          value={draft.unrecognisedNumberText}
-          onChange={value => set("unrecognisedNumberText", value)}
-        />
-        <TextArea
-          label={en.whatsappBot.settings.rateLimitLabel}
-          value={draft.rateLimitText}
-          onChange={value => set("rateLimitText", value)}
-        />
-        <div className="flex flex-col gap-1">
-          <label className="text-sm text-typography-900">
-            {en.whatsappBot.settings.helplineNumbersLabel}
-          </label>
+      <Card title={t.safetyTitle} subtitle={t.safetyIntro}>
+        <Field label={t.helplineLabel} help={t.helplineHelp}>
           <TextInput
             id="wa-helpline"
             labelText=""
@@ -192,198 +120,286 @@ export const BotSettingsTab: React.FC = () => {
             value={draft.helplineNumbers}
             onChange={event => set("helplineNumbers", event.target.value)}
           />
-          <span className="text-xs text-typography-400">
-            {en.whatsappBot.settings.helplineNumbersHelp}
-          </span>
-        </div>
-      </Section>
+        </Field>
+        <Message
+          label={t.crisisReplyLabel}
+          help={t.crisisReplyHelp}
+          value={draft.crisisEscalationText}
+          onChange={value => set("crisisEscalationText", value)}
+        />
+        <Message
+          label={t.disclaimerLabel}
+          help={t.disclaimerHelp}
+          value={draft.disclaimerText}
+          onChange={value => set("disclaimerText", value)}
+        />
+      </Card>
 
-      <Section title={en.whatsappBot.settings.limitsSection}>
-        <p className="text-xs text-typography-500">{en.whatsappBot.settings.limitsHelp}</p>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Num
-            label={en.whatsappBot.settings.perMinute}
-            value={draft.rateLimit.perMinute}
-            min={0}
-            onChange={value => setRateLimit("perMinute", value)}
-          />
-          <Num
-            label={en.whatsappBot.settings.perHour}
-            value={draft.rateLimit.perHour}
-            min={0}
-            onChange={value => setRateLimit("perHour", value)}
-          />
-          <Num
-            label={en.whatsappBot.settings.perDay}
-            value={draft.rateLimit.perDay}
-            min={0}
-            onChange={value => setRateLimit("perDay", value)}
-          />
-        </div>
-      </Section>
+      <Card title={t.cantHelpTitle} subtitle={t.cantHelpIntro}>
+        <Message
+          label={t.declineLabel}
+          value={draft.declineText}
+          onChange={value => set("declineText", value)}
+        />
+        <Message
+          label={t.notListedLabel}
+          help={t.notListedHelp}
+          value={draft.unrecognisedNumberText}
+          onChange={value => set("unrecognisedNumberText", value)}
+        />
+        <Message
+          label={t.fallbackLabel}
+          value={draft.fallbackText}
+          onChange={value => set("fallbackText", value)}
+        />
+        <Message
+          label={t.mediaLabel}
+          value={draft.unsupportedMediaText}
+          onChange={value => set("unsupportedMediaText", value)}
+        />
+        <Message
+          label={t.tooManyLabel}
+          value={draft.rateLimitText}
+          onChange={value => set("rateLimitText", value)}
+        />
+      </Card>
 
-      <Section title={en.whatsappBot.settings.retrievalSection}>
+      <Card title={t.limitsTitle} subtitle={t.limitsIntro}>
+        <div className="flex flex-col gap-1">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {(["perMinute", "perHour", "perDay"] as const).map(key => (
+              <Num
+                key={key}
+                label={t[key]}
+                value={draft.rateLimit[key]}
+                min={0}
+                onChange={value => setRateLimit(key, value)}
+              />
+            ))}
+          </div>
+          <span className="text-xs text-typography-500">{t.perPersonHelp}</span>
+        </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Num
-            label={en.whatsappBot.settings.topK}
-            value={draft.retrieval.topK}
-            min={1}
-            max={50}
-            onChange={value => setRetrieval("topK", value)}
+            label={t.idleLabel}
+            help={t.idleHelp}
+            tooltipLocation={TooltipLocation.WA_CONVERSATION_IDLE}
+            value={draft.conversationIdleMinutes}
+            min={5}
+            onChange={value => set("conversationIdleMinutes", value)}
           />
           <Num
-            label={en.whatsappBot.settings.maxPassages}
-            value={draft.retrieval.maxPassages}
-            min={1}
-            max={20}
-            onChange={value => setRetrieval("maxPassages", value)}
-          />
-          <Num
-            label={en.whatsappBot.settings.minSimilarity}
-            help={en.whatsappBot.settings.minSimilarityHelp}
-            tooltipLocation={TooltipLocation.WA_MIN_SIMILARITY}
-            value={draft.retrieval.minSimilarity}
+            label={t.retentionLabel}
+            help={t.retentionHelp}
+            tooltipLocation={TooltipLocation.WA_RETENTION_DAYS}
+            value={draft.retentionDays}
             min={0}
-            max={1}
-            step={0.01}
-            onChange={value => setRetrieval("minSimilarity", value)}
-          />
-          <Num
-            label={en.whatsappBot.settings.declineSimilarity}
-            help={en.whatsappBot.settings.declineSimilarityHelp}
-            tooltipLocation={TooltipLocation.WA_DECLINE_SIMILARITY}
-            value={draft.retrieval.declineSimilarity}
-            min={0}
-            max={1}
-            step={0.01}
-            onChange={value => setRetrieval("declineSimilarity", value)}
+            onChange={value => set("retentionDays", value)}
           />
         </div>
-
-        {/* A floor above the decision threshold means retrieval never returns anything the gate
-            would accept, so the bot declines everything. Warned about rather than silently clamped,
-            because clamping would hide a misconfiguration the admin needs to understand. */}
-        {draft.retrieval.minSimilarity > draft.retrieval.declineSimilarity && (
-          <InlineNotification
-            kind="warning"
-            title="The retrieval floor is above the answer threshold, so the bot will decline every question."
-            lowContrast
-            hideCloseButton
-          />
-        )}
-
-        <div className="pt-2">
-          <CarbonToggle
-            id="wa-translate"
-            labelText={en.whatsappBot.settings.translateQuery}
-            size="sm"
-            toggled={draft.retrieval.translateQuery}
-            onToggle={(checked: boolean) => setRetrieval("translateQuery", checked)}
-          />
-          <p className="text-xs text-typography-500 pt-1">
-            {en.whatsappBot.settings.translateQueryHelp}
-          </p>
-        </div>
-      </Section>
-
-      <Section title={en.whatsappBot.settings.replySection}>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Num
-            label={en.whatsappBot.settings.maxAnswerChars}
-            value={draft.maxAnswerChars}
-            min={100}
-            onChange={value => set("maxAnswerChars", value)}
-          />
-          <Num
-            label={en.whatsappBot.settings.maxReplyChars}
-            help={en.whatsappBot.settings.maxReplyCharsHelp}
-            value={draft.maxReplyChars}
-            min={100}
-            max={4096}
-            onChange={value => set("maxReplyChars", value)}
-          />
-          <Num
-            label={en.whatsappBot.settings.maxCitations}
-            value={draft.maxCitations}
-            min={0}
-            max={10}
-            onChange={value => set("maxCitations", value)}
-          />
-        </div>
-        <Num
-          label={en.whatsappBot.settings.conversationIdle}
-          help={en.whatsappBot.settings.conversationIdleHelp}
-          tooltipLocation={TooltipLocation.WA_CONVERSATION_IDLE}
-          value={draft.conversationIdleMinutes}
-          min={5}
-          onChange={value => set("conversationIdleMinutes", value)}
-        />
-        <Num
-          label={en.whatsappBot.settings.retentionDays}
-          help={en.whatsappBot.settings.retentionDaysHelp}
-          tooltipLocation={TooltipLocation.WA_RETENTION_DAYS}
-          value={draft.retentionDays}
-          min={0}
-          onChange={value => set("retentionDays", value)}
-        />
-        {/* Warned about explicitly rather than left to the reader to infer from a 0. Indefinite
-            retention of workers' clinical questions against their phone numbers is a decision, and it
-            should look like one on the screen where it is made. */}
+        {/* Indefinite retention of people's questions against their phone numbers is a decision,
+            and it should look like one on the screen where it is made. */}
         {draft.retentionDays === 0 && (
           <InlineNotification
             kind="warning"
-            title={en.whatsappBot.settings.retentionOffWarning}
+            title={t.retentionOffWarning}
             lowContrast
             hideCloseButton
           />
         )}
-      </Section>
+      </Card>
 
-      <InlineNotification
-        kind="info"
-        title={en.whatsappBot.settings.promptsNote}
-        lowContrast
-        hideCloseButton
-      />
+      <details className="group border border-border-light rounded-md">
+        <summary className="cursor-pointer list-none p-5 flex items-start justify-between gap-4">
+          <div className="flex flex-col gap-1">
+            <span className="text-base text-typography-900 font-secondary">{t.advancedTitle}</span>
+            <span className="text-sm text-typography-600">{t.advancedIntro}</span>
+          </div>
+          <span
+            className="text-typography-500 transition-transform group-open:rotate-180"
+            aria-hidden
+          >
+            ▾
+          </span>
+        </summary>
+        <div className="flex flex-col gap-4 px-5 pb-5">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Num
+              label={t.floorLabel}
+              tooltipLocation={TooltipLocation.WA_MIN_SIMILARITY}
+              value={draft.retrieval.minSimilarity}
+              min={0}
+              max={1}
+              step={0.01}
+              onChange={value => setRetrieval("minSimilarity", value)}
+            />
+            <Num
+              label={t.thresholdLabel}
+              help={t.thresholdHelp}
+              tooltipLocation={TooltipLocation.WA_DECLINE_SIMILARITY}
+              value={draft.retrieval.declineSimilarity}
+              min={0}
+              max={1}
+              step={0.01}
+              onChange={value => setRetrieval("declineSimilarity", value)}
+            />
+          </div>
+          {/* Warned about rather than clamped: clamping would hide a misconfiguration. */}
+          {draft.retrieval.minSimilarity > draft.retrieval.declineSimilarity && (
+            <InlineNotification
+              kind="warning"
+              title={t.thresholdWarning}
+              lowContrast
+              hideCloseButton
+            />
+          )}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Num
+              label={t.topKLabel}
+              value={draft.retrieval.topK}
+              min={1}
+              max={50}
+              onChange={value => setRetrieval("topK", value)}
+            />
+            <Num
+              label={t.maxPassagesLabel}
+              value={draft.retrieval.maxPassages}
+              min={1}
+              max={20}
+              onChange={value => setRetrieval("maxPassages", value)}
+            />
+          </div>
+          <Toggle
+            id="wa-translate"
+            label={t.translateLabel}
+            help={t.translateHelp}
+            value={draft.retrieval.translateQuery}
+            onChange={value => setRetrieval("translateQuery", value)}
+          />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <Num
+              label={t.answerLengthLabel}
+              value={draft.maxAnswerChars}
+              min={100}
+              onChange={value => set("maxAnswerChars", value)}
+            />
+            <Num
+              label={t.replyLengthLabel}
+              help={t.replyLengthHelp}
+              value={draft.maxReplyChars}
+              min={100}
+              max={4096}
+              onChange={value => set("maxReplyChars", value)}
+            />
+            <Num
+              label={t.sourcesLabel}
+              value={draft.maxCitations}
+              min={0}
+              max={10}
+              onChange={value => set("maxCitations", value)}
+            />
+          </div>
+        </div>
+      </details>
 
-      <div>
-        <Button
-          variant={ButtonVariant.PRIMARY}
-          className="w-full sm:w-auto"
-          onClick={() => void handleSave()}
-          disabled={isSaving}
-        >
-          {en.whatsappBot.settings.save}
-        </Button>
-      </div>
+      <p className="text-sm text-typography-600">{t.agentNote}</p>
+
+      {/* Appears only when something changed, and stays in view however far down the edit was. */}
+      {dirty && (
+        <div className="fixed bottom-0 left-0 right-0 z-10 border-t border-border-light bg-white">
+          <div className="max-w-3xl mx-auto px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+            <span className="text-sm text-typography-900">{t.unsaved}</span>
+            <div className="flex gap-2">
+              <Button variant={ButtonVariant.SECONDARY} onClick={() => setDraft(data ?? null)}>
+                {t.discard}
+              </Button>
+              <Button
+                variant={ButtonVariant.PRIMARY}
+                onClick={() => void handleSave()}
+                disabled={isSaving}
+              >
+                {t.save}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-  <section className="flex flex-col gap-3">
-    <h3 className="text-base text-typography-900 font-secondary">{title}</h3>
-    {children}
-  </section>
-);
-
-const TextArea: React.FC<{
+const Field: React.FC<{
   label: string;
   help?: string;
-  value: string;
-  onChange: (value: string) => void;
-  /** See {@link Num} — data-driven, and silent until a superadmin enables it. */
   tooltipLocation?: string;
-}> = ({ label, help, value, onChange, tooltipLocation }) => (
+  children: React.ReactNode;
+}> = ({ label, help, tooltipLocation, children }) => (
   <div className="flex flex-col gap-1">
     <label className="text-sm text-typography-900">{label}</label>
-    <AutoExpandableTextarea value={value} onChange={onChange} minHeight={70} />
+    {children}
     {(help || tooltipLocation) && (
-      <span className="flex items-center gap-1 text-xs text-typography-400">
+      <span className="flex items-center gap-1 text-xs text-typography-500">
         {help}
         <TooltipHint location={tooltipLocation} />
       </span>
     )}
+  </div>
+);
+
+/** Enough rows to show the whole message without scrolling, up to a sensible cap. */
+const rowsFor = (text: string) =>
+  Math.min(
+    8,
+    Math.max(
+      2,
+      text.split("\n").reduce((rows, line) => rows + Math.max(1, Math.ceil(line.length / 90)), 0),
+    ),
+  );
+
+const Message: React.FC<{
+  label: string;
+  help?: string;
+  value: string;
+  onChange: (value: string) => void;
+}> = ({ label, help, value, onChange }) => (
+  <Field label={label} help={help}>
+    <TextArea
+      id={`wa-${label.replace(/\W+/g, "-").toLowerCase()}`}
+      labelText=""
+      hideLabel
+      rows={rowsFor(value)}
+      value={value}
+      onChange={event => onChange(event.target.value)}
+    />
+  </Field>
+);
+
+const Toggle: React.FC<{
+  id: string;
+  label: string;
+  help: string;
+  value: boolean;
+  onChange: (value: boolean) => void;
+  tooltipLocation?: string;
+}> = ({ id, label, help, value, onChange, tooltipLocation }) => (
+  <div className="flex items-start justify-between gap-6">
+    <div className="flex flex-col gap-1">
+      <span className="text-sm text-typography-900">{label}</span>
+      <span className="flex items-center gap-1 text-xs text-typography-500">
+        {help}
+        <TooltipHint location={tooltipLocation} />
+      </span>
+    </div>
+    <CarbonToggle
+      id={id}
+      labelText=""
+      aria-label={label}
+      labelA={t.off}
+      labelB={t.on}
+      size="sm"
+      toggled={value}
+      onToggle={(checked: boolean) => onChange(checked)}
+    />
   </div>
 );
 
@@ -395,16 +411,14 @@ const Num: React.FC<{
   max?: number;
   step?: number;
   onChange: (value: number) => void;
-  /**
-   * Data-driven tooltip slug. Renders nothing until a superadmin authors the text and enables it
-   * under Manage Tooltips — so a field carries no explanation rather than a developer's guess at one.
-   */
+  /** Data-driven tooltip slug; renders nothing until a superadmin enables it in Manage Tooltips. */
   tooltipLocation?: string;
 }> = ({ label, help, value, min, max, step, onChange, tooltipLocation }) => (
-  <div className="flex flex-col gap-1">
+  <Field label={label} help={help} tooltipLocation={tooltipLocation}>
     <NumberInput
-      id={`wa-${label.replace(/\s+/g, "-").toLowerCase()}`}
-      label={label}
+      id={`wa-${label.replace(/\W+/g, "-").toLowerCase()}`}
+      label=""
+      hideLabel
       value={value}
       min={min}
       max={max}
@@ -415,11 +429,5 @@ const Num: React.FC<{
         if (!Number.isNaN(next)) onChange(next);
       }}
     />
-    {(help || tooltipLocation) && (
-      <span className="flex items-center gap-1 text-xs text-typography-400">
-        {help}
-        <TooltipHint location={tooltipLocation} />
-      </span>
-    )}
-  </div>
+  </Field>
 );

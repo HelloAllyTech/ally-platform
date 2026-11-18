@@ -1,10 +1,9 @@
 import { useMemo, useState } from "react";
 
-import { GroupedBarChart } from "@carbon/charts-react";
-
 import { Tooltip } from "@ally-ui-mono/ui-shared";
 import { useGetGoalsXpQuery } from "@api";
 import { TooltipIcon } from "@assets";
+import { GroupedBarChart } from "@components/charts";
 
 import { GROUPINGS, GROUPING_LABEL } from "./analyticsGrouping";
 import { defaultControlsFor, useChartControls } from "./chartControls";

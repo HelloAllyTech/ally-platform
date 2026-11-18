@@ -13,11 +13,12 @@ export const TRANSLATABLE_PROMPT_TYPES = ['main_agent', 'branching'];
 export const MAX_TRANSLATION_ATTEMPTS = 3;
 
 /**
- * Codes `1980750000000-RemoveUnusedPrompts` deleted. Sync never recreates them:
- * an older service build that still ships one of their files (a container
- * restarted before its new image is deployed, or a rollback) would otherwise
- * bring the row back with that file as its live text. The migration keeps its
- * own copy of the list so it never changes once it has run.
+ * Codes `1980750000000-RemoveUnusedPrompts` and
+ * `1981001200000-RemoveRetiredCuratorPrompts` deleted. Sync never recreates
+ * them: an older service build that still ships one of their files (a
+ * container restarted before its new image is deployed, or a rollback) would
+ * otherwise bring the row back with that file as its live text. Each migration
+ * keeps its own copy of its list so it never changes once it has run.
  */
 export const REMOVED_PROMPT_CODES: ReadonlySet<string> = new Set([
   'ally_ai_learn_trainee_base',
@@ -46,4 +47,7 @@ export const REMOVED_PROMPT_CODES: ReadonlySet<string> = new Set([
   'roadmap_release_notes',
   'ally_ai_simulation_simulation_analysis',
   'ally_ai_simulation_simulation_analysis_with_memory',
+  // Retired in phase 5 of the Context Library (one agent-chunk curator replaced both).
+  'agent_memory_curator_system',
+  'builder_lesson_curator_system',
 ]);

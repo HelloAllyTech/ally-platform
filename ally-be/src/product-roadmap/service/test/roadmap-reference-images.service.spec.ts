@@ -67,6 +67,7 @@ describe('RoadmapOpportunityService — reference images', () => {
       {} as never, // allocationRepository — unused by these tests
       {
         countGoals: jest.fn().mockResolvedValue(0),
+        isProdDirector: jest.fn().mockResolvedValue(false),
         getRankContext: jest.fn().mockResolvedValue({
           weights: {
             votesWeight: 1,

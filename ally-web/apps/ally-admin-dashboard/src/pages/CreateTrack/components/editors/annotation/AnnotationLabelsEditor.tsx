@@ -105,7 +105,7 @@ export const AnnotationLabelsEditor: FC<AnnotationLabelsEditorProps> = ({
                     className="h-6 w-6 rounded-md border-2 outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:opacity-25"
                     style={{
                       background: ARTIFACT_SWATCHES[swatch].solid,
-                      borderColor: selected ? "#111827" : "transparent",
+                      borderColor: selected ? "currentColor" : "transparent",
                     }}
                   />
                 );

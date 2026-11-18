@@ -1,164 +1,308 @@
 import React from "react";
 
-import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-/**
- * The shell's job beyond routing is the QUEUE BADGE.
- *
- * The unanswered queue is the only tab holding work that arrives on its own. A count an operator has
- * to click into to discover is a count that grows unnoticed, so it belongs on the tab itself — and it
- * must be the OPEN count, not the total, or a queue that has been fully triaged would still read as
- * a pile of outstanding work.
- */
-vi.mock("@constants", () => ({
-  en: {
-    whatsappBot: {
-      title: "WhatsApp Bot",
-      subtitle: "Answer workers' questions from vetted material.",
-      tabs: {
-        corpus: "Corpus",
-        templates: "Templates",
-        testConsole: "Test Console",
-        settings: "Settings",
-        conversations: "Conversations",
-        unanswered: "Unanswered",
-        usage: "Usage",
-      },
-    },
-  },
-}));
+import {
+  ChatbotAccessMode,
+  ChatbotAnswerMode,
+  ChatbotKnowledgeSource,
+  ChatbotMemberRole,
+  ChatbotStatus,
+  type Chatbot,
+} from "@types";
 
-const unansweredQuerySpy = vi.fn();
+/**
+ * The chatbot shell: a home listing the bots you can work on (and, for platform admins, what every
+ * bot shares), and one page per bot whose tabs and actions follow your role on it.
+ */
+vi.mock("@constants", async () => {
+  const bots = {
+    listEmpty: "No chatbots yet",
+    listEmptyMember: "You haven't been added to a chatbot yet",
+    listEmptyHint: "Create one",
+    listEmptyMemberHint: "Ask an admin",
+    create: "New chatbot",
+    loadFailed: "Could not load",
+    homeTabs: {
+      bots: "Chatbots",
+      inbox: "Inbox",
+      connectors: "Connectors",
+      defaults: "Defaults",
+      library: "Knowledge library",
+      archived: "Archived",
+    },
+    archived: {
+      empty: "Nothing archived",
+      emptyHint: "Removed ones appear here",
+      removed: "Removed {date}",
+      loadFailed: "Could not load archived",
+    },
+    status: { draft: "Draft", live: "Live", paused: "Paused" },
+    role: { viewer: "Viewer", editor: "Editor", owner: "Owner" },
+    noConnector: "Not connected",
+    cardMessages: "{count} messages",
+    cardPeople: "{count} people",
+    cardDocs: "{count} documents",
+    back: "All chatbots",
+    defaults: {
+      intro: "Defaults are the starting point",
+      sectionSettings: "Settings",
+      sectionReplies: "Quick replies",
+      repliesIntro: "Fixed replies",
+    },
+    tabs: {
+      overview: "Overview",
+      persona: "Persona",
+      knowledge: "Knowledge",
+      test: "Test",
+      conversations: "Conversations",
+      unanswered: "Unanswered",
+      usage: "Usage",
+      settings: "Settings",
+    },
+    settingsSections: {
+      agent: "Agent",
+      replies: "Replies",
+      people: "People",
+      connectors: "Connectors",
+      general: "General",
+    },
+  };
+  return {
+    en: { whatsappBot: { title: "Chatbots", subtitle: "Bots", bots } },
+    ROUTES: { WHATSAPP_BOT: "/chatbots", CHATBOT_DETAIL: "/chatbots/:botId" },
+  };
+});
+
+const bot = (over: Partial<Chatbot> = {}): Chatbot => ({
+  id: "bot-1",
+  name: "Policy helper",
+  description: null,
+  status: ChatbotStatus.LIVE,
+  accessMode: ChatbotAccessMode.LISTED,
+  answerMode: ChatbotAnswerMode.DOCUMENTS_ONLY,
+  knowledgeSource: ChatbotKnowledgeSource.SELECTED,
+  persona: { displayName: "Ava" },
+  model: null,
+  myRole: ChatbotMemberRole.OWNER,
+  connectors: [],
+  documentCount: 3,
+  audienceCount: 1,
+  memberCount: 1,
+  stats: {
+    messages: 5,
+    people: 2,
+    answered: 4,
+    declined: 1,
+    openUnanswered: 0,
+    lastMessageAt: null,
+  },
+  createdAt: "2026-11-04T00:00:00Z",
+  updatedAt: "2026-11-04T00:00:00Z",
+  ...over,
+});
+
+let mockList: { chatbots: Chatbot[]; canCreate: boolean };
+const mockArchive = vi.fn((_id: string) => ({ unwrap: () => Promise.resolve() }));
+const mockRestore = vi.fn((_id: string) => ({ unwrap: () => Promise.resolve() }));
+let mockBot: Chatbot | undefined;
+let mockArchived: { chatbots: Chatbot[] };
 
 vi.mock("@api", () => ({
-  useGetWaUnansweredQuery: (params: unknown) => {
-    unansweredQuerySpy(params);
-    return { data: mockQueue };
-  },
+  useGetChatbotsQuery: () => ({ data: mockList, isLoading: false, isError: false }),
+  useGetChatbotQuery: () => ({ data: mockBot, isLoading: false, isError: false }),
+  useArchiveChatbotMutation: () => [mockArchive, { isLoading: false }],
+  useRestoreChatbotMutation: () => [mockRestore, { isLoading: false }],
+  useGetArchivedChatbotsQuery: () => ({
+    data: mockArchived,
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
 }));
 
-/**
- * Mirrors the REAL shared Tabs render — `{label} {showCount ? count || "0" : ""}` — rather than an
- * idealised version of it. An earlier mock rendered `item.count ?? ""`, which let a test pass while
- * the live strip showed a literal "0" after all seven labels. A mock that flatters the code under
- * test is worse than no mock.
- */
+/** Mirrors the shared Tabs: one span per tab. */
 vi.mock("@ally-ui-mono/ui-shared", () => ({
-  Tabs: ({
-    items,
-    showCount,
-  }: {
-    items: { id: string; label: string; count?: number }[];
-    showCount?: boolean;
-  }) => (
-    <div data-testid="tabs" data-show-count={String(showCount)}>
+  Tabs: ({ items }: { items: { id: string; label: string }[] }) => (
+    <div data-testid="tabs">
       {items.map(item => (
         <span key={item.id} data-testid={`tab-${item.id}`}>
-          {item.label} {showCount ? item.count || "0" : ""}
+          {item.label}
         </span>
       ))}
     </div>
   ),
+  SkeletonText: () => null,
 }));
 
-vi.mock("../CorpusTab", () => ({ CorpusTab: () => <div data-testid="corpus" /> }));
-vi.mock("../TemplatesTab", () => ({ TemplatesTab: () => <div /> }));
-vi.mock("../TestConsoleTab", () => ({ TestConsoleTab: () => <div /> }));
-vi.mock("../BotSettingsTab", () => ({ BotSettingsTab: () => <div /> }));
-vi.mock("../ConversationsTab", () => ({
-  ConversationsTab: () => <div data-testid="conversations" />,
+vi.mock("@components", () => ({
+  Button: ({ children }: { children: React.ReactNode }) => <button>{children}</button>,
+  EmptyState: ({ title }: { title: string }) => <div>{title}</div>,
 }));
-vi.mock("../UnansweredTab", () => ({ UnansweredTab: () => <div data-testid="unanswered" /> }));
-vi.mock("../UsageTab", () => ({ UsageTab: () => <div data-testid="usage" /> }));
+vi.mock("@components/types", () => ({ ButtonVariant: { PRIMARY: "primary" } }));
 
-let mockQueue: { count: number } | undefined;
+// The inbox (chunk 11a) has its own tests; here it's just the tab's content.
+vi.mock("../../Inbox", () => ({ Inbox: () => <div data-testid="inbox" /> }));
+vi.mock("../shared", () => ({
+  fill: (text: string, values: Record<string, unknown>) =>
+    text.replace(/\{(\w+)\}/g, (_m, key: string) => String(values[key])),
+  LoadError: ({ title }: { title: string }) => <div role="alert">{title}</div>,
+  StatusPill: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
+}));
+
+const { useChatbotId } = await import("../chatbotContext");
+const stub = (id: string) => () => <div data-testid={id} data-bot={useChatbotId() ?? ""} />;
+const withRoles =
+  (id: string) =>
+  ({ canEdit, canManage }: { canEdit?: boolean; canManage?: boolean }) => (
+    <div data-testid={id} data-edit={String(canEdit)} data-manage={String(canManage)} />
+  );
+
+vi.mock("../BotSettingsTab", () => ({ BotSettingsTab: stub("defaults-settings") }));
+vi.mock("../ConnectorsTab", () => ({
+  AllConnectorsTab: stub("all-connectors"),
+  BotConnectorsTab: withRoles("bot-connectors"),
+}));
+vi.mock("../CorpusTab", () => ({ CorpusTab: stub("library") }));
+vi.mock("../TemplatesTab", () => ({ TemplatesTab: stub("replies") }));
+vi.mock("../AgentTab", () => ({ AgentTab: withRoles("agent") }));
+vi.mock("../ChatbotSettingsTab", () => ({ ChatbotSettingsTab: withRoles("settings") }));
 
 const { WhatsAppBot } = await import("../WhatsAppBot");
 
-const renderAt = (path = "/whatsapp-bot") =>
+const renderAt = (path: string) =>
   render(
     <MemoryRouter initialEntries={[path]}>
-      <WhatsAppBot />
+      <Routes>
+        <Route path="/chatbots" element={<WhatsAppBot />} />
+      </Routes>
     </MemoryRouter>,
   );
 
-describe("WhatsAppBot shell", () => {
+describe("Chatbots home", () => {
   beforeEach(() => {
-    unansweredQuerySpy.mockClear();
-    mockQueue = { count: 12 };
+    mockList = { chatbots: [bot()], canCreate: true };
+    mockArchived = { chatbots: [] };
   });
 
-  describe("the queue badge", () => {
-    it("puts the open-question count in the Unanswered label", () => {
-      renderAt();
-
-      expect(screen.getByTestId("tab-unanswered").textContent).toContain("Unanswered (12)");
-    });
-
-    it("leaves showCount OFF, so no other tab renders a stray zero", () => {
-      renderAt();
-
-      // The shared Tabs applies showCount to the WHOLE strip: turning it on to badge one tab puts a
-      // literal "0" after every label. This is the regression that shipped and had to be caught in a
-      // browser.
-      expect(screen.getByTestId("tabs").dataset.showCount).toBe("false");
-      for (const id of ["corpus", "templates", "settings", "conversations", "usage"]) {
-        expect(screen.getByTestId(`tab-${id}`).textContent?.trim()).not.toMatch(/\b0$/);
-      }
-    });
-
-    it("counts only OPEN questions", () => {
-      renderAt();
-
-      // A badge counting triaged and dismissed items too would never fall, so it would stop meaning
-      // "there is work here" within a week of going live.
-      const params = unansweredQuerySpy.mock.calls[0]?.[0] as { status?: string; limit?: number };
-      expect(params.status).toBe("open");
-      // Only the count is read; the rows come from the tab's own query.
-      expect(params.limit).toBe(1);
-    });
-
-    it("shows no badge at all when the queue is empty", () => {
-      // "Unanswered (0)" is noise, and a badge that never disappears stops meaning "work is waiting".
-      mockQueue = { count: 0 };
-
-      renderAt();
-
-      expect(screen.getByTestId("tab-unanswered").textContent).toContain("Unanswered");
-      expect(screen.getByTestId("tab-unanswered").textContent).not.toContain("(");
-    });
-
-    it("survives the count being unavailable", () => {
-      mockQueue = undefined;
-
-      renderAt();
-
-      expect(screen.getByTestId("tab-unanswered").textContent).not.toContain("(");
-    });
+  it("lists the bots as cards with their status and activity", () => {
+    renderAt("/chatbots");
+    expect(screen.getByText("Policy helper")).toBeTruthy();
+    expect(screen.getByText("Live")).toBeTruthy();
+    expect(screen.getByText("5 messages")).toBeTruthy();
+    expect(screen.getByText("Not connected")).toBeTruthy();
   });
 
-  describe("tab routing", () => {
-    it("defaults to the corpus", () => {
-      renderAt();
-      expect(screen.getByTestId("corpus")).toBeTruthy();
-    });
+  it("gives a platform admin what every bot shares", () => {
+    renderAt("/chatbots?tab=defaults");
+    expect(screen.getByTestId("tab-connectors")).toBeTruthy();
+    expect(screen.getByTestId("defaults-settings")).toBeTruthy();
+    // The shared replies, with no bot in context: the global set.
+    fireEvent.click(screen.getByRole("tab", { name: "Quick replies" }));
+    expect(screen.getByTestId("replies").dataset.bot).toBe("");
+  });
 
-    it("honours ?tab=", () => {
-      renderAt("/whatsapp-bot?tab=unanswered");
-      expect(screen.getByTestId("unanswered")).toBeTruthy();
-    });
+  it("shows a member only their bots and the inbox — no creating, no platform tabs", () => {
+    mockList = { chatbots: [bot({ myRole: ChatbotMemberRole.VIEWER })], canCreate: false };
+    renderAt("/chatbots?tab=defaults");
+    expect(screen.queryByText("New chatbot")).toBeNull();
+    // The inbox (chunk 11a) is for everyone who can see an assistant.
+    expect(screen.getByTestId("tabs").textContent).toBe("ChatbotsInboxArchived");
+    expect(screen.queryByTestId("defaults-settings")).toBeNull();
+    expect(screen.queryByTestId("defaults-settings")).toBeNull();
+    expect(screen.getByText("Policy helper")).toBeTruthy();
+  });
 
-    it("falls back to the default rather than rendering nothing for an unknown tab", () => {
-      // A stale bookmark or a renamed tab must not leave the page blank.
-      renderAt("/whatsapp-bot?tab=nonsense");
-      expect(screen.getByTestId("corpus")).toBeTruthy();
-    });
+  it("lets an owner remove an assistant from its ··· menu, even one still being set up", async () => {
+    mockList = {
+      chatbots: [bot({ status: ChatbotStatus.DRAFT, setupDraftId: "draft-1" })],
+      canCreate: true,
+    };
+    mockArchive.mockClear();
+    renderAt("/chatbots");
+    fireEvent.click(screen.getByRole("button", { name: "More for Policy helper" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Remove assistant" }));
+    // Asked in a dialog on the page, not the browser's own confirm box.
+    const dialog = screen.getByRole("dialog", { name: "Remove Policy helper?" });
+    expect(dialog.textContent).toContain("Its conversations are kept.");
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    expect(mockArchive).toHaveBeenCalledWith("bot-1");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
 
-    it("opens the conversations tab when a thread is deep-linked", () => {
-      renderAt("/whatsapp-bot?tab=conversations&conversation=conv-1");
-      expect(screen.getByTestId("conversations")).toBeTruthy();
-    });
+  it("removes nothing when the owner keeps it", () => {
+    mockArchive.mockClear();
+    renderAt("/chatbots");
+    fireEvent.click(screen.getByRole("button", { name: "More for Policy helper" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Remove assistant" }));
+    fireEvent.click(screen.getByRole("button", { name: "Keep it" }));
+    expect(mockArchive).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("says so, and stays open, when removing fails", async () => {
+    mockArchive.mockImplementationOnce(() => ({ unwrap: () => Promise.reject(new Error("500")) }));
+    renderAt("/chatbots");
+    fireEvent.click(screen.getByRole("button", { name: "More for Policy helper" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Remove assistant" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    expect(await screen.findByText("Couldn't remove it. Try again.")).toBeTruthy();
+    expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+
+  it("gives no menu to someone who doesn't own the assistant", () => {
+    mockList = { chatbots: [bot({ myRole: ChatbotMemberRole.EDITOR })], canCreate: true };
+    renderAt("/chatbots");
+    expect(screen.queryByRole("button", { name: "More for Policy helper" })).toBeNull();
+  });
+
+  it("keeps removed assistants under Archived, to open and read", () => {
+    mockArchived = {
+      chatbots: [bot({ id: "bot-9", name: "Old helper", archivedAt: "2026-11-10T09:00:00Z" })],
+    };
+    renderAt("/chatbots?tab=archived");
+    expect(screen.getByText("Old helper")).toBeTruthy();
+    expect(screen.getByText(/^Removed /)).toBeTruthy();
+    // Removed already: its menu offers Restore, never Remove.
+    fireEvent.click(screen.getByRole("button", { name: "More for Old helper" }));
+    expect(screen.queryByRole("menuitem", { name: "Remove assistant" })).toBeNull();
+  });
+
+  it("lets an owner restore a removed assistant from its ··· menu", async () => {
+    mockArchived = {
+      chatbots: [bot({ id: "bot-9", name: "Old helper", archivedAt: "2026-11-10T09:00:00Z" })],
+    };
+    mockRestore.mockClear();
+    renderAt("/chatbots?tab=archived");
+    fireEvent.click(screen.getByRole("button", { name: "More for Old helper" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Restore assistant" }));
+    await waitFor(() => expect(mockRestore).toHaveBeenCalledWith("bot-9"));
+  });
+
+  it("gives no Restore to someone who doesn't own the removed assistant", () => {
+    mockArchived = {
+      chatbots: [
+        bot({
+          name: "Old helper",
+          archivedAt: "2026-11-10T09:00:00Z",
+          myRole: ChatbotMemberRole.VIEWER,
+        }),
+      ],
+    };
+    renderAt("/chatbots?tab=archived");
+    expect(screen.queryByRole("button", { name: "More for Old helper" })).toBeNull();
+  });
+
+  it("says when nothing has been archived", () => {
+    renderAt("/chatbots?tab=archived");
+    expect(screen.getByText("Nothing archived")).toBeTruthy();
+  });
+
+  it("tells a member with no bots who to ask", () => {
+    mockList = { chatbots: [], canCreate: false };
+    renderAt("/chatbots");
+    expect(screen.getByText("You haven't been added to a chatbot yet")).toBeTruthy();
   });
 });

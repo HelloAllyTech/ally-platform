@@ -124,7 +124,13 @@ export class TrackCoverImageService {
    */
   private toHttpError(error: unknown): HttpException {
     const err = error as { status?: number; code?: string };
-    if (err?.status === 400 || err?.code === 'content_policy_violation') {
+    // Only a content refusal is the trainer's to fix by rewording. Every
+    // other 400 (invalid size, retired model) is our configuration bug —
+    // blaming the prompt for those sent two fixes down the wrong road.
+    if (
+      err?.code === 'moderation_blocked' ||
+      err?.code === 'content_policy_violation'
+    ) {
       return new BadRequestException(
         "The image service couldn't use this prompt. Try rewording it — for example, remove anything graphic or any real person's name.",
       );

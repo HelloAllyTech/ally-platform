@@ -36,12 +36,13 @@ Currently Tracked Events Reference
 
 ### Simulation
 
-| Constant                       | Event Name                     | Description                                                                                                                                                                                                                                                                                                | Fires at                                               |
-| ------------------------------ | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| `SIMULATION_STARTED`           | `simulation_started`           | The agent actually joined and the learner can practise — **not** merely that a room opened. A session that never got an agent emits nothing, so an infrastructure failure cannot read as a completion problem                                                                                              | `hooks/useLiveKitRoom.ts` (`transitionToAgentJoined`)  |
-| `SIMULATION_COMPLETED`         | `simulation_completed`         | Room disconnected after a real start. Carries `duration_seconds` and `ended_by_learner`, which separates a finished practice from one that dropped                                                                                                                                                         | `hooks/useLiveKitRoom.ts` (`onRoomDisconnect`)         |
-| `SIMULATION_CREDITS_USED`      | `simulation_credits_used`      | Credits consumed                                                                                                                                                                                                                                                                                           | —                                                      |
-| `SIMULATION_CONNECTION_FAILED` | `simulation_connection_failed` | The learner was shown a start-failure screen. `failure_kind` is `connect` (room connect threw), `microphone` (room connected but the browser refused the mic) or `agent_absent` (no agent joined within 30s); `connect`/`microphone` also carry `error_name` (e.g. `NotReadableError`) and `error_message` | `hooks/useLiveKitRoom.ts` (`captureConnectionFailure`) |
+| Constant                       | Event Name                     | Description                                                                                                                                                                                                                                                                                                | Fires at                                                          |
+| ------------------------------ | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `SIMULATION_STARTED`           | `simulation_started`           | The agent actually joined and the learner can practise — **not** merely that a room opened. A session that never got an agent emits nothing, so an infrastructure failure cannot read as a completion problem                                                                                              | `hooks/useLiveKitRoom.ts` (`transitionToAgentJoined`)             |
+| `SIMULATION_COMPLETED`         | `simulation_completed`         | Room disconnected after a real start. Carries `duration_seconds` and `ended_by_learner`, which separates a finished practice from one that dropped                                                                                                                                                         | `hooks/useLiveKitRoom.ts` (`onRoomDisconnect`)                    |
+| `SIMULATION_CREDITS_USED`      | `simulation_credits_used`      | Credits consumed                                                                                                                                                                                                                                                                                           | —                                                                 |
+| `LIVE_QUIZ_ATTEMPTS_INCREASED` | `live_quiz_attempts_increased` | Admin raised a quiz's or annotation's attempt limit on a published course. Carries `trackItemId`, `itemType` (the component's `TrackItemType`) and the new `maxAttempts` (`null` = unlimited); fires once per component, after the PATCH succeeds                                                          | `apps/ally-admin-dashboard/src/pages/CreateTrack/CreateTrack.tsx` |
+| `SIMULATION_CONNECTION_FAILED` | `simulation_connection_failed` | The learner was shown a start-failure screen. `failure_kind` is `connect` (room connect threw), `microphone` (room connected but the browser refused the mic) or `agent_absent` (no agent joined within 30s); `connect`/`microphone` also carry `error_name` (e.g. `NotReadableError`) and `error_message` | `hooks/useLiveKitRoom.ts` (`captureConnectionFailure`)            |
 
 A **text-chat** roleplay adds `interaction_mode: "TEXT"` to `simulation_started` and
 `simulation_completed`. Voice sessions send no `interaction_mode` at all, so their payload is
@@ -347,11 +348,21 @@ detectors:
 
 ### Admin & Organization
 
-| Constant               | Event Name             | Description                                                 |
-| ---------------------- | ---------------------- | ----------------------------------------------------------- | -------------------------------------------------------------- |
-| `UPGRADE_PROMPT_SHOWN` | `upgrade.prompt_shown` | An upgrade prompt or paywall is shown to a learner or admin | —                                                              |
-| `UPGRADE_CLICKED`      | `upgrade.clicked`      | Learner or admin clicks an upgrade call-to-action           | —                                                              |
-| `SIDEBAR_INTERACTION`  | `sidebar_interaction`  | Admin pins or unpins the sidebar                            | `apps/ally-admin-dashboard/src/components/sidebar/Sidebar.tsx` |
+| Constant                         | Event Name                       | Description                                                                                                                       |
+| -------------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `UPGRADE_PROMPT_SHOWN`           | `upgrade.prompt_shown`           | An upgrade prompt or paywall is shown to a learner or admin                                                                       | —                                                                       |
+| `UPGRADE_CLICKED`                | `upgrade.clicked`                | Learner or admin clicks an upgrade call-to-action                                                                                 | —                                                                       |
+| `SIDEBAR_INTERACTION`            | `sidebar_interaction`            | Admin pins or unpins the sidebar                                                                                                  | `apps/ally-admin-dashboard/src/components/sidebar/Sidebar.tsx`          |
+| `IDEA_CAPTURE_SESSION_STARTED`   | `idea_capture_session_started`   | Admin opened the Idea Capture overlay from the header mic-and-bulb button (the mic starts with it)                                | `apps/ally-admin-dashboard/src/components/idea-capture/IdeaCapture.tsx` |
+| `IDEA_CAPTURE_DRAFT_SAVED`       | `idea_capture_draft_saved`       | An idea was saved to My drafts, after the save succeeds. Carries `capture_mode` (`voice` if any of it was dictated, else `typed`) | `apps/ally-admin-dashboard/src/components/idea-capture/IdeaCapture.tsx` |
+| `IDEA_CAPTURE_SESSION_ABANDONED` | `idea_capture_session_abandoned` | The overlay was closed with words in it and nothing saved (Discard on the leave prompt). Carries `capture_mode`                   | `apps/ally-admin-dashboard/src/components/idea-capture/IdeaCapture.tsx` |
+| `ADMIN_PAGE_VIEWED`              | `admin_page_viewed`              | Admin opened a screen. Sends `route` (route pattern, no ids), `user_role`, `tenant_tier` (`platform` or `tenant`)                 | `apps/ally-admin-dashboard/src/hooks/useAdminAnalytics.ts`              |
+| `ADMIN_ACTION`                   | `admin_action`                   | Admin performed a named action on a screen. Sends `screen`, `action`                                                              | `apps/ally-admin-dashboard/src/hooks/useAdminAnalytics.ts`              |
+| `ADMIN_SEARCH_USED`              | `admin_search_used`              | Admin typed a search/filter query on a screen. Sends `screen` and `query_length` only, never the text                             | `apps/ally-admin-dashboard/src/hooks/useAdminAnalytics.ts`              |
+
+The three `idea_capture_*` events measure the save rate of voice-initiated idea captures:
+`idea_capture_draft_saved` over `idea_capture_session_started`, filtered to
+`capture_mode = voice`. They never carry the idea's text.
 
 `upgrade.prompt_shown` sends `org_id`, `trigger_source`, `current_plan`; `upgrade.clicked` sends
 `org_id`, `current_plan`, `target_plan`. Both are **registered but not yet emitted** — this app has
@@ -361,3 +372,29 @@ re-deriving the property names.
 
 `sidebar_interaction` sends `action` as `pinned` or `unpinned`.
 
+### Roadmap v2 time targets (admin, dark behind `roadmap_v2`)
+
+One pair of events times each core job in the plan's time-targets table; `job` tells them apart.
+The Owner's **Measures** view (`/roadmap/measures`) shows each job's target beside its name and
+points here: the medians are read in PostHog, never queried from the browser.
+
+| Constant                | Event Name              | Description                                                                                                                                         | Fires at                                                                  |
+| ----------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `ROADMAP_JOB_STARTED`   | `roadmap_job_started`   | An attempt at one core job began. Sends `job`, `role` (the Roadmap role) and `item_id` (the idea's code) where there is one                         | `apps/ally-admin-dashboard/src/pages/Roadmap/hooks/useRoadmapJobTimer.ts` |
+| `ROADMAP_JOB_COMPLETED` | `roadmap_job_completed` | That attempt finished. Adds `duration_ms`. An abandoned attempt (never finished, or finished 30 minutes or more after it began) sends no completion | `apps/ally-admin-dashboard/src/pages/Roadmap/hooks/useRoadmapJobTimer.ts` |
+
+Where each job starts and ends:
+
+| `job`                      | Starts                                                                        | Completes                                             |
+| -------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `find_my_idea`             | The Queue opens from outside the Roadmap                                      | The first idea you wrote opens (page or reading pane) |
+| `capture_idea`             | New idea opens                                                                | The first save creates the draft                      |
+| `draft_to_submitted`       | A draft's page opens (the earliest open in this tab counts)                   | Submit succeeds                                       |
+| `answer_from_notification` | An idea opens from a For you row that is an agent question                    | You send an answer on that idea                       |
+| `triage_one`               | A row in _To triage → Awaiting review_ takes focus (J/K, opened, or the card) | Accept (with or without a lead) or Decline succeeds   |
+| `settle_answers`           | A question card with conflicting answers is shown to its settler              | Use this answer succeeds                              |
+| `brief_to_claude_code`     | Build ▾ is shown on a Ready-to-build idea to someone who can send the brief   | Open in Claude Code opens the app                     |
+
+They never carry a title, an answer, a reason or a name. They call `captureEvent` directly rather
+than `useAnalytics()`, so `user_role` is not added: `role` is the Roadmap role, which is what the
+targets are split by.

@@ -1,1 +1,0 @@
-export {EmptyTranscript} from './EmptyTranscript';

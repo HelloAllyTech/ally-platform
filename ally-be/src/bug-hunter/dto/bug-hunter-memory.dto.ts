@@ -9,25 +9,38 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   Max,
   MaxLength,
   Min,
   MinLength,
 } from 'class-validator';
 
-import { AGENT_MEMORY_BODY_MAX } from 'src/agent-memory/entity/agent-memory.entity';
-import { AGENT_MEMORY_MAX_HITS } from 'src/agent-memory/service/agent-memory.service';
+import { BUG_HUNTER_NOTE_MAX_CHARS } from 'src/context-library/profiles/bug-hunter-notes.profile';
 
-/** One notebook entry as the agent or an admin writes it. */
+/**
+ * Bug Hunter's memory is the Context Library's Bug Hunter Notes collection (phase 5). These
+ * DTOs are the pipeline's contract with it, unchanged in shape so a runner built before the
+ * move keeps working.
+ */
+
+/** Cap on hits a single lookup may return, whatever the caller asked for. */
+export const BUG_HUNTER_NOTES_MAX_HITS = 10;
+
+/** A note's id (uuid) or its code (`BN-0042`). */
+const NOTE_REF =
+  /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[A-Z]{2}-\d{4,})$/i;
+
+/** One note as the agent writes it. */
 export class WriteBugHunterMemoryDto {
   @ApiProperty({
-    maxLength: AGENT_MEMORY_BODY_MAX,
+    maxLength: BUG_HUNTER_NOTE_MAX_CHARS,
     description:
       'The one lesson, written for a stranger: name the repo, file, command or symptom. Under 600 characters.',
   })
   @IsString()
   @MinLength(1)
-  @MaxLength(AGENT_MEMORY_BODY_MAX)
+  @MaxLength(BUG_HUNTER_NOTE_MAX_CHARS)
   body!: string;
 
   @ApiPropertyOptional({
@@ -63,7 +76,7 @@ export class WriteBugHunterMemoryDto {
 
   @ApiPropertyOptional({
     description:
-      'Admins only: a pinned entry is never edited or retired by the curator.',
+      'Ignored: the pipeline may not pin — a pin is a person outranking the curator, and people pin notes in the Context Library.',
   })
   @IsOptional()
   @IsBoolean()
@@ -84,16 +97,17 @@ export class SearchBugHunterMemoryQueryDto {
   @IsString()
   repo?: string;
 
-  @ApiPropertyOptional({ default: 3, maximum: AGENT_MEMORY_MAX_HITS })
+  @ApiPropertyOptional({ default: 3, maximum: BUG_HUNTER_NOTES_MAX_HITS })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(AGENT_MEMORY_MAX_HITS)
+  @Max(BUG_HUNTER_NOTES_MAX_HITS)
   limit?: number;
 
   @ApiPropertyOptional({
-    description: 'Override the configured relevance floor, 0-1.',
+    description:
+      'Accepted for older runners and ignored: the Context Library returns only good-or-better matches.',
   })
   @IsOptional()
   @IsNumber()
@@ -111,47 +125,25 @@ export class SearchBugHunterMemoryQueryDto {
 }
 
 export class BugHunterMemoryHitDto {
-  @ApiProperty() id!: string;
+  @ApiProperty({ description: 'The note id; report it back in feedback.' })
+  id!: string;
+  @ApiProperty({ description: 'The note code, e.g. BN-0042.' }) code!: string;
   @ApiProperty() body!: string;
   @ApiProperty({ type: [String] }) tags!: string[];
   @ApiProperty({ type: [String], nullable: true }) repos!: string[] | null;
   @ApiProperty() pinned!: boolean;
-  @ApiProperty({ description: 'Cosine similarity to the query, 0-1.' })
+  @ApiProperty({ description: 'How well it matched: strong or good.' })
+  band!: string;
+  @ApiProperty({
+    description:
+      'Relevance, 0-1, from the band (strong 0.9, good 0.7). Kept for runners that read it.',
+  })
   similarity!: number;
 }
 
 export class BugHunterMemorySearchResponseDto {
   @ApiProperty({ type: [BugHunterMemoryHitDto] })
   hits!: BugHunterMemoryHitDto[];
-}
-
-export class BugHunterMemoryEntryDto {
-  @ApiProperty() id!: string;
-  @ApiProperty() body!: string;
-  @ApiProperty({ type: [String] }) tags!: string[];
-  @ApiProperty({ type: [String], nullable: true }) repos!: string[] | null;
-  @ApiProperty() status!: string;
-  @ApiProperty() pinned!: boolean;
-  @ApiProperty() sourceCount!: number;
-  @ApiProperty() timesApplied!: number;
-  @ApiProperty() timesContradicted!: number;
-  @ApiProperty({ nullable: true }) runId!: string | null;
-  @ApiProperty({ nullable: true }) findingId!: string | null;
-  @ApiProperty({ nullable: true }) createdBy!: number | null;
-  @ApiProperty() embeddingStatus!: string;
-  @ApiProperty() createdAt!: Date;
-  @ApiProperty({ nullable: true }) lastAppliedAt!: Date | null;
-  /** When it left the active set; null while active. */
-  @ApiProperty({ nullable: true }) retiredAt!: Date | null;
-  /** The admin who retired it, or null when the agent's own pass did. */
-  @ApiProperty({ nullable: true }) retiredBy!: number | null;
-  /** The agent's reason, in its own words, when it retired the entry itself. */
-  @ApiProperty({ nullable: true }) retiredReason!: string | null;
-}
-
-export class ListBugHunterMemoryResponseDto {
-  @ApiProperty({ type: [BugHunterMemoryEntryDto] })
-  items!: BugHunterMemoryEntryDto[];
 }
 
 /**
@@ -167,20 +159,20 @@ export class BugHunterMemoryFeedbackDto {
 
   @ApiProperty({
     type: [String],
-    description: 'Entry ids that changed what this run did.',
+    description: 'Entry ids (or codes) that changed what this run did.',
   })
   @IsArray()
   @ArrayMaxSize(50)
-  @IsUUID('4', { each: true })
+  @Matches(NOTE_REF, { each: true })
   applied!: string[];
 
   @ApiPropertyOptional({
     type: [String],
-    description: 'Entry ids that proved wrong during this run.',
+    description: 'Entry ids (or codes) that proved wrong during this run.',
   })
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(50)
-  @IsUUID('4', { each: true })
+  @Matches(NOTE_REF, { each: true })
   contradicted?: string[];
 }

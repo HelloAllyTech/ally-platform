@@ -59,19 +59,28 @@ export const CorpusTab: React.FC = () => {
   const addFilterBtnRef = useRef<HTMLButtonElement>(null);
   const [sort, setSort] = useState<EntityTableSort>({ key: "createdAt", direction: "desc" });
 
+  // One organisation's page shows only the documents aimed at it; the shared ones every
+  // organisation gets are listed under All organisations. The organisation filter disappears,
+  // since the scope already is one.
+  // The library is platform-wide: bots pick from it, and no organisation narrows it here.
+  const scopeTenantId: string | undefined = undefined;
+
   const { data, isLoading, isFetching, isError, refetch } = useGetKbDocumentsQuery(
     {
       limit: PAGE_SIZE,
       offset,
       search: search.trim() || undefined,
-      tenantId: tenantFilter ?? undefined,
+      tenantId: scopeTenantId ?? tenantFilter ?? undefined,
+      // An organisation's tab lists ITS documents; the shared ones live under All organisations.
+      excludeGlobal: Boolean(scopeTenantId),
       includeArchived,
       sortBy: sort.key,
       sortDir: sort.direction,
     },
     { pollingInterval: pollInterval },
   );
-  const { data: stats } = useGetKbStatsQuery();
+  // Platform-wide counts: meaningless (and refused to an org-restricted admin) on one organisation.
+  const { data: stats } = useGetKbStatsQuery(undefined, { skip: Boolean(scopeTenantId) });
   const { data: tenantData } = useGetTenantsQuery({ limit: TENANT_PAGE_SIZE });
 
   // id → name, so the organisations cell shows names rather than uuids. The question that cell
@@ -108,37 +117,49 @@ export const CorpusTab: React.FC = () => {
   const handleRetry = useCallback(
     async (doc: KbDocument) => {
       try {
-        await reindexDocument(doc.id).unwrap();
+        await reindexDocument({ id: doc.id, tenantId: scopeTenantId }).unwrap();
         toast.success(en.whatsappBot.corpus.retryQueued);
       } catch {
         toast.error(en.whatsappBot.corpus.saveFailed);
       }
     },
-    [reindexDocument],
+    [reindexDocument, scopeTenantId],
+  );
+
+  const handleReindex = useCallback(
+    async (doc: KbDocument) => {
+      try {
+        await reindexDocument({ id: doc.id, tenantId: scopeTenantId }).unwrap();
+        toast.success(en.whatsappBot.corpus.reindexQueued);
+      } catch {
+        toast.error(en.whatsappBot.corpus.saveFailed);
+      }
+    },
+    [reindexDocument, scopeTenantId],
   );
 
   const handleArchiveConfirmed = useCallback(async () => {
     if (!archiveTarget) return;
     try {
-      await archiveDocument(archiveTarget.id).unwrap();
+      await archiveDocument({ id: archiveTarget.id, tenantId: scopeTenantId }).unwrap();
       toast.success(en.whatsappBot.corpus.archiveSuccess);
     } catch {
       toast.error(en.whatsappBot.corpus.saveFailed);
     } finally {
       setArchiveTarget(null);
     }
-  }, [archiveTarget, archiveDocument]);
+  }, [archiveTarget, archiveDocument, scopeTenantId]);
 
   const handleUnarchive = useCallback(
     async (doc: KbDocument) => {
       try {
-        await unarchiveDocument(doc.id).unwrap();
+        await unarchiveDocument({ id: doc.id, tenantId: scopeTenantId }).unwrap();
         toast.success(en.whatsappBot.corpus.unarchiveSuccess);
       } catch {
         toast.error(en.whatsappBot.corpus.saveFailed);
       }
     },
-    [unarchiveDocument],
+    [unarchiveDocument, scopeTenantId],
   );
 
   const columns: EntityTableColumn<KbDocument>[] = useMemo(
@@ -256,6 +277,11 @@ export const CorpusTab: React.FC = () => {
         <TooltipHint location={TooltipLocation.WA_CORPUS_CHUNKS} />
         <TooltipHint location={TooltipLocation.WA_CORPUS_SOURCE_TYPE} />
       </p>
+      {scopeTenantId && (
+        <p className="text-xs text-typography-500 -mt-2 pb-4">
+          {en.whatsappBot.corpus.orgOnlyNote}
+        </p>
+      )}
 
       {stats && (
         <div className="flex flex-wrap gap-x-6 gap-y-2 pb-4 text-sm">
@@ -289,12 +315,16 @@ export const CorpusTab: React.FC = () => {
           // nudge to pick up a status change.
           onClick: () => void refetch(),
         }}
-        filterChips={filterChips}
-        addFilterCta={{
-          label: en.whatsappBot.corpus.filterButton,
-          onClick: () => setIsFilterOpen(open => !open),
-        }}
-        addFilterButtonRef={addFilterBtnRef}
+        {...(scopeTenantId
+          ? {}
+          : {
+              filterChips,
+              addFilterCta: {
+                label: en.whatsappBot.corpus.filterButton,
+                onClick: () => setIsFilterOpen(open => !open),
+              },
+              addFilterButtonRef: addFilterBtnRef,
+            })}
       />
 
       {/* Filtering by organisation shows what that customer can actually retrieve — its own
@@ -395,6 +425,16 @@ export const CorpusTab: React.FC = () => {
                 onClick: doc => void handleRetry(doc),
               },
               {
+                key: "reindex",
+                label: en.whatsappBot.corpus.reindex,
+                icon: <Refresh size={18} />,
+                // For an indexed document whose passages should be rebuilt — after a chunking
+                // change, say. Not offered mid-flight, on a failure (Retry covers it) or when
+                // archived (its vectors are gone until it is unarchived).
+                hidden: doc => doc.status !== KbDocumentStatus.INDEXED || doc.isArchived,
+                onClick: doc => void handleReindex(doc),
+              },
+              {
                 key: "unarchive",
                 label: en.whatsappBot.corpus.unarchive,
                 icon: <Unarchive size={18} />,
@@ -422,6 +462,7 @@ export const CorpusTab: React.FC = () => {
       <CorpusDocumentPanel
         isOpen={isPanelOpen}
         document={editing}
+        scopeTenantId={scopeTenantId}
         onClose={() => {
           setIsPanelOpen(false);
           setEditing(null);

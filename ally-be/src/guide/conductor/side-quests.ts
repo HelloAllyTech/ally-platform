@@ -153,7 +153,7 @@ export function planSideQuest(input: {
 }
 
 /**
- * Hidden difficulty (plan §4.6, Stacks: Adaptive Difficulty — when to hide
+ * Hidden difficulty (plan §4.6, Adaptive Difficulty — when to hide
  * system adjustments): side quests only, never graded items. Asking for
  * more challenge always stretches.
  */

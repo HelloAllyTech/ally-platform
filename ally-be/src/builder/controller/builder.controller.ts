@@ -1,6 +1,8 @@
 import {
   Body,
   Controller,
+  Delete,
+  ForbiddenException,
   Get,
   NotFoundException,
   Param,
@@ -9,7 +11,9 @@ import {
   Post,
   Query,
   Res,
+  UseInterceptors,
 } from '@nestjs/common';
+import { BuilderSessionVisibilityInterceptor } from '../interceptor/builder-session-visibility.interceptor';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -19,6 +23,7 @@ import {
 import { Response } from 'express';
 import { CurrentUser } from 'src/auth/decorators/user.decorator';
 import { TokenUser } from 'src/auth/type/auth.types';
+import { RequireBuilderOrPlanRead } from '../guard/builder-plan-read.guard';
 import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorator';
 import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
 import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
@@ -37,14 +42,16 @@ import {
   switchesForAutonomyLevel,
 } from '../util/builder-autonomy.util';
 import { BuilderSettingsService } from '../service/builder-settings.service';
+import { AUTO_RELEASE_HELD_PATHS_DEFAULT } from 'src/product-planning/constants/product-planning.constants';
+import { RoadmapRoleService } from 'src/product-planning/service/roadmap-role.service';
 import { BuilderNotificationService } from '../service/builder-notification.service';
-import { BuilderLessonCuratorService } from '../service/builder-lesson-curator.service';
 import { BuilderExemplarService } from '../service/builder-exemplar.service';
 import { BuilderMetricsService } from '../service/builder-metrics.service';
 import { BuilderEpicService } from '../service/builder-epic.service';
 import { BuilderResearchService } from '../service/builder-research.service';
 import { BuilderCatalogService } from '../service/builder-catalog.service';
 import { BuilderEvidenceLogService } from '../service/builder-evidence-log.service';
+import { BuilderDecisionService } from '../service/builder-decision.service';
 import { BuilderPrdVersionRepository } from '../repository/builder-prd.repository';
 import { BuilderBuildRunRepository } from '../repository/builder-build.repository';
 import {
@@ -57,9 +64,8 @@ import {
   StartBuilderBuildDto,
   UpdateBuilderSessionDto,
   UpdateBuilderSettingsDto,
-  ListBuilderLessonsQueryDto,
-  UpdateBuilderLessonDto,
   BuilderResearchDto,
+  AnswerBuilderDecisionDto,
 } from '../dto/builder.dto';
 import {
   BUILDER_EVENT_PAGE_SIZE,
@@ -69,6 +75,8 @@ import {
   BUILDER_PR_AUTOMATION_TIMEBOX_MS,
 } from '../constants/builder.constants';
 import { BUILDER_REPOS } from '../constants/builder-repos.constants';
+import { buildDecisionId } from '../type/builder-decision.type';
+import { BuilderSessionStatus } from '../enum/builder.enum';
 
 /**
  * Builder — the admin-facing half (JWT). The machine-facing pipeline that
@@ -81,6 +89,8 @@ import { BUILDER_REPOS } from '../constants/builder-repos.constants';
 @ApiTags('Builder')
 @ApiBearerAuth()
 @ApiSecurity('access-token')
+// PRIVATE sessions (unfiled plans) are their author's alone on every :sessionId route.
+@UseInterceptors(BuilderSessionVisibilityInterceptor)
 @Controller({ path: 'builder', version: '1' })
 export class BuilderController {
   private readonly logger = LoggerService.getInstance(BuilderController.name);
@@ -95,7 +105,6 @@ export class BuilderController {
     private readonly pullRequestService: BuilderPullRequestService,
     private readonly settingsService: BuilderSettingsService,
     private readonly notificationService: BuilderNotificationService,
-    private readonly curatorService: BuilderLessonCuratorService,
     private readonly exemplarService: BuilderExemplarService,
     private readonly metricsService: BuilderMetricsService,
     private readonly epicService: BuilderEpicService,
@@ -105,6 +114,8 @@ export class BuilderController {
     private readonly redisService: RedisService,
     private readonly catalogService: BuilderCatalogService,
     private readonly evidenceLog: BuilderEvidenceLogService,
+    private readonly decisionService: BuilderDecisionService,
+    private readonly roadmapRoles: RoadmapRoleService,
   ) {}
 
   @Post('sessions')
@@ -112,10 +123,18 @@ export class BuilderController {
     permissions: [PERMISSIONS.EDIT_BUILDER],
   })
   @ApiOperation({ summary: 'Start a Builder session (PRD interview)' })
-  createSession(
+  async createSession(
     @Body() dto: CreateBuilderSessionDto,
     @CurrentUser() user: TokenUser,
   ) {
+    // Retired once plans start on the roadmap (rev 5.2, P7): existing sessions
+    // carry on; new work starts as an idea on the roadmap.
+    const settings = await this.settingsService.get();
+    if (settings.builderDirectInterviewEnabled === false) {
+      throw new ForbiddenException(
+        'New builds now start on the Product Roadmap: file an idea there, and its plan comes here to build.',
+      );
+    }
     return this.sessionService.createSession(user.id, {
       title: dto.title,
       tenantId: user.tenantId ?? null,
@@ -150,7 +169,7 @@ export class BuilderController {
   }
 
   @Get('sessions/:sessionId')
-  @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
+  @RequireBuilderOrPlanRead({
     permissions: [PERMISSIONS.VIEW_BUILDER],
   })
   @ApiOperation({
@@ -187,7 +206,12 @@ export class BuilderController {
     @Param('sessionId', ParseUUIDPipe) sessionId: string,
     @CurrentUser() user: TokenUser,
   ) {
-    return this.sessionService.cancelSession(sessionId, user.id);
+    return this.decisionService.withSessionAnswer(
+      [buildDecisionId('budget', sessionId)],
+      { selectedOptionIds: ['stop'] },
+      user.id,
+      () => this.sessionService.cancelSession(sessionId, user.id),
+    );
   }
 
   @Post('sessions/:sessionId/pull-requests/:pullRequestId/resume-automation')
@@ -205,10 +229,16 @@ export class BuilderController {
     @Param('pullRequestId', ParseUUIDPipe) pullRequestId: string,
     @CurrentUser() user: TokenUser,
   ) {
-    return this.pullRequestService.resumeAutomation(
-      sessionId,
-      pullRequestId,
+    return this.decisionService.withSessionAnswer(
+      [buildDecisionId('pr_needs_human', sessionId, pullRequestId)],
+      { selectedOptionIds: ['resume'] },
       user.id,
+      () =>
+        this.pullRequestService.resumeAutomation(
+          sessionId,
+          pullRequestId,
+          user.id,
+        ),
     );
   }
 
@@ -229,10 +259,19 @@ export class BuilderController {
     @Param('pullRequestId', ParseUUIDPipe) pullRequestId: string,
     @CurrentUser() user: TokenUser,
   ) {
-    return this.pullRequestService.mergePullRequest(
-      sessionId,
-      pullRequestId,
+    return this.decisionService.withSessionAnswer(
+      [
+        buildDecisionId('pr_merge', sessionId, pullRequestId),
+        buildDecisionId('pr_needs_human', sessionId, pullRequestId),
+      ],
+      { selectedOptionIds: ['merge'] },
       user.id,
+      () =>
+        this.pullRequestService.mergePullRequest(
+          sessionId,
+          pullRequestId,
+          user.id,
+        ),
     );
   }
 
@@ -247,7 +286,12 @@ export class BuilderController {
     @Param('sessionId', ParseUUIDPipe) sessionId: string,
     @CurrentUser() user: TokenUser,
   ) {
-    return this.sessionService.archiveSession(sessionId, user.id);
+    return this.decisionService.withSessionAnswer(
+      [buildDecisionId('build_failed', sessionId)],
+      { selectedOptionIds: ['archive'] },
+      user.id,
+      () => this.sessionService.archiveSession(sessionId, user.id),
+    );
   }
 
   @Post('sessions/:sessionId/unarchive')
@@ -307,7 +351,7 @@ export class BuilderController {
   }
 
   @Get('sessions/:sessionId/prd/versions')
-  @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
+  @RequireBuilderOrPlanRead({
     permissions: [PERMISSIONS.VIEW_BUILDER],
   })
   @ApiOperation({ summary: 'PRD version history, newest first' })
@@ -402,7 +446,13 @@ export class BuilderController {
     @CurrentUser() user: TokenUser,
   ) {
     const session = await this.sessionService.getSession(sessionId);
-    return this.buildService.startBuild(session, user.id, dto);
+    const failed = session.status === BuilderSessionStatus.FAILED;
+    return this.decisionService.withSessionAnswer(
+      [buildDecisionId(failed ? 'build_failed' : 'start_build', sessionId)],
+      { selectedOptionIds: [failed ? 'retry' : 'start'] },
+      user.id,
+      () => this.buildService.startBuild(session, user.id, dto),
+    );
   }
 
   /**
@@ -437,7 +487,12 @@ export class BuilderController {
     @CurrentUser() user: TokenUser,
   ) {
     const session = await this.sessionService.getSession(sessionId);
-    return this.buildService.approveDesign(session, user.id);
+    return this.decisionService.withSessionAnswer(
+      [buildDecisionId('design_review', sessionId)],
+      { selectedOptionIds: ['approve'] },
+      user.id,
+      () => this.buildService.approveDesign(session, user.id),
+    );
   }
 
   /**
@@ -458,7 +513,12 @@ export class BuilderController {
     @CurrentUser() user: TokenUser,
   ) {
     const session = await this.sessionService.getSession(sessionId);
-    return this.buildService.raiseBudget(session, user.id, dto.budgetUsd);
+    return this.decisionService.withSessionAnswer(
+      [buildDecisionId('budget', sessionId)],
+      { customText: `Raise the ceiling to $${dto.budgetUsd}` },
+      user.id,
+      () => this.buildService.raiseBudget(session, user.id, dto.budgetUsd),
+    );
   }
 
   /**
@@ -476,7 +536,7 @@ export class BuilderController {
   }
 
   @Get('sessions/:sessionId/runs')
-  @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
+  @RequireBuilderOrPlanRead({
     permissions: [PERMISSIONS.VIEW_BUILDER],
   })
   @ApiOperation({ summary: 'Build runs for a session, oldest first' })
@@ -486,7 +546,7 @@ export class BuilderController {
   }
 
   @Get('runs/:runId/events')
-  @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
+  @RequireBuilderOrPlanRead({
     permissions: [PERMISSIONS.VIEW_BUILDER],
   })
   @ApiOperation({
@@ -607,46 +667,6 @@ export class BuilderController {
     return this.buildService.startBuild(session, user.id, dto);
   }
 
-  /* ── The lesson library ─────────────────────────────────────────────── */
-
-  @Get('lessons')
-  @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
-    permissions: [PERMISSIONS.VIEW_BUILDER],
-  })
-  @ApiOperation({
-    summary: 'The lesson library, with its curation state and counters',
-  })
-  listLessons(@Query() query: ListBuilderLessonsQueryDto) {
-    return this.knowledgeService.listLessons(query);
-  }
-
-  @Patch('lessons/:lessonId')
-  @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
-    permissions: [PERMISSIONS.EDIT_BUILDER],
-  })
-  @ApiOperation({
-    summary:
-      'Edit, retire or pin a lesson. A pinned lesson the curator may not touch.',
-  })
-  updateLesson(
-    @Param('lessonId', ParseUUIDPipe) lessonId: string,
-    @Body() dto: UpdateBuilderLessonDto,
-    @CurrentUser() user: TokenUser,
-  ) {
-    return this.knowledgeService.updateLesson(lessonId, dto, user.id);
-  }
-
-  @Post('lessons/consolidate')
-  @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
-    permissions: [PERMISSIONS.EDIT_BUILDER],
-  })
-  @ApiOperation({
-    summary: 'Run the consolidation pass now rather than waiting for the tick',
-  })
-  consolidateLessons() {
-    return this.curatorService.consolidate(true);
-  }
-
   @Get('scoreboard')
   @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
     permissions: [PERMISSIONS.VIEW_BUILDER],
@@ -693,12 +713,17 @@ export class BuilderController {
     const trackRecord = await this.pullRequestService.trackRecord();
     // The next level is suggested only once it has been earned: a full window
     // of clean reviews that people then merged exactly as reviewed, with no
-    // release that failed its health check (Stacks, "Progressive Delegation").
+    // release that failed its health check ("Progressive Delegation").
     const earned =
       trackRecord.mergedAsReviewed >= trackRecord.window &&
       trackRecord.unhealthyReleases === 0;
     return {
       ...settings,
+      // Null on the row means the defaults in code; the settings screen shows
+      // the list that applies, not the storage detail.
+      autoReleaseHeldPaths: settings.autoReleaseHeldPaths ?? [
+        ...AUTO_RELEASE_HELD_PATHS_DEFAULT,
+      ],
       autonomyLevel,
       trackRecord,
       suggestedLevel: earned ? nextAutonomyLevel(autonomyLevel) : null,
@@ -711,15 +736,30 @@ export class BuilderController {
     permissions: [PERMISSIONS.EDIT_BUILDER],
   })
   @ApiOperation({ summary: 'Update Builder settings' })
-  updateSettings(
+  async updateSettings(
     @Body() dto: UpdateBuilderSettingsDto,
     @CurrentUser() user: TokenUser,
   ) {
-    return this.settingsService.update(
+    // The roadmap_v2 flag moves every Roadmap and Builder user at once (D8),
+    // so it is the Owner's switch (plans/roadmap-builder-merge §3.1:
+    // configure is Owner-only), not every Builder's. The other settings keep
+    // their Builder gate.
+    if (
+      dto.roadmapV2Enabled !== undefined &&
+      (await this.roadmapRoles.roleOf(user.id)) !== 'owner'
+    ) {
+      throw new ForbiddenException(
+        'Only a Roadmap Owner (Product Roadmap — Manage) can switch Roadmap v2 on or off.',
+      );
+    }
+    const saved = await this.settingsService.update(
       {
         ...(dto.enabled !== undefined ? { enabled: dto.enabled } : {}),
         ...(dto.maxConcurrentBuilds !== undefined
           ? { maxConcurrentBuilds: dto.maxConcurrentBuilds }
+          : {}),
+        ...(dto.inProgressLimit !== undefined
+          ? { inProgressLimit: dto.inProgressLimit }
           : {}),
         ...(dto.defaultBudgetUsd !== undefined
           ? { defaultBudgetUsd: String(dto.defaultBudgetUsd) }
@@ -767,6 +807,38 @@ export class BuilderController {
                 : null,
             }
           : {}),
+        ...(dto.planningEnabled !== undefined
+          ? { planningEnabled: dto.planningEnabled }
+          : {}),
+        ...(dto.planCeilingUsd !== undefined
+          ? { planCeilingUsd: String(dto.planCeilingUsd) }
+          : {}),
+        ...(dto.planIdeaCeilingUsd !== undefined
+          ? { planIdeaCeilingUsd: String(dto.planIdeaCeilingUsd) }
+          : {}),
+        ...(dto.planCloseConfirmVotes !== undefined
+          ? { planCloseConfirmVotes: dto.planCloseConfirmVotes }
+          : {}),
+        ...(dto.builderDirectInterviewEnabled !== undefined
+          ? {
+              builderDirectInterviewEnabled: dto.builderDirectInterviewEnabled,
+            }
+          : {}),
+        ...(dto.roadmapV2Enabled !== undefined
+          ? { roadmapV2Enabled: dto.roadmapV2Enabled }
+          : {}),
+        ...(dto.maxLeadCeilingUsd !== undefined
+          ? { maxLeadCeilingUsd: String(dto.maxLeadCeilingUsd) }
+          : {}),
+        ...(dto.awaitingReviewAmberDays !== undefined
+          ? { awaitingReviewAmberDays: dto.awaitingReviewAmberDays }
+          : {}),
+        ...(dto.releaseWindow !== undefined
+          ? { releaseWindow: dto.releaseWindow ?? null }
+          : {}),
+        ...(dto.autoReleaseHeldPaths !== undefined
+          ? { autoReleaseHeldPaths: dto.autoReleaseHeldPaths ?? null }
+          : {}),
         // The level sets the switches, and wins over any given alongside it.
         ...(dto.autonomyLevel
           ? switchesForAutonomyLevel(dto.autonomyLevel)
@@ -774,6 +846,19 @@ export class BuilderController {
       },
       user.id,
     );
+    // Switching Roadmap off is the rollback (Roadmap v2 P6): say plainly that nothing made
+    // on the Roadmap, nor anything the cutover copied, was deleted. Deletion is P7.
+    if (dto.roadmapV2Enabled === false) {
+      return {
+        ...saved,
+        roadmapV2Off: {
+          dataKept: true,
+          message:
+            'Roadmap is off. Product Roadmap and Builder are back as they were, and everything made on the Roadmap is kept for when it is switched on again.',
+        },
+      };
+    }
+    return saved;
   }
 
   @Get('notifications')
@@ -810,6 +895,64 @@ export class BuilderController {
   async markAllNotificationsRead(@CurrentUser() user: TokenUser) {
     await this.notificationService.markAllRead(user.id);
     return { ok: true };
+  }
+
+  /**
+   * The decision feed: everything Builder is waiting on a person for, across
+   * every session, as answerable cards. See builder-decision.type.ts.
+   */
+  @Get('decisions')
+  @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
+    permissions: [PERMISSIONS.VIEW_BUILDER],
+  })
+  @ApiOperation({
+    summary: 'Every pending decision across Builder sessions, oldest first',
+  })
+  async listDecisions() {
+    const decisions = await this.decisionService.listPending();
+    return { decisions, count: decisions.length };
+  }
+
+  /**
+   * EDIT_BUILDER, like every action this routes to: an answer can start a
+   * build, approve a design, raise spend or merge a pull request.
+   */
+  @Post('decisions/:decisionId/answer')
+  @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
+    permissions: [PERMISSIONS.EDIT_BUILDER],
+  })
+  @ApiOperation({
+    summary:
+      'Answer one decision — routed to the same action the session page would take',
+  })
+  answerDecision(
+    @Param('decisionId') decisionId: string,
+    @Body() dto: AnswerBuilderDecisionDto,
+    @CurrentUser() user: TokenUser,
+  ) {
+    return this.decisionService.answer(decisionId, dto, user.id, {
+      surface: 'now',
+      client: dto.client ?? null,
+      msToDecide: dto.msToDecide ?? null,
+    });
+  }
+
+  /**
+   * Take back a reversible answer inside its undo window. One-way answers
+   * (a merge) are never held, so there is nothing to take back.
+   */
+  @Delete('decisions/:decisionId/answer')
+  @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
+    permissions: [PERMISSIONS.EDIT_BUILDER],
+  })
+  @ApiOperation({
+    summary: 'Undo an answer inside its undo window',
+  })
+  undoDecision(
+    @Param('decisionId') decisionId: string,
+    @CurrentUser() user: TokenUser,
+  ) {
+    return this.decisionService.undo(decisionId, user.id);
   }
 
   @Post('sessions/:sessionId/messages/stream')
@@ -865,6 +1008,27 @@ export class BuilderController {
       return;
     }
 
+    // An answer to a pending question or brief, typed on the session page,
+    // goes to History like one answered from Now. Snapshotted before the turn
+    // runs: once it starts, the question is no longer pending.
+    if (dto.questionId || dto.briefResponse?.briefId) {
+      await this.decisionService.withSessionAnswer(
+        [
+          dto.questionId
+            ? buildDecisionId('question', sessionId, dto.questionId)
+            : buildDecisionId('brief', sessionId, dto.briefResponse!.briefId),
+        ],
+        {
+          selectedOptionIds: dto.answer?.selectedOptionIds ?? [],
+          customText:
+            dto.answer?.customValues?.join('\n') || dto.message || null,
+          none: dto.answer?.none,
+        },
+        user.id,
+        async () => undefined,
+      );
+    }
+
     // Keep-alive: a turn that spends 40s researching the codebase emits
     // nothing, which trips proxy idle timeouts. Clients ignore these.
     const heartbeat = setInterval(
@@ -908,6 +1072,8 @@ export class BuilderController {
           }`,
         );
       }
+      // After the lock: a requester answering starts the next turn.
+      void this.sessionService.turnEnded(sessionId);
       if (!res.writableEnded) {
         res.end();
       }

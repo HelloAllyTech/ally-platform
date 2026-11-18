@@ -173,7 +173,7 @@ const TransferSlope = ({
 
 /** A small labelled count beside the slope: how the difficulty tag moved across the pairs. */
 const Count = ({ label, value }: { label: string; value: string | number }) => (
-  <div className="flex items-baseline justify-between gap-4 border-t border-[#f0f0f0] py-1 text-xs">
+  <div className="flex items-baseline justify-between gap-4 border-t border-gray-100 py-1 text-xs">
     <span className="text-typography-500">{label}</span>
     <span className="tabular-nums text-typography-900">{value}</span>
   </div>
@@ -224,7 +224,7 @@ const ConvergenceMatrix = ({ data }: { data: MeasurementConvergenceResponse }) =
                   return (
                     <td
                       key={key}
-                      className="rounded-sm bg-[#f4f4f4] px-2 py-1 text-center tabular-nums"
+                      className="rounded-sm bg-background-secondary px-2 py-1 text-center tabular-nums"
                     >
                       {p.r === null ? (
                         <span className="text-typography-500">n = {p.n}</span>
@@ -304,7 +304,7 @@ const JudgeAgreementTable = ({ data }: { data: JudgeAgreementResponse }) => {
         </thead>
         <tbody>
           {rows.map(r => (
-            <tr key={r.key} className="border-t border-[#f0f0f0]">
+            <tr key={r.key} className="border-t border-gray-100">
               <th scope="row" className="py-1 pr-3 text-left font-normal">
                 <span className="block text-typography-900">{r.label}</span>
                 <span className="block text-xs text-typography-500">{r.sublabel}</span>

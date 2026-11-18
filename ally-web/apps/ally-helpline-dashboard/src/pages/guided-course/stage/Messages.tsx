@@ -87,7 +87,7 @@ const Thumb: FC<{ down?: boolean }> = ({ down }) => (
 
 /**
  * Was this helpful? Thumbs on Ally's messages, an explicit signal the team
- * reviews (Stacks: "Collect User Feedback to Evaluate Agent Performance").
+ * reviews ("Collect User Feedback to Evaluate Agent Performance").
  * Quiet: shown on the latest message, on hover or focus for the others. A
  * thumbs-down offers one optional line on what missed.
  */

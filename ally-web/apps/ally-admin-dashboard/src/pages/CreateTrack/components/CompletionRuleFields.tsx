@@ -1,12 +1,12 @@
 import { FC } from "react";
 
-import { Controller, useFormContext } from "react-hook-form";
+import { Controller, useFormContext, useWatch } from "react-hook-form";
 
 import { Tooltip } from "@ally-ui-mono/ui-shared";
 import { TooltipIcon } from "@assets";
 import { ToggleSwitch } from "@components";
 import { DEFAULT_VIDEO_WATCH_PCT, MAX_VIDEO_WATCH_PCT, MIN_VIDEO_WATCH_PCT } from "@constants";
-import { TrackFormValues, TrackItemType } from "@types";
+import { RoleplayCompletionLogic, TrackFormValues, TrackItemType } from "@types";
 
 interface CompletionRuleFieldsProps {
   sectionIndex: number;
@@ -18,6 +18,194 @@ interface CompletionRuleFieldsProps {
 const fieldLabel = "text-xs font-medium text-typography-700";
 const numberInput =
   "w-24 border border-border-light rounded-md px-2 py-1 text-sm outline-none focus:border-primary-400 disabled:opacity-60";
+
+export const ROLEPLAY_COMPLETION_LOGIC_OPTIONS: Array<{
+  value: RoleplayCompletionLogic;
+  label: string;
+  hint: string;
+}> = [
+  {
+    value: "SCORE",
+    label: "Minimum score",
+    hint: "Any length of roleplay counts once the learner reaches the score.",
+  },
+  {
+    value: "DURATION",
+    label: "Minimum duration",
+    hint: "Any score counts once the roleplay lasts long enough.",
+  },
+  {
+    value: "SCORE_AND_DURATION",
+    label: "Minimum score AND duration",
+    hint: "The learner needs both the score and the time.",
+  },
+  {
+    value: "PARTICIPATION",
+    label: "Participation only",
+    hint: "Complete as soon as the learner starts the roleplay. Good for a trial or warm-up.",
+  },
+];
+
+const DEFAULT_LOGIC: RoleplayCompletionLogic = "SCORE_AND_DURATION";
+
+/** Splits a total in seconds into the minutes and seconds the fields show. */
+export const splitDuration = (
+  total: number | undefined,
+): { minutes: number | undefined; seconds: number | undefined } => {
+  if (total == null) return { minutes: undefined, seconds: undefined };
+  return { minutes: Math.floor(total / 60), seconds: total % 60 };
+};
+
+/**
+ * Combines the two fields into total seconds, which is what the server
+ * stores. Both blank means "use the platform default" (undefined); one blank
+ * reads as 0.
+ */
+export const combineDuration = (
+  minutes: number | undefined,
+  seconds: number | undefined,
+): number | undefined => {
+  if (minutes == null && seconds == null) return undefined;
+  return Math.max(0, Math.floor(minutes ?? 0)) * 60 + Math.max(0, Math.floor(seconds ?? 0));
+};
+
+interface RoleplayGateFieldsProps {
+  base: `sections.${number}.items.${number}.completionCriteria`;
+  disabled: boolean;
+  toNumber: (raw: string) => number | undefined;
+}
+
+/**
+ * The roleplay's completion requirement: a dropdown choosing which gates
+ * apply, then only the inputs that choice reads.
+ */
+const RoleplayGateFields: FC<RoleplayGateFieldsProps> = ({ base, disabled, toNumber }) => {
+  const { control } = useFormContext<TrackFormValues>();
+  const logic =
+    (useWatch({ control, name: `${base}.completionLogic` }) as
+      | RoleplayCompletionLogic
+      | undefined) ?? DEFAULT_LOGIC;
+  const showScore = logic === "SCORE" || logic === "SCORE_AND_DURATION";
+  const showDuration = logic === "DURATION" || logic === "SCORE_AND_DURATION";
+  const selectId = `${base}.completionLogic`;
+  const hint = ROLEPLAY_COMPLETION_LOGIC_OPTIONS.find(option => option.value === logic)?.hint;
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <span className="inline-flex items-center gap-1">
+          <label htmlFor={selectId} className={fieldLabel}>
+            Completion requirement
+          </label>
+          <Tooltip
+            label="What a learner's roleplay attempt must reach before this item counts as complete and the next one unlocks. Attempts that miss it can be retried, and the learner is told which part they missed. You can change this after learners have enrolled: it applies from their next attempt and never undoes an item they have already completed."
+            align="top"
+          >
+            <button type="button" className="cursor-pointer inline-flex items-center">
+              <TooltipIcon />
+            </button>
+          </Tooltip>
+        </span>
+        <Controller
+          control={control}
+          name={`${base}.completionLogic`}
+          render={({ field }) => (
+            <select
+              id={selectId}
+              disabled={disabled}
+              className="w-72 border border-border-light rounded-md px-2 py-1.5 text-sm outline-none focus:border-primary-400 disabled:opacity-60"
+              value={field.value ?? DEFAULT_LOGIC}
+              onChange={event => field.onChange(event.target.value as RoleplayCompletionLogic)}
+            >
+              {ROLEPLAY_COMPLETION_LOGIC_OPTIONS.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          )}
+        />
+        {hint && <span className="text-xs text-typography-500">{hint}</span>}
+      </div>
+
+      {showScore && (
+        <div className="flex flex-col gap-1">
+          <label htmlFor={`${base}.minScore`} className={fieldLabel}>
+            Minimum score (0 or above, optional)
+          </label>
+          <Controller
+            control={control}
+            name={`${base}.minScore`}
+            render={({ field }) => (
+              <input
+                id={`${base}.minScore`}
+                type="number"
+                min={0}
+                disabled={disabled}
+                className={numberInput}
+                value={field.value ?? ""}
+                onChange={event => field.onChange(toNumber(event.target.value))}
+                onWheel={event => event.currentTarget.blur()}
+              />
+            )}
+          />
+          <span className="text-xs text-typography-500">
+            Learner must reach this score to complete this roleplay. Leave blank to let any attempt
+            unlock the next item, regardless of score.
+          </span>
+        </div>
+      )}
+
+      {showDuration && (
+        <Controller
+          control={control}
+          name={`${base}.minDurationSeconds`}
+          render={({ field }) => {
+            const { minutes, seconds } = splitDuration(field.value);
+            return (
+              <fieldset className="flex flex-col gap-1" disabled={disabled}>
+                <legend className={fieldLabel}>Minimum duration</legend>
+                <div className="flex items-center gap-2 mt-1">
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    aria-label="Minimum duration minutes"
+                    className={numberInput}
+                    value={minutes ?? ""}
+                    onChange={event =>
+                      field.onChange(combineDuration(toNumber(event.target.value), seconds))
+                    }
+                    onWheel={event => event.currentTarget.blur()}
+                  />
+                  <span className="text-xs text-typography-700">min</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={59}
+                    step={1}
+                    aria-label="Minimum duration seconds"
+                    className={numberInput}
+                    value={seconds ?? ""}
+                    onChange={event =>
+                      field.onChange(combineDuration(minutes, toNumber(event.target.value)))
+                    }
+                    onWheel={event => event.currentTarget.blur()}
+                  />
+                  <span className="text-xs text-typography-700">sec</span>
+                </div>
+                <span className="text-xs text-typography-500">
+                  How long the roleplay must last. Leave both blank to use the platform default (3
+                  minutes); enter 0 for no minimum.
+                </span>
+              </fieldset>
+            );
+          }}
+        />
+      )}
+    </div>
+  );
+};
 
 /**
  * Per-item completion criteria editor. Renders only the fields the given item
@@ -58,28 +246,7 @@ export const CompletionRuleFields: FC<CompletionRuleFieldsProps> = ({
       <p className="text-sm font-semibold text-typography-900 mb-3">Completion rule</p>
 
       {type === TrackItemType.ROLEPLAY && (
-        <div className="flex flex-col gap-1">
-          <label className={fieldLabel}>Minimum score (0 or above, optional)</label>
-          <Controller
-            control={control}
-            name={`${base}.minScore`}
-            render={({ field }) => (
-              <input
-                type="number"
-                min={0}
-                disabled={disabled}
-                className={numberInput}
-                value={field.value ?? ""}
-                onChange={event => field.onChange(toNumberOrUndefined(event.target.value))}
-                onWheel={event => event.currentTarget.blur()}
-              />
-            )}
-          />
-          <span className="text-xs text-typography-500">
-            Learner must reach this score to complete this roleplay. Leave blank to let any attempt
-            unlock the next item, regardless of score.
-          </span>
-        </div>
+        <RoleplayGateFields base={base} disabled={disabled} toNumber={toNumberOrUndefined} />
       )}
 
       {type === TrackItemType.ROLEPLAY && (

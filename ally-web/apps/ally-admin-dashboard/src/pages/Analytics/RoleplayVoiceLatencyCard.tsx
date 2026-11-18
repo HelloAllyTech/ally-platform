@@ -1,9 +1,8 @@
 import { useMemo, useState } from "react";
 
-import { LineChart } from "@carbon/charts-react";
-
 import { Tooltip } from "@ally-ui-mono/ui-shared";
 import { useGetVoiceLatencyQuery } from "@api";
+import { LineChart } from "@components/charts";
 
 import { asOf, windowLabel } from "./analyticsFilters";
 import { GROUPINGS, bucketTitle, grainAsBucket, groupingNote } from "./analyticsGrouping";

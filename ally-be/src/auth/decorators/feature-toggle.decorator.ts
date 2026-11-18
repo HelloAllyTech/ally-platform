@@ -23,6 +23,25 @@ export interface FeatureToggleOptions {
    * decides read vs. write.
    */
   tenantPreference?: PreferenceName;
+  /**
+   * Own-org escape hatch: a caller holding this permission passes without a
+   * toggle row, for a surface that acts on the caller's own organization
+   * only. Pair it with `operator: 'OR'` so PermissionsGuard admits the
+   * holder, and with a scope check in the handler — this never widens WHICH
+   * organization the caller may touch, only who may reach the route. Unlike
+   * `tenantPreference` the org-level gate is the service's own (branding:
+   * the org's switch), so the refusal can name the fix.
+   */
+  orgAdminPermission?: string;
+  /**
+   * A second toggle that also opens the route, for a caller who lacks the
+   * first. Used on Builder's `:sessionId` routes so a Product Planning Lead can
+   * work a plan's PRD, design and build without the Builder toggle. The guard
+   * marks such a caller (`request.viaAlternateToggle`) so the route's own
+   * scope check can confine them — BuilderSessionVisibilityInterceptor lets
+   * them reach plan sessions only.
+   */
+  alsoAllowedBy?: FeatureToggleKey;
 }
 
 /**
@@ -45,16 +64,22 @@ export function RequireFeatureToggle(
   featureKey: FeatureToggleKey,
   options: {
     permissions?: string[];
+    /** How `permissions` combine; AND unless a route says otherwise. */
+    operator?: 'AND' | 'OR';
     tenantPreference?: PreferenceName;
+    orgAdminPermission?: string;
+    alsoAllowedBy?: FeatureToggleKey;
   } = {},
 ) {
   const permissions = options.permissions ?? [PERMISSIONS.SYSTEM_ACCESS];
   return applyDecorators(
     UseGuards(AuthGuard('jwt'), PermissionsGuard, FeatureToggleGuard),
-    RequirePermissions(permissions, 'AND'),
+    RequirePermissions(permissions, options.operator ?? 'AND'),
     SetMetadata(FEATURE_TOGGLE_KEY, {
       featureKey,
       tenantPreference: options.tenantPreference,
+      orgAdminPermission: options.orgAdminPermission,
+      alsoAllowedBy: options.alsoAllowedBy,
     } as FeatureToggleOptions),
   );
 }

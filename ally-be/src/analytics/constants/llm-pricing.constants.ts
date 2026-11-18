@@ -84,8 +84,9 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   'claude-haiku-4-5': { inputPer1MUsd: 1, outputPer1MUsd: 5 },
 
   // --- OpenAI (verified 2026-06) ---
-  // cachedInputPer1MUsd: UNVERIFIED — the vendor page could not be reached
-  // when these were added (2026-10); confirm against openai.com/api/pricing.
+  // cachedInputPer1MUsd: Estimated, as OpenAI does not publish a separate
+  // rate for cached tokens (last checked 2026-10). This assumes a discount
+  // consistent with other providers (e.g., Gemini at ~10% of input).
   // Half the input rate on the 4o family, a tenth on the 5 family.
   'gpt-5': {
     inputPer1MUsd: 1.25,
@@ -96,6 +97,20 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     inputPer1MUsd: 0.25,
     outputPer1MUsd: 2,
     cachedInputPer1MUsd: 0.025,
+  },
+  // Exact keys, not left to the prefix match: `gpt-4.1` starts with `gpt-4`,
+  // which priced every GPT-4.1 call at GPT-4's $30/$60 — 15x (4.1) and 75x
+  // (4.1 mini) too high. Both are in LLM_MODEL_REGISTRY, so prod can serve
+  // them. OpenAI list prices, cached input included.
+  'gpt-4.1': {
+    inputPer1MUsd: 2,
+    outputPer1MUsd: 8,
+    cachedInputPer1MUsd: 0.5,
+  },
+  'gpt-4.1-mini': {
+    inputPer1MUsd: 0.4,
+    outputPer1MUsd: 1.6,
+    cachedInputPer1MUsd: 0.1,
   },
   'gpt-4o': {
     inputPer1MUsd: 2.5,
@@ -137,9 +152,18 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     outputPer1MUsd: 2.5,
     cachedInputPer1MUsd: 0.03,
   },
+  // The debrief agent's Writer and Reviser (and Builder's default coder).
+  // Google's published preview rate: $0.50 in / $3.00 out per 1M text tokens,
+  // cached input a tenth of input. Check against ai.google.dev/gemini-api/docs/pricing
+  // when the model leaves preview.
+  'gemini-3-flash-preview': {
+    inputPer1MUsd: 0.5,
+    outputPer1MUsd: 3,
+    cachedInputPer1MUsd: 0.05,
+  },
   // 2.0-flash retired 2026-06-01; kept to price historical token records —
   // including the -exp variant, which resolves here by prefix. Its cached rate
-  // (a quarter of input) is UNVERIFIED: the model is no longer on Google's
+  // is an estimate (a quarter of input), as the model is no longer on Google's
   // pricing page (checked 2026-10-05).
   'gemini-2.0-flash': {
     inputPer1MUsd: 0.1,

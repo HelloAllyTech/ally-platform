@@ -59,6 +59,7 @@ export const handleLogout = () => {
   // Clear tokens
   localStorage.removeItem(LOCAL_STORAGE_KEYS.ACCESS_TOKEN);
   localStorage.removeItem(LOCAL_STORAGE_KEYS.REFRESH_TOKEN);
+  localStorage.removeItem(LOCAL_STORAGE_KEYS.ORG_BRANDING);
 
   const params = new URLSearchParams();
   params.set("sessionExpired", "1");
@@ -242,6 +243,7 @@ export const baseAPI = createApi({
     TAG_TYPES.CALL_SUMMARY,
     TAG_TYPES.CALL_LOGS,
     TAG_TYPES.SIMULATION_LOGS,
+    TAG_TYPES.LEARNER_DEBRIEF,
     TAG_TYPES.SCENARIOS,
     TAG_TYPES.SIMULATION_CREDITS,
     TAG_TYPES.USER,
@@ -259,6 +261,7 @@ export const baseAPI = createApi({
     TAG_TYPES.LEARN_TRACK_NEXT,
     TAG_TYPES.CHARACTER_LIBRARY,
     TAG_TYPES.LEARNER_SCENARIO_ATTEMPTS,
+    TAG_TYPES.LEARNER_ENROLLMENTS,
     // Practice streak. Must be registered here as well as used in
     // providesTags/invalidatesTags — RTK Query silently ignores tags that are
     // not declared on the API, so an unregistered tag makes the invalidation

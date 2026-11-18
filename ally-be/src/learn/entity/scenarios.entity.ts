@@ -23,6 +23,23 @@ export class Scenarios extends BaseWithoutTenantEntity {
   @Column({ nullable: true })
   description?: string;
 
+  /** Public URL of the narration of `description`; null until generated, and
+   *  cleared when the description changes so a learner never hears stale text. */
+  @Column({ type: 'varchar', nullable: true })
+  descriptionAudioUrl?: string | null;
+
+  /** Hash of the voice + language + text the stored audio was made from. */
+  @Column({ type: 'varchar', nullable: true })
+  descriptionAudioHash?: string | null;
+
+  /** Failed generations since the description last changed. */
+  @Column({ type: 'int', default: 0 })
+  descriptionAudioAttempts?: number;
+
+  /** When the retry sweep may next try; null = nothing pending. */
+  @Column({ type: 'timestamptz', nullable: true })
+  descriptionAudioNextAttemptAt?: Date | null;
+
   @Column({ nullable: true })
   coverImageUrl?: string;
 

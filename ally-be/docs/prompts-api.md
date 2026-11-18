@@ -52,8 +52,11 @@ Revert — goes through `PromptVersioningService`:
   judge rubrics (results are labelled by a version pinned in code, so bump it
   in the same change), Builder's eval admin and judge (start a new baseline
   run), and guards such as Builder's PRD reviewer (have the change reviewed).
-  The list is `src/prompt/constants/pinned-prompts.constants.ts`. Putting an
-  earlier version live again needs `rollback: true`.
+  The list is `src/prompt/constants/pinned-prompts.constants.ts`. Only the
+  user ids in `SKILLS_STORE_PINNED_EDITORS` can confirm (`403
+  SKILLS_STORE_PINNED_LOCKED`; unset means nobody, and a caller with no
+  signed-in person is always refused). Putting an earlier version live again
+  needs `rollback: true`.
 - **Every version is kept.** Only a draft that was never live can be
   discarded. Sessions record each version's content hash, so the text that
   ran stays identifiable.

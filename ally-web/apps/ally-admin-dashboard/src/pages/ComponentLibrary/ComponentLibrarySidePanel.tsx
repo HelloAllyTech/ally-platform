@@ -57,6 +57,7 @@ export const ComponentLibrarySidePanel: FC<ComponentLibrarySidePanelProps> = ({
 }) => {
   const effectiveType = template?.type ?? type;
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [showDiscardConfirmation, setShowDiscardConfirmation] = useState(false);
 
   const defaultValues = useMemo<TrackFormValues>(() => {
     const item = template
@@ -88,11 +89,24 @@ export const ComponentLibrarySidePanel: FC<ComponentLibrarySidePanelProps> = ({
   }, []);
 
   const methods = useForm<TrackFormValues>({ defaultValues, mode: "onChange" });
-  const { getValues } = methods;
+  const {
+    getValues,
+    formState: { isDirty },
+  } = methods;
 
   const [createComponentTemplate, { isLoading: isCreating }] = useCreateComponentTemplateMutation();
   const [updateComponentTemplate, { isLoading: isUpdating }] = useUpdateComponentTemplateMutation();
   const isSaving = isCreating || isUpdating;
+
+  // A stray click on the backdrop (or Cancel / the header arrow) used to
+  // throw away everything authored so far. With edits in progress, ask first.
+  const requestClose = () => {
+    if (isDirty && !isSaving) {
+      setShowDiscardConfirmation(true);
+      return;
+    }
+    onClose();
+  };
 
   const handleSave = async () => {
     const values = getValues();
@@ -153,12 +167,12 @@ export const ComponentLibrarySidePanel: FC<ComponentLibrarySidePanelProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex">
-      <div className="flex-1 bg-black bg-opacity-50" onClick={onClose} />
+      <div className="flex-1 bg-black bg-opacity-50" onClick={requestClose} />
 
       <div className="w-full md:w-[50%] relative md:min-w-[600px] max-w-[800px] h-full bg-white shadow-xl flex flex-col">
         <div className="flex items-center justify-between p-4 md:p-6 border-b border-border-light">
           <button
-            onClick={onClose}
+            onClick={requestClose}
             type="button"
             className="flex flex-row items-center justify-center gap-2 text-typography-600 hover:text-neutral-800 max-md:min-h-10"
           >
@@ -195,7 +209,7 @@ export const ComponentLibrarySidePanel: FC<ComponentLibrarySidePanelProps> = ({
           </Button>
           <Button
             variant={ButtonVariant.SECONDARY}
-            onClick={onClose}
+            onClick={requestClose}
             className="min-w-[120px]"
             disabled={isSaving}
           >
@@ -203,6 +217,26 @@ export const ComponentLibrarySidePanel: FC<ComponentLibrarySidePanelProps> = ({
           </Button>
         </div>
       </div>
+
+      <ActionConfirmationPopup
+        isOpen={showDiscardConfirmation}
+        onClose={() => setShowDiscardConfirmation(false)}
+        title={en.componentLibrary.unsavedChanges}
+        description={en.componentLibrary.unsavedChangesDescription}
+        primaryButton={{
+          label: en.componentLibrary.closeAnyway,
+          onClick: () => {
+            setShowDiscardConfirmation(false);
+            onClose();
+          },
+          variant: ButtonVariant.DESTRUCTIVE,
+        }}
+        secondaryButton={{
+          label: en.componentLibrary.keepEditing,
+          onClick: () => setShowDiscardConfirmation(false),
+          variant: ButtonVariant.SECONDARY,
+        }}
+      />
 
       <ActionConfirmationPopup
         isOpen={showDeleteConfirmation}

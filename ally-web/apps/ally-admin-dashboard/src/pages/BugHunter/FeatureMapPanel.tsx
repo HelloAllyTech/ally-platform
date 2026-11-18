@@ -82,8 +82,9 @@ export interface FeatureMapPanelProps {
  * across repos, written by a weekly read-only run and read by every study
  * before it opens a file.
  *
- * Sits under the notebook because both are what Bug Hunter remembers: the
- * notebook holds lessons, this holds how the product is built. What an admin
+ * Sits under the link to Bug Hunter's notes because both are what Bug Hunter
+ * remembers: the notes (in the Context Library) hold lessons, this holds how
+ * the product is built. What an admin
  * reads here is what a fix session starts from, so a wrong card is worth
  * spotting here before it misleads a study.
  */

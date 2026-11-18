@@ -4,6 +4,7 @@ import {
   IsArray,
   IsBoolean,
   IsEnum,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsNumber,
@@ -17,6 +18,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { WaTemplateKind, WaTemplateMatchType } from '../enum/whatsapp.enum';
+import type { HistorySource } from '../type/whatsapp-settings.type';
 
 export class CreateWaTemplateDto {
   @ApiProperty({ enum: WaTemplateKind })
@@ -268,6 +270,48 @@ export class UpdateWaSettingsDto {
   @IsOptional()
   @IsBoolean()
   crisisClassifierEnabled?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Allow bots to use the Agents v2 engine. Off, every bot answers with v1.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  agentRuntimeAllowed?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Also write WhatsApp messages to the shared conversation store (chunk 12).',
+  })
+  @IsOptional()
+  @IsBoolean()
+  sharedStoreWrites?: boolean;
+
+  @ApiPropertyOptional({
+    enum: ['wa', 'shared'],
+    description:
+      'Where WhatsApp reads history from. `shared` needs sharedStoreWrites on.',
+  })
+  @IsOptional()
+  @IsIn(['wa', 'shared'])
+  readHistoryFrom?: HistorySource;
+
+  @ApiPropertyOptional({
+    description:
+      'Let bot pages be opened by anyone with the link (chunk 12b). Platform admins only; off until chunk 15a.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  botPagePublicAllowed?: boolean;
+
+  @ApiPropertyOptional({
+    enum: ['wa', 'shared'],
+    description:
+      'Where the dashboard reads conversations from. `shared` needs sharedStoreWrites on. Platform admins only.',
+  })
+  @IsOptional()
+  @IsIn(['wa', 'shared'])
+  dashboardReadsFrom?: HistorySource;
 }
 
 export class PreviewAskDto {

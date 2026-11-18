@@ -74,6 +74,13 @@ export class LeaderboardEntryDto {
   @ApiProperty({ description: 'Total minutes played in the time window' })
   minutesPlayed!: number;
 
+  @ApiProperty({
+    description:
+      'XP earned in the time window (sum of xp_events). This is the value rank is ordered by.',
+    example: 240,
+  })
+  xpScore!: number;
+
   @ApiProperty({ description: 'Badge count' })
   badgeCount!: number;
 

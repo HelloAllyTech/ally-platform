@@ -1,5 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 
 export class KnowledgeSourceDto {
   @ApiProperty({
@@ -40,4 +47,29 @@ export class KnowledgeSourceDto {
   @IsString()
   @IsOptional()
   unlocksFromStateId?: string | null;
+}
+
+/**
+ * A Stage Director memory. Same shape as a Knowledge Source, plus the states
+ * the author picked for it: the memory is available once the session has been
+ * in ANY of them. An empty list means available from the start. When the list
+ * is absent the older single `unlocksFromStateId` (that state or any later
+ * one) still applies.
+ */
+export class MemoryDto extends KnowledgeSourceDto {
+  @ApiProperty({
+    description:
+      'Ids of the scenario states at which the client may talk about this ' +
+      'memory. It becomes available once the session has been in any of ' +
+      'them and stays available. Empty means available from the start. Each ' +
+      'must name one of the scenario `states`.',
+    example: ['state-2', 'state-4'],
+    required: false,
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @IsString({ each: true })
+  unlocksInStateIds?: string[];
 }

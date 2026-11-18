@@ -176,6 +176,13 @@ export class MobileReleasesService {
    * `ally-mobile/` folder of the monorepo (GITHUB_MONOREPO): its workflows,
    * its version files and every release from then on are there. With no
    * monorepo configured, the app's own repo, as before.
+   *
+   * That folder held the React Native app until the 2026-11 Flutter rename —
+   * it now holds the Flutter app that took over the same store identity
+   * (`com.helloally.app`). RN itself was archived to `ally-mobile-rn-archive/`
+   * for a possible rollback, then deleted outright shortly after once that
+   * turned out not to be needed (see `ally-mobile/docs/RELEASE.md`'s
+   * Rollback section for what's left).
    */
   private get repo(): string {
     const monorepo = this.configService.githubMonorepo;
@@ -194,6 +201,12 @@ export class MobileReleasesService {
    * only for what happened before it — run history, and the version bumps
    * from before the first one in the monorepo — so the release page and the
    * What's New draft keep their past instead of starting empty on 10-23.
+   *
+   * This is the standalone pre-monorepo `HelloAllyTech/ally-mobile` GitHub
+   * repo (RN's own repo, archived read-only at the GitHub-org level before
+   * the 2026-10-23 monorepo cutover) — unrelated to, and unaffected by, the
+   * later 2026-11 Flutter rename that archived and then deleted RN's
+   * in-monorepo folder.
    */
   private get legacyRepo(): string {
     return this.configService.githubMobileRepo;
@@ -222,12 +235,12 @@ export class MobileReleasesService {
   }
 
   /**
-   * Recent runs of all three release workflows, merged into one array and
+   * Recent runs of all of MOBILE_WORKFLOW_FILES, merged into one array and
    * sorted by createdAt descending.
    *
    * Uses allSettled, not all: this is polled every 30s from the admin page,
    * and GitHub's REST API occasionally throws a transient secondary-rate-limit
-   * 403 on one of the three parallel per-workflow calls. With Promise.all,
+   * 403 on one of the parallel per-workflow calls. With Promise.all,
    * that one flaky call used to fail the whole merged list — which the
    * frontend's polling then rendered as a "Failed to load run history"
    * screen replacing an otherwise-healthy table every time it happened. A
@@ -341,10 +354,24 @@ export class MobileReleasesService {
   }
 
   /**
-   * Live version info from `master` — android/app/build.gradle's versionCode
-   * + versionName, and ios/ally.xcodeproj/project.pbxproj's first
-   * MARKETING_VERSION. Regex-extracted rather than parsed: both files are
-   * not valid JSON/YAML, and the pipeline only ever needs these few fields.
+   * Live version info from `master`. Both platforms' store-identity
+   * (`com.helloally.app`) builds come from `ally-mobile/pubspec.yaml`'s
+   * single `version:` field (its own comment: "Marketing version ... sits
+   * above every React Native release" — one field drives both
+   * `CFBundleShortVersionString` and `versionName`), so that's the
+   * marketing-version source for both `android.versionName` and
+   * `ios.marketingVersion` here.
+   *
+   * `android.versionCode` comes from the live Play internal track instead
+   * of a committed file: Flutter's real versionCode is computed per-build
+   * by CI (see build-android-production-flutter.yml), never committed to
+   * source the way RN's `build.gradle` used to provide one. The build
+   * workflow's own `releaseName` already encodes it
+   * (`'<versionCode> (<versionName>) Flutter'`), and the Play Developer API
+   * hands that back verbatim — see fetchAndroidInternalRelease().
+   *
+   * Regex-extracted rather than parsed: `pubspec.yaml` isn't a format this
+   * service otherwise needs a real YAML parser for just one field.
    *
    * Also includes `nextEligibleCheckAt`, a best-effort ETA for the next
    * scheduled-mobile-release.yml run that could actually ship a build. That
@@ -353,42 +380,32 @@ export class MobileReleasesService {
    */
   async getCurrentVersion(): Promise<MobileCurrentVersionResponseDto> {
     const headers = this.headers;
-
-    const [android, pbxproj, nextEligibleCheckAt] = await Promise.all([
-      this.fetchCurrentAndroidVersion(headers),
-      this.fetchFileContent('ios/ally.xcodeproj/project.pbxproj', headers),
-      this.computeNextEligibleCheckAt(headers),
-    ]);
-
-    const marketingVersionMatch = pbxproj.match(
-      /MARKETING_VERSION\s*=\s*([^;]+);/,
-    );
+    const [marketingVersion, androidInternalRelease, nextEligibleCheckAt] =
+      await Promise.all([
+        this.fetchCurrentMarketingVersion(headers),
+        this.fetchAndroidInternalRelease().catch(() => null),
+        this.computeNextEligibleCheckAt(headers),
+      ]);
 
     return {
-      android,
+      android: {
+        versionCode: androidInternalRelease?.versionCode ?? null,
+        versionName: marketingVersion,
+      },
       ios: {
-        marketingVersion: marketingVersionMatch
-          ? marketingVersionMatch[1].trim()
-          : null,
+        marketingVersion,
       },
       nextEligibleCheckAt,
     };
   }
 
-  /** Regex-extracted from master's android/app/build.gradle — shared by getCurrentVersion() and the Android auto-bump task below. */
-  private async fetchCurrentAndroidVersion(
+  /** Regex-extracted from master's ally-mobile/pubspec.yaml — the one marketing version that drives both platforms. */
+  private async fetchCurrentMarketingVersion(
     headers: Record<string, string>,
-  ): Promise<{ versionCode: number | null; versionName: string | null }> {
-    const gradle = await this.fetchFileContent(
-      'android/app/build.gradle',
-      headers,
-    );
-    const versionCodeMatch = gradle.match(/versionCode\s+(\d+)/);
-    const versionNameMatch = gradle.match(/versionName\s+"([^"]+)"/);
-    return {
-      versionCode: versionCodeMatch ? Number(versionCodeMatch[1]) : null,
-      versionName: versionNameMatch ? versionNameMatch[1] : null,
-    };
+  ): Promise<string | null> {
+    const pubspec = await this.fetchFileContent('pubspec.yaml', headers);
+    const versionMatch = pubspec.match(/^version:\s*(\d+\.\d+\.\d+)/m);
+    return versionMatch ? versionMatch[1] : null;
   }
 
   /**
@@ -558,15 +575,17 @@ export class MobileReleasesService {
   }
 
   /**
-   * The most recent release points, newest first: commits that changed
-   * android/app/build.gradle on master, i.e. version bumps (automated or,
-   * historically, manual).
+   * The most recent release points, newest first: commits that changed the
+   * app's marketing-version file on master, i.e. version bumps.
    *
-   * In the monorepo the file is `ally-mobile/android/app/build.gradle`, and
-   * its history there starts at the cutover — the first commits it shows are
-   * the import merges, which bumped nothing. So merge commits are skipped,
-   * and when the monorepo has fewer bumps than asked for, the rest come from
-   * the archived repo's history, where every release before 2026-10-23 is.
+   * In the monorepo that file is `ally-mobile/pubspec.yaml` (Flutter —
+   * scheduled-mobile-release.yml bumps it automatically now, same as it
+   * bumped RN's files before the rename), and its history there starts at
+   * the Flutter rename — the first commits it shows are the import/rename
+   * merges, which bumped nothing. So merge commits are skipped, and when
+   * the monorepo has fewer bumps than asked for, the rest come from the
+   * archived repo's history (RN's own `android/app/build.gradle` bumps),
+   * where every release before 2026-10-23 is.
    */
   private async fetchReleasePoints(
     headers: Record<string, string>,
@@ -575,7 +594,7 @@ export class MobileReleasesService {
     const points: { sha: string; repo: string; at: string | null }[] = [];
     const sources = this.hasLegacyHistory
       ? [
-          { repo: this.repo, path: `${this.folder}android/app/build.gradle` },
+          { repo: this.repo, path: `${this.folder}pubspec.yaml` },
           { repo: this.legacyRepo, path: 'android/app/build.gradle' },
         ]
       : [{ repo: this.repo, path: 'android/app/build.gradle' }];
@@ -609,9 +628,7 @@ export class MobileReleasesService {
       }
     }
     if (!points.length) {
-      throw new Error(
-        'No commits found for android/app/build.gradle on master',
-      );
+      throw new Error('No release-point commits found on master');
     }
     return points;
   }
@@ -1078,6 +1095,67 @@ export class MobileReleasesService {
     );
   }
 
+  /**
+   * AUTONOMOUS, REAL-PRODUCTION ACTION — Android's counterpart to
+   * autoBumpIosMinimumVersionIfLive() above, run on the same 30-minute
+   * schedule. Only safe to enable once Managed Publishing is OFF for this
+   * app in Play Console: with it on, a track's release `status` reflects
+   * what was last *committed*, not whether Google's review-then-manual-
+   * publish gate has actually let it through — confirmed by checking
+   * Google's own Play Developer API reference before building this, the
+   * same discipline as the iOS side. With Managed Publishing off, `status:
+   * 'completed'` on the production track is a trustworthy "this is really
+   * live" signal, the same role READY_FOR_DISTRIBUTION plays for iOS.
+   *
+   * Matches the production release to the *current* build by exact
+   * versionCode equality against the internal track's latest release
+   * (fetchAndroidInternalRelease() — see its own doc comment for why that's
+   * the Flutter-era source of truth instead of a committed file) —
+   * deliberately strict, not a "close enough" heuristic: if a newer build
+   * has already landed on internal since this production release went out,
+   * the match simply fails and this is a no-op until production catches up.
+   *
+   * A staged rollout (status 'inProgress' with userFraction < 1) is
+   * deliberately NOT treated as live — raising the minimum version while
+   * only a fraction of users can download the build would lock out
+   * everyone else, the exact failure mode this whole feature exists to
+   * prevent.
+   */
+  async autoBumpAndroidMinimumVersionIfLive(): Promise<void> {
+    if (!this.configService.androidMinVersionAutoBumpEnabled) {
+      this.logger.debug(
+        'Skipping Android min-version auto-bump — ANDROID_MIN_VERSION_AUTO_BUMP_ENABLED is not true.',
+      );
+      return;
+    }
+
+    const internalRelease = await this.fetchAndroidInternalRelease();
+    if (!internalRelease) return;
+    const { versionCode, versionName } = internalRelease;
+
+    const release = await this.fetchAndroidProductionRelease();
+    if (!release || release.status !== 'completed') return;
+    if (!release.versionCodes.includes(versionCode)) return;
+
+    const current =
+      await this.appVersionSettingsService.getAppVersionSettings('android');
+    if (current.minimumSupportedVersion === versionName) return;
+
+    await this.appVersionSettingsService.updateAppVersionSettings({
+      android: versionName,
+    });
+
+    this.logger.info(
+      `Auto-raised Android minimum supported version from ${current.minimumSupportedVersion} to ` +
+        `${versionName} — production track confirmed status: completed for versionCode ${versionCode}.`,
+    );
+    await this.slackService.sendMessage(
+      `Android minimum supported version auto-raised to ${versionName} — the production track ` +
+        `confirmed this build is fully live (not a staged rollout). Previous minimum was ` +
+        `${current.minimumSupportedVersion}. No human action taken; this ran on schedule.`,
+    );
+  }
+
   /** null if no appStoreVersions resource matches `versionString` yet (e.g. not created, or already replaced). */
   private async fetchAppStoreVersionState(
     appId: string,
@@ -1142,68 +1220,6 @@ export class MobileReleasesService {
   }
 
   /**
-   * AUTONOMOUS, REAL-PRODUCTION ACTION — Android's counterpart to
-   * autoBumpIosMinimumVersionIfLive() above, run on the same 30-minute
-   * schedule. Only safe to enable once Managed Publishing is OFF for this
-   * app in Play Console: with it on, a track's release `status` reflects
-   * what was last *committed*, not whether Google's review-then-manual-
-   * publish gate has actually let it through — confirmed by checking
-   * Google's own Play Developer API reference before building this, the
-   * same discipline as the iOS side. With Managed Publishing off, `status:
-   * 'completed'` on the production track is a trustworthy "this is really
-   * live" signal, the same role READY_FOR_DISTRIBUTION plays for iOS.
-   *
-   * Matches the production release to the *current* build by exact
-   * versionCode equality against what's committed on master right now —
-   * deliberately strict, not a "close enough" heuristic: if master has
-   * already moved on to a newer versionCode this promotion doesn't cover,
-   * the match simply fails and this is a no-op until the production track
-   * catches up, rather than bumping to a version the resolved versionCode
-   * doesn't actually correspond to.
-   *
-   * A staged rollout (status 'inProgress' with userFraction < 1) is
-   * deliberately NOT treated as live — raising the minimum version while
-   * only a fraction of users can download the build would lock out
-   * everyone else, the exact failure mode this whole feature exists to
-   * prevent.
-   */
-  async autoBumpAndroidMinimumVersionIfLive(): Promise<void> {
-    if (!this.configService.androidMinVersionAutoBumpEnabled) {
-      this.logger.debug(
-        'Skipping Android min-version auto-bump — ANDROID_MIN_VERSION_AUTO_BUMP_ENABLED is not true.',
-      );
-      return;
-    }
-
-    const headers = this.headers;
-    const { versionCode, versionName } =
-      await this.fetchCurrentAndroidVersion(headers);
-    if (!versionCode || !versionName) return;
-
-    const release = await this.fetchAndroidProductionRelease();
-    if (!release || release.status !== 'completed') return;
-    if (!release.versionCodes.includes(versionCode)) return;
-
-    const current =
-      await this.appVersionSettingsService.getAppVersionSettings('android');
-    if (current.minimumSupportedVersion === versionName) return;
-
-    await this.appVersionSettingsService.updateAppVersionSettings({
-      android: versionName,
-    });
-
-    this.logger.info(
-      `Auto-raised Android minimum supported version from ${current.minimumSupportedVersion} to ` +
-        `${versionName} — production track confirmed status: completed for versionCode ${versionCode}.`,
-    );
-    await this.slackService.sendMessage(
-      `Android minimum supported version auto-raised to ${versionName} — the production track ` +
-        `confirmed this build is fully live (not a staged rollout). Previous minimum was ` +
-        `${current.minimumSupportedVersion}. No human action taken; this ran on schedule.`,
-    );
-  }
-
-  /**
    * The production track's highest-versionCode release, or null if the track has none. Reads via
    * a throwaway edit (insert -> tracks.get -> delete) — never committed, so this can never
    * publish anything; the delete is just tidiness, not a correctness requirement, since an
@@ -1213,6 +1229,49 @@ export class MobileReleasesService {
     status: string;
     versionCodes: number[];
     userFraction: number | null;
+  } | null> {
+    return this.fetchHighestVersionCodeRelease('production');
+  }
+
+  /**
+   * The internal track's highest-versionCode release — i.e. the build
+   * `build-android-production-flutter.yml` just uploaded — with its
+   * `versionCode`/`versionName` recovered from the release's own `name`.
+   *
+   * There is no committed Android versionCode for Flutter to read instead
+   * (it's computed per-build by CI, see build-android-production-flutter.yml's
+   * "Compute versionCode" step) — but that workflow already uploads with
+   * `releaseName: '<versionCode> (<versionName>) Flutter'`, and the Play
+   * Developer API hands that `name` field back verbatim on `edits.tracks.get`.
+   * Parsing it back out is the one piece of this module with no RN
+   * precedent: sanity-check the parsed versionCode against Play Console
+   * after the first real automated build before trusting
+   * autoBumpAndroidMinimumVersionIfLive to act on it.
+   */
+  private async fetchAndroidInternalRelease(): Promise<{
+    versionCode: number;
+    versionName: string;
+  } | null> {
+    const release = await this.fetchHighestVersionCodeRelease('internal');
+    if (!release?.name) return null;
+    const match = release.name.match(/^(\d+)\s*\(([\d.]+)\)/);
+    if (!match) return null;
+    return { versionCode: Number(match[1]), versionName: match[2] };
+  }
+
+  /**
+   * The highest-versionCode release on a given track, or null if the track has none. Reads via
+   * a throwaway edit (insert -> tracks.get -> delete) — never committed, so this can never
+   * publish anything; the delete is just tidiness, not a correctness requirement, since an
+   * uncommitted edit Google doesn't hear from again expires on its own.
+   */
+  private async fetchHighestVersionCodeRelease(
+    track: 'production' | 'internal',
+  ): Promise<{
+    status: string;
+    versionCodes: number[];
+    userFraction: number | null;
+    name: string | null;
   } | null> {
     const serviceAccountJson = this.requireAndroidPublisherConfig();
     const androidpublisher = google.androidpublisher({
@@ -1231,13 +1290,13 @@ export class MobileReleasesService {
       editId = edit.id ?? undefined;
       if (!editId) return null;
 
-      const { data: track } = await androidpublisher.edits.tracks.get({
+      const { data: trackData } = await androidpublisher.edits.tracks.get({
         packageName: ANDROID_PACKAGE_NAME,
         editId,
-        track: 'production',
+        track,
       });
 
-      const releases = track.releases ?? [];
+      const releases = trackData.releases ?? [];
       const latest = releases
         .flatMap((release) =>
           (release.versionCodes ?? []).map((vc) => ({
@@ -1252,11 +1311,12 @@ export class MobileReleasesService {
         status: latest.release.status ?? '',
         versionCodes: (latest.release.versionCodes ?? []).map(Number),
         userFraction: latest.release.userFraction ?? null,
+        name: latest.release.name ?? null,
       };
     } catch (error) {
       throw this.toReadableError(
         error,
-        `Could not read the Android production track for ${ANDROID_PACKAGE_NAME}`,
+        `Could not read the Android ${track} track for ${ANDROID_PACKAGE_NAME}`,
       );
     } finally {
       if (editId) {
@@ -1520,10 +1580,11 @@ export class MobileReleasesService {
   private async fetchFileContent(
     path: string,
     headers: Record<string, string>,
+    folder: string = this.folder,
   ): Promise<string> {
     try {
       const { data } = await axios.get(
-        `${GITHUB_API}/repos/${this.repo}/contents/${this.folder}${path}`,
+        `${GITHUB_API}/repos/${this.repo}/contents/${folder}${path}`,
         { headers, params: { ref: 'master' }, timeout: 15_000 },
       );
       const content = data?.content;

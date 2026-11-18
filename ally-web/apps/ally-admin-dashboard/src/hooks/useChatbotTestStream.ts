@@ -1,0 +1,112 @@
+import { useCallback, useEffect, useRef } from "react";
+
+import { ApiEndpoints } from "@constants";
+import { AgentTraceStep, ChatbotTestStatus, TestChatbotRequest, TestChatbotResponse } from "@types";
+
+import { fetchWithReauth } from "./chatStream/fetchWithReauth";
+import { readSse } from "./chatStream/sse";
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
+/** What a streamed Preview reply sends before its `final`. */
+export interface ChatbotTestStreamHandlers {
+  onStatus(status: ChatbotTestStatus): void;
+  onStep(step: AgentTraceStep): void;
+  /** Reply text the check and the crisis check have both cleared. */
+  onToken(text: string): void;
+  /**
+   * A live step (chunk 6b): what the assistant is doing, as a kind with a list's name or a record's
+   * title. Optional, so callers that don't show steps are unchanged.
+   */
+  onActivity?(activity: { kind: string; list?: string; title?: string }): void;
+}
+
+/**
+ * The stream could not start (a network error, an error status, or it closed before its first
+ * event). Nothing ran that the person saw, so the caller asks `/test` instead.
+ */
+export class ChatbotTestStreamUnavailable extends Error {
+  constructor(readonly status?: number) {
+    super("The streamed test could not start");
+    this.name = "ChatbotTestStreamUnavailable";
+  }
+}
+
+type StreamEvent =
+  | { type: "run_started"; data: { run_id: string } }
+  | { type: "status"; data: ChatbotTestStatus }
+  | { type: "step"; data: AgentTraceStep }
+  | { type: "token"; data: { text: string } }
+  | { type: "activity"; data: { kind: string; list?: string; title?: string } }
+  | { type: "final"; data: TestChatbotResponse }
+  | { type: "error"; data: { code: string } };
+
+/**
+ * One Preview message over SSE (POST /v1/chatbots/:id/test/stream). `run` resolves with the same
+ * result `/test` returns — the stream's `final` — while the handlers see the agent work. It
+ * rejects with `ChatbotTestStreamUnavailable` when the stream never started, so the caller can
+ * fall back to `/test`; after the first event it never re-sends (that would run the bot twice).
+ *
+ * The request is aborted on unmount and by `cancel` (New thread), which stops the run.
+ */
+export const useChatbotTestStream = () => {
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => () => abortRef.current?.abort(), []);
+
+  const cancel = useCallback(() => abortRef.current?.abort(), []);
+
+  const run = useCallback(
+    async (
+      { id, ...body }: TestChatbotRequest,
+      handlers: ChatbotTestStreamHandlers,
+    ): Promise<TestChatbotResponse> => {
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      let response: Response;
+      try {
+        response = await fetchWithReauth(
+          `${API_BASE_URL}/api${ApiEndpoints.CHATBOTS.TEST_STREAM(id)}`,
+          body,
+          controller.signal,
+        );
+      } catch {
+        if (controller.signal.aborted) throw new Error("cancelled");
+        throw new ChatbotTestStreamUnavailable();
+      }
+      if (!response.ok || !response.body) {
+        throw new ChatbotTestStreamUnavailable(response.status);
+      }
+
+      let started = false;
+      let final: TestChatbotResponse | undefined;
+      try {
+        ({ started } = await readSse(response.body, raw => {
+          started = true;
+          const event = raw as StreamEvent;
+          if (event.type === "final") {
+            final = event.data;
+            return true;
+          }
+          if (event.type === "error") throw new Error(event.data.code);
+          if (event.type === "status") handlers.onStatus(event.data);
+          else if (event.type === "step") handlers.onStep(event.data);
+          else if (event.type === "token") handlers.onToken(event.data.text);
+          else if (event.type === "activity") handlers.onActivity?.(event.data);
+          return false;
+        }));
+      } catch (error) {
+        if (!started && !controller.signal.aborted) throw new ChatbotTestStreamUnavailable();
+        throw error;
+      }
+      if (final) return final;
+      if (!started) throw new ChatbotTestStreamUnavailable();
+      throw new Error("The test ended without a reply");
+    },
+    [],
+  );
+
+  return { run, cancel };
+};

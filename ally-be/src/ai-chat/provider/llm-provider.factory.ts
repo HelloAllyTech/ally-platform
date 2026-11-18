@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { LlmProvider } from '../interface/llm-provider.interface';
 import { OpenAiLlmProvider } from './openai-llm.provider';
 import { GeminiLlmProvider } from './gemini-llm.provider';
+import { AnthropicLlmProvider } from './anthropic-llm.provider';
 import { AppConfigService } from 'src/config/config.service';
 
 @Injectable()
@@ -12,10 +13,12 @@ export class LlmProviderFactory {
     private readonly configService: AppConfigService,
     private readonly openAiProvider: OpenAiLlmProvider,
     private readonly geminiProvider: GeminiLlmProvider,
+    private readonly anthropicProvider: AnthropicLlmProvider,
   ) {
     this.providers = new Map<string, LlmProvider>([
       ['openai', this.openAiProvider],
       ['gemini', this.geminiProvider],
+      ['anthropic', this.anthropicProvider],
     ]);
   }
 

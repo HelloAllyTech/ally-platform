@@ -5,7 +5,7 @@
  * Every criterion is a binary call with an "not applicable" escape, never a
  * 1–5 scale, and each carries a pass and a fail anchor: a scoring key that
  * different judges apply the same way is what makes κ meaningful
- * (Stacks: Scoring key reliability across multiple judges).
+ * (Scoring key reliability across multiple judges).
  */
 
 export type RubricVerdict = 'pass' | 'fail' | 'na';

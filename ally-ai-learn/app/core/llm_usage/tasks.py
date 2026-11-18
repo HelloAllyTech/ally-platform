@@ -16,6 +16,9 @@ class LLMTask(str, Enum):
     # actor's inner state. Same cadence as AGENT_TURN but off the reply path,
     # so it must be separable from turn cost when arguing the feature's worth.
     CLIENT_WORKING_MEMORY = "client_working_memory"
+    # Stage Director: the same detached call per learner turn for scenarios on
+    # Main Agent Prompt — Stage Director, writing one paragraph of thoughts.
+    STAGE_DIRECTOR = "stage_director"
     # Back-channel phrases: one call per session, at session start, generating
     # the listener affirmations played while the learner holds the floor. Kept
     # separate from AGENT_TURN because it is a per-simulation opt-in, so its

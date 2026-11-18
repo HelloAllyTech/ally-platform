@@ -16,6 +16,10 @@ const SEARCH_DEBOUNCE_MS = 300;
 
 interface CharacterPickerProps {
   onPick: (character: CharacterData) => void;
+  /** Overrides the toggle's label (default "Fill from Character Library"). */
+  openLabel?: string;
+  /** Overrides the hint beside the toggle. */
+  hint?: string;
 }
 
 /**
@@ -26,7 +30,7 @@ interface CharacterPickerProps {
  * cannot be read: the persona is perfectly writable by hand, so a broken picker must not get in
  * the way of it. The list is only requested once the author opens the picker.
  */
-export const CharacterPicker: FC<CharacterPickerProps> = ({ onPick }) => {
+export const CharacterPicker: FC<CharacterPickerProps> = ({ onPick, openLabel, hint }) => {
   const copy = en.courseLanding.hero.characterPicker;
   const { permissions } = useUser();
   const canView = hasPermissions(permissions, [Permissions.VIEW_CHARACTER_LIBRARY]);
@@ -61,9 +65,9 @@ export const CharacterPicker: FC<CharacterPickerProps> = ({ onPick }) => {
           onClick={() => setIsOpen(open => !open)}
           aria-expanded={isOpen}
         >
-          {isOpen ? copy.close : copy.open}
+          {isOpen ? copy.close : (openLabel ?? copy.open)}
         </Button>
-        <span className={hintClass}>{copy.hint}</span>
+        <span className={hintClass}>{hint ?? copy.hint}</span>
       </div>
 
       {isOpen && (

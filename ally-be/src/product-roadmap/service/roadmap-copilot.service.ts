@@ -44,6 +44,44 @@ export interface CopilotTurnInput {
   messages: { role: 'admin' | 'agent'; content: string }[];
   /** The brief from the previous turn, echoed back unchanged. */
   brief?: unknown;
+  /**
+   * Called once per model pass with its usage, awaited. The plan flow passes it to price each
+   * pass into the plan's spend ledger; the stateless endpoints leave it out. A failure inside it
+   * is swallowed: spend accounting must never fail the turn it is accounting for.
+   */
+  onUsage?: (usage: CopilotPassUsage) => Promise<void> | void;
+  /**
+   * Roadmap v2's Check my idea (the draft page, §4.13). When present, the same
+   * `submit_turn` also returns each met check's verbatim evidence and a goal
+   * suggestion (`checkTurn` on the result). Absent for every existing caller,
+   * whose request and answer stay exactly as they were.
+   */
+  checks?: {
+    /** Checks the author reopened with "Not quite": the copilot asks about them again. */
+    reopened?: string[];
+  };
+}
+
+/** What Check my idea adds to a turn (only when `CopilotTurnInput.checks` is set). */
+export interface CopilotCheckTurn {
+  /** Check id -> the verbatim words that met it; only met checks with a quote. */
+  evidence: Record<string, string>;
+  /** One of the live product goal names, or null. */
+  suggestedGoal: string | null;
+}
+
+/** A turn as the v2 draft page receives it: the usual turn plus the check evidence. */
+export type CopilotTurnResult = OpportunityInterviewTurnResponseDto & {
+  checkTurn?: CopilotCheckTurn;
+};
+
+export interface CopilotPassUsage {
+  provider: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  cachedTokens: number;
+  cacheCreationTokens: number;
 }
 
 /** What the stream carries. `turn` or `error` is always the last frame. */
@@ -53,19 +91,21 @@ export type CopilotFrame =
       event: 'activity_done';
       data: { id: string; summary: string; ok: boolean };
     }
-  | { event: 'turn'; data: OpportunityInterviewTurnResponseDto }
+  | { event: 'turn'; data: CopilotTurnResult }
   | { event: 'error'; data: { message: string } };
 
 /** What the model hands `submit_turn`, before any of it is trusted. */
 interface SubmittedTurn {
   reply?: string;
-  gates?: { id?: string; met?: boolean; note?: string }[];
+  gates?: { id?: string; met?: boolean; note?: string; evidence?: string }[];
   draft?: {
     description?: string;
     productGoal?: string | null;
     effort?: string | null;
   } | null;
   brief?: unknown;
+  /** Check my idea only. */
+  suggestedGoal?: string | null;
 }
 
 type CopilotTarget = { provider: string; model: string };
@@ -132,7 +172,7 @@ export class RoadmapCopilotService {
   async takeTurn(
     input: CopilotTurnInput,
     userId: number,
-  ): Promise<OpportunityInterviewTurnResponseDto> {
+  ): Promise<CopilotTurnResult> {
     for await (const frame of this.streamTurn(input, userId)) {
       if (frame.event === 'turn') return frame.data;
       if (frame.event === 'error') {
@@ -217,10 +257,16 @@ export class RoadmapCopilotService {
     const messages: AgentMessage[] = [
       {
         role: 'user',
-        content: this.renderUserTurn(input.messages, previousBrief),
+        content: this.renderUserTurn(
+          input.messages,
+          previousBrief,
+          input.checks?.reopened,
+        ),
       },
     ];
-    const allTools = this.tools.getToolDefinitions();
+    const allTools = this.tools.getToolDefinitions(
+      input.checks ? { checks: true } : undefined,
+    );
     const submitOnly = allTools.filter((t) => t.name === COPILOT_SUBMIT_TOOL);
 
     let nudged = false;
@@ -244,6 +290,7 @@ export class RoadmapCopilotService {
           iteration,
           turnId,
           userId,
+          onUsage: input.onUsage,
         });
       } catch (error) {
         this.logger.error(
@@ -270,11 +317,18 @@ export class RoadmapCopilotService {
             );
       const submit = toolUses.find((b) => b.name === COPILOT_SUBMIT_TOOL);
       if (submit) {
-        const turnResult = this.buildTurn(
-          submit.input as SubmittedTurn,
+        const submitted = submit.input as SubmittedTurn;
+        const built = this.buildTurn(
+          submitted,
           productGoalNames,
           previousBrief,
         );
+        const turnResult: CopilotTurnResult = input.checks
+          ? {
+              ...built,
+              checkTurn: this.checkTurnOf(submitted, built, productGoalNames),
+            }
+          : built;
         // Before the admin has said anything there is no idea to assess, and a "Needs work"
         // verdict over an empty conversation reads as a judgement of the person, not the idea.
         const spoken = input.messages.some((m) => m.role === 'admin');
@@ -403,6 +457,7 @@ export class RoadmapCopilotService {
       iteration: number;
       turnId: string;
       userId: number;
+      onUsage?: CopilotTurnInput['onUsage'];
     },
   ): Promise<AgentTurnResult> {
     let turn: AgentTurnResult | null = null;
@@ -436,6 +491,22 @@ export class RoadmapCopilotService {
         userId: pass.userId,
       },
     });
+    if (pass.onUsage) {
+      try {
+        await pass.onUsage({
+          provider: target.provider,
+          model: target.model,
+          inputTokens: turn.usage.inputTokens,
+          outputTokens: turn.usage.outputTokens,
+          cachedTokens: turn.usage.cachedTokens ?? 0,
+          cacheCreationTokens: turn.usage.cacheCreationTokens ?? 0,
+        });
+      } catch (error) {
+        this.logger.warn(
+          `[ROADMAP] Copilot usage callback failed: ${(error as Error)?.message}`,
+        );
+      }
+    }
     return turn;
   }
 
@@ -509,7 +580,7 @@ export class RoadmapCopilotService {
   private async boardSnapshot(userId: number): Promise<string> {
     try {
       const { items } = await this.opportunityService.list(userId, {
-        stage: ['new', 'prioritised', 'under_development'],
+        stage: ['new', 'prioritised'],
         limit: ROADMAP_COPILOT.BOARD_SNAPSHOT_ROWS,
       } as any);
       if (!items.length) return '(the board is empty)';
@@ -538,6 +609,7 @@ export class RoadmapCopilotService {
   private renderUserTurn(
     messages: CopilotTurnInput['messages'],
     brief: RoadmapOpportunityBrief | null,
+    reopened?: string[],
   ): string {
     const transcript = messages.length
       ? messages
@@ -555,6 +627,11 @@ export class RoadmapCopilotService {
           ? JSON.stringify(brief, null, 2)
           : '(empty — nothing established yet)'
       }`,
+      ...(reopened?.length
+        ? [
+            `The admin marked these criteria as not quite met yet, so treat them as unmet and ask about them again: ${reopened.join(', ')}.`,
+          ]
+        : []),
       'Take your next turn now, and end it by calling submit_turn.',
     ].join('\n\n');
   }
@@ -647,6 +724,39 @@ export class RoadmapCopilotService {
             brief,
           })
         : null,
+    };
+  }
+
+  /**
+   * Check my idea's extras, from the same `submit_turn`: evidence for the
+   * checks the gate actually counted as met (an unmet check's quote is
+   * dropped), and a goal suggestion only when it names a live product goal.
+   */
+  checkTurnOf(
+    submitted: SubmittedTurn | null | undefined,
+    built: OpportunityInterviewTurnResponseDto,
+    productGoalNames: string[],
+  ): CopilotCheckTurn {
+    const met = new Set(built.gates.filter((g) => g.met).map((g) => g.id));
+    const evidence: Record<string, string> = {};
+    for (const gate of Array.isArray(submitted?.gates)
+      ? submitted!.gates
+      : []) {
+      const quote =
+        typeof gate?.evidence === 'string' ? gate.evidence.trim() : '';
+      if (typeof gate?.id === 'string' && met.has(gate.id) && quote) {
+        evidence[gate.id] = quote.slice(0, 500);
+      }
+    }
+    const proposed =
+      typeof submitted?.suggestedGoal === 'string'
+        ? submitted.suggestedGoal.trim()
+        : '';
+    return {
+      evidence,
+      suggestedGoal: productGoalNames.includes(proposed)
+        ? proposed
+        : (built.draft?.productGoal ?? null),
     };
   }
 

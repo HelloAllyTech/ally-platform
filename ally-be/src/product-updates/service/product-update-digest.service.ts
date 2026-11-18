@@ -6,9 +6,15 @@ import dayjs, {
   BUSINESS_TIMEZONE,
   toBusinessDateString,
 } from 'src/common/util/date.util';
+import { RoadmapVotingAnalyticsService } from 'src/analytics/service/roadmap-voting-analytics.service';
 import { AppConfigService } from 'src/config/config.service';
 import { LoggerService } from 'src/logger/logger.service';
 import { RedisService } from 'src/redis/service/redis.service';
+import {
+  RoadmapDigestFeedService,
+  WeeklyIdeaNews,
+} from 'src/product-planning/service/roadmap-digest-feed.service';
+import { PlanSettingsService } from 'src/product-planning/service/plan-settings.service';
 
 import { LOW_CONFIDENCE } from '../constants/product-update.constants';
 import { ProductUpdateSourceStatus } from '../entity/product-update-source.entity';
@@ -20,6 +26,14 @@ import { ProductUpdateLivenessService } from './product-update-liveness.service'
 /** Only updates this recent are reported; anything older (a backfill) is marked announced silently. */
 const REPORT_WINDOW_MS = 36 * 60 * 60 * 1000;
 const LAST_SENT_KEY = 'product-updates:digest:last-sent';
+
+/** Email-safe design tokens: inline styles only, serif throughout. */
+const FONT = "Georgia,'Times New Roman',Times,serif";
+const INK = '#29261F';
+const MUTED = '#6E6656';
+const RULE = '#E3DBCE';
+const ACCENT = '#8A4B14';
+const linkStyle = `color:${ACCENT};text-decoration:underline`;
 
 /** What a waiting deployable is called in an email a non-engineer reads. */
 const DEPLOYABLE_LABELS: Record<string, string> = {
@@ -42,9 +56,30 @@ export type DigestOutcome =
   | 'disabled'
   | 'not-due'
   | 'already-sent'
+  | 'not-production'
   | 'nothing-to-report'
   | 'sent'
   | 'failed';
+
+export type WeeklyIdeasOutcome =
+  | 'not-due'
+  | 'not-production'
+  | 'roadmap-v2-off'
+  | 'already-sent'
+  | { sent: number; skipped: number; failed: number };
+
+/** A week, less a day of slack so a late tick never skips anyone. */
+const WEEKLY_RESEND_AFTER_MS = 6 * 24 * 60 * 60 * 1000;
+
+const STAGE_WORDS: Record<WeeklyIdeaNews['stage'], string> = {
+  submitted: 'Submitted, waiting for review',
+  accepted: 'Accepted',
+  planning: 'Planning',
+  building: 'Building',
+  shipped: 'Shipped',
+  declined: 'Not going ahead',
+  closed: 'Closed',
+};
 
 export interface DigestContent {
   subject: string;
@@ -58,7 +93,7 @@ export interface DigestContent {
  * waiting on a release, and anything worth a second look.
  *
  * The public page is highlights; this is the detail and the reasoning behind
- * them — Stacks' *Adapt stakeholder communication to their role and cadence*.
+ * them — *Adapt stakeholder communication to their role and cadence*.
  * Sent once a day at a business-timezone hour, and only on a day with
  * something to say.
  */
@@ -75,14 +110,140 @@ export class ProductUpdateDigestService {
     private readonly sesService: SESService,
     private readonly configService: AppConfigService,
     private readonly redisService: RedisService,
+    private readonly roadmapVoting: RoadmapVotingAnalyticsService,
+    private readonly roadmapFeed: RoadmapDigestFeedService,
+    private readonly planSettings: PlanSettingsService,
   ) {}
+
+  // ── Your ideas this week (Roadmap v2, §4.14, §5.7b) ────────────────────────
+
+  /**
+   * The hourly tick's weekly half: on Monday, in the digest hour, each person
+   * who turned "Your ideas this week" on gets one email about the ideas they
+   * filed — only if something happened to one of them. Production only, like
+   * the team digest, and never while roadmap_v2 is off (its links open the
+   * new idea page). Nobody gets it without opting in: the preference is the
+   * only way in, and it defaults to off.
+   */
+  async sendWeeklyIdeasIfDue(
+    now: Date = new Date(),
+  ): Promise<WeeklyIdeasOutcome> {
+    const { digestHour, digestAllowed } = this.configService.productUpdates;
+    const local = dayjs(now).tz(BUSINESS_TIMEZONE);
+    if (local.isoWeekday() !== 1 || local.hour() !== digestHour) {
+      return 'not-due';
+    }
+    if (!digestAllowed) return 'not-production';
+    if (!(await this.planSettings.getRoadmapV2()).enabled) {
+      return 'roadmap-v2-off';
+    }
+    const lockKey = `roadmap:weekly-ideas:${toBusinessDateString(now)}`;
+    if (!(await this.redisService.acquireLock(lockKey, 20 * 60 * 60))) {
+      return 'already-sent';
+    }
+
+    const since = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const recipients = await this.roadmapFeed.recipients(
+      new Date(now.getTime() - WEEKLY_RESEND_AFTER_MS),
+    );
+    let sent = 0;
+    let skipped = 0;
+    let failed = 0;
+    for (const person of recipients) {
+      try {
+        const ideas = await this.roadmapFeed.ideasThisWeek(
+          person.userId,
+          since,
+        );
+        if (!ideas.length) {
+          skipped += 1;
+          continue;
+        }
+        const email = this.weeklyIdeasEmail(person.name, ideas, now);
+        await this.sesService.sendEmail({
+          from: this.configService.email.sourceEmail,
+          to: [person.email],
+          subject: email.subject,
+          body: email.html,
+          isHtml: true,
+          purpose: 'roadmap weekly ideas digest',
+        });
+        await this.roadmapFeed.markSent(person.userId, now);
+        sent += 1;
+      } catch (error) {
+        failed += 1;
+        this.logger.error(
+          `[ROADMAP] Weekly ideas digest failed for user ${person.userId}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
+    return { sent, skipped, failed };
+  }
+
+  /** "Your ideas this week": the section, in the team digest's own chrome. */
+  weeklyIdeasEmail(
+    name: string,
+    ideas: WeeklyIdeaNews[],
+    now: Date,
+  ): { subject: string; html: string } {
+    const date = dayjs(now).tz(BUSINESS_TIMEZONE).format('ddd D MMM');
+    const adminBase = this.configService.adminBaseUrl.replace(/\/$/, '');
+    const ideaLink = (code: string) =>
+      `${adminBase}/roadmap/i/${encodeURIComponent(code)}`;
+    const shipped = ideas.filter((idea) => idea.shippedAt).length;
+    const subject = `Your ideas this week · ${date}${
+      shipped ? ` — ${shipped} shipped!` : ''
+    }`;
+
+    const body = section('Your ideas this week', ideas, '', (idea) => {
+      const news = [
+        idea.shippedAt
+          ? `Shipped on ${dayjs(idea.shippedAt).tz(BUSINESS_TIMEZONE).format('D MMM')}!`
+          : null,
+        idea.reviewed === 'accepted' ? 'Accepted' : null,
+        idea.reviewed === 'declined' ? 'Reviewed: not going ahead' : null,
+        idea.comments
+          ? `${idea.comments} new comment${idea.comments === 1 ? '' : 's'}`
+          : null,
+        idea.planUpdates
+          ? `${idea.planUpdates} update${idea.planUpdates === 1 ? '' : 's'} on its plan`
+          : null,
+      ].filter((line): line is string => !!line);
+      return `<div style="padding:14px 0;border-bottom:1px solid ${RULE}">
+<p style="margin:0 0 2px;font-size:17px;line-height:1.35"><a href="${escapeHtml(ideaLink(idea.code))}" style="${linkStyle}">${escapeHtml(idea.code)}</a> · ${escapeHtml(idea.title)}</p>
+<p style="margin:0;color:${MUTED};font-size:14px">${escapeHtml(STAGE_WORDS[idea.stage])} · ${escapeHtml(news.join(' · '))}</p>
+</div>`;
+    });
+
+    const html = `<div style="background:#FAF7F1;padding:24px 12px;font-family:${FONT}">
+<div style="font-family:${FONT};color:${INK};max-width:640px;margin:0 auto;background:#FFFFFF;border:1px solid ${RULE};border-radius:6px;padding:32px 36px;line-height:1.6">
+<p style="margin:0 0 6px;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:${ACCENT}">Ally · Roadmap</p>
+<h1 style="font-family:${FONT};font-size:26px;line-height:1.25;font-weight:normal;margin:0 0 6px">${escapeHtml(name ? `Hi ${name.split(' ')[0]}` : 'Hello')}</h1>
+<p style="margin:0;color:${MUTED};font-size:15px">Here is what happened to the ideas you filed in the last seven days.</p>
+${body}
+<hr style="border:none;border-top:1px solid ${RULE};margin:32px 0 16px">
+<p style="margin:0;color:${MUTED};font-size:13px;line-height:1.6">You get this because you turned on the weekly email in <a href="${escapeHtml(`${adminBase}/roadmap/queue?view=for-you`)}" style="${linkStyle}">Roadmap</a>. Turn it off there at any time.</p>
+</div>
+</div>`;
+    return { subject, html };
+  }
 
   /** The hourly tick: sends once, in the configured business hour, if there is anything to report. */
   async sendIfDue(now: Date = new Date()): Promise<DigestOutcome> {
-    const { digestTo, digestHour } = this.configService.productUpdates;
+    const { digestTo, digestHour, digestAllowed } =
+      this.configService.productUpdates;
     if (digestTo.length === 0) return 'disabled';
     if (dayjs(now).tz(BUSINESS_TIMEZONE).hour() !== digestHour)
       return 'not-due';
+    if (!digestAllowed) {
+      // After the hour check, so this is one line a day, not one an hour.
+      this.logger.warn(
+        '[PRODUCT-UPDATES] Digest skipped: PRODUCT_UPDATES_DIGEST_TO is set but this is not the production database (*_prd).',
+      );
+      return 'not-production';
+    }
 
     const lockKey = `product-updates:digest:${toBusinessDateString(now)}`;
     if (!(await this.redisService.acquireLock(lockKey, 20 * 60 * 60))) {
@@ -198,7 +359,12 @@ export class ProductUpdateDigestService {
     const editLink = (update: ProductUpdate) =>
       `${adminBase}/product-updates?update=${encodeURIComponent(update.id)}`;
 
+    // Votes lead the email: getting more of the team voting is the point of
+    // putting them here at all, and a section below the release cards is one
+    // most readers never scroll to.
     const sections: string[] = [];
+    const votes = await this.roadmapVotesSection(now);
+    if (votes) sections.push(votes);
     sections.push(
       section(
         'Live for customers',
@@ -214,7 +380,7 @@ export class ProductUpdateDigestService {
           worthALook,
           '',
           (update) =>
-            `<p style="margin:0 0 8px"><a href="${editLink(update)}">${escapeHtml(update.title)}</a>, published automatically with low confidence (${Math.round(update.confidence * 100)}%). ${escapeHtml(update.decisionReason ?? '')}</p>`,
+            `<p style="margin:0 0 10px;font-size:15px;line-height:1.6"><a href="${editLink(update)}" style="${linkStyle}">${escapeHtml(update.title)}</a>, published automatically with low confidence (${Math.round(update.confidence * 100)}%). ${escapeHtml(update.decisionReason ?? '')}</p>`,
         ),
       );
     }
@@ -249,24 +415,90 @@ export class ProductUpdateDigestService {
       backlog
         ? `${backlog} merge(s) are still being read and grouped; they will appear in a later digest.`
         : null,
-      `Public updates appear on the changelog as soon as they are live. Edit or hide any of them in <a href="${adminBase}/product-updates">Admin → Product updates</a>.`,
+      `Public updates appear on the changelog as soon as they are live. Edit or hide any of them in <a href="${adminBase}/product-updates" style="${linkStyle}">Admin → Product updates</a>.`,
     ]
       .filter(Boolean)
       .map(
         (line) =>
-          `<p style="margin:0 0 6px;color:#6E6656;font-size:13px">${line}</p>`,
+          `<p style="margin:0 0 8px;color:${MUTED};font-size:13px;line-height:1.6">${line}</p>`,
       )
       .join('');
 
-    const html = `<div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#29261F;max-width:680px">
-<h1 style="font-size:20px;margin:0 0 16px">${escapeHtml(subject)}</h1>
+    const html = `<div style="background:#FAF7F1;padding:24px 12px;font-family:${FONT}">
+<div style="font-family:${FONT};color:${INK};max-width:640px;margin:0 auto;background:#FFFFFF;border:1px solid ${RULE};border-radius:6px;padding:32px 36px;line-height:1.6">
+<p style="margin:0 0 6px;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:${ACCENT}">Ally · Product updates</p>
+<h1 style="font-family:${FONT};font-size:26px;line-height:1.25;font-weight:normal;margin:0 0 6px">${escapeHtml(date)}</h1>
+<p style="margin:0;color:${MUTED};font-size:15px">${live.length} live · ${waiting.length} waiting on a release</p>
+<hr style="border:none;border-top:2px solid ${INK};margin:20px 0 0">
 ${sections.join('\n')}
-<hr style="border:none;border-top:1px solid #E3DBCE;margin:24px 0 12px">
+<hr style="border:none;border-top:1px solid ${RULE};margin:32px 0 16px">
 ${footer}
+</div>
 </div>`;
 
     return { subject, html, live, waiting };
   }
+
+  /**
+   * "Roadmap votes this month", by name — so the team sees who is shaping the
+   * roadmap, the same figures as Analytics → Highlights → Priority (AAQ-254),
+   * which reads the same service.
+   *
+   * Voters lead, highest first, as recognition (*Social Presence and
+   * Recognition in Crowdsourced Work*). Admins who have not voted are left off,
+   * so nobody is ranked at the bottom of a table.
+   *
+   * First section of the email, but a rider on one that is going out anyway: it never makes a digest send
+   * on its own, and a failure here drops the section rather than the email.
+   */
+  private async roadmapVotesSection(now: Date): Promise<string> {
+    try {
+      const data = await this.roadmapVoting.getRoadmapVoting(now);
+      const month = data.months.find((m) => m.partial);
+      if (!month || month.users.length === 0) return '';
+
+      const nameOf = new Map(data.users.map((u) => [u.userId, u.name]));
+      const name = (userId: number) => nameOf.get(userId) ?? `Admin #${userId}`;
+      const voters = month.users
+        .filter((u) => u.votes > 0)
+        .sort(
+          (a, b) =>
+            b.votes - a.votes || name(a.userId).localeCompare(name(b.userId)),
+        );
+
+      const monthName = dayjs(now).tz(BUSINESS_TIMEZONE).format('MMMM');
+      const th = (label: string, align: 'left' | 'right') =>
+        `<th style="padding:0 ${align === 'left' ? '16px' : '0'} 6px ${align === 'left' ? '0' : '16px'};border-bottom:1px solid ${RULE};text-align:${align};font-size:12px;font-weight:normal;color:${MUTED}">${label}</th>`;
+      const cell = (content: string, last = false) =>
+        `<td style="padding:7px ${last ? '0' : '16px'} 7px 0;border-bottom:1px solid ${RULE};text-align:right;font-size:15px;font-variant-numeric:tabular-nums">${content}</td>`;
+      const rows = voters
+        .map((u) => {
+          // Share of this person's votes that went to colleagues' ideas.
+          const othersShare = `${Math.round(
+            ((u.votesOnOthers ?? u.votes) / u.votes) * 100,
+          )}%`;
+          return `<tr><td style="padding:7px 16px 7px 0;border-bottom:1px solid ${RULE};font-size:15px">${escapeHtml(name(u.userId))}</td>${cell(u.votes.toLocaleString('en-IN'))}${cell(othersShare, true)}</tr>`;
+        })
+        .join('');
+      const table = rows
+        ? `<table style="border-collapse:collapse;width:100%;font-family:${FONT}"><tr>${th('Name', 'left')}${th('Votes cast', 'right')}${th('Voters voted others share', 'right')}</tr>${rows}</table>`
+        : `<p style="margin:0;color:${MUTED}">No votes cast yet this month.</p>`;
+
+      return `${heading(`Roadmap votes in ${monthName} so far:`)}
+${table}`;
+    } catch (error) {
+      this.logger.error(
+        `[PRODUCT-UPDATES] Roadmap votes section skipped: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return '';
+    }
+  }
+}
+
+function heading(text: string): string {
+  return `<h2 style="font-family:${FONT};font-size:13px;font-weight:normal;letter-spacing:0.12em;text-transform:uppercase;color:${MUTED};margin:32px 0 6px;padding-bottom:8px;border-bottom:1px solid ${RULE}">${escapeHtml(text)}</h2>`;
 }
 
 function section<T>(
@@ -278,12 +510,11 @@ function section<T>(
   if (items.length === 0 && !empty) return '';
   const body = items.length
     ? items.map(render).join('\n')
-    : `<p style="margin:0;color:#6E6656">${escapeHtml(empty)}</p>`;
-  return `<h2 style="font-size:16px;margin:24px 0 10px">${escapeHtml(title)}${
-    items.length ? ` (${items.length})` : ''
-  }</h2>\n${body}`;
+    : `<p style="margin:12px 0 0;color:${MUTED};font-style:italic">${escapeHtml(empty)}</p>`;
+  return `${heading(`${title}${items.length ? ` (${items.length})` : ''}`)}\n${body}`;
 }
 
+/** One update: no box, just a hairline above every entry after the heading's own rule. */
 function card(
   update: ProductUpdate,
   editLink: string,
@@ -299,7 +530,7 @@ function card(
     .split('\n')
     .map((line) => line.replace(/^\s*[-*]\s*/, '').trim())
     .filter(Boolean)
-    .map((line) => `<li>${escapeHtml(line)}</li>`)
+    .map((line) => `<li style="margin:0 0 4px">${escapeHtml(line)}</li>`)
     .join('');
   const links = (update.sources ?? [])
     .map((source) => {
@@ -308,20 +539,20 @@ function card(
           ? `${source.repo}#${source.prNumber}`
           : `${source.repo} push`;
       return source.prUrl
-        ? `<a href="${escapeHtml(source.prUrl)}">${escapeHtml(label)}</a>`
+        ? `<a href="${escapeHtml(source.prUrl)}" style="${linkStyle}">${escapeHtml(label)}</a>`
         : escapeHtml(label);
     })
     .join(' · ');
-  return `<div style="border:1px solid #E3DBCE;border-radius:8px;padding:12px 14px;margin:0 0 10px">
-<p style="margin:0 0 4px;font-weight:600">${escapeHtml(update.title)}</p>
-<p style="margin:0 0 6px;color:#6E6656;font-size:13px">${escapeHtml(meta)}${
+  return `<div style="padding:18px 0;border-bottom:1px solid ${RULE}">
+<p style="margin:0 0 2px;font-size:18px;line-height:1.35;font-weight:bold">${escapeHtml(update.title)}</p>
+<p style="margin:0 0 10px;color:${MUTED};font-size:13px;font-style:italic">${escapeHtml(meta)}${
     options.waitingOn?.length
       ? ` · waiting on the ${escapeHtml(options.waitingOn.join(' and '))}`
       : ''
   }</p>
-${options.showPublicSummary ? `<p style="margin:0 0 6px">${escapeHtml(update.summary)}</p>` : ''}
-${notes ? `<ul style="margin:0 0 6px;padding-left:18px">${notes}</ul>` : ''}
-<p style="margin:0;font-size:12px;color:#6E6656">${links}${links ? ' · ' : ''}<a href="${escapeHtml(editLink)}">Edit</a></p>
+${options.showPublicSummary ? `<p style="margin:0 0 10px;font-size:16px">${escapeHtml(update.summary)}</p>` : ''}
+${notes ? `<ul style="margin:0 0 10px;padding-left:20px;font-size:14px;color:#4A4538">${notes}</ul>` : ''}
+<p style="margin:0;font-size:13px;color:${MUTED}">${links}${links ? ' · ' : ''}<a href="${escapeHtml(editLink)}" style="${linkStyle}">Edit</a></p>
 </div>`;
 }
 

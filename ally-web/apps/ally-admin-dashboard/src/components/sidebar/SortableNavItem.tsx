@@ -2,6 +2,7 @@ import { FC, ReactNode } from "react";
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { Link } from "react-router-dom";
 
 import { NavigationItem } from "@components/types";
 
@@ -12,7 +13,8 @@ interface SortableNavItemProps {
   isExpanded: boolean;
   /** When true the row is draggable; clicking still navigates (press-and-drag). */
   canReorder: boolean;
-  onNavigate: (path: string) => void;
+  /** Called after a plain click navigates (closes the phone drawer). Modified clicks open a new tab and skip it. */
+  onNavigate?: () => void;
   /**
    * Optional trailing status for the tab — a count of things waiting on you.
    * Rendered only in the expanded sidebar: a legible pill needs more room than
@@ -22,7 +24,8 @@ interface SortableNavItemProps {
 }
 
 /**
- * A single left-nav tab rendered as a sortable list item.
+ * A single left-nav tab rendered as a sortable list item. It is a real link, so Cmd/Ctrl+click and
+ * middle-click open it in a new tab, and the current page carries `aria-current="page"`.
  *
  * The whole row is the drag source (no separate handle). A `PointerSensor` with
  * an activation distance lives in the parent `DndContext`, so a quick click
@@ -52,21 +55,32 @@ export const SortableNavItem: FC<SortableNavItemProps> = ({
   // Attach drag attributes/listeners only when reordering is enabled. Object
   // spread tolerates `listeners` being undefined, and this keeps the sortable
   // ARIA semantics off rows for roles that can't reorder.
-  const dragProps = canReorder ? { ...attributes, ...listeners } : {};
+  // dnd-kit's `role="button"` would replace the link's role, so it is dropped.
+  const dragAttributes: Omit<typeof attributes, "role"> & { role?: string } = { ...attributes };
+  delete dragAttributes.role;
+  const dragProps = canReorder ? { ...dragAttributes, ...listeners } : {};
 
   return (
     <li ref={setNodeRef} style={style}>
-      <button
-        onClick={() => onNavigate(item.path)}
+      <Link
+        to={item.path}
+        aria-current={isActive ? "page" : undefined}
+        // A native link drag would race dnd-kit's mouse sensor.
+        draggable={false}
+        onClick={event => {
+          if (!event.metaKey && !event.ctrlKey && !event.shiftKey && event.button === 0)
+            onNavigate?.();
+        }}
         {...dragProps}
-        className={`w-full flex items-center px-3 py-3 mb-3 rounded-none border-l-4 text-left transition-colors focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500 ${
+        className={`w-full flex items-center px-3 py-2 mb-0.5 rounded-none border-l-4 text-left transition-colors focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500 ${
           canReorder ? "cursor-grab active:cursor-grabbing" : ""
         } ${
           isActive
             ? "border-primary-500 bg-neutral-100 text-typography-900 font-medium "
             : "border-transparent text-typography-800 hover:bg-background-secondary hover:text-typography-900"
         }`}
-        title={!isExpanded ? item.label : ""}
+        title={!isExpanded ? item.label : undefined}
+        aria-label={!isExpanded ? item.label : undefined}
       >
         <span
           className={`w-6 flex items-center justify-center ${isExpanded ? "mr-3" : "mx-auto"} ${isActive ? "text-typography-800" : "text-typography-600"}`}
@@ -81,7 +95,7 @@ export const SortableNavItem: FC<SortableNavItemProps> = ({
             {badge && <span className="ml-auto shrink-0">{badge}</span>}
           </span>
         )}
-      </button>
+      </Link>
     </li>
   );
 };

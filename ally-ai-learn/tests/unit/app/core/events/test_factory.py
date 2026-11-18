@@ -1,4 +1,5 @@
 from unittest.mock import MagicMock, patch
+
 from pydantic import ValidationError
 
 from app.core.constants import DetectionType
@@ -83,9 +84,9 @@ def test_build_events_from_metadata_with_invalid_score_data(mock_get_logger):
             assert isinstance(call[0][2], ValidationError)
             found_invalid_data_log = True
             break
-    assert found_invalid_data_log, (
-        "A specific validation error should have been logged."
-    )
+    assert (
+        found_invalid_data_log
+    ), "A specific validation error should have been logged."
 
     # Check that the event was marked as skipped in the summary
     found_skipped_log = False

@@ -100,4 +100,14 @@ export class UpdateTenantDto {
   @IsBoolean()
   @IsOptional()
   isTestOrganization?: boolean;
+
+  @ApiProperty({
+    description:
+      'Org-level branding switch. Off = clients show Ally defaults and the ' +
+      'branding route refuses writes; stored branding is kept for switching ' +
+      'back on. Super-admins only — ignored when a multi-tenant admin sends it.',
+  })
+  @IsBoolean()
+  @IsOptional()
+  brandingEnabled?: boolean;
 }

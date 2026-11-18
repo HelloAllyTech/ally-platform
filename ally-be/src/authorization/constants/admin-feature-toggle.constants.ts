@@ -85,7 +85,6 @@ export enum FeatureToggleKey {
   // Analytics (route itself is SUPER_ADMIN-tier; two sub-tabs are SDA-only)
   ANALYTICS = 'analytics',
   ANALYTICS_AGENT = 'analytics_agent',
-  ANALYTICS_SUGGESTIONS = 'analytics_suggestions',
   UX_SIGNALS = 'ux_signals',
 
   // Platform config (formerly SUPER_DUPER_ADMIN-only)
@@ -112,14 +111,6 @@ export enum FeatureToggleKey {
   // everyone; only the manage surface was SDA-exclusive)
   PRODUCT_ROADMAP_MANAGE = 'product_roadmap_manage',
 
-  // Product Roadmap quick add: file an opportunity straight onto the board,
-  // skipping the guided interview and its readiness gate. A trusted-curator
-  // shortcut, not a filing tier — the interview stays the only door for
-  // everyone else. No backfill migration grants it by group; it is handed to
-  // named admins (see *-GrantProductRoadmapQuickAddToggle) and otherwise
-  // per-admin from Admin User Management.
-  PRODUCT_ROADMAP_QUICK_ADD = 'product_roadmap_quick_add',
-
   // Admin-of-admins surfaces (formerly SUPER_DUPER_ADMIN-only)
   ADMIN_USER_MANAGEMENT = 'admin_user_management',
   MULTI_TENANT_ALLOWLIST_MANAGEMENT = 'multi_tenant_allowlist_management',
@@ -127,12 +118,31 @@ export enum FeatureToggleKey {
   // Bug Hunter: the autonomous find-and-fix agent (formerly SUPER_DUPER_ADMIN-only)
   BUG_HUNTER = 'bug_hunter',
 
+  // The clinical advisor: whoever holds this is notified when a debrief or a
+  // flagged point is escalated to the clinical advisor (v9 FR-38). It once also
+  // signed off clinical debrief guidance; that sign-off was dropped when the
+  // guidance moved into the Context Library (docs/context-library/PLAN.md §1,
+  // decision 8). The key keeps its name because grants are stored by it. Off for
+  // everyone until named here, one person at a time.
+  DEBRIEF_CLINICAL_SIGN_OFF = 'debrief_clinical_sign_off',
+
+  // Debrief › Settings › Schedules (view, change, Run now, run history): for
+  // engineering. Granted person by person, never to a group; off for everyone
+  // until named (migration 1981900770000 adds no grant).
+  DEBRIEF_SCHEDULES = 'debrief_schedules',
+
   // Builder: the PRD-interview + coding agent that opens PRs
   BUILDER = 'builder',
+
+  // PM Agent (docs/pm-agent.md): the admin AI product manager whose accepted
+  // recommendations are built by Builder. Backfilled ON for the platform tier by
+  // migration 1982000000000; the agent itself ships switched off.
+  PM_AGENT = 'pm_agent',
 
   // Course Copilot: the agent that interviews a trainer and builds a whole
   // DRAFT course (Track 2.0) from the answers, then edits it on request.
   COURSE_COPILOT = 'course_copilot',
+  CONTEXT_LIBRARY = 'context_library',
 
   // Ally guide (plans/ally-guide/plan.md §10.5). ALLY_GUIDE is the Ally
   // Console (settings, releases, traces) and reaches every organisation;
@@ -337,20 +347,11 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
     platformOnly: true,
   },
   {
-    key: FeatureToggleKey.ANALYTICS_SUGGESTIONS,
-    label: 'Analytics — Suggestions',
-    description:
-      'The Analytics Suggestions sub-tab, on top of general Analytics access.',
-    legacyGrants: SDA_ONLY,
-    // Built from platform-wide analytics.
-    platformOnly: true,
-  },
-  {
     key: FeatureToggleKey.UX_SIGNALS,
     label: 'UX Signals',
     description:
-      'The PostHog UX scan that files findings to Bug Hunter and suggestions ' +
-      'to the Analytics Suggestions queue, plus its "Scan now" control.',
+      'The PostHog UX scan that files findings to Bug Hunter and improvement ' +
+      'signals for the PM Agent, plus its "Scan now" control.',
     legacyGrants: SDA_ONLY,
     // Scans every user's PostHog sessions across the platform.
     platformOnly: true,
@@ -420,12 +421,15 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
   },
   {
     key: FeatureToggleKey.WHATSAPP_BOT,
-    label: 'WhatsApp Bot',
+    // Called Assistants everywhere people see it (6b); the key stays whatsapp_bot.
+    label: 'Assistants',
     description:
-      'Manage the WhatsApp Q&A bot: templates, conversations, unanswered queue and analytics.',
+      'Create assistants and see Assistants in the menu. Anyone can open an assistant whose team they are on without this.',
     legacyGrants: SDA_ONLY,
-    // One bot for the platform; most contacts belong to no organization.
-    platformOnly: true,
+    // The platform number and global settings span every organization, but each organization
+    // can connect its own number. An org-restricted admin reaches only the @OrgScopedRoute
+    // routes (their organization's number and settings); everything else stays platform-wide.
+    orgScopedRoutesOnly: true,
   },
   {
     key: FeatureToggleKey.KNOWLEDGE_BASE,
@@ -433,23 +437,16 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
     description:
       'View, edit, upload and archive documents in the WhatsApp bot’s knowledge base.',
     legacyGrants: SDA_ONLY,
-    // Feeds the one platform-wide WhatsApp bot.
-    platformOnly: true,
+    // An org-restricted admin manages only documents targeted solely at their organisations
+    // (the per-document routes, marked @OrgScopedRoute). Search, stats and the global corpus stay
+    // platform-wide.
+    orgScopedRoutesOnly: true,
   },
   {
     key: FeatureToggleKey.PRODUCT_ROADMAP_MANAGE,
     label: 'Product Roadmap — Manage',
     description:
       'Stage transitions, editing/deleting any opportunity, taxonomy, split/merge, month-board lane moves, and pinning a saved view for everyone. Viewing and voting stay open to every admin. Opening a card in Builder is not part of this — it follows the Builder toggle.',
-    legacyGrants: SDA_ONLY,
-  },
-  {
-    key: FeatureToggleKey.PRODUCT_ROADMAP_QUICK_ADD,
-    label: 'Product Roadmap — Quick Add',
-    description:
-      'File an opportunity directly onto the roadmap with a plain form, skipping the guided interview and its readiness check. For curators who already know what belongs on the board; everyone else keeps filing through the interview.',
-    // Inert, like every key added after the role-collapse cutover: no
-    // migration reads it, and nobody is granted the key by group.
     legacyGrants: SDA_ONLY,
   },
   {
@@ -471,6 +468,32 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
     platformOnly: true,
   },
   {
+    key: FeatureToggleKey.DEBRIEF_CLINICAL_SIGN_OFF,
+    label: 'Debriefs — Clinical advisor',
+    description:
+      'Be notified when a debrief or a flagged point is escalated to the clinical advisor, from any organisation. For the clinical advisor.',
+    legacyGrants: {
+      superAdmin: false,
+      superDuperAdmin: false,
+      multiTenantAdmin: false,
+    },
+    // Escalations arrive from every organisation's debriefs.
+    platformOnly: true,
+  },
+  {
+    key: FeatureToggleKey.DEBRIEF_SCHEDULES,
+    label: 'Debriefs — Schedules',
+    description:
+      'See and change when the Debrief agent and PM agent jobs run, run one now, and read the run history. For engineering.',
+    legacyGrants: {
+      superAdmin: false,
+      superDuperAdmin: false,
+      multiTenantAdmin: false,
+    },
+    // The jobs run for every organisation.
+    platformOnly: true,
+  },
+  {
     key: FeatureToggleKey.BUG_HUNTER,
     label: 'Bug Hunter',
     description:
@@ -483,6 +506,30 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
     description:
       'Interview an agent into a PRD, then have it build the feature and open pull requests for review — from the Builder tab or from a Product Roadmap card.',
     legacyGrants: SUPER_ADMIN_TIER,
+  },
+  {
+    key: FeatureToggleKey.PM_AGENT,
+    label: 'PM Agent',
+    description:
+      "Review the AI product manager's recommendations and questions, accept them into Builder builds that merge and release automatically, and configure its budget, queue and memory.",
+    // Backfilled ON for platform-tier admins by 1982000000000-CreatePmAgent; inert like
+    // every key added after the role-collapse cutover.
+    legacyGrants: SUPER_ADMIN_TIER,
+    // Reads every organisation's aggregates and ships platform-wide changes.
+    platformOnly: true,
+  },
+  {
+    key: FeatureToggleKey.CONTEXT_LIBRARY,
+    label: 'Context Library',
+    description:
+      'Add documentation and written entries to the central library that Builder, Bug Hunter, the character interview, Course Copilot, the Ally guide and Debrief retrieve from; see what it learned and who may read each collection.',
+    // Backfilled ON for platform-tier admins by its access migration; inert like every key
+    // added after the role-collapse cutover.
+    legacyGrants: SUPER_ADMIN_TIER,
+    // Every collection, every organisation's entries and Settings. An admin restricted to some
+    // organisations reaches their organisations' entries through the organisation routes
+    // instead, under the Ally organisation-settings toggle (ContextLibraryOrgController).
+    platformOnly: true,
   },
   {
     key: FeatureToggleKey.COURSE_COPILOT,

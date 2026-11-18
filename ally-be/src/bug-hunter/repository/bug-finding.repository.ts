@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { createHash } from 'crypto';
-import { DataSource, IsNull, Repository } from 'typeorm';
+import { DataSource, In, IsNull, Repository } from 'typeorm';
 
 import { BugFinding } from '../entity/bug-finding.entity';
 import {
@@ -664,6 +664,15 @@ export class BugFindingRepository extends Repository<BugFinding> {
   listChildren(parentFindingId: string): Promise<BugFinding[]> {
     return this.find({
       where: { parentFindingId },
+      order: { stepIndex: 'ASC' },
+    });
+  }
+
+  /** The steps of several plans in one read — for a page of the bugs table. */
+  listChildrenOf(parentFindingIds: string[]): Promise<BugFinding[]> {
+    if (!parentFindingIds.length) return Promise.resolve([]);
+    return this.find({
+      where: { parentFindingId: In(parentFindingIds) },
       order: { stepIndex: 'ASC' },
     });
   }

@@ -18,6 +18,7 @@ import { initAnalytics } from "@utils/analytics";
 
 import { AnalyticsProvider } from "./analytics";
 import App from "./App.tsx";
+import { applyCachedBranding } from "./branding";
 import i18n from "./i18n";
 import { store, persistor } from "./store";
 
@@ -25,6 +26,10 @@ const GOOGLE_AUTH_CLIENT_ID = import.meta.env.VITE_GOOGLE_AUTH_CLIENT_ID || "";
 
 // Initialise PostHog once before the React tree mounts
 initAnalytics();
+
+// A branded org's colours, title and favicon from the last visit, before the
+// first paint — the live fetch in BrandingProvider confirms or corrects them.
+applyCachedBranding();
 
 createRoot(document.getElementById("root")!).render(
   <Provider store={store}>

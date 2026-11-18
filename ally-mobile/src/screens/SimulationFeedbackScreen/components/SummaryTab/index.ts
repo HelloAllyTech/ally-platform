@@ -1,1 +1,0 @@
-export {SummaryTab} from './SummaryTab';

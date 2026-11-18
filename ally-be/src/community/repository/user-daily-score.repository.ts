@@ -147,6 +147,7 @@ export class UserDailyScoreRepository extends Repository<UserDailyScores> {
         SELECT
           rs."userId",
           rs."minutesPlayed",
+          rs.score,
           rs.rank,
           u.name,
           u."profileImageUrl",
@@ -173,6 +174,7 @@ export class UserDailyScoreRepository extends Repository<UserDailyScores> {
       SELECT
         p."userId",
         p."minutesPlayed",
+        p.score as "xpScore",
         p.rank,
         p.name,
         p."profileImageUrl",
@@ -228,6 +230,7 @@ export class UserDailyScoreRepository extends Repository<UserDailyScores> {
         profileImageUrl: row.profileImageUrl || undefined,
         rank: hideRankInCommunity ? undefined : parseInt(row.rank) || 0,
         minutesPlayed: parseInt(row.minutesPlayed) || 0,
+        xpScore: parseInt(row.xpScore) || 0,
         badgeCount: parseInt(row.badgeCount) || 0,
         daysActiveThisWeek,
         weeklyGoalDays: WEEKLY_CONSISTENCY_DAYS,
@@ -288,6 +291,7 @@ export class UserDailyScoreRepository extends Repository<UserDailyScores> {
       SELECT
         rs."userId",
         rs."minutesPlayed",
+        rs.score as "xpScore",
         rs.rank,
         u.name,
         u."profileImageUrl",
@@ -325,6 +329,7 @@ export class UserDailyScoreRepository extends Repository<UserDailyScores> {
       status: row.status,
       rank: hideRankInCommunity ? undefined : parseInt(row.rank) || 0,
       minutesPlayed: parseInt(row.minutesPlayed) || 0,
+      xpScore: parseInt(row.xpScore) || 0,
       badgeCount: parseInt(row.badgeCount) || 0,
       daysActiveThisWeek,
       weeklyGoalDays: WEEKLY_CONSISTENCY_DAYS,

@@ -61,9 +61,9 @@ scan_report.*
 .secrets/
 
 # .claude/ holds personal overrides *and* shared agent config. Ignore the
-# contents by default, then re-include the committed team pieces — the Stacks
-# skill and UserPromptSubmit hook only reach other engineers if they are
-# tracked. Re-include needs `.claude/*`, not `.claude/`: git will not descend
+# contents by default, then re-include the committed team pieces — the
+# context-library skill and shared agents only reach other engineers if they
+# are tracked. Re-include needs `.claude/*`, not `.claude/`: git will not descend
 # into an excluded directory to un-exclude anything inside it.
 .claude/*
 !.claude/settings.json
@@ -77,3 +77,6 @@ scan_report.*
 # Bug Hunter eval replays: per-run detail stays local, the score is recorded in ally-be (see evals/bug-hunter/README.md)
 evals/bug-hunter/results/
 .eval-worktrees/
+
+# chunk 12 shared-store backfill progress
+.backfill-chatbot-shared-store.cursor.json

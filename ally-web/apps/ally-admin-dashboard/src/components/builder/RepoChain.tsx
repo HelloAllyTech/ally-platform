@@ -90,7 +90,7 @@ const nextStep = (row: ChainRow, previousRepo: string | null): string | null => 
  *
  * Each fact lives here once. The page used to repeat a pull request's number
  * six times and "CI passed" eight (a repo list, a rail with its own links, the
- * feed, a separate pull-request panel, the steering hint) — Stacks'
+ * feed, a separate pull-request panel, the steering hint) —
  * "Segmentation and Redundancy in Multimedia Design": the same information in
  * several places adds load without adding meaning. So the rail is a line
  * inside the row that is building, and the pull-request panel is gone for a

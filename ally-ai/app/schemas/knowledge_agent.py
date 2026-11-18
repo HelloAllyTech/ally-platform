@@ -5,12 +5,12 @@ the request. ally-be owns the rows, the phone numbers and the settings; this ser
 owns the retrieval and the wording.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SerializerFunctionWrapHandler, model_serializer
 
-from app.core.knowledge_agent.schemas import AnswerIntent, DeclineReason
+from app.core.knowledge_agent.schemas import AnswerIntent, AnswerMode, DeclineReason
 from app.schemas.knowledge_chunk import AudienceSelector
 
 
@@ -21,6 +21,62 @@ class AgentTurn(BaseModel):
         ..., description="'user' for the worker, anything else = assistant"
     )
     content: str = ""
+
+
+class PersonaSelector(BaseModel):
+    """How the answering chatbot presents itself. Every field is optional."""
+
+    display_name: Optional[str] = Field(None, max_length=80)
+    system_prompt: Optional[str] = Field(
+        None,
+        max_length=4000,
+        description=(
+            "The bot team's instructions. Rendered ahead of the answer template and "
+            "ranked below its grounding, format and safety rules."
+        ),
+    )
+    tone: Optional[str] = Field(None, max_length=120)
+    safety_rules: Optional[str] = Field(
+        None,
+        max_length=3000,
+        description=(
+            "The bot's safety pack and its owner's own Never rules (chunk 20a), "
+            "rendered as a fixed block after the instructions, so editing the "
+            "instructions can't remove them."
+        ),
+    )
+    safety_pack: Optional[str] = Field(
+        None,
+        max_length=32,
+        description=(
+            "The pack's id (mental_health, medical, pharmacy, ...). For a health "
+            "pack the check refuses diagnosis and dosing in code, not only by prompt."
+        ),
+    )
+    purpose: Optional[Literal["answer", "enquiries", "training", "guide", "custom"]] = (
+        Field(
+            None,
+            description=(
+                "What the owner chose the assistant for (chunk 20a-2). Adds a "
+                "short section after the instructions and before the safety rules; "
+                "it changes how the assistant uses what it knows, never what it "
+                "knows."
+            ),
+        )
+    )
+    purpose_note: Optional[str] = Field(
+        None,
+        max_length=600,
+        description='The owner\'s own description, for "Something else".',
+    )
+    avoid_topics: List[str] = Field(
+        default_factory=list,
+        max_length=10,
+        description=(
+            "Topics the owner asked it not to talk about (chunk 20a-2). They also "
+            "travel in `safety_rules`; the check declines a reply that touches one."
+        ),
+    )
 
 
 class KnowledgeAnswerRequest(BaseModel):
@@ -88,6 +144,19 @@ class KnowledgeAnswerRequest(BaseModel):
         None,
         description="Restrict retrieval to these documents; None searches everything",
     )
+    persona: Optional[PersonaSelector] = Field(
+        None, description="The answering chatbot's persona; absent = no persona block"
+    )
+    answer_mode: AnswerMode = Field(
+        "documents_only",
+        description=(
+            "documents_only declines what the documents do not cover; "
+            "documents_and_general may answer from general knowledge, saying so"
+        ),
+    )
+    channel: Optional[str] = Field(
+        None, max_length=32, description="Where the question came in (whatsapp, test…)"
+    )
     audience: AudienceSelector = Field(
         ...,
         description=(
@@ -120,6 +189,20 @@ class Citation(BaseModel):
     section_path: str
     source_url: str
     similarity: float
+    #: A list record's id (chunk 6): the passage was a record, not a document
+    #: chunk. `document_title` is the list, `section_path` the record's title.
+    record_id: Optional[str] = None
+
+    @model_serializer(mode="wrap")
+    def _record_id_only_when_set(
+        self, handler: SerializerFunctionWrapHandler
+    ) -> Dict[str, Any]:
+        """`record_id` is sent only for a record, so a document citation is
+        exactly what it was before chunk 6."""
+        data = handler(self)
+        if data.get("record_id") is None:
+            data.pop("record_id", None)
+        return data
 
 
 class RetrievalMeta(BaseModel):
@@ -181,6 +264,15 @@ class KnowledgeAnswerResponse(BaseModel):
 
 class CrisisCheckRequest(BaseModel):
     message: str = Field(..., min_length=1)
+    # Not length-validated: a 422 here would turn a long chat into a check that did not
+    # run. The prompt builder trims it instead.
+    history: List[str] = Field(
+        default_factory=list,
+        description=(
+            "The sender's own earlier messages in this conversation, oldest first, "
+            "without the message being checked. Never the assistant's replies."
+        ),
+    )
     prompts: Optional[Dict[str, Any]] = Field(
         None, description="ally-be prompt overrides, keyed by prompt code."
     )

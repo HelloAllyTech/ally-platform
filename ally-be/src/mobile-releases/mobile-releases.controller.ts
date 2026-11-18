@@ -36,9 +36,14 @@ import {
  * (migration 1944300000000) for the manual, full App Store review submission
  * endpoint below — same divergence pattern as the AWS Logs viewer. (iOS
  * external-TestFlight promotion used to have a matching manual endpoint here
- * too; removed once submission became fully automatic in ally-mobile's
- * build-ios-production.yml and this repo's actual testers turned out to all
- * be Internal, not External — see git history if it's ever needed again.)
+ * too; removed once submission became fully automatic and this repo's
+ * actual testers turned out to all be Internal, not External — see git
+ * history if it's ever needed again. RN's own build/test workflows plus the
+ * archived app they built (ally-mobile-rn-archive/) were deleted outright
+ * after the 2026-11 cutover, once the rollback path they were kept for was
+ * confirmed unneeded; the scheduled-release mechanism itself was rebuilt on
+ * Flutter afterward rather than left retired — see
+ * scheduled-mobile-release.yml's own header comment.)
  *
  * ios-whats-new-suggestion below is also read-only, but is gated to the
  * narrower submit-app-store-review:mobile-releases permission rather than

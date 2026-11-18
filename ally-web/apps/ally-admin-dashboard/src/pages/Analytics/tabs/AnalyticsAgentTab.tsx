@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { LineChart, ScatterChart, SimpleBarChart, StackedBarChart } from "@carbon/charts-react";
 import {
   Add,
   Send,
@@ -37,6 +36,7 @@ import {
   useSetAnalyticsAgentFeedbackMutation,
 } from "@api";
 import { sharedMarkdownComponents } from "@components";
+import { LineChart, ScatterChart, SimpleBarChart, StackedBarChart } from "@components/charts";
 import { en } from "@constants";
 import {
   AnalyticsAgentConversationDetail,

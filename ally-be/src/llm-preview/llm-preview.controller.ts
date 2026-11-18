@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Param,
   ParseUUIDPipe,
@@ -13,6 +14,7 @@ import {
 } from '@nestjs/swagger';
 import { AuthPermissions } from 'src/auth/decorators/auth-permissions.decorator';
 import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
+import { PromptTestDto } from './dto/prompt-test.dto';
 import { LlmPreviewResponse, LlmPreviewService } from './llm-preview.service';
 
 @Controller('llm-preview')
@@ -40,6 +42,21 @@ export class LlmPreviewController {
     @Param('modelId', ParseUUIDPipe) modelId: string,
   ): Promise<LlmPreviewResponse> {
     return this.llmPreviewService.previewModel(modelId);
+  }
+
+  /**
+   * Run an edited, unsaved prompt against a sample input (Prompts screen,
+   * "Test this prompt"). Spends money like the model preview, so POST; gated on
+   * EDIT_PROMPT because the caller is someone who may change prompts.
+   */
+  @Post('prompt')
+  @Version('1')
+  @ApiOperation({
+    summary: 'Run an unsaved prompt against a sample on a catalog model',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_PROMPT])
+  async testPrompt(@Body() body: PromptTestDto): Promise<LlmPreviewResponse> {
+    return this.llmPreviewService.previewPrompt(body);
   }
 
   /** @deprecated llm_configs is being retired; use POST model/:modelId. */

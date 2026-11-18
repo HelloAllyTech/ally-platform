@@ -18,6 +18,7 @@ import {
   GetProfileUrlResponse,
   profileUrlRequest,
   logoUrlResponse,
+  TenantBranding,
 } from "@types";
 
 import { baseAPI, baseQuery } from "./baseAPI";
@@ -163,6 +164,17 @@ const authAPI = baseAPI.injectEndpoints({
     }),
 
     /**
+     * Signed-out branding for an org code. Public and cached by the backend;
+     * 404 for an unknown or inactive code, which the provider treats as "no
+     * branding" rather than an error the learner needs to see.
+     */
+    getPublicBranding: builder.query<TenantBranding, string>({
+      query: code => ({
+        url: ApiEndpoints.AUTH.PUBLIC_TENANT_BRANDING(code),
+      }),
+    }),
+
+    /**
      * Completes the current user's profile on first login (bulk-created
      * accounts). Invalidates the USER tag so the gate clears on refetch.
      */
@@ -212,6 +224,7 @@ export const {
   useDeleteProfileImageMutation,
   useGetProfileImageUrlMutation,
   useGetLogoUrlQuery,
+  useGetPublicBrandingQuery,
   useVerifyMagicLinkMutation,
   useCompleteProfileMutation,
 } = authAPI;

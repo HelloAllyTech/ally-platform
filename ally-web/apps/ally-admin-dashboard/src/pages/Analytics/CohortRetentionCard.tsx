@@ -1,9 +1,8 @@
 import { useMemo, useState } from "react";
 
-import { LineChart } from "@carbon/charts-react";
-
 import { CarbonDropdown as Dropdown, ContentSwitcher, Switch } from "@ally-ui-mono/ui-shared";
 import { useGetCohortRetentionQuery } from "@api";
+import { LineChart } from "@components/charts";
 
 import { ChartCard, ScrollableChart, buildSource, lineOpts } from "./chartKit";
 import {
@@ -22,7 +21,7 @@ import {
 const EMPTY_THRESHOLDS = [];
 
 /** Carbon's `cds--tile` background — what the pinned cohort column sits on. */
-const PINNED_BG = "bg-[#f4f4f4]";
+const PINNED_BG = "bg-background-secondary";
 
 /** The admin-facing wording for each server-declared minutes threshold. */
 const thresholdLabel = (minutes: number) => `${minutes}+ min practised in the month`;
@@ -39,13 +38,13 @@ const GridCell = ({ cell }: { cell: CohortGridRow["cells"][number] }) => {
   if (!cell) {
     // Not yet happened. Blank, never zero — an unmeasured month rendered as 0%
     // is the most flattering possible way to be wrong.
-    return <td className="border border-[#f4f4f4] bg-[#fafafa]" />;
+    return <td className="border border-gray-100 bg-gray-50" />;
   }
 
   if (cell.pct === null) {
     return (
       <td
-        className="border border-[#e0e0e0] text-center text-typography-400"
+        className="border border-border-light text-center text-typography-400"
         title="Cohort too small to show a rate"
       >
         ·
@@ -55,7 +54,7 @@ const GridCell = ({ cell }: { cell: CohortGridRow["cells"][number] }) => {
 
   return (
     <td
-      className={`border border-[#e0e0e0] text-center tabular-nums ${cell.partial ? "italic" : ""}`}
+      className={`border border-border-light text-center tabular-nums ${cell.partial ? "italic" : ""}`}
       style={{ backgroundColor: cellBackground(cell.pct) }}
       title={`${cell.activityMonth.slice(0, 7)} · ${cell.active} of the cohort${
         cell.partial ? " · month still in progress" : ""
@@ -228,7 +227,7 @@ export const CohortRetentionCard = ({ tenantId }: { tenantId?: string }) => {
             </table>
           </div>
         ) : curves.length === 0 ? (
-          <div className="flex items-center justify-center rounded border border-dashed border-[#e0e0e0] text-sm text-typography-500 h-[340px]">
+          <div className="flex items-center justify-center rounded border border-dashed border-border-light text-sm text-typography-500 h-[340px]">
             No cohort has a completed month yet.
           </div>
         ) : (

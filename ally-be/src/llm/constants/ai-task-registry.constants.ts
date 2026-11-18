@@ -69,6 +69,8 @@ export type AiTaskProvider =
   | 'google'
   /** Legacy: unfunded since 2026-10, kept so an old row still reads. */
   | 'deepgram'
+  /** Sarvam AI speech (Indic TTS/STT). */
+  | 'sarvam'
   | 'multiple'
   | 'resolved';
 
@@ -225,6 +227,20 @@ const AI_LEARN_TASKS: AiTaskEntry[] = [
     trigger: 'The context window fills mid-session',
     detail:
       'Episodic-memory compaction during the session, plus one final fold at session end.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'resolved',
+    defaultModel: "the scenario's main LLM",
+    configuredBy: 'Inherits the agent_turn client',
+  },
+  {
+    id: 'stage-director',
+    task: LlmTask.STAGE_DIRECTOR,
+    runtime: LlmRuntime.AI_LEARN,
+    trigger: 'Every learner turn, off the reply path',
+    detail:
+      'Scenarios on Main Agent Prompt — Stage Director only: one paragraph of the ' +
+      "client's thoughts, passed to the next reply as written. Replaces " +
+      'client-working-memory for those scenarios; it plans no fillers or interims.',
     kind: AiTaskKind.COMPLETION,
     provider: 'resolved',
     defaultModel: "the scenario's main LLM",
@@ -867,15 +883,324 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     configuredBy: 'FEEDBACK_GROUNDEDNESS_JUDGE__MODEL',
   },
   {
+    id: 'debrief-quality-judge',
+    task: LlmTask.DEBRIEF_QUALITY_JUDGE,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'Scheduled: debrief quality is judged',
+    detail:
+      'How good is the whole debrief? Scores eight rubric dimensions and lists hard fails; ' +
+      'the overall out of 10 is computed in ally-be. Pinned, so scores stay comparable.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-pro',
+    configuredBy: 'DEBRIEF_QUALITY_JUDGE__MODEL',
+  },
+  {
+    id: 'debrief-safety-reader',
+    task: LlmTask.DEBRIEF_SAFETY_READER,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'Every debrief run, whatever the recipe; and every Ask Ally reply that passed the crisis keyword screen',
+    detail:
+      "Finds the client's risk cues and how the learner responded, and the learner's own " +
+      'distress. Mandatory: a recipe cannot drop it. Recall is gated at 100% on the seeded ' +
+      'safety set before any change to its prompt or model. Ask Ally runs it on the ' +
+      "learner's message inside its reply request, for distress the keywords miss.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    configuredBy: 'DEBRIEF__SAFETY_READER_MODEL',
+  },
+  {
+    id: 'debrief-analyst',
+    task: LlmTask.DEBRIEF_ANALYST,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'Every debrief run with an Analyst step',
+    detail:
+      "Builds the evidence map the Writer writes from: each behaviour's opportunity, observation and exact quote, the pivotal moments and the AI client's faults.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-pro',
+    configuredBy: 'debrief release bundle (recipes.*.steps[analyst].model)',
+  },
+  {
+    id: 'debrief-progress-reader',
+    task: LlmTask.DEBRIEF_PROGRESS_READER,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'Standard runs for a learner with past debriefs',
+    detail:
+      "The progress agent (prompt debrief_progress_system): reads the session's evidence with the learner's progress profile and proposes up to 3 skill trends, follow-ups and a focus; code vetoes any trend the record contradicts. Older releases run the Progress reader's comparison with past Work-on-this points.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    configuredBy:
+      'debrief release bundle (recipes.standard.steps[progress_reader].model)',
+  },
+  {
+    id: 'debrief-guidance-agent',
+    // No LlmTask label: adding one is outside the Debrief system (src/learn). ally-ai records its usage under the step name.
+    task: null,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'Debrief runs whose release sets guidanceAgentMaxCalls above 0, before the Writer',
+    detail:
+      'The guidance agent (prompt debrief_guidance_agent_system): a bounded tool loop that browses the Debrief Guidance index (guidance_index), searches it (guidance_search) and fetches entries by code (guidance_fetch), at most guidanceAgentMaxCalls tool calls, then hands the passages to the Writer. The tools it is offered come from the release setting guidanceTools.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    configuredBy:
+      'debrief release bundle (settings.guidanceAgentMaxCalls, settings.guidanceTools); model DEBRIEF_MODELS.guidanceAgent',
+    promptOverride: 'debrief_guidance_agent_system',
+  },
+  {
+    id: 'debrief-writer',
+    task: LlmTask.DEBRIEF_WRITER,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'Every debrief run',
+    detail:
+      "Writes the learner's debrief cards in the session's language. Never sees the rubric; differs from the Evaluator's and the judge's model.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-3-flash-preview',
+    configuredBy: 'debrief release bundle (recipes.*.steps[writer].model)',
+  },
+  {
+    id: 'debrief-evaluator',
+    task: LlmTask.DEBRIEF_EVALUATOR,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'Every draft, up to three per run',
+    detail:
+      "Scores a draft on the pinned rubric with fix notes per section; the loop's guide, never the KPI (the independent judge is).",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    configuredBy: 'debrief release bundle (recipes.*.steps[evaluator].model)',
+  },
+  {
+    id: 'debrief-reviser',
+    task: LlmTask.DEBRIEF_REVISER,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'A draft below the bar or failing a check, with budget and time left',
+    detail: 'Edits only the flagged sections of the best draft.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-3-flash-preview',
+    configuredBy:
+      'debrief release bundle (recipes.standard.steps[reviser].model)',
+  },
+  {
+    id: 'debrief-planner',
+    task: LlmTask.DEBRIEF_PLANNER,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'Every run on a challenger release with the orchestrator on, after the safety reading; once more after a failed evaluation (the top-up)',
+    detail:
+      'Chooses which registry agents run from the session profile and their manifests (never the transcript). Structured, temperature 0; past 8 s, or on any failure, the run takes the default plan (the recipe) and records it.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    configuredBy: 'debrief release bundle (orchestrator.plannerModel)',
+    promptOverride: 'debrief_planner_system',
+  },
+  {
+    id: 'debrief-protocol-check',
+    task: LlmTask.DEBRIEF_PROTOCOL_CHECK,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'Orchestrated runs whose plan chose it: the organisation has protocols the session touches, or a risk cue',
+    detail:
+      "Registry agent: the session against the organisation's own protocols (get_org_protocols), as findings for the Writer.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    configuredBy:
+      'debrief release bundle (orchestrator.agents[protocol_check].model); default the registry manifest',
+    promptOverride: 'debrief_protocol_check_system',
+  },
+  {
+    id: 'debrief-history-deep',
+    task: LlmTask.DEBRIEF_HISTORY_DEEP,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'Orchestrated runs whose plan chose it: three or more past debriefs and a pattern worth naming',
+    detail:
+      "Registry agent: the learner's last debriefs (get_learner_history) against this session's evidence map, as findings.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    configuredBy:
+      'debrief release bundle (orchestrator.agents[history_deep].model); default the registry manifest',
+    promptOverride: 'debrief_history_deep_system',
+  },
+  {
+    id: 'debrief-language-specialist',
+    task: LlmTask.DEBRIEF_LANGUAGE_SPECIALIST,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'Orchestrated runs whose plan chose it: a code-mixed or Indian-language session, or quotes in another script',
+    detail:
+      'Registry agent: what a Writer in the session language could get wrong, as findings.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    configuredBy:
+      'debrief release bundle (orchestrator.agents[language_specialist].model); default the registry manifest',
+    promptOverride: 'debrief_language_specialist_system',
+  },
+  {
+    id: 'debrief-reply',
+    task: LlmTask.DEBRIEF_REPLY,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'A learner replies under the reflective question of a published Debrief-agent debrief',
+    detail:
+      'Ask Ally: answers from the published debrief and the transcript, streamed, one short reply ' +
+      'per message (≤ $0.05). A LangChain create_agent loop in ally-ai (app/core/ask_ally), up to ' +
+      '4 passes, calling tools through the ally-be Debrief gateway when a question needs them: ' +
+      'search_guidance (Context Library, Debrief Guidance), get_learner_history and ' +
+      'get_live_detections (v9 FR-43); the last pass never calls a tool. ally-be screens first: a ' +
+      'first-person risk statement gets the fixed support reply instead, and the Safety reader ' +
+      'reads each message alongside; ally-be also runs the reply checks, keeps the thread and ' +
+      'relays the stream. Replaces coaching-chat for switched-on organisations.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    configuredBy:
+      'debrief release bundle (reply.model); default DEBRIEF_REPLY_DEFAULT',
+    promptOverride: 'debrief_reply_system',
+  },
+  {
+    id: 'debrief-read-aloud',
+    task: LlmTask.DEBRIEF_READ_ALOUD,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger: 'A learner taps Listen on a card of a Debrief-agent debrief',
+    detail:
+      'Speech of one card, generated on the first tap and cached in the private audio bucket ' +
+      'by its exact text and voice, so a second play makes no TTS call (≤ $0.05 a debrief).',
+    kind: AiTaskKind.SPEECH,
+    provider: 'sarvam',
+    defaultModel: 'bulbul:v3',
+    configuredBy: 'DEBRIEF_READ_ALOUD_VOICE in debrief-audio.service.ts',
+  },
+  {
+    id: 'scenario-description-narration',
+    task: LlmTask.SCENARIO_DESCRIPTION_NARRATION,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'An author publishes a role-play, or edits the description of a published one; also the ' +
+      'backfill script and the retry sweep for a failed attempt',
+    detail:
+      'Speech of the role-play description, one standard narrator voice per language, made in ' +
+      'the background and stored in the assets bucket. Skipped when the text, voice and language ' +
+      'match the stored audio, so a re-save makes no TTS call. Failures retry up to 3 times ' +
+      'over about an hour and never block the save.',
+    kind: AiTaskKind.SPEECH,
+    provider: 'sarvam',
+    defaultModel: 'bulbul:v3',
+    configuredBy:
+      'SCENARIO_NARRATION_VOICE in scenario-description-audio.service.ts',
+  },
+  {
+    id: 'debrief-reflection-check',
+    task: LlmTask.DEBRIEF_REFLECTION_CHECK,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'A learner message in Ask Ally that is 15+ words and not copied from the debrief',
+    detail:
+      'Says only whether the message is an on-topic answer to the reflective question, for ' +
+      'DEBRIEF_REFLECTION XP (v9 FR-65). Never grades quality or sincerity. Off the reply path.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-flash',
+    configuredBy:
+      'DEBRIEF_REFLECTION_CHECK_MODEL in debrief-release.constants.ts',
+    promptOverride: 'debrief_reflection_check_system',
+  },
+  {
+    id: 'debrief-improver',
+    task: LlmTask.DEBRIEF_PM_AGENT,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'Weekly, a deeper review monthly, on demand from the Debrief Console, and when a Builder ' +
+      'interview handed over with "Hand to Builder" asks a question',
+    detail:
+      'The Debrief PM agent, one Deep Agent in ally-ai (app/core/pm_agent): reads expert comments, metric failure points ' +
+      'and redacted reporting views (never transcripts), plans, investigates with read-only subagents, and proposes ' +
+      'ideas routed to itself, Builder, Bug Hunter or a person through ally-be gateway tools that refuse the ' +
+      'never-list. A reviewer subagent (fresh context, read-only tools, structured verdict) checks each proposed ' +
+      'change: does the evidence support it, does it fit every language and organisation it reaches, could it hurt ' +
+      'safety; ally-ai code posts the verdict (change_review_record) and it sets the change’s confidence (high only ' +
+      'on three yeses), which the always-ask check reads. Every model call (main agent and subagents) is one row. Falls back to ' +
+      'DEBRIEF_MODELS.pmAgentBackup. Paid from the learning budget, capped per run (pmAgentRunCapUsd). ' +
+      'Also answers Builder interview questions for a handed-over idea (R2-20, POST /pm-agent/builder-answers): ' +
+      'one structured call from the idea brief alone (no tools, no learner text), at most $0.10 each, ' +
+      'escalating to a person what the brief does not settle. Its instructions are the Skills Store ' +
+      'prompt ally_ai_debrief_pm_builder_answers_system (not pinned); its model is DEBRIEF_MODELS.pmAgent, ' +
+      'not the prompt row.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-pro',
+    configuredBy:
+      'DEBRIEF_MODELS.pmAgent / pmAgentBackup in debrief-release.constants.ts',
+    promptOverride: 'debrief_improver_system',
+  },
+  {
+    id: 'debrief-pm-conversation',
+    task: LlmTask.DEBRIEF_PM_AGENT,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'A person posts in the Debrief console’s Debrief PM agent conversation (POST v1/debriefs/console/pm-agent/conversation)',
+    detail:
+      'The Debrief PM agent answering one message (V2_AUTONOMY C1–C3, POST /pm-agent/conversation): the same Deep Agent ' +
+      'harness as the weekly run (shared /memories/ store namespace, read-only skills, investigator and reviewer ' +
+      'subagents) on a Postgres checkpoint thread per console thread, over the conversation’s gateway tools (read ' +
+      'changes, sessions and metrics; propose; stop, undo, retry, hold a language, pause a kind of change). Approve, ' +
+      'turn down and an always-ask retry pause with LangGraph human-in-the-loop; ally-be resumes approve only on the ' +
+      'same person’s explicit yes with the permission, else reject (a second call in the same turn when the person ' +
+      'could never say yes). Every reply passes a code quote check against the turn’s tool texts. No transcripts, ' +
+      'no learner words. Same task label and learning budget as the weekly run: each turn at most ' +
+      'min(pmAgentRunCapUsd, $0.25, learning budget left). Its instructions are the Skills Store prompt ' +
+      'ally_ai_debrief_pm_conversation_system (not pinned); its model is DEBRIEF_MODELS.pmAgent with pmAgentBackup.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-2.5-pro',
+    configuredBy:
+      'DEBRIEF_MODELS.pmAgent / pmAgentBackup in debrief-release.constants.ts',
+    promptOverride: 'ally_ai_debrief_pm_conversation_system',
+  },
+  {
+    id: 'debrief-flag-answer',
+    task: LlmTask.DEBRIEF_FLAG_ANSWER,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'A learner flags a card of their debrief as not right ("This isn’t right"); a 5-minute sweep retries any that failed',
+    detail:
+      'The Debrief agent answers the flag within a minute (V2_AUTONOMY F1, POST /debrief/flag-answers): re-reads the ' +
+      'roleplay transcript and the flagged card and decides keep / correct (rewrites the card’s own fields; the quote ' +
+      'stays, quoted words must be in the transcript) / remove (never the important moment), with a short reply to ' +
+      'the learner in the debrief’s language. One structured call, the backup via with_fallbacks, one corrected ' +
+      'retry; at most $0.05 a flag. ally-be applies it as a card version and tells the learner.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'gemini',
+    defaultModel: 'gemini-3-flash-preview',
+    configuredBy:
+      'DEBRIEF_MODELS.flagAnswer / flagAnswerBackup in debrief-release.constants.ts',
+    promptOverride: 'ally_ai_debrief_flag_answer_system',
+  },
+  {
     id: 'rag-quality-judge',
     task: LlmTask.RAG_QUALITY_JUDGE,
     runtime: LlmRuntime.ALLY_AI,
-    trigger: 'Scheduled: corpus retrievals are judged',
+    trigger:
+      'Scheduled: corpus retrievals and a sample of Context Library searches are judged',
     detail:
       'Did the passages retrieved actually answer the query, and what was a short ' +
       'retrieval missing? The similarity floor is calibrated from these labels, because ' +
       'a similarity score is not a measure of usefulness — the character corpus returned ' +
-      'nothing for a question one of its own section titles answered.',
+      'nothing for a question one of its own section titles answered. The Context Library ' +
+      'calls it nightly (ally-be ContextJudgeService) on a sample of live searches; its labels ' +
+      'are the benchmark every learning loop reads.',
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
     defaultModel: 'gemini-2.5-pro',
@@ -944,18 +1269,23 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     id: 'whatsapp-answer',
     task: null,
     runtime: LlmRuntime.ALLY_AI,
-    trigger: 'A worker sends the WhatsApp bot a question',
+    trigger:
+      'Someone asks a chatbot a question (WhatsApp, or the test console)',
     detail:
-      'Answers only from retrieved corpus passages, or declines. Ran on Claude because ' +
+      'Answers from the bot’s documents, or declines — or, for a bot in "documents + general ' +
+      'knowledge" mode, answers generally and says so. A bot may pick its own model from the ' +
+      'catalog (ally-ai runtime); it applies to this call only, never to the crisis check. Ran on Claude because ' +
       'refusing to answer from outside the passages is an instruction-following problem, ' +
       'until that credential expired and took the bot silent — OpenAI is the one provider ' +
       'whose key is required in that service. Falls back to OpenAI whatever is selected, ' +
-      'and says so in the metadata.',
+      'and says so in the metadata. With the Agents v2 emergency switch on ' +
+      '(agentRuntimeAllowed), every bot makes the same calls through /agent/run, and this ' +
+      'path is v2’s fallback.',
     kind: AiTaskKind.COMPLETION,
     provider: 'openai',
     defaultModel: 'gpt-5-mini',
     configuredBy:
-      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER',
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per bot: chatbots.model',
     promptOverride: 'ally_ai_knowledge_whatsapp_answer',
   },
   {
@@ -983,15 +1313,198 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     configuredBy: 'KNOWLEDGE_AGENT__TRANSLATE_MODEL',
   },
   {
+    id: 'whatsapp-agent-step',
+    task: LlmTask.WHATSAPP_AGENT_STEP,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'Someone messages a chatbot that is in Agent mode (Agents v2)',
+    detail:
+      'One call per step: the agent reads the conversation and either searches the bot’s ' +
+      'documents (writing its own query) or replies. Small talk takes one call, a question ' +
+      'usually two; at most 2 searches (none after one that found nothing new) and one rewrite ' +
+      'of a reply the check refused, within a 15-second run budget. Replaces ' +
+      'the translate and answer calls for these bots, so the bot’s own model (chatbots.model) ' +
+      'applies here, never to the crisis check.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per bot: chatbots.model',
+    promptOverride: 'ally_ai_agent_system',
+  },
+  {
+    id: 'chatbot-memory-check',
+    task: LlmTask.CHATBOT_MEMORY_CHECK,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'A health, pharmacy or mental-health assistant with memory on wants to remember something',
+    detail:
+      'After the reply has been sent, one call per run with up to 6 lines: keeps only practical, ' +
+      'non-clinical details (prefers evenings), never symptoms, conditions, medicines or ' +
+      'diagnoses. 5-second wait; an error or timeout keeps nothing (chunk 8a).',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per prompt: the Skills Store',
+    promptOverride: 'ally_ai_memory_check',
+  },
+  {
+    id: 'chatbot-conversation-summary',
+    task: LlmTask.CHATBOT_CONVERSATION_SUMMARY,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'A chat with an assistant passes 10 messages and more leave the window the agent reads',
+    detail:
+      'After the reply, at most one at a time per chat: folds the messages leaving the ' +
+      '10-message window into the chat’s summary (about 800 characters), which later runs read ' +
+      'before the last 10 messages. On failure the old summary stays (chunk 8a).',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per prompt: the Skills Store',
+    promptOverride: 'ally_ai_conversation_summary',
+  },
+  {
+    id: 'onboarding-builder-step',
+    task: LlmTask.ONBOARDING_BUILDER_STEP,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'Someone setting up an assistant at /chatbots/new sends a message or taps a quick reply',
+    detail:
+      'One call per owner message that needs a reply written (quick replies with a fixed answer, such as Skip for now, need none): the setup guide replies and proposes changes to the draft. It sees summaries of the pages read (titles and headings), what we learned, the answers so far and the draft — never whole pages. ally-be checks every proposed change (paths, schema, safety lock) before writing. 45-second step cap.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per prompt: the Skills Store',
+    promptOverride: 'ally_ai_builder_system',
+  },
+  {
+    id: 'onboarding-extract-facts',
+    task: LlmTask.ONBOARDING_EXTRACT_FACTS,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'A website is read during onboarding: once per batch of 8 pages',
+    detail:
+      'Reads up to 8 crawled pages (text capped per page) and returns the details for What we learned, each citing the page it came from by number; a detail citing no page in the batch is dropped and counted. At most 50 pages per site, so about 7 calls per onboarding — the largest share of its cost.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per prompt: the Skills Store',
+    promptOverride: 'ally_ai_builder_extract',
+  },
+  {
+    id: 'onboarding-classify',
+    task: LlmTask.ONBOARDING_CLASSIFY,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'The owner confirms What we learned during onboarding',
+    detail:
+      'One call per onboarding: chooses the industry from a fixed list of 13. ally-be maps the industry to its safety pack in code (PACK_FOR_INDUSTRY); the model never chooses the pack.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per prompt: the Skills Store',
+    promptOverride: 'ally_ai_builder_classify',
+  },
+  {
+    id: 'onboarding-gaps',
+    task: LlmTask.ONBOARDING_GAPS,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'Right after the industry is chosen during onboarding',
+    detail:
+      "One call per onboarding: checks what we learned against the industry's fixed checklist (in ally-ai code) and adds at most 2 gaps of the site's own. At most 3 gaps are asked, then the three fixed questions.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per prompt: the Skills Store',
+    promptOverride: 'ally_ai_builder_gaps',
+  },
+  {
+    id: 'onboarding-purposes',
+    task: LlmTask.ONBOARDING_PURPOSES,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'The owner answers the last onboarding question',
+    detail:
+      "One call per onboarding (chunk 20a-2): recommends one of the purposes (answer questions, bring in customers, train my team, guide step by step) and tailors each card's Best for and sample exchange. What each will and won't do is fixed in code.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per prompt: the Skills Store',
+    promptOverride: 'ally_ai_builder_purposes',
+  },
+  {
+    id: 'onboarding-draft',
+    task: LlmTask.ONBOARDING_DRAFT,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'The owner chooses a design during onboarding',
+    detail:
+      "One call per build: writes the assistant's introduction, instructions, tone, topics, suggested questions, pre-chat questions (enquiries only) and decline wording from what we learned and the owner's answers. Any sentence stating a number we were never given is dropped in code.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per prompt: the Skills Store',
+    promptOverride: 'ally_ai_builder_draft',
+  },
+  {
+    id: 'onboarding-change',
+    task: LlmTask.ONBOARDING_CHANGE,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'The owner asks for a change in "Change your assistant"',
+    detail:
+      "One call per request: proposes a before and after for a fixed set of settings, or refuses one that would weaken safety. Nothing is applied until the owner confirms; ally-be applies it through the assistant home's field saves.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per prompt: the Skills Store',
+    promptOverride: 'ally_ai_builder_change',
+  },
+  {
+    id: 'checkup-judge',
+    task: LlmTask.CHECKUP_JUDGE,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      "An assistant's checkup runs (onboarding, Run again, after a change, or an eval suite)",
+    detail:
+      'One call per graded question that needs a reading for meaning: are the expected facts there, is anything it must not say there, did it make anything up. Automatic checks decide the rest; the judge can fail a question, never pass one.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per prompt: the Skills Store',
+    promptOverride: 'ally_ai_checkup_judge',
+  },
+  {
+    id: 'checkup-questions',
+    task: LlmTask.CHECKUP_QUESTIONS,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      "An onboarding assistant's checkup is written (before its first run)",
+    detail:
+      "One call per checkup: phrases up to 12 test questions, each answered by one or two of the business's learned details. Code keeps the details as the question's expected facts and source, and drops a question naming a detail it wasn't given.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per prompt: the Skills Store',
+    promptOverride: 'ally_ai_checkup_questions',
+  },
+  {
     id: 'corpus-embedding',
     task: LlmTask.EMBEDDING,
     runtime: LlmRuntime.ALLY_AI,
     trigger:
-      'Anything is embedded for semantic search — including every document added to ' +
-      "Ally's library and every library search Ally makes for a learner",
+      'Anything is embedded for semantic search — including every Context Library entry and ' +
+      'every library search Ally makes for a learner',
     detail:
-      'All three knowledge corpora (WhatsApp Q&A, the character library and the Ally ' +
-      "guide's library, one Weaviate collection each) plus roadmap opportunities — " +
+      'The WhatsApp Q&A corpus (the one knowledge corpus left; the character library, the Ally ' +
+      "guide's library and Debrief guidance moved into the Context Library, whose indexes embed " +
+      'with the same model) plus roadmap opportunities — ' +
       'embedded once per chunk at ingest and once per query at search. Every corpus embeds with THIS model, ' +
       'because a query vector from another model lands in a different space and makes every ' +
       'similarity number meaningless rather than merely worse. 1536 dimensions; Weaviate ' +
@@ -1232,6 +1745,22 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     promptOverride: 'glossary_lexeme_pairing',
   },
   {
+    id: 'stage-director-memory-mapping',
+    task: LlmTask.STAGE_DIRECTOR_MEMORY_MAPPING,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger: 'An author switches a simulation to the Stage Director prompt',
+    detail:
+      'Once per simulation (and once per simulation in the bulk switch): assigns ' +
+      'each memory to the stage the client is ready to share it from. Falls back ' +
+      'to every memory available from the start if it fails.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'stage_director_memory_mapping',
+  },
+  {
     id: 'track-memory-fold',
     task: LlmTask.TRACK_MEMORY_FOLD,
     runtime: LlmRuntime.ALLY_BE,
@@ -1252,6 +1781,39 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     trigger: 'A counsellor dictates a scribe note',
     detail:
       'Accepts webm/mp4/mp3/wav up to 25MB and auto-detects the language.',
+    kind: AiTaskKind.TRANSCRIPTION,
+    provider: 'openai',
+    defaultModel: 'whisper-1',
+    configuredBy: 'OPENAI_TRANSCRIPTION_MODEL',
+    configPath: 'openai.transcriptionModel',
+  },
+  {
+    id: 'roadmap-dictation',
+    task: LlmTask.ROADMAP_DICTATION,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'Someone presses the mic on a Roadmap v2 draft, answer box or comment box and stops talking',
+    detail:
+      'One call per clip, capped at 2 minutes (and 10MB) before it is sent; mixed Hindi–English ' +
+      'is expected, so the language is auto-detected. The words come back as editable text and ' +
+      'are never sent on their own. Same OpenAI transcription path as the scribe voice note. A ' +
+      "draft's clips count against its $1 idea-stage cap (refused at the cap); a shared idea's " +
+      'against its plan ceiling. Audio is never stored.',
+    kind: AiTaskKind.TRANSCRIPTION,
+    provider: 'openai',
+    defaultModel: 'whisper-1',
+    configuredBy: 'OPENAI_TRANSCRIPTION_MODEL',
+    configPath: 'openai.transcriptionModel',
+  },
+  {
+    id: 'roadmap-idea-transcribe',
+    task: LlmTask.TRANSCRIPTION,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger: 'An admin speaks an idea into the mic-and-bulb idea capture',
+    detail:
+      'One call per spoken phrase: the browser cuts a clip at each pause (or ' +
+      'every 30 s of unbroken speech) and skips clips with no speech in them. ' +
+      'Auto-detects the language. Nothing is stored.',
     kind: AiTaskKind.TRANSCRIPTION,
     provider: 'openai',
     defaultModel: 'whisper-1',
@@ -1319,7 +1881,7 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
       'Gemini renders from an aspect ratio rather than pixel dimensions and has no quality setting.',
     kind: AiTaskKind.IMAGE,
     provider: 'openai',
-    defaultModel: 'dall-e-3',
+    defaultModel: 'gpt-image-1.5',
     configuredBy: 'OPENAI_IMAGE_MODEL / GEMINI_IMAGE_MODEL',
     configPath: 'openai.imageModel',
   },
@@ -1338,24 +1900,64 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
       'the roleplay cover library.',
     kind: AiTaskKind.IMAGE,
     provider: 'openai',
-    defaultModel: 'dall-e-3',
+    defaultModel: 'gpt-image-1.5',
     configuredBy: 'OPENAI_IMAGE_MODEL / GEMINI_IMAGE_MODEL',
     configPath: 'openai.imageModel',
   },
   {
-    id: 'analytics-suggestions',
-    task: LlmTask.ANALYTICS_SUGGESTIONS,
+    id: 'image-studio-compose',
+    task: LlmTask.IMAGE_STUDIO_COMPOSE,
     runtime: LlmRuntime.ALLY_BE,
-    tier: LlmModelTier.REASONING,
-    trigger: 'An admin clicks Generate on the Suggestions tab',
+    tier: LlmModelTier.FAST,
+    trigger:
+      'An author presses Generate or "Suggest from content" in the Image Studio pop-up on any image slot',
     detail:
-      'A whole analytics window in, at most ten roadmap suggestions out — the one place a ' +
-      'larger model may be worth the latency, so it has its own env var.',
+      'One call per press (not per variation): screens the request against the ' +
+      'depiction rules, drafts or tidies the description, writes alt text and the ' +
+      'scene the image prompt is compiled from. JSON mode. A keyword backstop ' +
+      'runs when this call fails, and generation continues from the raw description.',
     kind: AiTaskKind.COMPLETION,
     provider: 'openai',
-    defaultModel: 'gpt-5-mini',
-    configuredBy: 'LLM_REASONING_MODEL',
-    promptOverride: 'analytics_suggestions_generate',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'image_studio_compose',
+  },
+  {
+    id: 'image-studio-image',
+    task: LlmTask.IMAGE_STUDIO_IMAGE,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'The Image Studio worker renders one image an author asked for (a cover, scene, portrait, quiz or article image, badge icon or cast sheet)',
+    detail:
+      'One call per variation (1–4 per press, up to 20 in a "fill empty scenes" ' +
+      'batch), plus one silent retry when the check fails. Text-only images use ' +
+      'IMAGE_STUDIO_TEXT_PROVIDER/MODEL; images with reference images (scenes with ' +
+      'a cast, cast sheets, refine) use IMAGE_STUDIO_REFERENCE_PROVIDER/MODEL ' +
+      '(Gemini by default). An outage falls back to the other provider. Durable ' +
+      'job rows in generated_images; cost estimated per image in costUsd.',
+    kind: AiTaskKind.IMAGE,
+    provider: 'openai',
+    defaultModel: 'gpt-image-1.5',
+    configuredBy:
+      'IMAGE_STUDIO_TEXT_PROVIDER / IMAGE_STUDIO_TEXT_MODEL / IMAGE_STUDIO_REFERENCE_PROVIDER / IMAGE_STUDIO_REFERENCE_MODEL',
+    configPath: 'openai.imageModel',
+  },
+  {
+    id: 'image-studio-judge',
+    task: LlmTask.IMAGE_STUDIO_JUDGE,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'The Image Studio worker checks a freshly generated image before the author sees it',
+    detail:
+      'Vision call with the generated image (and its reference images): fails it ' +
+      'for visible text, wrong people, unsafe depiction, anatomy errors or a ' +
+      'character who does not match their reference. A failed image is regenerated ' +
+      'once. Off with IMAGE_STUDIO_JUDGE_ENABLED=false; skipped when no OpenAI key.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'IMAGE_STUDIO_JUDGE_MODEL',
+    configPath: 'imageStudio.judgeModel',
   },
   {
     id: 'ux-signals',
@@ -1364,13 +1966,105 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     tier: LlmModelTier.REASONING,
     trigger: 'Scheduled: the UX Signals scan triages PostHog',
     detail:
-      'Threshold-crossing detectors become bug findings and roadmap suggestions. Its token ' +
+      'Threshold-crossing detectors become bug findings and PM Agent signals. Its token ' +
       'profile tracks detector count, not date range.',
     kind: AiTaskKind.COMPLETION,
     provider: 'openai',
     defaultModel: 'gpt-5-mini',
     configuredBy: 'LLM_REASONING_MODEL',
     promptOverride: 'ux_signals_triage',
+  },
+  // PM Agent (src/pm-agent, docs/pm-agent.md): one row per prompt, all labelled `pm_agent`
+  // so the agent's monthly budget sums them. Each pass of a lane is one call and one
+  // llm_usage row; every call first reserves its maximum cost in the run's ledger, so a
+  // cap-full or queue-full day makes no call at all. Model: the prompt row in Skills Store,
+  // else the tier; a provider with no key or a failing call falls back to the tier model on
+  // OpenAI. When the budget runs short a lane drops to LLM_FAST_MODEL.
+  ...(
+    [
+      [
+        'analytics',
+        'the platform analytics aggregates (15 dashboard sections)',
+      ],
+      [
+        'ux-signals',
+        'UX Signals findings (pm_agent_signals); skipped when there are none',
+      ],
+      [
+        'code-health',
+        'the docs, code and product map through Builder’s GitHub read tools',
+      ],
+      ['infra-cost', 'llm_usage spend aggregates and this registry'],
+      [
+        'strategy-content',
+        'the mandate, Vision & strategy page, product goals, roadmap and interview notes',
+      ],
+      [
+        'revisions',
+        "an admin's feedback on a closed card (runs first; Revise now runs it alone)",
+      ],
+    ] as const
+  ).map(
+    ([lane, reads]): AiTaskEntry => ({
+      id: `pm-agent-lane-${lane}`,
+      task: LlmTask.PM_AGENT,
+      runtime: LlmRuntime.ALLY_BE,
+      tier: LlmModelTier.REASONING,
+      trigger:
+        'Scheduled daily at the PM Agent’s run hour (or Run now) while it is enabled, has budget ' +
+        'and has free queue slots',
+      detail:
+        `PM Agent ${lane} lane: a read-only tool loop over ${reads}, at most 6 passes of ` +
+        '4,000 output tokens, ending in one submit_candidates call (one repair retry). ' +
+        'Mandate, strategy page, product map, the roadmap filing checklist and a digest of what ' +
+        'the roadmap already holds ride in a cached system block. It proposes; an accepted card ' +
+        'is filed to the roadmap, never built.',
+      kind: AiTaskKind.COMPLETION,
+      provider: 'openai',
+      defaultModel: 'gpt-5-mini',
+      configuredBy: 'LLM_REASONING_MODEL',
+      promptOverride: `pm_agent_lane_${lane.replace(/-/g, '_')}`,
+    }),
+  ),
+  {
+    id: 'pm-agent-critic',
+    task: LlmTask.PM_AGENT,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger:
+      'A PM Agent run has candidate cards that passed the deterministic and dedupe gates',
+    detail:
+      'One call per run reviews up to 12 candidates against a written rubric and grades each ' +
+      "recommendation's roadmap entry against the roadmap's readiness checklist (submit_verdicts, " +
+      '3,000 output tokens). Fail-closed: if it cannot run, or any readiness item is not met, the ' +
+      'card does not reach the feed. Its ' +
+      'share of the run budget is held back from the lanes. Pick a different model family ' +
+      'from the lanes in Skills Store to reduce correlated blind spots.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'pm_agent_critic',
+  },
+  {
+    id: 'pm-agent-lessons',
+    task: LlmTask.PM_AGENT,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger:
+      'Weekly on the PM Agent’s lessons weekday at its run hour (IST), or Run lessons now, while ' +
+      'the agent and lessons are enabled and the month has budget',
+    detail:
+      'One reflection call over an anonymised pack of the last 90 days of card decisions and ' +
+      'outcomes (submit_lessons, 3,000 output tokens, one repair). Each surviving candidate is ' +
+      'then evaluated by replaying the pm-agent-critic row (same prompt and model) over up to 20 ' +
+      'past decided cards: one baseline call plus one per candidate, all counted in llm_usage ' +
+      'and the monthly budget; the eval share (60% of the job cap) is held back from the reflection.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'pm_agent_lessons',
   },
   {
     id: 'foundational-skills-judge',
@@ -1533,12 +2227,20 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     runtime: LlmRuntime.ALLY_BE,
     tier: LlmModelTier.REASONING,
     trigger:
-      'The roadmap board classifies, de-duplicates or assesses an opportunity',
+      'The roadmap board classifies, de-duplicates or assesses an opportunity (including one the PM Agent files)',
     detail:
       "Goal classification, the duplicate check's confirmation pass, goal-impact assessment, " +
+      '(the PM Agent runs the duplicate check once per accepted card before filing it, and its ' +
+      "filing is assessed like any other; that spend is the roadmap's, not the PM Agent budget), " +
       "interview-note summaries, Claude-prompt generation, and the Builder drawer's split/merge " +
       'guard. Filing itself moved to the opportunity copilot (its own row). The standalone ' +
-      'readiness check, review and enhance calls were removed with the blank filing form.',
+      'readiness check, review and enhance calls were removed with the blank filing form. ' +
+      "Goal-impact assessment re-runs when an idea's text changes, whether from the drawer or " +
+      "from Roadmap v2's inline edit (PATCH /v1/roadmap/items/:code), which reuses the same update path. " +
+      "Roadmap v2 reuses the duplicate check twice more: a draft page's Similar ideas (GET /v1/roadmap/drafts/:code/similar, " +
+      "debounced by the client after typing stops) and the Owner's triage pane (GET /v1/roadmap/items/:code/similar). " +
+      "The Roadmap cutover (POST /v1/roadmap/cutover, an Owner's one-off switch-on) assesses each idea it files for a " +
+      'live direct Builder session once, after its commit, as any filing is (and embeds it for the duplicate check).',
     kind: AiTaskKind.COMPLETION,
     provider: 'openai',
     defaultModel: 'gpt-5-mini',
@@ -1546,15 +2248,38 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     promptOverride: 'the prompt row for each roadmap call',
   },
   {
+    id: 'product-planning-ai',
+    task: null,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger:
+      'A roadmap plan runs a review-board check, drafts launch materials, plans user research, reviews an outcome, or the weekly signal scout runs',
+    detail:
+      'The planning_* prompts: the safety, privacy and AI-quality reviewers (cold, from the PRD and ' +
+      'design only), the outcome reviewer (scheduled after release), the launch planner, the ' +
+      "research planner and the weekly signal scout. Every call is priced into the plan's " +
+      'spend ledger (plan_spend_entries). Nothing they write leaves Ally without a person ' +
+      'publishing it.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'the planning_* prompt row for each call',
+  },
+  {
     id: 'roadmap-opportunity-copilot',
     task: LlmTask.ROADMAP_OPPORTUNITY_COPILOT,
     runtime: LlmRuntime.ALLY_BE,
     trigger:
-      'Someone files a roadmap opportunity — every turn of the "New opportunity" conversation',
+      'Someone files a roadmap opportunity — every turn of the "New opportunity" conversation, ' +
+      "and (Roadmap v2) Check my idea and every reply on a private draft's page",
     detail:
       'A tool loop per turn: up to 8 research passes (the board, user-interview notes, the ' +
       'Analytics Agent, UX signals, Bug Hunter findings, repo docs, GitHub code and wiki, ' +
-      'Stacks), then a structured turn — question, readiness verdicts, draft and brief. One ' +
+      'First Principles from the Context Library), then a structured turn — question, readiness verdicts, draft and brief. ' +
+      'On the Roadmap v2 draft page the same submit_turn also returns, per met check, the verbatim words that met it, ' +
+      'and a product-goal suggestion — structured output of this call, never a second call. Each draft turn is priced ' +
+      'into the plan spend ledger at the idea stage ($1 wrap-up cap). One ' +
       'llm_usage row per pass. Two cached system blocks: a product map (repos, admin ' +
       'surfaces, the head of each Builder knowledge pack, the wiki and repo-docs index — ' +
       '~10k tokens, re-rendered at most every 30 min) and the Vision & strategy page, goals ' +
@@ -1594,9 +2319,12 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     // A preview answered by a substitute would report a model as working that
     // nobody tested — worse than an error, because it is believed.
     neverFallback: true,
-    trigger: 'An admin tests a prompt in LLM Preview',
+    trigger:
+      'An admin tests a model in the Model Catalog, or runs "Test this prompt" in the Prompts editor',
     detail:
-      'The bench for trying a prompt against a chosen model before saving it.',
+      'The bench for trying a model (a fixed one-word prompt) or an edited, unsaved prompt ' +
+      'against a sample input on a chosen catalog model, before saving it. Nothing is stored; ' +
+      'replies are capped at 1,024 tokens for prompt tests.',
     kind: AiTaskKind.COMPLETION,
     provider: 'resolved',
     defaultModel: 'chosen in the UI',
@@ -1612,6 +2340,21 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     provider: 'gemini',
     defaultModel: 'gemini-2.5-flash',
     configuredBy: 'BUG_HUNTER_CLASSIFY_REPO_MODEL (compiled in)',
+  },
+  {
+    id: 'bug-hunter-image-probe',
+    task: LlmTask.BUG_HUNTER,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'A Bug Hunter run calls the image-generation probe on a bug about the image service',
+    detail:
+      'One real image call made the way the product makes it, to see what the provider accepts today (a retired model, a refused size, a blocked prompt); the image is discarded. Quality low; capped at 20 calls an hour across every run.',
+    kind: AiTaskKind.IMAGE,
+    provider: 'openai',
+    defaultModel: 'gpt-image-1.5',
+    configuredBy:
+      "OPENAI_IMAGE_MODEL / GEMINI_IMAGE_MODEL (or the probe's model parameter)",
+    configPath: 'openai.imageModel',
   },
   {
     id: 'bug-hunter-miss-classifier',
@@ -1649,24 +2392,6 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     provider: 'gemini',
     defaultModel: 'gemini-2.5-flash',
     configuredBy: 'BUG_HUNTER_DECIDE_MODEL (compiled in)',
-  },
-  {
-    id: 'agent-memory-curation',
-    task: LlmTask.AGENT_MEMORY_CURATION,
-    runtime: LlmRuntime.ALLY_BE,
-    // Mechanical editing of short entries against a fixed operation set: cost
-    // and time dominate, and a wrong merge is caught by the next pass.
-    tier: LlmModelTier.FAST,
-    trigger: "Hourly, when an agent's notebook has new candidate entries",
-    detail:
-      'Folds the notes a sweep or fix session wrote into the curated active set: agree, ' +
-      'edit, add or remove, one operation per candidate. Bug Hunter today; Builder when ' +
-      'its lessons move to the same table.',
-    kind: AiTaskKind.COMPLETION,
-    provider: 'openai',
-    defaultModel: 'gpt-4o-mini',
-    configuredBy: 'LLM_FAST_MODEL',
-    promptOverride: 'agent_memory_curator_system',
   },
   {
     id: 'skill-experiment-judge',
@@ -1797,7 +2522,12 @@ const BUILDER_TASKS: AiTaskEntry[] = [
       'before (at most two rejections, then a pass offered only edit and turn-ending tools). Off, ' +
       'the prior streamed loop runs. A session opened from a roadmap opportunity also carries ' +
       "the opportunity's hand-off (description, copilot brief, filing interview) as a third " +
-      'cached system block on every turn.',
+      'cached system block on every turn. With roadmap_v2 on, a plan session past its one idea ' +
+      'ceiling (ledger + runner spend) does not start a turn at all (PlanCeilingService). ' +
+      "Roadmap v2 (P3b): after Start planning the plan interview runs in the idea's one session, and " +
+      'each turn also reads every answer, comment and settled choice posted since the last turn by anyone ' +
+      'with Roadmap access, attributed as [Name · role] (no extra call; a longer user message). ' +
+      'Conflicting answers are withheld until the settler chooses.',
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
     defaultModel: 'gemini-2.5-pro',
@@ -2018,17 +2748,68 @@ const BUILDER_TASKS: AiTaskEntry[] = [
       'BUILDER_REVIEW_MODEL, falling back to BUILDER_REVIEW_FALLBACK_MODEL (Actions variables on the monorepo, read by .github/workflows/builder-review-opencode.yml)',
   },
   {
-    id: 'builder-lesson-curation',
-    task: LlmTask.BUILDER_LESSON_CURATION,
+    id: 'builder-session-ask',
+    task: LlmTask.BUILDER_SESSION_ASK,
     runtime: LlmRuntime.ALLY_BE,
-    trigger: 'A run finishes and the flywheel folds it in',
-    detail: 'Retrospective bullets into the curated lesson set.',
+    tier: LlmModelTier.REASONING,
+    trigger:
+      'An admin asks one Builder session a question from the Builder tab',
+    detail:
+      'Read-only: one call per question, grounded in the PRD, transcript tail, runs, pull ' +
+      "requests, the session's History and the admin's rules. Takes no turn lock and writes " +
+      'no transcript; the answer is stored in History.',
     kind: AiTaskKind.COMPLETION,
-    provider: 'gemini',
-    defaultModel: 'gemini-2.5-flash',
-    configuredBy: 'BUILDER_MECHANICAL_MODEL',
-    promptOverride: 'builder_lesson_curator_system',
-    configPath: 'builder.mechanicalModel',
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'builder_session_ask_system',
+  },
+  {
+    id: 'builder-work-ask',
+    task: LlmTask.BUILDER_WORK_ASK,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger:
+      'An admin asks about all of Builder’s work at once (⌘K → Ask about all work)',
+    detail:
+      'Read-only: one call per question over the sessions in progress, pending decisions, ' +
+      'rules, recent History and Up next.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'builder_work_ask_system',
+  },
+  {
+    id: 'builder-rule-draft',
+    task: LlmTask.BUILDER_RULE_DRAFT,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger: 'An admin makes a rule from one of their answers',
+    detail:
+      'One short call: generalises the answer into a one-sentence rule and an area, which ' +
+      'the admin edits before saving. Nothing is saved by the model.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'builder_rule_draft_system',
+  },
+  {
+    id: 'builder-rule-match',
+    task: LlmTask.BUILDER_RULE_MATCH,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger:
+      '...and the rule editor previews what the rule would have applied to',
+    detail:
+      'One call per preview over up to 60 History decisions from the last 90 days; cached in ' +
+      'Redis per statement and scope for 10 minutes, so typing does not re-bill it.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'builder_rule_match_system',
   },
   {
     id: 'builder-outcome-categorise',
@@ -2191,7 +2972,10 @@ const COURSE_COPILOT_TASKS: AiTaskEntry[] = [
       'take a pass or two more (at most two rejections). Off, the prior loop runs, plus one ' +
       'tool-less wrap-up call when the cap is hit. ' +
       'The system prompt and a per-session library context block are cached; the ' +
-      'brief, blueprint or course outline rides on the newest user turn. Runs on ' +
+      'brief, blueprint or course outline rides on the newest user turn. ' +
+      'design_guidance_search / _get read the Context Library’s Learning Design and ' +
+      'search_library its Content Catalogue — their re-rank and the blueprint’s citation check ' +
+      'are the context-library rows, not this one. Runs on ' +
       'any of the three providers through AgentLlmProviderFactory — the prompt ' +
       'row wins, so set the model there (Claude Sonnet recommended for tool-use ' +
       'reliability in production).',
@@ -2409,7 +3193,7 @@ const COURSE_COPILOT_TASKS: AiTaskEntry[] = [
       'row, so the session budget counts each at COURSE_COPILOT_IMAGE_COST_USD.',
     kind: AiTaskKind.IMAGE,
     provider: 'openai',
-    defaultModel: 'dall-e-3',
+    defaultModel: 'gpt-image-1.5',
     configuredBy: 'OPENAI_IMAGE_MODEL / GEMINI_IMAGE_MODEL',
     configPath: 'openai.imageModel',
   },
@@ -2697,6 +3481,206 @@ const GUIDE_TASKS: AiTaskEntry[] = [
   },
 ];
 
+/**
+ * Context Library (docs/context-library/PLAN.md). Extraction writes the chunks, so it runs on
+ * Builder's interview model (the owner's decision); the checks around it are mechanical and
+ * high-volume, so they run on the fast tier. Every row reads its prompt's own model first.
+ */
+const CONTEXT_LIBRARY_TASKS: AiTaskEntry[] = [
+  {
+    id: 'context-library-overview',
+    task: LlmTask.CONTEXT_LIBRARY_OVERVIEW,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger: 'An admin adds a document to the Context Library',
+    detail:
+      'Once per document of more than three parts: the outline plus opening and closing parts ' +
+      'become a ≤150-word overview and key terms, shared by every collection the document feeds ' +
+      'and sent as the cached prefix of each extraction call.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'LLM_REASONING_MODEL — the call passes BUILDER_INTERVIEW_MODEL explicitly when it is set, so in practice the chunks are written by Builder’s interview model',
+    promptOverride: 'context_library_overview_system',
+  },
+  {
+    id: 'context-library-extract',
+    task: LlmTask.CONTEXT_LIBRARY_EXTRACT,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger: 'A document part is extracted into a Context Library collection',
+    detail:
+      'One call per part per target collection (~2,500-token parts, up to 8 principles or 12 ' +
+      'insights each). The prompt is the collection’s own extractor — ' +
+      '`context_library_extract_first_principles_system` for First Principles, ' +
+      '`context_library_extract_character_insights_system` for Character Insights (including ' +
+      'the one-off distillation of the retired character corpus), ' +
+      '`context_library_extract_ally_guide_library_system` for the Ally Guide Library, ' +
+      '`context_library_extract_debrief_guidance_system` for Debrief Guidance and ' +
+      '`context_library_extract_learning_design_system` for Learning Design — and each prompt’s own model ' +
+      'is read first. The overview and vocabularies are an identical prefix across a document, ' +
+      'so prompt caching applies.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'LLM_REASONING_MODEL — the call passes BUILDER_INTERVIEW_MODEL explicitly when it is set, so in practice the chunks are written by Builder’s interview model',
+    promptOverride: 'context_library_extract_first_principles_system',
+  },
+  {
+    id: 'context-library-critic',
+    task: LlmTask.CONTEXT_LIBRARY_CRITIC,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger:
+      'Candidates extracted from a document part are checked before publishing',
+    detail:
+      'One call per part per collection, with the part text: grounded, standalone (with a ' +
+      'rewrite), specificity, actionability, names and the collection’s own checks. A separate ' +
+      'call from the extractor because models grade their own output generously.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'context_library_critic_system',
+  },
+  {
+    id: 'context-library-adjudicate',
+    task: LlmTask.CONTEXT_LIBRARY_ADJUDICATE,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger: 'A new chunk is close to existing ones in its collection',
+    detail:
+      'Only for candidates between the merge and publish similarity thresholds: same, refines, ' +
+      'conflicts or different, against the nearest three. Keeps people out of the easy cases.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'context_library_adjudicate_system',
+  },
+  {
+    id: 'context-library-consolidate',
+    task: LlmTask.CONTEXT_LIBRARY_CONSOLIDATE,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger: 'A document finishes extracting into a collection',
+    detail:
+      'Once per document per collection: merges repeats, ranks for the density cap (enforced in ' +
+      'code), and records relations.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'context_library_consolidate_system',
+  },
+  {
+    id: 'context-library-enrich',
+    task: LlmTask.CONTEXT_LIBRARY_ENRICH,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger:
+      'An admin writes or bulk-uploads an entry, an agent writes a lesson, a platform admin enriches the Ally guide and Debrief passages imported from the Knowledge Base, or a Studio item is synced into the Content Catalogue',
+    detail:
+      'Adds situations, example searches, keywords and missing facets without touching the ' +
+      'entry text (an imported passage also gets a one-line statement in place of its citation). ' +
+      'One call per entry; bulk uploads and the import enrichment run them in small parallel batches. ' +
+      'A synced Content Catalogue item gets example searches only — its text and facets are its ' +
+      'Studio row’s — once after it is created or renamed, at most 300 a night (ContextCatalogueSyncService).',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'context_library_enrich_system',
+  },
+  {
+    id: 'context-library-rerank',
+    task: LlmTask.CONTEXT_LIBRARY_RERANK,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger:
+      'Any use case searches the Context Library (Builder, Bug Hunter, the character interview, Course Copilot, the Ally guide, Debrief, engineers)',
+    detail:
+      'One listwise call per search over up to 50 fused candidates, grading each 0–3; capped at ' +
+      '2.5 s, after which the search falls back to retriever agreement. A different model family ' +
+      'from the Gemini judge that grades samples of these searches, so the loop cannot grade its own work.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'context_library_rerank_system',
+  },
+  {
+    id: 'context-library-citation-check',
+    task: LlmTask.CONTEXT_LIBRARY_CITATION_CHECK,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger: 'A PRD, blueprint or answer cites Context Library codes',
+    detail:
+      'One call per saved version that adds citations, over the new ones only: Builder’s PRD ' +
+      '(`[FP-…]`) and Course Copilot’s blueprint (`[LD-…]`, `[CC-…]`). Codes never surfaced in ' +
+      'the session are stripped in code before this runs.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'context_library_citation_check_system',
+  },
+  {
+    id: 'context-library-query-plan',
+    task: LlmTask.CONTEXT_LIBRARY_QUERY_PLAN,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger: 'A Builder interview (or a Course Copilot brief) starts',
+    detail:
+      'Once per session: a short context descriptor plus 8–12 situational searches, fanned out ' +
+      'in parallel to build the guiding brief. Runs alongside the first turn, never before it.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'context_library_query_plan_system',
+  },
+  {
+    id: 'context-library-gap-label',
+    task: LlmTask.CONTEXT_LIBRARY_GAP_LABEL,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger:
+      'Nightly: the Context Library gap loop clusters searches that found nothing good',
+    detail:
+      'One call per cluster of three or more similar unanswered searches: a general topic label ' +
+      'for Insights → What’s missing?. Never repeats a person’s own words, so sensitive queries ' +
+      'reach the page only as this label.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'context_library_gap_label_system',
+  },
+  {
+    id: 'context-library-agent-curate',
+    task: LlmTask.CONTEXT_LIBRARY_AGENT_CURATE,
+    runtime: LlmRuntime.ALLY_BE,
+    // Mechanical editing of short entries against a fixed operation set: cost and time
+    // dominate, and a wrong merge is caught by the next pass (or undone from Insights).
+    tier: LlmModelTier.FAST,
+    trigger:
+      'Hourly, when Builder Lessons or Bug Hunter Notes have new candidates an agent wrote',
+    detail:
+      'One call per collection per pass over its candidates and active set: agree, edit, add or ' +
+      'remove, one operation per candidate. Pins, the per-pass change budget and the active cap ' +
+      'are enforced in code; every change is a Context Library loop action an admin can undo. ' +
+      'Replaces the agent-memory and Builder lesson curators.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'context_library_agent_curator_system',
+  },
+];
+
 export const AI_TASK_REGISTRY: AiTaskEntry[] = [
   ...AI_LEARN_TASKS,
   ...ALLY_AI_TASKS,
@@ -2705,6 +3689,7 @@ export const AI_TASK_REGISTRY: AiTaskEntry[] = [
   ...BUG_HUNTER_TASKS,
   ...COURSE_COPILOT_TASKS,
   ...GUIDE_TASKS,
+  ...CONTEXT_LIBRARY_TASKS,
 ];
 
 /**

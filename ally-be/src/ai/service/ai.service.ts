@@ -1,12 +1,23 @@
 import {
   HttpStatus,
   Injectable,
+  Optional,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import axios, { AxiosError } from 'axios';
 import {
+  ContextChunkBulkUpsertResponse,
+  ContextChunkIdsResponse,
+  ContextChunkSearchRequest,
+  ContextChunkSearchResponse,
+  ContextChunkUpsertItem,
+  ContextEmbedResponse,
+} from '../dto/context-chunk.dto';
+import {
   aiFailureToHttpException,
+  AiUpstreamError,
   classifyAiFailure,
   isRetryableAiFailure,
 } from '../exception/ai-upstream.exception';
@@ -22,6 +33,27 @@ import { AppConfigService } from '../../config/config.service';
 import { LoggerService } from '../../logger/logger.service';
 import { NotificationErrorType } from '../../notification/type/notification.error.type';
 import { ENDPOINTS } from '../constants/endpoints.constants';
+import type {
+  BuilderChangeRequest,
+  BuilderChangeResponse,
+  BuilderExtractRequest,
+  BuilderExtractResponse,
+  BuilderStepRequest,
+  BuilderStepResponse,
+  BuilderStreamEvent,
+} from '../dto/builder.dto';
+import {
+  BUILDER_LIMITS,
+  KNOWLEDGE_ANSWER_LIMITS,
+} from '../constants/knowledge-answer.constants';
+import { SseParser } from '../util/sse-parser';
+import {
+  CHECKUP_GRADE_TIMEOUT_MS,
+  type CheckupGradeRequest,
+  type CheckupGradeResponse,
+  type CheckupQuestionsRequest,
+  type CheckupQuestionsResponse,
+} from '../dto/checkup.dto';
 import {
   HelplineRiskRequest,
   HelplineRiskResponse,
@@ -29,6 +61,13 @@ import {
   HelplineTurnResponse,
 } from '../dto/helpline-copilot.dto';
 import {
+  AgentRunRequest,
+  AgentRunResponse,
+  ConversationSummaryRequest,
+  ConversationSummaryResponse,
+  MemoryCheckRequest,
+  MemoryCheckResponse,
+  AgentStreamEvent,
   CrisisCheckRequest,
   CrisisCheckResponse,
   KnowledgeAnswerRequest,
@@ -38,9 +77,7 @@ import {
   KnowledgeChunkBulkUpsertRequest,
   KnowledgeChunkBulkUpsertResponse,
   KnowledgeChunkDeleteResponse,
-  KnowledgeChunkSearchRequest,
   KnowledgeCorpus,
-  KnowledgeChunkSearchResponse,
 } from '../dto/knowledge.dto';
 import {
   AddReferenceDocumentRequest,
@@ -63,12 +100,11 @@ import {
   TagPositivityRatingsRequest,
   TranscribeAudioRequest,
   UpdateReferenceDocumentRequest,
-  AgentMemoryUpsertRequest,
-  AgentMemorySearchRequest,
 } from '../dto/ai.request.dto';
 import { PromptSharedService } from '../../prompt/service/prompt-shared.service';
 import { SkillExperimentRouterService } from '../../skill-experiment/service/skill-experiment-router.service';
 import { ExecutionManager } from '../../common/execution/execution-manager';
+import { DEBRIEF_AGENT_KEY } from '../../debrief/constants/debrief-release.constants';
 import {
   ALLY_AI_PROMPT_PREFIX,
   ALLY_AI_LEARN_PROMPT_PREFIX,
@@ -90,9 +126,6 @@ import {
   TagPositivityRatingsResponse,
   TranscribeAudioResponse,
   UpdateReferenceDocumentResponse,
-  AgentMemoryUpsertResponse,
-  AgentMemorySearchResponse,
-  AgentMemoryDeleteResponse,
 } from '../dto/ai.response.dto';
 import { ScribeSessionMode } from 'src/common/constants/chat.constants';
 import { LlmTask } from 'src/learn/enum/llm-task.enum';
@@ -133,6 +166,14 @@ export const TRANSCRIPTION_PIPELINE_PROMPT_CODES = [
 const SCENARIO_EVALUATION_WITH_MEMORY_PROMPT_CODE =
   'ally_ai_scenario_scenario_evaluation_with_memory';
 
+/** ally-ai's `/agent/instructions` answer (chunk 20d-2). */
+export interface AgentInstructions {
+  full: string;
+  parts: { layer: string; text: string; owner: boolean }[];
+  placeholders: Record<string, string>;
+  search: Record<string, number>;
+}
+
 @Injectable()
 export class AiService {
   logger = LoggerService.getInstance(AiService.name);
@@ -143,7 +184,42 @@ export class AiService {
     private eventEmitter: EventEmitter2,
     private promptSharedService: PromptSharedService,
     private skillExperiments: SkillExperimentRouterService,
+    @Optional() private readonly dataSource?: DataSource,
   ) {}
+
+  /**
+   * v9 FR-44: once an organisation is switched on for the Debrief agent, the
+   * old optimiser stops experimenting on today's debrief there. Learners read
+   * the agent's debrief, so a challenger would be judged on text nobody sees.
+   * Fails open to "not live": an experiment must never make a debrief fail.
+   */
+  private async debriefAgentIsLive(
+    scenarioSessionId?: string,
+  ): Promise<boolean> {
+    if (!this.dataSource) return false;
+    const tenantId = ExecutionManager.getTenantId() ?? null;
+    if (!scenarioSessionId && !tenantId) return false;
+    try {
+      const rows = await this.dataSource.query(
+        `SELECT 1 FROM agent_config_overrides o
+          WHERE o."agentKey" = $1 AND o.layer = 'org'
+            AND (o."values"->>'live')::boolean = true
+            AND o."scopeId" = COALESCE(
+              (SELECT s.tenant_id FROM scenario_sessions s WHERE s.id::text = $2),
+              $3)
+          LIMIT 1`,
+        [DEBRIEF_AGENT_KEY, scenarioSessionId ?? null, tenantId],
+      );
+      return rows.length > 0;
+    } catch (error) {
+      this.logger.warn(
+        `[SKILL_EXPERIMENT] could not read the debrief agent's live organisations: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return false;
+    }
+  }
 
   async transcribeAudioFromBuffer(audioBuffer: Buffer): Promise<string> {
     try {
@@ -422,64 +498,13 @@ export class AiService {
     );
   }
 
-  // ── Agent memory (Bug Hunter / Builder notebook) ─────────────────────────
-  // ally-ai owns the `AgentMemory` Weaviate collection; ally-be's `agent_memories`
-  // is the system of record. Same explicit-timeout rule as the roadmap block: a
-  // memory write is best-effort and a lookup happens mid-task on a CI runner, so
-  // neither may hang on an unhealthy ally-ai.
-
-  /** Idempotent: the Weaviate object uuid IS the memory id. 8s — a write nobody waits on. */
-  async upsertAgentMemory(request: AgentMemoryUpsertRequest) {
-    return this.makeRequest<
-      AgentMemoryUpsertResponse,
-      AgentMemoryUpsertRequest
-    >(
-      `${ENDPOINTS.AGENT_MEMORY_UPSERT}/${request.memory_id}`,
-      request,
-      true,
-      'put',
-      undefined,
-      false,
-      8_000,
-    );
-  }
-
-  /** Called when an entry is retired or merged away, so it stops surfacing in lookups. */
-  async deleteAgentMemory(memoryId: string) {
-    return this.makeRequest<AgentMemoryDeleteResponse, undefined>(
-      `${ENDPOINTS.AGENT_MEMORY_DELETE}/${memoryId}`,
-      undefined,
-      true,
-      'delete',
-      undefined,
-      false,
-      8_000,
-    );
-  }
-
-  /** 10s — the agent is waiting on this mid-task, and a slow answer is worse than none. */
-  async findSimilarAgentMemories(request: AgentMemorySearchRequest) {
-    return this.makeRequest<
-      AgentMemorySearchResponse,
-      AgentMemorySearchRequest
-    >(
-      ENDPOINTS.AGENT_MEMORY_SEARCH,
-      request,
-      true,
-      'post',
-      undefined,
-      false,
-      10_000,
-    );
-  }
-
   // ── WhatsApp Q&A knowledge corpus ──────────────────────────────────────────
   // ally-ai owns the chunk collections; ally-be's Postgres is the system of record.
   //
   // Every one of these takes a `corpus`, which ally-ai resolves to that corpus's own Weaviate
   // collection — one per corpus, not one collection with a scope argument. That is what makes the
-  // boundary structural: there is no filter to leave unset, so a character-library document can
-  // never be retrieved by the WhatsApp bot. See ally-ai migration 005 for why (a similarity
+  // boundary structural: there is no filter to leave unset, so one corpus's document can never be
+  // retrieved for another's consumer. See ally-ai migration 005 for why (a similarity
   // threshold only means something against one chunk-size distribution; filtered ANN search is
   // weaker than unfiltered; and re-chunking one corpus must not touch the other's live index).
   //
@@ -567,24 +592,132 @@ export class AiService {
     );
   }
 
-  /** Retrieval only, no LLM. Backs the admin retrieval console. */
-  async searchKnowledgeChunks(
-    request: KnowledgeChunkSearchRequest,
-    corpus: KnowledgeCorpus,
+  /**
+   * Drop the whole Weaviate collection of a retired corpus (the character corpus's
+   * `CharacterChunk`, the Ally guide's `GuideLibraryChunk`, Debrief's `DebriefKnowledgeChunk`).
+   * Called once, by the confirmed platform-admin retirement after the corpus
+   * has been distilled or copied into the Context Library. `deleted: false` means it was already gone.
+   */
+  async dropRetiredKnowledgeCollection(collection: string) {
+    const params = new URLSearchParams({ collection, confirm: collection });
+    return this.makeRequest<{ deleted: boolean }, undefined>(
+      `${ENDPOINTS.KNOWLEDGE_CHUNK_RETIRED_COLLECTION}?${params.toString()}`,
+      undefined,
+      true,
+      'delete',
+      undefined,
+      false,
+      60_000,
+    );
+  }
+
+  // ── Context Library index ─────────────────────────────────────────────────
+  // The derived Weaviate index for `cl_chunks`. Every call names one versioned collection
+  // (`Ctx<Collection>_v{N}`); ally-ai refuses any other name. Explicit timeouts, as above.
+
+  /** Index up to 100 chunks; per-item failures come back in `failed`, never thrown. */
+  async contextChunksBulkUpsert(
+    collection: string,
+    items: ContextChunkUpsertItem[],
   ) {
     return this.makeRequest<
-      KnowledgeChunkSearchResponse,
-      KnowledgeChunkSearchRequest
+      ContextChunkBulkUpsertResponse,
+      { items: ContextChunkUpsertItem[] }
     >(
-      withCorpus(ENDPOINTS.KNOWLEDGE_CHUNK_SEARCH, corpus),
-      request,
+      `${ENDPOINTS.CONTEXT_CHUNK_BULK_UPSERT}?collection=${encodeURIComponent(collection)}`,
+      { items },
+      true,
+      'post',
+      undefined,
+      false,
+      120_000,
+    );
+  }
+
+  async contextChunksDelete(collection: string, chunkIds: string[]) {
+    return this.makeRequest<{ deleted: number }, { chunk_ids: string[] }>(
+      `${ENDPOINTS.CONTEXT_CHUNK_DELETE}?collection=${encodeURIComponent(collection)}`,
+      { chunk_ids: chunkIds },
       true,
       'post',
       undefined,
       false,
       30_000,
-      // The query is a worker's question on the WhatsApp path.
+    );
+  }
+
+  /** One page of indexed ids with their text hashes, for reconciliation. */
+  async contextChunksIds(
+    collection: string,
+    after?: string | null,
+    limit = 200,
+  ) {
+    const params = new URLSearchParams({ collection, limit: String(limit) });
+    if (after) params.set('after', after);
+    return this.makeRequest<ContextChunkIdsResponse, undefined>(
+      `${ENDPOINTS.CONTEXT_CHUNK_IDS}?${params.toString()}`,
+      undefined,
       true,
+      'get',
+      undefined,
+      false,
+      30_000,
+    );
+  }
+
+  /**
+   * Run every query against every requested retriever and return each ranked list
+   * separately; fusion happens in ally-be so each signal can be logged and tuned.
+   * `sensitive` redacts the body from logs (a learner's or an admin's own words).
+   */
+  async contextChunksSearch(
+    collection: string,
+    request: ContextChunkSearchRequest,
+    sensitive = false,
+  ) {
+    return this.makeRequest<
+      ContextChunkSearchResponse,
+      ContextChunkSearchRequest
+    >(
+      `${ENDPOINTS.CONTEXT_CHUNK_SEARCH}?collection=${encodeURIComponent(collection)}`,
+      request,
+      true,
+      'post',
+      undefined,
+      false,
+      15_000,
+      sensitive,
+    );
+  }
+
+  /**
+   * Embeddings with the index's own model, for platitude and duplicate checks and gap
+   * clustering. `sensitive` keeps the texts out of request logs (a person's own words).
+   */
+  async contextEmbed(texts: string[], sensitive = false) {
+    return this.makeRequest<ContextEmbedResponse, { texts: string[] }>(
+      ENDPOINTS.CONTEXT_CHUNK_EMBED,
+      { texts },
+      true,
+      'post',
+      undefined,
+      false,
+      60_000,
+      sensitive,
+    );
+  }
+
+  /** Drop a whole index version after a blue/green switch. Refused unless named twice. */
+  async contextDeleteCollection(collection: string) {
+    const params = new URLSearchParams({ collection, confirm: collection });
+    return this.makeRequest<{ deleted: boolean }, undefined>(
+      `${ENDPOINTS.CONTEXT_CHUNK_COLLECTION}?${params.toString()}`,
+      undefined,
+      true,
+      'delete',
+      undefined,
+      false,
+      60_000,
     );
   }
 
@@ -610,22 +743,17 @@ export class AiService {
    * cost the window.
    */
   @RetryWithinBudget({
-    attempts: 2,
-    delayMs: 500,
-    budgetMs: 40_000,
+    attempts: KNOWLEDGE_ANSWER_LIMITS.attempts,
+    delayMs: KNOWLEDGE_ANSWER_LIMITS.delayMs,
+    budgetMs: KNOWLEDGE_ANSWER_LIMITS.budgetMs,
     shouldRetry: isRetryableAiFailure,
     label: 'answerKnowledgeQuestion',
   })
   async answerKnowledgeQuestion(request: KnowledgeAnswerRequest) {
-    return this.makeRequest<KnowledgeAnswerResponse, KnowledgeAnswerRequest>(
+    return this.postKnowledge<KnowledgeAnswerResponse, KnowledgeAnswerRequest>(
       ENDPOINTS.KNOWLEDGE_AGENT_ANSWER,
       request,
-      true,
-      'post',
-      undefined,
-      false,
-      25_000,
-      true,
+      { timeoutMs: KNOWLEDGE_ANSWER_LIMITS.attemptMs },
     );
   }
 
@@ -658,16 +786,339 @@ export class AiService {
     label: 'checkWhatsAppCrisis',
   })
   async checkWhatsAppCrisis(request: CrisisCheckRequest) {
-    return this.makeRequest<CrisisCheckResponse, CrisisCheckRequest>(
+    return this.postKnowledge<CrisisCheckResponse, CrisisCheckRequest>(
       ENDPOINTS.KNOWLEDGE_AGENT_CRISIS_CHECK,
+      request,
+      { timeoutMs: 15_000 },
+    );
+  }
+
+  /**
+   * Answer through the Agents v2 engine (ally-ai `/agent/run`).
+   *
+   * ONE attempt, 25s (the answer call's per-attempt timeout). The engine falls back to
+   * `/knowledge-agent/answer` when this fails, and that fallback IS the retry — retrying here too
+   * would spend the SQS window twice before v1 even started.
+   *
+   * No Slack alert from here (`alertOnFailure=false`): the engine raises one throttled
+   * "agent runtime degraded" alert per bot and reason. The failure is still logged.
+   *
+   * redactBody=true: the payload is the person's question.
+   */
+  /**
+   * Which memory lines a health assistant may keep (chunk 8a). One attempt, 5s: it runs after the
+   * reply, and the caller keeps nothing when it fails or times out. The body is what the person
+   * said, so it is never logged.
+   */
+  async checkMemoryLines(request: MemoryCheckRequest) {
+    return this.postKnowledge<MemoryCheckResponse, MemoryCheckRequest>(
+      ENDPOINTS.AGENT_MEMORY_CHECK,
+      request,
+      { timeoutMs: 5_000, alertOnFailure: false },
+    );
+  }
+
+  /**
+   * A chat's new rolling summary (chunk 8a). One attempt, 15s, after the reply: the caller keeps
+   * the old summary when it fails, and the next reply tries again.
+   */
+  async summarizeConversation(request: ConversationSummaryRequest) {
+    return this.postKnowledge<
+      ConversationSummaryResponse,
+      ConversationSummaryRequest
+    >(ENDPOINTS.AGENT_CONVERSATION_SUMMARY, request, {
+      timeoutMs: 15_000,
+      alertOnFailure: false,
+    });
+  }
+
+  /**
+   * The owner's "How it works" (chunk 20d-2): the instructions a run would start from, built by
+   * ally-ai's own prompt code from the same body `runAgent` sends. No model call. Additive.
+   */
+  async agentInstructions(
+    request: AgentRunRequest,
+  ): Promise<AgentInstructions> {
+    return this.postKnowledge<AgentInstructions, AgentRunRequest>(
+      ENDPOINTS.AGENT_INSTRUCTIONS,
+      request,
+      { timeoutMs: 10_000, alertOnFailure: false },
+    );
+  }
+
+  /** The builder's safety check on text an owner typed into their instructions (chunk 20d-2). */
+  async checkOwnerText(
+    text: string,
+  ): Promise<{ refused: string | null; warning: string | null }> {
+    return this.postKnowledge<
+      { refused: string | null; warning: string | null },
+      { text: string }
+    >(
+      ENDPOINTS.AGENT_INSTRUCTIONS_CHECK,
+      { text },
+      {
+        timeoutMs: 10_000,
+        alertOnFailure: false,
+      },
+    );
+  }
+
+  async runAgent(request: AgentRunRequest) {
+    return this.postKnowledge<AgentRunResponse, AgentRunRequest>(
+      ENDPOINTS.AGENT_RUN,
+      request,
+      {
+        timeoutMs: KNOWLEDGE_ANSWER_LIMITS.attemptMs,
+        alertOnFailure: false,
+      },
+    );
+  }
+
+  /**
+   * `runAgent`, streamed (ally-ai `/agent/run/stream`): the run's live events go to `onEvent` as
+   * they arrive, and the stream's `final` is returned — the same body `runAgent` returns, so the
+   * caller treats both alike. Preview only; WhatsApp can't show a stream.
+   *
+   * Fails like `runAgent` does, as an `AiUpstreamError`, so the same v1 fallback follows: ally-ai's
+   * `error: timeout` or our own 22s deadline is `AI_SERVICE_TIMEOUT`, any other error event or a
+   * stream that ends without `final` is a 502. `signal` (the client went away) cancels the request,
+   * and with it the run.
+   *
+   * The body is the person's question, so it is never logged.
+   */
+  async runAgentStreaming(
+    request: AgentRunRequest,
+    onEvent: (event: AgentStreamEvent) => void,
+    signal?: AbortSignal,
+  ): Promise<AgentRunResponse> {
+    return this.streamSse<AgentRunResponse, AgentStreamEvent>(
+      ENDPOINTS.AGENT_RUN_STREAM,
+      request,
+      { deadlineMs: KNOWLEDGE_ANSWER_LIMITS.streamMs, what: 'agent run' },
+      onEvent,
+      signal,
+    );
+  }
+
+  /**
+   * One onboarding builder step (chunk 20a), streamed: `status` and `token` events, then the
+   * proposal. ally-ai caps a step at 45s (`BUILDER__STEP_TIMEOUT_SECONDS`), so its own
+   * `error: timeout` arrives before this deadline does.
+   */
+  async runBuilderStepStreaming(
+    request: BuilderStepRequest,
+    onEvent: (event: BuilderStreamEvent) => void,
+    signal?: AbortSignal,
+  ): Promise<BuilderStepResponse> {
+    return this.streamSse<BuilderStepResponse, BuilderStreamEvent>(
+      ENDPOINTS.BUILDER_STEP_STREAM,
+      request,
+      { deadlineMs: BUILDER_LIMITS.stepMs, what: 'builder step' },
+      onEvent,
+      signal,
+    );
+  }
+
+  /**
+   * Grade one checkup question (chunk 20a-2): the case and what the engine did go in, one verdict
+   * comes back. The same grader serves the Checkup, the eval suites and the scorecard.
+   *
+   * redactBody=true: the payload holds the question and the reply. No Slack alert: a failed grade
+   * is recorded on the result and the run carries on.
+   */
+  async gradeCheckup(
+    request: CheckupGradeRequest,
+  ): Promise<CheckupGradeResponse> {
+    return this.postKnowledge<CheckupGradeResponse, CheckupGradeRequest>(
+      ENDPOINTS.CHECKUP_GRADE,
+      request,
+      { timeoutMs: CHECKUP_GRADE_TIMEOUT_MS, alertOnFailure: false },
+    );
+  }
+
+  /**
+   * Change by chat (chunk 20a-2): the owner's request as a proposed before and after. Nothing is
+   * applied here. redactBody=true: the payload is the assistant's settings and the owner's words.
+   */
+  async proposeChange(
+    request: BuilderChangeRequest,
+  ): Promise<BuilderChangeResponse> {
+    return this.postKnowledge<BuilderChangeResponse, BuilderChangeRequest>(
+      ENDPOINTS.BUILDER_CHANGE,
+      request,
+      { timeoutMs: BUILDER_LIMITS.stepMs, alertOnFailure: false },
+    );
+  }
+
+  /**
+   * Checkup questions from what we learned (chunk 20a-2): each keeps the ids of the facts that
+   * answer it. redactBody=true: the payload is the business's own details.
+   */
+  async writeCheckupQuestions(
+    request: CheckupQuestionsRequest,
+  ): Promise<CheckupQuestionsResponse> {
+    return this.postKnowledge<
+      CheckupQuestionsResponse,
+      CheckupQuestionsRequest
+    >(ENDPOINTS.CHECKUP_QUESTIONS, request, {
+      timeoutMs: CHECKUP_GRADE_TIMEOUT_MS * 2,
+      alertOnFailure: false,
+    });
+  }
+
+  /**
+   * "Suggest more questions" (chunk 20d-2): the same writer, told which questions the checkup
+   * already asks so it offers new ones. Additive: `writeCheckupQuestions` is unchanged.
+   */
+  async suggestCheckupQuestions(
+    request: CheckupQuestionsRequest & { exclude: string[] },
+  ): Promise<CheckupQuestionsResponse> {
+    return this.postKnowledge<
+      CheckupQuestionsResponse,
+      CheckupQuestionsRequest & { exclude: string[] }
+    >(ENDPOINTS.CHECKUP_QUESTIONS, request, {
+      timeoutMs: CHECKUP_GRADE_TIMEOUT_MS * 2,
+      alertOnFailure: false,
+    });
+  }
+
+  /**
+   * Facts for "What we learned" from a batch of crawled pages. redactBody=true: the payload is
+   * a business's site text, which can carry staff names, phones and emails.
+   */
+  async extractOnboardingFacts(
+    request: BuilderExtractRequest,
+  ): Promise<BuilderExtractResponse> {
+    return this.makeRequest<BuilderExtractResponse, BuilderExtractRequest>(
+      ENDPOINTS.BUILDER_EXTRACT,
       request,
       true,
       'post',
       undefined,
       false,
-      15_000,
+      BUILDER_LIMITS.extractMs,
       true,
     );
+  }
+
+  /** An ally-ai SSE endpoint: live events to `onEvent`, resolving with `final`. */
+  private async streamSse<R, E>(
+    endpoint: string,
+    request: unknown,
+    { deadlineMs, what }: { deadlineMs: number; what: string },
+    onEvent: (event: E) => void,
+    signal?: AbortSignal,
+  ): Promise<R> {
+    const deadline = AbortSignal.timeout(deadlineMs);
+    const startedAt = Date.now();
+    try {
+      const response = await axios({
+        method: 'post',
+        url: `${this.config.ai.apiUrl}/${endpoint}`,
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'text/event-stream',
+          'x-api-key': this.config.ai.outboundApiKey,
+        },
+        data: request,
+        responseType: 'stream',
+        signal: signal ? AbortSignal.any([signal, deadline]) : deadline,
+      });
+      const parser = new SseParser();
+      for await (const chunk of response.data as AsyncIterable<Buffer>) {
+        for (const message of parser.push(chunk.toString('utf8'))) {
+          const data = JSON.parse(message.data);
+          if (message.event === 'final') {
+            this.logger.info(
+              `AI stream DONE | endpoint=${endpoint} | elapsedMs=${Date.now() - startedAt}`,
+            );
+            return data as R;
+          }
+          if (message.event === 'error') {
+            const code = String(data?.code ?? 'internal');
+            throw code === 'timeout'
+              ? new AiUpstreamError(
+                  `The ${what} timed out`,
+                  ErrorCode.AI_SERVICE_TIMEOUT,
+                  504,
+                )
+              : new AiUpstreamError(
+                  `The ${what} failed (${code})`,
+                  ErrorCode.AI_SERVICE_UNAVAILABLE,
+                  502,
+                );
+          }
+          onEvent({ event: message.event, data } as E);
+        }
+      }
+      throw new AiUpstreamError(
+        `The ${what.split(' ')[0]} stream ended without a final event`,
+        ErrorCode.AI_SERVICE_UNAVAILABLE,
+        502,
+      );
+    } catch (error) {
+      const failure =
+        deadline.aborted && !(error instanceof AiUpstreamError)
+          ? new AiUpstreamError(
+              `The ${what.split(' ')[0]} stream timed out`,
+              ErrorCode.AI_SERVICE_TIMEOUT,
+            )
+          : classifyAiFailure(error);
+      this.logger.warn(
+        `AI stream FAILED | endpoint=${endpoint} | elapsedMs=${Date.now() - startedAt} | ` +
+          `code=${failure.errorCode} | status=${failure.upstreamStatus ?? '-'}`,
+      );
+      throw failure;
+    }
+  }
+
+  /**
+   * `answerKnowledgeQuestion` inside whatever is LEFT of its 40s budget — the v1 fallback after a
+   * failed `/agent/run`.
+   *
+   * The budget is the SQS visibility window's (see `answerKnowledgeQuestion`), and the failed v2
+   * attempt already spent part of it. So each attempt's timeout is capped at the time remaining,
+   * and the retry follows `RetryWithinBudget`'s rule (only when elapsed + delay + the last
+   * attempt's duration still fits). The usual failure — `/agent/run` 404ing because the runtime
+   * is off — costs milliseconds, which leaves v1 nearly the whole budget.
+   */
+  async answerKnowledgeQuestionWithin(
+    request: KnowledgeAnswerRequest,
+    budgetMs: number,
+  ): Promise<KnowledgeAnswerResponse> {
+    const {
+      attempts,
+      delayMs,
+      attemptMs: maxAttemptMs,
+    } = KNOWLEDGE_ANSWER_LIMITS;
+    const startedAt = Date.now();
+    for (let attempt = 1; ; attempt++) {
+      const remainingMs = budgetMs - (Date.now() - startedAt);
+      const attemptStartedAt = Date.now();
+      try {
+        return await this.postKnowledge<
+          KnowledgeAnswerResponse,
+          KnowledgeAnswerRequest
+        >(ENDPOINTS.KNOWLEDGE_AGENT_ANSWER, request, {
+          timeoutMs: Math.max(1, Math.min(maxAttemptMs, remainingMs)),
+        });
+      } catch (error) {
+        const attemptMs = Date.now() - attemptStartedAt;
+        const elapsedMs = Date.now() - startedAt;
+        if (
+          attempt >= attempts ||
+          !isRetryableAiFailure(error) ||
+          elapsedMs + delayMs + attemptMs > budgetMs
+        ) {
+          throw error;
+        }
+        this.logger.warn(
+          `answerKnowledgeQuestionWithin: retrying after a ${attemptMs}ms failure; ` +
+            `elapsed ${elapsedMs}ms of ${budgetMs}ms budget`,
+        );
+        await new Promise((res) => setTimeout(res, delayMs));
+      }
+    }
   }
 
   /** Backfill/reindex batches. 60s because a batch embeds up to 64 items in one call. */
@@ -858,6 +1309,32 @@ export class AiService {
     }
   }
 
+  /**
+   * A POST to one of ally-ai's knowledge endpoints: throws on failure (the caller decides what a
+   * failure means) and logs the body's size only, never the person's message.
+   * `alertOnFailure: false` where the caller raises its own, throttled alert.
+   */
+  private postKnowledge<R, T>(
+    endpoint: string,
+    body: T,
+    {
+      timeoutMs,
+      alertOnFailure = true,
+    }: { timeoutMs: number; alertOnFailure?: boolean },
+  ): Promise<R> {
+    return this.makeRequest<R, T>(
+      endpoint,
+      body,
+      true,
+      'post',
+      undefined,
+      false,
+      timeoutMs,
+      true,
+      alertOnFailure,
+    );
+  }
+
   private async makeRequest<R, T>(
     endpoint: string,
     data: T,
@@ -877,6 +1354,10 @@ export class AiService {
     // outside the designated audit logger. Callers on those paths pass redactBody=true, which
     // logs the size only. Opt-IN rather than opt-out so existing endpoints keep their traces.
     redactBody = false,
+    // Whether a failure also goes to Slack ('AI Request Error'). Every existing caller keeps it.
+    // Off only where the caller raises its own, throttled alert — otherwise a dependency that is
+    // down by design (the Agents v2 runtime switched off) pages once per message.
+    alertOnFailure = true,
   ): Promise<R> {
     const requestTimeout = timeoutMs ?? this.maxTimeout;
     const execId = uuidv4();
@@ -998,18 +1479,20 @@ export class AiService {
           `dataSize=${dataSize}B | requestData=${requestDataForLog}`,
         error.stack,
       );
-      this.eventEmitter.emit('exception', {
-        statusCode: 500,
-        timestamp: new Date().toISOString(),
-        path: endpoint,
-        message:
-          `${execId} | startTime: ${startTime} | elapsedMs=${elapsedMs} | ` +
-          `category=${failureCategory} | ${error.message} | ` +
-          `errCode=${errCode} | upstreamStatus=${upstreamStatus} | ` +
-          `upstreamTraceId=${upstreamTraceId ?? 'none'} | ` +
-          `upstreamDetail=${JSON.stringify(upstreamDetail)}`,
-        type: 'AI Request Error',
-      } as NotificationErrorType);
+      if (alertOnFailure) {
+        this.eventEmitter.emit('exception', {
+          statusCode: 500,
+          timestamp: new Date().toISOString(),
+          path: endpoint,
+          message:
+            `${execId} | startTime: ${startTime} | elapsedMs=${elapsedMs} | ` +
+            `category=${failureCategory} | ${error.message} | ` +
+            `errCode=${errCode} | upstreamStatus=${upstreamStatus} | ` +
+            `upstreamTraceId=${upstreamTraceId ?? 'none'} | ` +
+            `upstreamDetail=${JSON.stringify(upstreamDetail)}`,
+          type: 'AI Request Error',
+        } as NotificationErrorType);
+      }
       if (throwError) {
         // Classified rather than flattened. `AiUpstreamError.message` is still
         // the raw axios message, so existing callers that log `error.message`
@@ -1144,9 +1627,10 @@ export class AiService {
     const promptCode = needMemory
       ? SCENARIO_EVALUATION_WITH_MEMORY_PROMPT_CODE
       : SCENARIO_EVALUATION_PROMPT_CODE;
-    const arm = usageTask
-      ? null
-      : await this.skillExperiments.assign(promptCode, scenarioSessionId);
+    const arm =
+      usageTask || (await this.debriefAgentIsLive(scenarioSessionId))
+        ? null
+        : await this.skillExperiments.assign(promptCode, scenarioSessionId);
     const experimentInput = {
       scenarioSessionId: scenarioSessionId ?? null,
       transcript: messages.map((m) => `${m.role}: ${m.content}`).join('\n'),

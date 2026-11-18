@@ -68,6 +68,24 @@ def guard_stale_websockets(tts_instance: Any) -> None:
     object.__setattr__(pool, "_ally_stale_guard", True)
 
 
+class _WhitespaceFilterWrapper:
+    """A wrapper to filter out whitespace-only text before synthesis."""
+
+    def __init__(self, tts_instance: "sarvam.TTS"):
+        self._tts_instance = tts_instance
+
+    async def push_text(self, text: str):
+        if not text or text.isspace():
+            logger.warning(
+                "[Sarvam] Ignoring whitespace-only text for synthesis: %s", text
+            )
+            return
+        await self._tts_instance.push_text(text)
+
+    def __getattr__(self, name):
+        return getattr(self._tts_instance, name)
+
+
 class SarvamTTSClient(BaseTTSClient):
     """
     Sarvam TTS client implementation.
@@ -75,7 +93,8 @@ class SarvamTTSClient(BaseTTSClient):
     Args:
         model: Sarvam model name (e.g., "multilingual-meera")
         speaker: Sarvam speaker name (e.g., "meera", "arjun")
-        language_code: BCP 47 language code (e.g., "en-IN", "hi-IN")
+        language_code: BCP 47 language code
+                       (e.g., "en-IN", "hi-IN")
         api_key: Optional API key (defaults to settings.SARVAM_API_KEY)
     """
 
@@ -291,6 +310,9 @@ class SarvamTTSClient(BaseTTSClient):
                     logger.warning(
                         f"[Sarvam] Failed to apply parameters to new instance: " f"{e}"
                     )
+        if not isinstance(self._tts_instance, _WhitespaceFilterWrapper):
+            self._tts_instance = _WhitespaceFilterWrapper(self._tts_instance)
+
         return self._tts_instance
 
     def _apply_parameters_dict(self, params_dict: Dict[str, Any]) -> None:

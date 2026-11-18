@@ -6,6 +6,10 @@ import { CSS } from "@dnd-kit/utilities";
 import { Tooltip } from "@ally-ui-mono/ui-shared";
 import { RoadmapVoteBudget, RoadmapOpportunity, RoadmapOpportunityType } from "@types";
 
+import { DirectorStarButton } from "./DirectorStarButton";
+import { NewColleagueTag } from "./NewToYouChip";
+import { useScoreUnit } from "./useScoreUnit";
+import { formatPoints } from "./utils/points";
 import {
   isConsumerSourced,
   SOURCE_BADGE_STYLE,
@@ -49,6 +53,7 @@ export const MonthOpportunityCard: React.FC<MonthOpportunityCardProps> = ({
   onSetVotes,
   onOpen,
 }) => {
+  const { enabled } = useScoreUnit();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: opportunity.id,
     disabled: !canDrag,
@@ -102,6 +107,7 @@ export const MonthOpportunityCard: React.FC<MonthOpportunityCardProps> = ({
             {SOURCE_LABEL[opportunity.source]}
           </span>
         )}
+        {canVote && enabled && opportunity.breadthNew && <NewColleagueTag />}
       </div>
 
       {/* Priority bar, same unfiltered scale as the table's, so switching layout doesn't rescale
@@ -111,13 +117,20 @@ export const MonthOpportunityCard: React.FC<MonthOpportunityCardProps> = ({
           <div className="bg-primary-500 h-full" style={{ width: `${scorePercent}%` }} />
         </div>
         <span className="text-typography-secondary font-mono text-xs tabular-nums">
-          {opportunity.priorityScore}
+          {formatPoints(opportunity.priorityScore)}
         </span>
       </div>
 
       {/* stopPropagation on the wrapper, on BOTH events: click alone is not enough, because
           dnd-kit's PointerSensor activates on pointerdown — without it, tapping the vote button
           starts dragging the card instead of adding a vote. */}
+      <div
+        className="flex flex-col items-center gap-1"
+        onClick={event => event.stopPropagation()}
+        onPointerDown={event => event.stopPropagation()}
+      >
+        <DirectorStarButton opportunity={opportunity} />
+      </div>
       {budget && (
         <div
           onClick={event => event.stopPropagation()}

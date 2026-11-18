@@ -218,4 +218,12 @@ export interface SaveNoteTranscriptInput {
   chatId: number;
   /** The full (possibly accumulated) dictation transcript to store. */
   transcript: string;
+  /**
+   * Length, in seconds, of the dictation just recorded (not the note's
+   * accumulated total) — a manual note's startedAt/endedAt are both set to
+   * the instant it was created and never touched again, so without this
+   * the backend's call-duration math always computes zero no matter how
+   * long the counsellor actually dictated.
+   */
+  durationSeconds?: number;
 }

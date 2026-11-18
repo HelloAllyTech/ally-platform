@@ -10,6 +10,7 @@ import {
   DEFAULT_ANNOTATION_SETTINGS,
   MAX_ANNOTATION_UNITS,
 } from "@constants";
+import { useContentAuthoring } from "@hooks";
 import {
   AnnotationArtifactKind,
   AnnotationFormValue,
@@ -21,6 +22,7 @@ import {
 } from "@types";
 
 import { resegmentArtifact } from "../../../annotationSegmentation";
+import { AttemptLimitField } from "../AttemptLimitField";
 import { ItemEditorFrame } from "../ItemEditorFrame";
 import { AnnotationLabelsEditor } from "./AnnotationLabelsEditor";
 
@@ -28,6 +30,8 @@ interface AnnotationItemEditorProps {
   sectionIndex: number;
   itemIndex: number;
   onDelete: () => void;
+  /** The course is live: Max attempts can only go up, through its own endpoint. */
+  isPublished?: boolean;
 }
 
 const sectionClass = "border-t border-border-light pt-4 flex flex-col gap-3";
@@ -57,9 +61,20 @@ export const AnnotationItemEditor: FC<AnnotationItemEditorProps> = ({
   sectionIndex,
   itemIndex,
   onDelete,
+  isPublished = false,
 }) => {
-  const { control, setValue } = useFormContext<TrackFormValues>();
+  const {
+    control,
+    setValue,
+    formState: { defaultValues },
+  } = useFormContext<TrackFormValues>();
+  const { canAuthorCourses } = useContentAuthoring();
   const base = `sections.${sectionIndex}.items.${itemIndex}.annotation` as const;
+
+  // What the server holds (the form's defaults are reset from it after every
+  // load and save). Structure is locked on a live course, so index = item.
+  const savedItem = defaultValues?.sections?.[sectionIndex]?.items?.[itemIndex];
+  const isLive = isPublished && Boolean(savedItem?.serverId);
 
   const annotation =
     (useWatch({ control, name: base }) as AnnotationFormValue | undefined) ?? EMPTY;
@@ -296,23 +311,30 @@ export const AnnotationItemEditor: FC<AnnotationItemEditorProps> = ({
             />
           </label>
 
-          <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-typography-700">
-              Attempts (blank = unlimited)
+          <div className="flex flex-col gap-1">
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-typography-700">
+              Max attempts
+              <Tooltip
+                label={
+                  isLive
+                    ? "On a live course the limit can only go up, and applies to every enrolled learner."
+                    : "Checking Unlimited lets learners retry this artifact as many times as they want."
+                }
+                align="top"
+              >
+                <button type="button" className="cursor-pointer inline-flex items-center">
+                  <TooltipIcon />
+                </button>
+              </Tooltip>
             </span>
-            <input
-              type="number"
-              min={1}
-              value={annotation.settings.maxAttempts ?? ""}
-              onChange={event =>
-                setSettings({
-                  maxAttempts: event.target.value === "" ? null : Number(event.target.value),
-                })
-              }
-              onWheel={event => event.currentTarget.blur()}
-              className={`${inputClass} w-24`}
+            <AttemptLimitField
+              value={annotation.settings.maxAttempts}
+              onChange={maxAttempts => setSettings({ maxAttempts })}
+              savedValue={savedItem?.annotation?.settings?.maxAttempts}
+              isLive={isLive}
+              canEdit={canAuthorCourses}
             />
-          </label>
+          </div>
 
           <label className="flex flex-col gap-1">
             <span className="inline-flex items-center gap-1 text-xs font-medium text-typography-700">

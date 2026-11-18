@@ -64,6 +64,37 @@ export interface knowledgeSource {
   unlocksFromStateId?: string | null;
 }
 
+/**
+ * A memory for the Stage Director main prompt (`{memories}`): an event or
+ * thing the client can reveal. Same shape as a Knowledge Source but stored
+ * in its own field (`metadata.memories`) so #3's `knowledgeSources` are never
+ * touched. `unlocksInStateIds` lists the states at which it unlocks (any of
+ * them); empty = available from the start. `unlocksFromStateId` is the older
+ * single lock ("this state and later"), converted on load and cleared on save.
+ */
+export interface ScenarioMemory {
+  id: string;
+  title: string;
+  content?: string;
+  unlocksInStateIds?: string[];
+  unlocksFromStateId?: string | null;
+}
+
+/** Body of POST /v1/learn/scenarios/memories/map — the editor's current form values. */
+export interface MapScenarioMemoriesRequest {
+  knowledgeSources: KnowledgeSourceInput[];
+  states: Array<{ id: string; name: string; guidelines?: string }>;
+  characterProfileText?: string;
+  roleInstructions?: string;
+  title?: string;
+}
+
+export interface MapScenarioMemoriesResponse {
+  memories: ScenarioMemory[];
+  /** False when the agent could not run and the sources were copied as they are. */
+  mapped?: boolean;
+}
+
 export type KnowledgeSourceInput = {
   id?: string;
   title: string;
@@ -138,6 +169,8 @@ export interface SimulationInput {
    * these two any more (`enableFeedback`, retired 2026-08-31).
    */
   feedbackTabs?: { debrief: boolean; transcript: boolean };
+  /** Debrief risk-cue option: null/unset = Standard, or an option's key. */
+  debriefRiskCueOption?: string | null;
   fillerEnabled?: boolean;
   languageGlossaryEnabled?: boolean;
   comfortAudioEnabled?: boolean;
@@ -155,6 +188,8 @@ export interface SimulationInput {
   stateInstructions?: stateInstruction[];
   behaviorInstructions?: behaviourInstruction[];
   knowledgeSources?: KnowledgeSourceInput[];
+  /** Stage Director prompt's memories — separate from knowledgeSources. */
+  memories?: ScenarioMemory[];
   stateNames?: stateInstruction[];
   translationOpeningStatements?: Record<string, string[]>;
   translationDescription?: Record<string, string>;
@@ -278,6 +313,8 @@ export interface GetSimulationByIdResponse {
     stateInstructions?: stateInstruction[];
     characterProfileText?: string;
     knowledgeSources?: knowledgeSource[];
+    /** Stage Director prompt's memories — separate from knowledgeSources. */
+    memories?: ScenarioMemory[];
     stateNames?: stateInstruction[];
     linguisticStyleSamples?: Record<string, string[]>;
     allowedFillerWords?: Record<string, string[]>;
@@ -356,6 +393,7 @@ export interface StartSimulationResponse {
       summaryChecklistEnabled?: boolean;
       showScoreMeter?: boolean;
       pauseEnabled?: boolean;
+      debriefRiskCueOption?: string | null;
       supervisorNotesEnabled?: boolean;
       videoActorEnabled?: boolean;
       liveTabEnabled?: boolean;
@@ -574,6 +612,11 @@ export interface CharacterData {
   coverImageUrl?: string;
   coverVideoUrl?: string;
   characterProfileText?: string;
+  /**
+   * `scenario_characters.appearance` (≤ 500): one fixed line on how they look,
+   * added to every AI image the character is in. Absent on an older backend.
+   */
+  appearance?: string | null;
   /**
    * Voice per language, keyed by `languages.id`. A character used to hold a
    * single `voiceId`, which a simulation (one voice PER language) could only

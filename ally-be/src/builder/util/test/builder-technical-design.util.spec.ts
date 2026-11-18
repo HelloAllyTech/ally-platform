@@ -43,13 +43,13 @@ const designedPrd = (
       designMd: 'Add an optional promptHtml beside prompt. '.repeat(10),
       scope: [
         { repo: 'ally-be', files: ['src/quiz/**/*.ts'] },
-        { repo: 'ally-mobile', files: ['src/screens/Quiz.tsx'] },
+        { repo: 'ally-ai', files: ['src/screens/Quiz.tsx'] },
       ],
       contracts: [
         {
           name: 'quiz_questions.payload.promptHtml',
           change: 'new optional key; prompt unchanged',
-          readers: ['ally-mobile:src/screens/Quiz.tsx:88'],
+          readers: ['ally-ai:src/screens/Quiz.tsx:88'],
         },
       ],
       compatibilityMd: 'Old clients read prompt, which still holds plain text.',
@@ -243,17 +243,17 @@ describe('computeDesignReadiness', () => {
       designedPrd({
         testMap: [
           ...design.testMap,
-          // In scope: the ally-mobile entry names it exactly.
+          // In scope: the ally-ai entry names it exactly.
           {
             requirementId: 'R2',
-            repo: 'ally-mobile',
+            repo: 'ally-ai',
             file: 'src/screens/Quiz.tsx',
             asserts: 'x',
           },
           // Not in scope: only Quiz.tsx is, not its spec.
           {
             requirementId: 'R2',
-            repo: 'ally-mobile',
+            repo: 'ally-ai',
             file: 'src/__tests__/Quiz.spec.tsx',
             asserts: 'x',
           },
@@ -269,7 +269,7 @@ describe('computeDesignReadiness', () => {
     );
     expect(blockers).toEqual([
       expect.stringMatching(
-        /not include: ally-mobile:src\/__tests__\/Quiz\.spec\.tsx, ally-web:src\/quiz\/test\/quiz\.spec\.ts\./,
+        /not include: ally-ai:src\/__tests__\/Quiz\.spec\.tsx, ally-web:src\/quiz\/test\/quiz\.spec\.ts\./,
       ),
     ]);
   });

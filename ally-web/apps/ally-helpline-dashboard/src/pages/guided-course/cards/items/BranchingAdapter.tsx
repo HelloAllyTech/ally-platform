@@ -6,7 +6,11 @@ import { BranchingScenarioPlayer } from "../../../track-player/components/player
 
 import type { ItemAdapterProps } from "./types";
 
-/** Scenario quiz, inline. "Next" and "back to course" both return to the conversation. */
+/**
+ * Scenario quiz, inline. "Next" and "back to course" both return to the
+ * conversation. Always classic: a STORY scenario needs the full screen, which
+ * an inline card can't give it.
+ */
 const BranchingAdapter: FC<ItemAdapterProps<StartBranchingScenarioItemPayload>> = ({
   payload,
   itemId,
@@ -19,6 +23,7 @@ const BranchingAdapter: FC<ItemAdapterProps<StartBranchingScenarioItemPayload>> 
     onCompleted={onCompleted}
     onRequestNext={onClose}
     onBackToCourse={onClose}
+    forceClassic
   />
 );
 

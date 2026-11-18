@@ -61,7 +61,36 @@ export interface GetLearnTracksResponse {
   count: number;
 }
 
+/** Which gates complete a roleplay item; absent = SCORE_AND_DURATION. */
+export type RoleplayCompletionLogic = "SCORE" | "DURATION" | "SCORE_AND_DURATION" | "PARTICIPATION";
+
+/**
+ * A roleplay item's completion rule as the server resolved it, platform
+ * default included. Display from this, never from raw completionCriteria —
+ * an item with no minDurationSeconds can still have a default minimum.
+ */
+export interface RoleplayGate {
+  completionLogic: RoleplayCompletionLogic;
+  /** Null when no score gate applies. */
+  minScore: number | null;
+  /** Null when no duration gate applies. */
+  minDurationSeconds: number | null;
+}
+
+export type RoleplayAttemptFailureReason = "INSUFFICIENT_SCORE" | "INSUFFICIENT_DURATION";
+
+/** The learner's latest roleplay attempt that missed a gate; null once the item is complete. */
+export interface LastRoleplayAttempt {
+  failureReasons: RoleplayAttemptFailureReason[];
+  score: number | null;
+  durationSeconds: number;
+  requiredScore: number | null;
+  requiredDurationSeconds: number | null;
+  endedAt: string;
+}
+
 export interface TrackCompletionCriteria {
+  completionLogic?: RoleplayCompletionLogic;
   minScore?: number;
   minDurationSeconds?: number;
   /** Roleplay: one attempt only, locked once submitted. */
@@ -111,6 +140,10 @@ export interface TrackDetailItem {
   maxWatchedPct: number | null;
   /** Assessment roleplay: when the one attempt was submitted; null while still open. */
   assessmentSubmittedAt?: string | null;
+  /** Roleplay: the resolved completion rule (absent from older servers). */
+  roleplayGate?: RoleplayGate;
+  /** Roleplay: why the latest attempt didn't complete the item. */
+  lastRoleplayAttempt?: LastRoleplayAttempt | null;
   /** The author enabled a discussion thread beneath this item. */
   hasDiscussion?: boolean;
   /**
@@ -626,6 +659,10 @@ export interface StartRoleplayItemPayload extends StartTrackItemBase {
   lastScenarioSessionId: string | null;
   /** Assessment roleplay: when the one attempt was submitted; null while still open. */
   assessmentSubmittedAt?: string | null;
+  /** The resolved completion rule (absent from older servers). */
+  roleplayGate?: RoleplayGate;
+  /** Why the latest attempt didn't complete the item; null once complete. */
+  lastRoleplayAttempt?: LastRoleplayAttempt | null;
 }
 
 export interface StartCaseItemPayload extends StartTrackItemBase {
@@ -683,14 +720,33 @@ export interface ArticleResourceEmbeddabilityResponse {
   resources: { id: string; openExternally: boolean }[];
 }
 
+/** How an article is laid out for the learner. */
+export type ArticleExperience = "CLASSIC" | "MAGAZINE" | "CARDS";
+
+/** An article's cover photo. */
+export interface ArticleCover {
+  url: string;
+  alt?: string;
+}
+
 export interface StartArticleItemPayload extends StartTrackItemBase {
   type: TrackItemType.ARTICLE;
+  /**
+   * Highlight boxes arrive inside it as
+   * `<div data-ally-callout="say|info|warn">…</div>`; the player adds their
+   * icon and label.
+   */
   html: string;
   minReadSeconds: number;
   /** Empty for an article authored without questions. */
   questions?: ArticleQuestion[];
   answeredQuestionCount?: number;
   resources?: ArticleResource[];
+  /** Absent from older servers; anything unknown reads as "CLASSIC". */
+  experience?: ArticleExperience;
+  cover?: ArticleCover | null;
+  /** 0–5 short lines shown as "Key takeaways" at the end. */
+  takeaways?: string[];
 }
 
 /** Response to `POST .../article-questions/:questionId/answer`. */
@@ -748,6 +804,9 @@ export interface StartGameItemPayload extends StartTrackItemBase {
 
 export type BranchingOutcomeTone = "POSITIVE" | "MIXED" | "NEGATIVE";
 
+/** How the scenario is staged: cards (CLASSIC) or full-screen photo and panel (STORY). */
+export type BranchingExperience = "CLASSIC" | "STORY";
+
 export interface BranchingChoice {
   id: string;
   text: string;
@@ -759,7 +818,7 @@ export interface BranchingNode {
   title?: string;
   text: string;
   image?: { url: string; alt?: string };
-  /** Absent or empty means this scene is an ending. */
+  /** Absent or empty means this scene is an ending; one choice is a single "continue" button. */
   choices?: BranchingChoice[];
   outcome?: BranchingOutcomeTone;
   score?: number;
@@ -777,6 +836,8 @@ export interface BranchingRecapRun {
 /** The whole story ships to the learner; the server scores the path walked. */
 export interface StartBranchingScenarioItemPayload extends StartTrackItemBase {
   type: TrackItemType.BRANCHING_SCENARIO;
+  /** Absent from older servers; anything but "STORY" plays classic. */
+  experience?: BranchingExperience;
   intro: string | null;
   startNodeId: string;
   nodes: BranchingNode[];

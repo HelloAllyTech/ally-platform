@@ -1,0 +1,55 @@
+{
+  "_about": "Image Studio eval set. Fictional people only. Covers test text-only images; sequences test character consistency across scenes with cast sheets as references. Edit freely, but keep it small: every run pays for each image.",
+  "covers": [
+    { "id": "cover-qpr", "slotKind": "course_cover", "description": "A volunteer and a young man talking quietly on a park bench in the late afternoon, the volunteer leaning in to listen." },
+    { "id": "cover-helpline", "slotKind": "course_cover", "description": "A helpline counsellor with a headset at a desk by a window at night, a mug of tea, a calm focused expression." },
+    { "id": "roleplay-anita", "slotKind": "roleplay_cover", "description": "Anita, a 45-year-old school teacher from Pune, tired but composed." },
+    { "id": "badge-listener", "slotKind": "badge_icon", "description": "An emblem of two speech shapes overlapping with a small heart, for completing the active listening module." },
+    { "id": "quiz-body-language", "slotKind": "quiz_question", "description": "A client sitting with arms crossed and looking away while a counsellor waits with an open posture." }
+  ],
+  "sequences": [
+    {
+      "id": "ravi-night-call",
+      "cast": [
+        { "id": "ravi", "name": "Ravi", "appearance": "a man in his early 30s, short black beard, slim, navy hoodie" }
+      ],
+      "setting": "Ravi's small rented room: single bed, a desk with a laptop, a window with a city at night",
+      "scenes": [
+        "Ravi sits on the edge of his bed at night, staring at his phone, the room lit only by the screen.",
+        "Ravi holds the phone to his ear, eyes closed, shoulders hunched.",
+        "Ravi leans back against the wall, phone still to his ear, slightly less tense.",
+        "Ravi sits at his desk in the morning light, writing something down in a notebook.",
+        "Ravi opens the window and looks out at the city at dawn, a faint calm on his face."
+      ]
+    },
+    {
+      "id": "meera-first-session",
+      "cast": [
+        { "id": "meera", "name": "Meera", "appearance": "a counsellor in her 40s, shoulder-length grey-streaked hair, round glasses, maroon cardigan" },
+        { "id": "sana", "name": "Sana", "appearance": "a 19-year-old college student, long braid, oversized yellow sweater" }
+      ],
+      "setting": "A small counselling room: two armchairs, a low table with tissues and a plant, soft daylight",
+      "scenes": [
+        "Sana sits on the edge of an armchair, hands clasped, avoiding eye contact, while Meera sits across from her.",
+        "Meera leans slightly forward with an open, warm expression; Sana glances up for the first time.",
+        "Sana talks, gesturing a little with one hand; Meera listens and nods.",
+        "Sana wipes her eyes with a tissue while Meera waits quietly.",
+        "Both stand at the door at the end of the session; Sana gives a small, shy smile."
+      ]
+    },
+    {
+      "id": "kiran-workplace",
+      "cast": [
+        { "id": "kiran", "name": "Kiran", "appearance": "a woman in her late 20s, short curly hair, green kurta, silver stud earrings" }
+      ],
+      "setting": "An open-plan office in the evening, mostly empty desks, warm desk lamps",
+      "scenes": [
+        "Kiran sits alone at her desk late in the evening, head resting on one hand, surrounded by papers.",
+        "A colleague's hand places a cup of tea on Kiran's desk; Kiran looks up, surprised.",
+        "Kiran and a colleague sit side by side in a quiet break room, talking.",
+        "Kiran walks out of the office building into the evening street, phone in hand.",
+        "Kiran sits on her balcony at home with a book, relaxed."
+      ]
+    }
+  ]
+}

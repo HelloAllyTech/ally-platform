@@ -41,6 +41,67 @@ export interface Tenant {
   hideRankInCommunity: boolean;
   engagementReminderEnabled: boolean;
   isTestOrganization: boolean;
+  /** Org-level branding switch; only an unrestricted platform admin can flip it. */
+  brandingEnabled: boolean;
+  /** Resolved branding: always complete, Ally defaults while the switch is off. */
+  branding: TenantBranding;
+  /** `/login?org=<code>` on the consumer app; null when the backend has no app base URL. */
+  brandedSignInUrl: string | null;
+}
+
+/** Light-to-dark ramp derived server-side from the one brand hex, keyed like Tailwind. */
+export interface BrandColourRamp {
+  DEFAULT: string;
+  50: string;
+  100: string;
+  200: string;
+  300: string;
+  400: string;
+  500: string;
+  600: string;
+  700: string;
+  800: string;
+  900: string;
+}
+
+export interface TenantBranding {
+  enabled: boolean;
+  displayName: string;
+  logoUrl: string | null;
+  faviconUrl: string | null;
+  primaryColor: string;
+  welcomeLine: string | null;
+  poweredByAlly: true;
+  tokens: {
+    primary: BrandColourRamp;
+    /** Label colour that reads on the brand colour. */
+    onPrimary: string;
+  };
+}
+
+/** PATCH /v1/tenants/:id/branding — a partial; null clears a field back to the Ally default. */
+export interface UpdateTenantBrandingBody {
+  displayName?: string | null;
+  primaryColor?: string | null;
+  faviconUrl?: string | null;
+  welcomeLine?: string | null;
+}
+
+export interface UpdateTenantBrandingResponse {
+  branding: TenantBranding;
+  /** Saved anyway; e.g. a colour that passes 3:1 but not 4.5:1. */
+  warnings: string[];
+}
+
+export interface BrandingFaviconUploadRequest {
+  fileName: string;
+  fileSize: number;
+  contentType: string;
+}
+
+export interface BrandingFaviconUploadResponse {
+  presignedUrl: string;
+  faviconUrl: string;
 }
 
 export interface GetTenantResponse {
@@ -54,6 +115,10 @@ export enum TabType {
   ORGANIZATIONS = "organizations",
   // Super-admin-tier management tab, visible to super duper admins only.
   SUPER_ADMINS = "super-admins",
+  // Debrief access (Clinical advisor and Debrief owner roles), gated like Ally admins.
+  DEBRIEF_ACCESS = "debrief-access",
+  // The tab's id before it was renamed; old links still open it.
+  CLINICAL_ADVISORS = "clinical-advisors",
   // Which organisation a WhatsApp number belongs to. Lives here because it is about people,
   // gated on the WhatsApp bot's own permission because it decides whose documents answer them.
   PHONE_MAPPINGS = "whatsapp-numbers",
@@ -85,6 +150,14 @@ export interface UserListProps {
   formatDate: (iso: string) => string;
   onOptionSelect?: (option: string, user: UserListUser) => void;
   canEditUser?: boolean;
+  /** Row selection for bulk actions; omit for a list with no checkboxes. */
+  selection?: {
+    isSelected: (id: number) => boolean;
+    toggle: (id: number) => void;
+    toggleAll: () => void;
+    allSelected: boolean;
+    someSelected: boolean;
+  };
 }
 
 export interface OrganizationListProps {
@@ -144,6 +217,8 @@ export interface CreateTenantBody {
   hideRankInCommunity?: boolean;
   engagementReminderEnabled?: boolean;
   isTestOrganization?: boolean;
+  /** Super-admin only; the backend drops it from a restricted admin's request. */
+  brandingEnabled?: boolean;
 }
 
 export interface GetUsersResponse {

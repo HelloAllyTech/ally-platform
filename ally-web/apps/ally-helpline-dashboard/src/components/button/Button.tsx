@@ -15,7 +15,9 @@ const getButtonStyles = (variant: ButtonProps["variant"]) => {
       return "bg-transparent border-none hover:bg-transparent disabled:bg-transparent";
     case ButtonVariant.PRIMARY:
     default:
-      return "text-white bg-primary-500 hover:bg-primary-600 disabled:bg-primary/50 font-tertiary";
+      // text-primary-foreground, not text-white: an org whose brand colour is
+      // light gets ink labels from the backend (see TenantBranding.tokens.onPrimary).
+      return "text-primary-foreground bg-primary-500 hover:bg-primary-600 disabled:bg-primary/50 font-tertiary";
   }
 };
 

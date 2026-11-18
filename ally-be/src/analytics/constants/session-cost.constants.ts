@@ -100,6 +100,7 @@ export const SESSION_COST_COMPONENT_BY_TASK: Partial<
 > = {
   [LlmTask.AGENT_TURN]: 'dialogue',
   [LlmTask.CLIENT_WORKING_MEMORY]: 'dialogue',
+  [LlmTask.STAGE_DIRECTOR]: 'dialogue',
   [LlmTask.WORKING_MEMORY_EMBEDDING]: 'dialogue',
   [LlmTask.KNOWLEDGE_RETRIEVAL]: 'dialogue',
   [LlmTask.ROLLING_SUMMARY]: 'dialogue',

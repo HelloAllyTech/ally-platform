@@ -10,7 +10,6 @@ import {
   BugHuntDecisionOwners,
   BugHuntDecisionPoint,
   BugHuntDecisionReplay,
-  BugHunterMemoryEntry,
   BugHunterMode,
   BugHunterModelSettings,
   BugHunterNotification,
@@ -24,10 +23,8 @@ import {
   ListBugFindingsQuery,
   ListBugFindingsResponse,
   ListBugHunterFeatureMapsResponse,
-  ListBugHunterMemoryResponse,
   ListBugHunterNotificationsResponse,
   ListBugHuntRunsResponse,
-  WriteBugHunterMemoryBody,
 } from "@types";
 
 import { baseAPI } from "./baseApi";
@@ -397,8 +394,8 @@ export const bugHunterAPI = baseAPI.injectEndpoints({
     }),
 
     // ── The notebook ────────────────────────────────────────────────────────
-    // What past sweeps and admins wrote down for the next one. Active entries
-    // for a repo (plus platform-wide ones), strongest evidence first.
+    // Bug Hunter's notes are the Context Library's Bug Hunter Notes collection,
+    // managed there; this page keeps the feature map.
     /**
      * Bug Hunter's feature map: one card per user-facing feature, how it works
      * across repos. Written by a weekly read-only run; read by every study.
@@ -415,17 +412,14 @@ export const bugHunterAPI = baseAPI.injectEndpoints({
       providesTags: [{ type: TAG_TYPES.BUG_HUNTER_FEATURE_MAP, id: "LIST" }],
     }),
 
-    /** Remove a wrong card; the reason becomes a notebook lesson the next map run reads. */
+    /** Remove a wrong card; the reason becomes a Bug Hunter note the next map run reads. */
     removeBugHunterFeatureMap: builder.mutation<{ removed: true }, { id: string; reason: string }>({
       query: ({ id, reason }) => ({
         url: ApiEndpoints.BUG_HUNTER.FEATURE_MAP_REMOVE(id),
         method: HttpMethod.POST,
         body: { reason },
       }),
-      invalidatesTags: [
-        { type: TAG_TYPES.BUG_HUNTER_FEATURE_MAP, id: "LIST" },
-        { type: TAG_TYPES.BUG_HUNTER_MEMORY, id: "LIST" },
-      ],
+      invalidatesTags: [{ type: TAG_TYPES.BUG_HUNTER_FEATURE_MAP, id: "LIST" }],
     }),
 
     /** Start a read-only map run now, for one repo or all of them. Returns the run ids started. */
@@ -436,66 +430,6 @@ export const bugHunterAPI = baseAPI.injectEndpoints({
         body,
       }),
       invalidatesTags: [{ type: TAG_TYPES.BUG_HUNTER_RUNS, id: "LIST" }],
-    }),
-
-    getBugHunterMemory: builder.query<
-      ListBugHunterMemoryResponse,
-      { repo?: string; limit?: number } | void
-    >({
-      query: params => ({
-        url: ApiEndpoints.BUG_HUNTER.MEMORY,
-        method: HttpMethod.GET,
-        params: params || undefined,
-      }),
-      providesTags: [{ type: TAG_TYPES.BUG_HUNTER_MEMORY, id: "LIST" }],
-    }),
-
-    /**
-     * Add an entry by hand. A person's note lands ACTIVE at once — it is
-     * already curated — and a pinned one is never edited or retired by the
-     * hourly curator.
-     */
-    addBugHunterMemory: builder.mutation<BugHunterMemoryEntry, WriteBugHunterMemoryBody>({
-      query: body => ({
-        url: ApiEndpoints.BUG_HUNTER.MEMORY,
-        method: HttpMethod.POST,
-        body,
-      }),
-      invalidatesTags: [{ type: TAG_TYPES.BUG_HUNTER_MEMORY, id: "LIST" }],
-    }),
-
-    retireBugHunterMemory: builder.mutation<BugHunterMemoryEntry, string>({
-      query: id => ({
-        url: ApiEndpoints.BUG_HUNTER.MEMORY_RETIRE(id),
-        method: HttpMethod.POST,
-      }),
-      invalidatesTags: [{ type: TAG_TYPES.BUG_HUNTER_MEMORY, id: "LIST" }],
-    }),
-
-    /**
-     * Entries the agent retired on its own in the last month, each with the
-     * rule that fired (OPP-0752). Shares the list tag with the active set:
-     * a restore moves a row from one list to the other, so both refetch.
-     */
-    getBugHunterRetiredMemory: builder.query<
-      ListBugHunterMemoryResponse,
-      { repo?: string; limit?: number } | void
-    >({
-      query: params => ({
-        url: ApiEndpoints.BUG_HUNTER.MEMORY_RETIRED,
-        method: HttpMethod.GET,
-        params: params || undefined,
-      }),
-      providesTags: [{ type: TAG_TYPES.BUG_HUNTER_MEMORY, id: "LIST" }],
-    }),
-
-    /** The undo for a retirement, the agent's or a person's. */
-    restoreBugHunterMemory: builder.mutation<BugHunterMemoryEntry, string>({
-      query: id => ({
-        url: ApiEndpoints.BUG_HUNTER.MEMORY_RESTORE(id),
-        method: HttpMethod.POST,
-      }),
-      invalidatesTags: [{ type: TAG_TYPES.BUG_HUNTER_MEMORY, id: "LIST" }],
     }),
 
     /**
@@ -604,9 +538,4 @@ export const {
   useGetBugHunterFeatureMapsQuery,
   useRefreshBugHunterFeatureMapsMutation,
   useRemoveBugHunterFeatureMapMutation,
-  useGetBugHunterMemoryQuery,
-  useAddBugHunterMemoryMutation,
-  useRetireBugHunterMemoryMutation,
-  useGetBugHunterRetiredMemoryQuery,
-  useRestoreBugHunterMemoryMutation,
 } = bugHunterAPI;

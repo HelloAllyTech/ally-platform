@@ -62,6 +62,7 @@ export const ApiEndpoints = {
     AI_TASKS: "/v1/llm/tasks",
     LLM_MODEL_CATALOG_BY_ID: (id: string) => `/v1/llm/catalog/${id}`,
     PREVIEW_LLM_MODEL: (id: string) => `/v1/llm-preview/model/${id}`,
+    PREVIEW_PROMPT: "/v1/llm-preview/prompt",
     UPDATE_LLM_CONFIG: (id: string) => `/v1/learn/llm-configs/${id}`,
     SCENARIO_LANGUAGES: "/v1/learn/scenario-languages",
     GET_LANGUAGES: "/v1/language",
@@ -171,6 +172,7 @@ export const ApiEndpoints = {
     FILLER_TAGS: "/v1/learn/filler-tags",
     GET_AUTOFILL_MODELS: "/v1/learn/models",
     ENHANCE_FIELD: "/v1/learn/scenarios/enhance-field",
+    MAP_SCENARIO_MEMORIES: "/v1/learn/scenarios/memories/map",
     GENERATE_AGENT_BUILDER_FIELD: "/v1/learn/agent-builder/generate-field",
     COMPETENCIES: "/v1/learn/competencies",
     COMPETENCY_BY_ID: (id: string) => `/v1/learn/competencies/${id}`,
@@ -186,6 +188,8 @@ export const ApiEndpoints = {
     LIST: "/v1/learn/admin/tracks",
     BY_ID: (id: string) => `/v1/learn/admin/tracks/${id}`,
     STRUCTURE: (id: string) => `/v1/learn/admin/tracks/${id}/structure`,
+    // Raise a live quiz's or annotation's attempt limit; the structure PUT is locked once learners enrol.
+    ATTEMPT_LIMIT: (itemId: string) => `/v1/learn/admin/tracks/items/${itemId}/attempt-limit`,
     // The trainer's notes for Ally and per-item tension.
     GUIDE_NOTES: (id: string) => `/v1/learn/admin/tracks/${id}/guide-notes`,
     DUPLICATE: (id: string) => `/v1/learn/admin/tracks/${id}/duplicate`,
@@ -209,6 +213,20 @@ export const ApiEndpoints = {
       `/v1/learn/admin/tracks/${id}/translations/${languageId}/publish`,
     TRANSLATION_UNPUBLISH: (id: string, languageId: number) =>
       `/v1/learn/admin/tracks/${id}/translations/${languageId}/unpublish`,
+  },
+
+  // Image Studio — AI images for every authoring slot (ally-be docs/image-studio.md).
+  IMAGE_STUDIO: {
+    CONFIG: "/v1/image-studio/config",
+    STYLES: "/v1/image-studio/styles",
+    SLOTS: "/v1/image-studio/slots",
+    DESCRIBE: "/v1/image-studio/describe",
+    JOBS: "/v1/image-studio/jobs",
+    JOBS_BATCH: "/v1/image-studio/jobs/batch",
+    ESTIMATE: "/v1/image-studio/estimate",
+    HISTORY: "/v1/image-studio/history",
+    ACCEPT: (imageId: string) => `/v1/image-studio/images/${imageId}/accept`,
+    CAST_SHEETS: "/v1/image-studio/cast-sheets",
   },
 
   // Component Library — global, cross-tenant Track/Course item templates.
@@ -244,6 +262,8 @@ export const ApiEndpoints = {
       `/v1/scenario-characters/interview/sessions/${sessionId}`,
     INTERVIEW_SESSION_STREAM: (sessionId: string) =>
       `/v1/scenario-characters/interview/sessions/${sessionId}/messages/stream`,
+    INTERVIEW_SESSION_ABANDON: (sessionId: string) =>
+      `/v1/scenario-characters/interview/sessions/${sessionId}/abandon`,
   },
 
   USER_MANAGEMENT: {
@@ -251,6 +271,8 @@ export const ApiEndpoints = {
     TENANT: "/v1/tenant",
     TENANTS: "/v1/tenants",
     TENANTS_BY_ID: (id: string) => `/v1/tenants/${id}`,
+    TENANT_BRANDING: (id: string) => `/v1/tenants/${id}/branding`,
+    TENANT_BRANDING_FAVICON_URL: (id: string) => `/v1/tenants/${id}/branding/favicon-url`,
     ADD_USER: "/v1/users",
     BULK_ADD_USERS: "/v1/users/bulk",
     SIMULATION_CREDITS: "/v1/simulation-credits",
@@ -277,6 +299,16 @@ export const ApiEndpoints = {
     ELIGIBLE: "/v1/platform-admins/eligible",
     ASSIGN: "/v1/platform-admins",
     REMOVE: (userId: number) => `/v1/platform-admins/${userId}`,
+  },
+  // User Management › Debrief access: the Clinical advisor and Debrief owner roles (gated by
+  // admin_user_management, like Ally admins).
+  CLINICAL_ADVISORS: {
+    LIST: "/v1/clinical-advisors",
+    SEARCH: "/v1/clinical-advisors/search",
+    ADD: (userId: number) => `/v1/clinical-advisors/${userId}`,
+    REMOVE: (userId: number) => `/v1/clinical-advisors/${userId}`,
+    // The Debrief owner role, on the same page and gate.
+    OWNER: (userId: number) => `/v1/clinical-advisors/${userId}/owner`,
   },
   SUPER_DUPER_ADMINS: {
     LIST: "/v1/super-duper-admins",
@@ -336,11 +368,6 @@ export const ApiEndpoints = {
   PRODUCT_ROADMAP: {
     OPPORTUNITIES: "/v1/product-roadmap/opportunities",
     /**
-     * Quick add: the same filing as OPPORTUNITIES with the readiness gate off. Behind the
-     * `product_roadmap_quick_add` admin toggle server-side; a caller without it gets a 403.
-     */
-    OPPORTUNITIES_QUICK: "/v1/product-roadmap/opportunities/quick",
-    /**
      * The same route helpline and mobile file a bug on. Not `/opportunities` with
      * type=bug: this one captures the reporter's screen/device context for triage and
      * stamps `source` from the reporter's own roles, so a staff report and a consumer
@@ -365,6 +392,8 @@ export const ApiEndpoints = {
     BOARD_LANE: "/v1/product-roadmap/board/lane",
     ALLOCATIONS: "/v1/product-roadmap/allocations",
     VOTE_BUDGET: "/v1/product-roadmap/me/vote-budget",
+    MY_BREADTH: "/v1/product-roadmap/me/breadth",
+    BREADTH_EVERYONE: "/v1/product-roadmap/breadth",
     FACETS: "/v1/product-roadmap/facets",
     PRODUCT_GOALS: "/v1/product-roadmap/product-goals",
     PRODUCT_GOAL_BY_ID: (id: string) => `/v1/product-roadmap/product-goals/${id}`,
@@ -377,6 +406,10 @@ export const ApiEndpoints = {
     STRATEGY_GOALS_ORDER: "/v1/product-roadmap/strategy-goals/order",
     STRATEGY_GOALS_ASSESS_MISSING: "/v1/product-roadmap/strategy-goals/assess-missing",
     RANK_WEIGHTS: "/v1/product-roadmap/rank-weights",
+    /** The Prod Director pick (GET/PUT) — a platform admin whose star boosts rank. */
+    PROD_DIRECTOR: "/v1/product-roadmap/prod-director",
+    OPPORTUNITY_DIRECTOR_STAR: (id: string) =>
+      `/v1/product-roadmap/opportunities/${id}/director-star`,
     /** The Vision & strategy page the opportunity copilot reads on every turn. */
     STRATEGY_CONTEXT: "/v1/product-roadmap/strategy-context",
     OPPORTUNITY_GOAL_IMPACT: (id: string) => `/v1/product-roadmap/opportunities/${id}/goal-impact`,
@@ -385,6 +418,9 @@ export const ApiEndpoints = {
     OWNER_BY_ID: (id: string) => `/v1/product-roadmap/opportunity-owners/${id}`,
     OWNERS_ORDER: "/v1/product-roadmap/opportunity-owners/order",
     OWNERS_USAGE: "/v1/product-roadmap/opportunity-owners/usage",
+    IDEA_DRAFTS: "/v1/product-roadmap/idea-drafts",
+    IDEA_DRAFT_BY_ID: (id: string) => `/v1/product-roadmap/idea-drafts/${id}`,
+    IDEA_TRANSCRIBE: "/v1/product-roadmap/idea-drafts/transcribe",
     INTERVIEW_NOTES: "/v1/product-roadmap/interview-notes",
     INTERVIEW_NOTE_BY_ID: (id: string) => `/v1/product-roadmap/interview-notes/${id}`,
     VIEWS: "/v1/product-roadmap/views",
@@ -407,6 +443,73 @@ export const ApiEndpoints = {
     BUILDER_SESSION: (opportunityId: string) =>
       `/v1/product-roadmap/opportunities/${opportunityId}/builder-session`,
     ADMIN_REINDEX: "/v1/product-roadmap/admin/reindex",
+  },
+  /**
+   * Roadmap v2's idea flow (P3 contract): New idea and drafts, dictation, the Owner's review and
+   * lead, and the answers and comments on a shared plan session. 404 while `roadmap_v2` is off.
+   */
+  ROADMAP_V2_FLOW: {
+    DRAFTS: "/v1/roadmap/drafts",
+    DRAFT: (code: string) => `/v1/roadmap/drafts/${encodeURIComponent(code)}`,
+    DRAFT_RESTORE: (code: string) => `/v1/roadmap/drafts/${encodeURIComponent(code)}/restore`,
+    DRAFT_TURN: (code: string) => `/v1/roadmap/drafts/${encodeURIComponent(code)}/turn`,
+    DRAFT_REOPEN_CHECK: (code: string, checkId: string) =>
+      `/v1/roadmap/drafts/${encodeURIComponent(code)}/checks/${encodeURIComponent(checkId)}/reopen`,
+    DRAFT_SELF_CHECK: (code: string) => `/v1/roadmap/drafts/${encodeURIComponent(code)}/self-check`,
+    DRAFT_SIMILAR: (code: string) => `/v1/roadmap/drafts/${encodeURIComponent(code)}/similar`,
+    DRAFT_ADD_TO: (code: string, target: string) =>
+      `/v1/roadmap/drafts/${encodeURIComponent(code)}/add-to/${encodeURIComponent(target)}`,
+    DRAFT_SUBMIT: (code: string) => `/v1/roadmap/drafts/${encodeURIComponent(code)}/submit`,
+    DICTATION: "/v1/roadmap/dictation",
+    REVIEW: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/review`,
+    REVIEW_BATCH: "/v1/roadmap/items/review:batch",
+    REVIEW_UNDO: "/v1/roadmap/items/review:undo",
+    LEAD: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/lead`,
+    LEAD_SUGGESTIONS: (code: string) =>
+      `/v1/roadmap/items/${encodeURIComponent(code)}/lead-suggestions`,
+    ITEM_SIMILAR: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/similar`,
+    START_PLANNING: (code: string) =>
+      `/v1/roadmap/items/${encodeURIComponent(code)}/start-planning`,
+    SESSION_ANSWERS: (sessionId: string) =>
+      `/v1/builder/sessions/${encodeURIComponent(sessionId)}/answers`,
+    SESSION_COMMENTS: (sessionId: string) =>
+      `/v1/builder/sessions/${encodeURIComponent(sessionId)}/comments`,
+    SESSION_USE_ANSWER: (sessionId: string, postId: string) =>
+      `/v1/builder/sessions/${encodeURIComponent(sessionId)}/answers/${encodeURIComponent(postId)}/use`,
+  },
+  /**
+   * Roadmap v2 (plans/roadmap-builder-merge §5.2, P2 contract). Every route answers 404 while the
+   * `roadmap_v2` flag is off, which is how the frontend learns the flag: `ME_ROLE` succeeding.
+   */
+  /** Roadmap v2 P4: build brief, roles, preferences; P5: the release policy. 404 while the flag is off. */
+  ROADMAP_V2_OPS: {
+    ITEM_BRIEF: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/brief`,
+    ITEM_EXTERNAL_BUILD: (code: string) =>
+      `/v1/roadmap/items/${encodeURIComponent(code)}/external-build`,
+    ROLES: "/v1/roadmap/roles",
+    ROLE: (userId: number) => `/v1/roadmap/roles/${userId}`,
+    MY_PREFERENCES: "/v1/roadmap/me/preferences",
+    RELEASE_PLAN: "/v1/roadmap/release/plan",
+    RELEASE: "/v1/roadmap/release",
+    RELEASE_RESUME: "/v1/roadmap/release/resume",
+  },
+  /** Roadmap v2 P6: Switch on Roadmap. Owner only; these two answer while the flag is off. */
+  ROADMAP_V2_CUTOVER: {
+    PREVIEW: "/v1/roadmap/cutover/preview",
+    RUN: "/v1/roadmap/cutover",
+  },
+  ROADMAP_V2: {
+    ME_ROLE: "/v1/roadmap/me/role",
+    ITEMS: "/v1/roadmap/items",
+    ITEM: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}`,
+    ITEM_READ: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/read`,
+    ITEM_WATCH: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/watch`,
+    ITEM_STAR: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/star`,
+    SEARCH: "/v1/roadmap/search",
+  },
+  /** Roadmap v2 P8: the Owner's Measures. 404 while the flag is off, 403 for anyone but an Owner. */
+  ROADMAP_V2_MEASURES: {
+    METRICS: "/v1/roadmap/metrics",
   },
   AI_LAB: {
     SKILLS: "/v1/lab/skills",
@@ -436,6 +539,110 @@ export const ApiEndpoints = {
     QUESTION_SET_BY_ID: (id: string) => `/v1/lab/question-sets/${id}`,
     QUESTION_SET_PUBLISH: (id: string) => `/v1/lab/question-sets/${id}/publish`,
     QUESTION_SET_ARCHIVE: (id: string) => `/v1/lab/question-sets/${id}/archive`,
+  },
+  /** Debrief Settings › Agents: recipes, models and tools of the live release. */
+  DEBRIEF_AGENTS: {
+    CONFIG: "/v1/debriefs/agents-config",
+    CHANGES: "/v1/debriefs/agents-config/changes",
+  },
+  /** Debrief choices per roleplay: risk-cue options. */
+  DEBRIEF_ROLEPLAY_OPTIONS: {
+    AVAILABILITY: "/v1/debriefs/roleplay-options/availability",
+    RISK_CUES: "/v1/debriefs/roleplay-options/risk-cue-options",
+    RISK_CUES_REVIEW: "/v1/debriefs/roleplay-options/risk-cue-options/review",
+    RISK_CUE: (id: string) => `/v1/debriefs/roleplay-options/risk-cue-options/${id}`,
+    RISK_CUE_ACTION: (
+      id: string,
+      action: "test" | "submit" | "review-test" | "approve" | "reject" | "retire",
+    ) => `/v1/debriefs/roleplay-options/risk-cue-options/${id}/${action}`,
+  },
+  DEBRIEF_CONSOLE: {
+    OVERVIEW: "/v1/debriefs/console/overview",
+    SETTINGS: "/v1/debriefs/console/settings",
+    METRICS: "/v1/debriefs/console/metrics",
+    NIGHTLY: "/v1/debriefs/console/metrics/nightly",
+    /** Analytics › Debriefs › Guidance. */
+    GUIDANCE_METRICS: "/v1/debriefs/console/guidance-metrics",
+    SETTINGS_ACCEPT: "/v1/debriefs/console/settings/accept",
+    /** Settings › Schedules (engineering only). */
+    SCHEDULES: "/v1/debriefs/console/schedules",
+    SETTINGS_BASELINE: "/v1/debriefs/console/settings/baseline",
+    CLINICAL_LISTS: "/v1/debriefs/console/settings/clinical-lists",
+    RUN_SESSION: (sessionId: string) => `/v1/debriefs/console/sessions/${sessionId}/run`,
+    PM_AGENT: "/v1/debriefs/console/pm-agent",
+    PM_AGENT_ANALYSE: "/v1/debriefs/console/pm-agent/analyse",
+    PM_AGENT_REPORTS: "/v1/debriefs/console/pm-agent/reports",
+    PM_AGENT_REPORT: (kind: string, period: string) =>
+      `/v1/debriefs/console/pm-agent/reports/${kind}/${period}`,
+    IDEA_ACTION: (id: string, action: "screen" | "approve" | "reject") =>
+      `/v1/debriefs/console/pm-agent/ideas/${id}/${action}`,
+    /** "Hand to Builder": where the idea stands in Builder, and answering its question. */
+    IDEA_BUILDER: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/builder`,
+    IDEA_BUILDER_ANSWER: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/builder/answer`,
+    MODELS: "/v1/debriefs/console/models",
+    ROLLBACK: (id: string) => `/v1/debriefs/console/releases/${id}/rollback`,
+    TEST_SETS_BUILD: "/v1/debriefs/console/test-sets/build",
+    TENANTS: "/v1/debriefs/console/tenants",
+    TENANT_LIVE: (tenantId: string) => `/v1/debriefs/console/tenants/${tenantId}/live`,
+    TENANT_REGION: (tenantId: string) => `/v1/debriefs/console/tenants/${tenantId}/region`,
+    TENANT_PROVIDERS: (tenantId: string) => `/v1/debriefs/console/tenants/${tenantId}/providers`,
+    RUN_ACTION: (id: string, action: "publish" | "todays-debrief" | "reviewed") =>
+      `/v1/debriefs/console/runs/${id}/${action}`,
+    RESOLVE_FLAG: (id: string) => `/v1/debriefs/console/flags/${id}/resolve`,
+    ESCALATE: (kind: "flags" | "runs", id: string) => `/v1/debriefs/console/${kind}/${id}/escalate`,
+    ME: "/v1/debriefs/console/me",
+    SESSIONS: "/v1/debriefs/console/sessions",
+    SESSION: (runId: string) => `/v1/debriefs/console/sessions/runs/${runId}`,
+    RUN_LOGS: (runId: string) => `/v1/debriefs/console/runs/${runId}/logs`,
+    ATTENTION: "/v1/debriefs/console/attention",
+    ANALYTICS: "/v1/debriefs/console/analytics",
+    CORRECT_RUN: (runId: string) => `/v1/debriefs/console/runs/${runId}/correct`,
+    COMMENTS: (runId: string) => `/v1/debriefs/console/runs/${runId}/comments`,
+    COMMENT: (id: string) => `/v1/debriefs/console/comments/${id}`,
+    COMMENT_ACTION: (id: string, action: "resolve" | "reopen" | "still-happening") =>
+      `/v1/debriefs/console/comments/${id}/${action}`,
+    IDEA_QUESTIONS: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/questions`,
+    IDEA_START_STEP: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/start-step`,
+    IDEA_APPROVE: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/approve`,
+    IDEA_REJECT: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/reject`,
+    IDEA_APPROVE_PINNED: (id: string) =>
+      `/v1/debriefs/console/pm-agent/ideas/${id}/approve-pinned-rule`,
+    IDEA_WITHDRAW_PINNED: (id: string) =>
+      `/v1/debriefs/console/pm-agent/ideas/${id}/withdraw-pinned-rule`,
+    IDEA_REJECT_PINNED: (id: string) =>
+      `/v1/debriefs/console/pm-agent/ideas/${id}/reject-pinned-rule`,
+    PINNED_RULES: "/v1/debriefs/console/pinned-rules",
+    PINNED_RULE_PROPOSALS: "/v1/debriefs/console/pinned-rules/proposals",
+    AUTONOMY: "/v1/debriefs/console/autonomy",
+    AUTONOMY_MATRIX: "/v1/debriefs/console/autonomy/matrix",
+    AUTONOMY_ORG: (tenantId: string) => `/v1/debriefs/console/autonomy/orgs/${tenantId}`,
+    BUDGETS: "/v1/debriefs/console/budgets",
+    RELEASE_HISTORY: "/v1/debriefs/console/release-history",
+    RELEASE_HISTORY_ITEM: (id: string) => `/v1/debriefs/console/release-history/${id}`,
+    RELEASE_COMPARE: (id: string) => `/v1/debriefs/console/releases/${id}/compare`,
+    PROPOSE: "/v1/debriefs/console/pm-agent/ideas/propose",
+    PROMOTE_WAITING: (id: string) => `/v1/debriefs/console/releases/${id}/promote-waiting`,
+    DISMISS_WAITING: (id: string) => `/v1/debriefs/console/releases/${id}/dismiss-waiting`,
+    EMERGENCY_STOP: (tenantId: string) => `/v1/debriefs/console/tenants/${tenantId}/emergency-stop`,
+    /** v2 (docs/debrief-harness/V2_AUTONOMY.md): the home, the changes, the one PM agent thread, the score. */
+    HOME: "/v1/debriefs/console/home",
+    CHANGES: "/v1/debriefs/console/changes",
+    CHANGE: (id: string) => `/v1/debriefs/console/changes/${id}`,
+    CHANGE_ACTION: (id: string, action: "undo" | "stop") =>
+      `/v1/debriefs/console/changes/${id}/${action}`,
+    PM_CONVERSATION: "/v1/debriefs/console/pm-agent/conversation",
+    SCORE: "/v1/debriefs/console/metrics/score",
+  },
+  // The caller's in-app notification feed (ally-be notification-feed.controller).
+  NOTIFICATIONS: {
+    LIST: "/v1/notifications",
+    UNREAD_COUNT: "/v1/notifications/unread-count",
+    READ: (id: string) => `/v1/notifications/${id}/read`,
+    READ_ALL: "/v1/notifications/read-all",
+  },
+  // Expert review (debrief orchestrator spec Part B): the verdict, from the session's Review panel.
+  DEBRIEF_EXPERT_REVIEW: {
+    VERDICT: (runId: string) => `/v1/debriefs/expert-review/runs/${runId}/verdict`,
   },
   SKILL_EXPERIMENTS: {
     LIST: "/v1/skill-experiments",
@@ -591,20 +798,39 @@ export const ApiEndpoints = {
     AUTOMATION_REJECT: (agentRunId: string) =>
       `/v1/analytics/agent/automation/agents/${agentRunId}/reject`,
   },
-  // Analytics Suggestions — its own namespace for the same reason as the agent's:
-  // the elevated super-duper-admin tier, because accepting a suggestion writes
-  // onto the product roadmap rather than only reading a chart.
-  ANALYTICS_SUGGESTIONS: {
-    LIST: "/v1/analytics/suggestions",
-    GENERATE: "/v1/analytics/suggestions/generate",
-    ACCEPT: (id: string) => `/v1/analytics/suggestions/${id}/accept`,
-    REJECT: (id: string) => `/v1/analytics/suggestions/${id}/reject`,
-  },
-  // UX Signals — the PostHog scan that files into Bug Hunter and the Suggestions
-  // queue. Its own namespace because it is a producer for both, owned by neither.
+  // UX Signals — the PostHog scan that files bugs into Bug Hunter and improvement
+  // signals for the PM Agent. Its own namespace because it is a producer for both,
+  // owned by neither.
   UX_SIGNALS: {
     SCAN: "/v1/ux-signals/scan",
     SCANS: "/v1/ux-signals/scans",
+  },
+  // PM Agent: the daily AI product manager's card feed (ally-be `docs/pm-agent.md`). Not to be
+  // confused with DEBRIEF_CONSOLE.PM_AGENT, which is the debrief console's own idea agent.
+  PM_AGENT: {
+    STATE: "/v1/pm-agent/state",
+    CARDS: "/v1/pm-agent/cards",
+    CARD: (id: string) => `/v1/pm-agent/cards/${id}`,
+    ACCEPT: (id: string) => `/v1/pm-agent/cards/${id}/accept`,
+    UNDO: (id: string) => `/v1/pm-agent/cards/${id}/undo`,
+    REJECT: (id: string) => `/v1/pm-agent/cards/${id}/reject`,
+    REASON: (id: string) => `/v1/pm-agent/cards/${id}/reason`,
+    FEEDBACK: (id: string) => `/v1/pm-agent/cards/${id}/feedback`,
+    ANSWER: (id: string) => `/v1/pm-agent/cards/${id}/answer`,
+    SKIP: (id: string) => `/v1/pm-agent/cards/${id}/skip`,
+    RETRY: (id: string) => `/v1/pm-agent/cards/${id}/retry`,
+    FILE_ANYWAY: (id: string) => `/v1/pm-agent/cards/${id}/file-anyway`,
+    DISMISS: (id: string) => `/v1/pm-agent/cards/${id}/dismiss`,
+    TRACKING: "/v1/pm-agent/tracking",
+    RUN: "/v1/pm-agent/run",
+    RUNS: "/v1/pm-agent/runs",
+    SETTINGS: "/v1/pm-agent/settings",
+    MEMORY: "/v1/pm-agent/memory",
+    MEMORY_BY_ID: (id: string) => `/v1/pm-agent/memory/${id}`,
+    LESSON_CONFIRM: (id: string) => `/v1/pm-agent/lessons/${id}/confirm`,
+    LESSONS_RUN: "/v1/pm-agent/lessons/run",
+    HISTORY: "/v1/pm-agent/history",
+    HEALTH: "/v1/pm-agent/health",
   },
   BUG_HUNTER: {
     SETTINGS: "/v1/bug-hunter/settings",
@@ -632,22 +858,60 @@ export const ApiEndpoints = {
     NOTIFICATIONS: "/v1/bug-hunter/notifications",
     NOTIFICATION_READ: (id: string) => `/v1/bug-hunter/notifications/${id}/read`,
     NOTIFICATIONS_READ_ALL: "/v1/bug-hunter/notifications/read-all",
-    // The notebook Bug Hunter reads before hunting and writes at close —
-    // ally-be src/agent-memory, docs/bug-hunter-memory-adr.md.
-    MEMORY: "/v1/bug-hunter/memory",
     FEATURE_MAPS: "/v1/bug-hunter/feature-maps",
     FEATURE_MAPS_REFRESH: "/v1/bug-hunter/feature-maps/refresh",
     FEATURE_MAP_REMOVE: (id: string) => `/v1/bug-hunter/feature-maps/${id}/remove`,
-    MEMORY_RETIRE: (id: string) => `/v1/bug-hunter/memory/${id}/retire`,
-    // What the agent retired on its own recently, with its reason (OPP-0752), and the undo.
-    MEMORY_RETIRED: "/v1/bug-hunter/memory/retired",
-    MEMORY_RESTORE: (id: string) => `/v1/bug-hunter/memory/${id}/restore`,
     // The decision log, scoreboard and replay (OPP-0776, OPP-0783).
     FINDING_DECISIONS: (id: string) => `/v1/bug-hunter/findings/${id}/decisions`,
     RUN_DECISIONS: (id: string) => `/v1/bug-hunter/runs/${id}/decisions`,
     SCOREBOARD: "/v1/bug-hunter/scoreboard",
     DECISION_REPLAY: "/v1/bug-hunter/decisions/replay",
     DECISION_OWNERS: "/v1/bug-hunter/decisions/owners",
+  },
+  // Context Library — ally-be src/context-library, docs/context-library/PLAN.md.
+  CONTEXT_LIBRARY: {
+    COLLECTIONS: "/v1/context-library/collections",
+    TEMPLATE: (collectionId: string) =>
+      `/v1/context-library/collections/${encodeURIComponent(collectionId)}/template.csv`,
+    // Multipart with upload progress, so sent by the upload client (XHR), not RTK Query.
+    UPLOADS: "/v1/context-library/uploads",
+    QUEUE: "/v1/context-library/queue",
+    SOURCES: "/v1/context-library/sources",
+    SOURCE_BY_ID: (id: string) => `/v1/context-library/sources/${id}`,
+    SOURCE_AUDIENCE: (id: string) => `/v1/context-library/sources/${id}/audience`,
+    SOURCE_ACTION: (id: string, action: "pause" | "resume" | "cancel" | "front" | "retry") =>
+      `/v1/context-library/sources/${id}/${action}`,
+    CHUNKS: "/v1/context-library/chunks",
+    CHUNK_BY_CODE: (code: string) => `/v1/context-library/chunks/${encodeURIComponent(code)}`,
+    CHUNK_AUDIENCE: (code: string) =>
+      `/v1/context-library/chunks/${encodeURIComponent(code)}/audience`,
+    CHUNK_ACTION: (code: string, action: "archive" | "restore" | "pin" | "unpin") =>
+      `/v1/context-library/chunks/${encodeURIComponent(code)}/${action}`,
+    COLLECTION_CHUNKS: (collectionId: string) =>
+      `/v1/context-library/collections/${encodeURIComponent(collectionId)}/chunks`,
+    BULK: "/v1/context-library/bulk",
+    SEARCH: "/v1/context-library/search",
+    USE_CASES: "/v1/context-library/settings/use-cases",
+    // Insights and the learning loops
+    INSIGHTS: (collectionId: string) =>
+      `/v1/context-library/collections/${encodeURIComponent(collectionId)}/insights`,
+    CHANGES: (collectionId: string) =>
+      `/v1/context-library/collections/${encodeURIComponent(collectionId)}/changes`,
+    CHANGE_UNDO: (actionId: string) =>
+      `/v1/context-library/changes/${encodeURIComponent(actionId)}/undo`,
+    GAP_DISMISS: (gapId: string) => `/v1/context-library/gaps/${encodeURIComponent(gapId)}/dismiss`,
+    LOOPS: (collectionId: string) =>
+      `/v1/context-library/collections/${encodeURIComponent(collectionId)}/loops`,
+    LOOPS_RUN: (collectionId: string) =>
+      `/v1/context-library/collections/${encodeURIComponent(collectionId)}/loops/run`,
+    // Read-only keys for engineers' Claude Code, and the MCP endpoint they unlock.
+    READER_KEYS: "/v1/context-library/reader-keys",
+    READER_KEY_BY_ID: (id: string) => `/v1/context-library/reader-keys/${encodeURIComponent(id)}`,
+    READER_KEY_RESTORE: (id: string) =>
+      `/v1/context-library/reader-keys/${encodeURIComponent(id)}/restore`,
+    MCP: "/v1/context-library/mcp",
+    // The automatic steps after a release (import or enrichment, smoke check, retirement).
+    ROLLOUT: "/v1/context-library/rollout",
   },
   BUILDER: {
     SESSIONS: "/v1/builder/sessions",
@@ -682,8 +946,31 @@ export const ApiEndpoints = {
     SESSION_PULL_REQUEST_RESUME: (id: string, prId: string) =>
       `/v1/builder/sessions/${id}/pull-requests/${prId}/resume-automation`,
     SESSION_PR_FEEDBACK: (id: string) => `/v1/builder/sessions/${id}/pr-feedback`,
+    // Principles in play, and the per-session switch (PUT { off }).
+    SESSION_PRINCIPLES: (id: string) => `/v1/builder/sessions/${id}/principles`,
     SETTINGS: "/v1/builder/settings",
     NOTIFICATIONS: "/v1/builder/notifications",
+    // The decision feed: every pending decision across sessions, and the one answer endpoint
+    // that routes each back to the action the session page would have taken.
+    DECISIONS: "/v1/builder/decisions",
+    DECISION_ANSWER: (id: string) => `/v1/builder/decisions/${encodeURIComponent(id)}/answer`,
+    // The Builder tab (Now · Rules · History). DELETE on DECISION_ANSWER is Undo.
+    NOW: "/v1/builder/now",
+    UP_NEXT: "/v1/builder/up-next",
+    UP_NEXT_START: (opportunityId: string) => `/v1/builder/up-next/${opportunityId}/start`,
+    SESSION_PUT_BACK: (id: string) => `/v1/builder/sessions/${id}/put-back`,
+    SESSION_ASK: (id: string) => `/v1/builder/sessions/${id}/ask`,
+    SESSION_TELL: (id: string) => `/v1/builder/sessions/${id}/tell`,
+    SESSION_THREAD: (id: string) => `/v1/builder/sessions/${id}/thread`,
+    ASK_ALL: "/v1/builder/ask",
+    HISTORY: "/v1/builder/history",
+    RULES: "/v1/builder/rules",
+    RULE_BY_ID: (id: string) => `/v1/builder/rules/${id}`,
+    RULE_DRAFT: "/v1/builder/rules/draft",
+    RULE_PREVIEW: "/v1/builder/rules/preview",
+    RULE_PROPOSALS: "/v1/builder/rules/proposals",
+    RULE_PROPOSAL: (key: string) => `/v1/builder/rules/proposals/${encodeURIComponent(key)}`,
+    PARTNER_SCOREBOARD: "/v1/builder/partner-scoreboard",
     NOTIFICATION_READ: (id: string) => `/v1/builder/notifications/${id}/read`,
     NOTIFICATIONS_READ_ALL: "/v1/builder/notifications/read-all",
     // Scoreboard + knowledge (lessons/exemplars) — the visibility surfaces.
@@ -691,9 +978,6 @@ export const ApiEndpoints = {
     // Where a run's time and money go. The scoreboard answers "is Builder
     // getting better"; this answers "and what would make it faster".
     PIPELINE_HEALTH: "/v1/builder/pipeline-health",
-    LESSONS: "/v1/builder/lessons",
-    LESSON_BY_ID: (id: string) => `/v1/builder/lessons/${id}`,
-    LESSONS_CONSOLIDATE: "/v1/builder/lessons/consolidate",
     EXEMPLARS: "/v1/builder/exemplars",
     // Replay eval: recorded interviews (fixtures), suites of runs, and the gate
     // that publishes a Builder prompt change only when its suite passes.
@@ -732,6 +1016,124 @@ export const ApiEndpoints = {
     TRACK_ALLY_NOTES_DRAFT: (trackId: string) =>
       `/v1/course-copilot/tracks/${trackId}/ally-notes-draft`,
   },
+  CHATBOTS: {
+    LIST: "/v1/chatbots",
+    BY_ID: (id: string) => `/v1/chatbots/${id}`,
+    STATUS: (id: string) => `/v1/chatbots/${id}/status`,
+    ARCHIVE: (id: string) => `/v1/chatbots/${id}/archive`,
+    ARCHIVED: "/v1/chatbots/archived",
+    RESTORE: (id: string) => `/v1/chatbots/${id}/restore`,
+    SETTINGS: (id: string) => `/v1/chatbots/${id}/settings`,
+    DOCUMENTS: (id: string) => `/v1/chatbots/${id}/documents`,
+    DOCUMENT_UPLOAD_URL: (id: string) => `/v1/chatbots/${id}/documents/upload-url`,
+    PRIVATE_DOCUMENTS: (id: string) => `/v1/chatbots/${id}/documents/private`,
+    DOCUMENT_BY_ID: (id: string, documentId: string) =>
+      `/v1/chatbots/${id}/documents/${documentId}`,
+    TEST: (id: string) => `/v1/chatbots/${id}/test`,
+    TEST_STREAM: (id: string) => `/v1/chatbots/${id}/test/stream`,
+    PAGE: (id: string) => `/v1/chatbots/${id}/page`,
+    PAGE_BRAND: (id: string) => `/v1/chatbots/${id}/page/brand`,
+    TEAM_NAMES: (id: string) => `/v1/chatbots/${id}/team-names`,
+    HOME: (id: string) => `/v1/chatbots/${id}/home`,
+    HOME_LIST: (id: string, list: string) => `/v1/chatbots/${id}/home/lists/${list}`,
+    RULES: (id: string) => `/v1/chatbots/${id}/rules`,
+    LISTS: (id: string) => `/v1/chatbots/${id}/lists`,
+    USER_LIST: (id: string, key: string) => `/v1/chatbots/${id}/lists/${key}`,
+    LIST_RESTORE: (id: string, listId: string) => `/v1/chatbots/${id}/lists/${listId}/restore`,
+    LIST_FIELDS: (id: string, key: string) => `/v1/chatbots/${id}/lists/${key}/fields`,
+    LIST_FIELD: (id: string, key: string, field: string) =>
+      `/v1/chatbots/${id}/lists/${key}/fields/${field}`,
+    LIST_RULES: (id: string, key: string) => `/v1/chatbots/${id}/lists/${key}/rules`,
+    LIST_RULE: (id: string, key: string, ruleId: string) =>
+      `/v1/chatbots/${id}/lists/${key}/rules/${ruleId}`,
+    LIST_ABILITIES: (id: string, key: string) => `/v1/chatbots/${id}/lists/${key}/abilities`,
+    LIST_RECORDS: (id: string, key: string) => `/v1/chatbots/${id}/lists/${key}/records`,
+    LIST_RECORDS_QUERY: (id: string, key: string) =>
+      `/v1/chatbots/${id}/lists/${key}/records/query`,
+    LIST_RECORDS_REPEAT: (id: string, key: string) =>
+      `/v1/chatbots/${id}/lists/${key}/records/repeat`,
+    LIST_RECORD: (id: string, key: string, recordId: string) =>
+      `/v1/chatbots/${id}/lists/${key}/records/${recordId}`,
+    LIST_RECORD_RESTORE: (id: string, key: string, recordId: string) =>
+      `/v1/chatbots/${id}/lists/${key}/records/${recordId}/restore`,
+    LIST_CONTACTS: (id: string) => `/v1/chatbots/${id}/lists/contacts`,
+    READY_MADE_LISTS: (id: string) => `/v1/chatbots/${id}/lists/ready-made`,
+    READY_MADE_LIST: (id: string, name: string) => `/v1/chatbots/${id}/lists/ready-made/${name}`,
+    FACT_CORRECTION: (id: string, factId: string) =>
+      `/v1/chatbots/${id}/facts/${encodeURIComponent(factId)}/correction`,
+    IMAGES: (id: string) => `/v1/chatbots/${id}/images`,
+    IMAGE: (id: string, imageId: string) => `/v1/chatbots/${id}/images/${imageId}`,
+    IMAGE_RESTORE: (id: string, imageId: string) => `/v1/chatbots/${id}/images/${imageId}/restore`,
+    CONNECTOR_BIND: (id: string) => `/v1/connectors/${id}/chatbot`,
+    CHECKUP: (id: string) => `/v1/chatbots/${id}/checkup`,
+    CHANGES: (id: string) => `/v1/chatbots/${id}/changes`,
+    HISTORY: (id: string) => `/v1/chatbots/${id}/history`,
+    HOW_IT_WORKS: (id: string) => `/v1/chatbots/${id}/how-it-works`,
+    HOME_NUMBERS: (id: string, days: 7 | 30) => `/v1/chatbots/${id}/home/numbers?days=${days}`,
+    CHANGES_PROPOSE: (id: string) => `/v1/chatbots/${id}/changes/propose`,
+    CHANGES_APPLY: (id: string) => `/v1/chatbots/${id}/changes/apply`,
+    CHANGE_UNDO: (id: string, eventId: string) => `/v1/chatbots/${id}/changes/${eventId}/undo`,
+    SOURCES: (id: string) => `/v1/chatbots/${id}/sources`,
+    SCORECARD: (id: string) => `/v1/chatbots/${id}/scorecard`,
+    SCORECARD_ANSWER: (id: string, questionId: string) =>
+      `/v1/chatbots/${id}/scorecard/unanswered/${questionId}/answer`,
+    SCORECARD_CORRECT: (id: string, feedbackId: string) =>
+      `/v1/chatbots/${id}/scorecard/feedback/${feedbackId}/correct`,
+    SCORECARD_FINE: (id: string, feedbackId: string) =>
+      `/v1/chatbots/${id}/scorecard/feedback/${feedbackId}/fine`,
+    SOURCE_PREVIEW: (id: string) => `/v1/chatbots/${id}/sources/preview`,
+    SOURCE_REMOVE: (id: string) => `/v1/chatbots/${id}/sources/remove`,
+    SOURCE_RESTORE: (id: string, eventId: string) =>
+      `/v1/chatbots/${id}/sources/${eventId}/restore`,
+    CHECKUP_RUNS: (id: string) => `/v1/chatbots/${id}/checkup/runs`,
+    CHECKUP_CASES: (id: string) => `/v1/chatbots/${id}/checkup/cases`,
+    CHECKUP_CASE: (id: string, caseId: string) => `/v1/chatbots/${id}/checkup/cases/${caseId}`,
+    CHECKUP_SUGGESTIONS: (id: string) => `/v1/chatbots/${id}/checkup/suggestions`,
+    CHECKUP_RUN: (id: string, runId: string) => `/v1/chatbots/${id}/checkup/runs/${runId}`,
+    CHECKUP_ANSWER: (id: string, caseId: string) =>
+      `/v1/chatbots/${id}/checkup/cases/${caseId}/answer`,
+    CHECKUP_NOT_OFFERED: (id: string, caseId: string) =>
+      `/v1/chatbots/${id}/checkup/cases/${caseId}/not-offered`,
+  },
+  INBOX: {
+    CONVERSATIONS: "/v1/inbox/conversations",
+    COUNTS: "/v1/inbox/counts",
+    EVENTS: "/v1/inbox/events",
+    THREAD: (chatbotId: string, id: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/conversations/${id}`,
+    TAKE_OVER: (chatbotId: string, id: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/conversations/${id}/take-over`,
+    HAND_BACK: (chatbotId: string, id: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/conversations/${id}/hand-back`,
+    REPLY: (chatbotId: string, id: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/conversations/${id}/messages`,
+    /** What the assistant remembers about one person (chunk 8a). */
+    MEMORY: (chatbotId: string, contactId: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/contacts/${contactId}/memory`,
+    MEMORY_LINE: (chatbotId: string, entryId: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/memory/${entryId}`,
+    FORGET_LINE: (chatbotId: string, entryId: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/memory/${entryId}/forget`,
+    FORGET_PERSON: (chatbotId: string, contactId: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/contacts/${contactId}/forget`,
+  },
+  BOT_DRAFTS: {
+    LIST: "/v1/bot-drafts",
+    CURRENT: "/v1/bot-drafts/current",
+    BY_ID: (id: string) => `/v1/bot-drafts/${id}`,
+    EVENTS: (id: string) => `/v1/bot-drafts/${id}/events`,
+    PAGES_FOUND: (id: string) => `/v1/bot-drafts/${id}/pages/found`,
+    PAGES: (id: string) => `/v1/bot-drafts/${id}/pages`,
+    PAGES_UNDO: (id: string, eventId: string) => `/v1/bot-drafts/${id}/pages/${eventId}/undo`,
+    MESSAGES_STREAM: (id: string) => `/v1/bot-drafts/${id}/messages/stream`,
+    UNDO: (id: string) => `/v1/bot-drafts/${id}/undo`,
+    BACK: (id: string) => `/v1/bot-drafts/${id}/back`,
+    DOCUMENTS: (id: string) => `/v1/bot-drafts/${id}/documents`,
+    DESCRIPTION: (id: string) => `/v1/bot-drafts/${id}/description`,
+    PUBLISH: (id: string) => `/v1/bot-drafts/${id}/publish`,
+    ABANDON: (id: string) => `/v1/bot-drafts/${id}/abandon`,
+    CHECKUP: (id: string) => `/v1/bot-drafts/${id}/checkup`,
+  },
   WHATSAPP_BOT: {
     // Corpus (ally-be src/knowledge-base)
     DOCUMENTS: "/v1/knowledge-base/documents",
@@ -739,12 +1141,9 @@ export const ApiEndpoints = {
     DOCUMENT_BY_ID: (id: string) => `/v1/knowledge-base/documents/${id}`,
     DOCUMENT_CONTENT: (id: string) => `/v1/knowledge-base/documents/${id}/content`,
     DOCUMENT_TENANTS: (id: string) => `/v1/knowledge-base/documents/${id}/tenants`,
-    DOCUMENT_CHUNKS: (id: string) => `/v1/knowledge-base/documents/${id}/chunks`,
     DOCUMENT_REINDEX: (id: string) => `/v1/knowledge-base/documents/${id}/reindex`,
     DOCUMENT_ARCHIVE: (id: string) => `/v1/knowledge-base/documents/${id}/archive`,
     DOCUMENT_UNARCHIVE: (id: string) => `/v1/knowledge-base/documents/${id}/unarchive`,
-    CHUNK_BY_ID: (chunkId: string) => `/v1/knowledge-base/chunks/${chunkId}`,
-    SEARCH: "/v1/knowledge-base/search",
     STATS: "/v1/knowledge-base/stats",
     // Bot (ally-be src/whatsapp)
     // Phone → organisation mappings. Surfaced under User Management, but owned by the bot:
@@ -757,23 +1156,15 @@ export const ApiEndpoints = {
     TEMPLATE_ARCHIVE: (id: string) => `/v1/whatsapp/templates/${id}/archive`,
     TEMPLATES_REORDER: "/v1/whatsapp/templates/reorder",
     TEMPLATES_TEST: "/v1/whatsapp/templates/test",
+    TEMPLATE_CUSTOMISE: (id: string) => `/v1/whatsapp/templates/${id}/customise`,
     SETTINGS: "/v1/whatsapp/settings",
-    PROVIDER_HEALTH: "/v1/whatsapp/settings/provider-health",
-    PROVIDER_CHECK: "/v1/whatsapp/settings/provider-check",
-    PROVIDER_REGISTER: "/v1/whatsapp/settings/provider-register",
-    PROVIDER_SUBSCRIBE: "/v1/whatsapp/settings/provider-subscribe",
-    PREVIEW_ASK: "/v1/whatsapp/preview/ask",
-    // Conversations, unanswered queue and usage dashboard
-    CONVERSATIONS: "/v1/whatsapp/conversations",
-    CONVERSATION_BY_ID: (id: string) => `/v1/whatsapp/conversations/${id}`,
-    CONVERSATION_LANGUAGES: "/v1/whatsapp/conversations/languages",
-    CITATION_BY_CHUNK: (chunkId: string) => `/v1/whatsapp/citations/${chunkId}`,
-    CONTACT_REVEAL: (id: string) => `/v1/whatsapp/contacts/${id}/reveal`,
-    CONTACT_BLOCK: (id: string) => `/v1/whatsapp/contacts/${id}/block`,
-    CONTACT_UNBLOCK: (id: string) => `/v1/whatsapp/contacts/${id}/unblock`,
-    UNANSWERED: "/v1/whatsapp/unanswered",
-    UNANSWERED_BY_ID: (id: string) => `/v1/whatsapp/unanswered/${id}`,
-    UNANSWERED_CREATE_DOCUMENT: (id: string) => `/v1/whatsapp/unanswered/${id}/create-document`,
+    // Organisations' own numbers
+    NUMBERS: "/v1/whatsapp/numbers",
+    NUMBERS_MANUAL: "/v1/whatsapp/numbers/manual",
+    NUMBER_CHECK: (id: string) => `/v1/whatsapp/numbers/${id}/check`,
+    NUMBER_SUBSCRIBE: (id: string) => `/v1/whatsapp/numbers/${id}/subscribe`,
+    NUMBER_BY_ID: (id: string) => `/v1/whatsapp/numbers/${id}`,
+    // All numbers on the assistant home's Overview
     ANALYTICS_OVERVIEW: "/v1/whatsapp/analytics/overview",
     ANALYTICS_TIMESERIES: "/v1/whatsapp/analytics/timeseries",
     ANALYTICS_LANGUAGES: "/v1/whatsapp/analytics/languages",
@@ -857,13 +1248,6 @@ export const ApiEndpoints = {
     // Advice moderation.
     ADVICE: "/v1/guide/admin/advice",
     ADVICE_MODERATE: (id: string) => `/v1/guide/admin/advice/${id}/moderate`,
-    // Library: the platform's, and one organisation's own.
-    LIBRARY_DOCUMENTS: "/v1/guide/admin/library/documents",
-    LIBRARY_UPLOAD_URL: "/v1/guide/admin/library/documents/upload-url",
-    LIBRARY_DOCUMENT: (id: string) => `/v1/guide/admin/library/documents/${id}`,
-    ORG_LIBRARY_DOCUMENTS: "/v1/guide/admin/org-library/documents",
-    ORG_LIBRARY_UPLOAD_URL: "/v1/guide/admin/org-library/documents/upload-url",
-    ORG_LIBRARY_DOCUMENT: (id: string) => `/v1/guide/admin/org-library/documents/${id}`,
     // Learning loop (plan §7.13, §10.5 "Evals").
     EVALUATOR_RUBRIC: "/v1/guide/admin/evaluator/rubric",
     EVALUATOR_SUMMARY: "/v1/guide/admin/evaluator/summary",
@@ -922,6 +1306,11 @@ export const ROUTES = {
   MANAGE_LLM_CONFIGS: "/manage-llm-configs",
   MANAGE_LLM_MODEL_CATALOG: "/manage-llm-model-catalog",
   AI_TASKS: "/ai-tasks",
+  DEBRIEFS: "/debriefs",
+  DEBRIEF_SESSION: (runId: string) => `/debriefs/sessions/${runId}`,
+  DEBRIEF_SESSION_LOGS: (runId: string) => `/debriefs/sessions/${runId}/logs`,
+  DEBRIEFS_PM_AGENT: "/debriefs/pm-agent",
+  DEBRIEFS_SETTINGS: "/debriefs/settings",
   MANAGE_SCENARIO_LANGUAGES: "/manage-scenario-languages",
   MANAGE_LANGUAGE_GLOSSARY: (id: string | number) => `/manage-scenario-languages/${id}/glossary`,
   MANAGE_PROMPTS: "/manage-prompts",
@@ -948,7 +1337,20 @@ export const ROUTES = {
   SETTINGS: "/settings",
   LOGS: "/logs",
   MOBILE_RELEASES: "/mobile-releases",
-  WHATSAPP_BOT: "/whatsapp-bot",
+  /** The assistants area (A1): its own space, out of Ally admin's navigation. */
+  WHATSAPP_BOT: "/assistants",
+  /** Bookmarks from before chatbots; redirected to WHATSAPP_BOT. */
+  WHATSAPP_BOT_LEGACY: "/whatsapp-bot",
+  /** Links from before A1 (`/chatbots`, `/chatbots/:id?section=…`); redirected to `/assistants…`. */
+  CHATBOTS_LEGACY: "/chatbots",
+  CHATBOT_DETAIL: "/assistants/:botId",
+  /** Onboarding (chunk 20a). Static, so it outranks `:botId`. */
+  CHATBOT_NEW: "/assistants/new",
+  INBOX: "/inbox",
+  CHATBOT_NEW_SESSION: (draftId: string) => `/assistants/new/${draftId}`,
+  /** There is no sign-up (A1): these redirect to the login screen. */
+  SIGN_UP: "/signup",
+  SIGN_UP_ALT: "/sign-up",
   TERMS: "/terms",
   PRIVACY: "/privacy",
   // Fully public, no-login gallery of the centralised design-system components.
@@ -957,14 +1359,38 @@ export const ROUTES = {
   PRODUCT_UPDATES: "/product-updates",
   AI_LAB: "/ai-lab",
   PRODUCT_ROADMAP: "/product-roadmap",
+  /** Roadmap v2's Queue (dark behind `roadmap_v2`; the old pages stay as they are). */
+  ROADMAP: "/roadmap",
+  /** My drafts: Roadmap's own tab (§4.4). */
+  ROADMAP_DRAFTS: "/roadmap/drafts",
+  /** New idea: an empty draft page; the draft and its code exist once there are words (§4.2). */
+  ROADMAP_NEW_IDEA: "/roadmap/new",
+  /** One idea's page, by code (OPP-388). The read model also accepts the uuid. */
+  ROADMAP_IDEA: (code: string) => `/roadmap/i/${code}`,
   BUG_HUNTER: "/bug-hunter",
+  PM_AGENT: "/pm-agent",
   BUILDER: "/builder",
   BUILDER_SESSION: (id: string) => `/builder/${id}`,
   BUILDER_SETTINGS: "/builder/settings",
+  BUILDER_DECISIONS: "/builder/decisions",
+  // Mission control's full session list (search, archive, start by hand), moved off /builder
+  // when the Builder tab became Now · Rules · History.
+  BUILDER_ALL_SESSIONS: "/builder/sessions",
   BUILDER_SCOREBOARD: "/builder/scoreboard",
   BUILDER_PIPELINE: "/builder/pipeline",
   BUILDER_KNOWLEDGE: "/builder/knowledge",
   BUILDER_EVAL: "/builder/eval",
+  /** Roadmap v2's Agent tab: Builder's pages, mounted under the Roadmap (§4.1). */
+  ROADMAP_AGENT: "/roadmap/agent",
+  ROADMAP_AGENT_SECTION: (section: string) => `/roadmap/agent/${section}`,
+  /** Roadmap v2's Settings tab (Owner). */
+  ROADMAP_SETTINGS: "/roadmap/settings",
+  /** Roadmap v2's Bugs tab: Bug Hunter's table, read-only. */
+  ROADMAP_BUGS: "/roadmap/bugs",
+  /** Roadmap v2's Measures (Owner, P8): funnel, stage times, review wait, releases, spend. */
+  ROADMAP_MEASURES: "/roadmap/measures",
+  /** User Interviews, out of the Roadmap into its own sidebar entry (D14). */
+  USER_INTERVIEWS: "/user-interviews",
   COURSE_COPILOT: "/course-copilot",
   // Registered before the session route in RouteLayout: "new" would otherwise match `:sessionId`.
   // Optional `?trackId=` binds the session to an existing course (EDIT mode).
@@ -972,6 +1398,9 @@ export const ROUTES = {
   COURSE_COPILOT_SESSION: (id: string) => `/course-copilot/${id}`,
   // The Ally Console (ally guide admin). `?tab=` picks the tab; `?thread=` opens the Turn Inspector.
   ALLY_CONSOLE: "/ally",
+  // `?view=` (library · insights · settings), `?collection=`, `?chunk=` and `?document=` open
+  // their sheets; `?sheet=new|bulk` the add flows.
+  CONTEXT_LIBRARY: "/context-library",
   // Evaluator micro-app (public routes; evaluator email+password auth)
   EVALUATE: "/evaluate",
   EVALUATE_RECORDS: "/evaluate/records",
@@ -1068,6 +1497,8 @@ export const TAG_TYPES = {
   CUSTOM_FIELD_DEFINITIONS: "customFieldDefinitions",
   CHARACTERS: "characters",
   IMAGE_LIBRARY: "imageLibrary",
+  IMAGE_STUDIO_HISTORY: "imageStudioHistory",
+  IMAGE_STUDIO_CAST_SHEETS: "imageStudioCastSheets",
   PROMPTS: "prompts",
   CONVERSATIONAL_GUARDRAILS: "conversationalGuardrails",
   USER_BADGES: "userBadges",
@@ -1085,7 +1516,6 @@ export const TAG_TYPES = {
   ROLEPLAY_SESSION_LOGS: "roleplaySessionLogs",
   COMFORT_AUDIO_LIBRARY: "comfortAudioLibrary",
   WHATSAPP_BOT_DOCUMENTS: "whatsAppBotDocuments",
-  WHATSAPP_BOT_DOCUMENT_CHUNKS: "whatsAppBotDocumentChunks",
   WHATSAPP_BOT_STATS: "whatsAppBotStats",
   WHATSAPP_BOT_TEMPLATES: "whatsAppBotTemplates",
   WHATSAPP_BOT_SETTINGS: "whatsAppBotSettings",
@@ -1093,6 +1523,15 @@ export const TAG_TYPES = {
   WHATSAPP_BOT_UNANSWERED: "whatsAppBotUnanswered",
   WHATSAPP_BOT_ANALYTICS: "whatsAppBotAnalytics",
   WHATSAPP_BOT_PHONE_MAPPINGS: "whatsAppBotPhoneMappings",
+  WHATSAPP_BOT_NUMBERS: "whatsAppBotNumbers",
+  CHATBOTS: "chatbots",
+  CHATBOT_DETAIL: "chatbotDetail",
+  BOT_DRAFT: "botDraft",
+  CHECKUP: "checkup",
+  SOURCES: "sources",
+  SCORECARD: "scorecard",
+  INBOX: "inbox",
+  CONNECTORS: "connectors",
 
   // Cohorts (per-organization user grouping). Restrictions are a separate tag so
   // a restriction edit refreshes the content tab without refetching the roster.
@@ -1117,10 +1556,13 @@ export const TAG_TYPES = {
   FEATURE_TOGGLE_REGISTRY: "featureToggleRegistry",
   USER_FEATURE_TOGGLES: "userFeatureToggles",
   PLATFORM_ADMINS: "platformAdmins",
+  CLINICAL_ADVISORS: "clinicalAdvisors",
   // Product Roadmap. NOTE: every one of these must ALSO be listed in baseApi.ts's
   // `tagTypes` array — an unregistered tag makes invalidatesTags a silent no-op.
   PRODUCT_ROADMAP_OPPORTUNITIES: "productRoadmapOpportunities",
+  PRODUCT_PLANS: "productPlans",
   PRODUCT_ROADMAP_VOTE_BUDGET: "productRoadmapVoteBudget",
+  PRODUCT_ROADMAP_BREADTH: "productRoadmapBreadth",
   PRODUCT_ROADMAP_FACETS: "productRoadmapFacets",
   PRODUCT_ROADMAP_GOALS: "productRoadmapGoals",
   PRODUCT_ROADMAP_STRATEGY_GOALS: "productRoadmapStrategyGoals",
@@ -1131,10 +1573,23 @@ export const TAG_TYPES = {
   PRODUCT_ROADMAP_COMMENTS: "productRoadmapComments",
   PRODUCT_ROADMAP_VOTERS: "productRoadmapVoters",
   PRODUCT_ROADMAP_INTERVIEWS: "productRoadmapInterviews",
+  PRODUCT_ROADMAP_IDEA_DRAFTS: "productRoadmapIdeaDrafts",
   PRODUCT_ROADMAP_SAVED_VIEWS: "productRoadmapSavedViews",
   PRODUCT_ROADMAP_VIEW_ORDER: "productRoadmapViewOrder",
-  // Analytics Suggestions review queue. Also registered in baseApi.ts's `tagTypes`.
-  ANALYTICS_SUGGESTIONS: "analyticsSuggestions",
+  // Roadmap v2 (also registered in baseApi.ts's `tagTypes`).
+  ROADMAP_V2_ROLES: "roadmapV2Roles",
+  ROADMAP_V2_PREFERENCES: "roadmapV2Preferences",
+  ROADMAP_V2_RELEASE: "roadmapV2Release",
+  ROADMAP_V2_ROLE: "roadmapV2Role",
+  ROADMAP_V2_ITEMS: "roadmapV2Items",
+  // PM Agent (also registered in baseApi.ts's `tagTypes`).
+  PM_AGENT_STATE: "pmAgentState",
+  PM_AGENT_CARDS: "pmAgentCards",
+  PM_AGENT_TRACKING: "pmAgentTracking",
+  PM_AGENT_SETTINGS: "pmAgentSettings",
+  PM_AGENT_MEMORY: "pmAgentMemory",
+  PM_AGENT_HISTORY: "pmAgentHistory",
+  PM_AGENT_HEALTH: "pmAgentHealth",
   ANALYTICS_AGENT_CONVERSATIONS: "analyticsAgentConversations",
   ANALYTICS_AGENT_AUDITS: "analyticsAgentAudits",
   ANALYTICS_AGENT_AUTOMATION: "analyticsAgentAutomation",
@@ -1149,8 +1604,6 @@ export const TAG_TYPES = {
   BUG_HUNTER_RUNS: "bugHunterRuns",
   BUG_HUNTER_FINDINGS: "bugHunterFindings",
   BUG_HUNTER_NOTIFICATIONS: "bugHunterNotifications",
-  // Bug Hunter's notebook. Also registered in baseApi.ts's `tagTypes`.
-  BUG_HUNTER_MEMORY: "bugHunterMemory",
   // Bug Hunter's feature map. Also registered in baseApi.ts's `tagTypes`.
   BUG_HUNTER_FEATURE_MAP: "bugHunterFeatureMap",
   // Who owns each orchestration decision point (OPP-0783). Also registered in baseApi.ts's `tagTypes`.
@@ -1164,10 +1617,15 @@ export const TAG_TYPES = {
   BUILDER_PRD_VERSIONS: "builderPrdVersions",
   BUILDER_SETTINGS: "builderSettings",
   BUILDER_NOTIFICATIONS: "builderNotifications",
-  BUILDER_LESSONS: "builderLessons",
+  BUILDER_DECISIONS: "builderDecisions",
   BUILDER_EXEMPLARS: "builderExemplars",
   BUILDER_EVAL_FIXTURES: "builderEvalFixtures",
   BUILDER_EVAL_SUITES: "builderEvalSuites",
+  BUILDER_NOW: "builderNow",
+  BUILDER_UP_NEXT: "builderUpNext",
+  BUILDER_HISTORY: "builderHistory",
+  BUILDER_RULES: "builderRules",
+  BUILDER_THREAD: "builderThread",
   // Course Copilot. Also registered in baseApi.ts's `tagTypes`.
   COURSE_COPILOT_SESSIONS: "courseCopilotSessions",
   COURSE_COPILOT_SESSION: "courseCopilotSession",
@@ -1180,7 +1638,6 @@ export const TAG_TYPES = {
   ALLY_GUIDE_BASELINE: "allyGuideBaseline",
   ALLY_GUIDE_CONFIG: "allyGuideConfig",
   ALLY_GUIDE_ADVICE: "allyGuideAdvice",
-  ALLY_GUIDE_LIBRARY: "allyGuideLibrary",
   ALLY_GUIDE_REVIEWS: "allyGuideReviews",
   ALLY_GUIDE_EVALS: "allyGuideEvals",
   ALLY_GUIDE_NOTES: "allyGuideNotes",
@@ -1211,9 +1668,24 @@ export const TAG_TYPES = {
   // Skill experiments (auto-improve on Skills Store). Also registered in
   // baseApi.ts's `tagTypes` — an unregistered tag is silently ignored.
   SKILL_EXPERIMENTS: "skillExperiments",
+  DEBRIEF_CONSOLE: "debriefConsole",
+  // Also registered in baseApi.ts's `tagTypes`.
+  DEBRIEF_EXPERT_REVIEW: "debriefExpertReview",
+  NOTIFICATIONS: "notifications",
   // Public roadmap cards (Settings → Roadmap). Also registered in baseApi.ts's
   // `tagTypes` — an unregistered tag is silently ignored.
   PUBLIC_ROADMAP: "publicRoadmap",
+  // Context Library. Also registered in baseApi.ts's `tagTypes`.
+  CONTEXT_LIBRARY_COLLECTIONS: "contextLibraryCollections",
+  CONTEXT_LIBRARY_QUEUE: "contextLibraryQueue",
+  CONTEXT_LIBRARY_SOURCES: "contextLibrarySources",
+  CONTEXT_LIBRARY_CHUNKS: "contextLibraryChunks",
+  CONTEXT_LIBRARY_USE_CASES: "contextLibraryUseCases",
+  CONTEXT_LIBRARY_INSIGHTS: "contextLibraryInsights",
+  CONTEXT_LIBRARY_LOOPS: "contextLibraryLoops",
+  CONTEXT_LIBRARY_READER_KEYS: "contextLibraryReaderKeys",
+  // Builder's "Principles in play", per session. Also registered in baseApi.ts's `tagTypes`.
+  BUILDER_PRINCIPLES: "builderPrinciples",
 };
 
 /**

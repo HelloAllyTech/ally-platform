@@ -51,7 +51,7 @@ export const FINALE_COPY = {
 /**
  * Heavy material hushes the finale (plan §5.10, §4.7): festive motion over
  * a course about suicide or abuse would clash with what the learner just
- * went through (Stacks: Beauty's Aesthetic Cost in Game Design).
+ * went through (Beauty's Aesthetic Cost in Game Design).
  */
 export function isHeavyCourse(spine: CourseSpine): boolean {
   if (!spine.items.length) return false;
@@ -144,7 +144,7 @@ export function buildFinalePayload(input: {
 /**
  * What Ally is told when the finale is on screen: host it briefly, scaled
  * to the course's tone, and point at pride in becoming — a specific change
- * it saw, not praise (Stacks: Combine Emotional Triggers for Pure Emotion).
+ * it saw, not praise (Combine Emotional Triggers for Pure Emotion).
  */
 export function finaleHostingNote(payload: GuideFinalePayload): string {
   return [

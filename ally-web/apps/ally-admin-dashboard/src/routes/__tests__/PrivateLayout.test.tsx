@@ -3,7 +3,7 @@ import React from "react";
 import { configureStore } from "@reduxjs/toolkit";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { Provider } from "react-redux";
-import { MemoryRouter, Routes, Route } from "react-router-dom";
+import { MemoryRouter, Routes, Route, useLocation } from "react-router-dom";
 import { describe, it, expect, afterAll, beforeEach, vi } from "vitest";
 
 import { LOCAL_STORAGE_KEYS, ROUTES, OrgToggle, Permissions } from "@constants";
@@ -12,6 +12,7 @@ import reportUploadReducer from "@reducer/reportUploadReducer";
 import * as api from "@api";
 
 import { PrivateLayout } from "../PrivateLayout";
+import { ShellContext } from "../ShellContext";
 
 vi.mock("@components", async importOriginal => {
   const actual = await importOriginal<typeof import("@components")>();
@@ -24,6 +25,9 @@ vi.mock("@components", async importOriginal => {
   };
 });
 
+vi.mock("@components/notification-bell/NotificationBell", () => ({
+  NotificationBell: () => null,
+}));
 // Mock ReportUploadProgressDialog to avoid API dependency
 vi.mock("@components/report-upload-progress-dialog/ReportUploadProgressDialog", () => ({
   default: () => null,
@@ -63,6 +67,7 @@ vi.mock("@api", () => ({
     refetch: refetchSpy,
   })),
   useGetCharacterLibraryEnabledQuery: vi.fn(() => ({ data: false, isLoading: false })),
+  useGetRoadmapMeRoleQuery: vi.fn(() => ({ data: undefined, isLoading: false })),
   useGetUserPreferencesQuery: () => ({ data: undefined, isLoading: false }),
   useLazyGetUserQuery: () => [vi.fn().mockResolvedValue({ data: { id: 1 } }), { isLoading: false }],
   useLazyGetPermissionsQuery: () => [
@@ -141,6 +146,56 @@ describe("PrivateLayout", () => {
     );
 
     expect(screen.getByText("LoginPage")).toBeInTheDocument();
+  });
+
+  it("keeps the deep link when sending a logged-out visitor to login (A1)", () => {
+    localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED, "false");
+    const Login = () => {
+      const { search } = useLocation();
+      return <div data-testid="login">{new URLSearchParams(search).get("next")}</div>;
+    };
+    render(
+      <Provider store={mockStore}>
+        <MemoryRouter initialEntries={["/assistants/b1?section=lists&tool=memory"]}>
+          <Routes>
+            <Route path={ROUTES.LOGIN} element={<Login />} />
+            <Route
+              path="/assistants/:botId"
+              element={
+                <PrivateLayout>
+                  <div>Assistant</div>
+                </PrivateLayout>
+              }
+            />
+          </Routes>
+        </MemoryRouter>
+      </Provider>,
+    );
+    expect(screen.getByTestId("login").textContent).toBe(
+      "/assistants/b1?section=lists&tool=memory",
+    );
+  });
+
+  it("draws the assistants area inside the admin sidebar, like every other page", () => {
+    localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED, "true");
+    render(
+      <Provider store={mockStore}>
+        <MemoryRouter initialEntries={["/assistants"]}>
+          <Routes>
+            <Route
+              path="/assistants"
+              element={
+                <PrivateLayout>
+                  <div>Your list</div>
+                </PrivateLayout>
+              }
+            />
+          </Routes>
+        </MemoryRouter>
+      </Provider>,
+    );
+    expect(screen.getByText("Your list")).toBeInTheDocument();
+    expect(screen.getByText("Sidebar")).toBeInTheDocument();
   });
 
   it("renders children when authenticated and has permissions", () => {
@@ -528,6 +583,58 @@ describe("PrivateLayout", () => {
 
       expect(screen.getByText("OpenContent")).toBeInTheDocument();
       expect(screen.queryByTestId("entitlements-failed")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("under the shared AdminShell", () => {
+    const renderInShell = (layout: React.ReactElement) =>
+      render(
+        <Provider store={mockStore}>
+          <MemoryRouter initialEntries={["/protected"]}>
+            <ShellContext.Provider value>
+              <Routes>
+                <Route path="/protected" element={layout} />
+              </Routes>
+            </ShellContext.Provider>
+          </MemoryRouter>
+        </Provider>,
+      );
+
+    it("only gates: it draws no sidebar or frame of its own", () => {
+      localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED, "true");
+      renderInShell(
+        <PrivateLayout>
+          <div>ShellContent</div>
+        </PrivateLayout>,
+      );
+      expect(screen.getByText("ShellContent")).toBeInTheDocument();
+      expect(screen.queryByText("Sidebar")).not.toBeInTheDocument();
+    });
+
+    it("still refuses access with the reason", async () => {
+      localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED, "true");
+      // Earlier tests leave their error/loading mocks behind; start from a healthy load.
+      const healthy = (data: unknown) => ({
+        data,
+        isLoading: false,
+        isError: false,
+        refetch: refetchSpy,
+      });
+      (api.useGetUserQuery as ReturnType<typeof vi.fn>).mockReturnValue(healthy({ id: 1 }));
+      (api.useGetPermissionsQuery as ReturnType<typeof vi.fn>).mockReturnValue(
+        healthy([Permissions.EDIT_USER]),
+      );
+      (api.useGetFeatureTogglesQuery as ReturnType<typeof vi.fn>).mockReturnValue(healthy([]));
+      const { hasPermissions } = await import("@utils");
+      (hasPermissions as unknown as ReturnType<typeof vi.fn>).mockReturnValue(false);
+      renderInShell(
+        <PrivateLayout requiredPermissions={[Permissions.EDIT_EVENT]}>
+          <div>BlockedInShell</div>
+        </PrivateLayout>,
+      );
+      expect(screen.queryByText("BlockedInShell")).not.toBeInTheDocument();
+      expect(screen.getByText("This page is not accessible")).toBeInTheDocument();
+      expect(screen.queryByText("Sidebar")).not.toBeInTheDocument();
     });
   });
 });

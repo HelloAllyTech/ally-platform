@@ -1,7 +1,9 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
+  Optional,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
@@ -13,6 +15,7 @@ import {
 } from '../entity/prompt-version.entity';
 import { PromptTranslation } from '../entity/prompt-translation.entity';
 import { PromptTranslationService } from './prompt-translation.service';
+import { emitPromptPublished } from '../util/prompt-published.events';
 import { PromptSharedService } from './prompt-shared.service';
 import { TRANSLATABLE_PROMPT_TYPES } from '../constants/prompt.constants';
 import {
@@ -28,6 +31,8 @@ import {
 } from 'src/builder/constants/builder-eval-gate.constants';
 import { LoggerService } from 'src/logger/logger.service';
 import { ErrorCode } from 'src/exception/error-code.enum';
+import { AppConfigService } from 'src/config/config.service';
+import { ExecutionManager } from 'src/common/execution/execution-manager';
 import {
   PINNED_PROMPTS,
   PINNED_PROMPT_REFUSAL,
@@ -39,6 +44,7 @@ export const SKILLS_STORE_ERROR = {
   CONTRACT_VIOLATION: ErrorCode.SKILLS_STORE_CONTRACT_VIOLATION,
   TRANSLATIONS_PENDING: ErrorCode.SKILLS_STORE_TRANSLATIONS_PENDING,
   PROMPT_PINNED: ErrorCode.SKILLS_STORE_PROMPT_PINNED,
+  PINNED_LOCKED: ErrorCode.SKILLS_STORE_PINNED_LOCKED,
   NOT_A_CANDIDATE: ErrorCode.SKILLS_STORE_NOT_A_CANDIDATE,
 } as const;
 
@@ -117,6 +123,9 @@ export class PromptVersioningService {
     private readonly dataSource: DataSource,
     private readonly promptTranslationService: PromptTranslationService,
     private readonly promptShared: PromptSharedService,
+    // Optional so a store built by hand (tests, scripts) still constructs;
+    // without it nobody is on the pinned-editor list, which refuses.
+    @Optional() private readonly config?: AppConfigService,
   ) {}
 
   async createVersion(
@@ -209,6 +218,18 @@ export class PromptVersioningService {
       requireTranslations?: boolean;
       /** Confirms a pinned prompt's change (see pinned-prompts.constants). */
       confirmPinnedChange?: boolean;
+      /**
+       * Set only by the local-store import (`prompts apply-local`), which
+       * copies versions that already went live elsewhere. No other caller may
+       * skip the pinned-editor check.
+       */
+      trustedImport?: boolean;
+      /**
+       * Set only by the Debrief console when the clinical advisor or the
+       * owner approves a pinned debrief rule (it checks their permission):
+       * that sign-off is the gate the pinned-editor list stands for.
+       */
+      signedOffPinnedRule?: boolean;
     } = {},
   ): Promise<PromoteResult> {
     const result = await this.dataSource.transaction(async (manager) => {
@@ -262,6 +283,7 @@ export class PromptVersioningService {
         this.assertPinnedChangeConfirmed(
           prompt.promptCode,
           options.confirmPinnedChange,
+          options.trustedImport || options.signedOffPinnedRule,
         );
       }
 
@@ -310,7 +332,40 @@ export class PromptVersioningService {
     });
     // This process serves the new version at once; others within the cache TTL.
     this.promptShared.invalidate();
+    if (result.previousVersion !== result.version) {
+      // Subscribers (the Debrief agent's releases) hear about it after the
+      // commit; they never fail or slow the publish.
+      void this.announcePublished(promptId, result).catch(() => undefined);
+    }
     return result;
+  }
+
+  private async announcePublished(
+    promptId: string,
+    result: { version: number; previousVersion: number | null },
+  ): Promise<void> {
+    const [row] = await this.dataSource.query(
+      `SELECT p."promptCode", pv."createdBy", pv.source, pv.note
+         FROM prompts p JOIN prompts_versions pv ON pv."promptId" = p.id
+        WHERE p.id = $1 AND pv.version = $2`,
+      [promptId, result.version],
+    );
+    if (!row) return;
+    await emitPromptPublished(
+      {
+        promptId,
+        promptCode: row.promptCode,
+        version: result.version,
+        previousVersion: result.previousVersion,
+        createdBy: row.createdBy != null ? Number(row.createdBy) : null,
+        source: row.source ?? null,
+        note: row.note ?? null,
+      },
+      (err) =>
+        this.logger.warn(
+          `[SKILLS_STORE] a publish listener failed for ${row.promptCode}: ${err.message}`,
+        ),
+    );
   }
 
   /**
@@ -576,15 +631,31 @@ export class PromptVersioningService {
   private assertPinnedChangeConfirmed(
     promptCode: string,
     confirmed: boolean | undefined,
+    trustedImport = false,
   ): void {
     const reason = PINNED_PROMPTS.get(promptCode);
-    if (!reason || confirmed) return;
-    throw new ConflictException({
-      statusCode: 409,
-      errorCode: SKILLS_STORE_ERROR.PROMPT_PINNED,
-      message: `${promptCode} ${PINNED_PROMPT_REFUSAL[reason]}`,
-      details: { reason },
-    });
+    if (!reason) return;
+    if (!confirmed) {
+      throw new ConflictException({
+        statusCode: 409,
+        errorCode: SKILLS_STORE_ERROR.PROMPT_PINNED,
+        message: `${promptCode} ${PINNED_PROMPT_REFUSAL[reason]}`,
+        details: { reason },
+      });
+    }
+    if (trustedImport) return;
+    // Confirming is not enough: the person confirming must be named. A caller
+    // with no person behind it (an automated agent, a script) is refused too.
+    const userId = Number(ExecutionManager.getUserId());
+    const allowed = this.config?.skillsStorePinnedEditorIds ?? [];
+    if (!userId || !allowed.includes(userId)) {
+      throw new ForbiddenException({
+        statusCode: 403,
+        errorCode: SKILLS_STORE_ERROR.PINNED_LOCKED,
+        message: `${promptCode} is pinned: only the people named in SKILLS_STORE_PINNED_EDITORS can put a new version live.`,
+        details: { reason },
+      });
+    }
   }
 
   /**

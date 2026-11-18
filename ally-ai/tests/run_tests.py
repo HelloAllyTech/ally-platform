@@ -30,9 +30,7 @@ def run_tests():
         return e.returncode
     except FileNotFoundError:
         logger.info("❌ Poetry not found. Please install poetry first.")
-        logger.info(
-            "   Install with: curl -sSL https://install.python-poetry.org | python3 -"
-        )
+        logger.info('   Install with: pip install "poetry==2.5.1"')
         return 1
 
 

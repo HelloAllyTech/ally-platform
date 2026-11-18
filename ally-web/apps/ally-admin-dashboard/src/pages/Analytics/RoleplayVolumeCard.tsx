@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
 
-import { SimpleBarChart } from "@carbon/charts-react";
-
 import { useGetRoleplayVolumeQuery } from "@api";
+import { SimpleBarChart } from "@components/charts";
 
 import { ChartDetailModal } from "./ChartDetailModal";
 import { ChartCard, barOpts, buildSource } from "./chartKit";

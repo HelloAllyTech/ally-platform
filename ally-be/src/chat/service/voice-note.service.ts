@@ -18,6 +18,8 @@ import { LlmTask } from 'src/learn/enum/llm-task.enum';
 import { SettingsService } from 'src/settings/service/settings.service';
 import { toPromptCode } from 'src/prompt/util/prompt-code.util';
 import { loadPromptTemplate } from 'src/common/util/prompt-template.util';
+import { audioUploadType } from 'src/common/util/audio.util';
+import { chunkWavBySeconds } from 'src/common/util/wav-chunker.util';
 import {
   GenerateNoteFromAudioResponseDto,
   VoiceNoteFieldSpec,
@@ -39,22 +41,18 @@ const MAX_TRANSCRIPT_CHARS = 40_000;
  * observed spend (2,324 tokens at 25 min on the current prompt).
  */
 const EXTRACTION_MAX_TOKENS = 16384;
+/** Shortest transcript quote accepted as evidence for an extracted value. */
+const MIN_EVIDENCE_WORDS = 3;
 /** AI-task-registry row id; the key for per-task model config. */
 const AI_TASK_ID = 'voice-note-extract';
-
-// OpenAI's transcription API infers the container from the filename extension,
-// so we derive the extension from the real MIME type rather than trusting the
-// client-sent filename (Safari records audio/mp4, Chromium audio/webm).
-const MIME_EXTENSIONS: Record<string, string> = {
-  'audio/webm': 'webm',
-  'audio/ogg': 'ogg',
-  'audio/mp4': 'mp4',
-  'audio/mpeg': 'mp3',
-  'audio/mp3': 'mp3',
-  'audio/wav': 'wav',
-  'audio/x-wav': 'wav',
-  'audio/wave': 'wav',
-};
+/**
+ * Mobile dictation records WAV, and a long WAV can be chunked losslessly in
+ * memory (see wav-chunker.util.ts) before transcribing — unlike web's
+ * compressed webm/mp4, which this does not attempt to chunk. 4 minutes stays
+ * comfortably inside whatever undocumented length pushes OpenAI's
+ * transcription API into silently truncating its output.
+ */
+const WAV_CHUNK_SECONDS = 240;
 
 const VALID_FIELD_TYPES: ReadonlySet<VoiceNoteFieldType> = new Set([
   'text',
@@ -180,24 +178,50 @@ export class VoiceNoteService {
   ): Promise<string> {
     const startedAt = Date.now();
     try {
-      const mimetype = (audio.mimetype || 'audio/webm').split(';')[0].trim();
-      const ext = MIME_EXTENSIONS[mimetype.toLowerCase()] ?? 'webm';
-      const file = await toFile(audio.buffer, `dictation.${ext}`, {
-        type: mimetype,
-      });
+      const { type, ext } = audioUploadType(audio.mimetype);
+      // Only WAV (mobile dictation) is split — it's raw PCM, so chunking is
+      // lossless and needs no temp files. A buffer that isn't parseable as
+      // WAV, or already short, comes back as the single original buffer
+      // unchanged (see chunkWavBySeconds's own doc comment).
+      const chunks =
+        ext === 'wav'
+          ? chunkWavBySeconds(audio.buffer, WAV_CHUNK_SECONDS)
+          : [audio.buffer];
+      if (chunks.length > 1) {
+        this.logger.info(
+          `[VOICE_NOTE] long WAV dictation split into ${chunks.length} chunks ` +
+            `of up to ${WAV_CHUNK_SECONDS}s each bytes=${audio.size}`,
+        );
+      }
 
-      const result = await this.openai.audio.transcriptions.create({
-        file,
-        model: this.transcriptionModel,
-        // Only pass a language when the client sent a hint; otherwise let the
-        // model auto-detect (Ally serves many languages).
-        ...(languageHint ? { language: languageHint } : {}),
-      });
+      // Chunks are independent, so transcribe them concurrently rather than
+      // one at a time — a sequential loop made a long dictation's total
+      // latency scale with its chunk count (each an extra full OpenAI
+      // round-trip), which pushed the whole request past the mobile
+      // client's receive timeout and surfaced as "no summary generated" for
+      // exactly the long dictations this chunking was meant to fix.
+      // `Promise.all` preserves input order in its results regardless of
+      // resolution order, so chunk order survives even though completion
+      // order doesn't.
+      const texts = await Promise.all(
+        chunks.map(async (chunkBuffer) => {
+          const file = await toFile(chunkBuffer, `dictation.${ext}`, { type });
+          const result = await this.openai.audio.transcriptions.create({
+            file,
+            model: this.transcriptionModel,
+            // Only pass a language when the client sent a hint; otherwise let the
+            // model auto-detect (Ally serves many languages).
+            ...(languageHint ? { language: languageHint } : {}),
+          });
+          return (result.text ?? '').trim();
+        }),
+      );
 
-      const text = (result.text ?? '').trim();
+      const text = texts.filter(Boolean).join(' ').trim();
       this.logger.info(
         `[VOICE_NOTE] transcribed model=${this.transcriptionModel} ` +
-          `bytes=${audio.size} chars=${text.length} elapsedMs=${Date.now() - startedAt}`,
+          `bytes=${audio.size} chunks=${chunks.length} chars=${text.length} ` +
+          `elapsedMs=${Date.now() - startedAt}`,
       );
       return text;
     } catch (error) {
@@ -259,10 +283,16 @@ export class VoiceNoteService {
     }
 
     const parsed = this.parseJsonObject(raw);
-    const values = this.coerceValues(parsed, fields);
+    const {
+      values: supported,
+      unsupported,
+      shape,
+    } = this.keepSupported(parsed, truncated);
+    const values = this.coerceValues(supported, fields);
     const summary =
       `[VOICE_NOTE] extracted model=${model} stopReason=${stopReason ?? 'unknown'} ` +
-      `requested=${fields.length} filled=${values.length} elapsedMs=${Date.now() - startedAt}`;
+      `requested=${fields.length} filled=${values.length} ` +
+      `unsupported=${unsupported} shape=${shape} elapsedMs=${Date.now() - startedAt}`;
     if (stopReason === 'max_tokens') {
       // The output was cut by EXTRACTION_MAX_TOKENS. The JSON is then usually
       // unparseable, so this surfaces as an empty or half-filled note that is
@@ -399,6 +429,88 @@ export class VoiceNoteService {
       );
       return {};
     }
+  }
+
+  /**
+   * Drops every value the transcript does not back with the model's own quote.
+   *
+   * The prompt alone did not stop invented values: with 58 fields, gpt-5-mini
+   * answered "No" to suicidal plan/action, picked "Congruent" affect and added
+   * homework the counsellor never dictated, despite a rule to fill clinical
+   * fields only when stated. So each entry carries `evidence` — words copied
+   * from the transcript — and an entry whose quote is missing or not found in
+   * the transcript is discarded.
+   *
+   * Accepts both answer shapes while the Skills Store text moves over:
+   *   - `evidence`: `{ id: { value, evidence } }` — the gated shape. A plain
+   *     value in such a reply has no evidence and is dropped.
+   *   - `legacy`: `{ id: value }` with no evidence anywhere — the pre-evidence
+   *     prompt is still live, so values pass through unchecked.
+   */
+  private keepSupported(
+    parsed: Record<string, unknown>,
+    transcript: string,
+  ): {
+    values: Record<string, unknown>;
+    unsupported: number;
+    shape: 'evidence' | 'legacy';
+  } {
+    const isEntry = (
+      v: unknown,
+    ): v is { value?: unknown; evidence?: unknown } =>
+      !!v && typeof v === 'object' && !Array.isArray(v) && 'value' in v;
+    if (!Object.values(parsed).some(isEntry)) {
+      return { values: parsed, unsupported: 0, shape: 'legacy' };
+    }
+
+    const haystack = ` ${this.normalizeForMatch(transcript)} `;
+    const values: Record<string, unknown> = {};
+    let unsupported = 0;
+    for (const [id, entry] of Object.entries(parsed)) {
+      if (isEntry(entry) && this.isQuoted(entry.evidence, haystack)) {
+        values[id] = entry.value;
+      } else {
+        unsupported++;
+      }
+    }
+    return { values, unsupported, shape: 'evidence' };
+  }
+
+  /**
+   * True when at least one quote is in the transcript and is MIN_EVIDENCE_WORDS
+   * long — shorter quotes ("the child", "no") match almost any transcript, so
+   * they count for nothing. A quote may skip words with an ellipsis; each piece
+   * must then appear on its own.
+   *
+   * A quote that is not found is ignored rather than sinking the field: a
+   * Session Summary cites two dozen passages, and one lightly reworded quote
+   * ("The child shared…" for "She shared…") or a two-word heading must not
+   * throw the counsellor's whole summary away. An invented value has no real
+   * passage behind it, so it still finds nothing.
+   */
+  private isQuoted(evidence: unknown, haystack: string): boolean {
+    const quotes = Array.isArray(evidence) ? evidence : [evidence];
+    return quotes.some((quote) => {
+      if (typeof quote !== 'string') return false;
+      const pieces = quote
+        .split(/\.{3}|…/)
+        .map((p) => this.normalizeForMatch(p))
+        .filter(Boolean);
+      const words = pieces.reduce((n, p) => n + p.split(' ').length, 0);
+      return (
+        words >= MIN_EVIDENCE_WORDS &&
+        pieces.every((p) => haystack.includes(` ${p} `))
+      );
+    });
+  }
+
+  /** Lowercase, letters and digits only, single spaces — so punctuation and
+   * curly quotes the model tidies do not decide a match. */
+  private normalizeForMatch(text: string): string {
+    return text
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, ' ')
+      .trim();
   }
 
   private stripMarkdownFences(text: string): string {

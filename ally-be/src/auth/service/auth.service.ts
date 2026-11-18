@@ -45,6 +45,8 @@ import { EmailSendFailedException } from 'src/aws/service/ses.service';
 import { CachedAuthAttempt } from '../interface/cached-auth-attempt.interface';
 import { PermissionsService } from 'src/authorization/service/permissions.service';
 import { TenantScopeService } from 'src/authorization/service/tenant-scope.service';
+import { Tenant } from 'src/tenant/entity/tenant.entity';
+import { resolveBranding } from 'src/tenant/util/tenant-branding.util';
 import { Impersonate } from '../interface/impersonate.interface';
 import {
   describeWait,
@@ -414,6 +416,40 @@ export class AuthService {
     return false;
   }
 
+  /**
+   * The org's branded display name for the sign-in email, or undefined when
+   * its branding switch is off (the email then speaks as Ally, as today).
+   * Never lets a branding lookup stop a code from going out.
+   */
+  private async brandedOrg(
+    tenantId: string | null | undefined,
+  ): Promise<
+    { orgName: string; orgLogoUrl?: string; orgColor: string } | undefined
+  > {
+    if (!tenantId) return undefined;
+    try {
+      const tenant = await this.dataSource.getRepository(Tenant).findOne({
+        where: { id: tenantId },
+        select: ['id', 'name', 'logoUrl', 'settings'],
+      });
+      if (!tenant) return undefined;
+      const branding = resolveBranding(tenant, tenant.settings?.branding);
+      if (!branding.enabled) return undefined;
+      return {
+        orgName: branding.displayName,
+        ...(branding.logoUrl ? { orgLogoUrl: branding.logoUrl } : {}),
+        orgColor: branding.primaryColor,
+      };
+    } catch (error) {
+      this.logger.warn(
+        `Branding lookup skipped for the sign-in email: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
+      return undefined;
+    }
+  }
+
   async generateOtpV2(
     generateOtpDto: GenerateOtpV2Dto,
   ): Promise<GenerateOtpV2ResponseDto> {
@@ -505,11 +541,13 @@ export class AuthService {
     // The credentials above are already cached, deliberately: if the send fails
     // the user can retry and the SAME attempt record is reused, and a code that
     // did go out despite a reported failure still verifies.
+    const orgBrand = await this.brandedOrg(user.tenantId);
     const results = await this.eventEmitter.emitAsync('otp.generated', {
       email,
       otp,
       magicLinkToken: magicToken,
       appType,
+      ...(orgBrand ?? {}),
     });
 
     // The notification consumer resolves `false` when the send failed (it

@@ -30,13 +30,13 @@ describe('verifyCommandsList', () => {
 });
 
 describe('BUG_HUNT_REPOS typecheck coverage', () => {
-  // Confirmed directly against each repo's own `.github/workflows/test.yml`:
-  // ally-be and ally-web both run a separate, blocking TypeScript compile
-  // that ESLint/ESLint-flake8 never catches — the real, recurring cause of a
-  // fix that passed Bug Hunter's own check and then failed the PR the moment
-  // someone tried to merge it. The other three repos' CI has no equivalent
-  // gate (ally-mobile's `tsc --noEmit` exists only in a local Husky
-  // pre-commit hook, never in CI), so adding one here would just make Bug
+  // Confirmed directly against each repo's own test workflow: ally-be and
+  // ally-web both run a separate, blocking TypeScript compile that
+  // ESLint/flake8/`flutter analyze` never catches — the real, recurring
+  // cause of a fix that passed Bug Hunter's own check and then failed the PR
+  // the moment someone tried to merge it. The other three repos' CI has no
+  // equivalent gate (ally-mobile's `flutter analyze` already does its own
+  // type checking, no separate step), so adding one here would just make Bug
   // Hunter fail fixes over something that was never going to block the PR.
   it('has a typecheck command for ally-be and ally-web only', () => {
     expect(repoCommands('ally-be')?.typecheck).toBe(

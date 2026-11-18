@@ -19,15 +19,18 @@ import {
 export const STAGE_STYLE: Record<string, string> = {
   new: "bg-background-secondary text-typography-primary",
   prioritised: "bg-primary-100 text-primary-600",
-  under_development: "bg-primary-50 text-primary-500",
+  // Retired stage, shown as Prioritised until the data migration removes it (see STAGE_LABEL).
+  under_development: "bg-primary-100 text-primary-600",
   released: "bg-green-50 text-green-700",
   archived: "bg-background-secondary text-typography-secondary",
 };
 
 export const STAGE_LABEL: Record<string, string> = {
-  new: "New",
+  // Stored as `new`, shown as "Idea": a stage called `idea` would collide with the idea/bug TYPE.
+  new: "Idea",
   prioritised: "Prioritised",
-  under_development: "In development",
+  // Retired: folded into Prioritised. Rows still carrying it read as Prioritised everywhere.
+  under_development: "Prioritised",
   released: "Released",
   archived: "Archived",
 };
@@ -71,7 +74,7 @@ export const SOURCE_LABEL: Record<string, string> = {
 
 /**
  * 'staff' is the default and every pre-existing row's value — badging it on every row would be
- * noise, not signal (Stacks: "Default to Common Case, Hide Alternatives"). Only 'consumer' gets
+ * noise, not signal ("Default to Common Case, Hide Alternatives"). Only 'consumer' gets
  * a badge, so a bug filed through the in-app "Report a problem" form is the thing that stands out.
  */
 export const isConsumerSourced = (source: RoadmapOpportunitySource | string): boolean =>
@@ -102,3 +105,34 @@ export const isReshapeableStage = (stage: RoadmapOpportunityStage | string): boo
 export const reshapeBlockedReason = (stage: RoadmapOpportunityStage | string): string =>
   `Already ${stageLabel(stage).toLowerCase()} — splitting or merging it would rewrite a record ` +
   `that release notes and its ship date already point at.`;
+
+/**
+ * The stages a person can pick: Idea, Prioritised, Released. Archived is a hidden state behind the
+ * "Show archived" toggle, and `under_development` is retired.
+ */
+export const VISIBLE_STAGES: string[] = ["new", "prioritised", "released"];
+
+/** The stage a stored value displays and edits as — `under_development` is Prioritised. */
+export const displayStage = (stage: string): string =>
+  stage === "under_development" ? "prioritised" : stage;
+
+/**
+ * The stage filter to SEND, from the stage filter the reader sees.
+ *
+ * Two jobs. Prioritised has to match legacy `under_development` rows until they are migrated, and
+ * archived rows stay out unless "Show archived" is on — the server still lists them when no stage
+ * is given, so the exclusion is spelled out here. Returns undefined when nothing needs saying.
+ */
+export const expandStageFilter = (
+  selected: string[],
+  showArchived: boolean,
+): string[] | undefined => {
+  if (selected.length === 0) {
+    const all = ["new", "prioritised", "under_development", "released"];
+    return showArchived ? undefined : all;
+  }
+  const out = new Set<string>(selected.map(displayStage));
+  if (out.has("prioritised")) out.add("under_development");
+  if (showArchived) out.add("archived");
+  return [...out];
+};

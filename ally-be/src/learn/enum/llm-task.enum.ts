@@ -25,6 +25,13 @@ export enum LlmTask {
   // AGENT_TURN but off the reply path, so it has to be separable from turn cost
   // for the feature's spend to be arguable against its benefit.
   CLIENT_WORKING_MEMORY = 'client_working_memory',
+  // Stage Director in ally-ai-learn: the same detached call per learner turn
+  // for scenarios on Main Agent Prompt — Stage Director, writing one paragraph
+  // of the client's thoughts.
+  STAGE_DIRECTOR = 'stage_director',
+  // Once per simulation, when it is switched to the Stage Director prompt:
+  // assigns each memory to the stage the client is ready to share it from.
+  STAGE_DIRECTOR_MEMORY_MAPPING = 'stage_director_memory_mapping',
   // Back-channel phrases in ally-ai-learn: one call per session, at session
   // start, generating the listener affirmations ("mm-hmm") the character plays
   // while the learner holds the floor. Its own label rather than AGENT_TURN
@@ -116,6 +123,34 @@ export enum LlmTask {
   // the transcript? Emitted by ally-ai before this member existed; the
   // processor stores the raw string, so those rows already carry this value.
   FEEDBACK_GROUNDEDNESS_JUDGE = 'feedback_groundedness_judge',
+  // Debrief-quality judge in ally-ai: scores the whole debrief on the rubric's
+  // eight dimensions. The independent judge the debrief quality bar is read
+  // from; a sibling of the groundedness judge, not a replacement for it.
+  DEBRIEF_QUALITY_JUDGE = 'debrief_quality_judge',
+  // Debrief agent steps in ally-ai, one label per step.
+  DEBRIEF_SAFETY_READER = 'debrief_safety_reader',
+  DEBRIEF_ANALYST = 'debrief_analyst',
+  DEBRIEF_PROGRESS_READER = 'debrief_progress_reader',
+  DEBRIEF_WRITER = 'debrief_writer',
+  DEBRIEF_EVALUATOR = 'debrief_evaluator',
+  DEBRIEF_REVISER = 'debrief_reviser',
+  // The orchestrated debrief (spec A5, A9): the planner and its prompt-only agents.
+  DEBRIEF_PLANNER = 'debrief_planner',
+  DEBRIEF_PROTOCOL_CHECK = 'debrief_protocol_check',
+  DEBRIEF_HISTORY_DEEP = 'debrief_history_deep',
+  DEBRIEF_LANGUAGE_SPECIALIST = 'debrief_language_specialist',
+  // Ask Ally: the Debrief agent answering the learner's replies, streamed.
+  DEBRIEF_REPLY = 'debrief_reply',
+  // Read-aloud of a debrief card (Sarvam TTS), cached per card text.
+  DEBRIEF_READ_ALOUD = 'debrief_read_aloud',
+  // Narration of a role-play's description (Sarvam TTS), made when it is published or edited.
+  SCENARIO_DESCRIPTION_NARRATION = 'scenario_description_narration',
+  // Whether an answer to the reflective question is on topic, for XP.
+  DEBRIEF_REFLECTION_CHECK = 'debrief_reflection_check',
+  // The debrief PM agent's daily analysis; learning budget, never production.
+  DEBRIEF_PM_AGENT = 'debrief_improver',
+  /** V2_AUTONOMY F1: the Debrief agent answering a learner's flag on a card. */
+  DEBRIEF_FLAG_ANSWER = 'debrief_flag_answer',
   // Thinking-filler judge in ally-ai: scores whether a filler sounded like the
   // character and fitted the turn. Its own label rather than folded into
   // LANGUAGE_JUDGE because it runs on a different cadence over a different
@@ -138,15 +173,16 @@ export enum LlmTask {
   // the narrator carries result rows, so their token profiles differ.
   ANALYTICS_AGENT_PLAN = 'analytics_agent_plan',
   ANALYTICS_AGENT_ANSWER = 'analytics_agent_answer',
-  // Analytics Suggestions (admin Analytics -> Suggestions tab): one call per
-  // Generate run. Its own label because the profile is unlike anything else
-  // here — a whole analytics window in, at most ten suggestions out.
-  ANALYTICS_SUGGESTIONS = 'analytics_suggestions',
   // UX Signals scan (src/ux-signals): one triage call per scan, turning
-  // threshold-crossing PostHog signals into bug findings and suggestions. Its
+  // threshold-crossing PostHog signals into bug findings and PM Agent signals. Its
   // own label because the input is telemetry aggregates rather than an
   // analytics window, so its token profile tracks detector count, not date range.
   UX_SIGNALS = 'ux_signals',
+  // PM Agent (src/pm-agent, docs/pm-agent.md): the admin AI product manager's own
+  // analysis — lanes, critic, ranker. Its own label because the agent's monthly budget is
+  // read from llm_usage rows carrying it (PmAgentBudgetService, IST month). The pipeline
+  // may add finer `pm_agent_*` labels per lane; the budget sums those too.
+  PM_AGENT = 'pm_agent',
   // Foundational helping skills (src/foundational-skills): one call per
   // 5,000-character cut of a learner's roleplay speech, scoring it against the
   // fixed foundational helping skills rubric. Scheduled, never on a request path. Its own
@@ -170,6 +206,32 @@ export enum LlmTask {
   HELPLINE_RISK_CLASSIFY = 'helpline_risk_classify',
   HELPLINE_COPILOT_TURN = 'helpline_copilot_turn',
   HELPLINE_QA_JUDGE = 'helpline_qa_judge',
+  // Chatbots in Agent mode (Agents v2), made by ally-ai's /agent/run: one call
+  // per loop iteration on the bot's answer model. Chatbot spend, not a learner practising, so
+  // absent from TASK_AREA like the helpline's.
+  WHATSAPP_AGENT_STEP = 'whatsapp_agent_step',
+  // Memory, light (chunk 8a), made by ally-ai after a chatbot's reply, never while someone waits:
+  // the memory check on health assistants, and the rolling summary of a long chat. Chatbot spend.
+  CHATBOT_MEMORY_CHECK = 'chatbot_memory_check',
+  CHATBOT_CONVERSATION_SUMMARY = 'chatbot_conversation_summary',
+  // Onboarding builder (chunk 20a), made by ally-ai's /builder/*: one label per
+  // sub-task, so the cost of setting up an assistant shows step by step.
+  // Extraction runs once per batch of crawled pages and dominates. Customer
+  // setup spend, not a learner practising, so absent from TASK_AREA.
+  ONBOARDING_BUILDER_STEP = 'onboarding_builder_step',
+  ONBOARDING_EXTRACT_FACTS = 'onboarding_extract_facts',
+  ONBOARDING_CLASSIFY = 'onboarding_classify',
+  ONBOARDING_GAPS = 'onboarding_gaps',
+  // Purposes (chunk 20a-2): tailors the five purpose cards and recommends one.
+  ONBOARDING_PURPOSES = 'onboarding_purposes',
+  ONBOARDING_DRAFT = 'onboarding_draft',
+  // Change by chat on the assistant home (chunk 20a-2): one call per request.
+  ONBOARDING_CHANGE = 'onboarding_change',
+  // The checkup (chunk 20a-2), made by ally-ai's /checkup/grade: one judge call per graded
+  // question that needs a reading for meaning. Customer spend, absent from TASK_AREA.
+  CHECKUP_JUDGE = 'checkup_judge',
+  // Writes an assistant's checkup questions from its learned details (chunk 20a-2).
+  CHECKUP_QUESTIONS = 'checkup_questions',
   // Feedback → skill mapping (src/foundational-skills): one call per completed
   // session whose debrief names areas of growth, filing each under one
   // foundational helping skill (or none) for the Helping skills "named
@@ -208,10 +270,9 @@ export enum LlmTask {
   // reported by the runner and recorded against BUILDER_BUILD).
   BUILDER_INTERVIEW = 'builder_interview',
   BUILDER_BUILD = 'builder_build',
-  // The flywheel's cheap passes: folding retrospective bullets into the
-  // curated lesson set, categorising how a build actually turned out, and
-  // picking which past lessons/exemplars a new session should see.
-  BUILDER_LESSON_CURATION = 'builder_lesson_curation',
+  // The flywheel's cheap passes: categorising how a build actually turned
+  // out, and picking which past exemplars a new session should see. (Folding
+  // lessons into the curated set is the Context Library's agent curator now.)
   BUILDER_OUTCOME_CATEGORISE = 'builder_outcome_categorise',
   BUILDER_CONTEXT_SELECTION = 'builder_context_selection',
   // Cutting a large PRD into independently shippable milestones.
@@ -234,10 +295,20 @@ export enum LlmTask {
   // The learning loop: is an admin's reply in a Builder interview a
   // correction, and of what kind.
   BUILDER_CORRECTION_CLASSIFY = 'builder_correction_classify',
+  // The Builder tab: a read-only question to one session, or to all work.
+  BUILDER_SESSION_ASK = 'builder_session_ask',
+  BUILDER_WORK_ASK = 'builder_work_ask',
+  // The Builder tab's rules: drafting one from an answer, and previewing what
+  // it would have matched.
+  BUILDER_RULE_DRAFT = 'builder_rule_draft',
+  BUILDER_RULE_MATCH = 'builder_rule_match',
   // The roadmap's opportunity copilot: one pass of the guided interview's tool
   // loop (research, then a structured turn). Tagged with metadata.iteration so
   // a turn's passes can be summed.
   ROADMAP_OPPORTUNITY_COPILOT = 'roadmap_opportunity_copilot',
+  // Roadmap v2 dictation (D9): one short clip from the mic on the draft page or
+  // an answer/comment box, transcribed to editable text.
+  ROADMAP_DICTATION = 'roadmap_dictation',
   // Track 2.0 quiz: grading one open-ended learner answer against its rubric.
   TRACK_QUIZ_GRADING = 'track_quiz_grading',
   TRANSLATE_SCENARIO = 'translate_scenario',
@@ -247,6 +318,11 @@ export enum LlmTask {
   // a prompt they wrote. Not the scenario template above, and not filed into
   // the roleplay cover library.
   GENERATE_COURSE_COVER_IMAGE = 'generate_course_cover_image',
+  // Image Studio (src/image-studio): the generator behind every authoring
+  // image slot — plan the scene, render the image, check the result.
+  IMAGE_STUDIO_COMPOSE = 'image_studio_compose',
+  IMAGE_STUDIO_IMAGE = 'image_studio_image',
+  IMAGE_STUDIO_JUDGE = 'image_studio_judge',
   TRANSLATE_TEXT = 'translate_text',
   TRANSLATE_OBJECT = 'translate_object',
   // Scribe voice note: turning one dictation transcript into note fields.
@@ -277,12 +353,6 @@ export enum LlmTask {
   // which sums llm_usage by this task tagged with metadata.runId to cost a
   // run, not by stage within it.
   BUG_HUNTER = 'bug_hunter',
-
-  // Agent memory: the curator pass that folds an agent's notebook candidates
-  // into its active set — see AgentMemoryCuratorService. Its own label rather
-  // than BUG_HUNTER because the notebook is agent-scoped and Builder's lessons
-  // are due to move onto the same table (OPP-0714).
-  AGENT_MEMORY_CURATION = 'agent_memory_curation',
 
   // Skill experiments (auto-improve): the judge that scores one skill output
   // against the admin's rubric, the designer that drafts the next variant,
@@ -335,6 +405,20 @@ export enum LlmTask {
   GUIDE_EVALUATOR_VERIFIER = 'guide_evaluator_verifier',
   GUIDE_RED_TEAM = 'guide_red_team',
   GUIDE_CURATOR = 'guide_curator',
+
+  // Context Library (docs/context-library/PLAN.md): extraction and its checks.
+  CONTEXT_LIBRARY_OVERVIEW = 'context_library_overview',
+  CONTEXT_LIBRARY_EXTRACT = 'context_library_extract',
+  CONTEXT_LIBRARY_CRITIC = 'context_library_critic',
+  CONTEXT_LIBRARY_ADJUDICATE = 'context_library_adjudicate',
+  CONTEXT_LIBRARY_CONSOLIDATE = 'context_library_consolidate',
+  CONTEXT_LIBRARY_ENRICH = 'context_library_enrich',
+  CONTEXT_LIBRARY_RERANK = 'context_library_rerank',
+  CONTEXT_LIBRARY_CITATION_CHECK = 'context_library_citation_check',
+  CONTEXT_LIBRARY_QUERY_PLAN = 'context_library_query_plan',
+  CONTEXT_LIBRARY_GAP_LABEL = 'context_library_gap_label',
+  // The agent curator: folds Builder's lessons and Bug Hunter's notes into their collections.
+  CONTEXT_LIBRARY_AGENT_CURATE = 'context_library_agent_curate',
 
   // Fallback for an un-mapped sender task (never drop a usage row).
   UNKNOWN = 'unknown',

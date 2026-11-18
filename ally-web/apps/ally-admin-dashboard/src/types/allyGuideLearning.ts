@@ -148,68 +148,6 @@ export interface ModerateAllyGuideAdviceBody {
   reason?: string;
 }
 
-// ── Library ──────────────────────────────────────────────────────────────────────
-
-export type AllyGuideLibraryScope = "platform" | "organisation";
-
-export interface AllyGuideLibraryDocument {
-  id: string;
-  title: string;
-  sourceType: "paste" | "pdf" | "docx" | "epub" | "url";
-  sourceUrl: string | null;
-  fileName: string | null;
-  sizeBytes: number | null;
-  language: string | null;
-  tags: string[];
-  status: "pending" | "extracting" | "chunking" | "indexing" | "indexed" | "failed";
-  /** The failure reason, verbatim. */
-  statusMessage: string | null;
-  chunkCount: number;
-  indexedChunkCount: number;
-  isArchived: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface AllyGuideLibraryList {
-  documents: AllyGuideLibraryDocument[];
-  count: number;
-}
-
-export interface AllyGuideLibraryListQuery {
-  scope: AllyGuideLibraryScope;
-  /** Required for the organisation library. */
-  tenantId?: string;
-  limit?: number;
-  offset?: number;
-}
-
-export interface CreateAllyGuideLibraryDocumentBody {
-  scope: AllyGuideLibraryScope;
-  tenantId?: string;
-  title: string;
-  sourceType: "paste" | "pdf" | "docx" | "epub";
-  text?: string;
-  fileUrl?: string;
-  fileName?: string;
-  contentType?: string;
-  sizeBytes?: number;
-  language?: string;
-}
-
-export interface AllyGuideLibraryUploadUrlBody {
-  scope: AllyGuideLibraryScope;
-  tenantId?: string;
-  fileName: string;
-  fileSize: number;
-  contentType: string;
-}
-
-export interface AllyGuideLibraryUploadUrl {
-  presignedUrl: string;
-  fileUrl: string;
-}
-
 // ── Evaluator ────────────────────────────────────────────────────────────────────
 
 export interface AllyGuideRubricCriterion {

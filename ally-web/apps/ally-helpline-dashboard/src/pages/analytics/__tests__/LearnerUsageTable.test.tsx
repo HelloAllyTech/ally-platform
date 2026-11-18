@@ -10,9 +10,9 @@ vi.mock("@api", () => ({
   useGetLearnerUsageTableQuery: (...args: unknown[]) => mockUseGetLearnerUsageTableQuery(...args),
 }));
 
-// No `edit:user` here: these tests cover the table itself; the reopen action
+// No `edit:learner-progress` here: these tests cover the table itself; the reopen action
 // is covered in ScenarioAttemptsDrawer.test.tsx.
-vi.mock("@constants", () => ({ Permissions: { EDIT_USER: "edit:user" } }));
+vi.mock("@constants", () => ({ Permissions: { EDIT_LEARNER_PROGRESS: "edit:learner-progress" } }));
 vi.mock("@utils", () => ({
   hasPermissions: (perms: string[], p: string) => perms.includes(p),
 }));

@@ -118,7 +118,7 @@ export interface AgentProfileCardProps {
  *   every bug the pipeline is about to find, and landing on the wrong one
  *   shouldn't be a misclick. This stays the one place the kill switch lives.
  * - **The ⋯ menu holds what is used rarely** — Model settings, "Scan UX signals
- *   now" with its last-scan line, and "Map features now" — per Stacks' *Default
+ *   now" with its last-scan line, and "Map features now" — per *Default
  *   to Common Case, Hide Alternatives*: discoverable, not in the way.
  * - **Help** opens About in a side panel, so About is no longer a tab.
  */

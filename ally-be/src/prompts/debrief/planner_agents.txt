@@ -1,0 +1,46 @@
+How the planner sees each analysis agent it may choose. One section per agent: a line "## <agent id>", then "description:", "use_when:" and "skip_when:", one line each. The ids are fixed in code; change only the wording after each colon.
+
+## assessment_anchoring
+description: For a graded attempt: keeps every finding the Writer sees anchored to a quoted moment of the transcript.
+use_when: An assessment session.
+skip_when: Never for an assessment session.
+
+## cohort_comparison
+description: For this session's skills, how often other trainees in the organisation show them (groups of five or more): names a less common strength, or a moment many find hard. Never a rank or a number.
+use_when: The learner is clearly ahead of or behind peers on a skill in this session.
+skip_when: No cohort data, or nothing in the session stands out against peers.
+
+## course_patterns
+description: The skills learners on the same course miss most (groups of five or more): when this session missed one, the debrief can say many people find it hard.
+use_when: A course session with a miss that may be common across the course.
+skip_when: Not a course session, or the session missed nothing notable.
+
+## guidance_agent
+description: Reads the index of practice guidance (the organisation's protocols, level guides and style guides) and decides, within a call limit, which entries the Writer should read for this session's moments.
+use_when: A moment, the organisation's protocols or the learner's level guide could change how the learner is coached.
+skip_when: A short session with nothing worth guidance. Never skip when a risk cue or an organisation protocol applies.
+
+## guidance_lookup
+description: Looks up practice guidance (the organisation's and Ally's Debrief Guidance) for up to three pivotal moments; the Writer may use it where it fits. An organisation's protocols come back labelled.
+use_when: A moment where practice guidance would help the learner.
+skip_when: A short or unremarkable session with no pivotal moment worth guidance.
+
+## history_deep
+description: Reads the learner's last debriefs (Work-on-this points, strengths, skill words) with this session's evidence and names a pattern worth their attention, only when three or more sessions support it.
+use_when: Several past sessions and a skill that keeps coming up or keeps improving.
+skip_when: Fewer than three past debriefs, or the Progress reader already covers it.
+
+## language_specialist
+description: Reads a code-mixed or Indian-language session for what a Writer could get wrong: meaning or warmth that depends on the language, deliberate code-mixing, quotes that must stay in their script.
+use_when: Code-mixed or Indic session, or the learner wrote in a different script from the debrief language.
+skip_when: A single-language, single-script session.
+
+## progress_reader
+description: Compares this session's evidence map with the learner's earlier Work-on-this points and says only what the evidence supports.
+use_when: The learner has earlier Work-on-this points to follow up.
+skip_when: No earlier debriefs, or nothing in them this session could answer.
+
+## protocol_check
+description: Checks the session against the learner's organisation's own protocols (referral, escalation, what to say about risk): which the session touched, and whether the learner followed them.
+use_when: The organisation has protocols and the session touches a topic they cover, or there is a risk cue.
+skip_when: The organisation has no protocols, or nothing in the session falls under one.

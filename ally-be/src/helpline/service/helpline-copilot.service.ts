@@ -86,7 +86,7 @@ export const SUGGESTION_CONTENT = 'Suggested replies';
  *  3. a **rolling summary** every `rollingSummaryEveryTurns` talker turns.
  *
  * A failure emits `COPILOT_STATUS: UNAVAILABLE` and nothing else — no partial
- * output, no retry storm (see the Stacks chunk "Graceful Failure: Transparent
+ * output, no retry storm (see the guidance "Graceful Failure: Transparent
  * Acknowledgment and Fallbacks"). Nothing here ever reaches a talker: every
  * row it writes is staff-only and every emit goes to `staff:{chatId}`.
  */

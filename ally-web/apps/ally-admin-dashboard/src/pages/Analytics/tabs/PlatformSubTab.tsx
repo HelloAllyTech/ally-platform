@@ -1,7 +1,5 @@
 import { useMemo, useState } from "react";
 
-import { LineChart, SimpleBarChart } from "@carbon/charts-react";
-
 import {
   useGetActivationQuery,
   useGetAnalyticsHighlightsQuery,
@@ -10,6 +8,7 @@ import {
   useGetLearnerKpisQuery,
   useGetXpGrowthQuery,
 } from "@api";
+import { LineChart, SimpleBarChart } from "@components/charts";
 import { AnalyticsBucket, AnalyticsGrain } from "@types";
 
 import {

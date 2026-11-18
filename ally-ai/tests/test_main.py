@@ -155,3 +155,34 @@ class TestMain:
 
             # Should have been in yielded section
             assert in_yielded_section
+
+
+class TestAgentRuntimeAtStartup:
+    @pytest.mark.asyncio
+    async def test_an_unreachable_checkpoint_database_does_not_stop_startup(
+        self, monkeypatch
+    ):
+        from app.core.agent_runtime import checkpointer as checkpointer_module
+        from app.core.config import settings
+
+        monkeypatch.setattr(settings.AGENT_RUNTIME, "ENABLED", True)
+        monkeypatch.setattr(
+            settings.AGENT_RUNTIME, "CHECKPOINT_DB_URL", "postgresql://u@db/agent"
+        )
+        monkeypatch.setattr(checkpointer_module, "_saver", None)
+        with (
+            patch("app.main.WeaviateClient") as weaviate,
+            patch("app.main.AllyCoreClient") as ally_core,
+            patch("app.main.initialize_openai_clients"),
+            patch(
+                "psycopg.AsyncConnection.connect",
+                AsyncMock(side_effect=OSError("connection refused")),
+            ),
+        ):
+            weaviate.connect = AsyncMock()
+            weaviate.close = AsyncMock()
+            ally_core.create_client = AsyncMock()
+            ally_core.close = AsyncMock()
+            async with lifespan(app):
+                assert checkpointer_module.checkpointer_available() is False
+        assert checkpointer_module.checkpointer_available() is True

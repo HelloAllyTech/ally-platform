@@ -24,26 +24,37 @@ describe('OpenAiImageProvider', () => {
   });
 
   it('leaves quality to the model default when none is asked for', async () => {
-    await providerFor('dall-e-3').generateImage('a bench', '1536x1024');
+    await providerFor('gpt-image-1.5').generateImage('a bench', '1536x1024');
     expect(mockGenerate.mock.calls[0][0]).not.toHaveProperty('quality');
   });
 
-  it('never sends a gpt-image tier to a dall-e model, which would reject it', async () => {
+  it('never sends a gpt-image tier or moderation to a dall-e model, which would reject them', async () => {
     await providerFor('dall-e-3').generateImage('a bench', '1792x1024', {
       quality: 'medium',
     });
     expect(mockGenerate.mock.calls[0][0]).not.toHaveProperty('quality');
+    expect(mockGenerate.mock.calls[0][0]).not.toHaveProperty('moderation');
+  });
+
+  it('relaxes moderation for gpt-image models, so counselling topics are not refused', async () => {
+    await providerFor('gpt-image-1.5').generateImage('a bench', '1536x1024', {
+      quality: 'medium',
+    });
+    expect(mockGenerate.mock.calls[0][0]).toMatchObject({
+      quality: 'medium',
+      moderation: 'low',
+    });
   });
 
   it('returns the decoded image bytes', async () => {
-    const image = await providerFor('dall-e-3').generateImage(
+    const image = await providerFor('gpt-image-1.5').generateImage(
       'a bench',
       '1536x1024',
     );
     expect(image.toString()).toBe('png');
   });
 
-  it('uses dall-e-3 as the default model for image generation', async () => {
+  it('uses gpt-image-1.5 as the default model for image generation', async () => {
     const configService = new ConfigService();
     jest
       .spyOn(configService, 'get')
@@ -60,10 +71,8 @@ describe('OpenAiImageProvider', () => {
 
     await provider.generateImage('a bench', '1024x1024');
 
-    // This test will fail before the fix, because the default model is 'gpt-image-1'.
-    // After fixing the default value in AppConfigService to 'dall-e-3', this test will pass.
     expect(mockGenerate).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'dall-e-3' }),
+      expect.objectContaining({ model: 'gpt-image-1.5' }),
     );
   });
 });

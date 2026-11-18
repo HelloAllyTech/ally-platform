@@ -1,6 +1,5 @@
 import { FC, useMemo, useState } from "react";
 
-import { LineChart, SimpleBarChart } from "@carbon/charts-react";
 import { Link } from "react-router-dom";
 
 import "@carbon/charts/styles.css";
@@ -20,6 +19,7 @@ import {
 } from "@ally-ui-mono/ui-shared";
 import { useGetWeakPerformingMetricsQuery } from "@api";
 import { TooltipIcon } from "@assets";
+import { LineChart, SimpleBarChart } from "@components/charts";
 import { ROUTES } from "@constants";
 import {
   AnalyticsRange,
@@ -32,6 +32,7 @@ import {
 } from "@types";
 
 import { AnalyticsTabFilters } from "../analyticsFilters";
+import { Jargon } from "../analyticsGlossary";
 import { inProgressCaption, isInProgress, withoutInProgress } from "../analyticsGrouping";
 import { ChartCard, buildSource, lineOpts, single, timeBarOpts } from "../chartKit";
 import { PALETTE } from "../chartScales";
@@ -790,7 +791,9 @@ export const WeakPerformingMetricsTab: FC<AnalyticsTabFilters> = ({ query, langu
               the fix for clienthood is a scenario-brief edit, and this is the
               only view that says which brief. */}
           <section style={{ marginBottom: "2.5rem" }}>
-            <h3 style={{ margin: "0 0 0.25rem" }}>Worst scenarios by role-slip rate</h3>
+            <h3 style={{ margin: "0 0 0.25rem" }}>
+              Worst scenarios by <Jargon term="role-slip">role-slip</Jargon> rate
+            </h3>
             <p style={{ margin: "0 0 1rem", opacity: 0.75 }}>
               Role-slip is concentrated, not diffuse — a small number of scenarios carry a quarter
               of every slip, and an English scenario sits among the worst. The aggregate language
@@ -813,7 +816,7 @@ export const WeakPerformingMetricsTab: FC<AnalyticsTabFilters> = ({ query, langu
                   {(data?.worstScenarios ?? []).map(r => (
                     <TableRow key={`${r.scenarioId}-${r.language ?? "all"}`}>
                       <TableCell>
-                        <Link to={`${ROUTES.ROLEPLAY_SESSION_LOGS}?search=${r.scenarioId}`}>
+                        <Link to={`${ROUTES.ROLEPLAY_SESSION_LOGS}?scenarioId=${r.scenarioId}`}>
                           {r.title ? `${r.scenarioId} · ${r.title}` : r.scenarioId}
                         </Link>
                       </TableCell>

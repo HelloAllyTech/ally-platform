@@ -68,7 +68,7 @@ const BulletList: React.FC<{ items: string[] }> = ({ items }) => (
  *
  * A section with nothing to say renders nothing at all (no "—" rows): an early brief is
  * mostly empty, and a page of dashes would read as broken rather than as just started.
- * Per Stacks, "Progressive Disclosure and Contextual Relevance in Agent Interfaces": show
+ * Per "Progressive Disclosure and Contextual Relevance in Agent Interfaces": show
  * what is relevant now and let the rest appear as it becomes so.
  */
 export const BriefPanel: React.FC<BriefPanelProps> = ({ brief, readiness }) => {

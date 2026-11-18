@@ -122,14 +122,27 @@ export class WhatsAppIdentityService {
    * instead of needing a support ticket. The write only happens when something actually
    * changed, so an already-linked contact costs two cheap reads.
    */
-  async identify(contact: WaContact): Promise<WaContact> {
+  async identify(
+    contact: WaContact,
+    requiredTenantId: string | null = null,
+  ): Promise<WaContact> {
     const mapped = await this.mappingService.resolve(contact.phoneE164);
     // The mapping's own `userId` is a snapshot for attribution and may be null — a mapped
     // number often belongs to someone with no Ally account at all, which is the case mappings
     // exist for. The organisation is what matters and it comes from the mapping.
-    const resolved = mapped
+    let resolved: { userId: number | null; tenantId: string } | null = mapped
       ? { userId: mapped.userId ?? null, tenantId: mapped.tenantId }
       : await this.resolveByPhone(contact.phoneE164);
+    // On an organisation's own number only that organisation's workers are recognised. A worker
+    // of another organisation writing to it is unrecognised HERE — answering them from this
+    // organisation's documents would hand one organisation's material to another's staff.
+    if (
+      requiredTenantId &&
+      resolved &&
+      String(resolved.tenantId) !== String(requiredTenantId)
+    ) {
+      resolved = null;
+    }
     const nextSource = mapped
       ? WaIdentitySource.MAPPING
       : WaIdentitySource.PHONE;

@@ -60,31 +60,25 @@ describe('MobileReleasesService in the monorepo', () => {
 
   beforeEach(() => jest.clearAllMocks());
 
-  it("reads the app's version files from its folder of the monorepo", async () => {
+  it("reads the marketing version from ally-mobile's (Flutter) pubspec.yaml in the monorepo", async () => {
     const encode = (text: string) => Buffer.from(text).toString('base64');
     route({
-      [`${MONO}/contents/ally-mobile/android/app/build.gradle`]: {
-        content: encode('versionCode 245\n versionName "1.23.45"'),
+      [`${MONO}/contents/ally-mobile/pubspec.yaml`]: {
+        content: encode('version: 2.0.0+1'),
       },
-      [`${MONO}/contents/ally-mobile/ios/ally.xcodeproj/project.pbxproj`]: {
-        content: encode('MARKETING_VERSION = 1.23.45;'),
-      },
-      [`${MONO}/commits?path=ally-mobile/android/app/build.gradle`]: [],
-      [`${OLD}/commits?path=android/app/build.gradle`]: [
-        commit('bump45', 'chore(release): 1.23.45', 1, '2026-10-22T16:46:54Z'),
-      ],
     });
 
     const version = await service.getCurrentVersion();
 
+    // versionCode is null here because this test's config has no Android
+    // Publisher credentials — fetchAndroidInternalRelease() degrades to null
+    // rather than throwing (see its own .catch in getCurrentVersion). With
+    // real credentials it reads the live Play internal track instead.
     expect(version.android).toEqual({
-      versionCode: 245,
-      versionName: '1.23.45',
+      versionCode: null,
+      versionName: '2.0.0',
     });
-    expect(version.ios.marketingVersion).toBe('1.23.45');
-    // The cadence clock runs from the last real bump — in the archived repo
-    // until the first release ships from the monorepo.
-    expect(version.nextEligibleCheckAt).not.toBeNull();
+    expect(version.ios.marketingVersion).toBe('2.0.0');
   });
 
   /**
@@ -94,7 +88,7 @@ describe('MobileReleasesService in the monorepo', () => {
    */
   it("skips the import merges and drafts What's New from the archived repo until the first monorepo release", async () => {
     route({
-      [`${MONO}/commits?path=ally-mobile/android/app/build.gradle`]: [
+      [`${MONO}/commits?path=ally-mobile/pubspec.yaml`]: [
         commit('import2', "Merge 'ally-mobile/' from commit '34eb25f'", 2),
         commit('import1', "Merge 'ally-mobile/' from commit 'bc73721'", 2),
       ],
@@ -121,7 +115,7 @@ describe('MobileReleasesService in the monorepo', () => {
 
   it("drafts the first monorepo release from the app's own commits, never another service's", async () => {
     route({
-      [`${MONO}/commits?path=ally-mobile/android/app/build.gradle`]: [
+      [`${MONO}/commits?path=ally-mobile/pubspec.yaml`]: [
         commit('bump46', 'chore(release): 1.23.46'),
         commit('import2', "Merge 'ally-mobile/' from commit '34eb25f'", 2),
       ],
@@ -148,7 +142,9 @@ describe('MobileReleasesService in the monorepo', () => {
   it('shows one run history across the cutover, even before a workflow is registered in the monorepo', async () => {
     mockedAxios.get.mockImplementation(async (url: string) => {
       if (
-        url.startsWith(`${MONO}/actions/workflows/build-android-production.yml`)
+        url.startsWith(
+          `${MONO}/actions/workflows/promote-android-production.yml`,
+        )
       ) {
         return {
           data: {
@@ -160,7 +156,9 @@ describe('MobileReleasesService in the monorepo', () => {
       }
       if (url.startsWith(MONO)) throw notFound;
       if (
-        url.startsWith(`${OLD}/actions/workflows/build-android-production.yml`)
+        url.startsWith(
+          `${OLD}/actions/workflows/promote-android-production.yml`,
+        )
       ) {
         return {
           data: {
@@ -174,7 +172,9 @@ describe('MobileReleasesService in the monorepo', () => {
     });
 
     const runs = await service.listRuns();
-    const android = runs.filter((run) => run.workflowName === 'Android Build');
+    const android = runs.filter(
+      (run) => run.workflowName === 'Promote Android',
+    );
 
     expect(android.map((run) => run.createdAt)).toEqual([
       '2026-10-24T05:00:00Z',

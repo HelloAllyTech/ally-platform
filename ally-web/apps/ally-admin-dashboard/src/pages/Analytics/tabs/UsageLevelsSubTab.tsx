@@ -1,12 +1,11 @@
 import { useMemo, useState } from "react";
 
-import { SimpleBarChart } from "@carbon/charts-react";
-
 import {
   useGetActivationQuery,
   useGetPracticeStickinessQuery,
   useGetQualifiedSessionsQuery,
 } from "@api";
+import { SimpleBarChart } from "@components/charts";
 
 import { AnalyticsTabFilters, asOfStamp, windowLabel } from "../analyticsFilters";
 import {

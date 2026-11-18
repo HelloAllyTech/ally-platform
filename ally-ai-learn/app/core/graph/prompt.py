@@ -232,6 +232,15 @@ def _build_behavior_instructions_json(
     return json.dumps(rules, indent=2, ensure_ascii=False)
 
 
+def _backstory(prompt_data: PromptData, fall_back_to_context: bool = False) -> str:
+    """The Character Backstory field, for {character_backstory} and its old
+    name {character_profile_text}."""
+    value = getattr(prompt_data, "character_profile_text", None)
+    if not value and fall_back_to_context:
+        value = getattr(prompt_data, "context", None)
+    return _coerce_block_value(value)
+
+
 def _build_branching_prompt(
     prompt_data: PromptData,
     next_instruction: str,
@@ -249,10 +258,11 @@ def _build_branching_prompt(
         age=getattr(prompt_data, "age", "") or "",
         gender=getattr(prompt_data, "gender", "") or "",
         current_location=getattr(prompt_data, "current_location", "") or "",
-        character_profile_text=_coerce_block_value(
-            getattr(prompt_data, "character_profile_text", None)
-            or getattr(prompt_data, "context", None)
-        ),
+        # `character_backstory` is the name authors see; `character_profile_text`
+        # is its old name, still supplied because older live versions (and
+        # their translations) render it.
+        character_backstory=_backstory(prompt_data, fall_back_to_context=True),
+        character_profile_text=_backstory(prompt_data, fall_back_to_context=True),
         # Multilingual fields substituted directly into the branching
         # template body (no block wrapper). Mirror of the main-agent
         # path — same kwargs go into both prompts so wording stays
@@ -394,6 +404,18 @@ def declared_working_memory_sections(prompt_data: PromptData) -> tuple:
     )
 
 
+def prompt_declares_stage_director(prompt_data: PromptData) -> bool:
+    """Does the selected main-agent prompt use the Stage Director?
+
+    Body-driven like every other opt-in here: a prompt whose text declares
+    `{thoughts}` gets the director's paragraph and `{memories}` without
+    retrieval (docs/stage-director-and-memories.md). It declares no
+    `working_memory_*` section, so the working-memory store, updater and its
+    interim stay off for it on their own.
+    """
+    return _prompt_declares_variable(prompt_data, "thoughts")
+
+
 def _get_selected_prompt_has_states(prompt_data: PromptData) -> bool:
     """Decide whether to resolve the active simulation state.
 
@@ -422,9 +444,11 @@ def _get_selected_prompt_has_states(prompt_data: PromptData) -> bool:
     longer fall back to the legacy `hasStates` boolean. Empty / missing list
     means "no states".
     """
-    return _prompt_declares_variable(
-        prompt_data, "state_x_guidelines"
-    ) or prompt_declares_client_working_memory(prompt_data)
+    return (
+        _prompt_declares_variable(prompt_data, "state_x_guidelines")
+        or prompt_declares_client_working_memory(prompt_data)
+        or prompt_declares_stage_director(prompt_data)
+    )
 
 
 def _format_dialogue_length_instruction(dialogue_length: Optional[str]) -> str:
@@ -450,6 +474,9 @@ def _build_behavior_prompt(
     embed_retrieved_context: bool = True,
     client_working_memory: Any = None,
     locked_memory_topics: Optional[List[str]] = None,
+    thoughts: Optional[str] = None,
+    memories: Optional[str] = None,
+    prompt_kwargs_sink: Optional[Dict[str, Any]] = None,
 ) -> Tuple[SystemMessage, Optional[str]]:
     """Returns (system_message, effective_retrieved_context).
 
@@ -556,6 +583,11 @@ def _build_behavior_prompt(
         if not (state_x_guidelines or "").strip():
             state_x_guidelines = NO_STATE_GUIDANCE
 
+    if thoughts is not None and not (state_x_guidelines or "").strip():
+        from app.core.working_memory.render import NO_STATE_GUIDANCE
+
+        state_x_guidelines = NO_STATE_GUIDANCE
+
     # Observability: surface variant + state + RAG decisions every turn so
     # we can verify behaviour from session logs alone. These fire on every
     # conversation turn — emitted at DEBUG to keep production INFO logs
@@ -652,9 +684,9 @@ def _build_behavior_prompt(
         sexual_orientation=_coerce_block_value(
             getattr(prompt_data, "sexual_orientation", None)
         ),
-        character_profile_text=_coerce_block_value(
-            getattr(prompt_data, "character_profile_text", None)
-        ),
+        # New name and old name, same value: see `_build_branching_prompt`.
+        character_backstory=_backstory(prompt_data),
+        character_profile_text=_backstory(prompt_data),
         retrieved_context=(
             _get_retrieved_context_text(effective_retrieved_context)
             if embed_retrieved_context
@@ -663,16 +695,11 @@ def _build_behavior_prompt(
         custom_fields_text=_format_custom_fields_text(
             getattr(prompt_data, "custom_fields", []) or []
         ),
+        # Not offered to authors any more (absent from the studio catalog and
+        # from Prompt #2's catalog-style contract): the competency is scenario
+        # metadata, not actor direction. Still supplied because Prompt #1's
+        # live text renders `{competency}`.
         competency=_coerce_block_value(getattr(prompt_data, "competency", None)),
-        # Additional persona/style fields exposed for prompt variants.
-        # Not referenced by the default main_agent_prompt.txt today; SafeFormatter
-        # silently ignores unused kwargs. Future variants can reference any of
-        # these as {placeholder} in their prompt text. These attributes are
-        # populated on PromptData by app/core/scenario/base.py and otherwise
-        # feed evaluator / worker subsystems.
-        opening_statements=_coerce_block_value(
-            getattr(prompt_data, "opening_statements", None)
-        ),
         # Persona + language variables used directly by the prompt
         # template body. `previous_memory` is preformatted on the BE
         # side (full "You remember from your last session: …" sentence
@@ -748,7 +775,15 @@ def _build_behavior_prompt(
         unhelpful_behaviours=", ".join(
             getattr(prompt_data, "unhelpful_behaviours", None) or []
         ),
+        # Stage Director prompts (docs/stage-director-and-memories.md). Every
+        # prompt gets both; SafeFormatter drops them where the body has neither.
+        thoughts=thoughts or "",
+        memories=memories or "",
     )
+    # The director is offered every variable this prompt had this turn.
+    if prompt_kwargs_sink is not None:
+        prompt_kwargs_sink.clear()
+        prompt_kwargs_sink.update(template_kwargs)
 
     # Route through the variant resolver when the simulation has picked a
     # specific main-agent prompt; otherwise use the default. Variants
@@ -985,6 +1020,9 @@ def generate_system_message(
     client_working_memory: Any = None,
     locked_memory_topics: Optional[List[str]] = None,
     text_chat_guidance: Optional[str] = None,
+    thoughts: Optional[str] = None,
+    memories: Optional[str] = None,
+    prompt_kwargs_sink: Optional[Dict[str, Any]] = None,
 ) -> Tuple[SystemMessage, Optional[SystemMessage]]:
     """
     Generates a SystemMessage prompt for an AI roleplay assistant
@@ -1052,6 +1090,9 @@ def generate_system_message(
             embed_retrieved_context=not defer_retrieved_context,
             client_working_memory=client_working_memory,
             locked_memory_topics=locked_memory_topics,
+            thoughts=thoughts,
+            memories=memories,
+            prompt_kwargs_sink=prompt_kwargs_sink,
         )
         logger.info(
             "%s BUILT behavior prompt: language_code=%s",
@@ -1081,6 +1122,9 @@ def generate_system_message(
         embed_retrieved_context=not defer_retrieved_context,
         client_working_memory=client_working_memory,
         locked_memory_topics=locked_memory_topics,
+        thoughts=thoughts,
+        memories=memories,
+        prompt_kwargs_sink=prompt_kwargs_sink,
     )
     logger.info(
         "%s BUILT behavior prompt: language_code=%s",

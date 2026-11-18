@@ -7,8 +7,10 @@ import {
 } from "@reduxjs/toolkit/query/react";
 import { toast } from "sonner";
 
-import { ApiEndpoints, HttpMethod, LOCAL_STORAGE_KEYS, ROUTES, TAG_TYPES, en } from "@constants";
+import { ApiEndpoints, HttpMethod, LOCAL_STORAGE_KEYS, TAG_TYPES, en } from "@constants";
 import { RefreshResponse } from "@types";
+
+import { loginPathWithNext } from "../utils/loginRedirect";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -17,7 +19,13 @@ const handleLogout = () => {
   localStorage.removeItem(LOCAL_STORAGE_KEYS.ADMIN_REFRESH_TOKEN);
   localStorage.removeItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED);
 
-  window.location.href = ROUTES.LOGIN;
+  // Raw window.location bypasses the router basename - prefix the Vite base
+  // (the app lives under /admin in production, / everywhere else). `next` brings them back to
+  // the page they were on once they log in again (A1).
+  const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+  const { pathname, search, hash } = window.location;
+  const inApp = base && pathname.startsWith(base) ? pathname.slice(base.length) || "/" : pathname;
+  window.location.href = base + loginPathWithNext(inApp, search, hash);
 };
 
 const baseQuery = fetchBaseQuery({
@@ -30,6 +38,12 @@ const baseQuery = fetchBaseQuery({
     return headers;
   },
 });
+
+/**
+ * Reads whose 403 is expected for some roles and handled by the caller: no toast. A function, not
+ * a constant: read at module load it breaks every suite that mocks `@constants` wholesale.
+ */
+export const silentForbiddenReads = (): string[] => [ApiEndpoints.AUTH.GET_USER_PREFERENCES];
 
 /**
  * This function wraps the base query to handle authentication token refresh.
@@ -105,7 +119,13 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
       // AiLabErrorState / the AI Lab tabs). One consistent toast here means
       // every endpoint gets a permission message even when the calling
       // component only checks `isError`.
-      toast.error(en.error.forbidden);
+      // Except a read every signed-in admin makes at start whose 403 is expected and handled:
+      // the saved sidebar order (only holders of the preference grant have one; a clinical
+      // advisor does not), which otherwise greeted them with this toast on every load.
+      const url = typeof args === "string" ? args : args.url;
+      if (!silentForbiddenReads().some(path => url.split("?")[0].endsWith(path))) {
+        toast.error(en.error.forbidden);
+      }
     }
 
     return result;
@@ -121,7 +141,14 @@ export const baseAPI = createApi({
   reducerPath: "baseAPI",
   baseQuery: baseQueryWithReauth,
   tagTypes: [
+    TAG_TYPES.NOTIFICATIONS,
+    TAG_TYPES.PRODUCT_PLANS,
     TAG_TYPES.USERS,
+    TAG_TYPES.BOT_DRAFT,
+    TAG_TYPES.CHECKUP,
+    TAG_TYPES.SOURCES,
+    TAG_TYPES.SCORECARD,
+    TAG_TYPES.INBOX,
     TAG_TYPES.TENANTS,
     TAG_TYPES.SESSION_EVENTS,
     TAG_TYPES.SESSION_EVENT_TAGS,
@@ -156,10 +183,13 @@ export const baseAPI = createApi({
     TAG_TYPES.COHORT_RESTRICTIONS,
     TAG_TYPES.COMFORT_AUDIO_LIBRARY,
     TAG_TYPES.WHATSAPP_BOT_DOCUMENTS,
-    TAG_TYPES.WHATSAPP_BOT_DOCUMENT_CHUNKS,
     TAG_TYPES.WHATSAPP_BOT_STATS,
     TAG_TYPES.WHATSAPP_BOT_TEMPLATES,
     TAG_TYPES.WHATSAPP_BOT_SETTINGS,
+    TAG_TYPES.WHATSAPP_BOT_NUMBERS,
+    TAG_TYPES.CHATBOTS,
+    TAG_TYPES.CHATBOT_DETAIL,
+    TAG_TYPES.CONNECTORS,
     TAG_TYPES.WHATSAPP_BOT_CONVERSATIONS,
     TAG_TYPES.WHATSAPP_BOT_UNANSWERED,
     TAG_TYPES.WHATSAPP_BOT_ANALYTICS,
@@ -170,9 +200,12 @@ export const baseAPI = createApi({
     TAG_TYPES.BLOGS,
     TAG_TYPES.PRODUCT_UPDATES,
     TAG_TYPES.IMAGE_LIBRARY,
+    TAG_TYPES.IMAGE_STUDIO_HISTORY,
+    TAG_TYPES.IMAGE_STUDIO_CAST_SHEETS,
     TAG_TYPES.SUPER_DUPER_ADMINS,
     TAG_TYPES.PRODUCT_ROADMAP_OPPORTUNITIES,
     TAG_TYPES.PRODUCT_ROADMAP_VOTE_BUDGET,
+    TAG_TYPES.PRODUCT_ROADMAP_BREADTH,
     TAG_TYPES.PRODUCT_ROADMAP_FACETS,
     TAG_TYPES.PRODUCT_ROADMAP_GOALS,
     TAG_TYPES.PRODUCT_ROADMAP_STRATEGY_GOALS,
@@ -183,7 +216,13 @@ export const baseAPI = createApi({
     TAG_TYPES.PRODUCT_ROADMAP_COMMENTS,
     TAG_TYPES.PRODUCT_ROADMAP_VOTERS,
     TAG_TYPES.PRODUCT_ROADMAP_INTERVIEWS,
+    TAG_TYPES.PRODUCT_ROADMAP_IDEA_DRAFTS,
     TAG_TYPES.PRODUCT_ROADMAP_SAVED_VIEWS,
+    TAG_TYPES.ROADMAP_V2_ROLES,
+    TAG_TYPES.ROADMAP_V2_PREFERENCES,
+    TAG_TYPES.ROADMAP_V2_RELEASE,
+    TAG_TYPES.ROADMAP_V2_ROLE,
+    TAG_TYPES.ROADMAP_V2_ITEMS,
     TAG_TYPES.PRODUCT_ROADMAP_VIEW_ORDER,
     TAG_TYPES.AI_LAB_SKILLS,
     TAG_TYPES.AI_LAB_VARIABLES,
@@ -193,10 +232,16 @@ export const baseAPI = createApi({
     TAG_TYPES.AI_LAB_ASSIGNMENTS,
     TAG_TYPES.AI_LAB_AUTO_EVALS,
     TAG_TYPES.AI_LAB_QUESTION_SETS,
-    TAG_TYPES.ANALYTICS_SUGGESTIONS,
     TAG_TYPES.ANALYTICS_AGENT_CONVERSATIONS,
     TAG_TYPES.ANALYTICS_AGENT_AUDITS,
     TAG_TYPES.ANALYTICS_AGENT_AUTOMATION,
+    TAG_TYPES.PM_AGENT_STATE,
+    TAG_TYPES.PM_AGENT_CARDS,
+    TAG_TYPES.PM_AGENT_TRACKING,
+    TAG_TYPES.PM_AGENT_SETTINGS,
+    TAG_TYPES.PM_AGENT_MEMORY,
+    TAG_TYPES.PM_AGENT_HISTORY,
+    TAG_TYPES.PM_AGENT_HEALTH,
     TAG_TYPES.ANALYTICS_CHART_PREFERENCES,
     TAG_TYPES.BUG_HUNTER_SETTINGS,
     TAG_TYPES.BUG_HUNTER_MODEL_SETTINGS,
@@ -204,7 +249,6 @@ export const baseAPI = createApi({
     TAG_TYPES.BUG_HUNTER_RUNS,
     TAG_TYPES.BUG_HUNTER_FINDINGS,
     TAG_TYPES.UX_SIGNAL_SCANS,
-    TAG_TYPES.BUG_HUNTER_MEMORY,
     TAG_TYPES.BUG_HUNTER_FEATURE_MAP,
     TAG_TYPES.BUG_HUNTER_DECISION_OWNERS,
     TAG_TYPES.BUILDER_SESSIONS,
@@ -212,10 +256,15 @@ export const baseAPI = createApi({
     TAG_TYPES.BUILDER_PRD_VERSIONS,
     TAG_TYPES.BUILDER_SETTINGS,
     TAG_TYPES.BUILDER_NOTIFICATIONS,
-    TAG_TYPES.BUILDER_LESSONS,
+    TAG_TYPES.BUILDER_DECISIONS,
     TAG_TYPES.BUILDER_EXEMPLARS,
     TAG_TYPES.BUILDER_EVAL_FIXTURES,
     TAG_TYPES.BUILDER_EVAL_SUITES,
+    TAG_TYPES.BUILDER_NOW,
+    TAG_TYPES.BUILDER_UP_NEXT,
+    TAG_TYPES.BUILDER_HISTORY,
+    TAG_TYPES.BUILDER_RULES,
+    TAG_TYPES.BUILDER_THREAD,
     TAG_TYPES.COURSE_COPILOT_SESSIONS,
     TAG_TYPES.COURSE_COPILOT_SESSION,
     TAG_TYPES.ALLY_GUIDE_SETTINGS,
@@ -226,7 +275,6 @@ export const baseAPI = createApi({
     TAG_TYPES.ALLY_GUIDE_BASELINE,
     TAG_TYPES.ALLY_GUIDE_CONFIG,
     TAG_TYPES.ALLY_GUIDE_ADVICE,
-    TAG_TYPES.ALLY_GUIDE_LIBRARY,
     TAG_TYPES.ALLY_GUIDE_REVIEWS,
     TAG_TYPES.ALLY_GUIDE_EVALS,
     TAG_TYPES.ALLY_GUIDE_NOTES,
@@ -248,11 +296,23 @@ export const baseAPI = createApi({
     TAG_TYPES.FEATURE_TOGGLE_REGISTRY,
     TAG_TYPES.USER_FEATURE_TOGGLES,
     TAG_TYPES.PLATFORM_ADMINS,
+    TAG_TYPES.CLINICAL_ADVISORS,
     TAG_TYPES.MOBILE_RELEASE_RUNS,
     TAG_TYPES.MIN_APP_VERSION,
     TAG_TYPES.HELPLINE_ADMIN_SETTINGS,
     TAG_TYPES.SKILL_EXPERIMENTS,
+    TAG_TYPES.DEBRIEF_CONSOLE,
+    TAG_TYPES.DEBRIEF_EXPERT_REVIEW,
     TAG_TYPES.PUBLIC_ROADMAP,
+    TAG_TYPES.CONTEXT_LIBRARY_COLLECTIONS,
+    TAG_TYPES.CONTEXT_LIBRARY_QUEUE,
+    TAG_TYPES.CONTEXT_LIBRARY_SOURCES,
+    TAG_TYPES.CONTEXT_LIBRARY_CHUNKS,
+    TAG_TYPES.CONTEXT_LIBRARY_USE_CASES,
+    TAG_TYPES.CONTEXT_LIBRARY_INSIGHTS,
+    TAG_TYPES.CONTEXT_LIBRARY_LOOPS,
+    TAG_TYPES.CONTEXT_LIBRARY_READER_KEYS,
+    TAG_TYPES.BUILDER_PRINCIPLES,
   ],
   endpoints: () => ({}),
 });

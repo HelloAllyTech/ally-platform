@@ -3,7 +3,13 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { RemoteParticipant, Room, RoomEvent } from "livekit-client";
 
 import { en } from "@constants";
-import { InternalMonologueTurn, MONOLOGUE_TOPIC } from "@src/types/internalMonologue";
+import {
+  InternalMonologueTurn,
+  isStageDirectorTurn,
+  MONOLOGUE_TOPIC,
+  MonologueTurn,
+  StageDirectorMonologueTurn,
+} from "@src/types/internalMonologue";
 import { decodeUint8ToJson } from "@utils";
 
 /**
@@ -74,7 +80,7 @@ interface InternalMonologuePanelProps {
   /** Live source: subscribe to monologue packets on this room. */
   room?: Room | null;
   /** Stored source: render a completed session's turns. Wins over `room`. */
-  turns?: InternalMonologueTurn[];
+  turns?: MonologueTurn[];
   /** Layout only — lets a container stretch the panel to fill it. */
   className?: string;
   /** Surface palette. Defaults to the admin console's light one. */
@@ -227,6 +233,87 @@ const TurnCard: React.FC<{
 };
 
 /**
+ * A Stage Director turn: the thought paragraph is the whole story, so it leads.
+ *
+ * The working-memory fields (affect, disclosed, sections…) don't exist on this
+ * payload, so nothing of theirs is rendered — an empty "Sent to the actor"
+ * block would read as a failure rather than a different mode.
+ */
+const StageDirectorTurnCard: React.FC<{
+  turn: StageDirectorMonologueTurn;
+  previousScore: number | null;
+  tone: ToneClasses;
+}> = ({ turn, previousScore, tone }) => {
+  const t = en.internalMonologue;
+  const delta = turn.score != null && previousScore != null ? turn.score - previousScore : null;
+  const showScore = turn.score != null && (previousScore == null || delta !== 0);
+  const events = turn.events ?? [];
+  const thought = (turn.thought ?? "").trim();
+
+  return (
+    <article
+      className={`rounded-md border p-3 ${turn.missed ? tone.cardMissed : tone.card}`}
+      data-testid={`monologue-turn-${turn.turn}`}
+    >
+      <header className="mb-1.5 flex items-baseline justify-between gap-2">
+        <span className={`text-xs font-medium ${tone.turnLabel}`}>
+          {t.turn} {turn.turn}
+          {turn.stanceTo ? ` · ${turn.stanceTo}` : ""}
+        </span>
+        {showScore && (
+          <span className={`text-xs ${tone.meta}`}>
+            {t.score} {turn.score}
+            {delta != null && delta !== 0 ? ` (${delta > 0 ? "+" : ""}${delta})` : ""}
+          </span>
+        )}
+      </header>
+
+      {(turn.counsellorSaid || turn.clientSaid) && (
+        <div className={`mb-2 border-l-2 pl-2 ${tone.quoteBorder}`}>
+          {turn.counsellorSaid && (
+            <p className={`mb-0.5 text-xs ${tone.quote}`}>
+              <span className={tone.speaker}>{t.counsellor}: </span>
+              {turn.counsellorSaid}
+            </p>
+          )}
+          {turn.clientSaid && (
+            <p className={`text-xs ${tone.quote}`}>
+              <span className={tone.speaker}>{t.client}: </span>
+              {turn.clientSaid}
+            </p>
+          )}
+        </div>
+      )}
+
+      <p className={`mb-0.5 text-xs font-medium tracking-wide ${tone.meta}`}>{t.thoughtHeading}</p>
+      <p
+        className={`mb-1.5 whitespace-pre-wrap text-sm leading-relaxed ${tone.body}`}
+        data-testid={`monologue-thought-${turn.turn}`}
+      >
+        {thought || t.noThought}
+      </p>
+
+      {turn.missed && <p className={`mb-1 text-xs ${tone.meta}`}>{t.thoughtMissed}</p>}
+      {turn.thoughtTurnsOld > 0 && (
+        <p className={`mb-1 text-xs ${tone.meta}`}>{t.thoughtAge(turn.thoughtTurnsOld)}</p>
+      )}
+
+      {events.length > 0 && (
+        <p className={`mb-1 text-xs leading-relaxed ${tone.body}`}>
+          {t.credited(
+            events
+              .map(e =>
+                e.score == null ? e.label : `${e.label} (${e.score > 0 ? "+" : ""}${e.score})`,
+              )
+              .join("; "),
+          )}
+        </p>
+      )}
+    </article>
+  );
+};
+
+/**
  * The client's internal monologue, turn by turn.
  *
  * Two sources, one shape: live LiveKit packets during a preview, or a stored
@@ -244,7 +331,7 @@ export const InternalMonologuePanel: React.FC<InternalMonologuePanelProps> = ({
 }) => {
   const t = en.internalMonologue;
   const c = TONES[tone];
-  const [liveTurns, setLiveTurns] = useState<InternalMonologueTurn[]>([]);
+  const [liveTurns, setLiveTurns] = useState<MonologueTurn[]>([]);
   const feedRef = useRef<HTMLDivElement>(null);
   // Auto-scroll only while the reader is already at the bottom. Yanking the
   // view mid-read is how a live feed becomes unusable during a session.
@@ -252,7 +339,7 @@ export const InternalMonologuePanel: React.FC<InternalMonologuePanelProps> = ({
 
   const isStored = Array.isArray(storedTurns);
   const turns = useMemo(
-    () => (isStored ? (storedTurns as InternalMonologueTurn[]) : liveTurns),
+    () => (isStored ? (storedTurns as MonologueTurn[]) : liveTurns),
     [isStored, storedTurns, liveTurns],
   );
 
@@ -272,7 +359,7 @@ export const InternalMonologuePanel: React.FC<InternalMonologuePanelProps> = ({
     ) => {
       if (topic !== MONOLOGUE_TOPIC) return;
       try {
-        const data = decodeUint8ToJson(payload) as InternalMonologueTurn;
+        const data = decodeUint8ToJson(payload) as MonologueTurn;
         if (data?.type !== "monologue.turn") return;
         setLiveTurns(previous => {
           // A retried publish can repeat a turn; last write wins so a late
@@ -345,14 +432,23 @@ export const InternalMonologuePanel: React.FC<InternalMonologuePanelProps> = ({
             {isStored ? t.emptyStored : t.waiting}
           </p>
         ) : (
-          turns.map((turn, i) => (
-            <TurnCard
-              key={turn.turn}
-              turn={turn}
-              previousScore={i > 0 ? turns[i - 1].score : null}
-              tone={c}
-            />
-          ))
+          turns.map((turn, i) =>
+            isStageDirectorTurn(turn) ? (
+              <StageDirectorTurnCard
+                key={turn.turn}
+                turn={turn}
+                previousScore={i > 0 ? turns[i - 1].score : null}
+                tone={c}
+              />
+            ) : (
+              <TurnCard
+                key={turn.turn}
+                turn={turn}
+                previousScore={i > 0 ? turns[i - 1].score : null}
+                tone={c}
+              />
+            ),
+          )
         )}
       </div>
     </section>

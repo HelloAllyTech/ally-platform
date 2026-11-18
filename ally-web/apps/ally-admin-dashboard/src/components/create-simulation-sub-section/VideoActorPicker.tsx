@@ -28,7 +28,7 @@ const COVER_VIDEO_FIELD = "coverVideoUrl";
  * directly above IS the preview: it shows the still at full size, and it is
  * what the learner actually sees. Every earlier shape here gave the selection its own preview pane, which put the same
  * portrait on screen twice — one fact at double visual weight, flattening the
- * hierarchy (Stacks: *Desert Oasis*, and the signal/noise argument beside
+ * hierarchy (*Desert Oasis*, and the signal/noise argument beside
  * *Homogenous Redundancy*, whose own rule is to drop the duplicate once the
  * message has landed). It also left a tall pane mostly empty. A horizontal
  * strip carries the roster and nothing else.

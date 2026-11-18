@@ -10,6 +10,7 @@ import {
 } from "@ally-ui-mono/ui-shared";
 import {
   useCreateKbDocumentMutation,
+  useGetKbDocumentQuery,
   useGetTenantsQuery,
   useReplaceKbDocumentContentMutation,
   useSetKbDocumentAudienceMutation,
@@ -17,7 +18,7 @@ import {
 } from "@api";
 import { EntityField, EntitySidePanel } from "@components";
 import { DOCUMENT_MAX_PASTE_CHARS, en } from "@constants";
-import { KbCharacterTopic, KbCorpus, KbDocument, KbDocumentSourceType } from "@types";
+import { KbCorpus, KbDocument, KbDocumentSourceType } from "@types";
 
 import { CorpusAudienceField } from "./CorpusAudienceField";
 import { DocumentUploadField } from "./DocumentUploadField";
@@ -36,13 +37,10 @@ interface CorpusDocumentPanelProps {
   /** Null = create. */
   document: KbDocument | null;
   /**
-   * Which corpus a NEW document is filed under. Defaults to the WhatsApp corpus so the tab
-   * that has always used this panel keeps behaving identically. Ignored when editing — corpus
-   * is immutable, because moving a document would change what every citation over it meant.
+   * Opened from one organisation's WhatsApp page: a new document is aimed at that organisation
+   * by default, and every request names it (an org-restricted admin's are refused otherwise).
    */
-  corpus?: KbCorpus;
-  /** Character topics to file a new document under. Character library only. */
-  characterTopics?: KbCharacterTopic[];
+  scopeTenantId?: string;
   onClose: () => void;
 }
 
@@ -76,16 +74,17 @@ const isUploadSource = (source: KbDocumentSourceType) =>
  *    "Replace file" instead.
  *  - Only PASTED text is editable in place. For a file-backed document the file IS the content, so
  *    letting an admin edit the extracted text would produce a corpus that silently disagrees with
- *    the PDF they can still download.
+ *    the PDF they can still download. Its extracted text is still SHOWN, read-only, so an admin
+ *    can see what the bot actually reads.
  */
 export const CorpusDocumentPanel: React.FC<CorpusDocumentPanelProps> = ({
   isOpen,
   document,
-  corpus = KbCorpus.WHATSAPP_QA,
-  characterTopics = [],
+  scopeTenantId,
   onClose,
 }) => {
   const isEdit = Boolean(document);
+  const scope = scopeTenantId ? { tenantId: scopeTenantId } : {};
 
   const [title, setTitle] = useState("");
   const [sourceType, setSourceType] = useState<KbDocumentSourceType>(KbDocumentSourceType.PASTE);
@@ -101,6 +100,16 @@ export const CorpusDocumentPanel: React.FC<CorpusDocumentPanelProps> = ({
   const [replaceContent, { isLoading: isReplacing }] = useReplaceKbDocumentContentMutation();
   const [setAudience, { isLoading: isSavingAudience }] = useSetKbDocumentAudienceMutation();
 
+  // The list leaves the text out (megabytes per page), so an opened document fetches its own
+  // copy. Refetched on every open: the text may have changed since through another admin's edit.
+  const { data: fullDocument, isFetching: isLoadingText } = useGetKbDocumentQuery(
+    { id: document?.id ?? "", tenantId: scopeTenantId },
+    { skip: !isOpen || !document, refetchOnMountOrArgChange: true },
+  );
+  const originalText = fullDocument?.id === document?.id ? (fullDocument?.rawText ?? "") : "";
+  // Seeded once per opening, so a background refetch cannot overwrite what the admin is typing.
+  const [seededFor, setSeededFor] = useState<string | null>(null);
+
   // Loaded only while the panel is open: the corpus table does not need it, and an admin who never
   // opens a document should not pay for the organisation list.
   const { data: tenantData } = useGetTenantsQuery({ limit: TENANT_PAGE_SIZE }, { skip: !isOpen });
@@ -110,9 +119,9 @@ export const CorpusDocumentPanel: React.FC<CorpusDocumentPanelProps> = ({
     if (!isOpen) return;
     setTitle(document?.title ?? "");
     setSourceType(document?.sourceType ?? KbDocumentSourceType.PASTE);
-    // The list response deliberately omits rawText (it would be megabytes per page), so an edit
-    // starts from empty and only sends a body when the admin actually types one.
+    // Filled from the single-document fetch below once it lands; empty until then.
     setText("");
+    setSeededFor(null);
     setSourceUrl(document?.sourceUrl ?? "");
     setUpload(null);
     setLanguage(document?.language ?? "");
@@ -120,8 +129,22 @@ export const CorpusDocumentPanel: React.FC<CorpusDocumentPanelProps> = ({
     // is for. The alternative — defaulting to every organisation — makes the most permissive
     // outcome the one you get by not reading the form.
     setIsGlobal(document?.isGlobal ?? false);
-    setTenantIds(document?.tenantIds ?? []);
-  }, [isOpen, document]);
+    setTenantIds(document?.tenantIds ?? (scopeTenantId ? [scopeTenantId] : []));
+  }, [isOpen, document, scopeTenantId]);
+
+  useEffect(() => {
+    if (!isOpen || !document || fullDocument?.id !== document.id) return;
+    if (seededFor === document.id) return;
+    setSeededFor(document.id);
+    if (document.sourceType === KbDocumentSourceType.PASTE) setText(fullDocument.rawText ?? "");
+  }, [isOpen, document, fullDocument, seededFor]);
+
+  const textReady = !isEdit || seededFor === document?.id;
+
+  // Compared trimmed, matching what is sent: re-saving the same text must not re-embed every
+  // passage, and an emptied box never blanks a document.
+  const textChanged =
+    isEdit && textReady && text.trim().length > 0 && text.trim() !== originalText.trim();
 
   const canEditBody = !isEdit || document?.sourceType === KbDocumentSourceType.PASTE;
 
@@ -166,10 +189,10 @@ export const CorpusDocumentPanel: React.FC<CorpusDocumentPanelProps> = ({
     return (
       title !== (document?.title ?? "") ||
       language !== (document?.language ?? "") ||
-      text.trim().length > 0 ||
+      textChanged ||
       audienceChanged
     );
-  }, [isEdit, title, text, sourceUrl, upload, language, document, audienceChanged]);
+  }, [isEdit, title, text, sourceUrl, upload, language, document, audienceChanged, textChanged]);
 
   const isSaving = isCreating || isUpdating || isReplacing || isSavingAudience;
 
@@ -179,14 +202,16 @@ export const CorpusDocumentPanel: React.FC<CorpusDocumentPanelProps> = ({
     try {
       if (isEdit && document) {
         await updateDocument({
+          ...scope,
           id: document.id,
           title: title.trim(),
           language: language.trim() || undefined,
         }).unwrap();
 
-        // Only send a body when there is one to send — an empty textarea must not blank a document.
-        if (text.trim() && document.sourceType === KbDocumentSourceType.PASTE) {
+        // Only when the text actually changed — an empty or untouched textarea sends nothing.
+        if (textChanged && document.sourceType === KbDocumentSourceType.PASTE) {
           const updated = await replaceContent({
+            ...scope,
             id: document.id,
             text: text.trim(),
           }).unwrap();
@@ -208,6 +233,7 @@ export const CorpusDocumentPanel: React.FC<CorpusDocumentPanelProps> = ({
         if (audienceChanged) {
           try {
             await setAudience({
+              scopeTenantId,
               id: document.id,
               isGlobal,
               tenantIds: isGlobal ? [] : tenantIds,
@@ -222,8 +248,9 @@ export const CorpusDocumentPanel: React.FC<CorpusDocumentPanelProps> = ({
         }
       } else {
         await createDocument({
-          corpus,
-          ...(characterTopics.length ? { characterTopics } : {}),
+          ...scope,
+          // The only corpus the Knowledge Base still serves.
+          corpus: KbCorpus.WHATSAPP_QA,
           title: title.trim(),
           sourceType,
           ...(sourceType === KbDocumentSourceType.PASTE ? { text: text.trim() } : {}),
@@ -296,22 +323,52 @@ export const CorpusDocumentPanel: React.FC<CorpusDocumentPanelProps> = ({
           label={en.whatsappBot.corpus.textLabel}
           required={!isEdit}
           help={
-            text.length > DOCUMENT_MAX_PASTE_CHARS ? en.whatsappBot.corpus.textTooLong : undefined
+            text.length > DOCUMENT_MAX_PASTE_CHARS
+              ? en.whatsappBot.corpus.textTooLong
+              : isEdit
+                ? en.whatsappBot.corpus.textEditHelp
+                : undefined
           }
         >
           <AutoExpandableTextarea
             value={text}
             onChange={setText}
-            placeholder={en.whatsappBot.corpus.textPlaceholder}
+            placeholder={
+              textReady ? en.whatsappBot.corpus.textPlaceholder : en.whatsappBot.corpus.textLoading
+            }
             maxLength={DOCUMENT_MAX_PASTE_CHARS}
             minHeight={180}
+            disabled={!textReady}
+          />
+        </EntityField>
+      )}
+
+      {isEdit && sourceType !== KbDocumentSourceType.PASTE && (
+        <EntityField
+          label={en.whatsappBot.corpus.extractedTextLabel}
+          help={en.whatsappBot.corpus.extractedTextHelp}
+        >
+          <AutoExpandableTextarea
+            value={
+              isLoadingText && !originalText
+                ? en.whatsappBot.corpus.textLoading
+                : originalText || en.whatsappBot.corpus.extractedTextEmpty
+            }
+            onChange={() => undefined}
+            minHeight={180}
+            disabled
           />
         </EntityField>
       )}
 
       {isUploadSource(sourceType) && (
         <EntityField label={en.whatsappBot.corpus.uploadLabel} required={!isEdit}>
-          <DocumentUploadField sourceType={sourceType} value={upload} onChange={setUpload} />
+          <DocumentUploadField
+            sourceType={sourceType}
+            value={upload}
+            onChange={setUpload}
+            scopeTenantId={scopeTenantId}
+          />
         </EntityField>
       )}
 
@@ -333,22 +390,16 @@ export const CorpusDocumentPanel: React.FC<CorpusDocumentPanelProps> = ({
         <p className="text-xs text-typography-500">{en.whatsappBot.corpus.sourceTypeLocked}</p>
       )}
 
-      {/* WhatsApp corpus only. Every corpus carries `isGlobal`/`tenantIds`, but only this
-          one's retrieval filters on them — the character library is Ally-global and its
-          retrieval names `unrestricted()`. An organisation picker on that corpus would
-          promise a targeting nothing enforces. */}
-      {(document?.corpus ?? corpus) === KbCorpus.WHATSAPP_QA && (
-        <CorpusAudienceField
-          isGlobal={isGlobal}
-          tenantIds={tenantIds}
-          tenants={tenants}
-          disabled={isSaving}
-          onChange={next => {
-            setIsGlobal(next.isGlobal);
-            setTenantIds(next.tenantIds);
-          }}
-        />
-      )}
+      <CorpusAudienceField
+        isGlobal={isGlobal}
+        tenantIds={tenantIds}
+        tenants={tenants}
+        disabled={isSaving}
+        onChange={next => {
+          setIsGlobal(next.isGlobal);
+          setTenantIds(next.tenantIds);
+        }}
+      />
 
       <EntityField
         label={en.whatsappBot.corpus.languageLabel}

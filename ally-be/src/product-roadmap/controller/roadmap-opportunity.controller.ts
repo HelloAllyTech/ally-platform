@@ -36,14 +36,16 @@ import {
   MergeOpportunitiesDto,
   MonthBoardQueryDto,
   MoveOpportunityDto,
-  QuickAddOpportunityDto,
   RoadmapReferenceImageUploadUrlDto,
   SetAllocationDto,
   SplitOpportunityDto,
   UpdateOpportunityDto,
 } from '../dto/roadmap-opportunity.dto';
+import { SetDirectorStarDto } from '../dto/roadmap-strategy.dto';
 import {
   VoteBudgetDto,
+  BreadthDto,
+  BreadthEveryoneRowDto,
   BugReportResponseDto,
   GetOpportunitiesResponseDto,
   MonthBoardMoveResponseDto,
@@ -57,11 +59,13 @@ import {
   OpenBuilderSessionResponseDto,
 } from '../dto/roadmap-response.dto';
 import { RoadmapOpportunityService } from '../service/roadmap-opportunity.service';
+import { RoadmapMultiplierService } from '../service/roadmap-multiplier.service';
 import { RoadmapAllocationService } from '../service/roadmap-allocation.service';
 import { RoadmapSplitMergeService } from '../service/roadmap-split-merge.service';
 import { RoadmapBuilderService } from '../service/roadmap-builder.service';
 import { RoadmapBoardService } from '../service/roadmap-board.service';
 import { RoadmapAccessService } from '../service/roadmap-access.service';
+import { PlanAccessService } from 'src/product-planning/service/plan-access.service';
 
 /**
  * The board itself.
@@ -83,6 +87,8 @@ export class RoadmapOpportunityController {
     private readonly builderService: RoadmapBuilderService,
     private readonly boardService: RoadmapBoardService,
     private readonly access: RoadmapAccessService,
+    private readonly multiplierService: RoadmapMultiplierService,
+    private readonly planAccess: PlanAccessService,
   ) {}
 
   @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
@@ -175,6 +181,34 @@ export class RoadmapOpportunityController {
     return this.allocationService.getBudget(user.id);
   }
 
+  // VIEW tier, not VOTE: every viewer's score label ("points" vs "votes") hangs on `enabled`.
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VIEW_PRODUCT_ROADMAP],
+  })
+  @Get('me/breadth')
+  @ApiOperation({
+    summary: "The caller's breadth multiplier and what's behind it",
+    description:
+      'A vote is worth 1.0 to 1.3 of a vote by how many different colleagues the caller has ' +
+      'backed in the last 14 days. `enabled` is false while the feature flag is off.',
+  })
+  @ApiResponse({ status: 200, type: BreadthDto })
+  breadth(@CurrentUser() user: TokenUser): Promise<BreadthDto> {
+    return this.multiplierService.getBreadth(user.id);
+  }
+
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VOTE_PRODUCT_ROADMAP],
+  })
+  @Get('breadth')
+  @ApiOperation({
+    summary: "Everyone's breadth multiplier, for the breadth panel",
+  })
+  @ApiResponse({ status: 200, type: [BreadthEveryoneRowDto] })
+  breadthEveryone(): Promise<BreadthEveryoneRowDto[]> {
+    return this.multiplierService.getEveryone();
+  }
+
   @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
     permissions: [PERMISSIONS.VIEW_PRODUCT_ROADMAP],
   })
@@ -251,45 +285,12 @@ export class RoadmapOpportunityController {
     @CurrentUser() user: TokenUser,
     @Body() dto: CreateOpportunityDto,
   ): Promise<OpportunityResponseDto> {
+    // Filing is the Idea role's (rev 5.2 §B.12); an org-restricted admin is
+    // a Viewer at most, so it is withheld from them.
+    await this.planAccess.assertIdeas(user.id);
     return this.opportunityService.create(user.id, dto, {
       canManage: await this.access.canManage(user.id),
       enforceReadiness: true,
-    });
-  }
-
-  /**
-   * The same filing as `create`, with the readiness gate OFF.
-   *
-   * A deliberate second door, for a named few: the `product_roadmap_quick_add` toggle on top of
-   * the VOTE tier, granted per-admin from Admin User Management. The interview exists so a draft
-   * reaches the board already sharpened; a curator who already knows what belongs on it pays that
-   * cost for nothing, and this is where they skip it. `enforceReadiness: false` is the whole
-   * difference — ownership, images, vector indexing and the realtime event all run as on `create`,
-   * so a quick-added row is indistinguishable from an interviewed one except that `hasBrief` is
-   * false (the DTO cannot carry a brief, and the server would refuse an unsigned one).
-   *
-   * Its own route rather than a flag on `create`: a flag is a bypass any VOTE-tier caller could
-   * send, and the gate would again be a discipline the client chose to keep.
-   */
-  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP_QUICK_ADD, {
-    permissions: [PERMISSIONS.VOTE_PRODUCT_ROADMAP],
-  })
-  @Post('opportunities/quick')
-  @ApiOperation({
-    summary: 'File a new opportunity directly, skipping the readiness check',
-    description:
-      'Requires the product_roadmap_quick_add admin toggle. Same body and rules as POST ' +
-      '/opportunities minus readinessToken and brief; `ownerUserId` still needs ' +
-      'edit:admin:product-roadmap.',
-  })
-  @ApiResponse({ status: 201, type: OpportunityResponseDto })
-  async quickAdd(
-    @CurrentUser() user: TokenUser,
-    @Body() dto: QuickAddOpportunityDto,
-  ): Promise<OpportunityResponseDto> {
-    return this.opportunityService.create(user.id, dto, {
-      canManage: await this.access.canManage(user.id),
-      enforceReadiness: false,
     });
   }
 
@@ -385,6 +386,25 @@ export class RoadmapOpportunityController {
     @Body() dto: UpdateOpportunityDto,
   ): Promise<OpportunityResponseDto> {
     return this.opportunityService.update(user.id, id, dto);
+  }
+
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VIEW_PRODUCT_ROADMAP],
+  })
+  @Put('opportunities/:id/director-star')
+  @ApiOperation({
+    summary: "Set or clear the Prod Director's star",
+    description:
+      'Only the configured Prod Director may call this (403 otherwise). A star adds the star ' +
+      "weight to the opportunity's composite rank.",
+  })
+  @ApiResponse({ status: 200, type: OpportunityResponseDto })
+  setDirectorStar(
+    @CurrentUser() user: TokenUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SetDirectorStarDto,
+  ): Promise<OpportunityResponseDto> {
+    return this.opportunityService.setDirectorStar(user.id, id, dto.starred);
   }
 
   @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP_MANAGE, {

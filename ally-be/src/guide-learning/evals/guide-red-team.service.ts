@@ -71,7 +71,7 @@ export function parseRedTeamCases(text: string): GeneratedCase[] {
 /**
  * The red-team generator (plans/ally-guide/plan.md §7.13): weekly, a model
  * writes adversarial learner messages for each hard category against a real
- * course, including noisy and code-mixed ones (Stacks: Synthetic Datasets for
+ * course, including noisy and code-mixed ones (Synthetic Datasets for
  * Red Teaming Agent Systems). Every case lands PROPOSED: nothing a model
  * wrote decides a gate until a person has read it and accepted it.
  *

@@ -1,11 +1,36 @@
-name: 'Build Android app - Production'
+# Store build of the Flutter app: applicationId com.helloally.app, i.e. an
+# UPDATE to the React Native app's Play listing. Mirrors ally-platform's
+# .github/workflows/build-android-production.yml with the SAME secret names
+# (docs/RELEASE.md), signed with RN's upload keystore.
+#
+# Manual only, and it only ever touches the Play *internal* track. By default
+# the release is left as a draft there; choose `completed` to roll it out to
+# internal testers (whose RN app it then replaces). Production rollout is a
+# separate, manual Play Console step (docs/RELEASE.md).
+name: 'Build Android app - Production (store identity)'
 
 on:
   workflow_dispatch:
     inputs:
+      confirm_store_identity:
+        description: 'Type com.helloally.app to confirm this build updates the RN app on Play'
+        required: true
+        type: string
       release_notes:
         description: 'Release Notes (What is New)'
         required: true
+        type: string
+      internal_track_status:
+        description: 'Play internal track release status'
+        required: true
+        default: draft
+        type: choice
+        options:
+          - draft
+          - completed
+      build_name:
+        description: 'versionName (blank = pubspec version). Must be above the RN version live in the store.'
+        required: false
         type: string
 
 permissions:
@@ -16,19 +41,32 @@ jobs:
   build:
     runs-on: ubuntu-latest
     environment: production
+    timeout-minutes: 60
     steps:
+      - name: Confirm store identity
+        env:
+          CONFIRM: ${{ inputs.confirm_store_identity }}
+        run: |
+          if [ "$CONFIRM" != "com.helloally.app" ]; then
+            echo "::error::Type com.helloally.app in confirm_store_identity to run a store-identity build."
+            exit 1
+          fi
+
+      - name: Free up disk space
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          android: false
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+          tool-cache: true
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           ref: master
-
-      - name: Free up disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          sudo rm -rf /usr/local/share/boost
-          df -h
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
@@ -40,98 +78,74 @@ jobs:
         run: |
           mkdir -p android/app/src/prod
           aws s3 cp "${{ secrets.ANDROID_GOOGLE_SERVICES_S3_URI_PROD }}" "android/app/src/prod/google-services.json"
+          jq -e '[.client[].client_info.android_client_info.package_name] | index("com.helloally.app")' \
+            android/app/src/prod/google-services.json > /dev/null \
+            || { echo "::error::google-services.json has no com.helloally.app client"; exit 1; }
 
       - name: Install Java
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           java-version: 17
           distribution: 'temurin'
           cache: gradle
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
-          node-version: '18'
-          cache: 'npm'
+          channel: stable
+          flutter-version: 3.47.7
 
       - name: Install dependencies
-        run: |
-          npm i -g corepack
-          npm ci
-
-      - name: Cache Gradle Wrapper
-        uses: actions/cache@v3
-        with:
-          path: ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-wrapper-${{ hashFiles('**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-wrapper-
-
-      - name: Cache Gradle Dependencies
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-            android/.gradle
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
+        run: flutter pub get
 
       - name: Create .env file
+        # RN's .env format; flutter --dart-define-from-file reads it as-is.
         run: |
           echo "${{ secrets.ENV_VALUES_PRODUCTION }}" > .env
 
-      - name: Build with Gradle (Production)
+      - name: Decode release keystore
+        env:
+          ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$ANDROID_RELEASE_KEYSTORE_BASE64" ]; then
+            echo "::error::ANDROID_RELEASE_KEYSTORE_BASE64 secret is not set"
+            exit 1
+          fi
+          echo "$ANDROID_RELEASE_KEYSTORE_BASE64" | base64 --decode > android/app/ally-release.keystore
+
+      - name: Compute versionCode
+        id: version_info
+        env:
+          BUILD_NAME: ${{ inputs.build_name }}
+        # yyMMddHH + one digit for the 6-minute slot of the hour, UTC
+        # (e.g. 261028153). Always far above RN's versionCode (107 at the
+        # time of writing) and under Play's 2100000000 cap until 2099.
+        run: |
+          VERSION_CODE="$(date -u +%y%m%d%H)$(( 10#$(date -u +%M) / 6 ))"
+          VERSION_NAME="$BUILD_NAME"
+          if [ -z "$VERSION_NAME" ]; then
+            VERSION_NAME=$(grep '^version:' pubspec.yaml | sed -E 's/version: *([^+]+).*/\1/')
+          fi
+          echo "versionCode $VERSION_CODE, versionName $VERSION_NAME"
+          echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
+          echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
+
+      - name: Build (prod flavor)
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          cd android
-          ./gradlew clean --stacktrace
-          # Build APK
-          ./gradlew assembleProdRelease --stacktrace
-          # Build AAB (App Bundle)
-          ./gradlew bundleProdRelease --stacktrace
-
-      - name: Rename APK with build number, date, and env
-        run: |
-          DATETIME=$(date +'%Y%m%d-%H%M')
-          APK_SRC="android/app/build/outputs/apk/prod/release/app-prod-release.apk"
-          APK_DST="android/app/build/outputs/apk/prod/release/app-production-release-${{ github.run_number }}-${DATETIME}.apk"
-          if [ -f "$APK_SRC" ]; then
-            mv "$APK_SRC" "$APK_DST"
-          else
-            echo "APK not found at $APK_SRC"
-            ls -R android/app/build/outputs/apk || true
-            exit 1
-          fi
-
-      - name: Rename AAB with build number, date, and env
-        id: rename_aab
-        run: |
-          DATETIME=$(date +'%Y%m%d-%H%M')
-          # Expected AAB path for flavor 'prod' and buildType 'release'
-          AAB_SRC="android/app/build/outputs/bundle/prodRelease/app-prod-release.aab"
-          AAB_DST="android/app/build/outputs/bundle/prod/release/app-production-release-${{ github.run_number }}-${DATETIME}.aab"
-          if [ -f "$AAB_SRC" ]; then
-            mkdir -p "$(dirname "$AAB_DST")"
-            mv "$AAB_SRC" "$AAB_DST"
-            echo "aab_path=$AAB_DST" >> $GITHUB_OUTPUT
-          else
-            echo "AAB not found at $AAB_SRC"
-            ls -R android/app/build/outputs/bundle || true
-            exit 1
-          fi
-
-      - name: Extract Version Information
-        id: version_info
-        run: |
-          VERSION_CODE=$(grep "versionCode" android/app/build.gradle | awk '{print $2}')
-          VERSION_NAME=$(grep "versionName" android/app/build.gradle | awk '{print $2}' | tr -d '"')
-          echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
-          echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
+          ARGS="--release --flavor prod --obfuscate --split-debug-info=build/symbols --dart-define-from-file=.env \
+            --build-number=${{ steps.version_info.outputs.version_code }} \
+            --build-name=${{ steps.version_info.outputs.version_name }}"
+          flutter build appbundle $ARGS
+          flutter build apk $ARGS
+          mkdir -p dist
+          cp build/app/outputs/bundle/prodRelease/app-prod-release.aab \
+            dist/ally-production-${{ steps.version_info.outputs.version_code }}.aab
+          cp build/app/outputs/flutter-apk/app-prod-release.apk \
+            dist/ally-production-${{ steps.version_info.outputs.version_code }}.apk
 
       - name: Create Release Notes
         env:
@@ -140,30 +154,59 @@ jobs:
           mkdir -p distribution/whatsnew
           echo "$RELEASE_NOTES" > distribution/whatsnew/whatsnew-en-US
 
-      - name: Upload to Google Play Console
+      - name: Upload to Google Play Console (internal track)
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.ANDROID_SERVICE_ACCOUNT_JSON }}
           packageName: com.helloally.app
-          releaseFiles: ${{ steps.rename_aab.outputs.aab_path }}
+          releaseFiles: dist/ally-production-${{ steps.version_info.outputs.version_code }}.aab
           track: internal
-          status: completed
-          releaseName: '${{ steps.version_info.outputs.version_code }} (${{ steps.version_info.outputs.version_name }})'
+          status: ${{ inputs.internal_track_status }}
+          releaseName: '${{ steps.version_info.outputs.version_code }} (${{ steps.version_info.outputs.version_name }}) Flutter'
           whatsNewDirectory: distribution/whatsnew
 
-      - name: Upload APK artifact
+      - name: Upload APK + AAB artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: app-production-release-apk-${{ github.run_number }}
-          path: android/app/build/outputs/apk/prod/release/app-production-release-${{ github.run_number }}-*.apk
+          name: app-production-release-${{ steps.version_info.outputs.version_code }}
+          path: dist/
           retention-days: 30
 
-      - name: Upload AAB artifact
+      - name: Keep Dart debug symbols
+        # Obfuscated Dart stack traces can only be read with these; kept so a
+        # build can still be symbolicated after the Firebase secret is added.
         uses: actions/upload-artifact@v4
         with:
-          name: app-production-release-aab-${{ github.run_number }}
-          path: android/app/build/outputs/bundle/prod/release/app-production-release-${{ github.run_number }}-*.aab
-          retention-days: 30
+          name: dart-symbols-${{ github.run_number }}
+          path: build/symbols
+          retention-days: 90
+
+      - name: Upload Crashlytics symbols
+        # Best effort, never fails the release: skipped with a warning when
+        # the Firebase config or the Firebase service account is missing.
+        # The R8 mapping file is uploaded by the Crashlytics Gradle plugin
+        # during the build; this uploads the Dart --split-debug-info files.
+        continue-on-error: true
+        env:
+          FIREBASE_SA: ${{ secrets.FIREBASE_CRASHLYTICS_SERVICE_ACCOUNT_JSON }}
+        run: |
+          GSJ=android/app/src/prod/google-services.json
+          APP_ID=""
+          if [ -f "$GSJ" ]; then
+            APP_ID=$(jq -r '.client[] | select(.client_info.android_client_info.package_name == "com.helloally.app") | .client_info.mobilesdk_app_id' "$GSJ" | head -n 1)
+          fi
+          if [ -z "$APP_ID" ]; then
+            echo "::warning::No google-services.json for com.helloally.app; skipping Crashlytics symbol upload"
+            exit 0
+          fi
+          if [ -z "$FIREBASE_SA" ]; then
+            echo "::warning::FIREBASE_CRASHLYTICS_SERVICE_ACCOUNT_JSON not set; skipping Dart symbol upload"
+            exit 0
+          fi
+          echo "$FIREBASE_SA" > "$RUNNER_TEMP/firebase-sa.json"
+          GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-sa.json" \
+            npx --yes firebase-tools@14 crashlytics:symbols:upload --app="$APP_ID" build/symbols
+          rm -f "$RUNNER_TEMP/firebase-sa.json"
 
       - name: Send Slack notification (Production)
         if: success()
@@ -171,22 +214,4 @@ jobs:
         env:
           INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         with:
-          text: 'Android Production Build #${{ github.run_number }} Successful!'
-          attachments: |
-            [
-              {
-                "color": "good",
-                "author_name": "${{ github.actor }}",
-                "author_icon": "${{ github.event.sender.avatar_url }}",
-                "fields": [
-                  {
-                    "title": "What's New",
-                    "value": "${{ github.event.head_commit.message }}"
-                  },
-                  {
-                    "title": "Download Production APK",
-                    "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Click Here>"
-                  }
-                ]
-              }
-            ]
+          text: 'Flutter Android store-identity build ${{ steps.version_info.outputs.version_code }} uploaded to the Play internal track (${{ inputs.internal_track_status }}).'

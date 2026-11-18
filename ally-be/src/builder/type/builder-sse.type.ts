@@ -74,6 +74,11 @@ export interface BuilderQuestionEvent {
    * clarification from a fresh line of enquiry.
    */
   rationale?: string;
+  /**
+   * Under the question gate: the kind of decision this asks for (scope,
+   * behaviour, priority, taste, contradiction). The decision feed filters on it.
+   */
+  questionType?: string;
 }
 
 export interface BuilderDoneEvent {

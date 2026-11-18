@@ -36,6 +36,18 @@ export enum WaHandledBy {
   UNIDENTIFIED = 'unidentified',
   /** Something failed and the fallback message went out. */
   ERROR = 'error',
+  /**
+   * A team member's reply from the inbox (chunk 11a). Stored with the sender's id; the assistant
+   * didn't write it.
+   */
+  HUMAN = 'human',
+  /** The assistant told the visitor it has asked the team to join (chunk 11a). */
+  HANDOVER = 'handover',
+  /**
+   * A team member has this chat, so the assistant didn't answer (chunk 11a). A decision only:
+   * nothing is sent, and no reply row is stored.
+   */
+  HELD = 'held',
 }
 
 /**
@@ -120,4 +132,19 @@ export enum WaUnansweredStatus {
   TRIAGED = 'triaged',
   ANSWERED = 'answered',
   DISMISSED = 'dismissed',
+}
+
+export enum WaBusinessNumberSource {
+  /** An org admin pasted the ids and a System User token from their own Meta app. */
+  MANUAL = 'manual',
+  /** Connected through Meta Embedded Signup, onto Ally's own Meta app. */
+  EMBEDDED_SIGNUP = 'embedded_signup',
+}
+
+export enum WaBusinessNumberStatus {
+  /** Saved and checked against Meta, but Meta has not called our webhook yet. */
+  AWAITING_WEBHOOK = 'awaiting_webhook',
+  CONNECTED = 'connected',
+  /** The last check against Meta failed; `lastError` says why. */
+  ERROR = 'error',
 }

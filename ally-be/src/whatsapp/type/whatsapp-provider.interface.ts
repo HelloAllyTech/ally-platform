@@ -12,6 +12,25 @@ export interface InboundWhatsAppMessage {
   isUnsupportedMedia: boolean;
   /** Provider timestamp when supplied, else receipt time. */
   timestamp: Date;
+  /**
+   * The business number the message was sent TO (Meta's `metadata.phone_number_id`). Decides which
+   * organisation's bot answers and which credentials the reply goes out with. Absent only on
+   * messages queued before multi-number support, which belong to the env-configured number.
+   */
+  phoneNumberId?: string;
+}
+
+/**
+ * The credentials for one business number.
+ *
+ * Either the env-configured platform number or an organisation's own number from
+ * `wa_business_numbers`. Every provider call that touches Meta takes one explicitly, so a reply can
+ * never go out from a different number than the one the worker wrote to.
+ */
+export interface WaNumberCredentials {
+  phoneNumberId?: string;
+  accessToken?: string;
+  businessAccountId?: string;
 }
 
 /**
@@ -36,13 +55,20 @@ export interface WhatsAppProvider {
    * echoed back. Returns null when the query is not a valid handshake (so the caller 403s) and for
    * providers that have no such step.
    */
-  verifyWebhookChallenge(query: Record<string, unknown>): string | null;
-
-  /** Verify the request actually came from the provider. This IS the webhook's authentication. */
-  verifyRequest(req: Request): boolean;
+  verifyWebhookChallenge(
+    query: Record<string, unknown>,
+    expectedToken?: string,
+  ): string | null;
 
   /**
-   * Parse a webhook payload into zero or more messages.
+   * Verify the request actually came from the provider. This IS the webhook's authentication.
+   * `appSecret` overrides the env secret for a number connected through an organisation's own app.
+   */
+  verifyRequest(req: Request, appSecret?: string): boolean;
+
+  /**
+   * Parse a webhook payload into zero or more messages, each tagged with the number it was sent to.
+   * Which of those numbers this deployment answers for is the webhook's decision, not the parser's.
    *
    * Always an array: Meta batches several events into one POST, and a payload can legitimately
    * contain none we care about (delivery receipts, read receipts, status updates).
@@ -50,7 +76,11 @@ export interface WhatsAppProvider {
   parseInbound(body: unknown): InboundWhatsAppMessage[];
 
   /** Send a plain-text reply. Resolves with the provider's id for the sent message. */
-  sendText(to: string, body: string): Promise<{ providerMessageId: string }>;
+  sendText(
+    to: string,
+    body: string,
+    creds?: WaNumberCredentials,
+  ): Promise<{ providerMessageId: string }>;
 
   /**
    * Mark an inbound message read and show "typing…" while the answer is prepared.
@@ -59,16 +89,21 @@ export interface WhatsAppProvider {
    * typing bubble must not cost the worker their answer. Optional because not every provider
    * has the concept.
    */
-  showTypingIndicator?(providerMessageId: string): Promise<void>;
+  showTypingIndicator?(
+    providerMessageId: string,
+    creds?: WaNumberCredentials,
+  ): Promise<void>;
 
   /** Live check of the provider credentials and number, for the admin settings screen. */
-  checkConnection?(): Promise<WhatsAppConnectionCheck>;
+  checkConnection?(
+    creds?: WaNumberCredentials,
+  ): Promise<WhatsAppConnectionCheck>;
 
   /** Register the number for API use with its two-step-verification PIN (Meta only). */
-  registerPhoneNumber?(pin: string): Promise<void>;
+  registerPhoneNumber?(pin: string, creds?: WaNumberCredentials): Promise<void>;
 
   /** Subscribe this app to the business account's webhooks (Meta only). */
-  subscribeApp?(): Promise<void>;
+  subscribeApp?(creds?: WaNumberCredentials): Promise<void>;
 }
 
 /**

@@ -31,7 +31,7 @@ export interface BlankCounts {
  * own erasure (one chat, now). Its list is exactly contract §10's, plus the
  * suggestion text inside message metadata and the talker's user-agent: both
  * outlive the bodies otherwise, and the retention rule is about what a talker
- * said and who they were, not just one column (see the Stacks chunk
+ * said and who they were, not just one column (see the guidance
  * "Automated Data Retention and Deletion in Agent Systems").
  *
  * Idempotent: every statement skips rows already blanked, so a re-run — or a

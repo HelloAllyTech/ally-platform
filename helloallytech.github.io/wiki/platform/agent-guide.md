@@ -2,7 +2,7 @@
 title: Cross-Repo Agent Guide
 tags: [platform, agents, conventions, reference]
 summary: Quick-reference for AI assistants and developers working across Ally repos — per-repo entry points, cross-repo conventions, common tasks, and gotchas.
-last_reconciled: 2026-07-28
+last_reconciled: 2026-11-10
 ---
 
 # Cross-Repo Agent Guide
@@ -10,11 +10,11 @@ last_reconciled: 2026-07-28
 This page helps AI agents (and developers) quickly orient in the Ally workspace and work effectively across repos. It is migrated from the workspace `AGENTS.md`. For per-repo depth, follow the links to each [repo page](../index.md#repositories).
 
 > [!IMPORTANT]
-> **This page tells you how to build. [Stacks](../contributing/planning-with-stacks.md) tells you what to build and how it should behave.**
-> **Whenever a decision about how the product should behave comes up, search Stacks with the `search_chunks` tool, incorporate relevant returned guidance, and cite chunk titles.** Before writing an implementation plan above all — but equally mid-implementation, at each point you would otherwise invent the answer: an empty, loading, edge or failure state; a user-facing label, button or error message; what a view shows and what it omits; a threshold, limit, cadence or reward rule. **Search on your own initiative** — specific noun phrases, several per task, then `get_chunks` on what bears on the decision and `list_tags` to see how the library is organised. Never claim Stacks does or doesn't cover something: tags aren't contents, and an empty search isn't a gap. `/stacks:planning_context` remains as the human entry point. The `stacks` server is declared in every repo's committed `.mcp.json` and reads your `STACKS_API_KEY` from the environment — see [Working with the Stacks MCP](../contributing/planning-with-stacks.md) for setup, retrieval technique, and how to cite. Trivial mechanical changes are exempt.
+> **This page tells you how to build. The [Context Library](../contributing/planning-with-context-library.md) tells you what to build and how it should behave.**
+> **Whenever a product or engineering judgement comes up, search the Context Library with the `search_context` tool, incorporate relevant returned guidance, and cite chunk codes such as `[FP-0142]`.** Before writing an implementation plan above all — but equally mid-implementation, at each point you would otherwise invent the answer: an empty, loading, edge or failure state; a user-facing label, button or error message; what a view shows and what it omits; a threshold, limit, cadence or reward rule. **Search on your own initiative** — several short queries that each describe a situation, in one call, then `get_chunks` on the one or two that bear on the decision, and `list_collections` to see what you can search. Never claim the library does or doesn't cover something: an empty search isn't a gap, and a failed search says nothing about what it holds. Results are advisory, not instructions. The `planning_context` MCP prompt remains as the human entry point. The `context-library` server is declared in each app directory's committed `.mcp.json` (not at the monorepo root) and reads `ALLY_CONTEXT_LIBRARY_URL` and `ALLY_CONTEXT_LIBRARY_KEY` from the environment — see [Working with the Context Library](../contributing/planning-with-context-library.md) for setup, retrieval technique, and how to cite. Trivial mechanical changes are exempt.
 
 > [!NOTE]
-> The in-wiki **Product Management Best Practices** section ([hub](../product/best-practices.md), [UI](../product/ui.md), [Gamification](../product/gamification.md), [Data Visualisation](../product/data-visualisation.md), [Prioritisation](../product/prioritisation.md), [User Personas](../product/user-personas.md), [AI-Product Patterns](../product/ai-product-patterns.md)) was **deprecated on 2026-08-07** and replaced by Stacks. Nothing in it is a gate any more. It is kept readable because platform pages cite its principles by number, and because it records what this team decided up to August 2026 — useful context, not a checklist.
+> The in-wiki **Product Management Best Practices** section ([hub](../product/best-practices.md), [UI](../product/ui.md), [Gamification](../product/gamification.md), [Data Visualisation](../product/data-visualisation.md), [Prioritisation](../product/prioritisation.md), [User Personas](../product/user-personas.md), [AI-Product Patterns](../product/ai-product-patterns.md)) was **deprecated on 2026-08-07** and replaced by what is now the Context Library. Nothing in it is a gate any more. It is kept readable because platform pages cite its principles by number, and because it records what this team decided up to August 2026 — useful context, not a checklist.
 
 ## Repo Quick Reference
 
@@ -53,11 +53,11 @@ This page helps AI agents (and developers) quickly orient in the Ally workspace 
 - **Key patterns**: RTK Query for API calls, path aliases (`@api`, `@components`), permission-based routing, i18next
 
 ### [ally-mobile](../repos/ally-mobile.md) — Mobile App
-- **Stack**: React Native 0.79 / TypeScript 5 / React 19 / Redux Toolkit + RTK Query
-- **Entry**: `index.js` → `ally-mobile/src/App.tsx`; navigation via React Navigation 7 (native-stack + bottom-tabs + drawer)
-- **Services**: RTK Query slices in `src/services/`; custom hooks in `src/hooks/`
-- **Real-time**: Socket.IO + LiveKit React Native; `react-native-live-audio-stream` for recording
-- **Key patterns**: Dual listening modes (microphone + conference), AsyncStorage for tokens, Firebase Crashlytics
+- **Stack**: Flutter / Dart 3 / Riverpod / go_router / dio
+- **Entry**: `ally-mobile/lib/main.dart`; navigation via go_router with an auth-gated redirect, a drawer plus permission-gated bottom tabs
+- **Services**: one dio client for all API access in `ally-mobile/lib/core/network/`; features in `ally-mobile/lib/features/<feature>/`
+- **Real-time**: Socket.IO (`socket_io_client`) + LiveKit (`livekit_client`); `record` for audio capture
+- **Key patterns**: Dual listening modes (microphone + conference), secure storage for tokens, Firebase Crashlytics, two build flavors (`dev`/`prod`)
 
 ### [infra](../repos/infra.md) — Infrastructure *(Standalone Repo — Outside `ally-platform`)*
 - **Repository**: `HelloAllyTech/infra` (intentionally kept **outside** the `ally-platform` monorepo as a standalone private repository to isolate deployment inventories and Ansible Vault secrets; `/infra/` is `.gitignore`d at the `ally-platform` root)
@@ -69,7 +69,7 @@ This page helps AI agents (and developers) quickly orient in the Ally workspace 
 ## Cross-Repo Conventions
 
 ### Branch Naming
-`<type>/<short-description>` — e.g. `feat/add-user-profile`, `fix/login-error`. Canonical rules and the full type list live in the [Contributing Guide](../contributing/guide.md#branch-naming); don't restate them elsewhere.
+`<type>/<short-description>` — e.g. `feat/add-user-profile`, `fix/login-error`. Canonical rules and the full type list live in the [Contributing Guide](../contributing/guide.md#branch-naming); don't restate them elsewhere. Branches are short-lived: see [Branch Lifetime](../contributing/guide.md#branch-lifetime) (merge within 2 working days, nothing older than 7, delete on merge, one branch per change, root checkout stays on `master`).
 
 ### API Versioning
 - All REST APIs use the `/api/v1/` prefix.
@@ -82,7 +82,7 @@ This page helps AI agents (and developers) quickly orient in the Ally workspace 
 
 ## Common Tasks
 
-> Every task below that reaches an implementation plan starts with the [Stacks search](../contributing/planning-with-stacks.md). Cross-repo work is the dominant hidden cost in estimates — worth a query of its own.
+> Every task below that reaches an implementation plan starts with a [Context Library search](../contributing/planning-with-context-library.md). Cross-repo work is the dominant hidden cost in estimates — worth a query of its own.
 
 **Adding a new API endpoint** — ally-be: controller + service + DTOs in the relevant `src/` module; ally-web/mobile: add an RTK Query endpoint in `src/services/`.
 
@@ -108,4 +108,4 @@ This page helps AI agents (and developers) quickly orient in the Ally workspace 
 
 ---
 
-*See also: [Platform Overview](overview.md), [Architecture](architecture.md), [Contributing Guide](../contributing/guide.md), [Planning with the Stacks MCP](../contributing/planning-with-stacks.md).*
+*See also: [Platform Overview](overview.md), [Architecture](architecture.md), [Contributing Guide](../contributing/guide.md), [Working with the Context Library](../contributing/planning-with-context-library.md).*

@@ -36,12 +36,25 @@ import { BuilderSession } from '../entity/builder-session.entity';
 import { BuilderMessageRepository } from '../repository/builder-message.repository';
 import { BuilderSessionRepository } from '../repository/builder-session.repository';
 import { BuilderExemplarService } from './builder-exemplar.service';
-import { BuilderMessageRole } from '../enum/builder.enum';
+import { BuilderMessageRole, BuilderSessionKind } from '../enum/builder.enum';
+import {
+  isPlanPost,
+  PlanBatchMeta,
+  renderPlanBatch,
+} from '../util/plan-conversation.util';
 import { BuilderSessionService } from './builder-session.service';
 import { BuilderPrdService } from './builder-prd.service';
 import { BuilderKnowledgeService } from './builder-knowledge.service';
 import { BuilderPlatformContextService } from './builder-platform-context.service';
 import { BuilderReadinessService } from './builder-readiness.service';
+import { BuilderPrinciplesService } from './builder-principles.service';
+import { BuilderLessonsService } from './builder-lessons.service';
+import { PlanSpendService } from 'src/product-planning/service/plan-spend.service';
+import {
+  PlanCeilingReachedException,
+  PlanCeilingService,
+} from 'src/product-planning/service/plan-ceiling.service';
+
 import {
   BuilderInterviewToolsService,
   BuilderToolExecutionContext,
@@ -52,6 +65,7 @@ import {
   BuilderTurnReceipt,
 } from '../type/builder-sse.type';
 import { BuilderSettingsService } from './builder-settings.service';
+import { BuilderRuleContextService } from './builder-rule-context.service';
 import { freeTextOf } from './builder-readiness.service';
 import { isAcknowledgement } from '../util/builder-readiness-checks.util';
 import {
@@ -103,6 +117,9 @@ import {
   BUILDER_PROMPTS,
   BUILDER_AI_TASKS,
 } from '../constants/builder.constants';
+
+/** The registry row interview turns run under; used only to label plan spend rows. */
+const INTERVIEW_SPEND_TASK = 'builder-interview';
 
 /**
  * What the model is told when its own message was cut off at the output cap.
@@ -389,6 +406,25 @@ export class BuilderInterviewOrchestratorService {
      */
     @Optional()
     private readonly settingsService?: BuilderSettingsService,
+    /** The admin's rules. Optional, like the two above, so fixtures without it still run. */
+    @Optional()
+    private readonly ruleContext?: BuilderRuleContextService,
+    /** Proactive principles (guiding brief, section focus). Optional, like the rules. */
+    @Optional()
+    private readonly principles?: BuilderPrinciplesService,
+    /** The lessons block (pinned, then retrieved and frozen per session). Optional, like the rest. */
+    @Optional()
+    private readonly lessons?: BuilderLessonsService,
+    /** Prices a plan session's interview into its plan spend ledger. Optional, like the rest. */
+    @Optional()
+    private readonly planSpend?: PlanSpendService,
+    /**
+     * Roadmap v2's one ceiling per idea, checked before a plan session's turn.
+     * A no-op while the flag is off and for every non-plan session. Optional,
+     * like the rest.
+     */
+    @Optional()
+    private readonly planCeiling?: PlanCeilingService,
   ) {}
 
   /**
@@ -500,6 +536,25 @@ export class BuilderInterviewOrchestratorService {
     userId: number,
   ): AsyncGenerator<BuilderSseFrame> {
     const session = await this.sessionService.getSession(sessionId);
+
+    // A plan past its ceiling does not start a turn (Roadmap v2, §5.6).
+    // Refused before anything is written, like a misconfigured model below,
+    // so the interview is exactly where it was once the lead raises it.
+    try {
+      await this.planCeiling?.assertWithinCeiling(
+        sessionId,
+        'interviewer_turn',
+      );
+    } catch (error) {
+      if (!(error instanceof PlanCeilingReachedException)) throw error;
+      yield {
+        event: 'error',
+        data: error.getResponse() as Record<string, unknown>,
+      };
+      yield { event: 'done', data: {} };
+      return;
+    }
+
     const doc = await this.prdService.getOrCreateDoc(
       sessionId,
       userId,
@@ -560,7 +615,22 @@ export class BuilderInterviewOrchestratorService {
       );
     }
 
-    const history = await this.messageRepository.listBySession(sessionId);
+    // A plan's private Idea stage was a different conversation (the roadmap
+    // copilot, its own protocol). It stays in the visible transcript but is not
+    // replayed to the PRD interview, which starts from the hand-off instead.
+    const fullHistory = await this.messageRepository.listBySession(sessionId);
+    const history = fullHistory.filter(
+      // Roadmap v2 posts (answers, comments, choices by anyone on the idea)
+      // reach the model only through the batch on the lead's row, below.
+      (m) => m.metadata?.planStage !== 'idea' && !isPlanPost(m),
+    );
+    // Roadmap v2 (D13, §4.5a): everything people posted since the last turn,
+    // attributed, folded into this turn. Plan sessions only; nothing posts
+    // these while roadmap_v2 is off, so every other turn is unchanged.
+    const planBatch =
+      session.kind === BuilderSessionKind.PLAN
+        ? renderPlanBatch(fullHistory, await this.planSettler(session))
+        : null;
     const validatedTurns = await this.validatedTurnsEnabled();
     // The interview protocol rides on validated turns: its brief and its
     // question gate are checked the way a validated reply is.
@@ -582,11 +652,12 @@ export class BuilderInterviewOrchestratorService {
       ? renderBriefResponse(briefAnswered, briefResponse)
       : this.renderUserContent(dto);
     const userMetadata =
-      dto.questionId || dto.answer || briefResponse
+      dto.questionId || dto.answer || briefResponse || planBatch
         ? {
             ...(dto.questionId ? { questionId: dto.questionId } : {}),
             ...(dto.answer ? { answer: dto.answer } : {}),
             ...(briefResponse ? { briefResponse } : {}),
+            ...(planBatch ? { planBatch } : {}),
           }
         : null;
     const userMessage = await this.messageRepository.appendMessage(sessionId, {
@@ -738,12 +809,30 @@ export class BuilderInterviewOrchestratorService {
       await checkpoint(false);
     }
 
+    // Proactive principles: the guiding brief builds in the background from the first turn
+    // and joins the cached prefix once it lands; the section focus is a small uncached block
+    // for the first PRD section that is not ready, bounded by a timeout.
+    const turnReadiness = await this.readiness.assess(sessionId, doc);
+    this.principles?.ensureBrief(session, userContent);
+    const principlesBrief = this.principles?.briefBlock(session) ?? null;
+    const sectionFocus = this.principles
+      ? await this.principles.sectionFocusBlock(session, turnReadiness)
+      : null;
+    // Lessons from previous builds: pinned ones, then the most relevant to this session, chosen
+    // once and frozen so the cached context block stays a stable prefix.
+    const lessonsBlock = this.lessons
+      ? await this.lessons.blockForSession(session, userContent).catch(() => '')
+      : '';
     const system = await this.buildSystemBlocks(
       session.repos ?? undefined,
       exemplars,
       handoffContext,
       validatedTurns,
       protocol,
+      sessionId,
+      principlesBrief,
+      sectionFocus,
+      lessonsBlock,
     );
     const messages: any[] = [
       ...(await this.replayHistory(session, history)),
@@ -751,8 +840,8 @@ export class BuilderInterviewOrchestratorService {
         role: 'user',
         content: this.buildLiveUserTurn(
           doc.draft,
-          await this.readiness.assess(sessionId, doc),
-          userContent,
+          turnReadiness,
+          planBatch ? `${planBatch.text}\n\n${userContent}` : userContent,
           [
             ...(turn.discovery
               ? [
@@ -1096,7 +1185,7 @@ export class BuilderInterviewOrchestratorService {
         tools,
       });
       turn.stopReason = finalMessage.stopReason;
-      this.recordUsage(
+      await this.recordUsage(
         finalMessage.usage,
         model,
         providerName,
@@ -1238,7 +1327,7 @@ export class BuilderInterviewOrchestratorService {
           content: JSON.stringify(outcome.modelResult),
         });
         // Per tool, not per iteration: a github_read_file that returns a
-        // large file, or a stacks_search, is exactly the work nobody wants
+        // large file, or a principles_search, is exactly the work nobody wants
         // to pay for twice.
         await checkpoint(false);
         if (outcome.endTurn) {
@@ -1282,7 +1371,7 @@ export class BuilderInterviewOrchestratorService {
         system,
         messages,
       });
-      this.recordUsage(
+      await this.recordUsage(
         wrapUpMessage.usage,
         model,
         providerName,
@@ -1449,7 +1538,7 @@ export class BuilderInterviewOrchestratorService {
         false,
       );
       turn.stopReason = finalMessage.stopReason;
-      this.recordUsage(
+      await this.recordUsage(
         finalMessage.usage,
         model,
         providerName,
@@ -2061,6 +2150,28 @@ export class BuilderInterviewOrchestratorService {
    * therefore cacheable, and the model always sees the document as it is now
    * rather than as it was when the session started.
    */
+  /**
+   * Who settles conflicting answers on a plan (D13): the lead, or the author
+   * before a lead exists. Named in the batch so the agent says who it waits
+   * for. Null when the name cannot be read; the batch still holds them back.
+   */
+  private async planSettler(
+    session: BuilderSession,
+  ): Promise<{ name: string } | null> {
+    const id = session.leadUserId ?? session.createdBy;
+    if (!id) return null;
+    try {
+      const rows: { name: string | null }[] =
+        await this.sessionRepository.manager.query(
+          `SELECT name FROM "users" WHERE id = $1`,
+          [id],
+        );
+      return rows?.[0]?.name ? { name: rows[0].name } : null;
+    } catch {
+      return null;
+    }
+  }
+
   private buildLiveUserTurn(
     draft: unknown,
     readiness: BuilderPrdReadiness,
@@ -2130,11 +2241,15 @@ export class BuilderInterviewOrchestratorService {
     handoffContext: string | null = null,
     validatedTurns = false,
     protocol = false,
+    sessionId: string | null = null,
+    principlesBrief: string | null = null,
+    sectionFocus: string | null = null,
+    lessonsBlock = '',
   ): Promise<AgentSystemBlock[]> {
     const [instructions, context, platformRules, platformMap] =
       await Promise.all([
         this.buildSystemPrompt(),
-        this.knowledgeService.buildContextBlock(repos, exemplars),
+        this.knowledgeService.buildContextBlock(repos, exemplars, lessonsBlock),
         this.knowledgeService.platformRules(),
         this.platformContext?.render() ?? Promise.resolve(''),
       ]);
@@ -2177,6 +2292,19 @@ export class BuilderInterviewOrchestratorService {
     if (handoffContext) {
       blocks.push({ text: this.renderHandoff(handoffContext), cache: true });
     }
+    // The guiding principles: frozen per session once built, so they cache like the hand-off.
+    if (principlesBrief) {
+      blocks.push({ text: principlesBrief, cache: true });
+    }
+    // The admin's rules: per session (some are scoped to it) and they change
+    // when the admin saves one, so after the shared prefix and uncached.
+    const rules =
+      sessionId && this.ruleContext
+        ? await this.ruleContext.renderRulesBlock(sessionId)
+        : '';
+    if (rules) blocks.push({ text: rules, cache: false });
+    // This turn's section focus: changes every turn, so after the cache breakpoint.
+    if (sectionFocus) blocks.push({ text: sectionFocus, cache: false });
     return blocks;
   }
 
@@ -2191,7 +2319,7 @@ export class BuilderInterviewOrchestratorService {
    * session rating, and the rating's shape, were both in the copilot's brief it was never
    * shown.
    *
-   * "Reference what was said rather than asking from scratch" is Stacks, "Sequencing
+   * "Reference what was said rather than asking from scratch" is "Sequencing
    * clarification questions to avoid user overwhelm".
    */
   private renderHandoff(handoffContext: string): string {
@@ -2254,7 +2382,7 @@ export class BuilderInterviewOrchestratorService {
       'You are a product-requirements interviewer for the Ally platform. Ask the ' +
       'admin ONE question at a time via ask_admin, always with recommended options ' +
       'and a custom answer. Research the codebase with the github_* tools and product ' +
-      'guidance with stacks_search before you assume. Keep the PRD up to date with ' +
+      'principles with principles_search before you assume. Keep the PRD up to date with ' +
       'update_prd as you learn, and drive it to full readiness.'
     );
   }
@@ -2493,12 +2621,20 @@ export class BuilderInterviewOrchestratorService {
             next?.role === BuilderMessageRole.ASSISTANT
               ? (next.metadata?.discovery as BuilderDiscovery | undefined)
               : undefined;
+          // Roadmap v2: the people's posts this turn was handed, replayed where
+          // the model first read them.
+          const batch = (
+            message.metadata?.planBatch as PlanBatchMeta | undefined
+          )?.text;
+          const content = batch
+            ? `${batch}\n\n${message.content}`
+            : message.content;
           messages.push({
             role: 'user',
             content:
               discovery && Array.isArray(discovery.items)
-                ? `${renderDiscoveryBlock(discovery)}\n\n${message.content}`
-                : message.content,
+                ? `${renderDiscoveryBlock(discovery)}\n\n${content}`
+                : content,
           });
         }
         continue;
@@ -2547,15 +2683,27 @@ export class BuilderInterviewOrchestratorService {
     return messages;
   }
 
-  private recordUsage(
+  private async recordUsage(
     usage: AgentUsage | undefined,
     model: string,
     provider: string,
     sessionId: string,
     iteration: number,
-  ): void {
+  ): Promise<void> {
     const input = usage?.inputTokens ?? 0;
     const output = usage?.outputTokens ?? 0;
+    // A plan session's spend meter is a ledger written awaited, so the meter is
+    // never behind the turn (plans/roadmap-owns-planning rev 5.2 §B.11).
+    await this.planSpend?.recordForBuilderSession(sessionId, {
+      specialist: null,
+      taskId: INTERVIEW_SPEND_TASK,
+      provider,
+      model,
+      tokensIn: input,
+      tokensOut: output,
+      cachedTokens: usage?.cachedTokens ?? 0,
+      cacheWriteTokens: usage?.cacheCreationTokens ?? 0,
+    });
     void this.llmUsage.record({
       // The provider that actually ran, not a literal. Attributing a Gemini
       // turn to Anthropic makes per-provider cost unreadable, and this row is

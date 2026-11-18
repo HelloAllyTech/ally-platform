@@ -167,7 +167,7 @@ export interface CharacterInterviewServerMessage {
 
 export interface CharacterInterviewSession {
   id: string;
-  status: "ACTIVE" | "COMPLETED";
+  status: "ACTIVE" | "COMPLETED" | "ABANDONED";
   lastMessageSeq: number;
   draftCharacter?: CharacterData | null;
   createdAt: string;

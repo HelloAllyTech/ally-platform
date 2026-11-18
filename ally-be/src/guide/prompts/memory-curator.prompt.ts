@@ -10,7 +10,7 @@ import { asData } from './sentinel.prompt';
  * release bundle.
  *
  * Consolidating as it adds keeps the notes from piling up into contradictory,
- * stale or duplicate lines (Stacks: QM Agent: Periodic LLM-Driven Memory
+ * stale or duplicate lines (QM Agent: Periodic LLM-Driven Memory
  * Consolidation).
  */
 

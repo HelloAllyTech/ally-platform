@@ -15,6 +15,10 @@ import {
   useDisableCaseMutation,
   useAddTracksToTenantMutation,
   useRemoveTracksFromTenantMutation,
+  useLazyGetSimulationsQuery,
+  useLazyGetScenarioPathsQuery,
+  useLazyGetScenarioCasesQuery,
+  useLazyGetTracksQuery,
 } from "@api";
 import { ArrowDown, Dot } from "@assets";
 import {
@@ -29,11 +33,14 @@ import {
   CoursesTab,
   GroupsTab,
   BadgesTab,
+  BrandingSettings,
+  BulkAccessBar,
 } from "@components";
+import type { BulkAccessConfig } from "@components";
 import { en, ROUTES, FeatureToggleKey } from "@constants";
 import { useAllyGuideAccess } from "@hooks";
 import { RootState } from "@store";
-import { Tenant } from "@types";
+import { AssignmentStatus, SimulationStatus, Tenant } from "@types";
 import { hasFeature } from "@utils";
 
 enum TAB_IDS {
@@ -46,6 +53,7 @@ enum TAB_IDS {
   SCRIBE_SETTINGS = "scribeSettings",
   SIMULATION_SETTINGS = "simulationSettings",
   TEXT_HELPLINE = "textHelpline",
+  BRANDING = "branding",
   ALLY = "ally",
 }
 
@@ -59,6 +67,7 @@ const defaultTabs = [
   { id: TAB_IDS.SCRIBE_SETTINGS, label: en.userManagement.scribeSettings },
   { id: TAB_IDS.SIMULATION_SETTINGS, label: en.userManagement.simulationSettings },
   { id: TAB_IDS.TEXT_HELPLINE, label: en.userManagement.textHelpline },
+  { id: TAB_IDS.BRANDING, label: en.orgBranding.tabLabel },
   { id: TAB_IDS.ALLY, label: en.allyConsole.org.tabLabel },
 ];
 
@@ -113,6 +122,12 @@ export const OrganizationDetail: FC = () => {
   const [disablePathAccess] = useDisablePathMutation();
   const [enableCaseAccess] = useEnableCaseMutation();
   const [disableCaseAccess] = useDisableCaseMutation();
+  const [fetchSimulations] = useLazyGetSimulationsQuery();
+  const [fetchPaths] = useLazyGetScenarioPathsQuery();
+  const [fetchCases] = useLazyGetScenarioCasesQuery();
+  const [fetchTracks] = useLazyGetTracksQuery();
+  // Bumped after a bulk change so the tab underneath refetches its list.
+  const [bulkReloadKey, setBulkReloadKey] = useState(0);
   const [addTracksToTenant] = useAddTracksToTenantMutation();
   const [removeTracksFromTenant] = useRemoveTracksFromTenantMutation();
 
@@ -206,6 +221,58 @@ export const OrganizationDetail: FC = () => {
     }
   };
 
+  // Every published item (up to BULK_LIMIT) that is / is not enabled for a tenant.
+  const BULK_LIMIT = 1000;
+  const bulkQuery = (tenantId: string, assigned: boolean) => ({
+    limit: BULK_LIMIT,
+    offset: 0,
+    tenantId,
+    status: SimulationStatus.ACTIVE,
+    assignmentStatus: assigned ? AssignmentStatus.ASSIGNED : AssignmentStatus.UNASSIGNED,
+  });
+  const bulkConfigs: Record<string, BulkAccessConfig> = {
+    [TAB_IDS.SIMULATIONS]: {
+      noun: "simulations",
+      fetchIds: async (tenantId, assigned) =>
+        (await fetchSimulations(bulkQuery(tenantId, assigned) as any).unwrap()).data.map(
+          (item: any) => item.id,
+        ),
+      enable: async ids => {
+        await enableSimulation({ tenantId: id, scenarioIds: ids as number[] }).unwrap();
+      },
+    },
+    [TAB_IDS.PATH]: {
+      noun: "paths",
+      fetchIds: async (tenantId, assigned) =>
+        (await fetchPaths(bulkQuery(tenantId, assigned) as any).unwrap()).data.map(
+          (item: any) => item.id,
+        ),
+      enable: async ids => {
+        await enablePathAccess({ tenantId: id, scenarioPathIds: ids as number[] }).unwrap();
+      },
+    },
+    [TAB_IDS.CASES]: {
+      noun: "cases",
+      fetchIds: async (tenantId, assigned) =>
+        (await fetchCases(bulkQuery(tenantId, assigned) as any).unwrap()).data.map(
+          (item: any) => item.id,
+        ),
+      enable: async ids => {
+        await enableCaseAccess({ tenantId: id, caseIds: ids as number[] }).unwrap();
+      },
+    },
+    [TAB_IDS.COURSES]: {
+      noun: "courses",
+      fetchIds: async (tenantId, assigned) =>
+        (await fetchTracks(bulkQuery(tenantId, assigned) as any).unwrap()).data.map(
+          (item: any) => item.id,
+        ),
+      enable: async ids => {
+        await addTracksToTenant({ tenantId: id, trackIds: ids as string[] }).unwrap();
+      },
+    },
+  };
+
   // Show skeleton loader while fetching organization data
   if (isTenantsLoading || !organization) {
     if (isTenantsLoading) {
@@ -278,6 +345,8 @@ export const OrganizationDetail: FC = () => {
         return <SimulationsSettings organizationId={id} onUpdateTenant={refetchTenant} />;
       case TAB_IDS.TEXT_HELPLINE:
         return <TextHelplineSettings tenantId={id} />;
+      case TAB_IDS.BRANDING:
+        return <BrandingSettings tenantId={id} onUpdateTenant={refetchTenant} />;
       case TAB_IDS.ALLY:
         return <AllyOrgTab tenantId={id} />;
       default:
@@ -338,7 +407,16 @@ export const OrganizationDetail: FC = () => {
         />
       </div>
 
-      <div className="md:flex-1 md:overflow-y-auto mt-4">{getTabContent(activeTab)}</div>
+      <div className="md:flex-1 md:overflow-y-auto mt-4">
+        {bulkConfigs[activeTab] && id && (
+          <BulkAccessBar
+            tenantId={id}
+            config={bulkConfigs[activeTab]}
+            onDone={() => setBulkReloadKey(k => k + 1)}
+          />
+        )}
+        <div key={bulkReloadKey}>{getTabContent(activeTab)}</div>
+      </div>
     </div>
   );
 };

@@ -13,6 +13,7 @@ import { VideoActorPicker } from "./VideoActorPicker";
 import { ComfortAudioDropdown } from "../comfort-audio-dropdown";
 import { Competency } from "../competency";
 import { CustomFieldGroup } from "../custom-field-group";
+import { DebriefRiskCueField } from "../debrief-roleplay-options";
 import { DropdownField } from "../dropdown-field";
 import { EnhanceButton } from "../enhance-button";
 import { FileUpload } from "../file-upload";
@@ -22,6 +23,7 @@ import { LanguageVoiceMapping } from "../language-voice-mapping";
 import { LinguisticStyleSamples } from "../linguistic-style-samples";
 import { MainAgentPromptPicker } from "../main-agent-prompt-picker";
 import { MainPromptVariantPicker } from "../main-prompt-variant-picker";
+import { MemoriesAutoMap, MemoriesEditor } from "../memories";
 import { OpeningDialoguesPanel } from "../opening-dialogues";
 import { RadioButtonGroup } from "../radio-button-group";
 import { RemindersPanel } from "../reminders";
@@ -47,10 +49,13 @@ export const FormField: FC<FormFieldProps> = ({ config, formMethods, readOnly = 
     enhanceType,
     promptVariable,
     hideWhenUnused,
+    showOnlyWhenUsed,
+    hideWhenPromptUses,
     accordion,
     tooltipLocation,
     tooltip,
     aiGenerate,
+    imageSlotKind,
     onValueChange,
   } = config;
   const {
@@ -66,6 +71,12 @@ export const FormField: FC<FormFieldProps> = ({ config, formMethods, readOnly = 
   const placeholderLookup = useIsPlaceholderUsed(selectedMainPromptCode, promptVariable);
   const isUnusedByPrompt =
     !!promptVariable && placeholderLookup.kind === "loaded" && !placeholderLookup.isUsed;
+  // Inverse gate: the field gives way when the selected prompt uses another
+  // placeholder (Knowledge Sources → Memories on `{memories}` prompts). Only
+  // once the list has loaded, so nothing flickers away on an unknown prompt.
+  const replacedByLookup = useIsPlaceholderUsed(selectedMainPromptCode, hideWhenPromptUses);
+  const isReplacedByPrompt =
+    !!hideWhenPromptUses && replacedByLookup.kind === "loaded" && replacedByLookup.isUsed;
 
   // Surface variant-not-found once per field-render via a dev-console
   // warning so it shows up in QA / dev tools without an in-UI toast spam.
@@ -97,6 +108,14 @@ export const FormField: FC<FormFieldProps> = ({ config, formMethods, readOnly = 
   // guard turns the inconsistency into a benign no-op instead of a
   // broken UX.
   if (isUnusedByPrompt && hideWhenUnused && !isMandatory) {
+    return null;
+  }
+  // Strict variant: shown only when the prompt is known to use the
+  // placeholder — hidden while unselected/loading/missing too.
+  if (showOnlyWhenUsed && promptVariable && !placeholderLookup.isUsed && !isMandatory) {
+    return null;
+  }
+  if (isReplacedByPrompt && !isMandatory) {
     return null;
   }
 
@@ -181,6 +200,7 @@ export const FormField: FC<FormFieldProps> = ({ config, formMethods, readOnly = 
               header={en.simulation.coverImage}
               fileType={FILE_TYPE.IMAGE}
               enableAiGeneration={aiGenerate}
+              imageSlotKind={imageSlotKind}
             />
           </div>
         );
@@ -286,12 +306,15 @@ export const FormField: FC<FormFieldProps> = ({ config, formMethods, readOnly = 
         );
       case FORM_FIELD_TYPES.CUSTOM.MAIN_AGENT_PROMPT_PICKER:
         return (
-          <MainAgentPromptPicker
-            id={id}
-            label={label}
-            formMethods={formMethods}
-            isMandatory={isMandatory}
-          />
+          <>
+            <MainAgentPromptPicker
+              id={id}
+              label={label}
+              formMethods={formMethods}
+              isMandatory={isMandatory}
+            />
+            {!readOnly && <MemoriesAutoMap formMethods={formMethods} />}
+          </>
         );
       case FORM_FIELD_TYPES.CUSTOM.MAIN_PROMPT_VARIANT_PICKER:
         return (
@@ -302,6 +325,18 @@ export const FormField: FC<FormFieldProps> = ({ config, formMethods, readOnly = 
             isMandatory={isMandatory}
           />
         );
+      case FORM_FIELD_TYPES.CUSTOM.MEMORIES_EDITOR:
+        return (
+          <MemoriesEditor
+            id={id}
+            label={label}
+            formMethods={formMethods}
+            isMandatory={isMandatory}
+            readOnly={readOnly}
+          />
+        );
+      case FORM_FIELD_TYPES.CUSTOM.DEBRIEF_RISK_CUE_OPTION:
+        return <DebriefRiskCueField id={id} formMethods={formMethods} readOnly={readOnly} />;
       case FORM_FIELD_TYPES.CUSTOM.STATES_EDITOR:
         return (
           <StatesEditor id={id} label={label} formMethods={formMethods} isMandatory={isMandatory} />
@@ -423,6 +458,8 @@ export const FormField: FC<FormFieldProps> = ({ config, formMethods, readOnly = 
     FORM_FIELD_TYPES.CUSTOM.CHALLENGE_DESCRIPTION,
     FORM_FIELD_TYPES.CUSTOM.LINGUISTIC_STYLE_SAMPLES,
     FORM_FIELD_TYPES.CUSTOM.REMINDERS,
+    FORM_FIELD_TYPES.CUSTOM.MEMORIES_EDITOR,
+    FORM_FIELD_TYPES.CUSTOM.DEBRIEF_RISK_CUE_OPTION,
   ];
 
   // View Details mode: the field content stays visible (accordions above

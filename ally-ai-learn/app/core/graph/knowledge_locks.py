@@ -77,6 +77,9 @@ class KnowledgeUnlockTracker:
 
     def __init__(self) -> None:
         self.highest_rung = -1
+        #: Every state id the session has been in. Stage Director memories
+        #: unlock at any of several states, so they need the set, not the mark.
+        self.visited: set = set()
 
     def observe(
         self, states: Optional[Sequence[Dict[str, Any]]], active_state: Any
@@ -85,6 +88,7 @@ class KnowledgeUnlockTracker:
         high-water mark rose (so newly unlocked memories exist)."""
         if not isinstance(active_state, dict) or not active_state.get("id"):
             return False
+        self.visited.add(str(active_state["id"]))
         ladder = _ladder(states)
         try:
             rung = ladder.index(str(active_state["id"]))

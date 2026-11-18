@@ -4,6 +4,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 const runTurn = vi.hoisted(() => vi.fn());
 const createOpportunity = vi.hoisted(() => vi.fn());
 const checkDuplicates = vi.hoisted(() => vi.fn());
+const deleteIdeaDraft = vi.hoisted(() => vi.fn());
 // One trigger for every render, as RTK Query's is: the drawer's duplicate effect depends on it,
 // and a fresh function per render would re-run that effect on every render.
 const duplicatesTrigger = vi.hoisted(() => (args: unknown) => ({
@@ -64,6 +65,10 @@ vi.mock("@api", () => ({
     { isLoading: false },
   ],
   useRoadmapAiDuplicatesMutation: () => [duplicatesTrigger, { isLoading: false }],
+  useDeleteRoadmapIdeaDraftMutation: () => [
+    (id: string) => ({ unwrap: () => deleteIdeaDraft(id) }),
+    { isLoading: false },
+  ],
 }));
 
 import { OpportunityInterviewDrawer } from "../OpportunityInterviewDrawer";
@@ -132,6 +137,8 @@ describe("OpportunityInterviewDrawer", () => {
     runTurn.mockReset();
     createOpportunity.mockReset();
     checkDuplicates.mockReset();
+    deleteIdeaDraft.mockReset();
+    deleteIdeaDraft.mockResolvedValue(undefined);
     checkDuplicates.mockResolvedValue({ matches: [] });
   });
 
@@ -143,6 +150,28 @@ describe("OpportunityInterviewDrawer", () => {
 
     await waitFor(() => expect(runTurn).toHaveBeenCalledWith({ messages: [], brief: null }));
     expect(await screen.findByText("Who is this for?")).toBeInTheDocument();
+  });
+
+  it("opens from a saved idea by sending it as the admin's first words", async () => {
+    runTurn.mockResolvedValue(turn());
+    renderDrawer({ seed: "What if notes wrote themselves?" });
+
+    await waitFor(() =>
+      expect(runTurn).toHaveBeenCalledWith({
+        messages: [{ role: "admin", content: "What if notes wrote themselves?" }],
+        brief: null,
+      }),
+    );
+  });
+
+  it("removes the source draft once the opportunity is filed", async () => {
+    runTurn.mockResolvedValue(readyTurn);
+    createOpportunity.mockResolvedValue({ id: "opp-1" });
+    renderDrawer({ seed: "raw idea", draftId: "draft-9" });
+
+    fireEvent.click(await screen.findByRole("button", { name: "File and review" }));
+
+    await waitFor(() => expect(deleteIdeaDraft).toHaveBeenCalledWith("draft-9"));
   });
 
   it("fires the opening turn exactly once", async () => {

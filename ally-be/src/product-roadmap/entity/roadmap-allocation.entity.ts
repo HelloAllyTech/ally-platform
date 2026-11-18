@@ -59,6 +59,19 @@ export class RoadmapAllocation extends BaseWithoutTenantEntity {
   @Column({ type: 'varchar', length: 7 })
   periodKey!: string;
 
+  /** Votes SPENT — what the grant ledger and its balance trigger count. */
   @Column({ type: 'int' })
   votes!: number;
+
+  /**
+   * What the votes are WORTH to the priority score: each vote times the voter's breadth
+   * multiplier when it was cast (frozen, never re-weighted). The score sums this column.
+   * numeric comes back from pg as a string — read it through Number().
+   */
+  @Column({ type: 'numeric', precision: 10, scale: 3, default: 0 })
+  weightedVotes!: string;
+
+  /** When `votes` last went UP; null only for rows that predate the backfill with no updatedAt. */
+  @Column({ type: 'timestamptz', nullable: true })
+  lastIncreasedAt!: Date | null;
 }

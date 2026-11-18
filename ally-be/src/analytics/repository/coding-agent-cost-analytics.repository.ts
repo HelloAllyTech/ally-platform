@@ -31,7 +31,6 @@ export const TASK_AGENT: Partial<Record<LlmTask, CodingAgent>> = {
   [LlmTask.BUG_HUNTER]: 'bug-hunter',
   [LlmTask.BUILDER_INTERVIEW]: 'builder',
   [LlmTask.BUILDER_BUILD]: 'builder',
-  [LlmTask.BUILDER_LESSON_CURATION]: 'builder',
   [LlmTask.BUILDER_OUTCOME_CATEGORISE]: 'builder',
   [LlmTask.BUILDER_CONTEXT_SELECTION]: 'builder',
   [LlmTask.BUILDER_EPIC_DECOMPOSITION]: 'builder',

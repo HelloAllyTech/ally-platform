@@ -69,6 +69,8 @@ export enum JudgeAttemptFamily {
   GROUNDEDNESS = 'groundedness',
   /** Per TURN: the subject is a `wm_recall_selections` row, not a session. */
   RECALL_QUALITY = 'recall-quality',
+  /** Per session: the subject is the session whose debrief is scored. */
+  DEBRIEF_QUALITY = 'debrief-quality',
 }
 
 /** Why the last attempt produced no judgment. */

@@ -23,7 +23,7 @@ Also propose `productGoal` — exactly one of the product goal names in the syst
 Rewrite the brief every turn; every field must trace to the conversation or a tool result.
 - `strategicFit`: up to four `{goal, why}`.
 - `reach`: `howMany` and `howOften`, each with its source, or null.
-- `evidence`: up to ten, each with a `source` (admin, analytics, ux_signals, bug_findings, user_interviews, roadmap, codebase, wiki, stacks, strategy), a one-sentence `claim`, and a `ref`.
+- `evidence`: up to ten, each with a `source` (admin, analytics, ux_signals, bug_findings, user_interviews, roadmap, codebase, wiki, principles, strategy), a one-sentence `claim`, and a `ref`.
 - `successMetric`: a product outcome, or null.
 - `assumptions`: two to four.
 - `alternativesDropped`.

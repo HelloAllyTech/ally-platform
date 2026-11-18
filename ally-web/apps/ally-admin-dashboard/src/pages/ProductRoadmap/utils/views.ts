@@ -12,6 +12,53 @@ import {
  */
 export const QUEUE_VIEW_ID = "queue";
 
+/**
+ * Sentinel id for the Inbox pseudo-view — the page's landing view. Like the Queue it is not a
+ * saved row (a saved-view id is a UUID, "inbox" can never collide) and it is not renameable,
+ * pinnable or deletable.
+ */
+export const INBOX_VIEW_ID = "inbox";
+
+/**
+ * What the Inbox shows: every Idea, the ones that still need an owner or a size first, oldest
+ * first. The `triage` sort is that ordering (ASC = needs-triage first, then oldest first — see
+ * SORT_COLUMNS in ally-be). It is a list, because triage is reading down a short queue.
+ */
+export const INBOX_VIEW_STATE: RoadmapViewState = {
+  stageFilter: [RoadmapOpportunityStage.NEW],
+  layout: RoadmapBoardLayout.LIST,
+  sort: { field: "triage", dir: "asc" },
+};
+
+/** The two views that are a definition rather than a filter: their stage cannot be changed. */
+export const isPipelineViewId = (id: string | null): boolean =>
+  id === QUEUE_VIEW_ID || id === INBOX_VIEW_ID;
+
+/** The hardcoded views' state, by id. */
+export const pseudoViewState = (id: string | null): RoadmapViewState | undefined =>
+  id === QUEUE_VIEW_ID ? QUEUE_VIEW_STATE : id === INBOX_VIEW_ID ? INBOX_VIEW_STATE : undefined;
+
+/**
+ * Folds a saved view's stage filter into the three visible stages. `under_development` becomes
+ * Prioritised; `archived` is dropped and reported, because Archived is now a toggle rather than
+ * a stage someone can pick — a view saved with it on should come back showing archived rows.
+ */
+export const normaliseStageFilter = (
+  stages: string[] | undefined,
+): { stages: string[]; archived: boolean } => {
+  const out: string[] = [];
+  let archived = false;
+  (stages ?? []).forEach(stage => {
+    if (stage === "archived") {
+      archived = true;
+      return;
+    }
+    const folded = stage === "under_development" ? "prioritised" : stage;
+    if (!out.includes(folded)) out.push(folded);
+  });
+  return { stages: out, archived };
+};
+
 /** What "Queue" shows: every opportunity still active in the pipeline, as a list. */
 export const QUEUE_VIEW_STATE: RoadmapViewState = {
   stageFilter: [
@@ -105,6 +152,8 @@ const STATE_KEYS: (keyof RoadmapViewState)[] = [
   "sourceFilter",
   // Same reasoning again: absent on every view saved before the effort filter existed.
   "effortFilter",
+  // Same again: absent on every earlier view, and only ever written as `true`.
+  "showArchived",
 ];
 
 /**

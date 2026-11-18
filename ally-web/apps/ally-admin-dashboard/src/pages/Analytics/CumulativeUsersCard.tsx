@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
 
-import { LineChart } from "@carbon/charts-react";
-
 import { useGetAnalyticsOverviewQuery } from "@api";
+import { LineChart } from "@components/charts";
 
 import { asOf, windowLabel } from "./analyticsFilters";
 import {

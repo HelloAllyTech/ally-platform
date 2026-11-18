@@ -21,6 +21,7 @@ describe('FeatureToggleGuard', () => {
   };
   let tenantScopeService: { assertTenantInScope: jest.Mock };
   let tenantFeatureService: { isEnabledForTenant: jest.Mock };
+  let permissionsService: { getUserPermissions: jest.Mock };
 
   const contextFor = (
     user: any,
@@ -52,13 +53,92 @@ describe('FeatureToggleGuard', () => {
     tenantFeatureService = {
       isEnabledForTenant: jest.fn().mockResolvedValue(false),
     };
+    permissionsService = {
+      getUserPermissions: jest.fn().mockResolvedValue([]),
+    };
 
     guard = new FeatureToggleGuard(
       reflector as unknown as Reflector,
       featureToggleService as any,
       tenantFeatureService as any,
       tenantScopeService as any,
+      permissionsService as any,
     );
+  });
+
+  describe('own-org permission (orgAdminPermission)', () => {
+    beforeEach(() => {
+      reflector.getAllAndOverride.mockReturnValue({
+        featureKey: 'users',
+        orgAdminPermission: 'edit:tenant-branding',
+      });
+    });
+
+    it('grants a tenant role that holds the named permission, with no toggle row', async () => {
+      permissionsService.getUserPermissions.mockResolvedValue([
+        'edit:tenant-branding',
+      ]);
+      await expect(guard.canActivate(contextFor(tenantAdmin))).resolves.toBe(
+        true,
+      );
+      expect(permissionsService.getUserPermissions).toHaveBeenCalledWith(2);
+    });
+
+    it('still refuses a caller without the permission or a toggle', async () => {
+      permissionsService.getUserPermissions.mockResolvedValue(['view:tenant']);
+      await expect(guard.canActivate(contextFor(tenantAdmin))).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('never consults permissions when the route names none', async () => {
+      reflector.getAllAndOverride.mockReturnValue({ featureKey: 'users' });
+      await expect(guard.canActivate(contextFor(tenantAdmin))).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(permissionsService.getUserPermissions).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('alternate toggle (alsoAllowedBy)', () => {
+    beforeEach(() => {
+      reflector.getAllAndOverride.mockReturnValue({
+        featureKey: 'builder',
+        alsoAllowedBy: 'debrief_clinical_sign_off',
+      });
+    });
+
+    it('lets a holder of the alternate toggle in, and marks the request', async () => {
+      featureToggleService.hasToggle.mockImplementation(
+        async (_id: number, key: string) => key === 'debrief_clinical_sign_off',
+      );
+      const request: any = { user: platformAdmin, query: {} };
+      const context = {
+        switchToHttp: () => ({ getRequest: () => request }),
+        getHandler: () => undefined,
+        getClass: () => undefined,
+      } as unknown as ExecutionContext;
+      await expect(guard.canActivate(context)).resolves.toBe(true);
+      expect(request.viaAlternateToggle).toBe('debrief_clinical_sign_off');
+    });
+
+    it('still refuses a caller with neither toggle', async () => {
+      await expect(
+        guard.canActivate(contextFor(platformAdmin)),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('does not mark a holder of the primary toggle', async () => {
+      featureToggleService.hasToggle.mockResolvedValue(true);
+      const request: any = { user: platformAdmin, query: {} };
+      const context = {
+        switchToHttp: () => ({ getRequest: () => request }),
+        getHandler: () => undefined,
+        getClass: () => undefined,
+      } as unknown as ExecutionContext;
+      await expect(guard.canActivate(context)).resolves.toBe(true);
+      expect(request.viaAlternateToggle).toBeUndefined();
+    });
   });
 
   it('passes through when the route carries no @RequireFeatureToggle', async () => {

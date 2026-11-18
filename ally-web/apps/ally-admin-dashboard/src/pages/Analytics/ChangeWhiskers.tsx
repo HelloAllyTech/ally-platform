@@ -57,7 +57,7 @@ export const ChangeWhiskers = ({
         return (
           <div
             key={r.key}
-            className="grid grid-cols-1 items-center gap-1 border-t border-[#f0f0f0] py-1.5 sm:grid-cols-[minmax(9rem,14rem)_1fr_10.5rem] sm:gap-3"
+            className="grid grid-cols-1 items-center gap-1 border-t border-gray-100 py-1.5 sm:grid-cols-[minmax(9rem,14rem)_1fr_10.5rem] sm:gap-3"
           >
             <span className="flex flex-col">
               <span className="text-xs text-typography-900">{r.label}</span>

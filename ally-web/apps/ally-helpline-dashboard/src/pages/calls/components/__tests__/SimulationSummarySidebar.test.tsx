@@ -197,6 +197,16 @@ describe("SimulationSummarySidebar Component", () => {
       expect(screen.getByTestId("debrief-session-id")).toHaveTextContent("test-summary-id");
     });
 
+    it("scrolls the debrief inside the drawer, which clips its body", () => {
+      // The drawer body is overflow-hidden; a long debrief could not be
+      // scrolled until the tab got its own scroll container (2026-11-16).
+      renderComponent();
+
+      const scroller = screen.getByTestId("debrief-tab-scroll");
+      expect(scroller).toHaveClass("overflow-y-auto", "min-h-0", "flex-1");
+      expect(scroller).toContainElement(screen.getByTestId("debrief-tab"));
+    });
+
     it("should not wire transcript-focus into the debrief here", () => {
       // The drawer's tabs are separate scrollers rather than one page, so a
       // "see this moment" chip would have nowhere to jump to.

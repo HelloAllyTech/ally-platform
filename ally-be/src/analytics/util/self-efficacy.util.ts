@@ -16,7 +16,7 @@ import {
  * The self-rating is never an outcome on its own. Learners are poor and often
  * over-confident self-assessors, and the least skilled self-assess least well,
  * so each confidence number travels beside the judge's number for the same
- * people over the same span (Stacks: "Include Self-Assessment Despite Known
+ * people over the same span ("Include Self-Assessment Despite Known
  * Accuracy Limitations").
  */
 

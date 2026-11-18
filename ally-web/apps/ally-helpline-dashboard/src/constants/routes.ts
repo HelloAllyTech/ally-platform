@@ -15,6 +15,7 @@ import { TabId } from "./tabs";
 // Imported by relative path, not from @assets: an @assets icon here breaks every
 // test that mocks @assets explicitly, and a lucide icon breaks the ones that
 // mock lucide-react — this one has no dependencies for either to miss.
+import BrandingNavIcon from "../components/nav-sidebar/BrandingNavIcon";
 import HelplineNavIcon from "../components/nav-sidebar/HelplineNavIcon";
 
 export const ROUTES = {
@@ -58,6 +59,8 @@ export const ROUTES = {
   SETTINGS: "/settings",
   CHARACTER_LIBRARY: "/character-library",
   CHARACTER_LIBRARY_INTERVIEW: "/character-library/interview",
+  // The org admin's own-organization branding editor.
+  ORG_BRANDING: "/organization/branding",
   SUMMARY: "/summary/:chatId",
   SEARCH: "/search",
   LEARN: "/learn",
@@ -265,6 +268,18 @@ export const navBarOptions = [
     // Empty on purpose, like Character Library: visibility needs a helpline
     // permission AND the tenant's TEXT_HELPLINE_ENABLED toggle, so
     // useCanUseTextHelpline decides it in NavSideBar.
+    permissions: [] as Permissions[],
+  },
+  {
+    id: TabId.ORG_BRANDING,
+    title: "Branding",
+    key: "nav.tabs.branding",
+    Icon: BrandingNavIcon,
+    path: ROUTES.ORG_BRANDING,
+    activePages: [],
+    // Empty on purpose, like Character Library: visibility needs the
+    // edit:tenant-branding permission AND the org's branding switch on, so
+    // useCanEditOrgBranding decides it in NavSideBar.
     permissions: [] as Permissions[],
   },
 ];

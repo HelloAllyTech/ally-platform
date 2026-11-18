@@ -140,24 +140,45 @@ test('an Nx web repo: apps, screen routes, pages and components per app', () => 
   );
 });
 
-test('a React Native repo: screens and components', () => {
+test('a Flutter repo: screens and components, by class not path', () => {
   const dir = repo({
-    'src/screens/SimulationFeedbackScreen/SimulationFeedbackScreen.tsx': 'x',
-    'src/screens/SimulationFeedbackScreen/components/Debrief/DebriefTab.tsx':
-      'x',
-    'src/components/Button/Button.tsx': 'x',
+    'pubspec.yaml': 'name: ally_mobile\nversion: 1.0.0\n',
+    'lib/features/auth/presentation/login_screen.dart': [
+      'class _EmailInputFormatter extends TextInputFormatter {}',
+      'class LoginScreen extends ConsumerStatefulWidget {}',
+      'class _LoginScreenState extends ConsumerState<LoginScreen> {}',
+    ].join('\n'),
+    // A file not named `*_screen.dart`, whose widget class is declared after
+    // other public classes — the bug this test guards: taking "the first
+    // public class in the file" instead of the one that actually extends a
+    // widget base would catalog this as `LaunchSplashState`, not the screen.
+    'lib/core/routing/launch_splash.dart': [
+      'class LaunchSplashState {}',
+      'class LaunchSplashController extends Notifier<LaunchSplashState> {}',
+      'class LaunchSplashScreen extends ConsumerStatefulWidget {}',
+      'class _LaunchSplashScreenState extends ConsumerState<LaunchSplashScreen> {}',
+    ].join('\n'),
+    'lib/core/widgets/app_button.dart':
+      'class AppButton extends StatelessWidget {}',
+    // Not a widget at all — no entry should come from it.
+    'lib/features/auth/data/auth_repository.dart':
+      'class AuthRepository {}',
+    // Under test/, excluded like every other repo's tests.
+    'test/features/auth/login_screen_test.dart':
+      'class LoginScreenFake extends StatelessWidget {}',
   });
   const catalog = extractCatalog('ally-mobile', dir);
 
-  assert.deepEqual(names(catalog, 'screen'), ['SimulationFeedbackScreen']);
+  assert.deepEqual(names(catalog, 'screen'), ['LoginScreen']);
   assert.deepEqual(names(catalog, 'component').sort(), [
-    'Button',
-    'DebriefTab',
-    'SimulationFeedbackScreen',
+    'AppButton',
+    'LaunchSplashScreen',
   ]);
   assert.ok(
     catalog.entries.every(
-      (entry) => entry.kind !== 'component' || entry.app === 'mobile',
+      (entry) =>
+        (entry.kind !== 'component' && entry.kind !== 'screen') ||
+        entry.app === 'mobile',
     ),
   );
 });

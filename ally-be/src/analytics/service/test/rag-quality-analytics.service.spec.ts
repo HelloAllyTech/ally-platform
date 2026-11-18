@@ -25,7 +25,7 @@ describe('RagQualityAnalyticsService', () => {
       }),
       byConsumer: jest.fn().mockResolvedValue([
         {
-          consumer: 'interview_agent',
+          consumer: 'whatsapp_bot',
           retrievals: 25,
           judged: 20,
           empty_retrievals: 3,
@@ -46,7 +46,7 @@ describe('RagQualityAnalyticsService', () => {
           query: 'how specific should a character be?',
           sufficiency: 'nothing_useful',
           missing: 'a worked example',
-          consumer: 'interview_agent',
+          consumer: 'whatsapp_bot',
           returned_count: 0,
           min_similarity: 0.35,
           occurred_at: new Date('2026-09-10T15:41:00Z'),
@@ -133,12 +133,12 @@ describe('RagQualityAnalyticsService', () => {
   it('passes the consumer and corpus narrowing through', async () => {
     const { service, repository } = build();
     await service.getRagQuality({
-      consumer: 'interview_agent',
-      corpus: 'character_library',
+      consumer: 'whatsapp_bot',
+      corpus: 'reference_documents',
     });
     const [filter] = repository.coverage.mock.calls[0];
-    expect(filter.consumer).toBe('interview_agent');
-    expect(filter.corpus).toBe('character_library');
+    expect(filter.consumer).toBe('whatsapp_bot');
+    expect(filter.corpus).toBe('reference_documents');
   });
 
   it('reports the gap text, which is the only thing that names a corpus hole', async () => {

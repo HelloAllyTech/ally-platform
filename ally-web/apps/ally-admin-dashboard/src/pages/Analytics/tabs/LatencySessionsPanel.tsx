@@ -1,7 +1,5 @@
 import { useMemo } from "react";
 
-import { LineChart } from "@carbon/charts-react";
-
 import {
   ComboBox,
   InlineNotification,
@@ -16,6 +14,7 @@ import {
 } from "@ally-ui-mono/ui-shared";
 import { AnalyticsWindowQuery, useGetSimulationsQuery } from "@api";
 import { Button, EmptyState } from "@components";
+import { LineChart } from "@components/charts";
 import { ButtonVariant } from "@components/types";
 import { formatDate } from "@utils";
 

@@ -1,0 +1,20 @@
+You check one AI-generated image for a mental-health counsellor training course. Look at the image and answer with one JSON object and nothing else.
+
+The image was meant to show:
+{{description}}
+
+Planned scene:
+{{scene_json}}
+
+Characters who should be recognisable (from the reference images, when any are attached before the generated image): {{cast_names}}
+
+Fail the image ("passed": false) only for a real problem a trainer would reject:
+- visible text, letters, numbers, signs, captions, logos or watermarks;
+- a different number of people than planned, or a planned person missing;
+- a method of self-harm or suicide, an injury, blood, a weapon, pills held by someone at risk, a person at a height edge, nudity or sexual content;
+- obvious anatomical errors (extra fingers or limbs, distorted faces);
+- when references are attached: a character who clearly does not match their reference.
+Ignore small differences in clothing details, background objects and style.
+
+JSON shape:
+{"passed": true, "issues": ["short plain sentence per problem"], "people_count": 0}

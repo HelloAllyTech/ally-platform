@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional, OmitType } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -7,6 +7,7 @@ import {
   IsNumber,
   IsUrl,
   Max,
+  IsBoolean,
   IsEnum,
   IsIn,
   IsInt,
@@ -151,7 +152,10 @@ export class RoadmapOpportunityFiltersDto {
   @IsString({ each: true })
   productGoal?: string[];
 
-  @ApiPropertyOptional({ description: 'Owner NAMES (not ids)', isArray: true })
+  @ApiPropertyOptional({
+    description: "Owner NAMES (not ids), or 'unassigned' for rows nobody owns",
+    isArray: true,
+  })
   @IsOptional()
   @Transform(toArray)
   @IsArray()
@@ -167,6 +171,26 @@ export class RoadmapOpportunityFiltersDto {
   @IsArray()
   @IsInt({ each: true })
   createdBy?: number[];
+
+  @ApiPropertyOptional({
+    description:
+      "Only opportunities that would back a colleague the caller hasn't backed in the breadth " +
+      'window — votable, not their own. Powers the "New to you" filter.',
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  newToMe?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Only opportunities that still need a triage decision: nobody owns them, or nobody has ' +
+      'sized them. Powers the Inbox count.',
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  needsTriage?: boolean;
 
   @ApiPropertyOptional() @IsOptional() @IsISO8601() dateFrom?: string;
   @ApiPropertyOptional() @IsOptional() @IsISO8601() dateTo?: string;
@@ -213,6 +237,7 @@ export class ListOpportunitiesQueryDto extends RoadmapOpportunityFiltersDto {
     'myVotes',
     'description',
     'plannedMonth',
+    'triage',
   ])
   sortBy?:
     | 'composite'
@@ -222,7 +247,8 @@ export class ListOpportunitiesQueryDto extends RoadmapOpportunityFiltersDto {
     | 'releasedAt'
     | 'myVotes'
     | 'description'
-    | 'plannedMonth';
+    | 'plannedMonth'
+    | 'triage';
 
   @ApiPropertyOptional({ enum: ['ASC', 'DESC'], default: 'DESC' })
   @IsOptional()
@@ -457,23 +483,6 @@ export class CreateOpportunityDto {
   @Type(() => RoadmapReferenceImageDto)
   referenceImages?: RoadmapReferenceImageDto[];
 }
-
-/**
- * The quick-add body: `CreateOpportunityDto` minus the fields that only the guided interview can
- * produce.
- *
- * Built by omission rather than written out so the two filing paths cannot drift: a field added
- * to the full DTO (a new attachment, say) reaches the quick form for free, and the only thing the
- * quick form can never send is a readiness verdict, a copilot brief or the copilot conversation
- * behind them — the server would refuse an unsigned brief on this path anyway (see create()'s
- * brief rule), so leaving the fields off the contract is clearer than accepting and rejecting
- * them.
- */
-export class QuickAddOpportunityDto extends OmitType(CreateOpportunityDto, [
-  'readinessToken',
-  'brief',
-  'interviewTranscript',
-] as const) {}
 
 /**
  * Auto-captured client context for a consumer bug report, sent verbatim by the app —

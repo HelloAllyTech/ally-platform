@@ -1,5 +1,10 @@
 name: Tests (ally-mobile)
 
+# `flutter test`/`flutter analyze` on the Flutter app. Re-created (the original, same name, ran
+# RN's Jest/ESLint before the 2026-11 rename) — this is the test-gate
+# scheduled-mobile-release.yml polls before shipping an automated build, so it has to exist and
+# go green on master before that pipeline can ever ship anything.
+
 on:
   pull_request:
     branches: [master]
@@ -9,6 +14,7 @@ on:
     branches: [master]
     paths:
       - "ally-mobile/**"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -23,49 +29,31 @@ defaults:
 
 jobs:
   test:
-    name: Jest (ally-mobile)
+    name: flutter test
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: subosito/flutter-action@v2
         with:
-          node-version: "22"
-          cache: "npm"
-          cache-dependency-path: ally-mobile/package-lock.json
+          channel: stable
+          flutter-version: 3.47.7
       - name: Install dependencies
-        run: npm ci
+        run: flutter pub get
       - name: Run tests
-        run: npm test
+        run: flutter test
 
-  lint:
-    name: Lint & format (ally-mobile)
+  analyze:
+    name: flutter analyze
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: subosito/flutter-action@v2
         with:
-          node-version: "22"
-          cache: "npm"
-          cache-dependency-path: ally-mobile/package-lock.json
+          channel: stable
+          flutter-version: 3.47.7
       - name: Install dependencies
-        run: npm ci
-      - name: Lint
-        run: npm run lint
-
-  typecheck:
-    name: Typecheck (ally-mobile)
-    runs-on: ubuntu-22.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: "npm"
-          cache-dependency-path: ally-mobile/package-lock.json
-      - name: Install dependencies
-        run: npm ci
-      - name: Typecheck
-        run: npm run typecheck
+        run: flutter pub get
+      - name: Analyze
+        run: flutter analyze

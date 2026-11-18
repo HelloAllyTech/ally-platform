@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
 
-import { SimpleBarChart } from "@carbon/charts-react";
-
 import { useGetActiveUsersXpQuery } from "@api";
+import { SimpleBarChart } from "@components/charts";
 import { AnalyticsBucket } from "@types";
 
 import {

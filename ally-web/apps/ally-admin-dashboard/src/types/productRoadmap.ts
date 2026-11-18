@@ -30,14 +30,16 @@ export enum RoadmapOpportunityStage {
 }
 
 /**
- * Who filed it — 'staff' (somebody internal, and every pre-existing row) or 'consumer' (an
- * app user). Answers "who", not "through which client": a bug report is stamped from the
+ * Who filed it — 'staff' (somebody internal, and every pre-existing row), 'consumer' (an
+ * app user) or 'pm_agent' (the PM Agent, from a card an admin accepted). Answers "who", not "through which client": a bug report is stamped from the
  * reporter's own roles server-side, so an admin filing from helpline still reads as staff.
  * Admin-side display/filtering only, mirrors ally-be's RoadmapOpportunitySource.
  */
 export enum RoadmapOpportunitySource {
   STAFF = "staff",
   CONSUMER = "consumer",
+  /** Filed by the PM Agent from an accepted card; the creator reads "Product Manager Agent". */
+  PM_AGENT = "pm_agent",
 }
 
 /**
@@ -157,13 +159,27 @@ export interface RoadmapOpportunity {
   effectiveMonth: string | null;
   /** True when the lane is a fact rather than a plan, so the card must not be draggable. */
   monthPinned: boolean;
-  /** SUM of every user's votes across every period. Computed in SQL, never stored. */
+  /**
+   * Priority POINTS: every user's votes across every period, each weighted by that voter's
+   * breadth multiplier when they voted. One decimal at most. Computed in SQL, never stored.
+   * Equals the raw vote total while every multiplier is 1.0.
+   */
   priorityScore: number;
+  /**
+   * True when voting here would back a colleague the caller hasn't backed in the breadth window
+   * (votable, not their own). Drives the "New colleague" marker and the "New to you" filter.
+   */
+  breadthNew: boolean;
   /**
    * The weighted four-factor rank, 0-100, and the board's DEFAULT ordering. Computed in SQL per
    * read from the live weights — never stored, so retuning the weights re-ranks immediately.
    */
   compositeScore: number;
+  /**
+   * The Prod Director's star. NON-NULL ONLY FOR THE DIRECTOR — null for everyone else, which is
+   * what keeps the icon invisible to them. The star still lifts their rank.
+   */
+  directorStarred?: boolean | null;
   /**
    * DISTINCT admins backing this, across all periods. BREADTH, where priorityScore is
    * INTENSITY — one admin spending 40 votes and forty spending one each are the same total and
@@ -212,6 +228,10 @@ export interface RoadmapOpportunitiesQuery {
   productGoal?: string[];
   owner?: string[];
   createdBy?: number[];
+  /** Only opportunities that would back a colleague the caller hasn't backed lately. */
+  newToMe?: boolean;
+  /** Unowned or unsized — the Inbox's definition of "needs a decision". */
+  needsTriage?: boolean;
   dateFrom?: string;
   dateTo?: string;
   releasedFrom?: string;
@@ -220,6 +240,7 @@ export interface RoadmapOpportunitiesQuery {
   priorityMax?: number;
   sortBy?:
     | "composite"
+    | "triage"
     | "priority"
     | "voters"
     | "createdAt"
@@ -327,6 +348,35 @@ export interface SetAllocationResponse {
   votes: number;
   priorityScore: number;
   budget: RoadmapVoteBudget;
+  /** The breadth multiplier this vote was weighted with (1 when the feature is off). */
+  multiplier: number;
+  /** Distinct colleagues now counted toward the caller's breadth. */
+  qualifying: number;
+}
+
+/** The caller's breadth multiplier and what's behind it. */
+export interface RoadmapBreadth {
+  /** False while the feature flag is off — render none of the breadth surface. */
+  enabled: boolean;
+  multiplier: number;
+  /** Distinct colleagues backed in the window. */
+  qualifying: number;
+  /** Colleagues needed for the full bonus today (capped, never more than exist). */
+  target: number;
+  windowDays: number;
+  /** The multiplier at full breadth for this caller today. */
+  maxMultiplier: number;
+  nextDropAt: string | null;
+  nextDropMultiplier: number | null;
+  nextDropAuthorName: string | null;
+}
+
+export interface RoadmapBreadthRow {
+  userId: number;
+  name: string;
+  multiplier: number;
+  qualifying: number;
+  target: number;
 }
 
 export interface RoadmapFacets {
@@ -363,12 +413,29 @@ export interface RoadmapStrategyGoalsResponse {
   needingAssessment: number;
 }
 
-/** The four composite-rank factor weights. Normalised to sum 1 server-side. */
+/** The five composite-rank factor weights. Normalised to sum 1 server-side. */
 export interface RoadmapRankWeights {
   votesWeight: number;
   votersWeight: number;
   effortWeight: number;
   goalImpactWeight: number;
+  /** The Prod Director's star as a factor: starred scores 100, unstarred 0. */
+  starWeight: number;
+  /** The platform admin acting as Prod Director, or null. */
+  prodDirectorUserId?: number | null;
+}
+
+export type RoadmapRankFactorKey =
+  | "votesWeight"
+  | "votersWeight"
+  | "effortWeight"
+  | "goalImpactWeight"
+  | "starWeight";
+
+export interface RoadmapProdDirector {
+  userId: number | null;
+  /** Every platform admin — the only people who can be picked. */
+  candidates: { id: number; name: string; email: string }[];
 }
 
 /** One stored verdict, for the drawer breakdown. Machine-derived and read-only by design. */
@@ -447,7 +514,7 @@ export type RoadmapBriefEvidenceSource =
   | "roadmap"
   | "codebase"
   | "wiki"
-  | "stacks"
+  | "principles"
   | "strategy";
 
 /**
@@ -494,7 +561,10 @@ export interface RoadmapVoter {
   userId: number;
   name: string;
   email: string;
+  /** Votes spent. */
   votes: number;
+  /** What those votes are worth to the score; equals `votes` when no bonus applied. */
+  weightedVotes: number;
 }
 
 export interface RoadmapInterviewNote {
@@ -543,6 +613,14 @@ export interface RoadmapViewState {
    * rather than treat undefined as a distinct third state.
    */
   layout?: RoadmapBoardLayout;
+  /** Archived rows are hidden unless this is on. Absent = hidden, so older views are unchanged. */
+  showArchived?: boolean;
+  /**
+   * Roadmap v2's Queue filters, as the URL-safe query params of `GET /v1/roadmap/items` (P2
+   * contract). Only views saved from the new Queue carry it; the old board ignores the key, and
+   * the Queue lists only views that have it.
+   */
+  queue?: Record<string, string>;
 }
 
 export interface RoadmapSavedView {
@@ -611,3 +689,19 @@ export interface RoadmapReadinessChecklist {
   criteria: RoadmapReadinessCriterion[];
   fileableEfforts: RoadmapOpportunityEffort[];
 }
+
+/**
+ * A private, unpublished raw idea (spoken or typed) saved before the guided interview. Not an
+ * opportunity: no code, votes or rank, and invisible to everyone but its author. Mirrors
+ * ally-be's RoadmapIdeaDraft.
+ */
+export interface RoadmapIdeaDraft {
+  id: string;
+  rawText: string;
+  captureMode: "voice" | "typed";
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Longest draft the server accepts — the interview's per-message cap, since a draft seeds it. */
+export const IDEA_DRAFT_TEXT_MAX = 4000;

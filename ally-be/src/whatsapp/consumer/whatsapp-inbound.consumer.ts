@@ -1,5 +1,5 @@
 import { Message } from '@aws-sdk/client-sqs';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { LoggerService } from 'src/logger/logger.service';
@@ -8,6 +8,7 @@ import {
   SqsListener,
 } from '../../aws/decorators/sqs-listener.decorator';
 import { WaMessage } from '../entity/wa-message.entity';
+import { WaSharedStoreWriter } from '../shared-store/wa-shared-store.writer';
 import { WaMessageStatus } from '../enum/whatsapp.enum';
 import { WhatsAppInboundService } from '../service/whatsapp-inbound.service';
 import { InboundWhatsAppMessage } from '../type/whatsapp-provider.interface';
@@ -79,6 +80,8 @@ export class WhatsAppInboundDlqConsumer {
   constructor(
     @InjectRepository(WaMessage)
     private readonly messageRepository: Repository<WaMessage>,
+    /** The shared store's dual-write (chunk 12); absent in modules built without it. */
+    @Optional() private readonly sharedStore?: WaSharedStoreWriter,
   ) {}
 
   @SqsDlqListener(process.env.SQS_WHATSAPP_INBOUND_DLQ_URL!)
@@ -121,5 +124,6 @@ export class WhatsAppInboundDlqConsumer {
           'allows a free-form reply within 24 hours of the incoming message.',
       },
     );
+    void this.sharedStore?.sync([existing.id], existing.id);
   }
 }

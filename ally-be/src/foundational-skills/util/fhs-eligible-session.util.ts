@@ -1,4 +1,7 @@
-import { countableSessionPredicate } from 'src/analytics/util/session-eligibility.util';
+import {
+  countableSessionPredicate,
+  notV2vTestPredicate,
+} from 'src/analytics/util/session-eligibility.util';
 import { excludeTestTenants } from 'src/analytics/util/test-tenant.util';
 import { FHS_SESSION_SETTLE_MINUTES } from '../constants/helping-skills-rubric.constants';
 
@@ -22,7 +25,7 @@ export function fhsEligibleSession(alias: string): string {
     `${alias}."endedAt" < now() - make_interval(mins => ${FHS_SESSION_SETTLE_MINUTES})`,
     `${alias}."counselorId" IS NOT NULL`,
     countableSessionPredicate(alias),
-    `COALESCE((${alias}.metadata->>'v2vTest')::boolean, false) = false`,
+    notV2vTestPredicate(alias),
     excludeTestTenants(`${alias}."tenant_id"`),
   ].join(' AND ');
 }

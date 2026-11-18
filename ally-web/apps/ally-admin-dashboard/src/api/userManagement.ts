@@ -27,6 +27,10 @@ import {
   CustomFieldDefinition,
   CreateCustomFieldDefinitionInput,
   UpdateCustomFieldDefinitionInput,
+  UpdateTenantBrandingBody,
+  UpdateTenantBrandingResponse,
+  BrandingFaviconUploadRequest,
+  BrandingFaviconUploadResponse,
 } from "@types";
 
 const userManagementAPI = baseAPI.injectEndpoints({
@@ -64,6 +68,35 @@ const userManagementAPI = baseAPI.injectEndpoints({
         body: data,
       }),
       invalidatesTags: [TAG_TYPES.TENANTS],
+    }),
+
+    /**
+     * Organization branding (logo aside, which lives on the tenant row and goes
+     * through updateTenant). Refused with 403 while the org's branding switch is
+     * off; a 400 carries the validation messages, e.g. a colour under 3:1.
+     */
+    updateTenantBranding: builder.mutation<
+      UpdateTenantBrandingResponse,
+      { id: string; data: UpdateTenantBrandingBody }
+    >({
+      query: ({ id, data }) => ({
+        url: ApiEndpoints.USER_MANAGEMENT.TENANT_BRANDING(id),
+        method: HttpMethod.PATCH,
+        body: data,
+      }),
+      invalidatesTags: [TAG_TYPES.TENANTS],
+    }),
+
+    /** Presigned PUT for a favicon (PNG, ICO, WebP or JPEG, 512 KB max; SVG refused). */
+    postBrandingFaviconUrl: builder.mutation<
+      BrandingFaviconUploadResponse,
+      { id: string; data: BrandingFaviconUploadRequest }
+    >({
+      query: ({ id, data }) => ({
+        url: ApiEndpoints.USER_MANAGEMENT.TENANT_BRANDING_FAVICON_URL(id),
+        method: HttpMethod.POST,
+        body: data,
+      }),
     }),
 
     deleteUser: builder.mutation<{ success: boolean }, { userId: number }>({
@@ -523,6 +556,8 @@ export const {
   useDisablePathMutation,
   usePostLogoUrlMutation,
   useDeleteLogoMutation,
+  useUpdateTenantBrandingMutation,
+  usePostBrandingFaviconUrlMutation,
   useGetSummarySectionsQuery,
   useUpdateSummarySectionsMutation,
   useUpdateSummaryFieldsMutation,

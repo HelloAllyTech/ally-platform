@@ -90,3 +90,6 @@ docker-compose.override.yml
 
 # Scratch clone of the wiki, created by the wiki-pr flow (see AGENTS.md)
 .wiki-tmp/
+
+# Agents v2 conversation eval output (scripts/agent_conversation_eval.py)
+eval_report.md

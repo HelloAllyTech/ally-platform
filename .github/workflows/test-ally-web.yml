@@ -88,3 +88,47 @@ jobs:
         run: npx tsc --noEmit -p apps/ally-helpline-dashboard/tsconfig.app.json
       - name: Typecheck ui-shared
         run: npx tsc --noEmit -p libs/ui-shared/tsconfig.lib.json
+
+  bot-page-budget:
+    # Agents v2 chunk 20d: the public bot page stays within 70 KB of JS and 25 KB of CSS gzipped
+    # (fonts excluded), measured from the built b.html.
+    name: Bot page size budget
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: ally-web/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+        env:
+          NX_NO_CLOUD: "true"
+      - name: Build admin dashboard
+        run: npx nx build ally-admin-dashboard
+        env:
+          NX_NO_CLOUD: "true"
+      - name: Check the bot page's size
+        run: node scripts/check-bot-page-size.mjs
+
+  browser-tests:
+    # Agents v2 chunk 20d: screenshots (1440 and 390 px, light and dark), axe, keyboard-only and
+    # reduced motion, in the Playwright image the baselines were made in.
+    name: Browser tests (Playwright)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: npm ci
+        env:
+          NX_NO_CLOUD: "true"
+      - name: Run browser tests
+        run: npx playwright test -c apps/ally-admin-dashboard/playwright.config.ts
+        env:
+          NX_NO_CLOUD: "true"
+          HOME: /root

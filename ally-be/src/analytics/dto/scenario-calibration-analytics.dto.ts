@@ -32,9 +32,9 @@ import {
  *
  * Why calibration is measured rather than read off the label: challenge has to
  * be tuned empirically against real learners — design alone cannot predict how
- * hard a task lands (Stacks: "Playtesting and Tuning Challenge Calibration"),
+ * hard a task lands ("Playtesting and Tuning Challenge Calibration"),
  * and easy/difficult depends on the learner's prior knowledge, not only on the
- * task (Stacks: "Task Classes Maintain Consistent Difficulty Despite
+ * task ("Task Classes Maintain Consistent Difficulty Despite
  * Increasing Complexity"). Hence the caveat on the card: this measures how
  * scores land, a property of the scenario's scoring AND its learners.
  */

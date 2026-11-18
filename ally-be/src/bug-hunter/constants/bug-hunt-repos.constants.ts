@@ -32,10 +32,10 @@ export interface BugHuntRepoConfig {
    * also runs a separate, blocking TypeScript compile
    * (`tsc --noEmit`) that ESLint's own rules never catch. Optional because
    * it's a genuine gap only for these two — ally-ai/ally-ai-learn's flake8
-   * and ally-mobile's eslint already match their CI exactly (confirmed
-   * directly against each repo's `test.yml`), and ally-mobile's own
-   * `tsc --noEmit` exists only in a local Husky pre-commit hook, never in
-   * CI, so there is nothing here for it to close.
+   * and ally-mobile's `flutter analyze` (which is Dart's own type-checking
+   * analyzer, not a separate step) already match their CI exactly, confirmed
+   * directly against each repo's test workflow, so there is nothing here for
+   * it to close.
    *
    * Two other real PR-gate workflows (`docs.yml`'s docs-guard, and
    * `secret-scan.yml`'s gitleaks on ally-ai) are NOT modeled as a command
@@ -132,15 +132,17 @@ export const BUG_HUNT_REPOS: Record<string, BugHuntRepoConfig> = {
     fixable: true,
     canBotMerge: true,
   },
-  // Fixable, but never auto-merged — see buildFixSessionPrompt's merge-policy
-  // doc: this pipeline only runs Jest, which cannot verify the native /
-  // on-device behaviour a mobile fix actually ships. A fix session opens a PR
-  // for a human to merge; it does not land on its own. `canBotMerge` is false
-  // for that product reason rather than a permissions one, and the two
-  // deliberately produce the same instruction.
+  // Onboarded 2026-11-06, after the Flutter rename's deliberate review:
+  // `flutter test`/`flutter analyze` match test-ally-mobile.yml exactly.
+  // `canBotMerge: false` as the same POLICY as ally-be/ally-web/ally-ai
+  // above, not because master is protected here differently — it is not,
+  // master carries no branch protection at all for any folder of this
+  // monorepo — but because this is the one repo whose shipped artifact is an
+  // app-store build an unreviewed bad merge cannot simply be rolled back
+  // from, via the now-automated scheduled-mobile-release.yml.
   'ally-mobile': {
-    test: 'npm test',
-    lint: 'npm run lint',
+    test: 'flutter test',
+    lint: 'flutter analyze',
     fixable: true,
     canBotMerge: false,
   },

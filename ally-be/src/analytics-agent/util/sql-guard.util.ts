@@ -112,7 +112,16 @@ const isFunctionCall = (sql: string, name: string): boolean =>
  * Validate one LLM-authored query. Returns the normalised SQL (trailing
  * semicolon and whitespace removed) or the reason it was refused.
  */
-export const guardSelectQuery = (rawSql: string): SqlGuardResult => {
+export const guardSelectQuery = (
+  rawSql: string,
+  /**
+   * The relations this caller may read. Defaults to the Analytics Agent's
+   * allowlist; the debrief PM agent passes only its `debrief_reporting` views.
+   */
+  allowedTables: Readonly<Record<string, string>> = ALLOWED_TABLES,
+  /** How the refusal names the reader, for its message. */
+  reader = 'the analytics agent',
+): SqlGuardResult => {
   const sql = (rawSql ?? '')
     .trim()
     .replace(/;+\s*$/, '')
@@ -193,10 +202,10 @@ export const guardSelectQuery = (rawSql: string): SqlGuardResult => {
     if (ALLOWED_TABLE_FUNCTIONS.includes(ref) && isFunctionCall(sql, ref)) {
       continue;
     }
-    if (!Object.prototype.hasOwnProperty.call(ALLOWED_TABLES, ref)) {
+    if (!Object.prototype.hasOwnProperty.call(allowedTables, ref)) {
       return {
         ok: false,
-        reason: `the query read from "${ref}", which is not one of the tables the analytics agent can see`,
+        reason: `the query read from "${ref}", which is not one of the tables ${reader} can see`,
       };
     }
   }

@@ -21,7 +21,7 @@ const LOGGED_REPOS: AwsLogServiceKey[] = [
 /**
  * What the running system says, for the interview to ground a PRD in.
  *
- * Until now the interview could reach product judgement (Stacks) and code
+ * Until now the interview could reach product judgement (principles) and code
  * (GitHub) but nothing about production, so a PRD asserted that a problem was
  * worth solving rather than showing it. These three sources answer "is this
  * real, and how big" from data the platform already holds.

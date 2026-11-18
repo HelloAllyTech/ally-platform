@@ -139,7 +139,7 @@ export class ProgressService {
 
   private ladder(): LevelThresholdDto[] {
     return LEVEL_THRESHOLDS.map((requiredXp, index) => ({
-      level: index + 1,
+      level: index,
       requiredXp,
     }));
   }

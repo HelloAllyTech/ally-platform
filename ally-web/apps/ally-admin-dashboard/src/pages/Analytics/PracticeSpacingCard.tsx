@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 
-import { SimpleBarChart } from "@carbon/charts-react";
-
+import { SimpleBarChart } from "@components/charts";
 import { StickinessResponse } from "@types";
 
 import { asOfStamp } from "./analyticsFilters";

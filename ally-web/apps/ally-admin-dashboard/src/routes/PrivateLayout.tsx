@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 
 import { Menu } from "@icons";
 import { useDispatch } from "react-redux";
@@ -12,18 +12,21 @@ import {
   useGetCharacterLibraryEnabledQuery,
 } from "@api";
 import { Sidebar, AccessDenied, ErrorBoundary } from "@components";
+import { NotificationBell } from "@components/notification-bell/NotificationBell";
 import ReportUploadProgressDialog from "@components/report-upload-progress-dialog/ReportUploadProgressDialog";
 import { ScenarioReportsSocketProvider } from "@components/scenario-reports-socket-provider/ScenarioReportsSocketProvider";
 import {
   LOCAL_STORAGE_KEYS,
-  ROUTES,
   OrgToggle,
   Permissions,
   en,
   normalizeEmailForAllowlist,
 } from "@constants";
+import { UploadDockHost } from "@pages/ContextLibrary/upload/UploadDock";
 import { setUser, setPermissions, setFeatures } from "@reducer";
-import { hasPermissions, hasFeature } from "@utils";
+import { hasPermissions, hasFeature, loginPathWithNext } from "@utils";
+
+import { ShellContext } from "./ShellContext";
 
 interface PrivateLayoutProps {
   children: React.ReactNode;
@@ -58,6 +61,11 @@ interface PrivateLayoutProps {
    * prop = no email gate (fully backward compatible).
    */
   allowedEmails?: string[];
+  /**
+   * No padding around the page: for full-screen flows that draw their own frame (Agents v2
+   * onboarding, chunk 20d).
+   */
+  fullBleed?: boolean;
 }
 
 export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
@@ -68,6 +76,7 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
   alsoRequiredFeatures,
   requiredOrgToggle,
   allowedEmails,
+  fullBleed = false,
 }) => {
   const isAuthenticated =
     localStorage.getItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED) === "true";
@@ -97,11 +106,15 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
       skip: requiredOrgToggle !== OrgToggle.CHARACTER_LIBRARY,
     });
 
+  // Under AdminShell this layout only gates: the sidebar, scroll area and error barrier are the
+  // shell's, and stay mounted across navigation.
+  const inShell = useContext(ShellContext);
+
   const dispatch = useDispatch();
   // Only used to reset the crash barrier below: React Router reuses this
   // element position across routes, so without a per-route key a page that
   // crashed would keep showing its error panel on the next page you opened.
-  const { pathname } = useLocation();
+  const { pathname, search, hash } = useLocation();
 
   // Phone-only nav drawer (the Sidebar is an in-flow rail from md up). It
   // covers the page, so any navigation and Escape close it.
@@ -125,7 +138,8 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
   }, [userData, permissions, features]);
 
   if (!isAuthenticated) {
-    return <Navigate to={ROUTES.LOGIN} replace />;
+    // Back here after logging in (A1): `/login?next=<this page>`.
+    return <Navigate to={loginPathWithNext(pathname, search, hash)} replace />;
   }
 
   // Check if user has permission to access current route
@@ -195,16 +209,16 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
   /*
     "Denied" and "we could not find out" are not the same answer, and until now they rendered
     the identical screen.
-    
+
     Failing CLOSED is right and stays: while entitlements are unknown, nothing gates open. What
     was wrong is what the reader was TOLD. A platform admin holding 215 permissions saw "this
     page isn't turned on for your role yet" because the API was down for ninety seconds, and
     the copy sent them to ask an admin for access they already had. It cost this session twice
     — once on a slow direct navigation, once on a backend restart.
-    
+
     So: still no children until the answer is known, but a load says it is loading and a
     failure says it failed and offers a retry.
-    
+
     Only routes that actually GATE on something get the failure screen. A route requiring
     neither a permission nor a feature is reachable regardless, and a blip on an endpoint it
     never consults must not block it.
@@ -231,6 +245,39 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
     void refetchFeatures();
   };
 
+  const gateContent = entitlementsLoading ? (
+    <div
+      className="flex h-full min-h-[500px] items-center justify-center"
+      data-testid="entitlements-loading"
+    >
+      <InlineLoading description={en.accessCheck.checking} />
+    </div>
+  ) : entitlementsFailed ? (
+    <div data-testid="entitlements-failed">
+      <AccessDenied
+        title={en.accessCheck.failedTitle}
+        message={en.accessCheck.failedMessage}
+        nextStep={en.accessCheck.failedNextStep}
+        showBackButton={false}
+      />
+      <div className="flex justify-center">
+        <button
+          type="button"
+          onClick={retryEntitlements}
+          data-testid="entitlements-retry"
+          className="inline-flex items-center rounded-lg bg-primary-500 px-6 py-3 text-base font-medium text-white shadow-sm transition-colors hover:bg-primary-600"
+        >
+          {en.accessCheck.retry}
+        </button>
+      </div>
+    </div>
+  ) : hasAccess ? (
+    children
+  ) : (
+    <AccessDenied reason={accessDeniedReason} nextStep={en.accessDenied.nextStepContactAdmin} />
+  );
+
+  if (inShell) return <>{gateContent}</>;
   // The preview routes render bare, with no shell to preserve — but a crash
   // there used to blank the page just the same, so they get the barrier too.
   if (hasAccess && isPreview) return <ErrorBoundary resetKey={pathname}>{children}</ErrorBoundary>;
@@ -250,8 +297,11 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
             scroll height far past the content, producing a phantom second
             scrollbar and empty white space you can scroll into below the page. */}
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          {/* Phone only: the menu button is the one way into navigation there. From md up the
+              Sidebar is always on screen and carries the idea mic and light/dark switch itself,
+              so no second bar is drawn. */}
           <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border-light bg-white px-2 md:hidden">
-            {/* 44px target: the only way into navigation on a phone. */}
+            {/* 44px target. */}
             <button
               type="button"
               onClick={() => setIsMobileNavOpen(true)}
@@ -263,50 +313,23 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
             >
               <Menu size={24} aria-hidden="true" />
             </button>
+            <div className="ml-auto">
+              <NotificationBell placement="below" />
+            </div>
           </div>
           {/* The barrier sits inside the shell, not around it: a page that
               throws during render should cost the admin that page, not the
               sidebar, the nav and their way out of it. */}
-          <div className="relative min-h-0 flex-1 overflow-y-auto p-4 lg:p-6">
-            <ErrorBoundary resetKey={pathname}>
-              {entitlementsLoading ? (
-                <div
-                  className="flex h-full min-h-[500px] items-center justify-center"
-                  data-testid="entitlements-loading"
-                >
-                  <InlineLoading description={en.accessCheck.checking} />
-                </div>
-              ) : entitlementsFailed ? (
-                <div data-testid="entitlements-failed">
-                  <AccessDenied
-                    title={en.accessCheck.failedTitle}
-                    message={en.accessCheck.failedMessage}
-                    nextStep={en.accessCheck.failedNextStep}
-                    showBackButton={false}
-                  />
-                  <div className="flex justify-center">
-                    <button
-                      type="button"
-                      onClick={retryEntitlements}
-                      data-testid="entitlements-retry"
-                      className="inline-flex items-center rounded-lg bg-primary-500 px-6 py-3 text-base font-medium text-white shadow-sm transition-colors hover:bg-primary-600"
-                    >
-                      {en.accessCheck.retry}
-                    </button>
-                  </div>
-                </div>
-              ) : hasAccess ? (
-                children
-              ) : (
-                <AccessDenied
-                  reason={accessDeniedReason}
-                  nextStep={en.accessDenied.nextStepContactAdmin}
-                />
-              )}
-            </ErrorBoundary>
+          <div
+            className={`relative min-h-0 flex-1 overflow-y-auto ${fullBleed ? "" : "p-4 lg:p-6"}`}
+          >
+            <ErrorBoundary resetKey={pathname}>{gateContent}</ErrorBoundary>
           </div>
         </main>
         <ReportUploadProgressDialog />
+        {/* Context Library's upload dock: draws nothing until documents are added, then keeps
+            following them on every admin page. */}
+        <UploadDockHost />
       </div>
     </ScenarioReportsSocketProvider>
   );

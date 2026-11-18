@@ -8,6 +8,7 @@ import type { InteractionMode } from "@ally-ui-mono/ui-shared";
 import { useEndSimulationMutation, useStartSimulationMutation } from "@api";
 import { LOCAL_STORAGE_KEYS } from "@constants";
 import { useUser } from "@hooks";
+import { ACTIVE_TRACK_CONTEXT_KEY } from "@types";
 
 interface StartSimulationParams {
   scenarioId: number;
@@ -105,6 +106,21 @@ export const useStartSimulation = (
 
       if (trackItemProgressId?.length > 0) {
         dataParams.trackItemProgressId = trackItemProgressId;
+      }
+
+      // A roleplay started on its own, outside any course, path or case:
+      // forget a course it may have been launched from earlier in this tab,
+      // so its summary shows no stale course breadcrumb or Continue.
+      if (
+        !(trackItemProgressId?.length > 0) &&
+        !(caseSessionItemId?.length > 0) &&
+        !(scenarioPathSessionItemId?.length > 0)
+      ) {
+        try {
+          sessionStorage.removeItem(ACTIVE_TRACK_CONTEXT_KEY);
+        } catch {
+          // sessionStorage unavailable: nothing stored to clear.
+        }
       }
 
       const { data, error } = await startSimulationMutation(dataParams);

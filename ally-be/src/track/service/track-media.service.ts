@@ -1,4 +1,5 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { ImageAssetService } from 'src/image-studio/service/image-asset.service';
+import { BadRequestException, Injectable, Optional } from '@nestjs/common';
 import { AppConfigService } from 'src/config/config.service';
 import { S3Service } from 'src/aws/service/s3.service';
 import { SuccessResponse } from 'src/common/type/common.type';
@@ -18,6 +19,7 @@ export class TrackMediaService {
   constructor(
     private readonly configService: AppConfigService,
     private readonly s3Service: S3Service,
+    @Optional() private readonly imageAssetService?: ImageAssetService,
   ) {}
 
   async getPresignedUploadUrl(
@@ -79,6 +81,11 @@ export class TrackMediaService {
     const storageKey = match ? match[1] : null;
     if (!storageKey || !storageKey.startsWith('track-media/')) {
       throw new BadRequestException('Invalid track media URL');
+    }
+    // Course Copilot images and copied components can share one file; keep
+    // a file another record still shows (see ImageAssetService.isShared).
+    if (await this.imageAssetService?.isShared(dto.url)) {
+      return { success: true };
     }
     await this.s3Service.deleteObject({ bucket, key: storageKey });
     return { success: true };

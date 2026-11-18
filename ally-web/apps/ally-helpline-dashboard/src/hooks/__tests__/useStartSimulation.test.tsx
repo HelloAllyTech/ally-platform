@@ -133,6 +133,42 @@ describe("useStartSimulation", () => {
     expect(localStorage.getItem(LOCAL_STORAGE_KEYS.ROOM_DATA)).toBeTruthy();
   });
 
+  describe("a stale course context", () => {
+    const start = async (params: Record<string, unknown>) => {
+      mockStartSimulationMutation.mockResolvedValue({
+        data: {
+          scenarioSession: { id: "s-1", startedAt: "2024-01-01T00:00:00Z" },
+          accessToken: { token: "t", serverUrl: "https://x" },
+        },
+        error: null,
+      });
+      const { result } = renderHook(() => useStartSimulation(), { wrapper });
+      await act(async () => {
+        await result.current.startSimulation({ params: { scenarioId: 1, ...params } as any });
+      });
+    };
+    const context = JSON.stringify({ trackId: "t-9", itemId: "i-1" });
+    afterEach(() => sessionStorage.removeItem("activeTrackContext"));
+
+    it("is cleared when a roleplay starts outside any course", async () => {
+      sessionStorage.setItem("activeTrackContext", context);
+      await start({});
+      expect(sessionStorage.getItem("activeTrackContext")).toBeNull();
+    });
+
+    it("is kept when the roleplay starts inside the course (or a case or path)", async () => {
+      for (const params of [
+        { trackItemProgressId: "tip-1" },
+        { caseSessionItemId: "c-1" },
+        { scenarioPathSessionItemId: "p-1" },
+      ]) {
+        sessionStorage.setItem("activeTrackContext", context);
+        await start(params);
+        expect(sessionStorage.getItem("activeTrackContext")).toBe(context);
+      }
+    });
+  });
+
   it("should handle 403 error", async () => {
     const mockError = {
       data: { statusCode: 403 },
@@ -169,10 +205,7 @@ describe("useStartSimulation", () => {
 
     mockStartSimulationMutation.mockResolvedValue({ data: null, error: mockError });
 
-    const { result } = renderHook(
-      () => useStartSimulation({ onError: mockOnError }),
-      { wrapper },
-    );
+    const { result } = renderHook(() => useStartSimulation({ onError: mockOnError }), { wrapper });
 
     await act(async () => {
       await result.current.startSimulation({
@@ -193,10 +226,7 @@ describe("useStartSimulation", () => {
 
     mockStartSimulationMutation.mockResolvedValue({ data: null, error: mockError });
 
-    const { result } = renderHook(
-      () => useStartSimulation({ onError: mockOnError }),
-      { wrapper },
-    );
+    const { result } = renderHook(() => useStartSimulation({ onError: mockOnError }), { wrapper });
 
     await act(async () => {
       await result.current.startSimulation({
@@ -204,9 +234,7 @@ describe("useStartSimulation", () => {
       });
     });
 
-    expect(toast.error).toHaveBeenCalledWith(
-      "Roleplay v2 is not available for this account yet.",
-    );
+    expect(toast.error).toHaveBeenCalledWith("Roleplay v2 is not available for this account yet.");
   });
 
   it("should fall back to the generic 403 message for an unrecognized backend message", async () => {
@@ -219,10 +247,7 @@ describe("useStartSimulation", () => {
 
     mockStartSimulationMutation.mockResolvedValue({ data: null, error: mockError });
 
-    const { result } = renderHook(
-      () => useStartSimulation({ onError: mockOnError }),
-      { wrapper },
-    );
+    const { result } = renderHook(() => useStartSimulation({ onError: mockOnError }), { wrapper });
 
     await act(async () => {
       await result.current.startSimulation({

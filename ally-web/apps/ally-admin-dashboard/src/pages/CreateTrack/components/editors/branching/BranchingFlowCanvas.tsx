@@ -101,7 +101,7 @@ const SceneNode = memo(({ data, selected }: NodeProps<SceneFlowNode>) => {
               {data.outcome ? OUTCOME_LABEL[data.outcome] : "Ending"} · {data.score}
             </span>
           ) : (
-            <span>{data.choiceCount} choices</span>
+            <span>{data.choiceCount === 1 ? "1 button" : `${data.choiceCount} choices`}</span>
           )}
           {data.hasImage && <span aria-label="Has an image">Image</span>}
           {data.unreachable && (

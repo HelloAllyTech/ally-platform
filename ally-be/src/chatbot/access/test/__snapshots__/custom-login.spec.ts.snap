@@ -1,0 +1,25 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`Custom logins: a platform admin with only Chatbots (A1) lists what it can still reach (open item): Ally-wide WhatsApp routes 1`] = `
+[
+  "DELETE v1/whatsapp/phone-mappings/:id",
+  "GET v1/connectors/types",
+  "GET v1/whatsapp/phone-mappings",
+  "GET v1/whatsapp/settings",
+  "GET v1/whatsapp/settings/provider-health",
+  "PATCH v1/whatsapp/phone-mappings/:id",
+  "POST v1/whatsapp/phone-mappings",
+  "POST v1/whatsapp/phone-mappings/bulk",
+  "POST v1/whatsapp/settings/provider-check",
+  "POST v1/whatsapp/settings/provider-register",
+  "POST v1/whatsapp/settings/provider-subscribe",
+  "PUT v1/whatsapp/settings",
+]
+`;
+
+exports[`Custom logins: a platform admin with only Chatbots (A1) lists what it can still reach (open item): counts 1`] = `
+{
+  "permissionOnly": 589,
+  "viaOrgPreference": 11,
+}
+`;

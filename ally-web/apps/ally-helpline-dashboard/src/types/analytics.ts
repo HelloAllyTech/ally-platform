@@ -201,6 +201,39 @@ export interface LearnerScenarioAttempt {
   submittedAt?: string | null;
 }
 
+/**
+ * What would keep a course from a learner who was not enrolled in it. Mirrors
+ * ally-be's `TrackAccessDenialReason`; unknown values from a newer server are
+ * treated as "not open to them".
+ */
+export type LearnerEnrollmentAccessDenial =
+  | "NOT_AVAILABLE"
+  | "NO_ORGANIZATION"
+  | "NOT_IN_ORGANIZATION"
+  | "NOT_IN_GROUP";
+
+/** One course a learner is enrolled in (trainer view). */
+export interface LearnerEnrollment {
+  trackEnrollmentId: string;
+  trackId: string;
+  trackTitle: string;
+  totalItems: number;
+  completedItems: number;
+  enrolledAt: string;
+  completedAt: string | null;
+  lastActivityAt: string | null;
+  /**
+   * Null while the course is still open to the learner. Otherwise the
+   * enrolment is the only reason it is in their list.
+   */
+  accessDenial: LearnerEnrollmentAccessDenial | null;
+}
+
+export interface RemoveLearnerEnrollmentRequest {
+  userId: number;
+  trackEnrollmentId: string;
+}
+
 export interface ResetBranchingAttemptsRequest {
   trackItemId: string;
   userId: number;

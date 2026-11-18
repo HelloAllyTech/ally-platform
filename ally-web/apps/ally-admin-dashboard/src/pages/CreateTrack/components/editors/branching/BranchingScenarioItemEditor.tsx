@@ -1,4 +1,4 @@
-import { FC, useMemo, useRef, useState } from "react";
+import { FC, lazy, Suspense, useMemo, useRef, useState } from "react";
 
 import { useFormContext, useWatch } from "react-hook-form";
 import { toast } from "sonner";
@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { TextArea, Tooltip } from "@ally-ui-mono/ui-shared";
 import { TooltipIcon, Trash } from "@assets";
 import { Button } from "@components";
+import { ImageSourceField, useCourseImage, useImageStudioEnabled } from "@components/image-studio";
 import { ButtonVariant } from "@components/types";
 import {
   MAX_BRANCHING_CHOICE_TEXT,
@@ -16,27 +17,36 @@ import {
   MAX_BRANCHING_TITLE,
   MAX_QUESTION_IMAGE_BYTES,
   MAX_QUESTION_MEDIA_ALT_LENGTH,
-  MIN_BRANCHING_CHOICES,
+  MIN_BRANCHING_DECISION_CHOICES,
   QUESTION_IMAGE_CONTENT_TYPES,
 } from "@constants";
 import {
   BranchingChoice,
+  BranchingExperience,
   BranchingNode,
   BranchingOutcomeTone,
   BranchingScenarioContent,
+  ImageCastOption,
+  ImageReferenceOptions,
   TrackFormValues,
   TrackItemType,
 } from "@types";
 
+import { sceneContext, sceneReferenceOptions, sceneSlotKey } from "../../../branchingImages";
 import {
   addStep,
+  BranchingSceneMode,
   connectChoice,
   createEnding,
   endingScore,
   isEnding,
+  isStoryExperience,
   OUTCOME_DEFAULT_SCORE,
   reachableNodeIds,
   removeChoiceFromNode,
+  sceneMode,
+  setSceneMode,
+  storyPhotoWarning,
   validateBranching,
 } from "../../../branchingScenario";
 import { useTrackMediaUpload } from "../../../useTrackMediaUpload";
@@ -58,10 +68,19 @@ const inputClass =
 
 const NEW_SCENE = "__new__";
 
+/** Cast and "Fill empty scenes": loaded only when Image Studio is on. */
+const BranchingImageTools = lazy(() => import("./BranchingImageTools"));
+
 const OUTCOME_OPTIONS: { value: BranchingOutcomeTone; label: string }[] = [
   { value: "POSITIVE", label: "Positive" },
   { value: "MIXED", label: "Mixed" },
   { value: "NEGATIVE", label: "Negative" },
+];
+
+const SCENE_MODE_OPTIONS: { value: BranchingSceneMode; label: string }[] = [
+  { value: "choose", label: "Asks the learner to choose" },
+  { value: "oneButton", label: "Continues with one button" },
+  { value: "ending", label: "Is an ending" },
 ];
 
 const HelpTip: FC<{ label: string }> = ({ label }) => (
@@ -77,7 +96,7 @@ const HelpTip: FC<{ label: string }> = ({ label }) => (
  * walks by making choices. A flow chart (left) shows every scene and choice and
  * is where branches are added and re-joined; a collapsed list view is the
  * keyboard alternative; the form (right) edits the selected scene. A scene with no choices is an ending, so "making an ending" and
- * "stopping asking a question" are the same switch.
+ * "stopping asking a question" are the same switch; a scene with one choice shows the learner a single button.
  */
 export const BranchingScenarioItemEditor: FC<BranchingScenarioItemEditorProps> = ({
   sectionIndex,
@@ -87,6 +106,17 @@ export const BranchingScenarioItemEditor: FC<BranchingScenarioItemEditorProps> =
   const { control, setValue } = useFormContext<TrackFormValues>();
   const base = `sections.${sectionIndex}.items.${itemIndex}.branching` as const;
   const content = useWatch({ control, name: base }) as BranchingScenarioContent | undefined;
+  const serverId = useWatch({
+    control,
+    name: `sections.${sectionIndex}.items.${itemIndex}.serverId`,
+  });
+  const localId = useWatch({
+    control,
+    name: `sections.${sectionIndex}.items.${itemIndex}.localId`,
+  });
+  const itemId = serverId || localId || `${sectionIndex}-${itemIndex}`;
+  const course = useCourseImage();
+  const imageStudioEnabled = useImageStudioEnabled();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
@@ -153,18 +183,28 @@ export const BranchingScenarioItemEditor: FC<BranchingScenarioItemEditorProps> =
   const setSettings = (next: Partial<NonNullable<BranchingScenarioContent["settings"]>>) =>
     patch({ settings: { ...content.settings, ...next } });
 
-  const ending = isEnding(selected);
+  const mode = sceneMode(selected);
+  const ending = mode === "ending";
 
-  const makeEnding = () => updateNode(selected.id, { choices: undefined });
+  const changeMode = (next: BranchingSceneMode) => {
+    const edited = setSceneMode(content, selected.id, next);
+    if (!edited) return;
+    patch(edited);
+    const dropped = (selected.choices?.length ?? 0) - 1;
+    if (next === "oneButton" && dropped > 0) {
+      // The only switch that quietly throws wording away, so say what happened.
+      toast.info(
+        `Kept choice 1 as the button and removed the other ${dropped === 1 ? "choice" : `${dropped} choices`}.`,
+      );
+    }
+  };
 
-  const makeDecision = () => {
-    const choices: BranchingChoice[] = Array.from({ length: MIN_BRANCHING_CHOICES }, () => ({
-      id: crypto.randomUUID(),
-      text: "",
-      nextNodeId: "",
-    }));
-    // Outcome, score and takeaway belong to endings only, so they are cleared here.
-    updateNode(selected.id, { choices, outcome: undefined, score: undefined, takeaway: undefined });
+  const setExperience = (experience: BranchingExperience) => {
+    // Classic is the default and is stored by leaving the field out.
+    const next: BranchingScenarioContent = { ...content };
+    if (experience === BranchingExperience.STORY) next.experience = experience;
+    else delete next.experience;
+    setValue(base, next, { shouldDirty: true });
   };
 
   const setChoice = (choiceId: string, next: Partial<BranchingChoice>) =>
@@ -248,6 +288,32 @@ export const BranchingScenarioItemEditor: FC<BranchingScenarioItemEditorProps> =
   const generalProblems = problems.filter(problem => problem.nodeId === null);
   const passScore = content.settings?.passScore ?? 0;
   const canAddScene = content.nodes.length < MAX_BRANCHING_NODES;
+  const story = isStoryExperience(content);
+  const photoWarning = story ? storyPhotoWarning(content) : null;
+
+  const renderDestination = (choice: BranchingChoice) => (
+    <label className="flex flex-col gap-1">
+      <span className={labelClass}>Leads to</span>
+      <select
+        value={choice.nextNodeId}
+        onChange={event => setDestination(choice.id, event.target.value)}
+        className={`${inputClass} w-full bg-white`}
+      >
+        <option value="" disabled>
+          Choose a scene…
+        </option>
+        {content.nodes
+          .filter(node => node.id !== selected.id)
+          .map(node => (
+            <option key={node.id} value={node.id}>
+              {sceneLabel(node)}
+              {isEnding(node) ? " (ending)" : ""}
+            </option>
+          ))}
+        {canAddScene && <option value={NEW_SCENE}>+ New scene</option>}
+      </select>
+    </label>
+  );
 
   return (
     <ItemEditorFrame
@@ -304,6 +370,84 @@ export const BranchingScenarioItemEditor: FC<BranchingScenarioItemEditorProps> =
           Preview
         </Button>
       </div>
+
+      {/* ---- Experience ---- */}
+      <div className="rounded-md border border-border-light bg-secondary-50 px-4 py-3 flex flex-col gap-3">
+        <div className="flex flex-col gap-0.5">
+          <span
+            id={`${base}.experience-label`}
+            className="inline-flex items-center gap-1 text-sm font-semibold text-typography-900"
+          >
+            Experience
+            <HelpTip label="How learners see this scenario. Classic shows text first in a card. Story makes each scene's photo fill the screen, with the text and buttons beside it. Switching doesn't change the story." />
+          </span>
+          <span className={subClass}>
+            How learners see this scenario. You can switch at any time; the story itself
+            doesn&apos;t change.
+          </span>
+        </div>
+        <div
+          role="radiogroup"
+          aria-labelledby={`${base}.experience-label`}
+          className="grid grid-cols-1 gap-3 sm:grid-cols-2"
+        >
+          {EXPERIENCE_OPTIONS.map(option => {
+            // An unrecognised stored value checks neither, so either card can fix it.
+            const checked = (content.experience ?? BranchingExperience.CLASSIC) === option.value;
+            return (
+              <label
+                key={option.value}
+                className={`flex cursor-pointer items-start gap-3 rounded-md border bg-white p-3 transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary-400 ${
+                  checked
+                    ? "border-primary-500 ring-1 ring-primary-500"
+                    : "border-border-light hover:bg-secondary-50"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name={`${base}.experience`}
+                  value={option.value}
+                  checked={checked}
+                  onChange={() => setExperience(option.value)}
+                  className="sr-only"
+                />
+                <ExperienceThumbnail experience={option.value} />
+                <span className="flex flex-col gap-0.5">
+                  <span className="text-sm font-semibold text-typography-900">{option.label}</span>
+                  <span className={subClass}>{option.description}</span>
+                </span>
+              </label>
+            );
+          })}
+        </div>
+        {photoWarning && (
+          <p
+            role="status"
+            className="rounded-md border border-warning-200 bg-warning-50 px-3 py-2 text-xs text-warning-800"
+          >
+            {photoWarning}
+          </p>
+        )}
+      </div>
+
+      {imageStudioEnabled && (
+        <Suspense fallback={null}>
+          <BranchingImageTools
+            content={content}
+            trackId={course.trackId}
+            itemId={itemId}
+            courseStyleId={course.courseStyleId}
+            courseTitle={course.courseTitle}
+            onCastChange={cast => {
+              const next: BranchingScenarioContent = { ...content };
+              if (cast.length > 0) next.imageCast = cast;
+              else delete next.imageCast;
+              setValue(base, next, { shouldDirty: true });
+            }}
+            onApplyImage={(nodeId, image) => updateNode(nodeId, { image })}
+          />
+        </Suspense>
+      )}
 
       <TextArea
         id={`${base}.intro`}
@@ -421,7 +565,9 @@ export const BranchingScenarioItemEditor: FC<BranchingScenarioItemEditorProps> =
                               ? OUTCOME_OPTIONS.find(o => o.value === node.outcome)?.label
                               : "No outcome"
                           } · ${endingScore(node)}`
-                        : `Scene · ${node.choices?.length ?? 0} choices`}
+                        : node.choices?.length === 1
+                          ? "Scene · 1 button"
+                          : `Scene · ${node.choices?.length ?? 0} choices`}
                     </span>
                   </button>
                 );
@@ -498,27 +644,32 @@ export const BranchingScenarioItemEditor: FC<BranchingScenarioItemEditorProps> =
             </span>
           </div>
 
-          <SceneImageField node={selected} onChange={image => updateNode(selected.id, { image })} />
+          <SceneImageField
+            node={selected}
+            onChange={image => updateNode(selected.id, { image })}
+            slotKey={sceneSlotKey(course.trackId, itemId, selected.id)}
+            referenceOptions={sceneReferenceOptions(content, selected.id)}
+            castOptions={(content.imageCast ?? []).map(member => ({
+              characterId: member.characterId,
+              name: member.name,
+            }))}
+          />
 
           {/* ---- Decision or ending ---- */}
           <div className="border-t border-border-light pt-4 flex flex-col gap-3">
             <div className="flex flex-wrap items-center gap-2">
-              <span className={labelClass}>This scene</span>
-              {[
-                { label: "Asks the learner to choose", value: false },
-                { label: "Is an ending", value: true },
-              ].map(option => (
+              <span className="inline-flex items-center gap-1">
+                <span className={labelClass}>This scene</span>
+                <HelpTip label="Choose: the learner picks one of 2 to 6 choices. One button: the learner taps a single button to carry on, to move the story along. Ending: the run finishes here with a score. Switching to one button keeps the first choice and removes the others." />
+              </span>
+              {SCENE_MODE_OPTIONS.map(option => (
                 <button
-                  key={option.label}
+                  key={option.value}
                   type="button"
-                  aria-pressed={ending === option.value}
-                  onClick={() => {
-                    if (ending === option.value) return;
-                    if (option.value) makeEnding();
-                    else makeDecision();
-                  }}
+                  aria-pressed={mode === option.value}
+                  onClick={() => changeMode(option.value)}
                   className={`rounded-full border px-3 py-1 text-sm transition-colors ${
-                    ending === option.value
+                    mode === option.value
                       ? "border-primary-500 bg-primary-50 text-primary-700"
                       : "border-border-light text-typography-700 hover:bg-secondary-50"
                   }`}
@@ -590,11 +741,32 @@ export const BranchingScenarioItemEditor: FC<BranchingScenarioItemEditorProps> =
                   </span>
                 </div>
               </>
+            ) : mode === "oneButton" ? (
+              (selected.choices ?? []).slice(0, 1).map(choice => (
+                <div key={choice.id} className="flex flex-col gap-3">
+                  <label className="flex flex-col gap-1">
+                    <span className={labelClass}>Button text</span>
+                    <input
+                      type="text"
+                      maxLength={MAX_BRANCHING_CHOICE_TEXT}
+                      value={choice.text}
+                      onChange={event => setChoice(choice.id, { text: event.target.value })}
+                      placeholder="Continue"
+                      className={`${inputClass} w-full`}
+                    />
+                    <span className={subClass}>
+                      Short and in the learner&apos;s voice, e.g. &ldquo;Keep listening&rdquo;.
+                    </span>
+                  </label>
+                  {renderDestination(choice)}
+                </div>
+              ))
             ) : (
               <div className="flex flex-col gap-3">
                 <p className={subClass}>
-                  {MIN_BRANCHING_CHOICES} to {MAX_BRANCHING_CHOICES} choices. Each leads to another
-                  scene, or back to an earlier one.
+                  {MIN_BRANCHING_DECISION_CHOICES} to {MAX_BRANCHING_CHOICES} choices. Each leads to
+                  another scene, or back to an earlier one. For a single button, switch to
+                  &ldquo;Continues with one button&rdquo;.
                 </p>
                 {(selected.choices ?? []).map((choice, choiceIndex) => (
                   <div
@@ -603,7 +775,7 @@ export const BranchingScenarioItemEditor: FC<BranchingScenarioItemEditorProps> =
                   >
                     <div className="flex items-center justify-between">
                       <span className={labelClass}>Choice {choiceIndex + 1}</span>
-                      {(selected.choices?.length ?? 0) > MIN_BRANCHING_CHOICES && (
+                      {(selected.choices?.length ?? 0) > MIN_BRANCHING_DECISION_CHOICES && (
                         <button
                           type="button"
                           onClick={() => removeChoice(choice.id)}
@@ -623,27 +795,7 @@ export const BranchingScenarioItemEditor: FC<BranchingScenarioItemEditorProps> =
                       placeholder="What the learner says or does"
                       className={`${inputClass} w-full`}
                     />
-                    <label className="flex flex-col gap-1">
-                      <span className={labelClass}>Leads to</span>
-                      <select
-                        value={choice.nextNodeId}
-                        onChange={event => setDestination(choice.id, event.target.value)}
-                        className={`${inputClass} w-full bg-white`}
-                      >
-                        <option value="" disabled>
-                          Choose a scene…
-                        </option>
-                        {content.nodes
-                          .filter(node => node.id !== selected.id)
-                          .map(node => (
-                            <option key={node.id} value={node.id}>
-                              {sceneLabel(node)}
-                              {isEnding(node) ? " (ending)" : ""}
-                            </option>
-                          ))}
-                        {canAddScene && <option value={NEW_SCENE}>+ New scene</option>}
-                      </select>
-                    </label>
+                    {renderDestination(choice)}
                   </div>
                 ))}
                 {(selected.choices?.length ?? 0) < MAX_BRANCHING_CHOICES && (
@@ -668,13 +820,63 @@ export const BranchingScenarioItemEditor: FC<BranchingScenarioItemEditorProps> =
   );
 };
 
+const EXPERIENCE_OPTIONS: { value: BranchingExperience; label: string; description: string }[] = [
+  {
+    value: BranchingExperience.CLASSIC,
+    label: "Classic",
+    description: "Text first, in a card. Images are optional and small.",
+  },
+  {
+    value: BranchingExperience.STORY,
+    label: "Story",
+    description: "Cinematic. Each scene's photo fills the screen, with text and buttons beside it.",
+  },
+];
+
+/** A tiny wireframe of each layout, drawn with divs so there are no image assets to keep in sync. */
+const ExperienceThumbnail: FC<{ experience: BranchingExperience }> = ({ experience }) => (
+  <span
+    aria-hidden="true"
+    className="flex h-14 w-20 shrink-0 gap-1 rounded-sm border border-border-light bg-white p-1.5"
+  >
+    {experience === BranchingExperience.STORY ? (
+      <>
+        <span className="h-full w-3/5 rounded-sm bg-primary-200" />
+        <span className="flex flex-1 flex-col justify-center gap-1">
+          <span className="h-1 w-full rounded-full bg-typography-300" />
+          <span className="h-1 w-2/3 rounded-full bg-typography-300" />
+          <span className="mt-0.5 h-1.5 w-full rounded-full bg-primary-500" />
+        </span>
+      </>
+    ) : (
+      <span className="flex w-full flex-col gap-1">
+        <span className="h-1 w-4/5 rounded-full bg-typography-300" />
+        <span className="h-1 w-1/2 rounded-full bg-typography-300" />
+        <span className="mt-0.5 h-2.5 w-full rounded-sm border border-typography-300" />
+        <span className="h-2.5 w-full rounded-sm border border-typography-300" />
+      </span>
+    )}
+  </span>
+);
+
 interface SceneImageFieldProps {
   node: BranchingNode;
   onChange: (image: BranchingNode["image"]) => void;
+  slotKey: string;
+  /** Parent scenes (`previous`) and the scenario's other scenes (`setting`). */
+  referenceOptions: ImageReferenceOptions;
+  /** The scenario's cast, ticked per generation. */
+  castOptions: ImageCastOption[];
 }
 
 /** One optional picture per scene, uploaded through the same track-media flow as quiz question images. */
-const SceneImageField: FC<SceneImageFieldProps> = ({ node, onChange }) => {
+const SceneImageField: FC<SceneImageFieldProps> = ({
+  node,
+  onChange,
+  slotKey,
+  referenceOptions,
+  castOptions,
+}) => {
   const { upload, isUploading } = useTrackMediaUpload();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const image = node.image;
@@ -713,53 +915,68 @@ const SceneImageField: FC<SceneImageFieldProps> = ({ node, onChange }) => {
         onChange={handleFileChange}
         data-testid="branching-image-file-input"
       />
-      {image ? (
-        <div className="flex flex-col gap-2 border border-border-light rounded-md p-3">
-          <img
-            src={image.url}
-            alt={image.alt || "Scene image preview"}
-            className="max-h-[200px] w-auto self-start rounded-md object-contain"
-          />
-          <label className="flex flex-col gap-1">
-            <span className={labelClass}>Describe the image (for screen readers)</span>
-            <input
-              type="text"
-              maxLength={MAX_QUESTION_MEDIA_ALT_LENGTH}
-              value={image.alt ?? ""}
-              onChange={event => onChange({ ...image, alt: event.target.value })}
-              placeholder="e.g. A woman sitting alone at a kitchen table"
-              className={`${inputClass} w-full`}
+      <ImageSourceField
+        slotKind="scene"
+        slotKey={slotKey}
+        context={sceneContext(node)}
+        referenceOptions={referenceOptions}
+        castOptions={castOptions}
+        onAccept={generated =>
+          // A generated picture comes with its own description; it replaces the old one.
+          onChange({
+            url: generated.url,
+            ...(generated.altText || image?.alt ? { alt: generated.altText || image?.alt } : {}),
+          })
+        }
+      >
+        {image ? (
+          <div className="flex flex-col gap-2 border border-border-light rounded-md p-3">
+            <img
+              src={image.url}
+              alt={image.alt || "Scene image preview"}
+              className="max-h-[200px] w-auto self-start rounded-md object-contain"
             />
-          </label>
-          <div className="flex items-center gap-2">
-            <Button
-              variant={ButtonVariant.SECONDARY}
-              className="!h-8 w-fit text-xs"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-            >
-              {isUploading ? "Uploading…" : "Replace"}
-            </Button>
-            <button
-              type="button"
-              onClick={() => onChange(undefined)}
-              className="inline-flex items-center gap-1 text-xs text-destructive-500 hover:text-destructive-600"
-            >
-              <Trash className="w-3.5 h-3.5" />
-              Remove
-            </button>
+            <label className="flex flex-col gap-1">
+              <span className={labelClass}>Describe the image (for screen readers)</span>
+              <input
+                type="text"
+                maxLength={MAX_QUESTION_MEDIA_ALT_LENGTH}
+                value={image.alt ?? ""}
+                onChange={event => onChange({ ...image, alt: event.target.value })}
+                placeholder="e.g. A woman sitting alone at a kitchen table"
+                className={`${inputClass} w-full`}
+              />
+            </label>
+            <div className="flex items-center gap-2">
+              <Button
+                variant={ButtonVariant.SECONDARY}
+                className="!h-8 w-fit text-xs"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+              >
+                {isUploading ? "Uploading…" : "Replace"}
+              </Button>
+              <button
+                type="button"
+                onClick={() => onChange(undefined)}
+                className="inline-flex items-center gap-1 text-xs text-destructive-500 hover:text-destructive-600"
+              >
+                <Trash className="w-3.5 h-3.5" />
+                Remove
+              </button>
+            </div>
           </div>
-        </div>
-      ) : (
-        <Button
-          variant={ButtonVariant.SECONDARY}
-          className="!h-9 w-fit text-sm"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isUploading}
-        >
-          {isUploading ? "Uploading…" : "Upload image"}
-        </Button>
-      )}
+        ) : (
+          <Button
+            variant={ButtonVariant.SECONDARY}
+            className="!h-9 w-fit text-sm"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+          >
+            {isUploading ? "Uploading…" : "Upload image"}
+          </Button>
+        )}
+      </ImageSourceField>
     </div>
   );
 };

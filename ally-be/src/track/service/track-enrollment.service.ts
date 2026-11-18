@@ -27,8 +27,10 @@ import { ScenarioSharedService } from 'src/learn/service/scenario-shared.service
 import {
   AnsweredArticleQuestion,
   ArticleContent,
+  ArticleExperience,
   ArticleQuestion,
   JournalContent,
+  LastRoleplayAttempt,
   parseArticleQuestionMarkers,
   TrackAccessDenialReason,
   TrackItemType,
@@ -36,6 +38,7 @@ import {
   VideoContent,
   VideoSource,
 } from '../type/track.type';
+import { roleplayFailureReasons } from '../util/roleplay-gate.util';
 import { QuizAnswer, QuizContent } from '../type/quiz.type';
 import { AnnotationContent } from '../type/annotation.type';
 import { TrackSharedService, TrackWithStructure } from './track-shared.service';
@@ -47,6 +50,7 @@ import { GameContent, TrackGameKey } from '../type/game.type';
 import { BucketSortContent } from '../type/bucket-sort.type';
 import { sanitizeBucketSortForLearner } from './track-bucket-sort.sanitizer';
 import {
+  BranchingExperience,
   BranchingScenarioContent,
   resolveBranchingRound,
 } from '../type/branching.type';
@@ -627,6 +631,7 @@ export class TrackEnrollmentService {
           trackItemProgressId: progress.id,
           scenarioId: item.scenarioId,
           completionCriteria: item.completionCriteria ?? null,
+          ...this.roleplayLearnerFields(item, progress),
           lastScenarioSessionId,
           assessmentSubmittedAt,
           /** The roleplay runs in the scenario's own translated language, which
@@ -784,6 +789,7 @@ export class TrackEnrollmentService {
           type: item.type,
           trackItemProgressId: progress.id,
           intro: scenario.intro ?? null,
+          experience: scenario.experience ?? BranchingExperience.CLASSIC,
           startNodeId: scenario.startNodeId,
           nodes: scenario.nodes,
           passScore: scenario.settings?.passScore || null,
@@ -824,6 +830,9 @@ export class TrackEnrollmentService {
             (question) => answered[question.id],
           ).length,
           resources: article.resources ?? [],
+          experience: article.experience ?? ArticleExperience.CLASSIC,
+          cover: article.cover?.url ? article.cover : null,
+          takeaways: article.takeaways ?? [],
         };
       }
 
@@ -1239,7 +1248,46 @@ export class TrackEnrollmentService {
         (item.completionCriteria?.assessmentMode &&
           progress?.meta?.assessmentSubmittedAt) ||
         null,
+      ...(item.type === TrackItemType.ROLEPLAY
+        ? this.roleplayLearnerFields(item, progress)
+        : {}),
     };
+  }
+
+  /**
+   * What a learner needs to see about a roleplay's completion rule:
+   * `roleplayGate` is the rule with the platform default already applied (so
+   * clients never need to know that default), and `lastRoleplayAttempt` says
+   * which bar their latest attempt missed. The attempt is dropped once the
+   * item is complete — there is nothing left to explain.
+   *
+   * A trainer can change a roleplay's rule on a live course, so the stored
+   * attempt is re-checked against the rule as it is now: only the gates it
+   * still misses are reported, against today's bars, and an attempt that
+   * misses none is not reported at all (the requirement line already says
+   * what a fresh attempt needs).
+   */
+  private roleplayLearnerFields(item: TrackItem, progress?: TrackItemProgress) {
+    const gate = this.trackProgressService.getRoleplayGate(
+      item.completionCriteria,
+    );
+    const stored = progress?.meta?.lastRoleplayAttempt;
+    let lastRoleplayAttempt: LastRoleplayAttempt | null = null;
+    if (progress?.status !== SessionItemStatus.COMPLETED && stored) {
+      const failureReasons = roleplayFailureReasons(gate, {
+        score: stored.score,
+        durationSeconds: stored.durationSeconds,
+      });
+      if (failureReasons.length > 0) {
+        lastRoleplayAttempt = {
+          ...stored,
+          failureReasons,
+          requiredScore: gate.minScore,
+          requiredDurationSeconds: gate.minDurationSeconds,
+        };
+      }
+    }
+    return { roleplayGate: gate, lastRoleplayAttempt };
   }
 
   /** Safe, answer-free summary of inline content for list/detail views. */
@@ -1350,6 +1398,97 @@ export class TrackEnrollmentService {
           'This course is not available for your group',
         );
     }
+  }
+
+  /**
+   * The courses a learner in the caller's organisation is enrolled in, for the
+   * trainer view that can remove them from one.
+   *
+   * `accessDenial` is what would keep the course from them if they were not
+   * enrolled. Non-null means the enrolment is the only reason it is in their
+   * list — the "finish what you started" grace after their group lost the
+   * course, or it was unassigned from the organisation — which is usually the
+   * case a trainer came here to fix.
+   */
+  async listLearnerEnrollmentsForAdmin(userId: number) {
+    const tenantId = ExecutionManager.getTenantId();
+    if (!tenantId) {
+      throw new NotFoundException('Learner not found');
+    }
+    const rows: Array<{
+      trackEnrollmentId: string;
+      trackId: string;
+      trackTitle: string;
+      trackStatus: TrackStatus;
+      totalItems: number | null;
+      completedItems: number;
+      enrolledAt: Date;
+      completedAt: Date | null;
+      lastActivityAt: Date | null;
+    }> = await this.dataSource.query(
+      `SELECT te.id AS "trackEnrollmentId", t.id AS "trackId",
+              t.title AS "trackTitle", t.status AS "trackStatus",
+              t."totalItems" AS "totalItems",
+              te."completedItems" AS "completedItems",
+              te."createdAt" AS "enrolledAt", te."completedAt" AS "completedAt",
+              te."lastActivityAt" AS "lastActivityAt"
+         FROM track_enrollments te
+         JOIN tracks t ON t.id = te."trackId" AND t."deletedAt" IS NULL
+        WHERE te."userId" = $1
+          AND te."tenantId"::text = $2
+          AND te."deletedAt" IS NULL
+        ORDER BY te."lastActivityAt" DESC NULLS LAST, t.title`,
+      [userId, tenantId],
+    );
+
+    // Two lookups per course; a learner holds a handful of enrolments.
+    return Promise.all(
+      rows.map(async (row) => ({
+        ...row,
+        totalItems: Number(row.totalItems ?? 0),
+        completedItems: Number(row.completedItems ?? 0),
+        accessDenial:
+          row.trackStatus === TrackStatus.ACTIVE
+            ? await this.findAccessDenial(row.trackId, userId, false)
+            : TrackAccessDenialReason.NOT_AVAILABLE,
+      })),
+    );
+  }
+
+  /**
+   * Take a learner in the caller's organisation out of a course. Soft-deletes
+   * the enrolment and its item progress together, so the course leaves their
+   * list unless it is still open to them, and re-enrolling starts afresh
+   * rather than finding the old progress rows. Attempts, sessions, journal
+   * entries and XP are left alone: they are the learner's practice history,
+   * not their place in the course.
+   */
+  async removeLearnerEnrollmentForAdmin(
+    userId: number,
+    trackEnrollmentId: string,
+  ) {
+    const tenantId = ExecutionManager.getTenantId();
+    const enrollment = await this.trackEnrollmentRepository.findOne({
+      where: { id: trackEnrollmentId, userId },
+    });
+    // Same answer for "no such enrolment" and "not your organisation", so the
+    // endpoint cannot be used to probe other tenants.
+    if (!tenantId || !enrollment || enrollment.tenantId !== tenantId) {
+      throw new NotFoundException('Enrolment not found');
+    }
+
+    await this.dataSource.transaction(async (manager) => {
+      await manager
+        .getRepository(TrackItemProgress)
+        .softDelete({ trackEnrollmentId });
+      await manager
+        .getRepository(TrackEnrollment)
+        .softDelete(trackEnrollmentId);
+    });
+    this.logger.info(
+      `Enrolment ${trackEnrollmentId} in track ${enrollment.trackId} removed for user ${userId}`,
+    );
+    return { success: true };
   }
 
   /**

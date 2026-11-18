@@ -1,9 +1,8 @@
 import { ReactNode, useMemo, useState } from "react";
 
-import { StackedBarChart } from "@carbon/charts-react";
-
 import { CarbonDropdown as Dropdown } from "@ally-ui-mono/ui-shared";
 import { useGetBugHunterOperationsMetricsQuery } from "@api";
+import { StackedBarChart } from "@components/charts";
 
 import { AnalyticsTabFilters } from "./analyticsFilters";
 import {

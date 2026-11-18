@@ -1,7 +1,6 @@
 import { ReactNode, useMemo, useState } from "react";
 
 import { ScaleTypes } from "@carbon/charts";
-import { AreaChart, DonutChart, StackedBarChart } from "@carbon/charts-react";
 
 import { CarbonDropdown as Dropdown, InlineNotification } from "@ally-ui-mono/ui-shared";
 import {
@@ -12,6 +11,7 @@ import {
   useGetFoundationalSkillsProgressQuery,
   useGetTenantsQuery,
 } from "@api";
+import { AreaChart, DonutChart, StackedBarChart } from "@components/charts";
 
 import { asOfStamp } from "../analyticsFilters";
 import { useAnalyticsOrgScope } from "../analyticsOrgScope";
@@ -201,7 +201,7 @@ const InlinePicker = <T extends { id: string; label: string }>({
 
 /** A small labelled number for the precision strip. */
 const Stat = ({ label, value, note }: { label: string; value: string; note: string }) => (
-  <div className="flex flex-col gap-0.5 rounded border border-[#e0e0e0] p-3">
+  <div className="flex flex-col gap-0.5 rounded border border-border-light p-3">
     <span className="text-xs text-typography-500">{label}</span>
     <span className="text-lg font-semibold tabular-nums text-typography-900">{value}</span>
     <span className="text-xs leading-snug text-typography-500">{note}</span>
@@ -839,7 +839,7 @@ export const FoundationalSkillsSubTab = () => {
                 </thead>
                 <tbody>
                   {(data?.tiers ?? []).map(t => (
-                    <tr key={t.tier} className="border-t border-[#f0f0f0]">
+                    <tr key={t.tier} className="border-t border-gray-100">
                       <td className="py-1 pr-3">{TIER_LABELS[t.tier]}</td>
                       <td className="py-1 pr-3 tabular-nums">
                         {level(t.earlyAvg)} → {level(t.lateAvg)}
@@ -1027,7 +1027,7 @@ export const FoundationalSkillsSubTab = () => {
               onExpand={() => setExpanded("behaviours")}
               chartId="AAQ-184"
             >
-              <ul className="flex flex-col divide-y divide-[#e0e0e0]">
+              <ul className="flex flex-col divide-y divide-border-light">
                 {profile.map(bh => (
                   <li key={bh.code} className="flex flex-col gap-1 py-2">
                     <div className="flex items-start justify-between gap-4">
@@ -1076,7 +1076,7 @@ export const FoundationalSkillsSubTab = () => {
                 </p>
               </div>
             ) : (
-              <ul className="flex flex-col divide-y divide-[#e0e0e0]">
+              <ul className="flex flex-col divide-y divide-border-light">
                 {moves.map(m => {
                   const good =
                     m.kind === "unhelpful" ? (m.changePts ?? 0) < 0 : (m.changePts ?? 0) > 0;
@@ -1358,11 +1358,11 @@ export const FoundationalSkillsSubTab = () => {
                 </thead>
                 <tbody>
                   {pageRows.map(r => (
-                    <tr key={r.id} className="border-t border-[#e0e0e0] align-top">
+                    <tr key={r.id} className="border-t border-border-light align-top">
                       <td className="py-2 pr-3">
                         <button
                           type="button"
-                          className="cursor-pointer text-left text-[#264D8E] underline-offset-2 hover:underline max-sm:min-h-8"
+                          className="cursor-pointer text-left text-primary-500 underline-offset-2 hover:underline max-sm:min-h-8"
                           onClick={() => setOpenLearner(r.id)}
                         >
                           {learnerName(r)}

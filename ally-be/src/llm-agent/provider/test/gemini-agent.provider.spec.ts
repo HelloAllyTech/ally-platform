@@ -347,4 +347,55 @@ describe('GeminiAgentProvider', () => {
       },
     ]);
   });
+
+  describe('toolChoice and thinkingBudget', () => {
+    const tool = {
+      name: 'get_voices',
+      description: 'd',
+      input_schema: { type: 'object', properties: {} },
+    };
+
+    it("forbids a call when toolChoice is 'none', keeping the declarations", async () => {
+      const captured: any[] = [];
+      const provider = new GeminiAgentProvider(
+        'key',
+        fakeClient([chunk([{ text: 'Done.' }], 'STOP')], captured),
+      );
+      await drain(provider, request({ tools: [tool], toolChoice: 'none' }));
+      expect(captured[0].config.tools[0].functionDeclarations).toHaveLength(1);
+      expect(captured[0].config.toolConfig).toEqual({
+        functionCallingConfig: { mode: 'NONE' },
+      });
+    });
+
+    it('leaves tool choice to the model otherwise', async () => {
+      const captured: any[] = [];
+      const provider = new GeminiAgentProvider(
+        'key',
+        fakeClient([chunk([{ text: 'Done.' }], 'STOP')], captured),
+      );
+      await drain(provider, request({ tools: [tool] }));
+      expect(captured[0].config.toolConfig).toBeUndefined();
+    });
+
+    it('sends a thinking budget to Gemini 2.x and never to Gemini 3', async () => {
+      const captured: any[] = [];
+      const provider = new GeminiAgentProvider(
+        'key',
+        fakeClient([chunk([{ text: 'a' }], 'STOP')], captured),
+      );
+      await drain(
+        provider,
+        request({ model: 'gemini-2.5-flash', thinkingBudget: 0 }),
+      );
+      await drain(
+        provider,
+        request({ model: 'gemini-3-flash-preview', thinkingBudget: 0 }),
+      );
+      await drain(provider, request({ model: 'gemini-2.5-flash' }));
+      expect(captured[0].config.thinkingConfig).toEqual({ thinkingBudget: 0 });
+      expect(captured[1].config.thinkingConfig).toBeUndefined();
+      expect(captured[2].config.thinkingConfig).toBeUndefined();
+    });
+  });
 });

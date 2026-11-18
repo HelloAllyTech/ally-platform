@@ -533,17 +533,17 @@ describe('BugFixSessionService', () => {
       expect(github.dispatchWorkflow).not.toHaveBeenCalled();
     });
 
-    it('dispatches to ally-mobile when the classifier recognizes a native-app bug', async () => {
+    it('dispatches to ally-ai-learn when the classifier recognizes a voice-agent bug', async () => {
       bugFindingService.getOne.mockResolvedValue(findingRow({ repo: null }));
       repoClassifier.classifyRepo.mockResolvedValue({
-        repo: 'ally-mobile',
-        rationale: 'Native terms screen.',
+        repo: 'ally-ai-learn',
+        rationale: 'Voice session agent.',
       });
 
       await service.start('finding-1', 42);
 
       expect(github.dispatchWorkflow).toHaveBeenCalledWith(
-        expect.objectContaining({ repo: 'ally-mobile' }),
+        expect.objectContaining({ repo: 'ally-ai-learn' }),
       );
     });
 
@@ -569,7 +569,7 @@ describe('BugFixSessionService', () => {
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('accepts an admin-supplied ally-mobile repo and dispatches it', async () => {
+    it('dispatches to ally-mobile (re-onboarded 2026-11-06 with its Flutter commands)', async () => {
       bugFindingService.getOne.mockResolvedValue(findingRow({ repo: null }));
 
       await service.start('finding-1', 42, 'ally-mobile');
@@ -1877,14 +1877,14 @@ describe('resolveReleaseTarget', () => {
     [
       'ally-web',
       'apps/ally-admin-dashboard/src/pages/BugHunter/BugHunter.tsx',
-      'production-release-admin-dashboard.yaml',
-      'admin-v',
+      'production-release-frontends.yaml',
+      'frontend-v',
     ],
     [
       'ally-web',
       'apps/ally-helpline-dashboard/src/x.tsx',
-      'production-release-helpline-dashboard.yaml',
-      'helpline-v',
+      'production-release-frontends.yaml',
+      'frontend-v',
     ],
   ])('maps %s/%s to %s', (repo, file, workflow, tagPrefix) => {
     expect(resolveReleaseTarget(repo, file)).toMatchObject({
@@ -2064,15 +2064,15 @@ describe('BugFixSessionService — coordinated multi-repo fixes', () => {
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('accepts a plan whose step lands in ally-mobile', async () => {
+    it('accepts a plan whose step lands in ally-web', async () => {
       bugFindingService.getOne.mockResolvedValue(findingRow());
       await service.recordPlan('finding-1', [
         { repo: 'ally-be', summary: 'add the field' },
-        { repo: 'ally-mobile', summary: 'render the field' },
+        { repo: 'ally-web', summary: 'render the field' },
       ]);
       expect(findingRepository.create).toHaveBeenNthCalledWith(
         2,
-        expect.objectContaining({ repo: 'ally-mobile', stepIndex: 1 }),
+        expect.objectContaining({ repo: 'ally-web', stepIndex: 1 }),
       );
     });
   });
@@ -2170,6 +2170,56 @@ describe('BugFixSessionService — coordinated multi-repo fixes', () => {
 
       expect(github.dispatchWorkflow).toHaveBeenCalledWith(
         expect.objectContaining({ repo: 'ally-web' }),
+      );
+    });
+
+    it('starts a first step whose own start never happened, instead of waiting on it forever', async () => {
+      // recordPlan dispatches step 0 at once and leaves it NEW; a dispatch
+      // that failed left the plan at "Fixing across repos" with nothing running.
+      findingRepository.listOpenPlanParents.mockResolvedValue([coordinating()]);
+      findingRepository.listChildren.mockResolvedValue([
+        step(0, { status: BugFindingStatus.NEW }),
+        step(1, { status: BugFindingStatus.BLOCKED }),
+      ]);
+
+      await service.reconcile();
+
+      expect(github.dispatchWorkflow).toHaveBeenCalledTimes(1);
+      expect(github.dispatchWorkflow).toHaveBeenCalledWith(
+        expect.objectContaining({
+          repo: 'ally-be',
+          inputs: expect.objectContaining({ finding_id: 'step-0' }),
+        }),
+      );
+    });
+
+    it('counts a released step as merged, so the next one starts and the plan can finish', async () => {
+      findingRepository.listOpenPlanParents.mockResolvedValue([coordinating()]);
+      findingRepository.listChildren.mockResolvedValue([
+        step(0, { status: BugFindingStatus.RELEASED }),
+        step(1, { status: BugFindingStatus.MERGED }),
+      ]);
+
+      await service.reconcile();
+
+      expect(findingRepository.update).toHaveBeenCalledWith('finding-1', {
+        status: BugFindingStatus.MERGED,
+      });
+    });
+
+    it('halts the plan on a step a human rejected', async () => {
+      findingRepository.listOpenPlanParents.mockResolvedValue([coordinating()]);
+      findingRepository.listChildren.mockResolvedValue([
+        step(0, { status: BugFindingStatus.REJECTED }),
+        step(1, { status: BugFindingStatus.BLOCKED }),
+      ]);
+
+      await service.reconcile();
+
+      expect(github.dispatchWorkflow).not.toHaveBeenCalled();
+      expect(findingRepository.update).toHaveBeenCalledWith(
+        'finding-1',
+        expect.objectContaining({ status: BugFindingStatus.FAILED }),
       );
     });
 

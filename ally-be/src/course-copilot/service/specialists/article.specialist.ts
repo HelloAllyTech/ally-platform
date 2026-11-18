@@ -81,7 +81,7 @@ interface ArticleNormaliseOptions {
  * Writes one ARTICLE item: the supportive information a learner reads before
  * the practice that needs it.
  *
- * Stacks: "Working Memory Constraints in Content Chunking" — one chunk built
+ * "Working Memory Constraints in Content Chunking" — one chunk built
  * around at most 5–7 key points, 600–900 words for beginners and up to 1,200
  * for experienced audiences, inline checks optional (≤
  * COURSE_COPILOT_LIMITS.articleQuestions). "Four interrelated components of

@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   forwardRef,
   Inject,
   Injectable,
@@ -34,6 +35,25 @@ import { CreateTenantDto } from '../dto/create-tenant.dto';
 import { SettingsService } from 'src/settings/service/settings.service';
 import { ChatTypes } from 'src/common/constants/chat.constants';
 import { TenantResponseDto } from '../dto/tenant-response.dto';
+import { UpdateTenantBrandingDto } from '../dto/update-tenant-branding.dto';
+import {
+  TenantBrandingResponseDto,
+  UpdateTenantBrandingResponseDto,
+} from '../dto/tenant-branding-response.dto';
+import {
+  FaviconUploadRequestDto,
+  FaviconUploadResponseDto,
+} from '../dto/branding-favicon-upload.dto';
+import {
+  FaviconUploadContentType,
+  TENANT_BRANDING_LIMITS,
+} from '../constants/tenant-branding.constants';
+import { TenantBrandingStored } from '../type/tenant-branding.types';
+import {
+  applyBrandingPatch,
+  resolveBranding,
+  validateBrandingPatch,
+} from '../util/tenant-branding.util';
 import { PreferenceRelatedEntity } from 'src/common/constants/user.constants';
 import { PreferenceService } from 'src/settings/service/preference.service';
 import { TenantCaseSharedService } from './tenant-case-shared';
@@ -251,6 +271,9 @@ export class TenantService {
       hideRankInCommunity: tenant.settings?.hideRankInCommunity ?? false,
       engagementReminderEnabled:
         tenant.settings?.engagementReminder?.remindersEnabled ?? false,
+      brandingEnabled: tenant.settings?.branding?.enabled === true,
+      branding: resolveBranding(tenant, tenant.settings?.branding),
+      brandedSignInUrl: this.brandedSignInUrl(tenant.code),
       enableAudioUpload: !hiddenChatTypes.includes(ChatTypes.AUDIO_UPLOAD),
       enableMicrophoneMode: !hiddenChatTypes.includes(
         ChatTypes.MICROPHONE_CHAT,
@@ -419,6 +442,9 @@ export class TenantService {
       // analytics, so it stays a super-admin decision — MULTI_TENANT_ADMIN
       // holds EDIT_TENANT too, and this PATCH route is shared by both.
       delete updateTenantDto.isTestOrganization;
+      // The branding switch is an org-level policy set above the org's own
+      // admins, so they cannot switch themselves on (or off).
+      delete updateTenantDto.brandingEnabled;
     }
     if (
       (updateTenantDto.name && updateTenantDto.name !== tenant.name) ||
@@ -451,6 +477,7 @@ export class TenantService {
       enableAudioUpload,
       hideRankInCommunity,
       engagementReminderEnabled,
+      brandingEnabled,
       ...tenantUpdateData
     } = updateTenantDto;
 
@@ -471,10 +498,19 @@ export class TenantService {
     let settingsUpdate: Record<string, any> | undefined;
     if (
       hideRankInCommunity !== undefined ||
-      engagementReminderEnabled !== undefined
+      engagementReminderEnabled !== undefined ||
+      brandingEnabled !== undefined
     ) {
       const currentSettings = tenant.settings ?? {};
       settingsUpdate = { ...currentSettings };
+      if (brandingEnabled !== undefined) {
+        // Nested under the branding partial, next to the values it gates, so
+        // one read answers both "is it on" and "what is it".
+        settingsUpdate.branding = {
+          ...(currentSettings.branding as TenantBrandingStored | undefined),
+          enabled: brandingEnabled,
+        };
+      }
       if (hideRankInCommunity !== undefined) {
         settingsUpdate.hideRankInCommunity = hideRankInCommunity;
       }
@@ -554,6 +590,21 @@ export class TenantService {
           },
         });
       }
+      if (
+        brandingEnabled !== undefined &&
+        brandingEnabled !== (tenant.settings?.branding?.enabled === true)
+      ) {
+        this.auditLogService.log({
+          eventType: AUDIT_EVENTS.TENANT_BRANDING_UPDATED,
+          details: {
+            action: AUDIT_ACTIONS.UPDATE_TENANT_BRANDING_ENABLED,
+            tenantId: id,
+            updatedTenantId: id,
+            userId,
+            enabled: brandingEnabled,
+          },
+        });
+      }
 
       return this.findById(id);
     } catch (error) {
@@ -565,6 +616,119 @@ export class TenantService {
         `Failed to update tenant: ${error.message}`,
       );
     }
+  }
+
+  /**
+   * Organization branding (see util/tenant-branding.util.ts). The caller has
+   * already checked the org is in scope; this refuses when the org's switch
+   * is off, so a stale admin tab cannot write branding nobody will see.
+   */
+  async updateBranding(
+    id: string,
+    dto: UpdateTenantBrandingDto,
+  ): Promise<UpdateTenantBrandingResponseDto> {
+    const tenant = await this.findTenantEntityById(id);
+    if (!tenant) {
+      throw new NotFoundException(`Tenant with ID ${id} not found`);
+    }
+    const stored = tenant.settings?.branding as
+      | TenantBrandingStored
+      | undefined;
+    if (stored?.enabled !== true) {
+      throw new ForbiddenException(
+        'Branding is switched off for this organization. ' +
+          'Ask an Ally platform admin to switch it on from the organization settings.',
+      );
+    }
+
+    const { value, errors, warnings } = validateBrandingPatch(dto);
+    if (errors.length > 0) {
+      throw new BadRequestException(errors);
+    }
+
+    // The logo lives on the tenant row (every client reads it from there),
+    // not in settings.branding, so it is split off before the patch is
+    // stored. Undefined = untouched; null = removed.
+    const { logoUrl, ...brandingValue } = value;
+    const branding = applyBrandingPatch(stored, brandingValue);
+    const userIdStr = ExecutionManager.getUserId();
+    const userId = userIdStr ? Number(userIdStr) : undefined;
+    await this.tenantRepository.update(id, {
+      settings: { ...(tenant.settings ?? {}), branding } as Record<string, any>,
+      ...(logoUrl !== undefined ? { logoUrl: logoUrl ?? '' } : {}),
+      ...(userId ? { updatedBy: userId } : {}),
+    });
+    if (logoUrl !== undefined) tenant.logoUrl = logoUrl ?? undefined;
+
+    const restricted = await this.tenantScopeService.isRestricted(userId);
+    this.auditLogService.log({
+      eventType: restricted
+        ? AUDIT_EVENTS.MULTI_TENANT_ADMIN_EDITED_TENANT_BRANDING
+        : AUDIT_EVENTS.TENANT_BRANDING_UPDATED,
+      details: {
+        action: AUDIT_ACTIONS.UPDATE_TENANT_BRANDING,
+        tenantId: id,
+        updatedTenantId: id,
+        userId,
+        fields: Object.keys(value),
+      },
+    });
+
+    return { branding: resolveBranding(tenant, branding), warnings };
+  }
+
+  /** Signed-out lookup by org code: what the login and talker pages paint. */
+  /**
+   * The link an org shares so its people land on a sign-in page already
+   * wearing its branding (`?org=<code>` is what the web app reads). Built
+   * here because only the backend knows the consumer app's base URL. Null
+   * when that URL is not configured, so the admin tab shows nothing rather
+   * than a broken link.
+   */
+  private brandedSignInUrl(code: string | null | undefined): string | null {
+    const baseUrl = this.configService.app?.baseUrl;
+    if (!baseUrl || !code) return null;
+    return `${baseUrl.replace(/\/+$/, '')}/login?org=${encodeURIComponent(code)}`;
+  }
+
+  async getPublicBranding(code: string): Promise<TenantBrandingResponseDto> {
+    const tenant = await this.tenantRepository.findOne({ where: { code } });
+    if (!tenant || tenant.status !== TenantStatus.ACTIVE) {
+      throw new NotFoundException('Organization not found');
+    }
+    return resolveBranding(tenant, tenant.settings?.branding);
+  }
+
+  async getPresignedUrlForBrandingFavicon(
+    tenantId: string,
+    dto: FaviconUploadRequestDto,
+  ): Promise<FaviconUploadResponseDto> {
+    const bucket = this.configService.s3.assetsBucket;
+    if (!bucket) {
+      throw new Error('S3 bucket name for assets bucket is not defined');
+    }
+    if (!Object.values(FaviconUploadContentType).includes(dto.contentType)) {
+      throw new BadRequestException('Invalid file type');
+    }
+    if (dto.fileSize > TENANT_BRANDING_LIMITS.FAVICON_MAX_BYTES) {
+      throw new BadRequestException(
+        `File size must be ${TENANT_BRANDING_LIMITS.FAVICON_MAX_BYTES / 1024} KB or less`,
+      );
+    }
+    const sanitizedFileName = this.s3Service.sanitizeFileName(dto.fileName);
+    const storageKey = `org-branding/${tenantId}/favicon-${uuidv4()}-${sanitizedFileName}`;
+    const presignedUrl = await this.s3Service.generatePresignedUrl({
+      bucket,
+      key: storageKey,
+      operation: 'put',
+      expiresIn: 600,
+      contentType: dto.contentType,
+    });
+    const region = this.configService.aws.region;
+    return {
+      presignedUrl,
+      faviconUrl: `https://${bucket}.s3.${region}.amazonaws.com/${storageKey}`,
+    };
   }
 
   async getPresignedUrlForOrganizationLogo(

@@ -61,10 +61,11 @@ export interface RoadmapUndatedRow {
  * weighting each released item by its votes makes the bar a measure of demand
  * satisfied rather than of throughput.
  *
- * Votes per opportunity are the board's `priorityScore` — `SUM(votes)` over every
- * voter and every monthly period, exactly as `RoadmapOpportunityRepository`
- * computes it. Same aggregate, same source, so a total here reconciles with the
- * priority bar a reader can go and look at on the roadmap board. Note the votes
+ * Votes per opportunity are votes SPENT — `SUM(votes)` over every voter and every
+ * monthly period. The board's `priorityScore` is `SUM(weightedVotes)` (votes weighted
+ * by each voter's breadth multiplier), so with the breadth feature on it can sit a few
+ * tenths above this; the two are identical while every multiplier is 1.0. Spend is the
+ * right unit here: it answers "how much of the team's voting went on shipped work". Note the votes
  * are NOT restricted to the release month: an opportunity accumulates backing
  * over the months it waits, and it is that whole accumulated demand that got
  * satisfied when it shipped.

@@ -11,6 +11,7 @@ import { Reflector } from '@nestjs/core';
 import { ErrorCode } from 'src/exception/error-code.enum';
 import { FAILURE_MESSAGES } from 'src/exception/failure-messages';
 import { FeatureToggleService } from 'src/authorization/service/feature-toggle.service';
+import { PermissionsService } from 'src/authorization/service/permissions.service';
 import { TenantFeatureService } from 'src/authorization/service/tenant-feature.service';
 import {
   PLATFORM_WIDE_ONLY_MESSAGE,
@@ -25,6 +26,7 @@ import {
   OrgScopedRouteOptions,
 } from '../decorators/org-scoped-route.decorator';
 import { CALLER_SCOPED_ROUTE_KEY } from '../decorators/caller-scoped-route.decorator';
+import { isAssistantMemberRoute } from '../decorators/assistant-member-route';
 
 /**
  * FeatureToggleGuard
@@ -57,6 +59,7 @@ export class FeatureToggleGuard implements CanActivate {
     private readonly featureToggleService: FeatureToggleService,
     private readonly tenantFeatureService: TenantFeatureService,
     private readonly tenantScopeService: TenantScopeService,
+    private readonly permissionsService: PermissionsService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -69,6 +72,9 @@ export class FeatureToggleGuard implements CanActivate {
       // No @RequireFeatureToggle on this route — nothing for this guard to check.
       return true;
     }
+    // An assistant's own route: being on its team is enough (chunk 6b). ChatbotMemberGuard, which
+    // runs after this one, checks the team and the role.
+    if (isAssistantMemberRoute(this.reflector, context)) return true;
 
     const request = context.switchToHttp().getRequest();
     const user = request.user;
@@ -115,6 +121,20 @@ export class FeatureToggleGuard implements CanActivate {
       return true;
     }
 
+    // Alternate-toggle branch: the route names a second toggle that also opens
+    // it. The caller is marked so the route's scope check can confine them to
+    // what that toggle is for (see FeatureToggleOptions.alsoAllowedBy).
+    if (
+      options.alsoAllowedBy &&
+      (await this.featureToggleService.hasToggle(
+        user.id,
+        options.alsoAllowedBy,
+      ))
+    ) {
+      request.viaAlternateToggle = options.alsoAllowedBy;
+      return true;
+    }
+
     // Org-level branch: no per-user toggle row, but the caller's tenant has the
     // feature switched on. This is the only way a non-PLATFORM_ADMIN reaches a
     // toggle-gated surface — admin_feature_toggles has no rows for them.
@@ -127,6 +147,20 @@ export class FeatureToggleGuard implements CanActivate {
           user.tenantId,
         );
       if (enabledForTenant) {
+        return true;
+      }
+    }
+
+    // Own-org branch: the route acts on the caller's own organization and a
+    // tenant role holds a permission for exactly that (an org admin editing
+    // its branding). No toggle row and no org preference involved — the
+    // service applies the org-level gate itself, and the handler's scope check
+    // keeps the caller inside their tenant.
+    if (options.orgAdminPermission) {
+      const permissions = await this.permissionsService.getUserPermissions(
+        user.id,
+      );
+      if (permissions.includes(options.orgAdminPermission)) {
         return true;
       }
     }

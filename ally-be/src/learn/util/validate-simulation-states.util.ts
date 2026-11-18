@@ -111,22 +111,31 @@ export function validateSimulationStates(
  */
 export function validateKnowledgeSourceUnlocks(
   knowledgeSources:
-    | { title?: string; unlocksFromStateId?: string | null }[]
+    | {
+        title?: string;
+        unlocksFromStateId?: string | null;
+        unlocksInStateIds?: string[] | null;
+      }[]
     | undefined
     | null,
   states: SimulationState[] | undefined | null,
 ): string[] {
-  const locked = (knowledgeSources ?? []).filter(
-    (source) => !!source?.unlocksFromStateId,
-  );
-  if (locked.length === 0) {
-    return [];
-  }
   const stateIds = new Set((states ?? []).map((state) => state?.id));
-  return locked
-    .filter((source) => !stateIds.has(source.unlocksFromStateId as string))
-    .map(
-      (source) =>
-        `Knowledge source '${source.title ?? ''}' unlocks at a state that does not exist on this simulation (${source.unlocksFromStateId}).`,
-    );
+  const errors: string[] = [];
+  for (const source of knowledgeSources ?? []) {
+    const picked = [
+      ...(source?.unlocksFromStateId ? [source.unlocksFromStateId] : []),
+      ...(Array.isArray(source?.unlocksInStateIds)
+        ? source.unlocksInStateIds
+        : []),
+    ];
+    for (const stateId of picked) {
+      if (!stateIds.has(stateId)) {
+        errors.push(
+          `Knowledge source '${source.title ?? ''}' unlocks at a state that does not exist on this simulation (${stateId}).`,
+        );
+      }
+    }
+  }
+  return errors;
 }

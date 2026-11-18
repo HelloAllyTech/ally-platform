@@ -37,7 +37,9 @@ const evaluatorBaseQuery: typeof rawEvaluatorBaseQuery = async (args, api, extra
   const url = typeof args === "string" ? args : args.url;
   if (result.error?.status === 401 && url !== ApiEndpoints.AI_LAB.EVAL_LOGIN) {
     clearEvaluatorSession();
-    window.location.href = ROUTES.EVALUATE;
+    // Raw window.location bypasses the router basename - prefix the Vite base
+    // (the app lives under /admin in production, / everywhere else).
+    window.location.href = import.meta.env.BASE_URL.replace(/\/$/, "") + ROUTES.EVALUATE;
   }
   return result;
 };

@@ -5,27 +5,13 @@
  * collection, so this is a scope that cannot be forgotten rather than a filter that can. The
  * WhatsApp Q&A bot was the first, which is why these endpoints live in this file — the data
  * layer is shared, the screens are not.
+ *
+ * The character corpus, the Ally guide's library and Debrief's guidance were retired into the
+ * Context Library (Character Insights, Ally Guide Library, Debrief Guidance); the API now rejects
+ * those values.
  */
 export enum KbCorpus {
   WHATSAPP_QA = "whatsapp_qa",
-  CHARACTER_LIBRARY = "character_library",
-}
-
-/**
- * Which part of a character a document helps ground. A curator's hint that BOOSTS those topics
- * in retrieval — mapped documents are searched first and the rest of the corpus tops up a short
- * result — never a restriction. Empty is the default and a perfectly good answer.
- *
- * Named for the SUBJECT, not for the interviewer prompt's phase numbering: that wording and
- * ordering change without a migration, so a mapping keyed to "phase 4" would be stale on
- * arrival.
- */
-export enum KbCharacterTopic {
-  IDENTITY = "identity",
-  LIFE_CONTEXT = "life_context",
-  INNER_LIFE = "inner_life",
-  HISTORY_AND_PRESENTING_CONCERN = "history_and_presenting_concern",
-  SPEECH_AND_LANGUAGE = "speech_and_language",
 }
 
 /** Types for the WhatsApp Q&A bot admin tab. Mirrors ally-be's DTOs. */
@@ -63,8 +49,6 @@ export const KB_IN_FLIGHT_STATUSES: KbDocumentStatus[] = [
 export interface KbDocument {
   id: string;
   corpus: KbCorpus;
-  /** Only meaningful for the character library; empty elsewhere. */
-  characterTopics: KbCharacterTopic[];
   title: string;
   sourceType: KbDocumentSourceType;
   sourceUrl: string | null;
@@ -89,6 +73,8 @@ export interface KbDocument {
   isArchived: boolean;
   createdAt: string;
   updatedAt: string;
+  /** The extracted text. Only on the single-document response (GET /documents/:id), never the list. */
+  rawText?: string;
 }
 
 export interface GetKbDocumentsParams {
@@ -108,6 +94,8 @@ export interface GetKbDocumentsParams {
   sourceType?: KbDocumentSourceType;
   /** Only what this organisation can retrieve: its own documents plus the global ones. */
   tenantId?: string;
+  /** With `tenantId`: only documents aimed at that organisation, not the shared ones. */
+  excludeGlobal?: boolean;
   includeArchived?: boolean;
 }
 
@@ -130,7 +118,6 @@ export interface CreateKbUploadUrlResponse {
 
 export interface CreateKbDocumentRequest {
   corpus?: KbCorpus;
-  characterTopics?: KbCharacterTopic[];
   title: string;
   sourceType: KbDocumentSourceType;
   text?: string;
@@ -162,11 +149,6 @@ export interface UpdateKbDocumentRequest {
   title?: string;
   tags?: string[];
   language?: string;
-  /**
-   * Free to change: a ranking hint read at query time, so it invalidates no chunk and
-   * triggers no re-index. `[]` clears it, which is a real answer ("no hint"), not a no-op.
-   */
-  characterTopics?: KbCharacterTopic[];
 }
 
 export interface ReplaceKbDocumentContentRequest {
@@ -174,55 +156,10 @@ export interface ReplaceKbDocumentContentRequest {
   text: string;
 }
 
-export interface KbChunk {
-  id: string;
-  chunkIndex: number;
-  text: string;
-  charStart: number;
-  charEnd: number;
-  /** 0 when the source format has no pages. */
-  pageFrom: number;
-  pageTo: number;
-  sectionPath: string | null;
-  tokenCount: number;
-  uploadStatus: string;
-  uploadError: string | null;
-}
-
-export interface GetKbChunksResponse {
-  chunks: KbChunk[];
-  count: number;
-}
-
 export interface KbStats {
   byStatus: Record<string, number>;
   totalChunks: number;
   indexedChunks: number;
-}
-
-export interface KbSearchRequest {
-  corpus?: KbCorpus;
-  /** Boosts documents a curator mapped to these topics; never restricts to them. */
-  characterTopics?: KbCharacterTopic[];
-  query: string;
-  limit?: number;
-  minSimilarity?: number;
-}
-
-export interface KbPassage {
-  chunk_id: string;
-  document_id: string;
-  document_title: string;
-  chunk_index: number;
-  text: string;
-  page_from: number;
-  page_to: number;
-  section_path: string;
-  similarity: number;
-}
-
-export interface KbSearchResponse {
-  passages: KbPassage[];
 }
 
 // ── Keyword templates ────────────────────────────────────────────────────────
@@ -260,7 +197,22 @@ export interface WaTemplate {
    */
   mandatory: boolean;
   archivedAt: string | null;
+  /** The organisation a reply belongs to; null = a default every organisation gets. */
+  chatbotId?: string | null;
+  /** The default reply this organisation's version replaces. */
+  overridesTemplateId?: string | null;
+  /**
+   * Only when listed for one organisation: where the reply comes from. `default` = shared and
+   * untouched, `customised` = its own wording of a default, `off` = an optional default it switched
+   * off, `own` = a reply only it has.
+   */
+  state?: WaTemplateState;
+  /** For a customised or switched-off default: the shared wording it replaces. */
+  defaultResponseText?: string;
+  defaultPatterns?: string[];
 }
+
+export type WaTemplateState = "default" | "customised" | "off" | "own";
 
 export interface GetWaTemplatesResponse {
   templates: WaTemplate[];
@@ -339,26 +291,90 @@ export interface WaBotSettings {
   retentionDays: number;
   /** Run the LLM crisis classifier alongside retrieval. Keyword rules are unaffected by this. */
   crisisClassifierEnabled: boolean;
+  /** The platform kill switch for the new engine (Agents v2). Off: every chatbot answers with v1. */
+  agentRuntimeAllowed: boolean;
   helplineNumbers: string;
 }
 
-/** Booleans and counts only — the endpoint never returns a secret's value. */
-export interface WaProviderHealth {
-  enabled: boolean;
-  provider: string;
-  verifyTokenConfigured: boolean;
-  appSecretConfigured: boolean;
-  phoneNumberIdConfigured: boolean;
-  accessTokenConfigured: boolean;
-  inboundQueueConfigured: boolean;
-  // Optional: a backend one release behind this build does not send them, and "unknown" must not
-  // render as "missing".
-  businessAccountIdConfigured?: boolean;
-  inboundDlqConfigured?: boolean;
-  kbIngestQueueConfigured?: boolean;
-  helplineNumbersSet?: boolean;
-  mappedNumbers?: number;
-  indexedDocuments?: number;
+export enum WaBusinessNumberStatus {
+  /** Checked with Meta, but Meta has not called the webhook yet. */
+  AWAITING_WEBHOOK = "awaiting_webhook",
+  CONNECTED = "connected",
+  ERROR = "error",
+}
+
+/** An organisation's own WhatsApp number. Never carries the token or the app secret. */
+export interface WaBusinessNumber {
+  id: string;
+  connectorId: string | null;
+  /** The bot this number answers for, if it is bound to one. */
+  chatbotId: string | null;
+  chatbotName: string | null;
+  /** The organisation that connected it, for numbers from before chatbots. */
+  tenantId: string | null;
+  tenantName: string | null;
+  phoneNumberId: string;
+  wabaId: string;
+  displayPhoneNumber: string | null;
+  verifiedName: string | null;
+  source: "manual" | "embedded_signup";
+  status: WaBusinessNumberStatus;
+  lastCheckedAt: string | null;
+  lastError: string | null;
+  /** When the number last received a message — the proof the setup works end to end. */
+  lastInboundAt: string | null;
+  /** Paste into the Meta app. Manual numbers only. */
+  callbackUrl: string | null;
+  verifyToken: string | null;
+  hasAppSecret: boolean;
+  createdAt: string;
+}
+
+/**
+ * One chatbot's changes to the defaults. Absent = follow the default. Safety levers
+ * (`crisisClassifierEnabled`, `consentRequired`, `rateLimit`) can only be made stricter.
+ */
+export interface WaOrgSettings {
+  enabled?: boolean;
+  /**
+   * What the agent may do on this bot, by tool name (chunk 3b): `hand_over`, `create_<list>`… A
+   * bot's own override only; owners change it (A1).
+   */
+  abilities?: Partial<Record<string, "do_it" | "never">>;
+  helplineNumbers?: string;
+  disclaimerText?: string;
+  crisisEscalationText?: string;
+  fallbackText?: string;
+  declineText?: string;
+  unsupportedMediaText?: string;
+  unrecognisedNumberText?: string;
+  rateLimitText?: string;
+  maxCitations?: number;
+  maxAnswerChars?: number;
+  conversationIdleMinutes?: number;
+  crisisClassifierEnabled?: boolean;
+  consentRequired?: boolean;
+  /**
+   * WhatsApp's typing dots while the bot works on a reply (they also mark the message read). On
+   * unless `false`; platform admins only.
+   */
+  showTyping?: boolean;
+  rateLimit?: { perMinute?: number; perHour?: number; perDay?: number };
+  retrieval?: {
+    minSimilarity?: number;
+    declineSimilarity?: number;
+    topK?: number;
+    maxPassages?: number;
+  };
+}
+
+export interface ConnectWaNumberRequest {
+  /** Bind to this bot straight away; none leaves the number free (platform admins). */
+  chatbotId?: string;
+  phoneNumberId: string;
+  wabaId: string;
+  accessToken: string;
+  appSecret: string;
 }
 
 /** Meta's live answer about the configured token and number. */
@@ -378,59 +394,7 @@ export interface WaConnectionCheck {
   subscriptionError?: string;
 }
 
-// ── Preview console ──────────────────────────────────────────────────────────
-
-export interface WaPreviewCitation {
-  passage_number: number;
-  chunk_id: string;
-  document_id: string;
-  document_title: string;
-  page_from: number;
-  page_to: number;
-  section_path: string;
-  similarity: number;
-}
-
-export interface WaPreviewRetrieval {
-  top_k: number;
-  min_similarity: number;
-  decline_similarity: number;
-  hit_count: number;
-  top_similarity: number;
-  passages_used: number;
-  query_language: string;
-  /** The English text actually embedded; null when searched as written. */
-  translated_query: string | null;
-  /** True when the model answered but cited nothing. */
-  unsupported: boolean;
-}
-
-export interface WaPreviewResponse {
-  intent: "answer" | "decline" | "clarify";
-  declineReason: string;
-  /** The exact message a worker would receive, including source lines and truncation. */
-  reply: string;
-  replyLength: number;
-  language: string;
-  citations: WaPreviewCitation[];
-  retrieval: WaPreviewRetrieval;
-  provider: string;
-  model: string;
-  promptVersion: string;
-  latencyMs: number;
-  /**
-   * Which corpus answered. Echoed back because "the bot found this fine" from an unscoped
-   * preview is otherwise indistinguishable from what one customer's worker would actually get.
-   */
-  audience: { tenantId: string | null; includesGlobal: boolean };
-}
-
-export interface WaPreviewRequest {
-  question: string;
-  retrieval?: Partial<WaRetrievalSettings>;
-  /** Answer as a worker from this organisation would be. Omitted searches the whole corpus. */
-  tenantId?: string;
-}
+// ── Citations and retrieval (on a conversation's replies) ────────────────────
 
 // ── Conversation log ─────────────────────────────────────────────────────────
 
@@ -452,117 +416,7 @@ export enum WaHandledBy {
   ERROR = "error",
 }
 
-/** A thread summary. Note there is no full phone number — only the last four digits. */
-export interface WaConversationSummary {
-  id: string;
-  contactId: string;
-  startedAt: string;
-  lastMessageAt: string;
-  messageCount: number;
-  lastLanguage: string | null;
-  phoneLast4: string;
-  consentStatus: string;
-  blockedAt: string | null;
-  /** Null for a number that is not on any Ally profile — which is why the thread was refused. */
-  tenantId: string | null;
-  tenantName: string | null;
-}
-
-export interface GetWaConversationsResponse {
-  conversations: WaConversationSummary[];
-  count: number;
-}
-
-export interface WaConversationMessage {
-  id: string;
-  direction: "inbound" | "outbound";
-  body: string;
-  language: string | null;
-  handledBy: WaHandledBy | null;
-  citations: WaPreviewCitation[];
-  /** Includes the provider and model that ACTUALLY ran, so a behaviour change is explainable. */
-  retrievalMeta:
-    | (WaPreviewRetrieval & {
-        provider?: string;
-        model?: string;
-        prompt_version?: string;
-      })
-    | null;
-  latencyMs: number | null;
-  status: string;
-  errorMessage: string | null;
-  createdAt: string;
-}
-
-export interface WaConversationDetail {
-  conversation: WaConversationSummary;
-  contact: {
-    id: string;
-    phoneLast4: string;
-    consentStatus: string;
-    locale: string | null;
-    blockedAt: string | null;
-    messageCount: number;
-    tenantId: string | null;
-    identifiedAt: string | null;
-    identitySource: string | null;
-    /** Named rather than an id. Null is meaningful: it is why the corpus could not be scoped. */
-    organisation: { id: string; name: string } | null;
-  } | null;
-  messages: WaConversationMessage[];
-}
-
-export interface GetWaConversationsParams {
-  limit?: number;
-  offset?: number;
-  from?: string;
-  to?: string;
-  handledBy?: WaHandledBy;
-  language?: string;
-  declinedOnly?: boolean;
-  search?: string;
-  /** Whitelisted server-side; an unknown key falls back to the default order rather than erroring. */
-  sortBy?: string;
-  sortDir?: "asc" | "desc";
-}
-
 // ── Unanswered queue ─────────────────────────────────────────────────────────
-
-export enum WaUnansweredReason {
-  NO_HITS = "no_hits",
-  BELOW_THRESHOLD = "below_threshold",
-  MODEL_DECLINED = "model_declined",
-  ERROR = "error",
-}
-
-export enum WaUnansweredStatus {
-  OPEN = "open",
-  TRIAGED = "triaged",
-  ANSWERED = "answered",
-  DISMISSED = "dismissed",
-}
-
-export interface WaUnansweredQuestion {
-  id: string;
-  messageId: string;
-  conversationId: string;
-  questionText: string;
-  language: string | null;
-  reason: WaUnansweredReason;
-  /** Numeric string from Postgres — how close the corpus came. */
-  topSimilarity: string | null;
-  hitCount: number;
-  status: WaUnansweredStatus;
-  assignedTo: number | null;
-  resolutionNote: string | null;
-  linkedDocumentId: string | null;
-  createdAt: string;
-}
-
-export interface GetWaUnansweredResponse {
-  questions: WaUnansweredQuestion[];
-  count: number;
-}
 
 // ── Usage dashboard ──────────────────────────────────────────────────────────
 

@@ -7,6 +7,7 @@ from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from weaviate.client import WeaviateAsyncClient
 
 from app.core.ally_core import AllyCoreClient, AllyCoreService
+from app.core.context_library.context_chunk_service import ContextChunkService
 from app.core.conversations.conversation_service import ConversationService
 from app.core.embeddings.base import BaseEmbeddingService
 from app.core.embeddings.openai_embedding_client import OpenAIEmbeddingClient
@@ -18,7 +19,6 @@ from app.core.knowledge_base.knowledge_chunk_service import KnowledgeChunkServic
 from app.core.reference_documents.reference_document_service import (
     ReferenceDocumentService,
 )
-from app.core.agent_memory.agent_memory_service import AgentMemoryService
 from app.core.roadmap.roadmap_opportunity_service import RoadmapOpportunityService
 from app.core.summaries.summary_service import SummaryService
 from app.core.text_generations.base import BaseTextGenerationService
@@ -172,24 +172,6 @@ def _get_roadmap_opportunity_service_cached() -> RoadmapOpportunityService:
     )
 
 
-@lru_cache(maxsize=1)
-def _get_agent_memory_service_cached() -> AgentMemoryService:
-    return AgentMemoryService(
-        _get_vector_db_cached(),
-        _get_embedding_service_cached(),
-    )
-
-
-# Dependency for the agent-memory (Bug Hunter / Builder notebook) index service
-async def get_agent_memory_service(
-    vector_db=Depends(get_vector_db), embedding_service=Depends(get_embedding_service)
-) -> AgentMemoryService:
-    """
-    Returns an instance of AgentMemoryService.
-    """
-    return _get_agent_memory_service_cached()
-
-
 # Dependency for the roadmap opportunity (semantic duplicate detection) service
 async def get_roadmap_opportunity_service(
     vector_db=Depends(get_vector_db), embedding_service=Depends(get_embedding_service)
@@ -237,6 +219,30 @@ async def get_knowledge_chunk_service(
     version the default can be dropped.
     """
     return _get_knowledge_chunk_service_cached(corpus)
+
+
+@lru_cache(maxsize=1)
+def _get_context_chunk_service_cached() -> ContextChunkService:
+    return ContextChunkService(
+        _get_vector_db_cached(),
+        _get_embedding_service_cached(),
+    )
+
+
+# Dependency for the Context Library index service
+async def get_context_chunk_service(
+    vector_db=Depends(get_vector_db),
+    embedding_service=Depends(get_embedding_service),
+) -> ContextChunkService:
+    """
+    Returns the ContextChunkService.
+
+    ONE instance for every Context Library collection, unlike the per-corpus
+    KnowledgeChunkService: those collections are versioned and created on demand, so
+    the set of names is open-ended and a per-name cache would be unbounded. The service
+    validates the name on every call instead.
+    """
+    return _get_context_chunk_service_cached()
 
 
 @lru_cache(maxsize=1)

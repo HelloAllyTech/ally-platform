@@ -4,6 +4,7 @@ import {
   computeServiceCostUsd,
   MODEL_PRICING,
 } from '../llm-pricing.constants';
+import { LLM_MODEL_REGISTRY } from '../../../llm/constants/llm-model-registry.constants';
 
 describe('MODEL_PRICING — Gemini coverage', () => {
   /**
@@ -335,5 +336,31 @@ describe('computeServiceCostUsd — Anthropic and unknown models unchanged', () 
         }),
       ).toEqual({ costUsd: 0, priced: false });
     }
+  });
+});
+
+describe('MODEL_PRICING — completeness for every model prod can serve', () => {
+  /**
+   * Every model in LLM_MODEL_REGISTRY can be picked for a prompt and so can
+   * reach a spend ledger. Each must have its OWN entry: the resolver's prefix
+   * match is a fallback for dated ids, and leaning on it priced GPT-4.1 at
+   * GPT-4's rate (15x too high) until this test existed. A model with no entry
+   * would be written as priced=false and shown as "approximate" — honest, but
+   * avoidable for a model we chose to offer.
+   */
+  it.each(LLM_MODEL_REGISTRY.map((m) => m.model))(
+    '%s has its own pricing entry',
+    (model) => {
+      expect(MODEL_PRICING[model]).toBeDefined();
+    },
+  );
+
+  it('prices GPT-4.1 at its own rate, not the gpt-4 prefix', () => {
+    expect(computeCostUsd('gpt-4.1', 1_000_000, 1_000_000).costUsd).toBeCloseTo(
+      10,
+    );
+    expect(
+      computeCostUsd('gpt-4.1-mini', 1_000_000, 1_000_000).costUsd,
+    ).toBeCloseTo(2);
   });
 });

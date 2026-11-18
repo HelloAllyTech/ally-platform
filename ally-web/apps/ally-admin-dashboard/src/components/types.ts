@@ -20,6 +20,8 @@ export const ButtonVariant = {
   PRIMARY: "primary",
   DESTRUCTIVE: "destructive",
   SECONDARY: "secondary",
+  // Carbon "tertiary": outlined, for the many non-primary actions on a screen.
+  TERTIARY: "tertiary",
   ICON: "icon",
   TEXT: "text",
 } as const;
@@ -28,6 +30,8 @@ export type ButtonVariantType = (typeof ButtonVariant)[keyof typeof ButtonVarian
 
 export interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "ref"> {
   variant?: ButtonVariantType;
+  /** "sm" is Carbon's small button (32px) for in-row and in-card actions. */
+  size?: "sm";
   className?: string;
   children?: ReactNode;
   fullWidth?: boolean;
@@ -215,6 +219,8 @@ export interface NavigationItem {
   id: string;
   label: string;
   path: string;
+  /** Sidebar section (a `NavSectionId`); a tab without one lands in the last section. */
+  section?: string;
   icon?: React.ReactNode;
 }
 
@@ -277,6 +283,8 @@ export interface ListToolbarProps {
   tertiaryAction?: ActionProps;
   className?: string;
   addFilterButtonRef?: React.RefObject<HTMLButtonElement>;
+  /** Quiet period before onSearchChange fires while typing (default 300ms; 0 = every keystroke). */
+  searchDebounceMs?: number;
 }
 
 export interface RequestFilterOption {

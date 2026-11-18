@@ -1,3 +1,4 @@
+import { RoadmapVotingAnalyticsService } from 'src/analytics/service/roadmap-voting-analytics.service';
 import { SESService } from 'src/aws/service/ses.service';
 import { AppConfigService } from 'src/config/config.service';
 import { RedisService } from 'src/redis/service/redis.service';
@@ -48,10 +49,21 @@ describe('ProductUpdateDigestService', () => {
     set: jest.Mock;
   };
   let config: {
-    productUpdates: { digestTo: string[]; digestHour: number };
+    productUpdates: {
+      digestTo: string[];
+      digestHour: number;
+      digestAllowed: boolean;
+    };
     email: { sourceEmail: string };
     adminBaseUrl: string;
   };
+  let roadmapVoting: { getRoadmapVoting: jest.Mock };
+  let roadmapFeed: {
+    recipients: jest.Mock;
+    ideasThisWeek: jest.Mock;
+    markSent: jest.Mock;
+  };
+  let planSettings: { getRoadmapV2: jest.Mock };
   let service: ProductUpdateDigestService;
 
   beforeEach(() => {
@@ -68,7 +80,11 @@ describe('ProductUpdateDigestService', () => {
       set: jest.fn().mockResolvedValue(undefined),
     };
     config = {
-      productUpdates: { digestTo: ['team@example.com'], digestHour: 18 },
+      productUpdates: {
+        digestTo: ['team@example.com'],
+        digestHour: 18,
+        digestAllowed: true,
+      },
       email: { sourceEmail: 'no-reply@example.com' },
       adminBaseUrl: 'https://admin.example.com/',
     };
@@ -86,6 +102,43 @@ describe('ProductUpdateDigestService', () => {
         .fn()
         .mockResolvedValue(new Map([['u2', ['ally-web:admin']]])),
     };
+    // Sept 2026 so far: Bea 12, Asha 3, Cy and Dev with access but no votes.
+    roadmapVoting = {
+      getRoadmapVoting: jest.fn().mockResolvedValue({
+        months: [
+          {
+            month: '2026-09-01',
+            partial: true,
+            votes: 15,
+            voters: 2,
+            eligible: 4,
+            granted: 800,
+            users: [
+              { userId: 1, votes: 3, votesOnOthers: 3, granted: 200 },
+              { userId: 2, votes: 12, votesOnOthers: 9, granted: 200 },
+              { userId: 3, votes: 0, votesOnOthers: 0, granted: 200 },
+              { userId: 4, votes: 0, votesOnOthers: 0, granted: 200 },
+            ],
+          },
+        ],
+        users: [
+          { userId: 2, name: 'Bea' },
+          { userId: 1, name: 'Asha' },
+          { userId: 4, name: 'Dev' },
+          { userId: 3, name: 'Cy' },
+        ],
+        accessRecordedFrom: '2026-09-01',
+        computedAt: IN_DIGEST_HOUR.toISOString(),
+      }),
+    };
+    roadmapFeed = {
+      recipients: jest.fn().mockResolvedValue([]),
+      ideasThisWeek: jest.fn().mockResolvedValue([]),
+      markSent: jest.fn().mockResolvedValue(undefined),
+    };
+    planSettings = {
+      getRoadmapV2: jest.fn().mockResolvedValue({ enabled: true }),
+    };
     service = new ProductUpdateDigestService(
       updateRepository as unknown as ProductUpdateRepository,
       sourceRepository as unknown as ProductUpdateSourceRepository,
@@ -93,7 +146,18 @@ describe('ProductUpdateDigestService', () => {
       sesService as unknown as SESService,
       config as unknown as AppConfigService,
       redis as unknown as RedisService,
+      roadmapVoting as unknown as RoadmapVotingAnalyticsService,
+      roadmapFeed as never,
+      planSettings as never,
     );
+  });
+
+  it('never sends from a database that is not production, and never takes the lock', async () => {
+    config.productUpdates.digestAllowed = false;
+
+    expect(await service.sendIfDue(IN_DIGEST_HOUR)).toBe('not-production');
+    expect(redis.acquireLock).not.toHaveBeenCalled();
+    expect(sesService.sendEmail).not.toHaveBeenCalled();
   });
 
   it('does nothing without recipients, or outside its business hour', async () => {
@@ -163,9 +227,146 @@ describe('ProductUpdateDigestService', () => {
     );
   });
 
+  it("adds this month's roadmap votes by name: voters highest first", async () => {
+    updateRepository.find
+      .mockResolvedValueOnce([update({})])
+      .mockResolvedValueOnce([]);
+
+    await service.sendIfDue(IN_DIGEST_HOUR);
+
+    const body: string = sesService.sendEmail.mock.calls[0][0].body;
+    expect(body).toContain('Roadmap votes in September so far:');
+    expect(body).toContain('Voters voted others share');
+    expect(body).toContain('75%'); // Bea: 9 of 12 on colleagues' ideas
+    expect(body).toContain('100%'); // Asha: 3 of 3
+    expect(body).not.toContain('admins have voted');
+    expect(body.indexOf('Bea')).toBeLessThan(body.indexOf('Asha'));
+    expect(body).not.toContain('Not voted yet');
+    expect(body.indexOf('Roadmap votes in September')).toBeLessThan(
+      body.indexOf('Live for customers'),
+    );
+    expect(body).not.toContain('analytics?tab=highlights');
+  });
+
+  it('still sends the digest when the roadmap votes cannot be read', async () => {
+    updateRepository.find
+      .mockResolvedValueOnce([update({})])
+      .mockResolvedValueOnce([]);
+    roadmapVoting.getRoadmapVoting.mockRejectedValue(new Error('db down'));
+
+    expect(await service.sendIfDue(IN_DIGEST_HOUR)).toBe('sent');
+    expect(sesService.sendEmail.mock.calls[0][0].body).not.toContain(
+      'Roadmap votes',
+    );
+  });
+
+  it('never sends a digest for the roadmap votes alone', async () => {
+    updateRepository.find.mockResolvedValue([]);
+
+    expect(await service.sendIfDue(IN_DIGEST_HOUR)).toBe('nothing-to-report');
+    expect(roadmapVoting.getRoadmapVoting).not.toHaveBeenCalled();
+  });
+
   it('escapes what it writes into the email', () => {
     expect(escapeHtml(`<b onclick="x">Tom & Jerry's</b>`)).toBe(
       '&lt;b onclick=&quot;x&quot;&gt;Tom &amp; Jerry&#39;s&lt;/b&gt;',
     );
+  });
+  describe('Your ideas this week (Roadmap v2)', () => {
+    // Monday 5 Oct 2026, 18:30 IST.
+    const MONDAY = new Date('2026-10-05T13:00:00Z');
+    const ravi = { userId: 7, email: 'ravi@example.com', name: 'Ravi Kumar' };
+    const news = {
+      code: 'OPP-0388',
+      title: 'Streak reminders <b>',
+      stage: 'shipped',
+      shippedAt: '2026-10-02T09:00:00.000Z',
+      reviewed: null,
+      comments: 2,
+      planUpdates: 0,
+    };
+
+    it('sends only on Monday in the digest hour, in production, with roadmap_v2 on', async () => {
+      expect(await service.sendWeeklyIdeasIfDue(IN_DIGEST_HOUR)).toBe(
+        'not-due',
+      );
+      config.productUpdates.digestAllowed = false;
+      expect(await service.sendWeeklyIdeasIfDue(MONDAY)).toBe('not-production');
+      config.productUpdates.digestAllowed = true;
+      planSettings.getRoadmapV2.mockResolvedValueOnce({ enabled: false });
+      expect(await service.sendWeeklyIdeasIfDue(MONDAY)).toBe('roadmap-v2-off');
+      expect(roadmapFeed.recipients).not.toHaveBeenCalled();
+      expect(sesService.sendEmail).not.toHaveBeenCalled();
+    });
+
+    it('emails each person who opted in about their own ideas, and stamps it', async () => {
+      roadmapFeed.recipients.mockResolvedValue([ravi]);
+      roadmapFeed.ideasThisWeek.mockResolvedValue([news]);
+
+      expect(await service.sendWeeklyIdeasIfDue(MONDAY)).toEqual({
+        sent: 1,
+        skipped: 0,
+        failed: 0,
+      });
+      // Nobody who has had one in the last six days.
+      expect(roadmapFeed.recipients).toHaveBeenCalledWith(
+        new Date(MONDAY.getTime() - 6 * 24 * 60 * 60 * 1000),
+      );
+      expect(roadmapFeed.ideasThisWeek).toHaveBeenCalledWith(
+        7,
+        new Date(MONDAY.getTime() - 7 * 24 * 60 * 60 * 1000),
+      );
+      const mail = sesService.sendEmail.mock.calls[0][0];
+      expect(mail.to).toEqual(['ravi@example.com']);
+      expect(mail.subject).toBe(
+        'Your ideas this week · Mon 5 Oct — 1 shipped!',
+      );
+      expect(mail.body).toContain('Hi Ravi');
+      expect(mail.body).toContain(
+        'https://admin.example.com/roadmap/i/OPP-0388',
+      );
+      expect(mail.body).toContain('Shipped on 2 Oct!');
+      expect(mail.body).toContain('2 new comments');
+      expect(mail.body).toContain('Streak reminders &lt;b&gt;');
+      expect(roadmapFeed.markSent).toHaveBeenCalledWith(7, MONDAY);
+    });
+
+    it('sends nothing to someone whose ideas had a quiet week', async () => {
+      roadmapFeed.recipients.mockResolvedValue([ravi]);
+      roadmapFeed.ideasThisWeek.mockResolvedValue([]);
+
+      expect(await service.sendWeeklyIdeasIfDue(MONDAY)).toEqual({
+        sent: 0,
+        skipped: 1,
+        failed: 0,
+      });
+      expect(sesService.sendEmail).not.toHaveBeenCalled();
+      expect(roadmapFeed.markSent).not.toHaveBeenCalled();
+    });
+
+    it('runs once a Monday across pods', async () => {
+      redis.acquireLock.mockResolvedValueOnce(false);
+      expect(await service.sendWeeklyIdeasIfDue(MONDAY)).toBe('already-sent');
+      expect(roadmapFeed.recipients).not.toHaveBeenCalled();
+    });
+
+    it('one failed email does not stop the rest', async () => {
+      roadmapFeed.recipients.mockResolvedValue([
+        ravi,
+        { ...ravi, userId: 8, email: 'asha@example.com', name: 'Asha' },
+      ]);
+      roadmapFeed.ideasThisWeek.mockResolvedValue([news]);
+      sesService.sendEmail
+        .mockRejectedValueOnce(new Error('throttled'))
+        .mockResolvedValueOnce(true);
+
+      expect(await service.sendWeeklyIdeasIfDue(MONDAY)).toEqual({
+        sent: 1,
+        skipped: 0,
+        failed: 1,
+      });
+      expect(roadmapFeed.markSent).toHaveBeenCalledTimes(1);
+      expect(roadmapFeed.markSent).toHaveBeenCalledWith(8, MONDAY);
+    });
   });
 });

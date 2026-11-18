@@ -2,6 +2,7 @@ import { UseFormReturn } from "react-hook-form";
 
 import { EventDetectionConfig } from "@types";
 
+import { ImageSlotKind } from "./imageStudio";
 import { AssignmentStatus } from "./organizationAccess";
 import {
   SessionEventDetectionData,
@@ -11,6 +12,7 @@ import {
   Competency,
   SimulationCustomField,
   knowledgeSource,
+  ScenarioMemory,
 } from "./simulation";
 import { TriggerCondition } from "./triggerConditions";
 
@@ -77,6 +79,8 @@ export type FormData = {
    */
   feedbackTabDebrief?: boolean;
   feedbackTabTranscript?: boolean;
+  /** The Debrief's risk-cue option for this roleplay: null = Standard, or an option's key. */
+  debriefRiskCueOption?: string | null;
   pauseEnabled?: boolean;
   /** Live in-session coaching hints in the learner's Supervisor sidebar tab. Opt-in. */
   supervisorNotesEnabled?: boolean;
@@ -91,6 +95,8 @@ export type FormData = {
   currentState?: boolean;
   remindersEnabled?: boolean;
   knowledgeSources?: knowledgeSource[];
+  /** Stage Director prompt's memories — separate from knowledgeSources. */
+  memories?: ScenarioMemory[];
   /** Per-language main-agent prompt variant choice (GENERIC vs MULTILINGUAL). */
   mainPromptVariantByLanguage?: Record<string, "GENERIC" | "MULTILINGUAL">;
   /**
@@ -421,6 +427,22 @@ export interface FormFieldConfig {
    */
   hideWhenUnused?: boolean;
   /**
+   * Stricter sibling of `hideWhenUnused`: render the field ONLY when the
+   * selected prompt is loaded and references `promptVariable`. Hidden while
+   * nothing is selected or the list is loading, because the default prompt
+   * doesn't use it. For editors that only mean something on one prompt
+   * family (e.g. Memories on the Stage Director prompt).
+   */
+  showOnlyWhenUsed?: boolean;
+  /**
+   * Placeholder name whose presence in the selected prompt HIDES this field —
+   * the inverse gate. Used when a newer prompt replaces a field with another
+   * (Knowledge Sources give way to Memories when the prompt uses
+   * `{memories}`). Only hides once the prompt list has loaded, so the field
+   * stays put while nothing is known.
+   */
+  hideWhenPromptUses?: string;
+  /**
    * Gate this field behind a per-user feature flag (key under the current
    * user's `featureFlags` from /users/me). When set and the user lacks the
    * flag, the field is not rendered. Used for email-allowlisted features.
@@ -444,11 +466,13 @@ export interface FormFieldConfig {
   /** When true, wrap the field in a collapsed accordion. */
   accordion?: boolean;
   /**
-   * IMAGE_UPLOAD only: render the "Generate with AI" controls under the
-   * upload tile. Generation uses the scenario's title/description form
-   * values via the managed `cover_image_generation` prompt.
+   * IMAGE_UPLOAD only: add Image Studio's "✨ Generate" beside the upload
+   * tile. The modal reads the form's title/description (and persona fields,
+   * when the form has them) as context.
    */
   aiGenerate?: boolean;
+  /** IMAGE_UPLOAD with `aiGenerate`: the Image Studio slot. Default `roleplay_cover`. */
+  imageSlotKind?: ImageSlotKind;
   /**
    * `location` slug of a data-driven tooltip (see TooltipLocation). When set,
    * the field renders an info-icon tooltip whose text superadmins author under
@@ -851,6 +875,8 @@ export type SkillsStoreErrorCode =
   | "SKILLS_STORE_TRANSLATIONS_PENDING"
   /** details: { reason } — see PinnedPromptReason */
   | "SKILLS_STORE_PROMPT_PINNED"
+  /** 403, details: { reason } — confirmed, but by someone not named as a pinned-prompt editor */
+  | "SKILLS_STORE_PINNED_LOCKED"
   | "SKILLS_STORE_NOT_A_CANDIDATE"
   /** details: { fields } */
   | "SKILLS_STORE_USE_VERSIONS";

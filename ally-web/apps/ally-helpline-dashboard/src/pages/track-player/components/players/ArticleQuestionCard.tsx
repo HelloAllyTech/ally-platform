@@ -14,6 +14,8 @@ interface ArticleQuestionCardProps {
   question: ArticleQuestion;
   /** Called with the server's response once an answer lands. */
   onAnswered: (result: SubmitArticleQuestionAnswerResponse) => void;
+  /** No box of its own — for a host that frames it (a Cards-layout card). */
+  bare?: boolean;
 }
 
 /** What the card knows about this question's outcome, however it learned it. */
@@ -41,6 +43,7 @@ export const ArticleQuestionCard: FC<ArticleQuestionCardProps> = ({
   itemId,
   question,
   onAnswered,
+  bare = false,
 }) => {
   const { t } = useTranslation();
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
@@ -97,9 +100,19 @@ export const ArticleQuestionCard: FC<ArticleQuestionCardProps> = ({
     <section
       data-testid={`article-question-${question.id}`}
       aria-label={t("tracks2.article.question.title")}
-      className="my-6 rounded-[16px] border border-border-light bg-neutral-50/60 p-4 text-base sm:p-5"
+      className={
+        bare
+          ? "text-base"
+          : "my-6 rounded-[16px] border border-border-light bg-neutral-50/60 p-4 text-base sm:p-5"
+      }
     >
-      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-typography-600">
+      <p
+        className={
+          bare
+            ? "mb-2 text-[11.5px] font-semibold uppercase tracking-[0.1em] text-primary-500"
+            : "mb-2 text-xs font-medium uppercase tracking-wide text-typography-600"
+        }
+      >
         {t("tracks2.article.question.title")}
       </p>
       <div className="mb-4 text-[1em] font-semibold text-typography-900">

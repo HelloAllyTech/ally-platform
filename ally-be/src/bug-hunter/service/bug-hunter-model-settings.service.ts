@@ -10,7 +10,7 @@ import {
  * Which models the sweep/fix-session pipeline and its escalation subagent run on — the
  * settings-driven replacement for the hardcoded `--model` flag in `bug-hunt-sweep.yml` /
  * `bug-fix-session.yml` and the static `model:` frontmatter in `.claude/agents/bug-escalation.md`.
- * Same `GlobalSettings`-backed get/merge/update shape as `WhatsAppSettingsService`.
+ * Same `GlobalSettings`-backed get/merge/update shape as `ChatbotSettingsService`.
  */
 @Injectable()
 export class BugHunterModelSettingsService {

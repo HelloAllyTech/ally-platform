@@ -261,4 +261,157 @@ describe("TrackPlayer", () => {
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     expect(await screen.findByRole("heading", { name: "Course complete!" })).toBeInTheDocument();
   });
+
+  describe("scenario quiz", () => {
+    const branchingTrack = {
+      ...mockTrackDetail,
+      sections: [
+        {
+          ...mockTrackDetail.sections[0],
+          items: [
+            { ...mockTrackDetail.sections[0].items[0], type: TrackItemType.BRANCHING_SCENARIO },
+          ],
+        },
+      ],
+    };
+    const branchingPayload = (experience?: "CLASSIC" | "STORY") => ({
+      type: TrackItemType.BRANCHING_SCENARIO,
+      trackItemProgressId: "p1",
+      experience,
+      intro: null,
+      startNodeId: "s",
+      passScore: null,
+      maxAttempts: null,
+      attemptsUsed: 0,
+      bestScore: null,
+      completed: false,
+      endingsReached: [],
+      exhausted: false,
+      nextRoundAt: null,
+      recap: [],
+      nodes: [
+        {
+          id: "s",
+          text: "Scene one",
+          image: { url: "https://x/y.png", alt: "A room" },
+          choices: [{ id: "c1", text: "Go on", nextNodeId: "end" }],
+        },
+        { id: "end", text: "The end", outcome: "POSITIVE" },
+      ],
+    });
+    const renderWith = (experience?: "CLASSIC" | "STORY") => {
+      (api.useGetLearnTrackDetailQuery as vi.Mock).mockReturnValue({
+        data: branchingTrack,
+        isError: false,
+        refetch: vi.fn(),
+      });
+      (api.useStartTrackItemMutation as vi.Mock).mockReturnValue([
+        vi.fn().mockReturnValue({
+          unwrap: vi.fn().mockResolvedValue(branchingPayload(experience)),
+        }),
+        { isLoading: false },
+      ]);
+      render(
+        <Provider store={store}>
+          <MemoryRouter initialEntries={["/track/track1/item1"]}>
+            <Routes>
+              <Route path="/track/:trackId/:itemId" element={<TrackPlayer />} />
+            </Routes>
+          </MemoryRouter>
+        </Provider>,
+      );
+    };
+
+    it("hides the course's bottom nav while a story scenario plays, keeping the close button", async () => {
+      renderWith("STORY");
+      await screen.findByTestId("branching-story");
+      expect(screen.queryByRole("button", { name: "Previous" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Go on" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { level: 1, name: "Test Item Title" }),
+      ).toBeInTheDocument();
+    });
+
+    it("keeps the bottom nav for a classic scenario (and an old server sending no experience)", async () => {
+      renderWith();
+      await screen.findByText("Scene one");
+      expect(screen.queryByTestId("branching-story")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Previous" })).toBeInTheDocument();
+    });
+  });
+
+  describe("article reading experiences", () => {
+    // Two articles, the second current, so the course nav has somewhere to go.
+    const articleTrack = {
+      ...mockTrackDetail,
+      totalItems: 2,
+      sections: [
+        {
+          ...mockTrackDetail.sections[0],
+          items: [
+            {
+              ...mockTrackDetail.sections[0].items[0],
+              id: "item0",
+              title: "Earlier item",
+              status: TrackItemStatus.COMPLETED,
+            },
+            { ...mockTrackDetail.sections[0].items[0], order: 2 },
+          ],
+        },
+      ],
+    };
+    const startItem = vi.fn();
+    const renderWith = (experience?: "CLASSIC" | "MAGAZINE" | "CARDS") => {
+      (api.useGetLearnTrackDetailQuery as vi.Mock).mockReturnValue({
+        data: articleTrack,
+        isError: false,
+        refetch: vi.fn(),
+      });
+      startItem.mockReset().mockReturnValue({
+        unwrap: vi.fn().mockResolvedValue({
+          type: TrackItemType.ARTICLE,
+          trackItemProgressId: "p1",
+          html: "<h2>Part one</h2><p>Hello</p>",
+          minReadSeconds: 0,
+          experience,
+        }),
+      });
+      (api.useStartTrackItemMutation as vi.Mock).mockReturnValue([startItem]);
+      render(
+        <Provider store={store}>
+          <MemoryRouter initialEntries={["/track/track1/item1"]}>
+            <Routes>
+              <Route path="/track/:trackId/:itemId" element={<TrackPlayer />} />
+            </Routes>
+          </MemoryRouter>
+        </Provider>,
+      );
+    };
+
+    it("hides the course's bottom nav under a cards article, which pages itself", async () => {
+      renderWith("CARDS");
+      await screen.findByTestId("article-cards");
+      expect(screen.queryByRole("button", { name: "Previous" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Start reading/ })).toBeInTheDocument();
+      // The top bar (close button, progress) stays; the cover card repeats the title.
+      expect(screen.getByRole("button", { name: "Exit" })).toBeInTheDocument();
+      expect(screen.getAllByRole("heading", { level: 1, name: "Test Item Title" })).toHaveLength(2);
+    });
+
+    it("leaves the arrow keys to the cards, not the course", async () => {
+      renderWith("CARDS");
+      await screen.findByTestId("article-cards");
+      fireEvent.keyDown(window, { key: "ArrowLeft" });
+      fireEvent.keyDown(window, { key: "ArrowRight" });
+      await screen.findByText("Hello");
+      expect(startItem).toHaveBeenCalledTimes(1);
+      expect(startItem).toHaveBeenCalledWith({ itemId: "item1" });
+    });
+
+    it("keeps the bottom nav for magazine and classic articles", async () => {
+      renderWith("MAGAZINE");
+      await screen.findByTestId("article-magazine");
+      expect(screen.getByRole("button", { name: "Previous" })).toBeInTheDocument();
+    });
+  });
 });

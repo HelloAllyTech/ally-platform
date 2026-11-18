@@ -14,6 +14,11 @@ export interface LeaderboardUser {
   name: string;
   profileImageUrl?: string;
   minutesPlayed: number;
+  /**
+   * XP earned in the selected window — the value rank is ordered by. Optional so
+   * the component keeps rendering against an API that has not shipped it yet.
+   */
+  xpScore?: number;
   badgeCount: number;
   /**
    * All-time consecutive-active-days streak. Optional so the component keeps
@@ -28,10 +33,12 @@ export interface LeaderboardUser {
  *
  * Narrow screens drop columns rather than squeezing them: below `sm` everything
  * but the name collapses into a single meta line under it. Streak outranks
- * badges because it changes daily and badges accumulate.
+ * badges because it changes daily and badges accumulate. XP never collapses: it is
+ * what rank is ordered by, so a rank without it is unexplained.
  */
 const COL = {
   rank: "w-16 shrink-0",
+  xp: "w-20 shrink-0",
   duration: "w-40 hidden md:block shrink-0",
   streak: "w-24 hidden sm:block shrink-0",
   badges: "w-24 hidden lg:block shrink-0",
@@ -219,6 +226,17 @@ const LeaderboardRow: FC<LeaderboardRowProps> = ({
         </div>
       </div>
 
+      {/* XP */}
+      <div className={cn(COL.xp, "text-right")}>
+        {user.xpScore !== undefined ? (
+          <span className="text-typography-900 text-base font-semibold">
+            {user.xpScore.toLocaleString()}
+          </span>
+        ) : (
+          <span className="text-typography-500 text-base">—</span>
+        )}
+      </div>
+
       {/* Total Duration */}
       <div className={cn(COL.duration, "text-right")}>
         <span className="text-typography-800 text-base">
@@ -263,6 +281,11 @@ const SkeletonRow: FC<{ isLast?: boolean }> = ({ isLast }) => {
       <div className="flex items-center gap-4 flex-1 min-w-0">
         <div className="w-12 h-12 rounded-full bg-neutral-200" />
         <div className="h-4 w-32 bg-neutral-200 rounded" />
+      </div>
+
+      {/* XP skeleton */}
+      <div className={cn(COL.xp, "flex justify-end")}>
+        <div className="h-4 w-12 bg-neutral-200 rounded" />
       </div>
 
       {/* Total Duration skeleton */}
@@ -401,6 +424,9 @@ export const LeaderboardList: FC<LeaderboardListProps> = ({
           <div className={cn(COL.rank, "text-center")}>{t("community.table.rank")}</div>
         )}
         <div className="flex-1 min-w-0">{t("community.table.user")}</div>
+        <div className={cn(COL.xp, "text-right")} title={t("community.table.xpHint")}>
+          {t("community.table.xp")}
+        </div>
         <div className={cn(COL.duration, "text-right")}>{t("community.table.totalDuration")}</div>
         <div className={cn(COL.streak, "text-center")} title={t("community.table.streakHint")}>
           {t("community.table.streak")}

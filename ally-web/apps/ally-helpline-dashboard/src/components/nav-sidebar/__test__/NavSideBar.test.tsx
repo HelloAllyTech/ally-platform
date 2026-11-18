@@ -47,6 +47,8 @@ vi.mock("@hooks", () => ({
   // CHARACTER_LIBRARY entry anyway, so this only needs to exist, not vary.
   useCanViewCharacterLibrary: () => ({ canView: false, isLoading: false }),
   useCanUseTextHelpline: () => ({ canView: false, isLoading: false }),
+  // Exhaustive mock: NavSideBar gates the Branding tab on this hook.
+  useCanEditOrgBranding: () => ({ canEdit: false, isLoading: false }),
   // useAnalytics reads the role from the Redux store; this suite renders without one.
   useAnalytics: () => ({ track: vi.fn() }),
   // Exhaustive mock: NavSideBar gates the Statistics tab on this hook, which
@@ -275,6 +277,8 @@ const mockOnClose = vi.fn();
 
 // Import component and types after mocks are set up
 import NavSideBar from "../NavSideBar";
+import { useGetLogoUrlQuery } from "@api";
+import { ALLY_BRANDING, BrandingContext } from "../../../branding";
 import { NavSideBarProps } from "../types";
 
 const getDefaultProps = (): NavSideBarProps => {
@@ -296,6 +300,22 @@ const renderComponent = (props: Partial<NavSideBarProps> = {}) => {
 };
 
 const PINNED_KEY = "navSidebarPinned";
+
+// Org branding: rendered with the context the BrandingProvider would supply
+// for an org whose switch is on. The provider itself is covered in src/branding.
+const renderBranded = (enabled: boolean, props: Partial<NavSideBarProps> = {}) => {
+  localStorage.setItem(PINNED_KEY, "true");
+  const branding = enabled
+    ? { ...ALLY_BRANDING, enabled: true, displayName: "Acme Helpline" }
+    : ALLY_BRANDING;
+  return render(
+    <BrowserRouter>
+      <BrandingContext.Provider value={{ branding, enabled }}>
+        <NavSideBar {...getDefaultProps()} {...props} />
+      </BrandingContext.Provider>
+    </BrowserRouter>,
+  );
+};
 
 // The desktop rail starts collapsed, where tabs are bare icons. Tests about a
 // tab's visible label render it the way a user who pinned it open sees it.
@@ -872,5 +892,62 @@ describe("NavSideBar", () => {
       expect(mockOnTabChange).toHaveBeenCalledWith("/analytics");
       expect(screen.getByTestId(`nav-tab-${TabId.ANALYTICS}`).tagName).toBe("DIV");
     });
+  });
+});
+
+describe("NavSideBar — organization branding", () => {
+  it("shows a Powered by Ally line, and no org name beside the logo, when branded", () => {
+    renderBranded(true);
+
+    expect(screen.queryByTestId("nav-sidebar-org-name")).not.toBeInTheDocument();
+    expect(screen.getByTestId("nav-sidebar-powered-by")).toHaveTextContent(/powered by ally/i);
+  });
+
+  it("shows neither for an org on Ally's own look", () => {
+    renderBranded(false);
+
+    expect(screen.queryByTestId("nav-sidebar-org-name")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("nav-sidebar-powered-by")).not.toBeInTheDocument();
+  });
+});
+
+describe("NavSideBar — tenant logo", () => {
+  const setLogo = (logoUrl: string | null) =>
+    vi.mocked(useGetLogoUrlQuery).mockReturnValue({
+      data: logoUrl === null ? null : { name: "Acme", logoUrl },
+    } as never);
+
+  afterEach(() => setLogo(null));
+
+  it("renders the logo at a fixed height with a free width", () => {
+    setLogo("https://cdn.example.com/acme.png");
+    renderComponent();
+
+    const logo = screen.getByTestId("nav-sidebar-logo");
+    expect(logo).toHaveAttribute("src", "https://cdn.example.com/acme.png");
+    expect(logo).toHaveClass("h-16", "w-auto", "object-contain");
+    expect(screen.getByTestId("nav-sidebar-header")).toHaveClass("h-[72px]");
+  });
+
+  it("shows nothing, and a compact header row, when the org has no logo", () => {
+    for (const none of [null, ""]) {
+      setLogo(none);
+      const { unmount } = renderComponent();
+
+      expect(screen.queryByTestId("nav-sidebar-logo")).not.toBeInTheDocument();
+      expect(screen.queryByAltText("org-logo")).not.toBeInTheDocument();
+      expect(screen.getByTestId("nav-sidebar-header")).toHaveClass("h-12");
+      expect(screen.getByTestId("nav-sidebar-toggle")).toBeInTheDocument();
+      unmount();
+    }
+  });
+
+  it("drops a logo that fails to load instead of showing a broken image", () => {
+    setLogo("https://cdn.example.com/dead.png");
+    renderComponent();
+
+    fireEvent.error(screen.getByTestId("nav-sidebar-logo"));
+
+    expect(screen.queryByTestId("nav-sidebar-logo")).not.toBeInTheDocument();
   });
 });

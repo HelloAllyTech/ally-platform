@@ -61,9 +61,11 @@ export const SCENARIO_METADATA_FIELDS: (keyof UpdateScenarioDto)[] = [
   'textChatEnabled',
   'liveTabEnabled',
   'pauseEnabled',
+  'debriefRiskCueOption',
   'currentState',
   'remindersEnabled',
   'knowledgeSources',
+  'memories',
   'stateNames',
   'selectedMainPromptCode',
   'selectedEvaluatorPromptCode',
@@ -270,6 +272,8 @@ export const mapCreateScenarioRequestToEntity = (
       // author explicitly disables it.
       liveTabEnabled: scenario.liveTabEnabled,
       pauseEnabled: scenario.pauseEnabled,
+      // What the roleplay's Debrief assesses and how it handles a risk cue (unset: today's).
+      debriefRiskCueOption: scenario.debriefRiskCueOption,
       currentState: scenario.currentState,
       remindersEnabled: scenario.remindersEnabled,
       knowledgeSources: scenario.knowledgeSources?.map((knowledgeSource) => ({
@@ -280,6 +284,17 @@ export const mapCreateScenarioRequestToEntity = (
         // dispatch path strips empties too — see createRoomMetadata.
         ...(knowledgeSource.unlocksFromStateId
           ? { unlocksFromStateId: knowledgeSource.unlocksFromStateId }
+          : {}),
+      })),
+      memories: scenario.memories?.map((memory) => ({
+        id: memory.id,
+        title: memory.title,
+        content: memory.content,
+        ...(memory.unlocksFromStateId
+          ? { unlocksFromStateId: memory.unlocksFromStateId }
+          : {}),
+        ...(Array.isArray(memory.unlocksInStateIds)
+          ? { unlocksInStateIds: memory.unlocksInStateIds }
           : {}),
       })),
       stateNames: scenario.stateNames,

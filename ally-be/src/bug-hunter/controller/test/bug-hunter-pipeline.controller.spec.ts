@@ -10,7 +10,7 @@ import { BugHunterModelSettingsService } from '../../service/bug-hunter-model-se
 import { BugHunterTelemetryService } from '../../service/bug-hunter-telemetry.service';
 import { BugHunterEvalService } from '../../service/bug-hunter-eval.service';
 import { BugHunterPolicyService } from '../../service/bug-hunter-policy.service';
-import { AgentMemoryService } from 'src/agent-memory/service/agent-memory.service';
+import { ContextAgentChunkService } from 'src/context-library/service/context-agent-chunk.service';
 import { BugHunterDossierService } from '../../service/bug-hunter-dossier.service';
 import { BugCaseFileService } from '../../service/bug-case-file.service';
 import { BugVerifyFixService } from '../../service/bug-verify-fix.service';
@@ -19,7 +19,6 @@ import { BugHunterFinderService } from '../../service/bug-hunter-finder.service'
 import { BugFixStudyService } from '../../service/bug-fix-study.service';
 import { BugHunterOrchestratorService } from '../../service/bug-hunter-orchestrator.service';
 import { SearchBugHunterMemoryQueryDto } from '../../dto/bug-hunter-memory.dto';
-import { AgentMemoryAgent } from 'src/agent-memory/enum/agent-memory.enum';
 import { BugFindingStatus } from '../../enum/bug-finding.enum';
 import { ValidationPipe } from '@nestjs/common';
 import { BugHunterProbeService } from '../../service/bug-hunter-probe.service';
@@ -29,7 +28,7 @@ import { BugHunterFeatureMapService } from '../../service/bug-hunter-feature-map
 
 describe('BugHunterPipelineController', () => {
   let controller: BugHunterPipelineController;
-  let agentMemoryService: AgentMemoryService;
+  let notes: ContextAgentChunkService;
   let bugFindingService: BugFindingService;
   let module: TestingModule;
 
@@ -83,8 +82,12 @@ describe('BugHunterPipelineController', () => {
           useValue: { assertTransitionAllowed: jest.fn() },
         },
         {
-          provide: AgentMemoryService,
-          useValue: { search: jest.fn(), write: jest.fn() },
+          provide: ContextAgentChunkService,
+          useValue: {
+            search: jest.fn(),
+            writeAgentChunk: jest.fn(),
+            recordFeedback: jest.fn(),
+          },
         },
         { provide: BugHunterDossierService, useValue: { build: jest.fn() } },
         { provide: BugCaseFileService, useValue: { build: jest.fn() } },
@@ -115,7 +118,7 @@ describe('BugHunterPipelineController', () => {
     controller = module.get<BugHunterPipelineController>(
       BugHunterPipelineController,
     );
-    agentMemoryService = module.get<AgentMemoryService>(AgentMemoryService);
+    notes = module.get<ContextAgentChunkService>(ContextAgentChunkService);
     bugFindingService = module.get<BugFindingService>(BugFindingService);
   });
 
@@ -198,13 +201,13 @@ describe('BugHunterPipelineController', () => {
         },
       });
 
-      expect(agentMemoryService.write).toHaveBeenCalledWith({
-        agent: AgentMemoryAgent.BUG_HUNTER,
-        body: 'ally-be: scheduler specs need a live Redis on the runner',
+      expect(notes.writeAgentChunk).toHaveBeenCalledWith({
+        collection: 'bug_hunter_notes',
+        agent: 'bug_hunter',
+        statement: 'ally-be: scheduler specs need a live Redis on the runner',
         repos: ['ally-be'],
-        tags: ['fix-gotcha', 'postmortem'],
-        runId: 'run-1',
-        findingId: 'finding-1',
+        facets: { tags: ['fix-gotcha', 'postmortem'] },
+        evidence: { runId: 'run-1', findingId: 'finding-1' },
       });
     });
 
@@ -223,12 +226,12 @@ describe('BugHunterPipelineController', () => {
         },
       });
 
-      expect(agentMemoryService.write).not.toHaveBeenCalled();
+      expect(notes.writeAgentChunk).not.toHaveBeenCalled();
     });
 
     it('still returns the finding when the notebook write fails — the failure was already recorded', async () => {
       (bugFindingService.setStatus as jest.Mock).mockResolvedValue(failed);
-      (agentMemoryService.write as jest.Mock).mockRejectedValue(
+      (notes.writeAgentChunk as jest.Mock).mockRejectedValue(
         new Error('ally-ai down'),
       );
 
@@ -251,9 +254,11 @@ describe('BugHunterPipelineController', () => {
 
   describe('memoryFeedback (OPP-0752)', () => {
     it('records the counters and marks the run as having reported, so an empty list still counts', async () => {
-      (agentMemoryService as any).recordFeedback = jest
-        .fn()
-        .mockResolvedValue({ applied: 0, contradicted: 0 });
+      (notes.recordFeedback as jest.Mock).mockResolvedValue({
+        applied: 0,
+        contradicted: 0,
+        unused: 4,
+      });
       const runs = module.get<BugHuntRunRepository>(
         BugHuntRunRepository,
       ) as any;
@@ -268,7 +273,11 @@ describe('BugHunterPipelineController', () => {
       });
 
       expect(result).toEqual({ applied: 0, contradicted: 0 });
-      expect((agentMemoryService as any).recordFeedback).toHaveBeenCalledWith({
+      // The run is the session: what it was shown and did not apply is marked unused.
+      expect(notes.recordFeedback).toHaveBeenCalledWith({
+        useCase: 'bug_hunter',
+        collection: 'bug_hunter_notes',
+        sessionId: 'run-1',
         applied: [],
         contradicted: [],
       });
@@ -308,12 +317,15 @@ describe('BugHunterPipelineController', () => {
 
       await validationPipe.transform(dto, { type: 'query' });
 
-      (agentMemoryService.search as jest.Mock).mockResolvedValue([]);
+      (notes.search as jest.Mock).mockResolvedValue([]);
 
       await controller.searchMemory(dto);
 
-      expect(agentMemoryService.search).toHaveBeenCalledWith(
+      expect(notes.search).toHaveBeenCalledWith(
         expect.objectContaining({
+          useCase: 'bug_hunter',
+          collection: 'bug_hunter_notes',
+          repos: ['ally-be'],
           limit: 3,
         }),
       );

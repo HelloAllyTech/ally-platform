@@ -8,12 +8,10 @@ import {
 
 /** Consumers a retrieval can come from — see `consumer` on kb_retrievals. */
 export const RAG_CONSUMERS = [
-  'interview_agent',
   'admin_preview',
   'whatsapp_bot',
   'reference_search',
   'roadmap_matcher',
-  'ally_guide',
 ] as const;
 export type RagConsumerParam = (typeof RAG_CONSUMERS)[number];
 
@@ -28,8 +26,6 @@ export type RagConsumerParam = (typeof RAG_CONSUMERS)[number];
  */
 export const RAG_CORPORA = [
   'whatsapp_qa',
-  'character_library',
-  'ally_guide_library',
   'reference_documents',
   'roadmap_opportunities',
 ] as const;
@@ -40,7 +36,7 @@ export type RagCorpusParam = (typeof RAG_CORPORA)[number];
  *
  * `consumer` is not a convenience filter. The admin retrieval preview is an operator probing
  * thresholds — deliberately odd queries, repeated, often against material uploaded a minute
- * earlier — and the interview agent's queries are the ones a floor should be calibrated
+ * earlier — and the agents' queries are the ones a floor should be calibrated
  * against. Pooled, an afternoon of tuning moves the very distribution the tuning was meant to
  * read, which is the trap the language judge already fell into once.
  */

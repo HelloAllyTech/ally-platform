@@ -26,7 +26,7 @@ describe('BugHunterFeatureMapService', () => {
     delete: jest.Mock;
     createQueryBuilder: jest.Mock;
   };
-  let memory: { write: jest.Mock };
+  let memory: { writeAgentChunk: jest.Mock };
   let bugHunterService: {
     getSettings: jest.Mock;
     startRun: jest.Mock;
@@ -44,7 +44,7 @@ describe('BugHunterFeatureMapService', () => {
       delete: jest.fn(),
       createQueryBuilder: jest.fn(),
     };
-    memory = { write: jest.fn() };
+    memory = { writeAgentChunk: jest.fn() };
     bugHunterService = {
       getSettings: jest.fn().mockResolvedValue({ mode: BugHunterMode.AI }),
       startRun: jest.fn().mockResolvedValue({ id: 'map-1' }),
@@ -174,20 +174,22 @@ describe('BugHunterFeatureMapService', () => {
       'Describes UI label bundles; simulation titles come translated from ally-be.',
     );
     expect(repository.delete).toHaveBeenCalledWith('c-9');
-    expect(memory.write).toHaveBeenCalledWith(
+    // A Bug Hunter note in the Context Library, as a candidate the curator folds in.
+    expect(memory.writeAgentChunk).toHaveBeenCalledWith(
       expect.objectContaining({
+        collection: 'bug_hunter_notes',
+        agent: 'bug_hunter',
         repos: ['ally-web'],
-        tags: ['feature-map', 'wrong-card'],
+        facets: { tags: ['feature-map', 'wrong-card'] },
         createdBy: 136,
-        curated: true,
-        body: expect.stringContaining(
+        statement: expect.stringContaining(
           'was removed as wrong: Describes UI label bundles',
         ),
       }),
     );
-    memory.write.mockClear();
+    memory.writeAgentChunk.mockClear();
     await service.remove('c-9', 136);
-    expect(memory.write).not.toHaveBeenCalled();
+    expect(memory.writeAgentChunk).not.toHaveBeenCalled();
     repository.findOne.mockResolvedValue(null);
     await expect(service.remove('nope', 136)).rejects.toThrow(
       /No feature card/,

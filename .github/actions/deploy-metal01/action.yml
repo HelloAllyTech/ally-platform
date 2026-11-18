@@ -1,0 +1,85 @@
+# Deploys a service to the metal01 production stack (Hetzner) by running its
+# Ansible playbook from the private HelloAllyTech/infra repo.
+#
+# Prod moved from ECS to incus containers on metal01 at the 2026-11-07 cutover
+# (infra/docs/metal01-cutover-runbook.md). The runner reaches the containers'
+# internal hostnames by SSH-jumping through metal01's public address; DB
+# migrations run inside the playbooks (ally_docker_service role), so no
+# separate migration job is needed.
+#
+# Required repository secrets (see infra docs):
+#   METAL01_ANSIBLE_SSH_KEY  private key accepted by ally@metal01 and the prod containers
+#   INFRA_DEPLOY_KEY         read-only deploy key on HelloAllyTech/infra
+#   ANSIBLE_VAULT_PASSWORD   the infra repo's ansible-vault password
+name: Deploy to metal01
+description: Run an infra Ansible playbook against the metal01 production stack
+
+inputs:
+  playbook:
+    description: Playbook filename inside infra/ansible (e.g. ally_core.yml)
+    required: true
+  extra-args:
+    description: Extra ansible-playbook arguments (e.g. -e inline_ecr_image=...)
+    required: false
+    default: ""
+  ssh-key:
+    description: METAL01_ANSIBLE_SSH_KEY secret
+    required: true
+  infra-deploy-key:
+    description: INFRA_DEPLOY_KEY secret
+    required: true
+  vault-password:
+    description: ANSIBLE_VAULT_PASSWORD secret
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout infra repo
+      uses: actions/checkout@v4
+      with:
+        repository: HelloAllyTech/infra
+        ssh-key: ${{ inputs.infra-deploy-key }}
+        path: infra-repo
+
+    - name: Install Ansible
+      shell: bash
+      run: pipx install --include-deps ansible
+
+    - name: Configure SSH and vault access
+      shell: bash
+      run: |
+        mkdir -p ~/.ssh && chmod 700 ~/.ssh
+        # Paths match infra's ansible.cfg (private_key_file, vault_password_file).
+        cat > ~/.ssh/id_ansible_ally <<'DEPLOY_KEY_EOF'
+        ${{ inputs.ssh-key }}
+        DEPLOY_KEY_EOF
+        chmod 600 ~/.ssh/id_ansible_ally
+        cat > ~/ansible_vault_pass <<'VAULT_PASS_EOF'
+        ${{ inputs.vault-password }}
+        VAULT_PASS_EOF
+        chmod 600 ~/ansible_vault_pass
+        cat >> ~/.ssh/config <<'SSH_CONFIG_EOF'
+        Host metal01.helloally.dev
+          User ally
+          IdentityFile ~/.ssh/id_ansible_ally
+          StrictHostKeyChecking no
+        Host *.internal.helloally.dev
+          User ally
+          IdentityFile ~/.ssh/id_ansible_ally
+          ProxyJump ally@metal01.helloally.dev
+          StrictHostKeyChecking no
+        SSH_CONFIG_EOF
+        chmod 600 ~/.ssh/config
+
+    - name: Run playbook
+      shell: bash
+      working-directory: infra-repo/ansible
+      run: |
+        ansible-playbook -i inventories/production \
+          ${{ inputs.playbook }} ${{ inputs.extra-args }}
+
+    - name: Clean up credentials
+      if: always()
+      shell: bash
+      run: rm -f ~/.ssh/id_ansible_ally ~/ansible_vault_pass

@@ -1,9 +1,11 @@
+import { ImageAssetService } from 'src/image-studio/service/image-asset.service';
 import {
   BadRequestException,
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { DataSource, DeepPartial, EntityManager, In } from 'typeorm';
 
@@ -107,6 +109,8 @@ import { ScenarioCompletionSummary } from '../interface/scenario-completion.inte
 import { ScenarioSessionRepository } from '../repository/scenario-session.repository';
 import { TriggerWarningsService } from './trigger-warnings.service';
 import { ScenarioTranslationsRepository } from '../repository/scenario-translations.repository';
+import { ScenarioTranslations } from '../entity/scenario-translation.entity';
+import { ScenarioEventsTranslation } from '../entity/scenario-events-translation.entity';
 import { GoogleTranslationsService } from 'src/common/service/google-translation.service';
 import { SharedLanguageService } from '../../language/service/shared-language.service';
 import { ScenarioSharedService } from './scenario-shared.service';
@@ -140,6 +144,7 @@ import {
   OpenAITranslationsService,
   TranslationProgressCallback,
 } from 'src/common/service/openai-translation.service';
+import { ScenarioDescriptionAudioService } from './scenario-description-audio.service';
 import { ScenarioTranslationNotificationService } from './scenario-translation-notification.service';
 import {
   ScenarioTranslationAction,
@@ -250,6 +255,9 @@ export class ScenarioService {
     private readonly cohortVisibilityService: CohortVisibilityService,
     private readonly tenantFeatureService: TenantFeatureService,
     private readonly contentAccessService: ContentAccessService,
+    @Optional() private readonly imageAssetService?: ImageAssetService,
+    @Optional()
+    private readonly descriptionAudioService?: ScenarioDescriptionAudioService,
   ) {}
 
   async getScenarios(): Promise<GetScenarioDto[]> {
@@ -521,6 +529,11 @@ export class ScenarioService {
     }
 
     if (languageCode) {
+      // The narration reads the base-language description: hide it when the
+      // learner is shown a translated one.
+      if (scenario.translations?.[languageCode]?.description) {
+        scenario.descriptionAudioUrl = null;
+      }
       applyScenarioTranslations(scenario, languageCode);
       scenario.triggerWarnings?.forEach((triggerWarning) => {
         if (
@@ -700,6 +713,14 @@ export class ScenarioService {
       throw new Error(
         'S3 bucket name for learnMediaPublicBucket is not defined',
       );
+    }
+    // A cover can be shared: a character's portrait copied in by the
+    // character picker, a library image, an AI-generated image. Deleting it
+    // when this roleplay's cover changes would blank it everywhere else.
+    if (
+      await this.imageAssetService?.isShared(deleteCoverImageDto.coverImageUrl)
+    ) {
+      return { success: true };
     }
     return this.s3Service.deleteS3Image(
       bucket,
@@ -1032,6 +1053,10 @@ export class ScenarioService {
         }
       }
 
+      for (const saved of savedScenarios) {
+        void this.descriptionAudioService?.onScenarioSaved(saved.id);
+      }
+
       return savedScenarios;
     } catch (error) {
       this.logger.error(
@@ -1093,10 +1118,16 @@ export class ScenarioService {
       }
     }
 
-    const unlockErrors = validateKnowledgeSourceUnlocks(
-      createScenarioDto.knowledgeSources,
-      createScenarioDto.states,
-    );
+    const unlockErrors = [
+      ...validateKnowledgeSourceUnlocks(
+        createScenarioDto.knowledgeSources,
+        createScenarioDto.states,
+      ),
+      ...validateKnowledgeSourceUnlocks(
+        createScenarioDto.memories,
+        createScenarioDto.states,
+      ),
+    ];
     if (unlockErrors.length > 0) {
       throw new BadRequestException(unlockErrors.join(' '));
     }
@@ -1731,6 +1762,10 @@ export class ScenarioService {
         ? await runUpdate(manager)
         : await this.dataSource.transaction(runUpdate);
 
+      if (success) {
+        void this.descriptionAudioService?.onScenarioSaved(id, manager);
+      }
+
       if (
         success &&
         (updateScenarioDto.translationOpeningStatements !== undefined ||
@@ -1925,6 +1960,8 @@ export class ScenarioService {
         }
       }
 
+      await this.copyScenarioTranslations(manager, id, newScenarioData.id);
+
       // Copy behavior instructions from the original scenario
       if (
         originalBehaviorInstructions &&
@@ -1967,6 +2004,56 @@ export class ScenarioService {
       this.logger.info(`Scenario ${id} duplicated successfully`);
       return newScenarioData;
     });
+  }
+
+  /**
+   * Copy a scenario's per-language text to its duplicate: opening statements,
+   * description, state names and Knowledge Sources (`scenario_translations`),
+   * and its events' messages (`scenario_events_translations`). Without them a
+   * copy plays its English opening statement in a Hindi session and shows
+   * English text in every other language until each field is edited again.
+   *
+   * The translated title is left behind: the copy's own title is "Copy of …",
+   * and a translation of the source's title would hide that it is a copy.
+   */
+  private async copyScenarioTranslations(
+    manager: EntityManager,
+    sourceId: number,
+    copyId: number,
+  ): Promise<void> {
+    const scenarioRepo = manager.getRepository(ScenarioTranslations);
+    const rows = await scenarioRepo.find({ where: { scenarioId: sourceId } });
+    if (rows.length > 0) {
+      await scenarioRepo.save(
+        rows.map(({ languageId, metadata }) => {
+          const rest = { ...(metadata ?? {}) };
+          delete rest.title;
+          return scenarioRepo.create({
+            scenarioId: copyId,
+            languageId,
+            metadata: rest,
+          });
+        }),
+      );
+    }
+
+    const eventRepo = manager.getRepository(ScenarioEventsTranslation);
+    const eventRows = await eventRepo.find({
+      where: { scenarioId: sourceId },
+    });
+    if (eventRows.length > 0) {
+      await eventRepo.save(
+        eventRows.map(({ eventId, languageId, message, branchInstruction }) =>
+          eventRepo.create({
+            scenarioId: copyId,
+            eventId,
+            languageId,
+            message,
+            branchInstruction,
+          }),
+        ),
+      );
+    }
   }
 
   async validateUpdateScenario(
@@ -2012,16 +2099,26 @@ export class ScenarioService {
     // Memory locks are checked against the EFFECTIVE pair: a payload may carry
     // only one of knowledgeSources / states, and a lock must still resolve
     // against whichever of the two is already stored.
-    const unlockErrors = validateKnowledgeSourceUnlocks(
-      updateScenarioDto.knowledgeSources !== undefined
-        ? updateScenarioDto.knowledgeSources
-        : (
-            scenario.metadata as
-              | { knowledgeSources?: KnowledgeSourceDto[] }
-              | undefined
-          )?.knowledgeSources,
-      effectiveStates as SimulationState[] | undefined,
-    );
+    const storedMetadata = scenario.metadata as
+      | {
+          knowledgeSources?: KnowledgeSourceDto[];
+          memories?: KnowledgeSourceDto[];
+        }
+      | undefined;
+    const unlockErrors = [
+      ...validateKnowledgeSourceUnlocks(
+        updateScenarioDto.knowledgeSources !== undefined
+          ? updateScenarioDto.knowledgeSources
+          : storedMetadata?.knowledgeSources,
+        effectiveStates as SimulationState[] | undefined,
+      ),
+      ...validateKnowledgeSourceUnlocks(
+        updateScenarioDto.memories !== undefined
+          ? updateScenarioDto.memories
+          : storedMetadata?.memories,
+        effectiveStates as SimulationState[] | undefined,
+      ),
+    ];
     if (unlockErrors.length > 0) {
       throw new BadRequestException(unlockErrors.join(' '));
     }

@@ -4,7 +4,12 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-import { useGetUserQuery, useGetPermissionsQuery, useGetUserPreferencesQuery } from "@api";
+import {
+  useGetUserQuery,
+  useGetPermissionsQuery,
+  useGetUserPreferencesQuery,
+  useGetFeatureTogglesQuery,
+} from "@api";
 import { LOCAL_STORAGE_KEYS, ROUTES, Permissions, SIDEBAR_ITEMS, UserRole } from "@constants";
 
 import { DefaultRedirect } from "../DefaultRedirect";
@@ -19,6 +24,9 @@ vi.mock("@api", () => ({
   useGetPermissionsQuery: vi.fn(),
   useGetUserPreferencesQuery: vi.fn(),
   useGetCharacterLibraryEnabledQuery: vi.fn(() => ({ data: false, isLoading: false })),
+  // The assistants they're on (chunk 6b): none unless a test says so.
+  useGetChatbotsQuery: vi.fn(() => ({ data: { chatbots: [] }, isLoading: false })),
+  useGetRoadmapMeRoleQuery: vi.fn(() => ({ data: undefined, isLoading: false })),
   // Feature-gated tabs can be the landing tab, so this screen fetches the
   // per-user toggles. Default to content_management on, matching the backfill
   // every platform admin gets, plus the per-tab toggles ally-be grants by default.
@@ -60,6 +68,8 @@ const renderAtRoot = () =>
         <Route path={ROUTES.LOGIN} element={<div>LoginPage</div>} />
         <Route path={ROUTES.SIMULATION_STUDIO} element={<div>StudioPage</div>} />
         <Route path={ROUTES.MANAGE_EVENTS} element={<div>EventsPage</div>} />
+        <Route path={ROUTES.DEBRIEFS} element={<div>DebriefsPage</div>} />
+        <Route path={ROUTES.WHATSAPP_BOT} element={<div>AssistantsPage</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -106,6 +116,30 @@ describe("DefaultRedirect", () => {
     expect(screen.queryByText("EventsPage")).not.toBeInTheDocument();
   });
 
+  it("lands a login whose only feature is Chatbots on its assistants (A1 custom login)", async () => {
+    localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED, "true");
+    // A custom login is a platform admin: lots of permissions, one toggle.
+    mockPermsQuery.mockReturnValue({
+      data: [Permissions.EDIT_EVENT, Permissions.EDIT_USER],
+      isLoading: false,
+    } as any);
+    const { useGetFeatureTogglesQuery } = await import("@api");
+    vi.mocked(useGetFeatureTogglesQuery).mockReturnValueOnce({
+      data: ["whatsapp_bot"],
+      isLoading: false,
+    } as any);
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <Routes>
+          <Route path="/" element={<DefaultRedirect />} />
+          <Route path={ROUTES.WHATSAPP_BOT} element={<div>AssistantsPage</div>} />
+          <Route path={ROUTES.MANAGE_EVENTS} element={<div>EventsPage</div>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("AssistantsPage")).toBeInTheDocument();
+  });
+
   it("redirects to the user's first accessible tab", () => {
     localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED, "true");
     mockPermsQuery.mockReturnValue({ data: [Permissions.EDIT_EVENT], isLoading: false } as any);
@@ -129,11 +163,53 @@ describe("DefaultRedirect", () => {
     expect(screen.getByText("EventsPage")).toBeInTheDocument();
   });
 
-  it("falls back to Simulation Studio when the user has no resolvable tabs", () => {
+  it("says so, instead of Simulation Studio's access-denied page, when the user can open nothing", () => {
+    localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED, "true");
+    mockPermsQuery.mockReturnValue({
+      data: [Permissions.REVIEW_DEBRIEFS],
+      isLoading: false,
+    } as any);
+    vi.mocked(useGetFeatureTogglesQuery).mockReturnValueOnce({ data: [], isLoading: false } as any);
+    renderAtRoot();
+    expect(screen.queryByText("StudioPage")).not.toBeInTheDocument();
+    expect(screen.getByTestId("default-redirect-no-access")).toHaveTextContent(
+      "Your account can't open any page here yet.",
+    );
+  });
+
+  it("lands someone whose only way in is an assistant's team on their assistants (chunk 6b)", async () => {
     localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED, "true");
     mockPermsQuery.mockReturnValue({ data: [], isLoading: false } as any);
+    vi.mocked(useGetFeatureTogglesQuery).mockReturnValueOnce({ data: [], isLoading: false } as any);
+    const { useGetChatbotsQuery } = await import("@api");
+    vi.mocked(useGetChatbotsQuery).mockReturnValueOnce({
+      data: { chatbots: [{ id: "bot-1" }], canCreate: false },
+      isLoading: false,
+    } as any);
+    renderAtRoot();
+    expect(screen.getByText("AssistantsPage")).toBeInTheDocument();
+  });
+
+  it("falls back to Simulation Studio when neither permissions nor toggles arrived", () => {
+    localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED, "true");
+    mockPermsQuery.mockReturnValue({ data: [], isLoading: false } as any);
+    vi.mocked(useGetFeatureTogglesQuery).mockReturnValueOnce({ data: [], isLoading: false } as any);
     renderAtRoot();
     expect(screen.getByText("StudioPage")).toBeInTheDocument();
+  });
+
+  it("lands a clinical advisor (review:admin:debriefs, the advisor's toggle, no platform group) on Debriefs", () => {
+    localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED, "true");
+    mockPermsQuery.mockReturnValue({
+      data: [Permissions.REVIEW_DEBRIEFS],
+      isLoading: false,
+    } as any);
+    vi.mocked(useGetFeatureTogglesQuery).mockReturnValueOnce({
+      data: ["debrief_clinical_sign_off"],
+      isLoading: false,
+    } as any);
+    renderAtRoot();
+    expect(screen.getByText("DebriefsPage")).toBeInTheDocument();
   });
 
   it("still resolves the first tab when the preferences query errors (403)", () => {

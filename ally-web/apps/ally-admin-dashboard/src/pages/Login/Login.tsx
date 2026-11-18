@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 
 import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import { AnimatePresence, motion } from "framer-motion";
 import { useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { CustomImage, GoogleSignInButton } from "@ally-ui-mono/ui-shared";
@@ -20,13 +20,29 @@ import {
 } from "@constants";
 import { useUser } from "@hooks";
 import { RootState } from "@store";
-import { validateEmail, openLinkInNewTab } from "@utils";
+import { afterLoginPath, validateEmail, openLinkInNewTab } from "@utils";
 
 const RESEND_CODE_COUNTDOWN = 60; // 60 seconds
 const DEFAULT_EXPIRES_IN = 10; // 10 minutes
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  // Once logged in, PublicRoute already sends them on (to `next`, or through "/"). A navigate from
+  // here after this page has gone would send them back to "/" from wherever they landed: the
+  // white page at "/" after login. So this page navigates only while it is still on screen.
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const goOn = useCallback(() => {
+    if (!mounted.current) return;
+    const shownAt = `${location.pathname}${location.search}${location.hash}`;
+    navigate(afterLoginPath(location.search, shownAt), { replace: true });
+  }, [navigate, location.pathname, location.search, location.hash]);
   const { user } = useSelector((state: RootState) => state.user);
 
   const [loginSection, setLoginSection] = useState<any>(LoginSection.EMAIL);
@@ -62,7 +78,10 @@ export const Login: React.FC = () => {
   const isLoading = isGeneratingOTP || isVerifyingOTP;
 
   useEffect(() => {
-    const rememberedEmail = localStorage.getItem("rememberedEmail");
+    // Namespaced since the app moved onto the helpline dashboard's origin
+    // (app.helloally.ai/admin) - both apps used "rememberedEmail" before.
+    const rememberedEmail =
+      localStorage.getItem("adminRememberedEmail") ?? localStorage.getItem("rememberedEmail");
     if (rememberedEmail) {
       setEmail(rememberedEmail);
     }
@@ -71,7 +90,7 @@ export const Login: React.FC = () => {
   useEffect(() => {
     if (isAuthenticated && user) {
       // Route through the root so DefaultRedirect lands the user on their first tab.
-      navigate("/");
+      goOn();
     }
   }, [isAuthenticated, user, navigate]);
 
@@ -112,7 +131,7 @@ export const Login: React.FC = () => {
         localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED, "true");
         const userData = await checkAuth();
         if (userData) {
-          navigate("/");
+          goOn();
         }
       }
     })();
@@ -143,7 +162,7 @@ export const Login: React.FC = () => {
       return;
     }
     if (rememberMe) {
-      localStorage.setItem("rememberedEmail", email);
+      localStorage.setItem("adminRememberedEmail", email);
     }
     generateOTP({ email: email.trim() });
   };
@@ -165,7 +184,7 @@ export const Login: React.FC = () => {
         localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED, "true");
         const userData = await checkAuth();
         if (userData) {
-          navigate("/");
+          goOn();
         }
       } else {
         const error = response.error as FetchBaseQueryError;
@@ -186,6 +205,9 @@ export const Login: React.FC = () => {
       return (
         <motion.div
           key="email"
+          onKeyDown={e => {
+            if (e.key === "Enter" && !isLoading && !isSubmitDisabled) handleNext();
+          }}
           initial={{ opacity: 0, x: -50 }}
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: 50 }}
@@ -283,6 +305,9 @@ export const Login: React.FC = () => {
     return (
       <motion.div
         key="otp"
+        onKeyDown={e => {
+          if (e.key === "Enter" && !isLoading && !isSubmitDisabled) handleVerify();
+        }}
         initial={{ opacity: 0, x: 50 }}
         animate={{ opacity: 1, x: 0 }}
         exit={{ opacity: 0, x: -50 }}
@@ -309,7 +334,14 @@ export const Login: React.FC = () => {
           </span>
         </div>
         <div className="flex flex-col gap-2">
-          <OTP value={otp} onChange={setOtp} />
+          <OTP
+            value={otp}
+            onChange={setOtp}
+            autoFocus
+            onComplete={code => {
+              if (!isLoading) verifyOTP({ email: email.trim(), otp: code });
+            }}
+          />
           <div className="text-xs text-typography-900">
             {en.auth.codeWillExpire}{" "}
             <span className="font-[700]">{`${generateOTPData?.expiresIn ? generateOTPData?.expiresIn / 60 : DEFAULT_EXPIRES_IN} ${en.auth.minutes}`}</span>

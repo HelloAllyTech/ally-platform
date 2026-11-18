@@ -57,7 +57,7 @@ export interface SideQuestCardProps {
  * up front that it doesn't count, and Skip is always there and never shamed.
  * Questions are answered on the card and marked against the course's answer,
  * with Ally's line on each; a written answer gets one note from the Coach.
- * Never a score (Stacks: "Action Activities Should Not Be Graded for
+ * Never a score ("Action Activities Should Not Be Graded for
  * Correctness"): the marks say what the course would answer, nothing more.
  */
 export const SideQuestCard: FC<SideQuestCardProps> = ({

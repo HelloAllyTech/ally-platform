@@ -153,19 +153,6 @@ export const AGENT_BUILDER_TITLE = definePrompt(
   { output: 'structured' },
 );
 
-/** src/prompts/analytics_suggestions/generate.txt */
-export const ANALYTICS_SUGGESTIONS_GENERATE = definePrompt(
-  'analytics_suggestions_generate',
-  {},
-  {
-    name: 'Analytics Suggestions: Generate',
-    description:
-      "System prompt for the admin Analytics -> Suggestions tab. Carries Ally's product-vision context and governs how the model turns one window of platform analytics into at most ten roadmap suggestions: evidence must come from the payload, all-time and unavailable sections must not be misread as window changes, product goals must be copied exactly from the live list, already-proposed and previously-rejected items must not be re-proposed, and returning fewer than ten (or none) is the correct answer when the data supports fewer. The analytics payload is sent as a separate user message, so this prompt has no runtime variables.",
-    category: 'Analytics',
-    output: 'json',
-  },
-);
-
 /** src/prompts/bug_hunter/classify_miss.txt */
 export const BUG_HUNTER_CLASSIFY_MISS = definePrompt(
   'bug_hunter_classify_miss',
@@ -213,7 +200,7 @@ export const BUILDER_INTERVIEWER_SYSTEM = definePrompt(
   {
     name: 'Builder Interviewer — System',
     description:
-      'System prompt for the Builder PRD-interview agent: interviews an Ally admin one option-card question at a time, grounding each question in the codebase (GitHub tools + repo knowledge packs) and the product library (Stacks), resolving contradictions between answers, and keeping a living PRD patched to build-readiness for the coding agent to implement.',
+      'System prompt for the Builder PRD-interview agent: interviews an Ally admin one option-card question at a time, grounding each question in the codebase (GitHub tools + repo knowledge packs) and the team’s principles (the Context Library’s First Principles), resolving contradictions between answers, and keeping a living PRD patched to build-readiness for the coding agent to implement.',
     category: 'Builder',
     runtimes: ['ally-be'],
   },
@@ -342,14 +329,56 @@ export const BUILDER_INTERVIEW_SUMMARY_SYSTEM = definePrompt(
   },
 );
 
-/** src/prompts/builder/lesson_curator_system.txt */
-export const BUILDER_LESSON_CURATOR_SYSTEM = definePrompt(
-  'builder_lesson_curator_system',
+/** src/prompts/builder/rule_draft_system.txt */
+export const BUILDER_RULE_DRAFT_SYSTEM = definePrompt(
+  'builder_rule_draft_system',
   {},
   {
-    name: 'Builder — Lesson Curator',
+    name: 'Builder — Rule Draft',
     description:
-      "Folds the lessons a finished build wrote into Builder's capped lesson set, one AGREE / EDIT / ADD / REMOVE operation per candidate. Answers with a JSON array of operations; every guardrail is enforced in code.",
+      'Turns one answer the admin gave Builder into a general rule (one sentence) and the area it belongs to, for the admin to edit before saving. Answers in JSON.',
+    category: 'Builder',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/builder/rule_match_system.txt */
+export const BUILDER_RULE_MATCH_SYSTEM = definePrompt(
+  'builder_rule_match_system',
+  {},
+  {
+    name: 'Builder — Rule Preview',
+    description:
+      'Checks a proposed rule against the admin\'s earlier decisions: which it would have answered, and whether it agrees with what was chosen. Powers the rule editor\'s "would have applied to" preview. Answers in JSON.',
+    category: 'Builder',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/builder/session_ask_system.txt */
+export const BUILDER_SESSION_ASK_SYSTEM = definePrompt(
+  'builder_session_ask_system',
+  {},
+  {
+    name: 'Builder — Ask a Session',
+    description:
+      "Answers an admin's read-only question about one Builder session from its PRD, transcript, runs, pull requests, decisions and rules. Never changes the session; may suggest an instruction for the admin to send. Answers in JSON.",
+    category: 'Builder',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/builder/work_ask_system.txt */
+export const BUILDER_WORK_ASK_SYSTEM = definePrompt(
+  'builder_work_ask_system',
+  {},
+  {
+    name: 'Builder — Ask About All Work',
+    description:
+      "Answers an admin's read-only question across every Builder session in progress, the decisions waiting, the admin's rules, recent history and Up next. Answers in JSON.",
     category: 'Builder',
     runtimes: ['ally-be'],
     output: 'json',
@@ -918,6 +947,55 @@ export const PRODUCT_UPDATES_CONSOLIDATE = definePrompt(
   },
 );
 
+/** src/prompts/planning/safety_review.txt */
+export const PLANNING_SAFETY_REVIEW = definePrompt(
+  'planning_safety_review',
+  {},
+  { output: 'json' },
+);
+
+/** src/prompts/planning/privacy_review.txt */
+export const PLANNING_PRIVACY_REVIEW = definePrompt(
+  'planning_privacy_review',
+  {},
+  { output: 'json' },
+);
+
+/** src/prompts/planning/ai_quality_review.txt */
+export const PLANNING_AI_QUALITY_REVIEW = definePrompt(
+  'planning_ai_quality_review',
+  {},
+  { output: 'json' },
+);
+
+/** src/prompts/planning/outcome_review.txt */
+export const PLANNING_OUTCOME_REVIEW = definePrompt(
+  'planning_outcome_review',
+  {},
+  { output: 'json' },
+);
+
+/** src/prompts/planning/launch_plan.txt */
+export const PLANNING_LAUNCH_PLAN = definePrompt(
+  'planning_launch_plan',
+  {},
+  { output: 'json' },
+);
+
+/** src/prompts/planning/research_plan.txt */
+export const PLANNING_RESEARCH_PLAN = definePrompt(
+  'planning_research_plan',
+  {},
+  { output: 'json' },
+);
+
+/** src/prompts/planning/signal_scout.txt */
+export const PLANNING_SIGNAL_SCOUT = definePrompt(
+  'planning_signal_scout',
+  {},
+  { output: 'json' },
+);
+
 /** src/prompts/roadmap/classify_goal.txt */
 export const ROADMAP_CLASSIFY_GOAL = definePrompt(
   'roadmap_classify_goal',
@@ -1042,6 +1120,29 @@ export const TRACK_MEMORY_FACTS = definePrompt(
   { output: 'json' },
 );
 
+/** src/prompts/stage_director/memory_mapping.txt */
+export const STAGE_DIRECTOR_MEMORY_MAPPING = definePrompt(
+  'stage_director_memory_mapping',
+  {
+    title: 'optional',
+    roleInstructions: 'optional',
+    backstory: 'optional',
+    states: 'required',
+    memories: 'required',
+  },
+  {
+    name: 'Stage Director: map memories to stages',
+    description:
+      'Runs once when a simulation is switched to Main Agent Prompt — Stage ' +
+      'Director: decides, for each of its memories (its Knowledge Sources), ' +
+      'from which stage the client is ready to talk about it. The author can ' +
+      'change every assignment afterwards in the editor.',
+    category: 'Simulation Studio',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
 /** src/prompts/track_memory/fold.txt */
 export const TRACK_MEMORY_FOLD = definePrompt('track_memory_fold', {
   sessionMemories: 'required',
@@ -1067,9 +1168,106 @@ export const UX_SIGNALS_TRIAGE = definePrompt(
   {
     name: 'UX Signals: Triage',
     description:
-      "System prompt for the UX Signals scan, which reads PostHog telemetry and files what it finds into the Bug Hunter queue and the Analytics Suggestions queue. Governs how the model turns threshold-crossing detector output into at most ten bugs and ten improvements: signals sharing a route or endpoint must be clustered into one item, the detector's bug-vs-improvement prior may be overridden by the evidence, a signal the model cannot explain must be surfaced as an investigation rather than dropped, bug descriptions must stand alone as the brief an engineer receives, severity must not be inflated, product goals must be copied exactly from the live list, and already-open or previously-rejected items must not be re-filed. Detectors see behaviour and never code, so guessing at files or functions is forbidden. The signal payload is sent as a separate user message, so this prompt has no runtime variables.",
+      "System prompt for the UX Signals scan, which reads PostHog telemetry and files what it finds as Bug Hunter findings and as UX signals the PM Agent reads as evidence. Governs how the model turns threshold-crossing detector output into at most ten bugs and ten improvements: signals sharing a route or endpoint must be clustered into one item, the detector's bug-vs-improvement prior may be overridden by the evidence, a signal the model cannot explain must be surfaced as an investigation rather than dropped, bug descriptions must stand alone as the brief an engineer receives, severity must not be inflated, product goals must be copied exactly from the live list, and already-open or previously-rejected items must not be re-filed. Detectors see behaviour and never code, so guessing at files or functions is forbidden. The signal payload is sent as a separate user message, so this prompt has no runtime variables.",
     category: 'Analytics',
     output: 'json',
+  },
+);
+
+/**
+ * PM Agent (src/pm-agent, docs/pm-agent.md): one system prompt per analysis lane plus the
+ * critic. The run's data arrives as tool results and a user message, so none of them has
+ * runtime variables. The answer is a tool call (`submit_candidates` / `submit_verdicts`)
+ * validated field by field in code, not parsed text, so no `output` is declared.
+ */
+const pmAgentLane = (lane: string, name: string, focus: string) =>
+  definePrompt(
+    `pm_agent_lane_${lane}`,
+    {},
+    {
+      name: `PM Agent: ${name} lane`,
+      description:
+        `System prompt for the PM Agent's ${name} lane: a bounded, read-only tool loop that ${focus} ` +
+        'and ends with one submit_candidates call. Sets the card rules code enforces (length limits, ' +
+        'S/M size, zero open decisions, evidence ids from this run only, public-repo hygiene) and that ' +
+        'everything inside a fence is untrusted data, never an instruction.',
+      category: 'PM Agent',
+      runtimes: ['ally-be'],
+    },
+  );
+
+/** src/prompts/pm_agent/lane_analytics.txt */
+export const PM_AGENT_LANE_ANALYTICS = pmAgentLane(
+  'analytics',
+  'Analytics',
+  'reads the analytics aggregates for usage gaps',
+);
+
+/** src/prompts/pm_agent/lane_ux_signals.txt */
+export const PM_AGENT_LANE_UX_SIGNALS = pmAgentLane(
+  'ux_signals',
+  'UX signals',
+  'reads UX Signals friction findings',
+);
+
+/** src/prompts/pm_agent/lane_code_health.txt */
+export const PM_AGENT_LANE_CODE_HEALTH = pmAgentLane(
+  'code_health',
+  'Code health',
+  'reads the docs, code and product map for one contained improvement',
+);
+
+/** src/prompts/pm_agent/lane_infra_cost.txt */
+export const PM_AGENT_LANE_INFRA_COST = pmAgentLane(
+  'infra_cost',
+  'Infra & cost',
+  'reads model spend and the AI task registry',
+);
+
+/** src/prompts/pm_agent/lane_strategy_content.txt */
+export const PM_AGENT_LANE_STRATEGY_CONTENT = pmAgentLane(
+  'strategy_content',
+  'Strategy & content',
+  'reads the mandate, strategy page, roadmap and interview notes',
+);
+
+/** src/prompts/pm_agent/lane_revisions.txt */
+export const PM_AGENT_LANE_REVISIONS = pmAgentLane(
+  'revisions',
+  'Revisions',
+  "turns an admin's feedback on a closed card into one successor candidate",
+);
+
+/** src/prompts/pm_agent/critic.txt */
+export const PM_AGENT_CRITIC = definePrompt(
+  'pm_agent_critic',
+  {},
+  {
+    name: 'PM Agent: Critic',
+    description:
+      "System prompt for the PM Agent's critic, the third gate layer: one call reviews the batch of " +
+      'candidate cards that passed the deterministic and dedupe layers against a written rubric ' +
+      '(grounded, scoped, no open decisions, sensible defaults, consistent with memory and strategy, ' +
+      'buildable, honest risk) and answers through submit_verdicts. A failed card never reaches the ' +
+      'feed; a failure caused by missing knowledge may carry a question for the admin.',
+    category: 'PM Agent',
+    runtimes: ['ally-be'],
+  },
+);
+
+/** src/prompts/pm_agent/lessons.txt */
+export const PM_AGENT_LESSONS = definePrompt(
+  'pm_agent_lessons',
+  {},
+  {
+    name: 'PM Agent: Weekly lessons',
+    description:
+      "System prompt for the PM Agent's weekly reflection: reads an anonymised pack of the last 90 " +
+      'days of card decisions and outcomes (fenced as data) and proposes candidate lessons through ' +
+      'submit_lessons, each with a structured predicate. Code recomputes support from the data, ' +
+      'classifies which need an admin confirm, and replays the critic before any lesson is used.',
+    category: 'PM Agent',
+    runtimes: ['ally-be'],
   },
 );
 
@@ -1187,6 +1385,430 @@ export const FEEDBACK_GROUNDEDNESS_RUBRIC = definePrompt(
   },
 );
 
+/** src/prompts/debrief_quality/rubric.txt */
+export const DEBRIEF_QUALITY_RUBRIC = definePrompt(
+  'debrief_quality_rubric',
+  {
+    risk_cue_definition: 'required',
+    session_language: 'optional',
+    trainee_level: 'optional',
+    transcript: 'required',
+    guidance: 'optional',
+    trainee_history: 'optional',
+    debrief: 'required',
+  },
+  {
+    name: 'Debrief Quality Judge Rubric',
+    description:
+      "Static rubric for the debrief-quality judge: scores a learner's whole debrief on eight dimensions and lists hard fails. The judge composes the transcript and the debrief around this text.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/debrief_quality/judge_system.txt */
+export const DEBRIEF_QUALITY_JUDGE_SYSTEM = definePrompt(
+  'debrief_quality_judge_system',
+  {},
+  {
+    name: "Debrief Quality Judge's Instructions",
+    description:
+      "What the independent debrief-quality judge is told to do after the rubric, the transcript and the debrief: list the risk cues, score the eight dimensions, list the hard fails. A pinned rule: a change is approved by the clinical advisor or the owner, and bumps ally-ai's DEBRIEF_QUALITY_JUDGE.PROMPT_VERSION. The Evaluator inside a debrief run keeps ally-ai's own copy.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/debrief/safety_reader_system.txt */
+export const DEBRIEF_SAFETY_READER_SYSTEM = definePrompt(
+  'debrief_safety_reader_system',
+  {
+    risk_cue_definition: 'required',
+    session_language: 'optional',
+    transcript: 'required',
+  },
+  {
+    name: 'Debrief Safety Reader',
+    description:
+      "The debrief agent's mandatory safety step: finds the client's risk cues (and how the learner responded) and the learner's own distress. The step composes the transcript around this text, with the RISK CUE DEFINITION block; each cue also carries its strength (clear or possible). Pinned: change it only after the safety recall gate passes.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/debrief/risk_cue_definition.txt */
+export const DEBRIEF_RISK_CUE_DEFINITION = definePrompt(
+  'debrief_risk_cue_definition',
+  {},
+  {
+    name: 'Debrief risk cue definition',
+    description:
+      'The one definition of a clear and a possible client risk cue, and what each means for a debrief. ally-ai adds it as a RISK CUE DEFINITION block to every Debrief call that judges risk cues: the Safety reader, the Writer, the Reviser, the Evaluator and the independent debrief-quality judge. Pinned: a change is approved by the clinical advisor or the owner.',
+    category: 'evaluation',
+  },
+);
+
+/** src/prompts/debrief/evaluator_system.txt */
+export const DEBRIEF_EVALUATOR_SYSTEM = definePrompt(
+  'debrief_evaluator_system',
+  {},
+  {
+    name: "Debrief Evaluator's instructions",
+    description:
+      "What the Evaluator inside a debrief run is told to do last, after the rubric, the risk cue definition, the transcript and the draft: list the risk cues, score the eight dimensions, list the hard fails. Its own code, separate from the independent judge's debrief_quality_judge_system, so a change to one never moves the other. Pinned: it decides whether a draft reaches learners.",
+    category: 'evaluation',
+  },
+);
+
+/** src/prompts/debrief/evaluator_fix_system.txt */
+export const DEBRIEF_EVALUATOR_FIX_SYSTEM = definePrompt(
+  'debrief_evaluator_fix_system',
+  {
+    pass_bar: 'required',
+    fix_sections: 'required',
+    risk_handling: 'optional',
+  },
+  {
+    name: "Debrief Evaluator's fix notes",
+    description:
+      "After the Evaluator's instructions: say whether each risk cue is clear, and list what to change, section by section, so the draft reaches the PASS BAR. The code adds the PASS BAR (the release's passScore) and the FIX SECTIONS names the Reviser's critique is keyed by. Release-only.",
+    category: 'evaluation',
+  },
+);
+
+/** src/prompts/debrief/planner_agents.txt */
+export const DEBRIEF_PLANNER_AGENTS = definePrompt(
+  'debrief_planner_agents',
+  {},
+  {
+    name: 'Debrief planner: how each agent is described',
+    description:
+      "The wording the planner sees for each analysis agent it may choose (description, use_when, skip_when), one '## <agent id>' section each. The ids and every machine field (scopes, costs, requires) stay in ally-ai's manifests, which are also the fallback for an agent or field this text leaves out. Release-only.",
+    category: 'evaluation',
+  },
+);
+
+/** src/prompts/debrief/pm_investigator_system.txt */
+export const DEBRIEF_PM_INVESTIGATOR_SYSTEM = definePrompt(
+  'debrief_pm_investigator_system',
+  {},
+  {
+    name: 'Debrief PM agent: investigator',
+    description:
+      "The PM agent's investigator subagent: investigates one problem with read-only tools and reports back. Sent with every PM agent run and conversation turn.",
+    category: 'evaluation',
+  },
+);
+
+/** src/prompts/debrief/pm_reviewer_system.txt */
+export const DEBRIEF_PM_REVIEWER_SYSTEM = definePrompt(
+  'debrief_pm_reviewer_system',
+  {},
+  {
+    name: 'Debrief PM agent: reviewer',
+    description:
+      "The PM agent's reviewer subagent: reviews one proposed change before it is tried and answers supported / fits_everywhere / safe; code stores its verdict as the change's confidence. Pinned: it defines what a safe change is and what waits for a person.",
+    category: 'evaluation',
+  },
+);
+
+/** src/prompts/debrief/pm_skill_builder_brief.txt */
+export const DEBRIEF_PM_SKILL_BUILDER_BRIEF = definePrompt(
+  'debrief_pm_skill_builder_brief',
+  {},
+  {
+    name: 'Debrief PM agent skill: Builder brief',
+    description:
+      "A PM agent skill (SKILL.md, with its frontmatter): how to write a brief for Builder. ally-ai writes it into the agent's read-only /skills/ before every run.",
+    category: 'evaluation',
+  },
+);
+
+/** src/prompts/debrief/pm_skill_prompt_change.txt */
+export const DEBRIEF_PM_SKILL_PROMPT_CHANGE = definePrompt(
+  'debrief_pm_skill_prompt_change',
+  {},
+  {
+    name: 'Debrief PM agent skill: prompt change',
+    description:
+      "A PM agent skill (SKILL.md, with its frontmatter): how to write a prompt change as a find/replace. ally-ai writes it into the agent's read-only /skills/ before every run.",
+    category: 'evaluation',
+  },
+);
+
+/** src/prompts/debrief/pm_skill_registry_agent.txt */
+export const DEBRIEF_PM_SKILL_REGISTRY_AGENT = definePrompt(
+  'debrief_pm_skill_registry_agent',
+  {},
+  {
+    name: 'Debrief PM agent skill: registry agent',
+    description:
+      "A PM agent skill (SKILL.md, with its frontmatter): how to propose a new analysis agent's manifest. ally-ai writes it into the agent's read-only /skills/ before every run.",
+    category: 'evaluation',
+  },
+);
+
+/** src/prompts/debrief/analyst_system.txt */
+export const DEBRIEF_ANALYST_SYSTEM = definePrompt(
+  'debrief_analyst_system',
+  {
+    session_language: 'optional',
+    trainee_level: 'optional',
+    checked_rules: 'optional',
+    scenario: 'optional',
+    expected_behaviours: 'optional',
+    roleplay_expectations: 'optional',
+    skill_framework: 'optional',
+    live_detections: 'optional',
+    case_memory: 'optional',
+    transcript: 'required',
+  },
+  {
+    name: 'Debrief Analyst',
+    description:
+      "The debrief agent's Analyst: builds the evidence map (each behaviour's opportunity, observed/partial/missed, confidence, importance and exact quote; pivotal moments; emotional arc; AI faults), leading with what the roleplay expects (its own helpful and unhelpful behaviours and its competencies) and adding a foundational helping skill only when it clearly shaped the session. The step composes the transcript, scenario, expected behaviours and the roleplay's expectations around this text, with data lines only (ROLEPLAY EXPECTATIONS, CASE, LIVE DETECTIONS); how to read them is this text's wording. Release-only: a new version reaches learners through an approved release.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/debrief/progress_reader_system.txt */
+export const DEBRIEF_PROGRESS_READER_SYSTEM = definePrompt(
+  'debrief_progress_reader_system',
+  {
+    evidence_map: 'required',
+    past_points: 'optional',
+  },
+  {
+    name: 'Debrief Progress Reader',
+    description:
+      "The debrief agent's Progress reader: compares the latest evidence map with the learner's past Work-on-this points and says only what the evidence supports, and how to use what the learner and experts said about past points. Release-only.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/debrief/progress_system.txt */
+export const DEBRIEF_PROGRESS_SYSTEM = definePrompt(
+  'debrief_progress_system',
+  {
+    session_language: 'optional',
+    card_due: 'optional',
+    skill_keys: 'optional',
+    checked_rules: 'optional',
+    this_session_evidence: 'required',
+    this_session_by_skill: 'optional',
+    learner_profile: 'required',
+  },
+  {
+    name: 'Debrief Progress Agent',
+    description:
+      "The debrief agent's Progress agent: reads this session's evidence map with the learner's progress profile (past sessions' Analyst observations, past points and their review verdicts, the last progress report, the learner's own words, Foundational Skills levels) and proposes up to 3 skill trends, follow-ups on past points and one focus. This text says how to use what people said about past points. Code vetoes any trend the record contradicts. Release-only.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/debrief/guidance_agent_system.txt */
+export const DEBRIEF_GUIDANCE_AGENT_SYSTEM = definePrompt(
+  'debrief_guidance_agent_system',
+  {
+    guidance_index: 'optional',
+    moments: 'required',
+    skills: 'optional',
+    baseline_passages: 'optional',
+    learner_level: 'optional',
+    max_calls: 'optional',
+  },
+  {
+    name: 'Debrief Guidance Agent',
+    description:
+      "The debrief agent's guidance agent: given the Analyst's moments, the skills in play and the baseline passages already found, it browses an index of Debrief Guidance (code, kind, level, title, hint) and may search or fetch more entries by code, within a call budget, so the Writer gets the guidance that fits this learner's level and moments. Release-only.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/debrief/writer_system.txt */
+export const DEBRIEF_WRITER_SYSTEM = definePrompt(
+  'debrief_writer_system',
+  {
+    risk_cue_definition: 'required',
+    session_language: 'optional',
+    trainee_level: 'optional',
+    organisation_tone: 'optional',
+    learner_distress: 'optional',
+    checked_rules: 'optional',
+    risk_cue_turns: 'required',
+    risk_handling: 'optional',
+    possible_risk_cue_turns: 'optional',
+    missed_feelings_turns: 'optional',
+    course_scenario_id: 'optional',
+    mixed_evidence: 'optional',
+    case_memory: 'optional',
+    evidence_map: 'optional',
+    safety_reading: 'required',
+    practice_options: 'optional',
+    guidance: 'optional',
+    progress: 'optional',
+    cohort: 'optional',
+    findings: 'optional',
+    transcript: 'required',
+  },
+  {
+    name: 'Debrief Writer',
+    description:
+      "The debrief agent's Writer: writes the learner's cards in the session's language from the evidence map, safety reading, guidance and progress, preferring the roleplay's own competencies and behaviours over the foundational skills. Every client risk cue is covered: the most serious by the important moment, each other one in its `others`. Never sees the rubric. The code adds only data lines (risk-cue turns, MISSED FEELINGS, COURSE, CASE, MIXED EVIDENCE, COHORT, FINDINGS), format lines and checked safety lines; the wording for each is in this text. Release-only.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/debrief/reviser_system.txt */
+export const DEBRIEF_REVISER_SYSTEM = definePrompt(
+  'debrief_reviser_system',
+  {
+    risk_cue_definition: 'required',
+    session_language: 'optional',
+    risk_cue_turns: 'required',
+    risk_handling: 'optional',
+    checked_rules: 'optional',
+    draft: 'optional',
+    critique: 'optional',
+    findings: 'optional',
+    evidence_map: 'optional',
+    transcript: 'required',
+  },
+  {
+    name: 'Debrief Reviser',
+    description:
+      "The debrief agent's Reviser: edits only the sections the checks or the Evaluator flagged, adding any uncovered risk cue to the important moment's `others`. How to use FINDINGS is in this text. Release-only.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/debrief/planner_system.txt */
+export const DEBRIEF_PLANNER_SYSTEM = definePrompt(
+  'debrief_planner_system',
+  {
+    max_agents: 'required',
+    top_up: 'optional',
+    session_profile: 'optional',
+    evidence_summary: 'optional',
+    available_agents: 'required',
+    critique: 'optional',
+    already_ran: 'optional',
+  },
+  {
+    name: 'Debrief planner',
+    description:
+      "The orchestrated debrief's planner (challenger releases only): runs after the safety reader and the Analyst; from the session profile, a summary of the Analyst's evidence map (pivotal moments with their turns, skills observed / partial / missed, the AI client's faults: the Analyst's words, no quotes) and the registry agents' manifests, never the transcript, chooses which analysis agents run and says why the others don't; once more after a failed evaluation, with the Evaluator's critique. The step composes the profile, the evidence summary, the manifests (worded by debrief_planner_agents) and the limits around this text; TOP-UP is a data line, its meaning is this text's. Release-only.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/debrief/protocol_check_system.txt */
+export const DEBRIEF_PROTOCOL_CHECK_SYSTEM = definePrompt(
+  'debrief_protocol_check_system',
+  {
+    session_language: 'optional',
+    findings_rules: 'required',
+    focus_turns: 'optional',
+    data: 'optional',
+    transcript: 'required',
+  },
+  {
+    name: 'Debrief protocol check',
+    description:
+      "Registry agent: checks the session against the learner's organisation's own protocols and says which the learner followed or missed, as findings. The step composes the protocols, the risk cues, the transcript and the findings contract around this text. Release-only.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/debrief/history_deep_system.txt */
+export const DEBRIEF_HISTORY_DEEP_SYSTEM = definePrompt(
+  'debrief_history_deep_system',
+  {
+    session_language: 'optional',
+    findings_rules: 'required',
+    focus_turns: 'optional',
+    data: 'optional',
+    transcript: 'optional',
+  },
+  {
+    name: 'Debrief history (deep)',
+    description:
+      "Registry agent: reads the learner's last debriefs with this session's evidence map and names a pattern only when three or more sessions support it, as findings. Release-only.",
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/debrief/language_specialist_system.txt */
+export const DEBRIEF_LANGUAGE_SPECIALIST_SYSTEM = definePrompt(
+  'debrief_language_specialist_system',
+  {
+    session_language: 'optional',
+    findings_rules: 'required',
+    focus_turns: 'optional',
+    data: 'optional',
+    transcript: 'required',
+  },
+  {
+    name: 'Debrief language specialist',
+    description:
+      'Registry agent: reads code-mixed and Indian-language sessions for what a Writer could get wrong (meaning that depends on the language, deliberate code-mixing, quotes that must keep their script), as findings. Release-only.',
+    category: 'evaluation',
+    output: 'structured',
+  },
+);
+
+/** src/prompts/debrief/reply_system.txt */
+export const DEBRIEF_REPLY_SYSTEM = definePrompt(
+  'debrief_reply_system',
+  {
+    session_language: 'optional',
+    debrief: 'required',
+    transcript: 'required',
+    organisation: 'optional',
+    reply_word_limit: 'required',
+  },
+  {
+    name: 'Ask Ally (debrief reply)',
+    description:
+      "The Debrief agent in conversation mode: answers the learner's replies under the reflective question from the published debrief and the transcript. Streamed, one short answer per message, checked by code afterwards (no score, no diagnosis, quotes must match, at most the REPLY LIMIT the code sends last). Release-only.",
+    category: 'evaluation',
+  },
+);
+
+/** src/prompts/debrief/reflection_check_system.txt */
+export const DEBRIEF_REFLECTION_CHECK_SYSTEM = definePrompt(
+  'debrief_reflection_check_system',
+  { question: 'required' },
+  {
+    name: 'Debrief reflection check (XP)',
+    description:
+      "Says only whether a learner's message is an on-topic answer to the debrief's reflective question, for DEBRIEF_REFLECTION XP (v9 FR-65). Never grades quality or sincerity.",
+    category: 'evaluation',
+    output: 'json',
+  },
+);
+
+/** src/prompts/debrief/improver_system.txt */
+export const DEBRIEF_PM_AGENT_SYSTEM = definePrompt(
+  'debrief_improver_system',
+  {},
+  {
+    name: 'Debrief PM agent',
+    description:
+      "The PM agent's instructions (one Deep Agent in ally-ai): how it plans, investigates, proposes ideas through ally-be's gateway tools, routes them (itself, Builder, Bug Hunter, a person), keeps its memory and writes the report. The run's inputs arrive as its first message, not as variables. On the never-list itself: changes go through a person.",
+    category: 'evaluation',
+  },
+);
+
 /** src/prompts/filler_quality_judge/rubric.txt */
 export const FILLER_QUALITY_JUDGE_RUBRIC = definePrompt(
   'filler_quality_judge_rubric',
@@ -1254,20 +1876,6 @@ export const OPENAI_TRANSLATION_TOOLTIP_TRANSLATION = definePrompt(
   },
 );
 
-/** src/prompts/agent_memory/curator_system.txt */
-export const AGENT_MEMORY_CURATOR_SYSTEM = definePrompt(
-  'agent_memory_curator_system',
-  {},
-  {
-    name: 'Agent Memory — Notebook Curator',
-    description:
-      "Folds the notes an autonomous agent wrote at the end of a run into its capped notebook, one AGREE / EDIT / ADD / REMOVE operation per candidate, never overriding a person's pinned entry. Bug Hunter today.",
-    category: 'Bug Hunter',
-    runtimes: ['ally-be'],
-    output: 'json',
-  },
-);
-
 /** src/prompts/debrief_chat/summary_system.txt */
 export const DEBRIEF_CHAT_SUMMARY_SYSTEM = definePrompt(
   'debrief_chat_summary_system',
@@ -1295,6 +1903,259 @@ export const OPENAI_TRACK_CONTENT_TRANSLATION = definePrompt(
     name: 'Course Content Translation',
     description:
       "Localises a course's keyed strings (titles, prose, HTML, fill-blank templates, marking keys, rubrics, speakers) into one language, per-field rules by kind. Answers with a JSON object keyed like the input; placeholders and HTML are validated in code.",
+    output: 'structured',
+  },
+);
+
+// ── Context Library (docs/context-library/PLAN.md) ──────────────────────────
+// System prompts are static; the document part, candidates or entry go in the user
+// message as delimited data, so no variables are needed.
+
+/** src/prompts/context_library/overview_system.txt */
+export const CONTEXT_LIBRARY_OVERVIEW_SYSTEM = definePrompt(
+  'context_library_overview_system',
+  {},
+  {
+    name: 'Context Library — Document Overview',
+    description:
+      'Reads the outline and opening and closing parts of an uploaded document and writes a ≤150-word overview, its key terms and which sections are filler, so each part can be extracted with the whole document in mind. Names no one.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/extract_first_principles_system.txt */
+export const CONTEXT_LIBRARY_EXTRACT_FIRST_PRINCIPLES_SYSTEM = definePrompt(
+  'context_library_extract_first_principles_system',
+  {},
+  {
+    name: 'Context Library — Extract First Principles',
+    description:
+      'Distils one part of a product, UX or engineering document into short, standalone principles for the Builder PRD interview: statement, rationale, situations, example searches, facets, probe and anti-pattern. Own words only; no names.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/extract_character_insights_system.txt */
+export const CONTEXT_LIBRARY_EXTRACT_CHARACTER_INSIGHTS_SYSTEM = definePrompt(
+  'context_library_extract_character_insights_system',
+  {},
+  {
+    name: 'Context Library — Extract Character Insights',
+    description:
+      'Distils one part of a clinical or lived-experience document into short, general insights for the character interview: statement, what it looks like, voice samples in its own words, the stereotype to avoid, aspect, basis and themes. Never about an identifiable person, never treatment guidance; own words only; no names.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/extract_ally_guide_library_system.txt */
+export const CONTEXT_LIBRARY_EXTRACT_ALLY_GUIDE_LIBRARY_SYSTEM = definePrompt(
+  'context_library_extract_ally_guide_library_system',
+  {},
+  {
+    name: 'Context Library — Extract Ally Guide Library entries',
+    description:
+      'Distils one part of a helping-skills document, or an organisation’s own procedure, into short, standalone entries for the Ally guide’s library: statement, what it says in practice, situations, example searches, kind, topics and an information-only clinical flag. Keeps a procedure whole; own words only; no names.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/extract_debrief_guidance_system.txt */
+export const CONTEXT_LIBRARY_EXTRACT_DEBRIEF_GUIDANCE_SYSTEM = definePrompt(
+  'context_library_extract_debrief_guidance_system',
+  {},
+  {
+    name: 'Context Library — Extract Debrief Guidance',
+    description:
+      'Distils one part of a practice guideline, style guide, level guide or protocol into short guidelines the Debrief agent reads beside a pivotal moment: statement, what good practice looks like, the moments it applies to, kind, learner levels, skills and an information-only clinical flag. Own words only; no names.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/extract_learning_design_system.txt */
+export const CONTEXT_LIBRARY_EXTRACT_LEARNING_DESIGN_SYSTEM = definePrompt(
+  'context_library_extract_learning_design_system',
+  {},
+  {
+    name: 'Context Library — Extract Learning Design',
+    description:
+      'Distils one part of a learning-design or training document into short, standalone principles Course Copilot reads while it plans a course for mental-health helpers: statement, rationale, situations, example searches, domain, course stage, item types, probe and anti-pattern. Never clinical treatment guidance; own words only; no names.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/critic_system.txt */
+export const CONTEXT_LIBRARY_CRITIC_SYSTEM = definePrompt(
+  'context_library_critic_system',
+  {},
+  {
+    name: 'Context Library — Critic',
+    description:
+      'Checks each extracted candidate against the part it came from: grounded, standalone (with a rewrite when not), specific, actionable, names, and the collection’s own checks. Decides what is published.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/adjudicate_system.txt */
+export const CONTEXT_LIBRARY_ADJUDICATE_SYSTEM = definePrompt(
+  'context_library_adjudicate_system',
+  {},
+  {
+    name: 'Context Library — Duplicate Adjudicator',
+    description:
+      'Decides whether a new candidate is the same as, refines, conflicts with or differs from its nearest chunks in the collection, so the library keeps one chunk per idea and records trade-offs.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/consolidate_system.txt */
+export const CONTEXT_LIBRARY_CONSOLIDATE_SYSTEM = definePrompt(
+  'context_library_consolidate_system',
+  {},
+  {
+    name: 'Context Library — Consolidator',
+    description:
+      'Tidies the chunks just extracted from one document: merges repeats, ranks the rest for the density cap, and records relations between them.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/enrich_system.txt */
+export const CONTEXT_LIBRARY_ENRICH_SYSTEM = definePrompt(
+  'context_library_enrich_system',
+  {},
+  {
+    name: 'Context Library — Enrich Written Entry',
+    description:
+      'Adds situations, example searches, keywords and missing facets to an entry an admin wrote, without changing its text, so it is found with the words people search with.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/rerank_system.txt */
+export const CONTEXT_LIBRARY_RERANK_SYSTEM = definePrompt(
+  'context_library_rerank_system',
+  {},
+  {
+    name: 'Context Library — Re-ranker',
+    description:
+      'Grades each retrieved candidate 0–3 for the situation being searched, one listwise call per search; grades become the relevance bands every use case sees.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/citation_check_system.txt */
+export const CONTEXT_LIBRARY_CITATION_CHECK_SYSTEM = definePrompt(
+  'context_library_citation_check_system',
+  {},
+  {
+    name: 'Context Library — Citation Check',
+    description:
+      'Checks whether each passage that cites a chunk genuinely applies it. Only a pass counts as a verified use, so the learning loops reward helping, not citing.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/gap_label_system.txt */
+export const CONTEXT_LIBRARY_GAP_LABEL_SYSTEM = definePrompt(
+  'context_library_gap_label_system',
+  {},
+  {
+    name: 'Context Library — Gap Label',
+    description:
+      'Names a cluster of searches that found nothing good, in general words that never repeat a person’s own wording, so the library’s maintainers know what to add.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/agent_curator_system.txt */
+export const CONTEXT_LIBRARY_AGENT_CURATOR_SYSTEM = definePrompt(
+  'context_library_agent_curator_system',
+  {},
+  {
+    name: 'Context Library — Agent Curator',
+    description:
+      "Folds the lessons and notes an agent wrote (Builder Lessons, Bug Hunter Notes) into the collection's capped active set, one AGREE / EDIT / ADD / REMOVE operation per candidate, never overriding a person's pinned entry. Answers with a JSON object of operations; every guardrail is enforced in code.",
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/context_library/query_plan_system.txt */
+export const CONTEXT_LIBRARY_QUERY_PLAN_SYSTEM = definePrompt(
+  'context_library_query_plan_system',
+  {},
+  {
+    name: 'Context Library — Query Planner',
+    description:
+      'Turns a rough product idea (or a course brief, or a character so far) into a short context descriptor and 8–12 situational searches across the areas a good result must cover.',
+    category: 'Context Library',
+    runtimes: ['ally-be'],
+    output: 'json',
+  },
+);
+
+/** src/prompts/image_studio/compose.txt */
+export const IMAGE_STUDIO_COMPOSE = definePrompt(
+  'image_studio_compose',
+  {
+    cast_json: 'optional',
+    context_json: 'optional',
+    description: 'optional',
+    framing: 'required',
+    image_purpose: 'required',
+    style_name: 'required',
+  },
+  {
+    name: 'Image Studio — Scene Composer',
+    description:
+      "Plans one author-requested image: screens the request against the platform's depiction rules (safe-messaging for self-harm content, no real people's details), drafts or tidies the description, writes alt text and a structured scene the image prompt is compiled from. JSON mode; the guardrails are also appended in code.",
+    category: 'Image Studio',
+    runtimes: ['ally-be'],
+    output: 'structured',
+  },
+);
+
+/** src/prompts/image_studio/judge.txt */
+export const IMAGE_STUDIO_JUDGE = definePrompt(
+  'image_studio_judge',
+  {
+    cast_names: 'optional',
+    description: 'required',
+    scene_json: 'optional',
+  },
+  {
+    name: 'Image Studio — Image Checker',
+    description:
+      'Looks at a generated image (and its reference images) and fails it only for problems a trainer would reject: visible text, wrong people, unsafe depiction, anatomical errors, a character who does not match their reference. JSON mode; a failed image is regenerated once.',
+    category: 'Image Studio',
+    runtimes: ['ally-be'],
     output: 'structured',
   },
 );

@@ -432,6 +432,45 @@ describe('SettingsService', () => {
         service.getSummaryFieldsConfig(getSummaryFieldsDto),
       ).rejects.toThrow(new BadRequestException('Tenant ID is required'));
     });
+
+    it('should use own tenantId for system access user when tenantId is missing from DTO', async () => {
+      jest
+        .spyOn(permissionValidator, 'validatePermissions')
+        .mockResolvedValue(true);
+      jest.spyOn(ExecutionManager, 'getTenantId').mockReturnValue(mockTenantId);
+
+      preferenceService.getPreference
+        .mockResolvedValueOnce(mockOrgPreference)
+        .mockResolvedValueOnce(null);
+
+      const getSummaryFieldsDto: GetSummaryFieldsDto = {}; // No tenantId
+      const result = await service.getSummaryFieldsConfig(getSummaryFieldsDto);
+
+      expect(permissionValidator.validatePermissions).toHaveBeenCalledWith(
+        parseInt(mockUserId),
+        [PERMISSIONS.SYSTEM_ACCESS],
+      );
+      expect(preferenceService.getPreference).toHaveBeenCalledTimes(2);
+      // It should have fallen back to the ExecutionManager's tenantId
+      expect(preferenceService.getPreference).toHaveBeenCalledWith(
+        PreferenceName.SUMMARY_HIDDEN_FIELDS,
+        mockTenantId,
+        PreferenceRelatedEntity.ORGANIZATION,
+      );
+
+      const fieldsFromDefaultHidden = DEFAULT_HIDDEN_SECTION_IDS.flatMap(
+        (id) => SECTION_ID_TO_FIELD_IDS[id] ?? [],
+      );
+      const hiddenFields = [
+        'callId',
+        'callDuration',
+        ...fieldsFromDefaultHidden,
+      ];
+      const expectedVisibleFields = DEFAULT_SUMMARY_FIELDS_ARRAY.filter(
+        (field) => !hiddenFields.includes(field),
+      );
+      expect(result).toEqual(expectedVisibleFields);
+    });
   });
 
   describe('getSummarySectionsConfig', () => {

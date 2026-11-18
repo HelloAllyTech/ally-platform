@@ -9,6 +9,8 @@ import { Button } from "@components";
 import { ButtonVariant } from "@components/types";
 import { RoadmapOpportunity } from "@types";
 
+import { useScoreUnit } from "./useScoreUnit";
+import { formatPoints } from "./utils/points";
 import { largestRemainderPreview } from "./utils/split";
 import { isReshapeableStage, reshapeBlockedReason } from "./utils/stages";
 
@@ -71,6 +73,7 @@ export const SplitOpportunitiesPanel: React.FC<SplitOpportunitiesPanelProps> = (
 const SplitTargetPicker: React.FC<{ onPick: (opportunity: RoadmapOpportunity) => void }> = ({
   onPick,
 }) => {
+  const { unit } = useScoreUnit();
   const [search, setSearch] = useState("");
   const trimmed = search.trim();
 
@@ -127,7 +130,7 @@ const SplitTargetPicker: React.FC<{ onPick: (opportunity: RoadmapOpportunity) =>
                   }`}
                 >
                   <span className="text-typography-secondary text-xs tabular-nums">
-                    {opportunity.code} · {opportunity.priorityScore} votes
+                    {opportunity.code} · {formatPoints(opportunity.priorityScore)} {unit}
                     {canReshape ? "" : " · cannot be split"}
                   </span>
                   <span className="text-typography-primary line-clamp-2 block text-sm">
@@ -149,6 +152,7 @@ const SplitForm: React.FC<{
   onSplit: (originalId: string) => void;
   onBack: () => void;
 }> = ({ opportunity, onSplit, onBack }) => {
+  const { unit } = useScoreUnit();
   const [parts, setParts] = useState<DraftPart[]>(() => [
     { id: opportunity.id, description: opportunity.description, weight: 50 },
     { description: "", weight: 50 },
@@ -162,7 +166,7 @@ const SplitForm: React.FC<{
   /** How the CURRENT total score would divide. Illustrative — the backend splits per
    *  (user, period) row, so real per-part totals are the sum of many small splits. */
   const preview = useMemo(
-    () => largestRemainderPreview(opportunity.priorityScore, weights),
+    () => largestRemainderPreview(Math.round(opportunity.priorityScore), weights),
     [opportunity.priorityScore, weights],
   );
 
@@ -211,7 +215,7 @@ const SplitForm: React.FC<{
       <div className="border-border-light flex items-start justify-between gap-2 border p-2">
         <div className="min-w-0">
           <span className="text-typography-secondary text-xs tabular-nums">
-            {opportunity.code} · {opportunity.priorityScore} votes
+            {opportunity.code} · {formatPoints(opportunity.priorityScore)} {unit}
           </span>
           <span className="text-typography-primary line-clamp-2 block text-sm">
             {opportunity.description}
@@ -224,7 +228,7 @@ const SplitForm: React.FC<{
 
       <p className="text-typography-secondary text-sm">
         Everyone&apos;s votes are redistributed across the parts by weight. Nothing is lost: the
-        parts always add up to the original {opportunity.priorityScore}.
+        parts always add up to the original {formatPoints(opportunity.priorityScore)}.
       </p>
 
       <ul className="flex flex-col gap-3">

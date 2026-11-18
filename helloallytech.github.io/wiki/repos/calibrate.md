@@ -2,7 +2,7 @@
 title: calibrate — Voice Agent Evaluation Framework
 tags: [repo, calibrate, evaluation, voice-agents, python, cli]
 summary: Open-source CLI/library for benchmarking STT, TTS and LLM providers and running persona-based voice-agent simulations.
-last_reconciled: 2026-08-14
+last_reconciled: 2026-11-09
 ---
 
 # calibrate — Voice Agent Evaluation Framework
@@ -54,7 +54,7 @@ calibrate simulations  # interactive text or voice simulations
 
 - **This is an externally-maintained open-source project, not an internal service.**
   Check upstream (`ARTPARK-SAHAI-ORG/calibrate`) conventions and its own docs before
-  assuming an Ally-repo convention (Stacks usage, `.docs-map.yml`, wiki-PR coupling)
+  assuming an Ally-repo convention (Context Library usage, `.docs-map.yml`, wiki-PR coupling)
   applies here — none of that machinery is wired into this repo.
 - **License is CC BY-SA 4.0**, not Ally's internal license posture — be deliberate about
   what gets contributed upstream versus kept as an Ally-side integration.

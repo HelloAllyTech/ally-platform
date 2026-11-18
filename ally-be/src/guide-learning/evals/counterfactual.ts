@@ -4,7 +4,7 @@
  * wording. A static suite passes by memorising its phrasing; the variants
  * keep the expectations and change everything the expectations should not
  * depend on — spelling, register, channel, what came before
- * (Stacks: Static Test Suites Are Insufficient for Agentic Systems;
+ * (Static Test Suites Are Insufficient for Agentic Systems;
  * Synthetic Datasets for Red Teaming Agent Systems — noisy, malformed input).
  *
  * Deterministic: the same case always yields the same variants, so a variant

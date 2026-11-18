@@ -13,7 +13,7 @@ import {
  * A specialist is ONE `LlmCompletionService.complete({jsonMode:true})` call
  * with a narrow prompt — not an agent loop. It gets only the context it needs:
  * the brief (the shared, cached understanding of the course), the blueprint
- * for position, and its own item. Stacks: "Bind Specialized Tools to Separate
+ * for position, and its own item. "Bind Specialized Tools to Separate
  * Language Models"; "Hierarchical Agent Managers Double Costs Without Quality
  * Gains".
  */

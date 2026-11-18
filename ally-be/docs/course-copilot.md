@@ -38,6 +38,9 @@ INTERVIEWING ──propose_blueprint──▶ AWAITING_BLUEPRINT ──Approve &
 |---|---|---|
 | Turn loop | `service/course-copilot-orchestrator.service.ts` | Fork of the Builder interview orchestrator: two cached system blocks (prompt + platform rules; a per-session library snapshot), volatile state on the newest user turn, summarisation after 40 messages, truncation / invalid-call / empty-turn recovery, per-tool checkpointing |
 | Tools | `service/course-copilot-tools.service.ts`, `course-copilot-edit-tools.service.ts` | Exposed by session state (progressive disclosure). Only `ask_trainer`, `propose_blueprint` and confirmation questions end a turn |
+| Design guidance | `constants/course-copilot-guidance.constants.ts` | `design_guidance_search` / `design_guidance_get` read the Context Library's **Learning Design** collection (`LD-` codes) through `ContextToolsService`, as the `course_copilot` use case with the session's organisation as audience — the same pipeline, cards and soft failure as Builder's `principles_*` |
+| Library search | `service/course-copilot-library.service.ts` | `search_library` (same name and parameters) searches the Context Library's **Content Catalogue** (`CC-` codes, synced from Studio by `ContextCatalogueSyncService`) by meaning, scoped to the session's organisation and to the kind asked for. Every hit is rechecked at hydration against who may open its row — `ContentAccessService` for roleplays and cases, the character library's own scope for characters — and built from the row itself. Competencies, languages, trigger warnings and cover images are still read straight from their tables |
+| Citations | `service/course-copilot-blueprint.service.ts` | `[LD-…]` / `[CC-…]` codes in a stored blueprint are checked with `ContextCitationService`, as Builder's PRD is: a code this session was never shown is stripped before the save; the rest are verified in the background |
 | Specialists | `service/specialists/*.specialist.ts` | One-shot JSON calls with narrow prompts (article, quiz, journal, annotation, course meta, reviewer, image prompt, blueprint planner, roleplay brief). Output is normalised and validated in code before it is written |
 | Landing page draft | `service/course-copilot-landing-page.service.ts`, `specialists/landing-page.specialist.ts` | `POST /v1/course-copilot/tracks/:trackId/landing-page-draft` — outside any session: reads the *saved* course, one JSON call (+ one repair pass), returns `{ draft }` and saves nothing. The builder's Landing page tab fills only empty fields. Usage rows carry `metadata.trackId`, not a session id, so they never count against a build's budget |
 | Ally notes draft | `service/course-copilot-ally-notes.service.ts`, `specialists/ally-notes.specialist.ts` | `POST /v1/course-copilot/tracks/:trackId/ally-notes-draft` — outside any session, like the landing page: reads the saved outline (titles, types, default tension, short article and scenario excerpts, trigger warnings — never answer keys), one JSON call (+ one repair pass, also taken when the draft quotes a correct quiz answer), returns `{ draft: { notes, tension, draftedByCopilot } }` and saves nothing. The builder's Ally notes editor saves it through `PUT /v1/learn/admin/tracks/:id/guide-notes` |
@@ -134,7 +137,6 @@ in AWS form, so they do not render locally — the same as the course editor's o
 | `COURSE_COPILOT_IMAGE_COST_USD` | 0.10 | Flat per image |
 | `COURSE_COPILOT_BUILD_CONCURRENCY` | 4 | |
 | `COURSE_COPILOT_MAX_NEW_ROLEPLAYS` | 4 | Also capped in `COURSE_COPILOT_LIMITS` |
-| `STACKS_API_URL` / `STACKS_API_KEY` | — | Design-guidance lookups soft-fail without them |
 | `OPENAI_IMAGE_MODEL` / `CHARACTER_IMAGE_DEFAULT_PROVIDER` + `LEARN_MEDIA_PUBLIC_S3_BUCKET` | — | Images are skipped with a reason without them |
 
 Limits (sections 8, items 40, new roleplays 4, new cases 2, images 12, languages per roleplay 4, two
@@ -151,5 +153,7 @@ active CREATE sessions per user) are in `constants/course-copilot.constants.ts` 
 - **A video without a link is a warning**, skipped at build time, not an approval blocker.
 - **Creating a new case from chat** is not offered in release 1 (a case needs its roleplays to exist
   first); library cases can be added.
-- **Stacks client moved** to `src/llm-agent/service/stacks-client.service.ts`; Builder keeps a thin
-  `BuilderStacksService` subclass.
+- **Design guidance and library search moved into the Context Library** (phase 7 of its plan,
+  2026-11-09): the tools keep their names, but read Learning Design and the Content Catalogue instead
+  of the retired third-party guidance service and the old substring search. Guidance lookups and
+  library searches fail soft and say the library could not be searched, never that it is empty.

@@ -1,95 +1,58 @@
-# OSX
-#
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
 .DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
 
-# Xcode
-#
-build/
-*.pbxuser
-!default.pbxuser
-*.mode1v3
-!default.mode1v3
-*.mode2v3
-!default.mode2v3
-*.perspectivev3
-!default.perspectivev3
-xcuserdata
-*.xccheckout
-*.moved-aside
-DerivedData
-*.hmap
-*.ipa
-*.xcuserstate
-**/.xcode.env.local
-
-# Android/IntelliJ
-#
-build/
-.idea
-.gradle
-local.properties
+# IntelliJ related
 *.iml
-*.hprof
-.cxx/
-# Signing keys never live in the repo (it is public). CI decodes the release
-# keystore from the ANDROID_RELEASE_KEYSTORE_BASE64 secret.
-*.keystore
-*.jks
-!debug.keystore
-.kotlin/
+*.ipr
+*.iws
+.idea/
 
-# node.js
-#
-node_modules/
-npm-debug.log
-yarn-error.log
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
 
-# fastlane
-#
-# It is recommended to not store the screenshots in the git repo. Instead, use fastlane to re-generate
-# the screenshots whenever they are needed. 
-# For more information about the recommended setup visit:
-# https://docs.fastlane.tools/best-practices/source-control/
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
 
-**/fastlane/report.xml
-**/fastlane/Preview.html
-**/fastlane/screenshots
-**/fastlane/test_output
+# Symbolication related
+app.*.symbols
 
-# Bundle artifact
-*.jsbundle
+# Obfuscation related
+app.*.map.json
 
-# Ruby / CocoaPods
-**/Pods/
-/vendor/bundle/
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
 
-# Temporary files created by Metro to check the health of the file watcher
-.metro-health-check*
+# Widget Preview related
+.widget_preview/
 
-# testing
-/coverage
-
-# Yarn
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/sdks
-!.yarn/versions
-
-# VSCode
-.vscode/
-
-# Environment files
-.env
-.env.dev
-.env.prod
-
-# Cursor
-.cursor/
-
-# Firebase config files (fetched from S3 in CI/local scripts)
-android/app/google-services.json
-android/app/src/dev/google-services.json
-android/app/src/prod/google-services.json
-ios/GoogleService-Info.plist
+# Release config that never goes in git (docs/RELEASE.md): per-environment
+# Firebase files (CI pulls them from S3, as RN's workflows do) and the
+# dart-define env file CI writes from the ENV_VALUES_* secret.
+**/GoogleService-Info.plist
+**/google-services.json
+/.env
+/.env.*
+/env/*.env
+!/env/example.env

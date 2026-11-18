@@ -211,7 +211,7 @@ describe("laneLabel", () => {
   });
 
   it("labels a stage through the display map, not its wire value", () => {
-    expect(laneLabel("under_development", RoadmapBoardGroupBy.STAGE)).toBe("In development");
+    expect(laneLabel("under_development", RoadmapBoardGroupBy.STAGE)).toBe("Prioritised");
   });
 
   it("passes goal and owner names through — they ARE their display names", () => {

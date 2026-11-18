@@ -194,29 +194,48 @@ function webEntries(dir, files) {
   return entries;
 }
 
-/* ── React Native (ally-mobile) ──────────────────────────────────────── */
+/* ── Flutter (ally-mobile) ────────────────────────────────────────────── */
+
+const FLUTTER_WIDGET_CLASS =
+  /\bclass\s+([A-Z]\w*)\s+extends\s+(?:StatefulWidget|StatelessWidget|ConsumerWidget|ConsumerStatefulWidget|HookWidget|HookConsumerWidget)\b/;
+
+/**
+ * The first public (non-underscore) top-level class in a Dart file. Used only
+ * as a fallback for a `_screen.dart` file whose widget extends something
+ * `FLUTTER_WIDGET_CLASS` does not recognise — Dart's convention of prefixing a
+ * file-private helper class with `_` (`_LoginScreenState`, `_OtpInput`, …)
+ * still makes the first uppercase-led class the one the file is named for.
+ */
+function firstPublicClass(text) {
+  const m = text.match(/\bclass\s+([A-Z]\w*)\b/);
+  return m ? m[1] : null;
+}
 
 function mobileEntries(dir, files) {
   const entries = [];
-  const screens = new Set();
+  // No RN-style `src/screens/Name/Name.tsx` path convention survives the
+  // Flutter rename: screens and shared widgets are both plain
+  // `snake_case.dart` files scattered under `lib/` (`lib/features/*/presentation/`,
+  // `lib/core/widgets/`, …), so the class name — not the path — is read out of
+  // each file's content instead of being inferred from it. Matched straight
+  // off the `extends <WidgetBase>` clause rather than "the first public class
+  // in the file": a file can declare other public classes above its widget
+  // (a Riverpod state/notifier pair, say), and the first one is not
+  // necessarily the widget the file is named for.
   for (const file of files) {
-    const m = file.match(/^src\/screens\/([^/]+)\//);
-    if (m) screens.add(m[1]);
-  }
-  for (const name of [...screens].sort()) {
-    entries.push({ kind: 'screen', name, path: `src/screens/${name}` });
-  }
-  for (const file of files) {
-    const m = file.match(
-      /^src\/(?:screens|components)\/.+\/([A-Z][A-Za-z0-9]+)\.tsx$/,
-    );
-    if (m && !isTest(file)) {
-      entries.push({
-        kind: 'component',
-        name: m[1],
-        path: file,
-        app: 'mobile',
-      });
+    if (!file.startsWith('lib/') || !file.endsWith('.dart') || isTest(file)) {
+      continue;
+    }
+    const isScreen = /(?:^|\/)[a-z][a-z0-9_]*_screen\.dart$/.test(file);
+    const text = readText(dir, file);
+    const widgetName = text.match(FLUTTER_WIDGET_CLASS)?.[1] ?? null;
+    if (isScreen) {
+      const name = widgetName ?? firstPublicClass(text);
+      if (name) entries.push({ kind: 'screen', name, path: file, app: 'mobile' });
+      continue;
+    }
+    if (widgetName) {
+      entries.push({ kind: 'component', name: widgetName, path: file, app: 'mobile' });
     }
   }
   return entries;
@@ -283,7 +302,7 @@ export function extractCatalog(repo, dir) {
   if (has((f) => f.startsWith('apps/') && f.endsWith('.tsx'))) {
     entries = entries.concat(webEntries(dir, files));
   }
-  if (has((f) => f.startsWith('src/screens/'))) {
+  if (has((f) => f === 'pubspec.yaml')) {
     entries = entries.concat(mobileEntries(dir, files));
   }
   if (has((f) => f.startsWith('app/') && f.endsWith('.py'))) {

@@ -2,7 +2,7 @@
 title: Contributing Guide
 tags: [contributing, sdlc, workflow, standards]
 summary: Branch naming, commit conventions, code standards, and the pull-request process shared across all Ally repositories.
-last_reconciled: 2026-07-28
+last_reconciled: 2026-11-09
 ---
 
 # Contributing Guide
@@ -20,6 +20,23 @@ Thank you for contributing to Ally! This guide covers the shared SDLC rules — 
 Examples: `feat/add-user-authentication`, `fix/login-error-handling`, `docs/update-setup-guide`.
 
 **Rules:** hyphens (not underscores) between words, lowercase, short and descriptive. Do **not** embed a ticket id in the branch name — reference the ticket in the PR description instead. This is the single canonical statement of the convention for every repo; `commitlint`/Husky enforce the matching commit format in the TypeScript repos.
+
+### Branch Lifetime
+
+**Branches are short-lived. `master` is the only long-lived branch.** A branch exists to carry one small change to a merged pull request, then it goes away.
+
+- **Open a pull request early.** Push a branch only when you open a PR for it (a draft is fine). A branch with no PR is invisible to review and CI, so it is a branch nobody will ever look at.
+- **Merge within 2 working days.** Aim for small PRs that can be reviewed in one sitting. If a change will take longer, split it and land the pieces behind a feature flag. Do not keep a long-running feature branch.
+- **Nothing lives past 7 days.** A branch with no commits for 7 days is stale. Finish it, or delete it. If the work still matters, reopen it later from a fresh branch off `master`; the closed PR keeps the history.
+- **Delete on merge.** Squash-merge and delete the head branch. The repository setting "Automatically delete head branches" must stay on; do not turn it off per PR.
+- **One branch per change.** Do not push `-2`, `-v2` or `-retry` copies of a branch. Force-push to the existing branch, or close the old PR first and delete its branch.
+- **Start from, and stay close to, `master`.** Branch from the latest `origin/master` and rebase or merge it in often. A branch that is hundreds of commits behind is cheaper to redo than to rescue.
+- **Keep the root checkout on `master`.** Do feature work in a worktree (`git worktree add ../ally-wt/<branch> -b <branch> origin/master`) so the main checkout never carries a feature branch.
+- **Bots follow the same rules.** Automation (bug hunter, Builder) opens one branch per issue, reuses it on a retry, and closes the PR and deletes the branch when the work is superseded.
+
+**Enforcement.** `.github/workflows/stale-branches.yml` runs every Monday. A branch with no PR and no commit for 7 days is deleted; a PR with no activity for 14 days is closed and its branch deleted. `release/*` and `hotfix/*` are exempt. It only reports (dry run) until the repository variable `STALE_BRANCH_ENFORCE` is set to `true`; the run summary lists every branch it would touch and its last commit.
+
+Anyone may delete a stale branch that is not an open PR under active review: the cleanup is always safe, because the tip commit is recoverable from the PR or the reflog for 90 days. When in doubt, ask in the PR instead of keeping the branch.
 
 ## Commit Messages
 
@@ -39,7 +56,7 @@ Commitlint / Husky hooks enforce this in the TypeScript repos.
 
 ## Development Workflow
 
-0. **Get Stacks context — before you plan, and again whenever a product judgement comes up.** Search the library and incorporate relevant returned guidance, citing chunk titles — see [Working with the Stacks MCP](planning-with-stacks.md). An agent calls `search_chunks` on its own initiative, so you do not have to fetch context for it; `/stacks:planning_context` is there for when *you* want the context in front of you. Planning is the most important moment, not the only one: reach for it mid-implementation too, whenever you would otherwise invent an empty or failure state, a user-facing label, a threshold or a cadence. This is where product guidance now comes from; the in-wiki [Product Management Best Practices](../product/best-practices.md) section was deprecated on 2026-08-07. Trivial mechanical changes (rename, dependency bump, typo) skip this.
+0. **Search the Context Library — before you plan, and again whenever a product or engineering judgement comes up.** Incorporate relevant returned guidance and cite the codes you apply, such as `[FP-0142]` — see [Working with the Context Library](planning-with-context-library.md). An agent calls `search_context` on its own initiative, so you do not have to fetch context for it; the `planning_context` MCP prompt is there for when *you* want the context in front of you. Planning is the most important moment, not the only one: reach for it mid-implementation too, whenever you would otherwise invent an empty or failure state, a user-facing label, a threshold or a cadence. This is where product guidance now comes from: the in-wiki [Product Management Best Practices](../product/best-practices.md) section was deprecated on 2026-08-07. Trivial mechanical changes (rename, dependency bump, typo) skip this.
 1. **Create a feature branch** following the naming convention.
 2. **Make your changes** following the code standards for that repo.
 3. **Test thoroughly** — run tests (`npm test` / `poetry run pytest`) and linters (`npm run lint` / `poetry run flake8 app/`).
@@ -74,7 +91,7 @@ Same format as commit messages: `<type>: short summary`.
 ### PR Description
 Include: a **Summary**, a **Changes** list, **Testing** notes (unit/integration/manual), **Related Issues** (`Closes #123`), and screenshots for UI changes. Use a checklist (style, self-review, comments, docs updated, no new warnings, tests pass).
 
-For user-facing PRs, name the Stacks guidance the plan applied (by chunk title) so a reviewer can trace the product decisions — see [Planning with the Stacks MCP](planning-with-stacks.md).
+For user-facing PRs, cite the Context Library codes the plan applied (e.g. `[FP-0142]`) so a reviewer can trace the product decisions — see [Working with the Context Library](planning-with-context-library.md).
 
 ### Review
 1. Submit the PR with a clear title and description.

@@ -6,11 +6,11 @@ import { excludeTestTenants } from '../util/test-tenant.util';
 import { getPlatformDataFloor } from '../util/data-floor.util';
 import { XpLevelReachedBucketParam } from '../dto/xp-level-reached-analytics.dto';
 
-/** One (bucket, level) crossing count. `level` is 1-indexed, matching `resolveLevel`. */
+/** One (bucket, level) crossing count. `level` matches `resolveLevel`; never 0. */
 export interface XpLevelCrossingRow {
   /** Bucket start as a calendar date string (yyyy-mm-dd). */
   bucket: string;
-  /** 1-indexed level, e.g. 2 = `LEVEL_THRESHOLDS[1]`. */
+  /** Level, 1 or higher, e.g. 2 = `LEVEL_THRESHOLDS[2]`. */
   level: number;
   /** Learners who FIRST reached this level in this bucket. */
   users: number;
@@ -31,17 +31,11 @@ export interface XpLevelCrossingRow {
  * `lastLevelUpAt` records only the single most recent level-up, not the full
  * history a time-bucketed chart needs.
  *
- * ## Level 1 is a special case, by construction
+ * ## Level 0 is not charted
  *
- * `LEVEL_THRESHOLDS[0]` is 0 XP — every account is "level 1" from the moment it
- * exists, with or without ever opening a simulation. A user with zero
- * `xp_events` rows never appears in this query at all (there is nothing to
- * bucket), so in practice `MIN(bucket) FILTER (WHERE cumulative >= 0)` resolves
- * to the bucket of a learner's very FIRST XP award ever — level 1's series is
- * therefore best read as "learners who started earning XP", not "learners who
- * created an account". This is a deliberate, useful reading of the same
- * one-sided crossing rule that produces every other level's series, not a
- * special-cased branch.
+ * `LEVEL_THRESHOLDS[0]` is 0 XP — every account is at level 0 from the moment it
+ * exists — so there is no crossing into it to count. The query starts at level 1
+ * (100 XP), the first rung a learner actually earns.
  *
  * ALL-TIME by construction (no lower bound on the ledger read): a windowed
  * running total would misattribute a crossing that actually happened earlier to
@@ -87,21 +81,30 @@ export class XpLevelReachedAnalyticsRepository {
     // above (whitelisted, not interpolated) — the ladder is a module constant
     // today, but a value inlined "because it is ours" is the habit that
     // eventually inlines one that is not.
-    const thresholdColumns = LEVEL_THRESHOLDS.map((threshold, i) => {
-      params.push(threshold);
-      return (
-        `MIN(bucket) FILTER (WHERE cumulative >= $${params.length}) ` +
-        `AS "crossed${i}"`
-      );
-    }).join(',\n               ');
+    const chartedLevels = LEVEL_THRESHOLDS.map((threshold, level) => ({
+      threshold,
+      level,
+    })).filter(({ level }) => level >= 1);
+
+    const thresholdColumns = chartedLevels
+      .map(({ threshold, level }) => {
+        params.push(threshold);
+        return (
+          `MIN(bucket) FILTER (WHERE cumulative >= $${params.length}) ` +
+          `AS "crossed${level}"`
+        );
+      })
+      .join(',\n               ');
 
     // One (level, bucket) row per crossing, unpivoted from the per-user crossing
     // columns.
-    const crossingUnion = LEVEL_THRESHOLDS.map(
-      (_, i) =>
-        `SELECT "crossed${i}" AS bucket, ${i + 1} AS level ` +
-        `FROM crossings WHERE "crossed${i}" IS NOT NULL`,
-    ).join('\n        UNION ALL\n        ');
+    const crossingUnion = chartedLevels
+      .map(
+        ({ level }) =>
+          `SELECT "crossed${level}" AS bucket, ${level} AS level ` +
+          `FROM crossings WHERE "crossed${level}" IS NOT NULL`,
+      )
+      .join('\n        UNION ALL\n        ');
 
     const rows = await this.dataSource.query(
       `

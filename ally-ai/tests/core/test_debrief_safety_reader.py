@@ -1,0 +1,103 @@
+"""The Safety reader: a missing answer is never a safe session, and a cue must
+point at a real turn of the right speaker."""
+
+import pytest
+
+from app.core.debrief.safety_reader import (
+    LearnerDistress,
+    RiskCue,
+    SafetyReading,
+    TranscriptTurn,
+    build_prompt,
+)
+
+TRANSCRIPT = [
+    TranscriptTurn(turn_index=1, role="counselor", text="How are you?"),
+    TranscriptTurn(turn_index=2, role="client", text="There's no point any more."),
+    TranscriptTurn(
+        turn_index=3, role="counselor", text="Sorry, this is close to home."
+    ),
+]
+
+
+@pytest.fixture
+def dispatch_returns(monkeypatch):
+    from app.core.llm import dispatch
+
+    calls = {}
+
+    def _set(output):
+        async def _fake(**kwargs):
+            calls.update(kwargs)
+            return output, {
+                "provider": "gemini",
+                "model": "gemini-2.5-flash",
+                "fell_back_from": None,
+            }
+
+        monkeypatch.setattr(dispatch, "generate_structured", _fake)
+        return calls
+
+    return _set
+
+
+def test_prompt_marks_speakers_and_wraps_data():
+    p = build_prompt(TRANSCRIPT, "hi")
+    assert "[turn 2] CLIENT: There's no point any more." in p
+    assert "[turn 1] COUNSELLOR: How are you?" in p
+    assert "<transcript>" in p and "SESSION LANGUAGE: hi" in p
+    live = "LIVE {{risk_cue_definition}} {{transcript}}"
+    assert build_prompt(TRANSCRIPT, "en", system=live).startswith("LIVE")
+
+
+@pytest.mark.asyncio
+async def test_keeps_cues_on_client_turns_and_distress_on_learner_turns(
+    dispatch_returns,
+):
+    from app.core.debrief.safety_reader import read_safety
+
+    calls = dispatch_returns(
+        SafetyReading(
+            risk_cues=[
+                RiskCue(
+                    turn_index=2,
+                    quote="no point",
+                    category="hopelessness",
+                    learner_response="missed",
+                ),
+                # A learner turn is not a client cue, and turn 9 does not exist.
+                RiskCue(
+                    turn_index=3,
+                    quote="x",
+                    category="hopelessness",
+                    learner_response="missed",
+                ),
+                RiskCue(
+                    turn_index=9,
+                    quote="x",
+                    category="hopelessness",
+                    learner_response="missed",
+                ),
+            ],
+            learner_distress=[
+                LearnerDistress(turn_index=3, quote="close to home"),
+                LearnerDistress(turn_index=2, quote="client turn"),
+            ],
+        )
+    )
+    reading, model = await read_safety(TRANSCRIPT, "en", scenario_session_id="s1")
+    assert [c.turn_index for c in reading.risk_cues] == [2]
+    assert [d.turn_index for d in reading.learner_distress] == [3]
+    assert model == "gemini-2.5-flash"
+    assert calls["task"] == "debrief_safety_reader"
+    assert calls["never_fallback"] is True
+    assert calls["scenario_session_id"] == "s1"
+
+
+@pytest.mark.asyncio
+async def test_no_answer_is_none_not_an_empty_reading(dispatch_returns):
+    from app.core.debrief.safety_reader import read_safety
+
+    dispatch_returns(None)
+    reading, _ = await read_safety(TRANSCRIPT, "en")
+    assert reading is None

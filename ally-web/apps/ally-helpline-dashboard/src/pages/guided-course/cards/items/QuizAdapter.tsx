@@ -12,12 +12,14 @@ const QuizAdapter: FC<ItemAdapterProps<StartQuizItemPayload>> = ({
   itemId,
   onCompleted,
   onClose,
+  languageCode,
 }) => (
   <QuizItemPlayer
     payload={payload}
     itemId={itemId}
     onCompleted={onCompleted}
     onRequestNext={onClose}
+    languageCode={languageCode}
   />
 );
 

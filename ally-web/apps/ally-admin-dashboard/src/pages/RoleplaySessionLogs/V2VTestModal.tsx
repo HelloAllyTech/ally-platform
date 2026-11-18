@@ -1,4 +1,4 @@
-import { FC, useState } from "react";
+import { FC, useEffect, useState } from "react";
 
 import { toast } from "sonner";
 
@@ -26,14 +26,28 @@ export const V2VTestModal: FC<V2VTestModalProps> = ({ open, onClose }) => {
   const [languageId, setLanguageId] = useState<string | number>("");
   const [maxExchanges, setMaxExchanges] = useState<number>(12);
 
-  const { data: simulations } = useGetSimulationsQuery({ limit: 200 });
+  // The list is searched on the server and shown newest first. It used to
+  // load the 200 OLDEST simulations and filter those in the browser, so any
+  // simulation created after them (or a fresh copy made to test something)
+  // could never be picked.
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+  const { data: simulations, isFetching: isSearching } = useGetSimulationsQuery({
+    limit: 200,
+    order: "DESC",
+    ...(debouncedSearch ? { search: debouncedSearch } : {}),
+  });
   const { data: languages = [] } = useGetScenarioLanguagesQuery({
     active: true,
   }) as { data: ScenarioLanguage[] };
   const [startV2VTest, { isLoading }] = useStartV2VTestMutation();
 
   const scenarioOptions: Option[] =
-    simulations?.data?.map(s => ({ id: s.id, value: s.title })) ?? [];
+    simulations?.data?.map(s => ({ id: s.id, value: `#${s.id} · ${s.title}` })) ?? [];
   const languageOptions: Option[] = languages.map(l => ({
     id: l.language_id,
     value: l.label,
@@ -68,6 +82,25 @@ export const V2VTestModal: FC<V2VTestModalProps> = ({ open, onClose }) => {
             An AI plays the user side and runs the roleplay end to end — no human tester needed. The
             result appears in the session logs.
           </p>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <label htmlFor="v2v-scenario-search" className="text-sm text-typography-900 font-primary">
+            Find a scenario
+          </label>
+          <input
+            id="v2v-scenario-search"
+            type="search"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Title or part of it — searches every simulation"
+            className="border rounded-md px-3 py-2 bg-white w-full outline-none font-primary text-base"
+          />
+          <span className="text-xs text-typography-700">
+            {isSearching
+              ? "Searching…"
+              : `${scenarioOptions.length} match${scenarioOptions.length === 1 ? "" : "es"}, newest first`}
+          </span>
         </div>
 
         <CustomDropdown

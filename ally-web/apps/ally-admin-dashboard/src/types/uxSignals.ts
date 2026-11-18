@@ -1,6 +1,6 @@
 /**
  * Wire types for UX Signals — the PostHog scan that files bug findings into Bug
- * Hunter and improvement suggestions into the Analytics Suggestions queue.
+ * Hunter and improvement signals into the PM Agent's evidence store.
  * Mirrors ally-be src/ux-signals DTOs.
  */
 

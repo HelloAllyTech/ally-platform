@@ -133,7 +133,12 @@ export class ChatController {
     @Body() dto: SetNoteTranscriptDto,
     @CurrentUser() tokenUser: TokenUser,
   ): Promise<{ success: boolean }> {
-    return this.service.setNoteTranscript(id, tokenUser.id, dto.transcript);
+    return this.service.setNoteTranscript(
+      id,
+      tokenUser.id,
+      dto.transcript,
+      dto.durationSeconds,
+    );
   }
 
   @AuthPermissions([PERMISSIONS.VIEW_CHAT])

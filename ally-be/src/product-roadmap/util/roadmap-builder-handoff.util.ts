@@ -23,7 +23,7 @@ export interface BuilderHandoffSource {
  * debrief feedback sits beside the existing session rating, and the rating's shape — both
  * recorded in the brief it was never shown. The brief is the copilot's distillation; the
  * transcript is what was actually said, including decisions no brief field has a slot for.
- * Stacks, "Bridging Design and Development Through Early Alignment": hand over the reasoning
+ * "Bridging Design and Development Through Early Alignment": hand over the reasoning
  * behind a design, not only the design, so whoever builds it keeps the intent when they have
  * to change something.
  *

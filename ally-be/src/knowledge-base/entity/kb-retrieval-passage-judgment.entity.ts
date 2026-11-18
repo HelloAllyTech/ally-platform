@@ -25,7 +25,7 @@ import {
  * WHAT THIS CANNOT MEASURE, stated so nobody reads it as more than it is: every row here already
  * cleared the floor, because the log only ever sees what ally-ai returned. So these labels give
  * PRECISION and never the RECALL of what the floor rejected. Measuring that needs the same
- * queries re-run at a lower floor — by hand today, through the retrieval preview's floor control.
+ * queries re-run at a lower floor, which nothing does yet.
  *
  * Dropped candidates are judged too, and that is the other half of the value: a retrieval that
  * returned three good passages looks the same whether it discarded nothing or discarded something

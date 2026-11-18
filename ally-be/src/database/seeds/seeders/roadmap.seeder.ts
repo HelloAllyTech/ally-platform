@@ -60,7 +60,7 @@ const OPPORTUNITIES: OpportunityFixture[] = [
     description:
       'Roleplay actor breaks character when interrupted mid-sentence instead of yielding the turn gracefully.',
     type: RoadmapOpportunityType.BUG,
-    stage: RoadmapOpportunityStage.UNDER_DEVELOPMENT,
+    stage: RoadmapOpportunityStage.PRIORITISED,
     productGoal: 'Roleplay Actor Realism',
     owner: 'Shubham Bhoite',
     hasOwnerUser: true,

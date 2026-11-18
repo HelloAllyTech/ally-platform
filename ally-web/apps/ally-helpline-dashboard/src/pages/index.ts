@@ -20,6 +20,7 @@ export * from "./scenario/Scenario";
 export * from "./search/Search";
 export * from "./settings/Settings";
 export * from "./character-library/CharacterLibrary";
+export * from "./org-branding/OrgBranding";
 export * from "./character-library/CharacterInterview";
 export * from "./simulation/Simulation";
 export * from "./suspended-user/SuspendedUser";

@@ -21,6 +21,8 @@ interface ItemEditorCanvasProps {
   itemIndex: number;
   type: TrackItemType;
   onDelete: () => void;
+  /** The course is live; the quiz and annotation editors read it (attempt limits can still go up). */
+  isPublished?: boolean;
 }
 
 /** Routes the selected item to its type-specific editor. */
@@ -29,6 +31,7 @@ export const ItemEditorCanvas: FC<ItemEditorCanvasProps> = ({
   itemIndex,
   type,
   onDelete,
+  isPublished = false,
 }) => {
   const { watch } = useFormContext<TrackFormValues>();
   const props = { sectionIndex, itemIndex, onDelete };
@@ -45,9 +48,9 @@ export const ItemEditorCanvas: FC<ItemEditorCanvasProps> = ({
     case TrackItemType.JOURNAL:
       return <JournalItemEditor {...props} />;
     case TrackItemType.QUIZ:
-      return <QuizItemEditor {...props} />;
+      return <QuizItemEditor {...props} isPublished={isPublished} />;
     case TrackItemType.ANNOTATED_ARTIFACT:
-      return <AnnotationItemEditor {...props} />;
+      return <AnnotationItemEditor {...props} isPublished={isPublished} />;
     case TrackItemType.GAME: {
       const gameKey = watch(`sections.${sectionIndex}.items.${itemIndex}.game.gameKey`);
       if (gameKey === TrackGameKey.BREATHING_EXERCISE) {

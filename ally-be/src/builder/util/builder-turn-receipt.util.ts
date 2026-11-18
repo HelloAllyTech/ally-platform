@@ -67,8 +67,8 @@ export function describeToolAttempt(
       return `Read ${input?.repo}/${input?.path}`;
     case 'wiki_read':
       return `Read ${input?.path}`;
-    case 'stacks_get':
-      return 'Read Stacks guidance';
+    case 'principles_get':
+      return `Read principles ${(Array.isArray(input?.codes) ? input.codes : []).join(', ')}`.trim();
     case 'github_search_code':
       return `Code search ${quoted(input?.query)}${inRepo}`;
     case 'github_repo_tree':
@@ -77,8 +77,14 @@ export function describeToolAttempt(
       return `Docs search ${quoted(input?.query)}${inRepo}`;
     case 'wiki_search':
       return `Wiki search ${quoted(input?.query)}`;
-    case 'stacks_search':
-      return `Stacks search ${quoted(input?.query)}`;
+    case 'principles_search':
+      return `Principles search ${(Array.isArray(input?.queries)
+        ? input.queries
+        : [input?.query]
+      )
+        .filter(Boolean)
+        .map((q: unknown) => quoted(q))
+        .join(', ')}`;
     case 'capability_lookup':
       return `Platform map ${quoted(input?.query)}`;
     case 'ai_tasks_lookup':
@@ -346,17 +352,13 @@ export function buildTurnReceipt(input: {
       read.push(`${call.input?.repo}/${call.input?.path}`);
     } else if (call.name === 'wiki_read') {
       read.push(String(call.input?.path ?? ''));
-    } else if (call.name === 'stacks_get') {
-      const titles = (
-        Array.isArray(call.result?.chunks) ? call.result.chunks : []
-      )
-        .map((chunk: { title?: unknown }) => clip(chunk?.title, 80))
+    } else if (call.name === 'principles_get') {
+      const items = (Array.isArray(call.result?.items) ? call.result.items : [])
+        .map((item: { code?: unknown; statement?: unknown }) =>
+          item?.code ? `${item.code}: ${clip(item.statement, 80)}` : '',
+        )
         .filter(Boolean);
-      read.push(
-        ...(titles.length
-          ? titles.map((title: string) => `Stacks: ${title}`)
-          : ['Stacks guidance']),
-      );
+      read.push(...(items.length ? items : ['Principles']));
     } else if (isResearchTool(call.name)) {
       searched.push(
         `${describeToolAttempt(call.name, call.input)} — ${describeFound(

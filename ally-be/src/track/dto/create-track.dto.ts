@@ -10,6 +10,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -103,6 +104,27 @@ export class CreateTrackDto {
   @ValidateNested()
   @Type(() => TrackLandingPageDto)
   landingPage?: TrackLandingPageDto | null;
+
+  @ApiPropertyOptional({
+    description:
+      "Image Studio: the course's visual style id (GET /v1/image-studio/styles). " +
+      'Omit to leave unchanged; null clears it.',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(48)
+  imageStyleId?: string | null;
+
+  @ApiPropertyOptional({
+    description:
+      "Image Studio: the generated image that is the course's style example. " +
+      'Omit to leave unchanged; null clears it.',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsUUID('4')
+  imageStyleAnchorId?: string | null;
 }
 
 export class TrackSummaryResponseDto {
@@ -130,6 +152,12 @@ export class TrackSummaryResponseDto {
     nullable: true,
   })
   competencyIds?: string[] | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  imageStyleId?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  imageStyleAnchorId?: string | null;
 
   @ApiProperty({
     description:

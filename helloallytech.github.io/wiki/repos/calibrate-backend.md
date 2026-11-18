@@ -2,7 +2,7 @@
 title: calibrate-backend — Calibrate API Service
 tags: [repo, calibrate, backend, fastapi, python]
 summary: FastAPI backend for the hosted Calibrate product — serves calibrate-frontend and orchestrates calibrate benchmark/simulation runs.
-last_reconciled: 2026-08-14
+last_reconciled: 2026-11-09
 ---
 
 # calibrate-backend — Calibrate API Service
@@ -37,7 +37,7 @@ for the full dependency set, including the `calibrate` evaluation library itself
 ## Gotchas that change what you write
 
 - **Externally-licensed (CC BY-SA 4.0), same as `calibrate`** — not on the internal
-  `.docs-map.yml`/Stacks/wiki-PR machinery the six core Ally repos use.
+  `.docs-map.yml`/Context Library/wiki-PR machinery the six core Ally repos use.
 - This service is a thin orchestration layer over `calibrate` — check whether a change
   belongs here (hosting/API concerns) or in `calibrate` itself (evaluation logic) before
   duplicating something the engine already does.

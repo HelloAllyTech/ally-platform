@@ -661,6 +661,29 @@ class AgentWorker:
         )
         self.client_working_memory_store = ClientWorkingMemoryStore(ladder=_ladder)
 
+        # The Stage Director's store (docs/stage-director-and-memories.md). Like
+        # the working-memory store it is constructed unconditionally and only
+        # read for a scenario whose prompt declares {thoughts}.
+        from app.core.graph.prompt import prompt_declares_stage_director
+        from app.core.stage_director import StageDirectorStore
+
+        self.stage_director_store = StageDirectorStore()
+        _sd_prompt_data = getattr(self.scenario, "prompt_data", None)
+        if _sd_prompt_data is not None and prompt_declares_stage_director(
+            _sd_prompt_data
+        ):
+            _sd_memories = getattr(_sd_prompt_data, "memories", None)
+            logger.info(
+                "[stage-director] engaged: prompt=%s memories=%d (%s)",
+                getattr(_sd_prompt_data, "selected_main_prompt_code", None),
+                len(
+                    _sd_memories
+                    or getattr(_sd_prompt_data, "knowledge_sources", None)
+                    or []
+                ),
+                "mapped" if _sd_memories else "from knowledge sources",
+            )
+
         # The pool `salient_backstory` is recalled FROM (phase 6). Built once,
         # here, because it never changes during a session and because chunking
         # on the reply path would be latency spent on an unchanging answer.
@@ -809,6 +832,7 @@ class AgentWorker:
             retrieved_context_store=self.retrieved_context_store,
             client_working_memory_store=self.client_working_memory_store,
             turn_delivery=self.turn_delivery,
+            stage_director_store=self.stage_director_store,
         )
 
         # Register callbacks
@@ -968,11 +992,18 @@ class AgentWorker:
         # BaseTTSClient.create_clip_tts).
         self._session_tts_instance = tts_instance
 
+        # A one-word acknowledgement ("Okay.") said while the client is still
+        # speaking neither cuts the reply nor becomes a turn of its own. Prod
+        # session 688069dc: "Okay." at 97.4s inside a 93.5-98.2s reply cut it
+        # off, and the fresh reply to "Okay." skipped ahead to the next
+        # question; every cut reply in that session was followed by one.
+        min_interruption_words = max(0, int(settings.AGENT_MIN_INTERRUPTION_WORDS))
         self.session = AgentSession(
             stt=stt_instance,
             tts=tts_instance,
             vad=vad,
             turn_detection=turn_detection,
+            min_interruption_words=min_interruption_words,
             **endpointing_kwargs,
         )
 
@@ -1432,6 +1463,10 @@ class AgentWorker:
                 self.client_working_memory_store.discard()
             except Exception as e:  # noqa: BLE001 - teardown must not raise
                 logger.debug(f"Error discarding working-memory store: {e}")
+            try:
+                self.stage_director_store.discard()
+            except Exception as e:  # noqa: BLE001 - teardown must not raise
+                logger.debug(f"Error discarding stage-director store: {e}")
             # Stop the predictive-filler job before deleting clips so it can't
             # swap in a new generation after cleanup (it's still awaited by
             # cleanup_background_tasks in the wrapped shutdown handler).

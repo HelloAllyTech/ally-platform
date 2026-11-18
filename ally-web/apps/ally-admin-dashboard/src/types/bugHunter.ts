@@ -49,16 +49,12 @@ export interface ListBugHunterFeatureMapsResponse {
 /**
  * Repos a fix session can run in — i.e. those carrying `bug-fix-session.yml`.
  * Mirrors ally-be's BUG_FIX_SESSION_REPOS; the admin picks from these when the
- * bug has no repo of its own yet. ally-mobile is included but never
- * auto-merges — Bug Hunter opens a PR there and a human always merges it.
+ * bug has no repo of its own yet.
+ *
+ * 'ally-mobile' has no entry since the 2026-11 Flutter rename — see ally-be's
+ * own comment on BUG_FIX_SESSION_REPOS.
  */
-export const BUG_FIX_SESSION_REPOS = [
-  "ally-be",
-  "ally-web",
-  "ally-ai",
-  "ally-ai-learn",
-  "ally-mobile",
-] as const;
+export const BUG_FIX_SESSION_REPOS = ["ally-be", "ally-web", "ally-ai", "ally-ai-learn"] as const;
 
 export enum BugHuntRunStatus {
   RUNNING = "running",
@@ -168,6 +164,7 @@ export enum BugFindingSource {
   CODE_REVIEW = "code_review",
   PRODUCTION_LOG = "production_log",
   REPORTED_BUG = "reported_bug",
+  /** Historical rows only: the Analytics Suggestions queue was retired; nothing writes this now. */
   ANALYTICS_SUGGESTION = "analytics_suggestion",
   UX_SIGNAL = "ux_signal",
   /** The sweep workflow's own locale-file check, a script and not a model (OPP-0782). */
@@ -400,6 +397,7 @@ export interface BugHuntEvent {
   stage: BugHuntEventStage;
   summary: string;
   payload: Record<string, unknown> | null;
+  /** Historical: referenced the retired Analytics Suggestions queue. */
   suggestionId: string | null;
   findingId: string | null;
   createdAt: string;
@@ -550,6 +548,11 @@ export interface BugFinding {
   /** The Verifier's latest verdict on the current fix PR, or null until one has run. */
   latestFixVerdict: BugFixVerdict | null;
   /**
+   * On a coordinating plan, the step waiting on a person (see PlanAttention).
+   * Null while Bug Hunter has it; absent on a backend one release behind.
+   */
+  attention?: PlanAttention | null;
+  /**
    * Where an unproven finding stands with the independent verifier (OPP-0780).
    * Null for proven findings, human reports, and findings from before it existed.
    */
@@ -621,8 +624,24 @@ export interface ListBugHunterNotificationsResponse {
 }
 
 /** One repo's worth of a multi-repo fix. The array order IS the ship order. */
+/**
+ * What a person has to do on a multi-repo plan — derived by the server from
+ * the plan's steps. `merge`: the step's PR passed the Verifier in a repo Bug
+ * Hunter may not merge in. `review`: the Verifier refused it and the
+ * orchestrator handed it to a person.
+ */
+export interface PlanAttention {
+  kind: "merge" | "review";
+  stepId: string;
+  stepIndex: number;
+  repo: string | null;
+  prUrl: string | null;
+}
+
 export interface BugFixStep {
   id: string;
+  /** The Verifier's latest verdict on this step's current PR. Absent on a backend one release behind. */
+  fixVerdict?: "pass" | "fail" | null;
   stepIndex: number;
   repo: string | null;
   stepSummary: string | null;
@@ -744,62 +763,6 @@ export interface BugHunterOperationsMetrics {
     costUsd: number;
     runs: number;
   };
-}
-
-// ── The notebook (agent memory) ────────────────────────────────────────────
-// ally-be src/agent-memory. Postgres is the system of record; search runs over a
-// derived Weaviate index. See docs/bug-hunter-memory-adr.md.
-
-export enum BugHunterMemoryStatus {
-  /** Written by the agent, waiting for the hourly curator. Not yet searched or shown to sweeps. */
-  CANDIDATE = "candidate",
-  ACTIVE = "active",
-  /** Folded into another entry by the curator. */
-  MERGED = "merged",
-  RETIRED = "retired",
-}
-
-/** Hard cap on an entry, in characters — mirrors ally-be's AGENT_MEMORY_BODY_MAX and the table's CHECK. */
-export const BUG_HUNTER_MEMORY_BODY_MAX = 600;
-
-export interface BugHunterMemoryEntry {
-  id: string;
-  body: string;
-  tags: string[];
-  /** Null means platform-wide. */
-  repos: string[] | null;
-  status: BugHunterMemoryStatus;
-  /** Pinned by a person: the curator never edits or retires it. */
-  pinned: boolean;
-  /** How many runs independently wrote this lesson. */
-  sourceCount: number;
-  timesApplied: number;
-  timesContradicted: number;
-  /** The run whose reflection wrote it; null for a human entry. */
-  runId: string | null;
-  findingId: string | null;
-  /** The admin who wrote it by hand; null for the agent's own entries. */
-  createdBy: number | null;
-  embeddingStatus: "pending" | "success" | "failed" | "skipped";
-  createdAt: string;
-  lastAppliedAt: string | null;
-  /** When it left the active set; null while active. */
-  retiredAt: string | null;
-  /** The admin who retired it, or null when the agent's own nightly pass did (OPP-0752). */
-  retiredBy: number | null;
-  /** The rule that fired, in the agent's words, when it retired the entry itself. */
-  retiredReason: string | null;
-}
-
-export interface ListBugHunterMemoryResponse {
-  items: BugHunterMemoryEntry[];
-}
-
-export interface WriteBugHunterMemoryBody {
-  body: string;
-  repos?: string[];
-  tags?: string[];
-  pinned?: boolean;
 }
 
 // ── the decision log, scoreboard and replay (OPP-0776 / OPP-0783) ─────────

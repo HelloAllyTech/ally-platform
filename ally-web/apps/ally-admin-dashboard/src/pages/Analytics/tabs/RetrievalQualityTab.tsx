@@ -34,7 +34,7 @@ import { ChartIdBadge } from "../chartKit";
  * aid rather than a result.
  */
 
-/** The floor the character corpus actually runs at, marked in the curve for orientation. */
+/** The default floor every judged corpus runs at, marked in the curve for orientation. */
 const CURRENT_DEFAULT_FLOOR = 0.35;
 
 const CONSUMERS: { id: string | undefined; label: string }[] = [
@@ -42,7 +42,6 @@ const CONSUMERS: { id: string | undefined; label: string }[] = [
   // The bot first: it is the platform's highest-volume retrieval path, and the one whose
   // floor has the least evidence behind it.
   { id: "whatsapp_bot", label: en.ragQuality.whatsappBot },
-  { id: "interview_agent", label: en.ragQuality.interviewAgent },
   { id: "admin_preview", label: en.ragQuality.adminPreview },
   { id: "reference_search", label: en.ragQuality.referenceSearch },
   { id: "roadmap_matcher", label: en.ragQuality.roadmapMatcher },
@@ -56,7 +55,6 @@ const CONSUMERS: { id: string | undefined; label: string }[] = [
  */
 const CORPORA: { id: string | undefined; label: string }[] = [
   { id: undefined, label: en.ragQuality.allCorpora },
-  { id: "character_library", label: en.ragQuality.characterLibrary },
   { id: "whatsapp_qa", label: en.ragQuality.whatsappQa },
   { id: "reference_documents", label: en.ragQuality.referenceDocuments },
   { id: "roadmap_opportunities", label: en.ragQuality.roadmapOpportunities },

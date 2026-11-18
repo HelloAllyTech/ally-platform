@@ -12,7 +12,7 @@ import { BugHunterModelSettingsService } from '../service/bug-hunter-model-setti
 import { BugHunterTelemetryService } from '../service/bug-hunter-telemetry.service';
 import { BugHunterEvalService } from '../service/bug-hunter-eval.service';
 import { BugHunterPolicyService } from '../service/bug-hunter-policy.service';
-import { AgentMemoryService } from 'src/agent-memory/service/agent-memory.service';
+import { ContextAgentChunkService } from 'src/context-library/service/context-agent-chunk.service';
 import { BugHunterDossierService } from '../service/bug-hunter-dossier.service';
 import { BugCaseFileService } from '../service/bug-case-file.service';
 import { BugVerifyFixService } from '../service/bug-verify-fix.service';
@@ -90,7 +90,7 @@ describe('BugHunterPipelineController', () => {
         // Telemetry: pass the fetch straight through, so finder-data cases
         // here read exactly as before and nothing is recorded.
         { provide: BugHunterEvalService, useValue: {} },
-        { provide: AgentMemoryService, useValue: {} },
+        { provide: ContextAgentChunkService, useValue: {} },
         { provide: BugHunterDossierService, useValue: { build: jest.fn() } },
         { provide: BugCaseFileService, useValue: { build: jest.fn() } },
         {

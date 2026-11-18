@@ -57,7 +57,7 @@ Providers optionally define two class constants:
 |----------|-------|------|-------------------|-----------------|
 | Deepgram | `DeepgramTTSClient` | `TTSProvider.DEEPGRAM` | No | No |
 | ElevenLabs | `ElevenLabsTTSClient` | `TTSProvider.ELEVENLABS` | Yes (speed, stability, similarity_boost, style) | Yes (SSML-like tags) |
-| Sarvam | `SarvamTTSClient` | `TTSProvider.SARVAM` | No | No |
+| Sarvam | `SarvamTTSClient` | `TTSProvider.SARVAM` | Yes (pace, pitch, loudness) | No |
 | Google Cloud | `GoogleTTSClient` | `TTSProvider.GOOGLE` | Yes (speed, pitch, volume_gain_db) | No |
 | Hume | `HumeTTSClient` | `TTSProvider.HUME` | Yes (speed, description) | No |
 | Cartesia | `CartesiaTTSClient` | `TTSProvider.CARTESIA` | No | No |
@@ -86,7 +86,7 @@ Providers optionally define two class constants:
 
 **Sarvam** -- Specialized for Indian languages. Uses `speaker` for voice selection.
 
-Two Sarvam traps, both handled in `app/tts/sarvam.py`:
+Three Sarvam traps, all handled in `app/tts/sarvam.py`:
 - **The configured `model` must be passed to `sarvam.TTS`.** Omitted, the plugin uses its own default
   (`bulbul:v2`), which Sarvam has retired (400 "has been deprecated"). v3 shares none of v2's
   speakers; prod voices were remapped by ally-be migration `1973600000000`. Don't call the plugin's
@@ -96,6 +96,8 @@ Two Sarvam traps, both handled in `app/tts/sarvam.py`:
   the first synthesis of nearly every turn failed with "Cannot write to closing transport" and
   only worked on the plugin's retry. `guard_stale_websockets` makes the pool discard a socket whose
   transport is gone before reusing it.
+- **Empty or whitespace-only text.** The Sarvam API rejects requests containing only whitespace,
+  leading to a lost turn. The client now filters these out before synthesis.
 
 **Google Cloud** -- Uses `voice_name` and `gender` for voice selection. Supports voice cloning via `voice_cloning_key`. Voice parameters only (no SSML) when streaming is enabled.
 

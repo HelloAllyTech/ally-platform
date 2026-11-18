@@ -180,6 +180,7 @@ export const ItemPlayerHost: FC<ItemPlayerHostProps> = ({
             onBeforeLaunch={handleLaunch}
             returnContext={returnContext}
             onPosition={handlePosition}
+            languageCode={detail?.languageCode}
           />
         </AskLayer>
       </Suspense>

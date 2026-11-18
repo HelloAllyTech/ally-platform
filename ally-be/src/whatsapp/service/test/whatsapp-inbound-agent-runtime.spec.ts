@@ -1,0 +1,140 @@
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { AiUpstreamError } from '../../../ai/exception/ai-upstream.exception';
+import { ErrorCode } from '../../../exception/error-code.enum';
+import { WaHandledBy } from '../../enum/whatsapp.enum';
+import { WhatsAppInboundService } from '../whatsapp-inbound.service';
+import { agentRunIdFor } from 'src/chatbot/engine/agent-runtime';
+import { Chatbot } from 'src/chatbot/entity/chatbot.entity';
+import { AgentRuntimeUsed } from 'src/chatbot/enum/chatbot.enum';
+import { AGENT_FALLBACK_EVENT } from 'src/chatbot/type/agent-runtime.event';
+import {
+  agentBot as bot,
+  ANSWER,
+  buildInboundHarness,
+  type InboundAiService,
+  inboundText,
+} from './whatsapp-inbound-agent.fixtures';
+
+const QUESTION = 'What does Ally do?';
+
+const AGENT_ANSWER = {
+  ...ANSWER,
+  answer: 'Ally trains counsellors (v2).',
+  run_id: 'run-from-ally-ai',
+  runtime: 'v2',
+  trace: Array.from({ length: 7 }, (_, i) => ({
+    node: `n${i}`,
+    ms: i,
+    summary: '',
+  })),
+};
+
+/**
+ * The WhatsApp path with the Agents v2 runtime switch: what is stored on the reply, and the
+ * throttled fallback alert.
+ *
+ * The real event emitter and throttle are wired in, so the hand-off from the inbound handler to
+ * its listener is tested as it runs.
+ */
+describe('WhatsAppInboundService with the Agents v2 runtime', () => {
+  let service: WhatsAppInboundService;
+  let emitter: EventEmitter2;
+  let provider: { sendText: jest.Mock; showTypingIndicator: jest.Mock };
+  let aiService: InboundAiService;
+  let chatbot: Chatbot;
+  let savedMessages: Record<string, unknown>[];
+
+  const inbound = () => inboundText(QUESTION);
+  const outbound = () =>
+    savedMessages.find((m) => m.direction === 'outbound') ?? {};
+  const emitted = (event: string) =>
+    (emitter.emit as jest.Mock).mock.calls.filter(([name]) => name === event);
+
+  beforeEach(async () => {
+    chatbot = bot();
+    ({ service, emitter, provider, aiService, savedMessages } =
+      await buildInboundHarness({
+        chatbot: () => chatbot,
+        agentAnswer: AGENT_ANSWER,
+      }));
+  });
+
+  describe('under the kill switch', () => {
+    beforeEach(async () => {
+      ({ service, aiService, savedMessages } = await buildInboundHarness({
+        chatbot: () => chatbot,
+        agentAnswer: AGENT_ANSWER,
+        settings: { agentRuntimeAllowed: false },
+      }));
+    });
+
+    it('stores no run on the reply and never calls /agent/run', async () => {
+      await service.handle(inbound());
+
+      expect(aiService.runAgent).not.toHaveBeenCalled();
+      expect(outbound()).not.toHaveProperty('agentRunId');
+      expect(outbound()).not.toHaveProperty('agentRuntime');
+    });
+  });
+
+  describe('with the switch on', () => {
+    it('answers through /agent/run and links the reply to its run', async () => {
+      await service.handle(inbound());
+
+      expect(aiService.runAgent).toHaveBeenCalledTimes(1);
+      expect(aiService.runAgent.mock.calls[0][0]).toMatchObject({
+        conversation_id: 'conv-1',
+        run_id: agentRunIdFor('wamid.1'),
+        chatbot_id: 'bot-1',
+        runtime_version: 'v2',
+      });
+      expect(aiService.answerKnowledgeQuestion).not.toHaveBeenCalled();
+      expect(provider.sendText.mock.calls[0][1]).toContain('(v2)');
+      expect(outbound()).toMatchObject({
+        handledBy: WaHandledBy.RAG,
+        agentRunId: 'run-from-ally-ai',
+        agentRuntime: AgentRuntimeUsed.V2,
+      });
+      expect(emitted('exception')).toHaveLength(0);
+    });
+
+    it('falls back to v1 with exactly one reply, recorded as a fallback, and alerts', async () => {
+      aiService.runAgent.mockRejectedValue(
+        new AiUpstreamError('404', ErrorCode.AI_REQUEST_REJECTED, 404),
+      );
+
+      await service.handle(inbound());
+
+      expect(aiService.answerKnowledgeQuestionWithin).toHaveBeenCalledTimes(1);
+      expect(provider.sendText).toHaveBeenCalledTimes(1);
+      expect(provider.sendText.mock.calls[0][1]).toContain(
+        'Ally trains counsellors.',
+      );
+      expect(outbound()).toMatchObject({
+        agentRunId: agentRunIdFor('wamid.1'),
+        agentRuntime: AgentRuntimeUsed.V2_FALLBACK,
+      });
+      const alerts = emitted('exception').map(([, alert]) => alert);
+      expect(alerts).toEqual([
+        expect.objectContaining({
+          type: 'Chatbot Agent Runtime Degraded',
+          message: expect.stringContaining('1 message fell back'),
+        }),
+      ]);
+    });
+
+    it('raises the fallback alert once per window, not once per message', async () => {
+      aiService.runAgent.mockRejectedValue(
+        new AiUpstreamError('404', ErrorCode.AI_REQUEST_REJECTED, 404),
+      );
+
+      await service.handle(inbound());
+      await service.handle(inbound());
+      await service.handle(inbound());
+
+      expect(provider.sendText).toHaveBeenCalledTimes(3);
+      expect(emitted(AGENT_FALLBACK_EVENT)).toHaveLength(3);
+      expect(emitted('exception')).toHaveLength(1);
+    });
+  });
+});

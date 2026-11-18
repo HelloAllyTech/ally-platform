@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { GoogleGenAI } from '@google/genai';
 import { AppConfigService } from 'src/config/config.service';
-import { ImageGenerationProvider } from '../interface/image-generation-provider.interface';
+import {
+  ImageGenerationOptions,
+  ImageGenerationProvider,
+} from '../interface/image-generation-provider.interface';
 
 @Injectable()
 export class GeminiImageProvider implements ImageGenerationProvider {
@@ -19,6 +22,16 @@ export class GeminiImageProvider implements ImageGenerationProvider {
         'GEMINI_API_KEY is not configured — cannot generate an image with Gemini.',
       );
     }
+  }
+
+  /**
+   * Gemini image models take several reference images as inline parts of the
+   * same turn (Google documents up to 14 for its pro image model; the flash
+   * model fewer). Capped well below either; IMAGE_STUDIO_MAX_REFERENCES caps
+   * what the editor sends.
+   */
+  maxReferences(): number {
+    return 6;
   }
 
   /** Lazily build the client so the app boots even without a key configured;
@@ -46,10 +59,29 @@ export class GeminiImageProvider implements ImageGenerationProvider {
     return ratio > 1 ? '16:9' : ratio < 1 ? '3:4' : '1:1';
   }
 
-  async generateImage(prompt: string, size: string): Promise<Buffer> {
+  async generateImage(
+    prompt: string,
+    size: string,
+    options?: ImageGenerationOptions,
+  ): Promise<Buffer> {
     const response = await this.getClient().models.generateContent({
-      model: this.getModel(),
-      contents: prompt,
+      model: options?.model ?? this.getModel(),
+      contents: options?.references?.length
+        ? [
+            {
+              role: 'user',
+              parts: [
+                ...options.references.map((reference) => ({
+                  inlineData: {
+                    mimeType: reference.mimeType,
+                    data: reference.data.toString('base64'),
+                  },
+                })),
+                { text: prompt },
+              ],
+            },
+          ]
+        : prompt,
       config: {
         imageConfig: { aspectRatio: this.toAspectRatio(size) },
       },

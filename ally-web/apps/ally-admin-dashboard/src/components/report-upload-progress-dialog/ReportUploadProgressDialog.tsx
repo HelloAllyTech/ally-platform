@@ -20,8 +20,8 @@ const UploadProgressDialogHeader: FC<UploadProgressHeaderProps> = ({
   onClose,
   onToggle,
 }) => (
-  <div className="flex items-center justify-between mx-4 py-2 border-b border-[#EFEFEF]">
-    <span className="text-base font-medium text-[#1A1A1A]">{getUploadHeader(uploads)}</span>
+  <div className="flex items-center justify-between mx-4 py-2 border-b border-gray-100">
+    <span className="text-base font-medium text-typography-900">{getUploadHeader(uploads)}</span>
     <div className="flex items-center gap-2 text-typography-800">
       <Button
         onClick={onToggle}
@@ -54,7 +54,7 @@ const ProgressCircle: FC<ProgressCircleProps> = ({ progress }) => {
             cy={size / 2}
             r={radius}
             fill="none"
-            stroke="#E0E0E0"
+            className="stroke-gray-200"
             strokeWidth={strokeWidth}
           />
           <circle
@@ -182,7 +182,7 @@ const UploadProgressDialog: FC = () => {
 
   return (
     <div className="fixed bottom-0 left-2 right-2 sm:left-auto sm:right-6 z-40 font-primary">
-      <div className="w-full sm:w-[360px] bg-white shadow-[0_2px_10px_rgba(0,0,0,0.15)] rounded-t-none border border-[#E5E7EB] overflow-hidden">
+      <div className="w-full sm:w-[360px] bg-white shadow-[0_2px_10px_rgba(0,0,0,0.15)] rounded-t-none border border-border-light overflow-hidden">
         <UploadProgressDialogHeader
           uploads={displayedUploads}
           expanded={expanded}

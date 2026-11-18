@@ -118,6 +118,8 @@ Production/dev runs on a fleet of **Hetzner baremetal** hosts, each provisioned 
 - **Supporting roles** — `incus_consul` (service discovery), `hashistack`, `postgres`, `minio`, `rabbitmq`, `posthog`, `metabase`, `nodejs`/`nodejs_ci`, `poetry`, `golang`, `openjdk21`, `ruby_334`/`rails_app`, `teamcity`/`teamcity_agent` (CI), `vite_static_site`.
 - **Secrets** — Ansible Vault; set `ANSIBLE_VAULT_PASSWORD_FILE` and place the deploy key at `~/.ssh/id_ansible_ally` (see `ansible/README.md`).
 
+- **Storage archive (planned, 2026-10-28)** — the first Hetzner **Cloud** VM (all other hosts are baremetal) plus a Hetzner **Storage Box**, for the [ally-archiver](ally-archiver.md) app that moves private S3 objects older than 30 days off AWS. The VM has no inbound firewall rules and is reached only over the VPN; the Storage Box has external reachability off and a sub-account for the archive only. The Terraform (`terraform/hetzner-cloud/`) and the `ally_archiver` role and playbook are written but not yet applied. See [Storage Archive](../platform/storage-archive.md).
+
 The `infra_upgrade.md` doc records a cost/reliability audit and a proposed AWS consolidation (collapsing services onto fewer nodes behind a bastion, keeping managed Postgres) to reduce monthly cost and operational surface.
 
 ## Operator Access

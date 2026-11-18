@@ -3,6 +3,8 @@ import { FC, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";
 
+import { useGetPublicBrandingQuery } from "@api";
+
 import { ConsentScreen } from "./components/ConsentScreen";
 import { ConversationScreen } from "./components/ConversationScreen";
 import { EndedScreen } from "./components/EndedScreen";
@@ -19,6 +21,7 @@ import { TalkerDialog } from "./components/TalkerDialog";
 import { TalkerHeader, type TalkerMenuItem } from "./components/TalkerHeader";
 import { useTalkerSession } from "./useTalkerSession";
 import { useTalkPrivacyReload } from "./useTalkPrivacyReload";
+import { useApplyBranding } from "../../branding";
 import { usePageMeta } from "../blog/usePageMeta";
 
 type PendingConfirm = "end" | "leave" | "delete" | null;
@@ -76,7 +79,20 @@ const HelplineTalkPage: FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [offered.join(","), pageLanguage, chat]);
 
-  const org = chat?.org ?? status?.org ?? null;
+  // The talker page has no signed-in user, so it brands itself from the org
+  // code in the URL: colours and favicon through the document, the display
+  // name and welcome line in the header. Ally while the org's switch is off.
+  const { data: branding, isError: brandingMissing } = useGetPublicBrandingQuery(tenantCode, {
+    skip: !tenantCode,
+  });
+  useApplyBranding(brandingMissing ? null : branding);
+  const isBranded = branding?.enabled === true;
+
+  const org = useMemo(() => {
+    const base = chat?.org ?? status?.org ?? null;
+    if (!base || !isBranded || !branding) return base;
+    return { ...base, name: branding.displayName || base.name };
+  }, [chat?.org, status?.org, isBranded, branding]);
   usePageMeta({
     title: org?.name || t("helplineTalker.orgFallback"),
     robots: "noindex, nofollow",
@@ -242,7 +258,12 @@ const HelplineTalkPage: FC = () => {
       data-testid="helpline-talk-page"
       lang={language}
     >
-      <TalkerHeader org={org} onQuickExit={session.quickExit} menuItems={menuItems} />
+      <TalkerHeader
+        org={org}
+        subtitle={isBranded ? branding?.welcomeLine : null}
+        onQuickExit={session.quickExit}
+        menuItems={menuItems}
+      />
 
       {state.screen === "chat" && (
         <div className="border-b border-border-light bg-background-secondary">

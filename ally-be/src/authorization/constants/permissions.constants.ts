@@ -6,6 +6,14 @@ const PERMISSIONS = {
   EDIT_USER_STATUS: 'edit:user:status',
   VIEW_USER_ROLES: 'view:user:roles',
   VIEW_USER_TENANT: 'view:user:tenant',
+  /**
+   * Fix up a learner's course progress from the consumer web app's Org Metrics
+   * learner table: remove them from a course, reopen scenario-quiz or
+   * assessment attempts. Held by the tenant ADMIN group and platform admins.
+   * Deliberately NOT EDIT_USER, which also opens user and role editing. Every
+   * route behind it acts only on learners in the caller's own organisation.
+   */
+  EDIT_LEARNER_PROGRESS: 'edit:learner-progress',
 
   // === CHAT MANAGEMENT ===
   VIEW_CHAT: 'view:chat',
@@ -91,6 +99,13 @@ const PERMISSIONS = {
   VIEW_TENANT: 'view:tenant',
   EDIT_TENANT: 'edit:tenant',
   VIEW_TENANTS: 'view:tenants',
+  /**
+   * Edit the caller's OWN organization's branding (logo, display name,
+   * colour, favicon, welcome line) from the consumer web app. Held by the
+   * tenant ADMIN group; never widens past the caller's tenant, and the
+   * org-level on/off switch stays with EDIT_TENANT (platform admins).
+   */
+  EDIT_TENANT_BRANDING: 'edit:tenant-branding',
 
   // === REFERENCE DOCUMENTS ===
   VIEW_REFERENCE_DOCUMENT: 'view:reference-document',
@@ -201,7 +216,6 @@ const PERMISSIONS = {
 
   // === CASES ===
   VIEW_ADMIN_CASES: 'view:admin:cases',
-  VIEW_ADMIN_CASE: 'view:admin:case',
   EDIT_ADMIN_CASE: 'edit:admin:case',
   DELETE_ADMIN_CASE: 'delete:admin:case',
   EDIT_CASE_TENANT: 'edit:case-tenant',
@@ -215,7 +229,6 @@ const PERMISSIONS = {
   VIEW_ADMIN_TRACK: 'view:admin:track',
   EDIT_ADMIN_TRACK: 'edit:admin:track',
   DELETE_ADMIN_TRACK: 'delete:admin:track',
-  EDIT_TENANT_TRACK: 'edit:tenant:track',
   EDIT_TRACK_TENANT: 'edit:track-tenant',
   DELETE_TRACK_TENANT: 'delete:track-tenant',
   VIEW_TRACKS: 'view:tracks',
@@ -295,6 +308,10 @@ const PERMISSIONS = {
   // Narrower than VIEW_MOBILE_RELEASES: dispatches a real production release
   // pipeline run (scheduled-mobile-release.yml with force: true), so it is
   // gated separately even though both are SUPER_DUPER_ADMIN-only today.
+  // Briefly unused between the RN retirement and the Flutter rebuild of this
+  // workflow — a migration had already seeded it into group_permissions
+  // (never recomputed from this file — see ally-be/CLAUDE.md's roles gotcha),
+  // which is why reviving it needed no new migration.
   TRIGGER_MOBILE_RELEASES: 'trigger:mobile-releases',
   // Narrower still: promotes an already-shipped build further into
   // production (Play Store staged rollout increase, or TestFlight external
@@ -370,12 +387,31 @@ const PERMISSIONS = {
   // the course it made outlives it.
   VIEW_COURSE_COPILOT: 'view:admin:course-copilot',
   EDIT_COURSE_COPILOT: 'edit:admin:course-copilot',
+
+  // === CONTEXT LIBRARY (docs/context-library/PLAN.md) ===
+  // VIEW browses and searches the library; EDIT uploads documents, writes and bulk-uploads
+  // entries, archives, and changes use-case grants. Platform-tier only for now; organisation
+  // admins get their own scoped access when organisation-owned collections arrive.
+  VIEW_CONTEXT_LIBRARY: 'view:admin:context-library',
+  EDIT_CONTEXT_LIBRARY: 'edit:admin:context-library',
   // Ally guide (plans/ally-guide/plan.md §10.5): the Ally Console and the org
   // Ally tab. Reading individual learner transcripts is a separate permission
   // AND a per-person toggle (ally_guide_transcripts), never a role default.
   VIEW_ALLY_GUIDE: 'view:admin:ally-guide',
   EDIT_ALLY_GUIDE: 'edit:admin:ally-guide',
   REVIEW_ALLY_GUIDE_TRANSCRIPTS: 'review:admin:ally-guide-transcripts',
+  // Debrief expert review (debrief orchestrator spec B1): read a debrief run's
+  // transcript beside its cards, comment on exact lines and give a verdict.
+  // The clinical advisor's, granted person by person; no group holds it
+  // (1981900780000 revoked it from the platform groups).
+  REVIEW_DEBRIEFS: 'review:admin:debriefs',
+  // The Debrief owner (debrief-console-redesign-notes.md, "Who can act"):
+  // switching an organisation on, budgets, test thresholds and accepted
+  // proposals, autonomy unlocks, steering weights, and (with REVIEW_DEBRIEFS
+  // holders) pinned-rule sign-off. SUPER_DUPER_ADMIN by migration; otherwise
+  // granted person by person. The Ally team acts on platform access
+  // (SYSTEM_ACCESS); the clinical advisor is REVIEW_DEBRIEFS.
+  MANAGE_DEBRIEF_SETTINGS: 'manage:admin:debrief-settings',
 
   // === PRODUCT ROADMAP ===
   // Three tiers, because the roadmap is a voting board rather than a CRUD screen:
@@ -438,6 +474,7 @@ const SUPER_ADMIN_PERMISSIONS = [
   // Full administrative access
   PERMISSIONS.SYSTEM_ACCESS,
   PERMISSIONS.EDIT_USER,
+  PERMISSIONS.EDIT_LEARNER_PROGRESS,
   PERMISSIONS.EDIT_USER_ROLE,
   PERMISSIONS.VIEW_USERS,
   PERMISSIONS.EDIT_USER_STATUS,
@@ -488,7 +525,6 @@ const SUPER_ADMIN_PERMISSIONS = [
   PERMISSIONS.VIEW_ADMIN_TRACK,
   PERMISSIONS.EDIT_ADMIN_TRACK,
   PERMISSIONS.DELETE_ADMIN_TRACK,
-  PERMISSIONS.EDIT_TENANT_TRACK,
   PERMISSIONS.EDIT_TRACK_TENANT,
   PERMISSIONS.DELETE_TRACK_TENANT,
   PERMISSIONS.EDIT_SCENARIO_TENANT,
@@ -541,9 +577,13 @@ const SUPER_ADMIN_PERMISSIONS = [
   PERMISSIONS.EDIT_BUILDER,
   PERMISSIONS.VIEW_COURSE_COPILOT,
   PERMISSIONS.EDIT_COURSE_COPILOT,
+  PERMISSIONS.VIEW_CONTEXT_LIBRARY,
+  PERMISSIONS.EDIT_CONTEXT_LIBRARY,
   PERMISSIONS.VIEW_ALLY_GUIDE,
   PERMISSIONS.EDIT_ALLY_GUIDE,
   PERMISSIONS.REVIEW_ALLY_GUIDE_TRANSCRIPTS,
+  // REVIEW_DEBRIEFS is the clinical advisor's, granted person by person
+  // (revoked from the platform groups in 1981900780000).
   // Product Roadmap: SUPER_ADMIN can see the board and vote on it. The management
   // surface (EDIT_PRODUCT_ROADMAP) is deliberately withheld here and granted only to
   // SUPER_DUPER_ADMIN below.
@@ -570,6 +610,8 @@ const SUPER_DUPER_ADMIN_PERMISSIONS = [
   // a Builder session, and pinning a saved view for everyone. SUPER_ADMIN gets
   // VIEW + VOTE only (see above).
   PERMISSIONS.EDIT_PRODUCT_ROADMAP,
+  // The Debrief owner: budgets, thresholds, switching an organisation on.
+  PERMISSIONS.MANAGE_DEBRIEF_SETTINGS,
   PERMISSIONS.VIEW_AWS_LOGS,
   PERMISSIONS.VIEW_MOBILE_RELEASES,
   PERMISSIONS.TRIGGER_MOBILE_RELEASES,
@@ -699,6 +741,16 @@ const ADMIN_PERMISSIONS = [
   // granted by 1975750000000 and revoked by
   // 1976600000000-RevokeTenantAdminHelplineWorkspaceGrants.
   PERMISSIONS.EDIT_HELPLINE_TEAM,
+
+  // Own-org branding editor in the consumer web app (Branding tab). Usable
+  // only once a platform admin has switched branding on for the org — the
+  // switch itself is EDIT_TENANT. Granted by
+  // 1980850000000-AddOrgAdminBrandingPermission.
+  PERMISSIONS.EDIT_TENANT_BRANDING,
+
+  // Remove a learner from a course / reopen their attempts, from the Org
+  // Metrics learner table. Granted by 1980880000000-GrantLearnerProgressPermission.
+  PERMISSIONS.EDIT_LEARNER_PROGRESS,
 
   // start:microphone-chat / start:cloud-telephony-chat are intentionally NOT
   // granted here — initiating a recording (scribe/dictation/telephony) is a

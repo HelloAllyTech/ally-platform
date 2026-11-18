@@ -1,11 +1,10 @@
-import { FC, useEffect, useMemo, useRef, useState } from "react";
+import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
-import { RichTextRenderer } from "@ally-ui-mono/ui-shared";
 import { useGetArticleResourceEmbeddabilityQuery, useMarkArticleReadMutation } from "@api";
-import { ArrowRight, TickGreenBackground } from "@assets";
+import { TickGreenBackground } from "@assets";
 import {
   ArticleResource,
   StartArticleItemPayload,
@@ -13,6 +12,15 @@ import {
   TrackItemCompletionResult,
 } from "@types";
 
+import { ArticleCards } from "./article/ArticleCards";
+import { ArticleMagazineHeader } from "./article/ArticleMagazineHeader";
+import { ArticleOutline } from "./article/ArticleOutline";
+import { ArticleProse } from "./article/ArticleProse";
+import { ArticleResourceList } from "./article/ArticleResourceList";
+import { ArticleTakeaways } from "./article/ArticleTakeaways";
+import { splitArticleCards } from "./articleCards";
+import { articleExperience, articleReadingMinutes, articleTakeaways } from "./articleExperience";
+import { prepareArticleHtml } from "./articleHtml";
 import { ArticleQuestionCard } from "./ArticleQuestionCard";
 import { splitArticleHtml } from "./articleSegments";
 import { ExternalResourceModal, openInNewTab } from "./ExternalResourceModal";
@@ -23,6 +31,20 @@ interface ArticleItemPlayerProps {
   /** Whether the item is already completed (resumed). */
   alreadyCompleted: boolean;
   onCompleted: (result: TrackItemCompletionResult) => void;
+  /** The item's title, for the Magazine headline and the Cards cover. */
+  title?: string;
+  /** The item's description: the Magazine dek and the Cards cover's. */
+  description?: string | null;
+  /** The course section's title: the Magazine kicker and the Cards cover's. */
+  sectionTitle?: string;
+  /**
+   * Cards only: the way on from the last card once the article is read. The
+   * course's bottom nav is hidden under a cards article, so without this the
+   * reader leaves through the top bar.
+   */
+  onRequestNext?: () => void;
+  /** Always the classic layout, whatever the article asks for (an inline host). */
+  forceClassic?: boolean;
 }
 
 /** Scroll fraction (0-1) past which the article counts as "read". */
@@ -33,6 +55,8 @@ const NO_SCROLL_READY_MS = 3000;
 /** Selectable article text sizes, in rem. Persisted across articles/sessions. */
 const FONT_SCALE_STEPS = [1, 1.125, 1.25, 1.375, 1.5];
 const DEFAULT_FONT_SCALE_INDEX = 0;
+/** Magazine reads a size up from the other layouts; the reader's scale still applies on top. */
+const MAGAZINE_TYPE_SCALE = 1.15;
 const FONT_SCALE_STORAGE_KEY = "ally.trackArticle.fontScaleIndex";
 
 function readStoredFontScaleIndex(): number {
@@ -55,14 +79,27 @@ function readStoredFontScaleIndex(): number {
  * are outstanding), so the reader has to work through them rather than
  * scrolling past. The body is split on their placeholders and the segments
  * rendered in order.
+ *
+ * The article's `experience` picks the layout. CLASSIC is the plain column;
+ * MAGAZINE adds a cover hero, a headline block, larger type and an outline
+ * rail; CARDS pages the article one card at a time (see ArticleCards), with
+ * reaching the last card standing in for scrolling to the end. Every layout
+ * draws the highlight boxes, the cover and the key takeaways, and completes
+ * under the same rules.
  */
 export const ArticleItemPlayer: FC<ArticleItemPlayerProps> = ({
   payload,
   itemId,
   alreadyCompleted,
   onCompleted,
+  title = "",
+  description = null,
+  sectionTitle = "",
+  onRequestNext,
+  forceClassic = false,
 }) => {
   const { t } = useTranslation();
+  const experience = forceClassic ? "CLASSIC" : articleExperience(payload);
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -94,9 +131,46 @@ export const ArticleItemPlayer: FC<ArticleItemPlayerProps> = ({
     setActiveResource(resource);
   };
 
+  const cover = payload.cover?.url ? payload.cover : null;
+  const takeaways = useMemo(() => articleTakeaways(payload), [payload]);
+  const minutes = useMemo(
+    () => articleReadingMinutes(payload.html, takeaways),
+    [payload.html, takeaways],
+  );
+
+  const sayLabel = t("tracks2.article.callout.say");
+  const infoLabel = t("tracks2.article.callout.info");
+  const warnLabel = t("tracks2.article.callout.warn");
+  const prepared = useMemo(
+    () =>
+      prepareArticleHtml(payload.html, {
+        labels: { say: sayLabel, info: infoLabel, warn: warnLabel },
+        idPrefix: `article-${itemId}`,
+        dropCap: experience === "MAGAZINE",
+      }),
+    [payload.html, sayLabel, infoLabel, warnLabel, itemId, experience],
+  );
+
   const segments = useMemo(
-    () => splitArticleHtml(payload.html, payload.questions ?? []),
-    [payload.html, payload.questions],
+    () => splitArticleHtml(prepared.html, payload.questions ?? []),
+    [prepared.html, payload.questions],
+  );
+  const cards = useMemo(
+    () =>
+      experience === "CARDS"
+        ? splitArticleCards(prepared.html, payload.questions ?? [], {
+            hasEnd: takeaways.length > 0 || hasResources,
+          })
+        : [],
+    [experience, prepared.html, payload.questions, takeaways.length, hasResources],
+  );
+  const takeawaysId = `article-${itemId}-takeaways`;
+  const outline = useMemo(
+    () =>
+      takeaways.length > 0
+        ? [...prepared.outline, { id: takeawaysId, text: t("tracks2.article.takeawaysHeading") }]
+        : prepared.outline,
+    [prepared.outline, takeaways.length, takeawaysId, t],
   );
   /**
    * Only the questions the article actually shows. Counting
@@ -181,6 +255,17 @@ export const ArticleItemPlayer: FC<ArticleItemPlayerProps> = ({
   }, [payload.html]);
 
   const canMark = (reachedEnd || scrollPct >= READ_SCROLL_THRESHOLD * 100) && unansweredCount === 0;
+  const markLabel =
+    unansweredCount > 0
+      ? t(
+          unansweredCount === 1
+            ? "tracks2.article.answerQuestionToContinue"
+            : "tracks2.article.answerQuestionsToContinue",
+        )
+      : canMark
+        ? t("tracks2.article.markRead")
+        : t("tracks2.article.keepReading");
+  const handleReachedEnd = useCallback(() => setReachedEnd(true), []);
 
   const handleMarkRead = async () => {
     if (marked || isLoading) return;
@@ -193,6 +278,93 @@ export const ArticleItemPlayer: FC<ArticleItemPlayerProps> = ({
     }
   };
 
+  const resourceModal = activeResource && (
+    <ExternalResourceModal resource={activeResource} onClose={() => setActiveResource(null)} />
+  );
+
+  if (experience === "CARDS") {
+    return (
+      <>
+        <ArticleCards
+          cards={cards}
+          itemId={itemId}
+          cover={cover}
+          title={title}
+          description={description}
+          sectionTitle={sectionTitle}
+          minutes={minutes}
+          takeaways={takeaways}
+          resources={payload.resources ?? []}
+          answeredIds={answeredIds}
+          onQuestionAnswered={handleQuestionAnswered}
+          onOpenResource={openResource}
+          onReachedEnd={handleReachedEnd}
+          marked={marked}
+          canMark={canMark}
+          isMarking={isLoading}
+          markLabel={markLabel}
+          onMarkRead={handleMarkRead}
+          onRequestNext={onRequestNext}
+        />
+        {resourceModal}
+      </>
+    );
+  }
+
+  const isMagazine = experience === "MAGAZINE";
+  const fontScale = FONT_SCALE_STEPS[fontScaleIndex];
+
+  const fontButtons = (
+    <div className="mb-3 flex items-center justify-end gap-1">
+      <button
+        type="button"
+        onClick={() => changeFontScale(-1)}
+        disabled={fontScaleIndex === 0}
+        aria-label={t("tracks2.article.decreaseFontSize")}
+        className="flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold text-typography-700 transition-colors hover:bg-neutral-100 disabled:pointer-events-none disabled:opacity-40 max-md:h-10 max-md:w-10"
+      >
+        A-
+      </button>
+      <button
+        type="button"
+        onClick={() => changeFontScale(1)}
+        disabled={fontScaleIndex === FONT_SCALE_STEPS.length - 1}
+        aria-label={t("tracks2.article.increaseFontSize")}
+        className="flex h-7 w-7 items-center justify-center rounded-full text-base font-semibold text-typography-700 transition-colors hover:bg-neutral-100 disabled:pointer-events-none disabled:opacity-40 max-md:h-10 max-md:w-10"
+      >
+        A+
+      </button>
+    </div>
+  );
+
+  const body = (
+    <>
+      <article
+        className="break-words"
+        style={{ fontSize: `${isMagazine ? fontScale * MAGAZINE_TYPE_SCALE : fontScale}rem` }}
+      >
+        {segments.map(segment =>
+          segment.kind === "html" ? (
+            <ArticleProse key={segment.key} html={segment.html} />
+          ) : (
+            <ArticleQuestionCard
+              key={segment.key}
+              itemId={itemId}
+              question={segment.question}
+              onAnswered={result => handleQuestionAnswered(segment.question.id, result)}
+            />
+          ),
+        )}
+        <ArticleTakeaways takeaways={takeaways} id={takeawaysId} />
+        <div ref={sentinelRef} aria-hidden className="h-px w-full" />
+      </article>
+
+      {hasResources && payload.resources && (
+        <ArticleResourceList resources={payload.resources} onOpen={openResource} />
+      )}
+    </>
+  );
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="h-1 w-full flex-shrink-0 bg-neutral-100">
@@ -202,73 +374,46 @@ export const ArticleItemPlayer: FC<ArticleItemPlayerProps> = ({
         />
       </div>
 
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6">
-        <div className="mx-auto mb-3 flex max-w-[68ch] items-center justify-end gap-1">
-          <button
-            type="button"
-            onClick={() => changeFontScale(-1)}
-            disabled={fontScaleIndex === 0}
-            aria-label={t("tracks2.article.decreaseFontSize")}
-            className="flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold text-typography-700 transition-colors hover:bg-neutral-100 disabled:pointer-events-none disabled:opacity-40 max-md:h-10 max-md:w-10"
-          >
-            A-
-          </button>
-          <button
-            type="button"
-            onClick={() => changeFontScale(1)}
-            disabled={fontScaleIndex === FONT_SCALE_STEPS.length - 1}
-            aria-label={t("tracks2.article.increaseFontSize")}
-            className="flex h-7 w-7 items-center justify-center rounded-full text-base font-semibold text-typography-700 transition-colors hover:bg-neutral-100 disabled:pointer-events-none disabled:opacity-40 max-md:h-10 max-md:w-10"
-          >
-            A+
-          </button>
-        </div>
-        <article
-          className="mx-auto max-w-[68ch] break-words"
-          style={{ fontSize: `${FONT_SCALE_STEPS[fontScaleIndex]}rem` }}
+      {isMagazine ? (
+        <div
+          ref={scrollRef}
+          data-testid="article-magazine"
+          className="ally-article-magazine min-h-0 flex-1 overflow-y-auto pb-10"
         >
-          {segments.map(segment =>
-            segment.kind === "html" ? (
-              <RichTextRenderer key={segment.key} content={segment.html} allowImages />
-            ) : (
-              <ArticleQuestionCard
-                key={segment.key}
-                itemId={itemId}
-                question={segment.question}
-                onAnswered={result => handleQuestionAnswered(segment.question.id, result)}
-              />
-            ),
-          )}
-          <div ref={sentinelRef} aria-hidden className="h-px w-full" />
-        </article>
-
-        {hasResources && payload.resources && (
-          <div className="mx-auto mt-8 max-w-[68ch] border-t border-border-light pt-6">
-            <h2 className="mb-3 text-sm font-semibold text-typography-900">
-              {t("tracks2.article.resourcesHeading")}
-            </h2>
-            <div className="flex flex-col gap-2">
-              {payload.resources.map(resource => (
-                <button
-                  key={resource.id}
-                  type="button"
-                  onClick={() => openResource(resource)}
-                  className="flex items-center justify-between gap-2 rounded-lg border border-border-light px-3 py-2 text-left text-sm font-medium text-primary-500 transition-colors hover:bg-background-secondary"
-                >
-                  <span className="truncate">{resource.title}</span>
-                  <span className="flex-shrink-0">
-                    <ArrowRight />
-                  </span>
-                </button>
-              ))}
+          <ArticleMagazineHeader
+            cover={cover}
+            kicker={sectionTitle}
+            title={title}
+            description={description}
+            minutes={minutes}
+            questionCount={shownQuestions.length}
+          />
+          <div className="mx-auto mt-6 max-w-[1100px] px-4 sm:px-6 lg:grid lg:grid-cols-[200px_minmax(0,1fr)] lg:gap-10">
+            <ArticleOutline entries={outline} scrollRef={scrollRef} />
+            <div className="mx-auto w-full max-w-[68ch] lg:mx-0">
+              {fontButtons}
+              {body}
             </div>
           </div>
-        )}
-      </div>
-
-      {activeResource && (
-        <ExternalResourceModal resource={activeResource} onClose={() => setActiveResource(null)} />
+        </div>
+      ) : (
+        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6">
+          <div className="mx-auto max-w-[68ch]">{fontButtons}</div>
+          <div className="mx-auto max-w-[68ch]">
+            {cover && (
+              <img
+                src={cover.url}
+                alt={cover.alt ?? ""}
+                data-testid="article-cover"
+                className="mb-6 max-h-[240px] w-full rounded-xl object-cover"
+              />
+            )}
+            {body}
+          </div>
+        </div>
       )}
+
+      {resourceModal}
 
       <div className="flex flex-shrink-0 items-center justify-center border-t border-border-light bg-white px-4 py-3">
         {marked ? (
@@ -282,15 +427,7 @@ export const ArticleItemPlayer: FC<ArticleItemPlayerProps> = ({
             disabled={!canMark || isLoading}
             className="w-full rounded-full bg-primary-500 px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-600 disabled:pointer-events-none disabled:opacity-40 max-md:min-h-11 sm:w-auto"
           >
-            {unansweredCount > 0
-              ? t(
-                  unansweredCount === 1
-                    ? "tracks2.article.answerQuestionToContinue"
-                    : "tracks2.article.answerQuestionsToContinue",
-                )
-              : canMark
-                ? t("tracks2.article.markRead")
-                : t("tracks2.article.keepReading")}
+            {markLabel}
           </button>
         )}
       </div>

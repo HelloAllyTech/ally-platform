@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
 
-import { GroupedBarChart } from "@carbon/charts-react";
-
 import { useGetBugHunterVolumeQuery } from "@api";
+import { GroupedBarChart } from "@components/charts";
 import { AnalyticsBucket } from "@types";
 
 import { bucketTitle, withoutInProgress } from "./analyticsGrouping";

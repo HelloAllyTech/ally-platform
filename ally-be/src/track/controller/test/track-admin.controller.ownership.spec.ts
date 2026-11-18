@@ -58,6 +58,7 @@ describe('TrackAdminController — course ownership for restricted admins', () =
         {} as any,
       ),
       {} as any,
+      {} as any, // trackEnrollmentService
     );
   });
 

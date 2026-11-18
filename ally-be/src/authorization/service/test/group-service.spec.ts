@@ -150,6 +150,19 @@ describe('GroupService', () => {
 
       expect(result.map((group) => group.name)).toEqual(['ADMIN']);
     });
+
+    // The advisor reads debriefs from every organisation, so a tenant-scoped
+    // role picker must never offer it.
+    it('should omit CLINICAL_ADVISOR', async () => {
+      groupRepo.getAll.mockResolvedValue([
+        { id: 1, name: 'LEARNER' },
+        { id: 20, name: 'CLINICAL_ADVISOR' },
+      ] as Group[]);
+
+      const result = await service.getAllRoles();
+
+      expect(result.map((group) => group.name)).toEqual(['LEARNER']);
+    });
   });
 
   describe('getGroupNames', () => {

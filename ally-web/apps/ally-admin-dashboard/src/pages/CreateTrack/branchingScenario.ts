@@ -7,8 +7,16 @@ import {
   MAX_BRANCHING_TITLE,
   MAX_QUESTION_MEDIA_ALT_LENGTH,
   MIN_BRANCHING_CHOICES,
+  MIN_BRANCHING_DECISION_CHOICES,
 } from "@constants";
-import { BranchingNode, BranchingOutcomeTone, BranchingScenarioContent } from "@types";
+import {
+  BranchingChoice,
+  BranchingExperience,
+  BranchingImage,
+  BranchingNode,
+  BranchingOutcomeTone,
+  BranchingScenarioContent,
+} from "@types";
 
 /*
  * Pure helpers for the Branching scenario editor. The graph rules mirror
@@ -26,6 +34,19 @@ export const OUTCOME_DEFAULT_SCORE: Record<BranchingOutcomeTone, number> = {
 
 export const isEnding = (node: BranchingNode): boolean =>
   !node.choices || node.choices.length === 0;
+
+/** What a scene does: asks the learner to choose, continues with one button, or ends the run. */
+export type BranchingSceneMode = "choose" | "oneButton" | "ending";
+
+export const sceneMode = (node: BranchingNode): BranchingSceneMode => {
+  const count = node.choices?.length ?? 0;
+  if (count === 0) return "ending";
+  return count === 1 ? "oneButton" : "choose";
+};
+
+/** Absent (or anything unrecognised) reads as Classic. */
+export const isStoryExperience = (content: BranchingScenarioContent): boolean =>
+  content.experience === BranchingExperience.STORY;
 
 /** The score a run earns on this ending: its own, else its outcome's default, else full marks. */
 export const endingScore = (node: BranchingNode): number => {
@@ -116,6 +137,12 @@ export const validateBranching = (
   }
   const ids = new Set(content.nodes.map(node => node.id));
   if (!ids.has(content.startNodeId)) add(null, "Pick which scene the learner starts on.");
+  if (
+    content.experience != null &&
+    !Object.values(BranchingExperience).includes(content.experience)
+  ) {
+    add(null, "Experience must be Classic or Story.");
+  }
 
   const choiceIds = new Set<string>();
   let endings = 0;
@@ -215,6 +242,17 @@ export const serializeBranching = (content: BranchingScenarioContent): Branching
   const passScore = content.settings?.passScore;
   return {
     ...(trimmed(content.intro) ? { intro: content.intro } : {}),
+    // Classic is the default, so it is never written: classic content stays byte-identical.
+    ...(isStoryExperience(content) ? { experience: BranchingExperience.STORY } : {}),
+    // Optional and new: written only when someone is cast, so other content stays byte-identical.
+    ...(content.imageCast?.length
+      ? {
+          imageCast: content.imageCast.map(member => ({
+            characterId: member.characterId,
+            name: member.name,
+          })),
+        }
+      : {}),
     settings: {
       passScore: passScore ?? 0,
       maxAttempts: content.settings?.maxAttempts ?? null,
@@ -372,7 +410,7 @@ export const addStepBlockedReason = (
   const node = content.nodes.find(candidate => candidate.id === nodeId);
   if (!node) return "That scene no longer exists.";
   const ending = isEnding(node);
-  const needed = ending ? MIN_BRANCHING_CHOICES : 1;
+  const needed = ending ? MIN_BRANCHING_DECISION_CHOICES : 1;
   if (content.nodes.length + needed > MAX_BRANCHING_NODES) {
     return `A scenario can have at most ${MAX_BRANCHING_NODES} scenes.`;
   }
@@ -393,7 +431,7 @@ export const addStep = (
 ): { content: BranchingScenarioContent; newNodeId: string } | null => {
   if (addStepBlockedReason(content, nodeId)) return null;
   const node = content.nodes.find(candidate => candidate.id === nodeId)!;
-  const scenes = Array.from({ length: isEnding(node) ? MIN_BRANCHING_CHOICES : 1 }, () =>
+  const scenes = Array.from({ length: isEnding(node) ? MIN_BRANCHING_DECISION_CHOICES : 1 }, () =>
     createEnding(),
   );
   const added = scenes.map(scene => newChoice(scene.id));
@@ -453,4 +491,131 @@ export const removeChoiceFromNode = (
       n.id === nodeId ? { ...n, choices: (n.choices ?? []).filter(c => c.id !== choiceId) } : n,
     ),
   };
+};
+
+/* ---- "This scene" switch: choose / one button / ending ---- */
+
+/** Default label for a single-button scene's button. */
+export const DEFAULT_BUTTON_TEXT = "Continue";
+
+/** Outcome, score and takeaway belong to endings only. */
+const ENDING_FIELDS_CLEARED = { outcome: undefined, score: undefined, takeaway: undefined };
+
+/**
+ * Switches a scene between "asks the learner to choose", "continues with one
+ * button" and "is an ending", in one content change:
+ * - to an ending: its choices are dropped;
+ * - ending to choose: two blank choices for the trainer to point somewhere;
+ * - choose to one button: the first choice (and where it leads) is kept, the rest dropped;
+ * - ending to one button: a "Continue" button leading to a new ending scene;
+ * - one button to choose: a second, blank choice leading to a new ending scene.
+ * A new scene is only added while there is room; otherwise the new choice is left
+ * without a destination for the trainer to pick. Null when the scene is missing or
+ * already in that mode.
+ */
+export const setSceneMode = (
+  content: BranchingScenarioContent,
+  nodeId: string,
+  mode: BranchingSceneMode,
+): BranchingScenarioContent | null => {
+  const node = content.nodes.find(candidate => candidate.id === nodeId);
+  if (!node || sceneMode(node) === mode) return null;
+  const choices = node.choices ?? [];
+  const added: BranchingNode[] = [];
+  const newDestination = () => {
+    if (content.nodes.length + added.length >= MAX_BRANCHING_NODES) return "";
+    const scene = createEnding();
+    added.push(scene);
+    return scene.id;
+  };
+
+  let edited: BranchingNode;
+  if (mode === "ending") {
+    edited = { ...node, choices: undefined };
+  } else if (mode === "choose" && choices.length === 0) {
+    const blank = Array.from({ length: MIN_BRANCHING_DECISION_CHOICES }, () => ({
+      id: newId(),
+      text: "",
+      nextNodeId: "",
+    }));
+    edited = { ...node, choices: blank, ...ENDING_FIELDS_CLEARED };
+  } else if (mode === "choose") {
+    edited = {
+      ...node,
+      choices: [...choices, { id: newId(), text: "", nextNodeId: newDestination() }],
+    };
+  } else if (choices.length === 0) {
+    const button: BranchingChoice = {
+      id: newId(),
+      text: DEFAULT_BUTTON_TEXT,
+      nextNodeId: newDestination(),
+    };
+    edited = { ...node, choices: [button], ...ENDING_FIELDS_CLEARED };
+  } else {
+    const [first] = choices;
+    edited = {
+      ...node,
+      choices: [{ ...first, text: first.text.trim() ? first.text : DEFAULT_BUTTON_TEXT }],
+    };
+  }
+  return {
+    ...content,
+    nodes: [...content.nodes.map(n => (n.id === nodeId ? edited : n)), ...added],
+  };
+};
+
+/* ---- Story experience: photos ---- */
+
+export interface StoryPhotoSummary {
+  total: number;
+  /** Scenes with no photo of their own. */
+  missing: number;
+  /** The first scene has no photo, so there is nothing earlier for it to reuse. */
+  startMissing: boolean;
+}
+
+export const storyPhotoSummary = (content: BranchingScenarioContent): StoryPhotoSummary => {
+  const start = content.nodes.find(node => node.id === content.startNodeId);
+  return {
+    total: content.nodes.length,
+    missing: content.nodes.filter(node => !node.image).length,
+    startMissing: Boolean(start && !start.image),
+  };
+};
+
+/**
+ * What the trainer should know about photos before choosing Story, or null when
+ * every scene has one. A warning only: Story still works, borrowing photos.
+ */
+export const storyPhotoWarning = (content: BranchingScenarioContent): string | null => {
+  const { total, missing, startMissing } = storyPhotoSummary(content);
+  if (missing === 0) return null;
+  if (missing === total) {
+    return "Story mode needs photos. Add a photo to at least the first scene.";
+  }
+  const first = "Add a photo to the first scene — there is no earlier photo for it to reuse.";
+  if (startMissing && missing === 1) return first;
+  const reuse =
+    missing === 1
+      ? `1 of ${total} scenes has no photo. In Story mode it'll reuse the photo from the scene before.`
+      : `${missing} of ${total} scenes have no photo. In Story mode they'll reuse the photo from the scene before.`;
+  return startMissing ? `${reuse} ${first}` : reuse;
+};
+
+/**
+ * The photo a Story-mode scene shows: the scene's own, else the latest photo on
+ * the path the learner took to get here, else the first photo in the scenario.
+ * `path` is the scenes visited in order, ending with the current one.
+ * Undefined only when the scenario has no photo at all (it then shows as Classic).
+ */
+export const storyPhotoFor = (
+  content: BranchingScenarioContent,
+  path: string[],
+): BranchingImage | undefined => {
+  const byId = new Map(content.nodes.map(node => [node.id, node]));
+  for (let i = path.length - 1; i >= 0; i -= 1) {
+    const image = byId.get(path[i])?.image;
+    if (image) return image;
+  }
+  return content.nodes.find(node => node.image)?.image;
 };

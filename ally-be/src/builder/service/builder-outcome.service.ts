@@ -11,9 +11,13 @@ import { BUILDER_OUTCOME_SYSTEM, renderPrompt } from 'src/prompt/contracts';
 import { PromptSharedService } from 'src/prompt/service/prompt-shared.service';
 import { BuilderExemplarService } from './builder-exemplar.service';
 import { BuilderKnowledgeService } from './builder-knowledge.service';
-import { BuilderLessonCuratorService } from './builder-lesson-curator.service';
+import { BuilderLessonsService } from './builder-lessons.service';
 import { BuilderSessionRepository } from '../repository/builder-session.repository';
-import { BuilderLessonRepository } from '../repository/builder-knowledge.repository';
+import {
+  ClCollectionId,
+  ClUseCase,
+} from 'src/context-library/enum/context-library.enum';
+import { ContextAgentChunkService } from 'src/context-library/service/context-agent-chunk.service';
 import {
   BuilderPrFeedbackRepository,
   BuilderPullRequestRepository,
@@ -58,10 +62,10 @@ export class BuilderOutcomeService {
     private readonly sessionRepository: BuilderSessionRepository,
     private readonly pullRequestRepository: BuilderPullRequestRepository,
     private readonly feedbackRepository: BuilderPrFeedbackRepository,
-    private readonly lessonRepository: BuilderLessonRepository,
+    private readonly lessons: BuilderLessonsService,
     private readonly exemplarService: BuilderExemplarService,
     private readonly knowledgeService: BuilderKnowledgeService,
-    private readonly curatorService: BuilderLessonCuratorService,
+    private readonly agentChunks: ContextAgentChunkService,
     private readonly llmCompletion: LlmCompletionService,
     /** The categoriser's instructions and, when it names one, its model. */
     private readonly prompts: PromptSharedService,
@@ -91,8 +95,8 @@ export class BuilderOutcomeService {
       }
     }
 
-    // Fold anything the sweep harvested into the curated set while we are here.
-    await this.curatorService.consolidate().catch(() => undefined);
+    // What the sweep harvested lands as candidates; the Context Library's agent curator folds
+    // them into Builder Lessons on its own hourly pass.
     return { refreshed };
   }
 
@@ -136,7 +140,7 @@ export class BuilderOutcomeService {
       });
     }
 
-    await this.applyLessonOutcomes(analysis);
+    await this.applyLessonOutcomes(sessionId, analysis);
 
     if (analysis.lessons.length || freshTags.length) {
       this.logger.info(
@@ -147,16 +151,31 @@ export class BuilderOutcomeService {
 
   /**
    * Mark a lesson against when it was in front of the agent and did not
-   * prevent the thing it warns about — evidence for the curator's retirement
-   * decisions. Credit for cited lessons came from the old runner's reports,
-   * which issue builds do not write.
+   * prevent the thing it warns about — an `agent_contradicted` usage event on
+   * the Builder Lessons chunk, which the agent curator's usage-based
+   * retirement reads. Credit for cited lessons comes from the interview's
+   * verified `[BL-…]` citations; issue builds write no report to take it from.
    */
-  private async applyLessonOutcomes(analysis: OutcomeAnalysis): Promise<void> {
-    if (analysis.contradictedLessonIds.length) {
-      await this.lessonRepository.recordContradicted(
-        analysis.contradictedLessonIds,
+  private async applyLessonOutcomes(
+    sessionId: string,
+    analysis: OutcomeAnalysis,
+  ): Promise<void> {
+    if (!analysis.contradictedLessonIds.length) return;
+    await this.agentChunks
+      .recordFeedback({
+        useCase: ClUseCase.BUILDER_BUILD,
+        collection: ClCollectionId.BUILDER_LESSONS,
+        sessionId,
+        applied: [],
+        contradicted: analysis.contradictedLessonIds,
+        // This pass judges what went wrong, not what was used: silence is not "unused".
+        markUnused: false,
+      })
+      .catch((error: Error) =>
+        this.logger.warn(
+          `Could not record contradicted lessons for ${sessionId}: ${error.message}`,
+        ),
       );
-    }
   }
 
   /**
@@ -179,9 +198,7 @@ export class BuilderOutcomeService {
       path?: string | null;
     }[],
   ): Promise<OutcomeAnalysis | null> {
-    const activeLessons = await this.lessonRepository.listActiveForRepos(
-      exemplar.repos ?? undefined,
-    );
+    const activeLessons = await this.lessons.inScope(exemplar.repos);
 
     try {
       const [template, target] = await Promise.all([
@@ -228,7 +245,7 @@ export class BuilderOutcomeService {
           '## Lessons this build already had access to',
           activeLessons.length
             ? activeLessons
-                .map((lesson) => `- [${lesson.id}] ${lesson.lesson}`)
+                .map((lesson) => `- [${lesson.code}] ${lesson.statement}`)
                 .join('\n')
             : '(none)',
           '',
@@ -237,7 +254,7 @@ export class BuilderOutcomeService {
       });
 
       const text = result.text;
-      return parseAnalysis(text, new Set(activeLessons.map((l) => l.id)));
+      return parseAnalysis(text, new Set(activeLessons.map((l) => l.code)));
     } catch (error) {
       this.logger.warn(
         `Could not categorise session ${sessionId}: ${

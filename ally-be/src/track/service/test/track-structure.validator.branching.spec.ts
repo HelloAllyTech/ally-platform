@@ -5,6 +5,7 @@ import {
 } from '../track-structure.validator';
 import { TrackItemType } from '../../type/track.type';
 import {
+  BranchingExperience,
   BranchingScenarioContent,
   branchingEndingScore,
   resolveBranchingPath,
@@ -88,12 +89,41 @@ describe('validateTrackStructure - branching scenario', () => {
     );
   });
 
-  it('rejects a scene with a single choice', () => {
+  it('accepts a single-button scene (exactly one choice)', () => {
     const content = scenario();
-    content.nodes[0].choices = [content.nodes[0].choices![0]];
-    expect(() => validateTrackStructure(wrap(content))).toThrow(
-      /2 to 6 choices/,
-    );
+    content.nodes[0].choices = [
+      { id: 'c1', text: 'Keep listening', nextNodeId: 'beat' },
+    ];
+    content.nodes.push({
+      id: 'beat',
+      text: 'She takes a long breath.',
+      choices: [
+        { id: 'c3', text: 'Reassure her', nextNodeId: 'quiet' },
+        { id: 'c4', text: 'Reflect the feeling', nextNodeId: 'open' },
+      ],
+    });
+    expect(() => validateTrackStructure(wrap(content))).not.toThrow();
+    expect(resolveBranchingPath(content, ['c1', 'c4'])).toBe('open');
+  });
+
+  it('accepts both experiences and no experience at all', () => {
+    for (const experience of [
+      undefined,
+      BranchingExperience.CLASSIC,
+      BranchingExperience.STORY,
+    ]) {
+      expect(() =>
+        validateTrackStructure(wrap(scenario({ experience }))),
+      ).not.toThrow();
+    }
+  });
+
+  it('rejects an unknown experience', () => {
+    expect(() =>
+      validateTrackStructure(
+        wrap(scenario({ experience: 'CINEMA' as BranchingExperience })),
+      ),
+    ).toThrow(/experience must be classic or story/);
   });
 
   it('rejects a scene with more than four choices', () => {

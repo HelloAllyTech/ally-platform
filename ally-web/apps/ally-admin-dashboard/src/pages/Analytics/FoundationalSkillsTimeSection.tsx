@@ -1,7 +1,5 @@
 import { ReactNode, useMemo, useState } from "react";
 
-import { LineChart, StackedBarChart } from "@carbon/charts-react";
-
 import { CarbonDropdown as Dropdown } from "@ally-ui-mono/ui-shared";
 import {
   useGetFoundationalSkillsRetentionQuery,
@@ -9,6 +7,7 @@ import {
   useGetFoundationalSkillsTimeToCompetenceQuery,
   useGetPracticeProgressionQuery,
 } from "@api";
+import { LineChart, StackedBarChart } from "@components/charts";
 
 import { asOfStamp } from "./analyticsFilters";
 import { ChangeWhiskers } from "./ChangeWhiskers";

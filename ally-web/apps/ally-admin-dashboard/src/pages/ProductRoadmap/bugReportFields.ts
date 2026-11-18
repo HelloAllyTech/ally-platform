@@ -12,7 +12,7 @@ export const BUG_REPORT_SURFACES = [
   { id: "admin", label: "Admin dashboard" },
   { id: "mobile", label: "Mobile app" },
   { id: "voice_roleplay", label: "Voice roleplay" },
-  { id: "whatsapp", label: "WhatsApp bot" },
+  { id: "whatsapp", label: "Assistants" },
   { id: "not_sure", label: "Not sure" },
 ] as const;
 export type BugReportSurface = (typeof BUG_REPORT_SURFACES)[number]["id"];

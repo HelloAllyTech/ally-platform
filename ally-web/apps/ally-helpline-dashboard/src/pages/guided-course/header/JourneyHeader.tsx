@@ -10,7 +10,7 @@ import { SHELF_UTILITIES, ShelfUtility } from "../shelf/shelfParts";
  * The guidance dial (plan §5.7): Lead me · Walk with me · I'll drive. It sets
  * how much Ally says, how readily Ally steers and how often Ally offers
  * optional practice, all at once. An explicit, clearly labelled autonomy
- * control builds trust (Stacks: "Graphical Agent Interface Design
+ * control builds trust ("Graphical Agent Interface Design
  * Constraints"; the autonomy slider).
  */
 export const GuidanceDial: FC<{

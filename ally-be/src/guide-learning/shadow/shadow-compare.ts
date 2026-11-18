@@ -3,7 +3,7 @@ import { CheckResult } from '../checks/deterministic-checks';
 
 /**
  * Comparing a shadow replay with what GA actually said (plans/ally-guide/
- * plan.md §7.4; Stacks: Instrumentation and Validation in Shadow
+ * plan.md §7.4; Instrumentation and Validation in Shadow
  * Deployments — compare outputs rigorously, separate improvements from
  * bugs). Pure. Both sides are graded by the same deterministic checks, so
  * the comparison is like for like and reproducible; no model grades it.

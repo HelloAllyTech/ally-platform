@@ -21,7 +21,7 @@ const STATUS_FLASH_DURATION_MS = 1500;
  * working" (Fixing, Starting…, Releasing…), and blue and pale green meant
  * "somewhere in between". Seven tints for seventeen statuses made colour
  * something to decode rather than something to scan — the opposite of
- * Stacks' *Dynamic visibility scaling tied to information urgency*: quiet when
+ * *Dynamic visibility scaling tied to information urgency*: quiet when
  * normal, loud only when it needs acting on.
  */
 const NEEDS_YOU = "bg-orange-50 text-orange-700 border-orange-200";

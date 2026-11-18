@@ -10,6 +10,7 @@ import { CharacterInterviewSessionRepository } from '../repository/character-int
 import { CharacterInterviewMessageRepository } from '../repository/character-interview-message.repository';
 import { CharacterInterviewSessionStatus } from '../enum/character-interview.enum';
 import {
+  CHARACTER_INTERVIEW_ACTIVE_SESSION_IDLE_MS,
   CHARACTER_INTERVIEW_MAX_ACTIVE_SESSIONS_PER_TENANT,
   CHARACTER_INTERVIEW_MAX_SESSIONS_PER_TENANT_PER_MONTH,
 } from '../constants/character-interview.constants';
@@ -48,8 +49,18 @@ export class CharacterInterviewSessionService {
    * actionable; a bare 429 is not.
    */
   private async assertTenantWithinCaps(tenantId: string): Promise<void> {
+    // Only sessions somebody has touched recently are "in progress"; see the
+    // idle-window note on the constant. updatedAt is bumped by every appended
+    // turn (character-interview-message.repository.ts), so it is the last
+    // moment anyone was actually interviewing.
     const activeCount = await this.sessionRepository.count({
-      where: { tenantId, status: CharacterInterviewSessionStatus.ACTIVE },
+      where: {
+        tenantId,
+        status: CharacterInterviewSessionStatus.ACTIVE,
+        updatedAt: MoreThanOrEqual(
+          new Date(Date.now() - CHARACTER_INTERVIEW_ACTIVE_SESSION_IDLE_MS),
+        ),
+      },
     });
     if (activeCount >= CHARACTER_INTERVIEW_MAX_ACTIVE_SESSIONS_PER_TENANT) {
       throw new ForbiddenException(
@@ -89,6 +100,25 @@ export class CharacterInterviewSessionService {
       throw new ForbiddenException('Not your interview session');
     }
     return session;
+  }
+
+  /**
+   * Leave or Start over: the interview is over without a draft. Marking it
+   * ABANDONED frees its slot under the per-tenant in-progress cap at once
+   * instead of after the idle window. Idempotent, and a COMPLETED session is
+   * left alone — its draft may still be opened from the review path.
+   */
+  async abandonSession(
+    sessionId: string,
+    userId: number,
+  ): Promise<CharacterInterviewSession> {
+    const session = await this.getSession(sessionId, userId);
+    if (session.status !== CharacterInterviewSessionStatus.ACTIVE) {
+      return session;
+    }
+    session.status = CharacterInterviewSessionStatus.ABANDONED;
+    session.updatedBy = userId;
+    return this.sessionRepository.save(session);
   }
 
   /**

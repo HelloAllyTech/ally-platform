@@ -87,6 +87,22 @@ export class WaKeywordTemplate extends BaseWithoutTenantEntity {
   @Column({ type: 'timestamp', name: 'archived_at', nullable: true })
   archivedAt?: Date | null;
 
+  /**
+   * The chatbot this reply belongs to. NULL is a global reply that every chatbot gets. A bot's
+   * row is either its OWN reply (faq/command only) or, with `overridesTemplateId` set, its
+   * version of a global one — reworded, or switched off.
+   */
+  @Index('idx_wa_keyword_templates_chatbot')
+  @Column({ type: 'uuid', name: 'chatbot_id', nullable: true })
+  chatbotId?: string | null;
+
+  /**
+   * The global reply this row replaces for its bot. One live override per (bot, global reply). A mandatory global can be reworded this way but never
+   * switched off — the matcher ignores an inactive override of one.
+   */
+  @Column({ type: 'uuid', name: 'overrides_template_id', nullable: true })
+  overridesTemplateId?: string | null;
+
   @Column({ type: 'int', name: 'created_by', nullable: true })
   createdBy?: number | null;
 

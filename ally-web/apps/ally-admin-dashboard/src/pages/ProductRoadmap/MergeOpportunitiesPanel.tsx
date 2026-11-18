@@ -9,6 +9,9 @@ import { Button } from "@components";
 import { ButtonVariant } from "@components/types";
 import { RoadmapOpportunity } from "@types";
 
+import { useScoreUnit } from "./useScoreUnit";
+import { formatPoints } from "./utils/points";
+
 const DESCRIPTION_MAX = 1000;
 /** Enough to find something by code or a distinctive phrase without paging. */
 const RESULT_LIMIT = 20;
@@ -20,6 +23,8 @@ const highestScoring = (list: RoadmapOpportunity[]) =>
 interface MergeOpportunitiesPanelProps {
   /** Opens the merged opportunity's own drawer, where every remaining setting already lives. */
   onMerged: (primaryId: string) => void;
+  /** Rows to start with — the peek's "Merge…" hands over the pair it found. */
+  initialPicked?: RoadmapOpportunity[];
 }
 
 /**
@@ -58,15 +63,21 @@ interface MergeOpportunitiesPanelProps {
  * `onClose`: the only thing this panel closes itself for is a completed merge, which `onMerged`
  * already covers.
  */
-export const MergeOpportunitiesPanel: React.FC<MergeOpportunitiesPanelProps> = ({ onMerged }) => {
+export const MergeOpportunitiesPanel: React.FC<MergeOpportunitiesPanelProps> = ({
+  onMerged,
+  initialPicked,
+}) => {
+  const { unit } = useScoreUnit();
   const [search, setSearch] = useState("");
-  const [picked, setPicked] = useState<RoadmapOpportunity[]>([]);
-  const [primaryId, setPrimaryId] = useState<string | null>(null);
+  const [picked, setPicked] = useState<RoadmapOpportunity[]>(initialPicked ?? []);
+  const [primaryId, setPrimaryId] = useState<string | null>(
+    initialPicked?.length ? highestScoring(initialPicked).id : null,
+  );
   /** Once the manager picks a radio button by hand, stop overriding their choice on later adds. */
   const [primaryManuallySet, setPrimaryManuallySet] = useState(false);
   /** Null until the user edits it, so the prefill can follow a changed primary. */
   const [descriptionOverride, setDescriptionOverride] = useState<string | null>(null);
-  const [isSearchOpen, setIsSearchOpen] = useState(true);
+  const [isSearchOpen, setIsSearchOpen] = useState(!initialPicked?.length);
 
   const [merge, { isLoading }] = useMergeRoadmapOpportunitiesMutation();
 
@@ -164,7 +175,9 @@ export const MergeOpportunitiesPanel: React.FC<MergeOpportunitiesPanelProps> = (
                 <div className="min-w-0 flex-1">
                   <div className="text-typography-secondary flex flex-wrap items-center gap-x-2 text-xs tabular-nums">
                     <span>{opportunity.code}</span>
-                    <span>{opportunity.priorityScore} votes</span>
+                    <span>
+                      {formatPoints(opportunity.priorityScore)} {unit}
+                    </span>
                     {isPrimary && <span className="text-primary-500">keeps code & comments</span>}
                   </div>
                   <p className="text-typography-primary line-clamp-2 text-sm">
@@ -217,7 +230,7 @@ export const MergeOpportunitiesPanel: React.FC<MergeOpportunitiesPanelProps> = (
                     className="hover:bg-background-secondary w-full p-2 text-left"
                   >
                     <span className="text-typography-secondary text-xs tabular-nums">
-                      {opportunity.code} · {opportunity.priorityScore} votes
+                      {opportunity.code} · {formatPoints(opportunity.priorityScore)} {unit}
                     </span>
                     <span className="text-typography-primary line-clamp-2 block text-sm">
                       {opportunity.description}
@@ -251,8 +264,8 @@ export const MergeOpportunitiesPanel: React.FC<MergeOpportunitiesPanelProps> = (
 
           <p className="text-typography-secondary text-sm">
             {picked.length} opportunities → 1. Votes roll up per person per month, so the merged
-            opportunity ends on <span className="tabular-nums">{combinedScore}</span> votes.
-            Comments move across; the others are removed from the board.
+            opportunity ends on <span className="tabular-nums">{formatPoints(combinedScore)}</span>{" "}
+            {unit}. Comments move across; the others are removed from the board.
           </p>
         </>
       )}

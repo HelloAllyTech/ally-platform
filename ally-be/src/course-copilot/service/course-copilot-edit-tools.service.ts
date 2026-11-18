@@ -15,6 +15,7 @@ import { TrackTranslationService } from 'src/track/service/track-translation.ser
 import { TrackWithStructure } from 'src/track/service/track-shared.service';
 import {
   TrackItemCompletionCriteria,
+  TrackItemCompletionLogic,
   TrackItemType,
   TrackStatus,
   VideoSource,
@@ -231,9 +232,11 @@ export const EDIT_TOOL_DEFINITIONS: AgentToolDefinition[] = [
   {
     name: 'set_completion_rule',
     description:
-      'What a learner must achieve to complete an item: ROLEPLAY {minScore 0-100, ' +
-      'minDurationSeconds}, CASE {minScore}, QUIZ / ANNOTATED_ARTIFACT {passScore 0-100}, VIDEO ' +
-      '{watchPct 1-100}, ARTICLE {minReadSeconds}. GAME has none.',
+      'What a learner must achieve to complete an item: ROLEPLAY {completionLogic, minScore 0-100, ' +
+      'minDurationSeconds} where completionLogic is SCORE, DURATION, SCORE_AND_DURATION (the ' +
+      'default: both gates) or PARTICIPATION (completes on launch, no gate); minDurationSeconds 0 = ' +
+      'no minimum, omitted = the platform default. CASE {minScore}, QUIZ / ANNOTATED_ARTIFACT ' +
+      '{passScore 0-100}, VIDEO {watchPct 1-100}, ARTICLE {minReadSeconds}. GAME has none.',
     input_schema: {
       type: 'object',
       properties: { itemId: id, completionCriteria: { type: 'object' } },
@@ -320,12 +323,12 @@ export const READ_ONLY_EDIT_TOOLS = new Set(['get_course_outline', 'get_item']);
  * path — so a change made in the editor between turns is never overwritten
  * and the copilot can never save something the editor would reject. Each
  * change lands in the change log and is pushed to the pane as a
- * `course_patch` frame mid-turn. Stacks: "Making Agent Trustworthiness
+ * `course_patch` frame mid-turn. "Making Agent Trustworthiness
  * Visible Through Transparency".
  *
  * Publishing, assigning to organisations and duplicating are confirmed in
  * code, not just in the prompt: the tool raises a question and only acts when
- * the trainer's next message answers THAT question with "confirm". Stacks:
+ * the trainer's next message answers THAT question with "confirm".
  * "Progressive Delegation: Staged Autonomy Growth".
  */
 @Injectable()
@@ -1493,12 +1496,22 @@ export class CourseCopilotEditToolsService {
     };
     const rule: TrackItemCompletionCriteria = {};
     switch (type) {
-      case TrackItemType.ROLEPLAY:
+      case TrackItemType.ROLEPLAY: {
+        const logic =
+          typeof source.completionLogic === 'string'
+            ? source.completionLogic.trim().toUpperCase()
+            : '';
+        if (
+          (Object.values(TrackItemCompletionLogic) as string[]).includes(logic)
+        ) {
+          rule.completionLogic = logic as TrackItemCompletionLogic;
+        }
         if (pct(source.minScore) !== undefined)
           rule.minScore = pct(source.minScore);
         if (seconds(source.minDurationSeconds) !== undefined)
           rule.minDurationSeconds = seconds(source.minDurationSeconds);
         break;
+      }
       case TrackItemType.CASE:
         if (pct(source.minScore) !== undefined)
           rule.minScore = pct(source.minScore);

@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
 
-import { DonutChart, LineChart, SimpleBarChart } from "@carbon/charts-react";
-
 import { useGetScribeOverviewQuery, useGetScribeSummaryFailuresQuery } from "@api";
+import { DonutChart, LineChart, SimpleBarChart } from "@components/charts";
 
 import { AnalyticsTabFilters, asOf, windowLabel } from "../analyticsFilters";
 import { ChartDetailModal } from "../ChartDetailModal";
@@ -560,10 +559,7 @@ export const ScribeTab = ({ query }: AnalyticsTabFilters) => {
                       >
                         {s.provider}
                       </div>
-                      <div
-                        className="order-last h-5 basis-full rounded overflow-hidden flex sm:order-none sm:flex-1"
-                        style={{ background: "#f0f0f0" }}
-                      >
+                      <div className="order-last h-5 basis-full rounded overflow-hidden flex sm:order-none sm:flex-1 bg-gray-100">
                         <div style={{ width: `${okPct}%`, background: PALETTE.teal }} />
                         <div style={{ width: `${failPct}%`, background: PALETTE.red }} />
                       </div>

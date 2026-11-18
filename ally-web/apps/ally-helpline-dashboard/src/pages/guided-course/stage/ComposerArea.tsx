@@ -103,7 +103,7 @@ export interface FailureNoticeProps {
 }
 
 /**
- * A failure, said by Ally with a way forward (plan §5.12; Stacks: "Apologetic
+ * A failure, said by Ally with a way forward (plan §5.12; "Apologetic
  * Language and Resolution Paths in Agent Failures"). Never red, never a code.
  */
 export const FailureNotice: FC<FailureNoticeProps> = ({

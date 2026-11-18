@@ -32,14 +32,14 @@ const PROVIDER_RUNTIMES: Record<string, string> = {
   openai: "Voice, AI, Backend",
   gemini: "Voice, AI, Backend",
   google: "Voice, AI, Backend",
-  anthropic: "Backend only",
+  anthropic: "AI, Backend",
   // Self-hosted: only the voice agent can reach them, so they cannot serve
   // prompts run by ally-be or ally-ai — and cannot be reached by Test model.
   ollama: "Voice only",
   vllm: "Voice only",
 };
 
-export const LlmModelCatalog: React.FC = () => {
+export const LlmModelCatalog: React.FC<{ hideTitle?: boolean }> = ({ hideTitle }) => {
   const { data: models = [], isFetching } = useGetLlmModelCatalogQuery();
   const [createModel] = useCreateLlmModelMutation();
   const [updateModel] = useUpdateLlmModelMutation();
@@ -134,9 +134,11 @@ export const LlmModelCatalog: React.FC = () => {
 
   return (
     <div className="py-[2px] font-primary overflow-hidden relative">
-      <div className="flex items-center gap-3 pb-4 md:pb-6">
-        <h1 className="text-2xl text-typography-900 font-secondary">Model Catalog</h1>
-      </div>
+      {!hideTitle && (
+        <div className="flex items-center gap-3 pb-4 md:pb-6">
+          <h1 className="text-2xl text-typography-900 font-secondary">Model Catalog</h1>
+        </div>
+      )}
 
       <ListToolbar
         searchValue={searchQuery}

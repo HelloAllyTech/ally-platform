@@ -142,7 +142,7 @@ export const showsStaleness = (finding: BugFinding): boolean => bucketOf(finding
  * row's possible moves (reject, "put me on it", stop, stage) live in the drawer
  * and, for the ones that batch, in the bulk bar. A column of three tinted
  * buttons on every row made every row look like it needed you; one button on
- * the rows that do is what makes those rows findable (Stacks: *Desert Oasis:
+ * the rows that do is what makes those rows findable (*Desert Oasis:
  * Isolating the Primary Call-to-Action*).
  *
  * - `approve` — PENDING_APPROVAL. Confirmed in place, like the `a` key.
@@ -153,7 +153,7 @@ export const showsStaleness = (finding: BugFinding): boolean => bucketOf(finding
  * - `release` — RELEASE_FAILED. Opens the drawer: whether it can be released
  *   again is something only the detail endpoint knows.
  */
-export type NextStep = "approve" | "answer" | "retry" | "merge" | "release";
+export type NextStep = "approve" | "answer" | "retry" | "merge" | "review" | "release";
 
 export const nextStep = (finding: BugFinding): NextStep | null => {
   switch (finding.status) {
@@ -165,6 +165,10 @@ export const nextStep = (finding: BugFinding): NextStep | null => {
       return "retry";
     case BugFindingStatus.PR_OPENED:
       return finding.prUrl ? "merge" : null;
+    // A plan parked on one of its steps: merge the step's passed PR, or
+    // review the one the Verifier refused. Null while Bug Hunter has it.
+    case BugFindingStatus.COORDINATING:
+      return finding.attention?.kind ?? null;
     case BugFindingStatus.RELEASE_FAILED:
       return "release";
     default:

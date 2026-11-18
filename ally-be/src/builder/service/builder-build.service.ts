@@ -3,10 +3,12 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  Optional,
   ServiceUnavailableException,
   forwardRef,
 } from '@nestjs/common';
-import { In, IsNull, Like } from 'typeorm';
+import { PlanCeilingService } from 'src/product-planning/service/plan-ceiling.service';
+import { In, IsNull, Like, MoreThanOrEqual, Not } from 'typeorm';
 import { LoggerService } from 'src/logger/logger.service';
 import { AppConfigService } from 'src/config/config.service';
 import { RedisService } from 'src/redis/service/redis.service';
@@ -50,6 +52,9 @@ import {
 import {
   BUILDER_CONSECUTIVE_FAILURE_LIMIT,
   BUILDER_DISPATCH_LOCK_PREFIX,
+  BUILDER_RUN_SLOT_ATTEMPTS,
+  BUILDER_RUN_SLOT_LOCK,
+  BUILDER_RUN_SLOT_LOCK_TTL_SECONDS,
   BUILDER_DISPATCH_LOCK_TTL_SECONDS,
   BUILDER_DISPATCH_TIMEOUT_MS,
   BUILDER_ENGINE,
@@ -174,6 +179,13 @@ export class BuilderBuildService {
     private readonly llmUsage: LlmUsageService,
     private readonly prdService: BuilderPrdService,
     private readonly readiness: BuilderReadinessService,
+    /**
+     * Roadmap v2's one ceiling per idea (plans/roadmap-builder-merge §5.6):
+     * a plan session's design and build runs count against it. A no-op while
+     * the flag is off and for every non-plan session, which keep `budgetUsd`.
+     */
+    @Optional()
+    private readonly planCeiling?: PlanCeilingService,
   ) {}
 
   /**
@@ -202,6 +214,8 @@ export class BuilderBuildService {
         'GITHUB_TOKEN is not configured on this environment, so builds cannot be dispatched.',
       );
     }
+    // Before the session is touched: a refused start leaves it as it was.
+    await this.planCeiling?.assertWithinCeiling(session.id, 'build_dispatch');
     // CANCELLED is startable, and leaving it out made stop a one-way door.
     //
     // A session only reaches CANCELLED by way of BUILDING, so its PRD is ready
@@ -457,6 +471,7 @@ export class BuilderBuildService {
 
     await this.assertWithinConcurrency(settings.maxConcurrentBuilds);
     this.assertWithinBudget(session, settings.maxRunnerMinutes);
+    await this.planCeiling?.assertWithinCeiling(session.id, 'design_run');
 
     const models = this.resolveModels(session, settings);
     await this.assertModelsAreReal(models);
@@ -1386,6 +1401,13 @@ export class BuilderBuildService {
     // straight through to `dispatchRunLocked`, which does the destructuring.
     const { session } = params;
 
+    // The backstop for every dispatch, including the next milestone of a
+    // chain (advanceEpic), which has no start call of its own to check in.
+    await this.planCeiling?.assertWithinCeiling(
+      session.id,
+      params.mode === BuilderRunMode.DESIGN ? 'design_run' : 'build_dispatch',
+    );
+
     // Per-session dispatch mutex. The atomic sequence counter stops two
     // dispatches colliding on a run number, but nothing stopped them both
     // *happening* — a double-clicked start would send two runs at the same
@@ -1421,6 +1443,68 @@ export class BuilderBuildService {
    * reconcile tick (reconcileIssueRun). One repo per build: a design spanning
    * several repos is a chain of repo milestones, each its own issue.
    */
+  /**
+   * A retry of a repo whose earlier issue build left an open pull request
+   * follows that pull request instead of raising a new issue.
+   *
+   * Raising one meant a second opencode job building the same feature from
+   * scratch beside the first one's PR (6ce1a354 run 4, 2026-11-17, while PR
+   * 277 was already green and being merged up to master). The run takes over
+   * the earlier issue, so the PR tick checks its CI and asks for fixes with a
+   * fresh budget. A person who wants a clean start closes the PR first.
+   */
+  private async adoptOpenIssuePullRequest(
+    session: BuilderSession,
+    run: BuilderBuildRun,
+    repo: string,
+  ): Promise<boolean> {
+    // State is NULL until the reconcile tick first reads the PR; that is open.
+    const base = {
+      sessionId: session.id,
+      repo,
+      merged: false,
+      branch: Like('opencode/issue%'),
+    };
+    const open = await this.pullRequestRepository.findOne({
+      where: [
+        { ...base, state: Not('closed') },
+        { ...base, state: IsNull() },
+      ],
+      order: { createdAt: 'DESC' },
+    });
+    const issueNumber = Number(
+      /^opencode\/issue(\d+)-/.exec(open?.branch ?? '')?.[1],
+    );
+    if (!open || !Number.isInteger(issueNumber) || issueNumber <= 0) {
+      return false;
+    }
+    const issueUrl = open.prUrl.replace(
+      /\/pull\/\d+$/,
+      `/issues/${issueNumber}`,
+    );
+    await this.runRepository.update(
+      { id: run.id },
+      {
+        issueNumber,
+        issueUrl,
+        githubRunUrl: issueUrl,
+        status: BuilderRunStatus.RUNNING,
+        startedAt: new Date(),
+      },
+    );
+    await this.recordIssueMilestone(
+      { ...run, issueNumber, issueUrl } as BuilderBuildRun,
+      `adopt:${open.prNumber}`,
+      `${open.prUrl} from an earlier run is still open, so this run picks it up instead of raising a new issue. ` +
+        'Close that pull request first for a fresh start.',
+      BuilderStage.GATE,
+    );
+    this.logger.info(
+      `Builder run ${run.id} adopted open ${repo} PR ${open.prUrl} (issue #${issueNumber}) for session ${session.id}.`,
+    );
+    return true;
+  }
+
   private async dispatchAsIssue(
     session: BuilderSession,
     run: BuilderBuildRun,
@@ -1432,6 +1516,7 @@ export class BuilderBuildService {
       );
     }
     const [repo] = repos;
+    if (await this.adoptOpenIssuePullRequest(session, run, repo)) return;
     // Nothing private in the issue: ally-be, ally-web and ally-ai are public
     // repos, and the PRD and design are not. The workflow fetches them from
     // GET /builder/pipeline/runs/:runId/spec with the Builder API key, cut to
@@ -1507,40 +1592,52 @@ export class BuilderBuildService {
     onCreated?: (run: BuilderBuildRun) => Promise<void>;
   }): Promise<BuilderBuildRun> {
     const { session, mode, userId, repos, models } = params;
-    const sequence = await this.runRepository.nextSequence(session.id);
 
-    // Our clock, a beat BEFORE the POST: clock skew can then only widen the
-    // correlation window, never exclude our own run from it.
-    const dispatchedAt = new Date(Date.now() - 5_000);
+    // The ceiling check and the run row are one step across sessions. Callers
+    // check early, for a clear refusal before any work; this re-checks under a
+    // platform-wide lock, because the early check counts rows that are only
+    // saved several awaits later — a burst of starts from different sessions
+    // all passed it and overshot maxConcurrentBuilds (builder-concurrency.spec).
+    const releaseSlot = await this.claimRunSlot();
+    let run: BuilderBuildRun;
+    try {
+      const sequence = await this.runRepository.nextSequence(session.id);
 
-    const run = await this.runRepository.save(
-      this.runRepository.create({
-        sessionId: session.id,
-        sequence,
-        mode,
-        status: BuilderRunStatus.QUEUED,
-        engine: BUILDER_ENGINE,
-        model: models.coder,
-        plannerModel: models.planner,
-        verifierModel: models.verifier,
-        size: models.size,
-        // Frozen with the run, not re-derived later: the PRD keeps changing,
-        // and a policy trained on today's draft would be learning from
-        // features this decision was never conditioned on.
-        requirementCount: models.requirementCount,
-        repoCount: models.repoCount,
-        technicalPlanLength: models.technicalPlanLength,
-        effort: models.effort,
-        // A milestone pushes to its own branch family (`<slug>-m2`), so the
-        // slices stay separately reviewable rather than piling into one branch.
-        branchSlug: params.branchSlugOverride ?? session.slug,
-        prdVersion: params.prdVersion ?? null,
-        repos,
-        milestoneId: params.milestoneId ?? null,
-        dispatchedAt,
-        createdBy: userId,
-      }),
-    );
+      // Our clock, a beat BEFORE the POST: clock skew can then only widen the
+      // correlation window, never exclude our own run from it.
+      const dispatchedAt = new Date(Date.now() - 5_000);
+
+      run = await this.runRepository.save(
+        this.runRepository.create({
+          sessionId: session.id,
+          sequence,
+          mode,
+          status: BuilderRunStatus.QUEUED,
+          engine: BUILDER_ENGINE,
+          model: models.coder,
+          plannerModel: models.planner,
+          verifierModel: models.verifier,
+          size: models.size,
+          // Frozen with the run, not re-derived later: the PRD keeps changing,
+          // and a policy trained on today's draft would be learning from
+          // features this decision was never conditioned on.
+          requirementCount: models.requirementCount,
+          repoCount: models.repoCount,
+          technicalPlanLength: models.technicalPlanLength,
+          effort: models.effort,
+          // A milestone pushes to its own branch family (`<slug>-m2`), so the
+          // slices stay separately reviewable rather than piling into one branch.
+          branchSlug: params.branchSlugOverride ?? session.slug,
+          prdVersion: params.prdVersion ?? null,
+          repos,
+          milestoneId: params.milestoneId ?? null,
+          dispatchedAt,
+          createdBy: userId,
+        }),
+      );
+    } finally {
+      await releaseSlot();
+    }
 
     try {
       if (params.onCreated) await params.onCreated(run);
@@ -1619,6 +1716,40 @@ export class BuilderBuildService {
           'Wait for one to finish, or raise the limit in Builder settings.',
       );
     }
+  }
+
+  /**
+   * Hold the platform-wide slot lock while a run row is created, re-checking
+   * the ceiling inside it. Returns the release. Waits briefly for another
+   * dispatch to finish rather than refusing at once: the lock is held for two
+   * queries, not for the GitHub call.
+   */
+  private async claimRunSlot(): Promise<() => Promise<void>> {
+    for (let attempt = 0; attempt < BUILDER_RUN_SLOT_ATTEMPTS; attempt++) {
+      if (
+        await this.redisService.acquireLock(
+          BUILDER_RUN_SLOT_LOCK,
+          BUILDER_RUN_SLOT_LOCK_TTL_SECONDS,
+        )
+      ) {
+        const release = () =>
+          this.redisService
+            .releaseLock(BUILDER_RUN_SLOT_LOCK)
+            .catch(() => undefined);
+        try {
+          const settings = await this.settingsService.get();
+          await this.assertWithinConcurrency(settings.maxConcurrentBuilds);
+        } catch (error) {
+          await release();
+          throw error;
+        }
+        return release;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+    throw new BadRequestException(
+      'Another build is being started right now. Try again in a moment.',
+    );
   }
 
   /** The run a cancel should stop, if the session still has one in flight. */
@@ -1939,6 +2070,62 @@ export class BuilderBuildService {
     return (await this.runRepository.listActive()).filter((run) =>
       Boolean(run.issueNumber),
     );
+  }
+
+  /**
+   * Issue builds that failed recently and may still come good, newest first.
+   *
+   * A build fails after its fix requests run out, but its pull request stays
+   * open and the PR loop keeps working it (review feedback, conflicts). On
+   * 2026-11-17 PR 277 went green twelve minutes after its run was failed, and
+   * nothing ever looked at the run again.
+   */
+  async listRecoverableIssueRuns(since: Date): Promise<BuilderBuildRun[]> {
+    return this.runRepository.find({
+      where: {
+        status: BuilderRunStatus.FAILED,
+        mode: BuilderRunMode.BUILD,
+        completedAt: MoreThanOrEqual(since),
+        issueNumber: Not(IsNull()),
+      },
+      order: { completedAt: 'DESC' },
+    });
+  }
+
+  /**
+   * Bring a FAILED issue build back to life because its pull request is now
+   * green, and settle it SUCCEEDED so the chain moves to the next repo.
+   *
+   * Narrow on purpose: only the session's latest run, only while the session
+   * is still FAILED from it, and only while its milestone is FAILED. A session
+   * that has moved on — a retry, a stop, another milestone — is left alone.
+   */
+  async reviveIssueRun(run: BuilderBuildRun): Promise<boolean> {
+    if (run.status !== BuilderRunStatus.FAILED || !run.issueNumber) {
+      return false;
+    }
+    const session = await this.sessionRepository.findOne({
+      where: { id: run.sessionId },
+    });
+    if (session?.status !== BuilderSessionStatus.FAILED) return false;
+    if (!(await this.runRepository.isLatestForSession(run.id, session.id))) {
+      return false;
+    }
+    if (run.milestoneId) {
+      const milestone = (await this.epicService.listBySession(session.id)).find(
+        (candidate) => candidate.id === run.milestoneId,
+      );
+      if (milestone?.status !== BuilderMilestoneStatus.FAILED) return false;
+    }
+    await this.sessionRepository.update(
+      { id: session.id },
+      { status: BuilderSessionStatus.BUILDING, error: null },
+    );
+    this.logger.info(
+      `Builder run ${run.id} failed earlier, but its pull request is now green; settling it SUCCEEDED.`,
+    );
+    await this.settleRun(run, BuilderRunStatus.SUCCEEDED, null);
+    return true;
   }
 
   private async reconcileRun(run: BuilderBuildRun): Promise<void> {
@@ -2422,6 +2609,19 @@ export class BuilderBuildService {
       // otherwise repeat it on every invocation past the ceiling, and the
       // dispatch guard already refuses from here on.
       await this.notificationService.budgetReached(session, total);
+    }
+
+    // A plan's phase boundary (Roadmap v2, §5.6). The runner does not read
+    // this response, so a phase already running finishes; what this does is
+    // tell the lead once, as the plan crosses its ceiling, and every later
+    // dispatch, turn and specialist is refused by the same check.
+    const plan = await this.planCeiling?.checkAt(session.id, 'phase_boundary');
+    if (plan?.exceeded && plan.spentUsd - delta < plan.ceilingUsd) {
+      await this.notificationService.planCeilingReached(
+        session,
+        plan.spentUsd,
+        plan.ceilingUsd,
+      );
     }
   }
 

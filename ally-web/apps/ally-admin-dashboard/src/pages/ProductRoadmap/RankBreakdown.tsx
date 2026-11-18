@@ -3,6 +3,8 @@ import React from "react";
 import { Tooltip } from "@ally-ui-mono/ui-shared";
 import { RoadmapGoalImpactVerdict, RoadmapOpportunity } from "@types";
 
+import { useScoreUnit } from "./useScoreUnit";
+import { formatPoints } from "./utils/points";
 import { EFFORT_LABEL } from "./utils/stages";
 
 /**
@@ -12,9 +14,13 @@ import { EFFORT_LABEL } from "./utils/stages";
  * blended number that nobody can take apart is a number people learn to ignore — so the score
  * and its inputs always travel together, on the card and in the drawer alike.
  */
-export const rankFactorSummary = (opportunity: RoadmapOpportunity): string[] => {
+export const rankFactorSummary = (
+  opportunity: RoadmapOpportunity,
+  unit: "votes" | "points" = "votes",
+): string[] => {
+  const word = unit === "points" ? "point" : "vote";
   const parts = [
-    `${opportunity.priorityScore} vote${opportunity.priorityScore === 1 ? "" : "s"}`,
+    `${formatPoints(opportunity.priorityScore)} ${word}${opportunity.priorityScore === 1 ? "" : "s"}`,
     `${opportunity.voterCount} admin${opportunity.voterCount === 1 ? "" : "s"}`,
     // "Unsized" rather than an omission: it scores at the neutral middle rather than at zero,
     // and a reader comparing two cards needs to know which of them was never estimated.
@@ -38,15 +44,18 @@ interface RankScoreProps {
  * The score is rendered as a NUMBER rather than as a bar or a hue alone — a hue cannot be read
  * by someone who cannot distinguish these hues, and cannot be compared precisely by anyone.
  */
-export const RankScore: React.FC<RankScoreProps> = ({ opportunity }) => (
-  <Tooltip
-    label={`Rank score ${opportunity.compositeScore} — ${rankFactorSummary(opportunity).join(" · ")}`}
-  >
-    <span className="text-typography-secondary text-xs tabular-nums" tabIndex={0}>
-      {opportunity.compositeScore} rank score
-    </span>
-  </Tooltip>
-);
+export const RankScore: React.FC<RankScoreProps> = ({ opportunity }) => {
+  const { unit } = useScoreUnit();
+  return (
+    <Tooltip
+      label={`Rank score ${opportunity.compositeScore} — ${rankFactorSummary(opportunity, unit).join(" · ")}`}
+    >
+      <span className="text-typography-secondary text-xs tabular-nums" tabIndex={0}>
+        {opportunity.compositeScore} rank score
+      </span>
+    </Tooltip>
+  );
+};
 
 interface RankBreakdownPanelProps {
   opportunity: RoadmapOpportunity;
@@ -76,6 +85,7 @@ export const RankBreakdownPanel: React.FC<RankBreakdownPanelProps> = ({
   isReassessing,
   onReassess,
 }) => {
+  const { unit } = useScoreUnit();
   // Assessed against fewer goals than exist means the strategy grew after this was judged.
   // Coverage divides by the LIVE count either way, so this row is scoring low for a reason that
   // has nothing to do with its merit — which is worth saying rather than leaving to be noticed.
@@ -92,8 +102,8 @@ export const RankBreakdownPanel: React.FC<RankBreakdownPanelProps> = ({
 
       <ul className="text-typography-secondary flex flex-col gap-1 text-xs">
         <li className="flex justify-between gap-2">
-          <span>Votes</span>
-          <span className="tabular-nums">{opportunity.priorityScore}</span>
+          <span>{unit === "points" ? "Points" : "Votes"}</span>
+          <span className="tabular-nums">{formatPoints(opportunity.priorityScore)}</span>
         </li>
         <li className="flex justify-between gap-2">
           <span>Admins backing it</span>

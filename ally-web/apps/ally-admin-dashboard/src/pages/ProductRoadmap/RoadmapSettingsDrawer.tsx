@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { Tabs } from "@ally-ui-mono/ui-shared";
 import { Button } from "@components";
 import { ButtonVariant } from "@components/types";
-import { RoadmapTaxonomyItem } from "@types";
+import { RoadmapOpportunity, RoadmapTaxonomyItem } from "@types";
 
 import { MergeOpportunitiesPanel } from "./MergeOpportunitiesPanel";
 import { ProductGoalsManager } from "./ProductGoalsManager";
@@ -34,6 +34,8 @@ interface RoadmapSettingsDrawerProps {
   onMerged: (primaryId: string) => void;
   /** Opens the surviving original's own drawer — see SplitOpportunitiesPanel. */
   onSplit: (originalId: string) => void;
+  /** Open on the Merge tab with these rows already picked. */
+  mergeSeed?: RoadmapOpportunity[];
 }
 
 /**
@@ -51,7 +53,7 @@ interface RoadmapSettingsDrawerProps {
  *
  * ## Why TABS and not one long form
  *
- * Stacks, "Consolidate Similar Nodes Without Over-Generalizing": cluster genuinely equivalent
+ * "Consolidate Similar Nodes Without Over-Generalizing": cluster genuinely equivalent
  * items, but do not generalise so far that important distinctions vanish. These four are NOT
  * equivalent — the Vision & strategy page is the prose the opportunity copilot reads, product
  * goals are the filing category, strategy goals are the outcomes the board is ranked against,
@@ -72,10 +74,13 @@ export const RoadmapSettingsDrawer: React.FC<RoadmapSettingsDrawerProps> = ({
   onClose,
   onMerged,
   onSplit,
+  mergeSeed,
 }) => {
   // Opens on the strategy page: it is what everything else in here — the goals, the ranking, the
   // copilot that files opportunities — is meant to serve, so it is the first thing to keep current.
-  const [activeTab, setActiveTab] = useState<SettingsTab>(SettingsTab.VISION);
+  const [activeTab, setActiveTab] = useState<SettingsTab>(
+    mergeSeed?.length ? SettingsTab.MERGE : SettingsTab.VISION,
+  );
 
   return (
     <div
@@ -128,7 +133,9 @@ export const RoadmapSettingsDrawer: React.FC<RoadmapSettingsDrawerProps> = ({
             <ProductGoalsManager goals={goals} isLoading={areGoalsLoading} />
           )}
           {activeTab === SettingsTab.STRATEGY && <StrategyRankingManager />}
-          {activeTab === SettingsTab.MERGE && <MergeOpportunitiesPanel onMerged={onMerged} />}
+          {activeTab === SettingsTab.MERGE && (
+            <MergeOpportunitiesPanel onMerged={onMerged} initialPicked={mergeSeed} />
+          )}
           {activeTab === SettingsTab.SPLIT && <SplitOpportunitiesPanel onSplit={onSplit} />}
         </div>
       </aside>

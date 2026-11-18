@@ -44,7 +44,7 @@ const PROMPT_MAX_CHARS = 600;
  * Writes one JOURNAL item: the learner's after-action review of the practice
  * block it follows.
  *
- * Stacks: "After-Action Review Deepens Reflection in Interactive Learning" —
+ * "After-Action Review Deepens Reflection in Interactive Learning" —
  * reflection after practice is where a simulation's lesson is drawn out, as
  * what happened, why it happened, and how to do it better next time. So the
  * prompt is handed the practice block itself (the roleplays, case or

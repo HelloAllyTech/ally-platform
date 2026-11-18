@@ -3,14 +3,10 @@ import {
   CreateKbDocumentRequest,
   CreateKbUploadUrlRequest,
   CreateKbUploadUrlResponse,
-  GetKbChunksResponse,
   KbCorpus,
-  KbChunk,
   GetKbDocumentsParams,
   GetKbDocumentsResponse,
   KbDocument,
-  KbSearchRequest,
-  KbSearchResponse,
   KbStats,
   ReplaceKbDocumentContentRequest,
   BulkWaPhoneMappingsRequest,
@@ -28,43 +24,52 @@ import {
   TestWaTemplateResponse,
   UpdateWaTemplateRequest,
   WaBotSettings,
-  WaPreviewRequest,
-  WaPreviewResponse,
   WaConnectionCheck,
-  WaProviderHealth,
+  WaBusinessNumber,
+  ConnectWaNumberRequest,
   WaTemplate,
   WaTemplateKind,
-  GetWaConversationsParams,
-  GetWaConversationsResponse,
-  GetWaUnansweredResponse,
   WaAnalyticsBucket,
   WaAnalyticsOverview,
-  WaConversationDetail,
   WaCorpusCoverageResponse,
   WaLanguageRow,
-  WaUnansweredQuestion,
-  WaUnansweredReason,
-  WaUnansweredStatus,
 } from "@types";
 
 import { baseAPI } from "./baseApi";
 
 /**
- * WhatsApp Q&A bot admin endpoints, plus the shared knowledge-corpus ones.
+ * The organisation a WhatsApp call acts for, as the `tenantId` query parameter.
  *
- * The corpus endpoints are NOT WhatsApp-specific — they take a `corpus` and serve the character
- * library too. They live here because the WhatsApp bot was their first consumer and moving them
- * would churn every import for no behavioural gain. The DATA layer is shared deliberately; the
- * SCREENS are not, and should not be: one is a bot's reference library and the other is
- * character-grounding material, and a single UI trying to be both would serve neither.
+ * Always in the QUERY: for an org-restricted admin the backend's guard reads it there to confirm
+ * they may act for that organisation at all. Absent = the platform-wide view.
+ */
+type WithOrg = { tenantId?: string };
+const org = (tenantId?: string) => (tenantId ? { tenantId } : {});
+
+/** Row calls accept a bare id (platform view) or the id with its organisation. */
+type RowArg = string | ({ id: string } & WithOrg);
+const row = (arg: RowArg) => (typeof arg === "string" ? { id: arg } : arg);
+
+/**
+ * The chatbot a WhatsApp activity call is about (replies, conversations, unanswered, usage), as the
+ * `chatbotId` query parameter. Absent = every bot (platform admins only).
+ */
+type WithBot = { chatbotId?: string };
+const bot = (chatbotId?: string) => (chatbotId ? { chatbotId } : {});
+type BotRowArg = string | ({ id: string } & WithBot);
+const botRow = (arg: BotRowArg) => (typeof arg === "string" ? { id: arg } : arg);
+
+/**
+ * WhatsApp Q&A bot admin endpoints, including its knowledge-corpus documents.
+ *
+ * The corpus endpoints take a `corpus`, but the WhatsApp Q&A corpus is the only one left: the
+ * character corpus, the Ally guide's library and Debrief's guidance moved into the Context Library
+ * (docs/context-library/PLAN.md).
  *
  * Injected onto `baseAPI` rather than creating a new api, so no store change is needed. Every tag
  * used here is also registered in baseApi.ts's `tagTypes` — an unregistered tag is silently ignored
  * by RTK Query and the invalidation never fires, which is the documented scar in that file.
  *
- * The document tag is shared across corpora, so a character-library write also refetches the
- * WhatsApp list. Deliberate: one wasted request beats registering a second tag and discovering
- * months later that a typo made its invalidation a no-op.
  */
 const whatsappBotAPI = baseAPI.injectEndpoints({
   endpoints: builder => ({
@@ -84,14 +89,17 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
           includeArchived: params?.includeArchived ?? false,
           ...(params?.sortBy ? { sortBy: params.sortBy } : {}),
           ...(params?.sortDir ? { sortDir: params.sortDir } : {}),
+          ...org(params?.tenantId),
+          ...(params?.tenantId && params.excludeGlobal ? { excludeGlobal: true } : {}),
         },
       }),
       providesTags: [TAG_TYPES.WHATSAPP_BOT_DOCUMENTS],
     }),
 
-    getKbDocument: builder.query<KbDocument, string>({
-      query: id => ({
-        url: ApiEndpoints.WHATSAPP_BOT.DOCUMENT_BY_ID(id),
+    getKbDocument: builder.query<KbDocument, RowArg>({
+      query: arg => ({
+        url: ApiEndpoints.WHATSAPP_BOT.DOCUMENT_BY_ID(row(arg).id),
+        params: org(row(arg).tenantId),
         method: HttpMethod.GET,
       }),
       providesTags: [TAG_TYPES.WHATSAPP_BOT_DOCUMENTS],
@@ -107,9 +115,13 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
     }),
 
     /** Presigned S3 PUT for a pdf/docx/epub. The browser uploads directly; see DocumentUploadField. */
-    createKbUploadUrl: builder.mutation<CreateKbUploadUrlResponse, CreateKbUploadUrlRequest>({
-      query: body => ({
+    createKbUploadUrl: builder.mutation<
+      CreateKbUploadUrlResponse,
+      CreateKbUploadUrlRequest & WithOrg
+    >({
+      query: ({ tenantId, ...body }) => ({
         url: ApiEndpoints.WHATSAPP_BOT.DOCUMENT_UPLOAD_URL,
+        params: org(tenantId),
         method: HttpMethod.POST,
         body,
       }),
@@ -119,13 +131,18 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
      * Create a document. Returns immediately at status=pending — extraction, chunking and indexing
      * run on a queue, so the corpus list polls until the row reaches a terminal status.
      */
-    createKbDocument: builder.mutation<KbDocument, CreateKbDocumentRequest>({
-      query: body => ({
+    createKbDocument: builder.mutation<KbDocument, CreateKbDocumentRequest & WithOrg>({
+      query: ({ tenantId, ...body }) => ({
         url: ApiEndpoints.WHATSAPP_BOT.DOCUMENTS,
+        params: org(tenantId),
         method: HttpMethod.POST,
         body,
       }),
-      invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_DOCUMENTS, TAG_TYPES.WHATSAPP_BOT_STATS],
+      invalidatesTags: [
+        TAG_TYPES.WHATSAPP_BOT_DOCUMENTS,
+        TAG_TYPES.WHATSAPP_BOT_STATS,
+        TAG_TYPES.CHATBOT_DETAIL,
+      ],
     }),
 
     // ── Phone → organisation mappings ───────────────────────────────────────
@@ -143,6 +160,8 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
     createWaPhoneMapping: builder.mutation<WaPhoneMapping, CreateWaPhoneMappingRequest>({
       query: body => ({
         url: ApiEndpoints.WHATSAPP_BOT.PHONE_MAPPINGS,
+        // The organisation the number goes to is also the one the request acts for.
+        params: org(body.tenantId),
         method: HttpMethod.POST,
         body,
       }),
@@ -162,6 +181,7 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
     >({
       query: body => ({
         url: ApiEndpoints.WHATSAPP_BOT.PHONE_MAPPINGS_BULK,
+        params: org(body.defaultTenantId),
         method: HttpMethod.POST,
         body,
       }),
@@ -171,28 +191,31 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
     updateWaPhoneMapping: builder.mutation<WaPhoneMapping, UpdateWaPhoneMappingRequest>({
       query: ({ id, ...body }) => ({
         url: ApiEndpoints.WHATSAPP_BOT.PHONE_MAPPING_BY_ID(id),
+        params: org(body.tenantId),
         method: HttpMethod.PATCH,
         body,
       }),
       invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_PHONE_MAPPINGS],
     }),
 
-    deleteWaPhoneMapping: builder.mutation<{ id: string; removed: boolean }, string>({
-      query: id => ({
-        url: ApiEndpoints.WHATSAPP_BOT.PHONE_MAPPING_BY_ID(id),
+    deleteWaPhoneMapping: builder.mutation<{ id: string; removed: boolean }, RowArg>({
+      query: arg => ({
+        url: ApiEndpoints.WHATSAPP_BOT.PHONE_MAPPING_BY_ID(row(arg).id),
+        params: org(row(arg).tenantId),
         method: HttpMethod.DELETE,
       }),
       invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_PHONE_MAPPINGS],
     }),
 
     /** Metadata only (title, tags, language). Never triggers a re-index. */
-    updateKbDocument: builder.mutation<KbDocument, UpdateKbDocumentRequest>({
-      query: ({ id, ...body }) => ({
+    updateKbDocument: builder.mutation<KbDocument, UpdateKbDocumentRequest & WithOrg>({
+      query: ({ id, tenantId, ...body }) => ({
         url: ApiEndpoints.WHATSAPP_BOT.DOCUMENT_BY_ID(id),
+        params: org(tenantId),
         method: HttpMethod.PATCH,
         body,
       }),
-      invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_DOCUMENTS],
+      invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_DOCUMENTS, TAG_TYPES.CHATBOT_DETAIL],
     }),
 
     /**
@@ -203,39 +226,50 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
      * assignment saved but retrieval may still use the old audience, and the panel has to say so
      * rather than closing as if nothing happened.
      */
-    setKbDocumentAudience: builder.mutation<KbDocument, UpdateKbDocumentAudienceRequest>({
-      query: ({ id, ...body }) => ({
+    setKbDocumentAudience: builder.mutation<
+      KbDocument,
+      UpdateKbDocumentAudienceRequest & { scopeTenantId?: string }
+    >({
+      // `scopeTenantId`, not `tenantId`: the body's `tenantIds` is the audience being SET, and the
+      // organisation acting is a separate thing.
+      query: ({ id, scopeTenantId, ...body }) => ({
         url: ApiEndpoints.WHATSAPP_BOT.DOCUMENT_TENANTS(id),
+        params: org(scopeTenantId),
         method: HttpMethod.PUT,
         body,
       }),
-      invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_DOCUMENTS],
+      invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_DOCUMENTS, TAG_TYPES.CHATBOT_DETAIL],
     }),
 
     /** Replace a pasted document's body. A no-op server-side when the text is unchanged. */
-    replaceKbDocumentContent: builder.mutation<KbDocument, ReplaceKbDocumentContentRequest>({
-      query: ({ id, text }) => ({
+    replaceKbDocumentContent: builder.mutation<
+      KbDocument,
+      ReplaceKbDocumentContentRequest & WithOrg
+    >({
+      query: ({ id, text, tenantId }) => ({
         url: ApiEndpoints.WHATSAPP_BOT.DOCUMENT_CONTENT(id),
+        params: org(tenantId),
         method: HttpMethod.PUT,
         body: { text },
       }),
       invalidatesTags: [
         TAG_TYPES.WHATSAPP_BOT_DOCUMENTS,
-        TAG_TYPES.WHATSAPP_BOT_DOCUMENT_CHUNKS,
         TAG_TYPES.WHATSAPP_BOT_STATS,
+        TAG_TYPES.CHATBOT_DETAIL,
       ],
     }),
 
     /** Re-chunk and re-index. Also the Retry action for a failed document. */
-    reindexKbDocument: builder.mutation<KbDocument, string>({
-      query: id => ({
-        url: ApiEndpoints.WHATSAPP_BOT.DOCUMENT_REINDEX(id),
+    reindexKbDocument: builder.mutation<KbDocument, RowArg>({
+      query: arg => ({
+        url: ApiEndpoints.WHATSAPP_BOT.DOCUMENT_REINDEX(row(arg).id),
+        params: org(row(arg).tenantId),
         method: HttpMethod.POST,
       }),
       invalidatesTags: [
         TAG_TYPES.WHATSAPP_BOT_DOCUMENTS,
-        TAG_TYPES.WHATSAPP_BOT_DOCUMENT_CHUNKS,
         TAG_TYPES.WHATSAPP_BOT_STATS,
+        TAG_TYPES.CHATBOT_DETAIL,
       ],
     }),
 
@@ -243,108 +277,125 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
      * Archive: the bot stops retrieving it, but its chunks stay so citations already recorded in
      * the conversation log still resolve. There is no delete — ally-be answers 409 and points here.
      */
-    archiveKbDocument: builder.mutation<KbDocument, string>({
-      query: id => ({
-        url: ApiEndpoints.WHATSAPP_BOT.DOCUMENT_ARCHIVE(id),
+    archiveKbDocument: builder.mutation<KbDocument, RowArg>({
+      query: arg => ({
+        url: ApiEndpoints.WHATSAPP_BOT.DOCUMENT_ARCHIVE(row(arg).id),
+        params: org(row(arg).tenantId),
         method: HttpMethod.POST,
       }),
-      invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_DOCUMENTS, TAG_TYPES.WHATSAPP_BOT_STATS],
+      invalidatesTags: [
+        TAG_TYPES.WHATSAPP_BOT_DOCUMENTS,
+        TAG_TYPES.WHATSAPP_BOT_STATS,
+        TAG_TYPES.CHATBOT_DETAIL,
+      ],
     }),
 
-    unarchiveKbDocument: builder.mutation<KbDocument, string>({
-      query: id => ({
-        url: ApiEndpoints.WHATSAPP_BOT.DOCUMENT_UNARCHIVE(id),
+    unarchiveKbDocument: builder.mutation<KbDocument, RowArg>({
+      query: arg => ({
+        url: ApiEndpoints.WHATSAPP_BOT.DOCUMENT_UNARCHIVE(row(arg).id),
+        params: org(row(arg).tenantId),
         method: HttpMethod.POST,
       }),
-      invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_DOCUMENTS, TAG_TYPES.WHATSAPP_BOT_STATS],
-    }),
-
-    /** A document's chunks — literally what the bot can see. */
-    getKbDocumentChunks: builder.query<
-      GetKbChunksResponse,
-      { id: string; limit?: number; offset?: number }
-    >({
-      query: ({ id, limit, offset }) => ({
-        url: ApiEndpoints.WHATSAPP_BOT.DOCUMENT_CHUNKS(id),
-        method: HttpMethod.GET,
-        params: { limit: limit ?? 50, offset: offset ?? 0 },
-      }),
-      providesTags: [TAG_TYPES.WHATSAPP_BOT_DOCUMENT_CHUNKS],
-    }),
-
-    /** Retrieval preview — no LLM call, so thresholds can be tuned without generation cost. */
-    searchKbCorpus: builder.mutation<KbSearchResponse, KbSearchRequest>({
-      query: body => ({
-        url: ApiEndpoints.WHATSAPP_BOT.SEARCH,
-        method: HttpMethod.POST,
-        body,
-      }),
+      invalidatesTags: [
+        TAG_TYPES.WHATSAPP_BOT_DOCUMENTS,
+        TAG_TYPES.WHATSAPP_BOT_STATS,
+        TAG_TYPES.CHATBOT_DETAIL,
+      ],
     }),
 
     // ---- Keyword templates ----
 
     getWaTemplates: builder.query<
       GetWaTemplatesResponse,
-      { kind?: WaTemplateKind; includeArchived?: boolean } | void
+      ({ kind?: WaTemplateKind; includeArchived?: boolean } & WithBot) | void
     >({
-      query: (params?: { kind?: WaTemplateKind; includeArchived?: boolean }) => ({
+      query: (params?: { kind?: WaTemplateKind; includeArchived?: boolean } & WithBot) => ({
         url: ApiEndpoints.WHATSAPP_BOT.TEMPLATES,
         method: HttpMethod.GET,
         params: {
           ...(params?.kind ? { kind: params.kind } : {}),
           includeArchived: params?.includeArchived ?? false,
+          ...bot(params?.chatbotId),
         },
       }),
       providesTags: [TAG_TYPES.WHATSAPP_BOT_TEMPLATES],
     }),
 
-    createWaTemplate: builder.mutation<WaTemplate, CreateWaTemplateRequest>({
-      query: body => ({
+    createWaTemplate: builder.mutation<WaTemplate, CreateWaTemplateRequest & WithBot>({
+      query: ({ chatbotId, ...body }) => ({
         url: ApiEndpoints.WHATSAPP_BOT.TEMPLATES,
         method: HttpMethod.POST,
+        params: bot(chatbotId),
         body,
       }),
       invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_TEMPLATES],
     }),
 
-    updateWaTemplate: builder.mutation<WaTemplate, UpdateWaTemplateRequest>({
-      query: ({ id, ...body }) => ({
+    updateWaTemplate: builder.mutation<WaTemplate, UpdateWaTemplateRequest & WithBot>({
+      query: ({ id, chatbotId, ...body }) => ({
         url: ApiEndpoints.WHATSAPP_BOT.TEMPLATE_BY_ID(id),
         method: HttpMethod.PATCH,
+        params: bot(chatbotId),
         body,
       }),
       invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_TEMPLATES],
     }),
 
     /** Archive a template. 403 for a mandatory safety template. */
-    archiveWaTemplate: builder.mutation<WaTemplate, string>({
-      query: id => ({
-        url: ApiEndpoints.WHATSAPP_BOT.TEMPLATE_ARCHIVE(id),
+    archiveWaTemplate: builder.mutation<WaTemplate, BotRowArg>({
+      query: arg => ({
+        url: ApiEndpoints.WHATSAPP_BOT.TEMPLATE_ARCHIVE(botRow(arg).id),
         method: HttpMethod.POST,
+        params: bot(botRow(arg).chatbotId),
       }),
       invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_TEMPLATES],
     }),
 
     /** Rewrite priorities from an ordered id list; renumbers within each kind band. */
-    reorderWaTemplates: builder.mutation<GetWaTemplatesResponse, string[]>({
-      query: ids => ({
+    reorderWaTemplates: builder.mutation<
+      GetWaTemplatesResponse,
+      string[] | ({ ids: string[] } & WithBot)
+    >({
+      query: arg => ({
         url: ApiEndpoints.WHATSAPP_BOT.TEMPLATES_REORDER,
         method: HttpMethod.POST,
-        body: { ids },
+        params: Array.isArray(arg) ? {} : org(arg.chatbotId),
+        body: { ids: Array.isArray(arg) ? arg : arg.ids },
       }),
       invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_TEMPLATES],
     }),
 
     /** Which rule a message would match. Sends nothing. */
-    testWaTemplate: builder.mutation<TestWaTemplateResponse, TestWaTemplateRequest>({
-      query: body => ({
+    testWaTemplate: builder.mutation<TestWaTemplateResponse, TestWaTemplateRequest & WithBot>({
+      query: ({ chatbotId, ...body }) => ({
         url: ApiEndpoints.WHATSAPP_BOT.TEMPLATES_TEST,
         method: HttpMethod.POST,
+        params: bot(chatbotId),
         body,
       }),
     }),
 
-    // ---- Settings ----
+    /**
+     * A bot's own version of a default reply: reworded, re-keyed, or switched off (optional
+     * replies only — the backend refuses switching a required safety reply off). Creates the version
+     * the first time and edits it after.
+     */
+    customiseWaTemplate: builder.mutation<
+      WaTemplate,
+      { id: string; chatbotId: string } & Partial<
+        Pick<WaTemplate, "responseText" | "patterns" | "matchType" | "active">
+      >
+    >({
+      query: ({ id, chatbotId, ...body }) => ({
+        url: ApiEndpoints.WHATSAPP_BOT.TEMPLATE_CUSTOMISE(id),
+        method: HttpMethod.POST,
+        params: { chatbotId },
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_TEMPLATES],
+    }),
+
+    // ---- Organisations ----
 
     getWaSettings: builder.query<WaBotSettings, void>({
       query: () => ({
@@ -363,236 +414,94 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
       invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_SETTINGS],
     }),
 
-    getWaProviderHealth: builder.query<WaProviderHealth, void>({
-      query: () => ({
-        url: ApiEndpoints.WHATSAPP_BOT.PROVIDER_HEALTH,
+    // ---- Organisations' own numbers ----
+    //
+    // WhatsApp numbers are the WhatsApp connector's store. Access follows the bot each number
+    // serves; the list takes `chatbotId`, or nothing for every number (platform admins).
+
+    getWaNumbers: builder.query<WaBusinessNumber[], { chatbotId?: string } | void>({
+      query: params => ({
+        url: ApiEndpoints.WHATSAPP_BOT.NUMBERS,
         method: HttpMethod.GET,
+        params: params && params.chatbotId ? { chatbotId: params.chatbotId } : undefined,
       }),
-      providesTags: [TAG_TYPES.WHATSAPP_BOT_SETTINGS],
+      providesTags: [TAG_TYPES.WHATSAPP_BOT_NUMBERS],
     }),
 
-    /**
-     * Ask Meta, live, whether the token and number work.
-     *
-     * A mutation so it runs only when the admin presses the button: as a query it would call out to
-     * Meta on every mount of the settings tab and on every settings save.
-     */
-    checkWaProviderConnection: builder.mutation<WaConnectionCheck, void>({
-      query: () => ({
-        url: ApiEndpoints.WHATSAPP_BOT.PROVIDER_CHECK,
-        method: HttpMethod.POST,
-      }),
-    }),
-
-    registerWaPhoneNumber: builder.mutation<WaConnectionCheck, { pin: string }>({
+    connectWaNumber: builder.mutation<WaBusinessNumber, ConnectWaNumberRequest>({
       query: body => ({
-        url: ApiEndpoints.WHATSAPP_BOT.PROVIDER_REGISTER,
+        url: ApiEndpoints.WHATSAPP_BOT.NUMBERS_MANUAL,
         method: HttpMethod.POST,
         body,
       }),
+      invalidatesTags: [
+        TAG_TYPES.WHATSAPP_BOT_NUMBERS,
+        TAG_TYPES.CONNECTORS,
+        TAG_TYPES.CHATBOTS,
+        TAG_TYPES.CHATBOT_DETAIL,
+      ],
     }),
 
-    subscribeWaProviderApp: builder.mutation<WaConnectionCheck, void>({
-      query: () => ({
-        url: ApiEndpoints.WHATSAPP_BOT.PROVIDER_SUBSCRIBE,
+    /** A mutation so it calls Meta only when pressed, never on mount or after a save. */
+    checkWaNumber: builder.mutation<
+      { number: WaBusinessNumber; check: WaConnectionCheck },
+      { id: string }
+    >({
+      query: ({ id }) => ({
+        url: ApiEndpoints.WHATSAPP_BOT.NUMBER_CHECK(id),
         method: HttpMethod.POST,
       }),
+      invalidatesTags: [
+        TAG_TYPES.WHATSAPP_BOT_NUMBERS,
+        TAG_TYPES.CONNECTORS,
+        TAG_TYPES.CHATBOTS,
+        TAG_TYPES.CHATBOT_DETAIL,
+      ],
     }),
 
-    // ---- Preview console ----
-
-    /**
-     * Ask a question and get back the exact reply a worker would receive.
-     *
-     * A mutation rather than a query even though it reads nothing: it must run only when the admin
-     * presses Ask. As a query, RTK Query would refetch it on mount and on cache invalidation, which
-     * would silently spend generation tokens.
-     */
-    previewWaAsk: builder.mutation<WaPreviewResponse, WaPreviewRequest>({
-      query: body => ({
-        url: ApiEndpoints.WHATSAPP_BOT.PREVIEW_ASK,
+    subscribeWaNumber: builder.mutation<WaBusinessNumber, { id: string }>({
+      query: ({ id }) => ({
+        url: ApiEndpoints.WHATSAPP_BOT.NUMBER_SUBSCRIBE(id),
         method: HttpMethod.POST,
-        body,
       }),
+      invalidatesTags: [
+        TAG_TYPES.WHATSAPP_BOT_NUMBERS,
+        TAG_TYPES.CONNECTORS,
+        TAG_TYPES.CHATBOTS,
+        TAG_TYPES.CHATBOT_DETAIL,
+      ],
+    }),
+
+    disconnectWaNumber: builder.mutation<void, { id: string }>({
+      query: ({ id }) => ({
+        url: ApiEndpoints.WHATSAPP_BOT.NUMBER_BY_ID(id),
+        method: HttpMethod.DELETE,
+      }),
+      invalidatesTags: [
+        TAG_TYPES.WHATSAPP_BOT_NUMBERS,
+        TAG_TYPES.CONNECTORS,
+        TAG_TYPES.CHATBOTS,
+        TAG_TYPES.CHATBOT_DETAIL,
+      ],
     }),
 
     // ---- Conversation log ----
 
-    getWaConversations: builder.query<GetWaConversationsResponse, GetWaConversationsParams | void>({
-      query: (params?: GetWaConversationsParams) => ({
-        url: ApiEndpoints.WHATSAPP_BOT.CONVERSATIONS,
-        method: HttpMethod.GET,
-        params: {
-          limit: params?.limit ?? 25,
-          offset: params?.offset ?? 0,
-          ...(params?.from ? { from: params.from } : {}),
-          ...(params?.to ? { to: params.to } : {}),
-          ...(params?.handledBy ? { handledBy: params.handledBy } : {}),
-          ...(params?.language ? { language: params.language } : {}),
-          ...(params?.declinedOnly ? { declinedOnly: true } : {}),
-          ...(params?.search ? { search: params.search } : {}),
-          ...(params?.sortBy ? { sortBy: params.sortBy } : {}),
-          ...(params?.sortDir ? { sortDir: params.sortDir } : {}),
-        },
-      }),
-      providesTags: [TAG_TYPES.WHATSAPP_BOT_CONVERSATIONS],
-    }),
-
-    /**
-     * The languages present in the log, for its filter.
-     *
-     * Not the analytics language breakdown: that one is windowed and sits behind a different
-     * permission, so it would hand an empty filter to a conversations-only admin and would drop a
-     * language nobody used this month while its threads were still listed.
-     */
-    getWaConversationLanguages: builder.query<string[], void>({
-      query: () => ({
-        url: ApiEndpoints.WHATSAPP_BOT.CONVERSATION_LANGUAGES,
-        method: HttpMethod.GET,
-      }),
-      providesTags: [TAG_TYPES.WHATSAPP_BOT_CONVERSATIONS],
-    }),
-
-    getWaConversation: builder.query<WaConversationDetail, string>({
-      query: id => ({
-        url: ApiEndpoints.WHATSAPP_BOT.CONVERSATION_BY_ID(id),
-        method: HttpMethod.GET,
-      }),
-      providesTags: [TAG_TYPES.WHATSAPP_BOT_CONVERSATIONS],
-    }),
-
-    /**
-     * Resolve a citation to the exact passage that was quoted.
-     *
-     * Reads the chunk row rather than the vector index, so a document re-chunked since the answer
-     * was sent still resolves: the row holding the quoted text survives even though its vector
-     * object was replaced.
-     */
-    getWaCitation: builder.query<KbChunk, string>({
-      query: chunkId => ({
-        url: ApiEndpoints.WHATSAPP_BOT.CITATION_BY_CHUNK(chunkId),
-        method: HttpMethod.GET,
-      }),
-      providesTags: [TAG_TYPES.WHATSAPP_BOT_CONVERSATIONS],
-    }),
-
-    /**
-     * Reveal one contact's full phone number.
-     *
-     * A mutation despite being a read: it must fire only on an explicit click, and every call is
-     * logged server-side. As a query, RTK Query would refetch it on mount and on cache
-     * invalidation — quietly re-emitting identifiable data nobody asked for again.
-     */
-    revealWaContactPhone: builder.mutation<{ id: string; phoneE164: string }, string>({
-      query: id => ({
-        url: ApiEndpoints.WHATSAPP_BOT.CONTACT_REVEAL(id),
-        method: HttpMethod.POST,
-      }),
-    }),
-
-    blockWaContact: builder.mutation<
-      { id: string; blocked: boolean },
-      { id: string; reason?: string }
-    >({
-      query: ({ id, reason }) => ({
-        url: ApiEndpoints.WHATSAPP_BOT.CONTACT_BLOCK(id),
-        method: HttpMethod.POST,
-        body: { reason },
-      }),
-      invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_CONVERSATIONS],
-    }),
-
-    unblockWaContact: builder.mutation<{ id: string; blocked: boolean }, string>({
-      query: id => ({
-        url: ApiEndpoints.WHATSAPP_BOT.CONTACT_UNBLOCK(id),
-        method: HttpMethod.POST,
-      }),
-      invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_CONVERSATIONS],
-    }),
-
     // ---- Unanswered queue ----
-
-    getWaUnanswered: builder.query<
-      GetWaUnansweredResponse,
-      {
-        limit?: number;
-        offset?: number;
-        status?: WaUnansweredStatus;
-        reason?: WaUnansweredReason;
-        sortBy?: string;
-        sortDir?: "asc" | "desc";
-      } | void
-    >({
-      query: (params?: {
-        limit?: number;
-        offset?: number;
-        status?: WaUnansweredStatus;
-        reason?: WaUnansweredReason;
-        sortBy?: string;
-        sortDir?: "asc" | "desc";
-      }) => ({
-        url: ApiEndpoints.WHATSAPP_BOT.UNANSWERED,
-        method: HttpMethod.GET,
-        params: {
-          limit: params?.limit ?? 25,
-          offset: params?.offset ?? 0,
-          ...(params?.status ? { status: params.status } : {}),
-          ...(params?.reason ? { reason: params.reason } : {}),
-          ...(params?.sortBy ? { sortBy: params.sortBy } : {}),
-          ...(params?.sortDir ? { sortDir: params.sortDir } : {}),
-        },
-      }),
-      providesTags: [TAG_TYPES.WHATSAPP_BOT_UNANSWERED],
-    }),
-
-    updateWaUnanswered: builder.mutation<
-      WaUnansweredQuestion,
-      {
-        id: string;
-        status?: WaUnansweredStatus;
-        assignedTo?: number | null;
-        resolutionNote?: string;
-        linkedDocumentId?: string;
-      }
-    >({
-      query: ({ id, ...body }) => ({
-        url: ApiEndpoints.WHATSAPP_BOT.UNANSWERED_BY_ID(id),
-        method: HttpMethod.PATCH,
-        body,
-      }),
-      invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_UNANSWERED],
-    }),
-
-    /**
-     * Write the answer as a corpus document and resolve the gap in one action.
-     *
-     * Invalidates the corpus tag too: the new document must appear in the corpus list, which is
-     * where its ingest status is watched.
-     */
-    createDocumentFromWaUnanswered: builder.mutation<
-      { question: WaUnansweredQuestion; document: KbDocument },
-      { id: string; title: string; text: string; tags?: string[] }
-    >({
-      query: ({ id, ...body }) => ({
-        url: ApiEndpoints.WHATSAPP_BOT.UNANSWERED_CREATE_DOCUMENT(id),
-        method: HttpMethod.POST,
-        body,
-      }),
-      invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_UNANSWERED, TAG_TYPES.WHATSAPP_BOT_DOCUMENTS],
-    }),
 
     // ---- Usage dashboard ----
 
     getWaAnalyticsOverview: builder.query<
       WaAnalyticsOverview,
-      { from?: string; to?: string } | void
+      ({ from?: string; to?: string } & WithBot) | void
     >({
-      query: (params?: { from?: string; to?: string }) => ({
+      query: (params?: { from?: string; to?: string } & WithBot) => ({
         url: ApiEndpoints.WHATSAPP_BOT.ANALYTICS_OVERVIEW,
         method: HttpMethod.GET,
         params: {
           ...(params?.from ? { from: params.from } : {}),
           ...(params?.to ? { to: params.to } : {}),
+          ...bot(params?.chatbotId),
         },
       }),
       providesTags: [TAG_TYPES.WHATSAPP_BOT_ANALYTICS],
@@ -600,26 +509,31 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
 
     getWaAnalyticsTimeseries: builder.query<
       WaAnalyticsBucket[],
-      { from?: string; to?: string } | void
+      ({ from?: string; to?: string } & WithBot) | void
     >({
-      query: (params?: { from?: string; to?: string }) => ({
+      query: (params?: { from?: string; to?: string } & WithBot) => ({
         url: ApiEndpoints.WHATSAPP_BOT.ANALYTICS_TIMESERIES,
         method: HttpMethod.GET,
         params: {
           ...(params?.from ? { from: params.from } : {}),
           ...(params?.to ? { to: params.to } : {}),
+          ...bot(params?.chatbotId),
         },
       }),
       providesTags: [TAG_TYPES.WHATSAPP_BOT_ANALYTICS],
     }),
 
-    getWaAnalyticsLanguages: builder.query<WaLanguageRow[], { from?: string; to?: string } | void>({
-      query: (params?: { from?: string; to?: string }) => ({
+    getWaAnalyticsLanguages: builder.query<
+      WaLanguageRow[],
+      ({ from?: string; to?: string } & WithBot) | void
+    >({
+      query: (params?: { from?: string; to?: string } & WithBot) => ({
         url: ApiEndpoints.WHATSAPP_BOT.ANALYTICS_LANGUAGES,
         method: HttpMethod.GET,
         params: {
           ...(params?.from ? { from: params.from } : {}),
           ...(params?.to ? { to: params.to } : {}),
+          ...bot(params?.chatbotId),
         },
       }),
       providesTags: [TAG_TYPES.WHATSAPP_BOT_ANALYTICS],
@@ -627,14 +541,15 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
 
     getWaCorpusCoverage: builder.query<
       WaCorpusCoverageResponse,
-      { from?: string; to?: string } | void
+      ({ from?: string; to?: string } & WithBot) | void
     >({
-      query: (params?: { from?: string; to?: string }) => ({
+      query: (params?: { from?: string; to?: string } & WithBot) => ({
         url: ApiEndpoints.WHATSAPP_BOT.ANALYTICS_CORPUS_COVERAGE,
         method: HttpMethod.GET,
         params: {
           ...(params?.from ? { from: params.from } : {}),
           ...(params?.to ? { to: params.to } : {}),
+          ...bot(params?.chatbotId),
         },
       }),
       providesTags: [TAG_TYPES.WHATSAPP_BOT_ANALYTICS],
@@ -659,8 +574,6 @@ export const {
   useReindexKbDocumentMutation,
   useArchiveKbDocumentMutation,
   useUnarchiveKbDocumentMutation,
-  useGetKbDocumentChunksQuery,
-  useSearchKbCorpusMutation,
   useGetWaTemplatesQuery,
   useCreateWaTemplateMutation,
   useUpdateWaTemplateMutation,
@@ -669,21 +582,12 @@ export const {
   useTestWaTemplateMutation,
   useGetWaSettingsQuery,
   useUpdateWaSettingsMutation,
-  useGetWaProviderHealthQuery,
-  useCheckWaProviderConnectionMutation,
-  useRegisterWaPhoneNumberMutation,
-  useSubscribeWaProviderAppMutation,
-  usePreviewWaAskMutation,
-  useGetWaConversationsQuery,
-  useGetWaConversationQuery,
-  useGetWaConversationLanguagesQuery,
-  useGetWaCitationQuery,
-  useRevealWaContactPhoneMutation,
-  useBlockWaContactMutation,
-  useUnblockWaContactMutation,
-  useGetWaUnansweredQuery,
-  useUpdateWaUnansweredMutation,
-  useCreateDocumentFromWaUnansweredMutation,
+  useGetWaNumbersQuery,
+  useConnectWaNumberMutation,
+  useCheckWaNumberMutation,
+  useSubscribeWaNumberMutation,
+  useDisconnectWaNumberMutation,
+  useCustomiseWaTemplateMutation,
   useGetWaAnalyticsOverviewQuery,
   useGetWaAnalyticsTimeseriesQuery,
   useGetWaAnalyticsLanguagesQuery,
