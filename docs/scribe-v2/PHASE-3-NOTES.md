@@ -119,3 +119,13 @@ It still needs an owner for clinical review (DESIGN §12, item 6).
   published.
 - Phase 4 (note API, provenance, label→id migration) is where a v2 draft would be shown.
   Shadow mode stops at storing it.
+
+## Phase 4a — dropdown answers (shipped on this branch)
+
+Mobile saved select answers as labels, web as option ids, so a mobile pick on an
+admin-created field (uuid ids) showed as "—" on web and never matched a filter.
+Now every reader accepts both forms (web `selectValues.ts`, mobile
+`custom_field_select_codec.dart`, the session-log filter), and mobile writes ids.
+Old builds keep writing labels and still work. **Later, after a minimum-version
+bump:** a data migration converting stored labels to ids, after which the
+label-tolerant reads can go.
