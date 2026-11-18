@@ -169,10 +169,8 @@ export class ChatbotSettingsService {
         override.crisisClassifierEnabled === true,
       consentRequired:
         global.consentRequired || override.consentRequired === true,
-      // Platform-wide only. The per-bot settings body is not checked key by key, so a bot's jsonb
-      // could otherwise switch the new engine on for itself past the kill switch.
-      agentRuntimeAllowed: global.agentRuntimeAllowed,
-      // The shared store's switches are platform-wide for the same reason.
+      // The shared store's switches are platform-wide only: the per-bot settings body is not
+      // checked key by key, so a bot's jsonb could otherwise switch them on for itself.
       sharedStoreWrites: global.sharedStoreWrites,
       readHistoryFrom: global.readHistoryFrom,
       botPagePublicAllowed: global.botPagePublicAllowed,

@@ -25,7 +25,7 @@ import {
   BotPageSessionDto,
   BotPageVerifyDto,
 } from '../dto/bot-page.dto';
-import { isFallback } from '../engine/agent-runtime';
+import { isFailedRun } from '../engine/agent-runtime';
 import { ChatbotEngineService } from '../engine/chatbot-engine.service';
 import type {
   ChatbotDecision,
@@ -757,7 +757,7 @@ export class BotPagePublicService {
       repliedAt: Date.now(),
     });
     void this.summaries?.afterTurn(chatbot, conversation.id);
-    if (isFallback(decision.agent)) {
+    if (isFailedRun(decision.agent)) {
       this.eventEmitter.emit(AGENT_FALLBACK_EVENT, {
         chatbot: { id: chatbot.id, name: chatbot.name },
         reason: decision.agent.fallbackReason,

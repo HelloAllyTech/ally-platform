@@ -73,7 +73,6 @@ describe('the crisis reply', () => {
 describe('no crisis reply on any path is sent without a phone number', () => {
   const settings = {
     ...DEFAULT_WHATSAPP_SETTINGS,
-    agentRuntimeAllowed: true,
     helplineNumbers: '',
     retrieval: { ...DEFAULT_WHATSAPP_SETTINGS.retrieval },
   };

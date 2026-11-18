@@ -94,8 +94,10 @@ const ANSWER = {
 describe('WhatsAppInboundService through the chatbot engine', () => {
   let service: WhatsAppInboundService;
   let provider: { sendText: jest.Mock; showTypingIndicator: jest.Mock };
+  // Every answer goes through /agent/run (Q3-fast: one path, no v1); the knowledge fields these
+  // tests check travel in its body unchanged.
   let aiService: {
-    answerKnowledgeQuestion: jest.Mock;
+    runAgent: jest.Mock;
     checkWhatsAppCrisis: jest.Mock;
   };
   let identityService: { identify: jest.Mock };
@@ -146,7 +148,7 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
     };
     promptShared = { getPromptsByOptions: jest.fn().mockResolvedValue([]) };
     aiService = {
-      answerKnowledgeQuestion: jest.fn(),
+      runAgent: jest.fn(),
       checkWhatsAppCrisis: jest
         .fn()
         .mockResolvedValue({ is_crisis: false, confidence: 0, signal: '' }),
@@ -299,7 +301,7 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
   it('refuses to answer a contact whose organisation cannot be resolved', async () => {
     await service.handle(inbound());
 
-    expect(aiService.answerKnowledgeQuestion).not.toHaveBeenCalled();
+    expect(aiService.runAgent).not.toHaveBeenCalled();
     expect(sentBody()).toBe(DEFAULT_WHATSAPP_SETTINGS.unrecognisedNumberText);
   });
 
@@ -375,7 +377,7 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
     await service.handle(inbound('STOP'));
 
     expect(identityService.identify).not.toHaveBeenCalled();
-    expect(aiService.answerKnowledgeQuestion).not.toHaveBeenCalled();
+    expect(aiService.runAgent).not.toHaveBeenCalled();
     expect(sentBody()).toContain('You will not receive any more messages');
   });
 
@@ -384,15 +386,16 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
       ...contact,
       tenantId: TENANT_A,
     });
-    aiService.answerKnowledgeQuestion.mockResolvedValue(ANSWER);
+    aiService.runAgent.mockResolvedValue(ANSWER);
 
     await service.handle(inbound());
 
     // Sent explicitly rather than left to a default: ally-ai refuses a request with no audience,
     // which is what stops "we forgot to scope the corpus" from ever being silent.
-    expect(aiService.answerKnowledgeQuestion.mock.calls[0][0].audience).toEqual(
-      { tenant_id: TENANT_A, include_global: true },
-    );
+    expect(aiService.runAgent.mock.calls[0][0].audience).toEqual({
+      tenant_id: TENANT_A,
+      include_global: true,
+    });
   });
 
   it('records which store version of each prompt answered', async () => {
@@ -418,7 +421,7 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
         model: 'gpt-4o-mini',
       },
     ]);
-    aiService.answerKnowledgeQuestion.mockResolvedValue(ANSWER);
+    aiService.runAgent.mockResolvedValue(ANSWER);
 
     await service.handle(inbound());
 
@@ -495,7 +498,7 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
         { kind: ChatbotAudienceKind.ORGANISATION, value: TENANT_A },
       ];
       documentRows = [{ documentId: 'doc-1' }, { documentId: 'doc-2' }];
-      aiService.answerKnowledgeQuestion.mockResolvedValue(ANSWER);
+      aiService.runAgent.mockResolvedValue(ANSWER);
     });
 
     it('answers with the bot the number is bound to', async () => {
@@ -523,7 +526,7 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
 
       await onNumber();
 
-      const request = aiService.answerKnowledgeQuestion.mock.calls[0][0];
+      const request = aiService.runAgent.mock.calls[0][0];
       expect(request.document_ids).toEqual(['doc-1', 'doc-2']);
       expect(request.audience).toEqual({ unrestricted: true });
     });
@@ -537,7 +540,7 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
 
       await onNumber();
 
-      const request = aiService.answerKnowledgeQuestion.mock.calls[0][0];
+      const request = aiService.runAgent.mock.calls[0][0];
       expect(request.document_ids).toEqual([
         '00000000-0000-0000-0000-000000000000',
       ]);
@@ -551,7 +554,7 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
 
       await onNumber();
 
-      expect(aiService.answerKnowledgeQuestion).not.toHaveBeenCalled();
+      expect(aiService.runAgent).not.toHaveBeenCalled();
       expect(sentBody()).toBe('Not one of Acme’s workers.');
     });
 
@@ -569,7 +572,7 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
 
       await onNumber();
 
-      const request = aiService.answerKnowledgeQuestion.mock.calls[0][0];
+      const request = aiService.runAgent.mock.calls[0][0];
       expect(request.persona).toEqual({
         display_name: 'Ava',
         system_prompt: 'Be brief.',

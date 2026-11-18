@@ -273,14 +273,6 @@ export class UpdateWaSettingsDto {
 
   @ApiPropertyOptional({
     description:
-      'Allow bots to use the Agents v2 engine. Off, every bot answers with v1.',
-  })
-  @IsOptional()
-  @IsBoolean()
-  agentRuntimeAllowed?: boolean;
-
-  @ApiPropertyOptional({
-    description:
       'Also write WhatsApp messages to the shared conversation store (chunk 12).',
   })
   @IsOptional()

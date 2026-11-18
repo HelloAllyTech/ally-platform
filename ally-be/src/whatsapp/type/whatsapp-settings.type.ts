@@ -116,12 +116,6 @@ export interface WhatsAppBotSettings {
   platformChatbotId?: string | null;
 
   /**
-   * The platform's emergency switch for the Agents v2 engine. Off, every bot answers with v1 —
-   * rollback is this switch, not a deploy. Platform-wide only: a bot's settings cannot turn it on.
-   */
-  agentRuntimeAllowed: boolean;
-
-  /**
    * Show WhatsApp's typing dots while the bot works on a reply. Meta's call for them also marks the
    * message read (blue ticks), so it is a product choice per bot. On unless set to `false`; only a
    * platform admin can change it.
@@ -235,7 +229,6 @@ export const DEFAULT_WHATSAPP_SETTINGS: WhatsAppBotSettings = {
   retentionDays: 180,
   crisisClassifierEnabled: true,
   helplineNumbers: '',
-  agentRuntimeAllowed: false,
   sharedStoreWrites: false,
   readHistoryFrom: 'wa',
   botPagePublicAllowed: false,

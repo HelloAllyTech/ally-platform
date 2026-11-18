@@ -17,7 +17,6 @@ export const CHATBOT = {
   knowledgeSource: "selected",
   persona: { displayName: "Asha", greeting: "Hi, I'm Asha from Sunrise Mind.", tone: "warm" },
   model: null,
-  effectiveRuntime: "v2",
   myRole: "owner",
   connectors: [],
   documentCount: 6,

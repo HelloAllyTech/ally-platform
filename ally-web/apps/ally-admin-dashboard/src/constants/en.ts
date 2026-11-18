@@ -1819,7 +1819,6 @@ export const en = {
         saved: "Saved.",
         saveFailed: "Could not save these settings.",
         tryIt: "Preview these changes",
-        agentOff: "Answers are in safe mode: “Answer with the agent” is switched off in Defaults.",
       },
       connectors: {
         title: "Channels",
@@ -1854,9 +1853,6 @@ export const en = {
         enabledLabel: "Assistants can reply",
         enabledHelp:
           "Turn off to stop every assistant replying at once, for example during an incident. Messages are still recorded.",
-        agentRuntimeLabel: "Answer with the agent",
-        agentRuntimeHelp:
-          "Turn off only in an emergency: every assistant then answers in safe mode, with simpler answers.",
         crisisCheckLabel: "Extra AI crisis check",
         crisisCheckHelp:
           "Keyword replies catch messages that say it outright. This also catches ones that don't, like “I can't keep doing this”. Assistants can't turn it off.",

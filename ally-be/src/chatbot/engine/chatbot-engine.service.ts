@@ -19,7 +19,7 @@ import {
 } from '../../whatsapp/enum/whatsapp.enum';
 import { composeReply } from '../../whatsapp/util/reply-composer';
 import { ChatbotDocument } from '../entity/chatbot-document.entity';
-import { ChatbotKnowledgeSource, ChatbotRuntime } from '../enum/chatbot.enum';
+import { ChatbotKnowledgeSource } from '../enum/chatbot.enum';
 import {
   asksForPerson,
   handoverMessage,
@@ -29,10 +29,9 @@ import { ChatbotAudienceService } from '../service/chatbot-audience.service';
 import { ChatbotReplyService } from '../service/chatbot-reply.service';
 import { ChatbotSettingsService } from '../service/chatbot-settings.service';
 import { ConversationService } from '../service/conversation.service';
-import { effectiveRuntime } from './agent-runtime';
 import {
   AgentActedError,
-  AgentFallbackFailedError,
+  AgentRunFailedError,
   AgentRuntimeRunner,
   type Answered,
   type EngineAnswer,
@@ -47,6 +46,8 @@ import { crisisRequest } from './crisis-history';
 import { holdTextUntilCleared } from './live-reply';
 import { agentAnswersInstead, isGreetingReply } from './keyword-skip';
 import { buildKnowledgeRequest, NO_DOCUMENTS } from './knowledge-request';
+import { replyLanguageOf } from './reply-language';
+import { contactFromSources, runFailedReply } from './run-failed-reply';
 
 /**
  * The ally-ai prompt codes the answering path owns.
@@ -62,10 +63,7 @@ export const KNOWLEDGE_PROMPT_CODES = [
 ];
 /** The agent's step prompt: it answers, so it takes the bot's own model like the answer prompt. */
 const AGENT_SYSTEM_PROMPT_CODE = 'ally_ai_agent_system';
-/**
- * The conversational agent's prompts (Agents v2). Loaded only when the agent answers, so a v1
- * request (the emergency switch off) is exactly as before.
- */
+/** The conversational agent's prompts (Agents v2), loaded for every answer. */
 export const AGENT_PROMPT_CODES = [
   AGENT_SYSTEM_PROMPT_CODE,
   // What it knows about the person (chunk 8a); used only when the bot's memory is on.
@@ -138,7 +136,7 @@ const runBehind = (
 ): AgentRunRef | undefined =>
   answerResult.status === 'fulfilled'
     ? answerResult.value.agent
-    : answerResult.reason instanceof AgentFallbackFailedError ||
+    : answerResult.reason instanceof AgentRunFailedError ||
         answerResult.reason instanceof AgentActedError
       ? answerResult.reason.agent
       : undefined;
@@ -163,8 +161,9 @@ type PromptsRan = {
  *   2. access gate      — a sender not on the bot's list is refused, but the LLM crisis classifier
  *                         runs BEFORE the refusal: someone in danger is not less in danger for
  *                         being unrecognised.
- *   3. answer           — retrieval over the bot's knowledge, with its persona and model, run
+ *   3. answer           — the agent's run (one path for every channel, Q3-fast: no v1), run
  *                         concurrently with the crisis classifier, which wins over any answer.
+ *                         A run that fails gets the fixed run-failed reply.
  */
 @Injectable()
 export class ChatbotEngineService {
@@ -313,8 +312,6 @@ export class ChatbotEngineService {
   ): Promise<ChatbotDecision> {
     const { chatbot, settings, sender } = turn;
     const allowed = await this.audienceService.canChat(chatbot, sender);
-    // v2 (the conversational agent) unless the platform's emergency switch is off.
-    const useAgent = effectiveRuntime(settings) === ChatbotRuntime.V2;
 
     // ── 1. Keyword replies ───────────────────────────────────────────────
     const match = await this.replyService.match(
@@ -327,7 +324,7 @@ export class ChatbotEngineService {
       match.bypassRag &&
       (allowed || match.template.kind !== WaTemplateKind.FAQ) &&
       // The agent answers greetings, help and FAQ-style messages itself.
-      !(useAgent && agentAnswersInstead(match.template, turn));
+      !agentAnswersInstead(match.template, turn);
     if (match && usable) {
       const isCrisis = match.template.kind === WaTemplateKind.CRISIS;
       // A bot with its own welcome message greets with THAT, not the generic shared greeting —
@@ -364,7 +361,7 @@ export class ChatbotEngineService {
     }
 
     // ── 3. Answer ────────────────────────────────────────────────────────
-    return this.answer(turn, useAgent, live);
+    return this.answer(turn, live);
   }
 
   /**
@@ -423,31 +420,28 @@ export class ChatbotEngineService {
 
   private async answer(
     turn: ChatTurn,
-    useAgent: boolean,
     live?: LiveReply,
   ): Promise<ChatbotDecision> {
     const { settings } = turn;
-    const { prompts, ran } = await this.loadPromptOverrides(turn, useAgent);
+    const { prompts, ran } = await this.loadPromptOverrides(turn, true);
     const knowledge = await this.knowledgeFor(turn);
     const request = buildKnowledgeRequest(turn, prompts, knowledge);
 
     // Concurrent, not sequential: the classifier adds no latency this way, and `allSettled`
     // keeps a rejected classifier from taking down an answer that arrived fine. The crisis check
-    // runs once and exactly as before, whichever engine answers.
+    // runs once and never depends on the run: a failed run still gets its verdict.
     const crisisCheck = settings.crisisClassifierEnabled
       ? this.aiService.checkWhatsAppCrisis(crisisRequest(turn, prompts))
       : Promise.resolve(null);
     // A streamed reply's text waits for the crisis check too: none of it is shown before the
     // check clears the message, and none at all if it doesn't.
     const [answerResult, crisisResult] = await Promise.allSettled([
-      useAgent
-        ? this.agentRuntime.answer(
-            turn,
-            request,
-            knowledge,
-            live && holdTextUntilCleared(live, crisisCheck),
-          )
-        : this.answerWithV1(request),
+      this.agentRuntime.answer(
+        turn,
+        request,
+        knowledge,
+        live && holdTextUntilCleared(live, crisisCheck),
+      ),
       crisisCheck,
     ]);
     const agent = runBehind(answerResult);
@@ -467,8 +461,8 @@ export class ChatbotEngineService {
 
     // The agent passed the chat to a person (chunk 3b): its `hand_over` tool already marked the
     // chat, and the visitor gets 11a's hand-over message, as when they ask for a person. The same
-    // when the run failed after `hand_over` acted; after any other tool acted, the bot's fallback
-    // wording. v1 never answers a message whose run has already done something.
+    // when the run failed after `hand_over` acted; after a list write, what it did; after anything
+    // else, the run-failed reply.
     const acted =
       answerResult.status === 'rejected' &&
       answerResult.reason instanceof AgentActedError
@@ -488,7 +482,7 @@ export class ChatbotEngineService {
       };
     }
     if (acted) {
-      // A list write that was done (chunk 6) says so; anything else gets the fallback wording.
+      // A list write that was done (chunk 6) says so; anything else gets the run-failed reply.
       const done =
         answerResult.status === 'rejected' &&
         answerResult.reason instanceof AgentActedError
@@ -496,26 +490,26 @@ export class ChatbotEngineService {
           : undefined;
       return {
         handledBy: WaHandledBy.ERROR,
-        body: done ?? settings.fallbackText,
+        body: done ?? (await this.runFailedText(turn)),
         alert: degradedAlert,
         ...(agent ? { agent } : {}),
       };
     }
 
     if (answerResult.status === 'rejected') {
-      // A model or index outage is NOT "the knowledge does not cover this": fallback wording and an
-      // ERROR-reason queue row, so a bad afternoon for ally-ai does not fill the unanswered queue
-      // with questions the documents answer perfectly well.
+      // A failed run is NOT "the knowledge does not cover this": the fixed run-failed reply
+      // (Q3-fast Part 0, never v1) and an ERROR-reason queue row, so a bad afternoon for ally-ai
+      // does not fill the unanswered queue with questions the documents answer perfectly well.
       const failure =
-        answerResult.reason instanceof AgentFallbackFailedError
+        answerResult.reason instanceof AgentRunFailedError
           ? answerResult.reason.cause
           : answerResult.reason;
       const reason =
         failure instanceof Error ? failure.message : 'unknown error';
-      this.logger.error(`Knowledge agent call failed: ${reason}`);
+      this.logger.error(`Agent run failed: ${reason}`);
       return {
         handledBy: WaHandledBy.ERROR,
-        body: settings.fallbackText,
+        body: await this.runFailedText(turn),
         unanswered: {
           reason: WaUnansweredReason.ERROR,
           topSimilarity: null,
@@ -599,16 +593,41 @@ export class ChatbotEngineService {
     );
   }
 
-  /** The v1 engine: ally-ai's `/knowledge-agent/answer`, with its own retry budget. */
-  private async answerWithV1(
-    request: KnowledgeAnswerRequest,
-  ): Promise<Answered> {
-    const startedAt = Date.now();
-    const response = await this.aiService.answerKnowledgeQuestion(request);
-    return { response, latencyMs: Date.now() - startedAt };
+  /**
+   * The fixed run-failed reply (Q3-fast Part 0), in the person's language. How to reach the
+   * business comes from its sources (the phone and email facts on its draft) or its helplines,
+   * never its decline wording. A lookup failure only leaves the contact out.
+   */
+  private async runFailedText(turn: ChatTurn): Promise<string> {
+    let facts: { section?: string | null; text: string }[] = [];
+    try {
+      const rows = await this.documentRepository.manager.query<
+        { learned: { facts?: { section?: string; text?: string }[] } | null }[]
+      >(
+        `SELECT learned FROM bot_drafts
+          WHERE chatbot_id = $1
+          ORDER BY "updatedAt" DESC
+          LIMIT 1`,
+        [turn.chatbot.id],
+      );
+      facts = (rows?.[0]?.learned?.facts ?? [])
+        .filter((fact) => typeof fact?.text === 'string')
+        .map((fact) => ({ section: fact.section, text: fact.text as string }));
+    } catch (error) {
+      this.logger.warn(
+        `Could not read the bot's facts for the run-failed reply: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
+    }
+    return runFailedReply(
+      replyLanguageOf(turn.text, turn.language),
+      turn.chatbot.name ?? '',
+      contactFromSources(facts, turn.settings.helplineNumbers),
+    );
   }
 
-  /** An answer from either engine, as one reply. */
+  /** The agent's answer, as one reply. */
   private toDecision(
     turn: ChatTurn,
     answer: EngineAnswer,

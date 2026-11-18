@@ -61,9 +61,8 @@ const upstream = (status: number, code: ErrorCode) =>
 /**
  * The engine on its own, with ally-ai and the Skills Store mocked.
  *
- * The first block pins the exact `/knowledge-agent/answer` body a v1 bot sends. It was written
- * against the engine BEFORE the Agents v2 runtime switch, so it is what proves the v1 request did
- * not change when the body moved into the shared builder.
+ * The first block pins the knowledge fields every answer sends. They were v1's request body, and
+ * since Q3-fast (one path, no v1) they travel inside `/agent/run`'s body unchanged.
  */
 describe('ChatbotEngineService', () => {
   let engine: ChatbotEngineService;
@@ -104,12 +103,12 @@ describe('ChatbotEngineService', () => {
     engine = makeEngine({ aiService, promptShared });
   });
 
-  describe('the v1 request body (snapshot)', () => {
-    it('sends exactly these fields to /knowledge-agent/answer', async () => {
+  describe('the request every answer sends (snapshot)', () => {
+    it('sends the knowledge fields, unchanged since v1, inside /agent/run', async () => {
       await engine.respond(turn());
 
-      expect(aiService.answerKnowledgeQuestion).toHaveBeenCalledTimes(1);
-      expect(aiService.answerKnowledgeQuestion.mock.calls[0][0]).toEqual({
+      expect(aiService.runAgent).toHaveBeenCalledTimes(1);
+      expect(aiService.runAgent.mock.calls[0][0]).toMatchObject({
         question: 'What does Ally do?',
         history: [{ role: 'user', content: 'hi' }],
         prompts: {
@@ -119,6 +118,10 @@ describe('ChatbotEngineService', () => {
             model: 'claude-sonnet-4-6',
           },
           ally_ai_knowledge_answer_general: {
+            provider: 'anthropic',
+            model: 'claude-sonnet-4-6',
+          },
+          ally_ai_agent_system: {
             provider: 'anthropic',
             model: 'claude-sonnet-4-6',
           },
@@ -140,14 +143,18 @@ describe('ChatbotEngineService', () => {
         similarity_band: settings.retrieval.similarityBand,
         max_answer_chars: settings.maxAnswerChars,
         translate_query: settings.retrieval.translateQuery,
+        runtime_version: 'v2',
+        chatbot_id: 'bot-1',
+        knowledge_topics: [],
+        decline_text: settings.declineText,
       });
     });
 
     it('sends the no-documents placeholder and an organisation audience as before', async () => {
       await engine.respond(turn({ documentIds: [] }));
-      expect(
-        aiService.answerKnowledgeQuestion.mock.calls[0][0].document_ids,
-      ).toEqual(['00000000-0000-0000-0000-000000000000']);
+      expect(aiService.runAgent.mock.calls[0][0].document_ids).toEqual([
+        '00000000-0000-0000-0000-000000000000',
+      ]);
 
       await engine.respond(
         turn({
@@ -159,7 +166,7 @@ describe('ChatbotEngineService', () => {
           sender: { externalId: 'x', label: 'x', tenantId: 'tenant-a' },
         }),
       );
-      const body = aiService.answerKnowledgeQuestion.mock.calls[1][0];
+      const body = aiService.runAgent.mock.calls[1][0];
       expect(body.audience).toEqual({
         tenant_id: 'tenant-a',
         include_global: true,
@@ -174,232 +181,223 @@ describe('ChatbotEngineService', () => {
         message: 'What does Ally do?',
         // The person's earlier messages (chunk 15a).
         history: ['hi'],
-        prompts: aiService.answerKnowledgeQuestion.mock.calls[0][0].prompts,
+        prompts: aiService.runAgent.mock.calls[0][0].prompts,
       });
     });
   });
 
-  describe('the runtime switch', () => {
-    const allowed = (on = true) => {
-      settings.agentRuntimeAllowed = on;
-    };
+  describe('one run path, no v1 (Q3-fast Part 0)', () => {
     const whatsapp = (over: Partial<Chatbot> = {}) =>
       turn({
         chatbot: bot(over),
         conversationId: 'conv-1',
         providerMessageId: 'wamid.1',
       });
+    const RUN_FAILED =
+      "Sorry, I couldn't answer that just now. Please try again.";
 
-    it('answers with v1 while the kill switch is off', async () => {
-      allowed(false);
+    it('answers every channel through /agent/run, never /knowledge-agent/answer', async () => {
+      for (const type of ['whatsapp', 'test', 'web'] as const) {
+        await engine.respond(turn({ channel: { type } }));
+      }
+      expect(aiService.runAgent).toHaveBeenCalledTimes(3);
+      expect(aiService.answerKnowledgeQuestion).not.toHaveBeenCalled();
+      expect(aiService.answerKnowledgeQuestionWithin).not.toHaveBeenCalled();
+    });
+
+    it('calls /agent/run once with the run fields and records the run', async () => {
       const decision = await engine.respond(whatsapp());
-      expect(decision.agent).toBeUndefined();
-      expect(aiService.runAgent).not.toHaveBeenCalled();
-      expect(aiService.answerKnowledgeQuestion).toHaveBeenCalledTimes(1);
+
+      expect(aiService.runAgent).toHaveBeenCalledTimes(1);
+      expect(aiService.runAgent.mock.calls[0][0]).toMatchObject({
+        conversation_id: 'conv-1',
+        run_id: agentRunIdFor('wamid.1'),
+        chatbot_id: 'bot-1',
+        runtime_version: 'v2',
+      });
+      expect(decision.body).toContain('(v2)');
+      expect(decision.handledBy).toBe(WaHandledBy.RAG);
+      expect(decision.agent).toEqual({
+        runtime: AgentRuntimeUsed.V2,
+        runId: 'run-from-ally-ai',
+        conversationId: 'conv-1',
+        trace: TRACE,
+      });
     });
 
-    it('answers Preview with v1 too while the kill switch is off', async () => {
-      allowed(false);
-      const decision = await engine.respond(
-        turn({ channel: { type: 'test' } }),
-      );
-      expect(aiService.runAgent).not.toHaveBeenCalled();
-      expect(decision.agent).toBeUndefined();
+    it("keeps ally-ai's debug-only chunk list off the stored retrieval", async () => {
+      const decision = await engine.respond(whatsapp());
+      expect(decision.retrievalMeta).not.toHaveProperty('hit_chunk_ids');
+      expect(decision.retrievalMeta?.hit_count).toBe(3);
     });
 
-    describe('a v2 bot', () => {
-      beforeEach(() => allowed());
-
-      it("calls /agent/run once with v1's body plus the run's fields and the agent's", async () => {
+    it.each([
+      [
+        'a 404 (runtime switched off)',
+        upstream(404, ErrorCode.AI_REQUEST_REJECTED),
+        'upstream_404',
+      ],
+      [
+        'a 500',
+        upstream(500, ErrorCode.AI_SERVICE_UNAVAILABLE),
+        'upstream_500',
+      ],
+      [
+        'a timeout',
+        new AiUpstreamError(
+          'timeout of 25000ms exceeded',
+          ErrorCode.AI_SERVICE_TIMEOUT,
+          undefined,
+          'ECONNABORTED',
+        ),
+        'timeout',
+      ],
+      [
+        'a refused connection',
+        new AiUpstreamError(
+          'connect ECONNREFUSED',
+          ErrorCode.AI_SERVICE_UNAVAILABLE,
+          undefined,
+          'ECONNREFUSED',
+        ),
+        'unavailable',
+      ],
+    ])(
+      'sends the fixed run-failed reply on %s, never v1',
+      async (_label, error, reason) => {
+        aiService.runAgent.mockRejectedValueOnce(error);
         const decision = await engine.respond(whatsapp());
-
-        // The v1 body, from the same bot on the same turn.
-        allowed(false);
-        await engine.respond(whatsapp());
-        const v1Body = aiService.answerKnowledgeQuestion.mock.calls[0][0];
 
         expect(aiService.runAgent).toHaveBeenCalledTimes(1);
-        const { prompts, ...agentBody } = aiService.runAgent.mock.calls[0][0];
-        const { prompts: v1Prompts, ...v1Rest } = v1Body;
-        expect(agentBody).toEqual({
-          ...v1Rest,
-          conversation_id: 'conv-1',
-          run_id: agentRunIdFor('wamid.1'),
-          chatbot_id: 'bot-1',
-          runtime_version: 'v2',
-          knowledge_topics: [],
-          decline_text: settings.declineText,
-        });
-        // The agent's prompt also takes the bot's model, like the answer prompt.
-        expect(prompts).toEqual({
-          ...v1Prompts,
-          ally_ai_agent_system: {
-            provider: 'anthropic',
-            model: 'claude-sonnet-4-6',
-          },
-        });
-        expect(aiService.answerKnowledgeQuestion).toHaveBeenCalledTimes(1);
-        expect(decision.body).toContain('(v2)');
-        expect(decision.handledBy).toBe(WaHandledBy.RAG);
-        expect(decision.agent).toEqual({
-          runtime: AgentRuntimeUsed.V2,
-          runId: 'run-from-ally-ai',
-          conversationId: 'conv-1',
-          trace: TRACE,
-        });
-      });
-
-      it('does not call /knowledge-agent/answer when v2 answers', async () => {
-        await engine.respond(whatsapp());
-        expect(aiService.answerKnowledgeQuestion).not.toHaveBeenCalled();
         expect(aiService.answerKnowledgeQuestionWithin).not.toHaveBeenCalled();
-      });
+        expect(aiService.answerKnowledgeQuestion).not.toHaveBeenCalled();
+        expect(decision.handledBy).toBe(WaHandledBy.ERROR);
+        expect(decision.body).toBe(RUN_FAILED);
+        expect(decision.body).not.toBe(settings.fallbackText);
+        expect(decision.unanswered?.reason).toBe('error');
+        expect(decision.agent).toEqual({
+          runtime: AgentRuntimeUsed.V2_FAILED,
+          runId: agentRunIdFor('wamid.1'),
+          conversationId: 'conv-1',
+          fallbackReason: reason,
+        });
+      },
+    );
 
-      it("keeps ally-ai's debug-only chunk list off the stored retrieval", async () => {
-        const decision = await engine.respond(whatsapp());
-        expect(decision.retrievalMeta).not.toHaveProperty('hit_chunk_ids');
-        expect(decision.retrievalMeta?.hit_count).toBe(3);
-      });
+    it('sends the run-failed reply on a 200 that is not an answer', async () => {
+      aiService.runAgent.mockResolvedValueOnce({ detail: 'nope' });
+      const decision = await engine.respond(whatsapp());
+      expect(aiService.answerKnowledgeQuestionWithin).not.toHaveBeenCalled();
+      expect(decision.body).toBe(RUN_FAILED);
+      expect(decision.agent).toMatchObject({ fallbackReason: 'malformed' });
+    });
 
-      it.each([
-        [
-          'a 404 (runtime switched off)',
-          upstream(404, ErrorCode.AI_REQUEST_REJECTED),
-          'upstream_404',
-        ],
-        [
-          'a 500',
-          upstream(500, ErrorCode.AI_SERVICE_UNAVAILABLE),
-          'upstream_500',
-        ],
-        [
-          'a timeout',
-          new AiUpstreamError(
-            'timeout of 25000ms exceeded',
-            ErrorCode.AI_SERVICE_TIMEOUT,
-            undefined,
-            'ECONNABORTED',
-          ),
-          'timeout',
-        ],
-        [
-          'a refused connection',
-          new AiUpstreamError(
-            'connect ECONNREFUSED',
-            ErrorCode.AI_SERVICE_UNAVAILABLE,
-            undefined,
-            'ECONNREFUSED',
-          ),
-          'unavailable',
-        ],
-      ])(
-        'falls back to v1 exactly once on %s',
-        async (_label, error, reason) => {
-          aiService.runAgent.mockRejectedValueOnce(error);
-          const decision = await engine.respond(whatsapp());
-
-          expect(aiService.runAgent).toHaveBeenCalledTimes(1);
-          expect(aiService.answerKnowledgeQuestionWithin).toHaveBeenCalledTimes(
-            1,
-          );
-          expect(aiService.answerKnowledgeQuestion).not.toHaveBeenCalled();
-          const [body, budget] =
-            aiService.answerKnowledgeQuestionWithin.mock.calls[0];
-          expect(body).not.toHaveProperty('run_id');
-          expect(budget).toBeGreaterThan(30_000);
-          expect(budget).toBeLessThanOrEqual(40_000);
-          expect(decision.body).toContain('Ally trains counsellors.');
-          expect(decision.body).not.toContain('(v2)');
-          expect(decision.agent).toEqual({
-            runtime: AgentRuntimeUsed.V2_FALLBACK,
-            runId: agentRunIdFor('wamid.1'),
-            conversationId: 'conv-1',
-            fallbackReason: reason,
-          });
+    it("names the business's sourced contact, in the person's language", async () => {
+      const query = jest.fn().mockResolvedValue([
+        {
+          learned: {
+            facts: [
+              { section: 'services', text: 'Therapy from Rs 1,500.' },
+              {
+                section: 'location',
+                text: 'Call us on +91 22 6849 3328 or write to hello@ally.test.',
+              },
+            ],
+          },
         },
+      ]);
+      engine = makeEngine({
+        aiService,
+        promptShared,
+        documents: {
+          find: jest.fn().mockResolvedValue([{ documentId: 'doc-1' }]),
+          manager: { query },
+        },
+      });
+      aiService.runAgent.mockRejectedValue(
+        upstream(500, ErrorCode.AI_SERVICE_UNAVAILABLE),
       );
 
-      it('falls back on a 200 that is not an answer', async () => {
-        aiService.runAgent.mockResolvedValueOnce({ detail: 'nope' });
-        const decision = await engine.respond(whatsapp());
-        expect(aiService.answerKnowledgeQuestionWithin).toHaveBeenCalledTimes(
-          1,
-        );
-        expect(decision.agent).toMatchObject({ fallbackReason: 'malformed' });
-      });
+      const english = await engine.respond(whatsapp({ name: 'Ally Clinic' }));
+      expect(english.body).toBe(
+        "Sorry, I couldn't answer that just now. Please try again, or contact Ally Clinic: " +
+          '+91 22 6849 3328 / hello@ally.test.',
+      );
+      const hinglish = await engine.respond(
+        turn({
+          chatbot: bot({ name: 'Ally Clinic' }),
+          text: 'mujhe appointment chahiye kal ke liye',
+        }),
+      );
+      expect(hinglish.body).toContain(
+        'Sorry, abhi iska jawab nahi diya ja saka',
+      );
+      expect(hinglish.body).toContain('+91 22 6849 3328');
+      const draftLookup = query.mock.calls.find(([sql]) =>
+        String(sql).includes('FROM bot_drafts'),
+      );
+      expect(draftLookup?.[1]).toEqual(['bot-1']);
+    });
 
-      it('sends the fallback text, still linked to the run, when v1 fails too', async () => {
-        aiService.runAgent.mockRejectedValueOnce(
-          upstream(503, ErrorCode.AI_SERVICE_UNAVAILABLE),
-        );
-        aiService.answerKnowledgeQuestionWithin.mockRejectedValueOnce(
-          new Error('ally-ai down'),
-        );
-        const decision = await engine.respond(whatsapp());
-        expect(decision.handledBy).toBe(WaHandledBy.ERROR);
-        expect(decision.body).toBe(settings.fallbackText);
-        expect(decision.agent?.runtime).toBe(AgentRuntimeUsed.V2_FALLBACK);
+    it('lets a crisis verdict override an answer, keeping the run', async () => {
+      aiService.checkWhatsAppCrisis.mockResolvedValueOnce({
+        is_crisis: true,
+        confidence: 0.9,
+        signal: 'end it',
       });
+      const decision = await engine.respond(whatsapp());
+      expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
+      expect(decision.body).toBe(GENERAL_CRISIS_TEXT);
+      expect(decision.alert?.type).toBe('Chatbot Crisis Classifier');
+      expect(decision.agent?.runId).toBe('run-from-ally-ai');
+    });
 
-      it('lets a crisis verdict override a v2 answer, keeping the run', async () => {
-        aiService.checkWhatsAppCrisis.mockResolvedValueOnce({
-          is_crisis: true,
-          confidence: 0.9,
-          signal: 'end it',
-        });
-        const decision = await engine.respond(whatsapp());
-        expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
-        expect(decision.body).toBe(GENERAL_CRISIS_TEXT);
-        expect(decision.alert?.type).toBe('Chatbot Crisis Classifier');
-        expect(decision.agent?.runId).toBe('run-from-ally-ai');
+    it('still gives the crisis reply when the run fails', async () => {
+      aiService.runAgent.mockRejectedValueOnce(
+        upstream(404, ErrorCode.AI_REQUEST_REJECTED),
+      );
+      aiService.checkWhatsAppCrisis.mockResolvedValueOnce({
+        is_crisis: true,
+        confidence: 0.9,
+        signal: 'end it',
       });
+      const decision = await engine.respond(whatsapp());
+      expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
+      expect(decision.body).toBe(GENERAL_CRISIS_TEXT);
+      expect(decision.agent?.runtime).toBe(AgentRuntimeUsed.V2_FAILED);
+    });
 
-      it('lets a crisis verdict override a fallback answer too', async () => {
-        aiService.runAgent.mockRejectedValueOnce(
-          upstream(404, ErrorCode.AI_REQUEST_REJECTED),
-        );
-        aiService.checkWhatsAppCrisis.mockResolvedValueOnce({
-          is_crisis: true,
-          confidence: 0.9,
-          signal: 'end it',
-        });
-        const decision = await engine.respond(whatsapp());
-        expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
-        expect(decision.agent?.runtime).toBe(AgentRuntimeUsed.V2_FALLBACK);
-      });
+    it('runs the crisis check once, alongside, with the same prompts', async () => {
+      aiService.runAgent.mockRejectedValueOnce(
+        upstream(404, ErrorCode.AI_REQUEST_REJECTED),
+      );
+      await engine.respond(whatsapp());
+      expect(aiService.checkWhatsAppCrisis).toHaveBeenCalledTimes(1);
+      expect(aiService.checkWhatsAppCrisis.mock.calls[0][0].prompts).toEqual(
+        aiService.runAgent.mock.calls[0][0].prompts,
+      );
+    });
 
-      it('runs the crisis check once, alongside, with the same prompts', async () => {
-        aiService.runAgent.mockRejectedValueOnce(
-          upstream(404, ErrorCode.AI_REQUEST_REJECTED),
-        );
-        await engine.respond(whatsapp());
-        expect(aiService.checkWhatsAppCrisis).toHaveBeenCalledTimes(1);
-        expect(aiService.checkWhatsAppCrisis.mock.calls[0][0].prompts).toEqual(
-          aiService.runAgent.mock.calls[0][0].prompts,
-        );
-      });
-
-      it('gives Preview a fresh run id and its own thread', async () => {
-        await engine.respond(
-          turn({
-            chatbot: bot(),
-            channel: { type: 'test' },
-            conversationId: 'preview-7b0c1b8e-8a43-4f61-9a43-3a2d5c0f9e11',
-          }),
-        );
-        await engine.respond(
-          turn({
-            chatbot: bot(),
-            channel: { type: 'test' },
-          }),
-        );
-        const [first, second] = aiService.runAgent.mock.calls.map((c) => c[0]);
-        expect(first.conversation_id).toBe(
-          'preview-7b0c1b8e-8a43-4f61-9a43-3a2d5c0f9e11',
-        );
-        expect(second.conversation_id).toMatch(/^preview-[0-9a-f-]{36}$/);
-        expect(first.run_id).not.toBe(second.run_id);
-      });
+    it('gives Preview a fresh run id and its own thread', async () => {
+      await engine.respond(
+        turn({
+          chatbot: bot(),
+          channel: { type: 'test' },
+          conversationId: 'preview-7b0c1b8e-8a43-4f61-9a43-3a2d5c0f9e11',
+        }),
+      );
+      await engine.respond(
+        turn({
+          chatbot: bot(),
+          channel: { type: 'test' },
+        }),
+      );
+      const [first, second] = aiService.runAgent.mock.calls.map((c) => c[0]);
+      expect(first.conversation_id).toBe(
+        'preview-7b0c1b8e-8a43-4f61-9a43-3a2d5c0f9e11',
+      );
+      expect(second.conversation_id).toMatch(/^preview-[0-9a-f-]{36}$/);
+      expect(first.run_id).not.toBe(second.run_id);
     });
   });
 

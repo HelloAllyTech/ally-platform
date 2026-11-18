@@ -605,7 +605,7 @@ describe('BotPagePublicService', () => {
         ...DECISION,
         alert,
         agent: {
-          runtime: AgentRuntimeUsed.V2_FALLBACK,
+          runtime: AgentRuntimeUsed.V2_FAILED,
           runId: 'r',
           conversationId: 'c',
           fallbackReason: 'timeout',

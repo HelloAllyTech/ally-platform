@@ -149,7 +149,6 @@ export async function buildInboundHarness({
     ...DEFAULT_WHATSAPP_SETTINGS,
     enabled: true,
     platformChatbotId: 'bot-1',
-    agentRuntimeAllowed: true,
     ...settingsOverride,
   };
   const messageUpdates = jest.fn().mockResolvedValue(undefined);

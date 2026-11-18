@@ -199,7 +199,7 @@ describePg('Memory, light (Postgres)', () => {
     it.each([
       ['a hand-over', { handledBy: WaHandledBy.HANDOVER }],
       ['an error', { handledBy: WaHandledBy.ERROR }],
-      ['a v1 fallback', { runtime: AgentRuntimeUsed.V2_FALLBACK }],
+      ['a v1 fallback', { runtime: AgentRuntimeUsed.V2_FAILED }],
       ['a reply that failed to send', { status: WaMessageStatus.FAILED }],
       ['a reply from another run', { runId: RUN.replace('01', '02') }],
     ])('stores nothing after %s', async (_label, reply) => {

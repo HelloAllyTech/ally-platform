@@ -35,7 +35,6 @@ const AGENT_ANSWER = {
 describe('crisis on the web channel', () => {
   const settings = {
     ...DEFAULT_WHATSAPP_SETTINGS,
-    agentRuntimeAllowed: true,
     retrieval: { ...DEFAULT_WHATSAPP_SETTINGS.retrieval },
   };
   const LIVE: AgentStreamEvent[] = [

@@ -2,7 +2,6 @@ import { Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
-import { KNOWLEDGE_ANSWER_LIMITS } from '../../ai/constants/knowledge-answer.constants';
 import type {
   AgentRetrievalMeta,
   AgentRunResponse,
@@ -45,37 +44,34 @@ import { buildAgentRunRequest, NO_DOCUMENTS } from './knowledge-request';
  */
 const MAX_KNOWLEDGE_TOPICS = 50;
 
-/**
- * The answer step's wall-clock budget, derived from the SQS visibility window. The fallback to v1
- * gets only what the failed v2 call left of it.
- */
-const ANSWER_BUDGET_MS = KNOWLEDGE_ANSWER_LIMITS.budgetMs;
-
-/** A reply from either engine: v1's response, or v2's without the run fields. */
+/** The agent's reply, without the run fields (v1's response shape, which v2 extends). */
 export type EngineAnswer = KnowledgeAnswerResponse &
   Pick<AgentRunResponse, 'turn_type' | 'handover'>;
 
-/** An answer from either engine, with the run behind it when v2 was involved. */
+/** The agent's answer, with the run behind it. */
 export interface Answered {
   response: EngineAnswer;
   latencyMs: number;
   agent?: AgentRunRef;
 }
 
-/** v2 failed and its v1 fallback failed too; carries the run so the reply still records it. */
-export class AgentFallbackFailedError extends Error {
+/**
+ * The run failed or ran out of time before an answer existed (Q3-fast Part 0). The person gets the
+ * fixed run-failed reply, never v1; this carries the run so the reply still records it.
+ */
+export class AgentRunFailedError extends Error {
   constructor(
     readonly cause: unknown,
     readonly agent: AgentRunRef,
   ) {
-    super(cause instanceof Error ? cause.message : 'v1 fallback failed');
-    this.name = 'AgentFallbackFailedError';
+    super(cause instanceof Error ? cause.message : 'the agent run failed');
+    this.name = 'AgentRunFailedError';
   }
 }
 
 /**
- * The v2 run failed after a gateway tool had already acted (chunk 3b), so v1 must not answer: the
- * message has been dealt with. `tool` is what acted: `hand_over` gets the hand-over message; a list
+ * The run failed after a gateway tool had already acted (chunk 3b): the message has been dealt
+ * with, so it gets what was done rather than the run-failed reply. `tool` is what acted: `hand_over` gets the hand-over message; a list
  * write (chunk 6) gets `done`, "Done: {record} in {list}."; anything else the bot's fallback wording.
  */
 export class AgentActedError extends Error {
@@ -118,9 +114,10 @@ const withoutDebugIds = (
 };
 
 /**
- * The Agents v2 engine, as the chatbot engine uses it: the answer through ally-ai's `/agent/run`,
- * with its fallback to v1. The chatbot engine keeps the order of steps and turns the answer into a
- * reply; everything about running v2 is here.
+ * The Agents v2 engine, as the chatbot engine uses it: the answer through ally-ai's `/agent/run`.
+ * Every channel answers this one way (Q3-fast Part 0: no runtime switch, no v1 fallback). The
+ * chatbot engine keeps the order of steps and turns the answer into a reply; everything about
+ * running v2 is here.
  */
 @Injectable()
 export class AgentRuntimeRunner {
@@ -140,12 +137,9 @@ export class AgentRuntimeRunner {
   ) {}
 
   /**
-   * The v2 engine: ally-ai's `/agent/run`, falling back to v1 when it fails before an answer
-   * exists (unreachable, timed out, switched off and 404ing, a 5xx, or a reply that is not an
-   * answer). Both calls happen before the decision is returned, so the channel still sends once.
-   *
-   * The fallback spends only what is left of the answer budget: a 25s v2 timeout followed by a
-   * full v1 budget would outlive the SQS visibility window and get the message redelivered.
+   * The v2 engine: ally-ai's `/agent/run`. When it fails before an answer exists (unreachable,
+   * timed out, switched off and 404ing, a 5xx, or a reply that is not an answer) it throws
+   * `AgentRunFailedError`, and the engine sends the fixed run-failed reply (Q3-fast Part 0).
    *
    * With `live`, on a channel that can stream, the same run goes through `/agent/run/stream`: its
    * events go to `live` as they happen, and its `final` is handled exactly like `/agent/run`'s
@@ -199,51 +193,29 @@ export class AgentRuntimeRunner {
         },
       };
     } catch (error) {
-      // The person left Preview: nobody is waiting for a v1 answer.
+      // The person left Preview: nobody is waiting for a reply.
       if (live?.signal?.aborted) throw error;
       const fallbackReason = agentFailureReason(error);
-      // v1 never answers a message whose run has already done something (chunk 3b).
-      const acted = withGateway ? await this.actedIn(runId) : null;
-      if (acted) {
-        this.logger.warn(
-          `Agent runtime failed for chatbot ${turn.chatbot.id} (${fallbackReason}) after ` +
-            `${acted.tool} acted; not answering with v1`,
-        );
-        throw new AgentActedError(
-          acted.tool,
-          {
-            runtime: AgentRuntimeUsed.V2_FALLBACK,
-            runId,
-            conversationId,
-            fallbackReason,
-          },
-          acted.done,
-        );
-      }
-      this.logger.warn(
-        `Agent runtime failed for chatbot ${turn.chatbot.id} (${fallbackReason}); ` +
-          `answering with v1`,
-      );
       const agent: AgentRunRef = {
-        runtime: AgentRuntimeUsed.V2_FALLBACK,
+        runtime: AgentRuntimeUsed.V2_FAILED,
         runId,
         conversationId,
         fallbackReason,
       };
-      const fallbackStartedAt = Date.now();
-      try {
-        const response = await this.aiService.answerKnowledgeQuestionWithin(
-          request,
-          ANSWER_BUDGET_MS - (Date.now() - startedAt),
+      // A run that has already done something says what it did (chunk 3b).
+      const acted = withGateway ? await this.actedIn(runId) : null;
+      if (acted) {
+        this.logger.warn(
+          `Agent runtime failed for chatbot ${turn.chatbot.id} (${fallbackReason}) after ` +
+            `${acted.tool} acted`,
         );
-        return {
-          response,
-          latencyMs: Date.now() - fallbackStartedAt,
-          agent,
-        };
-      } catch (v1Error) {
-        throw new AgentFallbackFailedError(v1Error, agent);
+        throw new AgentActedError(acted.tool, agent, acted.done);
       }
+      this.logger.warn(
+        `Agent runtime failed for chatbot ${turn.chatbot.id} (${fallbackReason}); ` +
+          `sending the run-failed reply`,
+      );
+      throw new AgentRunFailedError(error, agent);
     }
   }
 
@@ -357,7 +329,7 @@ export class AgentRuntimeRunner {
   /**
    * The gateway tool that acted in this run, if any: `hand_over` first, since it decides the
    * reply; then the last list write, with its "Done:" line. A find only read, so it doesn't count:
-   * v1 may still answer. A lookup failure is read as nothing acted, as before 3b.
+   * the run-failed reply still goes out. A lookup failure is read as nothing acted, as before 3b.
    */
   private async actedIn(
     runId: string,

@@ -86,7 +86,6 @@ describe('ChatbotEngineService streaming a reply', () => {
   beforeEach(() => {
     settings = {
       ...DEFAULT_WHATSAPP_SETTINGS,
-      agentRuntimeAllowed: true,
       retrieval: { ...DEFAULT_WHATSAPP_SETTINGS.retrieval },
     };
     aiService = {
@@ -157,7 +156,7 @@ describe('ChatbotEngineService streaming a reply', () => {
     expect(seen.filter((e) => e.event === 'token')).toHaveLength(2);
   });
 
-  it('falls back to v1 when the stream fails, marked as a fallback', async () => {
+  it('sends the run-failed reply when the stream fails, never v1', async () => {
     aiService.runAgentStreaming.mockImplementation(async (_body, onEvent) => {
       onEvent(LIVE[0]);
       throw new AiUpstreamError('late', ErrorCode.AI_SERVICE_TIMEOUT);
@@ -165,15 +164,17 @@ describe('ChatbotEngineService streaming a reply', () => {
 
     const decision = await engine.respond(turn(), live);
 
-    expect(aiService.answerKnowledgeQuestionWithin).toHaveBeenCalledTimes(1);
+    expect(aiService.answerKnowledgeQuestionWithin).not.toHaveBeenCalled();
     expect(decision.agent).toMatchObject({
-      runtime: AgentRuntimeUsed.V2_FALLBACK,
+      runtime: AgentRuntimeUsed.V2_FAILED,
       fallbackReason: 'timeout',
     });
-    expect(decision.body).toContain(ANSWER.answer);
+    expect(decision.body).toBe(
+      "Sorry, I couldn't answer that just now. Please try again.",
+    );
   });
 
-  it('does not fall back to v1 once the person has gone', async () => {
+  it('calls nothing else once the person has gone', async () => {
     const stop = new AbortController();
     aiService.runAgentStreaming.mockImplementation(async () => {
       stop.abort();
@@ -183,15 +184,6 @@ describe('ChatbotEngineService streaming a reply', () => {
     await engine.respond(turn(), { ...live, signal: stop.signal });
 
     expect(aiService.answerKnowledgeQuestionWithin).not.toHaveBeenCalled();
-  });
-
-  it('sends no events for v1, under the emergency switch', async () => {
-    settings.agentRuntimeAllowed = false;
-
-    await engine.respond(turn(), live);
-
-    expect(seen).toEqual([]);
-    expect(aiService.runAgentStreaming).not.toHaveBeenCalled();
   });
 
   it('never streams to a channel that cannot show it', async () => {

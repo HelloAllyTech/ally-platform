@@ -23,10 +23,7 @@ import {
 import { KnowledgeBaseService } from '../../knowledge-base/service/knowledge-base.service';
 import { LoggerService } from '../../logger/logger.service';
 import { WaHandledBy } from '../../whatsapp/enum/whatsapp.enum';
-import {
-  dashboardReadsShared,
-  type WhatsAppBotSettings,
-} from '../../whatsapp/type/whatsapp-settings.type';
+import { dashboardReadsShared } from '../../whatsapp/type/whatsapp-settings.type';
 import { ChatbotDocument } from '../entity/chatbot-document.entity';
 import { ChatbotMember } from '../entity/chatbot-member.entity';
 import { ChatbotAudience } from '../entity/chatbot-audience.entity';
@@ -39,7 +36,6 @@ import {
   ChatbotAnswerMode,
   ChatbotKnowledgeSource,
   ChatbotMemberRole,
-  ChatbotRuntime,
   ChatbotStatus,
 } from '../enum/chatbot.enum';
 import {
@@ -48,7 +44,7 @@ import {
   TestChatbotDto,
   UpdateChatbotDto,
 } from '../dto/chatbot.dto';
-import { effectiveRuntime, isFallback } from '../engine/agent-runtime';
+import { isFailedRun } from '../engine/agent-runtime';
 import { ChatbotEngineService } from '../engine/chatbot-engine.service';
 import {
   PREVIEW_CHANNEL,
@@ -85,8 +81,6 @@ export interface ChatbotSummary {
   knowledgeSource: ChatbotKnowledgeSource;
   persona: Chatbot['persona'];
   model: ChatbotModelChoice | null;
-  /** What actually answers: v1 whenever the platform's emergency switch is off. */
-  effectiveRuntime: ChatbotRuntime;
   myRole: ChatbotMemberRole;
   connectors: ConnectorView[];
   documentCount: number;
@@ -116,13 +110,15 @@ export interface ChatbotTestResult {
   wouldAlert: string | null;
   latencyMs: number;
   usedDraft: boolean;
-  /** The engine that answered: v1, v2, or v1 after v2 failed. */
-  runtime: ChatbotRuntime.V1 | AgentRuntimeUsed;
+  /**
+   * The run behind this reply: v2, or `v2_fallback` when the run failed and the fixed run-failed
+   * reply went out (Q3-fast: never v1). Null when no run was involved (a keyword reply).
+   */
+  runtime: AgentRuntimeUsed | null;
   runId: string | null;
   trace: AgentTraceStep[] | null;
   fallbackReason: AgentFailureReason | null;
   turnType: AgentTurnType | null;
-  runtimeAllowed: boolean;
   conversationId: string;
   /** The run booked or changed a list entry, checked and not saved (chunk 5b). */
   previewWrite?: boolean;
@@ -275,7 +271,6 @@ export class ChatbotService {
       audienceCounts,
       memberCounts,
       stats,
-      defaults,
       setups,
     ] = await Promise.all([
       this.access.rolesFor(ids),
@@ -285,7 +280,6 @@ export class ChatbotService {
       this.countBy(this.audienceRepository, ids),
       this.countBy(this.memberRepository, ids),
       this.stats(ids),
-      this.settingsService.get(),
       this.setupDrafts(ids),
     ]);
     return bots.map((bot) => ({
@@ -298,7 +292,6 @@ export class ChatbotService {
       knowledgeSource: bot.knowledgeSource,
       persona: bot.persona ?? {},
       model: bot.model ?? null,
-      effectiveRuntime: effectiveRuntime(defaults),
       myRole: roles.get(bot.id) ?? ChatbotMemberRole.VIEWER,
       connectors: connectors.get(bot.id) ?? [],
       documentCount: docCounts.get(bot.id) ?? 0,
@@ -961,7 +954,6 @@ export class ChatbotService {
 
     const result = this.toTestResult(decision, {
       reply,
-      settings,
       conversationId,
       latencyMs: Date.now() - startedAt,
       usedDraft: Boolean(dto.draft),
@@ -997,13 +989,11 @@ export class ChatbotService {
     decision: ChatbotDecision,
     {
       reply,
-      settings,
       conversationId,
       latencyMs,
       usedDraft,
     }: {
       reply: string;
-      settings: WhatsAppBotSettings;
       conversationId: string;
       latencyMs: number;
       usedDraft: boolean;
@@ -1020,19 +1010,18 @@ export class ChatbotService {
       // Shown rather than sent: the console must never page anyone.
       wouldAlert: decision.alert
         ? decision.alert.type
-        : isFallback(agent)
+        : isFailedRun(agent)
           ? AGENT_RUNTIME_DEGRADED_TYPE
           : null,
       latencyMs,
       usedDraft,
       // Agents v2: which engine answered this test, and the run behind it.
-      runtime: agent?.runtime ?? ChatbotRuntime.V1,
+      runtime: agent?.runtime ?? null,
       runId: agent?.runId ?? null,
       trace: agent?.runtime === AgentRuntimeUsed.V2 ? agent.trace : null,
-      fallbackReason: isFallback(agent) ? agent.fallbackReason : null,
+      fallbackReason: isFailedRun(agent) ? agent.fallbackReason : null,
       // What the agent understood the message to be (smalltalk, about_bot, …).
       turnType: decision.turnType ?? null,
-      runtimeAllowed: settings.agentRuntimeAllowed,
       conversationId,
     };
   }

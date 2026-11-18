@@ -59,25 +59,7 @@ describe('WhatsAppInboundService with the Agents v2 runtime', () => {
       }));
   });
 
-  describe('under the kill switch', () => {
-    beforeEach(async () => {
-      ({ service, aiService, savedMessages } = await buildInboundHarness({
-        chatbot: () => chatbot,
-        agentAnswer: AGENT_ANSWER,
-        settings: { agentRuntimeAllowed: false },
-      }));
-    });
-
-    it('stores no run on the reply and never calls /agent/run', async () => {
-      await service.handle(inbound());
-
-      expect(aiService.runAgent).not.toHaveBeenCalled();
-      expect(outbound()).not.toHaveProperty('agentRunId');
-      expect(outbound()).not.toHaveProperty('agentRuntime');
-    });
-  });
-
-  describe('with the switch on', () => {
+  describe('one run path (Q3-fast: no switch, no v1)', () => {
     it('answers through /agent/run and links the reply to its run', async () => {
       await service.handle(inbound());
 
@@ -98,32 +80,32 @@ describe('WhatsAppInboundService with the Agents v2 runtime', () => {
       expect(emitted('exception')).toHaveLength(0);
     });
 
-    it('falls back to v1 with exactly one reply, recorded as a fallback, and alerts', async () => {
+    it('sends the run-failed reply once, never v1, recorded as a failed run, and alerts', async () => {
       aiService.runAgent.mockRejectedValue(
         new AiUpstreamError('404', ErrorCode.AI_REQUEST_REJECTED, 404),
       );
 
       await service.handle(inbound());
 
-      expect(aiService.answerKnowledgeQuestionWithin).toHaveBeenCalledTimes(1);
+      expect(aiService.answerKnowledgeQuestionWithin).not.toHaveBeenCalled();
       expect(provider.sendText).toHaveBeenCalledTimes(1);
       expect(provider.sendText.mock.calls[0][1]).toContain(
-        'Ally trains counsellors.',
+        "Sorry, I couldn't answer that just now.",
       );
       expect(outbound()).toMatchObject({
         agentRunId: agentRunIdFor('wamid.1'),
-        agentRuntime: AgentRuntimeUsed.V2_FALLBACK,
+        agentRuntime: AgentRuntimeUsed.V2_FAILED,
       });
       const alerts = emitted('exception').map(([, alert]) => alert);
       expect(alerts).toEqual([
         expect.objectContaining({
           type: 'Chatbot Agent Runtime Degraded',
-          message: expect.stringContaining('1 message fell back'),
+          message: expect.stringContaining('1 message got it'),
         }),
       ]);
     });
 
-    it('raises the fallback alert once per window, not once per message', async () => {
+    it('raises the failed-run alert once per window, not once per message', async () => {
       aiService.runAgent.mockRejectedValue(
         new AiUpstreamError('404', ErrorCode.AI_REQUEST_REJECTED, 404),
       );

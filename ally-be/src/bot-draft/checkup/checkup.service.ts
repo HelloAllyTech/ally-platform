@@ -527,12 +527,12 @@ export class CheckupService {
             url: String(c.source_url ?? ''),
           })),
           verdict: grade?.verdict ?? 'error',
-          // v1 answered because v2 failed (usually the run's 20 s cap): kept on the result so
-          // the numbers can count it, never hidden in the reply time.
+          // The run failed (usually its 20 s cap) and the fixed run-failed reply went out: kept on
+          // the result so the numbers can count it, never hidden in the reply time.
           reasons: [
             ...(grade?.reasons ?? ['not_graded']),
-            ...(tested?.runtime === AgentRuntimeUsed.V2_FALLBACK
-              ? [`v1_fallback:${tested.fallbackReason ?? 'unknown'}`]
+            ...(tested?.runtime === AgentRuntimeUsed.V2_FAILED
+              ? [`run_failed:${tested.fallbackReason ?? 'unknown'}`]
               : []),
           ],
           hardFail: grade?.hard_fail ?? false,
