@@ -1,12 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import {
-  BugReportIcon,
-  LightbulbGuidedIcon,
-  QuickAddIcon,
-  RoadmapSettingsIcon,
-  TriangleIcon,
-} from "@icons";
+import { BugReportIcon, LightbulbGuidedIcon, RoadmapSettingsIcon, TriangleIcon } from "@icons";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -60,7 +54,6 @@ import { LeadQueueTab } from "./plans/LeadQueueTab";
 import { MyPlansTab } from "./plans/MyPlansTab";
 import { PlanDrawer } from "./plans/PlanDrawer";
 import { SignalsTab } from "./plans/SignalsTab";
-import { QuickAddOpportunityModal } from "./QuickAddOpportunityModal";
 import { RankExplainContext } from "./RankWhy";
 import { RejectReasonBar } from "./RejectReasonBar";
 import { ReportBugModal } from "./ReportBugModal";
@@ -78,7 +71,6 @@ import {
   canLeadRoadmapPlans,
   canManageRoadmap,
   canOpenRoadmapBuilder,
-  canQuickAddRoadmap,
 } from "./utils/access";
 import { seedForHandle } from "./utils/builder";
 import { EMPTY_ADVANCED_FILTERS, RoadmapAdvancedFilterValues } from "./utils/filters";
@@ -239,11 +231,6 @@ export const ProductRoadmap: React.FC = () => {
   const canManage = canManageRoadmap(permissions, features);
   /** Builder access, independent of canManage — see canOpenRoadmapBuilder. */
   const canOpenBuilder = canOpenRoadmapBuilder(permissions, features);
-  /**
-   * The header's second filing door — a plain form with no readiness check, for the named few
-   * who hold the Owner role — see canQuickAddRoadmap.
-   */
-  const canQuickAdd = canQuickAddRoadmap(permissions, features, restricted);
   /** The guided-interview door: VOTE plus the Idea role (canFileIdeas). */
   const canFile = canFileIdeas(permissions, features, restricted);
   /**
@@ -306,7 +293,6 @@ export const ProductRoadmap: React.FC = () => {
   /** Set when the interview was opened from a saved draft, so it opens seeded with those words. */
   const [interviewDraft, setInterviewDraft] = useState<RoadmapIdeaDraft | null>(null);
   /** The quick-add form — the other way, for holders of the quick-add toggle only. */
-  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [isReportBugOpen, setIsReportBugOpen] = useState(false);
   /**
    * The one admin surface: product goals, strategy & ranking and merge, as tabs in a drawer.
@@ -1041,7 +1027,6 @@ export const ProductRoadmap: React.FC = () => {
     !openBuilderSessionId &&
     !isSettingsOpen &&
     !isInterviewOpen &&
-    !isQuickAddOpen &&
     !isReportBugOpen &&
     !isShortcutSheetOpen &&
     !rejecting &&
@@ -1277,24 +1262,6 @@ export const ProductRoadmap: React.FC = () => {
                     paths with no weight to turn down, so beside a `wght 100` symbol they read
                     as a heavier family — which is exactly what this row looked like. */}
                   <LightbulbGuidedIcon size={20} />
-                </button>
-              </Tooltip>
-            )}
-
-            {/* The exception to "ONE new-opportunity door" above, and a narrow one: a plain form
-              that files with no readiness check, shown only to holders of the quick-add toggle
-              (the server refuses everyone else, so there is nothing for a hidden button to
-              leak). Right beside the bulb because it is the same act — add an opportunity — for
-              someone who does not need the help. See QuickAddOpportunityModal. */}
-            {canQuickAdd && (
-              <Tooltip label="Quick add (no readiness check)" align="bottom">
-                <button
-                  type="button"
-                  aria-label="Quick add an opportunity, skipping the readiness check"
-                  onClick={() => setIsQuickAddOpen(true)}
-                  className="text-typography-secondary hover:text-primary-500 inline-flex h-10 w-10 cursor-pointer items-center justify-center md:h-auto md:w-auto"
-                >
-                  <QuickAddIcon size={20} />
                 </button>
               </Tooltip>
             )}
@@ -1680,18 +1647,6 @@ export const ProductRoadmap: React.FC = () => {
             onOpenExisting={id => {
               setIsInterviewOpen(false);
               setInterviewDraft(null);
-              openOpportunity(id);
-            }}
-          />
-        )}
-
-        {/* Hands over exactly as the interview does: file, close, open the drawer on the row. */}
-        {isQuickAddOpen && canQuickAdd && (
-          <QuickAddOpportunityModal
-            goals={goals ?? []}
-            onClose={() => setIsQuickAddOpen(false)}
-            onCreated={id => {
-              setIsQuickAddOpen(false);
               openOpportunity(id);
             }}
           />

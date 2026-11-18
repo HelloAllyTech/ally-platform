@@ -237,6 +237,8 @@ export const useUser = () => {
     user,
     userStatus,
     filteredNavigationItems,
+    /** Roadmap v2 is on for this person (its role read succeeded). */
+    isRoadmapV2On,
     canReorder,
     reorderSidebar,
     getProfileUrl,
