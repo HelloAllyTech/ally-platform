@@ -75,6 +75,8 @@ export const botDraftsApi = baseAPI.injectEndpoints({
         organisationIds?: string[];
         /** Go live although an owner's own Must pass question failed (chunk 20d-2). */
         confirmMustPass?: boolean;
+        /** Publish below the checkup's quality gate, having seen the score (Q3-fast Part 3). */
+        publishAnyway?: boolean;
       }
     >({
       query: ({ id, ...body }) => ({

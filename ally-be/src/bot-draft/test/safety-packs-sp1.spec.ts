@@ -29,7 +29,8 @@ describe('Safety packs: clean declines (SP1)', () => {
     expect(text).toContain(
       'never list the services or tests the business offers',
     );
-    expect(SAFETY_PACKS[id].version).toBe(2);
+    // Medical 3: Q3-fast added the business's own published information.
+    expect(SAFETY_PACKS[id].version).toBe(id === SafetyPackId.MEDICAL ? 3 : 2);
   });
 
   it('adds the helpline and the booking offer only when the bot has them', () => {
@@ -119,6 +120,7 @@ describe('Safety packs: clean declines (SP1)', () => {
       packRulesBlock(null, [], { helpline: '1', hasCreateTool: true }),
     ).toBeNull();
     expect(SAFETY_PACKS[SafetyPackId.STANDARD].version).toBe(1);
-    expect(SAFETY_PACKS[SafetyPackId.LEGAL_FINANCIAL].version).toBe(1);
+    // 2: Q3-fast's no suitability interview and no implied guarantees.
+    expect(SAFETY_PACKS[SafetyPackId.LEGAL_FINANCIAL].version).toBe(2);
   });
 });

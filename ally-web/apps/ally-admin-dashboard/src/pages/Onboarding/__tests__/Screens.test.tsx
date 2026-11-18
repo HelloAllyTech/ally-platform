@@ -14,6 +14,7 @@ import {
   DesignScreen,
   LearnedScreen,
   LiveScreen,
+  ReadingScreen,
   SafetyScreen,
   ShareScreen,
 } from "../Screens";
@@ -133,6 +134,61 @@ describe("What we learned", () => {
       />,
     );
     expect(screen.queryByText(COPY.learned.confirm)).toBeNull();
+  });
+});
+
+describe("Reading your website, pages we couldn't read (Q3-fast Part 3)", () => {
+  const progress = {
+    domain: "sunrise.example",
+    read: 4,
+    findings: [],
+    done: { n: 4, seconds: 12 },
+    startedAt: null,
+  };
+
+  it("lists the pages that showed an error or a security check, once reading is done", () => {
+    render(
+      <ReadingScreen
+        view={view({
+          crawl: {
+            ...view().crawl,
+            notRead: [
+              { url: "https://sunrise.example/fees", title: "403 Forbidden" },
+              { url: "https://sunrise.example/team", title: null },
+            ],
+          },
+        })}
+        reading={progress}
+        onDone={vi.fn()}
+      />,
+    );
+    const list = screen.getByTestId("not-read");
+    expect(list.textContent).toContain(COPY.reading.notRead);
+    expect(list.textContent).toContain(COPY.reading.notReadHint);
+    expect(list.querySelectorAll("li")).toHaveLength(2);
+    expect(list.textContent).toContain("https://sunrise.example/team");
+  });
+
+  it("says it's reading the documents while an upload is read, never asks for it again (Q3-fast)", () => {
+    render(
+      <ReadingScreen
+        view={view({
+          step: "reading",
+          source: { website: null, description: null },
+          crawl: { ...view().crawl, status: "idle", pagesRead: 0 },
+        })}
+        reading={{ ...progress, done: null, read: 0 }}
+        onDone={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId("reading-documents").textContent).toBe(COPY.reading.documentsStatus);
+    expect(screen.queryByText(COPY.learned.nothing.upload)).toBeNull();
+    expect(screen.queryByText(/of up to 50 pages/)).toBeNull();
+  });
+
+  it("shows nothing when every page was read", () => {
+    render(<ReadingScreen view={view()} reading={progress} onDone={vi.fn()} />);
+    expect(screen.queryByTestId("not-read")).toBeNull();
   });
 });
 
@@ -390,6 +446,29 @@ describe("Share", () => {
     );
     expect(screen.getByRole("alert").textContent).toContain("Do you see couples?");
     fireEvent.click(screen.getByText(COPY.share.goLiveAnyway));
+    expect(onConfirm).toHaveBeenCalled();
+  });
+
+  it("below the checkup's quality gate, shows the score and offers Publish anyway (Q3-fast)", () => {
+    const onConfirm = vi.fn();
+    render(
+      <ShareScreen
+        view={view({ step: "share" })}
+        publicAllowed={false}
+        publishing={false}
+        onPublish={vi.fn()}
+        mustPass={{
+          message:
+            "8 of 14 questions need a fix: your assistant answered 38% of its questions well.",
+          questions: [],
+          belowGate: true,
+          onConfirm,
+        }}
+      />,
+    );
+    expect(screen.getByRole("alert").textContent).toContain("38%");
+    expect(screen.queryByText(COPY.share.goLiveAnyway)).toBeNull();
+    fireEvent.click(screen.getByText(COPY.share.publishAnyway));
     expect(onConfirm).toHaveBeenCalled();
   });
 

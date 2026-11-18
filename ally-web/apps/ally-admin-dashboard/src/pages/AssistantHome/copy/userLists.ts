@@ -283,6 +283,12 @@ export const USER_LISTS = {
     firstNote:
       "Your assistant will book only after the person confirms. Check new entries for the first few days.",
     gotIt: "Got it",
+    // Q3-fast Part 2b: the owner's own line for the list, under its playbook.
+    instructionLabel: "How should your assistant use this list?",
+    instructionHint:
+      'Optional. For example: "Always mention the size chart". It can\'t change your safety rules.',
+    instructionSave: "Save",
+    instructionSaved: "Saved",
   },
 
   setup: {
@@ -314,7 +320,7 @@ export const USER_LISTS = {
     example: "Example",
     addChoice: "Add",
     choicePlaceholder: "Add a {detail}",
-    needOne: "Keep at least one.",
+    needOne: "Add at least one of your own.",
     timesTitle: "Add the times people can book",
     timesBody: "Pick the days and hours. You can change or remove any of them later.",
     assistantTitle: "What can your assistant do with {list}?",

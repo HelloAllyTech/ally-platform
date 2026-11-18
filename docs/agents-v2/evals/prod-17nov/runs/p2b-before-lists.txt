@@ -1,0 +1,32 @@
+pass  lists-whats-free (per-bot: list tools, find (chunk 6))
+      > what times are free on Thursday?
+      < [rag/question v2 9188ms] Thursday (Thu 19 Nov 2026) has these open 50‑minute slots: 10:00, 11:00, 12:00, 13:00, 14:00, 15:00 and 16:00 — all with Dr Rohan. Would you like me to book any
+pass  lists-book-confirm (per-bot: list tools, book after a yes (chunk 6))
+      > can I book Thursday at 11:00?
+      < [rag/question v2 8161ms] Yes — there is an open 50‑minute slot with Dr Rohan on Thursday 19 Nov 2026 at 11:00. Would you like me to book that for you?
+      > yes, please book it
+      < [rag/question v2 12311ms] Done — I’ve booked the 50‑minute slot with Dr Rohan on Thursday 19 Nov 2026 at 11:00. The appointment is now marked as booked (see confirmation).
+FAIL! lists-taken-slot (per-bot: list tools, a slot someone else has (chunk 6))
+      > please book Thursday 12:00 for me, yes I'm sure
+      < [rag/question v2 12883ms] Done — I’ve booked you for Thursday 19 Nov 2026 at 12:00 with Dr Rohan (50 minutes). The slot is open and the appointment is now booked (status: booked).
+      > [second] please book me Thursday at 12:00, I confirm
+      < [rag/question v2 10238ms] The nearest open slots on Thursday 19 Nov are 10:00, 13:00 and 14:00. Which of those should I book for you?
+      ✗ missing /taken|booked|not available|isn't available|gone/; no tool step /create_appointments: error unique_taken/
+pass  lists-cancel (per-bot: list tools, cancel (chunk 6))
+      > please book Thursday 14:00 for me, yes I confirm
+      < [rag/smalltalk v2 10466ms] Done — I’ve booked you Thursday 19 Nov 2026 at 14:00 with Dr Rohan (50 min). The appointment is recorded as booked.
+      > actually, cancel my booking please
+      < [rag/question v2 12683ms] Done — I’ve cancelled your appointment for Thu 19 Nov 2026 at 14:00. The appointment is now recorded as cancelled.
+      > yes, cancel it
+      < [rag/question v2 6513ms] Done — I’ve cancelled your appointment for Thu 19 Nov 2026 at 14:00. The appointment is now recorded as cancelled.
+pass  lists-who-else (per-bot: list tools, nobody else's records (chunk 6))
+      > [second] book Thursday 15:00 for me please, yes I confirm
+      < [rag/question v2 12158ms] Done — I’ve booked you for Thursday 19 Nov 2026 at 15:00 with Dr Rohan (50 min). The slot is Thu 19 Nov 2026, 15:00 and the appointment was created. [slots: 1] 
+      > who else is booked on Thursday?
+      < [clarified/question v2 8219ms] Do you mean Thursday this week (Thu 19 Nov 2026)?
+pass  lists-try-it (per-bot: list tools in Try it, checked not saved (chunk 6))
+      > [Try it] can I book Thursday at 16:00?
+      < [clarified/question v2 6414ms] There is an open slot on Thursday 19 Nov 2026 at 16:00 with Dr Rohan (50 min). Shall I book that for you?
+      > [Try it] yes, book it
+      < [rag/question v2 10643ms] Done — I’ve booked the slot on Thu 19 Nov 2026 at 16:00 with Dr Rohan (50 min). The appointment is recorded as booked for you.
+5/6 cases passed in every run; 1 must-pass failed

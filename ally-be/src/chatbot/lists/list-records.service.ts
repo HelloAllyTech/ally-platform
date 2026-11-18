@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource, EntityManager, IsNull } from 'typeorm';
 import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
+import { Collection } from '../entity/collection.entity';
 import { CollectionConstraint } from '../entity/collection-constraint.entity';
 import { CollectionField } from '../entity/collection-field.entity';
 import {
@@ -529,6 +530,71 @@ export class ListRecordsService {
       page.map((r) => this.entity(r)),
     );
     return { records, total, next_cursor, ...(aggregate ? { aggregate } : {}) };
+  }
+
+  /**
+   * Which of these entries of `listKey` are no longer free (Q3-fast Part 0b, C19): another list of
+   * this bot books into it through a relation guarded by a one-per rule (`unique` on that relation
+   * alone) or a `capacity` rule, and its live bookings under the rule's `where` already fill it. The
+   * same counts the rules make on a create, so a find never offers what a booking would refuse.
+   */
+  async takenOf(
+    chatbotId: string,
+    listKey: string,
+    ids: string[],
+    manager: EntityManager = this.dataSource.manager,
+  ): Promise<Set<string>> {
+    const taken = new Set<string>();
+    if (!ids.length) return taken;
+    const collections = await manager.find(Collection, {
+      where: { chatbotId, deletedAt: IsNull() },
+    });
+    for (const collection of collections) {
+      const booking = await loadListById(manager, chatbotId, collection.id);
+      if (!booking) continue;
+      for (const rule of booking.rules) {
+        let key: string | undefined;
+        let capacity: CapacityConfig | undefined;
+        let where: WhereClause | undefined;
+        if (rule.kind === ListConstraintKind.UNIQUE) {
+          const config = rule.config as unknown as UniqueConfig;
+          if (config.fields.length !== 1) continue;
+          [key] = config.fields;
+          where = config.where;
+        } else if (rule.kind === ListConstraintKind.CAPACITY) {
+          capacity = rule.config as unknown as CapacityConfig;
+          key = capacity.field;
+          where = capacity.where;
+        } else {
+          continue;
+        }
+        const field = booking.field(key);
+        if (
+          !key ||
+          field?.type !== ListFieldType.RELATION ||
+          relationTarget(field) !== listKey
+        ) {
+          continue;
+        }
+        const sql = new Sql();
+        const rows: { target: string; n: number }[] = await manager.query(
+          `SELECT data->>${sql.p(key)} AS target, count(*)::int AS n
+             FROM collection_records
+            WHERE collection_id = ${sql.p(collection.id)} AND deleted_at IS NULL
+              AND data->>${sql.p(key)} = ANY(${sql.p(ids)}::text[])
+              AND ${whereSql(sql, where)}
+            GROUP BY 1`,
+          sql.params,
+        );
+        for (const row of rows) {
+          const max = capacity
+            ? await this.capacityOf(manager, chatbotId, capacity, row.target)
+            : 1;
+          if (row.n >= max) taken.add(row.target);
+        }
+      }
+    }
+    return taken;
   }
 
   // ---- the parts of a write -------------------------------------------------------------------

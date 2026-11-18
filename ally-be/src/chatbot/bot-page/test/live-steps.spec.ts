@@ -69,7 +69,7 @@ describe('the bot page live steps (chunk 6b)', () => {
       expect(confirmedWrite(decision(handledBy))).toBeNull();
     }
     expect(
-      doneSteps(decision(WaHandledBy.RAG, AgentRuntimeUsed.V2_FALLBACK)),
+      doneSteps(decision(WaHandledBy.RAG, AgentRuntimeUsed.V2_FAILED)),
     ).toEqual([]);
   });
 

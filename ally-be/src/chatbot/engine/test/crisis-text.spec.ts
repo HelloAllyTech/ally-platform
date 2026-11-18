@@ -12,8 +12,6 @@ import {
 
 const GENERAL =
   "It sounds like this may be urgent. This assistant can't help in a crisis. If you're in danger, call 112 now. If you're thinking of harming yourself, call Tele-MANAS on 14416 (free, 24×7).";
-const MEDICAL =
-  "If this is an emergency, call 112 or an ambulance (108) now. If you're thinking of harming yourself, call Tele-MANAS 14416.";
 const NUMBERS =
   "If you're in danger, call 112 now. If you're thinking of harming yourself, call Tele-MANAS on 14416 (free, 24×7).";
 
@@ -29,10 +27,12 @@ const turn = (safetyPack: string | null, own?: string, helplines = '') =>
 
 /** Chunk 6b, item 25 (as approved): every crisis reply carries a real number. */
 describe('the crisis reply', () => {
-  it("medical and pharmacy: both kinds of emergency, with the bot's helplines", () => {
-    expect(crisisTextFor(turn('medical'))).toBe(MEDICAL);
+  it("medical and pharmacy get the general at-risk text too, with the bot's helplines (Q3-fast)", () => {
+    // A medical emergency has its own reply now (emergencyReply), so the at-risk one is the same
+    // everywhere: Tele-MANAS first.
+    expect(crisisTextFor(turn('medical'))).toBe(GENERAL);
     expect(crisisTextFor(turn('pharmacy', undefined, '1800 111 222'))).toBe(
-      `${MEDICAL} You can also call: 1800 111 222.`,
+      `${GENERAL} You can also call: 1800 111 222.`,
     );
   });
 
@@ -73,7 +73,6 @@ describe('the crisis reply', () => {
 describe('no crisis reply on any path is sent without a phone number', () => {
   const settings = {
     ...DEFAULT_WHATSAPP_SETTINGS,
-    agentRuntimeAllowed: true,
     helplineNumbers: '',
     retrieval: { ...DEFAULT_WHATSAPP_SETTINGS.retrieval },
   };

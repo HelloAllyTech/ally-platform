@@ -179,6 +179,16 @@ export interface AgentRunRequest extends KnowledgeAnswerRequest {
   chatbot_id?: string;
   runtime_version: 'v2';
   /**
+   * Q3-fast Part 1: the crisis check found the person upset, not at risk. The agent's reply opens
+   * warmly (and, on health and mental-health assistants, gently names the support there is).
+   * Absent otherwise.
+   */
+  mood?: 'upset';
+  /** How to reach the business, from its sources (Q3-fast Part 2), for declines. */
+  business_contact?: string;
+  /** With `mood`: the business's helplines, for the support line on health assistants. */
+  support_helplines?: string;
+  /**
    * Titles of the bot's documents, so the agent can say what it covers. At most 50; ally-ai
    * cuts each title to 200 characters.
    */
@@ -391,9 +401,28 @@ export interface CrisisCheckResponse {
    */
   confidence: number;
   failed: boolean;
+  /**
+   * Q3-fast Part 1: which reply the message needs. `at_risk` and `emergency` get a fixed reply at
+   * once (`is_crisis` is true for both); `upset` is answered by the run, warmly; `none` normally.
+   * Absent from an older ally-ai: read it with `crisisLevelOf`.
+   */
+  level?: 'at_risk' | 'emergency' | 'upset' | 'none';
+  /** Suicide or self-harm is present too: an emergency reply adds the at-risk line. */
+  self_harm?: boolean;
   provider?: string;
   model?: string;
 }
+
+/** The verdict's level, or one read from `is_crisis` when ally-ai sent none (Q3-fast Part 1). */
+export const crisisLevelOf = (
+  verdict: Pick<CrisisCheckResponse, 'is_crisis' | 'level'> | null | undefined,
+): NonNullable<CrisisCheckResponse['level']> => {
+  if (!verdict) return 'none';
+  if (verdict.is_crisis) {
+    return verdict.level === 'emergency' ? 'emergency' : 'at_risk';
+  }
+  return verdict.level === 'upset' ? 'upset' : 'none';
+};
 
 /** What a streamed run is doing now (ally-ai `trace.STATUS_LABELS`). */
 type AgentStatusCode =

@@ -12,9 +12,9 @@ from app.core.agent_runtime.check.rejections import Rejection
 from app.core.agent_runtime.check.text import (
     SENTENCE_END,
     contact_details,
+    in_a_persons_words,
     looks_factual,
     mentions_sources,
-    normalise_detail,
     repeated_crisis_wording,
     unsupported_details,
     without_details,
@@ -57,7 +57,7 @@ def _keep_out_of_scope_declines_generic(verdict: Verdict, ctx: CheckContext) -> 
             verdict.answer, lambda sentence: not looks_factual(sentence)
         )
     if asks_for_contact(ctx.question) and not contact_details(verdict.answer):
-        contact = fallback_contact(ctx.decline_text)
+        contact = decline_contact(ctx)
         if contact:
             verdict.answer = f"{verdict.answer} {contact}".strip()
 
@@ -82,6 +82,8 @@ def _drop_unsourced_details(verdict: Verdict, ctx: CheckContext) -> None:
     sources = [*ctx.passages]
     if _looked(ctx) or asks_for_contact(ctx.question):
         sources.append({"text": ctx.decline_text})
+        # The business's contact from its sources (Q3-fast Part 2) is sourced too.
+        sources.append({"text": ctx.business_contact})
     unsourced = unsupported_details(verdict.answer, sources)
     if unsourced and verdict.rejection in (None, Rejection.UNSOURCED_DETAIL):
         logger.info("Reply carries %d unsourced contact detail(s)", len(unsourced))
@@ -104,6 +106,18 @@ def fallback_contact(decline_text: str) -> str:
     return text if text[-1] in ".!?।" else f"{text}."
 
 
+def decline_contact(ctx: CheckContext) -> str:
+    """How a decline points the person on (Q3-fast Part 2, 17 Nov S10/S11/C8c): the
+    owner's decline wording's own contact, word for word; else the business's
+    contact from its sources ("You can reach us on +91 22 6849 3328 or
+    connect@…"). Never one that is in neither."""
+    own = fallback_contact(ctx.decline_text)
+    if own:
+        return own
+    found = ctx.business_contact.strip()
+    return f"You can reach us on {found}." if found else ""
+
+
 def add_fallback_contact(verdict: Verdict, ctx: CheckContext) -> None:
     """A decline in the agent's own words always gives the owner's fallback contact
     (chunk 20a-2): taken word for word from the bot's decline wording, never
@@ -117,12 +131,12 @@ def add_fallback_contact(verdict: Verdict, ctx: CheckContext) -> None:
         # Out of scope (a poem, the weather): nothing was looked up, and the reply
         # stays generic, with no contact to call (chunk 6b).
         return
-    contact = fallback_contact(ctx.decline_text)
+    contact = decline_contact(ctx)
     if not contact:
         return
-    wanted = {normalise_detail(d) for d in contact_details(contact)}
-    present = {normalise_detail(d) for d in contact_details(verdict.answer)}
-    if wanted & present:
+    # Once only (Q3-fast, gaps item 7: "Please call 95949 04015." after a reply that
+    # had already given numbers): a reply that gives any phone or email is left as is.
+    if contact_details(verdict.answer):
         return
     verdict.answer = f"{verdict.answer.rstrip()} {contact}"
 
@@ -152,6 +166,32 @@ def _trim_booking_offers(verdict: Verdict, ctx: CheckContext) -> None:
     if offers_booking(verdict.answer):
         verdict.answer = (
             without_sentences(verdict.answer, lambda s: not offers_booking(s))
+            or verdict.answer
+        )
+
+
+# Offers of actions no assistant can take (Q3-fast Part 2, 17 Nov C3): there is no
+# cart, no delivery estimate and no shipping notification, and "explain our guarantee
+# policies" implied there are guarantees to explain (P5).
+_FALSE_OFFERS = re.compile(
+    r"\badd\s+(?:it|this|that|them|these|those|one|the\s+\w+)?\s*to\s+(?:your|the)\s+"
+    r"(?:cart|bag|basket)\b"
+    r"|\b(?:check|get|give\s+you|look\s+up|share)\s+(?:a|an|the|your)?\s*"
+    r"(?:delivery|shipping)\s+(?:estimate|date|time)\b"
+    r"|\b(?:send|give)\s+you\s+(?:shipping|delivery|order)\s+updates\b"
+    r"|\bshipping\s+updates\b"
+    r"|\bexplain\s+(?:our|the|its|their)?\s*guarantee\s+polic",
+    re.IGNORECASE,
+)
+
+
+def _trim_false_offers(verdict: Verdict, ctx: CheckContext) -> None:
+    """An offer no tool makes possible is trimmed, not sent back (Q3-fast Part 2):
+    "I can add it to your cart", "I can check a delivery estimate". If nothing would
+    be left, the reply stays."""
+    if _FALSE_OFFERS.search(verdict.answer):
+        verdict.answer = (
+            without_sentences(verdict.answer, lambda s: not _FALSE_OFFERS.search(s))
             or verdict.answer
         )
 
@@ -243,7 +283,7 @@ def _trim_pass_on_promises(verdict: Verdict, ctx: CheckContext) -> None:
     verdict.answer = without_sentences(verdict.answer, lambda s: not passes_on(s))
     if contact_details(verdict.answer):
         return
-    contact = fallback_contact(ctx.decline_text)
+    contact = decline_contact(ctx)
     if contact:
         verdict.answer = f"{verdict.answer} {contact}".strip()
     if verdict.rejection is None:
@@ -328,7 +368,13 @@ def _trim_repeated_topic_list(verdict: Verdict, ctx: CheckContext) -> None:
 
 
 def _cut_source_phrases(verdict: Verdict, ctx: CheckContext) -> None:
-    verdict.answer = without_source_phrases(verdict.answer) or verdict.answer
+    """Talk of sources, said in a person's words instead (Q3-fast Part 2, 17 Nov
+    C2): the usual openers rewritten, the phrases cut in place, and any sentence
+    still about sources dropped, so none of it reaches the person and no rewrite
+    is spent on it. Only a reply with nothing else left is sent back."""
+    text = without_source_phrases(in_a_persons_words(verdict.answer))
+    kept = without_sentences(text, lambda sentence: not mentions_sources(sentence))
+    verdict.answer = kept or text or verdict.answer
 
 
 def _flag_source_talk(verdict: Verdict, ctx: CheckContext) -> None:
@@ -351,6 +397,7 @@ WORDING_FIXES: Tuple[Callable[[Verdict, CheckContext], None], ...] = (
     _trim_repeated_crisis_wording,
     _trim_repeated_topic_list,
     _trim_booking_offers,
+    _trim_false_offers,
     _trim_pass_on_promises,
     _send_back_slot_offers,
     _ground_offered_times,

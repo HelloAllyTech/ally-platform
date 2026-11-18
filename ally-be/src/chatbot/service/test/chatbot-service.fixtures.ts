@@ -45,15 +45,13 @@ const countRepository = () => ({
 });
 
 /**
- * Build the service. Each option is read when it's needed, so a test can change the emergency
- * switch or the saved bot after building it. The caller is not a platform admin.
+ * Build the service. Each option is read when it's needed, so a test can change the saved bot
+ * after building it. The caller is not a platform admin.
  */
 export function buildChatbotService({
-  agentRuntimeAllowed = () => true,
   stored = storedBot,
   onUpdate = () => undefined,
 }: {
-  agentRuntimeAllowed?: () => boolean;
   stored?: () => Chatbot;
   onUpdate?: (patch: Partial<Chatbot>) => void;
 } = {}): { service: ChatbotService; respond: jest.Mock } {
@@ -76,10 +74,7 @@ export function buildChatbotService({
     } as never,
     { hasToggle: jest.fn(async () => true) } as never,
   );
-  const settings = () => ({
-    ...DEFAULT_WHATSAPP_SETTINGS,
-    agentRuntimeAllowed: agentRuntimeAllowed(),
-  });
+  const settings = () => ({ ...DEFAULT_WHATSAPP_SETTINGS });
   const respond = jest.fn().mockResolvedValue({
     handledBy: WaHandledBy.RAG,
     body: 'Ally trains counsellors.',

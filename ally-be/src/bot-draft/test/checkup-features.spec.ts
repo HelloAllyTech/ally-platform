@@ -1,4 +1,5 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
+import { checkupGate } from '../checkup/checkup-gate';
 import {
   answerCases,
   factSource,
@@ -365,6 +366,69 @@ describe('DraftCheckupService', () => {
     );
     // no question or reply text in the alert
     expect(JSON.stringify(events.emit.mock.calls[0][1])).not.toContain('s1');
+  });
+
+  describe('the quality gate (Q3-fast Part 3, B19)', () => {
+    const rows = (passed: number, failed: number, gaps = 0) => [
+      ...Array.from({ length: passed }, (_, i) => ({
+        caseId: `p${i}`,
+        reasons: [],
+        safety: false,
+        verdict: 'pass',
+      })),
+      ...Array.from({ length: failed }, (_, i) => ({
+        caseId: `f${i}`,
+        reasons: [],
+        safety: false,
+        verdict: 'fail',
+      })),
+      ...Array.from({ length: gaps }, (_, i) => ({
+        caseId: `g${i}`,
+        reasons: [],
+        safety: false,
+        verdict: 'needs_input',
+      })),
+      { caseId: 's', reasons: [], safety: true, verdict: 'pass' },
+    ];
+    const gated = (results: Record<string, unknown>[]) => ({
+      ...run(results),
+      gate: checkupGate(results as never),
+    });
+
+    it('below 70% of the other questions, asks first with the score', async () => {
+      // 38% with 10 to fix, as in the 17 Nov report (B18).
+      const latest = gated(rows(5, 4, 4));
+      await expect(
+        build(latest).service.assertCanPublish(draft),
+      ).rejects.toMatchObject({
+        response: {
+          errorCode: 'checkup_below_gate',
+          message: expect.stringContaining('8 of 14 questions need a fix'),
+          details: { gate: { otherPct: 38, ready: false } },
+        },
+      });
+    });
+
+    it('Publish anyway goes ahead; at 70% or more it never asks', async () => {
+      await expect(
+        build(gated(rows(5, 4, 4))).service.assertCanPublish(draft, true),
+      ).resolves.toBeUndefined();
+      await expect(
+        build(gated(rows(7, 3))).service.assertCanPublish(draft),
+      ).resolves.toBeUndefined();
+    });
+
+    it('Publish anyway never gets past a safety question that still fails', async () => {
+      const latest = gated([
+        { caseId: 's1', reasons: [], safety: true, verdict: 'fail' },
+      ]);
+      await expect(
+        build(latest, [{ verdict: 'fail' }]).service.assertCanPublish(
+          draft,
+          true,
+        ),
+      ).rejects.toMatchObject({ response: { errorCode: 'safety_recheck' } });
+    });
   });
 
   it('an answer to a gap goes into the Owner notes and makes it an answer question', async () => {

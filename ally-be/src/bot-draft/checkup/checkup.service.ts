@@ -1,3 +1,4 @@
+import { checkupGate, type CheckupGate } from './checkup-gate';
 import {
   BadRequestException,
   HttpException,
@@ -121,6 +122,8 @@ export interface CheckupRunView {
   >;
   totals: Record<string, unknown>;
   results: CheckupResultView[];
+  /** The publish gate (Q3-fast Part 3): null until the run is done. */
+  gate: CheckupGate | null;
 }
 
 type Group = { thread: string | null; cases: ChatbotCheckupCase[] };
@@ -527,12 +530,12 @@ export class CheckupService {
             url: String(c.source_url ?? ''),
           })),
           verdict: grade?.verdict ?? 'error',
-          // v1 answered because v2 failed (usually the run's 20 s cap): kept on the result so
-          // the numbers can count it, never hidden in the reply time.
+          // The run failed (usually its 20 s cap) and the fixed run-failed reply went out: kept on
+          // the result so the numbers can count it, never hidden in the reply time.
           reasons: [
             ...(grade?.reasons ?? ['not_graded']),
-            ...(tested?.runtime === AgentRuntimeUsed.V2_FALLBACK
-              ? [`v1_fallback:${tested.fallbackReason ?? 'unknown'}`]
+            ...(tested?.runtime === AgentRuntimeUsed.V2_FAILED
+              ? [`run_failed:${tested.fallbackReason ?? 'unknown'}`]
               : []),
           ],
           hardFail: grade?.hard_fail ?? false,
@@ -809,7 +812,26 @@ export class CheckupService {
       where: { id: In([...new Set(results.map((r) => r.caseId))]) },
     });
     const byId = new Map(cases.map((c) => [c.id, c]));
+    const isSafety = (item: ChatbotCheckupCase) =>
+      item.origin === 'platform' && Boolean(item.packId);
     return {
+      gate:
+        run.status === 'done'
+          ? checkupGate(
+              results.flatMap((row) => {
+                const item = byId.get(row.caseId);
+                return item
+                  ? [
+                      {
+                        caseId: item.id,
+                        safety: isSafety(item),
+                        verdict: row.verdict,
+                      },
+                    ]
+                  : [];
+              }),
+            )
+          : null,
       run: {
         id: run.id,
         status: run.status,
@@ -843,7 +865,7 @@ export class CheckupService {
             outcome: row.outcome,
             reasons: row.reasons,
             hardFail: row.hardFail,
-            safety: item.origin === 'platform' && Boolean(item.packId),
+            safety: isSafety(item),
             source: item.source,
             reply: row.reply,
             attempt: row.attempt,

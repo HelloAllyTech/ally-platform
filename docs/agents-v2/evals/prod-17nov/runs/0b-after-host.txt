@@ -1,0 +1,8 @@
+pass  appt-free-means-free (17 Nov C19 on Appointments: a booked slot is not offered as free (Q3-fast 0b))
+      > [first] Hi, I'm Neha. Can I book Friday 20 Nov at 12:00?
+      < [clarified/question v2 6907ms] I can book Friday 20 Nov at 12:00 with Dr Rohan (50 min). Would you like me to book that slot for you?
+      > [first] yes please book it
+      < [rag/smalltalk v2 11625ms] Done — I’ve booked Fri 20 Nov 2026 at 12:00 with Dr Rohan (50 min). The appointment is now marked as booked. (Slot details: Dr Rohan, Fri 20 Nov 2026, 12:00, 50
+      > [second] What times are free on Friday 20 Nov?
+      < [rag/question v2 6195ms] These slots are free on Friday 20 Nov: 10:00 (50 min), 11:00 (50 min), 13:00 (50 min), 14:00 (50 min), 15:00 (50 min), 16:00 (50 min). Which one would you like 
+1/1 cases passed in every run; 0 must-pass failed

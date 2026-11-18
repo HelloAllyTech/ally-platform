@@ -264,7 +264,8 @@ export const HowItWorksSection: React.FC<SectionProps> = ({ bot, home, canEdit, 
   }
   // What it can do with each list, under How it finds answers.
   const tools = (view.tools ?? []).filter(tool => tool.can.length);
-  if (tools.length) {
+  const playbooks = view.playbooks ?? [];
+  if (tools.length || playbooks.length) {
     controls.search = (
       <ul className="ally-small ally-how__tools" data-testid="how-tools">
         {tools.map(tool => (
@@ -273,6 +274,11 @@ export const HowItWorksSection: React.FC<SectionProps> = ({ bot, home, canEdit, 
               list: tool.list,
               can: joinAnd(tool.can.map(kind => t.tools[kind])),
             })}
+          </li>
+        ))}
+        {playbooks.map(playbook => (
+          <li key={`playbook-${playbook.list}`} data-testid="how-playbook">
+            {fill(t.playbooks[playbook.kind], { list: playbook.list })}
           </li>
         ))}
       </ul>

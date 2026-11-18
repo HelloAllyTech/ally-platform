@@ -110,6 +110,18 @@ export interface HomeSafety {
   version: string;
   /** What someone who may be at risk is sent when the owner hasn't written their own (20d-2). */
   atRiskReply?: string | null;
+  /** The packs the owner may switch to (Q3-fast), each marked less strict than the current or not. */
+  choices?: { id: string; name: string; summary: string; lessStrict: boolean }[];
+  /** The owner's last change of the pack (Q3-fast). */
+  packChange?: PackChange | null;
+}
+
+export interface PackChange {
+  from: string | null;
+  to: string;
+  reason: string | null;
+  lessStrict: boolean;
+  at: string;
 }
 
 export interface AssistantHomeView {
@@ -216,6 +228,8 @@ export interface HowItWorks {
   bookingLists?: string[];
   /** What it can do with each list, where the ability is Do it. */
   tools?: { list: string; can: ("find" | "create" | "update")[] }[];
+  /** Each list's playbook (Q3-fast Part 2b): what the list's tools add to how it behaves. */
+  playbooks?: { list: string; kind: "booking" | "details" | "orders" | "reference" }[];
 }
 
 export type HowLayer =

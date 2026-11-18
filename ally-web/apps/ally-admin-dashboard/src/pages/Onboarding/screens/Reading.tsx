@@ -49,6 +49,33 @@ export const ReadingScreen: React.FC<{
       : null);
   const domain = reading.domain ?? view.crawl.domain ?? "";
   useEnterToSubmit(onDone, Boolean(done));
+  // Uploads (Q3-fast): "Reading your documents…" until they're read; the step then moves on to
+  // what we learned, so the owner is never asked for the same file again.
+  if (!view.source.website) {
+    return (
+      <>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <Orb size={44} working />
+          <span className="ally-label">{COPY.reading.documentsTitle}</span>
+        </div>
+        <h1 className="ally-display" data-testid="reading-documents">
+          {COPY.reading.documentsStatus}
+        </h1>
+        <p className="ally-small" aria-live="polite">
+          {COPY.reading.documentsHint}
+        </p>
+        {reading.findings.length > 0 && (
+          <ul className="ally-findings" aria-live="polite">
+            {reading.findings.map((line, i) => (
+              <FindingLine key={line} index={i}>
+                {line}
+              </FindingLine>
+            ))}
+          </ul>
+        )}
+      </>
+    );
+  }
   return (
     <>
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
@@ -91,6 +118,19 @@ export const ReadingScreen: React.FC<{
             </FindingLine>
           ))}
         </ul>
+      )}
+      {done && Boolean(view.crawl.notRead?.length) && (
+        <section data-testid="not-read" aria-labelledby="not-read-title">
+          <p id="not-read-title" className="ally-label">
+            {COPY.reading.notRead}
+          </p>
+          <p className="ally-small">{COPY.reading.notReadHint}</p>
+          <ul className="ally-small">
+            {view.crawl.notRead!.map(page => (
+              <li key={page.url}>{page.title ? `${page.title} (${page.url})` : page.url}</li>
+            ))}
+          </ul>
+        </section>
       )}
       {done && (
         <PrimaryButton enterHint={COPY.frame.enterHint} onClick={onDone}>

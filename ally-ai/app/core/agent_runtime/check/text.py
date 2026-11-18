@@ -170,9 +170,61 @@ def without_repeated_crisis_wording(text: str, turn_type: str) -> str:
 _MENTIONS_SOURCES = re.compile(
     r"reference material|knowledge ?base|\bpassages?\b"
     r"|\b(?:my|the|our|these|those|provided|given|diye gaye)"
-    r"\s+(?:documents|docs|sources)\b",
+    r"\s+(?:documents|docs|sources)\b"
+    # Q3-fast Part 2 (17 Nov C2): the forms that reached customers.
+    r"|\bprovided\s+(?:[\w-]+\s+){0,2}"
+    r"(?:materials?|information|info|content|text|details|pages?)\b"
+    r"|\b(?:in|from)\s+(?:the\s+)?(?:information|info|materials?|content)"
+    r"\s+(?:i|we)\s+(?:can\s+(?:see|access)|have(?:\s+access\s+to)?|was\s+given)\b"
+    r"|\bin\s+(?:my|our|the)\s+"
+    r"(?:materials|records|system|help\s+(?:pages|docs|documents))\b"
+    r"|\bif\s+i\s+(?:don['’]?t|do\s+not)\s+know\s+the\s+answer\b",
     re.IGNORECASE,
 )
+
+# Q3-fast Part 2: the internal voice's usual opener, rewritten into a person's words
+# rather than sent back. "The provided passages do not say whether X" → "I don't know
+# whether X"; "The provided Scripbox materials don't describe X" → "I don't have
+# information on X".
+_SOURCES_NOUN = (
+    r"(?:the\s+)?provided\s+(?:[\w-]+\s+){0,2}"
+    r"(?:materials?|passages?|information|info|documents?|docs|sources?|content|pages?)"
+)
+_NOT = r"(?:do(?:es)?\s+not|do(?:es)?n['’]?t)"
+_SOURCE_OPENERS = (
+    (
+        re.compile(
+            rf"\b{_SOURCES_NOUN}\s+{_NOT}\s+(?:say|state|specify|confirm|tell\s+me)"
+            r"(?=\s+(?:whether|if|what|how|when|where|which|who|why)\b)",
+            re.IGNORECASE,
+        ),
+        "I don't know",
+    ),
+    (
+        re.compile(
+            rf"\b{_SOURCES_NOUN}\s+{_NOT}\s+(?:describe|cover|include|mention|list"
+            r"|have|contain|give|say\s+anything\s+about)\b",
+            re.IGNORECASE,
+        ),
+        "I don't have information on",
+    ),
+    (
+        re.compile(
+            r"\bif\s+i\s+(?:don['’]?t|do\s+not)\s+know\s+the\s+answer,?\s*", re.I
+        ),
+        "",
+    ),
+)
+
+
+def in_a_persons_words(text: str) -> str:
+    """The internal voice's openers rewritten (Q3-fast Part 2), each sentence then
+    starting with a capital."""
+    for pattern, words in _SOURCE_OPENERS:
+        text = pattern.sub(words, text or "")
+    return re.sub(
+        r"(^|[.!?।]\s+)([a-z])", lambda m: m.group(1) + m.group(2).upper(), text
+    ).strip()
 
 
 def mentions_sources(text: str) -> bool:
@@ -184,7 +236,11 @@ def mentions_sources(text: str) -> bool:
 # whole model call.
 _SOURCE_PHRASE = re.compile(
     r"\s*,?\s*\b(?:in|from|within)\s+(?:my|the|our)\s+"
-    r"(?:reference\s+materials?|references|documents|docs|knowledge\s*base|sources)\b"
+    r"(?:reference\s+materials?|references|documents|docs|knowledge\s*base|sources"
+    r"|materials|records|system|help\s+(?:pages|docs|documents))\b"
+    # Q3-fast Part 2: "…to Pune in the information I can see" → "…to Pune".
+    r"|\s*,?\s*\b(?:in|from)\s+(?:the\s+)?(?:information|info|materials?|content)"
+    r"\s+(?:i|we)\s+(?:can\s+(?:see|access)|have(?:\s+access\s+to)?)\b"
     r"|\s*\b(?:meri|mere|hamari|hamare)\s+(?:reference\s+materials?|documents)\s+"
     r"(?:mein|me)\b",
     re.IGNORECASE,

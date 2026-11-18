@@ -1,10 +1,11 @@
 import React, { useId, useState } from "react";
 
-import { useChangeOwnRuleMutation } from "@api";
+import { RadioButton, RadioButtonGroup } from "@ally-ui-mono/ui-shared";
+import { useChangeOwnRuleMutation, useChangeSafetyPackMutation } from "@api";
 import { Button } from "@components/button";
 import { ButtonVariant } from "@components/types";
 import { SafetyCard } from "@components/v2";
-import type { RuleChange, SafetyRule } from "@types";
+import type { HomeSafety, RuleChange, SafetyRule } from "@types";
 
 import { COPY, fill } from "../../Onboarding/copy";
 import { HOME } from "../copy";
@@ -94,12 +95,131 @@ const OwnRule: React.FC<{
   );
 };
 
+const MIN_REASON = 10;
+
+/** "Safety rules changed by you on 18 Nov 2026", with the reason when it was less strict. */
+export const packChangeLine = (change: HomeSafety["packChange"]): string | null => {
+  if (!change) return null;
+  const date = new Date(change.at).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+  return change.lessStrict && change.reason
+    ? fill(t.changedWhy, { date, reason: change.reason })
+    : fill(t.changed, { date });
+};
+
+/**
+ * "This isn't right for my business" (Q3-fast, C10): an owner switches to the pack that fits. An
+ * equally strict or stricter pack changes at once; a less strict one asks why first, and the reason
+ * is kept with the change. The setup chat still can't weaken a pack: only this owner action can.
+ */
+export const PackChooser: React.FC<{ botId: string; safety: HomeSafety }> = ({ botId, safety }) => {
+  const [open, setOpen] = useState(false);
+  const [choice, setChoice] = useState<string | null>(null);
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [changePack, state] = useChangeSafetyPackMutation();
+  const groupId = useId();
+  const reasonId = useId();
+  const options = (safety.choices ?? []).filter(option => option.id !== safety.pack?.id);
+  const picked = options.find(option => option.id === choice);
+  const needsReason = Boolean(picked?.lessStrict);
+  const tooShort = needsReason && reason.trim().length < MIN_REASON;
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        className="ally-link"
+        data-testid="pack-not-right"
+        onClick={() => setOpen(true)}
+      >
+        {t.notRight}
+      </button>
+    );
+  }
+  return (
+    <form
+      className="ally-home__pack-chooser"
+      data-testid="pack-chooser"
+      onSubmit={async event => {
+        event.preventDefault();
+        if (!picked || tooShort) return;
+        setError(null);
+        try {
+          await changePack({
+            id: botId,
+            pack: picked.id,
+            ...(needsReason ? { reason: reason.trim() } : {}),
+          }).unwrap();
+          setOpen(false);
+          setChoice(null);
+          setReason("");
+        } catch (failure) {
+          setError(message(failure) ?? HOME.saving.failed);
+        }
+      }}
+    >
+      <RadioButtonGroup
+        name="safety-pack"
+        legendText={t.choose}
+        orientation="vertical"
+        valueSelected={choice ?? undefined}
+        onChange={value => setChoice(String(value))}
+      >
+        {options.map(option => (
+          <RadioButton
+            key={option.id}
+            id={`${groupId}-${option.id}`}
+            value={option.id}
+            labelText={`${option.name}${option.lessStrict ? ` · ${t.lessStrict}` : ""} — ${option.summary}`}
+          />
+        ))}
+      </RadioButtonGroup>
+      {needsReason && (
+        <div>
+          <label htmlFor={reasonId}>{t.reasonLabel}</label>
+          <p className="ally-small">{t.reasonHint}</p>
+          <textarea
+            id={reasonId}
+            className="ally-input"
+            value={reason}
+            maxLength={300}
+            rows={3}
+            onChange={event => setReason(event.target.value)}
+          />
+          {reason.length > 0 && tooShort && <p className="ally-small">{t.reasonShort}</p>}
+        </div>
+      )}
+      {error && (
+        <p className="ally-error" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="ally-home__rule-actions">
+        <Button
+          variant={ButtonVariant.PRIMARY}
+          type="submit"
+          disabled={!picked || tooShort || state.isLoading}
+        >
+          {t.change}
+        </Button>
+        <Button variant={ButtonVariant.TERTIARY} type="button" onClick={() => setOpen(false)}>
+          {t.cancel}
+        </Button>
+      </div>
+    </form>
+  );
+};
+
 /**
  * Rules the assistant always follows (chunk 20d): the safety pack (fixed), the owner's own rules on
  * top, the disclaimer before every chat, and what it says when someone may be at risk. A pack rule
  * has no Edit or Remove; the server refuses both anyway.
  */
-export const SafetySection: React.FC<SectionProps> = ({ bot, home, canEdit }) => {
+export const SafetySection: React.FC<SectionProps> = ({ bot, home, canEdit, canManage }) => {
   const [change, state] = useChangeOwnRuleMutation();
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -152,6 +272,14 @@ export const SafetySection: React.FC<SectionProps> = ({ bot, home, canEdit }) =>
           atRisk={pack.atRisk}
           toggleLabel={COPY.safety.link}
         />
+      )}
+      {packChangeLine(home.safety.packChange) && (
+        <p className="ally-small" data-testid="pack-changed">
+          {packChangeLine(home.safety.packChange)}
+        </p>
+      )}
+      {canManage && (home.safety.choices?.length ?? 0) > 0 && (
+        <PackChooser botId={bot.id} safety={home.safety} />
       )}
 
       <Group title={t.ownRules} hint={t.ownRulesHint} testId="safety-own-rules">

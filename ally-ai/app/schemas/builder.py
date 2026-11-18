@@ -296,6 +296,9 @@ class BuilderStepResponse(BaseModel):
     designs: Optional[List[DesignCard]] = None
     # Patches the builder proposed and this service dropped (outside its paths).
     dropped_patches: int = 0
+    # A stricter safety pack the owner asked for (Q3-fast stop 1). ally-be applies it
+    # only when it is stricter than the one on; a weaker one is never applied.
+    stricter_pack: Optional[str] = None
 
 
 class ExtractRequest(BaseModel):

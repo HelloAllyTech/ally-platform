@@ -31,6 +31,34 @@ const ANSWER_KINDS = ['rag', 'declined', 'clarified'];
 const LIST_LIMIT = 20;
 
 /**
+ * Whether an unanswered question `q` was a step of a list action (Q3d; prod 18 Nov): the assistant
+ * used a list tool (find, create or change) in this turn, or in the turn before when this message
+ * answers the assistant's question ("Shall I book it?" → "Yes go ahead."). Hand-overs don't count.
+ */
+const BOOKING_STEP = `EXISTS (
+  SELECT 1
+    FROM chatbot_messages m
+    LEFT JOIN LATERAL (
+      SELECT a.text FROM chatbot_messages a
+       WHERE a.conversation_id = m.conversation_id AND a.direction = 'outbound'
+         AND a."createdAt" < m."createdAt"
+       ORDER BY a."createdAt" DESC LIMIT 1) asked ON true
+    JOIN tool_runs t ON t.chatbot_id = c.chatbot_id
+                    AND t.conversation_id = q.conversation_id::text
+   WHERE m.id = q.message_id
+     AND t.tool ~ '^(find|create|update)_'
+     AND t."createdAt" >= CASE WHEN rtrim(asked.text) LIKE '%?' THEN COALESCE((
+           SELECT p."createdAt" FROM chatbot_messages p
+            WHERE p.conversation_id = m.conversation_id AND p.direction = 'inbound'
+              AND p."createdAt" < m."createdAt"
+            ORDER BY p."createdAt" DESC LIMIT 1), '-infinity') ELSE m."createdAt" END
+     AND t."createdAt" < COALESCE((
+           SELECT n."createdAt" FROM chatbot_messages n
+            WHERE n.conversation_id = m.conversation_id AND n.direction = 'inbound'
+              AND n."createdAt" > m."createdAt"
+            ORDER BY n."createdAt" ASC LIMIT 1), 'infinity'))`;
+
+/**
  * Every live number, per assistant per India day (chunk Q2a), in one query: the job writes it to
  * `chatbot_daily_stats` and the Overview runs it for today. A count's meaning is defined here and
  * nowhere else (`CHUNK-Q2A-NOTES.md` §2 lists them in plain words).
@@ -114,6 +142,9 @@ function checkupCard(latest: CheckupRunView | null) {
     passed: accuracy.passed,
     total: accuracy.total,
     at: latest.run.finishedAt,
+    // Q3-fast Part 3: "X need a fix" while below the publish gate, live assistants included.
+    ready: latest.gate?.ready ?? null,
+    needFix: latest.gate?.needFix ?? null,
   };
 }
 
@@ -280,8 +311,9 @@ export class ScorecardService implements OnModuleInit {
     const days = await this.days(chatbotId, from, addDays(today, 1), now);
     const between = (a: string, b: string) =>
       days.filter((d) => d.day >= a && d.day < b);
-    const [unanswered, unhappy, latest] = await Promise.all([
+    const [unanswered, bookingProblems, unhappy, latest] = await Promise.all([
       this.openUnanswered(chatbotId),
+      this.openUnanswered(chatbotId, true),
       this.openThumbsDown(chatbotId),
       this.checkup.latestFor(chatbotId).catch(() => null),
     ]);
@@ -295,19 +327,27 @@ export class ScorecardService implements OnModuleInit {
           : null,
       })),
       unanswered,
+      bookingProblems,
       thumbsDown: unhappy,
       checkup: checkupCard(latest),
     };
   }
 
-  private async openUnanswered(chatbotId: string) {
+  /**
+   * Open questions it didn't know, newest first. `booking`: the ones that were a step of a booking
+   * or another list action ("Yes go ahead.", "11 works for me", "Please book…"), shown apart as
+   * "Couldn't complete a booking" for the last 7 days, since there's nothing to Answer (Q3d).
+   */
+  private async openUnanswered(chatbotId: string, booking = false) {
     return (await this.dataSource.query(
       `SELECT q.id, q.question_text AS question, q."createdAt" AS at
          FROM wa_unanswered_questions q
          JOIN chatbot_conversations c ON c.id = q.conversation_id
         WHERE c.chatbot_id = $1 AND q.status = $2
+          AND ${BOOKING_STEP} = $4
+          AND ($4 = false OR q."createdAt" >= now() - interval '7 days')
         ORDER BY q."createdAt" DESC LIMIT $3`,
-      [chatbotId, WaUnansweredStatus.OPEN, LIST_LIMIT],
+      [chatbotId, WaUnansweredStatus.OPEN, LIST_LIMIT, booking],
     )) as { id: string; question: string; at: Date }[];
   }
 

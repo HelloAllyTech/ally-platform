@@ -86,6 +86,8 @@ export interface BuilderStepResponse {
   gaps: BuilderGap[] | null;
   designs: BuilderDesignCard[] | null;
   dropped_patches: number;
+  /** A stricter pack the owner asked for in setup (Q3-fast stop 1); applied only if stricter. */
+  stricter_pack?: string | null;
 }
 
 export type BuilderStreamEvent =

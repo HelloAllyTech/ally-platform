@@ -102,17 +102,4 @@ describe('WhatsAppInboundService: the first message to an agent bot', () => {
     await service.handle(inbound());
     expect(sent()).toBe(ABOUT_BOT.answer);
   });
-
-  it('gives no notice on a first answer under the kill switch, as v1 always did', async () => {
-    ({ service, provider, aiService, savedMessages } =
-      await buildInboundHarness({
-        chatbot: () => chatbot,
-        agentAnswer: ABOUT_BOT,
-        contactMessageCount: () => messageCount,
-        settings: { disclaimerText: NOTICE, agentRuntimeAllowed: false },
-      }));
-    await service.handle(inbound());
-    expect(aiService.runAgent).not.toHaveBeenCalled();
-    expect(sent()).not.toContain(NOTICE);
-  });
 });

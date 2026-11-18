@@ -145,6 +145,72 @@ describePg('Lists, the owner’s section (Postgres)', () => {
       expect(reason.required).toBe(false);
     });
 
+    it('Appointments installs with examples that fit the business (Q3d; prod 18 Nov)', async () => {
+      const draft = async (industry: string, name: string, about = '') => {
+        await ds.query(`DELETE FROM bot_drafts WHERE chatbot_id = $1`, [bot]);
+        await ds.query(
+          `INSERT INTO bot_drafts (owner_user_id, industry, draft_config, learned, chatbot_id)
+           VALUES (1, $1, $2, $3, $4)`,
+          [
+            industry,
+            JSON.stringify({ name }),
+            JSON.stringify({
+              facts: about ? [{ section: 'about', text: about }] : [],
+              dropped: 0,
+            }),
+            bot,
+          ],
+        );
+      };
+      const services = async () => {
+        const { lists } = await owner.install(await chatbot(), 'appointments');
+        const list = lists.find((l) => l.key === 'appointments')!;
+        await ds.query(`DELETE FROM collections WHERE chatbot_id = $1`, [bot]);
+        return list.fields.find((f) => f.key === 'service')!.options.values;
+      };
+
+      await draft('gp_clinic', 'Centre for Sight', 'An eye hospital in Delhi.');
+      expect(await owner.businessKindOf(await chatbot())).toBe('eye');
+      expect(await services()).toEqual([
+        'Eye check-up',
+        'LASIK consultation',
+        'Cataract consultation',
+      ]);
+      const { groups } = owner.catalogue('eye');
+      expect(groups[0].items[0].needs_options[0].examples).toEqual([
+        'Eye check-up',
+        'LASIK consultation',
+        'Cataract consultation',
+      ]);
+
+      await draft('wellness', 'Looks Salon');
+      expect(await services()).toEqual(['Haircut', 'Hair colour', 'Facial']);
+
+      await draft('other', 'BHIVE Workspace');
+      expect(await services()).toEqual([
+        'Space tour',
+        'Meeting room',
+        'Day pass',
+      ]);
+
+      await ds.query(`DELETE FROM bot_drafts WHERE chatbot_id = $1`, [bot]);
+      expect(await services()).toEqual([
+        'Consultation',
+        'Follow-up',
+        'Something else',
+      ]);
+
+      // The owner's own choices still win.
+      const { lists } = await owner.install(await chatbot(), 'appointments', {
+        appointments: { service: ['Root canal'] },
+      });
+      expect(
+        lists
+          .find((l) => l.key === 'appointments')!
+          .fields.find((f) => f.key === 'service')!.options.values,
+      ).toEqual(['Root canal']);
+    });
+
     it('lists the catalogue grouped, with the options to fill in', () => {
       const { groups } = owner.catalogue();
       expect(groups.flatMap((g) => g.items)).toHaveLength(14);
@@ -157,11 +223,8 @@ describePg('Lists, the owner’s section (Postgres)', () => {
             list: 'appointments',
             field: 'service',
             label: 'Service',
-            examples: [
-              'Individual therapy',
-              'Couples therapy',
-              'Family therapy',
-            ],
+            // Neutral in the catalogue, never therapy services (Q3-fast).
+            examples: ['Consultation', 'Follow-up', 'Something else'],
           },
         ],
       });
@@ -203,6 +266,29 @@ describePg('Lists, the owner’s section (Postgres)', () => {
       expect(off.agent_read).toBe(false);
       expect(off.agent_write).toBe(false);
       expect((await abilities()).hand_over).toBe('never');
+    });
+
+    it('stores the owner’s line for the list, trimmed to 300 characters; blank removes it (Q3-fast 2b)', async () => {
+      const line = async () =>
+        (
+          await ds.query(
+            `SELECT settings->>'instruction' AS line FROM collections WHERE chatbot_id = $1 AND key = 'appointments'`,
+            [bot],
+          )
+        )[0].line;
+      await owner.setAbilities(
+        bot,
+        'appointments',
+        {},
+        `  Ask for the pet's name. ${'x'.repeat(400)}`,
+      );
+      expect(await line()).toHaveLength(300);
+      expect((await line()).startsWith("Ask for the pet's name.")).toBe(true);
+      // Leaving it out keeps it; an empty line removes it.
+      await owner.setAbilities(bot, 'appointments', { create: 'do_it' });
+      expect(await line()).toHaveLength(300);
+      await owner.setAbilities(bot, 'appointments', {}, '   ');
+      expect(await line()).toBeNull();
     });
 
     it('refuses Add on a list with nothing the assistant may fill in', async () => {
@@ -427,6 +513,48 @@ describePg('Lists, the owner’s section (Postgres)', () => {
         NOW,
       );
       expect(done).toMatchObject({ count: 104, skipped: 1, dry_run: false });
+    });
+
+    it('a booked table is no longer free, and the reservation names its table (Q3-fast 0b)', async () => {
+      await owner.install(await chatbot(), 'table_reservations');
+      const at = '2026-11-21T14:30:00Z';
+      const t1 = await records.create(bot, 'tables', OWNER, {
+        starts_at: at,
+        table: 'Table 1',
+        open: true,
+      });
+      const t2 = await records.create(bot, 'tables', OWNER, {
+        starts_at: at,
+        table: 'Table 2',
+        open: true,
+      });
+      const [{ id: guest }] = await ds.query(
+        `INSERT INTO chatbot_contacts (chatbot_id, display_name) VALUES ($1, 'Priya') RETURNING id`,
+        [bot],
+      );
+      const { record } = await records.create(bot, 'reservations', OWNER, {
+        table_slot: t1.record.id,
+        guest,
+        party_size: 4,
+        status: 'booked',
+      });
+      // The test bot has no time zone, so its times read in UTC.
+      expect(record.title).toBe('Sat 21 Nov 2026, 14:30 · Table 1');
+
+      const ids = [t1.record.id, t2.record.id];
+      expect([...(await records.takenOf(bot, 'tables', ids))]).toEqual([
+        t1.record.id,
+      ]);
+      // Cancelled, it is free again: the rule's own `where`.
+      await records.update(
+        bot,
+        'reservations',
+        OWNER,
+        record.id,
+        { status: 'cancelled' },
+        record.version,
+      );
+      expect((await records.takenOf(bot, 'tables', ids)).size).toBe(0);
     });
 
     it("refuses each on a detail that isn't text or a choice, or with no values", async () => {

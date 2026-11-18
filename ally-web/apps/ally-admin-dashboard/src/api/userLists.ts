@@ -174,7 +174,15 @@ export const userListsApi = baseAPI.injectEndpoints({
     /** Look up, Add and Change: the assistant's list tools, owner-editable (chunk 5b). */
     setListAbilities: builder.mutation<
       UserList,
-      { id: string; key: string; find?: ListAbility; create?: ListAbility; update?: ListAbility }
+      {
+        id: string;
+        key: string;
+        find?: ListAbility;
+        create?: ListAbility;
+        update?: ListAbility;
+        /** Q3-fast Part 2b: the owner's own line; "" clears it. */
+        instruction?: string;
+      }
     >({
       query: ({ id, key, ...body }) => ({
         url: ApiEndpoints.CHATBOTS.LIST_ABILITIES(id, key),

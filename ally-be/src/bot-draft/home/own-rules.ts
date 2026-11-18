@@ -1,5 +1,6 @@
+import type { PackChange } from '../../chatbot/entity/chatbot.entity';
 import { SafetyLockedError } from '../safety-pack/safety-lock';
-import { packFor } from '../safety-pack/safety-packs';
+import { packFor, SAFETY_PACKS } from '../safety-pack/safety-packs';
 import { HomeFieldInvalid, versionOf } from './home-fields';
 
 /**
@@ -30,6 +31,13 @@ export interface SafetyView {
   rules: SafetyRule[];
   /** The version of the owner's own rules a change must be based on. */
   version: string;
+  /**
+   * The packs the owner may choose from (Q3-fast Part 1, "This isn't right for my business"),
+   * each marked less strict than the current one or not.
+   */
+  choices: { id: string; name: string; summary: string; lessStrict: boolean }[];
+  /** The owner's last change of the pack, if any. */
+  packChange: PackChange | null;
 }
 
 export type RuleChange =
@@ -40,9 +48,20 @@ export type RuleChange =
 export function safetyView(
   packId: string | null | undefined,
   own: string[],
+  packChange: PackChange | null = null,
 ): SafetyView {
   const pack = packFor(packId);
   return {
+    choices: Object.values(SAFETY_PACKS)
+      // Pharmacy shares Medical's name for owners; it stays reachable only through setup.
+      .filter((p) => p.id !== 'pharmacy')
+      .map((p) => ({
+        id: p.id,
+        name: p.name,
+        summary: p.summary,
+        lessStrict: Boolean(pack && p.strength < pack.strength),
+      })),
+    packChange,
     pack: pack
       ? {
           id: pack.id,

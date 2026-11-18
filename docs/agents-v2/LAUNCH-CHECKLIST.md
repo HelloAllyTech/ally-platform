@@ -95,6 +95,27 @@ The Skills Store keeps a prompt's live text; a changed seed file never overwrite
 - [ ] **Tell support:** Ally admins no longer see Assistants unless it's switched on for them; anyone on an assistant's team opens it without the switch, and someone with nothing else sees only their assistants.
 - [ ] **Erasure now reaches list entries** (an explicit erase only; the retention sweep never touches them). The manual step is gone.
 
+## Q3-fast: one path, booking, safety, answers, trust in setup (`EPIC-Q3-FAST.md`, `CHUNK-Q3-FAST-NOTES.md`) <!-- docs-path-lint: planned -->
+
+- [ ] **Before deploying, publish the approved prompts to production's Skills Store** (sync never overwrites the text of a prompt that already exists):
+  - `ally_ai_knowledge_crisis_classify`: the four levels (`Q3-PROMPTS.md` Part 1). Keep the live model, `gpt-6-luna`, at temperature 0. It's safe before the code: the answer's shape comes from the code's schema, so the old code keeps reading its old fields.
+  - `ally_ai_builder_system`: rule 3, a stricter pack asked for in setup (`Q3-PROMPTS.md`, "Awaiting your OK" item 5).
+- [ ] **After deploying, check that the deploy's sync created the new prompts from their approved seeds:**
+  - `ally_ai_agent_upset` and `ally_ai_agent_upset_support`;
+  - `ally_ai_agent_playbook_booking`, `_details`, `_orders` and `_reference`.
+
+  Each live v1 should match its file in `ally-ai/app/prompts/agent/`.
+- [ ] **Remove `agentRuntimeAllowed` from config** (the production `whatsapp_bot` defaults, Part 0). Nothing reads it any more.
+- [ ] **Migration `1984600000000-KeepEightPassages` runs with ally-be** (data only): the platform's `retrieval.maxPassages` moves from 5 to 8 where it is still 5.
+- [ ] **No re-index of live assistants.** The "What we learned" document is written at publish, and production's assistants will be recreated (decided at Stop 2).
+- [ ] **Watch for a day after deploy:**
+  - crisis replies: at-risk and emergency replies per assistant, and false alarms owners report;
+  - the "agent runtime degraded" alert, which now means people got the fixed run-failed reply.
+- [ ] **Tell support:**
+  - owners can now correct a wrong safety pack (Safety → "This isn't right for my business"); less strict changes are logged with the owner's reason;
+  - young-people assistants no longer ask for a name or phone before the chat;
+  - publishing below the checkup's quality gate now asks "Publish anyway?" with the score.
+
 ## Checks
 
 - [ ] **Release `0fb34139c` (production onto the v2 agent), then watch the v1 fallback rate and reply times** (H0).

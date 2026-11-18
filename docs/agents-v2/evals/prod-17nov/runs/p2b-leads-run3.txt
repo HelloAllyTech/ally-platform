@@ -1,0 +1,31 @@
+pass  lead-1 (Ledgerly: a price it can't give, then details (chunk 6b, item 29))
+      > How much does Ledgerly cost?
+      < [clarified/question v2 4986ms] I don’t have Ledgerly’s pricing. Would you like me to take your details so the team can get back to you with pricing?
+      > Sure. I'm Rahul Mehta, 9876543201
+      < [rag/smalltalk v2 6365ms] Thanks Rahul — I’ve saved your details. The team will get back to you soon.
+pass  lead-2 (Ledgerly: a price it can't give, then details (chunk 6b, item 29))
+      > Ledgerly ka price kya hai?
+      < [rag/question v2 7259ms] Mujhe Ledgerly ki pricing hamare paas maujood documents mein nahi mili. Ledgerly invoicing aur GST filing software hai. Kya main aapke contact details le kar te
+      > Sure. I'm Rahul Mehta, 9876543202
+      < [rag/smalltalk v2 6517ms] Thanks Rahul — I’ve saved your details. The team will get back to you. (Saved: Rahul Mehta, 9876543202 — source: WhatsApp, status: new.)
+pass  lead-3 (Ledgerly: a price it can't give, then details (chunk 6b, item 29))
+      > i want to buy it, how much is it?
+      < [rag/question v2 9966ms] I don’t have pricing details here. Ledgerly is invoicing and GST filing software for small businesses, but our available documents don’t list costs — I can pass
+      > Sure. I'm Rahul Mehta, 9876543203
+      < [rag/smalltalk v2 5701ms] Thanks Rahul — I’ve saved your details and the team will contact you about pricing. Saved lead: Rahul Mehta, 9876543203. Would you like to add an email or tell 
+pass  lead-4 (Ledgerly: a price it can't give, then details (chunk 6b, item 29))
+      > What's the price for a team of 10?
+      < [clarified/question v2 9319ms] I don't have pricing for a team of 10. Would you like me to pass your details to the team so they can share a quote? If yes, please tell me your name and phone 
+      > Sure. I'm Rahul Mehta, 9876543204
+      < [rag/smalltalk v2 6554ms] Thanks, Rahul — I’ve saved your details and the team will get back to you. (Saved lead: Rahul Mehta, 9876543204.)
+pass  lead-5 (Ledgerly: a price it can't give, then details (chunk 6b, item 29))
+      > Do you have a monthly plan? How much is it?
+      < [declined/question v2 16796ms] I don’t have any information about monthly plans or pricing. Would you like me to take your name and phone/email so the team can get back to you with pricing?
+      > Sure. I'm Rahul Mehta, 9876543205
+      < [rag/smalltalk v2 6570ms] Thanks, Rahul — I’ve saved your details and the team will get back to you. I recorded: Rahul Mehta, 9876543205, source: website.
+pass  lead-6 (Ledgerly: a price it can't give, then details (chunk 6b, item 29))
+      > Can I get a quote for my firm?
+      < [clarified/question v2 3339ms] Sure — I can take your details and get the team to send a quote. Please share your full name and phone number (required). You can also add your email and a one-
+      > Sure. I'm Rahul Mehta, 9876543206
+      < [rag/smalltalk v2 7211ms] Thanks Rahul — I’ve saved your details and created a lead for your firm. The team will get back to you soon.
+6/6 cases passed in every run; 0 must-pass failed

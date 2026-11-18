@@ -1,0 +1,8 @@
+pass  bk-choice-is-not-yes (17 Nov F1: picking a table isn't a yes; it confirms the exact booking first (Q3-fast 0b))
+      > I'm Kabir. Table for 3 on Thursday 26 Nov at 2 pm?
+      < [clarified/question v2 14134ms] Thanks Kabir — I’ve noted your name. I see three 3‑seat tables available then (T1, T2, T3). Shall I go ahead and reserve one for you, and do you want me to pick
+      > T3 please
+      < [clarified/question v2 13977ms] Shall I book Thursday 26 Nov 2026 at 14:00 for 3 people at table T3?
+      > yes
+      < [rag/smalltalk v2 20620ms] All set — I’ve booked a table for 3 at T3 on Thursday 26 Nov 2026 at 14:00 under Kabir. (Confirmed.) Would you like me to pass your phone number to the team so 
+1/1 cases passed in every run; 0 must-pass failed

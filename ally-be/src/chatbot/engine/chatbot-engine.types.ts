@@ -114,7 +114,7 @@ export type AgentFailureReason =
 
 /**
  * The Agents v2 run behind a reply, for the channel to store and Preview to show: the run that
- * answered, with its steps, or the run that failed and v1 answered instead (see `isFallback`).
+ * answered, with its steps, or the run that failed (see `isFailedRun`; the fixed reply went out).
  */
 export type AgentRunRef = { runId: string; conversationId: string } & (
   | {
@@ -132,7 +132,7 @@ export type AgentRunRef = { runId: string; conversationId: string } & (
       activity?: AgentActivity[];
     }
   | {
-      runtime: AgentRuntimeUsed.V2_FALLBACK;
+      runtime: AgentRuntimeUsed.V2_FAILED;
       fallbackReason: AgentFailureReason;
     }
 );
@@ -166,7 +166,7 @@ export interface ChatbotDecision {
   /** A human should hear about this (crisis, degraded safety net). */
   alert?: NotificationErrorType;
   /**
-   * Set when the Agents v2 runtime answered or was tried (`v2_fallback`). The channel stores it on
+   * Set when the Agents v2 runtime answered or failed (`v2_fallback`, `AgentRuntimeUsed.V2_FAILED`). The channel stores it on
    * the reply and, for a fallback, raises the throttled "agent runtime degraded" alert.
    */
   agent?: AgentRunRef;

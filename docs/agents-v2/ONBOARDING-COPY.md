@@ -522,6 +522,7 @@ says when a save can't be made. More lines for the home's sections are added her
 - **Comparison:** vs {value} last week
 - **Unanswered list title:** Questions it didn't know
 - **Unanswered action:** Answer it
+- **Booking steps, apart from it** *(added in Q3d)*: Couldn't complete a booking · From the last 7 days. These were part of a booking, not questions to answer.
 - **Thumbs-down list title:** Answers people weren't happy with
 - **Thumbs-down actions:** Correct this · It was fine
 - **Checkup card:** Last checkup: {passed} of {total} answered well · View checkup
@@ -760,6 +761,12 @@ says when a save can't be made. More lines for the home's sections are added her
 - **How it works, in the section list (20d-2):** How it works · Everything your assistant follows, and the parts you can change.
 - **Your instructions, when the check can't run (20d-2, at approval):** Couldn't check this right now. Try again in a minute.
 - **When someone may be at risk, before the owner writes their own (20d-2, at approval):** From your safety rules. This is what it says now, and you can add to it.
+- **How it works, each list's playbook (Q3-fast Part 2b):** Because you added {list}, your assistant finds free times, confirms the exact time and books it. · Because you added {list}, your assistant offers to take people's details when it can't fully answer, and saves them once they share them. · Because you added {list}, your assistant looks up only the person's own entries and explains what their status means. · Because you added {list}, your assistant quotes it exactly as listed and never invents availability.
+- **Lists, What your assistant can do, the owner's own line (Q3-fast Part 2b):** How should your assistant use this list? · Optional. For example: "Always mention the size chart". It can't change your safety rules. · Save · Saved
+- **Reading uploaded documents (Q3-fast):** Reading your documents · Reading your documents… · This usually takes under a minute. We'll show what we learned as soon as it's done.
+- **Reading your website, pages we couldn't read (Q3-fast Part 3):** We couldn't read these pages · They showed an error or a security check instead of their content, so we kept nothing from them. · When it happens on the first page: The site showed our reader an error or a security check instead of its pages. · {domain} showed our reader an error or a security check instead of its pages. Upload documents or describe your business instead.
+- **Checkup and publishing, the quality gate (Q3-fast Part 3):** {n} of {total} questions need a fix. Answer the ones it couldn't, or look at what went wrong in Checkup once it's live. · Publish anyway · {n} of {total} questions need a fix (Checkup heading) · {n} need a fix (Overview, after "Last checkup") · From the server, before publishing: {n} of {total} questions need a fix: your assistant answered {pct}% of its questions well, and we suggest at least 70% before you publish. Publish anyway? · "You're ready to try it yourself" shows only when every safety question passed and at least 70% of the rest did.
+- **Safety, correcting the pack (Q3-fast Part 1, owners only; for review at stop 1):** This isn't right for my business · Which safety rules fit your business? · Less strict · Why is this right for your business? · These rules are less strict than the ones you have now. Your reason is kept with the change, and your checkup will show it. · Please say a little more (at least 10 characters). · Change safety rules · Cancel · Safety rules changed by you on {date}. · Safety rules changed by you on {date}: “{reason}”
 - **Overview numbers, with the 7 / 30 days switch (20d-2, at approval):** Your numbers · Show the last · 7 days · 30 days
 - **Overview, All numbers (CL1, replacing the classic usage tab; opens in place under the numbers):** See all numbers · Hide all numbers · Show the last · 7 days · 30 days · 90 days · Messages in · People · Didn't know · Of the questions it was asked · Too few questions to say · Typical reply time · 1 in 20 took {s} s or longer · {s} s · What happened to each message · Answered · Didn't know · Asked to clarify · Safety replies · From numbers it didn't recognise · Errors on our side · Other · Replies per day · {day}: {n} replies · Languages · Language · Questions · Documents it used most · {n} times · Not used in this period: 1 document · Not used in this period: {n} documents · No messages in this period yet. · We couldn't load these numbers. · Try again
 - **The header's `···` menu, staff only (CL1, replacing the classic view's Settings tab):** Settings · This assistant's own engine settings. Only platform admins see this.
@@ -1038,7 +1045,7 @@ says when a save can't be made. More lines for the home's sections are added her
 - Example
 - Add
 - Add a {detail}
-- Keep at least one.
+- Add at least one of your own.
 - Add the times people can book
 - Pick the days and hours. You can change or remove any of them later.
 - What can your assistant do with {list}?

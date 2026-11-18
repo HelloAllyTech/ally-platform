@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useId, useState } from "react";
 
 import { useSetListAbilitiesMutation } from "@api";
 import { Button } from "@components/button";
@@ -64,6 +64,9 @@ export const AssistantBlock: React.FC<{
   const [abilities, setAbilities] = useState(list.abilities);
   const [note, setNote] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [instruction, setInstruction] = useState(list.settings.instruction ?? "");
+  const [savedLine, setSavedLine] = useState(list.settings.instruction ?? "");
+  const instructionId = useId();
   const examples = examplesFor(list, lists, sample);
   const writes = fillable(list).length > 0;
   // The list that books this one: it has a live detail that points here (Reservations → Tables).
@@ -141,6 +144,48 @@ export const AssistantBlock: React.FC<{
               })
             : a.noFill}
         </p>
+      )}
+      {canEdit ? (
+        <form
+          className="ally-abilities__instruction"
+          data-testid="list-instruction"
+          onSubmit={async event => {
+            event.preventDefault();
+            setFailed(false);
+            try {
+              await save({ id: botId, key: list.key, instruction: instruction.trim() }).unwrap();
+              setSavedLine(instruction.trim());
+            } catch {
+              setFailed(true);
+            }
+          }}
+        >
+          <label htmlFor={instructionId} className="ally-abilities__label">
+            {a.instructionLabel}
+          </label>
+          <p className="ally-field__hint">{a.instructionHint}</p>
+          <textarea
+            id={instructionId}
+            className="ally-input"
+            rows={2}
+            maxLength={300}
+            value={instruction}
+            onChange={event => setInstruction(event.target.value)}
+          />
+          <Button
+            variant={ButtonVariant.TERTIARY}
+            type="submit"
+            disabled={isLoading || instruction.trim() === savedLine}
+          >
+            {instruction.trim() === savedLine && savedLine ? a.instructionSaved : a.instructionSave}
+          </Button>
+        </form>
+      ) : (
+        list.settings.instruction && (
+          <p className="ally-field__hint" data-testid="list-instruction">
+            {a.instructionLabel} {list.settings.instruction}
+          </p>
+        )
       )}
       {failed && (
         <p className="ally-error" role="alert">

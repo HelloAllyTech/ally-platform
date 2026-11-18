@@ -113,7 +113,7 @@ class KnowledgeAgentSettings(BaseModel):
     # even if they cleared the floor. Stops one strong match from being diluted by seven
     # weak ones.
     SIMILARITY_BAND: float = Field(0.08)
-    MAX_PASSAGES: int = Field(5)
+    MAX_PASSAGES: int = Field(8)
     MAX_CONTEXT_TOKENS: int = Field(3000)
     # Bump when the answer prompt changes in a way that could move answers; echoed back
     # to ally-be and stored per message so a behaviour change can be traced to its

@@ -1337,9 +1337,9 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
       'refusing to answer from outside the passages is an instruction-following problem, ' +
       'until that credential expired and took the bot silent — OpenAI is the one provider ' +
       'whose key is required in that service. Falls back to OpenAI whatever is selected, ' +
-      'and says so in the metadata. With the Agents v2 emergency switch on ' +
-      '(agentRuntimeAllowed), every bot makes the same calls through /agent/run, and this ' +
-      'path is v2’s fallback.',
+      'and says so in the metadata. Since Q3-fast no chatbot reaches this path: every bot answers ' +
+      'through /agent/run, with no v1 fallback; only the WhatsApp admin knowledge preview calls ' +
+      'it, until R2/CL2 removes v1.',
     kind: AiTaskKind.COMPLETION,
     provider: 'openai',
     defaultModel: 'gpt-5-mini',

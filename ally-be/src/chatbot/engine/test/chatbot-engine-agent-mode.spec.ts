@@ -165,7 +165,6 @@ describe('ChatbotEngineService in Agent mode', () => {
   beforeEach(() => {
     settings = {
       ...DEFAULT_WHATSAPP_SETTINGS,
-      agentRuntimeAllowed: true,
       retrieval: { ...DEFAULT_WHATSAPP_SETTINGS.retrieval },
     };
     aiService = engineAiService(SMALLTALK, SMALLTALK);
@@ -256,19 +255,6 @@ describe('ChatbotEngineService in Agent mode', () => {
       await engine.respond(turn({ isFirstMessage: true }));
       expect(aiService.runAgent).toHaveBeenCalledTimes(1);
     });
-
-    it('gives every bot every template under the kill switch', async () => {
-      settings = { ...settings, agentRuntimeAllowed: false };
-      for (const [text, id] of [
-        ['hello', 'greeting'],
-        ['what can you do', 'help'],
-        ['opening hours', 'faq'],
-      ]) {
-        const decision = await engine.respond(turn({ settings, text }));
-        expect(decision.templateId).toBe(id);
-      }
-      expect(aiService.runAgent).not.toHaveBeenCalled();
-    });
   });
 
   describe('the request', () => {
@@ -298,7 +284,10 @@ describe('ChatbotEngineService in Agent mode', () => {
           sender: { externalId: 'x', label: 'x', tenantId: 'tenant-1' },
         }),
       );
-      expect(titles).not.toHaveBeenCalled();
+      // No titles query (the business-facts lookup, Q3-fast Part 2, is another query).
+      expect(
+        titles.mock.calls.filter(([sql]) => String(sql).includes('id = ANY')),
+      ).toEqual([]);
       expect(aiService.runAgent.mock.calls[0][0].knowledge_topics).toEqual([]);
     });
 
@@ -417,7 +406,8 @@ describe('ChatbotEngineService in Agent mode', () => {
       expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
       expect(decision.body).toBe(GENERAL_CRISIS_TEXT);
       expect(decision.isWelcome).toBeUndefined();
-      expect(decision.agent?.runId).toBe('run-1');
+      // Q3-fast Part 1: the verdict came first, so the reply went out with no run at all.
+      expect(aiService.runAgent).not.toHaveBeenCalled();
     });
   });
 });

@@ -274,6 +274,29 @@ export const chatbotsApi = baseAPI.injectEndpoints({
       invalidatesTags: (r, _e, { id }) => (r ? botTags(id) : []),
     }),
 
+    /** Q3-fast: the owner corrects the safety pack; a less strict one needs a reason. */
+    changeSafetyPack: builder.mutation<HomeSafety, { id: string; pack: string; reason?: string }>({
+      query: ({ id, ...body }) => ({
+        url: ApiEndpoints.CHATBOTS.SAFETY_PACK(id),
+        method: HttpMethod.PUT,
+        body,
+      }),
+      async onQueryStarted({ id }, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(
+            chatbotsApi.util.updateQueryData("getAssistantHome", id, home => {
+              home.safety = { ...home.safety, ...data };
+            }),
+          );
+        } catch {
+          // The caller shows the refusal.
+        }
+      },
+      // The crisis reply and How it works follow the pack.
+      invalidatesTags: (r, _e, { id }) => (r ? botTags(id) : []),
+    }),
+
     changeOwnRule: builder.mutation<HomeSafety, { id: string; version: string } & RuleChange>({
       query: ({ id, ...body }) => ({
         url: ApiEndpoints.CHATBOTS.RULES(id),
@@ -409,6 +432,7 @@ export const {
   useGetAssistantHomeQuery,
   useSaveHomeFieldMutation,
   useChangeOwnRuleMutation,
+  useChangeSafetyPackMutation,
   useGetHomeListQuery,
   useGetHowItWorksQuery,
   useGetHomeNumbersQuery,

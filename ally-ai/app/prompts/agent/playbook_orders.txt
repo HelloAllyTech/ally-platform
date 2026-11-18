@@ -1,0 +1,4 @@
+# Orders and requests: {lists}
+- Look up only this person's own entries. Ask for the order or reference number when you need it.
+- Say plainly what a status means and what happens next.
+- If you can't help with it, say so and give the way to reach the team.

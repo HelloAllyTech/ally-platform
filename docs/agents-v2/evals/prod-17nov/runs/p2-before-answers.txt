@@ -1,0 +1,120 @@
+FAIL! cn-C2 (in data: 3-month antenatal fitness ₹7,990)
+      > What's the price of the 3-month antenatal fitness plan?
+      < [rag/question v2 7430ms] I’m sorry—I don’t have pricing for the 3‑month antenatal fitness plan. I can tell you what the 3‑month plan includes: 24 live antenatal exercise sessions (twice
+      ✗ missing /7,?990/
+pass  cn-C3 (in data: Level III NICU)
+      > Do you have a NICU? What level?
+      < [rag/question v2 8667ms] Yes — Cloudnine has a Level III (Advanced Level III) NICU. (Cloudnine is one of the few hospitals in the country to have an Advanced Level III NICU.)
+FAIL! cn-C6 (in data (site FAQ): baby movements 18 to 25 weeks, sourced)
+      > When will I feel my baby move?
+      < [rag/question v2 9066ms] Most people first feel baby movements (quickening) in the second trimester—typically around 16–20 weeks, often a little later for first pregnancies and a bit ea
+      ✗ missing /18|25/
+pass  cn-C8 (multi-turn: Apartment package inclusions and ambulance)
+      > I'm 7 months pregnant, what delivery packages do you have at Bannerghatta Road?
+      < [rag/question v2 9002ms] At Cloudnine Bannerghatta Road we offer several maternity/delivery package types, including options for different delivery types and an Apartment Suite (luxury)
+      > What's in the Apartment package? Do you give ambulance pickup?
+      < [rag/question v2 9139ms] The Apartment Pregnancy Package at Cloudnine Bannerghatta Road offers luxury accommodation and premium care for expecting mothers [3]. I don’t have details here
+      > Can someone call me tomorrow evening? I'm Asha, 9000000001
+      < [rag/question v2 8879ms] Thanks Asha — I can’t arrange a call directly here. You can request a callback for Cloudnine Bannerghatta Road via their Request a Callback form, or call the ce
+2/4 cases passed in every run; 2 must-pass failed
+FAIL! ho-B10 (in data (B10): Aquantis price per sq ft)
+      > Any 3 BHK in Gachibowli under 1.6 crore?
+      < [declined/question v2 10214ms] Would you like me to look for nearby 3 BHK options (Gopanpally or Financial District) that might fit your budget? Please call +91 9021516666.
+      ✗ missing /8,?499/
+0/1 cases passed in every run; 1 must-pass failed
+pass  ia-B8-address (in data (B8): the Delhi address)
+      > What's your address in Delhi?
+      < [rag/question v2 5015ms] Our Delhi address is: Indian Accent, The Lodhi, Lodhi Road, New Delhi, 110003. For reservations you can call or email the restaurant — please contact the number
+FAIL! ia-B13-dinner (in data (B13): both Mumbai dinner seatings)
+      > What are the dinner timings in Mumbai?
+      < [rag/question v2 5322ms] Dinner (second seating) in Mumbai is 9:45 pm to 12:00 am (last order by 10:30 pm).
+      ✗ missing /(6:45|7:00)/
+1/2 cases passed in every run; 1 must-pass failed
+pass  mp-B9 (in data (B9): works with children and adolescents)
+      > Do you work with children and teenagers?
+      < [rag/question v2 11825ms] Yes — Mpower offers holistic mental health care for children, adolescents and young people and their families. Would you like help finding services for a specif
+FAIL! mp-B12 (in data (B12): therapies and the Mumbai centre's address)
+      > What therapies do you offer, and where is the Mumbai centre?
+      < [rag/question v2 10163ms] Mpower offers psychiatry and therapy services at its Mumbai centre, plus specialist programmes and training (for example clinical courses and DBT training run b
+      ✗ missing /(CBT|cognitive behaviou?r)/; missing /(Hughes Road|Khareghat|Patkar Marg|400 ?007)/
+pass  mp-CBT (in data (B12): CBT is offered)
+      > Do you do CBT?
+      < [rag/question v2 7520ms] I don’t see CBT (Cognitive Behavioral Therapy) listed explicitly. Mpower does offer individual psychotherapy services [1], provides DBT training programs [3], a
+2/3 cases passed in every run; 1 must-pass failed
+pass  ne-checkin (in data: Tijara check-in and check-out)
+      > What time is check-in and check-out at Tijara Fort-Palace?
+      < [rag/question v2 7928ms] Check-in at Tijara Fort-Palace is 2:00 PM and check-out is 11:00 AM. Would you like help with a reservation or transfers?
+pass  ne-B31 (in data (B31, as the site now says): advance for weddings)
+      > How much do I need to pay in advance for a wedding?
+      < [rag/question v2 9655ms] For weddings and other large functions you must pay 100% of the total billing 40 days in advance to confirm the booking (payment terms). The exact charter cost 
+2/2 cases passed in every run; 0 must-pass failed
+FAIL! sb-P1 (in data: SEBI RIA number)
+      > Are you SEBI registered? What's your number?
+      < [rag/question v2 5886ms] Yes. Scripbox offers portfolio management through Wealth Managers (India) Private Limited — a Scripbox company — which is registered with SEBI as a Portfolio Ma
+      ✗ missing /INA200001041/
+FAIL! sb-P2 (in data: services)
+      > What services do you offer?
+      < [rag/question v2 7795ms] We offer mutual-fund investing (including SIPs), financial planning and goal-based plans, and tools/resources like SIP calculators and plan options through our 
+      ✗ missing /mutual fund|PMS|advis/
+pass  sb-P5 (in data: no guaranteed returns)
+      > What's the minimum for PMS, and are returns guaranteed?
+      < [rag/question v2 4851ms] Minimum investment for PMS in India is ₹50 lakh, and PMS cannot guarantee returns—investments are risky and fixed returns are not guaranteed. If you'd like help
+FAIL! sb-P9 (in data: none guaranteed)
+      > Are any of your products guaranteed?
+      < [declined/question v2 13787ms] I don’t have any information in the available Scripbox documents that says any Scripbox product is guaranteed. Please contact the Scripbox team to confirm— I do
+      ✗ missing /(no|not|none|aren.t|isn.t)\b.{0,30}guarantee/
+1/4 cases passed in every run; 3 must-pass failed
+FAIL! tss-S1 (in data: Batman high tops ₹4,499)
+      > How much are the Batman high top sneakers?
+      < [rag/question v2 7019ms] There are multiple listings for Men’s Batman high-top sneakers on our site: prices shown include ₹3,999, ₹2,999 and ₹3,899. Which price would you like me to che
+      ✗ missing /4,?499/
+FAIL! tss-S2 (in data: Orbit backpack ₹3,299, no cart offer)
+      > Price of the Orbit backpack?
+      < [declined/question v2 10864ms] I don’t have the Orbit backpack price in these notes. Please check the Orbit product page on our site for the current price and details (TSS Originals: Orbit). 
+      ✗ missing /3,?299/
+FAIL! tss-S3 (in data: 30-day returns)
+      > What's your return policy?
+      < [rag/question v2 6197ms] Our Terms say The Souled Store may, after reasonable assessment, 1) restrict accounts with unusually high return rates or repeated delivery failures and 2) levy
+      ✗ missing /30[- ]?day|30 days|thirty days/
+FAIL! tss-S4 (in data: prices include taxes)
+      > Are taxes included in the price?
+      < [rag/question v2 7360ms] Yes — product pages on The Souled Store state “Price incl. Of all taxes.” (See product pages.) Note that The Souled Store also reserves the right to correct pri
+      ✗ missing /inclu/
+pass  tss-S5 (in data: customer care phone and email)
+      > How do I reach customer care?
+      < [rag/question v2 5488ms] You can reach customer care by email at connect@thesouledstore.com or grievanceofficer@thesouledstore.com, or by phone at +91 22-68493328 (Mumbai). Would you li
+FAIL! tss-S6 (in data: oversized fit, size down)
+      > Your hoodies look oversized, should I size down?
+      < [clarified/question v2 5464ms] Which hoodie are you looking at (product name or link)? I can check the product page for size guidance.
+      ✗ missing /siz(e|ing) down|smaller size|one size (down|smaller)/
+pass  tss-S7 (in data: machine wash)
+      > How should I wash the cotton t-shirts?
+      < [rag/question v2 13017ms] Machine wash (this is the listed care instruction for cotton t-shirts on product pages). For more detailed care guidance, please contact our grievance officer a
+pass  tss-S8 (in data: membership non-refundable mid-way)
+      > Can I cancel the membership and get my money back?
+      < [rag/question v2 7466ms] The membership is non-refundable and non-transferable — if you cancel mid-way you will not get a refund. Exceptions: if The Souled Store cancels or terminates a
+pass  tss-S9 (in data: card details not stored)
+      > Do you save my card details?
+      < [rag/question v2 6747ms] Short answer: No — The Souled Store does not store your payment card details on its servers. Their policy says payment card and other sensitive financial detail
+pass  tss-S10 (not in data: shipping to Pune, honest, real contact, no estimate offer)
+      > How much is shipping and how long does delivery take to Pune?
+      < [declined/question v2 12890ms] I don’t have information on shipping charges or delivery times to Pune. Please contact The Souled Store at connect@thesouledstore.com or +91 22-68493328 to ask 
+FAIL! tss-S11 (not in data: cash on delivery, honest with contact)
+      > Do you have cash on delivery?
+      < [clarified/question v2 12879ms] Which product or order are you checking COD for?
+      ✗ missing /6849 ?3328|connect@thesouledstore\.com/
+FAIL! tss-S12 (multi-turn: Batman gift in budget, no hand-over, returns)
+      > I'm looking for a gift for my brother who loves Batman, budget 5000
+      < [clarified/question v2 8624ms] Would you prefer a T-shirt, hoodie, jacket or accessory as a gift?
+      ✗ missing /4,?499/
+      > he's UK 9
+      < [clarified/question v2 3664ms] Thanks — just to confirm: do you mean his shoe size is UK 9 because you want footwear, or did you mean clothing size? Which gift type do you prefer: T-shirt, ho
+      > what if it doesn't fit?
+      < [rag/question v2 9662ms] If the item doesn’t fit: the company may assess returns and can restrict accounts with unusually high return rates, and may levy a return processing fee for acc
+pass  tss-S16 (order lookup with no order: asks for order number or points to care)
+      > Where is my order?
+      < [clarified/question v2 3073ms] I can help track that. Please share your order number and the email or phone used to place the order so I can look it up.
+pass  tss-M2 (memory: 'please remember' is confirmed, not declined)
+      > Please remember for next time: I'm Rohan, I wear size M and UK 9, and I love Spiderman
+      < [rag/smalltalk v2 6592ms] I can't remember details between chats, but I'll use them for the rest of this one. I’ll use it when helping you here. Anything you’d like me to do with that in
+7/14 cases passed in every run; 7 must-pass failed

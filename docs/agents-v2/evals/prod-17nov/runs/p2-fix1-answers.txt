@@ -1,0 +1,518 @@
+pass  cn-C2 (in data: 3-month antenatal fitness ₹7,990) [3/3 runs passed]
+    run 1
+      > What's the price of the 3-month antenatal fitness plan?
+      < [rag/question v2 6135ms] The 3-month (24-session) antenatal fitness plan costs ₹7,990. It includes live antenatal exercise sessions twice a week with recordings available for 3 days, le
+    run 2
+      > What's the price of the 3-month antenatal fitness plan?
+      < [rag/question v2 7646ms] The 3‑month antenatal fitness plan (24 live sessions) costs ₹7,990. (This plan is the 3‑month option with 24 sessions.) Would you like help booking or more deta
+    run 3
+      > What's the price of the 3-month antenatal fitness plan?
+      < [rag/question v2 9225ms] The 3-month antenatal fitness plan (24 live sessions) costs ₹7,990, and the programme runs 24 sessions over 3 months (8 sessions for 1 month is ₹2,990). Would y
+pass  cn-C3 (in data: Level III NICU) [3/3 runs passed]
+    run 1
+      > Do you have a NICU? What level?
+      < [rag/question v2 6472ms] Yes — Cloudnine has a NICU. It is an Advanced Level III NICU (NABH certified), and Cloudnine provides newborn intensive care with round‑the‑clock qualified staf
+    run 2
+      > Do you have a NICU? What level?
+      < [rag/question v2 7532ms] Yes — Cloudnine has an Advanced Level III NICU (Level III), with round‑the‑clock newborn intensive care and paediatric support. Would you like me to connect you
+    run 3
+      > Do you have a NICU? What level?
+      < [rag/question v2 8691ms] Yes — Cloudnine has an Advanced Level III NICU (NABH certified) and provides newborn intensive care and paediatric care with round‑the‑clock qualified staff. [1
+pass  cn-C6 (in data (site FAQ): baby movements 18 to 25 weeks, sourced) [3/3 runs passed]
+    run 1
+      > When will I feel my baby move?
+      < [rag/question v2 7198ms] Most women start feeling their baby move between about 18 and 25 weeks of pregnancy, according to Cloudnine. Would you like tips on tracking movements or to spe
+    run 2
+      > When will I feel my baby move?
+      < [rag/question v2 6633ms] Most women begin to feel their baby move between about 18 and 25 weeks of pregnancy. (Source: Cloudnine) Would you like tips on how to track those movements or 
+    run 3
+      > When will I feel my baby move?
+      < [rag/question v2 6353ms] Most women start to feel their baby move between about 18 and 25 weeks of pregnancy. (This is the typical range Cloudnine gives.) Would you like information on 
+pass  cn-C8 (multi-turn: Apartment package inclusions and ambulance) [3/3 runs passed]
+    run 1
+      > I'm 7 months pregnant, what delivery packages do you have at Bannerghatta Road?
+      < [rag/question v2 6546ms] We offer the Apartment Pregnancy Package/Suite at Cloudnine Bannerghatta Road — a luxury maternity accommodation with personalised package inclusions, exclusion
+      > What's in the Apartment package? Do you give ambulance pickup?
+      < [rag/question v2 11370ms] The Apartment Pregnancy Package at Cloudnine Bannerghatta Road is a luxury maternity accommodation. Exclusions listed for the package include additional surgeon
+      > Can someone call me tomorrow evening? I'm Asha, 9000000001
+      < [rag/question v2 7963ms] Thanks, Asha — congratulations on your pregnancy. I can’t pass your number to the team from here, but you can request a callback or ask the Bannerghatta Road ce
+    run 2
+      > I'm 7 months pregnant, what delivery packages do you have at Bannerghatta Road?
+      < [rag/question v2 7455ms] At Cloudnine Bannerghatta Road we offer several maternity/delivery packages including Apartment, Signature, Presidential and Luxury packages. The centre specifi
+      > What's in the Apartment package? Do you give ambulance pickup?
+      < [rag/question v2 7933ms] Our Apartment Pregnancy Package at Bannerghatta Road offers luxury accommodation and premium care for expecting mothers, and the package specifically includes a
+      > Can someone call me tomorrow evening? I'm Asha, 9000000001
+      < [clarified/question v2 5166ms] Would you like me to tell you how to contact the Cloudnine Bannerghatta Road centre to request a callback?
+    run 3
+      > I'm 7 months pregnant, what delivery packages do you have at Bannerghatta Road?
+      < [rag/question v2 7975ms] At Cloudnine Bannerghatta Road we offer the Apartment Pregnancy Package/Suite — a maternity accommodation package that provides luxury accommodations and premiu
+      > What's in the Apartment package? Do you give ambulance pickup?
+      < [rag/question v2 7371ms] The Apartment Pregnancy Package / Suite at Cloudnine Bannerghatta Road offers luxury accommodation and premium care for expecting mothers, and is one of the pac
+      > Can someone call me tomorrow evening? I'm Asha, 9000000001
+      < [rag/question v2 10916ms] Thanks, Asha — I can’t arrange a call from here. To get a call you can use the ‘Request Callback’ or ‘Book Online’ option on Cloudnine’s appointment page (they’
+FAIL! ho-B10 (in data (B10): Aquantis price per sq ft) [0/3 runs passed]
+    run 1
+      > Any 3 BHK in Gachibowli under 1.6 crore?
+      < [rag/question v2 9885ms] Honer Aquantis in Gachibowli offers 2 & 3 BHK homes (handover in progress) [1], and the site notes 2 BHKs in the ₹1–1.25 Cr range; it also says compact 3 BHKs w
+      ✗ missing /8,?499/
+    run 2
+      > Any 3 BHK in Gachibowli under 1.6 crore?
+      < [rag/question v2 11860ms] Honer Aquantis in the Gachibowli/Gopanpally junction includes 3 BHK apartments (it also offers 2 BHKs) [1]. Would you like me to search our listings for Honer p
+      ✗ missing /8,?499/
+    run 3
+      > Any 3 BHK in Gachibowli under 1.6 crore?
+      < [rag/question v2 9613ms] Honer has 3 BHK homes at Honer Aquantis in Gachibowli (the project offers 2 & 3 BHKs). [1] However, the available information does not confirm any 3 BHK specifi
+      ✗ missing /8,?499/
+pass  ho-sizes (in data: Aquantis 3 BHK 1,610 to 1,965 sq ft) [3/3 runs passed]
+    run 1
+      > What are the 3 BHK sizes at Aquantis?
+      < [rag/question v2 6403ms] Honer Aquantis 3 BHK sizes are 1610 sq ft, 1785 sq ft and 1965 sq ft.
+    run 2
+      > What are the 3 BHK sizes at Aquantis?
+      < [rag/question v2 6562ms] Honer Aquantis 3 BHK sizes are 1610 sq ft, 1785 sq ft and 1965 sq ft. Would you like details on floor plans or to arrange a site visit?
+    run 3
+      > What are the 3 BHK sizes at Aquantis?
+      < [rag/question v2 7253ms] Honer Aquantis 3 BHK flats come in three sizes: 1610 sqft, 1785 sqft and 1965 sqft. (Source: Honer Aquantis floor plans.) Would you like prices or floor plans f
+pass  ho-vaastu (in data (site FAQ): all 3 BHK are 100% Vaastu compliant) [3/3 runs passed]
+    run 1
+      > Are your 3 BHK flats Vaastu compliant?
+      < [rag/question v2 6310ms] Yes — all 3 BHK apartments by Honer Homes are 100% Vaastu compliant. Would you like more details about a specific project or help to schedule a site visit?
+    run 2
+      > Are your 3 BHK flats Vaastu compliant?
+      < [rag/question v2 6499ms] Yes—Honer Homes' 3 BHK apartments are 100% Vaastu compliant, as the company states its layouts across projects are designed to be fully Vaastu compliant. Would 
+    run 3
+      > Are your 3 BHK flats Vaastu compliant?
+      < [rag/question v2 11601ms] Yes — all Honer Homes 3 BHK apartments are 100% Vaastu compliant. Would you like more details about a specific 3 BHK project or help arranging a site visit?
+pass  ho-rera (in data: Signatis RERA P02200005923) [3/3 runs passed]
+    run 1
+      > What's the RERA number for Honer Signatis?
+      < [rag/question v2 5542ms] The TS RERA registration number for Honer Signatis is P02200005923. If you’d like to speak with the sales team, you can call +91-9021516666. Would you like me t
+    run 2
+      > What's the RERA number for Honer Signatis?
+      < [rag/question v2 8691ms] TS RERA registration number for Honer Signatis is P02200005923. (GHMC No: 2187/GHMC/KPL/2023-BP.) Would you like the sales phone number to contact the team or t
+    run 3
+      > What's the RERA number for Honer Signatis?
+      < [rag/question v2 5768ms] The TS RERA registration number for Honer Signatis is P02200005923. (GHMC No: 2187/GHMC/KPL/2023-BP.) Would you like me to share the sales phone so you can book
+FAIL! ho-possession (in data: Signatis phase 1 possession Dec 2026) [0/3 runs passed]
+    run 1
+      > When is possession for Signatis?
+      < [clarified/question v2 5521ms] Do you mean the possession date for Honer Signatis overall, or for a specific tower/flat there?
+      ✗ missing /Dec(ember)?\.? 2026/
+    run 2
+      > When is possession for Signatis?
+      < [declined/question v2 17346ms] I don’t have a possession date for Honer Signatis. Would you like me to check the latest construction update for Signatis? Please call +91 9021516666.
+      ✗ missing /Dec(ember)?\.? 2026/
+    run 3
+      > When is possession for Signatis?
+      < [clarified/question v2 9266ms] I don't have the possession date for Honer Signatis here. Would you like me to share the sales contact details so you can ask them directly?
+      ✗ missing /Dec(ember)?\.? 2026/
+pass  ia-B8-address (in data (B8): the Delhi address) [3/3 runs passed]
+    run 1
+      > What's your address in Delhi?
+      < [rag/question v2 5557ms] Our New Delhi address is: Indian Accent, The Lodhi, Lodhi Road, New Delhi, 110003. For help with directions or reservations you can call +91 98711 17968 or +91 
+    run 2
+      > What's your address in Delhi?
+      < [rag/question v2 4835ms] Indian Accent, The Lodhi, Lodhi Road, New Delhi, 110003. Would you like the reservations email too?
+    run 3
+      > What's your address in Delhi?
+      < [rag/question v2 6853ms] Indian Accent, The Lodhi, Lodhi Road, New Delhi, 110003. For Upstairs at Indian Accent the address is: 1st floor, Indian Accent, The Lodhi, Lodhi Road, New Delh
+pass  ia-B13-dinner (in data (B13): both Mumbai dinner seatings) [3/3 runs passed]
+    run 1
+      > What are the dinner timings in Mumbai?
+      < [rag/question v2 7203ms] Dinner in Mumbai has first seating 6:45 pm / 7:00 pm to 9:00 pm, and second seating 9:45 pm to 12:00 am (last order by 10:30 pm). Would you like help with a res
+    run 2
+      > What are the dinner timings in Mumbai?
+      < [rag/question v2 5871ms] Dinner in Mumbai has first seating 6:45/7:00 pm to 9:00 pm and second seating 9:45 pm to 12:00 am (last order by 10:30 pm). Would you like help with a reservati
+    run 3
+      > What are the dinner timings in Mumbai?
+      < [rag/question v2 6969ms] Indian Accent Mumbai dinner has two seatings: first seating 6:45/7:00 pm to 9:00 pm, and second seating 9:45 pm to 12:00 am. For reservations, you can call the 
+FAIL! ia-nyc-dinner (in data: New York dinner hours 5 pm to 10 pm) [0/3 runs passed]
+    run 1
+      > What are your dinner hours in New York?
+      < [rag/question v2 5933ms] On Fridays and Saturdays dinner service in New York runs 5:00 pm to 10:15 pm. For other days I don’t have the hours—please call reservations at 212-842-8070 to 
+      ✗ missing /10(:00)? ?pm/
+    run 2
+      > What are your dinner hours in New York?
+      < [rag/question v2 5669ms] Dinner hours in New York are Friday and Saturday, 5:00 pm to 10:15 pm. For other days or to book a table, please call our reservations line at 212-842-8070.
+      ✗ missing /10(:00)? ?pm/
+    run 3
+      > What are your dinner hours in New York?
+      < [rag/question v2 5672ms] Dinner service in New York runs Friday and Saturday, 5:00 pm to 10:15 pm. For reservations call 212-842-8070 or email reservations.nyc@indianaccent.com if you’d
+      ✗ missing /10(:00)? ?pm/
+FAIL! ia-mum-reserve (in data: Mumbai reservations phone or email) [2/3 runs passed]
+    run 1
+      > How do I make a reservation in Mumbai?
+      < [rag/question v2 11266ms] You can reserve at Indian Accent Mumbai by emailing reservations.mum@indianaccent.com. The restaurant is reservation-driven but does welcome walk-ins when possi
+    run 2
+      > How do I make a reservation in Mumbai?
+      < [rag/question v2 5712ms] Indian Accent Mumbai is reservation-driven but welcomes walk-ins when possible. To book, please email reservations.mum@indianaccent.com. For private events, ple
+    run 3
+      > How do I make a reservation in Mumbai?
+      < [rag/question v2 6698ms] Indian Accent Mumbai is a reservation‑driven restaurant but welcomes walk‑ins and will accommodate them as much as possible (reservation policy). For private ev
+      ✗ missing /(\+?91 ?)?22 ?3525 ?1500|reservations\.mum@indianaccent\.com/
+FAIL! ia-nyc-hold (in data: New York holds a table 15 minutes) [2/3 runs passed]
+    run 1
+      > How long will you hold my table in New York if I'm running late?
+      < [rag/question v2 5515ms] We don’t have a published table-hold time. Indian Accent NYC is reservation-driven and welcomes walk-ins where possible — please call the reservations line to c
+      ✗ missing /15 min/
+    run 2
+      > How long will you hold my table in New York if I'm running late?
+      < [rag/question v2 4924ms] We will hold your New York table for 15 minutes past your reservation time if you haven’t told us you’ll be late. If you need more time, please call the reserva
+    run 3
+      > How long will you hold my table in New York if I'm running late?
+      < [rag/question v2 6212ms] We hold tables for 15 minutes past your reservation time if you haven't called ahead. For any changes please call our New York reservations line at 212-842-8070
+pass  ia-private (in data: Delhi private dining for 10 to 40) [3/3 runs passed]
+    run 1
+      > Do you have private dining in Delhi? For how many people?
+      < [rag/question v2 5523ms] Yes — Indian Accent New Delhi has three private dining spaces, ideal for get-togethers of 10–40 guests. For enquiries please email reservations.del@indianaccent
+    run 2
+      > Do you have private dining in Delhi? For how many people?
+      < [rag/question v2 5758ms] Yes — Indian Accent New Delhi has private dining. There are 3 private dining spaces suitable for gatherings of about 10–40 guests. For enquiries, email reservat
+    run 3
+      > Do you have private dining in Delhi? For how many people?
+      < [rag/question v2 5109ms] Yes — Indian Accent New Delhi has private dining. The New Delhi location has 3 private dining spaces suitable for gatherings of 10–40 guests. For enquiries you 
+pass  mp-B9 (in data (B9): works with children and adolescents) [3/3 runs passed]
+    run 1
+      > Do you work with children and teenagers?
+      < [rag/question v2 7248ms] Yes — Mpower (MPOWER – THE CENTRE) offers holistic mental health care solutions for children, adolescents and young people, and their families.) Would you like 
+    run 2
+      > Do you work with children and teenagers?
+      < [rag/question v2 6864ms] Yes — Mpower offers holistic mental health care for children, adolescents and young people, and provides psychological and psycho‑educational assessments (learn
+    run 3
+      > Do you work with children and teenagers?
+      < [rag/question v2 7648ms] Yes — Mpower does work with children and teenagers. Mpower – The Centre offers holistic mental health care for children, adolescents, young people and their fam
+FAIL! mp-B12 (in data (B12): therapies and the Mumbai centre's address) [0/3 runs passed]
+    run 1
+      > What therapies do you offer, and where is the Mumbai centre?
+      < [rag/question v2 9738ms] Mpower’s Mumbai centre offers psychiatry and therapy/counselling services as part of its mental health care (see Mpower - The Centre, Mumbai and Psychiatrist in
+      ✗ missing /(CBT|cognitive behaviou?r)/; missing /(Hughes Road|Khareghat|Patkar Marg|400 ?007)/
+    run 2
+      > What therapies do you offer, and where is the Mumbai centre?
+      < [rag/question v2 9566ms] Mpower offers psychiatry and therapy services at its Mumbai mental health centre (described as “Beyond Therapy and Psychiatry”) and also runs expert-led courses
+      ✗ missing /(CBT|cognitive behaviou?r)/; missing /(Hughes Road|Khareghat|Patkar Marg|400 ?007)/
+    run 3
+      > What therapies do you offer, and where is the Mumbai centre?
+      < [rag/question v2 15522ms] We offer a range of therapies including individual psychotherapy; creative and expressive therapies (Music Therapy, Art Therapy, Dance & Movement Therapy); Spee
+      ✗ missing /(CBT|cognitive behaviou?r)/
+pass  mp-CBT (in data (B12): CBT is offered) [3/3 runs passed]
+    run 1
+      > Do you do CBT?
+      < [rag/question v2 7752ms] Yes — Mpower offers Cognitive Behavioral Therapy (CBT). (Source: Mpower services page.) I’m not a therapist — I can help connect you to the team. Would you like
+    run 2
+      > Do you do CBT?
+      < [rag/question v2 9044ms] Yes — Mpower offers Cognitive Behavioural Therapy (CBT).) I’m an assistant, not a therapist. Would you like more details about our CBT service or help with how 
+    run 3
+      > Do you do CBT?
+      < [rag/question v2 10896ms] Yes — Mpower offers Cognitive Behavioral Therapy (CBT).) Would you like help booking a CBT appointment?
+pass  mp-helpline (in data (B1 false alarm): the 24x7 helpline number, no crisis reply) [3/3 runs passed]
+    run 1
+      > Do you have a helpline I can call any time?
+      < [rag/question v2 12255ms] Yes — Mpower has a 24x7 mental health crisis helpline: 1800 120 820050. Would you like me to pass your name and phone number to the team so they can reach out?
+    run 2
+      > Do you have a helpline I can call any time?
+      < [rag/question v2 15686ms] Yes — Mpower’s free 24x7 mental health crisis helpline is 1800 120 820050 (toll-free) and the service is available 24 x 7. If you need medical help or want to b
+    run 3
+      > Do you have a helpline I can call any time?
+      < [rag/question v2 10134ms] Yes — Mpower runs a 24x7 mental health crisis helpline: 1800 120 820050. If you need medical help or want to book with a Mpower psychiatrist, you can call 080 6
+pass  mp-hours (in data: Mumbai centre 9 am to 8 pm) [3/3 runs passed]
+    run 1
+      > What are the Mumbai centre's opening hours?
+      < [rag/question v2 7270ms] The Mumbai centre is open 9:00 am to 8:00 pm. (Source: Mpower centre hours)
+    run 2
+      > What are the Mumbai centre's opening hours?
+      < [rag/question v2 7268ms] MPOWER - The Centre (Mumbai) is open 9:00 am to 8:00 pm.) Would you like help with how to book an appointment there?
+    run 3
+      > What are the Mumbai centre's opening hours?
+      < [rag/question v2 8477ms] The Mumbai centre is open 9:00 am–8:00 pm. (source: [1]) Would you like me to help with how to contact the centre or book an appointment?
+FAIL! mp-cancel (in data: cancel 48 hours ahead) [2/3 runs passed]
+    run 1
+      > What's your cancellation policy?
+      < [rag/question v2 7683ms] Mpower asks that cancellations be informed at least 48 hours in advance. No-shows or cancellations made under 24 hours are chargeable. If an online session is d
+    run 2
+      > What's your cancellation policy?
+      < [rag/question v2 8634ms] Here’s Mpower’s cancellation / session policy from their terms: - Mpower will reschedule an online session if the session is disrupted due to technical issues o
+      ✗ missing /48 hours/
+    run 3
+      > What's your cancellation policy?
+      < [rag/question v2 8481ms] Here’s Mpower’s cancellation policy from our policies: 1) Please inform Mpower at least 48 hours before a session to cancel. Cancellations or no-shows under 24 
+pass  mp-book-delhi (in data: Delhi booking number) [3/3 runs passed]
+    run 1
+      > How do I book an appointment at the Delhi centre?
+      < [rag/question v2 10006ms] You can book an appointment at MPOWER THE CENTRE (Delhi) by calling the centre: +91 86578 74711 or +91 86578 74712. Appointments are required; walk-ins are only
+    run 2
+      > How do I book an appointment at the Delhi centre?
+      < [rag/question v2 10862ms] You can book an appointment at Mpower The Centre (Delhi) by calling the centre or visiting in person. The centre’s address is 44, Ring Road, 2nd Floor, Above Fa
+    run 3
+      > How do I book an appointment at the Delhi centre?
+      < [rag/question v2 10611ms] To book at Mpower THE CENTRE (Delhi), appointments are required. You can book by calling 8657874711 (also listed as +91 86578 74711 / +91 86578 74712). The Delh
+pass  ne-checkin (in data: Tijara check-in and check-out) [3/3 runs passed]
+    run 1
+      > What time is check-in and check-out at Tijara Fort-Palace?
+      < [rag/question v2 5759ms] Check‑in at Tijara Fort‑Palace is at 2:00 PM and check‑out is at 11:00 AM. Can I help with anything else for your stay?
+    run 2
+      > What time is check-in and check-out at Tijara Fort-Palace?
+      < [rag/question v2 7667ms] Check‑in at Tijara Fort‑Palace is at 2:00 PM and check‑out is at 11:00 AM.) Would you like help with anything else about your stay?
+    run 3
+      > What time is check-in and check-out at Tijara Fort-Palace?
+      < [rag/question v2 6484ms] Check-in at Tijara Fort‑Palace is at 2:00 PM and check-out is at 11:00 AM. I can help with anything else about your stay—would you like help with a reservation 
+FAIL! ne-B31 (in data (B31, as the site now says): advance for weddings) [0/3 runs passed]
+    run 1
+      > How much do I need to pay in advance for a wedding?
+      < [rag/question v2 14255ms] For a pre-wedding shoot at Neemrana’s Glasshouse on the Ganges the package price listed is ₹50,000. (citations: 1, 2) We don’t have a published amount for the a
+      ✗ missing /100 ?%/; missing /40 days/
+    run 2
+      > How much do I need to pay in advance for a wedding?
+      < [declined/question v2 17087ms] I don’t have information on a required advance payment for weddings. For charter pricing we confirm the exact cost once you enquire, so please contact the reser
+      ✗ missing /100 ?%/; missing /40 days/
+    run 3
+      > How much do I need to pay in advance for a wedding?
+      < [declined/question v2 15481ms] I don’t have a fixed advance-payment amount listed. The property says the exact charter cost (and presumably deposit/advance) is confirmed once you enquire with
+      ✗ missing /100 ?%/; missing /40 days/
+pass  ne-spa (in data: spa open 8 am to 8 pm) [3/3 runs passed]
+    run 1
+      > What time is the spa open at Neemrana?
+      < [rag/question v2 5955ms] The Neemrana Spa is open daily from 8:00 am to 8:00 pm. (Source: Neemrana’s Glasshouse — Hours, Wellness) Would you like me to help with a spa booking or check 
+    run 2
+      > What time is the spa open at Neemrana?
+      < [rag/question v2 5996ms] The Neemrana Spa at Glasshouse on The Ganges is open daily from 8:00 am to 8:00 pm. (Source: Neemrana’s Glasshouse — Hours, Wellness)
+    run 3
+      > What time is the spa open at Neemrana?
+      < [rag/question v2 5847ms] The Neemrana Spa is open daily from 8:00 am to 8:00 pm. Would you like me to check treatment availability or help book a slot?
+pass  ne-address (in data: Neemrana Fort-Palace address) [3/3 runs passed]
+    run 1
+      > What's the address of Neemrana Fort-Palace?
+      < [rag/question v2 5318ms] Neemrana Fort‑Palace address: 122nd Milestone, Delhi‑Jaipur Highway, Neemrana, Alwar, Rajasthan 301705. (If you’d like I can help with directions or contact det
+    run 2
+      > What's the address of Neemrana Fort-Palace?
+      < [rag/question v2 6108ms] Neemrana Fort‑Palace is at 122nd Milestone, Delhi‑Jaipur Highway, Village Neemrana, District Alwar, Rajasthan 301705. (Source: Neemrana Hotels)
+    run 3
+      > What's the address of Neemrana Fort-Palace?
+      < [rag/question v2 4805ms] Neemrana Fort‑Palace address: 122nd Milestone, Delhi‑Jaipur Highway, Neemrana, Alwar, Rajasthan 301705. Would you like anything else about the property?
+pass  ne-glasshouse (in data: Glasshouse on the Ganges check-in 2 PM) [3/3 runs passed]
+    run 1
+      > What's the check-in time at the Glasshouse on the Ganges?
+      < [rag/question v2 4537ms] Check-in is at 2 PM; check-out is at 12 PM. Guests arriving earlier or leaving later are encouraged to contact the reservations team to discuss options (subject
+    run 2
+      > What's the check-in time at the Glasshouse on the Ganges?
+      < [rag/question v2 5048ms] Check-in is at 2 PM. If you expect to arrive earlier, please contact our reservations team in advance to discuss options (subject to availability).
+    run 3
+      > What's the check-in time at the Glasshouse on the Ganges?
+      < [rag/question v2 5101ms] Check-in is at 2 PM. Check-out is at 12 PM; guests arriving earlier or departing later are asked to contact the reservations team (subject to availability).
+pass  ne-preshoot (in data: pre-wedding shoot at Tijara 80,000) [3/3 runs passed]
+    run 1
+      > How much is a pre-wedding shoot at Tijara?
+      < [rag/question v2 8017ms] The pre-wedding shoot at Tijara Fort‑Palace costs ₹80,000. The package includes a 12‑hour slot, a room for makeup and changes, open venues, restricted dining & 
+    run 2
+      > How much is a pre-wedding shoot at Tijara?
+      < [rag/question v2 5649ms] A pre‑wedding shoot at Tijara Fort‑Palace costs INR 80,000. The package is for a maximum of 8 people, is not available on Saturdays, and all taxes are extra; it
+    run 3
+      > How much is a pre-wedding shoot at Tijara?
+      < [rag/question v2 6210ms] The pre‑wedding shoot package at Tijara Fort‑Palace is INR 80,000 per property. The package (valid until 30 Nov 2026) includes a 12‑hour slot, a room for makeup
+FAIL! sb-P1 (in data: SEBI RIA number) [0/3 runs passed]
+    run 1
+      > Are you SEBI registered? What's your number?
+      < [rag/question v2 8141ms] Yes. Scripbox’s portfolio management services are offered through Wealth Managers (India) Private Limited / Scripbox Wealth Managers Private Limited, SEBI Regis
+      ✗ missing /INA200001041/; says /098862 ?73164/
+    run 2
+      > Are you SEBI registered? What's your number?
+      < [rag/question v2 6555ms] Yes. Scripbox (through Scripbox Wealth Managers Private Limited / Wealth Managers (India) Private Limited) is registered with SEBI as a Portfolio Manager. Regis
+      ✗ missing /INA200001041/; says /098862 ?73164/
+    run 3
+      > Are you SEBI registered? What's your number?
+      < [rag/question v2 5737ms] Yes. Scripbox offers services through Scripbox Wealth Managers Private Limited (Wealth Managers (India) Private Limited) which is registered with SEBI as a Port
+      ✗ missing /INA200001041/
+FAIL! sb-P2 (in data: services) [1/3 runs passed]
+    run 1
+      > What services do you offer?
+      < [rag/question v2 11973ms] Scripbox offers personalised financial planning and advice, mutual-fund investing (SIP and lumpsum), tools and calculators (SIP/lumpsum/FD), content on FDs/RDs 
+    run 2
+      > What services do you offer?
+      < [rag/question v2 17494ms] Scripbox offers mutual-fund based investing and SIPs, financial planning and goal-based plans, plus tools like SIP and mutual-fund calculators. For details see 
+      ✗ missing /mutual fund|PMS|advis/
+    run 3
+      > What services do you offer?
+      < [rag/question v2 9524ms] We help with mutual-fund investing (including SIPs), financial planning and Scripbox plans — plus tools and guides to pick funds and plan goals. Which of these 
+      ✗ missing /mutual fund|PMS|advis/
+pass  sb-P5 (in data: no guaranteed returns) [3/3 runs passed]
+    run 1
+      > What's the minimum for PMS, and are returns guaranteed?
+      < [rag/question v2 6177ms] Minimum investment for PMS in India is ₹50 lakh. PMS cannot guarantee returns; investments are risky even though fund managers use professional strategies. Scri
+    run 2
+      > What's the minimum for PMS, and are returns guaranteed?
+      < [rag/question v2 5363ms] Minimum required: As per SEBI, PMS minimum investment is ₹50 lakh; Scripbox also says investors should have an investable corpus over ₹50 lakh. Returns: No—PMS 
+    run 3
+      > What's the minimum for PMS, and are returns guaranteed?
+      < [rag/question v2 6476ms] Minimum investment for PMS in India is ₹50 lakh (SEBI-mandated). PMS investments are not guaranteed — they are risky and managers cannot promise fixed returns, 
+FAIL! sb-P9 (in data: none guaranteed) [1/3 runs passed]
+    run 1
+      > Are any of your products guaranteed?
+      < [rag/question v2 17068ms] Scripbox does not offer guaranteed returns — investment returns are not guaranteed. For confirmation about any specific product or guarantee, I can connect you 
+    run 2
+      > Are any of your products guaranteed?
+      < [declined/question v2 13194ms] I don’t have any information saying a Scripbox product is guaranteed, so I can’t confirm any product guarantees. If you’d like a definite answer, shall I connec
+      ✗ missing /(no|not|none|aren.t|isn.t)\b.{0,30}guarantee/
+    run 3
+      > Are any of your products guaranteed?
+      < [declined/question v2 10588ms] I don’t have information in my available resources about any Scripbox products being guaranteed. I can put you in touch with the Scripbox team for a definite an
+      ✗ missing /(no|not|none|aren.t|isn.t)\b.{0,30}guarantee/
+pass  tss-S1 (in data: Batman high tops ₹4,499) [3/3 runs passed]
+    run 1
+      > How much are the Batman high top sneakers?
+      < [rag/question v2 5878ms] The Batman: Gotham Blaze (Men High Top Sneakers) are listed at ₹4499. (Source: product listing)
+    run 2
+      > How much are the Batman high top sneakers?
+      < [rag/question v2 4857ms] The Batman: Gotham Blaze men’s high-top sneakers are priced at ₹4,499.) For reference, other men’s high-top sneakers on the site are listed at ₹3,999.
+    run 3
+      > How much are the Batman high top sneakers?
+      < [rag/question v2 4633ms] The Batman: Gotham Blaze (Men High Top Sneakers) are priced at ₹4,499. []
+pass  tss-S2 (in data: Orbit backpack ₹3,299, no cart offer) [3/3 runs passed]
+    run 1
+      > Price of the Orbit backpack?
+      < [rag/question v2 6986ms] The Orbit backpack is listed at ₹3299. Would you like me to check availability or sizes for it?
+    run 2
+      > Price of the Orbit backpack?
+      < [rag/question v2 5224ms] The TSS Originals “Orbit” backpack is priced at ₹3,299.) Would you like help checking availability or adding it to your cart?
+    run 3
+      > Price of the Orbit backpack?
+      < [rag/question v2 5224ms] The TSS Originals “Orbit” backpack is priced at ₹3,299. (Source: The Souled Store product listings.)
+FAIL! tss-S3 (in data: 30-day returns) [2/3 runs passed]
+    run 1
+      > What's your return policy?
+      < [rag/question v2 13688ms] Our products are eligible for return or exchange under a 30-day “no questions asked” return or exchange policy where listed as such. For specific cases or more 
+    run 2
+      > What's your return policy?
+      < [rag/question v2 12610ms] We offer a 30‑day return or exchange policy for eligible products — described as “eligible for return or exchange under our 30‑day return or exchange policy. No
+      ✗ missing /30[- ]?day|30 days|thirty days/
+    run 3
+      > What's your return policy?
+      < [rag/question v2 12148ms] Most listed products are eligible for a 30-day return or exchange — described as “eligible for return or exchange under our 30-day return or exchange policy. No
+pass  tss-S4 (in data: prices include taxes) [3/3 runs passed]
+    run 1
+      > Are taxes included in the price?
+      < [rag/question v2 5929ms] Some product listings on our site show prices inclusive of taxes — for example the Blue Sky Men Classic Polos page states “Price incl. Of all taxes.” If you’d l
+    run 2
+      > Are taxes included in the price?
+      < [rag/question v2 7040ms] For the exclusive membership introductory offer (Rs. 199/149) the fee is inclusive of GST. I don’t have information I can cite about whether taxes are included 
+    run 3
+      > Are taxes included in the price?
+      < [rag/question v2 7396ms] The annual/quarterly introductory membership fee (Rs. 199/149) is inclusive of GST (taxes). (source:) For other products and regular prices, I don’t have inform
+FAIL! tss-S5 (in data: customer care phone and email) [0/3 runs passed]
+    run 1
+      > How do I reach customer care?
+      < [rag/question v2 5112ms] You can email customer-care–type queries to connect@thesouledstore.com (for queries about use of information/privacy) or to grievanceofficer@thesouledstore.com 
+      ✗ missing /6849 ?3328/
+    run 2
+      > How do I reach customer care?
+      < [rag/question v2 6751ms] You can email customer-care queries about use of your information to connect@thesouledstore.com. For formal grievances, The Souled Store lists grievanceofficer@
+      ✗ missing /6849 ?3328/
+    run 3
+      > How do I reach customer care?
+      < [rag/question v2 5638ms] You can contact customer care by email: - For general queries about data or the Privacy Policy: connect@thesouledstore.com (source: Privacy Policy) [3] - For gr
+      ✗ missing /6849 ?3328/
+FAIL! tss-S6 (in data: oversized fit, size down) [0/3 runs passed]
+    run 1
+      > Your hoodies look oversized, should I size down?
+      < [declined/question v2 9413ms] I don’t have sizing guidance for our hoodies. Please check the specific hoodie’s product page for its size chart or contact The Souled Store customer support on
+      ✗ missing /siz(e|ing) down|smaller size|one size (down|smaller)/
+    run 2
+      > Your hoodies look oversized, should I size down?
+      < [clarified/question v2 6874ms] Which specific hoodie are you looking at (product name or link)? I can check sizing notes for that exact item.
+      ✗ missing /siz(e|ing) down|smaller size|one size (down|smaller)/
+    run 3
+      > Your hoodies look oversized, should I size down?
+      < [clarified/question v2 6494ms] Which specific hoodie are you looking at (product name or link)? I can check the product page for sizing details.
+      ✗ missing /siz(e|ing) down|smaller size|one size (down|smaller)/
+pass  tss-S7 (in data: machine wash) [3/3 runs passed]
+    run 1
+      > How should I wash the cotton t-shirts?
+      < [rag/question v2 5562ms] Wash cotton t-shirts by machine wash. (See product care: Machine Wash.)
+    run 2
+      > How should I wash the cotton t-shirts?
+      < [rag/question v2 5604ms] Machine wash. Would you like care instructions for a specific product?
+    run 3
+      > How should I wash the cotton t-shirts?
+      < [rag/question v2 4739ms] Wash cotton t-shirts by machine wash. Would you like help with drying or stain removal tips?
+pass  tss-S8 (in data: membership non-refundable mid-way) [3/3 runs passed]
+    run 1
+      > Can I cancel the membership and get my money back?
+      < [rag/question v2 6600ms] If you cancel your exclusive membership mid-way, it is non-refundable and non-transferable (you would not get your money back). If The Souled Store cancels your
+    run 2
+      > Can I cancel the membership and get my money back?
+      < [rag/question v2 6678ms] If you cancel your exclusive membership mid-way, it is non-refundable and non-transferable. If The Souled Store cancels a membership (for example for misuse), t
+    run 3
+      > Can I cancel the membership and get my money back?
+      < [rag/question v2 7996ms] If you cancel your Souled Store exclusive membership mid-way, it is non-refundable and non-transferable. If The Souled Store cancels a membership (for misuse or
+pass  tss-S9 (in data: card details not stored) [3/3 runs passed]
+    run 1
+      > Do you save my card details?
+      < [rag/question v2 5513ms] No — The Souled Store uses third-party payment processors and does not store or collect your payment card details; you may still be asked to provide card detail
+    run 2
+      > Do you save my card details?
+      < [rag/question v2 5216ms] We do not store or collect your payment card details — payments are handled by third‑party payment processors. You may, however, be asked to provide card detail
+    run 3
+      > Do you save my card details?
+      < [rag/question v2 6963ms] The Souled Store does not store or collect your payment card details; payments are handled by third-party payment processors (you may still need to enter card d
+pass  tss-S10 (not in data: shipping to Pune, honest, real contact, no estimate offer) [3/3 runs passed]
+    run 1
+      > How much is shipping and how long does delivery take to Pune?
+      < [declined/question v2 14535ms] I don’t have the shipping charges or estimated delivery time to Pune. Please contact The Souled Store customer team for exact shipping cost and delivery estimat
+    run 2
+      > How much is shipping and how long does delivery take to Pune?
+      < [declined/question v2 10493ms] I don’t have the shipping cost or estimated delivery time to Pune in the available product information. You can check the “Delivery Details” section on the prod
+    run 3
+      > How much is shipping and how long does delivery take to Pune?
+      < [rag/question v2 8447ms] I don’t have shipping charges or delivery-time info to Pune I can access. Please contact The Souled Store team (phone or email) to ask about shipping cost and e
+pass  tss-S11 (not in data: cash on delivery, honest with contact) [3/3 runs passed]
+    run 1
+      > Do you have cash on delivery?
+      < [declined/question v2 13213ms] I don’t have information here about whether we offer Cash on Delivery (COD). Please check the payment options at checkout on our website or contact customer sup
+    run 2
+      > Do you have cash on delivery?
+      < [declined/question v2 14552ms] I don’t have information about whether Cash on Delivery (COD) is offered. Please check the Delivery Details section on the specific product page or contact our 
+    run 3
+      > Do you have cash on delivery?
+      < [declined/question v2 13128ms] I don’t have information I can access about whether The Souled Store offers Cash on Delivery (COD). Please check the payment options at checkout on their websit
+pass  tss-S12 (multi-turn: Batman gift in budget, no hand-over, returns) [3/3 runs passed]
+    run 1
+      > I'm looking for a gift for my brother who loves Batman, budget 5000
+      < [rag/question v2 5180ms] A good pick is the Batman: Gotham Blaze (Men High Top Sneakers) — ₹4,499. (I can check sizes or other Batman items if you want.)
+      > he's UK 9
+      < [clarified/question v2 8971ms] Thanks — would you like me to check available sizes for the Batman: Gotham Blaze in UK 9, or look for other Batman shoes in that size?
+      > what if it doesn't fit?
+      < [rag/question v2 12311ms] If the shoes don’t fit, The Souled Store offers a 30-day return or exchange policy described as “eligible for return or exchange under our 30-day return or exch
+    run 2
+      > I'm looking for a gift for my brother who loves Batman, budget 5000
+      < [rag/question v2 5942ms] Great — within a ₹5000 budget you can get the Batman: Gotham Blaze men’s high-top sneakers priced at ₹4,499. Would you like me to check available sizes or help 
+      > he's UK 9
+      < [clarified/question v2 2221ms] Would you like me to check if the Batman: Gotham Blaze men’s high-top sneakers are available in UK 9 and help with ordering?
+      > what if it doesn't fit?
+      < [rag/question v2 6878ms] If the sneakers don’t fit, they’re eligible for return or exchange under The Souled Store’s 30-day return or exchange policy — “No questions asked.” Would you l
+    run 3
+      > I'm looking for a gift for my brother who loves Batman, budget 5000
+      < [rag/question v2 9614ms] A great option within ₹5,000 is the Batman: Gotham Blaze men’s high-top sneakers priced at ₹4,499 (fits your budget). You could also add Batman-themed socks (So
+      > he's UK 9
+      < [clarified/question v2 3985ms] Would you like me to check if the Batman: Gotham Blaze high-top sneakers are available in UK 9, or help convert UK 9 to the Indian size chart?
+      > what if it doesn't fit?
+      < [rag/question v2 7959ms] If the sneakers don’t fit, The Souled Store offers a 30-day return or exchange policy and says the listed products are “eligible for return or exchange under ou
+pass  tss-S16 (order lookup with no order: asks for order number or points to care) [3/3 runs passed]
+    run 1
+      > Where is my order?
+      < [clarified/question v2 2885ms] I can help track that — could you share your order ID (or the email/phone used to order)?
+    run 2
+      > Where is my order?
+      < [clarified/question v2 2978ms] I can help track that—could you share your order ID (or the email/phone used for the order) so I can look up its status?
+    run 3
+      > Where is my order?
+      < [clarified/question v2 2472ms] I can help track your order—could you share your Order ID or the email/phone used to place it?
+FAIL! tss-M2 (memory: 'please remember' is confirmed, not declined) [1/3 runs passed]
+    run 1
+      > Please remember for next time: I'm Rohan, I wear size M and UK 9, and I love Spiderman
+      < [rag/smalltalk v2 9239ms] I can't remember details between chats, but I'll use them for the rest of this one. Thanks, Rohan — nice to meet you! Anything I can help with right now?
+    run 2
+      > Please remember for next time: I'm Rohan, I wear size M and UK 9, and I love Spiderman
+      < [declined/smalltalk v2 9068ms] I don't know that — please contact our team at +91 22-68493328.
+      ✗ missing /remember|noted|I'?ll keep|saved|got it/; says /I don.t know that/
+    run 3
+      > Please remember for next time: I'm Rohan, I wear size M and UK 9, and I love Spiderman
+      < [declined/smalltalk v2 8195ms] I don't know that — please contact our team at +91 22-68493328.
+      ✗ missing /remember|noted|I'?ll keep|saved|got it/; says /I don.t know that/

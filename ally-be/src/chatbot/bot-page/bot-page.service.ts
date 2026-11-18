@@ -4,6 +4,7 @@ import {
   Injectable,
   Optional,
 } from '@nestjs/common';
+import { prechatFor } from './prechat-minors';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Raw, Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
@@ -336,6 +337,8 @@ export class BotPageService {
       this.defaults(chatbot, botSettings),
       page.settings,
     );
+    // Young people (Q3-fast Part 1): no name or contact questions before the chat.
+    settings.prechat = prechatFor(settings.prechat, chatbot.safetyPack);
     const brandImages = await this.resolveBrand(
       page.slug,
       chatbot.id,

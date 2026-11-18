@@ -7,6 +7,7 @@ import {
   ParseEnumPipe,
   ParseUUIDPipe,
   Patch,
+  Put,
   Post,
   Query,
 } from '@nestjs/common';
@@ -28,6 +29,7 @@ import { HomeListsService } from './home-lists.service';
 import type { RuleChange } from './own-rules';
 import {
   SaveHomeFieldDto,
+  ChangePackDto,
   ChangeRuleDto,
   ChangeListDto,
   ProposeChangeDto,
@@ -289,6 +291,20 @@ export class AssistantHomeController {
     @Body() dto: SaveHomeFieldDto,
   ) {
     return this.home.saveField(id, dto);
+  }
+
+  @Put(':id/safety-pack')
+  @ChatbotRole(ChatbotMemberRole.OWNER)
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
+  @ApiOperation({
+    summary:
+      "Correct the assistant's safety pack; a less strict one needs a reason and is logged",
+  })
+  changePack(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ChangePackDto,
+  ) {
+    return this.home.changePack(id, dto);
   }
 
   @Patch(':id/rules')

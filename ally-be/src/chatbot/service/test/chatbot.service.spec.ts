@@ -1,6 +1,6 @@
 import { WaHandledBy } from 'src/whatsapp/enum/whatsapp.enum';
 import { Chatbot } from '../../entity/chatbot.entity';
-import { AgentRuntimeUsed, ChatbotRuntime } from '../../enum/chatbot.enum';
+import { AgentRuntimeUsed } from '../../enum/chatbot.enum';
 import { ChatbotService } from '../chatbot.service';
 import { buildChatbotService, storedBot } from './chatbot-service.fixtures';
 
@@ -9,22 +9,19 @@ jest.mock('src/common/execution/execution-manager', () => ({
 }));
 
 /**
- * The Agents v2 engine switch on the chatbot API: GET says which engine actually answers, and
+ * The Agents v2 engine on the chatbot API: GET has no engine fields (Q3-fast: one run path), and
  * Preview reports the run behind a test.
  */
-describe('ChatbotService and the runtime switch', () => {
-  let agentRuntimeAllowed: boolean;
+describe('ChatbotService and the agent run', () => {
   let stored: Chatbot;
   let updates: Partial<Chatbot>[];
   let respond: jest.Mock;
   let service: ChatbotService;
 
   beforeEach(() => {
-    agentRuntimeAllowed = true;
     updates = [];
     stored = storedBot();
     ({ service, respond } = buildChatbotService({
-      agentRuntimeAllowed: () => agentRuntimeAllowed,
       stored: () => stored,
       onUpdate: (patch) => {
         updates.push(patch);
@@ -41,18 +38,11 @@ describe('ChatbotService and the runtime switch', () => {
   });
 
   describe('GET', () => {
-    it('returns what actually answers, and no stored engine', async () => {
+    it('returns no engine fields: every bot answers the same way', async () => {
       const bot = await service.get('bot-1');
-      expect(bot.effectiveRuntime).toBe(ChatbotRuntime.V2);
+      expect(bot).not.toHaveProperty('effectiveRuntime');
       expect(bot).not.toHaveProperty('runtime');
       expect(bot).not.toHaveProperty('features');
-    });
-
-    it('shows v1 as effective while the kill switch is off', async () => {
-      agentRuntimeAllowed = false;
-      await expect(service.get('bot-1')).resolves.toMatchObject({
-        effectiveRuntime: ChatbotRuntime.V1,
-      });
     });
   });
 
@@ -67,8 +57,8 @@ describe('ChatbotService and the runtime switch', () => {
         runId: 'run-1',
         trace: [{ node: 'retrieve', ms: 120, summary: '3 hits' }],
         conversationId: 'preview-7b0c1b8e-8a43-4f61-9a43-3a2d5c0f9e11',
-        runtimeAllowed: true,
       });
+      expect(result).not.toHaveProperty('runtimeAllowed');
       expect(respond.mock.calls[0][0]).toMatchObject({
         channel: { type: 'test' },
         conversationId: 'preview-7b0c1b8e-8a43-4f61-9a43-3a2d5c0f9e11',
@@ -80,19 +70,22 @@ describe('ChatbotService and the runtime switch', () => {
       expect(result.conversationId).toMatch(/^preview-[0-9a-f-]{36}$/);
     });
 
-    it('reports v1 with no run when v1 answered', async () => {
-      respond.mockResolvedValueOnce({ handledBy: WaHandledBy.RAG, body: 'x' });
+    it('reports no run when none was involved (a keyword reply)', async () => {
+      respond.mockResolvedValueOnce({
+        handledBy: WaHandledBy.TEMPLATE,
+        body: 'x',
+      });
       await expect(
         service.test('bot-1', { message: 'q' }),
-      ).resolves.toMatchObject({ runtime: 'v1', runId: null, trace: null });
+      ).resolves.toMatchObject({ runtime: null, runId: null, trace: null });
     });
 
-    it('shows a fallback as the alert it would raise, without raising it', async () => {
+    it('shows a failed run as the alert it would raise, without raising it', async () => {
       respond.mockResolvedValueOnce({
         handledBy: WaHandledBy.RAG,
         body: 'x',
         agent: {
-          runtime: AgentRuntimeUsed.V2_FALLBACK,
+          runtime: AgentRuntimeUsed.V2_FAILED,
           runId: 'run-2',
           conversationId: 'preview-x',
           fallbackReason: 'upstream_404',
@@ -101,7 +94,7 @@ describe('ChatbotService and the runtime switch', () => {
       await expect(
         service.test('bot-1', { message: 'q' }),
       ).resolves.toMatchObject({
-        runtime: AgentRuntimeUsed.V2_FALLBACK,
+        runtime: AgentRuntimeUsed.V2_FAILED,
         fallbackReason: 'upstream_404',
         wouldAlert: 'Chatbot Agent Runtime Degraded',
       });

@@ -85,9 +85,13 @@ export class Chatbot extends BaseWithoutTenantEntity {
   @Column({ name: 'safety_pack_version', type: 'int', nullable: true })
   safetyPackVersion?: number | null;
 
-  /** The owner's own rules, on top of the pack: lines the assistant must never cross. */
+  /**
+   * The owner's own rules, on top of the pack: lines the assistant must never cross. `packChange`
+   * (Q3-fast Part 1) is the owner's last change of the safety pack, with their reason when the new
+   * pack is less strict; the Safety and Checkup sections show it.
+   */
   @Column({ type: 'jsonb', default: () => `'{"never":[]}'` })
-  rules!: { never: string[]; avoid?: string[] };
+  rules!: { never: string[]; avoid?: string[]; packChange?: PackChange };
 
   /**
    * What it's for (chunk 20a-2): answer, enquiries, training, guide or custom; null for bots made
@@ -103,4 +107,15 @@ export class Chatbot extends BaseWithoutTenantEntity {
 
   @Column({ type: 'timestamp', name: 'archived_at', nullable: true })
   archivedAt?: Date | null;
+}
+
+/** The owner's change of an assistant's safety pack (Q3-fast Part 1). */
+export interface PackChange {
+  from: string | null;
+  to: string;
+  /** Only for a less strict pack, where it is required. */
+  reason: string | null;
+  lessStrict: boolean;
+  at: string;
+  by: number | null;
 }

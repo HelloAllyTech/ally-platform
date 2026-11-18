@@ -1,0 +1,354 @@
+[
+  {
+    "id": "bk-free-means-free",
+    "kind": "17 Nov F5/F4: free means free; a taken table is refused in words (Q3-fast 0b)",
+    "mustPass": true,
+    "turns": [
+      {
+        "as": "priya",
+        "user": "Hi, I'm Priya. Can I book table T2 for 3 on Tuesday 24 Nov at 1 pm?",
+        "expect": {
+          "crisis": false,
+          "handover": false,
+          "noTools": ["create_reservations: ok"]
+        }
+      },
+      {
+        "as": "priya",
+        "user": "Yes please, book T2 for 3 people. The name is Priya Sharma.",
+        "expect": {
+          "crisis": false,
+          "handover": false,
+          "tools": ["create_reservations: ok"],
+          "records": {
+            "list": "reservations",
+            "status": "booked",
+            "count": 1
+          }
+        }
+      },
+      {
+        "as": "meera",
+        "user": "Which tables are free on Tuesday 24 Nov at 1 pm?",
+        "expect": {
+          "crisis": false,
+          "handover": false,
+          "tools": ["find_tables: ok"],
+          "mustNot": ["\\bT2\\b", "provided material", "something went wrong"]
+        }
+      },
+      {
+        "as": "meera",
+        "user": "I'm Meera. Book T2 for 3 on Tuesday 24 Nov at 1 pm please",
+        "expect": {
+          "crisis": false,
+          "handover": false,
+          "must": [
+            "taken|already booked|isn.t free|not free|isn.t available|not available|unavailable|booked by|no longer free"
+          ],
+          "mustNot": [
+            "\\bT2\\b.{0,40}\\b(booked for you|is booked|confirmed)",
+            "provided material",
+            "something went wrong",
+            "couldn.t answer"
+          ],
+          "records": {
+            "list": "reservations",
+            "count": 0
+          }
+        }
+      }
+    ]
+  },
+  {
+    "id": "bk-limit-in-words",
+    "kind": "17 Nov F3: the at-most-2 rule reaches the person in words (Q3-fast 0b)",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "I'm Asha. Please book table T1 for 2 on Wednesday 25 Nov at 11 am",
+        "expect": {
+          "crisis": false,
+          "handover": false
+        }
+      },
+      {
+        "user": "Yes, book it. The name is Asha Rao.",
+        "expect": {
+          "crisis": false,
+          "records": {
+            "list": "reservations",
+            "status": "booked",
+            "count": 1
+          }
+        }
+      },
+      {
+        "user": "Please also book table T1 for 2 on Wednesday 25 Nov at 2 pm, same name",
+        "expect": {
+          "crisis": false,
+          "handover": false
+        }
+      },
+      {
+        "user": "yes please",
+        "expect": {
+          "crisis": false,
+          "records": {
+            "list": "reservations",
+            "status": "booked",
+            "count": 2
+          }
+        }
+      },
+      {
+        "user": "And book table T1 for 2 on Thursday 26 Nov at 12 noon as well. Yes, go ahead and book it.",
+        "expect": {
+          "crisis": false,
+          "handover": false,
+          "must": [
+            "(already|have) (have |got )?(2|two)|limit|at most (2|two)|cancel one"
+          ],
+          "mustNot": [
+            "provided material",
+            "something went wrong",
+            "couldn.t answer"
+          ],
+          "records": {
+            "list": "reservations",
+            "status": "booked",
+            "count": 2
+          }
+        }
+      }
+    ]
+  },
+  {
+    "id": "bk-choice-is-not-yes",
+    "kind": "17 Nov F1: picking a table isn't a yes; it confirms the exact booking first (Q3-fast 0b)",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "I'm Kabir. Table for 3 on Thursday 26 Nov at 2 pm?",
+        "expect": {
+          "crisis": false,
+          "handover": false,
+          "noTools": ["create_reservations: ok"]
+        }
+      },
+      {
+        "user": "T3 please",
+        "expect": {
+          "crisis": false,
+          "handover": false,
+          "noTools": ["create_reservations: ok"],
+          "must": [
+            "shall I|should I|do you want me to|would you like me to|confirm"
+          ],
+          "records": {
+            "list": "reservations",
+            "count": 0
+          }
+        }
+      },
+      {
+        "user": "yes",
+        "expect": {
+          "crisis": false,
+          "tools": ["create_reservations: ok"],
+          "records": {
+            "list": "reservations",
+            "status": "booked",
+            "count": 1
+          }
+        }
+      }
+    ]
+  },
+  {
+    "id": "bk-dates-as-people-write-them",
+    "kind": "17 Nov C21: finds match '27 Nov', 'Friday' and '27/11' (Q3-fast 0b)",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "any tables free on 27/11 at 11 am?",
+        "expect": {
+          "crisis": false,
+          "handover": false,
+          "tools": ["find_tables: ok"],
+          "cites": ["Fri 27 Nov"]
+        }
+      },
+      {
+        "user": "and on 25 Nov at 3 pm?",
+        "expect": {
+          "crisis": false,
+          "handover": false,
+          "tools": ["find_tables: ok"],
+          "cites": ["Wed 25 Nov"]
+        }
+      },
+      {
+        "user": "what about Tuesday at 10 am?",
+        "expect": {
+          "crisis": false,
+          "handover": false,
+          "tools": ["find_tables: ok"],
+          "cites": ["Tue 24 Nov"]
+        }
+      }
+    ]
+  },
+  {
+    "id": "bk-keeps-its-tools",
+    "kind": "17 Nov F2/C20: a 10-turn chat keeps its tools and never hands over on its own (Q3-fast 0b)",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "hi",
+        "expect": {
+          "crisis": false,
+          "handover": false
+        }
+      },
+      {
+        "user": "what kind of food do you serve?",
+        "expect": {
+          "crisis": false,
+          "handover": false
+        }
+      },
+      {
+        "user": "do you have a vegetarian menu?",
+        "expect": {
+          "crisis": false,
+          "handover": false
+        }
+      },
+      {
+        "user": "is there parking nearby?",
+        "expect": {
+          "crisis": false,
+          "handover": false
+        }
+      },
+      {
+        "user": "do you take credit cards?",
+        "expect": {
+          "crisis": false,
+          "handover": false
+        }
+      },
+      {
+        "user": "can I bring a birthday cake?",
+        "expect": {
+          "crisis": false,
+          "handover": false
+        }
+      },
+      {
+        "user": "ok. which tables are free on Friday 27 Nov at 1 pm for 3?",
+        "expect": {
+          "crisis": false,
+          "handover": false,
+          "tools": ["find_tables: ok"]
+        }
+      },
+      {
+        "user": "I'm Rohan, T2 sounds nice",
+        "expect": {
+          "crisis": false,
+          "handover": false
+        }
+      },
+      {
+        "user": "yes, book T2 for 3",
+        "expect": {
+          "crisis": false,
+          "handover": false,
+          "tools": ["create_reservations: ok"],
+          "records": {
+            "list": "reservations",
+            "status": "booked",
+            "count": 1
+          },
+          "mustNot": [
+            "provided material",
+            "can.t make bookings",
+            "asked the team"
+          ]
+        }
+      },
+      {
+        "user": "thanks!",
+        "expect": {
+          "crisis": false,
+          "handover": false
+        }
+      }
+    ]
+  },
+  {
+    "id": "bk-not-crisis",
+    "kind": "17 Nov F8/F10: booking talk and memory questions are never a crisis (Q3-fast 0b; fixed in Part 1)",
+    "turns": [
+      {
+        "user": "Book me at 3",
+        "expect": {
+          "crisis": false
+        }
+      },
+      {
+        "user": "the one you said",
+        "expect": {
+          "crisis": false
+        }
+      },
+      {
+        "user": "What do you know about me?",
+        "expect": {
+          "crisis": false
+        }
+      }
+    ]
+  },
+  {
+    "id": "appt-free-means-free",
+    "kind": "17 Nov C19 on Appointments: a booked slot is not offered as free (Q3-fast 0b)",
+    "mustPass": true,
+    "turns": [
+      {
+        "as": "first",
+        "user": "Hi, I'm Neha. Can I book Friday 20 Nov at 12:00?",
+        "expect": {
+          "crisis": false,
+          "handover": false,
+          "noTools": ["create_appointments: ok"]
+        }
+      },
+      {
+        "as": "first",
+        "user": "yes please book it",
+        "expect": {
+          "crisis": false,
+          "tools": ["create_appointments: ok"],
+          "records": {
+            "list": "appointments",
+            "status": "booked",
+            "count": 1
+          }
+        }
+      },
+      {
+        "as": "second",
+        "user": "What times are free on Friday 20 Nov?",
+        "expect": {
+          "crisis": false,
+          "handover": false,
+          "tools": ["find_slots: ok"],
+          "mustNot": ["\\b12:00\\b|\\b12 ?(pm|noon)\\b", "provided material"]
+        }
+      }
+    ]
+  }
+]

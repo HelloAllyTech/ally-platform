@@ -101,14 +101,6 @@ export const BotSettingsTab: React.FC = () => {
             hideCloseButton
           />
         )}
-        <div className="border-t border-border-light" />
-        <Toggle
-          id="wa-agent-runtime"
-          label={t.agentRuntimeLabel}
-          help={t.agentRuntimeHelp}
-          value={draft.agentRuntimeAllowed}
-          onChange={value => set("agentRuntimeAllowed", value)}
-        />
       </Card>
 
       <Card title={t.safetyTitle} subtitle={t.safetyIntro}>

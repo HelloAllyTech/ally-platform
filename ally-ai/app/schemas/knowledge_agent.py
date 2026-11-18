@@ -289,6 +289,11 @@ class CrisisCheckResponse(BaseModel):
     """
 
     is_crisis: bool = False
+    #: Q3-fast Part 1: `at_risk`, `emergency`, `upset` or `none`. `is_crisis` is true
+    #: for the first two, so a caller that reads only it behaves as before.
+    level: Literal["at_risk", "emergency", "upset", "none"] = "none"
+    #: Suicide or self-harm is present too: an emergency reply adds the at-risk line.
+    self_harm: bool = False
     signal: str = ""
     confidence: float = 0.0
     failed: bool = False

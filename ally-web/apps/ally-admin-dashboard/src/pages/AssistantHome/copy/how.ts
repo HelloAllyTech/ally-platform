@@ -58,6 +58,17 @@ export const HOW = {
     create: "add",
     update: "change",
   },
+  // Q3-fast Part 2b: one plain sentence per list's playbook.
+  playbooks: {
+    booking:
+      "Because you added {list}, your assistant finds free times, confirms the exact time and books it.",
+    details:
+      "Because you added {list}, your assistant offers to take people's details when it can't fully answer, and saves them once they share them.",
+    orders:
+      "Because you added {list}, your assistant looks up only the person's own entries and explains what their status means.",
+    reference:
+      "Because you added {list}, your assistant quotes it exactly as listed and never invents availability.",
+  },
   packAny: "your kind of practice",
   purposeNone: "answering questions",
   instructionsLabel: "Anything else it should know or do",

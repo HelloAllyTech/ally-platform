@@ -1,5 +1,6 @@
 import { FC, useEffect, useRef, useState } from "react";
 
+import { Notification } from "@icons";
 import { useNavigate } from "react-router-dom";
 
 import { Button } from "@ally-ui-mono/ui-shared";
@@ -10,7 +11,6 @@ import {
   useMarkNotificationReadMutation,
 } from "@api";
 import { en, ROUTES } from "@constants";
-import { Notification } from "@icons";
 import { AppNotification } from "@types";
 import { formatDateTime } from "@utils";
 

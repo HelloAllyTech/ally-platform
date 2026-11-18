@@ -37,9 +37,9 @@ export const OverviewSection: React.FC<
   const [removing, setRemoving] = useState(false);
   const [days, setDays] = useState<7 | 30>(30);
   const [allNumbers, setAllNumbers] = useState(openAllNumbers);
-  // The list already counted the last 30 days; 7 days is asked for when chosen.
-  const week = useGetHomeNumbersQuery({ id: bot.id, days: 7 }, { skip: days !== 7 });
-  const stats = days === 7 ? week.data : bot.stats;
+  // Both periods from the store "This week" counts (Q3d; prod 18 Nov: the list's own 30 days left
+  // out the bot page's chats, so "People 0, Messages 0" sat beside "7 conversations").
+  const stats = useGetHomeNumbersQuery({ id: bot.id, days }).data;
   const navigate = useNavigate();
   const qr = useRef<HTMLDivElement>(null);
   const live = bot.status === ChatbotStatus.LIVE;

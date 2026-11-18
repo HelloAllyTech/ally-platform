@@ -164,3 +164,6 @@ class ConverseOut(BaseModel):
     design: lenient(DesignChoice, DesignChoice.NONE) = DesignChoice.NONE
     # Details the owner told you in this message, to add to "What we learned".
     owner_facts: List[OwnerFact] = Field(default_factory=list)
+    # A stricter safety pack the owner asked for in this message (Q3-fast stop 1): one
+    # of the pack ids; empty otherwise. ally-be applies it only when it is stricter.
+    safety_pack: str = ""

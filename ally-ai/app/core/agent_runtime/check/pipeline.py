@@ -24,6 +24,7 @@ from app.core.agent_runtime.check.text import (
     plain_text,
     says_it_has_nothing,
     without_contact_details,
+    without_sentences,
 )
 from app.core.agent_runtime.check.verdict import CheckContext, Verdict
 from app.core.agent_runtime.schemas import REPLY_ACTION, AgentIntent
@@ -60,6 +61,9 @@ def check_reply(
     found_nothing: bool = False,
     can_pass_on: bool = True,
     carried: int = 0,
+    refused: Sequence[str] = (),
+    business_contact: str = "",
+    memory_on: bool = True,
 ) -> Tuple[AnswerResult, Optional[Rejection]]:
     """The run's result, and the rejection reason when the check refused the draft;
     None when it went through as the model meant it.
@@ -92,8 +96,12 @@ def check_reply(
         found_nothing=found_nothing,
         can_pass_on=can_pass_on,
         carried=carried,
+        refused=tuple(refused),
+        business_contact=(business_contact or "").strip(),
+        memory_on=memory_on,
     )
     verdict = _read_draft(step, ctx)
+    say_memory_is_off(verdict, ctx)
     # A list's times are cited from the run's records before grounding (chunk 6).
     cite_offered_times(verdict, ctx)
     _ground(verdict, step, ctx)
@@ -205,6 +213,13 @@ def _relabel(
 def _require_sources(
     verdict: Verdict, ctx: CheckContext, about_organisation: bool
 ) -> None:
+    if relays_refusal(verdict, ctx):
+        # "That table is taken; T3 is free", "You already have 2 bookings": the
+        # list's own refusal of this run's booking, in plain words (Q3-fast Part
+        # 0b). It is the answer to what the person asked, so it goes out as one,
+        # never as the fixed decline, and never counts toward a hand-over.
+        verdict.intent, verdict.rejection = AgentIntent.ANSWER, None
+        return
     if verdict.intent == AgentIntent.ANSWER and not verdict.citations:
         if answers_from_empty_find(verdict.answer, ctx):
             # "Nothing's free on Thursday evening": a find this run found nothing at
@@ -247,6 +262,72 @@ def _require_sources(
 
 
 _NUMBER = re.compile(r"\d+")
+
+# "Please remember…", "remember that I…", "yaad rakhna" (Q3-fast Part 2, 17 Nov M2).
+_ASKS_TO_REMEMBER = re.compile(
+    r"\b(?:please\s+)?remember\b(?!\s+(?:me\s+)?(?:when|what|if|how))"
+    r"|\bnote\s+(?:that|this|down)\b"
+    r"|\byaad\s+(?:rakh|rakhna|rakhiye|rakhein)",
+    re.IGNORECASE,
+)
+# A promise to remember for later, which nothing will keep with memory off.
+_PROMISES_TO_REMEMBER = re.compile(
+    r"\b(?:i['’]ll|i\s+will|i['’]ve|i\s+have|we['’]ll)\s+(?:\w+\s+)?"
+    r"(?:remember|noted|note|save|saved|keep)"
+    r"|\bnext\s+time\b|\bfor\s+(?:the\s+)?future\b",
+    re.IGNORECASE,
+)
+#: Fixed, honest, not the decline voice (Q3-fast Part 2).
+MEMORY_OFF_REPLY = (
+    "I can't remember details between chats, but I'll use them for the rest of "
+    "this one."
+)
+
+
+def say_memory_is_off(verdict: Verdict, ctx: CheckContext) -> None:
+    """With memory off, "please remember…" gets a plain answer (Q3-fast Part 2, 17 Nov
+    M2: it got "I don't know that; please contact us"): a decline becomes the fixed
+    line, and a promise to remember for later is replaced by it."""
+    if ctx.memory_on or not _ASKS_TO_REMEMBER.search(ctx.question or ""):
+        return
+    if verdict.intent == AgentIntent.DECLINE or not verdict.answer.strip():
+        verdict.intent, verdict.answer = AgentIntent.SMALLTALK, MEMORY_OFF_REPLY
+        verdict.model_declined, verdict.citations = False, []
+        return
+    if _PROMISES_TO_REMEMBER.search(verdict.answer):
+        kept = without_sentences(
+            verdict.answer, lambda s: not _PROMISES_TO_REMEMBER.search(s)
+        )
+        verdict.answer = f"{MEMORY_OFF_REPLY} {kept}".strip()
+        if not verdict.citations:
+            # About the person's own details: a personal reply, uncited, like 8a's.
+            verdict.intent = AgentIntent.SMALLTALK
+
+
+def relays_refusal(verdict: Verdict, ctx: CheckContext) -> bool:
+    """An uncited reply, labelled an answer or declined by the model itself, after
+    a list write this run was refused by the list's rules (Q3-fast Part 0b), that
+    states no number the run didn't see: in the refusal, a record or passage it
+    was shown, or the conversation."""
+    if not ctx.refused or verdict.citations or not verdict.answer.strip():
+        return False
+    if verdict.intent == AgentIntent.DECLINE and not verdict.model_declined:
+        return False
+    if verdict.intent not in (AgentIntent.ANSWER, AgentIntent.DECLINE):
+        return False
+    seen = " ".join(
+        [
+            *ctx.refused,
+            ctx.question,
+            *(m.get("content") or "" for m in ctx.history),
+            *(
+                f"{p.get('section_path') or ''} {p.get('text') or ''}"
+                for p in ctx.passages
+            ),
+        ]
+    )
+    shown = set(_NUMBER.findall(seen))
+    return all(number in shown for number in _NUMBER.findall(verdict.answer))
 
 
 def answers_from_empty_find(answer: str, ctx: CheckContext) -> bool:

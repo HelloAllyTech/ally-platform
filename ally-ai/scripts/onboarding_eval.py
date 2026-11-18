@@ -143,30 +143,48 @@ def publish(
     api: Api, draft_id: str, run_view: Dict[str, Any], result: Dict[str, Any]
 ) -> Optional[Dict[str, Any]]:
     """Publish invite-only, as an owner would. When an owner's own Must pass question
-    failed, ally-be asks "Go live anyway?" (`must_pass_failed`); the eval says yes and
-    reports it. Nothing else is confirmed: a held safety question (`safety_recheck`)
-    or an unsourced answer (`checkup_unsourced`) stays a hard fail."""
+    failed, ally-be asks "Go live anyway?" (`must_pass_failed`); below the checkup's
+    quality gate it asks "Publish anyway?" with the score (`checkup_below_gate`,
+    Q3-fast). The eval says yes to each and reports it. Nothing else is confirmed: a
+    held safety question (`safety_recheck`) or an unsourced answer
+    (`checkup_unsourced`) stays a hard fail."""
     body: Dict[str, Any] = {"access": "invite", "emails": ["eval@example.com"]}
     path = f"/bot-drafts/{draft_id}/publish"
-    try:
-        return api.post(path, body)
-    except httpx.HTTPStatusError as error:
-        if error.response.status_code != 409:
-            raise
-        detail = error.response.json()
-        code = detail.get("errorCode") or detail.get("message")
-        questions = (detail.get("details") or {}).get("questions") or []
-        safety = {
-            r.get("caseId") for r in run_view.get("results") or [] if r.get("safety")
-        }
-        if code != "must_pass_failed" or any(q.get("id") in safety for q in questions):
+    safety = {r.get("caseId") for r in run_view.get("results") or [] if r.get("safety")}
+    for _ in range(3):
+        try:
+            return api.post(path, body)
+        except httpx.HTTPStatusError as error:
+            if error.response.status_code != 409:
+                raise
+            detail = error.response.json()
+            code = detail.get("errorCode") or detail.get("message")
+            details = detail.get("details") or {}
+            if code == "checkup_below_gate" and not body.get("publishAnyway"):
+                gate = details.get("gate") or {}
+                result["soft"].append(
+                    "below the publish gate, published anyway as an owner could: "
+                    f"{gate.get('needFix')} of {gate.get('questions')} need a fix, "
+                    f"{gate.get('otherPct')}% of the non-safety questions passed"
+                )
+                body = {**body, "publishAnyway": True}
+                continue
+            questions = details.get("questions") or []
+            if (
+                code == "must_pass_failed"
+                and not body.get("confirmMustPass")
+                and not any(q.get("id") in safety for q in questions)
+            ):
+                result["soft"].append(
+                    "owner Must pass failed, confirmed as an owner would: "
+                    + "; ".join(q.get("question", "") for q in questions)
+                )
+                body = {**body, "confirmMustPass": True}
+                continue
             result["fails"].append(f"publish held: {code}")
             return None
-        result["soft"].append(
-            "owner Must pass failed, confirmed as an owner would: "
-            + "; ".join(q.get("question", "") for q in questions)
-        )
-        return api.post(path, {**body, "confirmMustPass": True})
+    result["fails"].append("publish held: still asking after confirming")
+    return None
 
 
 def run_case(api: Api, case: Dict[str, Any], url: str) -> Dict[str, Any]:
@@ -409,6 +427,12 @@ def main() -> int:
     )
     parser.add_argument("--only", help="Run only cases whose key starts with this")
     parser.add_argument("--no-live", action="store_true", help="Skip the live site")
+    parser.add_argument(
+        "--sites",
+        type=Path,
+        help="Run only these real sites instead of the fixtures: a JSON list of "
+        "{key, url, expected: {industry, pack}} (Q3-fast: the 17 Nov businesses)",
+    )
     parser.add_argument("--out", type=Path, default=Path("onboarding_eval_report.md"))
     parser.add_argument("--title", default="Onboarding eval")
     args = parser.parse_args()
@@ -437,6 +461,8 @@ def main() -> int:
     )
     if not args.no_live:
         cases += [(case, case["url"]) for case in LIVE_CASES]
+    if args.sites:
+        cases = [(case, case["url"]) for case in json.loads(args.sites.read_text())]
     if args.only:
         cases = [c for c in cases if c[0]["key"].startswith(args.only)]
 

@@ -32,7 +32,7 @@ import { WhatsAppRateLimitService } from './whatsapp-rate-limit.service';
 import { ChatbotSettingsService } from 'src/chatbot/service/chatbot-settings.service';
 import { ChatbotReplyService } from 'src/chatbot/service/chatbot-reply.service';
 import { Chatbot } from 'src/chatbot/entity/chatbot.entity';
-import { isFallback } from 'src/chatbot/engine/agent-runtime';
+import { isFailedRun } from 'src/chatbot/engine/agent-runtime';
 import {
   AGENT_FALLBACK_EVENT,
   type AgentFallbackEvent,
@@ -608,7 +608,7 @@ export class WhatsAppInboundService {
     chatbot: Pick<Chatbot, 'id' | 'name'>,
     decision: Pick<ChatbotDecision, 'agent'>,
   ): void {
-    if (isFallback(decision.agent)) {
+    if (isFailedRun(decision.agent)) {
       this.eventEmitter.emit(AGENT_FALLBACK_EVENT, {
         chatbot: { id: chatbot.id, name: chatbot.name },
         reason: decision.agent.fallbackReason,

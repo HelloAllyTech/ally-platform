@@ -136,3 +136,34 @@ export class CorrectFactDto {
   @Matches(VERSION)
   version!: string;
 }
+
+/** Q3-fast Part 1: the owner corrects the assistant's safety pack. */
+export class ChangePackDto {
+  @ApiProperty({
+    enum: [
+      'mental_health',
+      'medical',
+      'pharmacy',
+      'minors',
+      'legal_financial',
+      'standard',
+    ],
+  })
+  @IsIn([
+    'mental_health',
+    'medical',
+    'pharmacy',
+    'minors',
+    'legal_financial',
+    'standard',
+  ])
+  pack!: string;
+
+  @ApiPropertyOptional({
+    description: 'Required when the new pack is less strict: why it is right',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  reason?: string;
+}

@@ -122,8 +122,8 @@ export class ListController {
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   @ApiOperation({ summary: 'The ready-made lists an owner can add, grouped' })
   async readyMadeCatalogue(@Param('id', ParseUUIDPipe) id: string) {
-    await this.access.assert(id);
-    return this.owner.catalogue();
+    const { chatbot } = await this.access.assert(id);
+    return this.owner.catalogue(await this.owner.businessKindOf(chatbot));
   }
 
   @Post(':id/lists/ready-made/:name')
@@ -183,7 +183,7 @@ export class ListController {
     if (dto.find) change.find = dto.find;
     if (dto.create) change.create = dto.create;
     if (dto.update) change.update = dto.update;
-    return this.owner.setAbilities(id, key, change);
+    return this.owner.setAbilities(id, key, change, dto.instruction);
   }
 
   @Post(':id/lists/:key/records/repeat')

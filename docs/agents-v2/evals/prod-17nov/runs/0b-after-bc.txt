@@ -1,0 +1,68 @@
+FAIL! bk-free-means-free (17 Nov F5/F4: free means free; a taken table is refused in words (Q3-fast 0b))
+      > [priya] Hi, I'm Priya. Can I book table T2 for 3 on Tuesday 24 Nov at 1 pm?
+      < [clarified/question v2 15605ms] Lovely to meet you, Priya — shall I book Table T2 for 3 guests on Tue 24 Nov 2026 at 13:00 for you?
+      ✗ tool step /create_reservations/
+      > [priya] Yes please, book T2 for 3 people. The name is Priya Sharma.
+      < [rag/smalltalk v2 19094ms] All set, Priya — I’ve booked Table T2 for 3 guests on Tue 24 Nov 2026 at 13:00 under the name Priya Sharma. I’ve saved this reservation for you (details confirm
+      > [meera] Which tables are free on Tuesday 24 Nov at 1 pm?
+      < [rag/question v2 13507ms] At Tue 24 Nov 2026, 13:00 the following tables are free: T3 (3 seats) and T1 (3 seats).) Would you like me to book one of these for you?
+      > [meera] I'm Meera. Book T2 for 3 on Tuesday 24 Nov at 1 pm please
+      < [clarified/question v2 9380ms] Thanks Meera — I’ve noted your name. T2 isn’t available at Tue 24 Nov, 13:00. The tables free then are T3 (3 seats) and T1 (3 seats). Which of these would you l
+      ✗ missing /taken|already booked|isn.t free|not free|not available|unavailable|booked by/
+pass  bk-limit-in-words (17 Nov F3: the at-most-2 rule reaches the person in words (Q3-fast 0b))
+      > I'm Asha. Please book table T1 for 2 on Wednesday 25 Nov at 11 am
+      < [rag/question v2 16809ms] All set, Asha — I’ve booked Table T1 for 2 on Wednesday 25 Nov at 11:00. The reservation is recorded as booked. Would you like me to pass your phone number to t
+      > Yes, book it. The name is Asha Rao.
+      < [rag/smalltalk v2 14731ms] Done, Asha Rao — I’ve recorded your name with the reservation for Table T1, Wed 25 Nov at 11:00. The reservation is recorded as booked. (I see it here.) Would y
+      > Please also book table T1 for 2 on Wednesday 25 Nov at 2 pm, same name
+      < [rag/question v2 17918ms] All set, Asha Rao — I’ve booked Table T1 for 2 on Wednesday 25 Nov at 14:00. The reservation is recorded as booked. Would you like me to pass your phone number 
+      > yes please
+      < [clarified/question v2 14317ms] Which phone number should I share with them? Please contact us: Call/Whatsapp: 088808 02424.
+      > And book table T1 for 2 on Thursday 26 Nov at 12 noon as well. Yes, go ahead and book it.
+      < [clarified/question v2 14172ms] T1 for Thu 26 Nov at 12:00 is available (I see it here:. You already have two reservations, so I can’t add a third.
+FAIL! bk-choice-is-not-yes (17 Nov F1: picking a table isn't a yes; it confirms the exact booking first (Q3-fast 0b))
+      > I'm Kabir. Table for 3 on Thursday 26 Nov at 2 pm?
+      < [clarified/question v2 12865ms] Nice to meet you, Kabir — I can book a table for 3 on Thu 26 Nov at 2:00 pm. We have three 3‑seat tables open then (T1, T2, T3). Would you like me to book that 
+      > T3 please
+      < [clarified/question v2 16137ms] Great — just to confirm: book Thu 26 Nov 2026, 14:00 for 3 guests at table T3?
+      ✗ tool step /create_reservations/
+      > yes
+      < [rag/smalltalk v2 16576ms] All set, Kabir — your table is booked. I’ve reserved Thu 26 Nov 2026 at 14:00 for 3 guests at table T3, booked under Kabir (confirmed). Would you like me to pas
+pass  bk-dates-as-people-write-them (17 Nov C21: finds match '27 Nov', 'Friday' and '27/11' (Q3-fast 0b))
+      > any tables free on 27/11 at 11 am?
+      < [rag/question v2 6992ms] Yes — we have three tables open at 11:00 on Fri 27 Nov: a 3‑seat table T1, a 3‑seat table T2 and a 3‑seat table T3 (all shown available at that time). Would you
+      > and on 25 Nov at 3 pm?
+      < [rag/question v2 6389ms] We have three tables open at 15:00 on Wed 25 Nov — a 3-seat table T1, a 3-seat table T2 and a 3-seat table T3 (all shown available at that time). Would you like
+      > what about Tuesday at 10 am?
+      < [rag/question v2 12655ms] We have three tables open at 10:00 on Tuesday 24 Nov — three 3‑seat tables (T1, T2 and T3) shown available then (see results). Would you like me to book one of 
+FAIL! bk-keeps-its-tools (17 Nov F2/C20: a 10-turn chat keeps its tools and never hands over on its own (Q3-fast 0b))
+      > hi
+      < [template 9ms] I am the Bombay Canteen assistant. I can help you find the right service, explain our menus, events, hours and how to contact us.
+      > what kind of food do you serve?
+      < [rag/question v2 10497ms] We’re Indian at heart — we celebrate India’s regional, seasonal dishes and reinterpret age‑old Indian culinary traditions on a frequently changing menu, served 
+      > do you have a vegetarian menu?
+      < [declined/question v2 12470ms] I don’t have any passage that says we offer a separate vegetarian menu. Our menus are seasonal and change frequently, and we do feature many vegetable-led dishe
+      ✗ says /\bpassages?\b/
+      > is there parking nearby?
+      < [clarified/question v2 10975ms] I don’t have any information about nearby parking. You can contact us for that at reservations@thebombaycanteen.com (we can’t confirm parking from here) [2]. Wo
+      > do you take credit cards?
+      < [rag/question v2 14400ms] I’m sorry—I don’t have any information about whether we accept credit cards. Please contact the team and they can confirm: Email: reservations@thebombaycanteen.
+      > can I bring a birthday cake?
+      < [rag/question v2 9646ms] I’m sorry—I don’t have any information here about whether you can bring a birthday cake. I can ask the team to confirm for you: would you like me to pass your n
+      > ok. which tables are free on Friday 27 Nov at 1 pm for 4?
+      < [rag/question v2 16417ms] I’m sorry—there aren’t any tables at 13:00 on Fri 27 Nov that seat 4. The only tables shown for that time are three tables with 3 seats each (they’re open): T2,
+      > I'm Rohan, the window one sounds nice
+      < [clarified/smalltalk v2 19295ms] Nice to meet you, Rohan — I'll note your name. Shall I book the window table for Fri 27 Nov at 13:00? It seats 3.
+      > yes, book it for 4
+      < [clarified/question v2 12142ms] You asked to book the window table for 4 — the window table I offered seats 3. Would you like me to (A) book that window table for Fri 27 Nov, 13:00 anyway for 
+      ✗ no tool step /create_reservations: ok/; 0 reservations booked, expected 1
+      > thanks!
+      < [rag/smalltalk v2 5593ms] You’re welcome, Rohan — happy to help. Would you like me to pass your name and phone number to the team so they can confirm the cake and seating details?
+pass  bk-not-crisis (17 Nov F8/F10: booking talk and memory questions are never a crisis (Q3-fast 0b; fixed in Part 1))
+      > Book me at 3
+      < [declined/question v2 11674ms] I'm sorry I don't know that; please contact us: Call/Whatsapp: 088808 02424.
+      > the one you said
+      < [error v2_fallback 20074ms] Sorry, I couldn't answer that just now. Please try again, or contact The Bombay Canteen: +91 22 64222838 / wsdindia@gmail.com.
+      > What do you know about me?
+      < [declined/question v2 6645ms] I don’t have any information about you yet — there’s nothing saved in your profile from earlier chats. If you’d like, I can remember one small detail (for examp
+3/6 cases passed in every run; 3 must-pass failed

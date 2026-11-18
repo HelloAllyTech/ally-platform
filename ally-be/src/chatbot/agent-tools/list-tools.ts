@@ -79,7 +79,21 @@ export interface ListToolDefinition {
    * can't answer, and lets the assistant say the team will get back to them.
    */
   takes_details?: boolean;
+  /**
+   * What the list's offered tools do, so the run gets that kind's playbook (Q3-fast Part 2b): a
+   * create with a date-and-time target books; a create with a phone or person field takes details;
+   * a person's own list with update is orders; read-only is reference. One per list, the first that
+   * fits, on each of its tools.
+   */
+  playbook?: ListPlaybook;
+  /** The owner's own line for the list ("How should your assistant use this list?"). */
+  instruction?: string;
 }
+
+export type ListPlaybook = 'booking' | 'details' | 'orders' | 'reference';
+
+/** The most an owner's line for a list may be (Q3-fast Part 2b). */
+export const MAX_LIST_INSTRUCTION = 300;
 
 type ListView = ListDefinitionView;
 type FieldView = ListView['fields'][number];
@@ -534,12 +548,59 @@ export function offeredListTools(
   const dated = datedLists(lists);
   const on = lists
     .filter((list) => knowsPerson || !hasPersonField(list))
-    .flatMap((list) => listToolDefinitions(list, names, dated))
-    .filter((def) => abilityFor(stored, def.name) === 'do_it');
+    .flatMap((list) =>
+      withPlaybook(
+        list,
+        listToolDefinitions(list, names, dated).filter(
+          (def) => abilityFor(stored, def.name) === 'do_it',
+        ),
+      ),
+    );
   return {
     definitions: on.slice(0, MAX_LIST_TOOLS),
     omitted: on.slice(MAX_LIST_TOOLS).map((def) => def.name),
   };
+}
+
+/**
+ * A list's offered tools with its playbook and the owner's line (Q3-fast Part 2b). The playbook
+ * follows what the tools that are on can do, so a list whose writes are at Never is reference.
+ */
+export function withPlaybook(
+  list: ListView,
+  defs: ListToolDefinition[],
+): ListToolDefinition[] {
+  const playbook = playbookOf(list, defs);
+  const instruction = String(
+    (list.settings as { instruction?: unknown } | null)?.instruction ?? '',
+  )
+    .trim()
+    .slice(0, MAX_LIST_INSTRUCTION);
+  return defs.map((def) => ({
+    ...def,
+    ...(playbook ? { playbook } : {}),
+    ...(playbook && instruction ? { instruction } : {}),
+  }));
+}
+
+export function playbookOf(
+  list: ListView,
+  defs: ListToolDefinition[],
+): ListPlaybook | undefined {
+  if (!defs.length) return undefined;
+  const create = defs.find((def) => def.kind === 'create');
+  const books =
+    create &&
+    Object.values(create.input_schema.properties).some(
+      (property) => (property as { dated?: unknown }).dated,
+    );
+  if (books) return 'booking';
+  if (create?.takes_details) return 'details';
+  if (hasPersonField(list) && defs.some((def) => def.kind === 'update')) {
+    return 'orders';
+  }
+  if (defs.every((def) => def.kind === 'find')) return 'reference';
+  return undefined;
 }
 
 // ---- input ---------------------------------------------------------------------------------------

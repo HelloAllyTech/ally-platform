@@ -1453,3 +1453,134 @@ async def test_the_plain_yes_shortcut_still_goes_through_the_time_check(graph):
     assert [c["name"] for c in gateway.calls] == ["find_slots"]  # no create sent
     refused = [c for c in state["tool_calls"] if c.get("tool") == "create_appointments"]
     assert refused and refused[0]["error"] == "unconfirmed_time"
+
+
+class TestARefusalReachesThePersonInWords:
+    """Q3-fast Part 0b (17 Nov F3, F4): the list's rules refused this run's booking.
+    The reply relaying it is an answer, never the fixed decline, and never counts
+    toward an automatic hand-over."""
+
+    LIMIT = "You already have 2 Reservations. Cancel one to book another."
+    TAKEN = "That table is already booked at that time."
+
+    def _check(self, intent, answer, **kw):
+        step = reply(intent, answer, citations=[])
+        return check_reply(
+            step,
+            {},
+            [],
+            turn_type="question",
+            language="en",
+            retrieval=TestTheCheck.RETRIEVAL,
+            general=False,
+            search_gate=None,
+            question="book T1 for 2 on Thu 26 Nov at 12 noon",
+            searched=False,
+            organisation=Organisation(terms=("Bombay Canteen",)),
+            history=(
+                {"role": "user", "content": "book T1 on Wed 25 Nov at 11 and 14:00"},
+            ),
+            can_book=True,
+            looked_up=True,
+            **kw,
+        )
+
+    def test_the_limit_relayed_is_an_answer(self):
+        result, rejection = self._check(
+            "answer",
+            "You already have 2 bookings, so I can't add a third. "
+            "Cancel one to book another.",
+            refused=(self.LIMIT,),
+        )
+        assert rejection is None
+        assert result["intent"] == "answer"
+        assert "already have 2" in result["answer"]
+
+    def test_a_model_decline_relaying_the_limit_is_an_answer_too(self):
+        result, rejection = self._check(
+            "decline",
+            "I can't add a third reservation: you already have two "
+            "(Wed 25 Nov 11:00 and 14:00).",
+            refused=(self.LIMIT,),
+        )
+        assert rejection is None
+        assert result["intent"] == "answer"
+
+    def test_a_taken_table_relayed_is_an_answer(self):
+        result, rejection = self._check(
+            "answer",
+            "Sorry, that table is already booked at that time.",
+            refused=(self.TAKEN,),
+        )
+        assert rejection is None and result["intent"] == "answer"
+
+    def test_a_number_the_run_never_saw_still_needs_a_source(self):
+        result, _ = self._check(
+            "answer",
+            "That table is booked; call 98200 11223 to join the waitlist.",
+            refused=(self.TAKEN,),
+        )
+        assert result["intent"] == "decline"
+
+    def test_without_a_refusal_an_uncited_answer_is_still_declined(self):
+        result, _ = self._check("answer", "You already have 2 bookings.")
+        assert result["intent"] == "decline"
+
+
+class TestPickingIsNotAYes:
+    """Q3-fast Part 0b (17 Nov F1): choosing between offers isn't a yes. A create
+    that books a dated entry waits for the person to say yes to it."""
+
+    PROPS = {"slot": {"relation": "slots", "dated": "datetime"}}
+    PASSAGES = [slot_passage(SLOT_1, "Thu 19 Nov 2026, 11:00")]
+
+    @pytest.mark.parametrize(
+        "latest",
+        [
+            "yes",
+            "yes please, book it",
+            "Yes please, book T2 for 3 people. The name is Priya Sharma.",
+            "Please book table T1 for 2 on Wednesday 25 Nov at 11 am",
+            "go ahead",
+            "haan book kar do",
+        ],
+    )
+    def test_a_yes_or_a_booking_instruction_books(self, latest):
+        from app.core.agent_runtime.tools.confirmed import said_yes, unconsented
+
+        assert said_yes(latest)
+        assert unconsented(self.PROPS, {"slot": SLOT_1}, self.PASSAGES, latest) is None
+
+    @pytest.mark.parametrize(
+        "latest",
+        [
+            "T3 please",
+            "the window one sounds nice",
+            "Table 1",
+            "Can I book Friday 20 Nov at 12:00?",
+        ],
+    )
+    def test_a_pick_or_a_question_is_asked_first(self, latest):
+        from app.core.agent_runtime.tools.confirmed import unconsented
+
+        why = unconsented(self.PROPS, {"slot": SLOT_1}, self.PASSAGES, latest)
+        assert why is not None
+        assert "Shall I book Thu 19 Nov 2026, 11:00" in why
+
+    def test_a_list_with_nothing_dated_is_never_held(self):
+        from app.core.agent_runtime.tools.confirmed import unconsented
+
+        props = {"phone": {"type": "string"}}
+        assert (
+            unconsented(props, {"phone": "9000000001"}, [], "Asha, 9000000001") is None
+        )
+
+
+def test_a_day_written_in_numbers_is_a_named_day():
+    """Q3-fast Part 0b (17 Nov C21): "21/11" and "21-11-2026" are 21 November."""
+    from app.core.agent_runtime.tools.confirmed import named_days
+
+    assert named_days(["any table on 21/11 at 8 pm?"], None) == {(21, 11)}
+    assert named_days(["book 21-11-2026 at 20:00"], None) == {(21, 11)}
+    # A phone number or a time is not a date.
+    assert named_days(["call 22-68493328 at 11.30"], None) is None

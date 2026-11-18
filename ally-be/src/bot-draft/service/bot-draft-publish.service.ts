@@ -3,6 +3,8 @@ import {
   ConflictException,
   Injectable,
 } from '@nestjs/common';
+import { prechatFor } from '../../chatbot/bot-page/prechat-minors';
+import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { Repository } from 'typeorm';
@@ -42,6 +44,13 @@ import { packFor } from '../safety-pack/safety-packs';
 import type { BotDraft, DraftEvent } from '../type/bot-draft.type';
 import { BotDraftEventsService } from './bot-draft-events.service';
 import { BotDraftService } from './bot-draft.service';
+import {
+  LEARNED_FACTS_CHANGED,
+  LEARNED_FACTS_TAG,
+  LEARNED_FACTS_TITLE,
+  learnedFactsText,
+  type LearnedFactsChanged,
+} from './learned-facts-document';
 
 export const OWNER_NOTES_TITLE = 'Owner notes';
 
@@ -136,6 +145,7 @@ export class BotDraftPublishService {
       },
     );
     const ownerNotesDocumentId = await this.ownerNotes(draft, config);
+    const learnedFactsDocumentId = await this.learnedFacts(draft);
 
     const existing = await this.botPages.findForChatbot(chatbot.id);
     // Onboarding may have created the page early, off, to hold the logo it found (chunk 20d), while
@@ -166,7 +176,8 @@ export class BotDraftPublishService {
             config.branding.assistantName.trim() || config.assistantName,
         },
         suggestedQuestions: config.suggestedQuestions,
-        prechat: config.prechat,
+        // Young people (Q3-fast Part 1): no name or contact questions before the chat.
+        prechat: prechatFor(config.prechat, config.safetyPackId),
         limits: existing?.settings?.limits ?? DEFAULT_BOT_PAGE_LIMITS,
         language: pageLanguage(config.languages),
       } as never,
@@ -195,7 +206,11 @@ export class BotDraftPublishService {
       {
         status: BotDraftStatus.PUBLISHED,
         step: BotDraftStep.PUBLISHED,
-        source: { ...fresh.source, ownerNotesDocumentId },
+        source: {
+          ...fresh.source,
+          ownerNotesDocumentId,
+          learnedFactsDocumentId,
+        },
         draftConfig: {
           ...fresh.draftConfig,
           access: { mode: dto.access, emails, organisationIds },
@@ -253,10 +268,18 @@ export class BotDraftPublishService {
       },
     );
     const ownerNotesDocumentId = await this.ownerNotes(draft, config);
-    if (ownerNotesDocumentId !== (draft.source?.ownerNotesDocumentId ?? null)) {
+    const learnedFactsDocumentId = await this.learnedFacts(draft);
+    if (
+      ownerNotesDocumentId !== (draft.source?.ownerNotesDocumentId ?? null) ||
+      learnedFactsDocumentId !== (draft.source?.learnedFactsDocumentId ?? null)
+    ) {
       const fresh = (await this.drafts.findById(draft.id)) ?? draft;
       await this.drafts.update(fresh, {
-        source: { ...fresh.source, ownerNotesDocumentId },
+        source: {
+          ...fresh.source,
+          ownerNotesDocumentId,
+          learnedFactsDocumentId,
+        },
       });
     }
   }
@@ -320,6 +343,64 @@ export class BotDraftPublishService {
     await this.drafts.addKnowledgeDocument(draft.id, document.id);
     await this.drafts.attachDocument(draft, document.id);
     return document.id;
+  }
+
+  /**
+   * The facts setup learned, as a "What we learned" document of one passage each (Q3-fast
+   * Part 2, fix 1), written where Owner notes are: before the checkup (`stage`) and at publish.
+   * Afterwards it follows the draft (`onLearnedFactsChanged`). No facts, no document.
+   */
+  async learnedFacts(draft: BotDraftEntity): Promise<string | null> {
+    const text = learnedFactsText(draft.learned?.facts ?? []);
+    const existingId = draft.source?.learnedFactsDocumentId ?? null;
+    if (!text) return existingId;
+    if (existingId) {
+      await this.knowledge.updateForChatbot(draft.chatbotId!, existingId, {
+        text,
+      });
+      return existingId;
+    }
+    const document = await this.knowledge.createForChatbot(draft.chatbotId!, {
+      sourceType: KbDocumentSourceType.PASTE,
+      title: LEARNED_FACTS_TITLE,
+      text,
+      tags: ['onboarding', LEARNED_FACTS_TAG],
+    } as never);
+    await this.drafts.addKnowledgeDocument(draft.id, document.id);
+    await this.drafts.attachDocument(draft, document.id);
+    return document.id;
+  }
+
+  /** A saved draft's facts changed: the document follows (unchanged text is a no-op). */
+  @OnEvent(LEARNED_FACTS_CHANGED, { async: true })
+  async onLearnedFactsChanged(event: LearnedFactsChanged): Promise<void> {
+    const text = learnedFactsText(event.facts);
+    if (!text) return;
+    const update = () =>
+      this.knowledge.updateForChatbot(event.chatbotId, event.documentId, {
+        text,
+      });
+    try {
+      // A save outside a request (a background re-read) has no user: run as the owner.
+      if (ExecutionManager.getUserId()) await update();
+      else
+        await ExecutionManager.runWithContext(
+          async () => {
+            ExecutionManager.setAuthContext(
+              String(event.ownerUserId),
+              event.tenantId ?? '',
+            );
+            await update();
+          },
+          { path: 'bot-draft-learned-facts' },
+        );
+    } catch (error) {
+      this.logger.warn(
+        `Could not update the learned facts for chatbot ${event.chatbotId}: ${
+          error instanceof Error ? error.message : 'unknown'
+        }`,
+      );
+    }
   }
 }
 

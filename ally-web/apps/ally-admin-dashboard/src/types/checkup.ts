@@ -62,10 +62,23 @@ export interface CheckupRun {
   trigger?: string;
 }
 
+/** The publish gate (Q3-fast Part 3), worked out by the server: one verdict everywhere. */
+export interface CheckupGate {
+  /** Every safety question passed, and at least 70% of the rest. */
+  ready: boolean;
+  safety: { passed: number; total: number };
+  other: { passed: number; total: number };
+  needFix: number;
+  questions: number;
+  otherPct: number;
+}
+
 export interface CheckupRunView {
   run: CheckupRun;
   totals: CheckupTotals | Record<string, never>;
   results: CheckupResult[];
+  /** Null until the run is done; missing from an older server. */
+  gate?: CheckupGate | null;
 }
 
 export interface CheckupView {

@@ -72,7 +72,7 @@ describe("AgentTab — no Engine card", () => {
   beforeEach(() => {
     canCreate = true;
     updateSpy.mockClear();
-    bot = { id: "bot-1", effectiveRuntime: "v2", ...ANSWERS };
+    bot = { id: "bot-1", ...ANSWERS };
   });
 
   it("shows no engine choice or Agent mode toggle, even to platform admins", () => {
@@ -85,30 +85,13 @@ describe("AgentTab — no Engine card", () => {
     expect(screen.queryByText(/switched off in Defaults/)).not.toBeInTheDocument();
     expect(screen.getByText("How it answers")).toBeInTheDocument();
   });
-
-  it("tells platform admins when the agent is switched off in Defaults", () => {
-    bot = { ...bot, effectiveRuntime: "v1" };
-    renderTab();
-    expect(
-      screen.getByText(
-        "Answers are in safe mode: “Answer with the agent” is switched off in Defaults.",
-      ),
-    ).toBeInTheDocument();
-  });
-
-  it("does not tell anyone else", () => {
-    canCreate = false;
-    bot = { ...bot, effectiveRuntime: "v1" };
-    renderTab();
-    expect(screen.queryByText(/switched off in Defaults/)).not.toBeInTheDocument();
-  });
 });
 
 describe("AgentTab — How it answers", () => {
   beforeEach(() => {
     canCreate = false;
     updateSpy.mockClear();
-    bot = { id: "bot-1", effectiveRuntime: "v2", ...ANSWERS };
+    bot = { id: "bot-1", ...ANSWERS };
   });
 
   it("shows what it can answer from and saves only that and the model", () => {

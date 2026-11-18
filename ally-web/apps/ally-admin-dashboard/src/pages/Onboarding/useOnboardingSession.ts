@@ -118,13 +118,20 @@ export interface OnboardingSession {
     access: PublishResult["access"],
     emails: string[],
     confirmMustPass?: boolean,
+    publishAnyway?: boolean,
   ) => Promise<void>;
-  /** Asked before going live: an owner's own Must pass question failed (chunk 20d-2). */
+  /**
+   * Asked before going live: an owner's own Must pass question failed (chunk 20d-2), or the
+   * checkup is below the quality gate (Q3-fast Part 3, `belowGate`).
+   */
   mustPass: {
     message: string;
     questions: string[];
     access: PublishResult["access"];
     emails: string[];
+    belowGate?: boolean;
+    /** Whether Must pass was already confirmed on the way here. */
+    confirmedMustPass?: boolean;
   } | null;
 
   /** The one-screen flow (chunk 20d). Null while the draft loads. */
@@ -156,12 +163,7 @@ export const useOnboardingSession = (
   const session: BotDraftSession = useBotDraftSession(draftId);
   const { view, sending, working, send, setView } = session;
   const [publishedNow, setPublished] = useState<PublishResult | null>(null);
-  const [mustPass, setMustPass] = useState<{
-    message: string;
-    questions: string[];
-    access: PublishResult["access"];
-    emails: string[];
-  } | null>(null);
+  const [mustPass, setMustPass] = useState<OnboardingSession["mustPass"]>(null);
   const [patchDraft] = usePatchBotDraftMutation();
   const [goBack] = useBackBotDraftMutation();
   const [publishDraft, { isLoading: publishing }] = usePublishBotDraftMutation();
@@ -341,7 +343,7 @@ export const useOnboardingSession = (
       view?.chatbotId
         ? attempt(() => archiveChatbot(view.chatbotId!).unwrap())
         : Promise.resolve(false),
-    publish: async (access, emails, confirmMustPass = false) => {
+    publish: async (access, emails, confirmMustPass = false, publishAnyway = false) => {
       if (!view) return;
       try {
         setPublished(
@@ -350,6 +352,7 @@ export const useOnboardingSession = (
             access,
             emails,
             ...(confirmMustPass ? { confirmMustPass: true } : {}),
+            ...(publishAnyway ? { publishAnyway: true } : {}),
           }).unwrap(),
         );
         setMustPass(null);
@@ -365,6 +368,18 @@ export const useOnboardingSession = (
             questions: (details?.questions ?? []).map(q => q.question),
             access,
             emails,
+          });
+          return;
+        }
+        // Below the checkup's quality gate (Q3-fast Part 3): the score, then Publish anyway.
+        if (data?.errorCode === "checkup_below_gate") {
+          setMustPass({
+            message: data.message ?? "",
+            questions: [],
+            access,
+            emails,
+            belowGate: true,
+            confirmedMustPass: confirmMustPass,
           });
           return;
         }

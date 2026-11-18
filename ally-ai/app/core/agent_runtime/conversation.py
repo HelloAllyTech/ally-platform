@@ -10,6 +10,8 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from app.core.agent_runtime.memory import history_lead, memory_section, remember_mode
+from app.core.agent_runtime.mood import mood_section
+from app.core.agent_runtime.playbooks import playbooks_section
 from app.core.agent_runtime.prompt import AGENT_PROMPT_PATH, build_agent_prompt
 from app.core.agent_runtime.schemas import step_schema
 from app.core.agent_runtime.state import BotConfig
@@ -67,6 +69,8 @@ async def agent_step(
         today=bot.get("gateway_today") or "",
         prompts=prompts,
         memory=memory_section(bot, prompts),
+        mood=mood_section(bot, prompts),
+        playbooks=playbooks_section(bot.get("gateway_definitions"), prompts),
         history_lead=history_lead(bot),
         can_book=offers_create(bot.get("gateway_definitions")),
         takes_details=takes_details(bot.get("gateway_definitions")),

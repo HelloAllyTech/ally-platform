@@ -1,5 +1,11 @@
 import { readable, toHex, commonColour, detectBrand } from '../crawl/brand';
-import { decodeEntities, mainContent, parsePage } from '../crawl/page-parser';
+import { looksLikeErrorPage } from '../crawl/error-page';
+import {
+  decodeCfEmail,
+  decodeEntities,
+  mainContent,
+  parsePage,
+} from '../crawl/page-parser';
 import { parseRobots } from '../crawl/robots';
 import { parseSitemap } from '../crawl/sitemap';
 import {
@@ -272,5 +278,51 @@ describe('nextToRead', () => {
 
   it('still reads blog and news pages last', () => {
     expect(order(['/blog/one', '/fees'])).toEqual(['/fees', '/blog/one']);
+  });
+});
+
+describe('looksLikeErrorPage (Q3-fast Part 3, B16)', () => {
+  it('spots error, block and challenge pages served as a 200', () => {
+    expect(looksLikeErrorPage('403 Forbidden', 'nginx')).toBe(true);
+    expect(looksLikeErrorPage('Access Denied', 'Reference #18.2f')).toBe(true);
+    expect(
+      looksLikeErrorPage(
+        'Home',
+        'Sorry, the page you are looking for could not be found.',
+      ),
+    ).toBe(true);
+    expect(
+      looksLikeErrorPage(null, 'Please verify you are a human to continue.'),
+    ).toBe(true);
+  });
+
+  it('still reads real pages that mention the same words', () => {
+    expect(
+      looksLikeErrorPage('Contact us', 'Visit us at 404 MG Road, Bengaluru.'),
+    ).toBe(false);
+    expect(
+      looksLikeErrorPage('Room guide', 'Room 403 is the X-ray department.'),
+    ).toBe(false);
+    const long = `Our forms are protected by a captcha. ${'We treat anxiety. '.repeat(100)}`;
+    expect(looksLikeErrorPage('Services', long)).toBe(false);
+  });
+});
+
+describe('Cloudflare-hidden emails (Q3-fast, gaps item 6)', () => {
+  const HEX = '3a595554545f594e7a4e525f49554f565f5e494e55485f14595557';
+
+  it('puts the real address back, and never keeps "[email protected]"', () => {
+    expect(decodeCfEmail(HEX)).toBe('connect@thesouledstore.com');
+    expect(decodeCfEmail('zz')).toBeNull();
+    const html = `<html><head><title>Contact</title></head><body><main>
+      <p>Write to <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="${HEX}">[email&#160;protected]</a> any time.</p>
+      <p>Or <a href="/cdn-cgi/l/email-protection#${HEX}"><span>[email&#160;protected]</span></a>.</p>
+      <p>Grievances: [email&#160;protected] (we can't read this one).</p>
+      ${'<p>We sell t-shirts, hoodies and sneakers across India.</p>'.repeat(3)}
+    </main></body></html>`;
+    const { text } = parsePage(html);
+    expect(text).toContain('Write to connect@thesouledstore.com any time.');
+    expect(text.match(/connect@thesouledstore\.com/g)).toHaveLength(2);
+    expect(text).not.toMatch(/email\s*protected/i);
   });
 });

@@ -11,6 +11,8 @@
 | `CONTEXT.md` | Background, settled architecture decisions, glossary, which doc wins | Every session, first |
 | `v2-chunks.md` | Every chunk, the stages, progress, release gates. The one source for order and status | Planning or picking up a chunk |
 | `chunk-<id>.md` | The current chunk's brief (CL1: `chunk-cl1.md`; not yet built: `chunk-20e.md`) | Working on that chunk |
+| `EPIC-Q3-FAST.md` | The Q3 fast track: the fixes from the 17 Nov production tests, in build order, with its stops | Working on Q3-fast |
+| `FIXES-17NOV.md` | Every 17 Nov finding grouped by cause, with the chunk that fixes it | Deciding what a fix is for |
 | `CHUNK-<id>-NOTES.md` | What each chunk built, its decisions, how to test it, what's left | Touching code a chunk built |
 | `CHUNK-<id>-EVAL.md` | Eval reports (conversation evals, checkup rounds) | Comparing behaviour before and after a change |
 | `LAUNCH-CHECKLIST.md` | Everything outside the code before Stage 1 goes live | Deploying |
@@ -26,5 +28,5 @@
 ## Folders
 
 - `archive/`: finished chunk briefs and one-off reviews. Their notes stay at the top level.
-- `evals/`: checkup suites (`sunrise-mind-checkups.yaml`, `purpose-checkups.yaml`), run with `ally-ai/scripts/checkup_eval.py`.
+- `evals/`: checkup suites (`sunrise-mind-checkups.yaml`, `purpose-checkups.yaml`), run with `ally-ai/scripts/checkup_eval.py`. `evals/prod-17nov/` holds the two 17 Nov production reports and the Q3 suites built from them.
 - `design/`: screenshots the briefs and notes refer to (`design/20d2/` holds 20d-2's before and after).

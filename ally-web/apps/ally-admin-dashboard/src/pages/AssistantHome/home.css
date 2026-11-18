@@ -238,6 +238,30 @@
   align-items: center;
   gap: 10px;
 }
+/* Q3-fast: "This isn't right for my business", the owner's pack correction. */
+.ally-home__pack-chooser {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--ally-line);
+  border-radius: var(--ally-radius-sm);
+}
+.ally-home__pack-chooser fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+.ally-home__pack-chooser legend {
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+.ally-home__pack-chooser textarea {
+  width: 100%;
+}
 .ally-home__line .ally-input,
 .ally-home__rule-form .ally-input {
   flex: 1;

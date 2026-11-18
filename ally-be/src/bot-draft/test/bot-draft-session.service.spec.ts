@@ -1,3 +1,4 @@
+import { packRequest } from '../safety-pack/safety-packs';
 import { ConflictException } from '@nestjs/common';
 import type {
   BuilderStepResponse,
@@ -220,6 +221,67 @@ describe('BotDraftSessionService.turn', () => {
     });
     await h.turn({ chip: 'Looks right' });
     expect(h.store.row().draftConfig.safetyPackId).toBe(SafetyPackId.MEDICAL);
+  });
+
+  it('applies a stricter pack the owner asks for in setup, never a weaker one (Q3-fast)', async () => {
+    const h = harness(
+      { step: BotDraftStep.GAPS },
+      reply({ next_step: 'gaps', stricter_pack: 'minors' }),
+    );
+    await h.turn({ text: 'Some of our students are under 18' });
+    expect(h.store.row().draftConfig.safetyPackId).toBe(SafetyPackId.MINORS);
+
+    const weaker = harness(
+      { step: BotDraftStep.GAPS },
+      reply({ next_step: 'gaps', stricter_pack: 'standard' }),
+    );
+    weaker.store.poke({
+      safetyPack: SafetyPackId.MEDICAL,
+      draftConfig: {
+        ...weaker.store.row().draftConfig,
+        safetyPackId: SafetyPackId.MEDICAL,
+      },
+    });
+    await weaker.turn({ text: 'Make it facts only' });
+    expect(weaker.store.row().draftConfig.safetyPackId).toBe(
+      SafetyPackId.MEDICAL,
+    );
+  });
+
+  it('an eye hospital (medical) asking for young-people rules keeps medical, and setup says why (fast finish)', async () => {
+    const h = harness(
+      { step: BotDraftStep.GAPS },
+      reply({
+        next_step: 'gaps',
+        stricter_pack: 'minors',
+        message: "Done, I've added the young-people safety rules.",
+      }),
+    );
+    h.store.poke({
+      industry: 'gp_clinic',
+      safetyPack: SafetyPackId.MEDICAL,
+      draftConfig: {
+        ...h.store.row().draftConfig,
+        safetyPackId: SafetyPackId.MEDICAL,
+      },
+    } as never);
+    await h.turn({ text: 'Some of our patients are under 18' });
+    expect(h.store.row().draftConfig.safetyPackId).toBe(SafetyPackId.MEDICAL);
+    expect(h.store.row().transcript.slice(-1)[0]).toMatchObject({
+      role: 'builder',
+      text: "Your assistant uses the Medical safety rules. Young-people rules can't be added on top yet; tell Ally if you need both.",
+    });
+  });
+
+  it('never lets the four specialist packs replace each other; others only by strength', () => {
+    expect(packRequest('medical', 'mental_health')).toBe('cant_combine');
+    expect(packRequest('minors', 'medical')).toBe('cant_combine');
+    expect(packRequest('mental_health', 'pharmacy')).toBe('cant_combine');
+    expect(packRequest('standard', 'minors')).toBe('apply');
+    expect(packRequest('legal_financial', 'medical')).toBe('apply');
+    expect(packRequest('medical', 'legal_financial')).toBe('keep');
+    expect(packRequest('medical', 'medical')).toBe('keep');
+    expect(packRequest(null, 'minors')).toBe('apply');
   });
 
   it('builds on the draft as it is now, not as it was when the step began', async () => {
@@ -519,6 +581,40 @@ describe('reading an uploaded document', () => {
       role: 'builder',
       text: ONBOARDING_COPY.problems.generic,
     });
+  });
+
+  it('shows "reading" until the upload is read, then "What we learned", even when reading fails (Q3-fast)', async () => {
+    const h = harness();
+    h.documents.readForOnboarding.mockResolvedValue(pdf);
+    const during: string[] = [];
+    h.ai.extractOnboardingFacts.mockImplementation(async () => {
+      during.push(h.store.row().step);
+      return { facts: [], dropped: 0, findings: [] };
+    });
+    await h.session.startReading('draft-1', 'doc-1');
+    expect(h.store.row().step).toBe(BotDraftStep.READING);
+    expect(h.store.row().source.readingDocuments).toEqual(['doc-1']);
+    await h.session.learnFromDocument('draft-1', 'doc-1');
+    expect(during).toEqual([BotDraftStep.READING]);
+    expect(h.store.row().step).toBe(BotDraftStep.LEARNED);
+    expect(h.store.row().source.readingDocuments).toEqual([]);
+    expect(h.store.events.publish).toHaveBeenCalledWith(
+      'draft-1',
+      expect.objectContaining({ type: 'step', step: BotDraftStep.LEARNED }),
+    );
+
+    // Two uploads: the draft stays "reading" until the second is done.
+    await h.session.startReading('draft-1', 'doc-1');
+    await h.session.startReading('draft-1', 'doc-2');
+    h.ai.extractOnboardingFacts.mockRejectedValue(new Error('upstream'));
+    await expect(
+      h.session.learnFromDocument('draft-1', 'doc-1'),
+    ).rejects.toThrow('upstream');
+    expect(h.store.row().step).toBe(BotDraftStep.READING);
+    await expect(
+      h.session.learnFromDocument('draft-1', 'doc-2'),
+    ).rejects.toThrow('upstream');
+    expect(h.store.row().step).toBe(BotDraftStep.LEARNED);
   });
 
   it('refuses a document from another assistant', async () => {

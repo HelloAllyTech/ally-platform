@@ -3,9 +3,12 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
   ServiceUnavailableException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { ListToolsService } from '../../chatbot/agent-tools/list-tools.service';
+import type { ListPlaybook } from '../../chatbot/agent-tools/list-tools';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { createHash, randomUUID } from 'crypto';
 import { DataSource, EntityManager } from 'typeorm';
@@ -15,7 +18,8 @@ import { ChatbotSettingsService } from '../../chatbot/service/chatbot-settings.s
 import { ChatbotService } from '../../chatbot/service/chatbot.service';
 import { LoggerService } from '../../logger/logger.service';
 import { ChatbotPage } from '../../chatbot/entity/chatbot-page.entity';
-import { Chatbot } from '../../chatbot/entity/chatbot.entity';
+import { Chatbot, type PackChange } from '../../chatbot/entity/chatbot.entity';
+import { crisisReply, packFor } from '../safety-pack/safety-packs';
 import { BotPageAccess, BotPageStatus } from '../../chatbot/enum/bot-page.enum';
 import { ChatbotMemberRole } from '../../chatbot/enum/chatbot.enum';
 import { ChatbotAccessService } from '../../chatbot/service/chatbot-access.service';
@@ -43,6 +47,9 @@ import {
   versionOf,
 } from './home-fields';
 import { changeOwnRules, RuleChange, safetyView } from './own-rules';
+
+/** The shortest reason the owner can give for a less strict pack (Q3-fast Part 1). */
+const MIN_PACK_REASON = 10;
 
 /** "Your instructions" refused because they'd weaken a safety rule (deck §25). */
 export const SAFETY_CONFLICT_MESSAGE =
@@ -80,6 +87,8 @@ export class AssistantHomeService {
     private readonly ai?: AiService,
     private readonly chatbots?: ChatbotService,
     private readonly settings?: ChatbotSettingsService,
+    // Q3-fast Part 2b: How it works names each list's playbook.
+    @Optional() private readonly listToolsService?: ListToolsService,
   ) {}
 
   private readonly logger = LoggerService.getInstance(
@@ -102,7 +111,11 @@ export class AssistantHomeService {
       canEdit: role !== ChatbotMemberRole.VIEWER && !chatbot.archivedAt,
       fields: readAll(state),
       safety: {
-        ...safetyView(chatbot.safetyPack, chatbot.rules?.never ?? []),
+        ...safetyView(
+          chatbot.safetyPack,
+          chatbot.rules?.never ?? [],
+          chatbot.rules?.packChange ?? null,
+        ),
         atRiskReply,
       },
       facts,
@@ -176,19 +189,18 @@ export class AssistantHomeService {
    * rules is saved with a note that it can't. If the check can't be reached, nothing is saved.
    */
   /**
-   * The reply someone who may be at risk gets when the owner hasn't written their own: the
-   * platform's text with this bot's helpline numbers, as the engine sends it (chunk 20d-2).
+   * The reply someone who may be at risk gets when the owner hasn't written their own, exactly as
+   * the engine sends it (`crisisReply`): the real numbers (112, Tele-MANAS) and this bot's
+   * helplines. Q3-fast (gaps item 10): it showed the platform's old template, "your local crisis
+   * line", while customers got the numbers.
    */
   private async atRiskReply(chatbot: Chatbot): Promise<string | null> {
     if (!this.settings) return null;
-    const [defaults, effective] = await Promise.all([
-      this.settings.get(),
-      this.settings.getForChatbot(chatbot),
-    ]);
-    return this.settings.renderPlaceholders(
-      defaults.crisisEscalationText,
-      effective,
-    );
+    const effective = await this.settings.getForChatbot(chatbot);
+    return crisisReply({
+      pack: chatbot.safetyPack,
+      helplineNumbers: effective.helplineNumbers,
+    });
   }
 
   private async checkInstructions(value: unknown): Promise<string | null> {
@@ -340,7 +352,34 @@ export class AssistantHomeService {
       safetyPack: chatbot.safetyPack ?? null,
       bookingLists: await this.bookingLists(chatbotId, chatbot.settings),
       tools: await this.listTools(chatbotId, chatbot.settings),
+      playbooks: await this.playbooks(chatbotId, chatbot.settings),
     };
+  }
+
+  /**
+   * Each list's playbook (Q3-fast Part 2b), as a run gets it: "Because you added Appointments, your
+   * assistant finds free times, confirms the exact time and books it." One per list.
+   */
+  private async playbooks(
+    chatbotId: string,
+    stored: ChatbotSettingsOverride | null | undefined,
+  ): Promise<{ list: string; kind: ListPlaybook }[]> {
+    if (!this.listToolsService) return [];
+    try {
+      const { definitions } = await this.listToolsService.offeredFor(
+        chatbotId,
+        stored,
+        { knowsPerson: true },
+      );
+      const byList = new Map<string, ListPlaybook>();
+      for (const def of definitions) {
+        if (def.playbook && def.list_name)
+          byList.set(def.list_name, def.playbook);
+      }
+      return [...byList].map(([list, kind]) => ({ list, kind }));
+    } catch {
+      return [];
+    }
   }
 
   /**
@@ -401,6 +440,71 @@ export class AssistantHomeService {
       .map((list) => list.name);
   }
 
+  /**
+   * The owner corrects the safety pack (Q3-fast Part 1, C10: a restaurant given Care for young
+   * people, a lab given Mental health). An equally strict or stricter pack applies at once; a less
+   * strict one needs the owner's reason, is logged, and the Checkup says so. Owners only, and only
+   * here: the setup chat still refuses to weaken a pack, so nothing a conversation says can.
+   */
+  async changePack(chatbotId: string, dto: { pack: string; reason?: string }) {
+    await this.access.assert(chatbotId, ChatbotMemberRole.OWNER);
+    const next = packFor(dto.pack);
+    if (!next) {
+      throw new BadRequestException({
+        errorCode: 'invalid_pack',
+        message: "That isn't one of the safety packs.",
+      });
+    }
+    let change: PackChange | null = null;
+    const view = await this.dataSource.transaction(async (manager) => {
+      const chatbot = await this.lock(manager, chatbotId);
+      const was = packFor(chatbot.safetyPack);
+      if (was?.id === next.id) {
+        return safetyView(
+          chatbot.safetyPack,
+          chatbot.rules?.never ?? [],
+          chatbot.rules?.packChange ?? null,
+        );
+      }
+      const lessStrict = Boolean(was && next.strength < was.strength);
+      const reason = (dto.reason ?? '').trim();
+      if (lessStrict && reason.length < MIN_PACK_REASON) {
+        throw new BadRequestException({
+          errorCode: 'reason_required',
+          message: `${next.name} is less strict than ${was!.name}. Say why it's right for your business.`,
+        });
+      }
+      change = {
+        from: was?.id ?? null,
+        to: next.id,
+        reason: lessStrict ? reason.slice(0, 300) : null,
+        lessStrict,
+        at: new Date().toISOString(),
+        by: userId() ?? null,
+      };
+      await manager.getRepository(Chatbot).update(
+        { id: chatbotId },
+        {
+          safetyPack: next.id,
+          safetyPackVersion: next.version,
+          rules: { ...(chatbot.rules ?? { never: [] }), packChange: change },
+          updatedBy: userId(),
+        },
+      );
+      return safetyView(next.id, chatbot.rules?.never ?? [], change);
+    });
+    if (change) {
+      const made = change as PackChange;
+      // The reason stays in the record; the log names only the move.
+      this.logger.warn(
+        `Safety pack changed by the owner on chatbot ${chatbotId}: ${made.from ?? 'none'} → ` +
+          `${made.to}${made.lessStrict ? ' (less strict, with a reason)' : ''}`,
+      );
+      await this.record(chatbotId, 'safetyPack', made.from, made.to);
+    }
+    return view;
+  }
+
   /** Add, edit or remove one of the owner's own rules. Pack rules are fixed. */
   async changeRule(
     chatbotId: string,
@@ -419,7 +523,11 @@ export class AssistantHomeService {
           message: STALE_MESSAGE,
           details: {
             field: 'rules',
-            safety: safetyView(chatbot.safetyPack, own),
+            safety: safetyView(
+              chatbot.safetyPack,
+              own,
+              chatbot.rules?.packChange ?? null,
+            ),
           },
         });
       }
@@ -433,7 +541,11 @@ export class AssistantHomeService {
           updatedBy: userId(),
         },
       );
-      return safetyView(chatbot.safetyPack, next);
+      return safetyView(
+        chatbot.safetyPack,
+        next,
+        chatbot.rules?.packChange ?? null,
+      );
     });
     // In the History as "Your own rules"; undone by editing the rule again, not from there.
     if (options.record !== false) {

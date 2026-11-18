@@ -84,6 +84,7 @@ def make_tools_node(service: KnowledgeAgentService) -> Node:
                         confirmed_texts(state.get("history"), state["question"])
                     ),
                     today=state["bot"].get("gateway_today") or "",
+                    latest=state["question"] or "",
                 ),
             )
             if doing:
