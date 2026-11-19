@@ -1,3 +1,4 @@
+import { isEnglishLanguage } from './debrief-language-sections.util';
 import { DebriefRunStatus } from '../enum/debrief-run.enum';
 import { ADVISORY_CHECKS, DebriefCheckCode } from './debrief-cards.util';
 import { rate, Rate } from './debrief-metrics.util';
@@ -279,7 +280,8 @@ export function passRollup(
         language,
         debriefs: rs.length,
         ...group(rs),
-        languageProblem: languageProblem(rs),
+        // English is not language-checked (owner decision 2026-11-19): its row carries no check.
+        languageProblem: languageProblem(isEnglishLanguage(language) ? [] : rs),
       }))
       .sort((a, b) => b.debriefs - a.debriefs),
     bySegment: [

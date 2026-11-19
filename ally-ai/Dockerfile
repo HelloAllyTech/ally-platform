@@ -37,5 +37,6 @@ COPY . .
 # Expose the port on which the app will run
 EXPOSE 8000
 
-# Run migrations and sync prompts, then start the application and worker
-CMD ["bash", "-c", "poetry run python scripts/migrate.py all && poetry run python scripts/sync_prompts.py && (poetry run python -m app.main & poetry run python -m app.core.queue.transcription_request_sqs_worker & wait -n)"]
+# Run migrations and sync prompts, then start the application and worker.
+# The script forwards SIGTERM so a deploy drains the worker (see the script).
+CMD ["./scripts/start.sh"]

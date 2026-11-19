@@ -233,9 +233,12 @@ Recorded by the ally-be build (2026-11-10).
    `estimateStepCostUsd`, and the runner's narration helpers). Check 7 in §4 (legacy vs graph side by side)
    can only be done against a build from before this change (e.g. master at `e9c1e7123`).
 2. **`session` keys** are the snake_case of `DebriefSessionContext`: `id, tenant_id, counselor_id, status,
-   language, language_source, language_recorded, learner_level, learner_turns, scenario_id, scenario
+   language, language_source, language_recorded, learner_level, learner_turns, learner_words, thin, scenario_id, scenario
    ({title, description}), expected_behaviours, helpful_behaviours, unhelpful_behaviours, competencies,
-   assessment, in_case` (the last four: see "What the roleplay expects" below).
+   assessment, in_case` (the last four: see "What the roleplay expects" below). `thin` is true when the learner
+   said too little to coach on (fewer than 3 turns or 40 words, `THIN_SESSION`): the graph then reads the safety
+   reader first and ends the run as `skipped` / `too_short` unless the learner sounds distressed (then the Analyst
+   and the rest run as usual).
 3. **`transcript` turns** are `{turn_index, role, text}` (no `message_id`: the transcript ally-be builds has none).
 4. **`context` values** are passed exactly as ally-be's readers return them: `past_work_on_this` is
    `[{date, skill, point}]`, `case_memory` a string or null, `cohort` `{trainees, skills: [{skill, how_often}]}`

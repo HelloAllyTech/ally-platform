@@ -40,6 +40,10 @@ class DebriefState(TypedDict, total=False):
     recipe_key: str
     has_risk_cue: bool
     learner_distress: bool
+    #: A thin session (too little said to coach on) waits at the safety reader:
+    #: it ends as "too short" unless the learner sounds distressed. Set by
+    #: `plan`, cleared by `after_reading`.
+    thin_gate: bool
     safety: Dict[str, Any]
     evidence: Dict[str, Any]
     #: The Writer's `progress` (the old ProgressReading shape).

@@ -48,6 +48,8 @@ export interface DebriefSessionContext {
   language: string;
   learnerLevel: string;
   learnerTurns: number;
+  /** Words the learner spoke in all (blank lines left out). */
+  learnerWords: number;
   /** Null for a session whose scenario row is gone. */
   scenarioId: number | null;
   scenario: { title: string | null; description: string | null };
@@ -135,7 +137,11 @@ export class DebriefContextRepository {
               -- learner turn; the transcript the Writer reads skips it too.
               (SELECT count(*)::int FROM scenario_session_messages m
                 WHERE m."scenarioSessionId" = s.id AND m."senderId" <> -1
-                  AND btrim(m.content) <> '') AS learner_turns
+                  AND btrim(m.content) <> '') AS learner_turns,
+              (SELECT COALESCE(sum(array_length(regexp_split_to_array(btrim(m.content), '[[:space:]]+'), 1)), 0)::int
+                 FROM scenario_session_messages m
+                WHERE m."scenarioSessionId" = s.id AND m."senderId" <> -1
+                  AND btrim(m.content) <> '') AS learner_words
          FROM scenario_sessions s
          LEFT JOIN users u ON u.id = s."counselorId"
          LEFT JOIN scenarios sc ON sc.id = s."scenarioId"
@@ -163,6 +169,7 @@ export class DebriefContextRepository {
       language: String(r.language || 'en').slice(0, 10),
       learnerLevel: resolveWorkerType(r.user_metadata),
       learnerTurns: Number(r.learner_turns ?? 0),
+      learnerWords: Number(r.learner_words ?? 0),
       scenarioId: r.scenario_id == null ? null : Number(r.scenario_id),
       scenario: { title: r.title ?? null, description: r.description ?? null },
       roleplayFields: readRoleplayFields(r),

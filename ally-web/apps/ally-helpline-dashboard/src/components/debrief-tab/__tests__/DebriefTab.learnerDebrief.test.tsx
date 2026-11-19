@@ -322,13 +322,10 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
       within(moment).getByText("postSim.debriefCards.importantMoment.support"),
     ).toBeInTheDocument();
 
-    // The secondary cards start collapsed; their heading opens them.
+    // "What worked" is always open: no dropdown to click.
     const worked = screen.getByTestId("debrief-card-what-worked");
-    expect(within(worked).queryByText(`“${CARDS.what_worked[0].quote}”`)).not.toBeInTheDocument();
-    expect(within(worked).getByRole("button", { expanded: false })).toBeInTheDocument();
-    fireEvent.click(within(worked).getByRole("button"));
     expect(within(worked).getByText(`“${CARDS.what_worked[0].quote}”`)).toBeInTheDocument();
-    expect(within(worked).getByRole("button", { expanded: true })).toBeInTheDocument();
+    expect(within(worked).queryByRole("button", { expanded: false })).not.toBeInTheDocument();
 
     const trySaying = screen.getByTestId("debrief-try-saying");
     expect(trySaying).toHaveTextContent("postSim.debriefCards.trySaying");
@@ -361,8 +358,13 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
     renderTab();
 
     expect(screen.queryByTestId("breathing-pacer")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("debrief-breathe-start"));
-    expect(screen.getByTestId("breathing-pacer")).toBeInTheDocument();
+    // The link sits under the debrief box, not inside it; the pacer opens in a popup.
+    const start = screen.getByTestId("debrief-breathe-start");
+    expect(screen.getByTestId("debrief-cards")).not.toContainElement(start);
+    fireEvent.click(start);
+    const pacer = screen.getByTestId("breathing-pacer");
+    expect(pacer).toBeInTheDocument();
+    expect(screen.getByTestId("debrief-cards")).not.toContainElement(pacer);
     fireEvent.click(screen.getByTestId("debrief-breathe-stop"));
     expect(screen.queryByTestId("breathing-pacer")).not.toBeInTheDocument();
     expect(screen.getByTestId("debrief-breathe-start")).toBeInTheDocument();

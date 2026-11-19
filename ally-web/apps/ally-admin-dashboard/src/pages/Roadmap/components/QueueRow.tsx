@@ -90,9 +90,13 @@ export const QueueRow: React.FC<QueueRowProps> = ({
     : null;
   const facts = [
     row.goal?.name,
-    row.lead ? `Lead: ${row.lead.name}` : row.stage === "being_built" ? "No lead" : null,
+    row.lead
+      ? en.roadmapV2.people.leads(row.lead.name)
+      : row.stage === "being_built"
+        ? en.roadmapV2Tools.people.noBuilder
+        : null,
     month ? `Planned ${month}` : null,
-    row.author?.name ? `Wrote it: ${row.author.name}` : null,
+    row.author?.name ? en.roadmapV2.people.wrote(row.author.name) : null,
   ].filter((v): v is string => !!v);
 
   const why = whyHereLine(row.whyHere);

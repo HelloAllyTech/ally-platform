@@ -119,6 +119,11 @@ export const Thread: React.FC<{
     <div key={c.id} className="flex flex-col gap-1" data-testid="expert-comment">
       <div className="flex flex-wrap items-center gap-2 text-xs text-typography-700">
         <span className="font-medium">{c.mine ? t.you : (c.reviewer.name ?? t.someone)}</span>
+        {c.source === "learner" && (
+          <span data-testid="comment-from-learner">
+            <Pill tone="warning">{t.fromLearner}</Pill>
+          </span>
+        )}
         <span>{formatWhen(c.createdAt)}</span>
         {c.tag && (
           <Pill tone={c.tag === "good_keep_this" ? "success" : "info"}>{s().tags[c.tag]}</Pill>

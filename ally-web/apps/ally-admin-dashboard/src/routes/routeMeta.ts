@@ -115,7 +115,8 @@ const buildTable = (): RouteMetaEntry[] => {
       parent: ROUTES.COURSE_COPILOT,
     },
     { path: ROUTES.BLOG, title: i.blog, section: "create" },
-    { path: ROUTES.PRODUCT_UPDATES, title: i.productUpdates, section: "create" },
+    // A page of the Roadmap's top menu, so no breadcrumb above it (the frame names it); the page pads itself.
+    { path: ROUTES.PRODUCT_UPDATES, title: i.productUpdates, section: "create", fullBleed: true },
     // People
     { path: ROUTES.USER_MANAGEMENT, title: i.users, section: "people" },
     {
@@ -192,6 +193,8 @@ const buildTable = (): RouteMetaEntry[] => {
       { path: ROUTES.ROADMAP_AGENT, title: p.roadmapAgent },
       { path: ROUTES.ROADMAP_AGENT_SECTION(":section"), title: p.roadmapAgent },
       { path: ROUTES.ROADMAP_SETTINGS, title: p.roadmapSettings },
+      { path: ROUTES.ROADMAP_DRAFTS, title: p.roadmapDrafts },
+      { path: ROUTES.ROADMAP_NEW_IDEA, title: p.roadmapNewIdea },
       { path: ROUTES.ROADMAP_BUGS, title: p.roadmapBugs },
       { path: ROUTES.ROADMAP_MEASURES, title: en.roadmapV2Measures.title },
     ].map(entry => ({

@@ -6,6 +6,10 @@ import { useTranslation } from "react-i18next";
 import { DebriefSkillWord } from "@types";
 
 import { useIsAnyBeingRead, useIsBeingRead } from "./ReadAloudControls";
+import { ANCHOR_ATTR, ANCHOR_WRAP_ATTR, cardAnchor } from "./selectionAnchor";
+
+/** `data-anchor` for a field a learner can select words in (only read when the feature is on). */
+const anchorProps = (anchor?: string) => (anchor ? { [ANCHOR_ATTR]: cardAnchor(anchor) } : {});
 
 export const SKILL_WORD_ICON: Record<DebriefSkillWord, ReactNode> = {
   strength: <Star aria-hidden="true" className="h-4 w-4 shrink-0 text-success-600" />,
@@ -18,13 +22,15 @@ export const SKILL_WORD_ICON: Record<DebriefSkillWord, ReactNode> = {
 /** PRD §6.3: each quote opens the transcript at the turn it came from. */
 export const SeeMomentContext = createContext<((quote: string) => void) | null>(null);
 
-export const Quote: FC<{ text: string }> = ({ text }) => {
+export const Quote: FC<{ text: string; anchor?: string }> = ({ text, anchor }) => {
   const { t } = useTranslation();
   const seeMoment = useContext(SeeMomentContext);
   return (
     <div className="flex flex-col gap-1">
       <blockquote className="border-l-2 border-primary-200 pl-3 font-primary text-sm italic text-typography-700">
-        “{text}”
+        <span {...anchorProps(anchor)} {...(anchor ? { [ANCHOR_WRAP_ATTR]: 1 } : {})}>
+          “{text}”
+        </span>
       </blockquote>
       {seeMoment && (
         <button
@@ -112,12 +118,16 @@ export const Card: FC<{
   );
 };
 
-export const Body: FC<{ children: ReactNode }> = ({ children }) => (
-  <p className="font-primary text-sm leading-relaxed text-typography-800">{children}</p>
+export const Body: FC<{ children: ReactNode; anchor?: string }> = ({ children, anchor }) => (
+  <p className="font-primary text-sm leading-relaxed text-typography-800" {...anchorProps(anchor)}>
+    {children}
+  </p>
 );
 
-export const Lead: FC<{ children: ReactNode }> = ({ children }) => (
-  <h4 className="font-primary text-sm font-semibold text-typography-900">{children}</h4>
+export const Lead: FC<{ children: ReactNode; anchor?: string }> = ({ children, anchor }) => (
+  <h4 className="font-primary text-sm font-semibold text-typography-900" {...anchorProps(anchor)}>
+    {children}
+  </h4>
 );
 
 /** A card item that gets a ring while read-aloud is reading it. */

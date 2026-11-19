@@ -178,7 +178,9 @@ describe("question cards (§4.5a)", () => {
     };
     wrap(<Card detail={item()} />);
     expect(screen.getByText(en.roadmapV2.session.waitingFor("Priya"))).toBeInTheDocument();
-    expect(screen.getByText(en.roadmapV2.session.answeredBy("Ravi", "author"))).toBeInTheDocument();
+    expect(
+      screen.getByText(en.roadmapV2.session.answeredBy("Ravi", "submitter")),
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: en.roadmapV2.session.useThisAnswer }),
     ).not.toBeInTheDocument();

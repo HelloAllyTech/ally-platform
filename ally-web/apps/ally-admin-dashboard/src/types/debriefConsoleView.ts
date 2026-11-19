@@ -842,3 +842,20 @@ export interface AgentLogsView {
   /** Each prompt version the entries name, once: `code@version` → its text. */
   prompts: Record<string, string>;
 }
+
+/** A learner-facing debrief feature the Ally team can give to some people before everyone. */
+export type DebriefLearnerFeatureKey = "selection_comments";
+
+export interface DebriefLearnerFeaturePerson {
+  userId: number;
+  name: string;
+  email: string;
+  addedAt: string;
+}
+
+/** Who has the feature: the people listed, and whether everyone does. */
+export interface DebriefLearnerFeatureView {
+  feature: DebriefLearnerFeatureKey;
+  everyone: boolean;
+  people: DebriefLearnerFeaturePerson[];
+}

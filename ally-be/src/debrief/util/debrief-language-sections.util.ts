@@ -89,3 +89,8 @@ export function citedTurns(
   const want = new Set(citedTurnIndexes(cards));
   return transcript.filter((t) => want.has(t.turn_index));
 }
+
+/** English (any variety: en, en-IN, en_US): the language check does not run on it. */
+export const isEnglishLanguage = (
+  language: string | null | undefined,
+): boolean => /^en([-_]|$)/i.test(language || 'en');

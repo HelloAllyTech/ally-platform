@@ -238,6 +238,7 @@ describe('comments for the Debrief PM agent', () => {
         status: 'open',
         idea: { id: 'i1', status: 'proposed' },
         repeat_of_id: null,
+        source: 'expert',
         created_at: '2026-11-10T10:00:00.000Z',
         replies: [
           {

@@ -76,7 +76,10 @@ export class MicrophoneChatGateway
   // in-flight recordings can't hold the process past the termination grace
   // period (best-effort: any unflushed session still falls to the janitor/
   // reprocess path on the surviving replicas).
-  private static readonly SHUTDOWN_DRAIN_TIMEOUT_MS = 20_000;
+  // Ending the recordings AND waiting for their audio to be handed off
+  // (waitForFinalized). Below the container's stop timeout (infra: 60s for
+  // ally-be), after which Docker SIGKILLs the process.
+  private static readonly SHUTDOWN_DRAIN_TIMEOUT_MS = 45_000;
 
   // A dropped socket no longer ends the recording on the spot. A network blip
   // (Wi-Fi, a proxy or host network reset — seen on production 2026-11-18,
@@ -219,6 +222,8 @@ export class MicrophoneChatGateway
       `Draining ${inFlight.length} in-flight microphone recording(s) on shutdown`,
     );
 
+    const drainDeadline =
+      Date.now() + MicrophoneChatGateway.SHUTDOWN_DRAIN_TIMEOUT_MS;
     const drainAll = (async () => {
       for (const session of inFlight) {
         try {
@@ -232,15 +237,38 @@ export class MicrophoneChatGateway
             session.reason,
           );
           this.logger.warn(
-            `Flushed in-flight recording for chat ${session.chatId} on shutdown`,
+            `Ended in-flight recording for chat ${session.chatId} on shutdown`,
           );
         } catch (error) {
           this.logger.error(
-            `Failed to flush recording for chat ${session.chatId} on shutdown: ${
+            `Failed to end recording for chat ${session.chatId} on shutdown: ${
               error instanceof Error ? error.message : String(error)
             }`,
           );
         }
+      }
+      // endChat only ENDS the chat: the audio is flushed and handed to
+      // transcription by the async CHAT_ENDED listener. Wait for that here —
+      // Nest kills the process as soon as the shutdown hooks return, which
+      // used to drop every live recording's audio on a deploy.
+      const chatIds = inFlight.map((s) => s.chatId);
+      const notFinalized =
+        await this.streamFileProcessorService.waitForFinalized(
+          chatIds,
+          Math.max(0, drainDeadline - Date.now()),
+        );
+      if (notFinalized.length > 0) {
+        this.logger.error(
+          `Shutdown: audio for chat(s) ${notFinalized.join(', ')} not handed ` +
+            `off before the drain timeout; those recordings may be lost`,
+        );
+      } else {
+        // Finished, not necessarily succeeded: a failed finalize marks that
+        // chat's summary FAILED with the reason (logged above).
+        this.logger.warn(
+          `Shutdown: finalize finished for ${chatIds.length} recording(s) ` +
+            `(sent for transcription, or marked failed with the reason)`,
+        );
       }
     })();
 

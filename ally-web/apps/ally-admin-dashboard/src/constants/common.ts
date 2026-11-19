@@ -605,6 +605,13 @@ export const ApiEndpoints = {
     IDEA_APPROVE: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/approve`,
     IDEA_REJECT: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/reject`,
     PINNED_RULES: "/v1/debriefs/console/pinned-rules",
+    LEARNER_FEATURE: (feature: string) => `/v1/debriefs/console/learner-features/${feature}`,
+    LEARNER_FEATURE_PEOPLE: (feature: string) =>
+      `/v1/debriefs/console/learner-features/${feature}/people`,
+    LEARNER_FEATURE_PERSON: (feature: string, userId: number) =>
+      `/v1/debriefs/console/learner-features/${feature}/people/${userId}`,
+    LEARNER_FEATURE_EVERYONE: (feature: string) =>
+      `/v1/debriefs/console/learner-features/${feature}/everyone`,
     AUTONOMY: "/v1/debriefs/console/autonomy",
     AUTONOMY_MATRIX: "/v1/debriefs/console/autonomy/matrix",
     AUTONOMY_ORG: (tenantId: string) => `/v1/debriefs/console/autonomy/orgs/${tenantId}`,
