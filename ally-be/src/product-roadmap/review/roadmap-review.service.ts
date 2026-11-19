@@ -5,6 +5,7 @@ import {
   HttpStatus,
   Injectable,
   OnModuleDestroy,
+  Optional,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { LoggerService } from 'src/logger/logger.service';
@@ -29,6 +30,7 @@ import { RoadmapNotificationService } from '../service/roadmap-notification.serv
 import { RoadmapStrategyGoalService } from '../service/roadmap-strategy-goal.service';
 import { PlanSession, PlanSessionStore } from '../plan/plan-session.store';
 import { PlanStageService } from '../plan/plan-stage.service';
+import { PlanHandoffService } from '../plan/plan-handoff.service';
 import { RoadmapItemLookupService } from '../item/roadmap-item-lookup.service';
 import { RoadmapItemReadService } from '../item/roadmap-item-read.service';
 import type {
@@ -113,6 +115,8 @@ export class RoadmapReviewService implements OnModuleDestroy {
     private readonly broadcast: RoadmapNotificationService,
     private readonly strategyGoals: RoadmapStrategyGoalService,
     private readonly builderSessions: BuilderSessionService,
+    /** Start planning's dated hand-off (audit rec. 5). Optional so older fixtures still build. */
+    @Optional() private readonly planHandoff?: PlanHandoffService,
   ) {}
 
   // ── Review ─────────────────────────────────────────────────────────────────
@@ -409,6 +413,7 @@ export class RoadmapReviewService implements OnModuleDestroy {
       planningStartedAt: new Date().toISOString(),
       planningStartedBy: userId,
     });
+    await this.attachStartHandoff(userId, ref.code, session.id);
     await this.events.record({
       sessionId: session.id,
       kind: PlanEventKind.PLANNING_STARTED,
@@ -943,6 +948,21 @@ export class RoadmapReviewService implements OnModuleDestroy {
       detail: { by },
     });
     return this.planSession(created.id);
+  }
+
+  /** Never fails Start planning: a hand-off that could not be written is logged and skipped. */
+  private async attachStartHandoff(
+    userId: number,
+    code: string,
+    sessionId: string,
+  ): Promise<void> {
+    try {
+      await this.planHandoff?.attachAtStart(userId, code, sessionId);
+    } catch (error) {
+      this.logger.warn(
+        `[ROADMAP] Start planning hand-off for ${code} not written: ${(error as Error)?.message}`,
+      );
+    }
   }
 
   private async planSession(sessionId: string | null) {

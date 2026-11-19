@@ -861,6 +861,9 @@ export class BuilderInterviewOrchestratorService {
       validatedTurns,
       situationBrief: protocol,
       briefDue,
+      ...(session.kind === BuilderSessionKind.PLAN
+        ? { planSession: true }
+        : {}),
     });
 
     const loop: InterviewLoopContext = {

@@ -53,6 +53,8 @@ import { RoadmapReadinessTokenService } from './service/roadmap-readiness-token.
 import { RoadmapAiService } from './service/roadmap-ai.service';
 import { RoadmapStrategyContextService } from './service/roadmap-strategy-context.service';
 import { RoadmapCopilotToolsService } from './service/roadmap-copilot-tools.service';
+import { PlanHandoffService } from './plan/plan-handoff.service';
+import { PlanRoadmapToolsService } from './plan/plan-roadmap-tools.service';
 import { RoadmapCopilotService } from './service/roadmap-copilot.service';
 import { GlobalSettings } from 'src/settings/entity/global-settings.entity';
 import { RoadmapAllocationService } from './service/roadmap-allocation.service';
@@ -284,6 +286,8 @@ import { RoadmapMetricsService } from './metrics/roadmap-metrics.service';
     PlanDiscoveryService,
     PlanExportService,
     PlanSchedulerRegistrationService,
+    PlanHandoffService,
+    PlanRoadmapToolsService,
     // repositories
     RoadmapProductGoalRepository,
     RoadmapStrategyGoalRepository,

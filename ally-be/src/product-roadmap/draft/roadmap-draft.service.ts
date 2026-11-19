@@ -58,12 +58,20 @@ import { RoadmapItemLookupService } from '../item/roadmap-item-lookup.service';
 import { RoadmapItemReadService } from '../item/roadmap-item-read.service';
 import type { ItemDetail } from '../item/roadmap-item.types';
 import type { ShownStage } from 'src/product-planning/util/plan-stage.util';
+import type { RoadmapOpportunityBrief } from '../type/roadmap-brief.type';
+import {
+  normaliseFilingInterview,
+  normaliseOpportunityBrief,
+} from '../util/roadmap-brief.util';
 import {
   composeDescription,
   DraftCheck,
   draftChecks,
   DRAFT_CHECK_ORDER,
+  draftProposal,
+  DraftProposal,
   firstLine,
+  proposedDescription,
   QuotableAnswer,
   verifiedEvidence,
 } from './roadmap-draft.util';
@@ -111,6 +119,15 @@ export interface DraftDetail {
   archiveAt: string | null;
   purgeAt: string | null;
   spend: { spentUsd: number; ideaCapUsd: number; wrapUp: boolean };
+  /**
+   * Audit rec. 6, all optional for an older page. The one character limit for the text box
+   * (the same one Submit files against), the idea agent's statement and short title for "What
+   * will be submitted" (null until it has drafted one), and its research brief for "What the
+   * idea agent found" (null until its first turn).
+   */
+  textMax?: number;
+  proposal?: DraftProposal | null;
+  brief?: RoadmapOpportunityBrief | null;
 }
 
 export interface DraftRow {
@@ -496,6 +513,7 @@ export class RoadmapDraftService {
         draft: result.draft
           ? {
               description: result.draft.description,
+              title: result.draft.title ?? null,
               productGoal: result.draft.productGoal ?? null,
               effort: (result.draft.effort as string | null) ?? null,
             }
@@ -656,7 +674,13 @@ export class RoadmapDraftService {
   async submit(
     userId: number,
     code: string,
-    input: { goalId?: string | null },
+    input: {
+      goalId?: string | null;
+      /** Audit rec. 6. Absent (every older client) means `mine`: the draft text, verbatim. */
+      use?: 'mine' | 'agent';
+      title?: string;
+      statement?: string;
+    },
   ): Promise<{ item: ItemDetail; firstSubmit: boolean }> {
     const draft = await this.editableDraft(userId, code);
     const draftCode = draft.plan.code as string;
@@ -683,13 +707,43 @@ export class RoadmapDraftService {
       );
     }
     const selfChecked = checks.some((c) => c.source === 'self');
-    const description = composeDescription(
-      text,
-      selfChecked ? (idea.selfCheck ?? null) : null,
-    );
+    // The checks above always grade the author's own words (they quote them verbatim); this
+    // only chooses what the idea's text says once filed. The author's words stay on the
+    // session as `draftText` and show on the idea as where it started.
+    const submittedAs: 'author' | 'agent' =
+      input.use === 'agent' ? 'agent' : 'author';
+    let description: string;
+    if (submittedAs === 'agent') {
+      const proposal = draftProposal(idea);
+      if (!proposal) {
+        throw coded(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          'no_statement',
+          "The idea agent hasn't written a statement for this idea. Submit your own words.",
+        );
+      }
+      description = proposedDescription(
+        input.title ?? proposal.title,
+        input.statement ?? proposal.statement,
+      );
+      if (!description) {
+        throw coded(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          'statement_empty',
+          'Write a title or a statement, or submit your own words.',
+        );
+      }
+    } else {
+      description = composeDescription(
+        text,
+        selfChecked ? (idea.selfCheck ?? null) : null,
+      );
+    }
     if (description.length > ROADMAP_LIMITS.DESCRIPTION_MAX) {
-      throw new UnprocessableEntityException(
-        `An idea can be at most ${ROADMAP_LIMITS.DESCRIPTION_MAX} characters, with its five answers.`,
+      throw coded(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'too_long',
+        `An idea can be at most ${ROADMAP_LIMITS.DESCRIPTION_MAX} characters, title included.`,
       );
     }
 
@@ -748,6 +802,16 @@ export class RoadmapDraftService {
         } as unknown as CreateOpportunityDto,
         { canManage: false, enforceReadiness: signed, code: draftCode },
       );
+      if (!signed) {
+        // Audit rec. 5: an idea the agent could not size (or an unsigned filing) used to lose
+        // its brief and its interview here. Both are the server's own record of this draft,
+        // not anything the client sent, so keeping them claims nothing on the agent's behalf
+        // that it did not say; the readiness token still only signs a sized draft.
+        await this.keepFilingRecord(created.id, idea.brief, [
+          { role: 'admin', content: text },
+          ...transcript,
+        ]);
+      }
 
       await this.dataSource.query(
         `UPDATE "roadmap_opportunities"
@@ -759,7 +823,7 @@ export class RoadmapDraftService {
       const filedAt = new Date().toISOString();
       await this.store.update(draft.id, {
         visibility: BuilderSessionVisibility.SHARED,
-        title: firstLine(text),
+        title: firstLine(description),
         archivedAt: null,
         updatedBy: userId,
       });
@@ -769,6 +833,7 @@ export class RoadmapDraftService {
         filingAt: null,
         lastActiveAt: filedAt,
         planningStarted: false,
+        submittedAs,
       });
       const handoff = await this.roadmapBuilder.handoffTextForOpportunity(
         created.id,
@@ -780,7 +845,7 @@ export class RoadmapDraftService {
         sessionId: draft.id,
         kind: PlanEventKind.FILED,
         actorUserId: userId,
-        detail: { opportunityId: created.id, selfChecked },
+        detail: { opportunityId: created.id, selfChecked, submittedAs },
       });
       await this.events.record({
         sessionId: draft.id,
@@ -794,7 +859,11 @@ export class RoadmapDraftService {
         itemId: created.id,
         sessionId: draft.id,
         actorUserId: userId,
-        payload: { code: draftCode, title: firstLine(text), selfChecked },
+        payload: {
+          code: draftCode,
+          title: firstLine(description),
+          selfChecked,
+        },
       });
       this.broadcast.emit({
         kind: 'ITEM_CHANGED',
@@ -869,6 +938,28 @@ export class RoadmapDraftService {
       );
     }
     return draft;
+  }
+
+  /** Brief and filing interview onto an unsigned filing, each only where there is one. */
+  private async keepFilingRecord(
+    opportunityId: string,
+    rawBrief: unknown,
+    rawTranscript: unknown,
+  ): Promise<void> {
+    const brief = normaliseOpportunityBrief(rawBrief);
+    const transcript = normaliseFilingInterview(rawTranscript);
+    if (!brief && !transcript?.length) return;
+    await this.dataSource.query(
+      `UPDATE "roadmap_opportunities"
+          SET "brief" = COALESCE($2::jsonb, "brief"),
+              "interviewTranscript" = COALESCE($3::jsonb, "interviewTranscript")
+        WHERE id = $1`,
+      [
+        opportunityId,
+        brief ? JSON.stringify(brief) : null,
+        transcript?.length ? JSON.stringify(transcript) : null,
+      ],
+    );
   }
 
   private cleanText(text: string | undefined): string {
@@ -1091,6 +1182,9 @@ export class RoadmapDraftService {
         ideaCapUsd: cap.ceilingUsd,
         wrapUp: cap.state === 'wrap_up',
       },
+      textMax: ROADMAP_LIMITS.DESCRIPTION_MAX,
+      proposal: draftProposal(record.idea),
+      brief: normaliseOpportunityBrief(record.idea?.brief),
     };
   }
 }

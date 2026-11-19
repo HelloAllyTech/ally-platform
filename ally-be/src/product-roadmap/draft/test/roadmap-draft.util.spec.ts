@@ -1,6 +1,9 @@
 import {
   composeDescription,
   draftChecks,
+  draftProposal,
+  proposedDescription,
+  suggestTitle,
   DRAFT_CHECK_ORDER,
   locateQuote,
   normaliseForQuote,
@@ -119,5 +122,49 @@ describe('roadmap draft checks', () => {
     ).toBe(
       "Title\n\nWho it's for: Counsellors\nHow we'd know it worked: Fewer drop-offs",
     );
+  });
+});
+
+describe('What will be submitted (audit rec. 6)', () => {
+  it('offers nothing until the agent has written a statement', () => {
+    expect(draftProposal(undefined)).toBeNull();
+    expect(draftProposal({ draft: null })).toBeNull();
+  });
+
+  it("prefers the agent's own title, else its statement's first sentence", () => {
+    expect(
+      draftProposal({
+        draft: {
+          description: 'Long text. More.',
+          title: ' Short ',
+          productGoal: null,
+          effort: 'm',
+        },
+      }),
+    ).toEqual({ title: 'Short', statement: 'Long text. More.' });
+    expect(
+      draftProposal({
+        draft: {
+          description: 'Names carry over. More.',
+          productGoal: null,
+          effort: 'm',
+        },
+      })?.title,
+    ).toBe('Names carry over');
+  });
+
+  it('cuts a long first sentence at a word', () => {
+    const title = suggestTitle(`${'word '.repeat(40)}end.`);
+    expect(title.length).toBeLessThanOrEqual(81);
+    expect(title.endsWith('…')).toBe(true);
+    expect(title).not.toContain('wor…');
+  });
+
+  it('files the title on the first line, the statement after it', () => {
+    expect(proposedDescription(' A  title ', ' Body \n')).toBe(
+      'A title\n\nBody',
+    );
+    expect(proposedDescription('', 'Body')).toBe('Body');
+    expect(proposedDescription('', '  ')).toBe('');
   });
 });

@@ -106,6 +106,7 @@ function build(
     builderSessions: {
       createSession: jest.fn(async () => ({ id: 'new-session' })),
     },
+    planHandoff: { attachAtStart: jest.fn(async () => true) },
   };
   const service = new RoadmapReviewService(
     ...(Object.values(deps) as unknown as ConstructorParameters<
@@ -468,6 +469,28 @@ describe('RoadmapReviewService', () => {
     await expect(
       refused.service.startPlanning(AUTHOR, 'OPP-0001'),
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('Start planning dates the idea as it stands for the planning agent, and never fails on it', async () => {
+    const { service, deps } = build({
+      stage: 'accepted',
+      can: { startPlanning: true },
+    });
+    await service.startPlanning(OWNER, 'OPP-0001');
+    expect(deps.planHandoff.attachAtStart).toHaveBeenCalledWith(
+      OWNER,
+      'OPP-0001',
+      's-OPP-0001',
+    );
+
+    const failing = build({ stage: 'accepted', can: { startPlanning: true } });
+    failing.deps.planHandoff.attachAtStart.mockRejectedValue(new Error('db'));
+    await expect(
+      failing.service.startPlanning(OWNER, 'OPP-0001'),
+    ).resolves.toBeDefined();
+    expect(failing.deps.events.record).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: PlanEventKind.PLANNING_STARTED }),
+    );
   });
 
   it('Start planning on a submitted idea accepts it', async () => {

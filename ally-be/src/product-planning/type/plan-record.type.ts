@@ -79,6 +79,12 @@ export interface PlanRecord {
   draftGoalId?: string | null;
   /** Bumps on every autosave, for the page's stale-write check. */
   draftVersion?: number;
+  /**
+   * What Submit filed as the idea's text (audit rec. 6): the author's own words (`author`, also
+   * what an older client that sends no choice files) or the idea agent's statement and title as
+   * the author accepted or edited them (`agent`). The author's words stay in `draftText` either way.
+   */
+  submittedAs?: 'author' | 'agent';
   /** Set by Submit (P3): false until Start planning is pressed (P3b). */
   planningStarted?: boolean;
   planningStartedAt?: string | null;
@@ -137,6 +143,8 @@ export interface PlanIdeaState {
   /** Present only when every criterion is met. */
   draft?: {
     description: string;
+    /** The copilot's short title for it, when it gave one (audit rec. 6). */
+    title?: string | null;
     productGoal: string | null;
     effort: string | null;
   } | null;

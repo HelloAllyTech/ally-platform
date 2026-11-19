@@ -7,7 +7,11 @@ import {
 } from 'src/common/util/json-patch.util';
 import { BuilderSession } from '../entity/builder-session.entity';
 import { BuilderPrdDoc } from '../entity/builder-prd-doc.entity';
-import { BuilderPrdVersionAuthor } from '../enum/builder.enum';
+import {
+  BuilderPrdVersionAuthor,
+  BuilderSessionKind,
+} from '../enum/builder.enum';
+import { builderPlanTools } from '../util/builder-plan-tools.registry';
 import {
   BuilderQuestionOption,
   BuilderToolExecutionOutcome,
@@ -182,8 +186,21 @@ export class BuilderInterviewToolsService {
       situationBrief?: boolean;
       /** The opening turn under the protocol: the brief, and no question yet. */
       briefDue?: boolean;
+      /** A Roadmap plan session: the roadmap's read-only tools ride at the end. */
+      planSession?: boolean;
     } = {},
   ): any[] {
+    const tools = this.belt(options);
+    return options.planSession
+      ? [...tools, ...builderPlanTools.definitions()]
+      : tools;
+  }
+
+  private belt(options: {
+    validatedTurns?: boolean;
+    situationBrief?: boolean;
+    briefDue?: boolean;
+  }): any[] {
     const legacy = this.legacyToolDefinitions();
     if (!options.validatedTurns) return legacy;
     const gate = Boolean(options.situationBrief);
@@ -801,11 +818,23 @@ export class BuilderInterviewToolsService {
               ? ` (scanned ${result.scan.windowFrom} → ${result.scan.windowTo})`
               : ' (no scan has completed yet)'),
         );
-      default:
+      default: {
+        // A Roadmap plan session's own tools (builder-plan-tools.registry), only there.
+        const provider =
+          context.session?.kind === BuilderSessionKind.PLAN
+            ? builderPlanTools.providerFor(name)
+            : null;
+        if (provider) {
+          return provider.execute(name, input ?? {}, {
+            session: context.session,
+            userId: context.userId,
+          });
+        }
         return {
           modelResult: { ok: false, error: `Unknown tool "${name}"` },
           summary: `Unknown tool "${name}"`,
         };
+      }
     }
   }
 

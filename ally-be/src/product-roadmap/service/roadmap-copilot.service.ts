@@ -100,6 +100,7 @@ interface SubmittedTurn {
   gates?: { id?: string; met?: boolean; note?: string; evidence?: string }[];
   draft?: {
     description?: string;
+    title?: string | null;
     productGoal?: string | null;
     effort?: string | null;
   } | null;
@@ -683,10 +684,18 @@ export class RoadmapCopilotService {
       effort !== null &&
       (ROADMAP_FILEABLE_EFFORTS as readonly string[]).includes(effort);
 
+    const title =
+      typeof submitted?.draft?.title === 'string'
+        ? submitted.draft.title.replace(/\s+/g, ' ').trim()
+        : '';
     const draft =
       allMet && description && sizeFileable
         ? {
             description: description.slice(0, ROADMAP_LIMITS.DESCRIPTION_MAX),
+            // Optional and advisory: the draft page offers it beside the author's words.
+            ...(title
+              ? { title: title.slice(0, ROADMAP_LIMITS.IDEA_TITLE_MAX) }
+              : {}),
             productGoal: productGoalNames.includes(
               submitted?.draft?.productGoal as string,
             )
