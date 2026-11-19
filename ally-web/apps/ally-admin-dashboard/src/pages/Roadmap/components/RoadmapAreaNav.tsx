@@ -10,7 +10,7 @@ import { ROUTES, en } from "@constants";
 import type { RoadmapRole } from "@types";
 
 import { requestShortcuts, useRoadmapFrame } from "../RoadmapFrame";
-import { ConceptsButton } from "./ConceptsDrawer";
+import { CONCEPTS_WIKI_URL, ConceptsButton } from "./ConceptsLink";
 import { canSeeAgent, canSeeMeasures, canSeeSettings } from "../utils/redirects";
 
 export type RoleTabKey = "agent" | "settings" | "measures";
@@ -127,11 +127,8 @@ export const RoadmapMoreMenu: React.FC<{
   );
 };
 
-/** The book icon beside ? in the Roadmap header: the Core Concepts page, for every role. */
-export const RoadmapConceptsButton: React.FC = () => {
-  const { openConcepts } = useRoadmapFrame();
-  return <ConceptsButton onOpen={openConcepts} />;
-};
+/** The book icon beside ? in the Roadmap header: the Core Concepts wiki page, for every role. */
+export const RoadmapConceptsButton: React.FC = () => <ConceptsButton />;
 
 /** Agent and Settings on a phone: the bottom bar's ⋯ opens these (§4.17). */
 export const MoreSheetContent: React.FC<{ role: RoadmapRole; onNavigate: () => void }> = ({
@@ -139,7 +136,7 @@ export const MoreSheetContent: React.FC<{ role: RoadmapRole; onNavigate: () => v
   onNavigate,
 }) => {
   const copy = en.roadmapV2Tools;
-  const { openWhatMoved, openConcepts } = useRoadmapFrame();
+  const { openWhatMoved } = useRoadmapFrame();
   const tabs = roleTabsFor(role);
   return (
     <div className="flex flex-col gap-4">
@@ -168,16 +165,15 @@ export const MoreSheetContent: React.FC<{ role: RoadmapRole; onNavigate: () => v
       >
         {copy.help.whatMoved}
       </button>
-      <button
-        type="button"
-        onClick={() => {
-          onNavigate();
-          openConcepts();
-        }}
+      <a
+        href={CONCEPTS_WIKI_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={onNavigate}
         className="flex min-h-12 items-center text-left text-base text-primary-700"
       >
         {copy.concepts.button}
-      </button>
+      </a>
     </div>
   );
 };
