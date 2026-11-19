@@ -255,6 +255,156 @@ describe('RoadmapDraftService', () => {
     expect(result.firstSubmit).toBe(true);
   });
 
+  describe('What will be submitted (audit rec. 6) and the filing record (rec. 5)', () => {
+    const ready = (
+      draft: any,
+      brief: any = {
+        assessment: { rating: 'promising', summary: 'Worth doing.' },
+      },
+    ) =>
+      build({
+        row: draftRow({
+          draftGoalId: 'g1',
+          idea: { gates: allGates, brief, draft },
+        }),
+      });
+    const filing = (deps: any) =>
+      deps.dataSource.query.mockImplementation(async (sql: string) => {
+        if (sql.includes('FROM "roadmap_product_goals"'))
+          return [{ id: 'g1', name: 'Scribe' }];
+        if (sql.includes("jsonb_build_object('filingAt'"))
+          return [[{ id: SESSION }], 1];
+        if (sql.includes('count(*)')) return [{ n: 1 }];
+        return [];
+      });
+    const statement = {
+      description: 'Counsellors stop retyping client names between screens.',
+      title: 'Carry client names across screens',
+      productGoal: 'Scribe',
+      effort: 'm',
+    };
+
+    it('the page gets the agent statement, a title, the brief and the one limit', async () => {
+      const { service } = ready(statement);
+      const detail = await service.detail(ME, 'OPP-0900');
+      expect(detail.proposal).toEqual({
+        title: 'Carry client names across screens',
+        statement: statement.description,
+      });
+      expect(detail.brief).toMatchObject({
+        assessment: { rating: 'promising' },
+      });
+      expect(detail.textMax).toBe(1000);
+    });
+
+    it('an older client that sends no choice files the author text verbatim', async () => {
+      const { service, deps, row } = ready(statement);
+      filing(deps);
+      await service.submit(ME, 'OPP-0900', {
+        goalId: 'g1',
+        title: 'Keep client names',
+      });
+      expect(deps.opportunityService.create).toHaveBeenCalledWith(
+        ME,
+        expect.objectContaining({
+          title: 'Keep client names',
+          description: 'Counsellors retype names',
+        }),
+        expect.anything(),
+      );
+      expect(row().plan.submittedAs).toBe('author');
+    });
+
+    it('Use this files the edited statement as the summary under the title, signed, and keeps the author words', async () => {
+      const { service, deps, row } = ready(statement);
+      filing(deps);
+      await service.submit(ME, 'OPP-0900', {
+        use: 'agent',
+        title: 'Keep client names',
+        statement: 'Names typed once carry to every screen.',
+      });
+      // The title is its own field (#342); the opportunity service stores "title, blank, summary".
+      const filed = 'Names typed once carry to every screen.';
+      expect(deps.opportunityService.create).toHaveBeenCalledWith(
+        ME,
+        expect.objectContaining({
+          title: 'Keep client names',
+          description: filed,
+          readinessToken: 'signed',
+          interviewTranscript: [
+            { role: 'admin', content: 'Counsellors retype names' },
+          ],
+        }),
+        expect.objectContaining({ enforceReadiness: true }),
+      );
+      expect(deps.readinessToken.issue).toHaveBeenCalledWith(
+        expect.objectContaining({ description: filed }),
+      );
+      expect(row().plan.draftText).toBe('Counsellors retype names');
+      expect(row().plan.submittedAs).toBe('agent');
+    });
+
+    it('Use this with no agent statement fails closed', async () => {
+      const { service, deps } = ready(null);
+      filing(deps);
+      const error = await service
+        .submit(ME, 'OPP-0900', { title: 'A title', use: 'agent' })
+        .catch((e) => e);
+      expect(error.getStatus()).toBe(422);
+      expect(error.getResponse()).toMatchObject({ code: 'no_statement' });
+      expect(deps.opportunityService.create).not.toHaveBeenCalled();
+    });
+
+    it('refuses a summary past the one limit', async () => {
+      const { service, deps } = ready(statement);
+      filing(deps);
+      const error = await service
+        .submit(ME, 'OPP-0900', {
+          title: 'A title',
+          use: 'agent',
+          statement: 'x'.repeat(1001),
+        })
+        .catch((e) => e);
+      expect(error.getResponse()).toMatchObject({ code: 'too_long' });
+    });
+
+    it('an idea the agent could not size still keeps its brief and interview', async () => {
+      const { service, deps } = ready(null, {
+        assessment: {
+          rating: 'needs_work',
+          summary: 's',
+          openRecommendations: [],
+        },
+      });
+      filing(deps);
+      deps.messages.listBySession.mockResolvedValue([
+        {
+          id: 'a1',
+          role: 'assistant',
+          content: 'Who is this for?',
+          metadata: { planStage: 'idea' },
+        },
+      ]);
+      await service.submit(ME, 'OPP-0900', { title: 'A title' });
+      expect(deps.opportunityService.create).toHaveBeenCalledWith(
+        ME,
+        expect.not.objectContaining({ brief: expect.anything() }),
+        expect.objectContaining({ enforceReadiness: false }),
+      );
+      const kept = deps.dataSource.query.mock.calls.find(([sql]) =>
+        String(sql).includes('"interviewTranscript" = COALESCE'),
+      );
+      expect(kept).toBeDefined();
+      expect(JSON.parse(kept![1][1])).toMatchObject({
+        assessment: { rating: 'needs_work' },
+      });
+      expect(JSON.parse(kept![1][2])).toEqual([
+        { role: 'admin', content: 'Counsellors retype names' },
+        { role: 'agent', content: 'Who is this for?' },
+      ]);
+    });
+  });
+
   it('a self-filled draft no longer counts as ready, and Fill it in yourself answers 410', async () => {
     const selfCheck = Object.fromEntries(
       DRAFT_CHECK_ORDER.map((id) => [id, `answer ${id}`]),

@@ -14,6 +14,7 @@ import { IDEA_DRAFT_TEXT_MAX } from "@types";
 import { MicBulbIcon } from "./MicBulbIcon";
 import { useCreateRoadmapDraftMutation } from "../../api/roadmapV2Flow";
 import { canFileIdeas } from "../../pages/ProductRoadmap/utils/access";
+import { ROADMAP_IDEA_TEXT_MAX } from "../../types/roadmapV2Flow";
 
 const UNSENT_KEY = "ally-admin-idea-capture-unsent";
 const REVEAL_MS = 650;
@@ -83,6 +84,11 @@ export const IdeaCaptureLauncher: React.FC<IdeaCaptureLauncherProps> = ({
   className = "",
 }) => {
   const { permissions, features, user, isRoadmapV2On } = useUser();
+  // One limit end to end (audit rec. 6): with Roadmap v2 on, what this box accepts is exactly what
+  // a draft and Submit accept, so nothing typed here is refused later. The older store keeps its own.
+  const textMax = isRoadmapV2On ? ROADMAP_IDEA_TEXT_MAX : IDEA_DRAFT_TEXT_MAX;
+  const textMaxRef = useRef(textMax);
+  textMaxRef.current = textMax;
   // Parking an idea is filing's first step: the Idea role (or above), as ally-be checks.
   const allowed = canFileIdeas(permissions, features, user?.restrictedTenantIds != null);
 
@@ -140,7 +146,7 @@ export const IdeaCaptureLauncher: React.FC<IdeaCaptureLauncherProps> = ({
       const current = textRef.current;
       const joined =
         current && !/\s$/.test(current) ? `${current} ${phrase}` : `${current}${phrase}`;
-      setText(joined.slice(0, IDEA_DRAFT_TEXT_MAX));
+      setText(joined.slice(0, textMaxRef.current));
     },
     [setText],
   );
@@ -244,7 +250,7 @@ export const IdeaCaptureLauncher: React.FC<IdeaCaptureLauncherProps> = ({
       let destination: string;
       if (isRoadmapV2On) {
         const draft = await createV2Draft({
-          text: rawText.slice(0, IDEA_DRAFT_TEXT_MAX),
+          text: rawText.slice(0, ROADMAP_IDEA_TEXT_MAX),
           captureMode,
         }).unwrap();
         destination = ROUTES.ROADMAP_IDEA(draft.code);
@@ -483,7 +489,7 @@ export const IdeaCaptureLauncher: React.FC<IdeaCaptureLauncherProps> = ({
                 <textarea
                   ref={textareaRef}
                   value={text}
-                  onChange={event => setText(event.target.value.slice(0, IDEA_DRAFT_TEXT_MAX))}
+                  onChange={event => setText(event.target.value.slice(0, textMax))}
                   onScroll={syncMirror}
                   placeholder={
                     showDots && !text
@@ -498,7 +504,7 @@ export const IdeaCaptureLauncher: React.FC<IdeaCaptureLauncherProps> = ({
                 {showDots ? "Transcribing" : ""}
               </span>
               <span className="absolute bottom-2 right-4 text-[11px] tabular-nums text-white/25">
-                {text.length}/{IDEA_DRAFT_TEXT_MAX}
+                {text.length}/{textMax}
               </span>
             </div>
 

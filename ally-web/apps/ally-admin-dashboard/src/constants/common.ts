@@ -479,6 +479,11 @@ export const ApiEndpoints = {
       `/v1/roadmap/items/${encodeURIComponent(code)}/conversation`,
     CLOSE_PLAN: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/close-plan`,
     REOPEN_PLAN: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/reopen-plan`,
+    CLOSE_READINESS: (code: string) =>
+      `/v1/roadmap/items/${encodeURIComponent(code)}/close-readiness`,
+    PLAN_MESSAGE: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/plan-message`,
+    PLAN_CHECKS_RUN: (sessionId: string) =>
+      `/v1/product-roadmap/plans/${encodeURIComponent(sessionId)}/checks/run`,
     BUILD_MODE: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/build-mode`,
     MARK_RELEASED: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/mark-released`,
     SESSION_ANSWERS: (sessionId: string) =>
@@ -517,6 +522,11 @@ export const ApiEndpoints = {
     ITEM_WATCH: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/watch`,
     ITEM_STAR: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/star`,
     SEARCH: "/v1/roadmap/search",
+  },
+  /** The Owner's old-and-quiet sweep of To do (idea-to-plan audit rec 9). 403 for anyone else. */
+  ROADMAP_V2_SWEEP: {
+    LIST: "/v1/roadmap/todo-sweep",
+    KEEP: "/v1/roadmap/todo-sweep/keep",
   },
   /** Roadmap v2 P8: the Owner's Measures. 404 while the flag is off, 403 for anyone but an Owner. */
   ROADMAP_V2_MEASURES: {

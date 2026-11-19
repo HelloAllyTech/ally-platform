@@ -676,6 +676,7 @@ describe('BuilderInterviewOrchestratorService — validated turns', () => {
       validatedTurns: true,
       situationBrief: false,
       briefDue: false,
+      planSession: false,
     });
     expect(sentRequests[0].system[0].text).not.toContain(
       '# How this interview runs',

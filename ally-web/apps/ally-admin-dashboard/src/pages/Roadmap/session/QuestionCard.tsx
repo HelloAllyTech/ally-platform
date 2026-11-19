@@ -8,6 +8,7 @@ import { en } from "@constants";
 import { useUser } from "@hooks";
 import type { BuilderQuestionEvent, RoadmapItemDetail, RoadmapPersonRef } from "@types";
 
+import { AuthorQuestionTag } from "./AuthorQuestionTag";
 import { useRoadmapPresence, useTypingIn } from "./presenceContext";
 import { SessionAnswers } from "./useSessionAnswers";
 import { haptic, motionTransition, useReducedMotionPreference } from "../../../motion";
@@ -208,6 +209,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
         transition={motionTransition("moderate", "productive", reduced)}
       >
         <span className="text-xs font-semibold text-typography-secondary">{agentName}</span>
+        <AuthorQuestionTag question={question} item={item} />
         <p className="m-0 text-sm font-medium text-typography-primary">
           <CodeText text={question.prompt} />
         </p>

@@ -18,6 +18,7 @@ import { mapServerMessagesToFeed } from "../../../hooks/useBuilderStream";
 import { motionTransition, useReducedMotionPreference } from "../../../motion";
 import { useRoadmapBreakpoint } from "../hooks/useRoadmapBreakpoint";
 import { CommentBox, CommentItem } from "../session/CommentBox";
+import { PlanComposer } from "../session/PlanComposer";
 import { QuestionCard } from "../session/QuestionCard";
 import { commentAnchors, isPlanPost, planStartFeedIndex } from "../session/sessionFeed";
 import { useSessionAnswers } from "../session/useSessionAnswers";
@@ -342,6 +343,9 @@ export const Conversation: React.FC<ConversationProps> = ({
           <PhaseMarker label={currentMarker} />
         )}
       </ol>
+      <div className="pt-3 empty:hidden">
+        <PlanComposer item={item} messages={messages} />
+      </div>
       {!isPhone && (
         <div className="pt-3">
           <CommentBox item={item} session={session} />

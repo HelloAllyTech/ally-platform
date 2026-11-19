@@ -24,6 +24,7 @@ import type {
   RoadmapSelfCheck,
   RoadmapSessionAnswers,
   RoadmapSimilarIdea,
+  RoadmapSubmitChoice,
   RoadmapSubmitResult,
 } from "../types/roadmapV2Flow";
 
@@ -188,15 +189,15 @@ export const roadmapV2FlowAPI = baseAPI.injectEndpoints({
       ],
     }),
 
-    // A title is required to submit; the draft's text becomes the idea's Summary > Problem.
+    // A title is required to submit (#342); `choice` picks what the summary says (audit rec. 6).
     submitRoadmapDraft: builder.mutation<
       RoadmapSubmitResult,
-      { code: string; title: string; goalId?: string }
+      { code: string; title: string; goalId?: string; choice?: RoadmapSubmitChoice }
     >({
-      query: ({ code, title, goalId }) => ({
+      query: ({ code, title, goalId, choice }) => ({
         url: ApiEndpoints.ROADMAP_V2_FLOW.DRAFT_SUBMIT(code),
         method: HttpMethod.POST,
-        body: goalId ? { title, goalId } : { title },
+        body: { title, ...(goalId ? { goalId } : {}), ...(choice ?? {}) },
       }),
       // The draft page hands the answer to the idea page itself, after the Submit motion plays
       // (the dashed outline turns solid first), so the swap never cuts it short.

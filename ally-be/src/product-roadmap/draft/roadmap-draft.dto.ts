@@ -103,6 +103,28 @@ export class SubmitRoadmapDraftDto {
   @IsOptional()
   @IsString()
   goalId?: string | null;
+
+  /**
+   * What to file as the idea's summary beneath its title (audit rec. 6). Left out, as every
+   * client before it does, it is `mine`: the author's draft text, verbatim, exactly as before.
+   */
+  @ApiPropertyOptional({
+    enum: ['mine', 'agent'],
+    description:
+      "`mine` files the draft text verbatim as the summary (the default); `agent` files the idea agent's statement, as edited here",
+  })
+  @IsOptional()
+  @IsIn(['mine', 'agent'])
+  use?: 'mine' | 'agent';
+
+  @ApiPropertyOptional({
+    maxLength: ROADMAP_LIMITS.DESCRIPTION_MAX,
+    description: "With `use: 'agent'`: the statement, as the author edited it",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(ROADMAP_LIMITS.DESCRIPTION_MAX)
+  statement?: string;
 }
 
 export class RoadmapDictationDto {

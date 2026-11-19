@@ -2313,7 +2313,9 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
       "Roadmap v2 reuses the duplicate check twice more: a draft page's Similar ideas (GET /v1/roadmap/drafts/:code/similar, " +
       "debounced by the client after typing stops) and the Owner's triage pane (GET /v1/roadmap/items/:code/similar). " +
       "The Roadmap cutover (POST /v1/roadmap/cutover, an Owner's one-off switch-on) assesses each idea it files for a " +
-      'live direct Builder session once, after its commit, as any filing is (and embeds it for the duplicate check).',
+      'live direct Builder session once, after its commit, as any filing is (and embeds it for the duplicate check). ' +
+      'Start planning (POST /v1/roadmap/items/:code/start-planning) runs the duplicate check once per idea, as the Owner who ' +
+      "pressed it, to list similar ideas in the planning agent's dated hand-off (PlanHandoffService); a failure leaves the list empty.",
     kind: AiTaskKind.COMPLETION,
     provider: 'openai',
     defaultModel: 'gpt-5-mini',
@@ -2326,7 +2328,7 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     runtime: LlmRuntime.ALLY_BE,
     tier: LlmModelTier.REASONING,
     trigger:
-      'A roadmap plan runs a review-board check, drafts launch materials, plans user research, reviews an outcome, or the weekly signal scout runs',
+      'A roadmap plan runs a review-board check (on its own the first time the PRD reads ready, or when the planner asks), drafts launch materials, plans user research, reviews an outcome, or the weekly signal scout runs',
     detail:
       'The planning_* prompts: the safety, privacy and AI-quality reviewers (cold, from the PRD and ' +
       'design only), the outcome reviewer (scheduled after release), the launch planner, the ' +
@@ -2368,7 +2370,8 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
       'Analytics Agent, UX signals, Bug Hunter findings, repo docs, GitHub code and wiki, ' +
       'First Principles from the Context Library), then a structured turn — question, readiness verdicts, draft and brief. ' +
       'On the Roadmap v2 draft page the same submit_turn also returns, per met check, the verbatim words that met it, ' +
-      'and a product-goal suggestion — structured output of this call, never a second call. Each draft turn is priced ' +
+      'and a product-goal suggestion — structured output of this call, never a second call. Its draft may also carry an ' +
+      'optional short title, offered with the statement under "What will be submitted" (same call). Each draft turn is priced ' +
       'into the plan spend ledger at the idea stage ($1 wrap-up cap). One ' +
       'llm_usage row per pass. Two cached system blocks: a product map (repos, admin ' +
       'surfaces, the head of each Builder knowledge pack, the wiki and repo-docs index — ' +
@@ -2535,7 +2538,8 @@ const BUILDER_TASKS: AiTaskEntry[] = [
     id: 'builder-interview',
     task: LlmTask.BUILDER_INTERVIEW,
     runtime: LlmRuntime.ALLY_BE,
-    trigger: 'An admin talks to Builder about what to build',
+    trigger:
+      'An admin talks to Builder about what to build, or an Owner starts planning an idea or writes to its planning agent',
     detail:
       'PRD interview, tool loop capped at 16 round-trips. With builder_settings.validatedTurns ' +
       '(default on) a turn ends only through ask_admin / finish_turn, checked before it is shown: ' +
@@ -2549,7 +2553,18 @@ const BUILDER_TASKS: AiTaskEntry[] = [
       "Roadmap v2 (P3b): after Start planning the plan interview runs in the idea's one session, and " +
       'each turn also reads every answer, comment and settled choice posted since the last turn by anyone ' +
       'with Roadmap access, attributed as [Name · role] (no extra call; a longer user message). ' +
-      'Conflicting answers are withheld until the settler chooses.',
+      'Conflicting answers are withheld until the settler chooses. ' +
+      'Start planning queues the opening turn in the background, and the planner (an Owner or ' +
+      "the assigned builder) starts a turn from the idea page's composer (PlanTurnService): one " +
+      'turn per press, the same call. A plan turn also reads what its Close plan gate still lists ' +
+      '(design, success measure, checks, conflicts), may set the success measure with ' +
+      'set_success_measure (no model call), and a "ready" claim is sent back while that gate is open. ' +
+      "A plan session's hand-off opens with a dated block of the idea as it stands at Start planning (votes, " +
+      'comments, similar ideas; built without a model call except the similar-ideas check, which is the roadmap-ai row), ' +
+      'and its tool belt adds three read-only Roadmap tools (search_roadmap_ideas, read_roadmap_idea, ' +
+      "search_interview_notes) that reuse the idea agent's lookups — the board search embeds its query (corpus-embedding), no completion. " +
+      'ask_admin may mark a question forAuthor (about the problem or the user): it is addressed to ' +
+      "the idea's author with a notice; the turn's own call is unchanged (no extra call).",
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
     defaultModel: 'gemini-2.5-pro',

@@ -65,6 +65,7 @@ import {
   BuilderTurnReceipt,
 } from '../type/builder-sse.type';
 import { BuilderSettingsService } from './builder-settings.service';
+import { RoadmapIdeaNoticeService } from 'src/product-planning/service/roadmap-idea-notice.service';
 import { BuilderRuleContextService } from './builder-rule-context.service';
 import { freeTextOf } from './builder-readiness.service';
 import { isAcknowledgement } from '../util/builder-readiness-checks.util';
@@ -99,6 +100,7 @@ import {
 import {
   BuilderBriefResponse,
   BuilderSituationBrief,
+  filesReadIn,
   normaliseBriefResponse,
   normaliseSituationBrief,
   renderBriefForModel,
@@ -106,6 +108,11 @@ import {
   storedSituationBrief,
 } from '../util/builder-situation-brief.util';
 import { questionGateProblems } from '../util/builder-question-gate.util';
+import {
+  renderPlanGateBlock,
+  withPlanGate,
+} from '../util/builder-plan-gate.util';
+import { planGateRegistry } from 'src/product-planning/service/plan-gate.registry';
 import { CreateBuilderMessageDto } from '../dto/builder.dto';
 import { BuilderPrdReadiness } from '../type/builder-prd.type';
 import {
@@ -425,6 +432,9 @@ export class BuilderInterviewOrchestratorService {
      */
     @Optional()
     private readonly planCeiling?: PlanCeilingService,
+    /** Tells the author or the planner a question waits (idea-to-plan audit recs 8, 10). Optional, like the rest. */
+    @Optional()
+    private readonly ideaNotices?: RoadmapIdeaNoticeService,
   ) {}
 
   /**
@@ -813,6 +823,15 @@ export class BuilderInterviewOrchestratorService {
     // and joins the cached prefix once it lands; the section focus is a small uncached block
     // for the first PRD section that is not ready, bounded by a timeout.
     const turnReadiness = await this.readiness.assess(sessionId, doc);
+    // A plan being planned: what else stands between it and Close plan, the
+    // list the Owner's dialog shows (audit 2026-11-19, rec 2).
+    const planGateBlock =
+      session.kind === BuilderSessionKind.PLAN
+        ? renderPlanGateBlock(
+            turnReadiness,
+            await planGateRegistry.readiness(sessionId),
+          )
+        : null;
     this.principles?.ensureBrief(session, userContent);
     const principlesBrief = this.principles?.briefBlock(session) ?? null;
     const sectionFocus = this.principles
@@ -843,6 +862,7 @@ export class BuilderInterviewOrchestratorService {
           turnReadiness,
           planBatch ? `${planBatch.text}\n\n${userContent}` : userContent,
           [
+            ...(planGateBlock ? [planGateBlock] : []),
             ...(turn.discovery
               ? [
                   renderDiscoveryBlock(turn.discovery),
@@ -861,6 +881,7 @@ export class BuilderInterviewOrchestratorService {
       validatedTurns,
       situationBrief: protocol,
       briefDue,
+      planSession: session.kind === BuilderSessionKind.PLAN,
     });
 
     const loop: InterviewLoopContext = {
@@ -955,6 +976,15 @@ export class BuilderInterviewOrchestratorService {
     // Settle the assistant row even for aborted turns: `streaming` goes false
     // here and nowhere else, so a row still marked open is a turn that died.
     await checkpoint(true);
+    if (!turn.errored)
+      await this.ideaNotices?.questionsAsked(
+        sessionId,
+        turn.questions as {
+          id: string;
+          prompt?: string;
+          forAuthor?: boolean;
+        }[],
+      );
 
     // Readiness may have moved during the turn; settle the status before the
     // client reads it off the `done` frame. Settling may run the cold
@@ -1050,7 +1080,18 @@ export class BuilderInterviewOrchestratorService {
     loop: InterviewLoopContext,
   ): AsyncGenerator<BuilderSseFrame, BuilderPrdReadiness> {
     try {
-      return yield* this.settledReadiness(loop.sessionId, loop.context.doc);
+      const settled = yield* this.settledReadiness(
+        loop.sessionId,
+        loop.context.doc,
+      );
+      // A plan is not ready while its Close plan gate has anything open:
+      // the design, the success measure, the checks (audit rec 2).
+      return loop.context.session?.kind === BuilderSessionKind.PLAN
+        ? withPlanGate(
+            settled,
+            await planGateRegistry.readiness(loop.sessionId),
+          )
+        : settled;
     } catch (error) {
       this.logger.warn(
         `Builder session ${loop.sessionId}: readiness for a ready claim failed: ${
@@ -1899,7 +1940,17 @@ export class BuilderInterviewOrchestratorService {
     if (isBrief) {
       const { brief, problems: briefProblems } = normaliseSituationBrief(
         input,
-        { discovery: turn.discovery, sources: this.turnSources(turn) },
+        {
+          discovery: turn.discovery,
+          sources: this.turnSources(turn),
+          // Rec 4: a line about what exists is verified only by a file read (situation-brief util).
+          readFiles: [
+            ...((await this.readiness.filesRead?.(loop.sessionId)) ?? []),
+            ...filesReadIn(
+              joinCallsToResults(turn.allToolCalls, turn.allToolResults),
+            ),
+          ],
+        },
       );
       turn.pendingBrief = brief;
       problems.push(...briefProblems);

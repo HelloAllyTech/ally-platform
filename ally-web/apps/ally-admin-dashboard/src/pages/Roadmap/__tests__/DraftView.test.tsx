@@ -262,4 +262,94 @@ describe("the draft page (§4.2)", () => {
     expect(reduced.container.querySelectorAll("[data-met]").length).toBe(full);
     expect(screen.getByText(en.roadmapV2.draft.checksCountLong(4, 5))).toBeInTheDocument();
   });
+
+  describe("what will be submitted (audit rec. 6)", () => {
+    const proposal = { title: "Week-one streaks", statement: "New learners keep a streak." };
+    const confirmSubmit = async () => {
+      fireEvent.click(
+        within(screen.getByRole("region", { name: en.roadmapV2.draft.checksTitle })).getByRole(
+          "button",
+          { name: en.roadmapV2.draft.submit },
+        ),
+      );
+      await screen.findByText(en.roadmapV2.draft.submitConfirmBody);
+      const buttons = screen.getAllByRole("button", { name: en.roadmapV2.draft.submitConfirm });
+      fireEvent.click(buttons[buttons.length - 1]);
+    };
+
+    it("offers the agent's version first, editable, and files the edit under the agent's title", async () => {
+      mockDraft = draft(5, { proposal, textMax: 1000 });
+      mockSubmit.mockReturnValue({ item: { code: "OPP-0042" }, firstSubmit: false });
+      renderDraft();
+      const words = en.roadmapV2.draft.submitChoice;
+      expect(screen.getByRole("radio", { name: new RegExp(words.useThis) })).toBeChecked();
+      fireEvent.change(screen.getByLabelText(words.statementLabel), {
+        target: { value: "New learners keep a streak for a week." },
+      });
+      await confirmSubmit();
+      // The dialog's required Title box (#342) starts from the agent's own title.
+      await waitFor(() =>
+        expect(mockSubmit).toHaveBeenCalledWith(
+          expect.objectContaining({
+            code: "OPP-0042",
+            title: "Week-one streaks",
+            choice: { use: "agent", statement: "New learners keep a streak for a week." },
+          }),
+        ),
+      );
+    });
+
+    it("Use mine files the author's words", async () => {
+      mockDraft = draft(5, { proposal });
+      mockSubmit.mockReturnValue({ item: { code: "OPP-0042" }, firstSubmit: false });
+      renderDraft();
+      fireEvent.click(
+        screen.getByRole("radio", { name: new RegExp(en.roadmapV2.draft.submitChoice.useMine) }),
+      );
+      await confirmSubmit();
+      await waitFor(() =>
+        expect(mockSubmit).toHaveBeenCalledWith(
+          expect.objectContaining({ choice: { use: "mine" } }),
+        ),
+      );
+    });
+
+    it("with no agent statement it says so and sends no choice, as before", async () => {
+      mockDraft = draft(5);
+      mockSubmit.mockReturnValue({ item: { code: "OPP-0042" }, firstSubmit: false });
+      renderDraft();
+      expect(screen.getByText(en.roadmapV2.draft.submitChoice.noStatement)).toBeInTheDocument();
+      await confirmSubmit();
+      await waitFor(() => expect(mockSubmit).toHaveBeenCalled());
+      expect(mockSubmit.mock.calls[0][0]).not.toHaveProperty("choice");
+    });
+
+    it("shows the one limit as a counter on the text box", () => {
+      mockDraft = draft(3, { textMax: 1000 });
+      renderDraft();
+      expect(
+        screen.getByText(en.roadmapV2.draft.textCount("Streak for new learners".length, 1000)),
+      ).toBeInTheDocument();
+    });
+
+    it("what the idea agent found opens on demand", () => {
+      mockDraft = draft(3, {
+        brief: {
+          strategicFit: [],
+          reach: { howMany: null, howOften: null },
+          evidence: [{ source: "analytics", claim: "Few return in week two", ref: null }],
+          successMetric: null,
+          assumptions: ["Streaks motivate"],
+          alternativesDropped: [],
+          assessment: { rating: "promising", summary: "Worth testing", openRecommendations: [] },
+        },
+      });
+      renderDraft();
+      const findings = en.roadmapV2.draft.findings;
+      expect(screen.queryByText("Few return in week two")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: new RegExp(findings.title) }));
+      expect(screen.getByText("Few return in week two")).toBeInTheDocument();
+      expect(screen.getByText(findings.assessment)).toBeInTheDocument();
+    });
+  });
 });

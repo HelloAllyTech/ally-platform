@@ -95,9 +95,11 @@ export const ROADMAP_LIMITS = {
   /**
    * What `roadmap_opportunities.description` can hold: a title, the blank line after it, and
    * a full-length summary. Mirrors CHK_roadmap_opps_description (migration
-   * 1984900000000), which was 1000 while the title was the summary's own first line.
+   * 1984950000000), which was 1000 while the title was the summary's own first line.
    */
   STORED_TEXT_MAX: 1202,
+  /** The idea agent's suggested title: shorter than TITLE_MAX, so it reads as one line. */
+  IDEA_TITLE_MAX: 120,
   PRD_MAX: 20000,
   CLAUDE_PROMPT_MAX: 20000,
   COMMENT_MAX: 500,

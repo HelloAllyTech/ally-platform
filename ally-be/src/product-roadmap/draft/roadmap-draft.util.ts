@@ -206,3 +206,37 @@ export function firstLine(text: string): string {
   const line = (text ?? '').trim().split('\n')[0].trim();
   return (line || 'New idea').slice(0, 120);
 }
+
+/** A suggested title kept to about a headline. */
+export const PROPOSED_TITLE_MAX = 80;
+
+/** "What will be submitted" (audit rec. 6): the idea agent's statement and a short title. */
+export interface DraftProposal {
+  title: string;
+  statement: string;
+}
+
+/**
+ * A title from a statement, for when the agent gave none: its first sentence, cut at a word to
+ * PROPOSED_TITLE_MAX. Pure.
+ */
+export function suggestTitle(statement: string): string {
+  const flat = (statement ?? '').replace(/\s+/g, ' ').trim();
+  const sentence = flat.split(/(?<=[.!?])\s/)[0] ?? flat;
+  if (sentence.length <= PROPOSED_TITLE_MAX) {
+    return sentence.replace(/[.!?]+$/, '');
+  }
+  const cut = sentence.slice(0, PROPOSED_TITLE_MAX);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > 20 ? cut.slice(0, space) : cut).replace(/[,;:]+$/, '')}…`;
+}
+
+/** The agent's proposal for a draft, or null until it has written a statement. Pure. */
+export function draftProposal(
+  idea: PlanIdeaState | undefined | null,
+): DraftProposal | null {
+  const statement = (idea?.draft?.description ?? '').trim();
+  if (!statement) return null;
+  const given = (idea?.draft?.title ?? '').replace(/\s+/g, ' ').trim();
+  return { title: given || suggestTitle(statement), statement };
+}

@@ -5,6 +5,8 @@ import {
   BuilderPrdRequirement,
   createEmptyPrdDocument,
 } from '../type/builder-prd.type';
+import { normaliseCoverage } from './builder-prd-coverage.util';
+import { normalisePrincipleMarks } from './builder-prd-principles.util';
 
 /**
  * Bring an agent-written PRD back to its declared shape.
@@ -412,5 +414,13 @@ export function normalisePrdDocument(
       !Array.isArray(raw.technicalDesign)
         ? (raw.technicalDesign as BuilderPrdDocument['technicalDesign'])
         : null,
+    // Normalised only when present: a PRD from before these existed keeps no such key, so its
+    // product hash (and an approved design's) does not move.
+    ...(raw.coverage !== undefined
+      ? { coverage: normaliseCoverage(raw.coverage) }
+      : {}),
+    ...(raw.principleMarks !== undefined
+      ? { principleMarks: normalisePrincipleMarks(raw.principleMarks) }
+      : {}),
   };
 }

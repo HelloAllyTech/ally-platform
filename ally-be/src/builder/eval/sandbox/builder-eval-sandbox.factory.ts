@@ -25,6 +25,7 @@ import { BuilderLessonsService } from '../../service/builder-lessons.service';
 import { BuilderEvidenceService } from '../../service/builder-evidence.service';
 import { BuilderCatalogService } from '../../service/builder-catalog.service';
 import { BuilderEvidenceLogService } from '../../service/builder-evidence-log.service';
+import { BuilderPrdChecklistToolsService } from '../../service/builder-prd-checklist-tools.service';
 import { BuilderReadinessService } from '../../service/builder-readiness.service';
 import { BuilderPrdReviewService } from '../../service/builder-prd-review.service';
 import { BuilderPlatformContextService } from '../../service/builder-platform-context.service';
@@ -270,6 +271,8 @@ export class BuilderEvalSandboxFactory {
       readiness,
       reviewService,
       stores.messageRepository as any,
+      // The coverage pass is a readiness row, so a replay needs the tool that records it.
+      new BuilderPrdChecklistToolsService(prdService, readiness),
     );
 
     // The two session-service calls the turn makes, with the real status rule:

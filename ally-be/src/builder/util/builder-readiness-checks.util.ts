@@ -69,7 +69,8 @@ export function mentionsIdentifier(text: string, name: string): boolean {
 }
 
 const FILE_EXTENSION =
-  /\.(tsx?|jsx?|mjs|cjs|py|md|json|ya?ml|sql|txt|sh|kt|swift|css|scss|html)$/i;
+  // `dart`: ally-mobile is Flutter, and a PRD that cites its files must be checkable too.
+  /\.(tsx?|jsx?|mjs|cjs|py|md|json|ya?ml|sql|txt|sh|kt|swift|dart|css|scss|html)$/i;
 
 /** First path segments that mark a token as a repo path rather than "web/mobile". */
 const PATH_ROOTS = new Set([

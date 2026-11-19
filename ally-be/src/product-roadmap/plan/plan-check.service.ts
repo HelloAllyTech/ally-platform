@@ -125,8 +125,10 @@ export class PlanCheckService {
     kind: PlanCheckKind,
     findingId: string,
     resolution: { kind: 'fixed' | 'dismissed'; reason: string },
+    /** The caller already checked the actor (an Owner may resolve before anyone leads it). */
+    options: { authorised?: boolean } = {},
   ): Promise<PlanCheck> {
-    if (plan.leadUserId !== actorUserId) {
+    if (!options.authorised && plan.leadUserId !== actorUserId) {
       throw new ForbiddenException(
         'Only this plan’s lead can resolve findings.',
       );

@@ -141,11 +141,35 @@ export class ContextToolsService {
     summary: string;
     codes: string[];
   }> {
-    const queries: string[] = Array.isArray(input?.queries)
-      ? input.queries.map(String)
-      : input?.query
-        ? [String(input.query)]
-        : [];
+    // A model sometimes sends `queries` as one string, or `query` instead: both are a search,
+    // not a failure. Read as an empty list, they threw "at least one query" and came back as
+    // "library unavailable" — a failure that says nothing about the library.
+    const queries: string[] = (
+      Array.isArray(input?.queries)
+        ? input.queries
+        : typeof input?.queries === 'string'
+          ? [input.queries]
+          : input?.query
+            ? [input.query]
+            : []
+    )
+      .map((query: unknown) =>
+        typeof query === 'string'
+          ? query
+          : String((query as { text?: unknown })?.text ?? ''),
+      )
+      .filter((query: string) => query.trim());
+    if (!queries.length) {
+      return {
+        modelResult: {
+          ok: false,
+          error: 'no_query',
+          message: `Pass "queries": a list of 1 to 6 short situational searches.`,
+        },
+        summary: `${names.libraryLabel}: no query given`,
+        codes: [],
+      };
+    }
     const facets: Record<string, string> = {};
     for (const f of names.facets ?? []) {
       if (input?.[f.name]) facets[f.facet] = String(input[f.name]);
