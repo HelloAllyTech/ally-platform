@@ -48,6 +48,7 @@
     "check:chatbot-shared-store": "ts-node -r tsconfig-paths/register src/database/scripts/check-chatbot-shared-store.ts",
     "backfill:roadmap-idea-titles": "ts-node -r tsconfig-paths/register src/database/scripts/backfill-roadmap-idea-titles.ts",
     "backfill:scenario-description-audio": "ts-node -r tsconfig-paths/register src/database/scripts/backfill-scenario-description-audio.ts",
+    "backfill:copilot-roleplay-behaviours": "ts-node -r tsconfig-paths/register src/database/scripts/backfill-copilot-roleplay-behaviours.ts",
     "backfill:dictation-note-duration": "ts-node -r tsconfig-paths/register scripts/backfill-dictation-note-duration.ts"
   },
   "dependencies": {

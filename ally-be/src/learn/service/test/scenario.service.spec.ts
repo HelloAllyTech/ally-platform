@@ -323,6 +323,9 @@ describe('ScenarioService', () => {
 
     const mockCompetencyService = {
       validateCompetencyId: jest.fn().mockResolvedValue(undefined),
+      getCompetencyBehaviours: jest
+        .fn()
+        .mockResolvedValue({ helpful: [], unhelpful: [] }),
       getCompetency: jest.fn(),
       getCompetencies: jest.fn(),
       createCompetency: jest.fn(),
@@ -3166,6 +3169,228 @@ describe('ScenarioService', () => {
       await expect(
         service.validateCreateScenario(createDto),
       ).resolves.not.toThrow();
+    });
+  });
+
+  describe('createScenarios: behaviour rows from competencies', () => {
+    let competencyService: { getCompetencyBehaviours: jest.Mock };
+
+    const baseScenario = () => ({
+      title: 'Copilot roleplay',
+      description: 'Desc',
+      status: ScenarioStatus.DRAFT,
+      prompt: 'Prompt',
+      isGlobal: false,
+      languageVoices: { 1: 'voice-1' },
+      name: 'Meena',
+      age: 34,
+      gender: 'Female',
+      currentLocation: 'Mysuru',
+      openingStatements: ['Hello'],
+    });
+
+    beforeEach(() => {
+      competencyService = (service as any).competencyService;
+      scenarioVoiceRepository.findOne.mockResolvedValue({
+        id: 'voice-1',
+      } as any);
+      const repo = {
+        create: jest.fn().mockImplementation((data) => data),
+        save: jest.fn().mockResolvedValue([{ id: 7, isGlobal: false }]),
+      };
+      dataSource.transaction.mockImplementation((cb: any) =>
+        cb({ getRepository: jest.fn(() => repo) } as any),
+      );
+    });
+
+    it('fills one SHOULD_DO and one SHOULD_NOT_DO row per competency when none are sent', async () => {
+      competencyService.getCompetencyBehaviours
+        .mockResolvedValueOnce({
+          helpful: [
+            { id: 'b-listen', name: 'Reflects feelings' },
+            { id: 'b-ask', name: 'Asks directly about suicide' },
+          ],
+          unhelpful: [{ id: 'b-advice', name: 'Jumps to advice' }],
+        })
+        .mockResolvedValueOnce({
+          helpful: [{ id: 'b-refer', name: 'Refers to the PHC doctor' }],
+          unhelpful: [],
+        });
+
+      await service.createScenarios(
+        {
+          scenarios: [
+            {
+              ...baseScenario(),
+              competencyId: 'c-1',
+              competencyIds: ['c-1', 'c-2'],
+            },
+          ],
+        } as any,
+        1,
+      );
+
+      expect(competencyService.getCompetencyBehaviours).toHaveBeenCalledTimes(
+        2,
+      );
+      expect(
+        scenarioBehaviorInstructionService.createBehaviorInstructions,
+      ).toHaveBeenCalledWith(
+        [
+          {
+            scenarioId: 7,
+            behaviorInstructions: [
+              {
+                category: BehaviorInstructionCategory.SHOULD_DO,
+                score: null,
+                behaviors: ['b-listen', 'b-ask'],
+                stateInstructions: [],
+              },
+              {
+                category: BehaviorInstructionCategory.SHOULD_NOT_DO,
+                score: null,
+                behaviors: ['b-advice'],
+                stateInstructions: [],
+              },
+              {
+                category: BehaviorInstructionCategory.SHOULD_DO,
+                score: null,
+                behaviors: ['b-refer'],
+                stateInstructions: [],
+              },
+            ],
+          },
+        ],
+        expect.anything(),
+      );
+    });
+
+    it('keeps an empty list the caller sent on purpose', async () => {
+      await service.createScenarios(
+        {
+          scenarios: [
+            {
+              ...baseScenario(),
+              competencyId: 'c-1',
+              competencyIds: ['c-1'],
+              behaviorInstructions: [],
+            },
+          ],
+        } as any,
+        1,
+      );
+
+      expect(competencyService.getCompetencyBehaviours).not.toHaveBeenCalled();
+      expect(
+        scenarioBehaviorInstructionService.createBehaviorInstructions,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('does nothing when the roleplay has no competency', async () => {
+      await service.createScenarios({ scenarios: [baseScenario()] } as any, 1);
+
+      expect(competencyService.getCompetencyBehaviours).not.toHaveBeenCalled();
+      expect(
+        scenarioBehaviorInstructionService.createBehaviorInstructions,
+      ).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('addMissingBehaviorInstructions', () => {
+    let competencyService: { getCompetencyBehaviours: jest.Mock };
+    let countRows: jest.Mock;
+
+    beforeEach(() => {
+      competencyService = (service as any).competencyService;
+      countRows = jest.fn().mockResolvedValue(0);
+      dataSource.getRepository.mockReturnValue({ count: countRows } as any);
+      dataSource.transaction.mockImplementation((cb: any) => cb({} as any));
+      scenariosRepository.findOne.mockResolvedValue({
+        id: 9,
+        competencyId: 'c-1',
+        competencyIds: ['c-1'],
+      } as any);
+      competencyService.getCompetencyBehaviours.mockResolvedValue({
+        helpful: [{ id: 'b-1', name: 'Reflects feelings' }],
+        unhelpful: [{ id: 'b-2', name: 'Jumps to advice' }],
+      });
+    });
+
+    it('adds the competency rows to a roleplay that has none', async () => {
+      const result = await service.addMissingBehaviorInstructions(9);
+
+      expect(result).toEqual({ outcome: 'added', rows: 2 });
+      expect(countRows).toHaveBeenCalledWith({ where: { scenarioId: 9 } });
+      expect(
+        scenarioBehaviorInstructionService.createBehaviorInstructions,
+      ).toHaveBeenCalledWith(
+        [
+          {
+            scenarioId: 9,
+            behaviorInstructions: [
+              expect.objectContaining({
+                category: BehaviorInstructionCategory.SHOULD_DO,
+                behaviors: ['b-1'],
+              }),
+              expect.objectContaining({
+                category: BehaviorInstructionCategory.SHOULD_NOT_DO,
+                behaviors: ['b-2'],
+              }),
+            ],
+          },
+        ],
+        expect.anything(),
+      );
+    });
+
+    it('writes nothing on a dry run', async () => {
+      const result = await service.addMissingBehaviorInstructions(9, {
+        dryRun: true,
+      });
+
+      expect(result).toEqual({ outcome: 'added', rows: 2 });
+      expect(
+        scenarioBehaviorInstructionService.createBehaviorInstructions,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('leaves a roleplay that already has rows alone', async () => {
+      countRows.mockResolvedValue(3);
+
+      const result = await service.addMissingBehaviorInstructions(9);
+
+      expect(result).toEqual({ outcome: 'has-rows' });
+      expect(competencyService.getCompetencyBehaviours).not.toHaveBeenCalled();
+      expect(
+        scenarioBehaviorInstructionService.createBehaviorInstructions,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('reports a roleplay with no competency', async () => {
+      scenariosRepository.findOne.mockResolvedValue({ id: 9 } as any);
+
+      expect(await service.addMissingBehaviorInstructions(9)).toEqual({
+        outcome: 'no-competency',
+      });
+    });
+
+    it('reports competencies that map to no behaviours', async () => {
+      competencyService.getCompetencyBehaviours.mockResolvedValue({
+        helpful: [],
+        unhelpful: [],
+      });
+
+      expect(await service.addMissingBehaviorInstructions(9)).toEqual({
+        outcome: 'no-behaviours',
+      });
+    });
+
+    it('reports a missing roleplay', async () => {
+      scenariosRepository.findOne.mockResolvedValue(null);
+
+      expect(await service.addMissingBehaviorInstructions(9)).toEqual({
+        outcome: 'not-found',
+      });
     });
   });
 
