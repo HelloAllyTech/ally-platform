@@ -106,6 +106,8 @@ function build(
     builderSessions: {
       createSession: jest.fn(async () => ({ id: 'new-session' })),
     },
+    planTurns: { queueOpeningTurn: jest.fn() },
+    closeReadiness: { checkClose: jest.fn(async () => null) },
   };
   const service = new RoadmapReviewService(
     ...(Object.values(deps) as unknown as ConstructorParameters<
@@ -468,6 +470,112 @@ describe('RoadmapReviewService', () => {
     await expect(
       refused.service.startPlanning(AUTHOR, 'OPP-0001'),
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('Start planning queues the opening turn as its last step', async () => {
+    const { service, deps } = build({
+      stage: 'accepted',
+      can: { startPlanning: true },
+    });
+    const order: string[] = [];
+    deps.stage.sync.mockImplementation(async () => {
+      order.push('sync');
+    });
+    deps.broadcast.emit.mockImplementation(() => {
+      order.push('emit');
+    });
+    deps.planTurns.queueOpeningTurn.mockImplementation(() => {
+      order.push('turn');
+    });
+    (deps.reader.detail as jest.Mock).mockImplementation(
+      async (_u: number, code: string) => ({
+        code,
+        title: 'Streak reminders',
+        shownStage: 'accepted',
+        can: { startPlanning: true },
+      }),
+    );
+    await service.startPlanning(OWNER, 'OPP-0001');
+    expect(deps.planTurns.queueOpeningTurn).toHaveBeenCalledWith(
+      's-OPP-0001',
+      OWNER,
+      'OPP-0001',
+      'Streak reminders',
+    );
+    expect(order).toEqual(['sync', 'emit', 'turn']);
+  });
+
+  it('Start planning pressed again queues no second opening turn', async () => {
+    const { service, deps } = build({
+      stage: 'planning',
+      can: { startPlanning: false },
+    });
+    deps.store.find.mockImplementation(async (id: string) => ({
+      id,
+      leadUserId: null,
+      plan: { planningStarted: true },
+    }));
+    await service.startPlanning(OWNER, 'OPP-0001');
+    expect(deps.planTurns.queueOpeningTurn).not.toHaveBeenCalled();
+  });
+
+  it('Close plan with open blockers stores the reason and the blockers', async () => {
+    const { service, deps } = build({
+      stage: 'planning',
+      can: { closePlan: true },
+    });
+    deps.closeReadiness.checkClose.mockImplementation(async () => ({
+      reason: 'Shipping the spike to learn',
+      blockers: ['Approve the technical design.'],
+    }));
+    await service.setPlanClosed(
+      OWNER,
+      'OPP-0001',
+      true,
+      'Shipping the spike to learn',
+    );
+    expect(deps.closeReadiness.checkClose).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 's-OPP-0001' }),
+      'Shipping the spike to learn',
+    );
+    expect(deps.store.patchPlan).toHaveBeenCalledWith('s-OPP-0001', {
+      planClosed: expect.objectContaining({
+        byUserId: OWNER,
+        notReady: {
+          reason: 'Shipping the spike to learn',
+          blockers: ['Approve the technical design.'],
+        },
+      }),
+    });
+    expect(deps.events.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: PlanEventKind.PLAN_CLOSED,
+        detail: { notReady: true, openBlockers: 1 },
+      }),
+    );
+  });
+
+  it('Close plan refused by the gate writes nothing', async () => {
+    const { service, deps } = build({
+      stage: 'planning',
+      can: { closePlan: true },
+    });
+    deps.closeReadiness.checkClose.mockImplementation(async () => {
+      throw new ConflictException('not ready');
+    });
+    await expect(
+      service.setPlanClosed(OWNER, 'OPP-0001', true),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(deps.store.patchPlan).not.toHaveBeenCalled();
+  });
+
+  it('Reopen plan never asks the gate', async () => {
+    const { service, deps } = build({
+      stage: 'planning',
+      can: { reopenPlan: true },
+    });
+    await service.setPlanClosed(OWNER, 'OPP-0001', false);
+    expect(deps.closeReadiness.checkClose).not.toHaveBeenCalled();
   });
 
   it('Start planning on a submitted idea accepts it', async () => {

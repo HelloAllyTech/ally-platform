@@ -106,6 +106,11 @@ import {
   storedSituationBrief,
 } from '../util/builder-situation-brief.util';
 import { questionGateProblems } from '../util/builder-question-gate.util';
+import {
+  renderPlanGateBlock,
+  withPlanGate,
+} from '../util/builder-plan-gate.util';
+import { planGateRegistry } from 'src/product-planning/service/plan-gate.registry';
 import { CreateBuilderMessageDto } from '../dto/builder.dto';
 import { BuilderPrdReadiness } from '../type/builder-prd.type';
 import {
@@ -813,6 +818,15 @@ export class BuilderInterviewOrchestratorService {
     // and joins the cached prefix once it lands; the section focus is a small uncached block
     // for the first PRD section that is not ready, bounded by a timeout.
     const turnReadiness = await this.readiness.assess(sessionId, doc);
+    // A plan being planned: what else stands between it and Close plan, the
+    // list the Owner's dialog shows (audit 2026-11-19, rec 2).
+    const planGateBlock =
+      session.kind === BuilderSessionKind.PLAN
+        ? renderPlanGateBlock(
+            turnReadiness,
+            await planGateRegistry.readiness(sessionId),
+          )
+        : null;
     this.principles?.ensureBrief(session, userContent);
     const principlesBrief = this.principles?.briefBlock(session) ?? null;
     const sectionFocus = this.principles
@@ -843,6 +857,7 @@ export class BuilderInterviewOrchestratorService {
           turnReadiness,
           planBatch ? `${planBatch.text}\n\n${userContent}` : userContent,
           [
+            ...(planGateBlock ? [planGateBlock] : []),
             ...(turn.discovery
               ? [
                   renderDiscoveryBlock(turn.discovery),
@@ -861,6 +876,7 @@ export class BuilderInterviewOrchestratorService {
       validatedTurns,
       situationBrief: protocol,
       briefDue,
+      planSession: session.kind === BuilderSessionKind.PLAN,
     });
 
     const loop: InterviewLoopContext = {
@@ -1050,7 +1066,18 @@ export class BuilderInterviewOrchestratorService {
     loop: InterviewLoopContext,
   ): AsyncGenerator<BuilderSseFrame, BuilderPrdReadiness> {
     try {
-      return yield* this.settledReadiness(loop.sessionId, loop.context.doc);
+      const settled = yield* this.settledReadiness(
+        loop.sessionId,
+        loop.context.doc,
+      );
+      // A plan is not ready while its Close plan gate has anything open:
+      // the design, the success measure, the checks (audit rec 2).
+      return loop.context.session?.kind === BuilderSessionKind.PLAN
+        ? withPlanGate(
+            settled,
+            await planGateRegistry.readiness(loop.sessionId),
+          )
+        : settled;
     } catch (error) {
       this.logger.warn(
         `Builder session ${loop.sessionId}: readiness for a ready claim failed: ${

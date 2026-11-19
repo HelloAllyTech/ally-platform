@@ -5,6 +5,7 @@ import {
   HttpStatus,
   Injectable,
   OnModuleDestroy,
+  Optional,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { LoggerService } from 'src/logger/logger.service';
@@ -29,6 +30,8 @@ import { RoadmapNotificationService } from '../service/roadmap-notification.serv
 import { RoadmapStrategyGoalService } from '../service/roadmap-strategy-goal.service';
 import { PlanSession, PlanSessionStore } from '../plan/plan-session.store';
 import { PlanStageService } from '../plan/plan-stage.service';
+import { PlanCloseReadinessService } from '../plan/plan-close-readiness.service';
+import { PlanTurnService } from '../plan/plan-turn.service';
 import { RoadmapItemLookupService } from '../item/roadmap-item-lookup.service';
 import { RoadmapItemReadService } from '../item/roadmap-item-read.service';
 import type {
@@ -113,6 +116,10 @@ export class RoadmapReviewService implements OnModuleDestroy {
     private readonly broadcast: RoadmapNotificationService,
     private readonly strategyGoals: RoadmapStrategyGoalService,
     private readonly builderSessions: BuilderSessionService,
+    /** Start planning's opening turn (audit rec 1). Optional so fixtures without it still build. */
+    @Optional() private readonly planTurns?: PlanTurnService,
+    /** Close plan's one definition of ready (audit rec 2). Optional, like the turns. */
+    @Optional() private readonly closeReadiness?: PlanCloseReadinessService,
   ) {}
 
   // ── Review ─────────────────────────────────────────────────────────────────
@@ -421,6 +428,9 @@ export class RoadmapReviewService implements OnModuleDestroy {
       code: ref.code,
       fields: ['stage'],
     });
+    // Last: the situation brief is waiting by the time the Owner looks. Fire
+    // and forget, so a busy lock or a model failure never fails Start planning.
+    this.planTurns?.queueOpeningTurn(session.id, userId, ref.code, item.title);
     return this.reader.detail(userId, code);
   }
 
@@ -428,12 +438,14 @@ export class RoadmapReviewService implements OnModuleDestroy {
    * Close the plan (an Owner): planning is done, and the idea can now take a
    * builder. Reopen undoes it while nobody is assigned to build it yet.
    * Neither touches the PRD or design; they only open and shut the gate to
-   * assigning a builder.
+   * assigning a builder. Closing while the plan still has open blockers needs
+   * `reason` (PlanCloseReadinessService.checkClose, audit rec 2).
    */
   async setPlanClosed(
     userId: number,
     code: string,
     closed: boolean,
+    reason?: string,
   ): Promise<ItemDetail> {
     const item = await this.reader.detail(userId, code);
     const allowed = closed ? item.can.closePlan : item.can.reopenPlan;
@@ -449,15 +461,27 @@ export class RoadmapReviewService implements OnModuleDestroy {
     }
     const ref = await this.lookup.get(code);
     const session = await this.planSession(ref.builderSessionId);
+    const notReady =
+      closed && this.closeReadiness
+        ? await this.closeReadiness.checkClose(session, reason)
+        : null;
     await this.store.patchPlan(session.id, {
       planClosed: closed
-        ? { byUserId: userId, at: new Date().toISOString() }
+        ? {
+            byUserId: userId,
+            at: new Date().toISOString(),
+            ...(notReady ? { notReady } : {}),
+          }
         : null,
     });
     await this.events.record({
       sessionId: session.id,
       kind: closed ? PlanEventKind.PLAN_CLOSED : PlanEventKind.PLAN_REOPENED,
       actorUserId: userId,
+      // The count only: the reason lives on the plan and in the build brief.
+      ...(notReady
+        ? { detail: { notReady: true, openBlockers: notReady.blockers.length } }
+        : {}),
     });
     this.broadcast.emit({
       kind: 'ITEM_CHANGED',
