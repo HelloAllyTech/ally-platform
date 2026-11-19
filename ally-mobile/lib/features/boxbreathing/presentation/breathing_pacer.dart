@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/theme/app_fonts.dart';
 import 'flower_petal_painter.dart';
 
 /// A small, silent version of the box-breathing flower, for a moment of
@@ -91,6 +92,7 @@ class _BreathingPacerState extends ConsumerState<BreathingPacer>
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 16,
+                    fontFamily: AppFonts.replayProBold,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
