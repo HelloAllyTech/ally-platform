@@ -573,3 +573,82 @@ class TestNoBatchWait:
         assert not mp._in_flight
         # Not deleted: SQS redelivers it to the next worker.
         qs.delete_message.assert_not_awaited()
+
+
+class TestDrain:
+    """SIGTERM on a deploy: finish what fits, put the rest straight back."""
+
+    @pytest.mark.asyncio
+    async def test_finishes_quick_messages_and_releases_the_unfinished(self):
+        release_quick = asyncio.Event()
+
+        async def handler(body):
+            if body["chat_id"] == "quick":
+                await release_quick.wait()
+            else:
+                await asyncio.sleep(3600)  # a long summary
+
+        qs = _queue_service([[_msg("quick"), _msg("long")]])
+        qs.release_message = AsyncMock()
+        mp = MessageProcessor(
+            qs,
+            handler,
+            "q",
+            wait_time_seconds=0,
+            polling_interval=0.01,
+            max_concurrent_messages=2,
+        )
+        await mp.start()
+        await asyncio.sleep(0.02)
+        assert len(mp._in_flight) == 2
+
+        drain = asyncio.create_task(mp.drain(timeout=0.2))
+        await asyncio.sleep(0.01)
+        release_quick.set()  # finishes inside the drain window
+        await drain
+
+        assert not mp._in_flight
+        assert mp._task.done()
+        # The quick one was handled and deleted as normal...
+        qs.delete_message.assert_awaited_once_with(
+            queue_url="q", receipt_handle="rh-quick"
+        )
+        # ...the long one was put back at once, not left hidden for 900s.
+        qs.release_message.assert_awaited_once_with(
+            queue_url="q", receipt_handle="rh-long"
+        )
+
+    @pytest.mark.asyncio
+    async def test_takes_no_new_messages_once_draining(self):
+        qs = _queue_service([])
+        qs.release_message = AsyncMock()
+        mp = MessageProcessor(
+            qs, AsyncMock(), "q", wait_time_seconds=0, polling_interval=0.01
+        )
+        await mp.start()
+        await asyncio.sleep(0.02)
+
+        await mp.drain(timeout=1)
+        received = qs.receive_messages.await_count
+        await asyncio.sleep(0.05)
+
+        assert mp._task.done()
+        assert qs.receive_messages.await_count == received
+        qs.release_message.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_a_failed_release_is_logged_not_raised(self):
+        async def handler(body):
+            await asyncio.sleep(3600)
+
+        qs = _queue_service([[_msg("long")]])
+        qs.release_message = AsyncMock(side_effect=RuntimeError("sqs down"))
+        mp = MessageProcessor(
+            qs, handler, "q", wait_time_seconds=0, polling_interval=0.01
+        )
+        await mp.start()
+        await asyncio.sleep(0.02)
+
+        await mp.drain(timeout=0.05)  # must not raise
+
+        assert not mp._in_flight
