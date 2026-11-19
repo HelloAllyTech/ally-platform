@@ -615,6 +615,7 @@ export const ApiEndpoints = {
     IDEA_APPROVE: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/approve`,
     IDEA_REJECT: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/reject`,
     PINNED_RULES: "/v1/debriefs/console/pinned-rules",
+    LEARNER_COMMENTS: "/v1/debriefs/console/learner-comments",
     LEARNER_FEATURE: (feature: string) => `/v1/debriefs/console/learner-features/${feature}`,
     LEARNER_FEATURE_PEOPLE: (feature: string) =>
       `/v1/debriefs/console/learner-features/${feature}/people`,

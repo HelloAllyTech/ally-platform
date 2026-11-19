@@ -160,6 +160,87 @@ describe('what the PM agent reads', () => {
   });
 });
 
+describe('a learner reads their own comments, the Console reads all of them', () => {
+  const rowAt = (
+    id: string,
+    at: string,
+    over: Record<string, unknown> = {},
+  ) => ({
+    id,
+    runId: 'run-1',
+    sessionId: 's1',
+    section: 'what_worked[0].body',
+    quotedText: WORDS,
+    spanStart: 4,
+    spanEnd: 20,
+    body: 'Fine.',
+    status: 'open',
+    language: 'en-IN',
+    tenantName: 'Internal Testing',
+    learnerName: 'Tanuja Babre',
+    createdAt: new Date(at),
+    ...over,
+  });
+  const svcWith = (rows: any[]) => {
+    const query = jest.fn(async () => rows);
+    const svc = new DebriefLearnerCommentsService(
+      { query } as any,
+      {} as any,
+      {} as any,
+    );
+    return { svc, query };
+  };
+
+  it("asks only for the person's own learner comments on that debrief", async () => {
+    const { svc, query } = svcWith([rowAt('c1', '2026-11-19T01:00:00Z')]);
+    const out = await svc.mine('run-1', 7);
+    const [sql, params] = query.mock.calls[0] as unknown as [string, unknown[]];
+    expect(sql).toContain('"reviewerId" = $2');
+    expect(sql).toContain("source = 'learner'");
+    expect(sql).toContain('ORDER BY "createdAt" ASC');
+    expect(params).toEqual(['run-1', 7]);
+    expect(out[0]).toMatchObject({
+      id: 'c1',
+      quotedText: WORDS,
+      body: 'Fine.',
+    });
+    expect(JSON.stringify(out[0])).not.toMatch(/learnerName|tenant/);
+  });
+
+  it('lists every learner comment newest first, and gives the next page when there are more', async () => {
+    const rows = [
+      rowAt('c3', '2026-11-19T03:00:00Z'),
+      rowAt('c2', '2026-11-19T02:00:00Z'),
+      rowAt('c1', '2026-11-19T01:00:00Z'),
+    ];
+    const { svc, query } = svcWith(rows);
+    const page = await svc.list(2);
+    const [sql, params] = query.mock.calls[0] as unknown as [string, unknown[]];
+    expect(sql).toContain("c.source = 'learner'");
+    expect(sql).toContain('ORDER BY c."createdAt" DESC');
+    expect(params).toEqual([3]);
+    expect(page.items.map((i) => i.id)).toEqual(['c3', 'c2']);
+    expect(page.next).toBe('2026-11-19T02:00:00.000Z');
+    expect(page.items[0]).toMatchObject({
+      sessionId: 's1',
+      learnerName: 'Tanuja Babre',
+      tenantName: 'Internal Testing',
+    });
+  });
+
+  it('has no next page on the last page, pages from a date, and refuses a bad one', async () => {
+    const { svc, query } = svcWith([rowAt('c1', '2026-11-19T01:00:00Z')]);
+    expect((await svc.list(50)).next).toBeNull();
+    await svc.list(50, '2026-11-19T02:00:00.000Z');
+    const [sql, params] = query.mock.calls[1] as unknown as [string, unknown[]];
+    expect(sql).toContain('c."createdAt" < $1');
+    expect((params[0] as Date).toISOString()).toBe('2026-11-19T02:00:00.000Z');
+    await expect(svc.list(50, 'yesterday')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
+});
+
 describe('what the review screens read', () => {
   it('says who wrote a comment: a learner, or an expert (including rows from before the field)', () => {
     const view = (source?: string) =>

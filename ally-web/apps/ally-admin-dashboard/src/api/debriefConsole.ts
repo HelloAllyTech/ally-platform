@@ -22,6 +22,7 @@ import {
   DebriefAttention,
   DebriefAutonomyView,
   DebriefOrgOverride,
+  DebriefLearnerCommentsPage,
   DebriefLearnerFeatureKey,
   DebriefLearnerFeatureView,
   DebriefPinnedRulesView,
@@ -390,6 +391,14 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
       query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.PINNED_RULES, method: HttpMethod.GET }),
       providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
+    getDebriefLearnerComments: builder.query<DebriefLearnerCommentsPage, { before?: string }>({
+      query: ({ before }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.LEARNER_COMMENTS,
+        method: HttpMethod.GET,
+        params: { limit: 50, ...(before ? { before } : {}) },
+      }),
+      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
     getDebriefLearnerFeature: builder.query<DebriefLearnerFeatureView, DebriefLearnerFeatureKey>({
       query: feature => ({
         url: ApiEndpoints.DEBRIEF_CONSOLE.LEARNER_FEATURE(feature),
@@ -654,6 +663,7 @@ export const {
   useApproveDebriefChangeMutation,
   useTurnDownDebriefChangeMutation,
   useGetDebriefPinnedRulesQuery,
+  useGetDebriefLearnerCommentsQuery,
   useGetDebriefLearnerFeatureQuery,
   useGrantDebriefLearnerFeatureMutation,
   useRevokeDebriefLearnerFeatureMutation,

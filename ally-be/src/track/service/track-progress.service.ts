@@ -17,6 +17,7 @@ import { TrackTenant } from '../entity/track-tenant.entity';
 import { TrackItemProgressRepository } from '../repository/track-item-progress.repository';
 import { TrackItemRepository } from '../repository/track-item.repository';
 import {
+  LastCaseAttempt,
   RoleplayAttemptFailureReason,
   TrackItemCompletionCriteria,
   TrackItemCompletionLogic,
@@ -73,6 +74,18 @@ export const CASE_SESSION_COMPLETED_EVENT = 'case.session.completed';
 export interface CaseSessionCompletedEvent {
   caseSessionId: string;
   userId: number;
+}
+
+export const CASE_SESSION_ATTEMPT_MISSED_EVENT = 'case.session.attempt_missed';
+
+/** A case roleplay ended without clearing its bar (emitted from case-session). */
+export interface CaseSessionAttemptMissedEvent {
+  caseSessionId: string;
+  failureReasons: RoleplayAttemptFailureReason[];
+  score: number | null;
+  durationSeconds: number;
+  requiredScore: number | null;
+  requiredDurationSeconds: number | null;
 }
 
 export interface CompleteItemResult {
@@ -519,7 +532,9 @@ export class TrackProgressService {
         },
       });
       for (const progress of progressRows) {
-        await this.completeItem(progress.id, {});
+        await this.completeItem(progress.id, {
+          meta: { lastCaseAttempt: undefined },
+        });
       }
       if (progressRows.length > 0) {
         this.logger.info(
@@ -530,6 +545,43 @@ export class TrackProgressService {
       // Track progression must never break the case flow.
       this.logger.error(
         `Failed to propagate case session ${event.caseSessionId} completion to tracks: ${error}`,
+      );
+    }
+  }
+
+  /**
+   * A case roleplay missed its bar. Record it on every non-completed track
+   * progress row linked to that case session, so the next locked item can say
+   * why the case is not finished. Best-effort, like the completion listener.
+   */
+  @OnEvent(CASE_SESSION_ATTEMPT_MISSED_EVENT)
+  async handleCaseSessionAttemptMissed(
+    event: CaseSessionAttemptMissedEvent,
+  ): Promise<void> {
+    try {
+      const progressRows = await this.trackItemProgressRepository.find({
+        where: {
+          caseSessionId: event.caseSessionId,
+          status: Not(SessionItemStatus.COMPLETED),
+        },
+      });
+      const lastCaseAttempt: LastCaseAttempt = {
+        failureReasons: event.failureReasons,
+        score: event.score,
+        durationSeconds: event.durationSeconds,
+        requiredScore: event.requiredScore,
+        requiredDurationSeconds: event.requiredDurationSeconds,
+        endedAt: new Date().toISOString(),
+      };
+      for (const progress of progressRows) {
+        await this.trackItemProgressRepository.update(progress.id, {
+          meta: { ...(progress.meta ?? {}), lastCaseAttempt },
+        });
+      }
+    } catch (error) {
+      // Track progression must never break the case flow.
+      this.logger.error(
+        `Failed to record missed case attempt for case session ${event.caseSessionId}: ${error}`,
       );
     }
   }

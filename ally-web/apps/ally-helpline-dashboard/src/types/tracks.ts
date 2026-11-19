@@ -122,6 +122,27 @@ export interface TrackItemContentMeta {
   bucketCount?: number;
 }
 
+export type TrackBlockerReason =
+  | "NOT_FINISHED"
+  | "BELOW_SCORE"
+  | "TOO_SHORT"
+  | "NOT_SCORED"
+  | "ASSESSMENT_FAILED"
+  | "GRADING_PENDING"
+  | "OUT_OF_ATTEMPTS"
+  | "WATCH_MORE"
+  | "KEEP_READING";
+
+/** Why the first locked item is locked: the previous item and what it still needs. */
+export interface TrackBlocker {
+  itemId: string;
+  title: string;
+  type: string;
+  reasons: { code: TrackBlockerReason; actual?: number | null; required?: number | null }[];
+  action: "RETRY" | "OPEN" | "NONE";
+  retryAt?: string | null;
+}
+
 export interface TrackDetailItem {
   id: string;
   type: TrackItemType;
@@ -151,6 +172,8 @@ export interface TrackDetailItem {
    * read in another language — the card tells the learner why up front.
    */
   languageFallbackReason?: TrackLanguageFallbackReason | null;
+  /** Non-null only on the first LOCKED item: what is blocking it. */
+  blockedBy?: TrackBlocker | null;
 }
 
 /** Why a component reads in English inside a translated course. */

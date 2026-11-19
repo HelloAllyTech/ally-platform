@@ -1,8 +1,3 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-import '../../../../core/localization/translate_ref.dart';
-import '../../../../core/theme/app_colors.dart';
 import '../../data/course_models.dart';
 
 typedef RoleplayTranslate = String Function(String, [Map<String, Object?>?]);
@@ -45,61 +40,5 @@ String? roleplayRequirementText(RoleplayGate? gate, RoleplayTranslate t) {
       if (score != null) return scoreText();
       if (duration != null) return durationText();
       return null;
-  }
-}
-
-/// One line per failure reason, in the order the backend sent them.
-List<String> roleplayFailureLines(LastRoleplayAttempt attempt, RoleplayTranslate t) {
-  final lines = <String>[];
-  for (final reason in attempt.failureReasons) {
-    switch (reason) {
-      case RoleplayFailureReason.insufficientDuration:
-        lines.add(
-          t('courses.roleplay.lastAttemptDuration', {
-            'actual': formatRoleplayDuration(attempt.durationSeconds, t),
-            'required': formatRoleplayDuration(attempt.requiredDurationSeconds ?? 0, t),
-          }),
-        );
-      case RoleplayFailureReason.insufficientScore:
-        final required = _fmt(attempt.requiredScore ?? 0);
-        lines.add(
-          attempt.score == null
-              ? t('courses.roleplay.lastAttemptScoreUnknown', {'required': required})
-              : t('courses.roleplay.lastAttemptScore', {'score': _fmt(attempt.score!), 'required': required}),
-        );
-    }
-  }
-  return lines;
-}
-
-/// Why the learner's last roleplay attempt didn't count (same amber notice
-/// styling as the assessment-mode notice).
-class RoleplayAttemptNotice extends ConsumerWidget {
-  const RoleplayAttemptNotice({super.key, required this.attempt});
-
-  final LastRoleplayAttempt attempt;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final lines = roleplayFailureLines(attempt, ref.t);
-    const base = TextStyle(fontFamily: 'CupertinoSystemText', fontSize: 13, color: AppColors.amber900);
-    return Container(
-      key: const Key('roleplay-last-attempt-notice'),
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(color: AppColors.amber50, borderRadius: BorderRadius.circular(12)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            ref.t('courses.roleplay.lastAttemptTitle'),
-            style: base.copyWith(fontFamily: 'CupertinoSystemText', fontWeight: FontWeight.w600),
-          ),
-          for (final line in lines) ...[const SizedBox(height: 4), Text(line, style: base)],
-          const SizedBox(height: 4),
-          Text(ref.t('courses.roleplay.lastAttemptFooter'), style: base),
-        ],
-      ),
-    );
   }
 }

@@ -27,6 +27,7 @@ const BEFORE_THE_SPLIT: Array<[string, string]> = [
   ['POST', 'v1/debriefs/console/flags/:id/escalate'],
   ['POST', 'v1/debriefs/console/flags/:id/resolve'],
   ['GET', 'v1/debriefs/console/guidance-metrics'],
+  ['GET', 'v1/debriefs/console/learner-comments'],
   ['GET', 'v1/debriefs/console/learner-features/:feature'],
   ['PUT', 'v1/debriefs/console/learner-features/:feature/everyone'],
   ['POST', 'v1/debriefs/console/learner-features/:feature/people'],

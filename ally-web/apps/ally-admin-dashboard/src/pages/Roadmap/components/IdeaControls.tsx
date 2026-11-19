@@ -1,17 +1,13 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 
-import { Copy, Notification, StarOutline, StarSolid, Tick } from "@icons";
+import { Copy, StarOutline, StarSolid, Tick } from "@icons";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 
-import { Button, OverflowMenu, OverflowMenuItem } from "@ally-ui-mono/ui-shared";
-import {
-  usePatchRoadmapItemMutation,
-  useSetRoadmapStarMutation,
-  useSetRoadmapWatchMutation,
-} from "@api";
+import { Button } from "@ally-ui-mono/ui-shared";
+import { usePatchRoadmapItemMutation, useSetRoadmapStarMutation } from "@api";
 import { ROUTES, en } from "@constants";
-import type { RoadmapItemDetail, RoadmapWatchLevel } from "@types";
+import type { RoadmapItemDetail } from "@types";
 
 import { BuildMenu } from "./BuildMenu";
 import { BuildModeControl, buildModeOf } from "./BuildModeControl";
@@ -154,65 +150,6 @@ export const IdeaStar: React.FC<{ item: RoadmapItemDetail; compact?: boolean }> 
         )}
       </motion.span>
     </button>
-  );
-};
-
-/** Watch: All · Milestones · None. The bell gives one 8° wiggle on change (§4.18). */
-export const IdeaWatch: React.FC<{ item: RoadmapItemDetail }> = ({ item }) => {
-  const reduced = useReducedMotionPreference();
-  const [setWatch] = useSetRoadmapWatchMutation();
-  const copy = en.roadmapV2.actions;
-  const [level, setLevel] = useState<RoadmapWatchLevel>(item.watchLevel ?? "none");
-  const [wiggle, setWiggle] = useState(0);
-  useEffect(() => setLevel(item.watchLevel ?? "none"), [item.watchLevel]);
-
-  // Watching is for the Idea role and up (§3.1); a Viewer gets no control at all.
-  const canWatch = item.can?.watch ?? item.can?.answer ?? false;
-  if (!canWatch) return null;
-
-  const choose = async (next: RoadmapWatchLevel) => {
-    if (next === level) return;
-    const previous = level;
-    setLevel(next);
-    setWiggle(w => w + 1);
-    try {
-      await setWatch({ code: item.code, level: next }).unwrap();
-    } catch {
-      setLevel(previous);
-      toast.error(copy.watchFailed);
-    }
-  };
-
-  const label = copy.watchLevel(copy.watchLevels[level]);
-  return (
-    <OverflowMenu
-      aria-label={label}
-      iconDescription={label}
-      flipped
-      menuOptionsClass="!z-[9100] !w-64 [&_.cds--overflow-menu-options\_\_btn]:!max-w-none"
-      renderIcon={() => (
-        <span className="inline-flex items-center gap-1 px-1 text-sm text-typography-primary">
-          <motion.span
-            key={wiggle}
-            className="inline-flex"
-            animate={reduced || wiggle === 0 ? { rotate: 0 } : { rotate: [0, 8, -8, 0] }}
-            transition={motionTransition("fast", "productive", reduced)}
-          >
-            <Notification size={16} aria-hidden />
-          </motion.span>
-          <span className="hidden sm:inline">{label}</span>
-        </span>
-      )}
-      className="!h-8 !w-auto"
-    >
-      {(["all", "milestones", "none"] as RoadmapWatchLevel[]).map(option => (
-        <OverflowMenuItem
-          key={option}
-          itemText={`${option === level ? "✓ " : ""}${copy.watchLevels[option]} — ${copy.watchHelp[option]}`}
-          onClick={() => choose(option)}
-        />
-      ))}
-    </OverflowMenu>
   );
 };
 

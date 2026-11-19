@@ -190,6 +190,89 @@ class LastRoleplayAttempt {
   final int? requiredDurationSeconds;
 }
 
+enum TrackBlockerReasonCode {
+  notFinished,
+  belowScore,
+  tooShort,
+  notScored,
+  assessmentFailed,
+  gradingPending,
+  outOfAttempts,
+  watchMore,
+  keepReading,
+}
+
+enum TrackBlockerAction { retry, open, none }
+
+class TrackBlockerReason {
+  const TrackBlockerReason({required this.code, this.actual, this.required});
+
+  final TrackBlockerReasonCode code;
+  final double? actual;
+  final double? required;
+}
+
+/// `blockedBy` on the first LOCKED learner item: what the previous item still
+/// needs. Lenient: unknown reason code reads as notFinished, unknown action
+/// as none, malformed payload as null.
+class TrackBlocker {
+  const TrackBlocker({
+    required this.itemId,
+    required this.title,
+    required this.type,
+    required this.reasons,
+    required this.action,
+    this.retryAt,
+  });
+
+  static const _codes = {
+    'NOT_FINISHED': TrackBlockerReasonCode.notFinished,
+    'BELOW_SCORE': TrackBlockerReasonCode.belowScore,
+    'TOO_SHORT': TrackBlockerReasonCode.tooShort,
+    'NOT_SCORED': TrackBlockerReasonCode.notScored,
+    'ASSESSMENT_FAILED': TrackBlockerReasonCode.assessmentFailed,
+    'GRADING_PENDING': TrackBlockerReasonCode.gradingPending,
+    'OUT_OF_ATTEMPTS': TrackBlockerReasonCode.outOfAttempts,
+    'WATCH_MORE': TrackBlockerReasonCode.watchMore,
+    'KEEP_READING': TrackBlockerReasonCode.keepReading,
+  };
+
+  static TrackBlocker? tryParse(Object? json) {
+    if (json is! Map) return null;
+    final itemId = json['itemId'];
+    if (itemId is! String || itemId.isEmpty) return null;
+    final reasons = <TrackBlockerReason>[
+      for (final r in (json['reasons'] is List ? json['reasons'] as List : const []))
+        if (r is Map)
+          TrackBlockerReason(
+            code: _codes[r['code']] ?? TrackBlockerReasonCode.notFinished,
+            actual: r['actual'] is num ? (r['actual'] as num).toDouble() : null,
+            required: r['required'] is num ? (r['required'] as num).toDouble() : null,
+          ),
+    ];
+    if (reasons.isEmpty) return null;
+    return TrackBlocker(
+      itemId: itemId,
+      title: json['title'] is String ? json['title'] as String : '',
+      type: json['type'] is String ? json['type'] as String : '',
+      reasons: reasons,
+      action: switch (json['action']) {
+        'RETRY' => TrackBlockerAction.retry,
+        'OPEN' => TrackBlockerAction.open,
+        _ => TrackBlockerAction.none,
+      },
+      retryAt: json['retryAt'] is String ? json['retryAt'] as String : null,
+    );
+  }
+
+  final String itemId;
+  final String title;
+  final String type;
+  final List<TrackBlockerReason> reasons;
+  final TrackBlockerAction action;
+  final String? retryAt;
+}
+
 /// Mirrors RN's `TrackCompletionCriteria` (`src/types/courses.ts:58-66`) —
 /// only the two fields `getTrackItemMeta`'s QUIZ/ROLEPLAY branches actually
 /// read.
@@ -255,6 +338,7 @@ class TrackDetailItem {
     this.completionCriteria,
     this.roleplayGate,
     this.lastRoleplayAttempt,
+    this.blockedBy,
     this.languageFallbackReason,
     this.completedAt,
   });
@@ -282,6 +366,7 @@ class TrackDetailItem {
             : null,
         roleplayGate: RoleplayGate.tryParse(json['roleplayGate']),
         lastRoleplayAttempt: LastRoleplayAttempt.tryParse(json['lastRoleplayAttempt']),
+        blockedBy: TrackBlocker.tryParse(json['blockedBy']),
         // Lenient on purpose (RN: an unknown reason reads as "no notice").
         languageFallbackReason: const {
           'VIDEO_NOT_LOCALISED',
@@ -313,6 +398,7 @@ class TrackDetailItem {
 
   /// Latest roleplay attempt that missed a gate; null once completed.
   final LastRoleplayAttempt? lastRoleplayAttempt;
+  final TrackBlocker? blockedBy;
 
   /// RN's `TrackLanguageFallbackReason` (why this component reads in
   /// English), or null.

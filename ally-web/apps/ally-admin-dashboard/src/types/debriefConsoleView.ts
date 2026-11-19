@@ -859,3 +859,25 @@ export interface DebriefLearnerFeatureView {
   everyone: boolean;
   people: DebriefLearnerFeaturePerson[];
 }
+
+/** One comment a learner made on selected words in their own debrief (Console list). */
+export interface DebriefLearnerCommentItem {
+  id: string;
+  runId: string;
+  sessionId: string;
+  /** The card and field, or null for a comment on the debrief as a whole. */
+  section: string | null;
+  quotedText: string | null;
+  body: string;
+  status: "open" | "resolved";
+  language: string | null;
+  tenantName: string | null;
+  learnerName: string | null;
+  createdAt: string;
+}
+
+export interface DebriefLearnerCommentsPage {
+  items: DebriefLearnerCommentItem[];
+  /** Pass as `before` for the next page; null on the last. */
+  next: string | null;
+}

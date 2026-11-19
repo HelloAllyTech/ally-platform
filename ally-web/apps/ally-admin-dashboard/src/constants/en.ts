@@ -11438,10 +11438,32 @@ export const en = {
         title: "Debrief PM agent",
         runNow: "Run the Debrief PM agent now",
         running: "Running…",
-        tabs: { changes: "Changes", reports: "Reports", "test-sets": "Test sets" } as Record<
-          string,
-          string
-        >,
+        tabs: {
+          changes: "Changes",
+          reports: "Reports",
+          "test-sets": "Test sets",
+          "learner-comments": "Learner comments",
+        } as Record<string, string>,
+        learnerComments: {
+          intro:
+            "What learners wrote about their own debrief by selecting words in it, newest first. The Debrief PM agent reads the same comments.",
+          none: "No learner comments yet. People who have Select and comment will appear here once they send one.",
+          loadFailed: "learner comments",
+          more: "Show older comments",
+          whole: "On the whole debrief",
+          open: "Open the debrief",
+          resolved: "Resolved",
+          someone: "A learner",
+          cards: {
+            important_moment: "Important moment",
+            opening: "Opening",
+            what_worked: "What worked",
+            work_on_this: "Work on this",
+            practise_next: "Practise next",
+            reflective_question: "Reflective question",
+            progress_note: "Progress note",
+          } as Record<string, string>,
+        },
         headline: (live: number, trying: number, waits: number) => {
           const c = (n: number) =>
             ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"][n] ??

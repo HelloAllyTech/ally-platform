@@ -11,7 +11,7 @@ export const analyticsDebriefsPath = () => `${ROUTES.ANALYTICS}?tab=${ANALYTICS_
  * `?change=` the change in focus. Older links (`?view=ideas|releases`, `?idea=`) open on Changes; see
  * `readChangesView`.
  */
-export type PmAgentView = "changes" | "reports" | "test-sets";
+export type PmAgentView = "changes" | "reports" | "test-sets" | "learner-comments";
 export const pmAgentPath = (view: PmAgentView = "changes", change?: string): string => {
   const q = new URLSearchParams();
   if (view !== "changes") q.set("view", view);
@@ -28,7 +28,8 @@ export const readChangesView = (
   params: URLSearchParams,
 ): { view: PmAgentView; change: string | null } => {
   const raw = params.get("view");
-  const view: PmAgentView = raw === "reports" || raw === "test-sets" ? raw : "changes";
+  const view: PmAgentView =
+    raw === "reports" || raw === "test-sets" || raw === "learner-comments" ? raw : "changes";
   return { view, change: params.get("change") ?? params.get("idea") };
 };
 

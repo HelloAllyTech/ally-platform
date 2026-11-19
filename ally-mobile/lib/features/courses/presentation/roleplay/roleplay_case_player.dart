@@ -147,10 +147,6 @@ class _RoleplayCasePlayerState extends ConsumerState<RoleplayCasePlayer> {
           textAlign: TextAlign.center,
           style: _systemStyle,
         ),
-      if (!_isCase &&
-          !widget.alreadyCompleted &&
-          (payload.lastRoleplayAttempt ?? widget.item.lastRoleplayAttempt) != null)
-        RoleplayAttemptNotice(attempt: (payload.lastRoleplayAttempt ?? widget.item.lastRoleplayAttempt)!),
       if (_isAssessment && !_assessmentLocked)
         Container(
           key: const Key('roleplay-assessment-notice'),

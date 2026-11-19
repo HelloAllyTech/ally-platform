@@ -1,15 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 
-import { ArrowDown, ArrowUp } from "@icons";
-
-import { Tag } from "@ally-ui-mono/ui-shared";
-import { en } from "@constants";
 import type { RoadmapItemDetail } from "@types";
 
 import { IdeaTitle } from "./IdeaControls";
-import { RoadmapIconButton } from "./RoadmapIconButton";
 import { Tracker } from "./Tracker";
-import { simpleStageOfShown } from "../utils/copy";
 
 /**
  * The banner's colour says where the idea is at a glance, in the same hues as the stage's Carbon
@@ -25,7 +19,7 @@ export const BANNER_TONE: Record<string, string> = {
   draft: "border-t-4 border-t-neutral-400 border-b-neutral-200 bg-neutral-50",
 };
 
-/** The stage's Carbon Tag colour, matching its banner. */
+/** The stage's Carbon Tag colour, matching its banner — used by the queue rows. */
 export const STAGE_TAG: Record<string, "purple" | "blue" | "green" | "red" | "gray"> = {
   backlog: "purple",
   being_built: "blue",
@@ -36,12 +30,15 @@ export const STAGE_TAG: Record<string, "purple" | "blue" | "green" | "red" | "gr
 
 /**
  * The card's grounding strip: always on screen, whatever stage the idea is at and whichever tab,
- * panel or scroll position you are in. It carries the three things that say *what this card is*:
- * its code, its title and its stage.
+ * panel or scroll position you are in. It carries what says *what this card is*: its code and its
+ * title. The stage is the banner's colour and the To do → Building → Released tracker in the rows
+ * below (also inside this sticky strip); a stage chip beside the code repeated that tracker one
+ * line up, so it was dropped on 2026-11-19.
  *
- * The title never disappears. It sits on one line, cut with an ellipsis, and expands in place to
- * the full text (which is also where it is edited). A long title therefore costs one line of
- * height, not five.
+ * The title is always shown in full, wrapped over as many lines as it needs, on every layout —
+ * web and phone alike (and, for someone who may edit it, it is edited in place). It used to sit on
+ * one truncated line behind a show/hide chevron; that was dropped on 2026-11-19 because a cut-off
+ * title hid what the card was about, which is the one thing this strip is for.
  *
  * Pinned with `position: sticky`, so it also holds when a parent scrolls it (the phone page);
  * where the header already sits above the scrolling region (reading pane, desktop page) it is
@@ -51,7 +48,7 @@ export const OpportunityHeader: React.FC<{
   item: RoadmapItemDetail;
   as: "h1" | "h2";
   headingRef?: React.Ref<HTMLHeadingElement>;
-  /** Right-hand controls: votes, star, watch, copy link, open full page, close. */
+  /** Right-hand controls: votes, star, copy link, open full page, close. */
   actions?: React.ReactNode;
   /** The editable facts: goal, lead, planned month. */
   controls?: React.ReactNode;
@@ -67,94 +64,20 @@ export const OpportunityHeader: React.FC<{
       <span className="shrink-0 pt-1 text-xs tabular-nums text-typography-secondary">
         {item.code}
       </span>
-      <StageChip stage={item.stage ?? item.shownStage} />
-      <CollapsibleTitle
-        item={item}
-        as={as}
-        headingRef={headingRef}
-        className="min-w-0 flex-1 text-lg font-semibold text-typography-primary"
-      />
+      <div className="min-w-0 flex-1">
+        <IdeaTitle
+          item={item}
+          as={as}
+          headingRef={headingRef}
+          className="m-0 break-words text-lg font-semibold text-typography-primary"
+        />
+      </div>
       {actions && <div className="flex shrink-0 items-center gap-1">{actions}</div>}
     </div>
     {controls}
     {children}
   </header>
 );
-
-/** The stage as a Carbon Tag, next to the code, so it reads even when everything else scrolls. */
-export const StageChip: React.FC<{
-  stage: RoadmapItemDetail["stage"] | RoadmapItemDetail["shownStage"];
-}> = ({ stage }) => (
-  <Tag
-    type={STAGE_TAG[simpleStageOfShown(stage)] ?? "gray"}
-    size="sm"
-    className="!m-0 mt-0.5 shrink-0"
-  >
-    {en.roadmapV2.stages[stage]}
-  </Tag>
-);
-
-/**
- * One truncated line that opens to the full title. Collapsed is the default for every card, so the
- * header's height is the same from idea to build; opening a different card collapses it again.
- */
-export const CollapsibleTitle: React.FC<{
-  item: RoadmapItemDetail;
-  as: "h1" | "h2";
-  headingRef?: React.Ref<HTMLHeadingElement>;
-  className?: string;
-}> = ({ item, as: Heading, headingRef, className = "" }) => {
-  const copy = en.roadmapV2.idea;
-  const [expanded, setExpanded] = useState(false);
-  useEffect(() => setExpanded(false), [item.code]);
-
-  if (expanded) {
-    return (
-      <div className="flex min-w-0 flex-1 items-start gap-1">
-        <IdeaTitle item={item} as={Heading} headingRef={headingRef} className={className} />
-        <ToggleButton expanded onClick={() => setExpanded(false)} />
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex min-w-0 flex-1 items-start gap-1">
-      <Heading
-        ref={headingRef}
-        tabIndex={-1}
-        className={`m-0 min-w-0 flex-1 outline-none ${className}`}
-      >
-        <button
-          type="button"
-          onClick={() => setExpanded(true)}
-          title={item.title}
-          aria-label={`${item.title}. ${copy.titleShow}`}
-          className="block w-full cursor-pointer truncate bg-transparent p-0 text-left font-[inherit] text-[length:inherit] text-inherit"
-        >
-          {item.title}
-        </button>
-      </Heading>
-      <ToggleButton expanded={false} onClick={() => setExpanded(true)} />
-    </div>
-  );
-};
-
-const ToggleButton: React.FC<{ expanded: boolean; onClick: () => void }> = ({
-  expanded,
-  onClick,
-}) => {
-  const copy = en.roadmapV2.idea;
-  const Icon = expanded ? ArrowUp : ArrowDown;
-  return (
-    <RoadmapIconButton
-      label={expanded ? copy.titleHide : copy.titleShow}
-      onClick={onClick}
-      expanded={expanded}
-    >
-      <Icon size={16} aria-hidden />
-    </RoadmapIconButton>
-  );
-};
 
 /** The compact tracker row that sits under the strip on every layout. */
 export const HeaderTracker: React.FC<{

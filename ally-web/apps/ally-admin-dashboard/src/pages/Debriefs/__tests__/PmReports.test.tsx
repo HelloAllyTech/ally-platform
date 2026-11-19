@@ -252,7 +252,7 @@ describe("Changes › Reports", () => {
     const tabs = within(screen.getByRole("navigation", { name: "Debrief PM agent" }))
       .getAllByRole("link")
       .map(a => a.textContent);
-    expect(tabs).toEqual(["Changes", "Reports", "Test sets"]);
+    expect(tabs).toEqual(["Changes", "Reports", "Test sets", "Learner comments"]);
     expect(screen.queryByRole("button", { name: "Run the Debrief PM agent now" })).toBeNull();
     expect(screen.getByRole("link", { name: "Reports" })).toHaveAttribute("aria-current", "page");
   });

@@ -1,3 +1,4 @@
+import { DebriefLearnerCommentsService } from '../service/debrief-learner-comments.service';
 import {
   Controller,
   Get,
@@ -43,7 +44,21 @@ export class DebriefConsoleViewController {
     private readonly agentLogs: DebriefRunLogsService,
     private readonly nightly: DebriefNightlyService,
     private readonly guidanceMetrics: DebriefGuidanceMetricsService,
+    private readonly learnerComments: DebriefLearnerCommentsService,
   ) {}
+
+  @Get('learner-comments')
+  @DebriefRead()
+  @ApiOperation({
+    summary:
+      'Comments learners made on selected words in their own debrief, newest first: the words, the comment, the card, and which debrief',
+  })
+  learnerCommentList(
+    @Query('limit') limit?: string,
+    @Query('before') before?: string,
+  ) {
+    return this.learnerComments.list(Number(limit) || 50, before);
+  }
 
   @Get('overview')
   @DebriefRead()

@@ -31,6 +31,7 @@ import {
   ArticleQuestion,
   JournalContent,
   LastRoleplayAttempt,
+  TrackBlocker,
   parseArticleQuestionMarkers,
   TrackAccessDenialReason,
   TrackItemType,
@@ -39,6 +40,11 @@ import {
   VideoSource,
 } from '../type/track.type';
 import { roleplayFailureReasons } from '../util/roleplay-gate.util';
+import {
+  findBlockerPosition,
+  LatestGradedAttempt,
+  resolveTrackBlocker,
+} from '../util/track-blocker.util';
 import { QuizAnswer, QuizContent } from '../type/quiz.type';
 import { AnnotationContent } from '../type/annotation.type';
 import { TrackSharedService, TrackWithStructure } from './track-shared.service';
@@ -207,6 +213,39 @@ export class TrackEnrollmentService {
       translation,
     );
 
+    const localizedItems: TrackItem[] = [];
+    const sections = structure.sections.map((section) => {
+      const localizedSection = this.trackLocalizationService.localizeSection(
+        section as any,
+        translation,
+      );
+      return {
+        id: section.id,
+        title: localizedSection.title,
+        description: localizedSection.description,
+        order: section.order,
+        items: section.items.map((item) => {
+          const localized = this.trackLocalizationService.localizeItem(
+            item,
+            translation,
+          );
+          localizedItems.push(localized);
+          return this.toLearnerItem(
+            localized,
+            progressByItemId.get(item.id),
+            this.fallbackReasonFor(item, translation),
+          );
+        }),
+      };
+    });
+    if (enrollment) {
+      await this.attachBlocker(
+        sections.flatMap((section) => section.items),
+        localizedItems,
+        progressByItemId,
+      );
+    }
+
     return {
       id: structure.id,
       title: translated.title,
@@ -229,26 +268,53 @@ export class TrackEnrollmentService {
       /** What the learner is reading now, and what else they can switch to. */
       languageCode: resolvedLanguage,
       availableLanguages: languages,
-      sections: structure.sections.map((section) => {
-        const localizedSection = this.trackLocalizationService.localizeSection(
-          section as any,
-          translation,
-        );
-        return {
-          id: section.id,
-          title: localizedSection.title,
-          description: localizedSection.description,
-          order: section.order,
-          items: section.items.map((item) =>
-            this.toLearnerItem(
-              this.trackLocalizationService.localizeItem(item, translation),
-              progressByItemId.get(item.id),
-              this.fallbackReasonFor(item, translation),
-            ),
-          ),
-        };
-      }),
+      sections,
     };
+  }
+
+  /**
+   * Tell the first locked item why it is locked. Progression is sequential,
+   * so the blocker is the first non-completed item and the explanation goes on
+   * the item right after it (see findBlockerPosition). Every other item gets
+   * `blockedBy: null`. Costs one extra query, and only when the blocker is a
+   * quiz or annotation (its latest attempt).
+   */
+  private async attachBlocker(
+    learnerItems: Array<
+      ReturnType<TrackEnrollmentService['toLearnerItem']> & {
+        blockedBy?: TrackBlocker | null;
+      }
+    >,
+    localizedItems: TrackItem[],
+    progressByItemId: Map<string, TrackItemProgress>,
+  ): Promise<void> {
+    for (const learnerItem of learnerItems) learnerItem.blockedBy = null;
+    const position = findBlockerPosition(learnerItems);
+    if (!position) return;
+
+    const item = localizedItems[position.blockerIndex];
+    const progress = progressByItemId.get(item.id);
+    let latestAttempt: LatestGradedAttempt | null = null;
+    if (progress && item.type === TrackItemType.QUIZ) {
+      latestAttempt =
+        await this.trackQuizAttemptRepository.findLatestByProgressId(
+          progress.id,
+        );
+    } else if (progress && item.type === TrackItemType.ANNOTATED_ARTIFACT) {
+      latestAttempt =
+        await this.trackAnnotationAttemptRepository.findLatestByProgressId(
+          progress.id,
+        );
+    }
+    const blockerLearnerItem = learnerItems[position.blockerIndex] as {
+      lastRoleplayAttempt?: LastRoleplayAttempt | null;
+    };
+    learnerItems[position.targetIndex].blockedBy = resolveTrackBlocker({
+      item,
+      progress,
+      lastRoleplayAttempt: blockerLearnerItem.lastRoleplayAttempt ?? null,
+      latestAttempt,
+    });
   }
 
   /**
