@@ -1,3 +1,4 @@
+import { PlatformAdminOnly } from 'src/auth/decorators/platform-admin-only.decorator';
 import {
   Body,
   Controller,
@@ -41,6 +42,7 @@ export class ConnectorController {
 
   @Get('types')
   @AssistantScope('platform')
+  @PlatformAdminOnly()
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   @ApiOperation({ summary: 'The kinds of connector this deployment supports' })
   types() {

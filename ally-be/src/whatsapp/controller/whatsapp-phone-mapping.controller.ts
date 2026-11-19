@@ -1,5 +1,5 @@
+import { PlatformAdminOnly } from 'src/auth/decorators/platform-admin-only.decorator';
 import {
-  Body,
   Controller,
   Delete,
   Get,
@@ -8,6 +8,7 @@ import {
   Patch,
   Post,
   Query,
+  GoneException,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -21,15 +22,20 @@ import { OrgScopedRoute } from '../../auth/decorators/org-scoped-route.decorator
 import { FeatureToggleKey } from '../../authorization/constants/admin-feature-toggle.constants';
 import { PERMISSIONS } from '../../authorization/constants/permissions.constants';
 import {
-  BulkWaPhoneMappingsDto,
   BulkWaPhoneMappingsResponseDto,
-  CreateWaPhoneMappingDto,
   GetWaPhoneMappingsQueryDto,
   GetWaPhoneMappingsResponseDto,
-  UpdateWaPhoneMappingDto,
   WaPhoneMappingResponseDto,
 } from '../dto/whatsapp-phone-mapping.dto';
 import { WhatsAppPhoneMappingService } from '../service/whatsapp-phone-mapping.service';
+
+/**
+ * CR1 (WA-NUMBERS-REPORT.md step 1): the system is hidden and takes no new writes. Listing and
+ * removing stay, for support; inbound recognition (`resolve`) keeps working until its readers are
+ * replaced (step 2, Phase 3).
+ */
+const MAPPINGS_RETIRED =
+  'WhatsApp number mappings are retired and take no new numbers. Add the person to the assistant\u2019s own list instead.';
 
 /**
  * Phone → organisation mappings, surfaced in the admin console under User Management.
@@ -46,6 +52,7 @@ import { WhatsAppPhoneMappingService } from '../service/whatsapp-phone-mapping.s
 @ApiTags('WhatsApp Bot')
 @ApiBearerAuth()
 @ApiSecurity('access-token')
+@PlatformAdminOnly()
 @Controller('v1/whatsapp/phone-mappings')
 export class WhatsAppPhoneMappingController {
   constructor(private readonly service: WhatsAppPhoneMappingService) {}
@@ -86,10 +93,8 @@ export class WhatsAppPhoneMappingController {
     description:
       'Too few digits to identify anyone, or an unknown organisation',
   })
-  create(
-    @Body() dto: CreateWaPhoneMappingDto,
-  ): Promise<WaPhoneMappingResponseDto> {
-    return this.service.create(dto);
+  create(): Promise<WaPhoneMappingResponseDto> {
+    throw new GoneException(MAPPINGS_RETIRED);
   }
 
   @Post('bulk')
@@ -105,10 +110,8 @@ export class WhatsAppPhoneMappingController {
       'organisation come back as conflicts and are left alone unless overwriteConflicts is set.',
   })
   @ApiResponse({ status: 201, type: BulkWaPhoneMappingsResponseDto })
-  bulkCreate(
-    @Body() dto: BulkWaPhoneMappingsDto,
-  ): Promise<BulkWaPhoneMappingsResponseDto> {
-    return this.service.bulkCreate(dto);
+  bulkCreate(): Promise<BulkWaPhoneMappingsResponseDto> {
+    throw new GoneException(MAPPINGS_RETIRED);
   }
 
   @Patch(':id')
@@ -118,11 +121,8 @@ export class WhatsAppPhoneMappingController {
   })
   @ApiOperation({ summary: 'Change a mapping’s organisation or label' })
   @ApiResponse({ status: 200, type: WaPhoneMappingResponseDto })
-  update(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: UpdateWaPhoneMappingDto,
-  ): Promise<WaPhoneMappingResponseDto> {
-    return this.service.update(id, dto);
+  update(): Promise<WaPhoneMappingResponseDto> {
+    throw new GoneException(MAPPINGS_RETIRED);
   }
 
   @Delete(':id')
