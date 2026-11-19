@@ -27,6 +27,7 @@ class StartSimulationParams {
     this.caseId,
     this.trackId,
     this.trackItemId,
+    this.assessmentRequiredTurns,
   });
 
   final int scenarioId;
@@ -52,6 +53,10 @@ class StartSimulationParams {
   /// standalone roleplay.
   final String? trackId;
   final String? trackItemId;
+
+  /// Assessment roleplay launched from a course item: the learner-turn
+  /// minimum, for the live screen's "Turn k of n" counter (display only).
+  final int? assessmentRequiredTurns;
 }
 
 enum StartSimulationErrorKind { rateLimited, activeSimulation, other }
@@ -111,6 +116,7 @@ void _pushRoleplay(BuildContext context, SessionData session, StartSimulationPar
       'languageId': ?params.languageId,
       'trackId': ?params.trackId,
       'trackItemId': ?params.trackItemId,
+      'assessmentRequiredTurns': ?params.assessmentRequiredTurns,
     },
   );
 }

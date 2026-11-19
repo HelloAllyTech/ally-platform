@@ -754,6 +754,11 @@
   },
   "postSim": {
     "titlePrefix": "ರೋಲ್ ಪ್ಲೇ",
+    "assessment": {
+      "submittedTitle": "ನಿಮ್ಮ ಮೌಲ್ಯಮಾಪನವನ್ನು ಸಲ್ಲಿಸಲಾಗಿದೆ",
+      "submittedBody": "ನಿಮ್ಮ ತರಬೇತುದಾರರು ನಿಮ್ಮ ಫಲಿತಾಂಶಗಳನ್ನು ಪರಿಶೀಲಿಸುತ್ತಾರೆ.",
+      "continue": "ಮುಂದುವರಿಸಿ"
+    },
     "noSessionRecording": "ಪ್ಲೇಬ್ಯಾಕ್‌ಗಾಗಿ ಯಾವುದೇ ಸೆಷನ್ ರೆಕಾರ್ಡಿಂಗ್ ಲಭ್ಯವಿಲ್ಲ.",
     "skills": {
       "empty": "ಈ ಸೆಷನ್‌ಗಾಗಿ ಯಾವುದೇ ಕೌಶಲ್ಯ ಡೇಟಾ ಲಭ್ಯವಿಲ್ಲ",
@@ -1948,6 +1953,8 @@
       "requireDuration": "ಕನಿಷ್ಠ {{duration}}",
       "requireScoreAndDuration": "ಕನಿಷ್ಠ {{score}} ಸ್ಕೋರ್ ಮಾಡಿ · ಕನಿಷ್ಠ {{duration}}",
       "requireParticipation": "ಪ್ರಾರಂಭಿಸಿದಾಗಲೇ ಪೂರ್ಣಗೊಳ್ಳುತ್ತದೆ",
+      "requireTurns": "ಕನಿಷ್ಠ {{turns}} ಸರದಿಗಳು",
+      "requireTurnsAndScore": "ಕನಿಷ್ಠ {{turns}} ಸರದಿಗಳು · ಕನಿಷ್ಠ ಸ್ಕೋರ್ {{score}}",
       "durationMin": "{{min}} ನಿಮಿಷ",
       "durationSec": "{{sec}} ಸೆಕೆಂಡ್",
       "durationMinSec": "{{min}} ನಿಮಿಷ {{sec}} ಸೆಕೆಂಡ್",
@@ -2050,6 +2057,11 @@
       "saved": "ಉಳಿಸಲಾಗಿದೆ",
       "saveFailed": "ಉಳಿಸಲು ವಿಫಲವಾಗಿದೆ"
     },
+    "assessment": {
+      "tag": "ಮೌಲ್ಯಮಾಪನ",
+      "tagPre": "ಮೌಲ್ಯಮಾಪನ · ಪೂರ್ವ",
+      "tagPost": "ಮೌಲ್ಯಮಾಪನ · ನಂತರ"
+    },
     "roleplay": {
       "intro": "ಈ ರೋಲ್-ಪ್ಲೇ ಪ್ರಾರಂಭಿಸಲು ಕೆಳಗೆ ಟ್ಯಾಪ್ ಮಾಡಿ.",
       "start": "ಪ್ರಾರಂಭಿಸಿ",
@@ -2066,7 +2078,11 @@
       "lastAttemptDuration": "ಇದು {{actual}} ನಡೆಯಿತು; ಈ ರೋಲ್‌ಪ್ಲೇಗೆ ಕನಿಷ್ಠ {{required}} ಬೇಕು.",
       "lastAttemptScore": "ನಿಮ್ಮ ಸ್ಕೋರ್ {{score}}; ಈ ರೋಲ್‌ಪ್ಲೇಗೆ ಕನಿಷ್ಠ {{required}} ಬೇಕು.",
       "lastAttemptScoreUnknown": "ಇದು ಕನಿಷ್ಠ ಸ್ಕೋರ್ {{required}} ತಲುಪಲಿಲ್ಲ.",
-      "lastAttemptFooter": "ನೀವು ಸಿದ್ಧರಾದಾಗ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+      "lastAttemptFooter": "ನೀವು ಸಿದ್ಧರಾದಾಗ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+      "assessmentIntroTurns": "ಇದು ಒಂದು ಮೌಲ್ಯಮಾಪನ. ನಿಮಗೆ ಒಂದೇ ಪ್ರಯತ್ನ ಸಿಗುತ್ತದೆ, ಮತ್ತು ನೀವು ಕನಿಷ್ಠ {{n}} ಸರದಿ ಮಾತನಾಡಿದಾಗ ಅದು ಎಣಿಕೆಯಾಗುತ್ತದೆ.",
+      "shortAttempt": "ಆ ಪ್ರಯತ್ನ ಎಣಿಕೆಗೆ ಬರಲು ತುಂಬಾ ಚಿಕ್ಕದಾಗಿತ್ತು ({{n}} ರಲ್ಲಿ {{taken}} ಸರದಿ). ನೀವು ಸಿದ್ಧರಾದಾಗ ಮತ್ತೆ ಪ್ರಾರಂಭಿಸಿ.",
+      "postLocked": "ಮೊದಲು ಪೂರ್ವ-ಮೌಲ್ಯಮಾಪನವನ್ನು ಪೂರ್ಣಗೊಳಿಸಿ: {{title}}.",
+      "assessmentSubmittedHidden": "ಸಲ್ಲಿಸಲಾಗಿದೆ. ನಿಮ್ಮ ತರಬೇತುದಾರರು ನಿಮ್ಮ ಫಲಿತಾಂಶಗಳನ್ನು ಪರಿಶೀಲಿಸುತ್ತಾರೆ."
     },
     "quiz": {
       "intro": {
@@ -2337,7 +2353,11 @@
     "connect": "ಸಂಪರ್ಕಿಸಿ",
     "disconnect": "ಸಂಪರ್ಕ ಕಡಿತಗೊಳಿಸಿ",
     "connectedToRoom": "ರೂಮ್‌ಗೆ ಸಂಪರ್ಕಗೊಂಡಿದೆ",
-    "notConnected": "ಸಂಪರ್ಕಗೊಂಡಿಲ್ಲ"
+    "notConnected": "ಸಂಪರ್ಕಗೊಂಡಿಲ್ಲ",
+    "assessment": {
+      "turnCounter": "ಸರದಿ {{k}} / {{n}}",
+      "minimumReached": "ಕನಿಷ್ಠ ಸರದಿಗಳು ಪೂರ್ಣಗೊಂಡಿವೆ"
+    }
   },
   "scribe": {
     "title": "ಸ್ಕ್ರೈಬ್ ರೆಕಾರ್ಡಿಂಗ್ (ಹಂತ 1)",

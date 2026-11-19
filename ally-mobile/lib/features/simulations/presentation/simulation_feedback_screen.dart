@@ -206,6 +206,8 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
       final summary = await ref.read(simulationsRepositoryProvider).getSimulationDetails(widget.scenarioSessionId);
       if (generation != _retryGeneration || !mounted) return;
       setState(() => _summary = summary);
+      // A withheld assessment has no feedback to wait for or rate.
+      if (summary.resultsHidden) return;
       _onSummary(summary);
       final tabsOff = (summary.scenario?.hasFeedbackTabs ?? false) && !summary.feedbackEnabled;
       if (tabsOff || summary.hasSummaryFeedback) return;
@@ -377,6 +379,60 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
       return;
     }
     _continueCourse();
+  }
+
+  /// "Your assessment is submitted": no score, tabs or rating, just a way on.
+  Widget _buildSubmittedAssessment(BuildContext context) {
+    final inCourse = _trackId != null && !widget.fromLogs;
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _handleBack();
+      },
+      child: Scaffold(
+        key: const Key('simulation-feedback-assessment-submitted'),
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SvgPicture.asset('assets/icons/tickRound.svg', width: 48, height: 48),
+                const SizedBox(height: 16),
+                Text(
+                  ref.t('postSim.assessment.submittedTitle'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontFamily: AppFonts.ibmPlexSerifMedium,
+                    fontSize: 20,
+                    color: AppColors.highEmphasis,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  ref.t('postSim.assessment.submittedBody'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontFamily: 'CupertinoSystemText',
+                    fontSize: 14,
+                    color: AppColors.mediumEmphasis,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                AppButton(
+                  key: const Key('simulation-feedback-assessment-continue'),
+                  label: ref.t('postSim.assessment.continue'),
+                  isLoading: _continuing,
+                  onPressed: inCourse ? _continueCourse : _handleBack,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   bool get _feedbackEnabled => _summary?.feedbackEnabled ?? true;
@@ -611,6 +667,8 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
     final summary = _summary;
     final reviewId = summary?.reviewId;
     final shortSession = summary?.isShortSession ?? false;
+
+    if (summary?.resultsHidden ?? false) return _buildSubmittedAssessment(context);
 
     final showChecklist = _feedbackEnabled && canSeeMessages && (summary?.isChecklistMode ?? false) && !shortSession;
     final showTabs = _feedbackEnabled && canSeeMessages && _tabController != null;

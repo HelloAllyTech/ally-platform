@@ -769,6 +769,8 @@
       "requireDuration": "At least {{duration}}",
       "requireScoreAndDuration": "Score at least {{score}} · at least {{duration}}",
       "requireParticipation": "Completes when you start it",
+      "requireTurns": "At least {{turns}} turns",
+      "requireTurnsAndScore": "At least {{turns}} turns · score at least {{score}}",
       "durationMin": "{{min}} min",
       "durationSec": "{{sec}} sec",
       "durationMinSec": "{{min}} min {{sec}} sec",
@@ -871,6 +873,11 @@
       "saved": "Saved",
       "saveFailed": "Save failed"
     },
+    "assessment": {
+      "tag": "Assessment",
+      "tagPre": "Assessment · Pre",
+      "tagPost": "Assessment · Post"
+    },
     "roleplay": {
       "intro": "Tap below to start this role play.",
       "start": "Start",
@@ -887,7 +894,11 @@
       "lastAttemptDuration": "It lasted {{actual}}; this role play needs at least {{required}}.",
       "lastAttemptScore": "You scored {{score}}; this role play needs at least {{required}}.",
       "lastAttemptScoreUnknown": "It didn't reach the minimum score of {{required}}.",
-      "lastAttemptFooter": "Try again when you're ready."
+      "lastAttemptFooter": "Try again when you're ready.",
+      "assessmentIntroTurns": "This is an assessment. You get one attempt, and it counts once you've taken at least {{n}} turns.",
+      "shortAttempt": "That attempt was too short to count ({{taken}} of {{n}} turns). Start again when you're ready.",
+      "postLocked": "Complete the pre-assessment, {{title}}, first.",
+      "assessmentSubmittedHidden": "Submitted. Your trainer will review your results."
     },
     "quiz": {
       "intro": {
@@ -1154,6 +1165,11 @@
   },
   "postSim": {
     "titlePrefix": "Role play",
+    "assessment": {
+      "submittedTitle": "Your assessment is submitted",
+      "submittedBody": "Your trainer will review your results.",
+      "continue": "Continue"
+    },
     "noSessionRecording": "No session recording is available for playback.",
     "skills": {
       "empty": "No skills data available for this session",
@@ -2337,7 +2353,11 @@
     "connect": "Connect",
     "disconnect": "Disconnect",
     "connectedToRoom": "Connected to room",
-    "notConnected": "Not connected"
+    "notConnected": "Not connected",
+    "assessment": {
+      "turnCounter": "Turn {{k}} of {{n}}",
+      "minimumReached": "Minimum turns reached"
+    }
   },
   "scribe": {
     "title": "Scribe recording (Phase 1)",

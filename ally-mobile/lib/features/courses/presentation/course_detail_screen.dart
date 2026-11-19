@@ -549,6 +549,21 @@ class _CourseItemRow extends ConsumerWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(trackItemMeta(item, ref.t), style: _robotoSmall),
+                    if (_assessmentTag(item, ref.t) != null) ...[
+                      const SizedBox(height: 4),
+                      Container(
+                        key: ValueKey('assessment-tag-${item.id}'),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.amber50,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Text(
+                          _assessmentTag(item, ref.t)!,
+                          style: _robotoTiny.copyWith(color: AppColors.amber900),
+                        ),
+                      ),
+                    ],
                     if (item.type == TrackItemType.roleplay &&
                         !isCompleted &&
                         item.lastRoleplayAttempt != null) ...[
@@ -581,4 +596,21 @@ class _CourseItemRow extends ConsumerWidget {
     // styles.rowLocked: opacity 0.7.
     return isLocked ? Opacity(opacity: 0.7, child: row) : row;
   }
+}
+
+/// "Assessment · Pre" / "Assessment · Post" / "Assessment" for an assessment
+/// roleplay; null for everything else.
+String? _assessmentTag(TrackDetailItem item, String Function(String, [Map<String, Object?>?]) t) {
+  if (item.type != TrackItemType.roleplay) return null;
+  final isAssessment =
+      item.assessment != null ||
+      item.roleplayGate?.roleplayType == RoleplayType.assessment ||
+      (item.completionCriteria?.assessmentMode ?? false);
+  if (!isAssessment) return null;
+  final phase = item.assessment?.phase ?? item.completionCriteria?.assessmentPhase;
+  return switch (phase) {
+    AssessmentPhase.pre => t('courses.assessment.tagPre'),
+    AssessmentPhase.post => t('courses.assessment.tagPost'),
+    null => t('courses.assessment.tag'),
+  };
 }
