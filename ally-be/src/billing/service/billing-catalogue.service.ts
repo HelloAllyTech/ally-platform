@@ -18,6 +18,7 @@ import {
 } from '../enum/billing.enum';
 import {
   canonicalBillingProvider,
+  microsToUsd,
   priceAt,
   usdToMicros,
 } from '../util/pricing.util';
@@ -489,6 +490,19 @@ export class BillingCatalogueService {
   }
 
   // ── settings and fixed costs ────────────────────────────────────────
+
+  /** The settings in dollars, as the Costs screen edits them. */
+  async settingsUsd() {
+    const row = await this.settings();
+    return {
+      dailyBudgetUsd: microsToUsd(row.dailyBudgetMicros),
+      conversationAlertUsd: microsToUsd(row.conversationAlertMicros),
+      spikeMultiplier: Number(row.spikeMultiplier),
+      spikeMinUsd: microsToUsd(row.spikeMinMicros),
+      updatedAt: row.updatedAt,
+      updatedBy: row.updatedBy,
+    };
+  }
 
   async settings(): Promise<CostSettings> {
     const row = await this.dataSource

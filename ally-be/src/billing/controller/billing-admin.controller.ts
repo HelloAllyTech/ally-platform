@@ -196,14 +196,19 @@ export class BillingAdminController {
     return this.reports.exportCsv(parsePeriod(from, to));
   }
 
+  @ApiOperation({ summary: 'Budget and alert thresholds, in dollars' })
   @Get('costs/settings')
   settings() {
-    return this.catalogue.settings();
+    return this.catalogue.settingsUsd();
   }
 
   @Put('costs/settings')
-  updateSettings(@Body() dto: CostSettingsDto, @CurrentUser() user: TokenUser) {
-    return this.catalogue.updateSettings(dto, user?.id ?? null);
+  async updateSettings(
+    @Body() dto: CostSettingsDto,
+    @CurrentUser() user: TokenUser,
+  ) {
+    await this.catalogue.updateSettings(dto, user?.id ?? null);
+    return this.catalogue.settingsUsd();
   }
 
   @Get('costs/fixed')

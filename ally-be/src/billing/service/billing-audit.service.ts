@@ -47,16 +47,20 @@ export class BillingAuditService {
     subjectType: string | string[],
     subjectId?: string,
     limit = 200,
-  ): Promise<BillingAudit[]> {
+  ): Promise<
+    Array<
+      BillingAudit & { actorName: string | null; actorEmail: string | null }
+    >
+  > {
     const types = Array.isArray(subjectType) ? subjectType : [subjectType];
-    const query = this.dataSource
-      .getRepository(BillingAudit)
-      .createQueryBuilder('a')
-      .where('a."subjectType" IN (:...types)', { types })
-      .orderBy('a."createdAt"', 'DESC')
-      .limit(limit);
-    if (subjectId) query.andWhere('a."subjectId" = :subjectId', { subjectId });
-    return query.getMany();
+    // Who made each change, by name, so the history doesn't read "user #7".
+    return this.dataSource.query(
+      `SELECT a.*, u.name AS "actorName", u.email AS "actorEmail"
+         FROM billing_audit a LEFT JOIN users u ON u.id = a."actorUserId"
+        WHERE a."subjectType" = ANY($1) AND ($2::varchar IS NULL OR a."subjectId" = $2)
+        ORDER BY a."createdAt" DESC LIMIT $3`,
+      [types, subjectId ?? null, limit],
+    );
   }
 }
 
