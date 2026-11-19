@@ -79,10 +79,11 @@ const coded = (status: HttpStatus, code: string, message: string, extra = {}) =>
 
 /**
  * The Owner's review and the lead (plans/roadmap-builder-merge D10, D11,
- * §2.1a, §4.6, §4.11, §5.7a/b): accept (optionally with a lead in the same
- * call), decline with a reason only the author sees, reopen, bulk review in
- * one transaction with one undo token, pick or change the lead, the lead
- * handing an idea back, and the deterministic suggested lead.
+ * §2.1a, §4.6, §4.11, §5.7a/b): accept, decline with a reason only the author
+ * sees, reopen, bulk review in one transaction with one undo token, pick or
+ * change the lead (only once the Owner has planned the idea and closed the
+ * plan, never from a review call), the lead handing an idea back, and the
+ * deterministic suggested lead.
  *
  * Capabilities come from the read model's `can`, so the server refuses
  * exactly what the idea page hides. Every route reaching here has already
