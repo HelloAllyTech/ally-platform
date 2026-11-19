@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 import { LoggerService } from 'src/logger/logger.service';
 import {
@@ -26,6 +26,12 @@ import { BuilderEvidenceLogService } from './builder-evidence-log.service';
 import { BuilderReadinessService } from './builder-readiness.service';
 import { BuilderPrdReviewService } from './builder-prd-review.service';
 import { BuilderMessageRepository } from '../repository/builder-message.repository';
+import { BuilderSessionRepository } from '../repository/builder-session.repository';
+import {
+  normaliseSuccessMeasure,
+  SET_SUCCESS_MEASURE_TOOL,
+} from '../util/builder-success-measure-tool.util';
+import { successMeasureGaps } from 'src/product-planning/util/plan-readiness.util';
 import { BuilderMessageRole } from '../enum/builder.enum';
 import {
   BUILDER_REPO_NAMES,
@@ -166,6 +172,9 @@ export class BuilderInterviewToolsService {
     private readonly readiness: BuilderReadinessService,
     private readonly reviewService: BuilderPrdReviewService,
     private readonly messageRepository: BuilderMessageRepository,
+    /** Writes a plan's success measure. Optional so fixtures without it still build. */
+    @Optional()
+    private readonly sessionRepository?: BuilderSessionRepository,
   ) {}
 
   /**
@@ -182,9 +191,12 @@ export class BuilderInterviewToolsService {
       situationBrief?: boolean;
       /** The opening turn under the protocol: the brief, and no question yet. */
       briefDue?: boolean;
+      /** A roadmap plan session: adds set_success_measure (audit 2026-11-19, rec 2). */
+      planSession?: boolean;
     } = {},
   ): any[] {
-    const legacy = this.legacyToolDefinitions();
+    const planTools = options.planSession ? [SET_SUCCESS_MEASURE_TOOL] : [];
+    const legacy = [...this.legacyToolDefinitions(), ...planTools];
     if (!options.validatedTurns) return legacy;
     const gate = Boolean(options.situationBrief);
     const tools = [
@@ -677,6 +689,8 @@ export class BuilderInterviewToolsService {
         return this.executeEdit(name, input, context);
       case 'dismiss_review_finding':
         return this.executeDismissFinding(input, context);
+      case 'set_success_measure':
+        return this.executeSetSuccessMeasure(input, context);
       case 'github_search_code':
         return this.wrapResearch(
           await this.githubRead.searchCode(
@@ -1162,6 +1176,53 @@ export class BuilderInterviewToolsService {
    * latest message, so the reviewer cannot be overruled by the agent whose
    * work it reviews.
    */
+  /**
+   * The plan's success measure, written where the plan flow reads it. Plan
+   * sessions only, and never once the measure is frozen (design approved):
+   * changing it then needs a person's stated reason, on the plan's own route.
+   */
+  private async executeSetSuccessMeasure(
+    input: Record<string, any>,
+    context: BuilderToolExecutionContext,
+  ): Promise<BuilderToolExecutionOutcome> {
+    const refuse = (error: string, message: string) => ({
+      modelResult: { ok: false, error, message },
+      summary: `Success measure not set: ${message}`,
+    });
+    if (context.session?.kind !== 'plan' || !this.sessionRepository) {
+      return refuse('not_a_plan', 'Only a roadmap plan has a success measure.');
+    }
+    const normalised = normaliseSuccessMeasure(input);
+    if ('error' in normalised) return refuse('invalid', normalised.error);
+    const sessionId = context.session.id;
+    const [row] = await this.sessionRepository.manager.query(
+      `SELECT "plan"->>'measureFrozenAt' AS "frozenAt" FROM "builder_sessions" WHERE id = $1`,
+      [sessionId],
+    );
+    if (row?.frozenAt) {
+      return refuse(
+        'frozen',
+        'The success measure is frozen since the design was approved. Tell the planner what ' +
+          'you would change; they change it with a reason.',
+      );
+    }
+    await this.sessionRepository.manager.query(
+      `UPDATE "builder_sessions"
+          SET "plan" = COALESCE("plan", '{}'::jsonb) || jsonb_build_object('successMeasure', $2::jsonb)
+        WHERE id = $1`,
+      [sessionId, JSON.stringify(normalised.measure)],
+    );
+    const gaps = successMeasureGaps(normalised.measure);
+    return {
+      modelResult: {
+        ok: true,
+        stored: normalised.measure,
+        ...(gaps.length ? { stillMissing: gaps } : {}),
+      },
+      summary: `Set the success measure: ${normalised.measure.metric}`,
+    };
+  }
+
   private async executeDismissFinding(
     input: Record<string, any>,
     context: BuilderToolExecutionContext,

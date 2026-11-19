@@ -394,6 +394,32 @@ describe('capabilitiesFor (§3.1 matrix)', () => {
       ).toMatchObject({ closePlan: false, reopenPlan: false });
     });
 
+    it('works the plan from the idea page: an Owner or the assigned builder, while planning and before Close plan', () => {
+      const planning = {
+        shownStage: 'planning' as const,
+        planningStarted: true,
+      };
+      expect(can('owner', stranger, planning).workPlan).toBe(true);
+      expect(
+        can('builder', lead, { ...planning, hasLead: true }).workPlan,
+      ).toBe(true);
+      expect(can('builder', stranger, planning).workPlan).toBe(false);
+      expect(can('idea', author, planning).workPlan).toBe(false);
+      expect(
+        can('owner', stranger, { ...planning, planClosed: true }).workPlan,
+      ).toBe(false);
+      expect(
+        can('owner', stranger, { ...planning, planningStarted: false })
+          .workPlan,
+      ).toBe(false);
+      expect(
+        can('owner', stranger, {
+          shownStage: 'building',
+          planningStarted: true,
+        }).workPlan,
+      ).toBe(false);
+    });
+
     it('assigns a builder only once the plan is closed, and can always change one', () => {
       for (const shownStage of STAGES) {
         const open = !['draft', 'shipped', 'declined', 'closed'].includes(

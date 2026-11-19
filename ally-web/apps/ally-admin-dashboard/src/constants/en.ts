@@ -9549,6 +9549,43 @@ export const en = {
         undo: "Undo the last review",
       },
     },
+    /** Planning from the idea page, and Close plan's one definition of ready (audit 2026-11-19). */
+    planGate: {
+      composerLabel: "Message the plan agent",
+      composerHelp:
+        "Only you and the assigned builder see this box. Your message starts the plan agent's next turn; it answers here in a minute or so. Comments to people go in the box below.",
+      composerPlaceholder: "Tell the plan agent what to look at, decide or change…",
+      send: "Send to the plan agent",
+      sending: "Sending…",
+      sent: "Sent. The plan agent answers here shortly.",
+      busy: "The plan agent is still on its last turn. Try again in a moment.",
+      sendFailed: "Couldn't reach the plan agent.",
+      startAgent: "Start the plan agent",
+      startAgentHelp:
+        "The plan agent hasn't said anything on this idea yet. This asks it to look into what exists and send its situation brief.",
+      dialogTitle: "Close plan",
+      checking: "Checking what the plan still needs…",
+      checkFailed: "Couldn't check the plan. You can still close it with a reason.",
+      ready: "Everything the plan needs is in place. Once it's closed you can assign a builder.",
+      notReadyIntro: (n: number) =>
+        n === 1 ? "1 thing is still open:" : `${n} things are still open:`,
+      prdEmpty: "The PRD has no requirements yet.",
+      kinds: { prd: "PRD", design: "Design", answers: "Answers" } as Record<string, string>,
+      reasonLabel: "Why close it anyway?",
+      reasonHelp:
+        "Required while anything is open. It's saved with the plan and printed at the top of the build brief, so the builder reads it first.",
+      reasonPlaceholder: "What the builder should know about what's left open…",
+      reasonTooShort: (min: number) => `At least ${min} characters.`,
+      closeAnyway: "Close plan anyway",
+      confirm: "Close plan",
+      cancel: "Cancel",
+      close: "Close",
+      runChecks: "Run the reviews",
+      runChecksHelp:
+        "Runs the safety, privacy and AI-quality reviewers this PRD's paths call for. They run on their own the first time the PRD reads ready.",
+      runChecksStarted: "Reviews finished.",
+      runChecksFailed: "Couldn't run the reviews.",
+    },
     session: {
       startPlanning: "Start planning",
       startPlanningHelp:

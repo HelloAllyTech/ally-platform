@@ -31,9 +31,11 @@ import {
   BUILDER_ACTIVE_STATUSES,
   BUILDER_ARCHIVABLE_STATUSES,
   BuilderPrdVersionAuthor,
+  BuilderSessionKind,
   BuilderSessionStatus,
 } from '../enum/builder.enum';
 import { BuilderPrdReadiness } from '../type/builder-prd.type';
+import { planGateRegistry } from 'src/product-planning/service/plan-gate.registry';
 import {
   builderRequesters,
   PM_AGENT_REQUESTER,
@@ -564,6 +566,15 @@ export class BuilderSessionService {
       // message append on (sessionId, seq).
       await this.sessionRepository.update({ id: session.id }, { status: next });
       session.status = next;
+      // A plan's PRD reading ready for the first time runs the specialist
+      // reviewers it needs (audit 2026-11-19, rec 2). In the background: the
+      // turn or save that tipped it is not held up by them.
+      if (
+        next === BuilderSessionStatus.PRD_READY &&
+        session.kind === BuilderSessionKind.PLAN
+      ) {
+        planGateRegistry.prdReadied(session.id);
+      }
     }
     return next;
   }

@@ -2326,7 +2326,7 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     runtime: LlmRuntime.ALLY_BE,
     tier: LlmModelTier.REASONING,
     trigger:
-      'A roadmap plan runs a review-board check, drafts launch materials, plans user research, reviews an outcome, or the weekly signal scout runs',
+      'A roadmap plan runs a review-board check (on its own the first time the PRD reads ready, or when the planner asks), drafts launch materials, plans user research, reviews an outcome, or the weekly signal scout runs',
     detail:
       'The planning_* prompts: the safety, privacy and AI-quality reviewers (cold, from the PRD and ' +
       'design only), the outcome reviewer (scheduled after release), the launch planner, the ' +
@@ -2518,7 +2518,8 @@ const BUILDER_TASKS: AiTaskEntry[] = [
     id: 'builder-interview',
     task: LlmTask.BUILDER_INTERVIEW,
     runtime: LlmRuntime.ALLY_BE,
-    trigger: 'An admin talks to Builder about what to build',
+    trigger:
+      'An admin talks to Builder about what to build, or an Owner starts planning an idea or writes to its planning agent',
     detail:
       'PRD interview, tool loop capped at 16 round-trips. With builder_settings.validatedTurns ' +
       '(default on) a turn ends only through ask_admin / finish_turn, checked before it is shown: ' +
@@ -2532,7 +2533,12 @@ const BUILDER_TASKS: AiTaskEntry[] = [
       "Roadmap v2 (P3b): after Start planning the plan interview runs in the idea's one session, and " +
       'each turn also reads every answer, comment and settled choice posted since the last turn by anyone ' +
       'with Roadmap access, attributed as [Name · role] (no extra call; a longer user message). ' +
-      'Conflicting answers are withheld until the settler chooses.',
+      'Conflicting answers are withheld until the settler chooses. ' +
+      'Start planning queues the opening turn in the background, and the planner (an Owner or ' +
+      "the assigned builder) starts a turn from the idea page's composer (PlanTurnService): one " +
+      'turn per press, the same call. A plan turn also reads what its Close plan gate still lists ' +
+      '(design, success measure, checks, conflicts), may set the success measure with ' +
+      'set_success_measure (no model call), and a "ready" claim is sent back while that gate is open.',
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
     defaultModel: 'gemini-2.5-pro',

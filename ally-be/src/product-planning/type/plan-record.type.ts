@@ -99,7 +99,7 @@ export interface PlanRecord {
    * is "not pursuing". Cleared by reopening the plan, which only works while
    * nobody leads the idea.
    */
-  planClosed?: PlanActorStamp | null;
+  planClosed?: PlanClosedStamp | null;
 
   /**
    * How the assigned builder builds it: with the Builder agent here, or
@@ -116,6 +116,16 @@ export interface PlanRecord {
 export interface PlanActorStamp {
   byUserId: number;
   at: string;
+}
+
+/**
+ * Close plan's stamp. `notReady` is present only when the Owner closed it
+ * while the plan still had open blockers (PlanCloseReadinessService): the
+ * reason they typed, and the blockers as they stood, printed at the top of
+ * the build brief so the builder reads what was knowingly left open.
+ */
+export interface PlanClosedStamp extends PlanActorStamp {
+  notReady?: { reason: string; blockers: string[] } | null;
 }
 
 /** `builder_agent`: Builder builds it here. `outside`: built outside the Builder agent. */
