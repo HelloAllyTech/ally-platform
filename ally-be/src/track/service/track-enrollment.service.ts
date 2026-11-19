@@ -47,11 +47,13 @@ import {
 } from '../util/roleplay-gate.util';
 
 /** A POST assessment's paired PRE, as the learner stands with it. */
-interface PreAssessmentState {
+export interface PreAssessmentState {
   title: string;
   submitted: boolean;
 }
-type PreAssessmentLookup = (item: TrackItem) => PreAssessmentState | null;
+export type PreAssessmentLookup = (
+  item: TrackItem,
+) => PreAssessmentState | null;
 import { QuizAnswer, QuizContent } from '../type/quiz.type';
 import { AnnotationContent } from '../type/annotation.type';
 import { TrackSharedService, TrackWithStructure } from './track-shared.service';
