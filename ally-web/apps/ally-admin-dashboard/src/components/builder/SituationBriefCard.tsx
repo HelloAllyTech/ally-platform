@@ -57,7 +57,13 @@ export const SituationBriefCard: React.FC<SituationBriefCardProps> = ({
   const setDraft = (id: string, next: Partial<Draft>) =>
     setDrafts(current => ({ ...current, [id]: { ...draftOf(id), ...next } }));
 
-  const undecided = brief.lines.filter(line => !draftOf(line.id).verdict).length;
+  // A line no file read supports cannot be confirmed — only corrected or left unverified
+  // [FP-0490] — so it is not waiting on a decision.
+  const isUnverified = (line: BuilderBriefLine) => line.verified === false;
+  const undecided = brief.lines.filter(
+    line => !draftOf(line.id).verdict && !isUnverified(line),
+  ).length;
+  const confirmable = brief.lines.filter(line => !isUnverified(line)).length;
   const missingCorrection = brief.lines.some(
     line => draftOf(line.id).verdict === "correct" && !draftOf(line.id).correction.trim(),
   );
@@ -67,12 +73,15 @@ export const SituationBriefCard: React.FC<SituationBriefCardProps> = ({
       const draft = draftOf(line.id);
       return draft.verdict === "correct" && draft.correction.trim()
         ? { id: line.id, verdict: "correct" as const, correction: draft.correction.trim() }
-        : { id: line.id, verdict: "confirm" as const };
+        : isUnverified(line)
+          ? { id: line.id, verdict: "unverified" as const }
+          : { id: line.id, verdict: "confirm" as const };
     });
     const corrected = lines.filter(line => line.verdict === "correct").length;
+    const leftUnverified = lines.filter(line => line.verdict === "unverified").length;
     const trimmedNote = note.trim();
     const summary = [
-      strings.summary(lines.length - corrected, corrected),
+      strings.summary(lines.length - corrected - leftUnverified, corrected),
       trimmedNote ? strings.note(trimmedNote) : "",
     ]
       .filter(Boolean)
@@ -115,6 +124,14 @@ export const SituationBriefCard: React.FC<SituationBriefCardProps> = ({
             {line.cites.map(cite => cite.label).join(" · ")}
           </p>
         )}
+        {line.verified === true && line.verifiedBy && (
+          <p className="mt-1 break-words text-xs text-typography-500">
+            <span className="font-medium">{strings.checkedIn}:</span> {line.verifiedBy}
+          </p>
+        )}
+        {isUnverified(line) && !answered && draft.verdict !== "correct" && (
+          <p className="mt-1 text-xs text-typography-600">{strings.unverifiedHint}</p>
+        )}
 
         {answered ? (
           verdict?.verdict === "correct" ? (
@@ -125,6 +142,12 @@ export const SituationBriefCard: React.FC<SituationBriefCardProps> = ({
                 </Tag>
               </span>
               <p className="text-sm italic text-typography-700">{verdict.correction}</p>
+            </div>
+          ) : verdict?.verdict === "unverified" || (!verdict && isUnverified(line)) ? (
+            <div className="mt-1">
+              <Tag type="warm-gray" size="sm">
+                {strings.unverified}
+              </Tag>
             </div>
           ) : (
             <div className="mt-1">
@@ -143,6 +166,13 @@ export const SituationBriefCard: React.FC<SituationBriefCardProps> = ({
                   </Tag>
                 </span>
               )}
+              {!draft.verdict && isUnverified(line) && (
+                <span className="mr-auto shrink-0">
+                  <Tag type="warm-gray" size="sm">
+                    {strings.unverified}
+                  </Tag>
+                </span>
+              )}
               {draft.verdict ? (
                 <Button
                   kind="ghost"
@@ -154,14 +184,16 @@ export const SituationBriefCard: React.FC<SituationBriefCardProps> = ({
                 </Button>
               ) : (
                 <>
-                  <Button
-                    kind="ghost"
-                    size="sm"
-                    disabled={disabled}
-                    onClick={() => setDraft(line.id, { verdict: "confirm" })}
-                  >
-                    {strings.confirm}
-                  </Button>
+                  {!isUnverified(line) && (
+                    <Button
+                      kind="ghost"
+                      size="sm"
+                      disabled={disabled}
+                      onClick={() => setDraft(line.id, { verdict: "confirm" })}
+                    >
+                      {strings.confirm}
+                    </Button>
+                  )}
                   <Button
                     kind="ghost"
                     size="sm"
@@ -248,7 +280,7 @@ export const SituationBriefCard: React.FC<SituationBriefCardProps> = ({
               >
                 {undecided === 0
                   ? strings.send
-                  : undecided === brief.lines.length
+                  : undecided === confirmable
                     ? strings.confirmAllAndSend
                     : strings.sendConfirmingRest(undecided)}
               </Button>

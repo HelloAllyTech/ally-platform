@@ -140,4 +140,35 @@ describe("SituationBriefCard", () => {
     expect(screen.queryByText("Right")).toBeNull();
     expect(screen.queryByRole("button", { name: /send/i })).toBeNull();
   });
+
+  it("shows a line no file read supports as unverified, with no confirm box", () => {
+    const onSubmit = vi.fn();
+    const withClaims: BuilderSituationBrief = {
+      ...brief,
+      lines: [
+        { ...brief.lines[0], verified: false },
+        {
+          id: "X2",
+          kind: "exists",
+          text: "Debrief ratings are stored",
+          cites: [],
+          verified: true,
+          verifiedBy: "ally-be:src/debrief/debrief.entity.ts",
+        },
+        ...brief.lines.slice(1),
+      ],
+    };
+    render(<SituationBriefCard brief={withClaims} onSubmit={onSubmit} />);
+
+    expect(within(line("X1")).getByText("Unverified")).toBeInTheDocument();
+    expect(within(line("X1")).queryByText("Right")).toBeNull();
+    expect(within(line("X1")).getByText("Correct it")).toBeInTheDocument();
+    expect(within(line("X2")).getByText(/debrief\.entity\.ts/)).toBeInTheDocument();
+    expect(within(line("X2")).getByText("Right")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /send/i }));
+    const [response] = onSubmit.mock.calls[0];
+    expect(response.lines.find((entry: any) => entry.id === "X1").verdict).toBe("unverified");
+    expect(response.lines.find((entry: any) => entry.id === "X2").verdict).toBe("confirm");
+  });
 });
