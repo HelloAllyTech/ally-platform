@@ -6,3 +6,4 @@ export {
   getRoleplayRequirement,
   getRoleplayShortAttemptLine,
 } from "./roleplayRequirement";
+export { formatTrackBlocker } from "./trackBlocker";

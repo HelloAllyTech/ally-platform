@@ -301,6 +301,71 @@ export interface AssessmentSubmission {
 }
 
 /**
+ * The most recent case roleplay that missed its bar, kept on every track
+ * progress row linked to that case session so the learner can be told why
+ * the case is not finished. Cleared once the item completes.
+ */
+export interface LastCaseAttempt {
+  failureReasons: RoleplayAttemptFailureReason[];
+  score: number | null;
+  durationSeconds: number;
+  requiredScore: number | null;
+  requiredDurationSeconds: number | null;
+  /** ISO timestamp. */
+  endedAt: string;
+}
+
+/**
+ * Why the first locked item of a course is locked: what the item before it
+ * (the blocker) still needs. Sequential progression means the blocker is
+ * always the first non-completed item in track order.
+ */
+export enum TrackBlockerReason {
+  /** Never attempted, in progress, or a type with no gate to report. */
+  NOT_FINISHED = 'NOT_FINISHED',
+  /** actual/required are points (roleplay, case) or percent (quiz, annotation, branching). */
+  BELOW_SCORE = 'BELOW_SCORE',
+  /** actual/required in seconds. */
+  TOO_SHORT = 'TOO_SHORT',
+  /** A scored gate applied but the attempt came back with no score. */
+  NOT_SCORED = 'NOT_SCORED',
+  /** One-attempt roleplay assessment submitted and not passed. */
+  ASSESSMENT_FAILED = 'ASSESSMENT_FAILED',
+  /** Quiz answers still waiting to be marked. */
+  GRADING_PENDING = 'GRADING_PENDING',
+  /** No attempts left; `retryAt` set when a new round opens (branching). */
+  OUT_OF_ATTEMPTS = 'OUT_OF_ATTEMPTS',
+  /** actual/required in percent watched. */
+  WATCH_MORE = 'WATCH_MORE',
+  /** Article not read for long enough yet. */
+  KEEP_READING = 'KEEP_READING',
+}
+
+/** What the locked row offers: retry the blocker, open it, or nothing. */
+export enum TrackBlockerAction {
+  RETRY = 'RETRY',
+  OPEN = 'OPEN',
+  NONE = 'NONE',
+}
+
+export interface TrackBlockerReasonDetail {
+  code: TrackBlockerReason;
+  actual?: number | null;
+  required?: number | null;
+}
+
+export interface TrackBlocker {
+  itemId: string;
+  title: string;
+  type: TrackItemType;
+  /** At least one entry; two when a roleplay missed both score and duration. */
+  reasons: TrackBlockerReasonDetail[];
+  action: TrackBlockerAction;
+  /** ISO timestamp a new attempt round opens (OUT_OF_ATTEMPTS, branching). */
+  retryAt?: string | null;
+}
+
+/**
  * Per-item completion rule. Only the keys relevant to the item's type are
  * read; the rest are ignored:
  *  - ROLEPLAY/CASE → minScore (+ minDurationSeconds for ROLEPLAY, falling back
@@ -393,6 +458,8 @@ export interface TrackItemProgressMeta {
   answeredArticleQuestions?: Record<string, AnsweredArticleQuestion>;
   /** ROLEPLAY: the latest attempt that did not complete the item, and why. */
   lastRoleplayAttempt?: LastRoleplayAttempt;
+  /** CASE: the latest case roleplay that missed its bar, and why. */
+  lastCaseAttempt?: LastCaseAttempt;
   /**
    * ROLEPLAY in assessment mode: when the learner's one attempt ended. Set
    * whether or not it passed; drives the learner's "submitted" state.

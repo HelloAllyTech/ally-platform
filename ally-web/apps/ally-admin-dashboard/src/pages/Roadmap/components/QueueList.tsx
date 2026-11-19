@@ -26,7 +26,7 @@ export interface QueueSection {
   rows: RoadmapItemRow[];
 }
 
-const FOR_YOU_SECTIONS = ["needsYou", "yourIdeas", "watching", "recentlyShipped"];
+const FOR_YOU_SECTIONS = ["needsYou", "yourIdeas", "recentlyShipped"];
 const TRIAGE_SECTIONS = ["backlog"];
 const LEADING_STAGE_ORDER: RoadmapSimpleStage[] = ["being_built", "shipped", "backlog", "declined"];
 

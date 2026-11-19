@@ -1906,6 +1906,20 @@
     "progress": "{{total}} में से {{completed}}",
     "courseCompleted": "कोर्स पूर्ण हुआ",
     "lockedTooltip": "इसे अनलॉक करने के लिए पिछले आइटम पूरे करें",
+    "blocker": {
+      "notFinished": "इसे अनलॉक करने के लिए “{{title}}” पूरा करें",
+      "belowScore": "“{{title}}”: आपका स्कोर {{actual}} रहा, {{required}} चाहिए",
+      "tooShort": "“{{title}}”: यह {{actual}} चला, कम से कम {{required}} चाहिए",
+      "notScored": "“{{title}}”: हम आपके पिछले प्रयास को स्कोर नहीं कर पाए",
+      "assessmentFailed": "“{{title}}”: आपका आकलन पास नहीं हुआ। दूसरे प्रयास के लिए अपने ट्रेनर से पूछें।",
+      "gradingPending": "“{{title}}”: आपके उत्तरों की जाँच अभी हो रही है",
+      "outOfAttempts": "“{{title}}”: कोई प्रयास शेष नहीं है। अपने ट्रेनर से मदद माँगें।",
+      "outOfAttemptsUntil": "“{{title}}”: नए प्रयास {{date}} को खुलेंगे",
+      "watchMore": "“{{title}}”: आपने {{actual}}% देखा है, {{required}}% चाहिए",
+      "keepReading": "“{{title}}”: इसे पूरा करने के लिए पढ़ते रहें",
+      "tryAgain": "फिर से कोशिश करें",
+      "goToItem": "आइटम पर जाएँ"
+    },
     "notFound": "कोर्स नहीं मिला",
     "viewProgress": "प्रगति देखें",
     "progressDashboard": {

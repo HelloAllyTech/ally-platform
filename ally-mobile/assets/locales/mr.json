@@ -1906,6 +1906,20 @@
     "progress": "{{total}} पैकी {{completed}}",
     "courseCompleted": "कोर्स पूर्ण झाला",
     "lockedTooltip": "हे अनलॉक करण्यासाठी आधीचे आयटम पूर्ण करा",
+    "blocker": {
+      "notFinished": "हे अनलॉक करण्यासाठी “{{title}}” पूर्ण करा",
+      "belowScore": "“{{title}}”: तुमचा स्कोर {{actual}} होता, {{required}} हवा",
+      "tooShort": "“{{title}}”: तो {{actual}} चालला, किमान {{required}} हवा",
+      "notScored": "“{{title}}”: आम्ही तुमच्या मागील प्रयत्नाला स्कोर देऊ शकलो नाही",
+      "assessmentFailed": "“{{title}}”: तुमचे मूल्यांकन उत्तीर्ण झाले नाही. आणखी एका प्रयत्नासाठी तुमच्या ट्रेनरला विचारा.",
+      "gradingPending": "“{{title}}”: तुमच्या उत्तरांची तपासणी अजून सुरू आहे",
+      "outOfAttempts": "“{{title}}”: एकही प्रयत्न शिल्लक नाही. मदतीसाठी तुमच्या ट्रेनरला विचारा.",
+      "outOfAttemptsUntil": "“{{title}}”: नवीन प्रयत्न {{date}} रोजी उघडतील",
+      "watchMore": "“{{title}}”: तुम्ही {{actual}}% पाहिले आहे, {{required}}% हवे",
+      "keepReading": "“{{title}}”: हे पूर्ण करण्यासाठी वाचत राहा",
+      "tryAgain": "पुन्हा प्रयत्न करा",
+      "goToItem": "आयटमकडे जा"
+    },
     "notFound": "कोर्स सापडला नाही",
     "viewProgress": "प्रगती पहा",
     "progressDashboard": {

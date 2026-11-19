@@ -3,7 +3,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Refresh } from "@icons";
 import { MotionConfig, motion } from "framer-motion";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { toast } from "sonner";
 
 import { Button } from "@ally-ui-mono/ui-shared";
 import {
@@ -11,7 +10,6 @@ import {
   useGetRoadmapItemsQuery,
   useMarkRoadmapItemReadMutation,
   useRoadmapV2Prefetch,
-  useSetRoadmapWatchMutation,
 } from "@api";
 import { useClaimCommandPaletteShortcut } from "@components/command-palette/CommandPaletteContext";
 import { ROUTES, en } from "@constants";
@@ -135,7 +133,6 @@ export const RoadmapQueuePage: React.FC = () => {
 
   const prefetch = useRoadmapV2Prefetch("getRoadmapItem");
   const [markRead] = useMarkRoadmapItemReadMutation();
-  const [setWatch] = useSetRoadmapWatchMutation();
 
   // ── selection, opening, focus ───────────────────────────────────────────────────────────────
   const [selected, setSelected] = useState<string | undefined>(state.open);
@@ -270,12 +267,6 @@ export const RoadmapQueuePage: React.FC = () => {
 
   // ── actions ─────────────────────────────────────────────────────────────────────────────────
   const onMarkRead = (code: string) => void markRead(code);
-  const onWatch = (code: string) => {
-    setWatch({ code, level: "all" })
-      .unwrap()
-      .then(() => toast.success(copy.actions.watchLevel(copy.actions.watchLevels.all)))
-      .catch(() => toast.error(copy.actions.watchFailed));
-  };
 
   const setView = (view: DefaultViewId) => setState({ view, filters: {}, open: state.open }, false);
   const setFilters = (filters: QueueFilters) => setState({ ...state, filters });
@@ -440,7 +431,6 @@ export const RoadmapQueuePage: React.FC = () => {
         onVisibleCodes={onVisibleCodes}
         onOpen={openIdea}
         onMarkRead={onMarkRead}
-        onWatch={onWatch}
         onLongPress={code => setActionSheetFor(code)}
         onPrefetch={code => prefetch(code)}
       />
@@ -534,10 +524,7 @@ export const RoadmapQueuePage: React.FC = () => {
         >
           {actionSheetFor && (
             <div className="flex flex-col gap-2">
-              {[
-                { label: copy.row.openRow, run: () => openIdea(actionSheetFor) },
-                { label: copy.row.watch, run: () => onWatch(actionSheetFor) },
-              ].map(action => (
+              {[{ label: copy.row.openRow, run: () => openIdea(actionSheetFor) }].map(action => (
                 <Button
                   key={action.label}
                   kind="secondary"
