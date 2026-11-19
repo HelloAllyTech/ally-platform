@@ -9936,6 +9936,93 @@ export const en = {
     rankWeightsUnavailable: "Weights are not available to you.",
   },
   /** Roadmap v2 P8: the Owner's Measures (`/roadmap/measures`). One block; nothing else here. */
+  /** Roadmap idea-to-plan audit, recs 8–10: notices, the grouped To do, the sweep and the waits. */
+  roadmapIdeaToPlan: {
+    why: {
+      authorQuestion: (preview: string) => `Plan agent asks you: ${preview}`,
+      planReady: "The plan is ready to read",
+      questionAnswered: (name: string) =>
+        name ? `${name} answered the agent's question` : "Someone answered the agent's question",
+      progress: {
+        accepted: "Planning started",
+        planReady: "The plan is ready to read",
+        planClosed: "Plan closed",
+        comment: "New comments",
+      } as Record<string, string>,
+    },
+    /** One line per notice kind, for anywhere a notice is shown. */
+    notices: {
+      accepted: (code: string) => `${code} is accepted and being planned`,
+      plan_ready: (code: string) => `The plan for ${code} is ready to read`,
+      plan_closed: (code: string) => `The plan for ${code} is closed. It waits for a builder`,
+      comment: (code: string, count: number) =>
+        count === 1 ? `New comment on ${code}` : `${count} new comments on ${code}`,
+      question_answered: (code: string, name: string) =>
+        name ? `${name} answered the agent's question on ${code}` : `An answer on ${code}`,
+      agent_question_for_author: (code: string) =>
+        `The plan agent has a question for you on ${code}`,
+    },
+    forAuthor: (name: string) =>
+      name ? `For ${name}, who wrote the idea` : "For the idea's author",
+    groups: {
+      review: "Review",
+      planNext: "Plan next",
+      planning: "Planning in progress",
+      planClosed: "Plan closed",
+      later: "Later",
+    } as Record<string, string>,
+    groupHelp: {
+      review: "Submitted and waiting for you: start planning or decline.",
+      planNext: "The ten highest-ranked accepted ideas nobody is planning yet.",
+      planning: "Being planned. Close the plan from the idea when it's done.",
+      planClosed: "Planned. Pick a builder.",
+      later: "Accepted, lower in the rank.",
+    } as Record<string, string>,
+    showLater: (n: number) => `Show ${n} more`,
+    hideLater: "Hide",
+    waitingFor: (days: number) => `Waiting ${days} working days`,
+    sweep: {
+      banner: (n: number, days: number) =>
+        n === 1
+          ? `1 idea is older than ${days} days and has at most one voter.`
+          : `${n} ideas are older than ${days} days and have at most one voter.`,
+      open: "Review them",
+      title: "Old ideas with little support",
+      help: "Nothing changes until you choose. Decline with a reason, or keep an idea and the sweep won't offer it again.",
+      showingFirst: (shown: number, total: number) => `Showing the oldest ${shown} of ${total}.`,
+      selectAll: "Select all",
+      select: (code: string) => `Select ${code}`,
+      selected: (n: number) => (n === 1 ? "1 selected" : `${n} selected`),
+      decline: "Decline selected…",
+      keep: "Keep selected",
+      kept: (n: number) => (n === 1 ? "Kept 1 idea." : `Kept ${n} ideas.`),
+      keepFailed: "Couldn't keep those ideas.",
+      loadFailed: "The sweep didn't load.",
+      empty: "No old, quiet ideas left.",
+      close: "Done",
+    },
+    whyRanks: {
+      rank: (n: number) => `#${n} in To do`,
+      votes: (votes: number, voters: number) =>
+        `${votes} ${votes === 1 ? "vote" : "votes"} from ${voters} ${voters === 1 ? "person" : "people"}`,
+      goals: (helped: number, assessed: number) => `helps ${helped} of ${assessed} goals`,
+      starred: "starred by an Owner",
+    },
+    waits: {
+      title: "Waits after review",
+      help: "Where accepted ideas wait: for planning to start, and for the plan to close. Times are over the moves that finished in this range.",
+      acceptedUnplanned: "Accepted, not planned",
+      planningNow: "Being planned now",
+      toPlanning: "Filed to Start planning",
+      toClosed: "Start planning to Close plan",
+      median: "median",
+      p75: (value: string) => `3 in 4 within ${value}`,
+      over: (n: number) => (n === 1 ? "over 1 idea" : `over ${n} ideas`),
+      authorLooked: "Authors who opened the plan before it closed",
+      authorLookedValue: (opened: number, closed: number) => `${opened} of ${closed}`,
+      authorLookedNote: "Plans closed in this range, not counting ones the author planned.",
+    },
+  },
   roadmapV2Measures: {
     tab: "Measures",
     title: "Measures",

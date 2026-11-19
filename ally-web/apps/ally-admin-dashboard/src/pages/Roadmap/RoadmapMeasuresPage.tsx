@@ -7,6 +7,7 @@ import { useGetRoadmapMetricsQuery } from "@api";
 import { ROUTES, en } from "@constants";
 import type { RoadmapMetrics } from "@types";
 
+import { PlanWaits } from "./components/PlanWaits";
 import { RoadmapAreaHeader } from "./components/RoadmapAreaHeader";
 import { RoadmapBottomBar } from "./components/RoadmapBottomBar";
 import { RoadmapDropdown } from "./components/RoadmapDropdown";
@@ -423,6 +424,7 @@ export const RoadmapMeasuresPage: React.FC = () => {
         <Section id="measures-review" title={copy.review.title} help={copy.review.help}>
           <ReviewWait wait={data.reviewWait} />
         </Section>
+        <PlanWaits waits={data.waits} />
         <Section id="measures-releases" title={copy.releases.title} help={copy.releases.help}>
           <Releases metrics={data} />
         </Section>

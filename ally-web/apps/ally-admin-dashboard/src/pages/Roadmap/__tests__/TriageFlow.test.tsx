@@ -170,10 +170,31 @@ describe("To triage (§4.6)", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("puts no heading over the list when the Backlog is its only group: the To do tab names and counts it", () => {
-    renderTriage();
-    expect(screen.getByRole("region", { name: en.roadmapV2.sections.backlog })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: /^Backlog · / })).not.toBeInTheDocument();
+  it("groups To do by next step, naming only the groups that have ideas (idea-to-plan audit rec 9)", () => {
+    renderTriage({
+      data: {
+        sections: {
+          backlog: [
+            row("OPP-414"),
+            row("OPP-416", { shownStage: "planning", statusParts: { stage: "planning" } }),
+          ],
+        },
+      },
+    });
+    expect(screen.getByRole("heading", { name: "Review · 1" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Planning in progress · 1" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /^Plan closed/ })).not.toBeInTheDocument();
+  });
+
+  it("folds Later away until asked for", () => {
+    const accepted = Array.from({ length: 11 }, (_, i) =>
+      row(`OPP-5${String(i).padStart(2, "0")}`, { shownStage: "accepted", queueRank: i + 1 }),
+    );
+    renderTriage({ data: { sections: { backlog: accepted } } });
+    expect(screen.getByRole("heading", { name: "Plan next · 10" })).toBeInTheDocument();
+    expect(screen.queryByText("Idea OPP-510")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Show 1 more" }));
+    expect(screen.getByText("Idea OPP-510")).toBeInTheDocument();
   });
 
   it("shows each idea's queue rank on its row", () => {
