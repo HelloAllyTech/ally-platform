@@ -440,8 +440,8 @@ export const SimulationPage: FC<SimulationPageProps> = ({
               role="status"
               className={`rounded-full px-3 py-1 text-[12px] font-medium ${
                 learnerTurns >= assessmentRequiredTurns
-                  ? "bg-[#14532d] text-[#bbf7d0]"
-                  : "bg-[#2a2f30] text-white"
+                  ? "bg-success-800 text-success-50"
+                  : "bg-white/10 text-white"
               }`}
             >
               {formatTurnCounter(
