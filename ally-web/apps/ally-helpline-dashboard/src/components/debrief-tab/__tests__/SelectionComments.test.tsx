@@ -192,6 +192,27 @@ describe("select, add, and send together", () => {
     ).toHaveValue("Just this.");
   });
 
+  it("closes on a click anywhere else, even with a half-written comment, and adds nothing", async () => {
+    render(<Cards />);
+    const start = BODY.indexOf(WORDS);
+    const popup = await choose("line", start, start + WORDS.length);
+    fireEvent.change(within(popup).getByRole("textbox"), { target: { value: "Half a thou" } });
+    fireEvent.mouseDown(screen.getByTestId("plain"));
+    expect(screen.queryByTestId("selection-comment-popup")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("selection-feedback-chip")).not.toBeInTheDocument();
+    const again = await choose("line", start, start + WORDS.length);
+    fireEvent.mouseDown(document.body);
+    expect(again).not.toBeInTheDocument();
+  });
+
+  it("closes on Escape", async () => {
+    render(<Cards />);
+    const start = BODY.indexOf(WORDS);
+    const popup = await choose("line", start, start + WORDS.length);
+    fireEvent.keyDown(within(popup).getByRole("textbox"), { key: "Escape" });
+    expect(screen.queryByTestId("selection-comment-popup")).not.toBeInTheDocument();
+  });
+
   it("removes a chip", async () => {
     render(<Cards />);
     const start = BODY.indexOf(WORDS);

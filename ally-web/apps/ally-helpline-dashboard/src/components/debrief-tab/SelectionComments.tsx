@@ -68,8 +68,8 @@ const POPUP_WIDTH = 340;
 
 /**
  * The popup under the selected words: the words, a comment box and Add. It sits in the flow of the
- * debrief (positioned inside `containerRef`), not over the page. A click outside closes it unless a
- * comment is half-written.
+ * debrief (positioned inside `containerRef`), not over the page. A click anywhere outside it closes
+ * it, whatever was typed; Escape closes it too.
  */
 export const SelectionCommentPopup: FC<{ containerRef: RefObject<HTMLElement> }> = ({
   containerRef,
@@ -81,8 +81,6 @@ export const SelectionCommentPopup: FC<{ containerRef: RefObject<HTMLElement> }>
   const [body, setBody] = useState("");
   const [needBody, setNeedBody] = useState(false);
   const popupRef = useRef<HTMLDivElement>(null);
-  const typing = useRef(false);
-  typing.current = body.trim().length > 0;
 
   useEffect(() => {
     const container = containerRef.current;
@@ -115,9 +113,7 @@ export const SelectionCommentPopup: FC<{ containerRef: RefObject<HTMLElement> }>
   useEffect(() => {
     if (!draft) return undefined;
     const onDown = (e: MouseEvent) => {
-      if (popupRef.current && !popupRef.current.contains(e.target as Node) && !typing.current) {
-        setDraft(null);
-      }
+      if (popupRef.current && !popupRef.current.contains(e.target as Node)) setDraft(null);
     };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
