@@ -21,7 +21,7 @@ from typing import Any, Dict, Literal, Optional
 from langgraph.graph import END
 from langgraph.runtime import get_runtime
 
-from app.core.agent_runtime import activity
+from app.core.agent_runtime import activity, stages
 from app.core.agent_runtime.budget import extend_after_write
 from app.core.agent_runtime.gateway import AgentRunContext
 from app.core.agent_runtime.state import AgentState, json_safe
@@ -48,6 +48,13 @@ def make_tools_node(service: KnowledgeAgentService) -> Node:
         did_list = list(state.get("activity") or [])
 
         tool = offered.get(name)
+        stages.stage(
+            "tool_start",
+            active=f"tool:{name}",
+            tool=name,
+            kind=getattr(tool, "kind", "unknown"),
+            step=len(records),
+        )
         if tool is None:
             # Unreachable through the step schema, which names only offered tools;
             # kept so a bad step costs one tool call rather than the run.
@@ -151,6 +158,17 @@ def make_tools_node(service: KnowledgeAgentService) -> Node:
                     "search_gate": result.gate,
                 }
 
+        last = records[-1] if records else {}
+        stages.stage(
+            "tool_end",
+            active="between_nodes",
+            tool=name,
+            dur_ms=int((time.monotonic() - started) * 1000),
+            ok=bool(last.get("ok", not last.get("refused"))),
+            error=last.get("error") or "-",
+            list_kind=last.get("list_kind") or "-",
+            passages=len(added),
+        )
         return {
             **update,
             **({"activity": json_safe(did_list)} if did_list else {}),

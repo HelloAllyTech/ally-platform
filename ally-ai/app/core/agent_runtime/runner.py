@@ -18,7 +18,7 @@ from uuid import uuid4
 
 from langgraph.graph.state import CompiledStateGraph
 
-from app.core.agent_runtime import activity
+from app.core.agent_runtime import activity, stages
 from app.core.agent_runtime.budget import RUN_DEADLINE
 from app.core.agent_runtime.gateway import AgentGatewayClient
 from app.core.agent_runtime.graph import OnEvent, run_agent
@@ -94,6 +94,14 @@ async def execute(
     checkpoint keeps the steps already saved.
     """
     run_id = payload.run_id or str(uuid4())
+    clock = stages.begin(run_id)
+    stages.stage(
+        "run_start",
+        streamed=bool(on_event),
+        history=len(payload.history),
+        gateway=bool(payload.gateway),
+        cap_s=settings.AGENT_RUNTIME.RUN_TIMEOUT_SECONDS,
+    )
     if on_event:
         on_event("run_started", {"run_id": run_id})
     # ally-be's tool gateway (chunk 3b): one client for the run, closed with it.
@@ -119,12 +127,43 @@ async def execute(
                 on_event=on_event,
                 gateway=gateway,
             )
+    except TimeoutError:
+        stages.stage(
+            "run_end",
+            reason="timeout",
+            ended_by="ally-ai_run_cap",
+            cut_off=clock["active"],
+        )
+        raise
+    except asyncio.CancelledError:
+        stages.stage(
+            "run_end",
+            reason="cancelled",
+            ended_by="caller_went_away",
+            cut_off=clock["active"],
+        )
+        raise
+    except Exception as error:
+        stages.stage(
+            "run_end",
+            reason="error",
+            error=type(error).__name__,
+            cut_off=clock["active"],
+        )
+        raise
     finally:
         if gateway:
             await gateway.aclose()
     response = build_response(state, run_id)
+    stages.stage(
+        "run_end",
+        reason="finished",
+        intent=response.intent,
+        reply_chars=len(response.answer or ""),
+    )
     if on_event and response.answer:
         on_event("status", status_event("writing"))
+        stages.stage("first_token")
         for piece in chunk_reply(response.answer):
             on_event("token", {"text": piece})
     return response
@@ -192,5 +231,11 @@ async def stream(
     finally:
         # The client went away (or the run ended): stop the run and wait for it, so
         # no model call outlives the request.
+        if not task.done():
+            logger.info(
+                "[AGENT STAGE] run=%s stage=stream_closed_early "
+                "ended_by=caller_went_away",
+                payload.run_id,
+            )
         task.cancel()
         await asyncio.gather(task, return_exceptions=True)

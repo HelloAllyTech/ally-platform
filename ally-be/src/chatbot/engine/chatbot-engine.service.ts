@@ -53,6 +53,7 @@ import { looksEmotional } from './looks-emotional';
 import { businessFacts } from './business-facts';
 import { agentAnswersInstead, isGreetingReply } from './keyword-skip';
 import { buildKnowledgeRequest, NO_DOCUMENTS } from './knowledge-request';
+import { stageLine, stageRunIdFor } from './agent-stage-log';
 import { replyLanguageOf } from './reply-language';
 import {
   aboutAnAnimal,
@@ -410,7 +411,38 @@ export class ChatbotEngineService {
     }
 
     // ── 3. Answer ────────────────────────────────────────────────────────
-    return this.answer(turn, live);
+    return this.answerLogged(turn, live);
+  }
+
+  /** `answer`, with its start and end as stage lines (chunk H1 Part A). Changes nothing. */
+  private async answerLogged(
+    turn: ChatTurn,
+    live?: LiveReply,
+  ): Promise<ChatbotDecision> {
+    const runKey = stageRunIdFor(turn.providerMessageId);
+    const startedAt = Date.now();
+    this.logger.info(
+      stageLine(runKey, startedAt, 'engine_answer_start', {
+        channel: turn.channel?.type,
+      }),
+    );
+    try {
+      const decision = await this.answer(turn, live);
+      this.logger.info(
+        stageLine(runKey, startedAt, 'engine_answer_end', {
+          handled_by: decision.handledBy,
+        }),
+      );
+      return decision;
+    } catch (error) {
+      this.logger.info(
+        stageLine(runKey, startedAt, 'engine_answer_end', {
+          handled_by: 'threw',
+          error: error instanceof Error ? error.name : 'unknown',
+        }),
+      );
+      throw error;
+    }
   }
 
   /**
@@ -474,15 +506,41 @@ export class ChatbotEngineService {
     live?: LiveReply,
   ): Promise<ChatbotDecision> {
     const { settings } = turn;
+    const runKey = stageRunIdFor(turn.providerMessageId);
+    const startedAt = Date.now();
     const { prompts, ran } = await this.loadPromptOverrides(turn, true);
     const knowledge = await this.knowledgeFor(turn);
     const request = buildKnowledgeRequest(turn, prompts, knowledge);
+    this.logger.info(
+      stageLine(runKey, startedAt, 'context_loaded', {
+        documents: knowledge.document_ids?.length ?? 0,
+      }),
+    );
 
     // One fast check beside the run (Q3-fast Part 1). It never depends on the run: a failed run
     // still gets its verdict, and a rejected check never takes down an answer.
     const crisisCheck = settings.crisisClassifierEnabled
       ? this.aiService.checkWhatsAppCrisis(crisisRequest(turn, prompts))
       : Promise.resolve(null);
+    if (settings.crisisClassifierEnabled) {
+      this.logger.info(stageLine(runKey, startedAt, 'crisis_check_start'));
+      crisisCheck.then(
+        (verdict) =>
+          this.logger.info(
+            stageLine(runKey, startedAt, 'crisis_check_end', {
+              level: crisisLevelOf(verdict) ?? 'none',
+              urgent: isUrgent({ status: 'fulfilled', value: verdict }),
+            }),
+          ),
+        (error) =>
+          this.logger.info(
+            stageLine(runKey, startedAt, 'crisis_check_end', {
+              level: 'failed',
+              error: error instanceof Error ? error.name : 'unknown',
+            }),
+          ),
+      );
+    }
     const checked = settle(crisisCheck);
 
     // 1. Only for a message that looks emotional (stop 1, option c): the level, if it comes within
@@ -490,6 +548,11 @@ export class ChatbotEngineService {
     //    reply goes out now, with no run at all. Upset: the run is told, so its reply opens warmly.
     //    Every other message starts its run at once; the check still races it below.
     const waitMs = looksEmotional(turn.text) ? this.levelWaitMs : 0;
+    this.logger.info(
+      stageLine(runKey, startedAt, 'crisis_wait_before_run', {
+        wait_ms: waitMs,
+      }),
+    );
     const early = await Promise.race([checked, after(waitMs)]);
     if (early && isUrgent(early)) {
       return this.crisisDecision(turn, early.value!, ran, { notOnList: false });

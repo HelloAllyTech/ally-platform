@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+from app.core.agent_runtime import stages
 from app.core.agent_runtime.memory import history_lead, memory_section, remember_mode
 from app.core.agent_runtime.mood import mood_section
 from app.core.agent_runtime.playbooks import playbooks_section
@@ -82,6 +83,15 @@ async def agent_step(
         raise LLMInvocationFailedException(
             "The agent prompt template is missing or empty."
         )
+    stages.stage(
+        "agent_step_prompt",
+        prompt_chars=len(prompt),
+        passages=len(passages),
+        tools=len(tools),
+        history=len(history or []),
+        must_search=must_search,
+        retry=bool(feedback),
+    )
     parsed, meta = await generate_structured(
         schema=step_schema(tools, reply=not must_search, remember=remember_mode(bot)),
         prompt=prompt,

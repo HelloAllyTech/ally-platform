@@ -23,8 +23,13 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple, Type
 
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
+from app.core.agent_runtime import stages
 from app.core.agent_runtime.tools.base import Tool, ToolContext, ToolResult
-from app.core.agent_runtime.tools.confirmed import unconfirmed, unconsented
+from app.core.agent_runtime.tools.confirmed import (
+    is_plain_yes,
+    unconfirmed,
+    unconsented,
+)
 
 #: At most this many definitions a run (ally-be caps them too).
 MAX_LIST_TOOLS = 12
@@ -149,9 +154,26 @@ def list_tool(definition: Mapping[str, Any]) -> Tool:
                 ctx.today,
                 updating=str(values.get("id") or "") if kind == "update" else None,
             )
+            time_gate = why
             if not why and kind == "create":
                 # Picking between offers isn't a yes (Q3-fast Part 0b, 17 Nov F1).
                 why = unconsented(properties, values, ctx.passages, ctx.latest)
+            # Chunk H1 Part A, temporary: what each confirmation gate decided. Codes
+            # and counts only, never the person's words.
+            stages.stage(
+                "confirm_gate",
+                tool=name,
+                kind=kind,
+                time_gate="refused" if time_gate else "passed",
+                consent_gate=(
+                    "not_run"
+                    if kind != "create" or time_gate
+                    else ("refused" if why else "passed")
+                ),
+                latest_is_plain_yes=is_plain_yes(ctx.latest or ""),
+                messages_read=len(ctx.messages or ()),
+                moves_entry=bool(values.get("id")) if kind == "update" else False,
+            )
             if why:
                 return ToolResult(
                     summary=f"{name}: not sent, time not confirmed",

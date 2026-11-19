@@ -17,6 +17,7 @@ from typing import Any, Awaitable, Callable, Dict, List, Literal, Optional, Tupl
 
 from langgraph.config import get_stream_writer
 
+from app.core.agent_runtime import stages
 from app.core.agent_runtime.state import AgentState
 
 Node = Callable[[AgentState], Awaitable[Dict[str, Any]]]
@@ -109,8 +110,10 @@ def traced(
                 code, detail = said if isinstance(said, tuple) else (said, None)
                 status(code, detail)
             started = time.monotonic()
+            stages.stage(f"{name}_start", active=name)
             update = await node(state)
             step = trace_step(name, started, f"{name}: {summary(state, update)}")
+            stages.stage(f"{name}_end", active="between_nodes", dur_ms=step["ms"])
             # A node may add steps of its own first (the agent's list of tools
             # left out, chunk 6).
             return {**update, "trace": [*(update.get("trace") or []), step]}

@@ -35,6 +35,7 @@ from typing import Any, Dict, Optional, Tuple, Type, TypeVar
 
 from pydantic import BaseModel
 
+from app.core.agent_runtime import stages
 from app.core.config import settings
 from app.core.llm.capture import call_started, reply_of, usage_reported
 from app.exceptions.custom_exceptions import LLMInvocationFailedException
@@ -720,9 +721,48 @@ async def _generate_openai(
     if timeout:
         kwargs["timeout"] = timeout
 
-    response = await client.chat.completions.create(**kwargs)
+    # Chunk H1: one stage line per model request inside an agent run (no-op
+    # elsewhere). Not streamed, so its first token arrives with the whole response.
+    stages.stage(
+        "model_request_start",
+        task=task,
+        model=model,
+        timeout_s=timeout or 0.0,
+        effort=kwargs.get("reasoning_effort") or "-",
+    )
+    request_started = time.monotonic()
+    try:
+        response = await client.chat.completions.create(**kwargs)
+    except BaseException as error:
+        stages.stage(
+            "model_request_end",
+            task=task,
+            ok=False,
+            error=type(error).__name__,
+            dur_ms=int((time.monotonic() - request_started) * 1000),
+        )
+        raise
 
     usage = getattr(response, "usage", None)
+    stages.stage(
+        "model_request_end",
+        task=task,
+        ok=True,
+        dur_ms=int((time.monotonic() - request_started) * 1000),
+        in_tokens=int(getattr(usage, "prompt_tokens", 0) or 0) if usage else -1,
+        out_tokens=int(getattr(usage, "completion_tokens", 0) or 0) if usage else -1,
+        reasoning_tokens=(
+            _count(
+                getattr(
+                    getattr(usage, "completion_tokens_details", None),
+                    "reasoning_tokens",
+                    None,
+                )
+            )
+            if usage
+            else -1
+        ),
+    )
     if usage is not None:
         prompt_tokens = int(getattr(usage, "prompt_tokens", 0) or 0)
         # Already includes reasoning tokens — unlike Gemini, OpenAI counts them

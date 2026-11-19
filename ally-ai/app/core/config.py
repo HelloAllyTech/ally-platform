@@ -169,6 +169,11 @@ class AgentRuntimeSettings(BaseModel):
     # o-series; ignored for others). Unset = the provider default ("medium"). The
     # latency lever if the agent step is too slow; see CHUNK-03A-NOTES.md.
     AGENT_REASONING_EFFORT: Optional[Literal["minimal", "low", "medium", "high"]] = None
+    # Test only (chunk H1): seconds to wait inside every gateway tool call, before or
+    # after ally-be does the work, to see which timeout fires first. 0 = off. Ignored
+    # outside a development environment (ENV__ENV DEV or DEVELOPMENT), even if set.
+    DEBUG_TOOL_DELAY_SECONDS: float = Field(0.0, ge=0, le=60)
+    DEBUG_TOOL_DELAY_WHEN: Literal["before", "after"] = "before"
 
 
 class BuilderSettings(BaseModel):

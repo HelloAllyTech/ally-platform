@@ -36,6 +36,7 @@ import {
   MalformedAgentResponseError,
 } from './agent-runtime';
 import type { AgentRunRef, ChatTurn, LiveReply } from './chatbot-engine.types';
+import { endedBy, stageLine } from './agent-stage-log';
 import { businessFacts } from './business-facts';
 import { buildAgentRunRequest, NO_DOCUMENTS } from './knowledge-request';
 import { contactFromSources } from './run-failed-reply';
@@ -172,12 +173,21 @@ export class AgentRuntimeRunner {
         shown,
       );
       withGateway = Boolean(body.gateway);
+      const streamedRun = Boolean(live && turn.channel.capabilities?.streaming);
+      this.logger.info(
+        stageLine(runId, startedAt, 'run_request_built', {
+          streamed: streamedRun,
+          gateway: withGateway,
+          history: body.history?.length ?? 0,
+        }),
+      );
+      let firstToken = false;
       if (options.mood) {
         body.mood = options.mood;
         const helplines = turn.settings.helplineNumbers?.trim();
         if (helplines) body.support_helplines = helplines.slice(0, 300);
       }
-      const streamed = Boolean(live && turn.channel.capabilities?.streaming);
+      const streamed = streamedRun;
       const signals = [live?.signal, options.signal].filter(
         (signal): signal is AbortSignal => Boolean(signal),
       );
@@ -186,12 +196,27 @@ export class AgentRuntimeRunner {
             // Live steps (chunk 6b): only a streamed run, the bot page's or Try it's, asks for
             // them; WhatsApp can't stream, so its request is unchanged.
             { ...body, activity: true },
-            (event) => live!.onEvent(event),
+            (event) => {
+              if (event.event === 'token' && !firstToken) {
+                firstToken = true;
+                this.logger.info(
+                  stageLine(runId, startedAt, 'first_token_relayed'),
+                );
+              }
+              live!.onEvent(event);
+            },
             signals.length ? AbortSignal.any(signals) : undefined,
           )
         : await this.aiService.runAgent(body, options.signal);
       if (!response?.intent) throw new MalformedAgentResponseError();
       const { trace, run_id, memory_writes, activity, ...answer } = response;
+      this.logger.info(
+        stageLine(runId, startedAt, 'run_end', {
+          reason: 'finished',
+          ended_by: 'ally-ai_final',
+          intent: answer.intent,
+        }),
+      );
       return {
         response: { ...answer, retrieval: withoutDebugIds(answer.retrieval) },
         latencyMs: Date.now() - startedAt,
@@ -208,8 +233,18 @@ export class AgentRuntimeRunner {
         },
       };
     } catch (error) {
+      const callerAborted = Boolean(
+        live?.signal?.aborted || options.signal?.aborted,
+      );
+      this.logger.info(
+        stageLine(runId, startedAt, 'run_end', {
+          reason: 'failed',
+          ended_by: endedBy(error, callerAborted),
+          error: error instanceof Error ? error.name : 'unknown',
+        }),
+      );
       // The person left Preview, or a crisis reply went out instead: nobody is waiting.
-      if (live?.signal?.aborted || options.signal?.aborted) throw error;
+      if (callerAborted) throw error;
       const fallbackReason = agentFailureReason(error);
       const agent: AgentRunRef = {
         runtime: AgentRuntimeUsed.V2_FAILED,
