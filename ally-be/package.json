@@ -44,6 +44,8 @@
     "backfill:bug-finding-descriptions": "ts-node -r tsconfig-paths/register scripts/backfill-bug-finding-descriptions.ts",
     "backfill:chatbot-shared-store": "ts-node -r tsconfig-paths/register src/database/scripts/backfill-chatbot-shared-store.ts",
     "backfill:chatbot-owners": "ts-node -r tsconfig-paths/register src/database/scripts/backfill-chatbot-owners.ts",
+    "custom-logins:migrate": "ts-node -r tsconfig-paths/register src/database/scripts/migrate-custom-logins.ts",
+    "billing:backfill": "ts-node -r tsconfig-paths/register src/database/scripts/billing-backfill.ts",
     "reingest:onboarding-docs": "ts-node -r tsconfig-paths/register src/database/scripts/reingest-onboarding-docs.ts",
     "check:chatbot-shared-store": "ts-node -r tsconfig-paths/register src/database/scripts/check-chatbot-shared-store.ts",
     "backfill:roadmap-idea-titles": "ts-node -r tsconfig-paths/register src/database/scripts/backfill-roadmap-idea-titles.ts",

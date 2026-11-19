@@ -1,3 +1,4 @@
+import { usageHeaders } from 'src/billing/context/usage-context';
 import {
   HttpStatus,
   Injectable,
@@ -1072,6 +1073,8 @@ export class AiService {
           'Content-Type': 'application/json',
           Accept: 'text/event-stream',
           'x-api-key': this.config.ai.outboundApiKey,
+          // CR1: who this run's model calls are for (absent outside a usage context).
+          ...usageHeaders(endpoint),
         },
         data: request,
         responseType: 'stream',
@@ -1483,6 +1486,8 @@ export class AiService {
           'x-api-key': isLearnService
             ? this.config.ai.learnOutboundApiKey
             : this.config.ai.outboundApiKey,
+          // CR1: who these model calls are for (absent outside a usage context).
+          ...(isLearnService ? {} : usageHeaders(endpoint)),
           ...(headers || {}),
         },
         timeout: requestTimeout,

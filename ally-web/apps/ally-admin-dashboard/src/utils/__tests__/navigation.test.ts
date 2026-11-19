@@ -42,6 +42,7 @@ const ALL_FEATURE_GATED_KEYS = [
   FeatureToggleKey.CHARACTER_LIBRARY,
   FeatureToggleKey.MANAGE_STT_CONFIGS,
   FeatureToggleKey.MANAGE_LLM_MODEL_CATALOG,
+  FeatureToggleKey.MANAGE_COSTS,
   FeatureToggleKey.MANAGE_GUARDRAILS,
   FeatureToggleKey.MANAGE_TOOLTIPS,
   FeatureToggleKey.USER_BADGES,
@@ -211,6 +212,33 @@ describe("deriveNavigationItems", () => {
     expect(ids).toContain(SIDEBAR_ITEMS.SCENARIO_LANGUAGES);
     expect(ids).toContain(SIDEBAR_ITEMS.WHATSAPP_BOT);
     expect(ids).toContain(SIDEBAR_ITEMS.BUG_HUNTER);
+  });
+
+  // CR1: Models and Costs are the only screens with dollars; `manage_costs` alone opens them.
+  it("shows Models, Costs and Plans, next to Language Models, only with manage_costs", () => {
+    const withCosts = deriveNavigationItems({
+      permissions: [],
+      features: [FeatureToggleKey.MANAGE_LLM_MODEL_CATALOG, FeatureToggleKey.MANAGE_COSTS],
+      savedOrder: undefined,
+    });
+    expect(withCosts.map(i => i.id)).toEqual([
+      SIDEBAR_ITEMS.LLM_MODEL_CATALOG,
+      SIDEBAR_ITEMS.BILLING_MODELS,
+      SIDEBAR_ITEMS.BILLING_COSTS,
+      SIDEBAR_ITEMS.BILLING_PLANS,
+    ]);
+    expect(withCosts[1].path).toBe(ROUTES.BILLING_MODELS);
+    expect(withCosts[2].path).toBe(ROUTES.BILLING_COSTS);
+    expect(withCosts[3].path).toBe(ROUTES.BILLING_PLANS);
+
+    const ids = deriveNavigationItems({
+      permissions: [Permissions.EDIT_SCENARIO, Permissions.VIEW_USERS],
+      features: ALL_FEATURE_GATED_KEYS.filter(key => key !== FeatureToggleKey.MANAGE_COSTS),
+      savedOrder: undefined,
+    }).map(i => i.id);
+    expect(ids).not.toContain(SIDEBAR_ITEMS.BILLING_MODELS);
+    expect(ids).not.toContain(SIDEBAR_ITEMS.BILLING_COSTS);
+    expect(ids).not.toContain(SIDEBAR_ITEMS.BILLING_PLANS);
   });
 
   describe("org-toggle tier (a tenant's own admins)", () => {

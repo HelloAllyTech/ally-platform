@@ -127,6 +127,7 @@ export const makeEngine = ({
   toolRuns = { find: jest.fn().mockResolvedValue([]) },
   tools = [],
   listTools,
+  limits,
 }: {
   aiService: EngineAiService;
   promptShared: { getPromptsByOptions: jest.Mock };
@@ -141,6 +142,8 @@ export const makeEngine = ({
   tools?: { name: string }[];
   /** The bot's list tools (chunk 6); none by default. */
   listTools?: { offeredFor: jest.Mock };
+  /** CR1's limits; without them nothing is ever limited. */
+  limits?: { checkTurn: jest.Mock };
 }): ChatbotEngineService =>
   new ChatbotEngineService(
     documents as never,
@@ -168,4 +171,5 @@ export const makeEngine = ({
       new ListConsentService(memoryRedis() as never),
     ),
     conversations as never,
+    limits as never,
   );

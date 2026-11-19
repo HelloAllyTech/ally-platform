@@ -112,6 +112,7 @@ let mockArchived: { chatbots: Chatbot[] };
 
 vi.mock("@api", () => ({
   useGetChatbotsQuery: () => ({ data: mockList, isLoading: false, isError: false }),
+  useGetMyPlanQuery: () => ({ data: undefined }),
   useGetChatbotQuery: () => ({ data: mockBot, isLoading: false, isError: false }),
   useArchiveChatbotMutation: () => [mockArchive, { isLoading: false }],
   useRestoreChatbotMutation: () => [mockRestore, { isLoading: false }],

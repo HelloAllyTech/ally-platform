@@ -47,6 +47,39 @@ export interface BuilderCapability {
 
 export const BUILDER_CAPABILITIES: BuilderCapability[] = [
   {
+    id: 'billing',
+    name: 'Costs, tokens, plans and seats',
+    whatItIs:
+      'What every assistant costs Ally (each AI call and WhatsApp message priced from a versioned ' +
+      'model list), token allowances for custom logins, and plans, seats and monthly limits for ' +
+      'chatbot creators, checked before each run with crisis replies always going out.',
+    reuseWhen:
+      'Something needs to know what an AI call or a WhatsApp message cost, to meter or cap usage ' +
+      'per customer or per assistant, to add a plan, a seat type or a limit, or to price a new model.',
+    extendVia:
+      'A new metered call: send it inside a usage context (billing/context/usage-context.ts) and map ' +
+      'its ally-ai endpoint in ENDPOINT_USAGE_KIND. A new limit: a counter subject in LimitsService.',
+    modules: ['ally-be:src/billing'],
+    adminRoute: '/billing/costs',
+    keywords: [
+      'cost',
+      'costs',
+      'pricing',
+      'price per token',
+      'model price',
+      'tokens',
+      'token allowance',
+      'plan',
+      'plans',
+      'seat',
+      'seats',
+      'usage limit',
+      'quota',
+      'billing',
+      'metering',
+    ],
+  },
+  {
     id: 'auto-improve',
     name: 'Auto-improve (Skills Store → Auto-improve tab)',
     whatItIs:

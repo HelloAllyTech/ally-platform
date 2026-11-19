@@ -232,7 +232,7 @@ describe('Assistant routes: owners only (A1 route walk)', () => {
     );
   });
 
-  it('keeps the team, deleting, eval suites and the safety pack to owners', () => {
+  it('keeps the team, deleting, eval suites, the safety pack and seats to owners', () => {
     const owners = ALL.filter(
       (r) => roleOf(r)?.role === ChatbotMemberRole.OWNER,
     )
@@ -244,6 +244,8 @@ describe('Assistant routes: owners only (A1 route walk)', () => {
       'PUT v1/chatbots/:id/members',
       // Q3-fast Part 1: the owner corrects the pack, with a reason when it's less strict.
       'PUT v1/chatbots/:id/safety-pack',
+      // CR1: only an owner gives, moves or frees a seat on their assistant.
+      'PUT v1/chatbots/:id/seats/:seatId/assignee',
     ]);
   });
 });

@@ -299,6 +299,12 @@ export enum UserRole {
    * means a tenant-scoped org admin.
    */
   PLATFORM_ADMIN = "PLATFORM_ADMIN",
+  /**
+   * A custom login (CR1 Part B): the limited "Assistant owner" role, made on Users → Custom
+   * logins. It holds only what an owner needs (their assistants and their account); what they can
+   * open is their feature toggles. Not a platform admin.
+   */
+  ASSISTANT_OWNER = "ASSISTANT_OWNER",
 }
 
 /**
@@ -316,6 +322,8 @@ export const PLATFORM_MANAGED_ROLES: string[] = [
   UserRole.SUPER_ADMIN,
   UserRole.SUPER_DUPER_ADMIN,
   UserRole.MULTI_TENANT_ADMIN,
+  // Granted on Users → Custom logins (CR1 Part B), with the toggles that decide what it opens.
+  UserRole.ASSISTANT_OWNER,
 ];
 
 /**
@@ -354,6 +362,9 @@ export const ADMIN_PORTAL_LOGIN_ROLES: UserRole[] = [
   UserRole.PLATFORM_ADMIN,
   ...SUPER_ADMIN_ROLES,
   UserRole.MULTI_TENANT_ADMIN,
+  // CR1 Part B: custom logins sign in here for their assistants. Deliberately NOT in
+  // ADMIN_ROLE_PRECEDENCE: it is no admin tier, and holds nothing an admin gate should accept.
+  UserRole.ASSISTANT_OWNER,
 ];
 
 /**

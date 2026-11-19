@@ -36,6 +36,21 @@ import {
 } from '../../debrief/enum/debrief-review.enum';
 import { join } from 'path';
 import {
+  BillingModelType,
+  BillingStatus,
+  CostAlertKind,
+  CounterSubject,
+  PriceUnit,
+  SeatCycle,
+  SeatKind,
+  SeatStatus,
+  SubscriptionStatus,
+  UsageChannel,
+  UsageKind,
+  WhatsAppRateCategory,
+} from '../../billing/enum/billing.enum';
+import { TokenGrantStatus } from '../../billing/entity/token-grant.entity';
+import {
   ConversationChannel,
   ConversationMessageRole,
   ConversationStatus,
@@ -531,6 +546,22 @@ describe('CHECK constraints cover their enums', () => {
     ['CHK_chatbot_pages_status', Object.values(BotPageStatus)],
     ['CHK_chatbot_pages_access', Object.values(BotPageAccess)],
     ['CHK_chatbot_page_access_kind', Object.values(BotPageAccessKind)],
+    // Costs and models (Agents v2, CR1 Part A).
+    ['CHK_billing_models_type', Object.values(BillingModelType)],
+    ['CHK_billing_models_status', Object.values(BillingStatus)],
+    ['CHK_billing_model_prices_unit', Object.values(PriceUnit)],
+    ['CHK_whatsapp_rates_category', Object.values(WhatsAppRateCategory)],
+    ['CHK_whatsapp_rates_status', Object.values(BillingStatus)],
+    ['CHK_usage_events_channel', Object.values(UsageChannel)],
+    ['CHK_usage_events_kind', Object.values(UsageKind)],
+    ['CHK_cost_alerts_kind', Object.values(CostAlertKind)],
+    ['CHK_token_grants_status', Object.values(TokenGrantStatus)],
+    // Plans and seats (CR1 Part C).
+    ['CHK_subscriptions_status', Object.values(SubscriptionStatus)],
+    ['CHK_seats_kind', Object.values(SeatKind)],
+    ['CHK_seats_cycle', Object.values(SeatCycle)],
+    ['CHK_seats_status', Object.values(SeatStatus)],
+    ['CHK_usage_counters_subject', Object.values(CounterSubject)],
     // Agent-first onboarding (Agents v2, chunk 20a).
     ['CHK_bot_drafts_status', Object.values(BotDraftStatus)],
     ['CHK_bot_drafts_step', Object.values(BotDraftStep)],

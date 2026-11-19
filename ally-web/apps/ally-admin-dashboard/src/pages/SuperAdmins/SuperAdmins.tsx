@@ -358,15 +358,6 @@ export const SuperAdmins: React.FC = () => {
           variant: ButtonVariant.PRIMARY,
         }}
       />
-      <div className="mt-3 flex justify-end">
-        <CustomLoginButton
-          variant={ButtonVariant.SECONDARY}
-          onClick={() => setCustomLogin({})}
-          data-testid="custom-login-create"
-        >
-          {en.customLogins.create}
-        </CustomLoginButton>
-      </div>
       {/* 260px ≈ User Management header + tab strip + this tab's own chrome. */}
       <div className="mt-[20px] md:overflow-y-auto md:h-[calc(100vh-260px)]">
         {renderAdminsTable()}

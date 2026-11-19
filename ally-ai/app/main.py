@@ -9,7 +9,8 @@ from app.api.v1.api import api_router
 from app.core.agent_runtime.graph import close_agent_runtime, open_agent_runtime
 from app.core.ally_core.client import AllyCoreClient
 from app.core.config import settings
-from app.core.constants import APISettings
+from app.core.constants import ENV, APISettings
+from app.core.llm_usage.emitter import usage_feed_on
 from app.core.pm_agent.store import close_pm_agent_store, open_pm_agent_store
 from app.core.vector_db.weaviate_client import WeaviateClient
 from app.middleware import get_middlewares
@@ -17,10 +18,24 @@ from app.utils.logger import get_trace_id, logger, logging_config
 from app.utils.startup import initialize_openai_clients
 
 
+def warn_if_usage_feed_off() -> None:
+    """In production, say loudly at startup when no usage rows will be sent (CR1)."""
+    try:
+        is_prod = str(settings.ENV.ENV).upper() in {ENV.PROD.value, "PRODUCTION"}
+    except Exception:
+        is_prod = False
+    if is_prod and not usage_feed_on():
+        logger.warning(
+            "LLM usage feed is OFF: LLM_USAGE__QUEUE_URL is unset; "
+            "Ally can't meter costs or tokens"
+        )
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     """Application startup and shutdown lifecycle"""
     logger.info("Starting application...")
+    warn_if_usage_feed_off()
     # Initialize Weaviate client
     WeaviateClient.create_client()
     await WeaviateClient.connect(WeaviateClient.get_client())

@@ -116,6 +116,25 @@ const buildNavigationItems = (): NavigationItem[] => {
       path: ROUTES.MANAGE_LLM_MODEL_CATALOG,
       section: "ai-languages",
     },
+    // Ally admin → Models and → Costs (CR1): the only screens with dollars, `manage_costs` only.
+    {
+      id: S.BILLING_MODELS,
+      label: l.billingModels,
+      path: ROUTES.BILLING_MODELS,
+      section: "ai-languages",
+    },
+    {
+      id: S.BILLING_COSTS,
+      label: l.billingCosts,
+      path: ROUTES.BILLING_COSTS,
+      section: "ai-languages",
+    },
+    {
+      id: S.BILLING_PLANS,
+      label: l.billingPlans,
+      path: ROUTES.BILLING_PLANS,
+      section: "ai-languages",
+    },
     {
       id: S.SCENARIO_VOICES,
       label: l.voices,

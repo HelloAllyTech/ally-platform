@@ -1,3 +1,4 @@
+import { BillingModule } from './billing/billing.module';
 import { Module, MiddlewareConsumer, RequestMethod } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
@@ -156,6 +157,7 @@ import { DebriefFeedbackModule } from './debrief-feedback/debrief-feedback.modul
     BotDraftModule,
     ScenarioReportModule,
     SchedulerModule,
+    BillingModule,
     AppVersionModule,
     VoicePreviewModule,
     LlmPreviewModule,

@@ -92,6 +92,9 @@ export enum FeatureToggleKey {
   CHARACTER_LIBRARY = 'character_library',
   MANAGE_STT_CONFIGS = 'manage_stt_configs',
   MANAGE_LLM_MODEL_CATALOG = 'manage_llm_model_catalog',
+  // Agents v2 CR1: Ally admin → Models (prices), Costs, Plans, and each user's Tokens and Plan.
+  // Dollars live behind this key only; customers and owners never see them.
+  MANAGE_COSTS = 'manage_costs',
   MANAGE_GUARDRAILS = 'manage_guardrails',
   MANAGE_TOOLTIPS = 'manage_tooltips',
   SETTINGS = 'settings',
@@ -379,6 +382,15 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
     label: 'Language Model Catalog',
     description: 'Manage the LLM model catalog available to scenarios.',
     legacyGrants: SDA_ONLY,
+  },
+  {
+    key: FeatureToggleKey.MANAGE_COSTS,
+    label: 'Costs, plans and tokens',
+    description:
+      'Models and prices, what each assistant costs Ally, plans and seats, and custom logins\u2019 token allowances.',
+    legacyGrants: SDA_ONLY,
+    // Ally's own books: every organisation's assistants at once.
+    platformOnly: true,
   },
   {
     key: FeatureToggleKey.MANAGE_GUARDRAILS,

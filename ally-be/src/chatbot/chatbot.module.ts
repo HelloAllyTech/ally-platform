@@ -1,3 +1,4 @@
+import { AssistantSeatsController } from './controller/assistant-seats.controller';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AiModule } from '../ai/ai.module';
@@ -100,6 +101,7 @@ import { ListRecordsService } from './lists/list-records.service';
     NotificationModule,
   ],
   controllers: [
+    AssistantSeatsController,
     ChatbotController,
     ConnectorController,
     InboxController,

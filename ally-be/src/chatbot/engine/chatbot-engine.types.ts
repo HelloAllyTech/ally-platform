@@ -145,6 +145,13 @@ export type AgentRunRef = { runId: string; conversationId: string } & (
 export interface ChatbotDecision {
   handledBy: WaHandledBy;
   body: string;
+  /** CR1: no run started because a limit was reached; `body` is the fixed limit reply. */
+  limited?:
+    | 'customers'
+    | 'no_seat'
+    | 'seat_messages'
+    | 'owner_tokens'
+    | 'owner_runs';
   templateId?: string;
   /**
    * The body greets the person rather than answering a question: the bot's welcome message (it

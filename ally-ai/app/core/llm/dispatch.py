@@ -436,6 +436,14 @@ def _emit_usage(
     usage_reported(usage[0], usage[1])
     try:
         from app.core.llm_usage.emitter import emit_llm_usage_blocking
+        from app.core.llm_usage.scope import usage_attribution
+
+        # Who the call was spent for (CR1): the request's X-Ally-Usage keys, the
+        # agent step and this call's seq, when a scope is active. Taken here, in
+        # the caller's context, so the numbering follows the calls' order.
+        attribution = usage_attribution()
+        if attribution:
+            metadata = {**attribution, **(metadata or {})}
 
         emit_llm_usage_blocking(
             provider=provider,

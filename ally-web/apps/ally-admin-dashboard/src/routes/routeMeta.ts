@@ -165,6 +165,9 @@ const buildTable = (): RouteMetaEntry[] => {
     { path: ROUTES.MANAGE_GUARDRAILS, title: i.guardrails, section: "ai-languages" },
     { path: ROUTES.MANAGE_STT_CONFIGS, title: i.speechRecognition, section: "ai-languages" },
     { path: ROUTES.MANAGE_LLM_MODEL_CATALOG, title: i.languageModels, section: "ai-languages" },
+    { path: ROUTES.BILLING_MODELS, title: i.billingModels, section: "ai-languages" },
+    { path: ROUTES.BILLING_COSTS, title: i.billingCosts, section: "ai-languages" },
+    { path: ROUTES.BILLING_PLANS, title: i.billingPlans, section: "ai-languages" },
     { path: ROUTES.MANAGE_SCENARIO_VOICES, title: i.voices, section: "ai-languages" },
     { path: ROUTES.AI_TASKS, title: i.aiTasks, section: "ai-languages" },
     { path: ROUTES.MANAGE_SCENARIO_LANGUAGES, title: i.languages, section: "ai-languages" },
@@ -272,6 +275,8 @@ const buildTable = (): RouteMetaEntry[] => {
       parent: ROUTES.WHATSAPP_BOT,
       fullBleed: true,
     },
+    // The owner's Plan and usage (CR1), from the account menu.
+    { path: ROUTES.MY_PLAN, title: "Plan and usage", section: "product", fullBleed: true },
     { path: ROUTES.ALLY_CONSOLE, title: i.allyConsole, section: "product" },
     // Settings & Logs
     { path: ROUTES.SETTINGS, title: i.settings, section: "settings-logs" },

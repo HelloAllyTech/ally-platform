@@ -1,3 +1,4 @@
+import { ASSISTANT_SEATS } from "./billing.fixture";
 import { CHECKUP_RUN } from "./onboarding.mocks";
 
 import type { Page, Route } from "@playwright/test";
@@ -383,6 +384,10 @@ export async function mockAssistantHome(
     }
     // Chunk Q2a: the live scorecard on the Overview.
     if (path === `${base}/scorecard`) return json(route, SCORECARD);
+    // CR1 Part C: Share → People's seats, and "This uses 2 of your 3 assistants".
+    if (path === `${base}/seats` || path.startsWith(`${base}/seats/`)) {
+      return json(route, { ...ASSISTANT_SEATS, chatbotId: BOT_ID });
+    }
     // Chunk 20d-2: How it works (the runtime's text, here a short stand-in) and the History.
     if (path === `${base}/how-it-works`) {
       const parts = [

@@ -150,6 +150,22 @@ const ContextLibrary = lazy(() =>
   })),
 );
 
+// Ally admin → Models and → Costs (CR1). Lazy-loaded (kept out of the eager @pages barrel): only
+// super admins with `manage_costs` open them, and Costs draws a Carbon chart.
+const BillingModels = lazy(() =>
+  import("../pages/Billing/Models").then(module => ({ default: module.BillingModels })),
+);
+const BillingCosts = lazy(() =>
+  import("../pages/Billing/Costs").then(module => ({ default: module.BillingCosts })),
+);
+const BillingPlans = lazy(() =>
+  import("../pages/Billing/Plans").then(module => ({ default: module.BillingPlans })),
+);
+// The owner's Plan and usage (CR1 Part C): any signed-in user, for themselves. Never dollars.
+const MyPlan = lazy(() =>
+  import("../pages/Plan/MyPlan").then(module => ({ default: module.MyPlan })),
+);
+
 // Public design-system gallery. Lazy-loaded (kept out of the eager @pages
 // barrel) so this browse-only showcase never weighs on the main admin bundle.
 const DesignSystem = lazy(() =>
@@ -403,6 +419,38 @@ export const RouteLayout: React.FC = () => {
             element={
               <PrivateLayout requiredFeature={FeatureToggleKey.MANAGE_LLM_MODEL_CATALOG}>
                 <LlmModelCatalog />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.BILLING_MODELS}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.MANAGE_COSTS}>
+                <BillingModels />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.BILLING_COSTS}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.MANAGE_COSTS}>
+                <BillingCosts />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.BILLING_PLANS}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.MANAGE_COSTS}>
+                <BillingPlans />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.MY_PLAN}
+            element={
+              <PrivateLayout fullBleed>
+                <MyPlan />
               </PrivateLayout>
             }
           />

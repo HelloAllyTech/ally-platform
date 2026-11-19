@@ -21,6 +21,7 @@ import { dateTime } from "../dates";
 import { Collapsed, Group, SectionHead } from "../fields";
 import { CheckupCases } from "./CheckupCases";
 import { packChangeLine } from "./Safety";
+import { planLimitMessage } from "../../Plan/limits";
 
 import type { SectionProps } from "./props";
 
@@ -95,7 +96,9 @@ export const CheckupSection: React.FC<Pick<SectionProps, "bot" | "canEdit">> = (
     const result = await run(only ? { id: bot.id, only } : bot.id);
     if ("error" in result) {
       const status = (result.error as { status?: number }).status;
-      setNote(status === 429 ? t.blocked.limit : t.blocked.start);
+      setNote(
+        planLimitMessage(result.error) ?? (status === 429 ? t.blocked.limit : t.blocked.start),
+      );
     } else {
       setCompared(true);
     }

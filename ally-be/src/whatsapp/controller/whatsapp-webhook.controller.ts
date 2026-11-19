@@ -1,3 +1,4 @@
+import { WhatsAppPricingService } from 'src/billing/service/whatsapp-pricing.service';
 import {
   Controller,
   Get,
@@ -9,6 +10,7 @@ import {
   Query,
   Req,
   Res,
+  Optional,
 } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Request, Response } from 'express';
@@ -51,6 +53,7 @@ export class WhatsAppWebhookController {
     private readonly provider: WhatsAppProvider,
     private readonly inboundProducer: WhatsAppInboundProducer,
     private readonly numberService: WhatsAppBusinessNumberService,
+    @Optional() private readonly pricing?: WhatsAppPricingService,
   ) {}
 
   /**
@@ -99,6 +102,8 @@ export class WhatsAppWebhookController {
     // Respond first, then enqueue. The provider is waiting on this socket, and an enqueue that takes
     // a moment must not push the response past its timeout and trigger a redelivery.
     res.status(HttpStatus.OK).send();
+    // CR1: Meta's fee for each billable message an assistant sent. After the response, never awaited.
+    void this.pricing?.recordStatuses(req.body);
 
     try {
       const messages = this.provider.parseInbound(req.body);
@@ -172,6 +177,8 @@ export class WhatsAppWebhookController {
     }
 
     res.status(HttpStatus.OK).send();
+    // CR1: Meta's fee for each billable message an assistant sent. After the response, never awaited.
+    void this.pricing?.recordStatuses(req.body);
 
     try {
       const messages: InboundWhatsAppMessage[] = this.provider

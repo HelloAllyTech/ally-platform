@@ -33,6 +33,26 @@ vi.mock("@api", async importOriginal => ({
   useGetUserFeatureTogglesQuery: () => ({ data: undefined, isLoading: false }),
   useSetUserFeatureTogglesMutation: () => [vi.fn()],
   useGetTenantsQuery: () => ({ data: undefined }),
+  // CR1 Part B: Users → Custom logins.
+  useListCustomLoginsQuery: () => ({
+    data: {
+      data: [
+        {
+          id: 41,
+          name: "Asha Rao",
+          email: "asha@clinic.example",
+          status: "ACTIVE",
+          createdAt: "2026-11-01T00:00:00.000Z",
+          organisation: "Sunrise",
+          features: ["whatsapp_bot"],
+          assistants: 2,
+        },
+      ],
+      count: 1,
+    },
+    isLoading: false,
+  }),
+  useRemoveCustomLoginMutation: () => [vi.fn()],
 }));
 
 // Mock components
@@ -769,23 +789,40 @@ describe("UserManagement", () => {
     });
   });
 
-  // A1: custom logins are made from Ally admins, so only holders of Admin User Management (the
-  // super admins) see the screen; ally-be refuses its three routes to everyone else.
-  describe("Create a custom login", () => {
-    it("is offered on Ally admins with Admin User Management", () => {
+  // CR1 Part B: custom logins have their own tab (they are no longer platform admins), gated on
+  // Admin User Management like Ally admins; ally-be refuses its routes to everyone else.
+  describe("Custom logins", () => {
+    it("is a tab with Admin User Management, listing them and offering Create", () => {
       mockUserState(
         [Permissions.EDIT_USER],
         [FeatureToggleKey.USERS, FeatureToggleKey.ADMIN_USER_MANAGEMENT],
       );
-      renderUserManagement([`/?tab=${TabType.SUPER_ADMINS}`]);
+      renderUserManagement([`/?tab=${TabType.CUSTOM_LOGINS}`]);
+      expect(screen.getByTestId("custom-logins")).toBeInTheDocument();
       expect(screen.getByTestId("custom-login-create")).toBeInTheDocument();
+      expect(screen.getByText("asha@clinic.example")).toBeInTheDocument();
     });
 
     it("is hidden from anyone without it", () => {
       mockUserState([Permissions.EDIT_USER, Permissions.VIEW_USERS], [FeatureToggleKey.USERS]);
-      renderUserManagement([`/?tab=${TabType.SUPER_ADMINS}`]);
+      renderUserManagement([`/?tab=${TabType.CUSTOM_LOGINS}`]);
       expect(screen.queryByTestId("custom-login-create")).not.toBeInTheDocument();
-      expect(screen.queryByText(/^Ally admins/)).not.toBeInTheDocument();
+      expect(screen.queryByTestId("custom-logins")).not.toBeInTheDocument();
+      expect(screen.queryByText(/^Custom logins/)).not.toBeInTheDocument();
+    });
+  });
+
+  // CR1 (WA-NUMBERS-REPORT step 1): the old WhatsApp Numbers tab is off the admin screens.
+  describe("WhatsApp Numbers", () => {
+    it("is no longer a tab, and its old link opens Users", () => {
+      mockUserState(
+        [Permissions.EDIT_USER, Permissions.VIEW_USERS],
+        [FeatureToggleKey.USERS, FeatureToggleKey.WHATSAPP_BOT],
+      );
+      renderUserManagement([`/?tab=${TabType.PHONE_MAPPINGS}`]);
+      const tabs = screen.getAllByRole("button").map(b => b.textContent ?? "");
+      expect(tabs.some(t => t.startsWith("WhatsApp"))).toBe(false);
+      expect(screen.getByTestId("tab-users").querySelector("span")).not.toBeNull();
     });
   });
 

@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useState } from "react";
 
 import { useNavigate, useSearchParams } from "react-router-dom";
 
-import { useGetArchivedChatbotsQuery, useGetChatbotsQuery } from "@api";
+import { useGetArchivedChatbotsQuery, useGetChatbotsQuery, useGetMyPlanQuery } from "@api";
 import { EmptyState } from "@components";
 import { Button } from "@components/button";
 import { ButtonVariant } from "@components/types";
@@ -22,6 +22,7 @@ import { RemoveDialog } from "../AssistantHome/ui/RemoveDialog";
 import { useRestoreAssistant } from "../AssistantHome/ui/useRestoreAssistant";
 import { Inbox } from "../Inbox";
 import { COPY as ONBOARDING_COPY } from "../Onboarding/copy";
+import { PlanAlertsBanner } from "../Plan/ui";
 
 import "../AssistantHome/ui/scale.css";
 import "./list-page.css";
@@ -47,6 +48,8 @@ export const WhatsAppBot: React.FC = () => {
   const { data, isLoading, isError, refetch } = useGetChatbotsQuery();
   const navigate = useNavigate();
   const canCreate = Boolean(data?.canCreate);
+  // CR1: a limit at 80% or more this month shows as a banner above the assistants.
+  const { data: myPlan } = useGetMyPlanQuery();
 
   // The inbox (chunk 11a) is for everyone who can see an assistant: its chats, every channel.
   const tabItems = useMemo(
@@ -115,6 +118,11 @@ export const WhatsAppBot: React.FC = () => {
         </div>
       )}
       <div className="ally-list-page__body">
+        {activeTab === "bots" && myPlan?.alerts?.length ? (
+          <div style={{ marginBottom: 16 }}>
+            <PlanAlertsBanner alerts={myPlan.alerts} onOpen={() => navigate(ROUTES.MY_PLAN)} />
+          </div>
+        ) : null}
         {activeTab === "bots" &&
           (isLoading ? (
             <div className="ally-list-page__grid" aria-busy="true">

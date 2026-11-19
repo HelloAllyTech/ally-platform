@@ -564,6 +564,10 @@ export class WhatsAppPhoneMappingService {
     });
     if (!row) return null;
 
+    // CR1 (WA-NUMBERS-REPORT.md step 1): counted, to watch use of the retired system fall to zero.
+    this.logger.info(
+      `[WA_MAPPING_USED] inbound sender recognised through a phone mapping (tenant ${row.tenantId})`,
+    );
     return { tenantId: row.tenantId, userId: row.userId ?? null };
   }
 }

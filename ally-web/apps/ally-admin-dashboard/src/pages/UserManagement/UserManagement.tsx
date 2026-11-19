@@ -48,10 +48,10 @@ import { RootState } from "@store";
 import { TabType } from "@types";
 import { formatCapitalizedEnum, hasFeature } from "@utils";
 
-import { PhoneMappingsTab } from "./PhoneMappings";
 import { RoleDescriptions } from "./RoleDescriptions";
 import { useOrganizationManagement } from "./useOrganizationManagement";
 import { useUserManagement } from "./useUserManagement";
+import { CustomLogins } from "../SuperAdmins/CustomLogins";
 import { SuperAdmins } from "../SuperAdmins/SuperAdmins";
 
 const formatDate = (isoDate: string) =>
@@ -74,12 +74,6 @@ export const UserManagement: FC = () => {
   // flag rides on every users request, and a mismatch would 403 the whole list
   // instead of just one filter.
   const canListPlatformAdmins = permissions.includes(Permissions.VIEW_SUPER_DUPER_ADMINS);
-  // Gated on the WhatsApp bot's feature toggle alone, exactly like the WhatsApp Bot page itself
-  // — which carries no `Permissions` member on purpose, because adding one would need a backend
-  // grant migration for gating the toggle already does. The endpoints behind this tab ARE
-  // permission-gated server-side (view/edit:whatsapp-bot), so the authority for a mapping still
-  // sits with whoever runs the bot; this only decides whether the tab is offered.
-  const canManagePhoneMappings = hasFeature(features, FeatureToggleKey.WHATSAPP_BOT);
 
   // Platform-admin count for the tab strip. RTK Query shares this cache entry
   // with the SuperAdmins tab itself, so no duplicate request is made.
@@ -102,9 +96,11 @@ export const UserManagement: FC = () => {
       : tabParam) || fallbackTab;
   // The Ally admins tab is gated; a deep link to it from anyone else falls back to Users
   // (the backing endpoints would 403 anyway).
+  // The old WhatsApp Numbers tab is hidden (CR1, WA-NUMBERS-REPORT step 1): its link falls back.
   const activeTab =
-    (requestedTab === TabType.SUPER_ADMINS && !canManagePlatformAdmins) ||
-    (requestedTab === TabType.PHONE_MAPPINGS && !canManagePhoneMappings) ||
+    ((requestedTab === TabType.SUPER_ADMINS || requestedTab === TabType.CUSTOM_LOGINS) &&
+      !canManagePlatformAdmins) ||
+    requestedTab === TabType.PHONE_MAPPINGS ||
     ((requestedTab === TabType.USERS || requestedTab === TabType.ORGANIZATIONS) &&
       !canSeeUsersAndOrgs)
       ? fallbackTab
@@ -227,10 +223,10 @@ export const UserManagement: FC = () => {
         ]
       : []),
     ...(canManagePlatformAdmins
-      ? [{ id: TabType.SUPER_ADMINS, label: en.superAdmins.title, count: superAdminTierCount }]
-      : []),
-    ...(canManagePhoneMappings
-      ? [{ id: TabType.PHONE_MAPPINGS, label: en.whatsappBot.phoneMappings.tabLabel }]
+      ? [
+          { id: TabType.SUPER_ADMINS, label: en.superAdmins.title, count: superAdminTierCount },
+          { id: TabType.CUSTOM_LOGINS, label: en.customLogins.tabLabel },
+        ]
       : []),
   ];
 
@@ -681,8 +677,8 @@ export const UserManagement: FC = () => {
         );
       case TabType.SUPER_ADMINS:
         return canManagePlatformAdmins ? <SuperAdmins /> : null;
-      case TabType.PHONE_MAPPINGS:
-        return canManagePhoneMappings ? <PhoneMappingsTab /> : null;
+      case TabType.CUSTOM_LOGINS:
+        return canManagePlatformAdmins ? <CustomLogins /> : null;
     }
   };
 

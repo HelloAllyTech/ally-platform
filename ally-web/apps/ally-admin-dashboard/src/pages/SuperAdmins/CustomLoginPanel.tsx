@@ -3,13 +3,14 @@ import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import {
+  useAddCustomLoginMutation,
   useAddUserMutation,
-  useAssignPlatformAdminMutation,
   useGetFeatureToggleRegistryQuery,
   useGetTenantsQuery,
   useGetUserFeatureTogglesQuery,
   useSetUserFeatureTogglesMutation,
 } from "@api";
+import type { CustomLogin } from "@api";
 import { Button } from "@components/button";
 import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
@@ -23,7 +24,8 @@ const fill = (text: string, values: Record<string, string>) =>
 
 /**
  * The least role the create-user route accepts (one permission). What the login can actually use
- * comes from its toggles: it is made a platform admin, then every toggle is set to what was ticked.
+ * comes from its toggles: it is given the Assistant owner role, then every toggle is set to what
+ * was ticked.
  */
 export const CUSTOM_LOGIN_BASE_ROLE = "EVALUATOR";
 
@@ -35,23 +37,24 @@ const reason = (error: unknown): string =>
   );
 
 /**
- * Create a custom login, or edit what one can use (A1). Creating runs three existing routes in
- * order: POST /v1/users → POST /v1/platform-admins → PATCH /v1/users/:id/feature-toggles, the last
- * with EVERY key set to exactly what was ticked (so default-on keys are switched off too). If a
- * step fails, the message says which, and what is left to do.
+ * Create a custom login, or edit what one can use (A1, CR1 Part B). Creating runs three routes in
+ * order: POST /v1/users → POST /v1/custom-logins (the Assistant owner role; custom logins are no
+ * longer platform admins) → PATCH /v1/users/:id/feature-toggles, the last with EVERY key set to
+ * exactly what was ticked (so default-on keys are switched off too). If a step fails, the message
+ * says which, and what is left to do.
  *
- * Shown only inside Ally admins, which needs the admin_user_management toggle; the server refuses
- * the three routes to anyone without it.
+ * Shown only on Users → Custom logins and Ally admins, which need the admin_user_management
+ * toggle; the server refuses the three routes to anyone without it.
  */
 export const CustomLoginPanel: React.FC<{
-  edit?: PlatformAdmin;
+  edit?: PlatformAdmin | CustomLogin;
   onClose: () => void;
 }> = ({ edit, onClose }) => {
   const { data: registry, isLoading: registryLoading } = useGetFeatureToggleRegistryQuery();
   const { data: current } = useGetUserFeatureTogglesQuery(edit?.id ?? 0, { skip: !edit });
   const { data: tenants } = useGetTenantsQuery({ limit: 500 }, { skip: Boolean(edit) });
   const [addUser] = useAddUserMutation();
-  const [assignPlatformAdmin] = useAssignPlatformAdminMutation();
+  const [addCustomLogin] = useAddCustomLoginMutation();
   const [setToggles] = useSetUserFeatureTogglesMutation();
 
   const [name, setName] = useState("");
@@ -113,7 +116,7 @@ export const CustomLoginPanel: React.FC<{
           return setProblem(fill(t().failedCreate, { reason: reason(error) }));
         }
         try {
-          await assignPlatformAdmin({ userId: userId! }).unwrap();
+          await addCustomLogin({ userId: userId! }).unwrap();
         } catch (error) {
           return setProblem(fill(t().failedAdmin, { reason: reason(error) }));
         }
