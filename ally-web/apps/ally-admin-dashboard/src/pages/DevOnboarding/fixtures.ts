@@ -121,7 +121,8 @@ export const baseView = (): BotDraftView => ({
         { from: "assistant", text: "Happy to help. Is it for you, or for a family member?" },
       ],
       recommended: true,
-      limit: "It can't book or take payments yet. It sends you each new enquiry by email.",
+      limit:
+        "It can't take payments yet. It sends you each new enquiry by email, and books when you add an Appointments list.",
     },
     {
       id: "answer",

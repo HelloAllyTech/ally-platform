@@ -20,6 +20,7 @@ from langgraph.graph.state import CompiledStateGraph
 
 from app.core.agent_runtime import activity, stages
 from app.core.agent_runtime.budget import RUN_CAP_S, RUN_DEADLINE
+from app.core.agent_runtime.check.text import without_citation_marks
 from app.core.agent_runtime.gateway import AgentGatewayClient
 from app.core.agent_runtime.graph import OnEvent, run_agent
 from app.core.agent_runtime.state import AgentState
@@ -75,8 +76,10 @@ def build_response(state: AgentState, run_id: str) -> AgentRunResponse:
             if call.get("tool") == "search_knowledge"
         ),
     }
+    # Sent without citation numbers (chunk H1 Part D); sources stay as chips.
+    answer = without_citation_marks(result.get("answer") or "")
     return AgentRunResponse(
-        **{**result, "retrieval": retrieval},
+        **{**result, "answer": answer, "retrieval": retrieval},
         run_id=run_id,
         trace=state.get("trace") or [],
         memory_writes=state.get("memory_writes") or [],

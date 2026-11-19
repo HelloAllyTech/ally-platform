@@ -55,6 +55,7 @@ import { agentAnswersInstead, isGreetingReply } from './keyword-skip';
 import { buildKnowledgeRequest, NO_DOCUMENTS } from './knowledge-request';
 import { stageLine, stageRunIdFor } from './agent-stage-log';
 import { emergencyByKeywords } from './emergency-keywords';
+import { caringDecline } from './caring-decline';
 import { replyLanguageOf } from './reply-language';
 import {
   aboutAnAnimal,
@@ -716,7 +717,11 @@ export class ChatbotEngineService {
 
     const { response: answer } = answerResult.value;
     const decision = this.toDecision(
-      await this.withDeclineContact(turn, answer),
+      await this.withDeclineContact(
+        turn,
+        answer,
+        crisisLevelOf(crisis) === 'upset' || mood === 'upset',
+      ),
       answer,
       ran,
       degradedAlert,
@@ -733,14 +738,27 @@ export class ChatbotEngineService {
   private async withDeclineContact(
     turn: ChatTurn,
     answer: EngineAnswer,
+    upset = false,
   ): Promise<ChatTurn> {
     const wording = turn.settings.declineText ?? '';
     if (answer.intent !== 'decline' || answer.answer?.trim()) return turn;
-    if (phoneIn(wording) || emailIn(wording)) return turn;
     const contact = contactFromSources(
       await this.businessFacts(turn),
       turn.settings.helplineNumbers,
     );
+    // Upset, or a question about medicines (chunk H1 Part D): the approved warm line or polite
+    // decline, never the generic "I don't know that".
+    const caring = caringDecline({
+      upset,
+      question: turn.text ?? '',
+      language: replyLanguageOf(turn.text, turn.language),
+      organisation: turn.chatbot.name,
+      contact,
+    });
+    if (caring) {
+      return { ...turn, settings: { ...turn.settings, declineText: caring } };
+    }
+    if (phoneIn(wording) || emailIn(wording)) return turn;
     if (!contact) return turn;
     return {
       ...turn,

@@ -962,9 +962,8 @@ describe('Your instructions, checked like the builder checks (chunk 20d-2)', () 
     const home = await service.get('bot-1');
     // Exactly what's sent (Q3-fast, gaps item 10): the real numbers, then the bot's helplines;
     // never the platform's old "your local crisis line" template.
-    expect(home.safety.atRiskReply).toBe(
-      `${GENERAL_CRISIS_TEXT} You can also call: 14416.`,
-    );
+    // A helpline the reply already gives isn't repeated (chunk H1 Part D).
+    expect(home.safety.atRiskReply).toBe(GENERAL_CRISIS_TEXT);
     expect(home.safety.atRiskReply).not.toMatch(/your local crisis line/i);
     // Without the settings service the box just has no default.
     const bare = await harness().service.get('bot-1');

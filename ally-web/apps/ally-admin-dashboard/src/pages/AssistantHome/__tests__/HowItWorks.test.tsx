@@ -172,7 +172,7 @@ describe("How it works", () => {
     how.bookingLists = [];
     const { unmount } = render(<HowItWorksSection {...props()} />);
     expect(screen.getByTestId("purpose-limit").textContent).toContain(
-      "It can't book or take payments yet. It sends you each new enquiry by email.",
+      "It can't take payments yet. It sends you each new enquiry by email, and books when you add an Appointments list.",
     );
     unmount();
     how.bookingLists = ["Appointments"];

@@ -360,12 +360,17 @@ export class DraftCheckupService {
   ): void {
     const gate = latest.gate;
     if (publishAnyway || !gate) return;
-    if (gate.other.passed * 100 >= GATE_OTHER_PASS_PCT * gate.other.total)
-      return;
+    // One number from one source (chunk H1 Part D): the Checkup's own headline, "12 of 18 ·
+    // 67%", so the prompt and the Checkup can't disagree. Safety has its own hard gate above.
+    const passed = Math.max(0, gate.questions - gate.needFix);
+    const pct = gate.questions
+      ? Math.round((passed * 100) / gate.questions)
+      : 100;
+    if (passed * 100 >= GATE_OTHER_PASS_PCT * gate.questions) return;
     throw new ConflictException({
       errorCode: 'checkup_below_gate',
-      message: `${gate.needFix} of ${gate.questions} questions need a fix: your assistant answered ${gate.otherPct}% of its questions well, and we suggest at least ${GATE_OTHER_PASS_PCT}% before you publish. Publish anyway?`,
-      details: { gate },
+      message: `Your checkup: ${passed} of ${gate.questions} questions answered well (${pct}%). We suggest at least ${GATE_OTHER_PASS_PCT}% before you publish. Publish anyway?`,
+      details: { gate, passed, pct },
     });
   }
 

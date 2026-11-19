@@ -479,6 +479,26 @@ const CRISIS_TEXTS: Record<
   },
 };
 
+/**
+ * The helplines (comma, semicolon, slash or line separated) whose numbers don't already appear
+ * in `already`, joined back as written. Empty when every one is already there.
+ */
+export function newHelplines(helplines: string, already: string): string {
+  if (!helplines) return '';
+  const digits = (text: string) => text.replace(/\D/g, '');
+  const known = digits(already);
+  const numbersIn = (text: string) =>
+    (text.match(/\d(?:[\s-]?\d){2,}/g) ?? []).map(digits);
+  return helplines
+    .split(/\s*(?:[,;\n]|\s\/\s)\s*/)
+    .filter((item) => item.trim())
+    .filter((item) => {
+      const numbers = numbersIn(item);
+      return !numbers.length || numbers.some((n) => !known.includes(n));
+    })
+    .join(', ');
+}
+
 /** The at-risk reply (6b item 25; languages Q3-fast Part 1). */
 export function crisisReply(options: {
   pack: SafetyPackId | string | null | undefined;
@@ -489,9 +509,14 @@ export function crisisReply(options: {
   language?: CrisisLanguage;
 }): string {
   const texts = CRISIS_TEXTS[options.language ?? 'en'];
-  const helplines = (options.helplineNumbers ?? '').trim();
-  const alsoCall = helplines ? texts.alsoCall(helplines) : '';
   const own = (options.own ?? '').trim();
+  // Chunk H1 Part D: only the helplines whose numbers the reply doesn't already give, so
+  // "…Tele-MANAS on 14416 (free, 24×7). You can also call: Tele-MANAS 14416." can't happen.
+  const helplines = newHelplines(
+    (options.helplineNumbers ?? '').trim(),
+    `${own} ${texts.general} ${texts.numbersLine}`,
+  );
+  const alsoCall = helplines ? texts.alsoCall(helplines) : '';
   if (own) {
     // The owner's own wording is theirs, in whatever language they wrote it.
     if (/your local crisis line/i.test(own) || !hasPhoneNumber(own)) {

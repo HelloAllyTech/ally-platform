@@ -137,3 +137,15 @@ describe('crisis and emergency replies in the person language (Q3-fast Part 1)',
     );
   });
 });
+
+describe('newHelplines (chunk H1)', () => {
+  const { newHelplines } = require('../safety-pack/safety-packs');
+  it('drops a helpline the reply already gives, keeps the rest', () => {
+    const already = 'call Tele-MANAS on 14416 (free, 24×7), or 112';
+    expect(newHelplines('Tele-MANAS 14416', already)).toBe('');
+    expect(
+      newHelplines('Tele-MANAS 14416, Vandrevala 9999 666 555', already),
+    ).toBe('Vandrevala 9999 666 555');
+    expect(newHelplines('', already)).toBe('');
+  });
+});

@@ -151,7 +151,7 @@ describe("the purpose's honest limit", () => {
       "It books into your Appointments list. It can't take payments yet.",
     );
     expect(purposeLimit("enquiries", [])).toBe(
-      "It can't book or take payments yet. It sends you each new enquiry by email.",
+      "It can't take payments yet. It sends you each new enquiry by email, and books when you add an Appointments list.",
     );
     expect(purposeLimit("training")).toBe("It doesn't keep track of each person's progress yet.");
     expect(purposeLimit("answer", ["Appointments"])).toBeNull();

@@ -388,7 +388,8 @@ export const USER_LISTS = {
     limitLabel: "What it can't do yet",
     books: "It books into your {list} list. It can't take payments yet.",
     /** The purposes' honest limits, as onboarding's cards have them (deck §24). */
-    enquiries: "It can't book or take payments yet. It sends you each new enquiry by email.",
+    enquiries:
+      "It can't take payments yet. It sends you each new enquiry by email, and books when you add an Appointments list.",
     training: "It doesn't keep track of each person's progress yet.",
   },
 };

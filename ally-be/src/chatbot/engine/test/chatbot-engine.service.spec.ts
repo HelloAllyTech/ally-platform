@@ -273,7 +273,8 @@ describe('ChatbotEngineService', () => {
         expect(aiService.answerKnowledgeQuestion).not.toHaveBeenCalled();
         expect(decision.handledBy).toBe(WaHandledBy.ERROR);
         expect(decision.body).toBe(RUN_FAILED);
-        expect(decision.body).not.toBe(settings.fallbackText);
+        // Never the old error text (chunk H1: the default fallback is now this reply too).
+        expect(decision.body).not.toMatch(/Something went wrong on my side/);
         expect(decision.unanswered?.reason).toBe('error');
         expect(decision.agent).toEqual({
           runtime: AgentRuntimeUsed.V2_FAILED,

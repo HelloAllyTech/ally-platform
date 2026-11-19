@@ -403,7 +403,9 @@ describe('DraftCheckupService', () => {
       ).rejects.toMatchObject({
         response: {
           errorCode: 'checkup_below_gate',
-          message: expect.stringContaining('8 of 14 questions need a fix'),
+          message: expect.stringContaining(
+            '6 of 14 questions answered well (43%)',
+          ),
           details: { gate: { otherPct: 38, ready: false } },
         },
       });

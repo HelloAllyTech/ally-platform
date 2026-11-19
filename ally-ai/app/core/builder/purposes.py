@@ -33,7 +33,9 @@ class Purpose:
     default_sample: Tuple[Tuple[str, str], ...]
 
 
-_NO_BOOKING = "Book, take orders or take payments"
+#: What no assistant does yet (chunk H1 Part D). Booking is a list it can be given
+#: (Appointments), so the cards no longer say it can't book.
+_NO_BOOKING = "Take payments"
 
 PURPOSES: Dict[PurposeId, Purpose] = {
     PurposeId.ANSWER: Purpose(
@@ -69,8 +71,8 @@ PURPOSES: Dict[PurposeId, Purpose] = {
         ),
         wont=(_NO_BOOKING, "Promise discounts or slots you haven't listed"),
         limit=(
-            "It can't book or take payments yet. It sends you each new enquiry by "
-            "email."
+            "It can't take payments yet. It sends you each new enquiry by email, "
+            "and books when you add an Appointments list."
         ),
         default_sample=(
             ("visitor", "Which service would suit me?"),
