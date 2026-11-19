@@ -32,7 +32,8 @@ from __future__ import annotations
 import re
 import time
 from contextvars import ContextVar
-from typing import Any, Dict, Optional, Tuple, Type, TypeVar
+from types import SimpleNamespace
+from typing import Any, Callable, Dict, Optional, Tuple, Type, TypeVar
 
 from pydantic import BaseModel
 
@@ -667,6 +668,134 @@ async def _generate_gemini(
 SDK_RETRIES: ContextVar[Optional[int]] = ContextVar("llm_sdk_retries", default=None)
 
 
+async def _streamed(
+    client: Any,
+    kwargs: Dict[str, Any],
+    sink: Callable[[str], None],
+    task: Optional[str],
+    started: float,
+) -> Any:
+    """One OpenAI call, streamed (chunk H1): the reply text to `sink` as it comes,
+    and a response shaped like the non-streamed one, usage included."""
+    stream = await client.chat.completions.create(
+        **kwargs, stream=True, stream_options={"include_usage": True}
+    )
+    answer = AnswerStream(sink)
+    parts: list[str] = []
+    usage = None
+    finish = None
+    first = False
+    async for chunk in stream:
+        if getattr(chunk, "usage", None):
+            usage = chunk.usage
+        for choice in getattr(chunk, "choices", None) or []:
+            delta = getattr(getattr(choice, "delta", None), "content", None)
+            if delta:
+                if not first:
+                    first = True
+                    stages.stage(
+                        "model_first_content",
+                        task=task,
+                        ttft_ms=int((time.monotonic() - started) * 1000),
+                    )
+                parts.append(delta)
+                answer.feed(delta)
+            if getattr(choice, "finish_reason", None):
+                finish = choice.finish_reason
+    message = SimpleNamespace(content="".join(parts))
+    return SimpleNamespace(
+        usage=usage, choices=[SimpleNamespace(message=message, finish_reason=finish)]
+    )
+
+
+#: Where a structured call's reply text goes as it arrives (chunk H1 Part C). Set by
+#: the agent step; when set, an OpenAI call streams, and the top-level `answer`
+#: string of a step whose `action` is "reply" is passed on piece by piece. The
+#: parsed result is the same as without it.
+STREAM_ANSWER: ContextVar[Optional[Callable[[str], None]]] = ContextVar(
+    "llm_stream_answer", default=None
+)
+
+_ACTION = re.compile(r'"action"\s*:\s*"([^"\\]*)"')
+_ANSWER = re.compile(r'"answer"\s*:\s*"')
+_ESCAPES = {
+    "n": "\n",
+    "t": "\t",
+    "r": "",
+    '"': '"',
+    "\\": "\\",
+    "/": "/",
+    "b": "",
+    "f": "",
+}
+
+
+class AnswerStream:
+    """Reads a step's JSON as it streams and passes on its `answer` string, decoded,
+    once its `action` is "reply". Keys come in the schema's order (`action` first,
+    `answer` after the tool inputs), so the decision is known before the text."""
+
+    def __init__(self, sink: Callable[[str], None]) -> None:
+        self.sink = sink
+        self.buf = ""
+        self.pos: Optional[int] = None
+        self.off = False
+        self.done = False
+
+    def feed(self, text: str) -> None:
+        if self.off or self.done:
+            return
+        self.buf += text
+        if self.pos is None:
+            action = _ACTION.search(self.buf)
+            if not action:
+                return
+            if action.group(1) != "reply":
+                self.off = True
+                return
+            answer = _ANSWER.search(self.buf, action.end())
+            if not answer:
+                return
+            self.pos = answer.end()
+        out = []
+        i, buf = self.pos, self.buf
+        while i < len(buf):
+            char = buf[i]
+            if char == "\\":
+                if i + 1 >= len(buf):
+                    break
+                nxt = buf[i + 1]
+                if nxt == "u":
+                    if i + 6 > len(buf):
+                        break
+                    try:
+                        out.append(chr(int(buf[i + 2 : i + 6], 16)))
+                    except ValueError:
+                        pass
+                    i += 6
+                    continue
+                out.append(_ESCAPES.get(nxt, nxt))
+                i += 2
+                continue
+            if char == '"':
+                self.done = True
+                i += 1
+                break
+            out.append(char)
+            i += 1
+        self.pos = i
+        if out:
+            piece = "".join(out)
+            try:
+                piece = piece.encode("utf-16", "surrogatepass").decode("utf-16")
+            except UnicodeError:
+                piece = piece.encode("utf-8", "ignore").decode("utf-8", "ignore")
+            try:
+                self.sink(piece)
+            except Exception:  # noqa: BLE001 — a listener never fails the call
+                self.off = True
+
+
 async def _generate_openai(
     *,
     schema: Type[TSchema],
@@ -742,8 +871,12 @@ async def _generate_openai(
         effort=kwargs.get("reasoning_effort") or "-",
     )
     request_started = time.monotonic()
+    sink = STREAM_ANSWER.get()
     try:
-        response = await client.chat.completions.create(**kwargs)
+        if sink is None:
+            response = await client.chat.completions.create(**kwargs)
+        else:
+            response = await _streamed(client, kwargs, sink, task, request_started)
     except BaseException as error:
         stages.stage(
             "model_request_end",

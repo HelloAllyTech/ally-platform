@@ -106,6 +106,8 @@ class KnowledgeAgentSettings(BaseModel):
     # but its cost is not. A small model is adequate — the prompt asks for one binary
     # judgement with an explicit instruction to prefer the false positive.
     CRISIS_MODEL: str = Field("gpt-4o-mini")
+    # Chunk H1: one classifier call, inside ally-be's 4 s attempt (6 s in all).
+    CRISIS_TIMEOUT_SECONDS: float = Field(3.5, gt=0, le=15)
     TOP_K: int = Field(8)
     MIN_SIMILARITY: float = Field(0.35)
     DECLINE_SIMILARITY: float = Field(0.42)
@@ -159,6 +161,9 @@ class AgentRuntimeSettings(BaseModel):
     # Extra seconds after a write (chunk 8a). 0 since chunk H1: the cap is the whole
     # run, so ally-be's wait is always above it.
     RUN_WRITE_EXTRA_SECONDS: float = Field(0.0, ge=0, le=4.5)
+    # Search the question before the first model call (chunk H1), so a plain answer
+    # takes one model call instead of two. False: the agent decides when to search.
+    PRESEARCH: bool = Field(True)
     # Conversation messages the agent reads, most recent last.
     MAX_HISTORY_MESSAGES: int = Field(10, ge=0, le=50)
     # Reasoning effort for the agent step on an OpenAI reasoning model (gpt-5 and

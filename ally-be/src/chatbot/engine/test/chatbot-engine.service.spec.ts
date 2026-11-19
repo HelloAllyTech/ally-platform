@@ -394,6 +394,31 @@ describe('ChatbotEngineService', () => {
       expect(aiService.runAgent).not.toHaveBeenCalled();
     });
 
+    it('when the classifier fails, the emergency keywords decide: bleach in the eye is an emergency (H1)', async () => {
+      aiService.checkWhatsAppCrisis.mockRejectedValueOnce(
+        upstream(504, ErrorCode.AI_SERVICE_TIMEOUT),
+      );
+      const decision = await engine.respond(
+        turn({ text: "I splashed bleach in my eye and it's burning badly" }),
+      );
+      expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
+      expect(decision.body).toMatch(/emergency/i);
+      expect(decision.body).toMatch(/112|108/);
+    });
+
+    it('a failed classifier with no emergency keyword sends the answer as usual (H1)', async () => {
+      aiService.checkWhatsAppCrisis.mockResolvedValueOnce({
+        is_crisis: false,
+        confidence: 0,
+        signal: '',
+        failed: true,
+      });
+      const decision = await engine.respond(
+        turn({ text: 'Do you have parking at the Chennai hospital?' }),
+      );
+      expect(decision.handledBy).not.toBe(WaHandledBy.CRISIS);
+    });
+
     it('still gives the crisis reply when the run fails before a late verdict', async () => {
       engine.levelWaitMs = 0;
       aiService.runAgent.mockRejectedValueOnce(

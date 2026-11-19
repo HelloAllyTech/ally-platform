@@ -54,6 +54,7 @@ import { businessFacts } from './business-facts';
 import { agentAnswersInstead, isGreetingReply } from './keyword-skip';
 import { buildKnowledgeRequest, NO_DOCUMENTS } from './knowledge-request';
 import { stageLine, stageRunIdFor } from './agent-stage-log';
+import { emergencyByKeywords } from './emergency-keywords';
 import { replyLanguageOf } from './reply-language';
 import {
   aboutAnAnimal,
@@ -517,11 +518,41 @@ export class ChatbotEngineService {
       }),
     );
 
+    // Something on screen at once (chunk H1 Part C): the run, and for an emotional message the
+    // crisis level, can take seconds to send their own first status.
+    if (live && turn.channel.capabilities?.streaming) {
+      live.onEvent({
+        event: 'status',
+        data: { code: 'thinking', label: 'Reading the question' },
+      });
+    }
+
     // One fast check beside the run (Q3-fast Part 1). It never depends on the run: a failed run
     // still gets its verdict, and a rejected check never takes down an answer.
-    const crisisCheck = settings.crisisClassifierEnabled
+    const classifier = settings.crisisClassifierEnabled
       ? this.aiService.checkWhatsAppCrisis(crisisRequest(turn, prompts))
       : Promise.resolve(null);
+    const classified = settle(classifier);
+    // When the classifier fails (chunk H1): the emergency keyword rules decide. A match is an
+    // emergency verdict like the classifier's, so it takes the same fast path.
+    const byKeywords = (): CrisisCheckResponse | null => {
+      const verdict = emergencyByKeywords(turn.text);
+      if (verdict) {
+        this.logger.warn(
+          `Crisis classifier failed for chatbot ${turn.chatbot.id}; an emergency keyword rule ` +
+            `matched, so the emergency reply goes out`,
+        );
+      }
+      return verdict;
+    };
+    const crisisCheck: Promise<CrisisCheckResponse | null> = classifier.then(
+      (verdict) => (verdict?.failed ? (byKeywords() ?? verdict) : verdict),
+      (error: unknown) => {
+        const verdict = byKeywords();
+        if (verdict) return verdict;
+        throw error;
+      },
+    );
     if (settings.crisisClassifierEnabled) {
       this.logger.info(stageLine(runKey, startedAt, 'crisis_check_start'));
       crisisCheck.then(
@@ -603,7 +634,8 @@ export class ChatbotEngineService {
       };
     }
 
-    const degradedAlert = this.degradedAlertFor(turn, crisisResult);
+    // Alerted on the classifier's own result, so a keyword fallback still raises it.
+    const degradedAlert = this.degradedAlertFor(turn, await classified);
 
     // The agent passed the chat to a person (chunk 3b): its `hand_over` tool already marked the
     // chat, and the visitor gets 11a's hand-over message, as when they ask for a person. The same

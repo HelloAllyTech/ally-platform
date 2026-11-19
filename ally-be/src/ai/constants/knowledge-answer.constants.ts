@@ -35,6 +35,19 @@ export const AGENT_RUN_LIMITS = {
   silenceMs: 25_000,
 } as const;
 
+/**
+ * The crisis classifier's limits (chunk H1 Part C): one 4 s attempt and one quick retry, all inside
+ * 6 s, so a finished reply never waits longer than that for the verdict. ally-ai's own call has a
+ * shorter timeout and no SDK retries, so it answers `failed` inside an attempt rather than after.
+ */
+export const CRISIS_CHECK_LIMITS = {
+  attemptMs: 4_000,
+  retryDelayMs: 100,
+  budgetMs: 6_000,
+  /** Less than this left: no retry, the keyword rules decide. */
+  minRetryMs: 1_000,
+} as const;
+
 /** ally-ai's onboarding builder (chunk 20a). */
 export const BUILDER_LIMITS = {
   /**

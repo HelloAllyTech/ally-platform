@@ -45,6 +45,7 @@ import type {
 import {
   BUILDER_LIMITS,
   AGENT_RUN_LIMITS,
+  CRISIS_CHECK_LIMITS,
   KNOWLEDGE_ANSWER_LIMITS,
 } from '../constants/knowledge-answer.constants';
 import { SseParser } from '../util/sse-parser';
@@ -784,19 +785,36 @@ export class AiService {
    * connection reset is the difference between the net being there and the
    * keyword rules standing alone.
    */
-  @RetryWithinBudget({
-    attempts: 2,
-    delayMs: 500,
-    budgetMs: 25_000,
-    shouldRetry: isRetryableAiFailure,
-    label: 'checkWhatsAppCrisis',
-  })
-  async checkWhatsAppCrisis(request: CrisisCheckRequest) {
-    return this.postKnowledge<CrisisCheckResponse, CrisisCheckRequest>(
-      ENDPOINTS.KNOWLEDGE_AGENT_CRISIS_CHECK,
-      request,
-      { timeoutMs: 15_000 },
-    );
+  async checkWhatsAppCrisis(
+    request: CrisisCheckRequest,
+  ): Promise<CrisisCheckResponse> {
+    // Chunk H1: 4 s, then one quick retry inside what is left of 6 s, so a finished reply never
+    // waits more than 6 s for the verdict. A verdict ally-ai marks failed is retried too.
+    const { attemptMs, retryDelayMs, budgetMs, minRetryMs } =
+      CRISIS_CHECK_LIMITS;
+    const startedAt = Date.now();
+    const attempt = (timeoutMs: number) =>
+      this.postKnowledge<CrisisCheckResponse, CrisisCheckRequest>(
+        ENDPOINTS.KNOWLEDGE_AGENT_CRISIS_CHECK,
+        request,
+        { timeoutMs },
+      );
+    let first: { verdict: CrisisCheckResponse } | { error: unknown };
+    try {
+      const verdict = await attempt(attemptMs);
+      if (!verdict?.failed) return verdict;
+      first = { verdict };
+    } catch (error) {
+      if (!isRetryableAiFailure(error)) throw error;
+      first = { error };
+    }
+    const left = budgetMs - (Date.now() - startedAt) - retryDelayMs;
+    if (left < minRetryMs) {
+      if ('verdict' in first) return first.verdict;
+      throw first.error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+    return attempt(Math.min(attemptMs, left));
   }
 
   /**

@@ -48,28 +48,9 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
     async def agent(state: AgentState) -> Dict[str, Any]:
         bot = state["bot"]
         start: Dict[str, Any] = {}
-        if not state.get("agent_calls"):
-            # First step of the run: the working keys the rest of the path reads.
-            start = {
-                "limits": service.resolve_limits(**bot.get("limits", {})),
-                # The previous message's list entries (chunk 6b), so a confirmation
-                # can book without looking the slot up again.
-                "passages": list(state.get("carried_records") or []),
-                "tool_calls": [],
-                "activity": [],
-                "revisions": 0,
-                "started_at": time.time(),
-            }
-            omitted = bot.get("gateway_omitted") or []
-            if omitted:
-                # List tools over the cap of 12 (chunk 6), named once per run.
-                start["trace"] = [
-                    trace_step(
-                        "tools",
-                        time.monotonic(),
-                        "list tools left out (over 12): " + ", ".join(omitted),
-                    )
-                ]
+        # First step of the run, unless the search before it (chunk H1) set it up.
+        if not state.get("agent_calls") and not state.get("started_at"):
+            start = first_step_keys(service, state)
         budget = search_budget(state)
         # Past the caps the schema itself offers only `reply`. Searches keep their
         # own limit; gateway tools (chunk 3b) are offered while a tool step of any
@@ -197,6 +178,34 @@ def answered_finds(state: AgentState) -> set:
         for call in state.get("tool_calls") or []
         if call.get("list_kind") == "find" and call.get("ok") and call.get("nearest")
     }
+
+
+def first_step_keys(
+    service: KnowledgeAgentService, state: AgentState
+) -> Dict[str, Any]:
+    """The working keys a run's first step sets, which the rest of the path reads."""
+    bot = state["bot"]
+    start: Dict[str, Any] = {
+        "limits": service.resolve_limits(**bot.get("limits", {})),
+        # The previous message's list entries (chunk 6b), so a confirmation can book
+        # without looking the slot up again.
+        "passages": list(state.get("carried_records") or []),
+        "tool_calls": [],
+        "activity": [],
+        "revisions": 0,
+        "started_at": time.time(),
+    }
+    omitted = bot.get("gateway_omitted") or []
+    if omitted:
+        # List tools over the cap of 12 (chunk 6), named once per run.
+        start["trace"] = [
+            trace_step(
+                "tools",
+                time.monotonic(),
+                "list tools left out (over 12): " + ", ".join(omitted),
+            )
+        ]
+    return start
 
 
 def _time_left(started_at: float, state: AgentState) -> float:

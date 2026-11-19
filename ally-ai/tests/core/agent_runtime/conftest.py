@@ -105,3 +105,13 @@ def client(graph):
     test_client.headers.update({"x-api-key": settings.API.X_API_KEY})
     yield test_client
     app.dependency_overrides.pop(get_graph, None)
+
+
+@pytest.fixture(autouse=True)
+def no_presearch(monkeypatch):
+    """The scripted runs here were written for the agent deciding when to search.
+    The search before the first call (chunk H1) is tested on its own, with it on
+    (test_presearch.py)."""
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings.AGENT_RUNTIME, "PRESEARCH", False)

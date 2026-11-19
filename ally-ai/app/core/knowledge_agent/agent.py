@@ -50,7 +50,7 @@ from app.core.knowledge_base.knowledge_chunk_service import (
     ChunkAudience,
     KnowledgeChunkService,
 )
-from app.core.llm.dispatch import generate_structured
+from app.core.llm.dispatch import SDK_RETRIES, generate_structured
 from app.core.llm_usage.tasks import LLMTask
 from app.core.phi_events import PHIEvents
 from app.core.phi_logger import PHILogEvent, phi_logger
@@ -301,6 +301,10 @@ class KnowledgeAgentService:
                 "failed": True,
             }
 
+        # Chunk H1: inside ally-be's 4 s attempt, with no SDK retries, so a slow
+        # provider gives `failed` in time for ally-be's one quick retry rather than
+        # holding the reply (in two windows on 19 Nov these calls took 20-62 s).
+        retries = SDK_RETRIES.set(0)
         try:
             parsed, meta = await generate_structured(
                 schema=CrisisVerdict,
@@ -312,6 +316,7 @@ class KnowledgeAgentService:
                 # variance means the same message is a crisis on Tuesday and not
                 # on Wednesday.
                 temperature=temperature if temperature is not None else 0.0,
+                timeout=cfg.CRISIS_TIMEOUT_SECONDS,
             )
         # noqa: BLE001 below — never fail the question over the classifier.
         except Exception as e:  # noqa: BLE001
@@ -325,6 +330,8 @@ class KnowledgeAgentService:
                 "confidence": 0.0,
                 "failed": True,
             }
+        finally:
+            SDK_RETRIES.reset(retries)
 
         if parsed.is_crisis:
             # Info, not debug: a positive verdict is an operationally significant

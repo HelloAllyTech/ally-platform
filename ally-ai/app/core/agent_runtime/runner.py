@@ -23,7 +23,7 @@ from app.core.agent_runtime.budget import RUN_CAP_S, RUN_DEADLINE
 from app.core.agent_runtime.gateway import AgentGatewayClient
 from app.core.agent_runtime.graph import OnEvent, run_agent
 from app.core.agent_runtime.state import AgentState
-from app.core.agent_runtime.trace import status_event
+from app.core.agent_runtime.trace import STREAMED, status_event
 from app.core.config import settings
 from app.core.llm.dispatch import SDK_RETRIES
 from app.exceptions.custom_exceptions import (
@@ -102,6 +102,8 @@ async def execute(
     RUN_CAP_S.set(cap_s)
     # Each model call gets the time left of the cap and no SDK retries (chunk H1).
     SDK_RETRIES.set(0)
+    streamed = {"any": False}
+    STREAMED.set(streamed)
     clock = stages.begin(run_id)
     stages.stage(
         "run_start",
@@ -169,7 +171,9 @@ async def execute(
         intent=response.intent,
         reply_chars=len(response.answer or ""),
     )
-    if on_event and response.answer:
+    # A reply that streamed as it was written (chunk H1) isn't sent again; the
+    # `final` event carries it as checked.
+    if on_event and response.answer and not streamed["any"]:
         on_event("status", status_event("writing"))
         stages.stage("first_token")
         for piece in chunk_reply(response.answer):
