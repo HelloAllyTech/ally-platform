@@ -179,3 +179,18 @@ export function makeGateway(
   );
   return { db, tokens, gateway, listTools };
 }
+
+/** Redis as the consent store uses it (chunk H1): get, set and del over a Map. */
+export const memoryRedis = () => {
+  const store = new Map<string, string>();
+  return {
+    store,
+    get: jest.fn(async (key: string) => store.get(key) ?? null),
+    set: jest.fn(async (key: string, value: string) => {
+      store.set(key, value);
+    }),
+    del: jest.fn(async (key: string) => {
+      store.delete(key);
+    }),
+  };
+};

@@ -4,6 +4,7 @@ import { LlmCompletionService } from 'src/llm-agent/service/llm-completion.servi
 import { PromptSharedService } from 'src/prompt/service/prompt-shared.service';
 import {
   buildSpecialistPrompt,
+  withReference,
   parseSpecialistJson,
   SpecialistLlmService,
 } from '../specialist-llm.service';
@@ -127,6 +128,36 @@ describe('SpecialistLlmService', () => {
     expect(prompt.indexOf('REVISION')).toBeLessThan(
       prompt.indexOf('Too long.'),
     );
+  });
+
+  it('appends the reference passages after rendering, before revision and repair', () => {
+    const prompt = buildSpecialistPrompt('Write {{thing}}.', {
+      variables: { thing: 'an article' },
+      referenceMaterial:
+        'REFERENCE MATERIAL\n[1] Manual.pdf, p. 3\nUse {{x}} carefully.',
+      previous: { content: {}, instructions: 'Shorter.' },
+      repairErrors: ['Too long.'],
+    });
+    expect(prompt.startsWith('Write an article.')).toBe(true);
+    // Not read as a template variable.
+    expect(prompt).toContain('Use {{x}} carefully.');
+    expect(prompt.indexOf('REFERENCE MATERIAL')).toBeLessThan(
+      prompt.indexOf('REVISION'),
+    );
+    expect(prompt.indexOf('REVISION')).toBeLessThan(
+      prompt.indexOf('Too long.'),
+    );
+  });
+
+  it('sends the same prompt as before when there is no reference material', () => {
+    const args = { variables: { thing: 'a quiz' } };
+    expect(
+      buildSpecialistPrompt('Write {{thing}}.', {
+        ...args,
+        referenceMaterial: null,
+      }),
+    ).toBe(buildSpecialistPrompt('Write {{thing}}.', args));
+    expect(withReference('P', '   ')).toBe('P');
   });
 
   it('throws a clear error when the prompt row is missing', async () => {

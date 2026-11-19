@@ -316,6 +316,20 @@ export const EDIT_TOOL_NAMES = new Set(
 export const READ_ONLY_EDIT_TOOLS = new Set(['get_course_outline', 'get_item']);
 
 /**
+ * Tools that do not change what learners see, or that carry their own
+ * confirmation: they never ask "this course is live — change it?".
+ * Duplicating is the way AROUND editing a live course, so it must never be
+ * behind that question.
+ */
+const LIVE_EDIT_EXEMPT_TOOLS = new Set([
+  ...READ_ONLY_EDIT_TOOLS,
+  'list_organisations',
+  'assign_to_tenants',
+  'publish_course',
+  'duplicate_course',
+]);
+
+/**
  * The edit loop: course-aware tools that change a course in place.
  *
  * Every write re-reads the course under the session's structure lock, mutates
@@ -370,6 +384,8 @@ export class CourseCopilotEditToolsService {
     // then a locked course or a validator rejection reaches the model as a
     // raw exception instead of a refusal it knows how to explain.
     try {
+      const liveCheck = await this.confirmLiveEdit(name, input, context);
+      if (liveCheck) return liveCheck;
       switch (name) {
         case 'get_course_outline':
           return await this.getOutline(context);
@@ -1316,6 +1332,48 @@ export class CourseCopilotEditToolsService {
         newTrackId: copy.id,
       },
     );
+  }
+
+  /**
+   * A published course changes for learners the moment an edit is saved —
+   * there is no draft copy. So the first change to a live course in a session
+   * asks the trainer first, once; the answer is remembered for that course
+   * for the rest of the session. Null means go ahead.
+   */
+  private async confirmLiveEdit(
+    name: string,
+    input: Record<string, any>,
+    context: CourseCopilotToolContext,
+  ): Promise<CourseCopilotToolOutcome | null> {
+    const trackId = context.session.trackId!;
+    if (LIVE_EDIT_EXEMPT_TOOLS.has(name)) return null;
+    if (context.session.metadata?.liveEditsConfirmedFor === trackId) {
+      return null;
+    }
+    const track = await this.structureService.getTrack(trackId);
+    if (track.status !== TrackStatus.ACTIVE) return null;
+
+    const ask = await this.confirmOrAsk(
+      context,
+      'edit_live_course',
+      { tool: name, input },
+      {
+        prompt: `"${track.title}" is published. Change the live course? Learners will see your changes straight away.`,
+        confirmLabel: 'Yes, change the live course',
+        rationale:
+          'There is no draft copy of a published course: each change is live as soon as it is saved. ' +
+          'To work on it without learners seeing changes, choose "Not now" and ask me to duplicate the course.',
+      },
+    );
+    if (ask) return ask;
+    await this.sessionService.patchMetadata(context.session.id, {
+      liveEditsConfirmedFor: trackId,
+    });
+    context.session.metadata = {
+      ...(context.session.metadata ?? {}),
+      liveEditsConfirmedFor: trackId,
+    };
+    return null;
   }
 
   /**

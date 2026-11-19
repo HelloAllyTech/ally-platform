@@ -6282,17 +6282,62 @@ export const en = {
       CREATE: "New course",
       EDIT: "Editing a course",
     } as Record<string, string>,
+    // Replaces "Editing" on the status pill once the course is live.
+    publishedTag: "Published",
 
     // Sessions list
     list: {
-      subtitle: "Pick up where you left off, or start a new course.",
+      subtitle:
+        "Describe a course, review the plan, and Copilot builds it for you. Pick up where you left off, or start a new one.",
       // Decided.
       empty:
         "No copilot sessions yet. Start one from Simulation Studio → New → Course with Copilot.",
+      emptyTitle: "No courses in progress",
+      emptyBody:
+        "Tell Copilot what learners should be able to do. It asks a few questions, shows you a plan, then builds the course.",
       loadFailed: "Couldn't load your Course Copilot sessions.",
       updatedLabel: "Last updated",
       noCourseYet: "Not built yet",
       open: "Open",
+      // What each state means for the trainer, and the one thing to do next.
+      stateLine: {
+        INTERVIEWING: "Copilot is asking about the course.",
+        AWAITING_BLUEPRINT: "The plan is ready for your review.",
+        BUILDING: "Copilot is building the course.",
+        BUILD_FAILED: "The build stopped. Open it to retry what failed.",
+        EDITING: "The course is built. Review it or ask for changes.",
+        PUBLISHED: "The course is live for learners. Ask Copilot for changes any time.",
+        ARCHIVED: "Archived.",
+      } as Record<string, string>,
+      action: {
+        INTERVIEWING: "Continue",
+        AWAITING_BLUEPRINT: "Review plan",
+        BUILDING: "View progress",
+        BUILD_FAILED: "Fix build",
+        EDITING: "Open",
+        ARCHIVED: "Open",
+      } as Record<string, string>,
+      buildTime: "Build time",
+      buildTimeTooltip:
+        "From the first item starting to the last one finishing. Changes you ask for after the build don't count.",
+      notBuilt: "Not built yet",
+      buildingFor: (elapsed: string) => `Building · ${elapsed} so far`,
+      items: (done: number, total: number) => `${done} of ${total} items`,
+      failedItems: (count: number) => `${count} failed`,
+      started: "Started",
+      lastActivity: "Last activity",
+      course: "Course",
+      courseStatus: {
+        DRAFT: "Draft",
+        ACTIVE: "Published",
+        INACTIVE: "Unpublished",
+      } as Record<string, string>,
+      stats: {
+        inProgress: "In progress",
+        built: "Built, not published",
+        published: "Published",
+        averageBuild: "Average build time",
+      },
       archive: "Archive",
       archiveConfirmTitle: "Archive this session?",
       // Said plainly because "archive" next to a course invites the fear that the course goes too.
@@ -6312,6 +6357,27 @@ export const en = {
       // The server's own message wins (it says which limit was hit); this is the fallback for a 409.
       capReached: "You already have two active sessions. Archive one to start another.",
       backToList: "Back to my sessions",
+    },
+
+    // Reference files: a partner's manuals, decks and handouts the course is built from.
+    sources: {
+      title: "Reference material",
+      openingHint:
+        "Have a training manual, slides or handouts from the partner? Attach them and Copilot will build the course from their content.",
+      paneHint: "Copilot builds the course from these files, in its own words.",
+      choose: "Attach files",
+      dropHint: "or drop them here · PDF, Word (.docx), PowerPoint (.pptx) · up to 50 MB each",
+      uploading: (name: string) => `Reading ${name}…`,
+      remove: (name: string) => `Remove ${name}`,
+      removeFailed: "Couldn't remove that file.",
+      uploadFailed: (name: string) => `Couldn't attach ${name}.`,
+      pages: (count: number, kind: string) =>
+        `${count} ${kind === "pptx" ? (count === 1 ? "slide" : "slides") : count === 1 ? "page" : "pages"}`,
+      passages: (count: number) => `${count} ${count === 1 ? "passage" : "passages"}`,
+      lockedBuilding: "Files can't be changed while the course builds.",
+      lockedArchived: "This session is archived, so its files have been deleted.",
+      privacy: "Only this course uses these files. They're deleted when the session is archived.",
+      basedOn: (labels: string[]) => `From: ${labels.join(" · ")}`,
     },
 
     // One session
@@ -6341,6 +6407,44 @@ export const en = {
         ARCHIVED: "Course",
       } as Record<string, string>,
       emptyFeed: "Nothing has been said in this session yet.",
+      // A new session waits for the trainer instead of starting on its own.
+      opening: {
+        title: "What course do you want to make?",
+        body: "Say who it's for and what they should be able to do afterwards. Copilot asks a few questions, then drafts the course for you to review before anything is created.",
+        composerPlaceholder:
+          "For example: a 20-minute course for helpline volunteers on asking about suicide risk",
+        fromFiles: "Start from these files",
+        fromFilesMessage:
+          "I've attached the partner's material. Draft the brief from it, then ask me only what it doesn't answer.",
+        startersLabel: "Or start from one of these",
+        starters: [
+          {
+            label: "Asking about suicide risk",
+            message:
+              "A short course that teaches helpers to ask directly and calmly about suicide risk.",
+          },
+          {
+            label: "Building rapport on a first call",
+            message:
+              "A short course on building rapport with a caller in the first few minutes of a call.",
+          },
+          {
+            label: "Explaining confidentiality",
+            message:
+              "A short course on explaining confidentiality and its limits to a hesitant client.",
+          },
+          {
+            label: "Suggest ideas for my team",
+            message:
+              "I'm not sure yet. Suggest a few course ideas that fit my team's competencies.",
+          },
+        ],
+      },
+      // A published course has no draft copy: what the trainer asks for goes live on save.
+      liveNotice: {
+        title: "This course is live.",
+        body: "Changes you ask for are seen by learners straight away. Copilot checks with you before the first one. To work without learners seeing changes, ask Copilot to duplicate the course.",
+      },
       archivedNotice:
         "This session is archived, so the conversation is read-only. The course itself is untouched.",
       sessionGone:
@@ -6357,7 +6461,7 @@ export const en = {
       // Placeholder says what this state accepts, so the composer teaches the capability
       // ("Communicate Agent Capabilities via Visual Affordances").
       composerPlaceholder: {
-        INTERVIEWING: "Answer, or tell me something I haven't asked about…",
+        INTERVIEWING: "Type your answer, or anything else I should know…",
         AWAITING_BLUEPRINT: "Ask for a change — “drop the game, make section 3 two roleplays”…",
         BUILDING: "Ask a question while it builds…",
         BUILD_FAILED: "Ask what went wrong, or retry from the build panel…",

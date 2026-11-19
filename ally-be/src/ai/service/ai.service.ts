@@ -45,6 +45,8 @@ import type {
 } from '../dto/builder.dto';
 import {
   BUILDER_LIMITS,
+  AGENT_RUN_LIMITS,
+  CRISIS_CHECK_LIMITS,
   KNOWLEDGE_ANSWER_LIMITS,
 } from '../constants/knowledge-answer.constants';
 import { SseParser } from '../util/sse-parser';
@@ -784,19 +786,36 @@ export class AiService {
    * connection reset is the difference between the net being there and the
    * keyword rules standing alone.
    */
-  @RetryWithinBudget({
-    attempts: 2,
-    delayMs: 500,
-    budgetMs: 25_000,
-    shouldRetry: isRetryableAiFailure,
-    label: 'checkWhatsAppCrisis',
-  })
-  async checkWhatsAppCrisis(request: CrisisCheckRequest) {
-    return this.postKnowledge<CrisisCheckResponse, CrisisCheckRequest>(
-      ENDPOINTS.KNOWLEDGE_AGENT_CRISIS_CHECK,
-      request,
-      { timeoutMs: 15_000 },
-    );
+  async checkWhatsAppCrisis(
+    request: CrisisCheckRequest,
+  ): Promise<CrisisCheckResponse> {
+    // Chunk H1: 4 s, then one quick retry inside what is left of 6 s, so a finished reply never
+    // waits more than 6 s for the verdict. A verdict ally-ai marks failed is retried too.
+    const { attemptMs, retryDelayMs, budgetMs, minRetryMs } =
+      CRISIS_CHECK_LIMITS;
+    const startedAt = Date.now();
+    const attempt = (timeoutMs: number) =>
+      this.postKnowledge<CrisisCheckResponse, CrisisCheckRequest>(
+        ENDPOINTS.KNOWLEDGE_AGENT_CRISIS_CHECK,
+        request,
+        { timeoutMs },
+      );
+    let first: { verdict: CrisisCheckResponse } | { error: unknown };
+    try {
+      const verdict = await attempt(attemptMs);
+      if (!verdict?.failed) return verdict;
+      first = { verdict };
+    } catch (error) {
+      if (!isRetryableAiFailure(error)) throw error;
+      first = { error };
+    }
+    const left = budgetMs - (Date.now() - startedAt) - retryDelayMs;
+    if (left < minRetryMs) {
+      if ('verdict' in first) return first.verdict;
+      throw first.error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+    return attempt(Math.min(attemptMs, left));
   }
 
   /**
@@ -878,7 +897,10 @@ export class AiService {
       ENDPOINTS.AGENT_RUN,
       request,
       {
-        timeoutMs: KNOWLEDGE_ANSWER_LIMITS.attemptMs,
+        // ally-ai's cap plus a margin, so ally-ai always ends the run first (chunk H1).
+        timeoutMs:
+          (request.run_timeout_s ?? AGENT_RUN_LIMITS.waitedCapS) * 1000 +
+          AGENT_RUN_LIMITS.marginMs,
         alertOnFailure: false,
         signal,
       },
@@ -905,7 +927,14 @@ export class AiService {
     return this.streamSse<AgentRunResponse, AgentStreamEvent>(
       ENDPOINTS.AGENT_RUN_STREAM,
       request,
-      { deadlineMs: KNOWLEDGE_ANSWER_LIMITS.streamMs, what: 'agent run' },
+      {
+        // ally-ai's cap plus a margin (chunk H1), and the stream ends after a silence.
+        deadlineMs:
+          (request.run_timeout_s ?? AGENT_RUN_LIMITS.streamedCapS) * 1000 +
+          AGENT_RUN_LIMITS.marginMs,
+        silenceMs: AGENT_RUN_LIMITS.silenceMs,
+        what: 'agent run',
+      },
       onEvent,
       signal,
     );
@@ -1016,11 +1045,25 @@ export class AiService {
   private async streamSse<R, E>(
     endpoint: string,
     request: unknown,
-    { deadlineMs, what }: { deadlineMs: number; what: string },
+    {
+      deadlineMs,
+      silenceMs,
+      what,
+    }: { deadlineMs: number; silenceMs?: number; what: string },
     onEvent: (event: E) => void,
     signal?: AbortSignal,
   ): Promise<R> {
     const deadline = AbortSignal.timeout(deadlineMs);
+    // Silence (chunk H1): no event for `silenceMs` ends the stream; every event resets it.
+    const quiet = new AbortController();
+    let silence: NodeJS.Timeout | undefined;
+    const heard = (): void => {
+      if (!silenceMs) return;
+      clearTimeout(silence);
+      silence = setTimeout(() => quiet.abort(), silenceMs);
+      silence.unref?.();
+    };
+    heard();
     const startedAt = Date.now();
     try {
       const response = await axios({
@@ -1035,11 +1078,16 @@ export class AiService {
         },
         data: request,
         responseType: 'stream',
-        signal: signal ? AbortSignal.any([signal, deadline]) : deadline,
+        signal: AbortSignal.any(
+          [signal, deadline, quiet.signal].filter((one): one is AbortSignal =>
+            Boolean(one),
+          ),
+        ),
       });
       const parser = new SseParser();
       for await (const chunk of response.data as AsyncIterable<Buffer>) {
         for (const message of parser.push(chunk.toString('utf8'))) {
+          heard();
           const data = JSON.parse(message.data);
           if (message.event === 'final') {
             this.logger.info(
@@ -1071,17 +1119,26 @@ export class AiService {
       );
     } catch (error) {
       const failure =
-        deadline.aborted && !(error instanceof AiUpstreamError)
+        quiet.signal.aborted &&
+        !deadline.aborted &&
+        !(error instanceof AiUpstreamError)
           ? new AiUpstreamError(
-              `The ${what.split(' ')[0]} stream timed out`,
+              `The ${what.split(' ')[0]} stream went silent`,
               ErrorCode.AI_SERVICE_TIMEOUT,
             )
-          : classifyAiFailure(error);
+          : deadline.aborted && !(error instanceof AiUpstreamError)
+            ? new AiUpstreamError(
+                `The ${what.split(' ')[0]} stream timed out`,
+                ErrorCode.AI_SERVICE_TIMEOUT,
+              )
+            : classifyAiFailure(error);
       this.logger.warn(
         `AI stream FAILED | endpoint=${endpoint} | elapsedMs=${Date.now() - startedAt} | ` +
           `code=${failure.errorCode} | status=${failure.upstreamStatus ?? '-'}`,
       );
       throw failure;
+    } finally {
+      clearTimeout(silence);
     }
   }
 

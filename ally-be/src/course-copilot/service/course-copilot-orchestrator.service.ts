@@ -51,6 +51,7 @@ import {
   COURSE_COPILOT_SYSTEM_PROMPT_TTL_MS,
 } from '../constants/course-copilot.constants';
 import { CourseCopilotSessionService } from './course-copilot-session.service';
+import { CourseCopilotSourcesService } from './course-copilot-sources.service';
 import { CourseCopilotBriefService } from './course-copilot-brief.service';
 import { CourseCopilotLibraryService } from './course-copilot-library.service';
 import { CourseCopilotStructureService } from './course-copilot-structure.service';
@@ -300,6 +301,9 @@ export class CourseCopilotOrchestratorService {
      */
     @Optional()
     private readonly agentTurnSettings?: AgentTurnSettingsService,
+    /** The trainer's reference files. Optional for the same reason. */
+    @Optional()
+    private readonly sources?: CourseCopilotSourcesService,
   ) {}
 
   /** Prompt row first (provider + model), then COURSE_COPILOT_MODEL/PROVIDER. */
@@ -1063,9 +1067,10 @@ export class CourseCopilotOrchestratorService {
     session: CourseCopilotSession,
     validatedTurns = false,
   ): Promise<AgentSystemBlock[]> {
-    const [instructions, libraryContext] = await Promise.all([
+    const [instructions, libraryContext, references] = await Promise.all([
       this.buildSystemPrompt(),
       this.libraryContext(session),
+      this.referenceOverview(session),
     ]);
     // How a turn ends is code's to say, not the dashboard prompt's, and only
     // true while validated turns are on — so it rides the instructions block,
@@ -1076,7 +1081,27 @@ export class CourseCopilotOrchestratorService {
     return [
       { text: `${instructions}\n\n${PLATFORM_RULES}${protocol}`, cache: true },
       { text: libraryContext, cache: true },
+      // Read each turn, not frozen like the library block: files are usually
+      // attached before the first turn, but can be added or removed later.
+      ...(references ? [{ text: references, cache: true }] : []),
     ];
+  }
+
+  /** The trainer's reference files, as the interviewer sees them; null when there are none. */
+  private async referenceOverview(
+    session: CourseCopilotSession,
+  ): Promise<string | null> {
+    if (!this.sources) return null;
+    try {
+      return await this.sources.overview(session.id);
+    } catch (error) {
+      this.logger.warn(
+        `Course Copilot ${session.id}: reference overview unavailable: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
   }
 
   private async buildSystemPrompt(): Promise<string> {

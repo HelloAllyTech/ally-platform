@@ -110,11 +110,12 @@ export class AgentGatewayService {
       conversationId: claims.conversationId,
       runId: claims.runId,
       contactId: claims.contactId,
+      consentOfferId: claims.consent ?? null,
     };
     const claimed = await this.claim(ctx, step, name, input);
     if ('replay' in claimed) {
       this.logger.info(
-        `[AGENT TOOL] ${name} replayed (${claimed.replay.ok ? 'ok' : 'error'})`,
+        `[AGENT TOOL] ${name} replayed (${claimed.replay.ok ? 'ok' : 'error'}) run=${ctx.runId} step=${step}`,
       );
       return { ...claimed.replay, replayed: true };
     }
@@ -143,7 +144,8 @@ export class AgentGatewayService {
       ],
     );
     this.logger.info(
-      `[AGENT TOOL] ${name} ${outcome.ok ? 'ok' : 'error'} in ${ms}ms`,
+      `[AGENT TOOL] ${name} ${outcome.ok ? 'ok' : 'error'} in ${ms}ms run=${ctx.runId} step=${step}` +
+        (outcome.ok ? '' : ` error=${outcome.error}`),
     );
     return { ...outcome, replayed: false };
   }

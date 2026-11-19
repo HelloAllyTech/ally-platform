@@ -19,8 +19,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * Seeds the numbers agreed at the CR1 plan stop. Prices stay blank (entered on the Plans screen).
  * Subscriptions, seats and starting tokens are written by `npm run billing:backfill` (dry run first).
  */
-export class CreatePlansAndSeats1985300000200 implements MigrationInterface {
-  name = 'CreatePlansAndSeats1985300000200';
+export class CreatePlansAndSeats1985400000200 implements MigrationInterface {
+  name = 'CreatePlansAndSeats1985400000200';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`

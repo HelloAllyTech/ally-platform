@@ -433,6 +433,59 @@ describe('CourseCopilotSessionService', () => {
       ]);
     });
 
+    it('adds each build: wall-clock time once settled, counts, and nothing while running', async () => {
+      sessionRepository.find.mockResolvedValue([
+        makeSession({ id: 'built', trackId: null }),
+        makeSession({ id: 'building', trackId: null }),
+        makeSession({ id: 'interviewing', trackId: null }),
+      ]);
+      sessionRepository.manager.query.mockResolvedValueOnce([
+        {
+          sessionId: 'built',
+          startedAt: new Date('2026-11-19T10:00:00Z'),
+          finishedAt: new Date('2026-11-19T10:08:30Z'),
+          total: '12',
+          done: '11',
+          failed: '1',
+          active: '0',
+        },
+        {
+          sessionId: 'building',
+          startedAt: new Date('2026-11-19T11:00:00Z'),
+          finishedAt: new Date('2026-11-19T11:02:00Z'),
+          total: '9',
+          done: '3',
+          failed: '0',
+          active: '6',
+        },
+      ]);
+
+      const list = await service.listSessions(7);
+
+      const [sql, params] = sessionRepository.manager.query.mock.calls[0];
+      // Edits made after the build do not stretch it.
+      expect(sql).toContain(
+        "NOT (input ? 'placement' OR input ? 'replaceTrackItemId')",
+      );
+      expect(params).toEqual([['built', 'building', 'interviewing']]);
+      expect(list.find((s) => s.id === 'built')?.build).toEqual({
+        startedAt: '2026-11-19T10:00:00.000Z',
+        finishedAt: '2026-11-19T10:08:30.000Z',
+        seconds: 510,
+        running: false,
+        items: 12,
+        done: 11,
+        failed: 1,
+      });
+      expect(list.find((s) => s.id === 'building')?.build).toMatchObject({
+        running: true,
+        finishedAt: null,
+        seconds: null,
+        done: 3,
+      });
+      expect(list.find((s) => s.id === 'interviewing')?.build).toBeNull();
+    });
+
     it('does not query tracks when no session has a course', async () => {
       sessionRepository.find.mockResolvedValue([
         makeSession({ trackId: null }),

@@ -1006,6 +1006,10 @@ export const ApiEndpoints = {
     // it authorises spend, so it is not folded into a session PATCH.
     SESSION_BUDGET: (id: string) => `/v1/course-copilot/sessions/${id}/budget`,
     SESSION_ARCHIVE: (id: string) => `/v1/course-copilot/sessions/${id}/archive`,
+    // Reference files (manuals, decks) attached to one session. One file per upload request.
+    SESSION_SOURCES: (id: string) => `/v1/course-copilot/sessions/${id}/sources`,
+    SESSION_SOURCE: (id: string, sourceId: string) =>
+      `/v1/course-copilot/sessions/${id}/sources/${sourceId}`,
     // Drafts the story fields of a SAVED course's landing page. Returns the draft; saves nothing.
     TRACK_LANDING_PAGE_DRAFT: (trackId: string) =>
       `/v1/course-copilot/tracks/${trackId}/landing-page-draft`,
@@ -1692,6 +1696,7 @@ export const TAG_TYPES = {
   // Course Copilot. Also registered in baseApi.ts's `tagTypes`.
   COURSE_COPILOT_SESSIONS: "courseCopilotSessions",
   COURSE_COPILOT_SESSION: "courseCopilotSession",
+  COURSE_COPILOT_SOURCES: "courseCopilotSources",
   // Ally Console. Also registered in baseApi.ts's `tagTypes` — an unregistered tag is silently ignored.
   ALLY_GUIDE_SETTINGS: "allyGuideSettings",
   ALLY_GUIDE_RELEASES: "allyGuideReleases",

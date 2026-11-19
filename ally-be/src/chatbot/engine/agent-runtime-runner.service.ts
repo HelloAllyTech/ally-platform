@@ -14,12 +14,7 @@ import type {
 import { AiService } from '../../ai/service/ai.service';
 import { LoggerService } from '../../logger/logger.service';
 import { AgentRunTokenService } from '../agent-tools/agent-run-token.service';
-import {
-  listDoneLine,
-  listStatusLine,
-  parseListToolName,
-  todayFor,
-} from '../agent-tools/list-tools';
+import { parseListToolName, todayFor } from '../agent-tools/list-tools';
 import { handoverOf } from '../handover/handover';
 import { assistantZone } from '../agent-tools/list-tools';
 import {
@@ -37,6 +32,14 @@ import {
   MalformedAgentResponseError,
 } from './agent-runtime';
 import type { AgentRunRef, ChatTurn, LiveReply } from './chatbot-engine.types';
+import { endedBy, stageLine } from './agent-stage-log';
+import { AGENT_RUN_LIMITS } from '../../ai/constants/knowledge-answer.constants';
+import { ListConsentService } from '../agent-tools/list-consent.service';
+import {
+  questionIn,
+  questionShown,
+  type OfferQuestions,
+} from '../agent-tools/list-consent';
 import { businessFacts } from './business-facts';
 import { buildAgentRunRequest, NO_DOCUMENTS } from './knowledge-request';
 import { contactFromSources } from './run-failed-reply';
@@ -46,6 +49,9 @@ import { contactFromSources } from './run-failed-reply';
  * `AgentRunRequest.knowledge_topics` (see `AgentRunRequest`).
  */
 const MAX_KNOWLEDGE_TOPICS = 50;
+
+/** How long a reply waits for a list write already on its way when the run is cut off (H1). */
+const IN_FLIGHT_WAIT_MS = 2_000;
 
 /** The agent's reply, without the run fields (v1's response shape, which v2 extends). */
 export type EngineAnswer = KnowledgeAnswerResponse &
@@ -89,22 +95,49 @@ export class AgentActedError extends Error {
 }
 
 /**
- * "Done: {record} in {list}." from a list write's stored result; undefined if it isn't one. A
- * change that set a status says it ("Cancelled: … in Appointments.", chunk 8a), so a reply cut
- * short after a reschedule doesn't read as if the old time were still booked.
+ * What a list write saved, from its stored result (chunk H1 Part B): every detail the agent may
+ * read, as the record now is, and for a change what it was before, so a reply cut short never
+ * claims a bare "Done" and never hides a move or a cancel. Undefined if it isn't a list write.
+ *
+ *   Saved in Appointments: Slot: Wed 25 Nov 2026, 15:00; Client: Priya Test; Service: Eye checkup.
+ *   Changed in Appointments: Slot: Sat 21 Nov 2026, 11:00; Service: Eye checkup → now Slot: Sat 21
+ *   Nov 2026, 13:00; Service: LASIK consultation.
  */
 export function doneLineOf(
   result: Record<string, unknown> | null | undefined,
   input?: Record<string, unknown> | null,
 ): string | undefined {
   const list = (result?.list as { name?: unknown } | undefined)?.name;
-  const passages = result?.passages as { record_title?: unknown }[] | undefined;
-  const title = passages?.[0]?.record_title;
-  if (typeof list !== 'string' || typeof title !== 'string') return undefined;
-  const status = input?.status;
-  return typeof status === 'string' && status.trim()
-    ? listStatusLine(status, title, list)
-    : listDoneLine(title, list);
+  const after = fieldsOf((result?.passages as { text?: unknown }[])?.[0]);
+  if (typeof list !== 'string' || !after.length) return undefined;
+  const before = fieldsOf(result?.before as { text?: unknown } | undefined);
+  const said = (fields: [string, string][]): string =>
+    fields.map(([label, value]) => `${label}: ${value}`).join('; ');
+  if (!before.length) return `Saved in ${list}: ${said(after)}.`;
+  const status = typeof input?.status === 'string' ? input.status : '';
+  if (/cancel|withdraw|no.?show|rejected|declined/i.test(status)) {
+    return `Cancelled in ${list}: ${said(before)}.`;
+  }
+  const was = new Map(before);
+  const changed = after.filter(([label, value]) => was.get(label) !== value);
+  const touched = new Set(changed.map(([label]) => label));
+  return `Changed in ${list}: ${said(before.filter(([label]) => touched.has(label)))} → now ${said(changed)}.`;
+}
+
+/** A record passage's "Label: value" lines, without its id. */
+function fieldsOf(
+  passage: { text?: unknown } | null | undefined,
+): [string, string][] {
+  if (typeof passage?.text !== 'string') return [];
+  return (
+    passage.text
+      .split('\n')
+      .map((line) => /^([^:]+):\s*(.+)$/.exec(line))
+      .filter((m): m is RegExpExecArray => Boolean(m) && m![1] !== 'id')
+      .map((m): [string, string] => [m[1].trim(), m[2].trim()])
+      // A contact with no name yet ("A contact") isn't a detail to say back (chunk H1).
+      .filter(([, value]) => !/^(?:a contact|visitor\b|unknown)/i.test(value))
+  );
 }
 
 /** `/agent/run`'s debug-only list of every retrieved chunk; not stored on the message. */
@@ -137,6 +170,8 @@ export class AgentRuntimeRunner {
     private readonly listTools: ListToolsService,
     // Memory, light (chunk 8a). Optional: without it a run is exactly as before.
     @Optional() private readonly memory?: MemoryService,
+    // Consent for list writes (chunk H1). Without it no turn carries a yes: every write asks.
+    @Optional() private readonly consent?: ListConsentService,
   ) {}
 
   /**
@@ -167,22 +202,35 @@ export class AgentRuntimeRunner {
     const conversationId = turn.conversationId ?? `preview-${randomUUID()}`;
     const startedAt = Date.now();
     let withGateway = false;
+    const streamedRun = Boolean(live && turn.channel.capabilities?.streaming);
+    // The run's cap (chunk H1): ally-be names it, waits a little longer, and the token dies with it.
+    const capS = streamedRun
+      ? AGENT_RUN_LIMITS.streamedCapS
+      : AGENT_RUN_LIMITS.waitedCapS;
     try {
       const shown: { refs: Record<string, string> } = { refs: {} };
       const body = await this.requestFor(
         turn,
         request,
         knowledge,
-        { conversationId, runId },
+        { conversationId, runId, capS },
         shown,
       );
       withGateway = Boolean(body.gateway);
+      this.logger.info(
+        stageLine(runId, startedAt, 'run_request_built', {
+          streamed: streamedRun,
+          gateway: withGateway,
+          history: body.history?.length ?? 0,
+        }),
+      );
+      let firstToken = false;
       if (options.mood) {
         body.mood = options.mood;
         const helplines = turn.settings.helplineNumbers?.trim();
         if (helplines) body.support_helplines = helplines.slice(0, 300);
       }
-      const streamed = Boolean(live && turn.channel.capabilities?.streaming);
+      const streamed = streamedRun;
       const signals = [live?.signal, options.signal].filter(
         (signal): signal is AbortSignal => Boolean(signal),
       );
@@ -191,12 +239,39 @@ export class AgentRuntimeRunner {
             // Live steps (chunk 6b): only a streamed run, the bot page's or Try it's, asks for
             // them; WhatsApp can't stream, so its request is unchanged.
             { ...body, activity: true },
-            (event) => live!.onEvent(event),
+            (event) => {
+              if (event.event === 'token' && !firstToken) {
+                firstToken = true;
+                this.logger.info(
+                  stageLine(runId, startedAt, 'first_token_relayed'),
+                );
+              }
+              live!.onEvent(event);
+            },
             signals.length ? AbortSignal.any(signals) : undefined,
           )
         : await this.aiService.runAgent(body, options.signal);
       if (!response?.intent) throw new MalformedAgentResponseError();
-      const { trace, run_id, memory_writes, activity, ...answer } = response;
+      const { trace, run_id, memory_writes, activity, ...ran } = response;
+      // A write that waits for a yes (chunk H1): the reply carries its exact question, or the
+      // person's yes next turn couldn't be matched to it.
+      const asked = withGateway ? await this.askedIn(runId) : null;
+      const answer =
+        asked && !questionShown(ran.answer, asked)
+          ? {
+              ...ran,
+              answer: questionIn(asked, ran.language),
+              intent: 'clarify' as const,
+              citations: [],
+            }
+          : ran;
+      this.logger.info(
+        stageLine(runId, startedAt, 'run_end', {
+          reason: 'finished',
+          ended_by: 'ally-ai_final',
+          intent: answer.intent,
+        }),
+      );
       return {
         response: { ...answer, retrieval: withoutDebugIds(answer.retrieval) },
         latencyMs: Date.now() - startedAt,
@@ -213,8 +288,22 @@ export class AgentRuntimeRunner {
         },
       };
     } catch (error) {
-      // The person left Preview, or a crisis reply went out instead: nobody is waiting.
-      if (live?.signal?.aborted || options.signal?.aborted) throw error;
+      const callerAborted = Boolean(
+        live?.signal?.aborted || options.signal?.aborted,
+      );
+      this.logger.info(
+        stageLine(runId, startedAt, 'run_end', {
+          reason: 'failed',
+          ended_by: endedBy(error, callerAborted),
+          error: error instanceof Error ? error.name : 'unknown',
+        }),
+      );
+      // The person left Preview, or a crisis reply went out instead: nobody is waiting, and nothing
+      // may be written for this run any more (chunk H1).
+      if (callerAborted) {
+        if (withGateway) await this.consent?.endRun(runId);
+        throw error;
+      }
       const fallbackReason = agentFailureReason(error);
       const agent: AgentRunRef = {
         runtime: AgentRuntimeUsed.V2_FAILED,
@@ -222,8 +311,26 @@ export class AgentRuntimeRunner {
         conversationId,
         fallbackReason,
       };
-      // A run that has already done something says what it did (chunk 3b).
+      // ally-be stops waiting (chunk H1): the gateway refuses the run's later writes, and a write
+      // already on its way is waited for, so the reply says what was saved.
+      if (withGateway) {
+        await this.consent?.endRun(runId);
+        await this.settleWrites(runId);
+      }
+      // A run that has already done something says what it did (chunk 3b), from the saved record.
       const acted = withGateway ? await this.actedIn(runId) : null;
+      // One that only got as far as asking (chunk H1): its question, not the run-failed reply.
+      const asked = !acted && withGateway ? await this.askedIn(runId) : null;
+      if (asked) {
+        throw new AgentActedError(
+          'confirm',
+          agent,
+          questionIn(
+            asked,
+            /[\u0900-\u097F]/.test(turn.text ?? '') ? 'hi' : 'en',
+          ),
+        );
+      }
       if (acted) {
         this.logger.warn(
           `Agent runtime failed for chatbot ${turn.chatbot.id} (${fallbackReason}) after ` +
@@ -247,7 +354,12 @@ export class AgentRuntimeRunner {
     turn: ChatTurn,
     request: KnowledgeAnswerRequest,
     knowledge: Pick<KnowledgeAnswerRequest, 'document_ids'>,
-    run: { conversationId: string; runId: string; withGateway?: boolean },
+    run: {
+      conversationId: string;
+      runId: string;
+      withGateway?: boolean;
+      capS?: number;
+    },
     shown?: { refs: Record<string, string> },
   ): Promise<AgentRunRequest> {
     // What it knows about the person (chunk 8a): their lines with memory on, this chat's summary
@@ -281,6 +393,7 @@ export class AgentRuntimeRunner {
       }),
       ...memory.fields,
       ...(contact ? { business_contact: contact.slice(0, 200) } : {}),
+      run_timeout_s: run.capS ?? AGENT_RUN_LIMITS.streamedCapS,
     };
     if (run.withGateway === false) return body;
     // The tools this bot has on, from its OWN stored settings (chunk 3b), and its list tools
@@ -292,17 +405,40 @@ export class AgentRuntimeRunner {
       ...lists.definitions.map((def) => def.name),
     ];
     if (!tools.length) return body;
+    // The person's yes to the question the assistant asked last turn (chunk H1): the only write
+    // this run may make without asking.
+    if (lists.definitions.length && this.consent) {
+      // What this turn's yes answers, for the gateway (chunk H1).
+      await this.consent.rememberTurn(
+        run.runId,
+        request.question,
+        lastAssistant(request.history),
+      );
+    }
+    const consent =
+      lists.definitions.length && this.consent
+        ? await this.consent.consentFor(
+            turn.chatbot.id,
+            run.conversationId,
+            request.question,
+            lastAssistant(request.history),
+          )
+        : null;
     return {
       ...body,
       gateway: {
         url: this.runTokens.gatewayUrl(),
-        token: this.runTokens.sign({
-          chatbotId: turn.chatbot.id,
-          conversationId: run.conversationId,
-          runId: run.runId,
-          contactId,
-          tools,
-        }),
+        token: this.runTokens.sign(
+          {
+            chatbotId: turn.chatbot.id,
+            conversationId: run.conversationId,
+            runId: run.runId,
+            contactId,
+            tools,
+            consent,
+          },
+          run.capS ?? AGENT_RUN_LIMITS.streamedCapS,
+        ),
         tools,
         ...(lists.definitions.length
           ? {
@@ -353,7 +489,7 @@ export class AgentRuntimeRunner {
 
   /**
    * The gateway tool that acted in this run, if any: `hand_over` first, since it decides the
-   * reply; then the last list write, with its "Done:" line. A find only read, so it doesn't count:
+   * reply; then the list writes, each said from its saved record (`doneLineOf`). A find only read, so it doesn't count:
    * the run-failed reply still goes out. A lookup failure is read as nothing acted, as before 3b.
    */
   private async actedIn(
@@ -396,6 +532,65 @@ export class AgentRuntimeRunner {
   }
 
   /**
+   * Waits (up to `IN_FLIGHT_WAIT_MS`) for a list write the run had already started when ally-be
+   * stopped waiting (chunk H1), so `actedIn` sees it.
+   */
+  private async settleWrites(runId: string): Promise<void> {
+    const until = Date.now() + IN_FLIGHT_WAIT_MS;
+    try {
+      while (Date.now() < until) {
+        const started = await this.toolRuns.find({
+          where: { runId, status: ToolRunStatus.STARTED },
+          select: ['tool'],
+        });
+        if (
+          !started.some((row) => parseListToolName(row.tool)?.kind !== 'find')
+        ) {
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    } catch {
+      // Nothing to wait for that we can read: the reply goes as it would have.
+    }
+  }
+
+  /**
+   * The question a list write is waiting on, when this run asked one and wrote nothing after it
+   * (chunk H1): both languages, from the gateway's stored answer.
+   */
+  private async askedIn(runId: string): Promise<OfferQuestions | null> {
+    try {
+      const rows = await this.toolRuns.find({
+        where: { runId },
+        select: ['tool', 'step', 'status', 'errorCode', 'result'],
+        order: { step: 'ASC' },
+      });
+      let asked: OfferQuestions | null = null;
+      for (const row of rows) {
+        if (row.errorCode === 'needs_confirmation') {
+          const q = (row.result as { questions?: OfferQuestions } | null)
+            ?.questions;
+          if (q?.en) asked = q;
+        } else if (
+          row.status === ToolRunStatus.OK &&
+          parseListToolName(row.tool)?.kind !== 'find'
+        ) {
+          asked = null;
+        }
+      }
+      return asked;
+    } catch (error) {
+      this.logger.warn(
+        `Could not read the run's questions: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
+      return null;
+    }
+  }
+
+  /**
    * The titles of the documents the bot answers from: its "what I cover" list. A bot that
    * answers from its organisation's library sends none for now (`knowledge_topics: []`).
    */
@@ -427,4 +622,14 @@ export class AgentRuntimeRunner {
       return [];
     }
   }
+}
+
+/** The assistant's last message in the history, which the person's yes answers. */
+export function lastAssistant(
+  history: { role: string; content: string }[] | undefined,
+): string | null {
+  for (let i = (history?.length ?? 0) - 1; i >= 0; i--) {
+    if (history![i].role === 'assistant') return history![i].content;
+  }
+  return null;
 }

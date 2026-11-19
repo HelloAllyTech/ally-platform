@@ -3,6 +3,7 @@
 One loop serves every bot: the agent reads the turn and decides whether to search;
 a draft the check refuses goes back to it once.
 
+    START ─(a question the bot can search)→ presearch ─→ agent   (chunk H1)
     START → agent ─(tool call, budget left)→ tools ─→ agent
                   │                                └─(hand_over done)→ END
                   └─(reply)→ check ─(refused, first time)→ agent
@@ -36,6 +37,7 @@ from app.core.agent_runtime.nodes import (
     route_after_check,
     route_after_tools,
 )
+from app.core.agent_runtime.nodes.presearch import make_presearch_node, route_from_start
 from app.core.agent_runtime.state import RUN_SCOPED_KEYS, AgentState, BotConfig
 from app.core.agent_runtime.tools.confirmed import is_plain_yes
 from app.core.agent_runtime.trace import summarise_run
@@ -57,8 +59,10 @@ def build_graph(
     graph.add_node("agent", make_agent_node(service))
     graph.add_node("tools", make_tools_node(service))
     graph.add_node("check", make_agent_check_node(service))
+    graph.add_node("presearch", make_presearch_node(service))
 
-    graph.add_edge(START, "agent")
+    graph.add_conditional_edges(START, route_from_start, ["presearch", "agent"])
+    graph.add_edge("presearch", "agent")
     graph.add_conditional_edges("agent", route_after_agent, ["tools", "check"])
     graph.add_conditional_edges("tools", route_after_tools, ["agent", END])
     graph.add_conditional_edges("check", route_after_check, ["agent", END])

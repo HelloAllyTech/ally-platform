@@ -1,3 +1,5 @@
+import { ListConsentService } from '../../agent-tools/list-consent.service';
+import { memoryRedis } from '../../agent-tools/test/agent-tools.fakes';
 import type {
   KnowledgeAnswerResponse,
   KnowledgeRetrievalMeta,
@@ -165,6 +167,8 @@ export const makeEngine = ({
           .fn()
           .mockResolvedValue({ definitions: [], omitted: [] }),
       }) as never,
+      undefined,
+      new ListConsentService(memoryRedis() as never),
     ),
     conversations as never,
     limits as never,

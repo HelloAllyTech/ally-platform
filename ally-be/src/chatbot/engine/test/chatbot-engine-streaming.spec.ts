@@ -57,6 +57,11 @@ const deferredCrisis = () => {
  * Preview, streamed: the run's events are relayed as they arrive, the reply's text waits for the
  * crisis check, and the decision is the one the same message gets without streaming.
  */
+const THINKING = {
+  event: 'status',
+  data: { code: 'thinking', label: 'Reading the question' },
+};
+
 describe('ChatbotEngineService streaming a reply', () => {
   let engine: ChatbotEngineService;
   let aiService: EngineAiService & { runAgentStreaming: jest.Mock };
@@ -104,7 +109,8 @@ describe('ChatbotEngineService streaming a reply', () => {
   it('relays status and steps in order, then the text once the crisis check clears', async () => {
     await engine.respond(turn(), live);
 
-    expect(seen).toEqual(LIVE);
+    // Chunk H1: a status the moment the message arrives, before the run's own.
+    expect(seen).toEqual([THINKING, ...LIVE]);
     expect(aiService.runAgent).not.toHaveBeenCalled();
   });
 
@@ -125,11 +131,17 @@ describe('ChatbotEngineService streaming a reply', () => {
 
     const decided = engine.respond(turn(), live);
     await new Promise((r) => setTimeout(r, 20));
-    expect(seen.map((e) => e.event)).toEqual(['run_started', 'status', 'step']);
+    expect(seen.map((e) => e.event)).toEqual([
+      'status',
+      'run_started',
+      'status',
+      'step',
+    ]);
 
     crisis.resolve({ is_crisis: false, confidence: 0, signal: '' } as never);
     await decided;
     expect(seen.map((e) => e.event)).toEqual([
+      'status',
       'run_started',
       'status',
       'step',

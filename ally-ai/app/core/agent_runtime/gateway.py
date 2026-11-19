@@ -14,11 +14,13 @@ agent reads.
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 import httpx
 
+from app.core.agent_runtime import stages
 from app.core.config import settings
 from app.utils.logger import get_logger
 
@@ -56,11 +58,23 @@ class AgentGatewayClient:
         self, name: str, *, run_id: str, step: int, input: Dict[str, Any]
     ) -> Dict[str, Any]:
         """`{ok: True, result}` or `{ok: False, error}`, whatever happened."""
+        # Test only (chunk H1): off unless set, and never outside development.
+        await stages.debug_tool_delay("before", name)
+        stages.stage("gateway_http_start", tool=name, step=step)
+        started = time.monotonic()
         try:
             res = await self._client.post(
                 f"/tools/{name}",
                 json={"run_id": run_id, "step": step, "input": input},
             )
+            stages.stage(
+                "gateway_http_end",
+                tool=name,
+                step=step,
+                status=res.status_code,
+                dur_ms=int((time.monotonic() - started) * 1000),
+            )
+            await stages.debug_tool_delay("after", name)
         except httpx.TimeoutException:
             return _failed(name, "timeout")
         except httpx.HTTPError as error:

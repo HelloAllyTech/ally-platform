@@ -14,9 +14,15 @@ import {
 } from '../../constants/course-copilot.constants';
 import { CourseBlueprint } from '../../type/course-copilot.type';
 import {
+  ROLEPLAY_MODES,
+  RoleplayMode,
+  StructuredRoleplayBrief,
+} from '../../type/roleplay-brief.type';
+import {
   SpecialistContext,
   SpecialistValidationError,
 } from './specialist.types';
+import { withReference } from './specialist-llm.service';
 
 /** Room for a reasoning model's thinking plus a 300-word brief in JSON. */
 const ROLEPLAY_BRIEF_MAX_TOKENS = 4096;
@@ -27,6 +33,12 @@ const MIN_ACTOR_DESCRIPTION_CHARS = 200;
 const MAX_ACTOR_DESCRIPTION_CHARS = 4000;
 /** The studio's title cap (agentBuilderApply MAX_LENGTHS.title). */
 const MAX_TITLE_CHARS = 100;
+/** The template asks for 2–4 opportunities; more is the model padding. */
+const MAX_OPPORTUNITIES = 4;
+/** Caps one free-text field of the structured brief. */
+const MAX_BRIEF_LINE_CHARS = 400;
+/** A roleplay slot with no estimate of its own. */
+const DEFAULT_ROLEPLAY_MINUTES = 8;
 
 export type RoleplayBriefDifficulty = 'EASY' | 'MEDIUM' | 'HARD';
 
@@ -38,6 +50,8 @@ export interface RoleplayBriefOutput {
   personaAge?: number;
   title: string;
   difficultyLevel: RoleplayBriefDifficulty;
+  /** The slot as the manual's roleplay brief; read by the later build steps. */
+  structured: StructuredRoleplayBrief;
 }
 
 const PERSONA_GENDERS = new Set(['male', 'female', 'non-binary']);
@@ -161,7 +175,10 @@ export class RoleplayBriefSpecialist {
       taskId: COURSE_COPILOT_AI_TASKS.ROLEPLAY_BRIEF,
       task: LlmTask.COURSE_COPILOT_ROLEPLAY_BRIEF,
       promptCode: COURSE_COPILOT_PROMPTS.ROLEPLAY_BRIEF,
-      prompt: renderTemplate(template, this.variables(ctx)),
+      prompt: withReference(
+        renderTemplate(template, this.variables(ctx)),
+        ctx.referenceMaterial,
+      ),
       maxTokens: ROLEPLAY_BRIEF_MAX_TOKENS,
       jsonMode: true,
       usageMetadata: ctx.usageMetadata,
@@ -311,6 +328,17 @@ export class RoleplayBriefSpecialist {
       );
     }
 
+    const opportunities = (
+      Array.isArray(parsed.opportunities) ? parsed.opportunities : []
+    )
+      .filter((v: unknown): v is string => typeof v === 'string' && !!v.trim())
+      .map((v: string) => v.trim().slice(0, MAX_BRIEF_LINE_CHARS))
+      .slice(0, MAX_OPPORTUNITIES);
+    const line = (value: unknown): string | undefined =>
+      typeof value === 'string' && value.trim()
+        ? value.trim().slice(0, MAX_BRIEF_LINE_CHARS)
+        : undefined;
+
     return {
       actorDescription: actorDescription.slice(0, MAX_ACTOR_DESCRIPTION_CHARS),
       agentTestCases,
@@ -322,6 +350,73 @@ export class RoleplayBriefSpecialist {
         : {}),
       title: title.slice(0, MAX_TITLE_CHARS).trim(),
       difficultyLevel,
+      structured: this.structure(ctx, difficultyLevel, {
+        opportunities,
+        learnerGoal: line(parsed.learnerGoal),
+        setting: line(parsed.setting),
+      }),
+    };
+  }
+
+  /**
+   * The slot as the manual's roleplay brief. Mode, gate, difficulty and
+   * length come from the blueprint in code; only the opportunities, the
+   * learner's goal and the setting are the model's. Those three are optional:
+   * a live prompt written before they existed simply leaves them empty.
+   */
+  private structure(
+    ctx: SpecialistContext,
+    difficulty: RoleplayBriefDifficulty,
+    written: Pick<
+      StructuredRoleplayBrief,
+      'opportunities' | 'learnerGoal' | 'setting'
+    >,
+  ): StructuredRoleplayBrief {
+    const { brief, item } = ctx;
+    const spec = item.spec ?? {};
+    const enabling = brief.outcomes?.enabling ?? [];
+    const outcomes = (item.objectiveRefs ?? [])
+      .map((index) => enabling[index])
+      .filter((o): o is string => typeof o === 'string' && o.trim() !== '');
+    const terminal = brief.outcomes?.terminal?.trim();
+    const strings = (value: unknown): string[] =>
+      (Array.isArray(value) ? value : [])
+        .filter((v): v is string => typeof v === 'string' && !!v.trim())
+        .map((v) => v.trim());
+    const mode: RoleplayMode = ROLEPLAY_MODES.includes(spec.mode)
+      ? spec.mode
+      : 'practice';
+    const minScore = Number(item.completionCriteria?.minScore ?? spec.minScore);
+    const minutes = Number(item.estimatedMinutes);
+
+    return {
+      mode,
+      outcomes: outcomes.length ? outcomes : terminal ? [terminal] : [],
+      competencies: strings(brief.competencyNames),
+      behaviours: {
+        helpful: strings(brief.behaviours?.helpful),
+        unhelpful: strings(brief.behaviours?.unhelpful),
+      },
+      ...written,
+      condition: {
+        ...(typeof spec.taskClass === 'string' && spec.taskClass.trim()
+          ? { taskClass: spec.taskClass.trim() }
+          : {}),
+        difficulty,
+      },
+      character: {
+        ...(typeof spec.characterId === 'string' && spec.characterId
+          ? { characterId: spec.characterId }
+          : {}),
+        ...(typeof spec.personaBrief === 'string' && spec.personaBrief.trim()
+          ? { personaBrief: spec.personaBrief.trim() }
+          : {}),
+      },
+      gate: Number.isFinite(minScore) ? { minScore } : {},
+      lengthMinutes:
+        Number.isFinite(minutes) && minutes > 0
+          ? minutes
+          : DEFAULT_ROLEPLAY_MINUTES,
     };
   }
 }

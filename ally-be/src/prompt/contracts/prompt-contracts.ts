@@ -738,6 +738,24 @@ export const COURSE_COPILOT_ROLEPLAY_BRIEF = definePrompt(
   },
 );
 
+/** src/prompts/course_copilot/roleplay_fit_check.txt */
+export const COURSE_COPILOT_ROLEPLAY_FIT_CHECK = definePrompt(
+  'course_copilot_roleplay_fit_check',
+  {
+    brief: 'required',
+    candidates: 'optional',
+    character: 'required',
+  },
+  {
+    name: 'Course Copilot — Roleplay Fit Check',
+    description:
+      'Checks whether a saved Character Library character can carry one Course Copilot roleplay: whether who they are (history, openness, how they speak) lets them create the moments and invite the behaviours the roleplay brief needs. Mood and difficulty are set by the roleplay and are not reasons. When the character does not fit, ranks up to two better-fitting library characters. JSON mode.',
+    category: 'Course Copilot',
+    runtimes: ['ally-be'],
+    output: 'structured',
+  },
+);
+
 /** src/prompts/cover_image_generation.txt */
 export const COVER_IMAGE_GENERATION = definePrompt('cover_image_generation', {
   age: 'optional',

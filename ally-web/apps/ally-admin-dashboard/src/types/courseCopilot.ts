@@ -307,6 +307,21 @@ export interface CourseCopilotSessionSummary {
   trackStatus: string | null;
   createdAt: string;
   updatedAt: string;
+  /** The sessions list only: how its build went; null before one started. */
+  build?: CourseCopilotBuildTiming | null;
+}
+
+/** One session's build, from its first item starting to its last one settling. */
+export interface CourseCopilotBuildTiming {
+  startedAt: string | null;
+  /** Null while any item is queued or running. */
+  finishedAt: string | null;
+  /** Wall-clock build time in seconds; null until the build has settled. */
+  seconds: number | null;
+  running: boolean;
+  items: number;
+  done: number;
+  failed: number;
 }
 
 export interface CourseCopilotServerMessage {
@@ -356,6 +371,8 @@ export interface CourseCopilotJob {
   error: string | null;
   summary: string | null;
   skippedReason: string | null;
+  /** Reference files this item was written from ("Manual.pdf, p. 12"). Absent on older rows. */
+  references?: string[];
   startedAt: string | null;
   finishedAt: string | null;
   costUsd: number | null;
@@ -482,4 +499,16 @@ export interface CourseCopilotFeedMessage extends CourseCopilotChatMessage {
    * the last user turn. Absent for errors a retry cannot fix (misconfigured, budget, locked).
    */
   retryable?: boolean;
+}
+
+/** A reference file (partner manual, deck, handout) attached to one Copilot session. */
+export interface CourseCopilotSource {
+  id: string;
+  fileName: string;
+  kind: "pdf" | "docx" | "pptx";
+  sizeBytes: number;
+  /** Pages (PDF) or slides (PPTX); null for Word files. */
+  pageCount: number | null;
+  passageCount: number;
+  createdAt: string;
 }

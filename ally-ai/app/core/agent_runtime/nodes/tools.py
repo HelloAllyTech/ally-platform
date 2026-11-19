@@ -21,7 +21,7 @@ from typing import Any, Dict, Literal, Optional
 from langgraph.graph import END
 from langgraph.runtime import get_runtime
 
-from app.core.agent_runtime import activity
+from app.core.agent_runtime import activity, stages
 from app.core.agent_runtime.budget import extend_after_write
 from app.core.agent_runtime.gateway import AgentRunContext
 from app.core.agent_runtime.state import AgentState, json_safe
@@ -48,6 +48,13 @@ def make_tools_node(service: KnowledgeAgentService) -> Node:
         did_list = list(state.get("activity") or [])
 
         tool = offered.get(name)
+        stages.stage(
+            "tool_start",
+            active=f"tool:{name}",
+            tool=name,
+            kind=getattr(tool, "kind", "unknown"),
+            step=len(records),
+        )
         if tool is None:
             # Unreachable through the step schema, which names only offered tools;
             # kept so a bad step costs one tool call rather than the run.
@@ -104,7 +111,20 @@ def make_tools_node(service: KnowledgeAgentService) -> Node:
             # A list tool's records (chunk 6) join the run's passages, numbered
             # after them, citable; they are not searches.
             added = json_safe(result.passages)
-            if tool.ends_run and result.record.get("ok"):
+            asked = result.record.get("questions")
+            if result.record.get("error") == "needs_confirmation" and asked:
+                # The gateway asks before it writes (chunk H1): its question is the
+                # reply, and the run ends here, with no more model calls.
+                language = (step.get("language") or "en").strip()
+                question = asked.get("hi") if language.startswith("hi") else None
+                update = {
+                    "result": json_safe(
+                        _asked_result(
+                            service, state, step, question or asked.get("en") or ""
+                        )
+                    )
+                }
+            elif tool.ends_run and result.record.get("ok"):
                 update = {
                     "result": json_safe(_handover_result(service, state, step, tool))
                 }
@@ -151,6 +171,17 @@ def make_tools_node(service: KnowledgeAgentService) -> Node:
                     "search_gate": result.gate,
                 }
 
+        last = records[-1] if records else {}
+        stages.stage(
+            "tool_end",
+            active="between_nodes",
+            tool=name,
+            dur_ms=int((time.monotonic() - started) * 1000),
+            ok=bool(last.get("ok", not last.get("refused"))),
+            error=last.get("error") or "-",
+            list_kind=last.get("list_kind") or "-",
+            passages=len(added),
+        )
         return {
             **update,
             **({"activity": json_safe(did_list)} if did_list else {}),
@@ -201,6 +232,38 @@ def _handover_result(
     )
     result["turn_type"] = state.get("turn_type") or "question"
     result["handover"] = True
+    return result
+
+
+def _asked_result(
+    service: KnowledgeAgentService,
+    state: AgentState,
+    step: Dict[str, Any],
+    question: str,
+) -> Dict[str, Any]:
+    """The run's result when the gateway asked for a yes (chunk H1): its question,
+    as a clarifying reply, no citations."""
+    language = (step.get("language") or state.get("language") or "en").strip()
+    retrieval = state.get("retrieval") or service.retrieval_meta(
+        state["limits"],
+        [],
+        language=language,
+        translated=None,
+        translation_degraded=False,
+    )
+    result: Dict[str, Any] = dict(
+        build_result(
+            intent=AnswerIntent.CLARIFY,
+            answer=question,
+            language=language,
+            confidence=1.0,
+            citations=[],
+            decline_reason=DeclineReason.NONE,
+            retrieval={**retrieval, "passages_used": len(state.get("passages") or [])},
+            meta=state.get("agent_meta") or {},
+        )
+    )
+    result["turn_type"] = "question"
     return result
 
 

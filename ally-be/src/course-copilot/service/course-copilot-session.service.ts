@@ -29,6 +29,7 @@ import {
   CourseCopilotJobView,
   CourseCopilotMessageView,
   CourseCopilotSessionDetail,
+  CourseCopilotBuildTiming,
   CourseCopilotSessionSummary,
 } from '../type/course-copilot-api.type';
 import { CourseChangeLogEntry } from '../type/course-copilot.type';
@@ -198,11 +199,74 @@ export class CourseCopilotSessionService {
         })
       : [];
     const byId = new Map(tracks.map((track) => [track.id, track]));
-    return sessions.map((session) =>
-      this.toSummary(
+    const builds = await this.buildTimings(sessions.map((s) => s.id));
+    return sessions.map((session) => ({
+      ...this.toSummary(
         session,
         session.trackId ? byId.get(session.trackId) : null,
       ),
+      build: builds.get(session.id) ?? null,
+    }));
+  }
+
+  /**
+   * How each session's build went: when the first job started, when the last
+   * one finished, and how many items it made. Edit-loop jobs (an item added or
+   * regenerated after the build, which carry `placement` or
+   * `replaceTrackItemId`) are left out, so a later edit does not stretch the
+   * build time. One grouped query for the whole list.
+   */
+  private async buildTimings(
+    sessionIds: string[],
+  ): Promise<Map<string, CourseCopilotBuildTiming>> {
+    if (!sessionIds.length) return new Map();
+    const rows: {
+      sessionId: string;
+      startedAt: Date | null;
+      finishedAt: Date | null;
+      total: string;
+      done: string;
+      failed: string;
+      active: string;
+    }[] = await this.sessionRepository.manager.query(
+      `SELECT "sessionId",
+              MIN("startedAt") AS "startedAt",
+              MAX("finishedAt") AS "finishedAt",
+              COUNT(*) AS total,
+              COUNT(*) FILTER (WHERE status = 'done') AS done,
+              COUNT(*) FILTER (WHERE status = 'failed') AS failed,
+              COUNT(*) FILTER (WHERE status IN ('queued', 'running')) AS active
+         FROM course_copilot_jobs
+        WHERE "sessionId" = ANY($1::uuid[])
+          AND NOT (input ? 'placement' OR input ? 'replaceTrackItemId')
+        GROUP BY "sessionId"`,
+      [sessionIds],
+    );
+    return new Map(
+      rows.map((row) => {
+        const running = Number(row.active) > 0;
+        const started = row.startedAt ? new Date(row.startedAt) : null;
+        const finished =
+          !running && row.finishedAt ? new Date(row.finishedAt) : null;
+        return [
+          row.sessionId,
+          {
+            startedAt: iso(started),
+            finishedAt: iso(finished),
+            seconds:
+              started && finished
+                ? Math.max(
+                    0,
+                    Math.round((finished.getTime() - started.getTime()) / 1000),
+                  )
+                : null,
+            running,
+            items: Number(row.total),
+            done: Number(row.done),
+            failed: Number(row.failed),
+          },
+        ];
+      }),
     );
   }
 
@@ -434,6 +498,9 @@ export class CourseCopilotSessionService {
       error: job.error ?? null,
       summary: job.result?.summary ?? null,
       skippedReason: job.result?.skippedReason ?? null,
+      references: Array.isArray(job.result?.references)
+        ? job.result.references
+        : [],
       startedAt: iso(job.startedAt),
       finishedAt: iso(job.finishedAt),
       costUsd:

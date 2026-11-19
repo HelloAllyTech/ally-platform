@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { ListDefinitionsService } from '../lists/list-definitions.service';
@@ -9,12 +9,15 @@ import { ListRecordsService } from '../lists/list-records.service';
 import { LIST_COPY, ListRefusalException } from '../lists/list-refusals';
 import type { ListActor, ListRecordView } from '../lists/list-types';
 import type { ChatbotSettingsOverride } from '../type/chatbot.type';
+import { ListConsentService } from './list-consent.service';
+import { askFirstMessage, namesEntry, offerFor } from './list-consent';
 import {
   datedLists,
   listToolDefinitions,
   offeredListTools,
   parseListToolInput,
   parseListToolName,
+  playbookOf,
   recordPassage,
   toListData,
   toListQuery,
@@ -44,6 +47,9 @@ export class ListToolsService {
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly definitions: ListDefinitionsService,
     private readonly records: ListRecordsService,
+    // Chunk H1. Always provided by the chatbot module; without it nothing is written (every
+    // write asks, and no yes can be matched), so a wiring mistake fails closed.
+    @Optional() private readonly consent?: ListConsentService,
   ) {}
 
   /**
@@ -229,18 +235,30 @@ export class ListToolsService {
         };
       }
       const data = toListData(list, input);
-      let record: ListRecordView;
-      if (def.kind === 'create' && dryRun && !ctx.contactId && personList) {
-        record = await this.previewCreate(ctx.chatbotId, list.key, actor, data);
-      } else if (def.kind === 'create') {
-        ({ record } = await this.records.create(
-          ctx.chatbotId,
-          list.key,
-          actor,
-          data,
-          { ...scope, dryRun },
-        ));
-      } else {
+      if (def.kind === 'create') {
+        // A choice left out (the service) that the assistant's last message named, exactly one of
+        // the options (chunk H1): taken from there, rather than asked again.
+        await this.fillNamedChoice(ctx, list, def, data);
+      }
+      const booking =
+        def.kind === 'create' && playbookOf(list, [def]) === 'booking';
+      // A booking needs its service (chunk H1 Part D): an empty choice the list offers is asked
+      // for, never saved blank.
+      const missing = booking ? missingChoice(list, def, data) : null;
+      if (missing) {
+        return {
+          ok: false,
+          error: 'missing_detail',
+          result: {
+            list: about,
+            field: missing.key,
+            message: LIST_COPY.missing_choice(missing.label, missing.options),
+            passages: [],
+          },
+        };
+      }
+      let current: ListRecordView | null = null;
+      if (def.kind === 'update') {
         const id = String(input.id ?? '');
         if (!UUID.test(id)) {
           return refused(list, lists, {
@@ -248,28 +266,83 @@ export class ListToolsService {
             message: LIST_COPY.not_found(),
           });
         }
-        const current = await this.records.get(
+        current = await this.records.get(
           ctx.chatbotId,
           list.key,
           actor,
           id,
           scope,
         );
-        ({ record } = await this.records.update(
-          ctx.chatbotId,
-          list.key,
-          actor,
-          id,
-          data,
-          current.version,
-          { ...scope, dryRun },
-        ));
       }
+      // 1. The write, tried and rolled back (chunk H1 Part B): a full slot or the per-person limit
+      //    is refused here, before the person is asked anything; and it is exactly what the
+      //    question names.
+      const intended = await this.write(ctx, def, list, actor, data, current, {
+        dryRun: true,
+        personList,
+      });
+      // 2. Consent: a yes in a later turn to the question that named exactly this entry.
+      const offer = offerFor(
+        list,
+        def.kind === 'create' ? 'create' : 'update',
+        intended,
+        current,
+        booking,
+      );
+      const accepted = this.consent
+        ? await this.consent.accepts(
+            ctx,
+            def.name,
+            offer.key,
+            (message) =>
+              namesEntry(message, list, intended) &&
+              (!current || namesEntry(message, list, current)),
+          )
+        : null;
+      if (!accepted) {
+        const asked = this.consent
+          ? await this.consent.offer(
+              ctx,
+              def.name,
+              offer.key,
+              list.name,
+              offer.questions,
+            )
+          : { questions: offer.questions };
+        return {
+          ok: false,
+          error: 'needs_confirmation',
+          result: {
+            list: about,
+            question: asked.questions.en,
+            questions: asked.questions,
+            message: askFirstMessage(asked.questions.en),
+            // Not the dry-run record: its "booked" would read as done.
+            passages: [],
+          },
+        };
+      }
+      // 3. The write itself, unless ally-be has already stopped waiting for this run (chunk H1):
+      //    its reply has gone, and a write now would be one the person was never told about.
+      if (await this.consent?.ended(ctx.runId)) {
+        return {
+          ok: false,
+          error: 'run_ended',
+          result: { list: about, passages: [] },
+        };
+      }
+      const record = await this.write(ctx, def, list, actor, data, current, {
+        dryRun,
+        personList,
+      });
+      await this.consent?.consume(ctx.chatbotId, ctx.conversationId);
       return {
         ok: true,
         result: {
           list: about,
           passages: [recordPassage(list, record)],
+          ...(current ? { before: recordPassage(list, current) } : {}),
+          consent: { offered_in: accepted.runId },
           ...(dryRun ? { preview: true } : {}),
         },
       };
@@ -280,6 +353,60 @@ export class ListToolsService {
       throw error;
     }
   }
+  private async fillNamedChoice(
+    ctx: AgentToolContext,
+    list: ListDefinitionView,
+    def: ListToolDefinition,
+    data: Record<string, unknown>,
+  ): Promise<void> {
+    const missing = missingChoice(list, def, data);
+    if (!missing || !this.consent) return;
+    const previous = (await this.consent.previousMessage(ctx.runId)) ?? '';
+    const said = previous.toLowerCase();
+    const named = missing.options.filter((option) =>
+      said.includes(option.toLowerCase()),
+    );
+    if (named.length === 1) data[missing.key] = named[0];
+  }
+
+  /**
+   * One create or update through 5a's engine: tried and rolled back with `dryRun`, for real
+   * otherwise. Preview's create on a person's list with no person goes through `previewCreate`.
+   */
+  private async write(
+    ctx: AgentToolContext,
+    def: ListToolDefinition,
+    list: ListDefinitionView,
+    actor: ListActor,
+    data: Record<string, unknown>,
+    current: ListRecordView | null,
+    opts: { dryRun: boolean; personList: boolean },
+  ): Promise<ListRecordView> {
+    const scope = { contactId: ctx.contactId };
+    if (def.kind === 'create') {
+      if (opts.dryRun && !ctx.contactId && opts.personList) {
+        return this.previewCreate(ctx.chatbotId, list.key, actor, data);
+      }
+      return (
+        await this.records.create(ctx.chatbotId, list.key, actor, data, {
+          ...scope,
+          dryRun: opts.dryRun,
+        })
+      ).record;
+    }
+    return (
+      await this.records.update(
+        ctx.chatbotId,
+        list.key,
+        actor,
+        current!.id,
+        data,
+        current!.version,
+        { ...scope, dryRun: opts.dryRun },
+      )
+    ).record;
+  }
+
   /**
    * Only the entries still free (Q3-fast Part 0b, C19): on a list that others book into (Slots,
    * Tables, Classes), an entry whose live bookings already fill it under the booking list's rules
@@ -512,4 +639,30 @@ function refused(
       passages: alternatives,
     },
   };
+}
+
+/**
+ * A booking's choice the list offers (the service) that the call left empty and the list doesn't
+ * fill in itself (chunk H1 Part D): asked for, never saved blank. The status is the list's own.
+ */
+export function missingChoice(
+  list: ListDefinitionView,
+  def: ListToolDefinition,
+  data: Record<string, unknown>,
+): { key: string; label: string; options: string[] } | null {
+  for (const f of list.fields) {
+    if (f.archived_at || f.type !== ListFieldType.SELECT) continue;
+    if (f.key === 'status' || f.key === list.settings?.person_field) continue;
+    const property = def.input_schema.properties[f.key];
+    // The schema's enum carries "" for "not given": not an option to offer or match.
+    const options = (property?.enum ?? []).filter((o) => o.trim());
+    if (!options.length) continue;
+    const given = data[f.key];
+    if (given !== undefined && given !== null && given !== '') continue;
+    if (f.default !== undefined && f.default !== null && f.default !== '') {
+      continue;
+    }
+    return { key: f.key, label: f.label, options };
+  }
+  return null;
 }

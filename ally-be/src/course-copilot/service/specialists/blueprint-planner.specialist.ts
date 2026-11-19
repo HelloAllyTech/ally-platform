@@ -107,6 +107,7 @@ export class BlueprintPlannerSpecialist {
       maxTokens: SPECIALIST_MAX_TOKENS.BLUEPRINT,
       usageMetadata: input.usageMetadata,
       repairErrors,
+      referenceMaterial: input.referenceMaterial,
       variables: {
         brief_json: briefForPrompt(brief),
         objectives_list: enabling.length

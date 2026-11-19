@@ -126,6 +126,7 @@ export class ArticleSpecialist implements ItemSpecialist {
       maxTokens: SPECIALIST_MAX_TOKENS.ARTICLE,
       usageMetadata: context.usageMetadata,
       repairErrors: context.repairErrors,
+      referenceMaterial: context.referenceMaterial,
       previous,
       variables: {
         brief_json: briefForPrompt(brief),

@@ -41,6 +41,21 @@ export interface CourseCopilotSessionSummary {
   trackStatus: string | null;
   createdAt: string;
   updatedAt: string;
+  /** The session list only: how its build went; null before one started. */
+  build?: CourseCopilotBuildTiming | null;
+}
+
+/** One session's build, from its first job starting to its last job settling. */
+export interface CourseCopilotBuildTiming {
+  startedAt: string | null;
+  /** Null while any job is queued or running. */
+  finishedAt: string | null;
+  /** Wall-clock build time; null until the build has settled. */
+  seconds: number | null;
+  running: boolean;
+  items: number;
+  done: number;
+  failed: number;
 }
 
 export interface CourseCopilotMessageView {
@@ -66,6 +81,8 @@ export interface CourseCopilotJobView {
   /** "8 questions", "Created roleplay #412" — set once done. */
   summary: string | null;
   skippedReason: string | null;
+  /** Reference files this item was written from ("Manual.pdf, p. 12"). */
+  references: string[];
   startedAt: string | null;
   finishedAt: string | null;
   costUsd: number | null;

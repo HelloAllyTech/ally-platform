@@ -34,6 +34,13 @@ export interface SpecialistContext {
    * The specialist appends them to its prompt and tries once more.
    */
   repairErrors?: string[];
+  /**
+   * Passages from the trainer's reference files that bear on this item, with
+   * how to use them. Absent when the session has no files.
+   */
+  referenceMaterial?: string | null;
+  /** Where those passages came from ("Manual.pdf, p. 12"), for the build panel. */
+  referenceLabels?: string[];
   /** Merged into every usage row: `{ courseCopilotSessionId, jobId? }`. */
   usageMetadata: Record<string, any>;
 }
@@ -83,6 +90,8 @@ export interface BlueprintPlannerInput {
   }[];
   /** Game keys available, with one-line descriptions. */
   games: { key: string; description: string }[];
+  /** Passages from the trainer's reference files; absent when there are none. */
+  referenceMaterial?: string | null;
   usageMetadata: Record<string, any>;
 }
 

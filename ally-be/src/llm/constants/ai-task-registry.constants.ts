@@ -3235,6 +3235,24 @@ const COURSE_COPILOT_TASKS: AiTaskEntry[] = [
     promptOverride: 'course_copilot_roleplay_brief',
   },
   {
+    id: 'course-copilot-roleplay-fit-check',
+    task: LlmTask.COURSE_COPILOT_ROLEPLAY_FIT_CHECK,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger:
+      'Course Copilot builds a new roleplay on a Character Library character',
+    detail:
+      "Checks the chosen character's profile against the roleplay brief's " +
+      'opportunities and behaviours, and ranks up to two library alternatives ' +
+      'when it does not fit; the copilot then swaps and flags the swap for the ' +
+      'trainer. Skipped for generated personas. JSON mode.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'course_copilot_roleplay_fit_check',
+  },
+  {
     id: 'course-copilot-image-prompt',
     task: LlmTask.COURSE_COPILOT_IMAGE_PROMPT,
     runtime: LlmRuntime.ALLY_BE,

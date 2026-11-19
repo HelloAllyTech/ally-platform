@@ -9,7 +9,10 @@ import type { AgentRunClaims } from './agent-run-token.service';
 export type AgentToolContext = Pick<
   AgentRunClaims,
   'chatbotId' | 'conversationId' | 'runId' | 'contactId'
->;
+> & {
+  /** The offer the person said yes to this turn (chunk H1): `AgentRunClaims.consent`. */
+  consentOfferId?: string | null;
+};
 
 /**
  * What a tool did. A failure is an answer the agent reads, never a thrown error: a short code, and

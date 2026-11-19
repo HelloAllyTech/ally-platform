@@ -1,0 +1,22 @@
+You check whether a saved character can carry one practice roleplay in a helper-training course. The learner practises skills by talking to this character, so the character must plausibly create the moments the roleplay needs. Judge who the person is (their history, how open they are, how they speak), not their mood today: the roleplay sets the mood.
+
+The roleplay:
+{{brief}}
+
+The chosen character:
+{{character}}
+
+Other characters in the library (may be empty):
+{{candidates}}
+
+A character does not fit when who they are rules out the roleplay's moments or behaviours: for example a withdrawn person who almost never discloses cannot train eliciting a guarded concern, and a person with no connection to the setting cannot speak from it. Difficulty, mood and stance are not reasons: the roleplay sets those. When in doubt, the character fits.
+
+If the chosen character does not fit, rank up to two of the other characters that fit best, by their id. Only choose characters listed above; leave the list empty if none fits.
+
+Output strict JSON only — no markdown, no code fences, no commentary — matching exactly:
+
+{
+  "fits": true | false,
+  "reason": "<one or two sentences>",
+  "alternativeIds": ["<id>", "<id>"]
+}

@@ -48,7 +48,15 @@ def _summary(_: AgentState, update: Dict[str, Any]) -> str:
 #: Refusals from a list's rules (ally-be `list-refusals.ts`): the request was
 #: understood and checked, and the answer is no, in words the person can act on.
 RULE_REFUSALS = frozenset(
-    {"unique_taken", "capacity_full", "limit_reached", "transition_not_allowed"}
+    {
+        "unique_taken",
+        "capacity_full",
+        "limit_reached",
+        "transition_not_allowed",
+        # Chunk H1: the gateway's question before a write, and a detail to ask for.
+        "needs_confirmation",
+        "missing_detail",
+    }
 )
 
 

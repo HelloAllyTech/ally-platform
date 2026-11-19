@@ -1701,6 +1701,68 @@ describe('CourseCopilotEditToolsService', () => {
     });
   });
 
+  describe('editing a published course', () => {
+    beforeEach(() => {
+      store.track.status = 'ACTIVE';
+    });
+
+    it('asks once before the first change, and changes nothing yet', async () => {
+      const outcome = await run('update_course_meta', { title: 'New title' });
+
+      const question = questionOf(outcome);
+      expect(outcome.endTurn).toBe(true);
+      expect(question.prompt).toContain('is published');
+      expect(question.options).toEqual([
+        {
+          id: 'confirm',
+          label: 'Yes, change the live course',
+          recommended: true,
+        },
+        { id: 'cancel', label: 'Not now' },
+      ]);
+      expect(question.rationale).toContain('duplicate the course');
+      expect(trackService.updateTrack).not.toHaveBeenCalled();
+    });
+
+    it('makes the change once confirmed, and does not ask again this session', async () => {
+      const questionId = questionOf(
+        await run('update_course_meta', { title: 'New title' }),
+      ).id;
+      nextTurn();
+
+      await run(
+        'update_course_meta',
+        { title: 'New title' },
+        { questionId, selectedOptionIds: ['confirm'] },
+      );
+      expect(trackService.updateTrack).toHaveBeenCalledWith(
+        'track-1',
+        expect.objectContaining({ title: 'New title' }),
+      );
+      expect(dbMetadata.liveEditsConfirmedFor).toBe('track-1');
+
+      nextTurn();
+      trackService.updateTrack.mockClear();
+      const second = await run('update_course_meta', { title: 'Another' });
+      expect(second.modelResult.awaitingConfirmation).toBeUndefined();
+      expect(trackService.updateTrack).toHaveBeenCalled();
+    });
+
+    it('never asks before reading, publishing or duplicating', async () => {
+      for (const tool of ['get_course_outline', 'publish_course']) {
+        const outcome = await run(tool);
+        expect(outcome.modelResult.awaitingConfirmation).toBeUndefined();
+      }
+    });
+
+    it('does not ask for a draft course', async () => {
+      store.track.status = 'DRAFT';
+      const outcome = await run('update_course_meta', { title: 'Draft title' });
+      expect(outcome.modelResult.awaitingConfirmation).toBeUndefined();
+      expect(trackService.updateTrack).toHaveBeenCalled();
+    });
+  });
+
   describe('update_course_meta', () => {
     it('updates only the given fields, as the owner', async () => {
       const outcome = await run('update_course_meta', {

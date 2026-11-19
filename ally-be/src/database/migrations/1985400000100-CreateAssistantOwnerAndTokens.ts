@@ -28,8 +28,8 @@ const PERMISSIONS = [
   'view:whatsapp-bot:analytics',
 ];
 
-export class CreateAssistantOwnerAndTokens1985300000100 implements MigrationInterface {
-  name = 'CreateAssistantOwnerAndTokens1985300000100';
+export class CreateAssistantOwnerAndTokens1985400000100 implements MigrationInterface {
+  name = 'CreateAssistantOwnerAndTokens1985400000100';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(

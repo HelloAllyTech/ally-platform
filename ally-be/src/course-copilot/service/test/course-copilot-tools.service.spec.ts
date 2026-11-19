@@ -21,6 +21,7 @@ const INTERVIEW_TOOL_NAMES = [
   'get_trigger_warnings',
   'list_cover_images',
   'search_library',
+  'search_sources',
   'design_guidance_search',
   'design_guidance_get',
 ];
@@ -28,6 +29,7 @@ const EDIT_TOOL_NAMES = EDIT_TOOL_DEFINITIONS.map((tool) => tool.name);
 
 describe('CourseCopilotToolsService', () => {
   let service: CourseCopilotToolsService;
+  const sources = { search: jest.fn().mockResolvedValue([]) };
   let sessionRepository: { update: jest.Mock };
   let blueprintService: { propose: jest.Mock; applyPatch: jest.Mock };
   let library: Record<string, jest.Mock>;
@@ -64,6 +66,7 @@ describe('CourseCopilotToolsService', () => {
       library as any,
       guidance as any,
       editTools as any,
+      sources as any,
     );
   });
 
@@ -806,6 +809,51 @@ describe('CourseCopilotToolsService', () => {
         interviewing(),
       );
       expect(library.getBehaviours).toHaveBeenCalledWith(['1', 'c-2']);
+    });
+
+    it("search_sources searches this session's files and cites each passage", async () => {
+      sources.search.mockResolvedValueOnce([
+        {
+          sourceId: 's-1',
+          fileName: 'Manual.pdf',
+          label: 'Manual.pdf, p. 12',
+          section: 'Chapter 3',
+          text: 'Ask directly.',
+          score: 3.2,
+        },
+      ]);
+
+      const outcome = await exec(
+        'search_sources',
+        { query: 'asking about suicide', limit: 50 },
+        session(Status.INTERVIEWING, { id: 'sess-1' }),
+      );
+
+      expect(sources.search).toHaveBeenCalledWith(
+        'sess-1',
+        'asking about suicide',
+        8,
+      );
+      expect(outcome.modelResult.passages).toEqual([
+        {
+          source: 'Manual.pdf, p. 12',
+          section: 'Chapter 3',
+          text: 'Ask directly.',
+        },
+      ]);
+      expect(outcome.summary).toBe(
+        'Searched the reference files for "asking about suicide": 1 passage',
+      );
+    });
+
+    it('search_sources says when nothing matched', async () => {
+      const outcome = await exec(
+        'search_sources',
+        { query: 'zebra' },
+        session(Status.INTERVIEWING),
+      );
+      expect(outcome.modelResult.passages).toEqual([]);
+      expect(outcome.modelResult.note).toContain('No passage matched');
     });
 
     it('search_library defaults an unknown kind to roleplay and the limit to 8, and marks the hits as data', async () => {

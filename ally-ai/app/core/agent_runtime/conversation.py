@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+from app.core.agent_runtime import stages
 from app.core.agent_runtime.memory import history_lead, memory_section, remember_mode
 from app.core.agent_runtime.mood import mood_section
 from app.core.agent_runtime.playbooks import playbooks_section
@@ -17,8 +18,9 @@ from app.core.agent_runtime.schemas import step_schema
 from app.core.agent_runtime.state import BotConfig
 from app.core.agent_runtime.tools.base import Tool
 from app.core.agent_runtime.tools.lists import offers_create, takes_details
+from app.core.agent_runtime.trace import ReplyTokens
 from app.core.config import settings
-from app.core.llm.dispatch import generate_structured
+from app.core.llm.dispatch import STREAM_ANSWER, generate_structured
 from app.core.llm_usage.tasks import LLMTask
 from app.exceptions.custom_exceptions import LLMInvocationFailedException
 from app.prompts.resolver import get_backend_llm_overrides
@@ -82,14 +84,31 @@ async def agent_step(
         raise LLMInvocationFailedException(
             "The agent prompt template is missing or empty."
         )
-    parsed, meta = await generate_structured(
-        schema=step_schema(tools, reply=not must_search, remember=remember_mode(bot)),
-        prompt=prompt,
-        task=LLMTask.WHATSAPP_AGENT_STEP.value,
-        provider=provider,
-        model=model,
-        temperature=temperature if temperature is not None else 0.0,
-        reasoning_effort=settings.AGENT_RUNTIME.AGENT_REASONING_EFFORT,
-        timeout=timeout,
+    stages.stage(
+        "agent_step_prompt",
+        prompt_chars=len(prompt),
+        passages=len(passages),
+        tools=len(tools),
+        history=len(history or []),
+        must_search=must_search,
+        retry=bool(feedback),
     )
+    # Stream the reply as it is written (chunk H1 Part C), unless this step can only
+    # search. Outside a streamed run the tokens go nowhere.
+    sink = STREAM_ANSWER.set(None if must_search else ReplyTokens())
+    try:
+        parsed, meta = await generate_structured(
+            schema=step_schema(
+                tools, reply=not must_search, remember=remember_mode(bot)
+            ),
+            prompt=prompt,
+            task=LLMTask.WHATSAPP_AGENT_STEP.value,
+            provider=provider,
+            model=model,
+            temperature=temperature if temperature is not None else 0.0,
+            reasoning_effort=settings.AGENT_RUNTIME.AGENT_REASONING_EFFORT,
+            timeout=timeout,
+        )
+    finally:
+        STREAM_ANSWER.reset(sink)
     return parsed.model_dump(mode="json"), dict(meta or {})
