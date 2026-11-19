@@ -379,7 +379,7 @@ out which meaning is in play before you change anything.
 **Also called:** Ally admin → Models, Costs, Plans; usage events; metering; Plan and usage (owner screen) · **Not to be confused with:** the [Model catalog](#model-catalog) (`llm_models`, which models a runtime may pick; prices live in `billing_models`); `llm_usage` (every product's raw token log, kept as before); org licences and seats in the learning product.
 **Composed of:** ally-ai tags every model call with the `X-Ally-Usage` header ally-be sends (run, assistant, chat, kind) and reports it on the `llm_usage` SQS message; ally-be's `billing` module prices it into `usage_events` from versioned prices, idempotent per run, kind, step and call, and adds Meta's per-message WhatsApp fees from status webhooks. Costs, budget and spike alerts read those events. Tokens, plans, seats and counters are ally-be data; limits are checked before a run, and crisis replies go out at every limit. Customers and owners never see dollars.
 **Status:** Live — gate: `FeatureToggleKey.MANAGE_COSTS` (super admins: Models, Costs, Plans, a user's Tokens and Plan); owners see their own Plan and usage
-**Code:** `ally-be/src/billing/` · `ally-ai/app/core/llm_usage/` · `ally-web/apps/ally-admin-dashboard/src/pages/Billing/`
+**Code:** `ally-be/src/billing/` · `ally-ai/app/core/llm_usage/` · `ally-web/apps/ally-admin-dashboard/src/pages/Billing/` · `ally-web/apps/ally-admin-dashboard/src/pages/Plan/`
 **Deep doc:** [CR1 notes](https://github.com/HelloAllyTech/ally-platform/blob/master/docs/agents-v2/CHUNK-CR1-NOTES.md)
 
 ### Voice agent pipeline
