@@ -11,7 +11,6 @@ import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
 import 'package:ally_mobile_flutter/features/courses/data/course_models.dart';
 import 'package:ally_mobile_flutter/features/courses/data/courses_repository.dart';
 import 'package:ally_mobile_flutter/features/courses/presentation/course_detail_screen.dart';
-import 'package:ally_mobile_flutter/features/courses/presentation/roleplay/roleplay_requirement.dart';
 import 'package:ally_mobile_flutter/features/simulations/presentation/widgets/learning_path_widgets.dart';
 
 import '../../../support/fake_network_image.dart';
