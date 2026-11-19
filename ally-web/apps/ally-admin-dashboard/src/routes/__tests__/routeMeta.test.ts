@@ -29,6 +29,12 @@ describe("resolveRouteMeta", () => {
     expect(resolveRouteMeta("/assistants/bot-1").title).toBe("Assistant");
   });
 
+  it("titles Ally admin's Models and Costs", () => {
+    expect(resolveRouteMeta(ROUTES.BILLING_MODELS).title).toBe("Models");
+    expect(resolveRouteMeta(ROUTES.BILLING_COSTS).title).toBe("Costs");
+    expect(resolveRouteMeta(ROUTES.BILLING_COSTS).known).toBe(true);
+  });
+
   it("tolerates a trailing slash", () => {
     expect(resolveRouteMeta("/analytics/").title).toBe("Analytics");
   });

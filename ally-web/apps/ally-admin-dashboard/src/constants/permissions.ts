@@ -105,6 +105,8 @@ export const SIDEBAR_ITEMS = {
   STT_CONFIGS: "stt-configs",
   LLM_CONFIGS: "llm-configs",
   LLM_MODEL_CATALOG: "llm-model-catalog",
+  BILLING_MODELS: "billing-models",
+  BILLING_COSTS: "billing-costs",
   AI_TASKS: "ai-tasks",
   SCENARIO_LANGUAGES: "scenario-languages",
   PROMPTS: "prompts",

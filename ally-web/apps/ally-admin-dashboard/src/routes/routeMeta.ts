@@ -165,6 +165,8 @@ const buildTable = (): RouteMetaEntry[] => {
     { path: ROUTES.MANAGE_GUARDRAILS, title: i.guardrails, section: "ai-languages" },
     { path: ROUTES.MANAGE_STT_CONFIGS, title: i.speechRecognition, section: "ai-languages" },
     { path: ROUTES.MANAGE_LLM_MODEL_CATALOG, title: i.languageModels, section: "ai-languages" },
+    { path: ROUTES.BILLING_MODELS, title: i.billingModels, section: "ai-languages" },
+    { path: ROUTES.BILLING_COSTS, title: i.billingCosts, section: "ai-languages" },
     { path: ROUTES.MANAGE_SCENARIO_VOICES, title: i.voices, section: "ai-languages" },
     { path: ROUTES.AI_TASKS, title: i.aiTasks, section: "ai-languages" },
     { path: ROUTES.MANAGE_SCENARIO_LANGUAGES, title: i.languages, section: "ai-languages" },

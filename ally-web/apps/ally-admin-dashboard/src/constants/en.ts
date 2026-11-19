@@ -54,6 +54,9 @@ export const en = {
       // "Providers" item then.
       speechRecognition: "Speech Recognition",
       languageModels: "Language Models",
+      // Ally admin → Models and → Costs (CR1): prices and what assistants cost Ally.
+      billingModels: "Models",
+      billingCosts: "Costs",
       voices: "Voices",
       aiTasks: "AI Tasks",
       languages: "Languages",

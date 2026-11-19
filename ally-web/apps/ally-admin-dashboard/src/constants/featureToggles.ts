@@ -41,6 +41,8 @@ export const FeatureToggleKey = {
   CHARACTER_LIBRARY: "character_library",
   MANAGE_STT_CONFIGS: "manage_stt_configs",
   MANAGE_LLM_MODEL_CATALOG: "manage_llm_model_catalog",
+  // Ally admin → Models and → Costs (CR1): dollars, for Ally super admins only. Mirrors ally-be.
+  MANAGE_COSTS: "manage_costs",
   AI_TASKS: "ai_tasks",
   MANAGE_GUARDRAILS: "manage_guardrails",
   MANAGE_TOOLTIPS: "manage_tooltips",
@@ -126,6 +128,8 @@ export const buildSidebarItemFeatureKeyMap = (
     [sidebarItems.CHARACTER_LIBRARY, FeatureToggleKey.CHARACTER_LIBRARY],
     [sidebarItems.STT_CONFIGS, FeatureToggleKey.MANAGE_STT_CONFIGS],
     [sidebarItems.LLM_MODEL_CATALOG, FeatureToggleKey.MANAGE_LLM_MODEL_CATALOG],
+    [sidebarItems.BILLING_MODELS, FeatureToggleKey.MANAGE_COSTS],
+    [sidebarItems.BILLING_COSTS, FeatureToggleKey.MANAGE_COSTS],
     [sidebarItems.AI_TASKS, FeatureToggleKey.AI_TASKS],
     [sidebarItems.MANAGE_GUARDRAILS, FeatureToggleKey.MANAGE_GUARDRAILS],
     [sidebarItems.TOOLTIPS, FeatureToggleKey.MANAGE_TOOLTIPS],
@@ -200,6 +204,7 @@ export const FEATURE_TOGGLE_KEY_TO_SECTION: Record<string, FeatureToggleSection>
   [FeatureToggleKey.TRANSLATIONS]: FEATURE_TOGGLE_SECTIONS.CONTENT_AND_SIMULATION_CONFIG,
 
   [FeatureToggleKey.SETTINGS]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
+  [FeatureToggleKey.MANAGE_COSTS]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
   [FeatureToggleKey.LOGS]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
   [FeatureToggleKey.MOBILE_RELEASES]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
   [FeatureToggleKey.KNOWLEDGE_BASE]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
