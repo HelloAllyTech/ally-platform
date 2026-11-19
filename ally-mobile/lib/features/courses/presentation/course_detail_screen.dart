@@ -596,10 +596,10 @@ class _CourseItemRow extends ConsumerWidget {
                                     ? 'courses.blocker.tryAgain'
                                     : 'courses.blocker.goToItem',
                               ),
-                              style: _robotoSmall.copyWith(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w500,
-                              ),
+                              // Only Roboto Regular is bundled, so a weight
+                              // would render the same; the brand colour marks
+                              // it as a link.
+                              style: _robotoSmall.copyWith(color: AppColors.primary),
                             ),
                           ),
                         ),
