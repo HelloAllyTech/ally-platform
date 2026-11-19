@@ -1,6 +1,7 @@
 import { baseAPI } from "@api";
 import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
 import {
+  AssessmentPairCompat,
   CreateTrackResponse,
   GenerateTrackCoverImageInput,
   GetTracksQueryParams,
@@ -34,6 +35,17 @@ const tracksApi = baseAPI.injectEndpoints({
     getTrackById: builder.query<TrackDetail, string>({
       query: id => ({
         url: ApiEndpoints.TRACKS.BY_ID(id),
+        method: HttpMethod.GET,
+      }),
+    }),
+
+    /** Whether a pre and a post roleplay score the same behaviours (names listed when not). */
+    getAssessmentPairCompat: builder.query<
+      AssessmentPairCompat,
+      { preScenarioId: number; postScenarioId: number }
+    >({
+      query: ({ preScenarioId, postScenarioId }) => ({
+        url: ApiEndpoints.TRACKS.ASSESSMENT_PAIR_COMPAT(preScenarioId, postScenarioId),
         method: HttpMethod.GET,
       }),
     }),
@@ -265,6 +277,7 @@ export const {
   useGetTracksQuery,
   useGetTrackByIdQuery,
   useLazyGetTrackByIdQuery,
+  useGetAssessmentPairCompatQuery,
   useLazyGetTracksQuery,
   useCreateTrackMutation,
   useUpdateTrackByIdMutation,

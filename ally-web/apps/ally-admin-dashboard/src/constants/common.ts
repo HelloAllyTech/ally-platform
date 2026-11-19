@@ -190,6 +190,9 @@ export const ApiEndpoints = {
     STRUCTURE: (id: string) => `/v1/learn/admin/tracks/${id}/structure`,
     // Raise a live quiz's or annotation's attempt limit; the structure PUT is locked once learners enrol.
     ATTEMPT_LIMIT: (itemId: string) => `/v1/learn/admin/tracks/items/${itemId}/attempt-limit`,
+    // Do a pre and a post roleplay score the same behaviours? (pre/post assessment builder)
+    ASSESSMENT_PAIR_COMPAT: (preScenarioId: number, postScenarioId: number) =>
+      `/v1/tenant-analytics/assessment-pair-compat/${preScenarioId}/${postScenarioId}`,
     // The trainer's notes for Ally and per-item tension.
     GUIDE_NOTES: (id: string) => `/v1/learn/admin/tracks/${id}/guide-notes`,
     DUPLICATE: (id: string) => `/v1/learn/admin/tracks/${id}/duplicate`,

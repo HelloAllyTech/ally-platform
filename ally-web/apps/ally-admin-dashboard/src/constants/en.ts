@@ -10733,6 +10733,10 @@ export const en = {
       // Roleplay completion logic; SCORE_AND_DURATION needs no phrase of its
       // own — its two gates already read as two phrases.
       participation: "Completes on start",
+      assessment: "Assessment",
+      assessmentPre: "Assessment · Pre",
+      assessmentPost: "Assessment · Post",
+      minTurns: (turns: number) => `At least ${turns} turns`,
       scoreOnly: "Score only",
       durationOnly: "Duration only",
     },
