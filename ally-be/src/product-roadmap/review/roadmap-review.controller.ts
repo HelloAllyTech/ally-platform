@@ -76,7 +76,7 @@ export class RoadmapReviewController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
-      'Owner: accept (optionally with a lead), decline with a reason, or reopen',
+      'Owner: accept, decline with a reason, or reopen (a lead is assigned later, after the plan is closed)',
   })
   async review(
     @Param('code') code: string,
