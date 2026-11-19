@@ -4,4 +4,5 @@ export {
   formatRoleplayDuration,
   getRoleplayFailureLines,
   getRoleplayRequirement,
+  getRoleplayShortAttemptLine,
 } from "./roleplayRequirement";

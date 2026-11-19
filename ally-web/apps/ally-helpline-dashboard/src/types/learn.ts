@@ -282,6 +282,8 @@ export interface SimulationSummary {
   endReason?: string | null;
   scenarioPathSessionItemId?: string;
   caseSessionItemId?: string;
+  /** Assessment submitted with results withheld: no score, debrief or transcript. */
+  resultsHidden?: boolean;
   details: {
     id: string;
     createdAt: string;

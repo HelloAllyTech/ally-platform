@@ -2,12 +2,14 @@ import { FunctionComponent, useEffect, useMemo, useState } from "react";
 
 import { useTranslation } from "react-i18next";
 
-import { ActionableNotification, GenericTable, Loading } from "@ally-ui-mono/ui-shared";
+import { ActionableNotification, GenericTable, Loading, Tooltip } from "@ally-ui-mono/ui-shared";
 import { Column, FilterType } from "@ally-ui-mono/ui-shared/lib/generic-table/types";
 import { useGetCourseUsageTableQuery } from "@api";
 import { Download, NoResults } from "@assets";
 import { Button, Chip, ChipConfig, FallbackUI } from "@components";
 import { CourseUsageRow, CourseUsageSortField, GetCourseUsageTableRequest } from "@types";
+
+import { CourseAssessmentDrawer } from "./CourseAssessmentDrawer";
 
 const PAGE_SIZE = 25;
 
@@ -68,6 +70,9 @@ export const CourseUsageTable: FunctionComponent = () => {
   const [search, setSearch] = useState<string | undefined>(undefined);
   const [sortBy, setSortBy] = useState<CourseUsageSortField>("learnersStarted");
   const [order, setOrder] = useState<"ASC" | "DESC">("ASC");
+  const [assessmentCourse, setAssessmentCourse] = useState<{ id: string; title: string } | null>(
+    null,
+  );
 
   const params: GetCourseUsageTableRequest = useMemo(
     () => ({ search, sortBy, order, limit: PAGE_SIZE, offset }),
@@ -235,6 +240,23 @@ export const CourseUsageTable: FunctionComponent = () => {
       sortable: true,
       render: (value: string | null) => formatDate(value),
     },
+    // The row doesn't say whether the course has pre/post assessments, so the
+    // action is on every row and the drawer's empty state covers the rest.
+    {
+      key: "assessment",
+      header: "",
+      render: (_value: unknown, row: CourseUsageRow) => (
+        <Tooltip label={t("organizationMetrics.courseAssessment.actionTooltip")} align="top">
+          <Button
+            variant="text"
+            onClick={() => setAssessmentCourse({ id: row.id, title: row.title })}
+            data-testid={`course-assessment-action-${row.id}`}
+          >
+            {t("organizationMetrics.courseAssessment.action")}
+          </Button>
+        </Tooltip>
+      ),
+    },
   ];
 
   if (isError) {
@@ -299,6 +321,14 @@ export const CourseUsageTable: FunctionComponent = () => {
           handleLoadMore={hasMore ? handleLoadMore : undefined}
           loadMoreLabel={t("common.loadMore", "Load more")}
           className="min-w-full font-secondary text-sm text-typography-800"
+        />
+      )}
+      {assessmentCourse && (
+        <CourseAssessmentDrawer
+          open
+          onClose={() => setAssessmentCourse(null)}
+          trackId={assessmentCourse.id}
+          courseTitle={assessmentCourse.title}
         />
       )}
     </div>

@@ -11,7 +11,11 @@ import {
   InteractionModePicker,
   useInteractionModePreference,
 } from "@components/interaction-mode-picker/InteractionModePicker";
-import { getRoleplayFailureLines, getRoleplayRequirement } from "@components/track-visuals";
+import {
+  getRoleplayFailureLines,
+  getRoleplayRequirement,
+  getRoleplayShortAttemptLine,
+} from "@components/track-visuals";
 import { useStartSimulation } from "@hooks";
 import {
   ACTIVE_TRACK_CONTEXT_KEY,
@@ -76,7 +80,23 @@ export const RoleplayItemPlayer: FC<RoleplayItemPlayerProps> = ({
   const lastScenarioSessionId = payload.type === "ROLEPLAY" ? payload.lastScenarioSessionId : null;
   // Assessment mode: one attempt, so once it is submitted the item can only be
   // reviewed, never relaunched. The server refuses a second start either way.
-  const isAssessment = payload.type === "ROLEPLAY" && !!payload.completionCriteria?.assessmentMode;
+  const assessment = payload.type === "ROLEPLAY" ? (payload.assessment ?? null) : null;
+  const isAssessment =
+    payload.type === "ROLEPLAY" &&
+    (!!payload.completionCriteria?.assessmentMode ||
+      assessment != null ||
+      payload.roleplayGate?.roleplayType === "ASSESSMENT");
+  const requiredTurns =
+    payload.type === "ROLEPLAY" && isAssessment
+      ? (assessment?.requiredTurns ??
+        payload.roleplayGate?.minLearnerTurns ??
+        payload.completionCriteria?.minLearnerTurns ??
+        null)
+      : null;
+  // Submitted and results withheld: "Submitted" only, never a score or report.
+  const resultsHidden = assessment?.resultsHidden === true;
+  // A post can't start until its paired pre is submitted.
+  const postLocked = !!assessment?.preAssessment && !assessment.preAssessment.submitted;
   const assessmentSubmittedAt =
     payload.type === "ROLEPLAY" ? (payload.assessmentSubmittedAt ?? null) : null;
   const assessmentLocked = isAssessment && !!assessmentSubmittedAt;
@@ -87,6 +107,7 @@ export const RoleplayItemPlayer: FC<RoleplayItemPlayerProps> = ({
   const lastAttempt =
     payload.type === "ROLEPLAY" && !alreadyCompleted ? (payload.lastRoleplayAttempt ?? null) : null;
   const failureLines = lastAttempt ? getRoleplayFailureLines(lastAttempt, t) : [];
+  const shortAttemptLine = lastAttempt ? getRoleplayShortAttemptLine(lastAttempt, t) : null;
 
   const { data: scenario } = useGetScenarioQuery({ scenarioId, isPrivate: true }, { skip: isCase });
   const { data: caseDetails } = useGetScenarioCaseDetailsQuery(
@@ -141,7 +162,18 @@ export const RoleplayItemPlayer: FC<RoleplayItemPlayerProps> = ({
 
   const launch = async () => {
     onBeforeLaunch?.();
-    persistTrackContext({ ...trackContextExtras, trackId, itemId: item.id });
+    persistTrackContext({
+      ...trackContextExtras,
+      trackId,
+      itemId: item.id,
+      // So the live session can show "Turn k of n". Display only.
+      ...(payload.type === "ROLEPLAY" &&
+        isAssessment &&
+        requiredTurns != null && {
+          assessmentRequiredTurns: requiredTurns,
+          assessmentScenarioId: payload.scenarioId,
+        }),
+    });
 
     if (payload.type === "CASE") {
       navigate(`/case/${payload.caseId}`);
@@ -175,12 +207,16 @@ export const RoleplayItemPlayer: FC<RoleplayItemPlayerProps> = ({
             title={item.title}
             description=""
             triggerWarnings={isCase ? undefined : scenario?.triggerWarnings}
-            onClick={assessmentLocked ? () => undefined : launch}
+            onClick={assessmentLocked || postLocked ? () => undefined : launch}
           />
         </div>
 
         <p className="mt-5 max-w-md text-sm text-typography-700">
-          {isAssessment ? t("tracks2.roleplay.assessmentIntro") : t("tracks2.roleplay.intro")}
+          {isAssessment
+            ? requiredTurns != null
+              ? t("tracks2.roleplay.assessmentIntroTurns", { n: requiredTurns })
+              : t("tracks2.roleplay.assessmentIntro")
+            : t("tracks2.roleplay.intro")}
         </p>
 
         {requirement && !alreadyCompleted && !assessmentLocked && (
@@ -210,7 +246,17 @@ export const RoleplayItemPlayer: FC<RoleplayItemPlayerProps> = ({
           </div>
         )}
 
-        {isAssessment && !assessmentLocked && (
+        {shortAttemptLine && !assessmentLocked && (
+          <div
+            className="mt-4 w-full max-w-sm rounded-2xl border border-warning-200 bg-warning-50 px-4 py-3 text-left text-sm text-typography-800"
+            role="status"
+            data-testid="roleplay-short-attempt"
+          >
+            {shortAttemptLine}
+          </div>
+        )}
+
+        {isAssessment && !assessmentLocked && requiredTurns == null && (
           <div
             className="mt-4 w-full max-w-sm rounded-2xl border border-warning-200 bg-warning-50 px-4 py-3 text-left text-sm text-typography-800"
             data-testid="roleplay-assessment-notice"
@@ -228,7 +274,17 @@ export const RoleplayItemPlayer: FC<RoleplayItemPlayerProps> = ({
           </div>
         )}
 
-        {alreadyCompleted && lastScenarioSessionId && item.completedAt ? (
+        {resultsHidden ? (
+          <div
+            className="mt-4 flex w-full max-w-sm items-center gap-2 rounded-2xl border border-border-light bg-neutral-50 px-4 py-2.5 text-left"
+            data-testid="roleplay-assessment-results-hidden"
+          >
+            <TickGreenBackground className="h-4 w-4 shrink-0" />
+            <span className="text-sm font-medium text-typography-900">
+              {t("tracks2.roleplay.assessmentSubmittedHidden")}
+            </span>
+          </div>
+        ) : alreadyCompleted && lastScenarioSessionId && item.completedAt ? (
           <button
             type="button"
             onClick={() => setLogExpanded(prev => !prev)}
@@ -290,7 +346,7 @@ export const RoleplayItemPlayer: FC<RoleplayItemPlayerProps> = ({
           )
         )}
 
-        {logExpanded && lastScenarioSessionId && (
+        {logExpanded && lastScenarioSessionId && !resultsHidden && (
           <RoleplaySessionLogPanel sessionId={lastScenarioSessionId} />
         )}
 
@@ -303,6 +359,14 @@ export const RoleplayItemPlayer: FC<RoleplayItemPlayerProps> = ({
           </p>
         ) : (
           <>
+            {postLocked && (
+              <p
+                className="mt-6 max-w-sm text-sm font-medium text-typography-800"
+                data-testid="roleplay-post-locked"
+              >
+                {t("tracks2.roleplay.postLocked", { title: assessment?.preAssessment?.title })}
+              </p>
+            )}
             {availableLanguages.length > 0 && (
               <div className="mt-6 w-full max-w-sm text-left">
                 <DropdownField
@@ -327,7 +391,7 @@ export const RoleplayItemPlayer: FC<RoleplayItemPlayerProps> = ({
             <div className="mt-6 flex items-center gap-3">
               <button
                 onClick={launch}
-                disabled={isStarting}
+                disabled={isStarting || postLocked}
                 className="inline-flex items-center gap-2 rounded-full bg-primary-500 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-600 disabled:pointer-events-none disabled:opacity-50 max-md:min-h-11"
               >
                 {alreadyCompleted && !isCase ? (

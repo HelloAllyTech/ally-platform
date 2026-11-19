@@ -123,6 +123,8 @@ export interface SimulationTranslations {
   exitSimulation?: string;
   reconnecting?: string;
   missedSupervisorHints?: string;
+  /** Assessment sessions only; `{{turn}}` and `{{required}}` are substituted. */
+  assessmentTurnCounter?: { progress: string; reached: string };
   /** Text-chat roleplays only. Optional, like every addition above. */
   textChat?: TextChatTranslations;
   turnIndicator: TurnIndicatorTranslations;
@@ -280,6 +282,12 @@ export interface SimulationPageProps {
   difficultyLevel?: string;
   translations?: SimulationTranslations;
   agentTurnStatus?: AgentTurnStatus;
+  /**
+   * Assessment roleplays only: the minimum learner turns that make an attempt
+   * count. When set, the header shows a live "Turn k of n" counter. Optional
+   * and default-off; other roleplays and the admin preview never pass it.
+   */
+  assessmentRequiredTurns?: number;
 }
 
 export interface SimulationControlsProps {
