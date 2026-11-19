@@ -948,7 +948,7 @@ describe('AiService', () => {
         response: { status: code, data: { detail: 'x' }, headers: {} },
       });
 
-    it('posts to /agent/run once, with a 25s timeout and no retry', async () => {
+    it('posts to /agent/run once, waiting its cap (38 s) plus 5 s, and no retry', async () => {
       mockedAxios.mockRejectedValue(status(502));
       await expect(service.runAgent(body)).rejects.toMatchObject({
         upstreamStatus: 502,
@@ -956,7 +956,7 @@ describe('AiService', () => {
       expect(mockedAxios).toHaveBeenCalledTimes(1);
       expect(mockedAxios.mock.calls[0][0]).toMatchObject({
         url: 'https://test-ai-api.com/api/v1/agent/run',
-        timeout: 25_000,
+        timeout: 43_000,
       });
     });
 

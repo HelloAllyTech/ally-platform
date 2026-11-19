@@ -81,6 +81,9 @@ export const LIST_COPY = {
   transition_not_allowed: (list: string, from: string, to: string) =>
     `${list} can't go from ${from} to ${to}.`,
   not_found: () => `That entry doesn't exist any more.`,
+  /** Chunk H1: a booking without its service: ask which one. */
+  missing_choice: (field: string, options: string[]) =>
+    `Not done yet: ask which ${lower(field)} this is for (${options.join(', ')}).`,
   version_conflict: () =>
     `Someone changed this entry just now. Reload and try again.`,
   limit_exceeded: (limit: string) =>

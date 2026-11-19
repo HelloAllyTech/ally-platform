@@ -795,31 +795,27 @@ ASKED_11 = [
 
 class TestConfirmedTime:
     @pytest.mark.asyncio
-    async def test_run_6_a_different_time_is_not_booked_and_the_agent_asks(
+    async def test_every_write_goes_to_the_gateway_which_decides_consent(
         self, run_booking
     ):
-        # The person confirmed 11:00; find returned only 10:00, and the model books it.
+        """Chunk H1: ally-ai no longer guesses whether a time was confirmed. The
+        write goes to ally-be's gateway, which writes only after a yes in a later
+        turn to the question naming that entry (ally-be list-tools.pg.spec)."""
         gateway = FakeGateway(found((THU_10, "Thu 19 Nov 2026, 10:00")), BOOKED)
         llm = FakeLLM(
             find(starts_at_from="2026-11-19T10:00:00+05:30"),
             create(THU_10),
-            reply("clarify", "Did you mean 10:00 or 11:00 on Thursday?"),
+            reply("answer", "Booked: Thursday 19 Nov at 10:00.", citations=[2]),
         )
         with patch(f"{CONVERSATION}.generate_structured", llm):
             state = await run_booking(
                 "yes, please book it", history=ASKED_11, gateway=gateway
             )
-        assert [c["name"] for c in gateway.calls] == ["find_slots"]
-        record = state["tool_calls"][1]
-        assert record["error"] == "unconfirmed_time"
-        prompt = llm.calls[2]["prompt"]
-        assert (
-            "- `create_appointments`: refused (Not done: the person hasn't confirmed "
-            "this exact day and time (Thu 19 Nov 2026, 10:00). Ask them to confirm "
-            "the day and time before you book it.), not done"
-        ) in prompt
-        # A failed call: not offered again this run.
-        assert "create_appointments" not in offered(llm.calls[2])
+        assert [c["name"] for c in gateway.calls] == [
+            "find_slots",
+            "create_appointments",
+        ]
+        assert "error" not in state["tool_calls"][1]
 
     @pytest.mark.asyncio
     async def test_the_time_they_confirmed_is_booked(self, run_booking):
@@ -836,29 +832,6 @@ class TestConfirmedTime:
             "create_appointments",
         ]
         assert gateway.calls[1]["input"] == {"slot": THU_11}
-
-    @pytest.mark.asyncio
-    async def test_tomorrow_at_4_pm_is_worked_out_from_today(self, run_booking):
-        # Today is Saturday 14 Nov: tomorrow is Sunday 15 Nov.
-        gateway = FakeGateway(
-            found(
-                (MON_16, "Mon 16 Nov 2026, 16:00"),
-                (SUN_16, "Sun 15 Nov 2026, 16:00"),
-            ),
-            BOOKED,
-        )
-        llm = FakeLLM(
-            find(),
-            create(MON_16),
-            reply("clarify", "Did you mean Sunday 15 Nov at 4 pm?"),
-        )
-        with patch(f"{CONVERSATION}.generate_structured", llm):
-            state = await run_booking(
-                "book me tomorrow at 4 pm please, yes", history=[], gateway=gateway
-            )
-        # Monday is refused without a call; the create is then not offered again.
-        assert [c["name"] for c in gateway.calls] == ["find_slots"]
-        assert state["tool_calls"][1]["error"] == "unconfirmed_time"
 
     @pytest.mark.asyncio
     async def test_tomorrow_at_4_pm_books_sunday(self, run_booking):
@@ -900,18 +873,6 @@ class TestConfirmedTime:
             "find_slots",
             "create_appointments",
         ]
-
-    @pytest.mark.asyncio
-    async def test_no_time_named_is_not_booked(self, run_booking):
-        gateway = FakeGateway(found((THU_11, "Thu 19 Nov 2026, 11:00")), BOOKED)
-        llm = FakeLLM(
-            find(),
-            create(THU_11),
-            reply("clarify", "Which time on Thursday?"),
-        )
-        with patch(f"{CONVERSATION}.generate_structured", llm):
-            await run_booking("book me on Thursday", history=[], gateway=gateway)
-        assert [c["name"] for c in gateway.calls] == ["find_slots"]
 
     @pytest.mark.asyncio
     async def test_a_cancel_that_keeps_its_slot_needs_no_time(self, run_booking):
@@ -1404,55 +1365,6 @@ def test_a_find_that_returned_the_nearest_is_not_offered_again():
     ]
     assert answered_finds({"tool_calls": calls}) == {"find_slots"}
     assert answered_finds({"tool_calls": calls[1:]}) == set()
-
-
-@pytest.mark.asyncio
-async def test_the_plain_yes_shortcut_still_goes_through_the_time_check(graph):
-    """Chunk 6b (Shehbaz's check): the carried slots for a plain yes don't skip the
-    confirmed-time check. A "yes" after an offer of 11:00 can't book 10:00."""
-    gateway = FakeGateway(
-        found((THU_10, "Thu 19 Nov 2026, 10:00"), (THU_11, "Thu 19 Nov 2026, 11:00")),
-        BOOKED,
-    )
-    llm = FakeLLM(
-        find(starts_at_from="2026-11-19T10:00:00+05:30"),
-        reply(
-            "clarify",
-            "Thursday 19 Nov at 11:00 is free. Shall I book it?",
-            citations=[2],
-        ),
-        # The plain yes: the model books the wrong carried slot, straight away.
-        create(THU_10),
-        reply("clarify", "Just to check: did you want 11:00?"),
-    )
-    args = dict(
-        conversation_id="conv-yes",
-        chatbot_id="bot-1",
-        bot=booking_bot(),
-        gateway=gateway,
-    )
-    offered = [
-        {"role": "user", "content": "what's free on Thursday morning?"},
-        {
-            "role": "assistant",
-            "content": "Thursday 19 Nov at 11:00 is free. Shall I book it?",
-        },
-    ]
-    with patch(f"{CONVERSATION}.generate_structured", llm):
-        await run_agent(
-            graph,
-            run_id="run-y1",
-            question="what's free on Thursday morning?",
-            history=[],
-            **args,
-        )
-        state = await run_agent(
-            graph, run_id="run-y2", question="yes", history=offered, **args
-        )
-    assert state["carried_records"]  # the shortcut was taken
-    assert [c["name"] for c in gateway.calls] == ["find_slots"]  # no create sent
-    refused = [c for c in state["tool_calls"] if c.get("tool") == "create_appointments"]
-    assert refused and refused[0]["error"] == "unconfirmed_time"
 
 
 class TestARefusalReachesThePersonInWords:

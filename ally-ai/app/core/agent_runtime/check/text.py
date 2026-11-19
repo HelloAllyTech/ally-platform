@@ -136,6 +136,32 @@ def plain_text(text: str) -> str:
     return _MD_HEADING.sub("", text).strip()
 
 
+# Citation leftovers in a sent reply (chunk H1 Part D): "[1]", "[2][3]", "[1, 4]",
+# "Sources: [1], [2]", "(Source: [1])", "(Sources:)" and the ")" a stripped "(Source:
+# [1])" leaves after a full stop. Sources show as chips beside the reply.
+_SOURCE_LIST = re.compile(
+    r"\(?\s*\b(?:sources?|see)\s*:\s*(?:\[\d+\](?:\s*,\s*|\s+)?)*\s*\)?\.?",
+    re.IGNORECASE,
+)
+_MARKS = re.compile(r"\s*\[\d+(?:\s*,\s*\d+)*\](?:\s*\[\d+(?:\s*,\s*\d+)*\])*")
+_EMPTY_PARENS = re.compile(r"\(\s*\)")
+_STRAY_CLOSE = re.compile(r"(?<=[.!?])\)")
+
+
+def without_citation_marks(text: str) -> str:
+    """A reply as it is sent: no citation numbers or "Sources:" lists in the text."""
+    text = _SOURCE_LIST.sub(
+        lambda m: "" if re.search(r"\[\d|:\s*\)?\.?$", m.group(0)) else m.group(0),
+        text or "",
+    )
+    text = _MARKS.sub("", text)
+    text = _EMPTY_PARENS.sub("", text)
+    text = _STRAY_CLOSE.sub("", text)
+    text = re.sub(r"[ \t]+([.,;:!?])", r"\1", text)
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    return re.sub(r"[ \t]+\n", "\n", text).strip()
+
+
 # Crisis wording. Said once, when the bot introduces itself; small talk later in a
 # conversation doesn't repeat it, and nothing repeats "not a crisis service".
 _CRISIS = re.compile(r"crisis|emergency|helpline|tele-?manas", re.IGNORECASE)

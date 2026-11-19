@@ -290,7 +290,12 @@ describe('ChatbotEngineService: the tool gateway', () => {
       tool: 'create_appointments',
       result: {
         list: { key: 'appointments', name: 'Appointments' },
-        passages: [{ record_title: 'Thu 19 Nov 2026, 11:00' }],
+        passages: [
+          {
+            record_title: 'Thu 19 Nov 2026, 11:00',
+            text: 'id: r-1\nSlot: Thu 19 Nov 2026, 11:00\nClient: Priya Test\nService: Eye checkup',
+          },
+        ],
       },
     };
 
@@ -357,7 +362,10 @@ describe('ChatbotEngineService: the tool gateway', () => {
       const decision = await h.engine.respond(h.turn());
       expect(decision).toMatchObject({
         handledBy: WaHandledBy.ERROR,
-        body: 'Done: Thu 19 Nov 2026, 11:00 in Appointments.',
+        // From the saved record (chunk H1): what was booked, for whom, never a bare "Done".
+        body:
+          'Saved in Appointments: Slot: Thu 19 Nov 2026, 11:00; Client: Priya Test; ' +
+          'Service: Eye checkup.',
       });
       expect(h.aiService.answerKnowledgeQuestionWithin).not.toHaveBeenCalled();
     });

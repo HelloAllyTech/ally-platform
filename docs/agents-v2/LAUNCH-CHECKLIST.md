@@ -116,6 +116,27 @@ The Skills Store keeps a prompt's live text; a changed seed file never overwrite
   - young-people assistants no longer ask for a name or phone before the chat;
   - publishing below the checkup's quality gate now asks "Publish anyway?" with the score.
 
+## H1: replies that finish, bookings that are safe (`chunk-h1.md`, `CHUNK-H1-NOTES.md`, `PR-H1.md`)
+
+- [ ] **Before measuring prod, check prod's ally-ai env and Skills Store** (not read during H1, by decision):
+  - `AGENT_RUNTIME__AGENT_REASONING_EFFORT`: unset now means "low" (the new code default); anything else overrides it. Leave it unset or set `low`;
+  - any `AGENT_RUNTIME__RUN_TIMEOUT_SECONDS`, `RUN_BUDGET_SECONDS`, `RUN_WRITE_EXTRA_SECONDS` override: remove it (ally-be now names the cap per request);
+  - the model on `ally_ai_agent_system` and `ally_ai_knowledge_crisis_classify` in the Skills Store: note it in `CHUNK-H1-NOTES.md`; the crisis classifier must answer inside 3.5 s.
+- [ ] **Before deploying, publish the approved prompt change to production's Skills Store** (`prompts` CLI; the seed file in Git is unchanged, per the prompt rules): in `ally_ai_builder_system`, rule 4, replace
+  > Booking and payments are not available yet; never suggest the assistant can book, take orders or take payments. It can collect details and pass them on.
+
+  with
+  > Payments are not available yet; never suggest the assistant can take payments. It can book once an Appointments list is added, and it can collect details and pass them on.
+- [ ] **Migration `1984850000000-CurrentRunFailedReply` runs with ally-be** (data only): the old "Something went wrong on my side…" fallback becomes the run-failed reply where it is still the old default.
+- [ ] **Redis is required for bookings**: offers waiting for a yes live there; if Redis is down, nothing is written (every write asks again).
+- [ ] **After deploy, measure prod** with the same replay as `H1-PART-A.md` (E-A1–A9, E-B1–B7, E-S1–S5, 3 runs, fresh visitors): 0 fallbacks, median under 12 s, worst under 20 s, first words under 3 s, crisis under 6 s, 0 writes without a yes. Then the Q3 rerun list in `chunk-h1.md` (Tests).
+- [ ] **The test visitor's rate limit**: no limit was raised during H1 (fresh visitors per run); if the prod rerun needs one visitor for ~100 messages, raise it for that visitor only, and reset it after.
+- [ ] **Watch for a day after deploy:**
+  - "Crisis classifier did not run…" alerts (the 4 s limit now falls back to keywords instead of holding the reply);
+  - `[AGENT STAGE] … stage=run_end reason=failed` lines and which component ended the run;
+  - writes refused with `needs_confirmation` that never get a yes (people dropping off at the question).
+- [ ] **Tell support:** bookings now always ask "Shall I book … for …?" and save only after a yes; moves and cancels ask too.
+
 ## Checks
 
 - [ ] **Release `0fb34139c` (production onto the v2 agent), then watch the v1 fallback rate and reply times** (H0).

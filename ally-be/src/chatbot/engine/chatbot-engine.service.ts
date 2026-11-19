@@ -53,6 +53,9 @@ import { looksEmotional } from './looks-emotional';
 import { businessFacts } from './business-facts';
 import { agentAnswersInstead, isGreetingReply } from './keyword-skip';
 import { buildKnowledgeRequest, NO_DOCUMENTS } from './knowledge-request';
+import { stageLine, stageRunIdFor } from './agent-stage-log';
+import { emergencyByKeywords } from './emergency-keywords';
+import { caringDecline } from './caring-decline';
 import { replyLanguageOf } from './reply-language';
 import {
   aboutAnAnimal,
@@ -410,7 +413,38 @@ export class ChatbotEngineService {
     }
 
     // ── 3. Answer ────────────────────────────────────────────────────────
-    return this.answer(turn, live);
+    return this.answerLogged(turn, live);
+  }
+
+  /** `answer`, with its start and end as stage lines (chunk H1 Part A). Changes nothing. */
+  private async answerLogged(
+    turn: ChatTurn,
+    live?: LiveReply,
+  ): Promise<ChatbotDecision> {
+    const runKey = stageRunIdFor(turn.providerMessageId);
+    const startedAt = Date.now();
+    this.logger.info(
+      stageLine(runKey, startedAt, 'engine_answer_start', {
+        channel: turn.channel?.type,
+      }),
+    );
+    try {
+      const decision = await this.answer(turn, live);
+      this.logger.info(
+        stageLine(runKey, startedAt, 'engine_answer_end', {
+          handled_by: decision.handledBy,
+        }),
+      );
+      return decision;
+    } catch (error) {
+      this.logger.info(
+        stageLine(runKey, startedAt, 'engine_answer_end', {
+          handled_by: 'threw',
+          error: error instanceof Error ? error.name : 'unknown',
+        }),
+      );
+      throw error;
+    }
   }
 
   /**
@@ -474,15 +508,71 @@ export class ChatbotEngineService {
     live?: LiveReply,
   ): Promise<ChatbotDecision> {
     const { settings } = turn;
+    const runKey = stageRunIdFor(turn.providerMessageId);
+    const startedAt = Date.now();
     const { prompts, ran } = await this.loadPromptOverrides(turn, true);
     const knowledge = await this.knowledgeFor(turn);
     const request = buildKnowledgeRequest(turn, prompts, knowledge);
+    this.logger.info(
+      stageLine(runKey, startedAt, 'context_loaded', {
+        documents: knowledge.document_ids?.length ?? 0,
+      }),
+    );
+
+    // Something on screen at once (chunk H1 Part C): the run, and for an emotional message the
+    // crisis level, can take seconds to send their own first status.
+    if (live && turn.channel.capabilities?.streaming) {
+      live.onEvent({
+        event: 'status',
+        data: { code: 'thinking', label: 'Reading the question' },
+      });
+    }
 
     // One fast check beside the run (Q3-fast Part 1). It never depends on the run: a failed run
     // still gets its verdict, and a rejected check never takes down an answer.
-    const crisisCheck = settings.crisisClassifierEnabled
+    const classifier = settings.crisisClassifierEnabled
       ? this.aiService.checkWhatsAppCrisis(crisisRequest(turn, prompts))
       : Promise.resolve(null);
+    const classified = settle(classifier);
+    // When the classifier fails (chunk H1): the emergency keyword rules decide. A match is an
+    // emergency verdict like the classifier's, so it takes the same fast path.
+    const byKeywords = (): CrisisCheckResponse | null => {
+      const verdict = emergencyByKeywords(turn.text);
+      if (verdict) {
+        this.logger.warn(
+          `Crisis classifier failed for chatbot ${turn.chatbot.id}; an emergency keyword rule ` +
+            `matched, so the emergency reply goes out`,
+        );
+      }
+      return verdict;
+    };
+    const crisisCheck: Promise<CrisisCheckResponse | null> = classifier.then(
+      (verdict) => (verdict?.failed ? (byKeywords() ?? verdict) : verdict),
+      (error: unknown) => {
+        const verdict = byKeywords();
+        if (verdict) return verdict;
+        throw error;
+      },
+    );
+    if (settings.crisisClassifierEnabled) {
+      this.logger.info(stageLine(runKey, startedAt, 'crisis_check_start'));
+      crisisCheck.then(
+        (verdict) =>
+          this.logger.info(
+            stageLine(runKey, startedAt, 'crisis_check_end', {
+              level: crisisLevelOf(verdict) ?? 'none',
+              urgent: isUrgent({ status: 'fulfilled', value: verdict }),
+            }),
+          ),
+        (error) =>
+          this.logger.info(
+            stageLine(runKey, startedAt, 'crisis_check_end', {
+              level: 'failed',
+              error: error instanceof Error ? error.name : 'unknown',
+            }),
+          ),
+      );
+    }
     const checked = settle(crisisCheck);
 
     // 1. Only for a message that looks emotional (stop 1, option c): the level, if it comes within
@@ -490,6 +580,11 @@ export class ChatbotEngineService {
     //    reply goes out now, with no run at all. Upset: the run is told, so its reply opens warmly.
     //    Every other message starts its run at once; the check still races it below.
     const waitMs = looksEmotional(turn.text) ? this.levelWaitMs : 0;
+    this.logger.info(
+      stageLine(runKey, startedAt, 'crisis_wait_before_run', {
+        wait_ms: waitMs,
+      }),
+    );
     const early = await Promise.race([checked, after(waitMs)]);
     if (early && isUrgent(early)) {
       return this.crisisDecision(turn, early.value!, ran, { notOnList: false });
@@ -540,7 +635,8 @@ export class ChatbotEngineService {
       };
     }
 
-    const degradedAlert = this.degradedAlertFor(turn, crisisResult);
+    // Alerted on the classifier's own result, so a keyword fallback still raises it.
+    const degradedAlert = this.degradedAlertFor(turn, await classified);
 
     // The agent passed the chat to a person (chunk 3b): its `hand_over` tool already marked the
     // chat, and the visitor gets 11a's hand-over message, as when they ask for a person. The same
@@ -563,6 +659,22 @@ export class ChatbotEngineService {
         alert: degradedAlert,
         ...(agent ? { agent } : {}),
       };
+    }
+    if (acted === 'confirm') {
+      // The run got as far as asking for a yes (chunk H1): the question is the reply.
+      const question =
+        answerResult.status === 'rejected' &&
+        answerResult.reason instanceof AgentActedError
+          ? answerResult.reason.done
+          : undefined;
+      if (question) {
+        return {
+          handledBy: WaHandledBy.CLARIFIED,
+          body: question,
+          alert: degradedAlert,
+          ...(agent ? { agent } : {}),
+        };
+      }
     }
     if (acted) {
       // A list write that was done (chunk 6) says so; anything else gets the run-failed reply.
@@ -605,7 +717,11 @@ export class ChatbotEngineService {
 
     const { response: answer } = answerResult.value;
     const decision = this.toDecision(
-      await this.withDeclineContact(turn, answer),
+      await this.withDeclineContact(
+        turn,
+        answer,
+        crisisLevelOf(crisis) === 'upset' || mood === 'upset',
+      ),
       answer,
       ran,
       degradedAlert,
@@ -622,14 +738,27 @@ export class ChatbotEngineService {
   private async withDeclineContact(
     turn: ChatTurn,
     answer: EngineAnswer,
+    upset = false,
   ): Promise<ChatTurn> {
     const wording = turn.settings.declineText ?? '';
     if (answer.intent !== 'decline' || answer.answer?.trim()) return turn;
-    if (phoneIn(wording) || emailIn(wording)) return turn;
     const contact = contactFromSources(
       await this.businessFacts(turn),
       turn.settings.helplineNumbers,
     );
+    // Upset, or a question about medicines (chunk H1 Part D): the approved warm line or polite
+    // decline, never the generic "I don't know that".
+    const caring = caringDecline({
+      upset,
+      question: turn.text ?? '',
+      language: replyLanguageOf(turn.text, turn.language),
+      organisation: turn.chatbot.name,
+      contact,
+    });
+    if (caring) {
+      return { ...turn, settings: { ...turn.settings, declineText: caring } };
+    }
+    if (phoneIn(wording) || emailIn(wording)) return turn;
     if (!contact) return turn;
     return {
       ...turn,

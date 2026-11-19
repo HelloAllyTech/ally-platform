@@ -179,6 +179,11 @@ export interface AgentRunRequest extends KnowledgeAnswerRequest {
   chatbot_id?: string;
   runtime_version: 'v2';
   /**
+   * The run's hard cap in seconds (chunk H1). ally-be waits a little longer than this, so ally-ai's
+   * cap always fires first; the run token expires with it.
+   */
+  run_timeout_s?: number;
+  /**
    * Q3-fast Part 1: the crisis check found the person upset, not at risk. The agent's reply opens
    * warmly (and, on health and mental-health assistants, gently names the support there is).
    * Absent otherwise.

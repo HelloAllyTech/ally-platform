@@ -463,7 +463,14 @@ export function BotPageApp({
           slug,
           text,
           {
-            onStatus: code => setPending(p => (p ? { ...p, status: code } : p)),
+            onStatus: code => {
+              // A draft sent back to be rewritten (chunk H1): its streamed text goes.
+              if (code === "rewriting") {
+                target = "";
+                shown = 0;
+              }
+              setPending(p => (p ? { ...p, status: code } : p));
+            },
             onToken: piece => {
               target += piece;
             },

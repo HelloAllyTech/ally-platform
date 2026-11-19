@@ -504,11 +504,15 @@ class TestMoreTimeAfterAWrite:
         assert base + extra - 11 < time_left(started) <= base + extra - 10
 
     @pytest.mark.asyncio
-    async def test_a_write_moves_the_deadline_later_never_earlier(self):
+    async def test_a_write_moves_the_deadline_later_never_earlier(self, monkeypatch):
         import asyncio
         import time
 
         from app.core.agent_runtime.budget import RUN_DEADLINE, extend_after_write
+        from app.core.config import settings
+
+        # 0 by default since chunk H1; the mechanism still works when configured.
+        monkeypatch.setattr(settings.AGENT_RUNTIME, "RUN_WRITE_EXTRA_SECONDS", 4.0)
 
         async with asyncio.timeout(20) as cap:
             RUN_DEADLINE.set(cap)

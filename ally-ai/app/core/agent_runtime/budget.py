@@ -51,11 +51,21 @@ def wrote(state: AgentState) -> bool:
     )
 
 
+#: This run's hard cap in seconds (chunk H1): the request's `run_timeout_s`, set by
+#: the runner; RUN_TIMEOUT_SECONDS when the request names none.
+RUN_CAP_S: ContextVar[Optional[float]] = ContextVar("agent_run_cap_s", default=None)
+
+
+def base_cap() -> float:
+    """The run's cap before any write extra."""
+    return RUN_CAP_S.get() or settings.AGENT_RUNTIME.RUN_TIMEOUT_SECONDS
+
+
 def run_cap(state: AgentState) -> float:
-    """The run's hard cap: RUN_TIMEOUT_SECONDS, and RUN_WRITE_EXTRA_SECONDS more once
-    it has written (chunk 8a)."""
+    """The run's hard cap (`base_cap`), and RUN_WRITE_EXTRA_SECONDS more once it has
+    written (chunk 8a; 0 since chunk H1)."""
     extra = settings.AGENT_RUNTIME.RUN_WRITE_EXTRA_SECONDS if wrote(state) else 0.0
-    return settings.AGENT_RUNTIME.RUN_TIMEOUT_SECONDS + extra
+    return base_cap() + extra
 
 
 def time_left(state: AgentState) -> float:
@@ -82,9 +92,7 @@ def extend_after_write(started_at: Optional[float]) -> None:
     if extra <= 0:
         return
     loop = asyncio.get_running_loop()
-    target = loop.time() + (
-        settings.AGENT_RUNTIME.RUN_TIMEOUT_SECONDS + extra - (time.time() - started_at)
-    )
+    target = loop.time() + (base_cap() + extra - (time.time() - started_at))
     current = deadline.when()
     if current is None or target > current:
         deadline.reschedule(target)

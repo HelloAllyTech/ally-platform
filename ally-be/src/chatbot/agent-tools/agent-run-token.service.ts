@@ -3,8 +3,14 @@ import { createHmac } from 'crypto';
 import * as jwt from 'jsonwebtoken';
 import { AppConfigService } from '../../config/config.service';
 
-/** A run token outlives one agent run (15 s budget, 20 s cap) with room to spare, and no more. */
+/**
+ * The longest a run token lives when the caller names no cap. A run's own token expires with the
+ * run's cap (chunk H1 Part B): a write that arrives after the run was cut off is refused.
+ */
 export const AGENT_RUN_TOKEN_TTL_S = 2 * 60;
+
+/** Seconds a token outlives its run's cap: clock skew and the gateway call already on its way. */
+export const AGENT_RUN_TOKEN_GRACE_S = 1;
 
 /** What one chatbot agent run may do through the gateway, and on whose behalf. */
 export interface AgentRunClaims {
@@ -16,6 +22,11 @@ export interface AgentRunClaims {
   /** Null in Preview, which has no contact. */
   contactId: string | null;
   tools: string[];
+  /**
+   * The offer the person said yes to in this turn (chunk H1 Part B), when they did: the only write
+   * this run may make without asking first. Absent or null: every write asks.
+   */
+  consent?: string | null;
   exp: number;
 }
 
@@ -39,7 +50,11 @@ export class AgentRunTokenService {
       .digest('hex');
   }
 
-  sign(claims: Omit<AgentRunClaims, 'kind' | 'exp'>): string {
+  /** `ttlSeconds`: the run's cap, so the token dies with the run (plus a second's grace). */
+  sign(
+    claims: Omit<AgentRunClaims, 'kind' | 'exp'>,
+    ttlSeconds: number = AGENT_RUN_TOKEN_TTL_S,
+  ): string {
     return jwt.sign(
       {
         kind: 'chatbot_run',
@@ -48,9 +63,19 @@ export class AgentRunTokenService {
         runId: claims.runId,
         contactId: claims.contactId,
         tools: [...claims.tools],
+        consent: claims.consent ?? null,
       },
       this.secret(),
-      { algorithm: 'HS256', expiresIn: AGENT_RUN_TOKEN_TTL_S },
+      {
+        algorithm: 'HS256',
+        expiresIn: Math.max(
+          1,
+          Math.min(
+            AGENT_RUN_TOKEN_TTL_S,
+            Math.ceil(ttlSeconds) + AGENT_RUN_TOKEN_GRACE_S,
+          ),
+        ),
+      },
     );
   }
 
@@ -80,7 +105,12 @@ export class AgentRunTokenService {
       typeof claims.conversationId !== 'string' ||
       typeof claims.runId !== 'string' ||
       !(claims.contactId === null || typeof claims.contactId === 'string') ||
-      !Array.isArray(claims.tools)
+      !Array.isArray(claims.tools) ||
+      !(
+        claims.consent === undefined ||
+        claims.consent === null ||
+        typeof claims.consent === 'string'
+      )
     ) {
       throw new UnauthorizedException('Invalid run token');
     }

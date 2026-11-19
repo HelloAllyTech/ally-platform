@@ -115,13 +115,14 @@ export const baseView = (): BotDraftView => ({
         "Ask one question at a time",
         "Pass each person's name and number to you",
       ],
-      wont: ["Book, take orders or take payments", "Promise discounts or slots you haven't listed"],
+      wont: ["Take payments", "Promise discounts or slots you haven't listed"],
       sample: [
         { from: "visitor", text: "I need help with stress." },
         { from: "assistant", text: "Happy to help. Is it for you, or for a family member?" },
       ],
       recommended: true,
-      limit: "It can't book or take payments yet. It sends you each new enquiry by email.",
+      limit:
+        "It can't take payments yet. It sends you each new enquiry by email, and books when you add an Appointments list.",
     },
     {
       id: "answer",
@@ -132,7 +133,7 @@ export const baseView = (): BotDraftView => ({
         "Link each answer to where it came from",
         "Say plainly when it doesn't know",
       ],
-      wont: ["Book, take orders or take payments"],
+      wont: ["Take payments"],
       sample: [
         { from: "visitor", text: "Do you offer online sessions?" },
         { from: "assistant", text: "Yes, by video, in English, Hindi, Marathi and Tamil." },
@@ -147,7 +148,7 @@ export const baseView = (): BotDraftView => ({
         "Check each step is done before the next",
         "Keep your steps in order, safety steps included",
       ],
-      wont: ["Skip or reorder steps", "Book, take orders or take payments"],
+      wont: ["Skip or reorder steps", "Take payments"],
       sample: [
         { from: "visitor", text: "How do I get ready?" },
         { from: "assistant", text: "Here's the first step. Tell me when it's done." },

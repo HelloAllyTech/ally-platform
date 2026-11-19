@@ -196,8 +196,8 @@ export const DEFAULT_WHATSAPP_SETTINGS: WhatsAppBotSettings = {
   crisisEscalationText:
     'It sounds like this may be urgent. This assistant cannot help with a crisis. Please ' +
     'contact a supervisor or a crisis line now: {helpline_numbers}',
-  fallbackText:
-    'Something went wrong on my side and I could not answer that. Please try again in a moment.',
+  // Chunk H1 Part D: the current run-failed reply, not the old error text.
+  fallbackText: "Sorry, I couldn't answer that just now. Please try again.",
   unrecognisedNumberText:
     'I am sorry — I cannot recognise this number, so I am not able to answer from your ' +
     "organisation's reference material. Ask your supervisor or your Ally administrator to add " +

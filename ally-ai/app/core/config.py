@@ -106,6 +106,8 @@ class KnowledgeAgentSettings(BaseModel):
     # but its cost is not. A small model is adequate — the prompt asks for one binary
     # judgement with an explicit instruction to prefer the false positive.
     CRISIS_MODEL: str = Field("gpt-4o-mini")
+    # Chunk H1: one classifier call, inside ally-be's 4 s attempt (6 s in all).
+    CRISIS_TIMEOUT_SECONDS: float = Field(3.5, gt=0, le=15)
     TOP_K: int = Field(8)
     MIN_SIMILARITY: float = Field(0.35)
     DECLINE_SIMILARITY: float = Field(0.42)
@@ -147,28 +149,36 @@ class AgentRuntimeSettings(BaseModel):
     # 25-second timeout.
     MAX_TOOL_CALLS: int = Field(2, ge=0, le=8)
     # Seconds into a run after which the agent stops searching and its reply is
-    # final (no rewrite), so it answers inside ally-be's 25-second timeout rather
-    # than falling back to v1.
-    RUN_BUDGET_SECONDS: float = Field(15.0, gt=0, le=60)
-    # Hard cap on one run, model calls included: past it the run is cancelled and
-    # /agent/run answers 504 (the stream sends `error: timeout`). Below ally-be's
-    # waits (22 s streaming, 25 s otherwise) so ally-ai always ends first: ally-be
-    # gets a clean timeout to fall back on, and no run keeps spending tokens after
-    # ally-be has moved on.
-    RUN_TIMEOUT_SECONDS: float = Field(20.0, gt=0, le=60)
+    # final (no rewrite), so it answers inside the run's hard cap.
+    RUN_BUDGET_SECONDS: float = Field(30.0, gt=0, le=60)
+    # Hard cap on one run when the request names none (chunk H1: ally-be names it,
+    # 45 s streamed, 38 s for WhatsApp, and waits 5 s longer, so ally-ai always ends
+    # first and no run keeps spending tokens after ally-be has moved on).
+    RUN_TIMEOUT_SECONDS: float = Field(45.0, gt=0, le=60)
     # The memory check (ally-be waits 5 s and fails closed); the summary gets three
     # times this. Both run after the reply, never while someone waits (chunk 8a).
     MEMORY_CALL_TIMEOUT_SECONDS: float = Field(4.0, gt=0, le=30)
-    # Once a run has booked or changed something, its cap grows by this much (chunk
-    # 8a): a reschedule is a cancel, a booking and a reply. Kept inside ally-be's 25 s
-    # wait for one attempt.
-    RUN_WRITE_EXTRA_SECONDS: float = Field(4.0, ge=0, le=4.5)
+    # Extra seconds after a write (chunk 8a). 0 since chunk H1: the cap is the whole
+    # run, so ally-be's wait is always above it.
+    RUN_WRITE_EXTRA_SECONDS: float = Field(0.0, ge=0, le=4.5)
+    # Search the question before the first model call (chunk H1), so a plain answer
+    # takes one model call instead of two. False: the agent decides when to search.
+    PRESEARCH: bool = Field(True)
     # Conversation messages the agent reads, most recent last.
     MAX_HISTORY_MESSAGES: int = Field(10, ge=0, le=50)
     # Reasoning effort for the agent step on an OpenAI reasoning model (gpt-5 and
-    # o-series; ignored for others). Unset = the provider default ("medium"). The
-    # latency lever if the agent step is too slow; see CHUNK-03A-NOTES.md.
-    AGENT_REASONING_EFFORT: Optional[Literal["minimal", "low", "medium", "high"]] = None
+    # o-series; ignored for others). "low" by default since chunk H1: "medium" (the
+    # provider default) roughly doubled the reply call. Unset to use the provider's.
+    AGENT_REASONING_EFFORT: Optional[Literal["minimal", "low", "medium", "high"]] = (
+        "low"
+    )
+    # Test only (chunk H1): seconds to wait inside every gateway tool call, before or
+    # after ally-be does the work, to see which timeout fires first. 0 = off. Ignored
+    # outside a development environment (ENV__ENV DEV or DEVELOPMENT), even if set.
+    DEBUG_TOOL_DELAY_SECONDS: float = Field(0.0, ge=0, le=60)
+    DEBUG_TOOL_DELAY_WHEN: Literal["before", "after"] = "before"
+    # Only tools whose name starts with this ("create_", "update_"); empty = every tool.
+    DEBUG_TOOL_DELAY_ONLY: str = ""
 
 
 class BuilderSettings(BaseModel):

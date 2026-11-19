@@ -227,16 +227,20 @@ export const TryIt: React.FC<{
       let result: TestChatbotResponse;
       try {
         result = await stream.run(request, {
-          onStatus: status =>
+          onStatus: status => {
+            // A draft sent back to be rewritten (chunk H1): its streamed text goes.
+            if (status.code === "rewriting") arrived = "";
             setPending(
               p =>
                 p && {
                   ...p,
+                  ...(status.code === "rewriting" ? { text: "" } : {}),
                   status: STATUS.includes(status.code as StatusCode)
                     ? (status.code as StatusCode)
                     : p.status,
                 },
-            ),
+            );
+          },
           onStep: () => undefined,
           // The same live steps as the page (chunk 6b); a write's title only when it's a time.
           onActivity: activity => live.push(previewStep(activity)),
