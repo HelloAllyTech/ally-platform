@@ -72,6 +72,47 @@ class TestCueStrength:
         )
 
 
+class TestThinSessionGate:
+    """A session with too little said to coach on reads the safety reader first
+    and ends as "too short", unless the learner sounds distressed (then the
+    whole debrief runs)."""
+
+    async def test_a_thin_session_ends_too_short_without_the_analyst_or_writer(
+        self, steps, gateway
+    ):
+        result = await run(steps, gateway, session={**SESSION, "thin": True})
+
+        assert result["status"] == "skipped"
+        assert result["skip_reason"] == "too_short"
+        assert steps.count("safety-reader") == 1
+        assert steps.count("analyst") == 0
+        assert steps.count("writer") == 0
+        assert steps.count("evaluator") == 0
+
+    async def test_a_thin_session_with_a_distressed_learner_is_debriefed(
+        self, steps, gateway
+    ):
+        steps.answers["safety-reader"] = {
+            "risk_cues": [],
+            "learner_distress": [
+                {"turn_index": 1, "quote": "I can't do this, I'm overwhelmed."}
+            ],
+        }
+        result = await run(steps, gateway, session={**SESSION, "thin": True})
+
+        assert result["status"] in ("published", "below_bar")
+        assert result["learner_distress"] is True
+        assert steps.count("safety-reader") == 1
+        assert steps.count("analyst") == 1
+        assert steps.count("writer") >= 1
+
+    async def test_a_session_that_is_not_thin_is_unchanged(self, steps, gateway):
+        result = await run(steps, gateway, session={**SESSION, "thin": False})
+
+        assert result["status"] == "published"
+        assert steps.count("analyst") == 1
+
+
 class TestStandardRun:
     async def test_publishes_with_the_runners_step_records(self, steps, gateway):
         result = await run(steps, gateway)

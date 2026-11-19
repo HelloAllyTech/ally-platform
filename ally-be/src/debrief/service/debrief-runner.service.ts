@@ -20,6 +20,7 @@ import {
   DEBRIEF_SESSION_BUDGET_DEFAULT,
   GUIDANCE_TOOLS_DEFAULT,
   isOrchestrated,
+  isThinSession,
   orchestratorModels,
   validateDebriefBundle,
 } from '../constants/debrief-release.constants';
@@ -144,7 +145,8 @@ async function orFallback<T>(read: () => Promise<T>, fallback: T): Promise<T> {
 /** Why a run ended before it reached the graph, by its skip reason. */
 const END_WHY: Record<string, string> = {
   no_session: 'Stopped: the session could not be found.',
-  too_short: 'No debrief: the learner said nothing in the session.',
+  too_short:
+    'No debrief: the learner said too little in the session to coach on.',
   no_transcript: 'No debrief: the session has no transcript.',
   monthly_cap:
     'Held for a person: this month’s debrief budget is spent, so no run could start.',
@@ -1049,6 +1051,10 @@ export function sessionForGraph(
     language_recorded: s.languageRecorded,
     learner_level: s.learnerLevel,
     learner_turns: s.learnerTurns,
+    learner_words: s.learnerWords,
+    // Too little said to coach on: the graph reads the safety reader first and ends the run as
+    // "too short" unless the learner sounds distressed.
+    thin: isThinSession(s.learnerTurns, s.learnerWords ?? 0),
     scenario_id: s.scenarioId,
     // The roleplay's brief: the always-on fields plus the optional ones this release has on.
     scenario: s.roleplayFields

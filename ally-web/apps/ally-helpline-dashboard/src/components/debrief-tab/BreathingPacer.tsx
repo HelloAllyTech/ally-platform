@@ -32,9 +32,10 @@ const usePrefersReducedMotion = (): boolean => {
  * A small, silent breathing pacer for a moment of waiting (the debrief being
  * written): the same flower and four 4 s phases as the Scribe breathing
  * screen, no sound, no countdown. With reduced motion nothing moves and a
- * calm line is shown instead of the changing label.
+ * calm line is shown instead of the changing label. `bare` draws no box of its
+ * own, for a container that is already dark.
  */
-export const BreathingPacer: FC = () => {
+export const BreathingPacer: FC<{ bare?: boolean }> = ({ bare = false }) => {
   const { t } = useTranslation();
   const reduced = usePrefersReducedMotion();
   const [phase, setPhase] = useState(0);
@@ -55,7 +56,9 @@ export const BreathingPacer: FC = () => {
   return (
     <div
       data-testid="breathing-pacer"
-      className="flex flex-col items-center gap-2 rounded-lg bg-typography-900 p-4 text-white"
+      className={`flex flex-col items-center gap-2 text-white ${
+        bare ? "" : "rounded-lg bg-typography-900 p-4"
+      }`}
     >
       <p
         aria-live={reduced ? undefined : "polite"}
