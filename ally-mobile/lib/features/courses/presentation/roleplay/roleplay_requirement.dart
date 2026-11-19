@@ -23,6 +23,14 @@ String formatRoleplayDuration(int totalSeconds, RoleplayTranslate t) {
 /// `roleplayGate`; null when there is nothing to show.
 String? roleplayRequirementText(RoleplayGate? gate, RoleplayTranslate t) {
   if (gate == null) return null;
+  // An assessment is judged on turns, never duration; a pass mark is optional.
+  final turns = gate.minLearnerTurns;
+  if (gate.roleplayType == RoleplayType.assessment && turns != null && turns > 0) {
+    final pass = (gate.minScore ?? 0) > 0 ? gate.minScore : null;
+    return pass == null
+        ? t('courses.meta.requireTurns', {'turns': turns})
+        : t('courses.meta.requireTurnsAndScore', {'turns': turns, 'score': _fmt(pass)});
+  }
   final score = (gate.minScore ?? 0) > 0 ? gate.minScore : null;
   final duration = (gate.minDurationSeconds ?? 0) > 0 ? gate.minDurationSeconds : null;
   String scoreText() => t('courses.meta.requireScore', {'score': _fmt(score!)});
@@ -67,6 +75,13 @@ List<String> roleplayFailureLines(LastRoleplayAttempt attempt, RoleplayTranslate
               ? t('courses.roleplay.lastAttemptScoreUnknown', {'required': required})
               : t('courses.roleplay.lastAttemptScore', {'score': _fmt(attempt.score!), 'required': required}),
         );
+      case RoleplayFailureReason.insufficientTurns:
+        lines.add(
+          t('courses.roleplay.shortAttempt', {
+            'taken': attempt.learnerTurns ?? 0,
+            'n': attempt.requiredTurns ?? 0,
+          }),
+        );
     }
   }
   return lines;
@@ -82,6 +97,9 @@ class RoleplayAttemptNotice extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final lines = roleplayFailureLines(attempt, ref.t);
+    final turnsOnly =
+        attempt.failureReasons.isNotEmpty &&
+        attempt.failureReasons.every((r) => r == RoleplayFailureReason.insufficientTurns);
     const base = TextStyle(fontFamily: 'CupertinoSystemText', fontSize: 13, color: AppColors.amber900);
     return Container(
       key: const Key('roleplay-last-attempt-notice'),
@@ -91,13 +109,18 @@ class RoleplayAttemptNotice extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            ref.t('courses.roleplay.lastAttemptTitle'),
-            style: base.copyWith(fontFamily: 'CupertinoSystemText', fontWeight: FontWeight.w600),
-          ),
-          for (final line in lines) ...[const SizedBox(height: 4), Text(line, style: base)],
-          const SizedBox(height: 4),
-          Text(ref.t('courses.roleplay.lastAttemptFooter'), style: base),
+          // A short assessment attempt is one self-contained sentence.
+          if (turnsOnly)
+            for (final line in lines) Text(line, style: base)
+          else ...[
+            Text(
+              ref.t('courses.roleplay.lastAttemptTitle'),
+              style: base.copyWith(fontFamily: 'CupertinoSystemText', fontWeight: FontWeight.w600),
+            ),
+            for (final line in lines) ...[const SizedBox(height: 4), Text(line, style: base)],
+            const SizedBox(height: 4),
+            Text(ref.t('courses.roleplay.lastAttemptFooter'), style: base),
+          ],
         ],
       ),
     );

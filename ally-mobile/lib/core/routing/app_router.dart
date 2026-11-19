@@ -285,6 +285,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             languageId: params['languageId'] as int?,
             trackId: params['trackId'] as String?,
             trackItemId: params['trackItemId'] as String?,
+            assessmentRequiredTurns: params['assessmentRequiredTurns'] as int?,
           );
         },
       ),

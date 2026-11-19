@@ -589,6 +589,15 @@ void main() {
         expect(trackItemMeta(gated('PARTICIPATION'), t),
             'courses.meta.roleplay · courses.meta.requireParticipation');
       });
+      test('ASSESSMENT states the turn minimum, never the duration', () {
+        TrackDetailItem assessment(Map<String, Object?> gate) => withMeta(TrackItemType.roleplay, {
+              'roleplayGate': {'roleplayType': 'ASSESSMENT', 'completionLogic': 'SCORE', ...gate},
+            });
+        expect(trackItemMeta(assessment({'minLearnerTurns': 10, 'minDurationSeconds': 300}), t),
+            'courses.meta.roleplay · courses.meta.requireTurns[10]');
+        expect(trackItemMeta(assessment({'minLearnerTurns': 10, 'minScore': 70}), t),
+            'courses.meta.roleplay · courses.meta.requireTurnsAndScore[10, 70]');
+      });
       test('both gates null shows nothing extra', () {
         expect(trackItemMeta(gated('SCORE_AND_DURATION'), t), 'courses.meta.roleplay');
       });
@@ -612,6 +621,12 @@ void main() {
         'courses.roleplay.lastAttemptScoreUnknown[70]',
       ]);
       expect(roleplayFailureLines(attempt(['INSUFFICIENT_SCORE', 'INSUFFICIENT_DURATION'], score: 55), t).length, 2);
+      final short = LastRoleplayAttempt.tryParse({
+        'failureReasons': ['INSUFFICIENT_TURNS'],
+        'learnerTurns': 4,
+        'requiredTurns': 10,
+      })!;
+      expect(roleplayFailureLines(short, t), ['courses.roleplay.shortAttempt[4, 10]']);
     });
   });
 
@@ -654,6 +669,8 @@ extension on TrackDetailItem {
     completionCriteria: completionCriteria,
     roleplayGate: roleplayGate,
     lastRoleplayAttempt: lastRoleplayAttempt,
+    assessment: assessment,
+    assessmentSubmittedAt: assessmentSubmittedAt,
     languageFallbackReason: languageFallbackReason,
   );
 }

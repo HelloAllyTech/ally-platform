@@ -417,6 +417,7 @@ class SimulationSummary {
     this.supervisorNote,
     this.errorMessage,
     this.sessionFeedback,
+    this.resultsHidden = false,
   });
 
   factory SimulationSummary.fromJson(Map<String, dynamic> json) {
@@ -444,6 +445,7 @@ class SimulationSummary {
       hasSummaryFeedback: feedback != null,
       supervisorNote: feedback?['supervisorNote'] as String?,
       errorMessage: summary?['errorMessage'] as String?,
+      resultsHidden: json['resultsHidden'] == true,
       sessionFeedback: sessionFeedback == null
           ? null
           : (
@@ -496,6 +498,10 @@ class SimulationSummary {
 
   /// The learner's own rating (`sessionFeedback`), when already given.
   final ({int? rating, List<String> tags, String comment})? sessionFeedback;
+
+  /// A submitted assessment whose results are withheld from the learner: no
+  /// score, debrief or transcript, and nothing left to poll for.
+  final bool resultsHidden;
 
   /// RN `isShortSession`: 30s or less; unknown length is not short.
   bool get isShortSession => callDuration != null && callDuration! <= 30;
