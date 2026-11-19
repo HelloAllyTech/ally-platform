@@ -339,6 +339,8 @@ export class DebriefReviewService {
       tag: c.tag ?? null,
       status: c.status,
       reviewer: { id: Number(c.reviewerId), name: c.reviewerName ?? null },
+      /** Who wrote it: an expert reviewer, or the learner who read the debrief. */
+      source: c.source === 'learner' ? 'learner' : 'expert',
       mine: Number(c.reviewerId) === reviewerId,
       createdAt: new Date(c.createdAt).toISOString(),
       updatedAt: new Date(c.updatedAt).toISOString(),
