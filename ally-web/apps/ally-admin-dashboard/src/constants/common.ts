@@ -1096,6 +1096,33 @@ export const ApiEndpoints = {
     COSTS_SETTINGS: "/v1/admin/billing/costs/settings",
     FIXED_COSTS: "/v1/admin/billing/costs/fixed",
     FIXED_COST: (id: string) => `/v1/admin/billing/costs/fixed/${id}`,
+    COSTS_PLANS: "/v1/admin/billing/costs/plans",
+    // CR1 Parts B and C: a user's tokens and plan, plans and seat types, seats on any assistant.
+    USER_TOKENS: (userId: number) => `/v1/admin/billing/users/${userId}/tokens`,
+    USER_TOKEN_GRANTS: (userId: number) => `/v1/admin/billing/users/${userId}/tokens/grants`,
+    USER_TOKEN_GRANT: (userId: number, grantId: string) =>
+      `/v1/admin/billing/users/${userId}/tokens/grants/${grantId}`,
+    USER_TOKEN_UNLIMITED: (userId: number) => `/v1/admin/billing/users/${userId}/tokens/unlimited`,
+    USER_PLAN: (userId: number) => `/v1/admin/billing/users/${userId}/plan`,
+    PLANS: "/v1/admin/billing/plans",
+    PLAN: (id: string) => `/v1/admin/billing/plans/${id}`,
+    SEAT_TYPES: "/v1/admin/billing/seat-types",
+    SEAT_TYPE: (id: string) => `/v1/admin/billing/seat-types/${id}`,
+    ASSISTANT_SEATS: (chatbotId: string) => `/v1/admin/billing/assistants/${chatbotId}/seats`,
+    SEAT: (seatId: string) => `/v1/admin/billing/seats/${seatId}`,
+  },
+  /** The owner's own plan, seats and publish count (CR1 Part C). Counts only, never dollars. */
+  PLAN_AND_USAGE: {
+    ME: "/v1/me/plan",
+    SEATS: (chatbotId: string) => `/v1/chatbots/${chatbotId}/seats`,
+    SEAT_ASSIGNEE: (chatbotId: string, seatId: string) =>
+      `/v1/chatbots/${chatbotId}/seats/${seatId}/assignee`,
+    PUBLISH_USE: (chatbotId: string) => `/v1/chatbots/${chatbotId}/publish-use`,
+  },
+  /** Ally admin → Custom logins (CR1 Part B): the Assistant owner role. */
+  CUSTOM_LOGINS: {
+    LIST: "/v1/custom-logins",
+    ONE: (userId: number) => `/v1/custom-logins/${userId}`,
   },
   INBOX: {
     CONVERSATIONS: "/v1/inbox/conversations",
@@ -1311,6 +1338,10 @@ export const ROUTES = {
   BILLING_MODELS: "/billing/models",
   /** Ally admin → Costs: what every assistant costs Ally (CR1, `manage_costs`). */
   BILLING_COSTS: "/billing/costs",
+  /** Ally admin → Plans: plans, seat types and renewals due (CR1, `manage_costs`). */
+  BILLING_PLANS: "/billing/plans",
+  /** The owner's Plan and usage (CR1): any signed-in user, for themselves. Never dollars. */
+  MY_PLAN: "/account/plan",
   AI_TASKS: "/ai-tasks",
   DEBRIEFS: "/debriefs",
   DEBRIEF_SESSION: (runId: string) => `/debriefs/sessions/${runId}`,
@@ -1494,6 +1525,12 @@ export const TAG_TYPES = {
   BILLING_WHATSAPP_RATES: "billingWhatsAppRates",
   BILLING_COSTS: "billingCosts",
   BILLING_FIXED_COSTS: "billingFixedCosts",
+  BILLING_PLANS: "billingPlans",
+  BILLING_USER_TOKENS: "billingUserTokens",
+  BILLING_USER_PLAN: "billingUserPlan",
+  MY_PLAN: "myPlan",
+  ASSISTANT_SEATS: "assistantSeats",
+  CUSTOM_LOGINS: "customLogins",
   LLM_MODELS: "llmModels",
   SCENARIO_LANGUAGES: "scenarioLanguages",
   LANGUAGE_GLOSSARY: "languageGlossary",

@@ -1,12 +1,14 @@
 import { expect, test, type Page } from "@playwright/test";
 import path from "path";
 
+import { BOT_ID, mockAssistantHome } from "./assistantHome.fixture";
 import { logIn, mockBilling } from "./billing.fixture";
 
 /**
- * CR1 Part A: Ally admin → Models and → Costs from fixtures, at 1440 and 390. Saves full-page
- * screenshots for the plan stop to docs/agents-v2/screenshots/cr1/ (as publishGate does for its
- * PR); no baselines are compared.
+ * CR1: Ally admin → Models, → Costs and → Plans, a user's Tokens and Plan, the owner's Plan and
+ * usage, Share → People's seats and the publish limit, from fixtures, at 1440 and 390. Saves
+ * full-page screenshots for the stop to docs/agents-v2/screenshots/cr1/ (as publishGate does for
+ * its PR); no baselines are compared.
  */
 const SHOTS = path.join(__dirname, "../../../../docs/agents-v2/screenshots/cr1");
 
@@ -39,6 +41,29 @@ const shoot = async (page: Page, name: string) => {
   await page.waitForTimeout(1500);
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: path.join(SHOTS, `${name}-${size.width}.png`), fullPage: true });
+  await page.setViewportSize(size);
+};
+
+/** One part of a page (a user's Tokens, their Plan), with the viewport grown as `shoot` does. */
+const shootPart = async (page: Page, testId: string, name: string) => {
+  const size = page.viewportSize() ?? { width: 1440, height: 900 };
+  const tallest = await page.evaluate(() =>
+    Math.max(
+      document.documentElement.scrollHeight,
+      ...[...document.querySelectorAll("*")].map(el => {
+        const node = el as HTMLElement;
+        return node.scrollHeight > node.clientHeight + 1
+          ? node.scrollHeight + node.getBoundingClientRect().top
+          : 0;
+      }),
+    ),
+  );
+  await page.setViewportSize({ width: size.width, height: Math.ceil(tallest) + 40 });
+  await page.waitForTimeout(1000);
+  await page.evaluate(() => document.fonts.ready);
+  await page
+    .getByTestId(testId)
+    .screenshot({ path: path.join(SHOTS, `${name}-${size.width}.png`) });
   await page.setViewportSize(size);
 };
 
@@ -81,7 +106,9 @@ test("Costs: totals, the trend, breakdown, alerts, fixed costs and settings", as
   await expect(page.getByTestId("billing-cost-trend")).toBeVisible();
   await expect(page.getByTestId("billing-cost-breakdown")).toContainText("Calm Corner Clinic");
   await expect(page.getByTestId("billing-fixed-costs")).toContainText("Hetzner servers");
-  await expect(page.getByTestId("billing-plans-placeholder")).toBeVisible();
+  const margins = page.getByTestId("billing-plan-margins");
+  await expect(margins).toContainText("Pro");
+  await expect(margins).toContainText("$256.40");
   await expectNoPageScrollX(page);
   await shoot(page, "costs");
 
@@ -93,4 +120,87 @@ test("Costs: totals, the trend, breakdown, alerts, fixed costs and settings", as
     "href",
     /\/assistants\/bot-sunrise\?section=conversations&conversation=c-1$/,
   );
+});
+
+test("Plans: renewals due, plans and seat types with their limits and prices", async ({ page }) => {
+  await open(page, "/billing/plans");
+  await expect(page.getByTestId("billing-plans-page")).toBeVisible();
+  await expect(page.getByTestId("billing-renewals-due")).toContainText(
+    "dr.kulkarni@sunrise.example",
+  );
+  const plans = page.getByTestId("billing-plans-table");
+  await expect(plans).toContainText("Free");
+  await expect(plans).toContainText("$49.00");
+  await expect(page.getByTestId("billing-seat-types-table")).toContainText("Premium");
+  await expectNoPageScrollX(page);
+  await shoot(page, "plans");
+
+  // Every change asks why: editing a plan, then saving, opens the note.
+  await plans.getByText("Pro", { exact: true }).click();
+  await expect(page.getByTestId("billing-plan-panel")).toBeVisible();
+  await page.getByTestId("billing-plan-save").click();
+  await expect(page.getByTestId("billing-note")).toBeVisible();
+});
+
+test("a custom login's Tokens and Plan", async ({ page }) => {
+  await open(page, "/user-management?tab=custom-logins");
+  await page.getByTestId("custom-login-row").first().click();
+  await expect(page.getByTestId("custom-login-detail")).toBeVisible();
+  const tokens = page.getByTestId("user-tokens-section");
+  await expect(tokens.getByTestId("tokens-left")).toContainText("1,200,000");
+  await expect(tokens).toContainText("Sunrise Mind");
+  const plan = page.getByTestId("user-plan-section");
+  await expect(plan.getByTestId("user-plan-line")).toContainText(
+    "Free · 2 of 3 assistants published",
+  );
+  await expect(plan.getByTestId("user-plan-assistant").first()).toContainText("Premium");
+  await expectNoPageScrollX(page);
+  await shootPart(page, "user-tokens-section", "user-tokens");
+  await shootPart(page, "user-plan-section", "user-plan");
+});
+
+test("the owner's Plan and usage: counts and bars, never dollars", async ({ page }) => {
+  await open(page, "/account/plan");
+  const body = page.getByTestId("my-plan");
+  await expect(body.getByTestId("plan-line")).toContainText("Free · 2 of 3 assistants published");
+  await expect(body.getByTestId("plan-tokens")).toContainText(
+    "1.2M of 2M tokens left · resets 1 Dec",
+  );
+  await expect(body.getByTestId("plan-alerts")).toContainText("84% used");
+  await expect(body).not.toContainText("$");
+  await expectNoPageScrollX(page);
+  await shoot(page, "my-plan");
+});
+
+test("Share → People: the seats, who holds each, and Give them a seat", async ({ page }) => {
+  await mockAssistantHome(page);
+  await page.goto(`/dev/assistant-home/${BOT_ID}?section=share`);
+  const seats = page.getByTestId("share-seats");
+  await expect(seats).toBeVisible();
+  await expect(seats.getByTestId("seat-summary")).toContainText("5 included · 2 extra Premium");
+  await expect(seats.getByTestId("give-seat")).toBeVisible();
+  await expect(seats).not.toContainText("$");
+  await expectNoPageScrollX(page);
+  await shoot(page, "share-people");
+});
+
+test("Publish: the plan has no room, so publishing waits", async ({ page }) => {
+  await page.route("**/api/v1/chatbots/*/publish-use", route =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        planName: "Free",
+        maxPublished: 3,
+        published: 3,
+        wouldUse: 4,
+        canPublish: false,
+        message: "Free publishes up to 3 assistants. Ask Ally about Pro.",
+      }),
+    }),
+  );
+  await page.goto("/dev/onboarding?screen=share");
+  await expect(page.getByTestId("publish-limit")).toContainText("Ask Ally about Pro");
+  await expectNoPageScrollX(page);
+  await shoot(page, "publish-limit");
 });

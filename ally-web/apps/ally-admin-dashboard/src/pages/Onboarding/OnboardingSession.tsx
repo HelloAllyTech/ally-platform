@@ -19,8 +19,8 @@ import {
   QuestionScreen,
   ReadingScreen,
   SafetyScreen,
-  ShareScreen,
 } from "./Screens";
+import { ShareWithPlan } from "./screens/ShareWithPlan";
 import { reached } from "./steps";
 import {
   OnboardingSession as OnboardingSessionState,
@@ -178,7 +178,7 @@ export const OnboardingView: React.FC<{
         return <CheckupScreen view={view} onContinue={() => s.pass("checkup")} />;
       case "share":
         return (
-          <ShareScreen
+          <ShareWithPlan
             view={view}
             publicAllowed={s.publicAllowed}
             publishing={s.publishing}

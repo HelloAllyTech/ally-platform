@@ -7,6 +7,7 @@ import { readSse } from "@hooks/chatStream/sse";
 
 import { COPY } from "./copy";
 import { withFinding } from "./findings";
+import { planLimitMessage } from "../Plan/limits";
 
 import type { BotDraftView, TranscriptEntry } from "./types";
 
@@ -202,13 +203,20 @@ export const useBotDraftSession = (draftId: string): BotDraftSession => {
       setWorking(COPY.working.thinking);
       const controller = new AbortController();
       turnAbort.current = controller;
+      let refused: string | null = null;
       try {
         const response = await fetchWithReauth(
           url(ApiEndpoints.BOT_DRAFTS.MESSAGES_STREAM(draftId)),
           input,
           controller.signal,
         );
-        if (!response.ok || !response.body) throw new Error(String(response.status));
+        if (!response.ok || !response.body) {
+          // A refusal before the stream is plain JSON; the plan's own (tokens or monthly setup
+          // runs used up, CR1) is shown as ally-be words it.
+          const body = response.ok ? null : await response.json().catch(() => null);
+          refused = planLimitMessage(body);
+          throw new Error(String(response.status));
+        }
         let finished = false;
         await readSse(response.body, ({ type, data }) => {
           const event = data as Record<string, unknown>;
@@ -230,7 +238,7 @@ export const useBotDraftSession = (draftId: string): BotDraftSession => {
         if (!finished) throw new Error("no reply");
       } catch {
         if (!controller.signal.aborted) {
-          setError(COPY.problems.generic);
+          setError(refused ?? COPY.problems.generic);
           // Whatever the server kept (the owner's message, at least) comes back with the draft.
           void reload();
         }

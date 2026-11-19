@@ -26,7 +26,9 @@ import {
 } from "@constants";
 import type { RootState } from "@store";
 import { PlatformAdmin, UserFeatureToggle } from "@types";
+import { hasFeature } from "@utils/permissions";
 
+import { UserBillingSections } from "../Billing/Users";
 import { ROADMAP_ROLE_TOGGLE_KEYS, RoadmapRoleRadio } from "../Roadmap/components/RoadmapRoleRadio";
 
 const strings = en.superAdmins;
@@ -154,6 +156,10 @@ export const PlatformAdminDetail: React.FC<PlatformAdminDetailProps> = ({ admin,
   // Roadmap v2 (§3.2): one "Roadmap role" radio in place of the three toggles it writes together.
   // Answers only for an Owner while roadmap_v2 is on; otherwise the toggles stay as they are.
   const me = useSelector((state: RootState) => state.user.user);
+  // CR1: an Ally team member who creates assistants is on the internal plan; their Tokens and
+  // Plan are for holders of manage_costs (ally-be checks it too).
+  const myFeatures = useSelector((state: RootState) => state.user.features);
+  const canSeeCosts = hasFeature(myFeatures, FeatureToggleKey.MANAGE_COSTS);
   const { data: roadmapRole } = useGetRoadmapRoleForQuery(admin.id);
 
   const handleToggle = async (key: string, enabled: boolean) => {
@@ -256,6 +262,10 @@ export const PlatformAdminDetail: React.FC<PlatformAdminDetailProps> = ({ admin,
               <AssignedOrganizations userId={admin.id} canEdit />
             </div>
           </section>
+
+          {canSeeCosts && (
+            <UserBillingSections userId={admin.id} name={admin.name || admin.email} />
+          )}
         </div>
       )}
 

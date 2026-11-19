@@ -13,6 +13,7 @@ import { AlertsBanner, CostTotals, PerCustomer } from "./CostTotals";
 import { CostTrendChart } from "./CostTrendChart";
 import { FixedCosts } from "./FixedCosts";
 import { periodFor, PeriodPreset } from "./period";
+import { PlanMargins } from "./PlanMargins";
 
 const C = BILLING.costs;
 
@@ -114,12 +115,9 @@ export const CostsView: React.FC = () => {
         </Card>
       </div>
 
-      {/* Part C fills this in: each plan's and seat type's price against what it costs. */}
-      <Card className="border-dashed">
-        <section data-testid="billing-plans-placeholder">
-          <h2 className="text-lg font-medium">{C.plans.title}</h2>
-          <p className="text-sm text-typography-600">{C.plans.body}</p>
-        </section>
+      {/* Against plans (§A4): each plan's and seat type's price against what it costs. */}
+      <Card>
+        <PlanMargins period={period} />
       </Card>
     </div>
   );

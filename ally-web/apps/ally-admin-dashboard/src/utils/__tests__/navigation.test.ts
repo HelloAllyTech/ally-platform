@@ -215,7 +215,7 @@ describe("deriveNavigationItems", () => {
   });
 
   // CR1: Models and Costs are the only screens with dollars; `manage_costs` alone opens them.
-  it("shows Models and Costs, next to Language Models, only with manage_costs", () => {
+  it("shows Models, Costs and Plans, next to Language Models, only with manage_costs", () => {
     const withCosts = deriveNavigationItems({
       permissions: [],
       features: [FeatureToggleKey.MANAGE_LLM_MODEL_CATALOG, FeatureToggleKey.MANAGE_COSTS],
@@ -225,9 +225,11 @@ describe("deriveNavigationItems", () => {
       SIDEBAR_ITEMS.LLM_MODEL_CATALOG,
       SIDEBAR_ITEMS.BILLING_MODELS,
       SIDEBAR_ITEMS.BILLING_COSTS,
+      SIDEBAR_ITEMS.BILLING_PLANS,
     ]);
     expect(withCosts[1].path).toBe(ROUTES.BILLING_MODELS);
     expect(withCosts[2].path).toBe(ROUTES.BILLING_COSTS);
+    expect(withCosts[3].path).toBe(ROUTES.BILLING_PLANS);
 
     const ids = deriveNavigationItems({
       permissions: [Permissions.EDIT_SCENARIO, Permissions.VIEW_USERS],
@@ -236,6 +238,7 @@ describe("deriveNavigationItems", () => {
     }).map(i => i.id);
     expect(ids).not.toContain(SIDEBAR_ITEMS.BILLING_MODELS);
     expect(ids).not.toContain(SIDEBAR_ITEMS.BILLING_COSTS);
+    expect(ids).not.toContain(SIDEBAR_ITEMS.BILLING_PLANS);
   });
 
   describe("org-toggle tier (a tenant's own admins)", () => {

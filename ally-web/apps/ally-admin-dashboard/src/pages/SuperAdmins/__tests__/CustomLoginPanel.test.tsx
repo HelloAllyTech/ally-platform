@@ -41,7 +41,7 @@ vi.mock("@api", () => ({
     },
   }),
   useAddUserMutation: step("addUser", { id: 77 }),
-  useAssignPlatformAdminMutation: step("assignPlatformAdmin"),
+  useAddCustomLoginMutation: step("addCustomLogin"),
   useSetUserFeatureTogglesMutation: step("setToggles"),
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -114,13 +114,13 @@ describe("Create a custom login (A1)", () => {
     expect(h.calls[0].arg).toMatchObject({ tenantId: "t-ally" });
   });
 
-  it("creates the user, makes them a platform admin, then sets EVERY toggle to what was ticked", async () => {
+  it("creates the user, makes them a custom login (not a platform admin), then sets EVERY toggle to what was ticked", async () => {
     const onClose = vi.fn();
     render(<CustomLoginPanel onClose={onClose} />);
     fillIn();
     fireEvent.click(screen.getByTestId("custom-login-save"));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
-    expect(h.calls.map(c => c.step)).toEqual(["addUser", "assignPlatformAdmin", "setToggles"]);
+    expect(h.calls.map(c => c.step)).toEqual(["addUser", "addCustomLogin", "setToggles"]);
     expect(h.calls[0].arg).toMatchObject({
       name: "Asha Rao",
       email: "asha@clinic.example",
@@ -139,15 +139,15 @@ describe("Create a custom login (A1)", () => {
   });
 
   it("says which step failed, and stops there", async () => {
-    h.fail = "assignPlatformAdmin";
+    h.fail = "addCustomLogin";
     render(<CustomLoginPanel onClose={vi.fn()} />);
     fillIn();
     fireEvent.click(screen.getByTestId("custom-login-save"));
     await waitFor(() => expect(screen.getByTestId("custom-login-problem")).toBeTruthy());
     expect(screen.getByTestId("custom-login-problem").textContent).toContain(
-      "The account was made, but it couldn't be given access",
+      "The account was made, but it couldn't be made a custom login: addCustomLogin refused",
     );
-    expect(h.calls.map(c => c.step)).toEqual(["addUser", "assignPlatformAdmin"]);
+    expect(h.calls.map(c => c.step)).toEqual(["addUser", "addCustomLogin"]);
   });
 
   it("won't create a login that can use nothing", async () => {

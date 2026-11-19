@@ -76,6 +76,7 @@ import { useClickOutside, useUser } from "@hooks";
 import { isNavItemActive } from "@utils/navigation";
 
 import { BuilderNavBadge } from "./BuilderNavBadge";
+import { PlanMenuItem } from "./PlanMenuItem";
 import { PmAgentNavBadge } from "./PmAgentNavBadge";
 import { RoadmapNavBadge } from "./RoadmapNavBadge";
 import { SortableNavItem } from "./SortableNavItem";
@@ -298,6 +299,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
         return <Currency size={20} />;
       case SIDEBAR_ITEMS.BILLING_COSTS:
         return <BarChart3 size={20} />;
+      case SIDEBAR_ITEMS.BILLING_PLANS:
+        return <Catalog size={20} />;
       case SIDEBAR_ITEMS.AI_TASKS:
         return <Catalog size={20} />;
       case SIDEBAR_ITEMS.SCENARIO_LANGUAGES:
@@ -575,6 +578,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
                 <ManageAccounts />
                 <span>{en.auth.profileSettings}</span>
               </button>
+              <PlanMenuItem
+                onOpen={path => {
+                  setIsUserMenuOpen(false);
+                  navigate(path);
+                }}
+              />
               <ReduceMotionMenuItem />
               <button
                 role="menuitem"

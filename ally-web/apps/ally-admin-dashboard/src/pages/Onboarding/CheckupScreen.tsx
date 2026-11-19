@@ -13,6 +13,7 @@ import { Button, CheckRow, GapCard, PrimaryButton, Question } from "@components/
 import { COPY, fill } from "./copy";
 import { accuracyPct, gapsOf, hasTotals, statusOf } from "../AssistantHome/checkup";
 import { TryIt } from "../AssistantHome/TryIt";
+import { planLimitMessage } from "../Plan/limits";
 
 import type { BotDraftView } from "./types";
 import type { CheckupRunView } from "../../types/checkup";
@@ -69,7 +70,9 @@ export const CheckupScreen: React.FC<{ view: BotDraftView; onContinue: () => voi
         setRunId(run.id);
       })
       .catch((err: { status?: number }) =>
-        setError(err?.status === 429 ? t.blocked.limit : t.blocked.start),
+        setError(
+          planLimitMessage(err) ?? (err?.status === 429 ? t.blocked.limit : t.blocked.start),
+        ),
       );
   }, [runId, chatbotId, start, view.id]);
 

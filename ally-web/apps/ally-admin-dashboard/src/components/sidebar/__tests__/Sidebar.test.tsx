@@ -42,6 +42,8 @@ vi.mock("@api", () => ({
   // not in this test's nav items, so nothing renders it today — stubbed anyway
   // so adding that tab to the list here doesn't fail on a missing mock export.
   useGetBugHunterNotificationsQuery: () => ({ data: undefined }),
+  // CR1: the account menu's Plan and usage item asks whether there is a plan to show.
+  useGetMyPlanQuery: () => ({ data: undefined }),
 }));
 
 import { CustomImage } from "@ally-ui-mono/ui-shared";

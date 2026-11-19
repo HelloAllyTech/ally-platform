@@ -325,6 +325,408 @@ const FIXED = [
   { id: "f3", month: "2026-11-01", label: "Sentry", amountMicros: 15_000_000, note: "Nov invoice" },
 ];
 
+// ── CR1 Parts B and C ──
+
+const bar = (used: number, limit: number | null, resetsOn = "2026-12-01") => ({
+  used,
+  limit,
+  resetsOn,
+});
+
+const seat = (
+  id: string,
+  kind: "included" | "extra",
+  typeKey: string,
+  typeName: string,
+  assigneeEmail: string | null,
+  messages: ReturnType<typeof bar>,
+  extra: Partial<{ startDate: string; nextRenewal: string | null; status: string }> = {},
+) => ({
+  id,
+  kind,
+  typeKey,
+  typeName,
+  assigneeEmail,
+  startDate: extra.startDate ?? "2026-10-14",
+  nextRenewal: extra.nextRenewal ?? null,
+  status: extra.status ?? "active",
+  messages,
+});
+
+const SUNRISE_SEATS = [
+  seat("s-1", "included", "basic", "Basic", "meera@sunrise.example", bar(212, 500)),
+  seat("s-2", "included", "basic", "Basic", "ravi@sunrise.example", bar(431, 500)),
+  seat("s-3", "included", "basic", "Basic", "anita@sunrise.example", bar(58, 500)),
+  seat("s-4", "included", "basic", "Basic", null, bar(0, 500)),
+  seat("s-5", "included", "basic", "Basic", null, bar(0, 500)),
+  seat(
+    "s-6",
+    "extra",
+    "premium",
+    "Premium",
+    "dr.kulkarni@sunrise.example",
+    bar(1840, 3000, "2026-11-24"),
+    {
+      startDate: "2026-09-24",
+      nextRenewal: "2026-11-24",
+      status: "expiring",
+    },
+  ),
+  seat(
+    "s-7",
+    "extra",
+    "premium",
+    "Premium",
+    "front.desk@sunrise.example",
+    bar(620, 3000, "2026-12-03"),
+    {
+      startDate: "2026-11-03",
+      nextRenewal: "2026-12-03",
+    },
+  ),
+];
+
+const HARBOR_SEATS = [
+  seat("h-1", "included", "basic", "Basic", "meera@sunrise.example", bar(40, 500)),
+  seat("h-2", "included", "basic", "Basic", null, bar(0, 500)),
+  seat("h-3", "included", "basic", "Basic", null, bar(0, 500)),
+  seat("h-4", "included", "basic", "Basic", null, bar(0, 500)),
+  seat("h-5", "included", "basic", "Basic", null, bar(0, 500)),
+];
+
+const ASSISTANTS = [
+  {
+    chatbotId: "bot-sunrise",
+    name: "Sunrise Mind",
+    status: "live",
+    seats: SUNRISE_SEATS,
+    seatSummary: "5 included · 2 extra Premium",
+    unassigned: 2,
+    customers: bar(254, 300),
+  },
+  {
+    chatbotId: "bot-harbor",
+    name: "Harbor Counselling",
+    status: "live",
+    seats: HARBOR_SEATS,
+    seatSummary: "5 included",
+    unassigned: 4,
+    customers: bar(37, 300),
+  },
+  {
+    chatbotId: "bot-calm",
+    name: "Calm Corner (draft)",
+    status: "draft",
+    seats: [],
+    seatSummary: "0 included",
+    unassigned: 0,
+    customers: bar(0, 300),
+  },
+];
+
+export const MY_PLAN = {
+  isCreator: true,
+  tokens: { unlimited: false, left: 1_200_000, granted: 2_000_000, resetsOn: "2026-12-01" },
+  plan: {
+    key: "free",
+    name: "Free",
+    maxPublished: 3,
+    published: 2,
+    line: "Free · 2 of 3 assistants published",
+    status: "active",
+  },
+  period: { start: "2026-11-01", end: "2026-12-01" },
+  ownerRuns: bar(46, 100),
+  assistants: ASSISTANTS,
+  alerts: [
+    { what: "Customer conversations on Sunrise Mind", percent: 84 },
+    { what: "Messages for ravi@sunrise.example on Sunrise Mind", percent: 86 },
+  ],
+};
+
+const audit = (action: string, note: string, createdAt: string, extra = {}) => ({
+  id: `a-${action}-${createdAt}`,
+  createdAt,
+  subjectType: "tokens",
+  subjectId: "41",
+  action,
+  before: null,
+  after: null,
+  note,
+  actorUserId: 7,
+  actorName: "Ally Ops",
+  actorEmail: "ops@ally.example",
+  ...extra,
+});
+
+export const USER_PLAN = {
+  ...MY_PLAN,
+  subscription: {
+    id: "sub-1",
+    planKey: "free",
+    planName: "Free",
+    status: "active",
+    periodStart: "2026-10-01",
+    periodEnd: null,
+    note: "Starting plan at launch",
+  },
+  history: [
+    audit("add_seats", "Two Premium seats for the clinic's doctors", "2026-11-03T10:12:00.000Z", {
+      subjectType: "seats",
+    }),
+    audit("set_plan", "Starting plan at launch", "2026-10-01T09:00:00.000Z", {
+      subjectType: "subscription",
+    }),
+  ],
+};
+
+export const USER_TOKENS = {
+  hasAllowance: true,
+  unlimited: false,
+  left: 1_200_000,
+  granted: 2_000_000,
+  usedThisMonth: 800_000,
+  overdraft: 0,
+  resetsOn: "2026-12-01T00:00:00.000Z",
+  grants: [
+    {
+      id: "g-2",
+      amount: 500_000,
+      remaining: 0,
+      used: 0,
+      renewMonthly: false,
+      renewDay: null,
+      nextRenewalAt: null,
+      expiresAt: null,
+      status: "revoked",
+      note: "Added by mistake",
+      createdAt: "2026-11-12T08:00:00.000Z",
+    },
+    {
+      id: "g-1",
+      amount: 2_000_000,
+      remaining: 1_200_000,
+      used: 800_000,
+      renewMonthly: true,
+      renewDay: 1,
+      nextRenewalAt: "2026-12-01T00:00:00.000Z",
+      expiresAt: null,
+      status: "active",
+      note: "Starting allowance for custom logins",
+      createdAt: "2026-11-01T00:00:00.000Z",
+    },
+  ],
+  usage: {
+    byAssistant: [
+      { chatbotId: "bot-sunrise", name: "Sunrise Mind", tokens: 612_400, costUsd: 1.84 },
+      { chatbotId: "bot-harbor", name: "Harbor Counselling", tokens: 141_900, costUsd: 0.41 },
+      { chatbotId: null, name: "Setup drafts", tokens: 45_700, costUsd: 0.12 },
+    ],
+    byKind: [
+      { kind: "customer_reply", tokens: 498_000, costUsd: 1.31 },
+      { kind: "crisis_check", tokens: 160_100, costUsd: 0.48 },
+      { kind: "setup", tokens: 98_200, costUsd: 0.39 },
+      { kind: "checkup", tokens: 43_700, costUsd: 0.19 },
+    ],
+  },
+  history: [
+    audit("revoke", "Added by mistake", "2026-11-12T08:05:00.000Z"),
+    audit("assign", "Added by mistake", "2026-11-12T08:00:00.000Z"),
+    audit("assign", "Starting allowance for custom logins", "2026-11-01T00:00:00.000Z"),
+  ],
+};
+
+const SEAT_TYPES = [
+  {
+    id: id(31),
+    key: "basic",
+    name: "Basic",
+    messagesPerMonth: 500,
+    rank: 1,
+    price: 4,
+    active: true,
+  },
+  {
+    id: id(32),
+    key: "premium",
+    name: "Premium",
+    messagesPerMonth: 3000,
+    rank: 2,
+    price: 12,
+    active: true,
+  },
+];
+
+export const PLANS_CATALOGUE = {
+  plans: [
+    {
+      id: id(21),
+      key: "free",
+      name: "Free",
+      maxPublished: 3,
+      includedSeats: 5,
+      includedSeatTypeId: id(31),
+      customerConversations: 300,
+      ownerRuns: 100,
+      seatsRequired: true,
+      price: null,
+      active: true,
+    },
+    {
+      id: id(22),
+      key: "pro",
+      name: "Pro",
+      maxPublished: 20,
+      includedSeats: 5,
+      includedSeatTypeId: id(31),
+      customerConversations: 3000,
+      ownerRuns: 1000,
+      seatsRequired: true,
+      price: 49,
+      active: true,
+    },
+    {
+      id: id(23),
+      key: "internal",
+      name: "Internal",
+      maxPublished: null,
+      includedSeats: 5,
+      includedSeatTypeId: id(32),
+      customerConversations: null,
+      ownerRuns: null,
+      seatsRequired: false,
+      price: null,
+      active: true,
+    },
+  ],
+  seatTypes: SEAT_TYPES,
+  renewalsDue: [
+    {
+      id: "s-6",
+      chatbotId: "bot-sunrise",
+      assistant: "Sunrise Mind",
+      nextRenewal: "2026-11-24",
+      status: "expiring",
+      assigneeEmail: "dr.kulkarni@sunrise.example",
+      seatType: "Premium",
+      creatorEmail: "meera@sunrise.example",
+      creatorUserId: 41,
+    },
+    {
+      id: "s-9",
+      chatbotId: "bot-harbor",
+      assistant: "Harbor Counselling",
+      nextRenewal: "2026-11-25",
+      status: "expiring",
+      assigneeEmail: null,
+      seatType: "Basic",
+      creatorEmail: "team@harbor.example",
+      creatorUserId: 12,
+    },
+  ],
+};
+
+const PLAN_COSTS = {
+  months: 1,
+  plans: [
+    {
+      key: "free",
+      name: "Free",
+      price: null,
+      subscribers: 14,
+      cost: 21.4,
+      earns: 0,
+      margin: -21.4,
+      costPerSubscriber: 1.5286,
+    },
+    {
+      key: "pro",
+      name: "Pro",
+      price: 49,
+      subscribers: 6,
+      cost: 37.6,
+      earns: 294,
+      margin: 256.4,
+      costPerSubscriber: 6.2667,
+    },
+    {
+      key: "internal",
+      name: "Internal",
+      price: null,
+      subscribers: 4,
+      cost: 2.25,
+      earns: 0,
+      margin: -2.25,
+      costPerSubscriber: 0.5625,
+    },
+  ],
+  seatTypes: [
+    { key: "basic", name: "Basic", price: 4, extraSeats: 3, includedSeats: 95, earns: 12 },
+    { key: "premium", name: "Premium", price: 12, extraSeats: 9, includedSeats: 20, earns: 108 },
+  ],
+};
+
+export const CUSTOM_LOGIN = {
+  id: 41,
+  name: "Dr Meera Kulkarni",
+  email: "meera@sunrise.example",
+  status: "ACTIVE",
+  createdAt: "2026-09-30T00:00:00.000Z",
+  roleGrantedAt: "2026-10-01T00:00:00.000Z",
+  organisation: "Sunrise Mind Clinic",
+  features: ["whatsapp_bot"],
+  assistants: 3,
+};
+
+const CUSTOM_LOGINS = {
+  data: [
+    CUSTOM_LOGIN,
+    {
+      id: 42,
+      name: "Harbor team",
+      email: "team@harbor.example",
+      status: "ACTIVE",
+      createdAt: "2026-10-12T00:00:00.000Z",
+      roleGrantedAt: "2026-10-12T00:00:00.000Z",
+      organisation: "Harbor Counselling",
+      features: ["whatsapp_bot", "analytics"],
+      assistants: 1,
+    },
+  ],
+  count: 2,
+};
+
+const TOGGLE_REGISTRY = [
+  { key: "whatsapp_bot", label: "WhatsApp Bot", description: "", platformOnly: false },
+  {
+    key: "analytics",
+    label: "Analytics",
+    description: "Dashboards for their organisation.",
+    platformOnly: false,
+  },
+  { key: "users", label: "Users", description: "Users and organisations.", platformOnly: false },
+];
+
+/** Share → People's seats for the assistant home fixture: an owner's view of Sunrise Mind. */
+export const ASSISTANT_SEATS = {
+  chatbotId: "bot-sunrise",
+  name: "Sunrise Mind",
+  published: true,
+  seatsRequired: true,
+  seats: SUNRISE_SEATS,
+  seatSummary: "5 included · 2 extra Premium",
+  unassigned: 2,
+  customers: bar(254, 300),
+  people: [
+    { email: "meera@sunrise.example", role: "owner", hasSeat: true },
+    { email: "ravi@sunrise.example", role: "editor", hasSeat: true },
+    { email: "anita@sunrise.example", role: "invited", hasSeat: true },
+    { email: "dr.kulkarni@sunrise.example", role: "invited", hasSeat: true },
+    { email: "front.desk@sunrise.example", role: "invited", hasSeat: true },
+    { email: "intern@sunrise.example", role: "invited", hasSeat: false },
+  ],
+};
+
 /** Logs in as a super admin holding `manage_costs`, and answers the billing API. */
 export async function mockBilling(page: Page) {
   await page.route("**/api/v1/**", async route => {
@@ -343,6 +745,20 @@ export async function mockBilling(page: Page) {
     }
     if (path.startsWith("/admin/billing/costs/assistants/")) return json(route, ASSISTANT);
     if (path === "/admin/billing/costs/fixed") return json(route, FIXED);
+    if (path === "/admin/billing/costs/plans") return json(route, PLAN_COSTS);
+    if (path === "/admin/billing/plans") return json(route, PLANS_CATALOGUE);
+    if (/^\/admin\/billing\/users\/\d+\/tokens$/.test(path)) return json(route, USER_TOKENS);
+    if (/^\/admin\/billing\/users\/\d+\/plan$/.test(path)) return json(route, USER_PLAN);
+    if (path === "/custom-logins") return json(route, CUSTOM_LOGINS);
+    if (path === "/authorization/feature-toggles/registry") return json(route, TOGGLE_REGISTRY);
+    if (/^\/users\/\d+\/feature-toggles$/.test(path)) {
+      return json(
+        route,
+        TOGGLE_REGISTRY.map(entry => ({ ...entry, enabled: entry.key === "whatsapp_bot" })),
+      );
+    }
+    if (path === "/me/plan") return json(route, MY_PLAN);
+    if (path === "/platform-admins") return json(route, { data: [], count: 0 });
     if (path === "/users/me") {
       return json(route, {
         id: 7,
@@ -355,9 +771,11 @@ export async function mockBilling(page: Page) {
     }
     if (path === "/users/me/preferences") return json(route, {});
     if (path === "/users/me/feature-toggles") {
-      return json(route, ["manage_costs", "manage_llm_model_catalog"]);
+      return json(route, ["manage_costs", "manage_llm_model_catalog", "admin_user_management"]);
     }
-    if (path === "/authorization/permissions") return json(route, ["system:access"]);
+    if (path === "/authorization/permissions") {
+      return json(route, ["system:access", "edit:user", "view:users"]);
+    }
     return json(route, []);
   });
   await page.route("**/api/v2/auth/generate-otp", r => json(r, { message: "Code sent" }));

@@ -107,6 +107,7 @@ export const SIDEBAR_ITEMS = {
   LLM_MODEL_CATALOG: "llm-model-catalog",
   BILLING_MODELS: "billing-models",
   BILLING_COSTS: "billing-costs",
+  BILLING_PLANS: "billing-plans",
   AI_TASKS: "ai-tasks",
   SCENARIO_LANGUAGES: "scenario-languages",
   PROMPTS: "prompts",

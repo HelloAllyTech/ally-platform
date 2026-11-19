@@ -130,6 +130,12 @@ const buildNavigationItems = (): NavigationItem[] => {
       section: "ai-languages",
     },
     {
+      id: S.BILLING_PLANS,
+      label: l.billingPlans,
+      path: ROUTES.BILLING_PLANS,
+      section: "ai-languages",
+    },
+    {
       id: S.SCENARIO_VOICES,
       label: l.voices,
       path: ROUTES.MANAGE_SCENARIO_VOICES,

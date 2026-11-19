@@ -57,6 +57,8 @@ export const en = {
       // Ally admin → Models and → Costs (CR1): prices and what assistants cost Ally.
       billingModels: "Models",
       billingCosts: "Costs",
+      // Ally admin → Plans (CR1 Part C): plans, seat types and renewals due.
+      billingPlans: "Plans",
       voices: "Voices",
       aiTasks: "AI Tasks",
       languages: "Languages",
@@ -995,7 +997,7 @@ export const en = {
     edit: "Edit what they can use",
     editTitle: "What can {name} use?",
     intro:
-      "A login that can use only what you tick. It is a platform admin with just those features, so give it only to people you trust.",
+      "A login that can use only what you tick: their assistants and their account. It is not an Ally admin.",
     name: "Name",
     email: "Email",
     organisation: "Organisation",
@@ -1019,9 +1021,36 @@ export const en = {
     needOrganisation: "Choose an organisation.",
     failedCreate: "Couldn't create the account: {reason}",
     failedAdmin:
-      "The account was made, but it couldn't be given access: {reason}. Open it from Ally admins to finish.",
+      "The account was made, but it couldn't be made a custom login: {reason}. Ask an engineer to finish it.",
     failedFeatures:
-      "The account was made, but its features couldn't be set: {reason}. Open it from Ally admins and use Edit what they can use.",
+      "The account was made, but its features couldn't be set: {reason}. Open it from Custom logins to finish.",
+    // CR1 Part B: Users → Custom logins, the Assistant owner role.
+    tabLabel: "Custom logins",
+    listIntro:
+      "People who sign in to use their own assistants and nothing else. Open one to change what they can use, their tokens and their plan.",
+    search: "Search custom logins...",
+    loadingList: "Loading custom logins…",
+    empty: "No custom logins yet",
+    emptySubtitle: "Create one to give someone their own assistants.",
+    columns: {
+      name: "Name",
+      email: "Email",
+      organisation: "Organisation",
+      assistants: "Assistants",
+      status: "Status",
+      added: "Added",
+    },
+    back: "Back to custom logins",
+    detailSubtitle: (name: string) =>
+      `What ${name} can use. Tokens and Plan are for Ally super admins only.`,
+    canUseIntro: "Each switch saves at once.",
+    remove: "Remove custom login",
+    removeTitle: "Remove custom login",
+    removeBody: (name: string) =>
+      `${name} can no longer sign in to the admin dashboard. Their assistants stay.`,
+    removed: "Custom login removed.",
+    removeFailed: "Couldn't remove the custom login.",
+    toggleFailed: "Failed to update access",
   },
   superAdmins: {
     title: "Ally admins",

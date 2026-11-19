@@ -130,6 +130,7 @@ export const buildSidebarItemFeatureKeyMap = (
     [sidebarItems.LLM_MODEL_CATALOG, FeatureToggleKey.MANAGE_LLM_MODEL_CATALOG],
     [sidebarItems.BILLING_MODELS, FeatureToggleKey.MANAGE_COSTS],
     [sidebarItems.BILLING_COSTS, FeatureToggleKey.MANAGE_COSTS],
+    [sidebarItems.BILLING_PLANS, FeatureToggleKey.MANAGE_COSTS],
     [sidebarItems.AI_TASKS, FeatureToggleKey.AI_TASKS],
     [sidebarItems.MANAGE_GUARDRAILS, FeatureToggleKey.MANAGE_GUARDRAILS],
     [sidebarItems.TOOLTIPS, FeatureToggleKey.MANAGE_TOOLTIPS],
