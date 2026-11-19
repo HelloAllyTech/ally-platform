@@ -72,7 +72,7 @@ Production was not measured (decided 19 Nov). Measure it after deploy (`LAUNCH-C
 
 ## Prompt text
 
-- Approved and changed (seed only): `ally_ai_builder_system` line 7 (booking available with an Appointments list).
+- Approved, to publish in the Skills Store (the seed file stays as on master, per the prompt rules): `ally_ai_builder_system` rule 4 becomes "Payments are not available yet; never suggest the assistant can take payments. It can book once an Appointments list is added, and it can collect details and pass them on." The exact before/after is in `LAUNCH-CHECKLIST.md`.
 - Approved fixed reply text (code, not prompts): the warm line and the polite decline, `caring-decline.ts`.
 - Not trimmed: the agent prompt (~20 K characters). Trimming needs its own eval run.
 

@@ -38,7 +38,7 @@ On 19 Nov, 10 of 18 production replies hit a ~20 s cutoff and got the "Sorry, I 
 - No repeated helpline number in the at-risk reply.
 - The old "Something went wrong" fallback is migrated.
 - The publish prompt and the Checkup show one number.
-- Purpose cards and the builder line no longer say the assistant can't book.
+- Purpose cards no longer say the assistant can't book. The matching builder prompt line (approved) goes to the Skills Store before deploy, not into the seed file.
 - The Lists view refreshes on its own.
 
 Also: one `[AGENT STAGE]` log line per stage of a turn, in both services, under one run id. There is also a dev-only slow tool for tests, which production ignores.
@@ -62,7 +62,7 @@ Not met yet:
 
 ## Before deploying
 
-- Publish `ally_ai_builder_system` (approved line 7) to production's Skills Store.
+- Publish the approved `ally_ai_builder_system` rule-4 change to production's Skills Store (exact text in `LAUNCH-CHECKLIST.md`).
 - Check prod's `AGENT_RUNTIME__*` env and the agent and crisis prompts' models.
 - Migration `1984850000000-CurrentRunFailedReply` runs with ally-be.
 - Redis is needed for bookings: if it's down, nothing is written.

@@ -122,7 +122,11 @@ The Skills Store keeps a prompt's live text; a changed seed file never overwrite
   - `AGENT_RUNTIME__AGENT_REASONING_EFFORT`: unset now means "low" (the new code default); anything else overrides it. Leave it unset or set `low`;
   - any `AGENT_RUNTIME__RUN_TIMEOUT_SECONDS`, `RUN_BUDGET_SECONDS`, `RUN_WRITE_EXTRA_SECONDS` override: remove it (ally-be now names the cap per request);
   - the model on `ally_ai_agent_system` and `ally_ai_knowledge_crisis_classify` in the Skills Store: note it in `CHUNK-H1-NOTES.md`; the crisis classifier must answer inside 3.5 s.
-- [ ] **Before deploying, publish the approved prompt to production's Skills Store:** `ally_ai_builder_system` line 7 (booking is available once an Appointments list is added).
+- [ ] **Before deploying, publish the approved prompt change to production's Skills Store** (`prompts` CLI; the seed file in Git is unchanged, per the prompt rules): in `ally_ai_builder_system`, rule 4, replace
+  > Booking and payments are not available yet; never suggest the assistant can book, take orders or take payments. It can collect details and pass them on.
+
+  with
+  > Payments are not available yet; never suggest the assistant can take payments. It can book once an Appointments list is added, and it can collect details and pass them on.
 - [ ] **Migration `1984850000000-CurrentRunFailedReply` runs with ally-be** (data only): the old "Something went wrong on my side…" fallback becomes the run-failed reply where it is still the old default.
 - [ ] **Redis is required for bookings**: offers waiting for a yes live there; if Redis is down, nothing is written (every write asks again).
 - [ ] **After deploy, measure prod** with the same replay as `H1-PART-A.md` (E-A1–A9, E-B1–B7, E-S1–S5, 3 runs, fresh visitors): 0 fallbacks, median under 12 s, worst under 20 s, first words under 3 s, crisis under 6 s, 0 writes without a yes. Then the Q3 rerun list in `chunk-h1.md` (Tests).
