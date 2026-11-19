@@ -2340,6 +2340,23 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     promptOverride: 'the planning_* prompt row for each call',
   },
   {
+    id: 'roadmap-idea-title',
+    task: LlmTask.ROADMAP_IDEA_TITLE,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger:
+      'Someone files a Roadmap idea and asks for a suggested title, an agent (PM Agent, bug report) files one without a title, or the one-off script that gave every older idea a title',
+    detail:
+      "One short call per idea, capped at 120 output tokens: the idea's text in, one line of at most 200 characters out. " +
+      "Never blocks filing: if the call fails, the title falls back to the text's first sentence cut at a word. The " +
+      "backfill keeps the idea's whole original text as its Summary > Problem.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'roadmap_suggest_title',
+  },
+  {
     id: 'roadmap-opportunity-copilot',
     task: LlmTask.ROADMAP_OPPORTUNITY_COPILOT,
     runtime: LlmRuntime.ALLY_BE,

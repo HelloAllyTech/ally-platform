@@ -188,11 +188,15 @@ export const roadmapV2FlowAPI = baseAPI.injectEndpoints({
       ],
     }),
 
-    submitRoadmapDraft: builder.mutation<RoadmapSubmitResult, { code: string; goalId?: string }>({
-      query: ({ code, goalId }) => ({
+    // A title is required to submit; the draft's text becomes the idea's Summary > Problem.
+    submitRoadmapDraft: builder.mutation<
+      RoadmapSubmitResult,
+      { code: string; title: string; goalId?: string }
+    >({
+      query: ({ code, title, goalId }) => ({
         url: ApiEndpoints.ROADMAP_V2_FLOW.DRAFT_SUBMIT(code),
         method: HttpMethod.POST,
-        body: goalId ? { goalId } : {},
+        body: goalId ? { title, goalId } : { title },
       }),
       // The draft page hands the answer to the idea page itself, after the Submit motion plays
       // (the dashed outline turns solid first), so the swap never cuts it short.

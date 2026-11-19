@@ -7,7 +7,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { Button, OverflowMenu, OverflowMenuItem, SkeletonText } from "@ally-ui-mono/ui-shared";
-import { roadmapV2API, useGetRoadmapProductGoalsQuery } from "@api";
+import { roadmapV2API, useGetRoadmapProductGoalsQuery, useSuggestRoadmapTitleMutation } from "@api";
 import { ROUTES, en } from "@constants";
 
 import { ChecksPanel } from "./ChecksPanel";
@@ -170,6 +170,7 @@ const DraftEditor: React.FC<DraftViewProps & { draft?: RoadmapDraftDetail }> = (
   const [turn] = useRoadmapDraftTurnMutation();
   const [reopen] = useReopenRoadmapDraftCheckMutation();
   const [submit] = useSubmitRoadmapDraftMutation();
+  const [suggestTitle] = useSuggestRoadmapTitleMutation();
   const [addTo] = useAddRoadmapDraftToMutation();
   const [discard] = useDiscardRoadmapDraftMutation();
   const [restore] = useRestoreRoadmapDraftMutation();
@@ -271,13 +272,41 @@ const DraftEditor: React.FC<DraftViewProps & { draft?: RoadmapDraftDetail }> = (
   const [submitting, setSubmitting] = useState(false);
   const [sealed, setSealed] = useState(false);
 
+  // The title is required to submit. It is suggested from the draft's text when the dialog opens,
+  // and the author can change it; whatever they typed is never overwritten by a late suggestion.
+  const [title, setTitle] = useState("");
+  const [suggesting, setSuggesting] = useState(false);
+  const titleEdited = useRef(false);
+  useEffect(() => {
+    if (!confirmOpen || title.trim() || !draft?.text?.trim()) return undefined;
+    let live = true;
+    setSuggesting(true);
+    suggestTitle({ text: draft.text })
+      .unwrap()
+      .then(r => {
+        if (live && !titleEdited.current) setTitle(r.title);
+      })
+      .catch(() => undefined)
+      .finally(() => live && setSuggesting(false));
+    return () => {
+      live = false;
+    };
+    // Only when the dialog opens: typing must not refetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [confirmOpen]);
+  const titleReady = title.trim().length > 0;
+
   const doSubmit = async () => {
-    if (!code || !draft || submitting) return;
+    if (!code || !draft || submitting || !titleReady) return;
     setSubmitting(true);
     await autosave.flush();
     const goalId = autosave.goalId ?? draft.suggestedGoal?.id ?? undefined;
     try {
-      const result = await submit({ code, ...(goalId ? { goalId } : {}) }).unwrap();
+      const result = await submit({
+        code,
+        title: title.trim(),
+        ...(goalId ? { goalId } : {}),
+      }).unwrap();
       jobs.complete("draft_to_submitted", { itemId: code });
       setConfirmOpen(false);
       haptic(10);
@@ -618,11 +647,33 @@ const DraftEditor: React.FC<DraftViewProps & { draft?: RoadmapDraftDetail }> = (
         title={copy.submitConfirmTitle}
         primaryText={copy.submitConfirm}
         onPrimary={() => void doSubmit()}
-        primaryDisabled={submitting}
+        primaryDisabled={submitting || !titleReady}
         secondaryText={copy.submitCancel}
         sheet={touch}
         closeLabel={copy.submitCancel}
       >
+        <label
+          className="mb-1 block text-sm font-medium text-typography-primary"
+          htmlFor="draft-title"
+        >
+          {copy.titleLabel}
+        </label>
+        <input
+          id="draft-title"
+          value={title}
+          maxLength={200}
+          required
+          disabled={submitting}
+          placeholder={suggesting ? copy.titleSuggesting : copy.titlePlaceholder}
+          onChange={e => {
+            titleEdited.current = true;
+            setTitle(e.target.value.replace(/\n/g, " "));
+          }}
+          className="mb-1 w-full rounded border border-border-light bg-transparent px-3 py-2 text-sm text-typography-primary"
+        />
+        <p className="mb-3 mt-0 text-xs text-typography-secondary">
+          {titleReady ? copy.titleHint : copy.titleRequired}
+        </p>
         <p className="m-0 text-sm text-typography-primary">{copy.submitConfirmBody}</p>
       </RoadmapDialog>
 

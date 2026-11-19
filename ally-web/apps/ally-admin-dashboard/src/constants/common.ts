@@ -367,6 +367,8 @@ export const ApiEndpoints = {
   },
   PRODUCT_ROADMAP: {
     OPPORTUNITIES: "/v1/product-roadmap/opportunities",
+    /** A one-line title suggested from an idea's text, for the Title box to prefill. */
+    TITLE_SUGGESTION: "/v1/product-roadmap/title-suggestion",
     /**
      * The same route helpline and mobile file a bug on. Not `/opportunities` with
      * type=bug: this one captures the reporter's screen/device context for triage and

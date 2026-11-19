@@ -96,7 +96,8 @@ describe('RoadmapOpportunityService — bugs stay off the board', () => {
         }),
       } as never,
       repoClassifier as never,
-      { classifyAndRecord: jest.fn().mockResolvedValue(null) } as never, // missClassifier
+      { classifyAndRecord: jest.fn().mockResolvedValue(null) } as never, // missClassifier,
+      { suggestTitle: jest.fn().mockResolvedValue('A title') } as never, // roadmapAi
     );
 
     return { service, emit, bugFindingRepository, repoClassifier };
