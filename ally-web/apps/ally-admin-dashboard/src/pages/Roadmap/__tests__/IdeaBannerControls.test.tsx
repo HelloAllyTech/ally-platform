@@ -35,7 +35,13 @@ vi.mock("../../../api/roadmapV2Flow", async importOriginal => ({
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
 import { BANNER_TONE, OpportunityHeader } from "../components/OpportunityHeader";
-import { IdeaBannerControls, monthLabel, monthOptions } from "../components/IdeaBannerControls";
+import {
+  IdeaBannerControls,
+  monthLabel,
+  monthOptions,
+  releaseDateLabel,
+} from "../components/IdeaBannerControls";
+import { PeopleChips } from "../components/PeopleChips";
 
 const item = (can: RoadmapCan, over: Partial<RoadmapItemDetail> = {}): RoadmapItemDetail =>
   ({
@@ -69,6 +75,12 @@ describe("month choices", () => {
     expect(monthOptions("2026-03", new Date(2026, 10, 18))[0]).toBe("2026-03");
     expect(monthLabel("2026-12")).toBe("Dec 2026");
   });
+
+  it("words a release date with its year, and drops a missing one", () => {
+    expect(releaseDateLabel("2026-03-12T10:00:00.000Z")).toBe("12 Mar 2026");
+    expect(releaseDateLabel(null)).toBe("");
+    expect(releaseDateLabel("not a date")).toBe("");
+  });
 });
 
 describe("the banner's controls follow can{}", () => {
@@ -90,13 +102,55 @@ describe("the banner's controls follow can{}", () => {
     ).toBeInTheDocument();
   });
 
+  it("an Owner sizes the idea, and clears the size with Not sized", async () => {
+    wrap(<IdeaBannerControls item={item({ editSize: true }, { size: "m" })} />);
+    fireEvent.click(screen.getByRole("combobox", { name: "Size" }));
+    fireEvent.click(await screen.findByRole("option", { name: "XL" }));
+    await waitFor(() =>
+      expect(mockPatch).toHaveBeenCalledWith({ code: "OPP-1", patch: { size: "xl" } }),
+    );
+    fireEvent.click(screen.getByRole("combobox", { name: "Size" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Not sized" }));
+    await waitFor(() =>
+      expect(mockPatch).toHaveBeenCalledWith({ code: "OPP-1", patch: { size: null } }),
+    );
+  });
+
   it("someone who can't edit reads the same facts as plain text, with no controls", () => {
-    wrap(<IdeaBannerControls item={item({})} />);
+    wrap(
+      <IdeaBannerControls item={item({}, { size: "l", releasedAt: "2026-03-12T10:00:00.000Z" })} />,
+    );
     expect(screen.getByText("Goal: Actor realism")).toBeInTheDocument();
-    expect(screen.getByText("Lead: Priya")).toBeInTheDocument();
     expect(screen.getByText("Planned: Dec 2026")).toBeInTheDocument();
+    expect(screen.getByText("Size: L")).toBeInTheDocument();
+    expect(screen.getByText("Released: 12 Mar 2026")).toBeInTheDocument();
+    // The builder is named once, in the people line under the banner, not here too.
+    expect(screen.queryByText(/Builder: Priya/)).toBeNull();
     expect(screen.queryByRole("combobox")).toBeNull();
     expect(screen.queryByRole("button")).toBeNull();
+  });
+});
+
+describe("the people line", () => {
+  it("names the submitter and the builder", () => {
+    wrap(
+      <PeopleChips
+        item={item({}, { stage: "being_built", author: { id: 3, name: "Ravi", role: "idea" } })}
+      />,
+    );
+    expect(screen.getByText("Submitted by")).toBeInTheDocument();
+    expect(screen.getByText("Builder:")).toBeInTheDocument();
+    expect(screen.getByText("Priya")).toBeInTheDocument();
+  });
+
+  it("says No builder yet until one is assigned, but not once it is Not building", () => {
+    const { unmount } = wrap(
+      <PeopleChips item={item({}, { stage: "backlog", lead: undefined })} />,
+    );
+    expect(screen.getByText("No builder yet")).toBeInTheDocument();
+    unmount();
+    wrap(<PeopleChips item={item({}, { stage: "declined", lead: undefined })} />);
+    expect(screen.queryByText("No builder yet")).toBeNull();
   });
 });
 

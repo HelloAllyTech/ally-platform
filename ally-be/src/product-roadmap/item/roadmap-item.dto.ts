@@ -18,6 +18,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { RoadmapWatchLevel } from 'src/product-planning/enum/product-planning.enum';
+import { RoadmapOpportunityEffort } from '../enum/roadmap-opportunity.enum';
 
 export class SetRoadmapCeilingDto {
   @ApiProperty({
@@ -102,4 +103,14 @@ export class PatchRoadmapItemDto {
   @ValidateIf((_, value) => value !== null)
   @Matches(/^\d{4}-(0[1-9]|1[0-2])$/)
   plannedMonth?: string | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    enum: RoadmapOpportunityEffort,
+    description: 'S to XXL, or null for Not sized (Owner only)',
+  })
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsEnum(RoadmapOpportunityEffort)
+  size?: RoadmapOpportunityEffort | null;
 }

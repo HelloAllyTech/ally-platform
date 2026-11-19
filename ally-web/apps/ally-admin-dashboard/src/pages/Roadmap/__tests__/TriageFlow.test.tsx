@@ -170,6 +170,12 @@ describe("To triage (§4.6)", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("puts no heading over the list when the Backlog is its only group: the To do tab names and counts it", () => {
+    renderTriage();
+    expect(screen.getByRole("region", { name: en.roadmapV2.sections.backlog })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /^Backlog · / })).not.toBeInTheDocument();
+  });
+
   it("shows each idea's queue rank on its row", () => {
     renderTriage({
       data: {

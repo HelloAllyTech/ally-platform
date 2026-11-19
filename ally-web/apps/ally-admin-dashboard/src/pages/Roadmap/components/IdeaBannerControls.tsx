@@ -5,7 +5,8 @@ import { toast } from "sonner";
 import { Button, Tag } from "@ally-ui-mono/ui-shared";
 import { useGetRoadmapProductGoalsQuery, usePatchRoadmapItemMutation } from "@api";
 import { en } from "@constants";
-import type { RoadmapItemDetail, RoadmapItemPatch } from "@types";
+import { ROADMAP_ITEM_SIZES } from "@types";
+import type { RoadmapItemDetail, RoadmapItemPatch, RoadmapItemSize } from "@types";
 
 import { RoadmapDropdown } from "./RoadmapDropdown";
 import { useRoadmapBreakpoint } from "../hooks/useRoadmapBreakpoint";
@@ -17,6 +18,14 @@ export const monthLabel = (value: string): string => {
   const [y, m] = value.split("-").map(Number);
   if (!y || !m) return value;
   return new Date(y, m - 1, 1).toLocaleString("en", { month: "short", year: "numeric" });
+};
+
+/** ISO → "12 Mar 2026"; empty for a missing or unparseable date, so the field is left out. */
+export const releaseDateLabel = (iso: string | null | undefined): string => {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 };
 
 /** Unscheduled, then this month and the next twelve; a month outside that stays selectable. */
@@ -61,9 +70,11 @@ const ReadField: React.FC<{ label: string; children: React.ReactNode }> = ({ lab
 );
 
 /**
- * What the idea is about, in its banner: Goal, Lead and Planned month, editable by whoever the
- * server says may change them (`can.editGoal` / `editLead` / `editMonth`), plain text for everyone
- * else. Saved the moment a choice is made. Stage is not here: it is worked out from facts and moves
+ * What the idea is about, in its banner: Goal, Builder, Planned month and Size, editable by
+ * whoever the server says may change them (`can.editGoal` / `editLead` / `editMonth` /
+ * `editSize`), plain text for everyone else, and the Released date once it is live. Saved the
+ * moment a choice is made. A builder nobody may change is named in the people line below, not
+ * here. Stage is not here: it is worked out from facts and moves
  * with the actions (Pick a lead, Decline, Merge, Release).
  */
 export const IdeaBannerControls: React.FC<{ item: RoadmapItemDetail }> = ({ item }) => {
@@ -102,6 +113,15 @@ export const IdeaBannerControls: React.FC<{ item: RoadmapItemDetail }> = ({ item
     [item.plannedMonth, banner.monthNone],
   );
 
+  const sizeChoices = useMemo(
+    () => [
+      { value: "", label: banner.sizeNone },
+      ...ROADMAP_ITEM_SIZES.map(v => ({ value: v, label: banner.sizes[v] ?? v.toUpperCase() })),
+    ],
+    [banner.sizeNone, banner.sizes],
+  );
+  const released = releaseDateLabel(item.releasedAt);
+
   return (
     <div className="flex flex-wrap items-center gap-2" aria-label={en.roadmapV2.idea.panel}>
       {item.can?.editGoal ? (
@@ -135,8 +155,6 @@ export const IdeaBannerControls: React.FC<{ item: RoadmapItemDetail }> = ({ item
             sheet={breakpoint === "phone" || breakpoint === "tablet"}
           />
         </>
-      ) : item.lead ? (
-        <ReadField label={banner.lead}>{item.lead.name}</ReadField>
       ) : null}
 
       {item.can?.editMonth ? (
@@ -151,6 +169,21 @@ export const IdeaBannerControls: React.FC<{ item: RoadmapItemDetail }> = ({ item
       ) : item.plannedMonth ? (
         <ReadField label={banner.month}>{monthLabel(item.plannedMonth)}</ReadField>
       ) : null}
+
+      {item.can?.editSize ? (
+        <SelectField
+          id={`${item.code}-size`}
+          label={banner.size}
+          value={item.size ?? ""}
+          options={sizeChoices}
+          disabled={isLoading}
+          onChange={value => void save({ size: (value || null) as RoadmapItemSize | null })}
+        />
+      ) : item.size ? (
+        <ReadField label={banner.size}>{banner.sizes[item.size] ?? item.size}</ReadField>
+      ) : null}
+
+      {released && <ReadField label={banner.released}>{released}</ReadField>}
     </div>
   );
 };

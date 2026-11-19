@@ -250,9 +250,12 @@ export const TriageView: React.FC<TriageViewProps> = ({
       {sections.map(section =>
         section.rows.length === 0 ? null : (
           <section key={section.key} aria-label={section.label}>
-            <h3 className="sticky top-0 z-[1] bg-neutral-50 px-6 py-1.5 text-xs font-semibold uppercase tracking-wide text-typography-secondary">
-              {copy.sectionCount(section.label ?? section.key, section.rows.length)}
-            </h3>
+            {/* One group is the whole list: the To do tab already names and counts it. */}
+            {sections.length > 1 && (
+              <h3 className="sticky top-0 z-[1] bg-neutral-50 px-6 py-1.5 text-xs font-semibold uppercase tracking-wide text-typography-secondary">
+                {copy.sectionCount(section.label ?? section.key, section.rows.length)}
+              </h3>
+            )}
             <ul className="m-0 list-none p-0">
               <AnimatePresence initial={false}>
                 {section.rows.map(row => (
@@ -408,7 +411,10 @@ const TriageRow: React.FC<{
             </span>
             {(row.goal?.name || row.author?.name) && (
               <span className="mt-1 truncate text-xs text-typography-secondary">
-                {[row.goal?.name, row.author?.name ? `Wrote it: ${row.author.name}` : null]
+                {[
+                  row.goal?.name,
+                  row.author?.name ? en.roadmapV2.people.wrote(row.author.name) : null,
+                ]
                   .filter(Boolean)
                   .join(" · ")}
               </span>

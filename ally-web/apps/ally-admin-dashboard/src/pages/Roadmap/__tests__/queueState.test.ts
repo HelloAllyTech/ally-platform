@@ -21,7 +21,7 @@ import {
 } from "../utils/queueState";
 
 describe("the five default views", () => {
-  it("are All, To do, Building, Released and Declined, in that order", () => {
+  it("are All, To do, Building, Released and Not building, in that order", () => {
     expect(DEFAULT_VIEW_IDS).toEqual(["all", "todo", "building", "released", "declined"]);
   });
 
