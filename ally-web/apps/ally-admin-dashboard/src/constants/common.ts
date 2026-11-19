@@ -474,6 +474,11 @@ export const ApiEndpoints = {
       `/v1/roadmap/items/${encodeURIComponent(code)}/conversation`,
     CLOSE_PLAN: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/close-plan`,
     REOPEN_PLAN: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/reopen-plan`,
+    CLOSE_READINESS: (code: string) =>
+      `/v1/roadmap/items/${encodeURIComponent(code)}/close-readiness`,
+    PLAN_MESSAGE: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/plan-message`,
+    PLAN_CHECKS_RUN: (sessionId: string) =>
+      `/v1/product-roadmap/plans/${encodeURIComponent(sessionId)}/checks/run`,
     BUILD_MODE: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/build-mode`,
     MARK_RELEASED: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/mark-released`,
     SESSION_ANSWERS: (sessionId: string) =>

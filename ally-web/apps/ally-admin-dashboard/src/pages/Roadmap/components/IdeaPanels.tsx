@@ -10,6 +10,7 @@ import type { BuilderSessionDetail, RoadmapItemDetail } from "@types";
 
 import { CodeText } from "./CodeChip";
 import { ShipActions } from "./ReleaseDialog";
+import { usePlanPrdHandlers } from "./usePlanPrdHandlers";
 import { SimilarLine } from "../triage/TriageSummary";
 import { IdeaPanelTab, shortDate, usd } from "../utils/copy";
 import { outcomeLine } from "../utils/delight";
@@ -160,19 +161,22 @@ export const PrdPanel: React.FC<{ item: RoadmapItemDetail; session?: BuilderSess
   session,
 }) => {
   const copy = en.roadmapV2.idea;
+  const handlers = usePlanPrdHandlers(item.sessionId);
   if (!item.sessionId || !session?.prd || !session.readiness) {
     return <p className="text-sm text-typography-secondary">{copy.prdNone}</p>;
   }
+  // The planner (an Owner, or the assigned builder) edits it here while planning; everyone else reads.
+  const works = !!item.can?.workPlan;
   return (
     <ErrorBoundary variant="panel">
-      {/* Read-only here: the PRD is edited in the plan session, not from the idea page (P2). */}
       <PrdDocPanel
         prd={session.prd}
         readiness={session.readiness}
         versionNumber={session.prdVersionNumber}
-        editable={false}
+        editable={works}
         lockedReason=""
-        onSaveSection={noopSave}
+        onSaveSection={works ? handlers.onSaveSection : noopSave}
+        onDismissFinding={works ? handlers.onDismissFinding : undefined}
         sessionTitle={item.title}
         repos={session.repos ?? []}
         createdByName={session.createdByName}
@@ -197,8 +201,9 @@ export const DesignPanel: React.FC<{ item: RoadmapItemDetail; session?: BuilderS
             design={session.prd?.technicalDesign ?? null}
             designReadiness={session.designReadiness}
             prdReady={!!session.readiness?.ready}
-            // Approving is the lead's (or an Owner's) call; for everyone else the buttons are absent.
-            readOnly={!item.can?.approveDesign}
+            // Drafting (the planner) and approving (the lead or an Owner); for everyone else the
+            // buttons are absent.
+            readOnly={!item.can?.approveDesign && !item.can?.workPlan}
           />
         </ErrorBoundary>
       ) : (

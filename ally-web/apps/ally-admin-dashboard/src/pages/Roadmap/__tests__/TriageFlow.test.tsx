@@ -16,6 +16,8 @@ const mockStart = vi.fn();
 const mockSetLead = vi.fn();
 const mockPlanClosed = vi.fn();
 const mockOpenConversation = vi.fn();
+const mockClosePlan = vi.fn();
+const closeReadiness: { current: unknown } = { current: undefined };
 const unwrapOf = (fn: ReturnType<typeof vi.fn>) =>
   vi.fn((arg: unknown) => ({ unwrap: () => Promise.resolve(fn(arg)) }));
 
@@ -60,6 +62,17 @@ vi.mock("../../../api/roadmapV2Flow", async importOriginal => ({
     isLoading: false,
     isError: false,
   }),
+}));
+vi.mock("../../../api/roadmapPlanning", async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useGetRoadmapCloseReadinessQuery: () => ({
+    data: closeReadiness.current,
+    isFetching: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+  useCloseRoadmapPlanMutation: () => [unwrapOf(mockClosePlan), { isLoading: false }],
+  useRunRoadmapPlanChecksMutation: () => [unwrapOf(vi.fn()), { isLoading: false }],
 }));
 vi.mock("@api", async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -330,10 +343,19 @@ describe("the idea page's primary action (P3 / P3b)", () => {
       />,
     );
     expect(screen.queryByRole("button", { name: en.roadmapV2.review.pickLead })).toBeNull();
+    // Close plan opens the dialog of what is still open (audit rec 2): nothing open, a plain confirm.
+    closeReadiness.current = { ready: true, prdEmpty: false, blockers: [] };
     fireEvent.click(screen.getByRole("button", { name: en.roadmapV2.session.closePlan }));
-    await waitFor(() =>
-      expect(mockPlanClosed).toHaveBeenCalledWith({ code: "OPP-402", closed: true }),
+    expect(await screen.findByText(en.roadmapV2.planGate.ready)).toBeInTheDocument();
+    expect(mockClosePlan).not.toHaveBeenCalled();
+    const dialog = screen.getByText(en.roadmapV2.planGate.ready).closest("[role='dialog']");
+    fireEvent.click(
+      within(dialog as HTMLElement).getByRole("button", { name: en.roadmapV2.planGate.confirm }),
     );
+    await waitFor(() =>
+      expect(mockClosePlan).toHaveBeenCalledWith({ code: "OPP-402", reason: undefined }),
+    );
+    expect(mockPlanClosed).not.toHaveBeenCalled();
     open.unmount();
 
     wrap(
@@ -353,6 +375,54 @@ describe("the idea page's primary action (P3 / P3b)", () => {
     expect(
       screen.getByRole("button", { name: en.roadmapV2.session.reopenPlan }),
     ).toBeInTheDocument();
+  });
+
+  it("Close plan with open blockers lists them and needs a typed reason", async () => {
+    closeReadiness.current = {
+      ready: false,
+      prdEmpty: true,
+      blockers: [
+        { kind: "prd", text: "Write the requirements." },
+        { kind: "design", text: "Approve the technical design." },
+      ],
+    };
+    wrap(
+      <PrimaryAction
+        item={detail("OPP-403", {
+          shownStage: "planning",
+          statusParts: {
+            stage: "planning",
+            step: "prd",
+            leadUserId: null,
+            prdPercent: 10,
+            openQuestions: 0,
+            designAwaitingApproval: false,
+          },
+          can: { closePlan: true },
+        })}
+        onApproveDesign={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: en.roadmapV2.session.closePlan }));
+    expect(await screen.findByText(en.roadmapV2.planGate.prdEmpty)).toBeInTheDocument();
+    expect(screen.getByText("Write the requirements.")).toBeInTheDocument();
+    expect(screen.getByText("Approve the technical design.")).toBeInTheDocument();
+    const closeAnyway = screen.getByRole("button", { name: en.roadmapV2.planGate.closeAnyway });
+    expect(closeAnyway).toBeDisabled();
+    fireEvent.change(
+      screen.getByLabelText(en.roadmapV2.planGate.reasonLabel, { selector: "textarea" }),
+      {
+        target: { value: "Pilot first; we measure after it ships." },
+      },
+    );
+    expect(closeAnyway).toBeEnabled();
+    fireEvent.click(closeAnyway);
+    await waitFor(() =>
+      expect(mockClosePlan).toHaveBeenCalledWith({
+        code: "OPP-403",
+        reason: "Pilot first; we measure after it ships.",
+      }),
+    );
   });
 
   it("an Owner can still decline an idea that is Building, beside the builder's action", () => {

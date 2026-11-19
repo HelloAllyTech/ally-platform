@@ -70,7 +70,12 @@ export type RoadmapCapability =
   /** The assigned builder (or an Owner) says how it is built. */
   | "setBuildMode"
   /** The assigned builder (or an Owner) marks it Released. Nothing else does. */
-  | "markReleased";
+  | "markReleased"
+  /**
+   * Audit 2026-11-19: an Owner (or the assigned builder) works the plan from the idea page while it
+   * is being planned: messages the plan agent, edits the PRD, dismisses findings, drafts the design.
+   */
+  | "workPlan";
 
 /** How the assigned builder builds it. */
 export type RoadmapBuildMode = "builder_agent" | "outside";
