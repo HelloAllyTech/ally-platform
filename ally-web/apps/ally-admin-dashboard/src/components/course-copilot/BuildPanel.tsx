@@ -452,6 +452,16 @@ export const BuildPanel: React.FC<BuildPanelProps> = ({
                             {detailLine}
                           </p>
                         )}
+                        {/* Which of the trainer's files this item was written from, to check it
+                            against. Only on finished items: a queued job has read nothing yet. */}
+                        {job.status === "done" && (job.references?.length ?? 0) > 0 && (
+                          <p
+                            className="mt-0.5 line-clamp-2 text-xs text-typography-600"
+                            title={job.references!.join(" · ")}
+                          >
+                            {en.courseCopilot.sources.basedOn(job.references!)}
+                          </p>
+                        )}
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
                         {isRoleplay && job.scenarioId !== null && job.scenarioId !== undefined && (

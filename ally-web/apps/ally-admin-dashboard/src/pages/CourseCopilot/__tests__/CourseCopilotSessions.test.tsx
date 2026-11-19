@@ -15,6 +15,7 @@ vi.mock("@ally-ui-mono/ui-shared", () => ({
   ),
   InlineNotification: ({ title }: any) => <div role="alert">{title}</div>,
   SkeletonText: () => <div>Loading…</div>,
+  Tooltip: ({ children }: any) => <>{children}</>,
   Tile: ({ children, onClick, className }: any) => (
     <div className={className} onClick={onClick}>
       {children}
@@ -143,15 +144,90 @@ describe("CourseCopilotSessions", () => {
     };
     render(<CourseCopilotSessions />);
 
-    expect(screen.getByText("Safety planning")).toBeInTheDocument();
-    expect(screen.getByText("New course · Safety planning basics")).toBeInTheDocument();
-    expect(screen.getByText(en.courseCopilot.status.EDITING)).toBeInTheDocument();
+    const list = en.courseCopilot.list;
+    const [built, planning] = screen.getAllByTestId("course-copilot-session-card");
+
+    expect(built).toHaveTextContent("Safety planning");
+    expect(built).toHaveTextContent("Safety planning basics · Draft");
+    expect(built).toHaveTextContent(en.courseCopilot.status.EDITING);
+    expect(built).toHaveTextContent(list.stateLine.EDITING);
     // A session with no title or course yet still reads as something.
-    expect(screen.getByText(en.courseCopilot.session.untitled)).toBeInTheDocument();
-    expect(
-      screen.getByText(`Editing a course · ${en.courseCopilot.list.noCourseYet}`),
-    ).toBeInTheDocument();
-    expect(screen.getByText(en.courseCopilot.status.AWAITING_BLUEPRINT)).toBeInTheDocument();
+    expect(planning).toHaveTextContent(en.courseCopilot.session.untitled);
+    expect(planning).toHaveTextContent(`${list.noCourseYet} · ${en.courseCopilot.mode.EDIT}`);
+    expect(planning).toHaveTextContent(en.courseCopilot.status.AWAITING_BLUEPRINT);
+    // The next step, named for the state.
+    expect(planning).toHaveTextContent(list.action.AWAITING_BLUEPRINT);
+  });
+
+  it("shows how long each build took, live progress while building, and nothing before one", () => {
+    const list = en.courseCopilot.list;
+    listResult = {
+      data: [
+        session({
+          build: {
+            startedAt: "2026-10-01T10:00:00Z",
+            finishedAt: "2026-10-01T10:08:30Z",
+            seconds: 510,
+            running: false,
+            items: 12,
+            done: 11,
+            failed: 1,
+          },
+        }),
+        session({
+          id: "s2",
+          status: "BUILDING",
+          build: {
+            startedAt: new Date(Date.now() - 3 * 60_000).toISOString(),
+            finishedAt: null,
+            seconds: null,
+            running: true,
+            items: 10,
+            done: 4,
+            failed: 0,
+          },
+        }),
+        session({ id: "s3", status: "INTERVIEWING", trackId: null, trackTitle: null }),
+      ],
+      isLoading: false,
+      isError: false,
+    };
+    render(<CourseCopilotSessions />);
+    const [built, building, interviewing] = screen.getAllByTestId("course-copilot-session-card");
+
+    expect(built).toHaveTextContent("8m 30s · 11 of 12 items · 1 failed");
+    expect(building).toHaveTextContent("Building · 3m 0s so far");
+    expect(building).toHaveTextContent("4 of 10 items");
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "40");
+    expect(interviewing).toHaveTextContent(`${list.buildTime}${list.notBuilt}`);
+    // The average counts finished builds only.
+    expect(screen.getByTestId("course-copilot-stats")).toHaveTextContent(
+      `${list.stats.averageBuild}8m 30s`,
+    );
+  });
+
+  it("tags a live course Published, in place of Editing, and counts it", () => {
+    const list = en.courseCopilot.list;
+    listResult = {
+      data: [
+        session({ trackStatus: "ACTIVE" }),
+        session({ id: "s2", status: "BUILDING", trackStatus: "ACTIVE" }),
+      ],
+      isLoading: false,
+      isError: false,
+    };
+    render(<CourseCopilotSessions />);
+    const [live, rebuilding] = screen.getAllByTestId("course-copilot-session-card");
+
+    expect(live).toHaveTextContent(en.courseCopilot.publishedTag);
+    expect(live).not.toHaveTextContent(en.courseCopilot.status.EDITING);
+    expect(live).toHaveTextContent(list.stateLine.PUBLISHED);
+    expect(live).toHaveTextContent("Safety planning basics · Published");
+    // A build in progress still says so, whatever the course's state.
+    expect(rebuilding).toHaveTextContent(en.courseCopilot.status.BUILDING);
+    expect(screen.getByTestId("course-copilot-stats")).toHaveTextContent(
+      `${list.stats.published}1`,
+    );
   });
 
   it("resumes a session from its card or its Open button", () => {

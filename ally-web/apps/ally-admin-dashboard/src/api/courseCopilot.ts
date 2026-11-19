@@ -5,6 +5,7 @@ import {
   CourseCopilotBudget,
   CourseCopilotSessionDetail,
   CourseCopilotSessionSummary,
+  CourseCopilotSource,
   TrackLandingPageDraftResponse,
 } from "@types";
 
@@ -170,6 +171,44 @@ export const courseCopilotAPI = baseAPI.injectEndpoints({
       ],
     }),
 
+    /** Reference files attached to the session, oldest first. */
+    getCourseCopilotSources: builder.query<CourseCopilotSource[], string>({
+      query: id => ({
+        url: ApiEndpoints.COURSE_COPILOT.SESSION_SOURCES(id),
+        method: HttpMethod.GET,
+      }),
+      providesTags: (result, error, id) => [{ type: TAG_TYPES.COURSE_COPILOT_SOURCES, id }],
+    }),
+
+    /**
+     * Attaches one file. The server keeps its text, split into passages, and drops the file;
+     * 400 `{message}` names what is wrong (format, size, count, no readable text) and is shown
+     * as is.
+     */
+    uploadCourseCopilotSource: builder.mutation<CourseCopilotSource, { id: string; file: File }>({
+      query: ({ id, file }) => {
+        const body = new FormData();
+        body.append("file", file, file.name);
+        return {
+          url: ApiEndpoints.COURSE_COPILOT.SESSION_SOURCES(id),
+          method: HttpMethod.POST,
+          body,
+        };
+      },
+      invalidatesTags: (result, error, { id }) => [{ type: TAG_TYPES.COURSE_COPILOT_SOURCES, id }],
+    }),
+
+    removeCourseCopilotSource: builder.mutation<
+      { success: boolean },
+      { id: string; sourceId: string }
+    >({
+      query: ({ id, sourceId }) => ({
+        url: ApiEndpoints.COURSE_COPILOT.SESSION_SOURCE(id, sourceId),
+        method: HttpMethod.DELETE,
+      }),
+      invalidatesTags: (result, error, { id }) => [{ type: TAG_TYPES.COURSE_COPILOT_SOURCES, id }],
+    }),
+
     /**
      * Drafts the story fields of a SAVED course's landing page from its sections, items and
      * roleplay summaries. A POST because it spends a model call, but it writes nothing: the
@@ -199,4 +238,7 @@ export const {
   useRaiseCourseCopilotBudgetMutation,
   useArchiveCourseCopilotSessionMutation,
   useDraftTrackLandingPageMutation,
+  useGetCourseCopilotSourcesQuery,
+  useUploadCourseCopilotSourceMutation,
+  useRemoveCourseCopilotSourceMutation,
 } = courseCopilotAPI;
