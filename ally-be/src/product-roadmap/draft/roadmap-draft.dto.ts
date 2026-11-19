@@ -1,11 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
   IsIn,
   IsInt,
+  IsNotEmpty,
   IsOptional,
   IsString,
   Length,
@@ -86,6 +87,18 @@ export class RoadmapSelfCheckDto {
 }
 
 export class SubmitRoadmapDraftDto {
+  @ApiProperty({
+    maxLength: ROADMAP_LIMITS.TITLE_MAX,
+    description: 'One line naming the idea. Required to submit.',
+  })
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : value,
+  )
+  @IsString()
+  @IsNotEmpty({ message: 'An idea needs a title.' })
+  @MaxLength(ROADMAP_LIMITS.TITLE_MAX)
+  title!: string;
+
   @ApiPropertyOptional({ description: 'roadmap_product_goals id' })
   @IsOptional()
   @IsString()

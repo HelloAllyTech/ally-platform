@@ -203,7 +203,9 @@ describe('RoadmapDraftService', () => {
 
   it('Submit refuses anything short of 5 of 5', async () => {
     const { service, deps } = build();
-    const error = await service.submit(ME, 'OPP-0900', {}).catch((e) => e);
+    const error = await service
+      .submit(ME, 'OPP-0900', { title: 'A title' })
+      .catch((e) => e);
     expect(error.getStatus()).toBe(422);
     expect(error.getResponse()).toMatchObject({ code: 'checks_incomplete' });
     expect(deps.opportunityService.create).not.toHaveBeenCalled();
@@ -228,7 +230,7 @@ describe('RoadmapDraftService', () => {
       if (sql.includes('count(*)')) return [{ n: 0 }];
       return [];
     });
-    const result = await service.submit(ME, 'OPP-0900', {});
+    const result = await service.submit(ME, 'OPP-0900', { title: 'A title' });
     expect(deps.opportunityService.create).toHaveBeenCalledWith(
       ME,
       expect.objectContaining({
@@ -260,7 +262,9 @@ describe('RoadmapDraftService', () => {
     const { service, deps } = build({
       row: draftRow({ draftGoalId: 'g1', idea: { selfCheck } }),
     });
-    const error = await service.submit(ME, 'OPP-0900', {}).catch((e) => e);
+    const error = await service
+      .submit(ME, 'OPP-0900', { title: 'A title' })
+      .catch((e) => e);
     expect(error.getStatus()).toBe(422);
     expect(deps.opportunityService.create).not.toHaveBeenCalled();
     const gone = await service.selfCheck().catch((e) => e);

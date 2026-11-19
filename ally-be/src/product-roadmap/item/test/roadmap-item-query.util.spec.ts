@@ -1,4 +1,5 @@
 import {
+  fallbackTitle,
   bodyOf,
   codeDigits,
   compareRows,
@@ -275,5 +276,28 @@ describe('title and body', () => {
     expect(codeDigits('opp388')).toBe('388');
     expect(codeDigits('388')).toBe('388');
     expect(codeDigits('streak')).toBeNull();
+  });
+});
+
+describe('fallbackTitle', () => {
+  it('keeps short text as it is', () => {
+    expect(fallbackTitle('Add dark mode')).toBe('Add dark mode');
+  });
+
+  it('cuts a long single line at a sentence end, not mid-thought (OPP-0648)', () => {
+    const text =
+      'Reduce latency further: faster turn responses are being lost because two optimizations are defeated. ' +
+      'Possible approach: fix one issue at a time, starting with prompt prefix caching and then the RAG cache key.';
+    expect(fallbackTitle(text)).toBe(
+      'Reduce latency further: faster turn responses are being lost because two optimizations are defeated',
+    );
+  });
+
+  it('falls back to a clause, then to a word boundary, and never returns blank', () => {
+    const noStop = 'word '.repeat(60).trim();
+    const out = fallbackTitle(noStop);
+    expect(out.length).toBeLessThanOrEqual(120);
+    expect(out.endsWith('word')).toBe(true);
+    expect(fallbackTitle('x'.repeat(300))).toHaveLength(120);
   });
 });

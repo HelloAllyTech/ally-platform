@@ -12,6 +12,7 @@ import { BugFinding } from 'src/bug-hunter/entity/bug-finding.entity';
 import { S3Service } from 'src/aws/service/s3.service';
 import { AppConfigService } from 'src/config/config.service';
 
+import { RoadmapAiService } from '../roadmap-ai.service';
 import { RoadmapOpportunityService } from '../roadmap-opportunity.service';
 import { RoadmapOpportunityRepository } from '../../repository/roadmap-opportunity.repository';
 import { RoadmapAllocationRepository } from '../../repository/roadmap-allocation.repository';
@@ -84,6 +85,11 @@ describe('RoadmapOpportunityService — owners', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RoadmapOpportunityService,
+        // A title is written for a filing that arrives without one; these suites do not test it.
+        {
+          provide: RoadmapAiService,
+          useValue: { suggestTitle: jest.fn().mockResolvedValue('A title') },
+        },
         {
           provide: RoadmapOpportunityRepository,
           useValue: opportunityRepository,

@@ -656,7 +656,7 @@ export class RoadmapDraftService {
   async submit(
     userId: number,
     code: string,
-    input: { goalId?: string | null },
+    input: { goalId?: string | null; title: string },
   ): Promise<{ item: ItemDetail; firstSubmit: boolean }> {
     const draft = await this.editableDraft(userId, code);
     const draftCode = draft.plan.code as string;
@@ -725,6 +725,7 @@ export class RoadmapDraftService {
       const created = await this.opportunityService.create(
         userId,
         {
+          title: input.title,
           description,
           productGoal: goal.name,
           effort: effort ?? undefined,
@@ -759,7 +760,7 @@ export class RoadmapDraftService {
       const filedAt = new Date().toISOString();
       await this.store.update(draft.id, {
         visibility: BuilderSessionVisibility.SHARED,
-        title: firstLine(text),
+        title: input.title.slice(0, 120),
         archivedAt: null,
         updatedBy: userId,
       });

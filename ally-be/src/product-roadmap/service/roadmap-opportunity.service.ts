@@ -47,6 +47,7 @@ import {
 } from '../repository/roadmap-opportunity.repository';
 import { RoadmapAllocationRepository } from '../repository/roadmap-allocation.repository';
 import {
+  ROADMAP_LIMITS,
   BUG_REPORT_DEFAULT_PRODUCT_GOAL,
   ROADMAP_FILEABLE_EFFORTS,
   ROADMAP_OWNER_EMAILS,
@@ -78,6 +79,8 @@ import {
   normaliseFilingInterview,
   normaliseOpportunityBrief,
 } from '../util/roadmap-brief.util';
+import { RoadmapAiService } from './roadmap-ai.service';
+import { joinDescription } from '../item/roadmap-item-query.util';
 import { RoadmapGoalImpactService } from './roadmap-goal-impact.service';
 import { RoadmapStrategyGoalService } from './roadmap-strategy-goal.service';
 import { RoadmapVectorService } from './roadmap-vector.service';
@@ -111,7 +114,27 @@ export class RoadmapOpportunityService {
     private readonly readinessToken: RoadmapReadinessTokenService,
     private readonly repoClassifier: BugHunterRepoClassifierService,
     private readonly missClassifier: BugHunterMissClassifierService,
+    private readonly roadmapAi: RoadmapAiService,
   ) {}
+
+  /** `title`, a blank line, then the summary: how a titled idea is stored in `description`. */
+  private async storedText(
+    dto: Omit<CreateOpportunityDto, 'title'> & { title?: string },
+  ): Promise<string> {
+    const body = dto.description.trim();
+    if (dto.type === RoadmapOpportunityType.BUG) return body;
+    const title =
+      (dto.title ?? '').replace(/\s+/g, ' ').trim() ||
+      (await this.roadmapAi.suggestTitle(body));
+    if (!title) throw new BadRequestException('An idea needs a title.');
+    const text = joinDescription(title, body);
+    if (text.length > ROADMAP_LIMITS.STORED_TEXT_MAX) {
+      throw new BadRequestException(
+        `The title and summary together can be at most ${ROADMAP_LIMITS.STORED_TEXT_MAX} characters.`,
+      );
+    }
+    return text;
+  }
 
   async list(
     userId: number,
@@ -223,7 +246,9 @@ export class RoadmapOpportunityService {
    */
   async create(
     userId: number,
-    dto: CreateOpportunityDto,
+    // `title` is required over HTTP (CreateOpportunityDto) but optional here: a caller filing on
+    // someone's behalf may leave it out and have one written — see storedText.
+    dto: Omit<CreateOpportunityDto, 'title'> & { title?: string },
     extra?: {
       source?: RoadmapOpportunitySource;
       tenantId?: string | null;
@@ -294,9 +319,15 @@ export class RoadmapOpportunityService {
         ? normaliseFilingInterview(dto.interviewTranscript)
         : null;
 
+    // Every new IDEA has a title. The form and the draft's Submit send one; a caller that files
+    // on someone's behalf (the PM Agent) sends none, so one is written here rather than refused.
+    // A bug keeps its text as one block, as before: a bug report is a guided prompt, not a
+    // titled idea.
+    const storedText = await this.storedText(dto);
+
     const saved = await this.opportunityRepository.save(
       this.opportunityRepository.create({
-        description: dto.description.trim(),
+        description: storedText,
         type: dto.type,
         productGoal: dto.productGoal,
         // `?? null` so an omitted effort files as unsized rather than undefined — the column
@@ -419,7 +450,10 @@ export class RoadmapOpportunityService {
    * hatch had nothing left to open, and a gate with no client asking to bypass it should not
    * keep the bypass.
    */
-  private assertReady(userId: number, dto: CreateOpportunityDto): void {
+  private assertReady(
+    userId: number,
+    dto: Omit<CreateOpportunityDto, 'title'> & { title?: string },
+  ): void {
     if (!dto.readinessToken) {
       if (ROADMAP_READINESS_REQUIRE_TOKEN) {
         throw new BadRequestException(
