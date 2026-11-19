@@ -1,3 +1,8 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../../core/localization/translate_ref.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../data/course_models.dart';
 
 typedef RoleplayTranslate = String Function(String, [Map<String, Object?>?]);
