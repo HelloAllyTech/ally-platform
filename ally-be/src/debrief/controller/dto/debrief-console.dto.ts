@@ -496,3 +496,16 @@ export class ProposeChangeDto {
   @IsObject()
   prompts?: Record<string, number>;
 }
+
+export class LearnerFeatureEmailDto {
+  @ApiProperty({ example: 'name@company.com' })
+  @IsString()
+  @MaxLength(254)
+  email!: string;
+}
+
+export class LearnerFeatureEveryoneDto {
+  @ApiProperty()
+  @IsBoolean()
+  on!: boolean;
+}

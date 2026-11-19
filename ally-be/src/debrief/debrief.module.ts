@@ -39,6 +39,9 @@ import { DebriefLanguageJudgment } from './entity/debrief-language-judgment.enti
 import { DebriefLanguageJudgeService } from './service/debrief-language-judge.service';
 import { JudgeAttemptRepository } from '../analytics/repository/judge-attempt.repository';
 import { DebriefReviewComment } from './entity/debrief-review-comment.entity';
+import { DebriefLearnerFeatureAccess } from './entity/debrief-learner-feature-access.entity';
+import { DebriefLearnerFeaturesService } from './service/debrief-learner-features.service';
+import { DebriefLearnerCommentsService } from './service/debrief-learner-comments.service';
 import { DebriefReviewService } from './service/debrief-review.service';
 import { DebriefFeedback } from './entity/debrief-feedback.entity';
 import { DebriefRun } from './entity/debrief-run.entity';
@@ -128,6 +131,7 @@ import { DebriefFlagAnswerService } from './service/debrief-flag-answer.service'
       // The language check on each debrief's own text (findings only).
       DebriefLanguageJudgment,
       DebriefReviewComment,
+      DebriefLearnerFeatureAccess,
       DebriefReviewAnswer,
       DebriefAgreementSample,
       // Ask Ally writes to the same thread today's debrief chat uses.
@@ -216,6 +220,8 @@ import { DebriefFlagAnswerService } from './service/debrief-flag-answer.service'
     DebriefBuilderRequesterService,
     DebriefConsoleService,
     DebriefFeedbackService,
+    DebriefLearnerFeaturesService,
+    DebriefLearnerCommentsService,
     DebriefPracticeService,
     DebriefReplyService,
     DebriefPublishService,

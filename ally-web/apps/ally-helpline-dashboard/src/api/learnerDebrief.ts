@@ -2,6 +2,7 @@ import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
 import {
   DebriefFlagReason,
   DebriefPulseQuestion,
+  DebriefSelectionComment,
   LearnerDebriefView,
   SupervisorDebriefView,
 } from "@types";
@@ -59,6 +60,17 @@ const learnerDebriefAPI = baseAPI.injectEndpoints({
       invalidatesTags: (_r, _e, { sessionId }) => [
         { type: TAG_TYPES.LEARNER_DEBRIEF, id: sessionId },
       ],
+    }),
+    /** Comments on selected words, and an optional overall comment, sent together (web only). */
+    addDebriefComments: builder.mutation<
+      { saved: number },
+      { sessionId: string; overall?: string; items: DebriefSelectionComment[] }
+    >({
+      query: ({ sessionId, overall, items }) => ({
+        url: ApiEndpoints.DEBRIEFS.COMMENTS(sessionId),
+        method: HttpMethod.POST,
+        body: { ...(overall ? { overall } : {}), items },
+      }),
     }),
     /** The pulse (PRD §9): one yes/no answer per question; answering again changes it. */
     answerDebriefPulse: builder.mutation<
@@ -151,6 +163,7 @@ export const {
   useReportDebriefEventMutation,
   useGetLearnerDebriefQuery,
   useSetDebriefHelpfulMutation,
+  useAddDebriefCommentsMutation,
   useFlagDebriefCardMutation,
   useUndoDebriefFlagMutation,
 } = learnerDebriefAPI;

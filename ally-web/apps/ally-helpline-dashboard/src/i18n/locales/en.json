@@ -1067,6 +1067,20 @@
         "yes": "Yes",
         "no": "No",
         "thanks": "Thanks for telling us."
+      },
+      "selectionComments": {
+        "popupLabel": "Comment on the selected words",
+        "inputLabel": "Your comment",
+        "placeholder": "What do you think of this?",
+        "add": "Add",
+        "needText": "Write a comment first",
+        "note": "Added comments go into your feedback below. Nothing is sent yet.",
+        "remove": "Remove this comment",
+        "overallLabel": "Feedback on this debrief",
+        "hint": "Select words in the debrief to comment on them.",
+        "count_one": "{{count}} comment on selected words",
+        "count_other": "{{count}} comments on selected words",
+        "send": "Send"
       }
     }
   },

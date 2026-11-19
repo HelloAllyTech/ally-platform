@@ -163,6 +163,8 @@ export interface LearnerDebriefView {
    * shown as it is, with a kind notice that someone from the team is checking it more closely.
    */
   followUp?: boolean;
+  /** Learner features this person has (web only). Absent or false: nothing changes for them. */
+  features?: { selectionComments?: boolean };
   /**
    * Roleplays the cards link to that the learner can still open. Inside a
    * course only that course's roleplays, each with its course item.
@@ -210,3 +212,13 @@ export type DebriefProgress =
   | { key: "reading" | "past_sessions" | "writing" | "reviewing" | "care" }
   | { key: "guidance"; topic?: string }
   | { key: "revising"; round: number };
+
+/** One comment on selected words, as the server checks it against the card. */
+export interface DebriefSelectionComment {
+  /** The card and field, e.g. `work_on_this[0].why`. */
+  section: string;
+  spanStart: number;
+  spanEnd: number;
+  quotedText: string;
+  body: string;
+}

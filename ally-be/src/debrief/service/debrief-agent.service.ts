@@ -176,6 +176,8 @@ export interface LearnerDebriefView {
    * following up (risk-cue policy option C, 2026-11-18). Absent otherwise, so older apps ignore it.
    */
   followUp?: boolean;
+  /** Learner features this person has (web only today). Absent on a view with nothing to show. */
+  features?: { selectionComments: boolean };
   /** The organisation's support lines (the Guide's), crisis lines first. */
   supportLines?: GuideSupportLine[];
   /**

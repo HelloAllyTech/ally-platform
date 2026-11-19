@@ -13076,6 +13076,7 @@ export const en = {
         autonomy: "Autonomy",
         weights: "Score",
         pinned: "Locked prompts",
+        learner: "Learner features",
         clinical: "Clinical lists",
         progress: "Progress",
         schedules: "Schedules",
@@ -13421,6 +13422,33 @@ export const en = {
         "How the Debrief agent reads a learner's progress across their recent sessions, and what learners are shown.",
       weightsHelp:
         "How the weekly steering score weighs each signal, and how soon a learner's flag should be reviewed.",
+      learnerHelp:
+        "Features learners see on the web debrief, given to some people first and to everyone later.",
+      learner: {
+        selectionTitle: "Select and comment",
+        selectionBody:
+          "Learners on web can select words in their debrief and comment on them. The comments reach the PM agent with the words and the card they came from.",
+        loading: "Loading…",
+        loadFailed: "Couldn't load who has this. Reload to try again.",
+        emailLabel: "Email of the person to give access",
+        emailPlaceholder: "name@company.com",
+        give: "Give access",
+        needEmail: "Enter an email",
+        given: (email: string) => `Access given to ${email}`,
+        giveFailed: "Couldn't give access. Check the email and try again.",
+        remove: "Remove",
+        removed: "Access removed",
+        removeFailed: "Couldn't remove access. Try again.",
+        hasAccess: "Has access",
+        nobody: "Nobody has it yet. Add a person by email.",
+        everyoneTitle: "Everyone",
+        everyoneOff: "Off while we try it with a few people.",
+        everyoneOn: "On: every learner on web has it.",
+        everyoneLabel: "Give this to everyone",
+        everyoneFailed: "Couldn't change that. Try again.",
+        ownerOnly: "Only the owner can change who has this.",
+        added: (date: string) => `Added ${date}`,
+      },
       pinnedHelp:
         "These prompts decide what counts as safe, and they apply to every organisation. A few named people edit them in the Skills Store. The Debrief PM agent can read them but never change them.",
       orgs: {

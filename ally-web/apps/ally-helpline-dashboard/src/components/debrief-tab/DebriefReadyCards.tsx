@@ -21,6 +21,7 @@ import { PractiseLink, ROLEPLAYS_PATH, SupervisorFlag, SupportLines } from "./De
 import { Body, Card, Lead, Quote, ReadableItem, SKILL_WORD_ICON } from "./DebriefCardPrimitives";
 import { DebriefProgressCard, parseProgressCard } from "./DebriefProgressCard";
 import { ListenButton } from "./ReadAloudControls";
+import { SelectionFeedbackComposer } from "./SelectionComments";
 import { useDebriefEvent, useMarkOpened, useReadToTheEnd, useSeenOnce } from "./useReadToTheEnd";
 
 /** What a supervisor sees besides the cards: the learner's flags and answer. */
@@ -147,9 +148,9 @@ export const ReadyCards: FC<{
             title={momentTitle}
             icon={<Bookmark aria-hidden="true" className="h-5 w-5 text-warning-700" />}
           >
-            <Lead>{moment.lead}</Lead>
-            <Quote text={moment.quote} />
-            <Body>{moment.body}</Body>
+            <Lead anchor="important_moment.lead">{moment.lead}</Lead>
+            <Quote text={moment.quote} anchor="important_moment.quote" />
+            <Body anchor="important_moment.body">{moment.body}</Body>
             {!!moment.others?.length && (
               <div className="flex flex-col gap-2">
                 <Lead>{t("postSim.debriefCards.importantMoment.others")}</Lead>
@@ -172,6 +173,7 @@ export const ReadyCards: FC<{
 
       <p
         data-testid="debrief-card-opening"
+        data-anchor="card:opening"
         className="font-primary text-base leading-relaxed text-typography-800"
       >
         {cards.opening}
@@ -188,9 +190,9 @@ export const ReadyCards: FC<{
             <ul className="flex flex-col gap-4">
               {worked.map(({ item, index }) => (
                 <ReadableItem key={`${item.turn_index}-${index}`} section={`what_worked[${index}]`}>
-                  <Lead>{item.lead}</Lead>
-                  <Quote text={item.quote} />
-                  <Body>{item.body}</Body>
+                  <Lead anchor={`what_worked[${index}].lead`}>{item.lead}</Lead>
+                  <Quote text={item.quote} anchor={`what_worked[${index}].quote`} />
+                  <Body anchor={`what_worked[${index}].body`}>{item.body}</Body>
                   {flagControl(`what_worked[${index}]`, item.lead)}
                 </ReadableItem>
               ))}
@@ -210,9 +212,9 @@ export const ReadyCards: FC<{
                   key={`${item.turn_index}-${index}`}
                   section={`work_on_this[${index}]`}
                 >
-                  <Lead>{item.lead}</Lead>
-                  <Quote text={item.quote} />
-                  <Body>{item.why}</Body>
+                  <Lead anchor={`work_on_this[${index}].lead`}>{item.lead}</Lead>
+                  <Quote text={item.quote} anchor={`work_on_this[${index}].quote`} />
+                  <Body anchor={`work_on_this[${index}].why`}>{item.why}</Body>
                   <p
                     data-testid="debrief-try-saying"
                     className="flex gap-2 rounded-md border-l-4 border-warning-400 bg-warning-50 px-3 py-2 font-primary text-sm text-typography-900"
@@ -225,7 +227,9 @@ export const ReadyCards: FC<{
                       <strong className="font-semibold">
                         {t("postSim.debriefCards.trySaying")}
                       </strong>{" "}
-                      {item.try_saying}
+                      <span data-anchor={`card:work_on_this[${index}].try_saying`}>
+                        {item.try_saying}
+                      </span>
                     </span>
                   </p>
                   {practiceFor(item.scenario_id) && (
@@ -253,8 +257,8 @@ export const ReadyCards: FC<{
             title={practiseTitle}
             icon={<Sprout aria-hidden="true" className="h-5 w-5 text-primary-600" />}
           >
-            {practise.skill ? <Lead>{practise.skill}</Lead> : null}
-            <Body>{practise.reason}</Body>
+            {practise.skill ? <Lead anchor="practise_next.skill">{practise.skill}</Lead> : null}
+            <Body anchor="practise_next.reason">{practise.reason}</Body>
             {tryNext.length > 0 && (
               <div data-testid="debrief-practise-try">
                 <p className="font-primary text-sm font-semibold text-typography-900">
@@ -325,7 +329,7 @@ export const ReadyCards: FC<{
             title={t("postSim.debriefCards.progressNote")}
             icon={<TrendingUp aria-hidden="true" className="h-5 w-5 text-primary-600" />}
           >
-            <Body>{cards.progress_note}</Body>
+            <Body anchor="progress_note">{cards.progress_note}</Body>
           </Card>
         )}
 
@@ -347,7 +351,7 @@ export const ReadyCards: FC<{
             title={t("postSim.debriefCards.reflectiveQuestion")}
             icon={<HelpCircle aria-hidden="true" className="h-5 w-5 text-primary-600" />}
           >
-            <Body>{cards.reflective_question}</Body>
+            <Body anchor="reflective_question">{cards.reflective_question}</Body>
             <ListenButton
               section="reflective_question"
               cardLabel={t("postSim.debriefCards.reflectiveQuestion")}
@@ -392,6 +396,7 @@ export const ReadyCards: FC<{
       ) : (
         <>
           <DebriefHelpful sessionId={sessionId} helpful={view.feedback?.helpful ?? null} />
+          <SelectionFeedbackComposer sessionId={sessionId} />
           {view.pulse && <DebriefPulseCard sessionId={sessionId} pulse={view.pulse} />}
         </>
       )}
