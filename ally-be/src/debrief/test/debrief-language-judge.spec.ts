@@ -378,7 +378,7 @@ describe('the language problem rollup', () => {
 
   it('gives English no language-check figures, even for rows checked before English was left out', () => {
     const en = {
-      ...r({ findings: 1, types: ['meaning_drift'] }),
+      ...r({ findingCount: 1, types: ['meaning_drift'] }),
       language: 'en-IN',
     };
     const rows = passRollup([en as any, r(null)]).byLanguage;
