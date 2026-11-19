@@ -132,6 +132,11 @@ import { CaseSharedService } from 'src/case/service/case-shared.service';
 import { CaseSessionService } from 'src/case/service/case-session.service';
 import { TrackProgressService } from 'src/track/service/track-progress.service';
 import { TrackMemoryService } from 'src/track/service/track-memory.service';
+import {
+  countLearnerTurnsFromSenders,
+  showsResultsToLearner,
+} from 'src/track/util/roleplay-gate.util';
+import { TrackItemCompletionCriteria } from 'src/track/type/track.type';
 import { CommonUtil } from 'src/common/util/common.util';
 import {
   ScenarioSharedService,
@@ -343,7 +348,45 @@ export class ScenarioSessionService {
       delete (scenarioSession as any).scenario.translations;
     });
 
+    // The learner's own history must not leak a withheld assessment score.
+    const withheld = await this.withheldProgressIds(
+      scenarioSessions
+        .map((session) => session.trackItemProgressId)
+        .filter((id): id is string => !!id),
+    );
+    for (const session of scenarioSessions) {
+      if (
+        session.trackItemProgressId &&
+        withheld.has(session.trackItemProgressId)
+      ) {
+        session.score = undefined;
+        (session as any).resultsHidden = true;
+      }
+    }
+
     return { data: scenarioSessions };
+  }
+
+  /** Of these progress rows, the ones on an assessment that withholds results. */
+  private async withheldProgressIds(
+    trackItemProgressIds: string[],
+  ): Promise<Set<string>> {
+    if (trackItemProgressIds.length === 0) return new Set();
+    const rows: Array<{
+      id: string;
+      criteria: TrackItemCompletionCriteria | null;
+    }> = await this.dataSource.query(
+      `SELECT tip.id AS "id", ti."completionCriteria" AS "criteria"
+         FROM track_item_progress tip
+         JOIN track_items ti ON ti.id = tip."trackItemId"
+        WHERE tip.id = ANY($1::uuid[])`,
+      [Array.from(new Set(trackItemProgressIds))],
+    );
+    return new Set(
+      rows
+        .filter((row) => !showsResultsToLearner(row.criteria))
+        .map((row) => row.id),
+    );
   }
 
   /**
@@ -459,6 +502,21 @@ export class ScenarioSessionService {
 
     if (!scenarioSession) {
       throw new BadRequestException('Scenario session not found');
+    }
+
+    // An assessment whose trainer withheld results: the learner gets the
+    // session with no score and no feedback tabs. Turning both tabs off is a
+    // state every released client already renders (and stops polling on), so
+    // older apps degrade to "no report" rather than an error.
+    if (
+      await this.isAssessmentResultHidden(
+        scenarioSessionId,
+        counselorId,
+        (scenarioSession as any).counselorId,
+        (scenarioSession as any).trackItemProgressId,
+      )
+    ) {
+      return this.withheldAssessmentSession(scenarioSession, languageCode);
     }
 
     if (scenarioSession.startedAt && scenarioSession.endedAt) {
@@ -581,6 +639,93 @@ export class ScenarioSessionService {
       reviewNote: review?.note,
       reviewStatus: review?.status,
       reviewCreatedAt: review?.createdAt,
+    };
+  }
+
+  /**
+   * Whether this session's evaluation is withheld from the viewer: they are
+   * the learner who played it, inside a course, on an assessment roleplay
+   * whose "Show results to learner" is off. Every attempt on such an item is
+   * withheld — a discarded short attempt's debrief would coach the real one.
+   * Trainers and reviewers viewing someone else's session always see it.
+   */
+  async isAssessmentResultHidden(
+    scenarioSessionId: string,
+    viewerId: number,
+    ownerId?: number,
+    trackItemProgressId?: string | null,
+  ): Promise<boolean> {
+    let owner = ownerId;
+    let progressId = trackItemProgressId;
+    if (owner === undefined || progressId === undefined) {
+      const row = await this.scenarioSessionRepository.findOne({
+        where: { id: scenarioSessionId },
+        select: { id: true, counselorId: true, trackItemProgressId: true },
+      });
+      owner = row?.counselorId;
+      progressId = row?.trackItemProgressId ?? null;
+    }
+    if (!progressId || owner !== viewerId) return false;
+    const [row]: Array<{ criteria: TrackItemCompletionCriteria | null }> =
+      await this.dataSource.query(
+        `SELECT ti."completionCriteria" AS "criteria"
+           FROM track_item_progress tip
+           JOIN track_items ti ON ti.id = tip."trackItemId"
+          WHERE tip.id = $1`,
+        [progressId],
+      );
+    return !!row && !showsResultsToLearner(row.criteria);
+  }
+
+  /** Refuse an evaluation endpoint for a withheld assessment (see above). */
+  async assertAssessmentResultVisible(
+    scenarioSessionId: string,
+    viewerId: number,
+  ): Promise<void> {
+    if (await this.isAssessmentResultHidden(scenarioSessionId, viewerId)) {
+      throw new ForbiddenException(
+        'Results for this assessment are not shared with learners.',
+      );
+    }
+  }
+
+  private withheldAssessmentSession(
+    scenarioSession: Record<string, any>,
+    languageCode?: string,
+  ) {
+    const scenario = scenarioSession.scenario;
+    const title =
+      (languageCode && scenario?.translations?.[languageCode]?.title) ||
+      scenario?.title;
+    return {
+      id: scenarioSession.id,
+      scenarioId: scenarioSession.scenarioId,
+      counselorId: scenarioSession.counselorId,
+      status: scenarioSession.status,
+      eventStatus: scenarioSession.eventStatus,
+      interactionMode: scenarioSession.interactionMode,
+      startedAt: scenarioSession.startedAt,
+      endedAt: scenarioSession.endedAt,
+      trackItemProgressId: scenarioSession.trackItemProgressId,
+      score: null,
+      details: null,
+      events: [],
+      scenario: scenario
+        ? {
+            id: scenario.id,
+            title,
+            metadata: {
+              name: scenario.metadata?.name,
+              experienceMode:
+                scenario.metadata?.experienceMode ?? ExperienceMode.FEEDBACK,
+              feedbackTabs: { debrief: false, transcript: false },
+            },
+          }
+        : null,
+      /** The learner's assessment is submitted but its results are withheld. */
+      resultsHidden: true,
+      hasFeedback: false,
+      sessionFeedback: null,
     };
   }
 
@@ -1533,25 +1678,37 @@ export class ScenarioSessionService {
         callDuration,
       });
     } else if (session.trackItemProgressId) {
-      // Track 2.0: roleplay played inside a track.
-      await this.trackProgressService.handleRoleplayEnd({
+      // Track 2.0: roleplay played inside a track. The turn count and the
+      // assessment verdict are stamped on the session, so the start gate and
+      // the reports judge it by the rule in force now, not a later edit.
+      const learnerTurns = await this.countLearnerTurns(session.id);
+      const result = await this.trackProgressService.handleRoleplayEnd({
         trackItemProgressId: session.trackItemProgressId,
+        scenarioSessionId: session.id,
         score,
         callDuration,
-        learnerTookPart: await this.learnerTookPart(session.id),
+        learnerTurns,
+      });
+      await this.scenarioSessionRepository.update(session.id, {
+        learnerTurns,
+        assessmentAttemptValid: result.assessmentAttemptValid,
       });
     }
   }
 
   /**
-   * Whether the learner said anything in the session (the client's turns are
-   * stored with senderId -1). An assessment roleplay only counts as submitted
-   * when they did; see TrackProgressService.assertAssessmentAttemptAvailable.
+   * How many turns the learner took: runs of consecutive learner messages, in
+   * stored order (the simulated client's messages carry senderId -1). An
+   * assessment roleplay only counts as submitted once this reaches the item's
+   * minLearnerTurns; see TrackProgressService.handleRoleplayEnd.
    */
-  private async learnerTookPart(scenarioSessionId: string): Promise<boolean> {
-    return this.scenarioSessionMessagesRepository.exists({
-      where: { scenarioSessionId, senderId: Not(-1) },
+  private async countLearnerTurns(scenarioSessionId: string): Promise<number> {
+    const messages = await this.scenarioSessionMessagesRepository.find({
+      where: { scenarioSessionId },
+      select: { id: true, senderId: true },
+      order: { id: 'ASC' },
     });
+    return countLearnerTurnsFromSenders(messages.map((m) => m.senderId));
   }
 
   /**

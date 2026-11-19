@@ -43,6 +43,7 @@ describe('TrackEnrollmentService — roleplay requirement and last attempt', () 
       // The real resolver, with a 180s platform default.
       getRoleplayGate: (criteria: TrackItemCompletionCriteria) =>
         resolveRoleplayGate(criteria, 180),
+      findPairedPreAssessment: jest.fn().mockResolvedValue(null),
     } as any, // trackProgressService
     {} as any, // caseSessionService
     {
@@ -95,6 +96,8 @@ describe('TrackEnrollmentService — roleplay requirement and last attempt', () 
       minScore: 60,
     });
     expect(result.roleplayGate).toEqual({
+      roleplayType: 'PRACTICE',
+      minLearnerTurns: null,
       completionLogic: TrackItemCompletionLogic.SCORE_AND_DURATION,
       minScore: 60,
       minDurationSeconds: 180,
@@ -159,5 +162,107 @@ describe('TrackEnrollmentService — roleplay requirement and last attempt', () 
       SessionItemStatus.COMPLETED,
     );
     expect(result.lastRoleplayAttempt).toBeNull();
+  });
+
+  describe('assessment items', () => {
+    const KEY = '6f1d0b0e-8f0a-4c3b-9a55-0d6c2f0e9a11';
+
+    it('describes the assessment and keeps a short attempt as judged', async () => {
+      const shortAttempt = {
+        failureReasons: [RoleplayAttemptFailureReason.INSUFFICIENT_TURNS],
+        score: 70,
+        durationSeconds: 40,
+        requiredScore: null,
+        requiredDurationSeconds: null,
+        learnerTurns: 3,
+        requiredTurns: 10,
+        endedAt: '2026-11-19T10:00:00.000Z',
+      };
+      jest.spyOn(service, 'getPermittedItemProgress').mockResolvedValue({
+        item: {
+          id: 'item-1',
+          type: TrackItemType.ROLEPLAY,
+          scenarioId: 7,
+          completionCriteria: {
+            assessmentMode: true,
+            minLearnerTurns: 10,
+            assessmentPhase: 'PRE',
+            assessmentPairKey: KEY,
+          },
+        } as any,
+        sourceItem: {} as any,
+        progress: {
+          id: 'progress-1',
+          trackEnrollmentId: 'enr-1',
+          status: SessionItemStatus.UNLOCKED,
+          startedAt: new Date(),
+          meta: {
+            lastRoleplayAttempt: shortAttempt,
+            assessmentIncompleteStarts: 1,
+          },
+        } as any,
+        enrollment: {} as any,
+        languageCode: null,
+      });
+
+      const result: any = await service.startItem('item-1');
+
+      expect(result.lastRoleplayAttempt).toEqual(shortAttempt);
+      expect(result.assessment).toEqual({
+        phase: 'PRE',
+        requiredTurns: 10,
+        showResults: true,
+        resultsHidden: false,
+        preAssessment: null,
+        incompleteStarts: 1,
+        submission: null,
+      });
+    });
+
+    it('withholds the score and the report link when results are hidden', async () => {
+      jest.spyOn(service, 'getPermittedItemProgress').mockResolvedValue({
+        item: {
+          id: 'item-1',
+          type: TrackItemType.ROLEPLAY,
+          scenarioId: 7,
+          completionCriteria: {
+            assessmentMode: true,
+            minLearnerTurns: 6,
+            showResultsToLearner: false,
+          },
+        } as any,
+        sourceItem: {} as any,
+        progress: {
+          id: 'progress-1',
+          trackEnrollmentId: 'enr-1',
+          status: SessionItemStatus.COMPLETED,
+          startedAt: new Date(),
+          score: 88,
+          meta: {
+            assessmentSubmittedAt: '2026-11-19T10:00:00.000Z',
+            assessmentSubmission: {
+              scenarioSessionId: 'sess-1',
+              learnerTurns: 9,
+              requiredTurns: 6,
+              score: 88,
+              requiredScore: null,
+              submittedAt: '2026-11-19T10:00:00.000Z',
+            },
+          },
+        } as any,
+        enrollment: {} as any,
+        languageCode: null,
+      });
+
+      const result: any = await service.startItem('item-1');
+
+      expect(result.lastScenarioSessionId).toBeNull();
+      expect(result.assessment.resultsHidden).toBe(true);
+      expect(result.assessment.submission).toEqual({
+        learnerTurns: 9,
+        submittedAt: '2026-11-19T10:00:00.000Z',
+        score: null,
+      });
+    });
   });
 });

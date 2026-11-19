@@ -238,7 +238,33 @@ export enum TrackItemCompletionLogic {
 export enum RoleplayAttemptFailureReason {
   INSUFFICIENT_SCORE = 'INSUFFICIENT_SCORE',
   INSUFFICIENT_DURATION = 'INSUFFICIENT_DURATION',
+  /**
+   * Assessment only: the learner took part but ended before the item's
+   * minLearnerTurns. The attempt is not submitted and can be restarted.
+   */
+  INSUFFICIENT_TURNS = 'INSUFFICIENT_TURNS',
 }
+
+/**
+ * What kind of roleplay a course item is, as a trainer picks it. Derived, never
+ * stored: assessmentMode → ASSESSMENT; else PARTICIPATION → TRIAL; else
+ * PRACTICE. See resolveRoleplayType (roleplay-gate.util.ts).
+ */
+export enum RoleplayType {
+  TRIAL = 'TRIAL',
+  PRACTICE = 'PRACTICE',
+  ASSESSMENT = 'ASSESSMENT',
+}
+
+/** Where an assessment roleplay sits in a pre/post pair. */
+export enum AssessmentPhase {
+  PRE = 'PRE',
+  POST = 'POST',
+}
+
+/** Bounds for an assessment's minLearnerTurns; absent reads as the minimum. */
+export const ASSESSMENT_MIN_LEARNER_TURNS = 1;
+export const ASSESSMENT_MAX_LEARNER_TURNS = 50;
 
 /**
  * The most recent roleplay attempt on a track item, kept on the progress row
@@ -253,8 +279,25 @@ export interface LastRoleplayAttempt {
   /** The bar that applied to this attempt; null where that gate was off. */
   requiredScore: number | null;
   requiredDurationSeconds: number | null;
+  /** Assessment only: learner turns taken, and the minimum that applied. */
+  learnerTurns?: number;
+  requiredTurns?: number | null;
   /** ISO timestamp. */
   endedAt: string;
+}
+
+/**
+ * The attempt that counts for an assessment roleplay, frozen when it was
+ * submitted: later edits to the item's rule never re-judge it.
+ */
+export interface AssessmentSubmission {
+  scenarioSessionId: string | null;
+  learnerTurns: number;
+  requiredTurns: number;
+  score: number | null;
+  requiredScore: number | null;
+  /** ISO timestamp. */
+  submittedAt: string;
 }
 
 /**
@@ -273,7 +316,13 @@ export interface LastRoleplayAttempt {
  *
  * `assessmentMode` (ROLEPLAY only) is not a completion rule but rides along
  * here because it is per-item and read in the same places: the learner gets
- * one attempt, and the start gate refuses a second session once it is used.
+ * one valid attempt, and the start gate refuses a second session once it is
+ * used. An attempt is valid once the learner takes `minLearnerTurns` turns
+ * (absent = 1); a shorter one is discarded and can be restarted. The duration
+ * gate never applies to an assessment. `showResultsToLearner` (absent = true)
+ * hides the score and debrief from the learner after submission.
+ * `assessmentPhase` + `assessmentPairKey` pair a PRE with a POST in the same
+ * track; the POST can't start until the PRE is submitted.
  *
  * `completionLogic` (ROLEPLAY only) picks which of minScore and
  * minDurationSeconds gate the item — see TrackItemCompletionLogic. Absent
@@ -286,6 +335,10 @@ export interface TrackItemCompletionCriteria {
   minScore?: number;
   minDurationSeconds?: number;
   assessmentMode?: boolean;
+  minLearnerTurns?: number;
+  showResultsToLearner?: boolean;
+  assessmentPhase?: AssessmentPhase;
+  assessmentPairKey?: string;
   passScore?: number;
   watchPct?: number;
   minReadSeconds?: number;
@@ -350,4 +403,11 @@ export interface TrackItemProgressMeta {
    * Sessions started before this no longer count against the learner.
    */
   assessmentReopenedAt?: string;
+  /**
+   * ROLEPLAY in assessment mode: attempts the learner took part in but ended
+   * below minLearnerTurns since the last reopen. Shown to trainers.
+   */
+  assessmentIncompleteStarts?: number;
+  /** ROLEPLAY in assessment mode: the attempt that counts, frozen at submission. */
+  assessmentSubmission?: AssessmentSubmission;
 }

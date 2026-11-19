@@ -224,12 +224,20 @@ describe('computeStructuralSignature', () => {
       expect(computeStructuralSignature(roleplay(undefined))).toEqual(before);
     });
 
-    it('still locks assessment mode', () => {
+    it('lets the roleplay type and every assessment setting change live', () => {
+      // Each attempt is stamped as it ends, so a later edit never re-judges it.
       expect(
         computeStructuralSignature(
-          roleplay({ completionLogic: 'SCORE', assessmentMode: true }),
+          roleplay({
+            completionLogic: 'SCORE',
+            assessmentMode: true,
+            minLearnerTurns: 10,
+            showResultsToLearner: false,
+            assessmentPhase: 'PRE',
+            assessmentPairKey: '6f1d0b0e-8f0a-4c3b-9a55-0d6c2f0e9a11',
+          }),
         ),
-      ).not.toEqual(
+      ).toEqual(
         computeStructuralSignature(roleplay({ completionLogic: 'SCORE' })),
       );
     });
@@ -1077,5 +1085,102 @@ describe('validateTrackStructure - question media', () => {
         ),
       ),
     ).toThrow(/https link/);
+  });
+});
+
+describe('validateTrackStructure — pre/post assessment pairs', () => {
+  const KEY = '6f1d0b0e-8f0a-4c3b-9a55-0d6c2f0e9a11';
+  const assessment = (
+    order: number,
+    title: string,
+    criteria: Record<string, unknown>,
+  ) => ({
+    type: TrackItemType.ROLEPLAY,
+    order,
+    title,
+    scenarioId: order,
+    completionCriteria: { assessmentMode: true, ...criteria },
+  });
+  const course = (items: unknown[]) =>
+    [{ title: 'S', order: 1, items }] as unknown as UpsertTrackSectionDto[];
+
+  it('accepts a pre before its post', () => {
+    expect(() =>
+      validateTrackStructure(
+        course([
+          assessment(1, 'Pre', {
+            assessmentPhase: 'PRE',
+            assessmentPairKey: KEY,
+          }),
+          assessment(2, 'Post', {
+            assessmentPhase: 'POST',
+            assessmentPairKey: KEY,
+          }),
+        ]),
+      ),
+    ).not.toThrow();
+  });
+
+  it('refuses a post ordered before its pre', () => {
+    expect(() =>
+      validateTrackStructure(
+        course([
+          assessment(1, 'Post', {
+            assessmentPhase: 'POST',
+            assessmentPairKey: KEY,
+          }),
+          assessment(2, 'Pre', {
+            assessmentPhase: 'PRE',
+            assessmentPairKey: KEY,
+          }),
+        ]),
+      ),
+    ).toThrow(/must come before/);
+  });
+
+  it('refuses a pair with two pres or a missing post', () => {
+    expect(() =>
+      validateTrackStructure(
+        course([
+          assessment(1, 'A', {
+            assessmentPhase: 'PRE',
+            assessmentPairKey: KEY,
+          }),
+          assessment(2, 'B', {
+            assessmentPhase: 'PRE',
+            assessmentPairKey: KEY,
+          }),
+        ]),
+      ),
+    ).toThrow(BadRequestException);
+    expect(() =>
+      validateTrackStructure(
+        course([
+          assessment(1, 'A', {
+            assessmentPhase: 'PRE',
+            assessmentPairKey: KEY,
+          }),
+        ]),
+      ),
+    ).toThrow(/exactly one/);
+  });
+
+  it('refuses a pre/post role on a roleplay that is not an assessment', () => {
+    expect(() =>
+      validateTrackStructure(
+        course([
+          {
+            ...assessment(1, 'Practice', {
+              assessmentPhase: 'PRE',
+              assessmentPairKey: KEY,
+            }),
+            completionCriteria: {
+              assessmentPhase: 'PRE',
+              assessmentPairKey: KEY,
+            },
+          },
+        ]),
+      ),
+    ).toThrow(/not an assessment roleplay/);
   });
 });
