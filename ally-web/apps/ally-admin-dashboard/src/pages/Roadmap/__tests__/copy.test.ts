@@ -127,7 +127,7 @@ describe("statusLine", () => {
       shownStage: "declined",
       statusParts: { stage: "declined", byUserId: 9, at: null },
     });
-    expect(statusLine(declined)).toBe("Declined");
+    expect(statusLine(declined)).toBe("Not building");
     expect(
       statusLine({
         ...declined,
@@ -183,11 +183,11 @@ describe("trackerModel", () => {
     expect(simpleStageOfShown("accepted", true)).toBe("being_built");
     expect(simpleStageOfShown("closed")).toBe("declined");
   });
-  it("replaces the tracker for Declined, Closed and Draft", () => {
+  it("replaces the tracker for Not building, Closed and Draft", () => {
     expect(trackerModel("declined")).toEqual({
       kind: "terminal",
       stage: "declined",
-      label: "Declined",
+      label: "Not building",
     });
     expect(trackerModel("closed")).toMatchObject({ kind: "terminal", stage: "declined" });
     expect(trackerModel("draft")).toMatchObject({ kind: "terminal", stage: "draft" });
@@ -196,7 +196,7 @@ describe("trackerModel", () => {
 
 describe("people and quiet line", () => {
   it("labels people with their relation or role", () => {
-    expect(personLabel(ravi)).toBe("Ravi (author)");
+    expect(personLabel(ravi)).toBe("Ravi (submitter)");
     expect(personLabel({ id: 3, name: "Ana", role: "builder" })).toBe("Ana (Builder)");
   });
   it("says who decides instead of greying out a button", () => {

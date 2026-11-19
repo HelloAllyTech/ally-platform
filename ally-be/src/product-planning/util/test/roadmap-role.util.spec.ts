@@ -509,7 +509,7 @@ describe('editCapabilitiesFor (§4.11)', () => {
     ).toBe(true);
   });
 
-  it('gives an Owner the text and the month, and the month stops at Shipped', () => {
+  it('gives an Owner the text, the month and the size; the month stops at Shipped, the size does not', () => {
     expect(
       editCapabilitiesFor('owner', none, 'accepted', {
         planClosed: true,
@@ -521,11 +521,13 @@ describe('editCapabilitiesFor (§4.11)', () => {
       editSummary: true,
       editLead: true,
       editMonth: true,
+      editSize: true,
     });
     expect(editCapabilitiesFor('owner', none, 'shipped')).toMatchObject({
       editLead: false,
       editMonth: false,
       editTitle: true,
+      editSize: true,
     });
   });
 

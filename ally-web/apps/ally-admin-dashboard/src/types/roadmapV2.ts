@@ -60,6 +60,7 @@ export type RoadmapCapability =
   | "editSummary"
   | "editLead"
   | "editMonth"
+  | "editSize"
   /** Lifecycle 2026-11-18: an Owner declines at any point before Released. */
   | "decline"
   /** An Owner closes the plan; only then can a builder be assigned. */
@@ -175,6 +176,10 @@ export interface RoadmapItemRow {
   goal?: { id: string; name: string };
   /** YYYY-MM the Owner planned it for; null when unscheduled. */
   plannedMonth?: string | null;
+  /** The Owner's size, S to XXL (lowercase on the wire); null when not sized. */
+  size?: RoadmapItemSize | null;
+  /** When it went live (ISO), only once Released. */
+  releasedAt?: string | null;
   updatedAt: string;
   stageSince: string;
 }
@@ -331,6 +336,10 @@ export interface RoadmapSearchResponse {
   recent: RoadmapItemRow[];
 }
 
+/** An idea's rough size, as the Owner sets it. */
+export type RoadmapItemSize = "s" | "m" | "l" | "xl" | "xxl";
+export const ROADMAP_ITEM_SIZES: RoadmapItemSize[] = ["s", "m", "l", "xl", "xxl"];
+
 export interface RoadmapItemPatch {
   title?: string;
   goalId?: string;
@@ -338,6 +347,7 @@ export interface RoadmapItemPatch {
   summary?: { problem?: string };
   leadUserId?: number;
   plannedMonth?: string | null;
+  size?: RoadmapItemSize | null;
 }
 
 export interface RoadmapStarResponse {
