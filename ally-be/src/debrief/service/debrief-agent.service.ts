@@ -178,6 +178,16 @@ export interface LearnerDebriefView {
   followUp?: boolean;
   /** Learner features this person has (web only today). Absent on a view with nothing to show. */
   features?: { selectionComments: boolean };
+  /** The person's own comments on selected words in this debrief (only with the feature). */
+  myComments?: Array<{
+    id: string;
+    section: string | null;
+    quotedText: string | null;
+    spanStart: number | null;
+    spanEnd: number | null;
+    body: string;
+    createdAt: string;
+  }>;
   /** The organisation's support lines (the Guide's), crisis lines first. */
   supportLines?: GuideSupportLine[];
   /**

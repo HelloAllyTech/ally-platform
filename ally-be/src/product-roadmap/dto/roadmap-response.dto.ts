@@ -468,6 +468,12 @@ export class OpportunityInterviewGateDto {
 export class OpportunityInterviewDraftDto {
   @ApiProperty() description!: string;
 
+  @ApiPropertyOptional({
+    description:
+      "A short title the copilot suggests for the idea; the Roadmap v2 draft page offers it beside the author's words",
+  })
+  title?: string;
+
   @ApiProperty({
     nullable: true,
     description: 'One of the live product goal names, or null when none fit',

@@ -395,8 +395,8 @@ const WHATSAPP_INDIA: Array<[string, number]> = [
 const micros = (usd: number | null): number | null =>
   usd === null ? null : Math.round(usd * 1_000_000 * 1000) / 1000;
 
-export class CreateBillingCosts1984900000000 implements MigrationInterface {
-  name = 'CreateBillingCosts1984900000000';
+export class CreateBillingCosts1985300000000 implements MigrationInterface {
+  name = 'CreateBillingCosts1985300000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`

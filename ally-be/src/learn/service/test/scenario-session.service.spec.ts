@@ -217,7 +217,7 @@ describe('ScenarioSessionService', () => {
     const mockScenarioSessionMessagesRepo = {
       create: jest.fn(),
       save: jest.fn(),
-      find: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
       exists: jest.fn().mockResolvedValue(true),
       getMessagesByScenarioSessionId: jest.fn(),
     };
@@ -575,7 +575,9 @@ describe('ScenarioSessionService', () => {
           provide: TrackProgressService,
           useValue: {
             validateRoleplayStart: jest.fn(),
-            handleRoleplayEnd: jest.fn(),
+            handleRoleplayEnd: jest
+              .fn()
+              .mockResolvedValue({ assessmentAttemptValid: null }),
             handleRoleplayLaunch: jest.fn(),
           },
         },
@@ -2429,9 +2431,10 @@ describe('ScenarioSessionService', () => {
         (service as any).trackProgressService.handleRoleplayEnd,
       ).toHaveBeenCalledWith({
         trackItemProgressId: 'tip-1',
+        scenarioSessionId: row.id,
         score: 42,
         callDuration: activeMs,
-        learnerTookPart: true,
+        learnerTurns: 0,
       });
       expect((service as any).eventEmitter.emit).toHaveBeenCalledWith(
         ScenarioSessionLeaderboardEvent.SCENARIO_SESSION_ENDED,
@@ -4996,9 +4999,10 @@ describe('ScenarioSessionService', () => {
         (service as any).trackProgressService.handleRoleplayEnd,
       ).toHaveBeenCalledWith({
         trackItemProgressId: 'tip-1',
+        scenarioSessionId: expect.any(String),
         score: undefined,
         callDuration: activeMs,
-        learnerTookPart: true,
+        learnerTurns: 0,
       });
       expect((service as any).eventEmitter.emit).toHaveBeenCalledWith(
         ScenarioSessionLeaderboardEvent.SCENARIO_SESSION_ENDED,
@@ -5064,7 +5068,7 @@ describe('ScenarioSessionService', () => {
       ]);
       (service as any).trackProgressService.handleRoleplayEnd
         .mockRejectedValueOnce(new Error('progression exploded'))
-        .mockResolvedValueOnce(undefined);
+        .mockResolvedValueOnce({ assessmentAttemptValid: null });
 
       const result = await service.sweepUnfinalisedEndedSessions();
 

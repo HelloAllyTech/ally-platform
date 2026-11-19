@@ -325,7 +325,15 @@ export class DebriefLearnerController {
       DebriefLearnerFeature.SELECTION_COMMENTS,
       user.id,
     );
-    return { ...withPulse, features: { selectionComments } };
+    const myComments =
+      selectionComments && view.state === 'ready' && view.runId
+        ? await this.learnerComments.mine(view.runId, user.id)
+        : undefined;
+    return {
+      ...withPulse,
+      features: { selectionComments },
+      ...(myComments ? { myComments } : {}),
+    };
   }
 
   @Post('sessions/:sessionId/comments')

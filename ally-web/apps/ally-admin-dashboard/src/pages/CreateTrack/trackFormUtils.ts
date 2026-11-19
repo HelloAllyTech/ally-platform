@@ -30,6 +30,7 @@ import {
   BranchingScenarioContent,
   BucketSortContent,
   CompletionCriteria,
+  RoleplayType,
   FillBlankQuestion,
   GameContent,
   JournalContent,
@@ -586,6 +587,112 @@ const validateQuestion = (question: QuizQuestion, label: string): string[] => {
   return errors;
 };
 
+/* -------------------------------------------------------------------------- */
+/* Roleplay type (Trial / Practice / Assessment) — derived, never stored        */
+/* -------------------------------------------------------------------------- */
+
+export const DEFAULT_MIN_LEARNER_TURNS = 10;
+export const MIN_LEARNER_TURNS = 1;
+export const MAX_LEARNER_TURNS = 50;
+
+/** assessmentMode -> ASSESSMENT; else PARTICIPATION -> TRIAL; else PRACTICE. */
+export const getRoleplayType = (criteria?: CompletionCriteria | null): RoleplayType => {
+  if (criteria?.assessmentMode) return "ASSESSMENT";
+  if (criteria?.completionLogic === "PARTICIPATION") return "TRIAL";
+  return "PRACTICE";
+};
+
+/** The assessment-related slice of a roleplay's criteria, for change detection. */
+export const assessmentRuleSignature = (criteria?: CompletionCriteria | null): string => {
+  if (!criteria) return "";
+  const type = getRoleplayType(criteria);
+  return JSON.stringify({
+    type,
+    ...(type === "ASSESSMENT"
+      ? {
+          minScore: criteria.minScore ?? null,
+          minLearnerTurns: criteria.minLearnerTurns ?? null,
+          showResultsToLearner: criteria.showResultsToLearner ?? true,
+          assessmentPhase: criteria.assessmentPhase ?? null,
+          assessmentPairKey: criteria.assessmentPairKey ?? null,
+        }
+      : {}),
+  });
+};
+
+/**
+ * True when a roleplay's type or any assessment setting differs from what was
+ * loaded. Items are matched on server id; new items never count.
+ */
+export const hasAssessmentRuleChanges = (saved: TrackDetail, values: TrackFormValues): boolean => {
+  const savedSignatures = new Map<string, string>();
+  for (const section of saved.sections ?? []) {
+    for (const item of section.items ?? []) {
+      if (item.type !== TrackItemType.ROLEPLAY) continue;
+      savedSignatures.set(item.id, assessmentRuleSignature(item.completionCriteria));
+    }
+  }
+  for (const section of values.sections ?? []) {
+    for (const item of section.items ?? []) {
+      if (item.type !== TrackItemType.ROLEPLAY || !item.serverId) continue;
+      const before = savedSignatures.get(item.serverId);
+      if (before === undefined) continue;
+      if (before !== assessmentRuleSignature(item.completionCriteria)) return true;
+    }
+  }
+  return false;
+};
+
+/**
+ * Course-level pairing rules, mirroring the server: every pair key needs
+ * exactly one PRE and one POST, with the PRE earlier in course order.
+ * Returns errors keyed by [sectionIndex, itemIndex].
+ */
+export const validateAssessmentPairs = (
+  values: TrackFormValues,
+): Array<{ sectionIndex: number; itemIndex: number; message: string }> => {
+  type Entry = { sectionIndex: number; itemIndex: number; order: number; phase?: string };
+  const byKey = new Map<string, Entry[]>();
+  let order = 0;
+  values.sections?.forEach((section, sectionIndex) => {
+    section.items?.forEach((item, itemIndex) => {
+      order += 1;
+      if (item.type !== TrackItemType.ROLEPLAY) return;
+      const key = item.completionCriteria?.assessmentPairKey;
+      if (!key) return;
+      const list = byKey.get(key) ?? [];
+      list.push({
+        sectionIndex,
+        itemIndex,
+        order,
+        phase: item.completionCriteria?.assessmentPhase,
+      });
+      byKey.set(key, list);
+    });
+  });
+
+  const errors: Array<{ sectionIndex: number; itemIndex: number; message: string }> = [];
+  for (const entries of byKey.values()) {
+    const pres = entries.filter(entry => entry.phase === "PRE");
+    const posts = entries.filter(entry => entry.phase === "POST");
+    if (entries.length !== 2 || pres.length !== 1 || posts.length !== 1) {
+      for (const entry of entries) {
+        errors.push({
+          ...entry,
+          message:
+            "Roleplay: a pre/post pair needs exactly one pre-assessment and one post-assessment",
+        });
+      }
+    } else if (pres[0].order > posts[0].order) {
+      errors.push({
+        ...posts[0],
+        message: "Roleplay: the pre-assessment must come before its post-assessment in the course",
+      });
+    }
+  }
+  return errors;
+};
+
 const validateItem = (item: TrackItemFormValue): string[] => {
   const errors: string[] = [];
   const typeLabel = TRACK_ITEM_TYPE_LABELS[item.type];
@@ -601,6 +708,21 @@ const validateItem = (item: TrackItemFormValue): string[] => {
       const minDuration = item.completionCriteria?.minDurationSeconds;
       if (minDuration != null && (minDuration < 0 || !Number.isInteger(minDuration))) {
         errors.push("Roleplay: minimum duration must be whole minutes and seconds, 0 or above");
+      }
+      const criteria = item.completionCriteria;
+      if (getRoleplayType(criteria) === "ASSESSMENT") {
+        const turns = criteria?.minLearnerTurns;
+        if (
+          turns != null &&
+          (!Number.isInteger(turns) || turns < MIN_LEARNER_TURNS || turns > MAX_LEARNER_TURNS)
+        ) {
+          errors.push(
+            `Roleplay: minimum learner turns must be a whole number from ${MIN_LEARNER_TURNS} to ${MAX_LEARNER_TURNS}`,
+          );
+        }
+        if (!!criteria?.assessmentPhase !== !!criteria?.assessmentPairKey) {
+          errors.push("Roleplay: pre/post needs both a phase and a paired assessment");
+        }
       }
       break;
     }
@@ -854,6 +976,10 @@ export const validateTrackForPublish = (values: TrackFormValues): PublishError[]
     });
   });
 
+  for (const { sectionIndex, itemIndex, message } of validateAssessmentPairs(values)) {
+    errors.push({ nodeKey: itemNodeKey(sectionIndex, itemIndex), message });
+  }
+
   return errors;
 };
 
@@ -864,9 +990,27 @@ export const validateTrackForPublish = (values: TrackFormValues): PublishError[]
 const compactCriteria = (criteria?: CompletionCriteria): CompletionCriteria | undefined => {
   if (!criteria) return undefined;
   const compact: CompletionCriteria = {};
-  // Roleplay: keep only the gates the chosen logic reads, so the stored rule
-  // says exactly what applies. Other types never carry a logic, and read
-  // minScore (CASE) as before.
+
+  // Assessment roleplay: SCORE (with a pass mark if one is set), turns, the
+  // results toggle, and the pair keys. Duration never applies.
+  if (criteria.assessmentMode) {
+    compact.assessmentMode = true;
+    compact.completionLogic = "SCORE";
+    if (criteria.minScore != null && criteria.minScore > 0) compact.minScore = criteria.minScore;
+    if (criteria.minLearnerTurns != null) compact.minLearnerTurns = criteria.minLearnerTurns;
+    if (criteria.showResultsToLearner != null) {
+      compact.showResultsToLearner = criteria.showResultsToLearner;
+    }
+    if (criteria.assessmentPhase && criteria.assessmentPairKey) {
+      compact.assessmentPhase = criteria.assessmentPhase;
+      compact.assessmentPairKey = criteria.assessmentPairKey;
+    }
+    return compact;
+  }
+
+  // Trial / Practice: keep only the gates the chosen logic reads, so the stored
+  // rule says exactly what applies. Other types never carry a logic, and read
+  // minScore (CASE) as before. Assessment-only keys are never sent.
   const logic = criteria.completionLogic;
   if (logic) compact.completionLogic = logic;
   const scoreGated = !logic || logic === "SCORE" || logic === "SCORE_AND_DURATION";
@@ -877,9 +1021,6 @@ const compactCriteria = (criteria?: CompletionCriteria): CompletionCriteria | un
   }
   if (criteria.watchPct != null) compact.watchPct = criteria.watchPct;
   if (criteria.minReadSeconds != null) compact.minReadSeconds = criteria.minReadSeconds;
-  // Only when on: an absent flag is "off", and sending `false` would read as a
-  // structure change on a course learners are already enrolled in.
-  if (criteria.assessmentMode) compact.assessmentMode = true;
   // NOTE: passScore is intentionally never sent — the server mirrors it from
   // the quiz settings.
   return Object.keys(compact).length > 0 ? compact : undefined;
@@ -1354,6 +1495,12 @@ export const deserializeTrack = (detail: TrackDetail): TrackFormValues => ({
           switch (item.type) {
             case TrackItemType.ROLEPLAY:
               formItem.scenarioId = item.scenarioId ?? null;
+              // The roleplay type is derived from the criteria (see getRoleplayType).
+              // An assessment always reads SCORE and shows results unless told not to.
+              if (getRoleplayType(formItem.completionCriteria) === "ASSESSMENT") {
+                formItem.completionCriteria.completionLogic = "SCORE";
+                formItem.completionCriteria.showResultsToLearner ??= true;
+              }
               break;
             case TrackItemType.CASE:
               formItem.caseId = item.caseId ?? null;

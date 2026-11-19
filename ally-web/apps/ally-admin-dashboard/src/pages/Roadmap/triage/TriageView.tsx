@@ -5,17 +5,20 @@ import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 
 import { Button, SkeletonText } from "@ally-ui-mono/ui-shared";
+import { rowsOfItemsResponse } from "@api";
 import { en } from "@constants";
 import type { RoadmapItemRow, RoadmapItemsResponse } from "@types";
 
 import { DeclineDialog, DeclineTarget } from "./DeclineDialog";
 import { LeadPicker } from "./LeadPicker";
+import { TodoGroupHeader } from "./TodoGroupHeader";
+import { TodoGroupKey, WAITING_GROUPS, todoGroups } from "./todoGroups";
+import { TodoSweepBanner, TodoSweepPanel } from "./TodoSweep";
 import { TriageReviewMode } from "./TriageReviewMode";
 import { todoNextStep, workingDaysSince } from "./triageUtils";
 import { triageExit, undoLastReview, useReviewActions } from "./useReviewActions";
 import { motionTransition, useReducedMotionPreference } from "../../../motion";
 import { IdeaView } from "../components/IdeaView";
-import { sectionsFor } from "../components/QueueList";
 import { RoadmapBreakpoint, hasReadingPane } from "../hooks/useRoadmapBreakpoint";
 import { useRoadmapJobTimer } from "../hooks/useRoadmapJobTimer";
 import { isTypingTarget } from "../utils/keyboard";
@@ -68,7 +71,25 @@ export const TriageView: React.FC<TriageViewProps> = ({
   const copy = en.roadmapV2;
   const touch = !hasReadingPane(breakpoint);
   const actions = useReviewActions();
-  const sections = useMemo(() => sectionsFor("to-triage", data), [data]);
+  // Grouped by the Owner's next step (idea-to-plan audit rec 9); Later is folded until asked for.
+  const groups = useMemo(() => todoGroups(rowsOfItemsResponse(data)), [data]);
+  const [laterOpen, setLaterOpen] = useState(false);
+  const [sweepOpen, setSweepOpen] = useState(false);
+  const sections = useMemo(
+    () =>
+      groups.map(group => ({
+        ...group,
+        total: group.rows.length,
+        rows: group.key === "later" && !laterOpen ? [] : group.rows,
+      })),
+    [groups, laterOpen],
+  );
+  const groupOf = useMemo(() => {
+    const map = new Map<string, TodoGroupKey>();
+    groups.forEach(group => group.rows.forEach(row => map.set(row.code, group.key)));
+    return map;
+  }, [groups]);
+  const allRows = useMemo(() => groups.flatMap(g => g.rows), [groups]);
   const rows = useMemo(() => sections.flatMap(s => s.rows), [sections]);
   const codes = useMemo(() => rows.map(r => r.code), [rows]);
   useEffect(() => onVisibleCodes(codes), [codes, onVisibleCodes]);
@@ -82,7 +103,7 @@ export const TriageView: React.FC<TriageViewProps> = ({
     [declineFor, leadFor, reviewMode, onOverlay],
   );
 
-  const rowBy = useCallback((code: string) => rows.find(r => r.code === code), [rows]);
+  const rowBy = useCallback((code: string) => allRows.find(r => r.code === code), [allRows]);
   /** Still awaiting review (nobody has accepted it), so it can be declined too. */
   const needsReview = useCallback(
     (code: string) => rowBy(code)?.shownStage === "submitted",
@@ -225,7 +246,7 @@ export const TriageView: React.FC<TriageViewProps> = ({
       </div>
     );
   }
-  if (rows.length === 0) return <AllCaughtUp />;
+  if (allRows.length === 0) return <AllCaughtUp />;
 
   const paneCode = open ?? selected;
 
@@ -247,22 +268,36 @@ export const TriageView: React.FC<TriageViewProps> = ({
           <p className="m-0 pt-1 text-xs text-typography-secondary">{copy.triage.reviewModeHelp}</p>
         </div>
       )}
+      {sweepOpen ? (
+        <TodoSweepPanel
+          onDecline={list => startDecline(list)}
+          onClose={() => setSweepOpen(false)}
+        />
+      ) : (
+        <TodoSweepBanner onOpen={() => setSweepOpen(true)} />
+      )}
       {sections.map(section =>
-        section.rows.length === 0 ? null : (
-          <section key={section.key} aria-label={section.label}>
-            {/* One group is the whole list: the To do tab already names and counts it. */}
-            {sections.length > 1 && (
-              <h3 className="sticky top-0 z-[1] bg-neutral-50 px-6 py-1.5 text-xs font-semibold uppercase tracking-wide text-typography-secondary">
-                {copy.sectionCount(section.label ?? section.key, section.rows.length)}
-              </h3>
+        section.total === 0 ? null : (
+          <section
+            key={section.key}
+            aria-label={copy.sectionCount(
+              en.roadmapIdeaToPlan.groups[section.key] ?? section.key,
+              section.total,
             )}
+          >
+            <TodoGroupHeader
+              group={section.key}
+              count={section.total}
+              collapsed={section.key === "later" ? !laterOpen : undefined}
+              onToggle={section.key === "later" ? () => setLaterOpen(open => !open) : undefined}
+            />
             <ul className="m-0 list-none p-0">
               <AnimatePresence initial={false}>
                 {section.rows.map(row => (
                   <TriageRow
                     key={row.code}
                     row={row}
-                    awaitingReview={row.shownStage === "submitted"}
+                    awaitingReview={WAITING_GROUPS.includes(groupOf.get(row.code) ?? "later")}
                     current={paneCode === row.code}
                     leaving={leaving.get(row.code) ?? null}
                     touch={touch}

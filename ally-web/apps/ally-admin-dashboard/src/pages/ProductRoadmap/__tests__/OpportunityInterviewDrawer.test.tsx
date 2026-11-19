@@ -60,6 +60,9 @@ vi.mock("@api", () => ({
       fileableEfforts: ["s", "m"],
     },
   }),
+  useSuggestRoadmapTitleMutation: () => [
+    () => ({ unwrap: () => Promise.resolve({ title: "A suggested title" }) }),
+  ],
   useCreateRoadmapOpportunityMutation: () => [
     (args: unknown) => ({ unwrap: () => createOpportunity(args) }),
     { isLoading: false },
@@ -283,6 +286,8 @@ describe("OpportunityInterviewDrawer", () => {
 
     await waitFor(() =>
       expect(createOpportunity).toHaveBeenCalledWith({
+        // The copilot's draft has no title; one is suggested from its text.
+        title: "A suggested title",
         description: "As a counsellor, …",
         type: "idea",
         productGoal: "Scribe",

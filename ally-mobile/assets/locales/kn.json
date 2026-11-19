@@ -754,6 +754,11 @@
   },
   "postSim": {
     "titlePrefix": "ರೋಲ್ ಪ್ಲೇ",
+    "assessment": {
+      "submittedTitle": "ನಿಮ್ಮ ಮೌಲ್ಯಮಾಪನವನ್ನು ಸಲ್ಲಿಸಲಾಗಿದೆ",
+      "submittedBody": "ನಿಮ್ಮ ತರಬೇತುದಾರರು ನಿಮ್ಮ ಫಲಿತಾಂಶಗಳನ್ನು ಪರಿಶೀಲಿಸುತ್ತಾರೆ.",
+      "continue": "ಮುಂದುವರಿಸಿ"
+    },
     "noSessionRecording": "ಪ್ಲೇಬ್ಯಾಕ್‌ಗಾಗಿ ಯಾವುದೇ ಸೆಷನ್ ರೆಕಾರ್ಡಿಂಗ್ ಲಭ್ಯವಿಲ್ಲ.",
     "skills": {
       "empty": "ಈ ಸೆಷನ್‌ಗಾಗಿ ಯಾವುದೇ ಕೌಶಲ್ಯ ಡೇಟಾ ಲಭ್ಯವಿಲ್ಲ",
@@ -1901,6 +1906,20 @@
     "progress": "{{total}} ರಲ್ಲಿ {{completed}}",
     "courseCompleted": "ಕೋರ್ಸ್ ಪೂರ್ಣಗೊಂಡಿದೆ",
     "lockedTooltip": "ಇದನ್ನು ಅನ್‌ಲಾಕ್ ಮಾಡಲು ಹಿಂದಿನ ಐಟಂಗಳನ್ನು ಪೂರ್ಣಗೊಳಿಸಿ",
+    "blocker": {
+      "notFinished": "ಇದನ್ನು ಅನ್‌ಲಾಕ್ ಮಾಡಲು “{{title}}” ಪೂರ್ಣಗೊಳಿಸಿ",
+      "belowScore": "“{{title}}”: ನಿಮ್ಮ ಸ್ಕೋರ್ {{actual}}, {{required}} ಬೇಕು",
+      "tooShort": "“{{title}}”: ಇದು {{actual}} ನಡೆಯಿತು, ಕನಿಷ್ಠ {{required}} ಬೇಕು",
+      "notScored": "“{{title}}”: ನಿಮ್ಮ ಕೊನೆಯ ಪ್ರಯತ್ನಕ್ಕೆ ಸ್ಕೋರ್ ನೀಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
+      "assessmentFailed": "“{{title}}”: ನಿಮ್ಮ ಮೌಲ್ಯಮಾಪನ ಉತ್ತೀರ್ಣವಾಗಲಿಲ್ಲ. ಇನ್ನೊಂದು ಪ್ರಯತ್ನಕ್ಕಾಗಿ ನಿಮ್ಮ ತರಬೇತುದಾರರನ್ನು ಕೇಳಿ.",
+      "gradingPending": "“{{title}}”: ನಿಮ್ಮ ಉತ್ತರಗಳನ್ನು ಇನ್ನೂ ಪರಿಶೀಲಿಸಲಾಗುತ್ತಿದೆ",
+      "outOfAttempts": "“{{title}}”: ಯಾವುದೇ ಪ್ರಯತ್ನ ಉಳಿದಿಲ್ಲ. ಸಹಾಯಕ್ಕಾಗಿ ನಿಮ್ಮ ತರಬೇತುದಾರರನ್ನು ಕೇಳಿ.",
+      "outOfAttemptsUntil": "“{{title}}”: ಹೊಸ ಪ್ರಯತ್ನಗಳು {{date}} ರಂದು ತೆರೆಯುತ್ತವೆ",
+      "watchMore": "“{{title}}”: ನೀವು {{actual}}% ನೋಡಿದ್ದೀರಿ, {{required}}% ಬೇಕು",
+      "keepReading": "“{{title}}”: ಇದನ್ನು ಪೂರ್ಣಗೊಳಿಸಲು ಓದುತ್ತಿರಿ",
+      "tryAgain": "ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
+      "goToItem": "ಐಟಂಗೆ ಹೋಗಿ"
+    },
     "notFound": "ಕೋರ್ಸ್ ಕಂಡುಬಂದಿಲ್ಲ",
     "viewProgress": "ಪ್ರಗತಿ ವೀಕ್ಷಿಸಿ",
     "progressDashboard": {
@@ -1948,6 +1967,8 @@
       "requireDuration": "ಕನಿಷ್ಠ {{duration}}",
       "requireScoreAndDuration": "ಕನಿಷ್ಠ {{score}} ಸ್ಕೋರ್ ಮಾಡಿ · ಕನಿಷ್ಠ {{duration}}",
       "requireParticipation": "ಪ್ರಾರಂಭಿಸಿದಾಗಲೇ ಪೂರ್ಣಗೊಳ್ಳುತ್ತದೆ",
+      "requireTurns": "ಕನಿಷ್ಠ {{turns}} ಸರದಿಗಳು",
+      "requireTurnsAndScore": "ಕನಿಷ್ಠ {{turns}} ಸರದಿಗಳು · ಕನಿಷ್ಠ ಸ್ಕೋರ್ {{score}}",
       "durationMin": "{{min}} ನಿಮಿಷ",
       "durationSec": "{{sec}} ಸೆಕೆಂಡ್",
       "durationMinSec": "{{min}} ನಿಮಿಷ {{sec}} ಸೆಕೆಂಡ್",
@@ -2050,6 +2071,11 @@
       "saved": "ಉಳಿಸಲಾಗಿದೆ",
       "saveFailed": "ಉಳಿಸಲು ವಿಫಲವಾಗಿದೆ"
     },
+    "assessment": {
+      "tag": "ಮೌಲ್ಯಮಾಪನ",
+      "tagPre": "ಮೌಲ್ಯಮಾಪನ · ಪೂರ್ವ",
+      "tagPost": "ಮೌಲ್ಯಮಾಪನ · ನಂತರ"
+    },
     "roleplay": {
       "intro": "ಈ ರೋಲ್-ಪ್ಲೇ ಪ್ರಾರಂಭಿಸಲು ಕೆಳಗೆ ಟ್ಯಾಪ್ ಮಾಡಿ.",
       "start": "ಪ್ರಾರಂಭಿಸಿ",
@@ -2066,7 +2092,11 @@
       "lastAttemptDuration": "ಇದು {{actual}} ನಡೆಯಿತು; ಈ ರೋಲ್‌ಪ್ಲೇಗೆ ಕನಿಷ್ಠ {{required}} ಬೇಕು.",
       "lastAttemptScore": "ನಿಮ್ಮ ಸ್ಕೋರ್ {{score}}; ಈ ರೋಲ್‌ಪ್ಲೇಗೆ ಕನಿಷ್ಠ {{required}} ಬೇಕು.",
       "lastAttemptScoreUnknown": "ಇದು ಕನಿಷ್ಠ ಸ್ಕೋರ್ {{required}} ತಲುಪಲಿಲ್ಲ.",
-      "lastAttemptFooter": "ನೀವು ಸಿದ್ಧರಾದಾಗ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+      "lastAttemptFooter": "ನೀವು ಸಿದ್ಧರಾದಾಗ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+      "assessmentIntroTurns": "ಇದು ಒಂದು ಮೌಲ್ಯಮಾಪನ. ನಿಮಗೆ ಒಂದೇ ಪ್ರಯತ್ನ ಸಿಗುತ್ತದೆ, ಮತ್ತು ನೀವು ಕನಿಷ್ಠ {{n}} ಸರದಿ ಮಾತನಾಡಿದಾಗ ಅದು ಎಣಿಕೆಯಾಗುತ್ತದೆ.",
+      "shortAttempt": "ಆ ಪ್ರಯತ್ನ ಎಣಿಕೆಗೆ ಬರಲು ತುಂಬಾ ಚಿಕ್ಕದಾಗಿತ್ತು ({{n}} ರಲ್ಲಿ {{taken}} ಸರದಿ). ನೀವು ಸಿದ್ಧರಾದಾಗ ಮತ್ತೆ ಪ್ರಾರಂಭಿಸಿ.",
+      "postLocked": "ಮೊದಲು ಪೂರ್ವ-ಮೌಲ್ಯಮಾಪನವನ್ನು ಪೂರ್ಣಗೊಳಿಸಿ: {{title}}.",
+      "assessmentSubmittedHidden": "ಸಲ್ಲಿಸಲಾಗಿದೆ. ನಿಮ್ಮ ತರಬೇತುದಾರರು ನಿಮ್ಮ ಫಲಿತಾಂಶಗಳನ್ನು ಪರಿಶೀಲಿಸುತ್ತಾರೆ."
     },
     "quiz": {
       "intro": {
@@ -2337,7 +2367,11 @@
     "connect": "ಸಂಪರ್ಕಿಸಿ",
     "disconnect": "ಸಂಪರ್ಕ ಕಡಿತಗೊಳಿಸಿ",
     "connectedToRoom": "ರೂಮ್‌ಗೆ ಸಂಪರ್ಕಗೊಂಡಿದೆ",
-    "notConnected": "ಸಂಪರ್ಕಗೊಂಡಿಲ್ಲ"
+    "notConnected": "ಸಂಪರ್ಕಗೊಂಡಿಲ್ಲ",
+    "assessment": {
+      "turnCounter": "ಸರದಿ {{k}} / {{n}}",
+      "minimumReached": "ಕನಿಷ್ಠ ಸರದಿಗಳು ಪೂರ್ಣಗೊಂಡಿವೆ"
+    }
   },
   "scribe": {
     "title": "ಸ್ಕ್ರೈಬ್ ರೆಕಾರ್ಡಿಂಗ್ (ಹಂತ 1)",

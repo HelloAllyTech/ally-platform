@@ -107,7 +107,8 @@ describe('RoadmapOpportunityService — reference images', () => {
           .fn()
           .mockResolvedValue({ repo: null, rationale: '' }),
       } as never,
-      { classifyAndRecord: jest.fn().mockResolvedValue(null) } as never, // missClassifier
+      { classifyAndRecord: jest.fn().mockResolvedValue(null) } as never, // missClassifier,
+      { suggestTitle: jest.fn().mockResolvedValue('A title') } as never, // roadmapAi
     );
 
     return { service, opportunityRepository, s3Service };
@@ -261,6 +262,7 @@ describe('reference image DTO validation', () => {
   const errorsFor = (referenceImages: unknown) =>
     validateSync(
       plainToInstance(CreateOpportunityDto, {
+        title: 'A title',
         description: 'x',
         productGoal: 'Scribe',
         referenceImages,

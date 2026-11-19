@@ -40,6 +40,7 @@ describe('Filing doors require a Roadmap role', () => {
     {} as never,
     planAccess as never,
     planSettings as never,
+    {} as never,
   );
   const admin = new RoadmapAdminController(
     {} as never,

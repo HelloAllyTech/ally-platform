@@ -53,8 +53,44 @@ describe('recipientsFor (§4.8)', () => {
     [K.BUDGET, [LEAD, OWNER]],
     [K.MENTION, []],
     [K.ACTIVITY, []],
+    [K.PLAN_READY, [AUTHOR, LEAD, VOTER, WATCH_ALL, WATCH_MILESTONES]],
+    [K.PLAN_CLOSED, [AUTHOR, LEAD, VOTER, WATCH_ALL, WATCH_MILESTONES]],
+    [K.COMMENT, [AUTHOR, LEAD, WATCH_ALL]],
+    [K.QUESTION_ANSWERED, [LEAD]],
   ])('%s goes to %j', (kind, expected) => {
     expect(recipientsFor(kind, facts())).toEqual(expected);
+  });
+
+  describe('the planner (idea-to-plan audit rec 8)', () => {
+    const PLANNER = 8;
+    it("gets the lead's column and default watch while nobody leads the idea", () => {
+      const f = facts({ leadUserId: null, plannerUserId: PLANNER });
+      expect(recipientsFor(K.AGENT_QUESTION, f)).toContain(PLANNER);
+      expect(recipientsFor(K.QUESTION_ANSWERED, f)).toEqual([PLANNER]);
+      expect(recipientsFor(K.COMMENT, f)).toContain(PLANNER);
+      expect(effectiveWatchLevel(PLANNER, f)).toBe(W.ALL);
+    });
+    it('steps aside once a builder leads it', () => {
+      const f = facts({ plannerUserId: PLANNER });
+      expect(recipientsFor(K.QUESTION_ANSWERED, f)).toEqual([LEAD]);
+      expect(effectiveWatchLevel(PLANNER, f)).toBe(W.NONE);
+    });
+    it('is never told about their own action', () => {
+      const f = facts({
+        leadUserId: null,
+        plannerUserId: PLANNER,
+        actorUserId: PLANNER,
+      });
+      expect(recipientsFor(K.PLAN_CLOSED, f)).not.toContain(PLANNER);
+    });
+  });
+
+  it('a comment respects watch levels: Milestones and None hear nothing', () => {
+    const f = facts({ watches: [{ userId: AUTHOR, level: W.NONE }] });
+    const out = recipientsFor(K.COMMENT, f);
+    expect(out).not.toContain(AUTHOR);
+    expect(out).not.toContain(VOTER);
+    expect(out).not.toContain(WATCH_MILESTONES);
   });
 
   it('covers every kind', () => {

@@ -61,6 +61,8 @@ interface CopilotBriefProps {
    * should weigh, and the copy says so.
    */
   variant: "live" | "filed";
+  /** What the assessment line calls the agent; the Roadmap pages call it the idea agent. */
+  assessmentLabel?: string;
 }
 
 /**
@@ -71,7 +73,11 @@ interface CopilotBriefProps {
  * make it. The assessment always shows, because the rating is the one thing every reader looks
  * for.
  */
-export const CopilotBrief: React.FC<CopilotBriefProps> = ({ brief, variant }) => {
+export const CopilotBrief: React.FC<CopilotBriefProps> = ({
+  brief,
+  variant,
+  assessmentLabel = "Copilot's assessment",
+}) => {
   const strategicFit = asList<{ goal: string; why: string }>(brief.strategicFit);
   const evidence = asList<RoadmapOpportunityBrief["evidence"][number]>(brief.evidence);
   const assumptions = asList<string>(brief.assumptions);
@@ -84,7 +90,7 @@ export const CopilotBrief: React.FC<CopilotBriefProps> = ({ brief, variant }) =>
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-2">
           <BriefRatingChip rating={brief.assessment?.rating ?? "needs_work"} />
-          <span className="text-typography-700 text-xs">Copilot's assessment</span>
+          <span className="text-typography-700 text-xs">{assessmentLabel}</span>
         </div>
         {!!brief.assessment?.summary && (
           <p className="text-typography-900 text-sm">{brief.assessment.summary}</p>

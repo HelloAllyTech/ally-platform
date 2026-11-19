@@ -70,14 +70,36 @@ export type RoleplayCompletionLogic = "SCORE" | "DURATION" | "SCORE_AND_DURATION
  * an item with no minDurationSeconds can still have a default minimum.
  */
 export interface RoleplayGate {
+  /** Derived server-side: TRIAL, PRACTICE or ASSESSMENT (absent from older servers). */
+  roleplayType?: RoleplayType;
   completionLogic: RoleplayCompletionLogic;
   /** Null when no score gate applies. */
   minScore: number | null;
   /** Null when no duration gate applies. */
   minDurationSeconds: number | null;
+  /** Assessment only: learner turns an attempt needs to count. */
+  minLearnerTurns?: number | null;
 }
 
-export type RoleplayAttemptFailureReason = "INSUFFICIENT_SCORE" | "INSUFFICIENT_DURATION";
+export type RoleplayType = "TRIAL" | "PRACTICE" | "ASSESSMENT";
+
+export type RoleplayAttemptFailureReason =
+  | "INSUFFICIENT_SCORE"
+  | "INSUFFICIENT_DURATION"
+  | "INSUFFICIENT_TURNS";
+
+/** Assessment roleplays: pre/post pairing, turn minimum and result visibility. */
+export interface RoleplayAssessment {
+  phase: "PRE" | "POST" | null;
+  requiredTurns: number;
+  showResults: boolean;
+  /** Submitted and results withheld: show "Submitted", no score, no report. */
+  resultsHidden: boolean;
+  /** POST only: the paired pre-assessment that must be submitted first. */
+  preAssessment: { title: string; submitted: boolean } | null;
+  incompleteStarts: number;
+  submission: { learnerTurns: number; submittedAt: string; score: number | null } | null;
+}
 
 /** The learner's latest roleplay attempt that missed a gate; null once the item is complete. */
 export interface LastRoleplayAttempt {
@@ -86,6 +108,9 @@ export interface LastRoleplayAttempt {
   durationSeconds: number;
   requiredScore: number | null;
   requiredDurationSeconds: number | null;
+  /** Assessment short attempt: turns the learner took vs. the minimum. */
+  learnerTurns?: number;
+  requiredTurns?: number | null;
   endedAt: string;
 }
 
@@ -93,8 +118,13 @@ export interface TrackCompletionCriteria {
   completionLogic?: RoleplayCompletionLogic;
   minScore?: number;
   minDurationSeconds?: number;
-  /** Roleplay: one attempt only, locked once submitted. */
+  /** Roleplay: one valid attempt only, locked once submitted. */
   assessmentMode?: boolean;
+  /** Assessment roleplay: learner turns an attempt needs to count. */
+  minLearnerTurns?: number;
+  showResultsToLearner?: boolean;
+  assessmentPhase?: "PRE" | "POST";
+  assessmentPairKey?: string;
   passScore?: number;
   watchPct?: number;
   minReadSeconds?: number;
@@ -122,6 +152,27 @@ export interface TrackItemContentMeta {
   bucketCount?: number;
 }
 
+export type TrackBlockerReason =
+  | "NOT_FINISHED"
+  | "BELOW_SCORE"
+  | "TOO_SHORT"
+  | "NOT_SCORED"
+  | "ASSESSMENT_FAILED"
+  | "GRADING_PENDING"
+  | "OUT_OF_ATTEMPTS"
+  | "WATCH_MORE"
+  | "KEEP_READING";
+
+/** Why the first locked item is locked: the previous item and what it still needs. */
+export interface TrackBlocker {
+  itemId: string;
+  title: string;
+  type: string;
+  reasons: { code: TrackBlockerReason; actual?: number | null; required?: number | null }[];
+  action: "RETRY" | "OPEN" | "NONE";
+  retryAt?: string | null;
+}
+
 export interface TrackDetailItem {
   id: string;
   type: TrackItemType;
@@ -144,6 +195,8 @@ export interface TrackDetailItem {
   roleplayGate?: RoleplayGate;
   /** Roleplay: why the latest attempt didn't complete the item. */
   lastRoleplayAttempt?: LastRoleplayAttempt | null;
+  /** Roleplay: assessment block; null for trial/practice (absent from older servers). */
+  assessment?: RoleplayAssessment | null;
   /** The author enabled a discussion thread beneath this item. */
   hasDiscussion?: boolean;
   /**
@@ -151,6 +204,8 @@ export interface TrackDetailItem {
    * read in another language — the card tells the learner why up front.
    */
   languageFallbackReason?: TrackLanguageFallbackReason | null;
+  /** Non-null only on the first LOCKED item: what is blocking it. */
+  blockedBy?: TrackBlocker | null;
 }
 
 /** Why a component reads in English inside a translated course. */
@@ -663,6 +718,8 @@ export interface StartRoleplayItemPayload extends StartTrackItemBase {
   roleplayGate?: RoleplayGate;
   /** Why the latest attempt didn't complete the item; null once complete. */
   lastRoleplayAttempt?: LastRoleplayAttempt | null;
+  /** Assessment block; null for trial/practice (absent from older servers). */
+  assessment?: RoleplayAssessment | null;
 }
 
 export interface StartCaseItemPayload extends StartTrackItemBase {
@@ -958,6 +1015,13 @@ export interface ActiveTrackContext {
   /** Guided only: the thread and the card that launched the item. */
   threadId?: string;
   cardId?: string;
+  /**
+   * Assessment roleplays: the minimum learner turns, so the live session can
+   * show "Turn k of n". Display only; the server decides what counts.
+   */
+  assessmentRequiredTurns?: number;
+  /** The scenario `assessmentRequiredTurns` belongs to, to ignore a stale context. */
+  assessmentScenarioId?: number;
 }
 
 export const ACTIVE_TRACK_CONTEXT_KEY = "activeTrackContext";

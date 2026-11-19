@@ -10,19 +10,14 @@ import type { BuilderSessionDetail, RoadmapItemDetail } from "@types";
 
 import { CodeText } from "./CodeChip";
 import { ShipActions } from "./ReleaseDialog";
+import { usePlanPrdHandlers } from "./usePlanPrdHandlers";
+import { IdeaAgentFindingsForItem } from "../drafts/IdeaAgentFindings";
 import { SimilarLine } from "../triage/TriageSummary";
 import { IdeaPanelTab, shortDate, usd } from "../utils/copy";
 import { outcomeLine } from "../utils/delight";
+import { whyRanksLine } from "../utils/whyRanks";
 
 const noopSave = async () => undefined;
-
-/** "Why it ranks here" arrives as data of no fixed shape; show it only when it reads as text. */
-const whyRanksText = (value: unknown): string[] => {
-  if (typeof value === "string") return value.trim() ? [value] : [];
-  if (Array.isArray(value))
-    return value.filter((v): v is string => typeof v === "string" && !!v.trim());
-  return [];
-};
 
 const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
   <div className="flex flex-col gap-0.5">
@@ -85,7 +80,7 @@ const ProblemEditor: React.FC<{ item: RoadmapItemDetail }> = ({ item }) => {
 export const SummaryPanel: React.FC<{ item: RoadmapItemDetail }> = ({ item }) => {
   const copy = en.roadmapV2.idea.summary;
   const s = item.summary ?? {};
-  const why = whyRanksText(s.whyRanks);
+  const why = whyRanksLine(s.whyRanks);
   const images = Array.isArray(s.images) ? s.images.filter(src => typeof src === "string") : [];
   const empty = !s.problem && !s.who && !s.outcome && why.length === 0 && images.length === 0;
   return (
@@ -116,13 +111,9 @@ export const SummaryPanel: React.FC<{ item: RoadmapItemDetail }> = ({ item }) =>
           <SimilarLine code={item.code} bare />
         </Field>
       )}
-      {why.length > 0 && (
+      {why && (
         <Field label={copy.whyRanks}>
-          <ul className="m-0 list-disc pl-4">
-            {why.map((line, i) => (
-              <li key={i}>{line}</li>
-            ))}
-          </ul>
+          <p className="m-0">{why}</p>
         </Field>
       )}
       {images.length > 0 && (
@@ -148,6 +139,7 @@ export const SummaryPanel: React.FC<{ item: RoadmapItemDetail }> = ({ item }) =>
           </div>
         </Field>
       )}
+      <IdeaAgentFindingsForItem itemId={item.id} />
       {empty && !item.declineReason && (
         <p className="text-sm text-typography-secondary">{copy.empty}</p>
       )}
@@ -160,19 +152,22 @@ export const PrdPanel: React.FC<{ item: RoadmapItemDetail; session?: BuilderSess
   session,
 }) => {
   const copy = en.roadmapV2.idea;
+  const handlers = usePlanPrdHandlers(item.sessionId);
   if (!item.sessionId || !session?.prd || !session.readiness) {
     return <p className="text-sm text-typography-secondary">{copy.prdNone}</p>;
   }
+  // The planner (an Owner, or the assigned builder) edits it here while planning; everyone else reads.
+  const works = !!item.can?.workPlan;
   return (
     <ErrorBoundary variant="panel">
-      {/* Read-only here: the PRD is edited in the plan session, not from the idea page (P2). */}
       <PrdDocPanel
         prd={session.prd}
         readiness={session.readiness}
         versionNumber={session.prdVersionNumber}
-        editable={false}
+        editable={works}
         lockedReason=""
-        onSaveSection={noopSave}
+        onSaveSection={works ? handlers.onSaveSection : noopSave}
+        onDismissFinding={works ? handlers.onDismissFinding : undefined}
         sessionTitle={item.title}
         repos={session.repos ?? []}
         createdByName={session.createdByName}
@@ -197,8 +192,9 @@ export const DesignPanel: React.FC<{ item: RoadmapItemDetail; session?: BuilderS
             design={session.prd?.technicalDesign ?? null}
             designReadiness={session.designReadiness}
             prdReady={!!session.readiness?.ready}
-            // Approving is the lead's (or an Owner's) call; for everyone else the buttons are absent.
-            readOnly={!item.can?.approveDesign}
+            // Drafting (the planner) and approving (the lead or an Owner); for everyone else the
+            // buttons are absent.
+            readOnly={!item.can?.approveDesign && !item.can?.workPlan}
           />
         </ErrorBoundary>
       ) : (

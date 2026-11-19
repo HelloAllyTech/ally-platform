@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { SkeletonText, TextArea } from "@ally-ui-mono/ui-shared";
 import {
   useCreateRoadmapOpportunityMutation,
+  useSuggestRoadmapTitleMutation,
   useDeleteRoadmapIdeaDraftMutation,
   useGetRoadmapReadinessCriteriaQuery,
   useRoadmapAiDuplicatesMutation,
@@ -124,6 +125,7 @@ export const OpportunityInterviewDrawer: React.FC<OpportunityInterviewDrawerProp
   const { data: checklist } = useGetRoadmapReadinessCriteriaQuery();
   const { runTurn, activity, isThinking } = useRoadmapCopilotStream();
   const [createOpportunity, { isLoading: isFiling }] = useCreateRoadmapOpportunityMutation();
+  const [suggestTitle] = useSuggestRoadmapTitleMutation();
   const [deleteIdeaDraft] = useDeleteRoadmapIdeaDraftMutation();
   const [checkDuplicates, { isLoading: isCheckingDuplicates }] = useRoadmapAiDuplicatesMutation();
 
@@ -205,7 +207,10 @@ export const OpportunityInterviewDrawer: React.FC<OpportunityInterviewDrawerProp
   const file = async () => {
     if (!draft) return;
     try {
+      // The copilot's draft has no title of its own, so one is written from its text.
+      const { title } = await suggestTitle({ text: draft.description }).unwrap();
       const created = await createOpportunity({
+        title,
         description: draft.description,
         type: RoadmapOpportunityType.IDEA,
         productGoal: draft.productGoal ?? undefined,

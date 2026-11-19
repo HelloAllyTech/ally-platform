@@ -48,6 +48,7 @@
     "billing:backfill": "ts-node -r tsconfig-paths/register src/database/scripts/billing-backfill.ts",
     "reingest:onboarding-docs": "ts-node -r tsconfig-paths/register src/database/scripts/reingest-onboarding-docs.ts",
     "check:chatbot-shared-store": "ts-node -r tsconfig-paths/register src/database/scripts/check-chatbot-shared-store.ts",
+    "backfill:roadmap-idea-titles": "ts-node -r tsconfig-paths/register src/database/scripts/backfill-roadmap-idea-titles.ts",
     "backfill:scenario-description-audio": "ts-node -r tsconfig-paths/register src/database/scripts/backfill-scenario-description-audio.ts",
     "backfill:dictation-note-duration": "ts-node -r tsconfig-paths/register scripts/backfill-dictation-note-duration.ts"
   },

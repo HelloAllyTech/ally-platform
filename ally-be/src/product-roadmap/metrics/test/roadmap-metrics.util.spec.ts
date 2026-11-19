@@ -8,6 +8,7 @@ import {
   earliest,
   funnelFor,
   furthestStep,
+  planWaitsFor,
   quantile,
   releasesFor,
   resolveMetricsRange,
@@ -437,5 +438,91 @@ describe('computeRoadmapMetrics', () => {
       'building_shipped',
     ]);
     expect(result.idleLeadReleases).toBe(0);
+  });
+});
+
+describe('planWaitsFor (idea-to-plan audit rec 9)', () => {
+  it('counts accepted ideas nobody is planning, and ideas being planned, right now', () => {
+    const waits = planWaitsFor(
+      [
+        idea({ submittedAt: d('2026-09-01'), reviewState: 'accepted' }),
+        // Never reviewed (a carried-over idea) reads as accepted.
+        idea({ submittedAt: d('2026-09-01') }),
+        idea({ submittedAt: d('2026-09-01'), reviewState: 'pending' }),
+        idea({ submittedAt: d('2026-09-01'), reviewState: 'declined' }),
+        idea({
+          submittedAt: d('2026-09-01'),
+          reviewState: 'accepted',
+          closed: true,
+        }),
+        idea({
+          submittedAt: d('2026-09-01'),
+          reviewState: 'accepted',
+          planningAt: d('2026-11-02'),
+        }),
+        idea({
+          submittedAt: d('2026-09-01'),
+          reviewState: 'accepted',
+          planningAt: d('2026-11-02'),
+          planClosedAt: d('2026-11-04'),
+        }),
+      ],
+      range,
+    );
+    expect(waits.acceptedUnplannedNow).toBe(2);
+    expect(waits.planningNow).toBe(1);
+  });
+
+  it('times filing to Start planning and Start planning to Close plan, over moves in the range', () => {
+    const waits = planWaitsFor(
+      [
+        idea({
+          submittedAt: d('2026-10-01'),
+          planningAt: d('2026-11-01'),
+          planClosedAt: d('2026-11-03'),
+          authorOpenedPlanAt: d('2026-11-02'),
+        }),
+        idea({
+          submittedAt: d('2026-11-01'),
+          planningAt: d('2026-11-02'),
+          planClosedAt: d('2026-11-08'),
+        }),
+        // Started and closed before the range: counted nowhere.
+        idea({
+          submittedAt: d('2026-09-01'),
+          planningAt: d('2026-09-02'),
+          planClosedAt: d('2026-09-05'),
+        }),
+        // Planned by its own author: their look says nothing.
+        idea({
+          submittedAt: d('2026-10-01'),
+          planningAt: d('2026-11-01'),
+          planClosedAt: d('2026-11-02'),
+          plannedByAuthor: true,
+        }),
+      ],
+      range,
+    );
+    expect(waits.submittedToPlanning.n).toBe(3);
+    expect(waits.planningToClosed.n).toBe(3);
+    expect(waits.planningToClosed.medianMs).toBe(2 * DAY_MS);
+    expect(waits.authorLooked).toEqual({ closed: 2, opened: 1 });
+  });
+
+  it('is part of the whole', () => {
+    const result = computeRoadmapMetrics({
+      range,
+      now: d('2026-11-17'),
+      amberDays: 5,
+      ideas: [],
+      policyLog: [],
+      failingIdeasNow: 0,
+      idleLeadReleases: 0,
+      spend: [],
+    });
+    expect(result.waits).toMatchObject({
+      acceptedUnplannedNow: 0,
+      planningNow: 0,
+    });
   });
 });

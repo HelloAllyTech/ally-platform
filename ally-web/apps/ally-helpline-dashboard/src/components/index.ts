@@ -71,7 +71,7 @@ import ThreadCard from "./thread-card/ThreadCard";
 import Timer from "./timer";
 import ToggleButtonGroup from "./toggle-button-group";
 import { ToggleSwitch } from "./toggle-switch";
-import { TrackTypeIcon, getTrackItemMeta } from "./track-visuals";
+import { TrackTypeIcon, formatTrackBlocker, getTrackItemMeta } from "./track-visuals";
 import TranscriptListing from "./transcript-listing";
 import Transcription from "./transcription";
 import UserInfo from "./user-info";
@@ -167,5 +167,6 @@ export {
   AddReviewNote,
   ContinueLearningCard,
   TrackTypeIcon,
+  formatTrackBlocker,
   getTrackItemMeta,
 };

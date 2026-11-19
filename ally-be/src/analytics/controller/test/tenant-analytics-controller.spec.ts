@@ -3,6 +3,8 @@ import { ForbiddenException } from '@nestjs/common';
 import { TenantAnalyticsController } from '../tenant-analytics.controller';
 import { AnalyticsService } from '../../service/analytics.service';
 import { TenantAnalyticsService } from '../../service/tenant-analytics.service';
+import { CourseAssessmentReportService } from '../../service/course-assessment-report.service';
+import { DataSource } from 'typeorm';
 import { Reflector } from '@nestjs/core';
 import { PermissionsGuard } from '../../../auth/guards/permissions.guard';
 import { PermissionsService } from '../../../authorization/service/permissions.service';
@@ -38,6 +40,11 @@ describe('TenantAnalyticsController', () => {
           provide: TenantAnalyticsService,
           useValue: mockTenantAnalyticsService,
         },
+        {
+          provide: CourseAssessmentReportService,
+          useValue: { getCoursePairs: jest.fn() },
+        },
+        { provide: DataSource, useValue: { query: jest.fn() } },
         {
           provide: Reflector,
           useValue: {

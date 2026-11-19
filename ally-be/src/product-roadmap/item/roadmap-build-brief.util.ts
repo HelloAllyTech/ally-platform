@@ -27,6 +27,7 @@ export const BUILD_BRIEF_FIELDS = [
   'repoRules',
   'branch',
   'prTitle',
+  'closedNotReady',
 ] as const;
 
 /**
@@ -96,6 +97,12 @@ export interface BuildBriefInput {
   repoRules: string[];
   branch: string;
   prTitle: string;
+  /**
+   * The Owner closed the plan with blockers still open: their reason and the
+   * blockers as they stood (audit 2026-11-19, rec 2). Printed first, so the
+   * builder reads what was knowingly left open before anything else.
+   */
+  closedNotReady: { reason: string; blockers: string[] } | null;
 }
 
 /** The rules every change to ally-platform follows, as the repo states them. */
@@ -149,6 +156,8 @@ export interface BriefSources {
   prd?: unknown;
   /** Whether the technical design is approved and current (status approved, not stale). */
   designApproved?: boolean;
+  /** plan.planClosed: `notReady.reason` and `notReady.blockers` only are read. */
+  planClosed?: unknown;
 }
 
 /**
@@ -236,6 +245,17 @@ export function pickBriefInput(sources: BriefSources): BuildBriefInput {
     for (const raw of arr(obj(prd.technicalPlan).repos)) touch(obj(raw).repo);
   }
 
+  const notReady = obj(obj(sources.planClosed).notReady);
+  const notReadyReason = str(notReady.reason);
+  const closedNotReady = notReadyReason
+    ? {
+        reason: notReadyReason,
+        blockers: arr(notReady.blockers)
+          .map(str)
+          .filter((b): b is string => !!b),
+      }
+    : null;
+
   const title = str(sources.title) ?? sources.code;
   return {
     code: sources.code,
@@ -254,6 +274,7 @@ export function pickBriefInput(sources: BriefSources): BuildBriefInput {
     repoRules: [...REPO_RULES],
     branch: briefBranch(sources.code, title),
     prTitle: `${sources.code}: ${title}`,
+    closedNotReady,
   };
 }
 
@@ -266,6 +287,19 @@ export function renderBuildBrief(input: BuildBriefInput): string {
     '',
     `Build this change in the ally-platform monorepo. It comes from the Ally Roadmap idea ${input.code}.`,
     '',
+    ...(input.closedNotReady
+      ? [
+          '## Closed before the plan was ready',
+          'The plan was closed with these still open. Read them before you start, and ask where one leaves you guessing.',
+          '',
+          `Why it was closed anyway: ${input.closedNotReady.reason}`,
+          '',
+          ...(input.closedNotReady.blockers.length
+            ? input.closedNotReady.blockers.map((b) => `- ${b}`)
+            : ['- (none listed)']),
+          '',
+        ]
+      : []),
     '## Branch and pull request',
     `- Work on a branch named \`${input.branch}\`.`,
     `- Put \`${input.code}\` in the pull request title, for example: \`${input.prTitle}\`. The Roadmap links the pull request to the idea by that code, and tracks its release from there.`,

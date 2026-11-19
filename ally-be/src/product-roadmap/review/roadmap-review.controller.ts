@@ -25,6 +25,7 @@ import {
   RoadmapReviewDto,
   RoadmapReviewUndoDto,
 } from '../draft/roadmap-draft.dto';
+import { RoadmapClosePlanDto } from '../plan/plan-gate.dto';
 import { RoadmapReviewService } from './roadmap-review.service';
 
 const VIEW = { permissions: [PERMISSIONS.VIEW_PRODUCT_ROADMAP] };
@@ -138,9 +139,13 @@ export class RoadmapReviewController {
   @ApiOperation({
     summary: 'Owner: close the plan, so a builder can be assigned',
   })
-  async closePlan(@Param('code') code: string, @CurrentUser() user: TokenUser) {
+  async closePlan(
+    @Param('code') code: string,
+    @CurrentUser() user: TokenUser,
+    @Body() dto: RoadmapClosePlanDto = {},
+  ) {
     await this.settings.assertRoadmapV2();
-    return this.reviews.setPlanClosed(user.id, code, true);
+    return this.reviews.setPlanClosed(user.id, code, true, dto?.reason);
   }
 
   @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, VIEW)

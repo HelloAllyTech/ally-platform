@@ -5,6 +5,7 @@ import {
   HttpStatus,
   Injectable,
   OnModuleDestroy,
+  Optional,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { LoggerService } from 'src/logger/logger.service';
@@ -23,12 +24,16 @@ import {
 import { PlanEventService } from 'src/product-planning/service/plan-event.service';
 import { PlanSettingsService } from 'src/product-planning/service/plan-settings.service';
 import { RoadmapInboxService } from 'src/product-planning/service/roadmap-inbox.service';
+import { RoadmapIdeaNoticeService } from 'src/product-planning/service/roadmap-idea-notice.service';
 import { RoadmapRoleService } from 'src/product-planning/service/roadmap-role.service';
 import { roleAtLeast } from 'src/product-planning/util/roadmap-role.util';
 import { RoadmapNotificationService } from '../service/roadmap-notification.service';
 import { RoadmapStrategyGoalService } from '../service/roadmap-strategy-goal.service';
 import { PlanSession, PlanSessionStore } from '../plan/plan-session.store';
 import { PlanStageService } from '../plan/plan-stage.service';
+import { PlanCloseReadinessService } from '../plan/plan-close-readiness.service';
+import { PlanTurnService } from '../plan/plan-turn.service';
+import { PlanHandoffService } from '../plan/plan-handoff.service';
 import { RoadmapItemLookupService } from '../item/roadmap-item-lookup.service';
 import { RoadmapItemReadService } from '../item/roadmap-item-read.service';
 import type {
@@ -113,6 +118,13 @@ export class RoadmapReviewService implements OnModuleDestroy {
     private readonly broadcast: RoadmapNotificationService,
     private readonly strategyGoals: RoadmapStrategyGoalService,
     private readonly builderSessions: BuilderSessionService,
+    private readonly ideaNotices: RoadmapIdeaNoticeService,
+    /** Start planning's opening turn (audit rec 1). Optional so fixtures without it still build. */
+    @Optional() private readonly planTurns?: PlanTurnService,
+    /** Close plan's one definition of ready (audit rec 2). Optional, like the turns. */
+    @Optional() private readonly closeReadiness?: PlanCloseReadinessService,
+    /** Start planning's dated hand-off (audit rec. 5). Optional so older fixtures still build. */
+    @Optional() private readonly planHandoff?: PlanHandoffService,
   ) {}
 
   // ── Review ─────────────────────────────────────────────────────────────────
@@ -409,6 +421,7 @@ export class RoadmapReviewService implements OnModuleDestroy {
       planningStartedAt: new Date().toISOString(),
       planningStartedBy: userId,
     });
+    await this.attachStartHandoff(userId, ref.code, session.id);
     await this.events.record({
       sessionId: session.id,
       kind: PlanEventKind.PLANNING_STARTED,
@@ -421,6 +434,20 @@ export class RoadmapReviewService implements OnModuleDestroy {
       code: ref.code,
       fields: ['stage'],
     });
+    await this.ideaNotices
+      .planningStarted({
+        actorUserId: userId,
+        itemId: ref.id,
+        code: ref.code,
+        sessionId: session.id,
+        acceptedNow: item.shownStage === 'submitted',
+      })
+      .catch((e) =>
+        this.logger.warn(`Start planning notice failed: ${String(e)}`),
+      );
+    // Last: the situation brief is waiting by the time the Owner looks. Fire
+    // and forget, so a busy lock or a model failure never fails Start planning.
+    this.planTurns?.queueOpeningTurn(session.id, userId, ref.code, item.title);
     return this.reader.detail(userId, code);
   }
 
@@ -428,12 +455,14 @@ export class RoadmapReviewService implements OnModuleDestroy {
    * Close the plan (an Owner): planning is done, and the idea can now take a
    * builder. Reopen undoes it while nobody is assigned to build it yet.
    * Neither touches the PRD or design; they only open and shut the gate to
-   * assigning a builder.
+   * assigning a builder. Closing while the plan still has open blockers needs
+   * `reason` (PlanCloseReadinessService.checkClose, audit rec 2).
    */
   async setPlanClosed(
     userId: number,
     code: string,
     closed: boolean,
+    reason?: string,
   ): Promise<ItemDetail> {
     const item = await this.reader.detail(userId, code);
     const allowed = closed ? item.can.closePlan : item.can.reopenPlan;
@@ -449,15 +478,27 @@ export class RoadmapReviewService implements OnModuleDestroy {
     }
     const ref = await this.lookup.get(code);
     const session = await this.planSession(ref.builderSessionId);
+    const notReady =
+      closed && this.closeReadiness
+        ? await this.closeReadiness.checkClose(session, reason)
+        : null;
     await this.store.patchPlan(session.id, {
       planClosed: closed
-        ? { byUserId: userId, at: new Date().toISOString() }
+        ? {
+            byUserId: userId,
+            at: new Date().toISOString(),
+            ...(notReady ? { notReady } : {}),
+          }
         : null,
     });
     await this.events.record({
       sessionId: session.id,
       kind: closed ? PlanEventKind.PLAN_CLOSED : PlanEventKind.PLAN_REOPENED,
       actorUserId: userId,
+      // The count only: the reason lives on the plan and in the build brief.
+      ...(notReady
+        ? { detail: { notReady: true, openBlockers: notReady.blockers.length } }
+        : {}),
     });
     this.broadcast.emit({
       kind: 'ITEM_CHANGED',
@@ -465,6 +506,17 @@ export class RoadmapReviewService implements OnModuleDestroy {
       code: ref.code,
       fields: ['stage'],
     });
+    if (closed)
+      await this.ideaNotices
+        .planClosed({
+          actorUserId: userId,
+          itemId: ref.id,
+          code: ref.code,
+          sessionId: session.id,
+        })
+        .catch((e) =>
+          this.logger.warn(`Close plan notice failed: ${String(e)}`),
+        );
     return this.reader.detail(userId, code);
   }
 
@@ -945,8 +997,24 @@ export class RoadmapReviewService implements OnModuleDestroy {
     return this.planSession(created.id);
   }
 
+  /** Never fails Start planning: a hand-off that could not be written is logged and skipped. */
+  private async attachStartHandoff(
+    userId: number,
+    code: string,
+    sessionId: string,
+  ): Promise<void> {
+    try {
+      await this.planHandoff?.attachAtStart(userId, code, sessionId);
+    } catch (error) {
+      this.logger.warn(
+        `[ROADMAP] Start planning hand-off for ${code} not written: ${(error as Error)?.message}`,
+      );
+    }
+  }
+
+  /** The idea's linked session: a plan session, or an older idea's Builder interview. */
   private async planSession(sessionId: string | null) {
-    const session = sessionId ? await this.store.find(sessionId) : null;
+    const session = sessionId ? await this.store.findLinked(sessionId) : null;
     if (!session) {
       throw new ConflictException(
         'This idea has no plan yet, so it has no lead to set.',

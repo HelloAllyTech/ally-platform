@@ -139,6 +139,22 @@ describe('BuilderReadinessService', () => {
       expect(plan(false, doc(null), 'edit')).toBeNull();
     });
 
+    it('does not wait on principle marks, which are settled before close', () => {
+      const readiness = {
+        ready: false,
+        sections: [
+          ...sections(true),
+          {
+            key: 'principleMarks',
+            label: 'Principles marked',
+            ok: false,
+            hint: 'x',
+          },
+        ],
+      } as any;
+      expect(service.reviewPlan(readiness, doc(null), 'edit')).toBe('review');
+    });
+
     it('runs the first review on any occasion, including inside an edit', () => {
       expect(plan(true, doc(null), 'edit')).toBe('review');
       expect(plan(true, doc(null), 'turn_end')).toBe('review');

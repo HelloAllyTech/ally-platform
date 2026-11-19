@@ -685,7 +685,33 @@
       "assessmentScore": "Score {{score}}",
       "assessmentReopen": "Give another attempt",
       "assessmentConfirm": "Give {{name}} another attempt at {{scenario}}? Their earlier attempt and its report are kept.",
-      "assessmentReopenSuccess": "Assessment reopened"
+      "assessmentReopenSuccess": "Assessment reopened",
+      "incompleteStarts": "{{count}} incomplete start",
+      "incompleteStarts_other": "{{count}} incomplete starts"
+    },
+    "courseAssessment": {
+      "title": "Pre/post assessment",
+      "action": "Assessments",
+      "actionTooltip": "Shows each learner's pre and post assessment scores for this course and the cohort's average gain.",
+      "empty": "This course has no pre/post assessments.",
+      "n": "Learners with both",
+      "avgPre": "Avg pre",
+      "avgPost": "Avg post",
+      "avgGain": "Avg gain",
+      "suppressed": "Averages appear once {{min}} learners have both",
+      "notComparable": "These scenarios score different behaviours, so the pre→post gain may not be comparable.",
+      "onlyInPre": "Only in the pre: {{list}}",
+      "onlyInPost": "Only in the post: {{list}}",
+      "reopened": "Reopened",
+      "columns": {
+        "learner": "Learner",
+        "pre": "Pre",
+        "post": "Post",
+        "gain": "Gain",
+        "incompleteStarts": "Incomplete starts"
+      },
+      "errorTitle": "Couldn't load assessments",
+      "errorSubtitle": "Something went wrong loading this course's assessments."
     },
     "learnerCourses": {
       "action": "Courses",
@@ -795,6 +821,10 @@
   },
   "postSim": {
     "titlePrefix": "Role play",
+    "assessmentSubmitted": {
+      "title": "Your assessment is submitted",
+      "body": "Your trainer will review your results."
+    },
     "skills": {
       "categories": {
         "listeningEngagement": "Listening Engagement",
@@ -1080,7 +1110,9 @@
         "hint": "Select words in the debrief to comment on them.",
         "count_one": "{{count}} comment on selected words",
         "count_other": "{{count}} comments on selected words",
-        "send": "Send"
+        "send": "Send",
+        "yourComments": "Your comments",
+        "onWholeDebrief": "On the whole debrief"
       }
     }
   },
@@ -1710,6 +1742,10 @@
     "exitSimulation": "Leave this session",
     "reconnecting": "Reconnecting…",
     "missedSupervisorHints": "Some supervisor hints may not have reached you",
+    "assessmentTurnCounter": {
+      "progress": "Turn {{turn}} of {{required}}",
+      "reached": "Minimum turns reached"
+    },
     "textChat": {
       "panelLabel": "Text chat",
       "inChat": "In the chat",
@@ -2009,6 +2045,20 @@
     "progress": "{{completed}} of {{total}}",
     "trackCompleted": "Track completed",
     "lockedTooltip": "Complete the previous items to unlock this",
+    "blocker": {
+      "notFinished": "Finish “{{title}}” to unlock this",
+      "belowScore": "“{{title}}”: you scored {{actual}}, need {{required}}",
+      "tooShort": "“{{title}}”: it lasted {{actual}}, needs at least {{required}}",
+      "notScored": "“{{title}}”: we couldn't score your last attempt",
+      "assessmentFailed": "“{{title}}”: your assessment didn't pass. Ask your trainer for another attempt.",
+      "gradingPending": "“{{title}}”: your answers are still being marked",
+      "outOfAttempts": "“{{title}}”: no attempts left. Ask your trainer for help.",
+      "outOfAttemptsUntil": "“{{title}}”: new attempts open {{date}}",
+      "watchMore": "“{{title}}”: you've watched {{actual}}%, need {{required}}%",
+      "keepReading": "“{{title}}”: keep reading to finish it",
+      "tryAgain": "Try again",
+      "goToItem": "Go to item"
+    },
     "notFound": "This track could not be found",
     "backToLearn": "Back to Learn",
     "viewProgress": "View progress",
@@ -2054,6 +2104,11 @@
       "minScore": "score {{score}}+",
       "minDuration": "{{duration}}+",
       "participation": "completes on start",
+      "assessment": "Assessment",
+      "assessmentPre": "Assessment · Pre",
+      "assessmentPost": "Assessment · Post",
+      "turns": "{{count}} turn",
+      "turns_other": "{{count}} turns",
       "case": "Case study",
       "annotationTranscript": "Transcript",
       "annotationDocument": "Note",
@@ -2155,6 +2210,10 @@
       "completed": "Completed",
       "completedOn": "Completed {{date}}",
       "language": "Language",
+      "assessmentIntroTurns": "This is an assessment. You get one attempt, and it counts once you've taken at least {{n}} turns.",
+      "shortAttempt": "That attempt was too short to count ({{taken}} of {{n}} turns). Start again when you're ready.",
+      "postLocked": "Complete the pre-assessment, {{title}}, first.",
+      "assessmentSubmittedHidden": "Submitted. Your trainer will review your results.",
       "assessmentIntro": "This roleplay is an assessment. Complete the scenario in a live roleplay.",
       "assessmentNotice": "You get one attempt. When you end the roleplay, your attempt is submitted and can't be retaken.",
       "assessmentSubmitted": "Submitted {{date}}",
@@ -2169,7 +2228,9 @@
         "score": "To complete it, score at least {{score}}.",
         "duration": "To complete it, keep the roleplay going for at least {{duration}}.",
         "scoreAndDuration": "To complete it, score at least {{score}} and keep the roleplay going for at least {{duration}}.",
-        "participation": "This completes as soon as you start the roleplay."
+        "participation": "This completes as soon as you start the roleplay.",
+        "turns": "To count, take at least {{turns}} turns.",
+        "turnsAndScore": "To count, take at least {{turns}} turns and score at least {{score}}."
       },
       "lastAttempt": {
         "title": "Your last attempt didn't complete this roleplay",

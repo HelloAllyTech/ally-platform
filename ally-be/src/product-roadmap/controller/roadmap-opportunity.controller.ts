@@ -33,6 +33,7 @@ import { BUG_REPORT_RATE_LIMIT } from '../constants/product-roadmap.constants';
 import {
   CreateBugReportDto,
   CreateOpportunityDto,
+  SuggestTitleDto,
   ListOpportunitiesQueryDto,
   MergeOpportunitiesDto,
   MonthBoardQueryDto,
@@ -59,6 +60,7 @@ import {
   SetAllocationResponseDto,
   OpenBuilderSessionResponseDto,
 } from '../dto/roadmap-response.dto';
+import { RoadmapAiService } from '../service/roadmap-ai.service';
 import { RoadmapOpportunityService } from '../service/roadmap-opportunity.service';
 import { RoadmapMultiplierService } from '../service/roadmap-multiplier.service';
 import { RoadmapAllocationService } from '../service/roadmap-allocation.service';
@@ -92,6 +94,7 @@ export class RoadmapOpportunityController {
     private readonly multiplierService: RoadmapMultiplierService,
     private readonly planAccess: PlanAccessService,
     private readonly planSettings: PlanSettingsService,
+    private readonly roadmapAi: RoadmapAiService,
   ) {}
 
   @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
@@ -303,6 +306,21 @@ export class RoadmapOpportunityController {
       canManage: await this.access.canManage(user.id),
       enforceReadiness: true,
     });
+  }
+
+  /**
+   * A suggested title for an idea's text, for the Title box to prefill. Always on: the form
+   * that files an idea needs it whether or not the Roadmap is on. On the VOTE tier like filing
+   * itself. A failed model call answers with the text's first sentence, never an error.
+   */
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VOTE_PRODUCT_ROADMAP],
+  })
+  @Post('title-suggestion')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Suggest a one-line title for an idea' })
+  async suggestTitle(@Body() dto: SuggestTitleDto): Promise<{ title: string }> {
+    return { title: await this.roadmapAi.suggestTitle(dto.text) };
   }
 
   /**

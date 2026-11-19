@@ -261,6 +261,68 @@ describe('BuilderDecisionService', () => {
       expect(await service.listPending()).toEqual([]);
     });
 
+    it('clears a question answered on the idea page by a contributor (a plan post)', async () => {
+      const { service } = build({
+        messages: {
+          'sess-1': [
+            assistantRow({ questions: [question()] }),
+            {
+              id: 'm-3',
+              seq: 3,
+              role: BuilderMessageRole.USER,
+              content: 'Monday',
+              metadata: {
+                planPost: {
+                  kind: 'answer',
+                  questionId: 'q-1',
+                  by: { id: 9, name: 'Ravi', role: 'idea', relation: 'idea' },
+                },
+                idempotencyKey: 'key-12345',
+              },
+            },
+          ],
+        },
+      });
+
+      expect(await service.listPending()).toEqual([]);
+    });
+
+    it('keeps a question pending when a plan post is only a comment', async () => {
+      const { service } = build({
+        messages: {
+          'sess-1': [
+            assistantRow({ questions: [question()] }),
+            {
+              id: 'm-3',
+              seq: 3,
+              role: BuilderMessageRole.USER,
+              content: 'Not sure, ask Priya',
+              metadata: {
+                planPost: {
+                  kind: 'comment',
+                  by: { id: 9, name: 'Ravi', role: 'idea', relation: 'idea' },
+                },
+              },
+            },
+          ],
+        },
+      });
+
+      expect(await service.listPending()).toHaveLength(1);
+    });
+
+    it('carries the author marker of a problem-or-user question', async () => {
+      const { service } = build({
+        messages: {
+          'sess-1': [
+            assistantRow({ questions: [{ ...question(), forAuthor: true }] }),
+          ],
+        },
+      });
+      const [decision] = await service.listPending();
+      expect(decision.forAuthor).toBe(true);
+    });
+
     it('ignores a row whose turn is still streaming', async () => {
       const { service } = build({
         messages: {

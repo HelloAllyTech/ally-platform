@@ -4130,6 +4130,10 @@ export const en = {
         undo: "Undo",
         confirmed: "Confirmed",
         corrected: "Corrected",
+        unverified: "Unverified",
+        unverifiedHint:
+          "No file Builder read shows this, so it can't be confirmed. Correct it if it's wrong; otherwise Builder checks it before relying on it.",
+        checkedIn: "Checked in",
         correctionLabel: "What's true instead?",
         correctionPlaceholder: "e.g. This already lives in Auto-improve — extend that instead",
         noteLabel: "Anything else Builder should know? (optional)",
@@ -4174,7 +4178,49 @@ export const en = {
         testPlanMd: "Test plan",
         e2ePlanMd: "End-to-end checks",
         openQuestions: "Open questions",
+        coverage: "Coverage",
+        dataModelMd: "Data model notes",
+        apiMd: "API notes",
       } as Record<string, string>,
+      // The coverage pass: questions every PRD has to have faced before it reads ready.
+      coverage: {
+        heading: "Coverage",
+        tooltip:
+          "Every PRD answers each of these, says why it doesn't apply, or has the question open. The PRD isn't ready until all of them are covered.",
+        items: {
+          admin_web: "Admin web app",
+          helpline_web: "Helpline web app",
+          mobile_app: "Mobile app",
+          failure_empty_states: "Failure and empty states",
+          permission_toggle: "Permission and toggle",
+          success_metric: "Success metric",
+          existing_data_old_clients: "Existing data and old clients",
+          translations: "Translations",
+          model_cost_registry: "Model cost and AI task row",
+          other_readers: "Other readers of changed fields",
+        } as Record<string, string>,
+        status: {
+          answered: "Answered",
+          not_applicable: "Not applicable",
+          asked: "Asked",
+          open: "Not covered",
+        },
+        inSection: (section: string) => `In ${section}`,
+        count: (covered: number, total: number) => `${covered} of ${total} covered`,
+      },
+      // Context Library principles from the session's guiding brief, and what became of each.
+      principles: {
+        heading: "Principles",
+        tooltip:
+          "The principles Builder was given for this plan. Each one is marked applied, in the section that cites it, or not relevant, with the reason, before the plan closes.",
+        applied: "Applied",
+        notRelevant: "Not relevant",
+        unmarked: "Not marked",
+        inSection: (section: string) => `In ${section}`,
+        noneRetrieved:
+          "No principles were retrieved for this plan, so none could guide it. Check the Context Library is reachable before closing the plan.",
+        off: "Principles are off for this plan.",
+      },
       acceptanceCriteria: "Acceptance criteria",
       assumptionUnconfirmed: "Unconfirmed",
       assumptionConfirmed: "Confirmed",
@@ -4194,6 +4240,8 @@ export const en = {
           unapplied_correction: "Correction not applied",
           missed_reuse: "Missed reuse",
           missing_success_metric: "No success metric",
+          missing_edge_case: "Missing edge case",
+          missing_platform: "Missing platform",
         } as Record<string, string>,
         fixLabel: "Fix:",
         sectionLabel: (section: string) => `In ${section}`,
@@ -9016,6 +9064,7 @@ export const en = {
         allIdeas: "All ideas",
         idea: "this idea",
         bugs: "Bugs",
+        drafts: "My drafts",
         interviews: "User Interviews",
         settings: "Settings",
         pipeline: "Agent",
@@ -9423,9 +9472,39 @@ export const en = {
         "Everyone with Roadmap access will see this idea and its conversation. Submit?",
       submitConfirm: "Submit",
       submitCancel: "Not yet",
+      titleLabel: "Title",
+      titleHint: "One line that names the idea. Your text stays as its Problem.",
+      titlePlaceholder: "What is this idea, in a line?",
+      titleSuggesting: "Suggesting a title…",
+      titleRequired: "Give this idea a title to submit it.",
       submitGoalNeeded: "Pick a goal first. The suggested one is fine.",
       submitFailed: "Couldn't submit this idea.",
       submitChecksMissing: "A check reopened. Have another look before submitting.",
+      // Audit rec. 6: what Submit files, the one text limit, and the agent's research.
+      submitNoStatement: "The idea agent hasn't written its own version. Use your own words.",
+      submitStatementEmpty: "Write a summary, or use your own words.",
+      submitTooLong: (max: number) =>
+        `The title and summary together can be at most ${max} characters.`,
+      textCount: (n: number, max: number) => `${n}/${max}`,
+      textOverLimit: (max: number) => `An idea can be at most ${max} characters.`,
+      submitChoice: {
+        title: "What will be submitted",
+        help: "The idea agent wrote your idea up from the interview. Submit its version as the summary, edited if you like, or your own words. Your own words stay on the idea either way.",
+        useThis: "Use this",
+        useThisHelp: "The idea agent's version",
+        useMine: "Use mine",
+        useMineHelp: "Your words, as in the box above",
+        statementLabel: "Summary",
+        noStatement:
+          "The idea agent hasn't written its own version yet, so your own words will be submitted.",
+      },
+      findings: {
+        title: "What the idea agent found",
+        show: "Show",
+        hide: "Hide",
+        empty: "Nothing yet. Check my idea, and what the idea agent finds shows here.",
+        assessment: "Idea agent's assessment",
+      },
       submitted: "Submitted.",
       firstSubmitNote:
         "Submitted. Everyone with Roadmap access can see it now. You'll hear when it's reviewed.",
@@ -9580,6 +9659,43 @@ export const en = {
         select: "Select or unselect the idea",
         undo: "Undo the last review",
       },
+    },
+    /** Planning from the idea page, and Close plan's one definition of ready (audit 2026-11-19). */
+    planGate: {
+      composerLabel: "Message the plan agent",
+      composerHelp:
+        "Only you and the assigned builder see this box. Your message starts the plan agent's next turn; it answers here in a minute or so. Comments to people go in the box below.",
+      composerPlaceholder: "Tell the plan agent what to look at, decide or change…",
+      send: "Send to the plan agent",
+      sending: "Sending…",
+      sent: "Sent. The plan agent answers here shortly.",
+      busy: "The plan agent is still on its last turn. Try again in a moment.",
+      sendFailed: "Couldn't reach the plan agent.",
+      startAgent: "Start the plan agent",
+      startAgentHelp:
+        "The plan agent hasn't said anything on this idea yet. This asks it to look into what exists and send its situation brief.",
+      dialogTitle: "Close plan",
+      checking: "Checking what the plan still needs…",
+      checkFailed: "Couldn't check the plan. You can still close it with a reason.",
+      ready: "Everything the plan needs is in place. Once it's closed you can assign a builder.",
+      notReadyIntro: (n: number) =>
+        n === 1 ? "1 thing is still open:" : `${n} things are still open:`,
+      prdEmpty: "The PRD has no requirements yet.",
+      kinds: { prd: "PRD", design: "Design", answers: "Answers" } as Record<string, string>,
+      reasonLabel: "Why close it anyway?",
+      reasonHelp:
+        "Required while anything is open. It's saved with the plan and printed at the top of the build brief, so the builder reads it first.",
+      reasonPlaceholder: "What the builder should know about what's left open…",
+      reasonTooShort: (min: number) => `At least ${min} characters.`,
+      closeAnyway: "Close plan anyway",
+      confirm: "Close plan",
+      cancel: "Cancel",
+      close: "Close",
+      runChecks: "Run the reviews",
+      runChecksHelp:
+        "Runs the safety, privacy and AI-quality reviewers this PRD's paths call for. They run on their own the first time the PRD reads ready.",
+      runChecksStarted: "Reviews finished.",
+      runChecksFailed: "Couldn't run the reviews.",
     },
     session: {
       startPlanning: "Start planning",
@@ -9968,6 +10084,93 @@ export const en = {
     rankWeightsUnavailable: "Weights are not available to you.",
   },
   /** Roadmap v2 P8: the Owner's Measures (`/roadmap/measures`). One block; nothing else here. */
+  /** Roadmap idea-to-plan audit, recs 8–10: notices, the grouped To do, the sweep and the waits. */
+  roadmapIdeaToPlan: {
+    why: {
+      authorQuestion: (preview: string) => `Plan agent asks you: ${preview}`,
+      planReady: "The plan is ready to read",
+      questionAnswered: (name: string) =>
+        name ? `${name} answered the agent's question` : "Someone answered the agent's question",
+      progress: {
+        accepted: "Planning started",
+        planReady: "The plan is ready to read",
+        planClosed: "Plan closed",
+        comment: "New comments",
+      } as Record<string, string>,
+    },
+    /** One line per notice kind, for anywhere a notice is shown. */
+    notices: {
+      accepted: (code: string) => `${code} is accepted and being planned`,
+      plan_ready: (code: string) => `The plan for ${code} is ready to read`,
+      plan_closed: (code: string) => `The plan for ${code} is closed. It waits for a builder`,
+      comment: (code: string, count: number) =>
+        count === 1 ? `New comment on ${code}` : `${count} new comments on ${code}`,
+      question_answered: (code: string, name: string) =>
+        name ? `${name} answered the agent's question on ${code}` : `An answer on ${code}`,
+      agent_question_for_author: (code: string) =>
+        `The plan agent has a question for you on ${code}`,
+    },
+    forAuthor: (name: string) =>
+      name ? `For ${name}, who wrote the idea` : "For the idea's author",
+    groups: {
+      review: "Review",
+      planNext: "Plan next",
+      planning: "Planning in progress",
+      planClosed: "Plan closed",
+      later: "Later",
+    } as Record<string, string>,
+    groupHelp: {
+      review: "Submitted and waiting for you: start planning or decline.",
+      planNext: "The ten highest-ranked accepted ideas nobody is planning yet.",
+      planning: "Being planned. Close the plan from the idea when it's done.",
+      planClosed: "Planned. Pick a builder.",
+      later: "Accepted, lower in the rank.",
+    } as Record<string, string>,
+    showLater: (n: number) => `Show ${n} more`,
+    hideLater: "Hide",
+    waitingFor: (days: number) => `Waiting ${days} working days`,
+    sweep: {
+      banner: (n: number, days: number) =>
+        n === 1
+          ? `1 idea is older than ${days} days and has at most one voter.`
+          : `${n} ideas are older than ${days} days and have at most one voter.`,
+      open: "Review them",
+      title: "Old ideas with little support",
+      help: "Nothing changes until you choose. Decline with a reason, or keep an idea and the sweep won't offer it again.",
+      showingFirst: (shown: number, total: number) => `Showing the oldest ${shown} of ${total}.`,
+      selectAll: "Select all",
+      select: (code: string) => `Select ${code}`,
+      selected: (n: number) => (n === 1 ? "1 selected" : `${n} selected`),
+      decline: "Decline selected…",
+      keep: "Keep selected",
+      kept: (n: number) => (n === 1 ? "Kept 1 idea." : `Kept ${n} ideas.`),
+      keepFailed: "Couldn't keep those ideas.",
+      loadFailed: "The sweep didn't load.",
+      empty: "No old, quiet ideas left.",
+      close: "Done",
+    },
+    whyRanks: {
+      rank: (n: number) => `#${n} in To do`,
+      votes: (votes: number, voters: number) =>
+        `${votes} ${votes === 1 ? "vote" : "votes"} from ${voters} ${voters === 1 ? "person" : "people"}`,
+      goals: (helped: number, assessed: number) => `helps ${helped} of ${assessed} goals`,
+      starred: "starred by an Owner",
+    },
+    waits: {
+      title: "Waits after review",
+      help: "Where accepted ideas wait: for planning to start, and for the plan to close. Times are over the moves that finished in this range.",
+      acceptedUnplanned: "Accepted, not planned",
+      planningNow: "Being planned now",
+      toPlanning: "Filed to Start planning",
+      toClosed: "Start planning to Close plan",
+      median: "median",
+      p75: (value: string) => `3 in 4 within ${value}`,
+      over: (n: number) => (n === 1 ? "over 1 idea" : `over ${n} ideas`),
+      authorLooked: "Authors who opened the plan before it closed",
+      authorLookedValue: (opened: number, closed: number) => `${opened} of ${closed}`,
+      authorLookedNote: "Plans closed in this range, not counting ones the author planned.",
+    },
+  },
   roadmapV2Measures: {
     tab: "Measures",
     title: "Measures",
@@ -10765,6 +10968,10 @@ export const en = {
       // Roleplay completion logic; SCORE_AND_DURATION needs no phrase of its
       // own — its two gates already read as two phrases.
       participation: "Completes on start",
+      assessment: "Assessment",
+      assessmentPre: "Assessment · Pre",
+      assessmentPost: "Assessment · Post",
+      minTurns: (turns: number) => `At least ${turns} turns`,
       scoreOnly: "Score only",
       durationOnly: "Duration only",
     },
@@ -11272,10 +11479,32 @@ export const en = {
         title: "Debrief PM agent",
         runNow: "Run the Debrief PM agent now",
         running: "Running…",
-        tabs: { changes: "Changes", reports: "Reports", "test-sets": "Test sets" } as Record<
-          string,
-          string
-        >,
+        tabs: {
+          changes: "Changes",
+          reports: "Reports",
+          "test-sets": "Test sets",
+          "learner-comments": "Learner comments",
+        } as Record<string, string>,
+        learnerComments: {
+          intro:
+            "What learners wrote about their own debrief by selecting words in it, newest first. The Debrief PM agent reads the same comments.",
+          none: "No learner comments yet. People who have Select and comment will appear here once they send one.",
+          loadFailed: "learner comments",
+          more: "Show older comments",
+          whole: "On the whole debrief",
+          open: "Open the debrief",
+          resolved: "Resolved",
+          someone: "A learner",
+          cards: {
+            important_moment: "Important moment",
+            opening: "Opening",
+            what_worked: "What worked",
+            work_on_this: "Work on this",
+            practise_next: "Practise next",
+            reflective_question: "Reflective question",
+            progress_note: "Progress note",
+          } as Record<string, string>,
+        },
         headline: (live: number, trying: number, waits: number) => {
           const c = (n: number) =>
             ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"][n] ??

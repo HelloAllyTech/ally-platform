@@ -237,9 +237,22 @@ export const productRoadmapAPI = baseAPI.injectEndpoints({
       providesTags: [TAG_TYPES.PRODUCT_ROADMAP_FACETS],
     }),
 
+    // The server falls back to the text's first sentence when the model fails, so this only
+    // rejects when the request itself does.
+    suggestRoadmapTitle: builder.mutation<{ title: string }, { text: string }>({
+      query: body => ({
+        url: ApiEndpoints.PRODUCT_ROADMAP.TITLE_SUGGESTION,
+        method: HttpMethod.POST,
+        body,
+      }),
+    }),
+
     createRoadmapOpportunity: builder.mutation<
       RoadmapOpportunity,
       {
+        /** One line naming the idea. Required: the server refuses an idea without one. */
+        title: string;
+        /** The summary beneath the title (Summary > Problem). */
         description: string;
         type: string;
         productGoal: string;
@@ -1003,6 +1016,7 @@ export const {
   useGetRoadmapBreadthQuery,
   useGetRoadmapBreadthEveryoneQuery,
   useGetRoadmapFacetsQuery,
+  useSuggestRoadmapTitleMutation,
   useCreateRoadmapOpportunityMutation,
   useCreateRoadmapBugReportMutation,
   useUpdateRoadmapOpportunityMutation,

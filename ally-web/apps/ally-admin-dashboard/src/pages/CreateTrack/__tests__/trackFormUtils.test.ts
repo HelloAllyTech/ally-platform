@@ -42,9 +42,11 @@ describe("serializeItem — ROLEPLAY assessment mode", () => {
     item.scenarioId = 12;
     item.completionCriteria = { minScore: 40, assessmentMode: true };
 
+    // An assessment is score-gated only (its pass mark); duration never applies.
     expect(serializeItem(item, 1).completionCriteria).toEqual({
       minScore: 40,
       assessmentMode: true,
+      completionLogic: "SCORE",
     });
   });
 

@@ -20,9 +20,10 @@ import { TruncatedTitle } from "../consoleRows";
 import { BackLink, Tile } from "../consoleUi";
 import { useDebriefAccess } from "../debriefAccess";
 import { ChangesView } from "./ChangesView";
+import { LearnerCommentsView } from "./LearnerCommentsView";
 import { ReportsView } from "./ReportsView";
 
-const VIEWS: PmAgentView[] = ["changes", "reports", "test-sets"];
+const VIEWS: PmAgentView[] = ["changes", "reports", "test-sets", "learner-comments"];
 
 /** Changes › Test sets: the Open / Gate / Sealed counts, and adding recent sessions. */
 const TestSetsView: React.FC<{
@@ -141,6 +142,8 @@ export const PmAgentPage: React.FC = () => {
         <TestSetsView overview={overview} canAct={access.testSets} />
       ) : view === "reports" ? (
         <ReportsView />
+      ) : view === "learner-comments" ? (
+        <LearnerCommentsView />
       ) : (
         <ChangesView
           access={access}

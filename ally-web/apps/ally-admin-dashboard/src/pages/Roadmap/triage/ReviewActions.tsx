@@ -8,6 +8,7 @@ import { TooltipIcon } from "@assets";
 import { ROUTES, en } from "@constants";
 import type { RoadmapItemDetail } from "@types";
 
+import { ClosePlanDialog } from "./ClosePlanDialog";
 import { DeclineDialog } from "./DeclineDialog";
 import { LeadPicker } from "./LeadPicker";
 import { useReviewActions } from "./useReviewActions";
@@ -160,14 +161,29 @@ export const PlanClosedButton: React.FC<{
 }> = ({ item, closed, fullWidth }) => {
   const copy = en.roadmapV2.session;
   const [setClosed, { isLoading }] = useSetRoadmapPlanClosedMutation();
+  const breakpoint = useRoadmapBreakpoint();
+  // Close plan opens the dialog of what is still open (audit rec 2); Reopen stays one click.
+  const [dialogOpen, setDialogOpen] = useState(false);
   return (
     <span className={`inline-flex items-center gap-1 ${fullWidth ? "flex-1" : ""}`}>
+      {closed && (
+        <ClosePlanDialog
+          item={item}
+          open={dialogOpen}
+          onClose={() => setDialogOpen(false)}
+          sheet={breakpoint === "phone" || breakpoint === "tablet"}
+        />
+      )}
       <Button
         kind={closed ? "primary" : "tertiary"}
         size={fullWidth ? "lg" : "md"}
         className={fullWidth ? "w-full max-w-none" : ""}
         disabled={isLoading}
         onClick={async () => {
+          if (closed) {
+            setDialogOpen(true);
+            return;
+          }
           try {
             await setClosed({ code: item.code, closed }).unwrap();
             haptic(10);

@@ -26,6 +26,31 @@ export interface LearnerCommentItem {
   body: string;
 }
 
+export interface LearnerOwnComment {
+  id: string;
+  /** The card and field, or null for a comment on the debrief as a whole. */
+  section: string | null;
+  quotedText: string | null;
+  spanStart: number | null;
+  spanEnd: number | null;
+  body: string;
+  createdAt: string;
+}
+
+export interface LearnerCommentListItem {
+  id: string;
+  runId: string;
+  sessionId: string;
+  section: string | null;
+  quotedText: string | null;
+  body: string;
+  status: string;
+  language: string | null;
+  tenantName: string | null;
+  learnerName: string | null;
+  createdAt: string;
+}
+
 export interface LearnerCommentsInput {
   /** A comment on the debrief as a whole. */
   overall?: string;
@@ -113,6 +138,89 @@ export class DebriefLearnerCommentsService {
     }
     await this.comments.save(rows);
     return { saved: rows.length };
+  }
+
+  /** A learner's own comments on one debrief, oldest first: what they see under their feedback box. */
+  async mine(runId: string, userId: number): Promise<LearnerOwnComment[]> {
+    const rows: Array<{
+      id: string;
+      section: string | null;
+      quotedText: string | null;
+      spanStart: number | null;
+      spanEnd: number | null;
+      body: string;
+      createdAt: Date;
+    }> = await this.comments.query(
+      `SELECT id, section, "quotedText", "spanStart", "spanEnd", body, "createdAt"
+         FROM debrief_review_comments
+        WHERE "runId" = $1 AND "reviewerId" = $2 AND source = 'learner' AND "parentId" IS NULL
+        ORDER BY "createdAt" ASC`,
+      [runId, userId],
+    );
+    return rows.map((r) => ({
+      id: r.id,
+      section: r.section,
+      quotedText: r.quotedText,
+      spanStart: r.spanStart,
+      spanEnd: r.spanEnd,
+      body: r.body,
+      createdAt: new Date(r.createdAt).toISOString(),
+    }));
+  }
+
+  /**
+   * Every learner comment across debriefs, newest first, for the Console's Learner comments view.
+   * `before` is the `next` of the previous page.
+   */
+  async list(
+    limit: number,
+    before?: string,
+  ): Promise<{ items: LearnerCommentListItem[]; next: string | null }> {
+    const size = Math.max(1, Math.min(Number(limit) || 50, 100));
+    const at = before ? new Date(before) : null;
+    if (at && Number.isNaN(at.getTime())) {
+      throw new BadRequestException('before must be an ISO date');
+    }
+    const params: unknown[] = [];
+    let where = `c.source = 'learner' AND c."parentId" IS NULL`;
+    if (at) {
+      params.push(at);
+      where += ` AND c."createdAt" < $${params.length}`;
+    }
+    params.push(size + 1);
+    const rows: Array<Record<string, any>> = await this.comments.query(
+      `SELECT c.id, c."runId", r."scenarioSessionId" AS "sessionId", c.section, c."quotedText",
+              c.body, c.status, c."createdAt", r.language, t.name AS "tenantName",
+              u.name AS "learnerName"
+         FROM debrief_review_comments c
+         JOIN debrief_runs r ON r.id = c."runId"
+         LEFT JOIN users u ON u.id = c."reviewerId"
+         LEFT JOIN tenants t ON t.id::text = r.tenant_id
+        WHERE ${where}
+        ORDER BY c."createdAt" DESC
+        LIMIT $${params.length}`,
+      params,
+    );
+    const page = rows.slice(0, size);
+    return {
+      items: page.map((r) => ({
+        id: r.id,
+        runId: r.runId,
+        sessionId: r.sessionId,
+        section: r.section ?? null,
+        quotedText: r.quotedText ?? null,
+        body: r.body,
+        status: r.status,
+        language: r.language ?? null,
+        tenantName: r.tenantName ?? null,
+        learnerName: r.learnerName ?? null,
+        createdAt: new Date(r.createdAt).toISOString(),
+      })),
+      next:
+        rows.length > size
+          ? new Date(page[page.length - 1].createdAt).toISOString()
+          : null,
+    };
   }
 
   private row(

@@ -46,6 +46,12 @@ export interface IdeaTimeline {
   measuredAt: Date | null;
   /** Archived, or closed as not pursuing: no longer waiting for anything. */
   closed: boolean;
+  /** An Owner closed the plan (the first time). Absent on a row read before it was tracked. */
+  planClosedAt?: Date | null;
+  /** The author first opened the idea while it was being planned. */
+  authorOpenedPlanAt?: Date | null;
+  /** The author is the person who started planning (their own look says nothing). */
+  plannedByAuthor?: boolean;
 }
 
 export interface DurationStats {
@@ -134,6 +140,25 @@ export interface SpendMetrics {
   top: IdeaSpend[];
 }
 
+/**
+ * The waits after review (idea-to-plan audit rec 9): how many accepted ideas
+ * nobody has started planning, how long from filing to Start planning, and
+ * how long a plan takes to close. Plus rec 8's "worked if": of the plans
+ * closed in the range (planned by someone other than the author), how many
+ * authors opened the idea before it closed.
+ */
+export interface PlanWaits {
+  /** Accepted (or never reviewed), still open, and nobody has pressed Start planning: right now. */
+  acceptedUnplannedNow: number;
+  /** Planning started and the plan not closed yet: right now. */
+  planningNow: number;
+  /** Filed → Start planning, over the starts in the range. */
+  submittedToPlanning: DurationStats;
+  /** Start planning → Close plan, over the closes in the range. */
+  planningToClosed: DurationStats;
+  authorLooked: { closed: number; opened: number };
+}
+
 export interface RoadmapMetrics {
   range: { from: string; to: string };
   generatedAt: string;
@@ -148,6 +173,8 @@ export interface RoadmapMetrics {
   idleLeadReleases: number | null;
   releases: ReleaseMetrics;
   spend: SpendMetrics;
+  /** Absent from a server older than idea-to-plan audit rec 9. */
+  waits?: PlanWaits;
 }
 
 // ── range ─────────────────────────────────────────────────────────────────────
@@ -374,6 +401,56 @@ export function reviewWaitFor(
   };
 }
 
+/** The waits between review and a closed plan (rec 9), and whether authors looked (rec 8). */
+export function planWaitsFor(
+  ideas: readonly IdeaTimeline[],
+  range: { from: Date; to: Date },
+): PlanWaits {
+  let acceptedUnplannedNow = 0;
+  let planningNow = 0;
+  const toPlanning: number[] = [];
+  const toClosed: number[] = [];
+  const authorLooked = { closed: 0, opened: 0 };
+  for (const idea of ideas) {
+    if (!idea.submittedAt) continue;
+    const moving = !!idea.buildingAt || !!idea.shippedAt;
+    const accepted =
+      idea.reviewState === 'accepted' || idea.reviewState === null;
+    if (!idea.closed && !moving) {
+      if (!idea.planningAt && accepted) acceptedUnplannedNow += 1;
+      if (idea.planningAt && !idea.planClosedAt) planningNow += 1;
+    }
+    if (idea.planningAt && inRange(idea.planningAt, range)) {
+      const ms = idea.planningAt.getTime() - idea.submittedAt.getTime();
+      if (ms >= 0) toPlanning.push(ms);
+    }
+    if (
+      idea.planningAt &&
+      idea.planClosedAt &&
+      inRange(idea.planClosedAt, range)
+    ) {
+      const ms = idea.planClosedAt.getTime() - idea.planningAt.getTime();
+      if (ms >= 0) toClosed.push(ms);
+      if (!idea.plannedByAuthor) {
+        authorLooked.closed += 1;
+        if (
+          idea.authorOpenedPlanAt &&
+          idea.authorOpenedPlanAt.getTime() <= idea.planClosedAt.getTime()
+        ) {
+          authorLooked.opened += 1;
+        }
+      }
+    }
+  }
+  return {
+    acceptedUnplannedNow,
+    planningNow,
+    submittedToPlanning: durationStats(toPlanning),
+    planningToClosed: durationStats(toClosed),
+    authorLooked,
+  };
+}
+
 const byService = (rows: readonly PolicyLogRow[]): ServiceCount[] => {
   const counts = new Map<string, number>();
   for (const row of rows) {
@@ -462,6 +539,7 @@ export function computeRoadmapMetrics(input: {
     idleLeadReleases: input.idleLeadReleases,
     releases: releasesFor(input.policyLog, range, input.failingIdeasNow),
     spend: spendFor(input.spend),
+    waits: planWaitsFor(input.ideas, range),
   };
 }
 

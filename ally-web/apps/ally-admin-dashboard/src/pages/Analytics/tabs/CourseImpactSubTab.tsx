@@ -5,6 +5,7 @@ import { useGetCourseImpactQuery, useGetTenantsQuery } from "@api";
 
 import { asOfStamp } from "../analyticsFilters";
 import { useAnalyticsOrgScope } from "../analyticsOrgScope";
+import { AssessmentAttemptsCard } from "../AssessmentAttemptsCard";
 import { ChangeWhiskers } from "../ChangeWhiskers";
 import { ChartCard, buildSource } from "../chartKit";
 import {
@@ -304,6 +305,13 @@ export const CourseImpactSubTab = () => {
             )}
           </div>
         </ChartCard>
+      </Section>
+
+      <Section
+        title="Assessments"
+        blurb="How often learners get through an assessment roleplay in a single valid attempt, across every course."
+      >
+        <AssessmentAttemptsCard />
       </Section>
 
       <Section

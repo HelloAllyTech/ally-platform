@@ -2,6 +2,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Optional,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
@@ -10,6 +11,7 @@ import {
   RoadmapNotificationKind,
 } from 'src/product-planning/enum/product-planning.enum';
 import { PlanEventService } from 'src/product-planning/service/plan-event.service';
+import { RoadmapIdeaNoticeService } from 'src/product-planning/service/roadmap-idea-notice.service';
 import { RoadmapInboxService } from 'src/product-planning/service/roadmap-inbox.service';
 import { RoadmapRoleService } from 'src/product-planning/service/roadmap-role.service';
 import { roleAtLeast } from 'src/product-planning/util/roadmap-role.util';
@@ -69,6 +71,9 @@ export class RoadmapItemEditService {
     private readonly events: PlanEventService,
     private readonly inbox: RoadmapInboxService,
     private readonly notifications: RoadmapNotificationService,
+    /** Opening an idea reads its notices (idea-to-plan audit rec 8). Optional for positional specs. */
+    @Optional()
+    private readonly ideaNotices?: RoadmapIdeaNoticeService,
   ) {}
 
   async patch(
@@ -256,6 +261,7 @@ export class RoadmapItemEditService {
     }
     const ref = await this.lookup.get(code);
     await this.inbox.markSeen(userId, ref.id);
+    await this.ideaNotices?.opened(userId, ref.id);
   }
 
   private async checkLead(

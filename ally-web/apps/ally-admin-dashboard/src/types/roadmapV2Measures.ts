@@ -28,6 +28,16 @@ export interface RoadmapIdeaSpend {
   approximate: boolean;
 }
 
+/** The waits after review (idea-to-plan audit rec 9). Absent from an older server. */
+export interface RoadmapPlanWaits {
+  acceptedUnplannedNow: number;
+  planningNow: number;
+  submittedToPlanning: RoadmapDurationStats;
+  planningToClosed: RoadmapDurationStats;
+  /** Plans closed in the range (planned by someone else than the author), and how many authors looked first. */
+  authorLooked: { closed: number; opened: number };
+}
+
 export interface RoadmapMetrics {
   range: { from: string; to: string };
   generatedAt: string;
@@ -62,6 +72,7 @@ export interface RoadmapMetrics {
     approximate: boolean;
     top: RoadmapIdeaSpend[];
   };
+  waits?: RoadmapPlanWaits;
 }
 
 export interface RoadmapMetricsQuery {

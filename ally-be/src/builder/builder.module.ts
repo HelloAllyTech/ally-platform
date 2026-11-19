@@ -70,6 +70,8 @@ import { BuilderCorrection } from './entity/builder-correction.entity';
 import { BuilderCorrectionService } from './service/builder-correction.service';
 import { BuilderCorrectionsController } from './controller/builder-corrections.controller';
 import { BuilderReadinessService } from './service/builder-readiness.service';
+import { BuilderPrdPathCheckService } from './service/builder-prd-path-check.service';
+import { BuilderPrdChecklistToolsService } from './service/builder-prd-checklist-tools.service';
 import { BuilderProductMapService } from './service/builder-product-map.service';
 import { BuilderPlatformContextService } from './service/builder-platform-context.service';
 import { BuilderNotificationService } from './service/builder-notification.service';
@@ -230,6 +232,8 @@ import { BuilderPlanConversationService } from './service/builder-plan-conversat
     BuilderEvidenceLogService,
     BuilderPrdReviewService,
     BuilderReadinessService,
+    BuilderPrdPathCheckService,
+    BuilderPrdChecklistToolsService,
     BuilderEvalSandboxFactory,
     BuilderEvalRunnerService,
     BuilderEvalFixtureService,

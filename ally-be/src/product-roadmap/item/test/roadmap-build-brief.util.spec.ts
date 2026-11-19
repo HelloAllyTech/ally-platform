@@ -94,6 +94,40 @@ function keysDeep(value: unknown, out = new Set<string>()): Set<string> {
   return out;
 }
 
+describe('a plan closed before it was ready', () => {
+  it('prints the reason and the open blockers first', () => {
+    const md = renderBuildBrief(
+      pickBriefInput(
+        sources({
+          planClosed: {
+            byUserId: 1,
+            at: 'x',
+            notReady: {
+              reason: 'Pilot first; measure after.',
+              blockers: ['Set a success measure.'],
+            },
+          },
+        }) as never,
+      ),
+    );
+    const closed = md.indexOf('## Closed before the plan was ready');
+    expect(closed).toBeGreaterThan(0);
+    expect(closed).toBeLessThan(md.indexOf('## Branch and pull request'));
+    expect(md).toContain(
+      'Why it was closed anyway: Pilot first; measure after.',
+    );
+    expect(md).toContain('- Set a success measure.');
+  });
+
+  it('says nothing about it for a plan closed ready', () => {
+    const input = pickBriefInput(
+      sources({ planClosed: { byUserId: 1, at: 'x' } }) as never,
+    );
+    expect(input.closedNotReady).toBeNull();
+    expect(renderBuildBrief(input)).not.toContain('Closed before');
+  });
+});
+
 describe('build brief allowlist', () => {
   it('picks exactly the allowlisted fields', () => {
     const input = pickBriefInput(sources() as never);

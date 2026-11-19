@@ -88,7 +88,18 @@ export const BUILDER_SEED_TITLE_MAX = 80;
 export const BUILDER_HANDOFF_TRANSCRIPT_MAX = 80_000;
 
 export const ROADMAP_LIMITS = {
+  /** The summary ("Problem") an idea carries beneath its title. */
   DESCRIPTION_MAX: 1000,
+  /** An idea's title: one line. Required on every new idea (2026-11-19). */
+  TITLE_MAX: 200,
+  /**
+   * What `roadmap_opportunities.description` can hold: a title, the blank line after it, and
+   * a full-length summary. Mirrors CHK_roadmap_opps_description (migration
+   * 1984950000000), which was 1000 while the title was the summary's own first line.
+   */
+  STORED_TEXT_MAX: 1202,
+  /** The idea agent's suggested title: shorter than TITLE_MAX, so it reads as one line. */
+  IDEA_TITLE_MAX: 120,
   PRD_MAX: 20000,
   CLAUDE_PROMPT_MAX: 20000,
   COMMENT_MAX: 500,
@@ -311,6 +322,8 @@ export const ROADMAP_PROMPT_CODES = {
   DUPLICATE_CHECK: 'roadmap_duplicate_check',
   GOAL_IMPACT: 'roadmap_goal_impact',
   SUMMARISE_INTERVIEW: 'roadmap_summarise_interview',
+  /** Writes a one-line title for idea text that has none. See RoadmapAiService.suggestTitle. */
+  SUGGEST_TITLE: 'roadmap_suggest_title',
   GENERATE_CLAUDE_PROMPT: 'roadmap_generate_claude_prompt',
   /**
    * The copilot that walks an admin to a fileable, strategically grounded draft. Grades the

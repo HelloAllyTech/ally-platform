@@ -4,6 +4,7 @@ import {
   type ShownStage,
   type SimpleStage,
 } from 'src/product-planning/util/plan-stage.util';
+import { ROADMAP_LIMITS } from '../constants/product-roadmap.constants';
 import type { WhyHere } from './roadmap-item.types';
 
 /**
@@ -314,7 +315,7 @@ export function page<T>(
 }
 
 /** The longest title the idea page shows and lets you save (the PATCH DTO allows the same). */
-export const TITLE_MAX = 200;
+export const TITLE_MAX = ROADMAP_LIMITS.TITLE_MAX;
 
 /**
  * Splits the idea's first non-empty line into a title of at most `TITLE_MAX` characters and the
@@ -361,4 +362,40 @@ export function joinDescription(title: string, body: string | null): string {
   const t = title.replace(/\s+/g, ' ').trim();
   const b = (body ?? '').trim();
   return b ? `${t}\n\n${b}` : t;
+}
+
+/**
+ * A title for idea text when no model is available: the first sentence (or clause) that fits
+ * in `max` characters, else the words that fit. Never empty for non-blank text. The same
+ * boundary preference `truncateTitle` uses for bug findings, kept local so the roadmap does not
+ * import from bug-hunter for it.
+ */
+export function fallbackTitle(text: string, max = 120): string {
+  const line = (text ?? '').replace(/\s+/g, ' ').trim();
+  if (line.length <= max) return line;
+  const head = line.slice(0, max + 1);
+  const sentence = Math.max(
+    head.lastIndexOf('. '),
+    head.lastIndexOf('? '),
+    head.lastIndexOf('! '),
+  );
+  if (sentence >= max / 3) return head.slice(0, sentence).trim();
+  const clause = Math.max(head.lastIndexOf(': '), head.lastIndexOf(' — '));
+  if (clause >= max / 3) return head.slice(0, clause).trim();
+  const space = head.lastIndexOf(' ');
+  return (space >= max / 2 ? head.slice(0, space) : line.slice(0, max)).trim();
+}
+
+/**
+ * What an idea's text becomes once it is given a new title (the backfill that titled every
+ * older idea). A single block of text becomes the Problem whole, so none of it is lost; an idea
+ * that already has a title line and a body keeps the body and takes the new title.
+ */
+export function retitled(description: string, title: string): string {
+  const body = bodyOf(description);
+  const hasOwnTitleLine = /\n/.test(description.trim());
+  return joinDescription(
+    title,
+    hasOwnTitleLine && body ? body : description.trim(),
+  );
 }

@@ -176,6 +176,8 @@ describe('Builder session visibility — every reader is accounted for', () => {
       'by id when archiving a finished build into an exemplar; never lists',
     'builder/service/builder-interview-orchestrator.service.ts':
       'updates by id inside a turn on a :sessionId route the interceptor checked',
+    'builder/service/builder-interview-tools.service.ts':
+      "set_success_measure reads and writes one plan's record by id, inside that plan's own turn",
     'builder/service/builder-outcome.service.ts':
       'injects the repository for its sweep; returns nothing to a viewer',
     'product-roadmap/cutover/roadmap-cutover.service.ts':

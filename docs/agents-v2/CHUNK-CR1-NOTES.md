@@ -50,7 +50,7 @@ Not assistants, so they stay in `llm_usage` only and show on Costs as one "Other
 - Controllers: `v1/admin/billing/*` (manage_costs), `v1/me/plan`, `v1/chatbots/:id/seats` + `publish-use` (chatbot module), `v1/custom-logins` (admin_user_management).
 - Engine: `chatbot/engine/limit-reply.ts`; `respond()` checks limits first, runs `crisisOnly` when limited, else the fixed reply (`handledBy: rate_limited`, `limited: <reason>`).
 - Auth: `UserRole.ASSISTANT_OWNER` + `ASSISTANT_OWNER_PERMISSIONS`, `@PlatformAdminOnly()` on the Ally-wide WhatsApp routes and phone mappings; mapping writes return 410.
-- Migrations: `1984900000000-CreateBillingCosts`, `1984900000100-CreateAssistantOwnerAndTokens`, `1984900000200-CreatePlansAndSeats`. `DATA_SCHEMA.md` §3.24.
+- Migrations: `1985300000000-CreateBillingCosts`, `1985300000100-CreateAssistantOwnerAndTokens`, `1985300000200-CreatePlansAndSeats`. `DATA_SCHEMA.md` §3.24.
 
 **ally-web** (`apps/ally-admin-dashboard/src/pages/Billing/`, `api/billing.ts`): Models (with WhatsApp rates), Costs, Plans, a user's Tokens and Plan (Custom logins and Ally admins details), the owner's Plan and usage, Share → People seats, the publish-limit line. Custom logins created with the new role; the WhatsApp Numbers tab is gone.
 
