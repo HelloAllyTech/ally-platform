@@ -240,14 +240,3 @@ export function draftProposal(
   const given = (idea?.draft?.title ?? '').replace(/\s+/g, ' ').trim();
   return { title: given || suggestTitle(statement), statement };
 }
-
-/**
- * What Submit files for `use: 'agent'`: the title on the first line, the statement after it —
- * the same shape an Owner's title and summary edit writes. Empty when both are. Pure.
- */
-export function proposedDescription(title: string, statement: string): string {
-  const t = (title ?? '').replace(/\s+/g, ' ').trim();
-  const b = (statement ?? '').replace(/\r\n/g, '\n').trim();
-  if (!t) return b;
-  return b ? `${t}\n\n${b}` : t;
-}

@@ -474,6 +474,18 @@ export type TrackItemContent =
  */
 export type RoleplayCompletionLogic = "SCORE" | "DURATION" | "SCORE_AND_DURATION" | "PARTICIPATION";
 
+/** Roleplay type, derived: assessmentMode -> ASSESSMENT, else PARTICIPATION -> TRIAL, else PRACTICE. */
+export type RoleplayType = "TRIAL" | "PRACTICE" | "ASSESSMENT";
+
+/** GET /v1/tenant-analytics/assessment-pair-compat/:pre/:post; behaviour names. */
+export interface AssessmentPairCompat {
+  comparable: boolean;
+  onlyInPre: string[];
+  onlyInPost: string[];
+}
+
+export type AssessmentPhase = "PRE" | "POST";
+
 export interface CompletionCriteria {
   /** Roleplay only: which of minScore / minDurationSeconds apply. */
   completionLogic?: RoleplayCompletionLogic;
@@ -481,8 +493,16 @@ export interface CompletionCriteria {
   minScore?: number;
   /** Roleplay: total seconds. Absent = the platform default; 0 = no minimum. */
   minDurationSeconds?: number;
-  /** Roleplay: one attempt only, locked once submitted. Sent only when on. */
+  /** Roleplay: assessment (one valid attempt). Sent only when on. */
   assessmentMode?: boolean;
+  /** Assessment only: learner turns an attempt needs before it counts (int 1-50). */
+  minLearnerTurns?: number;
+  /** Assessment only: false = the learner sees "Submitted" with no score or debrief. */
+  showResultsToLearner?: boolean;
+  /** Assessment only: pre/post role; needs `assessmentPairKey`. */
+  assessmentPhase?: AssessmentPhase;
+  /** Assessment only: uuid shared by a PRE and its POST. */
+  assessmentPairKey?: string;
   /** Quiz — server mirrors from settings, never sent by the client. */
   passScore?: number;
   /** Video 1-100, default 90. */

@@ -115,9 +115,9 @@ export interface RoadmapDraftProposal {
 }
 
 /** What Submit files: the author's own words ("mine", what leaving it out means) or the agent's, as edited. */
+/** What the summary says (audit rec. 6); the title is sent on its own (#342). */
 export interface RoadmapSubmitChoice {
   use: "mine" | "agent";
-  title?: string;
   statement?: string;
 }
 

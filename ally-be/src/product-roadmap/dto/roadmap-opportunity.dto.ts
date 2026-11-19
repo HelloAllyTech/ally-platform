@@ -342,8 +342,33 @@ export class RoadmapReferenceImageUploadUrlDto {
   contentType!: RoadmapReferenceImageContentType;
 }
 
-export class CreateOpportunityDto {
+export class SuggestTitleDto {
   @ApiProperty({ maxLength: ROADMAP_LIMITS.DESCRIPTION_MAX })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(ROADMAP_LIMITS.DESCRIPTION_MAX)
+  text!: string;
+}
+
+export class CreateOpportunityDto {
+  @ApiProperty({
+    maxLength: ROADMAP_LIMITS.TITLE_MAX,
+    description:
+      'One line naming the idea. Required on every new idea; stored as the first line of the text.',
+  })
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : value,
+  )
+  @IsString()
+  @IsNotEmpty({ message: 'An idea needs a title.' })
+  @MaxLength(ROADMAP_LIMITS.TITLE_MAX)
+  title!: string;
+
+  @ApiProperty({
+    maxLength: ROADMAP_LIMITS.DESCRIPTION_MAX,
+    description:
+      'The problem or summary beneath the title (Summary > Problem).',
+  })
   @IsString()
   @MinLength(1)
   @MaxLength(ROADMAP_LIMITS.DESCRIPTION_MAX)

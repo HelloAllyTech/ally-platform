@@ -203,7 +203,9 @@ describe('RoadmapDraftService', () => {
 
   it('Submit refuses anything short of 5 of 5', async () => {
     const { service, deps } = build();
-    const error = await service.submit(ME, 'OPP-0900', {}).catch((e) => e);
+    const error = await service
+      .submit(ME, 'OPP-0900', { title: 'A title' })
+      .catch((e) => e);
     expect(error.getStatus()).toBe(422);
     expect(error.getResponse()).toMatchObject({ code: 'checks_incomplete' });
     expect(deps.opportunityService.create).not.toHaveBeenCalled();
@@ -228,7 +230,7 @@ describe('RoadmapDraftService', () => {
       if (sql.includes('count(*)')) return [{ n: 0 }];
       return [];
     });
-    const result = await service.submit(ME, 'OPP-0900', {});
+    const result = await service.submit(ME, 'OPP-0900', { title: 'A title' });
     expect(deps.opportunityService.create).toHaveBeenCalledWith(
       ME,
       expect.objectContaining({
@@ -298,16 +300,22 @@ describe('RoadmapDraftService', () => {
     it('an older client that sends no choice files the author text verbatim', async () => {
       const { service, deps, row } = ready(statement);
       filing(deps);
-      await service.submit(ME, 'OPP-0900', { goalId: 'g1' });
+      await service.submit(ME, 'OPP-0900', {
+        goalId: 'g1',
+        title: 'Keep client names',
+      });
       expect(deps.opportunityService.create).toHaveBeenCalledWith(
         ME,
-        expect.objectContaining({ description: 'Counsellors retype names' }),
+        expect.objectContaining({
+          title: 'Keep client names',
+          description: 'Counsellors retype names',
+        }),
         expect.anything(),
       );
       expect(row().plan.submittedAs).toBe('author');
     });
 
-    it('Use this files the edited title and statement, signed, and keeps the author words on the session', async () => {
+    it('Use this files the edited statement as the summary under the title, signed, and keeps the author words', async () => {
       const { service, deps, row } = ready(statement);
       filing(deps);
       await service.submit(ME, 'OPP-0900', {
@@ -315,11 +323,12 @@ describe('RoadmapDraftService', () => {
         title: 'Keep client names',
         statement: 'Names typed once carry to every screen.',
       });
-      const filed =
-        'Keep client names\n\nNames typed once carry to every screen.';
+      // The title is its own field (#342); the opportunity service stores "title, blank, summary".
+      const filed = 'Names typed once carry to every screen.';
       expect(deps.opportunityService.create).toHaveBeenCalledWith(
         ME,
         expect.objectContaining({
+          title: 'Keep client names',
           description: filed,
           readinessToken: 'signed',
           interviewTranscript: [
@@ -339,18 +348,22 @@ describe('RoadmapDraftService', () => {
       const { service, deps } = ready(null);
       filing(deps);
       const error = await service
-        .submit(ME, 'OPP-0900', { use: 'agent' })
+        .submit(ME, 'OPP-0900', { title: 'A title', use: 'agent' })
         .catch((e) => e);
       expect(error.getStatus()).toBe(422);
       expect(error.getResponse()).toMatchObject({ code: 'no_statement' });
       expect(deps.opportunityService.create).not.toHaveBeenCalled();
     });
 
-    it('refuses a filed text past the one limit', async () => {
+    it('refuses a summary past the one limit', async () => {
       const { service, deps } = ready(statement);
       filing(deps);
       const error = await service
-        .submit(ME, 'OPP-0900', { use: 'agent', statement: 'x'.repeat(1000) })
+        .submit(ME, 'OPP-0900', {
+          title: 'A title',
+          use: 'agent',
+          statement: 'x'.repeat(1001),
+        })
         .catch((e) => e);
       expect(error.getResponse()).toMatchObject({ code: 'too_long' });
     });
@@ -372,7 +385,7 @@ describe('RoadmapDraftService', () => {
           metadata: { planStage: 'idea' },
         },
       ]);
-      await service.submit(ME, 'OPP-0900', {});
+      await service.submit(ME, 'OPP-0900', { title: 'A title' });
       expect(deps.opportunityService.create).toHaveBeenCalledWith(
         ME,
         expect.not.objectContaining({ brief: expect.anything() }),
@@ -399,7 +412,9 @@ describe('RoadmapDraftService', () => {
     const { service, deps } = build({
       row: draftRow({ draftGoalId: 'g1', idea: { selfCheck } }),
     });
-    const error = await service.submit(ME, 'OPP-0900', {}).catch((e) => e);
+    const error = await service
+      .submit(ME, 'OPP-0900', { title: 'A title' })
+      .catch((e) => e);
     expect(error.getStatus()).toBe(422);
     expect(deps.opportunityService.create).not.toHaveBeenCalled();
     const gone = await service.selfCheck().catch((e) => e);

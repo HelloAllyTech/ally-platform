@@ -2,7 +2,6 @@ import {
   composeDescription,
   draftChecks,
   draftProposal,
-  proposedDescription,
   suggestTitle,
   DRAFT_CHECK_ORDER,
   locateQuote,
@@ -158,13 +157,5 @@ describe('What will be submitted (audit rec. 6)', () => {
     expect(title.length).toBeLessThanOrEqual(81);
     expect(title.endsWith('…')).toBe(true);
     expect(title).not.toContain('wor…');
-  });
-
-  it('files the title on the first line, the statement after it', () => {
-    expect(proposedDescription(' A  title ', ' Body \n')).toBe(
-      'A title\n\nBody',
-    );
-    expect(proposedDescription('', 'Body')).toBe('Body');
-    expect(proposedDescription('', '  ')).toBe('');
   });
 });

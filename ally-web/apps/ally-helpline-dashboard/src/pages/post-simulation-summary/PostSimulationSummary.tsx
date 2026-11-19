@@ -108,7 +108,11 @@ export const PostSimulationSummary: FC = () => {
     isTechnicalInterruption,
     checkAgain,
     isCheckingAgain,
-  } = useSimulationSummaryPolling(sessionId, i18n.language);
+  } = useSimulationSummaryPolling(
+    // A withheld assessment has no evaluation to wait for: stop polling.
+    summary?.resultsHidden ? undefined : sessionId,
+    i18n.language,
+  );
   // Neither a too-short session nor a technically-interrupted one has enough
   // of a real conversation to rate, share for review, or count toward a
   // streak — same reasoning that already applied to isShortSession alone.
@@ -264,7 +268,7 @@ export const PostSimulationSummary: FC = () => {
   // Feedback-disabled flow: as soon as the scenario config loads, either prompt
   // for the star rating (if not yet given) or go straight back.
   useEffect(() => {
-    if (!summary || feedbackEnabled) return;
+    if (!summary || feedbackEnabled || summary.resultsHidden) return;
     if (summary.hasFeedback) {
       navigate(noFeedbackExit);
     } else {
@@ -374,6 +378,30 @@ export const PostSimulationSummary: FC = () => {
   if (isLoading) {
     return (
       <div className="flex h-[100dvh] min-h-0 w-full items-center justify-center overflow-hidden bg-white" />
+    );
+  }
+
+  // A submitted assessment whose results are withheld: confirm the submission
+  // and move on. No score, tabs, rating prompt or polling.
+  if (summary?.resultsHidden) {
+    return (
+      <div
+        className="flex min-h-[100dvh] w-full flex-col items-center justify-center gap-4 bg-white px-6 text-center"
+        data-testid="post-sim-submitted"
+      >
+        <h1 className="font-secondary text-2xl sm:text-4xl text-black">
+          {t("postSim.assessmentSubmitted.title")}
+        </h1>
+        <p className="max-w-md font-primary text-sm text-typography-700">
+          {t("postSim.assessmentSubmitted.body")}
+        </p>
+        <Button
+          onClick={() => (trackContext ? continueTrack() : navigate(ROUTES.LEARN))}
+          data-testid="post-sim-submitted-continue"
+        >
+          {t("common.continue")}
+        </Button>
+      </div>
     );
   }
 

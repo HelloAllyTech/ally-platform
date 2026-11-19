@@ -7,6 +7,7 @@ import { BugFinding } from 'src/bug-hunter/entity/bug-finding.entity';
 import { S3Service } from 'src/aws/service/s3.service';
 import { AppConfigService } from 'src/config/config.service';
 
+import { RoadmapAiService } from '../roadmap-ai.service';
 import { RoadmapOpportunityService } from '../roadmap-opportunity.service';
 import { RoadmapGoalImpactService } from '../roadmap-goal-impact.service';
 import { RoadmapStrategyGoalService } from '../roadmap-strategy-goal.service';
@@ -71,6 +72,11 @@ describe('RoadmapOpportunityService — readiness gate', () => {
     const module = await Test.createTestingModule({
       providers: [
         RoadmapOpportunityService,
+        // A title is written for a filing that arrives without one; these suites do not test it.
+        {
+          provide: RoadmapAiService,
+          useValue: { suggestTitle: jest.fn().mockResolvedValue('A title') },
+        },
         {
           provide: RoadmapOpportunityRepository,
           useValue: opportunityRepository,
@@ -159,13 +165,45 @@ describe('RoadmapOpportunityService — readiness gate', () => {
 
   const savedRow = () => opportunityRepository.create.mock.calls[0][0];
 
+  it('stores a title the filer sent above the summary, without asking the model', async () => {
+    givenVerdict([]);
+
+    await file({ title: '  Cut   assignment time  ' });
+
+    expect(savedRow().description).toBe(`Cut assignment time\n\n${DRAFT}`);
+  });
+
+  it('refuses a title and summary that together exceed what an idea can hold', async () => {
+    givenVerdict([]);
+
+    await expect(
+      file({ title: 'T'.repeat(200), description: 'D'.repeat(1001) }),
+    ).rejects.toThrow(/at most 1202 characters/);
+    expect(opportunityRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('keeps a bug report as one block, with no title written for it', async () => {
+    givenVerdict([]);
+
+    await file(
+      { type: RoadmapOpportunityType.BUG },
+      { enforceReadiness: false },
+    );
+
+    expect(savedRow().description).toBe(DRAFT);
+  });
+
   it('files a passing draft', async () => {
     givenVerdict([]);
 
     await file();
 
     expect(opportunityRepository.save).toHaveBeenCalled();
-    expect(savedRow()).toMatchObject({ description: DRAFT, productGoal: GOAL });
+    // The title is written above the draft, which becomes its Summary > Problem.
+    expect(savedRow()).toMatchObject({
+      description: `A title\n\n${DRAFT}`,
+      productGoal: GOAL,
+    });
   });
 
   /**

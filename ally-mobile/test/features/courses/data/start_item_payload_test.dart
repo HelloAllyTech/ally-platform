@@ -533,6 +533,104 @@ void main() {
     });
   });
 
+  group('ROLEPLAY assessment block', () {
+    StartItemPayload parse(Map<String, dynamic> extra) =>
+        StartItemPayload.fromJson({'trackItemProgressId': 'p', 'type': 'ROLEPLAY', 'scenarioId': 1, ...extra});
+
+    test('parses a POST assessment with its pre, submission and gate fields', () {
+      final payload = parse({
+        'completionCriteria': {
+          'assessmentMode': true,
+          'minLearnerTurns': 12,
+          'showResultsToLearner': false,
+          'assessmentPhase': 'POST',
+          'assessmentPairKey': 'k-1',
+        },
+        'roleplayGate': {'roleplayType': 'ASSESSMENT', 'completionLogic': 'SCORE', 'minLearnerTurns': 12},
+        'lastRoleplayAttempt': {
+          'failureReasons': ['INSUFFICIENT_TURNS'],
+          'learnerTurns': 4,
+          'requiredTurns': 12,
+        },
+        'assessment': {
+          'phase': 'POST',
+          'requiredTurns': 12,
+          'showResults': false,
+          'resultsHidden': true,
+          'preAssessment': {'title': 'Baseline', 'submitted': false},
+          'incompleteStarts': 2,
+          'submission': {'learnerTurns': 13, 'submittedAt': '2026-11-19T10:00:00Z', 'score': null},
+        },
+      });
+      final a = payload.assessment!;
+      expect(a.phase, AssessmentPhase.post);
+      expect(a.requiredTurns, 12);
+      expect(a.showResults, false);
+      expect(a.resultsHidden, true);
+      expect(a.preAssessment!.title, 'Baseline');
+      expect(a.postLocked, true);
+      expect(a.incompleteStarts, 2);
+      expect(a.submission!.learnerTurns, 13);
+      expect(a.submission!.score, isNull);
+      expect(payload.roleplayGate!.roleplayType, RoleplayType.assessment);
+      expect(payload.roleplayGate!.minLearnerTurns, 12);
+      expect(payload.lastRoleplayAttempt!.failureReasons, [RoleplayFailureReason.insufficientTurns]);
+      expect(payload.lastRoleplayAttempt!.learnerTurns, 4);
+      expect(payload.lastRoleplayAttempt!.requiredTurns, 12);
+    });
+
+    test('absent, null or garbage never throws', () {
+      expect(parse({}).assessment, isNull);
+      expect(parse({'assessment': null}).assessment, isNull);
+      expect(parse({'assessment': 'junk'}).assessment, isNull);
+      final lenient = parse({
+        'assessment': {'phase': 'SIDEWAYS', 'requiredTurns': 'ten', 'preAssessment': 5, 'submission': []},
+      }).assessment!;
+      expect(lenient.phase, isNull);
+      expect(lenient.requiredTurns, 10);
+      expect(lenient.showResults, true);
+      expect(lenient.resultsHidden, false);
+      expect(lenient.preAssessment, isNull);
+      expect(lenient.postLocked, false);
+      expect(lenient.submission, isNull);
+      expect(parse({'roleplayGate': {'roleplayType': 'WAT'}}).roleplayGate!.roleplayType, isNull);
+    });
+
+    test('a submitted pre unlocks the post', () {
+      final a = parse({
+        'assessment': {
+          'phase': 'POST',
+          'requiredTurns': 10,
+          'preAssessment': {'title': 'Baseline', 'submitted': true},
+        },
+      }).assessment!;
+      expect(a.postLocked, false);
+    });
+
+    test('completionCriteria assessment keys and item fields parse on the track item', () {
+      final item = TrackDetailItem.fromJson({
+        'id': 'x',
+        'type': 'ROLEPLAY',
+        'title': 'x',
+        'assessmentSubmittedAt': '2026-11-19T10:00:00Z',
+        'completionCriteria': {
+          'assessmentMode': true,
+          'minLearnerTurns': 8,
+          'showResultsToLearner': true,
+          'assessmentPhase': 'PRE',
+          'assessmentPairKey': 'k-1',
+        },
+        'assessment': {'phase': 'PRE', 'requiredTurns': 8},
+      });
+      expect(item.assessmentSubmittedAt, '2026-11-19T10:00:00Z');
+      expect(item.completionCriteria!.minLearnerTurns, 8);
+      expect(item.completionCriteria!.showResultsToLearner, true);
+      expect(item.completionCriteria!.assessmentPhase, AssessmentPhase.pre);
+      expect(item.completionCriteria!.assessmentPairKey, 'k-1');
+      expect(item.assessment!.phase, AssessmentPhase.pre);
+    });
+  });
+
   group('BranchingNode.fromJson', () {
     test('a node with choices is not an ending', () {
       final node = BranchingNode.fromJson({

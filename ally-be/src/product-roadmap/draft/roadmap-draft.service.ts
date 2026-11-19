@@ -71,7 +71,6 @@ import {
   draftProposal,
   DraftProposal,
   firstLine,
-  proposedDescription,
   QuotableAnswer,
   verifiedEvidence,
 } from './roadmap-draft.util';
@@ -676,9 +675,10 @@ export class RoadmapDraftService {
     code: string,
     input: {
       goalId?: string | null;
-      /** Audit rec. 6. Absent (every older client) means `mine`: the draft text, verbatim. */
+      /** One line naming the idea: required since 2026-11-19 (#342). */
+      title: string;
+      /** Audit rec. 6: what the summary says. Absent (every older client) means `mine`. */
       use?: 'mine' | 'agent';
-      title?: string;
       statement?: string;
     },
   ): Promise<{ item: ItemDetail; firstSubmit: boolean }> {
@@ -722,15 +722,15 @@ export class RoadmapDraftService {
           "The idea agent hasn't written a statement for this idea. Submit your own words.",
         );
       }
-      description = proposedDescription(
-        input.title ?? proposal.title,
-        input.statement ?? proposal.statement,
-      );
+      // The title is its own field (#342); the statement is the summary beneath it.
+      description = (input.statement ?? proposal.statement)
+        .replace(/\r\n/g, '\n')
+        .trim();
       if (!description) {
         throw coded(
           HttpStatus.UNPROCESSABLE_ENTITY,
           'statement_empty',
-          'Write a title or a statement, or submit your own words.',
+          'Write a summary, or submit your own words.',
         );
       }
     } else {
@@ -743,7 +743,7 @@ export class RoadmapDraftService {
       throw coded(
         HttpStatus.UNPROCESSABLE_ENTITY,
         'too_long',
-        `An idea can be at most ${ROADMAP_LIMITS.DESCRIPTION_MAX} characters, title included.`,
+        `A summary can be at most ${ROADMAP_LIMITS.DESCRIPTION_MAX} characters.`,
       );
     }
 
@@ -779,6 +779,7 @@ export class RoadmapDraftService {
       const created = await this.opportunityService.create(
         userId,
         {
+          title: input.title,
           description,
           productGoal: goal.name,
           effort: effort ?? undefined,
@@ -823,7 +824,7 @@ export class RoadmapDraftService {
       const filedAt = new Date().toISOString();
       await this.store.update(draft.id, {
         visibility: BuilderSessionVisibility.SHARED,
-        title: firstLine(description),
+        title: input.title.slice(0, 120),
         archivedAt: null,
         updatedBy: userId,
       });
@@ -861,7 +862,7 @@ export class RoadmapDraftService {
         actorUserId: userId,
         payload: {
           code: draftCode,
-          title: firstLine(description),
+          title: input.title,
           selfChecked,
         },
       });

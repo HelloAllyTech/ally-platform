@@ -754,6 +754,11 @@
   },
   "postSim": {
     "titlePrefix": "रोल प्ले",
+    "assessment": {
+      "submittedTitle": "आपका आकलन जमा हो गया है",
+      "submittedBody": "आपके ट्रेनर आपके परिणाम देखेंगे।",
+      "continue": "जारी रखें"
+    },
     "noSessionRecording": "प्लेबैक के लिए कोई सत्र रिकॉर्डिंग उपलब्ध नहीं है।",
     "skills": {
       "empty": "इस सत्र के लिए कोई कौशल डेटा उपलब्ध नहीं है",
@@ -1962,6 +1967,8 @@
       "requireDuration": "कम से कम {{duration}}",
       "requireScoreAndDuration": "कम से कम {{score}} स्कोर करें · कम से कम {{duration}}",
       "requireParticipation": "शुरू करते ही पूरा हो जाता है",
+      "requireTurns": "कम से कम {{turns}} बारी",
+      "requireTurnsAndScore": "कम से कम {{turns}} बारी · स्कोर कम से कम {{score}}",
       "durationMin": "{{min}} मिनट",
       "durationSec": "{{sec}} सेकंड",
       "durationMinSec": "{{min}} मिनट {{sec}} सेकंड",
@@ -2064,6 +2071,11 @@
       "saved": "सहेजा गया",
       "saveFailed": "सहेजने में विफल"
     },
+    "assessment": {
+      "tag": "आकलन",
+      "tagPre": "आकलन · प्री",
+      "tagPost": "आकलन · पोस्ट"
+    },
     "roleplay": {
       "intro": "यह रोल-प्ले शुरू करने के लिए नीचे टैप करें.",
       "start": "शुरू करें",
@@ -2075,7 +2087,16 @@
       "assessmentNotice": "आपको एक ही मौका मिलेगा। रोल-प्ले खत्म करते ही आपका प्रयास जमा हो जाएगा और दोबारा नहीं किया जा सकेगा।",
       "assessmentSubmitted": "{{date}} को जमा किया गया",
       "assessmentNotPassed": "यह प्रयास पास होने की शर्तें पूरी नहीं कर पाया।",
-      "assessmentLocked": "आपका मूल्यांकन जमा हो चुका है। दोबारा प्रयास के लिए अपने ट्रेनर से कहें।"
+      "assessmentLocked": "आपका मूल्यांकन जमा हो चुका है। दोबारा प्रयास के लिए अपने ट्रेनर से कहें।",
+      "lastAttemptTitle": "आपका पिछला प्रयास इस रोलप्ले को पूरा नहीं कर पाया",
+      "lastAttemptDuration": "यह {{actual}} चला; इस रोलप्ले के लिए कम से कम {{required}} चाहिए।",
+      "lastAttemptScore": "आपका स्कोर {{score}} रहा; इस रोलप्ले के लिए कम से कम {{required}} चाहिए।",
+      "lastAttemptScoreUnknown": "यह न्यूनतम स्कोर {{required}} तक नहीं पहुँचा।",
+      "lastAttemptFooter": "जब आप तैयार हों, फिर से कोशिश करें।",
+      "assessmentIntroTurns": "यह एक आकलन है। आपको एक ही प्रयास मिलता है, और यह तब गिना जाता है जब आप कम से कम {{n}} बार बोल लेते हैं।",
+      "shortAttempt": "वह प्रयास गिनने के लिए बहुत छोटा था ({{n}} में से {{taken}} बारी)। तैयार होने पर फिर से शुरू करें।",
+      "postLocked": "पहले प्री-आकलन पूरा करें: {{title}}।",
+      "assessmentSubmittedHidden": "जमा हो गया। आपके ट्रेनर आपके परिणाम देखेंगे।"
     },
     "quiz": {
       "intro": {
@@ -2346,7 +2367,11 @@
     "connect": "कनेक्ट करें",
     "disconnect": "डिस्कनेक्ट करें",
     "connectedToRoom": "रूम से कनेक्ट है",
-    "notConnected": "कनेक्ट नहीं है"
+    "notConnected": "कनेक्ट नहीं है",
+    "assessment": {
+      "turnCounter": "बारी {{k}} / {{n}}",
+      "minimumReached": "न्यूनतम बारी पूरी हुई"
+    }
   },
   "scribe": {
     "title": "स्क्राइब रिकॉर्डिंग (फ़ेज़ 1)",

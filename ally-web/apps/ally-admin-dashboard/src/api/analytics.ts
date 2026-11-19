@@ -62,6 +62,7 @@ import {
 
 import { baseAPI } from "./baseApi";
 import { ActiveUsersXpQuery, ActiveUsersXpResponse } from "../pages/Analytics/activeUsersXpChart";
+import { AssessmentAttemptsResponse } from "../pages/Analytics/assessmentAttemptsChart";
 import {
   BugHunterVolumeQuery,
   BugHunterVolumeResponse,
@@ -250,6 +251,7 @@ const GOALS_TAB_PATHS = {
   BUG_HUNTER_VOLUME: "/v1/analytics/bug-hunter-volume",
   XP_BY_TENANT: "/v1/analytics/xp-by-tenant",
   ROADMAP_VOTING: "/v1/analytics/roadmap-voting",
+  ASSESSMENT_ATTEMPTS: "/v1/analytics/assessment-attempts",
 } as const;
 
 type ConversationDriftQuery = AnalyticsWindowQuery & {
@@ -1183,6 +1185,13 @@ export const analyticsAPI = baseAPI.injectEndpoints({
         method: HttpMethod.GET,
       }),
     }),
+    // Single valid assessment attempts (AAQ-255): all-time, weekly, platform-wide.
+    getAssessmentAttempts: builder.query<AssessmentAttemptsResponse, void>({
+      query: () => ({
+        url: GOALS_TAB_PATHS.ASSESSMENT_ATTEMPTS,
+        method: HttpMethod.GET,
+      }),
+    }),
     // Bug Hunter found vs. fixed volume per bucket. Standard window params;
     // `tenantId` is deliberately not offered here — `bug_findings` carries no
     // tenant column, so it would be a no-op on the server.
@@ -1307,5 +1316,6 @@ export const {
   useGetXpLevelReachedQuery,
   useGetBugHunterVolumeQuery,
   useGetRoadmapVotingQuery,
+  useGetAssessmentAttemptsQuery,
   useGetXpByTenantQuery,
 } = analyticsAPI;

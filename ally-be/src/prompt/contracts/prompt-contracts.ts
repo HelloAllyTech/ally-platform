@@ -1035,6 +1035,9 @@ export const ROADMAP_SUMMARISE_INTERVIEW = definePrompt(
   {},
 );
 
+/** src/prompts/roadmap/suggest_title.txt */
+export const ROADMAP_SUGGEST_TITLE = definePrompt('roadmap_suggest_title', {});
+
 /** src/prompts/scribe_voice_note/field_extraction_system.txt */
 export const SCRIBE_VOICE_NOTE_FIELD_EXTRACTION_SYSTEM = definePrompt(
   'scribe_voice_note_field_extraction_system',

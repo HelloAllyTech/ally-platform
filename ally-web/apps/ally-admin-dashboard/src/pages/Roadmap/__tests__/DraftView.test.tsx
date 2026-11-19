@@ -14,6 +14,7 @@ import type { RoadmapDraftDetail } from "../../../types/roadmapV2Flow";
 const mockTurn = vi.fn();
 const mockReopen = vi.fn();
 const mockSubmit = vi.fn();
+const mockSuggestTitle = vi.fn();
 const mockPatch = vi.fn();
 const mockCreate = vi.fn();
 let mockDraft: RoadmapDraftDetail | undefined;
@@ -46,6 +47,7 @@ vi.mock("@api", async importOriginal => ({
   useGetRoadmapProductGoalsQuery: () => ({
     data: [{ id: "g1", name: "Learner return", position: 1 }],
   }),
+  useSuggestRoadmapTitleMutation: () => [unwrapOf(mockSuggestTitle)],
 }));
 vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn(), custom: vi.fn(), dismiss: vi.fn() },
@@ -106,7 +108,10 @@ const renderDraft = (breakpoint: "desktop" | "phone" = "desktop") =>
   );
 
 beforeEach(() => {
-  [mockTurn, mockReopen, mockSubmit, mockPatch, mockCreate].forEach(fn => fn.mockReset());
+  [mockTurn, mockReopen, mockSubmit, mockPatch, mockCreate, mockSuggestTitle].forEach(fn =>
+    fn.mockReset(),
+  );
+  mockSuggestTitle.mockReturnValue({ title: "A suggested title" });
   mockPatch.mockImplementation(() => ({
     code: "OPP-0042",
     title: "t",
@@ -147,6 +152,35 @@ describe("the draft page (§4.2)", () => {
     expect(submit).toBeEnabled();
     fireEvent.click(submit);
     expect(await screen.findByText(en.roadmapV2.draft.submitConfirmBody)).toBeInTheDocument();
+  });
+
+  it("the Submit dialog suggests a title, requires one, and sends it", async () => {
+    mockDraft = draft(5);
+    mockSubmit.mockReturnValue({ item: { code: "OPP-0042" }, firstSubmit: true });
+    renderDraft();
+    fireEvent.click(
+      within(screen.getByRole("region", { name: en.roadmapV2.draft.checksTitle })).getByRole(
+        "button",
+        { name: en.roadmapV2.draft.submit },
+      ),
+    );
+    const input = await screen.findByLabelText(en.roadmapV2.draft.titleLabel);
+    await waitFor(() => expect(input).toHaveValue("A suggested title"));
+
+    fireEvent.change(input, { target: { value: "" } });
+    const confirm = within(
+      screen.getByRole("dialog", { name: en.roadmapV2.draft.submitConfirmTitle }),
+    ).getByRole("button", {
+      name: en.roadmapV2.draft.submitConfirm,
+    });
+    expect(confirm).toBeDisabled();
+    expect(screen.getByText(en.roadmapV2.draft.titleRequired)).toBeInTheDocument();
+
+    fireEvent.change(input, { target: { value: "  My own title  " } });
+    fireEvent.click(confirm);
+    await waitFor(() =>
+      expect(mockSubmit).toHaveBeenCalledWith(expect.objectContaining({ title: "My own title" })),
+    );
   });
 
   it("Not quite reopens the check, then asks the agent again", async () => {
@@ -243,25 +277,23 @@ describe("the draft page (§4.2)", () => {
       fireEvent.click(buttons[buttons.length - 1]);
     };
 
-    it("offers the agent's version first, both fields editable, and files the edit", async () => {
+    it("offers the agent's version first, editable, and files the edit under the agent's title", async () => {
       mockDraft = draft(5, { proposal, textMax: 1000 });
       mockSubmit.mockReturnValue({ item: { code: "OPP-0042" }, firstSubmit: false });
       renderDraft();
       const words = en.roadmapV2.draft.submitChoice;
       expect(screen.getByRole("radio", { name: new RegExp(words.useThis) })).toBeChecked();
-      fireEvent.change(screen.getByLabelText(words.titleLabel), {
-        target: { value: "Streaks in week one" },
+      fireEvent.change(screen.getByLabelText(words.statementLabel), {
+        target: { value: "New learners keep a streak for a week." },
       });
       await confirmSubmit();
+      // The dialog's required Title box (#342) starts from the agent's own title.
       await waitFor(() =>
         expect(mockSubmit).toHaveBeenCalledWith(
           expect.objectContaining({
             code: "OPP-0042",
-            choice: {
-              use: "agent",
-              title: "Streaks in week one",
-              statement: "New learners keep a streak.",
-            },
+            title: "Week-one streaks",
+            choice: { use: "agent", statement: "New learners keep a streak for a week." },
           }),
         ),
       );

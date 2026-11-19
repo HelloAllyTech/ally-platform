@@ -25,6 +25,13 @@ export const getRoleplayRequirement = (
 ): string | null => {
   if (!gate) return null;
   const { completionLogic, minScore, minDurationSeconds } = gate;
+  // An assessment is judged on turns, never duration.
+  if (gate.roleplayType === "ASSESSMENT" && gate.minLearnerTurns != null) {
+    const turns = gate.minLearnerTurns;
+    return minScore != null && minScore > 0
+      ? t("tracks2.roleplay.requirement.turnsAndScore", { turns, score: minScore })
+      : t("tracks2.roleplay.requirement.turns", { turns });
+  }
   if (completionLogic === "PARTICIPATION") return t("tracks2.roleplay.requirement.participation");
   const duration =
     minDurationSeconds != null ? formatRoleplayDuration(minDurationSeconds, t) : null;
@@ -62,4 +69,20 @@ export const getRoleplayFailureLines = (attempt: LastRoleplayAttempt, t: TFuncti
     );
   }
   return lines;
+};
+
+/**
+ * The "too short to count" notice for an assessment attempt that spoke but
+ * fell under the turn minimum, or null when that wasn't the reason.
+ */
+export const getRoleplayShortAttemptLine = (
+  attempt: LastRoleplayAttempt,
+  t: TFunction,
+): string | null => {
+  if (!(attempt.failureReasons ?? []).includes("INSUFFICIENT_TURNS")) return null;
+  if (attempt.requiredTurns == null) return null;
+  return t("tracks2.roleplay.shortAttempt", {
+    taken: attempt.learnerTurns ?? 0,
+    n: attempt.requiredTurns,
+  });
 };

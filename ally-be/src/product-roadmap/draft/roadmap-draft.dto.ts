@@ -1,11 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
   IsIn,
   IsInt,
+  IsNotEmpty,
   IsOptional,
   IsString,
   Length,
@@ -86,32 +87,35 @@ export class RoadmapSelfCheckDto {
 }
 
 export class SubmitRoadmapDraftDto {
+  @ApiProperty({
+    maxLength: ROADMAP_LIMITS.TITLE_MAX,
+    description: 'One line naming the idea. Required to submit.',
+  })
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : value,
+  )
+  @IsString()
+  @IsNotEmpty({ message: 'An idea needs a title.' })
+  @MaxLength(ROADMAP_LIMITS.TITLE_MAX)
+  title!: string;
+
   @ApiPropertyOptional({ description: 'roadmap_product_goals id' })
   @IsOptional()
   @IsString()
   goalId?: string | null;
 
   /**
-   * What to file as the idea's text (audit rec. 6). Left out, as every client before it does,
-   * it is `mine`: the author's draft text, verbatim, exactly as before.
+   * What to file as the idea's summary beneath its title (audit rec. 6). Left out, as every
+   * client before it does, it is `mine`: the author's draft text, verbatim, exactly as before.
    */
   @ApiPropertyOptional({
     enum: ['mine', 'agent'],
     description:
-      "`mine` files the draft text verbatim (the default); `agent` files the idea agent's statement and title, as edited here",
+      "`mine` files the draft text verbatim as the summary (the default); `agent` files the idea agent's statement, as edited here",
   })
   @IsOptional()
   @IsIn(['mine', 'agent'])
   use?: 'mine' | 'agent';
-
-  @ApiPropertyOptional({
-    maxLength: ROADMAP_LIMITS.IDEA_TITLE_MAX,
-    description: "With `use: 'agent'`: the title, as the author edited it",
-  })
-  @IsOptional()
-  @IsString()
-  @MaxLength(ROADMAP_LIMITS.IDEA_TITLE_MAX)
-  title?: string;
 
   @ApiPropertyOptional({
     maxLength: ROADMAP_LIMITS.DESCRIPTION_MAX,
