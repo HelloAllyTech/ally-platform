@@ -69,6 +69,9 @@ class MessageProcessor:
         # slot at once and the loop fetches the next one; it no longer waits
         # for the whole batch it came in with (see poll_queue).
         self._in_flight: set[asyncio.Task] = set()
+        # The message each in-flight task is processing, so drain() can put
+        # unfinished ones back on the queue.
+        self._task_messages: dict[asyncio.Task, Dict[str, Any]] = {}
 
     async def process_message(self, message: Dict[str, Any]) -> None:
         """
@@ -250,7 +253,13 @@ class MessageProcessor:
     def _start_processing(self, message: Dict[str, Any]) -> None:
         task = asyncio.create_task(self.process_message(message))
         self._in_flight.add(task)
-        task.add_done_callback(self._in_flight.discard)
+        self._task_messages[task] = message
+
+        def _done(t: asyncio.Task) -> None:
+            self._in_flight.discard(t)
+            self._task_messages.pop(t, None)
+
+        task.add_done_callback(_done)
 
     async def poll_queue(self) -> None:
         """
@@ -372,6 +381,64 @@ class MessageProcessor:
         if self._task is None or self._task.done():
             self._task = asyncio.create_task(self.run())
             logger.info("Message processor started")
+
+    async def drain(self, timeout: float) -> None:
+        """
+        Shut down without losing or delaying work (SIGTERM on a deploy).
+
+        Stops taking messages, lets the ones in progress finish for up to
+        `timeout` seconds, then cancels the rest and makes them visible on the
+        queue again at once, so the new container picks them up instead of
+        SQS hiding them for the rest of their visibility timeout.
+        """
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        self._running = False
+        logger.info(
+            "Draining: no new messages; %s in progress get up to %ss",
+            len(self._in_flight),
+            timeout,
+        )
+        # Let the poll loop exit by itself rather than cancel it mid-receive:
+        # messages a cancelled receive had already taken would be lost until
+        # their visibility timeout. A receive returns within wait_time_seconds;
+        # past that the loop is only waiting for a free slot, safe to cancel.
+        if self._task and not self._task.done():
+            await asyncio.wait(
+                {self._task},
+                timeout=min(
+                    self.wait_time_seconds + 2, max(0.0, deadline - loop.time())
+                ),
+            )
+            if not self._task.done():
+                self._task.cancel()
+                await asyncio.gather(self._task, return_exceptions=True)
+
+        if self._in_flight:
+            await asyncio.wait(
+                list(self._in_flight), timeout=max(0.0, deadline - loop.time())
+            )
+        unfinished = [(t, self._task_messages.get(t)) for t in list(self._in_flight)]
+        for task, _ in unfinished:
+            task.cancel()
+        await asyncio.gather(*(t for t, _ in unfinished), return_exceptions=True)
+        for _, message in unfinished:
+            receipt_handle = (message or {}).get("receipt_handle")
+            if not receipt_handle:
+                continue
+            try:
+                await self.queue_service.release_message(
+                    queue_url=self.queue_url, receipt_handle=receipt_handle
+                )
+            except Exception as e:
+                logger.error(
+                    f"Could not put an unfinished message back on the queue: "
+                    f"{type(e).__name__}; SQS redelivers it after its visibility "
+                    f"timeout"
+                )
+        logger.info(
+            "Drained: %s unfinished message(s) put back on the queue", len(unfinished)
+        )
 
     async def stop(self) -> None:
         """

@@ -3,6 +3,7 @@ Production SQS Worker with proper cleanup and shutdown.
 """
 
 import asyncio
+import signal
 
 from app.core.ally_core import AllyCoreClient, AllyCoreService
 from app.core.config import settings
@@ -250,12 +251,26 @@ async def main():
             f"{settings.QUEUE.TRANSCRIBE_AND_SUMMARIZE_REQUESTS_QUEUE_URL}"
         )
 
-        # Start processor and wait for it to complete
-        await transcription_request_processor.start()
+        # SIGTERM (a deploy stopping this container) drains instead of dying
+        # mid-message; see MessageProcessor.drain.
+        shutdown = asyncio.Event()
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            loop.add_signal_handler(sig, shutdown.set)
 
-        # Wait for the processor task to finish (it handles KeyboardInterrupt)
-        if transcription_request_processor._task:
-            await transcription_request_processor._task
+        # Start processor and wait for it to complete, or for a shutdown signal
+        await transcription_request_processor.start()
+        shutdown_wait = asyncio.create_task(shutdown.wait())
+        await asyncio.wait(
+            {transcription_request_processor._task, shutdown_wait},
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        if shutdown.is_set():
+            logger.info("Shutdown signal received; draining the queue worker")
+            await transcription_request_processor.drain(
+                SQSWorkerConstants.SHUTDOWN_DRAIN_SECONDS
+            )
+        shutdown_wait.cancel()
 
     except KeyboardInterrupt:
         logger.info("Worker interrupted by user")
