@@ -116,6 +116,23 @@ The Skills Store keeps a prompt's live text; a changed seed file never overwrite
   - young-people assistants no longer ask for a name or phone before the chat;
   - publishing below the checkup's quality gate now asks "Publish anyway?" with the score.
 
+## CR1: costs, models, tokens, plans and seats (`CHUNK-CR1-NOTES.md`) <!-- docs-path-lint: planned -->
+
+In this order, before and right after deploying. Nothing here touches a prompt: CR1 changes no prompt text.
+
+- [ ] **`LLM_USAGE__QUEUE_URL` is set on ally-ai in production** and points at the queue ally-be consumes `llm_usage` from. Without it nothing is metered: costs read $0 and token allowances never move. ally-ai logs a loud warning at startup and reports `usage_feed: off` on `/api/health`; ally-be checks that at startup and every hour and posts a Slack alert (CR1 plan stop, decision 7).
+- [ ] **Deploy ally-ai before ally-be.** ally-be sends the new `X-Ally-Usage` header; an older ally-ai ignores it (no attribution, nothing breaks), but costs per assistant only appear once both are out.
+- [ ] **Migrations run with ally-be:** `1984900000000-CreateBillingCosts` (models, prices, WhatsApp rates, usage events, settings; grants `manage_costs` to every holder of `admin_user_management`), `1984900000100-CreateAssistantOwnerAndTokens` (the Assistant owner role, tokens), `1984900000200-CreatePlansAndSeats` (Free, Pro, internal; Basic, Premium). All additive.
+- [ ] **Check the models and prices** on Ally admin → Models against the providers' pages (seeded 19 Nov 2026), and add any model the Skills Store names that isn't listed. Usage on an unlisted model is recorded unpriced and alerts once a day.
+- [ ] **Check the WhatsApp rates** (India seeded; add other countries the assistants serve).
+- [ ] **Set the daily budget and alert thresholds** on Ally admin → Costs (seeded $20, $0.50 a conversation, 5× and over $1 for a spike), and enter this month's fixed costs.
+- [ ] **Enter the prices** of Pro and of the Basic and Premium seats on Ally admin → Plans (for Costs only; left blank at the plan stop).
+- [ ] **Move custom logins to the Assistant owner role:** `npm run custom-logins:migrate -- --dry-run` in ally-be, read it, then `npm run custom-logins:migrate`. It exits 2 for logins with other Ally admin pages ticked (left as admins): untick those pages, then run it again. Then clear `user:*` role caches in Redis, or wait 30 minutes.
+- [ ] **Starting point:** `npm run billing:backfill -- --dry-run`, read every "would be blocked" line (seats are strict), add seats for those people in Ally admin → a user → Plan if they should keep chatting, then `npm run billing:backfill`. It exits 2 while anyone would be blocked. Ally's own accounts (an @helloally.ai email, a platform admin, a test organisation) go on `internal`; everyone else on Pro; custom logins get max(20M, 3× their last 30 days' tokens), renewing monthly — 20M at first deploy, since usage events start with CR1.
+- [ ] **Tell pilots and support:** invited people on an invite-only or organisation page need a seat; at any limit the assistant replies with a fixed "isn't available" or "ask {owner} for a seat" line, and crisis replies always go out. Owners see their plan and usage in the account menu and in Share → People, never prices.
+- [ ] **The old WhatsApp numbers are hidden and take no new writes** (`WA-NUMBERS-REPORT.md` step 1). Watch the `[WA_MAPPING_USED]` log line fall; step 2 (replacing its readers) is Phase 3.
+- [ ] **Follow-up before 14 Jan 2027:** the crisis check's code default `gpt-4o-mini` leaves the OpenAI API then. Production uses `gpt-6-luna` through the Skills Store; change the code default (`KNOWLEDGE_AGENT__CRISIS_MODEL`) and the translate default before that date (CR1 plan stop, decision 6).
+
 ## Checks
 
 - [ ] **Release `0fb34139c` (production onto the v2 agent), then watch the v1 fallback rate and reply times** (H0).
