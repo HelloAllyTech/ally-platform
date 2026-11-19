@@ -106,4 +106,21 @@ export class ScenarioSessions extends BaseEntity {
   // Track 2.0: the track_item_progress row this session was played for.
   @Column({ type: 'uuid', nullable: true })
   trackItemProgressId?: string;
+
+  /**
+   * Track roleplays: runs of consecutive learner messages, counted once when
+   * the session's end is processed. Null until then, and for sessions outside
+   * a track.
+   */
+  @Column({ type: 'int', nullable: true })
+  learnerTurns?: number | null;
+
+  /**
+   * Assessment roleplays: whether this session counted as the learner's one
+   * attempt, judged by the item's rule in force as it ended (min learner
+   * turns). Null for non-assessment sessions and until the end is processed.
+   * The start gate, trainer reports and AAQ-255 all read this stamp.
+   */
+  @Column({ type: 'boolean', nullable: true })
+  assessmentAttemptValid?: boolean | null;
 }

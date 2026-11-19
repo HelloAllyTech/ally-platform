@@ -83,6 +83,10 @@ export const Simulation = () => {
       you: t("simulationPage.textChat.you"),
       connectingHint: t("simulationPage.textChat.connectingHint"),
     },
+    assessmentTurnCounter: {
+      progress: t("simulationPage.assessmentTurnCounter.progress"),
+      reached: t("simulationPage.assessmentTurnCounter.reached"),
+    },
     turnIndicator: {
       speaking: t("simulationPage.turnIndicator.speaking"),
       listening: t("simulationPage.turnIndicator.listening"),
@@ -138,6 +142,17 @@ export const Simulation = () => {
       { replace: true },
     );
   };
+
+  // Assessment roleplays launched from a course: the player stashed the turn
+  // minimum with the track context. Ignore it when it names another scenario.
+  const trackContext = readTrackContext();
+  const contextScenarioMatches =
+    trackContext?.assessmentScenarioId == null ||
+    roomData?.scenarioId == null ||
+    String(trackContext.assessmentScenarioId) === String(roomData.scenarioId);
+  const assessmentRequiredTurns = contextScenarioMatches
+    ? trackContext?.assessmentRequiredTurns
+    : undefined;
 
   if (roomData) {
     roomData["title"] = scenarioTitle;
@@ -220,6 +235,7 @@ export const Simulation = () => {
         difficultyLevel={roomData?.difficultyLevel ?? ""}
         translations={simulationTranslations}
         agentTurnStatus={agentTurnStatus}
+        assessmentRequiredTurns={assessmentRequiredTurns}
       />
       <ConfirmationDialog
         isOpen={isBackConfirmOpen}

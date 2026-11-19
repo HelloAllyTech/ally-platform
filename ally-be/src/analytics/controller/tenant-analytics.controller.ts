@@ -3,9 +3,13 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  Param,
+  ParseIntPipe,
+  ParseUUIDPipe,
   Patch,
   Query,
 } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -29,6 +33,8 @@ import {
 } from '../dto/tenant-analytics.dto';
 import { AnalyticsService } from '../service/analytics.service';
 import { TenantAnalyticsService } from '../service/tenant-analytics.service';
+import { CourseAssessmentReportService } from '../service/course-assessment-report.service';
+import { compareScenarioBehaviours } from 'src/track/util/assessment-compat.util';
 
 @ApiTags('Tenant Analytics')
 @Controller('v1/tenant-analytics')
@@ -38,7 +44,51 @@ export class TenantAnalyticsController {
   constructor(
     private readonly analyticsService: AnalyticsService,
     private readonly tenantAnalyticsService: TenantAnalyticsService,
+    private readonly courseAssessmentReportService: CourseAssessmentReportService,
+    private readonly dataSource: DataSource,
   ) {}
+
+  /**
+   * Pre/post assessment roleplays in one course, for the caller's own tenant:
+   * each learner's pre and post score (as frozen at submission), the gain,
+   * incomplete starts, and a cohort summary whose averages are withheld below
+   * the minimum group size. A course with no pairs returns `pairs: []`.
+   */
+  @Get('courses/:trackId/assessment-pairs')
+  @ApiOperation({
+    summary:
+      "Pre/post assessment results for one course, in the caller's tenant",
+  })
+  @AuthPermissions([PERMISSIONS.VIEW_ORGANIZATION_METRICS])
+  async getCourseAssessmentPairs(
+    @Param('trackId', ParseUUIDPipe) trackId: string,
+  ) {
+    const tenantId = ExecutionManager.getTenantId();
+    if (!tenantId) {
+      throw new ForbiddenException('No tenant in the auth context');
+    }
+    return this.courseAssessmentReportService.getCoursePairs(trackId, tenantId);
+  }
+
+  /**
+   * Whether two roleplays score the same behaviours — the course builder's
+   * warning when a trainer pairs a pre with a post. Advisory only.
+   */
+  @Get('assessment-pair-compat/:preScenarioId/:postScenarioId')
+  @ApiOperation({
+    summary: 'Whether a pre and a post roleplay score the same behaviours',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_ADMIN_TRACK])
+  async getAssessmentPairCompat(
+    @Param('preScenarioId', ParseIntPipe) preScenarioId: number,
+    @Param('postScenarioId', ParseIntPipe) postScenarioId: number,
+  ) {
+    return compareScenarioBehaviours(
+      this.dataSource,
+      preScenarioId,
+      postScenarioId,
+    );
+  }
 
   /**
    * Organization Metrics for the caller's own tenant (tenant-admin native

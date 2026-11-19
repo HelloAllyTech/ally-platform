@@ -146,6 +146,12 @@ export interface CourseBlueprintCompletionCriteria {
   watchPct?: number;
   minReadSeconds?: number;
   minDurationSeconds?: number;
+  /** Roleplay assessment keys; carried through untouched. */
+  assessmentMode?: boolean;
+  minLearnerTurns?: number;
+  showResultsToLearner?: boolean;
+  assessmentPhase?: "PRE" | "POST";
+  assessmentPairKey?: string;
 }
 
 export interface CourseBlueprintItem {

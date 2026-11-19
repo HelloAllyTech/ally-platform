@@ -11,6 +11,7 @@ import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
 import 'package:ally_mobile_flutter/features/courses/data/course_models.dart';
 import 'package:ally_mobile_flutter/features/courses/data/courses_repository.dart';
 import 'package:ally_mobile_flutter/features/courses/presentation/course_detail_screen.dart';
+import 'package:ally_mobile_flutter/features/courses/presentation/roleplay/roleplay_requirement.dart';
 import 'package:ally_mobile_flutter/features/simulations/presentation/widgets/learning_path_widgets.dart';
 
 import '../../../support/fake_network_image.dart';
@@ -630,9 +631,44 @@ void main() {
         expect(trackItemMeta(gated('PARTICIPATION'), t),
             'courses.meta.roleplay · courses.meta.requireParticipation');
       });
+      test('ASSESSMENT states the turn minimum, never the duration', () {
+        TrackDetailItem assessment(Map<String, Object?> gate) => withMeta(TrackItemType.roleplay, {
+              'roleplayGate': {'roleplayType': 'ASSESSMENT', 'completionLogic': 'SCORE', ...gate},
+            });
+        expect(trackItemMeta(assessment({'minLearnerTurns': 10, 'minDurationSeconds': 300}), t),
+            'courses.meta.roleplay · courses.meta.requireTurns[10]');
+        expect(trackItemMeta(assessment({'minLearnerTurns': 10, 'minScore': 70}), t),
+            'courses.meta.roleplay · courses.meta.requireTurnsAndScore[10, 70]');
+      });
       test('both gates null shows nothing extra', () {
         expect(trackItemMeta(gated('SCORE_AND_DURATION'), t), 'courses.meta.roleplay');
       });
+    });
+
+    test('failure lines for duration, score and both', () {
+      LastRoleplayAttempt attempt(List<String> reasons, {num? score}) => LastRoleplayAttempt.tryParse({
+            'failureReasons': reasons,
+            'score': score,
+            'durationSeconds': 90,
+            'requiredScore': 70,
+            'requiredDurationSeconds': 180,
+          })!;
+      expect(roleplayFailureLines(attempt(['INSUFFICIENT_DURATION']), t), [
+        'courses.roleplay.lastAttemptDuration[courses.meta.durationMinSec[1, 30], courses.meta.durationMin[3]]',
+      ]);
+      expect(roleplayFailureLines(attempt(['INSUFFICIENT_SCORE'], score: 55), t), [
+        'courses.roleplay.lastAttemptScore[55, 70]',
+      ]);
+      expect(roleplayFailureLines(attempt(['INSUFFICIENT_SCORE']), t), [
+        'courses.roleplay.lastAttemptScoreUnknown[70]',
+      ]);
+      expect(roleplayFailureLines(attempt(['INSUFFICIENT_SCORE', 'INSUFFICIENT_DURATION'], score: 55), t).length, 2);
+      final short = LastRoleplayAttempt.tryParse({
+        'failureReasons': ['INSUFFICIENT_TURNS'],
+        'learnerTurns': 4,
+        'requiredTurns': 10,
+      })!;
+      expect(roleplayFailureLines(short, t), ['courses.roleplay.shortAttempt[4, 10]']);
     });
   });
 
@@ -675,6 +711,8 @@ extension on TrackDetailItem {
     completionCriteria: completionCriteria,
     roleplayGate: roleplayGate,
     lastRoleplayAttempt: lastRoleplayAttempt,
+    assessment: assessment,
+    assessmentSubmittedAt: assessmentSubmittedAt,
     blockedBy: blockedBy,
     languageFallbackReason: languageFallbackReason,
   );

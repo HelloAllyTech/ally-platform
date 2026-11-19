@@ -1095,7 +1095,12 @@ export class LearnController {
   async getScenarioSessionSkills(
     @Param('scenarioSessionId', ParseUUIDPipe)
     scenarioSessionId: string,
+    @CurrentUser() tokenUser: TokenUser,
   ): Promise<ScenarioSessionSkillsResponseDto> {
+    await this.scenarioSessionService.assertAssessmentResultVisible(
+      scenarioSessionId,
+      tokenUser.id,
+    );
     return this.scenarioSessionService.getScenarioSessionSkills(
       scenarioSessionId,
     );
@@ -1148,6 +1153,10 @@ export class LearnController {
     @Query('order') order?: SortOrder,
     @Query('languageCode') languageCode?: string,
   ): Promise<ScenarioSessionEventChecklistResponseDto> {
+    await this.scenarioSessionService.assertAssessmentResultVisible(
+      scenarioSessionId,
+      tokenUser.id,
+    );
     return this.scenarioSessionService.getScenarioSessionEventChecklist(
       scenarioSessionId,
       tokenUser.id,

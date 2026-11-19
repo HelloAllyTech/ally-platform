@@ -754,6 +754,11 @@
   },
   "postSim": {
     "titlePrefix": "रोल प्ले",
+    "assessment": {
+      "submittedTitle": "तुमचे मूल्यमापन सादर झाले आहे",
+      "submittedBody": "तुमचे ट्रेनर तुमचे निकाल पाहतील.",
+      "continue": "पुढे जा"
+    },
     "noSessionRecording": "प्लेबॅकसाठी कोणतेही सत्र रेकॉर्डिंग उपलब्ध नाही.",
     "skills": {
       "empty": "या सत्रासाठी कोणताही कौशल्य डेटा उपलब्ध नाही",
@@ -1962,6 +1967,8 @@
       "requireDuration": "किमान {{duration}}",
       "requireScoreAndDuration": "किमान {{score}} स्कोर करा · किमान {{duration}}",
       "requireParticipation": "सुरू केल्यावर लगेच पूर्ण होते",
+      "requireTurns": "किमान {{turns}} वेळा",
+      "requireTurnsAndScore": "किमान {{turns}} वेळा · किमान स्कोअर {{score}}",
       "durationMin": "{{min}} मिनिट",
       "durationSec": "{{sec}} सेकंद",
       "durationMinSec": "{{min}} मिनिट {{sec}} सेकंद",
@@ -2064,6 +2071,11 @@
       "saved": "सेव्ह केले",
       "saveFailed": "सेव्ह करण्यात अयशस्वी"
     },
+    "assessment": {
+      "tag": "मूल्यमापन",
+      "tagPre": "मूल्यमापन · पूर्व",
+      "tagPost": "मूल्यमापन · नंतर"
+    },
     "roleplay": {
       "intro": "हा रोल-प्ले सुरू करण्यासाठी खाली टॅप करा.",
       "start": "सुरू करा",
@@ -2075,7 +2087,16 @@
       "assessmentNotice": "तुम्हाला एकच संधी मिळेल. रोल-प्ले संपवताच तुमचा प्रयत्न सबमिट होईल आणि पुन्हा करता येणार नाही.",
       "assessmentSubmitted": "{{date}} रोजी सबमिट केले",
       "assessmentNotPassed": "हा प्रयत्न उत्तीर्ण होण्याच्या अटी पूर्ण करू शकला नाही.",
-      "assessmentLocked": "तुमचे मूल्यांकन सबमिट झाले आहे. पुन्हा प्रयत्न हवा असल्यास तुमच्या ट्रेनरला सांगा."
+      "assessmentLocked": "तुमचे मूल्यांकन सबमिट झाले आहे. पुन्हा प्रयत्न हवा असल्यास तुमच्या ट्रेनरला सांगा.",
+      "lastAttemptTitle": "तुमचा मागील प्रयत्न हा रोलप्ले पूर्ण करू शकला नाही",
+      "lastAttemptDuration": "तो {{actual}} चालला; या रोलप्लेसाठी किमान {{required}} लागतात.",
+      "lastAttemptScore": "तुमचा स्कोर {{score}} होता; या रोलप्लेसाठी किमान {{required}} लागतात.",
+      "lastAttemptScoreUnknown": "तो किमान स्कोर {{required}} पर्यंत पोहोचला नाही.",
+      "lastAttemptFooter": "तयार झाल्यावर पुन्हा प्रयत्न करा.",
+      "assessmentIntroTurns": "हे एक मूल्यमापन आहे. तुम्हाला एकच प्रयत्न मिळतो, आणि तुम्ही किमान {{n}} वेळा बोलल्यावर तो ग्राह्य धरला जातो.",
+      "shortAttempt": "तो प्रयत्न मोजण्यासाठी खूप लहान होता ({{n}} पैकी {{taken}} वेळा). तयार झाल्यावर पुन्हा सुरू करा.",
+      "postLocked": "आधी पूर्व-मूल्यमापन पूर्ण करा: {{title}}.",
+      "assessmentSubmittedHidden": "सादर केले. तुमचे ट्रेनर तुमचे निकाल पाहतील."
     },
     "quiz": {
       "intro": {
@@ -2346,7 +2367,11 @@
     "connect": "कनेक्ट करा",
     "disconnect": "डिस्कनेक्ट करा",
     "connectedToRoom": "रूमशी कनेक्ट आहे",
-    "notConnected": "कनेक्ट नाही"
+    "notConnected": "कनेक्ट नाही",
+    "assessment": {
+      "turnCounter": "वेळ {{k}} / {{n}}",
+      "minimumReached": "किमान वेळा पूर्ण झाल्या"
+    }
   },
   "scribe": {
     "title": "स्क्राइब रेकॉर्डिंग (फेज 1)",

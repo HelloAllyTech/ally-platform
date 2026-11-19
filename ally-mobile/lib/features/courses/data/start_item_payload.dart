@@ -569,6 +569,7 @@ class StartItemPayload {
     this.roleplayGate,
     this.lastRoleplayAttempt,
     this.assessmentSubmittedAt,
+    this.assessment,
     this.caseId,
   });
 
@@ -701,6 +702,7 @@ class StartItemPayload {
           ? LastRoleplayAttempt.tryParse(json['lastRoleplayAttempt'])
           : null,
       assessmentSubmittedAt: type == 'ROLEPLAY' ? json['assessmentSubmittedAt'] as String? : null,
+      assessment: type == 'ROLEPLAY' ? RoleplayAssessment.tryParse(json['assessment']) : null,
       caseId: type == 'CASE' ? json['caseId'] as String? : null,
     );
   }
@@ -722,6 +724,10 @@ class StartItemPayload {
 
   /// Assessment roleplay: when the one attempt was submitted; null while open.
   final String? assessmentSubmittedAt;
+
+  /// Pre/post assessment block (turn minimum, phase, results visibility);
+  /// null for trial/practice and on older backends.
+  final RoleplayAssessment? assessment;
 
   // CASE (RN's `StartCaseItemPayload`)
   final String? caseId;

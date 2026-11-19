@@ -8,6 +8,7 @@ import { RoomEvent } from "livekit-client";
 import { toast } from "sonner";
 
 import { isTextChatSession } from "./constants";
+import { countLearnerTurns, formatTurnCounter, useVoiceLearnerTurns } from "./learnerTurns";
 import { SessionTimeBar } from "./SessionTimeBar";
 import { BottomSection } from "./SimulationBottomSection";
 import { RoomStatus, SimulationInterface } from "./SimulationInterface";
@@ -103,6 +104,7 @@ export const SimulationPage: FC<SimulationPageProps> = ({
   difficultyLevel = "",
   translations,
   agentTurnStatus,
+  assessmentRequiredTurns,
 }) => {
   const [isMuted, setIsMuted] = useState(false);
   const [isWarning, setIsWarning] = useState(false);
@@ -143,6 +145,12 @@ export const SimulationPage: FC<SimulationPageProps> = ({
   // during the countdown, before the panel mounts.
   const isTextChat = isTextChatSession(roomData);
   const textChat = useTextChat(room, isTextChat);
+  // Assessment sessions only: live learner-turn count for the header counter.
+  const showTurnCounter = assessmentRequiredTurns != null && assessmentRequiredTurns > 0;
+  const voiceLearnerTurns = useVoiceLearnerTurns(room, showTurnCounter && !isTextChat);
+  const learnerTurns = isTextChat
+    ? countLearnerTurns(textChat.messages.filter(m => m.status !== "failed"))
+    : voiceLearnerTurns;
 
   useEffect(() => {
     startAudio.current?.play();
@@ -426,6 +434,23 @@ export const SimulationPage: FC<SimulationPageProps> = ({
           )}
         </div>
         <div className="flex items-center gap-3">
+          {showTurnCounter && (
+            <span
+              data-testid="assessment-turn-counter"
+              role="status"
+              className={`rounded-full px-3 py-1 text-[12px] font-medium ${
+                learnerTurns >= assessmentRequiredTurns
+                  ? "bg-success-800 text-success-50"
+                  : "bg-white/10 text-white"
+              }`}
+            >
+              {formatTurnCounter(
+                learnerTurns,
+                assessmentRequiredTurns,
+                translations?.assessmentTurnCounter,
+              )}
+            </span>
+          )}
           <SessionTimeBar
             startTime={startTime}
             maxTimeSeconds={roomData?.timerMode ? maxTimeSeconds : undefined}

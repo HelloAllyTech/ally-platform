@@ -199,6 +199,8 @@ export interface LearnerScenarioAttempt {
   passed?: boolean;
   /** ROLEPLAY_ASSESSMENT only: when the attempt ended. */
   submittedAt?: string | null;
+  /** ROLEPLAY_ASSESSMENT only: starts that never reached the turn minimum. */
+  incompleteStarts?: number;
 }
 
 /**
@@ -326,4 +328,48 @@ export interface GetCourseUsageTableRequest {
   order?: "ASC" | "DESC";
   limit?: number;
   offset?: number;
+}
+
+/** One side (pre or post) of a learner's assessment pair. */
+export interface AssessmentSummary {
+  score: number | null;
+  submittedAt: string | null;
+  incompleteStarts: number;
+  reopened: boolean;
+}
+
+export interface AssessmentPairLearner {
+  userId: number;
+  name: string;
+  pre: AssessmentSummary | null;
+  post: AssessmentSummary | null;
+  gain: number | null;
+}
+
+export interface AssessmentPairItemRef {
+  id: string;
+  title: string;
+  scenarioId: number;
+}
+
+export interface AssessmentPair {
+  pairKey: string;
+  preItem: AssessmentPairItemRef;
+  postItem: AssessmentPairItemRef;
+  comparability: { comparable: boolean; onlyInPre: string[]; onlyInPost: string[] };
+  learners: AssessmentPairLearner[];
+  /** Averages are null while `suppressed` (fewer than `minGroupSize` learners have both). */
+  cohort: {
+    n: number;
+    avgPre: number | null;
+    avgPost: number | null;
+    avgGain: number | null;
+    suppressed: boolean;
+    minGroupSize: number;
+  };
+}
+
+export interface GetCourseAssessmentPairsResponse {
+  trackId: string;
+  pairs: AssessmentPair[];
 }
