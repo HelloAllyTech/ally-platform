@@ -148,15 +148,41 @@ export type RoadmapDecisionKind =
   /** A stopped build, or a PR handed to a person. */
   | "unblock";
 
+/** What moved on an idea you follow, when an unread notice says. */
+export type RoadmapProgressNotice = "accepted" | "planReady" | "planClosed" | "comment";
+
+/** The Owner's old-and-quiet sweep of To do (`GET /v1/roadmap/todo-sweep`). */
+export interface RoadmapSweepResponse {
+  olderThanDays: number;
+  maxVoters: number;
+  /** Every idea the sweep pulls up now; `rows` holds the first of them. */
+  total: number;
+  rows: RoadmapItemRow[];
+}
+
 /** Why a row is in a view. The frontend renders the copy. */
 export type RoadmapWhyHere =
-  | { kind: "agentQuestion"; phase: "idea" | "plan"; questionPreview: string; since?: string }
+  | {
+      kind: "agentQuestion";
+      phase: "idea" | "plan";
+      questionPreview: string;
+      since?: string;
+      /** The agent addressed it to the idea's author. */
+      forAuthor?: boolean;
+    }
   | { kind: "mention"; by: RoadmapPersonRef; since?: string }
+  /** A notice that waits on you: the plan is ready to read, or someone answered your question. */
+  | {
+      kind: "notice";
+      notice: "planReady" | "questionAnswered";
+      since: string;
+      by?: RoadmapPersonRef;
+    }
   | { kind: "decision"; decision: RoadmapDecisionKind; since?: string }
   | { kind: "awaitingReview"; since: string }
   | { kind: "needsLead"; since: string }
   | { kind: "reassign"; idleDays: number }
-  | { kind: "progress" }
+  | { kind: "progress"; notice?: RoadmapProgressNotice }
   | { kind: "shipped"; at: string };
 
 export interface RoadmapItemRow {

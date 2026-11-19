@@ -288,6 +288,95 @@ describe('RoadmapItemReadService.list', () => {
     });
   });
 
+  describe('Needs you after the idea-to-plan audit (recs 8 and 10)', () => {
+    type Sections = {
+      sections: Record<string, { code: string; whyHere?: unknown }[]>;
+    };
+    const needsYou = async (
+      service: RoadmapItemReadService,
+      userId: number,
+    ): Promise<{ code: string; whyHere?: unknown }[]> =>
+      (
+        (await service.list(
+          userId,
+          parseItemQuery({ view: 'for-you' }),
+        )) as unknown as Sections
+      ).sections.needsYou;
+    const PLANNER = 3;
+    const planned = (over: Record<string, unknown> = {}) =>
+      item(
+        1,
+        { builderSessionId: 's1' },
+        {
+          ...planSession('s1', {
+            sessionPlanStage: 'prd',
+            planningStarted: true,
+          }),
+          planningStartedBy: String(PLANNER),
+          ...over,
+        },
+      );
+    const question = (over: Record<string, unknown> = {}) => ({
+      sessionId: 's1',
+      kind: 'question',
+      waitingSince: ago(1),
+      prompt: 'Which tab should it live on?',
+      ...over,
+    });
+
+    it('gives the Owner who started planning the open question, as the lead would get it', async () => {
+      const { service } = build([planned()], {
+        decisions: [question()],
+        roles: { [PLANNER]: 'owner' },
+      });
+      expect((await needsYou(service, PLANNER)).map((r) => r.code)).toEqual([
+        'OPP-0001',
+      ]);
+    });
+
+    it('keeps a scope question off the author’s list while someone plans the idea', async () => {
+      const { service } = build([planned()], {
+        decisions: [question()],
+        roles: { 1: 'idea' },
+      });
+      expect(await needsYou(service, 1)).toEqual([]);
+    });
+
+    it('sends a problem-or-user question to the author, marked as theirs', async () => {
+      const { service } = build([planned()], {
+        decisions: [
+          question({ forAuthor: true, prompt: 'Who hits this most?' }),
+        ],
+        roles: { 1: 'idea' },
+      });
+      const [row] = await needsYou(service, 1);
+      expect(row.whyHere).toMatchObject({
+        kind: 'agentQuestion',
+        forAuthor: true,
+      });
+    });
+
+    it('counts ideas awaiting review on an Owner’s list, so the badge moves', async () => {
+      const pending = item(2, {}, { reviewState: 'pending' });
+      const { service } = build([pending], { roles: { [PLANNER]: 'owner' } });
+      const [row] = await needsYou(service, PLANNER);
+      expect(row.whyHere).toMatchObject({ kind: 'awaitingReview' });
+      const { service: asIdea } = build([pending]);
+      expect(await needsYou(asIdea, ME)).toEqual([]);
+    });
+
+    it('asks the settler to choose while answers conflict, whatever the notices say', async () => {
+      const { service } = build([planned({ openConflicts: '1' })], {
+        roles: { [PLANNER]: 'owner' },
+      });
+      const [row] = await needsYou(service, PLANNER);
+      expect(row.whyHere).toMatchObject({
+        kind: 'decision',
+        decision: 'settleAnswer',
+      });
+    });
+  });
+
   it('builds To triage for an Owner: one Backlog list, never an idea someone leads', async () => {
     const pending = item(1, {}, { reviewState: 'pending' });
     const noLead = item(2, { builderSessionId: 's2' }, planSession('s2'));

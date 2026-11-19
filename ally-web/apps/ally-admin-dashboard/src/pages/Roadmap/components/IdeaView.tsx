@@ -169,7 +169,9 @@ export const IdeaView: React.FC<IdeaViewProps> = ({
   useEffect(() => {
     if (!item || markedRef.current === item.code) return;
     markedRef.current = item.code;
-    if (item.unread) void markRead(item.code);
+    // Always, not only when bold: opening also reads its notices, so a mention or a plan-ready
+    // notice stops holding it in Needs you (idea-to-plan audit rec 8).
+    void markRead(item.code);
   }, [item, markRead]);
 
   // P8: opening an idea you wrote ends "find where my idea is" (§4.16), if the Roadmap open

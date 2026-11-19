@@ -793,6 +793,7 @@ export class BuilderDecisionService implements OnModuleInit, OnModuleDestroy {
               prompt: question.prompt,
               rationale: question.rationale ?? null,
               questionType: question.questionType ?? null,
+              ...(question.forAuthor ? { forAuthor: true } : {}),
               context: [
                 ...(pending.said ? [`Builder said: ${pending.said}`] : []),
                 ...prdContext,
@@ -1158,9 +1159,19 @@ export class BuilderDecisionService implements OnModuleInit, OnModuleDestroy {
     if (row.metadata?.streaming || row.metadata?.interrupted) return [];
 
     const later = history.slice(lastAssistantIndex + 1);
+    // An answer from the feed or session page carries `questionId`; one posted
+    // on the idea page by anyone with Roadmap access (a plan post) carries it
+    // in `planPost` — reading only the first left a contributor's answer
+    // pending forever (idea-to-plan audit, small defects).
     const answeredQuestionIds = new Set(
       later
-        .map((message) => message.metadata?.questionId)
+        .map(
+          (message) =>
+            message.metadata?.questionId ??
+            (message.metadata?.planPost?.kind === 'answer'
+              ? message.metadata.planPost.questionId
+              : undefined),
+        )
         .filter((id): id is string => typeof id === 'string'),
     );
     const answeredBriefIds = new Set(

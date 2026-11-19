@@ -8,7 +8,15 @@ import { RoadmapInboxService } from '../roadmap-inbox.service';
 
 const ITEM = '11111111-1111-1111-1111-111111111111';
 
-function build(opts: { ownerIds?: number[]; voters?: number[] } = {}) {
+function build(
+  opts: {
+    ownerIds?: number[];
+    voters?: number[];
+    planner?: number | null;
+    lead?: number | null;
+    openComment?: number[];
+  } = {},
+) {
   const saved: any[] = [];
   const notifications = {
     create: jest.fn((row) => row),
@@ -27,7 +35,18 @@ function build(opts: { ownerIds?: number[]; voters?: number[] } = {}) {
     const sql = String(args[0]);
     if (sql.includes('"builderSessionId" = $1')) return [{ id: ITEM }];
     if (sql.includes('LEFT JOIN "builder_sessions"'))
-      return [{ authorUserId: 1, leadUserId: 2 }];
+      return [
+        {
+          authorUserId: 1,
+          leadUserId: opts.lead === undefined ? 2 : opts.lead,
+          plannerUserId: opts.planner == null ? null : String(opts.planner),
+        },
+      ];
+    if (sql.includes('"readAt" IS NULL') && sql.startsWith('SELECT id'))
+      return (opts.openComment ?? []).map((recipientUserId) => ({
+        id: `n-${recipientUserId}`,
+        recipientUserId,
+      }));
     if (sql.includes('roadmap_allocations'))
       return (opts.voters ?? [4]).map((userId) => ({ userId }));
     return [];
@@ -183,5 +202,76 @@ describe('RoadmapInboxService', () => {
     expect(criteria.recipientUserId).toBe(5);
     expect(criteria.readAt).toBeDefined();
     expect(criteria.groupKey).toBeDefined();
+  });
+
+  describe('idea-to-plan audit rec 8', () => {
+    it('tells the planner what the lead would hear while nobody leads the idea', async () => {
+      const { service } = build({ lead: null, planner: 7 });
+      expect(
+        await service.deliver({
+          kind: K.QUESTION_ANSWERED,
+          itemId: ITEM,
+          actorUserId: 1,
+        }),
+      ).toEqual([7]);
+    });
+
+    it('sends only to the named people when asked to, never the actor', async () => {
+      const { service } = build();
+      expect(
+        await service.deliver({
+          kind: K.AGENT_QUESTION,
+          itemId: ITEM,
+          directRecipientIds: [2, 5],
+          actorUserId: 5,
+          onlyDirect: true,
+        }),
+      ).toEqual([2]);
+    });
+
+    it('keeps one unread comment notice per person: a second comment bumps it', async () => {
+      const { service, saved, query } = build({ openComment: [1] });
+      const told = await service.deliverComment({
+        itemId: ITEM,
+        actorUserId: 9,
+        payload: { code: 'OPP-1', byUserId: 9 },
+      });
+      // Author and lead follow on All by default; the voter (Milestones) does not hear.
+      expect(told).toEqual([1, 2]);
+      expect(saved.map((r) => r.recipientUserId)).toEqual([2]);
+      expect(saved[0]).toMatchObject({
+        kind: K.COMMENT,
+        payload: { count: 1 },
+      });
+      expect(
+        query.mock.calls.some(
+          ([sql, params]) =>
+            String(sql).startsWith('UPDATE "roadmap_notifications"') &&
+            (params as unknown[])[0] instanceof Array &&
+            ((params as unknown[])[0] as string[]).includes('n-1'),
+        ),
+      ).toBe(true);
+    });
+
+    it('leaves out the people a comment mentions (they get the mention)', async () => {
+      const { service } = build();
+      expect(
+        await service.deliverComment({
+          itemId: ITEM,
+          actorUserId: 9,
+          payload: {},
+          excludeRecipientIds: [2],
+        }),
+      ).toEqual([1]);
+    });
+
+    it('reads every notice about an idea when it is opened', async () => {
+      const { service, notifications } = build();
+      await expect(service.markItemRead(4, ITEM)).resolves.toBe(2);
+      expect(notifications.update).toHaveBeenCalledWith(
+        expect.objectContaining({ recipientUserId: 4, itemId: ITEM }),
+        expect.objectContaining({ readAt: expect.any(Date) }),
+      );
+    });
   });
 });

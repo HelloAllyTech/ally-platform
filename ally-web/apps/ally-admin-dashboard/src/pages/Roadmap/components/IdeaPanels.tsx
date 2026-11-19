@@ -15,16 +15,9 @@ import { IdeaAgentFindingsForItem } from "../drafts/IdeaAgentFindings";
 import { SimilarLine } from "../triage/TriageSummary";
 import { IdeaPanelTab, shortDate, usd } from "../utils/copy";
 import { outcomeLine } from "../utils/delight";
+import { whyRanksLine } from "../utils/whyRanks";
 
 const noopSave = async () => undefined;
-
-/** "Why it ranks here" arrives as data of no fixed shape; show it only when it reads as text. */
-const whyRanksText = (value: unknown): string[] => {
-  if (typeof value === "string") return value.trim() ? [value] : [];
-  if (Array.isArray(value))
-    return value.filter((v): v is string => typeof v === "string" && !!v.trim());
-  return [];
-};
 
 const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
   <div className="flex flex-col gap-0.5">
@@ -87,7 +80,7 @@ const ProblemEditor: React.FC<{ item: RoadmapItemDetail }> = ({ item }) => {
 export const SummaryPanel: React.FC<{ item: RoadmapItemDetail }> = ({ item }) => {
   const copy = en.roadmapV2.idea.summary;
   const s = item.summary ?? {};
-  const why = whyRanksText(s.whyRanks);
+  const why = whyRanksLine(s.whyRanks);
   const images = Array.isArray(s.images) ? s.images.filter(src => typeof src === "string") : [];
   const empty = !s.problem && !s.who && !s.outcome && why.length === 0 && images.length === 0;
   return (
@@ -118,13 +111,9 @@ export const SummaryPanel: React.FC<{ item: RoadmapItemDetail }> = ({ item }) =>
           <SimilarLine code={item.code} bare />
         </Field>
       )}
-      {why.length > 0 && (
+      {why && (
         <Field label={copy.whyRanks}>
-          <ul className="m-0 list-disc pl-4">
-            {why.map((line, i) => (
-              <li key={i}>{line}</li>
-            ))}
-          </ul>
+          <p className="m-0">{why}</p>
         </Field>
       )}
       {images.length > 0 && (

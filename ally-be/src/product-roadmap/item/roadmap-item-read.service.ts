@@ -73,6 +73,7 @@ import {
   ItemTimelineKind,
   ItemSearchResponse,
   PersonRef,
+  ProgressNotice,
   ToTriageSections,
   WhyHere,
   WhyHereDecision,
@@ -105,6 +106,14 @@ const DECISION_WHY: Partial<Record<string, WhyHereDecision>> = {
   build_failed: 'unblock',
 };
 const QUESTION_KINDS = ['question', 'brief'];
+
+/** The unread notices a For you progress row names (newest wins). */
+const PROGRESS_NOTICE: Partial<Record<string, ProgressNotice>> = {
+  [RoadmapNotificationKind.ACCEPTED]: 'accepted',
+  [RoadmapNotificationKind.PLAN_READY]: 'planReady',
+  [RoadmapNotificationKind.PLAN_CLOSED]: 'planClosed',
+  [RoadmapNotificationKind.COMMENT]: 'comment',
+};
 
 /** The plan events an idea's timeline shows: milestones, not housekeeping. */
 const TIMELINE_EVENT_KINDS: string[] = [
@@ -164,6 +173,8 @@ interface ItemCore extends ItemQueryFacts {
   watchLevel: RoadmapWatchLevel;
   unread: boolean;
   votedByMe: boolean;
+  /** The Owner who pressed Start planning (`plan.planningStartedBy`); null before. */
+  plannerId: number | null;
 }
 
 type CoreSections<T> = { [K in keyof T]: ItemCore[] };
@@ -648,15 +659,25 @@ export class RoadmapItemReadService {
         .map((c) => ({ ...c, whyHere: this.needsYouWhy(loaded, c) }))
         .filter((c) => !!c.whyHere),
     );
-    const progress = (c: ItemCore): ItemCore => ({
-      ...c,
-      whyHere:
-        c.shownStage === 'shipped'
-          ? { kind: 'shipped', at: c.stageSince }
-          : c.unread
-            ? { kind: 'progress' }
-            : undefined,
-    });
+    const progress = (c: ItemCore): ItemCore => {
+      // What moved, from the newest unread notice that says (idea-to-plan audit rec 8).
+      const latestNotice = [...c.notices]
+        .reverse()
+        .map((n) => PROGRESS_NOTICE[n.kind])
+        .find((n): n is ProgressNotice => !!n);
+      return {
+        ...c,
+        whyHere:
+          c.shownStage === 'shipped'
+            ? { kind: 'shipped', at: c.stageSince }
+            : c.unread
+              ? {
+                  kind: 'progress',
+                  ...(latestNotice ? { notice: latestNotice } : {}),
+                }
+              : undefined,
+      };
+    };
     const yourIdeas = claim(
       cores.filter((c) => c.authorId === userId).map(progress),
     );
@@ -685,13 +706,27 @@ export class RoadmapItemReadService {
   }
 
   /**
-   * Why an idea needs the caller now, or undefined. The lead's decisions
-   * first, then agent questions on ideas they wrote, lead or watch on All,
-   * then answers to settle and @mentions addressed to them (§4.3, §4.8).
+   * Why an idea needs the caller now, or undefined (§4.3, §4.8; idea-to-plan
+   * audit recs 8 and 10):
+   *
+   * 1. The lead's decisions. While nobody leads the idea, the Owner who
+   *    started planning (the planner) gets the lead's rows.
+   * 2. An open agent question. A question the agent addressed to the author
+   *    (about the problem or the user) reaches the author and the planner;
+   *    any other reaches the planner or lead and people watching on All, and
+   *    the author only while nobody is planning it (or in the idea interview,
+   *    which is theirs).
+   * 3. The lead's ask of the author, answers to settle, @mentions.
+   * 4. The plan reads ready (the author, until they open it), and someone
+   *    answered the planner's question.
+   * 5. For an Owner, every idea still awaiting review, so new submissions
+   *    move the badge.
    */
   private needsYouWhy(loaded: Loaded, c: ItemCore): WhyHere | undefined {
     const { userId } = loaded;
-    const isLead = c.leadId === userId;
+    const planner = c.leadId === null ? c.plannerId : null;
+    const isLead = c.leadId === userId || planner === userId;
+    const isAuthor = c.authorId === userId;
     if (isLead) {
       for (const d of c.decisions) {
         const decision = DECISION_WHY[d.kind];
@@ -700,21 +735,26 @@ export class RoadmapItemReadService {
         }
       }
     }
-    const follows =
-      c.authorId === userId || isLead || c.watchLevel === RoadmapWatchLevel.ALL;
     const phase = c.session?.planStage === 'idea' ? 'idea' : 'plan';
-    if (follows) {
-      const question = c.decisions.find((d) => QUESTION_KINDS.includes(d.kind));
-      if (question) {
+    const question = c.decisions.find((d) => QUESTION_KINDS.includes(d.kind));
+    if (question) {
+      const forAuthor = question.kind === 'question' && !!question.forAuthor;
+      const someonePlans = (c.leadId ?? planner) !== null;
+      const reaches =
+        isLead ||
+        (isAuthor && (forAuthor || phase === 'idea' || !someonePlans)) ||
+        (!isAuthor && c.watchLevel === RoadmapWatchLevel.ALL);
+      if (reaches) {
         return {
           kind: 'agentQuestion',
           phase,
           questionPreview: clip(question.prompt ?? '', 140),
           since: question.waitingSince,
+          ...(forAuthor ? { forAuthor: true } : {}),
         };
       }
     }
-    if (c.authorId === userId && c.asks.length) {
+    if (isAuthor && c.asks.length) {
       const ask = c.asks[0];
       return {
         kind: 'agentQuestion',
@@ -723,9 +763,18 @@ export class RoadmapItemReadService {
         since: ask.createdAt,
       };
     }
-    const conflict = c.notices.find(
-      (n) => n.kind === RoadmapNotificationKind.ANSWERS_CONFLICT,
-    );
+    const unread = (kind: RoadmapNotificationKind) =>
+      c.notices.find((n) => n.kind === kind);
+    const conflict = unread(RoadmapNotificationKind.ANSWERS_CONFLICT);
+    // The settler: the lead (or the planner), or the author before anyone leads it.
+    const settles = isLead || (c.leadId === null && isAuthor);
+    if ((c.session?.openConflicts ?? 0) > 0 && settles) {
+      return {
+        kind: 'decision',
+        decision: 'settleAnswer',
+        since: conflict?.createdAt ?? c.lastActivityAt,
+      };
+    }
     if (conflict) {
       return {
         kind: 'decision',
@@ -733,9 +782,7 @@ export class RoadmapItemReadService {
         since: conflict.createdAt,
       };
     }
-    const mention = c.notices.find(
-      (n) => n.kind === RoadmapNotificationKind.MENTION,
-    );
+    const mention = unread(RoadmapNotificationKind.MENTION);
     if (mention) {
       return {
         kind: 'mention',
@@ -743,6 +790,29 @@ export class RoadmapItemReadService {
         by: { id: mention.byUserId ?? 0, name: '', role: 'none' },
         since: mention.createdAt,
       };
+    }
+    const planReady = unread(RoadmapNotificationKind.PLAN_READY);
+    if (planReady && isAuthor) {
+      return {
+        kind: 'notice',
+        notice: 'planReady',
+        since: planReady.createdAt,
+      };
+    }
+    const answered = unread(RoadmapNotificationKind.QUESTION_ANSWERED);
+    if (answered && isLead) {
+      return {
+        kind: 'notice',
+        notice: 'questionAnswered',
+        since: answered.createdAt,
+        // Resolved to a name and role in toRows.
+        ...(answered.byUserId
+          ? { by: { id: answered.byUserId, name: '', role: 'none' as const } }
+          : {}),
+      };
+    }
+    if (loaded.role === 'owner' && c.shownStage === 'submitted') {
+      return { kind: 'awaitingReview', since: c.stageSince };
     }
     return undefined;
   }
@@ -843,6 +913,7 @@ export class RoadmapItemReadService {
               s.plan->'reviews' AS "planReviews",
               s.plan->'externalBuild' AS "externalBuild",
               s.plan->'planningStarted' AS "planningStarted",
+              s.plan->>'planningStartedBy' AS "planningStartedBy",
               s.plan->'planClosed' AS "planClosedStamp",
               s.plan->'buildMode' AS "buildMode",
               s.plan->>'openConflicts' AS "openConflicts",
@@ -1080,7 +1151,11 @@ export class RoadmapItemReadService {
           f.watchLevel as RoadmapWatchLevel,
         )
           ? f.watchLevel
-          : authorId === userId || leadId === userId
+          : authorId === userId ||
+              leadId === userId ||
+              (leadId === null &&
+                f.planningStartedBy != null &&
+                num(f.planningStartedBy) === userId)
             ? RoadmapWatchLevel.ALL
             : votedByMe
               ? RoadmapWatchLevel.MILESTONES
@@ -1146,6 +1221,8 @@ export class RoadmapItemReadService {
         notices: itemNotices,
         watchLevel,
         unread,
+        plannerId:
+          f.planningStartedBy == null ? null : num(f.planningStartedBy) || null,
       });
     }
     return cores;
@@ -1272,6 +1349,9 @@ export class RoadmapItemReadService {
       if (c.whyHere?.kind === 'mention' && c.whyHere.by.id) {
         ids.add(c.whyHere.by.id);
       }
+      if (c.whyHere?.kind === 'notice' && c.whyHere.by?.id) {
+        ids.add(c.whyHere.by.id);
+      }
     }
     const people = await this.resolvePeople([...ids]);
     const person = (id: number, relation?: ItemRelation): PersonRef => ({
@@ -1286,6 +1366,9 @@ export class RoadmapItemReadService {
     return cores.map((c) => {
       let whyHere = c.whyHere;
       if (whyHere?.kind === 'mention') {
+        whyHere = { ...whyHere, by: person(whyHere.by.id) };
+      }
+      if (whyHere?.kind === 'notice' && whyHere.by) {
         whyHere = { ...whyHere, by: person(whyHere.by.id) };
       }
       return {

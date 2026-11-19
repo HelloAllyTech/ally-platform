@@ -111,6 +111,8 @@ export interface BuilderDecision {
   /** When the agent started waiting — the feed orders oldest-first within a kind. */
   waitingSince: string;
   pullRequestUrl: string | null;
+  /** An interview question about the problem or the user: addressed to the idea's author. */
+  forAuthor?: boolean;
 }
 
 /** What the answer endpoint did with an answer. */

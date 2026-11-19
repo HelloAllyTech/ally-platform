@@ -318,6 +318,14 @@ export class BuilderInterviewToolsService {
             allowNone: { type: 'boolean' },
             minSelections: { type: 'number' },
             maxSelections: { type: 'number' },
+            forAuthor: {
+              type: 'boolean',
+              description:
+                'True when the question is about the problem or the people who have it — ' +
+                'who hits it, how often, what they do today, what outcome they need. The ' +
+                "idea's author knows that best, so it goes to them. Leave it out for scope, " +
+                'behaviour, priority, technical or design decisions.',
+            },
           },
           required: ['prompt', 'kind'],
         },
@@ -952,6 +960,8 @@ export class BuilderInterviewToolsService {
           ? { rationale: String(input.rationale) }
           : {}),
       ...(options.length ? { options } : {}),
+      // A problem-or-user question goes to the idea's author (idea-to-plan audit rec 10).
+      ...(input?.forAuthor === true ? { forAuthor: true } : {}),
       // A select question without a custom escape hatch forces the admin to
       // pick a wrong answer, so it is on by default rather than on request.
       allowCustom: isSelect

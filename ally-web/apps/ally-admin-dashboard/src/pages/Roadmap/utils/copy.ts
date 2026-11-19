@@ -224,8 +224,10 @@ export const statusLine = (
 export const whyHereLine = (why: RoadmapWhyHere | undefined, now: number = Date.now()): string => {
   if (!why || typeof why !== "object") return "";
   const w = t().why;
+  const i2p = en.roadmapIdeaToPlan.why;
   switch (why.kind) {
     case "agentQuestion":
+      if (why.forAuthor) return i2p.authorQuestion(why.questionPreview ?? "");
       return why.phase === "idea"
         ? w.ideaAgentAsks(why.questionPreview ?? "")
         : w.planAgentAsks(why.questionPreview ?? "");
@@ -240,7 +242,9 @@ export const whyHereLine = (why: RoadmapWhyHere | undefined, now: number = Date.
     case "reassign":
       return w.reassign(num(why.idleDays));
     case "progress":
-      return w.progress;
+      return (why.notice && i2p.progress[why.notice]) || w.progress;
+    case "notice":
+      return why.notice === "planReady" ? i2p.planReady : i2p.questionAnswered(why.by?.name ?? "");
     case "shipped":
       return w.shipped(shortDate(why.at));
     default:

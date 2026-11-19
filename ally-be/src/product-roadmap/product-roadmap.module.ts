@@ -138,6 +138,8 @@ import { RoadmapPlanGateController } from './plan/roadmap-plan-gate.controller';
 import { PlanCloseReadinessService } from './plan/plan-close-readiness.service';
 import { PlanTurnService } from './plan/plan-turn.service';
 import { RoadmapReviewService } from './review/roadmap-review.service';
+import { RoadmapSweepController } from './review/roadmap-sweep.controller';
+import { RoadmapSweepService } from './review/roadmap-sweep.service';
 import { RoadmapMetricsController } from './metrics/roadmap-metrics.controller';
 import { RoadmapMetricsService } from './metrics/roadmap-metrics.service';
 
@@ -249,6 +251,7 @@ import { RoadmapMetricsService } from './metrics/roadmap-metrics.service';
     RoadmapDraftController,
     RoadmapReviewController,
     RoadmapPlanGateController,
+    RoadmapSweepController,
     // P8: the Owner's Measures.
     RoadmapMetricsController,
     RoadmapItemBuildController,
@@ -271,6 +274,7 @@ import { RoadmapMetricsService } from './metrics/roadmap-metrics.service';
     RoadmapDraftService,
     RoadmapDictationService,
     RoadmapReviewService,
+    RoadmapSweepService,
     RoadmapMetricsService,
     RoadmapItemBuildService,
     RoadmapRoleAdminService,

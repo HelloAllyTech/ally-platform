@@ -327,6 +327,8 @@ export interface BuilderQuestionEvent {
    * priority, taste, contradiction). Its basis and why it is the admin's call are in `rationale`.
    */
   questionType?: string;
+  /** The agent addressed it to the idea's author: a question about the problem or the user. */
+  forAuthor?: boolean;
 }
 
 /**
