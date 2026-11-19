@@ -174,6 +174,8 @@ class AgentRuntimeSettings(BaseModel):
     # outside a development environment (ENV__ENV DEV or DEVELOPMENT), even if set.
     DEBUG_TOOL_DELAY_SECONDS: float = Field(0.0, ge=0, le=60)
     DEBUG_TOOL_DELAY_WHEN: Literal["before", "after"] = "before"
+    # Only tools whose name starts with this ("create_", "update_"); empty = every tool.
+    DEBUG_TOOL_DELAY_ONLY: str = ""
 
 
 class BuilderSettings(BaseModel):

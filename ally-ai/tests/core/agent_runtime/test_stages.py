@@ -71,6 +71,21 @@ async def test_development_sleeps_only_on_the_chosen_side(delay, monkeypatch):
     assert slept == [25]
 
 
+@pytest.mark.asyncio
+async def test_the_delay_can_be_limited_to_some_tools(delay, monkeypatch):
+    delay(25, env="DEVELOPMENT", when="after")
+    monkeypatch.setattr(settings.AGENT_RUNTIME, "DEBUG_TOOL_DELAY_ONLY", "create_")
+    slept = []
+
+    async def fake_sleep(seconds):
+        slept.append(seconds)
+
+    monkeypatch.setattr(stages.asyncio, "sleep", fake_sleep)
+    await stages.debug_tool_delay("after", "find_slots")
+    await stages.debug_tool_delay("after", "create_appointments")
+    assert slept == [25]
+
+
 def test_a_stage_outside_a_run_logs_nothing(caplog):
     with caplog.at_level(logging.INFO):
         stages.stage("tool_start", tool="find_slots")

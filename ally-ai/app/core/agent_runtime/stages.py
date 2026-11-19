@@ -86,6 +86,9 @@ async def debug_tool_delay(when: str, tool: str) -> None:
     seconds = debug_tool_delay_seconds()
     if not seconds or settings.AGENT_RUNTIME.DEBUG_TOOL_DELAY_WHEN != when:
         return
+    only = settings.AGENT_RUNTIME.DEBUG_TOOL_DELAY_ONLY
+    if only and not tool.startswith(only):
+        return
     stage("debug_delay_start", tool=tool, when=when, seconds=seconds)
     await asyncio.sleep(seconds)
     stage("debug_delay_end", tool=tool, when=when)
