@@ -7,7 +7,11 @@ import {
 } from 'src/common/util/json-patch.util';
 import { BuilderSession } from '../entity/builder-session.entity';
 import { BuilderPrdDoc } from '../entity/builder-prd-doc.entity';
-import { BuilderPrdVersionAuthor } from '../enum/builder.enum';
+import {
+  BuilderPrdVersionAuthor,
+  BuilderSessionKind,
+} from '../enum/builder.enum';
+import { builderPlanTools } from '../util/builder-plan-tools.registry';
 import {
   BuilderQuestionOption,
   BuilderToolExecutionOutcome,
@@ -198,12 +202,23 @@ export class BuilderInterviewToolsService {
       situationBrief?: boolean;
       /** The opening turn under the protocol: the brief, and no question yet. */
       briefDue?: boolean;
-      /** A roadmap plan session: adds set_success_measure (audit 2026-11-19, rec 2). */
+      /** A Roadmap plan session: the roadmap's read-only tools ride at the end. */
       planSession?: boolean;
     } = {},
   ): any[] {
-    const planTools = options.planSession ? [SET_SUCCESS_MEASURE_TOOL] : [];
-    const legacy = [...this.legacyToolDefinitions(), ...planTools];
+    const tools = this.belt(options);
+    // A plan session adds set_success_measure (rec 2) and the roadmap's read-only tools (rec 5).
+    return options.planSession
+      ? [...tools, SET_SUCCESS_MEASURE_TOOL, ...builderPlanTools.definitions()]
+      : tools;
+  }
+
+  private belt(options: {
+    validatedTurns?: boolean;
+    situationBrief?: boolean;
+    briefDue?: boolean;
+  }): any[] {
+    const legacy = this.legacyToolDefinitions();
     if (!options.validatedTurns) return legacy;
     const gate = Boolean(options.situationBrief);
     const tools = [
@@ -834,7 +849,18 @@ export class BuilderInterviewToolsService {
               ? ` (scanned ${result.scan.windowFrom} → ${result.scan.windowTo})`
               : ' (no scan has completed yet)'),
         );
-      default:
+      default: {
+        // A Roadmap plan session's own tools (builder-plan-tools.registry), only there.
+        const provider =
+          context.session?.kind === BuilderSessionKind.PLAN
+            ? builderPlanTools.providerFor(name)
+            : null;
+        if (provider) {
+          return provider.execute(name, input ?? {}, {
+            session: context.session,
+            userId: context.userId,
+          });
+        }
         if (this.checklist && BUILDER_PRD_CHECKLIST_TOOL_NAMES.has(name)) {
           return this.checklist.execute(name, input, context);
         }
@@ -842,6 +868,7 @@ export class BuilderInterviewToolsService {
           modelResult: { ok: false, error: `Unknown tool "${name}"` },
           summary: `Unknown tool "${name}"`,
         };
+      }
     }
   }
 

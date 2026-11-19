@@ -32,6 +32,7 @@ import { PlanSession, PlanSessionStore } from '../plan/plan-session.store';
 import { PlanStageService } from '../plan/plan-stage.service';
 import { PlanCloseReadinessService } from '../plan/plan-close-readiness.service';
 import { PlanTurnService } from '../plan/plan-turn.service';
+import { PlanHandoffService } from '../plan/plan-handoff.service';
 import { RoadmapItemLookupService } from '../item/roadmap-item-lookup.service';
 import { RoadmapItemReadService } from '../item/roadmap-item-read.service';
 import type {
@@ -120,6 +121,8 @@ export class RoadmapReviewService implements OnModuleDestroy {
     @Optional() private readonly planTurns?: PlanTurnService,
     /** Close plan's one definition of ready (audit rec 2). Optional, like the turns. */
     @Optional() private readonly closeReadiness?: PlanCloseReadinessService,
+    /** Start planning's dated hand-off (audit rec. 5). Optional so older fixtures still build. */
+    @Optional() private readonly planHandoff?: PlanHandoffService,
   ) {}
 
   // ── Review ─────────────────────────────────────────────────────────────────
@@ -416,6 +419,7 @@ export class RoadmapReviewService implements OnModuleDestroy {
       planningStartedAt: new Date().toISOString(),
       planningStartedBy: userId,
     });
+    await this.attachStartHandoff(userId, ref.code, session.id);
     await this.events.record({
       sessionId: session.id,
       kind: PlanEventKind.PLANNING_STARTED,
@@ -967,6 +971,21 @@ export class RoadmapReviewService implements OnModuleDestroy {
       detail: { by },
     });
     return this.planSession(created.id);
+  }
+
+  /** Never fails Start planning: a hand-off that could not be written is logged and skipped. */
+  private async attachStartHandoff(
+    userId: number,
+    code: string,
+    sessionId: string,
+  ): Promise<void> {
+    try {
+      await this.planHandoff?.attachAtStart(userId, code, sessionId);
+    } catch (error) {
+      this.logger.warn(
+        `[ROADMAP] Start planning hand-off for ${code} not written: ${(error as Error)?.message}`,
+      );
+    }
   }
 
   private async planSession(sessionId: string | null) {

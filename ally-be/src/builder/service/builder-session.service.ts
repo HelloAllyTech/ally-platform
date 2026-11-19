@@ -242,6 +242,37 @@ export class BuilderSessionService {
   }
 
   /**
+   * Put one block in front of a session's hand-off, once. The one exception to "frozen once
+   * written": Roadmap's Start planning dates the idea as it stands then, before the planning
+   * interview's first turn, so no turn has cached the older prefix yet. `marker` is text the
+   * block contains; a hand-off already holding it is left alone, so a second press, or two
+   * racing, write it once. Bounded to BUILDER_HANDOFF_CONTEXT_MAX like every hand-off, from
+   * the end, so the new block survives. Resolves true when it wrote.
+   */
+  async prependHandoffBlock(
+    sessionId: string,
+    block: string,
+    marker: string,
+  ): Promise<boolean> {
+    const text = (block ?? '').trim();
+    if (!text || !marker || !text.includes(marker)) return false;
+    const rows: unknown = await this.sessionRepository.query(
+      `UPDATE "builder_sessions"
+          SET "handoffContext" = left($2 || COALESCE(E'\\n\\n' || "handoffContext", ''), $4)
+        WHERE id = $1
+          AND ("handoffContext" IS NULL OR strpos("handoffContext", $3) = 0)
+        RETURNING id`,
+      [sessionId, text, marker, BUILDER_HANDOFF_CONTEXT_MAX],
+    );
+    const list = Array.isArray(rows)
+      ? Array.isArray(rows[0])
+        ? rows[0]
+        : rows
+      : [];
+    return list.length > 0;
+  }
+
+  /**
    * The session's hand-off, or null. A read of its own because the column is `select: false`
    * — every other session read leaves it out, and only the interview turn needs it.
    */

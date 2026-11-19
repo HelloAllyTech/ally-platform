@@ -88,7 +88,14 @@ export const BUILDER_SEED_TITLE_MAX = 80;
 export const BUILDER_HANDOFF_TRANSCRIPT_MAX = 80_000;
 
 export const ROADMAP_LIMITS = {
+  /**
+   * An idea's whole text (title and summary), and so also a Roadmap v2 draft's text box: one
+   * limit for the capture box, the draft and what Submit files, so nothing typed is refused
+   * later. The admin mirrors it as ROADMAP_IDEA_TEXT_MAX and reads `textMax` from a draft.
+   */
   DESCRIPTION_MAX: 1000,
+  /** A title on its own: what firstLine() keeps of the first line. */
+  IDEA_TITLE_MAX: 120,
   PRD_MAX: 20000,
   CLAUDE_PROMPT_MAX: 20000,
   COMMENT_MAX: 500,

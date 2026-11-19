@@ -14,7 +14,15 @@ import { ChecksPanel } from "./ChecksPanel";
 import { DraftConversation, TurnError } from "./DraftConversation";
 import { agoText, dueSoon, errorCode, markFirstSubmit, newlyMet } from "./draftUtils";
 import { HighlightedTextBox } from "./HighlightedTextBox";
+import { IdeaAgentFindings } from "./IdeaAgentFindings";
 import { SimilarIdeas } from "./SimilarIdeas";
+import {
+  SubmitChoice,
+  SubmitChoiceState,
+  initialSubmitChoice,
+  submitChoiceProblem,
+  toSubmitChoice,
+} from "./SubmitChoice";
 import {
   useAddRoadmapDraftToMutation,
   useDiscardRoadmapDraftMutation,
@@ -30,7 +38,7 @@ import { DictationButton } from "../components/DictationButton";
 import { RoadmapDialog } from "../components/RoadmapDialog";
 import { RoadmapDropdown } from "../components/RoadmapDropdown";
 import { typeInText } from "../hooks/useDictation";
-import { useDraftAutosave } from "../hooks/useDraftAutosave";
+import { DRAFT_TEXT_MAX, useDraftAutosave } from "../hooks/useDraftAutosave";
 import { useOutbox } from "../hooks/useOutbox";
 import { RoadmapBreakpoint } from "../hooks/useRoadmapBreakpoint";
 import { useRoadmapJobTimer } from "../hooks/useRoadmapJobTimer";
@@ -271,13 +279,30 @@ const DraftEditor: React.FC<DraftViewProps & { draft?: RoadmapDraftDetail }> = (
   const [submitting, setSubmitting] = useState(false);
   const [sealed, setSealed] = useState(false);
 
+  // "What will be submitted" (audit rec. 6). A new statement from the agent replaces the edits.
+  const textMax = draft?.textMax ?? DRAFT_TEXT_MAX;
+  const proposal = draft?.proposal ?? null;
+  const [choice, setChoice] = useState<SubmitChoiceState>(() => initialSubmitChoice(proposal));
+  const proposalKey = proposal ? `${proposal.title}\n${proposal.statement}` : "";
+  useEffect(() => {
+    setChoice(initialSubmitChoice(proposal));
+    // Only when the agent's version itself changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proposalKey]);
+  const choiceProblem = proposal ? submitChoiceProblem(choice, textMax) : null;
+
   const doSubmit = async () => {
     if (!code || !draft || submitting) return;
     setSubmitting(true);
     await autosave.flush();
     const goalId = autosave.goalId ?? draft.suggestedGoal?.id ?? undefined;
     try {
-      const result = await submit({ code, ...(goalId ? { goalId } : {}) }).unwrap();
+      const result = await submit({
+        code,
+        ...(goalId ? { goalId } : {}),
+        // Only a page that showed the choice sends one; with none the server files the text as is.
+        ...(proposal ? { choice: toSubmitChoice(choice) } : {}),
+      }).unwrap();
       jobs.complete("draft_to_submitted", { itemId: code });
       setConfirmOpen(false);
       haptic(10);
@@ -296,6 +321,9 @@ const DraftEditor: React.FC<DraftViewProps & { draft?: RoadmapDraftDetail }> = (
       const c = errorCode(error);
       if (c === "goal_required") toast.error(copy.submitGoalNeeded);
       else if (c === "checks_incomplete") toast.error(copy.submitChecksMissing);
+      else if (c === "no_statement") toast.error(copy.submitNoStatement);
+      else if (c === "statement_empty") toast.error(copy.submitStatementEmpty);
+      else if (c === "too_long") toast.error(copy.submitTooLong(textMax));
       else toast.error(copy.submitFailed);
     }
   };
@@ -379,9 +407,13 @@ const DraftEditor: React.FC<DraftViewProps & { draft?: RoadmapDraftDetail }> = (
       </div>
       <p
         id={`roadmap-draft-help-${code ?? "new"}`}
-        className="m-0 text-xs text-typography-secondary"
+        className="m-0 flex justify-between gap-2 text-xs text-typography-secondary"
       >
-        {copy.textHelp}
+        <span>{copy.textHelp}</span>
+        {/* The one limit, shared with the capture box and with what Submit files. */}
+        <span className="shrink-0 tabular-nums">
+          {copy.textCount(autosave.text.length, textMax)}
+        </span>
       </p>
     </div>
   );
@@ -447,6 +479,21 @@ const DraftEditor: React.FC<DraftViewProps & { draft?: RoadmapDraftDetail }> = (
       large={isPhone}
     />
   );
+
+  const findings = (
+    <IdeaAgentFindings brief={draft?.brief ?? null} variant="live" showEmpty={!!code} />
+  );
+
+  const submitChoice =
+    complete && !readOnly ? (
+      <SubmitChoice
+        authorText={autosave.text}
+        proposal={proposal}
+        max={textMax}
+        value={choice}
+        onChange={setChoice}
+      />
+    ) : null;
 
   const similar = (
     <SimilarIdeas
@@ -543,12 +590,14 @@ const DraftEditor: React.FC<DraftViewProps & { draft?: RoadmapDraftDetail }> = (
       <div className="flex flex-col gap-4 px-4 py-3">
         {textBox}
         {goalRow}
+        {submitChoice}
       </div>
 
       {isPhone ? (
         <div className="flex flex-col gap-4 border-t border-border-light px-4 py-3">
           {conversation}
           {similar}
+          {findings}
         </div>
       ) : (
         <div
@@ -561,6 +610,7 @@ const DraftEditor: React.FC<DraftViewProps & { draft?: RoadmapDraftDetail }> = (
           <div className="flex min-w-0 flex-col gap-4">
             {conversation}
             {similar}
+            {findings}
           </div>
           <div className="min-w-0">{checksPanel}</div>
         </div>
@@ -618,7 +668,7 @@ const DraftEditor: React.FC<DraftViewProps & { draft?: RoadmapDraftDetail }> = (
         title={copy.submitConfirmTitle}
         primaryText={copy.submitConfirm}
         onPrimary={() => void doSubmit()}
-        primaryDisabled={submitting}
+        primaryDisabled={submitting || !!choiceProblem}
         secondaryText={copy.submitCancel}
         sheet={touch}
         closeLabel={copy.submitCancel}

@@ -24,6 +24,7 @@ import type {
   RoadmapSelfCheck,
   RoadmapSessionAnswers,
   RoadmapSimilarIdea,
+  RoadmapSubmitChoice,
   RoadmapSubmitResult,
 } from "../types/roadmapV2Flow";
 
@@ -188,11 +189,14 @@ export const roadmapV2FlowAPI = baseAPI.injectEndpoints({
       ],
     }),
 
-    submitRoadmapDraft: builder.mutation<RoadmapSubmitResult, { code: string; goalId?: string }>({
-      query: ({ code, goalId }) => ({
+    submitRoadmapDraft: builder.mutation<
+      RoadmapSubmitResult,
+      { code: string; goalId?: string; choice?: RoadmapSubmitChoice }
+    >({
+      query: ({ code, goalId, choice }) => ({
         url: ApiEndpoints.ROADMAP_V2_FLOW.DRAFT_SUBMIT(code),
         method: HttpMethod.POST,
-        body: goalId ? { goalId } : {},
+        body: { ...(goalId ? { goalId } : {}), ...(choice ?? {}) },
       }),
       // The draft page hands the answer to the idea page itself, after the Submit motion plays
       // (the dashed outline turns solid first), so the swap never cuts it short.
