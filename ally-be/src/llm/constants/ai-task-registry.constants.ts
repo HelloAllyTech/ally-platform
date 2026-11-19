@@ -2545,7 +2545,7 @@ const BUILDER_TASKS: AiTaskEntry[] = [
       "A plan session's hand-off opens with a dated block of the idea as it stands at Start planning (votes, " +
       'comments, similar ideas; built without a model call except the similar-ideas check, which is the roadmap-ai row), ' +
       'and its tool belt adds three read-only Roadmap tools (search_roadmap_ideas, read_roadmap_idea, ' +
-      "search_interview_notes) that reuse the idea agent's lookups — the board search embeds its query (corpus-embedding), no completion. ' +
+      "search_interview_notes) that reuse the idea agent's lookups — the board search embeds its query (corpus-embedding), no completion. " +
       'ask_admin may mark a question forAuthor (about the problem or the user): it is addressed to ' +
       "the idea's author with a notice; the turn's own call is unchanged (no extra call).",
     kind: AiTaskKind.COMPLETION,
