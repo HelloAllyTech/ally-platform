@@ -271,11 +271,14 @@ class TestMessageProcessor:
         )
 
         await message_processor.poll_queue()
+        # poll_queue returns once the messages have started; wait for them.
+        await message_processor.wait_until_idle()
 
-        # Verify receive was called with correct params
+        # Asks for no more than the free slots (3 by default), never the full
+        # max_messages: a received message must start at once.
         mock_queue_service.receive_messages.assert_awaited_once_with(
             queue_url="https://example-queue",
-            max_messages=10,
+            max_messages=3,
             wait_time_seconds=20,
             visibility_timeout=30,
         )
@@ -464,3 +467,109 @@ class TestMessageProcessor:
 
         # Should have called receive_messages multiple times despite the error
         assert mock_queue_service.receive_messages.await_count >= 1
+
+
+def _queue_service(batches):
+    """A queue whose receive_messages returns each batch in turn, then []."""
+    qs = MagicMock()
+    batches = list(batches)
+    qs.receive_messages = AsyncMock(
+        side_effect=lambda **_: batches.pop(0) if batches else []
+    )
+    qs.delete_message = AsyncMock()
+    qs.get_queue_depth = AsyncMock(return_value={})
+    return qs
+
+
+def _msg(chat_id):
+    return {"receipt_handle": f"rh-{chat_id}", "body": {"chat_id": chat_id}}
+
+
+class TestNoBatchWait:
+    """A finished message frees its slot at once (no waiting for its batch)."""
+
+    @pytest.mark.asyncio
+    async def test_a_slow_message_does_not_hold_back_the_next_one(self):
+        release_slow = asyncio.Event()
+        done = []
+
+        async def handler(body):
+            if body["chat_id"] == "slow":
+                await release_slow.wait()
+            done.append(body["chat_id"])
+
+        qs = _queue_service([[_msg("slow"), _msg("fast")], [_msg("next")]])
+        mp = MessageProcessor(
+            qs, handler, "q", max_messages=2, max_concurrent_messages=2
+        )
+
+        await mp.poll_queue()  # starts slow + fast
+        await asyncio.sleep(0)  # fast finishes, slow is still running
+        await asyncio.sleep(0)
+        assert done == ["fast"]
+
+        await mp.poll_queue()  # the freed slot is filled straight away
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        # Before, "next" waited until "slow" finished (the batch's slowest).
+        assert done == ["fast", "next"]
+        assert qs.receive_messages.await_args_list[1].kwargs["max_messages"] == 1
+
+        release_slow.set()
+        await mp.wait_until_idle()
+        assert done == ["fast", "next", "slow"]
+        assert qs.delete_message.await_count == 3
+
+    @pytest.mark.asyncio
+    async def test_never_receives_while_every_slot_is_busy(self):
+        release = asyncio.Event()
+
+        async def handler(body):
+            await release.wait()
+
+        qs = _queue_service([[_msg("a"), _msg("b")]])
+        mp = MessageProcessor(
+            qs, handler, "q", max_messages=5, max_concurrent_messages=2
+        )
+
+        await mp.poll_queue()
+        assert mp.free_slots == 0
+        assert qs.receive_messages.await_args_list[0].kwargs["max_messages"] == 2
+
+        # Full: the next poll waits for a slot instead of fetching messages
+        # that would sit invisible with their visibility clock running.
+        waiting = asyncio.create_task(mp.poll_queue())
+        await asyncio.sleep(0.01)
+        assert not waiting.done()
+        assert qs.receive_messages.await_count == 1
+
+        release.set()
+        await waiting
+        assert qs.receive_messages.await_count == 1
+        await mp.wait_until_idle()
+
+    @pytest.mark.asyncio
+    async def test_stop_cancels_messages_still_processing_and_keeps_them(self):
+        started = asyncio.Event()
+
+        async def handler(body):
+            started.set()
+            await asyncio.sleep(3600)
+
+        qs = _queue_service([[_msg("a")]])
+        mp = MessageProcessor(
+            qs,
+            handler,
+            "q",
+            wait_time_seconds=0,
+            polling_interval=0.01,
+            max_concurrent_messages=2,
+        )
+
+        await mp.start()
+        await asyncio.wait_for(started.wait(), 1)
+        await mp.stop()
+
+        assert not mp._in_flight
+        # Not deleted: SQS redelivers it to the next worker.
+        qs.delete_message.assert_not_awaited()
