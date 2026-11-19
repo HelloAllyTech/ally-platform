@@ -16,8 +16,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *
  * down() drops both columns.
  */
-export class AddAssessmentAttemptStamp1984800000000 implements MigrationInterface {
-  name = 'AddAssessmentAttemptStamp1984800000000';
+export class AddAssessmentAttemptStamp1984900000000 implements MigrationInterface {
+  name = 'AddAssessmentAttemptStamp1984900000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
