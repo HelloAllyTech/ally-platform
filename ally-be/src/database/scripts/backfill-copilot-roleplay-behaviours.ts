@@ -12,6 +12,10 @@
  *
  *   npm run backfill:copilot-roleplay-behaviours -- --dry-run   # report only
  *   npm run backfill:copilot-roleplay-behaviours                # write rows
+ *
+ * Runs the COMPILED script (dist/), after `npm run build`. TypeORM loads its
+ * entities from dist/, so running this file through ts-node would load a second
+ * copy of every entity class and fail with "No metadata for …".
  */
 import 'reflect-metadata';
 import { config as loadEnv } from 'dotenv';
@@ -44,7 +48,7 @@ async function main(): Promise<void> {
       tenantId: string | null;
     }[] = await dataSource.query(
       `SELECT DISTINCT ON (s.id)
-              s.id AS "scenarioId", s."createdBy", cs."tenantId"
+              s.id AS "scenarioId", s."createdBy", cs.tenant_id AS "tenantId"
          FROM course_copilot_jobs j
          JOIN course_copilot_sessions cs ON cs.id = j."sessionId"
          JOIN scenarios s ON s.id = (j.result->>'scenarioId')::int
@@ -88,7 +92,11 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+// Exit explicitly: the app context leaves pollers and Redis subscribers behind
+// that keep the process alive after app.close().
+main()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
