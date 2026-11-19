@@ -646,13 +646,15 @@ export function missingChoice(
     if (f.archived_at || f.type !== ListFieldType.SELECT) continue;
     if (f.key === 'status' || f.key === list.settings?.person_field) continue;
     const property = def.input_schema.properties[f.key];
-    if (!property?.enum?.length) continue;
+    // The schema's enum carries "" for "not given": not an option to offer or match.
+    const options = (property?.enum ?? []).filter((o) => o.trim());
+    if (!options.length) continue;
     const given = data[f.key];
     if (given !== undefined && given !== null && given !== '') continue;
     if (f.default !== undefined && f.default !== null && f.default !== '') {
       continue;
     }
-    return { key: f.key, label: f.label, options: property.enum };
+    return { key: f.key, label: f.label, options };
   }
   return null;
 }

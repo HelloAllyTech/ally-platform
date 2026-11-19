@@ -353,3 +353,31 @@ describe('consent for list writes (chunk H1)', () => {
     });
   });
 });
+
+describe('missingChoice (chunk H1)', () => {
+  const { missingChoice } = require('../list-tools.service');
+  const list = {
+    settings: { person_field: 'client' },
+    fields: [
+      { key: 'service', label: 'Service', type: 'select' },
+      { key: 'status', label: 'Status', type: 'select', default: 'booked' },
+    ],
+  };
+  const def = {
+    input_schema: {
+      properties: {
+        service: { enum: ['', 'Eye checkup', 'LASIK consultation'] },
+        status: { enum: ['', 'booked'] },
+      },
+    },
+  };
+
+  it('offers only real options, never the empty "not given"', () => {
+    expect(missingChoice(list, def, {})).toEqual({
+      key: 'service',
+      label: 'Service',
+      options: ['Eye checkup', 'LASIK consultation'],
+    });
+    expect(missingChoice(list, def, { service: 'Eye checkup' })).toBeNull();
+  });
+});
