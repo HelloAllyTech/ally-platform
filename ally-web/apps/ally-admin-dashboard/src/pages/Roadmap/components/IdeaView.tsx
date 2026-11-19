@@ -28,14 +28,7 @@ import type { RoadmapItemDetail } from "@types";
 import { BottomSheet } from "./BottomSheet";
 import { Conversation } from "./Conversation";
 import { IdeaBannerControls } from "./IdeaBannerControls";
-import {
-  CopyLinkButton,
-  IdeaStar,
-  IdeaTitle,
-  IdeaVotes,
-  IdeaWatch,
-  PrimaryAction,
-} from "./IdeaControls";
+import { CopyLinkButton, IdeaStar, IdeaTitle, IdeaVotes, PrimaryAction } from "./IdeaControls";
 import { IdeaPanelContent } from "./IdeaPanels";
 import { BANNER_TONE, HeaderTracker, OpportunityHeader } from "./OpportunityHeader";
 import { PeopleChips } from "./PeopleChips";
@@ -361,7 +354,6 @@ export const IdeaView: React.FC<IdeaViewProps> = ({
         <>
           <IdeaVotes item={item} />
           <IdeaStar item={item} />
-          <IdeaWatch item={item} />
           <CopyLinkButton code={item.code} />
           {mode === "pane" && onOpenFull && (
             <RoadmapIconButton label={copy.openFullPage} onClick={onOpenFull}>
@@ -614,7 +606,8 @@ export const IdeaView: React.FC<IdeaViewProps> = ({
 
 /**
  * The phone header (§4.17): ‹ Queue, votes, star, ⋯; code and title; a 5-segment tracker with the
- * stage word. As you scroll, the title moves into the top bar and the tracker thins to a line.
+ * stage word. As you scroll, the title moves into the top bar (in full, wrapped) and the tracker
+ * thins to a line.
  */
 const PhoneHeader: React.FC<{
   item: RoadmapItemDetail;
@@ -624,8 +617,6 @@ const PhoneHeader: React.FC<{
 }> = ({ item, collapsed, status, headingRef }) => {
   const reduced = useReducedMotionPreference();
   const copy = en.roadmapV2;
-  const [barOpen, setBarOpen] = useState(false);
-  useEffect(() => setBarOpen(false), [item.code]);
   return (
     <header className="flex flex-col">
       <div
@@ -640,26 +631,19 @@ const PhoneHeader: React.FC<{
         >
           ‹ {copy.backToQueue}
         </Link>
-        {/* The grounding strip: code, stage and title are on screen at every scroll position and in
-            every tab. The title is one line until tapped, then the whole text. */}
-        <button
-          type="button"
-          onClick={() => setBarOpen(open => !open)}
-          aria-expanded={barOpen}
-          aria-label={`${item.code}. ${item.title}. ${barOpen ? copy.idea.titleHide : copy.idea.titleShow}`}
-          className="flex min-h-12 min-w-0 flex-1 flex-col justify-center bg-transparent py-1 text-left"
-        >
+        {/* The grounding strip: code and stage at every scroll position and in every tab. The title
+            is always on screen in full: in the body below until you scroll past it, then here,
+            wrapped — never cut to one line (2026-11-19). */}
+        <div className="flex min-h-12 min-w-0 flex-1 flex-col justify-center py-1">
           <span className="text-xs tabular-nums leading-tight text-typography-secondary">
             {item.code} · {copy.stages[item.stage ?? item.shownStage]}
           </span>
-          <span
-            className={`text-sm font-semibold leading-snug text-typography-primary ${
-              barOpen ? "" : "truncate"
-            }`}
-          >
-            {item.title}
-          </span>
-        </button>
+          {collapsed && (
+            <span className="break-words text-sm font-semibold leading-snug text-typography-primary">
+              {item.title}
+            </span>
+          )}
+        </div>
         <IdeaStar item={item} compact />
         <CopyLinkButton code={item.code} compact />
       </div>
@@ -684,7 +668,6 @@ const PhoneHeader: React.FC<{
         <IdeaBannerControls item={item} />
         <div className="flex items-center gap-2">
           <IdeaVotes item={item} />
-          <IdeaWatch item={item} />
         </div>
       </div>
     </header>

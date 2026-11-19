@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 
-import { Notification, StarSolid } from "@icons";
+import { StarSolid } from "@icons";
 import { AnimatePresence, PanInfo, motion, useAnimationControls } from "framer-motion";
 
 import { Tag } from "@ally-ui-mono/ui-shared";
@@ -19,8 +19,7 @@ import { simpleStageOfShown, stageWord, whyHereLine } from "../utils/copy";
 export interface QueueRowActions {
   onOpen: (code: string) => void;
   onMarkRead: (code: string) => void;
-  onWatch: (code: string) => void;
-  /** Long-press on touch: the action sheet (open, watch, copy link). */
+  /** Long-press on touch: the action sheet (open the idea). */
   onLongPress?: (code: string) => void;
   /** Hovered or focused for 150 ms: prefetch the reading pane (§4.12). */
   onPrefetch?: (code: string) => void;
@@ -38,7 +37,6 @@ interface QueueRowProps extends QueueRowActions {
 }
 
 const REVEAL_LEFT = -132;
-const REVEAL_RIGHT = 96;
 const SNAP_THRESHOLD = 56;
 const LONG_PRESS_MS = 500;
 const PREFETCH_DELAY_MS = 150;
@@ -48,8 +46,8 @@ const PREFETCH_DELAY_MS = 150;
  * and star on the right. Bold with a dot = changed since you last opened it, and the open button's
  * name says "Unread" too, so the state is never carried by weight alone.
  *
- * On touch, a swipe only REVEALS actions — left: Mark read; right: Watch — and every one of them is
- * also in the row's ⋯ menu (§4.17). The row is a plain list item with one named button, never a
+ * On touch, a swipe left only REVEALS Mark read; it is also in the row's ⋯ menu (§4.17). (Swipe
+ * right revealed Watch until per-idea watching was removed from the UI on 2026-11-19.) The row is a plain list item with one named button, never a
  * `role="button"` row, so screen readers keep the list semantics.
  */
 export const QueueRow: React.FC<QueueRowProps> = ({
@@ -60,14 +58,13 @@ export const QueueRow: React.FC<QueueRowProps> = ({
   index,
   onOpen,
   onMarkRead,
-  onWatch,
   onLongPress,
   onPrefetch,
 }) => {
   const reduced = useReducedMotionPreference();
   const copy = en.roadmapV2;
   const controls = useAnimationControls();
-  const [revealed, setRevealed] = useState<"none" | "left" | "right">("none");
+  const [revealed, setRevealed] = useState<"none" | "left">("none");
   const prefetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressed = useRef(false);
@@ -111,17 +108,16 @@ export const QueueRow: React.FC<QueueRowProps> = ({
     prefetchTimer.current = null;
   };
 
-  const snapTo = (where: "none" | "left" | "right") => {
+  const snapTo = (where: "none" | "left") => {
     setRevealed(where);
     void controls.start({
-      x: where === "left" ? REVEAL_LEFT : where === "right" ? REVEAL_RIGHT : 0,
+      x: where === "left" ? REVEAL_LEFT : 0,
       transition: springTransition(reduced),
     });
   };
 
   const onDragEnd = (_event: unknown, info: PanInfo) => {
     if (info.offset.x < -SNAP_THRESHOLD) snapTo("left");
-    else if (info.offset.x > SNAP_THRESHOLD) snapTo("right");
     else snapTo("none");
   };
 
@@ -164,21 +160,6 @@ export const QueueRow: React.FC<QueueRowProps> = ({
     >
       {touch && (
         <>
-          {/* Revealed by a swipe right. */}
-          <div
-            className="absolute inset-y-0 left-0 flex items-center"
-            aria-hidden={revealed !== "right"}
-          >
-            <button
-              type="button"
-              tabIndex={revealed === "right" ? 0 : -1}
-              onClick={act(onWatch)}
-              className="flex h-full w-24 flex-col items-center justify-center gap-1 bg-primary-600 text-sm text-white"
-            >
-              <Notification size={20} aria-hidden />
-              {copy.row.watch}
-            </button>
-          </div>
           {/* Revealed by a swipe left. */}
           <div
             className="absolute inset-y-0 right-0 flex items-center"
@@ -199,7 +180,7 @@ export const QueueRow: React.FC<QueueRowProps> = ({
       <motion.div
         animate={controls}
         drag={touch && !reduced ? "x" : false}
-        dragConstraints={{ left: REVEAL_LEFT, right: REVEAL_RIGHT }}
+        dragConstraints={{ left: REVEAL_LEFT, right: 0 }}
         dragElastic={0.1}
         dragDirectionLock
         onDragStart={cancelLongPress}
