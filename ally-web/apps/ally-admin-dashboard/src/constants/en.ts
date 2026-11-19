@@ -8984,6 +8984,7 @@ export const en = {
         allIdeas: "All ideas",
         idea: "this idea",
         bugs: "Bugs",
+        drafts: "My drafts",
         interviews: "User Interviews",
         settings: "Settings",
         pipeline: "Agent",

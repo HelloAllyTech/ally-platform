@@ -15,6 +15,7 @@ export type MovedLanding =
   | "allIdeas"
   | "idea"
   | "bugs"
+  | "drafts"
   | "interviews"
   | "settings"
   | AgentSection;
@@ -49,15 +50,17 @@ export const canSeeMeasures = (role: RoadmapRole): boolean => role === "owner";
 
 /**
  * `/product-roadmap?…`. `opportunity` and `plan` carry the opportunity's uuid, which the idea page
- * accepts as well as its code. My drafts stays on the old page until it has a Roadmap tab of its
- * own (P3), so `?tab=drafts` returns null.
+ * accepts as well as its code. `?tab=drafts` lands on the Roadmap's own My drafts: the old tab's
+ * drawer files through `POST /opportunities`, which answers 410 once the Roadmap is on.
  */
 export const productRoadmapTarget = (search: string): LegacyTarget | null => {
   const params = new URLSearchParams(search);
   const id = params.get("opportunity") || params.get("plan");
   if (id) return { to: ROUTES.ROADMAP_IDEA(id), from: "productRoadmap", landed: "idea" };
   const tab = params.get("tab");
-  if (tab === "drafts") return null;
+  if (tab === "drafts") {
+    return { to: ROUTES.ROADMAP_DRAFTS, from: "productRoadmap", landed: "drafts" };
+  }
   if (tab === "bugs") return { to: ROUTES.ROADMAP_BUGS, from: "productRoadmap", landed: "bugs" };
   if (tab === "interviews") {
     return { to: ROUTES.USER_INTERVIEWS, from: "productRoadmap", landed: "interviews" };

@@ -73,8 +73,12 @@ describe("redirect mapping (§5.7)", () => {
     expect(productRoadmapTarget("?tab=interviews")?.to).toBe(ROUTES.USER_INTERVIEWS);
   });
 
-  it("keeps My drafts on the old page until it has a Roadmap tab", () => {
-    expect(productRoadmapTarget("?tab=drafts")).toBeNull();
+  it("sends ?tab=drafts to My drafts, never the old drafts tab (its drawer files through a retired endpoint)", () => {
+    expect(productRoadmapTarget("?tab=drafts&view=inbox")).toEqual({
+      to: ROUTES.ROADMAP_DRAFTS,
+      from: "productRoadmap",
+      landed: "drafts",
+    });
   });
 
   it("sends the bare board to All ideas", () => {
