@@ -91,6 +91,7 @@ export class RoadmapMetricsService {
               o.stage, ${UTC('o."releasedAt"')} AS "releasedAt", o."builderSessionId", o.source,
               ${UTC('s."createdAt"')} AS "sessionCreatedAt",
               (s.kind = 'plan' AND s.plan ? 'draftVersion') AS drafted,
+              (s.kind = 'build') AS "builderInterview",
               COALESCE(jsonb_typeof(s.plan->'closed') = 'object', false)
                 AS "planClosed",
               s.plan->>'planningStartedAt' AS "planningStartedAt",
@@ -200,6 +201,9 @@ export class RoadmapMetricsService {
           date(e.planningAt),
           date(o.planningStartedAt),
           externalBuildAt,
+          // An older idea planned in a Builder interview: planning began with
+          // the interview, as the To do list already shows it.
+          o.builderInterview === true ? date(o.sessionCreatedAt) : null,
         ),
         // Here: the first build run. In Claude Code: once the brief went and
         // a pull request exists (deriveItemStage's rule, §4.5b).

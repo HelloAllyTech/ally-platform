@@ -1012,8 +1012,9 @@ export class RoadmapReviewService implements OnModuleDestroy {
     }
   }
 
+  /** The idea's linked session: a plan session, or an older idea's Builder interview. */
   private async planSession(sessionId: string | null) {
-    const session = sessionId ? await this.store.find(sessionId) : null;
+    const session = sessionId ? await this.store.findLinked(sessionId) : null;
     if (!session) {
       throw new ConflictException(
         'This idea has no plan yet, so it has no lead to set.',

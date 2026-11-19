@@ -87,7 +87,7 @@ export class PlanCloseReadinessService implements OnModuleInit {
     }
     const ref = await this.lookup.get(code);
     const plan = ref.builderSessionId
-      ? await this.store.find(ref.builderSessionId)
+      ? await this.store.findLinked(ref.builderSessionId)
       : null;
     if (!plan) throw new ConflictException('This idea has no plan yet.');
     return this.assess(plan);

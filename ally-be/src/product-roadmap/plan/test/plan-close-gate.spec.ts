@@ -26,6 +26,7 @@ function gate(
   const deps = {
     store: {
       find: jest.fn(async () => plan()),
+      findLinked: jest.fn(async () => plan()),
       patchPlan: jest.fn(),
     },
     builderSessions: {

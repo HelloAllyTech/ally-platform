@@ -97,6 +97,11 @@ function build(
       update: jest.fn(),
       patchPlan: jest.fn(),
       repository: { update: jest.fn() },
+      // The idea's linked session (plan or older Builder interview): same rows here.
+      findLinked: jest.fn(
+        async (id: string): Promise<unknown> =>
+          (deps.store.find as jest.Mock)(id),
+      ),
     },
     stage: { sync: jest.fn() },
     events: { record: jest.fn() },
