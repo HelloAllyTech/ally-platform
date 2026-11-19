@@ -89,7 +89,8 @@ const SignedInShell: React.FC = () => {
   if (assistantOnly) {
     // Every assistants page stays open, New assistant included: that page checks the Assistants
     // switch itself, so someone with it can create one and someone without it is told so.
-    if (!pathname.startsWith(ROUTES.WHATSAPP_BOT)) {
+    // Plan and usage is theirs too: with no Sidebar, the slim header is its only way in.
+    if (!pathname.startsWith(ROUTES.WHATSAPP_BOT) && pathname !== ROUTES.MY_PLAN) {
       return <Navigate to={ROUTES.WHATSAPP_BOT} replace />;
     }
     return (

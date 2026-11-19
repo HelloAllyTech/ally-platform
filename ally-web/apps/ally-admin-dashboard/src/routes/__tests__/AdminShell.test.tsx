@@ -74,6 +74,7 @@ const renderShell = (path: string) =>
           <Route path="/create-simulation/edit/:id" element={<div>editor</div>} />
           <Route path="/assistants" element={<div>assistants</div>} />
           <Route path="/assistants/new" element={<div>new assistant</div>} />
+          <Route path="/account/plan" element={<div>plan and usage</div>} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>
@@ -209,6 +210,12 @@ describe("AdminShell", () => {
       renderShell("/assistants/new");
       expect(screen.getByText("new assistant")).toBeInTheDocument();
       expect(screen.queryByTestId("stub-sidebar")).not.toBeInTheDocument();
+    });
+
+    it("can open Plan and usage, which has no other way in without the Sidebar", () => {
+      renderShell("/account/plan");
+      expect(screen.getByText("plan and usage")).toBeInTheDocument();
+      expect(screen.getByTestId("assistant-only-header")).toBeInTheDocument();
     });
 
     it("is sent back to their assistants from any other page", () => {
