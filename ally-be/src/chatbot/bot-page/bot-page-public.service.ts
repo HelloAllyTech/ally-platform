@@ -670,6 +670,12 @@ export class BotPagePublicService {
             ? UsageChannel.BUBBLE
             : UsageChannel.BOT_PAGE,
           runKind: UsageKind.CUSTOMER_REPLY,
+          // CR1: on an invite-only or organisation page the signed-in person holds a seat.
+          audience:
+            available.page.access === BotPageAccess.PUBLIC
+              ? 'customer'
+              : 'seat',
+          seatEmail: ready.email ?? null,
         },
         () =>
           this.engine.respond(

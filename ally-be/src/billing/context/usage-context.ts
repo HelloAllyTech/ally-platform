@@ -22,6 +22,14 @@ export interface UsageContext {
   channel: UsageChannel;
   /** The kind for the agent run itself: customer_reply, try_it or checkup. */
   runKind: UsageKind;
+  /**
+   * Who is messaging, for the limits (CR1 Part C): an invited person on an invite-only or
+   * organisation bot page holds a seat; public visitors and WhatsApp are customers; Try it is the
+   * owner's team. Defaults from the channel.
+   */
+  audience?: 'customer' | 'seat' | 'owner';
+  /** The signed-in email on an invite or organisation bot page: whose seat it is. */
+  seatEmail?: string | null;
 }
 
 const storage = new AsyncLocalStorage<UsageContext>();

@@ -1,8 +1,10 @@
+import { PlanService } from 'src/billing/service/plan.service';
 import {
   BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -220,6 +222,8 @@ export class ChatbotService {
     private readonly engine: ChatbotEngineService,
     private readonly llmModels: LlmModelService,
     private readonly knowledgeBase: KnowledgeBaseService,
+    // CR1: going live is publishing, under the plan's limit (optional for existing specs).
+    @Optional() private readonly plans?: PlanService,
   ) {}
 
   // ───────────────────────────────────────────────────────────── read
@@ -490,10 +494,14 @@ export class ChatbotService {
 
   async setStatus(id: string, status: ChatbotStatus): Promise<ChatbotSummary> {
     await this.access.assert(id, ChatbotMemberRole.EDITOR);
+    if (status === ChatbotStatus.LIVE) await this.plans?.assertCanPublish(id);
     await this.chatbotRepository.update(
       { id },
       { status, updatedBy: currentUserId() },
     );
+    if (status === ChatbotStatus.LIVE) {
+      await this.plans?.ensureIncludedSeats(id).catch(() => undefined);
+    }
     // One switch: live means people can use it, so its page (and website chat) turns on with it.
     // Pausing leaves the page on, where visitors see that it's away rather than a missing page.
     if (status === ChatbotStatus.LIVE) {

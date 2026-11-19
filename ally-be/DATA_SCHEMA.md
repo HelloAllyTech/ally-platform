@@ -1205,6 +1205,25 @@ Agents v2 chunk CR1 (notes: `../docs/agents-v2/CHUNK-CR1-NOTES.md`). **Not multi
 
 `llm_usage` is unchanged and still receives every row; an assistant's row is also a `usage_events` row, recorded first.
 
+**Part B — tokens** (migration `1984900000100-CreateAssistantOwnerAndTokens`, which also creates the `ASSISTANT_OWNER` group with the WhatsApp-bot permissions only, never `system:access`):
+
+| Table | Key columns | Notes |
+| --- | --- | --- |
+| `token_grants` | `userId`, `amount` (> 0), `remaining` (≥ 0), `used`, `renewMonthly`, `renewDay` (1–28), `nextRenewalAt`, `expiresAt`, `status` (CHECK active/revoked/expired), `note`, `createdBy` | One allowance Ally assigned. Usage is taken from the oldest grant first; revoking zeroes `remaining`; a grant with `used > 0` can't be deleted. |
+| `token_balances` | `userId` (PK), `unlimited`, `overdraft` (≥ 0), `usedThisMonth`, `monthStart` | One row per user with an allowance; **no row = no limit**. Row-locked and updated in the same transaction as each `usage_events` insert; `overdraft` is what a run used past zero, taken from the next grant or renewal. Nightly reconcile against `usage_events`. |
+
+**Part C — plans and seats** (migration `1984900000200-CreatePlansAndSeats`; seeds Free, Pro, internal and Basic, Premium):
+
+| Table | Key columns | Notes |
+| --- | --- | --- |
+| `plans` | `key` (UNIQUE), `name`, `maxPublished`, `includedSeats`, `includedSeatTypeId`, `customerConversations`, `ownerRuns`, `seatsRequired`, `priceMicros`, `active` | NULL limit = unlimited. `seatsRequired` false (internal): invited people need no seat. Price is for Costs only. |
+| `seat_types` | `key` (UNIQUE), `name`, `messagesPerMonth` (NULL = unlimited), `rank`, `priceMicros`, `active` | Adding one needs no code. |
+| `subscriptions` | `userId` (UNIQUE), `planId`, `status` (CHECK active/past_due/cancelled), `periodStart` (its day resets the counters), `periodEnd`, `setBy`, `note` | One per chatbot creator. A creator without one is on Free. |
+| `seats` | `chatbotId` (FK CASCADE), `seatTypeId`, `kind` (CHECK included/extra), `assigneeEmail` (lower case; CHECK), `assigneeUserId`, `startDate`, `cycle` (CHECK monthly), `nextRenewal` (extra only), `status` (CHECK active/expiring/lapsed/cancelled), `addedBy`, `note` | **Partial UNIQUE (`chatbotId`, `assigneeEmail`) while active/expiring.** Extra seats renew on their own date while the subscription is active, else lapse. |
+| `usage_counters` | `subjectType` (CHECK seat/customers/owner_runs), `subjectId`, `periodStart`/`periodEnd` (UNIQUE with subject), `count`, `limitAtTime`, `alerted80At`, `alerted100At` | Locked for each check-and-add. |
+| `usage_counter_hits` | PK (`runId`, `kind`), `counterId` (FK CASCADE) | What made each count: a repeated message or request counts once. |
+| `customer_activity` | PK (`chatbotId`, `conversationKey`), `lastMessageAt` | A customer conversation is new after a 24-hour gap. Written only when the message may go ahead. |
+
 ---
 
 ## 4. Weaviate (vector DB — `ally-ai`)

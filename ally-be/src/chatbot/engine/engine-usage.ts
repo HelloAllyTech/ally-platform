@@ -42,5 +42,8 @@ export function usageContextFor(turn: ChatTurn): UsageContext {
     draftId: outer?.draftId ?? null,
     channel,
     runKind,
+    // Who is messaging, as the channel named it (a bot page names seats).
+    ...(outer?.audience ? { audience: outer.audience } : {}),
+    ...(outer?.seatEmail ? { seatEmail: outer.seatEmail } : {}),
   };
 }

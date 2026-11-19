@@ -70,3 +70,35 @@ export enum CostAlertKind {
   TOKEN_DRIFT = 'token_drift',
   SEAT_RENEWAL = 'seat_renewal',
 }
+
+export enum SubscriptionStatus {
+  ACTIVE = 'active',
+  PAST_DUE = 'past_due',
+  CANCELLED = 'cancelled',
+}
+
+export enum SeatKind {
+  INCLUDED = 'included',
+  EXTRA = 'extra',
+}
+
+export enum SeatStatus {
+  ACTIVE = 'active',
+  /** An extra seat whose renewal is within 7 days. */
+  EXPIRING = 'expiring',
+  /** Past its renewal and not renewed: the person can't chat until a seat is assigned again. */
+  LAPSED = 'lapsed',
+  CANCELLED = 'cancelled',
+}
+
+export enum SeatCycle {
+  MONTHLY = 'monthly',
+}
+
+export enum CounterSubject {
+  SEAT = 'seat',
+  /** An assistant's monthly customer conversations (public visitors and WhatsApp). */
+  CUSTOMERS = 'customers',
+  /** A creator's monthly owner-side runs: setup, site reading, checkups, change by chat, re-indexing, Try it. */
+  OWNER_RUNS = 'owner_runs',
+}

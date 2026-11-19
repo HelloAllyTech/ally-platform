@@ -1,7 +1,8 @@
+import { LimitsService } from 'src/billing/service/limits.service';
 import { usageContext } from 'src/billing/context/usage-context';
 import { UsageChannel, UsageKind } from 'src/billing/enum/billing.enum';
 import { createHash } from 'crypto';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { AiService } from 'src/ai/service/ai.service';
 import { KnowledgeChunkItemRequest } from 'src/ai/dto/knowledge.dto';
 import { S3Service } from 'src/aws/service/s3.service';
@@ -43,6 +44,8 @@ export class KbIngestService {
     private readonly documentTenantRepository: KbDocumentTenantRepository,
     private readonly aiService: AiService,
     private readonly s3Service: S3Service,
+    // CR1: owner-side runs and tokens (optional, so existing specs build without it).
+    @Optional() private readonly limits?: LimitsService,
   ) {}
 
   static hash(text: string): string {
@@ -92,6 +95,17 @@ export class KbIngestService {
       // uses it, that assistant. One run id per ingest, so a redelivered SQS message re-meters
       // nothing it already recorded.
       const chatbotId = await this.chatbotUsing(document.id);
+      // CR1: re-indexing an assistant's document is an owner-side run. Counted here, never
+      // refused: the request was already accepted and nobody is waiting on this queue.
+      if (action === 'reindex' && chatbotId && document.createdBy) {
+        void this.limits
+          ?.countOwnerRun(
+            document.createdBy,
+            `indexing:${document.id}:${document.updatedAt?.getTime?.() ?? 0}`,
+            'indexing',
+          )
+          .catch(() => undefined);
+      }
       await usageContext.run(
         {
           runId: `${action}:${document.id}:${document.updatedAt?.getTime?.() ?? 0}`,

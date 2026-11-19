@@ -1,3 +1,5 @@
+import { LimitsService } from 'src/billing/service/limits.service';
+import { randomUUID } from 'crypto';
 import { usageContext } from 'src/billing/context/usage-context';
 import { UsageChannel, UsageKind } from 'src/billing/enum/billing.enum';
 import { checkupGate, type CheckupGate } from './checkup-gate';
@@ -7,6 +9,7 @@ import {
   HttpStatus,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, LessThan, MoreThan, Repository } from 'typeorm';
@@ -154,6 +157,8 @@ export class CheckupService {
     private readonly chatbots: ChatbotService,
     private readonly ai: AiService,
     private readonly settings?: ChatbotSettingsService,
+    // CR1: owner-side runs and tokens (optional, so existing specs build without it).
+    @Optional() private readonly limits?: LimitsService,
   ) {}
 
   private readonly logger = LoggerService.getInstance(CheckupService.name);
@@ -286,6 +291,12 @@ export class CheckupService {
     const { chatbot } = await this.access.assert(
       chatbotId,
       ChatbotMemberRole.EDITOR,
+    );
+    // CR1: a checkup run is one owner-side run (not one per question); refused at the limit.
+    await this.limits?.assertOwnerRun(
+      chatbot.createdBy,
+      `checkup:${chatbotId}:${randomUUID()}`,
+      'checkup',
     );
     const attempts = Math.min(
       Math.max(options.attempts ?? 1, 1),
@@ -745,6 +756,16 @@ export class CheckupService {
     draftId: string | null,
     trigger: 'onboarding' | 'try' = 'onboarding',
   ): Promise<CheckupResultView[]> {
+    // CR1: asking now is an owner-side run on the creator's plan.
+    const [creator] = await this.runs.manager.query(
+      `SELECT created_by AS "createdBy" FROM chatbots WHERE id = $1`,
+      [chatbotId],
+    );
+    await this.limits?.assertOwnerRun(
+      creator?.createdBy,
+      `checkup:${chatbotId}:${randomUUID()}`,
+      'checkup',
+    );
     const cases = await this.cases.find({
       where: { chatbotId, id: In(caseIds), deletedAt: IsNull() },
     });

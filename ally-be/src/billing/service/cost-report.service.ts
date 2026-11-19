@@ -267,6 +267,69 @@ export class CostReportService {
     }
   }
 
+  /**
+   * Against plans (CR1 A4): each plan's cost this period beside what it earns at the prices entered
+   * on Ally admin → Plans (plan price × subscribers, extra seats × their seat price). Plans without
+   * a price earn nothing here, so their margin reads as the cost.
+   */
+  async planMargins(period: Period) {
+    const months = Math.max(
+      1,
+      (period.to.getTime() - period.from.getTime()) / (30 * DAY_MS),
+    );
+    const plans: Array<Record<string, string | null>> =
+      await this.dataSource.query(
+        `SELECT p.id, p.key, p.name, p."priceMicros",
+              count(DISTINCT s."userId") FILTER (WHERE s.status = 'active') AS subscribers,
+              coalesce((SELECT sum(e."costMicros") FROM usage_events e
+                          JOIN subscriptions s2 ON s2."userId" = e."creatorUserId"
+                         WHERE s2."planId" = p.id AND e."createdAt" >= $1 AND e."createdAt" < $2), 0) AS cost
+         FROM plans p LEFT JOIN subscriptions s ON s."planId" = p.id
+        GROUP BY p.id ORDER BY p."createdAt"`,
+        [period.from, period.to],
+      );
+    const seats: Array<Record<string, string | null>> =
+      await this.dataSource.query(
+        `SELECT t.key, t.name, t."priceMicros",
+              count(s.id) FILTER (WHERE s.kind = 'extra' AND s.status IN ('active','expiring')) AS extra,
+              count(s.id) FILTER (WHERE s.kind = 'included' AND s.status IN ('active','expiring')) AS included
+         FROM seat_types t LEFT JOIN seats s ON s."seatTypeId" = t.id
+        GROUP BY t.id ORDER BY t.rank`,
+      );
+    const seatRows = seats.map((row) => {
+      const price =
+        row.priceMicros === null ? null : microsToUsd(row.priceMicros);
+      return {
+        key: row.key,
+        name: row.name,
+        price,
+        extraSeats: Number(row.extra),
+        includedSeats: Number(row.included),
+        earns: price === null ? 0 : price * Number(row.extra) * months,
+      };
+    });
+    const planRows = plans.map((row) => {
+      const price =
+        row.priceMicros === null ? null : microsToUsd(row.priceMicros);
+      const earns =
+        price === null ? 0 : price * Number(row.subscribers) * months;
+      const cost = microsToUsd(row.cost);
+      return {
+        key: row.key,
+        name: row.name,
+        price,
+        subscribers: Number(row.subscribers),
+        cost,
+        earns,
+        margin: earns - cost,
+        costPerSubscriber: Number(row.subscribers)
+          ? cost / Number(row.subscribers)
+          : null,
+      };
+    });
+    return { months, plans: planRows, seatTypes: seatRows };
+  }
+
   async recentAlerts(limit = 20) {
     const rows: Array<Record<string, unknown>> = await this.dataSource.query(
       `SELECT kind, "subjectKey", day, detail, "createdAt" FROM cost_alerts

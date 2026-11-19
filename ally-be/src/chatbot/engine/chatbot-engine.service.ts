@@ -1,3 +1,5 @@
+import { LimitReason, limitReply } from './limit-reply';
+import { LimitsService } from 'src/billing/service/limits.service';
 import { usageContextFor } from './engine-usage';
 import { usageContext } from 'src/billing/context/usage-context';
 import { Injectable, Optional } from '@nestjs/common';
@@ -223,6 +225,8 @@ export class ChatbotEngineService {
     private readonly agentRuntime: AgentRuntimeRunner,
     // Optional so the engine's own specs build it without the store: then no chat is ever held.
     @Optional() private readonly conversations?: ConversationService,
+    // CR1: plans, seats and tokens. Optional so the engine's own specs build it without them.
+    @Optional() private readonly limits?: LimitsService,
   ) {}
 
   /**
@@ -238,6 +242,59 @@ export class ChatbotEngineService {
   }
 
   private async respondInContext(
+    turn: ChatTurn,
+    live?: LiveReply,
+  ): Promise<ChatbotDecision> {
+    // CR1: at any limit, no run starts. The crisis check still runs first and its reply always
+    // goes out; otherwise the person gets a fixed, honest reply (no AI call, no dollars).
+    const limited = await this.limits?.checkTurn({
+      chatbotId: turn.chatbot.id,
+      creatorUserId: turn.chatbot.createdBy,
+      conversationKey: turn.conversationId ?? turn.sender?.externalId,
+      context: usageContext.current(),
+    });
+    if (limited) {
+      return (
+        (await this.crisisOnly(turn)) ?? {
+          handledBy: WaHandledBy.RATE_LIMITED,
+          body: await this.limitText(turn, limited),
+          limited,
+        }
+      );
+    }
+    return this.respondUnlimited(turn, live);
+  }
+
+  /** The fixed reply at a limit, in the person's language, naming the business or its owner. */
+  private async limitText(
+    turn: ChatTurn,
+    reason: LimitReason,
+  ): Promise<string> {
+    const language = replyLanguageOf(turn.text, turn.language);
+    if (reason === 'customers') {
+      return limitReply(reason, language, {
+        business: turn.chatbot.name,
+        contact: contactFromSources(
+          await this.businessFacts(turn),
+          turn.settings.helplineNumbers,
+        ),
+      });
+    }
+    let owner: string | null = null;
+    if (reason === 'no_seat' || reason === 'seat_messages') {
+      const [row] = await this.documentRepository.manager
+        .query(
+          `SELECT u.name FROM chatbot_members m JOIN users u ON u.id = m.user_id
+            WHERE m.chatbot_id = $1 AND m.role = 'owner' ORDER BY m."createdAt" LIMIT 1`,
+          [turn.chatbot.id],
+        )
+        .catch(() => []);
+      owner = row?.name ?? null;
+    }
+    return limitReply(reason, language, { owner });
+  }
+
+  private async respondUnlimited(
     turn: ChatTurn,
     live?: LiveReply,
   ): Promise<ChatbotDecision> {

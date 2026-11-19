@@ -1,7 +1,9 @@
+import { LimitsService } from 'src/billing/service/limits.service';
 import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Optional,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import type {
@@ -98,6 +100,8 @@ export class BotDraftSessionService implements CrawlLearner {
     private readonly events: BotDraftEventsService,
     private readonly ai: AiService,
     private readonly documents: KbIngestService,
+    // CR1: owner-side runs and tokens (optional, so existing specs build without it).
+    @Optional() private readonly limits?: LimitsService,
   ) {}
 
   // ── the conversation ──────────────────────────────────────────────────
@@ -129,6 +133,12 @@ export class BotDraftSessionService implements CrawlLearner {
     // The owner's message is saved with the reply, not before it: a turn that's stopped (or
     // fails) leaves the draft exactly as it was.
     const said = text || chipLabel(draft, chip);
+    // CR1: a setup step is an owner-side run on the creator's plan; refused before any AI call.
+    await this.limits?.assertOwnerRun(
+      draft.ownerUserId,
+      `setup:${draft.id}:${randomUUID()}`,
+      'setup',
+    );
     const request = await this.stepRequest(draft, text, chip);
     const tokens: string[] = [];
     const response = await this.ai.runBuilderStepStreaming(
@@ -379,6 +389,17 @@ export class BotDraftSessionService implements CrawlLearner {
   async learnFrom(draftId: string, pages: LearnablePage[]): Promise<void> {
     if (!pages.length) return;
     const draft = await this.fresh(draftId);
+    // CR1: reading a site is one owner-side run a day per draft, however many batches it takes.
+    // At the limit the pages are skipped (the reader is in the background; nothing to refuse to).
+    try {
+      await this.limits?.assertOwnerRun(
+        draft.ownerUserId,
+        `site_reading:${draftId}:${new Date().toISOString().slice(0, 10)}`,
+        'site_reading',
+      );
+    } catch {
+      return;
+    }
     const result = await this.ai.extractOnboardingFacts({
       draft_id: draftId,
       pages: pages.map((page) => ({

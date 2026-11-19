@@ -1,4 +1,5 @@
 import { DataSource } from 'typeorm';
+import { BILLING_ENTITIES } from './billing-entities';
 import {
   closeTestDataSource,
   describePg,
@@ -6,14 +7,6 @@ import {
   resetTables,
   seedChatbot,
 } from '../../whatsapp/shared-store/test/shared-store.pg';
-import { BillingAudit } from '../entity/billing-audit.entity';
-import { BillingModel } from '../entity/billing-model.entity';
-import { BillingModelPrice } from '../entity/billing-model-price.entity';
-import { CostAlert } from '../entity/cost-alert.entity';
-import { CostSettings } from '../entity/cost-settings.entity';
-import { FixedCost } from '../entity/fixed-cost.entity';
-import { UsageEvent } from '../entity/usage-event.entity';
-import { WhatsAppRate } from '../entity/whatsapp-rate.entity';
 import {
   BillingModelType,
   BillingStatus,
@@ -27,17 +20,6 @@ import { CostAlertService } from '../service/cost-alert.service';
 import { CostReportService } from '../service/cost-report.service';
 import { UsageEventService } from '../service/usage-event.service';
 import { WhatsAppPricingService } from '../service/whatsapp-pricing.service';
-
-export const BILLING_ENTITIES = [
-  BillingModel,
-  BillingModelPrice,
-  WhatsAppRate,
-  UsageEvent,
-  FixedCost,
-  CostSettings,
-  CostAlert,
-  BillingAudit,
-];
 
 /**
  * CR1 Part A on real Postgres: recording, idempotency, price versions, repricing, the delete rule,

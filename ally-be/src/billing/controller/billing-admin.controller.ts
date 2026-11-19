@@ -196,6 +196,14 @@ export class BillingAdminController {
     return this.reports.exportCsv(parsePeriod(from, to));
   }
 
+  @ApiOperation({
+    summary: "Each plan's cost against what it earns at the entered prices",
+  })
+  @Get('costs/plans')
+  planMargins(@Query('from') from?: string, @Query('to') to?: string) {
+    return this.reports.planMargins(parsePeriod(from, to));
+  }
+
   @ApiOperation({ summary: 'Budget and alert thresholds, in dollars' })
   @Get('costs/settings')
   settings() {

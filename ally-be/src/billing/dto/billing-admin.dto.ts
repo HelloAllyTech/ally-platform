@@ -207,3 +207,176 @@ export class BreakdownQueryDto {
   @IsString()
   to?: string;
 }
+
+export class TokenGrantDto extends NoteDto {
+  @ApiProperty({ example: 2_000_000 })
+  @IsNumber()
+  @Min(1)
+  amount!: number;
+
+  @ApiPropertyOptional({
+    description: 'Resets to this amount on the same day each month',
+  })
+  @IsOptional()
+  renewMonthly?: boolean;
+
+  @ApiPropertyOptional({ example: '2027-03-31' })
+  @IsOptional()
+  @IsString()
+  expiresAt?: string | null;
+}
+
+export class TokenGrantUpdateDto extends NoteDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  amount?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  renewMonthly?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  expiresAt?: string | null;
+}
+
+export class UnlimitedDto extends NoteDto {
+  @ApiProperty()
+  unlimited!: boolean;
+}
+
+export class PlanDto extends NoteDto {
+  @ApiPropertyOptional({ example: 'pro', description: 'Set on create only' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  key?: string;
+
+  @ApiProperty({ example: 'Pro' })
+  @IsString()
+  @MaxLength(100)
+  name!: string;
+
+  @ApiPropertyOptional({ description: 'Empty: unlimited' })
+  @IsOptional()
+  maxPublished!: number | null;
+
+  @ApiProperty({ example: 5 })
+  @IsNumber()
+  @Min(0)
+  includedSeats!: number;
+
+  @ApiPropertyOptional({ example: 'basic' })
+  @IsOptional()
+  @IsString()
+  includedSeatTypeKey?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  customerConversations!: number | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  ownerRuns!: number | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  seatsRequired?: boolean;
+
+  @ApiPropertyOptional({ description: 'USD per month, for Costs only' })
+  @IsOptional()
+  priceUsd?: number | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  active?: boolean;
+}
+
+export class SeatTypeDto extends NoteDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  key?: string;
+
+  @ApiProperty({ example: 'Premium' })
+  @IsString()
+  @MaxLength(100)
+  name!: string;
+
+  @ApiPropertyOptional({ description: 'Empty: unlimited' })
+  @IsOptional()
+  messagesPerMonth!: number | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  rank?: number;
+
+  @ApiPropertyOptional({
+    description: 'USD per seat per month, for Costs only',
+  })
+  @IsOptional()
+  priceUsd?: number | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  active?: boolean;
+}
+
+export class SubscriptionDto extends NoteDto {
+  @ApiProperty({ example: 'pro' })
+  @IsString()
+  planKey!: string;
+
+  @ApiPropertyOptional({ example: '2026-11-19' })
+  @IsOptional()
+  @IsString()
+  periodStart?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  periodEnd?: string | null;
+
+  @ApiPropertyOptional({ enum: ['active', 'past_due', 'cancelled'] })
+  @IsOptional()
+  @IsString()
+  status?: 'active' | 'past_due' | 'cancelled';
+}
+
+export class AddSeatsDto extends NoteDto {
+  @ApiProperty({ example: 'premium' })
+  @IsString()
+  seatTypeKey!: string;
+
+  @ApiProperty({ example: 2 })
+  @IsNumber()
+  @Min(1)
+  count!: number;
+
+  @ApiPropertyOptional({ example: '2026-12-01' })
+  @IsOptional()
+  @IsString()
+  startDate?: string;
+}
+
+export class SeatTypeChangeDto extends NoteDto {
+  @ApiProperty({ example: 'premium' })
+  @IsString()
+  seatTypeKey!: string;
+}
+
+export class AssignSeatDto {
+  @ApiPropertyOptional({
+    example: 'person@example.com',
+    description: 'Null frees the seat',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(320)
+  email!: string | null;
+}

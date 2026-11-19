@@ -1,7 +1,9 @@
+import { PlanService } from 'src/billing/service/plan.service';
 import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Optional,
 } from '@nestjs/common';
 import { prechatFor } from '../../chatbot/bot-page/prechat-minors';
 import { OnEvent } from '@nestjs/event-emitter';
@@ -86,6 +88,8 @@ export class BotDraftPublishService {
     private readonly knowledge: KnowledgeBaseService,
     @InjectRepository(Chatbot)
     private readonly chatbots: Repository<Chatbot>,
+    // CR1: the plan's publish limit and the included seats (optional for existing specs).
+    @Optional() private readonly plans?: PlanService,
   ) {}
 
   async publish(
@@ -108,6 +112,8 @@ export class BotDraftPublishService {
       draft.chatbotId,
       ChatbotMemberRole.EDITOR,
     );
+    // CR1: refused before anything is written ("Free publishes up to 3 assistants…").
+    await this.plans?.assertCanPublish(chatbot.id);
     const config = draft.draftConfig;
     const pageAccess = dto.access as BotPageAccess;
 
@@ -228,6 +234,14 @@ export class BotDraftPublishService {
     this.logger.info(
       `Draft ${draft.id} published as chatbot ${chatbot.id} (${pageAccess}, ${emails.length} emails, ${organisationIds.length} organisations)`,
     );
+    // CR1: a published assistant has its included seats: owners, then editors, then invitees.
+    await this.plans
+      ?.ensureIncludedSeats(chatbot.id)
+      .catch((error: unknown) =>
+        this.logger.warn(
+          `Included seats not created for chatbot ${chatbot.id}: ${error instanceof Error ? error.message : 'unknown error'}`,
+        ),
+      );
     return {
       chatbotId: chatbot.id,
       slug: view.slug,
