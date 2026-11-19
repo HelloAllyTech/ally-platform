@@ -8762,13 +8762,8 @@ export const en = {
     },
     concepts: {
       button: "Core concepts",
-      tooltip: "Core concepts: what each part of Ally is, its code, and whether it's live",
-      title: "Core concepts",
-      source: "View only. The latest version of the Developer Wiki page.",
-      openOnWiki: "Open on the wiki",
-      loading: "Loading core concepts",
-      failed: "Couldn't load the core concepts page.",
-      retry: "Try again",
+      tooltip:
+        "Core concepts: what each part of Ally is, its code, and whether it's live. Opens the Developer Wiki in a new tab.",
     },
     agent: {
       title: "Agent",
