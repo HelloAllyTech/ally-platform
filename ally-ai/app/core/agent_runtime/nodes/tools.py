@@ -111,7 +111,20 @@ def make_tools_node(service: KnowledgeAgentService) -> Node:
             # A list tool's records (chunk 6) join the run's passages, numbered
             # after them, citable; they are not searches.
             added = json_safe(result.passages)
-            if tool.ends_run and result.record.get("ok"):
+            asked = result.record.get("questions")
+            if result.record.get("error") == "needs_confirmation" and asked:
+                # The gateway asks before it writes (chunk H1): its question is the
+                # reply, and the run ends here, with no more model calls.
+                language = (step.get("language") or "en").strip()
+                question = asked.get("hi") if language.startswith("hi") else None
+                update = {
+                    "result": json_safe(
+                        _asked_result(
+                            service, state, step, question or asked.get("en") or ""
+                        )
+                    )
+                }
+            elif tool.ends_run and result.record.get("ok"):
                 update = {
                     "result": json_safe(_handover_result(service, state, step, tool))
                 }
@@ -219,6 +232,38 @@ def _handover_result(
     )
     result["turn_type"] = state.get("turn_type") or "question"
     result["handover"] = True
+    return result
+
+
+def _asked_result(
+    service: KnowledgeAgentService,
+    state: AgentState,
+    step: Dict[str, Any],
+    question: str,
+) -> Dict[str, Any]:
+    """The run's result when the gateway asked for a yes (chunk H1): its question,
+    as a clarifying reply, no citations."""
+    language = (step.get("language") or state.get("language") or "en").strip()
+    retrieval = state.get("retrieval") or service.retrieval_meta(
+        state["limits"],
+        [],
+        language=language,
+        translated=None,
+        translation_degraded=False,
+    )
+    result: Dict[str, Any] = dict(
+        build_result(
+            intent=AnswerIntent.CLARIFY,
+            answer=question,
+            language=language,
+            confidence=1.0,
+            citations=[],
+            decline_reason=DeclineReason.NONE,
+            retrieval={**retrieval, "passages_used": len(state.get("passages") or [])},
+            meta=state.get("agent_meta") or {},
+        )
+    )
+    result["turn_type"] = "question"
     return result
 
 

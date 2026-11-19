@@ -10,7 +10,7 @@ import { LIST_COPY, ListRefusalException } from '../lists/list-refusals';
 import type { ListActor, ListRecordView } from '../lists/list-types';
 import type { ChatbotSettingsOverride } from '../type/chatbot.type';
 import { ListConsentService } from './list-consent.service';
-import { askFirstMessage, offerFor } from './list-consent';
+import { askFirstMessage, namesEntry, offerFor } from './list-consent';
 import {
   datedLists,
   listToolDefinitions,
@@ -285,7 +285,14 @@ export class ListToolsService {
         booking,
       );
       const accepted = this.consent
-        ? await this.consent.accepts(ctx, def.name, offer.key)
+        ? await this.consent.accepts(
+            ctx,
+            def.name,
+            offer.key,
+            (message) =>
+              namesEntry(message, list, intended) &&
+              (!current || namesEntry(message, list, current)),
+          )
         : null;
       if (!accepted) {
         const asked = this.consent

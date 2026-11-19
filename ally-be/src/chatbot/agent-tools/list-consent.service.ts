@@ -10,6 +10,9 @@ import {
   type WriteOffer,
 } from './list-consent';
 
+/** A turn's context lives as long as a run can. */
+const TURN_TTL_S = 120;
+
 /**
  * Where the offers wait (chunk H1 Part B): one per conversation, the latest, in Redis for a day. A
  * Redis failure fails closed: no offer is accepted, so nothing is written without a yes.
@@ -57,6 +60,43 @@ export class ListConsentService {
     return offer.id;
   }
 
+  /**
+   * What this turn's yes may answer (chunk H1): whether the person's message is a plain yes, and
+   * the assistant's previous message, for the gateway to check a write against. Two minutes: the
+   * run's own life.
+   */
+  async rememberTurn(
+    runId: string,
+    message: string,
+    previousAssistant: string | null | undefined,
+  ): Promise<void> {
+    try {
+      await this.redis.set(
+        `agent:turn:${runId}`,
+        JSON.stringify({
+          yes: isPlainYes(message),
+          previous: (previousAssistant ?? '').slice(0, 4000),
+        }),
+        TURN_TTL_S,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Could not store the turn: ${error instanceof Error ? error.message : 'unknown'}`,
+      );
+    }
+  }
+
+  private async turn(
+    runId: string,
+  ): Promise<{ yes: boolean; previous: string } | null> {
+    try {
+      const raw = await this.redis.get(`agent:turn:${runId}`);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+
   /** Store what this run would write, replacing any earlier offer. */
   async offer(
     ctx: { chatbotId: string; conversationId: string; runId: string },
@@ -101,7 +141,25 @@ export class ListConsentService {
     },
     tool: string,
     key: string,
+    /** Whether a message names exactly this entry (and for a move, the one it moves). */
+    names?: (message: string) => boolean,
   ): Promise<WriteOffer | null> {
+    // A plain yes to the assistant's last message, which named exactly this entry, in its own
+    // words (the model asked before calling the tool): that is the person's yes to it.
+    if (names) {
+      const turn = await this.turn(ctx.runId);
+      if (turn?.yes && turn.previous && names(turn.previous)) {
+        return {
+          id: 'previous-message',
+          runId: 'previous-turn',
+          tool,
+          key,
+          list: '',
+          questions: { en: '', hi: '' },
+          createdAt: Date.now(),
+        };
+      }
+    }
     if (!ctx.consentOfferId) return null;
     const offer = await this.current(ctx.chatbotId, ctx.conversationId);
     if (

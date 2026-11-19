@@ -6,6 +6,7 @@ import type { ListRecordView } from '../../lists/list-types';
 import { AgentRunTokenService } from '../agent-run-token.service';
 import {
   isPlainYes,
+  namesEntry,
   offerFor,
   questionIn,
   questionShown,
@@ -154,6 +155,60 @@ describe('consent for list writes (chunk H1)', () => {
     expect(questionIn(q, 'en')).toBe(q.en);
   });
 
+  it('a model-written question names the entry when it gives its date, time and service', () => {
+    const entry = record('x', 'Thu 26 Nov 2026, 13:00', 'LASIK consultation');
+    expect(
+      namesEntry(
+        'Shall I book Thursday 26 Nov 2026 at 1:00 PM for a LASIK consultation?',
+        list,
+        entry,
+      ),
+    ).toBe(true);
+    expect(
+      namesEntry(
+        'Shall I book 26 Nov at 13:00, LASIK consultation?',
+        list,
+        entry,
+      ),
+    ).toBe(true);
+    // Another time, another day or another service is not this entry.
+    expect(
+      namesEntry(
+        'Shall I book 26 Nov at 11:00, LASIK consultation?',
+        list,
+        entry,
+      ),
+    ).toBe(false);
+    expect(
+      namesEntry(
+        'Shall I book 27 Nov at 13:00, LASIK consultation?',
+        list,
+        entry,
+      ),
+    ).toBe(false);
+    expect(
+      namesEntry('Shall I book 26 Nov at 13:00, Eye checkup?', list, entry),
+    ).toBe(false);
+  });
+
+  it('a nameless contact is never said back, and the key ignores the person', () => {
+    const nameless = {
+      ...record('x', 'Sat 21 Nov 2026, 13:00', 'Eye checkup'),
+      display: {
+        slot: 'Sat 21 Nov 2026, 13:00',
+        client: 'A contact',
+        service: 'Eye checkup',
+        status: 'booked',
+      },
+    } as unknown as ListRecordView;
+    const named = record('y', 'Sat 21 Nov 2026, 13:00', 'Eye checkup');
+    const a = offerFor(list, 'create', nameless, null, true);
+    expect(a.questions.en).toBe(
+      'Shall I book Eye checkup on Sat 21 Nov 2026, 13:00?',
+    );
+    expect(offerFor(list, 'create', named, null, true).key).toBe(a.key);
+  });
+
   describe('ListConsentService', () => {
     const ctx = { chatbotId: 'bot', conversationId: 'conv', runId: 'run-1' };
     const q = {
@@ -215,6 +270,35 @@ describe('consent for list writes (chunk H1)', () => {
       await consent.consume('bot', 'conv');
       expect(
         await consent.accepts(later, 'create_appointments', 'k'),
+      ).toBeNull();
+    });
+
+    it('a plain yes to a message naming the entry is accepted without a stored offer', async () => {
+      const consent = new ListConsentService(memoryRedis() as never);
+      await consent.rememberTurn(
+        'run-9',
+        'Yes, book it.',
+        'Shall I book it at 10:00?',
+      );
+      const later = { ...ctx, runId: 'run-9' };
+      expect(
+        await consent.accepts(later, 'create_appointments', 'k', () => true),
+      ).not.toBeNull();
+      expect(
+        await consent.accepts(later, 'create_appointments', 'k', () => false),
+      ).toBeNull();
+      await consent.rememberTurn(
+        'run-10',
+        'OK, 1pm then',
+        'Shall I book it at 10:00?',
+      );
+      expect(
+        await consent.accepts(
+          { ...ctx, runId: 'run-10' },
+          'create_appointments',
+          'k',
+          () => true,
+        ),
       ).toBeNull();
     });
 

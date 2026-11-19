@@ -385,6 +385,14 @@ export class AgentRuntimeRunner {
     if (!tools.length) return body;
     // The person's yes to the question the assistant asked last turn (chunk H1): the only write
     // this run may make without asking.
+    if (lists.definitions.length && this.consent) {
+      // What this turn's yes answers, for the gateway (chunk H1).
+      await this.consent.rememberTurn(
+        run.runId,
+        request.question,
+        lastAssistant(request.history),
+      );
+    }
     const consent =
       lists.definitions.length && this.consent
         ? await this.consent.consentFor(

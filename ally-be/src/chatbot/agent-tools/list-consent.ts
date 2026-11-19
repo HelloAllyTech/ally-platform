@@ -124,6 +124,10 @@ function describe(list: ListDefinitionView, record: ListRecordView): Described {
     if (value === record.title) continue;
     if (details.length < 2) details.push(value);
   }
+  // A contact with no name yet shows as "A contact": not a name to say back.
+  if (person && /^(?:a contact|visitor\b|unknown|someone)/i.test(person)) {
+    person = undefined;
+  }
   return {
     title: record.title,
     ...(person ? { person } : {}),
@@ -150,13 +154,20 @@ export function offerFor(
   booking: boolean,
 ): { key: string; questions: OfferQuestions } {
   const a = describe(list, after);
+  // The person isn't in the key: the token pins every write to the person in the chat, and their
+  // name can change between the question and the yes (it is saved after a reply).
+  const personKey = list.settings?.person_field;
   const key = JSON.stringify([
     kind,
     list.key,
     before?.id ?? null,
     a.title,
     Object.entries(after.display ?? {})
-      .filter(([, v]) => v !== '' && v !== null && v !== undefined)
+      .filter(
+        ([k, v]) =>
+          k !== personKey && v !== '' && v !== null && v !== undefined,
+      )
+      .filter(([k]) => !isPersonField(list, k))
       .sort(([x], [y]) => x.localeCompare(y)),
   ]);
   if (kind === 'update' && before) {
@@ -209,3 +220,48 @@ export function offerFor(
 export const askFirstMessage = (question: string): string =>
   `Not done yet: nothing is saved until the person says yes. Ask them exactly this, and nothing ` +
   `else about it: "${question}"`;
+
+function isPersonField(list: ListDefinitionView, key: string): boolean {
+  const f = list.fields.find((field) => field.key === key);
+  return Boolean(f?.options && isContactRelation(f));
+}
+
+const MONTHS = 'jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec';
+
+/**
+ * Whether an assistant message named this entry: its date (day and month), its time (13:00,
+ * 1:00 PM, 1pm) and its details (the service), in any wording. Used when the person said a plain
+ * yes to a question the model wrote itself (chunk H1): the same entry, named, is what they agreed
+ * to. A title that isn't a day and time must appear as written.
+ */
+export function namesEntry(
+  message: string | null | undefined,
+  list: ListDefinitionView,
+  record: ListRecordView,
+): boolean {
+  const text = normal(message ?? '');
+  if (!text) return false;
+  const d = describe(list, record);
+  if (!d.details.every((detail) => text.includes(normal(detail)))) return false;
+  const when = new RegExp(
+    `(\\d{1,2})\\s+(${MONTHS})\\w*\\s+\\d{4},?\\s+(\\d{1,2}):(\\d{2})`,
+    'i',
+  ).exec(d.title);
+  if (!when) return text.includes(normal(d.title));
+  const [, day, month, hh, mm] = when;
+  const hour = Number(hh);
+  const twelve = hour % 12 || 12;
+  const ampm = hour < 12 ? 'am' : 'pm';
+  const times = [
+    `${hh}:${mm}`,
+    `${hour}:${mm}`,
+    `${twelve}:${mm} ${ampm}`,
+    `${twelve}:${mm}${ampm}`,
+    ...(mm === '00' ? [`${twelve} ${ampm}`, `${twelve}${ampm}`] : []),
+  ];
+  const dated =
+    new RegExp(`\\b${Number(day)}(?:st|nd|rd|th)?\\s+${month}`, 'i').test(
+      text,
+    ) || new RegExp(`${month}\\w*\\s+${Number(day)}\\b`, 'i').test(text);
+  return dated && times.some((t) => text.includes(t));
+}

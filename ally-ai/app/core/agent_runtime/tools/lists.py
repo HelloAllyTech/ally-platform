@@ -173,6 +173,12 @@ def list_tool(definition: Mapping[str, Any]) -> Tool:
             if isinstance(message, str) and message:
                 # A refusal from the list's rules: copy deck §26, plain words.
                 record["message"] = message[:300]
+            questions = result.get("questions")
+            if record["error"] == "needs_confirmation" and isinstance(questions, dict):
+                # The gateway's question before a write (chunk H1): the run's reply.
+                record["questions"] = {
+                    k: str(v)[:400] for k, v in questions.items() if k in ("en", "hi")
+                }
         summary = (
             f"{name}: ok, {len(added)} record" + ("" if len(added) == 1 else "s")
             if ok
