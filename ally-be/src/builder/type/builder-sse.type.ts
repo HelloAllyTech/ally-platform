@@ -79,6 +79,11 @@ export interface BuilderQuestionEvent {
    * behaviour, priority, taste, contradiction). The decision feed filters on it.
    */
   questionType?: string;
+  /**
+   * The agent marked it a question about the problem or the people who have
+   * it, so it is addressed to the idea's author (idea-to-plan audit rec 10).
+   */
+  forAuthor?: boolean;
 }
 
 export interface BuilderDoneEvent {

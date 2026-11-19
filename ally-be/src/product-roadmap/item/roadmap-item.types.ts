@@ -42,19 +42,35 @@ export type WhyHereDecision =
   | 'unblock';
 
 /** Why a row is in a view. */
+/** What moved on an idea you follow, when an unread notice says. */
+export type ProgressNotice =
+  | 'accepted'
+  | 'planReady'
+  | 'planClosed'
+  | 'comment';
+
 export type WhyHere =
   | {
       kind: 'agentQuestion';
       phase: 'idea' | 'plan';
       questionPreview: string;
       since: string;
+      /** The agent addressed it to the idea's author (a problem-or-user question). */
+      forAuthor?: boolean;
     }
   | { kind: 'mention'; by: PersonRef; since: string }
+  /** Something a notice says waits on you: the plan is ready to read, or your question was answered. */
+  | {
+      kind: 'notice';
+      notice: 'planReady' | 'questionAnswered';
+      since: string;
+      by?: PersonRef;
+    }
   | { kind: 'decision'; decision: WhyHereDecision; since: string }
   | { kind: 'awaitingReview'; since: string }
   | { kind: 'needsLead'; since: string }
   | { kind: 'reassign'; idleDays: number }
-  | { kind: 'progress' }
+  | { kind: 'progress'; notice?: ProgressNotice }
   | { kind: 'shipped'; at: string };
 
 export interface ItemRow {

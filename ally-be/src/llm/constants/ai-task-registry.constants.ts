@@ -2532,7 +2532,9 @@ const BUILDER_TASKS: AiTaskEntry[] = [
       "Roadmap v2 (P3b): after Start planning the plan interview runs in the idea's one session, and " +
       'each turn also reads every answer, comment and settled choice posted since the last turn by anyone ' +
       'with Roadmap access, attributed as [Name · role] (no extra call; a longer user message). ' +
-      'Conflicting answers are withheld until the settler chooses.',
+      'Conflicting answers are withheld until the settler chooses. ' +
+      'ask_admin may mark a question forAuthor (about the problem or the user): it is addressed to ' +
+      "the idea's author with a notice; the turn's own call is unchanged (no extra call).",
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
     defaultModel: 'gemini-2.5-pro',

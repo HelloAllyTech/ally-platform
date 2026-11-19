@@ -133,6 +133,8 @@ import { RoadmapDraftService } from './draft/roadmap-draft.service';
 import { RoadmapDictationService } from './draft/roadmap-dictation.service';
 import { RoadmapReviewController } from './review/roadmap-review.controller';
 import { RoadmapReviewService } from './review/roadmap-review.service';
+import { RoadmapSweepController } from './review/roadmap-sweep.controller';
+import { RoadmapSweepService } from './review/roadmap-sweep.service';
 import { RoadmapMetricsController } from './metrics/roadmap-metrics.controller';
 import { RoadmapMetricsService } from './metrics/roadmap-metrics.service';
 
@@ -243,6 +245,7 @@ import { RoadmapMetricsService } from './metrics/roadmap-metrics.service';
     // P3: New idea, drafts, dictation, review and the lead.
     RoadmapDraftController,
     RoadmapReviewController,
+    RoadmapSweepController,
     // P8: the Owner's Measures.
     RoadmapMetricsController,
     RoadmapItemBuildController,
@@ -265,6 +268,7 @@ import { RoadmapMetricsService } from './metrics/roadmap-metrics.service';
     RoadmapDraftService,
     RoadmapDictationService,
     RoadmapReviewService,
+    RoadmapSweepService,
     RoadmapMetricsService,
     RoadmapItemBuildService,
     RoadmapRoleAdminService,

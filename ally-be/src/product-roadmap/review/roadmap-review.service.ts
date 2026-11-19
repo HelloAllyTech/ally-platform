@@ -23,6 +23,7 @@ import {
 import { PlanEventService } from 'src/product-planning/service/plan-event.service';
 import { PlanSettingsService } from 'src/product-planning/service/plan-settings.service';
 import { RoadmapInboxService } from 'src/product-planning/service/roadmap-inbox.service';
+import { RoadmapIdeaNoticeService } from 'src/product-planning/service/roadmap-idea-notice.service';
 import { RoadmapRoleService } from 'src/product-planning/service/roadmap-role.service';
 import { roleAtLeast } from 'src/product-planning/util/roadmap-role.util';
 import { RoadmapNotificationService } from '../service/roadmap-notification.service';
@@ -113,6 +114,7 @@ export class RoadmapReviewService implements OnModuleDestroy {
     private readonly broadcast: RoadmapNotificationService,
     private readonly strategyGoals: RoadmapStrategyGoalService,
     private readonly builderSessions: BuilderSessionService,
+    private readonly ideaNotices: RoadmapIdeaNoticeService,
   ) {}
 
   // ── Review ─────────────────────────────────────────────────────────────────
@@ -421,6 +423,17 @@ export class RoadmapReviewService implements OnModuleDestroy {
       code: ref.code,
       fields: ['stage'],
     });
+    await this.ideaNotices
+      .planningStarted({
+        actorUserId: userId,
+        itemId: ref.id,
+        code: ref.code,
+        sessionId: session.id,
+        acceptedNow: item.shownStage === 'submitted',
+      })
+      .catch((e) =>
+        this.logger.warn(`Start planning notice failed: ${String(e)}`),
+      );
     return this.reader.detail(userId, code);
   }
 
@@ -465,6 +478,17 @@ export class RoadmapReviewService implements OnModuleDestroy {
       code: ref.code,
       fields: ['stage'],
     });
+    if (closed)
+      await this.ideaNotices
+        .planClosed({
+          actorUserId: userId,
+          itemId: ref.id,
+          code: ref.code,
+          sessionId: session.id,
+        })
+        .catch((e) =>
+          this.logger.warn(`Close plan notice failed: ${String(e)}`),
+        );
     return this.reader.detail(userId, code);
   }
 

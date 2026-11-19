@@ -106,6 +106,10 @@ function build(
     builderSessions: {
       createSession: jest.fn(async () => ({ id: 'new-session' })),
     },
+    ideaNotices: {
+      planningStarted: jest.fn(async () => undefined),
+      planClosed: jest.fn(async () => undefined),
+    },
   };
   const service = new RoadmapReviewService(
     ...(Object.values(deps) as unknown as ConstructorParameters<
@@ -486,6 +490,27 @@ describe('RoadmapReviewService', () => {
         detail: { decision: 'accept', via: 'start_planning' },
       }),
     );
+    // The accept is news to the author, voters and watchers (idea-to-plan audit rec 8).
+    expect(deps.ideaNotices.planningStarted).toHaveBeenCalledWith({
+      actorUserId: OWNER,
+      itemId: 'id-OPP-0001',
+      code: 'OPP-0001',
+      sessionId: 's-OPP-0001',
+      acceptedNow: true,
+    });
+  });
+
+  it('a failed notice never fails Start planning or Close plan', async () => {
+    const { service, deps } = build({
+      stage: 'planning',
+      can: { startPlanning: true, closePlan: true },
+    });
+    deps.ideaNotices.planningStarted.mockRejectedValueOnce(new Error('down'));
+    deps.ideaNotices.planClosed.mockRejectedValueOnce(new Error('down'));
+    await expect(
+      service.setPlanClosed(OWNER, 'OPP-0001', true),
+    ).resolves.toBeDefined();
+    expect(deps.ideaNotices.planClosed).toHaveBeenCalledTimes(1);
   });
 
   it('closes and reopens the plan for an Owner only, with an event each way', async () => {
@@ -504,6 +529,8 @@ describe('RoadmapReviewService', () => {
     expect(deps.store.patchPlan).toHaveBeenCalledWith('s-OPP-0001', {
       planClosed: null,
     });
+    // Closing tells followers; reopening tells nobody.
+    expect(deps.ideaNotices.planClosed).toHaveBeenCalledTimes(1);
     expect(deps.events.record).toHaveBeenCalledWith(
       expect.objectContaining({ kind: PlanEventKind.PLAN_CLOSED }),
     );

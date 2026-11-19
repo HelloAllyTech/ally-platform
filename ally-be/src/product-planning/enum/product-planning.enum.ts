@@ -122,6 +122,14 @@ export enum RoadmapNotificationKind {
   BREAKER_OPEN = 'breaker_open',
   BUDGET = 'budget',
   ACTIVITY = 'activity',
+  /** The PRD first reads ready: the plan is there to read before it closes. */
+  PLAN_READY = 'plan_ready',
+  /** An Owner closed the plan: the idea now waits for a builder. */
+  PLAN_CLOSED = 'plan_closed',
+  /** New comments on an idea you follow; one unread notice per idea, however many arrive. */
+  COMMENT = 'comment',
+  /** Someone answered the planning agent's question: told to the planner. */
+  QUESTION_ANSWERED = 'question_answered',
 }
 
 /** How closely someone follows one idea (§4.8). */

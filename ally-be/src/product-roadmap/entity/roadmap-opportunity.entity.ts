@@ -298,6 +298,17 @@ export class RoadmapOpportunity extends BaseWithoutTenantEntity {
   @Column({ type: 'text', nullable: true })
   declineReason?: string | null;
 
+  /**
+   * The Owner kept this idea when the old-and-quiet sweep pulled it up for review (To do, idea-to-
+   * plan audit rec 9), so the sweep does not offer it again. Set only by an Owner's click; the
+   * sweep itself never changes an idea.
+   */
+  @Column({ type: 'timestamptz', nullable: true })
+  sweepKeptAt?: Date | null;
+
+  @Column({ type: 'int', nullable: true })
+  sweepKeptBy?: number | null;
+
   /** Filed with "Fill it in yourself" rather than the copilot's check (§5.7b); shown in triage. */
   @Column({ type: 'boolean', default: false })
   selfChecked!: boolean;

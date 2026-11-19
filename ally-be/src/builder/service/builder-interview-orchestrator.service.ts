@@ -65,6 +65,7 @@ import {
   BuilderTurnReceipt,
 } from '../type/builder-sse.type';
 import { BuilderSettingsService } from './builder-settings.service';
+import { RoadmapIdeaNoticeService } from 'src/product-planning/service/roadmap-idea-notice.service';
 import { BuilderRuleContextService } from './builder-rule-context.service';
 import { freeTextOf } from './builder-readiness.service';
 import { isAcknowledgement } from '../util/builder-readiness-checks.util';
@@ -425,6 +426,9 @@ export class BuilderInterviewOrchestratorService {
      */
     @Optional()
     private readonly planCeiling?: PlanCeilingService,
+    /** Tells the author or the planner a question waits (idea-to-plan audit recs 8, 10). Optional, like the rest. */
+    @Optional()
+    private readonly ideaNotices?: RoadmapIdeaNoticeService,
   ) {}
 
   /**
@@ -955,6 +959,15 @@ export class BuilderInterviewOrchestratorService {
     // Settle the assistant row even for aborted turns: `streaming` goes false
     // here and nowhere else, so a row still marked open is a turn that died.
     await checkpoint(true);
+    if (!turn.errored)
+      await this.ideaNotices?.questionsAsked(
+        sessionId,
+        turn.questions as {
+          id: string;
+          prompt?: string;
+          forAuthor?: boolean;
+        }[],
+      );
 
     // Readiness may have moved during the turn; settle the status before the
     // client reads it off the `done` frame. Settling may run the cold
