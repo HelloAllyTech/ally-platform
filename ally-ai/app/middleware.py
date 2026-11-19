@@ -7,9 +7,11 @@ from fastapi.middleware import Middleware
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.core.config import settings
 from app.core.constants import APISettings
+from app.core.llm_usage.scope import parse_header, use_scope
 from app.utils.logger import logger, trace_id_var
 
 
@@ -54,6 +56,33 @@ class LogRequestMiddleware(BaseHTTPMiddleware):
         return response
 
 
+class UsageScopeMiddleware:
+    """Sets the usage scope from the ``X-Ally-Usage`` header for the request (CR1).
+
+    Pure ASGI rather than ``BaseHTTPMiddleware``: the scope is a ContextVar set
+    around the downstream app's whole call, so it is still set while a
+    StreamingResponse's generator runs (an SSE reply's model calls happen there).
+    An absent or invalid header leaves no scope, exactly as before.
+    """
+
+    HEADER = b"x-ally-usage"
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        raw = None
+        for name, value in scope.get("headers") or []:
+            if name.lower() == self.HEADER:
+                raw = value
+                break
+        with use_scope(parse_header(raw)):
+            await self.app(scope, receive, send)
+
+
 def get_middlewares() -> List[Middleware]:
     """
     Create and configure middleware for the application.
@@ -69,5 +98,6 @@ def get_middlewares() -> List[Middleware]:
             allow_headers=[],  # Empty list = reject all headers
         ),
         Middleware(AuthMiddleware),
+        Middleware(UsageScopeMiddleware),
     ]
     return middlewares

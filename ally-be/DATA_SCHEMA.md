@@ -1188,6 +1188,25 @@ drain holds Postgres advisory lock `(1982000, 1)`.
 
 ---
 
+### 3.24 Costs, tokens, plans and seats (`billing`)
+
+Agents v2 chunk CR1 (notes: `../docs/agents-v2/CHUNK-CR1-NOTES.md`). **Not multi-tenant**: these are Ally's own books, read by super admins (`manage_costs`) and, for plans and usage counts only, by an assistant's owners. Money is in **micros** (millionths of a US dollar) as `numeric(20,3)`; token prices are micros per 1,000,000 tokens. Every enum is a varchar with a CHECK. Migration `1984900000000-CreateBillingCosts` creates Part A's tables and seeds the starting prices, India's WhatsApp rates and the settings singleton.
+
+| Table | Key columns | Notes |
+| --- | --- | --- |
+| `billing_models` | `provider`, `model` (UNIQUE together), `label`, `type` (CHECK chat/embedding/classifier/transcription/tts/other), `status` (CHECK active/retired), `notes`, `createdBy` | What Ally can be billed for. **Not `llm_models`** (the runtime pickers' list); nothing here changes which model a call uses. A model with usage can be retired, never deleted. |
+| `billing_model_prices` | `modelId` (FK CASCADE), `version` (UNIQUE with `modelId`), `inputPer1MMicros`, `cachedInputPer1MMicros`, `outputPer1MMicros`, `unitPriceMicros` + `unit` (CHECK minute/page/million_chars/call), `effectiveFrom` (date), `note`, `createdBy` | Append-only: a price change is a new version. The version effective on a call's day prices it; a same-day correction (higher version) wins. |
+| `whatsapp_rates` | `category` (CHECK marketing/utility/authentication/authentication_international/service), `country` (ISO-2), `version` (UNIQUE with both), `priceMicros`, `effectiveFrom`, `status`, `note` | Meta's per-delivered-message rate. Versioned like model prices. |
+| `usage_events` | `createdAt` (when the call happened), `creatorUserId` (who pays), `chatbotId`, `draftId`, `conversationId` (text), `channel` (CHECK bot_page/bubble/whatsapp/owner/other), `runId`, `step`, `seq`, `kind` (CHECK, the metering map's kinds), `provider`, `modelName`, `modelId`, `priceId`, `inputTokens`, `cachedTokens`, `outputTokens`, `units`/`unit`, `costMicros` (**NULL = unpriced**), `detail` (jsonb; no message text) | One row per metered call on an assistant or billable WhatsApp message. **UNIQUE (`runId`, `kind`, `step`, `seq`)**: an SQS redelivery or a repeated webhook writes nothing. Written by `UsageEventService` from the `llm_usage` SQS message (when ally-ai attributed it through `X-Ally-Usage`) and from Meta status webhooks. Partial index on unpriced rows; adding a model or price re-prices them. |
+| `fixed_costs` | `month` (first day; CHECK), `label`, `amountMicros` (≥ 0), `note` | Hosting, database, subscriptions, entered by hand. |
+| `cost_settings` | `id` (CHECK `= 1`), `dailyBudgetMicros`, `conversationAlertMicros`, `spikeMultiplier`, `spikeMinMicros` | Singleton, seeded $20 / $0.50 / 5× / $1. |
+| `cost_alerts` | `kind` (CHECK), `subjectKey`, `day`, `detail` | **UNIQUE (`kind`, `subjectKey`, `day`)** — what makes each alert fire once a day. Also the Costs screen's banner. |
+| `billing_audit` | `subjectType`, `subjectId`, `action`, `before`/`after` (jsonb), `note` (required), `actorUserId` | Append-only history of every CR1 admin change. |
+
+`llm_usage` is unchanged and still receives every row; an assistant's row is also a `usage_events` row, recorded first.
+
+---
+
 ## 4. Weaviate (vector DB — `ally-ai`)
 
 Defined in `ally-ai/app/core/vector_db/constants.py`; migrations in `ally-ai/app/migrations/`.

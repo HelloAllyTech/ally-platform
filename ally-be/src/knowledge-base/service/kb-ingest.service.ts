@@ -1,3 +1,5 @@
+import { usageContext } from 'src/billing/context/usage-context';
+import { UsageChannel, UsageKind } from 'src/billing/enum/billing.enum';
 import { createHash } from 'crypto';
 import { Injectable } from '@nestjs/common';
 import { AiService } from 'src/ai/service/ai.service';
@@ -86,7 +88,20 @@ export class KbIngestService {
           ? { text: document.rawText, pages: [], sections: [] }
           : await this.extract(document);
 
-      await this.chunkAndIndex(document, extracted, action);
+      // CR1: indexing's embeddings are billed to the document's creator and, when an assistant
+      // uses it, that assistant. One run id per ingest, so a redelivered SQS message re-meters
+      // nothing it already recorded.
+      const chatbotId = await this.chatbotUsing(document.id);
+      await usageContext.run(
+        {
+          runId: `${action}:${document.id}:${document.updatedAt?.getTime?.() ?? 0}`,
+          channel: UsageChannel.OWNER,
+          runKind: UsageKind.INDEXING,
+          creatorUserId: document.createdBy ?? null,
+          chatbotId,
+        },
+        () => this.chunkAndIndex(document, extracted, action),
+      );
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Unknown ingest failure';
@@ -98,6 +113,20 @@ export class KbIngestService {
       // Swallowed rather than rethrown: the failure is already recorded where the admin will see
       // it, and rethrowing would make SQS redeliver a document that will fail identically every
       // time until someone fixes the file. The Retry action re-queues it deliberately.
+    }
+  }
+
+  /** An assistant that answers from this document, if any (the first, for CR1's attribution). */
+  private async chatbotUsing(documentId: string): Promise<string | null> {
+    try {
+      const rows: Array<{ chatbot_id: string }> =
+        await this.documentRepository.manager.query(
+          `SELECT chatbot_id FROM chatbot_documents WHERE document_id = $1 ORDER BY "createdAt" LIMIT 1`,
+          [documentId],
+        );
+      return rows[0]?.chatbot_id ?? null;
+    } catch {
+      return null;
     }
   }
 

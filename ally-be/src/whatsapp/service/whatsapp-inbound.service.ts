@@ -1,3 +1,5 @@
+import { usageContext } from 'src/billing/context/usage-context';
+import { UsageChannel, UsageKind } from 'src/billing/enum/billing.enum';
 import { Injectable, Inject, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -958,19 +960,27 @@ export class WhatsAppInboundService {
     const repliedAt = Date.now();
     try {
       if (!(await copied)) return;
-      await Promise.all([
-        this.memory?.afterTurn({
-          chatbot,
-          conversationId,
-          runId: decision.agent?.runId,
-          pending:
-            decision.agent?.runtime === AgentRuntimeUsed.V2
-              ? decision.agent.memory
-              : undefined,
-          repliedAt,
-        }),
-        this.summaries?.afterTurn(chatbot, conversationId),
-      ]);
+      await usageContext.run(
+        {
+          channel: UsageChannel.WHATSAPP,
+          runKind: UsageKind.CUSTOMER_REPLY,
+          chatbotId: chatbot.id,
+        },
+        () =>
+          Promise.all([
+            this.memory?.afterTurn({
+              chatbot,
+              conversationId,
+              runId: decision.agent?.runId,
+              pending:
+                decision.agent?.runtime === AgentRuntimeUsed.V2
+                  ? decision.agent.memory
+                  : undefined,
+              repliedAt,
+            }),
+            this.summaries?.afterTurn(chatbot, conversationId),
+          ]),
+      );
     } catch {
       // Each step logs its own failure; the reply has already gone out.
     }

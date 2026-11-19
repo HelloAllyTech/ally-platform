@@ -1,3 +1,5 @@
+import { usageContext } from 'src/billing/context/usage-context';
+import { UsageChannel, UsageKind } from 'src/billing/enum/billing.enum';
 import { checkupGate, type CheckupGate } from './checkup-gate';
 import {
   BadRequestException,
@@ -415,6 +417,24 @@ export class CheckupService {
   }
 
   private async execute(
+    run: ChatbotCheckupRun,
+    cases: ChatbotCheckupCase[],
+    attempts: number | ((item: ChatbotCheckupCase) => TryPlan),
+    context: GradeContext = {},
+  ): Promise<void> {
+    // CR1: every run and grade a checkup makes is metered as `checkup` / `judge` on this assistant.
+    return usageContext.with(
+      {
+        chatbotId: run.chatbotId,
+        draftId: run.draftId ?? null,
+        channel: UsageChannel.OWNER,
+        runKind: UsageKind.CHECKUP,
+      },
+      () => this.executeInContext(run, cases, attempts, context),
+    );
+  }
+
+  private async executeInContext(
     run: ChatbotCheckupRun,
     cases: ChatbotCheckupCase[],
     attempts: number | ((item: ChatbotCheckupCase) => TryPlan),

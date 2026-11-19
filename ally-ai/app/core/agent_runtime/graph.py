@@ -41,6 +41,7 @@ from app.core.agent_runtime.tools.confirmed import is_plain_yes
 from app.core.agent_runtime.trace import summarise_run
 from app.core.config import settings
 from app.core.knowledge_agent.agent import KnowledgeAgentService
+from app.core.llm_usage.scope import current_scope, use_scope
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -159,7 +160,19 @@ async def run_agent(
     # nodes' custom events when someone is listening.
     modes = ["values", "custom"] if on_event else ["values"]
     state: AgentState = {}  # type: ignore[typeddict-item]
-    with tracing_context(enabled=False):
+    # Usage attribution (CR1): ally-be's X-Ally-Usage header normally set the
+    # scope already; without it the run's own ids start one, so its rows are
+    # still tied to the run and share one seq counter.
+    fallback_scope = (
+        None
+        if current_scope()
+        else {
+            "run_id": run_id,
+            "chatbot_id": chatbot_id,
+            "conversation_id": conversation_id,
+        }
+    )
+    with tracing_context(enabled=False), use_scope(**(fallback_scope or {})):
         async for mode, chunk in graph.astream(
             inputs,
             config,

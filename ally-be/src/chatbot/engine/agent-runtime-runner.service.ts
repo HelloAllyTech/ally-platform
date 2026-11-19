@@ -1,3 +1,4 @@
+import { usageContext } from 'src/billing/context/usage-context';
 import { Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -158,7 +159,11 @@ export class AgentRuntimeRunner {
      */
     options: { mood?: 'upset'; signal?: AbortSignal } = {},
   ): Promise<Answered> {
-    const runId = agentRunIdFor(turn.providerMessageId);
+    // Preview has no provider id: reuse the run id its usage context already named (CR1), so the
+    // run's metered calls and the run itself share one id.
+    const runId = turn.providerMessageId
+      ? agentRunIdFor(turn.providerMessageId)
+      : (usageContext.current()?.runId ?? agentRunIdFor(null));
     const conversationId = turn.conversationId ?? `preview-${randomUUID()}`;
     const startedAt = Date.now();
     let withGateway = false;

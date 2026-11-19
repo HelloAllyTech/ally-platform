@@ -3,6 +3,7 @@ import asyncio
 from fastapi import APIRouter, status
 from fastapi.responses import JSONResponse
 
+from app.core.llm_usage.emitter import usage_feed_on
 from app.core.vector_db.weaviate_client import WeaviateClient
 from app.schemas.health import HealthCheckResponse, ReadinessCheckResponse
 from app.utils.logger import get_logger
@@ -27,7 +28,9 @@ async def health_check():
     """
     health_logger.debug("Health check called")
 
-    return HealthCheckResponse(status="ok")
+    return HealthCheckResponse(
+        status="ok", usage_feed="on" if usage_feed_on() else "off"
+    )
 
 
 @router.get(

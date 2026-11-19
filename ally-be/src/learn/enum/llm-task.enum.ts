@@ -428,6 +428,11 @@ export enum LlmTask {
   // The agent curator: folds Builder's lessons and Bug Hunter's notes into their collections.
   CONTEXT_LIBRARY_AGENT_CURATE = 'context_library_agent_curate',
 
+  // Knowledge embeddings (CR1, ally-ai): the query embedded on each knowledge
+  // search, and the passages embedded when a document is indexed.
+  EMBEDDING_SEARCH = 'embedding_search',
+  EMBEDDING_INDEX = 'embedding_index',
+
   // Fallback for an un-mapped sender task (never drop a usage row).
   UNKNOWN = 'unknown',
 }

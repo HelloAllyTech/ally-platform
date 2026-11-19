@@ -1568,6 +1568,34 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     promptOverride: 'ally_ai_checkup_questions',
   },
   {
+    id: 'knowledge-search-embedding',
+    task: LlmTask.EMBEDDING_SEARCH,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'An assistant searches its knowledge while answering (search_knowledge)',
+    detail:
+      'The query embedded for one knowledge search inside an agent run. Recorded so Ally admin ' +
+      '→ Costs can bill it to the assistant (CR1); the same call as corpus-embedding, counted ' +
+      'per assistant.',
+    kind: AiTaskKind.EMBEDDING,
+    provider: 'openai',
+    defaultModel: 'text-embedding-3-small',
+    configuredBy: 'OpenAIEmbeddingConstants.MODEL',
+  },
+  {
+    id: 'knowledge-index-embedding',
+    task: LlmTask.EMBEDDING_INDEX,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: "An assistant's document is indexed or re-indexed",
+    detail:
+      'The passages of one indexing batch. Recorded per batch so the creator is billed for ' +
+      're-indexing (CR1).',
+    kind: AiTaskKind.EMBEDDING,
+    provider: 'openai',
+    defaultModel: 'text-embedding-3-small',
+    configuredBy: 'OpenAIEmbeddingConstants.MODEL',
+  },
+  {
     id: 'corpus-embedding',
     task: LlmTask.EMBEDDING,
     runtime: LlmRuntime.ALLY_AI,

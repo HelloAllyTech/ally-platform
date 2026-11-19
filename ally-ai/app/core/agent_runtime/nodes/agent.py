@@ -26,6 +26,7 @@ from app.core.agent_runtime.tools import gateway_tools, search_tools
 from app.core.agent_runtime.trace import Node, StatusCode, trace_step, traced
 from app.core.config import settings
 from app.core.knowledge_agent.agent import KnowledgeAgentService
+from app.core.llm_usage.scope import set_step
 from app.exceptions.custom_exceptions import LLMInvocationFailedException
 
 
@@ -47,6 +48,15 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
     @traced("agent", _summary, _announce)
     async def agent(state: AgentState) -> Dict[str, Any]:
         bot = state["bot"]
+        # Usage attribution (CR1): this node's model calls are agent step N of the
+        # run. Set for this node's context only; without the X-Ally-Usage header
+        # the run's own ids start the scope.
+        set_step(
+            (state.get("agent_calls") or 0) + 1,
+            run_id=state.get("run_id"),
+            chatbot_id=state.get("chatbot_id"),
+            conversation_id=state.get("conversation_id"),
+        )
         start: Dict[str, Any] = {}
         if not state.get("agent_calls"):
             # First step of the run: the working keys the rest of the path reads.

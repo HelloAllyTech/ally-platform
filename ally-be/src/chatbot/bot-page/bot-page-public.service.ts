@@ -1,3 +1,5 @@
+import { usageContext } from 'src/billing/context/usage-context';
+import { UsageChannel, UsageKind } from 'src/billing/enum/billing.enum';
 import {
   HttpException,
   HttpStatus,
@@ -661,28 +663,38 @@ export class BotPagePublicService {
     let decision: ChatbotDecision;
     try {
       const history = await this.conversations.recentHistory(conversation.id);
-      decision = await this.engine.respond(
+      // CR1: the bubble is its own channel on the Costs screen; the turn stays the page's.
+      decision = await usageContext.with(
         {
-          // The page's own gate has already decided who may chat here; the bot's accessMode is
-          // WhatsApp's (and every other channel's) list, and the page must neither use nor widen it.
-          chatbot: { ...chatbot, accessMode: ChatbotAccessMode.ANYONE },
-          settings: botSettings,
-          text,
-          history,
-          isFirstMessage: history.length <= 1,
-          sender: {
-            externalId: ready.visitor.id,
-            label: `bot page visitor ${BotPageVisitorService.logTag(ready.visitor.id)}`,
-            email: ready.email,
-            userId: ready.eligibility.userId ?? null,
-            tenantId: ready.eligibility.tenantId ?? null,
-          },
-          channel: WEB_CHANNEL,
-          conversationId: conversation.id,
-          providerMessageId: inbound.id,
-          contactId: contact.id,
+          channel: ready.visitor.embed
+            ? UsageChannel.BUBBLE
+            : UsageChannel.BOT_PAGE,
+          runKind: UsageKind.CUSTOMER_REPLY,
         },
-        live,
+        () =>
+          this.engine.respond(
+            {
+              // The page's own gate has already decided who may chat here; the bot's accessMode is
+              // WhatsApp's (and every other channel's) list, and the page must neither use nor widen it.
+              chatbot: { ...chatbot, accessMode: ChatbotAccessMode.ANYONE },
+              settings: botSettings,
+              text,
+              history,
+              isFirstMessage: history.length <= 1,
+              sender: {
+                externalId: ready.visitor.id,
+                label: `bot page visitor ${BotPageVisitorService.logTag(ready.visitor.id)}`,
+                email: ready.email,
+                userId: ready.eligibility.userId ?? null,
+                tenantId: ready.eligibility.tenantId ?? null,
+              },
+              channel: WEB_CHANNEL,
+              conversationId: conversation.id,
+              providerMessageId: inbound.id,
+              contactId: contact.id,
+            },
+            live,
+          ),
       );
     } catch (error) {
       await this.conversations.updateMessage(inbound.id, {
@@ -747,17 +759,30 @@ export class BotPagePublicService {
     void this.leads.afterTurn(chatbot, conversation.id);
     // What the run asked to remember, and the chat's rolling summary (chunk 8a): after the reply
     // has gone out, decided from what was stored as sent. Not awaited: nobody waits for either.
-    void this.memory?.afterTurn({
-      chatbot,
-      conversationId: conversation.id,
-      runId: decision.agent?.runId,
-      pending:
-        decision.agent?.runtime === AgentRuntimeUsed.V2
-          ? decision.agent.memory
-          : undefined,
-      repliedAt: Date.now(),
-    });
-    void this.summaries?.afterTurn(chatbot, conversation.id);
+    // CR1: both are this channel's calls for the Costs screen.
+    usageContext.run(
+      {
+        channel: ready.visitor.embed
+          ? UsageChannel.BUBBLE
+          : UsageChannel.BOT_PAGE,
+        runKind: UsageKind.CUSTOMER_REPLY,
+        chatbotId: chatbot.id,
+        creatorUserId: chatbot.createdBy ?? null,
+      },
+      () => {
+        void this.memory?.afterTurn({
+          chatbot,
+          conversationId: conversation.id,
+          runId: decision.agent?.runId,
+          pending:
+            decision.agent?.runtime === AgentRuntimeUsed.V2
+              ? decision.agent.memory
+              : undefined,
+          repliedAt: Date.now(),
+        });
+        void this.summaries?.afterTurn(chatbot, conversation.id);
+      },
+    );
     if (isFailedRun(decision.agent)) {
       this.eventEmitter.emit(AGENT_FALLBACK_EVENT, {
         chatbot: { id: chatbot.id, name: chatbot.name },

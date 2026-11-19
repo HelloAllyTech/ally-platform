@@ -1,3 +1,5 @@
+import { usageContextFor } from './engine-usage';
+import { usageContext } from 'src/billing/context/usage-context';
 import { Injectable, Optional } from '@nestjs/common';
 import {
   crisisReply,
@@ -228,6 +230,17 @@ export class ChatbotEngineService {
    * steps and text while it happens; the decision returned is the same either way.
    */
   async respond(turn: ChatTurn, live?: LiveReply): Promise<ChatbotDecision> {
+    // CR1: every model call this message causes (crisis check, the run, memory, summary) is
+    // attributed to this assistant, conversation and run. Recording happens elsewhere, after.
+    return usageContext.run(usageContextFor(turn), () =>
+      this.respondInContext(turn, live),
+    );
+  }
+
+  private async respondInContext(
+    turn: ChatTurn,
+    live?: LiveReply,
+  ): Promise<ChatbotDecision> {
     // ── 0. The single switch (chunk 11a) ─────────────────────────────────
     // A team member has this chat: the assistant never answers here, on any channel (they all
     // reach the engine through this method). Crisis is still checked first, and its reply always
