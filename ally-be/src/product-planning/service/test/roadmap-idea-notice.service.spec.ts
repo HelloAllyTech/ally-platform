@@ -14,7 +14,9 @@ function build(
   } = {},
 ) {
   const inbox = {
-    deliver: jest.fn(async (_event: Record<string, unknown>) => [1]),
+    deliver: jest.fn<Promise<number[]>, [Record<string, unknown>]>(async () => [
+      1,
+    ]),
     deliverComment: jest.fn(async () => [1]),
     markItemRead: jest.fn(async () => 1),
   };
