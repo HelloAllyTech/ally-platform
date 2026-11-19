@@ -11991,6 +11991,7 @@ export const en = {
             "Share of checked debriefs with at least one language fault (wrong language, mixed scripts, a changed quote, stiff wording and so on). The check runs after a debrief is published, so a debrief appears here a little later.",
           cols: { checked: "Checked", withProblem: "With a problem", kinds: "Most common" },
           none: "None found",
+          tooFew: (n: number, min: number) => `Not enough checked yet (${n} of ${min})`,
           notChecked: (n: number) => `${n} not checked yet`,
           types: {
             wrong_language: "Wrong language",

@@ -174,6 +174,9 @@ export const topKinds = (byType: Record<string, number>, names: Record<string, s
     .map(([k, n]) => `${names[k] ?? k} ${n}`)
     .join(" · ");
 
+/** Same floor the backend failure point uses before it trusts a rate. */
+const MIN_LANGUAGE_CHECKS = 20;
+
 export const LanguageProblems: React.FC<{
   rows: NonNullable<DebriefMetricsView["quality"]>["byLanguage"];
 }> = ({ rows }) => {
@@ -196,8 +199,10 @@ export const LanguageProblems: React.FC<{
             return [
               languageLabel(r.language),
               String(p.checked),
-              rateWithRange(p.withFinding),
-              topKinds(p.byType, s.types) || s.none,
+              p.checked < MIN_LANGUAGE_CHECKS
+                ? s.tooFew(p.checked, MIN_LANGUAGE_CHECKS)
+                : rateWithRange(p.withFinding),
+              p.checked < MIN_LANGUAGE_CHECKS ? "–" : topKinds(p.byType, s.types) || s.none,
             ];
           })}
         />
