@@ -65,7 +65,10 @@ class MessageProcessor:
         self.message_timeout_seconds = message_timeout_seconds
         self._running = False
         self._task = None
-        self._process_semaphore = asyncio.Semaphore(self.max_concurrent_messages)
+        # Messages being processed right now. A finished message frees its
+        # slot at once and the loop fetches the next one; it no longer waits
+        # for the whole batch it came in with (see poll_queue).
+        self._in_flight: set[asyncio.Task] = set()
 
     async def process_message(self, message: Dict[str, Any]) -> None:
         """
@@ -234,14 +237,45 @@ class MessageProcessor:
                         )
                     )
 
+    @property
+    def free_slots(self) -> int:
+        """How many more messages can start processing right now."""
+        return self.max_concurrent_messages - len(self._in_flight)
+
+    async def wait_until_idle(self) -> None:
+        """Wait for every message that has started to finish."""
+        while self._in_flight:
+            await asyncio.gather(*list(self._in_flight), return_exceptions=True)
+
+    def _start_processing(self, message: Dict[str, Any]) -> None:
+        task = asyncio.create_task(self.process_message(message))
+        self._in_flight.add(task)
+        task.add_done_callback(self._in_flight.discard)
+
     async def poll_queue(self) -> None:
         """
-        Poll the queue for messages and process them.
+        Fetch as many messages as there are free slots and start them.
+
+        Returns once they have STARTED, not finished. This used to receive a
+        batch and await all of it before polling again, so one slow recording
+        held every other slot idle: with 10 calls ending together, the second
+        five waited for the slowest of the first five (summaries in 84-285s).
+        Now each finished message frees its slot and the next poll fills it.
+
+        Never receives more than the free slots: SQS starts every received
+        message's visibility clock at once, so a message that waited for a slot
+        could time out and be redelivered (see SQSWorkerConstants).
         """
         try:
+            if self.free_slots <= 0:
+                # Every slot is busy: wait for one to free up, then poll.
+                await asyncio.wait(
+                    list(self._in_flight), return_when=asyncio.FIRST_COMPLETED
+                )
+                return
             messages = await self.queue_service.receive_messages(
                 queue_url=self.queue_url,
-                max_messages=self.max_messages,
+                max_messages=min(self.max_messages, self.free_slots),
                 wait_time_seconds=self.wait_time_seconds,
                 visibility_timeout=self.visibility_timeout,
             )
@@ -256,35 +290,25 @@ class MessageProcessor:
                 if callable(get_depth):
                     depth = await get_depth(self.queue_url)
                 logger.info(
-                    "poll: received batch_size=%s max_concurrent=%s "
-                    "queue_visible=%s queue_in_flight=%s queue=%s",
+                    "poll: received batch_size=%s already_processing=%s "
+                    "max_concurrent=%s queue_visible=%s queue_in_flight=%s queue=%s",
                     len(messages),
+                    len(self._in_flight),
                     self.max_concurrent_messages,
                     depth.get("visible", "n/a"),
                     depth.get("in_flight", "n/a"),
                     self.queue_url,
                 )
-
-                # Bound concurrency: SQS may hand us up to max_messages (default 10)
-                # per poll, but processing each may load an audio blob and call an
-                # LLM. Without this semaphore the worker's memory spikes linearly
-                # with batch size.
-                async def _bounded(msg: Dict[str, Any]) -> None:
-                    # Log when a message has to wait for a concurrency slot, so
-                    # saturation (more concurrent recordings than slots) is
-                    # visible rather than silent.
-                    if self._process_semaphore.locked():
-                        logger.info(
-                            "All %s concurrency slots busy; message queued for a slot",
-                            self.max_concurrent_messages,
-                        )
-                    async with self._process_semaphore:
-                        await self.process_message(msg)
-
-                await asyncio.gather(
-                    *[_bounded(message) for message in messages],
-                    return_exceptions=True,
-                )
+                # Bounded by free_slots above: each processed message may hold
+                # an audio blob and an LLM call in memory.
+                for message in messages:
+                    self._start_processing(message)
+                if self.free_slots <= 0:
+                    # Saturation is visible, not silent: more recordings than
+                    # slots are waiting in the queue, not in this process.
+                    logger.info(
+                        "All %s concurrency slots busy", self.max_concurrent_messages
+                    )
 
         except Exception as e:
             logger.exception(f"Error polling queue: {type(e).__name__}")
@@ -360,4 +384,9 @@ class MessageProcessor:
                 await self._task
             except asyncio.CancelledError:
                 pass
+        # As before, stopping cancels messages still being processed; they
+        # are not deleted, so SQS redelivers them.
+        for task in list(self._in_flight):
+            task.cancel()
+        await asyncio.gather(*list(self._in_flight), return_exceptions=True)
         logger.info("Message processor stopped")
