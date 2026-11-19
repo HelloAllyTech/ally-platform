@@ -243,6 +243,54 @@ export interface BuilderPrdDocument {
   ui?: BuilderPrdUiState;
   /** Null until an admin drafts one. See BuilderTechnicalDesign. */
   technicalDesign?: BuilderTechnicalDesign | null;
+  /**
+   * The coverage pass: one entry per item of `BUILDER_PRD_COVERAGE` — an answer, a stated
+   * not-applicable reason, or a question asked. Absent on a PRD written before it existed.
+   */
+  coverage?: BuilderPrdCoverageItem[];
+  /**
+   * What became of each principle the session's guiding brief surfaced: applied (in a named
+   * section that cites it) or not relevant (with a reason). Absent until the first mark.
+   */
+  principleMarks?: BuilderPrdPrincipleMark[];
+}
+
+/** The fixed coverage list. Labels and guidance live in `builder-prd-coverage.constants.ts`. */
+export type BuilderPrdCoverageKey =
+  | 'admin_web'
+  | 'helpline_web'
+  | 'mobile_app'
+  | 'failure_empty_states'
+  | 'permission_toggle'
+  | 'success_metric'
+  | 'existing_data_old_clients'
+  | 'translations'
+  | 'model_cost_registry'
+  | 'other_readers';
+
+export type BuilderPrdCoverageStatus = 'answered' | 'not_applicable' | 'asked';
+
+export interface BuilderPrdCoverageItem {
+  key: BuilderPrdCoverageKey;
+  status: BuilderPrdCoverageStatus;
+  /** answered: the answer in a line. not_applicable: why not. asked: what is being asked. */
+  note: string;
+  /** answered: the PRD section that holds the answer. */
+  section?: string;
+  /** asked: the open question, as it stands in `openQuestions`. */
+  question?: string;
+  at?: string;
+}
+
+export interface BuilderPrdPrincipleMark {
+  /** `FP-0142`. */
+  code: string;
+  mark: 'applied' | 'not_relevant';
+  /** applied: the PRD section that cites `[code]`. */
+  section?: string;
+  /** not_relevant: why it does not bear on this plan. */
+  reason?: string;
+  at?: string;
 }
 
 /** One row of the readiness rubric shown beside the document. */
@@ -282,6 +330,22 @@ export interface BuilderPrdReadiness {
    * findings, their status and any dismissals. Null before the first review.
    */
   review?: BuilderPrdReview | null;
+  /**
+   * The Context Library principles this session saw and which of them still need a mark.
+   * Absent when principles were not part of the assessment.
+   */
+  principles?: BuilderPrdPrinciplesSummary;
+}
+
+export interface BuilderPrdPrinciplesSummary {
+  /** Principles are on for this session (they can be switched off per session). */
+  enabled: boolean;
+  /** Codes in the session's guiding brief: each needs a mark before the plan closes. */
+  inBrief: string[];
+  /** Distinct principles retrieved for this session at all. Zero is worth a warning. */
+  retrieved: number;
+  /** In-brief codes with no valid mark yet. */
+  unmarked: string[];
 }
 
 /**
@@ -294,7 +358,11 @@ export type BuilderPrdReviewCategory =
   | 'unsupported_claim'
   | 'unapplied_correction'
   | 'missed_reuse'
-  | 'missing_success_metric';
+  | 'missing_success_metric'
+  // A failure, empty, permission or concurrency state the requirements must handle and don't.
+  | 'missing_edge_case'
+  // A client the change reaches (admin web, helpline web, mobile app) neither covered nor ruled out.
+  | 'missing_platform';
 
 export const BUILDER_PRD_REVIEW_CATEGORIES: BuilderPrdReviewCategory[] = [
   'contradiction',
@@ -302,6 +370,8 @@ export const BUILDER_PRD_REVIEW_CATEGORIES: BuilderPrdReviewCategory[] = [
   'unapplied_correction',
   'missed_reuse',
   'missing_success_metric',
+  'missing_edge_case',
+  'missing_platform',
 ];
 
 /** A person's decision that a finding is wrong, kept as eval data. */
@@ -392,6 +462,21 @@ export interface BuilderReadinessSignals {
   lastPrdEditAt?: Date | null;
   /** `null`: not reviewed yet. Undefined: not part of this assessment. */
   review?: BuilderPrdReview | null;
+  /**
+   * File paths the PRD names that the repo tree does not have. Undefined: the trees could
+   * not be read, so the check is left out rather than passed.
+   */
+  paths?: {
+    /** Paths looked up in a tree (or matched a file read this session). */
+    checked: number;
+    missing: { path: string; section: string; repo?: string }[];
+  };
+  /** The session's principles, for the marks row. Undefined: not part of this assessment. */
+  principles?: {
+    enabled: boolean;
+    inBrief: string[];
+    retrieved: number;
+  };
 }
 
 /** A fresh, empty PRD. Every key present so RFC-6902 `replace` always resolves. */

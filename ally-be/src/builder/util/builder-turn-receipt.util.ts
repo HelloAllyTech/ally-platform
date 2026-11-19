@@ -33,6 +33,9 @@ export const BUILDER_PRD_EDIT_TOOLS = new Set([
   'remove_repo_plan',
   'upsert_assumption',
   'set_open_questions',
+  // The coverage pass and principle marks (builder-prd-checklist-tools.service).
+  'record_coverage',
+  'mark_principle',
 ]);
 
 /** Lookups: a result the model has to read before what it says can rest on it. */
@@ -127,6 +130,10 @@ export function describeToolAttempt(
       return 'PRD edit: open questions';
     case 'dismiss_review_finding':
       return `Dismiss review finding ${input?.findingId ?? '?'}`;
+    case 'record_coverage':
+      return 'PRD edit: coverage pass';
+    case 'mark_principle':
+      return 'PRD edit: principle marks';
     default:
       return name;
   }

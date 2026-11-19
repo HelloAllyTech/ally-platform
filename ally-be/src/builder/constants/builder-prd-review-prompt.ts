@@ -32,4 +32,6 @@ export const BUILDER_PRD_REVIEW_SECTION_KEYS = [
   'testPlanMd',
   'e2ePlanMd',
   'openQuestions',
+  // The coverage pass: a finding that an answer recorded there is wrong.
+  'coverage',
 ] as const;

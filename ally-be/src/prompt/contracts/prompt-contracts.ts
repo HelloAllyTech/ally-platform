@@ -425,7 +425,7 @@ export const BUILDER_PRD_REVIEW_SYSTEM = definePrompt(
   {
     name: 'Builder — PRD Review',
     description:
-      'The cold reviewer that reads a PRD when it first reads ready, against the evidence log, the transcript and the reusable-systems map, and files contradictions, unsupported claims, unapplied corrections, missed reuse and a missing success metric. Findings block readiness until fixed or dismissed.',
+      'The cold reviewer that reads a PRD when it first reads ready, against the evidence log, the transcript and the reusable-systems map, and files contradictions, unsupported claims, unapplied corrections, missed reuse, a missing success metric, a missing edge case and a missing platform. Findings block readiness until fixed or dismissed.',
     category: 'Builder',
     runtimes: ['ally-be'],
     output: 'structured',

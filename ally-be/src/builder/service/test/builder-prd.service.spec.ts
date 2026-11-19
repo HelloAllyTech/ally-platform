@@ -5,6 +5,7 @@ import {
   BuilderPrdDocument,
   createEmptyPrdDocument,
 } from '../../type/builder-prd.type';
+import { BUILDER_PRD_COVERAGE_KEYS } from '../../constants/builder-prd-coverage.constants';
 
 /** A PRD that clears every rubric row, so a test can knock out one at a time. */
 const buildReadyPrd = (): BuilderPrdDocument => ({
@@ -45,6 +46,12 @@ const buildReadyPrd = (): BuilderPrdDocument => ({
     apiMd: 'REST under /v1/builder.',
   },
   openQuestions: [],
+  // The coverage pass, every item ruled out with a reason.
+  coverage: BUILDER_PRD_COVERAGE_KEYS.map((key) => ({
+    key,
+    status: 'not_applicable' as const,
+    note: 'Not touched by this change at all.',
+  })),
 });
 
 describe('BuilderPrdService', () => {
@@ -742,6 +749,53 @@ describe('BuilderPrdService', () => {
       expect(readiness.score).toBe(100);
     });
 
+    describe('coverage, paths and principle marks', () => {
+      const keys = (readiness: any) =>
+        readiness.sections.map((section: any) => section.key);
+
+      it('blocks on an uncovered item without scoring it', () => {
+        const draft = buildReadyPrd();
+        draft.coverage = [];
+        const readiness = service.computeReadiness(draft);
+        expect(readiness.ready).toBe(false);
+        expect(readiness.score).toBe(100);
+        expect(row(readiness, 'coverage').ok).toBe(false);
+      });
+
+      it('adds the path row only when the trees were read', () => {
+        expect(keys(service.computeReadiness(buildReadyPrd()))).not.toContain(
+          'pathsExist',
+        );
+        const readiness = service.computeReadiness(buildReadyPrd(), {
+          paths: {
+            checked: 1,
+            missing: [
+              { path: 'ally-be/src/x.ts', section: 'existingBehaviour' },
+            ],
+          },
+        });
+        expect(row(readiness, 'pathsExist').ok).toBe(false);
+        expect(readiness.ready).toBe(false);
+      });
+
+      it('puts the principle row after the cold review and reports the summary', () => {
+        const readiness = service.computeReadiness(buildReadyPrd(), {
+          review: null,
+          principles: { enabled: true, inBrief: ['FP-0142'], retrieved: 4 },
+        });
+        const order = keys(readiness);
+        expect(order.indexOf('principleMarks')).toBeGreaterThan(
+          order.indexOf('prdReview'),
+        );
+        expect(readiness.principles).toEqual({
+          enabled: true,
+          inBrief: ['FP-0142'],
+          retrieved: 4,
+          unmarked: ['FP-0142'],
+        });
+      });
+    });
+
     describe('mobile twins', () => {
       const twins = [
         {
@@ -758,6 +812,10 @@ describe('BuilderPrdService', () => {
         ];
         draft.whereChangesBelong =
           '- ally-be: storage.\n- ally-web: the control.';
+        // Mobile not yet settled by the coverage pass.
+        draft.coverage = (draft.coverage ?? []).filter(
+          (item) => item.key !== 'mobile_app',
+        );
         return draft;
       };
 
@@ -772,14 +830,30 @@ describe('BuilderPrdService', () => {
         );
       });
 
-      it('passes once ally-mobile is planned or ruled out in non-goals', () => {
+      it('passes once ally-mobile is planned or ruled out in the coverage pass', () => {
         const planned = webOnly();
         planned.technicalPlan.repos.push({
           repo: 'ally-mobile',
           changesMd: 'Thumbs in DebriefTab (R1).',
         });
         const ruledOut = webOnly();
-        ruledOut.nonGoals = 'Mobile waits for the next app release.';
+        ruledOut.coverage = [
+          {
+            key: 'mobile_app',
+            status: 'not_applicable',
+            note: 'Mobile waits for the next app release.',
+          },
+        ];
+        // The word "mobile" in Non-goals no longer settles it.
+        const mentioned = webOnly();
+        mentioned.coverage = [];
+        mentioned.nonGoals = 'Mobile waits for the next app release.';
+        expect(
+          row(
+            service.computeReadiness(mentioned, { parityTwins: twins }),
+            'mobileTwins',
+          ).ok,
+        ).toBe(false);
 
         expect(
           row(

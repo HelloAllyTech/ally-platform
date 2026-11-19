@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { LoggerService } from 'src/logger/logger.service';
 import { BuilderPrdDoc } from '../entity/builder-prd-doc.entity';
 import { BuilderMessage } from '../entity/builder-message.entity';
@@ -14,6 +14,8 @@ import { BuilderPrdService } from './builder-prd.service';
 import { BuilderCatalogService } from './builder-catalog.service';
 import { BuilderEvidenceLogService } from './builder-evidence-log.service';
 import { BuilderPrdReviewService } from './builder-prd-review.service';
+import { BuilderPrdPathCheckService } from './builder-prd-path-check.service';
+import { BuilderPrinciplesService } from './builder-principles.service';
 
 /**
  * Where a readiness assessment is happening, which decides what the reviewer
@@ -110,6 +112,10 @@ export class BuilderReadinessService {
     private readonly messageRepository: BuilderMessageRepository,
     private readonly versionRepository: BuilderPrdVersionRepository,
     private readonly reviewService: BuilderPrdReviewService,
+    // Optional so the eval sandbox and older unit tests build the service without them; a
+    // missing source leaves its row out, the way every other signal fails soft.
+    @Optional() private readonly pathCheck?: BuilderPrdPathCheckService,
+    @Optional() private readonly principles?: BuilderPrinciplesService,
   ) {}
 
   /**
@@ -138,9 +144,18 @@ export class BuilderReadinessService {
         .latestCreatedAt(doc.id)
         .catch(() => undefined as Date | null | undefined),
     ]);
+    // After the evidence log: a file this session read exists, whatever the tree says.
+    const [paths, principles] = await Promise.all([
+      this.pathCheck
+        ?.check(doc.draft, evidence?.readOk ?? [])
+        .catch(() => undefined),
+      this.principles?.readinessSignal(sessionId).catch(() => undefined),
+    ]);
     return {
       parityTwins,
       evidence,
+      ...(paths ? { paths } : {}),
+      ...(principles ? { principles } : {}),
       ...(messages && lastPrdEditAt !== undefined
         ? {
             lastAdminMessage: lastAdminMessageToApply(messages),
@@ -149,6 +164,14 @@ export class BuilderReadinessService {
         : {}),
       review: doc.review ?? null,
     };
+  }
+
+  /** `repo:path` of every file this session read successfully, from the evidence log. */
+  async filesRead(sessionId: string): Promise<string[]> {
+    const outcomes = await this.evidenceLog
+      .readOutcomes(sessionId)
+      .catch(() => undefined);
+    return outcomes?.readOk ?? [];
   }
 
   /** Readiness for a read path. Never calls a model. */
@@ -217,8 +240,13 @@ export class BuilderReadinessService {
     doc: BuilderPrdDoc,
     occasion: BuilderReadinessOccasion,
   ): BuilderReviewPlan {
+    // Principle marks are settled before the plan closes, not before the review: the review is
+    // one of the things a principle mark may cite back to.
     const othersPass = readiness.sections
-      .filter((section) => section.key !== 'prdReview')
+      .filter(
+        (section) =>
+          section.key !== 'prdReview' && section.key !== 'principleMarks',
+      )
       .every((section) => section.ok);
     if (!othersPass) return null;
 
