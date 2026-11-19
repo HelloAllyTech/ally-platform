@@ -191,6 +191,7 @@ describe("Settings › Schedules: engineering only", () => {
     ).toEqual([
       en.debriefs.settingsPage.nav.weights,
       en.debriefs.settingsPage.nav.pinned,
+      en.debriefs.settingsPage.nav.learner,
       en.debriefs.settingsPage.nav.clinical,
       en.debriefs.settingsPage.nav.progress,
       en.debriefs.settingsPage.nav.agents,
@@ -218,6 +219,7 @@ describe("Settings › Schedules: engineering only", () => {
     ).toEqual([
       en.debriefs.settingsPage.nav.weights,
       en.debriefs.settingsPage.nav.pinned,
+      en.debriefs.settingsPage.nav.learner,
       en.debriefs.settingsPage.nav.clinical,
       en.debriefs.settingsPage.nav.progress,
       en.debriefs.settingsPage.nav.schedules,
@@ -246,6 +248,7 @@ describe("Settings › Schedules: engineering only", () => {
     expect(items.map(i => i.textContent)).toEqual([
       en.debriefs.settingsPage.nav.weights,
       en.debriefs.settingsPage.nav.pinned,
+      en.debriefs.settingsPage.nav.learner,
       en.debriefs.settingsPage.nav.clinical,
       en.debriefs.settingsPage.nav.progress,
       en.debriefs.settingsPage.nav.agents,

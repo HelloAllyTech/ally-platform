@@ -46,6 +46,25 @@ describe("resolveRouteMeta", () => {
     expect(resolveRouteMeta(ROUTES.BLOG).fullBleed).toBe(false);
   });
 
+  // Every page drawn inside the RoadmapFrame must be known and full-bleed here, or the shell pads it
+  // and the Roadmap's top menu jumps when you switch tabs. The route's own `fullBleed` prop is not
+  // what the shell reads.
+  it.each([
+    ROUTES.ROADMAP,
+    ROUTES.ROADMAP_DRAFTS,
+    ROUTES.ROADMAP_NEW_IDEA,
+    ROUTES.ROADMAP_IDEA("OPP-1"),
+    ROUTES.ROADMAP_BUGS,
+    ROUTES.ROADMAP_SETTINGS,
+    ROUTES.ROADMAP_AGENT,
+    ROUTES.ROADMAP_MEASURES,
+    ROUTES.PRODUCT_UPDATES,
+  ])("draws the Roadmap page %s edge to edge, with no breadcrumb", path => {
+    const meta = resolveRouteMeta(path);
+    expect(meta.known).toBe(true);
+    expect(meta.fullBleed).toBe(true);
+  });
+
   it("reports an unknown URL as not known, with a 404 title", () => {
     const meta = resolveRouteMeta("/nope/never");
     expect(meta.known).toBe(false);

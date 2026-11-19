@@ -9,6 +9,7 @@ import type {
   RoadmapRole,
 } from 'src/product-planning/util/roadmap-role.util';
 import type { RoadmapWatchLevel } from 'src/product-planning/enum/product-planning.enum';
+import type { RoadmapOpportunityEffort } from '../enum/roadmap-opportunity.enum';
 
 /**
  * The Roadmap v2 read model's wire shapes (plans/roadmap-v2-build/P2-contract.md,
@@ -78,6 +79,10 @@ export interface ItemRow {
   goal?: { id: string; name: string };
   /** 'YYYY-MM' the Owner planned it for, or null when unscheduled. */
   plannedMonth: string | null;
+  /** The Owner's size (S to XXL, stored lowercase), or null when not sized. */
+  size: RoadmapOpportunityEffort | null;
+  /** When it went live (ISO), only once Released; null otherwise. */
+  releasedAt: string | null;
   updatedAt: string;
   stageSince: string;
 }

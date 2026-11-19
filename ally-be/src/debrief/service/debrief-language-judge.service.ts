@@ -24,6 +24,7 @@ import { DebriefRunStatus } from '../enum/debrief-run.enum';
 import { DebriefCards } from '../util/debrief-cards.util';
 import {
   citedTurns,
+  isEnglishLanguage,
   languageSections,
 } from '../util/debrief-language-sections.util';
 import { DebriefContextRepository } from './debrief-context.repository';
@@ -105,6 +106,9 @@ export class DebriefLanguageJudgeService {
       });
       if (existing) return existing;
     }
+    // English debriefs are not language-checked (owner decision 2026-11-19): the check exists for
+    // the languages the team cannot read. A deliberate re-judge (`force`) still runs.
+    if (!opts.force && isEnglishLanguage(run.language)) return null;
     const cards = run.cards as unknown as DebriefCards;
     const sections = languageSections(cards);
     if (!sections.length) return null;
@@ -204,7 +208,7 @@ export class DebriefLanguageJudgeService {
     return this.judgments.findOne({ where: { runId: run.id } });
   }
 
-  /** Runs with cards and no language check yet, newest first, skipping ones the ledger says to leave. */
+  /** Non-English runs with cards and no language check yet, newest first, skipping ones the ledger says to leave. */
   async pending(limit: number, rate = 1): Promise<DebriefRun[]> {
     const params: unknown[] = [];
     const p = (v: unknown) => {
@@ -221,6 +225,7 @@ export class DebriefLanguageJudgeService {
       `SELECT r.id FROM debrief_runs r
         WHERE r.status = ANY(${p(statuses)}::text[])
           AND r.cards IS NOT NULL AND r.mode <> 'replay'
+          AND COALESCE(r.language, 'en') !~* '^en([-_]|$)'
           AND NOT EXISTS (SELECT 1 FROM debrief_language_judgments j WHERE j."runId" = r.id)
           AND (${rateParam}::float8 >= 1 OR (('x' || substr(md5(r.id::text), 1, 8))::bit(32)::bigint / 4294967295.0) < ${rateParam}::float8)
           AND ${judgeAttemptGate(JudgeAttemptFamily.DEBRIEF_LANGUAGE, 'r.id', p)}

@@ -29,25 +29,34 @@ export const PersonChip: React.FC<{ person: RoadmapPersonRef; prefix?: string }>
   );
 };
 
-/** "Ravi wrote it · Priya leads", with each name a chip. */
-export const PeopleChips: React.FC<{ item: Pick<RoadmapItemRow, "author" | "lead"> }> = ({
-  item,
-}) => {
+/**
+ * "Submitted by Ravi · Builder: Priya", with each name a chip. Until a builder is assigned it says
+ * "No builder yet", while the idea can still get one (not once Released or Not building).
+ */
+export const PeopleChips: React.FC<{
+  item: Pick<RoadmapItemRow, "author" | "lead"> & Partial<Pick<RoadmapItemRow, "stage">>;
+}> = ({ item }) => {
   const p = en.roadmapV2Tools.people;
   const parts: React.ReactNode[] = [];
   if (item.author?.name) {
     parts.push(
       <span key="author" className="inline-flex items-center gap-1">
+        <span className="text-xs text-typography-600">{p.submittedBy}</span>
         <PersonChip person={item.author} />
-        <span className="text-xs text-typography-600">{p.wroteIt}</span>
       </span>,
     );
   }
   if (item.lead?.name) {
     parts.push(
       <span key="lead" className="inline-flex items-center gap-1">
+        <span className="text-xs text-typography-600">{p.builder}</span>
         <PersonChip person={item.lead} />
-        <span className="text-xs text-typography-600">{p.leadsIt}</span>
+      </span>,
+    );
+  } else if (item.stage && item.stage !== "shipped" && item.stage !== "declined") {
+    parts.push(
+      <span key="lead" className="text-xs text-typography-600">
+        {p.noBuilder}
       </span>,
     );
   }

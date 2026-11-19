@@ -6,12 +6,13 @@ import { I18nextProvider, useTranslation } from "react-i18next";
 
 import { LearnerDebriefView } from "@types";
 
-import { BreathingPacer } from "./BreathingPacer";
+import { BreathingPopup } from "./BreathingPopup";
 import { Body, SeeMomentContext } from "./DebriefCardPrimitives";
 import { DistressFirst } from "./DebriefDistressFirst";
 import { DebriefExplainer } from "./DebriefExplainer";
 import { ReadyCards, readableSections } from "./DebriefReadyCards";
 import { ListenAllBar, ReadAloudContext, ReadAloudStatusLine } from "./ReadAloudControls";
+import { SelectionCommentPopup, SelectionCommentsProvider } from "./SelectionComments";
 import { useDebriefReadAloud } from "./useDebriefReadAloud";
 import { useDebriefEvent, useWaitingEvents } from "./useReadToTheEnd";
 
@@ -127,7 +128,6 @@ const DebriefCardsInLanguage: FC<DebriefCardsProps> = ({
   // order the run took them; the current one keeps the spinner.
   const currentLine = view.state === "working" ? progressLine() : null;
   const [doneLines, setDoneLines] = useState<string[]>([]);
-  const [breathing, setBreathing] = useState(false);
   const lastLine = useRef<string | null>(null);
   useEffect(() => {
     if (!currentLine) return;
@@ -141,6 +141,7 @@ const DebriefCardsInLanguage: FC<DebriefCardsProps> = ({
   // Plan §7.8: when a debrief the learner waited for is ready, focus moves to
   // the heading (never on a page that opened on a ready debrief).
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const cardsRef = useRef<HTMLDivElement>(null);
   const wasWorking = useRef(false);
   useEffect(() => {
     if (view.state === "working") wasWorking.current = true;
@@ -183,20 +184,6 @@ const DebriefCardsInLanguage: FC<DebriefCardsProps> = ({
               {currentLine}
             </li>
           </ul>
-          {/* Breathing is the learner's choice, never started for them. */}
-          {breathing && <BreathingPacer />}
-          <button
-            type="button"
-            data-testid={breathing ? "debrief-breathe-stop" : "debrief-breathe-start"}
-            onClick={() => setBreathing(b => !b)}
-            className="mt-1 flex min-h-[44px] items-center self-start px-1 font-primary text-sm text-typography-700 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600"
-          >
-            {t(
-              breathing
-                ? "postSim.debriefCards.working.breatheStop"
-                : "postSim.debriefCards.working.breatheStart",
-            )}
-          </button>
         </div>
       </div>
     );
@@ -284,38 +271,48 @@ const DebriefCardsInLanguage: FC<DebriefCardsProps> = ({
   return (
     <SeeMomentContext.Provider value={onSeeQuote ?? null}>
       <ReadAloudContext.Provider value={ready ? readAloud : null}>
-        <div className="flex w-full flex-col rounded-lg bg-gradient-to-br from-primary-500 to-primary-100 p-1">
-          <div className="flex w-full items-center justify-between gap-3 px-4 py-3">
-            <h2
-              ref={headingRef}
-              tabIndex={-1}
-              className="font-primary text-lg font-semibold text-white focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
-            >
-              {t("postSim.debriefCards.header")}
-            </h2>
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              {ready && <ListenAllBar sections={readableSections(view)} />}
-              <span className="rounded-full bg-white/90 px-2.5 py-0.5 font-primary text-xs font-medium text-typography-800">
-                {t("postSim.debriefCards.aiLabel")}
-              </span>
-              <DebriefExplainer />
+        <SelectionCommentsProvider enabled={ready && !!view.features?.selectionComments}>
+          <div className="flex w-full flex-col gap-2">
+            <div className="flex w-full flex-col rounded-lg bg-gradient-to-br from-primary-500 to-primary-100 p-1">
+              <div className="flex w-full items-center justify-between gap-3 px-4 py-3">
+                <h2
+                  ref={headingRef}
+                  tabIndex={-1}
+                  className="font-primary text-lg font-semibold text-white focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+                >
+                  {t("postSim.debriefCards.header")}
+                </h2>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  {ready && <ListenAllBar sections={readableSections(view)} />}
+                  <span className="rounded-full bg-white/90 px-2.5 py-0.5 font-primary text-xs font-medium text-typography-800">
+                    {t("postSim.debriefCards.aiLabel")}
+                  </span>
+                  <DebriefExplainer />
+                </div>
+              </div>
+              <div
+                ref={cardsRef}
+                lang={toLangAttribute(view.language)}
+                data-testid="debrief-cards"
+                className={`relative flex flex-col gap-5 rounded-t-lg rounded-b-md bg-white p-4 sm:p-6 ${
+                  isIndicLanguage(view.language) ? "[&_*]:!leading-[1.7]" : ""
+                }`}
+              >
+                <ReadAloudStatusLine />
+                {/* FR-27: screen readers hear when the debrief is ready. */}
+                <p className="sr-only" role="status" aria-live="polite">
+                  {view.state === "ready" && view.cards
+                    ? t("postSim.debriefCards.ready.announce")
+                    : ""}
+                </p>
+                {content}
+                <SelectionCommentPopup containerRef={cardsRef} />
+              </div>
             </div>
+            {/* Breathing is the learner's choice, never started for them: a link under the box, a popup on top of the page. */}
+            {view.state === "working" && !supervisor && <BreathingPopup />}
           </div>
-          <div
-            lang={toLangAttribute(view.language)}
-            data-testid="debrief-cards"
-            className={`flex flex-col gap-5 rounded-t-lg rounded-b-md bg-white p-4 sm:p-6 ${
-              isIndicLanguage(view.language) ? "[&_*]:!leading-[1.7]" : ""
-            }`}
-          >
-            <ReadAloudStatusLine />
-            {/* FR-27: screen readers hear when the debrief is ready. */}
-            <p className="sr-only" role="status" aria-live="polite">
-              {view.state === "ready" && view.cards ? t("postSim.debriefCards.ready.announce") : ""}
-            </p>
-            {content}
-          </div>
-        </div>
+        </SelectionCommentsProvider>
       </ReadAloudContext.Provider>
     </SeeMomentContext.Provider>
   );

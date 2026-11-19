@@ -22,6 +22,8 @@ import {
   DebriefAttention,
   DebriefAutonomyView,
   DebriefOrgOverride,
+  DebriefLearnerFeatureKey,
+  DebriefLearnerFeatureView,
   DebriefPinnedRulesView,
   DebriefProposal,
   DebriefReleaseCompare,
@@ -388,6 +390,45 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
       query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.PINNED_RULES, method: HttpMethod.GET }),
       providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
+    getDebriefLearnerFeature: builder.query<DebriefLearnerFeatureView, DebriefLearnerFeatureKey>({
+      query: feature => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.LEARNER_FEATURE(feature),
+        method: HttpMethod.GET,
+      }),
+      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    grantDebriefLearnerFeature: builder.mutation<
+      DebriefLearnerFeatureView,
+      { feature: DebriefLearnerFeatureKey; email: string }
+    >({
+      query: ({ feature, email }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.LEARNER_FEATURE_PEOPLE(feature),
+        method: HttpMethod.POST,
+        body: { email },
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    revokeDebriefLearnerFeature: builder.mutation<
+      DebriefLearnerFeatureView,
+      { feature: DebriefLearnerFeatureKey; userId: number }
+    >({
+      query: ({ feature, userId }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.LEARNER_FEATURE_PERSON(feature, userId),
+        method: HttpMethod.DELETE,
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    setDebriefLearnerFeatureEveryone: builder.mutation<
+      DebriefLearnerFeatureView,
+      { feature: DebriefLearnerFeatureKey; on: boolean }
+    >({
+      query: ({ feature, on }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.LEARNER_FEATURE_EVERYONE(feature),
+        method: HttpMethod.PUT,
+        body: { on },
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
     getDebriefAutonomy: builder.query<DebriefAutonomyView, void>({
       query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.AUTONOMY, method: HttpMethod.GET }),
       providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
@@ -613,6 +654,10 @@ export const {
   useApproveDebriefChangeMutation,
   useTurnDownDebriefChangeMutation,
   useGetDebriefPinnedRulesQuery,
+  useGetDebriefLearnerFeatureQuery,
+  useGrantDebriefLearnerFeatureMutation,
+  useRevokeDebriefLearnerFeatureMutation,
+  useSetDebriefLearnerFeatureEveryoneMutation,
   useGetDebriefClinicalListsQuery,
   useUpdateDebriefClinicalListMutation,
   useGetDebriefAutonomyQuery,

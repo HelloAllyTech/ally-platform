@@ -268,7 +268,7 @@
     {
       "tool": "comments_read",
       "kind": "read",
-      "reads": "Expert review comments"
+      "reads": "Expert and learner review comments, each marked by who wrote it"
     },
     {
       "tool": "metrics_view",

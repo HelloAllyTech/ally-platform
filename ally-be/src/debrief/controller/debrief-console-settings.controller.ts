@@ -1,8 +1,11 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
+  ParseEnumPipe,
+  ParseIntPipe,
   Post,
   Put,
   Req,
@@ -30,7 +33,11 @@ import {
   AutonomyMatrixDto,
   AutonomyOrgDto,
   BudgetsDto,
+  LearnerFeatureEmailDto,
+  LearnerFeatureEveryoneDto,
 } from './dto/debrief-console.dto';
+import { DebriefLearnerFeaturesService } from '../service/debrief-learner-features.service';
+import { DebriefLearnerFeature } from '../enum/debrief-review.enum';
 import { AuthedRequest, budgetTitle } from './console-shared';
 
 /**
@@ -52,7 +59,63 @@ export class DebriefConsoleSettingsController {
     private readonly view: DebriefConsoleViewService,
     private readonly autonomy: DebriefAutonomyService,
     private readonly releaseHistory: DebriefReleasesService,
+    private readonly learnerFeatures: DebriefLearnerFeaturesService,
   ) {}
+
+  @Get('learner-features/:feature')
+  @DebriefRead()
+  @ApiOperation({
+    summary:
+      'Who has a learner-facing debrief feature: the people, and whether everyone does',
+  })
+  learnerFeature(
+    @Param('feature', new ParseEnumPipe(DebriefLearnerFeature))
+    feature: DebriefLearnerFeature,
+  ) {
+    return this.learnerFeatures.view(feature);
+  }
+
+  @Post('learner-features/:feature/people')
+  @DebriefAct('ownerSettings')
+  @ApiOperation({
+    summary: 'Give a person a learner feature, by email (audited)',
+  })
+  grantLearnerFeature(
+    @Req() req: AuthedRequest,
+    @Param('feature', new ParseEnumPipe(DebriefLearnerFeature))
+    feature: DebriefLearnerFeature,
+    @Body() body: LearnerFeatureEmailDto,
+  ) {
+    return this.learnerFeatures.grant(feature, body.email, req.user.id);
+  }
+
+  @Delete('learner-features/:feature/people/:userId')
+  @DebriefAct('ownerSettings')
+  @ApiOperation({
+    summary: 'Take a learner feature away from a person (audited)',
+  })
+  revokeLearnerFeature(
+    @Param('feature', new ParseEnumPipe(DebriefLearnerFeature))
+    feature: DebriefLearnerFeature,
+    @Param('userId', ParseIntPipe) userId: number,
+  ) {
+    return this.learnerFeatures.revoke(feature, userId);
+  }
+
+  @Put('learner-features/:feature/everyone')
+  @DebriefAct('ownerSettings')
+  @ApiOperation({
+    summary:
+      'Give a learner feature to everyone, or back to the listed people (audited)',
+  })
+  setLearnerFeatureEveryone(
+    @Req() req: AuthedRequest,
+    @Param('feature', new ParseEnumPipe(DebriefLearnerFeature))
+    feature: DebriefLearnerFeature,
+    @Body() body: LearnerFeatureEveryoneDto,
+  ) {
+    return this.learnerFeatures.setEveryone(feature, body.on, req.user.id);
+  }
 
   @Get('settings')
   @DebriefRead()

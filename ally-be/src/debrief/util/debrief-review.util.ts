@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import {
   DebriefCommentAnchor,
   DebriefCommentTag,
@@ -5,6 +6,18 @@ import {
 
 export const COMMENT_BODY_MAX = 4000;
 export const QUOTE_MAX = 2000;
+
+/** A comment's text, trimmed; empty or over-long is a 400 the person can act on. */
+export const trimCommentBody = (body: unknown): string => {
+  const text = typeof body === 'string' ? body.trim() : '';
+  if (!text) throw new BadRequestException('Write a comment first.');
+  if (text.length > COMMENT_BODY_MAX) {
+    throw new BadRequestException(
+      `Keep a comment under ${COMMENT_BODY_MAX} characters.`,
+    );
+  }
+  return text;
+};
 
 /** Top-level card keys that are one string. */
 const STRING_SECTIONS = new Set([
@@ -197,6 +210,8 @@ export interface GatewayComment {
   status: string;
   idea: { id: string; status: string } | null;
   repeat_of_id: string | null;
+  /** Who wrote it: an expert reviewer, or the learner who read the debrief. */
+  source: 'expert' | 'learner';
   created_at: string;
   replies: Array<{
     id: string;
@@ -222,6 +237,7 @@ export interface CommentRow {
   ideaId: string | null;
   ideaStatus?: string | null;
   repeatOfId: string | null;
+  source?: string | null;
   createdAt: Date | string;
   recipeKey?: string | null;
   language?: string | null;
@@ -257,6 +273,7 @@ export function toGatewayComments(
     status: c.status,
     idea: c.ideaId ? { id: c.ideaId, status: c.ideaStatus ?? 'unknown' } : null,
     repeat_of_id: c.repeatOfId ?? null,
+    source: c.source === 'learner' ? 'learner' : 'expert',
     created_at: iso(c.createdAt),
     replies: (byParent.get(c.id) ?? [])
       .sort((a, b) => +new Date(a.createdAt) - +new Date(b.createdAt))

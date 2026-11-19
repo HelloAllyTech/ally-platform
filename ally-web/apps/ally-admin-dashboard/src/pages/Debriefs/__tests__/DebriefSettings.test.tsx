@@ -344,6 +344,7 @@ describe("Debrief settings page: who can change what", () => {
       "Autonomy",
       "Score",
       "Locked prompts",
+      "Learner features",
       "Clinical lists",
       "Progress",
     ]);
@@ -418,7 +419,7 @@ describe("Debrief settings page: who can change what", () => {
     expect(note).toHaveAttribute("title", "Only the owner can change these.");
     expect(note).toHaveClass("truncate");
     expect(screen.getByTestId("settings-tabs")).toHaveClass("flex-nowrap");
-    // Score, Locked prompts and Progress are tabs at lg and up, More items below it.
+    // Score, Locked prompts, Learner features and Progress are tabs at lg and up, More items below it.
     for (const id of ["weights", "pinned", "clinical", "progress"])
       expect(tab(id)).toHaveClass("hidden", "min-[1056px]:inline");
     expect(tab("orgs")).not.toHaveClass("hidden");

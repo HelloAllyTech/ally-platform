@@ -211,6 +211,10 @@ export class DebriefQualityRepository {
   /**
    * The whole conversation, every turn numbered from 1, plus the map the
    * debrief's `[[msg:<id>]]` anchors resolve through.
+   *
+   * In the order it was spoken (`startSeconds`), the order the transcript panel shows. Turns reach
+   * the database through a queue that does not keep order, so the time a row was saved can put a
+   * later turn first; the save time only breaks ties and orders rows with no speech time.
    */
   async buildTranscript(sessionId: string): Promise<{
     turns: DebriefTranscriptTurn[];
@@ -220,7 +224,7 @@ export class DebriefQualityRepository {
       `SELECT id, "senderId" AS sender_id, content
          FROM scenario_session_messages
         WHERE "scenarioSessionId" = $1
-        ORDER BY "createdAt" ASC, id ASC`,
+        ORDER BY "startSeconds" ASC, "createdAt" ASC, id ASC`,
       [sessionId],
     );
     const turns: DebriefTranscriptTurn[] = [];

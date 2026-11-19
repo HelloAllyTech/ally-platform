@@ -255,12 +255,18 @@ async def plan(
             }
         if memory:
             floor = floor_data_agent({**base, **probe}, ctx, "case_memory")
+    # A thin session (the learner said too little to coach on) reads the safety
+    # reader first: the Analyst waits for it, so a session that ends as "too
+    # short" never pays for it. Its cost is still reserved, so the budget logic
+    # is the same whichever way the gate goes.
+    thin = bool(ctx.sess("thin"))
     if analyst_step:
         analyst_est = _reserve(ctx, estimated, analyst_step, ctx.transcript_chars)
         if analyst_est is not None:
             estimated += analyst_est
             reserved["analyst#0"] = analyst_est
-            goto.append("analyst")
+            if not thin:
+                goto.append("analyst")
     plan_log = _plan_log(
         ctx,
         t0,
@@ -277,6 +283,7 @@ async def plan(
             "workspace": {**workspace, **floor.get("workspace", {})},
             "estimated": estimated,
             "reserved": reserved,
+            "thin_gate": thin,
             # The plan first, then a floor data agent it applied.
             "logs": [plan_log] + floor.get("logs", []),
         },
@@ -305,7 +312,16 @@ def floor_data_agent(state: State, ctx: Ctx, agent: str) -> Dict[str, Any]:
 
 async def after_reading(
     state: State, runtime: Runtime[Ctx]
-) -> Command[Literal["progress_reader", "guidance_lookup", "profile", "finish"]]:
+) -> Command[
+    Literal[
+        "progress_reader",
+        "guidance_lookup",
+        "profile",
+        "finish",
+        "analyst",
+        "after_reading",
+    ]
+]:
     ctx = runtime.context
     results = state.get("results") or {}
     safety_res = results.get("safety-reader#0")
@@ -324,6 +340,24 @@ async def after_reading(
     }
     analyst_step = ctx.step_of(state["recipe_key"], Step.ANALYST)
     analyst_res = results.get("analyst#0")
+    if state.get("thin_gate"):
+        # The thin-session gate: only the safety reader has run. A learner who
+        # sounds distressed is still debriefed (the Analyst runs now and this
+        # node is reached again with the gate off); anyone else ends here as
+        # "too short", and the Analyst and Writer never run.
+        if not safety["learner_distress"]:
+            return _end(
+                Status.SKIPPED,
+                "too_short",
+                safety=safety,
+                has_risk_cue=len(safety["risk_cues"]) > 0,
+                learner_distress=False,
+                workspace={"safety": safety},
+            )
+        update_gate: Dict[str, Any] = {"thin_gate": False, "safety": safety}
+        if analyst_step and "analyst#0" in (state.get("reserved") or {}):
+            return Command(update=update_gate, goto="analyst")
+        return Command(update=update_gate, goto="after_reading")
     evidence = (analyst_res or {}).get("evidence") or {}
     estimated = state.get("estimated", 0.0)
     rung = 0

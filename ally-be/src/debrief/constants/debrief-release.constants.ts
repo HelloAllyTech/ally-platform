@@ -885,3 +885,23 @@ export const DEBRIEF_PM_AGENT_PROMPT_CODES: readonly string[] = [
   'debrief_pm_skill_prompt_change',
   'debrief_pm_skill_registry_agent',
 ];
+
+/**
+ * A session is thin when the learner spoke too little to coach on: fewer than this many turns or
+ * words. A thin session is not debriefed unless the safety reader hears the learner in distress
+ * (owner decision 2026-11-19: a 7-turn, 27-word session had cost a full 130 s debrief).
+ */
+export const THIN_SESSION = {
+  minLearnerTurns: 3,
+  minLearnerWords: 40,
+} as const;
+
+export function isThinSession(
+  learnerTurns: number,
+  learnerWords: number,
+): boolean {
+  return (
+    learnerTurns < THIN_SESSION.minLearnerTurns ||
+    learnerWords < THIN_SESSION.minLearnerWords
+  );
+}

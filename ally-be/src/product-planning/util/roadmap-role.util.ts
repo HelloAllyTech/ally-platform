@@ -256,6 +256,7 @@ export interface RoadmapEditCapabilities {
   editSummary: boolean;
   editLead: boolean;
   editMonth: boolean;
+  editSize: boolean;
 }
 
 /**
@@ -267,6 +268,8 @@ export interface RoadmapEditCapabilities {
  * - Lead: an Owner, once the plan is closed or a builder is already
  *   assigned. Planned month: an Owner. The month stops being editable once
  *   the idea ships, because a shipped idea sits in the month it shipped.
+ * - Size: an Owner, at any open stage (a shipped idea can still be sized for
+ *   the record).
  * - Declined and Closed ideas are read-only (§4.7), and a draft is edited on
  *   its own page, not here.
  */
@@ -293,5 +296,6 @@ export function editCapabilitiesFor(
     editLead:
       open && owner && stage !== 'shipped' && (plan.planClosed || plan.hasLead),
     editMonth: open && owner && stage !== 'shipped',
+    editSize: text,
   };
 }
