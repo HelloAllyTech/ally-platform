@@ -11551,6 +11551,7 @@ export const en = {
         actionFailed: "Couldn't update the comment",
         you: "You",
         someone: "A reviewer",
+        fromLearner: "From the learner",
         whole: "Whole debrief",
         onTurn: (n: number) => `Turn ${n}`,
         onCard: "Card",

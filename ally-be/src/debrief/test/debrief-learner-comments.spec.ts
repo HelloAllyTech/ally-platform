@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { DebriefLearnerCommentsService } from '../service/debrief-learner-comments.service';
 import { DebriefLearnerFeaturesService } from '../service/debrief-learner-features.service';
+import { DebriefReviewService } from '../service/debrief-review.service';
 import { toGatewayComments } from '../util/debrief-review.util';
 
 const CARDS = {
@@ -156,6 +157,30 @@ describe('what the PM agent reads', () => {
     expect(expert.source).toBe('expert');
     const [old] = toGatewayComments([{ ...row, source: undefined } as any], []);
     expect(old.source).toBe('expert');
+  });
+});
+
+describe('what the review screens read', () => {
+  it('says who wrote a comment: a learner, or an expert (including rows from before the field)', () => {
+    const view = (source?: string) =>
+      (DebriefReviewService.prototype as any).toView.call(
+        {},
+        {
+          id: 'c1',
+          runId: 'r1',
+          reviewerId: 7,
+          reviewerName: 'T',
+          body: 'b',
+          status: 'open',
+          createdAt: new Date(0),
+          updatedAt: new Date(0),
+          source,
+        },
+        1,
+      );
+    expect(view('learner').source).toBe('learner');
+    expect(view('expert').source).toBe('expert');
+    expect(view(undefined).source).toBe('expert');
   });
 });
 
