@@ -15,6 +15,7 @@ import '../data/courses_repository.dart';
 import 'course_language_sheet.dart';
 import 'course_progress_screen.dart';
 import 'roleplay/roleplay_requirement.dart';
+import 'track_blocker.dart';
 
 /// Port of ally-mobile (React Native)'s `CourseOverviewScreen` (header,
 /// language row, LearningPathListHeader, CourseSectionBlock/CourseItemRow).
@@ -200,6 +201,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
           if (index < leading.length) return leading[index];
           final i = index - leading.length;
           return _CourseSectionBlock(
+            allSections: sections,
             section: sections[i],
             sectionIndex: i,
             nextItemId: nextItemId,
@@ -235,12 +237,14 @@ String? findNextTrackItemId(List<TrackSection> sortedSections) {
 /// description, else "x of y"), then the item rows 8 apart.
 class _CourseSectionBlock extends ConsumerWidget {
   const _CourseSectionBlock({
+    required this.allSections,
     required this.section,
     required this.sectionIndex,
     required this.nextItemId,
     required this.onItemTap,
   });
 
+  final List<TrackSection> allSections;
   final TrackSection section;
   final int sectionIndex;
   final String? nextItemId;
@@ -321,6 +325,16 @@ class _CourseSectionBlock extends ConsumerWidget {
               item: items[i],
               isNext: items[i].id == nextItemId,
               onTap: () => onItemTap(items[i]),
+              onBlockerTap: (id) {
+                for (final sec in allSections) {
+                  for (final it in sec.items) {
+                    if (it.id == id) {
+                      onItemTap(it);
+                      return;
+                    }
+                  }
+                }
+              },
             ),
           ],
         ],
@@ -425,11 +439,17 @@ String trackItemMeta(TrackDetailItem item, String Function(String, [Map<String, 
 /// with a 40px type-letter badge (filled when completed, lock when locked),
 /// title + tick / status chip, the meta line, and optional captions.
 class _CourseItemRow extends ConsumerWidget {
-  const _CourseItemRow({required this.item, required this.isNext, required this.onTap});
+  const _CourseItemRow({
+    required this.item,
+    required this.isNext,
+    required this.onTap,
+    this.onBlockerTap,
+  });
 
   final TrackDetailItem item;
   final bool isNext;
   final VoidCallback onTap;
+  final ValueChanged<String>? onBlockerTap;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -549,12 +569,6 @@ class _CourseItemRow extends ConsumerWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(trackItemMeta(item, ref.t), style: _robotoSmall),
-                    if (item.type == TrackItemType.roleplay &&
-                        !isCompleted &&
-                        item.lastRoleplayAttempt != null) ...[
-                      const SizedBox(height: 8),
-                      RoleplayAttemptNotice(attempt: item.lastRoleplayAttempt!),
-                    ],
                     if (item.languageFallbackReason != null) ...[
                       const SizedBox(height: 2),
                       Text(
@@ -562,7 +576,34 @@ class _CourseItemRow extends ConsumerWidget {
                         style: _robotoTiny,
                       ),
                     ],
-                    if (isLocked) ...[
+                    if (isLocked && item.blockedBy != null) ...[
+                      for (final line in trackBlockerLines(item.blockedBy!, ref.t)) ...[
+                        const SizedBox(height: 2),
+                        // Wraps rather than truncating, so the numbers are
+                        // never cut off.
+                        Text(line, style: _robotoTiny.copyWith(color: AppColors.lowEmphasis)),
+                      ],
+                      if (item.blockedBy!.action != TrackBlockerAction.none &&
+                          onBlockerTap != null)
+                        InkWell(
+                          key: const ValueKey('blocker-link'),
+                          onTap: () => onBlockerTap!(item.blockedBy!.itemId),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            child: Text(
+                              ref.t(
+                                item.blockedBy!.action == TrackBlockerAction.retry
+                                    ? 'courses.blocker.tryAgain'
+                                    : 'courses.blocker.goToItem',
+                              ),
+                              style: _robotoSmall.copyWith(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ] else if (isLocked) ...[
                       const SizedBox(height: 2),
                       Text(
                         ref.t('courses.lockedTooltip'),

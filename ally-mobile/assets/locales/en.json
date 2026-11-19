@@ -720,6 +720,20 @@
     "progress": "{{completed}} of {{total}}",
     "courseCompleted": "Course completed",
     "lockedTooltip": "Complete the previous items to unlock this",
+    "blocker": {
+      "notFinished": "Finish “{{title}}” to unlock this",
+      "belowScore": "“{{title}}”: you scored {{actual}}, need {{required}}",
+      "tooShort": "“{{title}}”: it lasted {{actual}}, needs at least {{required}}",
+      "notScored": "“{{title}}”: we couldn't score your last attempt",
+      "assessmentFailed": "“{{title}}”: your assessment didn't pass. Ask your trainer for another attempt.",
+      "gradingPending": "“{{title}}”: your answers are still being marked",
+      "outOfAttempts": "“{{title}}”: no attempts left. Ask your trainer for help.",
+      "outOfAttemptsUntil": "“{{title}}”: new attempts open {{date}}",
+      "watchMore": "“{{title}}”: you've watched {{actual}}%, need {{required}}%",
+      "keepReading": "“{{title}}”: keep reading to finish it",
+      "tryAgain": "Try again",
+      "goToItem": "Go to item"
+    },
     "notFound": "Course not found",
     "viewProgress": "View progress",
     "enroll": "Enroll",
@@ -882,12 +896,7 @@
       "assessmentNotice": "You get one attempt. When you end the role play, your attempt is submitted and can't be retaken.",
       "assessmentSubmitted": "Submitted on {{date}}",
       "assessmentNotPassed": "This attempt didn't meet the passing requirements.",
-      "assessmentLocked": "Your assessment is submitted. If you need another attempt, ask your trainer.",
-      "lastAttemptTitle": "Your last attempt didn't complete this role play",
-      "lastAttemptDuration": "It lasted {{actual}}; this role play needs at least {{required}}.",
-      "lastAttemptScore": "You scored {{score}}; this role play needs at least {{required}}.",
-      "lastAttemptScoreUnknown": "It didn't reach the minimum score of {{required}}.",
-      "lastAttemptFooter": "Try again when you're ready."
+      "assessmentLocked": "Your assessment is submitted. If you need another attempt, ask your trainer."
     },
     "quiz": {
       "intro": {

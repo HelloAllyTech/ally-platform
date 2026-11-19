@@ -5,3 +5,4 @@ export {
   getRoleplayFailureLines,
   getRoleplayRequirement,
 } from "./roleplayRequirement";
+export { formatTrackBlocker } from "./trackBlocker";
