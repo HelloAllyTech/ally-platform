@@ -26,6 +26,7 @@ describe('BuilderSessionService', () => {
     update: jest.Mock;
     slugExists: jest.Mock;
     findCreatorNames: jest.Mock;
+    query?: jest.Mock;
   };
   let prdService: {
     getOrCreateDoc: jest.Mock;
@@ -277,6 +278,39 @@ describe('BuilderSessionService', () => {
 
       await expect(
         service.attachHandoffContext('session-1', 'the brief'),
+      ).resolves.toBe(false);
+    });
+
+    it('puts the Start planning block in front once, keyed by its marker', async () => {
+      sessionRepository.query = jest
+        .fn()
+        .mockResolvedValue([[{ id: 'session-1' }], 1]);
+      await expect(
+        service.prependHandoffBlock(
+          'session-1',
+          '## Marker (today)\n\nfacts',
+          '## Marker',
+        ),
+      ).resolves.toBe(true);
+      const [sql, params] = sessionRepository.query!.mock.calls[0];
+      expect(sql).toContain('strpos("handoffContext", $3) = 0');
+      expect(params.slice(0, 3)).toEqual([
+        'session-1',
+        '## Marker (today)\n\nfacts',
+        '## Marker',
+      ]);
+
+      sessionRepository.query!.mockResolvedValue([[], 0]);
+      await expect(
+        service.prependHandoffBlock(
+          'session-1',
+          '## Marker again',
+          '## Marker',
+        ),
+      ).resolves.toBe(false);
+      // A block without its own marker could never be told apart: refused.
+      await expect(
+        service.prependHandoffBlock('session-1', 'no marker here', '## Marker'),
       ).resolves.toBe(false);
     });
 

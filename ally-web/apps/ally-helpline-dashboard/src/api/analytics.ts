@@ -9,6 +9,7 @@ import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
 import {
   GetCounsellorStatsRequest,
   GetCounsellorStatsResponse,
+  GetCourseAssessmentPairsResponse,
   GetCourseUsageTableRequest,
   GetCourseUsageTableResponse,
   GetDashboardUrlResponse,
@@ -109,6 +110,17 @@ const analyticsAPI = baseAPI.injectEndpoints({
     }),
 
     /**
+     * Pre/post assessment pairs of one course, with per-learner scores and a
+     * cohort summary (tenant-admin dashboard). Tenant-scoped via the caller's JWT.
+     */
+    getCourseAssessmentPairs: builder.query<GetCourseAssessmentPairsResponse, string>({
+      query: trackId => ({
+        url: ApiEndpoints.ANALYTICS.COURSE_ASSESSMENT_PAIRS(trackId),
+        method: HttpMethod.GET,
+      }),
+    }),
+
+    /**
      * Scenario quizzes a learner has started but not passed (trainer view).
      * Tenant-scoped on the backend; needs `edit:learner-progress`.
      * @param {number} userId - The learner
@@ -193,6 +205,7 @@ export const {
   useGetOrganizationMetricsQuery,
   useGetLearnerUsageTableQuery,
   useGetCourseUsageTableQuery,
+  useGetCourseAssessmentPairsQuery,
   useGetLearnerScenarioAttemptsQuery,
   useResetBranchingAttemptsMutation,
   useReopenRoleplayAssessmentMutation,

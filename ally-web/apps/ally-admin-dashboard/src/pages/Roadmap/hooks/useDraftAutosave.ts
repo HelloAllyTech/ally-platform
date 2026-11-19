@@ -5,6 +5,7 @@ import {
   useDiscardRoadmapDraftMutation,
   usePatchRoadmapDraftMutation,
 } from "../../../api/roadmapV2Flow";
+import { ROADMAP_IDEA_TEXT_MAX } from "../../../types/roadmapV2Flow";
 import {
   DeviceDraft,
   deviceDelete,
@@ -19,8 +20,8 @@ import type { RoadmapDraftDetail } from "../../../types/roadmapV2Flow";
 export const NEW_DRAFT_KEY = "new";
 /** Quiet time before a change goes to the server (§4.2: "every change saves as you type"). */
 export const AUTOSAVE_DELAY_MS = 800;
-/** The server's limit on a draft's text. */
-export const DRAFT_TEXT_MAX = 1000;
+/** The server's limit on a draft's text: the one Roadmap v2 idea limit. */
+export const DRAFT_TEXT_MAX = ROADMAP_IDEA_TEXT_MAX;
 
 export type AutosaveState = "idle" | "saving" | "saved" | "device" | "error";
 

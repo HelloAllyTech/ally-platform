@@ -17,10 +17,11 @@ import { TrackTenant } from '../entity/track-tenant.entity';
 import { TrackItemProgressRepository } from '../repository/track-item-progress.repository';
 import { TrackItemRepository } from '../repository/track-item.repository';
 import {
+  AssessmentPhase,
   LastCaseAttempt,
   RoleplayAttemptFailureReason,
+  RoleplayType,
   TrackItemCompletionCriteria,
-  TrackItemCompletionLogic,
   TrackItemProgressMeta,
   TrackItemType,
 } from '../type/track.type';
@@ -28,8 +29,8 @@ import {
   parseDefaultMinDurationSeconds,
   resolveRoleplayGate,
   RoleplayGate,
-  roleplayCompletionLogic,
   roleplayFailureReasons,
+  resolveRoleplayType,
 } from '../util/roleplay-gate.util';
 
 export const TRACK_EVENTS = {
@@ -62,7 +63,7 @@ export interface TrackRoleplayAttemptEndedEvent {
   trackItemId: string;
   trackItemProgressId: string;
   /** Kept for listeners that predate failureReasons; too_short wins a tie. */
-  outcome: 'completed' | 'too_short' | 'below_score';
+  outcome: 'completed' | 'too_short' | 'below_score' | 'too_few_turns';
   /** Every gate the attempt missed; empty when it completed the item. */
   failureReasons: RoleplayAttemptFailureReason[];
   score: number | null;
@@ -100,6 +101,20 @@ const NOOP_RESULT: CompleteItemResult = {
   unlockedItemIds: [],
   sectionCompleted: false,
   trackCompleted: false,
+};
+
+/**
+ * handleRoleplayEnd's result. `assessmentAttemptValid` is null for a
+ * non-assessment item; otherwise whether this session counted as the
+ * learner's one attempt, judged by the rule in force as it ended.
+ */
+export interface RoleplayEndResult extends CompleteItemResult {
+  assessmentAttemptValid: boolean | null;
+}
+
+const NOOP_END_RESULT: RoleplayEndResult = {
+  ...NOOP_RESULT,
+  assessmentAttemptValid: null,
 };
 
 /**
@@ -160,38 +175,99 @@ export class TrackProgressService {
     }
     if (item.completionCriteria?.assessmentMode) {
       await this.assertAssessmentAttemptAvailable(progress);
+      await this.assertPreAssessmentSubmitted(item, progress);
     }
   }
 
   /**
-   * Assessment-mode gate: one attempt per learner. Counts the sessions
+   * A POST assessment can't start until the learner has submitted its paired
+   * PRE, so every post has a baseline. Course order usually guarantees this,
+   * but order and pairing are editable on a live course. No paired PRE in the
+   * track (deleted, unpaired, or not an assessment any more) → no check.
+   */
+  private async assertPreAssessmentSubmitted(
+    item: TrackItem,
+    progress: TrackItemProgress,
+  ): Promise<void> {
+    const pre = await this.findPairedPreAssessment(
+      item,
+      progress.trackEnrollmentId,
+    );
+    if (pre && !pre.submitted) {
+      throw new BadRequestException(
+        `Complete the pre-assessment "${pre.title}" first.`,
+      );
+    }
+  }
+
+  /**
+   * The PRE paired with a POST assessment item, and whether this enrolment
+   * has submitted it. Null for anything that isn't a paired POST, or when the
+   * PRE is gone or no longer an assessment.
+   */
+  async findPairedPreAssessment(
+    item: Pick<TrackItem, 'id' | 'trackId' | 'completionCriteria'>,
+    trackEnrollmentId: string,
+  ): Promise<{ title: string; submitted: boolean } | null> {
+    const criteria = item.completionCriteria;
+    if (
+      !criteria?.assessmentMode ||
+      criteria.assessmentPhase !== AssessmentPhase.POST ||
+      !criteria.assessmentPairKey
+    ) {
+      return null;
+    }
+    const [pre]: Array<{ title: string; submittedAt: string | null }> =
+      await this.dataSource.query(
+        `SELECT ti.title AS "title",
+                tip.meta->>'assessmentSubmittedAt' AS "submittedAt"
+           FROM track_items ti
+           LEFT JOIN track_item_progress tip
+             ON tip."trackItemId" = ti.id
+            AND tip."trackEnrollmentId" = $3
+          WHERE ti."trackId" = $1
+            AND ti."deletedAt" IS NULL
+            AND ti.id <> $4
+            AND (ti."completionCriteria"->>'assessmentMode')::boolean IS TRUE
+            AND ti."completionCriteria"->>'assessmentPhase' = 'PRE'
+            AND ti."completionCriteria"->>'assessmentPairKey' = $2
+          LIMIT 1`,
+        [item.trackId, criteria.assessmentPairKey, trackEnrollmentId, item.id],
+      );
+    return pre ? { title: pre.title, submitted: !!pre.submittedAt } : null;
+  }
+
+  /**
+   * Assessment-mode gate: one valid attempt per learner. Counts the sessions
    * themselves rather than `attemptCount` (which only moves when a session's
    * end is processed), so a second start while the first is still live is
-   * refused too. A session only uses the attempt if the learner actually took
-   * part — at least one message of theirs in the transcript (the client's are
-   * stored with senderId -1) — and it was not a room that closed with no
-   * end-of-session at all (`eventStatus` ABANDONED: a crash, not a
-   * submission). So a denied microphone, a failed connection or leaving before
-   * saying anything never costs the learner their assessment. `startedAt` can't
-   * be the signal: ending a session backfills it. Sessions before a trainer's
+   * refused too. A session uses the attempt only if it was stamped
+   * `assessmentAttemptValid` when it ended — the learner took the item's
+   * minimum learner turns under the rule in force then. Shorter attempts,
+   * crashes (`eventStatus` ABANDONED) and sessions where the learner never
+   * spoke don't count, so they can start again. An ended session whose end
+   * hasn't been processed yet (no `learnerTurns`) blocks briefly, so a quick
+   * restart can't slip past a valid attempt. Sessions before a trainer's
    * reopen don't count.
    */
   private async assertAssessmentAttemptAvailable(
     progress: TrackItemProgress,
   ): Promise<void> {
     const reopenedAt = progress.meta?.assessmentReopenedAt ?? null;
-    const [row]: Array<{ live: number; ended: number }> =
+    const [row]: Array<{ live: number; ended: number; pending: number }> =
       await this.dataSource.query(
         `SELECT COUNT(*) FILTER (WHERE s.status = 'ACTIVE')::int AS "live",
                 COUNT(*) FILTER (
                   WHERE s.status = 'ENDED'
+                    AND s."assessmentAttemptValid" IS TRUE
+                )::int AS "ended",
+                COUNT(*) FILTER (
+                  WHERE s.status = 'ENDED'
                     AND s."eventStatus" <> 'ABANDONED'
-                    AND EXISTS (
-                      SELECT 1 FROM scenario_session_messages m
-                       WHERE m."scenarioSessionId" = s.id
-                         AND m."senderId" <> -1
-                    )
-                )::int AS "ended"
+                    AND s."learnerTurns" IS NULL
+                    AND s."assessmentAttemptValid" IS NULL
+                    AND s."updatedAt" > NOW() - INTERVAL '2 minutes'
+                )::int AS "pending"
            FROM scenario_sessions s
           WHERE s."trackItemProgressId" = $1
             AND ($2::timestamptz IS NULL OR s."createdAt" > $2::timestamptz)`,
@@ -205,6 +281,11 @@ export class TrackProgressService {
     if ((row?.live ?? 0) > 0) {
       throw new BadRequestException(
         'Your assessment attempt for this roleplay is already in progress.',
+      );
+    }
+    if ((row?.pending ?? 0) > 0) {
+      throw new BadRequestException(
+        'Your last attempt is still being saved. Try again in a moment.',
       );
     }
   }
@@ -296,22 +377,38 @@ export class TrackProgressService {
    * item's `completionLogic` (see resolveRoleplayGate). A miss is not an
    * error: the item stays UNLOCKED for a retry, and the reasons are kept on
    * the progress row so the learner can be told which bar they missed.
+   *
+   * An assessment item is judged on learner turns instead (see
+   * handleAssessmentEnd). The result says whether this session counted as the
+   * learner's assessment attempt, so the caller can stamp it on the session —
+   * that stamp, not the item's current rule, is what every later reader uses.
    */
   async handleRoleplayEnd({
     trackItemProgressId,
+    scenarioSessionId = null,
     score,
     callDuration = 0,
-    learnerTookPart = true,
+    learnerTookPart,
+    learnerTurns,
   }: {
     trackItemProgressId: string;
+    scenarioSessionId?: string | null;
     score?: number;
     callDuration: number;
-    /**
-     * Whether the learner said anything in the session. An assessment only
-     * counts as submitted if they did — the same rule the start gate applies.
-     */
+    /** Legacy signal; `learnerTurns` wins when both are given. */
     learnerTookPart?: boolean;
-  }): Promise<CompleteItemResult> {
+    /**
+     * Runs of consecutive learner messages in the session. An assessment only
+     * counts as submitted when this reaches the item's minLearnerTurns.
+     */
+    learnerTurns?: number;
+  }): Promise<RoleplayEndResult> {
+    const turns =
+      typeof learnerTurns === 'number'
+        ? learnerTurns
+        : learnerTookPart === false
+          ? 0
+          : 1;
     const progress = await this.trackItemProgressRepository.findOne({
       where: { id: trackItemProgressId },
     });
@@ -319,30 +416,29 @@ export class TrackProgressService {
       this.logger.error(
         `Track item progress not found: ${trackItemProgressId}`,
       );
-      return NOOP_RESULT;
+      return NOOP_END_RESULT;
     }
     const item = await this.trackItemRepository.findOne({
       where: { id: progress.trackItemId },
     });
-    const assessment =
-      !!item?.completionCriteria?.assessmentMode && learnerTookPart;
-    const submittedMeta: Partial<TrackItemProgressMeta> = assessment
-      ? { assessmentSubmittedAt: new Date().toISOString() }
-      : {};
+    const gate = item ? this.getRoleplayGate(item.completionCriteria) : null;
+
+    if (item && gate?.roleplayType === RoleplayType.ASSESSMENT) {
+      return this.handleAssessmentEnd({
+        progress,
+        gate,
+        scenarioSessionId,
+        score,
+        callDuration,
+        turns,
+      });
+    }
 
     if (progress.status === SessionItemStatus.COMPLETED) {
-      // A passed assessment a trainer reopened: the new attempt is submitted
-      // too, but it never un-completes the item or replaces its score.
-      if (assessment) {
-        await this.trackItemProgressRepository.update(progress.id, {
-          meta: { ...(progress.meta ?? {}), ...submittedMeta },
-        });
-      }
-      return { ...NOOP_RESULT, completed: true };
+      return { ...NOOP_END_RESULT, completed: true };
     }
 
     const durationSeconds = (callDuration ?? 0) / 1000;
-    const gate = item ? this.getRoleplayGate(item.completionCriteria) : null;
     const failureReasons = gate
       ? roleplayFailureReasons(gate, { score, durationSeconds })
       : [];
@@ -359,34 +455,24 @@ export class TrackProgressService {
             },
           }
         : {};
-    const metaPatch = { ...submittedMeta, ...lastAttemptMeta };
 
-    // In assessment mode the ended attempt is final whatever its outcome, so
-    // the score is kept here too — completeItem only writes it on a pass.
     await this.trackItemProgressRepository.update(progress.id, {
       attemptCount: progress.attemptCount + 1,
-      ...(assessment ? { score: score ?? undefined } : {}),
-      ...(Object.keys(metaPatch).length > 0
-        ? { meta: { ...(progress.meta ?? {}), ...metaPatch } }
+      ...(Object.keys(lastAttemptMeta).length > 0
+        ? { meta: { ...(progress.meta ?? {}), ...lastAttemptMeta } }
         : {}),
     });
 
     if (!item || !gate) {
       this.logger.error(`Track item not found: ${progress.trackItemId}`);
-      return NOOP_RESULT;
+      return NOOP_END_RESULT;
     }
 
-    const attemptEnded = (outcome: TrackRoleplayAttemptEndedEvent['outcome']) =>
-      this.emitSafely(TRACK_EVENTS.ROLEPLAY_ATTEMPT_ENDED, {
-        userId: progress.userId,
-        trackEnrollmentId: progress.trackEnrollmentId,
-        trackItemId: progress.trackItemId,
-        trackItemProgressId,
-        outcome,
-        failureReasons,
-        score: score ?? null,
-        callDurationMs: callDuration ?? 0,
-      } satisfies TrackRoleplayAttemptEndedEvent);
+    const attemptEnded = this.attemptEndedEmitter(progress, {
+      failureReasons,
+      score,
+      callDuration,
+    });
 
     if (failureReasons.length > 0) {
       this.logger.info(
@@ -402,15 +488,197 @@ export class TrackProgressService {
           ? 'too_short'
           : 'below_score',
       );
-      return NOOP_RESULT;
+      return NOOP_END_RESULT;
     }
 
-    const result = await this.completeItem(trackItemProgressId, {
+    const result = await this.completeItem(progress.id, {
       score,
       meta: { lastRoleplayAttempt: undefined },
     });
     attemptEnded('completed');
-    return result;
+    return { ...result, assessmentAttemptValid: null };
+  }
+
+  /**
+   * An assessment roleplay has ended. Three outcomes, by learner turns:
+   *  - none: the learner never spoke (denied mic, failed connection). Nothing
+   *    is submitted and nothing is shown — it never costs them the attempt.
+   *  - fewer than minLearnerTurns: an incomplete start. Not submitted, so the
+   *    learner may start again; counted for trainers and explained to the
+   *    learner (INSUFFICIENT_TURNS).
+   *  - enough: the one valid attempt. Submitted whatever its outcome, its
+   *    score kept, and frozen in `assessmentSubmission`. The optional pass
+   *    mark then decides whether the item completes; a miss pauses the course
+   *    until a trainer reopens the attempt.
+   * Duration never gates an assessment.
+   */
+  private async handleAssessmentEnd({
+    progress,
+    gate,
+    scenarioSessionId,
+    score,
+    callDuration,
+    turns,
+  }: {
+    progress: TrackItemProgress;
+    gate: RoleplayGate;
+    scenarioSessionId: string | null;
+    score?: number;
+    callDuration: number;
+    turns: number;
+  }): Promise<RoleplayEndResult> {
+    const requiredTurns = gate.minLearnerTurns ?? 1;
+    const now = new Date().toISOString();
+    const meta = progress.meta ?? {};
+    const durationSeconds = Math.round((callDuration ?? 0) / 1000);
+
+    if (turns <= 0) {
+      await this.trackItemProgressRepository.update(progress.id, {
+        attemptCount: progress.attemptCount + 1,
+      });
+      return NOOP_END_RESULT;
+    }
+
+    if (turns < requiredTurns) {
+      const failureReasons = [RoleplayAttemptFailureReason.INSUFFICIENT_TURNS];
+      await this.trackItemProgressRepository.update(progress.id, {
+        attemptCount: progress.attemptCount + 1,
+        meta: {
+          ...meta,
+          assessmentIncompleteStarts:
+            (meta.assessmentIncompleteStarts ?? 0) + 1,
+          ...(progress.status === SessionItemStatus.COMPLETED
+            ? {}
+            : {
+                lastRoleplayAttempt: {
+                  failureReasons,
+                  score: score ?? null,
+                  durationSeconds,
+                  requiredScore: gate.minScore,
+                  requiredDurationSeconds: null,
+                  learnerTurns: turns,
+                  requiredTurns,
+                  endedAt: now,
+                },
+              }),
+        },
+      });
+      this.logger.info(
+        `Track assessment attempt too short on progress ${progress.id}: ` +
+          `${turns} of ${requiredTurns} learner turns; not submitted`,
+      );
+      this.attemptEndedEmitter(progress, {
+        failureReasons,
+        score,
+        callDuration,
+      })('too_few_turns');
+      return {
+        ...NOOP_END_RESULT,
+        completed: progress.status === SessionItemStatus.COMPLETED,
+        assessmentAttemptValid: false,
+      };
+    }
+
+    const submissionMeta: Partial<TrackItemProgressMeta> = {
+      assessmentSubmittedAt: now,
+      assessmentSubmission: {
+        scenarioSessionId,
+        learnerTurns: turns,
+        requiredTurns,
+        score: score ?? null,
+        requiredScore: gate.minScore,
+        submittedAt: now,
+      },
+    };
+
+    if (progress.status === SessionItemStatus.COMPLETED) {
+      // A passed assessment a trainer reopened: the new attempt is submitted
+      // too, but it never un-completes the item or replaces its score.
+      await this.trackItemProgressRepository.update(progress.id, {
+        attemptCount: progress.attemptCount + 1,
+        meta: { ...meta, ...submissionMeta },
+      });
+      return {
+        ...NOOP_END_RESULT,
+        completed: true,
+        assessmentAttemptValid: true,
+      };
+    }
+
+    const failureReasons = roleplayFailureReasons(gate, {
+      score,
+      durationSeconds,
+      learnerTurns: turns,
+    });
+    const lastAttemptMeta: Partial<TrackItemProgressMeta> =
+      failureReasons.length > 0
+        ? {
+            lastRoleplayAttempt: {
+              failureReasons,
+              score: score ?? null,
+              durationSeconds,
+              requiredScore: gate.minScore,
+              requiredDurationSeconds: null,
+              learnerTurns: turns,
+              requiredTurns,
+              endedAt: now,
+            },
+          }
+        : {};
+
+    // The ended attempt is final whatever its outcome, so the score is kept
+    // here too — completeItem only writes it on a pass.
+    await this.trackItemProgressRepository.update(progress.id, {
+      attemptCount: progress.attemptCount + 1,
+      score: score ?? undefined,
+      meta: { ...meta, ...submissionMeta, ...lastAttemptMeta },
+    });
+
+    const attemptEnded = this.attemptEndedEmitter(progress, {
+      failureReasons,
+      score,
+      callDuration,
+    });
+    if (failureReasons.length > 0) {
+      this.logger.info(
+        `Track assessment submitted below its pass mark on progress ${progress.id}: ` +
+          `score ${score ?? '-'} vs ${gate.minScore ?? '-'}`,
+      );
+      attemptEnded('below_score');
+      return { ...NOOP_END_RESULT, assessmentAttemptValid: true };
+    }
+
+    const result = await this.completeItem(progress.id, {
+      score,
+      meta: { lastRoleplayAttempt: undefined },
+    });
+    attemptEnded('completed');
+    return { ...result, assessmentAttemptValid: true };
+  }
+
+  private attemptEndedEmitter(
+    progress: TrackItemProgress,
+    {
+      failureReasons,
+      score,
+      callDuration,
+    }: {
+      failureReasons: RoleplayAttemptFailureReason[];
+      score?: number;
+      callDuration: number;
+    },
+  ) {
+    return (outcome: TrackRoleplayAttemptEndedEvent['outcome']) =>
+      this.emitSafely(TRACK_EVENTS.ROLEPLAY_ATTEMPT_ENDED, {
+        userId: progress.userId,
+        trackEnrollmentId: progress.trackEnrollmentId,
+        trackItemId: progress.trackItemId,
+        trackItemProgressId: progress.id,
+        outcome,
+        failureReasons,
+        score: score ?? null,
+        callDurationMs: callDuration ?? 0,
+      } satisfies TrackRoleplayAttemptEndedEvent);
   }
 
   /**
@@ -431,10 +699,11 @@ export class TrackProgressService {
     const item = await this.trackItemRepository.findOne({
       where: { id: progress.trackItemId },
     });
+    // An assessment is judged when it ends, never on launch — even a legacy
+    // row that also carries PARTICIPATION.
     if (
       item?.type !== TrackItemType.ROLEPLAY ||
-      roleplayCompletionLogic(item.completionCriteria) !==
-        TrackItemCompletionLogic.PARTICIPATION
+      resolveRoleplayType(item.completionCriteria) !== RoleplayType.TRIAL
     ) {
       return NOOP_RESULT;
     }
@@ -492,6 +761,9 @@ export class TrackProgressService {
     }
     const meta = { ...(progress.meta ?? {}) };
     delete meta.assessmentSubmittedAt;
+    // The incomplete-start count is per attempt window; the last submission
+    // snapshot stays for pre/post reporting until a new valid attempt replaces it.
+    delete meta.assessmentIncompleteStarts;
     await this.trackItemProgressRepository.update(progress.id, {
       meta: { ...meta, assessmentReopenedAt: new Date().toISOString() },
     });

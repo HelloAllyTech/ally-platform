@@ -1,12 +1,17 @@
 import {
   RoleplayAttemptFailureReason,
+  RoleplayType,
   TrackItemCompletionLogic,
 } from '../../type/track.type';
 import {
+  countLearnerTurnsFromSenders,
   parseDefaultMinDurationSeconds,
+  resolveMinLearnerTurns,
   resolveRoleplayGate,
+  resolveRoleplayType,
   roleplayCompletionLogic,
   roleplayFailureReasons,
+  showsResultsToLearner,
 } from '../roleplay-gate.util';
 
 const { INSUFFICIENT_SCORE, INSUFFICIENT_DURATION } =
@@ -59,6 +64,8 @@ describe('resolveRoleplayGate', () => {
         DEFAULT,
       ),
     ).toEqual({
+      roleplayType: RoleplayType.PRACTICE,
+      minLearnerTurns: null,
       completionLogic: TrackItemCompletionLogic.SCORE,
       minScore: 60,
       minDurationSeconds: null,
@@ -76,6 +83,8 @@ describe('resolveRoleplayGate', () => {
         DEFAULT,
       ),
     ).toEqual({
+      roleplayType: RoleplayType.PRACTICE,
+      minLearnerTurns: null,
       completionLogic: TrackItemCompletionLogic.DURATION,
       minScore: null,
       minDurationSeconds: 90,
@@ -117,6 +126,8 @@ describe('resolveRoleplayGate', () => {
     ).toBe(DEFAULT);
     // An untouched legacy item: both gates, platform duration.
     expect(resolveRoleplayGate({}, DEFAULT)).toEqual({
+      roleplayType: RoleplayType.PRACTICE,
+      minLearnerTurns: null,
       completionLogic: TrackItemCompletionLogic.SCORE_AND_DURATION,
       minScore: null,
       minDurationSeconds: DEFAULT,
@@ -214,5 +225,108 @@ describe('roleplayFailureReasons', () => {
     expect(
       roleplayFailureReasons(durationOnly, { score: -20, durationSeconds: 91 }),
     ).toEqual([]);
+  });
+});
+
+describe('resolveRoleplayType', () => {
+  it('derives the trainer-facing type from the stored keys', () => {
+    expect(resolveRoleplayType(undefined)).toBe(RoleplayType.PRACTICE);
+    expect(
+      resolveRoleplayType({
+        completionLogic: TrackItemCompletionLogic.PARTICIPATION,
+      }),
+    ).toBe(RoleplayType.TRIAL);
+    expect(
+      resolveRoleplayType({ completionLogic: TrackItemCompletionLogic.SCORE }),
+    ).toBe(RoleplayType.PRACTICE);
+  });
+
+  it('lets assessment mode win, even over a legacy PARTICIPATION', () => {
+    expect(
+      resolveRoleplayType({
+        assessmentMode: true,
+        completionLogic: TrackItemCompletionLogic.PARTICIPATION,
+      }),
+    ).toBe(RoleplayType.ASSESSMENT);
+  });
+});
+
+describe('assessment gate', () => {
+  it('drops the duration gate and applies min turns', () => {
+    expect(
+      resolveRoleplayGate(
+        {
+          assessmentMode: true,
+          completionLogic: TrackItemCompletionLogic.SCORE_AND_DURATION,
+          minScore: 50,
+          minDurationSeconds: 120,
+          minLearnerTurns: 10,
+        },
+        DEFAULT,
+      ),
+    ).toEqual({
+      roleplayType: RoleplayType.ASSESSMENT,
+      completionLogic: TrackItemCompletionLogic.SCORE_AND_DURATION,
+      minScore: 50,
+      minDurationSeconds: null,
+      minLearnerTurns: 10,
+    });
+  });
+
+  it('reads an absent minimum as 1 turn and clamps to 1–50', () => {
+    expect(resolveMinLearnerTurns({ assessmentMode: true })).toBe(1);
+    expect(resolveMinLearnerTurns({ minLearnerTurns: 0 })).toBe(1);
+    expect(resolveMinLearnerTurns({ minLearnerTurns: 999 })).toBe(50);
+    expect(resolveMinLearnerTurns({ minLearnerTurns: 6.7 })).toBe(6);
+  });
+
+  it('reports too few turns, and a missed pass mark alongside', () => {
+    const gate = resolveRoleplayGate(
+      {
+        assessmentMode: true,
+        completionLogic: TrackItemCompletionLogic.SCORE,
+        minScore: 50,
+        minLearnerTurns: 6,
+      },
+      DEFAULT,
+    );
+    expect(
+      roleplayFailureReasons(gate, {
+        score: 10,
+        durationSeconds: 5,
+        learnerTurns: 3,
+      }),
+    ).toEqual([
+      RoleplayAttemptFailureReason.INSUFFICIENT_TURNS,
+      INSUFFICIENT_SCORE,
+    ]);
+    expect(
+      roleplayFailureReasons(gate, {
+        score: 80,
+        durationSeconds: 5,
+        learnerTurns: 6,
+      }),
+    ).toEqual([]);
+  });
+
+  it('shows results unless an assessment turns them off', () => {
+    expect(showsResultsToLearner(undefined)).toBe(true);
+    expect(showsResultsToLearner({ showResultsToLearner: false })).toBe(true);
+    expect(showsResultsToLearner({ assessmentMode: true })).toBe(true);
+    expect(
+      showsResultsToLearner({
+        assessmentMode: true,
+        showResultsToLearner: false,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe('countLearnerTurnsFromSenders', () => {
+  it('counts runs of consecutive learner messages as one turn each', () => {
+    expect(countLearnerTurnsFromSenders([])).toBe(0);
+    expect(countLearnerTurnsFromSenders([-1, -1])).toBe(0);
+    expect(countLearnerTurnsFromSenders([-1, 7, 7, -1, 7, -1])).toBe(2);
+    expect(countLearnerTurnsFromSenders([7, -1, 7, 7, 7])).toBe(2);
   });
 });

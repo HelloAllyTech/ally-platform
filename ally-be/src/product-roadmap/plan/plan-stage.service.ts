@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Not, Repository } from 'typeorm';
 import { BuilderSessionService } from 'src/builder/service/builder-session.service';
@@ -9,6 +9,7 @@ import {
 } from 'src/builder/enum/builder.enum';
 import { PlanEventService } from 'src/product-planning/service/plan-event.service';
 import { PlanNotificationService } from 'src/product-planning/service/plan-notification.service';
+import { RoadmapIdeaNoticeService } from 'src/product-planning/service/roadmap-idea-notice.service';
 import {
   PlanEventKind,
   PlanNotificationKind,
@@ -55,6 +56,13 @@ export class PlanStageService {
     private readonly notifications: PlanNotificationService,
     @InjectRepository(RoadmapOpportunity)
     private readonly opportunities: Repository<RoadmapOpportunity>,
+    /**
+     * The plan-ready notice (idea-to-plan audit rec 8). Optional so specs that
+     * build this positionally need not pass it; typed as the class so DI
+     * resolves it. Never throws.
+     */
+    @Optional()
+    private readonly ideaNotices?: RoadmapIdeaNoticeService,
   ) {}
 
   /**
@@ -138,6 +146,7 @@ export class PlanStageService {
     });
     await this.onEnter(plan, next, actorUserId);
     await this.announce(plan, next);
+    await this.ideaNotices?.stageEntered(sessionId, next);
     return next;
   }
 

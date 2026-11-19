@@ -97,6 +97,11 @@ function build(
       update: jest.fn(),
       patchPlan: jest.fn(),
       repository: { update: jest.fn() },
+      // The idea's linked session (plan or older Builder interview): same rows here.
+      findLinked: jest.fn(
+        async (id: string): Promise<unknown> =>
+          (deps.store.find as jest.Mock)(id),
+      ),
     },
     stage: { sync: jest.fn() },
     events: { record: jest.fn() },
@@ -106,6 +111,18 @@ function build(
     builderSessions: {
       createSession: jest.fn(async () => ({ id: 'new-session' })),
     },
+    ideaNotices: {
+      planningStarted: jest.fn(async () => undefined),
+      planClosed: jest.fn(async () => undefined),
+    },
+    planTurns: { queueOpeningTurn: jest.fn() },
+    closeReadiness: {
+      checkClose: jest.fn(
+        async (): Promise<{ reason: string; blockers: string[] } | null> =>
+          null,
+      ),
+    },
+    planHandoff: { attachAtStart: jest.fn(async () => true) },
   };
   const service = new RoadmapReviewService(
     ...(Object.values(deps) as unknown as ConstructorParameters<
@@ -470,6 +487,134 @@ describe('RoadmapReviewService', () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
+  it('Start planning queues the opening turn as its last step', async () => {
+    const { service, deps } = build({
+      stage: 'accepted',
+      can: { startPlanning: true },
+    });
+    const order: string[] = [];
+    deps.stage.sync.mockImplementation(async () => {
+      order.push('sync');
+    });
+    deps.broadcast.emit.mockImplementation(() => {
+      order.push('emit');
+    });
+    deps.planTurns.queueOpeningTurn.mockImplementation(() => {
+      order.push('turn');
+    });
+    (deps.reader.detail as jest.Mock).mockImplementation(
+      async (_u: number, code: string) => ({
+        code,
+        title: 'Streak reminders',
+        shownStage: 'accepted',
+        can: { startPlanning: true },
+      }),
+    );
+    await service.startPlanning(OWNER, 'OPP-0001');
+    expect(deps.planTurns.queueOpeningTurn).toHaveBeenCalledWith(
+      's-OPP-0001',
+      OWNER,
+      'OPP-0001',
+      'Streak reminders',
+    );
+    expect(order).toEqual(['sync', 'emit', 'turn']);
+  });
+
+  it('Start planning pressed again queues no second opening turn', async () => {
+    const { service, deps } = build({
+      stage: 'planning',
+      can: { startPlanning: false },
+    });
+    deps.store.find.mockImplementation(async (id: string) => ({
+      id,
+      leadUserId: null,
+      plan: { planningStarted: true },
+    }));
+    await service.startPlanning(OWNER, 'OPP-0001');
+    expect(deps.planTurns.queueOpeningTurn).not.toHaveBeenCalled();
+  });
+
+  it('Close plan with open blockers stores the reason and the blockers', async () => {
+    const { service, deps } = build({
+      stage: 'planning',
+      can: { closePlan: true },
+    });
+    deps.closeReadiness.checkClose.mockImplementation(async () => ({
+      reason: 'Shipping the spike to learn',
+      blockers: ['Approve the technical design.'],
+    }));
+    await service.setPlanClosed(
+      OWNER,
+      'OPP-0001',
+      true,
+      'Shipping the spike to learn',
+    );
+    expect(deps.closeReadiness.checkClose).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 's-OPP-0001' }),
+      'Shipping the spike to learn',
+    );
+    expect(deps.store.patchPlan).toHaveBeenCalledWith('s-OPP-0001', {
+      planClosed: expect.objectContaining({
+        byUserId: OWNER,
+        notReady: {
+          reason: 'Shipping the spike to learn',
+          blockers: ['Approve the technical design.'],
+        },
+      }),
+    });
+    expect(deps.events.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: PlanEventKind.PLAN_CLOSED,
+        detail: { notReady: true, openBlockers: 1 },
+      }),
+    );
+  });
+
+  it('Close plan refused by the gate writes nothing', async () => {
+    const { service, deps } = build({
+      stage: 'planning',
+      can: { closePlan: true },
+    });
+    deps.closeReadiness.checkClose.mockImplementation(async () => {
+      throw new ConflictException('not ready');
+    });
+    await expect(
+      service.setPlanClosed(OWNER, 'OPP-0001', true),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(deps.store.patchPlan).not.toHaveBeenCalled();
+  });
+
+  it('Reopen plan never asks the gate', async () => {
+    const { service, deps } = build({
+      stage: 'planning',
+      can: { reopenPlan: true },
+    });
+    await service.setPlanClosed(OWNER, 'OPP-0001', false);
+    expect(deps.closeReadiness.checkClose).not.toHaveBeenCalled();
+  });
+
+  it('Start planning dates the idea as it stands for the planning agent, and never fails on it', async () => {
+    const { service, deps } = build({
+      stage: 'accepted',
+      can: { startPlanning: true },
+    });
+    await service.startPlanning(OWNER, 'OPP-0001');
+    expect(deps.planHandoff.attachAtStart).toHaveBeenCalledWith(
+      OWNER,
+      'OPP-0001',
+      's-OPP-0001',
+    );
+
+    const failing = build({ stage: 'accepted', can: { startPlanning: true } });
+    failing.deps.planHandoff.attachAtStart.mockRejectedValue(new Error('db'));
+    await expect(
+      failing.service.startPlanning(OWNER, 'OPP-0001'),
+    ).resolves.toBeDefined();
+    expect(failing.deps.events.record).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: PlanEventKind.PLANNING_STARTED }),
+    );
+  });
+
   it('Start planning on a submitted idea accepts it', async () => {
     const { service, deps } = build({
       stage: 'submitted',
@@ -486,6 +631,27 @@ describe('RoadmapReviewService', () => {
         detail: { decision: 'accept', via: 'start_planning' },
       }),
     );
+    // The accept is news to the author, voters and watchers (idea-to-plan audit rec 8).
+    expect(deps.ideaNotices.planningStarted).toHaveBeenCalledWith({
+      actorUserId: OWNER,
+      itemId: 'id-OPP-0001',
+      code: 'OPP-0001',
+      sessionId: 's-OPP-0001',
+      acceptedNow: true,
+    });
+  });
+
+  it('a failed notice never fails Start planning or Close plan', async () => {
+    const { service, deps } = build({
+      stage: 'planning',
+      can: { startPlanning: true, closePlan: true },
+    });
+    deps.ideaNotices.planningStarted.mockRejectedValueOnce(new Error('down'));
+    deps.ideaNotices.planClosed.mockRejectedValueOnce(new Error('down'));
+    await expect(
+      service.setPlanClosed(OWNER, 'OPP-0001', true),
+    ).resolves.toBeDefined();
+    expect(deps.ideaNotices.planClosed).toHaveBeenCalledTimes(1);
   });
 
   it('closes and reopens the plan for an Owner only, with an event each way', async () => {
@@ -504,6 +670,8 @@ describe('RoadmapReviewService', () => {
     expect(deps.store.patchPlan).toHaveBeenCalledWith('s-OPP-0001', {
       planClosed: null,
     });
+    // Closing tells followers; reopening tells nobody.
+    expect(deps.ideaNotices.planClosed).toHaveBeenCalledTimes(1);
     expect(deps.events.record).toHaveBeenCalledWith(
       expect.objectContaining({ kind: PlanEventKind.PLAN_CLOSED }),
     );

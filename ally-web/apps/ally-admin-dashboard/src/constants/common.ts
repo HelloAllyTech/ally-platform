@@ -190,6 +190,9 @@ export const ApiEndpoints = {
     STRUCTURE: (id: string) => `/v1/learn/admin/tracks/${id}/structure`,
     // Raise a live quiz's or annotation's attempt limit; the structure PUT is locked once learners enrol.
     ATTEMPT_LIMIT: (itemId: string) => `/v1/learn/admin/tracks/items/${itemId}/attempt-limit`,
+    // Do a pre and a post roleplay score the same behaviours? (pre/post assessment builder)
+    ASSESSMENT_PAIR_COMPAT: (preScenarioId: number, postScenarioId: number) =>
+      `/v1/tenant-analytics/assessment-pair-compat/${preScenarioId}/${postScenarioId}`,
     // The trainer's notes for Ally and per-item tension.
     GUIDE_NOTES: (id: string) => `/v1/learn/admin/tracks/${id}/guide-notes`,
     DUPLICATE: (id: string) => `/v1/learn/admin/tracks/${id}/duplicate`,
@@ -367,6 +370,8 @@ export const ApiEndpoints = {
   },
   PRODUCT_ROADMAP: {
     OPPORTUNITIES: "/v1/product-roadmap/opportunities",
+    /** A one-line title suggested from an idea's text, for the Title box to prefill. */
+    TITLE_SUGGESTION: "/v1/product-roadmap/title-suggestion",
     /**
      * The same route helpline and mobile file a bug on. Not `/opportunities` with
      * type=bug: this one captures the reporter's screen/device context for triage and
@@ -474,6 +479,11 @@ export const ApiEndpoints = {
       `/v1/roadmap/items/${encodeURIComponent(code)}/conversation`,
     CLOSE_PLAN: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/close-plan`,
     REOPEN_PLAN: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/reopen-plan`,
+    CLOSE_READINESS: (code: string) =>
+      `/v1/roadmap/items/${encodeURIComponent(code)}/close-readiness`,
+    PLAN_MESSAGE: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/plan-message`,
+    PLAN_CHECKS_RUN: (sessionId: string) =>
+      `/v1/product-roadmap/plans/${encodeURIComponent(sessionId)}/checks/run`,
     BUILD_MODE: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/build-mode`,
     MARK_RELEASED: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/mark-released`,
     SESSION_ANSWERS: (sessionId: string) =>
@@ -512,6 +522,11 @@ export const ApiEndpoints = {
     ITEM_WATCH: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/watch`,
     ITEM_STAR: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/star`,
     SEARCH: "/v1/roadmap/search",
+  },
+  /** The Owner's old-and-quiet sweep of To do (idea-to-plan audit rec 9). 403 for anyone else. */
+  ROADMAP_V2_SWEEP: {
+    LIST: "/v1/roadmap/todo-sweep",
+    KEEP: "/v1/roadmap/todo-sweep/keep",
   },
   /** Roadmap v2 P8: the Owner's Measures. 404 while the flag is off, 403 for anyone but an Owner. */
   ROADMAP_V2_MEASURES: {

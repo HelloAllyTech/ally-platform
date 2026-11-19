@@ -1,6 +1,7 @@
 import {
   ForbiddenException,
   Injectable,
+  Optional,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
@@ -12,6 +13,7 @@ import {
 import { PlanEventService } from 'src/product-planning/service/plan-event.service';
 import { PlanSettingsService } from 'src/product-planning/service/plan-settings.service';
 import { RoadmapInboxService } from 'src/product-planning/service/roadmap-inbox.service';
+import { RoadmapIdeaNoticeService } from 'src/product-planning/service/roadmap-idea-notice.service';
 import { RoadmapNotificationService } from 'src/product-roadmap/service/roadmap-notification.service';
 import { RoadmapRoleService } from 'src/product-planning/service/roadmap-role.service';
 import {
@@ -81,6 +83,9 @@ export class BuilderPlanConversationService {
     private readonly inbox: RoadmapInboxService,
     private readonly events: PlanEventService,
     private readonly broadcast: RoadmapNotificationService,
+    /** Answer and comment notices (idea-to-plan audit recs 8 and 10). Optional for positional specs. */
+    @Optional()
+    private readonly ideaNotices?: RoadmapIdeaNoticeService,
   ) {}
 
   async list(
@@ -153,7 +158,17 @@ export class BuilderPlanConversationService {
         },
       },
     );
-    if (created) this.changed(plan, 'answers', userId);
+    if (created) {
+      this.changed(plan, 'answers', userId);
+      // The planner hears that someone answered (the planner's own answer tells nobody).
+      await this.ideaNotices?.questionAnswered({
+        sessionId,
+        itemId: plan.itemId,
+        code: plan.code,
+        questionId: input.questionId,
+        answererId: userId,
+      });
+    }
     const after = await this.messages.listBySession(sessionId);
     const states = await this.questions(plan, after);
     const state = states.find(
@@ -215,8 +230,19 @@ export class BuilderPlanConversationService {
         itemId: plan.itemId,
         sessionId,
         actorUserId: userId,
-        payload: { code: plan.code, postId: post.id },
+        payload: { code: plan.code, postId: post.id, byUserId: userId },
         directRecipientIds: mentions,
+      });
+    }
+    // Everyone else following the idea: one grouped notice, however busy the thread.
+    if (created) {
+      await this.ideaNotices?.commented({
+        sessionId,
+        itemId: plan.itemId,
+        code: plan.code,
+        actorUserId: userId,
+        postId: post.id,
+        mentionedIds: mentions,
       });
     }
     return { post };

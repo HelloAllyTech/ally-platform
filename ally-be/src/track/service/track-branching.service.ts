@@ -243,6 +243,8 @@ export class TrackBranchingService {
         bestScore: row.score === null ? null : Number(row.score),
         passed: row.status === SessionItemStatus.COMPLETED,
         submittedAt: row.meta?.assessmentSubmittedAt ?? null,
+        /** Attempts ended below the minimum learner turns, since the last reopen. */
+        incompleteStarts: row.meta?.assessmentIncompleteStarts ?? 0,
       }));
     const branching = rows
       .filter(

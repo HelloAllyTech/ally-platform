@@ -53,6 +53,8 @@ import { RoadmapReadinessTokenService } from './service/roadmap-readiness-token.
 import { RoadmapAiService } from './service/roadmap-ai.service';
 import { RoadmapStrategyContextService } from './service/roadmap-strategy-context.service';
 import { RoadmapCopilotToolsService } from './service/roadmap-copilot-tools.service';
+import { PlanHandoffService } from './plan/plan-handoff.service';
+import { PlanRoadmapToolsService } from './plan/plan-roadmap-tools.service';
 import { RoadmapCopilotService } from './service/roadmap-copilot.service';
 import { GlobalSettings } from 'src/settings/entity/global-settings.entity';
 import { RoadmapAllocationService } from './service/roadmap-allocation.service';
@@ -132,7 +134,12 @@ import { RoadmapDraftController } from './draft/roadmap-draft.controller';
 import { RoadmapDraftService } from './draft/roadmap-draft.service';
 import { RoadmapDictationService } from './draft/roadmap-dictation.service';
 import { RoadmapReviewController } from './review/roadmap-review.controller';
+import { RoadmapPlanGateController } from './plan/roadmap-plan-gate.controller';
+import { PlanCloseReadinessService } from './plan/plan-close-readiness.service';
+import { PlanTurnService } from './plan/plan-turn.service';
 import { RoadmapReviewService } from './review/roadmap-review.service';
+import { RoadmapSweepController } from './review/roadmap-sweep.controller';
+import { RoadmapSweepService } from './review/roadmap-sweep.service';
 import { RoadmapMetricsController } from './metrics/roadmap-metrics.controller';
 import { RoadmapMetricsService } from './metrics/roadmap-metrics.service';
 
@@ -243,6 +250,8 @@ import { RoadmapMetricsService } from './metrics/roadmap-metrics.service';
     // P3: New idea, drafts, dictation, review and the lead.
     RoadmapDraftController,
     RoadmapReviewController,
+    RoadmapPlanGateController,
+    RoadmapSweepController,
     // P8: the Owner's Measures.
     RoadmapMetricsController,
     RoadmapItemBuildController,
@@ -265,6 +274,7 @@ import { RoadmapMetricsService } from './metrics/roadmap-metrics.service';
     RoadmapDraftService,
     RoadmapDictationService,
     RoadmapReviewService,
+    RoadmapSweepService,
     RoadmapMetricsService,
     RoadmapItemBuildService,
     RoadmapRoleAdminService,
@@ -278,12 +288,16 @@ import { RoadmapMetricsService } from './metrics/roadmap-metrics.service';
     PlanIdeaService,
     PlanLeadService,
     PlanCheckService,
+    PlanCloseReadinessService,
+    PlanTurnService,
     PlanAiService,
     PlanOutcomeService,
     PlanLaunchService,
     PlanDiscoveryService,
     PlanExportService,
     PlanSchedulerRegistrationService,
+    PlanHandoffService,
+    PlanRoadmapToolsService,
     // repositories
     RoadmapProductGoalRepository,
     RoadmapStrategyGoalRepository,

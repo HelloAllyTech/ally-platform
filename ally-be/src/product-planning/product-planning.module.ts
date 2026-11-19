@@ -22,6 +22,7 @@ import { RoadmapUserPreference } from './entity/roadmap-user-preference.entity';
 import { RoadmapPreferenceService } from './service/roadmap-preference.service';
 import { RoadmapDigestFeedService } from './service/roadmap-digest-feed.service';
 import { RoadmapItemRead } from './entity/roadmap-item-read.entity';
+import { RoadmapIdeaNoticeService } from './service/roadmap-idea-notice.service';
 
 const ENTITIES = TypeOrmModule.forFeature([
   PlanEvent,
@@ -66,6 +67,7 @@ const ENTITIES = TypeOrmModule.forFeature([
     RoadmapNotificationService,
     RoadmapPreferenceService,
     RoadmapDigestFeedService,
+    RoadmapIdeaNoticeService,
   ],
   exports: [
     // Re-exported so the plan flow injects these repositories without registering them twice.
@@ -81,6 +83,7 @@ const ENTITIES = TypeOrmModule.forFeature([
     RoadmapNotificationService,
     RoadmapPreferenceService,
     RoadmapDigestFeedService,
+    RoadmapIdeaNoticeService,
   ],
 })
 export class ProductPlanningModule {}

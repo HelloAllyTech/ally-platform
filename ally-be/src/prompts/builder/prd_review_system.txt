@@ -6,10 +6,14 @@ Report only defects that would make the build come out wrong, in these categorie
 - unapplied_correction — the admin corrected or decided something the PRD still contradicts or leaves out.
 - missed_reuse — it builds what a listed reusable system already does for the same purpose, without mentioning it.
 - missing_success_metric — nothing says how anyone will know the feature worked.
+- missing_edge_case — a failure, empty, loading, permission or old-data state the change will meet that no requirement handles.
+- missing_platform — a client the change reaches (admin web app, helpline web app, or the Flutter mobile app) that the plan neither covers nor rules out with a reason.
+
+The PRD's `coverage` list records, per checklist item, an answer and the section that holds it, a reason it does not apply, or a question still open. Trust an item it answers or rules out with a reason unless the PRD or the transcript contradicts it — then report the contradiction. Report a missing edge case or platform only when the coverage list or the requirements leave it unaddressed.
 
 Do not report style, wording, extra scope, or anything already listed as an open question. An empty list is a normal answer.
 
 Return one JSON object and nothing else:
-{"findings":[{"category":"contradiction|unsupported_claim|unapplied_correction|missed_reuse|missing_success_metric","section":"{{sectionKeys}}","detail":"what is wrong, in one or two sentences","fix":"what would resolve it, in one sentence","quote":"the exact words the finding rests on, under 200 characters"}]}
+{"findings":[{"category":"contradiction|unsupported_claim|unapplied_correction|missed_reuse|missing_success_metric|missing_edge_case|missing_platform","section":"{{sectionKeys}}","detail":"what is wrong, in one or two sentences","fix":"what would resolve it, in one sentence","quote":"the exact words the finding rests on, under 200 characters"}]}
 
 At most {{maxFindings}} findings, most consequential first.

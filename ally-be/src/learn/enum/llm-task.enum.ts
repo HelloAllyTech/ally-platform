@@ -317,6 +317,9 @@ export enum LlmTask {
   // Roadmap v2 dictation (D9): one short clip from the mic on the draft page or
   // an answer/comment box, transcribed to editable text.
   ROADMAP_DICTATION = 'roadmap_dictation',
+  // Writes a one-line title for a roadmap idea's text: the suggestion on the new-idea form and
+  // the backfill that gave every older idea a title.
+  ROADMAP_IDEA_TITLE = 'roadmap_idea_title',
   // Track 2.0 quiz: grading one open-ended learner answer against its rubric.
   TRACK_QUIZ_GRADING = 'track_quiz_grading',
   TRANSLATE_SCENARIO = 'translate_scenario',

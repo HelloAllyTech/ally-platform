@@ -331,6 +331,13 @@ export class RoadmapCopilotToolsService {
               description: 'Null while any criterion is unmet.',
               properties: {
                 description: { type: 'string' },
+                title: {
+                  type: 'string',
+                  description:
+                    'Optional. A short title for the idea in plain words, at most 80 characters: ' +
+                    'what changes for whom, not a feature code name. Shown beside the description ' +
+                    'for the author to accept or edit.',
+                },
                 productGoal: { type: 'string', nullable: true },
                 effort: {
                   type: 'string',

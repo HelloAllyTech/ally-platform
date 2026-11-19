@@ -190,6 +190,48 @@ describe('RoadmapMetricsService', () => {
     expect(result.funnel.filedWithoutDraft).toBe(2);
   });
 
+  it('counts an older idea planned in a Builder interview as being planned', async () => {
+    const legacy = {
+      id: 'o4',
+      createdAt: '2026-06-04T00:00:00Z',
+      reviewState: 'accepted',
+      reviewedAt: '2026-06-05T00:00:00Z',
+      stage: 'prioritised',
+      releasedAt: null,
+      builderSessionId: 's4',
+      sessionCreatedAt: '2026-08-27T00:00:00Z',
+      drafted: false,
+      builderInterview: true,
+      planClosed: false,
+      planningStartedAt: null,
+      externalBuildAt: null,
+    };
+    const run = async (row: Record<string, unknown>) => {
+      const query = jest.fn(async (sql: string) =>
+        sql.includes('FROM "roadmap_opportunities" o') &&
+        sql.includes('drafted')
+          ? [row]
+          : sql.includes('FROM "roadmap_opportunities" o')
+            ? []
+            : sql.includes('FROM "builder_sessions" s') &&
+                sql.includes('draftVersion')
+              ? []
+              : [],
+      );
+      const service = new RoadmapMetricsService({ query } as any);
+      return (await service.compute({ from, to, amberDays: 5, now })).waits;
+    };
+    expect(await run(legacy)).toMatchObject({
+      planningNow: 1,
+      acceptedUnplannedNow: 0,
+    });
+    // A plan session nobody has started planning stays "accepted, not planned".
+    expect(await run({ ...legacy, builderInterview: false })).toMatchObject({
+      planningNow: 0,
+      acceptedUnplannedNow: 1,
+    });
+  });
+
   it('reads timestamp-without-time-zone columns as UTC', async () => {
     const { service, query } = make();
     await service.compute({ from, to, amberDays: 5, now });

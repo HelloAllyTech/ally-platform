@@ -78,6 +78,7 @@ export class RoadmapItemBuildService {
       prd: session?.prd ?? null,
       designApproved:
         design?.status === 'approved' && !session?.designReadiness?.stale,
+      planClosed: plan?.plan?.planClosed ?? null,
     });
     const markdown = renderBuildBrief(input);
     return {

@@ -91,9 +91,13 @@ export class RoadmapMetricsService {
               o.stage, ${UTC('o."releasedAt"')} AS "releasedAt", o."builderSessionId", o.source,
               ${UTC('s."createdAt"')} AS "sessionCreatedAt",
               (s.kind = 'plan' AND s.plan ? 'draftVersion') AS drafted,
+              (s.kind = 'build') AS "builderInterview",
               COALESCE(jsonb_typeof(s.plan->'closed') = 'object', false)
                 AS "planClosed",
               s.plan->>'planningStartedAt' AS "planningStartedAt",
+              s.plan->'planClosed'->>'at' AS "planClosedStampAt",
+              s.plan->>'authorOpenedPlanAt' AS "authorOpenedPlanAt",
+              (s.plan->>'planningStartedBy')::text = o."createdBy"::text AS "plannedByAuthor",
               s.plan->'externalBuild'->>'at' AS "externalBuildAt",
               s."lastRunSequence"
          FROM "roadmap_opportunities" o
@@ -127,7 +131,8 @@ export class RoadmapMetricsService {
                     min(e.at) FILTER (WHERE e.kind = $4
                       OR (e.kind = $5 AND e.detail->>'to' = 'building')) AS "buildingAt",
                     min(e.at) FILTER (WHERE e.kind = $5
-                      AND e.detail->>'to' IN ('launching', 'measuring', 'learned')) AS "shippedAt"
+                      AND e.detail->>'to' IN ('launching', 'measuring', 'learned')) AS "shippedAt",
+                    min(e.at) FILTER (WHERE e.kind = $6) AS "planClosedAt"
                FROM "plan_events" e
               WHERE e."sessionId" = ANY($1::uuid[])
               GROUP BY e."sessionId"`,
@@ -137,6 +142,7 @@ export class RoadmapMetricsService {
               PlanEventKind.EXTERNAL_BUILD,
               PlanEventKind.BUILD_SENT,
               PlanEventKind.STAGE_CHANGED,
+              PlanEventKind.PLAN_CLOSED,
             ],
           )
         : Promise.resolve([]),
@@ -195,6 +201,9 @@ export class RoadmapMetricsService {
           date(e.planningAt),
           date(o.planningStartedAt),
           externalBuildAt,
+          // An older idea planned in a Builder interview: planning began with
+          // the interview, as the To do list already shows it.
+          o.builderInterview === true ? date(o.sessionCreatedAt) : null,
         ),
         // Here: the first build run. In Claude Code: once the brief went and
         // a pull request exists (deriveItemStage's rule, §4.5b).
@@ -209,6 +218,9 @@ export class RoadmapMetricsService {
         shippedAt: earliest(date(o.releasedAt), date(e.shippedAt)),
         measuredAt: date(outcomesBy.get(sessionId)?.measuredAt),
         closed: o.stage === 'archived' || o.planClosed === true,
+        planClosedAt: earliest(date(e.planClosedAt), date(o.planClosedStampAt)),
+        authorOpenedPlanAt: date(o.authorOpenedPlanAt),
+        plannedByAuthor: o.plannedByAuthor === true,
       };
     });
     for (const draft of unfiled) {

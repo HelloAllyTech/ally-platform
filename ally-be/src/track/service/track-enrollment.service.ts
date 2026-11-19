@@ -26,6 +26,7 @@ import { TrackAnnotationAttemptRepository } from '../repository/track-annotation
 import { ScenarioSharedService } from 'src/learn/service/scenario-shared.service';
 import {
   AnsweredArticleQuestion,
+  AssessmentPhase,
   ArticleContent,
   ArticleExperience,
   ArticleQuestion,
@@ -33,18 +34,32 @@ import {
   LastRoleplayAttempt,
   TrackBlocker,
   parseArticleQuestionMarkers,
+  RoleplayAttemptFailureReason,
+  RoleplayType,
   TrackAccessDenialReason,
   TrackItemType,
   TrackStatus,
   VideoContent,
   VideoSource,
 } from '../type/track.type';
-import { roleplayFailureReasons } from '../util/roleplay-gate.util';
+import {
+  roleplayFailureReasons,
+  showsResultsToLearner,
+} from '../util/roleplay-gate.util';
 import {
   findBlockerPosition,
   LatestGradedAttempt,
   resolveTrackBlocker,
 } from '../util/track-blocker.util';
+
+/** A POST assessment's paired PRE, as the learner stands with it. */
+export interface PreAssessmentState {
+  title: string;
+  submitted: boolean;
+}
+export type PreAssessmentLookup = (
+  item: TrackItem,
+) => PreAssessmentState | null;
 import { QuizAnswer, QuizContent } from '../type/quiz.type';
 import { AnnotationContent } from '../type/annotation.type';
 import { TrackSharedService, TrackWithStructure } from './track-shared.service';
@@ -212,6 +227,7 @@ export class TrackEnrollmentService {
       structure as any,
       translation,
     );
+    const preLookup = this.preAssessmentLookup(structure, progressByItemId);
 
     const localizedItems: TrackItem[] = [];
     const sections = structure.sections.map((section) => {
@@ -234,6 +250,7 @@ export class TrackEnrollmentService {
             localized,
             progressByItemId.get(item.id),
             this.fallbackReasonFor(item, translation),
+            preLookup,
           );
         }),
       };
@@ -680,13 +697,22 @@ export class TrackEnrollmentService {
           (item.completionCriteria?.assessmentMode &&
             progress.meta?.assessmentSubmittedAt) ||
           null;
+        // With results withheld the learner gets "submitted" and nothing to
+        // open: no session id to reach the report from.
+        const resultsHidden = this.assessmentResultsHidden(item, progress);
         const lastScenarioSessionId =
-          progress.status === SessionItemStatus.COMPLETED ||
-          assessmentSubmittedAt
+          !resultsHidden &&
+          (progress.status === SessionItemStatus.COMPLETED ||
+            assessmentSubmittedAt)
             ? await this.scenarioSharedService.getLatestScenarioSessionIdByTrackItemProgressId(
                 progress.id,
               )
             : null;
+        const preAssessment =
+          await this.trackProgressService.findPairedPreAssessment(
+            sourceItem,
+            progress.trackEnrollmentId,
+          );
         const scenarioTranslated =
           await this.trackLocalizationService.hasScenarioTranslation(
             item.scenarioId,
@@ -697,7 +723,7 @@ export class TrackEnrollmentService {
           trackItemProgressId: progress.id,
           scenarioId: item.scenarioId,
           completionCriteria: item.completionCriteria ?? null,
-          ...this.roleplayLearnerFields(item, progress),
+          ...this.roleplayLearnerFields(item, progress, preAssessment),
           lastScenarioSessionId,
           assessmentSubmittedAt,
           /** The roleplay runs in the scenario's own translated language, which
@@ -1192,6 +1218,7 @@ export class TrackEnrollmentService {
       trackId,
       enrollment.languageCode,
     );
+    const preLookup = this.preAssessmentLookup(structure, progressByItemId);
 
     for (const section of structure.sections) {
       for (const item of section.items) {
@@ -1209,6 +1236,7 @@ export class TrackEnrollmentService {
                 this.trackLocalizationService.localizeItem(item, translation),
                 progress,
                 this.fallbackReasonFor(item, translation),
+                preLookup,
               ),
               sectionId: section.id,
               sectionTitle: localizedSection.title,
@@ -1288,7 +1316,9 @@ export class TrackEnrollmentService {
     item: TrackItem,
     progress?: TrackItemProgress,
     fallbackReason: TrackTranslationFallbackReason | null = null,
+    preLookup?: PreAssessmentLookup,
   ) {
+    const resultsHidden = this.assessmentResultsHidden(item, progress);
     return {
       id: item.id,
       type: item.type,
@@ -1306,7 +1336,7 @@ export class TrackEnrollmentService {
       status: progress?.status ?? SessionItemStatus.LOCKED,
       startedAt: progress?.startedAt ?? null,
       completedAt: progress?.completedAt ?? null,
-      score: progress?.score ?? null,
+      score: resultsHidden ? null : (progress?.score ?? null),
       attemptCount: progress?.attemptCount ?? 0,
       maxWatchedPct: progress?.meta?.maxWatchedPct ?? 0,
       /** Assessment roleplay: set once the one attempt is used (locked). */
@@ -1315,9 +1345,68 @@ export class TrackEnrollmentService {
           progress?.meta?.assessmentSubmittedAt) ||
         null,
       ...(item.type === TrackItemType.ROLEPLAY
-        ? this.roleplayLearnerFields(item, progress)
+        ? this.roleplayLearnerFields(
+            item,
+            progress,
+            preLookup ? preLookup(item) : null,
+          )
         : {}),
     };
+  }
+
+  /**
+   * For each POST assessment in a loaded structure, its paired PRE and whether
+   * this learner has submitted it — built once per request from rows already
+   * in memory, so listing a course costs no extra queries.
+   */
+  private preAssessmentLookup(
+    structure: TrackWithStructure,
+    progressByItemId: Map<string, TrackItemProgress>,
+  ): PreAssessmentLookup {
+    const preByKey = new Map<string, PreAssessmentState>();
+    for (const section of structure.sections) {
+      for (const candidate of section.items as TrackItem[]) {
+        const criteria = candidate.completionCriteria;
+        if (
+          candidate.type === TrackItemType.ROLEPLAY &&
+          criteria?.assessmentMode &&
+          criteria.assessmentPhase === AssessmentPhase.PRE &&
+          criteria.assessmentPairKey
+        ) {
+          preByKey.set(criteria.assessmentPairKey, {
+            title: candidate.title,
+            submitted: !!progressByItemId.get(candidate.id)?.meta
+              ?.assessmentSubmittedAt,
+          });
+        }
+      }
+    }
+    return (item) => {
+      const criteria = item.completionCriteria;
+      if (
+        !criteria?.assessmentMode ||
+        criteria.assessmentPhase !== AssessmentPhase.POST ||
+        !criteria.assessmentPairKey
+      ) {
+        return null;
+      }
+      return preByKey.get(criteria.assessmentPairKey) ?? null;
+    };
+  }
+
+  /**
+   * Whether the learner's submitted assessment result is withheld from them
+   * (the item's "Show results to learner" is off). Trainers still see it.
+   */
+  private assessmentResultsHidden(
+    item: TrackItem,
+    progress?: TrackItemProgress,
+  ): boolean {
+    return (
+      item.type === TrackItemType.ROLEPLAY &&
+      !showsResultsToLearner(item.completionCriteria) &&
+      !!progress?.meta?.assessmentSubmittedAt
+    );
   }
 
   /**
@@ -1333,27 +1422,71 @@ export class TrackEnrollmentService {
    * misses none is not reported at all (the requirement line already says
    * what a fresh attempt needs).
    */
-  private roleplayLearnerFields(item: TrackItem, progress?: TrackItemProgress) {
+  private roleplayLearnerFields(
+    item: TrackItem,
+    progress?: TrackItemProgress,
+    preAssessment: PreAssessmentState | null = null,
+  ) {
     const gate = this.trackProgressService.getRoleplayGate(
       item.completionCriteria,
     );
     const stored = progress?.meta?.lastRoleplayAttempt;
+    const isAssessment = gate.roleplayType === RoleplayType.ASSESSMENT;
     let lastRoleplayAttempt: LastRoleplayAttempt | null = null;
     if (progress?.status !== SessionItemStatus.COMPLETED && stored) {
-      const failureReasons = roleplayFailureReasons(gate, {
-        score: stored.score,
-        durationSeconds: stored.durationSeconds,
-      });
-      if (failureReasons.length > 0) {
-        lastRoleplayAttempt = {
-          ...stored,
-          failureReasons,
-          requiredScore: gate.minScore,
-          requiredDurationSeconds: gate.minDurationSeconds,
-        };
+      if (isAssessment) {
+        // An assessment attempt was judged once, as it ended; show that
+        // verdict as recorded. A short attempt is moot once a valid one exists.
+        const tooShort = stored.failureReasons.includes(
+          RoleplayAttemptFailureReason.INSUFFICIENT_TURNS,
+        );
+        if (!(tooShort && progress?.meta?.assessmentSubmittedAt)) {
+          lastRoleplayAttempt = stored;
+        }
+      } else {
+        const failureReasons = roleplayFailureReasons(gate, {
+          score: stored.score,
+          durationSeconds: stored.durationSeconds,
+        });
+        if (failureReasons.length > 0) {
+          lastRoleplayAttempt = {
+            ...stored,
+            failureReasons,
+            requiredScore: gate.minScore,
+            requiredDurationSeconds: gate.minDurationSeconds,
+          };
+        }
       }
     }
-    return { roleplayGate: gate, lastRoleplayAttempt };
+    const resultsHidden = this.assessmentResultsHidden(item, progress);
+    if (resultsHidden && lastRoleplayAttempt) {
+      lastRoleplayAttempt = { ...lastRoleplayAttempt, score: null };
+    }
+    const submission = progress?.meta?.assessmentSubmission;
+    return {
+      roleplayGate: gate,
+      lastRoleplayAttempt,
+      /** Assessment items only; null for trial and practice roleplays. */
+      assessment: isAssessment
+        ? {
+            phase: item.completionCriteria?.assessmentPhase ?? null,
+            requiredTurns: gate.minLearnerTurns ?? 1,
+            showResults: showsResultsToLearner(item.completionCriteria),
+            resultsHidden,
+            /** POST only: its PRE, and whether the learner has submitted it. */
+            preAssessment,
+            incompleteStarts: progress?.meta?.assessmentIncompleteStarts ?? 0,
+            submission:
+              progress?.meta?.assessmentSubmittedAt && submission
+                ? {
+                    learnerTurns: submission.learnerTurns,
+                    submittedAt: submission.submittedAt,
+                    score: resultsHidden ? null : submission.score,
+                  }
+                : null,
+          }
+        : null,
+    };
   }
 
   /** Safe, answer-free summary of inline content for list/detail views. */

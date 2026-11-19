@@ -79,6 +79,12 @@ export interface PlanRecord {
   draftGoalId?: string | null;
   /** Bumps on every autosave, for the page's stale-write check. */
   draftVersion?: number;
+  /**
+   * What Submit filed as the idea's text (audit rec. 6): the author's own words (`author`, also
+   * what an older client that sends no choice files) or the idea agent's statement and title as
+   * the author accepted or edited them (`agent`). The author's words stay in `draftText` either way.
+   */
+  submittedAs?: 'author' | 'agent';
   /** Set by Submit (P3): false until Start planning is pressed (P3b). */
   planningStarted?: boolean;
   planningStartedAt?: string | null;
@@ -99,7 +105,7 @@ export interface PlanRecord {
    * is "not pursuing". Cleared by reopening the plan, which only works while
    * nobody leads the idea.
    */
-  planClosed?: PlanActorStamp | null;
+  planClosed?: PlanClosedStamp | null;
 
   /**
    * How the assigned builder builds it: with the Builder agent here, or
@@ -116,6 +122,16 @@ export interface PlanRecord {
 export interface PlanActorStamp {
   byUserId: number;
   at: string;
+}
+
+/**
+ * Close plan's stamp. `notReady` is present only when the Owner closed it
+ * while the plan still had open blockers (PlanCloseReadinessService): the
+ * reason they typed, and the blockers as they stood, printed at the top of
+ * the build brief so the builder reads what was knowingly left open.
+ */
+export interface PlanClosedStamp extends PlanActorStamp {
+  notReady?: { reason: string; blockers: string[] } | null;
 }
 
 /** `builder_agent`: Builder builds it here. `outside`: built outside the Builder agent. */
@@ -137,6 +153,8 @@ export interface PlanIdeaState {
   /** Present only when every criterion is met. */
   draft?: {
     description: string;
+    /** The copilot's short title for it, when it gave one (audit rec. 6). */
+    title?: string | null;
     productGoal: string | null;
     effort: string | null;
   } | null;

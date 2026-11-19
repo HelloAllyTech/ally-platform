@@ -531,6 +531,11 @@ export class GuideProgressListener {
               'Acknowledge it without judgement and offer to try again when they are ready, ' +
               'or to rehearse one opening line first.'
             );
+          case 'too_few_turns':
+            return (
+              `The learner ended the assessment "${title}" before taking enough turns, so it was not submitted and they can start it again. ` +
+              'Reassure them their attempt is still unused, and suggest staying in the conversation until the end.'
+            );
           case 'below_score':
             return (
               `The learner finished the practice "${title}" but it did not meet the course's bar yet. ` +

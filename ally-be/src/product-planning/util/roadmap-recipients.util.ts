@@ -92,12 +92,37 @@ export const ROADMAP_AUDIENCE: Record<RoadmapNotificationKind, Audience> = {
   [RoadmapNotificationKind.BREAKER_OPEN]: { ...none, lead: true, owners: true },
   [RoadmapNotificationKind.BUDGET]: { ...none, lead: true, owners: true },
   [RoadmapNotificationKind.ACTIVITY]: none,
+  // Idea-to-plan audit rec 8: the plan is there to read before it closes, and
+  // it closing is a milestone for everyone who follows the idea.
+  [RoadmapNotificationKind.PLAN_READY]: {
+    ...none,
+    author: 'yes',
+    watchAll: true,
+    milestones: true,
+    lead: true,
+  },
+  [RoadmapNotificationKind.PLAN_CLOSED]: {
+    ...none,
+    author: 'yes',
+    watchAll: true,
+    milestones: true,
+  },
+  // Comments go to people following on All (the author and the lead or
+  // planner by default); Milestones and None are respected.
+  [RoadmapNotificationKind.COMMENT]: { ...none, watchAll: true },
+  [RoadmapNotificationKind.QUESTION_ANSWERED]: { ...none, lead: true },
 };
 
 /** The facts the rules read about one idea. */
 export interface RecipientFacts {
   authorUserId: number | null;
   leadUserId: number | null;
+  /**
+   * The Owner who pressed Start planning (`plan.planningStartedBy`), while
+   * nobody leads the idea: they get the lead's column and its default watch
+   * (idea-to-plan audit rec 8). Once a builder leads it, the lead does.
+   */
+  plannerUserId?: number | null;
   ownerIds: number[];
   voterIds: number[];
   watches: { userId: number; level: RoadmapWatchLevel }[];
@@ -120,16 +145,27 @@ export function effectiveWatchLevel(
   userId: number,
   facts: Pick<
     RecipientFacts,
-    'authorUserId' | 'leadUserId' | 'voterIds' | 'watches'
+    'authorUserId' | 'leadUserId' | 'voterIds' | 'watches' | 'plannerUserId'
   >,
 ): RoadmapWatchLevel {
   const row = facts.watches.find((w) => w.userId === userId);
   if (row) return row.level;
-  if (userId === facts.authorUserId || userId === facts.leadUserId) {
+  if (
+    userId === facts.authorUserId ||
+    userId === facts.leadUserId ||
+    userId === activePlanner(facts)
+  ) {
     return RoadmapWatchLevel.ALL;
   }
   if (facts.voterIds.includes(userId)) return RoadmapWatchLevel.MILESTONES;
   return RoadmapWatchLevel.NONE;
+}
+
+/** The planner while nobody leads the idea; null otherwise. */
+export function activePlanner(
+  facts: Pick<RecipientFacts, 'leadUserId' | 'plannerUserId'>,
+): number | null {
+  return facts.leadUserId ? null : (facts.plannerUserId ?? null);
 }
 
 /**
@@ -153,14 +189,17 @@ export function recipientsFor(
   ) {
     add(facts.authorUserId);
   }
-  if (audience.lead) add(facts.leadUserId);
+  if (audience.lead) {
+    add(facts.leadUserId);
+    add(activePlanner(facts));
+  }
   if (audience.owners) facts.ownerIds.forEach(add);
 
   if (audience.watchAll || audience.milestones) {
     const people = new Set<number>([
       ...facts.watches.map((w) => w.userId),
       ...facts.voterIds,
-      ...[facts.authorUserId, facts.leadUserId].filter(
+      ...[facts.authorUserId, facts.leadUserId, activePlanner(facts)].filter(
         (id): id is number => !!id,
       ),
     ]);

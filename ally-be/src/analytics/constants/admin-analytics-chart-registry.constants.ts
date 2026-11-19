@@ -2358,6 +2358,16 @@ export const ADMIN_ANALYTICS_CHART_REGISTRY: readonly AdminAnalyticsChartEntry[]
       componentFile: f('Analytics/RoadmapVotingCard.tsx'),
       note: 'Votes each admin with product-roadmap access cast per month (stacked, top 8 + Other admins), with participation (voted / could vote) per month and a who-voted grid that keeps non-voters visible. All-time. /v1/analytics/roadmap-voting',
     },
+    {
+      id: 'AAQ-255',
+      tab: 'Highlights',
+      subTab: 'Course impact',
+      title: 'Single valid assessment attempts',
+      kind: 'chart',
+      chartType: 'ComboChart',
+      componentFile: f('Analytics/AssessmentAttemptsCard.tsx'),
+      note: 'Share of learner × assessment-roleplay units (≥1 valid attempt: minimum learner turns met, stamped as the session ended) with exactly one valid attempt and no trainer reopen, weekly by first valid attempt (line), units per week (bars), plus a KPI of the all-time share and incomplete starts per unit alongside, never subtracted. Sessions before minimum turns existed were backfilled as valid at one learner turn. Platform-wide, all-time. /v1/analytics/assessment-attempts',
+    },
   ];
 
 /** Total number of registered charts — handy for the guard test and the UI. */

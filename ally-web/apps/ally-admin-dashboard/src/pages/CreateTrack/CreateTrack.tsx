@@ -48,6 +48,7 @@ import {
   deserializeTrack,
   extractTrackMetadata,
   getLiveAttemptLimitChanges,
+  hasAssessmentRuleChanges,
   serializeTrackForm,
   validateTrackForPublish,
 } from "./trackFormUtils";
@@ -73,6 +74,8 @@ export const CreateTrack: FC = () => {
   const [showDiscardPopup, setShowDiscardPopup] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showErrorPopover, setShowErrorPopover] = useState(false);
+  // A save held back while the author confirms an assessment-rule change on a live course.
+  const [pendingLiveSave, setPendingLiveSave] = useState<(() => Promise<unknown>) | null>(null);
 
   const [getTrackById, { data: trackDetail }] = useLazyGetTrackByIdQuery();
   // Drives the badge on the rail's Languages node. Skipped until the course
@@ -311,18 +314,46 @@ export const CreateTrack: FC = () => {
     }
   };
 
-  const handleSaveDraft = async () => {
+  /**
+   * Assessment settings are editable after learners enrol, but a change applies
+   * to new attempts only, so confirm first. The track GET exposes no enrolment
+   * count, so a published (ACTIVE) course stands in for "learners may be
+   * enrolled". Returns true when the save was held for confirmation.
+   */
+  const holdForLiveEditConfirm = (run: () => Promise<unknown>): boolean => {
+    if (
+      !trackId ||
+      trackDetail?.status !== SimulationStatus.ACTIVE ||
+      !hasAssessmentRuleChanges(trackDetail, getValues())
+    ) {
+      return false;
+    }
+    setPendingLiveSave(() => run);
+    return true;
+  };
+
+  const runSaveDraft = async () => {
     const savedId = await persist();
     return savedId ? [savedId] : null;
   };
 
-  const handlePublish = async () => {
-    if (!canPublish) return;
+  const handleSaveDraft = async () => {
+    if (holdForLiveEditConfirm(runSaveDraft)) return null;
+    return runSaveDraft();
+  };
+
+  const runPublish = async () => {
     const savedId = await persist(SimulationStatus.ACTIVE);
     if (savedId) {
       toast.success(`${TRACK_ENTITY_LABEL} published successfully`);
       navigate(-1);
     }
+  };
+
+  const handlePublish = async () => {
+    if (!canPublish) return;
+    if (holdForLiveEditConfirm(runPublish)) return;
+    await runPublish();
   };
 
   const handleBack = () => {
@@ -331,12 +362,26 @@ export const CreateTrack: FC = () => {
     else navigate(-1);
   };
 
-  const handleSaveAndExit = async () => {
+  const runSaveAndExit = async () => {
     const savedId = await persist();
     if (savedId) {
       setShowDiscardPopup(false);
       navigate(-1);
     }
+  };
+
+  const handleSaveAndExit = async () => {
+    if (holdForLiveEditConfirm(runSaveAndExit)) {
+      setShowDiscardPopup(false);
+      return;
+    }
+    await runSaveAndExit();
+  };
+
+  const confirmLiveSave = async () => {
+    const run = pendingLiveSave;
+    setPendingLiveSave(null);
+    if (run) await run();
   };
 
   const handleDiscard = () => {
@@ -563,6 +608,23 @@ export const CreateTrack: FC = () => {
             secondaryButton={{
               label: en.simulation.discardChanges,
               onClick: handleDiscard,
+              variant: ButtonVariant.SECONDARY,
+            }}
+          />
+
+          <ActionConfirmationPopup
+            isOpen={pendingLiveSave !== null}
+            onClose={() => setPendingLiveSave(null)}
+            title="Save changes to a live course?"
+            description="Learners are already enrolled in this course. Attempts already submitted keep the rule they were judged on; your changes apply to new attempts."
+            primaryButton={{
+              label: "Save changes",
+              onClick: confirmLiveSave,
+              variant: ButtonVariant.PRIMARY,
+            }}
+            secondaryButton={{
+              label: "Cancel",
+              onClick: () => setPendingLiveSave(null),
               variant: ButtonVariant.SECONDARY,
             }}
           />

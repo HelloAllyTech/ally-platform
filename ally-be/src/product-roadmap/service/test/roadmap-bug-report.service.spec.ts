@@ -106,7 +106,8 @@ describe('RoadmapOpportunityService.createBugReport', () => {
       // assert — a stub that resolves to "unclassified" keeps the created
       // finding's repo null, same as before this dependency existed.
       repoClassifier as never,
-      { classifyAndRecord: jest.fn().mockResolvedValue(null) } as never, // missClassifier
+      { classifyAndRecord: jest.fn().mockResolvedValue(null) } as never, // missClassifier,
+      { suggestTitle: jest.fn().mockResolvedValue('A title') } as never, // roadmapAi
     );
 
     return {
@@ -248,7 +249,8 @@ describe('RoadmapOpportunityService.createBugReport', () => {
       // assert — a stub that resolves to "unclassified" keeps the created
       // finding's repo null, same as before this dependency existed.
       repoClassifier as never,
-      { classifyAndRecord: jest.fn().mockResolvedValue(null) } as never, // missClassifier
+      { classifyAndRecord: jest.fn().mockResolvedValue(null) } as never, // missClassifier,
+      { suggestTitle: jest.fn().mockResolvedValue('A title') } as never, // roadmapAi
     );
 
     await service.createBugReport(7, 'tenant-a', {

@@ -393,7 +393,7 @@ export class PlanLeadService {
     userId: number,
     tags: PlanImpactTagId[],
   ): Promise<PlanView> {
-    const plan = await this.ledBy(sessionId, userId);
+    const plan = await this.planWork(sessionId, userId);
     const merged = mergeImpactTags(
       plan.plan.impactTags ?? [],
       tags,
@@ -428,7 +428,7 @@ export class PlanLeadService {
     measure: PlanSuccessMeasure,
     changeReason?: string,
   ): Promise<PlanView> {
-    const plan = await this.ledBy(sessionId, userId);
+    const plan = await this.planWork(sessionId, userId);
     const frozen = !!plan.plan.measureFrozenAt;
     if (frozen && !(changeReason ?? '').trim()) {
       throw new BadRequestException(
@@ -518,7 +518,7 @@ export class PlanLeadService {
     userId: number,
     only?: PlanCheckKind,
   ): Promise<PlanCheck[]> {
-    const plan = await this.ledBy(sessionId, userId);
+    const plan = await this.planWork(sessionId, userId);
     const detail = await this.builderSessions.getSessionDetail(
       sessionId,
       plan.createdBy,
@@ -536,14 +536,17 @@ export class PlanLeadService {
     findingId: string,
     resolution: { kind: 'fixed' | 'dismissed'; reason: string },
   ): Promise<PlanCheck[]> {
-    const plan = await this.ledBy(sessionId, userId);
-    await this.checks.resolve(plan, userId, kind, findingId, resolution);
+    const plan = await this.planWork(sessionId, userId);
+    // planWork has already checked the caller: the lead, or an Owner.
+    await this.checks.resolve(plan, userId, kind, findingId, resolution, {
+      authorised: true,
+    });
     await this.stage.sync(sessionId, userId);
     return this.checks.list(sessionId);
   }
 
   async listChecks(sessionId: string, userId: number): Promise<PlanCheck[]> {
-    await this.settings.assertEnabled();
+    await this.assertPlanWorkOn();
     const plan = await this.sharedPlan(sessionId);
     if (!(await this.access.canRead(plan, userId)))
       throw new NotFoundException('Plan not found');
@@ -628,6 +631,33 @@ export class PlanLeadService {
       );
     }
     return plan;
+  }
+
+  /**
+   * The plan's success measure, impact tags and specialist checks, which the
+   * Owner-led flow needs (audit 2026-11-19, rec 2): reachable while either
+   * the old planning flag or `roadmap_v2` is on, so turning the Owner-led
+   * flow on does not need the rest of the old planning flow switched on.
+   * Same people as ledBy: the assigned builder, or an Owner.
+   */
+  private async planWork(
+    sessionId: string,
+    userId: number,
+  ): Promise<PlanSession> {
+    await this.assertPlanWorkOn();
+    await this.access.assertLead(userId);
+    const plan = await this.sharedPlan(sessionId);
+    if (plan.leadUserId !== userId && !(await this.access.isOwner(userId))) {
+      throw new ForbiddenException(
+        'Only an Owner or the builder assigned to this idea can do that.',
+      );
+    }
+    return plan;
+  }
+
+  private async assertPlanWorkOn(): Promise<void> {
+    if ((await this.settings.get()).enabled) return;
+    await this.settings.assertRoadmapV2();
   }
 
   private async votesFor(

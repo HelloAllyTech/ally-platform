@@ -441,3 +441,131 @@ describe("RoleplayItemPlayer — completion requirement and last attempt", () =>
     expect(screen.queryByTestId("roleplay-last-attempt")).not.toBeInTheDocument();
   });
 });
+
+describe("RoleplayItemPlayer — turn-based assessment", () => {
+  const assessment = (overrides: Record<string, unknown> = {}) => ({
+    phase: null,
+    requiredTurns: 10,
+    showResults: true,
+    resultsHidden: false,
+    preAssessment: null,
+    incompleteStarts: 0,
+    submission: null,
+    ...overrides,
+  });
+
+  const renderTurns = (extra: Partial<StartRoleplayItemPayload>, alreadyCompleted = false) =>
+    render(
+      <RoleplayItemPlayer
+        payload={{
+          ...payload,
+          completionCriteria: { assessmentMode: true },
+          roleplayGate: {
+            roleplayType: "ASSESSMENT",
+            completionLogic: "SCORE",
+            minScore: null,
+            minDurationSeconds: null,
+            minLearnerTurns: 10,
+          },
+          assessment: assessment(),
+          ...extra,
+        }}
+        item={buildItem(null)}
+        trackId="track-1"
+        alreadyCompleted={alreadyCompleted}
+      />,
+    );
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionStorage.clear();
+    mockScenario();
+    mockCatalogLanguages([ENGLISH]);
+  });
+
+  it("explains the turn minimum in the intro and requirement, never a duration", () => {
+    renderTurns({});
+    expect(
+      screen.getByText(
+        "This is an assessment. You get one attempt, and it counts once you've taken at least 10 turns.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("roleplay-requirement")).toHaveTextContent(
+      "To count, take at least 10 turns.",
+    );
+    expect(screen.queryByTestId("roleplay-assessment-notice")).not.toBeInTheDocument();
+  });
+
+  it("stashes the turn minimum so the live session can count toward it", async () => {
+    renderTurns({});
+    fireEvent.click(screen.getByText("Start roleplay"));
+    await waitFor(() => expect(mockStartSimulation).toHaveBeenCalled());
+    expect(JSON.parse(sessionStorage.getItem("activeTrackContext") ?? "{}")).toMatchObject({
+      assessmentRequiredTurns: 10,
+      assessmentScenarioId: 123,
+    });
+  });
+
+  it("tells the learner a short attempt didn't count and lets them start again", () => {
+    renderTurns({
+      lastRoleplayAttempt: {
+        failureReasons: ["INSUFFICIENT_TURNS"],
+        score: null,
+        durationSeconds: 40,
+        requiredScore: null,
+        requiredDurationSeconds: null,
+        learnerTurns: 4,
+        requiredTurns: 10,
+        endedAt: "2026-11-17T10:00:00.000Z",
+      },
+    });
+    expect(screen.getByTestId("roleplay-short-attempt")).toHaveTextContent(
+      "That attempt was too short to count (4 of 10 turns). Start again when you're ready.",
+    );
+    expect(screen.getByText("Start roleplay").closest("button")).toBeEnabled();
+  });
+
+  it("locks a post until the paired pre is submitted", () => {
+    renderTurns({
+      assessment: assessment({
+        phase: "POST",
+        preAssessment: { title: "Baseline call", submitted: false },
+      }),
+    });
+    expect(screen.getByTestId("roleplay-post-locked")).toHaveTextContent(
+      "Complete the pre-assessment, Baseline call, first.",
+    );
+    const start = screen.getByText("Start roleplay").closest("button") as HTMLButtonElement;
+    expect(start).toBeDisabled();
+    fireEvent.click(start);
+    expect(mockStartSimulation).not.toHaveBeenCalled();
+  });
+
+  it("opens a post once its pre is submitted", () => {
+    renderTurns({
+      assessment: assessment({
+        phase: "POST",
+        preAssessment: { title: "Baseline call", submitted: true },
+      }),
+    });
+    expect(screen.queryByTestId("roleplay-post-locked")).not.toBeInTheDocument();
+    expect(screen.getByText("Start roleplay").closest("button")).toBeEnabled();
+  });
+
+  it("shows only 'Submitted' when results are hidden: no score, no report", () => {
+    renderTurns(
+      {
+        assessmentSubmittedAt: "2026-10-26T09:00:00.000Z",
+        lastScenarioSessionId: null,
+        assessment: assessment({ phase: "PRE", showResults: false, resultsHidden: true }),
+      },
+      true,
+    );
+    expect(screen.getByTestId("roleplay-assessment-results-hidden")).toHaveTextContent(
+      "Submitted. Your trainer will review your results.",
+    );
+    expect(screen.queryByTestId("session-log-panel")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("roleplay-assessment-submitted")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("play-icon")).not.toBeInTheDocument();
+  });
+});

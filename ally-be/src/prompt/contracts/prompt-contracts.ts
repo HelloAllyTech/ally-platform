@@ -425,7 +425,7 @@ export const BUILDER_PRD_REVIEW_SYSTEM = definePrompt(
   {
     name: 'Builder — PRD Review',
     description:
-      'The cold reviewer that reads a PRD when it first reads ready, against the evidence log, the transcript and the reusable-systems map, and files contradictions, unsupported claims, unapplied corrections, missed reuse and a missing success metric. Findings block readiness until fixed or dismissed.',
+      'The cold reviewer that reads a PRD when it first reads ready, against the evidence log, the transcript and the reusable-systems map, and files contradictions, unsupported claims, unapplied corrections, missed reuse, a missing success metric, a missing edge case and a missing platform. Findings block readiness until fixed or dismissed.',
     category: 'Builder',
     runtimes: ['ally-be'],
     output: 'structured',
@@ -1034,6 +1034,9 @@ export const ROADMAP_SUMMARISE_INTERVIEW = definePrompt(
   'roadmap_summarise_interview',
   {},
 );
+
+/** src/prompts/roadmap/suggest_title.txt */
+export const ROADMAP_SUGGEST_TITLE = definePrompt('roadmap_suggest_title', {});
 
 /** src/prompts/scribe_voice_note/field_extraction_system.txt */
 export const SCRIBE_VOICE_NOTE_FIELD_EXTRACTION_SYSTEM = definePrompt(

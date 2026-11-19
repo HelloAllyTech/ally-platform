@@ -110,6 +110,48 @@ export interface BuilderPrdDocument {
    * someone asks for one.
    */
   technicalDesign?: BuilderTechnicalDesign | null;
+  /** The coverage pass, one entry per item. Absent on PRDs from before it. */
+  coverage?: BuilderPrdCoverageItem[];
+  /** What became of each principle in the session's guiding brief. */
+  principleMarks?: BuilderPrdPrincipleMark[];
+}
+
+/** Mirrors ally-be's `BuilderPrdCoverageKey`. */
+export type BuilderPrdCoverageKey =
+  | "admin_web"
+  | "helpline_web"
+  | "mobile_app"
+  | "failure_empty_states"
+  | "permission_toggle"
+  | "success_metric"
+  | "existing_data_old_clients"
+  | "translations"
+  | "model_cost_registry"
+  | "other_readers";
+
+export interface BuilderPrdCoverageItem {
+  key: BuilderPrdCoverageKey;
+  status: "answered" | "not_applicable" | "asked";
+  note: string;
+  section?: string;
+  question?: string;
+  at?: string;
+}
+
+export interface BuilderPrdPrincipleMark {
+  code: string;
+  mark: "applied" | "not_relevant";
+  section?: string;
+  reason?: string;
+  at?: string;
+}
+
+/** The session's Context Library principles, as readiness reports them. */
+export interface BuilderPrdPrinciplesSummary {
+  enabled: boolean;
+  inBrief: string[];
+  retrieved: number;
+  unmarked: string[];
 }
 
 /* ── Technical design ───────────────────────────────────────────────────── */
@@ -191,7 +233,9 @@ export type BuilderPrdReviewCategory =
   | "unsupported_claim"
   | "unapplied_correction"
   | "missed_reuse"
-  | "missing_success_metric";
+  | "missing_success_metric"
+  | "missing_edge_case"
+  | "missing_platform";
 
 /** One thing the cold PRD reviewer objected to. Mirrors ally-be's BuilderPrdReviewFinding. */
 export interface BuilderPrdReviewFinding {
@@ -242,6 +286,8 @@ export interface BuilderPrdReadiness {
   blockers: string[];
   /** Null before the first review; absent from servers that predate it. */
   review?: BuilderPrdReview | null;
+  /** Absent from servers that predate principle marks, or when principles were not assessed. */
+  principles?: BuilderPrdPrinciplesSummary;
 }
 
 export interface BuilderPrdVersion {
@@ -281,6 +327,8 @@ export interface BuilderQuestionEvent {
    * priority, taste, contradiction). Its basis and why it is the admin's call are in `rationale`.
    */
   questionType?: string;
+  /** The agent addressed it to the idea's author: a question about the problem or the user. */
+  forAuthor?: boolean;
 }
 
 /**
@@ -301,6 +349,13 @@ export interface BuilderBriefLine {
   part?: string;
   approach?: "reuse" | "extend" | "new";
   repo?: string;
+  /**
+   * Claims about what exists: true when a file read in the session supports the line, false
+   * when none does (shown as unverified, with no confirm box). Absent on older briefs and on
+   * proposal and repo lines.
+   */
+  verified?: boolean;
+  verifiedBy?: string;
 }
 
 export interface BuilderSituationBrief {
@@ -313,7 +368,8 @@ export interface BuilderSituationBrief {
 /** The admin's answer to a brief, line by line. */
 export interface BuilderBriefResponse {
   briefId: string;
-  lines: { id: string; verdict: "confirm" | "correct"; correction?: string }[];
+  /** `unverified` is set by the server for a line no file read supports; never sent. */
+  lines: { id: string; verdict: "confirm" | "correct" | "unverified"; correction?: string }[];
   note?: string;
 }
 

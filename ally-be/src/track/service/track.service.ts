@@ -993,6 +993,18 @@ export class TrackService {
           delete item.completionCriteria.assessmentMode;
         }
         if (
+          item.completionCriteria &&
+          (item.type !== TrackItemType.ROLEPLAY ||
+            !item.completionCriteria.assessmentMode)
+        ) {
+          // Assessment-only settings mean nothing on a practice or trial
+          // roleplay; drop them so a type switch leaves no stale keys behind.
+          delete item.completionCriteria.minLearnerTurns;
+          delete item.completionCriteria.showResultsToLearner;
+          delete item.completionCriteria.assessmentPhase;
+          delete item.completionCriteria.assessmentPairKey;
+        }
+        if (
           item.type !== TrackItemType.ROLEPLAY &&
           item.completionCriteria?.completionLogic !== undefined
         ) {

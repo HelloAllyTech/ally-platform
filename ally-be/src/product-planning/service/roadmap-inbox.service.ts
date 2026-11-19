@@ -29,6 +29,10 @@ export interface RoadmapInboxEvent {
   payload?: Record<string, unknown>;
   actorUserId?: number | null;
   directRecipientIds?: (number | null | undefined)[];
+  /** Only the people named in `directRecipientIds`: the kind's audience is skipped. */
+  onlyDirect?: boolean;
+  /** Never these people (e.g. those @mentioned, who get their own notice). */
+  excludeRecipientIds?: number[];
 }
 
 /** One line in the inbox: every notice sharing a group key. */
@@ -84,7 +88,7 @@ export class RoadmapInboxService {
         event.itemId ??
         (event.sessionId ? await this.itemForSession(event.sessionId) : null);
       const facts = await this.factsFor(event.kind, itemId, event);
-      const recipients = recipientsFor(event.kind, facts);
+      const recipients = this.recipientsOf(event, facts);
       if (!recipients.length) return [];
       const now = new Date();
       const groupKey = roadmapGroupKey(
@@ -112,6 +116,76 @@ export class RoadmapInboxService {
     } catch (error) {
       this.logger.warn(
         `Could not deliver roadmap notification (${event.kind}): ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return [];
+    }
+  }
+
+  /**
+   * New comments, as ONE unread notice per person and idea however many
+   * arrive (idea-to-plan audit rec 8): a person who already has an unread
+   * comment notice about this idea gets it bumped (count, newest commenter,
+   * time) instead of a second row, so a busy thread is one line. Reading it
+   * (opening the idea) starts the next one. Never throws.
+   */
+  async deliverComment(event: {
+    itemId: string;
+    sessionId?: string | null;
+    actorUserId: number;
+    payload: Record<string, unknown>;
+    excludeRecipientIds?: number[];
+  }): Promise<number[]> {
+    try {
+      const kind = RoadmapNotificationKind.COMMENT;
+      const facts = await this.factsFor(kind, event.itemId, {
+        kind,
+        actorUserId: event.actorUserId,
+      });
+      const recipients = this.recipientsOf(
+        { kind, excludeRecipientIds: event.excludeRecipientIds },
+        facts,
+      );
+      if (!recipients.length) return [];
+      const open: { id: string; recipientUserId: number }[] =
+        await this.dataSource.query(
+          `SELECT id, "recipientUserId" FROM "roadmap_notifications"
+            WHERE "itemId" = $1 AND kind = $2 AND "readAt" IS NULL
+              AND "recipientUserId" = ANY($3::int[])`,
+          [event.itemId, kind, recipients],
+        );
+      const bump = new Set(open.map((row) => Number(row.recipientUserId)));
+      if (open.length) {
+        await this.dataSource.query(
+          `UPDATE "roadmap_notifications"
+              SET payload = payload || $2::jsonb
+                    || jsonb_build_object('count', COALESCE((payload->>'count')::int, 1) + 1),
+                  "createdAt" = now()
+            WHERE id = ANY($1::uuid[])`,
+          [open.map((row) => row.id), JSON.stringify(event.payload)],
+        );
+      }
+      const fresh = recipients.filter((id) => !bump.has(id));
+      if (fresh.length) {
+        await this.notifications.save(
+          fresh.map((recipientUserId) =>
+            this.notifications.create({
+              recipientUserId,
+              itemId: event.itemId,
+              sessionId: event.sessionId ?? null,
+              kind,
+              payload: { ...event.payload, count: 1 },
+              // One open group per idea: the reader sees one line however long the thread.
+              groupKey: `item:${event.itemId}:${kind}:open`,
+            }),
+          ),
+        );
+      }
+      return recipients;
+    } catch (error) {
+      this.logger.warn(
+        `Could not deliver roadmap comment notice: ${
           error instanceof Error ? error.message : String(error)
         }`,
       );
@@ -256,6 +330,19 @@ export class RoadmapInboxService {
     return [...groups.values()];
   }
 
+  /**
+   * The caller opened this idea: every notice about it is read now, so a
+   * mention or a plan-ready notice stops holding it in Needs you (idea-to-plan
+   * audit rec 8). Returns how many changed.
+   */
+  async markItemRead(recipientUserId: number, itemId: string): Promise<number> {
+    const result = await this.notifications.update(
+      { recipientUserId, itemId, readAt: IsNull() },
+      { readAt: new Date() },
+    );
+    return result.affected ?? 0;
+  }
+
   /** Mark the caller's notices read: these ids, these groups, or everything. */
   async markRead(
     recipientUserId: number,
@@ -285,6 +372,22 @@ export class RoadmapInboxService {
     return copy;
   }
 
+  private recipientsOf(
+    event: Pick<
+      RoadmapInboxEvent,
+      'kind' | 'onlyDirect' | 'excludeRecipientIds'
+    >,
+    facts: RecipientFacts,
+  ): number[] {
+    const all = event.onlyDirect
+      ? [...new Set(facts.directRecipientIds ?? [])]
+          .filter((id) => id !== facts.actorUserId)
+          .sort((a, b) => a - b)
+      : recipientsFor(event.kind, facts);
+    const skip = new Set(event.excludeRecipientIds ?? []);
+    return all.filter((id) => !skip.has(id));
+  }
+
   /** The idea a session belongs to: the opportunity pointing at it. */
   private async itemForSession(sessionId: string): Promise<string | null> {
     const rows: { id: string }[] = await this.dataSource.query(
@@ -300,7 +403,10 @@ export class RoadmapInboxService {
   private async factsFor(
     kind: RoadmapNotificationKind,
     itemId: string | null,
-    event: RoadmapInboxEvent,
+    event: Pick<
+      RoadmapInboxEvent,
+      'kind' | 'directRecipientIds' | 'actorUserId'
+    >,
   ): Promise<RecipientFacts> {
     const audience = ROADMAP_AUDIENCE[kind];
     const facts: RecipientFacts = {
@@ -318,7 +424,8 @@ export class RoadmapInboxService {
     if (!itemId) return facts;
 
     const [row] = await this.dataSource.query(
-      `SELECT o."createdBy" AS "authorUserId", s."leadUserId" AS "leadUserId"
+      `SELECT o."createdBy" AS "authorUserId", s."leadUserId" AS "leadUserId",
+              s.plan->>'planningStartedBy' AS "plannerUserId"
          FROM "roadmap_opportunities" o
          LEFT JOIN "builder_sessions" s ON s.id = o."builderSessionId"
         WHERE o.id = $1`,
@@ -326,6 +433,8 @@ export class RoadmapInboxService {
     );
     facts.authorUserId = row?.authorUserId ?? null;
     facts.leadUserId = row?.leadUserId ?? null;
+    facts.plannerUserId =
+      row?.plannerUserId == null ? null : Number(row.plannerUserId) || null;
 
     if (audience.watchAll || audience.milestones) {
       const [watchRows, voterRows] = await Promise.all([

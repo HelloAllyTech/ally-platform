@@ -119,6 +119,13 @@ export interface RoadmapCapabilities {
   setBuildMode: boolean;
   /** Mark it Released (the assigned builder, or an Owner). */
   markReleased: boolean;
+  /**
+   * Work the plan from the idea page (audit 2026-11-19, rec 1): send the
+   * planning agent a message, edit the PRD, dismiss a review finding and draft
+   * the technical design. An Owner, or the builder already assigned to it,
+   * while it is being planned and the plan is not closed.
+   */
+  workPlan: boolean;
 }
 
 export const NO_CAPABILITIES: RoadmapCapabilities = Object.freeze({
@@ -146,6 +153,7 @@ export const NO_CAPABILITIES: RoadmapCapabilities = Object.freeze({
   reopenPlan: false,
   setBuildMode: false,
   markReleased: false,
+  workPlan: false,
 });
 
 /** What the caller can do anywhere, with no idea in view (the `me/role` answer). */
@@ -246,6 +254,9 @@ export function capabilitiesFor(
       open &&
       stage !== 'submitted' &&
       (owner || (builder && rel.isLead && item.hasLead)),
+    // Closing the plan ends planning: reopen it to change the PRD again.
+    workPlan:
+      stage === 'planning' && item.planningStarted && !item.planClosed && leads,
   };
 }
 

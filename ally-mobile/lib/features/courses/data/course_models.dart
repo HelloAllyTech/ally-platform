@@ -125,10 +125,27 @@ RoleplayCompletionLogic? roleplayCompletionLogicFromJson(Object? value) => switc
   _ => null,
 };
 
+/// Derived roleplay type (`roleplayGate.roleplayType`); null when absent or
+/// unknown (older backend).
+enum RoleplayType { trial, practice, assessment }
+
+RoleplayType? roleplayTypeFromJson(Object? value) => switch (value) {
+  'TRIAL' => RoleplayType.trial,
+  'PRACTICE' => RoleplayType.practice,
+  'ASSESSMENT' => RoleplayType.assessment,
+  _ => null,
+};
+
 /// The effective roleplay rule (`roleplayGate`) with the platform default
 /// already applied; a null threshold means that gate is off.
 class RoleplayGate {
-  const RoleplayGate({required this.completionLogic, this.minScore, this.minDurationSeconds});
+  const RoleplayGate({
+    required this.completionLogic,
+    this.minScore,
+    this.minDurationSeconds,
+    this.roleplayType,
+    this.minLearnerTurns,
+  });
 
   /// Null for a missing/malformed gate (older backend: show no requirement).
   static RoleplayGate? tryParse(Object? json) {
@@ -140,15 +157,23 @@ class RoleplayGate {
       minDurationSeconds: (json['minDurationSeconds'] is num)
           ? (json['minDurationSeconds'] as num).toInt()
           : null,
+      roleplayType: roleplayTypeFromJson(json['roleplayType']),
+      minLearnerTurns: (json['minLearnerTurns'] is num) ? (json['minLearnerTurns'] as num).toInt() : null,
     );
   }
 
   final RoleplayCompletionLogic completionLogic;
   final double? minScore;
   final int? minDurationSeconds;
+
+  /// Null on an older backend.
+  final RoleplayType? roleplayType;
+
+  /// Assessment only: learner turns needed for an attempt to count.
+  final int? minLearnerTurns;
 }
 
-enum RoleplayFailureReason { insufficientScore, insufficientDuration }
+enum RoleplayFailureReason { insufficientScore, insufficientDuration, insufficientTurns }
 
 /// `lastRoleplayAttempt`: the latest attempt that missed a gate.
 class LastRoleplayAttempt {
@@ -158,6 +183,8 @@ class LastRoleplayAttempt {
     this.durationSeconds = 0,
     this.requiredScore,
     this.requiredDurationSeconds,
+    this.learnerTurns,
+    this.requiredTurns,
   });
 
   /// Null when absent, malformed, or no known reason is present.
@@ -168,7 +195,9 @@ class LastRoleplayAttempt {
         if (r == 'INSUFFICIENT_SCORE')
           RoleplayFailureReason.insufficientScore
         else if (r == 'INSUFFICIENT_DURATION')
-          RoleplayFailureReason.insufficientDuration,
+          RoleplayFailureReason.insufficientDuration
+        else if (r == 'INSUFFICIENT_TURNS')
+          RoleplayFailureReason.insufficientTurns,
     ];
     if (reasons.isEmpty) return null;
     double? d(Object? v) => v is num ? v.toDouble() : null;
@@ -180,6 +209,8 @@ class LastRoleplayAttempt {
       requiredDurationSeconds: (json['requiredDurationSeconds'] is num)
           ? (json['requiredDurationSeconds'] as num).toInt()
           : null,
+      learnerTurns: (json['learnerTurns'] is num) ? (json['learnerTurns'] as num).toInt() : null,
+      requiredTurns: (json['requiredTurns'] is num) ? (json['requiredTurns'] as num).toInt() : null,
     );
   }
 
@@ -188,6 +219,91 @@ class LastRoleplayAttempt {
   final int durationSeconds;
   final double? requiredScore;
   final int? requiredDurationSeconds;
+
+  /// Assessment short attempt: turns the learner took vs. the minimum.
+  final int? learnerTurns;
+  final int? requiredTurns;
+}
+
+/// `assessment.phase`: PRE or POST; null when standalone or unknown.
+enum AssessmentPhase { pre, post }
+
+AssessmentPhase? assessmentPhaseFromJson(Object? value) => switch (value) {
+  'PRE' => AssessmentPhase.pre,
+  'POST' => AssessmentPhase.post,
+  _ => null,
+};
+
+/// The paired pre-assessment a POST waits on.
+class PreAssessmentRef {
+  const PreAssessmentRef({required this.title, required this.submitted});
+
+  static PreAssessmentRef? tryParse(Object? json) {
+    if (json is! Map) return null;
+    final title = json['title'];
+    return PreAssessmentRef(title: title is String ? title : '', submitted: json['submitted'] == true);
+  }
+
+  final String title;
+  final bool submitted;
+}
+
+/// A submitted assessment attempt (`assessment.submission`).
+class AssessmentSubmission {
+  const AssessmentSubmission({this.learnerTurns, this.submittedAt, this.score});
+
+  static AssessmentSubmission? tryParse(Object? json) {
+    if (json is! Map) return null;
+    return AssessmentSubmission(
+      learnerTurns: (json['learnerTurns'] is num) ? (json['learnerTurns'] as num).toInt() : null,
+      submittedAt: json['submittedAt'] is String ? json['submittedAt'] as String : null,
+      score: (json['score'] is num) ? (json['score'] as num).toDouble() : null,
+    );
+  }
+
+  final int? learnerTurns;
+  final String? submittedAt;
+  final double? score;
+}
+
+/// The learner-facing `assessment` block on a roleplay item (null for
+/// trial/practice and on older backends). Parsing never throws.
+class RoleplayAssessment {
+  const RoleplayAssessment({
+    this.phase,
+    this.requiredTurns = 10,
+    this.showResults = true,
+    this.resultsHidden = false,
+    this.preAssessment,
+    this.incompleteStarts = 0,
+    this.submission,
+  });
+
+  static RoleplayAssessment? tryParse(Object? json) {
+    if (json is! Map) return null;
+    return RoleplayAssessment(
+      phase: assessmentPhaseFromJson(json['phase']),
+      requiredTurns: (json['requiredTurns'] is num) ? (json['requiredTurns'] as num).toInt() : 10,
+      showResults: json['showResults'] is bool ? json['showResults'] as bool : true,
+      resultsHidden: json['resultsHidden'] == true,
+      preAssessment: PreAssessmentRef.tryParse(json['preAssessment']),
+      incompleteStarts: (json['incompleteStarts'] is num) ? (json['incompleteStarts'] as num).toInt() : 0,
+      submission: AssessmentSubmission.tryParse(json['submission']),
+    );
+  }
+
+  final AssessmentPhase? phase;
+  final int requiredTurns;
+  final bool showResults;
+  final bool resultsHidden;
+
+  /// POST only.
+  final PreAssessmentRef? preAssessment;
+  final int incompleteStarts;
+  final AssessmentSubmission? submission;
+
+  /// POST whose paired pre-assessment is not yet submitted.
+  bool get postLocked => preAssessment != null && !preAssessment!.submitted;
 }
 
 enum TrackBlockerReasonCode {
@@ -277,7 +393,16 @@ class TrackBlocker {
 /// only the two fields `getTrackItemMeta`'s QUIZ/ROLEPLAY branches actually
 /// read.
 class TrackCompletionCriteria {
-  TrackCompletionCriteria({this.minScore, this.passScore, this.assessmentMode = false, this.completionLogic});
+  TrackCompletionCriteria({
+    this.minScore,
+    this.passScore,
+    this.assessmentMode = false,
+    this.completionLogic,
+    this.minLearnerTurns,
+    this.showResultsToLearner,
+    this.assessmentPhase,
+    this.assessmentPairKey,
+  });
 
   factory TrackCompletionCriteria.fromJson(Map<String, dynamic> json) =>
       TrackCompletionCriteria(
@@ -285,6 +410,10 @@ class TrackCompletionCriteria {
         passScore: (json['passScore'] as num?)?.toDouble(),
         assessmentMode: json['assessmentMode'] as bool? ?? false,
         completionLogic: roleplayCompletionLogicFromJson(json['completionLogic']),
+        minLearnerTurns: json['minLearnerTurns'] is num ? (json['minLearnerTurns'] as num).toInt() : null,
+        showResultsToLearner: json['showResultsToLearner'] is bool ? json['showResultsToLearner'] as bool : null,
+        assessmentPhase: assessmentPhaseFromJson(json['assessmentPhase']),
+        assessmentPairKey: json['assessmentPairKey'] is String ? json['assessmentPairKey'] as String : null,
       );
 
   final double? minScore;
@@ -295,6 +424,12 @@ class TrackCompletionCriteria {
 
   /// Roleplay only; null = absent (reads as score and duration).
   final RoleplayCompletionLogic? completionLogic;
+
+  /// Assessment only (null = absent).
+  final int? minLearnerTurns;
+  final bool? showResultsToLearner;
+  final AssessmentPhase? assessmentPhase;
+  final String? assessmentPairKey;
 }
 
 /// Mirrors RN's `TrackItemContentMeta` (`src/types/courses.ts:69-80`) — only
@@ -338,6 +473,8 @@ class TrackDetailItem {
     this.completionCriteria,
     this.roleplayGate,
     this.lastRoleplayAttempt,
+    this.assessment,
+    this.assessmentSubmittedAt,
     this.blockedBy,
     this.languageFallbackReason,
     this.completedAt,
@@ -366,6 +503,8 @@ class TrackDetailItem {
             : null,
         roleplayGate: RoleplayGate.tryParse(json['roleplayGate']),
         lastRoleplayAttempt: LastRoleplayAttempt.tryParse(json['lastRoleplayAttempt']),
+        assessment: RoleplayAssessment.tryParse(json['assessment']),
+        assessmentSubmittedAt: json['assessmentSubmittedAt'] is String ? json['assessmentSubmittedAt'] as String : null,
         blockedBy: TrackBlocker.tryParse(json['blockedBy']),
         // Lenient on purpose (RN: an unknown reason reads as "no notice").
         languageFallbackReason: const {
@@ -399,6 +538,12 @@ class TrackDetailItem {
   /// Latest roleplay attempt that missed a gate; null once completed.
   final LastRoleplayAttempt? lastRoleplayAttempt;
   final TrackBlocker? blockedBy;
+
+  /// Assessment roleplay block; null for trial/practice or older backends.
+  final RoleplayAssessment? assessment;
+
+  /// When the assessment attempt was submitted; null while open.
+  final String? assessmentSubmittedAt;
 
   /// RN's `TrackLanguageFallbackReason` (why this component reads in
   /// English), or null.

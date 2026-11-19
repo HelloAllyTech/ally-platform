@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 import { LoggerService } from 'src/logger/logger.service';
 import {
@@ -7,7 +7,11 @@ import {
 } from 'src/common/util/json-patch.util';
 import { BuilderSession } from '../entity/builder-session.entity';
 import { BuilderPrdDoc } from '../entity/builder-prd-doc.entity';
-import { BuilderPrdVersionAuthor } from '../enum/builder.enum';
+import {
+  BuilderPrdVersionAuthor,
+  BuilderSessionKind,
+} from '../enum/builder.enum';
+import { builderPlanTools } from '../util/builder-plan-tools.registry';
 import {
   BuilderQuestionOption,
   BuilderToolExecutionOutcome,
@@ -26,6 +30,12 @@ import { BuilderEvidenceLogService } from './builder-evidence-log.service';
 import { BuilderReadinessService } from './builder-readiness.service';
 import { BuilderPrdReviewService } from './builder-prd-review.service';
 import { BuilderMessageRepository } from '../repository/builder-message.repository';
+import { BuilderSessionRepository } from '../repository/builder-session.repository';
+import {
+  normaliseSuccessMeasure,
+  SET_SUCCESS_MEASURE_TOOL,
+} from '../util/builder-success-measure-tool.util';
+import { successMeasureGaps } from 'src/product-planning/util/plan-readiness.util';
 import { BuilderMessageRole } from '../enum/builder.enum';
 import {
   BUILDER_REPO_NAMES,
@@ -39,6 +49,11 @@ import {
   structuralRegressions,
 } from '../util/builder-prd-edits.util';
 import { describeToolAttempt } from '../util/builder-turn-receipt.util';
+import {
+  BUILDER_PRD_CHECKLIST_TOOL_NAMES,
+  BUILDER_PRD_CHECKLIST_TOOLS,
+  BuilderPrdChecklistToolsService,
+} from './builder-prd-checklist-tools.service';
 import {
   ASK_ADMIN_GATE_NOTE,
   gatedRationale,
@@ -166,6 +181,11 @@ export class BuilderInterviewToolsService {
     private readonly readiness: BuilderReadinessService,
     private readonly reviewService: BuilderPrdReviewService,
     private readonly messageRepository: BuilderMessageRepository,
+    // The coverage pass and principle marks. Optional so the eval sandbox builds without it.
+    @Optional() private readonly checklist?: BuilderPrdChecklistToolsService,
+    /** Writes a plan's success measure. Optional so fixtures without it still build. */
+    @Optional()
+    private readonly sessionRepository?: BuilderSessionRepository,
   ) {}
 
   /**
@@ -182,8 +202,22 @@ export class BuilderInterviewToolsService {
       situationBrief?: boolean;
       /** The opening turn under the protocol: the brief, and no question yet. */
       briefDue?: boolean;
+      /** A Roadmap plan session: the roadmap's read-only tools ride at the end. */
+      planSession?: boolean;
     } = {},
   ): any[] {
+    const tools = this.belt(options);
+    // A plan session adds set_success_measure (rec 2) and the roadmap's read-only tools (rec 5).
+    return options.planSession
+      ? [...tools, SET_SUCCESS_MEASURE_TOOL, ...builderPlanTools.definitions()]
+      : tools;
+  }
+
+  private belt(options: {
+    validatedTurns?: boolean;
+    situationBrief?: boolean;
+    briefDue?: boolean;
+  }): any[] {
     const legacy = this.legacyToolDefinitions();
     if (!options.validatedTurns) return legacy;
     const gate = Boolean(options.situationBrief);
@@ -284,6 +318,14 @@ export class BuilderInterviewToolsService {
             allowNone: { type: 'boolean' },
             minSelections: { type: 'number' },
             maxSelections: { type: 'number' },
+            forAuthor: {
+              type: 'boolean',
+              description:
+                'True when the question is about the problem or the people who have it — ' +
+                'who hits it, how often, what they do today, what outcome they need. The ' +
+                "idea's author knows that best, so it goes to them. Leave it out for scope, " +
+                'behaviour, priority, technical or design decisions.',
+            },
           },
           required: ['prompt', 'kind'],
         },
@@ -371,7 +413,7 @@ export class BuilderInterviewToolsService {
         name: 'github_search_code',
         description:
           'Search code across the Ally org (or one repo) and get back matching ' +
-          'file paths. Use this to check how something is already built before ' +
+          'file paths, with line numbers for the top hits. Use this to check how something is already built before ' +
           'proposing it, then read the two or three files that matter.',
         input_schema: {
           type: 'object',
@@ -388,8 +430,9 @@ export class BuilderInterviewToolsService {
       {
         name: 'github_read_file',
         description:
-          'Read one file. Large files are truncated — prefer a specific path ' +
-          'over a whole barrel or a 3000-line service.',
+          'Read one file, or a range of its lines. A read stops at a byte cap and says the ' +
+          'line it stopped at — read on with startLine. Code search gives line numbers for ' +
+          'its top hits, so read around those rather than a whole 3000-line service.',
         input_schema: {
           type: 'object',
           properties: {
@@ -398,6 +441,14 @@ export class BuilderInterviewToolsService {
             ref: {
               type: 'string',
               description: 'Branch or sha (default master)',
+            },
+            startLine: {
+              type: 'number',
+              description: 'First line to read, 1-based (default 1)',
+            },
+            endLine: {
+              type: 'number',
+              description: 'Last line to read, inclusive (default the end)',
             },
           },
           required: ['repo', 'path'],
@@ -422,6 +473,7 @@ export class BuilderInterviewToolsService {
         },
       },
       ...contextToolDefinitions(BUILDER_PRINCIPLE_TOOLS),
+      ...(this.checklist ? BUILDER_PRD_CHECKLIST_TOOLS : []),
       {
         name: 'list_repo_commands',
         description:
@@ -677,11 +729,14 @@ export class BuilderInterviewToolsService {
         return this.executeEdit(name, input, context);
       case 'dismiss_review_finding':
         return this.executeDismissFinding(input, context);
+      case 'set_success_measure':
+        return this.executeSetSuccessMeasure(input, context);
       case 'github_search_code':
         return this.wrapResearch(
           await this.githubRead.searchCode(
             String(input?.query ?? ''),
             input?.repo ? String(input.repo) : undefined,
+            { lineNumbers: true },
           ),
           (result) =>
             `Searched code for "${input?.query}": ${
@@ -694,6 +749,7 @@ export class BuilderInterviewToolsService {
             String(input?.repo ?? ''),
             String(input?.path ?? ''),
             input?.ref ? String(input.ref) : undefined,
+            { startLine: input?.startLine, endLine: input?.endLine },
           ),
           () => `Read ${input?.repo}/${input?.path}`,
         );
@@ -801,11 +857,26 @@ export class BuilderInterviewToolsService {
               ? ` (scanned ${result.scan.windowFrom} → ${result.scan.windowTo})`
               : ' (no scan has completed yet)'),
         );
-      default:
+      default: {
+        // A Roadmap plan session's own tools (builder-plan-tools.registry), only there.
+        const provider =
+          context.session?.kind === BuilderSessionKind.PLAN
+            ? builderPlanTools.providerFor(name)
+            : null;
+        if (provider) {
+          return provider.execute(name, input ?? {}, {
+            session: context.session,
+            userId: context.userId,
+          });
+        }
+        if (this.checklist && BUILDER_PRD_CHECKLIST_TOOL_NAMES.has(name)) {
+          return this.checklist.execute(name, input, context);
+        }
         return {
           modelResult: { ok: false, error: `Unknown tool "${name}"` },
           summary: `Unknown tool "${name}"`,
         };
+      }
     }
   }
 
@@ -889,6 +960,8 @@ export class BuilderInterviewToolsService {
           ? { rationale: String(input.rationale) }
           : {}),
       ...(options.length ? { options } : {}),
+      // A problem-or-user question goes to the idea's author (idea-to-plan audit rec 10).
+      ...(input?.forAuthor === true ? { forAuthor: true } : {}),
       // A select question without a custom escape hatch forces the admin to
       // pick a wrong answer, so it is on by default rather than on request.
       allowCustom: isSelect
@@ -1162,6 +1235,53 @@ export class BuilderInterviewToolsService {
    * latest message, so the reviewer cannot be overruled by the agent whose
    * work it reviews.
    */
+  /**
+   * The plan's success measure, written where the plan flow reads it. Plan
+   * sessions only, and never once the measure is frozen (design approved):
+   * changing it then needs a person's stated reason, on the plan's own route.
+   */
+  private async executeSetSuccessMeasure(
+    input: Record<string, any>,
+    context: BuilderToolExecutionContext,
+  ): Promise<BuilderToolExecutionOutcome> {
+    const refuse = (error: string, message: string) => ({
+      modelResult: { ok: false, error, message },
+      summary: `Success measure not set: ${message}`,
+    });
+    if (context.session?.kind !== 'plan' || !this.sessionRepository) {
+      return refuse('not_a_plan', 'Only a roadmap plan has a success measure.');
+    }
+    const normalised = normaliseSuccessMeasure(input);
+    if ('error' in normalised) return refuse('invalid', normalised.error);
+    const sessionId = context.session.id;
+    const [row] = await this.sessionRepository.manager.query(
+      `SELECT "plan"->>'measureFrozenAt' AS "frozenAt" FROM "builder_sessions" WHERE id = $1`,
+      [sessionId],
+    );
+    if (row?.frozenAt) {
+      return refuse(
+        'frozen',
+        'The success measure is frozen since the design was approved. Tell the planner what ' +
+          'you would change; they change it with a reason.',
+      );
+    }
+    await this.sessionRepository.manager.query(
+      `UPDATE "builder_sessions"
+          SET "plan" = COALESCE("plan", '{}'::jsonb) || jsonb_build_object('successMeasure', $2::jsonb)
+        WHERE id = $1`,
+      [sessionId, JSON.stringify(normalised.measure)],
+    );
+    const gaps = successMeasureGaps(normalised.measure);
+    return {
+      modelResult: {
+        ok: true,
+        stored: normalised.measure,
+        ...(gaps.length ? { stillMissing: gaps } : {}),
+      },
+      summary: `Set the success measure: ${normalised.measure.metric}`,
+    };
+  }
+
   private async executeDismissFinding(
     input: Record<string, any>,
     context: BuilderToolExecutionContext,
