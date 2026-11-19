@@ -14,7 +14,12 @@ import {
   citedTurns,
   languageSections,
 } from '../util/debrief-language-sections.util';
-import { languageProblem, RolledRun } from '../util/debrief-outcome.util';
+import { isEnglishLanguage } from '../util/debrief-language-sections.util';
+import {
+  languageProblem,
+  passRollup,
+  RolledRun,
+} from '../util/debrief-outcome.util';
 import {
   JudgeAttemptFamily,
   JudgeAttemptOutcome,
@@ -336,6 +341,30 @@ describe('DebriefLanguageJudgeService', () => {
     );
     expect(sql).toContain('judge_attempts');
   });
+
+  it('never checks English: not in the drain query, and not when judged directly', async () => {
+    const { svc, dataSource } = build();
+    await svc.drain(5);
+    const sql: string = dataSource.query.mock.calls.find((c: any[]) =>
+      String(c[0]).includes('FROM debrief_runs r'),
+    )[0];
+    expect(sql).toContain("!~* '^en([-_]|$)'");
+    for (const language of ['en', 'en-IN', 'en_US', null]) {
+      post.mockClear();
+      expect(await svc.judge(run({ language }))).toBeNull();
+      expect(post).not.toHaveBeenCalled();
+    }
+    expect(isEnglishLanguage('hi-IN')).toBe(false);
+    expect(isEnglishLanguage('ml-IN')).toBe(false);
+  });
+
+  it('a deliberate re-judge still runs on English', async () => {
+    const { svc } = build();
+    post.mockResolvedValueOnce(answer([]));
+    expect(
+      await svc.judge(run({ language: 'en-IN' }), { force: true }),
+    ).not.toBeNull();
+  });
 });
 
 describe('the language problem rollup', () => {
@@ -346,6 +375,19 @@ describe('the language problem rollup', () => {
       status: 'published',
       languageCheck: check,
     }) as any;
+
+  it('gives English no language-check figures, even for rows checked before English was left out', () => {
+    const en = {
+      ...r({ findings: 1, types: ['meaning_drift'] }),
+      language: 'en-IN',
+    };
+    const rows = passRollup([en as any, r(null)]).byLanguage;
+    const english = rows.find((x) => x.language === 'en-IN')!;
+    const hindi = rows.find((x) => x.language === 'hi-IN')!;
+    expect(english.languageProblem.checked).toBe(0);
+    expect(english.languageProblem.notChecked).toBe(0);
+    expect(hindi.languageProblem.notChecked).toBe(1);
+  });
 
   it('counts the share with a finding among checked debriefs, and each type once per debrief', () => {
     const g = languageProblem([
