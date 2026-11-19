@@ -107,7 +107,12 @@ function build(
       createSession: jest.fn(async () => ({ id: 'new-session' })),
     },
     planTurns: { queueOpeningTurn: jest.fn() },
-    closeReadiness: { checkClose: jest.fn(async () => null) },
+    closeReadiness: {
+      checkClose: jest.fn(
+        async (): Promise<{ reason: string; blockers: string[] } | null> =>
+          null,
+      ),
+    },
   };
   const service = new RoadmapReviewService(
     ...(Object.values(deps) as unknown as ConstructorParameters<
