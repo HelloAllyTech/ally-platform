@@ -15,8 +15,9 @@ import { Quote as QuoteIcon, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { useAddDebriefCommentsMutation } from "@api";
-import { DebriefSelectionComment } from "@types";
+import { DebriefMyComment, DebriefSelectionComment } from "@types";
 
+import { applyHighlights } from "./highlightRanges";
 import { SelectionAnchor, selectionToAnchor } from "./selectionAnchor";
 
 interface PendingComment extends DebriefSelectionComment {
@@ -27,6 +28,8 @@ interface SelectionCommentsValue {
   /** The person has the feature: otherwise nothing here shows or listens. */
   enabled: boolean;
   items: PendingComment[];
+  /** What the person already sent on this debrief (read from the server). */
+  saved: DebriefMyComment[];
   add: (anchor: SelectionAnchor, body: string) => void;
   remove: (id: number) => void;
   clear: () => void;
@@ -38,10 +41,11 @@ const Ctx = createContext<SelectionCommentsValue | null>(null);
  * Select-and-comment on the web debrief, for people the Ally team has given it. Comments added in
  * the popup wait here; the feedback box under the debrief shows them and sends them together.
  */
-export const SelectionCommentsProvider: FC<{ enabled: boolean; children: ReactNode }> = ({
-  enabled,
-  children,
-}) => {
+export const SelectionCommentsProvider: FC<{
+  enabled: boolean;
+  saved?: DebriefMyComment[];
+  children: ReactNode;
+}> = ({ enabled, saved, children }) => {
   const [items, setItems] = useState<PendingComment[]>([]);
   const next = useRef(1);
   const add = useCallback((anchor: SelectionAnchor, body: string) => {
@@ -50,8 +54,8 @@ export const SelectionCommentsProvider: FC<{ enabled: boolean; children: ReactNo
   const remove = useCallback((id: number) => setItems(list => list.filter(c => c.id !== id)), []);
   const clear = useCallback(() => setItems([]), []);
   const value = useMemo(
-    () => ({ enabled, items, add, remove, clear }),
-    [enabled, items, add, remove, clear],
+    () => ({ enabled, items, saved: saved ?? [], add, remove, clear }),
+    [enabled, items, saved, add, remove, clear],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 };
@@ -109,6 +113,14 @@ export const SelectionCommentPopup: FC<{ containerRef: RefObject<HTMLElement> }>
       container.removeEventListener("keyup", read);
     };
   }, [enabled, containerRef]);
+
+  // The words already commented on stay marked in the debrief.
+  const saved = ctx?.saved;
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!enabled || !container || !saved?.length) return undefined;
+    return applyHighlights(container, saved);
+  }, [enabled, saved, containerRef]);
 
   useEffect(() => {
     if (!draft) return undefined;
@@ -224,6 +236,33 @@ const FeedbackComposer: FC<{ sessionId: string; ctx: SelectionCommentsValue }> =
       data-testid="selection-feedback"
       className="flex flex-col gap-2 border-t border-gray-100 pt-4"
     >
+      {ctx.saved.length > 0 && (
+        <div data-testid="selection-feedback-saved" className="flex flex-col gap-2">
+          <p className="font-primary text-sm font-semibold text-typography-900">
+            {t("postSim.debriefCards.selectionComments.yourComments")}
+          </p>
+          {ctx.saved.map(c => (
+            <div
+              key={c.id}
+              data-testid="selection-feedback-saved-item"
+              className="rounded-lg border border-gray-100 bg-white p-2 font-primary text-sm"
+            >
+              <p className="font-semibold text-typography-900">
+                {c.quotedText
+                  ? `“${c.quotedText}”`
+                  : t("postSim.debriefCards.selectionComments.onWholeDebrief")}
+              </p>
+              <p className="text-typography-700">{c.body}</p>
+              <p className="text-xs text-typography-600">
+                {new Date(c.createdAt).toLocaleDateString(undefined, {
+                  day: "numeric",
+                  month: "short",
+                })}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
       {ctx.items.map(c => (
         <div
           key={c.id}

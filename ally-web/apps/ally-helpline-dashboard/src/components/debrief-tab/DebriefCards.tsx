@@ -271,7 +271,10 @@ const DebriefCardsInLanguage: FC<DebriefCardsProps> = ({
   return (
     <SeeMomentContext.Provider value={onSeeQuote ?? null}>
       <ReadAloudContext.Provider value={ready ? readAloud : null}>
-        <SelectionCommentsProvider enabled={ready && !!view.features?.selectionComments}>
+        <SelectionCommentsProvider
+          enabled={ready && !!view.features?.selectionComments}
+          saved={view.myComments}
+        >
           <div className="flex w-full flex-col gap-2">
             <div className="flex w-full flex-col rounded-lg bg-gradient-to-br from-primary-500 to-primary-100 p-1">
               <div className="flex w-full items-center justify-between gap-3 px-4 py-3">

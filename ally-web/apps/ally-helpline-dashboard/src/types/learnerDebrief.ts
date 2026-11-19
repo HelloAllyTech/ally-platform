@@ -165,6 +165,8 @@ export interface LearnerDebriefView {
   followUp?: boolean;
   /** Learner features this person has (web only). Absent or false: nothing changes for them. */
   features?: { selectionComments?: boolean };
+  /** The person's own comments on this debrief, oldest first (only with the feature). */
+  myComments?: DebriefMyComment[];
   /**
    * Roleplays the cards link to that the learner can still open. Inside a
    * course only that course's roleplays, each with its course item.
@@ -221,4 +223,16 @@ export interface DebriefSelectionComment {
   spanEnd: number;
   quotedText: string;
   body: string;
+}
+
+/** One of the person's own comments on this debrief, as saved. */
+export interface DebriefMyComment {
+  id: string;
+  /** The card and field, or null for a comment on the whole debrief. */
+  section: string | null;
+  quotedText: string | null;
+  spanStart: number | null;
+  spanEnd: number | null;
+  body: string;
+  createdAt: string;
 }

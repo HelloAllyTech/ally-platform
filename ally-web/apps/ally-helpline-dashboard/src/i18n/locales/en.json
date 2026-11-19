@@ -1080,7 +1080,9 @@
         "hint": "Select words in the debrief to comment on them.",
         "count_one": "{{count}} comment on selected words",
         "count_other": "{{count}} comments on selected words",
-        "send": "Send"
+        "send": "Send",
+        "yourComments": "Your comments",
+        "onWholeDebrief": "On the whole debrief"
       }
     }
   },

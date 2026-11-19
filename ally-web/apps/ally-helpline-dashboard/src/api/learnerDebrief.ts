@@ -71,6 +71,9 @@ const learnerDebriefAPI = baseAPI.injectEndpoints({
         method: HttpMethod.POST,
         body: { ...(overall ? { overall } : {}), items },
       }),
+      invalidatesTags: (_r, _e, { sessionId }) => [
+        { type: TAG_TYPES.LEARNER_DEBRIEF, id: sessionId },
+      ],
     }),
     /** The pulse (PRD §9): one yes/no answer per question; answering again changes it. */
     answerDebriefPulse: builder.mutation<

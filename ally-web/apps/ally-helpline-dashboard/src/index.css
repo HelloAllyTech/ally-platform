@@ -536,3 +536,8 @@
     max-inline-size: 100%;
   }
 }
+
+/* Words the person commented on in their debrief (see debrief-tab/highlightRanges.ts). */
+::highlight(my-debrief-comments) {
+  background-color: rgb(250 204 21 / 0.35);
+}
