@@ -419,26 +419,53 @@ describe('the run carries memory both ways', () => {
 
 describe('the line sent when a run is cut short after acting', () => {
   const { doneLineOf } = require('../../engine/agent-runtime-runner.service');
-  const result = (title: string) => ({
+  const passage = (
+    slot: string,
+    service = 'Eye checkup',
+    status = 'booked',
+  ) => ({
+    record_title: slot,
+    text: `id: r1\nSlot: ${slot}\nClient: Priya Test\nService: ${service}\nStatus: ${status}`,
+  });
+  const result = (slot: string, before?: ReturnType<typeof passage>) => ({
     list: { name: 'Appointments' },
-    passages: [{ record_title: title }],
+    passages: [passage(slot)],
+    ...(before ? { before } : {}),
   });
 
-  it('says what a booking did', () => {
+  // Chunk H1: from the saved record, never a bare "Done".
+  it('says what a booking saved: every detail, for whom', () => {
     expect(doneLineOf(result('Mon 23 Nov 2026, 10:00'), { slot: 's1' })).toBe(
-      'Done: Mon 23 Nov 2026, 10:00 in Appointments.',
+      'Saved in Appointments: Slot: Mon 23 Nov 2026, 10:00; Client: Priya Test; ' +
+        'Service: Eye checkup; Status: booked.',
     );
   });
 
-  it('says a cancellation is cancelled, not done', () => {
+  it('says a cancellation is cancelled, naming what was cancelled', () => {
     expect(
-      doneLineOf(result('Thu 19 Nov 2026, 19:00'), {
-        id: 'a1',
-        status: 'cancelled',
-      }),
-    ).toBe('Cancelled: Thu 19 Nov 2026, 19:00 in Appointments.');
+      doneLineOf(
+        result('Thu 19 Nov 2026, 19:00', passage('Thu 19 Nov 2026, 19:00')),
+        { id: 'a1', status: 'cancelled' },
+      ),
+    ).toBe(
+      'Cancelled in Appointments: Slot: Thu 19 Nov 2026, 19:00; Client: Priya Test; ' +
+        'Service: Eye checkup; Status: booked.',
+    );
+  });
+
+  it('says what a move changed, from and to', () => {
     expect(
-      doneLineOf(result('Thu 19 Nov 2026, 19:00'), { status: 'no_show' }),
-    ).toBe('No show: Thu 19 Nov 2026, 19:00 in Appointments.');
+      doneLineOf(
+        {
+          list: { name: 'Appointments' },
+          passages: [passage('Sat 21 Nov 2026, 13:00', 'LASIK consultation')],
+          before: passage('Sat 21 Nov 2026, 11:00'),
+        },
+        { id: 'a1', slot: 's2', service: 'LASIK consultation' },
+      ),
+    ).toBe(
+      'Changed in Appointments: Slot: Sat 21 Nov 2026, 11:00; Service: Eye checkup ' +
+        '→ now Slot: Sat 21 Nov 2026, 13:00; Service: LASIK consultation.',
+    );
   });
 });

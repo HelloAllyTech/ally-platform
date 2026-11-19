@@ -19,6 +19,22 @@ export const KNOWLEDGE_ANSWER_LIMITS = {
   delayMs: 500,
 } as const;
 
+/**
+ * One agent run's limits (chunk H1 Part B/C). ally-be names the cap in the request
+ * (`run_timeout_s`) and always waits `marginMs` longer, so ally-ai's cap fires first and ally-be
+ * never gives up on a run that is still allowed to write. A streamed run also ends when no progress
+ * event (a status, step, live step or token) has come for `silenceMs`: it times out on silence,
+ * not on total time.
+ */
+export const AGENT_RUN_LIMITS = {
+  /** The bot page, the bubble and Try it: a status line shows while it works. */
+  streamedCapS: 45,
+  /** WhatsApp: one reply, inside the SQS window (60 s) less the send that follows (15 s). */
+  waitedCapS: 38,
+  marginMs: 5_000,
+  silenceMs: 25_000,
+} as const;
+
 /** ally-ai's onboarding builder (chunk 20a). */
 export const BUILDER_LIMITS = {
   /**

@@ -110,6 +110,7 @@ export class AgentGatewayService {
       conversationId: claims.conversationId,
       runId: claims.runId,
       contactId: claims.contactId,
+      consentOfferId: claims.consent ?? null,
     };
     const claimed = await this.claim(ctx, step, name, input);
     if ('replay' in claimed) {

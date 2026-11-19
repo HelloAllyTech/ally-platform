@@ -23,13 +23,7 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple, Type
 
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
-from app.core.agent_runtime import stages
 from app.core.agent_runtime.tools.base import Tool, ToolContext, ToolResult
-from app.core.agent_runtime.tools.confirmed import (
-    is_plain_yes,
-    unconfirmed,
-    unconsented,
-)
 
 #: At most this many definitions a run (ally-be caps them too).
 MAX_LIST_TOOLS = 12
@@ -137,56 +131,11 @@ def list_tool(definition: Mapping[str, Any]) -> Tool:
     name = str(definition["name"])
     kind = str(definition.get("kind") or "find")
 
-    properties: Dict[str, Any] = (definition.get("input_schema") or {}).get(
-        "properties"
-    ) or {}
-
     async def handler(args: BaseModel, ctx: ToolContext) -> ToolResult:
-        if kind in ("create", "update"):
-            # The day and time it books must be what the person confirmed, read from
-            # their own messages (chunk 6 follow-up). Otherwise it isn't sent.
-            values = args.model_dump(mode="json", by_alias=True)
-            why = unconfirmed(
-                properties,
-                values,
-                ctx.passages,
-                ctx.messages,
-                ctx.today,
-                updating=str(values.get("id") or "") if kind == "update" else None,
-            )
-            time_gate = why
-            if not why and kind == "create":
-                # Picking between offers isn't a yes (Q3-fast Part 0b, 17 Nov F1).
-                why = unconsented(properties, values, ctx.passages, ctx.latest)
-            # Chunk H1 Part A, temporary: what each confirmation gate decided. Codes
-            # and counts only, never the person's words.
-            stages.stage(
-                "confirm_gate",
-                tool=name,
-                kind=kind,
-                time_gate="refused" if time_gate else "passed",
-                consent_gate=(
-                    "not_run"
-                    if kind != "create" or time_gate
-                    else ("refused" if why else "passed")
-                ),
-                latest_is_plain_yes=is_plain_yes(ctx.latest or ""),
-                messages_read=len(ctx.messages or ()),
-                moves_entry=bool(values.get("id")) if kind == "update" else False,
-            )
-            if why:
-                return ToolResult(
-                    summary=f"{name}: not sent, time not confirmed",
-                    record={
-                        "tool": name,
-                        "kind": "gateway",
-                        "list_kind": kind,
-                        "ok": False,
-                        "added": [],
-                        "error": "unconfirmed_time",
-                        "message": why,
-                    },
-                )
+        # A create or update is checked in ally-be's gateway (chunk H1 Part B): it
+        # writes only after the person said yes, in a later turn, to a question that
+        # named exactly this entry; otherwise it answers `needs_confirmation` with the
+        # question to ask. No check here can let a write through, so none is done.
         if ctx.gateway is None or ctx.run_id is None or ctx.step is None:
             outcome: Dict[str, Any] = {"ok": False, "error": "no_gateway"}
         else:

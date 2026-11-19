@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import re
 import time
+from contextvars import ContextVar
 from typing import Any, Dict, Optional, Tuple, Type, TypeVar
 
 from pydantic import BaseModel
@@ -659,6 +660,13 @@ async def _generate_gemini(
     )
 
 
+#: How many times the OpenAI SDK may retry one request; None = its default (2).
+#: Chunk H1: 0 inside an agent run and the crisis check, whose callers give each
+#: call exactly the time that is left. The SDK's own retries stretched a 10.7 s
+#: timeout to 33 s, past the run's cap.
+SDK_RETRIES: ContextVar[Optional[int]] = ContextVar("llm_sdk_retries", default=None)
+
+
 async def _generate_openai(
     *,
     schema: Type[TSchema],
@@ -689,6 +697,9 @@ async def _generate_openai(
     same `schema.model_validate` every provider goes through.
     """
     client = _get_openai_client()
+    retries = SDK_RETRIES.get()
+    if retries is not None:
+        client = client.with_options(max_retries=retries)
 
     messages: list[Dict[str, Any]] = []
     if system:

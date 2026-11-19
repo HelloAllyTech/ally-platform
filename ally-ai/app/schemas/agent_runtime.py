@@ -110,6 +110,15 @@ class AgentRunRequest(KnowledgeAnswerRequest):
         None, max_length=200, description="Recorded with the run; not used to answer"
     )
     runtime_version: str = Field("v2", max_length=16)
+    run_timeout_s: Optional[float] = Field(
+        None,
+        gt=0,
+        le=60,
+        description=(
+            "The run's hard cap in seconds (chunk H1), named by ally-be, which waits a "
+            "little longer. Unset: AGENT_RUNTIME__RUN_TIMEOUT_SECONDS."
+        ),
+    )
     log_retrieval: bool = Field(
         True,
         description=(

@@ -627,6 +627,22 @@ export class ChatbotEngineService {
         ...(agent ? { agent } : {}),
       };
     }
+    if (acted === 'confirm') {
+      // The run got as far as asking for a yes (chunk H1): the question is the reply.
+      const question =
+        answerResult.status === 'rejected' &&
+        answerResult.reason instanceof AgentActedError
+          ? answerResult.reason.done
+          : undefined;
+      if (question) {
+        return {
+          handledBy: WaHandledBy.CLARIFIED,
+          body: question,
+          alert: degradedAlert,
+          ...(agent ? { agent } : {}),
+        };
+      }
+    }
     if (acted) {
       // A list write that was done (chunk 6) says so; anything else gets the run-failed reply.
       const done =

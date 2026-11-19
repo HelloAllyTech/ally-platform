@@ -19,12 +19,13 @@ from uuid import uuid4
 from langgraph.graph.state import CompiledStateGraph
 
 from app.core.agent_runtime import activity, stages
-from app.core.agent_runtime.budget import RUN_DEADLINE
+from app.core.agent_runtime.budget import RUN_CAP_S, RUN_DEADLINE
 from app.core.agent_runtime.gateway import AgentGatewayClient
 from app.core.agent_runtime.graph import OnEvent, run_agent
 from app.core.agent_runtime.state import AgentState
 from app.core.agent_runtime.trace import status_event
 from app.core.config import settings
+from app.core.llm.dispatch import SDK_RETRIES
 from app.exceptions.custom_exceptions import (
     EmbeddingFailedException,
     LLMInvocationFailedException,
@@ -94,13 +95,20 @@ async def execute(
     checkpoint keeps the steps already saved.
     """
     run_id = payload.run_id or str(uuid4())
+    # The cap ally-be named (chunk H1), never above the configured ceiling of 60 s.
+    cap_s = min(
+        payload.run_timeout_s or settings.AGENT_RUNTIME.RUN_TIMEOUT_SECONDS, 60.0
+    )
+    RUN_CAP_S.set(cap_s)
+    # Each model call gets the time left of the cap and no SDK retries (chunk H1).
+    SDK_RETRIES.set(0)
     clock = stages.begin(run_id)
     stages.stage(
         "run_start",
         streamed=bool(on_event),
         history=len(payload.history),
         gateway=bool(payload.gateway),
-        cap_s=settings.AGENT_RUNTIME.RUN_TIMEOUT_SECONDS,
+        cap_s=cap_s,
     )
     if on_event:
         on_event("run_started", {"run_id": run_id})
@@ -113,7 +121,7 @@ async def execute(
         else None
     )
     try:
-        async with asyncio.timeout(settings.AGENT_RUNTIME.RUN_TIMEOUT_SECONDS) as cap:
+        async with asyncio.timeout(cap_s) as cap:
             # A write extends the cap (chunk 8a, budget.extend_after_write).
             RUN_DEADLINE.set(cap)
             state = await run_agent(
