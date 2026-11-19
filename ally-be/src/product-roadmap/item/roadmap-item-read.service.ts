@@ -77,6 +77,7 @@ import {
   WhyHere,
   WhyHereDecision,
 } from './roadmap-item.types';
+import type { RoadmapOpportunityEffort } from '../enum/roadmap-opportunity.enum';
 
 const DAY_MS = 86_400_000;
 /** Recently shipped, in For you (§4.3). */
@@ -140,6 +141,7 @@ interface OpenAsk {
 /** Everything the read model knows about one idea for one caller. */
 interface ItemCore extends ItemQueryFacts {
   description: string;
+  size: RoadmapOpportunityEffort | null;
   opp: OpportunityFacts & {
     updatedAt: string;
     planStageAt: string | null;
@@ -1127,6 +1129,7 @@ export class RoadmapItemReadService {
         openQuestion: planning.openQuestions > 0,
         votedByMe,
         plannedMonth: row.plannedMonth ?? null,
+        size: row.effort ?? null,
         votes: opp.votes,
         queueRank: row.queueRank == null ? null : num(row.queueRank),
         compositeScore: num(row.compositeScore),
@@ -1307,6 +1310,11 @@ export class RoadmapItemReadService {
           ? { goal: { id: c.goalId, name: c.goalName } }
           : {}),
         plannedMonth: c.plannedMonth,
+        size: c.size,
+        releasedAt:
+          c.stage.statusParts.stage === 'shipped'
+            ? (c.stage.statusParts.liveSince ?? null)
+            : null,
         updatedAt: c.lastActivityAt,
         stageSince: c.stageSince,
       };

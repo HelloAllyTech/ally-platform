@@ -7,6 +7,7 @@ import {
   PlanEventKind,
   RoadmapNotificationKind,
 } from 'src/product-planning/enum/product-planning.enum';
+import { RoadmapOpportunityEffort } from '../../enum/roadmap-opportunity.enum';
 import { RoadmapItemEditService } from '../roadmap-item-edit.service';
 
 const ME = 5;
@@ -18,6 +19,7 @@ const ALL_EDITS = {
   editSummary: true,
   editLead: true,
   editMonth: true,
+  editSize: true,
   star: true,
 };
 
@@ -50,6 +52,7 @@ function build(
               'Streak on start screen\n\nLearners drop off.',
             productGoal: 'Growth',
             plannedMonth: null,
+            effort: 'm',
           },
         ];
       }
@@ -187,6 +190,36 @@ describe('RoadmapItemEditService.patch', () => {
     expect(opportunities.update).toHaveBeenCalledWith(ME, ITEM_ID, {
       plannedMonth: '2026-12',
     });
+  });
+
+  it('sets the size, clears it with null, and skips a size that did not change', async () => {
+    const set = build();
+    await set.service.patch(ME, 'OPP-0388', {
+      size: RoadmapOpportunityEffort.L,
+    });
+    expect(set.opportunities.update).toHaveBeenCalledWith(ME, ITEM_ID, {
+      effort: 'l',
+    });
+    const cleared = build();
+    await cleared.service.patch(ME, 'OPP-0388', { size: null });
+    expect(cleared.opportunities.update).toHaveBeenCalledWith(ME, ITEM_ID, {
+      effort: null,
+    });
+    const same = build();
+    await same.service.patch(ME, 'OPP-0388', {
+      size: RoadmapOpportunityEffort.M,
+    });
+    expect(same.opportunities.update).not.toHaveBeenCalled();
+  });
+
+  it('refuses the size to someone who may not size the idea', async () => {
+    const { service, opportunities } = build({ can: { editSize: false } });
+    await expect(
+      service.patch(ME, 'OPP-0388', { size: RoadmapOpportunityEffort.S }),
+    ).rejects.toThrow(
+      new ForbiddenException("You can't change this idea's size."),
+    );
+    expect(opportunities.update).not.toHaveBeenCalled();
   });
 
   describe('lead', () => {

@@ -355,6 +355,21 @@ class SQSQueueService:
             )
             raise
 
+    async def release_message(self, queue_url: str, receipt_handle: str) -> None:
+        """
+        Make a received message visible again right away, for another worker.
+
+        Used on shutdown for a message this worker could not finish: without
+        it, SQS would hide the message for the rest of its visibility timeout
+        (900s) before anyone retried it.
+        """
+        await self._run_in_executor(
+            self.client.change_message_visibility,
+            QueueUrl=queue_url,
+            ReceiptHandle=receipt_handle,
+            VisibilityTimeout=0,
+        )
+
     async def get_queue_depth(self, queue_url: str) -> Dict[str, int]:
         """
         Return approximate queue depth for visibility/backlog monitoring.

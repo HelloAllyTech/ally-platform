@@ -26,7 +26,7 @@ import { RoadmapItemReadService } from './roadmap-item-read.service';
 import { bodyOf, joinDescription, titleOf } from './roadmap-item-query.util';
 import type { ItemCan, ItemDetail, PersonRef } from './roadmap-item.types';
 
-type EditField = 'title' | 'goal' | 'summary' | 'lead' | 'month';
+type EditField = 'title' | 'goal' | 'summary' | 'lead' | 'month' | 'size';
 
 const FIELD_CAN: Record<EditField, keyof ItemCan> = {
   title: 'editTitle',
@@ -34,6 +34,7 @@ const FIELD_CAN: Record<EditField, keyof ItemCan> = {
   summary: 'editSummary',
   lead: 'editLead',
   month: 'editMonth',
+  size: 'editSize',
 };
 
 const FIELD_WORDS: Record<EditField, string> = {
@@ -42,6 +43,7 @@ const FIELD_WORDS: Record<EditField, string> = {
   summary: 'summary',
   lead: 'lead',
   month: 'planned month',
+  size: 'size',
 };
 
 /**
@@ -84,6 +86,7 @@ export class RoadmapItemEditService {
     if (dto.leadUserId !== undefined && dto.leadUserId !== null)
       asked.push('lead');
     if (dto.plannedMonth !== undefined) asked.push('month');
+    if (dto.size !== undefined) asked.push('size');
     if (!asked.length) return before;
 
     for (const field of asked) {
@@ -95,7 +98,7 @@ export class RoadmapItemEditService {
     }
 
     const [current] = await this.dataSource.query(
-      `SELECT description, "productGoal", "plannedMonth"
+      `SELECT description, "productGoal", "plannedMonth", effort
          FROM "roadmap_opportunities" WHERE id = $1`,
       [ref.id],
     );
@@ -154,6 +157,14 @@ export class RoadmapItemEditService {
       if (next !== (current.plannedMonth ?? null)) {
         update.plannedMonth = next;
         changes.push({ field: 'month', from: current.plannedMonth, to: next });
+      }
+    }
+
+    if (asked.includes('size')) {
+      const next = dto.size ?? null;
+      if (next !== (current.effort ?? null)) {
+        update.effort = next;
+        changes.push({ field: 'size', from: current.effort, to: next });
       }
     }
 

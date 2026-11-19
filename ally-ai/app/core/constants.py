@@ -140,6 +140,12 @@ class SQSWorkerConstants:
     # SQS would redeliver it, and below the ally-be summary reaper (1200s) so a
     # legitimately slow-but-finishing job still beats the timeout.
     MESSAGE_PROCESSING_TIMEOUT_SECONDS: Final[int] = 840
+    # On SIGTERM (a deploy), how long messages in progress get to finish before
+    # the rest are put straight back on the queue for the new container. Must
+    # stay below the container's stop timeout (infra: 60s for ally-ai), after
+    # which Docker SIGKILLs the worker and an unfinished message would wait out
+    # its whole VISIBILITY_TIMEOUT before anyone retried it.
+    SHUTDOWN_DRAIN_SECONDS: Final[int] = 45
 
 
 class APISettings:
