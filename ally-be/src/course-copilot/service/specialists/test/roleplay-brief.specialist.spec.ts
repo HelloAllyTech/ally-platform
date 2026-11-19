@@ -179,6 +179,8 @@ describe('RoleplayBriefSpecialist', () => {
       personaAge: 29,
       title: 'Night-shift nurse doubting herself',
       difficultyLevel: 'MEDIUM',
+      // Covered by the "structured brief" tests below.
+      structured: expect.objectContaining({ mode: 'practice' }),
     });
   });
 
@@ -275,6 +277,83 @@ describe('RoleplayBriefSpecialist', () => {
       COURSE_COPILOT_PROMPTS.ROLEPLAY_BRIEF,
     );
     expect(complete).not.toHaveBeenCalled();
+  });
+
+  describe('structured brief', () => {
+    it('sets mode, gate, difficulty and length from the blueprint, and the moments from the model', async () => {
+      complete.mockResolvedValue({
+        text: answer({
+          opportunities: [
+            'Apologises for calling at all',
+            'Mentions not sleeping, then changes the subject',
+          ],
+          learnerGoal: 'Help Meera say what is keeping her awake',
+          setting: 'A phone call at 2am, between her rounds',
+        }),
+      });
+      const ctx = makeContext('ambivalent, one concern');
+      ctx.item.spec.mode = 'learning';
+      ctx.item.spec.characterId = 'char-1';
+      ctx.item.completionCriteria = { minScore: 60 };
+
+      const { structured } = await specialist.write(ctx);
+
+      expect(structured).toEqual({
+        mode: 'learning',
+        outcomes: ['Reflect feelings accurately'],
+        competencies: ['Empathic reflection'],
+        behaviours: {
+          helpful: ['Reflecting feelings'],
+          unhelpful: ['Giving premature advice'],
+        },
+        opportunities: [
+          'Apologises for calling at all',
+          'Mentions not sleeping, then changes the subject',
+        ],
+        learnerGoal: 'Help Meera say what is keeping her awake',
+        setting: 'A phone call at 2am, between her rounds',
+        condition: {
+          taskClass: 'ambivalent, one concern',
+          difficulty: 'MEDIUM',
+        },
+        character: {
+          characterId: 'char-1',
+          personaBrief: 'A night-shift nurse',
+        },
+        gate: { minScore: 60 },
+        lengthMinutes: 12,
+      });
+    });
+
+    it('still builds when the live prompt returns none of the new fields', async () => {
+      const ctx = makeContext('cooperative, one concern');
+      ctx.item.objectiveRefs = [];
+      ctx.item.estimatedMinutes = 0;
+
+      const { structured } = await specialist.write(ctx);
+
+      expect(structured.mode).toBe('practice');
+      expect(structured.opportunities).toEqual([]);
+      expect(structured.learnerGoal).toBeUndefined();
+      expect(structured.outcomes).toEqual([
+        'Hold a supportive call with a struggling colleague',
+      ]);
+      expect(structured.gate).toEqual({});
+      expect(structured.lengthMinutes).toBe(8);
+    });
+
+    it('keeps at most four opportunities and ignores an unknown mode', async () => {
+      complete.mockResolvedValue({
+        text: answer({ opportunities: ['a', 'b', '', 'c', 'd', 'e'] }),
+      });
+      const ctx = makeContext('ambivalent');
+      ctx.item.spec.mode = 'rehearsal';
+
+      const { structured } = await specialist.write(ctx);
+
+      expect(structured.opportunities).toEqual(['a', 'b', 'c', 'd']);
+      expect(structured.mode).toBe('practice');
+    });
   });
 });
 

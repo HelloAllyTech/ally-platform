@@ -21,7 +21,7 @@ This roleplay:
 {{practiceSequence}}
 - Sensitive themes: {{sensitiveThemes}}
 
-Rules: one fictional person; behaviour that reflects the task class; 150–300 words of plain paragraphs for actorDescription; agentTestCases as 2–4 comma-separated phrases; title of 3–8 words; personaGender exactly one of "male", "female", "non-binary"; personaAge an integer between 16 and 90; difficulty "EASY", "MEDIUM" or "HARD". Handle sensitive themes without graphic detail.
+Rules: one fictional person; behaviour that reflects the task class; 150–300 words of plain paragraphs for actorDescription; agentTestCases as 2–4 comma-separated phrases; title of 3–8 words; personaGender exactly one of "male", "female", "non-binary"; personaAge an integer between 16 and 90; difficulty "EASY", "MEDIUM" or "HARD"; opportunities as 2–4 moments the client creates in the conversation so the learner can show the helpful behaviours (for example "mentions not sleeping, then hints at not wanting to wake up"); learnerGoal as one sentence on what the learner is trying to do; setting as one sentence on where and when the conversation happens. Handle sensitive themes without graphic detail.
 {{revisionNotes}}
 Output strict JSON only — no markdown, no code fences, no commentary — matching exactly:
 
@@ -31,5 +31,8 @@ Output strict JSON only — no markdown, no code fences, no commentary — match
   "agentTestCases": "<phrase>, <phrase>",
   "personaGender": "male | female | non-binary",
   "personaAge": <integer>,
-  "difficulty": "EASY | MEDIUM | HARD"
+  "difficulty": "EASY | MEDIUM | HARD",
+  "opportunities": ["<moment>", "<moment>"],
+  "learnerGoal": "<one sentence>",
+  "setting": "<one sentence>"
 }

@@ -67,6 +67,44 @@ export const COURSE_COPILOT_LIMITS = {
 } as const;
 
 /** Durations the interview offers, minutes. Anything else is still accepted. */
+// ── Reference material ───────────────────────────────────────────────────────
+
+/**
+ * Limits on the files a trainer attaches to one session. A partner manual is rarely more than a
+ * few hundred pages; the character cap keeps one session's passages small enough to rank in
+ * memory on every writer call.
+ */
+export const COURSE_COPILOT_SOURCE_LIMITS = {
+  maxFiles: 10,
+  maxBytes: 50 * 1024 * 1024,
+  maxCharsPerSession: 2_000_000,
+  /** The interviewer's overview of every file, in its system context. */
+  overviewChars: 12_000,
+  /** Passages handed to one writer or planner call. */
+  referenceChars: 9_000,
+};
+
+/**
+ * How reference material may be used (decided 2026-11-19): take the CONTENT — facts, steps,
+ * examples, structure — and write it in your own words; key terms, the partner's own tool and
+ * programme names, and helpline numbers stay exactly as written.
+ */
+export const COURSE_COPILOT_SOURCE_RULES = {
+  interviewer:
+    'Use these files before asking the trainer anything: draft the brief from them (audience, ' +
+    "outcomes, the partner's terms, existing exercises) and ask only what they do not answer. " +
+    'Call search_sources for detail. The course should follow their content — facts, steps, ' +
+    "examples, structure — written in Ally's own words; key terms, the partner's own tool and " +
+    'programme names, and helpline numbers stay exactly as written. When the files and the ' +
+    'trainer disagree, the trainer wins.',
+  writer:
+    'REFERENCE MATERIAL — passages from files the trainer attached for this course. Base the ' +
+    'content on them: follow their facts, steps, examples and order, and do not contradict them. ' +
+    'Write in your own words, in the format asked for above; do not copy sentences. Keep key ' +
+    "terms, the partner's own tool and programme names, and helpline numbers exactly as written. " +
+    'If a passage is off-topic for this item, ignore it.',
+};
+
 export const COURSE_COPILOT_DURATION_OPTIONS = [30, 60, 120, 240];
 
 // ── Cost ────────────────────────────────────────────────────────────────────
@@ -133,6 +171,7 @@ export const COURSE_COPILOT_PROMPTS = {
   COURSE_REVIEWER: 'course_copilot_course_reviewer',
   HISTORY_SUMMARY: 'course_copilot_history_summary',
   ROLEPLAY_BRIEF: 'course_copilot_roleplay_brief',
+  ROLEPLAY_FIT_CHECK: 'course_copilot_roleplay_fit_check',
   IMAGE_PROMPT: 'course_copilot_image_prompt',
   LANDING_PAGE_WRITER: 'course_copilot_landing_page_writer',
   ALLY_NOTES_WRITER: 'course_copilot_ally_notes_writer',
@@ -150,6 +189,7 @@ export const COURSE_COPILOT_AI_TASKS = {
   REVIEW: 'course-copilot-review',
   SUMMARY: 'course-copilot-summary',
   ROLEPLAY_BRIEF: 'course-copilot-roleplay-brief',
+  ROLEPLAY_FIT_CHECK: 'course-copilot-roleplay-fit-check',
   IMAGE_PROMPT: 'course-copilot-image-prompt',
   IMAGE: 'course-copilot-image',
   LANDING_PAGE: 'course-copilot-landing-page',

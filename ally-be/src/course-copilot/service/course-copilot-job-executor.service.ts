@@ -33,6 +33,7 @@ import {
   COURSE_COPILOT_SCENARIO_CATEGORY,
 } from '../constants/course-copilot.constants';
 import { SpecialistContext } from './specialists/specialist.types';
+import { CourseCopilotSourcesService } from './course-copilot-sources.service';
 import { ArticleSpecialist } from './specialists/article.specialist';
 import { QuizSpecialist } from './specialists/quiz.specialist';
 import { JournalSpecialist } from './specialists/journal.specialist';
@@ -41,6 +42,7 @@ import { CourseMetaSpecialist } from './specialists/course-meta.specialist';
 import { CourseReviewSpecialist } from './specialists/course-review.specialist';
 import { ImagePromptSpecialist } from './specialists/image-prompt.specialist';
 import { RoleplayBriefSpecialist } from './specialists/roleplay-brief.specialist';
+import { RoleplayFitCheckSpecialist } from './specialists/roleplay-fit-check.specialist';
 import {
   CourseCopilotJobSkip,
   CourseCopilotMediaService,
@@ -92,6 +94,8 @@ export class CourseCopilotJobExecutorService {
     private readonly review: CourseReviewSpecialist,
     private readonly imagePrompt: ImagePromptSpecialist,
     private readonly roleplayBrief: RoleplayBriefSpecialist,
+    private readonly fitCheck: RoleplayFitCheckSpecialist,
+    private readonly sources: CourseCopilotSourcesService,
   ) {}
 
   async execute(
@@ -124,6 +128,9 @@ export class CourseCopilotJobExecutorService {
           content: output.content,
           summary: output.summary,
           ...(output.imageBrief ? { imageBrief: output.imageBrief } : {}),
+          ...(context.referenceLabels?.length
+            ? { references: context.referenceLabels }
+            : {}),
         };
       }
       case CourseCopilotJobKind.GAME:
@@ -185,7 +192,14 @@ export class CourseCopilotJobExecutorService {
     if (!blueprint || !section) {
       throw new Error('The job has no course context to write against.');
     }
+    const reference = await this.referenceFor(session, section, item);
     return {
+      ...(reference
+        ? {
+            referenceMaterial: reference.text,
+            referenceLabels: reference.labels,
+          }
+        : {}),
       sessionId: session.id,
       brief: session.brief ?? {},
       blueprint,
@@ -205,6 +219,36 @@ export class CourseCopilotJobExecutorService {
         : {}),
       usageMetadata,
     };
+  }
+
+  /**
+   * The trainer's reference passages that bear on one item, found by what the
+   * item is about. A lookup failure writes the item without them rather than
+   * failing the job: the files are a help, not a precondition.
+   */
+  private async referenceFor(
+    session: CourseCopilotSession,
+    section: CourseBlueprintSection,
+    item: CourseBlueprintItem,
+  ) {
+    const query = [
+      section.title,
+      item?.title,
+      (item as any)?.purpose,
+      JSON.stringify(item?.spec ?? {}),
+    ]
+      .filter(Boolean)
+      .join(' ');
+    try {
+      return await this.sources.referenceFor(session.id, query);
+    } catch (error) {
+      this.logger.warn(
+        `Course Copilot ${session.id}: reference lookup failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
   }
 
   /**
@@ -371,6 +415,14 @@ export class CourseCopilotJobExecutorService {
         'A new roleplay needs a competency, and the brief has none.',
       );
     }
+    const casting = await this.structureService.asOwner(session, () =>
+      this.fitCheck.cast(actor.structured, {
+        sessionId: session.id,
+        tenantId: session.tenantId ?? null,
+        competencyIds,
+        usageMetadata,
+      }),
+    );
     const track = session.trackId
       ? await this.structureService.getTrack(session.trackId).catch(() => null)
       : null;
@@ -396,8 +448,7 @@ export class CourseCopilotJobExecutorService {
             : undefined,
           coverImageUrl: imageryOn ? (track?.coverImageUrl ?? null) : null,
           titleHint: actor.title ?? item.title,
-          characterId:
-            typeof spec.characterId === 'string' ? spec.characterId : undefined,
+          characterId: casting.characterId,
           saveCharacter: spec.saveCharacter === true,
           category: COURSE_COPILOT_SCENARIO_CATEGORY,
           provenance:
@@ -423,10 +474,18 @@ export class CourseCopilotJobExecutorService {
         created.characterId,
       );
     }
+    const summary = created.summary || `Created roleplay "${created.title}"`;
     return {
       scenarioId: created.scenarioId,
       ...(created.characterId ? { characterId: created.characterId } : {}),
-      summary: created.summary || `Created roleplay "${created.title}"`,
+      summary: casting.swapped
+        ? `${summary}. Used ${casting.swapped.toName} instead of ${casting.swapped.fromName}: ${casting.swapped.reason} Please check.`
+        : summary,
+      roleplayBrief: actor.structured,
+      ...(context.referenceLabels?.length
+        ? { references: context.referenceLabels }
+        : {}),
+      ...(casting.fitCheck ? { casting } : {}),
     };
   }
 

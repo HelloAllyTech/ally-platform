@@ -25,6 +25,13 @@ export interface SpecialistJsonRequest {
   repairErrors?: string[];
   /** Regeneration: the item's current content and the trainer's change. */
   previous?: { content: Record<string, any>; instructions: string };
+  /**
+   * Passages from the trainer's reference files, with how to use them (see
+   * CourseCopilotSourcesService.referenceFor). Appended after rendering, so no
+   * live prompt needs a new variable, and a session without files sends exactly
+   * the prompt it sent before.
+   */
+  referenceMaterial?: string | null;
 }
 
 export interface SpecialistJsonResult<T> {
@@ -98,7 +105,7 @@ export function buildSpecialistPrompt(
   template: string,
   request: Pick<
     SpecialistJsonRequest,
-    'variables' | 'repairErrors' | 'previous'
+    'variables' | 'repairErrors' | 'previous' | 'referenceMaterial'
   >,
 ): string {
   const variables: Record<string, string> = {};
@@ -112,6 +119,8 @@ export function buildSpecialistPrompt(
   }
 
   let prompt = renderTemplate(template, variables);
+
+  prompt = withReference(prompt, request.referenceMaterial);
 
   if (request.previous) {
     const instructions =
@@ -136,6 +145,19 @@ export function buildSpecialistPrompt(
   }
 
   return prompt;
+}
+
+/**
+ * Append the trainer's reference passages to a rendered prompt. After
+ * rendering, so a passage that happens to contain `{{…}}` is never read as a
+ * template variable; unchanged when there is nothing to add.
+ */
+export function withReference(
+  prompt: string,
+  referenceMaterial: string | null | undefined,
+): string {
+  const reference = referenceMaterial?.trim();
+  return reference ? `${prompt}\n\n---\n${reference}` : prompt;
 }
 
 /**

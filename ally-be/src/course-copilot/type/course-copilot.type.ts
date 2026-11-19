@@ -2,6 +2,10 @@ import {
   TrackItemCompletionLogic,
   TrackItemType,
 } from 'src/track/type/track.type';
+import {
+  RoleplayCasting,
+  StructuredRoleplayBrief,
+} from './roleplay-brief.type';
 
 /**
  * The distilled interview — what the trainer has told the copilot so far.
@@ -248,12 +252,21 @@ export interface CourseCopilotJobResult {
   description?: string;
   /** One-line, human summary for the build panel ("8 questions"). */
   summary?: string;
+  /**
+   * The trainer's reference files this item was written from
+   * ("Manual.pdf, p. 12"), shown on the build panel for the trainer to check.
+   */
+  references?: string[];
   /** Article only: what an illustration should show, for the image job. */
   imageBrief?: string;
   /** Reviewer findings (course_review). */
   findings?: CourseReviewFinding[];
   /** Why a job was skipped, when it was. */
   skippedReason?: string;
+  /** New roleplay only: the slot as the manual's roleplay brief. */
+  roleplayBrief?: StructuredRoleplayBrief;
+  /** New roleplay only: the fit check's verdict, and any character swap. */
+  casting?: RoleplayCasting;
 }
 
 export interface CourseReviewFinding {

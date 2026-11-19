@@ -45,6 +45,17 @@ export interface LibraryHit {
   extra?: Record<string, any>;
 }
 
+/** A library character as the roleplay fit check reads it. */
+export interface CharacterProfile {
+  id: string;
+  name: string;
+  /** "34, female, ASHA worker, Mandya". */
+  summary: string;
+  /** The saved character profile; empty when the character has none. */
+  profileText: string;
+  hasVoices: boolean;
+}
+
 export interface CopilotLanguage {
   id: string;
   name: string;
@@ -387,12 +398,34 @@ export class CourseCopilotLibraryService {
   }
 
   /**
-   * Characters in the asker's slice of the character library — the rule the character library's
-   * own screens apply (CharacterLibraryAccessService): a platform admin sees every character, or
-   * global ones plus their organisations' when restricted; anyone else only their own
-   * organisation's. Outside a request there is no slice, and no character is shown.
+   * Full profiles of the given library characters, in the asker's slice of
+   * the library (the rule characterHits applies), for the roleplay fit check.
+   * Ids the asker may not see, or that no longer exist, are left out.
    */
-  private async characterHits(ids: string[]): Promise<LibraryHit[]> {
+  async characterProfiles(ids: string[]): Promise<CharacterProfile[]> {
+    const rows = await this.visibleCharacters(ids);
+    return rows.map((character) => ({
+      id: character.id,
+      name: character.name,
+      summary:
+        oneLine(
+          [
+            character.age ? `${character.age}` : null,
+            character.gender,
+            character.profession,
+            character.currentLocation,
+          ]
+            .filter(Boolean)
+            .join(', '),
+        ) ?? '',
+      profileText: (character.characterProfileText ?? '').trim(),
+      hasVoices: Boolean(Object.keys(character.voices ?? {}).length),
+    }));
+  }
+
+  private async visibleCharacters(ids: string[]): Promise<ScenarioCharacter[]> {
+    const valid = ids.filter((id) => isUUID(id));
+    if (!valid.length) return [];
     let scope: CharacterLibraryScope;
     try {
       scope = await this.characterAccess.resolveScope();
@@ -405,33 +438,42 @@ export class CourseCopilotLibraryService {
       return [];
     }
     const rows = await this.dataSource.getRepository(ScenarioCharacter).find({
-      where: { id: In(ids.filter((id) => isUUID(id))) },
+      where: { id: In(valid) },
     });
-    return rows
-      .filter((character) =>
-        scope.restrictedToTenantIds
-          ? !character.tenantId ||
-            scope.restrictedToTenantIds.includes(character.tenantId)
-          : scope.isPlatform || character.tenantId === scope.tenantId,
-      )
-      .map((character) => ({
-        kind: 'character' as const,
-        id: character.id,
-        title: character.name,
-        description: oneLine(
-          [
-            character.age ? `${character.age}` : null,
-            character.gender,
-            character.profession,
-            character.currentLocation,
-          ]
-            .filter(Boolean)
-            .join(', '),
-        ),
-        extra: {
-          hasVoices: Boolean(Object.keys(character.voices ?? {}).length),
-        },
-      }));
+    return rows.filter((character) =>
+      scope.restrictedToTenantIds
+        ? !character.tenantId ||
+          scope.restrictedToTenantIds.includes(character.tenantId)
+        : scope.isPlatform || character.tenantId === scope.tenantId,
+    );
+  }
+
+  /**
+   * Characters in the asker's slice of the character library — the rule the character library's
+   * own screens apply (CharacterLibraryAccessService): a platform admin sees every character, or
+   * global ones plus their organisations' when restricted; anyone else only their own
+   * organisation's. Outside a request there is no slice, and no character is shown.
+   */
+  private async characterHits(ids: string[]): Promise<LibraryHit[]> {
+    const rows = await this.visibleCharacters(ids);
+    return rows.map((character) => ({
+      kind: 'character' as const,
+      id: character.id,
+      title: character.name,
+      description: oneLine(
+        [
+          character.age ? `${character.age}` : null,
+          character.gender,
+          character.profession,
+          character.currentLocation,
+        ]
+          .filter(Boolean)
+          .join(', '),
+      ),
+      extra: {
+        hasVoices: Boolean(Object.keys(character.voices ?? {}).length),
+      },
+    }));
   }
 
   private async templateHits(ids: string[]): Promise<LibraryHit[]> {

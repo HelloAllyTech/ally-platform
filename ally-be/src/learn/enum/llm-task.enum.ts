@@ -388,6 +388,7 @@ export enum LlmTask {
   COURSE_COPILOT_REVIEW = 'course_copilot_review',
   COURSE_COPILOT_SUMMARY = 'course_copilot_summary',
   COURSE_COPILOT_ROLEPLAY_BRIEF = 'course_copilot_roleplay_brief',
+  COURSE_COPILOT_ROLEPLAY_FIT_CHECK = 'course_copilot_roleplay_fit_check',
   COURSE_COPILOT_IMAGE_PROMPT = 'course_copilot_image_prompt',
   COURSE_COPILOT_IMAGE = 'course_copilot_image',
   // The one Course Copilot call made outside a session: an admin's click on the
