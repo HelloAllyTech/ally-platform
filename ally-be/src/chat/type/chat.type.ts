@@ -17,6 +17,9 @@ export type UserChatSessionData = {
   chatId: number;
   tenantId: string;
   provider?: AudioChatProvider;
+  /** When this socket last delivered audio (ms). A recording cut off by a
+   *  dropped socket is ended at this time, not when its grace period ran out. */
+  lastAudioAt?: number;
 };
 
 export type ServiceSessionData = {
