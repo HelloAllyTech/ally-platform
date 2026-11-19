@@ -553,6 +553,74 @@ describe('StreamFileProcessorService', () => {
     });
   });
 
+  describe('waitForFinalized (shutdown: audio handed off before exit)', () => {
+    const deferred = () => {
+      let resolve!: () => void;
+      const promise = new Promise<void>((r) => (resolve = r));
+      return { promise, resolve };
+    };
+
+    it('returns at once when this replica holds none of the recordings', async () => {
+      await expect(service.waitForFinalized([1, 2], 1000)).resolves.toEqual([]);
+    });
+
+    it('waits while a recording is still held (its end listener has not run yet)', async () => {
+      service['activeCallStreams'][7] = { chatId: 7 } as any;
+      const waiting = service.waitForFinalized([7], 2000);
+      await new Promise((r) => setTimeout(r, 150));
+      delete service['activeCallStreams'][7];
+      await expect(waiting).resolves.toEqual([]);
+    });
+
+    it('waits for a finalize in progress, not just for the stream to leave the map', async () => {
+      // endCallStream drops the stream from activeCallStreams as it STARTS
+      // finalizing; the flush/upload/dispatch is still running after that.
+      service['activeCallStreams'][8] = { chatId: 8 } as any;
+      const finalize = deferred();
+      jest
+        .spyOn(service as any, 'finalizeCallStream')
+        .mockImplementation(async () => {
+          delete service['activeCallStreams'][8];
+          await finalize.promise;
+        });
+
+      const ending = service.endCallStream({ chatId: 8 });
+      let done = false;
+      const waiting = service
+        .waitForFinalized([8], 2000)
+        .then((left) => ((done = true), left));
+      await new Promise((r) => setTimeout(r, 150));
+      expect(service['activeCallStreams'][8]).toBeUndefined();
+      expect(done).toBe(false);
+
+      finalize.resolve();
+      await ending;
+      await expect(waiting).resolves.toEqual([]);
+    });
+
+    it('gives up at the timeout and names the recordings not handed off', async () => {
+      service['activeCallStreams'][9] = { chatId: 9 } as any;
+      await expect(service.waitForFinalized([9, 10], 120)).resolves.toEqual([
+        9,
+      ]);
+      delete service['activeCallStreams'][9];
+    });
+
+    it('stops tracking a finalize that failed', async () => {
+      service['activeCallStreams'][11] = { chatId: 11 } as any;
+      jest
+        .spyOn(service as any, 'finalizeCallStream')
+        .mockImplementation(async () => {
+          delete service['activeCallStreams'][11];
+          throw new Error('s3 down');
+        });
+      await expect(service.endCallStream({ chatId: 11 })).rejects.toThrow(
+        's3 down',
+      );
+      await expect(service.waitForFinalized([11], 500)).resolves.toEqual([]);
+    });
+  });
+
   describe('endCallStream', () => {
     it('should handle missing stream gracefully', async () => {
       await service.endCallStream({ chatId: 999 });
