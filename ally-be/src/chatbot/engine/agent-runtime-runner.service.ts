@@ -49,6 +49,9 @@ import { contactFromSources } from './run-failed-reply';
  */
 const MAX_KNOWLEDGE_TOPICS = 50;
 
+/** How long a reply waits for a list write already on its way when the run is cut off (H1). */
+const IN_FLIGHT_WAIT_MS = 2_000;
+
 /** The agent's reply, without the run fields (v1's response shape, which v2 extends). */
 export type EngineAnswer = KnowledgeAnswerResponse &
   Pick<AgentRunResponse, 'turn_type' | 'handover'>;
@@ -125,11 +128,15 @@ function fieldsOf(
   passage: { text?: unknown } | null | undefined,
 ): [string, string][] {
   if (typeof passage?.text !== 'string') return [];
-  return passage.text
-    .split('\n')
-    .map((line) => /^([^:]+):\s*(.+)$/.exec(line))
-    .filter((m): m is RegExpExecArray => Boolean(m) && m![1] !== 'id')
-    .map((m) => [m[1].trim(), m[2].trim()]);
+  return (
+    passage.text
+      .split('\n')
+      .map((line) => /^([^:]+):\s*(.+)$/.exec(line))
+      .filter((m): m is RegExpExecArray => Boolean(m) && m![1] !== 'id')
+      .map((m): [string, string] => [m[1].trim(), m[2].trim()])
+      // A contact with no name yet ("A contact") isn't a detail to say back (chunk H1).
+      .filter(([, value]) => !/^(?:a contact|visitor\b|unknown)/i.test(value))
+  );
 }
 
 /** `/agent/run`'s debug-only list of every retrieved chunk; not stored on the message. */
@@ -286,8 +293,12 @@ export class AgentRuntimeRunner {
           error: error instanceof Error ? error.name : 'unknown',
         }),
       );
-      // The person left Preview, or a crisis reply went out instead: nobody is waiting.
-      if (callerAborted) throw error;
+      // The person left Preview, or a crisis reply went out instead: nobody is waiting, and nothing
+      // may be written for this run any more (chunk H1).
+      if (callerAborted) {
+        if (withGateway) await this.consent?.endRun(runId);
+        throw error;
+      }
       const fallbackReason = agentFailureReason(error);
       const agent: AgentRunRef = {
         runtime: AgentRuntimeUsed.V2_FAILED,
@@ -295,6 +306,12 @@ export class AgentRuntimeRunner {
         conversationId,
         fallbackReason,
       };
+      // ally-be stops waiting (chunk H1): the gateway refuses the run's later writes, and a write
+      // already on its way is waited for, so the reply says what was saved.
+      if (withGateway) {
+        await this.consent?.endRun(runId);
+        await this.settleWrites(runId);
+      }
       // A run that has already done something says what it did (chunk 3b), from the saved record.
       const acted = withGateway ? await this.actedIn(runId) : null;
       // One that only got as far as asking (chunk H1): its question, not the run-failed reply.
@@ -506,6 +523,30 @@ export class AgentRuntimeRunner {
         }`,
       );
       return null;
+    }
+  }
+
+  /**
+   * Waits (up to `IN_FLIGHT_WAIT_MS`) for a list write the run had already started when ally-be
+   * stopped waiting (chunk H1), so `actedIn` sees it.
+   */
+  private async settleWrites(runId: string): Promise<void> {
+    const until = Date.now() + IN_FLIGHT_WAIT_MS;
+    try {
+      while (Date.now() < until) {
+        const started = await this.toolRuns.find({
+          where: { runId, status: ToolRunStatus.STARTED },
+          select: ['tool'],
+        });
+        if (
+          !started.some((row) => parseListToolName(row.tool)?.kind !== 'find')
+        ) {
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    } catch {
+      // Nothing to wait for that we can read: the reply goes as it would have.
     }
   }
 

@@ -489,6 +489,25 @@ describePg('List tools through the gateway (Postgres)', () => {
       expect(moved.result!.passages[0].record_title).toBe(b.record_title);
     });
 
+    it('a run ally-be has stopped waiting for writes nothing, even with a yes', async () => {
+      const [slot] = await freeSlots(1);
+      const conversationId = 'conv-consent-8';
+      await call(
+        'create_appointments',
+        { slot: slot.record_id },
+        { conversationId },
+      );
+      const offer = await consent.current(bot, conversationId);
+      await consent.endRun('run-late');
+      const late = await call(
+        'create_appointments',
+        { slot: slot.record_id },
+        { conversationId, consent: offer!.id, runId: 'run-late' },
+      );
+      expect(late).toMatchObject({ ok: false, error: 'run_ended' });
+      expect(await appointmentRows()).toEqual([]);
+    });
+
     it('a slot someone has is refused before anything is asked', async () => {
       const [slot] = await freeSlots(1);
       await write(

@@ -322,7 +322,15 @@ export class ListToolsService {
           },
         };
       }
-      // 3. The write itself.
+      // 3. The write itself, unless ally-be has already stopped waiting for this run (chunk H1):
+      //    its reply has gone, and a write now would be one the person was never told about.
+      if (await this.consent?.ended(ctx.runId)) {
+        return {
+          ok: false,
+          error: 'run_ended',
+          result: { list: about, passages: [] },
+        };
+      }
       const record = await this.write(ctx, def, list, actor, data, current, {
         dryRun,
         personList,

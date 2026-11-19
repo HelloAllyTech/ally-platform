@@ -86,6 +86,29 @@ export class ListConsentService {
     }
   }
 
+  /**
+   * ally-be has stopped waiting for this run (chunk H1): its reply is being sent, so the gateway
+   * refuses any write the run still makes. Ten minutes, longer than any run.
+   */
+  async endRun(runId: string): Promise<void> {
+    try {
+      await this.redis.set(`agent:ended:${runId}`, '1', 600);
+    } catch (error) {
+      this.logger.warn(
+        `Could not mark the run ended: ${error instanceof Error ? error.message : 'unknown'}`,
+      );
+    }
+  }
+
+  /** Whether ally-be has stopped waiting for this run. A Redis failure reads as not ended. */
+  async ended(runId: string): Promise<boolean> {
+    try {
+      return Boolean(await this.redis.get(`agent:ended:${runId}`));
+    } catch {
+      return false;
+    }
+  }
+
   /** The assistant's previous message this turn answers, when ally-be recorded it. */
   async previousMessage(runId: string): Promise<string | null> {
     return (await this.turn(runId))?.previous || null;
