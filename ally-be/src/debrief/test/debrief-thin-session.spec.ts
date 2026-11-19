@@ -3,6 +3,8 @@ import {
   isThinSession,
 } from '../constants/debrief-release.constants';
 import { sessionForGraph } from '../service/debrief-runner.service';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
 describe('a thin session: too little said to coach on', () => {
   it('is thin below the minimum turns or the minimum words, and only then', () => {
@@ -54,5 +56,20 @@ describe('a thin session: too little said to coach on', () => {
       learnerWords: 150,
     });
     expect(fine).toMatchObject({ thin: false, learner_words: 150 });
+  });
+
+  it('counts words by splitting on whitespace, not on a backslash escape a template string would eat', () => {
+    // `'\s+'` inside a template literal reaches Postgres as `'s+'` and splits on the letter s:
+    // a 79-word session counted as a handful of words and was skipped as thin (2026-11-19).
+    const src = readFileSync(
+      join(__dirname, '../service/debrief-context.repository.ts'),
+      'utf8',
+    );
+    const line = src
+      .split('\n')
+      .find((l) => l.includes('regexp_split_to_array'));
+    expect(line).toBeDefined();
+    expect(line).toContain("'[[:space:]]+'");
+    expect(line).not.toMatch(/'\\?s\+'/);
   });
 });

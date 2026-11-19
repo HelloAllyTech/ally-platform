@@ -138,7 +138,7 @@ export class DebriefContextRepository {
               (SELECT count(*)::int FROM scenario_session_messages m
                 WHERE m."scenarioSessionId" = s.id AND m."senderId" <> -1
                   AND btrim(m.content) <> '') AS learner_turns,
-              (SELECT COALESCE(sum(array_length(regexp_split_to_array(btrim(m.content), '\s+'), 1)), 0)::int
+              (SELECT COALESCE(sum(array_length(regexp_split_to_array(btrim(m.content), '[[:space:]]+'), 1)), 0)::int
                  FROM scenario_session_messages m
                 WHERE m."scenarioSessionId" = s.id AND m."senderId" <> -1
                   AND btrim(m.content) <> '') AS learner_words
