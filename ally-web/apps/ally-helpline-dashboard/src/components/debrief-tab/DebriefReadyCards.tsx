@@ -181,14 +181,6 @@ export const ReadyCards: FC<{
         {worked.length > 0 && (
           <Card
             testId="debrief-card-what-worked"
-            // Open when the learner flagged a point or a reviewer answered one: the reply must not hide behind a click.
-            collapsible={
-              !supervisor &&
-              !worked.some(
-                ({ index }) =>
-                  !!flagFor(`what_worked[${index}]`) || !!correctionFor(`what_worked[${index}]`),
-              )
-            }
             readSections={worked.map(({ index }) => `what_worked[${index}]`)}
             title={t("postSim.debriefCards.whatWorked")}
             icon={<ThumbsUp aria-hidden="true" className="h-5 w-5 text-success-600" />}
