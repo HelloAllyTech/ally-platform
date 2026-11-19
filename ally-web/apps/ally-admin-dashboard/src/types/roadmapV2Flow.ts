@@ -6,6 +6,7 @@
  * Kept in its own file (not re-exported from the types barrel) so it merges cleanly beside the
  * parallel P4 work; import it by path.
  */
+import type { RoadmapOpportunityBrief } from "./productRoadmap";
 import type {
   RoadmapItemDetail,
   RoadmapItemRow,
@@ -93,6 +94,31 @@ export interface RoadmapDraftDetail {
   archiveAt: string | null;
   purgeAt: string | null;
   spend: { spentUsd: number; ideaCapUsd: number; wrapUp: boolean };
+  /** The one character limit for the idea's text; Submit files against the same one. Older servers omit it. */
+  textMax?: number;
+  /** The idea agent's statement and a short title, for "What will be submitted"; null until it has drafted one. */
+  proposal?: RoadmapDraftProposal | null;
+  /** The idea agent's research brief, for "What the idea agent found"; null until its first turn. */
+  brief?: RoadmapOpportunityBrief | null;
+}
+
+/**
+ * The one character limit for an idea's text on the Roadmap v2 pages: the capture box, a draft
+ * and what Submit files. Mirrors ally-be's ROADMAP_LIMITS.DESCRIPTION_MAX; a draft also carries
+ * the server's own value as `textMax`, which wins where it is known.
+ */
+export const ROADMAP_IDEA_TEXT_MAX = 1000;
+
+export interface RoadmapDraftProposal {
+  title: string;
+  statement: string;
+}
+
+/** What Submit files: the author's own words ("mine", what leaving it out means) or the agent's, as edited. */
+export interface RoadmapSubmitChoice {
+  use: "mine" | "agent";
+  title?: string;
+  statement?: string;
 }
 
 export interface RoadmapDraftRow {

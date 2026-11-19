@@ -10,6 +10,7 @@ import type { BuilderSessionDetail, RoadmapItemDetail } from "@types";
 
 import { CodeText } from "./CodeChip";
 import { ShipActions } from "./ReleaseDialog";
+import { IdeaAgentFindingsForItem } from "../drafts/IdeaAgentFindings";
 import { SimilarLine } from "../triage/TriageSummary";
 import { IdeaPanelTab, shortDate, usd } from "../utils/copy";
 import { outcomeLine } from "../utils/delight";
@@ -148,6 +149,7 @@ export const SummaryPanel: React.FC<{ item: RoadmapItemDetail }> = ({ item }) =>
           </div>
         </Field>
       )}
+      <IdeaAgentFindingsForItem itemId={item.id} />
       {empty && !item.declineReason && (
         <p className="text-sm text-typography-secondary">{copy.empty}</p>
       )}

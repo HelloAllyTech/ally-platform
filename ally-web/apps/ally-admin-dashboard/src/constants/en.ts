@@ -9394,6 +9394,32 @@ export const en = {
       submitGoalNeeded: "Pick a goal first. The suggested one is fine.",
       submitFailed: "Couldn't submit this idea.",
       submitChecksMissing: "A check reopened. Have another look before submitting.",
+      // Audit rec. 6: what Submit files, the one text limit, and the agent's research.
+      submitNoStatement: "The idea agent hasn't written its own version. Use your own words.",
+      submitStatementEmpty: "Write a title or a summary, or use your own words.",
+      submitTooLong: (max: number) =>
+        `The title and summary together can be at most ${max} characters.`,
+      textCount: (n: number, max: number) => `${n}/${max}`,
+      textOverLimit: (max: number) => `An idea can be at most ${max} characters.`,
+      submitChoice: {
+        title: "What will be submitted",
+        help: "The idea agent wrote your idea up from the interview. Submit its version, edited if you like, or your own words. Your own words stay on the idea either way.",
+        useThis: "Use this",
+        useThisHelp: "The idea agent's version",
+        useMine: "Use mine",
+        useMineHelp: "Your words, as in the box above",
+        titleLabel: "Title",
+        statementLabel: "Summary",
+        noStatement:
+          "The idea agent hasn't written its own version yet, so your own words will be submitted.",
+      },
+      findings: {
+        title: "What the idea agent found",
+        show: "Show",
+        hide: "Hide",
+        empty: "Nothing yet. Check my idea, and what the idea agent finds shows here.",
+        assessment: "Idea agent's assessment",
+      },
       submitted: "Submitted.",
       firstSubmitNote:
         "Submitted. Everyone with Roadmap access can see it now. You'll hear when it's reviewed.",
