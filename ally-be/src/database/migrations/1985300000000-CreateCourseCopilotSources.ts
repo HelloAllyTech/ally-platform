@@ -6,8 +6,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * stored. Rows go with their session (ON DELETE CASCADE) and are also deleted when the session
  * is archived. See docs/course-copilot.md.
  */
-export class CreateCourseCopilotSources1984900000000 implements MigrationInterface {
-  name = 'CreateCourseCopilotSources1984900000000';
+export class CreateCourseCopilotSources1985300000000 implements MigrationInterface {
+  name = 'CreateCourseCopilotSources1985300000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
