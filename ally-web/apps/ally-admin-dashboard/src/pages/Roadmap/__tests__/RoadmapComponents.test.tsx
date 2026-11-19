@@ -44,13 +44,7 @@ vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 import { deriveNavigationItems } from "../../../utils/navigation";
 import { setReduceMotionSwitch, __resetReduceMotionForTests } from "../../../motion/roadmapMotion";
 import { fromDropdownState, toDropdownState } from "../components/FilterControls";
-import {
-  IdeaStar,
-  IdeaTitle,
-  IdeaVotes,
-  IdeaWatch,
-  PrimaryAction,
-} from "../components/IdeaControls";
+import { IdeaStar, IdeaTitle, IdeaVotes, PrimaryAction } from "../components/IdeaControls";
 import { QueueList, sectionsFor } from "../components/QueueList";
 import { QueueRow } from "../components/QueueRow";
 import { Tracker } from "../components/Tracker";
@@ -149,11 +143,6 @@ describe("controls follow can{} — absent, never greyed out (§4.0 #14)", () =>
     );
     fireEvent.click(screen.getByRole("button", { name: en.roadmapV2.actions.approveDesign }));
     expect(onApprove).toHaveBeenCalled();
-  });
-
-  it("a Viewer gets no watch control", () => {
-    const { container } = wrap(<IdeaWatch item={detail({ watch: false, answer: false })} />);
-    expect(container).toBeEmptyDOMElement();
   });
 
   it("locks voting once the idea leaves the Backlog: the count stays, the control goes", () => {
@@ -273,7 +262,6 @@ describe("QueueRow", () => {
   const actions = {
     onOpen: vi.fn(),
     onMarkRead: vi.fn(),
-    onWatch: vi.fn(),
     onCopyLink: vi.fn(),
   };
   beforeEach(() => Object.values(actions).forEach(fn => fn.mockReset()));
@@ -348,7 +336,6 @@ describe("reduced motion lands on the same final state", () => {
             index={3}
             onOpen={vi.fn()}
             onMarkRead={vi.fn()}
-            onWatch={vi.fn()}
             onCopyLink={vi.fn()}
           />
         </ul>
@@ -383,7 +370,6 @@ describe("QueueList", () => {
     onRelease: vi.fn(),
     onOpen: vi.fn(),
     onMarkRead: vi.fn(),
-    onWatch: vi.fn(),
     onCopyLink: vi.fn(),
   };
 

@@ -101,7 +101,19 @@ export interface BugReportFormProps {
    * it optional in both senses: the consumer form passes nothing.
    */
   extraFields?: ReactNode;
+  /**
+   * Take over the whole viewport instead of opening a small dialog. For the admin
+   * dashboard's staff form, whose required answers and "Add details" section outgrow a
+   * small modal; the consumer forms keep the dialog. The fields sit in a readable
+   * centred column either way, so a wide screen doesn't stretch a text box edge to edge.
+   */
+  fullScreen?: boolean;
 }
+
+/** Full-viewport container; `!` beats the width/height Carbon's size classes set. */
+const FULL_SCREEN_CONTAINER =
+  "!fixed !inset-0 !m-0 !h-screen !max-h-none !w-screen !max-w-none !translate-x-0 !translate-y-0 !rounded-none";
+const FULL_SCREEN_COLUMN = "mx-auto w-full max-w-2xl";
 
 /**
  * The "Report a problem" form shared by every consumer-facing app.
@@ -123,6 +135,7 @@ export const BugReportForm: FC<BugReportFormProps> = ({
   onDescriptionChange,
   labels: labelOverrides,
   extraFields,
+  fullScreen = false,
 }) => {
   const labels = { ...DEFAULT_BUG_REPORT_LABELS, ...labelOverrides };
   const [description, setDescription] = useState("");
@@ -160,47 +173,66 @@ export const BugReportForm: FC<BugReportFormProps> = ({
     }
   };
 
+  // Full-screen only: the dialog's DOM stays exactly as the consumer apps have always had it.
+  const inColumn = (children: ReactNode, className = "") =>
+    fullScreen ? <div className={`${FULL_SCREEN_COLUMN} ${className}`}>{children}</div> : children;
+
   return (
-    <ComposedModal open={open} onClose={handleClose} size="sm">
+    <ComposedModal
+      open={open}
+      onClose={handleClose}
+      size="sm"
+      containerClassName={fullScreen ? FULL_SCREEN_CONTAINER : undefined}
+      data-testid={fullScreen ? "bug-report-form-full-screen" : undefined}
+    >
       <ModalHeader title={labels.title} iconDescription={labels.close} />
       <ModalBody>
-        <TextArea
-          id="bug-report-description"
-          labelText={labels.prompt}
-          placeholder={labels.placeholder}
-          value={description}
-          onChange={e => {
-            setDescription(e.target.value);
-            onDescriptionChange?.(e.target.value);
-          }}
-          maxCount={maxLength}
-          enableCounter
-          rows={5}
-          disabled={submitting}
-          helperText={
-            trimmed.length > 0 && remaining > 0
-              ? labels.tooShort.replace("{remaining}", String(remaining))
-              : undefined
-          }
-        />
-        {extraFields}
-        {error && (
-          <InlineNotification
-            kind="error"
-            title={error}
-            hideCloseButton
-            lowContrast
-            className="mt-3"
-          />
+        {inColumn(
+          <>
+            <TextArea
+              id="bug-report-description"
+              labelText={labels.prompt}
+              placeholder={labels.placeholder}
+              value={description}
+              onChange={e => {
+                setDescription(e.target.value);
+                onDescriptionChange?.(e.target.value);
+              }}
+              maxCount={maxLength}
+              enableCounter
+              rows={fullScreen ? 8 : 5}
+              disabled={submitting}
+              helperText={
+                trimmed.length > 0 && remaining > 0
+                  ? labels.tooShort.replace("{remaining}", String(remaining))
+                  : undefined
+              }
+            />
+            {extraFields}
+            {error && (
+              <InlineNotification
+                kind="error"
+                title={error}
+                hideCloseButton
+                lowContrast
+                className="mt-3"
+              />
+            )}
+          </>,
         )}
       </ModalBody>
       <ActionDialogFooter>
-        <Button kind="secondary" onClick={handleClose} disabled={submitting} className="flex-1">
-          {labels.cancel}
-        </Button>
-        <Button onClick={handleSubmit} disabled={!canSubmit} className="flex-1">
-          {submitting ? <InlineLoading description={labels.submitting} /> : labels.submit}
-        </Button>
+        {inColumn(
+          <>
+            <Button kind="secondary" onClick={handleClose} disabled={submitting} className="flex-1">
+              {labels.cancel}
+            </Button>
+            <Button onClick={handleSubmit} disabled={!canSubmit} className="flex-1">
+              {submitting ? <InlineLoading description={labels.submitting} /> : labels.submit}
+            </Button>
+          </>,
+          "flex items-center gap-4",
+        )}
       </ActionDialogFooter>
     </ComposedModal>
   );
