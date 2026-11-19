@@ -235,6 +235,11 @@ export class ListToolsService {
         };
       }
       const data = toListData(list, input);
+      if (def.kind === 'create') {
+        // A choice left out (the service) that the assistant's last message named, exactly one of
+        // the options (chunk H1): taken from there, rather than asked again.
+        await this.fillNamedChoice(ctx, list, def, data);
+      }
       const booking =
         def.kind === 'create' && playbookOf(list, [def]) === 'booking';
       // A booking needs its service (chunk H1 Part D): an empty choice the list offers is asked
@@ -340,6 +345,22 @@ export class ListToolsService {
       throw error;
     }
   }
+  private async fillNamedChoice(
+    ctx: AgentToolContext,
+    list: ListDefinitionView,
+    def: ListToolDefinition,
+    data: Record<string, unknown>,
+  ): Promise<void> {
+    const missing = missingChoice(list, def, data);
+    if (!missing || !this.consent) return;
+    const previous = (await this.consent.previousMessage(ctx.runId)) ?? '';
+    const said = previous.toLowerCase();
+    const named = missing.options.filter((option) =>
+      said.includes(option.toLowerCase()),
+    );
+    if (named.length === 1) data[missing.key] = named[0];
+  }
+
   /**
    * One create or update through 5a's engine: tried and rolled back with `dryRun`, for real
    * otherwise. Preview's create on a person's list with no person goes through `previewCreate`.

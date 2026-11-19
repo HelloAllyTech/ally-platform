@@ -86,6 +86,11 @@ export class ListConsentService {
     }
   }
 
+  /** The assistant's previous message this turn answers, when ally-be recorded it. */
+  async previousMessage(runId: string): Promise<string | null> {
+    return (await this.turn(runId))?.previous || null;
+  }
+
   private async turn(
     runId: string,
   ): Promise<{ yes: boolean; previous: string } | null> {
