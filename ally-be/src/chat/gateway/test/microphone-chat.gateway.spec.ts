@@ -141,6 +141,7 @@ describe('MicrophoneChatGateway', () => {
     mockStreamFileProcessorService = {
       startCallStream: jest.fn(),
       saveAudio: jest.fn(),
+      waitForFinalized: jest.fn().mockResolvedValue([]),
     };
 
     mockPublisher = {
@@ -604,6 +605,35 @@ describe('MicrophoneChatGateway', () => {
       );
       expect(mockChatService.endChat).toHaveBeenCalledTimes(2);
       expect(gatewayPrivate.sessions).toEqual({});
+    });
+
+    it('waits for the ended recordings audio to be handed off before returning', async () => {
+      gatewayPrivate.sessions = {
+        'sid-a': { ...mockSession, id: 'sid-a', chatId: 42, tenantId: 't1' },
+        'sid-b': { ...mockSession, id: 'sid-b', chatId: 43, tenantId: 't2' },
+      };
+      mockChatService.endChat.mockResolvedValue(null);
+      let release!: (left: number[]) => void;
+      mockStreamFileProcessorService.waitForFinalized.mockReturnValue(
+        new Promise<number[]>((r) => (release = r)),
+      );
+
+      let returned = false;
+      const destroying = gatewayPrivate
+        .onModuleDestroy()
+        .then(() => (returned = true));
+      await new Promise((r) => setImmediate(r));
+
+      // endChat only ENDS the chats; Nest exits as soon as this hook returns,
+      // so it must not return while the audio is still being finalized.
+      expect(
+        mockStreamFileProcessorService.waitForFinalized,
+      ).toHaveBeenCalledWith([42, 43], expect.any(Number));
+      expect(returned).toBe(false);
+
+      release([]);
+      await destroying;
+      expect(returned).toBe(true);
     });
 
     it('keeps draining other sessions when one flush throws', async () => {
