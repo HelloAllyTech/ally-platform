@@ -46,6 +46,11 @@ import {
 } from '../util/builder-prd-edits.util';
 import { describeToolAttempt } from '../util/builder-turn-receipt.util';
 import {
+  BUILDER_PRD_CHECKLIST_TOOL_NAMES,
+  BUILDER_PRD_CHECKLIST_TOOLS,
+  BuilderPrdChecklistToolsService,
+} from './builder-prd-checklist-tools.service';
+import {
   ASK_ADMIN_GATE_NOTE,
   gatedRationale,
   QUESTION_GATE_PROPERTIES,
@@ -172,6 +177,8 @@ export class BuilderInterviewToolsService {
     private readonly readiness: BuilderReadinessService,
     private readonly reviewService: BuilderPrdReviewService,
     private readonly messageRepository: BuilderMessageRepository,
+    // The coverage pass and principle marks. Optional so the eval sandbox builds without it.
+    @Optional() private readonly checklist?: BuilderPrdChecklistToolsService,
     /** Writes a plan's success measure. Optional so fixtures without it still build. */
     @Optional()
     private readonly sessionRepository?: BuilderSessionRepository,
@@ -383,7 +390,7 @@ export class BuilderInterviewToolsService {
         name: 'github_search_code',
         description:
           'Search code across the Ally org (or one repo) and get back matching ' +
-          'file paths. Use this to check how something is already built before ' +
+          'file paths, with line numbers for the top hits. Use this to check how something is already built before ' +
           'proposing it, then read the two or three files that matter.',
         input_schema: {
           type: 'object',
@@ -400,8 +407,9 @@ export class BuilderInterviewToolsService {
       {
         name: 'github_read_file',
         description:
-          'Read one file. Large files are truncated — prefer a specific path ' +
-          'over a whole barrel or a 3000-line service.',
+          'Read one file, or a range of its lines. A read stops at a byte cap and says the ' +
+          'line it stopped at — read on with startLine. Code search gives line numbers for ' +
+          'its top hits, so read around those rather than a whole 3000-line service.',
         input_schema: {
           type: 'object',
           properties: {
@@ -410,6 +418,14 @@ export class BuilderInterviewToolsService {
             ref: {
               type: 'string',
               description: 'Branch or sha (default master)',
+            },
+            startLine: {
+              type: 'number',
+              description: 'First line to read, 1-based (default 1)',
+            },
+            endLine: {
+              type: 'number',
+              description: 'Last line to read, inclusive (default the end)',
             },
           },
           required: ['repo', 'path'],
@@ -434,6 +450,7 @@ export class BuilderInterviewToolsService {
         },
       },
       ...contextToolDefinitions(BUILDER_PRINCIPLE_TOOLS),
+      ...(this.checklist ? BUILDER_PRD_CHECKLIST_TOOLS : []),
       {
         name: 'list_repo_commands',
         description:
@@ -696,6 +713,7 @@ export class BuilderInterviewToolsService {
           await this.githubRead.searchCode(
             String(input?.query ?? ''),
             input?.repo ? String(input.repo) : undefined,
+            { lineNumbers: true },
           ),
           (result) =>
             `Searched code for "${input?.query}": ${
@@ -708,6 +726,7 @@ export class BuilderInterviewToolsService {
             String(input?.repo ?? ''),
             String(input?.path ?? ''),
             input?.ref ? String(input.ref) : undefined,
+            { startLine: input?.startLine, endLine: input?.endLine },
           ),
           () => `Read ${input?.repo}/${input?.path}`,
         );
@@ -816,6 +835,9 @@ export class BuilderInterviewToolsService {
               : ' (no scan has completed yet)'),
         );
       default:
+        if (this.checklist && BUILDER_PRD_CHECKLIST_TOOL_NAMES.has(name)) {
+          return this.checklist.execute(name, input, context);
+        }
         return {
           modelResult: { ok: false, error: `Unknown tool "${name}"` },
           summary: `Unknown tool "${name}"`,

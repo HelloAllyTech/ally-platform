@@ -37,6 +37,8 @@ export const normalizeSituationBrief = (value: unknown): BuilderSituationBrief |
         ...(asAgentText(line.part) ? { part: asAgentText(line.part) } : {}),
         ...(APPROACHES.has(approach) ? { approach: approach as BuilderBriefLine["approach"] } : {}),
         ...(asAgentText(line.repo) ? { repo: asAgentText(line.repo) } : {}),
+        ...(typeof line.verified === "boolean" ? { verified: line.verified } : {}),
+        ...(asAgentText(line.verifiedBy) ? { verifiedBy: asAgentText(line.verifiedBy) } : {}),
       };
     })
     .filter(line => line.id && line.text);
@@ -57,7 +59,9 @@ export const normalizeBriefResponse = (value: unknown): BuilderBriefResponse | n
         const correction = asAgentText(line.correction).trim();
         return line.verdict === "correct" && correction
           ? { id: asAgentText(line.id), verdict: "correct" as const, correction }
-          : { id: asAgentText(line.id), verdict: "confirm" as const };
+          : line.verdict === "unverified"
+            ? { id: asAgentText(line.id), verdict: "unverified" as const }
+            : { id: asAgentText(line.id), verdict: "confirm" as const };
       })
       .filter(line => line.id),
     ...(note ? { note } : {}),

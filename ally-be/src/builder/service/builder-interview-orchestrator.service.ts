@@ -99,6 +99,7 @@ import {
 import {
   BuilderBriefResponse,
   BuilderSituationBrief,
+  filesReadIn,
   normaliseBriefResponse,
   normaliseSituationBrief,
   renderBriefForModel,
@@ -1926,7 +1927,17 @@ export class BuilderInterviewOrchestratorService {
     if (isBrief) {
       const { brief, problems: briefProblems } = normaliseSituationBrief(
         input,
-        { discovery: turn.discovery, sources: this.turnSources(turn) },
+        {
+          discovery: turn.discovery,
+          sources: this.turnSources(turn),
+          // Rec 4: a line about what exists is verified only by a file read (situation-brief util).
+          readFiles: [
+            ...((await this.readiness.filesRead?.(loop.sessionId)) ?? []),
+            ...filesReadIn(
+              joinCallsToResults(turn.allToolCalls, turn.allToolResults),
+            ),
+          ],
+        },
       );
       turn.pendingBrief = brief;
       problems.push(...briefProblems);
