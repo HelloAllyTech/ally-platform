@@ -2,10 +2,12 @@ import { FC } from "react";
 
 import { motion } from "framer-motion";
 import { useTranslation } from "react-i18next";
+import { useNavigate, useParams } from "react-router-dom";
 
 import { Lock, TickGreenBackground } from "@assets";
-import { TrackTypeIcon, getTrackItemMeta } from "@components";
-import { TrackDetailItem, TrackItemStatus } from "@types";
+import { TrackTypeIcon, formatTrackBlocker, getTrackItemMeta } from "@components";
+import { buildTrackItemRoute } from "@constants";
+import { TrackBlocker, TrackDetailItem, TrackItemStatus } from "@types";
 
 interface TrackItemNodeProps {
   item: TrackDetailItem;
@@ -49,6 +51,42 @@ const StateChip: FC<{ item: TrackDetailItem; isNext: boolean }> = ({ item, isNex
 };
 
 /**
+ * What is blocking the first locked item, plus a link to the blocking item
+ * when the learner can act on it. Only mounted when the server sent `blockedBy`.
+ */
+const BlockerReason: FC<{ blocker: TrackBlocker }> = ({ blocker }) => {
+  const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
+  const { trackId } = useParams<{ trackId: string }>();
+  const lines = formatTrackBlocker(blocker, t, i18n.language);
+  const showLink = blocker.action !== "NONE" && Boolean(trackId);
+
+  return (
+    <span className="mt-0.5 flex flex-col gap-0.5 text-xs text-typography-700">
+      {lines.map(line => (
+        <span key={line} className="break-words">
+          {line}
+        </span>
+      ))}
+      {showLink && (
+        <button
+          type="button"
+          onClick={e => {
+            e.stopPropagation();
+            navigate(buildTrackItemRoute(trackId as string, blocker.itemId));
+          }}
+          className="self-start font-semibold text-primary-600 underline hover:text-primary-700"
+        >
+          {blocker.action === "RETRY"
+            ? t("tracks2.blocker.tryAgain")
+            : t("tracks2.blocker.goToItem")}
+        </button>
+      )}
+    </span>
+  );
+};
+
+/**
  * A single item node row on the journey map. Locked nodes are dimmed with a
  * lock icon and an always-visible reason line; the current/next item gets a
  * ring highlight; unlocked/completed nodes open the player.
@@ -89,9 +127,12 @@ export const TrackItemNode: FC<TrackItemNodeProps> = ({ item, index, isNext, onC
           </span>
         )}
         {/* Always-visible reason, not hover-only, so it reaches touch and screen-reader users too. */}
-        {isLocked && (
-          <span className="mt-0.5 text-xs text-typography-400">{t("tracks2.lockedTooltip")}</span>
-        )}
+        {isLocked &&
+          (item.blockedBy ? (
+            <BlockerReason blocker={item.blockedBy} />
+          ) : (
+            <span className="mt-0.5 text-xs text-typography-400">{t("tracks2.lockedTooltip")}</span>
+          ))}
       </span>
     </>
   );
@@ -109,7 +150,9 @@ export const TrackItemNode: FC<TrackItemNodeProps> = ({ item, index, isNext, onC
       {isLocked ? (
         <div
           aria-label={item.title}
-          className={`${baseClasses} border-border-light bg-neutral-50 opacity-60 cursor-not-allowed`}
+          className={`${baseClasses} border-border-light bg-neutral-50 ${
+            item.blockedBy ? "" : "opacity-60"
+          } cursor-default`}
         >
           {content}
         </div>

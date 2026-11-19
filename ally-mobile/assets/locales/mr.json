@@ -1901,6 +1901,20 @@
     "progress": "{{total}} पैकी {{completed}}",
     "courseCompleted": "कोर्स पूर्ण झाला",
     "lockedTooltip": "हे अनलॉक करण्यासाठी आधीचे आयटम पूर्ण करा",
+    "blocker": {
+      "notFinished": "हे अनलॉक करण्यासाठी “{{title}}” पूर्ण करा",
+      "belowScore": "“{{title}}”: तुमचा स्कोर {{actual}} होता, {{required}} हवा",
+      "tooShort": "“{{title}}”: तो {{actual}} चालला, किमान {{required}} हवा",
+      "notScored": "“{{title}}”: आम्ही तुमच्या मागील प्रयत्नाला स्कोर देऊ शकलो नाही",
+      "assessmentFailed": "“{{title}}”: तुमचे मूल्यांकन उत्तीर्ण झाले नाही. आणखी एका प्रयत्नासाठी तुमच्या ट्रेनरला विचारा.",
+      "gradingPending": "“{{title}}”: तुमच्या उत्तरांची तपासणी अजून सुरू आहे",
+      "outOfAttempts": "“{{title}}”: एकही प्रयत्न शिल्लक नाही. मदतीसाठी तुमच्या ट्रेनरला विचारा.",
+      "outOfAttemptsUntil": "“{{title}}”: नवीन प्रयत्न {{date}} रोजी उघडतील",
+      "watchMore": "“{{title}}”: तुम्ही {{actual}}% पाहिले आहे, {{required}}% हवे",
+      "keepReading": "“{{title}}”: हे पूर्ण करण्यासाठी वाचत राहा",
+      "tryAgain": "पुन्हा प्रयत्न करा",
+      "goToItem": "आयटमकडे जा"
+    },
     "notFound": "कोर्स सापडला नाही",
     "viewProgress": "प्रगती पहा",
     "progressDashboard": {
@@ -2061,12 +2075,7 @@
       "assessmentNotice": "तुम्हाला एकच संधी मिळेल. रोल-प्ले संपवताच तुमचा प्रयत्न सबमिट होईल आणि पुन्हा करता येणार नाही.",
       "assessmentSubmitted": "{{date}} रोजी सबमिट केले",
       "assessmentNotPassed": "हा प्रयत्न उत्तीर्ण होण्याच्या अटी पूर्ण करू शकला नाही.",
-      "assessmentLocked": "तुमचे मूल्यांकन सबमिट झाले आहे. पुन्हा प्रयत्न हवा असल्यास तुमच्या ट्रेनरला सांगा.",
-      "lastAttemptTitle": "तुमचा मागील प्रयत्न हा रोलप्ले पूर्ण करू शकला नाही",
-      "lastAttemptDuration": "तो {{actual}} चालला; या रोलप्लेसाठी किमान {{required}} लागतात.",
-      "lastAttemptScore": "तुमचा स्कोर {{score}} होता; या रोलप्लेसाठी किमान {{required}} लागतात.",
-      "lastAttemptScoreUnknown": "तो किमान स्कोर {{required}} पर्यंत पोहोचला नाही.",
-      "lastAttemptFooter": "तयार झाल्यावर पुन्हा प्रयत्न करा."
+      "assessmentLocked": "तुमचे मूल्यांकन सबमिट झाले आहे. पुन्हा प्रयत्न हवा असल्यास तुमच्या ट्रेनरला सांगा."
     },
     "quiz": {
       "intro": {
