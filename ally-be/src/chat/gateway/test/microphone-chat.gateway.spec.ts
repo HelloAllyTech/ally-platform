@@ -247,18 +247,42 @@ describe('MicrophoneChatGateway', () => {
 
     it('ends it, flagged as a disconnect, once the grace period passes', async () => {
       gatewayPrivate.sessions = { a: recording('a', 7) };
+      const droppedAt = Date.now();
       await gateway.handleDisconnect(socket('a'));
 
       await jest.advanceTimersByTimeAsync(GRACE - 1);
       expect(mockChatService.endChat).not.toHaveBeenCalled();
       await jest.advanceTimersByTimeAsync(1);
 
+      // No audio seen on this socket: it ends at the drop, not a grace later.
       expect(mockChatService.endChat).toHaveBeenCalledWith(
         7,
-        undefined,
+        new Date(droppedAt),
         StreamEndReason.CLIENT_DISCONNECT,
       );
       expect(gatewayPrivate.pendingEnds.has(7)).toBe(false);
+    });
+
+    it('ends a cut-off recording when its audio stopped, not when the grace period ran out', async () => {
+      gatewayPrivate.sessions = { a: recording('a', 7) };
+      mockChatService.getChatById.mockResolvedValue({ id: 7, counselorId: 1 });
+      await gateway.handleAudioMessage(socket('a') as any, {
+        audioData: 'AAAA',
+        chatId: 7,
+      });
+      const lastAudioAt = Date.now();
+
+      // The socket only notices the drop a few seconds later.
+      await jest.advanceTimersByTimeAsync(5_000);
+      await gateway.handleDisconnect(socket('a'));
+      await jest.advanceTimersByTimeAsync(GRACE);
+
+      // Was ended at "now": 30s of audio showed as 90s (the grace counted).
+      expect(mockChatService.endChat).toHaveBeenCalledWith(
+        7,
+        new Date(lastAudioAt),
+        StreamEndReason.CLIENT_DISCONNECT,
+      );
     });
 
     it('resumes the recording when the same counsellor sends audio for it again', async () => {
@@ -297,7 +321,9 @@ describe('MicrophoneChatGateway', () => {
 
     it('ends a held recording right away when the counsellor starts a new one', async () => {
       gatewayPrivate.sessions = { a: recording('a', 7) };
+      const droppedAt = Date.now();
       await gateway.handleDisconnect(socket('a'));
+      await jest.advanceTimersByTimeAsync(10_000);
       gatewayPrivate.sessions.b = recording('b', PLACEHOLDER_CHAT_ID);
       mockChatService.getChatsByCouncilorId.mockResolvedValue(null);
 
@@ -307,7 +333,7 @@ describe('MicrophoneChatGateway', () => {
 
       expect(mockChatService.endChat).toHaveBeenCalledWith(
         7,
-        undefined,
+        new Date(droppedAt),
         StreamEndReason.CLIENT_DISCONNECT,
       );
       expect(gatewayPrivate.pendingEnds.size).toBe(0);
@@ -351,13 +377,16 @@ describe('MicrophoneChatGateway', () => {
 
     it('drains held recordings on shutdown instead of dropping them', async () => {
       gatewayPrivate.sessions = { a: recording('a', 7) };
+      const droppedAt = Date.now();
       await gateway.handleDisconnect(socket('a'));
+      await jest.advanceTimersByTimeAsync(10_000);
 
       await gateway.onModuleDestroy();
 
+      // Ended when it was cut off, not at shutdown.
       expect(mockChatService.endChat).toHaveBeenCalledWith(
         7,
-        undefined,
+        new Date(droppedAt),
         StreamEndReason.CLIENT_DISCONNECT,
       );
       expect(gatewayPrivate.pendingEnds.size).toBe(0);
@@ -454,7 +483,7 @@ describe('MicrophoneChatGateway', () => {
 
       expect(mockChatService.endChat).toHaveBeenCalledWith(
         1,
-        undefined,
+        expect.any(Date),
         StreamEndReason.CLIENT_DISCONNECT,
       );
       expect(
@@ -486,7 +515,7 @@ describe('MicrophoneChatGateway', () => {
 
       expect(mockChatService.endChat).toHaveBeenCalledWith(
         1,
-        undefined,
+        expect.any(Date),
         StreamEndReason.CLIENT_DISCONNECT,
       );
       expect(
@@ -519,7 +548,7 @@ describe('MicrophoneChatGateway', () => {
       // stale session is evicted.
       expect(mockChatService.endChat).toHaveBeenCalledWith(
         42,
-        undefined,
+        expect.any(Date),
         StreamEndReason.JANITOR_ORPHAN,
       );
       expect(gatewayPrivate.sessions['dead-sid']).toBeUndefined();

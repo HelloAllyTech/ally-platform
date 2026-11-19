@@ -47,6 +47,8 @@ interface PendingEnd {
   reason: StreamEndReason;
   clientId: string;
   disconnectedAt: number;
+  /** When the audio stopped: the last audio frame, or the drop if none came. */
+  audioEndedAt: number;
 }
 
 @WebSocketGateway({
@@ -181,6 +183,8 @@ export class MicrophoneChatGateway
       userId?: number;
       tenantId?: string;
       reason: StreamEndReason;
+      /** Set for a recording already cut off (in its grace period). */
+      endedAt?: Date;
     }> = Object.values(this.sessions)
       .filter(
         (session) =>
@@ -202,6 +206,7 @@ export class MicrophoneChatGateway
           userId: pending.userId,
           tenantId: pending.tenantId,
           reason: pending.reason,
+          endedAt: new Date(pending.audioEndedAt),
         });
       }
     }
@@ -223,7 +228,7 @@ export class MicrophoneChatGateway
           );
           await this.chatService.endChat(
             session.chatId,
-            undefined,
+            session.endedAt,
             session.reason,
           );
           this.logger.warn(
@@ -629,6 +634,7 @@ export class MicrophoneChatGateway
     this.sessions[client.id] = {
       ...this.sessions[client.id],
       chatId,
+      lastAudioAt: Date.now(),
     };
     const session = this.sessions[client.id];
     const isChatEnded = await this.chatService.isChatEnded(chatId);
@@ -699,6 +705,10 @@ export class MicrophoneChatGateway
       // Unknown: fall through and treat it as a drop; finalizeEnd re-checks.
     }
 
+    // The recording's end is when its audio stopped, not when the grace period
+    // ran out: ending it at "now" counted the whole grace period as call time.
+    const disconnectedAt = Date.now();
+    const audioEndedAt = session.lastAudioAt ?? disconnectedAt;
     const graceMs = MicrophoneChatGateway.reconnectGraceMs();
     if (graceMs <= 0) {
       this.pendingEnds.delete(chatId);
@@ -709,6 +719,7 @@ export class MicrophoneChatGateway
         reason,
         clientId,
         session.provider,
+        new Date(audioEndedAt),
       );
       return;
     }
@@ -721,6 +732,7 @@ export class MicrophoneChatGateway
         reason,
         clientId,
         session.provider,
+        new Date(audioEndedAt),
       );
     }, graceMs);
     if (typeof timer.unref === 'function') timer.unref();
@@ -731,7 +743,8 @@ export class MicrophoneChatGateway
       provider: session.provider,
       reason,
       clientId,
-      disconnectedAt: Date.now(),
+      disconnectedAt,
+      audioEndedAt,
     });
     this.logger.warn(
       `Socket ${clientId} for chat ${chatId} dropped (${reason}); holding the ` +
@@ -752,6 +765,7 @@ export class MicrophoneChatGateway
         pending.reason,
         pending.clientId,
         pending.provider,
+        new Date(pending.audioEndedAt),
       );
     }
   }
@@ -764,6 +778,7 @@ export class MicrophoneChatGateway
     reason: StreamEndReason,
     clientId: string,
     provider?: AudioChatProvider,
+    endedAt?: Date,
   ): Promise<void> {
     ExecutionManager.setAuthContext(
       userId ? String(userId) : '',
@@ -773,7 +788,7 @@ export class MicrophoneChatGateway
       // Ended some other way meanwhile (the counsellor pressed End after
       // reconnecting): nothing to do, and not a failure.
       if (await this.chatService.isChatEnded(chatId)) return;
-      await this.chatService.endChat(chatId, undefined, reason);
+      await this.chatService.endChat(chatId, endedAt, reason);
       this.auditLogger.log({
         eventType: AUDIT_EVENTS.CALL_ENDED,
         tenantId,
