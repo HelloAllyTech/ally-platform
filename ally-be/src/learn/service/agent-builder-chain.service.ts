@@ -1,3 +1,4 @@
+import { isUUID } from 'class-validator';
 import { randomUUID } from 'crypto';
 import { Injectable } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
@@ -962,7 +963,11 @@ export class AgentBuilderChainService {
         ? character!.coverImageUrl
         : undefined;
     const agentTestCaseIds = dedupe(input.agentTestCaseIds ?? []);
-    const triggerWarningIds = dedupe(input.triggerWarningIds ?? []);
+    // Only real ids: a label the model wrote ("TW_SEXUAL_ABUSE") would fail the whole save with
+    // "invalid input syntax for type uuid". Callers map labels to ids first; this is the backstop.
+    const triggerWarningIds = dedupe(input.triggerWarningIds ?? []).filter(
+      (id) => isUUID(id),
+    );
     const backstory = isNonEmptyString(parts.backstory)
       ? truncate(parts.backstory.trim(), MAX_LENGTHS.backstory)
       : undefined;
