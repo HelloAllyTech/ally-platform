@@ -2,28 +2,72 @@
   "repos": {
     "ally-ai": {
       "scanner": "vulture",
-      "paths": ["app"],
+      "paths": [
+        "app"
+      ],
       "min_confidence": 60,
       "gate": true,
-      "ignore_decorators": ["@router.*", "@app.*", "@field_validator", "@model_validator", "@validator", "@computed_field", "@property", "@asynccontextmanager"],
-      "ignore_names": ["model_post_init", "awrap_model_call", "awrap_tool_call", "lifespan"]
+      "ignore_decorators": [
+        "@router.*",
+        "@app.*",
+        "@field_validator",
+        "@model_validator",
+        "@validator",
+        "@computed_field",
+        "@property",
+        "@asynccontextmanager"
+      ],
+      "ignore_names": [
+        "model_post_init",
+        "awrap_model_call",
+        "awrap_tool_call",
+        "lifespan"
+      ]
     },
     "ally-ai-learn": {
       "scanner": "vulture",
-      "paths": ["app"],
+      "paths": [
+        "app"
+      ],
       "min_confidence": 60,
       "gate": true,
-      "ignore_decorators": ["@router.*", "@app.*", "@field_validator", "@model_validator", "@validator", "@computed_field", "@property", "@asynccontextmanager", "@function_tool"],
-      "ignore_names": ["model_post_init", "lifespan", "entrypoint", "prewarm"]
+      "ignore_decorators": [
+        "@router.*",
+        "@app.*",
+        "@field_validator",
+        "@model_validator",
+        "@validator",
+        "@computed_field",
+        "@property",
+        "@asynccontextmanager",
+        "@function_tool"
+      ],
+      "ignore_names": [
+        "model_post_init",
+        "lifespan",
+        "entrypoint",
+        "prewarm"
+      ]
     },
     "ally-be": {
       "scanner": "knip",
-      "gate": false
+      "gate": false,
+      "enabled": false
     },
     "ally-web": {
       "scanner": "knip",
-      "gate": false
+      "gate": false,
+      "enabled": false
     }
   },
-  "ignore": []
+  "ignore": [
+    {
+      "path": "ally-ai/app/prompts/contracts.py",
+      "why": "Prompt contracts are PromptInputs subclasses found at runtime by _collect_contracts() via __subclasses__(); nothing imports them by name."
+    },
+    {
+      "path": "ally-ai-learn/app/prompts/contracts.py",
+      "why": "Same as ally-ai: PROMPT_CONTRACTS collects PromptInputs subclasses via __subclasses__() at runtime."
+    }
+  ]
 }

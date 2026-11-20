@@ -13,7 +13,7 @@ Unused code costs every reader, human or agent, who has to work out whether it m
 
 1. **Scan.** One scanner per repo, tuned to that repo's frameworks. Only deletable things are reported: functions, classes, methods, imports (Python); files, exports, types (TypeScript). Never variables.
 2. **Ratchet.** `scripts/dead-code-baseline.json` lists today's known dead code. A finding not in it is new, and fails the PR check. Old debt never blocks anyone.
-3. **Report.** The `Dead code` workflow keeps one rolling issue with the full list, refreshed every Monday. That issue is the cleanup queue.
+3. **Publish.** Every Monday the `Dead code` workflow groups the findings by module and sends them to the PM Agent (`POST /v1/pm-agent/signals/dead-code`, platform service key). The PM Agent's `code_health` lane can turn a module into a card, and an admin accepting the card files the roadmap ticket: one ticket per module. The roadmap is the cleanup queue. Nothing is filed automatically, and nothing is filed while the PM Agent is off.
 
 ## Commands
 
@@ -22,6 +22,7 @@ pip install 'vulture==2.14'
 python3 scripts/dead_code.py --repo ally-ai            # report
 python3 scripts/dead_code.py --check                   # what CI runs
 python3 scripts/dead_code.py --update-baseline         # after a cleanup, commit the smaller file
+python3 scripts/dead_code.py --publish                 # what the weekly job runs (needs ALLY_BE_API_URL and ALLY_BE_API_KEY)
 ```
 
 ## When a finding is wrong

@@ -26,7 +26,7 @@
         "ci"
       ],
       "last_reconciled": "2026-11-20",
-      "words": 276,
+      "words": 337,
       "url": "https://tech.helloally.ai/#/wiki/contributing/dead-code.md",
       "skip_reason": ""
     },
@@ -142,7 +142,7 @@
         "log"
       ],
       "last_reconciled": "",
-      "words": 14280,
+      "words": 14306,
       "url": "https://tech.helloally.ai/#/wiki/log.md",
       "skip_reason": "append-only history — read only when auditing what changed"
     },
@@ -290,7 +290,7 @@
         "reference"
       ],
       "last_reconciled": "2026-11-18",
-      "words": 10199,
+      "words": 10210,
       "url": "https://tech.helloally.ai/#/wiki/platform/concepts.md",
       "skip_reason": ""
     },

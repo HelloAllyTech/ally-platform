@@ -473,7 +473,7 @@ export class PmAgentPipelineStore implements PmPipelineStore {
           `UPDATE "pm_agent_signals" s
               SET status = $1::varchar, "cardId" = $2::uuid, "updatedAt" = now()
              FROM "pm_agent_evidence" e
-            WHERE e.id = ANY($3::uuid[]) AND e.source = 'ux_signals'
+            WHERE e.id = ANY($3::uuid[]) AND e.source IN ('ux_signals', 'dead_code')
               AND s.id::text = e.query->>'signalId' AND s.status = $4::varchar`,
           [PmSignalStatus.USED, card.id, ids, PmSignalStatus.NEW],
         );

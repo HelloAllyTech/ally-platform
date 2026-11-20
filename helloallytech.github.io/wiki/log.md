@@ -11,6 +11,8 @@ This is an append-only log of modifications, updates, and indexing runs performe
 
 ## [2026-11-20] create | `contributing/dead-code.md`: dead-code scan, baseline ratchet and weekly report (`scripts/dead_code.py`).
 
+## [2026-11-20] update | Dead code now feeds the PM Agent: weekly module report → `pm_agent_signals` (`dead_code`) → `code_health` lane card → roadmap ticket on accept.
+
 
 ## [2026-11-18] update | Doc drift fixed: deploy, releases, docs system, ally-be roles — all re-checked against the code.
 

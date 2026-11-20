@@ -3,7 +3,8 @@ name: Dead code
 # Keeps unused code from piling up. Two halves (spec: scripts/dead_code.py):
 #   * PR gate  — fails if the PR ADDS dead code that is not in scripts/dead-code-baseline.json.
 #                Existing debt never blocks anyone; only new debt does.
-#   * Weekly   — keeps one rolling issue with the full list, so cleanup has a visible queue.
+#   * Weekly   — publishes the findings, grouped by module, to the PM Agent, which can turn
+#                a module into a roadmap card. The roadmap is the cleanup queue.
 #
 # Only Python repos are scanned today (vulture). The TypeScript repos (knip) are wired
 # in scripts/dead_code.py but need knip added as a pinned devDependency first; see wiki.
@@ -21,7 +22,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
 
 jobs:
   dead-code:
@@ -45,16 +45,19 @@ jobs:
           cat report-*.md | tee full-report.md >> "$GITHUB_STEP_SUMMARY"
           ! grep -q '=1' status.txt
 
-      - name: Update the rolling issue
+      # Weekly only, and only on the schedule/manual run: a PR never publishes. The report goes
+      # to ally-be, which stores it as PM Agent evidence; the PM Agent's code_health lane may
+      # turn a module into a card, and an admin accepting that card files the roadmap ticket.
+      # Same secret and variable bug-hunt-sweep.yml uses to reach ally-be.
+      - name: Publish modules to the PM Agent
         if: always() && github.event_name != 'pull_request'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ALLY_BE_API_KEY: ${{ secrets.ALLY_BE_API_KEY }}
+          ALLY_BE_API_URL: ${{ vars.ALLY_BE_API_URL }}
         run: |
           set -euo pipefail
-          TITLE="Dead code report"
-          NUM="$(gh issue list --state open --search "$TITLE in:title" --json number --jq '.[0].number // empty')"
-          if [ -n "$NUM" ]; then
-            gh issue edit "$NUM" --body-file full-report.md
-          else
-            gh issue create --title "$TITLE" --body-file full-report.md
+          if [ -z "$ALLY_BE_API_URL" ] || [ -z "$ALLY_BE_API_KEY" ]; then
+            echo "::warning::ALLY_BE_API_URL / ALLY_BE_API_KEY not set; dead code was not published."
+            exit 0
           fi
+          python3 scripts/dead_code.py --publish

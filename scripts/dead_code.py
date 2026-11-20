@@ -14,11 +14,16 @@ So this script does three jobs:
               are known debt; a finding NOT in it is new dead code and fails `--check`.
               The baseline only ever shrinks: clean something up, re-baseline, commit.
   3. REPORT   print a markdown report (what's new, what's old, per-repo counts).
+  4. PUBLISH  group the findings by module and send them to ally-be, which stores them as
+              PM Agent evidence. The PM Agent's code_health lane turns a module into a card;
+              an admin accepting the card files the roadmap ticket. Nothing is filed here.
 
     python3 scripts/dead_code.py                     # report, never fails
     python3 scripts/dead_code.py --check             # exit 1 on new findings (PR gate)
     python3 scripts/dead_code.py --update-baseline   # accept the current state
     python3 scripts/dead_code.py --repo ally-ai      # one repo only
+    python3 scripts/dead_code.py --publish           # weekly: send modules to the PM Agent
+                                                     # (needs ALLY_BE_API_URL + ALLY_BE_API_KEY)
 
 A finding is a candidate, not a verdict: dynamic dispatch (getattr, decorators, DI by
 string, reflection) hides real use from static tools. When a finding is wrong, don't
@@ -34,10 +39,12 @@ from __future__ import annotations
 import argparse
 import fnmatch
 import json
+import os
 import re
 import shutil
 import subprocess
 import sys
+import urllib.request
 from collections import Counter
 from pathlib import Path
 
@@ -140,6 +147,10 @@ def scan(config: dict, only: str | None) -> list[dict]:
     for repo, cfg in config["repos"].items():
         if only and repo != only:
             continue
+        # `enabled: false` = wired but not switched on (the scanner is untuned here).
+        # Naming the repo with --repo still runs it, so it can be tuned.
+        if cfg.get("enabled", True) is False and not only:
+            continue
         found += SCANNERS[cfg["scanner"]](repo, cfg)
     rules = config.get("ignore", [])
     for r in rules:
@@ -177,11 +188,55 @@ def report(found: list[dict], baseline: set[str], only: str | None) -> tuple[str
     return "\n".join(lines) + "\n", new
 
 
+# Mirrors DEAD_CODE_LIMITS in ally-be/src/pm-agent/constants/pm-agent.constants.ts.
+GROUPS_MAX = 400
+ITEMS_MAX = 40
+ITEM_MAX = 200
+GROUP_DEPTH = 4  # repo/app/core/<module>: deep enough to be one PR, shallow enough to be few
+
+
+def group_by_module(found: list[dict], depth: int = GROUP_DEPTH) -> list[dict]:
+    """One group per module directory: the unit that becomes one roadmap ticket."""
+    groups: dict[str, dict] = {}
+    for f in found:
+        key = "/".join(f["path"].split("/")[:-1][:depth]) or f["repo"]
+        g = groups.setdefault(
+            key, {"key": key, "repo": f["repo"], "count": 0, "kinds": Counter(), "items": []}
+        )
+        g["count"] += 1
+        g["kinds"][f["kind"]] += 1
+        g["items"].append(f"{f['kind']} {f['name']} ({f['path']})"[:ITEM_MAX])
+    out = []
+    for g in groups.values():
+        g["kinds"] = dict(g["kinds"])
+        g["items"] = g["items"][:ITEMS_MAX]
+        out.append(g)
+    # Biggest first, so if the cap bites it drops the smallest modules, not the worst.
+    return sorted(out, key=lambda g: (-g["count"], g["key"]))[:GROUPS_MAX]
+
+
+def publish(found: list[dict]) -> None:
+    url = os.environ.get("ALLY_BE_API_URL", "").rstrip("/")
+    key = os.environ.get("ALLY_BE_API_KEY", "")
+    if not url or not key:
+        sys.exit("--publish needs ALLY_BE_API_URL and ALLY_BE_API_KEY in the environment")
+    groups = group_by_module(found)
+    req = urllib.request.Request(
+        f"{url}/api/v1/pm-agent/signals/dead-code",
+        data=json.dumps({"groups": groups}).encode(),
+        headers={"Content-Type": "application/json", "x-api-key": key},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=60) as resp:  # noqa: S310 (our own API)
+        print(f"published {len(groups)} modules to the PM Agent: {resp.read().decode()}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--check", action="store_true", help="exit 1 if there are new findings")
     ap.add_argument("--update-baseline", action="store_true")
     ap.add_argument("--repo", help="scan one repo only")
+    ap.add_argument("--publish", action="store_true", help="send modules to the PM Agent")
     args = ap.parse_args()
 
     config = load_json(CONFIG_PATH, None) or sys.exit(f"missing {CONFIG_PATH}")
@@ -195,6 +250,10 @@ def main() -> int:
             ids |= {i for i in load_json(BASELINE_PATH, []) if not i.startswith(args.repo + "|")}
         BASELINE_PATH.write_text(json.dumps(sorted(ids), indent=1) + "\n")
         print(f"baseline written: {len(ids)} known findings")
+        return 0
+
+    if args.publish:
+        publish(found)
         return 0
 
     text, new = report(found, set(load_json(BASELINE_PATH, [])), args.repo)
