@@ -13,6 +13,7 @@ import {
 import {
   RoleplayBriefSpecialist,
   difficultyFromTaskClass,
+  characterOf,
 } from '../roleplay-brief.specialist';
 import {
   SpecialistContext,
@@ -293,7 +294,7 @@ describe('RoleplayBriefSpecialist', () => {
       });
       const ctx = makeContext('ambivalent, one concern');
       ctx.item.spec.mode = 'learning';
-      ctx.item.spec.characterId = 'char-1';
+      ctx.item.spec.characterId = '3f2b6c1e-8a4d-4f0e-9b7a-2c5d8e1f0a3b';
       ctx.item.completionCriteria = { minScore: 60 };
 
       const { structured } = await specialist.write(ctx);
@@ -317,7 +318,7 @@ describe('RoleplayBriefSpecialist', () => {
           difficulty: 'MEDIUM',
         },
         character: {
-          characterId: 'char-1',
+          characterId: '3f2b6c1e-8a4d-4f0e-9b7a-2c5d8e1f0a3b',
           personaBrief: 'A night-shift nurse',
         },
         gate: { minScore: 60 },
@@ -380,5 +381,32 @@ describe('difficultyFromTaskClass', () => {
     'works in a network hospital',
   ])('names neither axis: %p → null', (taskClass) => {
     expect(difficultyFromTaskClass(taskClass)).toBeNull();
+  });
+});
+
+describe('characterOf', () => {
+  it('keeps a real library id', () => {
+    const id = '3f2b6c1e-8a4d-4f0e-9b7a-2c5d8e1f0a3b';
+    expect(
+      characterOf({ characterId: id, personaBrief: 'Older farmer' }),
+    ).toEqual({
+      characterId: id,
+      personaBrief: 'Older farmer',
+    });
+  });
+
+  it('turns a name written as an id into a hint for a new character', () => {
+    expect(characterOf({ characterId: 'Arjun' })).toEqual({
+      personaBrief: 'The client is called Arjun.',
+    });
+    expect(
+      characterOf({ characterId: 'Arjun', personaBrief: 'A student.' }),
+    ).toEqual({
+      personaBrief: 'A student. The client is called Arjun.',
+    });
+  });
+
+  it('is empty when there is neither', () => {
+    expect(characterOf({})).toEqual({});
   });
 });

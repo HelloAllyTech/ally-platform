@@ -72,7 +72,9 @@ export class RoleplayFitCheckSpecialist {
 
     try {
       const [chosen] = await this.library.characterProfiles([characterId]);
-      if (!chosen) return { characterId };
+      // Gone, or not one this trainer can open: loading it would fail the roleplay, so a new
+      // character is written for the brief instead.
+      if (!chosen) return {};
 
       const candidates = await this.candidates(brief, chosen.id, scope);
       const fitCheck = await this.check(brief, chosen, candidates, scope);

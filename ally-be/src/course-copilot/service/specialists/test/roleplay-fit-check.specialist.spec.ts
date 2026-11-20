@@ -183,12 +183,10 @@ describe('RoleplayFitCheckSpecialist', () => {
     });
   });
 
-  it('passes through a character the trainer can no longer see', async () => {
+  it('drops a character the trainer can no longer see, so a new one is written', async () => {
     characterProfiles.mockResolvedValue([]);
 
-    expect(await specialist.cast(brief(), scope)).toEqual({
-      characterId: 'gowramma',
-    });
+    expect(await specialist.cast(brief(), scope)).toEqual({});
     expect(complete).not.toHaveBeenCalled();
   });
 });

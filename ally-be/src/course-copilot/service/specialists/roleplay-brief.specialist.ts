@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { isUUID } from 'class-validator';
 import { LlmTask } from 'src/learn/enum/llm-task.enum';
 import {
   parseFirstJsonObject,
@@ -404,14 +405,7 @@ export class RoleplayBriefSpecialist {
           : {}),
         difficulty,
       },
-      character: {
-        ...(typeof spec.characterId === 'string' && spec.characterId
-          ? { characterId: spec.characterId }
-          : {}),
-        ...(typeof spec.personaBrief === 'string' && spec.personaBrief.trim()
-          ? { personaBrief: spec.personaBrief.trim() }
-          : {}),
-      },
+      character: characterOf(spec),
       gate: Number.isFinite(minScore) ? { minScore } : {},
       lengthMinutes:
         Number.isFinite(minutes) && minutes > 0
@@ -419,4 +413,25 @@ export class RoleplayBriefSpecialist {
           : DEFAULT_ROLEPLAY_MINUTES,
     };
   }
+}
+
+/**
+ * The slot's character. Only a real library id counts as one: the planner sometimes writes the
+ * client's NAME in `characterId` ("Arjun"), and loading that fails the whole roleplay. A name is
+ * kept as a hint for the new character instead.
+ */
+export function characterOf(spec: Record<string, any>): {
+  characterId?: string;
+  personaBrief?: string;
+} {
+  const id =
+    typeof spec.characterId === 'string' ? spec.characterId.trim() : '';
+  const persona =
+    typeof spec.personaBrief === 'string' ? spec.personaBrief.trim() : '';
+  if (id && isUUID(id)) {
+    return { characterId: id, ...(persona ? { personaBrief: persona } : {}) };
+  }
+  const hint = id ? `The client is called ${id}.` : '';
+  const personaBrief = [persona, hint].filter(Boolean).join(' ');
+  return personaBrief ? { personaBrief } : {};
 }
