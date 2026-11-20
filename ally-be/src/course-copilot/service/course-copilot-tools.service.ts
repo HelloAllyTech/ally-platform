@@ -25,6 +25,10 @@ import { CourseCopilotBriefService } from './course-copilot-brief.service';
 import { CourseCopilotBlueprintService } from './course-copilot-blueprint.service';
 import { CourseCopilotLibraryService } from './course-copilot-library.service';
 import { CourseCopilotLearnerProfileService } from './course-copilot-learner-profile.service';
+import {
+  CourseCopilotExampleCourseService,
+  renderExampleCourse,
+} from './course-copilot-example-course.service';
 import { CourseCopilotSourcesService } from './course-copilot-sources.service';
 import {
   CourseCopilotEditToolsService,
@@ -253,6 +257,28 @@ const INTERVIEW_TOOLS: AgentToolDefinition[] = [
       required: ['id'],
     },
   },
+  {
+    name: 'list_example_courses',
+    description:
+      'Published Ally courses a person chose as models of good design: [{id, title, summary, ' +
+      'sectionCount, itemCount, typeCounts}]. Read one with get_example_course when the trainer ' +
+      'asks what a good course looks like, or to ground a recommendation on shape, length or ' +
+      'components. ' +
+      DATA_NOTE,
+    input_schema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'get_example_course',
+    description:
+      "One example course's outline by id: every section and item in order, with type, title, " +
+      "size and completion rule. Learn its pattern; never copy its titles, characters or topic. " +
+      DATA_NOTE,
+    input_schema: {
+      type: 'object',
+      properties: { id: { type: 'string' } },
+      required: ['id'],
+    },
+  },
   // design_guidance_search / design_guidance_get: Learning Design, through the Context Library.
   ...(contextToolDefinitions(
     COURSE_COPILOT_GUIDANCE_TOOLS,
@@ -321,6 +347,7 @@ export class CourseCopilotToolsService {
     @Optional() private readonly sources?: CourseCopilotSourcesService,
     @Optional()
     private readonly learnerProfiles: CourseCopilotLearnerProfileService = new CourseCopilotLearnerProfileService(),
+    private readonly exampleCourses: CourseCopilotExampleCourseService = new CourseCopilotExampleCourseService(),
   ) {}
 
   /**
@@ -469,6 +496,35 @@ export class CourseCopilotToolsService {
           summary: query
             ? `Matched the learners against the profile library: ${bestMatches[0]?.name ?? 'no close match'}`
             : `Listed ${profiles.length} learner profiles`,
+        };
+      }
+      case 'list_example_courses': {
+        const courses = this.exampleCourses.list();
+        return {
+          modelResult: { ok: true, courses, note: DATA_NOTE },
+          summary: `Listed ${courses.length} example courses`,
+        };
+      }
+      case 'get_example_course': {
+        const course = this.exampleCourses.get(input?.id);
+        if (!course) {
+          return {
+            modelResult: {
+              ok: false,
+              error: 'unknown_example',
+              message: `No example course "${String(input?.id ?? '')}". Ids come from list_example_courses.`,
+              ids: this.exampleCourses.list().map((entry) => entry.id),
+            },
+            summary: 'Example course not found',
+          };
+        }
+        return {
+          modelResult: {
+            ok: true,
+            outline: renderExampleCourse(course),
+            note: DATA_NOTE,
+          },
+          summary: `Read the example course "${course.title}"`,
         };
       }
       case 'get_learner_profile': {

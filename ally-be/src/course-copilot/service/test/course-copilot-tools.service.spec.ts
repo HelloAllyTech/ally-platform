@@ -25,6 +25,8 @@ const INTERVIEW_TOOL_NAMES = [
   'search_sources',
   'list_learner_profiles',
   'get_learner_profile',
+  'list_example_courses',
+  'get_example_course',
   'design_guidance_search',
   'design_guidance_get',
 ];
@@ -441,6 +443,33 @@ describe('CourseCopilotToolsService', () => {
       expect(outcome.modelResult.profile.fullProfile).toContain(
         'Habitual responses',
       );
+    });
+
+    it('list_example_courses and get_example_course read the chosen examples', async () => {
+      const listed = await exec(
+        'list_example_courses',
+        {},
+        session(Status.INTERVIEWING),
+      );
+      expect(listed.modelResult.ok).toBe(true);
+      const [first] = listed.modelResult.courses;
+      const read = await exec(
+        'get_example_course',
+        { id: first.id },
+        session(Status.INTERVIEWING),
+      );
+      expect(read.modelResult.ok).toBe(true);
+      expect(read.modelResult.outline).toContain('Section 1:');
+      const missing = await exec(
+        'get_example_course',
+        { id: 'nope' },
+        session(Status.INTERVIEWING),
+      );
+      expect(missing.modelResult).toMatchObject({
+        ok: false,
+        error: 'unknown_example',
+      });
+      expect(isCourseCopilotLookup('get_example_course')).toBe(true);
     });
 
     it('get_learner_profile soft-fails an unknown id with the valid ids', async () => {

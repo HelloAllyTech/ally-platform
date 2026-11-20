@@ -45,6 +45,8 @@ export const COURSE_COPILOT_LOOKUP_TOOLS = new Set([
   'search_library',
   'list_learner_profiles',
   'get_learner_profile',
+  'list_example_courses',
+  'get_example_course',
   'design_guidance_search',
   'design_guidance_get',
   'get_course_outline',
