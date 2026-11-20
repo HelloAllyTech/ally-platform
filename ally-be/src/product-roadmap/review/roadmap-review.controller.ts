@@ -119,6 +119,50 @@ export class RoadmapReviewController {
   }
 
   @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, VIEW)
+  @Post('items/:code/take-planning')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Take up the plan interview nobody holds (an Owner, or the idea author)',
+  })
+  async takePlanning(
+    @Param('code') code: string,
+    @CurrentUser() user: TokenUser,
+  ) {
+    await this.settings.assertRoadmapV2();
+    return this.reviews.takePlanning(user.id, code);
+  }
+
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, VIEW)
+  @Post('items/:code/release-planning')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Hand the plan interview back, part-way through',
+  })
+  async releasePlanning(
+    @Param('code') code: string,
+    @CurrentUser() user: TokenUser,
+  ) {
+    await this.settings.assertRoadmapV2();
+    return this.reviews.releasePlanning(user.id, code);
+  }
+
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, VIEW)
+  @Post('items/:code/ask-owner-to-plan')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'The author asks the Owners to run the plan interview instead, before it starts',
+  })
+  async askOwnerToPlan(
+    @Param('code') code: string,
+    @CurrentUser() user: TokenUser,
+  ) {
+    await this.settings.assertRoadmapV2();
+    return this.reviews.askOwnerToPlan(user.id, code);
+  }
+
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, VIEW)
   @Post('items/:code/conversation')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

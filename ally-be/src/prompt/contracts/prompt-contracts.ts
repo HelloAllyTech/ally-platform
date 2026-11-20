@@ -553,6 +553,31 @@ export const COURSE_COPILOT_BLUEPRINT_PLANNER = definePrompt(
   },
 );
 
+/** src/prompts/course_copilot/bucket_sort_writer.txt */
+export const COURSE_COPILOT_BUCKET_SORT_WRITER = definePrompt(
+  'course_copilot_bucket_sort_writer',
+  {
+    brief_json: 'optional',
+    bucket_instruction: 'optional',
+    course_characters: 'optional',
+    course_outline: 'optional',
+    helpful_behaviours: 'optional',
+    item_count: 'optional',
+    item_json: 'required',
+    max_buckets: 'optional',
+    objectives: 'optional',
+    unhelpful_behaviours: 'optional',
+  },
+  {
+    name: 'Course Copilot — Bucket Sort Writer',
+    description:
+      "Writes one BUCKET_SORT item: 2-6 buckets (often the brief's rubric categories) and up to 20 items learners are likely to misplace, each with its right bucket and an explanation written for the wrong guess. Practice, never a gate. JSON mode; ids and the key checked in code.",
+    category: 'Course Copilot',
+    runtimes: ['ally-be'],
+    output: 'structured',
+  },
+);
+
 /** src/prompts/course_copilot/course_meta.txt */
 export const COURSE_COPILOT_COURSE_META = definePrompt(
   'course_copilot_course_meta',
@@ -750,6 +775,31 @@ export const COURSE_COPILOT_ROLEPLAY_FIT_CHECK = definePrompt(
     name: 'Course Copilot — Roleplay Fit Check',
     description:
       'Checks whether a saved Character Library character can carry one Course Copilot roleplay: whether who they are (history, openness, how they speak) lets them create the moments and invite the behaviours the roleplay brief needs. Mood and difficulty are set by the roleplay and are not reasons. When the character does not fit, ranks up to two better-fitting library characters. JSON mode.',
+    category: 'Course Copilot',
+    runtimes: ['ally-be'],
+    output: 'structured',
+  },
+);
+
+/** src/prompts/course_copilot/scenario_quiz_writer.txt */
+export const COURSE_COPILOT_SCENARIO_QUIZ_WRITER = definePrompt(
+  'course_copilot_scenario_quiz_writer',
+  {
+    brief_json: 'optional',
+    course_characters: 'optional',
+    course_outline: 'optional',
+    helpful_behaviours: 'optional',
+    item_json: 'required',
+    max_scenes: 'optional',
+    objectives: 'optional',
+    pass_instruction: 'optional',
+    scene_count: 'optional',
+    unhelpful_behaviours: 'optional',
+  },
+  {
+    name: 'Course Copilot — Scenario Quiz Writer',
+    description:
+      "Writes one BRANCHING_SCENARIO item (a Studio scenario quiz) as a scene list: one moment per scene in the person's own voice, 2-6 choices drawn from the brief's helpful and unhelpful behaviours, poor choices leading to recoverable scenes, and endings with an outcome, score and takeaway. JSON mode; the graph is checked in code.",
     category: 'Course Copilot',
     runtimes: ['ally-be'],
     output: 'structured',
@@ -2191,5 +2241,57 @@ export const IMAGE_STUDIO_JUDGE = definePrompt(
     category: 'Image Studio',
     runtimes: ['ally-be'],
     output: 'structured',
+  },
+);
+
+/** src/prompts/blog/authoring_skill.txt */
+export const BLOG_AUTHORING_SKILL = definePrompt(
+  'blog_authoring_skill',
+  {},
+  {
+    name: 'Blog - Authoring skill (overview)',
+    description:
+      'The overview Claude Code reads first when writing for the Ally blog: the three passes (research, compose, review), when to use each alone, and the rules that hold in every pass. Served by the blog_guide tool. Not a model prompt.',
+    category: 'Blog',
+    runtimes: ['ally-be'],
+  },
+);
+
+/** src/prompts/blog/research_skill.txt */
+export const BLOG_RESEARCH_SKILL = definePrompt(
+  'blog_research_skill',
+  {},
+  {
+    name: 'Blog - Pass 1: Research',
+    description:
+      'Pass 1 of writing a blog post: find what is true and what can be said, and produce a research brief (question and reader, claims with evidence, plain words for internal terms, what must stay out, a picture plan). Served by blog_guide with pass research. Not a model prompt.',
+    category: 'Blog',
+    runtimes: ['ally-be'],
+  },
+);
+
+/** src/prompts/blog/compose_skill.txt */
+export const BLOG_COMPOSE_SKILL = definePrompt(
+  'blog_compose_skill',
+  {},
+  {
+    name: 'Blog - Pass 2: Compose',
+    description:
+      'Pass 2 of writing a blog post: write the post and its illustrations from the research brief, in plain words for a reader outside Ally, saying what the thing does and not what it achieves, in the Ally blog design. Served by blog_guide with pass compose. Not a model prompt.',
+    category: 'Blog',
+    runtimes: ['ally-be'],
+  },
+);
+
+/** src/prompts/blog/review_skill.txt */
+export const BLOG_REVIEW_SKILL = definePrompt(
+  'blog_review_skill',
+  {},
+  {
+    name: 'Blog - Pass 3: Review',
+    description:
+      'Pass 3 of writing a blog post: read the saved draft as an outsider, run check_draft, remove unproven claims, retrospective sections and internal words, check the images, fix with update_draft and report. Served by blog_guide with pass review. Not a model prompt.',
+    category: 'Blog',
+    runtimes: ['ally-be'],
   },
 );

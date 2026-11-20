@@ -58,6 +58,9 @@ export enum CourseCopilotJobKind {
   QUIZ = 'quiz',
   JOURNAL = 'journal',
   ANNOTATED_ARTIFACT = 'annotated_artifact',
+  /** A scenario quiz (TrackItemType.BRANCHING_SCENARIO). */
+  BRANCHING_SCENARIO = 'branching_scenario',
+  BUCKET_SORT = 'bucket_sort',
   GAME = 'game',
   VIDEO = 'video',
   ROLEPLAY_NEW = 'roleplay_new',

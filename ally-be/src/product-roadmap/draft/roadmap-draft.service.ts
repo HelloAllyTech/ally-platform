@@ -983,6 +983,19 @@ export class RoadmapDraftService {
           selfChecked,
         },
       });
+      // The nudge: now it is filed, the author may expand it into a plan themselves or leave it
+      // to the Owners. An Owner who files their own idea needs no nudge.
+      if ((await this.roles.roleOf(userId).catch(() => 'none')) !== 'owner') {
+        // `deliver` never throws.
+        await this.inbox.deliver({
+          kind: RoadmapNotificationKind.PLAN_OFFERED,
+          itemId: created.id,
+          sessionId: draft.id,
+          payload: { code: draftCode, title: input.title },
+          directRecipientIds: [userId],
+          onlyDirect: true,
+        });
+      }
       this.broadcast.emit({
         kind: 'ITEM_CHANGED',
         actorId: userId,

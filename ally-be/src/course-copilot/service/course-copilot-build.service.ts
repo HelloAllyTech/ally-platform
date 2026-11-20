@@ -76,6 +76,10 @@ export function jobKindForItem(
       return CourseCopilotJobKind.JOURNAL;
     case TrackItemType.ANNOTATED_ARTIFACT:
       return CourseCopilotJobKind.ANNOTATED_ARTIFACT;
+    case TrackItemType.BRANCHING_SCENARIO:
+      return CourseCopilotJobKind.BRANCHING_SCENARIO;
+    case TrackItemType.BUCKET_SORT:
+      return CourseCopilotJobKind.BUCKET_SORT;
     case TrackItemType.GAME:
       return CourseCopilotJobKind.GAME;
     case TrackItemType.VIDEO:

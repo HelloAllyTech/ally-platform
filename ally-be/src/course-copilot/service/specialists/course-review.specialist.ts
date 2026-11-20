@@ -59,6 +59,7 @@ export class CourseReviewSpecialist {
       task: LlmTask.COURSE_COPILOT_REVIEW,
       maxTokens: SPECIALIST_MAX_TOKENS.REVIEW,
       usageMetadata: input.usageMetadata,
+      referenceMaterial: input.referenceMaterial ?? null,
       variables: {
         brief_json: briefForPrompt(input.brief),
         course_digest: input.courseDigest,

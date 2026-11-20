@@ -76,6 +76,10 @@ export enum PlanEventKind {
   BUILD_MODE_SET = 'build_mode_set',
   /** The builder or an Owner marked the idea Released. detail: { liveAt? }. */
   MARKED_RELEASED = 'marked_released',
+  /** Someone took the plan interview (Owner or the idea's author). detail: { as, resumed? }. */
+  PLAN_CLAIMED = 'plan_claimed',
+  /** The holder handed the plan interview back, unfinished or before starting. detail: { as, started }. */
+  PLAN_RELEASED = 'plan_released',
 }
 
 /** What a plan notification says (plan_notifications.kind). */
@@ -130,6 +134,10 @@ export enum RoadmapNotificationKind {
   COMMENT = 'comment',
   /** Someone answered the planning agent's question: told to the planner. */
   QUESTION_ANSWERED = 'question_answered',
+  /** The author's nudge after submitting: expand it yourself, or ask an Owner to. */
+  PLAN_OFFERED = 'plan_offered',
+  /** The author handed the plan interview to the Owners, before or part-way through. */
+  PLAN_HANDED_OVER = 'plan_handed_over',
 }
 
 /** How closely someone follows one idea (§4.8). */

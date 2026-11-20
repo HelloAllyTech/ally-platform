@@ -1,19 +1,3 @@
-import { DataSource } from 'typeorm';
-import { DEBRIEF_AGENT_KEY } from '../constants/debrief-agent.constants';
-
-/**
- * Asked by the Debrief agent when a learner in a switched-on organisation
- * gets no agent debrief (no draft after its retry, the agent or the
- * roleplay's Debrief tab off, no run started): the session service then
- * writes today's debrief for that session, which it otherwise skips for
- * switched-on organisations.
- */
-export const DEBRIEF_FALLBACK_TO_TODAY_EVENT = 'debrief.fallback_to_today';
-
-export interface DebriefFallbackToTodayEventParams {
-  scenarioSessionId: string;
-}
-
 /**
  * The keys a published live debrief writes into `summary.feedback`
  * (DebriefPublishService). A feedback object holding only these was written
@@ -42,30 +26,4 @@ export function hasLegacyFeedback(
   if (!feedback) return false;
   if (!('debriefGenerator' in feedback)) return true;
   return Object.keys(feedback).some((k) => !DEBRIEF_AGENT_FEEDBACK_KEYS.has(k));
-}
-
-/**
- * Whether the session's organisation is switched on for the Debrief agent
- * (`agent_config_overrides`, layer `org`, key `live`). Read without the
- * debrief module so the session service can ask it without a circular
- * import. Fails to "not live": a read error must leave today's behaviour.
- */
-export async function isDebriefAgentLiveForSession(
-  dataSource: DataSource,
-  scenarioSessionId: string,
-): Promise<boolean> {
-  try {
-    const rows = await dataSource.query(
-      `SELECT 1 FROM agent_config_overrides o
-         JOIN scenario_sessions s ON s.tenant_id = o."scopeId"
-        WHERE s.id = $1
-          AND o."agentKey" = $2 AND o.layer = 'org'
-          AND (o."values"->>'live')::boolean = true
-        LIMIT 1`,
-      [scenarioSessionId, DEBRIEF_AGENT_KEY],
-    );
-    return rows.length > 0;
-  } catch {
-    return false;
-  }
 }

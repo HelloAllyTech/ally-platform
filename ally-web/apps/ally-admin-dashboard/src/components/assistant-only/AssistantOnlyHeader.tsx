@@ -14,11 +14,11 @@ const linkClass =
 /**
  * "Plan and usage" for someone with no Sidebar, so no account menu to find it in: their plan in
  * one line (written by ally-be, never dollars) and the way to the page. Same rule as the account
- * menu's item: only for someone with a plan (a chatbot creator) or a token allowance.
+ * menu's item: only for someone with a plan (a chatbot creator).
  */
 const PlanLink: React.FC = () => {
   const { data } = useGetMyPlanQuery();
-  if (!data || (!data.isCreator && !data.tokens)) return null;
+  if (!data?.isCreator) return null;
   return (
     <>
       {data.plan?.line && (

@@ -2,7 +2,7 @@ import React from "react";
 
 import { PLANS } from "../plansCopy";
 import { UserPlan } from "./UserPlan";
-import { UserTokens } from "./UserTokens";
+import { UserSpend } from "./UserSpend";
 
 const Section: React.FC<{
   title: string;
@@ -20,7 +20,7 @@ const Section: React.FC<{
 );
 
 /**
- * A user's Tokens and Plan (CR1 Parts B and C), on a custom login's page and an Ally admin's page.
+ * A user's Spend and Plan, on a custom login's page and an Ally admin's page.
  * The caller shows these only to holders of `manage_costs`; ally-be checks it too.
  */
 export const UserBillingSections: React.FC<{ userId: number; name: string }> = ({
@@ -28,8 +28,8 @@ export const UserBillingSections: React.FC<{ userId: number; name: string }> = (
   name,
 }) => (
   <>
-    <Section title={PLANS.tokens.title} intro={PLANS.tokens.intro} testId="user-tokens-section">
-      <UserTokens userId={userId} name={name} />
+    <Section title={PLANS.spend.title} intro={PLANS.spend.intro} testId="user-spend-section">
+      <UserSpend userId={userId} name={name} />
     </Section>
     <Section title={PLANS.userPlan.title} intro={PLANS.userPlan.intro} testId="user-plan-section">
       <UserPlan userId={userId} name={name} />

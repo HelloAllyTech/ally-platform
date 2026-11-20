@@ -10,7 +10,8 @@ import { MyPlanController } from './controller/my-plan.controller';
 import { PlanViewService } from './service/plan-view.service';
 import { TokenBalance } from './entity/token-balance.entity';
 import { TokenGrant } from './entity/token-grant.entity';
-import { TokenService } from './service/token.service';
+import { SpendPeriod } from './entity/spend-period.entity';
+import { SpendCapService } from './service/spend-cap.service';
 import { LimitsService } from './service/limits.service';
 import { PlanService } from './service/plan.service';
 import { Plan } from './entity/plan.entity';
@@ -34,7 +35,8 @@ import { UsageEventService } from './service/usage-event.service';
 import { WhatsAppPricingService } from './service/whatsapp-pricing.service';
 
 /**
- * Agents v2 CR1: costs and models (Part A), tokens (Part B), plans and seats (Part C).
+ * Agents v2 CR1: costs and models (Part A), plans and seats (Part C), and the spend cap that
+ * replaced Part B's token allowances (their two tables remain, unread).
  *
  * Global: the engine, the SQS usage processor, the WhatsApp webhook and the setup services all
  * reach it, and importing it from each would tie those modules to each other.
@@ -54,6 +56,7 @@ import { WhatsAppPricingService } from './service/whatsapp-pricing.service';
       BillingAudit,
       TokenGrant,
       TokenBalance,
+      SpendPeriod,
       Plan,
       SeatType,
       Subscription,
@@ -74,7 +77,7 @@ import { WhatsAppPricingService } from './service/whatsapp-pricing.service';
     CostReportService,
     CostAlertService,
     WhatsAppPricingService,
-    TokenService,
+    SpendCapService,
     PlanService,
     LimitsService,
     PlanViewService,
@@ -87,7 +90,7 @@ import { WhatsAppPricingService } from './service/whatsapp-pricing.service';
     CostReportService,
     CostAlertService,
     WhatsAppPricingService,
-    TokenService,
+    SpendCapService,
     PlanService,
     LimitsService,
     PlanViewService,

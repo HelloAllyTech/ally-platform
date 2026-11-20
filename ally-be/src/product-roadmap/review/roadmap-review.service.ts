@@ -375,27 +375,41 @@ export class RoadmapReviewService implements OnModuleDestroy {
   }
 
   /**
-   * Start planning: an Owner expands the idea into a plan, in its one
-   * session (lifecycle 2026-11-18). Only an Owner, and nobody is assigned to
-   * build it by doing so: the Owner plans, closes the plan, and only then
-   * assigns a builder. Starting to plan an idea still waiting for review
-   * accepts it. Idempotent.
+   * Start planning: an Owner — or the idea's author, with the Idea role —
+   * expands the idea into a plan, in its one session (lifecycle 2026-11-18).
+   * Whoever starts holds the interview: it has one holder at a time (`claimPlan`).
+   * Nobody is assigned to build it by doing so: the plan is closed by an Owner,
+   * who then assigns a builder. An Owner starting to plan an idea still waiting
+   * for review accepts it; an author doing so does not, because review stays the
+   * Owner's call. Idempotent.
    */
   async startPlanning(userId: number, code: string): Promise<ItemDetail> {
     const item = await this.reader.detail(userId, code);
     const ref = await this.lookup.get(code);
     const refusal = () =>
-      new ForbiddenException(
-        item.shownStage === 'submitted' || item.shownStage === 'accepted'
-          ? 'Only an Owner expands an idea into a plan.'
-          : 'This idea is past planning.',
-      );
+      item.planHolder && item.planHolder.id !== userId
+        ? new ConflictException(
+            `${item.planHolder.name} is already planning this idea.`,
+          )
+        : new ForbiddenException(
+            item.shownStage === 'submitted' || item.shownStage === 'accepted'
+              ? "Only an Owner, or the idea's author, expands an idea into a plan."
+              : 'This idea is past planning.',
+          );
     if (!ref.builderSessionId && !item.can.startPlanning) throw refusal();
     const session = await this.ensurePlanSession(userId, ref);
     if (session.plan?.planningStarted === true) return item;
     if (!item.can.startPlanning) throw refusal();
 
-    if (item.shownStage === 'submitted') {
+    const asOwner = (await this.roles.roleOf(userId)) === 'owner';
+    // The holder is written first, atomically: two people pressing Start at once get one winner.
+    if (
+      !(await this.claimPlan(session.id, userId, asOwner ? 'owner' : 'author'))
+    ) {
+      throw refusal();
+    }
+
+    if (item.shownStage === 'submitted' && asOwner) {
       // Expanding it into a plan is the Owner taking it on: it is accepted.
       const accepted = await this.dataSource.query(
         `UPDATE "roadmap_opportunities"
@@ -426,6 +440,7 @@ export class RoadmapReviewService implements OnModuleDestroy {
       sessionId: session.id,
       kind: PlanEventKind.PLANNING_STARTED,
       actorUserId: userId,
+      detail: { as: asOwner ? 'owner' : 'author' },
     });
     await this.stage.sync(session.id, userId);
     this.broadcast.emit({
@@ -434,21 +449,179 @@ export class RoadmapReviewService implements OnModuleDestroy {
       code: ref.code,
       fields: ['stage'],
     });
-    await this.ideaNotices
-      .planningStarted({
-        actorUserId: userId,
-        itemId: ref.id,
-        code: ref.code,
-        sessionId: session.id,
-        acceptedNow: item.shownStage === 'submitted',
-      })
-      .catch((e) =>
-        this.logger.warn(`Start planning notice failed: ${String(e)}`),
-      );
+    // The author starting their own idea's interview is not an acceptance: nothing to announce.
+    if (asOwner) {
+      await this.ideaNotices
+        .planningStarted({
+          actorUserId: userId,
+          itemId: ref.id,
+          code: ref.code,
+          sessionId: session.id,
+          acceptedNow: item.shownStage === 'submitted',
+        })
+        .catch((e) =>
+          this.logger.warn(`Start planning notice failed: ${String(e)}`),
+        );
+    }
     // Last: the situation brief is waiting by the time the Owner looks. Fire
     // and forget, so a busy lock or a model failure never fails Start planning.
     this.planTurns?.queueOpeningTurn(session.id, userId, ref.code, item.title);
     return this.reader.detail(userId, code);
+  }
+
+  /**
+   * Take the plan interview back up where it stopped: an Owner (any free interview on the
+   * board) or the idea's author (until they hand it to the Owners). Refused while someone
+   * else holds it. The transcript and PRD are untouched, so the holder carries on from them.
+   */
+  async takePlanning(userId: number, code: string): Promise<ItemDetail> {
+    const item = await this.reader.detail(userId, code);
+    if (!item.can.takePlanning) {
+      if (item.planHolder && item.planHolder.id !== userId) {
+        throw new ConflictException(
+          `${item.planHolder.name} is already planning this idea.`,
+        );
+      }
+      throw new ForbiddenException(
+        'This idea has no plan interview you can take up.',
+      );
+    }
+    const ref = await this.lookup.get(code);
+    const session = await this.planSession(ref.builderSessionId);
+    const as =
+      (await this.roles.roleOf(userId)) === 'owner' ? 'owner' : 'author';
+    if (!(await this.claimPlan(session.id, userId, as))) {
+      throw new ConflictException('Someone just took this interview.');
+    }
+    await this.events.record({
+      sessionId: session.id,
+      kind: PlanEventKind.PLAN_CLAIMED,
+      actorUserId: userId,
+      detail: { as, resumed: true },
+    });
+    this.broadcast.emit({
+      kind: 'ITEM_CHANGED',
+      actorId: userId,
+      code: ref.code,
+      fields: ['stage'],
+    });
+    return this.reader.detail(userId, code);
+  }
+
+  /**
+   * Hand the plan interview back, part-way through. It stays as it is (transcript, PRD,
+   * answers) and is free for an Owner to take. An author doing this hands it to the Owners
+   * and cannot take it again; an Owner doing it just frees it.
+   */
+  async releasePlanning(userId: number, code: string): Promise<ItemDetail> {
+    const item = await this.reader.detail(userId, code);
+    if (!item.can.releasePlanning) {
+      throw new ForbiddenException(
+        'Only whoever is running the plan interview can hand it back.',
+      );
+    }
+    const ref = await this.lookup.get(code);
+    const session = await this.planSession(ref.builderSessionId);
+    const asOwner = (await this.roles.roleOf(userId)) === 'owner';
+    await this.store.patchPlan(session.id, {
+      planClaim: null,
+      ...(asOwner ? {} : { authorPassed: { at: new Date().toISOString() } }),
+    });
+    await this.events.record({
+      sessionId: session.id,
+      kind: PlanEventKind.PLAN_RELEASED,
+      actorUserId: userId,
+      detail: { as: asOwner ? 'owner' : 'author', started: true },
+    });
+    if (!asOwner)
+      await this.tellOwnersHandedOver(userId, ref, session.id, true);
+    this.broadcast.emit({
+      kind: 'ITEM_CHANGED',
+      actorId: userId,
+      code: ref.code,
+      fields: ['stage'],
+    });
+    return this.reader.detail(userId, code);
+  }
+
+  /**
+   * The author, before starting: "I'd rather the Owners run the interview". It removes the
+   * author's own right to start it and tells the Owners.
+   */
+  async askOwnerToPlan(userId: number, code: string): Promise<ItemDetail> {
+    const item = await this.reader.detail(userId, code);
+    if (!item.can.askOwnerToPlan) {
+      throw new ForbiddenException(
+        "Only the idea's author can ask the Owners to plan it, before planning starts.",
+      );
+    }
+    const ref = await this.lookup.get(code);
+    const session = await this.ensurePlanSession(userId, ref);
+    await this.store.patchPlan(session.id, {
+      authorPassed: { at: new Date().toISOString() },
+    });
+    await this.events.record({
+      sessionId: session.id,
+      kind: PlanEventKind.PLAN_RELEASED,
+      actorUserId: userId,
+      detail: { as: 'author', started: false },
+    });
+    await this.tellOwnersHandedOver(userId, ref, session.id, false);
+    this.broadcast.emit({
+      kind: 'ITEM_CHANGED',
+      actorId: userId,
+      code: ref.code,
+      fields: ['stage'],
+    });
+    return this.reader.detail(userId, code);
+  }
+
+  /**
+   * Make `userId` the holder of the plan interview, only if nobody is: a plan that was never
+   * claimed, or whose claim was released. Plans from before claims count their starter as the
+   * holder. One statement, so two simultaneous takers get one winner.
+   */
+  private async claimPlan(
+    sessionId: string,
+    userId: number,
+    as: 'owner' | 'author',
+  ): Promise<boolean> {
+    const claim = JSON.stringify({ userId, as, at: new Date().toISOString() });
+    const result: unknown = await this.dataSource.query(
+      `UPDATE "builder_sessions"
+          SET "plan" = COALESCE("plan", '{}'::jsonb)
+                || jsonb_build_object('planClaim', $2::jsonb),
+              "updatedBy" = $3
+        WHERE id = $1 AND "deletedAt" IS NULL
+          AND (
+            (COALESCE("plan", '{}'::jsonb) ? 'planClaim'
+               AND jsonb_typeof("plan"->'planClaim') = 'null')
+            OR (NOT (COALESCE("plan", '{}'::jsonb) ? 'planClaim')
+               AND COALESCE("plan"->>'planningStartedBy', '') = '')
+          )
+        RETURNING id`,
+      [sessionId, claim, userId],
+    );
+    const rows = Array.isArray((result as unknown[])?.[0])
+      ? (result as unknown[][])[0]
+      : (result as unknown[]);
+    return !!rows?.length;
+  }
+
+  private async tellOwnersHandedOver(
+    userId: number,
+    ref: { id: string; code: string },
+    sessionId: string,
+    started: boolean,
+  ): Promise<void> {
+    // `deliver` never throws.
+    await this.inbox.deliver({
+      kind: RoadmapNotificationKind.PLAN_HANDED_OVER,
+      itemId: ref.id,
+      sessionId,
+      actorUserId: userId,
+      payload: { code: ref.code, byUserId: userId, started },
+    });
   }
 
   /**

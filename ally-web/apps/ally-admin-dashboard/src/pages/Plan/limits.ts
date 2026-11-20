@@ -1,9 +1,13 @@
 /**
  * The plan's refusals (CR1 enforcement). ally-be refuses an owner-side run before any AI call with
- * 403 and one of these codes, and its message is the words to show: "Your tokens are used up. Ask
- * Ally to add more." Screens show that message instead of their generic "something went wrong".
+ * 403 and one of these codes, and its message is the words to show: "Your account has reached this
+ * month's usage limit. Ask Ally to raise it." Screens show that message instead of their generic
+ * "something went wrong".
  */
 export const PLAN_LIMIT_CODES = [
+  "USAGE_CAP_REACHED",
+  // What ally-be sent before the spend cap replaced tokens; kept for one release so the order the
+  // two deploy in doesn't matter.
   "TOKENS_USED_UP",
   "PLAN_OWNER_RUNS_USED_UP",
   "PLAN_PUBLISH_LIMIT",

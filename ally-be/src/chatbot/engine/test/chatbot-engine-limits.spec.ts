@@ -17,7 +17,7 @@ const REASONS: LimitReason[] = [
   'customers',
   'no_seat',
   'seat_messages',
-  'owner_tokens',
+  'owner_cap',
   'owner_runs',
 ];
 
@@ -150,11 +150,12 @@ describe('ChatbotEngineService: limits (CR1)', () => {
     expect(decision.body).toContain('यह सहायक अभी उपलब्ध नहीं है');
   });
 
-  it('owners hear about tokens and plan runs', async () => {
+  it('owners hear about the usage limit and plan runs', async () => {
     expect(
-      (await setup('owner_tokens').engine.respond(setup('owner_tokens').turn()))
-        .body,
-    ).toBe('Your tokens are used up. Ask Ally to add more.');
+      (await setup('owner_cap').engine.respond(setup('owner_cap').turn())).body,
+    ).toBe(
+      "Your account has reached this month's usage limit. Ask Ally to raise it.",
+    );
     const h = setup('owner_runs');
     expect((await h.engine.respond(h.turn())).body).toBe(
       "Your plan's monthly limit for setup and checkups is used up. Ask Ally to upgrade.",

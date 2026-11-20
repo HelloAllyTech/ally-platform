@@ -8,7 +8,7 @@ import {
   OnModuleInit,
   Optional,
 } from '@nestjs/common';
-import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
+import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { AppConfigService } from '../../config/config.service';
@@ -31,7 +31,6 @@ import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constant
 import { DebriefRun } from '../entity/debrief-run.entity';
 import {
   PROVIDER_ALLOWED_KEY,
-  ALLOWLIST_WHEN_UNREADABLE,
   allowlistFromValues,
 } from '../util/debrief-provider-allowlist.util';
 import { GuideSupportLine } from '../../guide/entity/guide-org-profile.entity';
@@ -51,12 +50,7 @@ import { DebriefPublishService } from './debrief-publish.service';
 import { DebriefTrialsService } from './debrief-trials.service';
 import { DebriefReleasesService } from './debrief-releases.service';
 import { DebriefPracticeService } from './debrief-practice.service';
-import {
-  DEBRIEF_FALLBACK_TO_TODAY_EVENT,
-  DebriefFallbackToTodayEventParams,
-  hasLegacyFeedback,
-} from '../../common/util/debrief-live.util';
-import { todaysDebriefProvider } from '../util/debrief-todays-provider.util';
+import { hasLegacyFeedback } from '../../common/util/debrief-live.util';
 import { RUN_STATUS_WRITERS } from '../util/debrief-run-status.util';
 import { cardsForReader } from '../util/debrief-cards.util';
 import { readableCards } from '../util/debrief-competencies.util';
@@ -85,12 +79,6 @@ export const RETRYABLE_SKIP_REASONS: ReadonlySet<string> = new Set([
   'stuck',
   'budget_below_minimum',
   'monthly_cap',
-]);
-/** Skips that are not a missing debrief: nothing to fall back to. */
-const NO_FALLBACK_SKIPS: ReadonlySet<string> = new Set([
-  'too_short',
-  'no_transcript',
-  'no_session',
 ]);
 export const REPUBLISH_AFTER_MINUTES = DEBRIEF_TIMING.republishAfterMinutes;
 const REPUBLISH_BATCH = DEBRIEF_TIMING.republishBatch;
@@ -427,8 +415,6 @@ export class DebriefAgentService implements OnModuleInit {
     @Optional() private readonly holds?: DebriefChangeHoldsService,
     /** v2 K3: a debrief shown with a missed clear risk cue goes to the safety contact. */
     @Optional() private readonly slack?: DebriefSlackService,
-    /** Asks the session service for today's debrief when the agent's cannot be had. */
-    @Optional() private readonly events?: EventEmitter2,
   ) {}
 
   /**
@@ -436,8 +422,8 @@ export class DebriefAgentService implements OnModuleInit {
    * end, a resume, a retry): the learner is told it is ready, the owner is
    * told when it went past the month's budget, and the judge reads it. A
    * live run that ended with no draft is run again once from the start;
-   * one that still has none sends the learner to today's debrief
-   * (Gopi, 2026-11-16: "in the worst case fall back to today's debrief").
+   * one that still has none leaves the learner at "not available" (the
+   * fallback to the old note is retired).
    */
   async afterRun(run: DebriefRun): Promise<DebriefRun> {
     await this.announceReady(run);
@@ -458,16 +444,6 @@ export class DebriefAgentService implements OnModuleInit {
     if (retryPending(run)) {
       const again = await this.retryRun(run);
       if (again) return this.afterRun(again);
-    }
-    if (
-      [
-        DebriefRunStatus.NEEDS_PERSON,
-        DebriefRunStatus.FAILED,
-        DebriefRunStatus.SKIPPED,
-      ].includes(run.status) &&
-      !NO_FALLBACK_SKIPS.has(run.skipReason ?? '')
-    ) {
-      await this.fallBackToToday(run);
     }
     return run;
   }
@@ -562,129 +538,6 @@ export class DebriefAgentService implements OnModuleInit {
   }
 
   /**
-   * Live runs that ended for good with no draft and whose learner was not
-   * sent to today's debrief yet (a restart between the two): sent now.
-   */
-  async fallBackSweep(limit = 20): Promise<number> {
-    const rows: Array<{ id: string }> = await this.dataSource.query(
-      `SELECT id FROM debrief_runs
-        WHERE mode = 'live' AND cards IS NULL
-          AND status IN ($1, $2, $3)
-          AND NOT (coalesce("skipReason", '') = ANY($4::text[]))
-          AND NOT (coalesce(workspace, '{}'::jsonb) ? 'fallbackToToday')
-          AND (status = $3 OR ${retriesSql()} >= $5
-               OR NOT (coalesce("skipReason", '') = ANY($6::text[])))
-          AND "createdAt" >= now() - make_interval(hours => $7)
-        ORDER BY "createdAt" LIMIT $8`,
-      [
-        DebriefRunStatus.NEEDS_PERSON,
-        DebriefRunStatus.FAILED,
-        DebriefRunStatus.SKIPPED,
-        [...NO_FALLBACK_SKIPS],
-        MAX_RETRIES,
-        [...RETRYABLE_SKIP_REASONS],
-        DRAIN_WINDOW_HOURS,
-        limit,
-      ],
-    );
-    let n = 0;
-    for (const { id } of rows ?? []) {
-      const run = await this.runs.findOne({ where: { id } });
-      if (run && !retryPending(run) && (await this.fallBackToToday(run))) n++;
-    }
-    return n;
-  }
-
-  /**
-   * Whether today's debrief may be written for this organisation: its model
-   * runs on a provider the organisation allows (plan §8.9, FR-57: a
-   * learner's data never goes to a provider the organisation does not
-   * allow). Null when the allowlist could not be read: callers fail closed
-   * (nothing is written) but must not record a verdict from a blip.
-   */
-  private async readTodaysAllowance(
-    tenantId: string | null,
-  ): Promise<boolean | null> {
-    const provider = todaysDebriefProvider();
-    if (!provider || !tenantId) return true;
-    try {
-      const row = await this.overrides.get(
-        DEBRIEF_AGENT_KEY,
-        AgentConfigLayer.ORG,
-        tenantId,
-      );
-      return allowlistFromValues(row?.values).includes(provider);
-    } catch {
-      return null;
-    }
-  }
-
-  /**
-   * Whether today's debrief may be written. A failed read allows nothing
-   * (fail closed, as the context repository's allowlist does): the learner
-   * then sees the defined "not available" state, never a stuck one.
-   */
-  async todaysDebriefAllowed(tenantId: string | null): Promise<boolean> {
-    const read = await this.readTodaysAllowance(tenantId);
-    if (read !== null) return read;
-    const provider = todaysDebriefProvider();
-    return !!provider && ALLOWLIST_WHEN_UNREADABLE.includes(provider);
-  }
-
-  /**
-   * The learner gets today's debrief instead of the agent's: the session
-   * service writes it (it skips sessions of switched-on organisations
-   * otherwise). Not when today's debrief runs on a provider the
-   * organisation does not allow: the learner reads "not available". Marked
-   * on the run once (`workspace.fallbackToToday`). True when this call did it.
-   */
-  async fallBackToToday(run: DebriefRun): Promise<boolean> {
-    const read = await this.readTodaysAllowance(run.tenantId ?? null);
-    if (read === null) {
-      // The allowlist could not be read: write nothing and record no verdict, so the next sweep
-      // decides once it can be read (a blip must not mark a learner "not available" for good).
-      this.logger.warn(
-        `[debrief] run ${run.id}: the provider allowlist could not be read; deciding at the next sweep`,
-      );
-      return false;
-    }
-    const allowed = read;
-    const outcome = allowed ? 'today' : 'not_available';
-    const res = await this.dataSource.query(
-      `UPDATE debrief_runs
-          SET workspace = jsonb_set(coalesce(workspace, '{}'::jsonb), '{fallbackToToday}',
-                jsonb_build_object('at', now(), 'outcome', $2::text), true)
-        WHERE id = $1 AND NOT (coalesce(workspace, '{}'::jsonb) ? 'fallbackToToday')
-        RETURNING id`,
-      [run.id, outcome],
-    );
-    const rows = Array.isArray(res?.[0]) ? res[0] : (res ?? []);
-    if (!rows.length) return false;
-    run.workspace = {
-      ...run.workspace,
-      fallbackToToday: { at: new Date().toISOString(), outcome },
-    };
-    this.logger.warn(
-      `[debrief] run ${run.id} session=${run.scenarioSessionId} has no draft (${run.status}${run.skipReason ? `/${run.skipReason}` : ''}): ${allowed ? "today's debrief" : "not available (today's provider is not allowed)"}`,
-    );
-    if (allowed) this.requestTodaysDebrief(run.scenarioSessionId);
-    return true;
-  }
-
-  /** Asks the session service for today's debrief; it skips one already written. */
-  requestTodaysDebrief(sessionId: string): void {
-    try {
-      this.events?.emit(DEBRIEF_FALLBACK_TO_TODAY_EVENT, {
-        scenarioSessionId: sessionId,
-      } as DebriefFallbackToTodayEventParams);
-    } catch (e) {
-      this.logger.warn(
-        `[debrief] could not ask for today's debrief for ${sessionId}: ${(e as Error).message}`,
-      );
-    }
-  }
-
-  /**
    * A live run went past the month's budget (Gopi, 2026-11-16: allowed, so
    * the learner gets their debrief): the owner hears once a day, in the app
    * and on Slack when it is set up, with what has been spent. The day is
@@ -721,10 +574,10 @@ export class DebriefAgentService implements OnModuleInit {
   }
 
   /**
-   * The Slack post for a missed risk cue. The urgent review itself does not depend on it: the run
-   * carries `decision.reviewReason = 'missed_risk_cue'`, which the Console lists first and the
-   * overdue notice follows; and a post that failed here is made again by the safety sweep. So a
-   * failure is logged at error and never stops the run.
+   * The Slack post for a missed risk cue, for the safety contact when the owner has set one. The run
+   * carries `decision.reviewReason = 'missed_risk_cue'` (no urgent review since 2026-11-20: nobody
+   * reviews by hand, the PM agent learns from it); a post that failed here is made again by the
+   * safety sweep. So a failure is logged at error and never stops the run.
    */
   private postMissedRiskCue(run: DebriefRun): void {
     void Promise.resolve(this.slack?.missedRiskCue(run)).catch((e: Error) =>
@@ -776,11 +629,10 @@ export class DebriefAgentService implements OnModuleInit {
         const handed = await this.sweepStuckRuns();
         const shown = await this.showHeldDrafts();
         const retried = await this.retryFailedRuns();
-        const fellBack = await this.fallBackSweep();
         const republished = await this.republishUnapplied();
-        return resumed + handed + shown + retried + fellBack + republished === 0
+        return resumed + handed + shown + retried + republished === 0
           ? 'none stuck'
-          : `${resumed} resumed, ${handed} handed to a person, ${shown} held draft(s) shown, ${retried} retried, ${fellBack} sent to today's debrief, ${republished} published again`;
+          : `${resumed} resumed, ${handed} handed to a person, ${shown} held draft(s) shown, ${retried} retried, ${republished} published again`;
       },
     );
     scheduledTaskRegistry.registerConfigurable('debrief-judge', async () => {
@@ -857,7 +709,7 @@ export class DebriefAgentService implements OnModuleInit {
   async setLive(
     tenantId: string,
     live: boolean,
-    userId: number,
+    userId: number | null,
   ): Promise<void> {
     if (live) await this.requireSupportContact(tenantId);
     await this.overrides.save({
@@ -866,7 +718,8 @@ export class DebriefAgentService implements OnModuleInit {
       scopeId: tenantId,
       schema: DEBRIEF_POLICY,
       // Off is the emergency stop (FR-46): remember when, so learners read
-      // "not available" rather than today's debrief.
+      // "not available" and the organisation is not switched back on by
+      // switchOnNewOrganisations.
       change: live
         ? { set: { live: true }, clear: ['stoppedAt'] }
         : { set: { stoppedAt: Date.now() }, clear: ['live'] },
@@ -1026,10 +879,54 @@ export class DebriefAgentService implements OnModuleInit {
     );
   }
 
+  /**
+   * Every organisation reads the Debrief agent's debrief (the old note is
+   * retired), so one that was never switched either way is switched on here:
+   * new organisations need no step from anyone. Never touches an organisation
+   * with a `live` or `stoppedAt` setting, so an emergency stop (FR-46) stays
+   * a stop, nor a test organisation (`isTestOrganization`), which only runs
+   * once someone switches it on. One outside India with no support line of
+   * its own is left off, as setLive refuses it (FR-25). Says how many.
+   */
+  async switchOnNewOrganisations(limit = 50): Promise<number> {
+    const rows: Array<{ id: string }> = await this.dataSource.query(
+      `SELECT t.id::text AS id
+         FROM tenants t
+        WHERE t."deletedAt" IS NULL
+          AND COALESCE(t."isTestOrganization", false) = false
+          AND NOT EXISTS (
+            SELECT 1 FROM agent_config_overrides o
+             WHERE o."agentKey" = $1 AND o.layer = 'org'
+               AND o."scopeId" = t.id::text
+               AND (o."values" ? 'live' OR o."values" ? 'stoppedAt'))
+        ORDER BY t."createdAt"
+        LIMIT $2`,
+      [DEBRIEF_AGENT_KEY, limit],
+    );
+    let n = 0;
+    for (const { id } of rows ?? []) {
+      try {
+        await this.setLive(id, true, null);
+        n++;
+        this.logger.info(`[debrief] organisation ${id} switched on (new)`);
+      } catch (e) {
+        this.logger.warn(
+          `[debrief] organisation ${id} not switched on: ${(e as Error).message}`,
+        );
+      }
+    }
+    return n;
+  }
+
   /** Start debriefs waiting in switched-on organisations; says what it did, for the run log. */
   async drain(): Promise<string> {
     if (this.config.debriefAgentMode === 'off') return 'Debrief agent is off';
     await this.ensureRelease();
+    await this.switchOnNewOrganisations().catch((e) =>
+      this.logger.warn(
+        `[debrief] could not switch on new organisations: ${(e as Error).message}`,
+      ),
+    );
     // Only switched-on organisations: no automatic shadow runs elsewhere.
     const pending = await this.pendingSessions(
       DRAIN_BATCH,
@@ -1311,12 +1208,10 @@ export class DebriefAgentService implements OnModuleInit {
    *
    * Never stuck (Gopi, 2026-11-16: "as much as possible the learner should
    * get the debrief; in the worst case fall back to today's debrief"):
-   * `working` only while a run is going or about to, `not_available` (the
-   * apps show today's debrief) once there is no draft to wait for — the
-   * agent is off, the roleplay's Debrief tab is off, no run started within
-   * 30 minutes of the session ending, or the run ended with no draft after
-   * its retry. Today's debrief is asked for then; when its provider is not
-   * one the organisation allows, the tab says "not available" instead.
+   * `working` only while a run is going or about to, `not_available` once
+   * there is no draft to wait for — the agent is off, the roleplay's Debrief
+   * tab is off, no run started within 30 minutes of the session ending, or
+   * the run ended with no draft after its retry. Nothing is regenerated.
    */
   async learnerView(
     sessionId: string,
@@ -1370,9 +1265,9 @@ export class DebriefAgentService implements OnModuleInit {
         return { state: 'not_available' };
       }
       // The agent is switched off platform-wide, or the roleplay shows no
-      // Debrief tab: no debrief is coming, so today's.
+      // Debrief tab: no debrief is coming.
       if (this.config.debriefAgentMode === 'off' || s.debrief_tab_off) {
-        return this.unavailable(sessionId, s, run);
+        return this.unavailable();
       }
       // Nothing the learner said: say so now, not "working".
       if (s.learner_turns != null && Number(s.learner_turns) === 0) {
@@ -1391,9 +1286,7 @@ export class DebriefAgentService implements OnModuleInit {
         endedAt !== null &&
         Date.now() - endedAt < NO_RUN_GIVE_UP_MINUTES * 60_000;
       if (!shadowed && stillQueued) return { state: 'working' };
-      return shadowed
-        ? { state: 'not_available' }
-        : this.unavailable(sessionId, s, run);
+      return shadowed ? { state: 'not_available' } : this.unavailable();
     }
     switch (run.status) {
       case DebriefRunStatus.RUNNING:
@@ -1457,7 +1350,7 @@ export class DebriefAgentService implements OnModuleInit {
       case DebriefRunStatus.SKIPPED:
         return run.skipReason === 'too_short'
           ? { state: 'too_short' }
-          : this.unavailable(sessionId, s, run);
+          : this.unavailable();
       default:
         // A draft waiting for a person is shown as it is within minutes
         // (showHeldDrafts): with a risk cue the learner reads "on its way",
@@ -1466,40 +1359,20 @@ export class DebriefAgentService implements OnModuleInit {
           return { state: run.hasRiskCue ? 'on_its_way' : 'taking_longer' };
         }
         // No draft yet: it is being run again once (retryPending), then
-        // the learner gets today's debrief.
+        // the learner reads "not available".
         if (retryPending(run)) return { state: 'working' };
-        return this.unavailable(sessionId, s, run);
+        return this.unavailable();
     }
   }
 
   /**
-   * `not_available`: the apps show today's debrief, which is asked for here
-   * when it has not been written (organisations switched on skip it at
-   * session end). When today's debrief runs on a provider the organisation
-   * does not allow, the tab says "not available" instead (FR-57).
+   * `not_available`: no debrief is coming for this session (the agent or the
+   * roleplay's Debrief tab is off, or the run ended with no draft after its
+   * retry). Nothing is regenerated: the old post-session note is retired, so
+   * the tab says so and a note already written stays readable through the
+   * session itself.
    */
-  private async unavailable(
-    sessionId: string,
-    s: { tenant_id: string | null; feedback: Record<string, unknown> | null },
-    run?: DebriefRun | null,
-  ): Promise<LearnerDebriefView> {
-    if (!(await this.todaysDebriefAllowed(s.tenant_id))) {
-      return {
-        state: 'not_available',
-        stopped: true,
-        reason: 'provider_not_allowed',
-      };
-    }
-    if (!hasLegacyFeedback(s.feedback)) {
-      if (run && run.mode === DebriefRunMode.LIVE) {
-        // Marks the run once; a run already marked asks again only below.
-        if (!(await this.fallBackToToday(run).catch(() => false))) {
-          this.requestTodaysDebrief(sessionId);
-        }
-      } else {
-        this.requestTodaysDebrief(sessionId);
-      }
-    }
+  private unavailable(): LearnerDebriefView {
     return { state: 'not_available' };
   }
 

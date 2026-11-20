@@ -3,22 +3,15 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { useGetMyPlanQuery } from "@api";
-import type { AssistantPlanUsage, MyPlan as MyPlanView, MyTokens } from "@api";
+import type { AssistantPlanUsage, MyPlan as MyPlanView } from "@api";
 import { ROUTES } from "@constants";
 
 import { PLAN } from "./copy";
-import { compactCount, shortDay } from "./format";
+import { usd } from "./format";
 import { Meter, PlanAlertsBanner, SeatList } from "./ui";
 
 import "../AssistantHome/ui/scale.css";
 import "../WhatsAppBot/list-page.css";
-
-/** "1.2M of 2M tokens left · resets 1 Dec", or "Unlimited tokens". */
-export const tokensLine = (tokens: MyTokens): string => {
-  if (tokens.unlimited) return PLAN.tokens.unlimited;
-  const left = PLAN.tokens.left(compactCount(tokens.left), compactCount(tokens.granted));
-  return tokens.resetsOn ? `${left} · ${PLAN.tokens.resets(shortDay(tokens.resetsOn))}` : left;
-};
 
 const shareLink = (chatbotId: string) =>
   `${ROUTES.CHATBOT_DETAIL.replace(":botId", chatbotId)}?section=share`;
@@ -92,15 +85,20 @@ export const MyPlanBody: React.FC<{ plan: MyPlanView }> = ({ plan }) => (
       </p>
     )}
 
-    {plan.tokens && (
-      <section className="ally-plan__card" data-testid="plan-tokens">
-        <h2>{PLAN.tokens.title}</h2>
-        <p className="ally-body" style={{ margin: 0 }}>
-          {tokensLine(plan.tokens)}
+    {plan.isCreator && plan.monthlyUsage && (
+      <section className="ally-plan__card" data-testid="plan-usage">
+        <h2>{PLAN.usage.title}</h2>
+        <div className="ally-plan__meters">
+          <Meter
+            label={PLAN.usage.label}
+            bar={plan.monthlyUsage}
+            format={usd}
+            testId="plan-monthly-usage"
+          />
+        </div>
+        <p className="ally-plan__note" data-testid="plan-usage-note">
+          {plan.capReached ? PLAN.usage.stopped : PLAN.usage.stops}
         </p>
-        {!plan.tokens.unlimited && plan.tokens.left <= 0 && (
-          <p className="ally-plan__note">{PLAN.tokens.usedUp}</p>
-        )}
       </section>
     )}
 
@@ -135,8 +133,9 @@ export const MyPlanBody: React.FC<{ plan: MyPlanView }> = ({ plan }) => (
 );
 
 /**
- * The owner's Plan and usage (CR1 §C3), from the account menu: the plan, tokens left, each
- * assistant's seats and this month's counts as plain bars. **Never dollars.**
+ * The owner's Plan and usage (CR1 §C3), from the account menu: the plan, each assistant's seats
+ * and this month's counts as plain bars. The monthly usage allowance is the one amount in dollars:
+ * what is used of it, when it resets, and that assistants stop answering when it is used up.
  */
 export const MyPlan: React.FC = () => {
   const { data, isLoading, isError } = useGetMyPlanQuery();

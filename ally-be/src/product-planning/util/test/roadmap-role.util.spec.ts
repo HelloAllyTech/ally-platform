@@ -131,6 +131,8 @@ describe('capabilitiesFor (§3.1 matrix)', () => {
         const lower = capabilitiesFor(ROLES[i - 1], rel, it);
         const higher = capabilitiesFor(ROLES[i], rel, it);
         for (const key of KEYS) {
+          // Asking the Owners to plan is asking upward: an Owner has no one to ask.
+          if (key === 'askOwnerToPlan') continue;
           if (lower[key])
             expect([ROLES[i], key, higher[key]]).toEqual([ROLES[i], key, true]);
         }
@@ -493,6 +495,98 @@ describe('capabilitiesFor (§3.1 matrix)', () => {
       submit: true,
     });
     expect(globalCapabilities('viewer').submit).toBe(false);
+  });
+});
+
+describe('the plan interview has one holder at a time', () => {
+  const holder = { ...author, holdsPlanClaim: true };
+  const started = { shownStage: 'planning', planningStarted: true } as const;
+
+  it('offers the author Start planning, and Ask the Owners, before it starts', () => {
+    const c = can('idea', author, { shownStage: 'submitted' });
+    expect(c.startPlanning).toBe(true);
+    expect(c.askOwnerToPlan).toBe(true);
+    expect(c.takePlanning || c.releasePlanning || c.workPlan).toBe(false);
+  });
+
+  it('never offers it to a stranger without the Owner role', () => {
+    for (const role of ['viewer', 'idea', 'builder'] as RoadmapRole[]) {
+      const c = can(role, stranger, { shownStage: 'submitted' });
+      expect([c.startPlanning, c.takePlanning, c.askOwnerToPlan]).toEqual([
+        false,
+        false,
+        false,
+      ]);
+    }
+  });
+
+  it('needs the Idea role: a viewer who authored it is not offered it', () => {
+    expect(
+      can('viewer', author, { shownStage: 'submitted' }).startPlanning,
+    ).toBe(false);
+  });
+
+  it('hides it from everyone else once someone holds it', () => {
+    const held = { ...started, planClaimed: true };
+    for (const [role, rel] of [
+      ['owner', stranger],
+      ['idea', author],
+    ] as [RoadmapRole, RoadmapRelationship][]) {
+      const c = can(role, rel, held);
+      expect([c.startPlanning, c.takePlanning, c.askOwnerToPlan]).toEqual([
+        false,
+        false,
+        false,
+      ]);
+      expect(c.workPlan).toBe(false);
+    }
+    expect(
+      can('owner', stranger, {
+        shownStage: 'accepted',
+        planClaimed: true,
+      }).startPlanning,
+    ).toBe(false);
+  });
+
+  it('lets the holder work it and hand it back, part-way through', () => {
+    const c = can('idea', holder, { ...started, planClaimed: true });
+    expect(c.workPlan).toBe(true);
+    expect(c.releasePlanning).toBe(true);
+    expect(c.takePlanning).toBe(false);
+    expect(c.closePlan).toBe(false);
+  });
+
+  it('lets an Owner take a started interview nobody holds, and work it', () => {
+    const c = can('owner', stranger, started);
+    expect(c.takePlanning).toBe(true);
+    expect(c.workPlan).toBe(true); // an older plan, never claimed
+  });
+
+  it('lets the author take it up again after releasing — until they hand it to the Owners', () => {
+    expect(can('idea', author, started).takePlanning).toBe(true);
+    expect(
+      can('idea', author, { ...started, authorPassed: true }).takePlanning,
+    ).toBe(false);
+    expect(
+      can('idea', author, { shownStage: 'submitted', authorPassed: true })
+        .startPlanning,
+    ).toBe(false);
+    expect(
+      can('owner', stranger, { ...started, authorPassed: true }).takePlanning,
+    ).toBe(true);
+  });
+
+  it('closes the offer once the plan is closed or a builder leads it', () => {
+    for (const over of [{ planClosed: true }, { hasLead: true }]) {
+      const c = can('owner', stranger, { ...started, ...over });
+      expect(c.takePlanning).toBe(false);
+      const a = can('idea', holder, { ...started, planClaimed: true, ...over });
+      expect(a.releasePlanning).toBe(false);
+    }
+  });
+
+  it('keeps the author from asking once planning has started', () => {
+    expect(can('idea', author, started).askOwnerToPlan).toBe(false);
   });
 });
 

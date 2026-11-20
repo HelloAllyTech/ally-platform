@@ -37,6 +37,10 @@ import { CourseCopilotLandingPageService } from './service/course-copilot-landin
 import { CourseCopilotAllyNotesService } from './service/course-copilot-ally-notes.service';
 import { AllyNotesSpecialist } from './service/specialists/ally-notes.specialist';
 import { CourseCopilotLibraryService } from './service/course-copilot-library.service';
+import { CourseCopilotLearnerProfileService } from './service/course-copilot-learner-profile.service';
+import { CourseCopilotExampleCourseService } from './service/course-copilot-example-course.service';
+import { CourseCopilotDesignGuidanceService } from './service/course-copilot-design-guidance.service';
+import { CourseCopilotLearnerResultsService } from './service/course-copilot-learner-results.service';
 import { CourseCopilotMediaService } from './service/course-copilot-media.service';
 import { CourseCopilotOrchestratorService } from './service/course-copilot-orchestrator.service';
 import { CourseCopilotSchedulerRegistrationService } from './service/course-copilot-scheduler-registration.service';
@@ -44,6 +48,8 @@ import { CourseCopilotSessionService } from './service/course-copilot-session.se
 import { CourseCopilotStructureService } from './service/course-copilot-structure.service';
 import { CourseCopilotToolsService } from './service/course-copilot-tools.service';
 import { AnnotationSpecialist } from './service/specialists/annotation.specialist';
+import { ScenarioQuizSpecialist } from './service/specialists/scenario-quiz.specialist';
+import { BucketSortSpecialist } from './service/specialists/bucket-sort.specialist';
 import { ArticleSpecialist } from './service/specialists/article.specialist';
 import { BlueprintPlannerSpecialist } from './service/specialists/blueprint-planner.specialist';
 import { CourseMetaSpecialist } from './service/specialists/course-meta.specialist';
@@ -98,6 +104,10 @@ import { SpecialistLlmService } from './service/specialists/specialist-llm.servi
     CourseCopilotGateway,
     CourseCopilotBriefService,
     CourseCopilotLibraryService,
+    CourseCopilotLearnerProfileService,
+    CourseCopilotExampleCourseService,
+    CourseCopilotDesignGuidanceService,
+    CourseCopilotLearnerResultsService,
     CourseCopilotCostService,
     CourseCopilotStructureService,
     CourseCopilotSessionService,
@@ -118,6 +128,8 @@ import { SpecialistLlmService } from './service/specialists/specialist-llm.servi
     QuizSpecialist,
     JournalSpecialist,
     AnnotationSpecialist,
+    ScenarioQuizSpecialist,
+    BucketSortSpecialist,
     CourseMetaSpecialist,
     CourseReviewSpecialist,
     ImagePromptSpecialist,

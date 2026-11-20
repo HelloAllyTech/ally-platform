@@ -44,7 +44,7 @@ Not assistants, so they stay in `llm_usage` only and show on Costs as one "Other
 **ally-be** (`src/billing/`, a global module):
 - `context/usage-context.ts` (AsyncLocalStorage; `usageHeaders`, `ENDPOINT_USAGE_KIND`), `context/owner-usage.interceptor.ts` (owner routes), `chatbot/engine/engine-usage.ts`.
 - `service/usage-event.service.ts` (prices and records; listeners in the same transaction), `billing-catalogue.service.ts` (models, price versions, WhatsApp rates, settings, fixed costs), `cost-report.service.ts`, `cost-alert.service.ts` (hourly; once a day per subject), `whatsapp-pricing.service.ts`.
-- `service/token.service.ts` (grants, FIFO consumption under a row lock, overdraft, renewals, nightly reconcile).
+- Token allowances (grants, FIFO consumption, overdraft, renewals) were replaced by the spend cap in CR3: `service/spend-cap.service.ts`, see `CHUNK-CR3-NOTES.md`. The token service is gone; its two tables remain, unread.
 - `service/plan.service.ts` (plans, seat types, subscriptions, publish limit, seats, renewals), `limits.service.ts` (every limit before a run; counters), `plan-view.service.ts` (owner and admin views, no dollars).
 - `backfill/billing-backfill.ts` + `npm run billing:backfill`; `user/custom-login/` + `npm run custom-logins:migrate`.
 - Controllers: `v1/admin/billing/*` (manage_costs), `v1/me/plan`, `v1/chatbots/:id/seats` + `publish-use` (chatbot module), `v1/custom-logins` (admin_user_management).
@@ -68,7 +68,7 @@ Not assistants, so they stay in `llm_usage` only and show on Costs as one "Other
 - **Limits fail open.** A counting error lets the message through and logs; a counting outage must not silence assistants.
 - **Customer conversations** count when one starts: no message in the last 24 hours (`customer_activity`, keyed by conversation or sender). A refused first message isn't recorded as activity, so the next one is still "new".
 - **Seats:** owners, then editors, then viewers, then invited emails get the included seats. Extra seats renew on their own date while the subscription is active and lapse otherwise. Included seats lapse only if the subscription is cancelled. `internal` needs no seats.
-- **Tokens** count input + output of every model call on assistants the user created (WhatsApp fees excluded). At zero, runs are refused; one already going may overdraw, taken from the next grant or renewal. The balance moves with the SQS delay (seconds).
+- **Tokens no longer limit anything** (CR3). A creator's cost this period is checked against a dollar cap instead: `CHUNK-CR3-NOTES.md`.
 - **Owner-side runs:** a setup step, a checkup run (not per question), change by chat, Try it, re-indexing (counted, never refused: it's a queue) and site reading (once a day per draft; at the limit the pages are skipped).
 - **Publishing:** live only counts; paused doesn't, but unpausing is checked like publishing. Lowering a plan never unpublishes.
 - **No dollars outside `manage_costs`:** owner and customer replies, `v1/me/plan`, seats and publish-use carry counts only. A web test checks the owner screens render no `$`.

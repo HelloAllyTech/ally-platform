@@ -1,4 +1,3 @@
-import { SCENARIO_SESSION_DEBRIEF_READY_EVENT } from '../../constants/scenario-session-events.constants';
 import { CohortVisibilityService } from 'src/cohort/service/cohort-visibility.service';
 import { TenantFeatureService } from 'src/authorization/service/tenant-feature.service';
 import { ScenarioInteractionMode } from '../../enum/scenario-interaction-mode.enum';
@@ -21,8 +20,6 @@ import { ScenarioSessionEvents } from 'src/learn/entity/scenario-session-events.
 import { ScenarioSessionTurnMetrics } from 'src/learn/entity/scenario-session-turn-metrics.entity';
 import { LearnTurnMetricsData } from 'src/learn/interface/learn-message.interface';
 import { ScenarioSessionBehaviorInstructions } from 'src/learn/entity/scenario-session-behavior-instructions.entity';
-import { ScenarioSessionMessages } from 'src/learn/entity/scenario-session-messages.entity';
-import { ScenarioSessionMessageType } from 'src/learn/enum/scenario-session-message.type.enum';
 import { ScenarioSessionFeedbacks } from 'src/learn/entity/scenario-session-feedbacks.entity';
 import { ScenarioSessionLifecycleEvent } from 'src/learn/entity/scenario-session-lifecycle-event.entity';
 import { ScenarioSessions } from 'src/learn/entity/scenario-sessions.entity';
@@ -35,8 +32,6 @@ import {
   ScenarioSessionCompletionEvent,
   ScenarioSessionLeaderboardEvent,
 } from 'src/learn/type/scenario-session-leaderboard-event.type';
-import { BehaviorInstructionCategory } from 'src/learn/enum/behavior-instruction.enum';
-import { LlmTask } from 'src/learn/enum/llm-task.enum';
 import {
   ScenarioStatus,
   ScenarioDifficultyLevel,
@@ -253,10 +248,7 @@ describe('ScenarioSessionService', () => {
       findByIds: jest.fn(),
     };
 
-    const mockAiService = {
-      getScenarioSessionSummary: jest.fn(),
-      getScenarioSessionEvaluation: jest.fn(),
-    };
+    const mockAiService = {};
 
     const mockPermissionsService = {
       getUserRoles: jest.fn(),
@@ -1458,32 +1450,7 @@ describe('ScenarioSessionService', () => {
       expect(dataSource.transaction).not.toHaveBeenCalled();
     });
 
-    it('withholds feedback and triggers a background re-evaluation when the requested language is not cached', async () => {
-      const row: any = {
-        summary: { feedback: { positives: ['English'] }, language: 'en' },
-      };
-      const repoStub = {
-        findOne: jest.fn().mockResolvedValue(row),
-        save: jest.fn(),
-      };
-      dataSource.transaction.mockImplementation(async (cb: any) =>
-        cb({ getRepository: () => repoStub }),
-      );
-      scenarioSessionMessagesRepository.find.mockResolvedValue([
-        {
-          id: 1,
-          senderId: 1,
-          content: 'hello',
-          startSeconds: 0,
-          endSeconds: 1,
-        },
-      ] as any);
-      aiService.getScenarioSessionEvaluation.mockResolvedValue({
-        positives: [],
-        improvements: [],
-        emotional_movement: [],
-        areas_of_growth: [],
-      } as any);
+    it('serves the stored feedback and generates nothing when the requested language is not cached', async () => {
       scenarioSessionRepository.getScenarioSession.mockResolvedValue(
         endedSession({
           feedback: { positives: ['English'] },
@@ -1498,21 +1465,12 @@ describe('ScenarioSessionService', () => {
         'ta',
       );
 
-      // Feedback withheld so the client keeps polling until the Tamil copy lands.
-      expect((result as any).details.summary.feedback).toBeUndefined();
-      // PENDING slot was reserved.
-      expect(repoStub.save).toHaveBeenCalled();
-      expect(row.summary.translations.ta.status).toBeDefined();
-
-      // The fire-and-forget generation runs the evaluation in the target language.
-      await new Promise((resolve) => setImmediate(resolve));
-      await new Promise((resolve) => setImmediate(resolve));
-      const evalCall = aiService.getScenarioSessionEvaluation.mock.calls[0];
-      expect(evalCall[1]).toBe(false); // need_memory
-      expect(evalCall[5]).toBe('ta'); // languageCode
-      // Attributed to the session, under its own usage label.
-      expect(evalCall[7]).toBe(mockScenarioSessionId);
-      expect(evalCall[8]).toBe(LlmTask.SCENARIO_EVALUATION_LANGUAGE);
+      // The old per-language re-evaluation is retired: no reservation, no AI call.
+      expect((result as any).details.summary.feedback).toEqual({
+        positives: ['English'],
+      });
+      expect(dataSource.transaction).not.toHaveBeenCalled();
+      expect(scenarioSessionMessagesRepository.find).not.toHaveBeenCalled();
     });
   });
 
@@ -1623,52 +1581,10 @@ describe('ScenarioSessionService', () => {
       global.Date = originalDate;
     });
 
-    it('should call getScenarioSessionEvaluation when useScenarioSessionEvaluation is true', async () => {
-      const mockSummaryResponse = {
-        improvements: ['Improve exploration'],
-        positives: ['Good empathy'],
-        sessionGlimpse: 'Client discussed work stress.',
-        cumulativeMemory: '',
-        messageTags: [] as string[],
-        emotionalMovement: [] as string[],
-      };
-      const mockMessages = [
-        {
-          id: 1,
-          scenarioSessionId: mockScenarioSessionId,
-          senderId: 1,
-          messageType: ScenarioSessionMessageType.TEXT,
-          content: 'Hello',
-          startSeconds: 0,
-          endSeconds: 2,
-          tenantId: mockTenantId,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-      ];
-      const mockDetailsSave = jest.fn().mockResolvedValue(undefined);
-      const mockDetailsRepo = {
-        // summary persist is an atomic upsert against the unique
-        // scenarioSessionId index (duplicate-details fix)
-        upsert: mockDetailsSave,
-      };
-      const mockEntityManager = {
-        getRepository: jest.fn(() => mockDetailsRepo),
-      };
-
-      mockConfigService.featureFlag.useScenarioSessionEvaluation = true;
-      scenarioSessionMessagesRepository.find.mockResolvedValue(
-        mockMessages as ScenarioSessionMessages[],
-      );
-      aiService.getScenarioSessionEvaluation.mockResolvedValue(
-        mockSummaryResponse as any,
-      );
-      dataSource.transaction.mockImplementation(async (cb: any) =>
-        cb(mockEntityManager),
-      );
-
+    // The old post-session note is retired: the Debrief agent writes the
+    // learner's debrief, so ending a session only records its duration.
+    it('records the duration and evaluates nothing', async () => {
       scenarioSessionRepository.findOne.mockResolvedValue(mockScenarioSession);
-      scenarioSessionRepository.getScenarioSessionScore.mockResolvedValue(0);
       scenarioSessionRepository.update.mockResolvedValue({
         affected: 1,
       } as any);
@@ -1678,449 +1594,12 @@ describe('ScenarioSessionService', () => {
       await service.endScenarioSession(mockScenarioSessionId, mockCounselorId);
       await new Promise((r) => setImmediate(r));
 
-      expect(aiService.getScenarioSessionEvaluation).toHaveBeenCalled();
-      // The end-of-session debrief keeps the default scenario_evaluation label.
-      expect(
-        aiService.getScenarioSessionEvaluation.mock.calls[0][8],
-      ).toBeUndefined();
-      expect(aiService.getScenarioSessionSummary).not.toHaveBeenCalled();
-      expect(mockDetailsSave).toHaveBeenCalledWith(
-        expect.objectContaining({
-          // No language code on the end call: ally-ai wrote English.
-          summary: { feedback: mockSummaryResponse, language: 'en' },
-        }),
+      expect(scenarioSessionDetailsRepository.upsert).toHaveBeenCalledWith(
+        expect.not.objectContaining({ summary: expect.anything() }),
         { conflictPaths: ['scenarioSessionId'] },
       );
-
-      mockConfigService.featureFlag.useScenarioSessionEvaluation = false;
-    });
-
-    it('should call getScenarioSessionSummary when useScenarioSessionEvaluation is false', async () => {
-      const mockFeedbackResponse = { feedback: 'Summary feedback' };
-      const mockMessages = [
-        {
-          id: 1,
-          scenarioSessionId: mockScenarioSessionId,
-          senderId: 0,
-          messageType: ScenarioSessionMessageType.TEXT,
-          content: 'Client said hi',
-          startSeconds: 0,
-          endSeconds: 1,
-          tenantId: mockTenantId,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-      ];
-      const mockDetailsSave = jest.fn().mockResolvedValue(undefined);
-      const mockDetailsRepo = {
-        // summary persist is an atomic upsert against the unique
-        // scenarioSessionId index (duplicate-details fix)
-        upsert: mockDetailsSave,
-      };
-      const mockEntityManager = {
-        getRepository: jest.fn(() => mockDetailsRepo),
-      };
-
-      mockConfigService.featureFlag.useScenarioSessionEvaluation = false;
-      scenarioSessionMessagesRepository.find.mockResolvedValue(
-        mockMessages as ScenarioSessionMessages[],
-      );
-      aiService.getScenarioSessionSummary.mockResolvedValue(
-        mockFeedbackResponse as any,
-      );
-      dataSource.transaction.mockImplementation(async (cb: any) =>
-        cb(mockEntityManager),
-      );
-
-      scenarioSessionRepository.findOne.mockResolvedValue(mockScenarioSession);
-      scenarioSessionRepository.getScenarioSessionScore.mockResolvedValue(0);
-      scenarioSessionRepository.update.mockResolvedValue({
-        affected: 1,
-      } as any);
-      livekitService.deleteRoom.mockResolvedValue(undefined);
-      simulationCreditsService.consumeCredits.mockResolvedValue(true);
-
-      await service.endScenarioSession(mockScenarioSessionId, mockCounselorId);
-      await new Promise((r) => setImmediate(r));
-
-      expect(aiService.getScenarioSessionSummary).toHaveBeenCalled();
-      expect(aiService.getScenarioSessionEvaluation).not.toHaveBeenCalled();
-      expect(mockDetailsSave).toHaveBeenCalledWith(
-        expect.objectContaining({
-          summary: { feedback: mockFeedbackResponse, language: 'en' },
-        }),
-        { conflictPaths: ['scenarioSessionId'] },
-      );
-    });
-
-    it('should pass enableRecommendations to getScenarioSessionEvaluation', async () => {
-      const mockSummaryResponse = {
-        improvements: [],
-        positives: [],
-        sessionGlimpse: '',
-        cumulativeMemory: '',
-        messageTags: [] as string[],
-        emotionalMovement: [] as string[],
-        areas_of_improvement: [
-          { improvement: 'Improve X', recommendation: 'Do Y' },
-        ],
-      };
-      const mockMessages = [
-        {
-          id: 1,
-          scenarioSessionId: mockScenarioSessionId,
-          senderId: 1,
-          messageType: ScenarioSessionMessageType.TEXT,
-          content: 'Hello',
-          startSeconds: 0,
-          endSeconds: 2,
-          tenantId: mockTenantId,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-      ];
-      const mockDetailsSave = jest.fn().mockResolvedValue(undefined);
-      const mockDetailsRepo = {
-        // summary persist is an atomic upsert against the unique
-        // scenarioSessionId index (duplicate-details fix)
-        upsert: mockDetailsSave,
-      };
-      const mockEntityManager = {
-        getRepository: jest.fn(() => mockDetailsRepo),
-      };
-
-      mockConfigService.featureFlag.useScenarioSessionEvaluation = true;
-      scenarioSessionMessagesRepository.find.mockResolvedValue(
-        mockMessages as ScenarioSessionMessages[],
-      );
-      aiService.getScenarioSessionEvaluation.mockResolvedValue(
-        mockSummaryResponse as any,
-      );
-      dataSource.transaction.mockImplementation(async (cb: any) =>
-        cb(mockEntityManager),
-      );
-
-      scenarioSessionRepository.findOne.mockResolvedValue(mockScenarioSession);
-      scenarioSessionRepository.update.mockResolvedValue({
-        affected: 1,
-      } as any);
-      livekitService.deleteRoom.mockResolvedValue(undefined);
-      simulationCreditsService.consumeCredits.mockResolvedValue(true);
-
-      await service.endScenarioSession(mockScenarioSessionId, mockCounselorId, {
-        enableRecommendations: true,
-      });
-      await new Promise((r) => setImmediate(r));
-
-      expect(aiService.getScenarioSessionEvaluation).toHaveBeenCalledWith(
-        expect.any(Array),
-        false,
-        null,
-        undefined,
-        true,
-        undefined,
-        // Supervisor context for the debrief note. Undefined worker type and
-        // name here because this fixture's session has no resolvable user;
-        // ally-ai falls back to the lay register in that case.
-        expect.objectContaining({ supervisorMemory: null }),
-        mockScenarioSessionId,
-      );
-
-      mockConfigService.featureFlag.useScenarioSessionEvaluation = false;
-    });
-
-    it("should pass the scenario's helpful/unhelpful behaviours to getScenarioSessionEvaluation", async () => {
-      const mockSummaryResponse = {
-        improvements: [],
-        positives: [],
-        sessionGlimpse: '',
-        cumulativeMemory: '',
-        messageTags: [] as string[],
-        emotionalMovement: [] as string[],
-        areas_of_improvement: [],
-      };
-      const mockMessages = [
-        {
-          id: 1,
-          scenarioSessionId: mockScenarioSessionId,
-          senderId: 1,
-          messageType: ScenarioSessionMessageType.TEXT,
-          content: 'Hello',
-          startSeconds: 0,
-          endSeconds: 2,
-          tenantId: mockTenantId,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-      ];
-      const mockDetailsSave = jest.fn().mockResolvedValue(undefined);
-      const mockDetailsRepo = { upsert: mockDetailsSave };
-      const mockEntityManager = {
-        getRepository: jest.fn(() => mockDetailsRepo),
-      };
-
-      mockConfigService.featureFlag.useScenarioSessionEvaluation = true;
-      scenarioSessionMessagesRepository.find.mockResolvedValue(
-        mockMessages as ScenarioSessionMessages[],
-      );
-      aiService.getScenarioSessionEvaluation.mockResolvedValue(
-        mockSummaryResponse as any,
-      );
-      dataSource.transaction.mockImplementation(async (cb: any) =>
-        cb(mockEntityManager),
-      );
-      scenarioSessionRepository.findOne.mockResolvedValue(mockScenarioSession);
-      scenarioSessionRepository.update.mockResolvedValue({
-        affected: 1,
-      } as any);
-      livekitService.deleteRoom.mockResolvedValue(undefined);
-      simulationCreditsService.consumeCredits.mockResolvedValue(true);
-      scenariosRepository.findOne.mockResolvedValue({
-        id: 1,
-        metadata: {},
-      } as any);
-      (dataSource.getRepository as jest.Mock) = jest.fn().mockReturnValue({
-        findOne: jest.fn().mockResolvedValue(null),
-      });
-      scenarioSharedService.getBehaviorInstructionsByScenarioId.mockResolvedValue(
-        [
-          {
-            id: 'instr-1',
-            category: BehaviorInstructionCategory.SHOULD_DO,
-            behaviors: [{ id: 'b1', name: 'Reflects feelings before advice' }],
-            stateInstructions: null,
-          },
-          {
-            id: 'instr-2',
-            category: BehaviorInstructionCategory.SHOULD_NOT_DO,
-            behaviors: [{ id: 'b2', name: 'Interrupts the client' }],
-            stateInstructions: null,
-          },
-        ] as any,
-      );
-
-      await service.endScenarioSession(mockScenarioSessionId, mockCounselorId);
-      await new Promise((r) => setImmediate(r));
-
-      expect(aiService.getScenarioSessionEvaluation).toHaveBeenCalledWith(
-        expect.any(Array),
-        false,
-        null,
-        undefined,
-        undefined,
-        undefined,
-        expect.objectContaining({
-          helpfulBehaviours: ['Reflects feelings before advice'],
-          unhelpfulBehaviours: ['Interrupts the client'],
-        }),
-        mockScenarioSessionId,
-      );
-
-      mockConfigService.featureFlag.useScenarioSessionEvaluation = false;
-    });
-
-    it('leaves behaviours empty when the scenario has none configured', async () => {
-      const mockMessages = [
-        {
-          id: 1,
-          scenarioSessionId: mockScenarioSessionId,
-          senderId: 1,
-          messageType: ScenarioSessionMessageType.TEXT,
-          content: 'Hello',
-          startSeconds: 0,
-          endSeconds: 2,
-          tenantId: mockTenantId,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-      ];
-      const mockEntityManager = {
-        getRepository: jest.fn(() => ({ upsert: jest.fn() })),
-      };
-
-      mockConfigService.featureFlag.useScenarioSessionEvaluation = true;
-      scenarioSessionMessagesRepository.find.mockResolvedValue(
-        mockMessages as ScenarioSessionMessages[],
-      );
-      aiService.getScenarioSessionEvaluation.mockResolvedValue({
-        improvements: [],
-        positives: [],
-        messageTags: [] as string[],
-        emotionalMovement: [] as string[],
-      } as any);
-      dataSource.transaction.mockImplementation(async (cb: any) =>
-        cb(mockEntityManager),
-      );
-      scenarioSessionRepository.findOne.mockResolvedValue(mockScenarioSession);
-      scenarioSessionRepository.update.mockResolvedValue({
-        affected: 1,
-      } as any);
-      livekitService.deleteRoom.mockResolvedValue(undefined);
-      simulationCreditsService.consumeCredits.mockResolvedValue(true);
-      scenariosRepository.findOne.mockResolvedValue({
-        id: 1,
-        metadata: {},
-      } as any);
-      (dataSource.getRepository as jest.Mock) = jest.fn().mockReturnValue({
-        findOne: jest.fn().mockResolvedValue(null),
-      });
-      scenarioSharedService.getBehaviorInstructionsByScenarioId.mockResolvedValue(
-        undefined,
-      );
-
-      await service.endScenarioSession(mockScenarioSessionId, mockCounselorId);
-      await new Promise((r) => setImmediate(r));
-
-      expect(aiService.getScenarioSessionEvaluation).toHaveBeenCalledWith(
-        expect.any(Array),
-        false,
-        null,
-        undefined,
-        undefined,
-        undefined,
-        expect.objectContaining({
-          helpfulBehaviours: [],
-          unhelpfulBehaviours: [],
-        }),
-        mockScenarioSessionId,
-      );
-
-      mockConfigService.featureFlag.useScenarioSessionEvaluation = false;
-    });
-
-    it('should pass languageCode to getScenarioSessionEvaluation', async () => {
-      const mockSummaryResponse = {
-        improvements: [],
-        positives: [],
-        sessionGlimpse: '',
-        cumulativeMemory: '',
-        messageTags: [] as string[],
-        emotionalMovement: [] as string[],
-        areas_of_improvement: [
-          { improvement: 'Improve X', recommendation: 'Do Y' },
-        ],
-      };
-      const mockMessages = [
-        {
-          id: 1,
-          scenarioSessionId: mockScenarioSessionId,
-          senderId: 1,
-          messageType: ScenarioSessionMessageType.TEXT,
-          content: 'Hello',
-          startSeconds: 0,
-          endSeconds: 2,
-          tenantId: mockTenantId,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-      ];
-      const mockDetailsSave = jest.fn().mockResolvedValue(undefined);
-      const mockDetailsRepo = {
-        // summary persist is an atomic upsert against the unique
-        // scenarioSessionId index (duplicate-details fix)
-        upsert: mockDetailsSave,
-      };
-      const mockEntityManager = {
-        getRepository: jest.fn(() => mockDetailsRepo),
-      };
-
-      mockConfigService.featureFlag.useScenarioSessionEvaluation = true;
-      scenarioSessionMessagesRepository.find.mockResolvedValue(
-        mockMessages as ScenarioSessionMessages[],
-      );
-      aiService.getScenarioSessionEvaluation.mockResolvedValue(
-        mockSummaryResponse as any,
-      );
-      dataSource.transaction.mockImplementation(async (cb: any) =>
-        cb(mockEntityManager),
-      );
-
-      scenarioSessionRepository.findOne.mockResolvedValue(mockScenarioSession);
-      scenarioSessionRepository.update.mockResolvedValue({
-        affected: 1,
-      } as any);
-      livekitService.deleteRoom.mockResolvedValue(undefined);
-      simulationCreditsService.consumeCredits.mockResolvedValue(true);
-
-      await service.endScenarioSession(mockScenarioSessionId, mockCounselorId, {
-        enableRecommendations: true,
-        languageCode: 'hi',
-      });
-      await new Promise((r) => setImmediate(r));
-
-      expect(aiService.getScenarioSessionEvaluation).toHaveBeenCalledWith(
-        expect.any(Array),
-        false,
-        null,
-        undefined,
-        true,
-        'hi',
-        expect.objectContaining({ supervisorMemory: null }),
-        mockScenarioSessionId,
-      );
-
-      mockConfigService.featureFlag.useScenarioSessionEvaluation = false;
-    });
-
-    // endScenarioSession has several unguarded entry points (learner-facing
-    // controller, /end-v2v webhook, auto-termination), so a retry used to
-    // re-run a full transcript evaluation on a session that already had
-    // feedback.
-    it('skips summary generation when feedback already exists', async () => {
-      scenarioSessionDetailsRepository.findOne.mockResolvedValue({
-        id: 'details-1',
-        summary: { feedback: { positives: [] } },
-      });
-      scenarioSessionRepository.findOne.mockResolvedValue(mockScenarioSession);
-      scenarioSessionRepository.update.mockResolvedValue({
-        affected: 1,
-      } as any);
-      livekitService.deleteRoom.mockResolvedValue(undefined);
-      simulationCreditsService.consumeCredits.mockResolvedValue(true);
-
-      await service.endScenarioSession(mockScenarioSessionId, mockCounselorId);
-      await new Promise((r) => setImmediate(r));
-
-      expect(aiService.getScenarioSessionEvaluation).not.toHaveBeenCalled();
-      expect(aiService.getScenarioSessionSummary).not.toHaveBeenCalled();
-      // The guard must short-circuit before the transcript is even read.
+      // The transcript is never even read.
       expect(scenarioSessionMessagesRepository.find).not.toHaveBeenCalled();
-    });
-
-    // A row holding only `errorMessage` (no messages / too short / AI failed)
-    // stays retriable — that is what the "Please try again" copy promises.
-    it('regenerates when the stored summary is an error placeholder', async () => {
-      scenarioSessionDetailsRepository.findOne.mockResolvedValue({
-        id: 'details-1',
-        summary: {
-          errorMessage: 'Failed to generate summary. Please try again.',
-        },
-      });
-      scenarioSessionMessagesRepository.find.mockResolvedValue([
-        {
-          id: 1,
-          senderId: mockCounselorId,
-          content: 'hello',
-          startSeconds: 0,
-          endSeconds: 2,
-          tenantId: mockTenantId,
-        },
-      ] as unknown as ScenarioSessionMessages[]);
-      aiService.getScenarioSessionSummary.mockResolvedValue({} as any);
-      dataSource.transaction.mockImplementation(async (cb: any) =>
-        cb({ getRepository: () => ({ upsert: jest.fn() }) }),
-      );
-      scenarioSessionRepository.findOne.mockResolvedValue(mockScenarioSession);
-      scenarioSessionRepository.update.mockResolvedValue({
-        affected: 1,
-      } as any);
-      livekitService.deleteRoom.mockResolvedValue(undefined);
-      simulationCreditsService.consumeCredits.mockResolvedValue(true);
-
-      await service.endScenarioSession(mockScenarioSessionId, mockCounselorId);
-      await new Promise((r) => setImmediate(r));
-
-      expect(scenarioSessionMessagesRepository.find).toHaveBeenCalled();
     });
   });
 
@@ -5087,184 +4566,6 @@ describe('ScenarioSessionService', () => {
     });
   });
 
-  // Two end calls (learner POST + auto-termination / room_finished /
-  // /end-v2v, a client retry, web and mobile) used to both pay for a full
-  // evaluation and both write the learner's supervisor memory, because the
-  // only guard looked for FINISHED feedback. And a summary written without a
-  // language code was stored with no language, so an English viewer triggered
-  // a second, identical evaluation.
-  describe('debrief evaluation — once per session, in its real language', () => {
-    const lockKey = `scenario-session-summary:${mockScenarioSessionId}`;
-    let upsert: jest.Mock;
-    const flush = () => new Promise((r) => setImmediate(r));
-
-    beforeEach(() => {
-      mockConfigService.featureFlag.useScenarioSessionEvaluation = true;
-      scenarioSessionMessagesRepository.find.mockResolvedValue([
-        {
-          id: 1,
-          senderId: mockCounselorId,
-          content: 'Hello',
-          startSeconds: 0,
-          endSeconds: 2,
-          tenantId: mockTenantId,
-        },
-      ] as unknown as ScenarioSessionMessages[]);
-      upsert = jest.fn().mockResolvedValue(undefined);
-      dataSource.transaction.mockImplementation(async (cb: any) =>
-        cb({ getRepository: () => ({ upsert }) }),
-      );
-      scenarioSessionRepository.findOne.mockResolvedValue(mockScenarioSession);
-      scenarioSessionRepository.update.mockResolvedValue({
-        affected: 1,
-      } as any);
-      livekitService.deleteRoom.mockResolvedValue(undefined);
-      simulationCreditsService.consumeCredits.mockResolvedValue(true);
-      aiService.getScenarioSessionEvaluation.mockResolvedValue({
-        positives: ['Warm opening'],
-        emotional_movement: [],
-      } as any);
-    });
-
-    afterEach(() => {
-      mockConfigService.featureFlag.useScenarioSessionEvaluation = false;
-    });
-
-    const persistedSummary = () =>
-      upsert.mock.calls.map(([row]) => row.summary).find(Boolean);
-
-    // v9 FR-4: in an organisation switched on for the Debrief agent, the
-    // learner reads the agent's debrief, so the "debrief ready" event (and the
-    // supervisor memory) come from it; today's debrief only hands back.
-    describe('when the organisation is switched on for the Debrief agent', () => {
-      const liveFor = (live: boolean) =>
-        (dataSource.query as jest.Mock).mockImplementation(
-          async (sql: string) =>
-            String(sql).includes('agent_config_overrides') && live
-              ? [{ x: 1 }]
-              : [],
-        );
-      const emitted = () =>
-        ((service as any).eventEmitter.emit as jest.Mock).mock.calls.map(
-          (c: any[]) => c[0],
-        );
-
-      it('announces the debrief as before when the organisation is not switched on', async () => {
-        liveFor(false);
-        await service.endScenarioSession(
-          mockScenarioSessionId,
-          mockCounselorId,
-        );
-        await flush();
-        expect(emitted()).toContain(SCENARIO_SESSION_DEBRIEF_READY_EVENT);
-      });
-
-      it('does not run today’s debrief, and only records the call duration', async () => {
-        liveFor(true);
-        const detailsUpsert =
-          scenarioSessionDetailsRepository.upsert as jest.Mock;
-        detailsUpsert.mockResolvedValue(undefined);
-        await service.endScenarioSession(
-          mockScenarioSessionId,
-          mockCounselorId,
-        );
-        await flush();
-        expect(aiService.getScenarioSessionEvaluation).not.toHaveBeenCalled();
-        expect(scenarioSessionMessagesRepository.find).not.toHaveBeenCalled();
-        expect(persistedSummary()).toBeUndefined();
-        expect(detailsUpsert).toHaveBeenCalledWith(
-          expect.not.objectContaining({ summary: expect.anything() }),
-          { conflictPaths: ['scenarioSessionId'] },
-        );
-        expect(emitted()).not.toContain(SCENARIO_SESSION_DEBRIEF_READY_EVENT);
-        expect(
-          (service as any).learnerSupervisorMemoryService.recordFromEvaluation,
-        ).not.toHaveBeenCalled();
-      });
-    });
-
-    it('a second end while the first evaluation is in flight pays for nothing', async () => {
-      let finish!: (value: any) => void;
-      aiService.getScenarioSessionEvaluation.mockReturnValue(
-        new Promise((resolve) => (finish = resolve)) as any,
-      );
-
-      await service.endScenarioSession(mockScenarioSessionId, mockCounselorId);
-      await flush();
-      await service.endScenarioSession(mockScenarioSessionId, mockCounselorId);
-      await flush();
-
-      expect(aiService.getScenarioSessionEvaluation).toHaveBeenCalledTimes(1);
-
-      finish({ positives: [], emotional_movement: [], memory_update: 'x' });
-      await flush();
-
-      expect(redisService.releaseLock).toHaveBeenCalledWith(lockKey);
-      expect(heldLocks.has(lockKey)).toBe(false);
-    });
-
-    it('does not read the transcript when another evaluation holds the lock', async () => {
-      heldLocks.add(lockKey);
-
-      await service.endScenarioSession(mockScenarioSessionId, mockCounselorId);
-      await flush();
-
-      expect(scenarioSessionMessagesRepository.find).not.toHaveBeenCalled();
-      expect(aiService.getScenarioSessionEvaluation).not.toHaveBeenCalled();
-      // Not ours to release.
-      expect(redisService.releaseLock).not.toHaveBeenCalled();
-      expect(heldLocks.has(lockKey)).toBe(true);
-    });
-
-    it('releases the lock when the evaluation fails, so the session stays retriable', async () => {
-      aiService.getScenarioSessionEvaluation.mockRejectedValue(
-        new Error('ally-ai timeout'),
-      );
-
-      await service.endScenarioSession(mockScenarioSessionId, mockCounselorId);
-      await flush();
-
-      expect(persistedSummary()).toEqual({
-        errorMessage: 'Failed to generate summary. Please try again.',
-      });
-      expect(redisService.acquireLock).toHaveBeenCalledWith(lockKey, 15 * 60);
-      expect(heldLocks.has(lockKey)).toBe(false);
-    });
-
-    it('still evaluates when Redis is unreachable', async () => {
-      redisService.acquireLock.mockRejectedValue(new Error('redis down'));
-
-      await service.endScenarioSession(mockScenarioSessionId, mockCounselorId);
-      await flush();
-
-      expect(aiService.getScenarioSessionEvaluation).toHaveBeenCalledTimes(1);
-      expect(redisService.releaseLock).not.toHaveBeenCalled();
-    });
-
-    it("records 'en' when the end call carries no language code", async () => {
-      await service.endScenarioSession(mockScenarioSessionId, mockCounselorId);
-      await flush();
-
-      expect(aiService.getScenarioSessionEvaluation.mock.calls[0][5]).toBe(
-        undefined,
-      );
-      expect(persistedSummary()).toEqual(
-        expect.objectContaining({ language: 'en' }),
-      );
-    });
-
-    it('records the requested language when there is one', async () => {
-      await service.endScenarioSession(mockScenarioSessionId, mockCounselorId, {
-        languageCode: 'ta-IN',
-      });
-      await flush();
-
-      expect(persistedSummary()).toEqual(
-        expect.objectContaining({ language: 'ta' }),
-      );
-    });
-  });
-
   describe('getScenarioSession - summary stored without a language', () => {
     const endedSession = (summary: Record<string, any>) =>
       ({
@@ -5295,19 +4596,9 @@ describe('ScenarioSessionService', () => {
         positives: ['English'],
       });
       expect(dataSource.transaction).not.toHaveBeenCalled();
-      expect(aiService.getScenarioSessionEvaluation).not.toHaveBeenCalled();
     });
 
-    it('still re-evaluates for a viewer in another language', async () => {
-      const repoStub = {
-        findOne: jest.fn().mockResolvedValue({
-          summary: { feedback: { positives: ['English'] } },
-        }),
-        save: jest.fn(),
-      };
-      dataSource.transaction.mockImplementation(async (cb: any) =>
-        cb({ getRepository: () => repoStub }),
-      );
+    it('serves a viewer in another language the stored feedback, never regenerating it', async () => {
       scenarioSessionRepository.getScenarioSession.mockResolvedValue(
         endedSession({ feedback: { positives: ['English'] } }),
       );
@@ -5319,8 +4610,10 @@ describe('ScenarioSessionService', () => {
         'hi',
       );
 
-      expect((result as any).details.summary.feedback).toBeUndefined();
-      expect(repoStub.save).toHaveBeenCalled();
+      expect((result as any).details.summary.feedback).toEqual({
+        positives: ['English'],
+      });
+      expect(dataSource.transaction).not.toHaveBeenCalled();
     });
   });
 

@@ -9867,9 +9867,32 @@ export const en = {
     session: {
       startPlanning: "Start planning",
       startPlanningHelp:
-        "Expands this idea into a plan, in its conversation, and accepts it if it was waiting. Only an Owner plans. Nobody builds it until you close the plan and assign a builder.",
+        "Expands this idea into a plan, in its conversation. An Owner starting it also accepts the idea if it was waiting. Only one person runs the interview at a time, and you can hand it over part-way. Nobody builds it until an Owner closes the plan and assigns a builder.",
       planningStarted: "Planning started.",
       startPlanningFailed: "Couldn't start planning.",
+      planInterview: {
+        offerTitle: "Want to expand this idea into a plan?",
+        offerBody:
+          "Complete the plan interview yourself, or ask the product owner to do it. You can hand it over part-way through too.",
+        askOwner: "Ask the product owner",
+        askOwnerHelp:
+          "Tells the Owners you'd like them to run the plan interview. You won't be offered it again.",
+        askOwnerDone: "The product owner has been asked.",
+        askOwnerFailed: "Couldn't ask the product owner.",
+        take: "Continue the plan interview",
+        takeHelp:
+          "Nobody is running this interview now. Taking it up carries on from the conversation and PRD so far. Only one person can run it at a time.",
+        taken: "You're running the plan interview.",
+        takeFailed: "Couldn't take up the plan interview.",
+        release: "Hand over",
+        releaseAuthor: "Hand over to the product owner",
+        releaseHelp: "Frees the interview for an Owner to continue. Everything so far is kept.",
+        releaseAuthorHelp:
+          "Hands the interview to the Owners. Everything so far is kept, and you won't be offered it again.",
+        released: "Handed back.",
+        releaseFailed: "Couldn't hand it back.",
+        heldBy: (name: string) => `${name} is running the plan interview.`,
+      },
       openConversation: "Comment on this idea",
       openConversationHelp:
         "This idea was filed before ideas had a conversation. Opening one lets everyone comment; it changes nothing else.",
@@ -9957,6 +9980,11 @@ export const en = {
         declined: (name: string) => `Declined by ${name}`,
         reopened: (name: string) => `Reopened by ${name}`,
         planningStarted: (name: string) => `${name} started planning`,
+        planClaimed: (name: string) => `${name} took up the plan interview`,
+        planReleased: (name: string, byAuthor: boolean) =>
+          byAuthor
+            ? `${name} handed the plan interview to the Owners`
+            : `${name} handed the plan interview back`,
         planClosed: (name: string) => `${name} closed the plan`,
         planReopened: (name: string) => `${name} reopened the plan`,
         builderAssigned: (by: string, to: string) => `${by} assigned ${to} to build it`,
@@ -10256,6 +10284,9 @@ export const en = {
     why: {
       authorQuestion: (preview: string) => `Plan agent asks you: ${preview}`,
       planReady: "The plan is ready to read",
+      planOffered: "Expand it into a plan yourself, or ask the product owner",
+      planHandedOver: (name: string) =>
+        name ? `${name} handed you the plan interview` : "A plan interview is waiting for an Owner",
       questionAnswered: (name: string) =>
         name ? `${name} answered the agent's question` : "Someone answered the agent's question",
       progress: {
@@ -10270,6 +10301,10 @@ export const en = {
       accepted: (code: string) => `${code} is accepted and being planned`,
       plan_ready: (code: string) => `The plan for ${code} is ready to read`,
       plan_closed: (code: string) => `The plan for ${code} is closed. It waits for a builder`,
+      plan_offered: (code: string) =>
+        `${code} is filed. Want to expand it into a plan, or ask the product owner to?`,
+      plan_handed_over: (code: string) =>
+        `The plan interview for ${code} is free for an Owner to take`,
       comment: (code: string, count: number) =>
         count === 1 ? `New comment on ${code}` : `${count} new comments on ${code}`,
       question_answered: (code: string, name: string) =>
@@ -15517,5 +15552,99 @@ export const en = {
       revokeLabel: (label: string) => `Revoke ${label}`,
       revoked: (label: string) => `${label} revoked`,
     },
+  },
+  blogClaudeConnect: {
+    button: "Connect Claude",
+    title: "Connect Claude",
+    intro: "Lets Claude Code write blog posts as drafts.",
+    introKeys: "A person always publishes them here.",
+    createHeading: "Create a key",
+    labelLabel: "Name it after the machine it's for",
+    labelPlaceholder: "My laptop",
+    create: "Create key",
+    creating: "Creating…",
+    createFailed: "Couldn't create a key. Nothing changed.",
+    newKeyHeading: (label: string) => `Your key for ${label}`,
+    newKeyWarning: "Copy it now. You won't see this key again.",
+    copyKey: "Copy key",
+    copied: "Copied",
+    copyFailed: "Couldn't copy. Select the text and copy it yourself.",
+    done: "I've copied it",
+    testConnection: "Test connection",
+    testing: "Testing…",
+    testHelp: "Checks this key the way Claude Code will use it.",
+    testResult: {
+      reachable: "Connected. Claude Code can write drafts with this key.",
+      refused: "The blog turned this key away. Revoke it, create a new one and test again.",
+      unreachable:
+        "Couldn't reach the blog from here. Check the address in the first line, then test again.",
+    } as Record<"reachable" | "refused" | "unreachable", string>,
+    shellHeading: "Set these in your shell",
+    shellHelp:
+      "Add both lines to your shell profile, then restart Claude Code. Never commit either.",
+    keyPlaceholder: "<your key>",
+    copyCommands: "Copy both lines",
+    keysHeading: "Your keys",
+    noKeys: "No keys yet.",
+    created: (date: string) => `Created ${date}`,
+    lastUsed: (date: string) => `last used ${date}`,
+    neverUsed: "never used",
+    revoke: "Revoke",
+    revokeLabel: (label: string) => `Revoke ${label}`,
+    revoked: (label: string) => `${label} revoked`,
+    revokeFailed: "Couldn't revoke that key. Nothing changed.",
+  },
+  blogPostPreview: {
+    button: "Preview",
+    title: "Preview",
+    draft: "Draft",
+    published: "Published",
+    draftNotice: "Not published yet. Readers cannot see this.",
+    deviceGroup: "Preview width",
+    desktop: "Desktop",
+    mobile: "Mobile",
+    close: "Close",
+    by: "By",
+    untitled: "Untitled post",
+    refresh: "Refresh",
+    refreshing: "Refreshing…",
+    updatedJustNow: "Updated just now",
+    updatedAgo: (seconds: number) =>
+      seconds < 60 ? `Updated ${seconds}s ago` : `Updated ${Math.floor(seconds / 60)} min ago`,
+    refreshFailed: "Could not refresh. Try again.",
+    savedVersionNote: "Showing the saved version",
+  },
+  blogShareReview: {
+    button: "Share for review",
+    rowAction: "Share",
+    title: "Share for review",
+    close: "Close",
+    intro:
+      "Anyone with this link can read this draft and leave suggestions. They do not need to sign in. It stops working when you turn it off or it expires.",
+    publishedNotice: "This post is published and public. Share its public link instead.",
+    linkLabel: "Link",
+    publicLinkLabel: "Public link",
+    copy: "Copy",
+    copied: "Copied",
+    copyFailed: "Could not copy. The link is selected, so you can copy it yourself.",
+    expiryLabel: "Link works for",
+    expiryOption: (days: number) => `${days} days`,
+    create: "Create link",
+    creating: "Creating…",
+    expires: (date: string) => `Works until ${date}`,
+    turnOff: "Turn off link",
+    turnOffConfirm: "Turn this link off? People who have it will no longer see the draft.",
+    turnOffYes: "Yes, turn off",
+    turnOffCancel: "Keep it",
+    extend: "Extend",
+    extendLabel: "Extend by",
+    loadFailed: "Could not load the sharing details.",
+    actionFailed: "That did not work. Nothing changed.",
+    suggestionsHeading: (open: number) => `Suggestions (${open} open)`,
+    noSuggestions: "No suggestions yet. They appear here when someone sends one.",
+    refreshSuggestions: "Refresh",
+    markDone: "Mark as done",
+    reopen: "Reopen",
+    done: "Done",
   },
 };

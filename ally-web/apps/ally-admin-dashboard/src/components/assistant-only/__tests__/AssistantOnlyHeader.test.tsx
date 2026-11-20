@@ -27,7 +27,6 @@ describe("AssistantOnlyHeader", () => {
   beforeEach(() => {
     plan.data = {
       isCreator: true,
-      tokens: null,
       plan: { line: "Free · 1 of 3 assistants published", status: "active" },
     };
   });
@@ -44,15 +43,8 @@ describe("AssistantOnlyHeader", () => {
     expect(screen.getByText("asha@clinic.example")).toBeInTheDocument();
   });
 
-  it("links someone with only a token allowance too", () => {
-    plan.data = { isCreator: false, tokens: { unlimited: false, left: 5, granted: 10 } };
-    renderAt("/assistants");
-    expect(screen.getByRole("link", { name: "Plan and usage" })).toBeInTheDocument();
-    expect(screen.queryByTestId("assistant-only-plan-line")).not.toBeInTheDocument();
-  });
-
-  it("shows nothing about plans to an invited teammate with no plan and no tokens", () => {
-    plan.data = { isCreator: false, tokens: null };
+  it("shows nothing about plans to an invited teammate with no plan", () => {
+    plan.data = { isCreator: false };
     renderAt("/assistants");
     expect(screen.queryByRole("link", { name: "Plan and usage" })).not.toBeInTheDocument();
   });

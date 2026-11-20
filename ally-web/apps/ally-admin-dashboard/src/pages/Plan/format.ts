@@ -24,6 +24,12 @@ export const fullCount = (n: number | null | undefined): string =>
     ? "—"
     : Math.round(n).toLocaleString("en-US");
 
+/** $6.20: the monthly usage allowance, the one amount of money the owner is shown. */
+export const usd = (n: number | null | undefined): string =>
+  n === null || n === undefined || !Number.isFinite(n)
+    ? "—"
+    : `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
 /** "1 Dec" from YYYY-MM-DD or an ISO time, read in UTC as ally-be counts days. */
 export const shortDay = (value: string | null | undefined): string => {
   if (!value) return "—";

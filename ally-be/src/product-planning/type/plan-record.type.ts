@@ -89,6 +89,14 @@ export interface PlanRecord {
   planningStarted?: boolean;
   planningStartedAt?: string | null;
   planningStartedBy?: number | null;
+  /**
+   * Who holds the plan interview right now: one person at a time. Absent on plans from before
+   * claims existed (the reader then treats `planningStartedBy` as the holder); `null` once
+   * released, so nobody holds it.
+   */
+  planClaim?: { userId: number; as: 'owner' | 'author'; at: string } | null;
+  /** The author handed the interview to the Owners: their right to take it is gone. */
+  authorPassed?: { at: string } | null;
   /** Questions whose answers conflict and wait for the settler (P3b), for the read model. */
   openConflicts?: number;
 

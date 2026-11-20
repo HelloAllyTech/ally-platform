@@ -24,6 +24,12 @@ import { COURSE_COPILOT_GUIDANCE_TOOLS } from '../constants/course-copilot-guida
 import { CourseCopilotBriefService } from './course-copilot-brief.service';
 import { CourseCopilotBlueprintService } from './course-copilot-blueprint.service';
 import { CourseCopilotLibraryService } from './course-copilot-library.service';
+import { CourseCopilotLearnerProfileService } from './course-copilot-learner-profile.service';
+import { CourseCopilotLearnerResultsService } from './course-copilot-learner-results.service';
+import {
+  CourseCopilotExampleCourseService,
+  renderExampleCourse,
+} from './course-copilot-example-course.service';
 import { CourseCopilotSourcesService } from './course-copilot-sources.service';
 import {
   CourseCopilotEditToolsService,
@@ -122,11 +128,15 @@ const INTERVIEW_TOOLS: AgentToolDefinition[] = [
     description:
       'JSON-patch the course brief whenever you learn something. Fields: /seed, ' +
       '/audience/{who,priorExperience,applicationContext,groupNote}, /outcomes/terminal, ' +
-      '/outcomes/enabling (array), /competencyIds + /competencyNames (arrays, ids from ' +
+      '/outcomes/enabling (array), /learnerProfileId (id from list_learner_profiles), ' +
+      '/competencyIds + /competencyNames (arrays, ids from ' +
       'list_competencies), /behaviours/{helpful,unhelpful} (arrays of names), ' +
+      '/skillTargets (array of {competencyId?, skill, a: A1|A2|A3|A4, b: B1|B2|B3} — one per ' +
+      'primary skill; append with "/skillTargets/-"), /rubric (array of {skill, ' +
+      'harmfulOrUnhelpful: [], basicHelpful: [], advancedHelpful: []} — the EQUIP groups), ' +
       '/assessment/{kind: roleplay|quiz|annotated_artifact|journal, note, threshold}, ' +
       '/shape/{durationMinutes, sections, practiceWeight: practice-heavy|balanced|reading-heavy, ' +
-      'components (article|video|journal|annotated_artifact|game|quiz), tone, readingLevel, ' +
+      'components (article|video|journal|annotated_artifact|branching_scenario|bucket_sort|game|quiz), tone, readingLevel, ' +
       'languageIds (numeric ids as strings, from get_languages)}, /practice (array of ' +
       '{slot, source: library|new, scenarioId?, caseId?, characterId?, personaBrief?, taskClass, ' +
       'minScore?, triggerWarningIds?, saveCharacter?}), /look/{cover: generate|library|upload-later, ' +
@@ -222,6 +232,66 @@ const INTERVIEW_TOOLS: AgentToolDefinition[] = [
       required: ['query'],
     },
   },
+  {
+    name: 'list_learner_profiles',
+    description:
+      "The Course Design Manual's learner profile library: [{id, number, name, group, oneLine}] " +
+      "for all 19 profiles. Pass query (the trainer's words for their learners) to also get " +
+      'bestMatches. Match the learners to the closest one, then read it with get_learner_profile. ' +
+      DATA_NOTE,
+    input_schema: {
+      type: 'object',
+      properties: { query: { type: 'string' } },
+    },
+  },
+  {
+    name: 'get_learner_profile',
+    description:
+      "One learner profile in full, by id (or the manual's number): its matching notes (who it " +
+      'fits, nearest neighbours), the trainer view (the draft profile to confirm with the ' +
+      'trainer, and its questions) and the full profile (role, background, what they do well, ' +
+      'struggle with, habitual responses, learning needs, language, access). ' +
+      DATA_NOTE,
+    input_schema: {
+      type: 'object',
+      properties: { id: { type: 'string' } },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'list_example_courses',
+    description:
+      'Published Ally courses a person chose as models of good design: [{id, title, summary, ' +
+      'sectionCount, itemCount, typeCounts}]. Read one with get_example_course when the trainer ' +
+      'asks what a good course looks like, or to ground a recommendation on shape, length or ' +
+      'components. ' +
+      DATA_NOTE,
+    input_schema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'get_example_course',
+    description:
+      "One example course's outline by id: every section and item in order, with type, title, " +
+      "size and completion rule. Learn its pattern; never copy its titles, characters or topic. " +
+      DATA_NOTE,
+    input_schema: {
+      type: 'object',
+      properties: { id: { type: 'string' } },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'get_learner_results',
+    description:
+      'What real learners did in THIS course (only once it is published and has learners): per ' +
+      'item, how many reached and completed it, attempts, scores and time; the quiz questions ' +
+      'most missed on first try; roleplay sessions ended early or under the bar and the unhelpful ' +
+      'behaviours most detected; scenario-quiz endings reached; bucket-sort first-try accuracy. ' +
+      "Aggregates for the session's organisation; items with fewer than 5 learners are withheld. " +
+      'Use it before suggesting changes to a live course. ' +
+      DATA_NOTE,
+    input_schema: { type: 'object', properties: {} },
+  },
   // design_guidance_search / design_guidance_get: Learning Design, through the Context Library.
   ...(contextToolDefinitions(
     COURSE_COPILOT_GUIDANCE_TOOLS,
@@ -288,6 +358,11 @@ export class CourseCopilotToolsService {
     private readonly guidance: ContextToolsService,
     private readonly editTools: CourseCopilotEditToolsService,
     @Optional() private readonly sources?: CourseCopilotSourcesService,
+    @Optional()
+    private readonly learnerProfiles: CourseCopilotLearnerProfileService = new CourseCopilotLearnerProfileService(),
+    private readonly exampleCourses: CourseCopilotExampleCourseService = new CourseCopilotExampleCourseService(),
+    @Optional()
+    private readonly learnerResults?: CourseCopilotLearnerResultsService,
   ) {}
 
   /**
@@ -420,6 +495,106 @@ export class CourseCopilotToolsService {
         return {
           modelResult: { ok: true, images },
           summary: `Looked up ${images.length} cover images`,
+        };
+      }
+      case 'list_learner_profiles': {
+        const profiles = this.learnerProfiles.list();
+        const query = input?.query ? String(input.query) : '';
+        const bestMatches = query ? this.learnerProfiles.match(query) : [];
+        return {
+          modelResult: {
+            ok: true,
+            profiles,
+            ...(query ? { bestMatches } : {}),
+            note: DATA_NOTE,
+          },
+          summary: query
+            ? `Matched the learners against the profile library: ${bestMatches[0]?.name ?? 'no close match'}`
+            : `Listed ${profiles.length} learner profiles`,
+        };
+      }
+      case 'get_learner_results': {
+        const trackId = context.session.trackId;
+        if (!trackId || !this.learnerResults) {
+          return {
+            modelResult: {
+              ok: false,
+              error: 'no_course',
+              message: 'There is no course with learners yet: results exist only for a published course.',
+            },
+            summary: 'No learner results yet',
+          };
+        }
+        try {
+          const results = await this.learnerResults.forCourse(
+            trackId,
+            context.session.tenantId,
+          );
+          return {
+            modelResult: {
+              ok: true,
+              results: this.learnerResults.render(results),
+              note: DATA_NOTE,
+            },
+            summary: `Read learner results: ${results.enrolled} learners, ${results.completed} completed`,
+          };
+        } catch (error) {
+          return {
+            modelResult: {
+              ok: false,
+              error: 'results_unavailable',
+              message:
+                'Learner results could not be read just now. This says nothing about how learners did.',
+            },
+            summary: 'Learner results unavailable this turn',
+          };
+        }
+      }
+      case 'list_example_courses': {
+        const courses = this.exampleCourses.list();
+        return {
+          modelResult: { ok: true, courses, note: DATA_NOTE },
+          summary: `Listed ${courses.length} example courses`,
+        };
+      }
+      case 'get_example_course': {
+        const course = this.exampleCourses.get(input?.id);
+        if (!course) {
+          return {
+            modelResult: {
+              ok: false,
+              error: 'unknown_example',
+              message: `No example course "${String(input?.id ?? '')}". Ids come from list_example_courses.`,
+              ids: this.exampleCourses.list().map((entry) => entry.id),
+            },
+            summary: 'Example course not found',
+          };
+        }
+        return {
+          modelResult: {
+            ok: true,
+            outline: renderExampleCourse(course),
+            note: DATA_NOTE,
+          },
+          summary: `Read the example course "${course.title}"`,
+        };
+      }
+      case 'get_learner_profile': {
+        const profile = this.learnerProfiles.get(input?.id);
+        if (!profile) {
+          return {
+            modelResult: {
+              ok: false,
+              error: 'unknown_profile',
+              message: `No learner profile "${String(input?.id ?? '')}". Ids come from list_learner_profiles.`,
+              ids: this.learnerProfiles.list().map((entry) => entry.id),
+            },
+            summary: 'Learner profile not found',
+          };
+        }
+        return {
+          modelResult: { ok: true, profile, note: DATA_NOTE },
+          summary: `Read the learner profile "${profile.name}"`,
         };
       }
       case 'search_sources': {

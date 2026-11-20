@@ -2,10 +2,7 @@ import { SCENARIO_SESSION_DEBRIEF_READY_EVENT } from '../../learn/constants/scen
 import { DebriefRunMode, DebriefRunStatus } from '../enum/debrief-run.enum';
 import { DebriefPublishService } from '../service/debrief-publish.service';
 import { DebriefCards } from '../util/debrief-cards.util';
-import {
-  hasLegacyFeedback,
-  isDebriefAgentLiveForSession,
-} from '../../common/util/debrief-live.util';
+import { hasLegacyFeedback } from '../../common/util/debrief-live.util';
 import {
   areasOfGrowthFromCards,
   claimsFromCards,
@@ -159,17 +156,6 @@ describe('publish write-out (v9 FR-20, FR-42)', () => {
     expect(
       hasLegacyFeedback({ supervisorNote: 'x', emotionalMovement: [] }),
     ).toBe(true);
-  });
-
-  it('reads an organisation as not live when the read fails', async () => {
-    const ds = {
-      query: jest.fn(async () => {
-        throw new Error('down');
-      }),
-    };
-    expect(await isDebriefAgentLiveForSession(ds as any, 's1')).toBe(false);
-    ds.query.mockResolvedValueOnce([{ '?column?': 1 }] as never);
-    expect(await isDebriefAgentLiveForSession(ds as any, 's1')).toBe(true);
   });
 });
 

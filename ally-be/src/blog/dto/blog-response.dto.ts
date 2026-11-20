@@ -29,6 +29,11 @@ export class BlogResponseDto {
   @ApiPropertyOptional()
   authorName?: string | null;
 
+  @ApiPropertyOptional({
+    description: 'Shown with the byline as a mailto link',
+  })
+  authorEmail?: string | null;
+
   @ApiPropertyOptional()
   headerImageUrl?: string | null;
 

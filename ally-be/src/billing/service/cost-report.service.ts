@@ -1,6 +1,10 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { UsageChannel, UsageKind } from '../enum/billing.enum';
+import {
+  DEFAULT_PLAN_KEY,
+  UsageChannel,
+  UsageKind,
+} from '../enum/billing.enum';
 import { microsToUsd } from '../util/pricing.util';
 
 export type CostDimension =
@@ -279,14 +283,22 @@ export class CostReportService {
     );
     const plans: Array<Record<string, string | null>> =
       await this.dataSource.query(
+        // A creator with no subscription is on the default plan, so their cost belongs there too.
         `SELECT p.id, p.key, p.name, p."priceMicros",
-              count(DISTINCT s."userId") FILTER (WHERE s.status = 'active') AS subscribers,
+              count(DISTINCT s."userId") FILTER (WHERE s.status = 'active')
+                + CASE WHEN p.key = $3 THEN
+                    (SELECT count(DISTINCT c.created_by) FROM chatbots c
+                      WHERE c.created_by IS NOT NULL
+                        AND NOT EXISTS (SELECT 1 FROM subscriptions s3 WHERE s3."userId" = c.created_by))
+                  ELSE 0 END AS subscribers,
               coalesce((SELECT sum(e."costMicros") FROM usage_events e
-                          JOIN subscriptions s2 ON s2."userId" = e."creatorUserId"
-                         WHERE s2."planId" = p.id AND e."createdAt" >= $1 AND e."createdAt" < $2), 0) AS cost
+                          LEFT JOIN subscriptions s2 ON s2."userId" = e."creatorUserId"
+                         WHERE e."creatorUserId" IS NOT NULL
+                           AND (s2."planId" = p.id OR (s2.id IS NULL AND p.key = $3))
+                           AND e."createdAt" >= $1 AND e."createdAt" < $2), 0) AS cost
          FROM plans p LEFT JOIN subscriptions s ON s."planId" = p.id
         GROUP BY p.id ORDER BY p."createdAt"`,
-        [period.from, period.to],
+        [period.from, period.to, DEFAULT_PLAN_KEY],
       );
     const seats: Array<Record<string, string | null>> =
       await this.dataSource.query(

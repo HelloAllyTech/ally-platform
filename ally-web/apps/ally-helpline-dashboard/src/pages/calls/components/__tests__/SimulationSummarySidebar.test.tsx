@@ -49,12 +49,11 @@ vi.mock("@components", async importOriginal => {
   const actual = await importOriginal<typeof import("@components")>();
   return {
     ...actual,
-    DebriefTab: ({ sessionId, summaryData, retryMaxReached, readOnly, onOpenMoment }: any) => (
+    DebriefTab: ({ sessionId, summaryData, readOnly, onOpenMoment }: any) => (
       <div
         data-testid="debrief-tab"
         data-read-only={String(!!readOnly)}
         data-has-summary={String(!!summaryData)}
-        data-retry-max={String(retryMaxReached)}
         data-has-open-moment={String(!!onOpenMoment)}
       >
         <div data-testid="debrief-session-id">{sessionId}</div>

@@ -59,6 +59,8 @@ export interface RoadmapRelationship {
   isAuthor: boolean;
   isLead: boolean;
   isWatcher: boolean;
+  /** The caller holds the plan interview right now (see `RoadmapCapabilityItem.planClaimed`). */
+  holdsPlanClaim?: boolean;
 }
 
 /** The facts about one idea that decide what can be done to it. */
@@ -70,6 +72,10 @@ export interface RoadmapCapabilityItem {
   hasPlan: boolean;
   /** Start planning has been pressed (P3b). */
   planningStarted: boolean;
+  /** Someone holds the plan interview: one person at a time. Legacy plans count their starter. */
+  planClaimed?: boolean;
+  /** The author handed the interview to the Owners, so the author may not take it again. */
+  authorPassed?: boolean;
   /** The Owner closed the plan: planning is done and the idea can take a builder. */
   planClosed: boolean;
   /** A technical design is waiting for approval. */
@@ -98,6 +104,12 @@ export interface RoadmapCapabilities {
   review: boolean;
   pickLead: boolean;
   startPlanning: boolean;
+  /** Continue a started plan interview nobody holds now (an Owner, or the author who has not handed it over). */
+  takePlanning: boolean;
+  /** Hand the interview back — the holder, before or part-way through. */
+  releasePlanning: boolean;
+  /** The author, before starting: ask the Owners to run the interview instead. */
+  askOwnerToPlan: boolean;
   settleAnswer: boolean;
   approveDesign: boolean;
   startBuild: boolean;
@@ -137,6 +149,9 @@ export const NO_CAPABILITIES: RoadmapCapabilities = Object.freeze({
   review: false,
   pickLead: false,
   startPlanning: false,
+  takePlanning: false,
+  releasePlanning: false,
+  askOwnerToPlan: false,
   settleAnswer: false,
   approveDesign: false,
   startBuild: false,
@@ -178,8 +193,12 @@ export function globalCapabilities(
  *   to read and comment on, and to vote on (their own included) while it is
  *   in To do.
  * - Submitting puts it in To do (Backlog). From then on only an Owner edits it.
- * - Only an Owner expands it into a plan (Start planning accepts an idea that
- *   was waiting for review), works the plan, and closes the plan.
+ * - An Owner expands it into a plan (Start planning accepts an idea that was
+ *   waiting for review), works the plan, and closes the plan. The idea's author
+ *   (with the Idea role) may take the plan interview too, but it has one holder
+ *   at a time: while someone holds it nobody else is offered it, and the holder
+ *   can hand it back before or part-way through. An author who hands it to the
+ *   Owners cannot take it again. Only an Owner closes the plan.
  * - Only once the plan is closed does an Owner assign a builder; assigning one
  *   is what moves it to Being built. An Owner can change the builder.
  * - After that the assigned builder leads it: how it is built (Builder agent or
@@ -212,6 +231,16 @@ export function capabilitiesFor(
   const leads = owner || (builder && rel.isLead);
   // Build-side calls need someone assigned to build it.
   const builds = item.hasLead && leads;
+  // The plan interview has one holder at a time. An Owner may always take a free one; the
+  // idea's author may too, until they hand it to the Owners.
+  const claimed = item.planClaimed === true;
+  const holds = rel.holdsPlanClaim === true && claimed;
+  const authorMay = idea && rel.isAuthor && item.authorPassed !== true;
+  const planOpen =
+    !item.hasLead &&
+    !item.planClosed &&
+    (stage === 'submitted' || stage === 'accepted' || stage === 'planning');
+  const canClaim = planOpen && !claimed && (owner || authorMay);
 
   return {
     // Votes are open while it is in To do: once a builder is assigned they lock, and the votes
@@ -228,9 +257,18 @@ export function capabilitiesFor(
     // handed to another.
     pickLead: owner && open && (item.planClosed || item.hasLead),
     startPlanning:
-      owner &&
+      canClaim &&
       (stage === 'submitted' || stage === 'accepted') &&
       !item.planningStarted,
+    takePlanning: canClaim && item.planningStarted,
+    releasePlanning: holds && planOpen && item.planningStarted,
+    askOwnerToPlan:
+      authorMay &&
+      !owner &&
+      planOpen &&
+      !claimed &&
+      !item.planningStarted &&
+      (stage === 'submitted' || stage === 'accepted'),
     closePlan: owner && toDo && stage === 'planning' && !item.planClosed,
     reopenPlan: owner && toDo && item.planClosed,
     settleAnswer:
@@ -255,8 +293,13 @@ export function capabilitiesFor(
       stage !== 'submitted' &&
       (owner || (builder && rel.isLead && item.hasLead)),
     // Closing the plan ends planning: reopen it to change the PRD again.
+    // Held by someone: only the holder works it. Not held (older plans): an Owner or the builder.
+    // (An author's interview on an idea still awaiting review runs in the submitted stage.)
     workPlan:
-      stage === 'planning' && item.planningStarted && !item.planClosed && leads,
+      (stage === 'planning' || (stage === 'submitted' && claimed)) &&
+      item.planningStarted &&
+      !item.planClosed &&
+      (claimed ? holds : leads),
   };
 }
 

@@ -1,0 +1,15 @@
+# Writing for the Ally blog: three passes
+
+You are a coding agent writing a post for the Ally blog, usually from a conversation or a piece of work you did with an engineer. Write it in three separate passes. Each pass has its own skill, and each can be used on its own. Call blog_guide with the pass name to read it.
+
+1. **research.** Find out what is true and what can be said. Produce a research brief: the question and the reader, a claims table with evidence, plain words for every internal term, what must stay out, and a plan for the pictures. Write no post text.
+2. **compose.** Write the post and its illustrations from the brief and save it as a draft with create_draft.
+3. **review.** Read the saved draft as a stranger would, run check_draft, fix what fails with update_draft, and report to the person.
+
+Use all three for a new post. Use research alone to prepare, compose alone when the person gives you the facts, and review alone to check or tidy an existing draft.
+
+Rules that hold in every pass:
+- The reader is outside Ally and has never seen our code, tools or team words. Plain words only.
+- Say what the thing does, not what it achieves. No claim that is not proven in the brief.
+- No section about what is not done, what went wrong or lessons learned.
+- Only a person publishes. Never say a post is published.

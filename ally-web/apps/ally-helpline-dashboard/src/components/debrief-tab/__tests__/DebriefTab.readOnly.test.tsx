@@ -78,10 +78,6 @@ vi.mock("../DebriefReplyInput", () => ({
   DebriefReplyInput: () => <div data-testid="reply-input" />,
 }));
 
-vi.mock("../DebriefFeedback", () => ({
-  DebriefFeedback: () => <div data-testid="debrief-feedback" />,
-}));
-
 const NOTE = "You opened well and stayed with her silence.";
 
 const summaryWithNote = () =>
@@ -111,7 +107,7 @@ describe("DebriefTab — readOnly (revisit)", () => {
       <DebriefTab
         sessionId="s-1"
         summaryData={summaryWithNote()}
-        retryMaxReached={false}
+       
         readOnly
       />,
     );
@@ -124,7 +120,7 @@ describe("DebriefTab — readOnly (revisit)", () => {
       <DebriefTab
         sessionId="s-1"
         summaryData={summaryWithNote()}
-        retryMaxReached={false}
+       
         readOnly
       />,
     );
@@ -132,7 +128,6 @@ describe("DebriefTab — readOnly (revisit)", () => {
     expect(screen.queryByText("Why was that a miss?")).not.toBeInTheDocument();
     expect(screen.queryByText(/you moved on/)).not.toBeInTheDocument();
     expect(screen.queryByTestId("reply-input")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("debrief-feedback")).not.toBeInTheDocument();
   });
 
   it("does not even fetch the conversation", () => {
@@ -143,7 +138,7 @@ describe("DebriefTab — readOnly (revisit)", () => {
       <DebriefTab
         sessionId="s-1"
         summaryData={summaryWithNote()}
-        retryMaxReached={false}
+       
         readOnly
       />,
     );
@@ -156,7 +151,7 @@ describe("DebriefTab — readOnly (revisit)", () => {
       <DebriefTab
         sessionId="s-1"
         summaryData={summaryWithNote()}
-        retryMaxReached={false}
+       
         readOnly
       />,
     );
@@ -165,7 +160,7 @@ describe("DebriefTab — readOnly (revisit)", () => {
   });
 });
 
-describe("DebriefTab — full mode (just finished)", () => {
+describe("DebriefTab — old note fallback (new debrief not available)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockChatHistoryQuery.mockReturnValue({ data: undefined, isLoading: false });
@@ -179,14 +174,26 @@ describe("DebriefTab — full mode (just finished)", () => {
     });
   });
 
-  it("shows the thread and the composer, and fetches the history", () => {
-    render(<DebriefTab sessionId="s-1" summaryData={summaryWithNote()} retryMaxReached={false} />);
+  it("shows an old session's note read-only: no rating, no reply composer, no thread", () => {
+    render(<DebriefTab sessionId="s-1" summaryData={summaryWithNote()} />);
 
-    expect(screen.getByTestId("supervisor-note")).toBeInTheDocument();
-    expect(screen.getByText("Why was that a miss?")).toBeInTheDocument();
-    expect(screen.getByTestId("reply-input")).toBeInTheDocument();
-    expect(screen.getByTestId("debrief-feedback")).toBeInTheDocument();
-    expect(mockChatHistoryQuery).toHaveBeenCalledWith({ sessionId: "s-1" }, { skip: false });
+    expect(screen.getByTestId("supervisor-note")).toHaveTextContent(NOTE);
+    expect(screen.queryByTestId("reply-input")).not.toBeInTheDocument();
+    expect(screen.queryByText("Why was that a miss?")).not.toBeInTheDocument();
+    expect(screen.queryByText("postSim.debrief.replyPrompt")).not.toBeInTheDocument();
+    expect(screen.queryByText("postSim.debrief.feedback.question")).not.toBeInTheDocument();
+    expect(mockChatHistoryQuery).toHaveBeenCalledWith({ sessionId: "s-1" }, { skip: true });
+  });
+
+  it("says one calm line when there is no note, never 'generating'", () => {
+    render(<DebriefTab sessionId="s-1" summaryData={undefined} />);
+
+    expect(screen.getByTestId("debrief-none-for-session")).toHaveTextContent(
+      "postSim.debrief.noneForSession",
+    );
+    expect(screen.queryByTestId("supervisor-note")).not.toBeInTheDocument();
+    expect(screen.queryByText("postSim.debrief.generating")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("reply-input")).not.toBeInTheDocument();
   });
 });
 
@@ -236,7 +243,7 @@ describe("DebriefTab — a supervisor on Roleplay Logs (FR-26)", () => {
       <DebriefTab
         sessionId="s-1"
         summaryData={undefined as never}
-        retryMaxReached={false}
+       
         readOnly
       />,
     );
@@ -267,7 +274,7 @@ describe("DebriefTab — a supervisor on Roleplay Logs (FR-26)", () => {
       <DebriefTab
         sessionId="s-1"
         summaryData={undefined as never}
-        retryMaxReached={false}
+       
         readOnly
       />,
     );
@@ -293,7 +300,7 @@ describe("DebriefTab — a supervisor on Roleplay Logs (FR-26)", () => {
         <DebriefTab
           sessionId="s-1"
           summaryData={undefined as never}
-          retryMaxReached={false}
+         
           readOnly
         />,
       );

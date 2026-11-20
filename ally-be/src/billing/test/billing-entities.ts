@@ -9,6 +9,7 @@ import { TokenGrant } from '../entity/token-grant.entity';
 import { UsageEvent } from '../entity/usage-event.entity';
 import { WhatsAppRate } from '../entity/whatsapp-rate.entity';
 import { Plan } from '../entity/plan.entity';
+import { SpendPeriod } from '../entity/spend-period.entity';
 import { Seat } from '../entity/seat.entity';
 import { SeatType } from '../entity/seat-type.entity';
 import { Subscription } from '../entity/subscription.entity';
@@ -26,6 +27,7 @@ export const BILLING_ENTITIES = [
   BillingAudit,
   TokenGrant,
   TokenBalance,
+  SpendPeriod,
   Plan,
   SeatType,
   Subscription,
