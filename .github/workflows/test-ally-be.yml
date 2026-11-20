@@ -97,6 +97,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Typecheck
+        # Outgrew Node's default heap when #315 landed (OOM, exit 134), as the build step
+        # below did on 2026-11-11; the runner has 7 GB.
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
         run: npm run typecheck
       # `nest build` runs the Nest CLI's path-alias compiler hook, which plain
       # `tsc` does not: a `src/…` re-export in a decorated class crashed it
