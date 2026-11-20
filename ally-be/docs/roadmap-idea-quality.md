@@ -6,7 +6,7 @@ enforces it. It is the spec the interview prompt, the checks, the score and the 
 
 Code: `ally-be/src/product-roadmap/constants/product-roadmap.constants.ts` (the numbers),
 `ally-be/src/product-roadmap/util/roadmap-quality.util.ts` (the scoring),
-`ally-be/src/prompts/roadmap/opportunity_copilot.txt` (how the agent interviews),
+the `roadmap_opportunity_copilot` prompt (how the agent interviews; live text in the Skills Store),
 `ally-be/src/product-roadmap/draft/roadmap-draft.util.ts` (`submitBlock`, the draft-side gate).
 
 ## 1. What a good idea is
@@ -129,9 +129,12 @@ The agent (prompt `roadmap_opportunity_copilot`) is a coach, not a gatekeeper:
   drafts have been graded; look at the distribution of scores of ideas the Owners accept and decline.
 - **Adding a gate changes the criteria fingerprint**, which invalidates readiness tokens in flight and
   re-opens the new checks on existing drafts. That is intended: open drafts need one more interview turn.
-- **The prompt text is live in the Skills Store.** The `.txt` is only the default. After deploying,
-  publish the new `roadmap_opportunity_copilot` text with the `prompts` CLI, or the old interview keeps
-  running against the new gates (see [`prompts-api.md`](prompts-api.md)). The prompt adds no variables,
-  so the deploy-before-publish ordering rule does not bite.
+- **The interview prompt is published through the Skills Store, not Git.** This change does not touch
+  `src/prompts/roadmap/opportunity_copilot.txt` (the default). Until the new `roadmap_opportunity_copilot`
+  text is published with the `prompts` CLI (see [`prompts-api.md`](prompts-api.md)), the old interview runs
+  against the new gates: the checks, the quality dimensions and the slice rules still reach it through the
+  system context and the `submit_turn` schema, and the server still grades fail-closed, but it does not
+  know the coaching method, the dimension anchors or when to propose slices, so fewer ideas will pass. The
+  prompt adds no variables, so the deploy-before-publish ordering rule does not bite.
 - **A live prompt row can pin a model** (see the note on `ROADMAP_PROMPT_CODES.OPPORTUNITY_COPILOT`); check
   the row after publishing.
