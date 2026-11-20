@@ -34,6 +34,7 @@ import type { PlanIdeaState } from 'src/product-planning/type/plan-record.type';
 import {
   ROADMAP_FILEABLE_EFFORTS,
   ROADMAP_LIMITS,
+  ROADMAP_SLICES,
 } from '../constants/product-roadmap.constants';
 import { CreateOpportunityDto } from '../dto/roadmap-opportunity.dto';
 import { RoadmapOpportunityEffort } from '../enum/roadmap-opportunity.enum';
@@ -72,6 +73,7 @@ import {
   DraftProposal,
   firstLine,
   QuotableAnswer,
+  submitBlock,
   verifiedEvidence,
 } from './roadmap-draft.util';
 
@@ -127,6 +129,14 @@ export interface DraftDetail {
   textMax?: number;
   proposal?: DraftProposal | null;
   brief?: RoadmapOpportunityBrief | null;
+  /** The quality grade from the last interview turn; null before the first. */
+  quality?: PlanIdeaState['quality'];
+  /** The interview's proposed split of a too-big idea; [] when none. */
+  slices?: NonNullable<PlanIdeaState['slices']>;
+  /** Drafts created from this one by Split; [] when it was not split. */
+  splitInto?: NonNullable<PlanIdeaState['splitInto']>;
+  /** The draft this one was split from. */
+  splitFrom?: string | null;
 }
 
 export interface DraftRow {
@@ -518,6 +528,14 @@ export class RoadmapDraftService {
             }
           : null,
         readinessToken: result.readinessToken ?? null,
+        quality: result.quality ?? null,
+        // A slice is signed afresh when it is submitted; its turn token expires in minutes.
+        slices: (result.slices ?? []).map((sl) => ({
+          title: sl.title ?? null,
+          description: sl.description,
+          effort: sl.effort as string,
+          productGoal: sl.productGoal ?? null,
+        })),
         lastTurnAt: new Date().toISOString(),
         evidence: verifiedEvidence(
           result.checkTurn?.evidence ?? {},
@@ -566,6 +584,94 @@ export class RoadmapDraftService {
     throw new GoneException(
       'Filling the checks in yourself was removed: a draft is ready once the idea agent has interviewed it. Try Check my idea again.',
     );
+  }
+
+  /**
+   * Split: turn the interview's proposed slices of a too-big idea into sibling drafts, each
+   * already through the interview (the same checks and quality grade, its own size, goal and
+   * words), so the author submits each to the board on its own. This is how ONE interview ends
+   * in several ideas. The author's call, not a side effect of a turn.
+   *
+   * Idempotent: a draft that was already split answers with its children, and a claim on the
+   * session stops a double click creating them twice. The parent keeps its history but can no
+   * longer be submitted (submitBlock: already_split).
+   */
+  async split(userId: number, code: string): Promise<DraftDetail> {
+    const draft = await this.editableDraft(userId, code);
+    const idea: PlanIdeaState = draft.plan.idea ?? {};
+    if (idea.splitInto?.length) return this.render(draft);
+    const slices = idea.slices ?? [];
+    if (!idea.quality?.passed || slices.length < ROADMAP_SLICES.MIN) {
+      throw coded(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'nothing_to_split',
+        "The idea agent hasn't proposed a split for this idea.",
+      );
+    }
+
+    const claimed = await this.dataSource.query(
+      `UPDATE "builder_sessions"
+          SET "plan" = COALESCE("plan", '{}'::jsonb) || jsonb_build_object('splittingAt', now()::text)
+        WHERE id = $1 AND COALESCE("plan"->>'splittingAt', '') = ''
+          AND COALESCE("plan"->>'opportunityId', '') = ''
+        RETURNING id`,
+      [draft.id],
+    );
+    const claimRows = Array.isArray(claimed?.[0]) ? claimed[0] : claimed;
+    if (!claimRows?.length) {
+      throw coded(
+        HttpStatus.CONFLICT,
+        'split_in_progress',
+        'This idea is already being split.',
+      );
+    }
+
+    try {
+      const created: { code: string; title: string }[] = [];
+      for (const slice of slices) {
+        const goal = await this.goalByName(
+          slice.productGoal ?? idea.suggestedGoal ?? null,
+        );
+        const child = await this.create(userId, {
+          text: slice.description,
+          goalId: goal?.id ?? null,
+        });
+        await this.store.patchPlan(child.sessionId, {
+          idea: {
+            brief: idea.brief ?? null,
+            gates: idea.gates ?? [],
+            quality: idea.quality,
+            draft: {
+              description: slice.description,
+              title: slice.title,
+              productGoal: goal?.name ?? null,
+              effort: slice.effort,
+            },
+            slices: [],
+            evidence: {},
+            suggestedGoal: goal?.name ?? idea.suggestedGoal ?? null,
+            lastTurnAt: new Date().toISOString(),
+            splitFrom: code,
+          },
+        });
+        created.push({
+          code: child.code,
+          title: slice.title || firstLine(slice.description),
+        });
+      }
+      await this.store.patchPlan(draft.id, {
+        idea: { ...idea, splitInto: created },
+        lastActiveAt: new Date().toISOString(),
+      });
+    } finally {
+      await this.dataSource.query(
+        `UPDATE "builder_sessions"
+            SET "plan" = COALESCE("plan", '{}'::jsonb) - 'splittingAt'
+          WHERE id = $1`,
+        [draft.id],
+      );
+    }
+    return this.render(await this.store.get(draft.id));
   }
 
   // ── Similar ideas and Add my point ─────────────────────────────────────────
@@ -696,6 +802,16 @@ export class RoadmapDraftService {
         { missing },
       );
     }
+    // The quality bar: every check met is the floor, not the bar. See wiki/product/idea-quality.md.
+    const block = submitBlock(idea);
+    if (block) {
+      throw coded(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        block.code,
+        block.message,
+        block.extra,
+      );
+    }
     const goal = input.goalId
       ? await this.goalById(input.goalId)
       : await this.goalOf(draft, true);
@@ -792,6 +908,7 @@ export class RoadmapDraftService {
                   failedCriteria: [],
                   proposedEffort: effort,
                   brief: brief as any,
+                  qualityScore: idea.quality?.score ?? null,
                 }),
                 brief,
                 interviewTranscript: [
@@ -1164,7 +1281,10 @@ export class RoadmapDraftService {
       checks,
       checksMet,
       checksTotal: checks.length,
-      canSubmit: !!text.trim() && checksMet === checks.length,
+      canSubmit:
+        !!text.trim() &&
+        checksMet === checks.length &&
+        submitBlock(record.idea) === null,
       selfChecked: checks.some((c) => c.source === 'self'),
       // "Fill it in yourself" was removed (lifecycle 2026-11-18): never offered.
       selfCheckOffered: false,
@@ -1199,6 +1319,10 @@ export class RoadmapDraftService {
       textMax: ROADMAP_LIMITS.DESCRIPTION_MAX,
       proposal: draftProposal(record.idea),
       brief: normaliseOpportunityBrief(record.idea?.brief),
+      quality: record.idea?.quality ?? null,
+      slices: record.idea?.slices ?? [],
+      splitInto: record.idea?.splitInto ?? [],
+      splitFrom: record.idea?.splitFrom ?? null,
     };
   }
 }

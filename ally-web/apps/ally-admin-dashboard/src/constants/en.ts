@@ -9609,6 +9609,44 @@ export const en = {
       submitGoalNeeded: "Pick a goal first. The suggested one is fine.",
       submitFailed: "Couldn't submit this idea.",
       submitChecksMissing: "A check reopened. Have another look before submitting.",
+      submitQualityBelowBar: (score: number, passScore: number, weakest: string | null) =>
+        `This idea scores ${score} of 100 and needs ${passScore} to go to the board.${
+          weakest ? ` Strengthen "${weakest}" first.` : ""
+        }`,
+      submitNeedsSplit:
+        "This idea is too big to file as one. Split it into smaller ideas, then submit each.",
+      submitNotSized: "The idea agent hasn't been able to size this yet. Keep going with it.",
+      submitAlreadySplit: "This draft was split into separate ideas. Submit those instead.",
+      quality: {
+        title: "Idea quality",
+        scoreLine: (score: number, passScore: number) => `${score} of 100 · needs ${passScore}`,
+        scoreLong: (score: number, passScore: number) =>
+          `Quality score ${score} out of 100, ${passScore} needed`,
+        passed: "Ready for the board",
+        passedHelp: "Every check is met and the idea clears the quality bar.",
+        notPassed: "Not at the bar yet",
+        notPassedHelp: "Answer the idea agent's questions; the score updates after each one.",
+        weakest: (label: string) => `Strengthen next: ${label}`,
+        belowFloor: "Needs more",
+        dimensionScore: (score: number, max: number) => `${score} of ${max}`,
+        empty: "Check my idea, and its quality score shows here.",
+        show: "Show breakdown",
+        hide: "Hide breakdown",
+      },
+      split: {
+        title: "This is bigger than one idea",
+        intro: (n: number) =>
+          `The idea agent split it into ${n} ideas that can each be built and voted on on their own. Each starts as its own draft that already passes the checks.`,
+        sliceSize: (effort: string) => `Size ${effort.toUpperCase()}`,
+        button: (n: number) => `Split into ${n} ideas`,
+        splitting: "Splitting…",
+        failed: "Couldn't split this idea.",
+        doneTitle: "Split into separate drafts",
+        doneBody: "This draft isn't submitted itself. Open each new draft and submit it.",
+        open: (code: string) => `Open ${code}`,
+        from: (code: string) => `Split from ${code}`,
+        submitBlocked: "Split into separate ideas. Submit those instead.",
+      },
       // Audit rec. 6: what Submit files, the one text limit, and the agent's research.
       submitNoStatement: "The idea agent hasn't written its own version. Use your own words.",
       submitStatementEmpty: "Write a summary, or use your own words.",

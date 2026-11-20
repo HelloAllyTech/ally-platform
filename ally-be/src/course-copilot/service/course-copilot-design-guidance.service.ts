@@ -1,6 +1,9 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ContextToolsService } from 'src/context-library/service/context-tools.service';
-import { ClCollectionId, ClUseCase } from 'src/context-library/enum/context-library.enum';
+import {
+  ClCollectionId,
+  ClUseCase,
+} from 'src/context-library/enum/context-library.enum';
 import { COURSE_COPILOT_GUIDANCE_TOOLS } from '../constants/course-copilot-guidance.constants';
 import { CourseBrief } from '../type/course-copilot.type';
 
@@ -12,7 +15,9 @@ const MAX_QUERIES = 4;
 export type DesignGuidanceStage = 'blueprint' | 'review';
 
 const clip = (value: unknown, max = 160): string => {
-  const text = String(value ?? '').replace(/\s+/g, ' ').trim();
+  const text = String(value ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 };
 
@@ -45,7 +50,10 @@ export function designGuidanceQueries(
       ? `choosing components: ${components}`
       : 'worked example before practice, debrief after practice',
   ];
-  return queries.map((q) => clip(q, 200)).filter(Boolean).slice(0, MAX_QUERIES);
+  return queries
+    .map((q) => clip(q, 200))
+    .filter(Boolean)
+    .slice(0, MAX_QUERIES);
 }
 
 /**

@@ -301,8 +301,8 @@ export class RoadmapCopilotToolsService {
         name: COPILOT_SUBMIT_TOOL,
         description:
           'End your turn. Call this exactly once, as the LAST thing you do every turn, with ' +
-          'your message to the admin, a verdict on every readiness criterion, the draft (or ' +
-          'null), and the brief as it now stands. Nothing you write outside this call reaches ' +
+          'your message to the admin, a verdict on every readiness criterion, a grade for every ' +
+          'quality dimension, the draft (or null, or slices), and the brief as it now stands. Nothing you write outside this call reaches ' +
           'the admin.',
         input_schema: {
           type: 'object',
@@ -325,10 +325,55 @@ export class RoadmapCopilotToolsService {
                 required: ['id', 'met', 'note'],
               },
             },
+            quality: {
+              type: 'array',
+              description:
+                'A grade for EVERY quality dimension in the system context, in that order, on the ' +
+                'anchored 0-4 scale. Grade what the conversation has established, not what you ' +
+                'hope is true. Do not compute a total; the server does.',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  score: { type: 'integer', minimum: 0, maximum: 4 },
+                  note: {
+                    type: 'string',
+                    description:
+                      'One short sentence: what earned this grade, or the one thing that would raise it.',
+                  },
+                },
+                required: ['id', 'score', 'note'],
+              },
+            },
+            slices: {
+              type: 'array',
+              nullable: true,
+              description:
+                'Only when the idea is too big for one filing (you would size it XL or XXL) or is ' +
+                'really two or more independent ideas: two to five slices, each one independently ' +
+                'shippable and valuable, each sized s, m or l, each with its own who, outcome and ' +
+                'scope line. Leave null otherwise. When you send slices, send draft as null.',
+              items: {
+                type: 'object',
+                properties: {
+                  title: { type: 'string' },
+                  description: {
+                    type: 'string',
+                    description:
+                      'Same shape as draft.description, for this slice alone.',
+                  },
+                  productGoal: { type: 'string', nullable: true },
+                  effort: { type: 'string', enum: ['s', 'm', 'l'] },
+                },
+                required: ['description', 'effort'],
+              },
+            },
             draft: {
               type: 'object',
               nullable: true,
-              description: 'Null while any criterion is unmet.',
+              description:
+                'Null while any criterion is unmet, while the quality bar is not reached, and ' +
+                'whenever you send slices.',
               properties: {
                 description: { type: 'string' },
                 title: {
@@ -418,7 +463,7 @@ export class RoadmapCopilotToolsService {
               required: ['assessment'],
             },
           },
-          required: ['reply', 'gates', 'draft', 'brief'],
+          required: ['reply', 'gates', 'quality', 'draft', 'brief'],
         },
       },
     ];

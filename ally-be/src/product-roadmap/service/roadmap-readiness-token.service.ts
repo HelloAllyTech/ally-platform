@@ -19,6 +19,11 @@ export interface VerifiedReadiness {
   failedCriteria: string[];
   /** The size the grader proposed. Informational here — see the note in `verify`. */
   proposedEffort: RoadmapOpportunityEffort | null;
+  /**
+   * The 0-100 quality score the interview graded, or null for a token that carries none (a
+   * system filing such as the PM Agent's). Signed, so a client cannot raise it.
+   */
+  qualityScore: number | null;
 }
 
 /** The signed payload, with short keys because this rides in a request body. */
@@ -35,6 +40,11 @@ interface ReadinessTokenPayload {
   f: string[];
   /** The proposed size, or null when the grader could not size the draft. */
   e: RoadmapOpportunityEffort | null;
+  /**
+   * The quality score (0-100) the interview graded, when it graded one. Absent on system
+   * filings, which is how the filing gate tells the two apart. Signed with the rest.
+   */
+  q?: number;
   /**
    * sha256 of the copilot's brief (canonical JSON), when the turn produced one.
    *
@@ -149,6 +159,7 @@ export class RoadmapReadinessTokenService {
     failedCriteria: string[];
     proposedEffort: RoadmapOpportunityEffort | null;
     brief?: RoadmapOpportunityBrief | null;
+    qualityScore?: number | null;
   }): string {
     const payload: ReadinessTokenPayload = {
       v: 1,
@@ -157,6 +168,10 @@ export class RoadmapReadinessTokenService {
       c: RoadmapReadinessTokenService.criteriaFingerprint(),
       f: input.failedCriteria,
       e: input.proposedEffort,
+      ...(typeof input.qualityScore === 'number' &&
+      Number.isFinite(input.qualityScore)
+        ? { q: input.qualityScore }
+        : {}),
       ...(input.brief
         ? { b: RoadmapReadinessTokenService.briefFingerprint(input.brief) }
         : {}),
@@ -275,6 +290,10 @@ export class RoadmapReadinessTokenService {
         ? payload.f.filter((id): id is string => typeof id === 'string')
         : [],
       proposedEffort: payload.e ?? null,
+      qualityScore:
+        typeof payload.q === 'number' && Number.isFinite(payload.q)
+          ? payload.q
+          : null,
     };
   }
 }

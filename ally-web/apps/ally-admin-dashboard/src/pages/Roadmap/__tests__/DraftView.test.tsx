@@ -17,6 +17,7 @@ const mockSubmit = vi.fn();
 const mockSuggestTitle = vi.fn();
 const mockPatch = vi.fn();
 const mockCreate = vi.fn();
+const mockSplit = vi.fn();
 let mockDraft: RoadmapDraftDetail | undefined;
 
 const unwrapOf = (fn: ReturnType<typeof vi.fn>) =>
@@ -33,6 +34,7 @@ vi.mock("../../../api/roadmapV2Flow", async importOriginal => ({
   useRoadmapDraftTurnMutation: () => [unwrapOf(mockTurn)],
   useReopenRoadmapDraftCheckMutation: () => [unwrapOf(mockReopen)],
   useSubmitRoadmapDraftMutation: () => [unwrapOf(mockSubmit)],
+  useSplitRoadmapDraftMutation: () => [unwrapOf(mockSplit)],
   usePatchRoadmapDraftMutation: () => [unwrapOf(mockPatch)],
   useCreateRoadmapDraftMutation: () => [unwrapOf(mockCreate)],
   useDiscardRoadmapDraftMutation: () => [unwrapOf(vi.fn())],
@@ -52,6 +54,8 @@ vi.mock("@api", async importOriginal => ({
 vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn(), custom: vi.fn(), dismiss: vi.fn() },
 }));
+
+import { toast } from "sonner";
 
 import { setReduceMotionSwitch, __resetReduceMotionForTests } from "../../../motion/roadmapMotion";
 import { DraftView } from "../drafts/DraftView";
@@ -108,8 +112,8 @@ const renderDraft = (breakpoint: "desktop" | "phone" = "desktop") =>
   );
 
 beforeEach(() => {
-  [mockTurn, mockReopen, mockSubmit, mockPatch, mockCreate, mockSuggestTitle].forEach(fn =>
-    fn.mockReset(),
+  [mockTurn, mockReopen, mockSubmit, mockPatch, mockCreate, mockSuggestTitle, mockSplit].forEach(
+    fn => fn.mockReset(),
   );
   mockSuggestTitle.mockReturnValue({ title: "A suggested title" });
   mockPatch.mockImplementation(() => ({
@@ -351,5 +355,118 @@ describe("the draft page (§4.2)", () => {
       expect(screen.getByText("Few return in week two")).toBeInTheDocument();
       expect(screen.getByText(findings.assessment)).toBeInTheDocument();
     });
+  });
+});
+
+const quality = (passed: boolean) => ({
+  score: passed ? 72 : 48,
+  passScore: 65,
+  passed,
+  scaleMax: 4,
+  weakest: passed ? null : "evidence",
+  dimensions: [
+    { id: "problem", label: "Problem clarity", score: 3, weight: 20, floor: 2, note: "Clear." },
+    { id: "evidence", label: "Evidence", score: 0, weight: 15, floor: 0, note: "No data yet." },
+  ],
+});
+
+describe("the quality bar and splitting", () => {
+  const submitButton = () =>
+    within(screen.getByRole("region", { name: en.roadmapV2.draft.checksTitle })).getByRole(
+      "button",
+      { name: en.roadmapV2.draft.submit },
+    );
+
+  it("shows the score, and keeps Submit locked with a reason when the checks are met but the bar is not", () => {
+    mockDraft = draft(5, { canSubmit: false, quality: quality(false) });
+    renderDraft();
+    expect(submitButton()).toBeDisabled();
+    const panel = within(screen.getByRole("region", { name: en.roadmapV2.draft.quality.title }));
+    expect(panel.getByText(en.roadmapV2.draft.quality.notPassed)).toBeInTheDocument();
+    expect(panel.getByText(/Strengthen next: Evidence/)).toBeInTheDocument();
+    expect(screen.getAllByText(en.roadmapV2.draft.quality.notPassedHelp).length).toBeGreaterThan(0);
+  });
+
+  it("a passing idea reads Ready for the board and Submit is enabled", () => {
+    mockDraft = draft(5, { quality: quality(true) });
+    renderDraft();
+    expect(screen.getByText(en.roadmapV2.draft.quality.passed)).toBeInTheDocument();
+    expect(submitButton()).toBeEnabled();
+  });
+
+  it("offers the split, calls it once, and a split draft lists its children and cannot be submitted", async () => {
+    const slices = [
+      {
+        title: "Streak counter",
+        description: "Show a streak.",
+        effort: "s" as const,
+        productGoal: null,
+      },
+      {
+        title: "Streak reminders",
+        description: "Nudge before it breaks.",
+        effort: "m" as const,
+        productGoal: null,
+      },
+    ];
+    mockDraft = draft(5, { quality: quality(true), slices });
+    mockSplit.mockReturnValue(draft(5, { slices, splitInto: [] }));
+    renderDraft();
+    expect(screen.getByText(en.roadmapV2.draft.split.title)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: en.roadmapV2.draft.split.button(2) }));
+    await waitFor(() => expect(mockSplit).toHaveBeenCalledWith("OPP-0042"));
+  });
+
+  it("after a split: children are linked, Submit is locked and says why", () => {
+    mockDraft = draft(5, {
+      quality: quality(true),
+      slices: [],
+      splitInto: [
+        { code: "OPP-0043", title: "Streak counter" },
+        { code: "OPP-0044", title: "Streak reminders" },
+      ],
+    });
+    renderDraft();
+    expect(screen.getByText(en.roadmapV2.draft.split.doneTitle)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Open OPP-0043/ })).toBeInTheDocument();
+    expect(submitButton()).toBeDisabled();
+    expect(screen.getByText(en.roadmapV2.draft.split.submitBlocked)).toBeInTheDocument();
+  });
+
+  it("a draft made by a split says where it came from", () => {
+    mockDraft = draft(3, { splitFrom: "OPP-0040" });
+    renderDraft();
+    expect(screen.getByText(en.roadmapV2.draft.split.from("OPP-0040"))).toBeInTheDocument();
+  });
+
+  it("a quality_below_bar refusal on Submit says where the idea scored", async () => {
+    mockDraft = draft(5, { quality: quality(true) });
+    mockSubmit.mockImplementation(() => {
+      throw {
+        data: { code: "quality_below_bar", score: 60, passScore: 65, weakest: "evidence" },
+      };
+    });
+    renderDraft();
+    fireEvent.click(submitButton());
+    const input = await screen.findByLabelText(en.roadmapV2.draft.titleLabel);
+    await waitFor(() => expect(input).toHaveValue("A suggested title"));
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: en.roadmapV2.draft.submitConfirmTitle })).getByRole(
+        "button",
+        { name: en.roadmapV2.draft.submitConfirm },
+      ),
+    );
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        en.roadmapV2.draft.submitQualityBelowBar(60, 65, "Evidence"),
+      ),
+    );
+  });
+
+  it("an older server without the new fields still renders the page", () => {
+    mockDraft = draft(5);
+    renderDraft();
+    expect(submitButton()).toBeEnabled();
+    expect(screen.queryByText(en.roadmapV2.draft.split.title)).not.toBeInTheDocument();
   });
 });

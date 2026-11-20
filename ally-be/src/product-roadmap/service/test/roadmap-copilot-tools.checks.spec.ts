@@ -22,6 +22,12 @@ describe('RoadmapCopilotToolsService — Check my idea schema', () => {
       'string',
     );
     expect(schema.properties.suggestedGoal.nullable).toBe(true);
-    expect(schema.required).toEqual(['reply', 'gates', 'draft', 'brief']);
+    expect(schema.required).toEqual([
+      'reply',
+      'gates',
+      'quality',
+      'draft',
+      'brief',
+    ]);
   });
 });

@@ -1,4 +1,7 @@
-import { ClCollectionId, ClUseCase } from 'src/context-library/enum/context-library.enum';
+import {
+  ClCollectionId,
+  ClUseCase,
+} from 'src/context-library/enum/context-library.enum';
 import {
   CourseCopilotDesignGuidanceService,
   designGuidanceQueries,
@@ -69,7 +72,9 @@ describe('CourseCopilotDesignGuidanceService', () => {
 
   it('gives nothing when the library has no match, fails, or is absent', async () => {
     const empty = new CourseCopilotDesignGuidanceService({
-      runSearch: jest.fn().mockResolvedValue({ modelResult: { ok: true, results: [] } }),
+      runSearch: jest
+        .fn()
+        .mockResolvedValue({ modelResult: { ok: true, results: [] } }),
     } as any);
     expect(await empty.reference(args)).toBe('');
 
@@ -78,6 +83,8 @@ describe('CourseCopilotDesignGuidanceService', () => {
     } as any);
     expect(await failing.reference(args)).toBe('');
 
-    expect(await new CourseCopilotDesignGuidanceService().reference(args)).toBe('');
+    expect(await new CourseCopilotDesignGuidanceService().reference(args)).toBe(
+      '',
+    );
   });
 });

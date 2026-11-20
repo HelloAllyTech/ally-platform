@@ -1,3 +1,4 @@
+import { ROADMAP_QUALITY_PASS_SCORE } from '../../constants/product-roadmap.constants';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { BadRequestException } from '@nestjs/common';
@@ -50,7 +51,8 @@ describe('RoadmapOpportunityService — readiness gate', () => {
   const givenVerdict = (
     failedCriteria: string[],
     proposedEffort: RoadmapOpportunityEffort | null = RoadmapOpportunityEffort.M,
-  ) => verify.mockReturnValue({ failedCriteria, proposedEffort });
+    qualityScore: number | null = null,
+  ) => verify.mockReturnValue({ failedCriteria, proposedEffort, qualityScore });
 
   beforeEach(async () => {
     opportunityRepository = {
@@ -245,6 +247,41 @@ describe('RoadmapOpportunityService — readiness gate', () => {
     await file({ effort });
 
     expect(savedRow()).toMatchObject({ effort });
+  });
+
+  /**
+   * The quality bar. A token the interview signed carries its score; a system filing (the PM
+   * Agent) carries none and keeps the wider size rule above.
+   */
+  describe('a token carrying a quality score', () => {
+    it('files an idea at the pass mark at a single-idea size', async () => {
+      givenVerdict([], RoadmapOpportunityEffort.L, ROADMAP_QUALITY_PASS_SCORE);
+
+      await file({ effort: RoadmapOpportunityEffort.L });
+
+      expect(savedRow()).toMatchObject({ effort: RoadmapOpportunityEffort.L });
+    });
+
+    it('refuses an idea below the pass mark, whatever the client says', async () => {
+      givenVerdict(
+        [],
+        RoadmapOpportunityEffort.M,
+        ROADMAP_QUALITY_PASS_SCORE - 0.1,
+      );
+
+      await expect(
+        file({ effort: RoadmapOpportunityEffort.M }),
+      ).rejects.toThrow(/quality/);
+    });
+
+    it.each([RoadmapOpportunityEffort.XL, RoadmapOpportunityEffort.XXL])(
+      'refuses a %s idea: it has to be split first',
+      async (effort) => {
+        givenVerdict([], effort, 90);
+
+        await expect(file({ effort })).rejects.toThrow(/split_needed/);
+      },
+    );
   });
 
   it('accepts a human correction of a size the model got wrong', async () => {
