@@ -10246,6 +10246,9 @@ export const en = {
     why: {
       authorQuestion: (preview: string) => `Plan agent asks you: ${preview}`,
       planReady: "The plan is ready to read",
+      planOffered: "Expand it into a plan yourself, or ask the product owner",
+      planHandedOver: (name: string) =>
+        name ? `${name} handed you the plan interview` : "A plan interview is waiting for an Owner",
       questionAnswered: (name: string) =>
         name ? `${name} answered the agent's question` : "Someone answered the agent's question",
       progress: {

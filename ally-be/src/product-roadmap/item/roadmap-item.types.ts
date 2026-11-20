@@ -62,7 +62,11 @@ export type WhyHere =
   /** Something a notice says waits on you: the plan is ready to read, or your question was answered. */
   | {
       kind: 'notice';
-      notice: 'planReady' | 'questionAnswered';
+      notice:
+        | 'planReady'
+        | 'questionAnswered'
+        | 'planOffered'
+        | 'planHandedOver';
       since: string;
       by?: PersonRef;
     }
