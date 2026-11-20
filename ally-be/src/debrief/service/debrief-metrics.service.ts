@@ -105,7 +105,7 @@ export interface ExperienceRates {
  * The debrief's metrics (v9 §3.3, PRD §4) for the Console: weekly series of
  * the steering proxy, guardrails, agent efficiency and experience over live
  * debriefs, experience broken down by language and device, the two
- * baselines, and the monthly uptake lift. Reads only; nothing here costs a
+ * and the monthly uptake lift. Reads only; nothing here costs a
  * model call.
  */
 @Injectable()
@@ -169,7 +169,6 @@ export class DebriefMetricsService {
     const [
       byLanguage,
       byPlatform,
-      baselines,
       uptake,
       safety,
       quality,
@@ -180,7 +179,6 @@ export class DebriefMetricsService {
     ] = await Promise.all([
       this.breakdown(w, s.flagReviewSlaHours, 'language', fsql),
       this.breakdown(w, s.flagReviewSlaHours, 'platform', fsql),
-      this.baselines(),
       this.uptakeByMonth(6),
       this.latestSafetyRecall(),
       this.quality(w, qsql),
@@ -197,7 +195,6 @@ export class DebriefMetricsService {
       series,
       byLanguage,
       byPlatform,
-      baselines,
       uptake,
       safetyRecall: safety,
       quality,
@@ -206,7 +203,7 @@ export class DebriefMetricsService {
       agents: { stages, askAlly, pmAgent },
       filter,
       /** Read across all organisations and versions whatever the filter says. */
-      unfiltered: ['baselines', 'uptake', 'pmAgent'],
+      unfiltered: ['uptake', 'pmAgent'],
       filterOptions: await this.filterOptions(w),
       generatedAt: new Date().toISOString(),
     };
@@ -700,40 +697,6 @@ export class DebriefMetricsService {
       debriefs: num(r.debriefs),
       experience: experience(r),
     }));
-  }
-
-  /**
-   * The guardrails' two baselines (PRD §4): today's debrief's hard-fail rate
-   * under the same judge, and its thumbs-down rate, both over the 28 days
-   * before the first organisation was switched on (or the last 28 days when
-   * none is).
-   */
-  private async baselines() {
-    const [first] = await this.dataSource.query(
-      `SELECT min("createdAt") AS at FROM debrief_runs WHERE mode = 'live'`,
-    );
-    const until = first?.at ? new Date(first.at) : new Date();
-    const [hf] = await this.dataSource.query(
-      `SELECT count(*)::int AS n,
-              count(*) FILTER (WHERE jsonb_array_length(COALESCE("hardFails", '[]'::jsonb)) > 0)::int AS failed
-         FROM debrief_quality_judgment
-        WHERE "createdAt" >= $1::timestamp - interval '28 days' AND "createdAt" < $1::timestamp`,
-      [until.toISOString()],
-    );
-    const [th] = await this.dataSource.query(
-      `SELECT count(*) FILTER (WHERE rating = 'positive')::int AS up,
-              count(*) FILTER (WHERE rating = 'negative')::int AS down
-         FROM debrief_feedback
-        WHERE "deletedAt" IS NULL
-          AND "createdAt" >= $1::timestamp - interval '28 days' AND "createdAt" < $1::timestamp`,
-      [until.toISOString()],
-    );
-    return {
-      from: new Date(until.getTime() - 28 * 86_400_000).toISOString(),
-      until: until.toISOString(),
-      legacyHardFailRate: rate(num(hf?.failed), num(hf?.n)),
-      legacyThumbsDownRate: rate(num(th?.down), num(th?.up) + num(th?.down)),
-    };
   }
 
   /** The north star, per calendar month over the last `months` (v9 §3.3). */

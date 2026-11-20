@@ -510,10 +510,13 @@ const SEED_RECIPES_BASE = {
     runCeilingUsd: 0.5,
     runFloorUsd: 0.15,
     poolPerSessionUsd: 0.25,
-    // Lowered from 500 on 2026-11-10 as a safety net while the Debrief agent
-    // is still in development (~$3 a month today). Raise it to a proper level
-    // once the whole loop is finished.
-    monthlyCapUsd: 50,
+    // Lowered to 50 on 2026-11-10 while the agent was in development, 150 in
+    // production from 2026-11-16. 2026-11-20: every organisation goes live, so
+    // it is sized for that: about 400 sessions a month across all organisations
+    // (Aug-Nov 315-473) at a median $0.11 is ~$45, so 300 is roughly six times
+    // today's spend. A safety net, not a budget; a run is never allowed to
+    // spend more than runCeilingUsd.
+    monthlyCapUsd: 300,
     deadlineMs: 150_000,
     riskDeadlineMs: 180_000,
     // 0: the fixed per-moment lookup is off and the guidance agent is the guidance step (local

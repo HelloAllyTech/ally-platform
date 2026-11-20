@@ -538,10 +538,6 @@ describe('the language failure point', () => {
       ],
       byLanguage: [],
       byPlatform: [],
-      baselines: {
-        legacyHardFailRate: rate(0, 0),
-        legacyThumbsDownRate: rate(0, 0),
-      },
       agents: { stages: {} },
       quality: { byLanguage },
     }) as any;

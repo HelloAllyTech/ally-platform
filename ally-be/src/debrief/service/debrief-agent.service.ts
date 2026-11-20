@@ -1446,7 +1446,7 @@ export class DebriefAgentService implements OnModuleInit {
           // Whether a character's cue brings the support lines follows the roleplay's risk-cue
           // option (recorded on the run); the learner's own distress always does.
           riskCue: cueBringsSupportLines(run),
-          // A clear cue the debrief still leaves out: the apps add a kind "a coach will follow up"
+          // A clear cue the debrief still leaves out: the apps add a kind "this may not cover it fully"
           // notice next to the support lines. The debrief itself is shown exactly as before.
           ...(needsFollowUp(run) ? { followUp: true } : {}),
           supportLines: await this.supportLines(s.tenant_id, run.language),

@@ -940,8 +940,8 @@
         "lead": "If this session brought something up for you, you can talk to:"
       },
       "followUp": {
-        "title": "We're taking a closer look",
-        "body": "Something important came up in this session, so someone from the Ally team is checking this debrief more closely.",
+        "title": "Something important came up",
+        "body": "Something important came up in this session, and this debrief may not cover it fully.",
         "support": "If you need support right now, the support lines in this debrief are open any time."
       },
       "distress": {

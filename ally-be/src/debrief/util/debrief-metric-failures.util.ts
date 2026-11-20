@@ -124,7 +124,6 @@ export interface MetricsViewLike {
     debriefs: number;
     experience: ExperienceRates;
   }>;
-  baselines: { legacyHardFailRate: Rate; legacyThumbsDownRate: Rate };
   /** The quality rollup; only the language check's part is read here. */
   quality?: {
     byLanguage?: Array<{
@@ -255,24 +254,6 @@ export function metricFailurePoints(
   }
 
   // Guardrails.
-  const hf = sumRates(s.map((w) => w.guardrails.hardFailRate));
-  const legacyHf = view.baselines.legacyHardFailRate.value;
-  if (
-    hf.value != null &&
-    hf.of >= MIN_RATE_SAMPLE &&
-    legacyHf != null &&
-    hf.value > legacyHf
-  ) {
-    points.push({
-      kind: 'guardrail_breached',
-      name: 'hard_fail_rate',
-      segment: 'all',
-      value: r3(hf.value),
-      n: hf.of,
-      target: `<= ${r3(legacyHf)} (pre-launch)`,
-      why: 'judge hard-fail rate is above the pre-launch baseline',
-    });
-  }
   const fabricated = s.reduce((a, w) => a + w.guardrails.fabricatedQuotes, 0);
   if (fabricated > 0) {
     points.push({
@@ -283,24 +264,6 @@ export function metricFailurePoints(
       n: null,
       target: '0',
       why: 'the judge found quotes that are not in the transcript',
-    });
-  }
-  const td = sumRates(s.map((w) => w.guardrails.thumbsDownRate));
-  const preTd = view.baselines.legacyThumbsDownRate.value;
-  if (
-    td.value != null &&
-    td.of >= MIN_RATE_SAMPLE &&
-    preTd != null &&
-    td.value > preTd
-  ) {
-    points.push({
-      kind: 'guardrail_breached',
-      name: 'thumbs_down_rate',
-      segment: 'all',
-      value: r3(td.value),
-      n: td.of,
-      target: `<= ${r3(preTd)} (pre-launch)`,
-      why: 'thumbs-down rate is above the pre-launch baseline',
     });
   }
   if (

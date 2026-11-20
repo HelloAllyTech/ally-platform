@@ -86,7 +86,7 @@ export class DebriefConsoleViewController {
   @DebriefRead()
   @ApiOperation({
     summary:
-      'Success metrics (v9 §3.3): the weekly steering proxy, guardrails, efficiency, experience by language and device, baselines and monthly uptake lift',
+      'Success metrics (v9 §3.3): the weekly steering proxy, guardrails, efficiency, experience by language and device and monthly uptake lift',
   })
   metricsView(@Query() q: Record<string, string>) {
     const weeks = q.weeks ? Number(q.weeks) || 12 : 12;
