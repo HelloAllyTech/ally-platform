@@ -1,0 +1,60 @@
+name: Dead code
+
+# Keeps unused code from piling up. Two halves (spec: scripts/dead_code.py):
+#   * PR gate  — fails if the PR ADDS dead code that is not in scripts/dead-code-baseline.json.
+#                Existing debt never blocks anyone; only new debt does.
+#   * Weekly   — keeps one rolling issue with the full list, so cleanup has a visible queue.
+#
+# Only Python repos are scanned today (vulture). The TypeScript repos (knip) are wired
+# in scripts/dead_code.py but need knip added as a pinned devDependency first; see wiki.
+
+on:
+  pull_request:
+    paths:
+      - "ally-ai/app/**"
+      - "ally-ai-learn/app/**"
+      - "scripts/dead_code.py"
+      - "scripts/dead-code*.json"
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  dead-code:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install 'vulture==2.14'
+
+      - name: Scan
+        id: scan
+        run: |
+          set -uo pipefail
+          for repo in ally-ai ally-ai-learn; do
+            python3 scripts/dead_code.py --repo "$repo" --check > "report-$repo.md"
+            echo "$repo=$?" >> status.txt
+          done
+          cat report-*.md | tee full-report.md >> "$GITHUB_STEP_SUMMARY"
+          ! grep -q '=1' status.txt
+
+      - name: Update the rolling issue
+        if: always() && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TITLE="Dead code report"
+          NUM="$(gh issue list --state open --search "$TITLE in:title" --json number --jq '.[0].number // empty')"
+          if [ -n "$NUM" ]; then
+            gh issue edit "$NUM" --body-file full-report.md
+          else
+            gh issue create --title "$TITLE" --body-file full-report.md
+          fi

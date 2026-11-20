@@ -1,0 +1,29 @@
+{
+  "repos": {
+    "ally-ai": {
+      "scanner": "vulture",
+      "paths": ["app"],
+      "min_confidence": 60,
+      "gate": true,
+      "ignore_decorators": ["@router.*", "@app.*", "@field_validator", "@model_validator", "@validator", "@computed_field", "@property", "@asynccontextmanager"],
+      "ignore_names": ["model_post_init", "awrap_model_call", "awrap_tool_call", "lifespan"]
+    },
+    "ally-ai-learn": {
+      "scanner": "vulture",
+      "paths": ["app"],
+      "min_confidence": 60,
+      "gate": true,
+      "ignore_decorators": ["@router.*", "@app.*", "@field_validator", "@model_validator", "@validator", "@computed_field", "@property", "@asynccontextmanager", "@function_tool"],
+      "ignore_names": ["model_post_init", "lifespan", "entrypoint", "prewarm"]
+    },
+    "ally-be": {
+      "scanner": "knip",
+      "gate": false
+    },
+    "ally-web": {
+      "scanner": "knip",
+      "gate": false
+    }
+  },
+  "ignore": []
+}

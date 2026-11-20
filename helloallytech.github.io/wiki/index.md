@@ -55,6 +55,7 @@ Superseded by Ally's **Context Library** — see [Working with the Context Libra
 - [Working with the Context Library](contributing/planning-with-context-library.md) — Search the Context Library yourself whenever a product or engineering judgement comes up, while planning and while coding, and cite the codes you use
 - [Release Process](contributing/release-process.md) — Shared production-release process: versioning, pipeline, troubleshooting
 - [Documentation System](contributing/docs-system.md) — How docs are routed, deduplicated, enforced in CI, and kept current
+- [Dead Code Tracking](contributing/dead-code.md) — How unused code is found, why new dead code fails a PR, and what to do when the tool is wrong
 
 ## Generated Indexes
 - [Routing Index](ROUTING.md) — **Generated.** One line per page: what to read for a task, and how big it is. Copied into every code repo.
