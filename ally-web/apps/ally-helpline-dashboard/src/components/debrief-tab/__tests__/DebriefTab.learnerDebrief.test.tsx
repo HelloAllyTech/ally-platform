@@ -92,15 +92,12 @@ vi.mock("../SupervisorNote", () => ({
 vi.mock("../DebriefReplyInput", () => ({
   DebriefReplyInput: () => <div data-testid="reply-input" />,
 }));
-vi.mock("../DebriefFeedback", () => ({
-  DebriefFeedback: () => <div data-testid="debrief-feedback" />,
-}));
 
 const NOTE = "You opened well and stayed with her silence.";
 const summaryWithNote = { details: { summary: { feedback: { supervisorNote: NOTE } } } } as any;
 
 const renderTab = () =>
-  render(<DebriefTab sessionId="s-1" summaryData={summaryWithNote} retryMaxReached={false} />);
+  render(<DebriefTab sessionId="s-1" summaryData={summaryWithNote} />);
 
 const CARDS = {
   opening: "You stayed calm when Meena went quiet.",
@@ -156,14 +153,15 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
     vi.clearAllMocks();
   });
 
-  it("keeps today's debrief when the organisation isn't switched on", () => {
+  it("shows the old note read-only when the new debrief isn't available", () => {
     mockLearnerDebriefQuery.mockReturnValue({ data: { state: "not_available" } });
     renderTab();
 
     expect(screen.getByTestId("supervisor-note")).toHaveTextContent(NOTE);
     expect(screen.getByText("postSim.debrief.header")).toBeInTheDocument();
     expect(screen.queryByTestId("debrief-cards")).not.toBeInTheDocument();
-    // No polling for an org that isn't on the new debrief.
+    expect(screen.queryByTestId("reply-input")).not.toBeInTheDocument();
+    // No polling when the new debrief isn't available.
     expect(mockLearnerDebriefQuery).toHaveBeenLastCalledWith(
       "s-1",
       expect.objectContaining({ pollingInterval: 0 }),
@@ -213,7 +211,7 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
     expect(screen.getByTestId("debrief-failed")).toBeInTheDocument();
   });
 
-  it("keeps today's debrief when the server refuses (403)", () => {
+  it("shows the old note read-only when the server refuses (403)", () => {
     mockLearnerDebriefQuery.mockReturnValue({
       data: undefined,
       isError: true,
@@ -412,7 +410,7 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
     mockLearnerDebriefQuery.mockReturnValue({
       data: { state: "working", steps: [], progress: { key: "writing" } },
     });
-    rerender(<DebriefTab sessionId="s-1" summaryData={summaryWithNote} retryMaxReached={false} />);
+    rerender(<DebriefTab sessionId="s-1" summaryData={summaryWithNote} />);
     const steps = screen.getByTestId("debrief-working-steps");
     const items = within(steps).getAllByRole("listitem");
     expect(items.map(li => li.textContent)).toEqual([
@@ -422,7 +420,7 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
     expect(items[1]).toHaveAttribute("aria-current", "step");
 
     mockLearnerDebriefQuery.mockReturnValue({ data: { state: "ready", cards: CARDS } });
-    rerender(<DebriefTab sessionId="s-1" summaryData={summaryWithNote} retryMaxReached={false} />);
+    rerender(<DebriefTab sessionId="s-1" summaryData={summaryWithNote} />);
     expect(document.activeElement).toBe(
       screen.getByRole("heading", { name: "postSim.debriefCards.header" }),
     );
@@ -435,7 +433,7 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
       <DebriefTab
         sessionId="s-1"
         summaryData={summaryWithNote}
-        retryMaxReached={false}
+       
         onSeeQuote={onSeeQuote}
       />,
     );
@@ -1230,7 +1228,7 @@ describe("DebriefTab — never an endless wait", () => {
   });
 
   it.each(["working", "on_its_way", "taking_longer"])(
-    "shows today's debrief after 30 minutes %s, and stops asking",
+    "shows the old note (or the static line) after 30 minutes %s, and stops asking",
     state => {
       vi.useFakeTimers();
       mockLearnerDebriefQuery.mockReturnValue({ data: { state, steps: [] } });
@@ -1299,7 +1297,7 @@ describe("DebriefTab — waiting on the debrief (v9 §3.3 abandoned before ready
     mockLearnerDebriefQuery.mockReturnValue({
       data: { state: "ready", cards: CARDS, language: "en", practice: [] },
     });
-    rerender(<DebriefTab sessionId="s-1" summaryData={summaryWithNote} retryMaxReached={false} />);
+    rerender(<DebriefTab sessionId="s-1" summaryData={summaryWithNote} />);
     unmount();
     expect(mockReportEvent.mock.calls.filter(([a]) => a.kind === "left_before_ready")).toHaveLength(
       0,

@@ -909,6 +909,7 @@
       "checkAgain": "Check again",
       "checkingAgain": "Checking…",
       "notAvailable": "This session doesn't have a written debrief — it took place before Ally started writing them.",
+      "noneForSession": "Your debrief isn't available for this session.",
       "momentLabel": "See this moment",
       "momentNotFound": "We couldn't jump to that moment — here's the full transcript instead.",
       "section": {

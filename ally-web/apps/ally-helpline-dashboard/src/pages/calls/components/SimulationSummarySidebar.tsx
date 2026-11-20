@@ -46,7 +46,7 @@ const SimulationSummarySidebar: FC<SimulationSummarySidebarProps> = ({
     { sessionId: summaryId, languageCode: i18n.language },
     { skip: !summaryId },
   );
-  const { summaryData, retryMaxReached, isShortSession } = useSimulationSummaryPolling(
+  const { summaryData, isShortSession } = useSimulationSummaryPolling(
     summaryId,
     i18n.language,
   );
@@ -221,7 +221,6 @@ const SimulationSummarySidebar: FC<SimulationSummarySidebarProps> = ({
                 <DebriefTab
                   sessionId={summaryId}
                   summaryData={summaryData}
-                  retryMaxReached={retryMaxReached}
                   readOnly
                 />
               </div>

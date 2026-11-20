@@ -86,6 +86,11 @@ class LearnerDebriefController extends ChangeNotifier {
 
   /// True once polling gave up on a debrief that never finished.
   bool get gaveUp => _gaveUp;
+
+  /// True once the first request has answered or failed, so "not available"
+  /// is never shown while it is still in flight.
+  bool get settled => _settled;
+  bool _settled = false;
   Timer? _pollTimer;
 
   /// Runs out [fastPollFor] after `working` is seen; like the web, it
@@ -183,12 +188,16 @@ class LearnerDebriefController extends ChangeNotifier {
           ? await _ownOrSupervisor()
           : await _repository.getDebrief(sessionId);
       if (_disposed) return;
+      _settled = true;
       _latest = next;
       _loadFailure = null;
       notifyListeners();
     } catch (error) {
       // Keep whatever we had: a blip mid-poll keeps the last good answer.
       if (_disposed) return;
+      final wasSettled = _settled;
+      _settled = true;
+      if (!wasSettled) notifyListeners();
       if (_latest == null && !supervisor) {
         final failure = failureOf(error);
         if (failure != null || _loadFailure != null) {
