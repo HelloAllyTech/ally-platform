@@ -399,3 +399,97 @@ describe('parseLabelNames', () => {
     expect(parseLabelNames('not json')).toBeNull();
   });
 });
+
+describe('AnalyticsAutomationGithubService labels, comments and tool lists', () => {
+  const OLD_ENV = process.env;
+  beforeEach(() => {
+    process.env = {
+      ...OLD_ENV,
+      AUTOMATION_PLATFORM_REPO: 'Org/platform',
+      AUTOMATION_DBT_REPO: 'Org/dbt',
+    };
+  });
+  afterAll(() => {
+    process.env = OLD_ENV;
+  });
+
+  const dbt = { owner: 'Org', repo: 'dbt' };
+
+  function buildWrite(answers: Record<string, string>) {
+    const calls: { name: string; args: Record<string, unknown> }[] = [];
+    const listTools = jest.fn().mockResolvedValue([]);
+    const service = new AnalyticsAutomationGithubService();
+    (service as unknown as { mcp: unknown }).mcp = {
+      listTools,
+      getClient: async () => ({
+        callTool: async ({
+          name,
+          arguments: args,
+        }: {
+          name: string;
+          arguments: Record<string, unknown>;
+        }) => {
+          calls.push({ name, args });
+          return { content: [{ type: 'text', text: answers[name] ?? '{}' }] };
+        },
+      }),
+    };
+    return { service, calls, listTools };
+  }
+
+  it('keeps the existing labels when adding one', async () => {
+    const { service, calls } = buildWrite({
+      issue_read: '[{"name":"keep"}]',
+    });
+    await service.addPullRequestLabel(dbt, 7, 'dbt-build');
+    expect(calls.find((c) => c.name === 'issue_write')?.args.labels).toEqual([
+      'keep',
+      'dbt-build',
+    ]);
+  });
+
+  it('never replaces labels it could not read, even on a fresh pull request', async () => {
+    const { service, calls } = buildWrite({ issue_read: '"surprise"' });
+    await expect(
+      service.addPullRequestLabel(dbt, 7, 'dbt-build', { fresh: true }),
+    ).rejects.toThrow('did not return the pull request labels');
+    expect(calls.some((c) => c.name === 'issue_write')).toBe(false);
+  });
+
+  it('refuses a label outside the allow-list, a foreign repo and an oversized comment before GitHub is called', async () => {
+    const { service, calls } = buildWrite({});
+    await expect(
+      service.addPullRequestLabel(dbt, 7, 'ship-it'),
+    ).rejects.toThrow('not one the agent may add');
+    await expect(
+      service.commentOnPullRequest({ owner: 'Other', repo: 'x' }, 7, 'hi'),
+    ).rejects.toThrow('you may only write to');
+    await expect(
+      service.commentOnPullRequest(dbt, 7, 'x'.repeat(20_001)),
+    ).rejects.toThrow('at most');
+    expect(calls).toEqual([]);
+  });
+
+  it('comments on a pull request in an allowed repo', async () => {
+    const { service, calls } = buildWrite({});
+    await service.commentOnPullRequest(dbt, 7, 'hello');
+    expect(calls).toEqual([
+      {
+        name: 'add_issue_comment',
+        args: { ...dbt, issue_number: 7, body: 'hello' },
+      },
+    ]);
+  });
+
+  it('lists a server’s tools once, and retries after a failed listing', async () => {
+    const { service, listTools } = buildWrite({});
+    listTools.mockRejectedValueOnce(new Error('network blip'));
+    await expect(service.commentOnPullRequest(dbt, 1, 'a')).rejects.toThrow(
+      'network blip',
+    );
+    await service.commentOnPullRequest(dbt, 1, 'b');
+    await service.commentOnPullRequest(dbt, 1, 'c');
+    // one failed attempt, one that worked and was then reused
+    expect(listTools).toHaveBeenCalledTimes(2);
+  });
+});

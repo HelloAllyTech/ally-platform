@@ -23,7 +23,6 @@ import {
   AnalyticsAgentConversationDetailDto,
   AnalyticsAgentConversationSummaryDto,
   AnalyticsAgentFeedbackResponseDto,
-  AnalyticsAgentOutcome,
   AskAnalyticsAgentDto,
   AskAnalyticsAgentResponseDto,
   SetAnalyticsAgentFeedbackDto,
@@ -31,6 +30,7 @@ import {
 import { AnalyticsAgentConversationService } from '../service/analytics-agent-conversation.service';
 import { AnalyticsAgentService } from '../service/analytics-agent.service';
 import { invokeAnalyticalAgent } from '../service/new-analytical-agent.service';
+import { resultFieldsFromRun } from '../util/analytics-agent-result.util';
 
 /**
  * The Analytics Agent's HTTP surface — ask, catalogue, and the caller's saved
@@ -97,30 +97,33 @@ export class AnalyticsAgentController {
     // Previous SQL-planner pipeline, kept for now:
     // return this.analyticsAgentService.ask(body, req.user?.id);
 
-    const { response, queries } = await invokeAnalyticalAgent(
+    const run = await invokeAnalyticalAgent(
       body.question,
       body.history ?? [],
       String(userId),
     );
+    const { response, queries } = run;
+    const fields = resultFieldsFromRun(run);
     const result: AskAnalyticsAgentResponseDto = {
-      outcome: AnalyticsAgentOutcome.ANSWER,
+      outcome: fields.outcome,
       question: body.question,
-      message: '',
+      message: fields.message,
       answer: response.response,
       sql: queries
         .map((q) => q.sql)
         .filter(Boolean)
         .join('\n\n'),
       rationale: '',
-      columns: [],
-      rows: [],
-      rowCount: 0,
-      truncated: false,
+      columns: fields.columns,
+      rows: fields.rows,
+      rowCount: fields.rowCount,
+      truncated: fields.truncated,
+      // The agent writes no chart specification, so there is nothing to draw.
       chart: null,
       caveats: [],
       followUps: response.followUps ?? [],
-      durationMs: 0,
-      provenance: { plannerModel: '', answerModel: '', promptVersion: '' },
+      durationMs: fields.durationMs,
+      provenance: fields.provenance,
     };
 
     // The answer already cost a full agent run, so a failure to save it must

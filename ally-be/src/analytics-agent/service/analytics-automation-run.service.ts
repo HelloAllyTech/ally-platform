@@ -274,10 +274,13 @@ export class AnalyticsAutomationRunService {
       order: { ranAt: 'DESC' },
       take: 10,
     });
+    if (candidates.length === 0) return null;
+    // One query for all the candidates, grouped here, rather than one per candidate.
+    const allAgents = await this.agentRuns.find({
+      where: { runId: In(candidates.map((c) => c.id)) },
+    });
     for (const candidate of candidates) {
-      const agents = await this.agentRuns.find({
-        where: { runId: candidate.id },
-      });
+      const agents = allAgents.filter((a) => a.runId === candidate.id);
       const posthogDone = agents.some(
         (a) => a.agent === 'posthog_events' && a.status === 'completed',
       );

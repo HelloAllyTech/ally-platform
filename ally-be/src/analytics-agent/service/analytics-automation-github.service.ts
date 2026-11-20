@@ -5,9 +5,13 @@ import { createAppAuth } from '@octokit/auth-app';
 import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
 import type { AnalyticsAutomationPrState } from '../entity/analytics-automation-agent-run.entity';
 import type { CheckRun } from '../util/analytics-automation.util';
-import { resolveAutomationRepos } from '../constants/analytics-automation.constants';
+import {
+  DBT_BUILD_LABEL,
+  resolveAutomationRepos,
+} from '../constants/analytics-automation.constants';
 import {
   checkWriteCall,
+  newWriteState,
   noteWriteSucceeded,
   parsePullRequestResult,
   WriteState,
@@ -44,6 +48,16 @@ const ALLOWED_CALLS: ReadonlySet<string> = new Set([
   'issue_read',
   'issue_write',
 ]);
+
+/** Labels the server may put on a pull request: only the one the dbt build keys on. */
+const ALLOWED_LABELS: readonly string[] = [DBT_BUILD_LABEL];
+/** Longest comment the server may post on a pull request. */
+const MAX_COMMENT_CHARS = 20_000;
+/**
+ * How long one server's tool list is reused. The list does not change while a
+ * run is going, but a long-lived process should still notice a server update.
+ */
+const TOOL_LIST_TTL_MS = 10 * 60 * 1000;
 
 const TOOLSETS = 'repos,git,pull_requests,issues';
 /**
@@ -130,7 +144,31 @@ export function parseLabelNames(text: string): string[] | null {
 export class AnalyticsAutomationGithubService {
   private readonly logger = new Logger(AnalyticsAutomationGithubService.name);
   private mcp?: MultiServerMCPClient;
-  private writeReady?: Promise<void>;
+  private readonly toolLists = new Map<
+    string,
+    { at: number; tools: Promise<McpTools> }
+  >();
+
+  /**
+   * One server's tools, listed once and reused for {@link TOOL_LIST_TTL_MS}: a
+   * run asks for them several times (every agent, every CI-fix retry). A failed
+   * listing is dropped at once, so a transient blip is retried by the next call
+   * instead of being cached for the life of the process.
+   */
+  private listTools(server: string): Promise<McpTools> {
+    const cached = this.toolLists.get(server);
+    if (cached && Date.now() - cached.at < TOOL_LIST_TTL_MS) {
+      return cached.tools;
+    }
+    const tools = this.client().listTools(server);
+    this.toolLists.set(server, { at: Date.now(), tools });
+    tools.catch(() => {
+      if (this.toolLists.get(server)?.tools === tools) {
+        this.toolLists.delete(server);
+      }
+    });
+    return tools;
+  }
 
   private client(): MultiServerMCPClient {
     if (this.mcp) return this.mcp;
@@ -200,7 +238,7 @@ export class AnalyticsAutomationGithubService {
    * configured. A model that names a `ref` (a pull request's branch, say) keeps it.
    */
   async readTools(): Promise<McpTools> {
-    const tools = await this.client().listTools(READ_SERVER);
+    const tools = await this.listTools(READ_SERVER);
     const repos = resolveAutomationRepos();
     const baseRefs = new Map<string, string>(
       [repos.platform, repos.dbt].map((r) => [
@@ -244,11 +282,9 @@ export class AnalyticsAutomationGithubService {
     if (!ALLOWED_CALLS.has(name)) {
       throw new Error(`GitHub tool "${name}" is not allowed for automation`);
     }
-    const mcp = this.client();
-    // Connecting is a side effect of discovering tools; do it once.
-    this.writeReady ??= mcp.listTools(WRITE_SERVER).then(() => undefined);
-    await this.writeReady;
-    const raw = await mcp.getClient(WRITE_SERVER);
+    // Connecting is a side effect of discovering tools; the cached listing does it once.
+    await this.listTools(WRITE_SERVER);
+    const raw = await this.client().getClient(WRITE_SERVER);
     if (!raw) throw new Error('The GitHub MCP write server is not connected');
     const result = await raw.callTool({ name, arguments: args });
     if (result.isError) {
@@ -295,7 +331,7 @@ export class AnalyticsAutomationGithubService {
     state: WriteState,
     allow: readonly ('create_branch' | 'push_files')[],
   ): Promise<McpTools> {
-    const upstream = await this.client().listTools(WRITE_SERVER);
+    const upstream = await this.listTools(WRITE_SERVER);
     const bare = (name: string) => name.replace(`${WRITE_SERVER}_`, '');
 
     return upstream
@@ -450,11 +486,46 @@ export class AnalyticsAutomationGithubService {
   }
 
   /**
+   * Refuses a label or comment the write guard does not allow. These writes go
+   * through {@link checkWriteCall} like every other: the repository must be one
+   * of the two configured ones, the label one of {@link ALLOWED_LABELS}, and a
+   * comment within {@link MAX_COMMENT_CHARS}.
+   */
+  private checkPullRequestNote(
+    tool: 'add_label' | 'add_issue_comment',
+    repo: RepoRef,
+    args: Record<string, unknown>,
+  ): void {
+    const repos = resolveAutomationRepos();
+    const same = (r: RepoRef) =>
+      r.owner.toLowerCase() === repo.owner.toLowerCase() &&
+      r.repo.toLowerCase() === repo.repo.toLowerCase();
+    const target = [repos.dbt, repos.platform].find(same) ?? repos.dbt;
+    const policy: WritePolicy = {
+      ...target,
+      branchPrefix: '',
+      allowedPrefixes: [],
+      maxFiles: 0,
+      maxFileBytes: 0,
+      allowedLabels: ALLOWED_LABELS,
+      maxCommentChars: MAX_COMMENT_CHARS,
+    };
+    const refusal = checkWriteCall(
+      tool,
+      { ...repo, ...args },
+      policy,
+      newWriteState(),
+    );
+    if (refusal) throw new Error(`GitHub write refused: ${refusal}`);
+  }
+
+  /**
    * Adds one label to a pull request, keeping the labels it already has
    * (`issue_write` replaces the whole list). `fresh` means the server opened
-   * the pull request moments ago, so when its labels cannot be read it has none
-   * to lose; otherwise an unreadable list throws rather than wipe a person's
-   * labels.
+   * the pull request moments ago, so when GitHub refuses to list its labels it
+   * has none to lose; otherwise a failed read throws rather than wipe a
+   * person's labels. An answer that is not a label list throws either way:
+   * writing then would replace labels that may be there.
    */
   async addPullRequestLabel(
     repo: RepoRef,
@@ -462,27 +533,31 @@ export class AnalyticsAutomationGithubService {
     label: string,
     opts: { fresh?: boolean } = {},
   ): Promise<void> {
-    let existing: string[] | null = null;
+    this.checkPullRequestNote('add_label', repo, { label });
+    let existing: string[] = [];
+    let content: unknown;
     try {
-      const content = await this.call('issue_read', {
+      content = await this.call('issue_read', {
         ...repo,
         issue_number: pullNumber,
         method: 'get_labels',
       });
-      existing = parseLabelNames(textOf(content));
     } catch (err) {
       if (!opts.fresh) throw err;
     }
-    if (existing === null && !opts.fresh) {
-      throw new Error('GitHub did not return the pull request labels');
+    if (content !== undefined) {
+      const parsed = parseLabelNames(textOf(content));
+      if (parsed === null) {
+        throw new Error('GitHub did not return the pull request labels');
+      }
+      existing = parsed;
     }
-    const labels = [...new Set([...(existing ?? []), label])];
-    if (existing?.includes(label)) return;
+    if (existing.includes(label)) return;
     await this.call('issue_write', {
       ...repo,
       method: 'update',
       issue_number: pullNumber,
-      labels,
+      labels: [...new Set([...existing, label])],
     });
     this.logger.log(
       `Labelled ${repo.owner}/${repo.repo}#${pullNumber} "${label}"`,
@@ -494,6 +569,7 @@ export class AnalyticsAutomationGithubService {
     pullNumber: number,
     body: string,
   ): Promise<void> {
+    this.checkPullRequestNote('add_issue_comment', repo, { body });
     await this.call('add_issue_comment', {
       ...repo,
       issue_number: pullNumber,

@@ -1,9 +1,10 @@
-// The real agent module builds MCP clients and GitHub/Google auth at import
-// time and needs their credentials; the auditor only borrows three exports.
+// The real agent module needs MCP/GitHub/Google credentials when it builds its
+// clients; the auditor only borrows three exports.
+const mockMcpClient = { listTools: jest.fn() };
 jest.mock('../new-analytical-agent.service', () => ({
-  LLM: {},
+  getLlm: () => ({}),
   AVAILABLE_TABLES: { 'proj.ds.table_a': 'a.yml', 'proj.ds.table_b': 'b.yml' },
-  client: { listTools: jest.fn() },
+  getMcpClient: () => mockMcpClient,
 }));
 jest.mock('langchain', () => ({
   createAgent: jest.fn(),
@@ -17,12 +18,13 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 import { createAgent } from 'langchain';
 import { QueryFailedError } from 'typeorm';
 import { AUDIT_AGENT_LIMITS } from '../../constants/analytics-agent.constants';
-import { client } from '../new-analytical-agent.service';
 import {
   AnalyticsAuditAgentService,
   resolveMessageCount,
   selectAuditTools,
 } from '../analytics-audit-agent.service';
+
+const client = mockMcpClient;
 
 const verdict = {
   verdict: 'correct',

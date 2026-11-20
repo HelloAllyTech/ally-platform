@@ -26,7 +26,11 @@ import {
   AnalyticsAgentFeedback,
   AnalyticsAgentMessage,
 } from '../entity/analytics-agent-message.entity';
-import { AVAILABLE_TABLES, client, LLM } from './new-analytical-agent.service';
+import {
+  AVAILABLE_TABLES,
+  getLlm,
+  getMcpClient,
+} from './new-analytical-agent.service';
 
 const auditSchema = z.object({
   verdict: z.enum(['correct', 'minor_issues', 'incorrect', 'unverifiable']),
@@ -39,7 +43,9 @@ const auditSchema = z.object({
   ),
 });
 
-type AgentTools = Awaited<ReturnType<typeof client.listTools>>;
+type AgentTools = Awaited<
+  ReturnType<ReturnType<typeof getMcpClient>['listTools']>
+>;
 type AuditAgent = ReturnType<typeof createAgent>;
 
 /**
@@ -379,10 +385,10 @@ export class AnalyticsAuditAgentService {
 
   private async buildAgent(): Promise<AuditAgent> {
     const tools = selectAuditTools(
-      await client.listTools(...AUDIT_MCP_SERVERS),
+      await getMcpClient().listTools(...AUDIT_MCP_SERVERS),
     );
     return createAgent({
-      model: LLM,
+      model: getLlm(),
       systemPrompt: AUDIT_AGENT_SYSTEM_PROMPT.replace(
         '{{AVAILABLE_TABLES}}',
         Object.keys(AVAILABLE_TABLES).join('\n'),

@@ -22,6 +22,10 @@ export interface WritePolicy {
   /** Files one run may change, across all its pushes. */
   maxFiles: number;
   maxFileBytes: number;
+  /** Labels the server may put on a pull request (see {@link PULL_REQUEST_NOTE_TOOLS}). */
+  allowedLabels?: readonly string[];
+  /** Longest comment the server may post on a pull request. */
+  maxCommentChars?: number;
 }
 
 /** What the agent has done so far in this run. */
@@ -47,6 +51,19 @@ export const WRITE_TOOL_NAMES: ReadonlySet<string> = new Set([
   'create_pull_request',
 ]);
 
+/**
+ * Writes the SERVER makes on a pull request that already exists: a label or a
+ * comment. A model never holds these. They pass through {@link checkWriteCall}
+ * too, so no write reaches GitHub without the repo, label and size checks.
+ */
+export const PULL_REQUEST_NOTE_TOOLS: ReadonlySet<string> = new Set([
+  'add_label',
+  'add_issue_comment',
+]);
+
+/** Comment size limit when a policy names none (GitHub's own limit is 65,536). */
+const DEFAULT_MAX_COMMENT_CHARS = 20_000;
+
 const str = (value: unknown): string | null =>
   typeof value === 'string' ? value : null;
 
@@ -60,13 +77,31 @@ export function checkWriteCall(
   policy: WritePolicy,
   state: WriteState,
 ): string | null {
-  if (!WRITE_TOOL_NAMES.has(tool)) return `the tool "${tool}" is not available`;
+  if (!WRITE_TOOL_NAMES.has(tool) && !PULL_REQUEST_NOTE_TOOLS.has(tool)) {
+    return `the tool "${tool}" is not available`;
+  }
 
   if (
     str(args.owner)?.toLowerCase() !== policy.owner.toLowerCase() ||
     str(args.repo)?.toLowerCase() !== policy.repo.toLowerCase()
   ) {
     return `you may only write to ${policy.owner}/${policy.repo}`;
+  }
+
+  if (tool === 'add_label') {
+    const label = str(args.label);
+    if (!label || !(policy.allowedLabels ?? []).includes(label)) {
+      return `the label "${String(args.label)}" is not one the agent may add`;
+    }
+    return null;
+  }
+
+  if (tool === 'add_issue_comment') {
+    const body = str(args.body);
+    if (!body || body.trim().length === 0) return 'a comment needs text';
+    const max = policy.maxCommentChars ?? DEFAULT_MAX_COMMENT_CHARS;
+    if (body.length > max) return `a comment may be at most ${max} characters`;
+    return null;
   }
 
   const named = str(tool === 'create_pull_request' ? args.head : args.branch);

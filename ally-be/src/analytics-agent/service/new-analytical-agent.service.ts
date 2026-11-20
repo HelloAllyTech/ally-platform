@@ -30,107 +30,131 @@ import { createDatalyzeTaskTokenMiddleware } from '../util/datalyze-task-token.u
 
 const logger = new Logger('AnalyticalAgent');
 
-export const LLM = new ChatOpenAI({
-  model: resolveAnalyticsChatModel(),
-  apiKey: process.env.OPENAI_API_KEY,
-  supportsStrictToolCalling: false,
-  useResponsesApi: true,
-});
-
 const outputSchema = z.object({
   response: z.string(),
   followUps: z.array(z.string()).optional(),
 });
 
-const google = new GoogleAuth({
-  scopes: ['https://www.googleapis.com/auth/bigquery'],
-});
+// Nothing below runs at import: the model, the Google/GitHub auth and the MCP client are built on
+// first use. `AnalyticsAgentModule` is always loaded by `AppModule`, so a missing GitHub App key
+// or API key must only fail the analytics feature that needs it, never the whole backend boot.
+let llm: ChatOpenAI | undefined;
+export function getLlm(): ChatOpenAI {
+  llm ??= new ChatOpenAI({
+    model: resolveAnalyticsChatModel(),
+    apiKey: process.env.OPENAI_API_KEY,
+    supportsStrictToolCalling: false,
+    useResponsesApi: true,
+  });
+  return llm;
+}
 
-const authProvider: OAuthClientProvider = {
-  get redirectUrl() {
-    return undefined;
-  },
-  get clientMetadata() {
-    return { redirect_uris: [] };
-  },
-  clientInformation: () => undefined,
-  tokens: async () => {
-    const accessToken = await google.getAccessToken();
-    if (!accessToken) {
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`${name} is not set; the analytics agent cannot use it`);
+  }
+  return value;
+}
+
+function buildMcpClient(): MultiServerMCPClient {
+  const google = new GoogleAuth({
+    scopes: ['https://www.googleapis.com/auth/bigquery'],
+  });
+
+  const authProvider: OAuthClientProvider = {
+    get redirectUrl() {
+      return undefined;
+    },
+    get clientMetadata() {
+      return { redirect_uris: [] };
+    },
+    clientInformation: () => undefined,
+    tokens: async () => {
+      const accessToken = await google.getAccessToken();
+      if (!accessToken) {
+        throw new Error(
+          'Failed to obtain a Google access token for the BigQuery MCP server',
+        );
+      }
+      return { access_token: accessToken, token_type: 'Bearer' };
+    },
+    saveTokens: () => {},
+    redirectToAuthorization: () => {
       throw new Error(
-        'Failed to obtain a Google access token for the BigQuery MCP server',
+        'Interactive OAuth is not supported; tokens come from GoogleAuth',
       );
-    }
-    return { access_token: accessToken, token_type: 'Bearer' };
-  },
-  saveTokens: () => {},
-  redirectToAuthorization: () => {
-    throw new Error(
-      'Interactive OAuth is not supported; tokens come from GoogleAuth',
-    );
-  },
-  saveCodeVerifier: () => {},
-  codeVerifier: () => {
-    throw new Error(
-      'Interactive OAuth is not supported; tokens come from GoogleAuth',
-    );
-  },
-};
-
-const github = createAppAuth({
-  appId: process.env.GITHUB_APP_ID!,
-  privateKey: process.env.GITHUB_APP_PRIVATE_KEY!.replace(/\\n/g, '\n'),
-  installationId: process.env.GITHUB_APP_INSTALLATION_ID!,
-});
-
-const githubAuthProvider: OAuthClientProvider = {
-  get redirectUrl() {
-    return undefined;
-  },
-  get clientMetadata() {
-    return { redirect_uris: [] };
-  },
-  clientInformation: () => undefined,
-  tokens: async () => {
-    const { token } = await github({ type: 'installation' });
-    return { access_token: token, token_type: 'Bearer' };
-  },
-  saveTokens: () => {},
-  redirectToAuthorization: () => {
-    throw new Error(
-      'Interactive OAuth is not supported; tokens come from the GitHub App',
-    );
-  },
-  saveCodeVerifier: () => {},
-  codeVerifier: () => {
-    throw new Error(
-      'Interactive OAuth is not supported; tokens come from the GitHub App',
-    );
-  },
-};
-
-export const client = new MultiServerMCPClient({
-  servers: {
-    bigQuery: {
-      transport: 'http',
-      url: 'https://bigquery.googleapis.com/mcp',
-      authProvider,
     },
-    github: {
-      transport: 'http',
-      url: 'https://api.githubcopilot.com/mcp/readonly',
-      headers: { 'X-MCP-Toolsets': 'repos,git' },
-      authProvider: githubAuthProvider,
+    saveCodeVerifier: () => {},
+    codeVerifier: () => {
+      throw new Error(
+        'Interactive OAuth is not supported; tokens come from GoogleAuth',
+      );
     },
-    datalyze: {
-      transport: 'http',
-      url: 'https://www.joindatalyze.com/api/datalyze/mcp',
-      headers: {
-        Authorization: `Bearer ${process.env.DATALYZE_MCP_KEY}`,
+  };
+
+  const github = createAppAuth({
+    appId: requireEnv('GITHUB_APP_ID'),
+    privateKey: requireEnv('GITHUB_APP_PRIVATE_KEY').replace(/\\n/g, '\n'),
+    installationId: requireEnv('GITHUB_APP_INSTALLATION_ID'),
+  });
+
+  const githubAuthProvider: OAuthClientProvider = {
+    get redirectUrl() {
+      return undefined;
+    },
+    get clientMetadata() {
+      return { redirect_uris: [] };
+    },
+    clientInformation: () => undefined,
+    tokens: async () => {
+      const { token } = await github({ type: 'installation' });
+      return { access_token: token, token_type: 'Bearer' };
+    },
+    saveTokens: () => {},
+    redirectToAuthorization: () => {
+      throw new Error(
+        'Interactive OAuth is not supported; tokens come from the GitHub App',
+      );
+    },
+    saveCodeVerifier: () => {},
+    codeVerifier: () => {
+      throw new Error(
+        'Interactive OAuth is not supported; tokens come from the GitHub App',
+      );
+    },
+  };
+
+  return new MultiServerMCPClient({
+    servers: {
+      bigQuery: {
+        transport: 'http',
+        url: 'https://bigquery.googleapis.com/mcp',
+        authProvider,
+      },
+      github: {
+        transport: 'http',
+        url: 'https://api.githubcopilot.com/mcp/readonly',
+        headers: { 'X-MCP-Toolsets': 'repos,git' },
+        authProvider: githubAuthProvider,
+      },
+      datalyze: {
+        transport: 'http',
+        url: 'https://www.joindatalyze.com/api/datalyze/mcp',
+        headers: {
+          Authorization: `Bearer ${process.env.DATALYZE_MCP_KEY}`,
+        },
       },
     },
-  },
-});
+  });
+}
+
+// Shared by the chat agent and the auditor. Built once, on first use; a failed build is not cached.
+let mcpClient: MultiServerMCPClient | undefined;
+export function getMcpClient(): MultiServerMCPClient {
+  mcpClient ??= buildMcpClient();
+  return mcpClient;
+}
 
 export const AVAILABLE_TABLES = {
   // Marts
@@ -202,6 +226,118 @@ export const AVAILABLE_TABLES = {
     'int_users_roles.yml',
   'ally-analytics-prod.dbt_dev_intermediate.int_xp_events_joined':
     'int_xp_events_joined.yml',
+
+  // Staging
+  'ally-analytics-prod.dbt_dev_staging.stg_agent_test_cases': 'stg_agent_test_cases_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_analytics_quality_thresholds': 'stg_analytics_quality_thresholds_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_analytics_xp_goals': 'stg_analytics_xp_goals_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_badge_groups': 'stg_badge_groups_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_badge_tenants': 'stg_badge_tenants_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_badge_users': 'stg_badge_users_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_badges': 'stg_badges_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_behaviors': 'stg_behaviors_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_call_details': 'stg_call_details_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_case_items': 'stg_case_items_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_case_session_items': 'stg_case_session_items_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_case_sessions': 'stg_case_sessions_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_case_tenants': 'stg_case_tenants_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_cases': 'stg_cases_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_chat_audio_uploads': 'stg_chat_audio_uploads_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_chat_custom_field_values': 'stg_chat_custom_field_values_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_chat_summary_attempts': 'stg_chat_summary_attempts_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_chats': 'stg_chats_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_competencies': 'stg_competencies_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_competency_behaviors': 'stg_competency_behaviors_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_course_discussion_posts': 'stg_course_discussion_posts_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_course_discussions': 'stg_course_discussions_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_custom_field_definitions': 'stg_custom_field_definitions_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_feedback': 'stg_feedback_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_feedback_claim_judgment': 'stg_feedback_claim_judgment_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_foundational_skill_assessments': 'stg_foundational_skill_assessments_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_foundational_skill_benchmark_assessments': 'stg_foundational_skill_benchmark_assessments_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_foundational_skill_cuts': 'stg_foundational_skill_cuts_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_glossary_adherence_reports': 'stg_glossary_adherence_reports_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_groups': 'stg_groups_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_in_app_notifications': 'stg_in_app_notifications_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_language_error_annotations': 'stg_language_error_annotations_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_language_judgment_sessions': 'stg_language_judgment_sessions_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_languages': 'stg_languages_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_learner_supervisor_memory': 'stg_learner_supervisor_memory_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_llm_models': 'stg_llm_models_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_llm_usage': 'stg_llm_usage_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_messages': 'stg_messages_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_posthog_events': 'stg_posthog_events_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_preference': 'stg_preference_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_queue_entries': 'stg_queue_entries_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_agent_test_case_selections': 'stg_scenario_agent_test_case_selections_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_behavior_instruction_behaviors': 'stg_scenario_behavior_instruction_behaviors_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_behavior_instructions': 'stg_scenario_behavior_instructions_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_characters': 'stg_scenario_characters_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_cohort_restrictions': 'stg_scenario_cohort_restrictions_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_events': 'stg_scenario_events_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_path_items': 'stg_scenario_path_items_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_path_session_items': 'stg_scenario_path_session_items_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_path_sessions': 'stg_scenario_path_sessions_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_path_tenants': 'stg_scenario_path_tenants_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_paths': 'stg_scenario_paths_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_session_behavior_instructions': 'stg_scenario_session_behavior_instructions_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_session_chat_messages': 'stg_scenario_session_chat_messages_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_session_chats': 'stg_scenario_session_chats_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_session_details': 'stg_scenario_session_details_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_session_events': 'stg_scenario_session_events_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_session_feedbacks': 'stg_scenario_session_feedbacks_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_session_lifecycle_events': 'stg_scenario_session_lifecycle_events_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_session_message_tags': 'stg_scenario_session_message_tags_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_session_messages': 'stg_scenario_session_messages_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_session_recordings': 'stg_scenario_session_recordings_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_session_review_comment_reactions': 'stg_scenario_session_review_comment_reactions_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_session_review_comments': 'stg_scenario_session_review_comments_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_session_review_reactions': 'stg_scenario_session_review_reactions_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_session_review_read_status': 'stg_scenario_session_review_read_status_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_session_review_threads': 'stg_scenario_session_review_threads_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_session_reviews': 'stg_scenario_session_reviews_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_session_start_metrics': 'stg_scenario_session_start_metrics_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_session_supervisor_notes': 'stg_scenario_session_supervisor_notes_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_session_tags': 'stg_scenario_session_tags_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_session_turn_metrics': 'stg_scenario_session_turn_metrics_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_sessions': 'stg_scenario_sessions_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_tenants': 'stg_scenario_tenants_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_trigger_warnings': 'stg_scenario_trigger_warnings_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_versions': 'stg_scenario_versions_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenario_voices': 'stg_scenario_voices_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scenarios': 'stg_scenarios_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scribe_session_review_comment_reactions': 'stg_scribe_session_review_comment_reactions_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scribe_session_review_comments': 'stg_scribe_session_review_comments_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scribe_session_review_reactions': 'stg_scribe_session_review_reactions_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scribe_session_review_read_status': 'stg_scribe_session_review_read_status_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scribe_session_review_threads': 'stg_scribe_session_review_threads_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_scribe_session_reviews': 'stg_scribe_session_reviews_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_session_events': 'stg_session_events_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_session_feedback_skill_links': 'stg_session_feedback_skill_links_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_simulation_credits': 'stg_simulation_credits_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_summary_feedback': 'stg_summary_feedback_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_tenant_cohort_members': 'stg_tenant_cohort_members_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_tenant_cohorts': 'stg_tenant_cohorts_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_tenants': 'stg_tenants_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_track_annotation_attempts': 'stg_track_annotation_attempts_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_track_cohort_restrictions': 'stg_track_cohort_restrictions_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_track_enrollments': 'stg_track_enrollments_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_track_item_progress': 'stg_track_item_progress_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_track_items': 'stg_track_items_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_track_journal_entries': 'stg_track_journal_entries_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_track_quiz_attempts': 'stg_track_quiz_attempts_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_track_sections': 'stg_track_sections_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_track_tenants': 'stg_track_tenants_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_tracks': 'stg_tracks_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_trigger_warnings': 'stg_trigger_warnings_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_turn_drift_judgment': 'stg_turn_drift_judgment_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_user_daily_scores': 'stg_user_daily_scores_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_user_groups': 'stg_user_groups_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_user_progress': 'stg_user_progress_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_users': 'stg_users_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_wm_recall_judgments': 'stg_wm_recall_judgments_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_wm_recall_selections': 'stg_wm_recall_selections_pk_test.yml',
+  'ally-analytics-prod.dbt_dev_staging.stg_xp_events': 'stg_xp_events_pk_test.yml',
 
   // Seeds
   'ally-analytics-prod.dbt_dev_seeds.ai_task_categories':
@@ -370,14 +506,14 @@ export async function invokeAnalyticalAgent(
     `[${runId}] Question received (${query.length} chars, ${history.length} earlier turns, user ${userId ?? '-'}, chat ${chatId ?? '-'})`,
   );
   const startedAtMs = Date.now();
-  const tools = await client.listTools();
+  const tools = await getMcpClient().listTools();
 
   const systemPrompt = AGENT_SYSTEM_PROMPT.replace(
     '{{AVAILABLE_TABLES}}',
     Object.keys(AVAILABLE_TABLES).join('\n'),
   );
   const agent = createAgent({
-    model: LLM,
+    model: getLlm(),
     systemPrompt,
     responseFormat: toolStrategy(outputSchema),
     tools,
@@ -470,10 +606,10 @@ export async function invokeAnalyticalAgent(
     newMessages: answer.messages.slice(inputMessages.length),
     headCommit,
     config: {
-      model: String(LLM.model),
+      model: String(getLlm().model),
       systemPrompt,
       modelSettings: {
-        temperature: LLM.temperature ?? null,
+        temperature: getLlm().temperature ?? null,
         useResponsesApi: true,
         supportsStrictToolCalling: false,
         recursionLimit: RECURSION_LIMIT,
@@ -508,7 +644,7 @@ export async function invokeAnalyticalAgent(
 // The commit the default branch of the dbt repo points at, used to say which version of the
 // docs the agent read. Best effort: null if the lookup fails or the tool isn't exposed.
 async function resolveDbtHeadCommit(
-  tools: Awaited<ReturnType<typeof client.listTools>>,
+  tools: Awaited<ReturnType<MultiServerMCPClient['listTools']>>,
   toolCalls: { name: string; args: unknown }[],
 ): Promise<DbtHeadCommit> {
   try {

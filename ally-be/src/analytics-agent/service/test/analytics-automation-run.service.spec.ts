@@ -594,12 +594,19 @@ describe('AnalyticsAutomationRunService starting a run', () => {
       update: jest.fn().mockResolvedValue({ affected: 0 }),
       findOne: jest.fn().mockResolvedValue(null),
       find: jest.fn(
-        async (opts: { where: { runId: string } }) =>
-          agentsOf[opts.where.runId] ??
+        async (opts: { where: { runId: string | { value: string[] } } }) => {
+          // A single id, or `In([...])` when several earlier runs are checked at once.
+          const w = opts.where.runId;
+          const ids = typeof w === 'string' ? [w] : w.value;
+          const known = ids.flatMap((id) =>
+            (agentsOf[id] ?? []).map((a) => ({ ...a, runId: id })),
+          );
+          if (ids.some((id) => agentsOf[id])) return known;
           // The run just created: hand back the agent rows saved for it.
-          created
+          return created
             .filter((c) => c.agent)
-            .map((c, i) => ({ ...c, id: `agent-${i}` })),
+            .map((c, i) => ({ ...c, id: `agent-${i}` }));
+        },
       ),
     };
     const findings = {

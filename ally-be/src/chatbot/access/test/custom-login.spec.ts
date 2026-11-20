@@ -27,12 +27,6 @@ import {
  *   LAUNCH-CHECKLIST.md: custom logins are platform admins until these are closed.
  */
 
-// Every controller is required below, and the Analytics Agent's builds its GitHub App auth at
-// import, which needs these (placeholders: nothing here calls GitHub).
-process.env.GITHUB_APP_ID ??= '1';
-process.env.GITHUB_APP_INSTALLATION_ID ??= '1';
-process.env.GITHUB_APP_PRIVATE_KEY ??= 'placeholder';
-
 const SRC = path.resolve(__dirname, '../../..');
 const VERBS = [
   'GET',
