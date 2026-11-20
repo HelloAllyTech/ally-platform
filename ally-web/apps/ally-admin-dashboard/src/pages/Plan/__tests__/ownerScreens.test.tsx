@@ -11,9 +11,9 @@ import type { AssistantSeatsView, MyPlan, PlanSeat, PublishUse } from "@api";
 
 import { SeatsBlock } from "../../AssistantHome/sections/Seats";
 import { ShareScreen } from "../../Onboarding/screens/Share";
-import { compactCount, fullCount, levelOf, shortDay } from "../format";
+import { compactCount, fullCount, levelOf, shortDay, usd } from "../format";
 import { planLimitMessage } from "../limits";
-import { MyPlanBody, tokensLine } from "../MyPlan";
+import { MyPlanBody } from "../MyPlan";
 
 /**
  * CR1 Part C, the owner side: Plan and usage, Share → People's seats and publishing. Customers and
@@ -54,7 +54,6 @@ const SEATS = [
 
 const PLAN_VIEW: MyPlan = {
   isCreator: true,
-  tokens: { unlimited: false, left: 1_200_000, granted: 2_000_000, resetsOn: "2026-12-01" },
   plan: {
     key: "free",
     name: "Free",
@@ -101,16 +100,17 @@ const shareView = { draft: { access: { mode: "invite", emails: ["kiran@sunrise.e
 const noDollars = (container: HTMLElement) => expect(container.textContent).not.toContain("$");
 
 describe("Plan and usage", () => {
-  it("shows the plan line, tokens left, this month's runs, seats and the alert, with no dollars", () => {
+  it("shows the plan line, this month's runs, seats in words and the alert, with no tokens and no dollars", () => {
     const { container } = render(
       <MemoryRouter>
         <MyPlanBody plan={PLAN_VIEW} />
       </MemoryRouter>,
     );
     expect(screen.getByText("Free · 2 of 3 assistants published")).toBeTruthy();
-    expect(screen.getByTestId("plan-tokens").textContent).toContain(
-      "1.2M of 2M tokens left · resets 1 Dec",
-    );
+    expect(screen.queryByTestId("plan-tokens")).toBeNull();
+    expect(container.textContent).not.toMatch(/tokens/i);
+    expect(screen.getAllByText("Basic · 500 messages a month")).toHaveLength(3);
+    expect(screen.getByText("Premium · 3,000 messages a month")).toBeTruthy();
     expect(screen.getByTestId("plan-owner-runs").textContent).toContain("84 of 100");
     expect(screen.getByTestId("plan-customers").textContent).toContain("312 of 1,000");
     expect(screen.getByTestId("plan-alerts").textContent).toContain("84% used");
@@ -120,21 +120,63 @@ describe("Plan and usage", () => {
     noDollars(container);
   });
 
-  it("says a user who never created an assistant has no plan, and still shows their tokens", () => {
+  it("says a user who never created an assistant has no plan, and nothing else", () => {
     const { container } = render(
+      <MemoryRouter>
+        <MyPlanBody plan={{ isCreator: false }} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId("plan-not-creator")).toBeTruthy();
+    expect(screen.queryByTestId("plan-assistants")).toBeNull();
+    noDollars(container);
+  });
+
+  it("shows the monthly usage allowance in dollars, and that assistants stop when it is used up", () => {
+    render(
+      <MemoryRouter>
+        <MyPlanBody
+          plan={{ ...PLAN_VIEW, monthlyUsage: { used: 6.2, limit: 10, resetsOn: "2026-12-01" } }}
+        />
+      </MemoryRouter>,
+    );
+    const usage = screen.getByTestId("plan-monthly-usage");
+    expect(usage.textContent).toContain("$6.20 of $10.00");
+    expect(usage.textContent).toContain("Resets 1 Dec");
+    expect(screen.getByTestId("plan-usage-note").textContent).toContain(
+      "When this is used up, your assistants stop answering until it resets.",
+    );
+    // The allowance is the only money on the page: no plan or seat price.
+    expect(screen.getByTestId("plan-assistants").textContent).not.toContain("$");
+    expect(screen.getByTestId("plan-line").textContent).not.toContain("$");
+  });
+
+  it("says so once the monthly usage is used up", () => {
+    render(
       <MemoryRouter>
         <MyPlanBody
           plan={{
-            isCreator: false,
-            tokens: { unlimited: true, left: 0, granted: 0, resetsOn: null },
+            ...PLAN_VIEW,
+            capReached: true,
+            monthlyUsage: { used: 10.6, limit: 10, resetsOn: "2026-12-01" },
+            alerts: [{ what: "Monthly usage", percent: 100 }],
           }}
         />
       </MemoryRouter>,
     );
-    expect(screen.getByTestId("plan-not-creator")).toBeTruthy();
-    expect(screen.getByTestId("plan-tokens").textContent).toContain("Unlimited tokens");
-    expect(screen.queryByTestId("plan-assistants")).toBeNull();
-    noDollars(container);
+    expect(screen.getByTestId("plan-alerts").textContent).toContain("Monthly usage: used up");
+    expect(screen.getByTestId("plan-monthly-usage").textContent).toContain("$10.60 of $10.00");
+    expect(screen.getByTestId("plan-usage-note").textContent).toContain(
+      "This month's usage is used up",
+    );
+  });
+
+  it("shows no monthly usage card to a creator with no allowance set", () => {
+    render(
+      <MemoryRouter>
+        <MyPlanBody plan={{ ...PLAN_VIEW, monthlyUsage: null }} />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByTestId("plan-usage")).toBeNull();
   });
 
   it("reads unlimited limits as Unlimited, with no bar", () => {
@@ -258,16 +300,15 @@ describe("Publish", () => {
 });
 
 describe("format and limits", () => {
-  it("formats tokens compactly and counts exactly", () => {
+  it("formats big numbers compactly and counts exactly", () => {
     expect(compactCount(1_200_000)).toBe("1.2M");
     expect(compactCount(2_000_000)).toBe("2M");
     expect(compactCount(950_000)).toBe("950K");
     expect(compactCount(312)).toBe("312");
     expect(fullCount(1000)).toBe("1,000");
     expect(shortDay("2026-12-01")).toBe("1 Dec");
-    expect(
-      tokensLine({ unlimited: false, left: 1_200_000, granted: 2_000_000, resetsOn: null }),
-    ).toBe("1.2M of 2M tokens left");
+    expect(usd(6.2)).toBe("$6.20");
+    expect(usd(1234.5)).toBe("$1,234.50");
   });
 
   it("warns at 80% and is full at the limit", () => {
@@ -278,10 +319,10 @@ describe("format and limits", () => {
   });
 
   it("passes the plan's own refusal through, and nothing else", () => {
-    const message = "Your tokens are used up. Ask Ally to add more.";
-    expect(planLimitMessage({ status: 403, data: { errorCode: "TOKENS_USED_UP", message } })).toBe(
-      message,
-    );
+    const message = "Your account has reached this month's usage limit. Ask Ally to raise it.";
+    expect(
+      planLimitMessage({ status: 403, data: { errorCode: "USAGE_CAP_REACHED", message } }),
+    ).toBe(message);
     expect(planLimitMessage({ errorCode: "PLAN_OWNER_RUNS_USED_UP", message: "x" })).toBe("x");
     expect(planLimitMessage({ data: { errorCode: "other", message: "nope" } })).toBeNull();
     expect(planLimitMessage(undefined)).toBeNull();

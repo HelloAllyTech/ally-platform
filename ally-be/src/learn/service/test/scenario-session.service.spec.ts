@@ -248,8 +248,7 @@ describe('ScenarioSessionService', () => {
       findByIds: jest.fn(),
     };
 
-    const mockAiService = {
-    };
+    const mockAiService = {};
 
     const mockPermissionsService = {
       getUserRoles: jest.fn(),

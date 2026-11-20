@@ -14,6 +14,7 @@ import { SeatType } from '../entity/seat-type.entity';
 import { Subscription } from '../entity/subscription.entity';
 import {
   CostAlertKind,
+  DEFAULT_PLAN_KEY,
   SeatKind,
   SeatStatus,
   SubscriptionStatus,
@@ -22,7 +23,7 @@ import { microsToUsd, usdToMicros } from '../util/pricing.util';
 import { BillingAuditService } from './billing-audit.service';
 import { CostAlertService } from './cost-alert.service';
 
-export const DEFAULT_PLAN_KEY = 'free';
+export { DEFAULT_PLAN_KEY };
 const DAY_MS = 86_400_000;
 
 // ── dates (UTC calendar days, `YYYY-MM-DD`) ──────────────────────────
@@ -112,6 +113,8 @@ export class PlanService implements OnModuleInit {
           seatTypes.find((type) => type.id === plan.includedSeatTypeId)?.key ??
           null,
         price: plan.priceMicros === null ? null : microsToUsd(plan.priceMicros),
+        costCap:
+          plan.costCapMicros === null ? null : microsToUsd(plan.costCapMicros),
       })),
       seatTypes: seatTypes.map((type) => ({
         ...type,
@@ -133,6 +136,8 @@ export class PlanService implements OnModuleInit {
       ownerRuns: number | null;
       seatsRequired?: boolean;
       priceUsd?: number | null;
+      /** USD a creator on this plan may cost per period; empty: no cap. Left as it is when not sent. */
+      costCapUsd?: number | null;
       active?: boolean;
       note: string;
     },
@@ -165,6 +170,10 @@ export class PlanService implements OnModuleInit {
       ownerRuns: limit(input.ownerRuns, 'Owner-side runs'),
       seatsRequired: input.seatsRequired ?? before?.seatsRequired ?? true,
       priceMicros: money(input.priceUsd),
+      costCapMicros:
+        input.costCapUsd === undefined
+          ? (before?.costCapMicros ?? null)
+          : costCap(input.costCapUsd),
       active: input.active ?? before?.active ?? true,
     });
     const saved = await repo.save(row);
@@ -880,6 +889,16 @@ function money(value: unknown): number | null {
   const n = Number(value);
   if (!Number.isFinite(n) || n < 0)
     throw new BadRequestException('A price must be zero or more.');
+  return usdToMicros(n);
+}
+
+function costCap(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0)
+    throw new BadRequestException(
+      'A cost cap must be more than $0 (or empty for no cap).',
+    );
   return usdToMicros(n);
 }
 

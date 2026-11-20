@@ -1,11 +1,8 @@
 import { DataSource } from 'typeorm';
 import { BillingAuditService } from '../service/billing-audit.service';
 import { PlanService } from '../service/plan.service';
-import { TokenService } from '../service/token.service';
 
 /** Decided at the CR1 plan stop. */
-export const STARTING_TOKENS_FLOOR = 20_000_000;
-export const STARTING_TOKENS_MULTIPLIER = 3;
 export const STARTING_PLAN_KEY = 'pro';
 export const INTERNAL_PLAN_KEY = 'internal';
 /** Ally's own accounts are on the internal plan. */
@@ -17,13 +14,6 @@ export interface BackfillReport {
     email: string;
     plan: string;
     why: string;
-    existing: boolean;
-  }>;
-  tokens: Array<{
-    userId: number;
-    email: string;
-    last30Days: number;
-    amount: number;
     existing: boolean;
   }>;
   assistants: Array<{
@@ -47,10 +37,10 @@ export interface BackfillReport {
  *     admin, or a test organisation) on `internal`, everyone else on Pro;
  *   - every live assistant gets its included seats: owners, then editors, then invited emails;
  *     the invited people left without one are listed — seats are strict, so they'd be blocked;
- *   - every custom login gets max(20M, 3× their last 30 days' tokens), renewing monthly. Usage
- *     events only exist from CR1's deploy, so at first run that is 20M for everyone.
  *
- * Idempotent: existing subscriptions, seats and allowances are kept, never doubled.
+ * Token allowances are no longer given: the spend cap on each plan replaced them.
+ *
+ * Idempotent: existing subscriptions and seats are kept, never doubled.
  */
 export async function billingBackfill(
   dataSource: DataSource,
@@ -62,15 +52,8 @@ export async function billingBackfill(
   const audit = new BillingAuditService(dataSource);
   const alerts = { fire: async () => false } as never;
   const plans = new PlanService(dataSource, audit, alerts);
-  const tokens = new TokenService(
-    dataSource,
-    audit,
-    { addListener: () => undefined } as never,
-    alerts,
-  );
   const report: BackfillReport = {
     subscriptions: [],
-    tokens: [],
     assistants: [],
   };
 
@@ -111,36 +94,6 @@ export async function billingBackfill(
       plan: planKey,
       why: creator.why,
       existing: creator.existing,
-    });
-  }
-
-  const logins: Array<{
-    id: number;
-    email: string;
-    existing: boolean;
-    last30: string;
-  }> = await dataSource.query(
-    `SELECT u.id, u.email,
-            EXISTS (SELECT 1 FROM token_balances b WHERE b."userId" = u.id) AS existing,
-            coalesce((SELECT sum(e."inputTokens" + e."outputTokens") FROM usage_events e
-                       WHERE e."creatorUserId" = u.id AND e.kind <> 'whatsapp'
-                         AND e."createdAt" >= now() - interval '30 days'), 0) AS last30
-       FROM users u
-      WHERE EXISTS (SELECT 1 FROM user_groups ug JOIN groups g ON g.id = ug."groupId"
-                     WHERE ug."userId" = u.id AND g.name = 'ASSISTANT_OWNER')
-      ORDER BY u.id`,
-  );
-  for (const login of logins) {
-    const last30 = Number(login.last30);
-    report.tokens.push({
-      userId: login.id,
-      email: login.email,
-      last30Days: last30,
-      amount: Math.max(
-        STARTING_TOKENS_FLOOR,
-        STARTING_TOKENS_MULTIPLIER * last30,
-      ),
-      existing: login.existing,
     });
   }
 
@@ -226,13 +179,6 @@ export async function billingBackfill(
     await plans.setPlan(
       sub.userId,
       { planKey: sub.plan, periodStart: start, note },
-      actorUserId,
-    );
-  }
-  for (const grant of report.tokens.filter((t) => !t.existing)) {
-    await tokens.assign(
-      grant.userId,
-      { amount: grant.amount, renewMonthly: true, note },
       actorUserId,
     );
   }

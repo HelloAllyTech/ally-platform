@@ -43,6 +43,19 @@ export class Plan extends BaseWithoutTenantEntity {
   })
   priceMicros!: number | null;
 
+  /**
+   * The most a creator on this plan may cost Ally in one plan period (NULL = no cap). Ally admin
+   * only: owners never see it. A subscription can carry its own.
+   */
+  @Column({
+    type: 'numeric',
+    precision: 20,
+    scale: 3,
+    nullable: true,
+    transformer: numericTransformer,
+  })
+  costCapMicros!: number | null;
+
   @Column({ type: 'boolean', default: true })
   active!: boolean;
 }

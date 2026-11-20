@@ -5,20 +5,20 @@ import type { ReplyLanguage } from './reply-language';
  * reply would have gone out instead.
  */
 export type LimitReason =
-  /** A public or WhatsApp customer: the creator's tokens, or this assistant's monthly customer conversations, are used up. */
+  /** A public or WhatsApp customer: the creator's monthly cost cap is reached, or this assistant's monthly customer conversations are used up. */
   | 'customers'
   /** An invited person with no seat, or whose seat lapsed. */
   | 'no_seat'
   /** An invited person who used this month's messages on their seat. */
   | 'seat_messages'
-  /** The owner or their team (Try it): the creator's tokens are used up. */
-  | 'owner_tokens'
+  /** The owner or their team (Try it): the creator's monthly cost cap is reached. */
+  | 'owner_cap'
   /** The owner or their team (Try it): the plan's monthly owner-side runs are used up. */
   | 'owner_runs';
 
 /**
  * Fixed, honest replies, in the person's language like the run-failed reply (no AI call). Never a
- * dollar, a plan price or a token count: customers and owners don't see those.
+ * dollar or a plan price: customers and owners don't see those.
  */
 const TEXT: Record<LimitReason, Record<ReplyLanguage, string>> = {
   customers: {
@@ -39,11 +39,11 @@ const TEXT: Record<LimitReason, Record<ReplyLanguage, string>> = {
     'hi-latn':
       'Aapne is mahine ke messages poore kar liye hain. Premium seat ke liye {owner} se kahein.',
   },
-  owner_tokens: {
-    en: 'Your tokens are used up. Ask Ally to add more.',
-    hi: 'आपके टोकन खत्म हो गए हैं। और टोकन के लिए Ally से कहें।',
+  owner_cap: {
+    en: "Your account has reached this month's usage limit. Ask Ally to raise it.",
+    hi: 'आपके खाते की इस महीने की उपयोग सीमा पूरी हो गई है। इसे बढ़ाने के लिए Ally से कहें।',
     'hi-latn':
-      'Aapke tokens khatam ho gaye hain. Aur tokens ke liye Ally se kahein.',
+      'Aapke account ki is mahine ki usage limit poori ho gayi hai. Ise badhane ke liye Ally se kahein.',
   },
   owner_runs: {
     en: "Your plan's monthly limit for setup and checkups is used up. Ask Ally to upgrade.",
@@ -84,6 +84,6 @@ export function limitReply(
 
 /** Owner-side refusals outside a chat (setup, checkups, change by chat, re-indexing), as API errors. */
 export const OWNER_LIMIT_MESSAGES = {
-  owner_tokens: TEXT.owner_tokens.en,
+  owner_cap: TEXT.owner_cap.en,
   owner_runs: TEXT.owner_runs.en,
 } as const;

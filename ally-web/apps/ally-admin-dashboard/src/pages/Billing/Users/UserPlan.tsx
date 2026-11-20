@@ -22,9 +22,9 @@ import type {
 import { Button } from "@components";
 import { ButtonVariant } from "@components/types";
 
-import { compactCount, levelOf, longDay } from "../../Plan/format";
+import { levelOf, longDay } from "../../Plan/format";
 import { fill } from "../copy";
-import { formatCount, todayIso } from "../money";
+import { formatCost, formatCount, formatUsd, todayIso } from "../money";
 import { NoteConfirm, NoteConfirmRequest } from "../NoteConfirm";
 import { PLANS } from "../plansCopy";
 import { Field, inputClass } from "../SidePanel";
@@ -444,12 +444,16 @@ export const UserPlanView: React.FC<{
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-md border border-border-light p-3 md:p-4">
         {plan.ownerRuns && <AdminBar label={U.ownerRuns} bar={plan.ownerRuns} />}
         <div className="min-w-0 text-sm">
-          <p className="text-typography-700">{U.tokens}</p>
-          <p className="text-typography-900">
-            {plan.tokens
-              ? plan.tokens.unlimited
-                ? PLANS.plans.unlimited
-                : `${compactCount(plan.tokens.left)} of ${compactCount(plan.tokens.granted)} left`
+          <p className="text-typography-700">{U.spend}</p>
+          <p className="text-typography-900" data-testid="user-plan-spend">
+            {plan.spend
+              ? `${formatCost(plan.spend.usedUsd)} of ${
+                  plan.spend.capSource === "off"
+                    ? PLANS.spend.neverCapped
+                    : plan.spend.capUsd === null
+                      ? PLANS.spend.noCap
+                      : formatUsd(plan.spend.capUsd)
+                }`
               : "—"}
           </p>
         </div>

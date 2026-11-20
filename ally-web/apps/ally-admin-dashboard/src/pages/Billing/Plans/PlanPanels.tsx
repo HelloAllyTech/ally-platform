@@ -67,6 +67,7 @@ export const PlanPanel: React.FC<{
     ownerRuns: text(plan?.ownerRuns),
     seatsRequired: plan?.seatsRequired ?? true,
     price: text(plan?.price),
+    costCap: text(plan?.costCap),
     active: plan?.active ?? true,
   });
   const [error, setError] = useState<string | null>(null);
@@ -83,6 +84,9 @@ export const PlanPanel: React.FC<{
       return setError(F.badNumber);
     const price = parseUsdField(draft.price);
     if (price !== null && (!Number.isFinite(price) || price < 0)) return setError(F.badPrice);
+    const costCap = parseUsdField(draft.costCap);
+    if (costCap !== null && (!Number.isFinite(costCap) || costCap <= 0))
+      return setError(F.badCostCap);
     setError(null);
     onSave({
       ...(plan ? { id: plan.id } : draft.key.trim() ? { key: draft.key.trim() } : {}),
@@ -94,6 +98,7 @@ export const PlanPanel: React.FC<{
       ownerRuns,
       seatsRequired: draft.seatsRequired,
       priceUsd: price,
+      costCapUsd: costCap,
       active: draft.active,
     });
   };
@@ -189,6 +194,16 @@ export const PlanPanel: React.FC<{
             className={inputClass}
             value={draft.price}
             onChange={event => set({ price: event.target.value })}
+          />
+        </Field>
+        <Field id="plan-cost-cap" label={F.costCap} help={F.costCapHelp}>
+          <input
+            id="plan-cost-cap"
+            inputMode="decimal"
+            className={inputClass}
+            value={draft.costCap}
+            placeholder={PLANS.plans.noCap}
+            onChange={event => set({ costCap: event.target.value })}
           />
         </Field>
         <Toggle

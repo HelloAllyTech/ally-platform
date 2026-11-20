@@ -208,44 +208,19 @@ export class BreakdownQueryDto {
   to?: string;
 }
 
-export class TokenGrantDto extends NoteDto {
-  @ApiProperty({ example: 2_000_000 })
-  @IsNumber()
-  @Min(1)
-  amount!: number;
-
+export class SpendCapDto extends NoteDto {
   @ApiPropertyOptional({
-    description: 'Resets to this amount on the same day each month',
+    example: 40,
+    description: "This creator's own monthly cap in USD. Empty: their plan's",
   })
   @IsOptional()
-  renewMonthly?: boolean;
+  capUsd?: number | null;
 
-  @ApiPropertyOptional({ example: '2027-03-31' })
+  @ApiPropertyOptional({
+    description: "Never capped (Ally's team and test accounts)",
+  })
   @IsOptional()
-  @IsString()
-  expiresAt?: string | null;
-}
-
-export class TokenGrantUpdateDto extends NoteDto {
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsNumber()
-  @Min(1)
-  amount?: number;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  renewMonthly?: boolean;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  expiresAt?: string | null;
-}
-
-export class UnlimitedDto extends NoteDto {
-  @ApiProperty()
-  unlimited!: boolean;
+  off?: boolean;
 }
 
 export class PlanDto extends NoteDto {
@@ -289,6 +264,14 @@ export class PlanDto extends NoteDto {
   @ApiPropertyOptional({ description: 'USD per month, for Costs only' })
   @IsOptional()
   priceUsd?: number | null;
+
+  @ApiPropertyOptional({
+    example: 25,
+    description:
+      'The most a creator on this plan may cost Ally per period, in USD. Empty: no cap',
+  })
+  @IsOptional()
+  costCapUsd?: number | null;
 
   @ApiPropertyOptional()
   @IsOptional()
