@@ -1,0 +1,188 @@
+# Security Audit — weekly, read-only
+#
+# Two layers per service:
+#   1. Deterministic scanners (dependency CVEs) — facts, no model involved.
+#   2. An AI code review using the same opencode engine as Bug Hunter, driven by
+#      scripts/security-audit/prompt.md (Ally-specific: tenant isolation, RBAC,
+#      PHI in logs, webhooks, LLM prompt injection).
+# Results land in ONE GitHub issue per service per run, labelled `security-audit`.
+# It never pushes, never opens PRs, never merges. Fixing is a human decision.
+#
+# Required repository secrets / variables:
+#   OPENAI_API_KEY        — used by opencode when the model is an OpenAI one
+#   GEMINI_API_KEY        — used when the model is a Gemini one
+#   SECURITY_AUDIT_MODEL  — (variable) opencode model id, e.g. "openai/<model>"
+
+name: Security Audit
+run-name: "Security Audit · ${{ inputs.repo || 'every service' }} · ${{ inputs.deep || 'false' }}"
+
+permissions:
+  contents: read
+  issues: write
+
+on:
+  schedule:
+    - cron: "17 21 * * 0" # Sundays, 21:17 UTC
+  workflow_dispatch:
+    inputs:
+      repo:
+        required: false
+        type: string
+        description: "Service folder, e.g. ally-be. Empty audits every service."
+      deep:
+        required: false
+        type: string
+        default: "false"
+        description: '"true" reviews the whole service; otherwise only changes from the last 7 days plus their callers.'
+
+jobs:
+  audit:
+    name: Audit ${{ matrix.service }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        service: ${{ fromJSON(inputs.repo && format('["{0}"]', inputs.repo) || '["ally-be","ally-web","ally-ai","ally-ai-learn","ally-mobile"]') }}
+    concurrency:
+      group: security-audit-${{ matrix.service }}
+      cancel-in-progress: false
+    env:
+      SERVICE: ${{ matrix.service }}
+      DEEP: ${{ inputs.deep || 'false' }}
+      MODEL: ${{ vars.SECURITY_AUDIT_MODEL }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Setup Python
+        if: env.SERVICE == 'ally-ai' || env.SERVICE == 'ally-ai-learn'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Dependency scan
+        id: deps
+        working-directory: ${{ env.SERVICE }}
+        run: |
+          set -uo pipefail
+          : > /tmp/deps.md
+          if [ -f package-lock.json ]; then
+            npm audit --omit=dev --json > /tmp/npm-audit.json 2>/dev/null || true
+            jq -r '
+              (.metadata.vulnerabilities // {}) as $v
+              | "npm audit (production deps): critical=\($v.critical // 0) high=\($v.high // 0) moderate=\($v.moderate // 0) low=\($v.low // 0)\n"
+              + ([.vulnerabilities // {} | to_entries[] | select(.value.severity=="critical" or .value.severity=="high")
+                  | "- **\(.value.severity)** `\(.key)` — fix available: \(.value.fixAvailable | if type=="object" then "yes (\(.name)@\(.version))" else tostring end)"] | join("\n"))
+            ' /tmp/npm-audit.json >> /tmp/deps.md || echo "npm audit output could not be parsed." >> /tmp/deps.md
+          elif [ -f poetry.lock ]; then
+            pip install --quiet pip-audit poetry poetry-plugin-export
+            poetry export --without-hashes -f requirements.txt -o /tmp/req.txt >/dev/null 2>&1 || true
+            echo "pip-audit:" >> /tmp/deps.md
+            pip-audit -r /tmp/req.txt --no-deps --disable-pip 2>&1 | tail -n 60 >> /tmp/deps.md || true
+          else
+            echo "No lockfile scanner for this service (Flutter) — see the AI review." >> /tmp/deps.md
+          fi
+          cat /tmp/deps.md
+
+      - name: Link the other services, read-only
+        run: |
+          mkdir -p /tmp/siblings
+          for r in ally-be ally-web ally-mobile ally-ai ally-ai-learn; do
+            [ "$r" = "$SERVICE" ] || ln -s "$GITHUB_WORKSPACE/$r" "/tmp/siblings/$r"
+          done
+
+      - name: Build the audit prompt
+        run: |
+          set -euo pipefail
+          if [ "$DEEP" = "true" ]; then
+            SCOPE="the whole service (deep audit)"
+          else
+            SINCE=$(git log --since='7 days ago' --name-only --pretty=format: -- "$SERVICE" | sort -u | grep -v '^$' | head -300 || true)
+            if [ -n "$SINCE" ]; then
+              SCOPE="files changed in the last 7 days (listed below), plus anything that calls them. Also skim the auth guards and every controller/gateway as a baseline.\n\nChanged files:\n$SINCE"
+            else
+              SCOPE="no changes in the last 7 days — only skim auth guards, controllers and gateways as a baseline"
+            fi
+          fi
+          export SERVICE SCOPE DATE="$(date -u +%F)" REPORT=/tmp/audit-report.md
+          python3 - <<'PY' > /tmp/audit-prompt.txt
+          import os
+          t = open("scripts/security-audit/prompt.md").read()
+          for k in ("SERVICE", "SCOPE", "DATE", "REPORT"):
+              t = t.replace("__%s__" % k, os.environ[k].replace("\\n", "\n"))
+          print(t)
+          PY
+          wc -c /tmp/audit-prompt.txt
+
+      - name: Run the AI review (opencode, read-only)
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GOOGLE_GENERATIVE_AI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          set -uo pipefail
+          test -n "$MODEL" || { echo "::error::Set the SECURITY_AUDIT_MODEL repository variable."; exit 1; }
+          npm install -g opencode-ai@1.18.32
+          mkdir -p ~/.config/opencode ~/.cache/opencode
+          # No `edit`/write inside the checkout is useful here, and the job token
+          # is read-only for contents anyway; the report is written to /tmp.
+          cat > ~/.config/opencode/opencode.json <<'OCEOF'
+          {
+            "$schema": "https://opencode.ai/config.json",
+            "share": "disabled",
+            "autoupdate": false,
+            "permission": {
+              "edit": "allow",
+              "bash": { "*": "allow", "git push*": "deny", "git commit*": "deny", "curl*": "deny", "wget*": "deny", "rm -rf /*": "deny" },
+              "webfetch": "deny"
+            }
+          }
+          OCEOF
+          curl -sSf -m 60 https://models.dev/api.json -o ~/.cache/opencode/models.json || true
+          cd "$SERVICE"
+          timeout 75m opencode run --format default --auto --model "$MODEL" \
+            "$(cat /tmp/audit-prompt.txt)" > /tmp/opencode-out.txt 2>&1 || echo "opencode exited non-zero"
+          tail -n 20 /tmp/opencode-out.txt
+          test -s /tmp/audit-report.md || { echo "::error::The agent wrote no report."; exit 1; }
+          cd "$GITHUB_WORKSPACE"
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::error::The agent changed files in the checkout; refusing to publish."; git status --short; exit 1
+          fi
+
+      - name: Redact anything secret-shaped
+        run: |
+          # Belt and braces: the prompt forbids secret values, this strips common shapes anyway.
+          sed -E -i \
+            -e 's/(sk|pk|rk)-[A-Za-z0-9_-]{16,}/[REDACTED]/g' \
+            -e 's/AKIA[0-9A-Z]{16}/[REDACTED]/g' \
+            -e 's/AIza[0-9A-Za-z_-]{30,}/[REDACTED]/g' \
+            -e 's/gh[pousr]_[A-Za-z0-9]{30,}/[REDACTED]/g' \
+            -e 's/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/[REDACTED]/g' \
+            /tmp/audit-report.md
+
+      - name: Open the findings issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh label create security-audit --color B60205 --description "Weekly security audit" 2>/dev/null || true
+          DATE=$(date -u +%F)
+          {
+            cat /tmp/audit-report.md
+            printf '\n\n---\n## Dependency scan (deterministic)\n\n'
+            cat /tmp/deps.md
+            printf '\n\n_Run: %s/%s/actions/runs/%s · scope: %s_\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" "$([ "$DEEP" = true ] && echo deep || echo '7-day')"
+          } > /tmp/issue-body.md
+          # Keep within GitHub's body limit.
+          head -c 60000 /tmp/issue-body.md > /tmp/issue-body-trimmed.md
+          gh issue create --title "Security audit — $SERVICE — $DATE" \
+            --label security-audit --body-file /tmp/issue-body-trimmed.md
