@@ -115,6 +115,7 @@ export class BlueprintPlannerSpecialist {
           learnerProfileReference(brief?.learnerProfileId),
           // A person-chosen published course of a similar size, as a pattern (not content).
           exampleCourseReference(brief?.shape?.durationMinutes),
+          input.designGuidance,
         ]
           .map((part) => part?.trim())
           .filter(Boolean)

@@ -1,3 +1,4 @@
+import { CourseCopilotDesignGuidanceService } from './course-copilot-design-guidance.service';
 import {
   BadRequestException,
   ConflictException,
@@ -57,6 +58,8 @@ export class CourseCopilotBlueprintService {
     private readonly trackService: TrackService,
     @Optional() private readonly citations?: ContextCitationService,
     @Optional() private readonly sources?: CourseCopilotSourcesService,
+    @Optional()
+    private readonly designGuidance?: CourseCopilotDesignGuidanceService,
   ) {}
 
   /** Run the planner and store blueprint v(n+1). Caller has checked readiness. */
@@ -66,6 +69,14 @@ export class CourseCopilotBlueprintService {
   ): Promise<CourseCopilotBlueprintResponse> {
     const libraryPicks = await this.libraryPicks(session);
     const reference = await this.referenceForPlan(session, notes);
+    const designGuidance = this.designGuidance
+      ? await this.designGuidance.reference({
+          sessionId: session.id,
+          tenantId: session.tenantId,
+          brief: session.brief ?? {},
+          stage: 'blueprint',
+        })
+      : '';
     const planned = await this.planner.plan(
       {
         sessionId: session.id,
@@ -74,6 +85,7 @@ export class CourseCopilotBlueprintService {
         libraryPicks,
         games: courseCopilotGameOptions(),
         referenceMaterial: reference?.text ?? null,
+        designGuidance: designGuidance || null,
         usageMetadata: { courseCopilotSessionId: session.id },
       },
       { maxNewRoleplays: this.configService.courseCopilot.maxNewRoleplays },
