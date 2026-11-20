@@ -8,8 +8,8 @@ A coding agent can write a blog post and save it as a **draft** in Ally admin. I
 |---|---|
 | MCP server (JSON-RPC over HTTP) | `POST /api/v1/blog-authoring/mcp`, `src/blog/controller/blog-authoring.controller.ts` |
 | Keys (`bga_…`, hash only, shown once) | `GET/POST/DELETE /api/v1/blog-authoring/keys` (needs `edit:blog`), table `blog_author_keys` |
-| Tools | `blog_guide`, `list_posts`, `get_post`, `list_suggestions`, `request_image_upload`, `create_draft`, `update_draft` (`src/blog/service/blog-authoring-tools.service.ts`) |
-| Writing guidance | Skills Store prompt `blog_authoring_skill` (default `src/prompts/blog/authoring_skill.txt`), returned by `blog_guide` |
+| Tools | `blog_guide` (with an optional `pass`), `check_draft`, `list_posts`, `get_post`, `list_suggestions`, `request_image_upload`, `create_draft`, `update_draft` (`src/blog/service/blog-authoring-tools.service.ts`) |
+| Writing guidance | Four Skills Store prompts, returned by `blog_guide`: `blog_authoring_skill` (overview), `blog_research_skill`, `blog_compose_skill`, `blog_review_skill` (defaults in `src/prompts/blog/`). Three passes, each usable alone |
 | What the blog supports | `src/blog/util/blog-authoring-guide.util.ts` (tags the sanitizer keeps, cover palette, body checks) |
 | Claude Code side | `.mcp.json` (`ally-blog`) and `.claude/skills/ally-blog/SKILL.md` at the monorepo root |
 
@@ -23,7 +23,7 @@ A coding agent can write a blog post and save it as a **draft** in Ally admin. I
 
 ## Changing how posts are written
 
-Edit the `blog_authoring_skill` prompt in the Skills Store. No deploy.
+Edit the four prompts in the Skills Store. No deploy. `check_draft` (src/blog/util/blog-style-check.util.ts) is the mechanical part of the review pass: retrospective headings, internal words, unproven-claim phrases and aside dashes. Its word lists are code and change with a deploy.
 
 ## Sharing a draft for review
 

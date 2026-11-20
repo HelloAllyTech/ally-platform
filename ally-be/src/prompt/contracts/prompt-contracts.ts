@@ -2249,9 +2249,48 @@ export const BLOG_AUTHORING_SKILL = definePrompt(
   'blog_authoring_skill',
   {},
   {
-    name: 'Blog — Authoring skill',
+    name: 'Blog - Authoring skill (overview)',
     description:
-      'The skill Claude Code reads before it writes a post for the Ally blog: what a post must contain (including tags, reused exactly as written), how to illustrate it (flow diagrams and product screens in the Ally blog design), the voice, what must never go in a public post, and how to apply suggestions from reviewers. Served by the blog_guide tool. Not a model prompt: edit it to change how every agent-written post is written.',
+      'The overview Claude Code reads first when writing for the Ally blog: the three passes (research, compose, review), when to use each alone, and the rules that hold in every pass. Served by the blog_guide tool. Not a model prompt.',
+    category: 'Blog',
+    runtimes: ['ally-be'],
+  },
+);
+
+/** src/prompts/blog/research_skill.txt */
+export const BLOG_RESEARCH_SKILL = definePrompt(
+  'blog_research_skill',
+  {},
+  {
+    name: 'Blog - Pass 1: Research',
+    description:
+      'Pass 1 of writing a blog post: find what is true and what can be said, and produce a research brief (question and reader, claims with evidence, plain words for internal terms, what must stay out, a picture plan). Served by blog_guide with pass research. Not a model prompt.',
+    category: 'Blog',
+    runtimes: ['ally-be'],
+  },
+);
+
+/** src/prompts/blog/compose_skill.txt */
+export const BLOG_COMPOSE_SKILL = definePrompt(
+  'blog_compose_skill',
+  {},
+  {
+    name: 'Blog - Pass 2: Compose',
+    description:
+      'Pass 2 of writing a blog post: write the post and its illustrations from the research brief, in plain words for a reader outside Ally, saying what the thing does and not what it achieves, in the Ally blog design. Served by blog_guide with pass compose. Not a model prompt.',
+    category: 'Blog',
+    runtimes: ['ally-be'],
+  },
+);
+
+/** src/prompts/blog/review_skill.txt */
+export const BLOG_REVIEW_SKILL = definePrompt(
+  'blog_review_skill',
+  {},
+  {
+    name: 'Blog - Pass 3: Review',
+    description:
+      'Pass 3 of writing a blog post: read the saved draft as an outsider, run check_draft, remove unproven claims, retrospective sections and internal words, check the images, fix with update_draft and report. Served by blog_guide with pass review. Not a model prompt.',
     category: 'Blog',
     runtimes: ['ally-be'],
   },

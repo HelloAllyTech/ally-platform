@@ -2,7 +2,12 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
 import { ExecutionManager } from 'src/common/execution/execution-manager';
-import { BLOG_AUTHORING_SKILL } from 'src/prompt/contracts';
+import {
+  BLOG_AUTHORING_SKILL,
+  BLOG_COMPOSE_SKILL,
+  BLOG_RESEARCH_SKILL,
+  BLOG_REVIEW_SKILL,
+} from 'src/prompt/contracts';
 import { PromptSharedService } from 'src/prompt/service/prompt-shared.service';
 
 import { BLOG_COVER_COLOR_PATTERN } from '../constants/blog.constants';
@@ -16,6 +21,7 @@ import {
   blogAuthoringGuide,
   findBodyIssues,
 } from '../util/blog-authoring-guide.util';
+import { findStyleIssues } from '../util/blog-style-check.util';
 import { BlogReviewService } from './blog-review.service';
 import { BlogService } from './blog.service';
 
@@ -85,8 +91,28 @@ export class BlogAuthoringToolsService {
       {
         name: 'blog_guide',
         description:
-          'Read this first. The Ally blog authoring skill (what a post must contain, how to illustrate it, the voice, what never goes in a public post) plus what the blog supports (fields, the HTML the body may use, image rules, tags and cover colours already in use).',
-        inputSchema: { type: 'object', properties: {} },
+          'Read this first. With no pass: the overview of the three passes (research, compose, review) plus what the blog supports (fields, the HTML the body may use, image rules, tags and cover colours in use). With a pass: that pass skill from the Skills Store. Each pass can be used on its own.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            pass: {
+              type: 'string',
+              enum: ['research', 'compose', 'review'],
+              description:
+                'research: find the facts and what can be said. compose: write the post and its pictures. review: check a saved draft and fix it.',
+            },
+          },
+        },
+      },
+      {
+        name: 'check_draft',
+        description:
+          'Review pass: mechanical checks on a saved post. Finds sections about what is not done or what went wrong, internal words an outsider cannot read, lines that read as unproven claims, dashes used for asides, and markup the blog removes. It cannot judge a claim; read the post yourself too.',
+        inputSchema: {
+          type: 'object',
+          properties: { id: { type: 'string' } },
+          required: ['id'],
+        },
       },
       {
         name: 'list_posts',
@@ -170,7 +196,9 @@ export class BlogAuthoringToolsService {
       ExecutionManager.setAuthContext(String(ownerId), '');
       switch (name) {
         case 'blog_guide':
-          return this.guide();
+          return this.guide(args?.pass);
+        case 'check_draft':
+          return this.check(args);
         case 'list_posts':
           return this.list(args);
         case 'get_post':
@@ -195,16 +223,59 @@ export class BlogAuthoringToolsService {
     return id;
   }
 
-  private async guide() {
-    const { tags } = await this.blogs.getPublishedTags();
-    // The editorial skill is a Skills Store prompt, so people change how posts are written without a deploy.
+  private async guide(pass?: unknown) {
+    const codes: Record<string, string> = {
+      research: BLOG_RESEARCH_SKILL.code,
+      compose: BLOG_COMPOSE_SKILL.code,
+      review: BLOG_REVIEW_SKILL.code,
+    };
+    const wanted =
+      pass === undefined || pass === null || pass === '' ? null : String(pass);
+    if (wanted && !codes[wanted]) {
+      throw new BadRequestException('pass must be research, compose or review');
+    }
+    // The skills are Skills Store prompts, so people change how posts are written without a deploy.
     const skill = await this.prompts
-      .getPromptByCode(BLOG_AUTHORING_SKILL.code)
+      .getPromptByCode(wanted ? codes[wanted] : BLOG_AUTHORING_SKILL.code)
       .catch(() => null);
-    return blogAuthoringGuide(
-      tags.map((t) => t.tag),
-      skill,
-    );
+    if (wanted === 'research' || wanted === 'review') {
+      return {
+        pass: wanted,
+        skill:
+          skill?.trim() ||
+          '(This skill could not be loaded. Ask the person what to check.)',
+        next:
+          wanted === 'research'
+            ? 'Hand the research brief to the person, then use the compose pass (blog_guide pass compose).'
+            : 'Run check_draft, fix what fails with update_draft, and report.',
+      };
+    }
+    const { tags } = await this.blogs.getPublishedTags();
+    return {
+      pass: wanted ?? 'overview',
+      ...blogAuthoringGuide(
+        tags.map((t) => t.tag),
+        skill,
+      ),
+      passes: ['research', 'compose', 'review'],
+    };
+  }
+
+  /** The review pass: mechanical checks on a saved post. */
+  private async check(args: Record<string, any>) {
+    const post = await this.blogs.getById(this.id(args));
+    const style = findStyleIssues(post);
+    const markup = findBodyIssues(post.body);
+    return {
+      id: post.id,
+      title: post.title,
+      status: post.status,
+      clean: style.length === 0 && markup.length === 0,
+      style,
+      markup,
+      reminder:
+        'These checks cannot judge a claim or read a picture. Read the post as an outsider, open each image, and compare every claim with the research brief.',
+    };
   }
 
   private async list(args: Record<string, any>) {

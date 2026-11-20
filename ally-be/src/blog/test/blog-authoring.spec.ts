@@ -199,12 +199,48 @@ describe('BlogAuthoringToolsService', () => {
     expect(out[0].comment).toBe('Shorter');
   });
 
+  it('serves each pass skill from the Skills Store', async () => {
+    const { svc, prompts } = make();
+    for (const [pass, code] of [
+      ['research', 'blog_research_skill'],
+      ['compose', 'blog_compose_skill'],
+      ['review', 'blog_review_skill'],
+    ]) {
+      const out: any = await svc.call('blog_guide', { pass }, 7);
+      expect(prompts.getPromptByCode).toHaveBeenLastCalledWith(code);
+      expect(out.pass).toBe(pass);
+      expect(out.skill).toBe('# Skill text');
+    }
+    const overview: any = await svc.call('blog_guide', {}, 7);
+    expect(overview.pass).toBe('overview');
+    expect(overview.passes).toEqual(['research', 'compose', 'review']);
+    await expect(svc.call('blog_guide', { pass: 'nope' }, 7)).rejects.toThrow(
+      /pass must be/,
+    );
+  });
+
+  it('check_draft reports style and markup problems on a saved post', async () => {
+    const { svc } = make(
+      post({
+        title: 'A planner',
+        body: '<h2>What went wrong first</h2><div>x</div>',
+      }),
+    );
+    const out: any = await svc.call('check_draft', { id: 'p1' }, 7);
+    expect(out.clean).toBe(false);
+    expect(out.style.map((i: any) => i.kind)).toEqual(
+      expect.arrayContaining(['retrospective_heading', 'internal_term']),
+    );
+    expect(out.markup.length).toBeGreaterThan(0);
+  });
+
   it('has no tool that publishes or deletes', () => {
     const names = make()
       .svc.definitions()
       .map((d) => d.name);
     expect(names).toEqual([
       'blog_guide',
+      'check_draft',
       'list_posts',
       'get_post',
       'list_suggestions',
