@@ -15,14 +15,15 @@ export const TemplateOriginLine: React.FC<{
   showExamples?: boolean;
 }> = ({ botId, onReplace, showExamples = true }) => {
   const { data } = useGetTemplateOriginQuery(botId);
-  if (!data?.template && !data?.examples_left.total) return null;
+  // Read defensively: an older server, or a mock, may answer with something else.
+  const template = data?.template ?? null;
+  const lists = Array.isArray(data?.examples_left?.lists) ? data!.examples_left.lists : [];
+  if (!template && !lists.length) return null;
   return (
     <div className="ally-small" data-testid="template-origin">
-      {data.template && (
-        <p style={{ margin: 0 }}>{fillIn(C.origin, { template: data.template.name })}</p>
-      )}
+      {template && <p style={{ margin: 0 }}>{fillIn(C.origin, { template: template.name })}</p>}
       {showExamples &&
-        data.examples_left.lists.map(list => (
+        lists.map(list => (
           <p key={list.key} style={{ margin: "4px 0 0" }}>
             {fillIn(C.examplesLeft, { n: list.count, list: list.name })}{" "}
             {onReplace && (
