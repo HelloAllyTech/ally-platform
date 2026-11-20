@@ -1,0 +1,169 @@
+/* Start from a template (T1): the cards in two groups, then the setup questions. v2 tokens only. */
+
+.ally-templates__group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+.ally-templates__group-title {
+  margin: 0;
+  font-family: var(--ally-font-label);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ally-muted);
+}
+.ally-templates__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ally-templates__cards > li {
+  display: flex;
+  min-width: 0;
+}
+.ally-templates__card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  overflow: hidden;
+  padding: 0;
+  text-align: left;
+  color: var(--ally-ink);
+  background: var(--ally-surface);
+  border: 1px solid var(--ally-line);
+  border-radius: var(--ally-radius-lg);
+  cursor: pointer;
+  transition:
+    box-shadow 0.2s var(--ally-ease),
+    transform 0.2s var(--ally-ease);
+}
+.ally-templates__card:hover {
+  box-shadow: var(--ally-shadow-hover);
+  transform: translateY(-2px);
+}
+.ally-templates__card:focus-visible {
+  outline: 2px solid var(--ally-accent);
+  outline-offset: 2px;
+}
+.ally-templates__art {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 72px;
+  background: var(--ally-sunken);
+}
+.ally-templates__motif {
+  height: 56px;
+}
+.ally-templates__emoji {
+  font-size: 32px;
+}
+.ally-templates__body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px 16px;
+}
+.ally-templates__badge {
+  align-self: flex-start;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: var(--ally-accent);
+  background: var(--ally-accent-soft);
+  border-radius: 999px;
+}
+.ally-templates__name {
+  font-weight: 600;
+  font-size: 16px;
+}
+.ally-templates__line {
+  color: var(--ally-ink-2);
+}
+.ally-templates__use {
+  margin-top: 6px;
+  color: var(--ally-accent);
+  font-weight: 600;
+}
+
+.ally-templates__form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.ally-templates__question {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.ally-templates__ask {
+  padding: 0;
+  font-weight: 600;
+}
+.ally-templates__skip {
+  color: var(--ally-muted);
+}
+.ally-templates__choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ally-templates__choice {
+  padding: 8px 14px;
+  color: var(--ally-ink);
+  background: var(--ally-surface);
+  border: 1px solid var(--ally-line-strong);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.ally-templates__choice.is-on {
+  color: var(--ally-on-accent);
+  background: var(--ally-accent);
+  border-color: var(--ally-accent);
+}
+.ally-templates__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.ally-templates__note {
+  margin: 0;
+}
+.ally-templates__result {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ally-templates__result ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.ally-templates__failed {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ally-templates__card {
+    transition: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .ally-templates__cards {
+    grid-template-columns: 1fr;
+  }
+  .ally-templates__art {
+    height: 56px;
+  }
+}

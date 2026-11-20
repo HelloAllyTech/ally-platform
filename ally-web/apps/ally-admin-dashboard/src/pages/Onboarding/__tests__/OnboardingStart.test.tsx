@@ -20,6 +20,15 @@ const start = {
   startWithInterview: vi.fn(),
 };
 vi.mock("../useOnboardingStart", () => ({ useOnboardingStart: () => start }));
+vi.mock("@api", async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  // T1's template hooks: no templates and no origin unless a test says so.
+  useGetTemplateCatalogueQuery: () => ({ data: undefined, isLoading: false, isError: false }),
+  useGetTemplateOriginQuery: () => ({ data: undefined }),
+  useApplyDraftTemplateMutation: () => [vi.fn()],
+  useGetAssistantTemplatesQuery: () => ({ data: undefined, isLoading: false, isError: false }),
+  useInstallTemplateMutation: () => [vi.fn(), { isLoading: false }],
+}));
 
 const renderStart = () =>
   render(
@@ -34,7 +43,7 @@ const renderStart = () =>
 
 const pdf = (name = "menu.pdf") => new File(["x"], name, { type: "application/pdf" });
 
-describe("onboarding start: four ways to begin", () => {
+describe("onboarding start: five ways to begin", () => {
   beforeEach(() => {
     // jsdom has no Element.scrollTo; StepFrame scrolls the new screen to the top.
     Element.prototype.scrollTo = vi.fn();
@@ -43,7 +52,7 @@ describe("onboarding start: four ways to begin", () => {
     start.startWithFiles.mockResolvedValue("draft-3");
   });
 
-  it("opens on four cards, in order, with a close button", () => {
+  it("opens on five cards, in order, with a close button", () => {
     renderStart();
     const cards = screen.getAllByTestId(/start-method-/).map(c => c.getAttribute("data-testid"));
     expect(cards).toEqual([
@@ -51,6 +60,8 @@ describe("onboarding start: four ways to begin", () => {
       "start-method-documents",
       "start-method-describe",
       "start-method-interview",
+      // T1: Start from a template.
+      "start-method-template",
     ]);
     expect(screen.getByRole("button", { name: COPY.frame.close })).toBeTruthy();
     expect(screen.queryByPlaceholderText(COPY.start.placeholder)).toBeNull();
@@ -67,7 +78,7 @@ describe("onboarding start: four ways to begin", () => {
     fireEvent.click(screen.getByTestId("start-method-website"));
     expect(screen.getByPlaceholderText(COPY.start.placeholder)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: new RegExp(COPY.frame.back) }));
-    expect(screen.getAllByTestId(/start-method-/)).toHaveLength(4);
+    expect(screen.getAllByTestId(/start-method-/)).toHaveLength(5);
   });
 
   it("documents need an explicit start, then upload what was chosen", async () => {

@@ -38,6 +38,7 @@
 | An example entry in a list | "Example" (pill) |
 | Before publishing, while examples remain | "Some lists still have example entries. Your assistant may share them as if they were yours. **Replace them** or **Publish anyway**" |
 | Installing never publishes | (no text; the assistant stays a draft or as it was) |
+| **Added in the build (20 Nov), for review** | Setup from nothing, first question: "What's it called?" · Buttons: "Back", "Set it up", "Done", "Try again" · Yes/No answers: "Yes", "No" · While loading: "Getting the templates…" · If they don't load: "The templates didn't load. Try again." |
 
 ## New lists
 

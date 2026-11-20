@@ -218,6 +218,16 @@ const DevOnboarding: React.FC = () => {
       flow: flowFor(view, passed, { sending: drafting, drafting, streaming: "" }),
       pass: advance,
       backScreen: async () => undefined,
+      // T1: "Start from a template" after reading, answered with a fixed result.
+      applyTemplate: async template => ({
+        template: { id: template, name: "Clinic or doctor" },
+        added: ["Slots", "Appointments", "Callback requests"],
+        skipped: [],
+        pack: { outcome: "raised" as const, pack: "Medical safety" },
+        checkups: 7,
+        examples: 0,
+        channels: null,
+      }),
     };
     // `next` changes every render; the stage is what matters.
     // eslint-disable-next-line react-hooks/exhaustive-deps

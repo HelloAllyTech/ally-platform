@@ -9,12 +9,13 @@ import { Segmented } from "@components/v2";
 import { ROUTES } from "@constants";
 import { BotPageView, ChatbotStatus } from "@types";
 
+import { AllNumbers } from "./AllNumbers";
+import { Scorecard } from "./Scorecard";
 import { Qr } from "../../Onboarding/Screens";
+import { TemplateOriginLine } from "../../Templates/TemplateOriginLine";
 import { copyToClipboard } from "../../WhatsAppBot/shared";
 import { HOME } from "../copy";
 import { Group, SectionHead } from "../fields";
-import { AllNumbers } from "./AllNumbers";
-import { Scorecard } from "./Scorecard";
 import { RemoveDialog } from "../ui/RemoveDialog";
 
 import type { SectionProps } from "./props";
@@ -82,6 +83,10 @@ export const OverviewSection: React.FC<
             </Button>
           )}
         </div>
+        <TemplateOriginLine
+          botId={bot.id}
+          onReplace={key => navigate(`?section=lists&tool=${encodeURIComponent(key)}`)}
+        />
       </Group>
 
       <Scorecard botId={bot.id} canEdit={canEdit} go={go} />
