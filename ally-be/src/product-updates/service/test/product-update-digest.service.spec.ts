@@ -236,9 +236,10 @@ describe('ProductUpdateDigestService', () => {
 
     const body: string = sesService.sendEmail.mock.calls[0][0].body;
     expect(body).toContain('Roadmap votes in September so far:');
-    expect(body).toContain('Voters voted others share');
-    expect(body).toContain('75%'); // Bea: 9 of 12 on colleagues' ideas
-    expect(body).toContain('100%'); // Asha: 3 of 3
+    expect(body).toContain('Balance');
+    expect(body).not.toContain('Voters voted others share');
+    // Bea: 9 of 12 and Asha: 3 of 3 on colleagues' ideas
+    expect(body).toContain('Most votes to other people&#39;s ideas');
     expect(body).not.toContain('admins have voted');
     expect(body.indexOf('Bea')).toBeLessThan(body.indexOf('Asha'));
     expect(body).not.toContain('Not voted yet');
