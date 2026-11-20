@@ -32,7 +32,7 @@ const saveReader = (name: string, email: string) => {
 };
 
 const inputClass =
-  "mt-1 w-full rounded-lg border border-[#29261f]/20 bg-white px-3 py-2 text-base text-[#29261f] focus:border-[#D97757] focus:outline-none focus:ring-1 focus:ring-[#D97757]";
+  "mt-1 w-full rounded-lg border border-gray-900/20 bg-white px-3 py-2 text-base text-gray-900 focus:border-blog-accent focus:outline-none focus:ring-1 focus:ring-blog-accent";
 
 const SuggestionPanel: FC<{
   token: string;
@@ -86,10 +86,10 @@ const SuggestionPanel: FC<{
 
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-4">
-      <h2 className="text-lg text-[#29261f]">Suggest a change</h2>
+      <h2 className="text-lg text-gray-900">Suggest a change</h2>
 
       <div>
-        <label htmlFor="review-name" className="text-sm text-[#565045]">
+        <label htmlFor="review-name" className="text-sm text-gray-700">
           Your name
         </label>
         <input
@@ -102,14 +102,14 @@ const SuggestionPanel: FC<{
           className={inputClass}
         />
         {touched && nameMissing && (
-          <p id="review-name-error" className="mt-1 text-sm text-[#b3402a]">
+          <p id="review-name-error" className="mt-1 text-sm text-blog-error">
             Please enter your name.
           </p>
         )}
       </div>
 
       <div>
-        <label htmlFor="review-email" className="text-sm text-[#565045]">
+        <label htmlFor="review-email" className="text-sm text-gray-700">
           Email (optional, so the author can reply)
         </label>
         <input
@@ -122,7 +122,7 @@ const SuggestionPanel: FC<{
       </div>
 
       <div>
-        <label htmlFor="review-quote" className="text-sm text-[#565045]">
+        <label htmlFor="review-quote" className="text-sm text-gray-700">
           About this text (optional)
         </label>
         <textarea
@@ -137,7 +137,7 @@ const SuggestionPanel: FC<{
       </div>
 
       <div>
-        <label htmlFor="review-comment" className="text-sm text-[#565045]">
+        <label htmlFor="review-comment" className="text-sm text-gray-700">
           Your comment
         </label>
         <textarea
@@ -151,10 +151,10 @@ const SuggestionPanel: FC<{
           className={inputClass}
         />
         <div className="flex justify-between text-sm">
-          <span id="review-comment-error" className="text-[#b3402a]">
+          <span id="review-comment-error" className="text-blog-error">
             {touched && commentMissing ? "Please write a comment." : ""}
           </span>
-          <span className="text-[#928b7c]">
+          <span className="text-gray-500">
             {comment.length}/{MAX_COMMENT}
           </span>
         </div>
@@ -163,14 +163,14 @@ const SuggestionPanel: FC<{
       <button
         type="submit"
         disabled={isLoading}
-        className="min-h-[44px] w-full rounded-full bg-[#29261f] px-5 py-2 text-base text-white transition-colors hover:bg-[#3d3a32] disabled:opacity-60"
+        className="min-h-[44px] w-full rounded-full bg-gray-900 px-5 py-2 text-base text-white transition-colors hover:bg-gray-800 disabled:opacity-60"
       >
         {isLoading ? "Sending…" : "Send suggestion"}
       </button>
 
       <div role="status" aria-live="polite">
         {message && (
-          <p className={message.kind === "ok" ? "text-[#33322F]" : "text-[#b3402a]"}>
+          <p className={message.kind === "ok" ? "text-blog-body" : "text-blog-error"}>
             {message.text}
           </p>
         )}
@@ -240,14 +240,14 @@ export const BlogReview: FC = () => {
   };
 
   return (
-    <div className="blog-serif flex min-h-dvh flex-col bg-[#FAF9F5] text-[#29261f]">
+    <div className="blog-serif flex min-h-dvh flex-col bg-gray-50 text-gray-900">
       <BlogHeader />
 
       {isLoading ? (
-        <p className="mx-auto mt-12 w-full max-w-2xl px-4 text-[#565045]">Loading…</p>
+        <p className="mx-auto mt-12 w-full max-w-2xl px-4 text-gray-700">Loading…</p>
       ) : isError || !post ? (
         <div className="mx-auto w-full max-w-2xl flex-1 px-4 pt-12 sm:px-6">
-          <p className="text-[#565045]">
+          <p className="text-gray-700">
             This review link is not valid any more. Ask the author for a new one.
           </p>
           <Link
@@ -261,7 +261,7 @@ export const BlogReview: FC = () => {
         <>
           <div
             role="note"
-            className="border-b border-[#D97757]/30 bg-[#F6E3D8] px-4 py-3 text-center text-sm text-[#29261f]"
+            className="border-b border-blog-accent/30 bg-blog-accent-tint px-4 py-3 text-center text-sm text-gray-900"
           >
             <strong>This is a draft for review. It is not published and may change.</strong> This
             link works until {formatDate(data?.expiresAt)}.
@@ -281,12 +281,12 @@ export const BlogReview: FC = () => {
               aria-label="Suggest a change"
               className={`${
                 sheetOpen ? "" : "max-xl:hidden"
-              } max-xl:fixed max-xl:inset-x-0 max-xl:bottom-0 max-xl:z-30 max-xl:max-h-[80dvh] max-xl:overflow-y-auto max-xl:rounded-t-2xl max-xl:border-t max-xl:border-[#29261f]/10 max-xl:bg-[#FAF9F5] max-xl:p-5 max-xl:shadow-2xl xl:sticky xl:top-8 xl:h-fit xl:w-80 xl:shrink-0 xl:rounded-2xl xl:border xl:border-[#29261f]/10 xl:bg-white xl:p-5`}
+              } max-xl:fixed max-xl:inset-x-0 max-xl:bottom-0 max-xl:z-30 max-xl:max-h-[80dvh] max-xl:overflow-y-auto max-xl:rounded-t-2xl max-xl:border-t max-xl:border-gray-900/10 max-xl:bg-gray-50 max-xl:p-5 max-xl:shadow-2xl xl:sticky xl:top-8 xl:h-fit xl:w-80 xl:shrink-0 xl:rounded-2xl xl:border xl:border-gray-900/10 xl:bg-white xl:p-5`}
             >
               <button
                 type="button"
                 onClick={() => setSheetOpen(false)}
-                className="mb-2 min-h-[44px] text-sm text-[#928b7c] xl:hidden"
+                className="mb-2 min-h-[44px] text-sm text-gray-500 xl:hidden"
               >
                 Close
               </button>
@@ -298,7 +298,7 @@ export const BlogReview: FC = () => {
             <button
               type="button"
               onClick={() => setSheetOpen(true)}
-              className="fixed bottom-4 right-4 z-20 min-h-[44px] rounded-full bg-[#29261f] px-5 text-white shadow-lg xl:hidden"
+              className="fixed bottom-4 right-4 z-20 min-h-[44px] rounded-full bg-gray-900 px-5 text-white shadow-lg xl:hidden"
             >
               Suggest a change
             </button>
@@ -311,7 +311,7 @@ export const BlogReview: FC = () => {
               onMouseDown={event => event.preventDefault()}
               onClick={applyChip}
               style={{ position: "fixed", top: chip.top, left: chip.left }}
-              className="z-40 rounded-full bg-[#29261f] px-3 py-2 text-sm text-white shadow-lg"
+              className="z-40 rounded-full bg-gray-900 px-3 py-2 text-sm text-white shadow-lg"
             >
               Suggest a change to this text
             </button>

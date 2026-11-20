@@ -40,7 +40,7 @@ Owners start from a whole use case instead of assembling an assistant from parts
 - ally-be: 1,301 suites, 19,140 tests pass (22 Postgres suites skip without a database); lint and typecheck clean. Postgres specs on `ally_t1_test`: templates 27/27, lists 141/141 (`bot-draft.pg.spec.ts` "publishing twice converges…" fails on master too).
 - ally-web (Node 22): 704 test files pass; typecheck clean. Playwright, the whole suite in the CI image after merging master: 144 of 150 passed. The 5 assistant-home tests that failed pass with one worker (the browser ran out of memory under load); the phone `lists-setup-yours` baseline is regenerated (Add from a template makes the empty state taller, so the capture's scroll differs).
 
-**CI:** "Lint & format (ally-web)" fails on its colour-literal step because of master's new blog pages (`BlogArticle.tsx`, `BlogReview.tsx`), not this branch; left to the blog's owner. This branch merged master and formats master's course-copilot files, which fixes ally-be's "Lint & format".
+**CI:** this branch merges master and formats the course-copilot and analytics-agent files merged in from it, which ally-be's "Lint & format" failed on. ally-web's colour-literal check passes again since master moved its blog pages to tokens (`4226c4484`).
 
 ## Decisions
 

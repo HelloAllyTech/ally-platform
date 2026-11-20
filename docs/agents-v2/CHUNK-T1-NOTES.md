@@ -104,7 +104,7 @@ Routes: `GET v1/assistant-templates` (before a setup starts), `GET v1/chatbots/:
 
 - **The migration moved after merging master** (master added `1985600000000-CreateBlogAuthorKeys`): T1's is now `1985800000000-CreateChatbotTemplateInstalls`. A local database that already ran it under the old name needs its row renamed, or the next start tries to create the table again:
   `UPDATE migrations SET "timestamp"=1985800000000, name='CreateChatbotTemplateInstalls1985800000000' WHERE name='CreateChatbotTemplateInstalls1985600000000';` (done on `ally_local` and `ally_t1_test`).
-- **ally-web's colour-literal check fails on master's new blog pages** (`BlogArticle.tsx` +22, `BlogReview.tsx` +29, two more), so it's red on every PR merged with master. Left to the blog's owner (Shehbaz, 20 Nov). T1 adds none.
+- **ally-web's colour-literal check** failed for a while on master's new blog pages; left to the blog's owner (Shehbaz, 20 Nov), who moved them to tokens (`4226c4484`). T1 adds no colour literals.
 - `bot-draft.pg.spec.ts` "publishing twice converges…" fails on master too (expects pack version 1; mental health is version 2), as in the Q3-fast notes.
 - ally-web's helpline-dashboard tests fail on Node 24 with or without T1; commit with Node 22.
 

@@ -198,6 +198,7 @@ const PLATFORM_RULES = [
   '- Then ask B: B1 practised scenarios only / B2 new scenarios of similar difficulty / B3 harder scenarios; recommend B2 or B3. Never offer B4 or B5. Record both in /skillTargets.',
   "- Keep the rubric in the three EQUIP groups (/rubric: harmfulOrUnhelpful, basicHelpful, advancedHelpful), adding unhelpful behaviours from the profile's habitual responses.",
   "- If a target looks ambitious, flag it and keep the trainer's choice.",
+  '- Before you recommend the assessment, the practice ladder or the course shape, call design_guidance_search once with the situation (who the learners are, the skill and its A × B target). Recommend what the principles support, and cite a code only when one changed your recommendation.',
 ].join('\n');
 
 /**
@@ -522,6 +523,12 @@ export class CourseCopilotOrchestratorService {
         after: this.snapshot(context.session, turn.blueprintVersion),
         coursePatches: turn.coursePatches,
         queued: turn.queued,
+        // What the planner had (example course, design principles), from the proposal's result.
+        blueprintPlanning:
+          [...turn.toolResults]
+            .reverse()
+            .find((r) => r.name === 'propose_blueprint' && r.result?.planning)
+            ?.result?.planning ?? null,
       });
 
     const checkpoint = async (final: boolean): Promise<void> => {

@@ -34,7 +34,7 @@ const post = (overrides: Partial<BlogPost> = {}): BlogPost => ({
   tldr: "Short",
   body: "<p>Body text here</p>",
   tags: [],
-  coverColor: "#000000",
+  coverColor: "", // empty = default cover; not under test here
   authorName: "Asha",
   authorEmail: "asha@example.com",
   status: "DRAFT",
