@@ -14,6 +14,12 @@ import "@constants";
 const numbers = vi.fn();
 vi.mock("@api", async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
+  // T1's template hooks: no templates and no origin unless a test says so.
+  useGetTemplateCatalogueQuery: () => ({ data: undefined, isLoading: false, isError: false }),
+  useGetTemplateOriginQuery: () => ({ data: undefined }),
+  useApplyDraftTemplateMutation: () => [vi.fn()],
+  useGetAssistantTemplatesQuery: () => ({ data: undefined, isLoading: false, isError: false }),
+  useInstallTemplateMutation: () => [vi.fn(), { isLoading: false }],
   useArchiveChatbotMutation: () => [vi.fn(), { isLoading: false }],
   useSetChatbotStatusMutation: () => [vi.fn(), { isLoading: false }],
   useGetHomeNumbersQuery: (arg: unknown) => numbers(arg),

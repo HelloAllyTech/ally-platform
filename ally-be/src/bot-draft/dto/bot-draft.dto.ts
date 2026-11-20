@@ -10,6 +10,7 @@ import {
   IsIn,
   IsInt,
   IsNotEmpty,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -163,6 +164,29 @@ export class CreateBotDraftDto {
   @IsOptional()
   @IsBoolean()
   interview?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Start from a use-case template (T1): its id. Its setup answers go in `answers`; the business name in `name`.',
+    example: 'helpline',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  template?: string;
+
+  @ApiPropertyOptional({
+    description: 'The template’s setup answers by question key',
+  })
+  @IsOptional()
+  @IsObject()
+  answers?: Record<string, unknown>;
+
+  @ApiPropertyOptional({ description: 'The business’s name, with a template' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  name?: string;
 }
 
 /** "Describe it instead", after a website gave too little (chunk 20a-2). */

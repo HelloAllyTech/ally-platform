@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 // `@constants` first: the admin app's barrel does module-load-time work.
 import "@constants";
 
+import { TEMPLATE_COPY } from "../../Templates/copy";
 import { COPY } from "../copy";
 import type { BotDraftView } from "../types";
 import { withFinding } from "../findings";
@@ -26,6 +27,15 @@ import { reached } from "../steps";
  * cards became one screen each: every case asserts the same behaviour against the new screens.
  */
 vi.mock("qrcode", () => ({ default: { toDataURL: async () => "data:image/png;base64,x" } }));
+vi.mock("@api", async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  // T1's template hooks: no templates and no origin unless a test says so.
+  useGetTemplateCatalogueQuery: () => ({ data: undefined, isLoading: false, isError: false }),
+  useGetTemplateOriginQuery: () => ({ data: undefined }),
+  useApplyDraftTemplateMutation: () => [vi.fn()],
+  useGetAssistantTemplatesQuery: () => ({ data: undefined, isLoading: false, isError: false }),
+  useInstallTemplateMutation: () => [vi.fn(), { isLoading: false }],
+}));
 
 const view = (over: Partial<BotDraftView> = {}): BotDraftView =>
   ({
@@ -429,6 +439,30 @@ describe("Building", () => {
 });
 
 describe("Share", () => {
+  it("asks once before going live while a template's examples are still in a list (T1)", () => {
+    const onPublish = vi.fn();
+    render(
+      <ShareScreen
+        view={view({ step: "share", chatbotId: "bot-1" } as Partial<BotDraftView>)}
+        publicAllowed={false}
+        publishing={false}
+        onPublish={onPublish}
+        examplesLeft={{ total: 2, lists: [{ key: "price_list", name: "Price list", count: 2 }] }}
+      />,
+    );
+    fireEvent.click(screen.getByRole("radio", { name: new RegExp(COPY.share.organisation) }));
+    fireEvent.click(screen.getByText(COPY.share.publish));
+    expect(onPublish).not.toHaveBeenCalled();
+    expect(screen.getByTestId("publish-examples").textContent).toContain(
+      TEMPLATE_COPY.publishWarning,
+    );
+    expect(screen.getByText(TEMPLATE_COPY.replaceThem).getAttribute("href")).toBe(
+      "/assistants/bot-1?section=lists&tool=price_list",
+    );
+    fireEvent.click(screen.getByText(TEMPLATE_COPY.publishAnyway));
+    expect(onPublish).toHaveBeenCalledWith("organisation", []);
+  });
+
   it("asks before going live when an owner's Must pass question failed (chunk 20d-2)", () => {
     const onConfirm = vi.fn();
     render(

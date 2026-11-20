@@ -20,6 +20,7 @@ import {
   ReadingScreen,
   SafetyScreen,
 } from "./Screens";
+import { DraftTemplate } from "./screens/DraftTemplate";
 import { ShareWithPlan } from "./screens/ShareWithPlan";
 import { reached } from "./steps";
 import {
@@ -111,17 +112,22 @@ export const OnboardingView: React.FC<{
         return <ReadingScreen view={view} reading={s.reading} onDone={() => s.pass("reading")} />;
       case "learned":
         return (
-          <LearnedScreen
-            view={view}
-            busy={s.sending}
-            onPatch={s.edit}
-            onConfirm={s.confirmLearned}
-            onDescribe={s.describe}
-            onUpload={s.upload}
-            onStartOver={async () => {
-              if (await s.discard()) onStartOver?.();
-            }}
-          />
+          <>
+            <LearnedScreen
+              view={view}
+              busy={s.sending}
+              onPatch={s.edit}
+              onConfirm={s.confirmLearned}
+              onDescribe={s.describe}
+              onUpload={s.upload}
+              onStartOver={async () => {
+                if (await s.discard()) onStartOver?.();
+              }}
+            />
+            {view.step === "learned" && (
+              <DraftTemplate busy={s.sending} onApply={s.applyTemplate} />
+            )}
+          </>
         );
       case "safety":
         return <SafetyScreen view={view} line={flow.line} onContinue={() => s.pass("safety")} />;

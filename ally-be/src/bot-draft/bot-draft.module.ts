@@ -1,4 +1,7 @@
 import { Module } from '@nestjs/common';
+import { ChatbotTemplateInstall } from './entity/chatbot-template-install.entity';
+import { TemplateController } from './templates/template.controller';
+import { TemplateService } from './templates/template.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ChatbotModule } from '../chatbot/chatbot.module';
 import { Chatbot } from '../chatbot/entity/chatbot.entity';
@@ -51,6 +54,7 @@ import { BotDraftService } from './service/bot-draft.service';
       ChatbotCheckupRun,
       ChatbotCheckupResult,
       ChatbotMessageFeedback,
+      ChatbotTemplateInstall,
     ]),
     ChatbotModule,
     BotPageModule,
@@ -64,6 +68,7 @@ import { BotDraftService } from './service/bot-draft.service';
     AssistantHomeController,
     CheckupController,
     ScorecardController,
+    TemplateController,
   ],
   providers: [
     BotDraftService,
@@ -79,6 +84,8 @@ import { BotDraftService } from './service/bot-draft.service';
     CheckupService,
     DraftCheckupService,
     CheckupCasesService,
+    // Use-case templates (T1).
+    TemplateService,
     // The crawl hands each batch of pages to the builder's fact extraction.
     { provide: CRAWL_LEARNER, useExisting: BotDraftSessionService },
   ],

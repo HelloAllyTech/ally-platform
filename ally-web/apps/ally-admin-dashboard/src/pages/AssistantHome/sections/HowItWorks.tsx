@@ -7,6 +7,7 @@ import { Segmented } from "@components/v2";
 import type { HowItWorks, HowLayer } from "@types";
 
 import { TONES, toneOf } from "../../Onboarding/MakeItYours";
+import { TemplateOriginLine } from "../../Templates/TemplateOriginLine";
 import { AvoidTopics } from "../AvoidTopics";
 import { HOME, fill } from "../copy";
 import { SectionHead, TextField } from "../fields";
@@ -255,11 +256,16 @@ export const HowItWorksSection: React.FC<SectionProps> = ({ bot, home, canEdit, 
   };
   // The purpose's honest limit, with what the assistant may do on its lists now (chunk 5b).
   const limit = purposeLimit(view.purpose, view.bookingLists);
+  const origin = <TemplateOriginLine botId={bot.id} showExamples={false} />;
+  controls.purpose = origin;
   if (limit) {
     controls.purpose = (
-      <p className="ally-small ally-how__limit" data-testid="purpose-limit">
-        <strong>{HOME.userLists.purpose.limitLabel}:</strong> {limit}
-      </p>
+      <>
+        {origin}
+        <p className="ally-small ally-how__limit" data-testid="purpose-limit">
+          <strong>{HOME.userLists.purpose.limitLabel}:</strong> {limit}
+        </p>
+      </>
     );
   }
   // What it can do with each list, under How it finds answers.

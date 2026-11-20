@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Optional,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -44,6 +45,9 @@ import { DraftCheckupService } from '../checkup/draft-checkup.service';
 import { CheckupCasesService } from '../checkup/checkup-cases.service';
 import { SourcesService } from '../home/sources.service';
 import { SseWriter } from './sse';
+import { templateById } from '../../chatbot/templates/templates';
+import { answersOf, templateDescription } from '../templates/template-answers';
+import { TemplateService } from '../templates/template.service';
 import { AssistantScope } from '../../chatbot/access/chatbot-role.decorator';
 
 const EDIT = { permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT] };
@@ -70,6 +74,8 @@ export class BotDraftController {
     private readonly sources: SourcesService,
     // Optional so the specs that build this controller by hand needn't change.
     private readonly checkupCases?: CheckupCasesService,
+    // Use-case templates (T1); optional for the same reason.
+    @Optional() private readonly templates?: TemplateService,
   ) {}
 
   @Post()
@@ -83,7 +89,20 @@ export class BotDraftController {
   })
   async create(@Body() dto: CreateBotDraftDto) {
     const website = dto.website?.trim();
-    const description = dto.description?.trim();
+    // T1: a template start reads a description written from the owner's answers.
+    const template = dto.template ? templateById(dto.template) : undefined;
+    if (dto.template && !template) {
+      throw new BadRequestException({
+        errorCode: 'unknown_template',
+        message: 'That template isn’t available.',
+      });
+    }
+    const answers = answersOf(dto.answers);
+    const description =
+      dto.description?.trim() ||
+      (template && !website
+        ? templateDescription(template, answers, dto.name)
+        : undefined);
     if (!website && !description && !dto.upload && !dto.interview) {
       throw new BadRequestException(
         'Paste your website, upload documents, describe your business, or choose the interview.',
@@ -100,7 +119,9 @@ export class BotDraftController {
       }
     }
     const draft = await this.drafts.create({
-      name: start ? nameFromDomain(displayDomain(start)) : 'Your business',
+      name: start
+        ? nameFromDomain(displayDomain(start))
+        : dto.name?.trim() || 'Your business',
       website: start,
       description: description ?? null,
       interview: !!dto.interview && !start && !description,
@@ -117,6 +138,11 @@ export class BotDraftController {
         ? [{ role: 'owner' as const, text: start ?? description! }]
         : []),
     ]);
+    if (template && this.templates) {
+      // Before reading starts: the template's pack and purpose are in place, and reading can only
+      // make the pack stricter.
+      await this.templates.installOnDraft(withOwner, template.id, answers);
+    }
     if (start) {
       await this.crawl.start(withOwner);
     } else if (description) {
