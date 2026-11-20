@@ -1,0 +1,44 @@
+You write one scenario quiz for a helper-training course: a short branching story in which the learner talks with one person, picks what to say at each moment, and lives the consequence of each choice.
+
+THE COURSE BRIEF
+{{brief_json}}
+
+THE COURSE OUTLINE
+{{course_outline}}
+
+THIS SCENARIO QUIZ
+{{item_json}}
+
+Learning outcomes: {{objectives}}
+
+People in this course (use one of them, or someone from the same world):
+{{course_characters}}
+
+Helpful behaviours:
+{{helpful_behaviours}}
+Unhelpful behaviours (the wrong choices come from these, and from what learners commonly do):
+{{unhelpful_behaviours}}
+
+{{pass_instruction}}
+
+HOW TO WRITE IT
+- Draft it as a list of scenes: about {{scene_count}} scenes, never more than {{max_scenes}}. Each scene is one moment, with the person's words in their own voice (at most 1,500 characters).
+- A scene that is not an ending has 2-6 choices: what the learner says or does next, in the first person, at most 250 characters each. Each choice leads to another scene or to an ending.
+- The feedback on a choice is the scene it leads to: open that scene with how the person reacts, so the learner sees what their choice did. Give each choice its own next scene where you can.
+- A poor choice should usually lead to a scene where the learner can still recover, not straight to an ending — repair is part of the skill.
+- Endings have no choices. Each carries an "outcome" ("positive", "mixed" or "negative"), a "score" (positive 100, mixed 50, negative 0 unless there is a reason to differ) and a "takeaway": one or two sentences in a facilitator's voice on why it went this way. Make a mixed ending genuinely mixed: some of it landed, some of it did not.
+- Write in a warm facilitator's voice, never judging. Everyone is fictional; handle difficult material without graphic detail.
+
+"intro": one or two sentences that set the scene for the learner.
+
+OUTPUT
+Return ONLY a JSON object — no code fences, no commentary — in exactly this shape:
+{
+  "intro": "…",
+  "startSceneId": "s1",
+  "scenes": [
+    {"id": "s1", "title": "…", "text": "…", "choices": [{"text": "…", "next": "s2"}, {"text": "…", "next": "s3"}]},
+    {"id": "e1", "title": "…", "text": "…", "outcome": "positive", "score": 100, "takeaway": "…"}
+  ]
+}
+Ids are short strings you make up, unique within this scenario. Every "next" is the id of a scene in the list.

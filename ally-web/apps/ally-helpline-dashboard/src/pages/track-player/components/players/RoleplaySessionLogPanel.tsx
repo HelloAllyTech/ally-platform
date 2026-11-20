@@ -29,7 +29,7 @@ export const RoleplaySessionLogPanel: FC<RoleplaySessionLogPanelProps> = ({ sess
     sessionId,
     languageCode: i18n.language,
   });
-  const { summaryData, retryMaxReached } = useSimulationSummaryPolling(sessionId, i18n.language);
+  const { summaryData } = useSimulationSummaryPolling(sessionId, i18n.language);
 
   const { data: availableLanguages } = useGetAvailableLanguagesQuery({});
   const originalLanguageCode = useMemo(() => {
@@ -56,7 +56,6 @@ export const RoleplaySessionLogPanel: FC<RoleplaySessionLogPanelProps> = ({ sess
               <DebriefTab
                 sessionId={sessionId}
                 summaryData={summaryData}
-                retryMaxReached={retryMaxReached}
                 readOnly
               />
             ),

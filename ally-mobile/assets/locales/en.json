@@ -1219,9 +1219,6 @@
       "from": "from Ally",
       "aiLabel": "AI-generated",
       "aiTooltip": "Ally is an AI supervisor. This debrief was written by AI from your session transcript, not by a person.",
-      "generating": "Ally is writing your debrief…",
-      "generatingHint": "This usually takes a few moments.",
-      "failed": "Ally couldn't write your debrief for this session.",
       "momentLabel": "See this moment",
       "momentNotFound": "We couldn't jump to that moment — here's the full transcript instead.",
       "section": {
@@ -1229,8 +1226,7 @@
         "what_it_cost": "What it cost",
         "try_next": "Try this next"
       },
-      "replyPlaceholder": "Reply to Ally about this session…",
-      "replyPrompt": "Have a question about any of this? Reply below."
+      "unavailable": "Your debrief isn't available for this session."
     },
     "feedback": {
       "generating": "Generating your feedback…",
@@ -1322,8 +1318,8 @@
         "lead": "If this session brought something up for you, you can talk to:"
       },
       "followUp": {
-        "title": "We're taking a closer look",
-        "body": "Something important came up in this session, so someone from the Ally team is checking this debrief more closely.",
+        "title": "Something important came up",
+        "body": "Something important came up in this session, and this debrief may not cover it fully.",
         "support": "If you need support right now, the support lines in this debrief are open any time."
       },
       "distress": {

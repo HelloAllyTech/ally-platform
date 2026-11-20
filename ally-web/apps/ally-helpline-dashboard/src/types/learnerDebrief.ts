@@ -160,7 +160,7 @@ export interface LearnerDebriefView {
   riskCue?: boolean;
   /**
    * A clear risk cue is still left out of this debrief (present, true, only then). The debrief is
-   * shown as it is, with a kind notice that someone from the team is checking it more closely.
+   * shown as it is, with a kind notice that it may not cover what came up, next to the support lines.
    */
   followUp?: boolean;
   /** Learner features this person has (web only). Absent or false: nothing changes for them. */

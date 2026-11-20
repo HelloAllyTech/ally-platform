@@ -6,8 +6,13 @@ import {
   CourseBriefComponent,
   CourseBriefPracticeSlot,
   CourseBriefReadiness,
+  CourseBriefRubricEntry,
+  CourseBriefSkillLevel,
+  CourseBriefSkillTarget,
+  CourseBriefSkillTransfer,
 } from '../type/course-copilot.type';
 import { COURSE_COPILOT_LIMITS } from '../constants/course-copilot.constants';
+import { CourseCopilotLearnerProfileService } from './course-copilot-learner-profile.service';
 
 const ASSESSMENT_KINDS: CourseBriefAssessmentKind[] = [
   'roleplay',
@@ -20,6 +25,8 @@ const COMPONENTS: CourseBriefComponent[] = [
   'video',
   'journal',
   'annotated_artifact',
+  'branching_scenario',
+  'bucket_sort',
   'game',
   'quiz',
 ];
@@ -27,14 +34,22 @@ const PRACTICE_WEIGHTS = ['practice-heavy', 'balanced', 'reading-heavy'];
 const COVER_MODES = ['generate', 'library', 'upload-later'];
 const ARTICLE_IMAGE_MODES = ['none', 'cover-only', 'one-per-article'];
 const VIDEO_SOURCES = ['youtube', 'vimeo', 'loom', 's3'];
+const SKILL_LEVELS: CourseBriefSkillLevel[] = ['A1', 'A2', 'A3', 'A4'];
+// B4/B5 exist in the manual but the copilot never offers them.
+const SKILL_TRANSFERS: CourseBriefSkillTransfer[] = ['B1', 'B2', 'B3'];
+const RUBRIC_GROUP_MAX = 20;
 
 const TOP_LEVEL_KEYS = new Set([
   'seed',
   'audience',
   'outcomes',
+  'learnerProfileId',
+  'learnerProfileName',
   'competencyIds',
   'competencyNames',
   'behaviours',
+  'skillTargets',
+  'rubric',
   'assessment',
   'shape',
   'practice',
@@ -80,6 +95,19 @@ const pick = <T extends string>(value: unknown, allowed: readonly string[]) =>
     ? (value as T)
     : undefined;
 
+/** "a2", " A2 ", "A2 Getting started" → "A2"; anything else → undefined. */
+const code = <T extends string>(
+  value: unknown,
+  allowed: readonly T[],
+): T | undefined => {
+  if (typeof value !== 'string') return undefined;
+  const head = value
+    .trim()
+    .toUpperCase()
+    .match(/^([A-Z]\d)(?!\d)/)?.[1];
+  return head && allowed.includes(head as T) ? (head as T) : undefined;
+};
+
 /** Drop undefined members so the stored jsonb carries only what was said. */
 const compact = <T extends Record<string, any>>(value: T): T | undefined => {
   const entries = Object.entries(value).filter(
@@ -100,6 +128,9 @@ const compact = <T extends Record<string, any>>(value: T): T | undefined => {
  */
 @Injectable()
 export class CourseCopilotBriefService {
+  /** Static library data — no dependencies, so constructed here, not injected. */
+  private readonly learnerProfiles = new CourseCopilotLearnerProfileService();
+
   applyPatch(current: CourseBrief, ops: JsonPatchOp[]): BriefPatchResult {
     const patched = applyJsonPatch<Record<string, any>>(
       // Seed missing containers so `add /audience/who` works on an empty brief
@@ -172,6 +203,15 @@ export class CourseCopilotBriefService {
     });
     if (outcomes) brief.outcomes = outcomes;
 
+    const learnerProfile = this.learnerProfiles.get(
+      str(source.learnerProfileId),
+    );
+    if (learnerProfile) {
+      brief.learnerProfileId = learnerProfile.id;
+      // Derived, for the brief panel: always the library's name for the id.
+      brief.learnerProfileName = learnerProfile.name;
+    }
+
     const competencyIds = strList(
       source.competencyIds,
       COURSE_COPILOT_LIMITS.competencies,
@@ -190,6 +230,11 @@ export class CourseCopilotBriefService {
       unhelpful: unhelpful?.length ? unhelpful : undefined,
     });
     if (behaviours) brief.behaviours = behaviours;
+
+    const skillTargets = this.normaliseSkillTargets(source.skillTargets);
+    if (skillTargets.length) brief.skillTargets = skillTargets;
+    const rubric = this.normaliseRubric(source.rubric);
+    if (rubric.length) brief.rubric = rubric;
 
     const assessment = compact({
       kind: pick<CourseBriefAssessmentKind>(
@@ -294,6 +339,50 @@ export class CourseCopilotBriefService {
     return 's3';
   }
 
+  /** Unknown A/B codes are dropped, not errors; an entry needs a skill and one valid code. */
+  private normaliseSkillTargets(raw: unknown): CourseBriefSkillTarget[] {
+    if (!Array.isArray(raw)) return [];
+    const targets: CourseBriefSkillTarget[] = [];
+    for (const entry of raw) {
+      if (!entry || typeof entry !== 'object') continue;
+      const skill = str(entry.skill);
+      const a = code(entry.a, SKILL_LEVELS);
+      const b = code(entry.b, SKILL_TRANSFERS);
+      if (!skill || (!a && !b)) continue;
+      const competencyId = str(entry.competencyId);
+      targets.push({
+        ...(competencyId ? { competencyId } : {}),
+        skill,
+        ...(a ? { a } : {}),
+        ...(b ? { b } : {}),
+      });
+    }
+    return targets.slice(0, COURSE_COPILOT_LIMITS.competencies);
+  }
+
+  private normaliseRubric(raw: unknown): CourseBriefRubricEntry[] {
+    if (!Array.isArray(raw)) return [];
+    const rubric: CourseBriefRubricEntry[] = [];
+    for (const entry of raw) {
+      if (!entry || typeof entry !== 'object') continue;
+      const skill = str(entry.skill);
+      if (!skill) continue;
+      const group = (value: unknown) => strList(value, RUBRIC_GROUP_MAX) ?? [];
+      const harmfulOrUnhelpful = group(entry.harmfulOrUnhelpful);
+      const basicHelpful = group(entry.basicHelpful);
+      const advancedHelpful = group(entry.advancedHelpful);
+      if (
+        !harmfulOrUnhelpful.length &&
+        !basicHelpful.length &&
+        !advancedHelpful.length
+      ) {
+        continue;
+      }
+      rubric.push({ skill, harmfulOrUnhelpful, basicHelpful, advancedHelpful });
+    }
+    return rubric.slice(0, COURSE_COPILOT_LIMITS.competencies);
+  }
+
   private normaliseSlot(
     raw: any,
     index: number,
@@ -339,6 +428,8 @@ export class CourseCopilotBriefService {
       notes: brief.notes ?? [],
       competencyIds: brief.competencyIds ?? [],
       competencyNames: brief.competencyNames ?? [],
+      skillTargets: brief.skillTargets ?? [],
+      rubric: brief.rubric ?? [],
     };
   }
 }

@@ -42,14 +42,15 @@ enum FeedbackTab { summary, debrief, transcript }
 /// subtitle by `fromLogs`) with a Share switch, and the learner's star
 /// rating under it. Then, for CHECKLIST roleplays, the evaluation
 /// checklist; then the tabs the roleplay turned on (`feedbackTabs`):
-/// Debrief (Ally's note + the Ask-AI reply thread, see [DebriefTab]) and
+/// Debrief (the Debrief agent's cards, or an old note read-only, see [DebriefTab]) and
 /// Transcript ([SimulationTranscriptTab]); a short session (≤30s) only
 /// gets "Session Review". Off the Debrief tab a floating review button
 /// (when the review has something to see — RN `useHideReviewDetails`,
 /// threads or reactions) and "Try another simulation" float at the bottom.
 ///
-/// The session is polled every 3.5s (up to 7 retries) until Ally's
-/// feedback lands, and again whenever the learner comes back from sharing.
+/// A failed load of the session is retried every 3.5s (up to 7 retries),
+/// and the session is read again whenever the learner comes back from
+/// sharing. Nothing polls for Ally's old note any more.
 /// A fresh session (not from Logs) without a rating opens the rating
 /// popup straight away, and asks again on leaving.
 class SimulationFeedbackScreen extends ConsumerStatefulWidget {
@@ -209,9 +210,8 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
       // A withheld assessment has no feedback to wait for or rate.
       if (summary.resultsHidden) return;
       _onSummary(summary);
-      final tabsOff = (summary.scenario?.hasFeedbackTabs ?? false) && !summary.feedbackEnabled;
-      if (tabsOff || summary.hasSummaryFeedback) return;
-      scheduleRetry();
+      // Loaded: nothing more to wait for. An old note is read as it stands;
+      // the backend no longer writes one, so there is no re-polling for it.
     } catch (_) {
       scheduleRetry();
     }

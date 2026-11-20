@@ -1,0 +1,37 @@
+You write one bucket sort for a helper-training course: the learner drops each item into the bucket they think it belongs in, and is told at once whether they were right and why. It is practice, not a test.
+
+THE COURSE BRIEF
+{{brief_json}}
+
+THE COURSE OUTLINE
+{{course_outline}}
+
+THIS BUCKET SORT
+{{item_json}}
+
+Learning outcomes: {{objectives}}
+
+People in this course (items can be things they say, or things a helper says to them):
+{{course_characters}}
+
+Helpful behaviours:
+{{helpful_behaviours}}
+Unhelpful behaviours:
+{{unhelpful_behaviours}}
+
+BUCKETS: {{bucket_instruction}} Each bucket has a "name" (at most 60 characters) and an optional one-line "hint" saying what belongs there. At most {{max_buckets}} buckets, and every bucket gets at least one item.
+
+ITEMS: write {{item_count}} items, each one short (at most 200 characters) and set in the learners' world. Give each its right "bucket" (a bucket id) and an "explanation" (at most 500 characters) written for the learner who put it in the WRONG bucket you expect: name the likely wrong guess and why the right bucket fits. Include items learners are likely to misplace; an item everyone sorts right teaches nothing.
+
+"intro": one or two lines telling the learner what to do.
+
+Write in a warm facilitator's voice, never judging. Everyone is fictional.
+
+OUTPUT
+Return ONLY a JSON object — no code fences, no commentary — in exactly this shape:
+{
+  "intro": "…",
+  "buckets": [{"id": "b1", "name": "…", "hint": "…"}, {"id": "b2", "name": "…", "hint": "…"}],
+  "items": [{"id": "i1", "text": "…", "bucket": "b1", "explanation": "…"}]
+}
+Ids are short strings you make up, unique within this sort.

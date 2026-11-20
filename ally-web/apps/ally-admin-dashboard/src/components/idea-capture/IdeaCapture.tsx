@@ -12,6 +12,7 @@ import { useSpeechCapture } from "@hooks/useSpeechCapture";
 import { IDEA_DRAFT_TEXT_MAX } from "@types";
 
 import { MicBulbIcon } from "./MicBulbIcon";
+import { useGetPlanSettingsQuery, useStartPlanMutation } from "../../api/productPlanning";
 import { useCreateRoadmapDraftMutation } from "../../api/roadmapV2Flow";
 import { canFileIdeas } from "../../pages/ProductRoadmap/utils/access";
 import { ROADMAP_IDEA_TEXT_MAX } from "../../types/roadmapV2Flow";
@@ -123,7 +124,12 @@ export const IdeaCaptureLauncher: React.FC<IdeaCaptureLauncherProps> = ({
 
   const [createLegacyDraft, { isLoading: isSavingLegacy }] = useCreateRoadmapIdeaDraftMutation();
   const [createV2Draft, { isLoading: isSavingV2 }] = useCreateRoadmapDraftMutation();
-  const isSaving = isSavingLegacy || isSavingV2;
+  // With Roadmap planning on, "My drafts" is replaced by "My ideas" (parked plans), so a draft
+  // saved to the older store would be invisible. Park it as a plan instead.
+  const { data: planSettings } = useGetPlanSettingsQuery(undefined, { skip: !allowed });
+  const planningOn = !!planSettings?.enabled;
+  const [startPlan, { isLoading: isSavingPlan }] = useStartPlanMutation();
+  const isSaving = isSavingLegacy || isSavingV2 || isSavingPlan;
   const [transcribeClip] = useTranscribeRoadmapIdeaMutation();
 
   const transcribe = useCallback(
@@ -254,6 +260,9 @@ export const IdeaCaptureLauncher: React.FC<IdeaCaptureLauncherProps> = ({
           captureMode,
         }).unwrap();
         destination = ROUTES.ROADMAP_IDEA(draft.code);
+      } else if (planningOn) {
+        await startPlan({ text: rawText, park: true }).unwrap();
+        destination = `${ROUTES.PRODUCT_ROADMAP}?tab=my-ideas`;
       } else {
         await createLegacyDraft({ rawText, captureMode }).unwrap();
         destination = `${ROUTES.PRODUCT_ROADMAP}?tab=drafts`;
@@ -282,6 +291,8 @@ export const IdeaCaptureLauncher: React.FC<IdeaCaptureLauncherProps> = ({
     isRoadmapV2On,
     createV2Draft,
     createLegacyDraft,
+    planningOn,
+    startPlan,
     finishClose,
     navigate,
     track,

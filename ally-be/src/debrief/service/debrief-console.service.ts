@@ -6,7 +6,6 @@ import {
 import { DataSource } from 'typeorm';
 import { AppConfigService } from '../../config/config.service';
 import { AgentReleaseService } from '../../llm-agent/harness/release/agent-release.service';
-import { debriefOverallSql } from '../../analytics/constants/debrief-quality.constants';
 import { LlmRuntime } from '../../llm/constants/llm-model-registry.constants';
 import { LlmModelService } from '../../llm/service/llm-model.service';
 import {
@@ -137,12 +136,6 @@ export class DebriefConsoleService {
         WHERE mode = 'live' AND "createdAt" >= now() - make_interval(days => $1)`,
       [days],
     );
-    const [today] = await this.dataSource.query(
-      `SELECT count(*)::int AS n, avg(${debriefOverallSql('j')}) AS mean
-         FROM debrief_quality_judgment j
-        WHERE j."occurredAt" >= now() - make_interval(days => $1)`,
-      [days],
-    );
     const mtd = await this.context.monthToDate();
     const ga = await this.releases.getGa(DEBRIEF_AGENT_KEY);
     const settings =
@@ -165,8 +158,6 @@ export class DebriefConsoleService {
         scored: r.judged,
         mean: num(r.judge_mean),
         passRate: num(r.pass_rate),
-        todayMean: num(today?.mean),
-        todayScored: Number(today?.n ?? 0),
       },
       costUsd: { p50: num(r.cost_p50, 4), p90: num(r.cost_p90, 4) },
       seconds: { p50: num(r.secs_p50, 0), p90: num(r.secs_p90, 0) },

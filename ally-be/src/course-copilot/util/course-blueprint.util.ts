@@ -49,7 +49,7 @@ export const COURSE_BLUEPRINT_ITEM_TYPE_LABELS: Record<TrackItemType, string> =
     [TrackItemType.JOURNAL]: 'Journal',
     [TrackItemType.ANNOTATED_ARTIFACT]: 'Annotated transcript',
     [TrackItemType.GAME]: 'Game',
-    [TrackItemType.BRANCHING_SCENARIO]: 'Branching scenario',
+    [TrackItemType.BRANCHING_SCENARIO]: 'Scenario quiz',
     [TrackItemType.BUCKET_SORT]: 'Bucket sort',
   };
 
@@ -130,6 +130,11 @@ const TYPE_ALIASES: Record<string, TrackItemType> = {
   TRANSCRIPT: TrackItemType.ANNOTATED_ARTIFACT,
   READING: TrackItemType.ARTICLE,
   REFLECTION: TrackItemType.JOURNAL,
+  SCENARIO_QUIZ: TrackItemType.BRANCHING_SCENARIO,
+  BRANCHING: TrackItemType.BRANCHING_SCENARIO,
+  SJT: TrackItemType.BRANCHING_SCENARIO,
+  SORT: TrackItemType.BUCKET_SORT,
+  SORTING: TrackItemType.BUCKET_SORT,
 };
 
 // ── Small coercions (kept local: this file must stay importable on its own) ──
@@ -632,6 +637,12 @@ function applyCompletionDefaults(
             TRACK_DEFAULT_ANNOTATION_PASS_SCORE,
         };
         break;
+      case TrackItemType.BRANCHING_SCENARIO:
+        // 0 = explore: the manual's default. A positive mark gates the item.
+        criteria = {
+          passScore: score(given.passScore) ?? 0,
+        };
+        break;
       case TrackItemType.VIDEO:
         criteria = {
           watchPct: score(given.watchPct) ?? TRACK_DEFAULT_VIDEO_WATCH_PCT,
@@ -646,7 +657,8 @@ function applyCompletionDefaults(
         break;
       }
       default:
-        // JOURNAL has no rule; GAME never gates (see game.type.ts).
+        // JOURNAL has no rule; GAME and BUCKET_SORT never gate (see
+        // game.type.ts, bucket-sort.type.ts).
         criteria = undefined;
     }
     if (criteria) item.completionCriteria = criteria;

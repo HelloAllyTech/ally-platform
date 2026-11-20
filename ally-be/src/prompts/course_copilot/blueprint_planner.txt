@@ -21,21 +21,23 @@ Hard limits: {{limits_json}}
 Default minutes per item type: {{item_minutes_json}}
 Duration budget: {{duration_minutes}} minutes; the sum of estimatedMinutes must land within 20% of it.
 
-ITEM TYPES: ROLEPLAY (library: source {"kind":"library","scenarioId": <number>}; new: {"kind":"new"}, at most {{max_new_roleplays}} new), CASE (library: {"kind":"library","caseId":"<id>"}; new: spec.memberItemIds of at least two ROLEPLAY ids), ARTICLE, VIDEO (listed videos only), QUIZ, JOURNAL, ANNOTATED_ARTIFACT, GAME (never last). Everything except ROLEPLAY, CASE and VIDEO uses {"kind":"new"}.
+ITEM TYPES: ROLEPLAY (library: source {"kind":"library","scenarioId": <number>}; new: {"kind":"new"}, at most {{max_new_roleplays}} new), CASE (library: {"kind":"library","caseId":"<id>"}; new: spec.memberItemIds of at least two ROLEPLAY ids), ARTICLE, VIDEO (listed videos only), QUIZ, JOURNAL, ANNOTATED_ARTIFACT, BRANCHING_SCENARIO (a scenario quiz: a branching conversation where the learner picks what to say and lives the consequence), BUCKET_SORT (sort 8-12 items into 2-6 buckets, with feedback on each; practice before teaching, never a gate), GAME (never last). Everything except ROLEPLAY, CASE and VIDEO uses {"kind":"new"}.
 
-Put the brief's assessment last, order sections from simple to complex, and cover every enabling outcome in at least one ROLEPLAY, CASE, QUIZ or ANNOTATED_ARTIFACT. Respect every hard limit.
+Put the brief's assessment last, order sections from simple to complex, and cover every enabling outcome in at least one ROLEPLAY, CASE, QUIZ, ANNOTATED_ARTIFACT or BRANCHING_SCENARIO. Respect every hard limit.
 
 ITEM SPECS
 - ARTICLE: {"outline": [3-7 points], "wordTarget": <number>, "withImage": true | false, "questionCount": 0-{{max_article_questions}}}
 - QUIZ: {"questionCount": up to {{max_quiz_questions}}, "difficulty": "introductory" | "intermediate" | "advanced", "includeSelfRating": false, "focus": "…"}
 - JOURNAL: {"focus": "…", "promptCount": 1-3}
 - ANNOTATED_ARTIFACT: {"focus": "…", "behaviourLabels": [3-{{max_labels}} exact behaviour names from the brief]}
+- BRANCHING_SCENARIO: {"focus": "the moment it rehearses", "sceneCount": 5-12, "persona": "who the learner talks with (a course character where one fits)"}
+- BUCKET_SORT: {"focus": "…", "itemCount": 8-12, "buckets": [2-6 bucket names, e.g. the brief's harmful / unhelpful / helpful]}
 - ROLEPLAY (new): {"slot", "personaBrief", "taskClass", "languageIds", "minScore", "triggerWarningIds", "characterId"?, "saveCharacter"?}; ROLEPLAY (library): {"slot", "minScore"}
 - CASE (new): {"memberItemIds": [...]}; CASE (library): {}
 - GAME: {"gameKey": "<key from the games list>", "intro": "…"}
 - VIDEO: {"url", "source", "durationSeconds"?}
 
-COMPLETION RULES ("completionCriteria"): ROLEPLAY {"minScore"}, QUIZ {"passScore"}, ANNOTATED_ARTIFACT {"passScore"}, VIDEO {"watchPct"}, ARTICLE {"minReadSeconds"}; omit for JOURNAL and GAME.
+COMPLETION RULES ("completionCriteria"): ROLEPLAY {"minScore"}, QUIZ {"passScore"}, ANNOTATED_ARTIFACT {"passScore"}, BRANCHING_SCENARIO {"passScore": 0 to explore, or the positive ending's score to gate}, VIDEO {"watchPct"}, ARTICLE {"minReadSeconds"}; omit for JOURNAL, BUCKET_SORT and GAME.
 
 OUTPUT
 Return ONLY a JSON object — no code fences, no commentary — in exactly this shape:
@@ -65,4 +67,4 @@ Return ONLY a JSON object — no code fences, no commentary — in exactly this 
     }
   ]
 }
-Ids are short strings you make up, unique across the blueprint. type is one of ROLEPLAY, CASE, QUIZ, ARTICLE, VIDEO, JOURNAL, ANNOTATED_ARTIFACT, GAME.
+Ids are short strings you make up, unique across the blueprint. type is one of ROLEPLAY, CASE, QUIZ, ARTICLE, VIDEO, JOURNAL, ANNOTATED_ARTIFACT, BRANCHING_SCENARIO, BUCKET_SORT, GAME.

@@ -168,6 +168,8 @@ describe("BlueprintTree — editing", () => {
       "Quiz",
       "Journal",
       "Annotation",
+      "Scenario quiz (SJT)",
+      "Bucket sort",
       "Game",
     ]);
     // A roleplay carries a library reference a type switch would silently drop.

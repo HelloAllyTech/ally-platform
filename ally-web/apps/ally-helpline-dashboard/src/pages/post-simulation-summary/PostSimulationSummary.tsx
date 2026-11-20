@@ -103,11 +103,8 @@ export const PostSimulationSummary: FC = () => {
   );
   const {
     summaryData,
-    retryMaxReached,
     isShortSession,
     isTechnicalInterruption,
-    checkAgain,
-    isCheckingAgain,
   } = useSimulationSummaryPolling(
     // A withheld assessment has no evaluation to wait for: stop polling.
     summary?.resultsHidden ? undefined : sessionId,
@@ -185,9 +182,6 @@ export const PostSimulationSummary: FC = () => {
               <DebriefTab
                 sessionId={sessionId ?? ""}
                 summaryData={summaryData}
-                retryMaxReached={retryMaxReached}
-                checkAgain={checkAgain}
-                isCheckingAgain={isCheckingAgain}
                 // Anchors and cited timestamps only become chips when there is
                 // a transcript tab to open; otherwise they render as plain
                 // prose.

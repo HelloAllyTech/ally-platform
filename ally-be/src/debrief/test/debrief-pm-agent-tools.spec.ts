@@ -214,10 +214,6 @@ describe('metric failure points (spec C2)', () => {
       { key: 'hi', debriefs: 30, experience: exp([5, 30]) },
     ],
     byPlatform: [{ key: 'ios', debriefs: 10, experience: exp([1, 10]) }],
-    baselines: {
-      legacyHardFailRate: rate(5, 100),
-      legacyThumbsDownRate: rate(10, 100),
-    },
     agents: {
       stages: {
         writer: {
@@ -241,7 +237,6 @@ describe('metric failure points (spec C2)', () => {
       expect.arrayContaining([
         'experience_off_target:read_through:all',
         'experience_off_target:read_through:language=hi',
-        'guardrail_breached:hard_fail_rate:all',
         'efficiency_drift:cost_p50:week=2026-11-02',
         'steering_falling:steering:week=2026-11-02',
         'stage_failing:analyst.fail_rate:all',

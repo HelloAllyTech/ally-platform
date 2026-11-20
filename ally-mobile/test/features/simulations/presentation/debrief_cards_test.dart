@@ -802,10 +802,10 @@ void main() {
       await h.pump(tester);
 
       expect(find.byKey(const Key('debrief-follow-up')), findsOneWidget);
-      expect(find.text("We're taking a closer look"), findsOneWidget);
+      expect(find.text("Something important came up"), findsOneWidget);
       expect(
         find.text(
-          'Something important came up in this session, so someone from the Ally team is checking this debrief more closely.',
+          'Something important came up in this session, and this debrief may not cover it fully.',
         ),
         findsOneWidget,
       );
@@ -822,7 +822,7 @@ void main() {
       await h.pump(tester);
 
       expect(find.byKey(const Key('debrief-follow-up')), findsNothing);
-      expect(find.text("We're taking a closer look"), findsNothing);
+      expect(find.text("Something important came up"), findsNothing);
     });
 
     testWidgets('a support line is a tel: link', (tester) async {

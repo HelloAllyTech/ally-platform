@@ -38,6 +38,8 @@ import { ArticleSpecialist } from './specialists/article.specialist';
 import { QuizSpecialist } from './specialists/quiz.specialist';
 import { JournalSpecialist } from './specialists/journal.specialist';
 import { AnnotationSpecialist } from './specialists/annotation.specialist';
+import { ScenarioQuizSpecialist } from './specialists/scenario-quiz.specialist';
+import { BucketSortSpecialist } from './specialists/bucket-sort.specialist';
 import { CourseMetaSpecialist } from './specialists/course-meta.specialist';
 import { CourseReviewSpecialist } from './specialists/course-review.specialist';
 import { ImagePromptSpecialist } from './specialists/image-prompt.specialist';
@@ -50,6 +52,10 @@ import {
 import { CourseCopilotStructureService } from './course-copilot-structure.service';
 import { CourseCopilotSessionService } from './course-copilot-session.service';
 import { CourseCopilotLibraryService } from './course-copilot-library.service';
+import {
+  DEFAULT_BREATHING_EXERCISE,
+  matchTriggerWarnings,
+} from '../util/item-defaults.util';
 
 const textOf = (html: unknown, max = 4_000): string => {
   const text =
@@ -90,6 +96,8 @@ export class CourseCopilotJobExecutorService {
     private readonly quiz: QuizSpecialist,
     private readonly journal: JournalSpecialist,
     private readonly annotation: AnnotationSpecialist,
+    private readonly scenarioQuiz: ScenarioQuizSpecialist,
+    private readonly bucketSort: BucketSortSpecialist,
     private readonly courseMeta: CourseMetaSpecialist,
     private readonly review: CourseReviewSpecialist,
     private readonly imagePrompt: ImagePromptSpecialist,
@@ -111,7 +119,9 @@ export class CourseCopilotJobExecutorService {
       case CourseCopilotJobKind.ARTICLE:
       case CourseCopilotJobKind.QUIZ:
       case CourseCopilotJobKind.JOURNAL:
-      case CourseCopilotJobKind.ANNOTATED_ARTIFACT: {
+      case CourseCopilotJobKind.ANNOTATED_ARTIFACT:
+      case CourseCopilotJobKind.BRANCHING_SCENARIO:
+      case CourseCopilotJobKind.BUCKET_SORT: {
         const context = await this.specialistContext(
           session,
           job,
@@ -122,6 +132,8 @@ export class CourseCopilotJobExecutorService {
           [CourseCopilotJobKind.QUIZ]: this.quiz,
           [CourseCopilotJobKind.JOURNAL]: this.journal,
           [CourseCopilotJobKind.ANNOTATED_ARTIFACT]: this.annotation,
+          [CourseCopilotJobKind.BRANCHING_SCENARIO]: this.scenarioQuiz,
+          [CourseCopilotJobKind.BUCKET_SORT]: this.bucketSort,
         }[job.kind];
         const output = await specialist.generate(context);
         return {
@@ -310,6 +322,13 @@ export class CourseCopilotJobExecutorService {
 
   // ── No-model items ───────────────────────────────────────────────────────
 
+  /** Trigger warnings as real ids (see matchTriggerWarnings). */
+  private async resolveTriggerWarningIds(raw: unknown[]): Promise<string[]> {
+    if (!raw.length) return [];
+    const warnings = await this.library.listTriggerWarnings().catch(() => []);
+    return matchTriggerWarnings(raw, warnings);
+  }
+
   private gameContent(item: CourseBlueprintItem): CourseCopilotJobResult {
     const requested = String(item?.spec?.gameKey ?? '');
     const gameKey = (Object.values(TrackGameKey) as string[]).includes(
@@ -321,6 +340,10 @@ export class CourseCopilotJobExecutorService {
       gameKey,
       ...(typeof item?.spec?.intro === 'string' && item.spec.intro.trim()
         ? { intro: item.spec.intro.trim() }
+        : {}),
+      // The breathing exercise needs its box timings; Studio's defaults (4-4-4-4, four rounds).
+      ...(gameKey === TrackGameKey.BREATHING_EXERCISE
+        ? { breathingExercise: { ...DEFAULT_BREATHING_EXERCISE } }
         : {}),
     };
     validateTrackItemContent({
@@ -435,6 +458,9 @@ export class CourseCopilotJobExecutorService {
       (brief.look?.articleImages ?? 'none') !== 'none' ||
       brief.look?.cover === 'generate';
 
+    const triggerWarningIds = Array.isArray(spec.triggerWarningIds)
+      ? await this.resolveTriggerWarningIds(spec.triggerWarningIds)
+      : undefined;
     const created = await this.structureService.asOwner(session, () =>
       this.chain.buildScenarioFromBrief(
         {
@@ -448,9 +474,7 @@ export class CourseCopilotJobExecutorService {
           personaAge: actor.personaAge,
           difficultyLevel:
             (actor.difficultyLevel as ScenarioDifficultyLevel) ?? undefined,
-          triggerWarningIds: Array.isArray(spec.triggerWarningIds)
-            ? spec.triggerWarningIds.map(String)
-            : undefined,
+          triggerWarningIds,
           coverImageUrl: imageryOn ? (track?.coverImageUrl ?? null) : null,
           titleHint: actor.title ?? item.title,
           characterId: newCharacter ? undefined : casting.characterId,
@@ -819,6 +843,30 @@ export class CourseCopilotJobExecutorService {
               `labels: ${(content.labels ?? []).map((l: any) => l.text).join(', ')}; lines: ${(content.units ?? []).length}; answers: ${(content.targets ?? []).length}`,
             );
             break;
+          case TrackItemType.BRANCHING_SCENARIO:
+            for (const node of (content.nodes ?? []).slice(0, 30)) {
+              const choices = Array.isArray(node.choices) ? node.choices : [];
+              lines.push(
+                choices.length
+                  ? `- scene: ${String(node.text ?? '').slice(0, 300)} → ${choices.map((choice: any) => choice.text).join(' | ')}`
+                  : `- ending (${node.outcome ?? 'no outcome'}, ${node.score ?? '?'}): ${String(node.text ?? '').slice(0, 200)}`,
+              );
+            }
+            break;
+          case TrackItemType.BUCKET_SORT: {
+            const labels = new Map<string, string>(
+              (content.buckets ?? []).map((b: any) => [b.id, b.label]),
+            );
+            lines.push(
+              `buckets: ${(content.buckets ?? []).map((b: any) => b.label).join(', ')}`,
+            );
+            for (const entry of (content.items ?? []).slice(0, 30)) {
+              lines.push(
+                `- ${entry.text} → ${labels.get(entry.bucketId) ?? '?'}`,
+              );
+            }
+            break;
+          }
           case TrackItemType.ROLEPLAY:
             lines.push(`roleplay scenario #${item.scenarioId}`);
             break;

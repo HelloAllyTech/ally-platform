@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
-import 'package:ally_mobile_flutter/core/widgets/ask_ai_chat/ask_ai_chat.dart';
 import 'package:ally_mobile_flutter/features/courses/data/course_models.dart';
 import 'package:ally_mobile_flutter/features/simulations/data/learner_debrief_repository.dart';
 import 'package:ally_mobile_flutter/features/reviews/data/review_models.dart';
@@ -121,7 +120,7 @@ void main() {
   });
 
   group('debrief', () {
-    testWidgets('renders the note by section, with headings and the reply composer', (tester) async {
+    testWidgets('an old session\'s note shows read-only: sections, no composer, no reply prompt, no closing', (tester) async {
       h.stubSummary(summaryJson(note: _note, hasFeedback: true));
       await h.pump(tester);
 
@@ -130,25 +129,29 @@ void main() {
       expect(find.text('from Ally'), findsOneWidget);
       expect(find.text('AI-GENERATED'), findsOneWidget);
       expect(find.byKey(const ValueKey('debrief-moment-42')), findsOneWidget);
-      expect(find.text('Have a question about any of this? Reply below.'), findsOneWidget);
-      expect(find.byKey(const Key('ask-ai-input')), findsOneWidget);
-      verify(() => h.chatApi.getHistory('session-1')).called(1);
+      expect(find.byKey(const Key('ask-ai-input')), findsNothing);
+      expect(find.text('Have a question about any of this? Reply below.'), findsNothing);
+      expect(find.textContaining("Reply and we'll talk"), findsNothing);
+      expect(find.byKey(const Key('debrief-unavailable')), findsNothing);
     });
 
-    testWidgets('while the note is still being written: skeleton and "writing" copy', (tester) async {
+    testWidgets('no old note: one calm static message, no waiting, no skeleton', (tester) async {
       h.stubSummary(summaryJson(hasFeedback: true));
       await h.pump(tester);
 
-      expect(find.byKey(const Key('debrief-note-skeleton')), findsOneWidget);
-      expect(find.textContaining('Ally is writing your debrief'), findsOneWidget);
+      expect(find.text("Your debrief isn't available for this session."), findsOneWidget);
+      expect(find.byKey(const Key('debrief-unavailable')), findsOneWidget);
+      expect(find.byKey(const Key('debrief-note-skeleton')), findsNothing);
+      expect(find.textContaining('Ally is writing your debrief'), findsNothing);
       expect(find.byKey(const Key('ask-ai-input')), findsNothing);
     });
 
-    testWidgets('a failed generation shows its error message', (tester) async {
+    testWidgets('a stored generation error is not shown: same static message', (tester) async {
       h.stubSummary(summaryJson(hasFeedback: true, errorMessage: 'Generation failed'));
       await h.pump(tester);
 
-      expect(find.text('Generation failed'), findsOneWidget);
+      expect(find.text('Generation failed'), findsNothing);
+      expect(find.text("Your debrief isn't available for this session."), findsOneWidget);
     });
 
     testWidgets('from Logs it is read-only: no composer, no closing, no history load', (tester) async {
@@ -194,50 +197,6 @@ void main() {
       expect((after.decoration! as BoxDecoration).border!.top.width, 0.5);
     });
 
-    testWidgets('replying streams Ally\'s answer into the thread', (tester) async {
-      h.stubSummary(summaryJson(note: _note, hasFeedback: true));
-      when(() => h.chatApi.streamChat('session-1', 'Why?', cancelToken: any(named: 'cancelToken'))).thenAnswer(
-        (_) => Stream.fromIterable(const [
-          AskAiSseStart(),
-          AskAiSseToken('Because '),
-          AskAiSseToken('**pacing** matters.'),
-          AskAiSseDone(),
-        ]),
-      );
-      await h.pump(tester);
-
-      await tester.enterText(find.byKey(const Key('ask-ai-input')), 'Why?');
-      await tester.pump();
-      await tester.tap(find.byKey(const Key('ask-ai-send')));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Why?'), findsOneWidget);
-      expect(find.textContaining('Because', findRichText: true), findsOneWidget);
-      expect(find.textContaining('pacing', findRichText: true), findsOneWidget);
-    });
-
-    testWidgets('a stream error shows the banner, and Retry re-sends', (tester) async {
-      h.stubSummary(summaryJson(note: _note, hasFeedback: true));
-      var calls = 0;
-      when(() => h.chatApi.streamChat('session-1', 'Why?', cancelToken: any(named: 'cancelToken'))).thenAnswer((_) {
-        calls++;
-        return calls == 1
-            ? Stream.fromIterable(const [AskAiSseError('Something broke')])
-            : Stream.fromIterable(const [AskAiSseToken('Fine now'), AskAiSseDone()]);
-      });
-      await h.pump(tester);
-
-      await tester.enterText(find.byKey(const Key('ask-ai-input')), 'Why?');
-      await tester.pump();
-      await tester.tap(find.byKey(const Key('ask-ai-send')));
-      await tester.pumpAndSettle();
-      expect(find.text('Something broke'), findsOneWidget);
-
-      await tester.tap(find.byKey(const Key('ask-ai-retry')));
-      await tester.pumpAndSettle();
-      expect(find.text('Something broke'), findsNothing);
-      expect(find.textContaining('Fine now', findRichText: true), findsOneWidget);
-    });
   });
 
   group('rating', () {
@@ -518,23 +477,18 @@ void main() {
   });
 
   group('polling', () {
-    testWidgets('re-fetches every 3.5s until Ally\'s note lands, then stops', (tester) async {
+    testWidgets('a loaded session is not polled again for an old note', (tester) async {
       var calls = 0;
       when(() => h.simulations.getSimulationDetails('session-1')).thenAnswer((_) async {
         calls++;
-        return SimulationSummary.fromJson(summaryJson(hasFeedback: true, note: calls >= 2 ? _note : null));
+        return SimulationSummary.fromJson(summaryJson(hasFeedback: true));
       });
       await h.pump(tester);
       expect(calls, 1);
-      expect(find.byKey(const Key('debrief-note-skeleton')), findsOneWidget);
-
-      await tester.pump(const Duration(milliseconds: 3600));
-      await tester.pumpAndSettle();
-      expect(calls, 2);
-      expect(find.byKey(const Key('supervisor-note')), findsOneWidget);
 
       await tester.pump(const Duration(seconds: 10));
-      expect(calls, 2);
+      expect(calls, 1);
+      expect(find.byKey(const Key('debrief-unavailable')), findsOneWidget);
     });
   });
 

@@ -25,6 +25,8 @@ export const SPECIALIST_MAX_TOKENS = {
   QUIZ: 12_000,
   ANNOTATION: 14_000,
   JOURNAL: 3_000,
+  SCENARIO_QUIZ: 14_000,
+  BUCKET_SORT: 8_000,
   META: 3_000,
   REVIEW: 12_000,
   IMAGE_PROMPT: 2_000,
@@ -383,6 +385,32 @@ export function precedingPracticeBlock(
     break;
   }
   return block;
+}
+
+/** The brief's confirmed behaviours as a bullet list, or a prompt to name them. */
+export function behavioursForPrompt(behaviours: string[] | undefined): string {
+  const named = (behaviours ?? [])
+    .map((behaviour) => asText(behaviour))
+    .filter(Boolean);
+  return named.length
+    ? named.map((behaviour) => `- ${behaviour}`).join('\n')
+    : '- (none confirmed — name them yourself from the outcomes)';
+}
+
+/**
+ * The people this course's roleplays put in front of the learner, one line
+ * each, so a scenario quiz or a bucket sort stays in the same world rather
+ * than inventing a stranger.
+ */
+export function courseCharactersForPrompt(blueprint: CourseBlueprint): string {
+  const lines = flattenItems(blueprint)
+    .filter((item) => item.type === TrackItemType.ROLEPLAY)
+    .map((item) => asText(item.spec?.personaBrief))
+    .filter(Boolean)
+    .map((persona) => `- ${persona}`);
+  return lines.length
+    ? Array.from(new Set(lines)).join('\n')
+    : "- (no roleplay characters in this course — invent one person from the audience's world)";
 }
 
 /** The next practice or assessment item after this one in the same section. */

@@ -737,7 +737,7 @@ class LearnerDebriefView {
   final bool riskCue;
 
   /// A clear risk cue is still left out of this debrief: it is shown as it is, with a kind notice that
-  /// someone from the team is checking it more closely. Older servers never send it.
+  /// it may not cover what came up (the notice sits next to the support lines). Older servers never send it.
   final bool followUp;
   final List<DebriefSupportLine> supportLines;
 
