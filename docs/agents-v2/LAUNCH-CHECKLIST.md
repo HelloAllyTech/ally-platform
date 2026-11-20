@@ -154,6 +154,14 @@ In this order, before and right after deploying. Nothing here touches a prompt: 
 - [ ] **The old WhatsApp numbers are hidden and take no new writes** (`WA-NUMBERS-REPORT.md` step 1). Watch the `[WA_MAPPING_USED]` log line fall; step 2 (replacing its readers) is Phase 3.
 - [ ] **Follow-up before 14 Jan 2027:** the crisis check's code default `gpt-4o-mini` leaves the OpenAI API then. Production uses `gpt-6-luna` through the Skills Store; change the code default (`KNOWLEDGE_AGENT__CRISIS_MODEL`) and the translate default before that date (CR1 plan stop, decision 6).
 
+## CR3: the spend cap replaces tokens (`CHUNK-CR3-NOTES.md`)
+
+- [ ] **Deploy ally-be and the admin dashboard together, in either order.** The dashboard accepts both the old and the new refusal code for one release.
+- [ ] **Migration runs with ally-be:** `1985400000300-AddSpendCap` (additive: the cap columns and `spend_periods`). Users whose tokens were unlimited are marked never capped. From this deploy no token allowance limits anyone.
+- [ ] **Enter the cost cap for Free and Pro** on Ally admin → Plans ("Cost cap per creator per month"). **Until this is done nobody is capped**; the daily-budget, spike and expensive-conversation alerts still run. Size it from Costs → "Per conversation" and "Per customer message" times what the plan allows, with generous headroom: it should only be reached when something has gone wrong. Leave Internal empty.
+- [ ] **Check anyone who needs their own cap** (a pilot with heavy WhatsApp use) on Ally admin → a user → Spend.
+- [ ] **Tell support:** owners no longer see tokens. If a creator's assistants answer "isn't available right now" with conversations left, look at their Spend: Ally is alerted at 80% and 100% of the cap, and the owner is emailed at 100%.
+
 ## Checks
 
 - [ ] **Release `0fb34139c` (production onto the v2 agent), then watch the v1 fallback rate and reply times** (H0).

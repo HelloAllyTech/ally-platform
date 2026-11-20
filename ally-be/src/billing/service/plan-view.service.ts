@@ -3,7 +3,8 @@ import { DataSource } from 'typeorm';
 import { CounterSubject, SeatKind } from '../enum/billing.enum';
 import { BillingAuditService } from './billing-audit.service';
 import { PlanService, dayString, periodFor } from './plan.service';
-import { TokenService } from './token.service';
+import { microsToUsd } from '../util/pricing.util';
+import { SpendCapService } from './spend-cap.service';
 
 export interface Bar {
   used: number;
@@ -14,33 +15,28 @@ export interface Bar {
 
 /**
  * What a plan's numbers look like (CR1 Part C): the owner's "Plan and usage", an assistant's
- * Share → People, and Ally admin → a user → Plan. Counts and limits only — **never dollars**; the
- * admin's prices live on Ally admin → Plans and Costs.
+ * Share → People, and Ally admin → a user → Plan. For owners, counts and limits only — **never
+ * dollars**; the admin's prices live on Ally admin → Plans and Costs, and `forAdmin` alone adds the
+ * creator's spend against their cost cap.
  */
 @Injectable()
 export class PlanViewService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly plans: PlanService,
-    private readonly tokens: TokenService,
+    private readonly spend: SpendCapService,
     private readonly audit: BillingAuditService,
   ) {}
 
   /** The creator's plan and usage (account menu). */
   async forUser(userId: number) {
     const isCreator = await this.plans.isCreator(userId);
-    const tokenState = await this.tokens.state(userId);
-    const tokens = tokenState.hasAllowance
-      ? {
-          unlimited: tokenState.unlimited,
-          left: Math.max(0, tokenState.left),
-          granted: tokenState.granted,
-          resetsOn: tokenState.resetsOn ? dayString(tokenState.resetsOn) : null,
-        }
-      : null;
-    if (!isCreator) return { isCreator: false, tokens };
+    if (!isCreator) return { isCreator: false };
 
-    const { plan, subscription, anchor } = await this.plans.planOf(userId);
+    const creatorPlan = await this.plans.planOf(userId);
+    const { plan, subscription, anchor } = creatorPlan;
+    // Ally's cost cap: the owner sees only that it was reached, never the amount.
+    const capReached = await this.spend.isOverCap(userId, creatorPlan);
     const period = periodFor(anchor);
     const published = await this.plans.publishedCount(userId);
     const assistants: Array<{ id: string; name: string; status: string }> =
@@ -81,10 +77,13 @@ export class PlanViewService {
         status: subscription?.status ?? 'active',
       },
       period,
-      tokens,
+      capReached,
       ownerRuns,
       assistants: perAssistant,
-      alerts: this.alertsFrom(ownerRuns, perAssistant),
+      alerts: [
+        ...(capReached ? [{ what: 'Monthly usage', percent: 100 }] : []),
+        ...this.alertsFrom(ownerRuns, perAssistant),
+      ],
     };
   }
 
@@ -139,8 +138,19 @@ export class PlanViewService {
         : [],
     );
     const sub = subscription[0] ?? null;
+    const spend = view.isCreator ? await this.spend.state(userId) : null;
     return {
       ...view,
+      // Dollars: this view is Ally admin only.
+      spend: spend
+        ? {
+            usedUsd: microsToUsd(spend.usedMicros),
+            capUsd:
+              spend.capMicros === null ? null : microsToUsd(spend.capMicros),
+            capSource: spend.capSource,
+            resetsOn: spend.period.end,
+          }
+        : null,
       subscription: sub
         ? {
             planKey: sub.planKey as string,

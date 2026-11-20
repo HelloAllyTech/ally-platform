@@ -1189,7 +1189,7 @@ drain holds Postgres advisory lock `(1982000, 1)`.
 
 ---
 
-### 3.24 Costs, tokens, plans and seats (`billing`)
+### 3.24 Costs, plans, seats and the spend cap (`billing`)
 
 Agents v2 chunk CR1 (notes: `../docs/agents-v2/CHUNK-CR1-NOTES.md`). **Not multi-tenant**: these are Ally's own books, read by super admins (`manage_costs`) and, for plans and usage counts only, by an assistant's owners. Money is in **micros** (millionths of a US dollar) as `numeric(20,3)`; token prices are micros per 1,000,000 tokens. Every enum is a varchar with a CHECK. Migration `1985400000000-CreateBillingCosts` creates Part A's tables and seeds the starting prices, India's WhatsApp rates and the settings singleton.
 
@@ -1201,29 +1201,35 @@ Agents v2 chunk CR1 (notes: `../docs/agents-v2/CHUNK-CR1-NOTES.md`). **Not multi
 | `usage_events` | `createdAt` (when the call happened), `creatorUserId` (who pays), `chatbotId`, `draftId`, `conversationId` (text), `channel` (CHECK bot_page/bubble/whatsapp/owner/other), `runId`, `step`, `seq`, `kind` (CHECK, the metering map's kinds), `provider`, `modelName`, `modelId`, `priceId`, `inputTokens`, `cachedTokens`, `outputTokens`, `units`/`unit`, `costMicros` (**NULL = unpriced**), `detail` (jsonb; no message text) | One row per metered call on an assistant or billable WhatsApp message. **UNIQUE (`runId`, `kind`, `step`, `seq`)**: an SQS redelivery or a repeated webhook writes nothing. Written by `UsageEventService` from the `llm_usage` SQS message (when ally-ai attributed it through `X-Ally-Usage`) and from Meta status webhooks. Partial index on unpriced rows; adding a model or price re-prices them. |
 | `fixed_costs` | `month` (first day; CHECK), `label`, `amountMicros` (≥ 0), `note` | Hosting, database, subscriptions, entered by hand. |
 | `cost_settings` | `id` (CHECK `= 1`), `dailyBudgetMicros`, `conversationAlertMicros`, `spikeMultiplier`, `spikeMinMicros` | Singleton, seeded $20 / $0.50 / 5× / $1. |
-| `cost_alerts` | `kind` (CHECK), `subjectKey`, `day`, `detail` | **UNIQUE (`kind`, `subjectKey`, `day`)** — what makes each alert fire once a day. Also the Costs screen's banner. |
+| `cost_alerts` | `kind` (CHECK), `subjectKey`, `day`, `detail` | **UNIQUE (`kind`, `subjectKey`, `day`)** — what makes each alert fire once a day. Also the Costs screen's banner. Kinds include `spend_cap` (a creator at 80% or 100% of their cap); `token_drift` is no longer raised. |
 | `billing_audit` | `subjectType`, `subjectId`, `action`, `before`/`after` (jsonb), `note` (required), `actorUserId` | Append-only history of every CR1 admin change. |
 
 `llm_usage` is unchanged and still receives every row; an assistant's row is also a `usage_events` row, recorded first.
 
-**Part B — tokens** (migration `1985400000100-CreateAssistantOwnerAndTokens`, which also creates the `ASSISTANT_OWNER` group with the WhatsApp-bot permissions only, never `system:access`):
+**Part B — tokens (retired)** (migration `1985400000100-CreateAssistantOwnerAndTokens`, which also creates the `ASSISTANT_OWNER` group with the WhatsApp-bot permissions only, never `system:access`). Token allowances were replaced by the spend cap below: both tables are still there and **nothing reads or writes them**.
 
 | Table | Key columns | Notes |
 | --- | --- | --- |
-| `token_grants` | `userId`, `amount` (> 0), `remaining` (≥ 0), `used`, `renewMonthly`, `renewDay` (1–28), `nextRenewalAt`, `expiresAt`, `status` (CHECK active/revoked/expired), `note`, `createdBy` | One allowance Ally assigned. Usage is taken from the oldest grant first; revoking zeroes `remaining`; a grant with `used > 0` can't be deleted. |
-| `token_balances` | `userId` (PK), `unlimited`, `overdraft` (≥ 0), `usedThisMonth`, `monthStart` | One row per user with an allowance; **no row = no limit**. Row-locked and updated in the same transaction as each `usage_events` insert; `overdraft` is what a run used past zero, taken from the next grant or renewal. Nightly reconcile against `usage_events`. |
+| `token_grants` | `userId`, `amount` (> 0), `remaining` (≥ 0), `used`, `renewMonthly`, `renewDay` (1–28), `nextRenewalAt`, `expiresAt`, `status` (CHECK active/revoked/expired), `note`, `createdBy` | Retired. One allowance Ally assigned, as it stood when the spend cap replaced it. |
+| `token_balances` | `userId` (PK), `unlimited`, `overdraft` (≥ 0), `usedThisMonth`, `monthStart` | Retired. `unlimited` was carried over to `subscriptions.costCapOff` by `1985400000300-AddSpendCap`. |
 
 **Part C — plans and seats** (migration `1985400000200-CreatePlansAndSeats`; seeds Free, Pro, internal and Basic, Premium):
 
 | Table | Key columns | Notes |
 | --- | --- | --- |
-| `plans` | `key` (UNIQUE), `name`, `maxPublished`, `includedSeats`, `includedSeatTypeId`, `customerConversations`, `ownerRuns`, `seatsRequired`, `priceMicros`, `active` | NULL limit = unlimited. `seatsRequired` false (internal): invited people need no seat. Price is for Costs only. |
+| `plans` | `key` (UNIQUE), `name`, `maxPublished`, `includedSeats`, `includedSeatTypeId`, `customerConversations`, `ownerRuns`, `seatsRequired`, `priceMicros`, `costCapMicros`, `active` | NULL limit = unlimited. `seatsRequired` false (internal): invited people need no seat. Price is for Costs only. `costCapMicros` is the spend cap per creator per period (NULL = none; CHECK > 0). |
 | `seat_types` | `key` (UNIQUE), `name`, `messagesPerMonth` (NULL = unlimited), `rank`, `priceMicros`, `active` | Adding one needs no code. |
-| `subscriptions` | `userId` (UNIQUE), `planId`, `status` (CHECK active/past_due/cancelled), `periodStart` (its day resets the counters), `periodEnd`, `setBy`, `note` | One per chatbot creator. A creator without one is on Free. |
+| `subscriptions` | `userId` (UNIQUE), `planId`, `status` (CHECK active/past_due/cancelled), `periodStart` (its day resets the counters), `periodEnd`, `costCapMicros`, `costCapOff`, `setBy`, `note` | One per chatbot creator. A creator without one is on Free. `costCapMicros` is this creator's own cap (NULL = the plan's); `costCapOff` means never capped. |
 | `seats` | `chatbotId` (FK CASCADE), `seatTypeId`, `kind` (CHECK included/extra), `assigneeEmail` (lower case; CHECK), `assigneeUserId`, `startDate`, `cycle` (CHECK monthly), `nextRenewal` (extra only), `status` (CHECK active/expiring/lapsed/cancelled), `addedBy`, `note` | **Partial UNIQUE (`chatbotId`, `assigneeEmail`) while active/expiring.** Extra seats renew on their own date while the subscription is active, else lapse. |
 | `usage_counters` | `subjectType` (CHECK seat/customers/owner_runs), `subjectId`, `periodStart`/`periodEnd` (UNIQUE with subject), `count`, `limitAtTime`, `alerted80At`, `alerted100At` | Locked for each check-and-add. |
 | `usage_counter_hits` | PK (`runId`, `kind`), `counterId` (FK CASCADE) | What made each count: a repeated message or request counts once. |
 | `customer_activity` | PK (`chatbotId`, `conversationKey`), `lastMessageAt` | A customer conversation is new after a 24-hour gap. Written only when the message may go ahead. |
+
+**Spend cap** (migration `1985400000300-AddSpendCap`; notes: `../docs/agents-v2/CHUNK-CR3-NOTES.md`). The most a creator's assistants may cost Ally in one plan period, in dollars. It is Ally's guard under the plan's own limits: owners never see the amount, only that it was reached.
+
+| Table | Key columns | Notes |
+| --- | --- | --- |
+| `spend_periods` | PK (`userId`, `periodStart`), `periodEnd`, `costMicros` (≥ 0), `alerted80At`, `alerted100At` | A creator's cost so far in each plan period. Added to in the same transaction as each priced `usage_events` insert (WhatsApp fees included), for the period the call happened in; corrected nightly from the events. A run doesn't start once `costMicros` reaches the cap. Ally is alerted at 80% and 100% (`cost_alerts.kind = spend_cap`), the owner emailed at 100%. |
 
 ---
 

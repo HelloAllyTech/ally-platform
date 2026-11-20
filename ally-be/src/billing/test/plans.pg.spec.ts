@@ -14,7 +14,7 @@ import {
   dayString,
   periodFor,
 } from '../service/plan.service';
-import { TokenService } from '../service/token.service';
+import { SpendCapService } from '../service/spend-cap.service';
 import { UsageEventService } from '../service/usage-event.service';
 import { BILLING_ENTITIES } from './billing-entities';
 
@@ -25,7 +25,7 @@ import { BILLING_ENTITIES } from './billing-entities';
 describePg('Billing: plans, seats and limits (Postgres)', () => {
   let dataSource: DataSource;
   let plans: PlanService;
-  let tokens: TokenService;
+  let spend: SpendCapService;
   let limits: LimitsService;
   let creator: number;
   const alerts = { fire: async () => true } as never;
@@ -34,20 +34,21 @@ describePg('Billing: plans, seats and limits (Postgres)', () => {
     dataSource = await openTestDataSource(BILLING_ENTITIES);
     const audit = new BillingAuditService(dataSource);
     plans = new PlanService(dataSource, audit, alerts);
-    tokens = new TokenService(
+    spend = new SpendCapService(
       dataSource,
+      plans,
       audit,
       new UsageEventService(dataSource),
       alerts,
     );
-    limits = new LimitsService(dataSource, plans, tokens);
+    limits = new LimitsService(dataSource, plans, spend);
   });
   afterAll(() => closeTestDataSource(dataSource));
 
   beforeEach(async () => {
     await resetTables(dataSource);
     await dataSource.query(
-      `TRUNCATE seats, subscriptions, usage_counters, usage_counter_hits, customer_activity, token_grants, token_balances, billing_audit CASCADE`,
+      `TRUNCATE seats, subscriptions, usage_counters, usage_counter_hits, customer_activity, spend_periods, billing_audit CASCADE`,
     );
     await dataSource.query(
       `DELETE FROM seat_types WHERE key NOT IN ('basic','premium')`,
@@ -100,6 +101,16 @@ describePg('Billing: plans, seats and limits (Postgres)', () => {
         [pageId, email],
       );
     }
+  };
+
+  /** What the creator's assistants have cost so far this period, as usage events would leave it. */
+  const spent = async (micros: number) => {
+    const { period } = await spend.state(creator);
+    await dataSource.query(
+      `INSERT INTO spend_periods ("userId", "periodStart", "periodEnd", "costMicros") VALUES ($1, $2, $3, $4)
+       ON CONFLICT ("userId", "periodStart") DO UPDATE SET "costMicros" = EXCLUDED."costMicros"`,
+      [creator, period.start, period.end, micros],
+    );
   };
 
   let run = 0;
@@ -345,7 +356,7 @@ describePg('Billing: plans, seats and limits (Postgres)', () => {
     }
   });
 
-  it('owner-side runs: refused with the owner message at the limit; tokens first', async () => {
+  it('owner-side runs: refused with the owner message at the limit; the cost cap first', async () => {
     await plans.setPlan(creator, { planKey: 'free', note: 'Start' }, 9);
     await dataSource.query(
       `UPDATE plans SET "ownerRuns" = 1 WHERE key = 'free'`,
@@ -359,24 +370,40 @@ describePg('Billing: plans, seats and limits (Postgres)', () => {
       ).rejects.toThrow(
         "Your plan's monthly limit for setup and checkups is used up. Ask Ally to upgrade.",
       );
-      await tokens.assign(creator, { amount: 1, note: 'Tiny' }, 9);
-      await dataSource.transaction((m) => tokens.consume(m, creator, 5));
+      await dataSource.query(
+        `UPDATE plans SET "costCapMicros" = 2000000 WHERE key = 'free'`,
+      );
+      await spent(2_000_000);
       await expect(
         limits.assertOwnerRun(creator, 'setup-3', 'setup'),
-      ).rejects.toThrow('Your tokens are used up. Ask Ally to add more.');
+      ).rejects.toThrow(
+        "Your account has reached this month's usage limit. Ask Ally to raise it.",
+      );
     } finally {
       await dataSource.query(
-        `UPDATE plans SET "ownerRuns" = 100 WHERE key = 'free'`,
+        `UPDATE plans SET "ownerRuns" = 100, "costCapMicros" = NULL WHERE key = 'free'`,
       );
     }
   });
 
-  it('customers get the fixed reply when the creator’s tokens are used up', async () => {
+  it('customers and invited people get the fixed reply when the creator’s cost cap is reached', async () => {
     await plans.setPlan(creator, { planKey: 'pro', note: 'Start' }, 9);
     const id = await bot();
-    await tokens.assign(creator, { amount: 10, note: 'Tiny' }, 9);
-    await dataSource.transaction((m) => tokens.consume(m, creator, 50));
-    expect(await customerTurn(id, 'p1')).toBe('customers');
+    await plans.ensureIncludedSeats(id);
+    await dataSource.query(
+      `UPDATE plans SET "costCapMicros" = 5000000 WHERE key = 'pro'`,
+    );
+    try {
+      await spent(4_999_999);
+      expect(await customerTurn(id, 'p1')).toBeNull();
+      await spent(5_000_000);
+      expect(await customerTurn(id, 'p2')).toBe('customers');
+      expect(await seatTurn(id, 'cr1-owner@test.local')).toBe('customers');
+    } finally {
+      await dataSource.query(
+        `UPDATE plans SET "costCapMicros" = NULL WHERE key = 'pro'`,
+      );
+    }
   });
 
   it('counters reset on the plan’s day', async () => {

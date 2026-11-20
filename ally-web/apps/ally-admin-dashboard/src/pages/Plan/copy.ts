@@ -1,6 +1,6 @@
 /**
  * The owner's words for plans, seats and limits (CR1 Part C, docs/agents-v2/chunk-cr1.md §C3):
- * Plan and usage, Share → People's seats, and publishing. **Never dollars, never token prices.**
+ * Plan and usage, Share → People's seats, and publishing. **Never dollars.**
  */
 export const PLAN = {
   title: "Plan and usage",
@@ -18,13 +18,6 @@ export const PLAN = {
     past_due: "Payment is due",
     cancelled: "Cancelled",
   } as Record<string, string>,
-  tokens: {
-    title: "Tokens",
-    unlimited: "Unlimited tokens",
-    left: (left: string, granted: string) => `${left} of ${granted} tokens left`,
-    resets: (day: string) => `resets ${day}`,
-    usedUp: "Your tokens are used up. Ask Ally to add more.",
-  },
   month: {
     title: "This month",
     ownerRuns: "Setup and checkups",
@@ -52,6 +45,8 @@ export const PLAN = {
     renews: (day: string) => `Renews ${day}`,
     since: (day: string) => `Since ${day}`,
     messages: "Messages",
+    /** "Basic · 500 messages a month": what the seat type gives, in words. */
+    allowance: (type: string, messages: string) => `${type} · ${messages} messages a month`,
     status: {
       active: "",
       expiring: "Renews soon",

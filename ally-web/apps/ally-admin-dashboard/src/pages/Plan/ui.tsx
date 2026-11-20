@@ -136,7 +136,11 @@ export const SeatList: React.FC<{ seats: PlanSeat[]; assigning?: SeatAssigning }
         <li key={seat.id} className="ally-seat" data-testid="seat-row">
           <div className="ally-seat__main">
             <span className="ally-seat__title">
-              <span>{seat.typeName}</span>
+              <span>
+                {seat.messages.limit === null
+                  ? seat.typeName
+                  : PLAN.seats.allowance(seat.typeName, fullCount(seat.messages.limit))}
+              </span>
               <span className="ally-badge ally-badge--muted">
                 {seat.kind === "extra" ? PLAN.seats.extra : PLAN.seats.included}
               </span>

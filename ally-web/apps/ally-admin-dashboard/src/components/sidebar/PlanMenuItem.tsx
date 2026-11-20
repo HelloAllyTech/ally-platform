@@ -7,11 +7,11 @@ import { PLAN } from "../../pages/Plan/copy";
 
 /**
  * "Plan and usage" in the account menu (CR1 Part C): only for someone with a plan (a chatbot
- * creator) or a token allowance. Everyone else has nothing to see there.
+ * creator). Everyone else has nothing to see there.
  */
 export const PlanMenuItem: React.FC<{ onOpen: (path: string) => void }> = ({ onOpen }) => {
   const { data } = useGetMyPlanQuery();
-  if (!data || (!data.isCreator && !data.tokens)) return null;
+  if (!data?.isCreator) return null;
   return (
     <button
       role="menuitem"

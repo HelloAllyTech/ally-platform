@@ -5,9 +5,9 @@ import { baseAPI } from "./baseApi";
 import type { BillingAuditEntry, CostPeriod, WithNote } from "./billing";
 
 /**
- * CR1 Parts B and C: tokens, plans and seats.
+ * Plans, seats and the spend cap.
  *
- * - Ally admin (`manage_costs`, checked by ally-be): a user's Tokens and Plan, Ally admin → Plans,
+ * - Ally admin (`manage_costs`, checked by ally-be): a user's Spend and Plan, Ally admin → Plans,
  *   seats on any assistant, and the Costs page's plan margins. Prices are dollars, for Costs only.
  * - The owner (any signed-in user, for themselves): their Plan and usage, an assistant's seats on
  *   Share → People, and "This uses 1 of your 3 assistants" before publishing. **Counts only, never
@@ -55,14 +55,6 @@ export interface PlanAlert {
   percent: number;
 }
 
-/** What the owner sees of their tokens: how many are left, never what they cost. */
-export interface MyTokens {
-  unlimited: boolean;
-  left: number;
-  granted: number;
-  resetsOn: string | null;
-}
-
 export interface CreatorPlanLine {
   key: string;
   name: string;
@@ -73,10 +65,11 @@ export interface CreatorPlanLine {
   status: string;
 }
 
-/** `GET v1/me/plan`. A user who has never created a chatbot has no plan, only maybe tokens. */
+/** `GET v1/me/plan`. A user who has never created a chatbot has no plan. */
 export interface MyPlan {
   isCreator: boolean;
-  tokens: MyTokens | null;
+  /** Ally's monthly cost cap was reached: assistants give the "not available" reply. No amount. */
+  capReached?: boolean;
   plan?: CreatorPlanLine;
   period?: { start: string; end: string };
   ownerRuns?: UsageBar;
@@ -110,32 +103,20 @@ export interface PublishUse {
 
 // ── Ally admin ──
 
-export type TokenGrantStatus = "active" | "revoked" | "expired";
+/** Where a creator's cost cap comes from: their plan, their own, switched off, or none set. */
+export type CapSource = "plan" | "own" | "off" | "none";
 
-export interface TokenGrant {
-  id: string;
-  amount: number;
-  remaining: number;
-  used: number;
-  renewMonthly: boolean;
-  renewDay: number | null;
-  nextRenewalAt: string | null;
-  expiresAt: string | null;
-  status: TokenGrantStatus;
-  note: string;
-  createdAt: string;
-}
-
-/** `GET v1/admin/billing/users/:id/tokens`. The usage's dollars are for Ally admins only. */
-export interface TokenSummary {
-  hasAllowance: boolean;
-  unlimited: boolean;
-  left: number;
-  granted: number;
-  usedThisMonth: number;
-  overdraft: number;
-  resetsOn: string | null;
-  grants: TokenGrant[];
+/** `GET v1/admin/billing/users/:id/spend`. Dollars: Ally admins only. */
+export interface SpendSummary {
+  isCreator: boolean;
+  planName: string;
+  usedUsd: number;
+  /** Null: not capped. */
+  capUsd: number | null;
+  capSource: CapSource;
+  /** What the plan says, whatever this creator's own setting. */
+  planCapUsd: number | null;
+  resetsOn: string;
   usage: {
     byAssistant: { chatbotId: string | null; name: string; tokens: number; costUsd: number }[];
     byKind: { kind: string; tokens: number; costUsd: number }[];
@@ -143,11 +124,11 @@ export interface TokenSummary {
   history: BillingAuditEntry[];
 }
 
-export interface TokenGrantInput extends WithNote {
-  amount: number;
-  renewMonthly?: boolean;
-  /** YYYY-MM-DD, or null for no expiry. */
-  expiresAt?: string | null;
+export interface SpendCapInput extends WithNote {
+  /** This creator's own cap in USD; null goes back to the plan's. */
+  capUsd?: number | null;
+  /** Never capped. */
+  off?: boolean;
 }
 
 export type SubscriptionStatus = "active" | "past_due" | "cancelled";
@@ -164,6 +145,8 @@ export interface CreatorSubscription {
 
 /** `GET v1/admin/billing/users/:id/plan`: the owner's view plus the subscription and history. */
 export interface AdminUserPlan extends MyPlan {
+  /** This period's cost against the cap (dollars). Null for someone who isn't a creator. */
+  spend?: { usedUsd: number; capUsd: number | null; capSource: CapSource; resetsOn: string } | null;
   subscription?: CreatorSubscription | null;
   history?: BillingAuditEntry[];
 }
@@ -187,6 +170,8 @@ export interface BillingPlan {
   seatsRequired: boolean;
   /** USD a month, for Costs only. */
   price: number | null;
+  /** The most a creator on this plan may cost Ally per period, in USD. Null: no cap. */
+  costCap: number | null;
   active: boolean;
 }
 
@@ -229,6 +214,7 @@ export interface PlanInput extends WithNote {
   ownerRuns: number | null;
   seatsRequired: boolean;
   priceUsd: number | null;
+  costCapUsd: number | null;
   active: boolean;
 }
 
@@ -335,80 +321,22 @@ export const plansApi = baseAPI.injectEndpoints({
       keepUnusedDataFor: 0,
     }),
 
-    // ── Ally admin → a user → Tokens ──
-    getUserTokens: builder.query<TokenSummary, number>({
-      query: userId => ({ url: B().USER_TOKENS(userId), method: HttpMethod.GET }),
-      providesTags: (_r, _e, userId) => [{ type: TAG_TYPES.BILLING_USER_TOKENS, id: userId }],
+    // ── Ally admin → a user → Spend ──
+    getUserSpend: builder.query<SpendSummary, number>({
+      query: userId => ({ url: B().USER_SPEND(userId), method: HttpMethod.GET }),
+      providesTags: (_r, _e, userId) => [
+        TAG_TYPES.BILLING_USER_SPEND,
+        { type: TAG_TYPES.BILLING_USER_SPEND, id: userId },
+      ],
     }),
-    assignTokens: builder.mutation<TokenSummary, TokenGrantInput & { userId: number }>({
+    setUserSpendCap: builder.mutation<SpendSummary, SpendCapInput & { userId: number }>({
       query: ({ userId, ...body }) => ({
-        url: B().USER_TOKEN_GRANTS(userId),
-        method: HttpMethod.POST,
-        body,
-      }),
-      invalidatesTags: (_r, _e, { userId }) => [
-        { type: TAG_TYPES.BILLING_USER_TOKENS, id: userId },
-        TAG_TYPES.BILLING_USER_PLAN,
-        TAG_TYPES.MY_PLAN,
-      ],
-    }),
-    updateTokenGrant: builder.mutation<
-      TokenSummary,
-      Partial<TokenGrantInput> & WithNote & { userId: number; grantId: string }
-    >({
-      query: ({ userId, grantId, ...body }) => ({
-        url: B().USER_TOKEN_GRANT(userId, grantId),
-        method: HttpMethod.PATCH,
-        body,
-      }),
-      invalidatesTags: (_r, _e, { userId }) => [
-        { type: TAG_TYPES.BILLING_USER_TOKENS, id: userId },
-        TAG_TYPES.BILLING_USER_PLAN,
-        TAG_TYPES.MY_PLAN,
-      ],
-    }),
-    revokeTokenGrant: builder.mutation<
-      TokenSummary,
-      WithNote & { userId: number; grantId: string }
-    >({
-      query: ({ userId, grantId, note }) => ({
-        url: `${B().USER_TOKEN_GRANT(userId, grantId)}/revoke`,
-        method: HttpMethod.POST,
-        body: { note },
-      }),
-      invalidatesTags: (_r, _e, { userId }) => [
-        { type: TAG_TYPES.BILLING_USER_TOKENS, id: userId },
-        TAG_TYPES.BILLING_USER_PLAN,
-        TAG_TYPES.MY_PLAN,
-      ],
-    }),
-    /** Refused with 409 once any of it is used: revoke it instead. */
-    deleteTokenGrant: builder.mutation<
-      TokenSummary,
-      WithNote & { userId: number; grantId: string }
-    >({
-      query: ({ userId, grantId, note }) => ({
-        url: B().USER_TOKEN_GRANT(userId, grantId),
-        method: HttpMethod.DELETE,
-        body: { note },
-      }),
-      invalidatesTags: (_r, _e, { userId }) => [
-        { type: TAG_TYPES.BILLING_USER_TOKENS, id: userId },
-        TAG_TYPES.BILLING_USER_PLAN,
-        TAG_TYPES.MY_PLAN,
-      ],
-    }),
-    setUnlimitedTokens: builder.mutation<
-      TokenSummary,
-      WithNote & { userId: number; unlimited: boolean }
-    >({
-      query: ({ userId, ...body }) => ({
-        url: B().USER_TOKEN_UNLIMITED(userId),
+        url: B().USER_SPEND_CAP(userId),
         method: HttpMethod.PUT,
         body,
       }),
       invalidatesTags: (_r, _e, { userId }) => [
-        { type: TAG_TYPES.BILLING_USER_TOKENS, id: userId },
+        { type: TAG_TYPES.BILLING_USER_SPEND, id: userId },
         TAG_TYPES.BILLING_USER_PLAN,
         TAG_TYPES.MY_PLAN,
       ],
@@ -428,7 +356,7 @@ export const plansApi = baseAPI.injectEndpoints({
         method: HttpMethod.PUT,
         body,
       }),
-      invalidatesTags: () => [...seatTags(), TAG_TYPES.BILLING_COSTS],
+      invalidatesTags: () => [...seatTags(), TAG_TYPES.BILLING_COSTS, TAG_TYPES.BILLING_USER_SPEND],
     }),
     addSeats: builder.mutation<unknown, AddSeatsInput>({
       query: ({ chatbotId, ...body }) => ({
@@ -474,7 +402,7 @@ export const plansApi = baseAPI.injectEndpoints({
         method: id ? HttpMethod.PUT : HttpMethod.POST,
         body,
       }),
-      invalidatesTags: () => [...seatTags(), TAG_TYPES.BILLING_COSTS],
+      invalidatesTags: () => [...seatTags(), TAG_TYPES.BILLING_COSTS, TAG_TYPES.BILLING_USER_SPEND],
     }),
     saveSeatType: builder.mutation<BillingSeatType, SeatTypeInput>({
       query: ({ id, ...body }) => ({
@@ -524,12 +452,8 @@ export const {
   useGetAssistantSeatsQuery,
   useAssignSeatMutation,
   useGetPublishUseQuery,
-  useGetUserTokensQuery,
-  useAssignTokensMutation,
-  useUpdateTokenGrantMutation,
-  useRevokeTokenGrantMutation,
-  useDeleteTokenGrantMutation,
-  useSetUnlimitedTokensMutation,
+  useGetUserSpendQuery,
+  useSetUserSpendCapMutation,
   useGetUserPlanQuery,
   useSetUserPlanMutation,
   useAddSeatsMutation,
