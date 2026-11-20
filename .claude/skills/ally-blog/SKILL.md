@@ -24,7 +24,7 @@ The writing guidance is a skill in the **Skills Store** (prompt `blog_authoring_
 
 1. Call **`blog_guide`**. It returns the live skill (what a post must contain, how to illustrate it, the voice, what never goes in a public post) and what the blog supports (allowed HTML, image rules, the tags and cover colours in use). Follow it.
 2. **`list_posts`** so you do not repeat a topic.
-3. Plan the pictures with the sections. Make each image, then **`request_image_upload`** and upload the file with the `curl` line it returns. Never send image bytes through a tool.
+3. Plan the pictures with the sections: a header, a flow diagram for each process the text describes, and a designed screen for each product screen it discusses, all in the blog design the skill specifies and nothing else. Make each image, then **`request_image_upload`** and upload the file with the `curl` line it returns. Never send image bytes through a tool.
 4. **`create_draft`** with title, tldr, body (allowed tags only), tags, coverColor, authorName and headerImageUrl. Read the `issues` it returns and fix them with **`update_draft`**.
 5. Tell the person where to review it and which facts need their confirmation. Never say it is published.
 

@@ -19,16 +19,27 @@ You are a coding agent writing a blog post for Ally, usually from a conversation
 7. **A closing.** Two sentences that restate the conclusion.
 8. **Tags (one to four).** Reuse existing tags. **Cover colour** from the palette. **Byline** as the person asked.
 
-## 3. Illustrations
+## 3. Illustrations: flow diagrams and product screens, in the Ally blog design only
 
-A post without pictures is a wall of text. Plan them as you plan the sections.
+A post without pictures is a wall of text. Plan them with the sections, and make them in the blog's own design, never in a style of your own.
 
-- A header image for the post.
-- One diagram for any process, architecture or loop the text describes. Show the real mechanism, not decoration.
-- One picture of the product for any screen the text talks about.
-- Draw product screens from the real code (colours, type, layout, exact copy), not from memory. Use invented people and content; never real learner data, transcripts or names.
-- Every image has alt text that says what it shows, and a one-line caption in <p><em> below it. The body cannot place images side by side, so combine pictures that belong together into one image.
-- Make diagrams SVG and screens PNG. See blog_guide for how to upload.
+What to draw:
+- A header image for every post.
+- A flow diagram for every process, system, loop, architecture or decision the text describes. Show the real mechanism: the actual steps, in order, with what runs always and what is chosen.
+- A designed screen for every product screen the text talks about, drawn from the real code (colours, type, layout, exact copy). Use invented people and content; never real learner data, transcripts or names. Put screens that belong together in one image at the same height.
+- Every image has alt text that says what it shows and a one-line caption in <p><em> below it. The body cannot place images side by side, so combine pictures that belong together into one image.
+
+The Ally blog design, for every illustration:
+- Canvas: SVG, 1200 wide and 480 to 600 tall, background #FAF9F5, 30px margin. Title top left (serif, 26px, semibold, #29261F) and a one-line subtitle under it (16px, #6E6656).
+- Type: Georgia, 'Times New Roman', serif only (an image cannot load web fonts). Small caps labels at 12px with letter spacing in #6E6656, step titles at 17px semibold, body lines at 13 to 15px in #565045. Real product copy only.
+- Shapes: rounded rectangles with 12px corners and 1.5px strokes. No shadows, gradients (except the header), 3D, icons from other sets, emoji, photos or stock art.
+- Colour means one thing each. Ally blue #264D8E stroke on #DFEBF7 fill: a step that always runs or is owned by code. Neutral #BCB4A4 stroke on #EEF0F4: optional or chosen per case. Sage #4E6B54 on #E3ECDF: the outcome, live, good. Amber #CFA449 on #FBF3E4: a person is involved or needs care. Clay #964F39 stroke: a limit, a fence or a risk. White with #E3DBCE stroke: a note. Never rely on colour alone: say it in a label too.
+- Arrows are 2px Ally blue with filled heads. A loop or an undo is dashed (6 5). Flow runs left to right, one row where it fits, six steps at most per row, each step with a caps label, a bold title and at most three short lines.
+- Add a small legend whenever two or more fill colours appear.
+- Header image: the Ally debrief blue gradient (#264D8E to #D7E2F4) with one simple motif and no text.
+- Product screens: Ally's own colours and type from the app, rendered to PNG at 2x. Phones 390 by 844, web crops at 1280 wide.
+
+Before you upload, render each image and look at it. Fix text sitting on a line, overlapping boxes and clipped words. Make diagrams SVG and screens PNG. See blog_guide for how to upload.
 
 ## 4. Voice
 

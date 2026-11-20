@@ -2251,7 +2251,7 @@ export const BLOG_AUTHORING_SKILL = definePrompt(
   {
     name: 'Blog — Authoring skill',
     description:
-      'The skill Claude Code reads before it writes a post for the Ally blog: what a post must contain, how to illustrate it, the voice, and what must never go in a public post. Served by the blog_guide tool. Not a model prompt: edit it to change how every agent-written post is written.',
+      'The skill Claude Code reads before it writes a post for the Ally blog: what a post must contain, how to illustrate it (flow diagrams and product screens in the Ally blog design), the voice, and what must never go in a public post. Served by the blog_guide tool. Not a model prompt: edit it to change how every agent-written post is written.',
     category: 'Blog',
     runtimes: ['ally-be'],
   },

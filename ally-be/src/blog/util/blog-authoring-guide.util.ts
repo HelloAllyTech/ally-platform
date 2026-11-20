@@ -134,7 +134,7 @@ export function blogAuthoringGuide(
       contentTypes: Object.values(BlogImageUploadContentType),
       maxBytes: BLOG_IMAGE_MAX_SIZE_BYTES,
       advice:
-        'Prefer SVG for diagrams and illustrations (crisp, small) and PNG for screenshots or UI designs. ' +
+        'Illustrate in the blog design only, as the skill describes: flow diagrams as SVG, product screens as PNG. ' +
         'Text inside an SVG shown through <img> cannot use web fonts: use a system font stack.',
     },
     voice:
