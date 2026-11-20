@@ -36,6 +36,7 @@ export interface PlannedCase {
   expect: StarterCase['expect'];
   facts: string[];
   mustNot: string[];
+  alsoOk: string[];
   hardFail: boolean;
 }
 
@@ -76,13 +77,19 @@ export function answerText(
   return text ? text.slice(0, 2000) : null;
 }
 
-/** One item per line; a single line with commas is one item per comma. */
-export function itemsOf(text: string): string[] {
+/**
+ * One item per line. For short choices ("Consultation, Follow-up"), a single line with commas is
+ * one item per comma; never for entries, whose details can hold commas ("12 Station Road, Area 1").
+ */
+export function itemsOf(
+  text: string,
+  { commas = true }: { commas?: boolean } = {},
+): string[] {
   const lines = text
     .split(/\r?\n/)
     .map((l) => l.replace(/^\s*(?:[-•*]|\d+[.)])\s+/, '').trim())
     .filter(Boolean);
-  if (lines.length === 1 && lines[0].includes(',')) {
+  if (commas && lines.length === 1 && lines[0].includes(',')) {
     return lines[0]
       .split(',')
       .map((p) => p.trim())
@@ -200,7 +207,7 @@ function entriesFrom(
   columns: string[],
   text: string,
 ): Record<string, unknown>[] {
-  return itemsOf(text)
+  return itemsOf(text, { commas: false })
     .slice(0, 50)
     .map((line) => {
       const parts = partsOf(line);
@@ -417,6 +424,7 @@ export function planInstall(
       expect: c.expect,
       facts: factsFilled,
       mustNot: c.must_not ?? [],
+      alsoOk: c.also_ok ?? [],
       hardFail: Boolean(c.hard_fail),
     });
   }

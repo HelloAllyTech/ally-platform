@@ -408,7 +408,7 @@ export class TemplateService {
             expect: c.expect,
             facts: c.facts,
             mustNot: c.mustNot,
-            alsoOk: [],
+            alsoOk: c.alsoOk,
             source: { kind: '' } as never,
             origin: 'generated',
             confirmed: true,

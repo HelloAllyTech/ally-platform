@@ -281,6 +281,25 @@ describe('Use-case templates (T1)', () => {
       ]);
     });
 
+    it('never splits an entry at the commas in its details (an address)', () => {
+      const services = TEMPLATES.find((t) => t.id === 'services')!;
+      const plan = planInstall(
+        services,
+        { where: 'Centre 1 - 12 Station Road, Area 1 - Mon–Fri 10:00–17:00' },
+        { zone: ZONE },
+      );
+      expect(plan.entries.service_locations).toEqual([
+        {
+          values: {
+            name: 'Centre 1',
+            address: '12 Station Road, Area 1',
+            hours: 'Mon–Fri 10:00–17:00',
+          },
+          example: false,
+        },
+      ]);
+    });
+
     it('splits a line into its parts', () => {
       expect(partsOf('Haircut - 300')).toEqual(['Haircut', '300']);
       expect(partsOf('Centre 1 – 12 Station Road – Mon–Fri 10–5')).toEqual([

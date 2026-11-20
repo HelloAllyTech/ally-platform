@@ -5,7 +5,7 @@
  *
  *   npm run chatbot:basics -- --bot <chatbot id> [--cases <file.json>] [--only <id,id>]
  *                             [--out <report.json>] [--concurrency <n>] [--keep]
- *                             [--repeat <n>] [--classifier-only]
+ *                             [--repeat <n>] [--classifier-only] [--crisis-must <regex>]
  *
  * Each case gets its own throwaway contact and conversation, deleted at the end unless `--keep`.
  * `--repeat <n>` runs every case n times, each in a fresh conversation; the report then counts
@@ -15,6 +15,9 @@
  * the full engine.
  * It calls the bot's models, so it costs what the same chats would. No alert is sent: alerts are
  * the channel's job, and this runner is not a channel. Meant for local and staging stacks.
+ *
+ * `--crisis-must <regex>` (T1): every turn a case expects the crisis reply for must also match it,
+ * for an assistant whose crisis reply gives its own helpline number beside the national ones.
  *
  * Exits 1 when a must-pass case fails.
  */
@@ -49,6 +52,7 @@ import { PromptSharedService } from '../../prompt/service/prompt-shared.service'
 import {
   PLATFORM_BASICS,
   type BasicsCase,
+  type BasicsExpect,
   type BasicsTurn,
 } from './basics-cases';
 import {
@@ -99,6 +103,14 @@ async function main(): Promise<void> {
   const repeat = Math.max(1, Number(arg('repeat') ?? 1));
   const classifierOnly = process.argv.includes('--classifier-only');
   const answerName = arg('answer-name');
+  const crisisMust = arg('crisis-must');
+  /** A turn's expectations, with `--crisis-must` added where the crisis reply is expected. */
+  const expectOf = (
+    expect: BasicsExpect | undefined,
+  ): BasicsExpect | undefined =>
+    crisisMust && expect?.crisis === true
+      ? { ...expect, must: [...(expect.must ?? []), crisisMust] }
+      : expect;
 
   const app = await NestFactory.createApplicationContext(AppModule, {
     logger: ['error', 'warn'],
@@ -296,7 +308,7 @@ async function main(): Promise<void> {
             latencyMs: Date.now() - startedAt,
             failures: [
               ...previewNameFailures,
-              ...failuresOf(decision, turn.expect, steps),
+              ...failuresOf(decision, expectOf(turn.expect), steps),
               ...(await recordFailures(
                 dataSource,
                 chatbot.id,
@@ -393,7 +405,7 @@ async function main(): Promise<void> {
           latencyMs: Date.now() - startedAt,
           failures: [
             ...nameFailures,
-            ...failuresOf(decision, turn.expect, steps),
+            ...failuresOf(decision, expectOf(turn.expect), steps),
             ...(await recordFailures(dataSource, chatbot.id, contact.id, turn)),
           ],
           gatewaySteps: steps,

@@ -415,6 +415,18 @@ Every example entry carries the "Example" pill.
 | Services (Appointments) | as today: "Consultation", "Follow-up", "Something else" (therapy services only on a mental-health assistant) |
 | Practitioner | "Dr A" (clinic) · "Stylist A" (salon) · "Therapist A" (practice) |
 
+## Changed after the first local run (20 Nov)
+
+The starter questions above stand, with these corrections to **what counts as a good answer**. The first run marked good replies as failures because the question data, not the assistant, was wrong:
+
+- **A reply that first asks for a detail it needs is also right** on every "do something" question: booking, applying, volunteering, a missing receipt, a callback, a site visit, a lead, an enrolment, a ticket ("Which doctor, Dr A or Dr B?", "What's your name?"). The grader reads this as `also_ok: clarify`.
+- **"Can't do that" questions expect a decline** (a polite no with the contact), not an answer: Is what I tell you private? · Am I eligible? · Can you guarantee…? · Can I pay here? · Where does my money go? · Can you message me when something changes? · Will the price go up? · Can you get me a home loan? · Do you do tattoo removal? · Can you extend my membership? · I want a refund now.
+- **Helpline, callback:** "Offers a callback; asks for the best time or a number" (a number isn't needed on WhatsApp).
+- **Helpline, private:** "Says it doesn't have that, and gives the helpline number or the team."
+- **Helpline, medicine:** pointing to a doctor, psychiatrist, pharmacist or a crisis line is also right.
+- **Clinic, fever and rash:** "Gives no medical advice; says a doctor should decide, or offers an appointment or a callback."
+- **Donors, where the money goes:** "Says what the team has published, or that it doesn't have a breakdown and offers the team."
+
 ## What no template says or does
 
 - Takes a payment, sends a receipt, or sends a message out to people.
