@@ -437,5 +437,6 @@ stores evidence: one `pm_agent_signals` row per module (`source = 'dead_code'`, 
 - **The card is the PM Agent's call.** The `code_health` lane reads the module's callers first (static analysis finds
   candidates, not proof), proposes one module per card, and an admin accepting the card files the roadmap ticket the usual way.
   Nothing on this path files a ticket by itself. It does nothing while the PM Agent is off (`pm_agent_settings.enabled`).
-- The lane prompt's dead-code paragraph is in `src/prompts/pm_agent/lane_code_health.txt`; the live text is the Skills Store
-  version, so pushing the default needs the `prompts` CLI.
+- **Prompt.** The lane works from the tool's own description (check callers, one module per card). A sentence in the
+  `pm_agent_lane_code_health` prompt pointing the lane at `dead_code_list` is an optional Skills Store edit (`prompts push`),
+  not a Git change: live prompt text lives in the Skills Store, and CI refuses edits to the default `.txt` without a contract change.
