@@ -15,8 +15,8 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Protocol
+from datetime import datetime, timedelta, timezone
+from typing import Any, Callable, Protocol
 
 from bug_hunter.signals.base import Candidate
 
@@ -124,6 +124,22 @@ class BugQueue(Protocol):
 
     def note_waiting(self, reason: str, mode: str) -> None: ...
 
+    # bugs left `running` by a worker that died (crash, kill, a laptop that slept)
+    def fail_abandoned(
+        self, limit_s: Callable[[str | None], int], now: datetime | None = None
+    ) -> list[int]: ...
+
+
+# A running bug older than its app's wall-clock cap plus this margin has no worker left.
+ABANDON_MARGIN_S = 15 * 60
+
+
+def abandoned(limit_s: int) -> str:
+    return (
+        f"the worker stopped during this run (no result {limit_s // 60} min after it "
+        "started): press Retry"
+    )
+
 
 def claimable(mode: str) -> tuple[str, ...]:
     """Which statuses the worker may start: queued always (an admin asked), backlog
@@ -187,6 +203,20 @@ class InMemoryQueue:
         for b in self.rows:
             if b.status in claimable(mode):
                 b.reason = reason
+
+    def fail_abandoned(
+        self, limit_s: Callable[[str | None], int], now: datetime | None = None
+    ) -> list[int]:
+        now = now or _now()
+        failed = []
+        for b in self.rows:
+            if b.status != "running" or b.started_at is None:
+                continue
+            limit = limit_s(b.app)
+            if now - b.started_at > timedelta(seconds=limit):
+                b.status, b.reason, b.finished_at = "failed", abandoned(limit), now
+                failed.append(b.id)
+        return failed
 
 
 class PostgresSettings:
@@ -294,6 +324,29 @@ class PostgresQueue:
             f"UPDATE bughunter.bugs SET {', '.join(sets)} WHERE id = %(id)s",
             {"status": status, "id": bug_id, **fields},
         )
+
+    def fail_abandoned(
+        self, limit_s: Callable[[str | None], int], now: datetime | None = None
+    ) -> list[int]:
+        # `now` is for the in-memory fake; Postgres compares with its own clock
+        rows = self.conn.execute(
+            "SELECT id, app, extract(epoch FROM now() - started_at) AS age_s "
+            "FROM bughunter.bugs WHERE status = 'running' AND started_at IS NOT NULL"
+        ).fetchall()
+        failed = []
+        for row in rows:
+            limit = limit_s(row["app"])
+            if float(row["age_s"]) > limit:
+                # only if it is still running: a worker that finished meanwhile wins
+                done = self.conn.execute(
+                    "UPDATE bughunter.bugs SET status = 'failed', reason = %s, "
+                    "finished_at = now(), updated_at = now() "
+                    "WHERE id = %s AND status = 'running' RETURNING id",
+                    (abandoned(limit), row["id"]),
+                ).fetchone()
+                if done:
+                    failed.append(int(row["id"]))
+        return failed
 
     def note_waiting(self, reason: str, mode: str) -> None:
         statuses = list(claimable(mode))

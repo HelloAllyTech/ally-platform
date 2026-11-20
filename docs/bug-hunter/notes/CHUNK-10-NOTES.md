@@ -36,6 +36,10 @@ daily job (signals) ─┴─> bughunter.bugs (backlog) ── worker, by mode �
   classifier when that names one of the five apps; otherwise the board asks for one at
   Start fix, and the worker never guesses. The reporter's text runs as an issue-mode
   signal (`reported_by: user`) and goes through the PHI scrubber like every signal.
+- **A worker that dies mid-run** (crash, kill, a laptop that sleeps) would leave its bug in
+  In progress for ever, and Start fix refuses a running bug. Each worker pass first moves
+  any bug `running` for longer than its app's wall-clock cap plus 15 minutes to Failed,
+  with the reason, so Retry works (`fail_abandoned`). Found in the first end-to-end run.
 - **The backfill:** reports filed before the queue got a board row (judged → done,
   waiting → needs_you), with no `started_at`, so they don't count against today's run
   limit.

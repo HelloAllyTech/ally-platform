@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from bug_hunter.queue.store import (
+    ABANDON_MARGIN_S,
     Bug,
     InMemoryQueue,
     InMemorySettings,
@@ -212,6 +213,29 @@ def test_a_run_that_raises_is_failed_with_the_reason_and_can_be_retried(config) 
     row.status = "queued"  # Retry in the dashboard
     work(config, settings, queue, Runs())
     assert row.status == "needs_you" and row.attempts == 2
+
+
+def test_a_bug_left_running_by_a_dead_worker_fails_with_the_reason(config) -> None:
+    queue, runs = InMemoryQueue(), Runs()
+    queue.add(bug("dead", status="running"))
+    queue.add(bug("alive", app="ally-web", status="running"))
+    limit = config.limits.run.wall_clock_s("ally-be") + ABANDON_MARGIN_S
+    queue.rows[0].started_at = NOW - timedelta(seconds=limit + 1)
+    # ally-web's cap is longer: the same age is still a live run there
+    queue.rows[1].started_at = NOW - timedelta(seconds=limit + 1)
+    result = work(config, InMemorySettings(Settings("off")), queue, runs)
+    assert result.action == "off" and runs.started == []
+    dead, alive = queue.rows
+    assert dead.status == "failed" and "press Retry" in (dead.reason or "")
+    assert alive.status == "running"
+
+
+def test_a_run_still_inside_its_cap_is_left_alone(config) -> None:
+    queue, runs = InMemoryQueue(), Runs()
+    queue.add(bug("slow", status="running"))
+    queue.rows[0].started_at = NOW - timedelta(minutes=30)
+    work(config, InMemorySettings(Settings("manual")), queue, runs)
+    assert queue.rows[0].status == "running"
 
 
 def test_no_bug_is_done(config) -> None:

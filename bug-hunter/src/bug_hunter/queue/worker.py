@@ -24,7 +24,12 @@ from typing import Callable
 
 from bug_hunter import spend
 from bug_hunter.config import BugHunterConfig
-from bug_hunter.queue.store import BugQueue, SettingsStore, board_status
+from bug_hunter.queue.store import (
+    ABANDON_MARGIN_S,
+    BugQueue,
+    SettingsStore,
+    board_status,
+)
 from bug_hunter.reports.store import PrivateReportsRepo, Report, ReportStore
 from bug_hunter.signals.base import Candidate
 from bug_hunter.signals.dispatcher import (
@@ -65,6 +70,11 @@ def work_once(
     now: datetime | None = None,
 ) -> WorkResult:
     now = now or datetime.now(timezone.utc)
+    # First, a bug whose worker died mid-run goes to Failed with the reason, so Retry
+    # works; otherwise it would sit in In progress for ever. Cleanup, so in every mode.
+    queue.fail_abandoned(
+        lambda app: config.limits.run.wall_clock_s(app) + ABANDON_MARGIN_S, now=now
+    )
     current = settings.get()
     if current.mode == "off":
         return WorkResult("off")
