@@ -78,6 +78,7 @@ export enum FeatureToggleKey {
   PROMPTS = 'prompts',
   TRANSLATIONS = 'translations',
   BLOG = 'blog',
+  LANDING_PAGES = 'landing_pages',
   PRODUCT_UPDATES = 'product_updates',
   PRODUCT_ROADMAP = 'product_roadmap',
   USERS = 'users',
@@ -638,6 +639,20 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
     description: 'The Blog tab.',
     legacyGrants: ALL_ADMIN_TIERS,
     defaultEnabled: true,
+  },
+  {
+    key: FeatureToggleKey.LANDING_PAGES,
+    label: 'Landing pages',
+    description:
+      'The Landing pages tab: design and publish public campaign pages for an organization.',
+    legacyGrants: ALL_ADMIN_TIERS,
+    // Publishes to the whole internet, across organizations: a platform admin
+    // limited to some organizations does not get it.
+    platformOnly: true,
+    // Not defaultEnabled: it is platform-only, so a default would vanish for a
+    // restricted admin, and a page about suicide prevention should be switched
+    // on for a person on purpose. 1986300000000 turns it on for SUPER_ADMIN and
+    // SUPER_DUPER_ADMIN; a PLATFORM_ADMIN is granted it from the Ally admins tab.
   },
   {
     key: FeatureToggleKey.PRODUCT_UPDATES,

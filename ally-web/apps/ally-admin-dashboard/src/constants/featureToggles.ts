@@ -31,6 +31,7 @@ export const FeatureToggleKey = {
   PROMPTS: "prompts",
   TRANSLATIONS: "translations",
   BLOG: "blog",
+  LANDING_PAGES: "landing_pages",
   PRODUCT_UPDATES: "product_updates",
   PRODUCT_ROADMAP: "product_roadmap",
   USERS: "users",
@@ -222,6 +223,7 @@ export const FEATURE_TOGGLE_KEY_TO_SECTION: Record<string, FeatureToggleSection>
   [FeatureToggleKey.UX_SIGNALS]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
   [FeatureToggleKey.SIDEBAR_HOVER_EXPAND]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
   [FeatureToggleKey.BLOG]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
+  [FeatureToggleKey.LANDING_PAGES]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
   [FeatureToggleKey.PRODUCT_UPDATES]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
 
   [FeatureToggleKey.USERS]: FEATURE_TOGGLE_SECTIONS.USER_AND_ORG_MANAGEMENT,

@@ -1096,6 +1096,26 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
     keywords: ['blog', 'post', 'article', 'announcement'],
   },
   {
+    id: 'landing-pages',
+    name: 'Landing pages',
+    whatItIs:
+      'Public pages a platform admin designs for one organisation at /<tenant-code>/<slug> — ' +
+      'template, languages, headings, helpline strip, quote slider, three content cards, ' +
+      'footer logos — edited as the live page, kept as a draft until published.',
+    reuseWhen:
+      'A request wants a campaign or partner page, a public entry point for one organisation, ' +
+      'or a page visitors can reach without logging in.',
+    modules: ['ally-be:src/landing-page'],
+    adminRoute: '/landing-pages',
+    keywords: [
+      'landing page',
+      'campaign',
+      'public page',
+      'partner page',
+      'microsite',
+    ],
+  },
+  {
     id: 'reference-documents',
     name: 'Reference documents (counsellor resource library)',
     whatItIs:
