@@ -1170,6 +1170,32 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
       'what to build',
     ],
   },
+  {
+    id: 'resources-directory',
+    name: 'Resources directory',
+    whatItIs:
+      'A directory of mental health resources that organisations build and publish themselves: ' +
+      'anyone signed in adds entries (public or private), saves public entries and their own into ' +
+      'collections, and publishes each collection as a public page, optionally on its own domain. ' +
+      'Only an entry’s or collection’s owner can edit it.',
+    reuseWhen:
+      'A request wants a list of services, hotlines or programmes that people add to, a curated ' +
+      'shortlist with its own public web page, or a page served on an organisation’s own domain.',
+    extendVia:
+      'DirectoryService for the ownership rules; DirectoryCollectionSettings for what a public ' +
+      'page can be told to show.',
+    modules: ['ally-be:src/directory'],
+    adminRoute: '/directory',
+    keywords: [
+      'directory',
+      'resources',
+      'resource list',
+      'collection',
+      'landing page',
+      'custom domain',
+      'helpline list',
+    ],
+  },
 ];
 
 /**
