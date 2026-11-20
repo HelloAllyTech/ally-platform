@@ -2,16 +2,34 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { AwsModule } from 'src/aws/aws.module';
+import { AuthorizationModule } from 'src/authorization/authorization.module';
+import { PromptModule } from 'src/prompt/prompt.module';
+import { RedisModule } from 'src/redis/redis.module';
 
+import { BlogAuthoringController } from './controller/blog-authoring.controller';
 import { BlogController } from './controller/blog.controller';
+import { BlogAuthorKey } from './entity/blog-author-key.entity';
 import { Blog } from './entity/blog.entity';
 import { BlogRepository } from './repository/blog.repository';
+import { BlogAuthorKeyService } from './service/blog-author-key.service';
+import { BlogAuthoringToolsService } from './service/blog-authoring-tools.service';
 import { BlogService } from './service/blog.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Blog]), AwsModule],
-  controllers: [BlogController],
-  providers: [BlogRepository, BlogService],
+  imports: [
+    TypeOrmModule.forFeature([Blog, BlogAuthorKey]),
+    AwsModule,
+    AuthorizationModule,
+    RedisModule,
+    PromptModule,
+  ],
+  controllers: [BlogController, BlogAuthoringController],
+  providers: [
+    BlogRepository,
+    BlogService,
+    BlogAuthorKeyService,
+    BlogAuthoringToolsService,
+  ],
   exports: [BlogService],
 })
 export class BlogModule {}

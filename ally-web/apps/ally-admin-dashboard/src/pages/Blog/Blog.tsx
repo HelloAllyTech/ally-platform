@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from "react";
 
+import { KeyRound } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -21,8 +22,10 @@ import {
   useUpdateBlogMutation,
 } from "@api";
 import { ActionConfirmationPopup, BlogSidePanel, Button, ListToolbar } from "@components";
+import { BlogClaudeConnect, useBlogClaudeConnect } from "@components/blog-claude-connect";
 import { BlogFormValues } from "@components/blog-side-panel/BlogSidePanel";
 import { ButtonVariant } from "@components/types";
+import { en } from "@constants";
 
 const LIMIT = 30;
 
@@ -48,6 +51,7 @@ export const BlogManagement: React.FC = () => {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [selectedBlog, setSelectedBlog] = useState<BlogPost | null>(null);
   const [pendingDelete, setPendingDelete] = useState<BlogPost | null>(null);
+  const connect = useBlogClaudeConnect();
 
   // Grow the page size for "Load more" (offset stays 0) so the query stays a
   // single source of truth — no manual page accumulation to keep in sync.
@@ -163,6 +167,16 @@ export const BlogManagement: React.FC = () => {
         onSearchChange={handleSearchChange}
         placeholder="Search posts..."
         action={{ label: "New Post", onClick: openCreate, variant: ButtonVariant.PRIMARY }}
+        secondaryAction={
+          connect.canConnect
+            ? {
+                label: en.blogClaudeConnect.button,
+                onClick: connect.openSheet,
+                variant: ButtonVariant.SECONDARY,
+                icon: <KeyRound size={16} aria-hidden />,
+              }
+            : undefined
+        }
       />
 
       <div className="flex flex-wrap items-center gap-2 mt-4">
@@ -292,6 +306,8 @@ export const BlogManagement: React.FC = () => {
         onSave={handleSave}
         isSaving={isCreating || isUpdating}
       />
+
+      <BlogClaudeConnect open={connect.open} onClose={connect.closeSheet} />
 
       <ActionConfirmationPopup
         isOpen={!!pendingDelete}

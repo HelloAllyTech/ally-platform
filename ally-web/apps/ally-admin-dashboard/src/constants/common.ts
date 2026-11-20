@@ -361,6 +361,12 @@ export const ApiEndpoints = {
     UNPUBLISH_BLOG: (id: string) => `/v1/blog/${id}/unpublish`,
     UPLOAD_IMAGE_URL: "/v1/blog/upload-url",
   },
+  // Keys that let Claude Code write draft posts, and the MCP endpoint they unlock.
+  BLOG_AUTHORING: {
+    KEYS: "/v1/blog-authoring/keys",
+    KEY_BY_ID: (id: string) => `/v1/blog-authoring/keys/${encodeURIComponent(id)}`,
+    MCP: "/v1/blog-authoring/mcp",
+  },
   PRODUCT_UPDATES: {
     LIST: "/v1/product-updates",
     STATUS: "/v1/product-updates/status",
@@ -1614,6 +1620,8 @@ export const TAG_TYPES = {
   // Course discussion moderation. Also registered in baseApi.ts's `tagTypes`.
   COURSE_DISCUSSION: "courseDiscussion",
   BLOGS: "blogs",
+  // Keys for Claude Code to write blog drafts. Also registered in baseApi.ts's `tagTypes`.
+  BLOG_AUTHORING_KEYS: "blogAuthoringKeys",
   // Product updates. Also registered in baseApi.ts's `tagTypes`.
   PRODUCT_UPDATES: "productUpdates",
   SUPER_DUPER_ADMINS: "superDuperAdmins",
