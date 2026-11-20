@@ -475,6 +475,11 @@ export const ApiEndpoints = {
     ITEM_SIMILAR: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/similar`,
     START_PLANNING: (code: string) =>
       `/v1/roadmap/items/${encodeURIComponent(code)}/start-planning`,
+    TAKE_PLANNING: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/take-planning`,
+    RELEASE_PLANNING: (code: string) =>
+      `/v1/roadmap/items/${encodeURIComponent(code)}/release-planning`,
+    ASK_OWNER_TO_PLAN: (code: string) =>
+      `/v1/roadmap/items/${encodeURIComponent(code)}/ask-owner-to-plan`,
     OPEN_CONVERSATION: (code: string) =>
       `/v1/roadmap/items/${encodeURIComponent(code)}/conversation`,
     CLOSE_PLAN: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/close-plan`,

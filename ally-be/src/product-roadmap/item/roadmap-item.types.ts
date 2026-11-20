@@ -140,6 +140,8 @@ export interface ItemDetail extends ItemRow {
   spend?: { spentUsd: number; ceilingUsd: number };
   people: PersonRef[];
   can: ItemCan;
+  /** Who holds the plan interview now (one at a time); absent when nobody does. */
+  planHolder?: { id: number; name: string; as: 'owner' | 'author' };
   watchLevel: RoadmapWatchLevel;
   reviewState?: 'pending' | 'accepted' | 'declined';
   /** Present only for the author and Owners (D10, [FP-0992]). */
@@ -170,6 +172,8 @@ export type ItemTimelineKind =
   | 'submitted'
   | 'reviewed'
   | 'planning_started'
+  | 'plan_claimed'
+  | 'plan_released'
   | 'plan_closed'
   | 'plan_reopened'
   | 'lead_assigned'
