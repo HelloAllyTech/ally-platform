@@ -552,6 +552,90 @@ describe('CourseCopilotBriefService', () => {
   });
 
   describe('normalise', () => {
+    describe('learner profile, skill targets and rubric', () => {
+      it('keeps a known learner profile id, resolving a number to its slug', () => {
+        expect(
+          service.normalise({
+            learnerProfileId: 'teachers',
+            learnerProfileName: 'Something the model made up',
+          }),
+        ).toEqual({
+          learnerProfileId: 'teachers',
+          learnerProfileName: 'Teachers',
+        });
+        expect(
+          service.normalise({ learnerProfileId: 5 }).learnerProfileId,
+        ).toBe('helpline-responders');
+      });
+
+      it('drops an unknown learner profile id', () => {
+        expect(
+          service.normalise({
+            learnerProfileId: 'astronauts',
+            learnerProfileName: 'Astronauts',
+          }),
+        ).toEqual({});
+      });
+
+      it('normalises skill targets leniently, dropping unknown codes', () => {
+        const brief = service.normalise({
+          skillTargets: [
+            { competencyId: 'c-1', skill: 'Listening', a: 'a2', b: 'B2' },
+            { skill: 'Risk', a: 'A4 Advanced', b: 'B5' },
+            { skill: 'Closing', a: 'A9', b: 'B3' },
+            { skill: 'Nothing valid', a: 'X', b: 'B4' },
+            { a: 'A1', b: 'B1' },
+            'junk',
+          ],
+        });
+        expect(brief.skillTargets).toEqual([
+          { competencyId: 'c-1', skill: 'Listening', a: 'A2', b: 'B2' },
+          { skill: 'Risk', a: 'A4' },
+          { skill: 'Closing', b: 'B3' },
+        ]);
+      });
+
+      it('normalises the rubric into the three EQUIP groups', () => {
+        const brief = service.normalise({
+          rubric: [
+            {
+              skill: 'Listening',
+              harmfulOrUnhelpful: ['Giving advice quickly', ' '],
+              basicHelpful: 'Reflecting feelings',
+              advancedHelpful: [],
+              extra: 'dropped',
+            },
+            { skill: 'Empty' },
+            { harmfulOrUnhelpful: ['no skill'] },
+          ],
+        });
+        expect(brief.rubric).toEqual([
+          {
+            skill: 'Listening',
+            harmfulOrUnhelpful: ['Giving advice quickly'],
+            basicHelpful: ['Reflecting feelings'],
+            advancedHelpful: [],
+          },
+        ]);
+      });
+
+      it('appends a skill target on an empty brief and keeps it idempotent', () => {
+        const { brief, ignoredKeys } = service.applyPatch({}, [
+          {
+            op: 'add',
+            path: '/skillTargets/-',
+            value: { skill: 'Listening', a: 'A3', b: 'B2' },
+          },
+          { op: 'add', path: '/learnerProfileId', value: 'teachers' },
+        ]);
+        expect(ignoredKeys).toEqual([]);
+        expect(brief.skillTargets).toEqual([
+          { skill: 'Listening', a: 'A3', b: 'B2' },
+        ]);
+        expect(service.normalise(brief)).toEqual(brief);
+      });
+    });
+
     it('returns an empty brief for garbage input', () => {
       expect(service.normalise(null)).toEqual({});
       expect(service.normalise('seed')).toEqual({});

@@ -86,6 +86,12 @@ export class CourseCopilotCostService {
           case TrackItemType.ANNOTATED_ARTIFACT:
             usd += COURSE_COPILOT_JOB_COST_ESTIMATE_USD.annotated_artifact;
             break;
+          case TrackItemType.BRANCHING_SCENARIO:
+            usd += COURSE_COPILOT_JOB_COST_ESTIMATE_USD.branching_scenario;
+            break;
+          case TrackItemType.BUCKET_SORT:
+            usd += COURSE_COPILOT_JOB_COST_ESTIMATE_USD.bucket_sort;
+            break;
           case TrackItemType.ROLEPLAY:
             if (isNew) {
               newRoleplays += 1;

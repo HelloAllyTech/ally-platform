@@ -63,6 +63,10 @@ export const COURSE_COPILOT_LIMITS = {
   annotationUnits: 60,
   annotationLabels: 6,
   journalPrompts: 3,
+  /** Scenes in a generated scenario quiz; the track allows 100, the manual aims for 5-12. */
+  scenarioQuizScenes: 20,
+  /** Items in a generated bucket sort; the track allows 30, the manual aims for 8-12. */
+  bucketSortItems: 20,
   reviewFindings: 10,
 } as const;
 
@@ -105,7 +109,25 @@ export const COURSE_COPILOT_SOURCE_RULES = {
     'If a passage is off-topic for this item, ignore it.',
 };
 
-export const COURSE_COPILOT_DURATION_OPTIONS = [30, 60, 120, 240];
+/**
+ * Course lengths the interview offers. (Course Pilot's "under 30 minutes" is the TRAINER's time
+ * to build a course, not the course's length — its own example is a 90-minute course.)
+ */
+export const COURSE_COPILOT_DURATION_OPTIONS = [30, 60, 90, 120];
+/** Used for an hour-long course when the brief names no duration. */
+export const COURSE_COPILOT_DEFAULT_DURATION_MINUTES = 60;
+
+/**
+ * How an interview question may look (Course Pilot: choice-only steps). Checked on every
+ * question before the trainer sees it; a question that breaks one is sent back once.
+ */
+export const COURSE_COPILOT_QUESTION_LIMITS = {
+  minOptions: 2,
+  maxOptions: 5,
+  promptChars: 160,
+  /** The reply shown above a question: one short sentence, not an account of the work. */
+  replyChars: 220,
+};
 
 // ── Cost ────────────────────────────────────────────────────────────────────
 
@@ -130,6 +152,8 @@ export const COURSE_COPILOT_JOB_COST_ESTIMATE_USD: Record<
   [CourseCopilotJobKind.QUIZ]: 0.08,
   [CourseCopilotJobKind.JOURNAL]: 0.01,
   [CourseCopilotJobKind.ANNOTATED_ARTIFACT]: 0.1,
+  [CourseCopilotJobKind.BRANCHING_SCENARIO]: 0.1,
+  [CourseCopilotJobKind.BUCKET_SORT]: 0.05,
   [CourseCopilotJobKind.GAME]: 0,
   [CourseCopilotJobKind.VIDEO]: 0,
   [CourseCopilotJobKind.ROLEPLAY_NEW]: 0.6,
@@ -151,6 +175,8 @@ export const COURSE_COPILOT_DEFAULT_ITEM_MINUTES: Record<string, number> = {
   QUIZ: 5,
   JOURNAL: 4,
   ANNOTATED_ARTIFACT: 8,
+  BRANCHING_SCENARIO: 8,
+  BUCKET_SORT: 4,
   ROLEPLAY: 12,
   CASE: 25,
   GAME: 3,
@@ -167,6 +193,8 @@ export const COURSE_COPILOT_PROMPTS = {
   QUIZ_WRITER: 'course_copilot_quiz_writer',
   JOURNAL_WRITER: 'course_copilot_journal_writer',
   ANNOTATION_WRITER: 'course_copilot_annotation_writer',
+  SCENARIO_QUIZ_WRITER: 'course_copilot_scenario_quiz_writer',
+  BUCKET_SORT_WRITER: 'course_copilot_bucket_sort_writer',
   COURSE_META: 'course_copilot_course_meta',
   COURSE_REVIEWER: 'course_copilot_course_reviewer',
   HISTORY_SUMMARY: 'course_copilot_history_summary',
@@ -185,6 +213,8 @@ export const COURSE_COPILOT_AI_TASKS = {
   QUIZ: 'course-copilot-quiz',
   JOURNAL: 'course-copilot-journal',
   ANNOTATION: 'course-copilot-annotation',
+  SCENARIO_QUIZ: 'course-copilot-scenario-quiz',
+  BUCKET_SORT: 'course-copilot-bucket-sort',
   META: 'course-copilot-meta',
   REVIEW: 'course-copilot-review',
   SUMMARY: 'course-copilot-summary',

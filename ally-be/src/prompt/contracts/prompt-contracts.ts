@@ -553,6 +553,31 @@ export const COURSE_COPILOT_BLUEPRINT_PLANNER = definePrompt(
   },
 );
 
+/** src/prompts/course_copilot/bucket_sort_writer.txt */
+export const COURSE_COPILOT_BUCKET_SORT_WRITER = definePrompt(
+  'course_copilot_bucket_sort_writer',
+  {
+    brief_json: 'optional',
+    bucket_instruction: 'optional',
+    course_characters: 'optional',
+    course_outline: 'optional',
+    helpful_behaviours: 'optional',
+    item_count: 'optional',
+    item_json: 'required',
+    max_buckets: 'optional',
+    objectives: 'optional',
+    unhelpful_behaviours: 'optional',
+  },
+  {
+    name: 'Course Copilot — Bucket Sort Writer',
+    description:
+      "Writes one BUCKET_SORT item: 2-6 buckets (often the brief's rubric categories) and up to 20 items learners are likely to misplace, each with its right bucket and an explanation written for the wrong guess. Practice, never a gate. JSON mode; ids and the key checked in code.",
+    category: 'Course Copilot',
+    runtimes: ['ally-be'],
+    output: 'structured',
+  },
+);
+
 /** src/prompts/course_copilot/course_meta.txt */
 export const COURSE_COPILOT_COURSE_META = definePrompt(
   'course_copilot_course_meta',
@@ -750,6 +775,31 @@ export const COURSE_COPILOT_ROLEPLAY_FIT_CHECK = definePrompt(
     name: 'Course Copilot — Roleplay Fit Check',
     description:
       'Checks whether a saved Character Library character can carry one Course Copilot roleplay: whether who they are (history, openness, how they speak) lets them create the moments and invite the behaviours the roleplay brief needs. Mood and difficulty are set by the roleplay and are not reasons. When the character does not fit, ranks up to two better-fitting library characters. JSON mode.',
+    category: 'Course Copilot',
+    runtimes: ['ally-be'],
+    output: 'structured',
+  },
+);
+
+/** src/prompts/course_copilot/scenario_quiz_writer.txt */
+export const COURSE_COPILOT_SCENARIO_QUIZ_WRITER = definePrompt(
+  'course_copilot_scenario_quiz_writer',
+  {
+    brief_json: 'optional',
+    course_characters: 'optional',
+    course_outline: 'optional',
+    helpful_behaviours: 'optional',
+    item_json: 'required',
+    max_scenes: 'optional',
+    objectives: 'optional',
+    pass_instruction: 'optional',
+    scene_count: 'optional',
+    unhelpful_behaviours: 'optional',
+  },
+  {
+    name: 'Course Copilot — Scenario Quiz Writer',
+    description:
+      "Writes one BRANCHING_SCENARIO item (a Studio scenario quiz) as a scene list: one moment per scene in the person's own voice, 2-6 choices drawn from the brief's helpful and unhelpful behaviours, poor choices leading to recoverable scenes, and endings with an outcome, score and takeaway. JSON mode; the graph is checked in code.",
     category: 'Course Copilot',
     runtimes: ['ally-be'],
     output: 'structured',

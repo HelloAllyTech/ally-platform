@@ -3129,6 +3129,38 @@ const COURSE_COPILOT_TASKS: AiTaskEntry[] = [
     promptOverride: 'course_copilot_annotation_writer',
   },
   {
+    id: 'course-copilot-scenario-quiz',
+    task: LlmTask.COURSE_COPILOT_SCENARIO_QUIZ,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger: 'Course Copilot writes a scenario quiz (branching scenario)',
+    detail:
+      'One call per scenario-quiz item (plus one repair call on a validator rejection): ' +
+      'a scene graph with choices, endings, outcomes and scores. JSON mode; the graph ' +
+      '(every choice leads somewhere, every scene reachable and finishable) is checked in code.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'course_copilot_scenario_quiz_writer',
+  },
+  {
+    id: 'course-copilot-bucket-sort',
+    task: LlmTask.COURSE_COPILOT_BUCKET_SORT,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger: 'Course Copilot writes a bucket sort for a course',
+    detail:
+      'One call per bucket-sort item (plus one repair call on a validator rejection): ' +
+      "buckets, items, each item's right bucket and an explanation. JSON mode; the key is " +
+      'checked in code.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'course_copilot_bucket_sort_writer',
+  },
+  {
     id: 'course-copilot-meta',
     task: LlmTask.COURSE_COPILOT_META,
     runtime: LlmRuntime.ALLY_BE,
