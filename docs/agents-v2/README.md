@@ -11,6 +11,7 @@
 | `CONTEXT.md` | Background, settled architecture decisions, glossary, which doc wins | Every session, first |
 | `v2-chunks.md` | Every chunk, the stages, progress, release gates. The one source for order and status | Planning or picking up a chunk |
 | `chunk-<id>.md` | The current chunk's brief (CL1: `chunk-cl1.md`; not yet built: `chunk-20e.md`) | Working on that chunk |
+| `chunk-sb1.md` | SB1, planned for after Q3-fast: a 50:50 build-and-test screen so the owner chats with a live bot from the first seconds | Planning the split build screen |
 | `EPIC-Q3-FAST.md` | The Q3 fast track: the fixes from the 17 Nov production tests, in build order, with its stops | Working on Q3-fast |
 | `FIXES-17NOV.md` | Every 17 Nov finding grouped by cause, with the chunk that fixes it | Deciding what a fix is for |
 | `CHUNK-<id>-NOTES.md` | What each chunk built, its decisions, how to test it, what's left | Touching code a chunk built |
