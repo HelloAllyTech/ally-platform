@@ -1431,6 +1431,9 @@ export const ROUTES = {
   // Fully public, no-login gallery of the centralised design-system components.
   DESIGN_SYSTEM: "/designsystem",
   BLOG: "/blog",
+  /** Landing pages: the list, and one page open in the editor. */
+  LANDING_PAGES: "/landing-pages",
+  LANDING_PAGE: "/landing-pages/:id",
   PRODUCT_UPDATES: "/product-updates",
   AI_LAB: "/ai-lab",
   PRODUCT_ROADMAP: "/product-roadmap",
@@ -1632,6 +1635,8 @@ export const TAG_TYPES = {
   // Course discussion moderation. Also registered in baseApi.ts's `tagTypes`.
   COURSE_DISCUSSION: "courseDiscussion",
   BLOGS: "blogs",
+  // Landing pages. Also registered in baseApi.ts's `tagTypes`.
+  LANDING_PAGES: "landingPages",
   // Keys for Claude Code to write blog drafts. Also registered in baseApi.ts's `tagTypes`.
   BLOG_AUTHORING_KEYS: "blogAuthoringKeys",
   // Review link and suggestions for one blog post. Also registered in baseApi.ts's `tagTypes`.

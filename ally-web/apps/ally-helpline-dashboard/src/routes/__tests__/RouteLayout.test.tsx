@@ -32,7 +32,9 @@ vi.mock("@pages", () => ({
   SjtReport1: () => <div data-testid="sjt-report1-page">SJT Report 1 Page</div>,
   HelplineTalk: () => <div data-testid="helpline-talk-page">Helpline Talk Page</div>,
   HomeV2: () => <div data-testid="home-v2-page">Home v2 Page</div>,
-  LandingPage1: () => <div data-testid="landing-page-1">Landing page 1</div>,
+  LandingPublicPage: ({ fallback }: { fallback: React.ReactNode }) => (
+    <div data-testid="landing-public-page">{fallback}</div>
+  ),
 }));
 
 // Mock useAnalytics and PageviewTracker to avoid context error
@@ -103,7 +105,7 @@ vi.mock("@constants", () => ({
     SJT_REPORT1: "/sjtreport1",
     TALK: "/talk/:tenantCode",
     HOME_V2: "/v2",
-    LANDING_PAGE_1: "/landingpage1",
+    LANDING_PAGE: "/:tenantCode/:slug/*",
   },
 }));
 
@@ -129,6 +131,30 @@ describe("RouteLayout", () => {
 
     expect(screen.getByTestId("roadmap-page")).toBeInTheDocument();
     expect(screen.queryByTestId("blog-post-page")).not.toBeInTheDocument();
+  });
+
+  it("serves a two-part address with the landing page, handing the app over as its fallback", () => {
+    window.history.pushState({}, "", "/agatsu/campaign");
+    renderWithRouter(<RouteLayout />);
+
+    const landing = screen.getByTestId("landing-public-page");
+    expect(landing).toBeInTheDocument();
+    expect(landing).toContainElement(screen.getByTestId("private-layout"));
+  });
+
+  it("serves a block's page under a landing page the same way", () => {
+    window.history.pushState({}, "", "/agatsu/campaign/courses");
+    renderWithRouter(<RouteLayout />);
+
+    expect(screen.getByTestId("landing-public-page")).toBeInTheDocument();
+  });
+
+  it("does not treat a one-part address as a landing page", () => {
+    window.history.pushState({}, "", "/agatsu");
+    renderWithRouter(<RouteLayout />);
+
+    expect(screen.queryByTestId("landing-public-page")).not.toBeInTheDocument();
+    expect(screen.getByTestId("private-layout")).toBeInTheDocument();
   });
 
   it("renders private routes with PrivateRouteLayout", () => {

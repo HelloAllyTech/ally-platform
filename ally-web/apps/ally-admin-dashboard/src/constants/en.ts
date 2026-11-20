@@ -41,6 +41,7 @@ export const en = {
       competencies: "Competencies",
       courseCopilot: "Course Copilot",
       blog: "Blog",
+      landingPages: "Landing pages",
       productUpdates: "Product Updates",
       users: "Users",
       badges: "Badges",

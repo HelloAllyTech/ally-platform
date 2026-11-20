@@ -31,6 +31,9 @@ export enum Permissions {
   VIEW_BLOGS = "view:blogs",
   EDIT_BLOG = "edit:blog",
   DELETE_BLOG = "delete:blog",
+  VIEW_LANDING_PAGES = "view:landing-pages",
+  EDIT_LANDING_PAGE = "edit:landing-page",
+  DELETE_LANDING_PAGE = "delete:landing-page",
   VIEW_AI_LAB = "view:admin:ai-lab",
   EDIT_AI_LAB = "edit:admin:ai-lab",
   // Product Roadmap. Three tiers because the board is a voting surface, not a CRUD screen:
@@ -127,6 +130,7 @@ export const SIDEBAR_ITEMS = {
   COMPETENCIES: "competencies",
   ROLEPLAY_SESSION_LOGS: "roleplay-session-logs",
   BLOG: "blog",
+  LANDING_PAGES: "landing-pages",
   PRODUCT_UPDATES: "product-updates",
   AI_LAB: "ai-lab",
   SETTINGS: "settings",

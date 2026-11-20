@@ -338,10 +338,10 @@ out which meaning is in play before you change anything.
 ### Landing pages
 <!-- concept: landing-pages -->
 **Is:** Public, campaign-facing pages an organization's platform admin designs in the admin console and publishes at `/<tenant code>/<slug>` on the consumer app, with a draft that stays private until published.
-**Also called:** campaign page, `/landingpage1` (the hand-built prototype it grew from) · **Not to be confused with:** a Track's course landing page (`tracks.landingPage`, the outline shown before a learner starts a course); the public `/blog` pages.
-**Composed of:** ally-be `landing-page` (one `landing_pages` row per page: `config` draft and `published_config` live copy, a normaliser that keeps text plain and image addresses to our own storage, publish checks, a signed-out read); the page renderer; the admin editor, which edits the page in place.
+**Also called:** campaign page, `/<tenant code>/<slug>` · **Not to be confused with:** a Track's course landing page (`tracks.landingPage`, the outline shown before a learner starts a course); the public `/blog` pages.
+**Composed of:** ally-be `landing-page` (one `landing_pages` row per page: `config` draft and `published_config` live copy, a normaliser that keeps text plain and image addresses to our own storage, publish checks, a signed-out read); one page component in `ui-shared` that both apps draw (three templates, five languages, click-to-edit text and images when `editable`); the consumer app route that serves a published page and hands any other two-part address to the app's own routes; the admin Landing pages tab, whose editor is the page itself under one toolbar (template, Save, Publish, Latest version / Live).
 **Status:** Dark — gate: `FeatureToggleKey.LANDING_PAGES` (platform-only: not for an admin limited to some organizations; on for SUPER_ADMIN and SUPER_DUPER_ADMIN by migration, granted to a PLATFORM_ADMIN from the Ally admins tab) plus permissions `view:landing-pages` / `edit:landing-page` / `delete:landing-page`; nothing links to a page until an admin publishes one. The sign-up switch on a page is stored but sign-up itself is not built.
-**Code:** `ally-be/src/landing-page/` · `ally-web/apps/ally-helpline-dashboard/src/pages/landing-page/`
+**Code:** `ally-be/src/landing-page/` · `ally-web/libs/ui-shared/src/lib/landing-page/` · `ally-web/apps/ally-helpline-dashboard/src/pages/landing-public/` · `ally-web/apps/ally-admin-dashboard/src/pages/LandingPages/`
 **Deep doc:** [ally-be](../repos/ally-be.md)
 
 ### Notifications

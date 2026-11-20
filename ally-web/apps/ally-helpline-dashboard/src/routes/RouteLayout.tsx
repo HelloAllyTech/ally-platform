@@ -27,7 +27,7 @@ import {
   SjtReport1,
   HelplineTalk,
   HomeV2,
-  LandingPage1,
+  LandingPublicPage,
 } from "@pages";
 
 import { PageviewTracker } from "../analytics";
@@ -68,8 +68,12 @@ const RouteLayout = () => {
           {/* Conversational homepage, trialled beside /login — no nav, sign-in
               happens inside the conversation */}
           <Route path={ROUTES.HOME_V2} element={<HomeV2 />} />
-          {/* Parent-campaign landing page prototype and its section pages — no nav, no API calls */}
-          <Route path={`${ROUTES.LANDING_PAGE_1}/*`} element={<LandingPage1 />} />
+          {/* An admin-designed landing page at /<tenant code>/<slug>. Not a landing page (an app
+              address, or nothing published there)? Then it is the app's own route. */}
+          <Route
+            path={ROUTES.LANDING_PAGE}
+            element={<LandingPublicPage fallback={<PrivateRouteLayout />} />}
+          />
         </Route>
 
         {/* Hybrid routes - routes which are public but have navbar upon login */}

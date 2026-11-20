@@ -2,26 +2,29 @@ import { FC, FormEvent, useEffect, useState } from "react";
 
 import { ROUTES } from "@constants";
 
-import { LandingCopy } from "./landingCopy";
+import { LoginCopy } from "./loginCopy";
 import { Button, ButtonVariant } from "../../components/button";
 import Drawer from "../../components/drawer";
 import Input from "../../components/input";
+
+import "./landing-login.css";
 
 type LoginMethod = "email" | "mobile";
 
 interface LoginDrawerProps {
   open: boolean;
   onClose: () => void;
-  copy: LandingCopy["login"];
+  copy: LoginCopy;
 }
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MOBILE_PATTERN = /^\d{10}$/;
 
 /**
- * Login panel for the landing page: a side drawer with two ways in, email or
- * mobile number, each followed by a one-time code. Prototype only: it checks
- * the field and says the flow isn't connected; nothing is sent anywhere.
+ * The login panel: a side drawer with two ways in, email or mobile number, each
+ * followed by a one-time code, and a link to the existing terms and privacy
+ * pages. It checks the field and says the flow is not connected yet; nothing
+ * is sent anywhere.
  */
 export const LoginDrawer: FC<LoginDrawerProps> = ({ open, onClose, copy }) => {
   const [method, setMethod] = useState<LoginMethod>("email");
@@ -30,7 +33,6 @@ export const LoginDrawer: FC<LoginDrawerProps> = ({ open, onClose, copy }) => {
   const [error, setError] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  // Start clean every time the drawer is opened.
   useEffect(() => {
     if (open) {
       setMethod("email");
@@ -57,14 +59,14 @@ export const LoginDrawer: FC<LoginDrawerProps> = ({ open, onClose, copy }) => {
 
   return (
     <Drawer open={open} onClose={onClose} title={copy.title} drawerClassName="w-[420px]">
-      <div className="lp1-login">
-        <div className="lp1-login-tabs" role="tablist" aria-label={copy.title}>
+      <div className="lpl">
+        <div className="lpl-tabs" role="tablist" aria-label={copy.title}>
           <button
             type="button"
             role="tab"
-            id="lp1-tab-email"
+            id="lpl-tab-email"
             aria-selected={method === "email"}
-            aria-controls="lp1-panel-login"
+            aria-controls="lpl-panel"
             className={method === "email" ? "is-on" : ""}
             onClick={() => choose("email")}
           >
@@ -73,9 +75,9 @@ export const LoginDrawer: FC<LoginDrawerProps> = ({ open, onClose, copy }) => {
           <button
             type="button"
             role="tab"
-            id="lp1-tab-mobile"
+            id="lpl-tab-mobile"
             aria-selected={method === "mobile"}
-            aria-controls="lp1-panel-login"
+            aria-controls="lpl-panel"
             className={method === "mobile" ? "is-on" : ""}
             onClick={() => choose("mobile")}
           >
@@ -84,17 +86,17 @@ export const LoginDrawer: FC<LoginDrawerProps> = ({ open, onClose, copy }) => {
         </div>
 
         <form
-          id="lp1-panel-login"
+          id="lpl-panel"
           role="tabpanel"
-          aria-labelledby={method === "email" ? "lp1-tab-email" : "lp1-tab-mobile"}
+          aria-labelledby={method === "email" ? "lpl-tab-email" : "lpl-tab-mobile"}
           onSubmit={onSubmit}
           noValidate
         >
           {method === "email" ? (
-            <div className="lp1-login-field">
-              <label htmlFor="lp1-login-email">{copy.emailLabel}</label>
+            <div className="lpl-field">
+              <label htmlFor="lpl-email">{copy.emailLabel}</label>
               <Input
-                id="lp1-login-email"
+                id="lpl-email"
                 type="email"
                 inputMode="email"
                 autoComplete="email"
@@ -105,14 +107,14 @@ export const LoginDrawer: FC<LoginDrawerProps> = ({ open, onClose, copy }) => {
               />
             </div>
           ) : (
-            <div className="lp1-login-field">
-              <label htmlFor="lp1-login-mobile">{copy.mobileLabel}</label>
-              <div className="lp1-login-mobile">
-                <span className="lp1-login-prefix" aria-hidden="true">
+            <div className="lpl-field">
+              <label htmlFor="lpl-mobile">{copy.mobileLabel}</label>
+              <div className="lpl-mobile">
+                <span className="lpl-prefix" aria-hidden="true">
                   +91
                 </span>
                 <Input
-                  id="lp1-login-mobile"
+                  id="lpl-mobile"
                   type="tel"
                   inputMode="numeric"
                   autoComplete="tel-national"
@@ -127,18 +129,18 @@ export const LoginDrawer: FC<LoginDrawerProps> = ({ open, onClose, copy }) => {
           )}
 
           {error && (
-            <p className="lp1-login-error" role="alert">
+            <p className="lpl-error" role="alert">
               {method === "email" ? copy.emailError : copy.mobileError}
             </p>
           )}
 
-          <p className="lp1-login-hint">{copy.codeHint}</p>
+          <p className="lpl-hint">{copy.codeHint}</p>
 
           <Button type="submit" variant={ButtonVariant.PRIMARY} fullWidth>
             {copy.sendCode}
           </Button>
 
-          <p className="lp1-login-legal">
+          <p className="lpl-legal">
             {copy.legalPrefix}
             <a href={ROUTES.TERMS} target="_blank" rel="noreferrer">
               {copy.termsLink}
@@ -151,7 +153,7 @@ export const LoginDrawer: FC<LoginDrawerProps> = ({ open, onClose, copy }) => {
           </p>
 
           {submitted && (
-            <p className="lp1-login-note" role="status">
+            <p className="lpl-note" role="status">
               {copy.prototypeNote}
             </p>
           )}
