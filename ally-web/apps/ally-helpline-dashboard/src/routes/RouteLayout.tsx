@@ -27,6 +27,7 @@ import {
   SjtReport1,
   HelplineTalk,
   HomeV2,
+  LandingPage1,
 } from "@pages";
 
 import { PageviewTracker } from "../analytics";
@@ -67,6 +68,8 @@ const RouteLayout = () => {
           {/* Conversational homepage, trialled beside /login — no nav, sign-in
               happens inside the conversation */}
           <Route path={ROUTES.HOME_V2} element={<HomeV2 />} />
+          {/* Parent-campaign landing page prototype and its section pages — no nav, no API calls */}
+          <Route path={`${ROUTES.LANDING_PAGE_1}/*`} element={<LandingPage1 />} />
         </Route>
 
         {/* Hybrid routes - routes which are public but have navbar upon login */}

@@ -47,6 +47,9 @@ export const ROUTES = {
   // The conversational homepage, trialled beside /login rather than replacing
   // it: Ally greets the visitor, and sign-in happens inside the conversation.
   HOME_V2: "/v2",
+  // Non-functional prototype of the parent-campaign landing page: public, no
+  // nav, Hindi first. Not wired to any backend yet.
+  LANDING_PAGE_1: "/landingpage1",
 
   // Private Routes
   HOME: "/",

@@ -1,0 +1,499 @@
+/* Prototype landing page at /landingpage1. Every rule is nested under .lp1 so
+ * nothing leaks into another route. Colours are aliases onto the app-wide
+ * tokens in index.css, the same way sjt.css does it. */
+.lp1 {
+  --ink: rgb(var(--color-secondary-900));
+  --ink-soft: rgb(var(--color-neutral-700));
+  --ink-faint: rgb(var(--color-neutral-600));
+  --wash: rgb(var(--color-background-tertiary));
+  --card: rgb(var(--color-background-DEFAULT));
+  --line: rgb(var(--color-border-medium));
+  --line-soft: rgb(var(--color-border-DEFAULT));
+  --mark: rgb(var(--color-primary-500));
+  --mark-deep: rgb(var(--color-primary-700));
+  --mark-wash: rgb(var(--color-primary-50));
+  --alarm: rgb(var(--color-tone-alarm));
+  --display: var(--font-primary);
+  --body: var(--font-secondary);
+
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--wash);
+  color: var(--ink);
+  font-family: var(--body);
+  line-height: 1.6;
+}
+.lp1 *,
+.lp1 *::before,
+.lp1 *::after {
+  box-sizing: border-box;
+}
+.lp1-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--card);
+  border-bottom: 1px solid var(--line-soft);
+}
+.lp1-logo {
+  display: block;
+  height: 40px;
+  width: auto;
+}
+.lp1-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.lp1-btn {
+  padding: 8px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.lp1-btn:hover,
+.lp1-btn:focus-visible {
+  border-color: var(--mark);
+}
+.lp1-lang {
+  width: max-content;
+  min-width: 96px;
+}
+/* The shared dropdown opens its list from the trigger's left edge; the trigger
+ * sits at the right of the header, so open it from the right edge instead and
+ * keep it on screen at any width. */
+.lp1-lang .absolute {
+  left: auto;
+  right: 0;
+  width: max-content;
+  min-width: 150px;
+  max-width: calc(100vw - 32px);
+}
+.lp1-helpline {
+  background: var(--mark-wash);
+  color: var(--mark-deep);
+  padding: 10px 16px;
+  font-size: 14px;
+  text-align: center;
+  border-bottom: 1px solid var(--line-soft);
+}
+.lp1-main {
+  flex: 1 0 auto;
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 16px 24px;
+}
+.lp1-hero {
+  text-align: center;
+  padding: 32px 0 16px;
+}
+.lp1-tagline {
+  margin: 0 0 8px;
+  font-family: var(--display);
+  font-size: 20px;
+  line-height: 1.4;
+}
+.lp1-hero h1 {
+  margin: 0 0 8px;
+  font-family: var(--display);
+  font-size: 40px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+.lp1-sub {
+  margin: 0 auto;
+  max-width: 480px;
+  color: var(--ink-soft);
+}
+.lp1-quotes {
+  max-width: 640px;
+  margin: 8px auto 0;
+  padding: 8px 0 4px;
+}
+.lp1-quotes-track {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.lp1-quotes-track::-webkit-scrollbar {
+  display: none;
+}
+.lp1-quote {
+  flex: 0 0 100%;
+  scroll-snap-align: start;
+  padding: 0 4px;
+}
+.lp1-quote blockquote {
+  margin: 0;
+  padding: 24px;
+  background: var(--card);
+  border: 1px solid var(--line-soft);
+  border-radius: 16px;
+}
+.lp1-quote p {
+  margin: 0 0 16px;
+  font-family: var(--display);
+  font-size: 20px;
+  line-height: 1.5;
+}
+.lp1-quote footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.lp1-quote-avatar {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--mark-wash);
+  border: 1px solid var(--line);
+}
+.lp1-quote-who {
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.lp1-quote-role {
+  color: var(--ink-faint);
+  font-size: 13px;
+}
+.lp1-quotes-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+.lp1-quotes-arrow {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.lp1-quotes-arrow:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.lp1-quotes-dots {
+  display: flex;
+  gap: 8px;
+}
+.lp1-quotes-dots button {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--line);
+  cursor: pointer;
+}
+.lp1-quotes-dots button.is-on {
+  background: var(--mark);
+}
+.lp1-options {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  padding: 16px 0;
+}
+.lp1-card {
+  text-decoration: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 20px;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.lp1-card:hover,
+.lp1-card:focus-visible {
+  border-color: var(--mark);
+}
+.lp1-card-name {
+  font-family: var(--display);
+  font-size: 18px;
+}
+.lp1-card-body {
+  color: var(--ink-soft);
+  font-size: 15px;
+}
+.lp1-card-count {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--ink-faint);
+}
+.lp1-foot p {
+  margin: 0;
+}
+.lp1-foot-logos {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 10px;
+}
+.lp1-foot-ally {
+  width: 40px;
+  height: auto;
+  color: var(--ink);
+}
+.lp1-foot-eleven {
+  display: block;
+  height: 14px;
+  width: auto;
+}
+.lp1-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--card);
+  border-top: 1px solid var(--line-soft);
+  font-size: 12px;
+  color: var(--ink-faint);
+  text-align: center;
+}
+
+.lp1-login {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 8px 4px;
+  font-family: var(--body);
+  color: var(--ink);
+}
+.lp1-login-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  background: var(--wash);
+  border-radius: 12px;
+}
+.lp1-login-tabs button {
+  padding: 10px 12px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+}
+.lp1-login-tabs button.is-on {
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--line);
+}
+.lp1-login form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.lp1-login-field label {
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+.lp1-login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+.lp1-crumbs {
+  padding: 20px 0 4px;
+  font-size: 14px;
+}
+.lp1-crumbs ol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lp1-crumbs li + li::before {
+  content: "/";
+  margin-right: 8px;
+  color: var(--ink-faint);
+}
+.lp1-crumbs a {
+  color: var(--mark-deep);
+}
+.lp1-crumbs [aria-current="page"] {
+  color: var(--ink-soft);
+}
+.lp1-section-head {
+  padding: 8px 0 16px;
+}
+.lp1-section-head h1 {
+  margin: 0 0 8px;
+  font-family: var(--display);
+  font-size: 32px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+.lp1-section-head p {
+  margin: 0;
+  max-width: 560px;
+  color: var(--ink-soft);
+}
+.lp1-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0 0 16px;
+  list-style: none;
+}
+.lp1-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 20px;
+  background: var(--card);
+  border: 1px solid var(--line-soft);
+  border-radius: 16px;
+}
+.lp1-item-name {
+  font-family: var(--display);
+  font-size: 18px;
+}
+.lp1-item-body {
+  color: var(--ink-faint);
+  font-size: 14px;
+}
+.lp1-login-mobile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.lp1-login-prefix {
+  flex: 0 0 auto;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+  font-size: 14px;
+}
+.lp1-login-hint,
+.lp1-login-note,
+.lp1-login-error {
+  margin: 0;
+  font-size: 13px;
+}
+.lp1-login-hint {
+  color: var(--ink-faint);
+}
+.lp1-login-legal {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-faint);
+}
+.lp1-login-legal a {
+  color: var(--mark-deep);
+}
+.lp1-login-note {
+  color: var(--ink-soft);
+  text-align: center;
+}
+.lp1-login-error {
+  color: var(--alarm);
+}
+@media (max-width: 600px) {
+  .lp1-top {
+    padding: 10px 16px;
+  }
+  .lp1-logo {
+    height: 32px;
+  }
+  .lp1-actions {
+    gap: 8px;
+  }
+  .lp1-btn {
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+  .lp1-helpline {
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+  .lp1-main {
+    padding: 0 16px 16px;
+  }
+  .lp1-hero {
+    padding: 24px 0 8px;
+  }
+  .lp1-hero h1 {
+    font-size: 32px;
+  }
+  .lp1-tagline {
+    font-size: 18px;
+  }
+  .lp1-options {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    padding: 12px 0;
+  }
+  .lp1-card {
+    padding: 16px;
+  }
+  .lp1-section-head h1 {
+    font-size: 28px;
+  }
+  .lp1-items {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+  .lp1-item {
+    padding: 16px;
+  }
+  .lp1-quote blockquote {
+    padding: 20px;
+  }
+  .lp1-quote p {
+    font-size: 18px;
+  }
+  .lp1-foot {
+    padding: 8px 16px;
+    font-size: 11px;
+  }
+  .lp1-foot-logos {
+    margin-top: 6px;
+  }
+  .lp1-foot-ally {
+    width: 34px;
+  }
+  .lp1-foot-eleven {
+    height: 12px;
+  }
+}

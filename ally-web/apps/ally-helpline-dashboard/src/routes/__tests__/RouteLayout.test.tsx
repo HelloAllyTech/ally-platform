@@ -32,6 +32,7 @@ vi.mock("@pages", () => ({
   SjtReport1: () => <div data-testid="sjt-report1-page">SJT Report 1 Page</div>,
   HelplineTalk: () => <div data-testid="helpline-talk-page">Helpline Talk Page</div>,
   HomeV2: () => <div data-testid="home-v2-page">Home v2 Page</div>,
+  LandingPage1: () => <div data-testid="landing-page-1">Landing page 1</div>,
 }));
 
 // Mock useAnalytics and PageviewTracker to avoid context error
@@ -102,6 +103,7 @@ vi.mock("@constants", () => ({
     SJT_REPORT1: "/sjtreport1",
     TALK: "/talk/:tenantCode",
     HOME_V2: "/v2",
+    LANDING_PAGE_1: "/landingpage1",
   },
 }));
 
