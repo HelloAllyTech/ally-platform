@@ -2931,16 +2931,17 @@ export const en = {
     inputPlaceholder: "e.g. How many simulations were completed per week in the last 90 days?",
     send: "Ask",
     sending: "Working…",
-    // Named for what it does. "Clear" would read as deleting data.
-    reset: "Reset chat",
-    resetConfirmTitle: "Reset this chat?",
-    resetConfirmBody:
-      "The conversation is only held in this browser tab, so resetting it cannot be undone. Nothing stored is affected.",
-    // Distinct from the trigger button's label: two controls named "Reset chat"
-    // on the same screen are one ambiguous target for a screen reader, and the
-    // dialog's job is to state what confirming does.
-    resetConfirm: "Reset and start over",
-    cancel: "Cancel",
+    // Conversations are saved, so starting over costs nothing and needs no
+    // confirmation: the old thread stays in the sidebar.
+    newConversation: "New conversation",
+    historyTitle: "Conversations",
+    historyEmpty: "Your conversations will appear here once you ask something.",
+    historyLoadFailed: "Couldn't load your conversations.",
+    conversationLoadFailed: "Couldn't open that conversation. Try again.",
+    conversationLoading: "Opening conversation…",
+    // Said once, where it matters: a reader should not have to wonder who else
+    // can see what they asked.
+    historyPrivacy: "Only you can see your conversations.",
     // Progress narrative, not a bare spinner: two model calls and a query take
     // real seconds, and a reader who cannot tell "working" from "stuck" reloads.
     pendingPlanning: "Working out which tables answer this…",
@@ -2962,6 +2963,12 @@ export const en = {
     failedTitle: "Query didn't run",
     provenance: "Planned by {planner} · written by {answer} · prompt {version}",
     provenancePlannerOnly: "Planned by {planner} · prompt {version}",
+    // Optional rating of an answer. Never required, and tapping the same thumb
+    // again takes it back.
+    feedbackLabel: "Rate this answer",
+    feedbackUp: "Good answer",
+    feedbackDown: "Not a good answer",
+    feedbackFailed: "Couldn't save your feedback. Try again.",
     scopeTitle: "What can I ask about?",
     scopeIntro:
       "The agent reads aggregate analytics only. It can query these tables, capped at {rowLimit} rows per question:",
@@ -2980,6 +2987,165 @@ export const en = {
       "How has AI spend per model changed month over month this year?",
       "How many learners practised at all in the last 30 days, by organisation?",
     ],
+  },
+  // The Audit agent tab: an auditor re-checks the Analytics Agent's recent answers.
+  analyticsAudit: {
+    tabLabel: "Audit agent",
+    newAudit: "New audit",
+    heading: "Audit the Analytics Agent",
+    intro:
+      "An auditor re-checks the agent's recent answers against BigQuery, the dbt docs and the product code, and says whether each one held up. Each answer is audited once — answers an earlier audit already covered are skipped.",
+    countLabel: "Messages to audit",
+    countHelp:
+      "The most recent answered questions, across every admin. Ones an earlier audit already covered are skipped, so fewer than this may be audited.",
+    start: "Start audit",
+    starting: "Starting…",
+    // Said where the reader is about to leave: the run lives on the server.
+    runningNotice: "An audit is running. You can leave this tab — it keeps going.",
+    alreadyRunning: "An audit is already running. Wait for it to finish before starting another.",
+    // `{count}` is the number the reader picked, so the sentence says what was checked.
+    nothingToAudit:
+      "Nothing new to audit — the last {count} answered messages have all been audited already.",
+    startFailed: "Couldn't start the audit. Try again.",
+    historyTitle: "Audits",
+    historyEmpty: "Audits will appear here once you run one.",
+    historyLoadFailed: "Couldn't load past audits.",
+    // Said once, where it matters, like the conversations sidebar's privacy line —
+    // but the opposite fact: this surface is not private to the author.
+    historyScope: "Audits cover every admin's questions, not just yours.",
+    auditLoading: "Opening audit…",
+    auditLoadFailed: "Couldn't open that audit. Try again.",
+    runTitle: "Audit from {date}",
+    statusRunning: "Running",
+    statusCompleted: "Done",
+    statusFailed: "Failed",
+    // What started the run, shown on its row and above its results.
+    triggerManual: "Manual",
+    triggerScheduled: "Scheduled",
+    // Sidebar row detail: "{done} of {total} audited".
+    runProgress: "{done} of {total} audited",
+    progress: "Audited {done} of {total} messages…",
+    runFailed:
+      "This audit stopped before it finished. Messages without a result here weren't audited; the next audit picks them up while they are still among the most recent.",
+    morePending: "{count} more being audited…",
+    runEmpty: "No messages have finished yet.",
+    verdictCorrect: "Correct",
+    verdictMinorIssues: "Minor issues",
+    verdictIncorrect: "Incorrect",
+    verdictUnverifiable: "Couldn't verify",
+    verdictError: "Audit failed",
+    severityHigh: "High",
+    severityMedium: "Medium",
+    severityLow: "Low",
+    issuesTitle: "Issues found",
+    noIssues: "No issues found.",
+    showAnswer: "Show the answer that was audited",
+    entryFailedTitle: "Couldn't audit this message",
+    entryFailedNote: "It will be retried in the next audit.",
+    askedAt: "Asked {date}",
+  },
+  // The Automation tab: the run of two agents (PostHog events, dbt:
+  // definition changes and a plan, then the dbt pull request). Runs start weekly on a schedule, or on demand with "Run now".
+  analyticsAutomation: {
+    tabLabel: "Weekly automation",
+    heading: "Weekly automation",
+    intro:
+      "Once a week, or whenever you press Run now, two agents look at what changed. The PostHog agent opens a pull request for any events the new code needs. The dbt agent lists the changes to the database and metric definitions, and plans what it would change in the dbt repo. Nothing in dbt is touched until you approve here. Approving checks the PostHog pull request: if it is still open, the approval is refused; if it was merged, the whole plan is applied; if it was closed, the changes that depend on its events are left out.",
+    historyTitle: "Runs",
+    runNow: "Run now",
+    runNowStarting: "Starting…",
+    runNowHelp:
+      "Starts a run now, the same as the weekly schedule would. The weekly run still happens.",
+    runNowFailed: "Couldn't start a run. One may already be in progress.",
+    historyEmpty: "No run yet. Press Run now, or wait for the next weekly run.",
+    historyLoadFailed: "Couldn't load past runs.",
+    runLoadFailed: "Couldn't open that run. Try again.",
+    runLoading: "Opening run…",
+    runTitle: "Run from {date}",
+    runFailed: "This run stopped before the PostHog agent and the dbt analysis finished.",
+    commits: "Platform {platform} · dbt {dbt}",
+    statusRunning: "Running",
+    statusWaiting: "Waiting",
+    statusAnalysing: "Planning",
+    statusAwaitingApproval: "Needs your approval",
+    statusApplying: "Opening pull request / checking CI",
+    statusPrOpened: "Pull request opened",
+    statusRejected: "Rejected",
+    statusCompleted: "Done",
+    statusFailed: "Failed",
+    agentPosthog: "PostHog events",
+    agentPosthogHelp:
+      "Checks whether new code needs product-analytics events and opens a pull request for them. It does not wait for approval; a person merges it.",
+    agentDbt: "dbt repo changes",
+    agentDbtHelp:
+      "Shows the plan for the dbt repo, and changes nothing until you approve. Approving checks that the PostHog pull request was merged, closed or not needed, then makes the planned changes and opens a pull request in the dbt repo. It then watches the pull request's CI (the dbt tests) and, if a check fails, pushes a fix to the same branch and checks again.",
+    definitionTitle: "Metrics / Definition changes",
+    definitionHelp:
+      "What changed in the backend database and in metric definitions since the last run, found by the dbt agent. Read-only: nothing in dbt has been touched at this point.",
+    definitionWorking: "Working out what changed…",
+    definitionNone:
+      "Nothing changed in the database or metric definitions that analytics needs to know about.",
+    definitionUnavailable: "No breakdown was recorded for this run.",
+    areaDatabase: "Database",
+    areaMetricDefinition: "Metric definition",
+    areaEnum: "Enum",
+    areaOther: "Other",
+    affectsDbt: "Needs a dbt change",
+    noDbtImpact: "No dbt change needed",
+    platformFilesLabel: "Source files",
+    dbtFilesLabel: "dbt files",
+    filesMore: "+{count} more",
+    definitionCount: "{count} change(s)",
+    definitionNeedDbtCount: "{count} need a dbt change",
+    planTitle: "Plan for the dbt repo",
+    planAlways: "Made whichever way the PostHog pull request goes",
+    planIfMerged: "Only if the PostHog events pull request is merged",
+    planIfMergedHelp: "Left out if that pull request is closed without merging.",
+    ciTitle: "CI",
+    ciRunning: "CI running",
+    ciFixing: "CI failed, fixing",
+    ciGreen: "CI passing",
+    ciFailed: "CI failing",
+    ciNone: "No CI checks",
+    ciTimeout: "CI did not finish",
+    ciStopped: "Stopped watching",
+    ciUnreadable: "CI status unknown",
+    ciAttempts: "Fix attempts: {attempts}",
+    planSteps: "Steps",
+    planCount: "{count} change(s)",
+    planScenarioMerged: "If the PostHog pull request is merged",
+    planScenarioMergedHelp: "Changes applied: the whole plan",
+    planScenarioClosed: "If it is closed, or none was opened",
+    planScenarioClosedHelp: "Changes applied: those that do not depend on the new events",
+    noSummary: "Nothing to report yet.",
+    pullRequest: "Pull request",
+    prState: "State",
+    prOpen: "Open",
+    prMerged: "Merged",
+    prClosed: "Closed without merging",
+    reviewTitle: "Review agent",
+    reviewApprove: "No blocking issues",
+    reviewConcerns: "Concerns",
+    reviewReject: "Should not merge as is",
+    reviewFailed: "Review failed",
+    findingsEvents: "Events",
+    findingProposed: "Proposed",
+    findingIncluded: "In the pull request",
+    findingDropped: "Not added",
+    findingRejected: "Rejected",
+    approve: "Approve and open dbt pull request",
+    approving: "Approving…",
+    reject: "Reject",
+    rejecting: "Rejecting…",
+    approveHelp:
+      "Checks the PostHog pull request on GitHub (it must be merged or closed), then makes the planned changes in the dbt repo and opens a pull request that a person still has to merge. If the PostHog pull request was closed, the changes that depend on its events are left out.",
+    rejectHelp: "Skips the dbt changes for this run. Nothing in the dbt repo is changed.",
+    decisionApproved: "Approved",
+    decisionRejected: "Rejected",
+    approveFailed: "Couldn't approve. It may have already been decided; refresh and try again.",
+    rejectFailed: "Couldn't reject. It may have already been decided; refresh and try again.",
+    retryNote:
+      "The last attempt opened no pull request. Approving again retries it on a new branch.",
   },
   uxSignals: {
     title: "UX Signals",
@@ -9609,6 +9775,44 @@ export const en = {
       submitGoalNeeded: "Pick a goal first. The suggested one is fine.",
       submitFailed: "Couldn't submit this idea.",
       submitChecksMissing: "A check reopened. Have another look before submitting.",
+      submitQualityBelowBar: (score: number, passScore: number, weakest: string | null) =>
+        `This idea scores ${score} of 100 and needs ${passScore} to go to the board.${
+          weakest ? ` Strengthen "${weakest}" first.` : ""
+        }`,
+      submitNeedsSplit:
+        "This idea is too big to file as one. Split it into smaller ideas, then submit each.",
+      submitNotSized: "The idea agent hasn't been able to size this yet. Keep going with it.",
+      submitAlreadySplit: "This draft was split into separate ideas. Submit those instead.",
+      quality: {
+        title: "Idea quality",
+        scoreLine: (score: number, passScore: number) => `${score} of 100 · needs ${passScore}`,
+        scoreLong: (score: number, passScore: number) =>
+          `Quality score ${score} out of 100, ${passScore} needed`,
+        passed: "Ready for the board",
+        passedHelp: "Every check is met and the idea clears the quality bar.",
+        notPassed: "Not at the bar yet",
+        notPassedHelp: "Answer the idea agent's questions; the score updates after each one.",
+        weakest: (label: string) => `Strengthen next: ${label}`,
+        belowFloor: "Needs more",
+        dimensionScore: (score: number, max: number) => `${score} of ${max}`,
+        empty: "Check my idea, and its quality score shows here.",
+        show: "Show breakdown",
+        hide: "Hide breakdown",
+      },
+      split: {
+        title: "This is bigger than one idea",
+        intro: (n: number) =>
+          `The idea agent split it into ${n} ideas that can each be built and voted on on their own. Each starts as its own draft that already passes the checks.`,
+        sliceSize: (effort: string) => `Size ${effort.toUpperCase()}`,
+        button: (n: number) => `Split into ${n} ideas`,
+        splitting: "Splitting…",
+        failed: "Couldn't split this idea.",
+        doneTitle: "Split into separate drafts",
+        doneBody: "This draft isn't submitted itself. Open each new draft and submit it.",
+        open: (code: string) => `Open ${code}`,
+        from: (code: string) => `Split from ${code}`,
+        submitBlocked: "Split into separate ideas. Submit those instead.",
+      },
       // Audit rec. 6: what Submit files, the one text limit, and the agent's research.
       submitNoStatement: "The idea agent hasn't written its own version. Use your own words.",
       submitStatementEmpty: "Write a summary, or use your own words.",

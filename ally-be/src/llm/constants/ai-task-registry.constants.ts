@@ -2553,6 +2553,74 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
       'skill_experiments.designerModel, else the prompt row, else LLM_REASONING_MODEL',
     promptOverride: 'skill_experiment_designer',
   },
+  {
+    id: 'analytics-agent-audit',
+    task: null,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      "An audit of the Analytics Agent's recent answers runs (UI: the last 15 not yet audited; scheduled, default weekly: every answer not yet audited, up to 50)",
+    detail:
+      'One LangChain agent run per answered question, with read-only BigQuery and GitHub ' +
+      'tools, re-checking the numbers and definitions. Several model calls per question. ' +
+      'Findings are saved as one analytics_agent_audits row per run. Shares the Analytics ' +
+      'Agent model; prompt is AUDIT_AGENT_SYSTEM_PROMPT in code, not a Skills Store prompt.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5.6-luna (OPENAI_CHAT_MODEL overrides it)',
+    configuredBy: 'OPENAI_CHAT_MODEL',
+  },
+  {
+    id: 'analytics-automation-posthog-events',
+    task: null,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'Scheduled, weekly: the Analytics Automation run starts its PostHog events agent',
+    detail:
+      'One LangChain agent run with read-only GitHub tools: decides whether code added since the last run needs new PostHog events and proposes them as exact-text edits. The agent holds three GitHub MCP write tools (create branch, push files, open pull request), each wrapped by a guard that refuses, in code, any write outside the platform repo, an automation/ branch and the allowed folders; reported events are then checked for personal-data property names. Prompt is POSTHOG_EVENTS_SYSTEM_PROMPT in code.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5.6-luna (OPENAI_CHAT_MODEL overrides it)',
+    configuredBy: 'OPENAI_CHAT_MODEL',
+  },
+  {
+    id: 'analytics-automation-dbt',
+    task: null,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'The Analytics Automation dbt agent. Analysis: scheduled, weekly, right after the PostHog events agent in the same run. Changes: only when a person clicks Approve in the admin tab, and only if the PostHog pull request is merged, closed or absent on GitHub at that moment',
+    detail:
+      'Two separate LangChain agent runs. Analysis (read-only GitHub tools, no approval needed, edits nothing): what changed in the platform (migrations, entities, metric definitions: the "Metrics / Definition changes" section) and a plan of the dbt changes, with the items that exist only because of the PostHog events marked. Changes (after approval): applies the part of the plan the PostHog pull request outcome allows (all of it if merged, without the PostHog-dependent items if closed) by editing the dbt repo and opening a pull request through guarded GitHub MCP write tools (confined in code to the dbt repo, an automation/ branch and models/seeds/tests). Prompts are DBT_ANALYSIS_SYSTEM_PROMPT and DBT_CHANGES_SYSTEM_PROMPT in code.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5.6-luna (OPENAI_CHAT_MODEL overrides it)',
+    configuredBy: 'OPENAI_CHAT_MODEL',
+  },
+  {
+    id: 'analytics-automation-dbt-ci-fix',
+    task: null,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'The dbt pull request the Analytics Automation dbt agent opened has a failing CI check (up to 3 times per pull request)',
+    detail:
+      "One LangChain agent run per fix attempt. The server polls the pull request's checks on GitHub; when one fails, the agent reads the failed job logs (read-only GitHub tools, including the Actions toolset) and pushes a fix to the same branch through the guarded push_files tool (confined in code to the dbt repo, the automation/ branch and models/seeds/tests; it cannot open, approve or merge a pull request). It is told not to weaken tests to get a pass and to push nothing when the failure is not caused by the branch. Prompt is DBT_CI_FIX_SYSTEM_PROMPT in code.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5.6-luna (OPENAI_CHAT_MODEL overrides it)',
+    configuredBy: 'OPENAI_CHAT_MODEL',
+  },
+  {
+    id: 'analytics-automation-pr-review',
+    task: null,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'A pull request opened by the PostHog events agent or the dbt agent is reviewed',
+    detail:
+      'One LangChain agent run with read-only GitHub tools, independent of the agent that wrote the pull request: reads the diff, judges it against a checklist (including no personal or health data in events) and posts a verdict as a PR comment. Never approves or merges. Prompt is PR_REVIEW_SYSTEM_PROMPT in code.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5.6-luna (OPENAI_CHAT_MODEL overrides it)',
+    configuredBy: 'OPENAI_CHAT_MODEL',
+  },
 ];
 
 /* ─────────────────────────────────────────────────────────────────────────────

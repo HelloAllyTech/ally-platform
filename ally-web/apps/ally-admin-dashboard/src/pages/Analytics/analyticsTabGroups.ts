@@ -36,8 +36,8 @@ export const ANALYTICS_TAB_GROUPS: AnalyticsTabGroup[] = [
   {
     id: "planning",
     label: "Planning (internal)",
-    blurb: "Our own delivery, plus ask-anything and suggested next builds.",
-    tabIds: ["product", "agent", "suggestions"],
+    blurb: "Our own delivery, plus the ask-anything agent, its audit and the weekly automation.",
+    tabIds: ["product", "agent", "audit", "automation"],
   },
 ];
 

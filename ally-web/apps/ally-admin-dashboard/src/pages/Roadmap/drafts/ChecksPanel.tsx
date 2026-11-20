@@ -24,11 +24,14 @@ interface ChecksPanelProps {
   onSubmit: () => void;
   /** Phone: Submit lives in the sticky bar instead. */
   hideSubmit?: boolean;
+  /** Why Submit is locked although the checks are met (below the quality bar, or split); shown under it. */
+  submitBlockedReason?: string | null;
 }
 
 /**
- * "Ready to submit?" (§4.2, §4.13): the five checks, each ticked one quoting the words that met it,
- * Not quite to reopen it, and Submit, which unlocks at 5 of 5. Motion (§4.18): a check's circle
+ * "Ready to submit?" (§4.2, §4.13): the checks (eight), each ticked one quoting the words that met
+ * it, Not quite to reopen it, and Submit, which unlocks when all are met and the idea clears the
+ * quality bar. Motion (§4.18): a check's circle
  * draws into a ✓; the counter rolls; at 5 of 5 the panel's border fills in a ring once and Submit
  * turns primary with one sheen; Not quite un-draws the ✓.
  */
@@ -43,6 +46,7 @@ export const ChecksPanel: React.FC<ChecksPanelProps> = ({
   onShowEvidence,
   onSubmit,
   hideSubmit,
+  submitBlockedReason,
 }) => {
   const reduced = useReducedMotionPreference();
   const copy = en.roadmapV2.draft;
@@ -108,9 +112,9 @@ export const ChecksPanel: React.FC<ChecksPanelProps> = ({
         <div className="flex flex-col gap-1">
           <span className="relative inline-flex self-start overflow-hidden rounded">
             <Button
-              kind={complete ? "primary" : "secondary"}
+              kind={complete && !submitBlockedReason ? "primary" : "secondary"}
               size="md"
-              disabled={!complete}
+              disabled={!complete || !!submitBlockedReason}
               onClick={onSubmit}
             >
               {copy.submit}
@@ -121,6 +125,9 @@ export const ChecksPanel: React.FC<ChecksPanelProps> = ({
             <span className="text-xs text-typography-secondary">
               {copy.submitLocked(met, total)}
             </span>
+          )}
+          {complete && submitBlockedReason && (
+            <span className="text-xs text-typography-secondary">{submitBlockedReason}</span>
           )}
         </div>
       )}

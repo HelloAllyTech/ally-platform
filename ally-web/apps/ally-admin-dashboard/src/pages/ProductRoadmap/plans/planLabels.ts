@@ -53,6 +53,9 @@ export const GATE_LABEL: Record<string, string> = {
   clear_why: "Clear about why it matters",
   who_it_affects: "Names the user group it affects",
   outcome: "Says what changes for them",
+  strategic_fit: "Serves a named Ally goal or bet",
+  success_signal: "Says how we would know it worked",
+  scope_boundary: "Draws the scope line",
 };
 
 export const VERDICT_LABEL: Record<string, string> = {

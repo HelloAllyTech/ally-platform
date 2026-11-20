@@ -138,6 +138,18 @@ export class RoadmapDraftController {
   }
 
   @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, VIEW)
+  @Post('drafts/:code/split')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Split a too-big idea into the slices the idea agent proposed: one new draft per slice',
+  })
+  async split(@Param('code') code: string, @CurrentUser() user: TokenUser) {
+    await this.settings.assertRoadmapV2();
+    return this.drafts.split(user.id, code);
+  }
+
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, VIEW)
   @Post('drafts/:code/checks/:checkId/reopen')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Not quite: reopen one check' })

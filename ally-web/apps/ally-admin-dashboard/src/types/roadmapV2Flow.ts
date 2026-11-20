@@ -14,13 +14,16 @@ import type {
   RoadmapShownStage,
 } from "./roadmapV2";
 
-/** The filing gate's five criteria, in the order the draft page lists them. */
+/** The filing gate's eight criteria, in the order the draft page lists them. */
 export type RoadmapCheckId =
   | "who_it_affects"
   | "pain_or_gain"
   | "clear_why"
   | "goal_before_solution"
-  | "outcome";
+  | "outcome"
+  | "strategic_fit"
+  | "success_signal"
+  | "scope_boundary";
 
 export const ROADMAP_CHECK_ORDER: RoadmapCheckId[] = [
   "who_it_affects",
@@ -28,7 +31,46 @@ export const ROADMAP_CHECK_ORDER: RoadmapCheckId[] = [
   "clear_why",
   "goal_before_solution",
   "outcome",
+  "strategic_fit",
+  "success_signal",
+  "scope_boundary",
 ];
+
+/** One scored dimension of the idea's quality, graded 0..scaleMax by the idea agent. */
+export interface RoadmapQualityDimension {
+  id: string;
+  label: string;
+  score: number;
+  weight: number;
+  /** The lowest score this dimension may have for the idea to pass. */
+  floor: number;
+  note: string;
+}
+
+/** The quality bar: a 0-100 score the idea must reach, on top of every check being met. */
+export interface RoadmapDraftQuality {
+  score: number;
+  passScore: number;
+  passed: boolean;
+  scaleMax: number;
+  /** The dimension id most worth strengthening, or null. */
+  weakest: string | null;
+  dimensions: RoadmapQualityDimension[];
+}
+
+/** One idea of a split: the interview's proposal for an idea too big (or too mixed) to file whole. */
+export interface RoadmapDraftSlice {
+  title: string | null;
+  description: string;
+  effort: "s" | "m" | "l";
+  productGoal: string | null;
+}
+
+/** A sibling draft created by "Split into N ideas". */
+export interface RoadmapDraftSplitChild {
+  code: string;
+  title: string;
+}
 
 export interface RoadmapCheckEvidence {
   /** The words that met the check, verbatim. */
@@ -100,6 +142,14 @@ export interface RoadmapDraftDetail {
   proposal?: RoadmapDraftProposal | null;
   /** The idea agent's research brief, for "What the idea agent found"; null until its first turn. */
   brief?: RoadmapOpportunityBrief | null;
+  /** The quality score and its dimensions; null until the idea agent's first turn. Older servers omit it. */
+  quality?: RoadmapDraftQuality | null;
+  /** The interview's proposed split; empty when the idea files as one. */
+  slices?: RoadmapDraftSlice[];
+  /** Drafts already created from this one by a split; empty when not split. */
+  splitInto?: RoadmapDraftSplitChild[];
+  /** The draft this one was split from, or null. */
+  splitFrom?: string | null;
 }
 
 /**
@@ -293,5 +343,9 @@ export interface RoadmapFlowError {
     failures?: number | { code: string; message: string }[];
     current?: RoadmapDraftDetail;
     codes?: string[];
+    /** `quality_below_bar`: where the idea scored, the bar, and the dimension id to strengthen. */
+    score?: number;
+    passScore?: number;
+    weakest?: string | null;
   };
 }

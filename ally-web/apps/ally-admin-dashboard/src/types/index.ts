@@ -30,6 +30,8 @@ export * from "./superDuperAdmins";
 export * from "./aiLab";
 export * from "./productRoadmap";
 export * from "./analyticsAgent";
+export * from "./analyticsAudit";
+export * from "./analyticsAutomation";
 export * from "./bugHunter";
 export * from "./uxSignals";
 export * from "./builder";

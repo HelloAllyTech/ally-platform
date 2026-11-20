@@ -39,6 +39,8 @@ import { FixSessionEngineCost } from "./FixSessionEngineCost";
 import { TabControlsSlotProvider } from "./tabControlsSlot";
 import { AllyGuideTab } from "./tabs/AllyGuideTab";
 import { AnalyticsAgentTab } from "./tabs/AnalyticsAgentTab";
+import { AnalyticsAuditTab } from "./tabs/AnalyticsAuditTab";
+import { AnalyticsAutomationTab } from "./tabs/AnalyticsAutomationTab";
 import { GlossaryAdherenceTab } from "./tabs/GlossaryAdherenceTab";
 import { HighlightsTab } from "./tabs/HighlightsTab";
 import { LanguageQualityTab } from "./tabs/LanguageQualityTab";
@@ -293,6 +295,33 @@ const TABS: TabDef[] = [
     label: "Analytics Agent",
     uses: { language: false, range: false },
     render: () => <AnalyticsAgentTab />,
+    visibleTo: ({ features }) => hasFeature(features, FeatureToggleKey.ANALYTICS_AGENT),
+  },
+  {
+    // An auditor that re-checks the Analytics Agent's recent answers against the
+    // data, the dbt docs and the product code. Behind the same toggle as the
+    // agent it audits: it reads what the agent was asked, so nobody who cannot
+    // use the agent has any business opening it.
+    //
+    // No page-level pickers: how many messages to audit is chosen inside the tab,
+    // next to the button that starts it, and the run is not scoped by period or
+    // language.
+    id: "audit",
+    label: en.analyticsAudit.tabLabel,
+    uses: { language: false, range: false },
+    render: () => <AnalyticsAuditTab />,
+    visibleTo: ({ features }) => hasFeature(features, FeatureToggleKey.ANALYTICS_AGENT),
+  },
+  {
+    // The weekly run of two agents (PostHog events, dbt definition changes and
+    // plan, then the dbt pull request), started only by the server's scheduler. Behind the same toggle as
+    // the agent: approving here makes the dbt agent open a pull request.
+    //
+    // No page-level pickers: a run is not scoped by period or language.
+    id: "automation",
+    label: en.analyticsAutomation.tabLabel,
+    uses: { language: false, range: false },
+    render: () => <AnalyticsAutomationTab />,
     visibleTo: ({ features }) => hasFeature(features, FeatureToggleKey.ANALYTICS_AGENT),
   },
 ];

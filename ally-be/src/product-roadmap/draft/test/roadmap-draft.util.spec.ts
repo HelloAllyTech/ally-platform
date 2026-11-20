@@ -1,4 +1,5 @@
 import {
+  submitBlock,
   composeDescription,
   draftChecks,
   draftProposal,
@@ -12,7 +13,7 @@ import {
 const allMet = DRAFT_CHECK_ORDER.map((id) => ({ id, met: true, note: 'ok' }));
 
 describe('roadmap draft checks', () => {
-  it('lists the five checks in page order with server labels', () => {
+  it('lists the checks in page order with server labels', () => {
     const checks = draftChecks(undefined, '', []);
     expect(checks.map((c) => c.id)).toEqual([
       'who_it_affects',
@@ -20,6 +21,9 @@ describe('roadmap draft checks', () => {
       'clear_why',
       'goal_before_solution',
       'outcome',
+      'strategic_fit',
+      'success_signal',
+      'scope_boundary',
     ]);
     expect(checks.every((c) => !c.met && c.label)).toBe(true);
   });
@@ -66,7 +70,9 @@ describe('roadmap draft checks', () => {
       met: false,
       evidence: null,
     });
-    expect(checks.filter((c) => c.met)).toHaveLength(4);
+    expect(checks.filter((c) => c.met)).toHaveLength(
+      DRAFT_CHECK_ORDER.length - 1,
+    );
   });
 
   it('Not quite overrides the agent; a self-filled answer no longer meets a check', () => {
@@ -157,5 +163,62 @@ describe('What will be submitted (audit rec. 6)', () => {
     expect(title.length).toBeLessThanOrEqual(81);
     expect(title.endsWith('…')).toBe(true);
     expect(title).not.toContain('wor…');
+  });
+});
+
+describe('submitBlock — the quality bar on a draft whose checks are all met', () => {
+  const quality = (over: Record<string, unknown> = {}) => ({
+    score: 72,
+    passScore: 65,
+    scaleMax: 4,
+    passed: true,
+    weakest: null,
+    dimensions: [],
+    ...over,
+  });
+  const draft = (effort: string | null = 'm') => ({
+    description: 'As a counsellor …',
+    productGoal: 'Retention',
+    effort,
+  });
+
+  it('lets a passing, sized, single idea through', () => {
+    expect(submitBlock({ quality: quality(), draft: draft('l') })).toBeNull();
+  });
+
+  it('blocks a draft nobody has graded, and one that missed the bar, saying how far off', () => {
+    expect(submitBlock({ draft: draft() })?.code).toBe('quality_below_bar');
+    const block = submitBlock({
+      quality: quality({ passed: false, score: 58, weakest: 'outcome' }),
+      draft: draft(),
+    });
+    expect(block?.code).toBe('quality_below_bar');
+    expect(block?.extra).toMatchObject({ score: 58, weakest: 'outcome' });
+  });
+
+  it('asks for a split when the interview proposed slices or the size is XL/XXL', () => {
+    const slices = [
+      { title: null, description: 'a', effort: 's', productGoal: null },
+      { title: null, description: 'b', effort: 'm', productGoal: null },
+    ];
+    expect(submitBlock({ quality: quality(), draft: null, slices })?.code).toBe(
+      'needs_split',
+    );
+    expect(submitBlock({ quality: quality(), draft: draft('xl') })?.code).toBe(
+      'needs_split',
+    );
+  });
+
+  it('refuses an unsized idea, and a draft that was already split', () => {
+    expect(submitBlock({ quality: quality(), draft: null })?.code).toBe(
+      'not_sized',
+    );
+    expect(
+      submitBlock({
+        quality: quality(),
+        draft: draft(),
+        splitInto: [{ code: 'OPP-0101', title: 'x' }],
+      })?.code,
+    ).toBe('already_split');
   });
 });

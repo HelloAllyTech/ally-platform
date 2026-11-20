@@ -12,6 +12,15 @@ const ME = 7;
 const SESSION = '00000000-0000-4000-8000-000000000001';
 
 const allGates = DRAFT_CHECK_ORDER.map((id) => ({ id, met: true }));
+/** A quality grade at the bar: submit is refused without one (the quality bar, 2026-11-20). */
+const passing = {
+  score: 75,
+  passScore: 65,
+  scaleMax: 4,
+  passed: true,
+  weakest: null,
+  dimensions: [],
+};
 
 function draftRow(
   plan: Record<string, any> = {},
@@ -217,6 +226,7 @@ describe('RoadmapDraftService', () => {
         draftGoalId: 'g1',
         idea: {
           gates: allGates,
+          quality: passing,
           brief: { assessment: { rating: 'promising' } },
           draft: { description: 'x', productGoal: 'Scribe', effort: 'm' },
         },
@@ -265,7 +275,7 @@ describe('RoadmapDraftService', () => {
       build({
         row: draftRow({
           draftGoalId: 'g1',
-          idea: { gates: allGates, brief, draft },
+          idea: { gates: allGates, quality: passing, brief, draft },
         }),
       });
     const filing = (deps: any) =>
@@ -345,7 +355,7 @@ describe('RoadmapDraftService', () => {
     });
 
     it('Use this with no agent statement fails closed', async () => {
-      const { service, deps } = ready(null);
+      const { service, deps } = ready({ ...statement, description: '' });
       filing(deps);
       const error = await service
         .submit(ME, 'OPP-0900', { title: 'A title', use: 'agent' })
@@ -368,40 +378,212 @@ describe('RoadmapDraftService', () => {
       expect(error.getResponse()).toMatchObject({ code: 'too_long' });
     });
 
-    it('an idea the agent could not size still keeps its brief and interview', async () => {
-      const { service, deps } = ready(null, {
-        assessment: {
-          rating: 'needs_work',
-          summary: 's',
-          openRecommendations: [],
-        },
+    /**
+     * Until 2026-11-20 an idea the agent could not size was filed unsigned, with its brief and
+     * interview kept on the side. An unsized idea is not an idea the board can weigh, so it now
+     * waits for its scope line instead.
+     */
+    it('an idea the agent could not size is not submitted', async () => {
+      const { service, deps } = ready(null);
+      filing(deps);
+      const error = await service
+        .submit(ME, 'OPP-0900', { title: 'A title' })
+        .catch((e) => e);
+      expect(error.getStatus()).toBe(422);
+      expect(error.getResponse()).toMatchObject({ code: 'not_sized' });
+      expect(deps.opportunityService.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('the quality bar', () => {
+    const idea = (over: Record<string, any> = {}) => ({
+      gates: allGates,
+      quality: passing,
+      brief: { assessment: { rating: 'promising', summary: 's' } },
+      draft: { description: 'x', productGoal: 'Scribe', effort: 'm' },
+      ...over,
+    });
+    const filing = (deps: any) =>
+      deps.dataSource.query.mockImplementation(async (sql: string) => {
+        if (sql.includes('FROM "roadmap_product_goals"'))
+          return [{ id: 'g1', name: 'Scribe' }];
+        if (sql.includes("jsonb_build_object('filingAt'"))
+          return [[{ id: SESSION }], 1];
+        if (sql.includes('count(*)')) return [{ n: 1 }];
+        return [];
+      });
+    const refused = async (over: Record<string, any>) => {
+      const { service, deps } = build({
+        row: draftRow({ draftGoalId: 'g1', idea: idea(over) }),
       });
       filing(deps);
-      deps.messages.listBySession.mockResolvedValue([
-        {
-          id: 'a1',
-          role: 'assistant',
-          content: 'Who is this for?',
-          metadata: { planStage: 'idea' },
-        },
-      ]);
-      await service.submit(ME, 'OPP-0900', { title: 'A title' });
-      expect(deps.opportunityService.create).toHaveBeenCalledWith(
-        ME,
-        expect.not.objectContaining({ brief: expect.anything() }),
-        expect.objectContaining({ enforceReadiness: false }),
-      );
-      const kept = deps.dataSource.query.mock.calls.find(([sql]) =>
-        String(sql).includes('"interviewTranscript" = COALESCE'),
-      );
-      expect(kept).toBeDefined();
-      expect(JSON.parse(kept![1][1])).toMatchObject({
-        assessment: { rating: 'needs_work' },
+      const error = await service
+        .submit(ME, 'OPP-0900', { title: 'A title' })
+        .catch((e) => e);
+      expect(deps.opportunityService.create).not.toHaveBeenCalled();
+      return error;
+    };
+
+    it('signs the score it graded into the token it files with', async () => {
+      const { service, deps } = build({
+        row: draftRow({ draftGoalId: 'g1', idea: idea() }),
       });
-      expect(JSON.parse(kept![1][2])).toEqual([
-        { role: 'admin', content: 'Counsellors retype names' },
-        { role: 'agent', content: 'Who is this for?' },
+      filing(deps);
+      await service.submit(ME, 'OPP-0900', { title: 'A title' });
+      expect(deps.readinessToken.issue).toHaveBeenCalledWith(
+        expect.objectContaining({ qualityScore: 75 }),
+      );
+    });
+
+    it('refuses an idea under the bar, saying where it stands and what to work on', async () => {
+      const error = await refused({
+        quality: { ...passing, score: 58, passed: false, weakest: 'outcome' },
+      });
+      expect(error.getStatus()).toBe(422);
+      expect(error.getResponse()).toMatchObject({
+        code: 'quality_below_bar',
+        score: 58,
+        passScore: 65,
+        weakest: 'outcome',
+      });
+    });
+
+    it('refuses a draft the agent never graded', async () => {
+      const error = await refused({ quality: undefined });
+      expect(error.getResponse()).toMatchObject({ code: 'quality_below_bar' });
+    });
+
+    it('asks for a split when the agent proposed slices, or the size is XL', async () => {
+      const slices = [
+        { title: 'a', description: 'a', effort: 's', productGoal: null },
+        { title: 'b', description: 'b', effort: 'm', productGoal: null },
+      ];
+      expect(
+        (await refused({ draft: null, slices })).getResponse(),
+      ).toMatchObject({
+        code: 'needs_split',
+      });
+      expect(
+        (
+          await refused({
+            draft: { description: 'x', productGoal: 'Scribe', effort: 'xl' },
+          })
+        ).getResponse(),
+      ).toMatchObject({ code: 'needs_split' });
+    });
+
+    it('reports canSubmit false until the bar is reached', async () => {
+      const { service } = build({
+        row: draftRow({
+          draftGoalId: 'g1',
+          idea: idea({ quality: { ...passing, passed: false, score: 40 } }),
+        }),
+      });
+      expect((await service.detail(ME, 'OPP-0900')).canSubmit).toBe(false);
+    });
+  });
+
+  describe('Split: one interview, several ideas', () => {
+    const slices = [
+      {
+        title: 'Remind',
+        description: 'Reminder slice',
+        effort: 's',
+        productGoal: 'Scribe',
+      },
+      {
+        title: null,
+        description: 'Digest slice',
+        effort: 'm',
+        productGoal: null,
+      },
+    ];
+    const splittable = (extra: Record<string, any> = {}) =>
+      build({
+        row: draftRow({
+          idea: {
+            gates: allGates,
+            quality: passing,
+            brief: { assessment: { rating: 'promising', summary: 's' } },
+            draft: null,
+            slices,
+            ...extra,
+          },
+        }),
+      });
+
+    it('refuses when the agent proposed no split', async () => {
+      const { service } = splittable({ slices: [] });
+      const error = await service.split(ME, 'OPP-0900').catch((e) => e);
+      expect(error.getResponse()).toMatchObject({ code: 'nothing_to_split' });
+    });
+
+    it('returns the children untouched when it was already split (idempotent)', async () => {
+      const { service, deps } = splittable({
+        splitInto: [{ code: 'OPP-0901', title: 'Remind' }],
+      });
+      const detail = await service.split(ME, 'OPP-0900');
+      expect(detail.splitInto).toEqual([{ code: 'OPP-0901', title: 'Remind' }]);
+      expect(deps.builderSessions.createSession).not.toHaveBeenCalled();
+    });
+
+    it('creates one graded sibling draft per slice and links them from the parent', async () => {
+      const { service, deps } = splittable();
+      deps.dataSource.query.mockImplementation(async (sql: string) => {
+        if (sql.includes("jsonb_build_object('splittingAt'"))
+          return [[{ id: SESSION }], 1];
+        if (sql.includes('FROM "roadmap_product_goals"'))
+          return [{ id: 'g1', name: 'Scribe' }];
+        return [];
+      });
+      const created = jest
+        .spyOn(service, 'create')
+        .mockResolvedValueOnce({ code: 'OPP-0901', sessionId: 's1' } as any)
+        .mockResolvedValueOnce({ code: 'OPP-0902', sessionId: 's2' } as any);
+
+      const detail = await service.split(ME, 'OPP-0900');
+
+      expect(created).toHaveBeenCalledTimes(2);
+      expect(created).toHaveBeenNthCalledWith(
+        1,
+        ME,
+        expect.objectContaining({ text: 'Reminder slice' }),
+      );
+      // Each child starts through the interview: same gates and grade, its own size and words.
+      expect(deps.store.patchPlan).toHaveBeenCalledWith(
+        's1',
+        expect.objectContaining({
+          idea: expect.objectContaining({
+            quality: passing,
+            splitFrom: 'OPP-0900',
+            draft: expect.objectContaining({
+              description: 'Reminder slice',
+              effort: 's',
+            }),
+          }),
+        }),
+      );
+      expect(detail.splitInto).toEqual([
+        { code: 'OPP-0901', title: 'Remind' },
+        { code: 'OPP-0902', title: 'Digest slice' },
       ]);
+      // The claim is always released, so a failed split can be tried again.
+      expect(
+        deps.dataSource.query.mock.calls.some(([sql]) =>
+          String(sql).includes("- 'splittingAt'"),
+        ),
+      ).toBe(true);
+    });
+
+    it('a split parent can no longer be submitted', async () => {
+      const { service } = splittable({
+        draft: { description: 'x', productGoal: 'Scribe', effort: 'm' },
+        splitInto: [{ code: 'OPP-0901', title: 'Remind' }],
+      });
+      const error = await service
+        .submit(ME, 'OPP-0900', { title: 'A title' })
+        .catch((e) => e);
+      expect(error.getResponse()).toMatchObject({ code: 'already_split' });
     });
   });
 
