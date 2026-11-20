@@ -1,4 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
+import { CourseCopilotDesignGuidanceService } from './course-copilot-design-guidance.service';
+import { CourseCopilotLearnerResultsService } from './course-copilot-learner-results.service';
 import { In } from 'typeorm';
 import { LoggerService } from 'src/logger/logger.service';
 import { TrackService } from 'src/track/service/track.service';
@@ -104,6 +106,10 @@ export class CourseCopilotJobExecutorService {
     private readonly roleplayBrief: RoleplayBriefSpecialist,
     private readonly fitCheck: RoleplayFitCheckSpecialist,
     private readonly sources: CourseCopilotSourcesService,
+    @Optional()
+    private readonly designGuidance?: CourseCopilotDesignGuidanceService,
+    @Optional()
+    private readonly learnerResults?: CourseCopilotLearnerResultsService,
   ) {}
 
   async execute(
@@ -755,10 +761,25 @@ export class CourseCopilotJobExecutorService {
     if (!session.trackId)
       throw new CourseCopilotJobSkip('No course to review.');
     const track = await this.structureService.getTrack(session.trackId);
+    const designGuidance = this.designGuidance
+      ? await this.designGuidance.reference({
+          sessionId: session.id,
+          tenantId: session.tenantId,
+          brief: session.brief ?? {},
+          stage: 'review',
+        })
+      : '';
+    // A live course with learners: what they did, so the review can point at real trouble.
+    const learnerEvidence = this.learnerResults
+      ? await this.learnerResults.reviewReference(track.id, session.tenantId)
+      : '';
     const findings: CourseReviewFinding[] = await this.review.review({
       sessionId: session.id,
       brief: session.brief ?? {},
       courseDigest: this.courseDigest(track),
+      referenceMaterial:
+        [designGuidance, learnerEvidence].filter(Boolean).join('\n\n---\n') ||
+        null,
       usageMetadata,
     });
     const fixes = findings.filter((f) => f.severity === 'fix').length;

@@ -62,6 +62,12 @@ describe('blog body issues', () => {
 describe('BlogAuthoringToolsService', () => {
   const make = (existing = post()) => {
     const prompts = { getPromptByCode: jest.fn(async () => '# Skill text') };
+    const review = {
+      listSuggestions: jest.fn(async () => [{ id: 's1', comment: 'Shorter' }]),
+    };
+    const dataSource = {
+      query: jest.fn(async () => [{ email: 'gopi@helloally.ai' }]),
+    };
     const blogs = {
       create: jest.fn(async (dto: any) => post({ ...dto, status: dto.status })),
       update: jest.fn(async (_id: string, dto: any) => post({ ...dto })),
@@ -78,7 +84,14 @@ describe('BlogAuthoringToolsService', () => {
     return {
       blogs,
       prompts,
-      svc: new BlogAuthoringToolsService(blogs as any, prompts as any),
+      svc: new BlogAuthoringToolsService(
+        blogs as any,
+        prompts as any,
+        review as any,
+        dataSource as any,
+      ),
+      review,
+      dataSource,
     };
   };
 
@@ -95,6 +108,24 @@ describe('BlogAuthoringToolsService', () => {
         status: BlogStatus.DRAFT,
         tags: ['release'],
       }),
+    );
+  });
+
+  it('keeps the exact casing of tags already in use and drops duplicates', async () => {
+    const { blogs, svc } = make();
+    blogs.getPublishedTags.mockResolvedValue({
+      tags: [
+        { tag: 'AI', count: 3 },
+        { tag: 'Product Updates', count: 2 },
+      ],
+    } as any);
+    await svc.call(
+      'create_draft',
+      { title: 'Hello', tags: ['ai', 'AI', 'product updates', 'New Thing'] },
+      7,
+    );
+    expect(blogs.create).toHaveBeenCalledWith(
+      expect.objectContaining({ tags: ['AI', 'Product Updates', 'New Thing'] }),
     );
   });
 
@@ -146,14 +177,73 @@ describe('BlogAuthoringToolsService', () => {
     expect(guide.skill).toMatch(/could not be loaded/);
   });
 
+  it('defaults the byline email to the key owner, and an explicit one wins', async () => {
+    const { blogs, svc } = make();
+    await svc.call('create_draft', { title: 'A' }, 7);
+    expect(blogs.create.mock.calls[0][0].authorEmail).toBe('gopi@helloally.ai');
+    await svc.call(
+      'create_draft',
+      { title: 'B', authorEmail: 'jane@helloally.ai' },
+      7,
+    );
+    expect(blogs.create.mock.calls[1][0].authorEmail).toBe('jane@helloally.ai');
+    await expect(
+      svc.call('create_draft', { title: 'C', authorEmail: 'nope' }, 7),
+    ).rejects.toThrow(/authorEmail/);
+  });
+
+  it('lists the suggestions on a draft for the agent to apply', async () => {
+    const { svc, review } = make();
+    const out: any = await svc.call('list_suggestions', { id: 'p1' }, 7);
+    expect(review.listSuggestions).toHaveBeenCalledWith('p1');
+    expect(out[0].comment).toBe('Shorter');
+  });
+
+  it('serves each pass skill from the Skills Store', async () => {
+    const { svc, prompts } = make();
+    for (const [pass, code] of [
+      ['research', 'blog_research_skill'],
+      ['compose', 'blog_compose_skill'],
+      ['review', 'blog_review_skill'],
+    ]) {
+      const out: any = await svc.call('blog_guide', { pass }, 7);
+      expect(prompts.getPromptByCode).toHaveBeenLastCalledWith(code);
+      expect(out.pass).toBe(pass);
+      expect(out.skill).toBe('# Skill text');
+    }
+    const overview: any = await svc.call('blog_guide', {}, 7);
+    expect(overview.pass).toBe('overview');
+    expect(overview.passes).toEqual(['research', 'compose', 'review']);
+    await expect(svc.call('blog_guide', { pass: 'nope' }, 7)).rejects.toThrow(
+      /pass must be/,
+    );
+  });
+
+  it('check_draft reports style and markup problems on a saved post', async () => {
+    const { svc } = make(
+      post({
+        title: 'A planner',
+        body: '<h2>What went wrong first</h2><div>x</div>',
+      }),
+    );
+    const out: any = await svc.call('check_draft', { id: 'p1' }, 7);
+    expect(out.clean).toBe(false);
+    expect(out.style.map((i: any) => i.kind)).toEqual(
+      expect.arrayContaining(['retrospective_heading', 'internal_term']),
+    );
+    expect(out.markup.length).toBeGreaterThan(0);
+  });
+
   it('has no tool that publishes or deletes', () => {
     const names = make()
       .svc.definitions()
       .map((d) => d.name);
     expect(names).toEqual([
       'blog_guide',
+      'check_draft',
       'list_posts',
       'get_post',
+      'list_suggestions',
       'request_image_upload',
       'create_draft',
       'update_draft',

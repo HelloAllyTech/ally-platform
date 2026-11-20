@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
 import { RichTextRenderer } from "@ally-ui-mono/ui-shared";
+import { BlogPost, useLazyGetBlogQuery } from "@api";
+import { BlogShareReviewButton } from "@components/blog-share-review";
 import { en } from "@constants";
 
 export interface BlogPreviewData {
@@ -19,7 +21,89 @@ export interface BlogPreviewData {
 interface BlogPostPreviewProps {
   post: BlogPreviewData;
   onClose: () => void;
+  /** The saved post this preview is of. Without it there is nothing to refresh or share. */
+  saved?: { id: string; slug: string };
+  /** True when `post` is unsaved form values, so Refresh swaps them for the saved version. */
+  unsaved?: boolean;
 }
+
+const toPreview = (blog: BlogPost): BlogPreviewData => ({
+  title: blog.title,
+  tldr: blog.tldr,
+  body: blog.body,
+  tags: blog.tags ?? [],
+  coverColor: blog.coverColor,
+  authorName: blog.authorName,
+  headerImageUrl: blog.headerImageUrl,
+  status: blog.status,
+  date: blog.publishedAt ?? blog.createdAt,
+});
+
+const btnClass =
+  "inline-flex min-h-[32px] items-center px-3 text-sm border focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500 bg-white text-typography-700 border-border-light hover:bg-neutral-100 disabled:opacity-60";
+
+/** Re-reads the saved post, because it may have been edited elsewhere (for example by Claude). */
+const RefreshControl: React.FC<{
+  postId: string;
+  unsaved: boolean;
+  onLoaded: (post: BlogPreviewData, slug: string) => void;
+}> = ({ postId, unsaved, onLoaded }) => {
+  const strings = en.blogPostPreview;
+  const [load, { isFetching }] = useLazyGetBlogQuery();
+  const [loadedAt, setLoadedAt] = useState<number | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (loadedAt === null) return undefined;
+    const timer = setInterval(() => setNow(Date.now()), 5000);
+    return () => clearInterval(timer);
+  }, [loadedAt]);
+
+  const refresh = async () => {
+    setFailed(false);
+    const result = await load(postId, false);
+    if (result.data) {
+      onLoaded(toPreview(result.data), result.data.slug);
+      setLoadedAt(Date.now());
+      setNow(Date.now());
+    } else {
+      setFailed(true);
+    }
+  };
+
+  const seconds = loadedAt === null ? 0 : Math.max(0, Math.round((now - loadedAt) / 1000));
+  return (
+    <div className="flex flex-wrap items-center gap-2" data-testid="blog-preview-refresh">
+      <button
+        type="button"
+        className={btnClass}
+        disabled={isFetching}
+        onClick={() => void refresh()}
+      >
+        {isFetching ? strings.refreshing : strings.refresh}
+      </button>
+      {isFetching && (
+        <span
+          role="status"
+          aria-label={strings.refreshing}
+          className="h-4 w-4 animate-spin rounded-full border-2 border-primary-500 border-t-transparent"
+        />
+      )}
+      {loadedAt !== null && !failed && (
+        <span className="text-xs text-typography-600" aria-live="polite">
+          {seconds < 5 ? strings.updatedJustNow : strings.updatedAgo(seconds)}
+          {unsaved && ` · ${strings.savedVersionNote}`}
+        </span>
+      )}
+      {failed && (
+        <span role="alert" className="text-xs text-red-700">
+          {strings.refreshFailed}
+        </span>
+      )}
+    </div>
+  );
+};
 
 type Device = "desktop" | "mobile";
 
@@ -55,14 +139,23 @@ const CSS = `
 .bpp-body img{height:auto;max-width:100%;border-radius:.75rem}
 `;
 
-export const BlogPostPreview: React.FC<BlogPostPreviewProps> = ({ post, onClose }) => {
+export const BlogPostPreview: React.FC<BlogPostPreviewProps> = ({
+  post: initialPost,
+  onClose,
+  saved,
+  unsaved = false,
+}) => {
   const strings = en.blogPostPreview;
+  const [refreshed, setRefreshed] = useState<{ post: BlogPreviewData; slug: string } | null>(null);
+  const post = refreshed?.post ?? initialPost;
   const [device, setDevice] = useState<Device>("desktop");
   const dialogRef = useRef<HTMLDivElement>(null);
   const isDraft = post.status !== "PUBLISHED";
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
+      // A share dialog opened from here handles its own keys.
+      if (dialogRef.current?.querySelector("[data-share-dialog]")) return;
       if (event.key === "Escape") {
         event.stopPropagation();
         onClose();
@@ -135,6 +228,19 @@ export const BlogPostPreview: React.FC<BlogPostPreviewProps> = ({ post, onClose 
             </button>
           ))}
         </div>
+        {saved && (
+          <>
+            <RefreshControl
+              postId={saved.id}
+              unsaved={unsaved}
+              onLoaded={(p, slug) => setRefreshed({ post: p, slug })}
+            />
+            <BlogShareReviewButton
+              post={{ id: saved.id, slug: refreshed?.slug ?? saved.slug, status: post.status }}
+              className={`${btnClass}`}
+            />
+          </>
+        )}
         <button
           type="button"
           onClick={onClose}

@@ -367,6 +367,13 @@ export const ApiEndpoints = {
     KEY_BY_ID: (id: string) => `/v1/blog-authoring/keys/${encodeURIComponent(id)}`,
     MCP: "/v1/blog-authoring/mcp",
   },
+  // Review links for draft posts, and the suggestions people leave through them.
+  BLOG_REVIEW: {
+    POST: (id: string) => `/v1/blog-review/posts/${encodeURIComponent(id)}`,
+    LINK: (id: string) => `/v1/blog-review/posts/${encodeURIComponent(id)}/link`,
+    SUGGESTION: (id: string, suggestionId: string) =>
+      `/v1/blog-review/posts/${encodeURIComponent(id)}/suggestions/${encodeURIComponent(suggestionId)}`,
+  },
   PRODUCT_UPDATES: {
     LIST: "/v1/product-updates",
     STATUS: "/v1/product-updates/status",
@@ -1627,6 +1634,8 @@ export const TAG_TYPES = {
   BLOGS: "blogs",
   // Keys for Claude Code to write blog drafts. Also registered in baseApi.ts's `tagTypes`.
   BLOG_AUTHORING_KEYS: "blogAuthoringKeys",
+  // Review link and suggestions for one blog post. Also registered in baseApi.ts's `tagTypes`.
+  BLOG_REVIEW: "blogReview",
   // Product updates. Also registered in baseApi.ts's `tagTypes`.
   PRODUCT_UPDATES: "productUpdates",
   SUPER_DUPER_ADMINS: "superDuperAdmins",

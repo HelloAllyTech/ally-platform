@@ -92,6 +92,8 @@ export interface BlueprintPlannerInput {
   games: { key: string; description: string }[];
   /** Passages from the trainer's reference files; absent when there are none. */
   referenceMaterial?: string | null;
+  /** Learning Design principles ranked for this course; absent when the library has none. */
+  designGuidance?: string | null;
   usageMetadata: Record<string, any>;
 }
 
@@ -112,6 +114,8 @@ export interface CourseReviewInput {
   brief: CourseBrief;
   /** Compact outline JSON plus full content of inline items (article html capped). */
   courseDigest: string;
+  /** Learning Design principles and other reference data for the reviewer; absent when none. */
+  referenceMaterial?: string | null;
   usageMetadata: Record<string, any>;
 }
 

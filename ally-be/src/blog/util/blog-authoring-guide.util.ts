@@ -106,7 +106,7 @@ export function blogAuthoringGuide(
       slug: 'Optional. Made from the title when left out; kept unique for you.',
       tldr: 'Up to about 280 characters. The answer in one or two sentences; shown big under the title and in listings.',
       body: 'Rich-text HTML in the allowed tags only (below).',
-      tags: `Short lowercase tags. Reuse existing ones where they fit: ${existingTags.length ? existingTags.join(', ') : '(none yet)'}.`,
+      tags: `One to four tags. Reuse an existing tag exactly as written, capitalisation included; a tag already in use keeps its spelling. Existing: ${existingTags.length ? existingTags.join(', ') : '(none yet)'}.`,
       coverColor: `A #RRGGBB fill shown when there is no header image. The editor palette: ${BLOG_COVER_SWATCHES.map((s) => `${s.name} ${s.value}`).join(', ')}. Default ${BLOG_DEFAULT_COVER_COLOR}.`,
       authorName:
         'The byline, free text (for example the engineer who wrote it).',
@@ -142,7 +142,10 @@ export function blogAuthoringGuide(
       'Plain words, short paragraphs, real numbers with their source and date, no marketing language. ' +
       'Match the spelling and tone of the posts already published.',
     flow:
-      'blog_guide → (list_posts to avoid repeating a topic) → request_image_upload for each picture → create_draft → ' +
-      'read the issues it returns and fix them with update_draft → tell the person to review and publish in Ally admin → Blog.',
+      'Three passes, each with its own skill (blog_guide with pass research, compose or review), usable alone. ' +
+      'research: find the facts and what can be said, and hand the person a brief. ' +
+      'compose: list_posts → request_image_upload for each picture → create_draft → fix the issues it returns with update_draft. ' +
+      'review: check_draft, read the post as an outsider, fix with update_draft, and tell the person to review and publish in Ally admin → Blog. ' +
+      'A person may share the draft for review: when asked to apply suggestions, call list_suggestions, change the draft with update_draft, and say which suggestions you applied and which you did not.',
   };
 }
