@@ -15,6 +15,10 @@ vi.hoisted(() => {
 });
 
 const askMock = vi.fn();
+const fetchConversationMock = vi.fn();
+const feedbackMock = vi.fn();
+// What the sidebar's list query returns; each test sets its own.
+let savedConversations: { id: string; title: string; createdAt: string; updatedAt: string }[] = [];
 
 // Partial mock: the store wires every other slice off `@api`, so replacing the
 // whole module would take the app's store down with it. Only the two hooks this
@@ -22,6 +26,13 @@ const askMock = vi.fn();
 vi.mock("@api", async importOriginal => ({
   ...(await importOriginal<typeof import("@api")>()),
   useAskAnalyticsAgentMutation: () => [askMock, { isLoading: false }],
+  useGetAnalyticsAgentConversationsQuery: () => ({
+    data: savedConversations,
+    isLoading: false,
+    isError: false,
+  }),
+  useLazyGetAnalyticsAgentConversationQuery: () => [fetchConversationMock],
+  useSetAnalyticsAgentFeedbackMutation: () => [feedbackMock, { isLoading: false }],
   useGetAnalyticsAgentCatalogQuery: () => ({
     data: {
       tables: [
@@ -90,6 +101,10 @@ const ask = async (question: string) => {
 describe("AnalyticsAgentTab", () => {
   beforeEach(() => {
     askMock.mockReset();
+    fetchConversationMock.mockReset();
+    feedbackMock.mockReset();
+    feedbackMock.mockReturnValue({ unwrap: () => Promise.resolve({}) });
+    savedConversations = [];
   });
 
   it("teaches what it can do before the first question", () => {
@@ -224,9 +239,7 @@ describe("AnalyticsAgentTab", () => {
     expect(secondCall.history).toHaveLength(1);
     expect(secondCall.history[0].question).toBe("How many sessions last week?");
     expect(secondCall.history[0].sql).toContain("scenario_sessions");
-  }, // Two full userEvent.type()+click+waitFor cycles — roughly double its
-  // single-ask siblings' work, which is what tips it over the default
-  // 5000ms budget under the full-suite's parallel load.
+  }, // 5000ms budget under the full-suite's parallel load. // single-ask siblings' work, which is what tips it over the default // Two full userEvent.type()+click+waitFor cycles — roughly double its
   15000);
 
   it("does not send a failed turn as context", async () => {
@@ -260,49 +273,142 @@ describe("AnalyticsAgentTab", () => {
     expect(askMock.mock.calls[1][0].question).toBe("And by organisation?");
   });
 
-  it("confirms before resetting, because the thread lives only in this tab", async () => {
-    resolveWith(response());
-    render(<AnalyticsAgentTab />);
-    await ask("How many sessions last week?");
-    await answered();
-
-    const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: strings.reset }));
-    expect(screen.getByText(strings.resetConfirmBody)).toBeInTheDocument();
-
-    // The thread is still there until the reset is confirmed.
-    expect(screen.getByText("How many sessions last week?")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: strings.resetConfirm }));
-
-    await waitFor(() =>
-      expect(screen.queryByText("How many sessions last week?")).not.toBeInTheDocument(),
-    );
-    // Back to the state that teaches.
-    expect(screen.getByText(strings.emptyTitle)).toBeInTheDocument();
+  const saved = (id: string, title: string) => ({
+    id,
+    title,
+    createdAt: "2026-11-01T10:00:00.000Z",
+    updatedAt: "2026-11-01T10:00:00.000Z",
   });
 
-  it("drops the history along with the thread when reset", async () => {
-    resolveWith(response());
-    render(<AnalyticsAgentTab />);
-    await ask("first question");
-    await answered();
+  describe("saved conversations", () => {
+    it("lists earlier conversations by their first question", () => {
+      savedConversations = [saved("c1", "Sessions last week"), saved("c2", "AI spend by model")];
+      render(<AnalyticsAgentTab />);
 
-    const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: strings.reset }));
-    await user.click(screen.getByRole("button", { name: strings.resetConfirm }));
+      expect(screen.getByRole("button", { name: "Sessions last week" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "AI spend by model" })).toBeInTheDocument();
+      // Said where the list is, so nobody wonders who else can see it.
+      expect(screen.getByText(strings.historyPrivacy)).toBeInTheDocument();
+    });
 
-    resolveWith(response());
-    await ask("fresh question");
+    it("says so when there are no saved conversations yet", () => {
+      render(<AnalyticsAgentTab />);
 
-    await waitFor(() => expect(askMock).toHaveBeenCalledTimes(2));
-    expect(askMock.mock.calls[1][0].history).toEqual([]);
-  });
+      expect(screen.getByText(strings.historyEmpty)).toBeInTheDocument();
+    });
 
-  it("cannot be reset mid-question", async () => {
-    render(<AnalyticsAgentTab />);
-    // Nothing asked yet: there is no thread to reset.
-    expect(screen.getByRole("button", { name: strings.reset })).toBeDisabled();
+    it("reopens a saved conversation exactly as it was answered", async () => {
+      savedConversations = [saved("c1", "Sessions last week")];
+      fetchConversationMock.mockReturnValue({
+        unwrap: () =>
+          Promise.resolve({
+            ...saved("c1", "Sessions last week"),
+            messages: [
+              {
+                id: "m1",
+                question: "How many sessions last week?",
+                outcome: "answer",
+                response: response({ conversationId: "c1" }),
+                createdAt: "2026-11-01T10:00:00.000Z",
+              },
+            ],
+          }),
+      });
+      render(<AnalyticsAgentTab />);
+
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: "Sessions last week" }));
+
+      expect(fetchConversationMock).toHaveBeenCalledWith("c1");
+      expect(await screen.findByText("How many sessions last week?")).toBeInTheDocument();
+      await answered();
+      expect(screen.getByRole("button", { name: "Sessions last week" })).toHaveAttribute(
+        "aria-current",
+        "true",
+      );
+    });
+
+    it("continues an opened conversation rather than starting another", async () => {
+      savedConversations = [saved("c1", "Sessions last week")];
+      fetchConversationMock.mockReturnValue({
+        unwrap: () =>
+          Promise.resolve({
+            ...saved("c1", "Sessions last week"),
+            messages: [
+              {
+                id: "m1",
+                question: "How many sessions last week?",
+                outcome: "answer",
+                response: response({ conversationId: "c1" }),
+                createdAt: "2026-11-01T10:00:00.000Z",
+              },
+            ],
+          }),
+      });
+      render(<AnalyticsAgentTab />);
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: "Sessions last week" }));
+      await answered();
+
+      resolveWith(response({ conversationId: "c1" }));
+      await ask("and by organisation?");
+
+      await waitFor(() => expect(askMock).toHaveBeenCalledTimes(1));
+      const call = askMock.mock.calls[0][0];
+      expect(call.conversationId).toBe("c1");
+      // The reopened turn is context for the follow-up, same as a live one.
+      expect(call.history[0].question).toBe("How many sessions last week?");
+    });
+
+    it("starts a conversation on the first question and keeps adding to it", async () => {
+      resolveWith(response({ conversationId: "new-conv" }));
+      render(<AnalyticsAgentTab />);
+
+      await ask("first question");
+      await answered();
+      await waitFor(() => expect(askMock).toHaveBeenCalledTimes(1));
+      expect(askMock.mock.calls[0][0].conversationId).toBeUndefined();
+
+      resolveWith(response({ conversationId: "new-conv" }));
+      await ask("second question");
+
+      await waitFor(() => expect(askMock).toHaveBeenCalledTimes(2));
+      expect(askMock.mock.calls[1][0].conversationId).toBe("new-conv");
+    }, 15000);
+
+    it("starts clean on New conversation — no thread, no history, no conversation id", async () => {
+      resolveWith(response({ conversationId: "conv-1" }));
+      render(<AnalyticsAgentTab />);
+      await ask("How many sessions last week?");
+      await answered();
+
+      const user = userEvent.setup();
+      // No confirmation: the old thread is saved and stays in the list.
+      await user.click(screen.getByRole("button", { name: strings.newConversation }));
+
+      expect(screen.queryByText("How many sessions last week?")).not.toBeInTheDocument();
+      // Back to the state that teaches.
+      expect(screen.getByText(strings.emptyTitle)).toBeInTheDocument();
+
+      resolveWith(response({ conversationId: "conv-2" }));
+      await ask("fresh question");
+
+      await waitFor(() => expect(askMock).toHaveBeenCalledTimes(2));
+      expect(askMock.mock.calls[1][0].history).toEqual([]);
+      expect(askMock.mock.calls[1][0].conversationId).toBeUndefined();
+    }, 15000);
+
+    it("says so when a conversation cannot be opened, and leaves the thread alone", async () => {
+      savedConversations = [saved("c1", "Sessions last week")];
+      fetchConversationMock.mockReturnValue({ unwrap: () => Promise.reject(new Error("500")) });
+      render(<AnalyticsAgentTab />);
+
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: "Sessions last week" }));
+
+      expect(await screen.findByText(strings.conversationLoadFailed)).toBeInTheDocument();
+      expect(screen.getByText(strings.emptyTitle)).toBeInTheDocument();
+    });
   });
 
   it("says the query matched nothing rather than showing an empty table", async () => {
@@ -319,5 +425,108 @@ describe("AnalyticsAgentTab", () => {
     await ask("sessions in 2019?");
 
     await waitFor(() => expect(screen.getByText(strings.emptyResult)).toBeInTheDocument());
+  });
+
+  describe("feedback on an answer", () => {
+    const up = () => screen.getByRole("button", { name: strings.feedbackUp });
+    const down = () => screen.getByRole("button", { name: strings.feedbackDown });
+
+    it("offers a thumbs up and down on a saved answer, and sends nothing until one is used", async () => {
+      resolveWith(response({ messageId: "msg-1" }));
+      render(<AnalyticsAgentTab />);
+
+      await ask("How many sessions last week?");
+      await answered();
+
+      expect(up()).toHaveAttribute("aria-pressed", "false");
+      expect(down()).toHaveAttribute("aria-pressed", "false");
+      // Feedback is optional: answering never records one by itself.
+      expect(feedbackMock).not.toHaveBeenCalled();
+    });
+
+    it("has nothing to rate when the turn was not saved", async () => {
+      resolveWith(response());
+      render(<AnalyticsAgentTab />);
+
+      await ask("q");
+      await answered();
+
+      expect(screen.queryByRole("button", { name: strings.feedbackUp })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: strings.feedbackDown })).not.toBeInTheDocument();
+    });
+
+    it("records a thumbs up against the saved turn", async () => {
+      resolveWith(response({ messageId: "msg-1" }));
+      render(<AnalyticsAgentTab />);
+      const user = await ask("q");
+      await answered();
+
+      await user.click(up());
+
+      expect(feedbackMock).toHaveBeenCalledWith({ messageId: "msg-1", feedback: "up" });
+      expect(up()).toHaveAttribute("aria-pressed", "true");
+      expect(down()).toHaveAttribute("aria-pressed", "false");
+    });
+
+    it("changes a rating, and takes it back when the same thumb is tapped again", async () => {
+      resolveWith(response({ messageId: "msg-1" }));
+      render(<AnalyticsAgentTab />);
+      const user = await ask("q");
+      await answered();
+
+      await user.click(up());
+      await user.click(down());
+      expect(feedbackMock).toHaveBeenLastCalledWith({ messageId: "msg-1", feedback: "down" });
+      expect(down()).toHaveAttribute("aria-pressed", "true");
+      expect(up()).toHaveAttribute("aria-pressed", "false");
+
+      await user.click(down());
+      expect(feedbackMock).toHaveBeenLastCalledWith({ messageId: "msg-1", feedback: null });
+      expect(down()).toHaveAttribute("aria-pressed", "false");
+    });
+
+    it("puts the buttons back and says so when the rating could not be saved", async () => {
+      resolveWith(response({ messageId: "msg-1" }));
+      feedbackMock.mockReturnValue({ unwrap: () => Promise.reject(new Error("500")) });
+      render(<AnalyticsAgentTab />);
+      const user = await ask("q");
+      await answered();
+
+      await user.click(down());
+
+      expect(await screen.findByText(strings.feedbackFailed)).toBeInTheDocument();
+      expect(down()).toHaveAttribute("aria-pressed", "false");
+    });
+
+    it("shows the rating a reopened conversation already has", async () => {
+      savedConversations = [saved("c1", "Sessions last week")];
+      fetchConversationMock.mockReturnValue({
+        unwrap: () =>
+          Promise.resolve({
+            ...saved("c1", "Sessions last week"),
+            messages: [
+              {
+                id: "m1",
+                question: "How many sessions last week?",
+                outcome: "answer",
+                response: response({ conversationId: "c1" }),
+                feedback: "down",
+                createdAt: "2026-11-01T10:00:00.000Z",
+              },
+            ],
+          }),
+      });
+      render(<AnalyticsAgentTab />);
+
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: "Sessions last week" }));
+      await answered();
+
+      expect(down()).toHaveAttribute("aria-pressed", "true");
+      expect(up()).toHaveAttribute("aria-pressed", "false");
+      // A reopened turn is rated against its own saved id.
+      await user.click(down());
+      expect(feedbackMock).toHaveBeenCalledWith({ messageId: "m1", feedback: null });
+    });
   });
 });
