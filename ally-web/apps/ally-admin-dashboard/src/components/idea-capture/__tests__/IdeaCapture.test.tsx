@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   createDraft: vi.fn(),
   createV2Draft: vi.fn(),
+  startPlan: vi.fn(),
+  planning: { on: false },
   navigate: vi.fn(),
   roadmapV2: { on: false },
   transcribeClip: vi.fn(),
@@ -58,6 +60,10 @@ vi.mock("@api", () => ({
 vi.mock("../../../api/roadmapV2Flow", () => ({
   useCreateRoadmapDraftMutation: () => [mocks.createV2Draft, { isLoading: false }],
 }));
+vi.mock("../../../api/productPlanning", () => ({
+  useGetPlanSettingsQuery: () => ({ data: { enabled: mocks.planning.on } }),
+  useStartPlanMutation: () => [mocks.startPlan, { isLoading: false }],
+}));
 vi.mock("@hooks/useSpeechCapture", () => ({
   useSpeechCapture: (options: {
     onFinal: (t: string) => void;
@@ -89,6 +95,8 @@ describe("IdeaCaptureLauncher", () => {
     mocks.speechState.status = "listening";
     mocks.speechState.transcribing = true;
     mocks.roadmapV2.on = false;
+    mocks.planning.on = false;
+    mocks.startPlan.mockReturnValue({ unwrap: () => Promise.resolve({ id: "p1" }) });
     mocks.createDraft.mockReturnValue({ unwrap: () => Promise.resolve({ id: "d1" }) });
     mocks.createV2Draft.mockReturnValue({ unwrap: () => Promise.resolve({ code: "RM-7" }) });
   });
@@ -216,6 +224,15 @@ describe("IdeaCaptureLauncher", () => {
       });
       expect(mocks.createV2Draft).not.toHaveBeenCalled();
       expect(mocks.navigate).toHaveBeenCalledWith("/product-roadmap?tab=drafts");
+    });
+
+    it("parks the idea as a plan and opens My ideas when planning is on", async () => {
+      mocks.planning.on = true;
+      await saveTyped();
+      expect(mocks.startPlan).toHaveBeenCalledWith({ text: "typed idea", park: true });
+      expect(mocks.createDraft).not.toHaveBeenCalled();
+      expect(mocks.createV2Draft).not.toHaveBeenCalled();
+      expect(mocks.navigate).toHaveBeenCalledWith("/product-roadmap?tab=my-ideas");
     });
   });
 
