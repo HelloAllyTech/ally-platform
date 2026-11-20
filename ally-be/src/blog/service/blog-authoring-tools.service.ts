@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 
 import { ExecutionManager } from 'src/common/execution/execution-manager';
 import { BLOG_AUTHORING_SKILL } from 'src/prompt/contracts';
@@ -15,6 +16,7 @@ import {
   blogAuthoringGuide,
   findBodyIssues,
 } from '../util/blog-authoring-guide.util';
+import { BlogReviewService } from './blog-review.service';
 import { BlogService } from './blog.service';
 
 export interface BlogToolDefinition {
@@ -53,6 +55,11 @@ const postFields = {
     description: 'A #RRGGBB fill shown when there is no header image.',
   },
   authorName: { type: 'string', description: 'The byline.' },
+  authorEmail: {
+    type: 'string',
+    description:
+      "The author's email, shown with the byline. Defaults to the email of the person whose key you use.",
+  },
   headerImageUrl: {
     type: 'string',
     description: 'An https image URL from request_image_upload.',
@@ -69,6 +76,8 @@ export class BlogAuthoringToolsService {
   constructor(
     private readonly blogs: BlogService,
     private readonly prompts: PromptSharedService,
+    private readonly review: BlogReviewService,
+    private readonly dataSource: DataSource,
   ) {}
 
   definitions(): BlogToolDefinition[] {
@@ -95,6 +104,16 @@ export class BlogAuthoringToolsService {
       {
         name: 'get_post',
         description: 'Read one post (any status) by id, with its body.',
+        inputSchema: {
+          type: 'object',
+          properties: { id: { type: 'string' } },
+          required: ['id'],
+        },
+      },
+      {
+        name: 'list_suggestions',
+        description:
+          'Read the suggestions reviewers sent on a draft through its review link (open ones first). A person shares the draft and marks suggestions done; you read them and change the draft with update_draft.',
         inputSchema: {
           type: 'object',
           properties: { id: { type: 'string' } },
@@ -156,10 +175,12 @@ export class BlogAuthoringToolsService {
           return this.list(args);
         case 'get_post':
           return this.blogs.getById(this.id(args));
+        case 'list_suggestions':
+          return this.review.listSuggestions(this.id(args));
         case 'request_image_upload':
           return this.requestUpload(args);
         case 'create_draft':
-          return this.create(args);
+          return this.create(args, ownerId);
         case 'update_draft':
           return this.update(args);
         default:
@@ -286,6 +307,14 @@ export class BlogAuthoringToolsService {
         );
       out.authorName = authorName;
     }
+    if (args.authorEmail !== undefined) {
+      const email = String(args.authorEmail).trim();
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+        throw new BadRequestException(
+          'authorEmail does not look like an email',
+        );
+      out.authorEmail = email;
+    }
     if (args.headerImageUrl !== undefined) {
       const url = String(args.headerImageUrl).trim();
       if (url && !/^https:\/\//i.test(url))
@@ -306,10 +335,21 @@ export class BlogAuthoringToolsService {
     return tags.map((t) => known.get(t.toLowerCase()) ?? t);
   }
 
-  private async create(args: Record<string, any>) {
+  /** The email of the person whose key this is: the default byline email. */
+  private async ownerEmail(ownerId: number): Promise<string | undefined> {
+    const rows: Array<{ email?: string }> = await this.dataSource
+      .query('SELECT email FROM users WHERE id = $1', [ownerId])
+      .catch(() => []);
+    return rows[0]?.email || undefined;
+  }
+
+  private async create(args: Record<string, any>, ownerId: number) {
     const fields = this.fields(args);
     if (!fields.title) throw new BadRequestException('title is required');
     if (fields.tags) fields.tags = await this.canonicalTags(fields.tags);
+    if (fields.authorEmail === undefined) {
+      fields.authorEmail = await this.ownerEmail(ownerId);
+    }
     // Always a draft, whatever the caller sent.
     const created = await this.blogs.create({
       ...(fields as CreateBlogDto),

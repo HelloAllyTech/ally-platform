@@ -19,6 +19,7 @@ import {
   Privacy,
   Blog,
   BlogPost,
+  BlogReview,
   Changelog,
   Roadmap,
   Sjt1,
@@ -50,6 +51,7 @@ const RouteLayout = () => {
           <Route path={ROUTES.PRIVACY} element={<Privacy />} />
           {/* Blog — public, accessible whether or not signed in */}
           <Route path={ROUTES.BLOG} element={<Blog />} />
+          <Route path={ROUTES.BLOG_REVIEW} element={<BlogReview />} />
           <Route path={ROUTES.BLOG_POST} element={<BlogPost />} />
           <Route path={ROUTES.CHANGELOG} element={<Changelog />} />
           <Route path={ROUTES.ROADMAP} element={<Roadmap />} />

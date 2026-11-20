@@ -24,6 +24,7 @@ import {
 import { ActionConfirmationPopup, BlogSidePanel, Button, ListToolbar } from "@components";
 import { BlogClaudeConnect, useBlogClaudeConnect } from "@components/blog-claude-connect";
 import { BlogPostPreview } from "@components/blog-post-preview";
+import { BlogShareReview } from "@components/blog-share-review";
 import { BlogFormValues } from "@components/blog-side-panel/BlogSidePanel";
 import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
@@ -53,6 +54,7 @@ export const BlogManagement: React.FC = () => {
   const [selectedBlog, setSelectedBlog] = useState<BlogPost | null>(null);
   const [pendingDelete, setPendingDelete] = useState<BlogPost | null>(null);
   const [previewBlog, setPreviewBlog] = useState<BlogPost | null>(null);
+  const [shareBlog, setShareBlog] = useState<BlogPost | null>(null);
   const connect = useBlogClaudeConnect();
 
   // Grow the page size for "Load more" (offset stays 0) so the query stays a
@@ -262,6 +264,12 @@ export const BlogManagement: React.FC = () => {
                       {en.blogPostPreview.button}
                     </button>
                     <button
+                      onClick={() => setShareBlog(blog)}
+                      className="text-typography-700 hover:underline py-2 md:py-0"
+                    >
+                      {en.blogShareReview.rowAction}
+                    </button>
+                    <button
                       onClick={() => handleTogglePublish(blog)}
                       className="text-typography-700 hover:underline py-2 md:py-0"
                     >
@@ -328,7 +336,15 @@ export const BlogManagement: React.FC = () => {
             status: previewBlog.status,
             date: previewBlog.publishedAt ?? previewBlog.createdAt,
           }}
+          saved={{ id: previewBlog.id, slug: previewBlog.slug }}
           onClose={() => setPreviewBlog(null)}
+        />
+      )}
+
+      {shareBlog && (
+        <BlogShareReview
+          post={{ id: shareBlog.id, slug: shareBlog.slug, status: shareBlog.status }}
+          onClose={() => setShareBlog(null)}
         />
       )}
 

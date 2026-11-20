@@ -143,6 +143,7 @@ export function blogAuthoringGuide(
       'Match the spelling and tone of the posts already published.',
     flow:
       'blog_guide → (list_posts to avoid repeating a topic) → request_image_upload for each picture → create_draft → ' +
-      'read the issues it returns and fix them with update_draft → tell the person to review and publish in Ally admin → Blog.',
+      'read the issues it returns and fix them with update_draft → tell the person to review and publish in Ally admin → Blog. ' +
+      'A person may share the draft for review: when asked to apply suggestions, call list_suggestions, change the draft with update_draft, and say which suggestions you applied and which you did not.',
   };
 }

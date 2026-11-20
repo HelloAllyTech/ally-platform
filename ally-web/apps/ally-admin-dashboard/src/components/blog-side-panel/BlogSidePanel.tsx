@@ -458,6 +458,8 @@ export const BlogSidePanel: React.FC<BlogSidePanelProps> = ({
             status: isPublished ? "PUBLISHED" : "DRAFT",
             date: selectedBlog?.publishedAt ?? selectedBlog?.createdAt,
           }}
+          saved={selectedBlog?.id ? { id: selectedBlog.id, slug: selectedBlog.slug } : undefined}
+          unsaved={isDirty}
           onClose={() => setShowPreview(false)}
         />
       )}

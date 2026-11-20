@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsArray,
+  IsEmail,
   IsEnum,
   IsNotEmpty,
   IsOptional,
@@ -71,6 +72,15 @@ export class CreateBlogDto {
   @IsString()
   @MaxLength(120)
   authorName?: string;
+
+  @ApiPropertyOptional({
+    description: 'Author email shown with the byline (a mailto link)',
+    example: 'jane@helloally.ai',
+  })
+  @IsOptional()
+  @IsEmail()
+  @MaxLength(255)
+  authorEmail?: string;
 
   @ApiPropertyOptional({ description: 'Header image URL (from upload-url)' })
   @IsOptional()

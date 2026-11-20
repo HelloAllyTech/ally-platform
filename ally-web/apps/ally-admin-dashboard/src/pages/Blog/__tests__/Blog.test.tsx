@@ -60,4 +60,17 @@ describe("Blog row preview", () => {
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.queryByRole("dialog", { name: "Preview" })).toBeNull();
   });
+
+  it("opens the share dialog from the row's Share action", () => {
+    render(
+      <Provider store={store}>
+        <BlogManagement />
+      </Provider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Share" }));
+    expect(screen.getByRole("dialog", { name: "Share for review" })).toBeInTheDocument();
+    expect(screen.getByText(/This post is published and public/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog", { name: "Share for review" })).toBeNull();
+  });
 });

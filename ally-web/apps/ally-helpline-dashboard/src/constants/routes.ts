@@ -29,6 +29,7 @@ export const ROUTES = {
   TERMS: "/terms",
   PRIVACY: "/privacy",
   BLOG: "/blog",
+  BLOG_REVIEW: "/blog/review/:token",
   BLOG_POST: "/blog/:slug",
   CHANGELOG: "/blog/changelog",
   ROADMAP: "/blog/roadmap",

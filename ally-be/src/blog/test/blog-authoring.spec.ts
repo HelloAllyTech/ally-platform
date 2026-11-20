@@ -62,6 +62,12 @@ describe('blog body issues', () => {
 describe('BlogAuthoringToolsService', () => {
   const make = (existing = post()) => {
     const prompts = { getPromptByCode: jest.fn(async () => '# Skill text') };
+    const review = {
+      listSuggestions: jest.fn(async () => [{ id: 's1', comment: 'Shorter' }]),
+    };
+    const dataSource = {
+      query: jest.fn(async () => [{ email: 'gopi@helloally.ai' }]),
+    };
     const blogs = {
       create: jest.fn(async (dto: any) => post({ ...dto, status: dto.status })),
       update: jest.fn(async (_id: string, dto: any) => post({ ...dto })),
@@ -78,7 +84,14 @@ describe('BlogAuthoringToolsService', () => {
     return {
       blogs,
       prompts,
-      svc: new BlogAuthoringToolsService(blogs as any, prompts as any),
+      svc: new BlogAuthoringToolsService(
+        blogs as any,
+        prompts as any,
+        review as any,
+        dataSource as any,
+      ),
+      review,
+      dataSource,
     };
   };
 
@@ -164,6 +177,28 @@ describe('BlogAuthoringToolsService', () => {
     expect(guide.skill).toMatch(/could not be loaded/);
   });
 
+  it('defaults the byline email to the key owner, and an explicit one wins', async () => {
+    const { blogs, svc } = make();
+    await svc.call('create_draft', { title: 'A' }, 7);
+    expect(blogs.create.mock.calls[0][0].authorEmail).toBe('gopi@helloally.ai');
+    await svc.call(
+      'create_draft',
+      { title: 'B', authorEmail: 'jane@helloally.ai' },
+      7,
+    );
+    expect(blogs.create.mock.calls[1][0].authorEmail).toBe('jane@helloally.ai');
+    await expect(
+      svc.call('create_draft', { title: 'C', authorEmail: 'nope' }, 7),
+    ).rejects.toThrow(/authorEmail/);
+  });
+
+  it('lists the suggestions on a draft for the agent to apply', async () => {
+    const { svc, review } = make();
+    const out: any = await svc.call('list_suggestions', { id: 'p1' }, 7);
+    expect(review.listSuggestions).toHaveBeenCalledWith('p1');
+    expect(out[0].comment).toBe('Shorter');
+  });
+
   it('has no tool that publishes or deletes', () => {
     const names = make()
       .svc.definitions()
@@ -172,6 +207,7 @@ describe('BlogAuthoringToolsService', () => {
       'blog_guide',
       'list_posts',
       'get_post',
+      'list_suggestions',
       'request_image_upload',
       'create_draft',
       'update_draft',
