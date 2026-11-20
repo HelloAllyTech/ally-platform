@@ -24,8 +24,8 @@ const PERMISSIONS = [
   'delete:landing-page',
 ];
 
-export class CreateLandingPages1986000000000 implements MigrationInterface {
-  name = 'CreateLandingPages1986000000000';
+export class CreateLandingPages1986200000000 implements MigrationInterface {
+  name = 'CreateLandingPages1986200000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`

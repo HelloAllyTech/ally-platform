@@ -21,8 +21,8 @@ const GROUPS = ['SUPER_ADMIN', 'SUPER_DUPER_ADMIN'];
 
 const FEATURE_KEY = 'landing_pages';
 
-export class GrantLandingPagesToggle1986100000000 implements MigrationInterface {
-  name = 'GrantLandingPagesToggle1986100000000';
+export class GrantLandingPagesToggle1986300000000 implements MigrationInterface {
+  name = 'GrantLandingPagesToggle1986300000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
