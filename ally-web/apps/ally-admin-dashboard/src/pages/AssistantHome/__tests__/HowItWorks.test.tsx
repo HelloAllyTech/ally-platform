@@ -23,6 +23,12 @@ const unwrapped = (fn: (arg: unknown) => unknown) => (arg: unknown) => ({
 });
 vi.mock("@api", async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
+  // T1's template hooks: no templates and no origin unless a test says so.
+  useGetTemplateCatalogueQuery: () => ({ data: undefined, isLoading: false, isError: false }),
+  useGetTemplateOriginQuery: () => ({ data: undefined }),
+  useApplyDraftTemplateMutation: () => [vi.fn()],
+  useGetAssistantTemplatesQuery: () => ({ data: undefined, isLoading: false, isError: false }),
+  useInstallTemplateMutation: () => [vi.fn(), { isLoading: false }],
   useGetHowItWorksQuery: () => ({ data: h.how.current, isLoading: false, isError: false }),
   useGetHistoryQuery: () => ({ data: h.history.current, isLoading: false }),
   useRevertEditMutation: () => [unwrapped(h.revert), { isLoading: false }],

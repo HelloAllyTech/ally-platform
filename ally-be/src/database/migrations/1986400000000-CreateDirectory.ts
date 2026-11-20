@@ -8,8 +8,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * collection's landing page is public. Ownership (`owner_id`) is what gates edits.
  * Hand-written, like every recent CREATE here. `down` drops the three tables.
  */
-export class CreateDirectory1986100000000 implements MigrationInterface {
-  name = 'CreateDirectory1986100000000';
+export class CreateDirectory1986400000000 implements MigrationInterface {
+  name = 'CreateDirectory1986400000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`

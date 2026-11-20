@@ -1,0 +1,841 @@
+{
+  "suggested": null,
+  "groups": [
+    {
+      "id": "organisations",
+      "name": "For organisations",
+      "templates": [
+        {
+          "id": "helpline",
+          "group": "organisations",
+          "name": "Helpline and crisis support",
+          "one_liner": "Share your helpline details and safe next steps, at any hour.",
+          "for": "Helplines, crisis lines and support services.",
+          "icon": "helpline",
+          "purpose": "answer",
+          "pack": "Mental health safety",
+          "hand_over": true,
+          "memory": false,
+          "lists": [
+            {
+              "key": "callback_requests",
+              "name": "Callback requests",
+              "optional": false,
+              "has": false
+            }
+          ],
+          "setup": [
+            {
+              "key": "helpline",
+              "ask": "What’s your helpline number, and when is it open?",
+              "kind": "text",
+              "hint": "Every crisis reply gives this number beside the national ones."
+            },
+            {
+              "key": "on_a_call",
+              "ask": "What happens when someone calls? Who picks up?",
+              "kind": "long_text"
+            },
+            {
+              "key": "not_covered",
+              "ask": "Is there anything your helpline doesn’t cover?",
+              "kind": "long_text"
+            }
+          ],
+          "checkups": 7,
+          "suggested": false
+        },
+        {
+          "id": "services",
+          "group": "organisations",
+          "name": "Services and eligibility",
+          "one_liner": "Explain who can apply, what to bring and where to go, in plain words.",
+          "for": "NGOs, government and community services.",
+          "icon": "services",
+          "purpose": "answer",
+          "pack": null,
+          "hand_over": true,
+          "memory": false,
+          "lists": [
+            {
+              "key": "services",
+              "name": "Services",
+              "optional": false,
+              "has": false
+            },
+            {
+              "key": "service_locations",
+              "name": "Service locations",
+              "optional": false,
+              "has": false
+            },
+            {
+              "key": "applications",
+              "name": "Applications",
+              "optional": false,
+              "has": false
+            }
+          ],
+          "setup": [
+            {
+              "key": "services",
+              "ask": "Which services do you offer, and who is each one for?",
+              "kind": "long_text",
+              "hint": "One per line, like “Food support - families with children”."
+            },
+            {
+              "key": "bring",
+              "ask": "What should people bring?",
+              "kind": "long_text"
+            },
+            {
+              "key": "where",
+              "ask": "Where can people go, and when are you open?",
+              "kind": "long_text",
+              "hint": "One place per line, like “Centre 1 - 12 Station Road - Mon–Fri 10–5”."
+            },
+            {
+              "key": "benefits",
+              "ask": "Are any of these benefits, legal aid or financial help?",
+              "kind": "yes_no",
+              "hint": "Yes adds Legal and financial care."
+            }
+          ],
+          "checkups": 7,
+          "suggested": false
+        },
+        {
+          "id": "supporters",
+          "group": "organisations",
+          "name": "Donors and volunteers",
+          "one_liner": "Handle giving, receipts and sign-ups without tying up your team.",
+          "for": "Charities, foundations and community groups.",
+          "icon": "supporters",
+          "purpose": "enquiries",
+          "pack": null,
+          "hand_over": true,
+          "memory": false,
+          "lists": [
+            {
+              "key": "ways_to_give",
+              "name": "Ways to give",
+              "optional": false,
+              "has": false
+            },
+            {
+              "key": "donor_enquiries",
+              "name": "Donor enquiries",
+              "optional": false,
+              "has": false
+            },
+            {
+              "key": "volunteer_signups",
+              "name": "Volunteer sign-ups",
+              "optional": false,
+              "has": false
+            },
+            {
+              "key": "volunteer_shifts",
+              "name": "Volunteer shifts",
+              "optional": false,
+              "has": false
+            },
+            {
+              "key": "shift_bookings",
+              "name": "Shift bookings",
+              "optional": false,
+              "has": false
+            }
+          ],
+          "setup": [
+            {
+              "key": "give",
+              "ask": "How can people give?",
+              "kind": "long_text",
+              "hint": "One way per line, like “UPI - scan the code at the office”."
+            },
+            {
+              "key": "tax",
+              "ask": "Are donations tax-exempt? What should donors know?",
+              "kind": "long_text"
+            },
+            {
+              "key": "activities",
+              "ask": "What do volunteers do with you?",
+              "kind": "long_text",
+              "hint": "A few words each, one per line or separated by commas."
+            },
+            {
+              "key": "shifts",
+              "ask": "Do you have volunteer shifts coming up?",
+              "kind": "long_text",
+              "hint": "You can add their times in Tools with Repeat weekly."
+            }
+          ],
+          "checkups": 7,
+          "suggested": false
+        },
+        {
+          "id": "training",
+          "group": "organisations",
+          "name": "Staff and volunteer onboarding",
+          "one_liner": "New teammates get answers from your own policies and guides.",
+          "for": "Teams bringing in new staff or volunteers.",
+          "icon": "training",
+          "purpose": "training",
+          "pack": null,
+          "hand_over": false,
+          "memory": false,
+          "lists": [
+            {
+              "key": "team_questions",
+              "name": "Questions for the team",
+              "optional": true,
+              "has": false
+            }
+          ],
+          "setup": [
+            {
+              "key": "guides",
+              "ask": "Upload your policies and guides, or paste a link.",
+              "kind": "text",
+              "hint": "You can add more in What it knows."
+            },
+            {
+              "key": "ask_who",
+              "ask": "Who should new teammates ask when the guides don’t cover it?",
+              "kind": "long_text"
+            },
+            {
+              "key": "collect",
+              "ask": "Collect questions the guides don’t answer?",
+              "kind": "yes_no"
+            }
+          ],
+          "checkups": 6,
+          "suggested": false
+        },
+        {
+          "id": "languages",
+          "group": "organisations",
+          "name": "Reach more communities",
+          "one_liner": "Meet people in the languages they speak, on the apps they already use.",
+          "for": "Organisations serving people in more than one language.",
+          "icon": "languages",
+          "purpose": "answer",
+          "pack": null,
+          "hand_over": true,
+          "memory": false,
+          "lists": [
+            {
+              "key": "callback_requests",
+              "name": "Callback requests",
+              "optional": false,
+              "has": false
+            }
+          ],
+          "setup": [
+            {
+              "key": "languages",
+              "ask": "Which languages do the people you serve write in?",
+              "kind": "choices",
+              "choices": ["English", "Hindi", "Hinglish"],
+              "hint": "More languages are coming."
+            },
+            {
+              "key": "asked_most",
+              "ask": "What do people ask you most?",
+              "kind": "long_text"
+            },
+            {
+              "key": "channel",
+              "ask": "Where do people already message you?",
+              "kind": "choices",
+              "choices": ["WhatsApp", "Your website"]
+            }
+          ],
+          "checkups": 6,
+          "suggested": false
+        },
+        {
+          "id": "updates",
+          "group": "organisations",
+          "name": "Campaigns and urgent updates",
+          "one_liner": "Keep your community informed when things change fast.",
+          "for": "Organisations whose news changes week to week.",
+          "icon": "updates",
+          "purpose": "answer",
+          "pack": null,
+          "hand_over": true,
+          "memory": false,
+          "lists": [
+            {
+              "key": "updates",
+              "name": "Updates",
+              "optional": false,
+              "has": false
+            }
+          ],
+          "setup": [
+            {
+              "key": "latest",
+              "ask": "What’s changed recently that people should know?",
+              "kind": "long_text",
+              "hint": "A short title, then what changed, like “Office closed - closed on Friday for the holiday”."
+            },
+            {
+              "key": "affects",
+              "ask": "Who does it affect, and until when?",
+              "kind": "text"
+            },
+            {
+              "key": "keeper",
+              "ask": "Who will keep the updates current?",
+              "kind": "text",
+              "hint": "They can change them any time in Tools → Updates."
+            }
+          ],
+          "checkups": 6,
+          "suggested": false
+        }
+      ]
+    },
+    {
+      "id": "businesses",
+      "name": "For businesses",
+      "templates": [
+        {
+          "id": "clinic",
+          "group": "businesses",
+          "name": "Clinic or doctor",
+          "one_liner": "Answers patients and books appointments from your free slots.",
+          "for": "Clinics and doctors.",
+          "icon": "🩺",
+          "purpose": "answer",
+          "pack": "Medical safety",
+          "hand_over": true,
+          "memory": false,
+          "lists": [
+            {
+              "key": "slots",
+              "name": "Slots",
+              "optional": false,
+              "has": false
+            },
+            {
+              "key": "appointments",
+              "name": "Appointments",
+              "optional": false,
+              "has": false
+            },
+            {
+              "key": "callback_requests",
+              "name": "Callback requests",
+              "optional": false,
+              "has": false
+            }
+          ],
+          "setup": [
+            {
+              "key": "doctors",
+              "ask": "Which doctors take appointments?",
+              "kind": "long_text",
+              "hint": "Add their times in Tools with Repeat weekly."
+            },
+            {
+              "key": "services",
+              "ask": "What do patients book?",
+              "kind": "long_text",
+              "hint": "One per line or separated by commas, like “Consultation, Follow-up”."
+            },
+            {
+              "key": "hours",
+              "ask": "When are you open?",
+              "kind": "long_text"
+            }
+          ],
+          "checkups": 7,
+          "suggested": false
+        },
+        {
+          "id": "salon",
+          "group": "businesses",
+          "name": "Salon, spa or consultant",
+          "one_liner": "Shares your prices and books clients into free slots.",
+          "for": "Salons, spas and consultants.",
+          "icon": "💇",
+          "purpose": "enquiries",
+          "pack": null,
+          "hand_over": false,
+          "memory": true,
+          "lists": [
+            {
+              "key": "price_list",
+              "name": "Price list",
+              "optional": false,
+              "has": false
+            },
+            {
+              "key": "slots",
+              "name": "Slots",
+              "optional": false,
+              "has": false
+            },
+            {
+              "key": "appointments",
+              "name": "Appointments",
+              "optional": false,
+              "has": false
+            }
+          ],
+          "setup": [
+            {
+              "key": "prices",
+              "ask": "What services do you offer, and at what price?",
+              "kind": "long_text",
+              "hint": "One per line, like “Haircut - 300”."
+            },
+            {
+              "key": "who",
+              "ask": "Who do clients book with?",
+              "kind": "long_text",
+              "hint": "Add their times in Tools with Repeat weekly."
+            },
+            {
+              "key": "hours",
+              "ask": "When are you open?",
+              "kind": "long_text"
+            }
+          ],
+          "checkups": 6,
+          "suggested": false
+        },
+        {
+          "id": "restaurant",
+          "group": "businesses",
+          "name": "Restaurant or café",
+          "one_liner": "Answers menu questions and reserves tables.",
+          "for": "Restaurants and cafés.",
+          "icon": "🍽️",
+          "purpose": "answer",
+          "pack": null,
+          "hand_over": false,
+          "memory": false,
+          "lists": [
+            {
+              "key": "menu",
+              "name": "Menu",
+              "optional": false,
+              "has": false
+            },
+            {
+              "key": "tables",
+              "name": "Tables",
+              "optional": false,
+              "has": false
+            },
+            {
+              "key": "reservations",
+              "name": "Reservations",
+              "optional": false,
+              "has": false
+            }
+          ],
+          "setup": [
+            {
+              "key": "menu",
+              "ask": "What’s on your menu?",
+              "kind": "long_text",
+              "hint": "One dish per line, like “Paneer tikka - 250”."
+            },
+            {
+              "key": "hours",
+              "ask": "When are you open?",
+              "kind": "long_text"
+            },
+            {
+              "key": "tables",
+              "ask": "How many tables do you take bookings for, and how many seats?",
+              "kind": "long_text",
+              "hint": "Add their times in Tools with Repeat weekly."
+            }
+          ],
+          "checkups": 6,
+          "suggested": false
+        },
+        {
+          "id": "real_estate",
+          "group": "businesses",
+          "name": "Real estate",
+          "one_liner": "Matches buyers to your listings and books site visits.",
+          "for": "Agents and builders.",
+          "icon": "🏠",
+          "purpose": "enquiries",
+          "pack": null,
+          "hand_over": true,
+          "memory": true,
+          "lists": [
+            {
+              "key": "property_listings",
+              "name": "Property listings",
+              "optional": false,
+              "has": false
+            },
+            {
+              "key": "site_visits",
+              "name": "Site visits",
+              "optional": false,
+              "has": false
+            },
+            {
+              "key": "leads",
+              "name": "Leads",
+              "optional": false,
+              "has": false
+            }
+          ],
+          "setup": [
+            {
+              "key": "areas",
+              "ask": "Which areas do you work in?",
+              "kind": "long_text"
+            },
+            {
+              "key": "listings",
+              "ask": "Add two or three listings to start.",
+              "kind": "long_text",
+              "hint": "One per line: title - area - price, like “2 BHK, Baner - Baner - 85 lakh”."
+            },
+            {
+              "key": "visits",
+              "ask": "When can you do site visits?",
+              "kind": "long_text"
+            }
+          ],
+          "checkups": 6,
+          "suggested": false
+        },
+        {
+          "id": "store",
+          "group": "businesses",
+          "name": "Online store",
+          "one_liner": "Answers product questions and tells customers where their order is.",
+          "for": "Online shops.",
+          "icon": "🛍️",
+          "purpose": "answer",
+          "pack": null,
+          "hand_over": true,
+          "memory": true,
+          "lists": [
+            {
+              "key": "products",
+              "name": "Products",
+              "optional": false,
+              "has": false
+            },
+            {
+              "key": "orders",
+              "name": "Orders",
+              "optional": false,
+              "has": false
+            },
+            {
+              "key": "support_tickets",
+              "name": "Support tickets",
+              "optional": false,
+              "has": false
+            }
+          ],
+          "setup": [
+            {
+              "key": "products",
+              "ask": "What do you sell?",
+              "kind": "long_text",
+              "hint": "One product per line, like “Cotton kurta - 899”."
+            },
+            {
+              "key": "returns",
+              "ask": "What’s your returns policy?",
+              "kind": "long_text"
+            },
+            {
+              "key": "delivery",
+              "ask": "How long does delivery take?",
+              "kind": "long_text"
+            }
+          ],
+          "checkups": 7,
+          "suggested": false
+        },
+        {
+          "id": "coaching",
+          "group": "businesses",
+          "name": "Coaching or school",
+          "one_liner": "Answers parents about courses and fees, and takes admissions enquiries.",
+          "for": "Coaching institutes and schools.",
+          "icon": "🎓",
+          "purpose": "enquiries",
+          "pack": "Care for young people",
+          "hand_over": true,
+          "memory": false,
+          "lists": [
+            {
+              "key": "admissions_enquiries",
+              "name": "Admissions enquiries",
+              "optional": false,
+              "has": false
+            },
+            {
+              "key": "classes",
+              "name": "Classes",
+              "optional": false,
+              "has": false
+            },
+            {
+              "key": "bookings",
+              "name": "Bookings",
+              "optional": false,
+              "has": false
+            }
+          ],
+          "setup": [
+            {
+              "key": "courses",
+              "ask": "Which courses do you run, and for which classes?",
+              "kind": "long_text"
+            },
+            {
+              "key": "fees",
+              "ask": "What are the fees?",
+              "kind": "long_text"
+            },
+            {
+              "key": "demos",
+              "ask": "Do you run demo classes? When?",
+              "kind": "long_text",
+              "hint": "Add their times in Tools."
+            }
+          ],
+          "checkups": 6,
+          "suggested": false
+        },
+        {
+          "id": "gym",
+          "group": "businesses",
+          "name": "Gym or studio",
+          "one_liner": "Shares your timetable, books classes and answers membership questions.",
+          "for": "Gyms, yoga and dance studios.",
+          "icon": "🏋️",
+          "purpose": "enquiries",
+          "pack": null,
+          "hand_over": false,
+          "memory": true,
+          "lists": [
+            {
+              "key": "classes",
+              "name": "Classes",
+              "optional": false,
+              "has": false
+            },
+            {
+              "key": "bookings",
+              "name": "Bookings",
+              "optional": false,
+              "has": false
+            },
+            {
+              "key": "memberships",
+              "name": "Memberships",
+              "optional": false,
+              "has": false
+            }
+          ],
+          "setup": [
+            {
+              "key": "classes",
+              "ask": "Which classes do you run?",
+              "kind": "long_text",
+              "hint": "Add their times in Tools with Repeat weekly."
+            },
+            {
+              "key": "plans",
+              "ask": "What membership plans do you have, and at what price?",
+              "kind": "long_text"
+            },
+            {
+              "key": "hours",
+              "ask": "When are you open?",
+              "kind": "long_text"
+            }
+          ],
+          "checkups": 6,
+          "suggested": false
+        },
+        {
+          "id": "practice",
+          "group": "businesses",
+          "name": "Mental-health helpline or practice",
+          "one_liner": "Shares your therapists, fees and how to reach you. Safety comes first.",
+          "for": "Therapy practices and helplines.",
+          "icon": "🌿",
+          "purpose": "answer",
+          "pack": "Mental health safety",
+          "hand_over": true,
+          "memory": false,
+          "lists": [
+            {
+              "key": "callback_requests",
+              "name": "Callback requests",
+              "optional": false,
+              "has": false
+            },
+            {
+              "key": "slots",
+              "name": "Slots",
+              "optional": false,
+              "has": false
+            },
+            {
+              "key": "appointments",
+              "name": "Appointments",
+              "optional": false,
+              "has": false
+            }
+          ],
+          "setup": [
+            {
+              "key": "helpline",
+              "ask": "What’s the number people should call, and when?",
+              "kind": "text",
+              "hint": "Every crisis reply gives this number beside the national ones."
+            },
+            {
+              "key": "therapists",
+              "ask": "Who are your therapists, and what do sessions cost?",
+              "kind": "long_text"
+            },
+            {
+              "key": "formats",
+              "ask": "Online, in person, or both?",
+              "kind": "text"
+            }
+          ],
+          "checkups": 7,
+          "suggested": false
+        },
+        {
+          "id": "finance_legal",
+          "group": "businesses",
+          "name": "Finance or legal firm",
+          "one_liner": "Answers what you do and takes enquiries, without giving advice.",
+          "for": "Accountants, advisers and law firms.",
+          "icon": "⚖️",
+          "purpose": "enquiries",
+          "pack": "Legal and financial care",
+          "hand_over": true,
+          "memory": false,
+          "lists": [
+            {
+              "key": "leads",
+              "name": "Leads",
+              "optional": false,
+              "has": false
+            },
+            {
+              "key": "callback_requests",
+              "name": "Callback requests",
+              "optional": false,
+              "has": false
+            }
+          ],
+          "setup": [
+            {
+              "key": "services",
+              "ask": "What services do you offer?",
+              "kind": "long_text"
+            },
+            {
+              "key": "fees",
+              "ask": "How do you charge?",
+              "kind": "long_text"
+            },
+            {
+              "key": "first",
+              "ask": "Who should a new client speak to first?",
+              "kind": "text"
+            }
+          ],
+          "checkups": 6,
+          "suggested": false
+        },
+        {
+          "id": "support",
+          "group": "businesses",
+          "name": "Customer support (any business)",
+          "one_liner": "Answers common questions and opens a ticket for the rest.",
+          "for": "Any business with after-sales questions.",
+          "icon": "💬",
+          "purpose": "answer",
+          "pack": null,
+          "hand_over": true,
+          "memory": true,
+          "lists": [
+            {
+              "key": "support_tickets",
+              "name": "Support tickets",
+              "optional": false,
+              "has": false
+            }
+          ],
+          "setup": [
+            {
+              "key": "top",
+              "ask": "What do customers ask you most?",
+              "kind": "long_text"
+            },
+            {
+              "key": "reply_time",
+              "ask": "How quickly does your team usually reply?",
+              "kind": "text"
+            },
+            {
+              "key": "take_over",
+              "ask": "When should a person take over?",
+              "kind": "long_text"
+            }
+          ],
+          "checkups": 5,
+          "suggested": false
+        },
+        {
+          "id": "handbook",
+          "group": "businesses",
+          "name": "Staff handbook",
+          "one_liner": "Your team asks; it answers from your handbook.",
+          "for": "Any team’s internal questions.",
+          "icon": "📘",
+          "purpose": "training",
+          "pack": null,
+          "hand_over": false,
+          "memory": false,
+          "lists": [],
+          "setup": [
+            {
+              "key": "handbook",
+              "ask": "Upload your handbook, or paste a link.",
+              "kind": "text",
+              "hint": "You can add more in What it knows."
+            },
+            {
+              "key": "ask_who",
+              "ask": "Who should people ask when the handbook doesn’t cover it?",
+              "kind": "text"
+            }
+          ],
+          "checkups": 5,
+          "suggested": false
+        }
+      ]
+    }
+  ]
+}

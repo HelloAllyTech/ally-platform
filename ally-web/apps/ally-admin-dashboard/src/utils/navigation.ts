@@ -76,6 +76,7 @@ const buildNavigationItems = (): NavigationItem[] => {
       section: "create",
     },
     { id: S.BLOG, label: l.blog, path: ROUTES.BLOG, section: "create" },
+    { id: S.LANDING_PAGES, label: l.landingPages, path: ROUTES.LANDING_PAGES, section: "create" },
     // Product updates is no longer a primary item: it is a tab of the Roadmap's own top menu.
     // People
     { id: S.USERS, label: l.users, path: ROUTES.USER_MANAGEMENT, section: "people" },
@@ -435,6 +436,11 @@ export const deriveNavigationItems = ({
             return (
               permissions!.includes(Permissions.VIEW_BLOGS) &&
               hasFeature(features, FeatureToggleKey.BLOG)
+            );
+          case SIDEBAR_ITEMS.LANDING_PAGES:
+            return (
+              permissions!.includes(Permissions.VIEW_LANDING_PAGES) &&
+              hasFeature(features, FeatureToggleKey.LANDING_PAGES)
             );
           // On the edit grant, unlike Blog: this page corrects and hides what
           // the automation published.

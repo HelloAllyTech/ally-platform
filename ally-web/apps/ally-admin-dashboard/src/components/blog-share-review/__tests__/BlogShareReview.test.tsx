@@ -33,7 +33,11 @@ import { BlogShareReview } from "../index";
 
 const unwrapped = (value: unknown) => ({ unwrap: () => Promise.resolve(value) });
 const draft = { id: "p1", slug: "my-post", status: "DRAFT" as const };
-const link = { token: "tok123", expiresAt: "2026-12-01T10:00:00Z", createdAt: "2026-11-17T10:00:00Z" };
+const link = {
+  token: "tok123",
+  expiresAt: "2026-12-01T10:00:00Z",
+  createdAt: "2026-11-17T10:00:00Z",
+};
 const suggestion = (over: Record<string, unknown> = {}) => ({
   id: "s1",
   name: "Asha",
@@ -128,11 +132,19 @@ describe("BlogShareReview", () => {
     expect(rows[0]).toHaveTextContent("the second paragraph");
     fireEvent.click(screen.getByRole("button", { name: "Mark as done" }));
     await waitFor(() =>
-      expect(state.setStatus).toHaveBeenCalledWith({ id: "p1", suggestionId: "old", status: "RESOLVED" }),
+      expect(state.setStatus).toHaveBeenCalledWith({
+        id: "p1",
+        suggestionId: "old",
+        status: "RESOLVED",
+      }),
     );
     fireEvent.click(screen.getByRole("button", { name: "Reopen" }));
     await waitFor(() =>
-      expect(state.setStatus).toHaveBeenCalledWith({ id: "p1", suggestionId: "new", status: "OPEN" }),
+      expect(state.setStatus).toHaveBeenCalledWith({
+        id: "p1",
+        suggestionId: "new",
+        status: "OPEN",
+      }),
     );
   });
 

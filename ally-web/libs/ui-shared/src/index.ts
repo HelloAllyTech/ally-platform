@@ -37,6 +37,7 @@ import Toggle from "./lib/toggle";
 import { logger } from "./logger";
 
 export * from "./lib/analytics";
+export * from "./lib/landing-page";
 
 // Central design system: canonical Carbon primitives, the single theme
 // boundary, and JS token constants. Apps import these from

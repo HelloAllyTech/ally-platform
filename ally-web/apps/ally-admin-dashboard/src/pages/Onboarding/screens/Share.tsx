@@ -2,8 +2,10 @@ import React, { useState } from "react";
 
 import type { PublishUse } from "@api";
 import { AssistantLine, Button, PrimaryButton, Question, useEnterToSubmit } from "@components/v2";
+import type { TemplateOrigin } from "@types";
 
 import { PLAN } from "../../Plan/copy";
+import { TEMPLATE_COPY } from "../../Templates/copy";
 import { COPY } from "../copy";
 import { parseEmails } from "../flow";
 
@@ -30,8 +32,10 @@ export const ShareScreen: React.FC<{
    * when the plan has no room. Absent while it loads or on Ally's unlimited plans.
    */
   publishUse?: PublishUse | null;
+  /** A template's examples still in its lists (T1): asked about once before going live. */
+  examplesLeft?: TemplateOrigin["examples_left"] | null;
   onPublish: (access: Access, emails: string[]) => void;
-}> = ({ view, publicAllowed, publishing, line, onPublish, mustPass, publishUse }) => {
+}> = ({ view, publicAllowed, publishing, line, onPublish, mustPass, publishUse, examplesLeft }) => {
   const [access, setAccess] = useState<Access>(view.draft.access.mode ?? "invite");
   const [emails, setEmails] = useState(view.draft.access.emails.join(", "));
   const options: { id: Access; label: string; help: string; disabled?: boolean }[] = [
@@ -47,7 +51,16 @@ export const ShareScreen: React.FC<{
   const list = parseEmails(emails);
   const blocked = publishUse?.canPublish === false;
   const ready = (access !== "invite" || list.length > 0) && !publishing && !blocked;
-  const publish = () => ready && onPublish(access, access === "invite" ? list : []);
+  // T1: a template's examples still in a list are asked about once before going live.
+  const examples = examplesLeft?.total ?? 0;
+  const [examplesOk, setExamplesOk] = useState(false);
+  const [askExamples, setAskExamples] = useState(false);
+  const goLive = () => onPublish(access, access === "invite" ? list : []);
+  const publish = () => {
+    if (!ready) return;
+    if (examples > 0 && !examplesOk) setAskExamples(true);
+    else goLive();
+  };
   useEnterToSubmit(publish, ready);
   return (
     <>
@@ -112,6 +125,33 @@ export const ShareScreen: React.FC<{
         {blocked && publishUse?.message && (
           <div className="ally-card ally-must-pass" role="alert" data-testid="publish-limit">
             <p className="ally-body">{publishUse.message}</p>
+          </div>
+        )}
+        {askExamples && (
+          <div className="ally-card ally-must-pass" role="alert" data-testid="publish-examples">
+            <p className="ally-body">{TEMPLATE_COPY.publishWarning}</p>
+            <div className="ally-templates__actions">
+              {view.chatbotId && (
+                <a
+                  className="ally-link"
+                  href={`/assistants/${view.chatbotId}?section=lists&tool=${encodeURIComponent(
+                    examplesLeft?.lists[0]?.key ?? "",
+                  )}`}
+                >
+                  {TEMPLATE_COPY.replaceThem}
+                </a>
+              )}
+              <Button
+                disabled={publishing}
+                onClick={() => {
+                  setExamplesOk(true);
+                  setAskExamples(false);
+                  goLive();
+                }}
+              >
+                {TEMPLATE_COPY.publishAnyway}
+              </Button>
+            </div>
           </div>
         )}
         <PrimaryButton enterHint={COPY.frame.enterHint} disabled={!ready} onClick={publish}>

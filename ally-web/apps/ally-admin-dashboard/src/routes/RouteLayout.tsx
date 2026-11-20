@@ -38,6 +38,8 @@ import {
   TranslationManagement,
   TooltipManagement,
   BlogManagement,
+  LandingPageEditor,
+  LandingPages,
   AILab,
   ProductRoadmap,
   RoadmapDraftsPage,
@@ -630,6 +632,30 @@ export const RouteLayout: React.FC = () => {
                 requiredFeature={FeatureToggleKey.BLOG}
               >
                 <BlogManagement />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.LANDING_PAGES}
+            element={
+              <PrivateLayout
+                requiredPermissions={[Permissions.VIEW_LANDING_PAGES]}
+                requiredFeature={FeatureToggleKey.LANDING_PAGES}
+              >
+                <LandingPages />
+              </PrivateLayout>
+            }
+          />
+          {/* The editor is the page itself, so it takes the whole width. */}
+          <Route
+            path={ROUTES.LANDING_PAGE}
+            element={
+              <PrivateLayout
+                requiredPermissions={[Permissions.VIEW_LANDING_PAGES]}
+                requiredFeature={FeatureToggleKey.LANDING_PAGES}
+                fullBleed
+              >
+                <LandingPageEditor />
               </PrivateLayout>
             }
           />

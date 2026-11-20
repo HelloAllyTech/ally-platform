@@ -72,6 +72,10 @@ button.ally-link--inline.ally-small {
   margin: 0;
   color: var(--ally-muted);
 }
+/* T1: Add from a template, the owner's whole-use-case choice, across the row. */
+.ally-lists__starts > [data-testid="lists-start-template"] {
+  grid-column: 1 / -1;
+}
 .ally-lists__starts {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1209,4 +1213,16 @@ button.ally-collapsible__toggle {
 /* The shared Input is 80px wide by default; a field here fills its row, as .ally-input does. */
 input.ally-input {
   width: 100%;
+}
+
+/* T1: a template's example entry, to replace with the owner's own. */
+.ally-lists__example {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  font-size: 12px;
+  color: var(--ally-warn);
+  background: var(--ally-warn-bg);
+  border-radius: 999px;
+  vertical-align: middle;
 }

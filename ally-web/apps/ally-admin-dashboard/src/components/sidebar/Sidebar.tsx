@@ -35,7 +35,7 @@ import {
   Terminal,
   Tools,
 } from "@icons";
-import { Compass, LibraryBig, TrendingUp } from "lucide-react";
+import { Compass, LayoutTemplate, LibraryBig, TrendingUp } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -317,6 +317,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
         return <Info size={20} />;
       case SIDEBAR_ITEMS.BLOG:
         return <Document size={20} />;
+      case SIDEBAR_ITEMS.LANDING_PAGES:
+        return <LayoutTemplate size={20} strokeWidth={1.5} aria-hidden />;
       case SIDEBAR_ITEMS.PRODUCT_UPDATES:
         return <Bullhorn size={20} />;
       case SIDEBAR_ITEMS.ANALYTICS:

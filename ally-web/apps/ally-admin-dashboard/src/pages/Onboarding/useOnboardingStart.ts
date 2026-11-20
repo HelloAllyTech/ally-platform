@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 
 import { useCreateBotDraftMutation, useGetCurrentBotDraftQuery } from "@api";
+import type { TemplateAnswers } from "@types";
 
 import { COPY } from "./copy";
 import { filesProblem, useDraftUpload } from "./useDraftUpload";
@@ -23,6 +24,12 @@ export interface OnboardingStart {
   startWithFiles: (files: File[]) => Promise<string | null>;
   /** "Interview me": an empty draft the builder opens by asking its first question. */
   startWithInterview: () => Promise<string | null>;
+  /** "Start from a template" (T1): the draft starts with the template and the owner's answers. */
+  startWithTemplate: (
+    template: string,
+    answers: TemplateAnswers,
+    name: string,
+  ) => Promise<string | null>;
 }
 
 /**
@@ -38,7 +45,14 @@ export const useOnboardingStart = (): OnboardingStart => {
   const upload = useDraftUpload();
 
   const start = useCallback(
-    async (body: { website?: string; description?: string; interview?: boolean }) => {
+    async (body: {
+      website?: string;
+      description?: string;
+      interview?: boolean;
+      template?: string;
+      answers?: TemplateAnswers;
+      name?: string;
+    }) => {
       setError(null);
       try {
         return (await createDraft(body).unwrap()).id;
@@ -81,5 +95,7 @@ export const useOnboardingStart = (): OnboardingStart => {
     startWithDescription: description => start({ description: description.trim() }),
     startWithFiles,
     startWithInterview: () => start({ interview: true }),
+    startWithTemplate: (template, answers, name) =>
+      start({ template, answers, ...(name ? { name } : {}) }),
   };
 };

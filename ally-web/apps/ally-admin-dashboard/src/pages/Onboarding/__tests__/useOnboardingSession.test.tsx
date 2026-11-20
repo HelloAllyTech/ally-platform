@@ -17,6 +17,12 @@ const publish = vi.fn();
 
 vi.mock("../useBotDraftSession", () => ({ useBotDraftSession: () => session }));
 vi.mock("@api", () => ({
+  // T1's template hooks: no templates and no origin unless a test says so.
+  useGetTemplateCatalogueQuery: () => ({ data: undefined, isLoading: false, isError: false }),
+  useGetTemplateOriginQuery: () => ({ data: undefined }),
+  useApplyDraftTemplateMutation: () => [vi.fn()],
+  useGetAssistantTemplatesQuery: () => ({ data: undefined, isLoading: false, isError: false }),
+  useInstallTemplateMutation: () => [vi.fn(), { isLoading: false }],
   usePatchBotDraftMutation: () => [patch],
   useBackBotDraftMutation: () => [vi.fn()],
   usePublishBotDraftMutation: () => [publish, { isLoading: false }],

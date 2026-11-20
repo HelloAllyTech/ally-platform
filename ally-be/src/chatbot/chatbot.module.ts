@@ -165,6 +165,8 @@ import { ListRecordsService } from './lists/list-records.service';
     // Lists (chunk 5a).
     ListRecordsService,
     ListDefinitionsService,
+    // Use-case templates install lists through it (T1).
+    ListOwnerService,
     // The bot page's confirmation card reads the record a reply booked (chunk 6b).
     ListToolsService,
     // Channels apply memory after a reply (chunk 8a).

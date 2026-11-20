@@ -75,6 +75,7 @@ import { TooltipModule } from './tooltip/tooltip.module';
 import { DirectoryModule } from './directory/directory.module';
 import { RoleplaySessionLogsModule } from './roleplay-session-logs/roleplay-session-logs.module';
 import { BlogModule } from './blog/blog.module';
+import { LandingPageModule } from './landing-page/landing-page.module';
 import { LabModule } from './lab/lab.module';
 import { SkillExperimentModule } from './skill-experiment/skill-experiment.module';
 import { ProductRoadmapModule } from './product-roadmap/product-roadmap.module';
@@ -169,6 +170,7 @@ import { DebriefFeedbackModule } from './debrief-feedback/debrief-feedback.modul
     DirectoryModule,
     RoleplaySessionLogsModule,
     BlogModule,
+    LandingPageModule,
     LabModule,
     SkillExperimentModule,
     ProductRoadmapModule,

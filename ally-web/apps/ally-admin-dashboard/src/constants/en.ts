@@ -1,3 +1,15 @@
+import ORGANISATION_USE_CASES from "./organisationUseCases.json";
+
+/**
+ * The sign-in page's "What organisations use it for": names and one-liners from the one file the
+ * organisation templates also read (T1; ally-be's `organisation-use-cases.json`, copied here).
+ */
+const organisationUseCase = (id: string) => {
+  const found = ORGANISATION_USE_CASES.find(c => c.id === id);
+  if (!found) throw new Error(`No organisation use case called ${id}`);
+  return found;
+};
+
 /** How "How it plays" names each kind of course item, singular then plural. Keyed by TrackItemType. */
 const LANDING_ITEM_NOUNS: Record<string, [string, string]> = {
   ROLEPLAY: ["roleplay", "roleplays"],
@@ -41,6 +53,7 @@ export const en = {
       competencies: "Competencies",
       courseCopilot: "Course Copilot",
       blog: "Blog",
+      landingPages: "Landing pages",
       productUpdates: "Product Updates",
       users: "Users",
       badges: "Badges",
@@ -1871,9 +1884,7 @@ export const en = {
       startBuilding: "Log in to build yours",
       useCases: [
         {
-          id: "helpline",
-          title: "Helpline and crisis support",
-          blurb: "Share your helpline details and safe next steps, at any hour.",
+          ...organisationUseCase("helpline"),
           detail: {
             intro:
               "People often reach out late at night, or when no one is free to pick up. Your assistant answers calmly and consistently from the guidance you've published, and points people to your team.",
@@ -1890,9 +1901,7 @@ export const en = {
           },
         },
         {
-          id: "services",
-          title: "Services and eligibility",
-          blurb: "Explain who can apply, what to bring and where to go, in plain words.",
+          ...organisationUseCase("services"),
           detail: {
             intro:
               "The same questions arrive every day: am I eligible, what do I bring, where do I go. Your assistant answers them from your own programme pages, so your staff can focus on people who need them most.",
@@ -1909,9 +1918,7 @@ export const en = {
           },
         },
         {
-          id: "supporters",
-          title: "Donors and volunteers",
-          blurb: "Handle giving, receipts and sign-ups without tying up your team.",
+          ...organisationUseCase("supporters"),
           detail: {
             intro:
               "Supporters want quick answers about how to give or help. Your assistant handles the everyday questions at any time, so no offer of help waits days for a reply.",
@@ -1928,9 +1935,7 @@ export const en = {
           },
         },
         {
-          id: "training",
-          title: "Staff and volunteer onboarding",
-          blurb: "New teammates get answers from your own policies and guides.",
+          ...organisationUseCase("training"),
           detail: {
             intro:
               "New staff and volunteers have a hundred small questions in their first weeks. Your assistant answers from your own handbooks and policies, so they get a consistent answer without waiting for a senior colleague.",
@@ -1947,9 +1952,7 @@ export const en = {
           },
         },
         {
-          id: "languages",
-          title: "Reach more communities",
-          blurb: "Meet people in the languages they speak, on the apps they already use.",
+          ...organisationUseCase("languages"),
           detail: {
             intro:
               "Information is only useful if people can read it. Your assistant can answer in many languages, on channels like WhatsApp that your community already uses, so language is not a barrier to getting help.",
@@ -1966,9 +1969,7 @@ export const en = {
           },
         },
         {
-          id: "updates",
-          title: "Campaigns and urgent updates",
-          blurb: "Keep your community informed when things change fast.",
+          ...organisationUseCase("updates"),
           detail: {
             intro:
               "When a camp moves, a deadline shifts or an emergency unfolds, people need the latest answer immediately. Update your pages once and your assistant gives everyone the same current information.",

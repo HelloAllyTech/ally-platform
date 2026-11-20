@@ -8,7 +8,9 @@ import type { RecordActorRef } from '../entity/collection-record.entity';
 export type ListActor =
   | { kind: 'user'; userId: number }
   | { kind: 'import'; userId: number | null }
-  | { kind: 'agent'; runId: string };
+  | { kind: 'agent'; runId: string }
+  /** A use-case template's install (T1): the owner's setup answers, or neutral examples. */
+  | { kind: 'template'; templateId: string; example: boolean };
 
 export const isAgent = (
   actor: ListActor,
@@ -17,6 +19,13 @@ export const isAgent = (
 export function actorRef(actor: ListActor): RecordActorRef {
   if (actor.kind === 'agent') return { kind: 'agent', run_id: actor.runId };
   if (actor.kind === 'import') return { kind: 'import', user_id: actor.userId };
+  if (actor.kind === 'template') {
+    return {
+      kind: 'template',
+      template_id: actor.templateId,
+      ...(actor.example ? { example: true as const } : {}),
+    };
+  }
   return { kind: 'user', user_id: actor.userId };
 }
 
@@ -123,7 +132,9 @@ export interface ListRecordView {
 
 /** "Created by" on an entry's form: You, a teammate, your assistant (and its chat), or an import. */
 export interface RecordCreator {
-  kind: 'user' | 'agent' | 'import';
+  kind: 'user' | 'agent' | 'import' | 'template';
+  /** A template's neutral example the owner hasn't changed yet (T1): shown as "Example". */
+  example?: true;
   name?: string;
   /** The reader made it. */
   you?: true;
