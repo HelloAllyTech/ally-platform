@@ -34,7 +34,11 @@ const STOPWORDS = new Set(
 
 /** Lower-case word stems for keyword matching (plural "-s"/"-ies" folded). */
 export function searchTokens(text: string): string[] {
-  return (String(text ?? '').toLowerCase().match(/[a-z0-9]+/g) ?? [])
+  return (
+    String(text ?? '')
+      .toLowerCase()
+      .match(/[a-z0-9]+/g) ?? []
+  )
     .map((token) => token.replace(/ies$/, 'y').replace(/s$/, ''))
     .filter((token) => token.length > 1 && !STOPWORDS.has(token));
 }

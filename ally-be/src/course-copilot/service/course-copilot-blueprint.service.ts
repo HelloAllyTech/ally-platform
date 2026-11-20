@@ -1,3 +1,4 @@
+import { CourseCopilotExampleCourseService } from './course-copilot-example-course.service';
 import { CourseCopilotDesignGuidanceService } from './course-copilot-design-guidance.service';
 import {
   BadRequestException,
@@ -69,14 +70,18 @@ export class CourseCopilotBlueprintService {
   ): Promise<CourseCopilotBlueprintResponse> {
     const libraryPicks = await this.libraryPicks(session);
     const reference = await this.referenceForPlan(session, notes);
-    const designGuidance = this.designGuidance
-      ? await this.designGuidance.reference({
+    const guidance = this.designGuidance
+      ? await this.designGuidance.referenceWithCodes({
           sessionId: session.id,
           tenantId: session.tenantId,
           brief: session.brief ?? {},
           stage: 'blueprint',
         })
-      : '';
+      : { text: '', codes: [] as string[] };
+    // The same pick the planner makes (exampleCourseReference), recorded for the build log.
+    const example = new CourseCopilotExampleCourseService().closestTo(
+      session.brief?.shape?.durationMinutes,
+    );
     const planned = await this.planner.plan(
       {
         sessionId: session.id,
@@ -85,14 +90,21 @@ export class CourseCopilotBlueprintService {
         libraryPicks,
         games: courseCopilotGameOptions(),
         referenceMaterial: reference?.text ?? null,
-        designGuidance: designGuidance || null,
+        designGuidance: guidance.text || null,
         usageMetadata: { courseCopilotSessionId: session.id },
       },
       { maxNewRoleplays: this.configService.courseCopilot.maxNewRoleplays },
     );
-    return this.store(session, planned, {
+    const response = await this.store(session, planned, {
       status: CourseCopilotSessionStatus.AWAITING_BLUEPRINT,
     });
+    return {
+      ...response,
+      planningContext: {
+        exampleCourse: example?.title ?? null,
+        principles: guidance.codes,
+      },
+    };
   }
 
   /**

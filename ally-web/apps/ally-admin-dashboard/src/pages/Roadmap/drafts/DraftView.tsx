@@ -15,7 +15,9 @@ import { DraftConversation, TurnError } from "./DraftConversation";
 import { agoText, dueSoon, errorCode, markFirstSubmit, newlyMet } from "./draftUtils";
 import { HighlightedTextBox } from "./HighlightedTextBox";
 import { IdeaAgentFindings } from "./IdeaAgentFindings";
+import { QualityPanel } from "./QualityPanel";
 import { SimilarIdeas } from "./SimilarIdeas";
+import { SplitCard } from "./SplitCard";
 import {
   SubmitChoice,
   SubmitChoiceState,
@@ -30,6 +32,7 @@ import {
   useReopenRoadmapDraftCheckMutation,
   useRestoreRoadmapDraftMutation,
   useRoadmapDraftTurnMutation,
+  useSplitRoadmapDraftMutation,
   useSubmitRoadmapDraftMutation,
 } from "../../../api/roadmapV2Flow";
 import { haptic, motionTransition, useReducedMotionPreference } from "../../../motion";
@@ -46,7 +49,11 @@ import { useKeyboardInset } from "../hooks/useVisualViewport";
 import { shortDate } from "../utils/copy";
 import { isOfflineError } from "../utils/deviceStore";
 
-import type { RoadmapDraftCheck, RoadmapDraftDetail } from "../../../types/roadmapV2Flow";
+import type {
+  RoadmapDraftCheck,
+  RoadmapDraftDetail,
+  RoadmapFlowError,
+} from "../../../types/roadmapV2Flow";
 
 interface DraftViewProps {
   /** Undefined on New idea: the draft is made by the first save. */
@@ -178,6 +185,7 @@ const DraftEditor: React.FC<DraftViewProps & { draft?: RoadmapDraftDetail }> = (
   const [turn] = useRoadmapDraftTurnMutation();
   const [reopen] = useReopenRoadmapDraftCheckMutation();
   const [submit] = useSubmitRoadmapDraftMutation();
+  const [splitDraft] = useSplitRoadmapDraftMutation();
   const [suggestTitle] = useSuggestRoadmapTitleMutation();
   const [addTo] = useAddRoadmapDraftToMutation();
   const [discard] = useDiscardRoadmapDraftMutation();
@@ -273,9 +281,21 @@ const DraftEditor: React.FC<DraftViewProps & { draft?: RoadmapDraftDetail }> = (
   };
 
   // ── submit ────────────────────────────────────────────────────────────────────────────────────
-  const total = draft?.checksTotal ?? 5;
+  const total = draft?.checksTotal ?? 0;
   const met = draft?.checksMet ?? 0;
-  const complete = !!draft && met >= total;
+  // Every check met, the quality bar cleared (the server folds it into canSubmit) and not split:
+  // a split draft files nothing itself, its new drafts do.
+  const isSplit = (draft?.splitInto?.length ?? 0) > 0;
+  const checksDone = !!draft && total > 0 && met >= total;
+  const complete = checksDone && draft.canSubmit !== false && !isSplit;
+  // Why Submit is locked though every check is met, so the lock is never unexplained.
+  const submitBlockedReason = !checksDone
+    ? null
+    : isSplit
+      ? copy.split.submitBlocked
+      : draft.quality && !draft.quality.passed
+        ? copy.quality.notPassedHelp
+        : null;
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [sealed, setSealed] = useState(false);
@@ -354,6 +374,19 @@ const DraftEditor: React.FC<DraftViewProps & { draft?: RoadmapDraftDetail }> = (
       else if (c === "no_statement") toast.error(copy.submitNoStatement);
       else if (c === "statement_empty") toast.error(copy.submitStatementEmpty);
       else if (c === "too_long") toast.error(copy.submitTooLong(textMax));
+      else if (c === "quality_below_bar") {
+        const data = (error as RoadmapFlowError)?.data;
+        const weakest = draft.quality?.dimensions.find(d => d.id === data?.weakest)?.label ?? null;
+        toast.error(
+          copy.submitQualityBelowBar(
+            Math.round(data?.score ?? draft.quality?.score ?? 0),
+            Math.round(data?.passScore ?? draft.quality?.passScore ?? 0),
+            weakest,
+          ),
+        );
+      } else if (c === "needs_split") toast.error(copy.submitNeedsSplit);
+      else if (c === "not_sized") toast.error(copy.submitNotSized);
+      else if (c === "already_split") toast.error(copy.submitAlreadySplit);
       else toast.error(copy.submitFailed);
     }
   };
@@ -393,6 +426,20 @@ const DraftEditor: React.FC<DraftViewProps & { draft?: RoadmapDraftDetail }> = (
       await restore(code).unwrap();
     } catch {
       toast.error(copy.restoreFailed);
+    }
+  };
+
+  const [splitting, setSplitting] = useState(false);
+  const doSplit = async () => {
+    if (!code || splitting) return;
+    setSplitting(true);
+    await autosave.flush();
+    try {
+      await splitDraft(code).unwrap();
+    } catch {
+      toast.error(copy.split.failed);
+    } finally {
+      setSplitting(false);
     }
   };
 
@@ -490,7 +537,26 @@ const DraftEditor: React.FC<DraftViewProps & { draft?: RoadmapDraftDetail }> = (
       }}
       onSubmit={() => setConfirmOpen(true)}
       hideSubmit={isPhone}
+      submitBlockedReason={submitBlockedReason}
     />
+  ) : null;
+
+  const qualityPanel = draft ? (
+    <QualityPanel quality={draft.quality ?? null} showEmpty={!!code} />
+  ) : null;
+
+  const splitCard = draft ? (
+    <SplitCard
+      draft={draft}
+      splitting={splitting}
+      readOnly={readOnly}
+      onSplit={() => void doSplit()}
+      onOpen={child => navigate(ROUTES.ROADMAP_IDEA(child))}
+    />
+  ) : null;
+
+  const splitFromNote = draft?.splitFrom ? (
+    <p className="m-0 text-xs text-typography-secondary">{copy.split.from(draft.splitFrom)}</p>
   ) : null;
 
   const conversation = (
@@ -618,8 +684,10 @@ const DraftEditor: React.FC<DraftViewProps & { draft?: RoadmapDraftDetail }> = (
       )}
 
       <div className="flex flex-col gap-4 px-4 py-3">
+        {splitFromNote}
         {textBox}
         {goalRow}
+        {splitCard}
         {submitChoice}
       </div>
 
@@ -642,7 +710,10 @@ const DraftEditor: React.FC<DraftViewProps & { draft?: RoadmapDraftDetail }> = (
             {similar}
             {findings}
           </div>
-          <div className="min-w-0">{checksPanel}</div>
+          <div className="flex min-w-0 flex-col gap-4">
+            {checksPanel}
+            {qualityPanel}
+          </div>
         </div>
       )}
 
@@ -675,7 +746,7 @@ const DraftEditor: React.FC<DraftViewProps & { draft?: RoadmapDraftDetail }> = (
               onClick={() => setChecksSheet(true)}
               className="min-h-12 flex-1 rounded border border-border-light text-sm"
             >
-              {copy.submitLocked(met, total)}
+              {submitBlockedReason ?? copy.submitLocked(met, total)}
             </button>
           )}
         </div>
@@ -688,7 +759,10 @@ const DraftEditor: React.FC<DraftViewProps & { draft?: RoadmapDraftDetail }> = (
           title={copy.checksTitle}
           closeLabel={en.roadmapV2.mobile.close}
         >
-          {checksPanel}
+          <div className="flex flex-col gap-4">
+            {checksPanel}
+            {qualityPanel}
+          </div>
         </BottomSheet>
       )}
 

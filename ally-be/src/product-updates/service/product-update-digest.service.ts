@@ -473,15 +473,21 @@ ${footer}
         `<td style="padding:7px ${last ? '0' : '16px'} 7px 0;border-bottom:1px solid ${RULE};text-align:right;font-size:15px;font-variant-numeric:tabular-nums">${content}</td>`;
       const rows = voters
         .map((u) => {
-          // Share of this person's votes that went to colleagues' ideas.
-          const othersShare = `${Math.round(
-            ((u.votesOnOthers ?? u.votes) / u.votes) * 100,
-          )}%`;
-          return `<tr><td style="padding:7px 16px 7px 0;border-bottom:1px solid ${RULE};font-size:15px">${escapeHtml(name(u.userId))}</td>${cell(u.votes.toLocaleString('en-IN'))}${cell(othersShare, true)}</tr>`;
+          // Where this person's votes went, as a label rather than a number:
+          // under a third on colleagues' ideas = mostly their own, over two
+          // thirds = mostly colleagues'.
+          const othersShare = (u.votesOnOthers ?? u.votes) / u.votes;
+          const balance =
+            othersShare < 1 / 3
+              ? 'Most votes to own ideas'
+              : othersShare > 2 / 3
+                ? "Most votes to other people's ideas"
+                : 'Balanced';
+          return `<tr><td style="padding:7px 16px 7px 0;border-bottom:1px solid ${RULE};font-size:15px">${escapeHtml(name(u.userId))}</td>${cell(u.votes.toLocaleString('en-IN'))}${cell(escapeHtml(balance), true)}</tr>`;
         })
         .join('');
       const table = rows
-        ? `<table style="border-collapse:collapse;width:100%;font-family:${FONT}"><tr>${th('Name', 'left')}${th('Votes cast', 'right')}${th('Voters voted others share', 'right')}</tr>${rows}</table>`
+        ? `<table style="border-collapse:collapse;width:100%;font-family:${FONT}"><tr>${th('Name', 'left')}${th('Votes cast', 'right')}${th('Balance', 'right')}</tr>${rows}</table>`
         : `<p style="margin:0;color:${MUTED}">No votes cast yet this month.</p>`;
 
       return `${heading(`Roadmap votes in ${monthName} so far:`)}

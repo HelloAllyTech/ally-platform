@@ -213,7 +213,9 @@ export class CourseCopilotLearnerResultsService {
                 `"${clip(b.instruction, 90)}" (${pct(Number(b.sessions), Number(r.sessions))}% of sessions)`,
             );
           if (unhelpful.length) {
-            notes.push(`unhelpful behaviours most detected: ${unhelpful.join('; ')}`);
+            notes.push(
+              `unhelpful behaviours most detected: ${unhelpful.join('; ')}`,
+            );
           }
         }
         if (Number(row.roleplay_missed) > 0) {
@@ -234,7 +236,8 @@ export class CourseCopilotLearnerResultsService {
             `endings reached: ${mine
               .map((e) => {
                 const node = nodes.get(String(e.ending_id));
-                const label = node?.outcome ?? clip(node?.title ?? node?.text, 40);
+                const label =
+                  node?.outcome ?? clip(node?.title ?? node?.text, 40);
                 return `${label || 'unknown'} ${pct(Number(e.learners), total)}%`;
               })
               .join(', ')}`,
@@ -244,7 +247,9 @@ export class CourseCopilotLearnerResultsService {
       }
       case 'BUCKET_SORT':
         if (num(row.avg_bucket_first_try) !== null) {
-          notes.push(`first-try sorting accuracy ${round(row.avg_bucket_first_try)}%`);
+          notes.push(
+            `first-try sorting accuracy ${round(row.avg_bucket_first_try)}%`,
+          );
         }
         break;
       case 'VIDEO':
@@ -432,7 +437,9 @@ export class CourseCopilotLearnerResultsService {
         item.medianMinutes !== null ? `median ${item.medianMinutes} min` : '',
         ...item.notes,
       ].filter(Boolean);
-      lines.push(`[${item.itemId}] S${item.section} ${item.type} "${item.title}": ${parts.join('; ')}`);
+      lines.push(
+        `[${item.itemId}] S${item.section} ${item.type} "${item.title}": ${parts.join('; ')}`,
+      );
     }
     if (results.withheld) {
       lines.push(

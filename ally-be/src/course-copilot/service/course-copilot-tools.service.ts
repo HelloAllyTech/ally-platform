@@ -20,6 +20,7 @@ import {
   CourseCopilotSseFrame,
   CourseCopilotToolOutcome,
 } from '../type/course-copilot-sse.type';
+import { CourseCopilotPlanningContext } from '../type/course-copilot-api.type';
 import { COURSE_COPILOT_GUIDANCE_TOOLS } from '../constants/course-copilot-guidance.constants';
 import { CourseCopilotBriefService } from './course-copilot-brief.service';
 import { CourseCopilotBlueprintService } from './course-copilot-blueprint.service';
@@ -272,7 +273,7 @@ const INTERVIEW_TOOLS: AgentToolDefinition[] = [
     name: 'get_example_course',
     description:
       "One example course's outline by id: every section and item in order, with type, title, " +
-      "size and completion rule. Learn its pattern; never copy its titles, characters or topic. " +
+      'size and completion rule. Learn its pattern; never copy its titles, characters or topic. ' +
       DATA_NOTE,
     input_schema: {
       type: 'object',
@@ -344,6 +345,23 @@ const UPDATE_BLUEPRINT: AgentToolDefinition = {
  * the edit tools raise) end the turn. In a validated turn the last two only
  * ask for the end: the reply still comes through `finish_turn`.
  */
+/**
+ * What the planner had beyond the brief, for the trainer-visible log line: the example course it
+ * followed as a pattern and the design principles it read. Empty when it had neither.
+ */
+export function planningNote(
+  context: CourseCopilotPlanningContext | undefined,
+): string {
+  if (!context) return '';
+  const parts = [
+    context.exampleCourse ? `example course "${context.exampleCourse}"` : '',
+    context.principles.length
+      ? `design principles ${context.principles.join(', ')}`
+      : '',
+  ].filter(Boolean);
+  return parts.length ? ` · planned with ${parts.join(' and ')}` : '';
+}
+
 @Injectable()
 export class CourseCopilotToolsService {
   private readonly logger = LoggerService.getInstance(
@@ -520,7 +538,8 @@ export class CourseCopilotToolsService {
             modelResult: {
               ok: false,
               error: 'no_course',
-              message: 'There is no course with learners yet: results exist only for a published course.',
+              message:
+                'There is no course with learners yet: results exist only for a published course.',
             },
             summary: 'No learner results yet',
           };
@@ -538,7 +557,7 @@ export class CourseCopilotToolsService {
             },
             summary: `Read learner results: ${results.enrolled} learners, ${results.completed} completed`,
           };
-        } catch (error) {
+        } catch {
           return {
             modelResult: {
               ok: false,
@@ -877,12 +896,16 @@ export class CourseCopilotToolsService {
           })),
           estimate: response.estimate,
           problems: response.problems,
+          // Also read by the turn receipt ("Blueprint drafted (v1) · planned with …").
+          planning: planningNote(response.planningContext).replace(/^ · /, '') || null,
           note:
             'The trainer now sees the blueprint and approves it in the panel. In one or two ' +
             'sentences, say what shape you chose and why; mention any problem they must fix. ' +
             'Do not list the items — they can see them.',
         },
-        summary: `Drafted a blueprint: ${response.blueprint.sections.length} sections, ${response.estimate.items} items`,
+        summary:
+          `Drafted a blueprint: ${response.blueprint.sections.length} sections, ${response.estimate.items} items` +
+          planningNote(response.planningContext),
         events: [{ event: 'blueprint', data: response as any }],
         endTurn: true,
       };

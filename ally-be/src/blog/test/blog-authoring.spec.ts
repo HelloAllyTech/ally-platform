@@ -222,7 +222,7 @@ describe('BlogAuthoringToolsService', () => {
   it('check_draft reports style and markup problems on a saved post', async () => {
     const { svc } = make(
       post({
-        title: 'A planner',
+        title: 'A fixed floor',
         body: '<h2>What went wrong first</h2><div>x</div>',
       }),
     );

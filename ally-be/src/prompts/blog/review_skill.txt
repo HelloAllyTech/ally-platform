@@ -21,7 +21,7 @@ Read the title, the TL;DR and the body as someone who works outside Ally, has ne
 
 ## 4. Internal words
 
-No internal names or labels in the text or in any image: tier 0, tier 1, fixed floor, planner, orchestrator, evaluator, adjudicator, analyst, reviser, PM agent, builder, risk cue, locked prompt, kill switch, fence, step names, table, endpoint or file names, model names, version numbers, config flags. Each helper program is described by what it does and called an AI assistant. Replace anything that fails.
+No internal labels in the text or in any image: tier 0, tier 1, fixed floor, risk cue, locked prompt, kill switch, fence, step names, table, endpoint or file names, model names, version numbers, config flags. Agents may be named by role (safety reader, planner, evaluator, analyst), but each name must be explained where it first appears, and an agent is called an agent. Replace anything that fails. Do not make the text plainer than an engineering reader would want.
 
 ## 5. Images
 

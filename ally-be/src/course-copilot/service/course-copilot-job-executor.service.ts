@@ -761,14 +761,14 @@ export class CourseCopilotJobExecutorService {
     if (!session.trackId)
       throw new CourseCopilotJobSkip('No course to review.');
     const track = await this.structureService.getTrack(session.trackId);
-    const designGuidance = this.designGuidance
-      ? await this.designGuidance.reference({
+    const guidance = this.designGuidance
+      ? await this.designGuidance.referenceWithCodes({
           sessionId: session.id,
           tenantId: session.tenantId,
           brief: session.brief ?? {},
           stage: 'review',
         })
-      : '';
+      : { text: '', codes: [] as string[] };
     // A live course with learners: what they did, so the review can point at real trouble.
     const learnerEvidence = this.learnerResults
       ? await this.learnerResults.reviewReference(track.id, session.tenantId)
@@ -778,7 +778,7 @@ export class CourseCopilotJobExecutorService {
       brief: session.brief ?? {},
       courseDigest: this.courseDigest(track),
       referenceMaterial:
-        [designGuidance, learnerEvidence].filter(Boolean).join('\n\n---\n') ||
+        [guidance.text, learnerEvidence].filter(Boolean).join('\n\n---\n') ||
         null,
       usageMetadata,
     });
@@ -798,9 +798,20 @@ export class CourseCopilotJobExecutorService {
       },
       createdBy: null,
     });
+    // What the reviewer read beyond the course, for the build log.
+    const used = [
+      guidance.codes.length
+        ? `design principles ${guidance.codes.join(', ')}`
+        : '',
+      learnerEvidence ? 'learner results' : '',
+    ].filter(Boolean);
     return {
       findings,
-      summary: findings.length ? `${findings.length} findings` : 'No findings',
+      principles: guidance.codes,
+      usedLearnerResults: Boolean(learnerEvidence),
+      summary:
+        (findings.length ? `${findings.length} findings` : 'No findings') +
+        (used.length ? ` · reviewed with ${used.join(' and ')}` : ''),
     };
   }
 

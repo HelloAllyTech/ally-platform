@@ -275,6 +275,10 @@ export interface CourseCopilotTrackIdMap {
 
 /** What a finished job hands to the structure writer. */
 export interface CourseCopilotJobResult {
+  /** Course review: the Learning Design principles the reviewer read. */
+  principles?: string[];
+  /** Course review: whether learner results were part of the review. */
+  usedLearnerResults?: boolean;
   trackItemId?: string;
   scenarioId?: number;
   caseId?: string;

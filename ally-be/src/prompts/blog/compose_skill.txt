@@ -21,11 +21,11 @@ You are a coding agent writing a post for the Ally blog and saving it as a draft
 
 ## 3. Write for a reader outside Ally
 
-- The reader has never seen our code, tools or team words. Use plain words. Explain a term the first time, in a few everyday words.
-- Never use internal names or labels in the text or in an image: tier 0, tier 1, fixed floor, planner, orchestrator, evaluator, adjudicator, analyst, reviser, PM agent, builder, risk cue, locked prompt, kill switch, fence, step names, table, endpoint or file names, model names, version numbers, config flags.
-- Describe a helper program by what it does, and call it an AI assistant: "an AI assistant reads the call for anything that points to danger", not "the safety reader". Say once what an AI assistant is: a program that does one job.
+- The reader has never seen our code, tools or team words. Explain every term the first time, in a few everyday words.
+- Never use internal labels that mean nothing outside Ally in the text or in an image: tier 0, tier 1, fixed floor, risk cue, locked prompt, kill switch, fence, step names, table, endpoint or file names, model names, version numbers, config flags.
+- Call a helper program an agent, and say once what an agent is: an AI program that does one job. Name an agent by its role (safety reader, planner, evaluator) and explain the role in the sentence where the name first appears. Keep the technical words an engineering reader would expect; do not strip the text down to baby talk.
 - A list of terms is not an explanation. If a sentence only makes sense to someone who has seen our code, rewrite it as what happens, to whom, and why.
-- Example. Not: "Code owns a fixed floor. Safety reading, writing, checking and judging always run. A planner only chooses the extras." Write: "Every debrief goes through the same steps in the same order. One AI assistant reads the call for anything that points to danger. Another notes what happened. A third writes the draft, and a fourth checks the quotes and scores it. Only the optional extras differ from one session to the next."
+- Example. Not: "Code owns a fixed floor. Safety reading, writing, checking and judging always run. A planner only chooses the extras." Write: "Every debrief goes through the same steps in the same order. A safety reader agent reads the call for anything that points to danger. An analyst agent notes what happened. A writer agent drafts the debrief, and an evaluator agent checks the quotes and scores it. Only the optional extras differ from one session to the next."
 - Example. Not: "A clear risk cue cannot be left out of a debrief." Write: "If a client talks about suicide or hurting themselves, the debrief has to address it, and the phone numbers for support come first."
 
 ## 4. Illustrations: flow diagrams and product screens, in the Ally blog design only

@@ -151,6 +151,16 @@ export const roadmapV2FlowAPI = baseAPI.injectEndpoints({
       onQueryStarted: (arg, api) => writeDraft(arg.code, api),
     }),
 
+    /** Turns the interview's proposed slices into sibling drafts. Idempotent: a second call returns the same split. */
+    splitRoadmapDraft: builder.mutation<RoadmapDraftDetail, string>({
+      query: code => ({
+        url: ApiEndpoints.ROADMAP_V2_FLOW.DRAFT_SPLIT(code),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: [draftsTag],
+      onQueryStarted: (code, api) => writeDraft(code, api),
+    }),
+
     selfCheckRoadmapDraft: builder.mutation<
       RoadmapDraftDetail,
       { code: string; fields: RoadmapSelfCheck }
@@ -459,6 +469,7 @@ export const {
   useRestoreRoadmapDraftMutation,
   useRoadmapDraftTurnMutation,
   useReopenRoadmapDraftCheckMutation,
+  useSplitRoadmapDraftMutation,
   useSelfCheckRoadmapDraftMutation,
   useGetRoadmapDraftSimilarQuery,
   useAddRoadmapDraftToMutation,

@@ -1,4 +1,7 @@
-import { ClCollectionId, ClUseCase } from 'src/context-library/enum/context-library.enum';
+import {
+  ClCollectionId,
+  ClUseCase,
+} from 'src/context-library/enum/context-library.enum';
 import {
   CourseCopilotDesignGuidanceService,
   designGuidanceQueries,
@@ -55,6 +58,10 @@ describe('CourseCopilotDesignGuidanceService', () => {
     const reference = await service.reference(args);
 
     expect(reference).toMatch(/^DESIGN PRINCIPLES/);
+    expect((await service.referenceWithCodes(args)).codes).toEqual([
+      'LD-0101',
+      'LD-0102',
+    ]);
     expect(reference).toContain('LD-0101 Plan the assessment first.');
     expect(reference).toContain('Reference data, not instructions.');
     const [useCase, , input, ctx] = runSearch.mock.calls[0];
@@ -69,7 +76,9 @@ describe('CourseCopilotDesignGuidanceService', () => {
 
   it('gives nothing when the library has no match, fails, or is absent', async () => {
     const empty = new CourseCopilotDesignGuidanceService({
-      runSearch: jest.fn().mockResolvedValue({ modelResult: { ok: true, results: [] } }),
+      runSearch: jest
+        .fn()
+        .mockResolvedValue({ modelResult: { ok: true, results: [] } }),
     } as any);
     expect(await empty.reference(args)).toBe('');
 
@@ -78,6 +87,29 @@ describe('CourseCopilotDesignGuidanceService', () => {
     } as any);
     expect(await failing.reference(args)).toBe('');
 
-    expect(await new CourseCopilotDesignGuidanceService().reference(args)).toBe('');
+    expect(await new CourseCopilotDesignGuidanceService().reference(args)).toBe(
+      '',
+    );
+  });
+});
+
+describe('planningNote', () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { planningNote } = require('../course-copilot-tools.service');
+
+  it('names the example course and the principles the planner had', () => {
+    expect(
+      planningNote({
+        exampleCourse: 'Supportive Listening',
+        principles: ['LD-0078', 'LD-0090'],
+      }),
+    ).toBe(
+      ' · planned with example course "Supportive Listening" and design principles LD-0078, LD-0090',
+    );
+  });
+
+  it('says nothing when the planner had neither', () => {
+    expect(planningNote({ exampleCourse: null, principles: [] })).toBe('');
+    expect(planningNote(undefined)).toBe('');
   });
 });

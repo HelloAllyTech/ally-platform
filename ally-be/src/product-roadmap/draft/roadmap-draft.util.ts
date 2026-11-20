@@ -1,10 +1,12 @@
 import { ROADMAP_READINESS_CRITERIA } from '../constants/product-roadmap.constants';
+import { isSingleIdeaEffort } from '../util/roadmap-quality.util';
 import type { PlanIdeaState } from 'src/product-planning/type/plan-record.type';
 
 /**
- * The five checks in the order the draft page lists them (§4.2: who, the
- * pain, why, goal before solution, how we'd know). The ids are the filing
- * gate's own criteria, so a draft that passes here passes the gate.
+ * The checks in the order the draft page lists them (§4.2: who, the pain, why,
+ * goal before solution, what changes — then, since 2026-11-20, strategic fit,
+ * how we'd know, and the scope line). The ids are the filing gate's own
+ * criteria, so a draft that passes here passes the gate.
  */
 export const DRAFT_CHECK_ORDER = [
   'who_it_affects',
@@ -12,6 +14,9 @@ export const DRAFT_CHECK_ORDER = [
   'clear_why',
   'goal_before_solution',
   'outcome',
+  'strategic_fit',
+  'success_signal',
+  'scope_boundary',
 ] as const;
 export type DraftCheckId = (typeof DRAFT_CHECK_ORDER)[number];
 
@@ -86,7 +91,7 @@ export function locateQuote(
 }
 
 /**
- * The five checks as the draft page shows them. Pure.
+ * The checks as the draft page shows them. Pure.
  *
  * - "Fill it in yourself" wins: each field is its own evidence.
  * - Otherwise the agent's last verdict, unless the author reopened the check.
@@ -239,4 +244,61 @@ export function draftProposal(
   if (!statement) return null;
   const given = (idea?.draft?.title ?? '').replace(/\s+/g, ' ').trim();
   return { title: given || suggestTitle(statement), statement };
+}
+
+/**
+ * Why a draft whose checks are all met still cannot be submitted, or null when nothing stops it.
+ * Pure, and the one place the quality bar is applied to a draft, so the page's `canSubmit` and
+ * Submit itself can never disagree.
+ *
+ * In order: already split (its slices are the ideas now) → quality bar not reached → no draft
+ * from the interview (slices proposed, or never sized) → a size one idea cannot be filed at.
+ */
+export function submitBlock(idea: PlanIdeaState | undefined | null): {
+  code: 'already_split' | 'quality_below_bar' | 'needs_split' | 'not_sized';
+  message: string;
+  extra?: Record<string, unknown>;
+} | null {
+  if (idea?.splitInto?.length) {
+    return {
+      code: 'already_split',
+      message:
+        'This idea was split. Submit the new drafts it was split into instead.',
+    };
+  }
+  const quality = idea?.quality;
+  if (!quality?.passed) {
+    return {
+      code: 'quality_below_bar',
+      message: quality
+        ? `Not at the bar yet: ${quality.score} of ${quality.passScore} needed.`
+        : 'The idea agent has not graded this idea yet.',
+      extra: {
+        score: quality?.score ?? null,
+        passScore: quality?.passScore ?? null,
+        weakest: quality?.weakest ?? null,
+      },
+    };
+  }
+  if (!idea?.draft) {
+    return (idea?.slices?.length ?? 0) >= 2
+      ? {
+          code: 'needs_split',
+          message:
+            'This is bigger than one idea. Split it, then submit each part.',
+        }
+      : {
+          code: 'not_sized',
+          message:
+            'The idea agent could not size this yet. Say what is in scope and what is not.',
+        };
+  }
+  if (!isSingleIdeaEffort(idea.draft.effort)) {
+    return {
+      code: 'needs_split',
+      message:
+        'This is too big for one idea. Split it into parts that can ship on their own.',
+    };
+  }
+  return null;
 }

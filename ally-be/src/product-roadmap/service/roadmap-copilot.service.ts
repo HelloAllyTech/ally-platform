@@ -20,15 +20,24 @@ import { IAgentLlmProvider } from 'src/llm-agent/provider/agent-llm-provider.int
 
 import {
   ROADMAP_COPILOT,
-  ROADMAP_FILEABLE_EFFORTS,
   ROADMAP_LIMITS,
   ROADMAP_PROMPT_CODES,
+  ROADMAP_QUALITY_DIMENSIONS,
+  ROADMAP_QUALITY_PASS_SCORE,
+  ROADMAP_QUALITY_SCALE_MAX,
   ROADMAP_READINESS_CRITERIA,
+  ROADMAP_SINGLE_IDEA_EFFORTS,
+  ROADMAP_SLICES,
 } from '../constants/product-roadmap.constants';
 import { RoadmapOpportunityEffort } from '../enum/roadmap-opportunity.enum';
 import { OpportunityInterviewTurnResponseDto } from '../dto/roadmap-response.dto';
 import { RoadmapOpportunityBrief } from '../type/roadmap-brief.type';
 import { normaliseOpportunityBrief } from '../util/roadmap-brief.util';
+import {
+  gradeQuality,
+  isSingleIdeaEffort,
+  normaliseSlices,
+} from '../util/roadmap-quality.util';
 import { RoadmapProductGoalRepository } from '../repository/roadmap-taxonomy.repository';
 import { RoadmapStrategyGoalRepository } from '../repository/roadmap-strategy.repository';
 import { RoadmapReadinessTokenService } from './roadmap-readiness-token.service';
@@ -98,6 +107,15 @@ export type CopilotFrame =
 interface SubmittedTurn {
   reply?: string;
   gates?: { id?: string; met?: boolean; note?: string; evidence?: string }[];
+  quality?: { id?: string; score?: number; note?: string }[];
+  slices?:
+    | {
+        title?: string;
+        description?: string;
+        productGoal?: string | null;
+        effort?: string;
+      }[]
+    | null;
   draft?: {
     description?: string;
     title?: string | null;
@@ -558,7 +576,12 @@ export class RoadmapCopilotService {
       ROADMAP_READINESS_CRITERIA.map(
         (c) => `- id: ${c.id}\n  criterion: ${c.label}\n  means: ${c.hint}`,
       ).join('\n'),
-      `Fileable sizes: ${ROADMAP_FILEABLE_EFFORTS.join(', ')}. Size what was described, not a slice of it; a draft with no size cannot be filed.`,
+      `# Quality bar — grade every dimension 0-${ROADMAP_QUALITY_SCALE_MAX} each turn, in this order. The server computes the 0-100 score; an idea reaches the board only when every readiness criterion is met AND the score is at least ${ROADMAP_QUALITY_PASS_SCORE} AND each dimension with a floor reaches it`,
+      ROADMAP_QUALITY_DIMENSIONS.map(
+        (d) =>
+          `- id: ${d.id}\n  dimension: ${d.label} (weight ${d.weight}${d.floor ? `, floor ${d.floor}` : ', no floor'})\n  means: ${d.hint}`,
+      ).join('\n'),
+      `One idea may be filed at sizes ${ROADMAP_SINGLE_IDEA_EFFORTS.join(', ')} only. Size what was described, not a slice of it; a draft with no size cannot be filed. An idea you would size xl or xxl, or that is really ${ROADMAP_SLICES.MIN}-${ROADMAP_SLICES.MAX} independent ideas, goes out as \`slices\` instead of a draft.`,
       `# The board right now — the ${ROADMAP_COPILOT.BOARD_SNAPSHOT_ROWS} highest-ranked open opportunities`,
       board,
     ].join('\n\n');
@@ -673,28 +696,42 @@ export class RoadmapCopilotService {
     const brief = normaliseOpportunityBrief(submitted?.brief) ?? previousBrief;
 
     const allMet = gates.every((g) => g.met);
+    const quality = gradeQuality(submitted?.quality);
     const description =
       typeof submitted?.draft?.description === 'string'
         ? submitted.draft.description.trim()
         : '';
     const effort = this.validEffort(submitted?.draft?.effort);
-    // Every size files, but not NO size: "could not tell how big this is" means it is not yet
-    // well defined enough to vote on, and there is no override to fall back on.
-    const sizeFileable =
-      effort !== null &&
-      (ROADMAP_FILEABLE_EFFORTS as readonly string[]).includes(effort);
+    const titleOf = (raw: unknown) =>
+      typeof raw === 'string' ? raw.replace(/\s+/g, ' ').trim() : '';
 
-    const title =
-      typeof submitted?.draft?.title === 'string'
-        ? submitted.draft.title.replace(/\s+/g, ' ').trim()
-        : '';
+    // THE BAR: every gate met AND the quality score reached. Anything less and nothing is
+    // handed over, however finished the model says it is.
+    const clearsBar = allMet && quality.passed;
+
+    // Too big for one filing, or several ideas in one: the model's slices, all-or-nothing.
+    const slices = clearsBar
+      ? normaliseSlices(submitted?.slices, productGoalNames, {
+          descriptionMax: ROADMAP_LIMITS.DESCRIPTION_MAX,
+          titleMax: ROADMAP_LIMITS.IDEA_TITLE_MAX,
+        })
+      : [];
+
+    // One idea files at S, M or L. XL/XXL, and "no size", are not an idea yet: the interview
+    // splits it or asks what is in and out of scope.
+    const sizeFileable = effort !== null && isSingleIdeaEffort(effort);
     const draft =
-      allMet && description && sizeFileable
+      clearsBar && !slices.length && description && sizeFileable
         ? {
             description: description.slice(0, ROADMAP_LIMITS.DESCRIPTION_MAX),
             // Optional and advisory: the draft page offers it beside the author's words.
-            ...(title
-              ? { title: title.slice(0, ROADMAP_LIMITS.IDEA_TITLE_MAX) }
+            ...(titleOf(submitted?.draft?.title)
+              ? {
+                  title: titleOf(submitted?.draft?.title).slice(
+                    0,
+                    ROADMAP_LIMITS.IDEA_TITLE_MAX,
+                  ),
+                }
               : {}),
             productGoal: productGoalNames.includes(
               submitted?.draft?.productGoal as string,
@@ -705,23 +742,48 @@ export class RoadmapCopilotService {
           }
         : null;
 
-    const withheldOnSize = allMet && !!description && !sizeFileable;
-    if (withheldOnSize) {
+    const needsSplit =
+      clearsBar &&
+      !slices.length &&
+      !!description &&
+      effort !== null &&
+      !sizeFileable;
+    const unsized =
+      clearsBar && !slices.length && !!description && effort === null;
+    if (needsSplit || unsized) {
       this.logger.warn(
         `[ROADMAP] Copilot drafted a ${effort ?? 'unsized'} opportunity. Withholding it and ` +
-          'asking about scope rather than handing over a draft that cannot be filed.',
+          'asking to split or scope it rather than handing over a draft that cannot be filed.',
       );
     }
 
     const reply =
       typeof submitted?.reply === 'string' ? submitted.reply.trim() : '';
 
+    const sliceDtos = slices.map((slice) => ({
+      ...slice,
+      effort: slice.effort as RoadmapOpportunityEffort,
+      readinessToken: this.readinessToken.issue({
+        description: slice.description,
+        productGoal: slice.productGoal,
+        failedCriteria: [],
+        proposedEffort: slice.effort as RoadmapOpportunityEffort,
+        brief,
+        qualityScore: quality.score,
+      }),
+    }));
+
     return {
-      reply: withheldOnSize
-        ? "I can't put a size on this yet, so it isn't ready to file. What is in scope " +
-          'for it, and what is deliberately left out?'
-        : reply || 'Sorry — I lost that. Could you say it again?',
+      reply: needsSplit
+        ? "This is bigger than one idea, so it can't go to the board as it is. Which part would " +
+          'deliver value on its own if it shipped first, and what comes after it?'
+        : unsized
+          ? "I can't put a size on this yet, so it isn't ready to file. What is in scope " +
+            'for it, and what is deliberately left out?'
+          : reply || 'Sorry — I lost that. Could you say it again?',
       gates,
+      quality,
+      slices: sliceDtos,
       draft,
       brief,
       readinessToken: draft
@@ -731,6 +793,7 @@ export class RoadmapCopilotService {
             failedCriteria: [],
             proposedEffort: draft.effort,
             brief,
+            qualityScore: quality.score,
           })
         : null,
     };
