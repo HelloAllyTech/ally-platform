@@ -128,6 +128,15 @@ export interface CourseCopilotBlueprintResponse {
   budget: CourseCopilotBudgetView;
   /** Problems that would block approval (over a limit, missing input). */
   problems: string[];
+  /** What the planner was given beyond the brief, for the build log. Absent on edits. */
+  planningContext?: CourseCopilotPlanningContext;
+}
+
+export interface CourseCopilotPlanningContext {
+  /** Title of the example course the planner followed as a pattern; null when none. */
+  exampleCourse: string | null;
+  /** Codes of the Learning Design principles the planner received. */
+  principles: string[];
 }
 
 /**
