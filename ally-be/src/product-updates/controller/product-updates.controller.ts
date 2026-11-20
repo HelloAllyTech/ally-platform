@@ -3,6 +3,7 @@ import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorat
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
@@ -23,6 +24,8 @@ import { Public } from 'src/auth/decorators/auth.metadata';
 import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
 
 import {
+  AddDigestRecipientDto,
+  DigestRecipientsDto,
   GetProductUpdatesDto,
   GetProductUpdatesResponseDto,
   GetPublicProductUpdatesDto,
@@ -33,6 +36,7 @@ import {
   TriggerProductUpdatesRunResponseDto,
   UpdateProductUpdateDto,
 } from '../dto/product-update.dto';
+import { ProductUpdateRecipientsService } from '../service/product-update-recipients.service';
 import { ProductUpdatesService } from '../service/product-updates.service';
 
 /**
@@ -51,7 +55,10 @@ import { ProductUpdatesService } from '../service/product-updates.service';
 @ApiTags('Product updates')
 @Controller('v1/product-updates')
 export class ProductUpdatesController {
-  constructor(private readonly productUpdatesService: ProductUpdatesService) {}
+  constructor(
+    private readonly productUpdatesService: ProductUpdatesService,
+    private readonly recipientsService: ProductUpdateRecipientsService,
+  ) {}
 
   @Get('public')
   @Public()
@@ -96,6 +103,49 @@ export class ProductUpdatesController {
     @Body() body: TriggerProductUpdatesRunDto,
   ): Promise<TriggerProductUpdatesRunResponseDto> {
     return this.productUpdatesService.triggerRun(Boolean(body?.backfill));
+  }
+
+  @Get('digest-recipients')
+  @ApiBearerAuth()
+  @ApiSecurity('access-token')
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_UPDATES, {
+    permissions: [PERMISSIONS.EDIT_BLOG],
+  })
+  @ApiOperation({ summary: 'Who gets the daily product-updates email' })
+  @ApiResponse({ status: 200, type: DigestRecipientsDto })
+  async listDigestRecipients(): Promise<DigestRecipientsDto> {
+    return this.recipientsService.list();
+  }
+
+  @Post('digest-recipients')
+  @ApiBearerAuth()
+  @ApiSecurity('access-token')
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_UPDATES, {
+    permissions: [PERMISSIONS.EDIT_BLOG],
+  })
+  @ApiOperation({ summary: 'Add an address to the daily email' })
+  @ApiResponse({ status: 201, type: DigestRecipientsDto })
+  async addDigestRecipient(
+    @Body() body: AddDigestRecipientDto,
+  ): Promise<DigestRecipientsDto> {
+    return this.recipientsService.add(body.email);
+  }
+
+  @Delete('digest-recipients/:id')
+  @ApiBearerAuth()
+  @ApiSecurity('access-token')
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_UPDATES, {
+    permissions: [PERMISSIONS.EDIT_BLOG],
+  })
+  @ApiParam({ name: 'id', description: 'Recipient UUID' })
+  @ApiOperation({
+    summary: 'Remove an address from the daily email',
+  })
+  @ApiResponse({ status: 200, type: DigestRecipientsDto })
+  async removeDigestRecipient(
+    @Param('id') id: string,
+  ): Promise<DigestRecipientsDto> {
+    return this.recipientsService.remove(id);
   }
 
   @Get()

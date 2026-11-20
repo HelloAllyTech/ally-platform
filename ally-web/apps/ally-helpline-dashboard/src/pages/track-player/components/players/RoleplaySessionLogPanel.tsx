@@ -52,13 +52,7 @@ export const RoleplaySessionLogPanel: FC<RoleplaySessionLogPanelProps> = ({ sess
           {
             id: "debrief",
             label: t("postSim.tabs.debrief"),
-            content: (
-              <DebriefTab
-                sessionId={sessionId}
-                summaryData={summaryData}
-                readOnly
-              />
-            ),
+            content: <DebriefTab sessionId={sessionId} summaryData={summaryData} readOnly />,
           },
         ]
       : []),

@@ -102,13 +102,10 @@ export class AppConfigService {
    *   environment opts in rather than discovering it on its bill.
    * - `startAt` is the oldest journal entry turned into an update. The journal
    *   began on 2026-08-13; the default replays all of it.
-   * - `digestTo` is who gets the daily email (comma-separated). Empty means no
-   *   email, even when enabled.
    * - `digestHour` is the business-timezone (IST) hour it goes out.
-   * - `digestAllowed` is true only on the production database (`*_prd`). Env
-   *   files get copied between environments, and a staging copy that kept
-   *   `PRODUCT_UPDATES_DIGEST_TO` sent a second, differently-formatted digest
-   *   to the same people on 2026-11-05.
+   * - `digestAllowed` is true only on the production database (`*_prd`). The
+   *   recipient list lives in the database, and a staging copy of it once sent
+   *   a second, differently-formatted digest to the same people (2026-11-05).
    */
   get productUpdates() {
     const start = new Date(
@@ -128,12 +125,6 @@ export class AppConfigService {
       startAt: Number.isNaN(start.getTime())
         ? new Date('2026-08-13T00:00:00Z')
         : start,
-      digestTo: (
-        this.configService.get<string>('PRODUCT_UPDATES_DIGEST_TO') ?? ''
-      )
-        .split(',')
-        .map((address) => address.trim())
-        .filter(Boolean),
       digestHour: Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : 18,
       digestAllowed: (this.database.database ?? '').endsWith('_prd'),
     };

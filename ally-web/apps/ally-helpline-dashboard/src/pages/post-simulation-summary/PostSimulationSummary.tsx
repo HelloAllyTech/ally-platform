@@ -101,11 +101,7 @@ export const PostSimulationSummary: FC = () => {
     { sessionId: sessionId ?? "", languageCode: i18n.language },
     { skip: !sessionId },
   );
-  const {
-    summaryData,
-    isShortSession,
-    isTechnicalInterruption,
-  } = useSimulationSummaryPolling(
+  const { summaryData, isShortSession, isTechnicalInterruption } = useSimulationSummaryPolling(
     // A withheld assessment has no evaluation to wait for: stop polling.
     summary?.resultsHidden ? undefined : sessionId,
     i18n.language,
