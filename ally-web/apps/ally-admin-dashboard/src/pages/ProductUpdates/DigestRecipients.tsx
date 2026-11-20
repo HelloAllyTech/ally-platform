@@ -1,5 +1,6 @@
 import { FC, FormEvent, useState } from "react";
 
+import { Delete } from "@icons";
 import { toast } from "sonner";
 
 import {
@@ -10,7 +11,6 @@ import {
 import { Button } from "@components";
 import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
-import { Delete } from "@icons";
 
 // Deliberately loose: the server validates properly, this only catches typos before a round trip.
 const LOOKS_LIKE_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
