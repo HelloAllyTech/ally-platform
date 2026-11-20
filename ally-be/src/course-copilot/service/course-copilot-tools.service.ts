@@ -25,6 +25,7 @@ import { CourseCopilotBriefService } from './course-copilot-brief.service';
 import { CourseCopilotBlueprintService } from './course-copilot-blueprint.service';
 import { CourseCopilotLibraryService } from './course-copilot-library.service';
 import { CourseCopilotLearnerProfileService } from './course-copilot-learner-profile.service';
+import { CourseCopilotLearnerResultsService } from './course-copilot-learner-results.service';
 import {
   CourseCopilotExampleCourseService,
   renderExampleCourse,
@@ -279,6 +280,18 @@ const INTERVIEW_TOOLS: AgentToolDefinition[] = [
       required: ['id'],
     },
   },
+  {
+    name: 'get_learner_results',
+    description:
+      'What real learners did in THIS course (only once it is published and has learners): per ' +
+      'item, how many reached and completed it, attempts, scores and time; the quiz questions ' +
+      'most missed on first try; roleplay sessions ended early or under the bar and the unhelpful ' +
+      'behaviours most detected; scenario-quiz endings reached; bucket-sort first-try accuracy. ' +
+      "Aggregates for the session's organisation; items with fewer than 5 learners are withheld. " +
+      'Use it before suggesting changes to a live course. ' +
+      DATA_NOTE,
+    input_schema: { type: 'object', properties: {} },
+  },
   // design_guidance_search / design_guidance_get: Learning Design, through the Context Library.
   ...(contextToolDefinitions(
     COURSE_COPILOT_GUIDANCE_TOOLS,
@@ -348,6 +361,8 @@ export class CourseCopilotToolsService {
     @Optional()
     private readonly learnerProfiles: CourseCopilotLearnerProfileService = new CourseCopilotLearnerProfileService(),
     private readonly exampleCourses: CourseCopilotExampleCourseService = new CourseCopilotExampleCourseService(),
+    @Optional()
+    private readonly learnerResults?: CourseCopilotLearnerResultsService,
   ) {}
 
   /**
@@ -497,6 +512,43 @@ export class CourseCopilotToolsService {
             ? `Matched the learners against the profile library: ${bestMatches[0]?.name ?? 'no close match'}`
             : `Listed ${profiles.length} learner profiles`,
         };
+      }
+      case 'get_learner_results': {
+        const trackId = context.session.trackId;
+        if (!trackId || !this.learnerResults) {
+          return {
+            modelResult: {
+              ok: false,
+              error: 'no_course',
+              message: 'There is no course with learners yet: results exist only for a published course.',
+            },
+            summary: 'No learner results yet',
+          };
+        }
+        try {
+          const results = await this.learnerResults.forCourse(
+            trackId,
+            context.session.tenantId,
+          );
+          return {
+            modelResult: {
+              ok: true,
+              results: this.learnerResults.render(results),
+              note: DATA_NOTE,
+            },
+            summary: `Read learner results: ${results.enrolled} learners, ${results.completed} completed`,
+          };
+        } catch (error) {
+          return {
+            modelResult: {
+              ok: false,
+              error: 'results_unavailable',
+              message:
+                'Learner results could not be read just now. This says nothing about how learners did.',
+            },
+            summary: 'Learner results unavailable this turn',
+          };
+        }
       }
       case 'list_example_courses': {
         const courses = this.exampleCourses.list();

@@ -27,6 +27,7 @@ const INTERVIEW_TOOL_NAMES = [
   'get_learner_profile',
   'list_example_courses',
   'get_example_course',
+  'get_learner_results',
   'design_guidance_search',
   'design_guidance_get',
 ];

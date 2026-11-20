@@ -40,6 +40,7 @@ import { CourseCopilotLibraryService } from './service/course-copilot-library.se
 import { CourseCopilotLearnerProfileService } from './service/course-copilot-learner-profile.service';
 import { CourseCopilotExampleCourseService } from './service/course-copilot-example-course.service';
 import { CourseCopilotDesignGuidanceService } from './service/course-copilot-design-guidance.service';
+import { CourseCopilotLearnerResultsService } from './service/course-copilot-learner-results.service';
 import { CourseCopilotMediaService } from './service/course-copilot-media.service';
 import { CourseCopilotOrchestratorService } from './service/course-copilot-orchestrator.service';
 import { CourseCopilotSchedulerRegistrationService } from './service/course-copilot-scheduler-registration.service';
@@ -106,6 +107,7 @@ import { SpecialistLlmService } from './service/specialists/specialist-llm.servi
     CourseCopilotLearnerProfileService,
     CourseCopilotExampleCourseService,
     CourseCopilotDesignGuidanceService,
+    CourseCopilotLearnerResultsService,
     CourseCopilotCostService,
     CourseCopilotStructureService,
     CourseCopilotSessionService,
