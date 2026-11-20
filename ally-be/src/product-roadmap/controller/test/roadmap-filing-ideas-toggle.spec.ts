@@ -60,6 +60,8 @@ describe('Filing doors require a Roadmap role', () => {
     drafts as never,
     transcription as never,
     planAccess as never,
+    planSettings as never,
+    {} as never,
   );
 
   beforeEach(() => jest.clearAllMocks());

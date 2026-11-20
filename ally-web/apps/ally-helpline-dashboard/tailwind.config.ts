@@ -150,6 +150,19 @@ export default {
           4: "#8F2D02",
         },
         /*
+         * The public blog's reading surface (/blog, /blog/review): the four
+         * colours its pages need that the warm gray ramp does not already hold.
+         * Ink and headings use gray-900/700/500 directly. `accent` is the
+         * blog's own terracotta (focus rings, quote rules) and `accent-tint` the
+         * banner behind it; `error` is the form-validation red, 5.6:1 on gray-50.
+         */
+        blog: {
+          body: "#33322F",
+          accent: "#D97757",
+          "accent-tint": "#F6E3D8",
+          error: "#B3402A",
+        },
+        /*
          * The public blog's terracotta accent as a colour, not a data step: the
          * roadmap's maturity dots (DEFAULT, decorative) and its italic card notes
          * (`text`, 5:1 on white and on gray-50). Same hues as activity-2/3, named

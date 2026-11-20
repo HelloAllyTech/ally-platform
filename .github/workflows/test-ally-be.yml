@@ -97,8 +97,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Typecheck
-        # Outgrew Node's default heap when #315 landed (OOM, exit 134), as the build step
-        # below did on 2026-11-11; the runner has 7 GB.
+        # Same heap as the build below: tsc over the whole tree OOMs on Node's default (exit 134).
         env:
           NODE_OPTIONS: --max-old-space-size=6144
         run: npm run typecheck

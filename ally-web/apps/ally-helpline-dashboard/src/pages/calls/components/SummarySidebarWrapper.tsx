@@ -65,7 +65,7 @@ const SummarySidebarWrapper: FC<SummarySidebarWrapperProps> = ({
               <div className="flex min-h-0 min-w-0 flex-col overflow-hidden">
                 {tabList[0].content}
               </div>
-              <div className="flex min-h-0 min-w-0 flex-col overflow-y-auto border-l border-[#d6cdbe] pl-4">
+              <div className="flex min-h-0 min-w-0 flex-col overflow-y-auto border-l border-gray-300 pl-4">
                 {tabList[1].content}
               </div>
             </div>
@@ -74,7 +74,7 @@ const SummarySidebarWrapper: FC<SummarySidebarWrapperProps> = ({
               {/* One tab is not a choice — the strip would only repeat the
                 heading the tab's own content already renders. */}
               {(tabList?.length ?? 0) > 1 && (
-                <div className="mb-4 w-full shrink-0 border-b border-[#d6cdbe]">
+                <div className="mb-4 w-full shrink-0 border-b border-gray-300">
                   <Tabs
                     items={tabList?.map(tab => ({ id: String(tab.id), label: tab.label })) ?? []}
                     activeId={String(selectedTab)}
