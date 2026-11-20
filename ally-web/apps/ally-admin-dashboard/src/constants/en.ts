@@ -15521,4 +15521,17 @@ export const en = {
     revoked: (label: string) => `${label} revoked`,
     revokeFailed: "Couldn't revoke that key. Nothing changed.",
   },
+  blogPostPreview: {
+    button: "Preview",
+    title: "Preview",
+    draft: "Draft",
+    published: "Published",
+    draftNotice: "Not published yet. Readers cannot see this.",
+    deviceGroup: "Preview width",
+    desktop: "Desktop",
+    mobile: "Mobile",
+    close: "Close",
+    by: "By",
+    untitled: "Untitled post",
+  },
 };

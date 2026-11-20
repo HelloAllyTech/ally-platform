@@ -23,6 +23,7 @@ import {
 } from "@api";
 import { ActionConfirmationPopup, BlogSidePanel, Button, ListToolbar } from "@components";
 import { BlogClaudeConnect, useBlogClaudeConnect } from "@components/blog-claude-connect";
+import { BlogPostPreview } from "@components/blog-post-preview";
 import { BlogFormValues } from "@components/blog-side-panel/BlogSidePanel";
 import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
@@ -51,6 +52,7 @@ export const BlogManagement: React.FC = () => {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [selectedBlog, setSelectedBlog] = useState<BlogPost | null>(null);
   const [pendingDelete, setPendingDelete] = useState<BlogPost | null>(null);
+  const [previewBlog, setPreviewBlog] = useState<BlogPost | null>(null);
   const connect = useBlogClaudeConnect();
 
   // Grow the page size for "Load more" (offset stays 0) so the query stays a
@@ -254,6 +256,12 @@ export const BlogManagement: React.FC = () => {
                       Edit
                     </button>
                     <button
+                      onClick={() => setPreviewBlog(blog)}
+                      className="text-typography-700 hover:underline py-2 md:py-0"
+                    >
+                      {en.blogPostPreview.button}
+                    </button>
+                    <button
                       onClick={() => handleTogglePublish(blog)}
                       className="text-typography-700 hover:underline py-2 md:py-0"
                     >
@@ -306,6 +314,23 @@ export const BlogManagement: React.FC = () => {
         onSave={handleSave}
         isSaving={isCreating || isUpdating}
       />
+
+      {previewBlog && (
+        <BlogPostPreview
+          post={{
+            title: previewBlog.title,
+            tldr: previewBlog.tldr,
+            body: previewBlog.body,
+            tags: previewBlog.tags ?? [],
+            coverColor: previewBlog.coverColor,
+            authorName: previewBlog.authorName,
+            headerImageUrl: previewBlog.headerImageUrl,
+            status: previewBlog.status,
+            date: previewBlog.publishedAt ?? previewBlog.createdAt,
+          }}
+          onClose={() => setPreviewBlog(null)}
+        />
+      )}
 
       <BlogClaudeConnect open={connect.open} onClose={connect.closeSheet} />
 

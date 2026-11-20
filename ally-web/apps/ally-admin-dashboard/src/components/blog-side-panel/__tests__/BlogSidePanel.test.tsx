@@ -89,3 +89,17 @@ describe("BlogSidePanel save buttons", () => {
     expect(onSave).toHaveBeenCalledWith(expect.anything(), false, true);
   });
 });
+
+describe("BlogSidePanel preview", () => {
+  it("previews the unsaved form values", () => {
+    renderPanel(post);
+    fireEvent.change(screen.getByPlaceholderText("Post title"), {
+      target: { value: "Edited, not saved" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Preview" }));
+    expect(screen.getByRole("dialog", { name: "Preview" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Edited, not saved" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog", { name: "Preview" })).toBeNull();
+  });
+});
