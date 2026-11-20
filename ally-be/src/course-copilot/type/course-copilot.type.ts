@@ -29,9 +29,17 @@ export interface CourseBrief {
   };
   /** Observable verbs: "de-escalate a caller who threatens to hang up". */
   outcomes?: { terminal?: string; enabling?: string[] };
+  /** The closest entry in the manual's learner profile library (`list_learner_profiles`). */
+  learnerProfileId?: string;
+  /** Set from the library by normalisation, never by the model — for display. */
+  learnerProfileName?: string;
   competencyIds?: string[];
   competencyNames?: string[];
   behaviours?: { helpful?: string[]; unhelpful?: string[] };
+  /** Per primary skill: how well (A) and how widely (B) learners should do it by the end. */
+  skillTargets?: CourseBriefSkillTarget[];
+  /** Per skill, its behaviours in the three EQUIP groups. */
+  rubric?: CourseBriefRubricEntry[];
   assessment?: {
     kind?: CourseBriefAssessmentKind;
     note?: string;
@@ -57,6 +65,31 @@ export interface CourseBrief {
   notes?: string[];
 }
 
+/**
+ * The manual's skill target. A — level: A1 Safe (no harmful or unhelpful
+ * behaviours), A2 Getting started (A1 + some basic helpful), A3 Solid basics
+ * (A1 + all basic helpful), A4 Advanced (A3 + some or all advanced helpful).
+ * B — transfer: B1 practised scenarios only, B2 new scenarios of similar
+ * difficulty, B3 harder scenarios. The copilot never offers B4/B5.
+ */
+export type CourseBriefSkillLevel = 'A1' | 'A2' | 'A3' | 'A4';
+export type CourseBriefSkillTransfer = 'B1' | 'B2' | 'B3';
+
+export interface CourseBriefSkillTarget {
+  competencyId?: string;
+  skill: string;
+  /** Optional at rest: the interview asks A first, then B. */
+  a?: CourseBriefSkillLevel;
+  b?: CourseBriefSkillTransfer;
+}
+
+export interface CourseBriefRubricEntry {
+  skill: string;
+  harmfulOrUnhelpful: string[];
+  basicHelpful: string[];
+  advancedHelpful: string[];
+}
+
 export type CourseBriefAssessmentKind =
   | 'roleplay'
   | 'quiz'
@@ -68,6 +101,8 @@ export type CourseBriefComponent =
   | 'video'
   | 'journal'
   | 'annotated_artifact'
+  | 'branching_scenario'
+  | 'bucket_sort'
   | 'game'
   | 'quiz';
 

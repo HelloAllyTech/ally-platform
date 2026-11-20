@@ -426,7 +426,8 @@ const ASSISTANTS = [
 
 export const MY_PLAN = {
   isCreator: true,
-  tokens: { unlimited: false, left: 1_200_000, granted: 2_000_000, resetsOn: "2026-12-01" },
+  capReached: false,
+  monthlyUsage: { used: 2.37, limit: 10, resetsOn: "2026-12-01" },
   plan: {
     key: "free",
     name: "Free",
@@ -447,7 +448,7 @@ export const MY_PLAN = {
 const audit = (action: string, note: string, createdAt: string, extra = {}) => ({
   id: `a-${action}-${createdAt}`,
   createdAt,
-  subjectType: "tokens",
+  subjectType: "spend_cap",
   subjectId: "41",
   action,
   before: null,
@@ -461,6 +462,7 @@ const audit = (action: string, note: string, createdAt: string, extra = {}) => (
 
 export const USER_PLAN = {
   ...MY_PLAN,
+  spend: { usedUsd: 2.37, capUsd: 10, capSource: "plan", resetsOn: "2026-12-01" },
   subscription: {
     id: "sub-1",
     planKey: "free",
@@ -480,42 +482,14 @@ export const USER_PLAN = {
   ],
 };
 
-export const USER_TOKENS = {
-  hasAllowance: true,
-  unlimited: false,
-  left: 1_200_000,
-  granted: 2_000_000,
-  usedThisMonth: 800_000,
-  overdraft: 0,
-  resetsOn: "2026-12-01T00:00:00.000Z",
-  grants: [
-    {
-      id: "g-2",
-      amount: 500_000,
-      remaining: 0,
-      used: 0,
-      renewMonthly: false,
-      renewDay: null,
-      nextRenewalAt: null,
-      expiresAt: null,
-      status: "revoked",
-      note: "Added by mistake",
-      createdAt: "2026-11-12T08:00:00.000Z",
-    },
-    {
-      id: "g-1",
-      amount: 2_000_000,
-      remaining: 1_200_000,
-      used: 800_000,
-      renewMonthly: true,
-      renewDay: 1,
-      nextRenewalAt: "2026-12-01T00:00:00.000Z",
-      expiresAt: null,
-      status: "active",
-      note: "Starting allowance for custom logins",
-      createdAt: "2026-11-01T00:00:00.000Z",
-    },
-  ],
+export const USER_SPEND = {
+  isCreator: true,
+  planName: "Free",
+  usedUsd: 2.37,
+  capUsd: 10,
+  capSource: "plan",
+  planCapUsd: 10,
+  resetsOn: "2026-12-01",
   usage: {
     byAssistant: [
       { chatbotId: "bot-sunrise", name: "Sunrise Mind", tokens: 612_400, costUsd: 1.84 },
@@ -530,9 +504,8 @@ export const USER_TOKENS = {
     ],
   },
   history: [
-    audit("revoke", "Added by mistake", "2026-11-12T08:05:00.000Z"),
-    audit("assign", "Added by mistake", "2026-11-12T08:00:00.000Z"),
-    audit("assign", "Starting allowance for custom logins", "2026-11-01T00:00:00.000Z"),
+    audit("plan", "Pilot over: back to the plan's cap", "2026-11-12T08:05:00.000Z"),
+    audit("set", "Raised for the clinic's launch week", "2026-11-01T00:00:00.000Z"),
   ],
 };
 
@@ -570,6 +543,7 @@ export const PLANS_CATALOGUE = {
       ownerRuns: 100,
       seatsRequired: true,
       price: null,
+      costCap: 10,
       active: true,
     },
     {
@@ -583,6 +557,7 @@ export const PLANS_CATALOGUE = {
       ownerRuns: 1000,
       seatsRequired: true,
       price: 49,
+      costCap: 120,
       active: true,
     },
     {
@@ -596,6 +571,7 @@ export const PLANS_CATALOGUE = {
       ownerRuns: null,
       seatsRequired: false,
       price: null,
+      costCap: null,
       active: true,
     },
   ],
@@ -747,7 +723,7 @@ export async function mockBilling(page: Page) {
     if (path === "/admin/billing/costs/fixed") return json(route, FIXED);
     if (path === "/admin/billing/costs/plans") return json(route, PLAN_COSTS);
     if (path === "/admin/billing/plans") return json(route, PLANS_CATALOGUE);
-    if (/^\/admin\/billing\/users\/\d+\/tokens$/.test(path)) return json(route, USER_TOKENS);
+    if (/^\/admin\/billing\/users\/\d+\/spend$/.test(path)) return json(route, USER_SPEND);
     if (/^\/admin\/billing\/users\/\d+\/plan$/.test(path)) return json(route, USER_PLAN);
     if (path === "/custom-logins") return json(route, CUSTOM_LOGINS);
     if (path === "/authorization/feature-toggles/registry") return json(route, TOGGLE_REGISTRY);

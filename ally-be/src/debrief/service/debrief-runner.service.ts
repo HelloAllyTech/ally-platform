@@ -525,9 +525,8 @@ export class DebriefRunnerService {
     // providers gets the release with only those providers' models — never
     // another company. A step whose models are all disallowed runs on a
     // priced model from the catalogue on an allowed provider (same tier
-    // first). Only when none exists does the run end, and the learner gets
-    // today's debrief (or "not available" when today's provider is not
-    // allowed either; DebriefAgentService.fallBackToToday).
+    // first). Only when none exists does the run end, and the learner reads
+    // "not available".
     const allowed = await this.context.providerAllowlist(session.tenantId);
     const everyAllowed = DEBRIEF_APPROVED_PROVIDERS.every((p) =>
       allowed.includes(p),

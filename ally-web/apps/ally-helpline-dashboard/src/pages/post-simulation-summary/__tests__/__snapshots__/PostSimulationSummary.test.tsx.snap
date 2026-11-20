@@ -279,7 +279,6 @@ exports[`PostSimulationSummary Component > Snapshot Testing > should match snaps
         >
           <div
             data-has-summary="false"
-            data-retry-max="false"
             data-testid="debrief-tab"
           >
             <div
@@ -596,7 +595,6 @@ exports[`PostSimulationSummary Component > Snapshot Testing > should match snaps
         >
           <div
             data-has-summary="false"
-            data-retry-max="false"
             data-testid="debrief-tab"
           >
             <div

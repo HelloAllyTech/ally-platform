@@ -209,7 +209,9 @@ export class DebriefConsoleViewService implements OnModuleInit {
    * queue order need. `rank`: 0 urgent (a flag on an important moment, an
    * Ask Ally distress item, an escalated flag, or learner distress not yet
    * checked), 1 another open flag, 2 held or below the bar and not reviewed,
-   * 3 the rest. Only live runs can need a person.
+   * 3 the rest. Only live runs can need a person. A debrief shown with a
+   * missed risk cue is NOT urgent: nobody reviews by hand (owner decision
+   * 2026-11-20), the PM agent learns from it as from any below-the-bar run.
    */
   private baseSql(f: SessionFilters, params: unknown[]): string {
     const p = (v: unknown) => {
@@ -291,8 +293,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
         SELECT b.*,
                CASE
                  WHEN b.mode = 'live' AND (b.urgent_open
-                      OR (b."learnerDistress" AND NOT b.reviewed)
-                      OR (b.review_reason = 'missed_risk_cue' AND NOT b.reviewed)) THEN 0
+                      OR (b."learnerDistress" AND NOT b.reviewed)) THEN 0
                  WHEN b.mode = 'live' AND b.any_open THEN 1
                  WHEN b.mode = 'live' AND NOT b.reviewed
                       AND (b.status IN ('needs_person','below_bar','failed')
@@ -1082,7 +1083,7 @@ export class DebriefConsoleViewService implements OnModuleInit {
         count: urgent.length,
         oldestSince: iso(urgent[0].since),
         overdue: overdue(urgent[0].since),
-        message: `${urgent.length} urgent: a flag on an important moment, a learner in distress, or a debrief shown with a missed risk cue.`,
+        message: `${urgent.length} urgent: a flag on an important moment or a learner in distress.`,
         link: { page: 'session', runId: urgent[0].id },
       });
     }

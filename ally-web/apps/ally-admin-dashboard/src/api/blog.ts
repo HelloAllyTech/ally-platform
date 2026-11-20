@@ -57,6 +57,20 @@ export interface BlogImageUploadResponse {
   imageUrl: string;
 }
 
+/** One of your keys for Claude Code. The key itself is never listed, only its start. */
+export interface BlogAuthoringKey {
+  id: string;
+  label: string;
+  keyPrefix: string;
+  lastUsedAt?: string | null;
+  createdAt?: string;
+}
+
+/** `POST keys`: the only response that ever carries the key. */
+export interface BlogAuthoringKeyCreated extends BlogAuthoringKey {
+  key: string;
+}
+
 export const blogAPI = baseAPI.injectEndpoints({
   endpoints: builder => ({
     getBlogs: builder.query<GetBlogsResponse, GetBlogsQuery | void>({
@@ -118,6 +132,21 @@ export const blogAPI = baseAPI.injectEndpoints({
         body,
       }),
     }),
+    getBlogAuthoringKeys: builder.query<BlogAuthoringKey[], void>({
+      query: () => ({ url: ApiEndpoints.BLOG_AUTHORING.KEYS, method: HttpMethod.GET }),
+      providesTags: [TAG_TYPES.BLOG_AUTHORING_KEYS],
+    }),
+    createBlogAuthoringKey: builder.mutation<BlogAuthoringKeyCreated, { label: string }>({
+      query: body => ({ url: ApiEndpoints.BLOG_AUTHORING.KEYS, method: HttpMethod.POST, body }),
+      invalidatesTags: [TAG_TYPES.BLOG_AUTHORING_KEYS],
+    }),
+    revokeBlogAuthoringKey: builder.mutation<void, string>({
+      query: id => ({
+        url: ApiEndpoints.BLOG_AUTHORING.KEY_BY_ID(id),
+        method: HttpMethod.DELETE,
+      }),
+      invalidatesTags: [TAG_TYPES.BLOG_AUTHORING_KEYS],
+    }),
   }),
 });
 
@@ -130,4 +159,7 @@ export const {
   useUnpublishBlogMutation,
   useDeleteBlogMutation,
   useGetBlogImageUploadUrlMutation,
+  useGetBlogAuthoringKeysQuery,
+  useCreateBlogAuthoringKeyMutation,
+  useRevokeBlogAuthoringKeyMutation,
 } = blogAPI;

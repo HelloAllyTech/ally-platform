@@ -361,6 +361,12 @@ export const ApiEndpoints = {
     UNPUBLISH_BLOG: (id: string) => `/v1/blog/${id}/unpublish`,
     UPLOAD_IMAGE_URL: "/v1/blog/upload-url",
   },
+  // Keys that let Claude Code write draft posts, and the MCP endpoint they unlock.
+  BLOG_AUTHORING: {
+    KEYS: "/v1/blog-authoring/keys",
+    KEY_BY_ID: (id: string) => `/v1/blog-authoring/keys/${encodeURIComponent(id)}`,
+    MCP: "/v1/blog-authoring/mcp",
+  },
   PRODUCT_UPDATES: {
     LIST: "/v1/product-updates",
     STATUS: "/v1/product-updates/status",
@@ -1122,12 +1128,9 @@ export const ApiEndpoints = {
     FIXED_COSTS: "/v1/admin/billing/costs/fixed",
     FIXED_COST: (id: string) => `/v1/admin/billing/costs/fixed/${id}`,
     COSTS_PLANS: "/v1/admin/billing/costs/plans",
-    // CR1 Parts B and C: a user's tokens and plan, plans and seat types, seats on any assistant.
-    USER_TOKENS: (userId: number) => `/v1/admin/billing/users/${userId}/tokens`,
-    USER_TOKEN_GRANTS: (userId: number) => `/v1/admin/billing/users/${userId}/tokens/grants`,
-    USER_TOKEN_GRANT: (userId: number, grantId: string) =>
-      `/v1/admin/billing/users/${userId}/tokens/grants/${grantId}`,
-    USER_TOKEN_UNLIMITED: (userId: number) => `/v1/admin/billing/users/${userId}/tokens/unlimited`,
+    // A user's spend and plan, plans and seat types, seats on any assistant.
+    USER_SPEND: (userId: number) => `/v1/admin/billing/users/${userId}/spend`,
+    USER_SPEND_CAP: (userId: number) => `/v1/admin/billing/users/${userId}/spend/cap`,
     USER_PLAN: (userId: number) => `/v1/admin/billing/users/${userId}/plan`,
     PLANS: "/v1/admin/billing/plans",
     PLAN: (id: string) => `/v1/admin/billing/plans/${id}`,
@@ -1551,7 +1554,7 @@ export const TAG_TYPES = {
   BILLING_COSTS: "billingCosts",
   BILLING_FIXED_COSTS: "billingFixedCosts",
   BILLING_PLANS: "billingPlans",
-  BILLING_USER_TOKENS: "billingUserTokens",
+  BILLING_USER_SPEND: "billingUserSpend",
   BILLING_USER_PLAN: "billingUserPlan",
   MY_PLAN: "myPlan",
   ASSISTANT_SEATS: "assistantSeats",
@@ -1622,6 +1625,8 @@ export const TAG_TYPES = {
   // Course discussion moderation. Also registered in baseApi.ts's `tagTypes`.
   COURSE_DISCUSSION: "courseDiscussion",
   BLOGS: "blogs",
+  // Keys for Claude Code to write blog drafts. Also registered in baseApi.ts's `tagTypes`.
+  BLOG_AUTHORING_KEYS: "blogAuthoringKeys",
   // Product updates. Also registered in baseApi.ts's `tagTypes`.
   PRODUCT_UPDATES: "productUpdates",
   SUPER_DUPER_ADMINS: "superDuperAdmins",

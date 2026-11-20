@@ -150,7 +150,7 @@ export interface ChatbotDecision {
     | 'customers'
     | 'no_seat'
     | 'seat_messages'
-    | 'owner_tokens'
+    | 'owner_cap'
     | 'owner_runs';
   templateId?: string;
   /**

@@ -384,6 +384,8 @@ export enum LlmTask {
   COURSE_COPILOT_QUIZ = 'course_copilot_quiz',
   COURSE_COPILOT_JOURNAL = 'course_copilot_journal',
   COURSE_COPILOT_ANNOTATION = 'course_copilot_annotation',
+  COURSE_COPILOT_SCENARIO_QUIZ = 'course_copilot_scenario_quiz',
+  COURSE_COPILOT_BUCKET_SORT = 'course_copilot_bucket_sort',
   COURSE_COPILOT_META = 'course_copilot_meta',
   COURSE_COPILOT_REVIEW = 'course_copilot_review',
   COURSE_COPILOT_SUMMARY = 'course_copilot_summary',

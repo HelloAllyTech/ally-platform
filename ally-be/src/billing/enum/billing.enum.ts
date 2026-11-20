@@ -67,8 +67,11 @@ export enum CostAlertKind {
   CONVERSATION_COST = 'conversation_cost',
   UNPRICED_MODEL = 'unpriced_model',
   USAGE_FEED_OFF = 'usage_feed_off',
+  /** No longer raised (token allowances were replaced by the spend cap); kept for old rows. */
   TOKEN_DRIFT = 'token_drift',
   SEAT_RENEWAL = 'seat_renewal',
+  /** A creator reached 80% or 100% of their monthly cost cap. */
+  SPEND_CAP = 'spend_cap',
 }
 
 export enum SubscriptionStatus {
@@ -102,3 +105,6 @@ export enum CounterSubject {
   /** A creator's monthly owner-side runs: setup, site reading, checkups, change by chat, re-indexing, Try it. */
   OWNER_RUNS = 'owner_runs',
 }
+
+/** The plan of a creator with no subscription. */
+export const DEFAULT_PLAN_KEY = 'free';

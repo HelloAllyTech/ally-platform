@@ -5,7 +5,7 @@ import { BOT_ID, mockAssistantHome } from "./assistantHome.fixture";
 import { logIn, mockBilling } from "./billing.fixture";
 
 /**
- * CR1: Ally admin → Models, → Costs and → Plans, a user's Tokens and Plan, the owner's Plan and
+ * CR1: Ally admin → Models, → Costs and → Plans, a user's Spend and Plan, the owner's Plan and
  * usage, Share → People's seats and the publish limit, from fixtures, at 1440 and 390. Saves
  * full-page screenshots for the stop to docs/agents-v2/screenshots/cr1/ (as publishGate does for
  * its PR); no baselines are compared.
@@ -44,7 +44,7 @@ const shoot = async (page: Page, name: string) => {
   await page.setViewportSize(size);
 };
 
-/** One part of a page (a user's Tokens, their Plan), with the viewport grown as `shoot` does. */
+/** One part of a page (a user's Spend, their Plan), with the viewport grown as `shoot` does. */
 const shootPart = async (page: Page, testId: string, name: string) => {
   const size = page.viewportSize() ?? { width: 1440, height: 900 };
   const tallest = await page.evaluate(() =>
@@ -130,6 +130,10 @@ test("Plans: renewals due, plans and seat types with their limits and prices", a
   );
   const plans = page.getByTestId("billing-plans-table");
   await expect(plans).toContainText("Free");
+  // The cost cap per creator: Ally's guard, in dollars, on this screen only.
+  await expect(plans).toContainText("Cost cap / creator / month");
+  await expect(plans).toContainText("$120.00");
+  await expect(plans).toContainText("No cap");
   await expect(plans).toContainText("$49.00");
   await expect(page.getByTestId("billing-seat-types-table")).toContainText("Premium");
   await expectNoPageScrollX(page);
@@ -142,32 +146,40 @@ test("Plans: renewals due, plans and seat types with their limits and prices", a
   await expect(page.getByTestId("billing-note")).toBeVisible();
 });
 
-test("a custom login's Tokens and Plan", async ({ page }) => {
+test("a custom login's Spend and Plan", async ({ page }) => {
   await open(page, "/user-management?tab=custom-logins");
   await page.getByTestId("custom-login-row").first().click();
   await expect(page.getByTestId("custom-login-detail")).toBeVisible();
-  const tokens = page.getByTestId("user-tokens-section");
-  await expect(tokens.getByTestId("tokens-left")).toContainText("1,200,000");
-  await expect(tokens).toContainText("Sunrise Mind");
+  const spend = page.getByTestId("user-spend-section");
+  await expect(spend.getByTestId("spend-used")).toContainText("$2.37");
+  await expect(spend.getByTestId("spend-cap")).toContainText("$10.00");
+  await expect(spend).toContainText("Sunrise Mind");
   const plan = page.getByTestId("user-plan-section");
   await expect(plan.getByTestId("user-plan-line")).toContainText(
     "Free · 2 of 3 assistants published",
   );
   await expect(plan.getByTestId("user-plan-assistant").first()).toContainText("Premium");
   await expectNoPageScrollX(page);
-  await shootPart(page, "user-tokens-section", "user-tokens");
+  await shootPart(page, "user-spend-section", "user-spend");
   await shootPart(page, "user-plan-section", "user-plan");
 });
 
-test("the owner's Plan and usage: counts and bars, never dollars", async ({ page }) => {
+test("the owner's Plan and usage: counts and bars, and the monthly usage in dollars", async ({
+  page,
+}) => {
   await open(page, "/account/plan");
   const body = page.getByTestId("my-plan");
   await expect(body.getByTestId("plan-line")).toContainText("Free · 2 of 3 assistants published");
-  await expect(body.getByTestId("plan-tokens")).toContainText(
-    "1.2M of 2M tokens left · resets 1 Dec",
-  );
+  await expect(body.getByTestId("plan-tokens")).toHaveCount(0);
+  await expect(body).not.toContainText(/tokens/i);
+  await expect(body).toContainText("Basic · 500 messages a month");
   await expect(body.getByTestId("plan-alerts")).toContainText("84% used");
-  await expect(body).not.toContainText("$");
+  await expect(body.getByTestId("plan-monthly-usage")).toContainText("$2.37 of $10.00");
+  await expect(body.getByTestId("plan-usage-note")).toContainText(
+    "your assistants stop answering until it resets",
+  );
+  // The allowance is the only money shown: no plan or seat price.
+  await expect(body.getByTestId("plan-assistants")).not.toContainText("$");
   await expectNoPageScrollX(page);
   await shoot(page, "my-plan");
 });

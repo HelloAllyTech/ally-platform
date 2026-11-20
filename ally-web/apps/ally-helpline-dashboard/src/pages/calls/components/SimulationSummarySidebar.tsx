@@ -46,10 +46,7 @@ const SimulationSummarySidebar: FC<SimulationSummarySidebarProps> = ({
     { sessionId: summaryId, languageCode: i18n.language },
     { skip: !summaryId },
   );
-  const { summaryData, retryMaxReached, isShortSession } = useSimulationSummaryPolling(
-    summaryId,
-    i18n.language,
-  );
+  const { summaryData, isShortSession } = useSimulationSummaryPolling(summaryId, i18n.language);
   const [createReview, { isLoading: isCreateReviewLoading }] = useCreateReviewMutation();
   const [updateReview, { isLoading: isUpdateReviewLoading }] = useUpdateReviewMutation();
 
@@ -218,12 +215,7 @@ const SimulationSummarySidebar: FC<SimulationSummarySidebarProps> = ({
             // otherwise could not be scrolled in the side pane.
             content: (
               <div className="min-h-0 flex-1 overflow-y-auto" data-testid="debrief-tab-scroll">
-                <DebriefTab
-                  sessionId={summaryId}
-                  summaryData={summaryData}
-                  retryMaxReached={retryMaxReached}
-                  readOnly
-                />
+                <DebriefTab sessionId={summaryId} summaryData={summaryData} readOnly />
               </div>
             ),
           },

@@ -4,7 +4,6 @@ import {
   LIVE_START_DELAY_MS,
   learnerProgress,
 } from '../service/debrief-agent.service';
-import { DEBRIEF_FALLBACK_TO_TODAY_EVENT } from '../../common/util/debrief-live.util';
 
 function build(opts: {
   owner?: number;
@@ -47,7 +46,6 @@ function build(opts: {
               ],
     ),
   };
-  const events = { emit: jest.fn() };
   const runs = { find: jest.fn(async () => opts.runs ?? []) };
   const overrides = {
     save: jest.fn(async () => undefined),
@@ -85,15 +83,19 @@ function build(opts: {
     undefined,
     undefined,
     undefined,
-    events as any,
   );
 }
 
-/** Whether the view asked the session service for today's debrief. */
+/**
+ * The old post-session note is retired: the view must never ask for it to be
+ * written, mark the run, or emit anything for it.
+ */
 const askedForToday = (svc: DebriefAgentService) =>
-  ((svc as any).events.emit as jest.Mock).mock.calls.some(
-    ([name]) => name === DEBRIEF_FALLBACK_TO_TODAY_EVENT,
-  );
+  ((svc as any).dataSource.query as jest.Mock).mock.calls.some(
+    ([sql]) => typeof sql === 'string' && sql.includes('fallbackToToday'),
+  ) ||
+  typeof (svc as any).fallBackToToday === 'function' ||
+  typeof (svc as any).requestTodaysDebrief === 'function';
 
 describe('DebriefAgentService.learnerView', () => {
   it('refuses anyone but the learner who did the session', async () => {
@@ -262,13 +264,13 @@ describe('DebriefAgentService.learnerView', () => {
     });
   });
 
-  it('gives today’s debrief when the agent is off or the roleplay’s Debrief tab is off', async () => {
+  it('says not available, regenerating nothing, when the agent is off or the roleplay’s Debrief tab is off', async () => {
     for (const o of [{ mode: 'off' as const }, { debriefTabOff: true }]) {
       const svc = build(o);
       expect(await svc.learnerView('s', 7)).toEqual({
         state: 'not_available',
       });
-      expect(askedForToday(svc)).toBe(true);
+      expect(askedForToday(svc)).toBe(false);
     }
   });
 
@@ -278,10 +280,10 @@ describe('DebriefAgentService.learnerView', () => {
     ).toBe('working');
     const late = build({ endedMinutesAgo: 31 });
     expect(await late.learnerView('s', 7)).toEqual({ state: 'not_available' });
-    expect(askedForToday(late)).toBe(true);
+    expect(askedForToday(late)).toBe(false);
   });
 
-  it('does not ask for today’s debrief again when it is already written', async () => {
+  it('leaves a note already written alone', async () => {
     const svc = build({
       endedMinutesAgo: 31,
       feedback: { supervisorNote: 'today’s note' },
@@ -290,24 +292,17 @@ describe('DebriefAgentService.learnerView', () => {
     expect(askedForToday(svc)).toBe(false);
   });
 
-  it('says "not available" instead of today’s debrief when its provider is not allowed (FR-57)', async () => {
-    const svc = build({
-      endedMinutesAgo: 31,
-      providers: { 'providerAllowed.openai': false },
-    });
-    expect(await svc.learnerView('s', 7)).toEqual({
-      state: 'not_available',
-      stopped: true,
-      reason: 'provider_not_allowed',
-    });
-    expect(askedForToday(svc)).toBe(false);
-    // Another provider switched off: today's debrief is still allowed.
-    const ok = build({
-      endedMinutesAgo: 31,
-      providers: { 'providerAllowed.anthropic': false },
-    });
-    expect(await ok.learnerView('s', 7)).toEqual({ state: 'not_available' });
-    expect(askedForToday(ok)).toBe(true);
+  it('says plain "not available" without regeneration, whichever provider the organisation switched off', async () => {
+    for (const providers of <Array<Record<string, boolean>>>[
+      { 'providerAllowed.openai': false },
+      { 'providerAllowed.anthropic': false },
+    ]) {
+      const svc = build({ endedMinutesAgo: 31, providers });
+      expect(await svc.learnerView('s', 7)).toEqual({
+        state: 'not_available',
+      });
+      expect(askedForToday(svc)).toBe(false);
+    }
   });
 
   it('says when the safety reading found a risk cue, so the support lines show without an important moment', async () => {
@@ -573,7 +568,7 @@ describe('DebriefAgentService.learnerView', () => {
       expect(await svc.learnerView('s', 7)).toEqual({
         state: 'not_available',
       });
-      expect(askedForToday(svc)).toBe(true);
+      expect(askedForToday(svc)).toBe(false);
     }
   });
 });

@@ -7,8 +7,10 @@ import { TextArea, TextInput } from "@ally-ui-mono/ui-shared";
 import { BlogPost, useGetBlogImageUploadUrlMutation } from "@api";
 import { DoubleArrowRight } from "@assets";
 import { ActionConfirmationPopup, Button } from "@components";
+import { BlogPostPreview } from "@components/blog-post-preview";
 import { RichTextEditor } from "@components/rich-text-editor";
 import { ButtonVariant } from "@components/types";
+import { en } from "@constants";
 
 export interface BlogFormValues {
   title: string;
@@ -107,6 +109,7 @@ export const BlogSidePanel: React.FC<BlogSidePanelProps> = ({
   const [tagInput, setTagInput] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [showConfirmClose, setShowConfirmClose] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   const [getUploadUrl] = useGetBlogImageUploadUrlMutation();
 
@@ -412,6 +415,9 @@ export const BlogSidePanel: React.FC<BlogSidePanelProps> = ({
             <Button variant={ButtonVariant.SECONDARY} onClick={handleClose} disabled={isSaving}>
               Cancel
             </Button>
+            <Button variant={ButtonVariant.SECONDARY} onClick={() => setShowPreview(true)}>
+              {en.blogPostPreview.button}
+            </Button>
             <Button
               variant={ButtonVariant.SECONDARY}
               onClick={() => handleSave(isPublished, true)}
@@ -438,6 +444,23 @@ export const BlogSidePanel: React.FC<BlogSidePanelProps> = ({
           </div>
         </div>
       </div>
+
+      {showPreview && (
+        <BlogPostPreview
+          post={{
+            title: form.title,
+            tldr: form.tldr,
+            body: form.body,
+            tags: form.tags,
+            coverColor: form.coverColor,
+            authorName: form.authorName,
+            headerImageUrl: form.headerImageUrl,
+            status: isPublished ? "PUBLISHED" : "DRAFT",
+            date: selectedBlog?.publishedAt ?? selectedBlog?.createdAt,
+          }}
+          onClose={() => setShowPreview(false)}
+        />
+      )}
 
       <ActionConfirmationPopup
         isOpen={showConfirmClose}

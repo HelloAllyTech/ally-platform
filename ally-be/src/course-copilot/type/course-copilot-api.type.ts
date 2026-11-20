@@ -180,5 +180,20 @@ export type CourseItemPreview =
       roleplayCount: number;
       generated: boolean;
     }
+  | {
+      type: 'BRANCHING_SCENARIO';
+      sceneCount: number;
+      endingCount: number;
+      /** null = explore (ungated). */
+      passScore: number | null;
+      intro: string | null;
+      firstScene: string | null;
+    }
+  | {
+      type: 'BUCKET_SORT';
+      itemCount: number;
+      buckets: string[];
+      intro: string | null;
+    }
   | { type: 'GAME'; gameKey: string | null; intro: string | null }
   | { type: 'VIDEO'; source: string | null; url: string | null };

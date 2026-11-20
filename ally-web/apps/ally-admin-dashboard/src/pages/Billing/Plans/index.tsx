@@ -108,6 +108,12 @@ export const BillingPlans: React.FC = () => {
       numeric: true,
       cell: plan => priceCell(plan.price),
     },
+    {
+      key: "costCap",
+      label: P.plans.columns.costCap,
+      numeric: true,
+      cell: plan => (plan.costCap === null ? P.plans.noCap : formatUsd(plan.costCap)),
+    },
     { key: "status", label: P.plans.columns.status, cell: plan => activeCell(plan.active) },
   ];
 

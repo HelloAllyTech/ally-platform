@@ -12,14 +12,14 @@ import {
   UsageKind,
 } from '../enum/billing.enum';
 import { PlanService, dayString, periodFor } from './plan.service';
-import { TokenService } from './token.service';
+import { SpendCapService } from './spend-cap.service';
 
 /** Why a run must not start (matches the engine's LimitReason). */
 export type LimitVerdict =
   | 'customers'
   | 'no_seat'
   | 'seat_messages'
-  | 'owner_tokens'
+  | 'owner_cap'
   | 'owner_runs';
 
 /** Who is messaging: a public/WhatsApp customer, an invited person (a seat), or the owner's team. */
@@ -46,7 +46,7 @@ export type OwnerRunKind =
 
 /**
  * Every limit, checked before a run starts (CR1 enforcement):
- *   - the creator's tokens, if they have an allowance;
+ *   - the creator's monthly cost cap, if they have one (Ally's guard; owners never see the amount);
  *   - an invited person's seat (and its messages this month);
  *   - an assistant's monthly customer conversations (public visitors and WhatsApp numbers);
  *   - the creator's monthly owner-side runs (setup, site reading, checkups, change by chat,
@@ -65,7 +65,7 @@ export class LimitsService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly plans: PlanService,
-    private readonly tokens: TokenService,
+    private readonly spend: SpendCapService,
     @Optional() private readonly ses?: SESService,
   ) {}
 
@@ -76,10 +76,11 @@ export class LimitsService {
     if (!context || !creator) return null;
     try {
       const audience = audienceOf(context);
-      const tokensOut = await this.tokens.isUsedUp(creator);
+      const creatorPlan = await this.plans.planOf(creator);
+      const capped = await this.spend.isOverCap(creator, creatorPlan);
 
       if (audience === 'owner') {
-        if (tokensOut) return 'owner_tokens';
+        if (capped) return 'owner_cap';
         // A checkup counts once when it starts, not per question.
         if (context.runKind === UsageKind.TRY_IT) {
           const ok = await this.countOwnerRun(
@@ -92,7 +93,7 @@ export class LimitsService {
         return null;
       }
 
-      const { plan, subscription } = await this.plans.planOf(creator);
+      const { plan, subscription } = creatorPlan;
 
       if (audience === 'seat' && plan.seatsRequired) {
         const seat = await this.plans.seatFor(
@@ -107,7 +108,7 @@ export class LimitsService {
             subscription?.status === SubscriptionStatus.CANCELLED
           );
         if (!usable) return 'no_seat';
-        if (tokensOut) return 'customers';
+        if (capped) return 'customers';
         const ok = await this.count(
           CounterSubject.SEAT,
           seat.id,
@@ -120,7 +121,7 @@ export class LimitsService {
         return ok ? null : 'seat_messages';
       }
 
-      if (tokensOut) return 'customers';
+      if (capped) return 'customers';
       if (audience === 'seat') return null; // internal plan: invited people need no seat
       return (await this.countCustomerConversation(
         input,
@@ -149,7 +150,7 @@ export class LimitsService {
     if (!creatorUserId) return;
     let verdict: LimitVerdict | null = null;
     try {
-      if (await this.tokens.isUsedUp(creatorUserId)) verdict = 'owner_tokens';
+      if (await this.spend.isOverCap(creatorUserId)) verdict = 'owner_cap';
       else if (!(await this.countOwnerRun(creatorUserId, runKey, kind)))
         verdict = 'owner_runs';
     } catch (error) {
@@ -158,10 +159,11 @@ export class LimitsService {
       );
       return;
     }
-    if (verdict === 'owner_tokens') {
+    if (verdict === 'owner_cap') {
       throw new ForbiddenException({
-        message: 'Your tokens are used up. Ask Ally to add more.',
-        errorCode: 'TOKENS_USED_UP',
+        message:
+          "Your account has reached this month's usage limit. Ask Ally to raise it.",
+        errorCode: 'USAGE_CAP_REACHED',
       });
     }
     if (verdict === 'owner_runs') {

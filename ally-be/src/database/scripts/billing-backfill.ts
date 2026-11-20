@@ -1,7 +1,6 @@
 /**
- * CR1 starting point: subscriptions for chatbot creators, included seats on live assistants and
- * starting tokens for custom logins. See docs/agents-v2/CHUNK-CR1-NOTES.md. Run
- * `custom-logins:migrate` first, so the moved custom logins get their tokens.
+ * CR1 starting point: subscriptions for chatbot creators and included seats on live assistants.
+ * See docs/agents-v2/CHUNK-CR1-NOTES.md.
  *
  *   npm run billing:backfill -- --dry-run   # who gets what, and who would be blocked; writes nothing
  *   npm run billing:backfill                # write it
@@ -25,14 +24,6 @@ async function main(): Promise<void> {
     for (const s of report.subscriptions) {
       console.log(
         `  user ${s.userId}  ${s.email}  → ${s.plan} (${s.why})${s.existing ? '  [already has one, kept]' : ''}`,
-      );
-    }
-    console.log(`\nStarting tokens for custom logins${tag}:`);
-    if (!report.tokens.length)
-      console.log('  none (run custom-logins:migrate first)');
-    for (const t of report.tokens) {
-      console.log(
-        `  user ${t.userId}  ${t.email}  last 30 days ${t.last30Days.toLocaleString('en-US')} → ${t.amount.toLocaleString('en-US')} renewing monthly${t.existing ? '  [has an allowance, kept]' : ''}`,
       );
     }
     console.log(`\nIncluded seats on live assistants${tag}:`);
