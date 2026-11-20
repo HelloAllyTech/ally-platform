@@ -1,6 +1,10 @@
 import { FEATURE_TOGGLE_KEY } from 'src/auth/decorators/feature-toggle.decorator';
 import { FeatureToggleKey } from '../admin-feature-toggle.constants';
 import { BlogController } from 'src/blog/controller/blog.controller';
+import {
+  LandingPageController,
+  LandingPagePublicController,
+} from 'src/landing-page/controller/landing-page.controller';
 import { ProductUpdatesController } from 'src/product-updates/controller/product-updates.controller';
 import { DynamicI18nController } from 'src/dynamic-i18n/controller/dynamic-i18n.controller';
 import { SessionEventController } from 'src/session-event/controller/session-event.controller';
@@ -51,6 +55,28 @@ const SURFACES: {
   gated: string[];
   open: Record<string, string>;
 }[] = [
+  {
+    key: FeatureToggleKey.LANDING_PAGES,
+    controller: LandingPageController,
+    gated: [
+      'createImageUploadUrl',
+      'create',
+      'list',
+      'getById',
+      'getPreview',
+      'update',
+      'publish',
+      'unpublish',
+      'remove',
+    ],
+    open: {},
+  },
+  {
+    key: FeatureToggleKey.LANDING_PAGES,
+    controller: LandingPagePublicController,
+    gated: [],
+    open: { getPublished: 'public landing page (helpline app)' },
+  },
   {
     key: FeatureToggleKey.BLOG,
     controller: BlogController,
