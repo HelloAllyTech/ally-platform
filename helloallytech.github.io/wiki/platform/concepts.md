@@ -335,6 +335,15 @@ out which meaning is in play before you change anything.
 **Code:** `ally-be/src/blog/` · `ally-be/src/product-updates/` · `ally-be/src/changelog/` · `ally-be/src/public-roadmap/` · `ally-web/apps/ally-admin-dashboard/src/pages/Blog/` · `ally-web/apps/ally-admin-dashboard/src/pages/ProductUpdates/` · `ally-web/apps/ally-admin-dashboard/src/pages/Privacy/` · `ally-web/apps/ally-admin-dashboard/src/pages/Terms/` · `ally-web/apps/ally-admin-dashboard/src/pages/Settings/` · `ally-web/apps/ally-helpline-dashboard/src/pages/blog/` · `ally-web/apps/ally-helpline-dashboard/src/pages/legal/` · `ally-web/apps/ally-helpline-dashboard/src/pages/home-v2/`
 **Deep doc:** [ally-changelog](../repos/ally-changelog.md)
 
+### Landing pages
+<!-- concept: landing-pages -->
+**Is:** Public, campaign-facing pages an organization's platform admin designs in the admin console and publishes at `/<tenant code>/<slug>` on the consumer app, with a draft that stays private until published.
+**Also called:** campaign page, `/landingpage1` (the hand-built prototype it grew from) · **Not to be confused with:** a Track's course landing page (`tracks.landingPage`, the outline shown before a learner starts a course); the public `/blog` pages.
+**Composed of:** ally-be `landing-page` (one `landing_pages` row per page: `config` draft and `published_config` live copy, a normaliser that keeps text plain and image addresses to our own storage, publish checks, a signed-out read); the page renderer; the admin editor, which edits the page in place.
+**Status:** Dark — gate: `FeatureToggleKey.LANDING_PAGES` (platform-only: not for an admin limited to some organizations; on for SUPER_ADMIN and SUPER_DUPER_ADMIN by migration, granted to a PLATFORM_ADMIN from the Ally admins tab) plus permissions `view:landing-pages` / `edit:landing-page` / `delete:landing-page`; nothing links to a page until an admin publishes one. The sign-up switch on a page is stored but sign-up itself is not built.
+**Code:** `ally-be/src/landing-page/` · `ally-web/apps/ally-helpline-dashboard/src/pages/landing-page/`
+**Deep doc:** [ally-be](../repos/ally-be.md)
+
 ### Notifications
 <!-- concept: notifications -->
 **Is:** How Ally tells users something happened while they were away: an in-app feed and mobile push, with email and Slack through the same module.
