@@ -6366,6 +6366,7 @@ export const en = {
         "Have a training manual, slides or handouts from the partner? Attach them and Copilot will build the course from their content.",
       paneHint: "Copilot builds the course from these files, in its own words.",
       choose: "Attach files",
+      addMore: "Add files",
       dropHint: "or drop them here · PDF, Word (.docx), PowerPoint (.pptx) · up to 50 MB each",
       uploading: (name: string) => `Reading ${name}…`,
       remove: (name: string) => `Remove ${name}`,
@@ -6411,8 +6412,7 @@ export const en = {
       opening: {
         title: "What course do you want to make?",
         body: "Say who it's for and what they should be able to do afterwards. Copilot asks a few questions, then drafts the course for you to review before anything is created.",
-        composerPlaceholder:
-          "For example: a 20-minute course for helpline volunteers on asking about suicide risk",
+        composerPlaceholder: "Describe the course you want…",
         fromFiles: "Start from these files",
         fromFilesMessage:
           "I've attached the partner's material. Draft the brief from it, then ask me only what it doesn't answer.",
@@ -6461,7 +6461,7 @@ export const en = {
       // Placeholder says what this state accepts, so the composer teaches the capability
       // ("Communicate Agent Capabilities via Visual Affordances").
       composerPlaceholder: {
-        INTERVIEWING: "Type your answer, or anything else I should know…",
+        INTERVIEWING: "Reply, or tell me anything else…",
         AWAITING_BLUEPRINT: "Ask for a change — “drop the game, make section 3 two roleplays”…",
         BUILDING: "Ask a question while it builds…",
         BUILD_FAILED: "Ask what went wrong, or retry from the build panel…",

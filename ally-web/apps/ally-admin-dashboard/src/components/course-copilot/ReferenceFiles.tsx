@@ -79,6 +79,7 @@ export const ReferenceFiles: React.FC<ReferenceFilesProps> = ({
   };
 
   const isOpening = variant === "opening";
+  const hasFiles = sources.length > 0 || pending.length > 0;
   // In the pane, an empty list with nothing to add is just noise.
   if (!isOpening && locked && !sources.length) return null;
 
@@ -90,15 +91,28 @@ export const ReferenceFiles: React.FC<ReferenceFilesProps> = ({
       }
       data-testid="course-copilot-reference-files"
     >
-      <div className="flex flex-col gap-0.5">
+      <div className="flex items-baseline justify-between gap-3">
         <h3 className="text-sm font-semibold text-typography-900">{strings.title}</h3>
-        <p className="text-xs text-typography-600">
+        {/* With files attached, adding more is a small link, not a second drop zone. */}
+        {hasFiles && !locked && (
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            className="inline-flex items-center gap-1 text-xs font-medium text-primary-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500"
+          >
+            <FileUp size={12} aria-hidden /> {strings.addMore}
+          </button>
+        )}
+      </div>
+      {!hasFiles && (
+        <p className="-mt-1 text-xs text-typography-600">
           {isOpening ? strings.openingHint : strings.paneHint}
         </p>
-      </div>
+      )}
 
       {!locked && (
         <div
+          hidden={hasFiles}
           onDragOver={event => {
             event.preventDefault();
             setDragging(true);

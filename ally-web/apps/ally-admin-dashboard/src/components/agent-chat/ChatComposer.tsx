@@ -19,6 +19,9 @@ interface ChatComposerProps {
   borderless?: boolean;
 }
 
+/** Sized to its label, so the reply box keeps the width (Carbon's default min-width is wide). */
+const BUTTON_CLASS = "shrink-0 !min-w-[5.5rem] !justify-center !px-4";
+
 /**
  * The free-text way in — shared by Builder, Course Copilot and the character interview. Most turns
  * are answered from a question card instead; this is for what the agent hasn't thought to ask, and
@@ -71,11 +74,17 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
         }}
       />
       {isStreaming ? (
-        <Button kind="danger--tertiary" size="md" onClick={onStop}>
+        <Button kind="danger--tertiary" size="md" className={BUTTON_CLASS} onClick={onStop}>
           {strings.stop}
         </Button>
       ) : (
-        <Button kind="primary" size="md" disabled={disabled || !value.trim()} onClick={submit}>
+        <Button
+          kind="primary"
+          size="md"
+          className={BUTTON_CLASS}
+          disabled={disabled || !value.trim()}
+          onClick={submit}
+        >
           {strings.send}
         </Button>
       )}

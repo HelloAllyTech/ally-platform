@@ -615,7 +615,8 @@ export const CourseCopilotSession: React.FC = () => {
               {budgetLabel}
             </span>
           </Tooltip>
-          {editorDisabledReason ? (
+          {/* No course yet: nothing to open, so no greyed-out button taking up the header. */}
+          {!trackId ? null : editorDisabledReason ? (
             <Tooltip label={editorDisabledReason} align="bottom">
               {/* A disabled button swallows hover, so the tooltip hangs off a wrapper. */}
               <span>{openInEditorButton}</span>
@@ -800,15 +801,15 @@ export const CourseCopilotSession: React.FC = () => {
                 aria-label={strings.chat.suggestedActionsLabel}
               >
                 {chips.map(chip => (
-                  <Button
+                  <button
                     key={chip.label}
-                    kind="tertiary"
-                    size="sm"
+                    type="button"
                     disabled={isStreaming}
                     onClick={() => void sendMessage(chip.message)}
+                    className="rounded-full border border-neutral-300 px-3 py-1 text-xs text-typography-800 hover:border-primary-500 hover:text-primary-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {chip.label}
-                  </Button>
+                  </button>
                 ))}
               </div>
             )}

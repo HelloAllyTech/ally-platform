@@ -403,11 +403,9 @@ describe("CourseCopilotSession — header", () => {
       );
     });
 
-    it("is disabled before there is a course to open", () => {
+    it("is not shown before there is a course to open", () => {
       render(<CourseCopilotSession />);
-      expect(
-        screen.getByText(en.courseCopilot.session.openInEditor).closest("button"),
-      ).toBeDisabled();
+      expect(screen.queryByText(en.courseCopilot.session.openInEditor)).toBeNull();
     });
 
     it("opens the course in the editor once it can be edited", () => {

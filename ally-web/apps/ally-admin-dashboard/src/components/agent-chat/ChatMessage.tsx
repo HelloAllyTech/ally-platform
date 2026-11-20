@@ -121,7 +121,14 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
         </div>
       )}
 
-      {showBubble && (
+      {/* Nothing written yet: a small inline "Thinking…" rather than an empty box. */}
+      {showBubble && !hasBody && message.isStreaming && !message.interrupted && (
+        <div className="px-1 py-1 text-sm text-typography-600" data-testid="agent-thinking">
+          <InlineLoading description={strings.thinking} />
+        </div>
+      )}
+
+      {showBubble && (hasBody || message.interrupted) && (
         <Tile className="w-full max-w-[92%]">
           {hasBody ? (
             <div className="prose prose-sm max-w-none break-words text-sm text-typography-900">
