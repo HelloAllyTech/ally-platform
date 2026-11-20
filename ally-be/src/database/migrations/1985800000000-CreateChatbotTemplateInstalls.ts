@@ -6,8 +6,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * left as it was. The templates themselves are definitions in code (`chatbot/templates/`), so this
  * holds only the template's id.
  */
-export class CreateChatbotTemplateInstalls1985600000000 implements MigrationInterface {
-  name = 'CreateChatbotTemplateInstalls1985600000000';
+export class CreateChatbotTemplateInstalls1985800000000 implements MigrationInterface {
+  name = 'CreateChatbotTemplateInstalls1985800000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`

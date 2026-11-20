@@ -54,7 +54,7 @@ Owners start from a whole use case instead of assembling an assistant from parts
 
 ## Deploy
 
-- Migration `1985600000000-CreateChatbotTemplateInstalls` (one new table; nothing else changes).
+- Migration `1985800000000-CreateChatbotTemplateInstalls` (one new table; nothing else changes).
 - No prompt text changed; no new prompt.
 - ally-be's `tsconfig` gains `resolveJsonModule` (the shared organisation file is imported and emitted with the build).
 

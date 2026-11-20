@@ -111,6 +111,9 @@ export const ROADMAP_AUDIENCE: Record<RoadmapNotificationKind, Audience> = {
   // planner by default); Milestones and None are respected.
   [RoadmapNotificationKind.COMMENT]: { ...none, watchAll: true },
   [RoadmapNotificationKind.QUESTION_ANSWERED]: { ...none, lead: true },
+  // Told to the author alone (direct), so it needs no audience of its own.
+  [RoadmapNotificationKind.PLAN_OFFERED]: none,
+  [RoadmapNotificationKind.PLAN_HANDED_OVER]: { ...none, owners: true },
 };
 
 /** The facts the rules read about one idea. */

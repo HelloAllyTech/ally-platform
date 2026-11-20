@@ -351,6 +351,8 @@ export const ApiEndpoints = {
     GET_PUBLIC_BLOGS: "/v1/blog/public",
     GET_PUBLIC_BLOG_TAGS: "/v1/blog/public/tags",
     GET_PUBLIC_BLOG_BY_SLUG: (slug: string) => `/v1/blog/public/${slug}`,
+    GET_BLOG_REVIEW: (token: string) => `/v1/blog-review/${token}`,
+    CREATE_BLOG_REVIEW_SUGGESTION: (token: string) => `/v1/blog-review/${token}/suggestions`,
   },
   CHANGELOG: {
     // Public (ungated) changelog reads for the /blog/changelog page.

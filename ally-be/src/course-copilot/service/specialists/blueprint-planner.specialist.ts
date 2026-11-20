@@ -14,6 +14,7 @@ import {
 } from '../../util/course-blueprint.util';
 import { SpecialistLlmService } from './specialist-llm.service';
 import { learnerProfileReference } from '../course-copilot-learner-profile.service';
+import { exampleCourseReference } from '../course-copilot-example-course.service';
 import {
   BlueprintPlannerInput,
   SpecialistValidationError,
@@ -112,6 +113,9 @@ export class BlueprintPlannerSpecialist {
         [
           input.referenceMaterial,
           learnerProfileReference(brief?.learnerProfileId),
+          // A person-chosen published course of a similar size, as a pattern (not content).
+          exampleCourseReference(brief?.shape?.durationMinutes),
+          input.designGuidance,
         ]
           .map((part) => part?.trim())
           .filter(Boolean)

@@ -44,6 +44,12 @@ export type RoadmapCapability =
   | "review"
   | "pickLead"
   | "startPlanning"
+  /** Continue a started plan interview nobody holds (an Owner, or the idea's author). */
+  | "takePlanning"
+  /** The holder hands the plan interview back, before or part-way through. */
+  | "releasePlanning"
+  /** The author, before starting, asks the Owners to run the interview. */
+  | "askOwnerToPlan"
   | "settleAnswer"
   | "approveDesign"
   | "startBuild"
@@ -174,7 +180,7 @@ export type RoadmapWhyHere =
   /** A notice that waits on you: the plan is ready to read, or someone answered your question. */
   | {
       kind: "notice";
-      notice: "planReady" | "questionAnswered";
+      notice: "planReady" | "questionAnswered" | "planOffered" | "planHandedOver";
       since: string;
       by?: RoadmapPersonRef;
     }
@@ -251,6 +257,8 @@ export interface RoadmapItemSummary {
 
 export interface RoadmapItemDetail extends RoadmapItemRow {
   summary: RoadmapItemSummary;
+  /** Who holds the plan interview now (one at a time); absent when nobody does. */
+  planHolder?: { id: number; name: string; as: "owner" | "author" };
   /** The plan / builder session; its transcript comes from the existing builder endpoints. */
   sessionId?: string;
   prd?: { readinessPct: number; versionNumber: number };
@@ -285,6 +293,8 @@ export type RoadmapTimelineKind =
   | "submitted"
   | "reviewed"
   | "planning_started"
+  | "plan_claimed"
+  | "plan_released"
   | "plan_closed"
   | "plan_reopened"
   | "lead_assigned"

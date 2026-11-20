@@ -32,6 +32,7 @@ import { CopyLinkButton, IdeaStar, IdeaTitle, IdeaVotes, PrimaryAction } from ".
 import { IdeaPanelContent } from "./IdeaPanels";
 import { BANNER_TONE, HeaderTracker, OpportunityHeader } from "./OpportunityHeader";
 import { PeopleChips } from "./PeopleChips";
+import { PlanInterviewBar } from "./PlanInterviewBar";
 import { RoadmapIconButton } from "./RoadmapIconButton";
 import { ShippedCard } from "./ShippedCard";
 import { Tracker } from "./Tracker";
@@ -334,13 +335,16 @@ export const IdeaView: React.FC<IdeaViewProps> = ({
   );
 
   const primary = (
-    <PrimaryAction
-      item={item}
-      onApproveDesign={() => openDetails("design")}
-      onOpenDetails={openDetails}
-      fullWidth={isPhone}
-      phone={isPhone}
-    />
+    <>
+      <PrimaryAction
+        item={item}
+        onApproveDesign={() => openDetails("design")}
+        onOpenDetails={openDetails}
+        fullWidth={isPhone}
+        phone={isPhone}
+      />
+      <PlanInterviewBar item={item} fullWidth={isPhone} />
+    </>
   );
 
   // ── header ──────────────────────────────────────────────────────────────────────────────────

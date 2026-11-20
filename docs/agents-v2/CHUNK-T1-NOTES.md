@@ -64,7 +64,7 @@ Five setups started from templates through the API, as an owner would (`POST v1/
 | `…/lists/list-types.ts`, `list-records.service.ts`, `entity/collection-record.entity.ts` | A `template` author for entries, with `example` |
 | `ally-be/src/bot-draft/templates/template.service.ts`, `template.controller.ts`, `template-answers.ts` | Catalogue, install (setup and Tools), origin and examples left |
 | `ally-be/src/bot-draft/controller/bot-draft.controller.ts` | `POST v1/bot-drafts` takes `template`, `answers`, `name` |
-| `ally-be/src/database/migrations/1985600000000-CreateChatbotTemplateInstalls.ts` | `chatbot_template_installs` (`DATA_SCHEMA.md` updated) |
+| `ally-be/src/database/migrations/1985800000000-CreateChatbotTemplateInstalls.ts` | `chatbot_template_installs` (`DATA_SCHEMA.md` updated) |
 | `ally-be/src/chatbot/basics/run-basics.ts` | `--crisis-must <regex>`: every crisis turn must also carry it (the helpline's own number) |
 | `ally-web/…/pages/Templates/` | `TemplateSetup` (cards, questions, result), `TemplateOriginLine`, the copy (held to the texts file) |
 | `ally-web/…/pages/Onboarding/` | The fifth way to begin, `screens/DraftTemplate.tsx`, `applyTemplate`, Share's examples check |
@@ -95,7 +95,7 @@ Routes: `GET v1/assistant-templates` (before a setup starts), `GET v1/chatbots/:
 
 ## How to test
 
-- **ally-be (Node 24):** `npm test -- --forceExit --detectOpenHandles`, `npm run lint`, `npm run typecheck`. Templates: `npx jest src/chatbot/templates`. Postgres: `CHATBOT_STORE_TEST_DB=postgres://…/ally_t1_test npx jest src/bot-draft/templates src/chatbot/lists` (a copy of the local schema plus `1985600000000`).
+- **ally-be (Node 24):** `npm test -- --forceExit --detectOpenHandles`, `npm run lint`, `npm run typecheck`. Templates: `npx jest src/chatbot/templates`. Postgres: `CHATBOT_STORE_TEST_DB=postgres://…/ally_t1_test npx jest src/bot-draft/templates src/chatbot/lists` (a copy of the local schema plus `1985800000000`).
 - **ally-web (Node 22):** `npx vitest run -c apps/ally-admin-dashboard/vite.config.ts apps/ally-admin-dashboard/src/pages/Templates`; Playwright `npx playwright test -c apps/ally-admin-dashboard/playwright.config.ts templates` (baselines in the Playwright Docker image, `e2e/README.md`).
 - **By hand:** `/assistants/new` → Start from a template; an assistant → Tools → + → Add from a template; `/dev/onboarding?screen=start` and `?screen=learned` without signing in.
 - **The crisis set with the helpline's own number:** `node dist/chatbot/basics/run-basics.js --bot <id> --cases src/chatbot/basics/cases/crisis.json --crisis-must '1800.?123.?4567'` in the ally-be container.

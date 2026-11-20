@@ -55,6 +55,15 @@ export class Blog extends BaseWithoutTenantEntity {
   @Column({ type: 'varchar', name: 'author_name', length: 120, nullable: true })
   authorName?: string | null;
 
+  // Shown with the byline (a mailto link). Optional; posts made before it existed have none.
+  @Column({
+    type: 'varchar',
+    name: 'author_email',
+    length: 255,
+    nullable: true,
+  })
+  authorEmail?: string | null;
+
   @Column({ type: 'text', name: 'header_image_url', nullable: true })
   headerImageUrl?: string | null;
 

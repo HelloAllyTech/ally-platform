@@ -361,6 +361,19 @@ export const ApiEndpoints = {
     UNPUBLISH_BLOG: (id: string) => `/v1/blog/${id}/unpublish`,
     UPLOAD_IMAGE_URL: "/v1/blog/upload-url",
   },
+  // Keys that let Claude Code write draft posts, and the MCP endpoint they unlock.
+  BLOG_AUTHORING: {
+    KEYS: "/v1/blog-authoring/keys",
+    KEY_BY_ID: (id: string) => `/v1/blog-authoring/keys/${encodeURIComponent(id)}`,
+    MCP: "/v1/blog-authoring/mcp",
+  },
+  // Review links for draft posts, and the suggestions people leave through them.
+  BLOG_REVIEW: {
+    POST: (id: string) => `/v1/blog-review/posts/${encodeURIComponent(id)}`,
+    LINK: (id: string) => `/v1/blog-review/posts/${encodeURIComponent(id)}/link`,
+    SUGGESTION: (id: string, suggestionId: string) =>
+      `/v1/blog-review/posts/${encodeURIComponent(id)}/suggestions/${encodeURIComponent(suggestionId)}`,
+  },
   PRODUCT_UPDATES: {
     LIST: "/v1/product-updates",
     STATUS: "/v1/product-updates/status",
@@ -475,6 +488,11 @@ export const ApiEndpoints = {
     ITEM_SIMILAR: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/similar`,
     START_PLANNING: (code: string) =>
       `/v1/roadmap/items/${encodeURIComponent(code)}/start-planning`,
+    TAKE_PLANNING: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/take-planning`,
+    RELEASE_PLANNING: (code: string) =>
+      `/v1/roadmap/items/${encodeURIComponent(code)}/release-planning`,
+    ASK_OWNER_TO_PLAN: (code: string) =>
+      `/v1/roadmap/items/${encodeURIComponent(code)}/ask-owner-to-plan`,
     OPEN_CONVERSATION: (code: string) =>
       `/v1/roadmap/items/${encodeURIComponent(code)}/conversation`,
     CLOSE_PLAN: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/close-plan`,
@@ -1621,6 +1639,10 @@ export const TAG_TYPES = {
   // Course discussion moderation. Also registered in baseApi.ts's `tagTypes`.
   COURSE_DISCUSSION: "courseDiscussion",
   BLOGS: "blogs",
+  // Keys for Claude Code to write blog drafts. Also registered in baseApi.ts's `tagTypes`.
+  BLOG_AUTHORING_KEYS: "blogAuthoringKeys",
+  // Review link and suggestions for one blog post. Also registered in baseApi.ts's `tagTypes`.
+  BLOG_REVIEW: "blogReview",
   // Product updates. Also registered in baseApi.ts's `tagTypes`.
   PRODUCT_UPDATES: "productUpdates",
   SUPER_DUPER_ADMINS: "superDuperAdmins",

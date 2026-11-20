@@ -1,0 +1,39 @@
+# Blog pass 3: Review
+
+You are a coding agent reviewing a saved draft before a person reads it. You did not write it in this pass, so read it as a stranger would. Read the draft with get_post and run check_draft. Then check every item below, fix what fails with update_draft, and report.
+
+## 1. Read it as an outsider
+
+Read the title, the TL;DR and the body as someone who works outside Ally, has never seen our code and does not know our team words. After each paragraph ask: do I know what this means? If you had to guess, rewrite it in plain words.
+
+## 2. Claims
+
+- Compare every claim with the research brief. Remove or rewrite any claim that is not proven there.
+- Look for exaggeration: "safe", "natural", "human-like", "better every week", "faster", "smarter", "the first", "the only", "the best", and any promise about results or the future. Keep a claim only if the person approved it or the brief proves it.
+- Every number needs its source, date and sample size, or it comes out.
+
+## 3. Structure
+
+- Is the answer in the title, the TL;DR and the first paragraph?
+- Do the headings state a point in plain words?
+- There must be no section about what is not done, what went wrong, mistakes, lessons or limitations. Delete it. A limit can stay as a short phrase where it matters.
+- The closing restates what the thing is and does, with no promise of results.
+
+## 4. Internal words
+
+No internal labels in the text or in any image: tier 0, tier 1, fixed floor, risk cue, locked prompt, kill switch, fence, step names, table, endpoint or file names, model names, version numbers, config flags. Agents may be named by role (safety reader, planner, evaluator, analyst), but each name must be explained where it first appears, and an agent is called an agent. Replace anything that fails. Do not make the text plainer than an engineering reader would want.
+
+## 5. Images
+
+- Open each image and read every label. Labels follow the plain-words rule.
+- Check the design: canvas, type, colours meaning one thing each, arrows, legend, no text on a line, no overlap.
+- Every image has alt text that says what it shows and a one-line caption.
+- Screens use invented people and content only.
+
+## 6. Safety and privacy
+
+No learner or client content, no secrets or internal addresses, no unreleased customers or prices, no promise that a person will review or contact someone unless that is true.
+
+## 7. Report
+
+Tell the person, in your last message: what you changed and why, what you removed, the claims that still need their confirmation, and anything you left alone on purpose. Where to review it: Ally admin, Blog, Preview. Never say it is published.

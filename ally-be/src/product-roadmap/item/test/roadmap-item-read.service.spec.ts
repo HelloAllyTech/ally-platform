@@ -98,6 +98,8 @@ function build(
     reads?: { itemId: string }[];
     events?: Record<string, unknown>[];
     origin?: Record<string, unknown>;
+    /** Unread notices for the caller: { itemId, kind, createdAt, byUserId }. */
+    notices?: Record<string, unknown>[];
   } = {},
 ) {
   const roleOf = jest.fn(
@@ -112,6 +114,8 @@ function build(
         return [1, 2, 3, 9, ME].map((id) => ({ id, name: `Person ${id}` }));
       }
       if (sql.includes('FROM "roadmap_item_reads"')) return opts.reads ?? [];
+      if (sql.includes('FROM "roadmap_notifications"'))
+        return opts.notices ?? [];
       if (sql.includes('FROM "plan_events"')) return opts.events ?? [];
       if (sql.includes(`plan->>'draftText'`)) {
         return opts.origin ? [opts.origin] : [];
@@ -374,6 +378,107 @@ describe('RoadmapItemReadService.list', () => {
         kind: 'decision',
         decision: 'settleAnswer',
       });
+    });
+  });
+
+  describe('Needs you after the plan-interview claim notices', () => {
+    type Sections = {
+      sections: Record<string, { code: string; whyHere?: unknown }[]>;
+    };
+    const needsYou = async (service: RoadmapItemReadService, userId: number) =>
+      (
+        (await service.list(
+          userId,
+          parseItemQuery({ view: 'for-you' }),
+        )) as unknown as Sections
+      ).sections.needsYou;
+    const ITEM = '00000000-0000-0000-0000-000000000001';
+    const AUTHOR = ME;
+    const OWNER = 7;
+    const notice = (kind: string, byUserId: string | null = null) => ({
+      itemId: ITEM,
+      kind,
+      createdAt: ago(1),
+      byUserId,
+    });
+    const filed = (over: Record<string, unknown> = {}) =>
+      item(
+        1,
+        { createdBy: AUTHOR, builderSessionId: 's1' },
+        {
+          ...planSession('s1', over),
+          reviewState: 'accepted',
+        },
+      );
+
+    it('shows the author the offer to plan their own idea', async () => {
+      const { service } = build([filed()], {
+        notices: [notice('plan_offered')],
+      });
+      const [row] = await needsYou(service, AUTHOR);
+      expect(row.whyHere).toMatchObject({
+        kind: 'notice',
+        notice: 'planOffered',
+      });
+    });
+
+    it('drops the offer once planning has started', async () => {
+      const { service } = build(
+        [filed({ sessionPlanStage: 'prd', planningStarted: true })],
+        { notices: [notice('plan_offered')] },
+      );
+      const rows = await needsYou(service, AUTHOR);
+      expect(rows.map((r) => r.whyHere)).not.toContainEqual(
+        expect.objectContaining({ notice: 'planOffered' }),
+      );
+    });
+
+    it('drops the offer once the author has passed it to the Owners', async () => {
+      const { service } = build([filed()], {
+        notices: [notice('plan_offered')],
+      });
+      const { service: passed } = build([filed({ authorPassed: true })], {
+        notices: [notice('plan_offered')],
+      });
+      expect((await needsYou(service, AUTHOR)).length).toBe(1);
+      const rows = await needsYou(passed, AUTHOR);
+      expect(rows.map((r) => r.whyHere)).not.toContainEqual(
+        expect.objectContaining({ notice: 'planOffered' }),
+      );
+    });
+
+    it('tells an Owner the interview was handed over, and by whom', async () => {
+      const { service } = build([filed()], {
+        roles: { [OWNER]: 'owner' },
+        notices: [notice('plan_handed_over', String(AUTHOR))],
+      });
+      const [row] = await needsYou(service, OWNER);
+      expect(row.whyHere).toMatchObject({
+        kind: 'notice',
+        notice: 'planHandedOver',
+        by: { id: AUTHOR },
+      });
+    });
+
+    it('stops telling Owners once someone holds the interview again', async () => {
+      const { service } = build(
+        [
+          filed({
+            sessionPlanStage: 'prd',
+            planningStarted: true,
+            planClaimSet: true,
+            planClaim: { userId: 3, as: 'owner' },
+          }),
+        ],
+        {
+          roles: { [OWNER]: 'owner' },
+          notices: [notice('plan_handed_over', String(AUTHOR))],
+        },
+      );
+      const rows = await needsYou(service, OWNER);
+      expect(rows.map((r) => r.whyHere)).not.toContainEqual(
+        expect.objectContaining({ notice: 'planHandedOver' }),
+      );
     });
   });
 

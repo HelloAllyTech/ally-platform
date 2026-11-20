@@ -1,4 +1,4 @@
-import { FC, useEffect, useMemo, useRef, useState } from "react";
+import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { differenceInMinutes } from "date-fns";
 import { useTranslation } from "react-i18next";
@@ -18,11 +18,28 @@ import { DebriefTab, SessionRatingTrigger, ToggleSwitch, ShareForReview } from "
 import { Permissions, REVIEW_PRIVACY_OPTIONS_VALUES, ROUTES } from "@constants";
 import { FeedbackDialog, useSimulationSummaryPolling } from "@containers";
 import { RootState } from "@store";
-import { SessionType, ShareForReviewsInput } from "@types";
+import { SessionType, ShareForReviewsInput, TranscriptFocusRequest } from "@types";
 import { resolveFeedbackTabs } from "@utils";
 
 import { SummarySidebarWrapper, SimulationTranscriptTab } from ".";
 import { SimulationSummarySidebarProps } from "./types";
+
+// The learner's own screen puts the transcript beside the debrief from 1024 px;
+// JS rather than CSS so only one transcript is ever mounted.
+const BESIDE_QUERY = "(min-width: 1024px)";
+const useTranscriptBeside = () => {
+  const [matches, setMatches] = useState(
+    () => typeof window !== "undefined" && Boolean(window.matchMedia?.(BESIDE_QUERY)?.matches),
+  );
+  useEffect(() => {
+    const mql = window.matchMedia?.(BESIDE_QUERY);
+    if (!mql?.addEventListener) return undefined;
+    const onChange = () => setMatches(mql.matches);
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
+  return matches;
+};
 
 const SimulationSummarySidebar: FC<SimulationSummarySidebarProps> = ({
   summaryId,
@@ -40,6 +57,17 @@ const SimulationSummarySidebar: FC<SimulationSummarySidebarProps> = ({
   const [rating, setRating] = useState<number | null>(null);
 
   const navigate = useNavigate();
+  const wideScreen = useTranscriptBeside();
+  const [momentRequest, setMomentRequest] = useState<TranscriptFocusRequest | null>(null);
+  const momentRequestCountRef = useRef(0);
+  const handleOpenMoment = useCallback((messageId: string) => {
+    momentRequestCountRef.current += 1;
+    setMomentRequest({ messageId, requestId: momentRequestCountRef.current });
+  }, []);
+  const handleSeeQuote = useCallback((quote: string) => {
+    momentRequestCountRef.current += 1;
+    setMomentRequest({ quote, requestId: momentRequestCountRef.current });
+  }, []);
 
   const { user, permissions } = useSelector((state: RootState) => state.user);
   const { data: summary, refetch } = useGetSimulationSummaryQuery(
@@ -122,7 +150,7 @@ const SimulationSummarySidebar: FC<SimulationSummarySidebarProps> = ({
     <div className="text-base flex flex-wrap items-center justify-between w-full gap-2">
       <div className="flex items-center gap-2">
         <span className="font-semibold font-tertiary text-typography-800">
-          {t("common.summary", "Summary")}
+          {t("postSim.tabs.debrief", "Debrief")}
         </span>
         {!isShortSession && (
           <SessionRatingTrigger value={displayRating} onSelect={handleStarSelect} size="sm" />
@@ -199,6 +227,7 @@ const SimulationSummarySidebar: FC<SimulationSummarySidebarProps> = ({
   // logs and from their org admin's org logs, both of which mount this same
   // component. The debrief note carries over; the conversation it opened does
   // not (see DebriefTab's `readOnly`).
+  const sideBySide = wideScreen && feedbackTabs.debrief && feedbackTabs.transcript;
   const tabList = [
     // Read-only, and first: the note is the fastest way to understand a session,
     // for the learner revisiting their own and for an admin reviewing someone
@@ -215,7 +244,16 @@ const SimulationSummarySidebar: FC<SimulationSummarySidebarProps> = ({
             // otherwise could not be scrolled in the side pane.
             content: (
               <div className="min-h-0 flex-1 overflow-y-auto" data-testid="debrief-tab-scroll">
-                <DebriefTab sessionId={summaryId} summaryData={summaryData} readOnly />
+                <DebriefTab
+                  sessionId={summaryId}
+                  summaryData={summaryData}
+                  readOnly
+                  // Moment chips only where the transcript is on screen beside
+                  // them; in the one-column drawer they would go nowhere.
+                  onOpenMoment={sideBySide ? handleOpenMoment : undefined}
+                  onSeeQuote={sideBySide ? handleSeeQuote : undefined}
+                  agentName={summary?.scenario?.metadata?.name}
+                />
               </div>
             ),
           },
@@ -233,6 +271,7 @@ const SimulationSummarySidebar: FC<SimulationSummarySidebarProps> = ({
                 agentName={summary?.scenario?.metadata?.name}
                 originalLanguageCode={originalLanguageCode}
                 className=" px-4 pt-[10px]"
+                focusMessage={momentRequest}
                 hasRecording={summary?.interactionMode !== "TEXT"}
               />
             ),
@@ -278,6 +317,7 @@ const SimulationSummarySidebar: FC<SimulationSummarySidebarProps> = ({
       isShortSession={isShortSession}
       summaryData={summaryData}
       tabList={tabList}
+      sideBySide={sideBySide}
       onSidebarClose={onSidebarClose}
       title={SidebarTitle}
     >
