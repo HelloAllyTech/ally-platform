@@ -20,6 +20,7 @@ import {
   CourseCopilotSseFrame,
   CourseCopilotToolOutcome,
 } from '../type/course-copilot-sse.type';
+import { CourseCopilotPlanningContext } from '../type/course-copilot-api.type';
 import { COURSE_COPILOT_GUIDANCE_TOOLS } from '../constants/course-copilot-guidance.constants';
 import { CourseCopilotBriefService } from './course-copilot-brief.service';
 import { CourseCopilotBlueprintService } from './course-copilot-blueprint.service';
@@ -344,6 +345,23 @@ const UPDATE_BLUEPRINT: AgentToolDefinition = {
  * the edit tools raise) end the turn. In a validated turn the last two only
  * ask for the end: the reply still comes through `finish_turn`.
  */
+/**
+ * What the planner had beyond the brief, for the trainer-visible log line: the example course it
+ * followed as a pattern and the design principles it read. Empty when it had neither.
+ */
+export function planningNote(
+  context: CourseCopilotPlanningContext | undefined,
+): string {
+  if (!context) return '';
+  const parts = [
+    context.exampleCourse ? `example course "${context.exampleCourse}"` : '',
+    context.principles.length
+      ? `design principles ${context.principles.join(', ')}`
+      : '',
+  ].filter(Boolean);
+  return parts.length ? ` · planned with ${parts.join(' and ')}` : '';
+}
+
 @Injectable()
 export class CourseCopilotToolsService {
   private readonly logger = LoggerService.getInstance(
@@ -883,7 +901,9 @@ export class CourseCopilotToolsService {
             'sentences, say what shape you chose and why; mention any problem they must fix. ' +
             'Do not list the items — they can see them.',
         },
-        summary: `Drafted a blueprint: ${response.blueprint.sections.length} sections, ${response.estimate.items} items`,
+        summary:
+          `Drafted a blueprint: ${response.blueprint.sections.length} sections, ${response.estimate.items} items` +
+          planningNote(response.planningContext),
         events: [{ event: 'blueprint', data: response as any }],
         endTurn: true,
       };
