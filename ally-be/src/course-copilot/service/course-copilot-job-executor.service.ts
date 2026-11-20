@@ -38,6 +38,8 @@ import { ArticleSpecialist } from './specialists/article.specialist';
 import { QuizSpecialist } from './specialists/quiz.specialist';
 import { JournalSpecialist } from './specialists/journal.specialist';
 import { AnnotationSpecialist } from './specialists/annotation.specialist';
+import { ScenarioQuizSpecialist } from './specialists/scenario-quiz.specialist';
+import { BucketSortSpecialist } from './specialists/bucket-sort.specialist';
 import { CourseMetaSpecialist } from './specialists/course-meta.specialist';
 import { CourseReviewSpecialist } from './specialists/course-review.specialist';
 import { ImagePromptSpecialist } from './specialists/image-prompt.specialist';
@@ -94,6 +96,8 @@ export class CourseCopilotJobExecutorService {
     private readonly quiz: QuizSpecialist,
     private readonly journal: JournalSpecialist,
     private readonly annotation: AnnotationSpecialist,
+    private readonly scenarioQuiz: ScenarioQuizSpecialist,
+    private readonly bucketSort: BucketSortSpecialist,
     private readonly courseMeta: CourseMetaSpecialist,
     private readonly review: CourseReviewSpecialist,
     private readonly imagePrompt: ImagePromptSpecialist,
@@ -115,7 +119,9 @@ export class CourseCopilotJobExecutorService {
       case CourseCopilotJobKind.ARTICLE:
       case CourseCopilotJobKind.QUIZ:
       case CourseCopilotJobKind.JOURNAL:
-      case CourseCopilotJobKind.ANNOTATED_ARTIFACT: {
+      case CourseCopilotJobKind.ANNOTATED_ARTIFACT:
+      case CourseCopilotJobKind.BRANCHING_SCENARIO:
+      case CourseCopilotJobKind.BUCKET_SORT: {
         const context = await this.specialistContext(
           session,
           job,
@@ -126,6 +132,8 @@ export class CourseCopilotJobExecutorService {
           [CourseCopilotJobKind.QUIZ]: this.quiz,
           [CourseCopilotJobKind.JOURNAL]: this.journal,
           [CourseCopilotJobKind.ANNOTATED_ARTIFACT]: this.annotation,
+          [CourseCopilotJobKind.BRANCHING_SCENARIO]: this.scenarioQuiz,
+          [CourseCopilotJobKind.BUCKET_SORT]: this.bucketSort,
         }[job.kind];
         const output = await specialist.generate(context);
         return {
@@ -835,6 +843,30 @@ export class CourseCopilotJobExecutorService {
               `labels: ${(content.labels ?? []).map((l: any) => l.text).join(', ')}; lines: ${(content.units ?? []).length}; answers: ${(content.targets ?? []).length}`,
             );
             break;
+          case TrackItemType.BRANCHING_SCENARIO:
+            for (const node of (content.nodes ?? []).slice(0, 30)) {
+              const choices = Array.isArray(node.choices) ? node.choices : [];
+              lines.push(
+                choices.length
+                  ? `- scene: ${String(node.text ?? '').slice(0, 300)} → ${choices.map((choice: any) => choice.text).join(' | ')}`
+                  : `- ending (${node.outcome ?? 'no outcome'}, ${node.score ?? '?'}): ${String(node.text ?? '').slice(0, 200)}`,
+              );
+            }
+            break;
+          case TrackItemType.BUCKET_SORT: {
+            const labels = new Map<string, string>(
+              (content.buckets ?? []).map((b: any) => [b.id, b.label]),
+            );
+            lines.push(
+              `buckets: ${(content.buckets ?? []).map((b: any) => b.label).join(', ')}`,
+            );
+            for (const entry of (content.items ?? []).slice(0, 30)) {
+              lines.push(
+                `- ${entry.text} → ${labels.get(entry.bucketId) ?? '?'}`,
+              );
+            }
+            break;
+          }
           case TrackItemType.ROLEPLAY:
             lines.push(`roleplay scenario #${item.scenarioId}`);
             break;

@@ -115,7 +115,12 @@ describe('CourseCopilotEditToolsService', () => {
   let library: { getActiveScenarios: jest.Mock; getActiveCase: jest.Mock };
   let executor: { specialistContext: jest.Mock };
   let specialists: Record<
-    'article' | 'quiz' | 'journal' | 'annotation',
+    | 'article'
+    | 'quiz'
+    | 'journal'
+    | 'annotation'
+    | 'scenarioQuiz'
+    | 'bucketSort',
     { generate: jest.Mock }
   >;
   let tenantRows: { id: string; name: string }[];
@@ -241,6 +246,8 @@ describe('CourseCopilotEditToolsService', () => {
       quiz: { generate: jest.fn() },
       journal: { generate: jest.fn() },
       annotation: { generate: jest.fn() },
+      scenarioQuiz: { generate: jest.fn() },
+      bucketSort: { generate: jest.fn() },
     };
 
     const structure = new CourseCopilotStructureService(
@@ -267,6 +274,8 @@ describe('CourseCopilotEditToolsService', () => {
       specialists.quiz as any,
       specialists.journal as any,
       specialists.annotation as any,
+      specialists.scenarioQuiz as any,
+      specialists.bucketSort as any,
     );
   };
 
