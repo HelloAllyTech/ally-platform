@@ -15,8 +15,12 @@ function fakeDataSource(rows: {
     if (sql.includes('FROM track_enrollments e')) return [rows.summary ?? {}];
     if (sql.includes('FROM track_quiz_attempts q')) return rows.quiz ?? [];
     if (sql.includes('WITH per_session')) return rows.roleplay ?? [];
-    if (sql.includes('scenario_behavior_instructions bi')) return rows.behaviours ?? [];
-    if (sql.includes('branchingEndingsReached') && sql.includes('ending AS ending_id'))
+    if (sql.includes('scenario_behavior_instructions bi'))
+      return rows.behaviours ?? [];
+    if (
+      sql.includes('branchingEndingsReached') &&
+      sql.includes('ending AS ending_id')
+    )
       return rows.endings ?? [];
     if (sql.includes('FROM track_items i')) return rows.items ?? [];
     return [];
@@ -107,13 +111,19 @@ describe('CourseCopilotLearnerResultsService', () => {
     const text = service.render(results);
 
     expect(results).toMatchObject({ enrolled: 20, completed: 9, withheld: 0 });
-    expect(text).toContain('20 learners enrolled, 15 started, 9 completed (median 6.2 days to finish).');
-    expect(text).toContain('[i1] S1 ARTICLE "Welcome": reached 10; completed 8 (80%); 1.3 attempts');
+    expect(text).toContain(
+      '20 learners enrolled, 15 started, 9 completed (median 6.2 days to finish).',
+    );
+    expect(text).toContain(
+      '[i1] S1 ARTICLE "Welcome": reached 10; completed 8 (80%); 1.3 attempts',
+    );
     expect(text).toContain('"When do you refer?" (30% right)');
     expect(text.indexOf('When do you refer')).toBeLessThan(
       text.indexOf('What is reflective listening'),
     );
-    expect(text).toContain('20 sessions, 25% ended early, avg session score 42 vs pass 60');
+    expect(text).toContain(
+      '20 sessions, 25% ended early, avg session score 42 vs pass 60',
+    );
     expect(text).toContain('learner rating 4.2/5');
     expect(text).toContain('"Rushing to advice" (60% of sessions)');
     expect(text).toContain('3 learners have an attempt that missed the bar');
@@ -152,7 +162,9 @@ describe('CourseCopilotLearnerResultsService', () => {
 
   it('gives the reviewer nothing without learners or on failure', async () => {
     const empty = new CourseCopilotLearnerResultsService(
-      fakeDataSource({ items: [item({ reached: 0, completed: 0, learners: 0 })] }).ds,
+      fakeDataSource({
+        items: [item({ reached: 0, completed: 0, learners: 0 })],
+      }).ds,
     );
     expect(await empty.reviewReference('t1')).toBe('');
 

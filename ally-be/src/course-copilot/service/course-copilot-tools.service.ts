@@ -272,7 +272,7 @@ const INTERVIEW_TOOLS: AgentToolDefinition[] = [
     name: 'get_example_course',
     description:
       "One example course's outline by id: every section and item in order, with type, title, " +
-      "size and completion rule. Learn its pattern; never copy its titles, characters or topic. " +
+      'size and completion rule. Learn its pattern; never copy its titles, characters or topic. ' +
       DATA_NOTE,
     input_schema: {
       type: 'object',
@@ -520,7 +520,8 @@ export class CourseCopilotToolsService {
             modelResult: {
               ok: false,
               error: 'no_course',
-              message: 'There is no course with learners yet: results exist only for a published course.',
+              message:
+                'There is no course with learners yet: results exist only for a published course.',
             },
             summary: 'No learner results yet',
           };
@@ -538,7 +539,7 @@ export class CourseCopilotToolsService {
             },
             summary: `Read learner results: ${results.enrolled} learners, ${results.completed} completed`,
           };
-        } catch (error) {
+        } catch {
           return {
             modelResult: {
               ok: false,
