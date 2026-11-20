@@ -244,7 +244,10 @@ export const whyHereLine = (why: RoadmapWhyHere | undefined, now: number = Date.
     case "progress":
       return (why.notice && i2p.progress[why.notice]) || w.progress;
     case "notice":
-      return why.notice === "planReady" ? i2p.planReady : i2p.questionAnswered(why.by?.name ?? "");
+      if (why.notice === "planReady") return i2p.planReady;
+      if (why.notice === "planOffered") return i2p.planOffered;
+      if (why.notice === "planHandedOver") return i2p.planHandedOver(why.by?.name ?? "");
+      return i2p.questionAnswered(why.by?.name ?? "");
     case "shipped":
       return w.shipped(shortDate(why.at));
     default:

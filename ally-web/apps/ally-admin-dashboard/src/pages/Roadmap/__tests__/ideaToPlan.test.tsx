@@ -111,6 +111,20 @@ describe("why-here lines for the new notices", () => {
         by: { id: 1, name: "Ravi", role: "idea" },
       }),
     ).toBe("Ravi answered the agent's question");
+    expect(whyHereLine({ kind: "notice", notice: "planOffered", since: "" })).toBe(
+      "Expand it into a plan yourself, or ask the product owner",
+    );
+    expect(
+      whyHereLine({
+        kind: "notice",
+        notice: "planHandedOver",
+        since: "",
+        by: { id: 1, name: "Ravi", role: "idea" },
+      }),
+    ).toBe("Ravi handed you the plan interview");
+    expect(whyHereLine({ kind: "notice", notice: "planHandedOver", since: "" })).toBe(
+      "A plan interview is waiting for an Owner",
+    );
     expect(whyHereLine({ kind: "progress", notice: "planClosed" })).toBe("Plan closed");
     expect(whyHereLine({ kind: "progress" })).toBe("Moved since you last looked");
   });

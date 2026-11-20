@@ -852,6 +852,47 @@ export class RoadmapItemReadService {
           : {}),
       };
     }
+    // After submitting: the author may expand the idea into a plan themselves. Only while that is
+    // still theirs to do — nobody has started it, and they have not passed it to the Owners.
+    const offered = unread(RoadmapNotificationKind.PLAN_OFFERED);
+    if (
+      offered &&
+      isAuthor &&
+      c.leadId === null &&
+      (c.shownStage === 'submitted' || c.shownStage === 'accepted') &&
+      c.session?.planningStarted !== true &&
+      c.session?.authorPassed !== true &&
+      planHolderOf(c.session, c.plannerId) === null
+    ) {
+      return {
+        kind: 'notice',
+        notice: 'planOffered',
+        since: offered.createdAt,
+      };
+    }
+    // The author handed the plan interview to the Owners: it waits for one of them, until one
+    // takes it (or the plan closes or a builder leads it).
+    const handedOver = unread(RoadmapNotificationKind.PLAN_HANDED_OVER);
+    if (
+      handedOver &&
+      loaded.role === 'owner' &&
+      c.leadId === null &&
+      !c.session?.planClosed?.at &&
+      (c.shownStage === 'submitted' ||
+        c.shownStage === 'accepted' ||
+        c.shownStage === 'planning') &&
+      planHolderOf(c.session, c.plannerId) === null
+    ) {
+      return {
+        kind: 'notice',
+        notice: 'planHandedOver',
+        since: handedOver.createdAt,
+        // Resolved to a name and role in toRows.
+        ...(handedOver.byUserId
+          ? { by: { id: handedOver.byUserId, name: '', role: 'none' as const } }
+          : {}),
+      };
+    }
     if (loaded.role === 'owner' && c.shownStage === 'submitted') {
       return { kind: 'awaitingReview', since: c.stageSince };
     }

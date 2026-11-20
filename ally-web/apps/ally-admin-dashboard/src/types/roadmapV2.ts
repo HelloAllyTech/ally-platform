@@ -180,7 +180,7 @@ export type RoadmapWhyHere =
   /** A notice that waits on you: the plan is ready to read, or someone answered your question. */
   | {
       kind: "notice";
-      notice: "planReady" | "questionAnswered";
+      notice: "planReady" | "questionAnswered" | "planOffered" | "planHandedOver";
       since: string;
       by?: RoadmapPersonRef;
     }
