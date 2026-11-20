@@ -1,17 +1,31 @@
+import { lazy, Suspense } from "react";
+
 import { Toaster } from "sonner";
 
 import { AllyThemeProvider } from "@ally-ui-mono/ui-shared";
 import { LogViewer } from "@components/log-viewer";
 import { useColorMode } from "@hooks/useColorMode";
-import { PublicDirectoryByHost } from "@pages/Directory/PublicDirectory";
 import { RouteLayout } from "@routes/RouteLayout";
 
 import { isCustomDirectoryHost } from "./utils/directoryHost";
 
+// Lazy: only a directory owner's own domain ever renders it, so it stays out of the admin bundle.
+const PublicDirectoryByHost = lazy(() =>
+  import("./pages/Directory/PublicDirectory").then(module => ({
+    default: module.PublicDirectoryByHost,
+  })),
+);
+
 export function App() {
   const { isDark } = useColorMode();
   // A directory owner's own domain serves their collection's page and nothing of the admin app.
-  if (isCustomDirectoryHost()) return <PublicDirectoryByHost />;
+  if (isCustomDirectoryHost()) {
+    return (
+      <Suspense fallback={null}>
+        <PublicDirectoryByHost />
+      </Suspense>
+    );
+  }
   const toastOptions = {
     style: {
       transform: "translateZ(0)",

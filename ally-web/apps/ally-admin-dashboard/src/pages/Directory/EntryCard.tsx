@@ -4,11 +4,8 @@ import { DirectoryEntry } from "@api";
 import { Button } from "@components/button";
 import { ButtonVariant } from "@components/types";
 
-import { DIR } from "./copy";
+import { DIR, placeOf } from "./copy";
 import { Badge } from "./ui";
-
-export const placeOf = (e: Pick<DirectoryEntry, "city" | "region" | "country">) =>
-  [e.city, e.region, e.country].filter(Boolean).join(", ");
 
 /** One resource. Owners get Edit/Delete; everyone gets Save to collection. */
 export const EntryCard: React.FC<{

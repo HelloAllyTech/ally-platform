@@ -4,8 +4,7 @@ import { useParams } from "react-router-dom";
 
 import { ApiEndpoints } from "@constants";
 
-import { DIR } from "./copy";
-import { placeOf } from "./EntryCard";
+import { DIR, placeOf } from "./copy";
 
 interface PublicEntry {
   id: string;

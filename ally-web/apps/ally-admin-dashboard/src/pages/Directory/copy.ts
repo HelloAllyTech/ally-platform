@@ -151,3 +151,7 @@ export const splitList = (text: string): string[] =>
     .split(",")
     .map(s => s.trim())
     .filter(Boolean);
+
+/** "City, Region, Country", skipping what is empty. */
+export const placeOf = (e: { city: string; region: string; country: string }): string =>
+  [e.city, e.region, e.country].filter(Boolean).join(", ");

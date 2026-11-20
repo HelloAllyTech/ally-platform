@@ -18,8 +18,7 @@ import { Button } from "@components/button";
 import { ButtonVariant } from "@components/types";
 import { ROUTES } from "@constants";
 
-import { DIR } from "./copy";
-import { placeOf } from "./EntryCard";
+import { DIR, placeOf } from "./copy";
 import { Badge, copyText, errMsg, Field, inputClass, publicPageUrl } from "./ui";
 
 const D = DIR.detail;
