@@ -34,7 +34,7 @@ const post = (overrides: Partial<BlogPost> = {}): BlogPost => ({
   tldr: "Short",
   body: "<p>Body text here</p>",
   tags: [],
-  coverColor: "#000000",
+  coverColor: "", // empty = default cover; not under test here
   authorName: "Asha",
   authorEmail: "asha@example.com",
   status: "DRAFT",
@@ -134,7 +134,9 @@ describe("BlogReview", () => {
         body: { name: "Ravi", comment: "Fix the typo" },
       }),
     );
-    expect(await screen.findByText("Thank you. Your suggestion was sent to the author.")).toBeTruthy();
+    expect(
+      await screen.findByText("Thank you. Your suggestion was sent to the author."),
+    ).toBeTruthy();
     expect((screen.getByLabelText("Your comment") as HTMLTextAreaElement).value).toBe("");
     expect((screen.getByLabelText("Your name") as HTMLInputElement).value).toBe("Ravi");
   });
