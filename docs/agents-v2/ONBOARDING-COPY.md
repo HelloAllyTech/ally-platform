@@ -26,6 +26,7 @@ The first screen offers four ways to begin, as cards. Picking one shows that way
   - Your documents: Upload a brochure, price list or FAQ.
   - Describe your business: Write a few sentences in your own words.
   - Interview me: Answer a few questions and we'll build it from that.
+  - Start from a template: Pick what your assistant is for. We set up the rest. (T1; the template screens' own copy is in `T1-TEMPLATE-TEXTS.md`)
 - **Close button (screen readers):** Close and go back to your assistants
 - **Footnote:** We only read the pages you point us to. Nothing is published until you choose to.
 

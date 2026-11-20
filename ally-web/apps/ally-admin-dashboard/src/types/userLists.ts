@@ -101,7 +101,9 @@ export interface UserList {
 }
 
 export interface ListEntryCreator {
-  kind: "user" | "agent" | "import";
+  kind: "user" | "agent" | "import" | "template";
+  /** A use-case template's neutral example, not changed yet (T1). */
+  example?: boolean;
   name?: string;
   /** The reader made it. */
   you?: boolean;

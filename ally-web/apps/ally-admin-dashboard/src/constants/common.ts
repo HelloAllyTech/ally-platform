@@ -1098,6 +1098,10 @@ export const ApiEndpoints = {
       `/v1/chatbots/${id}/lists/${key}/records/${recordId}/restore`,
     LIST_CONTACTS: (id: string) => `/v1/chatbots/${id}/lists/contacts`,
     READY_MADE_LISTS: (id: string) => `/v1/chatbots/${id}/lists/ready-made`,
+    // Use-case templates (T1).
+    TEMPLATES: (id: string) => `/v1/chatbots/${id}/templates`,
+    TEMPLATE_ORIGIN: (id: string) => `/v1/chatbots/${id}/templates/origin`,
+    TEMPLATE: (id: string, template: string) => `/v1/chatbots/${id}/templates/${template}`,
     READY_MADE_LIST: (id: string, name: string) => `/v1/chatbots/${id}/lists/ready-made/${name}`,
     FACT_CORRECTION: (id: string, factId: string) =>
       `/v1/chatbots/${id}/facts/${encodeURIComponent(factId)}/correction`,
@@ -1201,8 +1205,11 @@ export const ApiEndpoints = {
     FORGET_PERSON: (chatbotId: string, contactId: string) =>
       `/v1/inbox/chatbots/${chatbotId}/contacts/${contactId}/forget`,
   },
+  /** The use-case templates before a setup starts (T1). */
+  ASSISTANT_TEMPLATES: "/v1/assistant-templates",
   BOT_DRAFTS: {
     LIST: "/v1/bot-drafts",
+    TEMPLATE: (id: string) => `/v1/bot-drafts/${id}/template`,
     CURRENT: "/v1/bot-drafts/current",
     BY_ID: (id: string) => `/v1/bot-drafts/${id}`,
     EVENTS: (id: string) => `/v1/bot-drafts/${id}/events`,

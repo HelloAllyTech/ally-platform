@@ -2,12 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   useArchiveChatbotMutation,
+  useApplyDraftTemplateMutation,
   useBackBotDraftMutation,
   useDescribeBotDraftMutation,
   useGetBotPageQuery,
   usePatchBotDraftMutation,
   usePublishBotDraftMutation,
 } from "@api";
+import type { TemplateAnswers, TemplateInstallResult } from "@types";
 
 import { COPY } from "./copy";
 import {
@@ -140,6 +142,11 @@ export interface OnboardingSession {
   pass: (screen: keyof PassedScreens) => void;
   /** Back from the current screen: a browser-only screen, else the server's step back. */
   backScreen: () => Promise<void>;
+  /** "Start from a template" after the site was read (T1): what it did, or null if refused. */
+  applyTemplate: (
+    template: string,
+    answers: TemplateAnswers,
+  ) => Promise<TemplateInstallResult | null>;
   /**
    * When the website gave nothing (chunk 20a-2): read a description or documents into "What we
    * learned" instead. Each resolves false, having said why, if it was refused.
@@ -166,6 +173,7 @@ export const useOnboardingSession = (
   const [mustPass, setMustPass] = useState<OnboardingSession["mustPass"]>(null);
   const [patchDraft] = usePatchBotDraftMutation();
   const [goBack] = useBackBotDraftMutation();
+  const [applyDraftTemplate] = useApplyDraftTemplateMutation();
   const [publishDraft, { isLoading: publishing }] = usePublishBotDraftMutation();
   const [describeDraft] = useDescribeBotDraftMutation();
   const [archiveChatbot] = useArchiveChatbotMutation();
@@ -314,6 +322,21 @@ export const useOnboardingSession = (
     edit,
     flow,
     pass: screen => pass(screen),
+    applyTemplate: async (template, answers) => {
+      if (!view) return null;
+      try {
+        const { result, draft } = await applyDraftTemplate({
+          draftId: view.id,
+          template,
+          answers,
+        }).unwrap();
+        setView(draft);
+        return result;
+      } catch (err) {
+        onError(errorText(err));
+        return null;
+      }
+    },
     backScreen: async () => {
       if (!view || !flow) return;
       // Browser-only screens step back without asking the server.
