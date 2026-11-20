@@ -9,17 +9,19 @@ import "./plan.css";
 
 /**
  * A limit as a plain bar with its numbers and reset date (CR1 §C3). Unlimited shows "Unlimited"
- * and no bar. Counts only: never a price.
+ * and no bar. Counts, or the monthly usage in dollars: never a price.
  */
 export const Meter: React.FC<{
   label: string;
   bar: UsageBar;
   hint?: string;
-  /** Token amounts read compactly (1.2M); counts exactly (1,000). */
+  /** Big amounts read compactly (1.2M); counts exactly (1,000). */
   compact?: boolean;
+  /** How to write the numbers, when they aren't counts (the monthly usage is in dollars). */
+  format?: (n: number) => string;
   testId?: string;
-}> = ({ label, bar, hint, compact, testId }) => {
-  const number = compact ? compactCount : fullCount;
+}> = ({ label, bar, hint, compact, format, testId }) => {
+  const number = format ?? (compact ? compactCount : fullCount);
   const level = levelOf(bar.used, bar.limit);
   const width = bar.limit ? Math.min(100, Math.max(0, (bar.used / bar.limit) * 100)) : 0;
   return (

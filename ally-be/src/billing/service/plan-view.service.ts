@@ -15,9 +15,9 @@ export interface Bar {
 
 /**
  * What a plan's numbers look like (CR1 Part C): the owner's "Plan and usage", an assistant's
- * Share → People, and Ally admin → a user → Plan. For owners, counts and limits only — **never
- * dollars**; the admin's prices live on Ally admin → Plans and Costs, and `forAdmin` alone adds the
- * creator's spend against their cost cap.
+ * Share → People, and Ally admin → a user → Plan. For owners, counts and limits, plus one amount in
+ * dollars: their monthly usage against its allowance. **Never a price**: what a plan or a seat
+ * costs lives on Ally admin → Plans and Costs.
  */
 @Injectable()
 export class PlanViewService {
@@ -35,9 +35,27 @@ export class PlanViewService {
 
     const creatorPlan = await this.plans.planOf(userId);
     const { plan, subscription, anchor } = creatorPlan;
-    // Ally's cost cap: the owner sees only that it was reached, never the amount.
-    const capReached = await this.spend.isOverCap(userId, creatorPlan);
     const period = periodFor(anchor);
+    // The monthly usage allowance (Ally's cost cap), in dollars: what the owner has used of it,
+    // so they can see it coming. Null when they have no cap.
+    const spendState = await this.spend.state(userId, creatorPlan);
+    const monthlyUsage =
+      spendState.capMicros === null
+        ? null
+        : {
+            used: microsToUsd(spendState.usedMicros),
+            limit: microsToUsd(spendState.capMicros),
+            resetsOn: period.end,
+          };
+    const capReached =
+      spendState.capMicros !== null &&
+      spendState.usedMicros >= spendState.capMicros;
+    const usagePercent = monthlyUsage
+      ? Math.min(
+          100,
+          Math.floor((monthlyUsage.used / monthlyUsage.limit) * 100),
+        )
+      : 0;
     const published = await this.plans.publishedCount(userId);
     const assistants: Array<{ id: string; name: string; status: string }> =
       await this.dataSource.query(
@@ -78,10 +96,18 @@ export class PlanViewService {
       },
       period,
       capReached,
+      monthlyUsage,
       ownerRuns,
       assistants: perAssistant,
       alerts: [
-        ...(capReached ? [{ what: 'Monthly usage', percent: 100 }] : []),
+        ...(capReached || usagePercent >= 80
+          ? [
+              {
+                what: 'Monthly usage',
+                percent: capReached ? 100 : usagePercent,
+              },
+            ]
+          : []),
         ...this.alertsFrom(ownerRuns, perAssistant),
       ],
     };

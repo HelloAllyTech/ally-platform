@@ -426,6 +426,8 @@ const ASSISTANTS = [
 
 export const MY_PLAN = {
   isCreator: true,
+  capReached: false,
+  monthlyUsage: { used: 2.37, limit: 10, resetsOn: "2026-12-01" },
   plan: {
     key: "free",
     name: "Free",

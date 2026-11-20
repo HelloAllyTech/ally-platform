@@ -14,6 +14,7 @@ import {
   dayString,
   periodFor,
 } from '../service/plan.service';
+import { PlanViewService } from '../service/plan-view.service';
 import { SpendCapService } from '../service/spend-cap.service';
 import { UsageEventService } from '../service/usage-event.service';
 import { BILLING_ENTITIES } from './billing-entities';
@@ -27,6 +28,7 @@ describePg('Billing: plans, seats and limits (Postgres)', () => {
   let plans: PlanService;
   let spend: SpendCapService;
   let limits: LimitsService;
+  let views: PlanViewService;
   let creator: number;
   const alerts = { fire: async () => true } as never;
 
@@ -42,6 +44,7 @@ describePg('Billing: plans, seats and limits (Postgres)', () => {
       alerts,
     );
     limits = new LimitsService(dataSource, plans, spend);
+    views = new PlanViewService(dataSource, plans, spend, audit);
   });
   afterAll(() => closeTestDataSource(dataSource));
 
@@ -419,6 +422,44 @@ describePg('Billing: plans, seats and limits (Postgres)', () => {
     expect(periodFor(anchor, new Date('2026-11-10T00:00:00Z')).start).toBe(
       '2026-11-10',
     );
+  });
+
+  it('the owner sees their monthly usage in dollars, warned at 80% and told when it is used up', async () => {
+    await plans.setPlan(creator, { planKey: 'pro', note: 'Start' }, 9);
+    await bot();
+    expect(await views.forUser(creator)).toMatchObject({
+      monthlyUsage: null,
+      capReached: false,
+    });
+    await dataSource.query(
+      `UPDATE plans SET "costCapMicros" = 10000000 WHERE key = 'pro'`,
+    );
+    try {
+      await spent(6_200_000);
+      const part = await views.forUser(creator);
+      expect(part).toMatchObject({
+        capReached: false,
+        monthlyUsage: { used: 6.2, limit: 10 },
+      });
+      expect(part.alerts).toEqual([]);
+
+      await spent(8_400_000);
+      expect((await views.forUser(creator)).alerts).toEqual([
+        { what: 'Monthly usage', percent: 84 },
+      ]);
+
+      await spent(10_600_000);
+      const full = await views.forUser(creator);
+      expect(full).toMatchObject({
+        capReached: true,
+        monthlyUsage: { used: 10.6, limit: 10 },
+      });
+      expect(full.alerts).toEqual([{ what: 'Monthly usage', percent: 100 }]);
+    } finally {
+      await dataSource.query(
+        `UPDATE plans SET "costCapMicros" = NULL WHERE key = 'pro'`,
+      );
+    }
   });
 
   it('internal: nothing limited, and invited people need no seat', async () => {

@@ -1,6 +1,7 @@
 /**
  * The owner's words for plans, seats and limits (CR1 Part C, docs/agents-v2/chunk-cr1.md §C3):
- * Plan and usage, Share → People's seats, and publishing. **Never dollars.**
+ * Plan and usage, Share → People's seats, and publishing. One amount is in dollars, the monthly
+ * usage allowance; **never a price**.
  */
 export const PLAN = {
   title: "Plan and usage",
@@ -18,6 +19,14 @@ export const PLAN = {
     past_due: "Payment is due",
     cancelled: "Cancelled",
   } as Record<string, string>,
+  usage: {
+    title: "Monthly usage",
+    label: "Used this month",
+    stops:
+      "When this is used up, your assistants stop answering until it resets. Crisis replies still go out. To raise it, ask Ally.",
+    stopped:
+      'This month\'s usage is used up, so your assistants give a short "not available" reply until it resets. Crisis replies still go out. To raise it, ask Ally.',
+  },
   month: {
     title: "This month",
     ownerRuns: "Setup and checkups",

@@ -68,8 +68,10 @@ export interface CreatorPlanLine {
 /** `GET v1/me/plan`. A user who has never created a chatbot has no plan. */
 export interface MyPlan {
   isCreator: boolean;
-  /** Ally's monthly cost cap was reached: assistants give the "not available" reply. No amount. */
+  /** The monthly usage allowance is used up: assistants give the "not available" reply. */
   capReached?: boolean;
+  /** This month's usage against its allowance, **in US dollars**. Null: no allowance set. */
+  monthlyUsage?: UsageBar | null;
   plan?: CreatorPlanLine;
   period?: { start: string; end: string };
   ownerRuns?: UsageBar;

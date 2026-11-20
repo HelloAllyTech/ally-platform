@@ -53,8 +53,8 @@ export function capOf(
  * The spend cap: the most a creator's assistants may cost Ally in one plan period, in dollars.
  *
  * It replaces token allowances. The plan's own limits (conversations, seats, setup runs) are what
- * owners see and plan around; this is Ally's guard underneath them, sized so it is only reached
- * when something has gone wrong. Owners never see the amount.
+ * owners plan around; this is Ally's guard underneath them, sized so it is only reached when
+ * something has gone wrong. Owners see it on Plan and usage as their monthly usage allowance.
  *
  * What counts is every priced usage event attributed to the creator, WhatsApp fees included, added
  * in the same transaction the event is recorded in. A redelivered event is never inserted twice,

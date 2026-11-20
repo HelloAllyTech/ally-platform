@@ -7,6 +7,7 @@ import type { AssistantPlanUsage, MyPlan as MyPlanView } from "@api";
 import { ROUTES } from "@constants";
 
 import { PLAN } from "./copy";
+import { usd } from "./format";
 import { Meter, PlanAlertsBanner, SeatList } from "./ui";
 
 import "../AssistantHome/ui/scale.css";
@@ -84,6 +85,23 @@ export const MyPlanBody: React.FC<{ plan: MyPlanView }> = ({ plan }) => (
       </p>
     )}
 
+    {plan.isCreator && plan.monthlyUsage && (
+      <section className="ally-plan__card" data-testid="plan-usage">
+        <h2>{PLAN.usage.title}</h2>
+        <div className="ally-plan__meters">
+          <Meter
+            label={PLAN.usage.label}
+            bar={plan.monthlyUsage}
+            format={usd}
+            testId="plan-monthly-usage"
+          />
+        </div>
+        <p className="ally-plan__note" data-testid="plan-usage-note">
+          {plan.capReached ? PLAN.usage.stopped : PLAN.usage.stops}
+        </p>
+      </section>
+    )}
+
     {plan.isCreator && plan.ownerRuns && (
       <section className="ally-plan__card" data-testid="plan-month">
         <h2>{PLAN.month.title}</h2>
@@ -116,8 +134,8 @@ export const MyPlanBody: React.FC<{ plan: MyPlanView }> = ({ plan }) => (
 
 /**
  * The owner's Plan and usage (CR1 §C3), from the account menu: the plan, each assistant's seats
- * and this month's counts as plain bars. **Never dollars**: Ally's cost cap shows only as "Monthly
- * usage: used up" in the alerts, when it is reached.
+ * and this month's counts as plain bars. The monthly usage allowance is the one amount in dollars:
+ * what is used of it, when it resets, and that assistants stop answering when it is used up.
  */
 export const MyPlan: React.FC = () => {
   const { data, isLoading, isError } = useGetMyPlanQuery();

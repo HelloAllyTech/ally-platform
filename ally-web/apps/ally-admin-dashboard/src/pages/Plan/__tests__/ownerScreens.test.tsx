@@ -11,7 +11,7 @@ import type { AssistantSeatsView, MyPlan, PlanSeat, PublishUse } from "@api";
 
 import { SeatsBlock } from "../../AssistantHome/sections/Seats";
 import { ShareScreen } from "../../Onboarding/screens/Share";
-import { compactCount, fullCount, levelOf, shortDay } from "../format";
+import { compactCount, fullCount, levelOf, shortDay, usd } from "../format";
 import { planLimitMessage } from "../limits";
 import { MyPlanBody } from "../MyPlan";
 
@@ -131,20 +131,52 @@ describe("Plan and usage", () => {
     noDollars(container);
   });
 
-  it("says monthly usage is used up when Ally's cost cap is reached, with no amount", () => {
-    const { container } = render(
+  it("shows the monthly usage allowance in dollars, and that assistants stop when it is used up", () => {
+    render(
+      <MemoryRouter>
+        <MyPlanBody
+          plan={{ ...PLAN_VIEW, monthlyUsage: { used: 6.2, limit: 10, resetsOn: "2026-12-01" } }}
+        />
+      </MemoryRouter>,
+    );
+    const usage = screen.getByTestId("plan-monthly-usage");
+    expect(usage.textContent).toContain("$6.20 of $10.00");
+    expect(usage.textContent).toContain("Resets 1 Dec");
+    expect(screen.getByTestId("plan-usage-note").textContent).toContain(
+      "When this is used up, your assistants stop answering until it resets.",
+    );
+    // The allowance is the only money on the page: no plan or seat price.
+    expect(screen.getByTestId("plan-assistants").textContent).not.toContain("$");
+    expect(screen.getByTestId("plan-line").textContent).not.toContain("$");
+  });
+
+  it("says so once the monthly usage is used up", () => {
+    render(
       <MemoryRouter>
         <MyPlanBody
           plan={{
             ...PLAN_VIEW,
             capReached: true,
+            monthlyUsage: { used: 10.6, limit: 10, resetsOn: "2026-12-01" },
             alerts: [{ what: "Monthly usage", percent: 100 }],
           }}
         />
       </MemoryRouter>,
     );
     expect(screen.getByTestId("plan-alerts").textContent).toContain("Monthly usage: used up");
-    noDollars(container);
+    expect(screen.getByTestId("plan-monthly-usage").textContent).toContain("$10.60 of $10.00");
+    expect(screen.getByTestId("plan-usage-note").textContent).toContain(
+      "This month's usage is used up",
+    );
+  });
+
+  it("shows no monthly usage card to a creator with no allowance set", () => {
+    render(
+      <MemoryRouter>
+        <MyPlanBody plan={{ ...PLAN_VIEW, monthlyUsage: null }} />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByTestId("plan-usage")).toBeNull();
   });
 
   it("reads unlimited limits as Unlimited, with no bar", () => {
@@ -275,6 +307,8 @@ describe("format and limits", () => {
     expect(compactCount(312)).toBe("312");
     expect(fullCount(1000)).toBe("1,000");
     expect(shortDay("2026-12-01")).toBe("1 Dec");
+    expect(usd(6.2)).toBe("$6.20");
+    expect(usd(1234.5)).toBe("$1,234.50");
   });
 
   it("warns at 80% and is full at the limit", () => {

@@ -164,7 +164,9 @@ test("a custom login's Spend and Plan", async ({ page }) => {
   await shootPart(page, "user-plan-section", "user-plan");
 });
 
-test("the owner's Plan and usage: counts and bars, never dollars", async ({ page }) => {
+test("the owner's Plan and usage: counts and bars, and the monthly usage in dollars", async ({
+  page,
+}) => {
   await open(page, "/account/plan");
   const body = page.getByTestId("my-plan");
   await expect(body.getByTestId("plan-line")).toContainText("Free · 2 of 3 assistants published");
@@ -172,7 +174,12 @@ test("the owner's Plan and usage: counts and bars, never dollars", async ({ page
   await expect(body).not.toContainText(/tokens/i);
   await expect(body).toContainText("Basic · 500 messages a month");
   await expect(body.getByTestId("plan-alerts")).toContainText("84% used");
-  await expect(body).not.toContainText("$");
+  await expect(body.getByTestId("plan-monthly-usage")).toContainText("$2.37 of $10.00");
+  await expect(body.getByTestId("plan-usage-note")).toContainText(
+    "your assistants stop answering until it resets",
+  );
+  // The allowance is the only money shown: no plan or seat price.
+  await expect(body.getByTestId("plan-assistants")).not.toContainText("$");
   await expectNoPageScrollX(page);
   await shoot(page, "my-plan");
 });

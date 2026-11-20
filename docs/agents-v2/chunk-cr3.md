@@ -17,7 +17,7 @@ Tokens were also not how Ally knows its spend: every model call is already in `u
 
 1. **Tokens stop being a limit.** Nothing reads `token_grants` or `token_balances`. Owners no longer see tokens anywhere.
 2. **Each plan carries a monthly cost cap per creator, in dollars.** Set by super admins on Ally admin → Plans. A creator can have their own cap, or be never capped (Ally's team and test accounts).
-3. **Owners never see the amount.** If the cap is reached they are emailed and see "Monthly usage: used up"; customers get the existing "isn't available" reply; crisis replies still go out.
+3. **Owners see their monthly usage in dollars** on Plan and usage: "$6.20 of $10.00", when it resets, and that their assistants stop answering when it is used up. It is the only amount of money they see; plan and seat prices stay Ally's. At the cap they are emailed and see "Monthly usage: used up"; customers get the existing "isn't available" reply; crisis replies still go out.
 4. **Ally hears first.** An alert at 80% of a cap and again at 100%, so the cap can be raised before anyone is cut off.
 5. **Seats stay exactly as they are.** The owner screens now say what a seat gives in words: "Basic · 500 messages a month".
 

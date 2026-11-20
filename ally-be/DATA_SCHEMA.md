@@ -1225,7 +1225,7 @@ Agents v2 chunk CR1 (notes: `../docs/agents-v2/CHUNK-CR1-NOTES.md`). **Not multi
 | `usage_counter_hits` | PK (`runId`, `kind`), `counterId` (FK CASCADE) | What made each count: a repeated message or request counts once. |
 | `customer_activity` | PK (`chatbotId`, `conversationKey`), `lastMessageAt` | A customer conversation is new after a 24-hour gap. Written only when the message may go ahead. |
 
-**Spend cap** (migration `1985400000300-AddSpendCap`; notes: `../docs/agents-v2/CHUNK-CR3-NOTES.md`). The most a creator's assistants may cost Ally in one plan period, in dollars. It is Ally's guard under the plan's own limits: owners never see the amount, only that it was reached.
+**Spend cap** (migration `1985400000300-AddSpendCap`; notes: `../docs/agents-v2/CHUNK-CR3-NOTES.md`). The most a creator's assistants may cost Ally in one plan period, in dollars. It is Ally's guard under the plan's own limits. Owners see it as their monthly usage allowance, in dollars (`v1/me/plan` → `monthlyUsage`).
 
 | Table | Key columns | Notes |
 | --- | --- | --- |
