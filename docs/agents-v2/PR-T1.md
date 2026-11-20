@@ -40,6 +40,8 @@ Owners start from a whole use case instead of assembling an assistant from parts
 - ally-be: 1,301 suites, 19,140 tests pass (22 Postgres suites skip without a database); lint and typecheck clean. Postgres specs on `ally_t1_test`: templates 27/27, lists 141/141 (`bot-draft.pg.spec.ts` "publishing twice converges…" fails on master too).
 - ally-web (Node 22): 704 test files pass; typecheck clean. Playwright `templates.e2e.ts` 8/8 at 1440 and 390; the rest of the e2e suite wasn't rerun after the last fixes (skipped at Shehbaz's request; CI runs it).
 
+**CI:** "Lint & format (ally-web)" fails on its colour-literal step because of master's new blog pages (`BlogArticle.tsx`, `BlogReview.tsx`), not this branch; left to the blog's owner. This branch merged master and formats master's course-copilot files, which fixes ally-be's "Lint & format".
+
 ## Decisions
 
 - Setup answers become real entries; skipped ones get neutral examples marked as such (Shehbaz, at the plan).
