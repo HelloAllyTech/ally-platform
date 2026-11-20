@@ -9829,9 +9829,32 @@ export const en = {
     session: {
       startPlanning: "Start planning",
       startPlanningHelp:
-        "Expands this idea into a plan, in its conversation, and accepts it if it was waiting. Only an Owner plans. Nobody builds it until you close the plan and assign a builder.",
+        "Expands this idea into a plan, in its conversation. An Owner starting it also accepts the idea if it was waiting. Only one person runs the interview at a time, and you can hand it over part-way. Nobody builds it until an Owner closes the plan and assigns a builder.",
       planningStarted: "Planning started.",
       startPlanningFailed: "Couldn't start planning.",
+      planInterview: {
+        offerTitle: "Want to expand this idea into a plan?",
+        offerBody:
+          "Complete the plan interview yourself, or ask the product owner to do it. You can hand it over part-way through too.",
+        askOwner: "Ask the product owner",
+        askOwnerHelp:
+          "Tells the Owners you'd like them to run the plan interview. You won't be offered it again.",
+        askOwnerDone: "The product owner has been asked.",
+        askOwnerFailed: "Couldn't ask the product owner.",
+        take: "Continue the plan interview",
+        takeHelp:
+          "Nobody is running this interview now. Taking it up carries on from the conversation and PRD so far. Only one person can run it at a time.",
+        taken: "You're running the plan interview.",
+        takeFailed: "Couldn't take up the plan interview.",
+        release: "Hand over",
+        releaseAuthor: "Hand over to the product owner",
+        releaseHelp: "Frees the interview for an Owner to continue. Everything so far is kept.",
+        releaseAuthorHelp:
+          "Hands the interview to the Owners. Everything so far is kept, and you won't be offered it again.",
+        released: "Handed back.",
+        releaseFailed: "Couldn't hand it back.",
+        heldBy: (name: string) => `${name} is running the plan interview.`,
+      },
       openConversation: "Comment on this idea",
       openConversationHelp:
         "This idea was filed before ideas had a conversation. Opening one lets everyone comment; it changes nothing else.",
@@ -9919,6 +9942,11 @@ export const en = {
         declined: (name: string) => `Declined by ${name}`,
         reopened: (name: string) => `Reopened by ${name}`,
         planningStarted: (name: string) => `${name} started planning`,
+        planClaimed: (name: string) => `${name} took up the plan interview`,
+        planReleased: (name: string, byAuthor: boolean) =>
+          byAuthor
+            ? `${name} handed the plan interview to the Owners`
+            : `${name} handed the plan interview back`,
         planClosed: (name: string) => `${name} closed the plan`,
         planReopened: (name: string) => `${name} reopened the plan`,
         builderAssigned: (by: string, to: string) => `${by} assigned ${to} to build it`,
@@ -10232,6 +10260,10 @@ export const en = {
       accepted: (code: string) => `${code} is accepted and being planned`,
       plan_ready: (code: string) => `The plan for ${code} is ready to read`,
       plan_closed: (code: string) => `The plan for ${code} is closed. It waits for a builder`,
+      plan_offered: (code: string) =>
+        `${code} is filed. Want to expand it into a plan, or ask the product owner to?`,
+      plan_handed_over: (code: string) =>
+        `The plan interview for ${code} is free for an Owner to take`,
       comment: (code: string, count: number) =>
         count === 1 ? `New comment on ${code}` : `${count} new comments on ${code}`,
       question_answered: (code: string, name: string) =>

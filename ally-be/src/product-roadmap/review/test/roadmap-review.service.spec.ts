@@ -58,6 +58,8 @@ function build(
           return [{ reviewState: 'pending', createdBy: AUTHOR }];
         if (sql.startsWith('UPDATE "roadmap_opportunities"'))
           return [[{ id: 'id' }], 1];
+        // Taking the plan interview's holder (claimPlan) wins when nobody holds it.
+        if (sql.includes(`'planClaim'`)) return [[{ id: 's' }], 1];
         if (sql.includes('SELECT description'))
           return [{ description: 'Tell me why I am blocked.\nMore.' }];
         if (sql.startsWith('SELECT "reviewState"'))
@@ -638,6 +640,140 @@ describe('RoadmapReviewService', () => {
       code: 'OPP-0001',
       sessionId: 's-OPP-0001',
       acceptedNow: true,
+    });
+  });
+
+  describe('the plan interview has one holder', () => {
+    it("an author's Start planning holds it as author, without accepting the idea", async () => {
+      const { service, deps } = build({
+        roles: { [AUTHOR]: 'idea' },
+        stage: 'submitted',
+        can: { startPlanning: true },
+      });
+      await service.startPlanning(AUTHOR, 'OPP-0001');
+      expect(deps.dataSource.query).not.toHaveBeenCalledWith(
+        expect.stringContaining(`"reviewState" = 'accepted'`),
+        expect.anything(),
+      );
+      expect(deps.dataSource.query).toHaveBeenCalledWith(
+        expect.stringContaining(`'planClaim'`),
+        ['s-OPP-0001', expect.stringContaining('"as":"author"'), AUTHOR],
+      );
+      expect(deps.ideaNotices.planningStarted).not.toHaveBeenCalled();
+      expect(deps.planTurns.queueOpeningTurn).toHaveBeenCalled();
+    });
+
+    it('refuses Start planning when someone just took it', async () => {
+      const { service, deps } = build({
+        stage: 'accepted',
+        can: { startPlanning: true },
+      });
+      deps.dataSource.query.mockImplementation(async (sql: string) =>
+        sql.includes(`'planClaim'`) ? [] : [],
+      );
+      await expect(service.startPlanning(OWNER, 'OPP-0001')).rejects.toThrow(
+        HttpException,
+      );
+      expect(deps.store.patchPlan).not.toHaveBeenCalled();
+    });
+
+    it('takes up a free interview and records it', async () => {
+      const { service, deps } = build({
+        stage: 'planning',
+        can: { takePlanning: true },
+      });
+      await service.takePlanning(OWNER, 'OPP-0001');
+      expect(deps.events.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: PlanEventKind.PLAN_CLAIMED,
+          detail: { as: 'owner', resumed: true },
+        }),
+      );
+    });
+
+    it('names the holder when taking it is refused', async () => {
+      const { service, deps } = build({
+        stage: 'planning',
+        can: { takePlanning: false },
+      });
+      (deps.reader.detail as jest.Mock).mockResolvedValueOnce({
+        code: 'OPP-0001',
+        shownStage: 'planning',
+        can: { takePlanning: false },
+        planHolder: { id: AUTHOR, name: 'Asha', as: 'author' },
+      });
+      await expect(service.takePlanning(OWNER, 'OPP-0001')).rejects.toThrow(
+        ConflictException,
+      );
+    });
+
+    it("an author's hand-over frees it, ends their right and tells the Owners", async () => {
+      const { service, deps } = build({
+        roles: { [AUTHOR]: 'idea' },
+        stage: 'planning',
+        can: { releasePlanning: true },
+      });
+      await service.releasePlanning(AUTHOR, 'OPP-0001');
+      expect(deps.store.patchPlan).toHaveBeenCalledWith(
+        's-OPP-0001',
+        expect.objectContaining({
+          planClaim: null,
+          authorPassed: expect.objectContaining({ at: expect.any(String) }),
+        }),
+      );
+      expect(deps.inbox.deliver).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: RoadmapNotificationKind.PLAN_HANDED_OVER,
+          actorUserId: AUTHOR,
+        }),
+      );
+    });
+
+    it("an Owner's release frees it without ending anyone's right", async () => {
+      const { service, deps } = build({
+        stage: 'planning',
+        can: { releasePlanning: true },
+      });
+      await service.releasePlanning(OWNER, 'OPP-0001');
+      expect(deps.store.patchPlan).toHaveBeenCalledWith('s-OPP-0001', {
+        planClaim: null,
+      });
+      expect(deps.inbox.deliver).not.toHaveBeenCalled();
+    });
+
+    it('refuses a hand-over from anyone who does not hold it', async () => {
+      const { service } = build({
+        stage: 'planning',
+        can: { releasePlanning: false },
+      });
+      await expect(service.releasePlanning(OWNER, 'OPP-0001')).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('asking the Owners before starting ends the idea author’s right and tells them', async () => {
+      const { service, deps } = build({
+        roles: { [AUTHOR]: 'idea' },
+        stage: 'submitted',
+        can: { askOwnerToPlan: true },
+      });
+      await service.askOwnerToPlan(AUTHOR, 'OPP-0001');
+      expect(deps.store.patchPlan).toHaveBeenCalledWith(
+        's-OPP-0001',
+        expect.objectContaining({ authorPassed: expect.anything() }),
+      );
+      expect(deps.events.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: PlanEventKind.PLAN_RELEASED,
+          detail: { as: 'author', started: false },
+        }),
+      );
+      expect(deps.inbox.deliver).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: RoadmapNotificationKind.PLAN_HANDED_OVER,
+          payload: expect.objectContaining({ started: false }),
+        }),
+      );
     });
   });
 

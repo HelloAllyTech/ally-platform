@@ -56,6 +56,10 @@ export interface SessionFacts {
   reviews: { dueDates?: string[]; done?: number } | null;
   externalBuild: { byUserId?: number; at?: string } | null;
   planningStarted: boolean | null;
+  /** Who holds the plan interview; `undefined` on plans from before claims (starter holds it). */
+  planClaim?: { userId?: number; as?: string } | null;
+  /** The author handed the interview to the Owners. */
+  authorPassed?: boolean;
   /** The Owner closed the plan (lifecycle 2026-11-18). */
   planClosed?: { byUserId?: number; at?: string } | null;
   /** How the assigned builder builds it. */

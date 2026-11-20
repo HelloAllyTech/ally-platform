@@ -276,6 +276,33 @@ export const roadmapV2FlowAPI = baseAPI.injectEndpoints({
       invalidatesTags: (_r, _e, code) => [itemTag(code), listTag],
     }),
 
+    /** Take up the plan interview nobody holds (an Owner, or the idea's author). */
+    takeRoadmapPlanning: builder.mutation<RoadmapItemDetail, string>({
+      query: code => ({
+        url: ApiEndpoints.ROADMAP_V2_FLOW.TAKE_PLANNING(code),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: (_r, _e, code) => [itemTag(code), listTag],
+    }),
+
+    /** The holder hands the plan interview back, part-way through. */
+    releaseRoadmapPlanning: builder.mutation<RoadmapItemDetail, string>({
+      query: code => ({
+        url: ApiEndpoints.ROADMAP_V2_FLOW.RELEASE_PLANNING(code),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: (_r, _e, code) => [itemTag(code), listTag],
+    }),
+
+    /** The author, before starting: ask the Owners to run the plan interview instead. */
+    askRoadmapOwnerToPlan: builder.mutation<RoadmapItemDetail, string>({
+      query: code => ({
+        url: ApiEndpoints.ROADMAP_V2_FLOW.ASK_OWNER_TO_PLAN(code),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: (_r, _e, code) => [itemTag(code), listTag],
+    }),
+
     /** Opens the conversation on an older idea that has none, so it can take comments. */
     openRoadmapConversation: builder.mutation<RoadmapItemDetail, string>({
       query: code => ({
@@ -444,6 +471,9 @@ export const {
   useGetRoadmapLeadSuggestionsQuery,
   useGetRoadmapItemSimilarQuery,
   useStartRoadmapPlanningMutation,
+  useTakeRoadmapPlanningMutation,
+  useReleaseRoadmapPlanningMutation,
+  useAskRoadmapOwnerToPlanMutation,
   useSetRoadmapPlanClosedMutation,
   useOpenRoadmapConversationMutation,
   useSetRoadmapBuildModeMutation,

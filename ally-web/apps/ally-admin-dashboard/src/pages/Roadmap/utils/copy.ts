@@ -333,6 +333,10 @@ export const timelineLabel = (entry: RoadmapTimelineEntry): string | null => {
       return w.accepted(who);
     case "planning_started":
       return w.planningStarted(who);
+    case "plan_claimed":
+      return w.planClaimed(who);
+    case "plan_released":
+      return w.planReleased(who, d.as === "author");
     case "plan_closed":
       return w.planClosed(who);
     case "plan_reopened":

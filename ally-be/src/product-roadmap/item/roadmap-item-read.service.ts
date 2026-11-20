@@ -120,6 +120,8 @@ const TIMELINE_EVENT_KINDS: string[] = [
   PlanEventKind.FILED,
   PlanEventKind.REVIEWED,
   PlanEventKind.PLANNING_STARTED,
+  PlanEventKind.PLAN_CLAIMED,
+  PlanEventKind.PLAN_RELEASED,
   PlanEventKind.PLAN_CLOSED,
   PlanEventKind.PLAN_REOPENED,
   PlanEventKind.LEAD_ASSIGNED,
@@ -193,6 +195,21 @@ const num = (value: unknown): number => {
 const clip = (text: string, max: number) => {
   const flat = text.replace(/\s+/g, ' ').trim();
   return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
+};
+/**
+ * Who holds the plan interview: the claim, or — on plans from before claims existed — the
+ * person who pressed Start planning. Null when nobody does (never started, or released).
+ */
+const planHolderOf = (
+  session: SessionFacts | null,
+  plannerId: number | null,
+): number | null => {
+  if (!session) return null;
+  if (session.planClaim !== undefined) {
+    const id = Number(session.planClaim?.userId);
+    return Number.isFinite(id) && id > 0 ? id : null;
+  }
+  return session.planningStarted === true ? plannerId : null;
 };
 const asJson = <T>(value: unknown): T | null => {
   if (value === null || value === undefined) return null;
@@ -399,17 +416,26 @@ export class RoadmapItemReadService {
     const session = core.session;
     const viewer = role === 'viewer';
     const design = this.designState(sessionDetail);
+    const planHolderId = planHolderOf(session, core.plannerId);
     const can = {
       ...capabilitiesFor(
         role,
-        { isAuthor, isLead, isWatcher: core.watchLevel !== 'none' },
+        {
+          isAuthor,
+          isLead,
+          isWatcher: core.watchLevel !== 'none',
+          holdsPlanClaim: planHolderId !== null && planHolderId === userId,
+        },
         {
           shownStage: core.shownStage,
           hasLead: core.leadId !== null,
           hasPlan: session?.kind === 'plan',
           planningStarted:
-            core.shownStage !== 'submitted' && core.shownStage !== 'accepted',
+            session?.planningStarted === true ||
+            (core.shownStage !== 'submitted' && core.shownStage !== 'accepted'),
           planClosed: !!session?.planClosed?.at,
+          planClaimed: planHolderId !== null,
+          authorPassed: session?.authorPassed === true,
           designAwaitingApproval:
             design === 'awaitingApproval' ||
             core.decisions.some((d) => d.kind === 'design_review'),
@@ -503,6 +529,21 @@ export class RoadmapItemReadService {
       ...(spend ? { spend } : {}),
       people,
       can,
+      ...(planHolderId
+        ? {
+            planHolder: {
+              id: planHolderId,
+              name:
+                (await this.resolvePeople([planHolderId])).get(planHolderId)
+                  ?.name ?? 'Former member',
+              as:
+                session?.planClaim?.as === 'author' ||
+                planHolderId === core.authorId
+                  ? ('author' as const)
+                  : ('owner' as const),
+            },
+          }
+        : {}),
       watchLevel: core.watchLevel,
       reviewState,
       ...(core.shownStage === 'declined' &&
@@ -914,6 +955,9 @@ export class RoadmapItemReadService {
               s.plan->'externalBuild' AS "externalBuild",
               s.plan->'planningStarted' AS "planningStarted",
               s.plan->>'planningStartedBy' AS "planningStartedBy",
+              s.plan->'planClaim' AS "planClaim",
+              (s.plan ? 'planClaim') AS "planClaimSet",
+              (jsonb_typeof(s.plan->'authorPassed') = 'object') AS "authorPassed",
               s.plan->'planClosed' AS "planClosedStamp",
               s.plan->'buildMode' AS "buildMode",
               s.plan->>'openConflicts' AS "openConflicts",
@@ -1042,6 +1086,10 @@ export class RoadmapItemReadService {
               typeof asJson(f.planningStarted) === 'boolean'
                 ? (asJson(f.planningStarted) as boolean)
                 : null,
+            ...(f.planClaimSet === true || f.planClaimSet === 't'
+              ? { planClaim: asJson(f.planClaim) }
+              : {}),
+            authorPassed: f.authorPassed === true || f.authorPassed === 't',
             planClosed: asJson(f.planClosedStamp),
             buildMode: asJson(f.buildMode),
             openConflicts: num(f.openConflicts),
