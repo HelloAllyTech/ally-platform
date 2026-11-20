@@ -813,6 +813,23 @@ export const ApiEndpoints = {
   ANALYTICS_AGENT: {
     ASK: "/v1/analytics/agent/ask",
     CATALOG: "/v1/analytics/agent/catalog",
+    // The caller's own saved conversations (the sidebar), and one with its turns.
+    CONVERSATIONS: "/v1/analytics/agent/conversations",
+    CONVERSATION_BY_ID: (id: string) => `/v1/analytics/agent/conversations/${id}`,
+    // The reader's optional thumbs up / down on one saved answer (PUT; null clears it).
+    MESSAGE_FEEDBACK: (messageId: string) => `/v1/analytics/agent/messages/${messageId}/feedback`,
+    // Audit runs over the agent's recent answers: start one (POST), list past
+    // ones (GET), open one (GET by id — polled while it is running).
+    AUDITS: "/v1/analytics/agent/audits",
+    AUDIT_BY_ID: (id: string) => `/v1/analytics/agent/audits/${id}`,
+    // Weekly automation runs (scheduler-started; there is no start endpoint): list
+    // them, open one, and approve / reject the dbt agent's proposal.
+    AUTOMATION_RUNS: "/v1/analytics/agent/automation/runs",
+    AUTOMATION_RUN_BY_ID: (id: string) => `/v1/analytics/agent/automation/runs/${id}`,
+    AUTOMATION_APPROVE: (agentRunId: string) =>
+      `/v1/analytics/agent/automation/agents/${agentRunId}/approve`,
+    AUTOMATION_REJECT: (agentRunId: string) =>
+      `/v1/analytics/agent/automation/agents/${agentRunId}/reject`,
   },
   // UX Signals — the PostHog scan that files bugs into Bug Hunter and improvement
   // signals for the PM Agent. Its own namespace because it is a producer for both,
@@ -1680,6 +1697,9 @@ export const TAG_TYPES = {
   PM_AGENT_MEMORY: "pmAgentMemory",
   PM_AGENT_HISTORY: "pmAgentHistory",
   PM_AGENT_HEALTH: "pmAgentHealth",
+  ANALYTICS_AGENT_CONVERSATIONS: "analyticsAgentConversations",
+  ANALYTICS_AGENT_AUDITS: "analyticsAgentAudits",
+  ANALYTICS_AGENT_AUTOMATION: "analyticsAgentAutomation",
   ANALYTICS_CHART_PREFERENCES: "analyticsChartPreferences",
   BUG_HUNTER_SETTINGS: "bugHunterSettings",
   // Also registered in baseApi.ts's `tagTypes` — an unregistered tag is
