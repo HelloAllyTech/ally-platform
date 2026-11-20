@@ -746,6 +746,7 @@ export const CourseCopilotSession: React.FC = () => {
                         onRetry={() => void retryLast()}
                         disabled={isStreaming || isArchived}
                         citations
+                        compactQuestions
                       />
                       {showReceipt && (
                         <AgentReceipt receipt={{ ...receipt, unchangedBecause: null }} />

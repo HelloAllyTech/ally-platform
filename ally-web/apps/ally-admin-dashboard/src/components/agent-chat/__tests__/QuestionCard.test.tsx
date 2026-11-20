@@ -45,6 +45,27 @@ describe("agent-chat QuestionCard", () => {
     expect(screen.getByText("First month on a helpline")).toBeInTheDocument();
   });
 
+  it("compact: folds the rationale behind a toggle and keeps descriptions to one line", () => {
+    const { container } = render(
+      <QuestionCard question={single()} onAnswer={vi.fn()} compact />,
+    );
+
+    const toggle = screen.getByText(strings.whyAsked);
+    expect(toggle.tagName).toBe("SUMMARY");
+    // Still in the page for anyone who opens it, just not in the way.
+    expect(container.querySelector("details")).not.toHaveAttribute("open");
+    expect(screen.getByText("It decides how much background to explain.")).toBeInTheDocument();
+    const description = screen.getByText("First month on a helpline");
+    expect(description).toHaveClass("line-clamp-1");
+    expect(description).toHaveAttribute("title", "First month on a helpline");
+  });
+
+  it("is not compact unless asked (Builder and the character interview)", () => {
+    render(<QuestionCard question={single()} onAnswer={vi.fn()} />);
+    expect(screen.queryByText(strings.whyAsked)).toBeNull();
+    expect(screen.getByText("First month on a helpline")).not.toHaveClass("line-clamp-1");
+  });
+
   it("answers a single-select in one click with the option's id", () => {
     const onAnswer = vi.fn();
     render(<QuestionCard question={single()} onAnswer={onAnswer} />);

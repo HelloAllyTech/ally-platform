@@ -131,6 +131,27 @@ export const BriefPanel: React.FC<BriefPanelProps> = ({ brief, readiness }) => {
   );
   const notes = asAgentTextList(source.notes);
 
+  // Course Design Manual fields (learner profile, A×B skill targets, EQUIP rubric).
+  const profileName = text(source.learnerProfileName) || text(source.learnerProfileId);
+  const skillTargets = (Array.isArray(source.skillTargets) ? source.skillTargets : [])
+    .map(target => ({
+      skill: text(target?.skill),
+      level: [target?.a, target?.b]
+        .map(code => text(code))
+        .filter(Boolean)
+        .map(code => strings.skillLevels[code] ?? code)
+        .join(" × "),
+    }))
+    .filter(target => target.skill && target.level);
+  const rubric = (Array.isArray(source.rubric) ? source.rubric : [])
+    .map(entry => ({
+      skill: text(entry?.skill),
+      groups: (["harmfulOrUnhelpful", "basicHelpful", "advancedHelpful"] as const)
+        .map(key => ({ key, items: asAgentTextList(entry?.[key]) }))
+        .filter(group => group.items.length > 0),
+    }))
+    .filter(entry => entry.skill && entry.groups.length > 0);
+
   const hasContent =
     seed ||
     audienceRows.length > 0 ||
@@ -139,6 +160,9 @@ export const BriefPanel: React.FC<BriefPanelProps> = ({ brief, readiness }) => {
     competencies.length > 0 ||
     helpful.length > 0 ||
     unhelpful.length > 0 ||
+    Boolean(profileName) ||
+    skillTargets.length > 0 ||
+    rubric.length > 0 ||
     assessmentKind ||
     assessmentNote ||
     threshold !== null ||
@@ -207,6 +231,13 @@ export const BriefPanel: React.FC<BriefPanelProps> = ({ brief, readiness }) => {
         </Section>
       )}
 
+      {profileName && (
+        <Section title={strings.sections.learnerProfile}>
+          <p className="text-sm text-typography-900">{profileName}</p>
+          <p className="text-xs text-typography-500">{strings.learnerProfileHint}</p>
+        </Section>
+      )}
+
       {(terminal || enabling.length > 0) && (
         <Section title={strings.sections.outcomes}>
           {terminal && (
@@ -259,6 +290,34 @@ export const BriefPanel: React.FC<BriefPanelProps> = ({ brief, readiness }) => {
               <BulletList items={unhelpful} />
             </div>
           )}
+        </Section>
+      )}
+
+      {skillTargets.length > 0 && (
+        <Section title={strings.sections.skillTargets}>
+          <dl className="space-y-1.5">
+            {skillTargets.map(target => (
+              <Row key={target.skill} label={target.skill}>
+                {target.level}
+              </Row>
+            ))}
+          </dl>
+        </Section>
+      )}
+
+      {rubric.length > 0 && (
+        <Section title={strings.sections.rubric}>
+          {rubric.map(entry => (
+            <div key={entry.skill} className="space-y-1">
+              <p className="text-xs font-medium text-typography-800">{entry.skill}</p>
+              {entry.groups.map(group => (
+                <div key={group.key} className="space-y-0.5 pl-2">
+                  <p className="text-xs text-typography-700">{strings.rubricGroups[group.key]}</p>
+                  <BulletList items={group.items} />
+                </div>
+              ))}
+            </div>
+          ))}
         </Section>
       )}
 

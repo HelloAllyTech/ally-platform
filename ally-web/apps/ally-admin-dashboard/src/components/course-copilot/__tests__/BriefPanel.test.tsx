@@ -46,14 +46,19 @@ const fullBrief = (): CourseBrief => ({
     { slot: 2, source: "library", scenarioId: 9, taskClass: "Ambivalent caller" },
   ],
   look: { cover: "generate", articleImages: "cover-only" },
-  videoUrls: [{ title: "A real call", url: "https://youtu.be/abc", source: "youtube", durationSeconds: 180 }],
+  videoUrls: [
+    { title: "A real call", url: "https://youtu.be/abc", source: "youtube", durationSeconds: 180 },
+  ],
   notes: ["Avoid crisis-line jargon"],
 });
 
 describe("BriefPanel — empty and partial", () => {
   it("says the brief fills in as the trainer answers, and nothing else, when it is empty", () => {
     render(
-      <BriefPanel brief={{}} readiness={{ ready: false, missing: ["audience", "outcomes", "shape"] }} />,
+      <BriefPanel
+        brief={{}}
+        readiness={{ ready: false, missing: ["audience", "outcomes", "shape"] }}
+      />,
     );
 
     expect(screen.getByText("The brief fills in as you answer.")).toBeInTheDocument();
@@ -77,7 +82,15 @@ describe("BriefPanel — empty and partial", () => {
 
     expect(screen.getByRole("heading", { name: "Audience" })).toBeInTheDocument();
     expect(screen.getByText("New volunteers")).toBeInTheDocument();
-    for (const heading of ["Outcomes", "Competencies", "Shape", "Practice ladder", "Look", "Videos", "Notes"]) {
+    for (const heading of [
+      "Outcomes",
+      "Competencies",
+      "Shape",
+      "Practice ladder",
+      "Look",
+      "Videos",
+      "Notes",
+    ]) {
       expect(screen.queryByRole("heading", { name: heading })).toBeNull();
     }
     expect(screen.queryByText("—")).toBeNull();
@@ -94,16 +107,20 @@ describe("BriefPanel — empty and partial", () => {
     );
 
     const list = screen.getByRole("list", { name: "Still needed:" });
-    expect(within(list).getAllByRole("listitem").map(entry => entry.textContent)).toEqual([
-      "outcomes",
-      "course length",
-    ]);
+    expect(
+      within(list)
+        .getAllByRole("listitem")
+        .map(entry => entry.textContent),
+    ).toEqual(["outcomes", "course length"]);
     expect(screen.queryByText("Ready for a blueprint")).toBeNull();
   });
 
   it("says 'Ready for a blueprint' instead of a list once it is", () => {
     render(
-      <BriefPanel brief={{ audience: { who: "New volunteers" } }} readiness={{ ready: true, missing: [] }} />,
+      <BriefPanel
+        brief={{ audience: { who: "New volunteers" } }}
+        readiness={{ ready: true, missing: [] }}
+      />,
     );
 
     expect(screen.getByText("Ready for a blueprint")).toBeInTheDocument();
@@ -121,7 +138,9 @@ describe("BriefPanel — a full brief", () => {
     expect(screen.getByText("Volunteer listeners in their first month")).toBeInTheDocument();
     expect(screen.getByText("Cohort of 12")).toBeInTheDocument();
     // Outcomes, numbered the way blueprint objective tags refer to them
-    expect(screen.getByText("Respond to a distressed caller without giving advice")).toBeInTheDocument();
+    expect(
+      screen.getByText("Respond to a distressed caller without giving advice"),
+    ).toBeInTheDocument();
     expect(screen.getByText("O1")).toBeInTheDocument();
     expect(screen.getByText("Ask open questions")).toBeInTheDocument();
     expect(screen.getByText("O2")).toBeInTheDocument();
@@ -167,7 +186,9 @@ describe("BriefPanel — agent-authored values that are not what the type says",
       notes: "one note",
     } as never;
 
-    render(<BriefPanel brief={mangled} readiness={{ ready: false, missing: "audience" as never }} />);
+    render(
+      <BriefPanel brief={mangled} readiness={{ ready: false, missing: "audience" as never }} />,
+    );
 
     expect(screen.getByText("From an object")).toBeInTheDocument();
     expect(screen.getByText(/Two\s*Lines|Two\nlines/i)).toBeInTheDocument();
@@ -176,5 +197,34 @@ describe("BriefPanel — agent-authored values that are not what the type says",
     expect(screen.getByText("one note")).toBeInTheDocument();
     // A mistyped duration is ignored rather than rendered as "NaN min".
     expect(screen.queryByText(/NaN/)).toBeNull();
+  });
+});
+
+describe("BriefPanel — Course Design Manual fields", () => {
+  it("shows the learner profile, skill targets as A × B, and the rubric's EQUIP groups", () => {
+    render(
+      <BriefPanel
+        brief={{
+          learnerProfileId: "helpline-responders",
+          learnerProfileName: "Helpline responders",
+          skillTargets: [{ skill: "Asking about suicide", a: "A2", b: "B2" }],
+          rubric: [
+            {
+              skill: "Asking about suicide",
+              harmfulOrUnhelpful: ["Vague words instead of suicide"],
+              basicHelpful: ["Direct question about suicide"],
+              advancedHelpful: [],
+            },
+          ],
+        }}
+        readiness={null}
+      />,
+    );
+    expect(screen.getByText("Helpline responders")).toBeInTheDocument();
+    expect(screen.getByText("A2 Getting started × B2 New scenarios")).toBeInTheDocument();
+    expect(screen.getByText("Harmful or unhelpful")).toBeInTheDocument();
+    expect(screen.getByText("Direct question about suicide")).toBeInTheDocument();
+    // An empty group is left out rather than shown as a heading with nothing under it.
+    expect(screen.queryByText("Advanced helpful")).toBeNull();
   });
 });

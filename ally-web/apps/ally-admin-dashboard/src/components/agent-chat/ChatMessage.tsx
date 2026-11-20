@@ -33,6 +33,8 @@ export interface ChatMessageProps {
    * entry, for an agent that cites them (Course Copilot).
    */
   citations?: boolean;
+  /** Question cards with less to read (see QuestionCard's `compact`). */
+  compactQuestions?: boolean;
 }
 
 /**
@@ -55,6 +57,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   strings: stringOverrides,
   formatToolNote,
   citations = false,
+  compactQuestions = false,
 }) => {
   const strings: AgentChatStrings = { ...en.agentChat.chat, ...stringOverrides };
 
@@ -66,6 +69,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
         answeredAnswer={message.answeredAnswer}
         onAnswer={onAnswerQuestion}
         disabled={disabled}
+        compact={compactQuestions}
       />
     );
   }

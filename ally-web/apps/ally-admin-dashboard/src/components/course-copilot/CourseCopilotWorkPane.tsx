@@ -9,6 +9,7 @@ import type {
   CourseCopilotBlueprintResponse,
   CourseCopilotSessionDetail,
   CourseCopilotSessionStatus,
+  CourseOutlineItem,
 } from "@types";
 
 import { BlueprintTree } from "./BlueprintTree";
@@ -210,6 +211,11 @@ export const CourseCopilotWorkPane: React.FC<CourseCopilotWorkPaneProps> = ({
   // The copilot can only act on a finished, live course: not mid-build, not mid-turn, not archived.
   const canAskCopilot = status === "EDITING" && !isBusy;
 
+  const handleChangeItem = (item: CourseOutlineItem, reason: string) => {
+    const title = item.title || item.type;
+    onSendMessage(strings.course.changeReasons.message(title, item.id, reason));
+  };
+
   const handleAskCopilot = (check: PublishCheck) => {
     const detailText = check.detail ? ` (${check.detail})` : "";
     onSendMessage(strings.course.readiness.askCopilotMessage(check.label, detailText));
@@ -281,6 +287,7 @@ export const CourseCopilotWorkPane: React.FC<CourseCopilotWorkPaneProps> = ({
             onOpenEditor={onOpenEditor}
             openEditorDisabledReason={openEditorDisabledReason}
             onAskCopilot={canAskCopilot ? handleAskCopilot : undefined}
+            onChangeItem={canAskCopilot ? handleChangeItem : undefined}
           />
         );
       default:

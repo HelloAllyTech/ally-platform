@@ -7,6 +7,7 @@ import { en } from "@constants";
 import type {
   CourseChangeLogEntry,
   CourseOutline,
+  CourseOutlineItem,
   CourseOutlineSection,
   CoursePublishReadiness,
 } from "@types";
@@ -19,6 +20,8 @@ import { PublishCheck, PublishReadiness } from "./PublishReadiness";
 
 export interface CourseOutlinePanelProps {
   outline: CourseOutline | null | undefined;
+  /** Review by choosing a reason; absent while the copilot can't act. */
+  onChangeItem?: (item: CourseOutlineItem, reason: string) => void;
   readiness?: CoursePublishReadiness | null;
   changeLog?: CourseChangeLogEntry[] | null;
   /**
@@ -78,6 +81,7 @@ export const CourseOutlinePanel: React.FC<CourseOutlinePanelProps> = ({
   onOpenEditor,
   openEditorDisabledReason,
   onAskCopilot,
+  onChangeItem,
 }) => {
   const strings = en.courseCopilotPane.course;
 
@@ -126,6 +130,7 @@ export const CourseOutlinePanel: React.FC<CourseOutlinePanelProps> = ({
                     compact={compact}
                     flash={flashed.has(item.id)}
                     flashToken={flashItemIds}
+                    onChange={onChangeItem}
                   />
                 ))}
               </ul>

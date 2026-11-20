@@ -5959,6 +5959,8 @@ export const en = {
       suggestedActionsLabel: "Suggested next steps",
     },
     question: {
+      // Course Copilot folds the reason for a question behind this toggle.
+      whyAsked: "Why this question?",
       recommended: "Recommended",
       noneOfThese: "None of these",
       addCustom: "Something else",
@@ -6379,6 +6381,27 @@ export const en = {
       lockedArchived: "This session is archived, so its files have been deleted.",
       privacy: "Only this course uses these files. They're deleted when the session is archived.",
       basedOn: (labels: string[]) => `From: ${labels.join(" · ")}`,
+    },
+
+    // A new roleplay's summary card on the build panel (Course Pilot).
+    roleplayCard: {
+      label: "Roleplay summary",
+      mode: {
+        learning: "Learning",
+        practice: "Practice",
+        performance: "Performance",
+        pre_assessment: "Pre-assessment",
+        post_assessment: "Post-assessment",
+      } as Record<string, string>,
+      goal: "Learner's goal",
+      states: "States",
+      noStates: "No states (runs on the default main prompt)",
+      supports: "Supports",
+      reminders: "reminders",
+      stateVisible: "state shown",
+      supervisorNotes: "AI supervisor notes",
+      noSupports: "none",
+      checks: "Checks",
     },
 
     // One session
@@ -11090,9 +11113,12 @@ export const en = {
       sections: {
         seed: "Where this started",
         audience: "Audience",
+        learnerProfile: "Learner profile",
         outcomes: "Outcomes",
         competencies: "Competencies",
         behaviours: "Behaviours",
+        skillTargets: "Skill targets",
+        rubric: "Rubric (EQUIP)",
         assessment: "Assessment",
         shape: "Shape",
         practice: "Practice ladder",
@@ -11100,6 +11126,22 @@ export const en = {
         videos: "Videos",
         notes: "Notes",
       },
+      // The manual's skill target: A how well, B in what situations.
+      skillLevels: {
+        A1: "A1 Safe",
+        A2: "A2 Getting started",
+        A3: "A3 Solid basics",
+        A4: "A4 Advanced",
+        B1: "B1 Practised scenarios",
+        B2: "B2 New scenarios",
+        B3: "B3 Harder scenarios",
+      } as Record<string, string>,
+      rubricGroups: {
+        harmfulOrUnhelpful: "Harmful or unhelpful",
+        basicHelpful: "Basic helpful",
+        advancedHelpful: "Advanced helpful",
+      },
+      learnerProfileHint: "From the Course Design Manual's learner profile library",
       audience: {
         who: "Who",
         priorExperience: "Prior experience",
@@ -11145,6 +11187,8 @@ export const en = {
           video: "Videos",
           journal: "Journals",
           annotated_artifact: "Annotated transcripts",
+          branching_scenario: "Scenario quizzes",
+          bucket_sort: "Bucket sorts",
           game: "Game breaks",
           quiz: "Quizzes",
         } as Record<string, string>,
@@ -11344,6 +11388,8 @@ export const en = {
         quiz: "Quiz",
         journal: "Journal",
         annotated_artifact: "Annotation",
+        branching_scenario: "Scenario quiz",
+        bucket_sort: "Bucket sort",
         game: "Game",
         video: "Video",
         roleplay_new: "New roleplay",
@@ -11411,6 +11457,27 @@ export const en = {
         showMore: (count: number) => `Show ${count} more`,
         showLess: "Show fewer",
       },
+      // Review by choosing a reason (Course Pilot): each chip sends one change request.
+      changeReasons: {
+        label: "Change this:",
+        options: {
+          too_long: "Too long",
+          too_hard: "Too hard",
+          too_easy: "Too easy",
+          wrong_tone: "Wrong tone",
+          not_our_setting: "Not our setting",
+          regenerate: "Regenerate",
+        } as Record<string, string>,
+        message: (title: string, itemId: string, reason: string) =>
+          ({
+            too_long: `Make "${title}" (item ${itemId}) shorter, keeping what matters most.`,
+            too_hard: `Make "${title}" (item ${itemId}) easier for these learners.`,
+            too_easy: `Make "${title}" (item ${itemId}) more challenging for these learners.`,
+            wrong_tone: `Rewrite "${title}" (item ${itemId}) in the course facilitator's warm, supportive voice.`,
+            not_our_setting: `Rewrite "${title}" (item ${itemId}) so it fits our learners' own setting and the people they work with.`,
+            regenerate: `Regenerate "${title}" (item ${itemId}) from scratch.`,
+          })[reason] ?? `Improve "${title}" (item ${itemId}).`,
+      },
       preview: {
         generated: "Generated",
         moreImages: (count: number) => (count === 1 ? "+1 more image" : `+${count} more images`),
@@ -11419,6 +11486,10 @@ export const en = {
         resources: (count: number) => (count === 1 ? "1 resource" : `${count} resources`),
         questions: (count: number) => (count === 1 ? "1 question" : `${count} questions`),
         passMark: (score: number) => `Pass mark ${score}`,
+        scenes: (count: number) => (count === 1 ? "1 scene" : `${count} scenes`),
+        endings: (count: number) => (count === 1 ? "1 ending" : `${count} endings`),
+        explore: "Explore (no pass mark)",
+        sortItems: (count: number) => (count === 1 ? "1 item" : `${count} items`),
         questionTypes: {
           mcq_single: "Multiple choice",
           mcq_multi: "Select all",

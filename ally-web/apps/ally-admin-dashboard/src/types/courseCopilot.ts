@@ -24,6 +24,8 @@ export type CourseCopilotJobKind =
   | "quiz"
   | "journal"
   | "annotated_artifact"
+  | "branching_scenario"
+  | "bucket_sort"
   | "game"
   | "video"
   | "roleplay_new"
@@ -72,6 +74,8 @@ export type CourseBriefComponent =
   | "video"
   | "journal"
   | "annotated_artifact"
+  | "branching_scenario"
+  | "bucket_sort"
   | "game"
   | "quiz";
 
@@ -90,6 +94,18 @@ export interface CourseBriefPracticeSlot {
 
 export interface CourseBrief {
   seed?: string;
+  /** The closest learner profile in the manual's library, and its name (filled by the server). */
+  learnerProfileId?: string;
+  learnerProfileName?: string;
+  /** Per primary skill: A (how well) and B (in what situations). */
+  skillTargets?: { competencyId?: string; skill: string; a?: string; b?: string }[];
+  /** Per skill, its behaviours in the three EQUIP groups. */
+  rubric?: {
+    skill: string;
+    harmfulOrUnhelpful: string[];
+    basicHelpful: string[];
+    advancedHelpful: string[];
+  }[];
   audience?: {
     who?: string;
     priorExperience?: string;
@@ -236,6 +252,16 @@ export type CourseItemPreview =
       roleplayCount: number;
       generated: boolean;
     }
+  | {
+      type: "BRANCHING_SCENARIO";
+      sceneCount: number;
+      endingCount: number;
+      /** null = explore (ungated). */
+      passScore: number | null;
+      intro: string | null;
+      firstScene: string | null;
+    }
+  | { type: "BUCKET_SORT"; itemCount: number; buckets: string[]; intro: string | null }
   | { type: "GAME"; gameKey: string | null; intro: string | null }
   | { type: "VIDEO"; source: string | null; url: string | null };
 
@@ -373,6 +399,8 @@ export interface CourseCopilotJob {
   skippedReason: string | null;
   /** Reference files this item was written from ("Manual.pdf, p. 12"). Absent on older rows. */
   references?: string[];
+  /** New roleplays only: who, goal, mode, states, supports and what the validator found. */
+  roleplayCard?: CourseCopilotRoleplayCard | null;
   startedAt: string | null;
   finishedAt: string | null;
   costUsd: number | null;
@@ -511,4 +539,19 @@ export interface CourseCopilotSource {
   pageCount: number | null;
   passageCount: number;
   createdAt: string;
+}
+
+export interface CourseCopilotRoleplayCard {
+  title: string;
+  mode: string;
+  learnerGoal: string | null;
+  setting: string | null;
+  states: string[];
+  supports: {
+    experienceMode: string | null;
+    reminders: boolean;
+    stateVisible: boolean;
+    supervisorNotes: boolean;
+  };
+  checks: string[];
 }
