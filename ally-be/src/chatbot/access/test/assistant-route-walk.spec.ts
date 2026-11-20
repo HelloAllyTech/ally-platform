@@ -241,6 +241,8 @@ describe('Assistant routes: owners only (A1 route walk)', () => {
     expect(owners).toEqual([
       'POST v1/chatbots/:id/archive',
       'POST v1/chatbots/:id/checkup/suites',
+      // T1: a template can raise the safety pack and turn hand-over on, both owners' switches.
+      'POST v1/chatbots/:id/templates/:templateId',
       'PUT v1/chatbots/:id/members',
       // Q3-fast Part 1: the owner corrects the pack, with a reason when it's less strict.
       'PUT v1/chatbots/:id/safety-pack',

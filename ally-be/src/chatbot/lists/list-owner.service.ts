@@ -37,6 +37,7 @@ import {
   READY_MADE,
   READY_MADE_GROUPS,
   readyMade,
+  type ReadyMadeList,
 } from './ready-made-lists';
 
 export type Ability = 'do_it' | 'never';
@@ -438,23 +439,15 @@ export class ListOwnerService {
           );
         }
       }
-      const views: ListDefinitionView[] = [];
-      for (const list of item.lists) {
-        const { rules, ...input } = listInputFor(list, {
-          health,
-          options: { ...fitting[list.key], ...options?.[list.key] },
-        });
-        await this.definitions.createList(chatbot.id, input, { manager: m });
-        let view: ListDefinitionView | undefined;
-        for (const rule of rules) {
-          view = await this.definitions.addRule(chatbot.id, list.key, rule, {
-            manager: m,
-          });
-        }
-        views.push(
-          view ?? (await this.definitions.getListIn(m, chatbot.id, list.key)),
-        );
-      }
+      const views = await this.createLists(m, chatbot.id, item.lists, {
+        health,
+        options: Object.fromEntries(
+          item.lists.map((list) => [
+            list.key,
+            { ...fitting[list.key], ...options?.[list.key] },
+          ]),
+        ),
+      });
       const settings = await this.writeAbilities(
         m,
         chatbot.id,
@@ -477,6 +470,87 @@ export class ListOwnerService {
         views,
       ),
     };
+  }
+
+  /**
+   * Creates lists from their catalogue definitions, with their rules, in the caller's transaction
+   * (ready-made install, and T1's templates). Doesn't check for a list already there, and writes no
+   * switches: the caller does both.
+   */
+  async createLists(
+    m: EntityManager,
+    chatbotId: string,
+    lists: ReadyMadeList[],
+    {
+      health = false,
+      options = {},
+    }: {
+      health?: boolean;
+      options?: Record<string, Record<string, string[]>>;
+    } = {},
+  ): Promise<ListDefinitionView[]> {
+    const views: ListDefinitionView[] = [];
+    for (const list of lists) {
+      const { rules, ...input } = listInputFor(list, {
+        health,
+        options: options[list.key],
+      });
+      await this.definitions.createList(chatbotId, input, { manager: m });
+      let view: ListDefinitionView | undefined;
+      for (const rule of rules) {
+        view = await this.definitions.addRule(chatbotId, list.key, rule, {
+          manager: m,
+        });
+      }
+      views.push(
+        view ?? (await this.definitions.getListIn(m, chatbotId, list.key)),
+      );
+    }
+    return views;
+  }
+
+  /**
+   * One list's switches and the owner's line, in the caller's transaction (T1's templates): the
+   * same keys `setAbilities` writes, with the list's agent read and write to match. A write switch
+   * on a list nothing lets the assistant fill in is refused, as there.
+   */
+  async setAbilitiesIn(
+    m: EntityManager,
+    chatbotId: string,
+    key: string,
+    abilities: ListAbilities,
+    instruction?: string,
+  ): Promise<ChatbotSettingsOverride> {
+    const list = await loadList(m, chatbotId, key, 'update');
+    if (!list) throw refuse.notFound();
+    const writes = abilities.create === 'do_it' || abilities.update === 'do_it';
+    if (writes && !list.fields.some((f) => f.agentWrite)) {
+      throw refuse.invalidValue(
+        undefined,
+        list.collection.name,
+        'no detail lets your assistant fill it in',
+      );
+    }
+    const settings = { ...(list.collection.settings ?? {}) } as Record<
+      string,
+      unknown
+    >;
+    const line = instruction?.trim().slice(0, 300);
+    if (line) settings.instruction = line;
+    await m.update(
+      Collection,
+      { id: list.collection.id },
+      {
+        agentRead: abilities.find === 'do_it',
+        agentWrite: writes,
+        settings: settings as never,
+      },
+    );
+    return this.writeAbilities(m, chatbotId, {
+      [listToolName('find', key)]: abilities.find,
+      [listToolName('create', key)]: abilities.create,
+      [listToolName('update', key)]: abilities.update,
+    });
   }
 
   // ---- Repeat weekly until --------------------------------------------------------------------
