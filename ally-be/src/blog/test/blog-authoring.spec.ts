@@ -98,6 +98,24 @@ describe('BlogAuthoringToolsService', () => {
     );
   });
 
+  it('keeps the exact casing of tags already in use and drops duplicates', async () => {
+    const { blogs, svc } = make();
+    blogs.getPublishedTags.mockResolvedValue({
+      tags: [
+        { tag: 'AI', count: 3 },
+        { tag: 'Product Updates', count: 2 },
+      ],
+    } as any);
+    await svc.call(
+      'create_draft',
+      { title: 'Hello', tags: ['ai', 'AI', 'product updates', 'New Thing'] },
+      7,
+    );
+    expect(blogs.create).toHaveBeenCalledWith(
+      expect.objectContaining({ tags: ['AI', 'Product Updates', 'New Thing'] }),
+    );
+  });
+
   it('returns issues with the draft so they can be fixed', async () => {
     const { svc } = make();
     const result: any = await svc.call(

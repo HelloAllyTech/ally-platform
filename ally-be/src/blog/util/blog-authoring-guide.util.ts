@@ -106,7 +106,7 @@ export function blogAuthoringGuide(
       slug: 'Optional. Made from the title when left out; kept unique for you.',
       tldr: 'Up to about 280 characters. The answer in one or two sentences; shown big under the title and in listings.',
       body: 'Rich-text HTML in the allowed tags only (below).',
-      tags: `Short lowercase tags. Reuse existing ones where they fit: ${existingTags.length ? existingTags.join(', ') : '(none yet)'}.`,
+      tags: `One to four tags. Reuse an existing tag exactly as written, capitalisation included; a tag already in use keeps its spelling. Existing: ${existingTags.length ? existingTags.join(', ') : '(none yet)'}.`,
       coverColor: `A #RRGGBB fill shown when there is no header image. The editor palette: ${BLOG_COVER_SWATCHES.map((s) => `${s.name} ${s.value}`).join(', ')}. Default ${BLOG_DEFAULT_COVER_COLOR}.`,
       authorName:
         'The byline, free text (for example the engineer who wrote it).',

@@ -265,13 +265,13 @@ export class BlogAuthoringToolsService {
         args.tags.some((t: unknown) => typeof t !== 'string')
       )
         throw new BadRequestException('tags must be a list of strings');
-      out.tags = [
-        ...new Set(
-          (args.tags as string[])
-            .map((t) => t.trim().toLowerCase())
-            .filter(Boolean),
-        ),
-      ];
+      // Keep the casing the agent gave (existing tags are mixed case); only drop duplicates.
+      const seen = new Set<string>();
+      out.tags = (args.tags as string[])
+        .map((t) => t.trim())
+        .filter(
+          (t) => t && !seen.has(t.toLowerCase()) && seen.add(t.toLowerCase()),
+        );
     }
     if (args.coverColor !== undefined) {
       if (!BLOG_COVER_COLOR_PATTERN.test(String(args.coverColor)))
@@ -295,9 +295,21 @@ export class BlogAuthoringToolsService {
     return out;
   }
 
+  /** A tag already in use keeps its exact spelling and capitalisation ("AI", not "ai"). */
+  private async canonicalTags(tags: string[]): Promise<string[]> {
+    const known = new Map(
+      (await this.blogs.getPublishedTags()).tags.map((t) => [
+        t.tag.toLowerCase(),
+        t.tag,
+      ]),
+    );
+    return tags.map((t) => known.get(t.toLowerCase()) ?? t);
+  }
+
   private async create(args: Record<string, any>) {
     const fields = this.fields(args);
     if (!fields.title) throw new BadRequestException('title is required');
+    if (fields.tags) fields.tags = await this.canonicalTags(fields.tags);
     // Always a draft, whatever the caller sent.
     const created = await this.blogs.create({
       ...(fields as CreateBlogDto),
@@ -315,6 +327,7 @@ export class BlogAuthoringToolsService {
       );
     }
     const fields = this.fields(args) as UpdateBlogDto;
+    if (fields.tags) fields.tags = await this.canonicalTags(fields.tags);
     // Never change the status from here.
     delete (fields as { status?: BlogStatus }).status;
     const updated = await this.blogs.update(id, fields);

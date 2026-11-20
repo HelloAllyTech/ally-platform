@@ -17,7 +17,7 @@ You are a coding agent writing a blog post for Ally, usually from a conversation
 5. **Evidence.** Numbers carry their source, date and segment. Say how many cases a number rests on. Never present a first reading as a trend.
 6. **What is not done.** A short, honest section on limits, open questions and what comes next.
 7. **A closing.** Two sentences that restate the conclusion.
-8. **Tags (one to four).** Reuse existing tags. **Cover colour** from the palette. **Byline** as the person asked.
+8. **Tags (one to four).** Reuse existing tags exactly as written, capitalisation included. **Cover colour** from the palette. **Byline** as the person asked.
 
 ## 3. Illustrations: flow diagrams and product screens, in the Ally blog design only
 
