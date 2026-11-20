@@ -10708,6 +10708,23 @@ export const en = {
       runNow: "Run now",
       loadFailed: "Could not load the automation status.",
     },
+    recipients: {
+      title: "Daily email recipients",
+      description:
+        "Everyone here gets the daily product updates email, once a day, when something went live or is waiting on release.",
+      emailLabel: "Email address",
+      emailPlaceholder: "name@company.com",
+      add: "Add",
+      remove: (email: string) => `Remove ${email}`,
+      added: (email: string) => `${email} will get the daily email.`,
+      removed: (email: string) => `${email} will no longer get the daily email.`,
+      invalid: "Enter a valid email address.",
+      addFailed: "Could not add this address. Try again.",
+      removeFailed: "Could not remove this address. Try again.",
+      loading: "Loading…",
+      loadFailed: "Could not load the recipient list.",
+      empty: "No one is on the list, so the daily email is not being sent.",
+    },
     toasts: {
       runStarted: "Run started",
       runNotStarted: "Run not started",

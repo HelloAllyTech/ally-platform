@@ -183,7 +183,6 @@ export const validationSchema = Joi.object({
   PRODUCT_UPDATES_ENABLED: Joi.string().valid('true', 'false').optional(),
   PRODUCT_UPDATES_START: Joi.string().isoDate().optional(),
   // Comma-separated addresses for the daily team digest.
-  PRODUCT_UPDATES_DIGEST_TO: Joi.string().allow('').optional(),
   PRODUCT_UPDATES_DIGEST_HOUR: Joi.number().integer().min(0).max(23).optional(),
   /**
    * Publicly reachable base URL a GitHub-hosted runner can call this API back

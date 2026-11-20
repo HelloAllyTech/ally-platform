@@ -29,6 +29,7 @@ import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
 import { formatDate } from "@utils";
 
+import { DigestRecipients } from "./DigestRecipients";
 import { getAudienceOptions, getSurfaceOptions } from "./options";
 import { ProductUpdatePanel } from "./ProductUpdatePanel";
 import { StatusStrip } from "./StatusStrip";
@@ -138,6 +139,8 @@ export const ProductUpdates: FC = () => {
       </div>
 
       <StatusStrip status={automation} running={running} isError={isStatusError} />
+
+      <DigestRecipients />
 
       {/* Filters: search + status / audience / surface + hidden toggle. */}
       <div className="flex flex-wrap items-end gap-3 mt-4 md:mt-6 shrink-0">

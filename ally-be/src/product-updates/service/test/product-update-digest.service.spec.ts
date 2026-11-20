@@ -50,13 +50,13 @@ describe('ProductUpdateDigestService', () => {
   };
   let config: {
     productUpdates: {
-      digestTo: string[];
       digestHour: number;
       digestAllowed: boolean;
     };
     email: { sourceEmail: string };
     adminBaseUrl: string;
   };
+  let recipients: { effective: jest.Mock };
   let roadmapVoting: { getRoadmapVoting: jest.Mock };
   let roadmapFeed: {
     recipients: jest.Mock;
@@ -79,9 +79,11 @@ describe('ProductUpdateDigestService', () => {
       get: jest.fn().mockResolvedValue(null),
       set: jest.fn().mockResolvedValue(undefined),
     };
+    recipients = {
+      effective: jest.fn().mockResolvedValue(['team@example.com']),
+    };
     config = {
       productUpdates: {
-        digestTo: ['team@example.com'],
         digestHour: 18,
         digestAllowed: true,
       },
@@ -149,6 +151,7 @@ describe('ProductUpdateDigestService', () => {
       roadmapVoting as unknown as RoadmapVotingAnalyticsService,
       roadmapFeed as never,
       planSettings as never,
+      recipients as never,
     );
   });
 
@@ -161,10 +164,10 @@ describe('ProductUpdateDigestService', () => {
   });
 
   it('does nothing without recipients, or outside its business hour', async () => {
-    config.productUpdates.digestTo = [];
+    recipients.effective.mockResolvedValue([]);
     expect(await service.sendIfDue(IN_DIGEST_HOUR)).toBe('disabled');
 
-    config.productUpdates.digestTo = ['team@example.com'];
+    recipients.effective.mockResolvedValue(['team@example.com']);
     expect(await service.sendIfDue(OUTSIDE_DIGEST_HOUR)).toBe('not-due');
     expect(sesService.sendEmail).not.toHaveBeenCalled();
   });

@@ -22,6 +22,7 @@ import { ProductUpdate } from '../entity/product-update.entity';
 import { ProductUpdateSourceRepository } from '../repository/product-update-source.repository';
 import { ProductUpdateRepository } from '../repository/product-update.repository';
 import { ProductUpdateLivenessService } from './product-update-liveness.service';
+import { ProductUpdateRecipientsService } from './product-update-recipients.service';
 
 /** Only updates this recent are reported; anything older (a backfill) is marked announced silently. */
 const REPORT_WINDOW_MS = 36 * 60 * 60 * 1000;
@@ -113,6 +114,7 @@ export class ProductUpdateDigestService {
     private readonly roadmapVoting: RoadmapVotingAnalyticsService,
     private readonly roadmapFeed: RoadmapDigestFeedService,
     private readonly planSettings: PlanSettingsService,
+    private readonly recipients: ProductUpdateRecipientsService,
   ) {}
 
   // ── Your ideas this week (Roadmap v2, §4.14, §5.7b) ────────────────────────
@@ -232,15 +234,15 @@ ${body}
 
   /** The hourly tick: sends once, in the configured business hour, if there is anything to report. */
   async sendIfDue(now: Date = new Date()): Promise<DigestOutcome> {
-    const { digestTo, digestHour, digestAllowed } =
-      this.configService.productUpdates;
+    const { digestHour, digestAllowed } = this.configService.productUpdates;
+    const digestTo = await this.recipients.effective();
     if (digestTo.length === 0) return 'disabled';
     if (dayjs(now).tz(BUSINESS_TIMEZONE).hour() !== digestHour)
       return 'not-due';
     if (!digestAllowed) {
       // After the hour check, so this is one line a day, not one an hour.
       this.logger.warn(
-        '[PRODUCT-UPDATES] Digest skipped: PRODUCT_UPDATES_DIGEST_TO is set but this is not the production database (*_prd).',
+        '[PRODUCT-UPDATES] Digest skipped: recipients are set but this is not the production database (*_prd).',
       );
       return 'not-production';
     }
