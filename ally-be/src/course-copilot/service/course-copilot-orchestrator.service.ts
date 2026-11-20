@@ -523,6 +523,12 @@ export class CourseCopilotOrchestratorService {
         after: this.snapshot(context.session, turn.blueprintVersion),
         coursePatches: turn.coursePatches,
         queued: turn.queued,
+        // What the planner had (example course, design principles), from the proposal's result.
+        blueprintPlanning:
+          [...turn.toolResults]
+            .reverse()
+            .find((r) => r.name === 'propose_blueprint' && r.result?.planning)
+            ?.result?.planning ?? null,
       });
 
     const checkpoint = async (final: boolean): Promise<void> => {
