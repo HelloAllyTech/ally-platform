@@ -31,17 +31,17 @@ describe('findStyleIssues', () => {
   it('flags internal words an outsider cannot read, in the title, tldr and body', () => {
     const found = findStyleIssues({
       title: 'A fixed floor of code',
-      tldr: 'A planner picks the extras.',
-      body: '<p>Tier 0 is the style card and tier 1 the sections. The risk cue goes to the evaluator.</p>',
+      tldr: 'The kill switch turns it off.',
+      body: '<p>Tier 0 is the style card and tier 1 the sections. The risk cue stays inside the fence.</p>',
     }).filter((i) => i.kind === 'internal_term');
     const text = found.map((i) => i.why).join(' ');
     for (const term of [
       'fixed floor',
-      'planner',
+      'kill switch',
       'tier 0',
       'tier 1',
       'risk cue',
-      'evaluator',
+      'the fence',
     ]) {
       expect(text).toContain(`"${term}"`);
     }
@@ -52,7 +52,7 @@ describe('findStyleIssues', () => {
 
   it('does not flag a word that only contains an internal word', () => {
     expect(
-      findStyleIssues({ body: '<p>The planners of the city met.</p>' }).filter(
+      findStyleIssues({ body: '<p>The fences of the city met.</p>' }).filter(
         (i) => i.kind === 'internal_term',
       ),
     ).toEqual([]);

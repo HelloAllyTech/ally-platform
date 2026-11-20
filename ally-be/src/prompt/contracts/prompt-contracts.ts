@@ -2277,7 +2277,7 @@ export const BLOG_COMPOSE_SKILL = definePrompt(
   {
     name: 'Blog - Pass 2: Compose',
     description:
-      'Pass 2 of writing a blog post: write the post and its illustrations from the research brief, in plain words for a reader outside Ally, saying what the thing does and not what it achieves, in the Ally blog design. Served by blog_guide with pass compose. Not a model prompt.',
+      'Pass 2 of writing a blog post: write the post and its illustrations from the research brief, for a reader outside Ally with every term explained, saying what the thing does and not what it achieves, in the Ally blog design. Served by blog_guide with pass compose. Not a model prompt.',
     category: 'Blog',
     runtimes: ['ally-be'],
   },

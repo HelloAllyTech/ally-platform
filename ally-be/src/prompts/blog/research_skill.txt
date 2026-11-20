@@ -39,7 +39,7 @@ Learner or client content, names, secrets, internal addresses, unreleased custom
 
 ## 6. Plan the pictures
 
-For each part of the story that is a process, a loop or a choice, plan a flow diagram. For each product screen the story mentions, plan a designed screen. Plan one header image. Write the labels in plain words, using the list from section 4.
+For each part of the story that is a process, a loop or a choice, plan a flow diagram. For each product screen the story mentions, plan a designed screen. If the feature has a screen a person uses, plan a mockup of it even when your first outline does not mention one. Read the real UI code for the colours, type, layout and exact copy, and use invented people and content. Plan one header image. Write the labels in plain words, using the list from section 4.
 
 ## 7. Hand back
 
