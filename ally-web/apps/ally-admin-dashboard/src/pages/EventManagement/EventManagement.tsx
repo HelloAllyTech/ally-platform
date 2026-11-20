@@ -366,7 +366,7 @@ export const EventManagement: React.FC = () => {
         toast.error(en.errors.failedToDeleteEvent);
       } else {
         toast.success(
-          `Successfully deleted ${selectedEvents.length} ${selectedEvents.length > 1 ? "events" : "event"}`,
+          `Successfully deleted ${eventIds.length} ${eventIds.length > 1 ? "events" : "event"}`,
         );
         setShowDeleteConfirmationPopup(false);
         setSelectedEvents([]);

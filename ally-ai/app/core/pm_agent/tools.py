@@ -24,8 +24,10 @@ READ_TOOLS = (
     "reporting_query",
     "comments_read",
     "metrics_view",
+    "guidance_report",
     "questions_read",
     "change_read",
+    "prompt_read",
 )
 #: Tools that propose or request an action; main agent only.
 ACTION_TOOLS = (
@@ -53,7 +55,7 @@ CONVERSATION_ACTION_TOOLS = (
     "changes_pause",
 )
 CONVERSATION_TOOLS = (
-    ("change_read",) + CONVERSATION_READ_TOOLS + CONVERSATION_ACTION_TOOLS
+    ("change_read", "prompt_read") + CONVERSATION_READ_TOOLS + CONVERSATION_ACTION_TOOLS
 )
 #: Every read-only tool; the only tools a subagent is ever given.
 SUBAGENT_READ_TOOLS = READ_TOOLS + CONVERSATION_READ_TOOLS
@@ -86,6 +88,13 @@ class MetricsViewArgs(BaseModel):
     language: Optional[str] = Field(None, description="e.g. 'hi'; narrows every rate.")
     recipe: Optional[str] = Field(
         None, description="standard | short | case | assessment"
+    )
+
+
+class GuidanceReportArgs(BaseModel):
+    days: int = Field(30, ge=1, le=90, description="How many days back to read.")
+    mode: Optional[Literal["all", "live", "shadow"]] = Field(
+        None, description="all (default) | live runs only | shadow runs only"
     )
 
 
@@ -159,6 +168,12 @@ class ReleaseDraftArgs(BaseModel):
     replace: Optional[str] = None
     setting_key: Optional[str] = None
     setting_value: Optional[float] = None
+    setting_fields: Optional[List[str]] = Field(
+        None,
+        description="setting_key roleplayFields only: the optional roleplay fields "
+        "the debrief should read, as a list (empty = none). Call with the key and "
+        "no list to be told which fields exist and which are on.",
+    )
     agent: Optional[RegistryAgentManifest] = None
     run_ids: List[str] = Field(
         default_factory=list,
@@ -245,6 +260,16 @@ class GuidanceProposeArgs(BaseModel):
 
 class ChangeRef(BaseModel):
     idea_id: str = Field(description="The change's id (the idea id).")
+
+
+class PromptRef(BaseModel):
+    code: str = Field(
+        description=(
+            "A Debrief prompt code, e.g. debrief_risk_cue_definition, "
+            "debrief_safety_reader_system, debrief_writer_system, "
+            "debrief_quality_rubric, debrief_evaluator_system."
+        )
+    )
 
 
 class SessionRef(BaseModel):
@@ -350,6 +375,11 @@ def make_tools(
             "metrics_view", MetricsViewArgs(**a).model_dump(exclude_none=True)
         )
 
+    async def guidance_report(**a: Any) -> str:
+        return await call(
+            "guidance_report", GuidanceReportArgs(**a).model_dump(exclude_none=True)
+        )
+
     async def idea_propose(**a: Any) -> str:
         return await call("idea_propose", IdeaProposeArgs(**a).model_dump())
 
@@ -394,6 +424,9 @@ def make_tools(
 
     async def change_read(**a: Any) -> str:
         return await call("change_read", ChangeRef(**a).model_dump())
+
+    async def prompt_read(**a: Any) -> str:
+        return await call("prompt_read", PromptRef(**a).model_dump())
 
     async def session_read(**a: Any) -> str:
         return await call("session_read", SessionRef(**a).model_dump())
@@ -446,6 +479,14 @@ def make_tools(
             "Metric failure points: experience rates off target, guardrails breached, "
             "efficiency drift, steering falling, stages with more failures. Each has a "
             "name you can cite as evidence and as an expected effect.",
+        ),
+        (
+            guidance_report,
+            GuidanceReportArgs,
+            "How the guidance lookup and the guidance agent are used: runs, "
+            "planner choices and skip reasons, tool latency, which entries are "
+            "fetched and given to the Writer, and score and cost with and "
+            "without the agent.",
         ),
         (
             idea_propose,
@@ -509,6 +550,13 @@ def make_tools(
             ChangeRef,
             "One change in full: what it is, where it stands, its test results, "
             "confidence, languages, and what people said about it.",
+        ),
+        (
+            prompt_read,
+            PromptRef,
+            "A Debrief prompt's live text, exactly as the next debrief reads it: "
+            "the risk cue definition, a pinned rule, or a step's instructions. "
+            "Read it before you quote or describe what a prompt says.",
         ),
         (
             session_read,

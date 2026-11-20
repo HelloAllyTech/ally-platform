@@ -39,7 +39,7 @@ const PROVIDER_RUNTIMES: Record<string, string> = {
   vllm: "Voice only",
 };
 
-export const LlmModelCatalog: React.FC = () => {
+export const LlmModelCatalog: React.FC<{ hideTitle?: boolean }> = ({ hideTitle }) => {
   const { data: models = [], isFetching } = useGetLlmModelCatalogQuery();
   const [createModel] = useCreateLlmModelMutation();
   const [updateModel] = useUpdateLlmModelMutation();
@@ -134,9 +134,11 @@ export const LlmModelCatalog: React.FC = () => {
 
   return (
     <div className="py-[2px] font-primary overflow-hidden relative">
-      <div className="flex items-center gap-3 pb-4 md:pb-6">
-        <h1 className="text-2xl text-typography-900 font-secondary">Model Catalog</h1>
-      </div>
+      {!hideTitle && (
+        <div className="flex items-center gap-3 pb-4 md:pb-6">
+          <h1 className="text-2xl text-typography-900 font-secondary">Model Catalog</h1>
+        </div>
+      )}
 
       <ListToolbar
         searchValue={searchQuery}

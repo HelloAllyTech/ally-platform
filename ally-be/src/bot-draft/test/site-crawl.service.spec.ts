@@ -284,6 +284,62 @@ describe('SiteCrawlService', () => {
     expect(crawl).toMatchObject({ status: 'failed', problem: 'unreachable' });
   });
 
+  it('never stores an error, block or captcha page served as a 200, and lists it (Q3-fast B16)', async () => {
+    const s = await serve({
+      '/': { body: page('Sunrise Mind', LONG, ['/fees', '/team', '/gone']) },
+      '/fees': {
+        body: page(
+          '403 Forbidden',
+          'Website returned 403 Forbidden. You don’t have permission to access this resource.',
+        ),
+      },
+      '/team': {
+        body: page(
+          'Just a moment...',
+          'Checking if the site connection is secure. Enable JavaScript and cookies to continue. Ray ID: 8f2a',
+        ),
+      },
+      '/gone': { status: 404, body: 'Not found' },
+    });
+    const h = harness();
+    const crawl = await h.crawl(s.url);
+    expect(read(crawl)).toEqual(['/']);
+    expect(h.knowledge.createForChatbot).toHaveBeenCalledTimes(1);
+    const failed = crawl.pages.filter((p) => p.status === 'failed');
+    expect(
+      failed.map((p) => [new URL(p.url).pathname, p.reason]).sort(),
+    ).toEqual([
+      ['/fees', 'error_page'],
+      ['/gone', 'http_error'],
+      ['/team', 'error_page'],
+    ]);
+  });
+
+  it('says the site turned the reader away when the start page is a 403 or a block page', async () => {
+    const refused = await serve({ '/': { status: 403, body: 'Forbidden' } });
+    expect(await harness().crawl(refused.url)).toMatchObject({
+      status: 'failed',
+      problem: 'turned_away',
+    });
+    const challenged = await serve({
+      '/': {
+        body: page(
+          'Attention Required! | Cloudflare',
+          'Please complete the security check to access this site. Why do I have to complete a CAPTCHA?',
+          ['/about'],
+        ),
+      },
+      '/about': { body: page('About', LONG) },
+    });
+    const h = harness();
+    expect(await h.crawl(challenged.url)).toMatchObject({
+      status: 'failed',
+      problem: 'turned_away',
+    });
+    expect(challenged.hits).not.toContain('/about');
+    expect(h.knowledge.createForChatbot).not.toHaveBeenCalled();
+  });
+
   it('refuses private addresses unless allow-listed (the production guard)', async () => {
     const s = await serve({ '/': { body: page('Home', LONG) } });
     const crawl = await harness([]).crawl(s.url);

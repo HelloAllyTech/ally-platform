@@ -1,10 +1,17 @@
-from typing import Dict
+from typing import Dict, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class HealthCheckResponse(BaseModel):
     status: str = Field(..., description="Indicates the health status of the service.")
+    usage_feed: Optional[Literal["on", "off"]] = Field(
+        None,
+        description=(
+            "'on' when token-usage rows are sent to ally-be, 'off' when "
+            "LLM_USAGE__QUEUE_URL is unset (costs are not metered)."
+        ),
+    )
 
     model_config = ConfigDict(json_schema_extra={"example": {"status": "ok"}})
 

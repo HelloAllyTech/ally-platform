@@ -50,7 +50,7 @@ const getVoiceSaveErrorMessage = (error: unknown) => {
   return en.errors.failedToSaveVoice;
 };
 
-export const ScenarioVoices: React.FC = () => {
+export const ScenarioVoices: React.FC<{ hideTitle?: boolean }> = ({ hideTitle }) => {
   const limit = 30;
   const [offset, setOffset] = useState<number>(0);
   const [voices, setVoices] = useState<ScenarioVoice[]>([]);
@@ -464,11 +464,13 @@ export const ScenarioVoices: React.FC = () => {
   return (
     <div className="py-[2px] font-primary overflow-hidden relative">
       <div>
-        <div className="flex items-center gap-3 pb-4 md:pb-6">
-          <h1 className="text-2xl text-typography-900 font-secondary">
-            {en.simulation.scenarioVoices}
-          </h1>
-        </div>
+        {!hideTitle && (
+          <div className="flex items-center gap-3 pb-4 md:pb-6">
+            <h1 className="text-2xl text-typography-900 font-secondary">
+              {en.simulation.scenarioVoices}
+            </h1>
+          </div>
+        )}
         <ListToolbar
           searchValue={searchQuery}
           onSearchChange={handleSearchChange}

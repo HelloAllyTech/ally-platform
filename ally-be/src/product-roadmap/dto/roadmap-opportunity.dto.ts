@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional, OmitType } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -152,7 +152,10 @@ export class RoadmapOpportunityFiltersDto {
   @IsString({ each: true })
   productGoal?: string[];
 
-  @ApiPropertyOptional({ description: 'Owner NAMES (not ids)', isArray: true })
+  @ApiPropertyOptional({
+    description: "Owner NAMES (not ids), or 'unassigned' for rows nobody owns",
+    isArray: true,
+  })
   @IsOptional()
   @Transform(toArray)
   @IsArray()
@@ -178,6 +181,16 @@ export class RoadmapOpportunityFiltersDto {
   @Transform(({ value }) => value === true || value === 'true')
   @IsBoolean()
   newToMe?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Only opportunities that still need a triage decision: nobody owns them, or nobody has ' +
+      'sized them. Powers the Inbox count.',
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  needsTriage?: boolean;
 
   @ApiPropertyOptional() @IsOptional() @IsISO8601() dateFrom?: string;
   @ApiPropertyOptional() @IsOptional() @IsISO8601() dateTo?: string;
@@ -224,6 +237,7 @@ export class ListOpportunitiesQueryDto extends RoadmapOpportunityFiltersDto {
     'myVotes',
     'description',
     'plannedMonth',
+    'triage',
   ])
   sortBy?:
     | 'composite'
@@ -233,7 +247,8 @@ export class ListOpportunitiesQueryDto extends RoadmapOpportunityFiltersDto {
     | 'releasedAt'
     | 'myVotes'
     | 'description'
-    | 'plannedMonth';
+    | 'plannedMonth'
+    | 'triage';
 
   @ApiPropertyOptional({ enum: ['ASC', 'DESC'], default: 'DESC' })
   @IsOptional()
@@ -327,8 +342,33 @@ export class RoadmapReferenceImageUploadUrlDto {
   contentType!: RoadmapReferenceImageContentType;
 }
 
-export class CreateOpportunityDto {
+export class SuggestTitleDto {
   @ApiProperty({ maxLength: ROADMAP_LIMITS.DESCRIPTION_MAX })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(ROADMAP_LIMITS.DESCRIPTION_MAX)
+  text!: string;
+}
+
+export class CreateOpportunityDto {
+  @ApiProperty({
+    maxLength: ROADMAP_LIMITS.TITLE_MAX,
+    description:
+      'One line naming the idea. Required on every new idea; stored as the first line of the text.',
+  })
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : value,
+  )
+  @IsString()
+  @IsNotEmpty({ message: 'An idea needs a title.' })
+  @MaxLength(ROADMAP_LIMITS.TITLE_MAX)
+  title!: string;
+
+  @ApiProperty({
+    maxLength: ROADMAP_LIMITS.DESCRIPTION_MAX,
+    description:
+      'The problem or summary beneath the title (Summary > Problem).',
+  })
   @IsString()
   @MinLength(1)
   @MaxLength(ROADMAP_LIMITS.DESCRIPTION_MAX)
@@ -468,23 +508,6 @@ export class CreateOpportunityDto {
   @Type(() => RoadmapReferenceImageDto)
   referenceImages?: RoadmapReferenceImageDto[];
 }
-
-/**
- * The quick-add body: `CreateOpportunityDto` minus the fields that only the guided interview can
- * produce.
- *
- * Built by omission rather than written out so the two filing paths cannot drift: a field added
- * to the full DTO (a new attachment, say) reaches the quick form for free, and the only thing the
- * quick form can never send is a readiness verdict, a copilot brief or the copilot conversation
- * behind them — the server would refuse an unsigned brief on this path anyway (see create()'s
- * brief rule), so leaving the fields off the contract is clearer than accepting and rejecting
- * them.
- */
-export class QuickAddOpportunityDto extends OmitType(CreateOpportunityDto, [
-  'readinessToken',
-  'brief',
-  'interviewTranscript',
-] as const) {}
 
 /**
  * Auto-captured client context for a consumer bug report, sent verbatim by the app —

@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import { LoggerService } from '../../logger/logger.service';
 import { DebriefFeedback } from '../entity/debrief-feedback.entity';
 import { DebriefRun } from '../entity/debrief-run.entity';
 import {
@@ -18,6 +19,7 @@ import {
   DebriefRunStatus,
 } from '../enum/debrief-run.enum';
 import { DebriefCards, cardsForReader } from '../util/debrief-cards.util';
+import { checkTransition } from '../util/debrief-run-status.util';
 import { readableCards } from '../util/debrief-competencies.util';
 import { DebriefNotifier } from './debrief-notifier.service';
 import { DebriefSlackService } from './debrief-slack.service';
@@ -171,6 +173,10 @@ export function sectionText(
  */
 @Injectable()
 export class DebriefFeedbackService {
+  private readonly logger = LoggerService.getInstance(
+    DebriefFeedbackService.name,
+  );
+
   constructor(
     private readonly dataSource: DataSource,
     @InjectRepository(DebriefRun)
@@ -356,6 +362,66 @@ export class DebriefFeedbackService {
     row.status = DebriefFeedbackStatus.WITHDRAWN;
     await this.feedback.save(row);
     return { id: row.id, status: row.status };
+  }
+
+  /**
+   * What the learner's most recent debrief for this roleplay asked of them:
+   * the "What to strengthen" lines they could try saying, and the
+   * "Try this in your next practice" nudge. Shown under Reminders on the
+   * roleplay call screen so the points stay in mind on the next attempt.
+   * Only the learner's own live debrief, read as they read it; points a
+   * reviewer removed are left out; nothing when there is no debrief yet.
+   */
+  async latestPoints(
+    scenarioId: number,
+    userId: number,
+  ): Promise<{
+    runId: string | null;
+    workOnThis: Array<{ lead: string; trySaying: string }>;
+    practiseNext: { skill: string; reason: string } | null;
+  }> {
+    const none = { runId: null, workOnThis: [], practiseNext: null };
+    const rows: Array<{
+      id: string;
+      cards: Record<string, any> | null;
+      recipe_key: string | null;
+    }> = await this.dataSource.query(
+      `SELECT r.id, r.cards, r."recipeKey" AS recipe_key
+           FROM debrief_runs r
+           JOIN scenario_sessions s ON s.id = r."scenarioSessionId"
+          WHERE s."counselorId" = $1 AND s."scenarioId" = $2
+            AND r.mode = 'live' AND r.status IN ('published','below_bar')
+            AND r.cards IS NOT NULL
+          ORDER BY COALESCE(s."endedAt", s."updatedAt") DESC
+          LIMIT 1`,
+      [userId, scenarioId],
+    );
+    const run = rows?.[0];
+    if (!run?.cards) return none;
+    const removed = new Set(
+      (
+        await this.feedback.find({
+          where: { runId: run.id, status: DebriefFeedbackStatus.REMOVED },
+        })
+      ).map((r) => r.section),
+    );
+    const cards = cardsForReader(
+      run.cards,
+      run.recipe_key,
+    ) as Partial<DebriefCards>;
+    const workOnThis = (cards.work_on_this ?? [])
+      .map((c, i) => ({ c, i }))
+      .filter(({ c, i }) => !removed.has(`work_on_this[${i}]`) && c.lead)
+      .map(({ c }) => ({ lead: c.lead, trySaying: c.try_saying ?? '' }));
+    const next = cards.practise_next;
+    return {
+      runId: run.id,
+      workOnThis,
+      practiseNext:
+        next && !removed.has('practise_next') && next.skill
+          ? { skill: next.skill, reason: next.reason ?? '' }
+          : null,
+    };
   }
 
   /**
@@ -904,6 +970,14 @@ export class DebriefFeedbackService {
     note: string | undefined,
     patch: Partial<DebriefRun>,
   ) {
+    if (patch.status) {
+      checkTransition(
+        run.status,
+        patch.status,
+        this.logger,
+        `a person (${action})`,
+      );
+    }
     await this.runs.update(run.id, {
       ...patch,
       workspace: {

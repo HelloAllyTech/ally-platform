@@ -32,7 +32,7 @@ describe("the yes/no questions under the verdict", () => {
     const qs = [q("accuracy"), q("missed_risk_cue")];
     const ticked = liveQuestions(qs, ["fabricated_quote", "missed_risk_cue"], {});
     expect(ticked.map(x => x.answer)).toEqual([false, false]);
-    expect(sourceNote(ticked[1].source)).toBe("From the hard fail you ticked");
+    expect(sourceNote(ticked[1].source)).toBe("From the serious problem you ticked");
     expect(liveQuestions(qs, [], {}).map(x => x.answer)).toEqual([true, true]);
   });
 

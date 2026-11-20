@@ -45,7 +45,37 @@ describe('RoadmapReadinessTokenService', () => {
     expect(verdict).toEqual({
       failedCriteria: [],
       proposedEffort: RoadmapOpportunityEffort.M,
+      qualityScore: null,
     });
+  });
+
+  /** The score rides inside the signature: it is what the filing gate holds an idea to. */
+  it('carries the quality score the interview graded, and refuses a forged one', () => {
+    const token = service.issue({
+      description: DRAFT,
+      productGoal: GOAL,
+      failedCriteria: [],
+      proposedEffort: RoadmapOpportunityEffort.M,
+      qualityScore: 71.5,
+    });
+    expect(
+      service.verify(token, { description: DRAFT, productGoal: GOAL })
+        .qualityScore,
+    ).toBe(71.5);
+
+    const [body, signature] = token.split('.');
+    const forged = Buffer.from(
+      JSON.stringify({
+        ...JSON.parse(Buffer.from(body, 'base64url').toString('utf8')),
+        q: 99,
+      }),
+    ).toString('base64url');
+    expect(() =>
+      service.verify(`${forged}.${signature}`, {
+        description: DRAFT,
+        productGoal: GOAL,
+      }),
+    ).toThrow(/not valid/);
   });
 
   /** A failing verdict is signed too — it is what an override gets recorded against. */

@@ -1,3 +1,4 @@
+import { ASSISTANT_SEATS } from "./billing.fixture";
 import { CHECKUP_RUN } from "./onboarding.mocks";
 
 import type { Page, Route } from "@playwright/test";
@@ -17,7 +18,6 @@ export const CHATBOT = {
   knowledgeSource: "selected",
   persona: { displayName: "Asha", greeting: "Hi, I'm Asha from Sunrise Mind.", tone: "warm" },
   model: null,
-  effectiveRuntime: "v2",
   myRole: "owner",
   connectors: [],
   documentCount: 6,
@@ -384,26 +384,21 @@ export async function mockAssistantHome(
     }
     // Chunk Q2a: the live scorecard on the Overview.
     if (path === `${base}/scorecard`) return json(route, SCORECARD);
+    // CR1 Part C: Share → People's seats, and "This uses 2 of your 3 assistants".
+    if (path === `${base}/seats` || path.startsWith(`${base}/seats/`)) {
+      return json(route, { ...ASSISTANT_SEATS, chatbotId: BOT_ID });
+    }
     // Chunk 20d-2: How it works (the runtime's text, here a short stand-in) and the History.
     if (path === `${base}/how-it-works`) {
       const parts = [
         { layer: "business", text: "# Who you are\nYou are Asha.\n", owner: true },
         { layer: "tone", text: "Your tone: warm.\n", owner: true },
-        {
-          layer: "safety",
-          text: "# Safety rules\n- Never diagnose.\n- Never Talk about prices for other clinics\n\n",
-          owner: false,
-        },
-        {
-          layer: "base",
-          text: "Answer only from the passages, cite each one, and say plainly when you don't know.",
-          owner: false,
-        },
+        // Ally's layers arrive with no text (17 Nov 2026).
+        { layer: "safety", text: "", owner: false },
+        { layer: "base", text: "", owner: false },
       ];
       return json(route, {
-        full: parts.map(p => p.text).join(""),
         parts,
-        placeholders: { question: "(the visitor's message)", passages: "" },
         search: { top_k: 8, max_passages: 5, min_similarity: 0.35, searches: 2, documents: 5 },
         purpose: "answer",
         safetyPack: "mental_health",

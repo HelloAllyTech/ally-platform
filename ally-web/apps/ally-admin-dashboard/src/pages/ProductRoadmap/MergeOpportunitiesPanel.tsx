@@ -23,6 +23,8 @@ const highestScoring = (list: RoadmapOpportunity[]) =>
 interface MergeOpportunitiesPanelProps {
   /** Opens the merged opportunity's own drawer, where every remaining setting already lives. */
   onMerged: (primaryId: string) => void;
+  /** Rows to start with — the peek's "Merge…" hands over the pair it found. */
+  initialPicked?: RoadmapOpportunity[];
 }
 
 /**
@@ -61,16 +63,21 @@ interface MergeOpportunitiesPanelProps {
  * `onClose`: the only thing this panel closes itself for is a completed merge, which `onMerged`
  * already covers.
  */
-export const MergeOpportunitiesPanel: React.FC<MergeOpportunitiesPanelProps> = ({ onMerged }) => {
+export const MergeOpportunitiesPanel: React.FC<MergeOpportunitiesPanelProps> = ({
+  onMerged,
+  initialPicked,
+}) => {
   const { unit } = useScoreUnit();
   const [search, setSearch] = useState("");
-  const [picked, setPicked] = useState<RoadmapOpportunity[]>([]);
-  const [primaryId, setPrimaryId] = useState<string | null>(null);
+  const [picked, setPicked] = useState<RoadmapOpportunity[]>(initialPicked ?? []);
+  const [primaryId, setPrimaryId] = useState<string | null>(
+    initialPicked?.length ? highestScoring(initialPicked).id : null,
+  );
   /** Once the manager picks a radio button by hand, stop overriding their choice on later adds. */
   const [primaryManuallySet, setPrimaryManuallySet] = useState(false);
   /** Null until the user edits it, so the prefill can follow a changed primary. */
   const [descriptionOverride, setDescriptionOverride] = useState<string | null>(null);
-  const [isSearchOpen, setIsSearchOpen] = useState(true);
+  const [isSearchOpen, setIsSearchOpen] = useState(!initialPicked?.length);
 
   const [merge, { isLoading }] = useMergeRoadmapOpportunitiesMutation();
 

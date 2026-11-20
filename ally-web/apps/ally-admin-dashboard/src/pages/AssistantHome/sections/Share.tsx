@@ -6,12 +6,14 @@ import { useGetBotPageQuery } from "@api";
 import type { BotPageAccess } from "@types";
 
 import { COPY } from "../../Onboarding/copy";
+import { PLAN } from "../../Plan/copy";
 import { HOME } from "../copy";
 import { Collapsed, Group, SectionHead, TextField } from "../fields";
 import { useHomeField } from "../useHomeField";
 import { PageAccessList, WhatsAppAudience } from "./AccessLists";
 import { HandoverSettingsGroup } from "./HandoverSettings";
 import { TeamList, WhatsAppNumbers } from "./PeopleLists";
+import { AssistantSeats } from "./Seats";
 import { WebsiteGroup } from "./Website";
 
 import type { SectionProps } from "./props";
@@ -137,10 +139,19 @@ export const ShareSection: React.FC<SectionProps> = ({ bot, home, canEdit, canMa
         <WhatsAppNumbers bot={bot} canManage={canManage} />
       </Group>
 
-      <HandoverSettingsGroup field={handover} disabled={!canEdit} />
+      <HandoverSettingsGroup
+        field={handover}
+        disabled={!canEdit}
+        zone={home.fields.timeZone?.value}
+      />
 
       <Group title={t.team} hint={t.teamHint} testId="share-team">
         <TeamList botId={bot.id} canManage={canManage} myUserId={myUserId} />
+      </Group>
+
+      {/* CR1 §C3: who holds this assistant's seats, and this month's counts. Never dollars. */}
+      <Group title={PLAN.seats.title} hint={PLAN.seats.hint} testId="share-seats-group">
+        <AssistantSeats botId={bot.id} canManage={canManage} />
       </Group>
     </>
   );

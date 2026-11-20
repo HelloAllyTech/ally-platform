@@ -30,6 +30,7 @@ import type {
   CrawlState,
 } from '../type/bot-draft.type';
 import { detectBrand } from './brand';
+import { looksLikeErrorPage } from './error-page';
 import { parsePage } from './page-parser';
 import { CRAWLER_USER_AGENT, parseRobots, Robots } from './robots';
 import { parseSitemap } from './sitemap';
@@ -71,6 +72,14 @@ export const CRAWL_LIMITS = {
 /** Hands each batch of pages to the builder to learn from (BotDraftLearningService). */
 /** A page read, with its text for fact extraction. The text is never saved with the crawl. */
 export type LearnablePage = CrawlPage & { text: string };
+
+/** A start page refused with 401, 403 or 429: the site turned the reader away (Q3-fast). */
+function turnedAway(error: GuardedFetchError | null): boolean {
+  return Boolean(
+    error?.reason === 'http_error' &&
+    [401, 403, 429].includes(error.status ?? 0),
+  );
+}
 
 export interface CrawlLearner {
   learnFrom(draftId: string, pages: LearnablePage[]): Promise<void>;
@@ -328,6 +337,8 @@ export class SiteCrawlService implements OnModuleInit {
     };
 
     let startFailed: GuardedFetchError | null = null;
+    /** The start page was an error, block or challenge page (Q3-fast Part 3, B15/B16). */
+    let startTurnedAway = false;
     /** Read one URL from the queue; false when there's nothing left to do. */
     // Pages being read right now count against the cap, so 4 workers can't overshoot 50.
     let reading = 0;
@@ -350,15 +361,20 @@ export class SiteCrawlService implements OnModuleInit {
         crawl,
         draft,
       )
-        .catch((error: unknown) => {
+        .catch((error: unknown): CrawlPage => {
           if (url === startUrl && error instanceof GuardedFetchError)
             startFailed = error;
-          return { url, title: null, status: 'failed' as const };
+          return error instanceof GuardedFetchError &&
+            error.reason === 'http_error'
+            ? { url, title: null, status: 'failed', reason: 'http_error' }
+            : { url, title: null, status: 'failed' };
         })
         .finally(() => {
           reading -= 1;
         });
       const { text, ...stored } = page as CrawlPage & { text?: string };
+      if (url === startUrl && stored.reason === 'error_page')
+        startTurnedAway = true;
       crawl.pages.push(stored);
       if (stored.status === 'read') {
         pending.push({ ...stored, text: text ?? '' });
@@ -385,12 +401,16 @@ export class SiteCrawlService implements OnModuleInit {
     if (!crawl.pages.length) {
       await step();
       const kept = crawl.pages.some((p) => p.status === 'read');
-      if (startFailed || (!kept && !crawl.queue.length)) {
+      if (startFailed || startTurnedAway || (!kept && !crawl.queue.length)) {
         return this.finish(
           draft.id,
           crawl,
           'failed',
-          startFailed ? 'unreachable' : 'little_found',
+          startTurnedAway || turnedAway(startFailed)
+            ? 'turned_away'
+            : startFailed
+              ? 'unreachable'
+              : 'little_found',
         );
       }
     }
@@ -437,6 +457,15 @@ export class SiteCrawlService implements OnModuleInit {
     if (!sameSite(fetched.url, startUrl))
       return { url, title: null, status: 'skipped' };
     const parsed = parsePage(fetched.body);
+    // A 200 that is really an error, block or captcha page: nothing from it is kept or
+    // followed (Q3-fast Part 3, B16).
+    if (looksLikeErrorPage(parsed.title, parsed.text))
+      return {
+        url,
+        title: parsed.title,
+        status: 'failed',
+        reason: 'error_page',
+      };
 
     const canonical = parsed.canonical
       ? normaliseUrl(parsed.canonical, fetched.url)

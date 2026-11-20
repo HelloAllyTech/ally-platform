@@ -17,6 +17,7 @@ class Step:
     ANALYST = "analyst"
     PROGRESS_READER = "progress_reader"
     GUIDANCE_LOOKUP = "guidance_lookup"
+    GUIDANCE_AGENT = "guidance_agent"
     WRITER = "writer"
     CHECKS = "checks"
     EVALUATOR = "evaluator"
@@ -45,9 +46,16 @@ PROMPT_CODES = {
     "progress_reader": "debrief_progress_reader_system",
     # The progress agent, under the bundle's `progress_reader` step key.
     "progress": "debrief_progress_system",
+    # The guidance agent: a bounded tool loop over the guidance gateway tools.
+    "guidance_agent": "debrief_guidance_agent_system",
     "writer": "debrief_writer_system",
     "reviser": "debrief_reviser_system",
     "rubric": "debrief_quality_rubric",
+    # The Evaluator's own closing instructions (pinned) and fix notes.
+    "evaluator": "debrief_evaluator_system",
+    "evaluator_fix": "debrief_evaluator_fix_system",
+    # Pinned: the one definition of a clear and a possible risk cue.
+    "risk_cue_definition": "debrief_risk_cue_definition",
 }
 
 
@@ -65,11 +73,25 @@ class FallbackRung(IntEnum):
 
 #: Seconds one attempt at a step may take before it is retried (on the backup
 #: model when there is one): ally-be's `STEP_TIMEOUT_MS`, now the node timeout.
+#: The pass mark and the run deadline when a release names none: ally-be's seed values
+#: (`DEBRIEF_SEED_BUNDLE.settings.passScore` and `deadlineMs`), checked against them by
+#: `debrief-timing-invariants.spec.ts` and `test_deadline_margin.py`.
+DEFAULT_PASS_SCORE = 8
+DEFAULT_DEADLINE_MS = 150_000
+
+#: How long past its deadline a run may go before ally-be gives up on it (ally-be's
+#: `GRAPH_MARGIN_MS`, its HTTP timeout is deadline + this). A model call is cut off
+#: here, so ally-ai never keeps running after ally-be decided the worker was dead and
+#: started it again.
+HARD_MARGIN_MS = 60_000.0
+
 STEP_TIMEOUT_S: Dict[str, float] = {
     "safety-reader": 60.0,
     "progress-reader": 50.0,
     "progress-agent": 50.0,
     "analyst": 90.0,
+    # The guidance agent's whole tool loop (model passes and gateway calls).
+    "guidance-agent": 40.0,
     "writer": 75.0,
     "evaluator": 90.0,
     "reviser": 120.0,

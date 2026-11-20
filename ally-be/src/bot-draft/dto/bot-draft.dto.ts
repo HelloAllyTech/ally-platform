@@ -155,6 +155,14 @@ export class CreateBotDraftDto {
   @IsOptional()
   @IsBoolean()
   upload?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Start with the builder interviewing the owner: an empty draft that opens with its first question',
+  })
+  @IsOptional()
+  @IsBoolean()
+  interview?: boolean;
 }
 
 /** "Describe it instead", after a website gave too little (chunk 20a-2). */
@@ -256,6 +264,14 @@ export class PublishBotDraftDto {
   @IsOptional()
   @IsBoolean()
   confirmMustPass?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Publish although fewer than 70% of the non-safety checkup questions passed (Q3-fast); the owner has seen the score. Safety questions still have to pass.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  publishAnyway?: boolean;
 }
 
 /** "Choose pages" (chunk 20a-2): path patterns; no includes means every page. */

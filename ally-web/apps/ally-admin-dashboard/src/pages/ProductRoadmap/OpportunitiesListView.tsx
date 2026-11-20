@@ -3,6 +3,7 @@ import React from "react";
 import { SkeletonText } from "@ally-ui-mono/ui-shared";
 import { Button, EmptyState } from "@components";
 import { ButtonVariant } from "@components/types";
+import { en } from "@constants/en";
 import {
   RoadmapVoteBudget,
   RoadmapFacets,
@@ -14,8 +15,9 @@ import {
   RoadmapTaxonomyItem,
 } from "@types";
 
-import { OpportunityListCard } from "./OpportunityListCard";
+import { OpportunityListCard, RowEditor } from "./OpportunityListCard";
 import { RoadmapFilterBar, hasActiveFilters } from "./RoadmapFilterBar";
+import { RoadmapLoadError } from "./RoadmapLoadError";
 import { useSetVotes } from "./useSetVotes";
 import { RoadmapAdvancedFilterValues } from "./utils/filters";
 import { RoadmapEffortFilterValue } from "./utils/filterSelection";
@@ -26,6 +28,9 @@ interface OpportunitiesListViewProps {
   data?: RoadmapOpportunitiesResponse;
   isLoading: boolean;
   isFetching: boolean;
+  /** The fetch failed. Shown as an error with retry — never as an empty list. */
+  isError?: boolean;
+  onRetry?: () => void;
   budget?: RoadmapVoteBudget;
   goals: RoadmapTaxonomyItem[];
   facets?: RoadmapFacets;
@@ -54,6 +59,13 @@ interface OpportunitiesListViewProps {
   showFilters?: boolean;
   /** Draw the Queue presentation: reduced fields, rank at the top left. */
   isQueue?: boolean;
+  /** The Inbox, a pipeline view whose empty state is "inbox zero" rather than "queue empty". */
+  isInbox?: boolean;
+  /** The keyboard cursor row, owned by the page so the shortcut layer and the rows agree. */
+  cursorId?: string | null;
+  onCursor?: (id: string) => void;
+  /** In-place editing for managers; absent means read-only rows. */
+  editor?: RowEditor;
   /** Left-hand slot on the control row — the Queue's sort picker. */
   leading?: React.ReactNode;
   /**
@@ -82,6 +94,8 @@ export const OpportunitiesListView: React.FC<OpportunitiesListViewProps> = ({
   data,
   isLoading,
   isFetching,
+  isError,
+  onRetry,
   budget,
   goals,
   facets,
@@ -107,6 +121,10 @@ export const OpportunitiesListView: React.FC<OpportunitiesListViewProps> = ({
   onAddClick,
   showFilters,
   isQueue,
+  isInbox,
+  cursorId = null,
+  onCursor,
+  editor,
   leading,
   onLoadMore,
   layoutToggle,
@@ -157,6 +175,23 @@ export const OpportunitiesListView: React.FC<OpportunitiesListViewProps> = ({
 
       {isLoading ? (
         <SkeletonText paragraph lineCount={8} />
+      ) : isError && !data ? (
+        <RoadmapLoadError
+          what={isInbox ? "the inbox" : isQueue ? "the queue" : "opportunities"}
+          onRetry={() => onRetry?.()}
+          isRetrying={isFetching}
+        />
+      ) : rows.length === 0 && isQueue && !activeFilters && !search ? (
+        // An empty queue is the goal state of triage, not a missing-data state — so no "file the
+        // first one" prompt.
+        <EmptyState
+          title={isInbox ? "Inbox zero" : "Nothing waiting"}
+          subtitle={
+            isInbox
+              ? "Every idea has been triaged. New ones will show up here."
+              : "Every opportunity has been triaged. New ideas will show up here."
+          }
+        />
       ) : rows.length === 0 ? (
         // No page-vs-empty distinction to make any more: this view always starts from the top,
         // so "no rows" means no rows, not "you walked past the end".
@@ -173,7 +208,7 @@ export const OpportunitiesListView: React.FC<OpportunitiesListViewProps> = ({
         />
       ) : (
         <div className="flex flex-col gap-3">
-          {rows.map(opportunity => (
+          {rows.map((opportunity, index) => (
             <OpportunityListCard
               key={opportunity.id}
               opportunity={opportunity}
@@ -185,6 +220,11 @@ export const OpportunitiesListView: React.FC<OpportunitiesListViewProps> = ({
               canVote={canVote}
               onSetVotes={allocate}
               onOpen={() => onOpenOpportunity(opportunity.id)}
+              isCursor={opportunity.id === cursorId}
+              // Tab lands on the cursor row, or the first row when there is no cursor yet.
+              isTabStop={cursorId === null ? index === 0 : opportunity.id === cursorId}
+              onCursor={() => onCursor?.(opportunity.id)}
+              editor={editor}
             />
           ))}
         </div>
@@ -201,6 +241,7 @@ export const OpportunitiesListView: React.FC<OpportunitiesListViewProps> = ({
           {data ? `Showing ${rows.length} of ${total} opportunities` : null}
           {isFetching && !isLoading ? " · updating…" : null}
           {canManage ? " · you can manage stages and taxonomy" : null}
+          {rows.length > 0 ? ` · ${en.roadmapTriage.shortcutsHint}` : null}
         </div>
 
         {canLoadMore && (

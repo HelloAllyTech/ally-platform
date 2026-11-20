@@ -90,7 +90,13 @@ const jobs = () => [
     startedAt: "2026-10-14T09:58:10Z",
     finishedAt: "2026-10-14T09:59:10Z",
   }),
-  job({ id: "j4", kind: "video", blueprintItemId: "v", title: "Watch a real call", status: "queued" }),
+  job({
+    id: "j4",
+    kind: "video",
+    blueprintItemId: "v",
+    title: "Watch a real call",
+    status: "queued",
+  }),
   job({
     id: "j5",
     kind: "course_meta",
@@ -124,13 +130,14 @@ const detailFor = (
   makeDetail({
     status,
     session: { approvedBlueprint: makeBlueprint(), blueprintVersion: 3 },
-    detail: { jobs: jobs(), budget: budget({ ceilingUsd: 10, spentUsd: 3.5, remainingUsd: 6.5 }), ...overrides },
+    detail: {
+      jobs: jobs(),
+      budget: budget({ ceilingUsd: 10, spentUsd: 3.5, remainingUsd: 6.5 }),
+      ...overrides,
+    },
   });
 
-const setup = (
-  detail: CourseCopilotSessionDetail,
-  overrides: Partial<BuildPanelProps> = {},
-) => {
+const setup = (detail: CourseCopilotSessionDetail, overrides: Partial<BuildPanelProps> = {}) => {
   const props: BuildPanelProps = {
     detail,
     onRetryJobs: vi.fn().mockResolvedValue(undefined),
@@ -142,8 +149,7 @@ const setup = (
   return { ...render(<BuildPanel {...props} />), props };
 };
 
-const jobRow = (id: string) =>
-  document.querySelector(`[data-job-id="${id}"]`) as HTMLElement;
+const jobRow = (id: string) => document.querySelector(`[data-job-id="${id}"]`) as HTMLElement;
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -170,8 +176,12 @@ describe("BuildPanel — job rows", () => {
     setup(detailFor("BUILDING"));
 
     expect(within(jobRow("j1")).getByText("820 words, 2 checks")).toBeInTheDocument();
-    expect(within(jobRow("j3")).getByText("The persona didn't pass validation.")).toBeInTheDocument();
-    expect(within(jobRow("j6")).getByText("Image generation isn't configured.")).toBeInTheDocument();
+    expect(
+      within(jobRow("j3")).getByText("The persona didn't pass validation."),
+    ).toBeInTheDocument();
+    expect(
+      within(jobRow("j6")).getByText("Image generation isn't configured."),
+    ).toBeInTheDocument();
   });
 
   it("shows how long each job took, how long a running one has been going, attempts and cost", () => {
@@ -187,13 +197,17 @@ describe("BuildPanel — job rows", () => {
   it("groups jobs under their section, with course-wide jobs under Course, last", () => {
     setup(detailFor("BUILDING"));
 
-    const groups = screen.getAllByRole("region").filter(region => region.querySelector("[data-job-id]"));
+    const groups = screen
+      .getAllByRole("region")
+      .filter(region => region.querySelector("[data-job-id]"));
     expect(groups.map(group => group.getAttribute("aria-label"))).toEqual([
       "Foundations",
       "Practice",
       "Course",
     ]);
-    expect(within(groups[0]).getAllByText(/What listening is|Check your understanding/).length).toBeGreaterThan(0);
+    expect(
+      within(groups[0]).getAllByText(/What listening is|Check your understanding/).length,
+    ).toBeGreaterThan(0);
     expect(groups[0].querySelectorAll("[data-job-id]")).toHaveLength(3);
     expect(groups[1].querySelectorAll("[data-job-id]")).toHaveLength(2);
     expect(groups[2].querySelectorAll("[data-job-id]")).toHaveLength(2);
@@ -240,7 +254,11 @@ describe("BuildPanel — progress and cost", () => {
   });
 
   it("says there is no ceiling rather than drawing a meter against zero", () => {
-    setup(detailFor("BUILDING", { budget: budget({ ceilingUsd: 0, spentUsd: 3.5, remainingUsd: null }) }));
+    setup(
+      detailFor("BUILDING", {
+        budget: budget({ ceilingUsd: 0, spentUsd: 3.5, remainingUsd: null }),
+      }),
+    );
 
     expect(screen.getByText("$3.50 · no ceiling")).toBeInTheDocument();
     expect(screen.queryByRole("meter")).toBeNull();
@@ -333,7 +351,9 @@ describe("BuildPanel — cancel", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel build" }));
     await act(async () => {
-      fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Stop the build" }));
+      fireEvent.click(
+        within(screen.getByRole("dialog")).getByRole("button", { name: "Stop the build" }),
+      );
     });
     expect(props.onCancelBuild).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -347,7 +367,9 @@ describe("BuildPanel — cancel", () => {
 
 describe("BuildPanel — budget hold", () => {
   const held = () =>
-    detailFor("BUILDING", { budget: budget({ ceilingUsd: 10, spentUsd: 10, remainingUsd: 0, held: true }) });
+    detailFor("BUILDING", {
+      budget: budget({ ceilingUsd: 10, spentUsd: 10, remainingUsd: 0, held: true }),
+    });
 
   it("shows the decided hold copy with the figures", () => {
     setup(held());
@@ -455,7 +477,8 @@ describe("BuildPanel — the outline filling in below", () => {
       ],
     });
     setup(detailFor("BUILDING", { outline: course }), {
-      openEditorDisabledReason: "Wait for the build to finish — the copilot overwrites edits made during the build.",
+      openEditorDisabledReason:
+        "Wait for the build to finish — the copilot overwrites edits made during the build.",
     });
 
     const section = screen.getByRole("region", { name: "Course so far" });
@@ -468,5 +491,74 @@ describe("BuildPanel — the outline filling in below", () => {
   it("says the outline fills in as items are written when there is none yet", () => {
     setup(detailFor("BUILDING", { outline: null }));
     expect(screen.getByText("The outline fills in as items are written.")).toBeInTheDocument();
+  });
+});
+
+describe("BuildPanel — roleplay summary card (Course Pilot)", () => {
+  it("shows a finished new roleplay's mode, goal, states, supports and checks", () => {
+    setup(
+      detailFor("EDITING", {
+        jobs: [
+          job({
+            id: "rp",
+            kind: "roleplay_new",
+            blueprintItemId: "r",
+            status: "done",
+            summary: "Created roleplay",
+            roleplayCard: {
+              title: "Priya after class",
+              mode: "practice",
+              learnerGoal: "Find out whether Priya is thinking of suicide",
+              setting: null,
+              states: ["Pulling away", "Guarded", "Opening up"],
+              supports: {
+                experienceMode: "FEEDBACK",
+                reminders: true,
+                stateVisible: true,
+                supervisorNotes: false,
+              },
+              checks: ["reminders hidden (none were written)"],
+            },
+          }),
+        ],
+      }),
+    );
+    const card = within(jobRow("rp")).getByTestId("roleplay-card");
+    expect(card).toHaveTextContent("Practice");
+    expect(card).toHaveTextContent("Find out whether Priya is thinking of suicide");
+    expect(card).toHaveTextContent("Pulling away → Guarded → Opening up");
+    expect(card).toHaveTextContent("reminders, state shown");
+    expect(card).toHaveTextContent("reminders hidden (none were written)");
+  });
+
+  it("says when a roleplay has no states", () => {
+    setup(
+      detailFor("EDITING", {
+        jobs: [
+          job({
+            id: "rp",
+            kind: "roleplay_new",
+            status: "done",
+            roleplayCard: {
+              title: "T",
+              mode: "performance",
+              learnerGoal: null,
+              setting: null,
+              states: [],
+              supports: {
+                experienceMode: "NONE",
+                reminders: false,
+                stateVisible: false,
+                supervisorNotes: false,
+              },
+              checks: [],
+            },
+          }),
+        ],
+      }),
+    );
+    const card = within(jobRow("rp")).getByTestId("roleplay-card");
+    expect(card).toHaveTextContent("No states (runs on the default main prompt)");
+    expect(card).toHaveTextContent("none");
   });
 });

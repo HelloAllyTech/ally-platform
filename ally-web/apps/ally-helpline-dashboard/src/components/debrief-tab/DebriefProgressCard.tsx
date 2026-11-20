@@ -3,9 +3,9 @@ import { FC, ReactNode, useId, useState } from "react";
 import { ArrowRight, ChevronDown, Ellipsis, Eye, TrendingUp } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { useIsBeingRead } from "./ReadAloudControls";
-
 import { DebriefProgressCardData, DebriefProgressTrend } from "@types";
+
+import { useIsBeingRead } from "./ReadAloudControls";
 
 const TRENDS: readonly DebriefProgressTrend[] = [
   "more_consistent",

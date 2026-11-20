@@ -15,7 +15,7 @@ from app.core.debrief_graph.context import DebriefRunContext
 from app.core.debrief_graph.gateway import GatewayError
 from app.core.debrief_graph.graph import build_graph
 from app.core.debrief_graph.runner import run_debrief
-from app.core.debrief_graph.step_functions import StepError
+from app.core.debrief_graph.step_wire import StepError
 
 DIMENSIONS = [
     "evidence_specificity",
@@ -134,6 +134,7 @@ ALL_AGENTS = [
     "analyst",
     "progress_reader",
     "guidance_lookup",
+    "guidance_agent",
     "case_memory",
     "assessment_anchoring",
     "protocol_check",
@@ -216,7 +217,40 @@ PRICES = {
     ]
 }
 
+#: The foundational framework, as ally-be sends it from the Context Library
+#: entry (the code carries no default framework).
+FOUNDATIONAL_FRAMEWORK = {
+    "id": "fw-foundational",
+    "name": "Foundational Skills",
+    "foundational": True,
+    "skills": [
+        {"key": k, "name": n}
+        for k, n in {
+            "verbal": "Verbal communication",
+            "confidentiality": "Explain and promote confidentiality",
+            "rapport": "Rapport-building and self-disclosure",
+            "feelings": "Exploration and normalisation of feelings",
+            "empathy": "Empathy, warmth and genuineness",
+            "harm": "Assessment of harm and developing a response plan",
+            "functioning": "Connect to social functioning and impact on life",
+            "explanation": "Explore the client's explanation for the problem",
+            "family": "Involvement of family and significant others",
+            "goals": "Collaborative goal-setting",
+            "hope": "Promote realistic hope for change",
+            "coping": "Incorporate coping mechanisms and prior solutions",
+            "psychoeducation": "Psychoeducation with local terminology",
+            "feedback": "Elicitation of feedback",
+        }.items()
+    ],
+    "areas": [
+        {"name": "Listening Engagement", "description": "listening"},
+        {"name": "Emotional Attunement", "description": "emotions"},
+        {"name": "Supportive Engagement", "description": "support"},
+    ],
+}
+
 SESSION = {
+    "framework": FOUNDATIONAL_FRAMEWORK,
     "id": "sess-1",
     "tenant_id": "11111111-1111-1111-1111-111111111111",
     "counselor_id": 7,

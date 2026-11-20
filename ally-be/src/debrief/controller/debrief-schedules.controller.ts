@@ -66,7 +66,7 @@ class ScheduleChangeDto {
   @ApiProperty({
     required: false,
     description:
-      'Required (true) when the change alters learning-budget spend (PM agent analysis, monthly review, setting values: frequency or on/off)',
+      'Required (true) when the change alters learning-budget spend (Debrief PM agent analysis, monthly review, setting values: frequency or on/off)',
   })
   @IsOptional()
   @IsBoolean()
@@ -104,7 +104,7 @@ export class DebriefSchedulesController {
   @Get()
   @ApiOperation({
     summary:
-      'Every debrief / PM agent job: schedule, allowed frequencies, last run, next run',
+      'Every debrief / Debrief PM agent job: schedule, allowed frequencies, last run, next run',
   })
   list() {
     return this.schedules.view();

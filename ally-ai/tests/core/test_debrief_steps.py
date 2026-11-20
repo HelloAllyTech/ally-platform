@@ -16,6 +16,7 @@ from app.core.debrief.schemas import (
     ProgressReading,
 )
 from app.core.debrief_quality.schemas import DimensionScore
+from tests.core.debrief_graph.fakes import FOUNDATIONAL_FRAMEWORK as FOUNDATIONAL
 
 TRANSCRIPT = [
     TranscriptTurn(turn_index=1, role="counselor", text="What brings you in?"),
@@ -117,7 +118,9 @@ async def test_progress_reader_keeps_three_items(dispatch_returns):
 
 @pytest.mark.asyncio
 async def test_progress_reader_reads_what_people_said_with_its_guide(dispatch_returns):
-    from app.core.debrief.steps import PAST_FEEDBACK_GUIDE, read_progress
+    """The guide is the Progress reader prompt's wording (2026-11-16); the
+    code sends the past points with what people said about them."""
+    from app.core.debrief.steps import DEFAULT_PROGRESS_READER_SYSTEM, read_progress
 
     calls = dispatch_returns(ProgressReading(items=[]))
     await read_progress(
@@ -133,17 +136,10 @@ async def test_progress_reader_reads_what_people_said_with_its_guide(dispatch_re
         ],
         "gemini-2.5-flash",
     )
-    assert PAST_FEEDBACK_GUIDE in calls["prompt"]
+    guide = "HOW TO USE WHAT PEOPLE SAID ABOUT EARLIER DEBRIEFS"
+    assert guide in DEFAULT_PROGRESS_READER_SYSTEM
+    assert calls["prompt"].count(guide) == 1
     assert "She never said that" in calls["prompt"]
-
-
-@pytest.mark.asyncio
-async def test_progress_reader_without_feedback_gets_no_guide(dispatch_returns):
-    from app.core.debrief.steps import PAST_FEEDBACK_GUIDE, read_progress
-
-    calls = dispatch_returns(ProgressReading(items=[]))
-    await read_progress({"behaviours": []}, [{"point": "x"}], "gemini-2.5-flash")
-    assert PAST_FEEDBACK_GUIDE not in calls["prompt"]
 
 
 @pytest.mark.asyncio
@@ -208,7 +204,7 @@ async def test_evaluator_with_partial_scores_is_no_answer(dispatch_returns):
 async def test_a_step_with_no_usable_answer_is_a_502_failure(monkeypatch):
     """The graph treats it like any failed attempt: retry on the backup model."""
     from app.core.debrief import steps
-    from app.core.debrief_graph.step_functions import InProcessSteps, StepError
+    from app.core.debrief_graph.step_wire import InProcessSteps, StepError
 
     async def _none(*args, **kwargs):
         return None, "gemini-2.5-pro"
@@ -251,7 +247,7 @@ async def test_writer_is_told_every_risk_cue_turn_to_cover(dispatch_returns):
         TRANSCRIPT,
     )
     assert "RISK CUES TO COVER: turns 2, 9." in calls["prompt"]
-    assert "POSSIBLE RISK CUES" not in calls["prompt"]
+    assert "POSSIBLE RISK CUES: turns" not in calls["prompt"]
 
 
 @pytest.mark.asyncio
@@ -279,7 +275,7 @@ async def test_writer_must_cover_a_clear_cue_and_decides_a_possible_one(
     )
     assert "RISK CUES TO COVER: turns 2." in calls["prompt"]
     assert "POSSIBLE RISK CUES: turns 5, 7." in calls["prompt"]
-    assert "or might and you cannot tell" in calls["prompt"]
+    assert "you cannot tell, it is a clear risk cue" in calls["prompt"]
     assert "no coaching about assessing risk" in calls["prompt"]
 
     calls = dispatch_returns(DebriefCards(opening="Hi"))
@@ -290,8 +286,63 @@ async def test_writer_must_cover_a_clear_cue_and_decides_a_possible_one(
         "gemini-3-flash-preview",
         TRANSCRIPT,
     )
-    assert "RISK CUES TO COVER" not in calls["prompt"]
+    assert "RISK CUES TO COVER: none" in calls["prompt"]
     assert "POSSIBLE RISK CUES: turns 5." in calls["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_writer_coaches_a_missed_feeling_even_when_it_is_not_a_risk_cue(
+    dispatch_returns,
+):
+    """Review 2026-11-16 (Sangath, Nikhil): six "I feel stuck / lost" turns
+    the trainee passed over went unmentioned. A possible cue the learner
+    missed gets one work-on point about staying with the feeling, never a
+    risk assessment; one they explored, or a clear one, does not."""
+    from app.core.debrief.steps import write
+
+    calls = dispatch_returns(DebriefCards(opening="Hi"))
+    await write(
+        {},
+        {
+            "risk_cues": [
+                {"turn_index": 2, "strength": "clear", "learner_response": "missed"},
+                {"turn_index": 5, "strength": "possible", "learner_response": "missed"},
+                {
+                    "turn_index": 7,
+                    "strength": "possible",
+                    "learner_response": "explored",
+                },
+                {"turn_index": 9, "strength": "possible", "learner_response": "missed"},
+            ],
+        },
+        "en",
+        "gemini-3-flash-preview",
+        TRANSCRIPT,
+    )
+    # Data only; what to do with the turns is the Writer prompt's rule.
+    assert "MISSED FEELINGS: turns 5, 9." in calls["prompt"]
+    from app.core.debrief.steps import DEFAULT_WRITER_SYSTEM
+
+    assert "MISSED FEELINGS. When MISSED FEELINGS lists turns" in DEFAULT_WRITER_SYSTEM
+    assert "Never a risk assessment." in DEFAULT_WRITER_SYSTEM
+
+    calls = dispatch_returns(DebriefCards(opening="Hi"))
+    await write(
+        {},
+        {
+            "risk_cues": [
+                {
+                    "turn_index": 5,
+                    "strength": "possible",
+                    "learner_response": "explored",
+                }
+            ]
+        },
+        "en",
+        "gemini-3-flash-preview",
+        TRANSCRIPT,
+    )
+    assert "MISSED FEELINGS: turns" not in calls["prompt"]
 
 
 @pytest.mark.asyncio
@@ -325,13 +376,13 @@ async def test_writer_respects_case_memory_and_never_regrades(dispatch_returns):
         case_memory="Meena told you about her exams last time.",
         assessment=True,
     )
-    assert "CASE MEMORY:\nMeena told you about her exams last time." in calls["prompt"]
+    assert calls["prompt"].count("Meena told you about her exams last time.") == 1
     assert "Never contradict it" in calls["prompt"]
     assert "Never mention, imply or argue with a grade" in calls["prompt"]
 
     calls = dispatch_returns(DebriefCards(opening="Hi"))
     await write({}, {}, "en", "gemini-3-flash-preview", TRANSCRIPT)
-    assert "CASE MEMORY" not in calls["prompt"]
+    assert "(CASE MEMORY):\nnone" in calls["prompt"]
     assert "ASSESSMENT" not in calls["prompt"]
 
 
@@ -377,7 +428,7 @@ async def test_the_rationale_never_reaches_the_cards_or_the_evidence(monkeypatch
     only in `reasoning`: nothing a learner reads can carry it."""
     from app.core.debrief import steps
     from app.core.debrief.schemas import DebriefCardsReasoned, EvidenceMapReasoned
-    from app.core.debrief_graph.step_functions import InProcessSteps
+    from app.core.debrief_graph.step_wire import InProcessSteps
 
     async def _analyse(*args, **kwargs):
         return EvidenceMapReasoned(reasoning="Why I read it so."), "gemini-2.5-pro"
@@ -412,12 +463,12 @@ async def test_analyst_reads_the_live_detector_as_a_second_opinion(dispatch_retu
         live_detections=[{"behaviour": "Explores risk", "detected": False, "times": 0}],
     )
     prompt = calls["prompt"]
-    assert "LIVE DETECTIONS" in prompt and "It can be wrong" in prompt
+    assert "set detector_agreement" in prompt and "It can be wrong" in prompt
     assert '"behaviour": "Explores risk"' in prompt
 
     calls = dispatch_returns(EvidenceMap())
     await analyse(TRANSCRIPT, "en", "gemini-2.5-pro")
-    assert "LIVE DETECTIONS" not in calls["prompt"]
+    assert "set detector_agreement" not in calls["prompt"]
 
 
 @pytest.mark.asyncio
@@ -431,12 +482,12 @@ async def test_writer_may_use_the_cohort_only_to_normalise(dispatch_returns):
     calls = dispatch_returns(DebriefCards(opening="Hi"))
     await write({}, {}, "en", "gemini-3-flash-preview", TRANSCRIPT, cohort=cohort)
     prompt = calls["prompt"]
-    assert "COHORT:" in prompt and "Never compare this trainee" in prompt
+    assert prompt.count("<cohort>") == 1 and "Never compare this learner" in prompt
     assert "few trainees show this" in prompt
 
     calls = dispatch_returns(DebriefCards(opening="Hi"))
     await write({}, {}, "en", "gemini-3-flash-preview", TRANSCRIPT)
-    assert "COHORT" not in calls["prompt"]
+    assert "<cohort>" not in calls["prompt"]
 
 
 @pytest.mark.asyncio
@@ -448,7 +499,7 @@ async def test_writer_never_states_mixed_evidence_as_fact(dispatch_returns):
     }
     calls = dispatch_returns(DebriefCards(opening="Hi"))
     await write(evidence, {}, "en", "gemini-3-flash-preview", TRANSCRIPT)
-    assert "MIXED EVIDENCE" in calls["prompt"]
+    assert "MIXED EVIDENCE: Reflections." in calls["prompt"]
 
 
 @pytest.mark.asyncio
@@ -457,7 +508,7 @@ async def test_analyst_tags_behaviours_for_skill_coverage(dispatch_returns):
     from app.core.debrief.steps import analyse
 
     calls = dispatch_returns(EvidenceMap())
-    await analyse(TRANSCRIPT, "en", "gemini-2.5-pro")
+    await analyse(TRANSCRIPT, "en", "gemini-2.5-pro", framework=FOUNDATIONAL)
     assert "SKILL COVERAGE" in calls["prompt"]
     b = BehaviourEvidence(
         skill="reflections",
@@ -493,12 +544,12 @@ async def test_analyst_rates_client_turns_and_updates_case_memory(dispatch_retur
     assert [(e.turn_index, e.level) for e in out.emotional_movement] == [(2, -3)]
     assert out.case_memory_update == "She is still anxious about exams."
     prompt = calls["prompt"]
-    assert "EMOTIONAL MOVEMENT" in prompt and "CASE MEMORY:" in prompt
+    assert "EMOTIONAL MOVEMENT" in prompt and prompt.count("Exams worry her.") == 1
 
     calls = dispatch_returns(EvidenceMap(case_memory_update="invented"))
     out, _ = await analyse(TRANSCRIPT, "en", "gemini-2.5-pro")
     assert out.case_memory_update is None
-    assert "CASE MEMORY" not in calls["prompt"]
+    assert "Exams worry her." not in calls["prompt"]
 
 
 @pytest.mark.asyncio

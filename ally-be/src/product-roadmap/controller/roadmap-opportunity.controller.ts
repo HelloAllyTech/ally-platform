@@ -12,6 +12,7 @@ import {
   Put,
   Query,
   UseGuards,
+  GoneException,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -32,11 +33,11 @@ import { BUG_REPORT_RATE_LIMIT } from '../constants/product-roadmap.constants';
 import {
   CreateBugReportDto,
   CreateOpportunityDto,
+  SuggestTitleDto,
   ListOpportunitiesQueryDto,
   MergeOpportunitiesDto,
   MonthBoardQueryDto,
   MoveOpportunityDto,
-  QuickAddOpportunityDto,
   RoadmapReferenceImageUploadUrlDto,
   SetAllocationDto,
   SplitOpportunityDto,
@@ -59,6 +60,7 @@ import {
   SetAllocationResponseDto,
   OpenBuilderSessionResponseDto,
 } from '../dto/roadmap-response.dto';
+import { RoadmapAiService } from '../service/roadmap-ai.service';
 import { RoadmapOpportunityService } from '../service/roadmap-opportunity.service';
 import { RoadmapMultiplierService } from '../service/roadmap-multiplier.service';
 import { RoadmapAllocationService } from '../service/roadmap-allocation.service';
@@ -66,6 +68,7 @@ import { RoadmapSplitMergeService } from '../service/roadmap-split-merge.service
 import { RoadmapBuilderService } from '../service/roadmap-builder.service';
 import { RoadmapBoardService } from '../service/roadmap-board.service';
 import { RoadmapAccessService } from '../service/roadmap-access.service';
+import { PlanSettingsService } from 'src/product-planning/service/plan-settings.service';
 import { PlanAccessService } from 'src/product-planning/service/plan-access.service';
 
 /**
@@ -90,6 +93,8 @@ export class RoadmapOpportunityController {
     private readonly access: RoadmapAccessService,
     private readonly multiplierService: RoadmapMultiplierService,
     private readonly planAccess: PlanAccessService,
+    private readonly planSettings: PlanSettingsService,
+    private readonly roadmapAi: RoadmapAiService,
   ) {}
 
   @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
@@ -286,9 +291,17 @@ export class RoadmapOpportunityController {
     @CurrentUser() user: TokenUser,
     @Body() dto: CreateOpportunityDto,
   ): Promise<OpportunityResponseDto> {
-    // Filing is the Product Planning — Ideas toggle's (rev 5.2 §B.12): on by
-    // default for platform admins, withheld from org-restricted ones.
+    // Filing is the Idea role's (rev 5.2 §B.12); an org-restricted admin is
+    // a Viewer at most, so it is withheld from them.
     await this.planAccess.assertIdeas(user.id);
+    // With the Roadmap on, ideas are filed only through a draft and its
+    // interview (lifecycle 2026-11-18): this older door skipped the readiness
+    // check and left the idea unreviewed. Bug reports have their own route.
+    if ((await this.planSettings.getRoadmapV2()).enabled) {
+      throw new GoneException(
+        'Ideas are filed from a draft now: start one with New idea, finish it in the interview, then submit it.',
+      );
+    }
     return this.opportunityService.create(user.id, dto, {
       canManage: await this.access.canManage(user.id),
       enforceReadiness: true,
@@ -296,42 +309,18 @@ export class RoadmapOpportunityController {
   }
 
   /**
-   * The same filing as `create`, with the readiness gate OFF.
-   *
-   * A deliberate second door, for a named few: the `product_roadmap_quick_add` toggle on top of
-   * the VOTE tier, granted per-admin from Admin User Management. The interview exists so a draft
-   * reaches the board already sharpened; a curator who already knows what belongs on it pays that
-   * cost for nothing, and this is where they skip it. `enforceReadiness: false` is the whole
-   * difference — ownership, images, vector indexing and the realtime event all run as on `create`,
-   * so a quick-added row is indistinguishable from an interviewed one except that `hasBrief` is
-   * false (the DTO cannot carry a brief, and the server would refuse an unsigned one).
-   *
-   * Its own route rather than a flag on `create`: a flag is a bypass any VOTE-tier caller could
-   * send, and the gate would again be a discipline the client chose to keep.
+   * A suggested title for an idea's text, for the Title box to prefill. Always on: the form
+   * that files an idea needs it whether or not the Roadmap is on. On the VOTE tier like filing
+   * itself. A failed model call answers with the text's first sentence, never an error.
    */
-  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP_QUICK_ADD, {
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
     permissions: [PERMISSIONS.VOTE_PRODUCT_ROADMAP],
   })
-  @Post('opportunities/quick')
-  @ApiOperation({
-    summary: 'File a new opportunity directly, skipping the readiness check',
-    description:
-      'Requires the product_roadmap_quick_add admin toggle. Same body and rules as POST ' +
-      '/opportunities minus readinessToken and brief; `ownerUserId` still needs ' +
-      'edit:admin:product-roadmap.',
-  })
-  @ApiResponse({ status: 201, type: OpportunityResponseDto })
-  async quickAdd(
-    @CurrentUser() user: TokenUser,
-    @Body() dto: QuickAddOpportunityDto,
-  ): Promise<OpportunityResponseDto> {
-    // Quick add is a second filing door, so it needs Ideas too: both doors
-    // must agree on who may file.
-    await this.planAccess.assertIdeas(user.id);
-    return this.opportunityService.create(user.id, dto, {
-      canManage: await this.access.canManage(user.id),
-      enforceReadiness: false,
-    });
+  @Post('title-suggestion')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Suggest a one-line title for an idea' })
+  async suggestTitle(@Body() dto: SuggestTitleDto): Promise<{ title: string }> {
+    return { title: await this.roadmapAi.suggestTitle(dto.text) };
   }
 
   /**

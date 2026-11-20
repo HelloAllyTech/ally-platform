@@ -76,6 +76,59 @@ export class BuilderPrinciplesService {
     );
   }
 
+  /**
+   * What the readiness row needs to know about a session's principles: whether they are on, the
+   * guiding brief's codes (each needs a mark), and how many were retrieved at all. Undefined when
+   * the session cannot be read, which leaves the row out.
+   */
+  async readinessSignal(sessionId: string): Promise<
+    | {
+        enabled: boolean;
+        inBrief: string[];
+        retrieved: number;
+      }
+    | undefined
+  > {
+    try {
+      const rows: Array<{ principles: BuilderSessionPrinciples | null }> =
+        await this.dataSource.query(
+          `SELECT "metadata"->'principles' AS principles FROM "builder_sessions" WHERE "id" = $1`,
+          [sessionId],
+        );
+      if (!rows.length) return undefined;
+      const state = (rows[0].principles ?? {}) as BuilderSessionPrinciples;
+      const inBrief = Array.isArray(state.codes) ? state.codes.map(String) : [];
+      const surfaced = this.retrieval
+        ? await this.retrieval.surfacedCodes(sessionId)
+        : new Set<string>();
+      return {
+        enabled:
+          !!this.brief &&
+          !!this.retrieval &&
+          process.env.BUILDER_PRINCIPLES_PROACTIVE !== 'off' &&
+          !state.off,
+        inBrief,
+        retrieved: new Set([...inBrief, ...surfaced]).size,
+      };
+    } catch (error) {
+      this.logger.warn(
+        `Principles signal unavailable for ${sessionId}: ${(error as Error).message}`,
+      );
+      return undefined;
+    }
+  }
+
+  /** Codes this session was shown: its brief, and every surfaced or read principle. */
+  async shownCodes(sessionId: string): Promise<Set<string>> {
+    const signal = await this.readinessSignal(sessionId);
+    const surfaced = this.retrieval
+      ? await this.retrieval
+          .surfacedCodes(sessionId)
+          .catch(() => new Set<string>())
+      : new Set<string>();
+    return new Set([...(signal?.inBrief ?? []), ...surfaced]);
+  }
+
   async setOff(sessionId: string, off: boolean): Promise<void> {
     await this.save(sessionId, { off });
   }

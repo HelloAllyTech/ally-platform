@@ -8,7 +8,7 @@ import {
   OwnerSettingsBaseline,
   TEST_SETTING_KEYS,
 } from '../constants/debrief-owner-settings.constants';
-import { DEBRIEF_AGENT_KEY } from '../constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
 import { DebriefRun } from '../entity/debrief-run.entity';
 import {
   BaselineFacts,
@@ -263,7 +263,7 @@ export class DebriefBaselineService implements OnModuleInit {
       });
     }
     this.logger.info(
-      `[debrief] PM agent tuned ${picked.length} test setting(s): ${picked.join(', ')}`,
+      `[debrief] Debrief PM agent tuned ${picked.length} test setting(s): ${picked.join(', ')}`,
     );
     return picked.length;
   }

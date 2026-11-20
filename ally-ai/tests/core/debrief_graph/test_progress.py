@@ -13,15 +13,16 @@ from app.core.debrief.schemas import (
     ProgressReportReasoned,
 )
 from app.core.debrief_graph import circuit
+from app.core.debrief_graph import progress as _progress
+from app.core.debrief_graph import progress_vetoes as _vetoes
 from app.core.debrief_graph.progress import (
     analyst_versions,
     progress_card,
     response_record,
-    writer_reading,
 )
-from app.core.debrief_graph.progress_vetoes import apply_vetoes, skill_key
 from tests.core.debrief_graph.fakes import (
     CONTEXT,
+    FOUNDATIONAL_FRAMEWORK,
     PROGRESS_PROFILE,
     PROGRESS_REPORT,
     FakeGateway,
@@ -30,6 +31,30 @@ from tests.core.debrief_graph.fakes import (
     obs,
     run,
 )
+
+#: A framework's key -> name map, as the run builds it from session.framework
+#: (the code no longer carries a default one).
+NAMES = {
+    "empathy": "Empathy, warmth and genuineness",
+    "explanation": "Explore the client's explanation for the problem",
+    "feelings": "Exploration and normalisation of feelings",
+    "goals": "Collaborative goal-setting",
+}
+
+
+def apply_vetoes(report, prof, evidence, names=None, foundational=True):
+    return _vetoes.apply_vetoes(
+        report, prof, evidence, NAMES if names is None else names, foundational
+    )
+
+
+def skill_key(name, names=None):
+    return _vetoes.skill_key(name, NAMES if names is None else names)
+
+
+def writer_reading(report, prof, names=None):
+    return _progress.writer_reading(report, prof, NAMES if names is None else names)
+
 
 # --- synthetic histories ----------------------------------------------------------
 
@@ -493,10 +518,11 @@ async def test_the_agent_reads_the_profile_never_the_transcript(monkeypatch):
         {"empathy": {"name": "Empathy"}},
         "hi",
         "progress-m",
+        framework=FOUNDATIONAL_FRAMEWORK,
     )
     assert ran == "m" and len(out.skills) == 3
     prompt = calls["prompt"]
-    assert prompt.startswith(DEFAULT_PROGRESS_SYSTEM)
+    assert prompt.startswith(DEFAULT_PROGRESS_SYSTEM.split("{{")[0])
     assert "CARD DUE: yes" in prompt
     assert "Devanagari" in prompt
     assert "empathy = Empathy, warmth and genuineness" in prompt

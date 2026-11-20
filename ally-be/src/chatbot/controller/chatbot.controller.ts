@@ -46,6 +46,7 @@ import {
   CreateKbUploadUrlDto,
 } from '../../knowledge-base/dto/knowledge-base.dto';
 import { ChatbotService } from '../service/chatbot.service';
+import { ChatbotRole, AssistantScope } from '../access/chatbot-role.decorator';
 
 const VIEW = { permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT] };
 const EDIT = { permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT] };
@@ -69,6 +70,7 @@ export class ChatbotController {
   ) {}
 
   @Get('sections')
+  @AssistantScope('list')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   @ApiOperation({ summary: 'The configurable sections of a chatbot' })
   sections() {
@@ -76,6 +78,7 @@ export class ChatbotController {
   }
 
   @Get()
+  @AssistantScope('list')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   @ApiOperation({
     summary:
@@ -84,20 +87,23 @@ export class ChatbotController {
   async list() {
     return {
       chatbots: await this.chatbots.list(),
-      canCreate: await this.access.isPlatformAdmin(),
+      canCreate: await this.access.canCreate(),
     };
   }
 
   @Post()
+  @AssistantScope('create')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
-    summary: 'Create a chatbot (platform admins). It starts as a draft.',
+    summary:
+      'Create a chatbot (anyone with the Chatbots feature; they become its owner). It starts as a draft.',
   })
   create(@Body() dto: CreateChatbotDto) {
     return this.chatbots.create(dto);
   }
 
   @Get('archived')
+  @AssistantScope('list')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   @ApiOperation({
     summary:
@@ -108,12 +114,14 @@ export class ChatbotController {
   }
 
   @Get(':id')
+  @ChatbotRole(ChatbotMemberRole.VIEWER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   get(@Param('id', ParseUUIDPipe) id: string) {
     return this.chatbots.get(id);
   }
 
   @Patch(':id')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({ summary: 'Change name, persona, modes or model' })
   update(
@@ -124,6 +132,7 @@ export class ChatbotController {
   }
 
   @Patch(':id/status')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({ summary: 'Go live, pause, or back to draft' })
   setStatus(
@@ -135,6 +144,7 @@ export class ChatbotController {
 
   @Post(':id/archive')
   @HttpCode(204)
+  @ChatbotRole(ChatbotMemberRole.OWNER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Archive a chatbot; its connectors are freed for another bot',
@@ -144,6 +154,7 @@ export class ChatbotController {
   }
 
   @Post(':id/restore')
+  @ChatbotRole(ChatbotMemberRole.VIEWER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary:
@@ -156,6 +167,7 @@ export class ChatbotController {
   // ── settings ──────────────────────────────────────────────────────────
 
   @Get(':id/settings')
+  @ChatbotRole(ChatbotMemberRole.VIEWER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   @ApiOperation({ summary: 'Defaults, this bot’s changes, and the result' })
   async getSettings(@Param('id', ParseUUIDPipe) id: string) {
@@ -164,6 +176,7 @@ export class ChatbotController {
   }
 
   @Put(':id/settings')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Replace this bot’s changes to the defaults',
@@ -176,7 +189,8 @@ export class ChatbotController {
   ) {
     const { chatbot } = await this.access.assert(id, ChatbotMemberRole.EDITOR);
     if (changesAdminOnlySetting(chatbot.settings, dto.settings)) {
-      await this.access.assertPlatformAdmin();
+      // Typing and abilities (hand_over) belong to the bot's owners (A1).
+      await this.access.assert(id, ChatbotMemberRole.OWNER);
     }
     return this.settings.updateChatbotSettings(chatbot, dto.settings);
   }
@@ -184,12 +198,14 @@ export class ChatbotController {
   // ── knowledge ─────────────────────────────────────────────────────────
 
   @Get(':id/documents')
+  @ChatbotRole(ChatbotMemberRole.VIEWER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   listDocuments(@Param('id', ParseUUIDPipe) id: string) {
     return this.chatbots.listDocuments(id);
   }
 
   @Put(':id/documents')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Replace the library documents this bot answers from',
@@ -202,6 +218,7 @@ export class ChatbotController {
   }
 
   @Post(':id/documents/upload-url')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: "Presigned S3 PUT for a document of the bot's own (pdf/docx/epub)",
@@ -214,6 +231,7 @@ export class ChatbotController {
   }
 
   @Post(':id/documents/private')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: "Add a document of the bot's own",
@@ -229,6 +247,7 @@ export class ChatbotController {
   }
 
   @Get(':id/documents/:documentId')
+  @ChatbotRole(ChatbotMemberRole.VIEWER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   @ApiOperation({ summary: "One of the bot's documents, with its text" })
   getDocument(
@@ -239,6 +258,7 @@ export class ChatbotController {
   }
 
   @Patch(':id/documents/:documentId')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: "Rename one of the bot's own documents, or replace its text",
@@ -254,6 +274,7 @@ export class ChatbotController {
   }
 
   @Delete(':id/documents/:documentId')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Take a document off the bot',
@@ -270,12 +291,14 @@ export class ChatbotController {
   // ── team ──────────────────────────────────────────────────────────────
 
   @Get(':id/members')
+  @ChatbotRole(ChatbotMemberRole.VIEWER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   listMembers(@Param('id', ParseUUIDPipe) id: string) {
     return this.chatbots.listMembers(id);
   }
 
   @Put(':id/members')
+  @ChatbotRole(ChatbotMemberRole.OWNER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({ summary: 'Replace who can see and manage this bot (owners)' })
   setMembers(
@@ -288,6 +311,7 @@ export class ChatbotController {
   // ── who can chat ──────────────────────────────────────────────────────
 
   @Get(':id/audience')
+  @ChatbotRole(ChatbotMemberRole.VIEWER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   async listAudience(@Param('id', ParseUUIDPipe) id: string) {
     await this.access.assert(id);
@@ -295,6 +319,7 @@ export class ChatbotController {
   }
 
   @Post(':id/audience')
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Add people, organisations, phones or emails who may chat',
@@ -309,6 +334,7 @@ export class ChatbotController {
 
   @Delete(':id/audience/:entryId')
   @HttpCode(204)
+  @ChatbotRole(ChatbotMemberRole.EDITOR)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   async removeAudience(
     @Param('id', ParseUUIDPipe) id: string,
@@ -321,6 +347,7 @@ export class ChatbotController {
   // ── test ──────────────────────────────────────────────────────────────
 
   @Post(':id/test')
+  @ChatbotRole(ChatbotMemberRole.VIEWER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   @ApiOperation({
     summary: 'Ask the bot a question without sending or storing anything',
@@ -332,6 +359,7 @@ export class ChatbotController {
   }
 
   @Post(':id/test/stream')
+  @ChatbotRole(ChatbotMemberRole.VIEWER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   @ApiOperation({
     summary: 'The same test as /test, streamed (SSE)',

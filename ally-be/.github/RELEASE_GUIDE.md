@@ -10,46 +10,25 @@ to this service.
 
 | | |
 |---|---|
-| Workflow | **Production Release** (`.github/workflows/production-release.yaml`) |
+| Workflow | `production-release-ally-be.yaml` in the monorepo's root `.github/workflows/` |
 | Release branch | `master` |
+| Tag | `be-vX.Y.Z` |
 | Runtime in CI | Node.js 24 |
 | Package manager | npm |
 | Test framework | Jest |
-| Deployment | AWS ECS |
-| Runs migrations | **Yes** — as an ECS task, using the versioned image, before deploy |
+| Deployment | Ansible playbook via the `deploy-metal01` action (production stack, since the 2026-11-07 cutover) |
+| Runs migrations | **Yes** — inside the playbook (`npm run migration:run` in the service container), before the new container serves |
 
-## Deployment target
+## Deployment
 
-- **Service**: `ally-core` (Backend)
-- **Cluster**: `ally-prd-mb-ecs-cluster`
-- **ECS service**: `ally-prd-svc-core`
-- **Task definition**: `ally-prd-td-core`
-- **Container**: `ally-prd-cntr-core`
-- **ECR image**: `ally-prd-ecr-core`
+The release workflow's deploy job runs the `ally_core.yml` playbook from the private infra repo
+through `.github/actions/deploy-metal01`, then polls the public API's `/api/health` until it answers. Its
+inputs are repository secrets (the deploy SSH key, the infra deploy key and the Ansible
+vault password) — see the comment at the top of that action. Container logs, restarts and
+recovery are in the infra repo's runbook, not here: this repository is public.
 
-## Required repository variables
-
-Settings → Secrets and variables → Actions → Variables:
-
-```
-PRD_AWS_ROLE          # AWS IAM role ARN for production
-PRD_AWS_REGION
-PRD_ECR_REPOSITORY
-```
-
-## Verify a deployment
-
-```bash
-aws ecs describe-services \
-  --cluster ally-prd-mb-ecs-cluster \
-  --services ally-prd-svc-core
-
-aws ecs list-tasks \
-  --cluster ally-prd-mb-ecs-cluster \
-  --service-name ally-prd-svc-core
-
-aws logs tail /ecs/ally-prd-cntr-core --follow
-```
+The ECS cluster, service and task-definition names this guide used to list belong to the
+pre-cutover stack and no longer receive production releases.
 
 ## Notes specific to this service
 
@@ -68,4 +47,4 @@ aws logs tail /ecs/ally-prd-cntr-core --follow
 - Reproduce a failing pipeline test locally with
   `npm ci && npm run test -- --forceExit --detectOpenHandles`.
 - Migration failures: check the migration, database connectivity, and the database user's
-  permissions, then read the migration task's CloudWatch logs.
+  permissions, then read the migration step in the deploy job's Ansible output.

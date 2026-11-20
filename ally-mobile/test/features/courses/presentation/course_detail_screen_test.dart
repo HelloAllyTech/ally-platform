@@ -11,6 +11,7 @@ import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
 import 'package:ally_mobile_flutter/features/courses/data/course_models.dart';
 import 'package:ally_mobile_flutter/features/courses/data/courses_repository.dart';
 import 'package:ally_mobile_flutter/features/courses/presentation/course_detail_screen.dart';
+import 'package:ally_mobile_flutter/features/courses/presentation/roleplay/roleplay_requirement.dart';
 import 'package:ally_mobile_flutter/features/simulations/presentation/widgets/learning_path_widgets.dart';
 
 import '../../../support/fake_network_image.dart';
@@ -496,6 +497,83 @@ void main() {
     expect(find.byKey(const Key('course-language-option-en')), findsNothing);
   });
 
+  group('locked row blocker', () {
+    TrackDetailItem blocked(TrackBlocker? b) => TrackDetailItem(
+          id: 'l1',
+          type: TrackItemType.article,
+          order: 1,
+          title: 'Locked one',
+          description: null,
+          status: TrackItemStatus.locked,
+          score: null,
+          maxWatchedPct: null,
+          blockedBy: b,
+        );
+    TrackBlocker blocker(String action) => TrackBlocker(
+          itemId: 'p1',
+          title: 'Prev',
+          type: 'QUIZ',
+          reasons: const [TrackBlockerReason(code: TrackBlockerReasonCode.belowScore, actual: 40, required: 70)],
+          action: TrackBlockerAction.values.byName(action),
+        );
+    Future<GoRouter> pumpRouter(WidgetTester tester, TrackDetailItem lockedItem) async {
+      when(() => repository.getLearnTrackDetail('t1')).thenAnswer(
+        (_) async => _detail(items: [
+          _item(id: 'p1', type: TrackItemType.quiz, status: TrackItemStatus.unlocked, title: 'Prev'),
+          lockedItem,
+        ]),
+      );
+      final router = GoRouter(
+        routes: [
+          GoRoute(path: '/', builder: (context, state) => const CourseDetailScreen(trackId: 't1')),
+          GoRoute(
+            path: '/courses/item/:id',
+            builder: (context, state) => Text('item:${state.pathParameters['id']}'),
+          ),
+        ],
+      );
+      SharedPreferences.setMockInitialValues({});
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [coursesRepositoryProvider.overrideWithValue(repository)],
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return router;
+    }
+
+    testWidgets('shows the specific line and a Try again link that opens the blocking item', (tester) async {
+      await pumpRouter(tester, blocked(blocker('retry')));
+
+      expect(find.textContaining('courses.blocker.belowScore'), findsOneWidget);
+      expect(find.text('courses.lockedTooltip'), findsNothing);
+      expect(tester.widget<InkWell>(find.byKey(const ValueKey('course-item-l1'))).onTap, isNull);
+
+      await tester.tap(find.byKey(const ValueKey('blocker-link')));
+      await tester.pumpAndSettle();
+      expect(find.text('item:p1'), findsOneWidget);
+    });
+
+    testWidgets('OPEN action shows a Go to item link', (tester) async {
+      await pumpRouter(tester, blocked(blocker('open')));
+      expect(find.text('courses.blocker.goToItem'), findsOneWidget);
+      expect(find.text('courses.blocker.tryAgain'), findsNothing);
+    });
+
+    testWidgets('NONE action shows the line but no link', (tester) async {
+      await pumpRouter(tester, blocked(blocker('none')));
+      expect(find.textContaining('courses.blocker.belowScore'), findsOneWidget);
+      expect(find.byKey(const ValueKey('blocker-link')), findsNothing);
+    });
+
+    testWidgets('no blockedBy keeps the generic locked line', (tester) async {
+      await pumpRouter(tester, blocked(null));
+      expect(find.text('courses.lockedTooltip'), findsOneWidget);
+      expect(find.byKey(const ValueKey('blocker-link')), findsNothing);
+    });
+  });
+
   group('trackItemMeta (RN getTrackItemMeta)', () {
     String t(String key, [Map<String, Object?>? params]) =>
         params == null ? key : '$key${params.values.toList()}';
@@ -527,6 +605,70 @@ void main() {
         trackItemMeta(withMeta(TrackItemType.video, {'contentMeta': {'durationSeconds': 20}}), t),
         'courses.meta.videoDuration_one[1, 1]',
       );
+    });
+
+    group('roleplayGate requirement', () {
+      TrackDetailItem gated(String logic, {num? minScore, num? minDuration}) =>
+          withMeta(TrackItemType.roleplay, {
+            'roleplayGate': {'completionLogic': logic, 'minScore': minScore, 'minDurationSeconds': minDuration},
+          });
+
+      test('SCORE', () {
+        expect(trackItemMeta(gated('SCORE', minScore: 70), t),
+            'courses.meta.roleplay · courses.meta.requireScore[70]');
+      });
+      test('DURATION', () {
+        expect(trackItemMeta(gated('DURATION', minDuration: 180), t),
+            'courses.meta.roleplay · courses.meta.requireDuration[courses.meta.durationMin[3]]');
+      });
+      test('SCORE_AND_DURATION, and a null half is dropped', () {
+        expect(trackItemMeta(gated('SCORE_AND_DURATION', minScore: 70, minDuration: 90), t),
+            'courses.meta.roleplay · courses.meta.requireScoreAndDuration[70, courses.meta.durationMinSec[1, 30]]');
+        expect(trackItemMeta(gated('SCORE_AND_DURATION', minDuration: 45), t),
+            'courses.meta.roleplay · courses.meta.requireDuration[courses.meta.durationSec[45]]');
+      });
+      test('PARTICIPATION', () {
+        expect(trackItemMeta(gated('PARTICIPATION'), t),
+            'courses.meta.roleplay · courses.meta.requireParticipation');
+      });
+      test('ASSESSMENT states the turn minimum, never the duration', () {
+        TrackDetailItem assessment(Map<String, Object?> gate) => withMeta(TrackItemType.roleplay, {
+              'roleplayGate': {'roleplayType': 'ASSESSMENT', 'completionLogic': 'SCORE', ...gate},
+            });
+        expect(trackItemMeta(assessment({'minLearnerTurns': 10, 'minDurationSeconds': 300}), t),
+            'courses.meta.roleplay · courses.meta.requireTurns[10]');
+        expect(trackItemMeta(assessment({'minLearnerTurns': 10, 'minScore': 70}), t),
+            'courses.meta.roleplay · courses.meta.requireTurnsAndScore[10, 70]');
+      });
+      test('both gates null shows nothing extra', () {
+        expect(trackItemMeta(gated('SCORE_AND_DURATION'), t), 'courses.meta.roleplay');
+      });
+    });
+
+    test('failure lines for duration, score and both', () {
+      LastRoleplayAttempt attempt(List<String> reasons, {num? score}) => LastRoleplayAttempt.tryParse({
+            'failureReasons': reasons,
+            'score': score,
+            'durationSeconds': 90,
+            'requiredScore': 70,
+            'requiredDurationSeconds': 180,
+          })!;
+      expect(roleplayFailureLines(attempt(['INSUFFICIENT_DURATION']), t), [
+        'courses.roleplay.lastAttemptDuration[courses.meta.durationMinSec[1, 30], courses.meta.durationMin[3]]',
+      ]);
+      expect(roleplayFailureLines(attempt(['INSUFFICIENT_SCORE'], score: 55), t), [
+        'courses.roleplay.lastAttemptScore[55, 70]',
+      ]);
+      expect(roleplayFailureLines(attempt(['INSUFFICIENT_SCORE']), t), [
+        'courses.roleplay.lastAttemptScoreUnknown[70]',
+      ]);
+      expect(roleplayFailureLines(attempt(['INSUFFICIENT_SCORE', 'INSUFFICIENT_DURATION'], score: 55), t).length, 2);
+      final short = LastRoleplayAttempt.tryParse({
+        'failureReasons': ['INSUFFICIENT_TURNS'],
+        'learnerTurns': 4,
+        'requiredTurns': 10,
+      })!;
+      expect(roleplayFailureLines(short, t), ['courses.roleplay.shortAttempt[4, 10]']);
     });
   });
 
@@ -567,6 +709,11 @@ extension on TrackDetailItem {
     startedAt: startedAt,
     contentMeta: contentMeta,
     completionCriteria: completionCriteria,
+    roleplayGate: roleplayGate,
+    lastRoleplayAttempt: lastRoleplayAttempt,
+    assessment: assessment,
+    assessmentSubmittedAt: assessmentSubmittedAt,
+    blockedBy: blockedBy,
     languageFallbackReason: languageFallbackReason,
   );
 }

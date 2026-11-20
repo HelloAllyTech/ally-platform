@@ -8,7 +8,9 @@ import {
   isTranscriptGap,
   normaliseForQuote,
   renderCards,
+  REPLY_MAX_WORDS,
   replyCheckFailures,
+  replyWordCount,
   runDebriefChecks,
   speakerRuns,
   TranscriptTurn,
@@ -538,5 +540,78 @@ describe('skill labels for readers', () => {
   it('leaves English cards as they are', () => {
     const en = { ...cards, skill_labels: [] };
     expect(withSkillLabels(en).what_worked[0].skill).toBe('Validation');
+  });
+});
+
+describe('comparing the learner with others (compares_learner)', () => {
+  const withOpening = (opening: string) => run({ ...good(), opening });
+
+  it.each([
+    'This is a moment many find hard.',
+    'Many trainees find this moment hard, so you are not alone.',
+    'Staying with silence is a strength that is less common.',
+    'Few trainees show this, and you did.',
+    'Try another approach with the client next time.',
+    'Ask the client about other people in their life.',
+    'You stayed with the feeling longer than before.',
+  ])('passes "%s"', (text) => {
+    expect(withOpening(text)).not.toContain(DebriefCheckCode.COMPARES_LEARNER);
+  });
+
+  it.each([
+    'Only 20 percent of trainees asked about safety here.',
+    'Half of the learners missed this moment.',
+    'Most trainees did better at this moment.',
+    'Many learners handled it better.',
+    'You listened better than most.',
+    'You reflected more than your peers did.',
+    'Other learners asked about sleep here.',
+    'Compared with others, you moved on quickly.',
+    'In comparison to your group, you asked fewer questions.',
+    'You ranked near the middle on this skill.',
+    'This puts you in the top group for empathy.',
+    'You are in the bottom half for open questions.',
+    'Your reflections were above average.',
+  ])('fails "%s"', (text) => {
+    expect(withOpening(text)).toContain(DebriefCheckCode.COMPARES_LEARNER);
+  });
+
+  it('is a blocking check, so the Reviser must fix it', () => {
+    expect(ADVISORY_CHECKS.has(DebriefCheckCode.COMPARES_LEARNER)).toBe(false);
+  });
+
+  it('leaves a try-saying line alone: it is the learner speaking', () => {
+    const c = good();
+    c.work_on_this[0].try_saying =
+      'Other people in your family may have noticed this too.';
+    expect(run(c)).not.toContain(DebriefCheckCode.COMPARES_LEARNER);
+  });
+});
+
+describe('Ask Ally reply length (reply_too_long)', () => {
+  const words = (n: number) =>
+    Array.from({ length: n }, () => 'word').join(' ');
+
+  it('passes a reply at the cap and fails one over it', () => {
+    expect(REPLY_MAX_WORDS).toBe(120);
+    expect(replyCheckFailures(words(120), [])).toEqual([]);
+    expect(replyCheckFailures(words(121), [])).toEqual([
+      DebriefCheckCode.REPLY_TOO_LONG,
+    ]);
+  });
+
+  it('counts space-separated Indic scripts by their spaces', () => {
+    expect(replyWordCount('आपने अच्छा सवाल पूछा')).toBe(4);
+    expect(replyWordCount('நீங்கள் நன்றாக கேட்டீர்கள்')).toBe(3);
+  });
+
+  it('counts scripts without spaces by characters', () => {
+    // 240 Han characters at 2 per word is 120 words; two more is over.
+    expect(replyWordCount('你'.repeat(240))).toBe(120);
+    expect(replyCheckFailures('你'.repeat(242), [])).toContain(
+      DebriefCheckCode.REPLY_TOO_LONG,
+    );
+    // Thai at 4 letters per word, with an English word mixed in.
+    expect(replyWordCount(`${'ก'.repeat(8)} okay`)).toBe(3);
   });
 });

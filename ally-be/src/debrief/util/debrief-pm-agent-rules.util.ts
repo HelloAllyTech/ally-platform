@@ -1,9 +1,16 @@
 import {
   DEBRIEF_PROMPT_CODES,
   PM_AGENT_EDITABLE_PROMPTS,
+  GUIDANCE_TOOL_NAMES,
+  GUIDANCE_TOOL_STEPS,
   PM_AGENT_SETTINGS,
 } from '../constants/debrief-release.constants';
 import { OWNER_SETTINGS_SPEC } from '../constants/debrief-owner-settings.constants';
+import { ROLEPLAY_FIELDS_KEY } from '../constants/debrief-roleplay-fields.constants';
+import {
+  parseRoleplayFields,
+  roleplayFieldsCatalogue,
+} from './debrief-roleplay-brief.util';
 import {
   ASK_ALLY_GATEWAY_TOOLS,
   DEBRIEF_ORCHESTRATOR_TOOLS,
@@ -32,17 +39,17 @@ export type NeverListArea =
 
 const NEVER: Record<NeverListArea, string> = {
   context_library:
-    'Context Library chunks are never changed by the PM agent (never-list); ask a person (route D)',
+    'Context Library chunks are never changed by the Debrief PM agent (never-list); ask a person (route D)',
   judge:
-    "the judge's rubric and model are the fixed yardstick, never changed by the PM agent (never-list); ask a person (route D)",
+    "the judge's rubric and model are the fixed yardstick, never changed by the Debrief PM agent (never-list); ask a person (route D)",
   safety:
-    "safety rules and the Safety reader's instructions are never changed by the PM agent (never-list); ask a person (route D)",
+    "safety rules and the Safety reader's instructions are never changed by the Debrief PM agent (never-list); ask a person (route D)",
   budgets:
-    'budgets are never changed by the PM agent (never-list); ask the owner (route D)',
+    'budgets are never changed by the Debrief PM agent (never-list); ask the owner (route D)',
   data_access:
-    'data access and scopes are never changed by the PM agent (never-list); ask the owner (route D)',
+    'data access and scopes are never changed by the Debrief PM agent (never-list); ask the owner (route D)',
   approval_list:
-    'what needs a person’s approval is never changed by the PM agent (never-list); ask the owner (route D)',
+    'what needs a person’s approval is never changed by the Debrief PM agent (never-list); ask the owner (route D)',
 };
 
 const never = (area: NeverListArea): Refusal => ({
@@ -54,7 +61,12 @@ const never = (area: NeverListArea): Refusal => ({
 const NEVER_PROMPTS: Record<string, NeverListArea> = {
   [DEBRIEF_PROMPT_CODES.rubric]: 'judge',
   debrief_quality_judge_system: 'judge',
+  debrief_language_judge_rubric: 'judge',
   [DEBRIEF_PROMPT_CODES.safetyReader]: 'safety',
+  [DEBRIEF_PROMPT_CODES.riskCueDefinition]: 'safety',
+  [DEBRIEF_PROMPT_CODES.evaluator]: 'judge',
+  // What a safe change is, and what waits for a person.
+  [DEBRIEF_PROMPT_CODES.pmReviewer]: 'approval_list',
   // Its own instructions say what it may do and what needs a person.
   [DEBRIEF_PROMPT_CODES.pmAgent]: 'approval_list',
 };
@@ -115,6 +127,55 @@ const NEVER_SETTINGS: Record<string, NeverListArea> = {
   passScore: 'judge',
 };
 
+/** The one object-valued setting the PM agent may propose: which guidance tools each step has. */
+export const GUIDANCE_TOOLS_KEY = 'guidanceTools';
+
+/** A proposed `guidanceTools` value (an object or its JSON text) as an object, or null. */
+export function parseGuidanceTools(
+  value: unknown,
+): Record<string, string[]> | null {
+  let v = value;
+  if (typeof v === 'string') {
+    try {
+      v = JSON.parse(v);
+    } catch {
+      return null;
+    }
+  }
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+  const out: Record<string, string[]> = {};
+  for (const [step, tools] of Object.entries(v as Record<string, unknown>)) {
+    if (
+      !(GUIDANCE_TOOL_STEPS as readonly string[]).includes(step) ||
+      !Array.isArray(tools) ||
+      tools.some((t) => !(GUIDANCE_TOOL_NAMES as readonly string[]).includes(t))
+    ) {
+      return null;
+    }
+    out[step] = [...new Set(tools as string[])];
+  }
+  return out;
+}
+
+/**
+ * A stored or proposed setting value as the bundle holds it: a number, or for `guidanceTools` the
+ * per-step object. Ideas store it as text (numbers as `String(n)`, the object as JSON).
+ */
+export function settingValueOf(key: string, raw: unknown): unknown {
+  if (key === ROLEPLAY_FIELDS_KEY) return parseRoleplayFields(raw);
+  return key === GUIDANCE_TOOLS_KEY ? parseGuidanceTools(raw) : Number(raw);
+}
+
+/** A setting value as an idea stores it. */
+export function settingValueText(key: string, value: unknown): string {
+  if (key === ROLEPLAY_FIELDS_KEY) {
+    const r = parseRoleplayFields(value);
+    return r ? JSON.stringify(r) : '[]';
+  }
+  const g = key === GUIDANCE_TOOLS_KEY ? parseGuidanceTools(value) : null;
+  return g ? JSON.stringify(g) : String(Number(value));
+}
+
 export function settingRefusal(
   key: string | null | undefined,
   value: unknown,
@@ -134,12 +195,28 @@ export function settingRefusal(
         'deadlines are a promise to learners; ask the owner (route D) instead',
     };
   }
+  if (key === GUIDANCE_TOOLS_KEY) {
+    return parseGuidanceTools(value)
+      ? null
+      : {
+          reason: `guidanceTools must be an object whose keys are steps (${GUIDANCE_TOOL_STEPS.join(', ')}) and whose values are lists of ${GUIDANCE_TOOL_NAMES.join(', ')}`,
+        };
+  }
+  if (key === ROLEPLAY_FIELDS_KEY) {
+    return parseRoleplayFields(value)
+      ? null
+      : {
+          reason: `roleplayFields must be a list of roleplay fields. ${roleplayFieldsCatalogue()}`,
+        };
+  }
   const range = PM_AGENT_SETTINGS[key];
   if (!range) {
     return {
-      reason: `${key} is not a setting the PM agent may change; it may change: ${Object.keys(
-        PM_AGENT_SETTINGS,
-      ).join(', ')}`,
+      reason: `${key} is not a setting the PM agent may change; it may change: ${[
+        ...Object.keys(PM_AGENT_SETTINGS),
+        GUIDANCE_TOOLS_KEY,
+        ROLEPLAY_FIELDS_KEY,
+      ].join(', ')}`,
     };
   }
   const v = Number(value);

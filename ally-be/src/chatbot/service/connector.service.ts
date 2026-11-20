@@ -158,16 +158,19 @@ export class ConnectorService {
   }
 
   /**
-   * A connector the caller may act on at `minRole`: platform admins any; others only one bound to
-   * a bot they hold that role on. Anything else is 404.
+   * A connector the caller may act on at `minRole`: one bound to a bot they hold that role on, or
+   * (platform admins only) one bound to no bot. Anything else is 404.
    */
   async getVisible(id: string, minRole: ChatbotMemberRole): Promise<Connector> {
     const row = await this.connectorRepository.findOne({
       where: { id, deletedAt: IsNull() },
     });
     if (!row) throw new NotFoundException('Channel not found');
-    if (await this.access.isPlatformAdmin()) return row;
-    if (!row.chatbotId) throw new NotFoundException('Channel not found');
+    if (!row.chatbotId) {
+      // A connector bound to no bot is platform-wide (the platform number).
+      if (await this.access.isPlatformAdmin()) return row;
+      throw new NotFoundException('Channel not found');
+    }
     await this.access.assert(row.chatbotId, minRole);
     return row;
   }

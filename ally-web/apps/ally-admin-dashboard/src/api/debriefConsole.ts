@@ -5,6 +5,8 @@ import {
   DebriefMetricsFilter,
   DebriefMetricsView,
   DebriefSettingsView,
+  DebriefClinicalListKind,
+  DebriefClinicalListsView,
   DebriefCardCorrection,
   DebriefModels,
   DebriefOverview,
@@ -20,6 +22,9 @@ import {
   DebriefAttention,
   DebriefAutonomyView,
   DebriefOrgOverride,
+  DebriefLearnerCommentsPage,
+  DebriefLearnerFeatureKey,
+  DebriefLearnerFeatureView,
   DebriefPinnedRulesView,
   DebriefProposal,
   DebriefReleaseCompare,
@@ -81,6 +86,21 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
       { changes: Record<string, number | boolean | string | null> }
     >({
       query: body => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.SETTINGS, method: HttpMethod.PUT, body }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    getDebriefClinicalLists: builder.query<DebriefClinicalListsView, void>({
+      query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.CLINICAL_LISTS, method: HttpMethod.GET }),
+      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    updateDebriefClinicalList: builder.mutation<
+      DebriefClinicalListsView,
+      { kind: DebriefClinicalListKind; language: string; entries: string[] | null }
+    >({
+      query: body => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.CLINICAL_LISTS,
+        method: HttpMethod.PUT,
+        body,
+      }),
       invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
     acceptDebriefBaseline: builder.mutation<unknown, { keys: string[] }>({
@@ -351,17 +371,6 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
       }),
       invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
-    approvePinnedRule: builder.mutation<
-      { releaseId: string; version: number; promptVersion: number },
-      { id: string; reason?: string }
-    >({
-      query: ({ id, reason }) => ({
-        url: ApiEndpoints.DEBRIEF_CONSOLE.IDEA_APPROVE_PINNED(id),
-        method: HttpMethod.POST,
-        body: reason ? { reason } : {},
-      }),
-      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
-    }),
     approveDebriefChange: builder.mutation<unknown, { id: string; reason?: string }>({
       query: ({ id, reason }) => ({
         url: ApiEndpoints.DEBRIEF_CONSOLE.IDEA_APPROVE(id),
@@ -378,36 +387,56 @@ export const debriefConsoleAPI = baseAPI.injectEndpoints({
       }),
       invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
-    withdrawPinnedRule: builder.mutation<void, { id: string }>({
-      query: ({ id }) => ({
-        url: ApiEndpoints.DEBRIEF_CONSOLE.IDEA_WITHDRAW_PINNED(id),
-        method: HttpMethod.POST,
-        body: {},
-      }),
-      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
-    }),
-    rejectPinnedRule: builder.mutation<void, { id: string; reason: string }>({
-      query: ({ id, reason }) => ({
-        url: ApiEndpoints.DEBRIEF_CONSOLE.IDEA_REJECT_PINNED(id),
-        method: HttpMethod.POST,
-        body: { reason },
-      }),
-      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
-    }),
-    proposePinnedRule: builder.mutation<
-      { id: string },
-      { promptCode: string; find: string; replace: string; why: string }
-    >({
-      query: body => ({
-        url: ApiEndpoints.DEBRIEF_CONSOLE.PINNED_RULE_PROPOSALS,
-        method: HttpMethod.POST,
-        body,
-      }),
-      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
-    }),
     getDebriefPinnedRules: builder.query<DebriefPinnedRulesView, void>({
       query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.PINNED_RULES, method: HttpMethod.GET }),
       providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    getDebriefLearnerComments: builder.query<DebriefLearnerCommentsPage, { before?: string }>({
+      query: ({ before }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.LEARNER_COMMENTS,
+        method: HttpMethod.GET,
+        params: { limit: 50, ...(before ? { before } : {}) },
+      }),
+      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    getDebriefLearnerFeature: builder.query<DebriefLearnerFeatureView, DebriefLearnerFeatureKey>({
+      query: feature => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.LEARNER_FEATURE(feature),
+        method: HttpMethod.GET,
+      }),
+      providesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    grantDebriefLearnerFeature: builder.mutation<
+      DebriefLearnerFeatureView,
+      { feature: DebriefLearnerFeatureKey; email: string }
+    >({
+      query: ({ feature, email }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.LEARNER_FEATURE_PEOPLE(feature),
+        method: HttpMethod.POST,
+        body: { email },
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    revokeDebriefLearnerFeature: builder.mutation<
+      DebriefLearnerFeatureView,
+      { feature: DebriefLearnerFeatureKey; userId: number }
+    >({
+      query: ({ feature, userId }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.LEARNER_FEATURE_PERSON(feature, userId),
+        method: HttpMethod.DELETE,
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
+    }),
+    setDebriefLearnerFeatureEveryone: builder.mutation<
+      DebriefLearnerFeatureView,
+      { feature: DebriefLearnerFeatureKey; on: boolean }
+    >({
+      query: ({ feature, on }) => ({
+        url: ApiEndpoints.DEBRIEF_CONSOLE.LEARNER_FEATURE_EVERYONE(feature),
+        method: HttpMethod.PUT,
+        body: { on },
+      }),
+      invalidatesTags: [TAG_TYPES.DEBRIEF_CONSOLE],
     }),
     getDebriefAutonomy: builder.query<DebriefAutonomyView, void>({
       query: () => ({ url: ApiEndpoints.DEBRIEF_CONSOLE.AUTONOMY, method: HttpMethod.GET }),
@@ -619,6 +648,7 @@ export const {
   useEscalateDebriefMutation,
   useGetDebriefMeQuery,
   useGetDebriefSessionsQuery,
+  useLazyGetDebriefSessionsQuery,
   useGetDebriefSessionQuery,
   useGetDebriefRunLogsQuery,
   useGetDebriefAttentionQuery,
@@ -630,13 +660,16 @@ export const {
   useMarkDebriefCommentStillHappeningMutation,
   useAskIdeaQuestionMutation,
   useStartIdeaStepMutation,
-  useApprovePinnedRuleMutation,
   useApproveDebriefChangeMutation,
   useTurnDownDebriefChangeMutation,
-  useWithdrawPinnedRuleMutation,
-  useRejectPinnedRuleMutation,
-  useProposePinnedRuleMutation,
   useGetDebriefPinnedRulesQuery,
+  useGetDebriefLearnerCommentsQuery,
+  useGetDebriefLearnerFeatureQuery,
+  useGrantDebriefLearnerFeatureMutation,
+  useRevokeDebriefLearnerFeatureMutation,
+  useSetDebriefLearnerFeatureEveryoneMutation,
+  useGetDebriefClinicalListsQuery,
+  useUpdateDebriefClinicalListMutation,
   useGetDebriefAutonomyQuery,
   useSetDebriefOrgAutonomyMutation,
   useSetDebriefBudgetsMutation,

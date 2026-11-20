@@ -13,8 +13,7 @@
  */
 
 import { computeCostUsd } from '../../analytics/constants/llm-pricing.constants';
-
-export const DEBRIEF_AGENT_KEY = 'debrief';
+import { ROLEPLAY_OPTIONAL_KEYS } from './debrief-roleplay-fields.constants';
 
 /**
  * The gateway's approved providers (plan §8.9): learner data goes only to
@@ -54,6 +53,8 @@ export enum DebriefStep {
   ANALYST = 'analyst',
   PROGRESS_READER = 'progress_reader',
   GUIDANCE_LOOKUP = 'guidance_lookup',
+  /** The guidance agent: optional, between the lookup and the Writer (its tools: `settings.guidanceTools`). */
+  GUIDANCE_AGENT = 'guidance_agent',
   WRITER = 'writer',
   CHECKS = 'checks',
   EVALUATOR = 'evaluator',
@@ -92,6 +93,48 @@ export interface DebriefRecipe {
   shortForm: boolean;
 }
 
+/** The Debrief Guidance tools the guidance agent may be given (gateway tools). */
+export const GUIDANCE_TOOL_NAMES = [
+  'guidance_index',
+  'guidance_search',
+  'guidance_fetch',
+] as const;
+export type GuidanceToolName = (typeof GUIDANCE_TOOL_NAMES)[number];
+
+/**
+ * The steps `settings.guidanceTools` may name: only steps ally-ai wires to the toolbox, so nobody
+ * (the PM agent included) can switch on a step that would do nothing. The Writer and Reviser take
+ * the tools only when their own entry lists some (off by default). Wiring another step later: one
+ * toolbox call in that node, plus its key here.
+ */
+export const GUIDANCE_TOOL_STEPS = [
+  'guidance_agent',
+  'writer',
+  'reviser',
+] as const;
+
+export type GuidanceToolsSetting = Partial<Record<string, GuidanceToolName[]>>;
+
+/** Absent setting: only the guidance agent has the tools, all three. */
+export const GUIDANCE_TOOLS_DEFAULT: GuidanceToolsSetting = {
+  guidance_agent: [...GUIDANCE_TOOL_NAMES],
+};
+
+/** The guidance tools one step may call under a release's settings (none for an unlisted step). */
+export function guidanceToolsFor(
+  setting: unknown,
+  step: string,
+): GuidanceToolName[] {
+  const map =
+    setting && typeof setting === 'object' && !Array.isArray(setting)
+      ? (setting as GuidanceToolsSetting)
+      : GUIDANCE_TOOLS_DEFAULT;
+  const list = map[step];
+  return Array.isArray(list)
+    ? list.filter((t) => (GUIDANCE_TOOL_NAMES as readonly string[]).includes(t))
+    : [];
+}
+
 export interface DebriefSettings {
   /** Learner turns at or above this get the Standard recipe. */
   standardMinLearnerTurns: number;
@@ -103,6 +146,30 @@ export interface DebriefSettings {
   deadlineMs: number;
   riskDeadlineMs: number;
   guidancePassagesPerMoment: number;
+  /**
+   * Tool calls the guidance agent may make in one run (2026-11-17); 0 = the agent is off. Absent
+   * in releases made before it: ally-ai reads it as 0.
+   */
+  guidanceAgentMaxCalls?: number;
+  /**
+   * The share of debriefs the language check reads, 0 to 1 (2026-11-19). Absent: 1, every debrief
+   * (about 50 a week: pennies). The check runs after a debrief is published, in the background, so
+   * this only moves cost, never what a learner waits for. A run is in or out by a hash of its id,
+   * so a retry decides the same way. A person's setting, not the PM agent's.
+   */
+  languageJudgeSampleRate?: number;
+  /**
+   * The guidance tools each step is offered: an object keyed by step name (`GUIDANCE_TOOL_STEPS`),
+   * each a subset of `GUIDANCE_TOOL_NAMES`; a step not listed has none. Absent:
+   * `GUIDANCE_TOOLS_DEFAULT` (the guidance agent, all three). The gateway refuses a call a step
+   * is not enabled for. The PM agent may later switch a tool off for a step.
+   */
+  guidanceTools?: GuidanceToolsSetting;
+  /**
+   * The optional roleplay fields the debrief reads (keys from `ROLEPLAY_OPTIONAL_KEYS`); the
+   * always-on ones (title, description) are never listed. Absent: `ROLEPLAY_FIELDS_DEFAULT`.
+   */
+  roleplayFields?: string[];
   /**
    * Everything one session may spend: its debrief run and every Ask Ally
    * reply after it (Sandeep, 2026-11-16). Absent in releases made before it:
@@ -116,6 +183,12 @@ export interface DebriefSettings {
    * bands, not similarities. Releases made before it still carry the value; nothing reads it.
    */
   guidanceMinSimilarity?: number;
+  /**
+   * The release's prompt texts are the neutral ones ("the learner", "the character"), so the
+   * transcript says LEARNER and CHARACTER instead of COUNSELLOR and CLIENT. Set by the release
+   * that publishes the neutral texts, so prompts and labels never disagree. Absent: legacy labels.
+   */
+  neutralWording?: boolean;
 }
 
 /** Ask Ally in conversation mode (v9 FR-43): part of the release, like every step. */
@@ -164,6 +237,7 @@ export const DEBRIEF_REGISTRY_AGENTS = {
   analyst: { version: 1 },
   progress_reader: { version: 1 },
   guidance_lookup: { version: 1 },
+  guidance_agent: { version: 1 },
   case_memory: { version: 1 },
   assessment_anchoring: { version: 1 },
   protocol_check: { version: 1 },
@@ -199,16 +273,28 @@ export const DEBRIEF_MAX_AGENTS_PER_PLAN = 10;
 
 export const DEBRIEF_PROMPT_CODES = {
   safetyReader: 'debrief_safety_reader_system',
+  /** Pinned: the one definition of a clear and a possible risk cue. */
+  riskCueDefinition: 'debrief_risk_cue_definition',
   analyst: 'debrief_analyst_system',
   progressReader: 'debrief_progress_reader_system',
   /** The progress agent (learner progress over past sessions); its step key stays `progress_reader`. */
   progress: 'debrief_progress_system',
+  /** The guidance agent: browses the Debrief Guidance index and fetches entries before the Writer. */
+  guidanceAgent: 'debrief_guidance_agent_system',
   writer: 'debrief_writer_system',
   reviser: 'debrief_reviser_system',
   rubric: 'debrief_quality_rubric',
+  /** Pinned: what the Evaluator is told to do last (its own code, not the judge's). */
+  evaluator: 'debrief_evaluator_system',
+  evaluatorFix: 'debrief_evaluator_fix_system',
   pmAgent: 'debrief_improver_system',
   reply: 'debrief_reply_system',
   planner: 'debrief_planner_system',
+  /** How each analysis agent is described to the planner. */
+  plannerAgents: 'debrief_planner_agents',
+  pmInvestigator: 'debrief_pm_investigator_system',
+  /** Pinned: what a safe change is. */
+  pmReviewer: 'debrief_pm_reviewer_system',
   protocolCheck: 'debrief_protocol_check_system',
   historyDeep: 'debrief_history_deep_system',
   languageSpecialist: 'debrief_language_specialist_system',
@@ -217,6 +303,7 @@ export const DEBRIEF_PROMPT_CODES = {
 /** The orchestrator's prompts, sent to ally-ai only when a release turns it on. */
 export const DEBRIEF_ORCHESTRATOR_PROMPT_CODES: readonly string[] = [
   DEBRIEF_PROMPT_CODES.planner,
+  DEBRIEF_PROMPT_CODES.plannerAgents,
   DEBRIEF_PROMPT_CODES.protocolCheck,
   DEBRIEF_PROMPT_CODES.historyDeep,
   DEBRIEF_PROMPT_CODES.languageSpecialist,
@@ -268,6 +355,7 @@ export const PM_AGENT_EDITABLE_PROMPTS: ReadonlySet<string> = new Set([
 export const PM_AGENT_SETTINGS: Record<string, { min: number; max: number }> = {
   maxRevisionRounds: { min: 0, max: 3 },
   guidancePassagesPerMoment: { min: 0, max: 3 },
+  guidanceAgentMaxCalls: { min: 0, max: 5 },
   standardMinLearnerTurns: { min: 3, max: 10 },
 };
 
@@ -281,6 +369,8 @@ export const DEBRIEF_MODELS = {
   safetyReaderBackup: 'gemini-3-flash-preview',
   analyst: 'gemini-2.5-pro',
   progressReader: 'gemini-2.5-flash',
+  /** The guidance agent (its own step key `guidance_agent`; not a recipe step). */
+  guidanceAgent: 'gemini-2.5-flash',
   writer: 'gemini-3-flash-preview',
   // Only three Gemini models are priced, and 2.5-pro is the judge's. A run
   // that falls back to this shares the Evaluator's model; the run records it.
@@ -338,6 +428,11 @@ const SEED_RECIPES_BASE = {
         ),
         step(DebriefStep.GUIDANCE_LOOKUP, 'Looking up guidance…'),
         step(
+          DebriefStep.GUIDANCE_AGENT,
+          'Choosing guidance…',
+          DEBRIEF_MODELS.guidanceAgent,
+        ),
+        step(
           DebriefStep.WRITER,
           'Writing your debrief…',
           DEBRIEF_MODELS.writer,
@@ -376,6 +471,11 @@ const SEED_RECIPES_BASE = {
           DEBRIEF_MODELS.analyst,
         ),
         step(
+          DebriefStep.GUIDANCE_AGENT,
+          'Choosing guidance…',
+          DEBRIEF_MODELS.guidanceAgent,
+        ),
+        step(
           DebriefStep.WRITER,
           'Writing your debrief…',
           DEBRIEF_MODELS.writer,
@@ -410,13 +510,26 @@ const SEED_RECIPES_BASE = {
     runCeilingUsd: 0.5,
     runFloorUsd: 0.15,
     poolPerSessionUsd: 0.25,
-    // Lowered from 500 on 2026-11-10 as a safety net while the Debrief agent
-    // is still in development (~$3 a month today). Raise it to a proper level
-    // once the whole loop is finished.
-    monthlyCapUsd: 50,
+    // Lowered to 50 on 2026-11-10 while the agent was in development, 150 in
+    // production from 2026-11-16. 2026-11-20: every organisation goes live, so
+    // it is sized for that: about 400 sessions a month across all organisations
+    // (Aug-Nov 315-473) at a median $0.11 is ~$45, so 300 is roughly six times
+    // today's spend. A safety net, not a budget; a run is never allowed to
+    // spend more than runCeilingUsd.
+    monthlyCapUsd: 300,
     deadlineMs: 150_000,
     riskDeadlineMs: 180_000,
-    guidancePassagesPerMoment: 2,
+    // 0: the fixed per-moment lookup is off and the guidance agent is the guidance step (local
+    // comparison 2026-11-17: same judge scores, 5-16 s faster). Above 0 the lookup runs and the
+    // planner may choose the agent besides it.
+    guidancePassagesPerMoment: 0,
+    guidanceAgentMaxCalls: 3,
+    // The guidance agent has all three; the Writer and Reviser can take them but ship off.
+    guidanceTools: {
+      guidance_agent: [...GUIDANCE_TOOL_NAMES],
+      writer: [],
+      reviser: [],
+    } as GuidanceToolsSetting,
   },
   reply: DEBRIEF_REPLY_DEFAULT,
 };
@@ -707,6 +820,91 @@ export function validateDebriefBundle(
     if (!(s.riskDeadlineMs > 0 && s.deadlineMs > 0)) {
       problems.push('settings: deadlines must be set');
     }
+    if (s.guidanceAgentMaxCalls != null) {
+      const r = PM_AGENT_SETTINGS.guidanceAgentMaxCalls;
+      if (
+        !Number.isInteger(s.guidanceAgentMaxCalls) ||
+        s.guidanceAgentMaxCalls < r.min ||
+        s.guidanceAgentMaxCalls > r.max
+      ) {
+        problems.push(
+          `settings: guidanceAgentMaxCalls must be a whole number ${r.min}–${r.max}`,
+        );
+      }
+    }
+    if (
+      s.languageJudgeSampleRate != null &&
+      !(
+        typeof s.languageJudgeSampleRate === 'number' &&
+        s.languageJudgeSampleRate >= 0 &&
+        s.languageJudgeSampleRate <= 1
+      )
+    ) {
+      problems.push(
+        'settings: languageJudgeSampleRate must be between 0 and 1',
+      );
+    }
+    if (
+      s.roleplayFields != null &&
+      (!Array.isArray(s.roleplayFields) ||
+        s.roleplayFields.some((k) => !ROLEPLAY_OPTIONAL_KEYS.includes(k)))
+    ) {
+      problems.push(
+        `settings: roleplayFields must list only ${ROLEPLAY_OPTIONAL_KEYS.join(', ')}`,
+      );
+    }
+    if (s.guidanceTools != null) {
+      const g = s.guidanceTools as unknown;
+      const bad =
+        !g ||
+        typeof g !== 'object' ||
+        Array.isArray(g) ||
+        Object.entries(g).some(
+          ([step, tools]) =>
+            !(GUIDANCE_TOOL_STEPS as readonly string[]).includes(step) ||
+            !Array.isArray(tools) ||
+            tools.some(
+              (t) => !(GUIDANCE_TOOL_NAMES as readonly string[]).includes(t),
+            ),
+        );
+      if (bad) {
+        problems.push(
+          `settings: guidanceTools must map a step (${GUIDANCE_TOOL_STEPS.join(', ')}) to a list of ${GUIDANCE_TOOL_NAMES.join(', ')}`,
+        );
+      }
+    }
   }
   return problems;
+}
+
+/**
+ * The PM agent's own Skills Store texts, sent with every run and conversation
+ * turn (`prompts`): its subagents and its skills (each skill's SKILL.md).
+ */
+export const DEBRIEF_PM_AGENT_PROMPT_CODES: readonly string[] = [
+  DEBRIEF_PROMPT_CODES.pmInvestigator,
+  DEBRIEF_PROMPT_CODES.pmReviewer,
+  'debrief_pm_skill_builder_brief',
+  'debrief_pm_skill_prompt_change',
+  'debrief_pm_skill_registry_agent',
+];
+
+/**
+ * A session is thin when the learner spoke too little to coach on: fewer than this many turns or
+ * words. A thin session is not debriefed unless the safety reader hears the learner in distress
+ * (owner decision 2026-11-19: a 7-turn, 27-word session had cost a full 130 s debrief).
+ */
+export const THIN_SESSION = {
+  minLearnerTurns: 3,
+  minLearnerWords: 40,
+} as const;
+
+export function isThinSession(
+  learnerTurns: number,
+  learnerWords: number,
+): boolean {
+  return (
+    learnerTurns < THIN_SESSION.minLearnerTurns ||
+    learnerWords < THIN_SESSION.minLearnerWords
+  );
 }

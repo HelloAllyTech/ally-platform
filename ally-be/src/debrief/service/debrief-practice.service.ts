@@ -60,9 +60,9 @@ export class DebriefPracticeService {
 
   /**
    * The learner's roleplays with the skills each practises, for the Writer.
-   * A session played inside a course is offered only this same roleplay, as
-   * its course item: "Practise this again" (clinical review 2026-11-16: no
-   * other roleplay is suggested inside a course). Outside a course, the
+   * A session played inside a course is offered nothing: the course decides
+   * what the learner does next, so its debrief has no "Practise this next"
+   * and no "Practise this again" (Gopi, 2026-11-17). Outside a course, the
    * learner's own list.
    */
   async optionsFor(
@@ -70,22 +70,7 @@ export class DebriefPracticeService {
     tenantId: string | null,
     sessionId?: string | null,
   ): Promise<PracticeOption[]> {
-    const course = sessionId ? await this.course(sessionId) : null;
-    if (course) {
-      const r = course.roleplay;
-      if (!r) return [];
-      const skills = await this.skillsOf([r.id]);
-      return [
-        {
-          id: r.id,
-          title: r.title,
-          skills: skills.get(r.id) ?? [],
-          course: course.title,
-          this_roleplay: true,
-          trackItemId: r.trackItemId,
-        },
-      ];
-    }
+    if (sessionId && (await this.inCourse(sessionId))) return [];
     const listed = await this.listed(userId, tenantId);
     if (!listed.length) return [];
     const skills = await this.skillsOf(listed.map((s) => s.id));
@@ -162,10 +147,15 @@ export class DebriefPracticeService {
     return new Map(rows.map((r) => [Number(r.id), r.skills ?? []]));
   }
 
+  /** Whether the session was played inside a course (an unreadable course counts). */
+  async inCourse(sessionId: string): Promise<boolean> {
+    return (await this.course(sessionId)) !== null;
+  }
+
   /**
    * Of these roleplays, the ones the learner can still open, with their
    * current titles. A button whose roleplay has gone is hidden, not broken.
-   * Inside a course, only this same roleplay, with its course item.
+   * Inside a course, none: the course decides what comes next.
    */
   async available(
     userId: number,
@@ -175,13 +165,7 @@ export class DebriefPracticeService {
   ): Promise<Array<{ id: number; title: string; trackItemId?: string }>> {
     if (!ids.length) return [];
     const wanted = new Set(ids);
-    const course = sessionId ? await this.course(sessionId) : null;
-    if (course) {
-      const r = course.roleplay;
-      return r && wanted.has(r.id)
-        ? [{ id: r.id, title: r.title, trackItemId: r.trackItemId }]
-        : [];
-    }
+    if (sessionId && (await this.inCourse(sessionId))) return [];
     return (await this.listed(userId, tenantId)).filter((s) =>
       wanted.has(s.id),
     );

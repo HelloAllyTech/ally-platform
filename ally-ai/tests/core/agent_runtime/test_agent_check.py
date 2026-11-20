@@ -333,6 +333,7 @@ class TestDeclineThatIgnoresWhatWasFound:
             "decline",
             "I don't have that. Try www.example.org or call 1800 123 456.",
             passages=[],
+            searched=True,
         )
         assert rejection == "unsourced_detail"
         # If the rewrite still has it, the sentence carrying it is removed.
@@ -509,6 +510,7 @@ class TestContactDetailsInEveryReply:
             "Happy to help. Write to help@example.org or call 1800-123-456.",
             turn_type=turn_type,
             passages=[],
+            searched=True,
         )
         assert rejection == "unsourced_detail"
         assert result["answer"] == "Happy to help."
@@ -769,9 +771,28 @@ class TestFallbackContact:
             "I don't have her number. Try 98765 43210.",
             decline_text=self.WORDING,
             passages=[],
+            searched=True,
         )
         assert "98765" not in result["answer"]
         assert result["answer"].endswith("Please call +91 20 0000 4400.")
+
+    def test_a_reply_that_already_gives_other_numbers_gets_no_second_line(self):
+        # Q3-fast, gaps item 7: "Please call 95949 04015." after a reply that had
+        # already given the hospital's numbers.
+        text = (
+            "I don't have the parking details. You can call the hospital on "
+            "+91 44 4227 1500 or email care@hospital.example."
+        )
+        contact = passage(
+            CHUNK_A,
+            0.7,
+            "Call the hospital on +91 44 4227 1500, email care@hospital.example.",
+        )
+        result, _ = review(
+            "decline", text, decline_text=self.WORDING, passages=[contact]
+        )
+        assert result["answer"] == text
+        assert "4400" not in result["answer"]
 
     def test_no_contact_in_the_wording_adds_nothing(self):
         text = "I don't have that information."
@@ -938,3 +959,195 @@ class TestSlotOffers:
         for purpose in (None, "answer", "training", "guide"):
             _, rejection = review("answer", text, citations=[1], purpose=purpose)
             assert rejection != Rejection.OFFERS_SLOT, purpose
+
+
+class TestPricesAreNotCutOff:
+    """Chunk 6b, item 26 (Sunrise C4): "Rs." ended a sentence, so the price's number
+    was split off as its own sentence and taken out as an unsourced phone number,
+    leaving "…is Rs." The sum is judged on its answer now."""
+
+    FEES = passage(
+        CHUNK_A,
+        0.8,
+        text="An 8-session pack is Rs. 2,000. Students get a 20% discount.",
+    )
+
+    def test_a_computed_price_keeps_its_number(self):
+        answer = "With the 20% student discount, the 8-session pack comes to Rs. 1,600."
+        result, rejection = review(answer=answer, citations=[1], passages=[self.FEES])
+        assert rejection is None
+        assert result["answer"] == answer
+
+    def test_rs_and_dr_dont_end_a_sentence(self):
+        from app.core.agent_runtime.check.text import SENTENCE_END
+
+        assert SENTENCE_END.split("It is Rs. 500 a session. Dr. Rao sees you.") == [
+            "It is Rs. 500 a session.",
+            "Dr. Rao sees you.",
+        ]
+        assert SENTENCE_END.split("Room No. 5 is upstairs. No. It isn't.") == [
+            "Room No. 5 is upstairs.",
+            "No.",
+            "It isn't.",
+        ]
+
+    def test_amounts_and_percentages_are_not_phone_numbers(self):
+        from app.core.agent_runtime.check.text import contact_details
+
+        assert contact_details("Rs. 1,600, ₹ 500, INR 2000 or 20 %") == []
+        assert contact_details("Call 98200 11223 for Rs. 500") == ["98200 11223"]
+
+    def test_a_passage_number_never_eats_a_price(self):
+        from app.core.agent_runtime.check.text import without_source_phrases
+
+        assert without_source_phrases("See the details: 500 rupees.") == (
+            "See the details: 500 rupees."
+        )
+        assert without_source_phrases("Open daily (source 1).") == "Open daily."
+
+
+class TestStrayLeadIns:
+    """Chunk 6b, item 7: a lead-in left pointing at nothing after cleanup."""
+
+    @pytest.mark.parametrize(
+        "text,expected",
+        [
+            (
+                "Booked: Thu 19 Nov, 11:00. See the slot info:.",
+                "Booked: Thu 19 Nov, 11:00.",
+            ),
+            ("Booked. See the slot info:. Anything else?", "Booked. Anything else?"),
+            ("Your booking is done. Details here:", "Your booking is done."),
+            # A lead-in to a list, and an ordinary colon, stay.
+            ("Here are the times:\n1) 10:00", "Here are the times:\n1) 10:00"),
+            ("Note: we close at 6.", "Note: we close at 6."),
+        ],
+    )
+    def test_dangling_lead_ins_go(self, text, expected):
+        from app.core.agent_runtime.check.text import without_source_phrases
+
+        assert without_source_phrases(text) == expected
+
+
+class TestOutOfScopeDeclinesStayGeneric:
+    """Chunk 6b, item 24 (SP1's coaching and real-estate evals): a poem or the
+    weather gets a decline that may say what the assistant helps with in general
+    terms, but no specific facts, and no "Please call …" from the owner's wording."""
+
+    WORDING = "I can't help with that. Please call +91 20 0000 4400."
+
+    def test_no_number_price_or_time_and_no_fallback_contact(self):
+        result, _ = review(
+            "decline",
+            "I can't write poems, but I can help with questions about our courses. "
+            "Our batches start at 7 pm and cost Rs. 4,000. "
+            "Please call 98200 11223.",
+            decline_text=self.WORDING,
+            passages=[],
+        )
+        assert result["intent"] == "decline"
+        assert result["answer"] == (
+            "I can't write poems, but I can help with questions about our courses."
+        )
+
+    def test_a_generic_decline_is_untouched(self):
+        text = (
+            "That's not something I can help with, but I can answer questions "
+            "about our courses."
+        )
+        result, _ = review("decline", text, decline_text=self.WORDING, passages=[])
+        assert result["answer"] == text
+
+    def test_after_a_search_the_owners_contact_is_still_added(self):
+        result, _ = review(
+            "decline",
+            "I don't have that.",
+            decline_text=self.WORDING,
+            passages=[],
+            searched=True,
+        )
+        assert result["answer"].endswith("Please call +91 20 0000 4400.")
+
+    def test_a_request_for_a_contact_gets_the_owners_contact(self):
+        # Sunrise E4: a personal number is declined, and the person is pointed
+        # to the owner's own contact, word for word, not left with nothing.
+        result, _ = review(
+            "decline",
+            "I'm sorry, I can't share a staff member's personal mobile number.",
+            decline_text=self.WORDING,
+            passages=[],
+            question="what's Dr. Kavya's personal mobile number?",
+        )
+        assert result["answer"] == (
+            "I'm sorry, I can't share a staff member's personal mobile number. "
+            "Please call +91 20 0000 4400."
+        )
+
+    def test_the_weather_gets_no_contact(self):
+        result, _ = review(
+            "decline",
+            "I can't help with the weather, but I can answer questions about "
+            "our courses.",
+            decline_text=self.WORDING,
+            passages=[],
+            question="what's the weather in Pune?",
+        )
+        assert "4400" not in result["answer"]
+
+
+class TestNoPromiseToPassItOn:
+    """Chunk 6b, item 10: with `hand_over` off and no list that takes details, the
+    assistant never says "I'll pass it on" or "the team will get back to you"."""
+
+    WORDING = "I can't help with that. Please call +91 20 0000 4400."
+    INFO = passage(CHUNK_A, 0.8, text="Write to hello@lakeview.in for anything else.")
+
+    def test_the_promise_is_trimmed_and_the_reply_sent_back(self):
+        result, rejection = review(
+            "answer",
+            "We offer home visits on weekdays. I'll pass your request to the team "
+            "and they will get back to you.",
+            citations=[1],
+            passages=[self.INFO],
+            decline_text=self.WORDING,
+            can_pass_on=False,
+        )
+        assert rejection == "reach_team"
+        assert "pass" not in result["answer"]
+        # Meanwhile it says how to reach the team, from the owner's wording.
+        assert result["answer"].endswith("Please call +91 20 0000 4400.")
+
+    def test_a_reply_that_already_says_how_to_reach_them_is_only_trimmed(self):
+        result, rejection = review(
+            "answer",
+            "Write to hello@lakeview.in. The team will get back to you soon.",
+            citations=[1],
+            passages=[self.INFO],
+            can_pass_on=False,
+        )
+        assert rejection is None
+        assert result["answer"] == "Write to hello@lakeview.in."
+
+    def test_with_something_that_passes_it_on_nothing_changes(self):
+        text = "I'll pass your request to the team."
+        result, rejection = review(
+            "smalltalk", text, passages=[], searched=True, can_pass_on=True
+        )
+        assert rejection is None and result["answer"] == text
+
+
+def test_can_pass_on_needs_hand_over_or_a_list_that_takes_details():
+    from app.core.agent_runtime.nodes.agent_check import can_pass_on
+
+    create = {"name": "create_leads", "kind": "create", "description": ""}
+    assert not can_pass_on({})
+    assert not can_pass_on(
+        {"gateway_tools": ["create_leads"], "gateway_definitions": [create]}
+    )
+    assert can_pass_on(
+        {
+            "gateway_tools": ["create_leads"],
+            "gateway_definitions": [{**create, "takes_details": True}],
+        }
+    )
+    assert can_pass_on({"gateway_tools": ["hand_over"]})

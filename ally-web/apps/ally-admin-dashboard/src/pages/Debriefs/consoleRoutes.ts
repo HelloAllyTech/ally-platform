@@ -7,16 +7,17 @@ export const ANALYTICS_DEBRIEFS_TAB = "debriefs";
 export const analyticsDebriefsPath = () => `${ROUTES.ANALYTICS}?tab=${ANALYTICS_DEBRIEFS_TAB}`;
 
 /**
- * Changes (v2: the old PM agent page). `?view=` picks the tab, `?change=` the change in focus.
- * Older links (`?view=ideas|releases`, `?idea=`) open on Changes; see `readChangesView`.
+ * The Changes page (`/debriefs/changes`; `/debriefs/pm-agent` redirects here). `?view=` picks the tab,
+ * `?change=` the change in focus. Older links (`?view=ideas|releases`, `?idea=`) open on Changes; see
+ * `readChangesView`.
  */
-export type PmAgentView = "changes" | "reports" | "test-sets";
+export type PmAgentView = "changes" | "reports" | "test-sets" | "learner-comments";
 export const pmAgentPath = (view: PmAgentView = "changes", change?: string): string => {
   const q = new URLSearchParams();
   if (view !== "changes") q.set("view", view);
   if (change) q.set("change", change);
   const qs = q.toString();
-  return `${ROUTES.DEBRIEFS_PM_AGENT}${qs ? `?${qs}` : ""}`;
+  return `${ROUTES.DEBRIEFS_CHANGES}${qs ? `?${qs}` : ""}`;
 };
 
 /** Changes with one change open. */
@@ -27,13 +28,14 @@ export const readChangesView = (
   params: URLSearchParams,
 ): { view: PmAgentView; change: string | null } => {
   const raw = params.get("view");
-  const view: PmAgentView = raw === "reports" || raw === "test-sets" ? raw : "changes";
+  const view: PmAgentView =
+    raw === "reports" || raw === "test-sets" || raw === "learner-comments" ? raw : "changes";
   return { view, change: params.get("change") ?? params.get("idea") };
 };
 
 /** Changes › Reports at one report: `?view=reports&kind=monthly&period=2026-10`. */
 export const pmReportPath = (kind: "weekly" | "monthly", period: string): string =>
-  `${ROUTES.DEBRIEFS_PM_AGENT}?${new URLSearchParams({ view: "reports", kind, period })}`;
+  `${ROUTES.DEBRIEFS_CHANGES}?${new URLSearchParams({ view: "reports", kind, period })}`;
 
 export type SettingsSection =
   | "orgs"
@@ -42,8 +44,11 @@ export type SettingsSection =
   | "autonomy"
   | "weights"
   | "pinned"
+  | "learner"
+  | "clinical"
   | "progress"
   | "schedules"
+  | "agents"
   | "guidance";
 export const settingsPath = (section?: SettingsSection): string =>
   `${ROUTES.DEBRIEFS_SETTINGS}${section ? `#${section}` : ""}`;

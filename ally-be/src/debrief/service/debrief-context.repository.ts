@@ -5,11 +5,12 @@ import { resolveWorkerType } from '../../user/enum/user.enum';
 import { TranscriptTurn } from '../util/debrief-cards.util';
 import { guidancePassage } from '../util/debrief-guidance.util';
 import { ClChunk } from '../../context-library/entity/cl-chunk.entity';
+import { DebriefProvider } from '../constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
 import {
-  DEBRIEF_AGENT_KEY,
-  DebriefProvider,
-} from '../constants/debrief-release.constants';
-import { allowlistFromValues } from '../util/debrief-provider-allowlist.util';
+  ALLOWLIST_WHEN_UNREADABLE,
+  allowlistFromValues,
+} from '../util/debrief-provider-allowlist.util';
 import { istMonth } from '../util/debrief-pm-reports.util';
 import {
   assembleProgressProfile,
@@ -31,6 +32,13 @@ import {
   ScenarioBehaviourRow,
 } from '../util/debrief-competencies.util';
 import { FHS_RUBRIC_VERSION } from '../../foundational-skills/constants/helping-skills-rubric.constants';
+import { DebriefSkillFramework } from '../constants/debrief-framework.constants';
+import { Degraded } from '../util/debrief-degraded.util';
+import {
+  readRoleplayFields,
+  roleplayFieldSelect,
+  RoleplayFieldValues,
+} from '../util/debrief-roleplay-brief.util';
 
 export interface DebriefSessionContext {
   id: string;
@@ -40,9 +48,16 @@ export interface DebriefSessionContext {
   language: string;
   learnerLevel: string;
   learnerTurns: number;
+  /** Words the learner spoke in all (blank lines left out). */
+  learnerWords: number;
   /** Null for a session whose scenario row is gone. */
   scenarioId: number | null;
   scenario: { title: string | null; description: string | null };
+  /**
+   * Every field of the roleplay's brief the registry names (`ROLEPLAY_FIELDS`), raw. The runner
+   * sends the always-on ones and the ones the release has on (`roleplayBrief`).
+   */
+  roleplayFields?: RoleplayFieldValues;
   /**
    * The roleplay's named competencies, for cohort stats and other name
    * readers: never a custom competency's generated code.
@@ -68,6 +83,8 @@ export interface DebriefSessionContext {
    * run, nothing to tell the learner.
    */
   debriefTabOff?: boolean;
+  /** `scenarios.metadata.debriefRiskCueOption`: an option's key, or unset (Standard). */
+  riskCueOption?: string | null;
 }
 
 /** One event the live detector watched for during the roleplay. */
@@ -100,7 +117,10 @@ export class DebriefContextRepository {
     this.transcripts = new DebriefQualityRepository(dataSource);
   }
 
-  async loadSession(sessionId: string): Promise<DebriefSessionContext | null> {
+  async loadSession(
+    sessionId: string,
+    degraded?: Degraded,
+  ): Promise<DebriefSessionContext | null> {
     const rows = await this.dataSource.query(
       `SELECT s.id, s.tenant_id, s."counselorId" AS counselor_id, s.status,
               COALESCE(l.value, 'en') AS language,
@@ -108,14 +128,20 @@ export class DebriefContextRepository {
               u.metadata AS user_metadata,
               s."scenarioId" AS scenario_id,
               sc.title, sc.description, sc."competencyIds" AS competency_ids,
+              ${roleplayFieldSelect('sc')},
               s."caseSessionItemId" IS NOT NULL AS in_case,
               COALESCE(sc.metadata->'feedbackTabs'->>'debrief', '') = 'false' AS debrief_tab_off,
+              NULLIF(sc.metadata->>'debriefRiskCueOption', '') AS risk_cue_option,
               COALESCE((ti."completionCriteria"->>'assessmentMode')::boolean, false) AS assessment,
               -- PRD §6.1: a blank line (an empty transcription) is not a
               -- learner turn; the transcript the Writer reads skips it too.
               (SELECT count(*)::int FROM scenario_session_messages m
                 WHERE m."scenarioSessionId" = s.id AND m."senderId" <> -1
-                  AND btrim(m.content) <> '') AS learner_turns
+                  AND btrim(m.content) <> '') AS learner_turns,
+              (SELECT COALESCE(sum(array_length(regexp_split_to_array(btrim(m.content), '[[:space:]]+'), 1)), 0)::int
+                 FROM scenario_session_messages m
+                WHERE m."scenarioSessionId" = s.id AND m."senderId" <> -1
+                  AND btrim(m.content) <> '') AS learner_words
          FROM scenario_sessions s
          LEFT JOIN users u ON u.id = s."counselorId"
          LEFT JOIN scenarios sc ON sc.id = s."scenarioId"
@@ -133,6 +159,7 @@ export class DebriefContextRepository {
     const expects = await this.expectationsOf(
       ids,
       r.scenario_id == null ? null : Number(r.scenario_id),
+      degraded,
     );
     return {
       id: r.id,
@@ -142,8 +169,10 @@ export class DebriefContextRepository {
       language: String(r.language || 'en').slice(0, 10),
       learnerLevel: resolveWorkerType(r.user_metadata),
       learnerTurns: Number(r.learner_turns ?? 0),
+      learnerWords: Number(r.learner_words ?? 0),
       scenarioId: r.scenario_id == null ? null : Number(r.scenario_id),
       scenario: { title: r.title ?? null, description: r.description ?? null },
+      roleplayFields: readRoleplayFields(r),
       expectedBehaviours: expects.competencies.map((c) => c.name),
       helpfulBehaviours: expects.helpful,
       unhelpfulBehaviours: expects.unhelpful,
@@ -152,6 +181,7 @@ export class DebriefContextRepository {
       inCase: r.in_case === true,
       languageRecorded: r.language_recorded === true,
       debriefTabOff: r.debrief_tab_off === true,
+      riskCueOption: r.risk_cue_option ?? null,
     };
   }
 
@@ -165,6 +195,7 @@ export class DebriefContextRepository {
   async expectationsOf(
     competencyIds: string[],
     scenarioId: number | null,
+    degraded?: Degraded,
   ): Promise<RoleplayExpectations> {
     const rows: CompetencyBehaviourRow[] = competencyIds.length
       ? await this.dataSource.query(
@@ -191,7 +222,9 @@ export class DebriefContextRepository {
             ORDER BY i.category, b.name`,
           [scenarioId],
         );
-      } catch {
+      } catch (e) {
+        // The debrief goes on with the competencies' behaviours only, and says it did.
+        degraded?.note('roleplay_behaviours', 'roleplay_behaviours', e);
         own = [];
       }
     }
@@ -306,7 +339,7 @@ export class DebriefContextRepository {
             AND s."counselorId" IS NOT NULL
             AND s."counselorId" IS DISTINCT FROM $3
             AND r."scenarioSessionId" <> $4
-            AND r.mode IN ('shadow','live')
+            AND r.mode = 'live'
             AND r.status IN ('published','below_bar')
             AND r."createdAt" > now() - interval '90 days'
           ORDER BY s."counselorId", r."createdAt" DESC
@@ -401,11 +434,11 @@ export class DebriefContextRepository {
             JOIN scenario_sessions s ON s.id = r."scenarioSessionId"
            WHERE s."counselorId" = $2 AND s.tenant_id IS NOT DISTINCT FROM $1::text
              AND r."scenarioSessionId" <> $3
-             AND r.mode IN ('shadow','live') AND r.status IN ('published','below_bar')) AS past_debriefs,
+             AND r.mode = 'live' AND r.status IN ('published','below_bar')) AS past_debriefs,
          (SELECT count(DISTINCT s."counselorId")::int FROM debrief_runs r
             JOIN scenario_sessions s ON s.id = r."scenarioSessionId"
            WHERE s.tenant_id = $1::text AND s."counselorId" IS DISTINCT FROM $2
-             AND r.mode IN ('shadow','live') AND r.status IN ('published','below_bar')
+             AND r.mode = 'live' AND r.status IN ('published','below_bar')
              AND r."createdAt" > now() - interval '90 days') AS peers,
          (SELECT ti."trackId" IS NOT NULL FROM scenario_sessions s
             LEFT JOIN track_item_progress tip ON tip.id = s."trackItemProgressId"
@@ -486,7 +519,7 @@ export class DebriefContextRepository {
         WHERE s."counselorId" = $1
           AND s.tenant_id IS NOT DISTINCT FROM $2
           AND r."scenarioSessionId" <> $3
-          AND r.mode IN ('shadow','live')
+          AND r.mode = 'live'
           AND r.status IN ('published','below_bar')
         ORDER BY r."createdAt" DESC
         LIMIT $4`,
@@ -528,7 +561,7 @@ export class DebriefContextRepository {
         WHERE s."counselorId" = $1
           AND s.tenant_id IS NOT DISTINCT FROM $2
           AND r."scenarioSessionId" <> $3
-          AND r.mode IN ('shadow','live')
+          AND r.mode = 'live'
           AND r.status IN ('published','below_bar')
         ORDER BY r."createdAt" DESC
         LIMIT $4`,
@@ -566,6 +599,13 @@ export class DebriefContextRepository {
     tenantId: string | null,
     beforeSessionId: string,
     settings: ProgressSettings,
+    /** The roleplay's framework and named competencies: which skills are trended. */
+    skills?: {
+      framework?: DebriefSkillFramework;
+      competencies?: ReadonlyArray<string>;
+    },
+    /** Collects the optional reads (flags, comments, report, voice, levels) that fell back. */
+    degraded?: Degraded,
   ): Promise<ProgressProfile | null> {
     const window = progressWindow(settings);
     const rows: Array<ProgressWindowRow & { total: number }> =
@@ -583,7 +623,7 @@ export class DebriefContextRepository {
               AND s.tenant_id IS NOT DISTINCT FROM $2
               AND r."scenarioSessionId" <> $3
               AND s."createdAt" <= (SELECT at FROM this)
-              AND r.mode IN ('shadow','live')
+              AND r.mode = 'live'
               AND r.status IN ('published','below_bar')
             ORDER BY r."scenarioSessionId", (r.mode = 'live') DESC, r."createdAt" DESC
          ),
@@ -621,7 +661,7 @@ export class DebriefContextRepository {
                            AND s2."scenarioId" = pn.id AND s2.id <> $3
                            AND s2."createdAt" > w."createdAt"
                            AND s2."createdAt" <= (SELECT at FROM this)
-                           AND r2.mode IN ('shadow','live')
+                           AND r2.mode = 'live'
                            AND r2.status IN ('published','below_bar')) AS pn_published
            FROM win w
            LEFT JOIN scenarios sc ON sc.id = w."scenarioId"
@@ -635,13 +675,10 @@ export class DebriefContextRepository {
     if (!rows?.length) return null;
     const runIds = rows.map((r) => r.run_id);
     const sessionIds = rows.map((r) => r.session_id);
-    const optional = async <T>(read: () => Promise<T>, fallback: T) => {
-      try {
-        return await read();
-      } catch {
-        return fallback;
-      }
-    };
+    const optional = <T>(read: () => Promise<T>, fallback: T) =>
+      degraded
+        ? degraded.or('progress_profile', 'learner_history', read, fallback)
+        : read().catch(() => fallback);
     const [flags, comments, lastReport, voice, fhs] = await Promise.all([
       optional(
         () =>
@@ -678,7 +715,7 @@ export class DebriefContextRepository {
              JOIN debrief_runs r ON r.id = p.run_id
             WHERE p.counselor_id = $1 AND p.tenant_id IS NOT DISTINCT FROM $2
               AND p.scenario_session_id <> $3
-              AND r.mode IN ('shadow','live')
+              AND r.mode = 'live'
               AND r.status IN ('published','below_bar')
             ORDER BY p.created_at DESC LIMIT 1`,
           [counselorId, tenantId, beforeSessionId],
@@ -742,6 +779,8 @@ export class DebriefContextRepository {
       lastReport,
       voice,
       fhs,
+      framework: skills?.framework,
+      competencies: skills?.competencies,
     });
   }
 
@@ -818,7 +857,7 @@ export class DebriefContextRepository {
       );
       return allowlistFromValues(row?.values ?? null);
     } catch {
-      return [];
+      return [...ALLOWLIST_WHEN_UNREADABLE];
     }
   }
 

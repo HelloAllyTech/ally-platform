@@ -35,6 +35,9 @@ export const sessionLink = (runId: string, params: URLSearchParams) => {
     const v = params.get(k);
     if (v) q.set(k, v);
   }
+  // Which queue the viewer came from, so the session page can move on to the next item in it.
+  const cat = params.get("cat");
+  if (cat) q.set("cat", cat);
   const qs = q.toString();
   return `${ROUTES.DEBRIEF_SESSION(runId)}${qs ? `?${qs}` : ""}`;
 };
@@ -186,14 +189,14 @@ export const DebriefsHome: React.FC = () => {
   );
   const page = sessions.data;
   const access = useDebriefAccess(page?.viewer);
-  // The Ally team and the owner run the PM agent; the clinical advisor only answers pinned-rule
-  // changes (ally-be sends them only those), reached from Needs you, so gets no PM agent button.
+  // The Ally team and the owner run the PM agent; the clinical advisor gets no PM agent button.
   const team = access.pmAgent;
   const openChange = params.get("change");
-  // Older links to a change on Home (`/debriefs?change=`) open it on the PM agent page.
+  // Older links to a change on Home (`/debriefs?change=`) open it on the PM agent page, for the
+  // people who have one (the clinical advisor has no changes).
   useEffect(() => {
-    if (openChange) navigate(changesPath(openChange), { replace: true });
-  }, [openChange, navigate]);
+    if (openChange && team) navigate(changesPath(openChange), { replace: true });
+  }, [openChange, team, navigate]);
   const anyRunning = !!page?.items.some(r => r.status === "running" || r.status === "queued");
   if (anyRunning !== polling) setPolling(anyRunning);
 
@@ -329,24 +332,7 @@ export const DebriefsHome: React.FC = () => {
         <h1 className="font-secondary text-[32px] font-normal leading-tight text-typography-900">
           {en.debriefs.title}
         </h1>
-        {home.data && !team ? (
-          <p
-            className="m-0 max-w-[980px] text-[22px] font-light leading-snug text-typography-900"
-            data-testid="home-headline"
-          >
-            {home.data.needsYou.length > 0 ? (
-              <Link
-                to={changesPath()}
-                className="font-semibold text-primary-500"
-                data-testid="home-needs-link"
-              >
-                {t.advisorHeadline(home.data.needsYou.length)}
-              </Link>
-            ) : (
-              <b className="font-semibold">{t.advisorHeadline(0)}</b>
-            )}
-          </p>
-        ) : home.data ? (
+        {home.data && team ? (
           <Headline home={home.data} margin={margin} />
         ) : home.isError ? (
           <p className="m-0 text-sm text-neutral-700" data-testid="home-summary-error">
@@ -359,14 +345,14 @@ export const DebriefsHome: React.FC = () => {
               {en.debriefs.v2.conversation.retry}
             </button>
           </p>
-        ) : (
+        ) : home.data ? null : (
           <LoadingBlock lines={1} />
         )}
       </header>
 
-      {home.data && (
+      {home.data && team && (
         <div className="flex flex-col gap-4">
-          <NeedsYouList items={home.data.needsYou} advisor={!team} />
+          <NeedsYouList items={home.data.needsYou} />
         </div>
       )}
 

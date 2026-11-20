@@ -337,6 +337,7 @@ export const OPTIONAL_STEPS: readonly DebriefStep[] = [
   DebriefStep.ANALYST,
   DebriefStep.PROGRESS_READER,
   DebriefStep.GUIDANCE_LOOKUP,
+  DebriefStep.GUIDANCE_AGENT,
   DebriefStep.REVISER,
 ];
 
@@ -440,19 +441,27 @@ export const RECIPE_LABELS: Record<string, string> = {
 export function promptLabel(code: string): string {
   const known: Record<string, string> = {
     debrief_safety_reader_system: 'Safety reader',
+    debrief_risk_cue_definition: 'Risk cue definition',
     debrief_analyst_system: 'Analyst',
     debrief_progress_reader_system: 'Progress reader',
     debrief_progress_system: 'Progress agent',
+    debrief_guidance_agent_system: 'Guidance agent',
     debrief_writer_system: 'Writer',
     debrief_reviser_system: 'Reviser',
     debrief_quality_rubric: 'Rubric',
-    debrief_improver_system: 'PM agent',
+    debrief_improver_system: 'Debrief PM agent',
     debrief_reply_system: 'Ask Ally',
     debrief_planner_system: 'Planner',
     debrief_protocol_check_system: 'Protocol check',
     debrief_history_deep_system: 'History (deep)',
     debrief_language_specialist_system: 'Language specialist',
     debrief_quality_judge_system: 'Judge',
+    debrief_language_judge_rubric: 'Language check',
+    debrief_evaluator_system: "Evaluator's instructions",
+    debrief_evaluator_fix_system: "Evaluator's fix notes",
+    debrief_planner_agents: 'Planner agents',
+    debrief_pm_investigator_system: 'Debrief PM agent investigator',
+    debrief_pm_reviewer_system: 'Debrief PM agent reviewer',
   };
   if (known[code]) return known[code];
   const words = code

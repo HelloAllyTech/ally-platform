@@ -1,3 +1,4 @@
+import { AssistantSeatsController } from './controller/assistant-seats.controller';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AiModule } from '../ai/ai.module';
@@ -38,6 +39,7 @@ import { AgentGatewayController } from './agent-tools/agent-gateway.controller';
 import { AgentGatewayService } from './agent-tools/agent-gateway.service';
 import { AgentRunTokenService } from './agent-tools/agent-run-token.service';
 import { HandOverTool } from './agent-tools/hand-over.tool';
+import { ListConsentService } from './agent-tools/list-consent.service';
 import { ListToolsService } from './agent-tools/list-tools.service';
 import { AGENT_GATEWAY_TOOLS, AgentToolRegistry } from './agent-tools/tools';
 import { ToolRun } from './entity/tool-run.entity';
@@ -99,6 +101,7 @@ import { ListRecordsService } from './lists/list-records.service';
     NotificationModule,
   ],
   controllers: [
+    AssistantSeatsController,
     ChatbotController,
     ConnectorController,
     InboxController,
@@ -132,6 +135,7 @@ import { ListRecordsService } from './lists/list-records.service';
     },
     AgentToolRegistry,
     ListToolsService,
+    ListConsentService,
     // Lists (chunk 5a): the engine 6's tools and 5b's screens use.
     ListRecordsService,
     ListDefinitionsService,
@@ -161,6 +165,8 @@ import { ListRecordsService } from './lists/list-records.service';
     // Lists (chunk 5a).
     ListRecordsService,
     ListDefinitionsService,
+    // The bot page's confirmation card reads the record a reply booked (chunk 6b).
+    ListToolsService,
     // Channels apply memory after a reply (chunk 8a).
     MemoryService,
     SummaryService,

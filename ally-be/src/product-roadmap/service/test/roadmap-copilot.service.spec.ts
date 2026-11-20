@@ -10,6 +10,7 @@ import {
 } from '../roadmap-copilot.service';
 import {
   ROADMAP_COPILOT,
+  ROADMAP_QUALITY_DIMENSIONS,
   ROADMAP_READINESS_CRITERIA,
 } from '../../constants/product-roadmap.constants';
 import { RoadmapOpportunityEffort } from '../../enum/roadmap-opportunity.enum';
@@ -43,9 +44,18 @@ const prose = (text: string): AgentTurnResult => ({
   usage: { inputTokens: 100, outputTokens: 10 },
 });
 
+/** Every quality dimension at one grade; 3 ("specific") everywhere is 75, over the pass mark. */
+const graded = (n: number, over: Record<string, number> = {}) =>
+  ROADMAP_QUALITY_DIMENSIONS.map((d) => ({
+    id: d.id,
+    score: over[d.id] ?? n,
+    note: `${d.id}.`,
+  }));
+
 const allMet = (over: Record<string, any> = {}) => ({
   reply: 'You can file this now; a baseline would make it stronger.',
   gates: allIds.map((id) => ({ id, met: true, note: 'Covered.' })),
+  quality: graded(3),
   draft: {
     description:
       'As a counsellor, retyping the name wastes a minute — so that…',
@@ -416,6 +426,80 @@ describe('RoadmapCopilotService', () => {
     });
   });
 
+  describe('Check my idea (Roadmap v2): the same call, structured', () => {
+    const withEvidence = (over: Record<string, any> = {}) =>
+      allMet({
+        gates: allIds.map((id) => ({
+          id,
+          met: id !== 'outcome',
+          note: 'n',
+          evidence: id === 'outcome' ? 'not met' : `words for ${id}`,
+        })),
+        suggestedGoal: 'Reliability & Trust',
+        ...over,
+      });
+
+    it('leaves every existing caller untouched: no checks option, no extras, base schema', async () => {
+      const { service, tools } = build([submit(withEvidence())]);
+      const turn = turnOf(
+        await collect(
+          service.streamTurn(
+            { messages: [{ role: 'admin', content: 'Idea.' }] },
+            7,
+          ),
+        ),
+      );
+      expect(turn).not.toHaveProperty('checkTurn');
+      expect(tools.getToolDefinitions).toHaveBeenCalledWith(undefined);
+      expect(Object.keys(turn).sort()).toEqual(
+        [
+          'brief',
+          'draft',
+          'gates',
+          'quality',
+          'readinessToken',
+          'reply',
+          'slices',
+        ].sort(),
+      );
+    });
+
+    it("returns met checks' quotes and a live goal suggestion from one call", async () => {
+      const { service, tools, requests } = build([submit(withEvidence())]);
+      const turn = turnOf(
+        await collect(
+          service.streamTurn(
+            {
+              messages: [{ role: 'admin', content: 'Idea.' }],
+              checks: { reopened: ['clear_why'] },
+            },
+            7,
+          ),
+        ),
+      );
+      expect(tools.getToolDefinitions).toHaveBeenCalledWith({ checks: true });
+      expect(requests).toHaveLength(1);
+      expect(turn.checkTurn?.suggestedGoal).toBe('Reliability & Trust');
+      expect(turn.checkTurn?.evidence).not.toHaveProperty('outcome');
+      expect(turn.checkTurn?.evidence.who_it_affects).toBe(
+        'words for who_it_affects',
+      );
+      const userTurn = String(requests[0].messages[0].content);
+      expect(userTurn).toContain('not quite met yet');
+      expect(userTurn).toContain('clear_why');
+    });
+
+    it('drops a suggested goal that is not a live product goal', () => {
+      const { service } = build([]);
+      const submitted = withEvidence({ suggestedGoal: 'Made up', draft: null });
+      const built = service.buildTurn(submitted, ['Reliability & Trust'], null);
+      expect(
+        service.checkTurnOf(submitted, built, ['Reliability & Trust'])
+          .suggestedGoal,
+      ).toBeNull();
+    });
+  });
+
   describe('buildTurn — what the model said, made safe to show and to sign', () => {
     const goals = ['Reliability & Trust'];
     const { service, issue } = build([]);
@@ -440,10 +524,7 @@ describe('RoadmapCopilotService', () => {
       );
       expect(turn.gates.map((g) => g.met)).toEqual([
         true,
-        false,
-        false,
-        false,
-        false,
+        ...allIds.slice(1).map(() => false),
       ]);
       expect(turn.draft).toBeNull();
       expect(turn.readinessToken).toBeNull();
@@ -463,6 +544,7 @@ describe('RoadmapCopilotService', () => {
         failedCriteria: [],
         proposedEffort: RoadmapOpportunityEffort.M,
         brief: turn.brief,
+        qualityScore: 75,
       });
       expect(turn.brief?.assessment.rating).toBe(RoadmapBriefRating.PROMISING);
     });
@@ -515,12 +597,23 @@ describe('RoadmapCopilotService', () => {
       expect(turn.draft?.description).toBe('A draft');
     });
 
-    /**
-     * An opportunity does not have to be narrow to be well defined: a broad one is handed over
-     * at its honest size rather than withheld until it is cut down to a slice.
-     */
-    it.each(['l', 'xl', 'xxl'])(
-      'hands over a %s draft rather than asking to narrow it',
+    /** One idea files at S, M or L. XL and XXL are split into slices, never handed over whole. */
+    it('hands over an l draft', () => {
+      const turn = service.buildTurn(
+        allMet({
+          reply: 'Here is your draft.',
+          draft: { description: 'A draft', productGoal: null, effort: 'l' },
+        }),
+        goals,
+        null,
+      );
+      expect(turn.draft).toMatchObject({ description: 'A draft', effort: 'l' });
+      expect(turn.readinessToken).toBeTruthy();
+      expect(turn.reply).toBe('Here is your draft.');
+    });
+
+    it.each(['xl', 'xxl'])(
+      'withholds a %s draft and asks which part would ship first',
       (effort) => {
         const turn = service.buildTurn(
           allMet({
@@ -530,9 +623,10 @@ describe('RoadmapCopilotService', () => {
           goals,
           null,
         );
-        expect(turn.draft).toMatchObject({ description: 'A draft', effort });
-        expect(turn.readinessToken).toBeTruthy();
-        expect(turn.reply).toBe('Here is your draft.');
+        expect(turn.draft).toBeNull();
+        expect(turn.readinessToken).toBeNull();
+        expect(turn.slices).toEqual([]);
+        expect(turn.reply).toMatch(/bigger than one idea/);
       },
     );
 
@@ -556,6 +650,123 @@ describe('RoadmapCopilotService', () => {
         expect(turn.reply).not.toMatch(/single piece|narrow/);
       },
     );
+
+    describe('the quality bar', () => {
+      it('grades every dimension and computes the score itself', () => {
+        const turn = service.buildTurn(
+          allMet({ quality: graded(3), score: 100 }),
+          goals,
+          null,
+        );
+        expect(turn.quality.score).toBe(75);
+        expect(turn.quality.passed).toBe(true);
+        expect(turn.quality.dimensions.map((d) => d.id)).toEqual(
+          ROADMAP_QUALITY_DIMENSIONS.map((d) => d.id),
+        );
+      });
+
+      it('hands over nothing when every gate is met but the score is under the bar', () => {
+        const turn = service.buildTurn(
+          allMet({ quality: graded(2) }),
+          goals,
+          null,
+        );
+        expect(turn.quality.passed).toBe(false);
+        expect(turn.draft).toBeNull();
+        expect(turn.slices).toEqual([]);
+        expect(turn.readinessToken).toBeNull();
+        expect(issue).not.toHaveBeenCalled();
+      });
+
+      it('does not let a high total hide a dimension under its floor', () => {
+        const turn = service.buildTurn(
+          allMet({ quality: graded(4, { outcome: 1 }) }),
+          goals,
+          null,
+        );
+        expect(turn.quality.score).toBeGreaterThanOrEqual(65);
+        expect(turn.quality.weakest).toBe('outcome');
+        expect(turn.draft).toBeNull();
+      });
+
+      it('fails closed when the model grades nothing', () => {
+        const turn = service.buildTurn(
+          allMet({ quality: undefined }),
+          goals,
+          null,
+        );
+        expect(turn.quality.score).toBe(0);
+        expect(turn.draft).toBeNull();
+      });
+    });
+
+    describe('slices', () => {
+      const slice = (over: Record<string, any> = {}) => ({
+        title: 'Remind new counsellors',
+        description:
+          'As a new counsellor, I forget my first session — so that…',
+        productGoal: 'Reliability & Trust',
+        effort: 's',
+        ...over,
+      });
+
+      it('hands over a signed token per slice, and no single draft', () => {
+        const turn = service.buildTurn(
+          allMet({ draft: null, slices: [slice(), slice({ effort: 'm' })] }),
+          goals,
+          null,
+        );
+        expect(turn.draft).toBeNull();
+        expect(turn.readinessToken).toBeNull();
+        expect(turn.slices).toHaveLength(2);
+        expect(turn.slices.every((sl) => !!sl.readinessToken)).toBe(true);
+        expect(issue).toHaveBeenCalledTimes(2);
+        expect(issue).toHaveBeenCalledWith(
+          expect.objectContaining({
+            description: slice().description,
+            proposedEffort: 's',
+            qualityScore: 75,
+          }),
+        );
+      });
+
+      it('prefers the slices over a draft the model also sent', () => {
+        const turn = service.buildTurn(
+          allMet({ slices: [slice(), slice()] }),
+          goals,
+          null,
+        );
+        expect(turn.slices).toHaveLength(2);
+        expect(turn.draft).toBeNull();
+      });
+
+      it('voids the whole split when one slice is still too big', () => {
+        const turn = service.buildTurn(
+          allMet({
+            draft: null,
+            slices: [slice(), slice({ effort: 'xl' })],
+          }),
+          goals,
+          null,
+        );
+        expect(turn.slices).toEqual([]);
+        expect(turn.readinessToken).toBeNull();
+      });
+
+      it('offers no slices until the idea clears the bar', () => {
+        const turn = service.buildTurn(
+          allMet({
+            quality: graded(2),
+            draft: null,
+            slices: [slice(), slice()],
+          }),
+          goals,
+          null,
+        );
+        expect(turn.slices).toEqual([]);
+        expect(issue).not.toHaveBeenCalled();
+      });
+    });
 
     it('keeps the previous brief when a turn writes none', () => {
       const previous = normaliseOpportunityBrief(allMet().brief);

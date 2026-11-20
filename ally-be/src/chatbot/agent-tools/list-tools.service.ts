@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { ListDefinitionsService } from '../lists/list-definitions.service';
@@ -9,12 +9,15 @@ import { ListRecordsService } from '../lists/list-records.service';
 import { LIST_COPY, ListRefusalException } from '../lists/list-refusals';
 import type { ListActor, ListRecordView } from '../lists/list-types';
 import type { ChatbotSettingsOverride } from '../type/chatbot.type';
+import { ListConsentService } from './list-consent.service';
+import { askFirstMessage, namesEntry, offerFor } from './list-consent';
 import {
   datedLists,
   listToolDefinitions,
   offeredListTools,
   parseListToolInput,
   parseListToolName,
+  playbookOf,
   recordPassage,
   toListData,
   toListQuery,
@@ -44,7 +47,73 @@ export class ListToolsService {
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly definitions: ListDefinitionsService,
     private readonly records: ListRecordsService,
+    // Chunk H1. Always provided by the chatbot module; without it nothing is written (every
+    // write asks, and no yes can be matched), so a wiring mistake fails closed.
+    @Optional() private readonly consent?: ListConsentService,
   ) {}
+
+  /**
+   * A booking or change the assistant made in a reply, as its confirmation card shows it (chunk
+   * 6b): read from the stored record, scoped to the person, as the agent may see it. The record's
+   * title (the day and time) and up to three other details the agent may read, never the person
+   * field, a contact or a masked value. Null when it isn't there or isn't theirs (Try it rolls its
+   * writes back).
+   */
+  async confirmation(
+    chatbotId: string,
+    recordId: string,
+    contactId: string | null,
+    runId: string,
+  ): Promise<{
+    list: string;
+    title: string;
+    details: { label: string; value: string }[];
+  } | null> {
+    if (!UUID.test(recordId)) return null;
+    const [row] = (await this.dataSource.query(
+      `SELECT c.key FROM collection_records r
+         JOIN collections c ON c.id = r.collection_id
+        WHERE r.id = $1 AND r.chatbot_id = $2 AND r.deleted_at IS NULL`,
+      [recordId, chatbotId],
+    )) as { key: string }[];
+    if (!row) return null;
+    try {
+      const list = await this.definitions.getList(chatbotId, row.key);
+      const record = await this.records.get(
+        chatbotId,
+        list.key,
+        { kind: 'agent', runId },
+        recordId,
+        { contactId },
+      );
+      const titleKey = list.settings?.title_field;
+      const details = list.fields
+        .filter(
+          (f) =>
+            !f.archived_at &&
+            f.agent_read &&
+            !f.privacy?.masked &&
+            f.key !== titleKey &&
+            f.key !== list.settings?.person_field &&
+            !(
+              f.type === ListFieldType.RELATION &&
+              relationTarget(f) === 'contact'
+            ),
+        )
+        .map((f) => ({ label: f.label, value: record.display?.[f.key] ?? '' }))
+        .filter((d) => d.value !== '')
+        .slice(0, 3);
+      return { list: list.name, title: record.title, details };
+    } catch (error) {
+      if (
+        error instanceof ListRefusalException ||
+        error instanceof NotFoundException
+      ) {
+        return null;
+      }
+      throw error;
+    }
+  }
 
   /** The list tools this run gets. A bot without lists gets none, and its request is today's. */
   async offeredFor(
@@ -96,23 +165,31 @@ export class ListToolsService {
     const personList = Boolean(list.settings?.person_field);
     try {
       if (def.kind === 'find') {
-        let found = await this.records.query(
+        let found = await this.freeOnly(
           ctx.chatbotId,
-          list.key,
-          actor,
-          toListQuery(list, input),
-          scope,
+          list,
+          await this.records.query(
+            ctx.chatbotId,
+            list.key,
+            actor,
+            toListQuery(list, input),
+            scope,
+          ),
         );
         // A number with an upper bound ("seats 2 to 2") found nothing: read it as "at
         // least" (chunk 8a), since a table for 3 seats 2. Only when something comes back.
         const atLeast = withoutUpperBounds(list, input);
         if (found.total === 0 && !found.aggregate && atLeast) {
-          const roomier = await this.records.query(
+          const roomier = await this.freeOnly(
             ctx.chatbotId,
-            list.key,
-            actor,
-            toListQuery(list, atLeast),
-            scope,
+            list,
+            await this.records.query(
+              ctx.chatbotId,
+              list.key,
+              actor,
+              toListQuery(list, atLeast),
+              scope,
+            ),
           );
           if (roomier.total > 0) found = roomier;
         }
@@ -158,18 +235,30 @@ export class ListToolsService {
         };
       }
       const data = toListData(list, input);
-      let record: ListRecordView;
-      if (def.kind === 'create' && dryRun && !ctx.contactId && personList) {
-        record = await this.previewCreate(ctx.chatbotId, list.key, actor, data);
-      } else if (def.kind === 'create') {
-        ({ record } = await this.records.create(
-          ctx.chatbotId,
-          list.key,
-          actor,
-          data,
-          { ...scope, dryRun },
-        ));
-      } else {
+      if (def.kind === 'create') {
+        // A choice left out (the service) that the assistant's last message named, exactly one of
+        // the options (chunk H1): taken from there, rather than asked again.
+        await this.fillNamedChoice(ctx, list, def, data);
+      }
+      const booking =
+        def.kind === 'create' && playbookOf(list, [def]) === 'booking';
+      // A booking needs its service (chunk H1 Part D): an empty choice the list offers is asked
+      // for, never saved blank.
+      const missing = booking ? missingChoice(list, def, data) : null;
+      if (missing) {
+        return {
+          ok: false,
+          error: 'missing_detail',
+          result: {
+            list: about,
+            field: missing.key,
+            message: LIST_COPY.missing_choice(missing.label, missing.options),
+            passages: [],
+          },
+        };
+      }
+      let current: ListRecordView | null = null;
+      if (def.kind === 'update') {
         const id = String(input.id ?? '');
         if (!UUID.test(id)) {
           return refused(list, lists, {
@@ -177,28 +266,83 @@ export class ListToolsService {
             message: LIST_COPY.not_found(),
           });
         }
-        const current = await this.records.get(
+        current = await this.records.get(
           ctx.chatbotId,
           list.key,
           actor,
           id,
           scope,
         );
-        ({ record } = await this.records.update(
-          ctx.chatbotId,
-          list.key,
-          actor,
-          id,
-          data,
-          current.version,
-          { ...scope, dryRun },
-        ));
       }
+      // 1. The write, tried and rolled back (chunk H1 Part B): a full slot or the per-person limit
+      //    is refused here, before the person is asked anything; and it is exactly what the
+      //    question names.
+      const intended = await this.write(ctx, def, list, actor, data, current, {
+        dryRun: true,
+        personList,
+      });
+      // 2. Consent: a yes in a later turn to the question that named exactly this entry.
+      const offer = offerFor(
+        list,
+        def.kind === 'create' ? 'create' : 'update',
+        intended,
+        current,
+        booking,
+      );
+      const accepted = this.consent
+        ? await this.consent.accepts(
+            ctx,
+            def.name,
+            offer.key,
+            (message) =>
+              namesEntry(message, list, intended) &&
+              (!current || namesEntry(message, list, current)),
+          )
+        : null;
+      if (!accepted) {
+        const asked = this.consent
+          ? await this.consent.offer(
+              ctx,
+              def.name,
+              offer.key,
+              list.name,
+              offer.questions,
+            )
+          : { questions: offer.questions };
+        return {
+          ok: false,
+          error: 'needs_confirmation',
+          result: {
+            list: about,
+            question: asked.questions.en,
+            questions: asked.questions,
+            message: askFirstMessage(asked.questions.en),
+            // Not the dry-run record: its "booked" would read as done.
+            passages: [],
+          },
+        };
+      }
+      // 3. The write itself, unless ally-be has already stopped waiting for this run (chunk H1):
+      //    its reply has gone, and a write now would be one the person was never told about.
+      if (await this.consent?.ended(ctx.runId)) {
+        return {
+          ok: false,
+          error: 'run_ended',
+          result: { list: about, passages: [] },
+        };
+      }
+      const record = await this.write(ctx, def, list, actor, data, current, {
+        dryRun,
+        personList,
+      });
+      await this.consent?.consume(ctx.chatbotId, ctx.conversationId);
       return {
         ok: true,
         result: {
           list: about,
           passages: [recordPassage(list, record)],
+          ...(current ? { before: recordPassage(list, current) } : {}),
+          consent: { offered_in: accepted.runId },
           ...(dryRun ? { preview: true } : {}),
         },
       };
@@ -209,6 +353,84 @@ export class ListToolsService {
       throw error;
     }
   }
+  private async fillNamedChoice(
+    ctx: AgentToolContext,
+    list: ListDefinitionView,
+    def: ListToolDefinition,
+    data: Record<string, unknown>,
+  ): Promise<void> {
+    const missing = missingChoice(list, def, data);
+    if (!missing || !this.consent) return;
+    const previous = (await this.consent.previousMessage(ctx.runId)) ?? '';
+    const said = previous.toLowerCase();
+    const named = missing.options.filter((option) =>
+      said.includes(option.toLowerCase()),
+    );
+    if (named.length === 1) data[missing.key] = named[0];
+  }
+
+  /**
+   * One create or update through 5a's engine: tried and rolled back with `dryRun`, for real
+   * otherwise. Preview's create on a person's list with no person goes through `previewCreate`.
+   */
+  private async write(
+    ctx: AgentToolContext,
+    def: ListToolDefinition,
+    list: ListDefinitionView,
+    actor: ListActor,
+    data: Record<string, unknown>,
+    current: ListRecordView | null,
+    opts: { dryRun: boolean; personList: boolean },
+  ): Promise<ListRecordView> {
+    const scope = { contactId: ctx.contactId };
+    if (def.kind === 'create') {
+      if (opts.dryRun && !ctx.contactId && opts.personList) {
+        return this.previewCreate(ctx.chatbotId, list.key, actor, data);
+      }
+      return (
+        await this.records.create(ctx.chatbotId, list.key, actor, data, {
+          ...scope,
+          dryRun: opts.dryRun,
+        })
+      ).record;
+    }
+    return (
+      await this.records.update(
+        ctx.chatbotId,
+        list.key,
+        actor,
+        current!.id,
+        data,
+        current!.version,
+        { ...scope, dryRun: opts.dryRun },
+      )
+    ).record;
+  }
+
+  /**
+   * Only the entries still free (Q3-fast Part 0b, C19): on a list that others book into (Slots,
+   * Tables, Classes), an entry whose live bookings already fill it under the booking list's rules
+   * is left out, so "which tables are free?" never offers a taken one. Any other list is unchanged.
+   * A total that counted the taken entries drops by as many.
+   */
+  private async freeOnly<
+    T extends { records: ListRecordView[]; total: number },
+  >(chatbotId: string, list: ListDefinitionView, found: T): Promise<T> {
+    if (!found.records.length) return found;
+    const taken = await this.records.takenOf(
+      chatbotId,
+      list.key,
+      found.records.map((r) => r.id),
+    );
+    if (!taken.size) return found;
+    const records = found.records.filter((r) => !taken.has(r.id));
+    return {
+      ...found,
+      records,
+      total: Math.max(found.total - (found.records.length - records.length), 0),
+    };
+  }
+
   /**
    * The entries nearest a time asked for, when none matches it exactly (chunk 8a). Only for a
    * find with a time (`starts_at_at`, `_from` or `_to` on a date-and-time detail). The other
@@ -263,19 +485,27 @@ export class ListToolsService {
       limit: NEAREST_LOOK,
     });
     try {
-      const { records } = await this.records.query(
+      const { records } = await this.freeOnly(
         chatbotId,
-        list.key,
-        actor,
-        query,
-        scope,
+        list,
+        await this.records.query(chatbotId, list.key, actor, query, scope),
       );
       const at = (r: ListRecordView) => Date.parse(String(r.data[field.key]));
-      return records
-        .filter((r) => !Number.isNaN(at(r)))
-        .sort((a, b) => Math.abs(at(a) - asked) - Math.abs(at(b) - asked))
-        .slice(0, NEAREST_MAX)
-        .sort((a, b) => at(a) - at(b));
+      const timed = records.filter((r) => !Number.isNaN(at(r)));
+      const byNearness = [...timed].sort(
+        (a, b) => Math.abs(at(a) - asked) - Math.abs(at(b) - asked),
+      );
+      const picked = nearestForWindow(
+        timed,
+        at,
+        asked,
+        Date.parse(String(input[`${field.key}_to`] ?? '')),
+      );
+      for (const r of byNearness) {
+        if (picked.length >= NEAREST_MAX) break;
+        if (!picked.includes(r)) picked.push(r);
+      }
+      return picked.slice(0, NEAREST_MAX).sort((a, b) => at(a) - at(b));
     } catch {
       return [];
     }
@@ -346,6 +576,42 @@ const PREVIEW_ROLLBACK = new Error('preview: roll back');
 /** How many entries the nearest look reads, and how many it offers. */
 const NEAREST_LOOK = 50;
 const NEAREST_MAX = 3;
+const DAY_MS = 24 * 3_600_000;
+
+/**
+ * When the person asked for a stretch of time ("Thursday evening": from 17:00 to 23:59) and it has
+ * nothing (chunk 6b, item 1): the latest entry before it on that day, then the first entries in the
+ * same stretch on the days after ("Friday has 18:00 and 19:00"). The rest of the three are filled
+ * by nearness. A single time asked ("at 11") is left to nearness alone.
+ */
+export function nearestForWindow<T>(
+  records: T[],
+  at: (r: T) => number,
+  from: number,
+  to: number,
+): T[] {
+  if (Number.isNaN(to) || to <= from || to - from >= DAY_MS) return [];
+  const ordered = [...records].sort((a, b) => at(a) - at(b));
+  const picked: T[] = [];
+  const latestBefore = [...ordered]
+    .reverse()
+    .find((r) => at(r) < from && from - at(r) < 12 * 3_600_000);
+  if (latestBefore) picked.push(latestBefore);
+  const sameStretchLater = ordered.filter((r) => {
+    const days = Math.floor((at(r) - from) / DAY_MS);
+    return days >= 1 && at(r) - days * DAY_MS <= to;
+  });
+  // The first day after that has something in the stretch: up to two of its times.
+  if (sameStretchLater.length) {
+    const firstDay = Math.floor((at(sameStretchLater[0]) - from) / DAY_MS);
+    picked.push(
+      ...sameStretchLater
+        .filter((r) => Math.floor((at(r) - from) / DAY_MS) === firstDay)
+        .slice(0, NEAREST_MAX - picked.length),
+    );
+  }
+  return picked;
+}
 
 /**
  * A refusal the agent reads: the code (stored as the run's error code), §26's message, and any
@@ -373,4 +639,30 @@ function refused(
       passages: alternatives,
     },
   };
+}
+
+/**
+ * A booking's choice the list offers (the service) that the call left empty and the list doesn't
+ * fill in itself (chunk H1 Part D): asked for, never saved blank. The status is the list's own.
+ */
+export function missingChoice(
+  list: ListDefinitionView,
+  def: ListToolDefinition,
+  data: Record<string, unknown>,
+): { key: string; label: string; options: string[] } | null {
+  for (const f of list.fields) {
+    if (f.archived_at || f.type !== ListFieldType.SELECT) continue;
+    if (f.key === 'status' || f.key === list.settings?.person_field) continue;
+    const property = def.input_schema.properties[f.key];
+    // The schema's enum carries "" for "not given": not an option to offer or match.
+    const options = (property?.enum ?? []).filter((o) => o.trim());
+    if (!options.length) continue;
+    const given = data[f.key];
+    if (given !== undefined && given !== null && given !== '') continue;
+    if (f.default !== undefined && f.default !== null && f.default !== '') {
+      continue;
+    }
+    return { key: f.key, label: f.label, options };
+  }
+  return null;
 }

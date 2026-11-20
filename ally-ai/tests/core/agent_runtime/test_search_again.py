@@ -195,3 +195,24 @@ async def test_a_malformed_step_is_asked_again(agent_run, chunk_service):
 
     assert state["result"]["intent"] == "answer"
     assert len(llm.calls) == 3
+
+
+async def test_a_forced_search_that_replies_with_no_time_left_never_fails_the_run(
+    agent_run, chunk_service, monkeypatch
+):
+    """Chunk 6b, item 2 (Amaha, 16 Nov): forced to search, the model replied anyway
+    and too little time was left to ask again, so the run failed and v1 answered.
+    Now the draft it was sent back for goes through the check as final."""
+    from app.core.agent_runtime.nodes import agent as agent_node
+
+    chunk_service.search.return_value = [passage(CHUNK_A, 0.7)]
+    monkeypatch.setattr(agent_node, "_time_left", lambda *_: 5.0)
+    llm = DispatchLikeLLM(
+        reply("answer", "We're open until 8 pm."),  # uncited: sent back to search
+        reply("answer", "We're open until 8 pm."),  # forced: replied, fails
+    )
+    state = await agent_run("When does the clinic close?", llm)
+
+    assert state["result"] is not None
+    assert len(llm.calls) == 2
+    assert state["revisions"] == 1

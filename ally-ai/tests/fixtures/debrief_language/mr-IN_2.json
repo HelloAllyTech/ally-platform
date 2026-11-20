@@ -1,0 +1,167 @@
+{
+  "language": "mr-IN",
+  "writer_model": "gemini-3-flash-preview",
+  "scenario": "A father is exhausted and ashamed because he shouted at his ten-year-old son; he wants to be a calmer parent but does not know how.",
+  "transcript": [
+    {
+      "turn_index": 1,
+      "role": "counselor",
+      "text": "नमस्कार. तुम्ही आज इथे आलात, त्याबद्दल धन्यवाद. तुम्हाला काय बोलायचं आहे, ते सांगा."
+    },
+    {
+      "turn_index": 2,
+      "role": "client",
+      "text": "नमस्कार. मी खूप थकून गेलो आहे. काल मी माझ्या दहा वर्षांच्या मुलावर ओरडलो, आणि मला खूप वाईट वाटतंय."
+    },
+    {
+      "turn_index": 3,
+      "role": "counselor",
+      "text": "तुम्ही थकून गेला आहात आणि मुलावर ओरडल्यामुळे तुम्हाला खूप वाईट वाटतंय, हे मी समजू शकते."
+    },
+    {
+      "turn_index": 4,
+      "role": "client",
+      "text": "हो, मला खूप लाज वाटतेय. मला शांत वडील व्हायचं आहे, पण मला कसं करायचं ते कळत नाही."
+    },
+    {
+      "turn_index": 5,
+      "role": "counselor",
+      "text": "तुम्हाला शांत वडील व्हायचं आहे, ही खूप चांगली गोष्ट आहे. तुमच्या मुलावर ओरडल्यानंतर तुम्हाला नेमकं काय वाटलं?"
+    },
+    {
+      "turn_index": 6,
+      "role": "client",
+      "text": "मला खूप राग आला होता, पण नंतर लगेच पश्चात्ताप झाला. मी त्याला दुखावलं असं वाटलं."
+    },
+    {
+      "turn_index": 7,
+      "role": "counselor",
+      "text": "तुम्ही त्याच्याशी याबद्दल बोललात का?"
+    },
+    {
+      "turn_index": 8,
+      "role": "client",
+      "text": "नाही, अजून नाही. मला काय बोलावं ते कळत नाहीये."
+    },
+    {
+      "turn_index": 9,
+      "role": "counselor",
+      "text": "तुम्हाला त्याच्याशी बोलणं अवघड वाटतंय, कारण तुम्हाला काय बोलावं हे कळत नाहीये, बरोबर?"
+    },
+    {
+      "turn_index": 10,
+      "role": "client",
+      "text": "हो, मला लाज वाटतेय. त्याला कसं सामोरं जायचं हे मला कळत नाहीये."
+    },
+    {
+      "turn_index": 11,
+      "role": "counselor",
+      "text": "तुम्हाला शांत वडील व्हायचं आहे आणि मुलाशी संवाद साधायचा आहे. तुमच्या मते, एक शांत वडील कसा असतो?"
+    },
+    {
+      "turn_index": 12,
+      "role": "client",
+      "text": "तो संयमी असतो, मुलाचं ऐकतो. मला तसं व्हायचं आहे, पण खूप कठीण वाटतंय."
+    }
+  ],
+  "cards": {
+    "opening": "आजच्या सत्रामध्ये तुम्ही क्लायंटच्या मुलासोबतच्या नातेसंबंधातील संघर्षाला खूप संवेदनशीलतेने हाताळले. त्याच्या पश्चात्तापाच्या भावनांना जागा देऊन तुम्ही त्याला बदलाच्या दिशेने विचार करायला प्रवृत्त केले.",
+    "important_moment": null,
+    "what_worked": [
+      {
+        "skill": "Active Listening and Reflection",
+        "turn_index": 3,
+        "quote": "तुम्ही थकून गेला आहात आणि मुलावर ओरडल्यामुळे तुम्हाला खूप वाईट वाटतंय, हे मी समजू शकते.",
+        "lead": "तुम्ही क्लायंटच्या थकव्याचे आणि पश्चात्तापाचे प्रतिबिंब खूप प्रभावीपणे उमटवले.",
+        "body": "तुम्ही क्लायंटच्या भावनांचे अचूक प्रतिबिंब उमटवले. यामुळे त्याला असे वाटले की त्याचे म्हणणे कोणीतरी समजून घेत आहे, ज्यामुळे संभाषणात अधिक मोकळेपणा आला आणि त्याने पुढे त्याची भीती व्यक्त केली."
+      },
+      {
+        "skill": "Exploring Desired Self/Goals",
+        "turn_index": 11,
+        "quote": "तुम्हाला शांत वडील व्हायचं आहे आणि मुलाशी संवाद साधायचा आहे. तुमच्या मते, एक शांत वडील कसा असतो?",
+        "lead": "क्लायंटच्या ध्येयाबद्दल अधिक खोलवर विचारून तुम्ही त्याला स्पष्टता मिळवून दिली.",
+        "body": "केवळ ध्येय मान्य न करता, ते ध्येय क्लायंटसाठी नेमके काय आहे हे तुम्ही शोधले. यामुळे त्याला त्याच्या वागणुकीत भविष्यात नेमके काय बदल हवे आहेत यावर लक्ष केंद्रित करण्यास मदत झाली."
+      }
+    ],
+    "work_on_this": [
+      {
+        "skill": "Exploring Solutions/Next Steps",
+        "turn_index": 9,
+        "quote": "तुम्हाला त्याच्याशी बोलणं अवघड वाटतंय, कारण तुम्हाला काय बोलावं हे कळत नाहीये, बरोबर?",
+        "lead": "क्लायंटला त्याच्या मुलाशी संवाद साधण्यासाठी मार्ग शोधण्यास मदत करा.",
+        "why": "जेव्हा क्लायंटला काय बोलावे हे कळत नसते, तेव्हा लहान कृती सुचवल्याने किंवा त्यावर चर्चा केल्याने त्याचा गोंधळ कमी होऊन आत्मविश्वास वाढू शकतो.",
+        "try_saying": "पुढच्या वेळी जेव्हा तुम्हाला मुलाशी बोलावेसे वाटेल, तेव्हा संभाषणाची सुरुवात कशी करता येईल असे तुम्हाला वाटते?",
+        "scenario_id": null
+      }
+    ],
+    "practise_next": {
+      "skill": "Exploring Solutions/Next Steps",
+      "reason": "क्लायंटला त्याच्या ध्येयापर्यंत पोहोचण्यासाठी प्रत्यक्ष कृती कशी करावी हे समजून घेण्यासाठी मदतीची गरज आहे.",
+      "scenario_id": null,
+      "try_next": null
+    },
+    "skill_words": [
+      {
+        "skill": "Active Listening and Reflection",
+        "word": "strength"
+      },
+      {
+        "skill": "Exploring Emotions",
+        "word": "strength"
+      },
+      {
+        "skill": "Acknowledging and Validating Goals",
+        "word": "strength"
+      },
+      {
+        "skill": "Clarifying and Summarizing",
+        "word": "strength"
+      },
+      {
+        "skill": "Exploring Desired Self/Goals",
+        "word": "strength"
+      },
+      {
+        "skill": "Using Open-Ended Questions",
+        "word": "strength"
+      },
+      {
+        "skill": "Exploring Solutions/Next Steps",
+        "word": "keep_practising"
+      }
+    ],
+    "skill_labels": [
+      {
+        "skill": "Active Listening and Reflection",
+        "label": "सक्रियपणे ऐकणे आणि प्रतिबिंबित करणे"
+      },
+      {
+        "skill": "Exploring Emotions",
+        "label": "भावनांचा शोध घेणे"
+      },
+      {
+        "skill": "Acknowledging and Validating Goals",
+        "label": "ध्येयांना मान्यता देणे"
+      },
+      {
+        "skill": "Clarifying and Summarizing",
+        "label": "स्पष्टीकरण आणि सारांश"
+      },
+      {
+        "skill": "Exploring Desired Self/Goals",
+        "label": "ध्येयांचा आणि आदर्श प्रतिमेचा शोध घेणे"
+      },
+      {
+        "skill": "Using Open-Ended Questions",
+        "label": "मुक्त प्रश्नांचा वापर करणे"
+      },
+      {
+        "skill": "Exploring Solutions/Next Steps",
+        "label": "उपाय आणि पुढील पावलांचा शोध घेणे"
+      }
+    ],
+    "reflective_question": "तुमच्या मते, पालकांनी मुलांशी केलेल्या चुकांबद्दल माफी मागणे त्यांना स्वतःमध्ये बदल घडवण्यासाठी कशी मदत करू शकते?",
+    "progress_note": null
+  },
+  "rule_checks": "passed"
+}

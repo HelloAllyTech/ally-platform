@@ -20,7 +20,7 @@ import {
 } from "@types";
 import { asAgentText, asAgentTextList, formatRelativeTime } from "@utils";
 
-import { BuilderTagType } from "../../pages/Builder/builderMotion";
+import { BuilderTagType } from "../../motion/builderMotion";
 import { sharedMarkdownComponents } from "../markdown/markdownComponents";
 
 /** Same reasoning as PrdDocPanel's: every list here is agent-written. */
@@ -46,6 +46,11 @@ interface TechnicalDesignPanelProps {
   locked?: boolean;
   /** Scroll to this panel when it mounts — it sits at the foot of a long PRD. */
   scrollIntoViewOnMount?: boolean;
+  /**
+   * Roadmap v2: the design shown to someone who can't draft or approve it. The Draft / Approve
+   * buttons are absent, not greyed out (plans/roadmap-builder-merge §4.5c). Builder never sets it.
+   */
+  readOnly?: boolean;
 }
 
 /** The 400 message the backend sends names the real reason; prefer it. */
@@ -72,6 +77,7 @@ export const TechnicalDesignPanel: React.FC<TechnicalDesignPanelProps> = ({
   designReadiness,
   prdReady,
   locked = false,
+  readOnly = false,
   scrollIntoViewOnMount = false,
 }) => {
   const strings = en.builder.design;
@@ -406,7 +412,7 @@ export const TechnicalDesignPanel: React.FC<TechnicalDesignPanelProps> = ({
         </div>
       )}
 
-      {prdReady ? (
+      {readOnly ? null : prdReady ? (
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <Button
             kind={isRedraft ? "tertiary" : "primary"}

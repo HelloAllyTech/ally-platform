@@ -333,6 +333,9 @@ class AgentSystemInputs(PromptInputs):
     output_format: ClassVar[Optional[str]] = "structured"
 
     answer_scope: Optional[str] = None
+    #: Where the chat is (chunk 6b): "over WhatsApp", "on the website" or "in this
+    #: chat". Supplied by the code before the text uses it.
+    channel: Optional[str] = None
     decline_text: Optional[str] = None
     feedback: Optional[str] = None
     history: Optional[str] = None
@@ -469,6 +472,94 @@ class SharedWorkerTypeExperiencedProfessionalInputs(PromptInputs):
 class SharedWorkerTypeLayInputs(PromptInputs):
 
     prompt = PromptInfo(code="ally_ai_shared_worker_type_lay")
+
+
+class ScribeNoteGenerateInputs(PromptInputs):
+    """`scribe_note/generate.txt` — Scribe v2 note harness, the main pass."""
+
+    prompt = PromptInfo(
+        code="ally_ai_scribe_note_generate",
+        name="Scribe note (v2)",
+        description=(
+            "Writes a session note from the transcript: a time-ordered narrative "
+            "and the tenant's AI fields, each citing the turns it rests on."
+        ),
+        category="Scribe",
+    )
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    mode: str
+    note_spec: str
+    budget: str
+    transcript: str
+    context: Optional[str] = None
+    note_language: Optional[str] = None
+
+
+class ScribeNoteMapSegmentInputs(PromptInputs):
+    """`scribe_note/map_segment.txt` — timeline notes for one part of a long
+    session."""
+
+    prompt = PromptInfo(
+        code="ally_ai_scribe_note_map_segment",
+        name="Scribe note (v2): one part of a long session",
+        description=(
+            "Turns one part of a long transcript into time-ordered notes and field "
+            "evidence, which the main pass then writes the note from."
+        ),
+        category="Scribe",
+    )
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    mode: str
+    segment: str
+    note_spec: str
+    transcript: str
+    budget: Optional[str] = None
+    context: Optional[str] = None
+    note_language: Optional[str] = None
+
+
+class ScribeNoteSpeakerRolesInputs(PromptInputs):
+    """`scribe_note/speaker_roles.txt` — who spoke each canonical segment."""
+
+    prompt = PromptInfo(
+        code="ally_ai_scribe_note_speaker_roles",
+        name="Scribe note (v2): speaker roles",
+        description=(
+            "Labels each numbered transcript segment COUNSELOR or CLIENT, by id. "
+            "Never rewrites the transcript."
+        ),
+        category="Scribe",
+    )
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    segments: str
+    context: Optional[str] = None
+
+
+class ScribeNoteRepairInputs(PromptInputs):
+    """`scribe_note/repair.txt` — one rewrite when the draft falls short."""
+
+    prompt = PromptInfo(
+        code="ally_ai_scribe_note_repair",
+        name="Scribe note (v2): repair",
+        description=(
+            "Rewrites a note draft that missed events from the transcript, keeping "
+            "time order and evidence."
+        ),
+        category="Scribe",
+    )
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    mode: str
+    problem: str
+    draft: str
+    note_spec: str
+    budget: str
+    transcript: str
+    context: Optional[str] = None
+    note_language: Optional[str] = None
 
 
 class SummaryCondenseChunkInputs(PromptInputs):
@@ -700,8 +791,12 @@ class AgentListsInputs(PromptInputs):
         description=(
             "How the assistant uses the business's lists through its find_, create_ "
             "and update_ tools: look before claiming, book only once confirmed, cite "
-            "what the tools return (chunk 6). Only for a run with list tools; placed "
-            "after the purpose section."
+            "what the tools return (chunk 6). Since chunk 6b it also holds the "
+            "booking rules every purpose that can book follows (book once confirmed, "
+            "a name asked once, an optional detail asked once, the team confirms "
+            "only when entries start as requested) and saving a lead once its "
+            "details are given. Only for a run with list tools; placed after the "
+            "purpose section."
         ),
     )
 
@@ -717,9 +812,30 @@ class AgentPurposeEnquiriesCanBookInputs(PromptInputs):
         name="Chatbot Agent: Purpose, Bring in Customers (can book)",
         description=(
             'The "Bring in customers" purpose for an assistant that can book: it books '
-            "under the lists rules, asks for a name once and only when it isn't known, "
-            "and still passes on what the lists can't do (chunk 8a). Chosen in code "
-            "when the run offers a create_ tool; otherwise the plain section is used."
+            "under the lists rules and passes on what the lists can't do only when "
+            "a tool can (chunk 8a; since chunk 6b the booking rules themselves are "
+            "in the lists section). Chosen in code when the run offers a create_ "
+            "tool; otherwise the plain section is used."
+        ),
+    )
+
+    #: Where the chat is: "WhatsApp" or "the website".
+    channel: str
+
+
+class AgentPurposeAnswerTakesDetailsInputs(PromptInputs):
+    """`agent/purpose_answer_takes_details.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_agent_purpose_answer_takes_details",
+        name="Chatbot Agent: Purpose, Answer Questions (takes details)",
+        description=(
+            'The "Answer questions" purpose for an assistant that can save a '
+            "person's details for the team (a create_ tool on a list with a person "
+            "or phone field: Leads, Callback requests). When it can't answer, it "
+            "offers once to take their details, and saves them once given (chunk "
+            "6b). Chosen in code only then; otherwise the plain section is used, "
+            "byte for byte."
         ),
     )
 
@@ -745,6 +861,110 @@ class AgentMemoryInputs(PromptInputs):
     lines: str
     #: The bot's never-store list, one per line.
     never_store: str
+
+
+class AgentUpsetInputs(PromptInputs):
+    """`agent/upset.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_agent_upset",
+        name="Chatbot Agent: Upset",
+        description=(
+            "When the crisis check finds the person upset but not at risk (Q3-fast "
+            "Part 1): the reply opens warmly and answers normally, with no crisis "
+            "template. Placed after memory, before the safety rules."
+        ),
+    )
+
+
+class AgentUpsetSupportInputs(PromptInputs):
+    """`agent/upset_support.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_agent_upset_support",
+        name="Chatbot Agent: Upset, support line",
+        description=(
+            "Added after the upset section on health and mental-health assistants "
+            "only (Q3-fast Part 1): one gentle line naming the business's support "
+            "and its helpline."
+        ),
+    )
+
+    #: The assistant's name, as the person sees it.
+    organisation: str
+    #: The business's helplines; on a mental-health assistant with none, Tele-MANAS.
+    helplines: str
+    #: " any time" when the number is marked 24x7, otherwise empty (stop 1).
+    any_time: str = ""
+
+
+class AgentPlaybookBookingInputs(PromptInputs):
+    """`agent/playbook_booking.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_agent_playbook_booking",
+        name="Chatbot Agent: Playbook, Booking",
+        description=(
+            "Added when a list's tools can book a dated entry (Appointments, "
+            "Table reservations, Site visits, Classes, Events), whatever the "
+            "purpose (Q3-fast Part 2b). Ally-written; placed after the lists "
+            "section."
+        ),
+    )
+
+    #: The names of the lists this playbook covers, as the owner wrote them.
+    lists: str
+
+
+class AgentPlaybookDetailsInputs(PromptInputs):
+    """`agent/playbook_details.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_agent_playbook_details",
+        name="Chatbot Agent: Playbook, Taking details",
+        description=(
+            "Added when a list's tools take the person's details (Leads, Callback "
+            "requests, Admissions enquiries), whatever the purpose (Q3-fast Part "
+            "2b). Ally-written; placed after the lists section."
+        ),
+    )
+
+    #: The names of the lists this playbook covers, as the owner wrote them.
+    lists: str
+
+
+class AgentPlaybookOrdersInputs(PromptInputs):
+    """`agent/playbook_orders.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_agent_playbook_orders",
+        name="Chatbot Agent: Playbook, Orders and requests",
+        description=(
+            "Added when a list's tools look up and change the person's own "
+            "entries (Orders, Support tickets, Memberships), whatever the purpose "
+            "(Q3-fast Part 2b). Ally-written; placed after the lists section."
+        ),
+    )
+
+    #: The names of the lists this playbook covers, as the owner wrote them.
+    lists: str
+
+
+class AgentPlaybookReferenceInputs(PromptInputs):
+    """`agent/playbook_reference.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_agent_playbook_reference",
+        name="Chatbot Agent: Playbook, Reference lists",
+        description=(
+            "Added when a list is read-only (Products, Price list, Service areas, "
+            "Menu), whatever the purpose (Q3-fast Part 2b). Ally-written; placed "
+            "after the lists section."
+        ),
+    )
+
+    #: The names of the lists this playbook covers, as the owner wrote them.
+    lists: str
 
 
 class MemoryCheckInputs(PromptInputs):

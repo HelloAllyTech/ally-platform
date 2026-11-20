@@ -175,6 +175,7 @@ export class QuizSpecialist implements ItemSpecialist {
       maxTokens: SPECIALIST_MAX_TOKENS.QUIZ,
       usageMetadata: context.usageMetadata,
       repairErrors: context.repairErrors,
+      referenceMaterial: context.referenceMaterial,
       previous,
       variables: {
         brief_json: briefForPrompt(brief),

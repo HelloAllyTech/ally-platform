@@ -47,3 +47,14 @@ export enum DebriefAgreementMeasure {
   EVIDENCE = 'evidence_specificity',
   MISSED_RISK_CUE = 'missed_risk_cue',
 }
+
+/** Who wrote a comment: an expert reviewer, or a learner selecting words in their own debrief. */
+export enum DebriefCommentSource {
+  EXPERT = 'expert',
+  LEARNER = 'learner',
+}
+
+/** Learner-facing debrief features that can be given to some people before everyone. */
+export enum DebriefLearnerFeature {
+  SELECTION_COMMENTS = 'selection_comments',
+}

@@ -1,3 +1,5 @@
+import { usageContext } from 'src/billing/context/usage-context';
+import { UsageChannel, UsageKind } from 'src/billing/enum/billing.enum';
 import { Injectable, Inject, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -32,7 +34,7 @@ import { WhatsAppRateLimitService } from './whatsapp-rate-limit.service';
 import { ChatbotSettingsService } from 'src/chatbot/service/chatbot-settings.service';
 import { ChatbotReplyService } from 'src/chatbot/service/chatbot-reply.service';
 import { Chatbot } from 'src/chatbot/entity/chatbot.entity';
-import { isFallback } from 'src/chatbot/engine/agent-runtime';
+import { isFailedRun } from 'src/chatbot/engine/agent-runtime';
 import {
   AGENT_FALLBACK_EVENT,
   type AgentFallbackEvent,
@@ -608,7 +610,7 @@ export class WhatsAppInboundService {
     chatbot: Pick<Chatbot, 'id' | 'name'>,
     decision: Pick<ChatbotDecision, 'agent'>,
   ): void {
-    if (isFallback(decision.agent)) {
+    if (isFailedRun(decision.agent)) {
       this.eventEmitter.emit(AGENT_FALLBACK_EVENT, {
         chatbot: { id: chatbot.id, name: chatbot.name },
         reason: decision.agent.fallbackReason,
@@ -958,19 +960,27 @@ export class WhatsAppInboundService {
     const repliedAt = Date.now();
     try {
       if (!(await copied)) return;
-      await Promise.all([
-        this.memory?.afterTurn({
-          chatbot,
-          conversationId,
-          runId: decision.agent?.runId,
-          pending:
-            decision.agent?.runtime === AgentRuntimeUsed.V2
-              ? decision.agent.memory
-              : undefined,
-          repliedAt,
-        }),
-        this.summaries?.afterTurn(chatbot, conversationId),
-      ]);
+      await usageContext.run(
+        {
+          channel: UsageChannel.WHATSAPP,
+          runKind: UsageKind.CUSTOMER_REPLY,
+          chatbotId: chatbot.id,
+        },
+        () =>
+          Promise.all([
+            this.memory?.afterTurn({
+              chatbot,
+              conversationId,
+              runId: decision.agent?.runId,
+              pending:
+                decision.agent?.runtime === AgentRuntimeUsed.V2
+                  ? decision.agent.memory
+                  : undefined,
+              repliedAt,
+            }),
+            this.summaries?.afterTurn(chatbot, conversationId),
+          ]),
+      );
     } catch {
       // Each step logs its own failure; the reply has already gone out.
     }

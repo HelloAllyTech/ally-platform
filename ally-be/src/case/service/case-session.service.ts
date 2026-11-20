@@ -14,6 +14,8 @@ import { CaseSharedService } from './case-shared.service';
 import { CaseSortBy, CaseStatus } from '../type/cases.type';
 import { SessionItemStatus } from 'src/common/type/common.type';
 import { meetsMinimumScore } from 'src/common/util/progression.util';
+import type { CaseSessionAttemptMissedEvent } from 'src/track/service/track-progress.service';
+import { RoleplayAttemptFailureReason } from 'src/track/type/track.type';
 import { CaseSessionItemRepository } from '../repository/case-session-item.repository';
 import { DataSource, EntityManager } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -391,6 +393,62 @@ export class CaseSessionService {
     };
   }
 
+  /**
+   * Tell listeners (Track 2.0 progression) that a case roleplay ended without
+   * clearing its bar, and which bars it missed, so a learner can be told why
+   * the case is not finished. Best-effort: never breaks the case flow.
+   */
+  private async emitCaseAttemptMissed({
+    caseSessionItemId,
+    score,
+    durationSeconds,
+    requiredDurationSeconds,
+  }: {
+    caseSessionItemId: string;
+    score?: number;
+    durationSeconds: number;
+    requiredDurationSeconds: number;
+  }): Promise<void> {
+    try {
+      const sessionItem = await this.caseSessionItemRepository.findOne({
+        where: { id: caseSessionItemId },
+      });
+      if (!sessionItem) return;
+      const caseItem = await this.caseSharedService.getCaseItemById(
+        sessionItem.caseItemId,
+      );
+      const minimumScore = caseItem?.minimumScore ?? null;
+      const failureReasons: RoleplayAttemptFailureReason[] = [];
+      if (!meetsMinimumScore(score, minimumScore)) {
+        failureReasons.push(RoleplayAttemptFailureReason.INSUFFICIENT_SCORE);
+      }
+      if (
+        requiredDurationSeconds > 0 &&
+        durationSeconds < requiredDurationSeconds
+      ) {
+        failureReasons.push(RoleplayAttemptFailureReason.INSUFFICIENT_DURATION);
+      }
+      if (!failureReasons.length) return;
+      const event: CaseSessionAttemptMissedEvent = {
+        caseSessionId: sessionItem.caseSessionId,
+        failureReasons,
+        score: score ?? null,
+        durationSeconds,
+        requiredScore:
+          typeof minimumScore === 'number' && minimumScore > 0
+            ? minimumScore
+            : null,
+        requiredDurationSeconds:
+          requiredDurationSeconds > 0 ? requiredDurationSeconds : null,
+      };
+      this.eventEmitter.emit('case.session.attempt_missed', event);
+    } catch (error) {
+      this.logger.error(
+        `Failed to emit case.session.attempt_missed for caseSessionItemId ${caseSessionItemId}: ${error}`,
+      );
+    }
+  }
+
   async handleEndCaseSession({
     caseSessionItemId,
     score,
@@ -411,6 +469,12 @@ export class CaseSessionService {
       this.logger.info(
         `Call duration ${callDurationInSeconds} is less than required ${callDurationRequiredForCompletionInSeconds} for caseSessionItemId: ${caseSessionItemId}`,
       );
+      await this.emitCaseAttemptMissed({
+        caseSessionItemId,
+        score,
+        durationSeconds: callDurationInSeconds,
+        requiredDurationSeconds: callDurationRequiredForCompletionInSeconds,
+      });
       return;
     }
 
@@ -451,6 +515,12 @@ export class CaseSessionService {
       this.logger.info(
         `Score ${score} is less than minimum score ${currentCaseItem?.minimumScore} for caseSessionItemId: ${caseSessionItemId}`,
       );
+      await this.emitCaseAttemptMissed({
+        caseSessionItemId,
+        score,
+        durationSeconds: callDurationInSeconds,
+        requiredDurationSeconds: callDurationRequiredForCompletionInSeconds,
+      });
       return;
     }
 

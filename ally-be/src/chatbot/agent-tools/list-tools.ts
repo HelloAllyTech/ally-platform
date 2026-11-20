@@ -14,6 +14,7 @@ import type {
   ListRecordView,
   TransitionsConfig,
 } from '../lists/list-types';
+import { stillExamples } from '../lists/ready-made-lists';
 import type { ChatbotSettingsOverride } from '../type/chatbot.type';
 import type { Ability } from './tools';
 
@@ -70,7 +71,29 @@ export interface ListToolDefinition {
   description: string;
   input_schema: ListToolInputSchema;
   kind: ListToolKind;
+  /** The list's name as the owner wrote it, for the bot page's live steps (chunk 6b). */
+  list_name?: string;
+  /**
+   * A create on a list with a phone field the assistant fills in (Leads, Callback requests): it
+   * saves the person's details for the team (chunk 6b). ally-ai then offers to take details when it
+   * can't answer, and lets the assistant say the team will get back to them.
+   */
+  takes_details?: boolean;
+  /**
+   * What the list's offered tools do, so the run gets that kind's playbook (Q3-fast Part 2b): a
+   * create with a date-and-time target books; a create with a phone or person field takes details;
+   * a person's own list with update is orders; read-only is reference. One per list, the first that
+   * fits, on each of its tools.
+   */
+  playbook?: ListPlaybook;
+  /** The owner's own line for the list ("How should your assistant use this list?"). */
+  instruction?: string;
 }
+
+export type ListPlaybook = 'booking' | 'details' | 'orders' | 'reference';
+
+/** The most an owner's line for a list may be (Q3-fast Part 2b). */
+export const MAX_LIST_INSTRUCTION = 300;
 
 type ListView = ListDefinitionView;
 type FieldView = ListView['fields'][number];
@@ -144,6 +167,10 @@ const filterableFields = (list: ListView): FieldView[] =>
 
 const hasPersonField = (list: ListView): boolean =>
   Boolean(list.settings?.person_field);
+
+/** A list the assistant saves someone's details to: a phone field it fills in (chunk 6b). */
+export const takesDetails = (list: ListView): boolean =>
+  writableFields(list).some((f) => f.type === ListFieldType.PHONE);
 
 // ---- schemas ------------------------------------------------------------------------------------
 
@@ -275,6 +302,21 @@ function findSchema(list: ListView): ListToolInputSchema {
   return { type: 'object', properties };
 }
 
+/**
+ * The fields create and update offer: the writable ones, except an optional choice that still
+ * holds the ready-made examples (chunk 6b, item 30). "Make it yours" wasn't done, so those choices
+ * aren't the business's: the assistant isn't given them and never reads them out, and the field
+ * stays empty. A required one is always kept (none of the ready-made lists has one; a test says
+ * so).
+ */
+export const offeredWriteFields = (list: ListView): FieldView[] =>
+  writableFields(list).filter(
+    (f) =>
+      f.required ||
+      f.type !== ListFieldType.SELECT ||
+      !stillExamples(selectValues(f)),
+  );
+
 function writeSchema(
   list: ListView,
   update: boolean,
@@ -286,7 +328,7 @@ function writeSchema(
       `The id of the entry to change, from find_${list.key}`,
     );
   }
-  for (const f of writableFields(list)) {
+  for (const f of offeredWriteFields(list)) {
     if (!(f.key in properties)) {
       properties[f.key] = valueProperty(f, update, dated);
     }
@@ -389,7 +431,7 @@ function findDescription(list: ListView): string {
 
 function createDescription(list: ListView, names: Map<string, string>): string {
   const person = hasPersonField(list) ? ' for the person in this chat' : '';
-  const required = writableFields(list)
+  const required = offeredWriteFields(list)
     .filter((f) => f.required)
     .map((f) => lower(f.label));
   // A list whose new entries wait for the team (Site visits) says so, so the assistant can say the
@@ -456,12 +498,14 @@ export function listToolDefinitions(
 ): ListToolDefinition[] {
   const out: ListToolDefinition[] = [];
   if (list.deleted_at) return out;
+  const listName = list.name.trim();
   if (list.agent_read) {
     out.push({
       name: listToolName('find', list.key),
       description: findDescription(list),
       input_schema: findSchema(list),
       kind: 'find',
+      ...(listName ? { list_name: listName } : {}),
     });
   }
   if (writableFields(list).length) {
@@ -470,12 +514,15 @@ export function listToolDefinitions(
       description: createDescription(list, names),
       input_schema: writeSchema(list, false, dated),
       kind: 'create',
+      ...(listName ? { list_name: listName } : {}),
+      ...(takesDetails(list) ? { takes_details: true } : {}),
     });
     out.push({
       name: listToolName('update', list.key),
       description: updateDescription(list, names),
       input_schema: writeSchema(list, true, dated),
       kind: 'update',
+      ...(listName ? { list_name: listName } : {}),
     });
   }
   return out;
@@ -501,12 +548,59 @@ export function offeredListTools(
   const dated = datedLists(lists);
   const on = lists
     .filter((list) => knowsPerson || !hasPersonField(list))
-    .flatMap((list) => listToolDefinitions(list, names, dated))
-    .filter((def) => abilityFor(stored, def.name) === 'do_it');
+    .flatMap((list) =>
+      withPlaybook(
+        list,
+        listToolDefinitions(list, names, dated).filter(
+          (def) => abilityFor(stored, def.name) === 'do_it',
+        ),
+      ),
+    );
   return {
     definitions: on.slice(0, MAX_LIST_TOOLS),
     omitted: on.slice(MAX_LIST_TOOLS).map((def) => def.name),
   };
+}
+
+/**
+ * A list's offered tools with its playbook and the owner's line (Q3-fast Part 2b). The playbook
+ * follows what the tools that are on can do, so a list whose writes are at Never is reference.
+ */
+export function withPlaybook(
+  list: ListView,
+  defs: ListToolDefinition[],
+): ListToolDefinition[] {
+  const playbook = playbookOf(list, defs);
+  const instruction = String(
+    (list.settings as { instruction?: unknown } | null)?.instruction ?? '',
+  )
+    .trim()
+    .slice(0, MAX_LIST_INSTRUCTION);
+  return defs.map((def) => ({
+    ...def,
+    ...(playbook ? { playbook } : {}),
+    ...(playbook && instruction ? { instruction } : {}),
+  }));
+}
+
+export function playbookOf(
+  list: ListView,
+  defs: ListToolDefinition[],
+): ListPlaybook | undefined {
+  if (!defs.length) return undefined;
+  const create = defs.find((def) => def.kind === 'create');
+  const books =
+    create &&
+    Object.values(create.input_schema.properties).some(
+      (property) => (property as { dated?: unknown }).dated,
+    );
+  if (books) return 'booking';
+  if (create?.takes_details) return 'details';
+  if (hasPersonField(list) && defs.some((def) => def.kind === 'update')) {
+    return 'orders';
+  }
+  if (defs.every((def) => def.kind === 'find')) return 'reference';
+  return undefined;
 }
 
 // ---- input ---------------------------------------------------------------------------------------
@@ -672,8 +766,38 @@ export function recordPassage(
   };
 }
 
-/** Where a business is, until bots have a time zone setting: the pilots are in India. */
+/** Where a business is when its assistant hasn't said (chunk 6b): the pilots are in India. */
 export const DEFAULT_TIME_ZONE = 'Asia/Kolkata';
+
+/** Whether `zone` is an IANA time zone this runtime knows. */
+export function isTimeZone(zone: unknown): zone is string {
+  if (typeof zone !== 'string' || !zone.trim()) return false;
+  try {
+    new Intl.DateTimeFormat('en-GB', { timeZone: zone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Where the assistant's business is (chunk 6b, item 9): its own Time zone setting, else the
+ * hand-over hours' zone (what pilots set before 6b), else Asia/Kolkata. Lists, `{today}`, Repeat
+ * weekly, the time check and memory's dates all use it. Hand-over hours keep their own zone.
+ */
+export function assistantZone(
+  settings:
+    | {
+        timeZone?: unknown;
+        handover?: { hours?: { timeZone?: unknown } | null } | null;
+      }
+    | null
+    | undefined,
+): string {
+  if (isTimeZone(settings?.timeZone)) return settings!.timeZone as string;
+  const hours = settings?.handover?.hours?.timeZone;
+  return isTimeZone(hours) ? hours : DEFAULT_TIME_ZONE;
+}
 
 /**
  * Today where the business is, for the lists section (chunk 6): "Saturday 14 Nov 2026, 11:58

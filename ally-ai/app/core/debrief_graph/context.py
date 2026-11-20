@@ -11,8 +11,10 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
+from app.core.debrief import framework
+from app.core.debrief_graph.constants import DEFAULT_DEADLINE_MS, HARD_MARGIN_MS
 from app.core.debrief_graph.gateway import Gateway
-from app.core.debrief_graph.step_functions import StepRunner
+from app.core.debrief_graph.step_wire import StepRunner
 
 
 def now_ms() -> float:
@@ -74,6 +76,26 @@ class DebriefRunContext:
         return self.sess("language") or "en"
 
     @property
+    def framework(self) -> Dict[str, Any]:
+        """The session's skill framework (empty when absent)."""
+        return framework.framework_of(self.session)
+
+    @property
+    def risk_cue(self) -> Dict[str, Any]:
+        return framework.risk_cue_of(self.session)
+
+    @property
+    def speaker_labels(self) -> str:
+        return framework.speaker_labels_of(self.session)
+
+    def skill_names(self) -> Dict[str, str]:
+        """key -> name of every progress key for this run: the framework's
+        skills plus the profile's named competencies."""
+        profile = self.inputs.get("progress_profile")
+        extra = profile.get("skill_names") if isinstance(profile, dict) else None
+        return framework.skill_names(self.framework, extra)
+
+    @property
     def settings(self) -> Dict[str, Any]:
         return self.bundle.get("settings") or {}
 
@@ -108,8 +130,18 @@ class DebriefRunContext:
 
     def deadline_ms(self, has_risk_cue: bool) -> float:
         return float(
-            self.setting("riskDeadlineMs" if has_risk_cue else "deadlineMs", 150_000)
+            self.setting(
+                "riskDeadlineMs" if has_risk_cue else "deadlineMs", DEFAULT_DEADLINE_MS
+            )
         )
+
+    def hard_left_s(self, has_risk_cue: bool) -> float:
+        """Seconds until ally-be gives up on the run (deadline + margin); may be < 0."""
+        return (
+            self.deadline_ms(has_risk_cue)
+            + HARD_MARGIN_MS
+            - (self.clock() - self.started_at)
+        ) / 1000.0
 
     def time_left_ms(self, has_risk_cue: bool) -> float:
         return self.deadline_ms(has_risk_cue) - (self.clock() - self.started_at)

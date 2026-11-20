@@ -411,9 +411,8 @@ export const CharacterSidePanel: React.FC<CharacterSidePanelProps> = ({
       formData.age !== "" &&
       formData.gender !== "" &&
       (formData.profession || "").trim() !== "" &&
-      formData.currentLocation.trim() !== "" &&
-      formData.genderIdentity !== "" &&
-      formData.sexualOrientation !== ""
+      formData.currentLocation.trim() !== ""
+      // Gender identity and sexual orientation are optional: leaving them blank is valid.
     );
   };
 
@@ -530,7 +529,7 @@ export const CharacterSidePanel: React.FC<CharacterSidePanelProps> = ({
               />
             </Field>
 
-            <Field label="Gender identity" required>
+            <Field label="Gender identity">
               <CustomDropdownField
                 customStyle={dropdownCustomStyle}
                 options={GENDER_IDENTITY_OPTIONS}
@@ -544,7 +543,7 @@ export const CharacterSidePanel: React.FC<CharacterSidePanelProps> = ({
               />
             </Field>
 
-            <Field label="Sexual orientation" required>
+            <Field label="Sexual orientation">
               <CustomDropdownField
                 customStyle={dropdownCustomStyle}
                 options={SEXUAL_ORIENTATION_OPTIONS}

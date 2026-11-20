@@ -1,3 +1,4 @@
+import { GATE_OTHER_PASS_PCT, type CheckupGate } from './checkup-gate';
 import {
   BadRequestException,
   ConflictException,
@@ -304,8 +305,15 @@ export class DraftCheckupService {
    * Publishing needs a finished checkup on this draft with no unsourced answer and every safety
    * question passed. A safety question that failed is asked once more before blocking; if it
    * still fails, the owner is asked to try again later and the Ally team is alerted.
+   *
+   * Then the quality gate (Q3-fast Part 3, B19): at least 70% of the other questions passed, or
+   * the owner chose "Publish anyway" having seen the score. Assistants already live aren't
+   * re-gated: this runs on a draft's first publish only.
    */
-  async assertCanPublish(draft: BotDraftEntity): Promise<void> {
+  async assertCanPublish(
+    draft: BotDraftEntity,
+    publishAnyway = false,
+  ): Promise<void> {
     const latest = await this.checkup.latestFor(draft.chatbotId!, draft.id);
     if (!latest || latest.run.status !== 'done') {
       throw new ConflictException({
@@ -323,13 +331,14 @@ export class DraftCheckupService {
     const failedSafety = latest.results.filter(
       (r) => r.safety && r.verdict !== 'pass',
     );
-    if (!failedSafety.length) return;
+    if (!failedSafety.length) return this.assertQuality(latest, publishAnyway);
     const again = await this.checkup.askNow(
       draft.chatbotId!,
       failedSafety.map((r) => r.caseId),
       draft.id,
     );
-    if (again.every((r) => r.verdict === 'pass')) return;
+    if (again.every((r) => r.verdict === 'pass'))
+      return this.assertQuality(latest, publishAnyway);
     this.events.emit('exception', {
       statusCode: 409,
       timestamp: new Date().toISOString(),
@@ -341,6 +350,27 @@ export class DraftCheckupService {
       errorCode: 'safety_recheck',
       message:
         "We're double-checking a safety answer. Try again in a few minutes.",
+    });
+  }
+
+  /** At least 70% of the non-safety questions passed, or the owner said Publish anyway. */
+  private assertQuality(
+    latest: { gate: CheckupGate | null },
+    publishAnyway: boolean,
+  ): void {
+    const gate = latest.gate;
+    if (publishAnyway || !gate) return;
+    // One number from one source (chunk H1 Part D): the Checkup's own headline, "12 of 18 ·
+    // 67%", so the prompt and the Checkup can't disagree. Safety has its own hard gate above.
+    const passed = Math.max(0, gate.questions - gate.needFix);
+    const pct = gate.questions
+      ? Math.round((passed * 100) / gate.questions)
+      : 100;
+    if (passed * 100 >= GATE_OTHER_PASS_PCT * gate.questions) return;
+    throw new ConflictException({
+      errorCode: 'checkup_below_gate',
+      message: `Your checkup: ${passed} of ${gate.questions} questions answered well (${pct}%). We suggest at least ${GATE_OTHER_PASS_PCT}% before you publish. Publish anyway?`,
+      details: { gate, passed, pct },
     });
   }
 

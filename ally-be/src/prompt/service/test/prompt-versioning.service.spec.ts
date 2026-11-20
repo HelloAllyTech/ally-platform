@@ -1,3 +1,5 @@
+import { toStoreContract } from '../../contracts/define-prompt';
+import { DEBRIEF_WRITER_SYSTEM } from '../../contracts/prompt-contracts';
 import { PromptVersioningService } from '../prompt-versioning.service';
 import { Prompt } from '../../entity/prompt.entity';
 import {
@@ -204,6 +206,39 @@ describe('PromptVersioningService.createVersion', () => {
         details: { missing: ['age'], unknown: ['mood'] },
       }),
     });
+  });
+
+  it('refuses a Debrief Writer version that drops its safety data, with 422 (step 5)', async () => {
+    const contract = toStoreContract(DEBRIEF_WRITER_SYSTEM);
+    expect(contract.required).toEqual(
+      expect.arrayContaining([
+        'transcript',
+        'risk_cue_turns',
+        'risk_cue_definition',
+        'safety_reading',
+      ]),
+    );
+    const { service } = buildStore({
+      prompt: { currentVersion: 2, contract },
+      versions: twoVersions,
+    });
+    const body =
+      'Write the cards. {{transcript}} {{safety_reading}} {{risk_cue_definition}}';
+    await expect(
+      service.createVersion('p1', input({ body })),
+    ).rejects.toMatchObject({
+      status: 422,
+      response: expect.objectContaining({
+        errorCode: 'SKILLS_STORE_CONTRACT_VIOLATION',
+        details: { missing: ['risk_cue_turns'], unknown: [] },
+      }),
+    });
+    await expect(
+      service.createVersion(
+        'p1',
+        input({ body: `${body} {{risk_cue_turns}}` }),
+      ),
+    ).resolves.toEqual(expect.objectContaining({ version: 3 }));
   });
 
   it('refuses a change to a gated Builder prompt unless the eval approved it', async () => {

@@ -7,15 +7,16 @@ import { describe, expect, it, vi } from "vitest";
 import "@constants";
 
 /**
- * The Overview's numbers (chunk 20d-2): the last 30 days by default, as the list counted them, and
- * the last 7 days when chosen, asked for only then.
+ * The Overview's numbers (chunk 20d-2): the last 30 days by default, the last 7 when chosen. Both
+ * come from the home's numbers, counted from the store "This week" counts (Q3d), never from the
+ * list's own `bot.stats`.
  */
 const numbers = vi.fn();
 vi.mock("@api", async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useArchiveChatbotMutation: () => [vi.fn(), { isLoading: false }],
   useSetChatbotStatusMutation: () => [vi.fn(), { isLoading: false }],
-  useGetHomeNumbersQuery: (arg: unknown, options: { skip: boolean }) => numbers(arg, options),
+  useGetHomeNumbersQuery: (arg: unknown) => numbers(arg),
 }));
 vi.mock("react-router-dom", () => ({ useNavigate: () => vi.fn() }));
 vi.mock("../sections/Scorecard", () => ({ Scorecard: () => null }));
@@ -38,26 +39,28 @@ const shown = () =>
   [...screen.getByTestId("overview-numbers").querySelectorAll("dd")].map(dd => dd.textContent);
 
 describe("the Overview's numbers", () => {
-  it("shows the last 30 days, then the last 7 when chosen", () => {
-    numbers.mockImplementation((_arg, { skip }) => ({
-      data: skip
-        ? undefined
-        : { days: 7, people: 9, messages: 70, answered: 60, declined: 4, openUnanswered: 3 },
+  it("shows the last 30 days, then the last 7, both from the home's numbers", () => {
+    numbers.mockImplementation(({ days }: { days: 7 | 30 }) => ({
+      data:
+        days === 7
+          ? { days: 7, people: 9, messages: 70, answered: 60, declined: 4, openUnanswered: 3 }
+          : { days: 30, people: 31, messages: 210, answered: 180, declined: 9, openUnanswered: 3 },
     }));
     render(
       <OverviewSection
         {...({ bot: BOT, page: null, canEdit: true, canManage: false, go: vi.fn() } as never)}
       />,
     );
-    expect(shown()).toEqual(["40", "300", "250", "20"]);
-    expect(numbers).toHaveBeenLastCalledWith({ id: "bot-1", days: 7 }, { skip: true });
+    // Not the list's own counts (40, 300, …): those came from another store.
+    expect(shown()).toEqual(["31", "210", "180", "9"]);
+    expect(numbers).toHaveBeenLastCalledWith({ id: "bot-1", days: 30 });
 
     fireEvent.click(screen.getByRole("radio", { name: t.last7 }));
-    expect(numbers).toHaveBeenLastCalledWith({ id: "bot-1", days: 7 }, { skip: false });
+    expect(numbers).toHaveBeenLastCalledWith({ id: "bot-1", days: 7 });
     expect(shown()).toEqual(["9", "70", "60", "4"]);
 
     fireEvent.click(screen.getByRole("radio", { name: t.last30 }));
-    expect(shown()).toEqual(["40", "300", "250", "20"]);
+    expect(shown()).toEqual(["31", "210", "180", "9"]);
   });
 
   it("opens All numbers in place, and an old usage link arrives with it open", () => {

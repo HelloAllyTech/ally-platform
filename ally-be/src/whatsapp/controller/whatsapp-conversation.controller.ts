@@ -25,6 +25,7 @@ import {
   WaUnansweredStatus,
 } from '../enum/whatsapp.enum';
 import { WhatsAppConversationService } from '../service/whatsapp-conversation.service';
+import { AssistantScope } from '../../chatbot/access/chatbot-role.decorator';
 
 /**
  * Conversation log, unanswered queue and usage dashboard.
@@ -58,6 +59,7 @@ export class WhatsAppConversationController {
   // ── conversations ─────────────────────────────────────────────────────
 
   @Get('conversations')
+  @AssistantScope('list')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT_CONVERSATIONS],
   })
@@ -101,6 +103,7 @@ export class WhatsAppConversationController {
   }
 
   @Get('conversations/languages')
+  @AssistantScope('list')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT_CONVERSATIONS],
   })
@@ -119,6 +122,7 @@ export class WhatsAppConversationController {
   }
 
   @Get('conversations/:id')
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT_CONVERSATIONS],
   })
@@ -133,6 +137,7 @@ export class WhatsAppConversationController {
   }
 
   @Get('citations/:chunkId')
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT_CONVERSATIONS],
   })
@@ -147,6 +152,7 @@ export class WhatsAppConversationController {
   }
 
   @Post('contacts/:id/reveal')
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT_CONVERSATIONS],
   })
@@ -161,6 +167,7 @@ export class WhatsAppConversationController {
   }
 
   @Post('contacts/:id/block')
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT_CONVERSATIONS],
   })
@@ -178,6 +185,7 @@ export class WhatsAppConversationController {
   }
 
   @Post('contacts/:id/unblock')
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT_CONVERSATIONS],
   })
@@ -187,6 +195,7 @@ export class WhatsAppConversationController {
   }
 
   @Post('contacts/:id/erase')
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT_CONVERSATIONS],
   })
@@ -201,6 +210,7 @@ export class WhatsAppConversationController {
   }
 
   @Post('web-contacts/:id/erase')
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT_CONVERSATIONS],
   })
@@ -216,6 +226,7 @@ export class WhatsAppConversationController {
   // ── unanswered queue ──────────────────────────────────────────────────
 
   @Get('unanswered')
+  @AssistantScope('list')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT_UNANSWERED],
   })
@@ -252,6 +263,7 @@ export class WhatsAppConversationController {
   }
 
   @Patch('unanswered/:id')
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT_UNANSWERED],
   })
@@ -271,6 +283,7 @@ export class WhatsAppConversationController {
   }
 
   @Post('unanswered/:id/create-document')
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT_UNANSWERED],
   })
@@ -291,6 +304,7 @@ export class WhatsAppConversationController {
   // ── analytics ─────────────────────────────────────────────────────────
 
   @Get('analytics/overview')
+  @AssistantScope('list')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT_ANALYTICS],
   })
@@ -314,6 +328,7 @@ export class WhatsAppConversationController {
   }
 
   @Get('analytics/timeseries')
+  @AssistantScope('list')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT_ANALYTICS],
   })
@@ -332,6 +347,7 @@ export class WhatsAppConversationController {
   }
 
   @Get('analytics/languages')
+  @AssistantScope('list')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT_ANALYTICS],
   })
@@ -356,6 +372,7 @@ export class WhatsAppConversationController {
   }
 
   @Get('analytics/corpus-coverage')
+  @AssistantScope('list')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT_ANALYTICS],
   })

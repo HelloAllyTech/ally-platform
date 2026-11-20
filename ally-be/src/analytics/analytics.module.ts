@@ -34,6 +34,8 @@ import { ChangelogModule } from 'src/changelog/changelog.module';
 import { RoadmapDeliveryAnalyticsRepository } from './repository/roadmap-delivery-analytics.repository';
 // Highlights → Priority "Roadmap votes cast": the same untenanted roadmap tables.
 import { RoadmapVotingAnalyticsService } from './service/roadmap-voting-analytics.service';
+import { AssessmentAttemptsAnalyticsService } from './service/assessment-attempts-analytics.service';
+import { CourseAssessmentReportService } from './service/course-assessment-report.service';
 import { RoadmapVotingAnalyticsRepository } from './repository/roadmap-voting-analytics.repository';
 // Testing-tab endpoints: candidates for the leadership Highlights tab, kept on a
 // separate admin tab until they have proved they change a decision.
@@ -245,6 +247,8 @@ import { TenantModule } from 'src/tenant/tenant.module';
     RoadmapDeliveryAnalyticsRepository,
     RoadmapVotingAnalyticsService,
     RoadmapVotingAnalyticsRepository,
+    AssessmentAttemptsAnalyticsService,
+    CourseAssessmentReportService,
     // No repository: this one reads GitHub's statistics API, not our database.
     ShipVolumeAnalyticsService,
     ActivationAnalyticsService,
@@ -370,7 +374,7 @@ import { TenantModule } from 'src/tenant/tenant.module';
     DashboardRepository,
   ],
   /**
-   * The per-chart aggregate services, exported for AnalyticsSuggestionsModule.
+   * The per-chart aggregate services, exported for the PM Agent and the dashboard.
    *
    * Only the `getX(query)` read services are exported — never the repositories,
    * the judges, or the backfill schedulers. A consumer that wants a figure gets

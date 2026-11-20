@@ -82,7 +82,7 @@ import { RoadmapAccessService } from '../service/roadmap-access.service';
 import { RoadmapCopilotService } from '../service/roadmap-copilot.service';
 import {
   ROADMAP_COPILOT,
-  ROADMAP_FILEABLE_EFFORTS,
+  ROADMAP_SINGLE_IDEA_EFFORTS,
   ROADMAP_READINESS_CRITERIA,
 } from '../constants/product-roadmap.constants';
 import { RoadmapOpportunityEffort } from '../enum/roadmap-opportunity.enum';
@@ -594,9 +594,10 @@ export class RoadmapAdminController {
         hint: c.hint,
       })),
       // Same reason as the criteria: the size threshold gates filing, so the client must not
-      // hold its own copy of it.
+      // hold its own copy of it. This is the size ONE idea files at through the interview;
+      // XL and XXL are split into slices first (docs/roadmap-idea-quality.md).
       fileableEfforts: [
-        ...ROADMAP_FILEABLE_EFFORTS,
+        ...ROADMAP_SINGLE_IDEA_EFFORTS,
       ] as RoadmapOpportunityEffort[],
     };
   }
@@ -669,7 +670,7 @@ export class RoadmapAdminController {
     @CurrentUser() user: TokenUser,
     @Body() dto: OpportunityInterviewTurnDto,
   ): Promise<OpportunityInterviewTurnResponseDto> {
-    // The copilot is the filing interview: Product Planning — Ideas, like the
+    // The copilot is the filing interview: the Idea role, like the
     // door it leads to.
     await this.planAccess.assertIdeas(user.id);
     return this.copilotService.takeTurn(

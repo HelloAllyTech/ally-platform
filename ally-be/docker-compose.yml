@@ -148,8 +148,9 @@ services:
         aws --endpoint-url=http://localstack:4566 s3 mb s3://learn-media-public-s3-bucket || true &&
         aws --endpoint-url=http://localstack:4566 s3 mb s3://s3_bucket || true &&
         aws --endpoint-url=http://localstack:4566 s3 mb s3://local-dev-scenario-session-audio || true &&
+        aws --endpoint-url=http://localstack:4566 s3 mb s3://assets-s3-bucket || true &&
         echo '🔓 Configuring bucket CORS for browser uploads...' &&
-        for B in audio-storage-s3-bucket learn-media-public-s3-bucket local-dev-scenario-session-audio; do aws --endpoint-url=http://localstack:4566 s3api put-bucket-cors --bucket $$B --cors-configuration '{\"CORSRules\":[{\"AllowedOrigins\":[\"*\"],\"AllowedMethods\":[\"GET\",\"PUT\",\"POST\",\"HEAD\",\"DELETE\"],\"AllowedHeaders\":[\"*\"],\"ExposeHeaders\":[\"ETag\"],\"MaxAgeSeconds\":3000}]}' || true; done &&
+        for B in audio-storage-s3-bucket learn-media-public-s3-bucket local-dev-scenario-session-audio assets-s3-bucket; do aws --endpoint-url=http://localstack:4566 s3api put-bucket-cors --bucket $$B --cors-configuration '{\"CORSRules\":[{\"AllowedOrigins\":[\"*\"],\"AllowedMethods\":[\"GET\",\"PUT\",\"POST\",\"HEAD\",\"DELETE\"],\"AllowedHeaders\":[\"*\"],\"ExposeHeaders\":[\"ETag\"],\"MaxAgeSeconds\":3000}]}' || true; done &&
         echo '📦 Creating SQS queues...' &&
         aws --endpoint-url=http://localstack:4566 sqs create-queue --queue-name sqs-ai-transcription-request-queue &&
         aws --endpoint-url=http://localstack:4566 sqs create-queue --queue-name sqs-ai-transcription-response-queue &&

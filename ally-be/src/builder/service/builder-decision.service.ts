@@ -212,20 +212,43 @@ export class BuilderDecisionService implements OnModuleInit, OnModuleDestroy {
   async findPending(decisionId: string): Promise<BuilderDecision | null> {
     const parsed = parseDecisionId(decisionId);
     if (!parsed) return null;
+    const decisions = await this.derivePendingForSession(parsed.sessionId);
+    return decisions.find((decision) => decision.id === decisionId) ?? null;
+  }
+
+  /**
+   * What one shared session is waiting on a person for, oldest first, minus
+   * answers still inside their undo window — the slice of `listPending` for
+   * one session, for a page that shows one idea (Roadmap v2's idea page).
+   */
+  async listPendingForSession(sessionId: string): Promise<BuilderDecision[]> {
+    const decisions = await this.derivePendingForSession(sessionId);
+    const held = await this.heldIds(decisions.map((decision) => decision.id));
+    return decisions
+      .filter((decision) => !held.has(decision.id))
+      .sort(
+        (a, b) =>
+          new Date(a.waitingSince).getTime() -
+          new Date(b.waitingSince).getTime(),
+      );
+  }
+
+  private async derivePendingForSession(
+    sessionId: string,
+  ): Promise<BuilderDecision[]> {
     const session = await this.sessionRepository.findOne({
-      where: { id: parsed.sessionId, ...SHARED_SESSIONS_ONLY },
+      where: { id: sessionId, ...SHARED_SESSIONS_ONLY },
     });
-    if (!session) return null;
+    if (!session) return [];
     const [names, pullRequests] = await Promise.all([
       this.sessionRepository.findCreatorNames([session.createdBy]),
       this.pullRequestRepository.find({ where: { sessionId: session.id } }),
     ]);
-    const decisions = await this.decisionsForSession(
+    return this.decisionsForSession(
       session,
       names.get(session.createdBy) ?? null,
       pullRequests,
     );
-    return decisions.find((decision) => decision.id === decisionId) ?? null;
   }
 
   /**
@@ -770,6 +793,7 @@ export class BuilderDecisionService implements OnModuleInit, OnModuleDestroy {
               prompt: question.prompt,
               rationale: question.rationale ?? null,
               questionType: question.questionType ?? null,
+              ...(question.forAuthor ? { forAuthor: true } : {}),
               context: [
                 ...(pending.said ? [`Builder said: ${pending.said}`] : []),
                 ...prdContext,
@@ -1135,9 +1159,19 @@ export class BuilderDecisionService implements OnModuleInit, OnModuleDestroy {
     if (row.metadata?.streaming || row.metadata?.interrupted) return [];
 
     const later = history.slice(lastAssistantIndex + 1);
+    // An answer from the feed or session page carries `questionId`; one posted
+    // on the idea page by anyone with Roadmap access (a plan post) carries it
+    // in `planPost` — reading only the first left a contributor's answer
+    // pending forever (idea-to-plan audit, small defects).
     const answeredQuestionIds = new Set(
       later
-        .map((message) => message.metadata?.questionId)
+        .map(
+          (message) =>
+            message.metadata?.questionId ??
+            (message.metadata?.planPost?.kind === 'answer'
+              ? message.metadata.planPost.questionId
+              : undefined),
+        )
         .filter((id): id is string => typeof id === 'string'),
     );
     const answeredBriefIds = new Set(

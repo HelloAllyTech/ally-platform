@@ -15,8 +15,9 @@
  *    base score)`. An event fires at most `detectionConfig.maxOccurrences`
  *    times; with NO `maxOccurrences` the worker applies no cap at all
  *    (`app/core/graph/utils.py`), so its ceiling is unbounded.
- *  - Behaviour instructions: +10 per detected learner turn for SHOULD_DO, −10
- *    for SHOULD_NOT_DO (`BEHAVIOR_INSTRUCTION_*_SCORE`), re-checked on every
+ *  - Behaviour instructions: the authored score (`scenario_behavior_instructions.score`)
+ *    per detected learner turn, else +10 for SHOULD_DO / −10 for SHOULD_NOT_DO
+ *    (`BEHAVIOR_INSTRUCTION_*_SCORE`), re-checked on every
  *    learner turn and never capped.
  *
  * So a true ceiling exists only when every positive contributor is capped.

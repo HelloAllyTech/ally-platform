@@ -51,6 +51,7 @@ interface TrackOutlineRailProps {
     title: string,
   ) => void;
   onDeleteSection: (sectionIndex: number) => void;
+  onDuplicateSection: (sectionIndex: number) => void;
   onReorderSections: (from: number, to: number) => void;
   onReorderItems: (sectionIndex: number, from: number, to: number) => void;
 }
@@ -70,6 +71,7 @@ export const TrackOutlineRail: FC<TrackOutlineRailProps> = ({
   onAddItem,
   onAddItemFromTemplate,
   onDeleteSection,
+  onDuplicateSection,
   onReorderSections,
   onReorderItems,
 }) => {
@@ -175,6 +177,7 @@ export const TrackOutlineRail: FC<TrackOutlineRailProps> = ({
               onAddItem={onAddItem}
               onAddItemFromTemplate={onAddItemFromTemplate}
               onDeleteSection={onDeleteSection}
+              onDuplicateSection={onDuplicateSection}
               onReorderItems={onReorderItems}
             />
           ))}

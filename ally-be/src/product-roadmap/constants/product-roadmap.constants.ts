@@ -88,7 +88,18 @@ export const BUILDER_SEED_TITLE_MAX = 80;
 export const BUILDER_HANDOFF_TRANSCRIPT_MAX = 80_000;
 
 export const ROADMAP_LIMITS = {
+  /** The summary ("Problem") an idea carries beneath its title. */
   DESCRIPTION_MAX: 1000,
+  /** An idea's title: one line. Required on every new idea (2026-11-19). */
+  TITLE_MAX: 200,
+  /**
+   * What `roadmap_opportunities.description` can hold: a title, the blank line after it, and
+   * a full-length summary. Mirrors CHK_roadmap_opps_description (migration
+   * 1984950000000), which was 1000 while the title was the summary's own first line.
+   */
+  STORED_TEXT_MAX: 1202,
+  /** The idea agent's suggested title: shorter than TITLE_MAX, so it reads as one line. */
+  IDEA_TITLE_MAX: 120,
   PRD_MAX: 20000,
   CLAUDE_PROMPT_MAX: 20000,
   COMMENT_MAX: 500,
@@ -240,7 +251,6 @@ export const ROADMAP_RANK = {
 export const ROADMAP_QUEUE_STAGES = [
   RoadmapOpportunityStage.NEW,
   RoadmapOpportunityStage.PRIORITISED,
-  RoadmapOpportunityStage.UNDER_DEVELOPMENT,
 ] as const;
 
 export const ROADMAP_LIST_DEFAULTS = {
@@ -312,6 +322,8 @@ export const ROADMAP_PROMPT_CODES = {
   DUPLICATE_CHECK: 'roadmap_duplicate_check',
   GOAL_IMPACT: 'roadmap_goal_impact',
   SUMMARISE_INTERVIEW: 'roadmap_summarise_interview',
+  /** Writes a one-line title for idea text that has none. See RoadmapAiService.suggestTitle. */
+  SUGGEST_TITLE: 'roadmap_suggest_title',
   GENERATE_CLAUDE_PROMPT: 'roadmap_generate_claude_prompt',
   /**
    * The copilot that walks an admin to a fileable, strategically grounded draft. Grades the
@@ -398,9 +410,112 @@ export const ROADMAP_READINESS_CRITERIA = [
   {
     id: 'outcome',
     label: 'Says what changes for them',
-    hint: 'What that group can then do, stop losing, or gain — stated so we could later tell whether it happened.',
+    hint: 'What that group can then do, stop losing, or gain — a change in their situation or behaviour, not a feature shipping.',
+  },
+  // ── Added 2026-11-20 with the quality bar (docs: wiki/product/idea-quality.md) ──
+  {
+    id: 'strategic_fit',
+    label: 'Serves a named Ally goal or bet',
+    hint: "Names which strategy goal or current bet it advances, in the words of the Vision & strategy page, and does not contradict a stated non-goal. 'It would be nice' is not a fit.",
+  },
+  {
+    id: 'success_signal',
+    label: 'Says how we would know it worked',
+    hint: "A signal we could actually look at — a metric, an observable behaviour, a before→after direction — and where we would look. 'Users like it more' is not a signal.",
+  },
+  {
+    id: 'scope_boundary',
+    label: 'Draws the scope line',
+    hint: 'What is in, and at least one thing deliberately out — enough that someone could size it.',
   },
 ] as const;
+
+/**
+ * THE QUALITY BAR, on top of the gates above.
+ *
+ * The gates are a floor: eight yes/no facts that must each be established. They cannot say how
+ * WELL an idea is made, so the copilot also grades six dimensions on an anchored 0–4 scale (the
+ * anchors live in the prompt, so a "3" means the same thing on Monday and on Friday), and the
+ * server — never the model — turns those into one 0–100 score. An idea files only when every
+ * gate is met, the score reaches ROADMAP_QUALITY_PASS_SCORE and every dimension with a `floor`
+ * reaches it. See wiki/product/idea-quality.md for why these six and these weights.
+ *
+ * EVIDENCE IS SCORED, NOT REQUIRED (floor 0): ideas spotted internally or derived from a bug
+ * report must still be able to file. What the weights do is make an idea backed only by its
+ * author's own say-so (evidence 1 of 4) need to be sharper everywhere else.
+ *
+ * Ids are permanent once shipped: they are persisted on drafts and shown to voters.
+ * Weights sum to 100.
+ */
+export const ROADMAP_QUALITY_DIMENSIONS = [
+  {
+    id: 'problem',
+    label: 'Problem clarity',
+    weight: 20,
+    floor: 2,
+    hint: 'The pain or gain is concrete: a moment, a trigger, what people do today instead.',
+  },
+  {
+    id: 'audience',
+    label: 'Audience and reach',
+    weight: 15,
+    floor: 2,
+    hint: 'A specific group, with a sense of how many and how often.',
+  },
+  {
+    id: 'outcome',
+    label: 'Measurable outcome',
+    weight: 20,
+    floor: 2,
+    hint: 'A signal with a direction (and a baseline or target when one exists) that we could check after release.',
+  },
+  {
+    id: 'strategy',
+    label: 'Strategic leverage',
+    weight: 20,
+    floor: 2,
+    hint: 'Why this over the rest of the board: which goal it moves, and why now.',
+  },
+  {
+    id: 'evidence',
+    label: 'Evidence',
+    weight: 15,
+    floor: 0,
+    hint: 'Something beyond opinion: data, a user quote, a ticket, the board, the code.',
+  },
+  {
+    id: 'scope',
+    label: 'Scope and size',
+    weight: 10,
+    floor: 0,
+    hint: 'Bounded, with an explicit out-of-scope line, risks named, and small enough to ship as one idea.',
+  },
+] as const;
+
+export type RoadmapQualityDimensionId =
+  (typeof ROADMAP_QUALITY_DIMENSIONS)[number]['id'];
+
+/** The anchored scale: 0 absent · 1 vague · 2 adequate · 3 specific · 4 specific and evidenced. */
+export const ROADMAP_QUALITY_SCALE_MAX = 4;
+
+/**
+ * The score an idea needs to go to the board. Every dimension at 3 ("specific") is 75; every
+ * dimension at 2 ("adequate") is 50; specific everywhere with only the author's own
+ * observation as evidence is 67.5. 65 therefore means "specific across the board", and it is
+ * the single number to tune once real drafts have been graded.
+ */
+export const ROADMAP_QUALITY_PASS_SCORE = 65;
+
+/**
+ * The sizes ONE idea may be filed at through the interview. XL and XXL are not refused outright:
+ * the interview splits them into slices that are each filed on their own. (The wider
+ * ROADMAP_FILEABLE_EFFORTS still applies to system filings such as the PM Agent, which carry no
+ * quality score.)
+ */
+export const ROADMAP_SINGLE_IDEA_EFFORTS = ['s', 'm', 'l'] as const;
+
+/** One interview may hand over between MIN and MAX slices of a too-big (or two-ideas-in-one) idea. */
+export const ROADMAP_SLICES = { MIN: 2, MAX: 5 } as const;
 
 /**
  * The sizes an opportunity may be filed at: all of them. An opportunity does not have to be
@@ -427,6 +542,13 @@ export const ROADMAP_FILEABLE_EFFORTS = ['s', 'm', 'l', 'xl', 'xxl'] as const;
  * sized yet" means.
  */
 export const ROADMAP_EFFORT_UNSIZED = 'unsized';
+
+/**
+ * Sentinel the owner FILTER accepts alongside owner names, meaning "nobody owns this" — no linked
+ * user and no legacy owner text. Same idea as ROADMAP_EFFORT_UNSIZED: a filter-only value, never
+ * stored. It exists for the triage Inbox, which needs to find work that has no owner yet.
+ */
+export const ROADMAP_OWNER_UNASSIGNED = 'unassigned';
 
 /**
  * How long a signed readiness verdict stays spendable.

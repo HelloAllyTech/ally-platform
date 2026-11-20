@@ -12,6 +12,17 @@ import { PlanEventService } from './service/plan-event.service';
 import { PlanSpendService } from './service/plan-spend.service';
 import { PlanNotificationService } from './service/plan-notification.service';
 import { PlanSettingsService } from './service/plan-settings.service';
+import { RoadmapNotificationService } from 'src/product-roadmap/service/roadmap-notification.service';
+import { RoadmapRoleService } from './service/roadmap-role.service';
+import { PlanCeilingService } from './service/plan-ceiling.service';
+import { RoadmapInboxService } from './service/roadmap-inbox.service';
+import { RoadmapNotification } from './entity/roadmap-notification.entity';
+import { RoadmapWatch } from './entity/roadmap-watch.entity';
+import { RoadmapUserPreference } from './entity/roadmap-user-preference.entity';
+import { RoadmapPreferenceService } from './service/roadmap-preference.service';
+import { RoadmapDigestFeedService } from './service/roadmap-digest-feed.service';
+import { RoadmapItemRead } from './entity/roadmap-item-read.entity';
+import { RoadmapIdeaNoticeService } from './service/roadmap-idea-notice.service';
 
 const ENTITIES = TypeOrmModule.forFeature([
   PlanEvent,
@@ -20,6 +31,10 @@ const ENTITIES = TypeOrmModule.forFeature([
   PlanCheck,
   PlanOutcomeReview,
   PlanSuggestion,
+  RoadmapNotification,
+  RoadmapWatch,
+  RoadmapItemRead,
+  RoadmapUserPreference,
   BuilderSettings,
 ]);
 
@@ -44,6 +59,15 @@ const ENTITIES = TypeOrmModule.forFeature([
     PlanSpendService,
     PlanNotificationService,
     PlanSettingsService,
+    RoadmapRoleService,
+    PlanCeilingService,
+    RoadmapInboxService,
+    // The roadmap's listener registry (the gateway registers on it). Provided here, a leaf both
+    // Builder and the roadmap import, so there is exactly one instance.
+    RoadmapNotificationService,
+    RoadmapPreferenceService,
+    RoadmapDigestFeedService,
+    RoadmapIdeaNoticeService,
   ],
   exports: [
     // Re-exported so the plan flow injects these repositories without registering them twice.
@@ -53,6 +77,13 @@ const ENTITIES = TypeOrmModule.forFeature([
     PlanSpendService,
     PlanNotificationService,
     PlanSettingsService,
+    RoadmapRoleService,
+    PlanCeilingService,
+    RoadmapInboxService,
+    RoadmapNotificationService,
+    RoadmapPreferenceService,
+    RoadmapDigestFeedService,
+    RoadmapIdeaNoticeService,
   ],
 })
 export class ProductPlanningModule {}

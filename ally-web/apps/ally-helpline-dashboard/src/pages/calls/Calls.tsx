@@ -36,6 +36,8 @@ export const Calls: FC<CallsProps> = ({ sessionType }) => {
   const [selectedUserGroup, setSelectedUserGroup] = useState<SessionUserGroup | null>(null);
   const [isAudioUploadDialogOpen, setIsAudioUploadDialogOpen] = useState(false);
   const [isCreateNoteOpen, setIsCreateNoteOpen] = useState(false);
+  // The note the New note drawer just finished, to open in the logs sidebar.
+  const [openChatId, setOpenChatId] = useState<number | null>(null);
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
 
   const { permissions, availableChatTypes } = useUser();
@@ -97,6 +99,7 @@ export const Calls: FC<CallsProps> = ({ sessionType }) => {
       <UserLogsTable
         refreshKey={refreshKey}
         sessionType={sessionType}
+        openChatId={openChatId}
         className={
           userGroupList?.length > 1 ? "max-h-[calc(100dvh-200px)]" : "max-h-[calc(100dvh-140px)]"
         }
@@ -228,7 +231,14 @@ export const Calls: FC<CallsProps> = ({ sessionType }) => {
       </PermissionGuard>
 
       {canCreateNote && (
-        <CreateNoteDrawer open={isCreateNoteOpen} onClose={() => setIsCreateNoteOpen(false)} />
+        <CreateNoteDrawer
+          open={isCreateNoteOpen}
+          onClose={() => setIsCreateNoteOpen(false)}
+          onNoteReady={chatId => {
+            setIsCreateNoteOpen(false);
+            setOpenChatId(chatId);
+          }}
+        />
       )}
 
       <CustomMenu

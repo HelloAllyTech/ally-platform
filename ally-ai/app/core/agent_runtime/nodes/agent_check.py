@@ -28,7 +28,8 @@ from app.core.agent_runtime.check import (
 )
 from app.core.agent_runtime.memory import personal_context
 from app.core.agent_runtime.state import AgentState, json_safe
-from app.core.agent_runtime.tools.lists import offers_create
+from app.core.agent_runtime.tools import gateway_tools
+from app.core.agent_runtime.tools.lists import offers_create, takes_details
 from app.core.agent_runtime.trace import Node, traced
 from app.core.knowledge_agent.agent import KnowledgeAgentService
 from app.core.knowledge_agent.schemas import is_general
@@ -44,6 +45,28 @@ def _summary(_: AgentState, update: Dict[str, Any]) -> str:
     )
 
 
+#: Refusals from a list's rules (ally-be `list-refusals.ts`): the request was
+#: understood and checked, and the answer is no, in words the person can act on.
+RULE_REFUSALS = frozenset(
+    {
+        "unique_taken",
+        "capacity_full",
+        "limit_reached",
+        "transition_not_allowed",
+        # Chunk H1: the gateway's question before a write, and a detail to ask for.
+        "needs_confirmation",
+        "missing_detail",
+    }
+)
+
+
+def can_pass_on(bot: Dict[str, Any]) -> bool:
+    """Whether the run can pass a request on (chunk 6b): `hand_over` is offered, or
+    a create tool on a list that takes the person's details."""
+    names = {tool.name for tool in gateway_tools(bot)}
+    return "hand_over" in names or takes_details(bot.get("gateway_definitions"))
+
+
 def make_agent_check_node(service: KnowledgeAgentService) -> Node:
     @traced("check", _summary, lambda _: "checking")
     async def agent_check(state: AgentState) -> Dict[str, Any]:
@@ -54,8 +77,24 @@ def make_agent_check_node(service: KnowledgeAgentService) -> Node:
             translated=None,
             translation_degraded=False,
         )
-        # Searches only: a gateway tool (chunk 3b) is not a search.
+        # Searches only: a gateway tool (chunk 3b) is not a search. A find that
+        # answered did look, though (chunk 6b).
         searched = bool(searches(state))
+        finds = [
+            call
+            for call in state.get("tool_calls") or []
+            if call.get("list_kind") == "find" and call.get("ok")
+        ]
+        # What the list's rules refused this run, in their own plain words (Q3-fast
+        # Part 0b): a reply relaying it is an answer, not a decline.
+        refused = tuple(
+            str(call["message"])
+            for call in state.get("tool_calls") or []
+            if call.get("list_kind") in ("create", "update")
+            and not call.get("ok")
+            and call.get("error") in RULE_REFUSALS
+            and call.get("message")
+        )
         result, rejection = check_reply(
             state.get("agent_step") or {},
             state.get("agent_meta") or {},
@@ -75,6 +114,16 @@ def make_agent_check_node(service: KnowledgeAgentService) -> Node:
             purpose=(state["bot"].get("persona") or {}).get("purpose"),
             can_book=offers_create(state["bot"].get("gateway_definitions")),
             personal=personal_context(state["bot"]),
+            looked_up=bool(finds),
+            can_pass_on=can_pass_on(state["bot"]),
+            carried=len(state.get("carried_records") or []),
+            refused=refused,
+            business_contact=state["bot"].get("business_contact") or "",
+            memory_on="memory" in state["bot"],
+            found_nothing=any(
+                call.get("nearest") or not (call.get("added") or call.get("aggregate"))
+                for call in finds
+            ),
             can_search_again=len(searches(state)) == 1
             and search_budget(state) > 0
             and (state.get("revisions") or 0) < MAX_REVISIONS

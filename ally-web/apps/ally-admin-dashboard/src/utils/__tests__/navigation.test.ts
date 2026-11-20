@@ -3,7 +3,14 @@ import { describe, it, expect } from "vitest";
 import { NavigationItem } from "@components/types";
 import { ROUTES, SIDEBAR_ITEMS, Permissions, FeatureToggleKey, OrgToggle } from "@constants";
 
-import { applySavedOrder, deriveNavigationItems } from "../navigation";
+import {
+  NAV_SECTION_IDS,
+  applySavedOrder,
+  deriveNavigationItems,
+  flattenNavSections,
+  groupNavigationItems,
+  isNavItemActive,
+} from "../navigation";
 
 describe("applySavedOrder", () => {
   const items: NavigationItem[] = [
@@ -35,6 +42,7 @@ const ALL_FEATURE_GATED_KEYS = [
   FeatureToggleKey.CHARACTER_LIBRARY,
   FeatureToggleKey.MANAGE_STT_CONFIGS,
   FeatureToggleKey.MANAGE_LLM_MODEL_CATALOG,
+  FeatureToggleKey.MANAGE_COSTS,
   FeatureToggleKey.MANAGE_GUARDRAILS,
   FeatureToggleKey.MANAGE_TOOLTIPS,
   FeatureToggleKey.USER_BADGES,
@@ -96,18 +104,16 @@ describe("deriveNavigationItems", () => {
     expect(result.map(i => i.id)).not.toContain(SIDEBAR_ITEMS.PRODUCT_ROADMAP);
   });
 
-  it("shows Product updates right after Blog for a holder of EDIT_BLOG", () => {
+  it("no longer lists Product updates in the sidebar: it is a tab of the Roadmap's top menu", () => {
     const result = deriveNavigationItems({
       permissions: [Permissions.EDIT_BLOG, Permissions.VIEW_BLOGS],
       features: DEFAULT_TAB_KEYS,
       savedOrder: undefined,
     });
-    const ids = result.map(i => i.id);
-    expect(ids).toEqual([SIDEBAR_ITEMS.BLOG, SIDEBAR_ITEMS.PRODUCT_UPDATES]);
-    expect(result[1].path).toBe(ROUTES.PRODUCT_UPDATES);
+    expect(result.map(i => i.id)).toEqual([SIDEBAR_ITEMS.BLOG]);
   });
 
-  it("hides Product updates without EDIT_BLOG, even with VIEW_BLOGS or every feature toggle", () => {
+  it("keeps Product updates out of the sidebar whatever the permissions or toggles", () => {
     expect(
       deriveNavigationItems({
         permissions: [Permissions.VIEW_BLOGS],
@@ -206,6 +212,33 @@ describe("deriveNavigationItems", () => {
     expect(ids).toContain(SIDEBAR_ITEMS.SCENARIO_LANGUAGES);
     expect(ids).toContain(SIDEBAR_ITEMS.WHATSAPP_BOT);
     expect(ids).toContain(SIDEBAR_ITEMS.BUG_HUNTER);
+  });
+
+  // CR1: Models and Costs are the only screens with dollars; `manage_costs` alone opens them.
+  it("shows Models, Costs and Plans, next to Language Models, only with manage_costs", () => {
+    const withCosts = deriveNavigationItems({
+      permissions: [],
+      features: [FeatureToggleKey.MANAGE_LLM_MODEL_CATALOG, FeatureToggleKey.MANAGE_COSTS],
+      savedOrder: undefined,
+    });
+    expect(withCosts.map(i => i.id)).toEqual([
+      SIDEBAR_ITEMS.LLM_MODEL_CATALOG,
+      SIDEBAR_ITEMS.BILLING_MODELS,
+      SIDEBAR_ITEMS.BILLING_COSTS,
+      SIDEBAR_ITEMS.BILLING_PLANS,
+    ]);
+    expect(withCosts[1].path).toBe(ROUTES.BILLING_MODELS);
+    expect(withCosts[2].path).toBe(ROUTES.BILLING_COSTS);
+    expect(withCosts[3].path).toBe(ROUTES.BILLING_PLANS);
+
+    const ids = deriveNavigationItems({
+      permissions: [Permissions.EDIT_SCENARIO, Permissions.VIEW_USERS],
+      features: ALL_FEATURE_GATED_KEYS.filter(key => key !== FeatureToggleKey.MANAGE_COSTS),
+      savedOrder: undefined,
+    }).map(i => i.id);
+    expect(ids).not.toContain(SIDEBAR_ITEMS.BILLING_MODELS);
+    expect(ids).not.toContain(SIDEBAR_ITEMS.BILLING_COSTS);
+    expect(ids).not.toContain(SIDEBAR_ITEMS.BILLING_PLANS);
   });
 
   describe("org-toggle tier (a tenant's own admins)", () => {
@@ -337,22 +370,46 @@ describe("deriveNavigationItems", () => {
     expect(withToggle.map(i => i.id)).not.toContain(SIDEBAR_ITEMS.BUG_HUNTER);
   });
 
-  it("shows WhatsApp Bot to a holder of the whatsapp_bot toggle", () => {
-    const result = deriveNavigationItems({
+  it("shows PM Agent only to a holder of the pm_agent toggle", () => {
+    const withToggle = deriveNavigationItems({
       permissions: [],
+      features: [FeatureToggleKey.PM_AGENT],
+      savedOrder: undefined,
+    });
+    const item = withToggle.find(i => i.id === SIDEBAR_ITEMS.PM_AGENT);
+    expect(item?.path).toBe(ROUTES.PM_AGENT);
+    const without = deriveNavigationItems({ permissions: [], features: [], savedOrder: undefined });
+    expect(without.map(i => i.id)).not.toContain(SIDEBAR_ITEMS.PM_AGENT);
+  });
+
+  it("shows a Chatbots-only login (a custom login) just the Assistants item", () => {
+    // It holds the platform-admin role's permissions, which would otherwise surface every
+    // permission-gated tab.
+    const result = deriveNavigationItems({
+      permissions: Object.values(Permissions),
       features: [FeatureToggleKey.WHATSAPP_BOT],
       savedOrder: undefined,
     });
-    const item = result.find(i => i.id === SIDEBAR_ITEMS.WHATSAPP_BOT);
-    expect(item).toBeDefined();
-    expect(item?.path).toBe(ROUTES.WHATSAPP_BOT);
+    expect(result.map(i => [i.id, i.path, i.label])).toEqual([
+      [SIDEBAR_ITEMS.WHATSAPP_BOT, ROUTES.WHATSAPP_BOT, "Assistants"],
+    ]);
+  });
+
+  it("adds Assistants to everything else for a holder of Chatbots and other features", () => {
+    const ids = deriveNavigationItems({
+      permissions: Object.values(Permissions),
+      features: [FeatureToggleKey.WHATSAPP_BOT, FeatureToggleKey.ANALYTICS],
+      savedOrder: undefined,
+    }).map(i => i.id);
+    expect(ids).toContain(SIDEBAR_ITEMS.WHATSAPP_BOT);
+    expect(ids).toContain(SIDEBAR_ITEMS.ANALYTICS);
   });
 
   // Both halves are required, like Simulation Studio: Course Copilot is deliberately not in
   // buildSidebarItemFeatureKeyMap (which would make it feature-ONLY and drop the grant), so a
   // missing toggle and a missing permission each hide it on their own.
   describe("Course Copilot (toggle AND edit grant)", () => {
-    it("shows Course Copilot right after Builder to a holder of both", () => {
+    it("shows Course Copilot, in the Create section, to a holder of both", () => {
       const result = deriveNavigationItems({
         permissions: [Permissions.EDIT_COURSE_COPILOT],
         features: [
@@ -364,9 +421,7 @@ describe("deriveNavigationItems", () => {
       });
       const ids = result.map(i => i.id);
       expect(ids).toContain(SIDEBAR_ITEMS.COURSE_COPILOT);
-      expect(ids.indexOf(SIDEBAR_ITEMS.COURSE_COPILOT)).toBe(
-        ids.indexOf(SIDEBAR_ITEMS.BUILDER) + 1,
-      );
+      expect(result.find(i => i.id === SIDEBAR_ITEMS.COURSE_COPILOT)?.section).toBe("create");
       expect(result.find(i => i.id === SIDEBAR_ITEMS.COURSE_COPILOT)?.path).toBe(
         ROUTES.COURSE_COPILOT,
       );
@@ -410,7 +465,7 @@ describe("deriveNavigationItems", () => {
         savedOrder: undefined,
       });
       expect(result.find(i => i.id === SIDEBAR_ITEMS.ALLY_GUIDE)).toMatchObject({
-        label: "Ally",
+        label: "Ally Console",
         path: ROUTES.ALLY_CONSOLE,
       });
     });
@@ -483,7 +538,6 @@ describe("deriveNavigationItems", () => {
         FeatureToggleKey.TRANSLATIONS,
       ],
       [SIDEBAR_ITEMS.BLOG, Permissions.VIEW_BLOGS, FeatureToggleKey.BLOG],
-      [SIDEBAR_ITEMS.PRODUCT_UPDATES, Permissions.EDIT_BLOG, FeatureToggleKey.PRODUCT_UPDATES],
       [
         SIDEBAR_ITEMS.PRODUCT_ROADMAP,
         Permissions.VIEW_PRODUCT_ROADMAP,
@@ -510,5 +564,143 @@ describe("deriveNavigationItems", () => {
       }).map(i => i.id);
       expect(ids).toContain(SIDEBAR_ITEMS.USERS);
     });
+  });
+});
+
+describe("sections", () => {
+  const everything = () =>
+    deriveNavigationItems({
+      permissions: Object.values(Permissions),
+      features: Object.values(FeatureToggleKey),
+      savedOrder: undefined,
+      orgToggles: {},
+    });
+
+  it("gives every item a known section and lists sections in the agreed order", () => {
+    const items = everything();
+    items.forEach(item => expect(NAV_SECTION_IDS).toContain(item.section));
+    const sections = groupNavigationItems(items);
+    expect(sections.map(s => s.label)).toEqual([
+      "Create",
+      "People",
+      "Insights",
+      "AI & Languages",
+      "Product",
+      "Settings & Logs",
+    ]);
+  });
+
+  it("puts each tab in the section the plan names", () => {
+    const labelsOf = (id: string) =>
+      groupNavigationItems(everything())
+        .find(s => s.id === id)!
+        .items.map(i => i.label);
+    expect(labelsOf("create")).toEqual(
+      expect.arrayContaining(["Roleplays", "Events", "Characters", "Blog"]),
+    );
+    expect(labelsOf("people")).toEqual(["Users", "Badges", "Debriefs", "Roleplay Logs"]);
+    expect(labelsOf("insights")).toEqual(["Analytics", "Conversation Drift"]);
+    expect(labelsOf("ai-languages")).toEqual(
+      expect.arrayContaining([
+        "Prompts",
+        "Speech Recognition",
+        "Language Models",
+        "Voices",
+        "AI Tasks",
+        "AI Lab",
+      ]),
+    );
+    expect(labelsOf("product")).toEqual(
+      expect.arrayContaining(["Roadmap", "Bug Hunter", "Builder", "Ally Console"]),
+    );
+    expect(labelsOf("settings-logs")).toEqual(["Settings", "Logs"]);
+  });
+
+  it("lands a default user on Roleplays: the first section's first tab", () => {
+    expect(everything()[0].id).toBe(SIDEBAR_ITEMS.SIMULATION_STUDIO);
+  });
+
+  it("drops empty sections", () => {
+    const items = deriveNavigationItems({
+      permissions: [],
+      features: [FeatureToggleKey.SETTINGS],
+      savedOrder: undefined,
+    });
+    expect(groupNavigationItems(items).map(s => s.id)).toEqual(["settings-logs"]);
+  });
+
+  it("keeps a saved order inside each section and never hides a tab", () => {
+    const base = everything();
+    // Saved order interleaves sections and holds a stale id.
+    const saved = [SIDEBAR_ITEMS.LOGS, "ghost", SIDEBAR_ITEMS.USER_BADGES, SIDEBAR_ITEMS.USERS];
+    const items = deriveNavigationItems({
+      permissions: Object.values(Permissions),
+      features: Object.values(FeatureToggleKey),
+      savedOrder: saved,
+      orgToggles: {},
+    });
+    const sections = groupNavigationItems(items);
+    expect(flattenNavSections(sections)).toHaveLength(base.length);
+    expect(new Set(flattenNavSections(sections).map(i => i.id))).toEqual(
+      new Set(base.map(i => i.id)),
+    );
+    const people = sections.find(s => s.id === "people")!.items.map(i => i.id);
+    expect(people.slice(0, 2)).toEqual([SIDEBAR_ITEMS.USER_BADGES, SIDEBAR_ITEMS.USERS]);
+  });
+
+  it("puts a tab with no section in the last one rather than hiding it", () => {
+    const sections = groupNavigationItems([
+      { id: "x", label: "X", path: "/x" },
+      { id: "y", label: "Y", path: "/y", section: "nonsense" },
+    ]);
+    expect(sections).toHaveLength(1);
+    expect(sections[0].id).toBe("settings-logs");
+    expect(sections[0].items).toHaveLength(2);
+  });
+
+  it("shows Conversation Drift exactly when Analytics is on", () => {
+    const withIt = deriveNavigationItems({
+      permissions: [],
+      features: [FeatureToggleKey.ANALYTICS],
+      savedOrder: undefined,
+    });
+    expect(withIt.map(i => i.id)).toContain(SIDEBAR_ITEMS.CONVERSATION_DRIFT);
+    const without = deriveNavigationItems({
+      permissions: Object.values(Permissions),
+      features: [],
+      savedOrder: undefined,
+    });
+    expect(without.map(i => i.id)).not.toContain(SIDEBAR_ITEMS.CONVERSATION_DRIFT);
+  });
+});
+
+describe("isNavItemActive", () => {
+  const find = (id: string) => everythingItems().find(i => i.id === id)!;
+  const everythingItems = () =>
+    deriveNavigationItems({
+      permissions: Object.values(Permissions),
+      features: Object.values(FeatureToggleKey),
+      savedOrder: undefined,
+    });
+
+  it("splits /analytics between Analytics and Conversation Drift by tab", () => {
+    expect(isNavItemActive(find(SIDEBAR_ITEMS.ANALYTICS), "/analytics", "?tab=priority")).toBe(
+      true,
+    );
+    expect(isNavItemActive(find(SIDEBAR_ITEMS.ANALYTICS), "/analytics", "?tab=drift")).toBe(false);
+    expect(
+      isNavItemActive(find(SIDEBAR_ITEMS.CONVERSATION_DRIFT), "/analytics", "?tab=drift"),
+    ).toBe(true);
+    expect(isNavItemActive(find(SIDEBAR_ITEMS.CONVERSATION_DRIFT), "/analytics", "")).toBe(false);
+  });
+
+  it("stays lit on a tab's detail routes, and only on its own segments", () => {
+    expect(isNavItemActive(find(SIDEBAR_ITEMS.BUILDER), "/builder/abc")).toBe(true);
+    expect(isNavItemActive(find(SIDEBAR_ITEMS.ALLY_GUIDE), "/ally")).toBe(true);
+    expect(isNavItemActive(find(SIDEBAR_ITEMS.ALLY_GUIDE), "/allyfoo")).toBe(false);
+    expect(
+      isNavItemActive(find(SIDEBAR_ITEMS.SIMULATION_STUDIO), "/create-simulation/edit/3"),
+    ).toBe(true);
+    expect(isNavItemActive(find(SIDEBAR_ITEMS.WHATSAPP_BOT), "/assistants/42")).toBe(true);
   });
 });

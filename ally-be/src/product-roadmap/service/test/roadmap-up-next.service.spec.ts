@@ -15,7 +15,7 @@ describe('RoadmapUpNextService', () => {
     code: 'OPP-0582',
     description: 'Review and sign-off before a course goes live\nMore detail',
     type: RoadmapOpportunityType.IDEA,
-    stage: RoadmapOpportunityStage.UNDER_DEVELOPMENT,
+    stage: RoadmapOpportunityStage.PRIORITISED,
     builderSessionId: 'sess-1',
     ...over,
   });
@@ -152,7 +152,7 @@ describe('RoadmapUpNextService', () => {
     );
   });
 
-  it('puts an untouched interview back and returns the opportunity to prioritised', async () => {
+  it('puts an untouched interview back and leaves the stage alone', async () => {
     const { service, builderSessionService, opportunityRepository } = build();
 
     await expect(service.putBack(7, 'sess-1')).resolves.toEqual({
@@ -165,10 +165,10 @@ describe('RoadmapUpNextService', () => {
     );
     expect(opportunityRepository.update).toHaveBeenCalledWith(
       { id: 'opp-1' },
-      expect.objectContaining({
-        builderSessionId: null,
-        stage: RoadmapOpportunityStage.PRIORITISED,
-      }),
+      expect.objectContaining({ builderSessionId: null }),
+    );
+    expect(opportunityRepository.update.mock.calls[0][1]).not.toHaveProperty(
+      'stage',
     );
   });
 

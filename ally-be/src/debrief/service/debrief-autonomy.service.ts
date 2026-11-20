@@ -4,7 +4,8 @@ import {
   OnModuleInit,
   Optional,
 } from '@nestjs/common';
-import { ModuleRef } from '@nestjs/core';
+import { DebriefAgreementService } from './debrief-agreement.service';
+import { DebriefNotifier } from './debrief-notifier.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { AuditLogService } from '../../audit/service/audit-log.service';
@@ -59,7 +60,8 @@ export class DebriefAutonomyService implements OnModuleInit {
     private readonly rows: Repository<DebriefOwnerSettings>,
     private readonly settings: DebriefSettingsService,
     private readonly audit: AuditLogService,
-    private readonly moduleRef: ModuleRef,
+    private readonly agreement: DebriefAgreementService,
+    private readonly notifier: DebriefNotifier,
     /** V2_AUTONOMY C2: a kind of change a person paused until a date. */
     @Optional() private readonly holds?: DebriefChangeHoldsService,
   ) {}
@@ -153,7 +155,7 @@ export class DebriefAutonomyService implements OnModuleInit {
    */
   private async gate(): Promise<AutonomyFacts['gate']> {
     try {
-      const g = await (await this.agreementService()).gate();
+      const g = await this.agreement.gate();
       return { met: g.met, failing: g.failing };
     } catch (e) {
       this.logger.warn(
@@ -161,12 +163,6 @@ export class DebriefAutonomyService implements OnModuleInit {
       );
       return { met: false, failing: [] };
     }
-  }
-
-  private async agreementService() {
-    const { DebriefAgreementService } =
-      await import('./debrief-agreement.service');
-    return this.moduleRef.get(DebriefAgreementService, { strict: false });
   }
 
   /** Canary reverts in the last 4 weeks, by kind of change. */
@@ -241,11 +237,7 @@ export class DebriefAutonomyService implements OnModuleInit {
     data: Record<string, unknown>;
   }): Promise<void> {
     try {
-      const { DebriefNotifier } = await import('./debrief-notifier.service');
-      const notifier = this.moduleRef.get(DebriefNotifier, {
-        strict: false,
-      });
-      await notifier.owner(alert);
+      await this.notifier.owner(alert);
     } catch (e) {
       this.logger.warn(
         `[debrief] autonomy: owner notification failed: ${(e as Error).message}`,
@@ -406,9 +398,7 @@ export class DebriefAutonomyService implements OnModuleInit {
     agreement: AgreementView | null;
   }> {
     const f = await this.facts();
-    const agreement = await this.agreementService()
-      .then((a) => a.view())
-      .catch(() => null);
+    const agreement = await this.agreement.view().catch(() => null);
     const policy = await this.refreshRelocks(f);
     const s = await this.settings.get();
     const tenants: Array<{ id: string; name: string }> =
@@ -435,11 +425,10 @@ export class DebriefAutonomyService implements OnModuleInit {
         const last = [...policy.relocks].reverse().find((r) => r.kind === kind);
         return {
           kind,
-          configurable: kind !== 'pinned_rules',
+          configurable: true,
           cells: policy.matrix[kind],
           eligible: e.eligible,
-          overridable:
-            kind !== 'pinned_rules' && !e.eligible && !relockReason(kind, f),
+          overridable: !e.eligible && !relockReason(kind, f),
           reason: e.reason,
           eligibility: stepEligibility(kind, f),
           override: policy.overrides?.[kind] ?? null,

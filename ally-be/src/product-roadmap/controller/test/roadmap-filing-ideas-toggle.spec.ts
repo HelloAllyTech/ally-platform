@@ -1,18 +1,18 @@
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, GoneException } from '@nestjs/common';
 import { RoadmapOpportunityController } from '../roadmap-opportunity.controller';
 import { RoadmapAdminController } from '../roadmap-admin.controller';
 import { RoadmapIdeaDraftController } from '../roadmap-idea-draft.controller';
 
 /**
- * Every door that files, or leads to filing, needs the Product Planning — Ideas
- * toggle (plans/roadmap-owns-planning rev 5.2 §B.12), checked BEFORE any work.
+ * Every door that files, or leads to filing, needs the Idea role
+ * (Quick Add: the Owner role) (plans/roadmap-owns-planning rev 5.2 §B.12), checked BEFORE any work.
  * The route decorators stay as they were (Product Roadmap tab + VOTE); this is
- * the second gate, in the handler, so the old copilot door, Quick Add and the
+ * the second gate, in the handler, so the old copilot door and the
  * new plan flow can never disagree about who may file.
  */
-describe('Filing doors require Product Planning — Ideas', () => {
+describe('Filing doors require a Roadmap role', () => {
   const user = { id: 9 } as never;
-  const refused = new ForbiddenException('no ideas toggle');
+  const refused = new ForbiddenException('no roadmap role');
   const planAccess = {
     assertIdeas: jest.fn(async () => Promise.reject(refused)),
   };
@@ -26,6 +26,9 @@ describe('Filing doors require Product Planning — Ideas', () => {
   };
   const transcription = { transcribe: jest.fn() };
   const access = { canManage: jest.fn(async () => false) };
+  const planSettings = {
+    getRoadmapV2: jest.fn(async () => ({ enabled: false })),
+  };
 
   const opportunity = new RoadmapOpportunityController(
     opportunityService as never,
@@ -36,6 +39,8 @@ describe('Filing doors require Product Planning — Ideas', () => {
     access as never,
     {} as never,
     planAccess as never,
+    planSettings as never,
+    {} as never,
   );
   const admin = new RoadmapAdminController(
     {} as never,
@@ -55,13 +60,14 @@ describe('Filing doors require Product Planning — Ideas', () => {
     drafts as never,
     transcription as never,
     planAccess as never,
+    planSettings as never,
+    {} as never,
   );
 
   beforeEach(() => jest.clearAllMocks());
 
   it.each([
     ['create (interview filing)', () => opportunity.create(user, {} as never)],
-    ['quickAdd', () => opportunity.quickAdd(user, {} as never)],
     [
       'copilot turn (JSON)',
       () => admin.opportunityInterview(user, { messages: [] } as never),
@@ -99,5 +105,14 @@ describe('Filing doors require Product Planning — Ideas', () => {
     await ideaDrafts.list(user);
     await ideaDrafts.remove(user, 'id');
     expect(planAccess.assertIdeas).not.toHaveBeenCalled();
+  });
+
+  it('refuses to file an idea through the old door while the Roadmap is on: ideas come from drafts', async () => {
+    planAccess.assertIdeas.mockResolvedValueOnce(undefined as never);
+    planSettings.getRoadmapV2.mockResolvedValueOnce({ enabled: true });
+    await expect(opportunity.create(user, {} as never)).rejects.toBeInstanceOf(
+      GoneException,
+    );
+    expect(opportunityService.create).not.toHaveBeenCalled();
   });
 });

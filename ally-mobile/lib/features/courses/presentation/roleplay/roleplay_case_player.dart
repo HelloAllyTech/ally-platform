@@ -13,6 +13,7 @@ import '../../../simulations/presentation/widgets/scenario_language_dropdown.dar
 import '../../../simulations/presentation/widgets/simulation_card.dart';
 import '../../data/course_models.dart';
 import '../../data/start_item_payload.dart';
+import 'roleplay_requirement.dart';
 import '../../../../core/localization/cached_date_format.dart';
 
 /// System font — RN's `<Text>`s here set no `fontFamily`.
@@ -57,9 +58,17 @@ class _RoleplayCasePlayerState extends ConsumerState<RoleplayCasePlayer> {
   ScenarioLanguageOption? _selectedLanguage;
 
   bool get _isCase => widget.payload.type == 'CASE';
-  bool get _isAssessment => !_isCase && widget.payload.roleplayAssessmentMode;
+  RoleplayAssessment? get _assessment =>
+      _isCase ? null : (widget.payload.assessment ?? widget.item.assessment);
+  bool get _isAssessment => !_isCase && (widget.payload.roleplayAssessmentMode || _assessment != null);
   String? get _submittedAt => _isCase ? null : widget.payload.assessmentSubmittedAt;
   bool get _assessmentLocked => _isAssessment && _submittedAt != null;
+
+  /// POST whose paired pre-assessment isn't submitted yet: nothing to launch.
+  bool get _postLocked => _isAssessment && !_assessmentLocked && (_assessment?.postLocked ?? false);
+
+  /// Submitted with results withheld: "Submitted", no score.
+  bool get _resultsHidden => _assessmentLocked && (_assessment?.resultsHidden ?? false);
 
   void _onStartChanged() {
     if (mounted) setState(() {});
@@ -94,6 +103,7 @@ class _RoleplayCasePlayerState extends ConsumerState<RoleplayCasePlayer> {
         scenario: scenario,
         trackId: widget.trackId,
         trackItemId: widget.item.id,
+        assessmentRequiredTurns: _isAssessment ? _assessment?.requiredTurns : null,
       ),
     );
   }
@@ -132,14 +142,31 @@ class _RoleplayCasePlayerState extends ConsumerState<RoleplayCasePlayer> {
         description: description,
         coverImageUrl: coverImageUrl,
         triggerWarnings: _isCase ? const [] : (scenario?.triggerWarnings ?? const []),
-        onTap: _assessmentLocked ? () {} : () => _launch(scenario),
+        onTap: (_assessmentLocked || _postLocked) ? () {} : () => _launch(scenario),
       ),
       Text(
-        _isAssessment ? ref.t('courses.roleplay.assessmentIntro') : ref.t('courses.roleplay.intro'),
+        _assessment != null
+            ? ref.t('courses.roleplay.assessmentIntroTurns', {'n': _assessment!.requiredTurns})
+            : _isAssessment
+            ? ref.t('courses.roleplay.assessmentIntro')
+            : ref.t('courses.roleplay.intro'),
         textAlign: TextAlign.center,
         style: _systemStyle,
       ),
-      if (_isAssessment && !_assessmentLocked)
+      if (!_isCase && roleplayRequirementText(payload.roleplayGate ?? widget.item.roleplayGate, ref.t) != null)
+        Text(
+          roleplayRequirementText(payload.roleplayGate ?? widget.item.roleplayGate, ref.t)!,
+          key: const Key('roleplay-requirement'),
+          textAlign: TextAlign.center,
+          style: _systemStyle,
+        ),
+      if (!_isCase &&
+          !widget.alreadyCompleted &&
+          (payload.lastRoleplayAttempt ?? widget.item.lastRoleplayAttempt) != null)
+        RoleplayAttemptNotice(attempt: (payload.lastRoleplayAttempt ?? widget.item.lastRoleplayAttempt)!),
+      // The one-attempt warning is the legacy assessment; the turn-based
+      // intro above already says how an attempt counts.
+      if (_isAssessment && !_assessmentLocked && _assessment == null)
         Container(
           key: const Key('roleplay-assessment-notice'),
           width: double.infinity,
@@ -167,7 +194,14 @@ class _RoleplayCasePlayerState extends ConsumerState<RoleplayCasePlayer> {
             ],
           ),
         ),
-      if (_assessmentLocked && !widget.alreadyCompleted && submittedAt != null)
+      if (_resultsHidden)
+        Text(
+          ref.t('courses.roleplay.assessmentSubmittedHidden'),
+          key: const Key('roleplay-assessment-results-hidden'),
+          textAlign: TextAlign.center,
+          style: _systemStyle,
+        )
+      else if (_assessmentLocked && !widget.alreadyCompleted && submittedAt != null)
         Text(
           '${ref.t('courses.roleplay.assessmentSubmitted', {'date': _formatDate(submittedAt)})}\n'
           '${ref.t('courses.roleplay.assessmentNotPassed')}',
@@ -175,14 +209,22 @@ class _RoleplayCasePlayerState extends ConsumerState<RoleplayCasePlayer> {
           textAlign: TextAlign.center,
           style: _systemStyle,
         ),
-      if (_assessmentLocked)
+      if (_postLocked)
         Text(
-          ref.t('courses.roleplay.assessmentLocked'),
-          key: const Key('roleplay-assessment-locked'),
+          ref.t('courses.roleplay.postLocked', {'title': _assessment?.preAssessment?.title ?? ''}),
+          key: const Key('roleplay-assessment-post-locked'),
           textAlign: TextAlign.center,
           style: _systemStyle,
-        )
-      else ...[
+        ),
+      if (_assessmentLocked) ...[
+        if (!_resultsHidden)
+          Text(
+            ref.t('courses.roleplay.assessmentLocked'),
+            key: const Key('roleplay-assessment-locked'),
+            textAlign: TextAlign.center,
+            style: _systemStyle,
+          ),
+      ] else ...[
         if (languages.isNotEmpty)
           Align(
             alignment: Alignment.centerLeft,
@@ -199,7 +241,8 @@ class _RoleplayCasePlayerState extends ConsumerState<RoleplayCasePlayer> {
           key: const Key('roleplay-case-launch'),
           label: primaryLabel,
           isLoading: _start.isCreatingRoom,
-          onPressed: () => _launch(scenario),
+          isDisabled: _postLocked,
+          onPressed: _postLocked ? null : () => _launch(scenario),
         ),
       ],
     ];

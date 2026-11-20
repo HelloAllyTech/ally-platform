@@ -97,6 +97,11 @@ export enum LlmTask {
   NUDGE = 'nudge',
   SUMMARY = 'summary',
   DYNAMIC_SUMMARY = 'dynamic_summary',
+  // Scribe v2 note harness: main pass, per-part map step, repair rewrite.
+  SCRIBE_NOTE = 'scribe_note',
+  SCRIBE_NOTE_MAP = 'scribe_note_map',
+  SCRIBE_NOTE_REPAIR = 'scribe_note_repair',
+  SCRIBE_NOTE_ROLES = 'scribe_note_roles',
   SCENARIO_EVALUATION = 'scenario_evaluation',
   // The same debrief evaluation re-run in another language, when a viewer
   // opens a debrief in a UI language other than the one it was written in
@@ -127,6 +132,9 @@ export enum LlmTask {
   // eight dimensions. The independent judge the debrief quality bar is read
   // from; a sibling of the groundedness judge, not a replacement for it.
   DEBRIEF_QUALITY_JUDGE = 'debrief_quality_judge',
+  // Debrief language judge in ally-ai: is the debrief's own text written well in
+  // the session's language? Findings only; rates are computed in ally-be.
+  DEBRIEF_LANGUAGE_JUDGE = 'debrief_language_judge',
   // Debrief agent steps in ally-ai, one label per step.
   DEBRIEF_SAFETY_READER = 'debrief_safety_reader',
   DEBRIEF_ANALYST = 'debrief_analyst',
@@ -173,15 +181,16 @@ export enum LlmTask {
   // the narrator carries result rows, so their token profiles differ.
   ANALYTICS_AGENT_PLAN = 'analytics_agent_plan',
   ANALYTICS_AGENT_ANSWER = 'analytics_agent_answer',
-  // Analytics Suggestions (admin Analytics -> Suggestions tab): one call per
-  // Generate run. Its own label because the profile is unlike anything else
-  // here — a whole analytics window in, at most ten suggestions out.
-  ANALYTICS_SUGGESTIONS = 'analytics_suggestions',
   // UX Signals scan (src/ux-signals): one triage call per scan, turning
-  // threshold-crossing PostHog signals into bug findings and suggestions. Its
+  // threshold-crossing PostHog signals into bug findings and PM Agent signals. Its
   // own label because the input is telemetry aggregates rather than an
   // analytics window, so its token profile tracks detector count, not date range.
   UX_SIGNALS = 'ux_signals',
+  // PM Agent (src/pm-agent, docs/pm-agent.md): the admin AI product manager's own
+  // analysis — lanes, critic, ranker. Its own label because the agent's monthly budget is
+  // read from llm_usage rows carrying it (PmAgentBudgetService, IST month). The pipeline
+  // may add finer `pm_agent_*` labels per lane; the budget sums those too.
+  PM_AGENT = 'pm_agent',
   // Foundational helping skills (src/foundational-skills): one call per
   // 5,000-character cut of a learner's roleplay speech, scoring it against the
   // fixed foundational helping skills rubric. Scheduled, never on a request path. Its own
@@ -305,6 +314,12 @@ export enum LlmTask {
   // loop (research, then a structured turn). Tagged with metadata.iteration so
   // a turn's passes can be summed.
   ROADMAP_OPPORTUNITY_COPILOT = 'roadmap_opportunity_copilot',
+  // Roadmap v2 dictation (D9): one short clip from the mic on the draft page or
+  // an answer/comment box, transcribed to editable text.
+  ROADMAP_DICTATION = 'roadmap_dictation',
+  // Writes a one-line title for a roadmap idea's text: the suggestion on the new-idea form and
+  // the backfill that gave every older idea a title.
+  ROADMAP_IDEA_TITLE = 'roadmap_idea_title',
   // Track 2.0 quiz: grading one open-ended learner answer against its rubric.
   TRACK_QUIZ_GRADING = 'track_quiz_grading',
   TRANSLATE_SCENARIO = 'translate_scenario',
@@ -369,10 +384,13 @@ export enum LlmTask {
   COURSE_COPILOT_QUIZ = 'course_copilot_quiz',
   COURSE_COPILOT_JOURNAL = 'course_copilot_journal',
   COURSE_COPILOT_ANNOTATION = 'course_copilot_annotation',
+  COURSE_COPILOT_SCENARIO_QUIZ = 'course_copilot_scenario_quiz',
+  COURSE_COPILOT_BUCKET_SORT = 'course_copilot_bucket_sort',
   COURSE_COPILOT_META = 'course_copilot_meta',
   COURSE_COPILOT_REVIEW = 'course_copilot_review',
   COURSE_COPILOT_SUMMARY = 'course_copilot_summary',
   COURSE_COPILOT_ROLEPLAY_BRIEF = 'course_copilot_roleplay_brief',
+  COURSE_COPILOT_ROLEPLAY_FIT_CHECK = 'course_copilot_roleplay_fit_check',
   COURSE_COPILOT_IMAGE_PROMPT = 'course_copilot_image_prompt',
   COURSE_COPILOT_IMAGE = 'course_copilot_image',
   // The one Course Copilot call made outside a session: an admin's click on the
@@ -415,6 +433,11 @@ export enum LlmTask {
   CONTEXT_LIBRARY_GAP_LABEL = 'context_library_gap_label',
   // The agent curator: folds Builder's lessons and Bug Hunter's notes into their collections.
   CONTEXT_LIBRARY_AGENT_CURATE = 'context_library_agent_curate',
+
+  // Knowledge embeddings (CR1, ally-ai): the query embedded on each knowledge
+  // search, and the passages embedded when a document is indexed.
+  EMBEDDING_SEARCH = 'embedding_search',
+  EMBEDDING_INDEX = 'embedding_index',
 
   // Fallback for an un-mapped sender task (never drop a usage row).
   UNKNOWN = 'unknown',

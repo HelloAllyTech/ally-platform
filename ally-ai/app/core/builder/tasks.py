@@ -111,6 +111,18 @@ def answer_labels(gaps: Optional[Sequence[Gap]]) -> Dict[str, str]:
 # --- extract -----------------------------------------------------------------
 
 _FACT_MAX_CHARS = 500
+# A "fact" about the website failing ("Website returned '403 Forbidden'", B16) is
+# never about the business: dropped and counted, whatever page it cites (Q3-fast 3).
+_ERROR_FACT = re.compile(
+    r"\b(?:40[13]|404|50[0234])\b.{0,40}\b(?:forbidden|unauthori[sz]ed|not found|"
+    r"server error|bad gateway|unavailable)\b|\baccess (?:is |was )?denied\b|"
+    r"\b(?:captcha|security check)\b|"
+    r"\b(?:website|site|page|server) (?:returned|responded with|showed) "
+    r"(?:an? )?(?:error|'?\d{3})|\benable (?:javascript and )?cookies\b|"
+    # Cloudflare's hidden address (gaps item 6): the placeholder, never the email.
+    r"\[email(?:\s|&#160;|&nbsp;)*protected\]",
+    re.IGNORECASE,
+)
 SECTIONS = {section.value for section in LearnedSection}
 
 
@@ -137,7 +149,8 @@ async def extract(request: ExtractRequest) -> ExtractResponse:
         text = " ".join(fact.text.split())
         if not text:
             continue
-        if not 1 <= fact.page <= len(request.pages):
+        out_of_batch = not 1 <= fact.page <= len(request.pages)
+        if out_of_batch or _ERROR_FACT.search(text):
             dropped += 1
             continue
         if fact.section not in SECTIONS:

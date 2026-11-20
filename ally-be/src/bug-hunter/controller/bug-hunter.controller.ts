@@ -129,7 +129,7 @@ import { BUG_FIX_SESSION_REPOS } from '../constants/bug-fix-session.constants';
 /**
  * The Bug Hunter HUMAN admin surface — settings (kill switch), run history,
  * and a live event stream. Gated `@RequireFeatureToggle`, same tier as
- * Analytics Suggestions: this controls something that writes into repos and
+ * the other admin automation tools: this controls something that writes into repos and
  * other teams' backlogs, not a fixed reviewed chart.
  *
  * THREE EXCEPTIONS, all read-only and all gated on VIEW_PRODUCT_ROADMAP

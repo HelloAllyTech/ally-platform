@@ -393,4 +393,14 @@ export class ListAbilitiesDto {
   @IsOptional()
   @IsIn(ABILITY)
   update?: 'do_it' | 'never';
+
+  @ApiPropertyOptional({
+    description:
+      'Q3-fast Part 2b: "How should your assistant use this list?", the owner\'s own line under ' +
+      "the list's playbook. Empty clears it.",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  instruction?: string;
 }

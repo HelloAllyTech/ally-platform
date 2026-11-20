@@ -1,3 +1,4 @@
+import { usageHeaders } from 'src/billing/context/usage-context';
 import {
   HttpStatus,
   Injectable,
@@ -44,6 +45,8 @@ import type {
 } from '../dto/builder.dto';
 import {
   BUILDER_LIMITS,
+  AGENT_RUN_LIMITS,
+  CRISIS_CHECK_LIMITS,
   KNOWLEDGE_ANSWER_LIMITS,
 } from '../constants/knowledge-answer.constants';
 import { SseParser } from '../util/sse-parser';
@@ -88,10 +91,7 @@ import {
   GetReferenceDocumentRequest,
   IdentifySpeakersRequest,
   MessageRequest,
-  PromptOverride,
   ScenarioReportGenerateRequest,
-  ScenarioEvaluationChatMessage,
-  ScenarioEvaluationRequest,
   ActorGoalEvaluationRequest,
   RoadmapOpportunityBulkUpsertRequest,
   RoadmapOpportunityUpsertRequest,
@@ -103,8 +103,6 @@ import {
 } from '../dto/ai.request.dto';
 import { PromptSharedService } from '../../prompt/service/prompt-shared.service';
 import { SkillExperimentRouterService } from '../../skill-experiment/service/skill-experiment-router.service';
-import { ExecutionManager } from '../../common/execution/execution-manager';
-import { DEBRIEF_AGENT_KEY } from '../../debrief/constants/debrief-release.constants';
 import {
   ALLY_AI_PROMPT_PREFIX,
   ALLY_AI_LEARN_PROMPT_PREFIX,
@@ -116,7 +114,6 @@ import {
   GenerateSummaryResponse,
   GetReferenceDocumentResponse,
   IdentifySpeakersResponse,
-  ScenarioEvaluationResponse,
   RoadmapOpportunityBulkUpsertResponse,
   RoadmapOpportunityDeleteResponse,
   RoadmapOpportunityIdsResponse,
@@ -128,8 +125,6 @@ import {
   UpdateReferenceDocumentResponse,
 } from '../dto/ai.response.dto';
 import { ScribeSessionMode } from 'src/common/constants/chat.constants';
-import { LlmTask } from 'src/learn/enum/llm-task.enum';
-import { WorkerType } from 'src/user/enum/user.enum';
 
 /**
  * Append the corpus to a chunk-index endpoint.
@@ -142,9 +137,6 @@ function withCorpus(endpoint: string, corpus: KnowledgeCorpus): string {
   const separator = endpoint.includes('?') ? '&' : '?';
   return `${endpoint}${separator}corpus=${encodeURIComponent(corpus)}`;
 }
-
-/** The debrief skills (Skills Store codes); both are connected to auto-improve. */
-const SCENARIO_EVALUATION_PROMPT_CODE = 'ally_ai_scenario_scenario_evaluation';
 
 /** The prompts a live-chat nudge renders in ally-ai. */
 const NUDGE_PROMPT_CODES = ['ally_ai_nudge_nudge'] as const;
@@ -162,9 +154,12 @@ export const TRANSCRIPTION_PIPELINE_PROMPT_CODES = [
   'ally_ai_summary_dictation_summary',
   'ally_ai_summary_condense_chunk',
   'ally_ai_analysis_counselor_analysis',
+  // Scribe v2 note harness (shadow runs for tenants that have it on).
+  'ally_ai_scribe_note_generate',
+  'ally_ai_scribe_note_map_segment',
+  'ally_ai_scribe_note_repair',
+  'ally_ai_scribe_note_speaker_roles',
 ] as const;
-const SCENARIO_EVALUATION_WITH_MEMORY_PROMPT_CODE =
-  'ally_ai_scenario_scenario_evaluation_with_memory';
 
 /** ally-ai's `/agent/instructions` answer (chunk 20d-2). */
 export interface AgentInstructions {
@@ -186,40 +181,6 @@ export class AiService {
     private skillExperiments: SkillExperimentRouterService,
     @Optional() private readonly dataSource?: DataSource,
   ) {}
-
-  /**
-   * v9 FR-44: once an organisation is switched on for the Debrief agent, the
-   * old optimiser stops experimenting on today's debrief there. Learners read
-   * the agent's debrief, so a challenger would be judged on text nobody sees.
-   * Fails open to "not live": an experiment must never make a debrief fail.
-   */
-  private async debriefAgentIsLive(
-    scenarioSessionId?: string,
-  ): Promise<boolean> {
-    if (!this.dataSource) return false;
-    const tenantId = ExecutionManager.getTenantId() ?? null;
-    if (!scenarioSessionId && !tenantId) return false;
-    try {
-      const rows = await this.dataSource.query(
-        `SELECT 1 FROM agent_config_overrides o
-          WHERE o."agentKey" = $1 AND o.layer = 'org'
-            AND (o."values"->>'live')::boolean = true
-            AND o."scopeId" = COALESCE(
-              (SELECT s.tenant_id FROM scenario_sessions s WHERE s.id::text = $2),
-              $3)
-          LIMIT 1`,
-        [DEBRIEF_AGENT_KEY, scenarioSessionId ?? null, tenantId],
-      );
-      return rows.length > 0;
-    } catch (error) {
-      this.logger.warn(
-        `[SKILL_EXPERIMENT] could not read the debrief agent's live organisations: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-      return false;
-    }
-  }
 
   async transcribeAudioFromBuffer(audioBuffer: Buffer): Promise<string> {
     try {
@@ -778,19 +739,36 @@ export class AiService {
    * connection reset is the difference between the net being there and the
    * keyword rules standing alone.
    */
-  @RetryWithinBudget({
-    attempts: 2,
-    delayMs: 500,
-    budgetMs: 25_000,
-    shouldRetry: isRetryableAiFailure,
-    label: 'checkWhatsAppCrisis',
-  })
-  async checkWhatsAppCrisis(request: CrisisCheckRequest) {
-    return this.postKnowledge<CrisisCheckResponse, CrisisCheckRequest>(
-      ENDPOINTS.KNOWLEDGE_AGENT_CRISIS_CHECK,
-      request,
-      { timeoutMs: 15_000 },
-    );
+  async checkWhatsAppCrisis(
+    request: CrisisCheckRequest,
+  ): Promise<CrisisCheckResponse> {
+    // Chunk H1: 4 s, then one quick retry inside what is left of 6 s, so a finished reply never
+    // waits more than 6 s for the verdict. A verdict ally-ai marks failed is retried too.
+    const { attemptMs, retryDelayMs, budgetMs, minRetryMs } =
+      CRISIS_CHECK_LIMITS;
+    const startedAt = Date.now();
+    const attempt = (timeoutMs: number) =>
+      this.postKnowledge<CrisisCheckResponse, CrisisCheckRequest>(
+        ENDPOINTS.KNOWLEDGE_AGENT_CRISIS_CHECK,
+        request,
+        { timeoutMs },
+      );
+    let first: { verdict: CrisisCheckResponse } | { error: unknown };
+    try {
+      const verdict = await attempt(attemptMs);
+      if (!verdict?.failed) return verdict;
+      first = { verdict };
+    } catch (error) {
+      if (!isRetryableAiFailure(error)) throw error;
+      first = { error };
+    }
+    const left = budgetMs - (Date.now() - startedAt) - retryDelayMs;
+    if (left < minRetryMs) {
+      if ('verdict' in first) return first.verdict;
+      throw first.error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+    return attempt(Math.min(attemptMs, left));
   }
 
   /**
@@ -863,13 +841,21 @@ export class AiService {
     );
   }
 
-  async runAgent(request: AgentRunRequest) {
+  /**
+   * `signal` (Q3-fast Part 1): the crisis check decided first, so the reply no longer waits for
+   * this run; aborting stops waiting for it.
+   */
+  async runAgent(request: AgentRunRequest, signal?: AbortSignal) {
     return this.postKnowledge<AgentRunResponse, AgentRunRequest>(
       ENDPOINTS.AGENT_RUN,
       request,
       {
-        timeoutMs: KNOWLEDGE_ANSWER_LIMITS.attemptMs,
+        // ally-ai's cap plus a margin, so ally-ai always ends the run first (chunk H1).
+        timeoutMs:
+          (request.run_timeout_s ?? AGENT_RUN_LIMITS.waitedCapS) * 1000 +
+          AGENT_RUN_LIMITS.marginMs,
         alertOnFailure: false,
+        signal,
       },
     );
   }
@@ -894,7 +880,14 @@ export class AiService {
     return this.streamSse<AgentRunResponse, AgentStreamEvent>(
       ENDPOINTS.AGENT_RUN_STREAM,
       request,
-      { deadlineMs: KNOWLEDGE_ANSWER_LIMITS.streamMs, what: 'agent run' },
+      {
+        // ally-ai's cap plus a margin (chunk H1), and the stream ends after a silence.
+        deadlineMs:
+          (request.run_timeout_s ?? AGENT_RUN_LIMITS.streamedCapS) * 1000 +
+          AGENT_RUN_LIMITS.marginMs,
+        silenceMs: AGENT_RUN_LIMITS.silenceMs,
+        what: 'agent run',
+      },
       onEvent,
       signal,
     );
@@ -1005,11 +998,25 @@ export class AiService {
   private async streamSse<R, E>(
     endpoint: string,
     request: unknown,
-    { deadlineMs, what }: { deadlineMs: number; what: string },
+    {
+      deadlineMs,
+      silenceMs,
+      what,
+    }: { deadlineMs: number; silenceMs?: number; what: string },
     onEvent: (event: E) => void,
     signal?: AbortSignal,
   ): Promise<R> {
     const deadline = AbortSignal.timeout(deadlineMs);
+    // Silence (chunk H1): no event for `silenceMs` ends the stream; every event resets it.
+    const quiet = new AbortController();
+    let silence: NodeJS.Timeout | undefined;
+    const heard = (): void => {
+      if (!silenceMs) return;
+      clearTimeout(silence);
+      silence = setTimeout(() => quiet.abort(), silenceMs);
+      silence.unref?.();
+    };
+    heard();
     const startedAt = Date.now();
     try {
       const response = await axios({
@@ -1019,14 +1026,21 @@ export class AiService {
           'Content-Type': 'application/json',
           Accept: 'text/event-stream',
           'x-api-key': this.config.ai.outboundApiKey,
+          // CR1: who this run's model calls are for (absent outside a usage context).
+          ...usageHeaders(endpoint),
         },
         data: request,
         responseType: 'stream',
-        signal: signal ? AbortSignal.any([signal, deadline]) : deadline,
+        signal: AbortSignal.any(
+          [signal, deadline, quiet.signal].filter((one): one is AbortSignal =>
+            Boolean(one),
+          ),
+        ),
       });
       const parser = new SseParser();
       for await (const chunk of response.data as AsyncIterable<Buffer>) {
         for (const message of parser.push(chunk.toString('utf8'))) {
+          heard();
           const data = JSON.parse(message.data);
           if (message.event === 'final') {
             this.logger.info(
@@ -1058,17 +1072,26 @@ export class AiService {
       );
     } catch (error) {
       const failure =
-        deadline.aborted && !(error instanceof AiUpstreamError)
+        quiet.signal.aborted &&
+        !deadline.aborted &&
+        !(error instanceof AiUpstreamError)
           ? new AiUpstreamError(
-              `The ${what.split(' ')[0]} stream timed out`,
+              `The ${what.split(' ')[0]} stream went silent`,
               ErrorCode.AI_SERVICE_TIMEOUT,
             )
-          : classifyAiFailure(error);
+          : deadline.aborted && !(error instanceof AiUpstreamError)
+            ? new AiUpstreamError(
+                `The ${what.split(' ')[0]} stream timed out`,
+                ErrorCode.AI_SERVICE_TIMEOUT,
+              )
+            : classifyAiFailure(error);
       this.logger.warn(
         `AI stream FAILED | endpoint=${endpoint} | elapsedMs=${Date.now() - startedAt} | ` +
           `code=${failure.errorCode} | status=${failure.upstreamStatus ?? '-'}`,
       );
       throw failure;
+    } finally {
+      clearTimeout(silence);
     }
   }
 
@@ -1320,7 +1343,8 @@ export class AiService {
     {
       timeoutMs,
       alertOnFailure = true,
-    }: { timeoutMs: number; alertOnFailure?: boolean },
+      signal,
+    }: { timeoutMs: number; alertOnFailure?: boolean; signal?: AbortSignal },
   ): Promise<R> {
     return this.makeRequest<R, T>(
       endpoint,
@@ -1332,6 +1356,7 @@ export class AiService {
       timeoutMs,
       true,
       alertOnFailure,
+      signal,
     );
   }
 
@@ -1358,6 +1383,8 @@ export class AiService {
     // Off only where the caller raises its own, throttled alert — otherwise a dependency that is
     // down by design (the Agents v2 runtime switched off) pages once per message.
     alertOnFailure = true,
+    // Cancels the request (Q3-fast Part 1: a crisis reply that no longer waits for the run).
+    signal?: AbortSignal,
   ): Promise<R> {
     const requestTimeout = timeoutMs ?? this.maxTimeout;
     const execId = uuidv4();
@@ -1412,12 +1439,15 @@ export class AiService {
           'x-api-key': isLearnService
             ? this.config.ai.learnOutboundApiKey
             : this.config.ai.outboundApiKey,
+          // CR1: who these model calls are for (absent outside a usage context).
+          ...(isLearnService ? {} : usageHeaders(endpoint)),
           ...(headers || {}),
         },
         timeout: requestTimeout,
         url,
         method,
         data,
+        ...(signal ? { signal } : {}),
       });
       const elapsedMs = Date.now() - startMs;
       const upstreamTraceId =
@@ -1549,199 +1579,6 @@ export class AiService {
       });
     }
     return response;
-  }
-
-  async getScenarioSessionSummary(
-    messages: MessageRequest[],
-    needMemory: boolean,
-    previousMemory?: string | null,
-  ) {
-    try {
-      const prompts = await this.getPromptOverrides();
-      const response = await this.makeRequest<
-        any,
-        {
-          chat_history: MessageRequest[];
-          previous_memory?: string | null;
-          need_memory: boolean;
-          prompts: Record<string, PromptOverride>;
-        }
-      >(
-        'api/v1/summary/scenario/feedback',
-        {
-          chat_history: messages,
-          need_memory: needMemory,
-          previous_memory: previousMemory,
-          prompts,
-        },
-        true,
-        'post',
-      );
-      this.logger.debug(
-        `Scenario session summary received: ${JSON.stringify(response)}`,
-      );
-      return response;
-    } catch (error) {
-      // See transcribeAudioFromBuffer: preserve ally-ai's status class instead
-      // of collapsing everything to a 500.
-      throw aiFailureToHttpException(error, 'scenario session summary');
-    }
-  }
-
-  async getScenarioSessionEvaluation(
-    messages: ScenarioEvaluationChatMessage[],
-    needMemory: boolean,
-    previousMemory?: string | null,
-    memoryPrompt?: string | null,
-    enableRecommendations?: boolean,
-    languageCode?: string,
-    /**
-     * Who the debrief note is being written to, and what this scenario
-     * expects of them. Grouped into one object because this signature is
-     * already six positional arguments deep, and these always travel
-     * together.
-     */
-    supervisorContext?: {
-      workerType?: WorkerType | null;
-      learnerName?: string | null;
-      supervisorMemory?: string | null;
-      helpfulBehaviours?: string[];
-      unhelpfulBehaviours?: string[];
-      /**
-       * Coaching hints the supervisor already gave the learner DURING this
-       * session (live supervisor notes, in the order they were sent). Empty for
-       * the common case — the per-scenario toggle is off by default.
-       */
-      liveNotes?: string[] | null;
-    },
-    /** The session being debriefed — attributes the call's AI spend to it. */
-    scenarioSessionId?: string,
-    /**
-     * Records the call under a label other than `scenario_evaluation`. Only the
-     * per-language re-evaluation sets it; see `usage_task` on the request.
-     */
-    usageTask?: LlmTask.SCENARIO_EVALUATION_LANGUAGE,
-  ): Promise<ScenarioEvaluationResponse> {
-    // Auto-improve (skill experiments) runs on the learner's own debrief only —
-    // the per-language re-evaluation is a re-run of a debrief already judged.
-    const promptCode = needMemory
-      ? SCENARIO_EVALUATION_WITH_MEMORY_PROMPT_CODE
-      : SCENARIO_EVALUATION_PROMPT_CODE;
-    const arm =
-      usageTask || (await this.debriefAgentIsLive(scenarioSessionId))
-        ? null
-        : await this.skillExperiments.assign(promptCode, scenarioSessionId);
-    const experimentInput = {
-      scenarioSessionId: scenarioSessionId ?? null,
-      transcript: messages.map((m) => `${m.role}: ${m.content}`).join('\n'),
-      languageCode: languageCode ?? null,
-      workerType: supervisorContext?.workerType ?? null,
-      enableRecommendations: enableRecommendations ?? false,
-      helpfulBehaviours: supervisorContext?.helpfulBehaviours ?? [],
-      unhelpfulBehaviours: supervisorContext?.unhelpfulBehaviours ?? [],
-      ...(needMemory ? { previousSummary: previousMemory ?? null } : {}),
-    };
-    const tenantId = ExecutionManager.getTenantId() ?? null;
-
-    try {
-      const prompts = await this.getPromptOverrides();
-      const buildRequest = (
-        requestPrompts: ScenarioEvaluationRequest['prompts'],
-      ): ScenarioEvaluationRequest => ({
-        chat_history: messages,
-        need_memory: needMemory,
-        previous_memory: previousMemory ?? null,
-        memory_prompt: memoryPrompt ?? null,
-        prompts: requestPrompts,
-        enable_recommendations: enableRecommendations ?? false,
-        language_code: languageCode ?? null,
-        worker_type: supervisorContext?.workerType ?? null,
-        learner_name: supervisorContext?.learnerName ?? null,
-        supervisor_memory: supervisorContext?.supervisorMemory ?? null,
-        helpful_behaviours: supervisorContext?.helpfulBehaviours,
-        unhelpful_behaviours: supervisorContext?.unhelpfulBehaviours,
-        live_notes: supervisorContext?.liveNotes?.length
-          ? supervisorContext.liveNotes
-          : null,
-        scenario_session_id: scenarioSessionId ?? null,
-        // ally-ai validates this against a closed set and answers anything
-        // else with a 422, which fails the learner's debrief. So the one
-        // accepted override is sent as a literal, never as whatever arrived,
-        // and the default path omits the key entirely (not null), leaving its
-        // body exactly what it was before this field existed.
-        ...(usageTask === LlmTask.SCENARIO_EVALUATION_LANGUAGE
-          ? { usage_task: LlmTask.SCENARIO_EVALUATION_LANGUAGE }
-          : {}),
-      });
-
-      const send = async (variantText: string | null) => {
-        const request = buildRequest(
-          variantText === null
-            ? prompts
-            : {
-                ...prompts,
-                [promptCode]: await this.experimentPromptEntry(
-                  promptCode,
-                  variantText,
-                ),
-              },
-        );
-        return this.makeRequest<
-          ScenarioEvaluationResponse,
-          ScenarioEvaluationRequest
-        >(ENDPOINTS.SCENARIO_EVALUATION, request, true, 'post');
-      };
-
-      let response: ScenarioEvaluationResponse;
-      try {
-        response = await send(arm?.content ?? null);
-        void this.skillExperiments.record(arm, {
-          input: experimentInput,
-          output: JSON.stringify(response),
-          tenantId,
-        });
-      } catch (error) {
-        void this.skillExperiments.record(arm, {
-          input: experimentInput,
-          error: error instanceof Error ? error.message : String(error),
-          tenantId,
-        });
-        // A challenger that broke the debrief must not cost the learner theirs:
-        // retry once on the skill's own text. The failure is already recorded
-        // against the challenger, which is how the loop retires it.
-        if (!arm || arm.isOriginal) throw error;
-        this.logger.warn(
-          `Experiment variant failed for ${promptCode}; retrying the debrief on the skill's own text`,
-        );
-        response = await send(null);
-      }
-      this.logger.debug(
-        `Scenario session evaluation received: ${JSON.stringify(response)}`,
-      );
-      return response;
-    } catch (error) {
-      throw aiFailureToHttpException(error, 'scenario session evaluation');
-    }
-  }
-
-  /**
-   * The `prompts` entry that makes ally-ai run `text` for `promptCode`, keyed
-   * the way ally-ai looks it up. Carries the row's `availableVariables` (so
-   * ally-ai's formatter leaves unknown braces literal, as it would for the
-   * row's own text) and its model settings, so both arms of an experiment run
-   * on the same model and differ only in text.
-   */
-  private async experimentPromptEntry(promptCode: string, text: string) {
-    const [row] = await this.promptSharedService.getPromptsByOptions({
-      promptCode: [promptCode],
-    });
-    return {
-      prompt: text,
-      availableVariables: row?.availableVariables || [],
-      ...(row?.provider ? { provider: row.provider } : {}),
-      ...(row?.model ? { model: row.model } : {}),
-      ...(row?.temperature != null ? { temperature: row.temperature } : {}),
-    };
   }
 
   /**

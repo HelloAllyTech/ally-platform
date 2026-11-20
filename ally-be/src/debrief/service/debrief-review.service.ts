@@ -27,12 +27,12 @@ import {
 } from '../enum/debrief-review.enum';
 import { isTranscriptGap } from '../util/debrief-cards.util';
 import {
-  COMMENT_BODY_MAX,
   CommentAnchorInput,
   CommentRow,
   GatewayComment,
   isCommentTag,
   toGatewayComments,
+  trimCommentBody,
   validateAnchor,
 } from '../util/debrief-review.util';
 import { DebriefContextRepository } from './debrief-context.repository';
@@ -75,16 +75,7 @@ export interface ReviewTranscriptTurn {
   riskCue: { category: string; learnerResponse: string } | null;
 }
 
-const trimBody = (body: unknown): string => {
-  const text = typeof body === 'string' ? body.trim() : '';
-  if (!text) throw new BadRequestException('Write a comment first.');
-  if (text.length > COMMENT_BODY_MAX) {
-    throw new BadRequestException(
-      `Keep a comment under ${COMMENT_BODY_MAX} characters.`,
-    );
-  }
-  return text;
-};
+const trimBody = trimCommentBody;
 
 /** Turns where the client voiced a risk (the safety check's cues), 1-based like comments. */
 export const riskCueTurnsOf = (run: {
@@ -348,6 +339,8 @@ export class DebriefReviewService {
       tag: c.tag ?? null,
       status: c.status,
       reviewer: { id: Number(c.reviewerId), name: c.reviewerName ?? null },
+      /** Who wrote it: an expert reviewer, or the learner who read the debrief. */
+      source: c.source === 'learner' ? 'learner' : 'expert',
       mine: Number(c.reviewerId) === reviewerId,
       createdAt: new Date(c.createdAt).toISOString(),
       updatedAt: new Date(c.updatedAt).toISOString(),
@@ -768,7 +761,7 @@ export class DebriefReviewService {
     const top: CommentRow[] = await this.dataSource.query(
       `SELECT c.id, c."runId", c."parentId", c."anchorKind", c."turnIndex", c.section,
               c."spanStart", c."spanEnd", c."quotedText", c.body, c.tag, c.status,
-              c."ideaId", l.status AS "ideaStatus", c."repeatOfId", c."createdAt",
+              c."ideaId", l.status AS "ideaStatus", c."repeatOfId", c.source, c."createdAt",
               r."recipeKey", r.language
          FROM debrief_review_comments c
          JOIN debrief_runs r ON r.id = c."runId"

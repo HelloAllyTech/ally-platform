@@ -95,4 +95,30 @@ describe('AppConfigService', () => {
       expect(service.openai.imageModel).toBe('gpt-image-1-mini');
     });
   });
+
+  // Q3d, prod 18 Nov: publishing returned https://admin.helloally.ai/b/<slug>, a browser error
+  // page; the page lives under the admin app's base path. The Share step, Overview "Your link",
+  // the QR code and WhatsApp share all show `BotPageService.link`, `<botPage.baseUrl>/b/<slug>`.
+  describe('botPage', () => {
+    it('keeps a base path, so the link is app.helloally.ai/admin/b/<slug>', () => {
+      const { baseUrl, origin } = make({
+        ADMIN_APP_BASE_URL: 'https://admin.helloally.ai',
+        BOT_PAGE_BASE_URL: 'https://app.helloally.ai/admin/',
+      }).botPage;
+      expect(`${baseUrl}/b/sunrise-mind`).toBe(
+        'https://app.helloally.ai/admin/b/sunrise-mind',
+      );
+      // The public API's origin check compares origins, so the path doesn't matter there.
+      expect(origin).toBe('https://app.helloally.ai');
+    });
+
+    it('falls back to the admin app URL when BOT_PAGE_BASE_URL is empty', () => {
+      expect(
+        make({
+          ADMIN_APP_BASE_URL: 'https://app.helloally.ai/admin',
+          BOT_PAGE_BASE_URL: '',
+        }).botPage.baseUrl,
+      ).toBe('https://app.helloally.ai/admin');
+    });
+  });
 });

@@ -496,3 +496,222 @@ describe('at least, for a number range that found nothing (8a)', () => {
     expect(withoutUpperBounds(tables, {})).toBeNull();
   });
 });
+
+describe('chunk 6b: what the definitions carry', () => {
+  const leads = list(
+    'leads',
+    'Leads',
+    [
+      field('name', ListFieldType.TEXT, { required: true, agent_write: true }),
+      field('phone', ListFieldType.PHONE, {
+        required: true,
+        agent_write: true,
+      }),
+      field('interest', ListFieldType.SELECT, {
+        options: { values: ['A demo', 'Pricing', 'Something else'] },
+        agent_write: true,
+      }),
+      field('notes', ListFieldType.LONG_TEXT, { agent_write: true }),
+    ],
+    { agent_read: false, agent_write: true },
+  );
+  const create = (l: ListDefinitionView) =>
+    listToolDefinitions(l).find((d) => d.kind === 'create')!;
+
+  it('names the list as the owner wrote it, for the live steps', () => {
+    expect(
+      listToolDefinitions(slots).map((d) => [d.name, d.list_name]),
+    ).toEqual([['find_slots', 'Slots']]);
+  });
+
+  it('marks a create on a list with a phone the assistant fills in as taking details', () => {
+    expect(create(leads).takes_details).toBe(true);
+    // Appointments has a person field but no phone: it books, it doesn't take details.
+    expect(
+      create({ ...appointments, agent_write: true }).takes_details,
+    ).toBeUndefined();
+    expect(
+      listToolDefinitions(leads).find((d) => d.kind === 'update')!
+        .takes_details,
+    ).toBeUndefined();
+  });
+
+  it('leaves out an optional choice that still holds the ready-made examples (item 30)', () => {
+    expect(Object.keys(create(leads).input_schema.properties)).toEqual([
+      'name',
+      'phone',
+      'notes',
+    ]);
+    // A list installed before 6b, with the clinic's examples, in any order or case.
+    const before = {
+      ...leads,
+      fields: leads.fields.map((f) =>
+        f.key === 'interest'
+          ? {
+              ...f,
+              options: { values: ['check-up', 'Consultation', 'Follow-up'] },
+            }
+          : f,
+      ),
+    };
+    expect(create(before).input_schema.properties.interest).toBeUndefined();
+    expect(JSON.stringify(listToolDefinitions(before))).not.toMatch(
+      /Consultation/i,
+    );
+  });
+
+  it("keeps the owner's own choices", () => {
+    const own = {
+      ...leads,
+      fields: leads.fields.map((f) =>
+        f.key === 'interest'
+          ? { ...f, options: { values: ['Bookkeeping', 'GST filing'] } }
+          : f,
+      ),
+    };
+    expect(create(own).input_schema.properties.interest.enum).toEqual([
+      '',
+      'Bookkeeping',
+      'GST filing',
+    ]);
+  });
+
+  it('never drops a required choice, even with the examples', () => {
+    const required = {
+      ...leads,
+      fields: leads.fields.map((f) =>
+        f.key === 'interest' ? { ...f, required: true } : f,
+      ),
+    };
+    expect(create(required).input_schema.properties.interest).toBeDefined();
+  });
+});
+
+describe('chunk 6b: nothing in the stretch asked for', () => {
+  const { nearestForWindow } = require('../list-tools.service');
+  const t = (iso: string) => Date.parse(iso);
+  const at = (r: string) => t(r);
+  const slots = [
+    '2026-11-19T14:00:00+05:30',
+    '2026-11-19T15:00:00+05:30',
+    '2026-11-19T16:00:00+05:30',
+    '2026-11-20T10:00:00+05:30',
+    '2026-11-20T18:00:00+05:30',
+    '2026-11-20T19:00:00+05:30',
+    '2026-11-20T20:00:00+05:30',
+  ];
+
+  it('"Thursday evening": the latest that day, then the next evening with times', () => {
+    expect(
+      nearestForWindow(
+        slots,
+        at,
+        t('2026-11-19T17:00:00+05:30'),
+        t('2026-11-19T23:59:00+05:30'),
+      ),
+    ).toEqual([
+      '2026-11-19T16:00:00+05:30',
+      '2026-11-20T18:00:00+05:30',
+      '2026-11-20T19:00:00+05:30',
+    ]);
+  });
+
+  it('with no evening later in the week, only the latest that day', () => {
+    expect(
+      nearestForWindow(
+        slots.slice(0, 4),
+        at,
+        t('2026-11-19T17:00:00+05:30'),
+        t('2026-11-19T23:59:00+05:30'),
+      ),
+    ).toEqual(['2026-11-19T16:00:00+05:30']);
+  });
+
+  it('a single time asked is left to nearness', () => {
+    expect(
+      nearestForWindow(slots, at, t('2026-11-19T11:00:00+05:30'), NaN),
+    ).toEqual([]);
+  });
+});
+
+describe('playbooks (Q3-fast Part 2b): what a list’s tools add', () => {
+  const on = (names: string[]) =>
+    ({
+      abilities: Object.fromEntries(names.map((n) => [n, 'do_it'])),
+    }) as never;
+  const kinds = (offered: ReturnType<typeof offeredListTools>) =>
+    Object.fromEntries(
+      offered.definitions.map((d) => [d.name, d.playbook ?? null]),
+    );
+
+  it('a create with a date-and-time target books; a read-only list is reference', () => {
+    const offered = offeredListTools(
+      [slots, appointments],
+      on(['find_slots', 'find_appointments', 'create_appointments']),
+      { knowsPerson: true },
+    );
+    expect(kinds(offered)).toEqual({
+      find_slots: 'reference',
+      find_appointments: 'booking',
+      create_appointments: 'booking',
+    });
+  });
+
+  it('a list whose writes are at Never brings the read-only playbook', () => {
+    const offered = offeredListTools(
+      [slots, appointments],
+      on(['find_appointments']),
+      {
+        knowsPerson: true,
+      },
+    );
+    // Find is on unless set to Never, so Slots' find stays (reference too).
+    expect(kinds(offered)).toEqual({
+      find_slots: 'reference',
+      find_appointments: 'reference',
+    });
+  });
+
+  it('a create on a list with a phone field takes details', () => {
+    const leads = list(
+      'leads',
+      'Leads',
+      [
+        field('name', ListFieldType.TEXT, { agent_write: true }),
+        field('phone', ListFieldType.PHONE, { agent_write: true }),
+      ],
+      { agent_write: true },
+    );
+    const offered = offeredListTools([leads], on(['create_leads']), {
+      knowsPerson: true,
+    });
+    expect(offered.definitions[0].playbook).toBe('details');
+  });
+
+  it("carries the owner's own line on every tool of the list, trimmed", () => {
+    const products = list(
+      'products',
+      'Products',
+      [field('title', ListFieldType.TEXT)],
+      {
+        settings: {
+          instruction: '  Always mention the size chart.  ',
+        } as never,
+      },
+    );
+    const [def] = offeredListTools([products], on(['find_products']), {
+      knowsPerson: true,
+    }).definitions;
+    expect(def).toMatchObject({
+      playbook: 'reference',
+      instruction: 'Always mention the size chart.',
+    });
+  });
+
+  it('an assistant with no list tools gets no playbook at all', () => {
+    const off = { abilities: { find_slots: 'never' } } as never;
+    expect(
+      offeredListTools([slots], off, { knowsPerson: true }).definitions,
+    ).toEqual([]);
+  });
+});

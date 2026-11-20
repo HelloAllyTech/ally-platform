@@ -17,7 +17,7 @@ export const botDraftsApi = baseAPI.injectEndpoints({
 
     createBotDraft: builder.mutation<
       BotDraftView,
-      { website?: string; description?: string; upload?: boolean }
+      { website?: string; description?: string; upload?: boolean; interview?: boolean }
     >({
       query: body => ({ url: ApiEndpoints.BOT_DRAFTS.LIST, method: HttpMethod.POST, body }),
       invalidatesTags: [TAG_TYPES.BOT_DRAFT],
@@ -75,6 +75,8 @@ export const botDraftsApi = baseAPI.injectEndpoints({
         organisationIds?: string[];
         /** Go live although an owner's own Must pass question failed (chunk 20d-2). */
         confirmMustPass?: boolean;
+        /** Publish below the checkup's quality gate, having seen the score (Q3-fast Part 3). */
+        publishAnyway?: boolean;
       }
     >({
       query: ({ id, ...body }) => ({

@@ -31,6 +31,7 @@ import {
   parseCustomFieldDate,
   toCustomFieldDate,
 } from "./customFieldDate";
+import { optionLabel, resolveOptionId, resolveOptionIds } from "./selectValues";
 
 interface CustomFieldValuesPanelProps {
   chatId: number;
@@ -152,7 +153,7 @@ const CustomFieldValuesPanel: FC<CustomFieldValuesPanelProps> = ({
     }
 
     if (field.fieldType === CustomFieldType.SINGLE_SELECT) {
-      const selectedLabel = field.options?.find(o => o.id === value)?.label ?? "--";
+      const selectedLabel = optionLabel(field, value) ?? "--";
       return (
         <div key={field.fieldDefinitionId} className="flex gap-1 items-center">
           <span className="font-medium text-lg text-typography-800 md:whitespace-nowrap">
@@ -176,7 +177,7 @@ const CustomFieldValuesPanel: FC<CustomFieldValuesPanelProps> = ({
     }
 
     if (field.fieldType === CustomFieldType.MULTI_SELECT) {
-      const selectedIds: string[] = value ? JSON.parse(value) : [];
+      const selectedIds = resolveOptionIds(field, value);
       const selectedOptions = (field.options ?? []).filter(o => selectedIds.includes(o.id));
       return (
         <div key={field.fieldDefinitionId}>
@@ -264,7 +265,10 @@ const CustomFieldValuesPanel: FC<CustomFieldValuesPanelProps> = ({
             value={boolLabel}
             valueClassName={`${isEditable ? "text-typography-900" : "text-typography-800"} text-lg font-primary`}
             onChange={v =>
-              handleChange(field.fieldDefinitionId, v === "Yes" ? "true" : v === "No" ? "false" : null)
+              handleChange(
+                field.fieldDefinitionId,
+                v === "Yes" ? "true" : v === "No" ? "false" : null,
+              )
             }
             options={["--", "Yes", "No"]}
           />
@@ -318,7 +322,7 @@ const CustomFieldValuesPanel: FC<CustomFieldValuesPanelProps> = ({
             labelText={field.name}
             hideLabel
             disabled={!isEditable}
-            value={value ?? ""}
+            value={resolveOptionId(field, value) ?? ""}
             onChange={e => handleChange(field.fieldDefinitionId, e.target.value || null)}
           >
             <SelectItem value="" text="--" />
@@ -331,7 +335,7 @@ const CustomFieldValuesPanel: FC<CustomFieldValuesPanelProps> = ({
     }
 
     if (field.fieldType === CustomFieldType.MULTI_SELECT) {
-      const selectedIds: string[] = value ? JSON.parse(value) : [];
+      const selectedIds = resolveOptionIds(field, value);
       const toggle = (id: string) => {
         const next = selectedIds.includes(id)
           ? selectedIds.filter(x => x !== id)

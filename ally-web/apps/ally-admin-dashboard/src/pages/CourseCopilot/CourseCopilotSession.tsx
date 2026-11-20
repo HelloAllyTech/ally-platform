@@ -16,6 +16,7 @@ import {
   useCancelCourseCopilotBuildMutation,
   useCreateCourseCopilotSessionMutation,
   useGetCourseCopilotSessionQuery,
+  useGetCourseCopilotSourcesQuery,
   useRaiseCourseCopilotBudgetMutation,
   useRetryCourseCopilotBuildMutation,
   useUpdateCourseCopilotBlueprintMutation,
@@ -27,12 +28,11 @@ import {
   ChatComposer,
   ChatMessage,
 } from "@components/agent-chat";
-import { CourseCopilotWorkPane } from "@components/course-copilot";
+import { CourseCopilotWorkPane, ReferenceFiles } from "@components/course-copilot";
 import { ErrorBoundary } from "@components/error-boundary";
 import { ButtonVariant } from "@components/types";
 import { en, LOCAL_STORAGE_KEYS, ROUTES } from "@constants";
 import { useCourseCopilotSocket, useCourseCopilotStream } from "@hooks";
-import { COURSE_COPILOT_KICKOFF_MESSAGE } from "@hooks/useCourseCopilotStream";
 import {
   CourseBlueprint,
   CourseBrief,
@@ -43,6 +43,7 @@ import {
   CourseCopilotSessionStatus,
   CourseOutline,
 } from "@types";
+import { normalizeAgentReceipt } from "@utils/agentReceipt";
 
 import { errorMessageFrom, errorStatusOf } from "./courseCopilotErrors";
 import { changedItemIds, formatUsd, mergeEvents } from "./courseCopilotLive";
@@ -119,7 +120,6 @@ export const CourseCopilotSession: React.FC = () => {
   const [isLive, setIsLive] = useState(false);
 
   const hydratedForRef = useRef<string | null>(null);
-  const kickoffSentRef = useRef<string | null>(null);
   /** An id this page itself navigated to after replacing a lost session — keep the feed. */
   const replacementIdRef = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -147,6 +147,8 @@ export const CourseCopilotSession: React.FC = () => {
     data?.session?.id === sessionId ? data : undefined;
 
   const [createSession] = useCreateCourseCopilotSessionMutation();
+  const { data: sources } = useGetCourseCopilotSourcesQuery(sessionId, { skip: !sessionId });
+  const sourceCount = sources?.length ?? 0;
   const [archiveSession, { isLoading: isArchiving }] = useArchiveCourseCopilotSessionMutation();
   const [updateBlueprint] = useUpdateCourseCopilotBlueprintMutation();
   const [approveBlueprint] = useApproveCourseCopilotBlueprintMutation();
@@ -158,7 +160,7 @@ export const CourseCopilotSession: React.FC = () => {
     statusOverlay ?? detail?.session.status;
 
   // Stream callbacks are created once and read the latest values through refs, so the hooks below
-  // (and the kickoff effect that depends on `sendMessage`) never re-fire on a re-render. The refs
+  // never re-fire on a re-render. The refs
   // are synced after commit (below), not during render.
   const detailRef = useRef(detail);
   const statusRef = useRef(effectiveStatus);
@@ -222,7 +224,6 @@ export const CourseCopilotSession: React.FC = () => {
       const fresh = await createSession(trackId ? { trackId } : undefined).unwrap();
       // The feed on screen IS the conversation; do not re-seed it from the empty replacement.
       hydratedForRef.current = fresh.id;
-      kickoffSentRef.current = fresh.id;
       replacementIdRef.current = fresh.id;
       localStorage.setItem(LOCAL_STORAGE_KEYS.COURSE_COPILOT_SESSION_ID, fresh.id);
       navigate(ROUTES.COURSE_COPILOT_SESSION(fresh.id), { replace: true });
@@ -289,7 +290,6 @@ export const CourseCopilotSession: React.FC = () => {
       return;
     }
     hydratedForRef.current = null;
-    kickoffSentRef.current = null;
     liveOutlineRef.current = null;
     resetMessages();
     setStatusOverlay(null);
@@ -310,21 +310,13 @@ export const CourseCopilotSession: React.FC = () => {
       hydratedForRef.current = sessionId;
       hydrateMessages(detail.messages);
       localStorage.setItem(LOCAL_STORAGE_KEYS.COURSE_COPILOT_SESSION_ID, sessionId);
-      // A brand-new session opens with a hidden kickoff turn so the copilot asks its first
-      // question without the trainer typing anything. An EDIT session starts from the course,
-      // so it waits for the trainer.
-      if (
-        detail.messages.length === 0 &&
-        detail.session.status === "INTERVIEWING" &&
-        kickoffSentRef.current !== sessionId
-      ) {
-        kickoffSentRef.current = sessionId;
-        void sendMessage(COURSE_COPILOT_KICKOFF_MESSAGE, undefined, true);
-      }
+      // A new session waits for the trainer: the opening screen asks what the course is for, and
+      // nothing runs until they type or pick a starter. (It used to send a hidden kickoff turn,
+      // which had the copilot pick directions before the trainer had said anything.)
       return;
     }
     syncServerMessages(detail.messages);
-  }, [detail, sessionId, hydrateMessages, sendMessage, syncServerMessages]);
+  }, [detail, sessionId, hydrateMessages, syncServerMessages]);
 
   // A fresh server snapshot after a turn settles is the authority again: drop the overlays the
   // stream put on top of the previous one. Not while a turn streams — that snapshot is older than
@@ -531,6 +523,14 @@ export const CourseCopilotSession: React.FC = () => {
   const isArchived = effectiveStatus === "ARCHIVED";
   const isBuilding = effectiveStatus === "BUILDING";
   const composerDisabled = isArchived || sessionGone;
+  // A new course session that nobody has spoken in yet: show the opening screen, not an empty
+  // chat beside an empty brief. An EDIT session starts from its course, so it never opens here.
+  const isOpening =
+    session.mode === "CREATE" &&
+    effectiveStatus === "INTERVIEWING" &&
+    messages.length === 0 &&
+    !isStreaming;
+  const opening = strings.session.opening;
   // "Publish" is dropped once the course is live — offering to do what is already done reads
   // as the copilot not knowing the state it is in.
   const courseIsLive = (liveOutline ?? detail.outline)?.status === "ACTIVE";
@@ -604,18 +604,19 @@ export const CourseCopilotSession: React.FC = () => {
           </div>
         </div>
         <div className="flex min-w-0 flex-wrap items-center gap-2 md:shrink-0 md:flex-nowrap">
-          {!isLargeScreen && (
+          {!isLargeScreen && !isOpening && (
             <Button kind="ghost" size="sm" onClick={() => setShowPaneSheet(true)}>
               {strings.session.pane[effectiveStatus] ?? strings.title}
             </Button>
           )}
-          <CourseCopilotStatusTag status={effectiveStatus} />
+          <CourseCopilotStatusTag status={effectiveStatus} published={courseIsLive} />
           <Tooltip label={strings.session.budgetTooltip} align="bottom">
             <span className="cursor-default whitespace-nowrap text-xs text-typography-600">
               {budgetLabel}
             </span>
           </Tooltip>
-          {editorDisabledReason ? (
+          {/* No course yet: nothing to open, so no greyed-out button taking up the header. */}
+          {!trackId ? null : editorDisabledReason ? (
             <Tooltip label={editorDisabledReason} align="bottom">
               {/* A disabled button swallows hover, so the tooltip hangs off a wrapper. */}
               <span>{openInEditorButton}</span>
@@ -645,6 +646,22 @@ export const CourseCopilotSession: React.FC = () => {
         </div>
       </header>
 
+      {courseIsLive && !isArchived && (
+        <div
+          className="border-b border-neutral-200 px-4 py-2"
+          data-testid="course-copilot-live-notice"
+        >
+          <InlineNotification
+            kind="info"
+            lowContrast
+            hideCloseButton
+            title={strings.session.liveNotice.title}
+            subtitle={strings.session.liveNotice.body}
+            className="!max-w-none"
+          />
+        </div>
+      )}
+
       <div className="flex min-h-0 flex-1">
         <section className="flex min-w-0 flex-1 flex-col border-r border-neutral-200 max-lg:border-r-0">
           <div
@@ -653,7 +670,52 @@ export const CourseCopilotSession: React.FC = () => {
             className="flex-1 overflow-y-auto p-4"
             data-testid="course-copilot-feed"
           >
-            {messages.length === 0 && !isStreaming ? (
+            {isOpening ? (
+              <div
+                className="mx-auto mt-6 flex w-full max-w-xl flex-col gap-4 md:mt-16"
+                data-testid="course-copilot-opening"
+              >
+                <div className="flex flex-col gap-2">
+                  <h2 className="text-xl font-semibold text-typography-900">{opening.title}</h2>
+                  <p className="text-sm text-typography-600">{opening.body}</p>
+                </div>
+                <ReferenceFiles sessionId={sessionId} variant="opening" />
+                {/* With files attached, the natural first step is "work from these" — no
+                    need to type a description the files already give. */}
+                {sourceCount > 0 && (
+                  <div>
+                    <Button
+                      kind="primary"
+                      size="sm"
+                      disabled={composerDisabled}
+                      onClick={() => void sendMessage(opening.fromFilesMessage)}
+                    >
+                      {opening.fromFiles}
+                    </Button>
+                  </div>
+                )}
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs font-medium text-typography-500">{opening.startersLabel}</p>
+                  <div
+                    role="group"
+                    aria-label={opening.startersLabel}
+                    className="flex flex-wrap gap-2"
+                  >
+                    {opening.starters.map(starter => (
+                      <Button
+                        key={starter.label}
+                        kind="tertiary"
+                        size="sm"
+                        disabled={composerDisabled}
+                        onClick={() => void sendMessage(starter.message)}
+                      >
+                        {starter.label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : messages.length === 0 && !isStreaming ? (
               <p className="mt-8 text-center text-sm text-typography-600">
                 {strings.session.emptyFeed}
               </p>
@@ -661,9 +723,17 @@ export const CourseCopilotSession: React.FC = () => {
               <div className="flex flex-col gap-3">
                 {messages.map(message => {
                   // What the turn did, under its reply — never under a question card or the
-                  // trainer's own messages.
-                  const showReceipt =
-                    message.role === "assistant" && !message.question && Boolean(message.receipt);
+                  // trainer's own messages. Only when there is something worth a trainer's
+                  // attention: a change, a failure or a warning. "No lookups" and the model's
+                  // reason for changing nothing are working notes, not news.
+                  const receipt =
+                    message.role === "assistant" && !message.question
+                      ? normalizeAgentReceipt(message.receipt)
+                      : null;
+                  const showReceipt = Boolean(
+                    receipt &&
+                    (receipt.changed.length || receipt.failed.length || receipt.warnings.length),
+                  );
                   return (
                     <div
                       key={message.id}
@@ -676,8 +746,11 @@ export const CourseCopilotSession: React.FC = () => {
                         onRetry={() => void retryLast()}
                         disabled={isStreaming || isArchived}
                         citations
+                        compactQuestions
                       />
-                      {showReceipt && <AgentReceipt receipt={message.receipt} />}
+                      {showReceipt && (
+                        <AgentReceipt receipt={{ ...receipt, unchangedBecause: null }} />
+                      )}
                     </div>
                   );
                 })}
@@ -720,36 +793,45 @@ export const CourseCopilotSession: React.FC = () => {
               premature before there is a course. Each one sends its message as the next turn.
               ("Communicate Agent Capabilities via Visual Affordances"; "Progressive
               Disclosure and Contextual Relevance in Agent Interfaces".) */}
-          {chips.length > 0 && !composerDisabled && (
-            <div
-              role="group"
-              className="flex flex-wrap gap-2 border-t border-neutral-200 px-3 pt-3"
-              aria-label={strings.chat.suggestedActionsLabel}
-            >
-              {chips.map(chip => (
-                <Button
-                  key={chip.label}
-                  kind="tertiary"
-                  size="sm"
-                  disabled={isStreaming}
-                  onClick={() => void sendMessage(chip.message)}
-                >
-                  {chip.label}
-                </Button>
-              ))}
-            </div>
-          )}
+          {/* One footer, one border: the chips sit just above the box they belong to. */}
+          <div className="border-t border-neutral-200 bg-white">
+            {chips.length > 0 && !composerDisabled && !isOpening && (
+              <div
+                role="group"
+                className="flex flex-wrap gap-2 px-4 pt-3"
+                aria-label={strings.chat.suggestedActionsLabel}
+              >
+                {chips.map(chip => (
+                  <button
+                    key={chip.label}
+                    type="button"
+                    disabled={isStreaming}
+                    onClick={() => void sendMessage(chip.message)}
+                    className="rounded-full border border-neutral-300 px-3 py-1 text-xs text-typography-800 hover:border-primary-500 hover:text-primary-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+            )}
 
-          <ChatComposer
-            onSend={text => void sendMessage(text)}
-            onStop={stop}
-            isStreaming={isStreaming}
-            disabled={composerDisabled}
-            placeholder={strings.session.composerPlaceholder[effectiveStatus]}
-          />
+            <ChatComposer
+              onSend={text => void sendMessage(text)}
+              onStop={stop}
+              isStreaming={isStreaming}
+              disabled={composerDisabled}
+              placeholder={
+                isOpening
+                  ? opening.composerPlaceholder
+                  : strings.session.composerPlaceholder[effectiveStatus]
+              }
+              borderless
+            />
+          </div>
         </section>
 
-        {isLargeScreen && (
+        {/* The work pane appears once there is a conversation to fill it. */}
+        {isLargeScreen && !isOpening && (
           <aside className="flex w-[48%] min-w-[420px] max-w-[720px] flex-col overflow-y-auto">
             {workPane}
           </aside>

@@ -1,3 +1,5 @@
+import { ListConsentService } from '../list-consent.service';
+import { memoryRedis } from './agent-tools.fakes';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import {
@@ -33,6 +35,7 @@ describePg('List tools through the gateway (Postgres)', () => {
   let gateway: AgentGatewayService;
   let tokens: AgentRunTokenService;
   let lists: ListToolsService;
+  let consent: ListConsentService;
   let bot: string;
   let other: string;
   let alice: string;
@@ -57,6 +60,7 @@ describePg('List tools through the gateway (Postgres)', () => {
       chatbotId?: string;
       runId?: string;
       step?: number;
+      consent?: string | null;
     } = {},
   ) => {
     const runId = opts.runId ?? `run-6-${++run}`;
@@ -66,6 +70,7 @@ describePg('List tools through the gateway (Postgres)', () => {
       runId,
       contactId: opts.contactId === undefined ? alice : opts.contactId,
       tools: TOOLS,
+      consent: opts.consent ?? null,
     });
     return gateway.call(
       name,
@@ -77,6 +82,26 @@ describePg('List tools through the gateway (Postgres)', () => {
       replayed: boolean;
       result?: Record<string, any>;
     }>;
+  };
+
+  /**
+   * A write as a conversation makes it (chunk H1): asked first, then said yes to in a later run,
+   * whose token carries the stored offer. A refusal before the question comes back as it is.
+   */
+  const write = async (
+    name: string,
+    input: Record<string, unknown>,
+    opts: Parameters<typeof call>[2] = {},
+  ) => {
+    const conversationId = opts.conversationId ?? `conv-w-${++run}`;
+    const asked = await call(name, input, {
+      ...opts,
+      conversationId,
+      runId: `ask-${++run}`,
+    });
+    if (asked.error !== 'needs_confirmation') return asked;
+    const offer = await consent.current(opts.chatbotId ?? bot, conversationId);
+    return call(name, input, { ...opts, conversationId, consent: offer!.id });
   };
 
   const freeSlots = async (limit = 3) =>
@@ -101,10 +126,12 @@ describePg('List tools through the gateway (Postgres)', () => {
     ds = await openTestDataSource(LIST_ENTITIES);
     const config = appConfig();
     tokens = new AgentRunTokenService(config);
+    consent = new ListConsentService(memoryRedis() as never);
     lists = new ListToolsService(
       ds,
       new ListDefinitionsService(ds),
       new ListRecordsService(ds),
+      consent,
     );
     gateway = new AgentGatewayService(
       ds,
@@ -236,7 +263,7 @@ describePg('List tools through the gateway (Postgres)', () => {
 
   it('books for the person in the chat, and refuses the same slot for another with alternatives', async () => {
     const [slot] = await freeSlots(1);
-    const booked = await call('create_appointments', { slot: slot.record_id });
+    const booked = await write('create_appointments', { slot: slot.record_id });
     expect(booked).toMatchObject({ ok: true, replayed: false });
     expect(booked.result!.passages[0].title).toBe(
       `Appointments: ${slot.record_title}`,
@@ -245,7 +272,7 @@ describePg('List tools through the gateway (Postgres)', () => {
       expect.objectContaining({ contact_id: alice }),
     ]);
 
-    const taken = await call(
+    const taken = await write(
       'create_appointments',
       { slot: slot.record_id },
       { contactId: bob },
@@ -262,8 +289,8 @@ describePg('List tools through the gateway (Postgres)', () => {
 
   it('shows each person only their own records, and can’t change anyone else’s', async () => {
     const [a, b] = await freeSlots(2);
-    await call('create_appointments', { slot: a.record_id });
-    const bobs = await call(
+    await write('create_appointments', { slot: a.record_id });
+    const bobs = await write(
       'create_appointments',
       { slot: b.record_id },
       { contactId: bob },
@@ -274,7 +301,7 @@ describePg('List tools through the gateway (Postgres)', () => {
     expect(mine.result!.total).toBe(1);
     expect(mine.result!.passages[0].record_title).toBe(a.record_title);
 
-    const theirs = await call('update_appointments', {
+    const theirs = await write('update_appointments', {
       id: bobsId,
       status: 'cancelled',
     });
@@ -287,15 +314,15 @@ describePg('List tools through the gateway (Postgres)', () => {
 
   it('cancels a booking with update, and a bad transition is refused in plain words', async () => {
     const [slot] = await freeSlots(1);
-    const booked = await call('create_appointments', { slot: slot.record_id });
+    const booked = await write('create_appointments', { slot: slot.record_id });
     const id = booked.result!.passages[0].record_id;
-    const cancelled = await call('update_appointments', {
+    const cancelled = await write('update_appointments', {
       id,
       status: 'cancelled',
     });
     expect(cancelled.ok).toBe(true);
     expect(cancelled.result!.passages[0].text).toContain('Status: cancelled');
-    const back = await call('update_appointments', { id, status: 'booked' });
+    const back = await write('update_appointments', { id, status: 'booked' });
     expect(back).toMatchObject({ ok: false, error: 'transition_not_allowed' });
     expect(back.result!.message).toBe(
       "Appointments can't go from cancelled to booked.",
@@ -304,7 +331,7 @@ describePg('List tools through the gateway (Postgres)', () => {
 
   it('Preview checks every rule and returns the real result, but saves nothing', async () => {
     const [slot] = await freeSlots(1);
-    const preview = await call(
+    const preview = await write(
       'create_appointments',
       { slot: slot.record_id },
       { contactId: null, conversationId: 'preview-abc' },
@@ -321,12 +348,12 @@ describePg('List tools through the gateway (Postgres)', () => {
     ).toEqual([]);
 
     // A rule still holds in Preview: a slot someone has is refused, with alternatives.
-    await call(
+    await write(
       'create_appointments',
       { slot: slot.record_id },
       { contactId: bob },
     );
-    const taken = await call(
+    const taken = await write(
       'create_appointments',
       { slot: slot.record_id },
       { contactId: null, conversationId: 'preview-xyz' },
@@ -337,7 +364,7 @@ describePg('List tools through the gateway (Postgres)', () => {
       bob,
     ]);
 
-    const asPerson = await call(
+    const asPerson = await write(
       'create_appointments',
       { slot: slot.record_id },
       { conversationId: 'preview-def' },
@@ -358,9 +385,150 @@ describePg('List tools through the gateway (Postgres)', () => {
     expect(nobody.result!.total).toBe(0);
   });
 
+  describe('consent (chunk H1)', () => {
+    it('saves nothing without a yes, and asks a question naming the slot and the person', async () => {
+      const [slot] = await freeSlots(1);
+      const asked = await call(
+        'create_appointments',
+        { slot: slot.record_id },
+        { conversationId: 'conv-consent-1' },
+      );
+      expect(asked).toMatchObject({ ok: false, error: 'needs_confirmation' });
+      expect(asked.result!.question).toMatch(/^Shall I book .+\?$/);
+      expect(asked.result!.question).toContain(slot.record_title);
+      expect(asked.result!.question).toContain('for Alice');
+      expect(await appointmentRows()).toEqual([]);
+    });
+
+    it('a yes covers only the entry it was asked about', async () => {
+      const [a, b] = await freeSlots(2);
+      const conversationId = 'conv-consent-2';
+      await call(
+        'create_appointments',
+        { slot: a.record_id },
+        { conversationId },
+      );
+      const offer = await consent.current(bot, conversationId);
+      const other = await call(
+        'create_appointments',
+        { slot: b.record_id },
+        { conversationId, consent: offer!.id },
+      );
+      expect(other).toMatchObject({ ok: false, error: 'needs_confirmation' });
+      expect(other.result!.question).toContain(b.record_title);
+      expect(await appointmentRows()).toEqual([]);
+    });
+
+    it('a yes must come in a later run than the question', async () => {
+      const [slot] = await freeSlots(1);
+      const conversationId = 'conv-consent-3';
+      const runId = 'run-same-turn';
+      await call(
+        'create_appointments',
+        { slot: slot.record_id },
+        { conversationId, runId },
+      );
+      const offer = await consent.current(bot, conversationId);
+      const sameRun = await call(
+        'create_appointments',
+        { slot: slot.record_id },
+        { conversationId, runId, step: 1, consent: offer!.id },
+      );
+      expect(sameRun).toMatchObject({ ok: false, error: 'needs_confirmation' });
+      expect(await appointmentRows()).toEqual([]);
+    });
+
+    it('a token without the offer, or naming another, writes nothing', async () => {
+      const [slot] = await freeSlots(1);
+      const conversationId = 'conv-consent-4';
+      await call(
+        'create_appointments',
+        { slot: slot.record_id },
+        { conversationId },
+      );
+      const wrong = await call(
+        'create_appointments',
+        { slot: slot.record_id },
+        { conversationId, consent: 'not-the-offer' },
+      );
+      expect(wrong).toMatchObject({ ok: false, error: 'needs_confirmation' });
+      expect(await appointmentRows()).toEqual([]);
+    });
+
+    it('a move asks its own question, naming the entry it moves; a cancel says cancel', async () => {
+      const [a, b] = await freeSlots(2);
+      const booked = await write('create_appointments', { slot: a.record_id });
+      const id = booked.result!.passages[0].record_id;
+      const move = await call(
+        'update_appointments',
+        { id, slot: b.record_id },
+        { conversationId: 'conv-consent-5' },
+      );
+      expect(move).toMatchObject({ ok: false, error: 'needs_confirmation' });
+      expect(move.result!.question).toMatch(/^Shall I (move|change) your /);
+      expect(move.result!.question).toContain(a.record_title);
+      expect(move.result!.question).toContain(b.record_title);
+      const rows = await appointmentRows();
+      expect(rows).toHaveLength(1);
+      expect(rows[0].data.slot).toBe(a.record_id);
+
+      const cancel = await call(
+        'update_appointments',
+        { id, status: 'cancelled' },
+        { conversationId: 'conv-consent-6' },
+      );
+      expect(cancel.result!.question).toMatch(/^Shall I cancel your /);
+      expect(cancel.result!.question).toContain(a.record_title);
+
+      const moved = await write('update_appointments', {
+        id,
+        slot: b.record_id,
+      });
+      expect(moved.ok).toBe(true);
+      expect(moved.result!.before.record_title).toBe(a.record_title);
+      expect(moved.result!.passages[0].record_title).toBe(b.record_title);
+    });
+
+    it('a run ally-be has stopped waiting for writes nothing, even with a yes', async () => {
+      const [slot] = await freeSlots(1);
+      const conversationId = 'conv-consent-8';
+      await call(
+        'create_appointments',
+        { slot: slot.record_id },
+        { conversationId },
+      );
+      const offer = await consent.current(bot, conversationId);
+      await consent.endRun('run-late');
+      const late = await call(
+        'create_appointments',
+        { slot: slot.record_id },
+        { conversationId, consent: offer!.id, runId: 'run-late' },
+      );
+      expect(late).toMatchObject({ ok: false, error: 'run_ended' });
+      expect(await appointmentRows()).toEqual([]);
+    });
+
+    it('a slot someone has is refused before anything is asked', async () => {
+      const [slot] = await freeSlots(1);
+      await write(
+        'create_appointments',
+        { slot: slot.record_id },
+        { contactId: bob },
+      );
+      const conversationId = 'conv-consent-7';
+      const taken = await call(
+        'create_appointments',
+        { slot: slot.record_id },
+        { conversationId },
+      );
+      expect(taken).toMatchObject({ ok: false, error: 'unique_taken' });
+      expect(await consent.current(bot, conversationId)).toBeNull();
+    });
+  });
+
   it('a replayed create returns the stored record and leaves one row', async () => {
     const [slot] = await freeSlots(1);
-    const first = await call(
+    const first = await write(
       'create_appointments',
       { slot: slot.record_id },
       { runId: 'run-replay' },
@@ -387,7 +555,7 @@ describePg('List tools through the gateway (Postgres)', () => {
     );
     expect(theirs.ok).toBe(true);
     await expect(
-      call('create_appointments', { slot: 'x' }, { chatbotId: other }),
+      write('create_appointments', { slot: 'x' }, { chatbotId: other }),
     ).rejects.toBeInstanceOf(ForbiddenException);
     await ds.query(
       `UPDATE chatbots SET settings = '{"abilities":{"find_slots":"never"}}' WHERE id = $1`,

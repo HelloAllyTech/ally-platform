@@ -1,4 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
+import { CourseCopilotDesignGuidanceService } from './course-copilot-design-guidance.service';
+import { CourseCopilotLearnerResultsService } from './course-copilot-learner-results.service';
 import { In } from 'typeorm';
 import { LoggerService } from 'src/logger/logger.service';
 import { TrackService } from 'src/track/service/track.service';
@@ -33,14 +35,18 @@ import {
   COURSE_COPILOT_SCENARIO_CATEGORY,
 } from '../constants/course-copilot.constants';
 import { SpecialistContext } from './specialists/specialist.types';
+import { CourseCopilotSourcesService } from './course-copilot-sources.service';
 import { ArticleSpecialist } from './specialists/article.specialist';
 import { QuizSpecialist } from './specialists/quiz.specialist';
 import { JournalSpecialist } from './specialists/journal.specialist';
 import { AnnotationSpecialist } from './specialists/annotation.specialist';
+import { ScenarioQuizSpecialist } from './specialists/scenario-quiz.specialist';
+import { BucketSortSpecialist } from './specialists/bucket-sort.specialist';
 import { CourseMetaSpecialist } from './specialists/course-meta.specialist';
 import { CourseReviewSpecialist } from './specialists/course-review.specialist';
 import { ImagePromptSpecialist } from './specialists/image-prompt.specialist';
 import { RoleplayBriefSpecialist } from './specialists/roleplay-brief.specialist';
+import { RoleplayFitCheckSpecialist } from './specialists/roleplay-fit-check.specialist';
 import {
   CourseCopilotJobSkip,
   CourseCopilotMediaService,
@@ -48,6 +54,10 @@ import {
 import { CourseCopilotStructureService } from './course-copilot-structure.service';
 import { CourseCopilotSessionService } from './course-copilot-session.service';
 import { CourseCopilotLibraryService } from './course-copilot-library.service';
+import {
+  DEFAULT_BREATHING_EXERCISE,
+  matchTriggerWarnings,
+} from '../util/item-defaults.util';
 
 const textOf = (html: unknown, max = 4_000): string => {
   const text =
@@ -88,10 +98,18 @@ export class CourseCopilotJobExecutorService {
     private readonly quiz: QuizSpecialist,
     private readonly journal: JournalSpecialist,
     private readonly annotation: AnnotationSpecialist,
+    private readonly scenarioQuiz: ScenarioQuizSpecialist,
+    private readonly bucketSort: BucketSortSpecialist,
     private readonly courseMeta: CourseMetaSpecialist,
     private readonly review: CourseReviewSpecialist,
     private readonly imagePrompt: ImagePromptSpecialist,
     private readonly roleplayBrief: RoleplayBriefSpecialist,
+    private readonly fitCheck: RoleplayFitCheckSpecialist,
+    private readonly sources: CourseCopilotSourcesService,
+    @Optional()
+    private readonly designGuidance?: CourseCopilotDesignGuidanceService,
+    @Optional()
+    private readonly learnerResults?: CourseCopilotLearnerResultsService,
   ) {}
 
   async execute(
@@ -107,7 +125,9 @@ export class CourseCopilotJobExecutorService {
       case CourseCopilotJobKind.ARTICLE:
       case CourseCopilotJobKind.QUIZ:
       case CourseCopilotJobKind.JOURNAL:
-      case CourseCopilotJobKind.ANNOTATED_ARTIFACT: {
+      case CourseCopilotJobKind.ANNOTATED_ARTIFACT:
+      case CourseCopilotJobKind.BRANCHING_SCENARIO:
+      case CourseCopilotJobKind.BUCKET_SORT: {
         const context = await this.specialistContext(
           session,
           job,
@@ -118,12 +138,17 @@ export class CourseCopilotJobExecutorService {
           [CourseCopilotJobKind.QUIZ]: this.quiz,
           [CourseCopilotJobKind.JOURNAL]: this.journal,
           [CourseCopilotJobKind.ANNOTATED_ARTIFACT]: this.annotation,
+          [CourseCopilotJobKind.BRANCHING_SCENARIO]: this.scenarioQuiz,
+          [CourseCopilotJobKind.BUCKET_SORT]: this.bucketSort,
         }[job.kind];
         const output = await specialist.generate(context);
         return {
           content: output.content,
           summary: output.summary,
           ...(output.imageBrief ? { imageBrief: output.imageBrief } : {}),
+          ...(context.referenceLabels?.length
+            ? { references: context.referenceLabels }
+            : {}),
         };
       }
       case CourseCopilotJobKind.GAME:
@@ -185,7 +210,14 @@ export class CourseCopilotJobExecutorService {
     if (!blueprint || !section) {
       throw new Error('The job has no course context to write against.');
     }
+    const reference = await this.referenceFor(session, section, item);
     return {
+      ...(reference
+        ? {
+            referenceMaterial: reference.text,
+            referenceLabels: reference.labels,
+          }
+        : {}),
       sessionId: session.id,
       brief: session.brief ?? {},
       blueprint,
@@ -205,6 +237,36 @@ export class CourseCopilotJobExecutorService {
         : {}),
       usageMetadata,
     };
+  }
+
+  /**
+   * The trainer's reference passages that bear on one item, found by what the
+   * item is about. A lookup failure writes the item without them rather than
+   * failing the job: the files are a help, not a precondition.
+   */
+  private async referenceFor(
+    session: CourseCopilotSession,
+    section: CourseBlueprintSection,
+    item: CourseBlueprintItem,
+  ) {
+    const query = [
+      section.title,
+      item?.title,
+      (item as any)?.purpose,
+      JSON.stringify(item?.spec ?? {}),
+    ]
+      .filter(Boolean)
+      .join(' ');
+    try {
+      return await this.sources.referenceFor(session.id, query);
+    } catch (error) {
+      this.logger.warn(
+        `Course Copilot ${session.id}: reference lookup failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
   }
 
   /**
@@ -266,6 +328,13 @@ export class CourseCopilotJobExecutorService {
 
   // ── No-model items ───────────────────────────────────────────────────────
 
+  /** Trigger warnings as real ids (see matchTriggerWarnings). */
+  private async resolveTriggerWarningIds(raw: unknown[]): Promise<string[]> {
+    if (!raw.length) return [];
+    const warnings = await this.library.listTriggerWarnings().catch(() => []);
+    return matchTriggerWarnings(raw, warnings);
+  }
+
   private gameContent(item: CourseBlueprintItem): CourseCopilotJobResult {
     const requested = String(item?.spec?.gameKey ?? '');
     const gameKey = (Object.values(TrackGameKey) as string[]).includes(
@@ -277,6 +346,10 @@ export class CourseCopilotJobExecutorService {
       gameKey,
       ...(typeof item?.spec?.intro === 'string' && item.spec.intro.trim()
         ? { intro: item.spec.intro.trim() }
+        : {}),
+      // The breathing exercise needs its box timings; Studio's defaults (4-4-4-4, four rounds).
+      ...(gameKey === TrackGameKey.BREATHING_EXERCISE
+        ? { breathingExercise: { ...DEFAULT_BREATHING_EXERCISE } }
         : {}),
     };
     validateTrackItemContent({
@@ -371,6 +444,19 @@ export class CourseCopilotJobExecutorService {
         'A new roleplay needs a competency, and the brief has none.',
       );
     }
+    const casting = await this.structureService.asOwner(session, () =>
+      this.fitCheck.cast(actor.structured, {
+        sessionId: session.id,
+        tenantId: session.tenantId ?? null,
+        competencyIds,
+        usageMetadata,
+      }),
+    );
+    // Hand-back with nobody better in the library: build a new character for this brief and keep
+    // it in the library, rather than casting someone the fit check says can't carry the roleplay.
+    const newCharacter = Boolean(
+      casting.fitCheck && !casting.fitCheck.fits && !casting.swapped,
+    );
     const track = session.trackId
       ? await this.structureService.getTrack(session.trackId).catch(() => null)
       : null;
@@ -378,6 +464,9 @@ export class CourseCopilotJobExecutorService {
       (brief.look?.articleImages ?? 'none') !== 'none' ||
       brief.look?.cover === 'generate';
 
+    const triggerWarningIds = Array.isArray(spec.triggerWarningIds)
+      ? await this.resolveTriggerWarningIds(spec.triggerWarningIds)
+      : undefined;
     const created = await this.structureService.asOwner(session, () =>
       this.chain.buildScenarioFromBrief(
         {
@@ -391,14 +480,11 @@ export class CourseCopilotJobExecutorService {
           personaAge: actor.personaAge,
           difficultyLevel:
             (actor.difficultyLevel as ScenarioDifficultyLevel) ?? undefined,
-          triggerWarningIds: Array.isArray(spec.triggerWarningIds)
-            ? spec.triggerWarningIds.map(String)
-            : undefined,
+          triggerWarningIds,
           coverImageUrl: imageryOn ? (track?.coverImageUrl ?? null) : null,
           titleHint: actor.title ?? item.title,
-          characterId:
-            typeof spec.characterId === 'string' ? spec.characterId : undefined,
-          saveCharacter: spec.saveCharacter === true,
+          characterId: newCharacter ? undefined : casting.characterId,
+          saveCharacter: newCharacter || spec.saveCharacter === true,
           category: COURSE_COPILOT_SCENARIO_CATEGORY,
           provenance:
             `Generated by Course Copilot for the course "${context.blueprint.title}" ` +
@@ -423,10 +509,20 @@ export class CourseCopilotJobExecutorService {
         created.characterId,
       );
     }
+    const summary = created.summary || `Created roleplay "${created.title}"`;
     return {
       scenarioId: created.scenarioId,
       ...(created.characterId ? { characterId: created.characterId } : {}),
-      summary: created.summary || `Created roleplay "${created.title}"`,
+      summary: casting.swapped
+        ? `${summary}. Used ${casting.swapped.toName} instead of ${casting.swapped.fromName}: ${casting.swapped.reason} Please check.`
+        : newCharacter
+          ? `${summary}. Wrote a new character: no library character fit (${casting.fitCheck!.reason}) Please check.`
+          : summary,
+      roleplayBrief: actor.structured,
+      ...(context.referenceLabels?.length
+        ? { references: context.referenceLabels }
+        : {}),
+      ...(casting.fitCheck ? { casting } : {}),
     };
   }
 
@@ -665,10 +761,25 @@ export class CourseCopilotJobExecutorService {
     if (!session.trackId)
       throw new CourseCopilotJobSkip('No course to review.');
     const track = await this.structureService.getTrack(session.trackId);
+    const guidance = this.designGuidance
+      ? await this.designGuidance.referenceWithCodes({
+          sessionId: session.id,
+          tenantId: session.tenantId,
+          brief: session.brief ?? {},
+          stage: 'review',
+        })
+      : { text: '', codes: [] as string[] };
+    // A live course with learners: what they did, so the review can point at real trouble.
+    const learnerEvidence = this.learnerResults
+      ? await this.learnerResults.reviewReference(track.id, session.tenantId)
+      : '';
     const findings: CourseReviewFinding[] = await this.review.review({
       sessionId: session.id,
       brief: session.brief ?? {},
       courseDigest: this.courseDigest(track),
+      referenceMaterial:
+        [guidance.text, learnerEvidence].filter(Boolean).join('\n\n---\n') ||
+        null,
       usageMetadata,
     });
     const fixes = findings.filter((f) => f.severity === 'fix').length;
@@ -687,9 +798,20 @@ export class CourseCopilotJobExecutorService {
       },
       createdBy: null,
     });
+    // What the reviewer read beyond the course, for the build log.
+    const used = [
+      guidance.codes.length
+        ? `design principles ${guidance.codes.join(', ')}`
+        : '',
+      learnerEvidence ? 'learner results' : '',
+    ].filter(Boolean);
     return {
       findings,
-      summary: findings.length ? `${findings.length} findings` : 'No findings',
+      principles: guidance.codes,
+      usedLearnerResults: Boolean(learnerEvidence),
+      summary:
+        (findings.length ? `${findings.length} findings` : 'No findings') +
+        (used.length ? ` · reviewed with ${used.join(' and ')}` : ''),
     };
   }
 
@@ -753,6 +875,30 @@ export class CourseCopilotJobExecutorService {
               `labels: ${(content.labels ?? []).map((l: any) => l.text).join(', ')}; lines: ${(content.units ?? []).length}; answers: ${(content.targets ?? []).length}`,
             );
             break;
+          case TrackItemType.BRANCHING_SCENARIO:
+            for (const node of (content.nodes ?? []).slice(0, 30)) {
+              const choices = Array.isArray(node.choices) ? node.choices : [];
+              lines.push(
+                choices.length
+                  ? `- scene: ${String(node.text ?? '').slice(0, 300)} → ${choices.map((choice: any) => choice.text).join(' | ')}`
+                  : `- ending (${node.outcome ?? 'no outcome'}, ${node.score ?? '?'}): ${String(node.text ?? '').slice(0, 200)}`,
+              );
+            }
+            break;
+          case TrackItemType.BUCKET_SORT: {
+            const labels = new Map<string, string>(
+              (content.buckets ?? []).map((b: any) => [b.id, b.label]),
+            );
+            lines.push(
+              `buckets: ${(content.buckets ?? []).map((b: any) => b.label).join(', ')}`,
+            );
+            for (const entry of (content.items ?? []).slice(0, 30)) {
+              lines.push(
+                `- ${entry.text} → ${labels.get(entry.bucketId) ?? '?'}`,
+              );
+            }
+            break;
+          }
           case TrackItemType.ROLEPLAY:
             lines.push(`roleplay scenario #${item.scenarioId}`);
             break;

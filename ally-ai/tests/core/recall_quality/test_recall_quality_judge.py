@@ -156,9 +156,7 @@ class TestGuards:
                 ]
             )
         )
-        assert judgment.unused_selected == [
-            "she ran a tailoring shop for thirty years"
-        ]
+        assert judgment.unused_selected == ["she ran a tailoring shop for thirty years"]
 
     async def test_returns_none_when_the_judge_returns_nothing(self):
         # Distinct from `no_demand`: this is OUR failure, and counting it as "the
@@ -170,9 +168,7 @@ class TestGuards:
     async def test_does_not_call_the_model_when_there_was_no_pool(self):
         # No pool was never a ranking decision. Different from a pool with
         # nothing apt, which is a real finding.
-        with patch(
-            "app.core.llm.dispatch.generate_structured", new=AsyncMock()
-        ) as spy:
+        with patch("app.core.llm.dispatch.generate_structured", new=AsyncMock()) as spy:
             judgment, model = await judge_recall(
                 counsellor_turn="q",
                 client_reply="a",

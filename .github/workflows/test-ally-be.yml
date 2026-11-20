@@ -78,6 +78,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Lint
+        # ESLint over all of src/ sits near Node's default ~4 GB heap; the runner has 16 GB.
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
         run: npm run lint
 
   typecheck:
@@ -94,6 +97,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Typecheck
+        # Same heap as the build below: tsc over the whole tree OOMs on Node's default (exit 134).
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
         run: npm run typecheck
       # `nest build` runs the Nest CLI's path-alias compiler hook, which plain
       # `tsc` does not: a `src/…` re-export in a decorated class crashed it

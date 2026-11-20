@@ -16,6 +16,13 @@ set -e
 # HUSKY=0 turns hooks off, as it did under husky (the Builder workflows set it).
 [ "${HUSKY:-}" = "0" ] && exit 0
 cd "$(git rev-parse --show-toplevel)"
+# In a linked worktree, git runs hooks with GIT_DIR set but no GIT_WORK_TREE, so
+# git takes the CURRENT directory as the top of the tree. A service hook run from
+# its own directory (`git diff --relative` in ally-be/) then gets repo-root paths
+# and eslint finds no files. Pin the work tree so subdirectories resolve.
+if [ -n "${GIT_DIR:-}" ] && [ -z "${GIT_WORK_TREE:-}" ]; then
+  export GIT_WORK_TREE="$PWD"
+fi
 
 STAGED="$(git diff --cached --name-only --diff-filter=ACMR)"
 [ -n "$STAGED" ] || exit 0

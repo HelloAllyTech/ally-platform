@@ -87,6 +87,34 @@ describe('DebriefConsoleViewService queue: urgent flags skip the undo window', (
   });
 });
 
+/**
+ * Nobody reviews by hand (owner decision 2026-11-20): a debrief shown with a missed risk cue is not
+ * urgent. Only a learner's flag on an important moment or a learner in distress is.
+ */
+describe('DebriefConsoleViewService queue: a missed risk cue is not urgent', () => {
+  it('ranks 0 only for an open urgent flag or learner distress', async () => {
+    const calls: string[] = [];
+    const svc = new (DebriefConsoleViewService as any)({
+      query: jest.fn(async (sql: string) => {
+        calls.push(sql);
+        return [];
+      }),
+    });
+    await svc.sessions(parseSessionFilters({ category: 'needs' }), {
+      userId: 1,
+      roles: {},
+      can: {},
+    } as any);
+    const sql = calls[0].replace(/\s+/g, ' ');
+    expect(sql).toContain(
+      `WHEN b.mode = 'live' AND (b.urgent_open OR (b."learnerDistress" AND NOT b.reviewed)) THEN 0`,
+    );
+    expect(sql).not.toMatch(
+      /review_reason = 'missed_risk_cue' AND NOT b\.reviewed/,
+    );
+  });
+});
+
 /** Spec Q3: the clinical advisor gives a verdict before seeing the judge's scores. */
 describe('DebriefConsoleViewService list: advisor blinding', () => {
   const row = (id: string) => ({

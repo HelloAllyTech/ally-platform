@@ -1,3 +1,5 @@
+import { usageContext } from 'src/billing/context/usage-context';
+import { UsageChannel, UsageKind } from 'src/billing/enum/billing.enum';
 import {
   HttpException,
   HttpStatus,
@@ -25,7 +27,7 @@ import {
   BotPageSessionDto,
   BotPageVerifyDto,
 } from '../dto/bot-page.dto';
-import { isFallback } from '../engine/agent-runtime';
+import { isFailedRun } from '../engine/agent-runtime';
 import { ChatbotEngineService } from '../engine/chatbot-engine.service';
 import type {
   ChatbotDecision,
@@ -77,6 +79,14 @@ import { MemoryService } from '../memory/memory.service';
 import { SummaryService } from '../memory/summary.service';
 import { LeadAlertService } from './lead-alert.service';
 import { TurnstileService } from './turnstile.service';
+import { ListToolsService } from '../agent-tools/list-tools.service';
+import {
+  confirmedWrite,
+  doneSteps,
+  type PublicConfirmation,
+  type PublicStep,
+} from './live-steps';
+import { FEEDBACK_UPSERT } from './answer-feedback.sql';
 
 /** What a visitor's browser learns about a page. Nothing internal: no prompts, ids or settings. */
 export interface PublicBotPage {
@@ -164,6 +174,13 @@ export interface PublicFinal {
   rateable: boolean;
   /** A team member has this chat (chunk 11a): no reply now; theirs comes on the visitor stream. */
   held?: boolean;
+  /**
+   * What the assistant did for this reply, for its "what I did" line (chunk 6b). Absent for a v1,
+   * crisis or Safety reply, a template, or one that did nothing worth showing.
+   */
+  steps?: PublicStep[];
+  /** A booking or change made in this reply, from the stored record (chunk 6b). */
+  confirmation?: PublicConfirmation;
 }
 
 /** The bot page's refusals, mapped onto the repo's `ErrorCode` contract (see error-code.enum.ts). */
@@ -273,6 +290,8 @@ export class BotPagePublicService {
     // Memory, light (chunk 8a). Optional so older test wiring still builds the service.
     @Optional() private readonly memory?: MemoryService,
     @Optional() private readonly summaries?: SummaryService,
+    // The confirmation card (chunk 6b). Optional, like memory, for older test wiring.
+    @Optional() private readonly listTools?: ListToolsService,
   ) {}
 
   async page(slug: string): Promise<AvailableBotPage> {
@@ -644,28 +663,44 @@ export class BotPagePublicService {
     let decision: ChatbotDecision;
     try {
       const history = await this.conversations.recentHistory(conversation.id);
-      decision = await this.engine.respond(
+      // CR1: the bubble is its own channel on the Costs screen; the turn stays the page's.
+      decision = await usageContext.with(
         {
-          // The page's own gate has already decided who may chat here; the bot's accessMode is
-          // WhatsApp's (and every other channel's) list, and the page must neither use nor widen it.
-          chatbot: { ...chatbot, accessMode: ChatbotAccessMode.ANYONE },
-          settings: botSettings,
-          text,
-          history,
-          isFirstMessage: history.length <= 1,
-          sender: {
-            externalId: ready.visitor.id,
-            label: `bot page visitor ${BotPageVisitorService.logTag(ready.visitor.id)}`,
-            email: ready.email,
-            userId: ready.eligibility.userId ?? null,
-            tenantId: ready.eligibility.tenantId ?? null,
-          },
-          channel: WEB_CHANNEL,
-          conversationId: conversation.id,
-          providerMessageId: inbound.id,
-          contactId: contact.id,
+          channel: ready.visitor.embed
+            ? UsageChannel.BUBBLE
+            : UsageChannel.BOT_PAGE,
+          runKind: UsageKind.CUSTOMER_REPLY,
+          // CR1: on an invite-only or organisation page the signed-in person holds a seat.
+          audience:
+            available.page.access === BotPageAccess.PUBLIC
+              ? 'customer'
+              : 'seat',
+          seatEmail: ready.email ?? null,
         },
-        live,
+        () =>
+          this.engine.respond(
+            {
+              // The page's own gate has already decided who may chat here; the bot's accessMode is
+              // WhatsApp's (and every other channel's) list, and the page must neither use nor widen it.
+              chatbot: { ...chatbot, accessMode: ChatbotAccessMode.ANYONE },
+              settings: botSettings,
+              text,
+              history,
+              isFirstMessage: history.length <= 1,
+              sender: {
+                externalId: ready.visitor.id,
+                label: `bot page visitor ${BotPageVisitorService.logTag(ready.visitor.id)}`,
+                email: ready.email,
+                userId: ready.eligibility.userId ?? null,
+                tenantId: ready.eligibility.tenantId ?? null,
+              },
+              channel: WEB_CHANNEL,
+              conversationId: conversation.id,
+              providerMessageId: inbound.id,
+              contactId: contact.id,
+            },
+            live,
+          ),
       );
     } catch (error) {
       await this.conversations.updateMessage(inbound.id, {
@@ -730,37 +765,91 @@ export class BotPagePublicService {
     void this.leads.afterTurn(chatbot, conversation.id);
     // What the run asked to remember, and the chat's rolling summary (chunk 8a): after the reply
     // has gone out, decided from what was stored as sent. Not awaited: nobody waits for either.
-    void this.memory?.afterTurn({
-      chatbot,
-      conversationId: conversation.id,
-      runId: decision.agent?.runId,
-      pending:
-        decision.agent?.runtime === AgentRuntimeUsed.V2
-          ? decision.agent.memory
-          : undefined,
-      repliedAt: Date.now(),
-    });
-    void this.summaries?.afterTurn(chatbot, conversation.id);
-    if (isFallback(decision.agent)) {
+    // CR1: both are this channel's calls for the Costs screen.
+    usageContext.run(
+      {
+        channel: ready.visitor.embed
+          ? UsageChannel.BUBBLE
+          : UsageChannel.BOT_PAGE,
+        runKind: UsageKind.CUSTOMER_REPLY,
+        chatbotId: chatbot.id,
+        creatorUserId: chatbot.createdBy ?? null,
+      },
+      () => {
+        void this.memory?.afterTurn({
+          chatbot,
+          conversationId: conversation.id,
+          runId: decision.agent?.runId,
+          pending:
+            decision.agent?.runtime === AgentRuntimeUsed.V2
+              ? decision.agent.memory
+              : undefined,
+          repliedAt: Date.now(),
+        });
+        void this.summaries?.afterTurn(chatbot, conversation.id);
+      },
+    );
+    if (isFailedRun(decision.agent)) {
       this.eventEmitter.emit(AGENT_FALLBACK_EVENT, {
         chatbot: { id: chatbot.id, name: chatbot.name },
         reason: decision.agent.fallbackReason,
       } satisfies AgentFallbackEvent);
     }
 
+    const steps = doneSteps(decision);
+    const confirmation = await this.confirmationFor(
+      chatbot.id,
+      contact.id,
+      decision,
+    );
     return {
       reply: decision.body,
       citations: publicCitations(decision.citations),
       messageId: outbound.id,
       conversationId: conversation.id,
       rateable: RATEABLE.has(decision.handledBy),
+      ...(steps.length ? { steps } : {}),
+      ...(confirmation ? { confirmation } : {}),
     };
+  }
+
+  /**
+   * The card under a reply that booked or changed something (chunk 6b): the record as stored and
+   * as this person may see it, never the model's account of it. Nothing if it can't be read.
+   */
+  private async confirmationFor(
+    chatbotId: string,
+    contactId: string,
+    decision: ChatbotDecision,
+  ): Promise<PublicConfirmation | null> {
+    const write = confirmedWrite(decision);
+    if (!write || !this.listTools || !decision.agent) return null;
+    try {
+      const record = await this.listTools.confirmation(
+        chatbotId,
+        write.record_id,
+        contactId,
+        decision.agent.runId,
+      );
+      if (!record) return null;
+      return {
+        action: write.kind as PublicConfirmation['action'],
+        ...record,
+      };
+    } catch (error) {
+      // The reply has gone out; a card that can't be read is left off, never an error.
+      this.logger.warn(
+        `Confirmation card unavailable: ${error instanceof Error ? error.name : 'error'}`,
+      );
+      return null;
+    }
   }
 
   /**
    * "Was this helpful?" (chunk Q2a): the visitor's thumbs up or down on one of the answers in
    * their own conversation. Rating again changes it. Crisis replies, templates and the consent
-   * gate can't be rated. Nothing they wrote is logged.
+   * gate can't be rated. Nothing they wrote is logged. How a repeat is stored:
+   * `answer-feedback.sql.ts`.
    */
   async feedback(
     slug: string,
@@ -794,22 +883,14 @@ export class BotPagePublicService {
       throw publicError(HttpStatus.CONFLICT, 'not_rateable');
     }
     const down = dto.rating === 'down';
-    await db.query(
-      `INSERT INTO chatbot_message_feedback
-         (message_id, chatbot_id, conversation_id, rating, reason, note, status)
-       VALUES ($1, $2, $3, $4, $5, $6, 'open')
-       ON CONFLICT (message_id) DO UPDATE SET
-         rating = EXCLUDED.rating, reason = EXCLUDED.reason, note = EXCLUDED.note,
-         status = 'open', handled_by = NULL, handled_at = NULL, "updatedAt" = now()`,
-      [
-        message.id,
-        available.chatbot.id,
-        message.conversation_id,
-        dto.rating,
-        down ? (dto.reason ?? null) : null,
-        down ? dto.note?.trim().slice(0, 300) || null : null,
-      ],
-    );
+    await db.query(FEEDBACK_UPSERT, [
+      message.id,
+      available.chatbot.id,
+      message.conversation_id,
+      dto.rating,
+      down ? (dto.reason ?? null) : null,
+      down ? dto.note?.trim().slice(0, 300) || null : null,
+    ]);
     return { rating: dto.rating };
   }
 

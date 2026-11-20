@@ -21,6 +21,7 @@ import {
   BotPageVerifyDto,
 } from '../dto/bot-page.dto';
 import type { AgentStreamEvent } from '../../ai/dto/knowledge.dto';
+import { publicStep } from './live-steps';
 import { BotPagePublicService } from './bot-page-public.service';
 import { BotPageVisitorService } from './bot-page-visitor.service';
 
@@ -183,7 +184,7 @@ export class BotPagePublicController {
   @ApiOperation({
     summary: 'Send a message and stream the reply (SSE)',
     description:
-      'Events: status {code}, token {text} (only once the checks have cleared it), then final {reply, citations, messageId, conversationId}, or error {code}. Refusals before the reply starts (rate limit, busy, pre-chat questions unanswered) are plain HTTP errors with a `code`. Steps and run details never reach the page.',
+      'Events: status {code}, activity {kind, label?} (a live step: what the assistant is doing, as a kind the page words, with at most a list name or a day and time; only once the crisis check has cleared the message), token {text} (only once the checks have cleared it), then final {reply, citations, messageId, conversationId, steps?, confirmation?}, or error {code}. Refusals before the reply starts (rate limit, busy, pre-chat questions unanswered) are plain HTTP errors with a `code`. The run, its trace, tool names, ids and queries never reach the page.',
   })
   async stream(
     @Param('slug') slug: string,
@@ -231,18 +232,24 @@ export class BotPagePublicController {
 }
 
 /**
- * What a visitor may see of a run: what it is doing (`status`, as a code the page words itself) and
- * the checked reply text. Never `run_started` (the run id), `step` (the trace), or a status's
- * `detail` and `documents` (search queries and document titles).
+ * What a visitor may see of a run: what it is doing (`status`, as a code the page words itself; and
+ * since chunk 6b `activity`, a live step through `publicStep`'s whitelist) and the checked reply
+ * text. Never `run_started` (the run id), `step` (the trace), a status's `detail` and `documents`
+ * (search queries and document titles), or an activity's record id.
  */
-export function publicEvent(
-  event: AgentStreamEvent,
-): { event: 'status' | 'token'; data: Record<string, string> } | null {
+export function publicEvent(event: AgentStreamEvent): {
+  event: 'status' | 'token' | 'activity';
+  data: Record<string, string>;
+} | null {
   switch (event.event) {
     case 'status':
       return { event: 'status', data: { code: event.data.code } };
     case 'token':
       return { event: 'token', data: { text: event.data.text } };
+    case 'activity': {
+      const step = publicStep(event.data);
+      return step ? { event: 'activity', data: { ...step } } : null;
+    }
     default:
       return null;
   }

@@ -160,6 +160,15 @@ module.exports = withDarkMode({
           "active-bg": "#ffffff",
           "active-fg": "#161616",
         },
+        // Blog — paired with the consumer app's `blog` tokens. The blog pages
+        // live only in the consumer app; the names are declared here too so a
+        // shared component that reaches for them still resolves.
+        blog: {
+          body: "#33322F",
+          accent: "#D97757",
+          "accent-tint": "#F6E3D8",
+          error: "#B3402A",
+        },
         // Badge — the shared ui-shared/lib/badge component's three variants.
         // These are the exact literals Badge.tsx hardcoded before W4, lifted
         // into tokens unchanged so this console renders identically; the

@@ -39,8 +39,9 @@ describe('the run judge is given the Writer’s guidance', () => {
       } as any,
       { ai: { apiUrl: 'http://ai', outboundApiKey: 'k' } } as any,
       agentLogs as any,
+      { drain: jest.fn(async () => 0) } as any,
     );
-    return { svc, find, agentLogs };
+    return { svc, find, agentLogs, query };
   }
 
   const run = (passages?: string[]) =>
@@ -138,6 +139,26 @@ describe('the run judge is given the Writer’s guidance', () => {
       'm',
     );
   });
+
+  it('stores the score, model and prompt version as columns too, for SQL that filters on them', async () => {
+    const { svc, query } = build([]);
+    const r = run();
+    const judgment = await svc.judge(r);
+    const store = (query.mock.calls as any[][]).find(([sql]) =>
+      String(sql).includes('"judgeOverall" = $3'),
+    )!;
+    expect(String(store[0])).toContain(
+      '"judgeModel" = $4, "judgePromptVersion" = $5',
+    );
+    expect(store[1][2]).toBe(judgment!.overall);
+    expect(store[1][3]).toBe('m');
+    expect(store[1][4]).toBe(judgment!.promptVersion);
+    // The in-memory run carries them as well, so a later save does not blank them.
+    expect(r.judgeModel).toBe('m');
+    expect(r.judgeOverall).toBe(
+      judgment!.overall == null ? null : String(judgment!.overall),
+    );
+  });
 });
 
 /**
@@ -168,6 +189,11 @@ describe('judging a run is exclusive', () => {
         delete row.workspace.judgeClaimedAt;
         row.workspace.judge = JSON.parse(params[1] as string);
         return [[{ id: row.id }], 1];
+      }
+      if (sql.includes("'judgeFailures'")) {
+        row.workspace.judgeFailures = (row.workspace.judgeFailures ?? 0) + 1;
+        row.workspace.judgeFailedAt = new Date().toISOString();
+        return [[], 0];
       }
       if (sql.includes("workspace - 'judgeClaimedAt'")) {
         delete row.workspace.judgeClaimedAt;
@@ -209,6 +235,7 @@ describe('judging a run is exclusive', () => {
       } as any,
       { ai: { apiUrl: 'http://ai', outboundApiKey: 'k' } } as any,
       agentLogs as any,
+      { drain: jest.fn(async () => 0) } as any,
     );
     return { row, svc, snapshot, agentLogs };
   }
@@ -246,6 +273,22 @@ describe('judging a run is exclusive', () => {
     expect(row.workspace.judge.dimensions[0].score).toBe(8);
     expect(row.workspace.judgeClaimedAt).toBeUndefined();
     expect(agentLogs.recordJudge).toHaveBeenCalledTimes(1);
+  });
+
+  it('a run the judge fails on is counted, and the drain stops asking for it until it has backed off', async () => {
+    const { row, svc, snapshot } = fakeRow();
+    post.mockRejectedValueOnce(new Error('judge unavailable'));
+    expect(await svc.drain(5)).toBe(0);
+    expect(row.workspace.judgeFailures).toBe(1);
+    expect(typeof row.workspace.judgeFailedAt).toBe('string');
+    // The query the drain asks with leaves out runs that failed lately, so the newest failing
+    // runs cannot keep older ones from being judged.
+    const where = (svc as any).runs.find.mock.calls[0][0].where;
+    const sql: string = where.workspace.getSql('w');
+    expect(sql).toContain("(w ->> 'judgeFailedAt' IS NULL");
+    expect(sql).toContain('power(2,');
+    expect(sql).toContain("NOT (coalesce(w, '{}'::jsonb) ? 'judge')");
+    void snapshot;
   });
 
   it('a second caller with a stale copy gets the stored score, not a second call', async () => {
@@ -298,5 +341,76 @@ describe('judging a run is exclusive', () => {
     const j = await svc.judge(snapshot(), { store: false });
     expect(j?.dimensions[0].score).toBe(4);
     expect(row.workspace.judge.overall).toBe(5);
+  });
+});
+
+describe('the judge drain reaches older unscored runs', () => {
+  it('asks only for runs with no score, so scored newer runs cannot starve older ones', async () => {
+    const find = jest.fn(async () => []);
+    const svc = Object.create(DebriefRunJudgeService.prototype) as any;
+    Object.assign(svc, {
+      runs: { find },
+      language: { drain: jest.fn(async () => 0) },
+    });
+    await svc.drain(5);
+    const where = (find.mock.calls[0] as any)[0].where;
+    expect(where.workspace).toBeDefined();
+    // Starts with the no-score condition (the backoff clause follows it).
+    expect(where.workspace.getSql('w')).toMatch(
+      /^NOT \(coalesce\(w, '\{\}'::jsonb\) \? 'judge'\)/,
+    );
+  });
+});
+
+describe('the judge drain’s pending-runs filter', () => {
+  it('leaves a space, comma or parenthesis after every use of the column, so TypeORM quotes it', async () => {
+    const { judgePendingSql } =
+      await import('../service/debrief-run-judge.service');
+    const sql = judgePendingSql('__COLUMN__');
+    expect(sql.match(/__COLUMN__/g)?.length).toBeGreaterThan(0);
+    // TypeORM only rewrites the column name when whitespace, a comma or ")" follows it.
+    expect(sql).not.toMatch(/__COLUMN__(?![\s,)])/);
+  });
+});
+
+describe('the language check in the judge drain', () => {
+  const build = (languageDrain: jest.Mock, pending: unknown[] = []) => {
+    const order: string[] = [];
+    const run = {
+      find: jest.fn(async () => {
+        order.push('quality-list');
+        return pending;
+      }),
+    };
+    const svc = new DebriefRunJudgeService(
+      run as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {
+        drain: jest.fn(async (n: number) => {
+          order.push('language');
+          return languageDrain(n);
+        }),
+      } as any,
+    );
+    return { svc, order };
+  };
+
+  it('runs after the quality judge, with the same limit', async () => {
+    const drain = jest.fn(async () => 2);
+    const { svc, order } = build(drain);
+    expect(await svc.drain(5)).toBe(0);
+    expect(order).toEqual(['quality-list', 'language']);
+    expect(drain).toHaveBeenCalledWith(5);
+  });
+
+  it('a failing language check never fails the quality drain', async () => {
+    const { svc } = build(
+      jest.fn(async () => {
+        throw new Error('boom');
+      }),
+    );
+    await expect(svc.drain(5)).resolves.toBe(0);
   });
 });

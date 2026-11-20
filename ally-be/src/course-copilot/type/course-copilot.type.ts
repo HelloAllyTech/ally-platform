@@ -1,4 +1,11 @@
-import { TrackItemType } from 'src/track/type/track.type';
+import {
+  TrackItemCompletionLogic,
+  TrackItemType,
+} from 'src/track/type/track.type';
+import {
+  RoleplayCasting,
+  StructuredRoleplayBrief,
+} from './roleplay-brief.type';
 
 /**
  * The distilled interview — what the trainer has told the copilot so far.
@@ -22,9 +29,17 @@ export interface CourseBrief {
   };
   /** Observable verbs: "de-escalate a caller who threatens to hang up". */
   outcomes?: { terminal?: string; enabling?: string[] };
+  /** The closest entry in the manual's learner profile library (`list_learner_profiles`). */
+  learnerProfileId?: string;
+  /** Set from the library by normalisation, never by the model — for display. */
+  learnerProfileName?: string;
   competencyIds?: string[];
   competencyNames?: string[];
   behaviours?: { helpful?: string[]; unhelpful?: string[] };
+  /** Per primary skill: how well (A) and how widely (B) learners should do it by the end. */
+  skillTargets?: CourseBriefSkillTarget[];
+  /** Per skill, its behaviours in the three EQUIP groups. */
+  rubric?: CourseBriefRubricEntry[];
   assessment?: {
     kind?: CourseBriefAssessmentKind;
     note?: string;
@@ -50,6 +65,31 @@ export interface CourseBrief {
   notes?: string[];
 }
 
+/**
+ * The manual's skill target. A — level: A1 Safe (no harmful or unhelpful
+ * behaviours), A2 Getting started (A1 + some basic helpful), A3 Solid basics
+ * (A1 + all basic helpful), A4 Advanced (A3 + some or all advanced helpful).
+ * B — transfer: B1 practised scenarios only, B2 new scenarios of similar
+ * difficulty, B3 harder scenarios. The copilot never offers B4/B5.
+ */
+export type CourseBriefSkillLevel = 'A1' | 'A2' | 'A3' | 'A4';
+export type CourseBriefSkillTransfer = 'B1' | 'B2' | 'B3';
+
+export interface CourseBriefSkillTarget {
+  competencyId?: string;
+  skill: string;
+  /** Optional at rest: the interview asks A first, then B. */
+  a?: CourseBriefSkillLevel;
+  b?: CourseBriefSkillTransfer;
+}
+
+export interface CourseBriefRubricEntry {
+  skill: string;
+  harmfulOrUnhelpful: string[];
+  basicHelpful: string[];
+  advancedHelpful: string[];
+}
+
 export type CourseBriefAssessmentKind =
   | 'roleplay'
   | 'quiz'
@@ -61,6 +101,8 @@ export type CourseBriefComponent =
   | 'video'
   | 'journal'
   | 'annotated_artifact'
+  | 'branching_scenario'
+  | 'bucket_sort'
   | 'game'
   | 'quiz';
 
@@ -106,6 +148,8 @@ export type CourseBlueprintItemSource =
   | { kind: 'needs-input'; what: 'video-url' };
 
 export interface CourseBlueprintCompletionCriteria {
+  /** ROLEPLAY only: which of minScore / minDurationSeconds gate it. */
+  completionLogic?: TrackItemCompletionLogic;
   minScore?: number;
   passScore?: number;
   watchPct?: number;
@@ -231,6 +275,10 @@ export interface CourseCopilotTrackIdMap {
 
 /** What a finished job hands to the structure writer. */
 export interface CourseCopilotJobResult {
+  /** Course review: the Learning Design principles the reviewer read. */
+  principles?: string[];
+  /** Course review: whether learner results were part of the review. */
+  usedLearnerResults?: boolean;
   trackItemId?: string;
   scenarioId?: number;
   caseId?: string;
@@ -243,12 +291,21 @@ export interface CourseCopilotJobResult {
   description?: string;
   /** One-line, human summary for the build panel ("8 questions"). */
   summary?: string;
+  /**
+   * The trainer's reference files this item was written from
+   * ("Manual.pdf, p. 12"), shown on the build panel for the trainer to check.
+   */
+  references?: string[];
   /** Article only: what an illustration should show, for the image job. */
   imageBrief?: string;
   /** Reviewer findings (course_review). */
   findings?: CourseReviewFinding[];
   /** Why a job was skipped, when it was. */
   skippedReason?: string;
+  /** New roleplay only: the slot as the manual's roleplay brief. */
+  roleplayBrief?: StructuredRoleplayBrief;
+  /** New roleplay only: the fit check's verdict, and any character swap. */
+  casting?: RoleplayCasting;
 }
 
 export interface CourseReviewFinding {

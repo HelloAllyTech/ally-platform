@@ -1,9 +1,15 @@
+import { LimitsService } from 'src/billing/service/limits.service';
+import { randomUUID } from 'crypto';
+import { usageContext } from 'src/billing/context/usage-context';
+import { UsageChannel, UsageKind } from 'src/billing/enum/billing.enum';
+import { checkupGate, type CheckupGate } from './checkup-gate';
 import {
   BadRequestException,
   HttpException,
   HttpStatus,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, LessThan, MoreThan, Repository } from 'typeorm';
@@ -121,6 +127,8 @@ export interface CheckupRunView {
   >;
   totals: Record<string, unknown>;
   results: CheckupResultView[];
+  /** The publish gate (Q3-fast Part 3): null until the run is done. */
+  gate: CheckupGate | null;
 }
 
 type Group = { thread: string | null; cases: ChatbotCheckupCase[] };
@@ -149,6 +157,8 @@ export class CheckupService {
     private readonly chatbots: ChatbotService,
     private readonly ai: AiService,
     private readonly settings?: ChatbotSettingsService,
+    // CR1: owner-side runs and tokens (optional, so existing specs build without it).
+    @Optional() private readonly limits?: LimitsService,
   ) {}
 
   private readonly logger = LoggerService.getInstance(CheckupService.name);
@@ -159,8 +169,8 @@ export class CheckupService {
     suite: string,
     items: SuiteCase[],
   ): Promise<{ added: number; updated: number }> {
-    await this.access.assertPlatformAdmin();
-    await this.access.assert(chatbotId, ChatbotMemberRole.EDITOR);
+    // Suites belong to the bot's owners (A1; was platform admins).
+    await this.access.assert(chatbotId, ChatbotMemberRole.OWNER);
     const pages = await this.pageDocuments(chatbotId);
     const existing = await this.cases.find({ where: { chatbotId, suite } });
     const byId = new Map(existing.map((row) => [row.externalId, row]));
@@ -282,12 +292,19 @@ export class CheckupService {
       chatbotId,
       ChatbotMemberRole.EDITOR,
     );
+    // CR1: a checkup run is one owner-side run (not one per question); refused at the limit.
+    await this.limits?.assertOwnerRun(
+      chatbot.createdBy,
+      `checkup:${chatbotId}:${randomUUID()}`,
+      'checkup',
+    );
     const attempts = Math.min(
       Math.max(options.attempts ?? 1, 1),
       CHECKUP_LIMITS.maxAttempts,
     );
     if (options.trigger === 'eval' || (options.attempts ?? 1) > 1) {
-      await this.access.assertPlatformAdmin();
+      // Eval and multi-attempt runs belong to the bot's owners (A1; was platform admins).
+      await this.access.assert(chatbotId, ChatbotMemberRole.OWNER);
     } else {
       const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
       const today = await this.runs.count({
@@ -416,6 +433,24 @@ export class CheckupService {
     attempts: number | ((item: ChatbotCheckupCase) => TryPlan),
     context: GradeContext = {},
   ): Promise<void> {
+    // CR1: every run and grade a checkup makes is metered as `checkup` / `judge` on this assistant.
+    return usageContext.with(
+      {
+        chatbotId: run.chatbotId,
+        draftId: run.draftId ?? null,
+        channel: UsageChannel.OWNER,
+        runKind: UsageKind.CHECKUP,
+      },
+      () => this.executeInContext(run, cases, attempts, context),
+    );
+  }
+
+  private async executeInContext(
+    run: ChatbotCheckupRun,
+    cases: ChatbotCheckupCase[],
+    attempts: number | ((item: ChatbotCheckupCase) => TryPlan),
+    context: GradeContext = {},
+  ): Promise<void> {
     const prompts = await this.prompts();
     const planOf = (item: ChatbotCheckupCase): TryPlan =>
       typeof attempts === 'number'
@@ -526,12 +561,12 @@ export class CheckupService {
             url: String(c.source_url ?? ''),
           })),
           verdict: grade?.verdict ?? 'error',
-          // v1 answered because v2 failed (usually the run's 20 s cap): kept on the result so
-          // the numbers can count it, never hidden in the reply time.
+          // The run failed (usually its 20 s cap) and the fixed run-failed reply went out: kept on
+          // the result so the numbers can count it, never hidden in the reply time.
           reasons: [
             ...(grade?.reasons ?? ['not_graded']),
-            ...(tested?.runtime === AgentRuntimeUsed.V2_FALLBACK
-              ? [`v1_fallback:${tested.fallbackReason ?? 'unknown'}`]
+            ...(tested?.runtime === AgentRuntimeUsed.V2_FAILED
+              ? [`run_failed:${tested.fallbackReason ?? 'unknown'}`]
               : []),
           ],
           hardFail: grade?.hard_fail ?? false,
@@ -721,6 +756,16 @@ export class CheckupService {
     draftId: string | null,
     trigger: 'onboarding' | 'try' = 'onboarding',
   ): Promise<CheckupResultView[]> {
+    // CR1: asking now is an owner-side run on the creator's plan.
+    const [creator] = await this.runs.manager.query(
+      `SELECT created_by AS "createdBy" FROM chatbots WHERE id = $1`,
+      [chatbotId],
+    );
+    await this.limits?.assertOwnerRun(
+      creator?.createdBy,
+      `checkup:${chatbotId}:${randomUUID()}`,
+      'checkup',
+    );
     const cases = await this.cases.find({
       where: { chatbotId, id: In(caseIds), deletedAt: IsNull() },
     });
@@ -808,7 +853,26 @@ export class CheckupService {
       where: { id: In([...new Set(results.map((r) => r.caseId))]) },
     });
     const byId = new Map(cases.map((c) => [c.id, c]));
+    const isSafety = (item: ChatbotCheckupCase) =>
+      item.origin === 'platform' && Boolean(item.packId);
     return {
+      gate:
+        run.status === 'done'
+          ? checkupGate(
+              results.flatMap((row) => {
+                const item = byId.get(row.caseId);
+                return item
+                  ? [
+                      {
+                        caseId: item.id,
+                        safety: isSafety(item),
+                        verdict: row.verdict,
+                      },
+                    ]
+                  : [];
+              }),
+            )
+          : null,
       run: {
         id: run.id,
         status: run.status,
@@ -842,7 +906,7 @@ export class CheckupService {
             outcome: row.outcome,
             reasons: row.reasons,
             hardFail: row.hardFail,
-            safety: item.origin === 'platform' && Boolean(item.packId),
+            safety: isSafety(item),
             source: item.source,
             reply: row.reply,
             attempt: row.attempt,

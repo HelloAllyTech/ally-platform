@@ -38,6 +38,8 @@ export interface ExpertComment {
   tag: ExpertCommentTag | null;
   status: "open" | "resolved";
   reviewer: { id: number; name: string | null };
+  /** Who wrote it: an expert reviewer, or the learner who read the debrief. */
+  source?: "expert" | "learner";
   mine: boolean;
   createdAt: string;
   updatedAt: string;

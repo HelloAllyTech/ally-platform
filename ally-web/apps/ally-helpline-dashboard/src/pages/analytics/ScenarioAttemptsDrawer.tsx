@@ -139,6 +139,14 @@ export const ScenarioAttemptsDrawer: FunctionComponent<ScenarioAttemptsDrawerPro
                         ` · ${t("organizationMetrics.scenarioAttempts.assessmentScore", {
                           score: item.bestScore,
                         })}`}
+                      {(item.incompleteStarts ?? 0) > 0 && (
+                        <span data-testid="scenario-attempts-incomplete-starts">
+                          {" · "}
+                          {t("organizationMetrics.scenarioAttempts.incompleteStarts", {
+                            count: item.incompleteStarts,
+                          })}
+                        </span>
+                      )}
                     </div>
                   ) : (
                     <>

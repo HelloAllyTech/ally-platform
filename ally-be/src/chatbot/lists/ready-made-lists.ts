@@ -123,13 +123,109 @@ const moves = (
   config: { field: 'status', initial: [initial], allowed },
 });
 
-const SERVICES = ['Consultation', 'Follow-up', 'Check-up'];
+/** Leads' examples (chunk 6b): what a lead is usually about, for any business. */
+const LEAD_INTERESTS = ['A demo', 'Pricing', 'Something else'];
+/**
+ * Example sets lists installed with before (chunk 6b): Leads' interest was a clinic's services, so
+ * an assistant that still has them must not read them out (`stillExamples`).
+ */
+const EARLIER_EXAMPLES: string[][] = [
+  ['Consultation', 'Follow-up', 'Check-up'],
+  // Q3d's `generic` set, before Q3-fast made it neutral.
+  ['Consultation', 'Visit', 'Call back'],
+];
+/**
+ * Appointments' neutral examples (Q3-fast, gaps item 6): what the catalogue shows and what any
+ * business we can't place gets. Never therapy services, which only a mental-health assistant gets.
+ */
+export const NEUTRAL_APPOINTMENT_SERVICES = [
+  'Consultation',
+  'Follow-up',
+  'Something else',
+];
 /** Appointments' examples: the seed's, which 5a and 6's specs book with. */
 const APPOINTMENT_SERVICES = [
   'Individual therapy',
   'Couples therapy',
   'Family therapy',
 ];
+
+/**
+ * The kind of business an assistant serves, for examples that fit it (Q3d; prod 18 Nov: an eye
+ * hospital, a salon and a coworking space were all offered "Family therapy").
+ */
+export type BusinessKind =
+  | 'therapy'
+  | 'clinic'
+  | 'eye'
+  | 'lab'
+  | 'salon'
+  | 'coworking'
+  | 'education'
+  | 'generic';
+
+/** Appointments' services per kind of business; `generic` when we can't tell. */
+export const APPOINTMENT_EXAMPLES: Record<BusinessKind, string[]> = {
+  therapy: APPOINTMENT_SERVICES,
+  clinic: ['Consultation', 'Follow-up visit', 'Health check-up'],
+  eye: ['Eye check-up', 'LASIK consultation', 'Cataract consultation'],
+  lab: ['Blood test', 'Home sample collection', 'Health check-up package'],
+  salon: ['Haircut', 'Hair colour', 'Facial'],
+  coworking: ['Space tour', 'Meeting room', 'Day pass'],
+  education: ['Counselling session', 'Campus visit', 'Demo class'],
+  generic: NEUTRAL_APPOINTMENT_SERVICES,
+};
+
+/** Setup's industry → kind. The industries not here have no booking examples of their own. */
+const KIND_OF_INDUSTRY: Record<string, BusinessKind> = {
+  mental_health: 'therapy',
+  gp_clinic: 'clinic',
+  pharmacy: 'clinic',
+  diagnostic_lab: 'lab',
+  coaching: 'education',
+  school: 'education',
+};
+
+/**
+ * Words in the business's name or description that tell a kind setup's industries don't have (an
+ * eye hospital is a `gp_clinic`, a salon `wellness`, a coworking space `other`).
+ */
+const KIND_WORDS: [BusinessKind, RegExp][] = [
+  ['eye', /\b(eye|ophthalm\w*|lasik|cataract|retina\w*)\b/i],
+  ['coworking', /\b(co-?working|workspaces?|hot ?desks?|shared offices?)\b/i],
+  [
+    'salon',
+    /\b(salons?|beauty|barbers?|hair ?cuts?|hair ?stylists?|nails?)\b/i,
+  ],
+];
+
+/**
+ * The kind of business: a mental-health assistant is always therapy; otherwise the words in its
+ * name and description, then its industry, then `generic`.
+ */
+export function businessKind({
+  industry,
+  safetyPack,
+  text = '',
+}: {
+  industry?: string | null;
+  safetyPack?: string | null;
+  text?: string;
+}): BusinessKind {
+  if (industry === 'mental_health' || safetyPack === 'mental_health') {
+    return 'therapy';
+  }
+  const byWords = KIND_WORDS.find(([, words]) => words.test(text));
+  if (byWords) return byWords[0];
+  return KIND_OF_INDUSTRY[industry ?? ''] ?? 'generic';
+}
+
+/** The example values that fit a kind of business, per list and field, as `install` takes them. */
+export function examplesFor(
+  kind: BusinessKind,
+): Record<string, Record<string, string[]>> {
+  return { appointments: { service: APPOINTMENT_EXAMPLES[kind] } };
+}
 
 // ---- the catalogue -------------------------------------------------------------------------------
 
@@ -169,7 +265,7 @@ export const READY_MADE: ReadyMadeItem[] = [
         fields: [
           relation('slot', 'Slot', 'slots', { ...required, ...agent }),
           relation('client', 'Client', 'contact', required),
-          examples('service', 'Service', APPOINTMENT_SERVICES, agent),
+          examples('service', 'Service', NEUTRAL_APPOINTMENT_SERVICES, agent),
           status(
             ['booked', 'confirmed', 'completed', 'cancelled', 'no_show'],
             agent,
@@ -428,7 +524,7 @@ export const READY_MADE: ReadyMadeItem[] = [
             ...agent,
           }),
           field('email', 'Email', ListFieldType.EMAIL, agent),
-          examples('interest', 'Interest', SERVICES, agent),
+          examples('interest', 'Interest', LEAD_INTERESTS, agent),
           money('budget', 'Budget', agent),
           select(
             'source',
@@ -787,10 +883,15 @@ export function listInputFor(
   return { ...rest, fields, rules };
 }
 
-/** The selects that install with example values, for the "Make it yours" step. */
+/**
+ * The selects that install with example values, for the "Make it yours" step: the ones that fit
+ * the business when its kind is known (`examplesFor`), else the catalogue's.
+ */
 export function exampleOptions(
   item: ReadyMadeItem,
+  kind?: BusinessKind,
 ): { list: string; field: string; label: string; examples: string[] }[] {
+  const fitting = kind ? examplesFor(kind) : {};
   return item.lists.flatMap((list) =>
     list.fields
       .filter((f) => f.example_options)
@@ -798,7 +899,33 @@ export function exampleOptions(
         list: list.key,
         field: f.key,
         label: f.label,
-        examples: (f.options?.values as string[]) ?? [],
+        examples:
+          fitting[list.key]?.[f.key] ?? (f.options?.values as string[]) ?? [],
       })),
   );
+}
+
+/** Every example set a ready-made list installs with, now or before. */
+export function exampleSets(): string[][] {
+  const now = READY_MADE.flatMap((item) =>
+    exampleOptions(item).map((o) => o.examples),
+  );
+  return [...now, ...Object.values(APPOINTMENT_EXAMPLES), ...EARLIER_EXAMPLES];
+}
+
+const sameSet = (a: string[], b: string[]): boolean => {
+  const norm = (values: string[]) =>
+    [...new Set(values.map((v) => v.trim().toLowerCase()))]
+      .sort()
+      .join('\u0000');
+  return a.length > 0 && norm(a) === norm(b);
+};
+
+/**
+ * Whether a select's choices are still a ready-made list's examples: "Make it yours" wasn't done
+ * (chunk 6b, item 30). Compared as a set, case and spaces aside, so a list installed before 6b is
+ * recognised too.
+ */
+export function stillExamples(values: string[]): boolean {
+  return exampleSets().some((set) => sameSet(values, set));
 }

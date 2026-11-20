@@ -5,8 +5,9 @@ import type { AgentFailureReason } from '../engine/chatbot-engine.types';
 // replied, so a listener can never delay, fail or redeliver the message.
 
 /**
- * A v2 bot's message fell back to v1. Emitted by the channel after it replied; the listener raises
- * the throttled "agent runtime degraded" alert.
+ * A bot's run failed and the fixed run-failed reply went out (Q3-fast: there is no v1 fallback;
+ * the event keeps its name). Emitted by the channel after it replied; the listener raises the
+ * throttled "agent runtime degraded" alert.
  */
 export const AGENT_FALLBACK_EVENT = 'chatbot.agent-fallback';
 export interface AgentFallbackEvent {

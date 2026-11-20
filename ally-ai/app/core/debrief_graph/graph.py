@@ -6,7 +6,8 @@
     after_reading ─(no safety reading)→ finish
                   ├→ progress_reader → guidance_lookup   (the progress agent;
                   │     its vetoes run in code as it finishes, progress_vetoes.py)
-                  └→ guidance_lookup → prepare_writer ─(no budget)→ finish
+                  └→ guidance_lookup → guidance_agent → prepare_writer
+                                                      ─(no budget)→ finish
                                                       └→ writer ─(failed twice)→ finish
                                                                 └→ checks
     checks ─(evaluator fits)→ evaluator → score_draft
@@ -23,6 +24,15 @@ bundle's step key but runs the progress agent (`debrief_progress_system`); its
 code vetoes turn a claim the record contradicts into "too early", and the
 Writer reads the vetoed report in the old ProgressReading shape.
 
+`guidance_agent` (both paths) is a bounded tool-calling loop: it runs only when
+the release sets `guidanceAgentMaxCalls` > 0 and its recipe lists the step, and
+it never stops a debrief (see guidance_agent.py). The lookup's per-moment
+searches run concurrently. With `guidancePassagesPerMoment` 0 (the lookup off)
+the agent is the guidance mechanism: it is not offered to the planner (nor is
+the lookup) and runs as the fixed step after dispatch; with it above 0 the
+planner may choose or skip it. `workspace.guidanceMode` / `guidanceGiven` /
+`guidanceTimings` record which mechanism produced the passages.
+
 The loop ends: every pass through `revise_gate` that reaches the reviser adds a
 round, and `score_draft` stops at the recipe's `maxRevisionRounds`.
 
@@ -31,7 +41,8 @@ graph runs the orchestrated middle instead of the recipe's readers (see
 `orchestrator.py`): the safety reader and the Analyst still start together
 (the Analyst is in the floor, decided 2026-11-11), then after_reading → profile
 → planner (reads the profile and a summary of the evidence map) → dispatch
-─Send→ agent_<id> … → dispatch → prepare_writer, and one top-up after the first
+─Send→ agent_<id> … → dispatch → guidance_agent → prepare_writer, and one
+top-up after the first
 failed evaluation. With it off, none of those nodes is ever reached. The
 orchestrated path does not run the progress agent yet: its `progress_reader`
 registry agent is still the old Progress reader.
@@ -46,10 +57,15 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
 from app.core.agent_runtime import checkpointer as runtime_checkpointer
-from app.core.debrief_graph import model_steps, nodes, orchestrator
+from app.core.debrief_graph import (
+    guidance_agent,
+    model_step_inputs,
+    nodes,
+    orchestrator,
+)
 from app.core.debrief_graph.context import DebriefRunContext
 from app.core.debrief_graph.gateway import GATEWAY_RETRY
-from app.core.debrief_graph.model_step import make_model_step
+from app.core.debrief_graph.model_step_node import make_model_step
 from app.core.debrief_graph.registry.manifest import REGISTRY
 from app.core.debrief_graph.state import DebriefState
 
@@ -59,19 +75,20 @@ __all__ = ["GATEWAY_RETRY", "build_graph", "get_debrief_graph"]
 def build_graph(checkpointer: Optional[BaseCheckpointSaver]) -> CompiledStateGraph:
     g = StateGraph(DebriefState, context_schema=DebriefRunContext)
     g.add_node("plan", nodes.plan)
-    g.add_node("safety_reader", **make_model_step(model_steps.SAFETY_READER))
-    g.add_node("analyst", **make_model_step(model_steps.ANALYST))
+    g.add_node("safety_reader", **make_model_step(model_step_inputs.SAFETY_READER))
+    g.add_node("analyst", **make_model_step(model_step_inputs.ANALYST))
     g.add_node("after_reading", nodes.after_reading)
     # The release's `progress_reader` step now runs the progress agent.
-    g.add_node("progress_reader", **make_model_step(model_steps.PROGRESS_AGENT))
+    g.add_node("progress_reader", **make_model_step(model_step_inputs.PROGRESS_AGENT))
     g.add_node("guidance_lookup", nodes.guidance_lookup)
+    g.add_node("guidance_agent", guidance_agent.guidance_agent)
     g.add_node("prepare_writer", nodes.prepare_writer)
-    g.add_node("writer", **make_model_step(model_steps.WRITER))
+    g.add_node("writer", **make_model_step(model_step_inputs.WRITER))
     g.add_node("checks", nodes.checks, retry_policy=GATEWAY_RETRY)
-    g.add_node("evaluator", **make_model_step(model_steps.EVALUATOR))
+    g.add_node("evaluator", **make_model_step(model_step_inputs.EVALUATOR))
     g.add_node("score_draft", nodes.score_draft)
     g.add_node("revise_gate", nodes.revise_gate)
-    g.add_node("reviser", **make_model_step(model_steps.REVISER))
+    g.add_node("reviser", **make_model_step(model_step_inputs.REVISER))
     g.add_node("decide", nodes.decide, retry_policy=GATEWAY_RETRY)
     g.add_node("finish", nodes.finish)
 
@@ -95,7 +112,8 @@ def build_graph(checkpointer: Optional[BaseCheckpointSaver]) -> CompiledStateGra
     g.add_edge("safety_reader", "after_reading")
     g.add_edge("analyst", "after_reading")
     g.add_edge("progress_reader", "guidance_lookup")
-    g.add_edge("guidance_lookup", "prepare_writer")
+    g.add_edge("guidance_lookup", "guidance_agent")
+    g.add_edge("guidance_agent", "prepare_writer")
     g.add_edge("evaluator", "score_draft")
     g.add_edge("decide", "finish")
     g.add_edge("finish", END)

@@ -232,6 +232,7 @@ describe('AgentGatewayService', () => {
             conversationId: CONV_A,
             runId: 'run-1',
             contactId: null,
+            consentOfferId: null,
           },
           input: { note: 'hi' },
         },

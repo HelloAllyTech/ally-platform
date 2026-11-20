@@ -10,10 +10,9 @@ agent is sent, and what the run does with its vetoed report.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Mapping, Optional
 
 from app.core.debrief_graph.progress_vetoes import (
-    FOUNDATIONAL_SKILLS,
     OTHER,
     countable,
     skill_key,
@@ -41,26 +40,30 @@ def history_text(profile: Dict[str, Any], fallback: List[Dict[str, Any]]) -> str
     )
 
 
-def agent_input(profile: Dict[str, Any], evidence: Dict[str, Any]) -> Dict[str, Any]:
+def agent_input(
+    profile: Dict[str, Any],
+    evidence: Dict[str, Any],
+    names: Optional[Mapping[str, str]] = None,
+) -> Dict[str, Any]:
     """This session's observations per foundational skill (the newest evidence),
     beside each skill's countable history, so the agent reads one table."""
-    this = this_session_observations(evidence, profile.get("analyst_version"))
+    names = {} if names is None else names
+    this = this_session_observations(evidence, profile.get("analyst_version"), names)
+    order = list(names)
     keys = sorted(
         (set(profile.get("skills") or {}) | set(this)) - {OTHER},
-        key=lambda k: (
-            list(FOUNDATIONAL_SKILLS).index(k) if k in FOUNDATIONAL_SKILLS else 99
-        ),
+        key=lambda k: order.index(k) if k in names else 99,
     )
     return {
         k: {
-            "name": FOUNDATIONAL_SKILLS.get(k, k),
+            "name": names.get(k, k),
             "this_session": this.get(k),
             "counted_sessions": len(
                 {str(o.get("run_id")) for o in countable(profile, this, k)}
             ),
         }
         for k in keys
-        if k in FOUNDATIONAL_SKILLS
+        if k in names
     }
 
 
@@ -68,13 +71,17 @@ def agent_input(profile: Dict[str, Any], evidence: Dict[str, Any]) -> Dict[str, 
 
 
 def writer_reading(
-    report: Dict[str, Any], profile: Dict[str, Any]
+    report: Dict[str, Any],
+    profile: Dict[str, Any],
+    names: Optional[Mapping[str, str]] = None,
 ) -> Optional[Dict[str, Any]]:
     """The vetoed report as the Writer's `ProgressReading`
     (`items: [{skill, trend, evidence, follows_up_point}]`), or None when it
     has nothing for the Writer."""
+    names = {} if names is None else names
     by_point = {
-        str(p.get("point")): skill_key(p.get("skill")) for p in past_points(profile)
+        str(p.get("point")): skill_key(p.get("skill"), names)
+        for p in past_points(profile)
     }
     answered: Dict[str, str] = {}
     for f in report.get("followups") or []:
@@ -91,7 +98,7 @@ def writer_reading(
             trend = "about_the_same"
         items.append(
             {
-                "skill": FOUNDATIONAL_SKILLS.get(key, key),
+                "skill": names.get(key, key),
                 "trend": trend,
                 # The learner never reads a held-back or hidden trend's reason.
                 "evidence": (

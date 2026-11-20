@@ -75,6 +75,7 @@ export class BlogService {
       tags: entity.tags ?? [],
       coverColor: entity.coverColor ?? BLOG_DEFAULT_COVER_COLOR,
       authorName: entity.authorName ?? null,
+      authorEmail: entity.authorEmail ?? null,
       headerImageUrl: entity.headerImageUrl ?? null,
       status: entity.status,
       publishedAt: entity.publishedAt ?? null,
@@ -141,6 +142,7 @@ export class BlogService {
       tags: dto.tags ?? [],
       coverColor: dto.coverColor ?? BLOG_DEFAULT_COVER_COLOR,
       authorName: dto.authorName ?? null,
+      authorEmail: dto.authorEmail ?? null,
       headerImageUrl: dto.headerImageUrl ?? null,
       status,
       publishedAt: status === BlogStatus.PUBLISHED ? new Date() : null,
@@ -181,6 +183,9 @@ export class BlogService {
     if (dto.coverColor !== undefined) existing.coverColor = dto.coverColor;
     if (dto.authorName !== undefined) {
       existing.authorName = dto.authorName ?? null;
+    }
+    if (dto.authorEmail !== undefined) {
+      existing.authorEmail = dto.authorEmail || null;
     }
     if (dto.headerImageUrl !== undefined) {
       existing.headerImageUrl = dto.headerImageUrl ?? null;

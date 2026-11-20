@@ -34,6 +34,26 @@ export class PlanSessionStore {
     return { ...row, plan: row.plan ?? {} } as PlanSession;
   }
 
+  /**
+   * The session an idea links to (`roadmap_opportunities.builderSessionId`),
+   * whichever kind it is. Ideas planned before plan sessions existed link to
+   * a Builder interview (`kind = 'build'`); the read model already shows them
+   * as being planned, so Close plan, its readiness check and assigning a
+   * builder must find them too. Only call it with an idea's own link.
+   */
+  async findLinked(sessionId: string): Promise<PlanSession | null> {
+    const row = await this.sessions
+      .createQueryBuilder('s')
+      .addSelect('s.plan')
+      .where('s.id = :sessionId', { sessionId })
+      .andWhere('s.kind IN (:...kinds)', {
+        kinds: [BuilderSessionKind.PLAN, BuilderSessionKind.BUILD],
+      })
+      .getOne();
+    if (!row) return null;
+    return { ...row, plan: row.plan ?? {} } as PlanSession;
+  }
+
   async get(sessionId: string): Promise<PlanSession> {
     const plan = await this.find(sessionId);
     if (!plan) throw new NotFoundException('Plan not found');

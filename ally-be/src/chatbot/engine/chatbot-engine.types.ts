@@ -1,4 +1,5 @@
 import type {
+  AgentActivity,
   AgentStreamEvent,
   AgentMemoryWrite,
   AgentTraceStep,
@@ -113,7 +114,7 @@ export type AgentFailureReason =
 
 /**
  * The Agents v2 run behind a reply, for the channel to store and Preview to show: the run that
- * answered, with its steps, or the run that failed and v1 answered instead (see `isFallback`).
+ * answered, with its steps, or the run that failed (see `isFailedRun`; the fixed reply went out).
  */
 export type AgentRunRef = { runId: string; conversationId: string } & (
   | {
@@ -127,9 +128,11 @@ export type AgentRunRef = { runId: string; conversationId: string } & (
         writes: AgentMemoryWrite[];
         refs: Record<string, string>;
       };
+      /** What the run did, for the bot page's "what I did" and its card (chunk 6b). */
+      activity?: AgentActivity[];
     }
   | {
-      runtime: AgentRuntimeUsed.V2_FALLBACK;
+      runtime: AgentRuntimeUsed.V2_FAILED;
       fallbackReason: AgentFailureReason;
     }
 );
@@ -142,6 +145,13 @@ export type AgentRunRef = { runId: string; conversationId: string } & (
 export interface ChatbotDecision {
   handledBy: WaHandledBy;
   body: string;
+  /** CR1: no run started because a limit was reached; `body` is the fixed limit reply. */
+  limited?:
+    | 'customers'
+    | 'no_seat'
+    | 'seat_messages'
+    | 'owner_cap'
+    | 'owner_runs';
   templateId?: string;
   /**
    * The body greets the person rather than answering a question: the bot's welcome message (it
@@ -163,7 +173,7 @@ export interface ChatbotDecision {
   /** A human should hear about this (crisis, degraded safety net). */
   alert?: NotificationErrorType;
   /**
-   * Set when the Agents v2 runtime answered or was tried (`v2_fallback`). The channel stores it on
+   * Set when the Agents v2 runtime answered or failed (`v2_fallback`, `AgentRuntimeUsed.V2_FAILED`). The channel stores it on
    * the reply and, for a fallback, raises the throttled "agent runtime degraded" alert.
    */
   agent?: AgentRunRef;

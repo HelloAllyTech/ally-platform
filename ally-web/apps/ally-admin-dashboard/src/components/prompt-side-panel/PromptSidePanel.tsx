@@ -37,6 +37,7 @@ import {
   providerForModel,
   ROUTES,
 } from "@constants";
+import { promptTestCopy } from "@constants/providers";
 import { useCreatePortal } from "@hooks";
 import {
   Prompt,
@@ -47,6 +48,7 @@ import {
 } from "@types";
 import { getErrorMessage } from "@utils/errorMessage";
 
+import { PromptTestRunner } from "./PromptTestRunner";
 import PromptTranslationsSection from "./PromptTranslationsSection";
 import PromptVersionsSection, {
   pinnedReason,
@@ -1461,6 +1463,15 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
                 className={CARBON_FIELD_TEXTAREA}
               />
             </Field>
+
+            {selectedPrompt?.id && (
+              <Field label={promptTestCopy.title}>
+                <PromptTestRunner
+                  promptText={formData.prompt ?? ""}
+                  currentModel={formData.model}
+                />
+              </Field>
+            )}
 
             <Field label="LLM Model">
               <LlmModelDropdown

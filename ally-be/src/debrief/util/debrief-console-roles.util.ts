@@ -32,9 +32,8 @@ export const DEBRIEF_ACTIONS = {
   escalate: [TEAM, OWNER],
   /** Expert verdict and hard fails. */
   verdict: [ADVISOR],
-  /** PM agent: approve, promote, reject, try it, ask a question, run now; propose a pinned rule. */
+  /** PM agent: approve, promote, reject, try it, ask a question, run now. */
   pmAgent: [TEAM, OWNER],
-  approvePinnedRule: [ADVISOR, OWNER],
   testSets: [TEAM, OWNER],
   /** Roll back, change step models, make a release, shadow-run a session. */
   releases: [TEAM, OWNER],
@@ -45,6 +44,8 @@ export const DEBRIEF_ACTIONS = {
   agentLogs: [TEAM, OWNER],
   /** Budgets, test thresholds, accepting proposed values, autonomy unlocks, steering weights. */
   ownerSettings: [OWNER],
+  /** Settings › Clinical lists: the words behind the score, diagnosis and jargon checks. */
+  clinicalLists: [ADVISOR, OWNER],
 } as const satisfies Record<string, readonly string[]>;
 
 export type DebriefAction = keyof typeof DEBRIEF_ACTIONS;

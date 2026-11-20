@@ -15,7 +15,12 @@ interface ChatComposerProps {
    * Course Copilot lock the box until the turn ends.
    */
   editableWhileStreaming?: boolean;
+  /** Drop the top border when the page draws one around a footer the composer sits in. */
+  borderless?: boolean;
 }
+
+/** Sized to its label, so the reply box keeps the width (Carbon's default min-width is wide). */
+const BUTTON_CLASS = "shrink-0 !min-w-[5.5rem] !justify-center !px-4";
 
 /**
  * The free-text way in — shared by Builder, Course Copilot and the character interview. Most turns
@@ -32,6 +37,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
   disabled = false,
   placeholder,
   editableWhileStreaming = false,
+  borderless = false,
 }) => {
   const [value, setValue] = useState("");
   const strings = en.agentChat.chat;
@@ -44,13 +50,21 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
   };
 
   return (
-    <div className="flex items-end gap-2 border-t border-neutral-200 bg-white p-3">
+    <div
+      className={`flex items-end gap-3 bg-white px-4 py-3 ${
+        borderless ? "" : "border-t border-neutral-200"
+      }`}
+    >
+      {/* The shared textarea is built for inline editing (no padding, pulled up 8px); a chat box
+          needs its own frame, padding and a height that lines up with the button beside it. */}
       <AutoExpandableTextarea
         id="agent-chat-composer"
         value={value}
         onChange={setValue}
         placeholder={placeholder ?? strings.placeholder}
         disabled={disabled || (isStreaming && !editableWhileStreaming)}
+        minHeight={40}
+        className="!mt-0 block rounded border border-neutral-300 bg-white !px-3 !py-[9px] !leading-5 focus:border-primary-500 disabled:!bg-neutral-50 disabled:text-typography-500"
         maxLines={6}
         onKeyDown={(event: React.KeyboardEvent<HTMLTextAreaElement>) => {
           if (event.key === "Enter" && !event.shiftKey) {
@@ -60,11 +74,17 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
         }}
       />
       {isStreaming ? (
-        <Button kind="danger--tertiary" size="md" onClick={onStop}>
+        <Button kind="danger--tertiary" size="md" className={BUTTON_CLASS} onClick={onStop}>
           {strings.stop}
         </Button>
       ) : (
-        <Button kind="primary" size="md" disabled={disabled || !value.trim()} onClick={submit}>
+        <Button
+          kind="primary"
+          size="md"
+          className={BUTTON_CLASS}
+          disabled={disabled || !value.trim()}
+          onClick={submit}
+        >
           {strings.send}
         </Button>
       )}

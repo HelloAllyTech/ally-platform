@@ -26,6 +26,7 @@ describe('BuilderSessionService', () => {
     update: jest.Mock;
     slugExists: jest.Mock;
     findCreatorNames: jest.Mock;
+    query?: jest.Mock;
   };
   let prdService: {
     getOrCreateDoc: jest.Mock;
@@ -109,6 +110,29 @@ describe('BuilderSessionService', () => {
       // slug needs to survive being a git branch component.
       expect(sessionRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({ slug: 'build', title: '???' }),
+      );
+    });
+
+    it("gives PM Agent sessions the 'auto' autonomy override, and nobody else", async () => {
+      await service.createSession(1, {
+        requestedBy: 'pm_agent',
+        requestRef: 'card-1',
+      });
+      expect(sessionRepository.create).toHaveBeenLastCalledWith(
+        expect.objectContaining({ autonomyOverride: 'auto' }),
+      );
+
+      await service.createSession(1, {
+        requestedBy: 'debrief_pm_agent',
+        requestRef: 'idea-1',
+      });
+      expect(sessionRepository.create).toHaveBeenLastCalledWith(
+        expect.objectContaining({ autonomyOverride: null }),
+      );
+
+      await service.createSession(1, {});
+      expect(sessionRepository.create).toHaveBeenLastCalledWith(
+        expect.objectContaining({ autonomyOverride: null }),
       );
     });
 
@@ -257,6 +281,39 @@ describe('BuilderSessionService', () => {
       ).resolves.toBe(false);
     });
 
+    it('puts the Start planning block in front once, keyed by its marker', async () => {
+      sessionRepository.query = jest
+        .fn()
+        .mockResolvedValue([[{ id: 'session-1' }], 1]);
+      await expect(
+        service.prependHandoffBlock(
+          'session-1',
+          '## Marker (today)\n\nfacts',
+          '## Marker',
+        ),
+      ).resolves.toBe(true);
+      const [sql, params] = sessionRepository.query!.mock.calls[0];
+      expect(sql).toContain('strpos("handoffContext", $3) = 0');
+      expect(params.slice(0, 3)).toEqual([
+        'session-1',
+        '## Marker (today)\n\nfacts',
+        '## Marker',
+      ]);
+
+      sessionRepository.query!.mockResolvedValue([[], 0]);
+      await expect(
+        service.prependHandoffBlock(
+          'session-1',
+          '## Marker again',
+          '## Marker',
+        ),
+      ).resolves.toBe(false);
+      // A block without its own marker could never be told apart: refused.
+      await expect(
+        service.prependHandoffBlock('session-1', 'no marker here', '## Marker'),
+      ).resolves.toBe(false);
+    });
+
     it('reads the column explicitly, since no other session read loads it', async () => {
       sessionRepository.findOne.mockResolvedValue({
         id: 'session-1',
@@ -278,7 +335,7 @@ describe('BuilderSessionService', () => {
 
     it('stores who requested the session and their ref', async () => {
       await service.createSession(1, {
-        title: 'From the PM agent',
+        title: 'From the Debrief PM agent',
         requestedBy: DEBRIEF_PM_AGENT_REQUESTER,
         requestRef: 'idea-1',
       });

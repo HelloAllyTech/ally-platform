@@ -1,4 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import { LoggerService } from '../../logger/logger.service';
+import {
+  DebriefContractError,
+  normaliseGraphResponse,
+} from '../util/debrief-graph-contract.util';
 import axios, { AxiosError } from 'axios';
 import { AppConfigService } from '../../config/config.service';
 import { DebriefBundle } from '../constants/debrief-release.constants';
@@ -33,6 +38,8 @@ export interface DebriefSafetyRecall {
 
 /** `POST /api/v1/debrief/runs` (docs/debrief-harness/CONTRACT.md §1). */
 export interface DebriefGraphRequest {
+  /** The wire contract version ally-be speaks (an older ally-ai ignores it). */
+  contract_version?: number;
   run_id: string;
   scenario_session_id: string;
   mode: DebriefRunMode;
@@ -65,6 +72,8 @@ export interface DebriefGraphRequest {
 }
 
 export interface DebriefGraphResponse {
+  /** The version ally-ai speaks; absent from an older ally-ai (read as 1). */
+  contract_version?: number;
   status: 'published' | 'below_bar' | 'needs_person' | 'skipped' | 'failed';
   skip_reason?: string | null;
   recipe_key?: string | null;
@@ -76,6 +85,8 @@ export interface DebriefGraphResponse {
   estimated_cost_usd?: number;
   fallback_rung?: number;
   has_risk_cue?: boolean;
+  /** Any risk cue the roleplay does not treat as its practice: the full alarm applies. */
+  has_alarm_risk_cue?: boolean;
   learner_distress?: boolean;
   revision_rounds?: number;
   evaluator_overall?: number | null;
@@ -121,6 +132,8 @@ export class DebriefGraphError extends Error {
  */
 @Injectable()
 export class DebriefGraphClient {
+  private readonly logger = LoggerService.getInstance(DebriefGraphClient.name);
+
   constructor(private readonly config: AppConfigService) {}
 
   async run(
@@ -135,8 +148,13 @@ export class DebriefGraphClient {
         maxBodyLength: Infinity,
         maxContentLength: Infinity,
       });
-      return res.data as DebriefGraphResponse;
+      return this.readResponse(res.data);
     } catch (e) {
+      // A response ally-be cannot read is a contract error (422), not a network failure the
+      // sweeper would resume: the run ends as failed and is retried or falls back.
+      if (e instanceof DebriefContractError) {
+        throw new DebriefGraphError(e.status, e.message);
+      }
       const err = e as AxiosError<{ detail?: unknown }>;
       const detail = err.response?.data?.detail;
       throw new DebriefGraphError(
@@ -150,6 +168,15 @@ export class DebriefGraphClient {
         }`,
       );
     }
+  }
+
+  /** The response through the contract: warnings are logged with their field path, unknown extras kept. */
+  private readResponse(data: unknown): DebriefGraphResponse {
+    const { value, warnings } = normaliseGraphResponse(data);
+    if (warnings.length) {
+      this.logger.warn(`[debrief] graph response: ${warnings.join('; ')}`);
+    }
+    return value;
   }
 
   /**

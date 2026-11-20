@@ -1,3 +1,4 @@
+import { isEnglishLanguage } from './debrief-language-sections.util';
 import { DebriefRunStatus } from '../enum/debrief-run.enum';
 import { ADVISORY_CHECKS, DebriefCheckCode } from './debrief-cards.util';
 import { rate, Rate } from './debrief-metrics.util';
@@ -121,6 +122,40 @@ export interface RolledRun extends DebriefOutcomeRun {
   courses?: string[];
   learnerTurns?: number;
   hasRiskCue?: boolean;
+  /** The debrief language check on this run: absent or null while it has none. */
+  languageCheck?: { findingCount: number; types: string[] } | null;
+}
+
+/**
+ * How the debriefs of one group fare on language: of those the language check
+ * has read, the share with at least one finding (with its interval), and how
+ * many debriefs carry each kind of finding. Debriefs not yet checked are
+ * counted apart and are in neither number.
+ */
+export interface LanguageProblemGroup {
+  checked: number;
+  notChecked: number;
+  withFinding: Rate;
+  byType: Record<string, number>;
+}
+
+export function languageProblem(runs: RolledRun[]): LanguageProblemGroup {
+  const checked = runs.filter((r) => r.languageCheck);
+  const byType: Record<string, number> = {};
+  for (const r of checked) {
+    for (const t of new Set(r.languageCheck!.types)) {
+      byType[t] = (byType[t] ?? 0) + 1;
+    }
+  }
+  return {
+    checked: checked.length,
+    notChecked: runs.length - checked.length,
+    withFinding: rate(
+      checked.filter((r) => r.languageCheck!.findingCount > 0).length,
+      checked.length,
+    ),
+    byType,
+  };
 }
 
 /** Pass rate and its companions for one group of runs. */
@@ -206,7 +241,13 @@ export function passRollup(
   sessionBand: (learnerTurns: number) => string = (n) => String(n),
 ): {
   byWeek: Array<{ week: string } & PassGroup>;
-  byLanguage: Array<{ language: string; debriefs: number } & PassGroup>;
+  byLanguage: Array<
+    {
+      language: string;
+      debriefs: number;
+      languageProblem: LanguageProblemGroup;
+    } & PassGroup
+  >;
   bySegment: Array<
     {
       language: string;
@@ -239,6 +280,8 @@ export function passRollup(
         language,
         debriefs: rs.length,
         ...group(rs),
+        // English is not language-checked (owner decision 2026-11-19): its row carries no check.
+        languageProblem: languageProblem(isEnglishLanguage(language) ? [] : rs),
       }))
       .sort((a, b) => b.debriefs - a.debriefs),
     bySegment: [

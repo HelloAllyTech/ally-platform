@@ -563,6 +563,18 @@ export const simulationStudioAPI = baseAPI.injectEndpoints({
       }),
     }),
 
+    /** Run an edited, unsaved prompt against a sample on a catalog model. */
+    testPrompt: builder.mutation<
+      LlmPreviewResult,
+      { modelId: string; promptText: string; sampleInput?: string; temperature?: number }
+    >({
+      query: body => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.PREVIEW_PROMPT,
+        method: HttpMethod.POST,
+        body,
+      }),
+    }),
+
     createLlmModel: builder.mutation<LlmCatalogModel, LlmCatalogModelPayload>({
       query: body => ({
         url: ApiEndpoints.SIMULATION_STUDIO.LLM_MODEL_CATALOG,
@@ -1736,6 +1748,7 @@ export const simulationStudioAPI = baseAPI.injectEndpoints({
 
 export const {
   useGetSimulationsQuery,
+  useLazyGetSimulationsQuery,
   useMapScenarioMemoriesMutation,
   useLazyGetAdminSimulationByIdQuery,
   useCreateSimulationMutation,
@@ -1769,6 +1782,7 @@ export const {
   useGetAiTasksQuery,
   useGetLlmModelCatalogQuery,
   usePreviewLlmModelMutation,
+  useTestPromptMutation,
   useSyncElevenLabsVoiceMutation,
   useLazyLookupElevenLabsVoiceQuery,
   useBulkSyncElevenLabsVoicesMutation,

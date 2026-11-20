@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpException,
   NotFoundException,
@@ -10,9 +11,14 @@ import {
   Put,
   Query,
   Res,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
   ApiOperation,
   ApiQuery,
   ApiSecurity,
@@ -41,6 +47,11 @@ import {
 } from '../constants/course-copilot.constants';
 import { COURSE_COPILOT_ERROR_CODES } from '../type/course-copilot-sse.type';
 import { CourseCopilotSessionService } from '../service/course-copilot-session.service';
+import {
+  CourseCopilotSourcesService,
+  CourseCopilotUploadedFile,
+} from '../service/course-copilot-sources.service';
+import { COURSE_COPILOT_SOURCE_LIMITS } from '../constants/course-copilot.constants';
 import { CourseCopilotOrchestratorService } from '../service/course-copilot-orchestrator.service';
 import { CourseCopilotBlueprintService } from '../service/course-copilot-blueprint.service';
 import { CourseCopilotBuildService } from '../service/course-copilot-build.service';
@@ -84,6 +95,7 @@ export class CourseCopilotController {
     private readonly analytics: CourseCopilotAnalyticsService,
     private readonly landingPageService: CourseCopilotLandingPageService,
     private readonly allyNotesService: CourseCopilotAllyNotesService,
+    private readonly sourcesService: CourseCopilotSourcesService,
   ) {}
 
   @Post('sessions')
@@ -243,6 +255,59 @@ export class CourseCopilotController {
     @CurrentUser() user: TokenUser,
   ) {
     await this.sessionService.archive(sessionId, user.id);
+    // A partner's material does not outlive the course it was shared for.
+    await this.sourcesService.removeAll(sessionId);
+    return { success: true };
+  }
+
+  @Get('sessions/:sessionId/sources')
+  @RequireFeatureToggle(FeatureToggleKey.COURSE_COPILOT, VIEW)
+  @ApiOperation({ summary: 'Reference files attached to the session' })
+  async listSources(
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @CurrentUser() user: TokenUser,
+  ) {
+    await this.sessionService.getOwned(sessionId, user.id);
+    return this.sourcesService.list(sessionId);
+  }
+
+  @Post('sessions/:sessionId/sources')
+  @RequireFeatureToggle(FeatureToggleKey.COURSE_COPILOT, EDIT)
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { file: { type: 'string', format: 'binary' } },
+    },
+  })
+  @ApiOperation({
+    summary:
+      'Attach one reference file (PDF, .docx or .pptx) — its text is kept, the file is not',
+  })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: COURSE_COPILOT_SOURCE_LIMITS.maxBytes },
+    }),
+  )
+  async uploadSource(
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @UploadedFile() file: CourseCopilotUploadedFile | undefined,
+    @CurrentUser() user: TokenUser,
+  ) {
+    const session = await this.sessionService.getOwned(sessionId, user.id);
+    return this.sourcesService.upload(session, file, user.id);
+  }
+
+  @Delete('sessions/:sessionId/sources/:sourceId')
+  @RequireFeatureToggle(FeatureToggleKey.COURSE_COPILOT, EDIT)
+  @ApiOperation({ summary: 'Remove a reference file and its text' })
+  async removeSource(
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @Param('sourceId', ParseUUIDPipe) sourceId: string,
+    @CurrentUser() user: TokenUser,
+  ) {
+    const session = await this.sessionService.getOwned(sessionId, user.id);
+    await this.sourcesService.remove(session, sourceId);
     return { success: true };
   }
 

@@ -124,3 +124,20 @@ class CrisisVerdict(BaseModel):
     # the miscalibration by restating the model's reasoning instead of the evidence.
     signal: str = ""
     confidence: float = 0.0
+    # Q3-fast Part 1: which of the three kinds of reply the message needs. `at_risk`
+    # (suicide, self-harm) and `emergency` (a medical emergency now, a person's or an
+    # animal's) get a fixed reply at once; `upset` is distress without risk, answered
+    # normally and warmly; `none` is everything else. A prompt that predates the
+    # levels leaves it unset, and `crisis_level` reads it from `is_crisis`.
+    level: Literal["at_risk", "emergency", "upset", "none"] = "none"
+    # Suicide or self-harm is also present (an overdose taken on purpose): an
+    # emergency reply then adds the at-risk line.
+    self_harm: bool = False
+
+
+def crisis_level(verdict: "CrisisVerdict") -> str:
+    """The verdict's level, consistent with `is_crisis` (Q3-fast Part 1): a crisis
+    the prompt didn't grade is `at_risk`, as every crisis was before the levels."""
+    if verdict.is_crisis and verdict.level not in ("at_risk", "emergency"):
+        return "at_risk"
+    return verdict.level

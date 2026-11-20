@@ -1,3 +1,5 @@
+import { usageContext } from 'src/billing/context/usage-context';
+import { UsageChannel, UsageKind } from 'src/billing/enum/billing.enum';
 import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { isHealthPack } from '../../bot-draft/safety-pack/safety-packs';
@@ -276,6 +278,26 @@ export class MemoryService {
    * decision can still say "answer". Never throws, and the person never waits for it.
    */
   async afterTurn(input: {
+    chatbot: Pick<Chatbot, 'id' | 'settings' | 'safetyPack'>;
+    conversationId: string;
+    runId: string | undefined;
+    pending: PendingMemory | undefined;
+    repliedAt?: number;
+  }): Promise<MemoryApplied | null> {
+    // CR1: the memory check's model call is this run's, on this assistant and chat.
+    return usageContext.with(
+      {
+        runId: input.runId,
+        chatbotId: input.chatbot.id,
+        conversationId: input.conversationId,
+        channel: usageContext.current()?.channel ?? UsageChannel.OTHER,
+        runKind: UsageKind.CUSTOMER_REPLY,
+      },
+      () => this.afterTurnInContext(input),
+    );
+  }
+
+  private async afterTurnInContext(input: {
     chatbot: Pick<Chatbot, 'id' | 'settings' | 'safetyPack'>;
     conversationId: string;
     runId: string | undefined;

@@ -38,7 +38,7 @@ from app.core.debrief_graph.constants import FallbackRung, Recipe, Step
 from app.core.debrief_graph.context import DebriefRunContext as Ctx
 from app.core.debrief_graph.findings import count as count_findings
 from app.core.debrief_graph.gateway import GATEWAY_RETRY
-from app.core.debrief_graph.model_step import ModelStep
+from app.core.debrief_graph.model_step_node import ModelStep
 from app.core.debrief_graph.narration import n
 from app.core.debrief_graph.records import iso, js_len
 from app.core.debrief_graph.registry import (  # noqa: F401 - registers them
@@ -53,9 +53,13 @@ from app.core.debrief_graph.registry.manifest import (
     refusal,
 )
 from app.core.debrief_graph.registry.profile import build_profile, evidence_summary
+from app.core.debrief_graph.registry.wording import PROMPT_CODE as WORDING_PROMPT_CODE
+from app.core.debrief_graph.registry.wording import parse as parse_wording
+from app.core.debrief_graph.registry.wording import with_wording
 from app.core.debrief_graph.state import DebriefState as State
 
 PLANNER_PROMPT = "debrief_planner_system"
+PLANNER_AGENTS_PROMPT = WORDING_PROMPT_CODE
 #: A planner slower than this gives way to the default plan. Spec A5 said
 #: 8 s; measured 2026-11-11 on the synthetic planner cases with the evidence
 #: summary in the input, gemini-2.5-flash took p50 10.8 s, p90 17.8 s, max
@@ -155,6 +159,8 @@ def offered_agents(
         ):
             continue
         try:
+            if m.offered_when is not None and not m.offered_when(ctx):
+                continue
             if m.available(profile):
                 out.append(m.id)
         except Exception:  # noqa: BLE001 - an availability check never fails a run
@@ -415,11 +421,17 @@ def _candidates(state: State) -> List[str]:
 
 def planner_body(state: State, ctx: Ctx) -> Dict[str, Any]:
     top_up = state.get("phase") == "top_up"
+    planner_wording = parse_wording(ctx.prompt(PLANNER_AGENTS_PROMPT))
     return {
         "profile": state.get("profile") or {},
         # The Analyst's words, never the transcript (decided 2026-11-11).
         "evidence_summary": evidence_summary(state.get("evidence") or {}),
-        "agents": [REGISTRY[a].card() for a in _candidates(state)],
+        # The wording each agent is described by is the Skills Store's
+        # `debrief_planner_agents`; ids and machine fields are the manifest's.
+        "agents": [
+            with_wording(REGISTRY[a].card(), planner_wording)
+            for a in _candidates(state)
+        ],
         "max_agents": max_agents(ctx),
         "system_prompt": ctx.prompt(PLANNER_PROMPT),
         **(
@@ -759,8 +771,10 @@ async def dispatch(state: State, runtime: Runtime[Ctx]) -> Command:
     update["workspace"] = workspace
     if "analyst" in (state.get("actions") or {}) and not ok_map.get("analyst"):
         update["rung"] = int(FallbackRung.WRITER_AND_CHECKS_ONLY)
-    update["logs"] = [dispatch_log("prepare_writer")] + logs
-    return Command(update=update, goto="prepare_writer")
+    update["logs"] = [dispatch_log("guidance_agent")] + logs
+    # The guidance agent (a no-op unless the release turns it on) runs between
+    # the agents and the Writer, as it does after guidance_lookup.
+    return Command(update=update, goto="guidance_agent")
 
 
 # --- the one evidence top-up (D3) ---------------------------------------------------

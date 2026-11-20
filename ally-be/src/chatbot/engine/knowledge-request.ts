@@ -79,6 +79,15 @@ export function buildAgentRunRequest(
   };
 }
 
+/** Whether the bot may create entries itself: a `create_<list>` ability set to Do it (chunk 6). */
+function hasCreateTool(
+  stored: { abilities?: Partial<Record<string, string>> } | null | undefined,
+): boolean {
+  return Object.entries(stored?.abilities ?? {}).some(
+    ([tool, ability]) => tool.startsWith('create_') && ability === 'do_it',
+  );
+}
+
 function personaRequest(turn: ChatTurn): KnowledgeAnswerRequest['persona'] {
   const persona = turn.chatbot.persona ?? {};
   const out = {
@@ -88,13 +97,21 @@ function personaRequest(turn: ChatTurn): KnowledgeAnswerRequest['persona'] {
     // The bot's safety pack and its owner's Never rules (chunk 20a), on every run, in their own
     // field: an editor's instructions can't remove them.
     safety_rules:
-      packRulesBlock(turn.chatbot.safetyPack, [
-        ...(turn.chatbot.rules?.never ?? []),
-        // Topics the owner asked it not to talk about (chunk 20a-2).
-        ...(turn.chatbot.rules?.avoid ?? []).map(
-          (topic) => `Talk about ${topic}`,
-        ),
-      ]) ?? undefined,
+      packRulesBlock(
+        turn.chatbot.safetyPack,
+        [
+          ...(turn.chatbot.rules?.never ?? []),
+          // Topics the owner asked it not to talk about (chunk 20a-2).
+          ...(turn.chatbot.rules?.avoid ?? []).map(
+            (topic) => `Talk about ${topic}`,
+          ),
+        ],
+        // SP1: a health decline may name the bot's helpline, and offer booking only when it can.
+        {
+          helpline: turn.settings?.helplineNumbers,
+          hasCreateTool: hasCreateTool(turn.chatbot.settings),
+        },
+      ) ?? undefined,
     // The id too: for a health pack, ally-ai's check refuses diagnosis and dosing in code.
     safety_pack: turn.chatbot.safetyPack || undefined,
     // And for the check, which declines a reply touching one.

@@ -236,6 +236,120 @@ describe("no lists yet", () => {
     expect(screen.getByRole("heading", { name: t.setup.timesTitle })).toBeTruthy();
     expect(screen.getByRole("button", { name: t.setup.skipForNow })).toBeTruthy();
   });
+
+  it("every example can be removed, the last one too, and Next waits for one of their own", async () => {
+    // Prod, 18 Nov: the last example couldn't be removed, stayed, and the assistant offered it.
+    h.results.install = () => {
+      h.lists.current = [SLOTS, APPOINTMENTS];
+      return Promise.resolve({ lists: [SLOTS, APPOINTMENTS] });
+    };
+    const view = render(
+      <ListsSection bot={BOT} home={{} as never} canEdit canManage go={vi.fn()} tryIt={vi.fn()} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(t.empty.readyMade) }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: `${t.setup.use}: Appointments` }));
+    });
+    view.rerender(
+      <ListsSection bot={BOT} home={{} as never} canEdit canManage go={vi.fn()} tryIt={vi.fn()} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove Follow-up" }));
+    const last = screen.getByRole("button", { name: "Remove Consultation" }) as HTMLButtonElement;
+    expect(last.disabled).toBe(false);
+    fireEvent.click(last);
+    expect(screen.queryByText(t.setup.example)).toBeNull();
+    expect(screen.getByText(t.setup.needOne)).toBeTruthy();
+    const next = screen.getByRole("button", { name: t.setup.next }) as HTMLButtonElement;
+    expect(next.disabled).toBe(true);
+
+    fireEvent.change(screen.getByPlaceholderText("Add a service"), {
+      target: { value: "Eye check-up" },
+    });
+    expect(next.disabled).toBe(false);
+    await act(async () => {
+      fireEvent.click(next);
+    });
+    expect(h.calls.updateField).toHaveBeenCalledWith(
+      expect.objectContaining({
+        field: "service",
+        change: { options: { values: ["Eye check-up"] } },
+      }),
+    );
+  });
+});
+
+describe("a choice typed but not added", () => {
+  it("is kept when Next is pressed without Add (not dropped)", async () => {
+    h.results.install = () => {
+      h.lists.current = [SLOTS, APPOINTMENTS];
+      return Promise.resolve({ lists: [SLOTS, APPOINTMENTS] });
+    };
+    const view = render(
+      <ListsSection bot={BOT} home={{} as never} canEdit canManage go={vi.fn()} tryIt={vi.fn()} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(t.empty.readyMade) }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: `${t.setup.use}: Appointments` }));
+    });
+    view.rerender(
+      <ListsSection bot={BOT} home={{} as never} canEdit canManage go={vi.fn()} tryIt={vi.fn()} />,
+    );
+    fireEvent.change(screen.getByPlaceholderText("Add a service"), {
+      target: { value: "Thali" },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: t.setup.next }));
+    });
+    expect(h.calls.updateField).toHaveBeenCalledWith(
+      expect.objectContaining({
+        field: "service",
+        change: { options: { values: ["Consultation", "Follow-up", "Thali"] } },
+      }),
+    );
+  });
+});
+
+describe("Make it yours after Back", () => {
+  it("shows the owner's saved choices, not the examples again", async () => {
+    h.results.install = () => {
+      h.lists.current = [SLOTS, APPOINTMENTS];
+      return Promise.resolve({ lists: [SLOTS, APPOINTMENTS] });
+    };
+    h.results.updateField = () => {
+      h.lists.current = [
+        SLOTS,
+        {
+          ...APPOINTMENTS,
+          fields: APPOINTMENTS.fields.map(f =>
+            f.key === "service" ? { ...f, options: { values: ["Consultation", "Thali"] } } : f,
+          ),
+        },
+      ];
+      return Promise.resolve({});
+    };
+    const props = { bot: BOT, home: {} as never, canEdit: true, canManage: true, go: vi.fn() };
+    const view = render(<ListsSection {...props} tryIt={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(t.empty.readyMade) }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: `${t.setup.use}: Appointments` }));
+    });
+    view.rerender(<ListsSection {...props} tryIt={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Remove Follow-up" }));
+    fireEvent.change(screen.getByPlaceholderText("Add a service"), { target: { value: "Thali" } });
+    fireEvent.click(screen.getByRole("button", { name: t.setup.addChoice }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: t.setup.next }));
+    });
+    view.rerender(<ListsSection {...props} tryIt={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: t.setup.back }));
+
+    const choices = within(screen.getByTestId("choices"));
+    expect(choices.getByText("Thali")).toBeTruthy();
+    expect(choices.queryByText("Follow-up")).toBeNull();
+    // Only the example still kept is marked as one.
+    expect(choices.getAllByText(t.setup.example)).toHaveLength(1);
+  });
 });
 
 describe("the entries table", () => {
@@ -481,6 +595,23 @@ describe("details, rules and the assistant's switches", () => {
       create: "do_it",
     });
     expect(screen.getByText(t.assistant.firstNote)).toBeTruthy();
+  });
+
+  it("saves the owner's line on how the assistant should use the list (Q3-fast 2b)", async () => {
+    render(
+      <AssistantBlock botId="bot-1" list={APPOINTMENTS} lists={[SLOTS, APPOINTMENTS]} canEdit />,
+    );
+    const box = screen.getByLabelText(t.assistant.instructionLabel);
+    fireEvent.change(box, { target: { value: "  Ask for the pet's name too.  " } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: t.assistant.instructionSave }));
+    });
+    expect(h.calls.setAbilities).toHaveBeenCalledWith({
+      id: "bot-1",
+      key: "appointments",
+      instruction: "Ask for the pet's name too.",
+    });
+    expect(screen.getByRole("button", { name: t.assistant.instructionSaved })).toBeTruthy();
   });
 
   it("hides Add and Change when no detail lets the assistant fill it in", () => {

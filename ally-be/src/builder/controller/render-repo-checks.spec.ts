@@ -19,6 +19,14 @@ describe('renderRepoChecks', () => {
     expect(text).not.toMatch(/`Wiki-PR: none/);
   });
 
+  it('sends prompt text changes to a Skills Store follow-up, not the default .txt', () => {
+    const text = renderRepoChecks([findBuilderRepo('ally-be')!]);
+
+    expect(text).toContain('Skills Store');
+    expect(text).toContain('Do not edit prompt `.txt` files');
+    expect(text).toContain('## Skills Store follow-up');
+  });
+
   it('is empty without a repo', () => {
     expect(renderRepoChecks([])).toBe('');
   });

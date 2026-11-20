@@ -27,6 +27,11 @@ vi.mock("../PrivateLayout", () => ({
     return <>{props.children}</>;
   },
 }));
+// The shell (sidebar, palette) has its own suite; here it is just the layout route's outlet.
+vi.mock("../AdminShell", async () => {
+  const { Outlet } = await import("react-router-dom");
+  return { AdminShell: () => <Outlet /> };
+});
 vi.mock("../PublicRoute", () => ({
   PublicRoute: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
@@ -87,11 +92,26 @@ vi.mock("@pages", () => ({
   Privacy: () => <div>PrivacyPage</div>,
   AILab: () => <div>AILabPage</div>,
   ProductRoadmap: () => <div>ProductRoadmapPage</div>,
+  RoadmapGate: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  RoadmapQueuePage: () => <div>RoadmapQueuePage</div>,
+  RoadmapProductUpdatesPage: () => <div>ProductUpdatesPage</div>,
+  RoadmapIdeaPage: () => <div>RoadmapIdeaPage</div>,
+  RoadmapDraftsPage: () => <div>RoadmapDraftsPage</div>,
+  RoadmapNewIdeaPage: () => <div>RoadmapNewIdeaPage</div>,
+  RoadmapFrame: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  // Pass-through: the redirect's own mapping is covered in pages/Roadmap/__tests__.
+  RoadmapLegacyRedirect: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  RoadmapAgentPage: () => <div>RoadmapAgentPage</div>,
+  RoadmapSettingsPage: () => <div>RoadmapSettingsPage</div>,
+  RoadmapMeasuresPage: () => <div>RoadmapMeasuresPage</div>,
+  RoadmapBugsPage: () => <div>RoadmapBugsPage</div>,
+  UserInterviewsPage: () => <div>UserInterviewsPage</div>,
   EvaluateLogin: () => <div>EvaluateLoginPage</div>,
   EvaluateRecords: () => <div>EvaluateRecordsPage</div>,
   EvaluateRecordDetail: () => <div>EvaluateRecordDetailPage</div>,
   BugHunter: () => <div>BugHunterPage</div>,
   Builder: () => <div>BuilderPage</div>,
+  PmAgentFeed: () => <div>PmAgentFeedPage</div>,
   BuilderRoom: () => <div>BuilderRoomPage</div>,
   BuilderSession: () => <div>BuilderSessionPage</div>,
   BuilderSettings: () => <div>BuilderSettingsPage</div>,
@@ -103,6 +123,12 @@ vi.mock("@pages", () => ({
   CourseCopilotSessions: () => <div>CourseCopilotSessionsPage</div>,
   CourseCopilotNew: () => <div>CourseCopilotNewPage</div>,
   CourseCopilotSession: () => <div>CourseCopilotSessionPage</div>,
+}));
+
+// Onboarding pulls in the QR-code library; the router only needs the two entry components.
+vi.mock("../../pages/Onboarding", () => ({
+  OnboardingStart: () => <div>OnboardingStartPage</div>,
+  OnboardingSession: () => <div>OnboardingSessionPage</div>,
 }));
 
 // The assistant home (chunk 20d) stands in for its real page, which needs the store.
@@ -127,6 +153,40 @@ describe("RouteLayout", () => {
     }
   });
 
+  it("redirects old chatbot links to /assistants, keeping the section and query (A1)", () => {
+    for (const [from, to] of [
+      ["/chatbots", "/assistants"],
+      ["/chatbots/bot-1?section=lists&tool=memory", "/assistants/bot-1?section=lists&tool=memory"],
+      ["/chatbots/bot-1?section=conversations", "/assistants/bot-1?section=conversations"],
+      ["/whatsapp-bot", "/assistants"],
+    ]) {
+      window.history.pushState({}, "", from);
+      const { unmount } = render(<RouteLayout />);
+      expect(`${window.location.pathname}${window.location.search}`).toBe(to);
+      unmount();
+    }
+  });
+
+  it("opens an assistant at /assistants/:id edge to edge, inside the admin sidebar", () => {
+    privateLayoutCalls.props.length = 0;
+    window.history.pushState({}, "", "/assistants/bot-1?section=lists");
+    render(<RouteLayout />);
+    expect(screen.getByText("AssistantHomePage")).toBeInTheDocument();
+    const last = privateLayoutCalls.props.at(-1) as { shell?: string; fullBleed?: boolean };
+    expect(last.fullBleed).toBe(true);
+    expect(last.shell).toBeUndefined();
+  });
+
+  it("has no sign-up: /signup and /sign-up go to the login screen (A1)", () => {
+    for (const path of ["/signup", "/sign-up"]) {
+      window.history.pushState({}, "", path);
+      const { unmount } = render(<RouteLayout />);
+      expect(screen.getByText("LoginPage")).toBeInTheDocument();
+      expect(window.location.pathname).toBe(ROUTES.LOGIN);
+      unmount();
+    }
+  });
+
   it("renders Login route", () => {
     window.history.pushState({}, "", ROUTES.LOGIN);
     render(<RouteLayout />);
@@ -143,6 +203,14 @@ describe("RouteLayout", () => {
     window.history.pushState({}, "", ROUTES.SIMULATION_STUDIO);
     render(<RouteLayout />);
     expect(screen.getByText("RolePlaysPage")).toBeInTheDocument();
+  });
+
+  it("renders PM Agent at /pm-agent, gated on the pm_agent toggle", () => {
+    privateLayoutCalls.props.length = 0;
+    window.history.pushState({}, "", ROUTES.PM_AGENT);
+    render(<RouteLayout />);
+    expect(screen.getByText("PmAgentFeedPage")).toBeInTheDocument();
+    expect(privateLayoutCalls.props.at(-1)?.requiredFeature).toBe(FeatureToggleKey.PM_AGENT);
   });
 
   it("renders the Builder tab (Now · Rules · History) at /builder", () => {
@@ -357,9 +425,13 @@ describe("RouteLayout", () => {
     expect(screen.getByText("DefaultRedirectPage")).toBeInTheDocument();
   });
 
-  it("redirects unknown route to Simulation Studio", () => {
+  it("shows a 404 with a link home for an unknown route, instead of redirecting", () => {
     window.history.pushState({}, "", "/unknown-path");
     render(<RouteLayout />);
-    expect(screen.getByText("RolePlaysPage")).toBeInTheDocument();
+    expect(screen.queryByText("RolePlaysPage")).not.toBeInTheDocument();
+    expect(screen.getByTestId("admin-not-found")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Go to your home page" })).toHaveAttribute("href", "/");
+    expect(window.location.pathname).toBe("/unknown-path");
+    expect(document.title).toBe("Page not found · Ally Admin");
   });
 });

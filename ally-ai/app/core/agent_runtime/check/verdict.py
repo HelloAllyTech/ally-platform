@@ -44,6 +44,36 @@ class CheckContext:
     #: chat's summary and their name. A source for what they said about themselves,
     #: never for the organisation.
     personal: str = ""
+    #: A list find ran this run and answered (chunk 6b): it looked, even though it
+    #: isn't a search.
+    looked_up: bool = False
+    #: A find this run found nothing at the time asked, or only the nearest entries
+    #: (chunk 6b). "Nothing's free on Thursday evening" is then an answer, from the
+    #: find, not a missing source.
+    found_nothing: bool = False
+    #: Something in this run can pass the person's request on (chunk 6b): the
+    #: `hand_over` tool, or a create tool on a list that takes their details (a
+    #: callback or a lead). Without either, it never promises to pass anything on.
+    can_pass_on: bool = True
+    #: How many of `passages`, from the start, were carried over from the previous
+    #: message (chunk 6b): citable, but not found by this run.
+    carried: int = 0
+    #: The plain-words refusals this run's list writes got from the list's rules
+    #: (Q3-fast Part 0b): "That table is taken.", "You already have 2 Reservations…".
+    #: A reply that relays one is an answer about the person's request, not a gap
+    #: in what the assistant knows.
+    refused: Sequence[str] = ()
+    #: How to reach the business, from its sources (Q3-fast Part 2): what a decline
+    #: gives when the owner's decline wording has no contact of its own.
+    business_contact: str = ""
+    #: The bot remembers people between chats (chunk 8a's memory on). Off, a "please
+    #: remember…" gets a plain "I can't" (Q3-fast Part 2, 17 Nov M2).
+    memory_on: bool = True
+
+    @property
+    def found(self) -> List[Dict[str, Any]]:
+        """The passages this run looked up itself: carried list entries left out."""
+        return self.passages[self.carried :]
 
 
 @dataclass

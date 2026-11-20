@@ -1,3 +1,4 @@
+import { GENERAL_CRISIS_TEXT } from '../../../bot-draft/safety-pack/safety-packs';
 import {
   WaHandledBy,
   WaTemplateKind,
@@ -70,7 +71,7 @@ describe('ChatbotEngineService: the crisis check reads earlier messages', () => 
       expect.objectContaining({ message: 'I mean it', history: [DISCLOSURE] }),
     );
     expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
-    expect(decision.body).toBe(CRISIS_TEXT);
+    expect(decision.body).toBe(GENERAL_CRISIS_TEXT);
   });
 
   it('refuse: a sender the bot is not for is checked with history too', async () => {
@@ -171,6 +172,28 @@ describe('ChatbotEngineService: the crisis check reads earlier messages', () => 
     const decision = await engine.respond(stored());
     expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
     expect(aiService.checkWhatsAppCrisis).not.toHaveBeenCalled();
+  });
+
+  it('leaves a keyword inside an everyday idiom to the classifier (Q3-fast stop 1)', async () => {
+    const aiService = engineAiService(ANSWER, ANSWER);
+    const engine = makeEngine({
+      aiService,
+      promptShared: { getPromptsByOptions: jest.fn().mockResolvedValue([]) },
+      replyService: {
+        match: jest.fn().mockResolvedValue({
+          bypassRag: true,
+          template: { id: 't', kind: WaTemplateKind.CRISIS, responseText: '' },
+        }),
+      },
+    });
+    const decision = await engine.respond(
+      stored({
+        text: "I'm so done with working from home, I want to die of boredom. Do you have day passes?",
+      }),
+    );
+    expect(decision.handledBy).not.toBe(WaHandledBy.CRISIS);
+    expect(aiService.checkWhatsAppCrisis).toHaveBeenCalledTimes(1);
+    expect(aiService.runAgent).toHaveBeenCalledTimes(1);
   });
 });
 

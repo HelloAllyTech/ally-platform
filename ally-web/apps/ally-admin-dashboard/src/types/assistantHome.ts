@@ -30,6 +30,8 @@ export interface HomeFieldValues {
   whatsappAccess: ChatbotAccessMode;
   /** Remember people between chats (chunk 8a), and what it never remembers. */
   memory: MemorySettings;
+  /** Where the business is (chunk 6b): an IANA time zone, Asia/Kolkata until the owner picks one. */
+  timeZone: string;
 }
 
 /**
@@ -108,6 +110,18 @@ export interface HomeSafety {
   version: string;
   /** What someone who may be at risk is sent when the owner hasn't written their own (20d-2). */
   atRiskReply?: string | null;
+  /** The packs the owner may switch to (Q3-fast), each marked less strict than the current or not. */
+  choices?: { id: string; name: string; summary: string; lessStrict: boolean }[];
+  /** The owner's last change of the pack (Q3-fast). */
+  packChange?: PackChange | null;
+}
+
+export interface PackChange {
+  from: string | null;
+  to: string;
+  reason: string | null;
+  lessStrict: boolean;
+  at: string;
 }
 
 export interface AssistantHomeView {
@@ -194,13 +208,13 @@ export interface HomeListChange {
   ids?: string[];
 }
 
-/** "How it works" (chunk 20d-2): the instructions as ally-ai builds them for a run. */
+/**
+ * "How it works" (chunk 20d-2): the instructions as ally-ai builds them for a run. Ally's own
+ * layers come with no text (17 Nov 2026): only the owner's parts carry their exact words.
+ */
 export interface HowItWorks {
-  /** The whole text, as the assistant receives it. */
-  full: string;
-  /** The text in order, each part labelled with its layer; joined, they are `full`. */
+  /** The layers in order; `text` is empty for Ally's. */
   parts: { layer: HowLayer; text: string; owner: boolean }[];
-  placeholders: { question: string; passages: string };
   search: {
     top_k: number;
     max_passages: number;
@@ -212,6 +226,10 @@ export interface HowItWorks {
   safetyPack: string | null;
   /** Lists the assistant books into: Add is Do it (chunk 5b). */
   bookingLists?: string[];
+  /** What it can do with each list, where the ability is Do it. */
+  tools?: { list: string; can: ("find" | "create" | "update")[] }[];
+  /** Each list's playbook (Q3-fast Part 2b): what the list's tools add to how it behaves. */
+  playbooks?: { list: string; kind: "booking" | "details" | "orders" | "reference" }[];
 }
 
 export type HowLayer =

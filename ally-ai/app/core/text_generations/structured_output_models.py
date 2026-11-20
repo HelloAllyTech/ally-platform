@@ -181,9 +181,9 @@ class StructuredSummaryNote(BaseModel):
     new_call_follow_up: Optional[str] = Field(
         None, description="Indicates if this is a new or follow-up call."
     )
-    session_number: Optional[str] = Field(
-        None, description="Session number if it's a follow-up."
-    )
+    # session_number is deliberately NOT a model field: the model invented it
+    # from context. A session number comes from the record (or the counsellor),
+    # never from the transcript — see docs/scribe-v2/DESIGN.md.
     counselor_name: Optional[str] = Field(
         None, description="Name of the counselor handling the session."
     )

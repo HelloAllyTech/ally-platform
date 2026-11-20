@@ -40,6 +40,10 @@ class DebriefState(TypedDict, total=False):
     recipe_key: str
     has_risk_cue: bool
     learner_distress: bool
+    #: A thin session (too little said to coach on) waits at the safety reader:
+    #: it ends as "too short" unless the learner sounds distressed. Set by
+    #: `plan`, cleared by `after_reading`.
+    thin_gate: bool
     safety: Dict[str, Any]
     evidence: Dict[str, Any]
     #: The Writer's `progress` (the old ProgressReading shape).
@@ -49,6 +53,12 @@ class DebriefState(TypedDict, total=False):
     progress_result: Optional[Dict[str, Any]]
     history: Optional[str]
     passages: List[Dict[str, str]]  # {title, text}, what the Writer reads
+    #: The guidance agent has run (as the planner's choice or the fixed node):
+    #: the fixed hop never runs it a second time.
+    guidance_agent_ran: bool
+    #: The planner selected the `guidance_agent` registry agent (a marker the
+    #: registry agent writes alone in its wave; the fixed node does the work).
+    guidance_agent_selected: bool
 
     # The check → evaluate ⇄ revise loop.
     round: int  # revision rounds started

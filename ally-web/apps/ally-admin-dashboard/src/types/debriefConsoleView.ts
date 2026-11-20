@@ -26,13 +26,23 @@ export type DebriefCanAction =
   | "escalate"
   | "verdict"
   | "pmAgent"
-  | "approvePinnedRule"
   | "testSets"
   | "releases"
   | "switchOrgOn"
   | "emergencyStop"
   | "agentLogs"
-  | "ownerSettings";
+  | "ownerSettings"
+  | "clinicalLists";
+
+export type DebriefClinicalListKind = "jargon" | "diagnosis" | "score";
+
+/** Settings › Clinical lists: the words behind three checks, by kind and language. */
+export interface DebriefClinicalListsView {
+  kinds: Array<{ kind: DebriefClinicalListKind; label: string }>;
+  languages: string[];
+  lists: Record<DebriefClinicalListKind, Record<string, string[]>>;
+  defaults: Record<DebriefClinicalListKind, Record<string, string[]>>;
+}
 
 export interface DebriefViewer {
   roles: {
@@ -433,7 +443,7 @@ export interface DebriefAttention {
 }
 
 export type DebriefAutonomyStep = "quick_test" | "gate_test" | "paired_trial" | "canary";
-export type DebriefAutonomyKind = "settings" | "prompts" | "pinned_rules";
+export type DebriefAutonomyKind = "settings" | "prompts";
 export type DebriefAutonomyValue = "auto" | "ask" | "off";
 export type DebriefOrgOverride = "default" | "ask" | "never";
 
@@ -510,21 +520,9 @@ export interface DebriefPinnedRulesView {
     code: string;
     label: string;
     version: number | null;
-    pinnedByRelease: boolean;
-    inBundle: boolean;
-    signedBy: { id: number; name: string | null } | null;
-    signedAt: string | null;
-    ideaId: string | null;
-    writtenBy: { id: number; name: string | null } | null;
-    writtenAt: string | null;
-    note: string | null;
-    /** The whole rule in force, for "Ask for a change". */
-    text?: string | null;
-  }>;
-  /** Pinned-rule items still waiting (first versions included). */
-  proposals?: Array<{
-    id: string;
-    change?: { promptCode?: string; firstVersion?: boolean } | null;
+    promptId: string | null;
+    updatedAt: string | null;
+    updatedBy: { id: number; name: string | null } | null;
   }>;
 }
 
@@ -843,4 +841,43 @@ export interface AgentLogsView {
   entries: AgentLogEntry[];
   /** Each prompt version the entries name, once: `code@version` → its text. */
   prompts: Record<string, string>;
+}
+
+/** A learner-facing debrief feature the Ally team can give to some people before everyone. */
+export type DebriefLearnerFeatureKey = "selection_comments";
+
+export interface DebriefLearnerFeaturePerson {
+  userId: number;
+  name: string;
+  email: string;
+  addedAt: string;
+}
+
+/** Who has the feature: the people listed, and whether everyone does. */
+export interface DebriefLearnerFeatureView {
+  feature: DebriefLearnerFeatureKey;
+  everyone: boolean;
+  people: DebriefLearnerFeaturePerson[];
+}
+
+/** One comment a learner made on selected words in their own debrief (Console list). */
+export interface DebriefLearnerCommentItem {
+  id: string;
+  runId: string;
+  sessionId: string;
+  /** The card and field, or null for a comment on the debrief as a whole. */
+  section: string | null;
+  quotedText: string | null;
+  body: string;
+  status: "open" | "resolved";
+  language: string | null;
+  tenantName: string | null;
+  learnerName: string | null;
+  createdAt: string;
+}
+
+export interface DebriefLearnerCommentsPage {
+  items: DebriefLearnerCommentItem[];
+  /** Pass as `before` for the next page; null on the last. */
+  next: string | null;
 }

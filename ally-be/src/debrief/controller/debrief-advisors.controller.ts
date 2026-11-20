@@ -80,7 +80,7 @@ export class DebriefAdvisorsController {
   @RequireFeatureToggle(FeatureToggleKey.ADMIN_USER_MANAGEMENT)
   @ApiOperation({
     summary:
-      'Make a person the Debrief owner (settings, releases, PM agent, Agent logs). Adds only that role; nothing else they hold changes.',
+      'Make a person the Debrief owner (settings, releases, Debrief PM agent, Agent logs). Adds only that role; nothing else they hold changes.',
   })
   addOwner(
     @Param('userId', ParseIntPipe) userId: number,

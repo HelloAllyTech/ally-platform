@@ -7,19 +7,35 @@ import {
 } from "@reduxjs/toolkit/query/react";
 import { toast } from "sonner";
 
-import { ApiEndpoints, HttpMethod, LOCAL_STORAGE_KEYS, ROUTES, TAG_TYPES, en } from "@constants";
+import { ApiEndpoints, HttpMethod, LOCAL_STORAGE_KEYS, TAG_TYPES, en } from "@constants";
 import { RefreshResponse } from "@types";
+
+import { loginPathWithNext } from "../utils/loginRedirect";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
-const handleLogout = () => {
+export const handleLogout = () => {
+  const wasSignedIn = localStorage.getItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED) === "true";
   localStorage.removeItem(LOCAL_STORAGE_KEYS.ADMIN_ACCESS_TOKEN);
   localStorage.removeItem(LOCAL_STORAGE_KEYS.ADMIN_REFRESH_TOKEN);
   localStorage.removeItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED);
 
+  // A session that ran out mid-use: reload the page they are on. Signed out, the admin shows the
+  // login screen at this same URL and logging in leaves them here, so they keep their place with
+  // no redirect to /login. (Not for someone who was never signed in: reloading there would just
+  // repeat the failing request, so they take the redirect below.)
+  if (wasSignedIn) {
+    window.location.reload();
+    return;
+  }
+
   // Raw window.location bypasses the router basename - prefix the Vite base
-  // (the app lives under /admin in production, / everywhere else).
-  window.location.href = import.meta.env.BASE_URL.replace(/\/$/, "") + ROUTES.LOGIN;
+  // (the app lives under /admin in production, / everywhere else). `next` brings them back to
+  // the page they were on once they log in again (A1).
+  const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+  const { pathname, search, hash } = window.location;
+  const inApp = base && pathname.startsWith(base) ? pathname.slice(base.length) || "/" : pathname;
+  window.location.href = base + loginPathWithNext(inApp, search, hash);
 };
 
 const baseQuery = fetchBaseQuery({
@@ -81,6 +97,15 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
         );
 
         if (!refreshResult.data) {
+          // Only a refusal of the refresh token means the session is over. A network error or
+          // 5xx is ally-be restarting (every deploy) — logging out then threw away a good
+          // session. Hand back that error instead so the caller can retry once the API is up.
+          const refreshStatus = refreshResult.error?.status;
+          const isSessionRejected =
+            typeof refreshStatus === "number" && refreshStatus >= 400 && refreshStatus < 500;
+          if (refreshResult.error && !isSessionRejected) {
+            return { error: refreshResult.error };
+          }
           handleLogout();
           throw new Error(en.error.noRefreshDataReceived);
         }
@@ -192,6 +217,8 @@ export const baseAPI = createApi({
     TAG_TYPES.COMPONENT_LIBRARY,
     TAG_TYPES.COURSE_DISCUSSION,
     TAG_TYPES.BLOGS,
+    TAG_TYPES.BLOG_AUTHORING_KEYS,
+    TAG_TYPES.BLOG_REVIEW,
     TAG_TYPES.PRODUCT_UPDATES,
     TAG_TYPES.IMAGE_LIBRARY,
     TAG_TYPES.IMAGE_STUDIO_HISTORY,
@@ -212,6 +239,11 @@ export const baseAPI = createApi({
     TAG_TYPES.PRODUCT_ROADMAP_INTERVIEWS,
     TAG_TYPES.PRODUCT_ROADMAP_IDEA_DRAFTS,
     TAG_TYPES.PRODUCT_ROADMAP_SAVED_VIEWS,
+    TAG_TYPES.ROADMAP_V2_ROLES,
+    TAG_TYPES.ROADMAP_V2_PREFERENCES,
+    TAG_TYPES.ROADMAP_V2_RELEASE,
+    TAG_TYPES.ROADMAP_V2_ROLE,
+    TAG_TYPES.ROADMAP_V2_ITEMS,
     TAG_TYPES.PRODUCT_ROADMAP_VIEW_ORDER,
     TAG_TYPES.AI_LAB_SKILLS,
     TAG_TYPES.AI_LAB_VARIABLES,
@@ -221,7 +253,16 @@ export const baseAPI = createApi({
     TAG_TYPES.AI_LAB_ASSIGNMENTS,
     TAG_TYPES.AI_LAB_AUTO_EVALS,
     TAG_TYPES.AI_LAB_QUESTION_SETS,
-    TAG_TYPES.ANALYTICS_SUGGESTIONS,
+    TAG_TYPES.ANALYTICS_AGENT_CONVERSATIONS,
+    TAG_TYPES.ANALYTICS_AGENT_AUDITS,
+    TAG_TYPES.ANALYTICS_AGENT_AUTOMATION,
+    TAG_TYPES.PM_AGENT_STATE,
+    TAG_TYPES.PM_AGENT_CARDS,
+    TAG_TYPES.PM_AGENT_TRACKING,
+    TAG_TYPES.PM_AGENT_SETTINGS,
+    TAG_TYPES.PM_AGENT_MEMORY,
+    TAG_TYPES.PM_AGENT_HISTORY,
+    TAG_TYPES.PM_AGENT_HEALTH,
     TAG_TYPES.ANALYTICS_CHART_PREFERENCES,
     TAG_TYPES.BUG_HUNTER_V2_REPORTS,
     TAG_TYPES.BUG_HUNTER_SETTINGS,
@@ -248,6 +289,7 @@ export const baseAPI = createApi({
     TAG_TYPES.BUILDER_THREAD,
     TAG_TYPES.COURSE_COPILOT_SESSIONS,
     TAG_TYPES.COURSE_COPILOT_SESSION,
+    TAG_TYPES.COURSE_COPILOT_SOURCES,
     TAG_TYPES.ALLY_GUIDE_SETTINGS,
     TAG_TYPES.ALLY_GUIDE_RELEASES,
     TAG_TYPES.ALLY_GUIDE_CRISIS_RESPONSES,
@@ -273,6 +315,16 @@ export const baseAPI = createApi({
     TAG_TYPES.SCENARIO_LANGUAGES,
     TAG_TYPES.LLM_MODEL_CATALOG,
     TAG_TYPES.LLM_MODELS,
+    TAG_TYPES.BILLING_MODELS,
+    TAG_TYPES.BILLING_WHATSAPP_RATES,
+    TAG_TYPES.BILLING_COSTS,
+    TAG_TYPES.BILLING_FIXED_COSTS,
+    TAG_TYPES.BILLING_PLANS,
+    TAG_TYPES.BILLING_USER_SPEND,
+    TAG_TYPES.BILLING_USER_PLAN,
+    TAG_TYPES.MY_PLAN,
+    TAG_TYPES.ASSISTANT_SEATS,
+    TAG_TYPES.CUSTOM_LOGINS,
     TAG_TYPES.MY_FEATURE_TOGGLES,
     TAG_TYPES.FEATURE_TOGGLE_REGISTRY,
     TAG_TYPES.USER_FEATURE_TOGGLES,

@@ -205,7 +205,8 @@ export const DEFAULT_QUIZ_SETTINGS: QuizSettings = {
 };
 
 export const DEFAULT_COMPLETION_CRITERIA: Record<TrackItemType, CompletionCriteria> = {
-  [TrackItemType.ROLEPLAY]: {},
+  // Score and duration, as every roleplay item was before the choice existed.
+  [TrackItemType.ROLEPLAY]: { completionLogic: "SCORE_AND_DURATION" },
   [TrackItemType.CASE]: {},
   [TrackItemType.QUIZ]: {},
   [TrackItemType.ARTICLE]: {},

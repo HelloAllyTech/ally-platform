@@ -62,7 +62,28 @@ export enum UserRole {
    * in User Management > Clinical advisors, never by the role picker.
    */
   DEBRIEF_OWNER = 'DEBRIEF_OWNER',
+  /**
+   * Agents v2 CR1: a "custom login" — someone Ally gives an account to build assistants. Holds
+   * only the WhatsApp-bot (assistants) permissions, never `system:access`, so it is scoped to its
+   * own organisation and is not a platform admin. What it can open is decided by its feature
+   * toggles (Chatbots, ticked by Ally) and by assistant membership. Granted only by Ally admin →
+   * Custom logins (`POST /v1/custom-logins`); platform-managed, so the role picker can't hand it out.
+   */
+  ASSISTANT_OWNER = 'ASSISTANT_OWNER',
 }
+
+/** Everything an Assistant owner (CR1) may do outside an assistant's own member routes. */
+export const ASSISTANT_OWNER_PERMISSIONS: string[] = [
+  'view:whatsapp-bot',
+  'edit:whatsapp-bot',
+  'view:whatsapp-bot:templates',
+  'edit:whatsapp-bot:templates',
+  'view:whatsapp-bot:conversations',
+  'edit:whatsapp-bot:conversations',
+  'view:whatsapp-bot:unanswered',
+  'edit:whatsapp-bot:unanswered',
+  'view:whatsapp-bot:analytics',
+];
 
 /**
  * Platform-level super-admin roles. SUPER_DUPER_ADMIN is a peer of SUPER_ADMIN:
@@ -148,6 +169,7 @@ export const PLATFORM_MANAGED_ROLES: UserRole[] = [
   ...PLATFORM_TIER_ROLES,
   UserRole.CLINICAL_ADVISOR,
   UserRole.DEBRIEF_OWNER,
+  UserRole.ASSISTANT_OWNER,
 ];
 
 export enum AppType {
@@ -164,6 +186,17 @@ export enum PreferenceName {
   CUSTOM_FIELDS_ENABLED = 'CUSTOM_FIELDS_ENABLED',
   SCRIBE_NOTE_CREATION_ENABLED = 'SCRIBE_NOTE_CREATION_ENABLED',
   SCRIBE_VOICE_NOTE_ENABLED = 'SCRIBE_VOICE_NOTE_ENABLED',
+  /**
+   * Scribe v2: run the new note harness beside the v1 summary for this org
+   * and store its drafts for comparison (never shown). OFF when absent.
+   */
+  SCRIBE_NOTE_HARNESS_SHADOW_ENABLED = 'SCRIBE_NOTE_HARNESS_SHADOW_ENABLED',
+  /**
+   * Scribe recordings are saved as segments uploaded straight to S3 by the
+   * app (no server holds the audio), instead of over the live socket. Apps
+   * read it from GET /v1/scribe-recordings/config. OFF when absent.
+   */
+  SCRIBE_SEGMENTED_RECORDING_ENABLED = 'SCRIBE_SEGMENTED_RECORDING_ENABLED',
   /**
    * Org-level switch letting a tenant's own ADMINs reach the Character Library
    * (list + interview agent + create) for characters scoped to their tenant.

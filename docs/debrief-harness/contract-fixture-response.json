@@ -1,0 +1,64 @@
+{
+  "contract_version": 1,
+  "status": "published",
+  "skip_reason": null,
+  "recipe_key": "standard",
+  "cards": {
+    "lead": "You stayed with Meena’s worry about her exams and asked what it meant to her.",
+    "what_worked": [
+      { "turn_index": 3, "quote": "What does that mean for you?", "text": "You asked an open question." }
+    ],
+    "work_on_this": [
+      { "turn_index": 6, "quote": "That sounds hard.", "text": "Name the feeling before moving on." }
+    ],
+    "important_moment": {
+      "turn_index": 4,
+      "client_said": "I don't see the point anymore.",
+      "how_you_responded": "You asked her to tell you more.",
+      "others": []
+    },
+    "practise_next": null,
+    "a_card_added_later": { "note": "an unknown card must pass through untouched" }
+  },
+  "steps": [
+    {
+      "step": "safety_reader",
+      "label": "Safety reader",
+      "status": "done",
+      "startedAt": "2026-11-19T09:00:00.000Z",
+      "ms": 1840,
+      "model": "gemini-2.5-flash",
+      "estimatedUsd": 0.0012,
+      "a_field_added_later": true
+    },
+    {
+      "step": "writer",
+      "label": "Writer",
+      "status": "done",
+      "startedAt": "2026-11-19T09:00:03.000Z",
+      "ms": 5200,
+      "round": 1
+    }
+  ],
+  "logs": [{ "seq": 1, "step": "safety_reader", "kind": "model" }],
+  "progress": null,
+  "workspace": {
+    "languageSource": "recorded",
+    "decision": { "status": "published", "round": 1, "why": "Met the bar." }
+  },
+  "estimated_cost_usd": 0.0415,
+  "fallback_rung": 0,
+  "has_risk_cue": true,
+  "has_alarm_risk_cue": true,
+  "learner_distress": false,
+  "revision_rounds": 1,
+  "evaluator_overall": 8.5,
+  "evaluator_hard_fails": [],
+  "check_failures": [
+    { "code": "QUOTE_NOT_FOUND", "section": "what_worked", "detail": "advisory only" }
+  ],
+  "resumed": false,
+  "language": "en",
+  "error": null,
+  "a_top_level_field_added_later": "tolerated"
+}

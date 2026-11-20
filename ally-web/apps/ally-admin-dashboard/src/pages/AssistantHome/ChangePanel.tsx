@@ -17,6 +17,7 @@ import { ChangeHistory } from "./ChangeHistory";
 import { HOME } from "./copy";
 import { Collapsed } from "./fields";
 import { COPY, fill } from "../Onboarding/copy";
+import { planLimitMessage } from "../Plan/limits";
 
 const t = COPY.change;
 const c = HOME.changeControls;
@@ -85,8 +86,9 @@ export const ChangePanel: React.FC<{
     setError(null);
     try {
       setProposal(await propose({ id: botId, request: text.trim() }).unwrap());
-    } catch {
-      setError(COPY.problems.generic);
+    } catch (err) {
+      // The plan's refusal (tokens or monthly runs used up, CR1) says what to do in its own words.
+      setError(planLimitMessage(err) ?? COPY.problems.generic);
     }
   };
 

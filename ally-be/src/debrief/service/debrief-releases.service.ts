@@ -12,7 +12,6 @@ import { AgentReleaseService } from '../../llm-agent/harness/release/agent-relea
 import { AgentReleaseAuditAction } from '../../llm-agent/harness/enum/harness.enum';
 import { canonicalHash } from '../../llm-agent/harness/release/canonical-hash.util';
 import {
-  DEBRIEF_AGENT_KEY,
   DEBRIEF_MODELS,
   DEBRIEF_REGISTRY_AGENTS,
   DEBRIEF_REPLY_DEFAULT,
@@ -22,7 +21,11 @@ import {
   DebriefStep,
   validateDebriefBundle,
 } from '../constants/debrief-release.constants';
-import { PINNED_RULE_PROMPTS } from '../util/debrief-console-view.util';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
+import {
+  PINNED_RULE_CODES,
+  PINNED_RULE_PROMPTS,
+} from '../util/debrief-console-view.util';
 import {
   applyStepEdits,
   BUDGET_SETTING_KEYS,
@@ -120,12 +123,18 @@ export type ReleaseSettingChange = Partial<
 const RUNNABLE_PROVIDERS = ['gemini', 'openai'];
 
 /** Registry agents that are also recipe steps: listed once, as the step. */
-const STEP_AGENTS = new Set(['analyst', 'progress_reader', 'guidance_lookup']);
+const STEP_AGENTS = new Set([
+  'analyst',
+  'progress_reader',
+  'guidance_lookup',
+  'guidance_agent',
+]);
 const STEP_ORDER: string[] = [
   DebriefStep.SAFETY_READER,
   DebriefStep.ANALYST,
   DebriefStep.PROGRESS_READER,
   DebriefStep.GUIDANCE_LOOKUP,
+  DebriefStep.GUIDANCE_AGENT,
   DebriefStep.WRITER,
   DebriefStep.CHECKS,
   DebriefStep.EVALUATOR,
@@ -544,8 +553,8 @@ export class DebriefReleasesService implements OnModuleInit {
     }
     for (const rc of diff.recipes) {
       changes.push({
-        area: `Recipe: ${rc.recipe}`,
-        what: what ?? 'Recipe changed',
+        area: `Debrief flow: ${rc.recipe}`,
+        what: what ?? 'Debrief flow changed',
         why,
         before: JSON.stringify(rc.before),
         after: JSON.stringify(rc.after),
@@ -630,7 +639,7 @@ export class DebriefReleasesService implements OnModuleInit {
               percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM "finishedAt" - "startedAt"))
                 FILTER (WHERE status <> 'skipped' AND "finishedAt" IS NOT NULL) AS secs_p50
          FROM debrief_runs
-        WHERE mode IN ('shadow','live') AND "releaseId" = $1
+        WHERE mode = 'live' AND "releaseId" = $1
           AND "createdAt" >= $2 AND ($3::timestamp IS NULL OR "createdAt" < $3::timestamp)`,
       [releaseId, from, to],
     );
@@ -815,7 +824,7 @@ export class DebriefReleasesService implements OnModuleInit {
     }> = await this.dataSource.query(
       `WITH r AS (
            SELECT id, steps FROM debrief_runs
-            WHERE "releaseId" = $1 AND mode IN ('shadow','live') AND status <> 'skipped')
+            WHERE "releaseId" = $1 AND mode = 'live' AND status <> 'skipped')
          SELECT s->>'step' AS step, (SELECT count(*) FROM r)::int AS runs,
                 count(DISTINCT r.id) FILTER (WHERE s->>'status' = 'done')::int AS done,
                 COALESCE(sum((s->>'estimatedUsd')::float), 0)::float AS usd
@@ -895,11 +904,10 @@ export class DebriefReleasesService implements OnModuleInit {
    * A debrief prompt published in the Skills Store (dashboard, `prompts` CLI,
    * revert, experiment) becomes a release with that version: live at once,
    * unless it would undo a promoted PM-agent or person-proposed change.
-   * Pinned rules are not affected (their own sign-off route), nor prompts the
-   * live release does not use.
+   * A pinned rule goes the same way: only the pinned editors named in the Skills
+   * Store can publish one, and prompts the live release does not use are ignored.
    */
   async fromPublish(e: PromptPublishedEvent) {
-    if (PINNED_RULE_PROMPTS.some((p) => p.code === e.promptCode)) return null;
     const run = () => this.fromPublishNow(e);
     const next = this.sourceQueue.then(run, run);
     this.sourceQueue = next.catch(() => undefined);
@@ -1297,7 +1305,7 @@ export class DebriefReleasesService implements OnModuleInit {
     budgetOnly: boolean;
     diff: ReturnType<typeof bundleDiff>;
   }> {
-    const { release: live, bundle } = await this.runner.resolveRelease();
+    const { bundle } = await this.runner.resolveRelease();
     const next = await this.applyChanges(
       bundle,
       input.steps,
@@ -1305,6 +1313,28 @@ export class DebriefReleasesService implements OnModuleInit {
       input.reply,
       input.prompts,
     );
+    return this.proposeBundle(next, input.title, input.why, userId);
+  }
+
+  /**
+   * The shared tail of every person's proposed change: `next` is the live
+   * release's bundle with the changes applied and already validated. Makes the
+   * DRAFT release and the idea that carries it (never an edit to a live
+   * release). Settings › Agents uses it with a bundle it built and checked.
+   */
+  async proposeBundle(
+    next: DebriefBundle,
+    titleIn: string,
+    why: string | null | undefined,
+    userId: number,
+  ): Promise<{
+    ideaId: string;
+    releaseId: string;
+    version: number;
+    budgetOnly: boolean;
+    diff: ReturnType<typeof bundleDiff>;
+  }> {
+    const { release: live, bundle } = await this.runner.resolveRelease();
     const diff = bundleDiff(bundle, next);
     if (
       !diff.prompts.length &&
@@ -1316,7 +1346,7 @@ export class DebriefReleasesService implements OnModuleInit {
     ) {
       throw new BadRequestException('Nothing changed from the live release');
     }
-    const title = (input.title ?? '').trim();
+    const title = (titleIn ?? '').trim();
     if (!title) throw new BadRequestException('Give the change a title');
     const draft = await this.releases.createDraft(
       DEBRIEF_AGENT_KEY,
@@ -1344,7 +1374,7 @@ export class DebriefReleasesService implements OnModuleInit {
         title.slice(0, 300),
         JSON.stringify(change),
         JSON.stringify({
-          why: input.why?.trim() || null,
+          why: why?.trim() || null,
           proposedBy: userId,
           diff: { ...diff, budgetOnly: diff.budgetOnly },
         }),
@@ -1420,9 +1450,11 @@ export class DebriefReleasesService implements OnModuleInit {
           `${code} is not a prompt of this release`,
         );
       }
-      if (PINNED_RULE_PROMPTS.some((p) => p.code === code)) {
+      if (PINNED_RULE_CODES.has(code)) {
+        // Never from a release change a person or the PM agent proposes here: a pinned rule
+        // is published in the Skills Store by a pinned editor, and the release follows it.
         throw new BadRequestException(
-          `${code} is a pinned rule: propose it as a pinned-rule change`,
+          `${code} is a pinned rule: it is changed in the Skills Store by a pinned editor`,
         );
       }
       const [row] = await this.dataSource.query(

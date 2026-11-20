@@ -609,3 +609,113 @@ body {
   right: 10px;
   z-index: 6;
 }
+
+/* What the assistant is doing, and what it did (chunk 6b, copy §30). */
+.bp-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 24px;
+  color: var(--brand-muted);
+  font-size: 0.9375rem;
+}
+.bp-step__mark {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  border: 2px solid var(--brand-line);
+  border-top-color: var(--brand-accent);
+  animation: bp-step-turn 0.9s linear infinite;
+}
+@keyframes bp-step-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.bp-done {
+  margin-top: 6px;
+}
+.bp-done__toggle {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--brand-muted);
+  font: inherit;
+  font-size: 0.8125rem;
+  text-align: left;
+  cursor: pointer;
+}
+.bp-done__toggle:hover,
+.bp-done__toggle[aria-expanded="true"] {
+  color: var(--brand-ink);
+}
+.bp-done__toggle:focus-visible {
+  outline: 2px solid var(--brand-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.bp-done__list {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--brand-muted);
+  font-size: 0.8125rem;
+}
+.bp-done__list li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.bp-card {
+  margin-top: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--brand-line);
+  border-radius: 14px;
+  background: var(--brand-surface);
+  color: var(--brand-ink);
+  max-width: 340px;
+}
+.bp-card__what {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--brand-muted);
+  font-size: 0.8125rem;
+}
+.bp-card__when {
+  margin: 4px 0 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+.bp-card__details {
+  display: grid;
+  gap: 2px;
+  margin: 8px 0 0;
+  font-size: 0.875rem;
+}
+.bp-card__details div {
+  display: flex;
+  gap: 6px;
+}
+.bp-card__details dt {
+  color: var(--brand-muted);
+}
+.bp-card__details dt::after {
+  content: ":";
+}
+.bp-card__details dd {
+  margin: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bp-step__mark {
+    animation: none;
+    border-top-color: var(--brand-line);
+    background: var(--brand-accent);
+  }
+}

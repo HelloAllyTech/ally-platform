@@ -109,12 +109,8 @@ vi.mock("@components", async importOriginal => {
   const actual = await importOriginal<typeof import("@components")>();
   return {
     ...actual,
-    DebriefTab: ({ sessionId, summaryData, retryMaxReached, onOpenMoment }: any) => (
-      <div
-        data-testid="debrief-tab"
-        data-has-summary={String(!!summaryData)}
-        data-retry-max={String(retryMaxReached)}
-      >
+    DebriefTab: ({ sessionId, summaryData, onOpenMoment }: any) => (
+      <div data-testid="debrief-tab" data-has-summary={String(!!summaryData)}>
         <div data-testid="debrief-session-id">{sessionId}</div>
         {onOpenMoment && (
           <>
@@ -449,15 +445,14 @@ describe("PostSimulationSummary Component", () => {
    * old SimulationSummary container as the landing tab's content.
    */
   describe("DebriefTab Integration", () => {
-    it("should pass sessionId, summaryData and retryMaxReached to DebriefTab", () => {
+    it("should pass sessionId and summaryData to DebriefTab", () => {
       render(
         <TestWrapper>
           <PostSimulationSummary />
         </TestWrapper>,
       );
 
-      const debriefTab = screen.getByTestId("debrief-tab");
-      expect(debriefTab).toHaveAttribute("data-retry-max", "false");
+      expect(screen.getByTestId("debrief-tab")).toHaveAttribute("data-has-summary", "false");
       expect(screen.getByTestId("debrief-session-id")).toHaveTextContent("123");
     });
 

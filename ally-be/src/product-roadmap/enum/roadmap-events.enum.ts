@@ -15,6 +15,15 @@ export enum RoadmapEvents {
 
   // server → client (tier 2: one signal for sweeping structural changes)
   ROADMAP_INVALIDATED = 'ROADMAP_INVALIDATED',
+
+  // Roadmap v2 (plans/roadmap-v2-build/P2-contract.md). Ignored while roadmap_v2 is off.
+  /** server → board room: { code, fields, actorId }. */
+  ITEM_CHANGED = 'roadmap:item-changed',
+  /** client → server: { code }; the idea page or reading pane is open. */
+  JOIN_ITEM = 'roadmap:join-item',
+  LEAVE_ITEM = 'roadmap:leave-item',
+  /** both ways: who is viewing an idea or typing in one of its boxes. Never stored. */
+  PRESENCE = 'roadmap:presence',
 }
 
 export enum RoadmapRoomTypes {

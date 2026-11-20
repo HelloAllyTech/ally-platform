@@ -795,31 +795,27 @@ ASKED_11 = [
 
 class TestConfirmedTime:
     @pytest.mark.asyncio
-    async def test_run_6_a_different_time_is_not_booked_and_the_agent_asks(
+    async def test_every_write_goes_to_the_gateway_which_decides_consent(
         self, run_booking
     ):
-        # The person confirmed 11:00; find returned only 10:00, and the model books it.
+        """Chunk H1: ally-ai no longer guesses whether a time was confirmed. The
+        write goes to ally-be's gateway, which writes only after a yes in a later
+        turn to the question naming that entry (ally-be list-tools.pg.spec)."""
         gateway = FakeGateway(found((THU_10, "Thu 19 Nov 2026, 10:00")), BOOKED)
         llm = FakeLLM(
             find(starts_at_from="2026-11-19T10:00:00+05:30"),
             create(THU_10),
-            reply("clarify", "Did you mean 10:00 or 11:00 on Thursday?"),
+            reply("answer", "Booked: Thursday 19 Nov at 10:00.", citations=[2]),
         )
         with patch(f"{CONVERSATION}.generate_structured", llm):
             state = await run_booking(
                 "yes, please book it", history=ASKED_11, gateway=gateway
             )
-        assert [c["name"] for c in gateway.calls] == ["find_slots"]
-        record = state["tool_calls"][1]
-        assert record["error"] == "unconfirmed_time"
-        prompt = llm.calls[2]["prompt"]
-        assert (
-            "- `create_appointments`: refused (Not done: the person hasn't confirmed "
-            "this exact day and time (Thu 19 Nov 2026, 10:00). Ask them to confirm "
-            "the day and time before you book it.), not done"
-        ) in prompt
-        # A failed call: not offered again this run.
-        assert "create_appointments" not in offered(llm.calls[2])
+        assert [c["name"] for c in gateway.calls] == [
+            "find_slots",
+            "create_appointments",
+        ]
+        assert "error" not in state["tool_calls"][1]
 
     @pytest.mark.asyncio
     async def test_the_time_they_confirmed_is_booked(self, run_booking):
@@ -836,29 +832,6 @@ class TestConfirmedTime:
             "create_appointments",
         ]
         assert gateway.calls[1]["input"] == {"slot": THU_11}
-
-    @pytest.mark.asyncio
-    async def test_tomorrow_at_4_pm_is_worked_out_from_today(self, run_booking):
-        # Today is Saturday 14 Nov: tomorrow is Sunday 15 Nov.
-        gateway = FakeGateway(
-            found(
-                (MON_16, "Mon 16 Nov 2026, 16:00"),
-                (SUN_16, "Sun 15 Nov 2026, 16:00"),
-            ),
-            BOOKED,
-        )
-        llm = FakeLLM(
-            find(),
-            create(MON_16),
-            reply("clarify", "Did you mean Sunday 15 Nov at 4 pm?"),
-        )
-        with patch(f"{CONVERSATION}.generate_structured", llm):
-            state = await run_booking(
-                "book me tomorrow at 4 pm please, yes", history=[], gateway=gateway
-            )
-        # Monday is refused without a call; the create is then not offered again.
-        assert [c["name"] for c in gateway.calls] == ["find_slots"]
-        assert state["tool_calls"][1]["error"] == "unconfirmed_time"
 
     @pytest.mark.asyncio
     async def test_tomorrow_at_4_pm_books_sunday(self, run_booking):
@@ -900,18 +873,6 @@ class TestConfirmedTime:
             "find_slots",
             "create_appointments",
         ]
-
-    @pytest.mark.asyncio
-    async def test_no_time_named_is_not_booked(self, run_booking):
-        gateway = FakeGateway(found((THU_11, "Thu 19 Nov 2026, 11:00")), BOOKED)
-        llm = FakeLLM(
-            find(),
-            create(THU_11),
-            reply("clarify", "Which time on Thursday?"),
-        )
-        with patch(f"{CONVERSATION}.generate_structured", llm):
-            await run_booking("book me on Thursday", history=[], gateway=gateway)
-        assert [c["name"] for c in gateway.calls] == ["find_slots"]
 
     @pytest.mark.asyncio
     async def test_a_cancel_that_keeps_its_slot_needs_no_time(self, run_booking):
@@ -960,14 +921,45 @@ class TestNamedTimesAndDays:
 
         assert named_times(["book Thursday at 11:00"]) == {660}
         assert named_times(["tomorrow at 4 pm"]) == {960}
-        assert named_times(["at 4 please"]) == {240, 960}
+        # 6b: a bare 1 to 7 with no am or pm is the afternoon or evening.
+        assert named_times(["at 4 please"]) == {960}
         assert named_times(["around noon"]) == {720}
         assert named_times(["yes please"]) == set()
         # 8a: "around 1", "by 7", "4 o'clock"; never "for 2" (people).
-        assert named_times(["tomorrow around 1 for two of us"]) == {60, 780}
-        assert named_times(["by 7 please"]) == {420, 1140}
-        assert named_times(["4 o'clock"]) == {240, 960}
+        assert named_times(["tomorrow around 1 for two of us"]) == {780}
+        assert named_times(["by 7 please"]) == {1140}
+        assert named_times(["4 o'clock"]) == {960}
         assert named_times(["a table for 2 tomorrow"]) == set()
+
+    def test_a_bare_hour_from_1_to_7_is_the_afternoon(self):
+        from app.core.agent_runtime.tools.confirmed import named_times
+
+        # Clock times with no am or pm, written with a colon or a dot.
+        assert named_times(["at 4:30"]) == {990}
+        assert named_times(["4:30 works"]) == {990}
+        assert named_times(["at 4.30 please"]) == {990}
+        # Said which half, or a 24-hour time: as written.
+        assert named_times(["at 4 am"]) == {240}
+        assert named_times(["07:30"]) == {450}
+        assert named_times(["16:00"]) == {960}
+        # A bare 8 to 12 stays either way; a clock time from 8 is as written.
+        assert named_times(["at 9"]) == {540, 1260}
+        assert named_times(["11:00"]) == {660}
+        # A dotted number that isn't a time.
+        assert named_times(["Rs. 4.50 a strip"]) == set()
+
+    def test_the_morning_only_when_only_the_morning_time_exists(self):
+        from app.core.agent_runtime.tools.confirmed import (
+            morning_only_hours,
+            named_times,
+        )
+
+        early = [slot_record(SLOT_1, "Thu 19 Nov 2026, 07:00")]
+        both = [*early, slot_record(MON_10, "Thu 19 Nov 2026, 19:00")]
+        assert morning_only_hours(early) == {7}
+        assert morning_only_hours(both) == set()
+        assert named_times(["at 7"], morning_only_hours(early)) == {420, 1140}
+        assert named_times(["at 7"], morning_only_hours(both)) == {1140}
 
     def test_a_plain_yes_confirms_the_one_time_it_answers(self):
         from app.core.agent_runtime.tools.confirmed import confirmed_texts
@@ -997,16 +989,46 @@ class TestNamedTimesAndDays:
         assert named_days(["Saturday"], today) == {(14, 11)}
         assert named_days(["at 11"], today) is None
 
-    def test_only_the_persons_last_two_messages(self):
+    def test_only_the_persons_last_four_messages(self):
         from app.core.agent_runtime.tools.confirmed import person_messages
 
         history = [
             {"role": "user", "content": "first"},
             {"role": "assistant", "content": "11:00 is free"},
             {"role": "user", "content": "second"},
+            {"role": "assistant", "content": "anything else?"},
+            {"role": "user", "content": "third"},
+            {"role": "assistant", "content": "sure"},
+            {"role": "user", "content": "fourth"},
         ]
-        assert person_messages(history, "third") == ["second", "third"]
-        assert person_messages(history, "second") == ["first", "second"]
+        assert person_messages(history, "fifth") == [
+            "second",
+            "third",
+            "fourth",
+            "fifth",
+        ]
+        assert person_messages(history, "fourth") == [
+            "first",
+            "second",
+            "third",
+            "fourth",
+        ]
+
+    def test_a_time_confirmed_three_turns_back_still_books(self):
+        from app.core.agent_runtime.tools.confirmed import confirmed_texts, unconfirmed
+
+        history = [
+            {"role": "user", "content": "Can I book Thursday at 11:00?"},
+            {"role": "assistant", "content": "Thursday 11:00 is free."},
+            {"role": "user", "content": "Do you take insurance?"},
+            {"role": "assistant", "content": "We don't."},
+            {"role": "user", "content": "And is there parking?"},
+            {"role": "assistant", "content": "Yes, behind the building."},
+        ]
+        said = confirmed_texts(history, "ok, book it")
+        props = {"slot": {"type": "string", "relation": "slots", "dated": "datetime"}}
+        passages = [slot_record(SLOT_1, "Thu 19 Nov 2026, 11:00")]
+        assert unconfirmed(props, {"slot": SLOT_1}, passages, said, TODAY) is None
 
 
 # Site visits and Bookings as ally-be marks them (chunk 5b §9): a visit's own time,
@@ -1103,3 +1125,374 @@ class TestTheTimeCheckFromTheDefinition:
             )
             is None
         )
+
+
+class TestOneRetryAfterInvalidValue:
+    """Chunk 6b, item 6: a shortened id (`invalid_value`) gets one more try; every
+    other failure, and a second one, still stops the tool for the run."""
+
+    def _failed(self, *calls):
+        from app.core.agent_runtime.nodes.agent import failed_tools
+
+        return failed_tools({"tool_calls": list(calls)})
+
+    def call(self, tool, error=None):
+        return {"tool": tool, "kind": "gateway", "ok": error is None, "error": error}
+
+    def test_one_invalid_value_stays_offered(self):
+        assert self._failed(self.call("create_appointments", "invalid_value")) == set()
+
+    def test_a_second_failure_stops_it(self):
+        assert self._failed(
+            self.call("create_appointments", "invalid_value"),
+            self.call("create_appointments", "invalid_value"),
+        ) == {"create_appointments"}
+
+    def test_any_other_failure_stops_it(self):
+        for error in ("unique_taken", "unconfirmed_time", "not_found"):
+            assert self._failed(self.call("create_appointments", error)) == {
+                "create_appointments"
+            }
+
+    def test_successes_and_searches_dont_count(self):
+        assert (
+            self._failed(
+                self.call("find_slots"), {"tool": "search_knowledge", "ok": False}
+            )
+            == set()
+        )
+
+
+class TestNothingAtTheTimeAsked:
+    """Chunk 6b, item 1: "Thursday evening" on a list whose Thursday ends at 16:00.
+    An empty find is an answer, not a missing source."""
+
+    LATEST = slot_record(SLOT_1, "Thu 19 Nov 2026, 16:00")
+
+    def _check(self, answer, citations=(), passages=(), **kw):
+        step = reply("answer", answer, citations=list(citations))
+        return check_reply(
+            step,
+            {},
+            list(passages),
+            turn_type="question",
+            language="en",
+            retrieval=TestTheCheck.RETRIEVAL,
+            general=False,
+            search_gate=None,
+            question="anything free on Thursday evening?",
+            searched=False,
+            organisation=Organisation(terms=("Lakeview Clinic",)),
+            history=(),
+            can_book=True,
+            **kw,
+        )
+
+    def test_nothing_free_after_an_empty_find_is_an_answer(self):
+        result, rejection = self._check(
+            "Nothing's free on Thursday evening.",
+            looked_up=True,
+            found_nothing=True,
+        )
+        assert rejection is None
+        assert result["intent"] == "answer"
+        assert result["answer"] == "Nothing's free on Thursday evening."
+
+    def test_i_dont_have_any_after_an_empty_find_is_not_a_decline(self):
+        result, rejection = self._check(
+            "I don't have any free times on Thursday evening.",
+            looked_up=True,
+            found_nothing=True,
+        )
+        assert rejection is None and result["intent"] == "answer"
+
+    def test_the_latest_time_is_cited_from_the_nearest_record(self):
+        result, rejection = self._check(
+            "Nothing's free on Thursday evening. The latest is 16:00.",
+            passages=[self.LATEST],
+            looked_up=True,
+            found_nothing=True,
+        )
+        assert rejection is None
+        assert [c.get("record_id") for c in result["citations"]] == [SLOT_1]
+        assert "16:00" in result["answer"]
+
+    def test_a_number_no_record_shows_still_needs_a_source(self):
+        result, rejection = self._check(
+            "Nothing's free on Thursday evening; call 98200 11223.",
+            looked_up=True,
+            found_nothing=True,
+        )
+        assert result["intent"] == "decline"
+
+    def test_without_an_empty_find_it_is_still_a_decline(self):
+        result, rejection = self._check("Nothing's free on Thursday evening.")
+        assert result["intent"] == "decline"
+        assert rejection == Rejection.UNCITED
+
+    def test_a_find_counts_as_having_looked(self):
+        step = reply("decline", "I'm not sure about Lakeview Clinic's times.")
+        _, rejection = check_reply(
+            step,
+            {},
+            [],
+            turn_type="question",
+            language="en",
+            retrieval=TestTheCheck.RETRIEVAL,
+            general=False,
+            search_gate=None,
+            question="when is Lakeview Clinic free?",
+            searched=False,
+            organisation=Organisation(terms=("Lakeview Clinic",)),
+            history=(),
+            can_book=True,
+            looked_up=True,
+        )
+        assert rejection != Rejection.SEARCH_FIRST
+
+
+class TestCarriedRecords:
+    """Chunk 6b, item 3: "yes, book it" books the slot the previous message showed,
+    without a find first (one model step fewer). ally-be still checks every rule."""
+
+    @pytest.mark.asyncio
+    async def test_a_confirmation_books_the_slot_found_a_message_before(self, graph):
+        gateway = FakeGateway(found((THU_11, "Thu 19 Nov 2026, 11:00")), BOOKED)
+        llm = FakeLLM(
+            find(starts_at_from="2026-11-19T11:00:00+05:30"),
+            reply(
+                "clarify", "Thursday 19 Nov at 11:00 is free. Book it?", citations=[1]
+            ),
+            # Second message: books straight from the carried slot.
+            create(THU_11),
+            reply("answer", "Booked: Thursday 19 Nov at 11:00.", citations=[2]),
+        )
+        args = dict(
+            conversation_id="conv-carry",
+            chatbot_id="bot-1",
+            bot=booking_bot(),
+            gateway=gateway,
+        )
+        with patch(f"{CONVERSATION}.generate_structured", llm):
+            await run_agent(
+                graph,
+                run_id="run-c1",
+                question="can I book Thursday at 11:00?",
+                history=[],
+                **args,
+            )
+            state = await run_agent(
+                graph,
+                run_id="run-c2",
+                question="yes, please book it",
+                history=ASKED_11,
+                **args,
+            )
+        assert [c["name"] for c in gateway.calls] == [
+            "find_slots",
+            "create_appointments",
+        ]
+        assert state["result"]["intent"] == "answer"
+        assert state["passages"][0]["record_id"] == THU_11
+
+    @pytest.mark.asyncio
+    async def test_thanks_after_a_booking_is_not_sent_back(self, graph):
+        gateway = FakeGateway(found((THU_11, "Thu 19 Nov 2026, 11:00")))
+        llm = FakeLLM(
+            find(starts_at_from="2026-11-19T11:00:00+05:30"),
+            reply(
+                "clarify", "Thursday 19 Nov at 11:00 is free. Book it?", citations=[1]
+            ),
+            reply("smalltalk", "You're welcome!", turn_type="smalltalk"),
+        )
+        args = dict(
+            conversation_id="conv-thanks",
+            chatbot_id="bot-1",
+            bot=booking_bot(),
+            gateway=gateway,
+        )
+        with patch(f"{CONVERSATION}.generate_structured", llm):
+            await run_agent(
+                graph, run_id="run-t1", question="thursday 11?", history=[], **args
+            )
+            state = await run_agent(
+                graph, run_id="run-t2", question="thanks", history=[], **args
+            )
+        assert state["result"]["answer"] == "You're welcome!"
+        assert len(llm.calls) == 3
+
+
+@pytest.mark.asyncio
+async def test_a_new_question_never_carries_the_previous_entries(graph):
+    """Chunk 6b: only a plain yes carries the slot over; "can I book Thursday at
+    11:00?" looks it up afresh and asks before booking."""
+    gateway = FakeGateway(
+        found((THU_11, "Thu 19 Nov 2026, 11:00")),
+        found((THU_11, "Thu 19 Nov 2026, 11:00")),
+    )
+    llm = FakeLLM(
+        find(starts_at_from="2026-11-19T11:00:00+05:30"),
+        reply("answer", "Thursday 19 Nov at 11:00 is free.", citations=[1]),
+        find(starts_at_from="2026-11-19T11:00:00+05:30"),
+        reply("clarify", "Shall I book Thursday 19 Nov at 11:00?", citations=[1]),
+    )
+    args = dict(
+        conversation_id="conv-q", chatbot_id="bot-1", bot=booking_bot(), gateway=gateway
+    )
+    with patch(f"{CONVERSATION}.generate_structured", llm):
+        await run_agent(
+            graph, run_id="run-q1", question="what's free thursday?", history=[], **args
+        )
+        state = await run_agent(
+            graph,
+            run_id="run-q2",
+            question="can I book Thursday at 11:00?",
+            history=[],
+            **args,
+        )
+    assert not state.get("carried_records")
+    assert len(state["passages"]) == 1
+
+
+def test_a_find_that_returned_the_nearest_is_not_offered_again():
+    """Chunk 6b, item 3: "Thursday evening" looked again after the nearest came
+    back, and ran past the cap."""
+    from app.core.agent_runtime.nodes.agent import answered_finds
+
+    calls = [
+        {"tool": "find_slots", "list_kind": "find", "ok": True, "nearest": True},
+        {"tool": "find_appointments", "list_kind": "find", "ok": True},
+    ]
+    assert answered_finds({"tool_calls": calls}) == {"find_slots"}
+    assert answered_finds({"tool_calls": calls[1:]}) == set()
+
+
+class TestARefusalReachesThePersonInWords:
+    """Q3-fast Part 0b (17 Nov F3, F4): the list's rules refused this run's booking.
+    The reply relaying it is an answer, never the fixed decline, and never counts
+    toward an automatic hand-over."""
+
+    LIMIT = "You already have 2 Reservations. Cancel one to book another."
+    TAKEN = "That table is already booked at that time."
+
+    def _check(self, intent, answer, **kw):
+        step = reply(intent, answer, citations=[])
+        return check_reply(
+            step,
+            {},
+            [],
+            turn_type="question",
+            language="en",
+            retrieval=TestTheCheck.RETRIEVAL,
+            general=False,
+            search_gate=None,
+            question="book T1 for 2 on Thu 26 Nov at 12 noon",
+            searched=False,
+            organisation=Organisation(terms=("Bombay Canteen",)),
+            history=(
+                {"role": "user", "content": "book T1 on Wed 25 Nov at 11 and 14:00"},
+            ),
+            can_book=True,
+            looked_up=True,
+            **kw,
+        )
+
+    def test_the_limit_relayed_is_an_answer(self):
+        result, rejection = self._check(
+            "answer",
+            "You already have 2 bookings, so I can't add a third. "
+            "Cancel one to book another.",
+            refused=(self.LIMIT,),
+        )
+        assert rejection is None
+        assert result["intent"] == "answer"
+        assert "already have 2" in result["answer"]
+
+    def test_a_model_decline_relaying_the_limit_is_an_answer_too(self):
+        result, rejection = self._check(
+            "decline",
+            "I can't add a third reservation: you already have two "
+            "(Wed 25 Nov 11:00 and 14:00).",
+            refused=(self.LIMIT,),
+        )
+        assert rejection is None
+        assert result["intent"] == "answer"
+
+    def test_a_taken_table_relayed_is_an_answer(self):
+        result, rejection = self._check(
+            "answer",
+            "Sorry, that table is already booked at that time.",
+            refused=(self.TAKEN,),
+        )
+        assert rejection is None and result["intent"] == "answer"
+
+    def test_a_number_the_run_never_saw_still_needs_a_source(self):
+        result, _ = self._check(
+            "answer",
+            "That table is booked; call 98200 11223 to join the waitlist.",
+            refused=(self.TAKEN,),
+        )
+        assert result["intent"] == "decline"
+
+    def test_without_a_refusal_an_uncited_answer_is_still_declined(self):
+        result, _ = self._check("answer", "You already have 2 bookings.")
+        assert result["intent"] == "decline"
+
+
+class TestPickingIsNotAYes:
+    """Q3-fast Part 0b (17 Nov F1): choosing between offers isn't a yes. A create
+    that books a dated entry waits for the person to say yes to it."""
+
+    PROPS = {"slot": {"relation": "slots", "dated": "datetime"}}
+    PASSAGES = [slot_passage(SLOT_1, "Thu 19 Nov 2026, 11:00")]
+
+    @pytest.mark.parametrize(
+        "latest",
+        [
+            "yes",
+            "yes please, book it",
+            "Yes please, book T2 for 3 people. The name is Priya Sharma.",
+            "Please book table T1 for 2 on Wednesday 25 Nov at 11 am",
+            "go ahead",
+            "haan book kar do",
+        ],
+    )
+    def test_a_yes_or_a_booking_instruction_books(self, latest):
+        from app.core.agent_runtime.tools.confirmed import said_yes, unconsented
+
+        assert said_yes(latest)
+        assert unconsented(self.PROPS, {"slot": SLOT_1}, self.PASSAGES, latest) is None
+
+    @pytest.mark.parametrize(
+        "latest",
+        [
+            "T3 please",
+            "the window one sounds nice",
+            "Table 1",
+            "Can I book Friday 20 Nov at 12:00?",
+        ],
+    )
+    def test_a_pick_or_a_question_is_asked_first(self, latest):
+        from app.core.agent_runtime.tools.confirmed import unconsented
+
+        why = unconsented(self.PROPS, {"slot": SLOT_1}, self.PASSAGES, latest)
+        assert why is not None
+        assert "Shall I book Thu 19 Nov 2026, 11:00" in why
+
+    def test_a_list_with_nothing_dated_is_never_held(self):
+        from app.core.agent_runtime.tools.confirmed import unconsented
+
+        props = {"phone": {"type": "string"}}
+        assert (
+            unconsented(props, {"phone": "9000000001"}, [], "Asha, 9000000001") is None
+        )
+
+
+def test_a_day_written_in_numbers_is_a_named_day():
+    """Q3-fast Part 0b (17 Nov C21): "21/11" and "21-11-2026" are 21 November."""
+    from app.core.agent_runtime.tools.confirmed import named_days
+
+    assert named_days(["any table on 21/11 at 8 pm?"], None) == {(21, 11)}
+    assert named_days(["book 21-11-2026 at 20:00"], None) == {(21, 11)}
+    # A phone number or a time is not a date.
+    assert named_days(["call 22-68493328 at 11.30"], None) is None

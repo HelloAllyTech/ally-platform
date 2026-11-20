@@ -1,7 +1,9 @@
+import { LimitsService } from 'src/billing/service/limits.service';
 import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { ExecutionManager } from '../../common/execution/execution-manager';
@@ -59,12 +61,20 @@ export class ChangeService {
     private readonly ai: AiService,
     private readonly access: ChatbotAccessService,
     private readonly checkup: CheckupService,
+    // CR1: owner-side runs and tokens (optional, so existing specs build without it).
+    @Optional() private readonly limits?: LimitsService,
   ) {}
 
   async propose(chatbotId: string, request: string): Promise<Proposal> {
     const { chatbot } = await this.access.assert(
       chatbotId,
       ChatbotMemberRole.EDITOR,
+    );
+    // CR1: change by chat is an owner-side run on the creator's plan.
+    await this.limits?.assertOwnerRun(
+      chatbot.createdBy,
+      `change_by_chat:${chatbotId}:${randomUUID()}`,
+      'change_by_chat',
     );
     const view = await this.home.get(chatbotId);
     const f = view.fields as Record<string, { value: unknown }>;

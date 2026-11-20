@@ -47,4 +47,14 @@ module.exports = defineConfig([{
         "@typescript-eslint/no-require-imports": "off",
         "@typescript-eslint/no-empty-object-type": "off",
     },
+}, {
+    // One-off scripts sit outside tsconfig's project (its include MUST stay src/), so parse them
+    // without type information. No rule configured above needs types, so none is turned off.
+    files: ["scripts/**/*.ts"],
+
+    languageOptions: {
+        parserOptions: {
+            project: null,
+        },
+    },
 }, globalIgnores(["**/.eslintrc.js"])]);

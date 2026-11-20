@@ -5,7 +5,6 @@ import { AUDIT_EVENTS } from 'src/audit/constants/audit-event.constants';
 import { AdminFeatureToggleRepository } from '../repository/admin-feature-toggle.repository';
 import {
   DEFAULT_ENABLED_FEATURE_TOGGLE_KEYS,
-  DEFAULT_KEYS_WITHHELD_FROM_RESTRICTED,
   FEATURE_TOGGLES,
   FeatureToggleKey,
   isOrgScopedRoutesOnlyToggle,
@@ -72,24 +71,6 @@ export class FeatureToggleService {
       return stored;
     }
     return stored.filter((key) => !isPlatformOnlyToggle(key));
-  }
-
-  /**
-   * The caller's own toggle list, as the console reads it: getEnabledKeys,
-   * minus the default-on keys an org-restricted admin may not use
-   * (DEFAULT_KEYS_WITHHELD_FROM_RESTRICTED). Only this read pays the
-   * restriction lookup for them — once per page load, not per request.
-   */
-  async getVisibleKeys(userId: number): Promise<string[]> {
-    const keys = await this.getEnabledKeys(userId);
-    const withheld = keys.filter((key) =>
-      (DEFAULT_KEYS_WITHHELD_FROM_RESTRICTED as readonly string[]).includes(
-        key,
-      ),
-    );
-    if (!withheld.length) return keys;
-    if (!(await this.tenantScopeService.isRestricted(userId))) return keys;
-    return keys.filter((key) => !withheld.includes(key));
   }
 
   /** Whether this user is restricted to an organization allowlist. */
@@ -212,6 +193,17 @@ export class FeatureToggleService {
       platformOnly: definition.platformOnly === true,
       orgScopedRoutesOnly: definition.orgScopedRoutesOnly === true,
     }));
+  }
+
+  /**
+   * Ids of users holding an enabled ROW for this key. Rows only: a
+   * defaultEnabled key's implicit holders are not listed, so call this for
+   * keys that are granted per person (the Roadmap v2 role preview reads the
+   * Builder and Manage holders this way).
+   */
+  async listEnabledHolderIds(featureKey: string): Promise<number[]> {
+    const rows = await this.toggleRepository.findEnabledUserIds(featureKey);
+    return [...new Set(rows.map((row) => row.userId))];
   }
 
   async countEnabledHolders(featureKey: string): Promise<number> {

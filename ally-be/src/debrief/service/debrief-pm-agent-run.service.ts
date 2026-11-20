@@ -13,14 +13,15 @@ import { scheduledTaskRegistry } from '../../scheduler/registry/scheduled-task.r
 import { pmAgentAutonomy } from '../constants/debrief-owner-settings.constants';
 import { DebriefAutonomyService } from './debrief-autonomy.service';
 import {
-  DEBRIEF_AGENT_KEY,
   DEBRIEF_MODELS,
   DEBRIEF_ORCHESTRATOR_PROMPT_CODES,
+  DEBRIEF_PM_AGENT_PROMPT_CODES,
   DEBRIEF_PROMPT_CODES,
   DebriefRecipeKey,
   PM_AGENT_EDITABLE_PROMPTS,
   PM_AGENT_SETTINGS,
 } from '../constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
 import { modelPrices } from '../util/debrief-budget.util';
 import {
   PM_AGENT_GATEWAY_TOOLS,
@@ -54,10 +55,30 @@ export const ANSWER_RUN_TOOLS = [
   'reporting_query',
   'comments_read',
   'metrics_view',
+  'guidance_report',
 ] as const;
 
 /** A run is minutes; past this ally-be stops waiting (the token lives 2 h). */
 export const PM_AGENT_RUN_TIMEOUT_MS = 45 * 60 * 1000;
+
+/**
+ * The PM agent's own live texts (its subagents and skills), by code; a code
+ * the store cannot answer is left out and ally-ai uses its default.
+ */
+export async function pmAgentPrompts(context: {
+  promptText(code: string, version: number | null): Promise<string | null>;
+}): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  for (const code of DEBRIEF_PM_AGENT_PROMPT_CODES) {
+    try {
+      const text = await context.promptText(code, null);
+      if (text) out[code] = text;
+    } catch {
+      // ally-ai falls back to its default for this one.
+    }
+  }
+  return out;
+}
 
 /** `POST /api/v1/pm-agent/runs` (CONTRACT.md §7). */
 export interface PmAgentRunResponse {
@@ -88,7 +109,7 @@ export function pmRunSummary(o: PmAgentRunOutcome): string {
   const n = o.ideas.length;
   const cost = o.costUsd != null ? `, $${o.costUsd.toFixed(2)}` : '';
   const spent = o.status === 'budget_spent' ? ' (budget spent)' : '';
-  return `PM agent: ${n} idea${n === 1 ? '' : 's'}${cost}${spent}`;
+  return `Debrief PM agent: ${n} idea${n === 1 ? '' : 's'}${cost}${spent}`;
 }
 
 /**
@@ -139,7 +160,7 @@ export class DebriefPmAgentRunService implements OnModuleInit {
   /** The Console's "Run now": starts a run and answers at once; the report lands when it finishes. */
   async start(actorUserId: number): Promise<PmAgentRunOutcome> {
     if (this.running)
-      throw new ConflictException('the PM agent is already running');
+      throw new ConflictException('the Debrief PM agent is already running');
     const pre = await this.precheck();
     if (pre) return { report: null, ideas: [], skipped: pre };
     void this.run({ review: 'weekly', actorUserId }).catch((e) =>
@@ -151,7 +172,7 @@ export class DebriefPmAgentRunService implements OnModuleInit {
   private async precheck(): Promise<string | null> {
     const settings = await this.ownerSettings.get();
     if (pmAgentAutonomy(settings) === 'off')
-      return 'the PM agent is switched off';
+      return 'the Debrief PM agent is switched off';
     const spent = await this.pm.learningSpentThisMonth();
     if (spent >= (await this.pm.learningBudgetThisMonth())) {
       return 'learning budget spent';
@@ -254,6 +275,7 @@ export class DebriefPmAgentRunService implements OnModuleInit {
         DEBRIEF_PROMPT_CODES.pmAgent,
         null,
       ),
+      prompts: await pmAgentPrompts(this.context),
       inputs: { open_questions: questions, ideas },
       tools: [...ANSWER_RUN_TOOLS],
       agent_token: this.tokens.signAgent(agentRunId, ANSWER_RUN_TOOLS),
@@ -325,6 +347,7 @@ export class DebriefPmAgentRunService implements OnModuleInit {
         DEBRIEF_PROMPT_CODES.pmAgent,
         null,
       ),
+      prompts: await pmAgentPrompts(this.context),
       inputs,
       tools: [...WEEKLY_RUN_TOOLS],
       agent_token: this.tokens.signAgent(agentRunId, WEEKLY_RUN_TOOLS),

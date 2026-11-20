@@ -9,11 +9,6 @@ export const HOW = {
   byAlly: "Set by Ally",
   showText: "Show exact text",
   hideText: "Hide exact text",
-  showFull: "Show the full instructions",
-  hideFull: "Hide the full instructions",
-  fullHint:
-    "This is the whole text your assistant gets, with your parts highlighted. Where it says {question}, it gets the visitor's message; the parts of your pages it finds go in for each question.",
-  editHere: "Edit",
   editIn: "Edit in {section}",
   counter: "{n} of {max} characters",
   warning:
@@ -56,9 +51,31 @@ export const HOW = {
         "Searches your pages up to {searches} times a question and uses the best {passages} parts it finds, from {documents} documents.",
     },
   },
+  /** What it can do with each list, under How it finds answers: "Leads: look up, add and change entries." */
+  tools: {
+    line: "{list}: {can} entries.",
+    find: "look up",
+    create: "add",
+    update: "change",
+  },
+  // Q3-fast Part 2b: one plain sentence per list's playbook.
+  playbooks: {
+    booking:
+      "Because you added {list}, your assistant finds free times, confirms the exact time and books it.",
+    details:
+      "Because you added {list}, your assistant offers to take people's details when it can't fully answer, and saves them once they share them.",
+    orders:
+      "Because you added {list}, your assistant looks up only the person's own entries and explains what their status means.",
+    reference:
+      "Because you added {list}, your assistant quotes it exactly as listed and never invents availability.",
+  },
   packAny: "your kind of practice",
   purposeNone: "answering questions",
   instructionsLabel: "Anything else it should know or do",
+  /** Where the business is (chunk 6b, copy §30). */
+  timeZone: "Time zone",
+  timeZoneHint:
+    "Where your business is. Your lists' times, what your assistant calls today, and Repeat weekly use it.",
 } as const;
 
 export const WHY = {

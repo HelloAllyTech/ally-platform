@@ -3,22 +3,21 @@ import {
   istDay,
   retryPending,
   withPractiseNextFallback,
+  withoutPractice,
 } from '../service/debrief-agent.service';
 import { keepOfferedPractice } from '../util/debrief-cards.util';
 import { DebriefPracticeService } from '../service/debrief-practice.service';
 import { DebriefRunMode, DebriefRunStatus } from '../enum/debrief-run.enum';
-import { DEBRIEF_FALLBACK_TO_TODAY_EVENT } from '../util/debrief-live.util';
 import {
   modelTier,
   substituteModel,
 } from '../util/debrief-provider-allowlist.util';
-import { todaysDebriefProvider } from '../util/debrief-todays-provider.util';
 import { DEBRIEF_MODELS } from '../constants/debrief-release.constants';
 
 /**
  * Gopi, 2026-11-16: "as much as possible the learner should get the
  * debrief; in the worst case fall back to the old debrief". What happens
- * after a run returns: a retry, today's debrief, the owner told about the cap.
+ * after a run returns: a retry, the owner told about the cap.
  */
 function agent(opts: {
   /** What the retry claim answers (rows claimed). */
@@ -34,7 +33,6 @@ function agent(opts: {
       if (q.includes("'{retries}'")) return opts.claim ? [{ id: 'r1' }] : [];
       if (q.includes('overCapNotice'))
         return opts.noticeTaken ? [] : [{ id: 'r1' }];
-      if (q.includes('fallbackToToday')) return [{ id: 'r1' }];
       return [];
     }),
   };
@@ -63,7 +61,6 @@ function agent(opts: {
     post: jest.fn(async () => true),
     missedRiskCue: jest.fn(async () => false),
   };
-  const events = { emit: jest.fn() };
   const svc = new DebriefAgentService(
     dataSource as any,
     runs as any,
@@ -79,13 +76,11 @@ function agent(opts: {
     undefined,
     undefined,
     slack as any,
-    events as any,
   );
+  // The old note is retired: no sweep marks a run or asks for it.
   const askedForToday = () =>
-    events.emit.mock.calls.filter(
-      ([name]) => name === DEBRIEF_FALLBACK_TO_TODAY_EVENT,
-    ).length;
-  return { svc, runner, notifier, slack, events, askedForToday, sql };
+    sql.filter((q) => q.includes('fallbackToToday')).length;
+  return { svc, runner, notifier, slack, askedForToday, sql };
 }
 
 const noDraft = (o: Record<string, unknown> = {}) =>
@@ -118,7 +113,7 @@ describe('after a live run returns', () => {
     expect(askedForToday()).toBe(0);
   });
 
-  it('sends the learner to today’s debrief when the retry has no draft either', async () => {
+  it('leaves the learner at "not available" when the retry has no draft either: nothing is regenerated', async () => {
     const { svc, runner, askedForToday } = agent({
       claim: true,
       retried: {
@@ -130,11 +125,13 @@ describe('after a live run returns', () => {
     const out = await svc.afterRun(noDraft());
     // Retried once only: the retry's own retry count is spent.
     expect(runner.retry).toHaveBeenCalledTimes(1);
-    expect(out.workspace.fallbackToToday).toMatchObject({ outcome: 'today' });
-    expect(askedForToday()).toBe(1);
+    expect(out.workspace.fallbackToToday).toBeUndefined();
+    expect(askedForToday()).toBe(0);
+    expect((svc as any).fallBackToToday).toBeUndefined();
+    expect((svc as any).fallBackSweep).toBeUndefined();
   });
 
-  it('a run whose provider has no model goes straight to today’s debrief', async () => {
+  it('a run whose provider has no model is not retried and nothing is regenerated', async () => {
     const { svc, runner, askedForToday } = agent({});
     await svc.afterRun(
       noDraft({
@@ -143,23 +140,7 @@ describe('after a live run returns', () => {
       }),
     );
     expect(runner.retry).not.toHaveBeenCalled();
-    expect(askedForToday()).toBe(1);
-  });
-
-  it('never sends a provider-restricted learner to today’s debrief on a provider the organisation does not allow (FR-57)', async () => {
-    expect(todaysDebriefProvider()).toBe('openai');
-    const { svc, askedForToday } = agent({
-      providers: { 'providerAllowed.openai': false },
-    });
-    const run = noDraft({
-      status: DebriefRunStatus.SKIPPED,
-      skipReason: 'provider_not_allowed',
-    });
-    await svc.afterRun(run);
     expect(askedForToday()).toBe(0);
-    expect(run.workspace.fallbackToToday).toMatchObject({
-      outcome: 'not_available',
-    });
   });
 
   it('a too-short session is not a missing debrief', async () => {
@@ -253,18 +234,9 @@ describe('Practise this again inside a course (clinical review 2026-11-16)', () 
     { id: 3, title: 'This one', course: 'Basics', track_item_id: 'i3' },
   ];
 
-  it('offers only this same roleplay, as its course item; never another roleplay', async () => {
+  it('offers nothing inside a course: the course decides what comes next', async () => {
     const { svc, scenarios } = practice(thisOne);
-    expect(await svc.optionsFor(7, 't1', 's1')).toEqual([
-      {
-        id: 3,
-        title: 'This one',
-        skills: [],
-        course: 'Basics',
-        this_roleplay: true,
-        trackItemId: 'i3',
-      },
-    ]);
+    expect(await svc.optionsFor(7, 't1', 's1')).toEqual([]);
     expect(scenarios.getScenariosV2).not.toHaveBeenCalled();
   });
 
@@ -282,12 +254,27 @@ describe('Practise this again inside a course (clinical review 2026-11-16)', () 
     ]);
   });
 
-  it('shows a practise button only for this same course item', async () => {
+  it('shows no practise button inside a course, not even for this same roleplay', async () => {
     const { svc } = practice(thisOne);
-    expect(await svc.available(7, 't1', [3, 4, 99], 's1')).toEqual([
-      { id: 3, title: 'This one', trackItemId: 'i3' },
-    ]);
-    expect(await svc.available(7, 't1', [4, 99], 's1')).toEqual([]);
+    expect(await svc.available(7, 't1', [3, 4, 99], 's1')).toEqual([]);
+  });
+
+  it('strips the practise card and every roleplay link from a course debrief', () => {
+    const cards = {
+      opening: 'Hi',
+      practise_next: {
+        skill: 'Empathy',
+        reason: 'r',
+        scenario_id: 3,
+        try_next: ['a'],
+      },
+      work_on_this: [{ point: 'p', scenario_id: 3 }],
+    };
+    const out = withoutPractice(cards) as any;
+    expect(out.practise_next).toBeUndefined();
+    expect(out.work_on_this).toEqual([{ point: 'p', scenario_id: null }]);
+    expect(out.opening).toBe('Hi');
+    expect(withoutPractice(null)).toBeNull();
   });
 });
 
@@ -401,6 +388,7 @@ describe('"Practise this next" never loses its button', () => {
       ]),
     };
     const practice = {
+      inCourse: jest.fn(async () => false),
       available: jest.fn(async (_u: number, _t: string, ids: number[]) =>
         ids.includes(3)
           ? [{ id: 3, title: 'This one', trackItemId: 'i3' }]

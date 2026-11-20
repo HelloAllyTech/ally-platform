@@ -14,6 +14,9 @@ vi.mock("@api", () => ({
 import * as api from "@api";
 import { ScenarioLanguages } from "../LanguageManagement";
 
+// The readiness strip has its own tests (it needs a router and more endpoints).
+vi.mock("../LanguageReadiness", () => ({ LanguageReadiness: () => null }));
+
 // Mock components
 vi.mock("@components", () => ({
   NotionTable: ({ tableData, onRowClick }: any) => (

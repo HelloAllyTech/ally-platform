@@ -1,3 +1,4 @@
+import { BillingModule } from './billing/billing.module';
 import { Module, MiddlewareConsumer, RequestMethod } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
@@ -20,8 +21,8 @@ import { NotificationModule } from './notification/notification.module';
 import { RateLimitModule } from './rate-limit/rate-limit.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { AnalyticsAgentModule } from './analytics-agent/analytics-agent.module';
+import { PmAgentModule } from './pm-agent/pm-agent.module';
 import { BugHunterApprovalsModule } from './bug-hunter-approvals/bug-hunter-approvals.module';
-import { AnalyticsSuggestionsModule } from './analytics-suggestions/analytics-suggestions.module';
 import { BugHunterModule } from './bug-hunter/bug-hunter.module';
 import { BuilderModule } from './builder/builder.module';
 import { ContextLibraryModule } from './context-library/context-library.module';
@@ -113,8 +114,8 @@ import { DebriefFeedbackModule } from './debrief-feedback/debrief-feedback.modul
     RateLimitModule,
     AnalyticsModule,
     AnalyticsAgentModule,
+    PmAgentModule,
     BugHunterApprovalsModule,
-    AnalyticsSuggestionsModule,
     BugHunterModule,
     BuilderModule,
     ContextLibraryModule,
@@ -158,6 +159,7 @@ import { DebriefFeedbackModule } from './debrief-feedback/debrief-feedback.modul
     BotDraftModule,
     ScenarioReportModule,
     SchedulerModule,
+    BillingModule,
     AppVersionModule,
     VoicePreviewModule,
     LlmPreviewModule,

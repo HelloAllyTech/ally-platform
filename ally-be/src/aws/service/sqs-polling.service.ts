@@ -19,7 +19,20 @@ interface QueuePoller {
 export class SqsPollingService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = LoggerService.getInstance(SqsPollingService.name);
   private queuePollers: Map<string, QueuePoller> = new Map();
-  private readonly defaultPollInterval = 5000; // 5 seconds between polling cycles
+  /** The wait after a failed receive; a successful receive polls again at once (long polling already waited). */
+  private readonly defaultPollInterval = 5000;
+  /**
+   * Independent receive loops per queue. One loop took 10 messages, waited for the slowest and slept,
+   * so one slow message held up every message behind it: the chat-turn writes of a roleplay waited up
+   * to ~4 minutes in busy hours. Several loops mean a slow batch blocks only itself.
+   * `SQS_POLLER_CONCURRENCY` overrides it (1 restores the old single loop).
+   */
+  private readonly pollerConcurrency = Math.max(
+    1,
+    Math.min(10, Math.floor(Number(process.env.SQS_POLLER_CONCURRENCY)) || 3),
+  );
+  /** An empty receive that returns faster than this was not a real long poll: wait before asking again. */
+  private readonly minEmptyPollMs = 1000;
 
   constructor(
     private readonly sqsService: SqsService,
@@ -121,26 +134,41 @@ export class SqsPollingService implements OnModuleInit, OnModuleDestroy {
     this.logger.debug(`Starting polling for queue: ${poller.queueUrl}`);
     poller.isPolling = true;
 
-    // Run polling in background
-    setImmediate(() => this.pollQueue(poller));
+    // Run polling in background: one independent loop per slot.
+    for (let i = 0; i < this.pollerConcurrency; i++) {
+      setImmediate(() => this.pollQueue(poller));
+    }
   }
 
   private async pollQueue(poller: QueuePoller): Promise<void> {
     while (poller.isPolling) {
+      const startedAt = Date.now();
+      let wait = 0;
       try {
-        await this.pollMessages(poller);
+        const outcome = await this.pollMessages(poller);
+        if (outcome === 'failed') wait = poller.pollInterval;
+        else if (
+          outcome === 'empty' &&
+          Date.now() - startedAt < this.minEmptyPollMs
+        ) {
+          wait = this.minEmptyPollMs;
+        }
       } catch (error) {
         this.logger.error(
           `Error during polling for queue ${poller.queueUrl} with error ${JSON.stringify(
             error,
           )}`,
         );
+        wait = poller.pollInterval;
       }
-      await new Promise((resolve) => setTimeout(resolve, poller.pollInterval));
+      // Messages received (or a real 20 s long poll that found none): ask again at once.
+      if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
     }
   }
 
-  private async pollMessages(poller: QueuePoller): Promise<void> {
+  private async pollMessages(
+    poller: QueuePoller,
+  ): Promise<'received' | 'empty' | 'failed'> {
     try {
       const messages = await this.sqsService.receiveMessage(poller.queueUrl);
 
@@ -153,13 +181,16 @@ export class SqsPollingService implements OnModuleInit, OnModuleDestroy {
         await Promise.all(
           messages.map((message) => this.processMessage(poller, message)),
         );
+        return 'received';
       }
+      return 'empty';
     } catch (error) {
       this.logger.error(
         `Error receiving messages from queue ${poller.queueUrl} with error ${JSON.stringify(
           error,
         )}`,
       );
+      return 'failed';
     }
   }
 

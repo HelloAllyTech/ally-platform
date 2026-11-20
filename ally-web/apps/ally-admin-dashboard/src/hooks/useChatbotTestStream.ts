@@ -14,6 +14,11 @@ export interface ChatbotTestStreamHandlers {
   onStep(step: AgentTraceStep): void;
   /** Reply text the check and the crisis check have both cleared. */
   onToken(text: string): void;
+  /**
+   * A live step (chunk 6b): what the assistant is doing, as a kind with a list's name or a record's
+   * title. Optional, so callers that don't show steps are unchanged.
+   */
+  onActivity?(activity: { kind: string; list?: string; title?: string }): void;
 }
 
 /**
@@ -32,6 +37,7 @@ type StreamEvent =
   | { type: "status"; data: ChatbotTestStatus }
   | { type: "step"; data: AgentTraceStep }
   | { type: "token"; data: { text: string } }
+  | { type: "activity"; data: { kind: string; list?: string; title?: string } }
   | { type: "final"; data: TestChatbotResponse }
   | { type: "error"; data: { code: string } };
 
@@ -88,6 +94,7 @@ export const useChatbotTestStream = () => {
           if (event.type === "status") handlers.onStatus(event.data);
           else if (event.type === "step") handlers.onStep(event.data);
           else if (event.type === "token") handlers.onToken(event.data.text);
+          else if (event.type === "activity") handlers.onActivity?.(event.data);
           return false;
         }));
       } catch (error) {

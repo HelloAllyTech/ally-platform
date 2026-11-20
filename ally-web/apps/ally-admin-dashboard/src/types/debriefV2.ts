@@ -63,22 +63,8 @@ export interface DebriefChange {
    * a change with no text (a model, a setting, code).
    */
   wording?: { before: string; after: string } | null;
-  /** A pinned rule in full (sign-off: as it stands; change: after it, the changed passage marked). */
-  rule?: {
-    name: string;
-    segments: Array<{ text: string; changed: boolean }>;
-    stale: boolean;
-  } | null;
-  /** What kind of thing changes (pinned rules are the clinical advisor's or the owner's). */
-  kindKey?:
-    | "pinned_rule"
-    | "prompt"
-    | "setting"
-    | "budget"
-    | "model"
-    | "code"
-    | "agents"
-    | "change";
+  /** What kind of thing changes. */
+  kindKey?: "prompt" | "setting" | "budget" | "model" | "code" | "agents" | "change";
   /** Live: Undo now. */
   canUndo: boolean;
   /** Trying / testing: Stop now. */
@@ -134,6 +120,28 @@ export interface DebriefScoreView {
   }>;
   gates: Array<{ key: "risk" | "cost"; label: string; ok: boolean; display: string }>;
   byLanguage: Array<{ language: string; score: number | null; n: number }>;
+  /** One point a week, each over the four weeks ending that week. Shares are 0–1; overall 0–10. */
+  rolling?: Array<{
+    week: string;
+    n: number;
+    overall: number | null;
+    pass: number | null;
+    helpful: number | null;
+    notFlagged: number | null;
+  }>;
+  /** The quality score in detail over the last four weeks, against the four before. */
+  quality?: {
+    current: number | null;
+    previous: number | null;
+    n: number;
+    dimensions: Array<{
+      key: string;
+      weight: number;
+      score: number | null;
+      previous: number | null;
+      lost: number | null;
+    }>;
+  };
 }
 
 /** A learner flag's answer from the Debrief agent (session view, each flag). */
@@ -145,7 +153,7 @@ export interface DebriefFlagAnswer {
 
 /** Settings › Tests: the last change to one setting (by the PM agent or a person). */
 export interface DebriefSettingLastChange {
-  lastChangedBy: "PM agent" | string;
+  lastChangedBy: "Debrief PM agent" | string;
   /** The person's user id; absent or null when the PM agent made the change. */
   lastChangedById?: number | null;
   lastChangedAt: string;

@@ -1,3 +1,4 @@
+import { GENERAL_CRISIS_TEXT } from '../../../bot-draft/safety-pack/safety-packs';
 import * as jwt from 'jsonwebtoken';
 import { AiUpstreamError } from '../../../ai/exception/ai-upstream.exception';
 import { ErrorCode } from '../../../exception/error-code.enum';
@@ -43,7 +44,7 @@ const HANDED_OVER = {
 
 /**
  * The tool gateway in the engine (chunk 3b): who gets a gateway block, what a hand-over replies,
- * and that v1 never answers a message whose run has already done something.
+ * and what a failed run replies (Q3-fast: never v1): what it did, or the fixed run-failed reply.
  */
 describe('ChatbotEngineService: the tool gateway', () => {
   const setup = ({
@@ -93,7 +94,6 @@ describe('ChatbotEngineService: the tool gateway', () => {
       chatbot: chatbotFixture({ settings: abilities ? { abilities } : {} }),
       settings: {
         ...DEFAULT_WHATSAPP_SETTINGS,
-        agentRuntimeAllowed: true,
         crisisClassifierEnabled: true,
         crisisEscalationText: CRISIS_TEXT,
         fallbackText: 'Sorry, something went wrong.',
@@ -204,7 +204,7 @@ describe('ChatbotEngineService: the tool gateway', () => {
       });
       const decision = await h.engine.respond(h.turn());
       expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
-      expect(decision.body).toBe(CRISIS_TEXT);
+      expect(decision.body).toBe(GENERAL_CRISIS_TEXT);
       expect(decision.handover).toBeUndefined();
     });
 
@@ -222,7 +222,7 @@ describe('ChatbotEngineService: the tool gateway', () => {
         body: HANDOVER_TEXT,
         handover: 'assistant',
         agent: {
-          runtime: AgentRuntimeUsed.V2_FALLBACK,
+          runtime: AgentRuntimeUsed.V2_FAILED,
           fallbackReason: 'timeout',
         },
       });
@@ -237,7 +237,7 @@ describe('ChatbotEngineService: the tool gateway', () => {
       expect(h.aiService.answerKnowledgeQuestionWithin).not.toHaveBeenCalled();
     });
 
-    it('a run that fails after another tool acted gets the fallback wording, not v1', async () => {
+    it('a run that fails after another tool acted gets the run-failed reply, not v1', async () => {
       const h = setup({
         abilities: { hand_over: 'do_it' },
         acted: ['some_list_tool'],
@@ -248,20 +248,23 @@ describe('ChatbotEngineService: the tool gateway', () => {
       const decision = await h.engine.respond(h.turn());
       expect(decision).toMatchObject({
         handledBy: WaHandledBy.ERROR,
-        body: 'Sorry, something went wrong.',
+        body: "Sorry, I couldn't answer that just now. Please try again.",
       });
       expect(decision.handover).toBeUndefined();
       expect(h.aiService.answerKnowledgeQuestionWithin).not.toHaveBeenCalled();
     });
 
-    it('a run that fails before any tool acted falls back to v1 as today', async () => {
+    it('a run that fails before any tool acted gets the run-failed reply, never v1', async () => {
       const h = setup({ abilities: { hand_over: 'do_it' } });
       h.aiService.runAgent.mockRejectedValue(
         new AiUpstreamError('late', ErrorCode.AI_SERVICE_TIMEOUT),
       );
       const decision = await h.engine.respond(h.turn());
-      expect(decision.handledBy).toBe(WaHandledBy.RAG);
-      expect(h.aiService.answerKnowledgeQuestionWithin).toHaveBeenCalled();
+      expect(decision.handledBy).toBe(WaHandledBy.ERROR);
+      expect(decision.body).toBe(
+        "Sorry, I couldn't answer that just now. Please try again.",
+      );
+      expect(h.aiService.answerKnowledgeQuestionWithin).not.toHaveBeenCalled();
     });
 
     it('a bot with no tool on never reads tool_runs when its run fails', async () => {
@@ -271,7 +274,7 @@ describe('ChatbotEngineService: the tool gateway', () => {
       );
       await h.engine.respond(h.turn());
       expect(h.toolRuns.find).not.toHaveBeenCalled();
-      expect(h.aiService.answerKnowledgeQuestionWithin).toHaveBeenCalled();
+      expect(h.aiService.answerKnowledgeQuestionWithin).not.toHaveBeenCalled();
     });
   });
 
@@ -287,7 +290,12 @@ describe('ChatbotEngineService: the tool gateway', () => {
       tool: 'create_appointments',
       result: {
         list: { key: 'appointments', name: 'Appointments' },
-        passages: [{ record_title: 'Thu 19 Nov 2026, 11:00' }],
+        passages: [
+          {
+            record_title: 'Thu 19 Nov 2026, 11:00',
+            text: 'id: r-1\nSlot: Thu 19 Nov 2026, 11:00\nClient: Priya Test\nService: Eye checkup',
+          },
+        ],
       },
     };
 
@@ -354,12 +362,15 @@ describe('ChatbotEngineService: the tool gateway', () => {
       const decision = await h.engine.respond(h.turn());
       expect(decision).toMatchObject({
         handledBy: WaHandledBy.ERROR,
-        body: 'Done: Thu 19 Nov 2026, 11:00 in Appointments.',
+        // From the saved record (chunk H1): what was booked, for whom, never a bare "Done".
+        body:
+          'Saved in Appointments: Slot: Thu 19 Nov 2026, 11:00; Client: Priya Test; ' +
+          'Service: Eye checkup.',
       });
       expect(h.aiService.answerKnowledgeQuestionWithin).not.toHaveBeenCalled();
     });
 
-    it('a run that fails after only a find falls back to v1: a find did nothing', async () => {
+    it('a run that fails after only a find gets the run-failed reply: a find did nothing', async () => {
       const h = setup({
         definitions: [FIND],
         acted: [{ tool: 'find_slots', result: {} }],
@@ -368,8 +379,11 @@ describe('ChatbotEngineService: the tool gateway', () => {
         new AiUpstreamError('late', ErrorCode.AI_SERVICE_TIMEOUT),
       );
       const decision = await h.engine.respond(h.turn());
-      expect(decision.handledBy).toBe(WaHandledBy.RAG);
-      expect(h.aiService.answerKnowledgeQuestionWithin).toHaveBeenCalled();
+      expect(decision.handledBy).toBe(WaHandledBy.ERROR);
+      expect(decision.body).toBe(
+        "Sorry, I couldn't answer that just now. Please try again.",
+      );
+      expect(h.aiService.answerKnowledgeQuestionWithin).not.toHaveBeenCalled();
     });
   });
 });

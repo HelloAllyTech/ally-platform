@@ -92,15 +92,11 @@ vi.mock("../SupervisorNote", () => ({
 vi.mock("../DebriefReplyInput", () => ({
   DebriefReplyInput: () => <div data-testid="reply-input" />,
 }));
-vi.mock("../DebriefFeedback", () => ({
-  DebriefFeedback: () => <div data-testid="debrief-feedback" />,
-}));
 
 const NOTE = "You opened well and stayed with her silence.";
 const summaryWithNote = { details: { summary: { feedback: { supervisorNote: NOTE } } } } as any;
 
-const renderTab = () =>
-  render(<DebriefTab sessionId="s-1" summaryData={summaryWithNote} retryMaxReached={false} />);
+const renderTab = () => render(<DebriefTab sessionId="s-1" summaryData={summaryWithNote} />);
 
 const CARDS = {
   opening: "You stayed calm when Meena went quiet.",
@@ -156,14 +152,15 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
     vi.clearAllMocks();
   });
 
-  it("keeps today's debrief when the organisation isn't switched on", () => {
+  it("shows the old note read-only when the new debrief isn't available", () => {
     mockLearnerDebriefQuery.mockReturnValue({ data: { state: "not_available" } });
     renderTab();
 
     expect(screen.getByTestId("supervisor-note")).toHaveTextContent(NOTE);
     expect(screen.getByText("postSim.debrief.header")).toBeInTheDocument();
     expect(screen.queryByTestId("debrief-cards")).not.toBeInTheDocument();
-    // No polling for an org that isn't on the new debrief.
+    expect(screen.queryByTestId("reply-input")).not.toBeInTheDocument();
+    // No polling when the new debrief isn't available.
     expect(mockLearnerDebriefQuery).toHaveBeenLastCalledWith(
       "s-1",
       expect.objectContaining({ pollingInterval: 0 }),
@@ -213,7 +210,7 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
     expect(screen.getByTestId("debrief-failed")).toBeInTheDocument();
   });
 
-  it("keeps today's debrief when the server refuses (403)", () => {
+  it("shows the old note read-only when the server refuses (403)", () => {
     mockLearnerDebriefQuery.mockReturnValue({
       data: undefined,
       isError: true,
@@ -322,8 +319,10 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
       within(moment).getByText("postSim.debriefCards.importantMoment.support"),
     ).toBeInTheDocument();
 
+    // "What worked" is always open: no dropdown to click.
     const worked = screen.getByTestId("debrief-card-what-worked");
     expect(within(worked).getByText(`“${CARDS.what_worked[0].quote}”`)).toBeInTheDocument();
+    expect(within(worked).queryByRole("button", { expanded: false })).not.toBeInTheDocument();
 
     const trySaying = screen.getByTestId("debrief-try-saying");
     expect(trySaying).toHaveTextContent("postSim.debriefCards.trySaying");
@@ -331,6 +330,7 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
 
     // Skill words carry text, not colour alone.
     const words = screen.getByTestId("debrief-card-skill-words");
+    fireEvent.click(within(words).getByRole("button"));
     expect(within(words).getByText("postSim.debriefCards.skillWords.strength")).toBeInTheDocument();
     expect(
       within(words).getByText("postSim.debriefCards.skillWords.keep_practising"),
@@ -348,6 +348,23 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
 
     // No numeric score anywhere.
     expect(container.textContent).not.toMatch(/\d+\s*(%|\/\s*\d+)/);
+  });
+
+  it("offers breathing while waiting, only when the learner chooses it", () => {
+    mockLearnerDebriefQuery.mockReturnValue({ data: { state: "working", steps: [] } });
+    renderTab();
+
+    expect(screen.queryByTestId("breathing-pacer")).not.toBeInTheDocument();
+    // The link sits under the debrief box, not inside it; the pacer opens in a popup.
+    const start = screen.getByTestId("debrief-breathe-start");
+    expect(screen.getByTestId("debrief-cards")).not.toContainElement(start);
+    fireEvent.click(start);
+    const pacer = screen.getByTestId("breathing-pacer");
+    expect(pacer).toBeInTheDocument();
+    expect(screen.getByTestId("debrief-cards")).not.toContainElement(pacer);
+    fireEvent.click(screen.getByTestId("debrief-breathe-stop"));
+    expect(screen.queryByTestId("breathing-pacer")).not.toBeInTheDocument();
+    expect(screen.getByTestId("debrief-breathe-start")).toBeInTheDocument();
   });
 
   it("shows a calm progress panel with the latest step while working, and polls", () => {
@@ -392,7 +409,7 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
     mockLearnerDebriefQuery.mockReturnValue({
       data: { state: "working", steps: [], progress: { key: "writing" } },
     });
-    rerender(<DebriefTab sessionId="s-1" summaryData={summaryWithNote} retryMaxReached={false} />);
+    rerender(<DebriefTab sessionId="s-1" summaryData={summaryWithNote} />);
     const steps = screen.getByTestId("debrief-working-steps");
     const items = within(steps).getAllByRole("listitem");
     expect(items.map(li => li.textContent)).toEqual([
@@ -402,7 +419,7 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
     expect(items[1]).toHaveAttribute("aria-current", "step");
 
     mockLearnerDebriefQuery.mockReturnValue({ data: { state: "ready", cards: CARDS } });
-    rerender(<DebriefTab sessionId="s-1" summaryData={summaryWithNote} retryMaxReached={false} />);
+    rerender(<DebriefTab sessionId="s-1" summaryData={summaryWithNote} />);
     expect(document.activeElement).toBe(
       screen.getByRole("heading", { name: "postSim.debriefCards.header" }),
     );
@@ -411,14 +428,7 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
   it("gives each quote a See this moment that opens the transcript at that quote (PRD §6.3)", () => {
     mockLearnerDebriefQuery.mockReturnValue({ data: { state: "ready", cards: CARDS } });
     const onSeeQuote = vi.fn();
-    render(
-      <DebriefTab
-        sessionId="s-1"
-        summaryData={summaryWithNote}
-        retryMaxReached={false}
-        onSeeQuote={onSeeQuote}
-      />,
-    );
+    render(<DebriefTab sessionId="s-1" summaryData={summaryWithNote} onSeeQuote={onSeeQuote} />);
     const buttons = screen.getAllByRole("button", { name: "postSim.debrief.momentLabel" });
     expect(buttons.length).toBeGreaterThan(0);
     fireEvent.click(buttons[0]);
@@ -801,6 +811,52 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
       expect(screen.queryByTestId("debrief-card-support")).not.toBeInTheDocument();
     });
 
+    it("adds a kind follow-up notice, next to the lines, when a clear risk cue is still left out, and changes nothing else", () => {
+      mockLearnerDebriefQuery.mockReturnValue({
+        data: {
+          state: "ready",
+          cards: CARDS,
+          language: "en",
+          riskCue: true,
+          followUp: true,
+          supportLines: [TELE_MANAS],
+        },
+      });
+      renderTab();
+
+      const notice = screen.getByTestId("debrief-follow-up");
+      expect(within(notice).getByText("postSim.debriefCards.followUp.title")).toBeInTheDocument();
+      expect(within(notice).getByText("postSim.debriefCards.followUp.body")).toBeInTheDocument();
+      expect(within(notice).getByText("postSim.debriefCards.followUp.support")).toBeInTheDocument();
+      // The debrief is shown exactly as before: the cards are still there.
+      expect(screen.getByTestId("debrief-card-important-moment")).toBeInTheDocument();
+    });
+
+    it("says nothing about a follow-up when there is none, and does not promise the lines when there are none", () => {
+      mockLearnerDebriefQuery.mockReturnValue({
+        data: {
+          state: "ready",
+          cards: CARDS,
+          language: "en",
+          riskCue: true,
+          supportLines: [TELE_MANAS],
+        },
+      });
+      const { unmount } = renderTab();
+      expect(screen.queryByTestId("debrief-follow-up")).not.toBeInTheDocument();
+      unmount();
+
+      mockLearnerDebriefQuery.mockReturnValue({
+        data: { state: "ready", cards: CARDS, language: "en", followUp: true },
+      });
+      renderTab();
+      const notice = screen.getByTestId("debrief-follow-up");
+      expect(within(notice).getByText("postSim.debriefCards.followUp.body")).toBeInTheDocument();
+      expect(
+        within(notice).queryByText("postSim.debriefCards.followUp.support"),
+      ).not.toBeInTheDocument();
+    });
+
     it("puts care first when the learner was in distress, and the debrief opens on request", () => {
       mockLearnerDebriefQuery.mockReturnValue({
         data: {
@@ -1164,7 +1220,7 @@ describe("DebriefTab — never an endless wait", () => {
   });
 
   it.each(["working", "on_its_way", "taking_longer"])(
-    "shows today's debrief after 30 minutes %s, and stops asking",
+    "shows the old note (or the static line) after 30 minutes %s, and stops asking",
     state => {
       vi.useFakeTimers();
       mockLearnerDebriefQuery.mockReturnValue({ data: { state, steps: [] } });
@@ -1233,7 +1289,7 @@ describe("DebriefTab — waiting on the debrief (v9 §3.3 abandoned before ready
     mockLearnerDebriefQuery.mockReturnValue({
       data: { state: "ready", cards: CARDS, language: "en", practice: [] },
     });
-    rerender(<DebriefTab sessionId="s-1" summaryData={summaryWithNote} retryMaxReached={false} />);
+    rerender(<DebriefTab sessionId="s-1" summaryData={summaryWithNote} />);
     unmount();
     expect(mockReportEvent.mock.calls.filter(([a]) => a.kind === "left_before_ready")).toHaveLength(
       0,

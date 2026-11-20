@@ -244,6 +244,8 @@ export interface RoleplaySessionLogsParams {
   tenantId?: string;
   /** Restrict to a language, matched against languages.value (e.g. "ta-IN"). */
   language?: string;
+  /** Restrict to one scenario's sessions. */
+  scenarioId?: number;
   sortBy?: "createdAt" | "startedAt" | "endedAt" | "score" | "status";
   order?: "ASC" | "DESC";
   /** true = only V2V test sessions, false = only real sessions, omit = all */

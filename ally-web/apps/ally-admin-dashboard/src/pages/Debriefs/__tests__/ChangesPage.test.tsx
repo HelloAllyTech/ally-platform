@@ -15,8 +15,6 @@ const h = vi.hoisted(() => ({
   stop: vi.fn(),
   approve: vi.fn(() => ({ unwrap: () => Promise.resolve({}) })),
   turnDown: vi.fn(() => ({ unwrap: () => Promise.resolve({}) })),
-  approveRule: vi.fn(() => ({ unwrap: () => Promise.resolve({}) })),
-  rejectRule: vi.fn(() => ({ unwrap: () => Promise.resolve({}) })),
   me: vi.fn(),
   permissions: [] as string[],
 }));
@@ -50,8 +48,6 @@ vi.mock("@api", async importOriginal => ({
   useSendPmMessageMutation: () => [h.send, { isLoading: false }],
   useApproveDebriefChangeMutation: () => [h.approve, { isLoading: false }],
   useTurnDownDebriefChangeMutation: () => [h.turnDown, { isLoading: false }],
-  useApprovePinnedRuleMutation: () => [h.approveRule, { isLoading: false }],
-  useRejectPinnedRuleMutation: () => [h.rejectRule, { isLoading: false }],
 }));
 
 /* eslint-disable import/first */
@@ -91,7 +87,7 @@ const ALL = [
   change({
     id: "c-safety",
     title: "Safety reader: indirect self-harm cues",
-    kind: "Pinned rule · Safety reader",
+    kind: "Prompt · Safety reader",
     state: "waits",
     result: "Catches every indirect cue on the test sets",
     waitsBecause: "Safety reader text always asks a person.",
@@ -152,7 +148,7 @@ const Where = () => {
 
 const renderAt = (search = "") =>
   render(
-    <MemoryRouter initialEntries={[`/debriefs/pm-agent${search}`]}>
+    <MemoryRouter initialEntries={[`/debriefs/changes${search}`]}>
       <PmAgentPage />
       <Where />
     </MemoryRouter>,
@@ -193,7 +189,7 @@ describe("Changes (v2, U3)", () => {
       "Undone1",
     ]);
     expect(screen.getByTestId("changes-headline")).toHaveTextContent(
-      "The PM agent is improving debriefs on its own: one change went live this week, one is being tried, and one waits for you.",
+      "The Debrief PM agent is improving debriefs on its own: one change went live this week, one is being tried, and one waits for you.",
     );
   });
 
@@ -219,8 +215,8 @@ describe("Changes (v2, U3)", () => {
     expect(screen.getByTestId("change-waits-note")).toHaveTextContent(
       "Safety reader text always asks a person.",
     );
-    // A pinned rule is the clinical advisor's or the owner's call: the team gets no buttons.
-    expect(within(detail).queryByTestId("decision-buttons")).toBeNull();
+    // The team decides a change that waits for a person.
+    expect(within(detail).getByTestId("decision-buttons")).toBeInTheDocument();
     expect(within(detail).queryByRole("button", { name: "Undo now" })).toBeNull();
     expect(within(detail).queryByRole("button", { name: "Stop now" })).toBeNull();
   });
@@ -231,7 +227,7 @@ describe("Changes (v2, U3)", () => {
     const decide = within(screen.getByTestId("change-detail")).getByTestId("decision-buttons");
     expect(within(screen.getByTestId("changes-pm")).queryByTestId("decision-buttons")).toBeNull();
     fireEvent.click(within(decide).getByRole("button", { name: "Approve" }));
-    await waitFor(() => expect(h.approveRule).toHaveBeenCalledWith({ id: "c-safety" }));
+    await waitFor(() => expect(h.approve).toHaveBeenCalledWith({ id: "c-safety" }));
   });
 
   it("Undo now on a live change undoes it at once", async () => {
@@ -261,20 +257,20 @@ describe("Changes (v2, U3)", () => {
     expect(screen.getByTestId("where").textContent).toBe("?change=c-undone");
   });
 
-  it("has no Run the PM agent now button", () => {
+  it("has no Run the Debrief PM agent now button", () => {
     renderAt();
-    expect(screen.queryByRole("button", { name: "Run the PM agent now" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Run the Debrief PM agent now" })).toBeNull();
   });
 });
 
-describe("the PM agent conversation beside Changes", () => {
+describe("the Debrief PM agent conversation beside Changes", () => {
   it("All messages shows the one thread: who, what each message was about, and each action's status", () => {
     renderAt();
     fireEvent.click(screen.getByTestId("changes-pm-scope"));
     const pm = screen.getByTestId("changes-pm");
     const msgs = within(pm).getAllByTestId("pm-message");
     expect(msgs).toHaveLength(3);
-    expect(msgs[0]).toHaveTextContent("PM agent · about Writer on a cheaper model");
+    expect(msgs[0]).toHaveTextContent("Debrief PM agent · about Writer on a cheaper model");
     expect(msgs[1]).toHaveTextContent("Gopi · about Safety reader: indirect self-harm cues");
     const actions = within(pm).getAllByTestId("pm-message-action");
     expect(actions[0]).toHaveTextContent("Done: undone automatically");
@@ -290,7 +286,7 @@ describe("the PM agent conversation beside Changes", () => {
     expect(within(pm).getByTestId("pm-looking-at")).toHaveTextContent(
       "“Work on this” cards are at most two sentences.",
     );
-    fireEvent.change(within(pm).getByLabelText("Reply to the PM agent about this change"), {
+    fireEvent.change(within(pm).getByLabelText("Reply to the Debrief PM agent about this change"), {
       target: { value: "Undo it for Tamil only" },
     });
     fireEvent.click(within(pm).getByRole("button", { name: "Send" }));
@@ -328,9 +324,9 @@ describe("the PM agent conversation beside Changes", () => {
 });
 
 describe("who sees which changes", () => {
-  it("the clinical advisor sees only pinned-rule changes that wait for a person", () => {
+  it("only the team and the owner see changes; the clinical advisor sees none", () => {
     const advisor = debriefAccessFor(["review:admin:debriefs"]);
-    expect(visibleChanges(ALL as never, advisor).map(c => c.id)).toEqual(["c-safety"]);
+    expect(visibleChanges(ALL as never, advisor)).toHaveLength(0);
     const team = debriefAccessFor(TEAM_PERMS);
     expect(visibleChanges(ALL as never, team)).toHaveLength(ALL.length);
     expect(visibleChanges(ALL as never, debriefAccessFor([]))).toHaveLength(0);
@@ -345,7 +341,6 @@ describe("who sees which changes", () => {
         "escalate",
         "verdict",
         "pmAgent",
-        "approvePinnedRule",
         "testSets",
         "releases",
         "switchOrgOn",
@@ -375,13 +370,11 @@ describe("who sees which changes", () => {
     renderAt("?view=reports");
     expect(screen.queryByRole("link", { name: "Reports" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Test sets" })).toBeNull();
-    expect(screen.getByTestId("changes-list")).toHaveTextContent(
-      "Safety reader: indirect self-harm cues",
-    );
-    expect(screen.getByTestId("changes-list")).not.toHaveTextContent("Writer on a cheaper model");
+    expect(screen.queryByText("Safety reader: indirect self-harm cues")).toBeNull();
+    expect(screen.queryByText("Writer on a cheaper model")).toBeNull();
   });
 
-  it("someone with neither the PM agent nor pinned rules gets no conversation", () => {
+  it("someone without the Debrief PM agent gets no conversation", () => {
     h.permissions = [];
     renderAt();
     expect(screen.queryByTestId("changes-pm")).toBeNull();

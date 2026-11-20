@@ -46,7 +46,7 @@ const CLAIMS = {
   exp: 0,
 };
 
-describe('PM agent never-list and limits (spec C4, FR-53)', () => {
+describe('Debrief PM agent never-list and limits (spec C4, FR-53)', () => {
   it('refuses the rubric, the Safety reader and its own instructions as never-list', () => {
     expect(
       promptEditRefusal('debrief_quality_rubric', 'a', 'b', 'a')?.neverList,
@@ -214,10 +214,6 @@ describe('metric failure points (spec C2)', () => {
       { key: 'hi', debriefs: 30, experience: exp([5, 30]) },
     ],
     byPlatform: [{ key: 'ios', debriefs: 10, experience: exp([1, 10]) }],
-    baselines: {
-      legacyHardFailRate: rate(5, 100),
-      legacyThumbsDownRate: rate(10, 100),
-    },
     agents: {
       stages: {
         writer: {
@@ -241,7 +237,6 @@ describe('metric failure points (spec C2)', () => {
       expect.arrayContaining([
         'experience_off_target:read_through:all',
         'experience_off_target:read_through:language=hi',
-        'guardrail_breached:hard_fail_rate:all',
         'efficiency_drift:cost_p50:week=2026-11-02',
         'steering_falling:steering:week=2026-11-02',
         'stage_failing:analyst.fail_rate:all',
@@ -362,7 +357,7 @@ function tools(opts: {
   return { svc, pm, ds, reviews, queries };
 }
 
-describe('the PM agent’s gateway tools enforce the rules', () => {
+describe('the Debrief PM agent’s gateway tools enforce the rules', () => {
   const routeA = {
     id: IDEA,
     status: 'proposed',
@@ -852,6 +847,25 @@ describe('content safety for every self-made change (R2-18, FR-56)', () => {
     ).toMatchObject({ ok: true });
   });
 
+  it('roleplayFields travels as a list in setting_fields, and without one the PM agent is told what exists', async () => {
+    const t = tools({ idea: routeA });
+    expect(
+      await t.svc.call('release_draft', CLAIMS, {
+        idea_id: IDEA,
+        kind: 'setting',
+        setting_key: 'roleplayFields',
+        setting_fields: ['characterProfile'],
+      }),
+    ).toMatchObject({ ok: true });
+    const out: any = await t.svc.call('release_draft', CLAIMS, {
+      idea_id: IDEA,
+      kind: 'setting',
+      setting_key: 'roleplayFields',
+    });
+    expect(out.refused).toContain('characterProfile');
+    expect(out.refused).toContain('always read');
+  });
+
   it('judges a prompt edit on what it adds, not what the prompt already holds', () => {
     expect(
       introducedInjectionPattern(
@@ -871,7 +885,7 @@ describe('content safety for every self-made change (R2-18, FR-56)', () => {
     );
   });
 
-  it('approval re-checks the PM agent’s own prompt edits before learners see them', () => {
+  it('approval re-checks the Debrief PM agent’s own prompt edits before learners see them', () => {
     const idea = {
       authorKind: 'curator',
       change: { ideaKind: 'prompt_edit', find: 'a b', replace: 'a b c' },
@@ -1049,7 +1063,7 @@ describe('planted-idea fixtures (ally-ai tests/fixtures/pm_agent_planted_ideas.j
   });
 });
 
-describe('agent tokens list every PM agent tool', () => {
+describe('agent tokens list every Debrief PM agent tool', () => {
   it('signs all of them by default and only them', () => {
     const tokens = new DebriefRunTokenService(
       {
@@ -1132,5 +1146,29 @@ describe('the scheduler packs the inputs and calls ally-ai with an agent token',
     t = runService({ spent: 3 });
     expect((await t.svc.run({})).skipped).toMatch(/learning budget/);
     expect(t.svc.call).not.toHaveBeenCalled();
+  });
+});
+
+describe('prompt_read (review 2026-11-16)', () => {
+  it('reads a Debrief prompt as the next run reads it', async () => {
+    const { svc } = tools({});
+    const out = await svc.call('prompt_read', CLAIMS, {
+      code: 'debrief_risk_cue_definition',
+    });
+    expect(out).toMatchObject({
+      code: 'debrief_risk_cue_definition',
+      version: 'current',
+      text: expect.any(String),
+    });
+  });
+
+  it('refuses a prompt that is not the Debrief’s', async () => {
+    const { svc } = tools({});
+    const out = await svc.call('prompt_read', CLAIMS, {
+      code: 'some_other_product_prompt',
+    });
+    expect(out).toMatchObject({
+      refused: expect.stringContaining('unknown prompt code'),
+    });
   });
 });

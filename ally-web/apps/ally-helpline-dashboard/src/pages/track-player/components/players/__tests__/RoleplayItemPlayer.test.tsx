@@ -346,3 +346,226 @@ describe("RoleplayItemPlayer — assessment mode", () => {
     expect(screen.getByTestId("roleplay-assessment-locked")).toBeInTheDocument();
   });
 });
+
+describe("RoleplayItemPlayer — completion requirement and last attempt", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockScenario();
+    mockCatalogLanguages(undefined);
+  });
+
+  const renderWith = (extra: Partial<StartRoleplayItemPayload>, alreadyCompleted = false) =>
+    render(
+      <RoleplayItemPlayer
+        payload={{ ...payload, ...extra }}
+        item={buildItem(null)}
+        trackId="track-1"
+        alreadyCompleted={alreadyCompleted}
+      />,
+    );
+
+  const attempt = (failureReasons: Array<"INSUFFICIENT_SCORE" | "INSUFFICIENT_DURATION">) => ({
+    failureReasons,
+    score: 40,
+    durationSeconds: 75,
+    requiredScore: 60,
+    requiredDurationSeconds: 90,
+    endedAt: "2026-11-17T10:00:00.000Z",
+  });
+
+  it.each([
+    [
+      { completionLogic: "SCORE" as const, minScore: 60, minDurationSeconds: null },
+      "To complete it, score at least 60.",
+    ],
+    [
+      { completionLogic: "DURATION" as const, minScore: null, minDurationSeconds: 90 },
+      "To complete it, keep the roleplay going for at least 1 min 30 sec.",
+    ],
+    [
+      { completionLogic: "SCORE_AND_DURATION" as const, minScore: 60, minDurationSeconds: 180 },
+      "To complete it, score at least 60 and keep the roleplay going for at least 3 min.",
+    ],
+    [
+      { completionLogic: "PARTICIPATION" as const, minScore: null, minDurationSeconds: null },
+      "This completes as soon as you start the roleplay.",
+    ],
+  ])("states the %o requirement before launch", (roleplayGate, text) => {
+    renderWith({ roleplayGate });
+    expect(screen.getByTestId("roleplay-requirement")).toHaveTextContent(text);
+  });
+
+  it("states nothing when the item has no gate and no server rule", () => {
+    renderWith({});
+    expect(screen.queryByTestId("roleplay-requirement")).not.toBeInTheDocument();
+  });
+
+  it("tells the learner they missed the time requirement", () => {
+    renderWith({ lastRoleplayAttempt: attempt(["INSUFFICIENT_DURATION"]) });
+    const notice = screen.getByTestId("roleplay-last-attempt");
+    expect(notice).toHaveTextContent("Your last attempt didn't complete this roleplay");
+    expect(notice).toHaveTextContent(
+      "It lasted 1 min 15 sec; this roleplay needs at least 1 min 30 sec.",
+    );
+    expect(notice).not.toHaveTextContent("You scored");
+    expect(notice).toHaveTextContent("Try again when you're ready.");
+  });
+
+  it("tells the learner they missed the score", () => {
+    renderWith({ lastRoleplayAttempt: attempt(["INSUFFICIENT_SCORE"]) });
+    const notice = screen.getByTestId("roleplay-last-attempt");
+    expect(notice).toHaveTextContent("You scored 40; this roleplay needs at least 60.");
+    expect(notice).not.toHaveTextContent("It lasted");
+  });
+
+  it("names both gates when both were missed", () => {
+    renderWith({
+      lastRoleplayAttempt: attempt(["INSUFFICIENT_DURATION", "INSUFFICIENT_SCORE"]),
+    });
+    const notice = screen.getByTestId("roleplay-last-attempt");
+    expect(notice).toHaveTextContent("It lasted 1 min 15 sec");
+    expect(notice).toHaveTextContent("You scored 40");
+  });
+
+  it("explains a missing score without inventing one", () => {
+    renderWith({
+      lastRoleplayAttempt: { ...attempt(["INSUFFICIENT_SCORE"]), score: null },
+    });
+    expect(screen.getByTestId("roleplay-last-attempt")).toHaveTextContent(
+      "It didn't reach the minimum score of 60.",
+    );
+  });
+
+  it("shows no failure once the item is complete", () => {
+    renderWith({ lastRoleplayAttempt: attempt(["INSUFFICIENT_SCORE"]) }, true);
+    expect(screen.queryByTestId("roleplay-last-attempt")).not.toBeInTheDocument();
+  });
+});
+
+describe("RoleplayItemPlayer — turn-based assessment", () => {
+  const assessment = (overrides: Record<string, unknown> = {}) => ({
+    phase: null,
+    requiredTurns: 10,
+    showResults: true,
+    resultsHidden: false,
+    preAssessment: null,
+    incompleteStarts: 0,
+    submission: null,
+    ...overrides,
+  });
+
+  const renderTurns = (extra: Partial<StartRoleplayItemPayload>, alreadyCompleted = false) =>
+    render(
+      <RoleplayItemPlayer
+        payload={{
+          ...payload,
+          completionCriteria: { assessmentMode: true },
+          roleplayGate: {
+            roleplayType: "ASSESSMENT",
+            completionLogic: "SCORE",
+            minScore: null,
+            minDurationSeconds: null,
+            minLearnerTurns: 10,
+          },
+          assessment: assessment(),
+          ...extra,
+        }}
+        item={buildItem(null)}
+        trackId="track-1"
+        alreadyCompleted={alreadyCompleted}
+      />,
+    );
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionStorage.clear();
+    mockScenario();
+    mockCatalogLanguages([ENGLISH]);
+  });
+
+  it("explains the turn minimum in the intro and requirement, never a duration", () => {
+    renderTurns({});
+    expect(
+      screen.getByText(
+        "This is an assessment. You get one attempt, and it counts once you've taken at least 10 turns.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("roleplay-requirement")).toHaveTextContent(
+      "To count, take at least 10 turns.",
+    );
+    expect(screen.queryByTestId("roleplay-assessment-notice")).not.toBeInTheDocument();
+  });
+
+  it("stashes the turn minimum so the live session can count toward it", async () => {
+    renderTurns({});
+    fireEvent.click(screen.getByText("Start roleplay"));
+    await waitFor(() => expect(mockStartSimulation).toHaveBeenCalled());
+    expect(JSON.parse(sessionStorage.getItem("activeTrackContext") ?? "{}")).toMatchObject({
+      assessmentRequiredTurns: 10,
+      assessmentScenarioId: 123,
+    });
+  });
+
+  it("tells the learner a short attempt didn't count and lets them start again", () => {
+    renderTurns({
+      lastRoleplayAttempt: {
+        failureReasons: ["INSUFFICIENT_TURNS"],
+        score: null,
+        durationSeconds: 40,
+        requiredScore: null,
+        requiredDurationSeconds: null,
+        learnerTurns: 4,
+        requiredTurns: 10,
+        endedAt: "2026-11-17T10:00:00.000Z",
+      },
+    });
+    expect(screen.getByTestId("roleplay-short-attempt")).toHaveTextContent(
+      "That attempt was too short to count (4 of 10 turns). Start again when you're ready.",
+    );
+    expect(screen.getByText("Start roleplay").closest("button")).toBeEnabled();
+  });
+
+  it("locks a post until the paired pre is submitted", () => {
+    renderTurns({
+      assessment: assessment({
+        phase: "POST",
+        preAssessment: { title: "Baseline call", submitted: false },
+      }),
+    });
+    expect(screen.getByTestId("roleplay-post-locked")).toHaveTextContent(
+      "Complete the pre-assessment, Baseline call, first.",
+    );
+    const start = screen.getByText("Start roleplay").closest("button") as HTMLButtonElement;
+    expect(start).toBeDisabled();
+    fireEvent.click(start);
+    expect(mockStartSimulation).not.toHaveBeenCalled();
+  });
+
+  it("opens a post once its pre is submitted", () => {
+    renderTurns({
+      assessment: assessment({
+        phase: "POST",
+        preAssessment: { title: "Baseline call", submitted: true },
+      }),
+    });
+    expect(screen.queryByTestId("roleplay-post-locked")).not.toBeInTheDocument();
+    expect(screen.getByText("Start roleplay").closest("button")).toBeEnabled();
+  });
+
+  it("shows only 'Submitted' when results are hidden: no score, no report", () => {
+    renderTurns(
+      {
+        assessmentSubmittedAt: "2026-10-26T09:00:00.000Z",
+        lastScenarioSessionId: null,
+        assessment: assessment({ phase: "PRE", showResults: false, resultsHidden: true }),
+      },
+      true,
+    );
+    expect(screen.getByTestId("roleplay-assessment-results-hidden")).toHaveTextContent(
+      "Submitted. Your trainer will review your results.",
+    );
+    expect(screen.queryByTestId("session-log-panel")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("roleplay-assessment-submitted")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("play-icon")).not.toBeInTheDocument();
+  });
+});

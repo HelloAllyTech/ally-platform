@@ -75,6 +75,87 @@ describePg('Lists (Postgres)', () => {
   });
 
   describe('booking', () => {
+    describe('a slot deleted while it is being booked (chunk 6b, the in_use race)', () => {
+      const pending = (work: Promise<unknown>, ms = 300) =>
+        Promise.race([
+          work.then(
+            () => 'settled',
+            () => 'settled',
+          ),
+          new Promise((resolve) => setTimeout(() => resolve('waiting'), ms)),
+        ]);
+
+      it('the booking first: the delete waits for it, then is refused as in use', async () => {
+        const booking = ds.createQueryRunner();
+        const deleting = ds.createQueryRunner();
+        await booking.connect();
+        await deleting.connect();
+        try {
+          await booking.startTransaction();
+          await records.create(
+            bot,
+            'appointments',
+            OWNER,
+            { slot: slots[0].id, client: person },
+            { manager: booking.manager },
+          );
+          await deleting.startTransaction();
+          const del = records.delete(bot, 'slots', OWNER, slots[0].id, {
+            manager: deleting.manager,
+          });
+          expect(await pending(del)).toBe('waiting');
+          await booking.commitTransaction();
+          const r = await refusal(del);
+          expect(r.code).toBe('in_use');
+          await deleting.rollbackTransaction();
+        } finally {
+          await booking.release();
+          await deleting.release();
+        }
+        const [{ n }] = await ds.query(
+          `SELECT count(*)::int AS n FROM collection_records
+            WHERE id = $1 AND deleted_at IS NULL`,
+          [slots[0].id],
+        );
+        expect(n).toBe(1);
+      });
+
+      it('the delete first: the booking waits for it, then finds the slot gone', async () => {
+        const deleting = ds.createQueryRunner();
+        const booking = ds.createQueryRunner();
+        await deleting.connect();
+        await booking.connect();
+        try {
+          await deleting.startTransaction();
+          await records.delete(bot, 'slots', OWNER, slots[0].id, {
+            manager: deleting.manager,
+          });
+          await booking.startTransaction();
+          const book = records.create(
+            bot,
+            'appointments',
+            OWNER,
+            { slot: slots[0].id, client: person },
+            { manager: booking.manager },
+          );
+          expect(await pending(book)).toBe('waiting');
+          await deleting.commitTransaction();
+          const r = await refusal(book);
+          expect(r.code).toBe('invalid_value');
+          expect(r.field).toBe('slot');
+          await booking.rollbackTransaction();
+        } finally {
+          await deleting.release();
+          await booking.release();
+        }
+        const [{ n }] = await ds.query(
+          `SELECT count(*)::int AS n FROM collection_records WHERE data->>'slot' = $1`,
+          [slots[0].id],
+        );
+        expect(n).toBe(0);
+      });
+    });
+
     it('lets exactly one of two concurrent bookings of a slot win; the other gets alternatives', async () => {
       const second = await contact('Second');
       const results = await Promise.allSettled([
@@ -420,8 +501,8 @@ describePg('Lists (Postgres)', () => {
   describe('rules', () => {
     it('refuses a rule existing records break, and lists them', async () => {
       const second = await contact('Second');
-      const a = await book(slots[0].id, person, { service: 'Couples therapy' });
-      const b = await book(slots[1].id, second, { service: 'Couples therapy' });
+      const a = await book(slots[0].id, person, { service: 'Consultation' });
+      const b = await book(slots[1].id, second, { service: 'Consultation' });
       const r = await refusal(
         definitions.addRule(bot, 'appointments', {
           kind: ListConstraintKind.UNIQUE,
@@ -576,7 +657,7 @@ describePg('Lists (Postgres)', () => {
         'appointments',
         OWNER,
         record.id,
-        { service: 'Couples therapy' },
+        { service: 'Consultation' },
         1,
       );
       expect(

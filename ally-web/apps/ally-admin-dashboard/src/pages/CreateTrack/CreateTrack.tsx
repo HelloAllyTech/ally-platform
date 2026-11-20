@@ -41,12 +41,14 @@ import {
   isTranslationsSelection,
 } from "./components/types";
 import {
+  cloneSectionWithNewIds,
   createEmptySection,
   createItemFormValueFromTemplate,
   createItemOfType,
   deserializeTrack,
   extractTrackMetadata,
   getLiveAttemptLimitChanges,
+  hasAssessmentRuleChanges,
   serializeTrackForm,
   validateTrackForPublish,
 } from "./trackFormUtils";
@@ -72,6 +74,8 @@ export const CreateTrack: FC = () => {
   const [showDiscardPopup, setShowDiscardPopup] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showErrorPopover, setShowErrorPopover] = useState(false);
+  // A save held back while the author confirms an assessment-rule change on a live course.
+  const [pendingLiveSave, setPendingLiveSave] = useState<(() => Promise<unknown>) | null>(null);
 
   const [getTrackById, { data: trackDetail }] = useLazyGetTrackByIdQuery();
   // Drives the badge on the rail's Languages node. Skipped until the course
@@ -169,16 +173,55 @@ export const CreateTrack: FC = () => {
     setSelection({ sectionIndex, itemIndex: items.length - 1 });
   };
 
+  // Deleting is reversible here: the removed content is held for the toast's Undo instead of
+  // asking "are you sure?" first (a confirm on every delete is the friction; losing work is the harm).
   const handleDeleteSection = (sectionIndex: number) => {
+    const removed = cloneSectionWithNewIds(getValues(`sections.${sectionIndex}`));
+    const original = getValues(`sections.${sectionIndex}`);
     sectionArray.remove(sectionIndex);
     setSelection("settings");
+    toast("Section deleted", {
+      action: {
+        label: "Undo",
+        onClick: () => sectionArray.insert(sectionIndex, { ...removed, title: original.title }),
+      },
+    });
+  };
+
+  const handleDuplicateSection = (sectionIndex: number) => {
+    const copy = cloneSectionWithNewIds(getValues(`sections.${sectionIndex}`));
+    sectionArray.insert(sectionIndex + 1, copy);
   };
 
   const handleDeleteItem = (sectionIndex: number, itemIndex: number) => {
     const section = getValues(`sections.${sectionIndex}`);
+    const removed = section.items?.[itemIndex];
     const items = (section.items ?? []).filter((_, index) => index !== itemIndex);
     formMethods.setValue(`sections.${sectionIndex}.items`, items, { shouldDirty: true });
     setSelection("settings");
+    if (removed) {
+      toast("Component deleted", {
+        action: {
+          label: "Undo",
+          onClick: () => {
+            const current = [...(getValues(`sections.${sectionIndex}.items`) ?? [])];
+            current.splice(itemIndex, 0, removed);
+            formMethods.setValue(`sections.${sectionIndex}.items`, current, { shouldDirty: true });
+          },
+        },
+      });
+    }
+  };
+
+  const handleDuplicateItem = (sectionIndex: number, itemIndex: number) => {
+    const section = getValues(`sections.${sectionIndex}`);
+    const source = section.items?.[itemIndex];
+    if (!source) return;
+    const copy = cloneSectionWithNewIds({ ...section, items: [source] }).items[0];
+    const items = [...(section.items ?? [])];
+    items.splice(itemIndex + 1, 0, { ...copy, title: `${source.title || "Component"} (copy)` });
+    formMethods.setValue(`sections.${sectionIndex}.items`, items, { shouldDirty: true });
+    setSelection({ sectionIndex, itemIndex: itemIndex + 1 });
   };
 
   const handleReorderSections = (from: number, to: number) => {
@@ -271,18 +314,46 @@ export const CreateTrack: FC = () => {
     }
   };
 
-  const handleSaveDraft = async () => {
+  /**
+   * Assessment settings are editable after learners enrol, but a change applies
+   * to new attempts only, so confirm first. The track GET exposes no enrolment
+   * count, so a published (ACTIVE) course stands in for "learners may be
+   * enrolled". Returns true when the save was held for confirmation.
+   */
+  const holdForLiveEditConfirm = (run: () => Promise<unknown>): boolean => {
+    if (
+      !trackId ||
+      trackDetail?.status !== SimulationStatus.ACTIVE ||
+      !hasAssessmentRuleChanges(trackDetail, getValues())
+    ) {
+      return false;
+    }
+    setPendingLiveSave(() => run);
+    return true;
+  };
+
+  const runSaveDraft = async () => {
     const savedId = await persist();
     return savedId ? [savedId] : null;
   };
 
-  const handlePublish = async () => {
-    if (!canPublish) return;
+  const handleSaveDraft = async () => {
+    if (holdForLiveEditConfirm(runSaveDraft)) return null;
+    return runSaveDraft();
+  };
+
+  const runPublish = async () => {
     const savedId = await persist(SimulationStatus.ACTIVE);
     if (savedId) {
       toast.success(`${TRACK_ENTITY_LABEL} published successfully`);
       navigate(-1);
     }
+  };
+
+  const handlePublish = async () => {
+    if (!canPublish) return;
+    if (holdForLiveEditConfirm(runPublish)) return;
+    await runPublish();
   };
 
   const handleBack = () => {
@@ -291,12 +362,26 @@ export const CreateTrack: FC = () => {
     else navigate(-1);
   };
 
-  const handleSaveAndExit = async () => {
+  const runSaveAndExit = async () => {
     const savedId = await persist();
     if (savedId) {
       setShowDiscardPopup(false);
       navigate(-1);
     }
+  };
+
+  const handleSaveAndExit = async () => {
+    if (holdForLiveEditConfirm(runSaveAndExit)) {
+      setShowDiscardPopup(false);
+      return;
+    }
+    await runSaveAndExit();
+  };
+
+  const confirmLiveSave = async () => {
+    const run = pendingLiveSave;
+    setPendingLiveSave(null);
+    if (run) await run();
   };
 
   const handleDiscard = () => {
@@ -373,14 +458,27 @@ export const CreateTrack: FC = () => {
       );
     }
     return (
-      <ItemEditorCanvas
-        key={item.localId}
-        sectionIndex={sectionIndex}
-        itemIndex={itemIndex}
-        type={item.type}
-        onDelete={() => handleDeleteItem(sectionIndex, itemIndex)}
-        isPublished={trackDetail?.status === SimulationStatus.ACTIVE}
-      />
+      <>
+        {!isViewOnly && (
+          <div className="flex justify-end px-4 pt-2">
+            <button
+              type="button"
+              onClick={() => handleDuplicateItem(sectionIndex, itemIndex)}
+              className="text-xs text-typography-600 underline hover:text-typography-900"
+            >
+              Duplicate component
+            </button>
+          </div>
+        )}
+        <ItemEditorCanvas
+          key={item.localId}
+          sectionIndex={sectionIndex}
+          itemIndex={itemIndex}
+          type={item.type}
+          onDelete={() => handleDeleteItem(sectionIndex, itemIndex)}
+          isPublished={trackDetail?.status === SimulationStatus.ACTIVE}
+        />
+      </>
     );
   };
 
@@ -487,6 +585,7 @@ export const CreateTrack: FC = () => {
               onAddItem={handleAddItem}
               onAddItemFromTemplate={handleAddItemFromTemplate}
               onDeleteSection={handleDeleteSection}
+              onDuplicateSection={handleDuplicateSection}
               onReorderSections={isViewOnly ? () => undefined : handleReorderSections}
               onReorderItems={isViewOnly ? () => undefined : handleReorderItems}
             />
@@ -509,6 +608,23 @@ export const CreateTrack: FC = () => {
             secondaryButton={{
               label: en.simulation.discardChanges,
               onClick: handleDiscard,
+              variant: ButtonVariant.SECONDARY,
+            }}
+          />
+
+          <ActionConfirmationPopup
+            isOpen={pendingLiveSave !== null}
+            onClose={() => setPendingLiveSave(null)}
+            title="Save changes to a live course?"
+            description="Learners are already enrolled in this course. Attempts already submitted keep the rule they were judged on; your changes apply to new attempts."
+            primaryButton={{
+              label: "Save changes",
+              onClick: confirmLiveSave,
+              variant: ButtonVariant.PRIMARY,
+            }}
+            secondaryButton={{
+              label: "Cancel",
+              onClick: () => setPendingLiveSave(null),
               variant: ButtonVariant.SECONDARY,
             }}
           />

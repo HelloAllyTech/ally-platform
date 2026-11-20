@@ -11,7 +11,7 @@ import { clampVotes, isVotable, remainingWithPending } from "./utils/votes";
 
 const STAGE_LABEL: Record<string, string> = {
   prioritised: "prioritised",
-  under_development: "in development",
+  under_development: "prioritised",
   released: "released",
   archived: "archived",
 };

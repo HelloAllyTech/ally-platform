@@ -42,6 +42,21 @@ CORRECTABLE_FIELDS = ("lead", "body", "why", "try_saying", "reason")
 #: Two tries at most: the second is told what was wrong with the first.
 MAX_TRIES = 2
 _QUOTED = re.compile(r"[\"“”]([^\"“”]{3,})[\"“”]")
+#: The reply's cap, the prompt's "at most three short sentences" (2026-11-16):
+#: the wording is the prompt's, the check is here.
+REPLY_MAX_SENTENCES = 3
+#: A sentence ends at . ! ? or the Devanagari danda, before a space or the end;
+#: a decimal point or "e.g." mid-word does not end one.
+_SENTENCE_END = re.compile(r"[.!?।]+(?=\s|$)")
+
+
+def sentence_count(text: str) -> int:
+    """Sentences in a reply: ends counted, plus a last one without a full stop."""
+    t = text.strip()
+    if not t:
+        return 0
+    ends = len(_SENTENCE_END.findall(t))
+    return ends + (0 if _SENTENCE_END.search(t[-1:] + " ") else 1)
 
 
 class CardRewrite(BaseModel):
@@ -60,7 +75,7 @@ class FlagDecision(BaseModel):
     )
     reply: str = Field(
         description="To the learner, in the debrief's language: what you decided "
-        "and why, at most three short sentences."
+        "and why."
     )
 
 
@@ -108,6 +123,12 @@ def problem_with(decision: FlagDecision, req: FlagAnswerRequest) -> Optional[str
     """What breaks the rules in this answer, in words the model can act on."""
     if not decision.reply.strip():
         return "The reply to the learner is empty."
+    n = sentence_count(decision.reply)
+    if n > REPLY_MAX_SENTENCES:
+        return (
+            f"The reply to the learner has {n} sentences; write at most "
+            f"{REPLY_MAX_SENTENCES} short ones."
+        )
     if decision.action == "remove" and is_important_moment(req.section):
         return "The important-moment card is never removed: keep it or correct it."
     if decision.action != "correct":
@@ -133,8 +154,11 @@ def problem_with(decision: FlagDecision, req: FlagAnswerRequest) -> Optional[str
 
 
 def render_request(req: FlagAnswerRequest) -> str:
+    def speaker(role: str) -> str:
+        return "Learner" if role == "counselor" else "Character"
+
     transcript = "\n".join(
-        f"[{t.turn_index}] {'Learner' if t.role == 'counselor' else 'Client'}: {t.text}"
+        f"[{t.turn_index}] {speaker(t.role)}: {t.text}"
         for t in req.transcript
     )
     card = {k: v for k, v in req.card.items() if k != "point_id"}

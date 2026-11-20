@@ -52,7 +52,7 @@ export enum Permissions {
   // nothing to show without the chat), but both grants exist so the backend can tier them later.
   VIEW_COURSE_COPILOT = "view:admin:course-copilot",
   EDIT_COURSE_COPILOT = "edit:admin:course-copilot",
-  // AI Chatbots: onboarding (/chatbots/new) needs the edit grant, as ally-be checks it.
+  // AI Chatbots: onboarding (/assistants/new) needs the edit grant, as ally-be checks it.
   EDIT_WHATSAPP_BOT = "edit:whatsapp-bot",
   // Ally guide (Ally Console + org Ally tab). Transcripts need their own
   // permission AND the per-person ally_guide_transcripts toggle.
@@ -105,6 +105,9 @@ export const SIDEBAR_ITEMS = {
   STT_CONFIGS: "stt-configs",
   LLM_CONFIGS: "llm-configs",
   LLM_MODEL_CATALOG: "llm-model-catalog",
+  BILLING_MODELS: "billing-models",
+  BILLING_COSTS: "billing-costs",
+  BILLING_PLANS: "billing-plans",
   AI_TASKS: "ai-tasks",
   SCENARIO_LANGUAGES: "scenario-languages",
   PROMPTS: "prompts",
@@ -113,9 +116,14 @@ export const SIDEBAR_ITEMS = {
   TRANSLATIONS: "translations",
   TOOLTIPS: "tooltips",
   ANALYTICS: "analytics",
+  CONVERSATION_DRIFT: "conversation-drift",
   DEBRIEFS: "debriefs",
   AGENT_TEST_CASES: "agent-test-cases",
   PRODUCT_ROADMAP: "product-roadmap",
+  /** Roadmap v2, shown only while `roadmap_v2` is on (GET /v1/roadmap/me/role succeeds). */
+  ROADMAP_V2: "roadmap-v2",
+  /** User Interviews, its own entry while `roadmap_v2` is on (D14); inside the old board before. */
+  USER_INTERVIEWS: "user-interviews",
   COMPETENCIES: "competencies",
   ROLEPLAY_SESSION_LOGS: "roleplay-session-logs",
   BLOG: "blog",
@@ -126,6 +134,7 @@ export const SIDEBAR_ITEMS = {
   MOBILE_RELEASES: "mobile-releases",
   WHATSAPP_BOT: "whatsapp-bot",
   BUG_HUNTER: "bug-hunter",
+  PM_AGENT: "pm-agent",
   BUG_HUNTER_V2: "bug-hunter-v2",
   BUILDER: "builder",
   CONTEXT_LIBRARY: "context-library",

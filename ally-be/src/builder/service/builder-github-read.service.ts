@@ -3,10 +3,15 @@ import axios from 'axios';
 import { LoggerService } from 'src/logger/logger.service';
 import { AppConfigService } from 'src/config/config.service';
 import {
-  BUILDER_GITHUB_FILE_MAX_BYTES,
   BUILDER_GITHUB_SEARCH_MAX_RESULTS,
   BUILDER_GITHUB_TREE_MAX_ENTRIES,
 } from '../constants/builder.constants';
+import {
+  matchingLines,
+  searchTerms,
+  SEARCH_HITS_WITH_LINES,
+  sliceFileLines,
+} from '../util/builder-github-lines.util';
 import {
   BUILDER_WIKI_REPO,
   isBuilderReadableRepo,
@@ -122,7 +127,12 @@ export class BuilderGithubReadService {
    * only — GitHub's fragments are noisy and the agent should follow up with
    * readFile on the two or three that look right.
    */
-  async searchCode(query: string, repo?: string): Promise<Record<string, any>> {
+  async searchCode(
+    query: string,
+    repo?: string,
+    /** Line numbers for the top hits: the interview's code search asks; docs and discovery don't. */
+    options: { lineNumbers?: boolean } = {},
+  ): Promise<Record<string, any>> {
     if (!this.isConfigured) {
       return this.notConfigured();
     }
@@ -135,7 +145,11 @@ export class BuilderGithubReadService {
       : `org:${this.org}`;
     try {
       const response = await axios.get('https://api.github.com/search/code', {
-        headers: this.headers,
+        // text-match: the fragments say WHAT matched, which is what the line numbers are found by.
+        headers: {
+          ...this.headers,
+          Accept: 'application/vnd.github.text-match+json',
+        },
         params: {
           q: `${query} ${scope}`,
           per_page: BUILDER_GITHUB_SEARCH_MAX_RESULTS,
@@ -143,6 +157,7 @@ export class BuilderGithubReadService {
         timeout: 20_000,
       });
       const items: any[] = response.data?.items ?? [];
+      const terms = searchTerms(query, items);
       const seen = new Set<string>();
       const results = items
         .map((item) =>
@@ -158,7 +173,9 @@ export class BuilderGithubReadService {
       return {
         ok: true,
         totalCount: response.data?.total_count ?? items.length,
-        results,
+        results: options.lineNumbers
+          ? await this.withLineNumbers(results, terms)
+          : results,
       };
     } catch (error) {
       return this.failure('search_failed', error);
@@ -166,14 +183,35 @@ export class BuilderGithubReadService {
   }
 
   /**
-   * One file's contents at a ref. Truncated at a hard byte cap — a 6000-line
-   * service read in full would crowd out the reasoning the interview needs,
-   * and the agent can always ask for a narrower path.
+   * Every file path in a service at `master`, service-relative — what the PRD path check looks
+   * paths up in. Null when the tree came back truncated: a partial tree cannot say a file is
+   * missing. Throws on a failed call; the caller decides what a failure means.
+   */
+  async serviceFiles(repo: string, ref = 'master'): Promise<string[] | null> {
+    if (!this.isConfigured || !isBuilderReadableRepo(repo)) return null;
+    const { tree, truncated } = await this.serviceTree(
+      this.locate(repo),
+      ref,
+      ref !== 'master',
+    );
+    if (truncated) return null;
+    return tree
+      .filter((entry) => entry?.type === 'blob')
+      .map((entry) => String(entry.path));
+  }
+
+  /**
+   * One file's contents at a ref, optionally a range of its lines.
+   *
+   * Capped at a byte limit — a 6000-line service read in full would crowd out the reasoning the
+   * interview needs. A capped read says the line it stopped at and the file's line count, so the
+   * agent can read on with `startLine` instead of never seeing the rest of a large file.
    */
   async readFile(
     repo: string,
     path: string,
     ref?: string,
+    lines: { startLine?: number; endLine?: number } = {},
   ): Promise<Record<string, any>> {
     if (!this.isConfigured) {
       return this.notConfigured();
@@ -182,58 +220,100 @@ export class BuilderGithubReadService {
       return { ok: false, error: 'unknown_repo', repo };
     }
     try {
-      const location = this.locate(repo);
-      const get = (contentPath: string) =>
-        axios.get(
-          `https://api.github.com/repos/${location.fullName}/contents/${contentPath}`,
-          {
-            headers: this.headers,
-            params: ref ? { ref } : undefined,
-            timeout: 20_000,
-          },
-        );
-      let response;
-      try {
-        response = await get(
-          location.folder ? `${location.folder}/${path}` : path,
-        );
-      } catch (error) {
-        // A pinned ref from before the cutover is a commit of the old service
-        // repo, where the service is the root (see serviceTree).
-        if (!location.folder || !ref || !isNotFound(error)) throw error;
-        response = await get(path);
-      }
-      const data = response.data;
-      if (Array.isArray(data)) {
-        return {
-          ok: false,
-          error: 'path_is_directory',
-          message: `"${path}" is a directory — use github_repo_tree instead.`,
-        };
-      }
-      if (data?.encoding !== 'base64' || typeof data?.content !== 'string') {
-        return { ok: false, error: 'unreadable_file', path };
-      }
-      const decoded = Buffer.from(data.content, 'base64').toString('utf8');
-      const truncated = decoded.length > BUILDER_GITHUB_FILE_MAX_BYTES;
+      const file = await this.fetchText(repo, path, ref);
+      if ('error' in file) return { ok: false, ...file };
       return {
         ok: true,
         repo,
         path,
-        size: data.size,
-        truncated,
-        content: truncated
-          ? decoded.slice(0, BUILDER_GITHUB_FILE_MAX_BYTES)
-          : decoded,
-        ...(truncated
-          ? {
-              note: `Truncated at ${BUILDER_GITHUB_FILE_MAX_BYTES} bytes. Read a narrower path if you need the rest.`,
-            }
-          : {}),
+        size: file.size,
+        ...sliceFileLines(file.text, lines),
       };
     } catch (error) {
       return this.failure('read_failed', error);
     }
+  }
+
+  /** A file's whole text, or why it has none. Throws on a failed call. */
+  private async fetchText(
+    repo: string,
+    path: string,
+    ref?: string,
+  ): Promise<
+    | { text: string; size: number }
+    | { error: string; message?: string; path?: string }
+  > {
+    const location = this.locate(repo);
+    const get = (contentPath: string) =>
+      axios.get(
+        `https://api.github.com/repos/${location.fullName}/contents/${contentPath}`,
+        {
+          headers: this.headers,
+          params: ref ? { ref } : undefined,
+          timeout: 20_000,
+        },
+      );
+    let response;
+    try {
+      response = await get(
+        location.folder ? `${location.folder}/${path}` : path,
+      );
+    } catch (error) {
+      // A pinned ref from before the cutover is a commit of the old service
+      // repo, where the service is the root (see serviceTree).
+      if (!location.folder || !ref || !isNotFound(error)) throw error;
+      response = await get(path);
+    }
+    const data = response.data;
+    if (Array.isArray(data)) {
+      return {
+        error: 'path_is_directory',
+        message: `"${path}" is a directory — use github_repo_tree instead.`,
+      };
+    }
+    if (data?.encoding === 'base64' && typeof data?.content === 'string') {
+      return {
+        text: Buffer.from(data.content, 'base64').toString('utf8'),
+        size: Number(data.size ?? 0),
+      };
+    }
+    if (data?.encoding === 'none' && data?.download_url) {
+      // Over 1 MB the contents API sends no body; the raw file is a second call.
+      const raw = await axios.get(String(data.download_url), {
+        headers: this.headers,
+        responseType: 'text',
+        transformResponse: (body) => body,
+        timeout: 20_000,
+      });
+      return { text: String(raw.data ?? ''), size: Number(data.size ?? 0) };
+    }
+    return { error: 'unreadable_file', path };
+  }
+
+  /**
+   * Line numbers for the first few search hits, so the agent can read the part that matched
+   * with `startLine` rather than the whole file. Each file is a contents call, so only the top
+   * hits get one, in parallel, and a failure leaves that hit without lines.
+   */
+  private async withLineNumbers(
+    results: { repo: string; path: string }[],
+    terms: string[],
+  ): Promise<
+    { repo: string; path: string; lines?: { line: number; text: string }[] }[]
+  > {
+    const numbered = await Promise.all(
+      results.slice(0, SEARCH_HITS_WITH_LINES).map(async (hit) => {
+        try {
+          const file = await this.fetchText(hit.repo, hit.path);
+          if ('error' in file) return hit;
+          const lines = matchingLines(file.text, terms);
+          return lines.length ? { ...hit, lines } : hit;
+        } catch {
+          return hit;
+        }
+      }),
+    );
+    return [...numbered, ...results.slice(SEARCH_HITS_WITH_LINES)];
   }
 
   /**

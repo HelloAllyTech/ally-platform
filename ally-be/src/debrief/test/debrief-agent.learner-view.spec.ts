@@ -4,7 +4,6 @@ import {
   LIVE_START_DELAY_MS,
   learnerProgress,
 } from '../service/debrief-agent.service';
-import { DEBRIEF_FALLBACK_TO_TODAY_EVENT } from '../util/debrief-live.util';
 
 function build(opts: {
   owner?: number;
@@ -47,7 +46,6 @@ function build(opts: {
               ],
     ),
   };
-  const events = { emit: jest.fn() };
   const runs = { find: jest.fn(async () => opts.runs ?? []) };
   const overrides = {
     save: jest.fn(async () => undefined),
@@ -72,6 +70,7 @@ function build(opts: {
     overrides as any,
     { debriefAgentMode: opts.mode ?? 'shadow' } as any,
     {
+      inCourse: jest.fn(async () => false),
       available: jest.fn(async (_u: number, _t: string, ids: number[]) =>
         ids
           .filter((id) => id === 41)
@@ -84,15 +83,19 @@ function build(opts: {
     undefined,
     undefined,
     undefined,
-    events as any,
   );
 }
 
-/** Whether the view asked the session service for today's debrief. */
+/**
+ * The old post-session note is retired: the view must never ask for it to be
+ * written, mark the run, or emit anything for it.
+ */
 const askedForToday = (svc: DebriefAgentService) =>
-  ((svc as any).events.emit as jest.Mock).mock.calls.some(
-    ([name]) => name === DEBRIEF_FALLBACK_TO_TODAY_EVENT,
-  );
+  ((svc as any).dataSource.query as jest.Mock).mock.calls.some(
+    ([sql]) => typeof sql === 'string' && sql.includes('fallbackToToday'),
+  ) ||
+  typeof (svc as any).fallBackToToday === 'function' ||
+  typeof (svc as any).requestTodaysDebrief === 'function';
 
 describe('DebriefAgentService.learnerView', () => {
   it('refuses anyone but the learner who did the session', async () => {
@@ -195,6 +198,36 @@ describe('DebriefAgentService.learnerView', () => {
     });
   });
 
+  it('inside a course, serves no practise card and no roleplay link, even on a debrief written before the rule', async () => {
+    const svc = build({
+      runs: [
+        {
+          mode: 'live',
+          status: 'published',
+          cards: {
+            opening: 'x',
+            practise_next: {
+              skill: 'Empathy',
+              reason: 'r',
+              scenario_id: 41,
+              try_next: ['a'],
+            },
+            work_on_this: [{ point: 'p', scenario_id: 41 }],
+          },
+          language: 'en',
+          steps: [],
+        },
+      ],
+    });
+    ((svc as any).practice.inCourse as jest.Mock).mockResolvedValue(true);
+    const view = (await svc.learnerView('s', 7)) as any;
+    expect(view.cards.practise_next).toBeUndefined();
+    expect(view.cards.work_on_this).toEqual([
+      { point: 'p', scenario_id: null },
+    ]);
+    expect(view.practice).toEqual([]);
+  });
+
   it('keeps Ask Ally closed after its limit, until the month turns for the month limit', async () => {
     const view = (askAllyLimit: Record<string, unknown>) =>
       build({
@@ -231,13 +264,13 @@ describe('DebriefAgentService.learnerView', () => {
     });
   });
 
-  it('gives today’s debrief when the agent is off or the roleplay’s Debrief tab is off', async () => {
+  it('says not available, regenerating nothing, when the agent is off or the roleplay’s Debrief tab is off', async () => {
     for (const o of [{ mode: 'off' as const }, { debriefTabOff: true }]) {
       const svc = build(o);
       expect(await svc.learnerView('s', 7)).toEqual({
         state: 'not_available',
       });
-      expect(askedForToday(svc)).toBe(true);
+      expect(askedForToday(svc)).toBe(false);
     }
   });
 
@@ -247,10 +280,10 @@ describe('DebriefAgentService.learnerView', () => {
     ).toBe('working');
     const late = build({ endedMinutesAgo: 31 });
     expect(await late.learnerView('s', 7)).toEqual({ state: 'not_available' });
-    expect(askedForToday(late)).toBe(true);
+    expect(askedForToday(late)).toBe(false);
   });
 
-  it('does not ask for today’s debrief again when it is already written', async () => {
+  it('leaves a note already written alone', async () => {
     const svc = build({
       endedMinutesAgo: 31,
       feedback: { supervisorNote: 'today’s note' },
@@ -259,24 +292,17 @@ describe('DebriefAgentService.learnerView', () => {
     expect(askedForToday(svc)).toBe(false);
   });
 
-  it('says "not available" instead of today’s debrief when its provider is not allowed (FR-57)', async () => {
-    const svc = build({
-      endedMinutesAgo: 31,
-      providers: { 'providerAllowed.openai': false },
-    });
-    expect(await svc.learnerView('s', 7)).toEqual({
-      state: 'not_available',
-      stopped: true,
-      reason: 'provider_not_allowed',
-    });
-    expect(askedForToday(svc)).toBe(false);
-    // Another provider switched off: today's debrief is still allowed.
-    const ok = build({
-      endedMinutesAgo: 31,
-      providers: { 'providerAllowed.anthropic': false },
-    });
-    expect(await ok.learnerView('s', 7)).toEqual({ state: 'not_available' });
-    expect(askedForToday(ok)).toBe(true);
+  it('says plain "not available" without regeneration, whichever provider the organisation switched off', async () => {
+    for (const providers of <Array<Record<string, boolean>>>[
+      { 'providerAllowed.openai': false },
+      { 'providerAllowed.anthropic': false },
+    ]) {
+      const svc = build({ endedMinutesAgo: 31, providers });
+      expect(await svc.learnerView('s', 7)).toEqual({
+        state: 'not_available',
+      });
+      expect(askedForToday(svc)).toBe(false);
+    }
   });
 
   it('says when the safety reading found a risk cue, so the support lines show without an important moment', async () => {
@@ -294,6 +320,100 @@ describe('DebriefAgentService.learnerView', () => {
     }).learnerView('s', 7);
     expect(view).toMatchObject({ state: 'ready', riskCue: true });
     expect((view as any).supportLines.length).toBeGreaterThan(0);
+  });
+
+  it('does not bring the support lines for a character’s risk cue when the roleplay’s option says not to, but still for the learner’s own distress', async () => {
+    const run = (extra: Record<string, unknown>) => ({
+      mode: 'live',
+      status: 'published',
+      cards: { opening: 'x' },
+      language: 'en',
+      steps: [],
+      hasRiskCue: true,
+      workspace: {
+        riskCueOption: { key: 'part_of_practice', supportLinesOnCue: false },
+      },
+      ...extra,
+    });
+    const quiet = await build({ runs: [run({})] }).learnerView('s', 7);
+    expect(quiet).toMatchObject({
+      state: 'ready',
+      riskCue: false,
+      distress: false,
+    });
+    const distressed = await build({
+      runs: [run({ learnerDistress: true })],
+    }).learnerView('s', 7);
+    expect(distressed).toMatchObject({ riskCue: false, distress: true });
+    // A run with no record of an option (every run before them) behaves as today.
+    const legacy = await build({
+      runs: [run({ workspace: {} })],
+    }).learnerView('s', 7);
+    expect(legacy).toMatchObject({ riskCue: true });
+  });
+
+  describe('the follow-up notice (a clear risk cue the debrief still leaves out)', () => {
+    const run = (extra: Record<string, unknown>) => ({
+      mode: 'live',
+      status: 'below_bar',
+      cards: { opening: 'x' },
+      language: 'en',
+      steps: [],
+      hasRiskCue: true,
+      ...extra,
+    });
+    const view = (r: Record<string, unknown>) =>
+      build({ runs: [run(r)] }).learnerView('s', 7) as Promise<any>;
+
+    it('is true when the best draft left a clear cue uncovered', async () => {
+      expect(
+        await view({ checkFailures: [{ code: 'risk_cue_uncovered' }] }),
+      ).toMatchObject({ state: 'ready', followUp: true });
+    });
+
+    it('is true when the Evaluator found a missed clear cue, or the decision says so', async () => {
+      expect(
+        await view({ evaluatorHardFails: [{ code: 'missed_risk_cue' }] }),
+      ).toMatchObject({ followUp: true });
+      expect(
+        await view({
+          workspace: { decision: { reviewReason: 'missed_risk_cue' } },
+        }),
+      ).toMatchObject({ followUp: true });
+    });
+
+    it('is absent when the clear cue was covered, with or without other failed checks', async () => {
+      const covered = await view({
+        status: 'published',
+        checkFailures: [],
+        evaluatorHardFails: [],
+      });
+      expect(covered).not.toHaveProperty('followUp');
+      expect(
+        await view({ checkFailures: [{ code: 'quote_mismatch' }] }),
+      ).not.toHaveProperty('followUp');
+    });
+
+    it('is absent with no risk cue at all, and for a possible cue that raised nothing', async () => {
+      expect(
+        await view({
+          hasRiskCue: false,
+          checkFailures: [{ code: 'risk_cue_uncovered' }],
+        }),
+      ).not.toHaveProperty('followUp');
+      // A possible-only cue never fails the coverage check or raises the hard fail.
+      expect(await view({})).not.toHaveProperty('followUp');
+    });
+
+    it('never changes what the learner reads: the cards and the support lines are the same', async () => {
+      const plain = await view({});
+      const flagged = await view({
+        checkFailures: [{ code: 'risk_cue_uncovered' }],
+      });
+      const { followUp, ...rest } = flagged;
+      expect(followUp).toBe(true);
+      expect(rest).toEqual(plain);
+    });
   });
 
   it('gives Tele-MANAS when the organisation set no support lines', async () => {
@@ -448,7 +568,7 @@ describe('DebriefAgentService.learnerView', () => {
       expect(await svc.learnerView('s', 7)).toEqual({
         state: 'not_available',
       });
-      expect(askedForToday(svc)).toBe(true);
+      expect(askedForToday(svc)).toBe(false);
     }
   });
 });
@@ -498,7 +618,10 @@ describe('DebriefAgentService.onSessionEnded', () => {
       releases as any,
       overrides as any,
       { debriefAgentMode: mode } as any,
-      { available: jest.fn(async () => []) } as any,
+      {
+        inCourse: jest.fn(async () => false),
+        available: jest.fn(async () => []),
+      } as any,
       { ready: jest.fn(async () => undefined) } as any,
     );
     return { svc, runner };

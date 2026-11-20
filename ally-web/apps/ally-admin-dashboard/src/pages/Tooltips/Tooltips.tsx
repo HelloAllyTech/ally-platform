@@ -126,7 +126,23 @@ export const TooltipManagement: React.FC = () => {
       if (response.error) {
         toast.error(en.errors.failedToUpdateTooltip);
       } else {
-        toast.success(en.tooltip.tooltipUpdated);
+        // Instant save, so offer the way back: restore the previous values.
+        toast.success(en.tooltip.tooltipUpdated, {
+          id: `tooltip-saved-${originalTooltip.id}`,
+          action: {
+            label: "Undo",
+            onClick: () => {
+              void updateTooltip({
+                id: originalTooltip.id,
+                data: {
+                  location: originalTooltip.location,
+                  tipText: originalTooltip.tipText,
+                  active: originalTooltip.active,
+                },
+              });
+            },
+          },
+        });
       }
     },
     [tooltips, updateTooltip],

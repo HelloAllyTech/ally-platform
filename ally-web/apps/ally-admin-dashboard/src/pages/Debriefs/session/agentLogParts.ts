@@ -234,12 +234,9 @@ export const keyLabel = (k: string): string => {
 
 /** The short header lines a model's message opens with ("SESSION LANGUAGE: hi-IN"). */
 export const givenFacts = (e: AgentLogEntry): { label: string; value: string }[] => {
-  if (typeof e.input !== "string") {
-    // A code step's plain values (numbers, yes/no, words) read inline, not behind a button.
-    return Object.entries(asObj(e.input) ?? {})
-      .filter(([, v]) => v === null || typeof v !== "object")
-      .map(([k, v]) => ({ label: keyLabel(k), value: plainText(v) }));
-  }
+  // A code step's plain values (numbers, units, yes/no) are drawn by the page, which keeps
+  // the ones worth reading inline and the rest under "Show details" (agentLogReadable.ts).
+  if (typeof e.input !== "string") return [];
   const head = e.input.replace(SYSTEM_PROMPT_MARKER, "").replace(TAG, "");
   const out: { label: string; value: string }[] = [];
   for (const line of head.split("\n")) {

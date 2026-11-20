@@ -1,3 +1,5 @@
+import { usageContext } from 'src/billing/context/usage-context';
+import { UsageChannel, UsageKind } from 'src/billing/enum/billing.enum';
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { isHealthPack } from '../../bot-draft/safety-pack/safety-packs';
@@ -43,6 +45,23 @@ export class SummaryService {
 
   /** After a reply. Never throws. True when a new summary was stored. */
   async afterTurn(
+    chatbot: Pick<Chatbot, 'id' | 'safetyPack'>,
+    conversationId: string,
+  ): Promise<boolean> {
+    // CR1: the summary's model call belongs to this assistant and chat (its own run id).
+    return usageContext.with(
+      {
+        runId: undefined,
+        chatbotId: chatbot.id,
+        conversationId,
+        channel: usageContext.current()?.channel ?? UsageChannel.OTHER,
+        runKind: UsageKind.CUSTOMER_REPLY,
+      },
+      () => this.afterTurnInContext(chatbot, conversationId),
+    );
+  }
+
+  private async afterTurnInContext(
     chatbot: Pick<Chatbot, 'id' | 'safetyPack'>,
     conversationId: string,
   ): Promise<boolean> {

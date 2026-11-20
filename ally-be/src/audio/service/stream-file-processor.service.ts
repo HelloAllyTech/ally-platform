@@ -83,6 +83,14 @@ export class StreamFileProcessorService
   private static readonly CHECKPOINT_INTERVAL_MS = 30_000;
   private checkpointTimer?: NodeJS.Timeout;
 
+  /**
+   * Recordings whose finalize (flush, complete the upload, dispatch
+   * transcription) is running. endCallStream removes a recording from
+   * activeCallStreams as it STARTS that work, so on shutdown "not active" is
+   * not "safe": waitForFinalized() also waits for these.
+   */
+  private readonly finalizing = new Map<number, Promise<unknown>>();
+
   private activeCallStreams: {
     [key: string]: {
       parts: Array<{
@@ -376,10 +384,14 @@ export class StreamFileProcessorService
       tempFiles.push(tempFilePath0, tempFilePath1);
 
       // Create encrypted streams using AudioEncryptionUtil
-      const encryptionStream0 =
-        AudioEncryptionUtil.createEncryptionStream(tempFilePath0);
-      const encryptionStream1 =
-        AudioEncryptionUtil.createEncryptionStream(tempFilePath1);
+      const encryptionStream0 = AudioEncryptionUtil.createEncryptionStream(
+        tempFilePath0,
+        (error) => this.onRecordingWriteError(chatId!, error),
+      );
+      const encryptionStream1 = AudioEncryptionUtil.createEncryptionStream(
+        tempFilePath1,
+        (error) => this.onRecordingWriteError(chatId!, error),
+      );
 
       // Create audio upload record using entityManager
       await this.chatAudioUploadsService.createAudioUpload(
@@ -576,8 +588,10 @@ export class StreamFileProcessorService
     );
 
     // Create new encryption stream
-    const newEncryptionStream =
-      AudioEncryptionUtil.createEncryptionStream(newTempFilePath);
+    const newEncryptionStream = AudioEncryptionUtil.createEncryptionStream(
+      newTempFilePath,
+      (error) => this.onRecordingWriteError(chatId, error),
+    );
     fileToFlush.tempFilePath = newTempFilePath;
     fileToFlush.cipher = newEncryptionStream.cipher;
     fileToFlush.writeStream = newEncryptionStream.writeStream;
@@ -622,6 +636,10 @@ export class StreamFileProcessorService
       });
       return;
     }
+
+    // Its file can't be written (see onRecordingWriteError): writing more
+    // would only buffer it in memory, so drop it.
+    if (activeCallStream.partUploadFailed) return;
 
     const audioBuffer = this.processPendingAudioQueue(
       activeCallStream.callId,
@@ -728,7 +746,64 @@ export class StreamFileProcessorService
     });
   }
 
-  async endCallStream({
+  async endCallStream(
+    args: Parameters<StreamFileProcessorService['finalizeCallStream']>[0],
+  ) {
+    const owned = Boolean(this.activeCallStreams[args.chatId]);
+    const work = this.finalizeCallStream(args);
+    if (!owned) return work;
+    this.finalizing.set(args.chatId, work);
+    try {
+      return await work;
+    } finally {
+      if (this.finalizing.get(args.chatId) === work) {
+        this.finalizing.delete(args.chatId);
+      }
+    }
+  }
+
+  /**
+   * Shutdown: wait until each of these recordings is finalized here (flushed,
+   * upload completed, transcription dispatched) or isn't held by this replica,
+   * for up to `timeoutMs`. Returns the chat ids still not finalized.
+   *
+   * The end that triggers finalizing runs in an async CHAT_ENDED listener, and
+   * Nest kills the process right after its shutdown hooks — so without this a
+   * deploy dropped every live recording's audio, mid-finalize.
+   */
+  async waitForFinalized(
+    chatIds: number[],
+    timeoutMs: number,
+  ): Promise<number[]> {
+    const deadline = Date.now() + timeoutMs;
+    const pending = () =>
+      chatIds.filter(
+        (id) => Boolean(this.activeCallStreams[id]) || this.finalizing.has(id),
+      );
+    let left = pending();
+    while (left.length > 0 && Date.now() < deadline) {
+      const running = left
+        .map((id) => this.finalizing.get(id))
+        .filter((p): p is Promise<unknown> => Boolean(p));
+      // Wake on a finalize settling, or poll: a finalize not started yet (its
+      // listener hasn't run) has no promise to wait on. Never race an empty
+      // allSettled: it resolves at once and the loop would spin without
+      // yielding to the timers it is waiting for.
+      await Promise.race([
+        ...(running.length > 0 ? [Promise.allSettled(running)] : []),
+        new Promise((resolve) =>
+          setTimeout(
+            resolve,
+            Math.min(100, Math.max(0, deadline - Date.now())),
+          ),
+        ),
+      ]);
+      left = pending();
+    }
+    return left;
+  }
+
+  private async finalizeCallStream({
     chatId,
     provider,
     userId,
@@ -990,6 +1065,27 @@ export class StreamFileProcessorService
         },
       });
     }
+  }
+
+  /**
+   * A recording's temp file could not be written (a full disk, a missing
+   * directory). Fail that recording, not the process: stop writing to it, and
+   * endCallStream then marks its summary FAILED with the reason, as it does
+   * for a failed part upload.
+   */
+  private onRecordingWriteError(chatId: number, error: Error): void {
+    const stream = this.activeCallStreams[chatId];
+    if (stream) stream.partUploadFailed = true;
+    this.logger.error(
+      `Recording file write failed; this recording is lost | ChatId: ${chatId} | ${error.message}`,
+    );
+    this.auditLogger.log({
+      eventType: AUDIT_EVENTS.AUDIO_PROCESSING_FAILED,
+      details: {
+        chatId,
+        reason: `Recording file write failed: ${error.message}`,
+      },
+    });
   }
 
   clearPendingAudioQueue(callId: string) {

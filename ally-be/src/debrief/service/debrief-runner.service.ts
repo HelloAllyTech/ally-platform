@@ -9,7 +9,6 @@ import { AgentRelease } from '../../llm-agent/entity/agent-release.entity';
 import { DebriefChangeHoldsService } from './debrief-change-holds.service';
 import { withPinnedPrompts } from '../util/debrief-releases.util';
 import {
-  DEBRIEF_AGENT_KEY,
   DEBRIEF_APPROVED_PROVIDERS,
   DEBRIEF_PROMPT_CODES,
   DEBRIEF_SEED_BUNDLE,
@@ -19,10 +18,13 @@ import {
   DebriefModelCatalog,
   DEBRIEF_ORCHESTRATOR_PROMPT_CODES,
   DEBRIEF_SESSION_BUDGET_DEFAULT,
+  GUIDANCE_TOOLS_DEFAULT,
   isOrchestrated,
+  isThinSession,
   orchestratorModels,
   validateDebriefBundle,
 } from '../constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
 import { DebriefRun } from '../entity/debrief-run.entity';
 import {
   DebriefRunArm,
@@ -51,6 +53,22 @@ import {
   PromptVersions,
 } from './debrief-run-logs.service';
 import { DebriefPracticeService } from './debrief-practice.service';
+import { DebriefFrameworkService } from './debrief-framework.service';
+import { resolveRiskCue } from '../util/debrief-risk-cue.util';
+import { checkTransition } from '../util/debrief-run-status.util';
+import { Degraded } from '../util/debrief-degraded.util';
+import { canonicalHash } from '../../llm-agent/harness/release/canonical-hash.util';
+import { DEBRIEF_CONTRACT_VERSION } from '../util/debrief-graph-contract.util';
+import {
+  DataProvider,
+  debriefDataProviders,
+  loadDebriefData,
+} from './debrief-data-providers';
+import {
+  roleplayBrief,
+  roleplayFieldProblems,
+} from '../util/debrief-roleplay-brief.util';
+import { emptyFramework } from '../constants/debrief-framework.constants';
 import {
   DEBRIEF_ORCHESTRATOR_TOOLS,
   DEBRIEF_GATEWAY_TOOLS,
@@ -103,12 +121,16 @@ export interface RunOptions {
 /** The prompts the debrief graph's steps run, whether or not a release pins them. */
 const GRAPH_PROMPT_CODES: readonly string[] = [
   DEBRIEF_PROMPT_CODES.safetyReader,
+  DEBRIEF_PROMPT_CODES.riskCueDefinition,
   DEBRIEF_PROMPT_CODES.analyst,
   DEBRIEF_PROMPT_CODES.progressReader,
   DEBRIEF_PROMPT_CODES.progress,
+  DEBRIEF_PROMPT_CODES.guidanceAgent,
   DEBRIEF_PROMPT_CODES.writer,
   DEBRIEF_PROMPT_CODES.reviser,
   DEBRIEF_PROMPT_CODES.rubric,
+  DEBRIEF_PROMPT_CODES.evaluator,
+  DEBRIEF_PROMPT_CODES.evaluatorFix,
 ];
 
 /** An optional read that can never fail the run: any error gives the fallback. */
@@ -123,7 +145,8 @@ async function orFallback<T>(read: () => Promise<T>, fallback: T): Promise<T> {
 /** Why a run ended before it reached the graph, by its skip reason. */
 const END_WHY: Record<string, string> = {
   no_session: 'Stopped: the session could not be found.',
-  too_short: 'No debrief: the learner said nothing in the session.',
+  too_short:
+    'No debrief: the learner said too little in the session to coach on.',
   no_transcript: 'No debrief: the session has no transcript.',
   monthly_cap:
     'Held for a person: this month’s debrief budget is spent, so no run could start.',
@@ -184,6 +207,9 @@ export class DebriefRunnerService {
     DebriefRunnerService.name,
   );
 
+  /** Where each piece of context data comes from (one provider each). */
+  private readonly dataProviders: DataProvider[];
+
   constructor(
     @InjectRepository(DebriefRun)
     private readonly runs: Repository<DebriefRun>,
@@ -192,7 +218,7 @@ export class DebriefRunnerService {
     private readonly tokens: DebriefRunTokenService,
     private readonly config: AppConfigService,
     private readonly releases: AgentReleaseService,
-    private readonly practice: DebriefPracticeService,
+    practice: DebriefPracticeService,
     private readonly llmModels: LlmModelService,
     private readonly agentLogs: DebriefRunLogsService,
     @Optional() private readonly ownerSettings?: DebriefSettingsService,
@@ -201,7 +227,11 @@ export class DebriefRunnerService {
     private readonly progressResults?: Repository<DebriefProgressResult>,
     /** V2_AUTONOMY A9: a language pinned to another release. Absent in unit tests. */
     @Optional() private readonly holds?: DebriefChangeHoldsService,
-  ) {}
+    /** The organisation's skill frameworks (Context Library). Absent in unit tests: none. */
+    @Optional() private readonly frameworks?: DebriefFrameworkService,
+  ) {
+    this.dataProviders = debriefDataProviders({ context, practice });
+  }
 
   /**
    * The LLM catalog as the release check reads it. Its service falls back to
@@ -219,6 +249,7 @@ export class DebriefRunnerService {
   /** The GA bundle, or the seed when GA is missing or does not validate. */
   async resolveRelease(
     release?: AgentRelease | null,
+    degraded?: Degraded,
   ): Promise<{ release: AgentRelease | null; bundle: DebriefBundle }> {
     const r = release ?? (await this.releases.getGa(DEBRIEF_AGENT_KEY));
     const problems = r
@@ -229,9 +260,10 @@ export class DebriefRunnerService {
       // write the release runs with what it has recorded so far.
       const pins = r.id
         ? await this.pinPrompts(r).catch((e) => {
-            this.logger.warn(
+            this.logger.error(
               `[debrief] could not record prompt versions for release v${r.version}: ${(e as Error).message}`,
             );
+            degraded?.note('prompt_pins', null, e);
             return (
               (r.changeSet as Record<string, any> | null)?.pinnedPrompts ?? null
             );
@@ -296,13 +328,17 @@ export class DebriefRunnerService {
     const now = opts.now ?? Date.now;
     // V2_AUTONOMY A9: a production session whose language is pinned (a change
     // held or undone for it, or live only for it) runs on the pinned release.
-    // A pin that cannot be read never fails the run: the release in force runs.
+    // A pin that cannot be read fails the attempt (nothing is claimed, the drain
+    // starts it again) rather than running a pinned language on the release in force.
     const pinned =
       !opts.release && opts.mode !== DebriefRunMode.REPLAY
-        ? await this.holds?.releaseForSession(sessionId).catch(() => null)
+        ? await this.holds?.releaseForSession(sessionId)
         : null;
+    // Every read that falls back to a default for this run: noted on the run once it exists.
+    const degraded = new Degraded(this.logger);
     const { release, bundle: released } = await this.resolveRelease(
       opts.release ?? pinned,
+      degraded,
     );
     const bundle: DebriefBundle = {
       ...released,
@@ -324,9 +360,11 @@ export class DebriefRunnerService {
       const prepared = await this.prepare(run, sessionId, opts, release, {
         bundle,
         now,
+        degraded,
       });
       if ('ended' in prepared) return prepared.ended;
-      const retries = Number(run.workspace?.retries ?? 0) || 0;
+      const retries =
+        Number(run.retries ?? 0) || Number(run.workspace?.retries ?? 0) || 0;
       const res = await this.graph.run(
         {
           ...prepared.request,
@@ -339,6 +377,9 @@ export class DebriefRunnerService {
             isOrchestrated(bundle)
               ? [...DEBRIEF_GATEWAY_TOOLS, ...DEBRIEF_ORCHESTRATOR_TOOLS]
               : DEBRIEF_GATEWAY_TOOLS,
+            // Which step may call which guidance tool, enforced by the gateway.
+            (bundle.settings.guidanceTools as Record<string, string[]>) ??
+              GUIDANCE_TOOLS_DEFAULT,
           ),
           gateway_url: `${this.config.publicApiBaseUrl.replace(/\/+$/, '')}/api/v1/internal/debrief`,
         },
@@ -396,12 +437,16 @@ export class DebriefRunnerService {
     sessionId: string,
     opts: RunOptions,
     release: AgentRelease | null,
-    { bundle: released, now }: { bundle: DebriefBundle; now: () => number },
+    {
+      bundle: released,
+      now,
+      degraded,
+    }: { bundle: DebriefBundle; now: () => number; degraded: Degraded },
   ): Promise<Prepared> {
     let bundle = released;
     const settings = bundle.settings;
     const resumed = !!opts.resume;
-    const session = await this.context.loadSession(sessionId);
+    const session = await this.context.loadSession(sessionId, degraded);
     if (!session) {
       return {
         ended: await this.finish(run, DebriefRunStatus.SKIPPED, {
@@ -454,6 +499,7 @@ export class DebriefRunnerService {
     // and `language_recorded: false`; the graph reads the language from what
     // the learner wrote and answers it with `language` and
     // `workspace.languageSource` (the Console counts these per organisation).
+    if (session.languageRecorded) run.languageSource = 'recorded';
     run.workspace = {
       ...run.workspace,
       ...(session.languageRecorded ? { languageSource: 'recorded' } : {}),
@@ -479,9 +525,8 @@ export class DebriefRunnerService {
     // providers gets the release with only those providers' models — never
     // another company. A step whose models are all disallowed runs on a
     // priced model from the catalogue on an allowed provider (same tier
-    // first). Only when none exists does the run end, and the learner gets
-    // today's debrief (or "not available" when today's provider is not
-    // allowed either; DebriefAgentService.fallBackToToday).
+    // first). Only when none exists does the run end, and the learner reads
+    // "not available".
     const allowed = await this.context.providerAllowlist(session.tenantId);
     const everyAllowed = DEBRIEF_APPROVED_PROVIDERS.every((p) =>
       allowed.includes(p),
@@ -565,66 +610,97 @@ export class DebriefRunnerService {
 
     // Learner progress: the owner settings' switch, then the learner's
     // profile. Never blocks a debrief: unreadable means no profile.
-    const owner = await orFallback(
+    const owner = await degraded.or(
+      'owner_settings',
+      null,
       async () => (await this.ownerSettings?.get()) ?? defaultOwnerSettings(),
       defaultOwnerSettings(),
     );
 
     // The context the graph's steps read. The optional reads never block a
     // debrief: unreadable means none.
-    const [
-      liveDetections,
-      caseMemory,
-      pastWorkOnThis,
-      cohort,
-      practiceOptions,
-      { texts: prompts, versions: promptVersions },
-      availability,
-      progressProfile,
-    ] = await Promise.all([
-      orFallback(
-        () => this.context.liveDetections(sessionId, session.scenarioId),
-        [],
-      ),
-      recipe.key === DebriefRecipeKey.CASE
-        ? orFallback(() => this.context.caseMemory(session.id), null)
-        : Promise.resolve(null),
-      session.counselorId
-        ? orFallback(
-            () =>
-              this.context.pastWorkOnThis(
-                session.counselorId!,
-                session.tenantId,
-                sessionId,
-              ),
-            [],
-          )
-        : Promise.resolve([]),
-      orFallback(() => this.context.cohortStats(session), null),
-      this.practice.optionsFor(
-        session.counselorId,
-        session.tenantId,
-        sessionId,
-      ),
-      this.prompts(bundle, opts.promptOverrides),
-      // What the orchestrator's planner may build on (spec A5: presence of
-      // org protocols, past debriefs, cohort and course data), cheap counts.
-      isOrchestrated(bundle)
-        ? orFallback(() => this.context.availability(session), null)
-        : Promise.resolve(null),
-      owner.progressOn && session.counselorId
-        ? orFallback(
-            () =>
-              this.context.progressProfile(
-                session.counselorId!,
-                session.tenantId,
-                sessionId,
-                progressSettings(owner),
-              ),
-            null,
-          )
-        : Promise.resolve(null),
-    ]);
+    // The skill frameworks the learner's organisation can read (spec DEBRIEF_ACROSS_ROLEPLAYS §4);
+    // none or unreadable means only the roleplay's own competencies, so it can never stop a debrief.
+    const framework = this.frameworks
+      ? await this.frameworks.forTenant(session.tenantId)
+      : emptyFramework();
+    const riskCue = resolveRiskCue(session.riskCueOption);
+    const competencyNames = (session.competencies ?? []).map((c) => c.name);
+    const [{ texts: prompts, versions: promptVersions }, loaded] =
+      await Promise.all([
+        this.prompts(bundle, opts.promptOverrides, degraded),
+        // Every piece of context data, each from its one provider (debrief-data-providers.ts).
+        loadDebriefData(this.dataProviders, {
+          session,
+          sessionId,
+          recipeKey: recipe.key,
+          orchestrated: isOrchestrated(bundle),
+          progressOn: owner.progressOn,
+          progressProfile: () =>
+            this.context.progressProfile(
+              session.counselorId!,
+              session.tenantId,
+              sessionId,
+              progressSettings(owner),
+              { framework, competencies: competencyNames },
+              degraded,
+            ),
+        }),
+      ]);
+    const liveDetections = (loaded.context.live_detections ?? []) as unknown[];
+    const caseMemory = loaded.context.case_memory;
+    const cohort = loaded.context.cohort;
+    // A roleplay field in the wrong shape is skipped by the brief; say so on the run.
+    for (const p of roleplayFieldProblems(
+      session.roleplayFields,
+      bundle.settings?.roleplayFields,
+    )) {
+      loaded.problems.push({
+        contextKey: 'scenario',
+        item: 'roleplay_brief',
+        why: `${p.label}: ${p.why}`,
+      });
+    }
+    // Reads that fell back (this method's, the pins', the session's) join the providers' notes.
+    loaded.problems.push(...degraded.notes);
+    if (loaded.problems.length) {
+      // A run that read less than it should says so; the Agent logs can show it.
+      this.logger.warn(
+        `[debrief] ${sessionId}: ${loaded.problems.map((p) => `${p.contextKey} (${p.why})`).join('; ')}`,
+      );
+      run.workspace = { ...run.workspace, dataNotes: loaded.problems };
+    }
+    run.riskCueHandling = riskCue.handling;
+    // What this run ran, so it can be reproduced without a join.
+    run.bundleHash = canonicalHash(bundle);
+    run.promptVersions = Object.fromEntries(
+      Object.entries(promptVersions).map(([code, v]) => [
+        code,
+        v && typeof v === 'object' ? 'override' : v,
+      ]),
+    );
+    run.workspace = {
+      ...run.workspace,
+      // What this run used, kept so a later edit never changes how a past debrief reads.
+      // Not `framework`: the graph's answer writes its own key of that name into the workspace.
+      frameworkUsed: {
+        id: framework.id,
+        ids: framework.ids,
+        name: framework.name,
+        areas: framework.areas.map((a) => a.name),
+      },
+      riskCueOption: {
+        key: riskCue.key,
+        name: riskCue.name,
+        version: riskCue.version,
+        handling: riskCue.handling,
+        supportLinesOnCue: riskCue.supportLinesOnCue,
+        wordListRaises: riskCue.wordListRaises,
+        // Always null now: the pinned definition is the only one (older runs may hold a wording).
+        wording: riskCue.wording,
+      },
+      speakerLabels: bundle.settings?.neutralWording ? 'neutral' : 'legacy',
+    };
     if (liveDetections.length) {
       run.workspace = { ...run.workspace, liveDetections };
     }
@@ -639,6 +715,7 @@ export class DebriefRunnerService {
 
     return {
       request: {
+        contract_version: DEBRIEF_CONTRACT_VERSION,
         run_id: run.id,
         scenario_session_id: sessionId,
         mode: opts.mode,
@@ -656,17 +733,21 @@ export class DebriefRunnerService {
           ? { allow_over_ceiling: true }
           : {}),
         prices: modelPrices(models),
-        session: sessionForGraph(session),
-        transcript,
-        context: {
-          live_detections: liveDetections,
-          past_work_on_this: pastWorkOnThis,
-          cohort,
-          case_memory: caseMemory,
-          practice_options: practiceOptions,
-          ...(availability ? { availability } : {}),
-          progress_profile: progressProfile,
+        session: {
+          ...sessionForGraph(session, bundle.settings?.roleplayFields),
+          framework,
+          risk_cue: {
+            key: riskCue.key,
+            name: riskCue.name,
+            handling: riskCue.handling,
+            word_list_raises: riskCue.wordListRaises,
+          },
+          speaker_labels: bundle.settings?.neutralWording
+            ? 'neutral'
+            : 'legacy',
         },
+        transcript,
+        context: loaded.context as DebriefGraphRequest['context'],
       },
       promptVersions,
       counselorId: session.counselorId,
@@ -681,6 +762,7 @@ export class DebriefRunnerService {
   private async prompts(
     bundle: DebriefBundle,
     overrides: Record<string, string> = {},
+    degraded?: Degraded,
   ): Promise<{
     texts: Record<string, string | null>;
     versions: PromptVersions;
@@ -700,13 +782,18 @@ export class DebriefRunnerService {
           (await this.context.promptText(code, bundle.prompts?.[code] ?? null)),
       ),
     );
-    const current = await orFallback(
-      () =>
-        this.context.currentPromptVersions(
-          codes.filter((c) => bundle.prompts?.[c] == null && !overrides[c]),
-        ),
-      {} as Record<string, number>,
-    );
+    const readCurrent = () =>
+      this.context.currentPromptVersions(
+        codes.filter((c) => bundle.prompts?.[c] == null && !overrides[c]),
+      );
+    const current = degraded
+      ? await degraded.or(
+          'prompt_versions',
+          null,
+          readCurrent,
+          {} as Record<string, number>,
+        )
+      : await orFallback(readCurrent, {} as Record<string, number>);
     const versions: PromptVersions = Object.fromEntries(
       codes.map((code, i) => [
         code,
@@ -737,6 +824,10 @@ export class DebriefRunnerService {
     }
     const status = res.status as DebriefRunStatus;
     run.workspace = { ...run.workspace, ...(res.workspace ?? {}) };
+    const source = run.workspace.languageSource;
+    if (typeof source === 'string' && source) {
+      run.languageSource = source.slice(0, 40);
+    }
     if (status === DebriefRunStatus.FAILED && !run.workspace.decision) {
       run.workspace = {
         ...run.workspace,
@@ -747,13 +838,18 @@ export class DebriefRunnerService {
         },
       };
     }
+    checkTransition(run.status, status, this.logger, 'the graph answer');
     Object.assign(run, {
       status,
       skipReason: res.skip_reason ?? null,
       recipeKey: res.recipe_key ?? run.recipeKey ?? null,
       cards: res.cards ?? null,
       steps: res.steps ?? [],
-      estimatedCostUsd: Number(res.estimated_cost_usd ?? 0).toFixed(4),
+      // This attempt plus what earlier attempts of a retried run spent.
+      estimatedCostUsd: (
+        Number(res.estimated_cost_usd ?? 0) +
+        Number(run.workspace?.priorEstimatedUsd ?? 0)
+      ).toFixed(4),
       fallbackRung: Math.max(run.fallbackRung ?? 0, res.fallback_rung ?? 0),
       // The graph's language: the recorded one, or the one it read from the
       // learner's turns.
@@ -851,6 +947,7 @@ export class DebriefRunnerService {
         },
       };
     }
+    checkTransition(run.status, status, this.logger, 'the runner');
     Object.assign(run, patch, {
       status,
       steps: [],
@@ -938,6 +1035,7 @@ export class DebriefRunnerService {
 /** The session as the graph reads it (CONTRACT.md §1), in its snake_case. */
 export function sessionForGraph(
   s: DebriefSessionContext,
+  roleplayFields?: unknown,
 ): Record<string, unknown> {
   return {
     id: s.id,
@@ -952,8 +1050,15 @@ export function sessionForGraph(
     language_recorded: s.languageRecorded,
     learner_level: s.learnerLevel,
     learner_turns: s.learnerTurns,
+    learner_words: s.learnerWords,
+    // Too little said to coach on: the graph reads the safety reader first and ends the run as
+    // "too short" unless the learner sounds distressed.
+    thin: isThinSession(s.learnerTurns, s.learnerWords ?? 0),
     scenario_id: s.scenarioId,
-    scenario: s.scenario,
+    // The roleplay's brief: the always-on fields plus the optional ones this release has on.
+    scenario: s.roleplayFields
+      ? roleplayBrief(s.roleplayFields, roleplayFields)
+      : s.scenario,
     expected_behaviours: s.expectedBehaviours,
     helpful_behaviours: s.helpfulBehaviours ?? [],
     unhelpful_behaviours: s.unhelpfulBehaviours ?? [],

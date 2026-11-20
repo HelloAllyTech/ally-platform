@@ -22,7 +22,6 @@ export enum RoadmapOpportunityType {
 export enum RoadmapOpportunityStage {
   NEW = 'new',
   PRIORITISED = 'prioritised',
-  UNDER_DEVELOPMENT = 'under_development',
   RELEASED = 'released',
   ARCHIVED = 'archived',
 }
@@ -70,15 +69,30 @@ export enum RoadmapEmbeddingStatus {
 }
 
 /**
- * Who filed the opportunity, for admin-side filtering only — this has no bearing on
- * permissions or on the create pipeline (both paths run through
+ * Who filed the opportunity, for admin-side filtering and the author shown on the board —
+ * this has no bearing on permissions or on the create pipeline (every path runs through
  * RoadmapOpportunityService.create). Default is STAFF so every pre-existing row and the
  * staff-facing `/opportunities` endpoint need no change.
  */
 export enum RoadmapOpportunitySource {
   STAFF = 'staff',
   CONSUMER = 'consumer',
+  /**
+   * Filed by the PM Agent when an admin accepted one of its cards (src/pm-agent). The board
+   * shows "Product Manager Agent" as the author; `createdBy` is still the accepting admin, for
+   * audit. Same create pipeline and the same readiness gate as a person's filing.
+   */
+  PM_AGENT = 'pm_agent',
+  /**
+   * Filed by the Roadmap cutover (Roadmap v2 P6) for an in-flight direct Builder session that
+   * had no idea: one row per session, lead = the session's creator, already accepted. Written
+   * only by RoadmapOpportunityService.fileMigratedBuilderSession.
+   */
+  MIGRATED_BUILDER_SESSION = 'migrated_builder_session',
 }
+
+/** The author name the board shows for a `pm_agent` opportunity. */
+export const PM_AGENT_AUTHOR_NAME = 'Product Manager Agent';
 
 /**
  * How the board groups its lanes.
@@ -120,4 +134,19 @@ export enum RoadmapReferenceImageContentType {
   PNG = 'image/png',
   WEBP = 'image/webp',
   GIF = 'image/gif',
+}
+
+/**
+ * The Owner's review of a submitted idea (plans/roadmap-builder-merge D10, §2.1a).
+ * A fact on the opportunity, not a stage: deriveItemStage reads it.
+ *
+ * NULL is a legal, permanent state for rows nobody has reviewed through Roadmap v2:
+ * migration 1983000000100 backfilled every row that existed then to ACCEPTED, and a row
+ * filed through the old doors afterwards (flag off) is read as accepted too, the same as
+ * the legacy ideas the plan says count as already accepted.
+ */
+export enum RoadmapReviewState {
+  PENDING = 'pending',
+  ACCEPTED = 'accepted',
+  DECLINED = 'declined',
 }

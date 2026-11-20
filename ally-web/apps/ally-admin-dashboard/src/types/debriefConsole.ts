@@ -115,9 +115,7 @@ export type PmAgentIdeaKind =
   | "registry_agent"
   | "needs_code"
   | "defect"
-  | "needs_person"
-  /** A proposal to change a pinned rule: only the clinical advisor or the owner approves it. */
-  | "pinned_rule";
+  | "needs_person";
 
 /** What the PM agent wrote for a person to act on (routes B, C, D). Never learner quotes. */
 export type PmAgentHandoff = {
@@ -245,15 +243,9 @@ export interface PmAgentIdeaRow {
     replace: string | null;
     settingKey: string | null;
     settingValue: string | null;
-    /** A pinned rule's first version: the text in force, never approved; no find/replace. */
-    firstVersion?: boolean;
-    /** The version a first-version item asks to approve. */
-    version?: number;
   };
   evidence: {
     hypothesis?: string;
-    /** A pinned-rule proposal: who proposed it and why. */
-    proposedBy?: number;
     why?: string;
     evidence?: string;
     expectedEffect?: string;
@@ -311,7 +303,7 @@ export interface PmAgentIdeaRow {
   /** Console redesign item 7 (CONSOLE_API.md "PM agent: approvals"). */
   decidedBy?: number | null;
   decidedAt?: string | null;
-  changeKind?: "settings" | "prompts" | "pinned_rules" | null;
+  changeKind?: "settings" | "prompts" | null;
   /** Open = needs a person, being tested or in canary; closed = everything else. */
   state?: "open" | "closed";
   closedReason?:
@@ -338,7 +330,6 @@ export interface PmAgentIdeaRow {
   } | null;
   approval?: {
     wait:
-      | "pinned_rule"
       | "handoff"
       | "start_quick_test"
       | "promote_budget"
@@ -347,7 +338,7 @@ export interface PmAgentIdeaRow {
       | "start_canary"
       | "promote";
     since: string;
-    /** Null when it never expires (a pinned rule's first version). */
+    /** Null when it never expires. */
     expiresAt: string | null;
     expiresInDays: number | null;
     expired: boolean;
@@ -373,36 +364,7 @@ export interface PmAgentIdeaRow {
     editDraft?: boolean;
     /** Pinned rules: withdraw one's own proposal. */
     withdraw?: boolean;
-    /** Pinned rules: propose a change from this item. */
-    askForChange?: boolean;
   };
-  /** Pinned-rule items only: the rule as it would read, and what else is open on it. */
-  pinnedRule?: PmAgentPinnedRule;
-}
-
-/** One run of a pinned rule's text; `changed` is the proposed wording. */
-export interface PinnedRuleSegment {
-  text: string;
-  changed: boolean;
-}
-
-export interface PmAgentPinnedRule {
-  /** "Safety rules", "Rubric", "Judge's instructions". */
-  name: string;
-  firstVersion: boolean;
-  /** The viewer proposed it. */
-  mine: boolean;
-  proposedBy: number | null;
-  liveVersion: number | null;
-  /** The text in force, which a further change is written against (open items only). */
-  liveText: string | null;
-  /** The whole rule as it would read after the change (open items only). */
-  segments: PinnedRuleSegment[] | null;
-  /** The passage is no longer in the rule: it changed since. */
-  stale: boolean;
-  /** Other open proposals on the same rule. */
-  otherOpen: number;
-  approvedNote: string | null;
 }
 
 export interface PmAgentState {
@@ -577,6 +539,14 @@ export interface DebriefFilterOptions {
 
 export type DebriefPassBreakdownRow = { key: string; debriefs: number } & DebriefPassGroup;
 
+/** How a language's debriefs fare on the language check: those with at least one fault, and how many carry each kind. */
+export interface DebriefLanguageProblem {
+  checked: number;
+  notChecked: number;
+  withFinding: DebriefRate;
+  byType: Record<string, number>;
+}
+
 /** The pass rate and its companions for one group of live debriefs (same definition as the eval). */
 export interface DebriefPassGroup {
   passRate: DebriefRate;
@@ -675,7 +645,13 @@ export interface DebriefMetricsView {
   safetyRecall: DebriefSafetyRecallMetric;
   quality?: {
     byWeek: Array<{ week: string } & DebriefPassGroup>;
-    byLanguage: Array<{ language: string; debriefs: number } & DebriefPassGroup>;
+    byLanguage: Array<
+      {
+        language: string;
+        debriefs: number;
+        languageProblem?: DebriefLanguageProblem;
+      } & DebriefPassGroup
+    >;
     bySegment: Array<
       {
         language: string;

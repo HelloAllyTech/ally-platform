@@ -22,7 +22,10 @@ vi.mock("@api", async importOriginal => ({
 }));
 
 // eslint-disable-next-line import/first
-import { groupLabel, MetricsTab, orchestratorRows, targetState } from "../MetricsTab";
+import { MetricsTab } from "../MetricsTab";
+import { orchestratorRows } from "../metrics/AgentsMetricsSection";
+import { targetState } from "../metrics/metricsData";
+import { groupLabel } from "../metrics/MetricsQualitySection";
 // eslint-disable-next-line import/first
 import { kappaWords } from "../metrics/metricsCharts";
 // eslint-disable-next-line import/first
@@ -41,17 +44,15 @@ const answer = (data: unknown, extra: Record<string, unknown> = {}) => ({
 describe("Debriefs tab: headline tiles", () => {
   beforeEach(() => h.metrics.mockReturnValue(answer(fullView())));
 
-  it("shows pass rate with its 95% range and count, and the other five headline numbers", () => {
+  it("shows the four numbers the chart above does not: hard fails, debriefs, outages, unscored", () => {
     const view = fullView();
     const n = headlineNumbers(view);
     render(<MetricsTab />);
     const tiles = screen.getByTestId("metrics-tiles");
-    const ci = wilson(n.pass.n, n.pass.of);
-    expect(tiles).toHaveTextContent(`${Math.round((n.pass.n / n.pass.of) * 1000) / 10}%`);
-    expect(tiles).toHaveTextContent(`${n.pass.n} of ${n.pass.of} scored debriefs passed`);
-    expect(ci.low).not.toBeNull();
+    // Pass rate and the judge score lead the page in "What Debrief improves".
+    expect(tiles).not.toHaveTextContent("scored debriefs passed");
+    expect(tiles).not.toHaveTextContent("Judge score, mean");
     expect(tiles).toHaveTextContent("Hard-fail rate");
-    expect(tiles).toHaveTextContent("Judge score, mean");
     expect(tiles).toHaveTextContent(String(n.debriefs));
     expect(tiles).toHaveTextContent("Not ready: model unreachable");
     expect(tiles).toHaveTextContent("Not scored yet");
@@ -68,22 +69,10 @@ describe("Debriefs tab: headline tiles", () => {
 describe("Debriefs tab: pass rate", () => {
   beforeEach(() => h.metrics.mockReturnValue(answer(fullView())));
 
-  it("plots pass rate and hard-fail rate by week with a 95% band, and names thin weeks", () => {
+  it("plots the hard-fail rate by week; pass rate by week is the chart above, not repeated", () => {
     render(<MetricsTab />);
-    const pass = JSON.parse(
-      within(screen.getByTestId("metrics-pass-by-week"))
-        .getByTestId("area-chart")
-        .getAttribute("data-series")!,
-    );
-    expect(pass).toHaveLength(12);
-    expect(pass[11]).toMatchObject({ group: "Pass rate", key: "2026-11-09" });
-    expect(pass[11].min).toBeLessThan(pass[11].value);
-    expect(pass[11].max).toBeGreaterThan(pass[11].value);
+    expect(screen.queryByTestId("metrics-pass-by-week")).toBeNull();
     expect(screen.getByTestId("metrics-hard-fail-by-week")).toBeInTheDocument();
-    // The first week has 13 scored debriefs.
-    expect(screen.getByTestId("metrics-quality")).toHaveTextContent(
-      "Too few to read (under 20 scored): 2026-08-24",
-    );
   });
 
   it("keeps the exact numbers in a table view, with the window total summed in the browser", () => {
@@ -99,7 +88,19 @@ describe("Debriefs tab: pass rate", () => {
         ...fullView(),
         quality: {
           byWeek: [{ week: "2026-11-02", ...group(24, 30) }],
-          byLanguage: [{ language: "hi-IN", debriefs: 30, ...group(24, 30) }],
+          byLanguage: [
+            {
+              language: "hi-IN",
+              debriefs: 30,
+              ...group(24, 30),
+              languageProblem: {
+                checked: 25,
+                notChecked: 5,
+                withFinding: { n: 7, of: 25, value: 0.28, low: 0.14, high: 0.48 },
+                byType: { wrong_language: 4, script_mix: 3, quote_altered: 1 },
+              },
+            },
+          ],
           bySegment: [
             {
               language: "hi-IN",
@@ -116,10 +117,12 @@ describe("Debriefs tab: pass rate", () => {
     expect(screen.getByTestId("metrics-quality-headline")).toHaveTextContent(
       "80% (95% range 62.7%–90.5%, 24 of 30)",
     );
-    expect(screen.getByTestId("metrics-tiles")).toHaveTextContent(
-      "95% range 62.7%–90.5%. 24 of 30 scored debriefs passed.",
-    );
     expect(screen.getByTestId("metrics-quality-weeks")).toHaveTextContent("95% range 62%–90%");
+    const lp = screen.getByTestId("metrics-language-problems");
+    expect(lp).toHaveTextContent("Language problems in the debrief text");
+    expect(lp).toHaveTextContent("28%");
+    expect(lp).toHaveTextContent("Wrong language 4 · Mixed scripts 3");
+    expect(lp).not.toHaveTextContent("wrong_language");
   });
 
   it("draws pass rate by language as sorted dots with whiskers, thin groups hollow and labelled", () => {
@@ -131,7 +134,7 @@ describe("Debriefs tab: pass rate", () => {
     expect(lang[3]).toHaveAttribute("data-thin", "true");
     expect(lang[3]).toHaveTextContent("too few to read");
     expect(lang[0]).not.toHaveAttribute("data-thin");
-    expect(lang[0]).toHaveTextContent("Hard fail");
+    expect(lang[0]).toHaveTextContent("Serious problem");
     // The other segments are filters now, not lists.
     expect(screen.queryByTestId("metrics-quality-breakdowns")).toBeNull();
   });
@@ -169,21 +172,6 @@ describe("Debriefs tab: pass rate", () => {
     );
   });
 
-  it("keeps the headline tiles on the whole pass rate while a segment is set", () => {
-    const v = fullView();
-    const whole = {
-      ...v.quality!,
-      byWeek: v.quality!.byWeek.map(w => ({
-        ...w,
-        passRate: { n: 9, of: 10, value: 0.9, low: 0.6, high: 0.98 },
-      })),
-    };
-    h.metrics.mockReturnValue(answer({ ...v, qualityAll: whole }));
-    render(<MetricsTab />);
-    const totalOf = whole.byWeek.length * 10;
-    expect(screen.getByTestId("metrics-tiles")).toHaveTextContent(`of ${totalOf} scored`);
-  });
-
   it("leaves out a pass-rate filter with nothing to offer", () => {
     const v = fullView();
     v.filterOptions = { ...v.filterOptions!, courses: [] };
@@ -206,7 +194,9 @@ describe("Debriefs tab: steering, guardrails, experience, uptake", () => {
     render(<MetricsTab />);
     const g = screen.getByTestId("metrics-guardrails");
     expect(g).toHaveTextContent("Below today's debrief: 13.7%");
-    expect(g).toHaveTextContent("Not above before launch: 7%");
+    // Judge score and thumbs-down repeat the quality score and "Found it helpful" above.
+    expect(g).not.toHaveTextContent("Judge score, median");
+    expect(g).not.toHaveTextContent("Thumbs-down rate");
     // the slowest 10% took 131 s against 120 s
     expect(screen.getByTestId("metrics-guardrails-visible")).toHaveTextContent("Off target");
     expect(screen.getByTestId("metrics-guardrails-cost")).toHaveTextContent("On target");
@@ -329,7 +319,7 @@ describe("Debriefs tab: each agent", () => {
     expect(kappaWords(0.95)).toBe("Almost perfect");
   });
 
-  it("shows the PM agent's outcomes and the writer's failures as bars", () => {
+  it("shows the Debrief PM agent's outcomes and the writer's failures as bars", () => {
     render(<MetricsTab />);
     expect(screen.getByTestId("pm-outcome")).toHaveTextContent("Waiting 10");
     const failures = screen.getByTestId("writer-failures");
@@ -450,7 +440,7 @@ describe("Debriefs tab: states", () => {
       }),
     );
     expect(screen.getByTestId("metrics-unfiltered-note")).toHaveTextContent(
-      "Not filtered: baselines, uptake lift and the PM agent.",
+      "Not filtered: reference values, uptake lift and the Debrief PM agent.",
     );
     expect(screen.getByTestId("metrics-filter-more-button-count")).toHaveTextContent("2");
     const chips = screen.getByTestId("metrics-filter-chips");
@@ -580,15 +570,23 @@ describe("the orchestrator's rows in the agents table", () => {
   it("shows the planner's fallbacks, time, choices and skipped-then-missed with ranges", () => {
     expect(
       find(
-        "Planner",
-        "Fell back to the standard plan (planner failed, timed out or could not run)",
+        "Planner (picks extra agents)",
+        "Used the usual steps because the planner failed, timed out or could not run",
       ),
     ).toBe("14.3% (95% range 10%–90%, 1 of 7)");
-    expect(find("Planner", "Why it fell back")).toBe("Planner failed or returned a bad plan (1)");
-    expect(find("Planner", "Time, median / slowest 10%")).toBe("1200 / 3000");
-    expect(find("Planner", "Agents chosen per debrief, mean / median")).toBe("1.3 / 1");
-    expect(find("Planner", "Skipped Protocol check, then its miss showed up")).toContain("1 of 2");
-    expect(find("Top-up", "Debriefs that passed after a top-up added agents")).toContain("1 of 1");
+    expect(find("Planner (picks extra agents)", "Why it used the usual steps")).toBe(
+      "The planner failed or gave an answer that could not be used (1)",
+    );
+    expect(find("Planner (picks extra agents)", "Time, median / slowest 10%")).toBe("1200 / 3000");
+    expect(find("Planner (picks extra agents)", "Agents chosen per debrief, mean / median")).toBe(
+      "1.3 / 1",
+    );
+    expect(
+      find("Planner (picks extra agents)", "Skipped Protocol check, then its miss showed up"),
+    ).toContain("1 of 2");
+    expect(
+      find("Extra evidence round", "Debriefs that passed after the extra round added agents"),
+    ).toContain("1 of 1");
   });
 
   it("gives every registry agent its rows in plain words, plus the agent-specific ones", () => {

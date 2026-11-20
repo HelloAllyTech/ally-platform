@@ -29,11 +29,13 @@ vi.mock("@store", () => ({
 
 // The page is tested against the work pane's written contract, not its internals.
 let paneProps: any[] = [];
+let sourcesData: any[] = [];
 vi.mock("@components/course-copilot", () => ({
   CourseCopilotWorkPane: (props: any) => {
     paneProps.push(props);
     return <div data-testid="work-pane">{props.detail.session.status}</div>;
   },
+  ReferenceFiles: ({ variant }: any) => <div data-testid={`reference-files-${variant}`} />,
 }));
 
 vi.mock("@components/agent-chat", () => ({
@@ -138,6 +140,7 @@ vi.mock("@api", () => ({
   useRetryCourseCopilotBuildMutation: () => [retryFn],
   useCancelCourseCopilotBuildMutation: () => [cancelFn],
   useRaiseCourseCopilotBudgetMutation: () => [raiseFn],
+  useGetCourseCopilotSourcesQuery: () => ({ data: sourcesData }),
 }));
 
 // eslint-disable-next-line import/first
@@ -149,7 +152,14 @@ const makeItem = (id: string, title: string, order = 0) => ({
   order,
   title,
   size: "800 words",
-  preview: { type: "ARTICLE", excerpt: "", wordCount: 800, questionCount: 0, resourceCount: 0, imageUrls: [] },
+  preview: {
+    type: "ARTICLE",
+    excerpt: "",
+    wordCount: 800,
+    questionCount: 0,
+    resourceCount: 0,
+    imageUrls: [],
+  },
 });
 const makeOutline = (items: any[]) => ({
   trackId: "t1",
@@ -221,6 +231,7 @@ beforeEach(() => {
   stubViewport();
   localStorage.clear();
   paneProps = [];
+  sourcesData = [];
   streamOpts = undefined;
   socketOpts = undefined;
   stream.messages = [];
@@ -271,9 +282,16 @@ describe("CourseCopilotSession — loading and failure", () => {
   });
 });
 
-describe("CourseCopilotSession — hydration and kickoff", () => {
+/** A conversation has started, so the page shows the feed and the work pane, not the opening. */
+const startConversation = () => {
+  stream.messages = [{ id: "u1", role: "user", content: "A course on rapport" }];
+};
+
+describe("CourseCopilotSession — hydration and the opening screen", () => {
   it("seeds the feed from the server once, and pins the session id", () => {
-    const detail = makeDetail({ messages: [{ id: "m1", seq: 1, role: "assistant", content: "Hi" }] });
+    const detail = makeDetail({
+      messages: [{ id: "m1", seq: 1, role: "assistant", content: "Hi" }],
+    });
     setDetail(detail);
     const { rerender } = render(<CourseCopilotSession />);
 
@@ -294,32 +312,67 @@ describe("CourseCopilotSession — hydration and kickoff", () => {
     expect(stream.syncServerMessages).toHaveBeenCalledWith(later.messages);
   });
 
-  it("sends the hidden kickoff turn for a brand-new interview, exactly once", () => {
+  // A new session waits for the trainer: nothing is sent until they type or pick a starter.
+  it("opens a brand-new course on the opening screen and sends nothing", () => {
     const { rerender } = render(<CourseCopilotSession />);
     rerender(<CourseCopilotSession />);
-    rerender(<CourseCopilotSession />);
 
-    expect(stream.sendMessage).toHaveBeenCalledTimes(1);
-    expect(stream.sendMessage).toHaveBeenCalledWith("Let's begin.", undefined, true);
+    expect(stream.sendMessage).not.toHaveBeenCalled();
+    expect(screen.getByTestId("course-copilot-opening")).toBeInTheDocument();
+    expect(screen.getByText(en.courseCopilot.session.opening.title)).toBeInTheDocument();
+    // Nothing to show beside it yet, and "just build it" means nothing before a course is named.
+    expect(paneProps).toHaveLength(0);
+    expect(screen.queryByText("Just build it with sensible defaults")).toBeNull();
   });
 
-  it("does not kick off a session that already has messages", () => {
-    setDetail(makeDetail({ messages: [{ id: "m1", seq: 1, role: "assistant", content: "Hi" }] }));
+  it("offers to attach reference files on the opening screen", () => {
     render(<CourseCopilotSession />);
-    expect(stream.sendMessage).not.toHaveBeenCalled();
+    expect(screen.getByTestId("reference-files-opening")).toBeInTheDocument();
+    // Nothing to start from yet.
+    expect(screen.queryByText(en.courseCopilot.session.opening.fromFiles)).toBeNull();
+  });
+
+  it("once files are attached, offers to start from them", () => {
+    sourcesData = [{ id: "s-1", fileName: "Manual.pdf" }];
+    render(<CourseCopilotSession />);
+
+    fireEvent.click(screen.getByText(en.courseCopilot.session.opening.fromFiles));
+
+    expect(stream.sendMessage).toHaveBeenCalledWith(
+      en.courseCopilot.session.opening.fromFilesMessage,
+    );
+  });
+
+  it("sends a starter's message as the first turn", () => {
+    render(<CourseCopilotSession />);
+    const [starter] = en.courseCopilot.session.opening.starters;
+
+    fireEvent.click(screen.getByText(starter.label));
+
+    expect(stream.sendMessage).toHaveBeenCalledWith(starter.message);
+  });
+
+  it("does not show the opening screen once the conversation has started", () => {
+    startConversation();
+    render(<CourseCopilotSession />);
+    expect(screen.queryByTestId("course-copilot-opening")).toBeNull();
+    expect(paneProps.length).toBeGreaterThan(0);
   });
 
   // An EDIT session starts from an existing course and waits for the trainer.
-  it("does not kick off an EDIT session that starts in EDITING", () => {
+  it("never opens an EDIT session on the opening screen", () => {
     setDetail(makeDetail({}, { mode: "EDIT", status: "EDITING", trackId: "t1" }));
     render(<CourseCopilotSession />);
     expect(stream.sendMessage).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("course-copilot-opening")).toBeNull();
   });
 });
 
 describe("CourseCopilotSession — header", () => {
   it("shows the course title, the status, and the budget against its ceiling", () => {
-    setDetail(makeDetail({}, { trackTitle: "Safety planning basics", status: "EDITING", trackId: "t1" }));
+    setDetail(
+      makeDetail({}, { trackTitle: "Safety planning basics", status: "EDITING", trackId: "t1" }),
+    );
     render(<CourseCopilotSession />);
 
     expect(screen.getByText("Safety planning basics")).toBeInTheDocument();
@@ -328,7 +381,9 @@ describe("CourseCopilotSession — header", () => {
   });
 
   it("says there is no ceiling when the budget is uncapped", () => {
-    setDetail(makeDetail({ budget: { ceilingUsd: 0, spentUsd: 2, remainingUsd: null, held: false } }));
+    setDetail(
+      makeDetail({ budget: { ceilingUsd: 0, spentUsd: 2, remainingUsd: null, held: false } }),
+    );
     render(<CourseCopilotSession />);
     expect(screen.getByText("$2.00 · no ceiling")).toBeInTheDocument();
   });
@@ -348,11 +403,9 @@ describe("CourseCopilotSession — header", () => {
       );
     });
 
-    it("is disabled before there is a course to open", () => {
+    it("is not shown before there is a course to open", () => {
       render(<CourseCopilotSession />);
-      expect(
-        screen.getByText(en.courseCopilot.session.openInEditor).closest("button"),
-      ).toBeDisabled();
+      expect(screen.queryByText(en.courseCopilot.session.openInEditor)).toBeNull();
     });
 
     it("opens the course in the editor once it can be edited", () => {
@@ -412,8 +465,8 @@ describe("CourseCopilotSession — header", () => {
 
 describe("CourseCopilotSession — chips and composer", () => {
   it("offers the interview's chip and sends its message", () => {
+    startConversation();
     render(<CourseCopilotSession />);
-    stream.sendMessage.mockClear(); // the kickoff
 
     fireEvent.click(screen.getByText("Just build it with sensible defaults"));
 
@@ -429,6 +482,31 @@ describe("CourseCopilotSession — chips and composer", () => {
     expect(screen.getByText("Make it shorter")).toBeInTheDocument();
     expect(screen.getByText("Explain the sequence")).toBeInTheDocument();
     expect(screen.queryByText("Just build it with sensible defaults")).not.toBeInTheDocument();
+  });
+
+  it("says a published course is live, since changes reach learners straight away", () => {
+    setDetail(
+      makeDetail(
+        { outline: { status: "ACTIVE", sections: [] } },
+        { status: "EDITING", trackId: "t1" },
+      ),
+    );
+    render(<CourseCopilotSession />);
+    expect(screen.getByTestId("course-copilot-live-notice")).toHaveTextContent(
+      en.courseCopilot.session.liveNotice.title,
+    );
+    expect(screen.getByText(en.courseCopilot.publishedTag)).toBeInTheDocument();
+  });
+
+  it("shows no live notice for a draft course", () => {
+    setDetail(
+      makeDetail(
+        { outline: { status: "DRAFT", sections: [] } },
+        { status: "EDITING", trackId: "t1" },
+      ),
+    );
+    render(<CourseCopilotSession />);
+    expect(screen.queryByTestId("course-copilot-live-notice")).toBeNull();
   });
 
   it("offers review/publish/preview chips on a built course", () => {
@@ -454,7 +532,10 @@ describe("CourseCopilotSession — chips and composer", () => {
 
     const composer = screen.getByLabelText("composer");
     expect(composer).not.toBeDisabled();
-    expect(composer).toHaveAttribute("placeholder", en.courseCopilot.session.composerPlaceholder.BUILDING);
+    expect(composer).toHaveAttribute(
+      "placeholder",
+      en.courseCopilot.session.composerPlaceholder.BUILDING,
+    );
   });
 
   it("turns the composer and chips off for an archived session, and says it is read-only", () => {
@@ -499,7 +580,9 @@ describe("CourseCopilotSession — the work pane", () => {
     render(<CourseCopilotSession />);
 
     expect(screen.getAllByTestId("work-pane")).toHaveLength(1);
-    expect(screen.queryByText(en.courseCopilot.session.pane.AWAITING_BLUEPRINT)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(en.courseCopilot.session.pane.AWAITING_BLUEPRINT),
+    ).not.toBeInTheDocument();
   });
 
   it("passes the latest detail through the written contract", () => {
@@ -529,6 +612,7 @@ describe("CourseCopilotSession — the work pane", () => {
   });
 
   it("switches the pane to the blueprint the moment the frame arrives, before the turn ends", () => {
+    startConversation();
     const { rerender } = render(<CourseCopilotSession />);
     expect(lastPane().detail.session.status).toBe("INTERVIEWING");
 
@@ -551,10 +635,14 @@ describe("CourseCopilotSession — the work pane", () => {
   });
 
   it("hands the brief over live, and drops it when a fresher snapshot arrives after the turn", () => {
+    startConversation();
     const { rerender } = render(<CourseCopilotSession />);
 
     act(() =>
-      streamOpts.onBrief({ audience: { who: "New volunteers" } }, { ready: false, missing: ["Assessment"] }),
+      streamOpts.onBrief(
+        { audience: { who: "New volunteers" } },
+        { ready: false, missing: ["Assessment"] },
+      ),
     );
     rerender(<CourseCopilotSession />);
     expect(lastPane().liveBrief).toEqual({ audience: { who: "New volunteers" } });
@@ -663,14 +751,21 @@ describe("CourseCopilotSession — the work pane", () => {
     });
 
     it("does not poll an idle session", () => {
-      setDetail(makeDetail({ jobs: [{ id: "j1", status: "done" }] }, { status: "EDITING", trackId: "t1" }));
+      setDetail(
+        makeDetail({ jobs: [{ id: "j1", status: "done" }] }, { status: "EDITING", trackId: "t1" }),
+      );
       render(<CourseCopilotSession />);
       expect(queryOptions.pollingInterval).toBe(0);
     });
 
     it("treats pushed events as invalidation signals: refetch, debounced, and show them in the pane", () => {
       vi.useFakeTimers();
-      setDetail(makeDetail({ events: [{ seq: 1, type: "build_started", payload: {}, createdAt: "" }] }, { status: "BUILDING", trackId: "t1" }));
+      setDetail(
+        makeDetail(
+          { events: [{ seq: 1, type: "build_started", payload: {}, createdAt: "" }] },
+          { status: "BUILDING", trackId: "t1" },
+        ),
+      );
       const { rerender } = render(<CourseCopilotSession />);
 
       act(() =>
@@ -832,7 +927,9 @@ describe("CourseCopilotSession — the work pane", () => {
         ok = await lastPane().onRaiseBudget(1);
       });
       expect(ok).toBe(false);
-      expect(toastMock.error).toHaveBeenCalledWith("The ceiling must exceed what is already spent.");
+      expect(toastMock.error).toHaveBeenCalledWith(
+        "The ceiling must exceed what is already spent.",
+      );
     });
 
     it("sends a chat turn when the pane asks for one, unless a turn is already streaming", () => {
@@ -845,7 +942,12 @@ describe("CourseCopilotSession — the work pane", () => {
 
 describe("CourseCopilotSession — a session that vanished mid-turn", () => {
   it("creates a replacement (re-bound to the same course) and moves to it without reseeding the feed", async () => {
-    setDetail(makeDetail({ messages: [{ id: "m1", seq: 1, role: "assistant", content: "Hi" }] }, { mode: "EDIT", status: "EDITING", trackId: "t1" }));
+    setDetail(
+      makeDetail(
+        { messages: [{ id: "m1", seq: 1, role: "assistant", content: "Hi" }] },
+        { mode: "EDIT", status: "EDITING", trackId: "t1" },
+      ),
+    );
     render(<CourseCopilotSession />);
     stream.hydrateMessages.mockClear();
 

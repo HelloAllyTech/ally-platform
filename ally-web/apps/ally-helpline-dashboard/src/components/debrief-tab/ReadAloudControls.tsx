@@ -123,3 +123,11 @@ export const useIsBeingRead = (section: string) => {
   const ra = useContext(ReadAloudContext);
   return !!ra && ra.current === section && ra.status !== "idle" && ra.status !== "error";
 };
+
+/** True while read-aloud is reading any of these sections (a collapsed card opens). */
+export const useIsAnyBeingRead = (sections: string[]) => {
+  const ra = useContext(ReadAloudContext);
+  return (
+    !!ra && ra.status !== "idle" && ra.status !== "error" && sections.includes(ra.current as string)
+  );
+};

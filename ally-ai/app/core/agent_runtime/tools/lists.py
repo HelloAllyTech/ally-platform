@@ -24,7 +24,6 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple, Type
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
 from app.core.agent_runtime.tools.base import Tool, ToolContext, ToolResult
-from app.core.agent_runtime.tools.confirmed import unconfirmed
 
 #: At most this many definitions a run (ally-be caps them too).
 MAX_LIST_TOOLS = 12
@@ -132,36 +131,11 @@ def list_tool(definition: Mapping[str, Any]) -> Tool:
     name = str(definition["name"])
     kind = str(definition.get("kind") or "find")
 
-    properties: Dict[str, Any] = (definition.get("input_schema") or {}).get(
-        "properties"
-    ) or {}
-
     async def handler(args: BaseModel, ctx: ToolContext) -> ToolResult:
-        if kind in ("create", "update"):
-            # The day and time it books must be what the person confirmed, read from
-            # their own messages (chunk 6 follow-up). Otherwise it isn't sent.
-            values = args.model_dump(mode="json", by_alias=True)
-            why = unconfirmed(
-                properties,
-                values,
-                ctx.passages,
-                ctx.messages,
-                ctx.today,
-                updating=str(values.get("id") or "") if kind == "update" else None,
-            )
-            if why:
-                return ToolResult(
-                    summary=f"{name}: not sent, time not confirmed",
-                    record={
-                        "tool": name,
-                        "kind": "gateway",
-                        "list_kind": kind,
-                        "ok": False,
-                        "added": [],
-                        "error": "unconfirmed_time",
-                        "message": why,
-                    },
-                )
+        # A create or update is checked in ally-be's gateway (chunk H1 Part B): it
+        # writes only after the person said yes, in a later turn, to a question that
+        # named exactly this entry; otherwise it answers `needs_confirmation` with the
+        # question to ask. No check here can let a write through, so none is done.
         if ctx.gateway is None or ctx.run_id is None or ctx.step is None:
             outcome: Dict[str, Any] = {"ok": False, "error": "no_gateway"}
         else:
@@ -199,6 +173,12 @@ def list_tool(definition: Mapping[str, Any]) -> Tool:
             if isinstance(message, str) and message:
                 # A refusal from the list's rules: copy deck §26, plain words.
                 record["message"] = message[:300]
+            questions = result.get("questions")
+            if record["error"] == "needs_confirmation" and isinstance(questions, dict):
+                # The gateway's question before a write (chunk H1): the run's reply.
+                record["questions"] = {
+                    k: str(v)[:400] for k, v in questions.items() if k in ("en", "hi")
+                }
         summary = (
             f"{name}: ok, {len(added)} record" + ("" if len(added) == 1 else "s")
             if ok
@@ -232,3 +212,13 @@ def list_tools(definitions: Optional[List[Mapping[str, Any]]]) -> List[Tool]:
 def offers_create(definitions: Optional[List[Mapping[str, Any]]]) -> bool:
     """Whether this run can book or add something: any create tool."""
     return any((d or {}).get("kind") == "create" for d in definitions or [])
+
+
+def takes_details(definitions: Optional[List[Mapping[str, Any]]]) -> bool:
+    """Whether this run can save the person's details for the team (chunk 6b): a
+    create tool on a list with a person or phone field (Leads, Callback requests),
+    which ally-be marks `takes_details`."""
+    return any(
+        (d or {}).get("kind") == "create" and (d or {}).get("takes_details")
+        for d in definitions or []
+    )

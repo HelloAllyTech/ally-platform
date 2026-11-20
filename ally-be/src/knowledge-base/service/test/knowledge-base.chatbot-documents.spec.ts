@@ -163,6 +163,15 @@ describe("KnowledgeBaseService — a chatbot's own documents", () => {
       expect(ingestProducer.enqueue).not.toHaveBeenCalled();
     });
 
+    it('does nothing to the index for the same text before its first ingest has run (Q3-fast)', async () => {
+      // Pasted text is stored up front; its hash only after the first ingest.
+      documentRepository.findOne.mockResolvedValue(
+        own({ contentHash: '', rawText: 'same text' }),
+      );
+      await service.updateForChatbot(BOT, 'doc', { text: ' same text ' });
+      expect(ingestProducer.enqueue).not.toHaveBeenCalled();
+    });
+
     it("treats another bot's or a library document as not found", async () => {
       documentRepository.findOne.mockResolvedValue(
         own({ ownerChatbotId: null }),

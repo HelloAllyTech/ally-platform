@@ -1,7 +1,9 @@
 import React, { useState } from "react";
 
+import type { PublishUse } from "@api";
 import { AssistantLine, Button, PrimaryButton, Question, useEnterToSubmit } from "@components/v2";
 
+import { PLAN } from "../../Plan/copy";
 import { COPY } from "../copy";
 import { parseEmails } from "../flow";
 
@@ -16,10 +18,20 @@ export const ShareScreen: React.FC<{
   publicAllowed: boolean;
   publishing: boolean;
   /** An owner's Must pass question failed (chunk 20d-2): asked before going live. */
-  mustPass?: { message: string; questions: string[]; onConfirm: () => void } | null;
+  mustPass?: {
+    message: string;
+    questions: string[];
+    belowGate?: boolean;
+    onConfirm: () => void;
+  } | null;
   line?: string;
+  /**
+   * The plan's count (CR1 §C3): "This uses 1 of your 3 assistants", and why publishing is refused
+   * when the plan has no room. Absent while it loads or on Ally's unlimited plans.
+   */
+  publishUse?: PublishUse | null;
   onPublish: (access: Access, emails: string[]) => void;
-}> = ({ view, publicAllowed, publishing, line, onPublish, mustPass }) => {
+}> = ({ view, publicAllowed, publishing, line, onPublish, mustPass, publishUse }) => {
   const [access, setAccess] = useState<Access>(view.draft.access.mode ?? "invite");
   const [emails, setEmails] = useState(view.draft.access.emails.join(", "));
   const options: { id: Access; label: string; help: string; disabled?: boolean }[] = [
@@ -33,7 +45,8 @@ export const ShareScreen: React.FC<{
     { id: "invite", label: COPY.share.invite, help: COPY.share.inviteHelp },
   ];
   const list = parseEmails(emails);
-  const ready = (access !== "invite" || list.length > 0) && !publishing;
+  const blocked = publishUse?.canPublish === false;
+  const ready = (access !== "invite" || list.length > 0) && !publishing && !blocked;
   const publish = () => ready && onPublish(access, access === "invite" ? list : []);
   useEnterToSubmit(publish, ready);
   return (
@@ -87,8 +100,18 @@ export const ShareScreen: React.FC<{
               </ul>
             )}
             <Button disabled={publishing} onClick={mustPass.onConfirm}>
-              {COPY.share.goLiveAnyway}
+              {mustPass.belowGate ? COPY.share.publishAnyway : COPY.share.goLiveAnyway}
             </Button>
+          </div>
+        )}
+        {typeof publishUse?.maxPublished === "number" && !blocked && (
+          <p className="ally-small" data-testid="publish-use">
+            {PLAN.publish.uses(publishUse.wouldUse, publishUse.maxPublished)}
+          </p>
+        )}
+        {blocked && publishUse?.message && (
+          <div className="ally-card ally-must-pass" role="alert" data-testid="publish-limit">
+            <p className="ally-body">{publishUse.message}</p>
           </div>
         )}
         <PrimaryButton enterHint={COPY.frame.enterHint} disabled={!ready} onClick={publish}>

@@ -1,4 +1,4 @@
-import { DebriefConsoleController } from '../controller/debrief-console.controller';
+import { DebriefConsoleSettingsController } from '../controller/debrief-console-settings.controller';
 
 /**
  * Settings › Budgets (v9: a budget change needs a person's confirmation, the
@@ -6,7 +6,7 @@ import { DebriefConsoleController } from '../controller/debrief-console.controll
  * with its idea and audit so Roll back undoes them. The evaluator bar is not a
  * budget: it is proposed and climbs the ladder.
  */
-describe('DebriefConsoleController.budgets', () => {
+describe('DebriefConsoleSettingsController.budgets', () => {
   function setup(budgetOnly: boolean) {
     const releaseHistory = {
       proposeChange: jest.fn(async () => ({
@@ -21,9 +21,9 @@ describe('DebriefConsoleController.budgets', () => {
     const ctl = {
       releaseHistory,
       pmAgent,
-    } as unknown as DebriefConsoleController;
+    } as unknown as DebriefConsoleSettingsController;
     const call = (body: Record<string, unknown>) =>
-      DebriefConsoleController.prototype.budgets.call(
+      DebriefConsoleSettingsController.prototype.budgets.call(
         ctl,
         { user: { id: 124 } } as any,
         body as any,

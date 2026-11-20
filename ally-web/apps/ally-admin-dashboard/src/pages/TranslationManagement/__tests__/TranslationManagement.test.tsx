@@ -19,6 +19,16 @@ vi.mock("@api", () => ({
 }));
 
 vi.mock("@components", () => ({
+  ActionConfirmationPopup: ({ isOpen, title, description, children, primaryButton }: any) =>
+    isOpen ? (
+      <div role="dialog" aria-label={title}>
+        <p>{description}</p>
+        {children}
+        <button type="button" onClick={primaryButton.onClick}>
+          {`confirm:${primaryButton.label}`}
+        </button>
+      </div>
+    ) : null,
   Button: ({ children, onClick, disabled, title }: any) => (
     <button type="button" onClick={onClick} disabled={disabled} title={title}>
       {children}
@@ -308,14 +318,20 @@ describe("TranslationManagement", () => {
   it("publishes and rolls back retained i18n versions", async () => {
     render(<TranslationManagement />);
 
-    fireEvent.click(screen.getByRole("button", { name: /Publish/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Publish/i }));
+    // Publish only fires after the confirm step.
+    expect(publishI18n).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "Publish translations?" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "confirm:Publish" }));
 
     const rollbackSelect = screen
       .getAllByRole("combobox")
       .find(el => el.querySelector('option[value=""]')?.textContent === "Versions");
     expect(rollbackSelect).toBeDefined();
     fireEvent.change(rollbackSelect!, { target: { value: "1" } });
-    fireEvent.click(screen.getByRole("button", { name: /Rollback/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Rollback/i }));
+    expect(rollbackI18n).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "confirm:Roll back" }));
 
     await waitFor(() => {
       expect(publishI18n).toHaveBeenCalledWith({});
@@ -323,5 +339,15 @@ describe("TranslationManagement", () => {
     });
     expect(toast.success).toHaveBeenCalledWith("Published v2");
     expect(toast.success).toHaveBeenCalledWith("Rolled back to v1");
+  });
+
+  it("filters to keys missing a translation", () => {
+    render(<TranslationManagement />);
+    const select = screen
+      .getAllByRole("combobox")
+      .find(el => el.querySelector('option[value="__any"]'));
+    expect(select).toBeDefined();
+    fireEvent.change(select!, { target: { value: "hi" } });
+    expect(screen.getByText(/Showing \d+ of \d+ keys/)).toBeInTheDocument();
   });
 });

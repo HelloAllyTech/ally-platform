@@ -31,7 +31,9 @@ import { outline } from "./fixtures";
 
 const NOW = new Date("2026-10-14T10:00:00Z");
 
-const outlineItem = (overrides: Partial<CourseOutlineItem> & Pick<CourseOutlineItem, "id" | "type" | "preview">): CourseOutlineItem => ({
+const outlineItem = (
+  overrides: Partial<CourseOutlineItem> & Pick<CourseOutlineItem, "id" | "type" | "preview">,
+): CourseOutlineItem => ({
   order: 1,
   title: overrides.id,
   size: "",
@@ -119,7 +121,13 @@ const fullOutline = (): CourseOutline =>
             id: "case",
             type: "CASE",
             title: "Crisis call",
-            preview: { type: "CASE", caseId: "c1", caseTitle: "A night shift", roleplayCount: 3, generated: false },
+            preview: {
+              type: "CASE",
+              caseId: "c1",
+              caseTitle: "A night shift",
+              roleplayCount: 3,
+              generated: false,
+            },
           }),
           outlineItem({
             id: "game",
@@ -169,7 +177,9 @@ describe("CourseOutlinePanel — preview cards", () => {
     setup();
     const article = card("article");
 
-    expect(within(article).getByText("Listening is more than hearing the words.")).toBeInTheDocument();
+    expect(
+      within(article).getByText("Listening is more than hearing the words."),
+    ).toBeInTheDocument();
     // The counts appear once, next to the excerpt — not again as the header's size string.
     expect(within(article).queryByText("820 words, 2 checks")).toBeNull();
     expect(within(article).getByText("820 words")).toBeInTheDocument();
@@ -243,10 +253,9 @@ describe("CourseOutlinePanel — preview cards", () => {
     setup();
 
     expect(within(card("video")).getByText("YouTube")).toBeInTheDocument();
-    expect(within(card("video")).getByRole("link", { name: "https://youtu.be/abc123" })).toHaveAttribute(
-      "href",
-      "https://youtu.be/abc123",
-    );
+    expect(
+      within(card("video")).getByRole("link", { name: "https://youtu.be/abc123" }),
+    ).toHaveAttribute("href", "https://youtu.be/abc123");
     expect(within(card("video-empty")).getByText("Needs a video link")).toBeInTheDocument();
   });
 
@@ -288,7 +297,14 @@ describe("CourseOutlinePanel — preview cards", () => {
             id: "s1",
             order: 1,
             title: "S",
-            items: [outlineItem({ id: "bare", type: "JOURNAL", title: "Bare", preview: { type: "JOURNAL", prompts: [] } })],
+            items: [
+              outlineItem({
+                id: "bare",
+                type: "JOURNAL",
+                title: "Bare",
+                preview: { type: "JOURNAL", prompts: [] },
+              }),
+            ],
           },
         ],
       }),
@@ -309,14 +325,32 @@ describe("CourseOutlinePanel — preview cards", () => {
                 id: "bad-article",
                 type: "ARTICLE",
                 title: "Bad article",
-                preview: { type: "ARTICLE", excerpt: null, wordCount: "lots", questionCount: 0, resourceCount: 0, imageUrls: "not a list" } as never,
+                preview: {
+                  type: "ARTICLE",
+                  excerpt: null,
+                  wordCount: "lots",
+                  questionCount: 0,
+                  resourceCount: 0,
+                  imageUrls: "not a list",
+                } as never,
               }),
-              outlineItem({ id: "no-preview", type: "QUIZ", title: "No preview", preview: undefined as never }),
+              outlineItem({
+                id: "no-preview",
+                type: "QUIZ",
+                title: "No preview",
+                preview: undefined as never,
+              }),
               outlineItem({
                 id: "bad-quiz",
                 type: "QUIZ",
                 title: "Bad quiz",
-                preview: { type: "QUIZ", questionCount: 1, passScore: null, sampleQuestion: null, questionTypes: "mcq" } as never,
+                preview: {
+                  type: "QUIZ",
+                  questionCount: 1,
+                  passScore: null,
+                  sampleQuestion: null,
+                  questionTypes: "mcq",
+                } as never,
               }),
             ],
           },
@@ -384,7 +418,9 @@ describe("CourseOutlinePanel — meta", () => {
 
   it("explains itself when there is no outline yet", () => {
     setup({ outline: null });
-    expect(screen.getByText("The course outline will appear here once it has been written.")).toBeInTheDocument();
+    expect(
+      screen.getByText("The course outline will appear here once it has been written."),
+    ).toBeInTheDocument();
   });
 });
 
@@ -416,8 +452,12 @@ describe("CourseOutlinePanel — publish readiness", () => {
     expect(
       screen.getByRole("heading", { name: "Needs: Cover image, Every section has an item" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Cover image needed — pick one from the library or upload")).toBeInTheDocument();
-    expect(screen.getAllByRole("listitem").some(entry => entry.textContent?.startsWith("Title"))).toBe(true);
+    expect(
+      screen.getByText("Cover image needed — pick one from the library or upload"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByRole("listitem").some(entry => entry.textContent?.startsWith("Title")),
+    ).toBe(true);
   });
 
   it("offers to hand an unmet check to the copilot only when it can act", () => {
@@ -441,7 +481,11 @@ describe("CourseOutlinePanel — publish readiness", () => {
 });
 
 describe("CourseOutlinePanel — change log", () => {
-  const entry = (at: string, summary: string): CourseChangeLogEntry => ({ at, summary, tool: "update_section" });
+  const entry = (at: string, summary: string): CourseChangeLogEntry => ({
+    at,
+    summary,
+    tool: "update_section",
+  });
 
   it("lists changes newest first with a relative time", () => {
     setup({
@@ -453,7 +497,9 @@ describe("CourseOutlinePanel — change log", () => {
     });
 
     const log = screen.getByRole("region", { name: "What the copilot changed" });
-    const rows = within(log).getAllByRole("listitem").map(row => row.textContent);
+    const rows = within(log)
+      .getAllByRole("listitem")
+      .map(row => row.textContent);
     expect(rows).toEqual([
       "5m agoShortened the quiz",
       "30m agoAdded a journal",
@@ -531,5 +577,64 @@ describe("CourseOutlinePanel — compact", () => {
     expect(screen.queryByText("Listening is more than hearing the words.")).toBeNull();
     expect(screen.queryByText("Ready to publish")).toBeNull();
     expect(screen.queryByText("Shortened the quiz")).toBeNull();
+  });
+});
+
+describe("CourseOutlinePanel — review by choosing a reason (Course Pilot)", () => {
+  const withNewTypes = () =>
+    outline({
+      sections: [
+        {
+          id: "s1",
+          order: 1,
+          title: "Practice",
+          description: null,
+          items: [
+            outlineItem({
+              id: "sq",
+              type: "BRANCHING_SCENARIO",
+              title: "Priya after class",
+              preview: {
+                type: "BRANCHING_SCENARIO",
+                sceneCount: 5,
+                endingCount: 2,
+                passScore: 0,
+                intro: null,
+                firstScene: "Priya: I don't see the point any more.",
+              },
+            }),
+            outlineItem({
+              id: "bs",
+              type: "BUCKET_SORT",
+              title: "Sort the replies",
+              preview: {
+                type: "BUCKET_SORT",
+                itemCount: 8,
+                buckets: ["Helpful", "Harmful"],
+                intro: null,
+              },
+            }),
+          ],
+        },
+      ],
+    } as never);
+
+  it("previews a scenario quiz and a bucket sort", () => {
+    setup({ outline: withNewTypes() });
+    expect(screen.getByText("5 scenes")).toBeInTheDocument();
+    expect(screen.getByText("Explore (no pass mark)")).toBeInTheDocument();
+    expect(screen.getByText("8 items")).toBeInTheDocument();
+    expect(screen.getByText("Harmful")).toBeInTheDocument();
+  });
+
+  it("sends the chosen reason for the item, and offers none while the copilot can't act", () => {
+    const onChangeItem = vi.fn();
+    const { rerender, props } = setup({ outline: withNewTypes(), onChangeItem });
+    const card = document.querySelector('[data-item-id="bs"]') as HTMLElement;
+    fireEvent.click(within(card).getByRole("button", { name: "Too long" }));
+    expect(onChangeItem).toHaveBeenCalledWith(expect.objectContaining({ id: "bs" }), "too_long");
+
+    rerender(<CourseOutlinePanel {...props} onChangeItem={undefined} />);
+    expect(screen.queryByRole("button", { name: "Too long" })).toBeNull();
   });
 });

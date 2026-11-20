@@ -237,38 +237,22 @@ export const productRoadmapAPI = baseAPI.injectEndpoints({
       providesTags: [TAG_TYPES.PRODUCT_ROADMAP_FACETS],
     }),
 
-    /**
-     * Quick add: file straight onto the board with no readiness token and no brief. Same
-     * response and the same cache invalidation as createRoadmapOpportunity, so the new row shows
-     * up wherever an interviewed one would. Only shown to holders of the quick-add toggle — see
-     * canQuickAddRoadmap.
-     */
-    quickAddRoadmapOpportunity: builder.mutation<
-      RoadmapOpportunity,
-      {
-        description: string;
-        type: string;
-        productGoal: string;
-        effort?: RoadmapOpportunityEffort | null;
-        /** Only sent by a filer who can manage the roadmap — 403 otherwise, as on create. */
-        ownerUserId?: number | null;
-        referenceImages?: RoadmapReferenceImage[];
-      }
-    >({
+    // The server falls back to the text's first sentence when the model fails, so this only
+    // rejects when the request itself does.
+    suggestRoadmapTitle: builder.mutation<{ title: string }, { text: string }>({
       query: body => ({
-        url: ApiEndpoints.PRODUCT_ROADMAP.OPPORTUNITIES_QUICK,
+        url: ApiEndpoints.PRODUCT_ROADMAP.TITLE_SUGGESTION,
         method: HttpMethod.POST,
         body,
       }),
-      invalidatesTags: [
-        { type: TAG_TYPES.PRODUCT_ROADMAP_OPPORTUNITIES, id: "LIST" },
-        TAG_TYPES.PRODUCT_ROADMAP_FACETS,
-      ],
     }),
 
     createRoadmapOpportunity: builder.mutation<
       RoadmapOpportunity,
       {
+        /** One line naming the idea. Required: the server refuses an idea without one. */
+        title: string;
+        /** The summary beneath the title (Summary > Problem). */
         description: string;
         type: string;
         productGoal: string;
@@ -1032,8 +1016,8 @@ export const {
   useGetRoadmapBreadthQuery,
   useGetRoadmapBreadthEveryoneQuery,
   useGetRoadmapFacetsQuery,
+  useSuggestRoadmapTitleMutation,
   useCreateRoadmapOpportunityMutation,
-  useQuickAddRoadmapOpportunityMutation,
   useCreateRoadmapBugReportMutation,
   useUpdateRoadmapOpportunityMutation,
   useDeleteRoadmapOpportunityMutation,

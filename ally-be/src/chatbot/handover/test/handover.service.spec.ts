@@ -5,12 +5,13 @@ import { DEFAULT_WHATSAPP_SETTINGS } from '../../../whatsapp/type/whatsapp-setti
 import { ConversationMessageRole } from '../../enum/conversation.enum';
 import { HandoverService, WHATSAPP_SEND_EVENT } from '../handover.service';
 
-const BOT = {
+const BOT_FIELDS = {
   id: 'bot-1',
   name: 'Sunrise Mind',
   settings: {},
   safetyPack: null,
-} as never;
+};
+const BOT = BOT_FIELDS as never;
 const CHAT = 'conv-1';
 
 /**
@@ -135,7 +136,10 @@ describe('HandoverService', () => {
     it('a second "I don\'t know" in a row becomes the hand-over message', async () => {
       const h = harness();
       const out = await h.service.afterDecision(
-        BOT,
+        {
+          ...BOT_FIELDS,
+          settings: { abilities: { hand_over: 'do_it' } },
+        } as never,
         CHAT,
         { handledBy: WaHandledBy.DECLINED, body: "I don't have that." },
         new Date('2026-11-12T10:00:00Z'),
@@ -149,6 +153,31 @@ describe('HandoverService', () => {
       );
       expect(mark?.[1]).toEqual([CHAT, 'declined_twice']);
     });
+
+    it.each([
+      ['off', { abilities: { hand_over: 'never' } }],
+      ['never set', {}],
+    ])(
+      'with hand-over %s, a second "I don\'t know" stays the reply and nobody is asked (Q3-fast, F2)',
+      async (_label, settings) => {
+        const h = harness();
+        const decision = {
+          handledBy: WaHandledBy.DECLINED,
+          body: "I don't have that.",
+        };
+        const out = await h.service.afterDecision(
+          { ...BOT_FIELDS, settings } as never,
+          CHAT,
+          decision,
+        );
+        expect(out).toEqual(decision);
+        expect(
+          h.calls.some(([sql]) =>
+            sql.includes('needs_person_since = COALESCE'),
+          ),
+        ).toBe(false);
+      },
+    );
   });
 
   describe('taking over and handing back', () => {

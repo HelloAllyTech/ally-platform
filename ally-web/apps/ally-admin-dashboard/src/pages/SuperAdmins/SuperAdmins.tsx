@@ -13,17 +13,24 @@ import {
 } from "@ally-ui-mono/ui-shared";
 import {
   useAssignPlatformAdminMutation,
+  useListClinicalAdvisorsQuery,
   useListEligiblePlatformAdminsQuery,
   useListPlatformAdminsQuery,
+  useListRoadmapRolesQuery,
   useRemovePlatformAdminMutation,
 } from "@api";
 import { TooltipIcon } from "@assets";
 import { ActionConfirmationPopup, Button, EmptyState, ListToolbar, StatusBadge } from "@components";
+import { Button as ButtonDirect } from "@components/button";
 import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
 import { PlatformAdmin } from "@types";
 
+import { CustomLoginPanel } from "./CustomLoginPanel";
 import { PlatformAdminDetail } from "./PlatformAdminDetail";
+
+// From its own module: User Management's tests mock the `@components` barrel.
+const CustomLoginButton = ButtonDirect;
 
 const strings = en.superAdmins;
 
@@ -56,12 +63,43 @@ export const SuperAdmins: React.FC = () => {
   const listParams = search ? { search } : undefined;
   const { data: platformAdminsData, isLoading: isPlatformAdminsLoading } =
     useListPlatformAdminsQuery(listParams);
+  // Each admin's Debrief roles, as badges beside the name (switched on the admin's own page).
+  const { data: debriefPeople } = useListClinicalAdvisorsQuery();
+  const debriefRoles = useMemo(
+    () =>
+      new Map(
+        (debriefPeople ?? []).map(p => [
+          p.userId,
+          [p.advisor ? strings.debriefAdvisor : null, p.owner ? strings.debriefOwner : null].filter(
+            (x): x is string => !!x,
+          ),
+        ]),
+      ),
+    [debriefPeople],
+  );
+  // Everyone's Roadmap role in one column. The list answers only for an Owner while the Roadmap
+  // is on; for anyone else it errors and the column stays away.
+  const { data: roadmapRolesData } = useListRoadmapRolesQuery();
+  const roadmapRoles = useMemo(
+    () => new Map((roadmapRolesData?.users ?? []).map(u => [Number(u.userId), u])),
+    [roadmapRolesData],
+  );
+  const showRoadmapRoles = !!roadmapRolesData;
+  const roadmapRoleLabel = (userId: number) => {
+    const copy = en.roadmapV2Tools.roles;
+    const entry = roadmapRoles.get(Number(userId));
+    if (!entry || entry.role === "none") return copy.noRole;
+    if (entry.role === "viewer") return copy.viewer;
+    return copy.options[entry.role] ?? copy.noRole;
+  };
   const { data: candidatesData, isFetching: isCandidatesFetching } =
     useListEligiblePlatformAdminsQuery(candidateSearch ? { search: candidateSearch } : undefined, {
       skip: !isAddPanelOpen,
     });
 
   const [assignPlatformAdmin] = useAssignPlatformAdminMutation();
+  // A1 custom logins: create one, or change what an existing platform admin can use.
+  const [customLogin, setCustomLogin] = useState<{ edit?: PlatformAdmin } | null>(null);
   const [removePlatformAdmin] = useRemovePlatformAdminMutation();
 
   const admins = useMemo<PlatformAdmin[]>(
@@ -143,6 +181,18 @@ export const SuperAdmins: React.FC = () => {
             <TableHeader className="py-3 pr-4 font-medium">{strings.name}</TableHeader>
             <TableHeader className="py-3 pr-4 font-medium">{strings.email}</TableHeader>
             <TableHeader className="py-3 pr-4 font-medium">{strings.status}</TableHeader>
+            {showRoadmapRoles && (
+              <TableHeader className="py-3 pr-4 font-medium">
+                <span className="inline-flex items-center gap-1">
+                  {en.roadmapV2Tools.roles.column}
+                  <Tooltip label={en.roadmapV2Tools.roles.columnHelp} align="top">
+                    <button type="button" className="cursor-pointer inline-flex items-center">
+                      <TooltipIcon />
+                    </button>
+                  </Tooltip>
+                </span>
+              </TableHeader>
+            )}
             <TableHeader className="py-3 pr-4 font-medium">
               {/* The date is the role grant, not the account — worth spelling
                   out, since the two are years apart for long-time users and
@@ -167,13 +217,42 @@ export const SuperAdmins: React.FC = () => {
               data-testid="sa-row"
               onClick={() => setSelectedAdmin(admin)}
             >
-              <TableCell className="py-3 pr-4">{admin.name || admin.email}</TableCell>
+              <TableCell className="py-3 pr-4">
+                <div className="flex min-w-0 flex-nowrap items-center gap-2">
+                  <span className="truncate">{admin.name || admin.email}</span>
+                  {(debriefRoles.get(admin.id) ?? []).map(role => (
+                    <span
+                      key={role}
+                      data-testid="sa-debrief-role"
+                      className="shrink-0 whitespace-nowrap rounded-sm bg-primary-50 px-2 py-0.5 text-xs text-primary-700"
+                    >
+                      {role}
+                    </span>
+                  ))}
+                </div>
+              </TableCell>
               <TableCell className="py-3 pr-4">{admin.email}</TableCell>
               <TableCell className="py-3 pr-4">
                 <StatusBadge status={admin.status} />
               </TableCell>
+              {showRoadmapRoles && (
+                <TableCell className="py-3 pr-4" data-testid="sa-roadmap-role">
+                  {roadmapRoleLabel(admin.id)}
+                </TableCell>
+              )}
               <TableCell className="py-3 pr-4">{formatDate(admin.roleGrantedAt)}</TableCell>
-              <TableCell className="py-3 text-right">
+              <TableCell className="py-3 text-right whitespace-nowrap">
+                <CustomLoginButton
+                  variant={ButtonVariant.TERTIARY}
+                  onClick={event => {
+                    event.stopPropagation();
+                    setCustomLogin({ edit: admin });
+                  }}
+                  className="mr-2 px-3 py-1 text-sm"
+                  data-testid="sa-edit-features"
+                >
+                  {en.customLogins.edit}
+                </CustomLoginButton>
                 <Button
                   variant={ButtonVariant.DESTRUCTIVE}
                   onClick={event => {
@@ -285,6 +364,10 @@ export const SuperAdmins: React.FC = () => {
       </div>
 
       {renderAddPanel()}
+
+      {customLogin && (
+        <CustomLoginPanel edit={customLogin.edit} onClose={() => setCustomLogin(null)} />
+      )}
 
       {pendingAction && pendingCopy && (
         <ActionConfirmationPopup

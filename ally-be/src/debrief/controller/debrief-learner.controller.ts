@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  ParseIntPipe,
   ParseUUIDPipe,
   Post,
   Put,
@@ -17,13 +18,19 @@ import {
 } from 'src/learn/type/debrief-engagement-event.type';
 import { ApiProperty } from '@nestjs/swagger';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsIn,
+  IsInt,
   IsOptional,
   IsString,
   Matches,
   MaxLength,
+  Min,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -41,6 +48,13 @@ import { DebriefFeedbackService } from '../service/debrief-feedback.service';
 import { DebriefAudioService } from '../service/debrief-audio.service';
 import { DebriefReplyService } from '../service/debrief-reply.service';
 import { DebriefLearnerEventsService } from '../service/debrief-learner-events.service';
+import { DebriefLearnerFeaturesService } from '../service/debrief-learner-features.service';
+import {
+  DebriefLearnerCommentsService,
+  LEARNER_COMMENT_MAX_ITEMS,
+} from '../service/debrief-learner-comments.service';
+import { COMMENT_BODY_MAX } from '../util/debrief-review.util';
+import { DebriefLearnerFeature } from '../enum/debrief-review.enum';
 import {
   DEBRIEF_CLIENT_EVENT_KINDS,
   DEBRIEF_PLATFORMS,
@@ -91,6 +105,52 @@ class ReplyDto {
   section?: string;
 }
 
+class SelectionCommentDto {
+  @ApiProperty({ example: 'work_on_this[0].why' })
+  @IsString()
+  @MaxLength(64)
+  section!: string;
+
+  @ApiProperty()
+  @IsInt()
+  @Min(0)
+  spanStart!: number;
+
+  @ApiProperty()
+  @IsInt()
+  @Min(1)
+  spanEnd!: number;
+
+  @ApiProperty({ description: 'The selected words, checked against the card' })
+  @IsString()
+  @MaxLength(2000)
+  quotedText!: string;
+
+  @ApiProperty()
+  @IsString()
+  @MaxLength(COMMENT_BODY_MAX)
+  body!: string;
+}
+
+class LearnerCommentsDto {
+  @ApiProperty({
+    required: false,
+    description: 'A comment on the debrief as a whole',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(COMMENT_BODY_MAX)
+  overall?: string;
+
+  @ApiProperty({ required: false, type: [SelectionCommentDto] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(LEARNER_COMMENT_MAX_ITEMS)
+  @ValidateNested({ each: true })
+  @Type(() => SelectionCommentDto)
+  items?: SelectionCommentDto[];
+}
+
 class FlagDto {
   @ApiProperty({ example: 'work_on_this[0]' })
   @Matches(
@@ -127,6 +187,8 @@ export class DebriefLearnerController {
     private readonly events: EventEmitter2,
     private readonly learnerEvents: DebriefLearnerEventsService,
     private readonly toggles: FeatureToggleService,
+    private readonly learnerFeatures: DebriefLearnerFeaturesService,
+    private readonly learnerComments: DebriefLearnerCommentsService,
   ) {}
 
   @Post('sessions/:sessionId/read')
@@ -191,6 +253,24 @@ export class DebriefLearnerController {
     );
   }
 
+  @Get('scenarios/:scenarioId/latest-points')
+  @AuthPermissions([PERMISSIONS.VIEW_SCENARIO_SESSION])
+  @ApiOperation({
+    summary:
+      "The points from the learner's latest debrief for a roleplay, for its Reminders tab",
+    description:
+      'Empty when their organisation is not switched on or they have no debrief for this roleplay yet.',
+  })
+  async latestPoints(
+    @Param('scenarioId', ParseIntPipe) scenarioId: number,
+    @CurrentUser() user: TokenUser,
+  ) {
+    if (!(await this.agent.isLive(user.tenantId ?? null))) {
+      return { runId: null, workOnThis: [], practiseNext: null };
+    }
+    return this.feedback.latestPoints(scenarioId, user.id);
+  }
+
   @Get('sessions/:sessionId/supervisor')
   @AuthPermissions([PERMISSIONS.VIEW_ADMIN_SCENARIO_SESSION])
   @ApiOperation({
@@ -239,7 +319,37 @@ export class DebriefLearnerController {
     const decorated = await this.feedback.decorate(view, user.id);
     // PRD §9: the pulse, only on a debrief it asks on.
     const pulse = await this.learnerEvents.pulseFor(view, user.id);
-    return pulse ? { ...decorated, pulse } : decorated;
+    const withPulse = pulse ? { ...decorated, pulse } : decorated;
+    // Learner features this person has (web only: the apps that do not know it ignore it).
+    const selectionComments = await this.learnerFeatures.isEnabled(
+      DebriefLearnerFeature.SELECTION_COMMENTS,
+      user.id,
+    );
+    const myComments =
+      selectionComments && view.state === 'ready' && view.runId
+        ? await this.learnerComments.mine(view.runId, user.id)
+        : undefined;
+    return {
+      ...withPulse,
+      features: { selectionComments },
+      ...(myComments ? { myComments } : {}),
+    };
+  }
+
+  @Post('sessions/:sessionId/comments')
+  @AuthPermissions([PERMISSIONS.VIEW_SCENARIO_SESSION])
+  @ApiOperation({
+    summary:
+      'Comments on selected words in the learner’s own debrief, sent together',
+    description:
+      'Only for people the Ally team has given the feature. Each comment names the card and the exact words; an overall comment is optional.',
+  })
+  addComments(
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @Body() body: LearnerCommentsDto,
+    @CurrentUser() user: TokenUser,
+  ) {
+    return this.learnerComments.add(sessionId, user.id, body);
   }
 
   @Put('sessions/:sessionId/pulse')

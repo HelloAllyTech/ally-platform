@@ -110,7 +110,7 @@ describe('autoStartHandoff: hand-offs start on their own (V2_AUTONOMY A8)', () =
 });
 
 describe('approveHandoff: Hand to Builder', () => {
-  it('opens a session requested for the PM agent, stores the link, and starts the interview', async () => {
+  it('opens a session requested for the Debrief PM agent, stores the link, and starts the interview', async () => {
     const builder = { createSession: jest.fn(async () => ({ id: SESSION })) };
     const decisions = { startBackgroundTurn: jest.fn(async () => undefined) };
     const { svc, query } = pmService(builder, decisions);
@@ -192,7 +192,7 @@ describe('builderProgressStage', () => {
   });
 });
 
-describe('DebriefBuilderRequesterService: the PM agent answers Builder', () => {
+describe('DebriefBuilderRequesterService: the Debrief PM agent answers Builder', () => {
   const question = {
     id: 'q1',
     prompt: 'Should the tool write anything?',
@@ -283,7 +283,7 @@ describe('DebriefBuilderRequesterService: the PM agent answers Builder', () => {
 
   beforeEach(() => post.mockReset());
 
-  it('registers itself as the PM agent requester', () => {
+  it('registers itself as the Debrief PM agent requester', () => {
     builderRequesters.clear();
     const { svc } = setup();
     svc.onModuleInit();
@@ -312,7 +312,8 @@ describe('DebriefBuilderRequesterService: the PM agent answers Builder', () => {
       `question:${SESSION}:q1`,
       {
         selectedOptionIds: ['ro'],
-        message: 'From the PM agent: Read-only, per the acceptance checks.',
+        message:
+          'From the Debrief PM agent: Read-only, per the acceptance checks.',
       },
       7,
       { surface: 'requester' },
@@ -441,7 +442,7 @@ describe('DebriefBuilderRequesterService: the PM agent answers Builder', () => {
     expect(post).not.toHaveBeenCalled();
   });
 
-  it('escalates without a model call while the PM agent is switched off', async () => {
+  it('escalates without a model call while the Debrief PM agent is switched off', async () => {
     const { svc, evidence } = setup({ enabled: false });
     await svc.turnEnded(SESSION, IDEA);
     expect(post).not.toHaveBeenCalled();

@@ -35,7 +35,7 @@ from langgraph.types import Command
 from langsmith.run_helpers import tracing_context
 
 from app.core.debrief_graph.gateway import Gateway, HttpGateway
-from app.core.pm_agent.agent import build_pm_deep_agent, seed_memory
+from app.core.pm_agent.agent import build_pm_deep_agent, seed_memory, seed_skills
 from app.core.pm_agent.ledger import RunLedger
 from app.core.pm_agent.middleware import _text
 from app.core.pm_agent.models import build_models
@@ -48,8 +48,7 @@ logger = get_logger(__name__)
 
 #: The instructions' Skills Store prompt (`ally_ai_debrief_pm_conversation_system`).
 PROMPT_PATH = "debrief/pm_conversation_system"
-#: The console's one shared thread; the clinical advisor's turns have their own
-#: (`…:pinned-rules`) so they never see the rest of the thread (C4).
+#: The console's one shared thread.
 THREAD_PREFIX = "debrief-pm-conversation"
 #: A turn is short: model passes and tool calls together before the loop is cut.
 RECURSION_LIMIT = 80
@@ -229,6 +228,7 @@ async def run_conversation(
             label="conversation",
             interrupt_on=INTERRUPT_ON,
             context_schema=ConversationContext,
+            prompts=req.prompts,
         )
         config = {
             "configurable": {"thread_id": req.thread_id},
@@ -237,6 +237,7 @@ async def run_conversation(
         }
         context = ConversationContext(frozenset(req.always_ask_idea_ids))
         await seed_memory(store)
+        await seed_skills(store, req.prompts)
         paused = pending_decision((await agent.aget_state(config)).interrupts)
         if req.resume and paused and paused["interrupt_id"] == req.resume.interrupt_id:
             # The person's answer to the paused action(s): one decision for each.

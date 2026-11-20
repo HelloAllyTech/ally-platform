@@ -1,3 +1,4 @@
+import { isCourseCopilotLookup } from '../../util/course-copilot-turn.util';
 import { validate as isUuid } from 'uuid';
 import { CourseCopilotSessionStatus as Status } from '../../enum/course-copilot.enum';
 import {
@@ -21,6 +22,12 @@ const INTERVIEW_TOOL_NAMES = [
   'get_trigger_warnings',
   'list_cover_images',
   'search_library',
+  'search_sources',
+  'list_learner_profiles',
+  'get_learner_profile',
+  'list_example_courses',
+  'get_example_course',
+  'get_learner_results',
   'design_guidance_search',
   'design_guidance_get',
 ];
@@ -28,6 +35,7 @@ const EDIT_TOOL_NAMES = EDIT_TOOL_DEFINITIONS.map((tool) => tool.name);
 
 describe('CourseCopilotToolsService', () => {
   let service: CourseCopilotToolsService;
+  const sources = { search: jest.fn().mockResolvedValue([]) };
   let sessionRepository: { update: jest.Mock };
   let blueprintService: { propose: jest.Mock; applyPatch: jest.Mock };
   let library: Record<string, jest.Mock>;
@@ -64,6 +72,7 @@ describe('CourseCopilotToolsService', () => {
       library as any,
       guidance as any,
       editTools as any,
+      sources as any,
     );
   });
 
@@ -386,6 +395,102 @@ describe('CourseCopilotToolsService', () => {
   });
 
   // ── Brief ────────────────────────────────────────────────────────────────
+
+  describe('learner profile library', () => {
+    it('list_learner_profiles lists all 19 compactly, without the full text', async () => {
+      const outcome = await exec(
+        'list_learner_profiles',
+        {},
+        session(Status.INTERVIEWING),
+      );
+      expect(outcome.modelResult.ok).toBe(true);
+      expect(outcome.modelResult.profiles).toHaveLength(19);
+      expect(outcome.modelResult.profiles[0]).toEqual(
+        expect.objectContaining({ id: 'laypeople', name: 'Laypeople' }),
+      );
+      expect(JSON.stringify(outcome.modelResult)).not.toContain(
+        'Habitual responses',
+      );
+      expect(outcome.modelResult).not.toHaveProperty('bestMatches');
+      expect(outcome.endTurn).toBeUndefined();
+    });
+
+    it('list_learner_profiles with a query adds the best matches', async () => {
+      const outcome = await exec(
+        'list_learner_profiles',
+        { query: 'school teachers' },
+        session(Status.INTERVIEWING),
+      );
+      expect(outcome.modelResult.bestMatches[0]).toMatchObject({
+        id: 'teachers',
+      });
+      expect(outcome.summary).toContain('Teachers');
+    });
+
+    it('get_learner_profile returns the full entry', async () => {
+      const outcome = await exec(
+        'get_learner_profile',
+        { id: 'helpline-responders' },
+        session(Status.INTERVIEWING),
+      );
+      expect(outcome.modelResult.ok).toBe(true);
+      expect(outcome.modelResult.profile).toMatchObject({
+        id: 'helpline-responders',
+        number: 5,
+      });
+      expect(outcome.modelResult.profile.trainerView).toContain(
+        'Draft profile',
+      );
+      expect(outcome.modelResult.profile.fullProfile).toContain(
+        'Habitual responses',
+      );
+    });
+
+    it('list_example_courses and get_example_course read the chosen examples', async () => {
+      const listed = await exec(
+        'list_example_courses',
+        {},
+        session(Status.INTERVIEWING),
+      );
+      expect(listed.modelResult.ok).toBe(true);
+      const [first] = listed.modelResult.courses;
+      const read = await exec(
+        'get_example_course',
+        { id: first.id },
+        session(Status.INTERVIEWING),
+      );
+      expect(read.modelResult.ok).toBe(true);
+      expect(read.modelResult.outline).toContain('Section 1:');
+      const missing = await exec(
+        'get_example_course',
+        { id: 'nope' },
+        session(Status.INTERVIEWING),
+      );
+      expect(missing.modelResult).toMatchObject({
+        ok: false,
+        error: 'unknown_example',
+      });
+      expect(isCourseCopilotLookup('get_example_course')).toBe(true);
+    });
+
+    it('get_learner_profile soft-fails an unknown id with the valid ids', async () => {
+      const outcome = await exec(
+        'get_learner_profile',
+        { id: 'astronauts' },
+        session(Status.INTERVIEWING),
+      );
+      expect(outcome.modelResult).toMatchObject({
+        ok: false,
+        error: 'unknown_profile',
+      });
+      expect(outcome.modelResult.ids).toHaveLength(19);
+    });
+
+    it('counts both as lookups, not edits', () => {
+      expect(isCourseCopilotLookup('list_learner_profiles')).toBe(true);
+      expect(isCourseCopilotLookup('get_learner_profile')).toBe(true);
+    });
+  });
 
   describe('update_brief', () => {
     const update = (ops: any, s = session(Status.INTERVIEWING)) =>
@@ -806,6 +911,51 @@ describe('CourseCopilotToolsService', () => {
         interviewing(),
       );
       expect(library.getBehaviours).toHaveBeenCalledWith(['1', 'c-2']);
+    });
+
+    it("search_sources searches this session's files and cites each passage", async () => {
+      sources.search.mockResolvedValueOnce([
+        {
+          sourceId: 's-1',
+          fileName: 'Manual.pdf',
+          label: 'Manual.pdf, p. 12',
+          section: 'Chapter 3',
+          text: 'Ask directly.',
+          score: 3.2,
+        },
+      ]);
+
+      const outcome = await exec(
+        'search_sources',
+        { query: 'asking about suicide', limit: 50 },
+        session(Status.INTERVIEWING, { id: 'sess-1' }),
+      );
+
+      expect(sources.search).toHaveBeenCalledWith(
+        'sess-1',
+        'asking about suicide',
+        8,
+      );
+      expect(outcome.modelResult.passages).toEqual([
+        {
+          source: 'Manual.pdf, p. 12',
+          section: 'Chapter 3',
+          text: 'Ask directly.',
+        },
+      ]);
+      expect(outcome.summary).toBe(
+        'Searched the reference files for "asking about suicide": 1 passage',
+      );
+    });
+
+    it('search_sources says when nothing matched', async () => {
+      const outcome = await exec(
+        'search_sources',
+        { query: 'zebra' },
+        session(Status.INTERVIEWING),
+      );
+      expect(outcome.modelResult.passages).toEqual([]);
+      expect(outcome.modelResult.note).toContain('No passage matched');
     });
 
     it('search_library defaults an unknown kind to roleplay and the limit to 8, and marks the hits as data', async () => {

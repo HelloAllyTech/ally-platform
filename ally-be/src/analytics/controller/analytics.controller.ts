@@ -144,6 +144,10 @@ import { UsageLevelAnalyticsService } from '../service/usage-level-analytics.ser
 import { RoleplayVolumeAnalyticsService } from '../service/roleplay-volume-analytics.service';
 import { RoadmapDeliveryAnalyticsService } from '../service/roadmap-delivery-analytics.service';
 import { RoadmapVotingAnalyticsService } from '../service/roadmap-voting-analytics.service';
+import {
+  AssessmentAttemptsAnalyticsService,
+  AssessmentAttemptsResponse,
+} from '../service/assessment-attempts-analytics.service';
 import { ShipVolumeAnalyticsService } from '../service/ship-volume-analytics.service';
 import {
   HighlightsAnalyticsService,
@@ -438,6 +442,7 @@ export class AnalyticsController {
     private readonly roleplayVolumeAnalyticsService: RoleplayVolumeAnalyticsService,
     private readonly roadmapDeliveryAnalyticsService: RoadmapDeliveryAnalyticsService,
     private readonly roadmapVotingAnalyticsService: RoadmapVotingAnalyticsService,
+    private readonly assessmentAttemptsAnalyticsService: AssessmentAttemptsAnalyticsService,
     private readonly shipVolumeAnalyticsService: ShipVolumeAnalyticsService,
     private readonly platformAnalyticsService: PlatformAnalyticsService,
     private readonly scribeAnalyticsService: ScribeAnalyticsService,
@@ -1270,6 +1275,25 @@ export class AnalyticsController {
   })
   async getRoadmapDelivery(): Promise<RoadmapDeliveryResponseDto> {
     return this.roadmapDeliveryAnalyticsService.getRoadmapDelivery();
+  }
+
+  @Get('assessment-attempts')
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary: 'Single valid assessment attempts, weekly (super-admin, AAQ-255)',
+    description:
+      'The success metric for assessment roleplays in courses. Unit: a learner on an ' +
+      'assessment item with at least one valid attempt (a session stamped ' +
+      '`assessmentAttemptValid` as it ended — the minimum learner turns met). ' +
+      '`singleValid` counts units with exactly one valid attempt and no trainer reopen; ' +
+      '`share` = singleValid / units, weekly by first valid attempt. `incompleteStarts` ' +
+      '(attempts ended below the minimum turns, by week ended) travel alongside and are ' +
+      'never subtracted. Platform-wide, all-time. Sessions from before minimum turns ' +
+      'existed were backfilled as valid at one learner turn.',
+  })
+  @ApiResponse({ status: 200, description: 'Assessment attempts retrieved' })
+  async getAssessmentAttempts(): Promise<AssessmentAttemptsResponse> {
+    return this.assessmentAttemptsAnalyticsService.getAssessmentAttempts();
   }
 
   @Get('roadmap-voting')

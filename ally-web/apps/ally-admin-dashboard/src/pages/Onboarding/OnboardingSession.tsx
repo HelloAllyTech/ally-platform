@@ -13,13 +13,14 @@ import { defaultsConfirmation } from "./purposes";
 import {
   BuildingScreen,
   DesignScreen,
+  InterviewScreen,
   LearnedScreen,
   LiveScreen,
   QuestionScreen,
   ReadingScreen,
   SafetyScreen,
-  ShareScreen,
 } from "./Screens";
+import { ShareWithPlan } from "./screens/ShareWithPlan";
 import { reached } from "./steps";
 import {
   OnboardingSession as OnboardingSessionState,
@@ -95,6 +96,17 @@ export const OnboardingView: React.FC<{
 
   const body = (() => {
     switch (screen) {
+      case "interview":
+        return (
+          <InterviewScreen
+            view={view}
+            busy={s.sending}
+            working={s.working}
+            streaming={s.streaming}
+            onSend={s.say}
+            onDone={() => s.pass("interview")}
+          />
+        );
       case "reading":
         return <ReadingScreen view={view} reading={s.reading} onDone={() => s.pass("reading")} />;
       case "learned":
@@ -166,7 +178,7 @@ export const OnboardingView: React.FC<{
         return <CheckupScreen view={view} onContinue={() => s.pass("checkup")} />;
       case "share":
         return (
-          <ShareScreen
+          <ShareWithPlan
             view={view}
             publicAllowed={s.publicAllowed}
             publishing={s.publishing}
@@ -175,7 +187,16 @@ export const OnboardingView: React.FC<{
               s.mustPass && {
                 message: s.mustPass.message,
                 questions: s.mustPass.questions,
-                onConfirm: () => void s.publish(s.mustPass!.access, s.mustPass!.emails, true),
+                belowGate: s.mustPass.belowGate,
+                onConfirm: () =>
+                  void (s.mustPass!.belowGate
+                    ? s.publish(
+                        s.mustPass!.access,
+                        s.mustPass!.emails,
+                        Boolean(s.mustPass!.confirmedMustPass),
+                        true,
+                      )
+                    : s.publish(s.mustPass!.access, s.mustPass!.emails, true)),
               }
             }
           />

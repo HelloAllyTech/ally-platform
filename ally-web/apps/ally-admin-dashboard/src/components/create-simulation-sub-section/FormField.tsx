@@ -13,6 +13,7 @@ import { VideoActorPicker } from "./VideoActorPicker";
 import { ComfortAudioDropdown } from "../comfort-audio-dropdown";
 import { Competency } from "../competency";
 import { CustomFieldGroup } from "../custom-field-group";
+import { DebriefRiskCueField } from "../debrief-roleplay-options";
 import { DropdownField } from "../dropdown-field";
 import { EnhanceButton } from "../enhance-button";
 import { FileUpload } from "../file-upload";
@@ -334,6 +335,8 @@ export const FormField: FC<FormFieldProps> = ({ config, formMethods, readOnly = 
             readOnly={readOnly}
           />
         );
+      case FORM_FIELD_TYPES.CUSTOM.DEBRIEF_RISK_CUE_OPTION:
+        return <DebriefRiskCueField id={id} formMethods={formMethods} readOnly={readOnly} />;
       case FORM_FIELD_TYPES.CUSTOM.STATES_EDITOR:
         return (
           <StatesEditor id={id} label={label} formMethods={formMethods} isMandatory={isMandatory} />
@@ -456,6 +459,7 @@ export const FormField: FC<FormFieldProps> = ({ config, formMethods, readOnly = 
     FORM_FIELD_TYPES.CUSTOM.LINGUISTIC_STYLE_SAMPLES,
     FORM_FIELD_TYPES.CUSTOM.REMINDERS,
     FORM_FIELD_TYPES.CUSTOM.MEMORIES_EDITOR,
+    FORM_FIELD_TYPES.CUSTOM.DEBRIEF_RISK_CUE_OPTION,
   ];
 
   // View Details mode: the field content stays visible (accordions above

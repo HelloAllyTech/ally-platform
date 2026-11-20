@@ -9,7 +9,7 @@ import { Cron } from '@nestjs/schedule';
 import { DataSource } from 'typeorm';
 import { LoggerService } from '../../logger/logger.service';
 import { scheduledTaskRegistry } from '../../scheduler/registry/scheduled-task.registry';
-import { DEBRIEF_AGENT_KEY } from '../constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
 import {
   BASELINE_RUN_COST_USD,
   DEBRIEF_SCHEDULE_JOBS,

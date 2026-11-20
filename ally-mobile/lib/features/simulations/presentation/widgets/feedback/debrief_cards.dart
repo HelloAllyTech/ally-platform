@@ -12,6 +12,7 @@ import '../../../../../core/localization/translate_ref.dart';
 import '../../../../../core/theme/app_colors.dart';
 import '../../../../../core/theme/app_fonts.dart';
 import '../../../../courses/presentation/course_item_player_screen.dart' show CourseItemPlayerArgs;
+import '../../../../boxbreathing/presentation/breathing_pacer.dart';
 import '../../../data/learner_debrief_repository.dart';
 import 'debrief_read_aloud.dart';
 import 'learner_debrief_controller.dart';
@@ -614,8 +615,10 @@ class _Quote extends ConsumerWidget {
   }
 }
 
-/// One card: a heading with an icon, then its content.
-class _Card extends StatelessWidget {
+/// One card: a heading with an icon, then its content. A [collapsible] card
+/// starts closed and opens when the learner taps the heading (or while
+/// read-aloud is reading it), so a long debrief is easier to take in.
+class _Card extends StatefulWidget {
   const _Card({
     super.key,
     required this.title,
@@ -623,6 +626,7 @@ class _Card extends StatelessWidget {
     required this.children,
     this.attention = false,
     this.reading = false,
+    this.collapsible = false,
   });
 
   final String title;
@@ -633,31 +637,62 @@ class _Card extends StatelessWidget {
   /// Read-aloud is reading this card: a ring, so the eye can follow the voice.
   final bool reading;
 
+  /// Starts closed; the heading toggles it.
+  final bool collapsible;
+
+  @override
+  State<_Card> createState() => _CardState();
+}
+
+class _CardState extends State<_Card> {
+  bool _open = false;
+
   @override
   Widget build(BuildContext context) {
+    final w = widget;
+    final open = !w.collapsible || _open || w.reading;
+    final heading = Row(
+      children: [
+        w.icon,
+        const SizedBox(width: 8),
+        Expanded(child: Text(w.title, style: _leadStyle.copyWith(fontSize: 16))),
+        if (w.collapsible)
+          AnimatedRotation(
+            turns: open ? 0.5 : 0,
+            duration: (MediaQuery.maybeDisableAnimationsOf(context) ?? false)
+                ? Duration.zero
+                : const Duration(milliseconds: 150),
+            child: const Icon(Icons.expand_more, size: 22, color: AppColors.highEmphasis),
+          ),
+      ],
+    );
     return _ReadingRing(
-      reading: reading,
+      reading: w.reading,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: attention ? _amberFill : Colors.white,
+          color: w.attention ? _amberFill : Colors.white,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: attention ? _amberBorder : AppColors.blue50, width: attention ? 2 : 1),
+          border: Border.all(color: w.attention ? _amberBorder : AppColors.blue50, width: w.attention ? 2 : 1),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Semantics(
               header: true,
-              child: Row(
-                children: [
-                  icon,
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(title, style: _leadStyle.copyWith(fontSize: 16))),
-                ],
-              ),
+              child: w.collapsible
+                  ? Semantics(
+                      button: true,
+                      expanded: open,
+                      child: InkWell(
+                        onTap: () => setState(() => _open = !open),
+                        child: ConstrainedBox(constraints: const BoxConstraints(minHeight: 32), child: heading),
+                      ),
+                    )
+                  : heading,
             ),
-            for (final child in children) ...[const SizedBox(height: 12), child],
+            if (open)
+              for (final child in w.children) ...[const SizedBox(height: 12), child],
           ],
         ),
       ),
@@ -694,19 +729,29 @@ class _ReadingRing extends StatelessWidget {
 /// `progressLine`); without it (an older server, or a key this app doesn't
 /// know) it is the latest of the server's own steps, else "Reading your
 /// session…".
-class _Working extends ConsumerWidget {
+class _Working extends ConsumerStatefulWidget {
   const _Working({required this.progress, required this.latestStep});
 
   final DebriefProgress? progress;
   final String? latestStep;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_Working> createState() => _WorkingState();
+}
+
+class _WorkingState extends ConsumerState<_Working> {
+  /// Breathing is the learner's choice, never started for them.
+  bool _breathing = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = widget.progress;
+    final latestStep = widget.latestStep;
     const k = 'postSim.debriefCards.working';
     final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     final p = progress;
     final step = switch (p) {
-      null when latestStep == null || latestStep!.trim().isEmpty => ref.t('$k.defaultStep'),
+      null when latestStep == null || latestStep.trim().isEmpty => ref.t('$k.defaultStep'),
       null => latestStep!,
       DebriefProgress(key: 'guidance', :final topic?) => ref.t('$k.steps.guidanceTopic', {'topic': topic}),
       DebriefProgress(key: 'revising', :final round) => ref.t('$k.steps.revising', {'round': round}),
@@ -722,27 +767,53 @@ class _Working extends ConsumerWidget {
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: AppColors.blue100),
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            SizedBox(
-              width: 20,
-              height: 20,
-              child: reduceMotion
-                  ? Icon(Icons.edit_note, key: Key('debrief-working-static'), size: 20, color: AppColors.primary)
-                  : CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: reduceMotion
+                      ? Icon(Icons.edit_note, key: Key('debrief-working-static'), size: 20, color: AppColors.primary)
+                      : CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(ref.t('postSim.debriefCards.working.title'), style: _leadStyle),
+                      const SizedBox(height: 4),
+                      Text(step, style: _bodyStyle.copyWith(color: AppColors.mediumEmphasis)),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(ref.t('postSim.debriefCards.working.title'), style: _leadStyle),
-                  const SizedBox(height: 4),
-                  Text(step, style: _bodyStyle.copyWith(color: AppColors.mediumEmphasis)),
-                ],
+            const SizedBox(height: 12),
+            if (_breathing) ...[
+              const BreathingPacer(),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: _LinkButton(
+                  key: const Key('debrief-breathe-stop'),
+                  label: ref.t('postSim.debriefCards.working.breatheStop'),
+                  onPressed: () => setState(() => _breathing = false),
+                ),
               ),
-            ),
+            ] else
+              Align(
+                alignment: Alignment.centerLeft,
+                child: _LinkButton(
+                  key: const Key('debrief-breathe-start'),
+                  label: ref.t('postSim.debriefCards.working.breatheStart'),
+                  onPressed: () => setState(() => _breathing = true),
+                ),
+              ),
           ],
         ),
       ),
@@ -828,6 +899,38 @@ class _ReadyCards extends ConsumerWidget {
     final practiseTitle = ref.t(practiseAgain ? '$_k.practiseAgain' : '$_k.practiseNext');
 
     final children = <Widget>[
+      // A clear risk cue the debrief still leaves out: shown as it is, with a kind notice first.
+      if (view.followUp && supervisor == null)
+        Container(
+          key: const Key('debrief-follow-up'),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.blue50,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.blue100),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Semantics(
+                header: true,
+                child: Row(
+                  children: [
+                    Icon(Icons.volunteer_activism_outlined, size: 20, color: AppColors.primary),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(ref.t('$_k.followUp.title'), style: _leadStyle.copyWith(fontSize: 16))),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              _Body(ref.t('$_k.followUp.body')),
+              if (view.supportLines.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                _Body(ref.t('$_k.followUp.support')),
+              ],
+            ],
+          ),
+        ),
       if (moment != null)
         _Card(
           key: const Key('debrief-card-important-moment'),
@@ -862,6 +965,14 @@ class _ReadyCards extends ConsumerWidget {
       if (worked.isNotEmpty)
         _Card(
           key: const Key('debrief-card-what-worked'),
+          // Open when the learner flagged a point or a reviewer answered one:
+          // their reply must not be hidden behind a tap.
+          collapsible:
+              supervisor == null &&
+              !worked.any(
+                (e) =>
+                    flagFor('what_worked[${e.index}]') != null || correctionFor('what_worked[${e.index}]') != null,
+              ),
           title: ref.t('$_k.whatWorked'),
           icon: const Icon(Icons.thumb_up_outlined, size: 20, color: AppColors.success),
           children: [
@@ -939,6 +1050,7 @@ class _ReadyCards extends ConsumerWidget {
       if (cards.skillWords.isNotEmpty)
         _Card(
           key: const Key('debrief-card-skill-words'),
+          collapsible: supervisor == null,
           title: ref.t('$_k.skillWords.title'),
           icon: Icon(Icons.star_outline, size: 20, color: AppColors.primary),
           children: [
@@ -969,6 +1081,7 @@ class _ReadyCards extends ConsumerWidget {
       if (cards.progressNote != null)
         _Card(
           key: const Key('debrief-card-progress-note'),
+          collapsible: supervisor == null,
           title: ref.t('$_k.progressNote'),
           icon: Icon(Icons.trending_up, size: 20, color: AppColors.primary),
           children: [_Body(cards.progressNote!)],
@@ -1589,7 +1702,7 @@ class _LinkButton extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[Icon(icon, size: 14), const SizedBox(width: 4)],
-          Text(label),
+          Flexible(child: Text(label)),
         ],
       ),
     );

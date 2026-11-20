@@ -52,7 +52,7 @@ export class RoadmapStrategyGoalRepository extends Repository<RoadmapStrategyGoa
          FROM roadmap_opportunities o
         WHERE o."deletedAt" IS NULL
           AND o."type" <> 'bug'
-          AND o."stage" IN ('new', 'prioritised', 'under_development')
+          AND o."stage" IN ('new', 'prioritised')
           AND NOT EXISTS (SELECT 1 FROM roadmap_opportunity_goal_impacts i
                            WHERE i."opportunityId" = o.id AND i."goalName" = $1)`,
       [name],
@@ -133,7 +133,7 @@ export class RoadmapGoalImpactRepository extends Repository<RoadmapOpportunityGo
          FROM roadmap_opportunities o
         WHERE o."deletedAt" IS NULL
           AND o."type" <> 'bug'
-          AND o."stage" IN ('new', 'prioritised', 'under_development')
+          AND o."stage" IN ('new', 'prioritised')
           AND (SELECT COUNT(*) FROM roadmap_opportunity_goal_impacts i
                 WHERE i."opportunityId" = o.id)
               < (SELECT COUNT(*) FROM roadmap_strategy_goals)
@@ -151,7 +151,7 @@ export class RoadmapGoalImpactRepository extends Repository<RoadmapOpportunityGo
          FROM roadmap_opportunities o
         WHERE o."deletedAt" IS NULL
           AND o."type" <> 'bug'
-          AND o."stage" IN ('new', 'prioritised', 'under_development')
+          AND o."stage" IN ('new', 'prioritised')
           AND (SELECT COUNT(*) FROM roadmap_opportunity_goal_impacts i
                 WHERE i."opportunityId" = o.id)
               < (SELECT COUNT(*) FROM roadmap_strategy_goals)`,
@@ -188,7 +188,7 @@ export class RoadmapRankWeightsRepository extends Repository<RoadmapRankWeights>
          FROM users u
          JOIN user_groups ug ON ug."userId" = u.id
          JOIN groups g ON g.id = ug."groupId"
-        WHERE g.name = ANY($1) AND u."deletedAt" IS NULL
+        WHERE g.name = ANY($1) AND u.status = 'ACTIVE'
         ORDER BY u.name ASC`,
       [PLATFORM_TIER_ROLES],
     );

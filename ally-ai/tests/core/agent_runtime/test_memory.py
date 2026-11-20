@@ -10,6 +10,7 @@ from app.core.agent_runtime import memory
 from app.core.agent_runtime.prompt import build_agent_prompt
 from app.core.agent_runtime.schemas import step_schema
 from app.core.agent_runtime.tools import allowed_tools
+from app.core.agent_runtime.tools.lists import takes_details
 from app.core.memory_lines import service as memory_lines
 from app.schemas.agent_runtime import AgentRunRequest, AgentRunResponse
 
@@ -36,6 +37,7 @@ def prompt_for(bot, **kw):
         memory=memory.memory_section(bot),
         history_lead=memory.history_lead(bot),
         can_book=memory.offers_create(bot.get("gateway_definitions")),
+        takes_details=takes_details(bot.get("gateway_definitions")),
         channel=bot.get("channel"),
         **kw,
     )
@@ -124,27 +126,39 @@ class TestPrompt:
         assert summary in prompt
 
 
-class TestCanBook:
-    def test_bring_in_customers_with_a_create_tool_gets_the_booking_variant(self):
-        bot = lists_bot(persona={"purpose": "enquiries"}, channel="whatsapp")
-        prompt = prompt_for(bot)
-        assert "book it yourself once they've confirmed" in prompt
-        assert "You're talking with them on WhatsApp." in prompt
-        assert "say the team will confirm what's free" not in prompt
+VARIANT = "you book it for them in the organisation's lists"
+TAKES = "offer to take their details so the team can get back to them"
+CREATE_LEADS = {
+    "name": "create_leads",
+    "description": "Add an entry to Leads for the person in this chat.",
+    "kind": "create",
+    "input_schema": {"type": "object", "properties": {}},
+    "takes_details": True,
+}
 
-    def test_without_a_create_tool_it_keeps_todays_text(self):
-        bot = lists_bot(FIND_SLOTS, persona={"purpose": "enquiries"})
-        prompt = prompt_for(bot)
-        assert "say the team will confirm what's free" in prompt
-        assert "book it yourself" not in prompt
 
-    def test_other_purposes_are_unchanged_by_a_create_tool(self):
-        prompt = prompt_for(lists_bot(persona={"purpose": "answer"}))
-        assert "book it yourself" not in prompt
+class TestPlaybooksReplaceThePurposeVariants:
+    """Q3-fast Part 2b: the purpose sets the goal and tone; what a list's tools add
+    comes from its playbook, whatever the purpose. The `can_book` and
+    `takes_details` variants are no longer used."""
 
-    def test_the_website_is_named_off_whatsapp(self):
+    def test_bring_in_customers_with_a_create_tool_gets_its_base_section(self):
         prompt = prompt_for(lists_bot(persona={"purpose": "enquiries"}, channel="web"))
-        assert "You're talking with them on the website." in prompt
+        assert VARIANT not in prompt
+        # The booking rules are the lists section's, for every purpose (6b).
+        assert "book it yourself straight away" in prompt
+
+    def test_answer_with_a_list_that_takes_details_gets_no_variant(self):
+        prompt = prompt_for(lists_bot(CREATE_LEADS, persona={"purpose": "answer"}))
+        assert TAKES not in prompt
+        assert "You answer questions about this organisation" in prompt
+
+    def test_without_tools_the_purpose_section_is_byte_identical(self):
+        from app.core.knowledge_agent.prompt import format_purpose
+
+        for purpose in ("answer", "enquiries", "training", "guide"):
+            plain = format_purpose({"purpose": purpose})
+            assert plain in prompt_for(make_bot(persona={"purpose": purpose}))
 
 
 class TestRememberMode:
@@ -490,11 +504,15 @@ class TestMoreTimeAfterAWrite:
         assert base + extra - 11 < time_left(started) <= base + extra - 10
 
     @pytest.mark.asyncio
-    async def test_a_write_moves_the_deadline_later_never_earlier(self):
+    async def test_a_write_moves_the_deadline_later_never_earlier(self, monkeypatch):
         import asyncio
         import time
 
         from app.core.agent_runtime.budget import RUN_DEADLINE, extend_after_write
+        from app.core.config import settings
+
+        # 0 by default since chunk H1; the mechanism still works when configured.
+        monkeypatch.setattr(settings.AGENT_RUNTIME, "RUN_WRITE_EXTRA_SECONDS", 4.0)
 
         async with asyncio.timeout(20) as cap:
             RUN_DEADLINE.set(cap)
@@ -504,3 +522,33 @@ class TestMoreTimeAfterAWrite:
             later = cap.when()
             extend_after_write(time.time() - 100)  # would be earlier: ignored
             assert cap.when() == later
+
+
+class TestSystemChannel:
+    """Chunk 6b: the system prompt's first line names the run's channel; on WhatsApp
+    it's exactly what it was, and nothing else in the prompt changes."""
+
+    BEFORE = (
+        "You are the assistant described above, chatting with someone over WhatsApp "
+        "on behalf of the organisation that runs you."
+    )
+
+    def test_whatsapp_is_byte_identical_to_before(self):
+        whatsapp = prompt_for(make_bot(channel="whatsapp"))
+        assert self.BEFORE in whatsapp
+
+    def test_other_channels_change_only_those_words(self):
+        whatsapp = prompt_for(make_bot(channel="whatsapp"))
+        web = prompt_for(make_bot(channel="web"))
+        test = prompt_for(make_bot(channel="test"))
+        assert "chatting with someone on the website on behalf" in web
+        assert "chatting with someone in this chat on behalf" in test
+        assert web.replace("on the website", "over WhatsApp", 1) == whatsapp
+        assert test.replace("in this chat", "over WhatsApp", 1) == whatsapp
+
+    def test_the_seed_differs_from_before_only_in_the_channel(self):
+        from pathlib import Path
+
+        seed = Path("app/prompts/agent/system.txt").read_text()
+        assert seed.replace("{channel}", "over WhatsApp", 1).startswith(self.BEFORE)
+        assert seed.count("{channel}") == 1

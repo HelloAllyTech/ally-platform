@@ -15,12 +15,16 @@ import {
 import { useIsPlaceholderUsed } from "@hooks";
 import { ButtonVariant } from "@src/components/types";
 import { behaviourStateInstruction, HelperTagItem } from "@types";
+import { effectiveBehaviourScore, sameBehaviourScore, validateBehaviourScore } from "@utils";
 
 import { HelperTag } from "../helper-tag";
+import { BehaviourScoreInput } from "./BehaviourScoreInput";
 
 interface BehaviourRow {
   id?: string;
   category?: string;
+  /** Per-hit points, -100..100. Unset means the category default (+10 / -10). */
+  score?: number | null;
   behaviors?: string[];
   instructions?: string[];
   stateInstructions?: behaviourStateInstruction[];
@@ -43,7 +47,8 @@ const STATE_NAMES_ROW_ID = "state-names-row";
 // rubric can be scanned without reading every cell. Colour is redundant with
 // the now-untruncated text, never the only signal.
 // Narrower category column on phones so the behaviour name keeps some room.
-const RUBRIC_GRID = "grid grid-cols-[minmax(0,1fr)_9.5rem_40px] md:grid-cols-[1fr_248px_40px]";
+const RUBRIC_GRID =
+  "grid grid-cols-[minmax(0,1fr)_9.5rem_4.75rem_40px] md:grid-cols-[1fr_248px_110px_40px]";
 
 const rubricAccent = (isShould: boolean) =>
   isShould ? "border-l-success-400" : "border-l-destructive-400";
@@ -81,7 +86,7 @@ export const BehavioursAndStatesInstruction: FC<BehavioursAndStatesInstructionPr
   );
   const stateNames = useMemo(() => watchedStateNames ?? [], [watchedStateNames]);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
-  const [pendingRow, setPendingRow] = useState<{ category: string } | null>(null);
+  const [pendingRow, setPendingRow] = useState<{ category: string; score?: number } | null>(null);
 
   // Body-driven gate: the legacy per-state instruction columns and the
   // state-names header row only matter when the variant body actually
@@ -146,6 +151,12 @@ export const BehavioursAndStatesInstruction: FC<BehavioursAndStatesInstructionPr
       id: { value: behavior?.id ?? "", disabled: false, rowId: behavior.id },
       category: { value: behavior?.category ?? "", disabled: false, rowId: behavior.id },
       behaviors: { value: behavior?.behaviors, disabled: false, rowId: behavior.id },
+      // Shows what the row is worth (authored score, else +10 / -10).
+      score: {
+        value: effectiveBehaviourScore(behavior?.category, behavior?.score),
+        disabled: false,
+        rowId: behavior.id,
+      },
     };
 
     BEHAVIOUR_STATES.forEach(state => {
@@ -165,6 +176,7 @@ export const BehavioursAndStatesInstruction: FC<BehavioursAndStatesInstructionPr
       id: { value: STATE_NAMES_ROW_ID, disabled: true, rowId: STATE_NAMES_ROW_ID },
       category: { value: "State names", disabled: true, rowId: STATE_NAMES_ROW_ID },
       behaviors: { value: [], disabled: true, rowId: STATE_NAMES_ROW_ID },
+      score: { value: "", disabled: true, rowId: STATE_NAMES_ROW_ID },
       hideSelection: { value: true },
     };
 
@@ -210,9 +222,40 @@ export const BehavioursAndStatesInstruction: FC<BehavioursAndStatesInstructionPr
   }, [formMethods, id, formData]);
 
   const handleRowChange = useCallback(
-    (action: { columnId?: string; value?: string | HelperTagItem[]; rowId?: string }) => {
+    (action: {
+      columnId?: string;
+      value?: string | number | null | HelperTagItem[];
+      rowId?: string;
+    }) => {
       const { columnId, value, rowId } = action;
       if (columnId == null || rowId == null || value === undefined) return;
+
+      if (columnId === "score" && rowId !== STATE_NAMES_ROW_ID) {
+        const row = formData.find(r => r.id === rowId);
+        // Emptying the cell means "use the category default".
+        if (value === null || value === "") {
+          formMethods.setValue(
+            id,
+            formData.map(r => (r.id === rowId ? { ...r, score: undefined } : r)),
+            { shouldDirty: true },
+          );
+          return;
+        }
+        const check = validateBehaviourScore(String(value), row?.category);
+        if ("error" in check) {
+          toast.error(`Score: ${check.error}`);
+          // The cell keeps what was typed until its data changes, so hand it a
+          // fresh array to snap it back to the last valid score.
+          formMethods.setValue(id, [...formData], { shouldDirty: false });
+          return;
+        }
+        formMethods.setValue(
+          id,
+          formData.map(r => (r.id === rowId ? { ...r, score: check.value } : r)),
+          { shouldDirty: true },
+        );
+        return;
+      }
 
       if (rowId === STATE_NAMES_ROW_ID) {
         if (columnId.startsWith("stateInstruction_")) {
@@ -244,9 +287,20 @@ export const BehavioursAndStatesInstruction: FC<BehavioursAndStatesInstructionPr
         });
         formMethods.setValue(id, updatedFormData, { shouldDirty: true });
       } else {
-        const updatedFormData = formData.map(behavior =>
-          behavior.id !== rowId ? behavior : { ...behavior, [columnId]: value },
-        );
+        const updatedFormData = formData.map(behavior => {
+          if (behavior.id !== rowId) return behavior;
+          const next = { ...behavior, [columnId]: value };
+          // A score authored for one category can be invalid for the other
+          // (+50 on "should not do"); fall back to the new category's default.
+          if (
+            columnId === "category" &&
+            typeof next.score === "number" &&
+            !validateBehaviourScore(String(next.score), next.category).ok
+          ) {
+            next.score = undefined;
+          }
+          return next;
+        });
         formMethods.setValue(id, updatedFormData, { shouldDirty: true });
       }
     },
@@ -261,13 +315,25 @@ export const BehavioursAndStatesInstruction: FC<BehavioursAndStatesInstructionPr
 
   // Flattened rows for scoring rubric view: one row per (behaviour tag, category) pair.
   const rubricRows = useMemo(() => {
-    const rows: { rowId: string; tag: HelperTagItem; isShould: boolean }[] = [];
+    const rows: {
+      rowId: string;
+      tag: HelperTagItem;
+      isShould: boolean;
+      category?: string;
+      score?: number | null;
+    }[] = [];
     for (const row of formData) {
       if (!row.behaviors?.length) continue;
       const isShould = row.category === "SHOULD_DO";
       for (const tag of row.behaviors as unknown as HelperTagItem[]) {
         if (tag?.id) {
-          rows.push({ rowId: row.id ?? "", tag, isShould });
+          rows.push({
+            rowId: row.id ?? "",
+            tag,
+            isShould,
+            category: row.category,
+            score: row.score,
+          });
         }
       }
     }
@@ -293,37 +359,45 @@ export const BehavioursAndStatesInstruction: FC<BehavioursAndStatesInstructionPr
     [formData, formMethods, id],
   );
 
-  const handleRubricRowCategoryChange = useCallback(
-    (rowId: string, tagId: string, newCategory: string) => {
-      // Move the tag to a row with the matching category (create one if needed)
-      const updatedFormData = formData.map(row => {
-        if (row.id !== rowId) return row;
-        return {
-          ...row,
-          behaviors: (row.behaviors as unknown as HelperTagItem[]).filter(t => t.id !== tagId),
-        };
-      });
-      const targetRow = updatedFormData.find(
-        row =>
-          row.category === newCategory && (row.behaviors as unknown as HelperTagItem[]).length < 5,
-      );
+  // Moves one behaviour to the row that carries the given category AND score,
+  // creating that row when none has room. A row holds up to 5 behaviours that
+  // share a category and a score, so changing either one for a single behaviour
+  // means changing which row it lives in. `score` undefined is "category default".
+  const moveTagToRow = useCallback(
+    (rowId: string, tagId: string, target: { category: string; score?: number }) => {
       const tag = (
         formData.find(r => r.id === rowId)?.behaviors as unknown as HelperTagItem[]
       )?.find(t => t.id === tagId);
       if (!tag) return;
-      let finalData;
-      if (targetRow) {
-        finalData = updatedFormData.map(row =>
-          row.id === targetRow.id
-            ? { ...row, behaviors: [...(row.behaviors as unknown as HelperTagItem[]), tag] }
-            : row,
-        );
-      } else {
-        finalData = [
-          ...updatedFormData,
-          { ...createEmptyFormValue(), category: newCategory, behaviors: [tag] },
-        ];
-      }
+      const withoutTag = formData.map(row =>
+        row.id !== rowId
+          ? row
+          : {
+              ...row,
+              behaviors: (row.behaviors as unknown as HelperTagItem[]).filter(t => t.id !== tagId),
+            },
+      );
+      const targetRow = withoutTag.find(
+        row =>
+          row.category === target.category &&
+          sameBehaviourScore(row.score, target.score) &&
+          (row.behaviors as unknown as HelperTagItem[]).length < 5,
+      );
+      const finalData = targetRow
+        ? withoutTag.map(row =>
+            row.id === targetRow.id
+              ? { ...row, behaviors: [...(row.behaviors as unknown as HelperTagItem[]), tag] }
+              : row,
+          )
+        : [
+            ...withoutTag,
+            {
+              ...createEmptyFormValue(),
+              category: target.category,
+              score: target.score,
+              behaviors: [tag],
+            },
+          ];
       const cleaned = finalData.filter(
         row => (row.behaviors as unknown as HelperTagItem[]).length > 0,
       );
@@ -334,10 +408,27 @@ export const BehavioursAndStatesInstruction: FC<BehavioursAndStatesInstructionPr
     [formData, formMethods, id],
   );
 
+  // A new category resets the score to that category's default: a score of +50
+  // is not valid for "should not do", and carrying it over would be a surprise.
+  const handleRubricRowCategoryChange = useCallback(
+    (rowId: string, tagId: string, newCategory: string) =>
+      moveTagToRow(rowId, tagId, { category: newCategory }),
+    [moveTagToRow],
+  );
+
+  const handleRubricRowScoreChange = useCallback(
+    (rowId: string, tagId: string, category: string, newScore: number) =>
+      moveTagToRow(rowId, tagId, { category, score: newScore }),
+    [moveTagToRow],
+  );
+
   const commitPendingTag = useCallback(
-    (tag: HelperTagItem, category: string) => {
+    (tag: HelperTagItem, category: string, score?: number) => {
       const existingRow = formData.find(
-        r => r.category === category && (r.behaviors as unknown as HelperTagItem[]).length < 5,
+        r =>
+          r.category === category &&
+          sameBehaviourScore(r.score, score) &&
+          (r.behaviors as unknown as HelperTagItem[]).length < 5,
       );
       let updatedFormData;
       if (existingRow) {
@@ -349,7 +440,7 @@ export const BehavioursAndStatesInstruction: FC<BehavioursAndStatesInstructionPr
       } else {
         updatedFormData = [
           ...formData.filter(r => (r.behaviors as unknown as HelperTagItem[]).length > 0),
-          { ...createEmptyFormValue(), category, behaviors: [tag] },
+          { ...createEmptyFormValue(), category, score, behaviors: [tag] },
         ];
       }
       formMethods.setValue(id, updatedFormData, { shouldDirty: true });
@@ -371,6 +462,9 @@ export const BehavioursAndStatesInstruction: FC<BehavioursAndStatesInstructionPr
           <div className="px-4 py-2.5 text-xs font-medium text-typography-600 tracking-wide border-l border-border-light">
             Category
           </div>
+          <div className="px-4 py-2.5 text-xs font-medium text-typography-600 tracking-wide border-l border-border-light">
+            Score
+          </div>
           <div />
         </div>
 
@@ -380,9 +474,11 @@ export const BehavioursAndStatesInstruction: FC<BehavioursAndStatesInstructionPr
             No behaviour classes added yet.
           </div>
         ) : (
-          rubricRows.map(({ rowId, tag, isShould }, i) => (
+          rubricRows.map(({ rowId, tag, isShould, category, score }, i) => (
             <div
-              key={`${rowId}-${tag.id}`}
+              // The tag id, not row+tag: changing a score moves the behaviour to a
+              // different row, and a row-based key would remount (and un-focus) it.
+              key={tag.id}
               className={`${RUBRIC_GRID} items-center border-b border-border-light last:border-b-0 border-l-[3px] ${rubricAccent(isShould)} ${i % 2 === 0 ? "bg-white" : "bg-background-secondary/40"} group`}
             >
               <div className="px-4 py-2.5 text-sm text-typography-900">{tag.name}</div>
@@ -399,6 +495,14 @@ export const BehavioursAndStatesInstruction: FC<BehavioursAndStatesInstructionPr
                     <SelectItem key={opt.value} value={opt.value} text={opt.label} />
                   ))}
                 </Select>
+              </div>
+              <div className="px-3 py-2 border-l border-border-light">
+                <BehaviourScoreInput
+                  category={category}
+                  score={score}
+                  ariaLabel={`Score for ${tag.name}`}
+                  onCommit={next => handleRubricRowScoreChange(rowId, tag.id, category ?? "", next)}
+                />
               </div>
               <div className="flex items-center justify-center">
                 <button
@@ -425,7 +529,11 @@ export const BehavioursAndStatesInstruction: FC<BehavioursAndStatesInstructionPr
                 maxTags={1}
                 updateTags={tags => {
                   if (tags.length === 1) {
-                    commitPendingTag(tags[0] as HelperTagItem, pendingRow.category);
+                    commitPendingTag(
+                      tags[0] as HelperTagItem,
+                      pendingRow.category,
+                      pendingRow.score,
+                    );
                   }
                 }}
               />
@@ -437,7 +545,9 @@ export const BehavioursAndStatesInstruction: FC<BehavioursAndStatesInstructionPr
                 hideLabel
                 value={pendingRow.category}
                 onChange={e =>
-                  setPendingRow(prev => (prev ? { ...prev, category: e.target.value } : null))
+                  setPendingRow(prev =>
+                    prev ? { ...prev, category: e.target.value, score: undefined } : null,
+                  )
                 }
                 className={`w-full ${rubricSelectTone(pendingRow.category === "SHOULD_DO")}`}
               >
@@ -445,6 +555,14 @@ export const BehavioursAndStatesInstruction: FC<BehavioursAndStatesInstructionPr
                   <SelectItem key={opt.value} value={opt.value} text={opt.label} />
                 ))}
               </Select>
+            </div>
+            <div className="px-3 py-2 border-l border-border-light">
+              <BehaviourScoreInput
+                category={pendingRow.category}
+                score={pendingRow.score}
+                ariaLabel="Score for the new behaviour"
+                onCommit={next => setPendingRow(prev => (prev ? { ...prev, score: next } : null))}
+              />
             </div>
             <div />
           </div>

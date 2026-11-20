@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
+from app.core.debrief.framework import is_practice_cue
 from app.core.debrief_graph.agent_logs import numbered
 from app.core.debrief_graph.constants import END_WHY, FAILED_WHY, FallbackRung, Status
 from app.core.debrief_graph.context import DebriefRunContext
@@ -37,6 +38,10 @@ def build_result(
             "why": END_WHY.get(ended)
             or (FAILED_WHY if status == Status.FAILED else ended),
         }
+    # Guidance analytics: present on every result (none when nothing ran).
+    workspace.setdefault("guidanceMode", "none")
+    workspace.setdefault("guidanceGiven", [])
+    workspace.setdefault("guidanceTimings", {"lookupMs": None, "agentMs": None})
     if ctx.resumed:
         workspace["resumes"] = workspace.get("resumes") or 1
     patch = state.get("patch") or {}
@@ -59,6 +64,12 @@ def build_result(
         "estimated_cost_usd": round(float(state.get("estimated") or 0.0), 4),
         "fallback_rung": rung,
         "has_risk_cue": bool(state.get("has_risk_cue")),
+        # Any risk cue the reader did not mark as part of the practice: the
+        # ones that keep the full alarm treatment.
+        "has_alarm_risk_cue": any(
+            not (ctx.risk_cue["handling"] == "assessed" and is_practice_cue(c))
+            for c in (state.get("safety") or {}).get("risk_cues") or []
+        ),
         "learner_distress": bool(state.get("learner_distress")),
         "revision_rounds": int(patch.get("revision_rounds") or 0),
         "evaluator_overall": patch.get("evaluator_overall"),

@@ -76,7 +76,7 @@ describe("Analytics › Debriefs › Nightly check", () => {
               detail: "Debriefs are longer: 260 words at the median, against 200 before.",
               value: 260,
               baseline: 200,
-              routedTo: "PM agent: testing firmer wording",
+              routedTo: "Debrief PM agent: testing firmer wording",
             },
           ],
         ),
@@ -97,7 +97,7 @@ describe("Analytics › Debriefs › Nightly check", () => {
     ).toBeTruthy();
     // v2: each finding says where it went; nobody needs to watch this page.
     expect(screen.getByTestId("nightly-routed")).toHaveTextContent(
-      "→ PM agent: testing firmer wording",
+      "→ Debrief PM agent: testing firmer wording",
     );
     expect(screen.getByTestId("nightly-data-quality")).toHaveTextContent(
       "2 without a quality score yet",

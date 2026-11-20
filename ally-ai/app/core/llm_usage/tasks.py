@@ -8,6 +8,12 @@ class LLMTask(str, Enum):
     NUDGE = "nudge"
     SUMMARY = "summary"
     DYNAMIC_SUMMARY = "dynamic_summary"
+    # Scribe v2 note harness: the main pass, the per-part map step for long
+    # sessions, and the one repair rewrite.
+    SCRIBE_NOTE = "scribe_note"
+    SCRIBE_NOTE_MAP = "scribe_note_map"
+    SCRIBE_NOTE_REPAIR = "scribe_note_repair"
+    SCRIBE_NOTE_ROLES = "scribe_note_roles"
     SCENARIO_EVALUATION = "scenario_evaluation"
     # The same debrief call re-run by ally-be to regenerate a session's
     # feedback in another language, on demand, after the original debrief.
@@ -36,6 +42,7 @@ class LLMTask(str, Enum):
     # Debrief-quality judge: one call per debrief, scoring every rubric
     # dimension. Needs the matching value in ally-be's LlmTask enum.
     DEBRIEF_QUALITY_JUDGE = "debrief_quality_judge"
+    DEBRIEF_LANGUAGE_JUDGE = "debrief_language_judge"
     # Debrief agent steps, one label per step so each step's cost is visible.
     DEBRIEF_SAFETY_READER = "debrief_safety_reader"
     DEBRIEF_ANALYST = "debrief_analyst"
@@ -71,12 +78,7 @@ class LLMTask(str, Enum):
     # the retrieved passages on the admin-selected model, the translate call is a short
     # mechanical transform on a cheap one. Merged, cost-per-question would be
     # unattributable.
-    #
-    # No embedding label yet. The corpus and query embeddings are real cost, but
-    # emitting them needs an 'embedding' branch in emitter._has_quantity plus matching
-    # handling in ally-be's consumer (see the note in KnowledgeChunkService). Adding an
-    # enum member here before ally-be has the matching one would be exactly the drift
-    # this enum's docstring warns against.
+    # Their embeddings are EMBEDDING_SEARCH / EMBEDDING_INDEX below.
     WHATSAPP_RAG_ANSWER = "whatsapp_rag_answer"
     WHATSAPP_QUERY_TRANSLATE = "whatsapp_query_translate"
     WHATSAPP_CRISIS_CLASSIFY = "whatsapp_crisis_classify"
@@ -110,6 +112,11 @@ class LLMTask(str, Enum):
     CHECKUP_QUESTIONS = "checkup_questions"
     HELPLINE_RISK_CLASSIFY = "helpline_risk_classify"
     HELPLINE_COPILOT_TURN = "helpline_copilot_turn"
+    # Knowledge embeddings (CR1): the query embedded on each knowledge search, and
+    # the passages embedded when a document is indexed. Separate because one runs
+    # per reply and the other per upload. Matching members in ally-be's LlmTask.
+    EMBEDDING_SEARCH = "embedding_search"
+    EMBEDDING_INDEX = "embedding_index"
 
 
 def resolve_model_name(model: Any) -> str:

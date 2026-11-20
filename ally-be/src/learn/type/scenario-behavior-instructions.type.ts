@@ -20,6 +20,7 @@ export interface MergedBehaviorInstructions {
   id: string;
   scenarioId: number;
   category: BehaviorInstructionCategory;
+  score?: number | null;
   stateInstructions?: BehaviorStateInstruction[];
 }
 

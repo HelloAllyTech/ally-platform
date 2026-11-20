@@ -58,7 +58,7 @@ describe("console labels", () => {
     ).toBe("Try-out share of new debriefs: change to 25%");
     expect(
       settingChangeLabel("gateNoNewHardFails", "0", { default: true, kind: "bool", group: "gate" }),
-    ).toBe("No new hard fails: change to No");
+    ).toBe("No new serious problems: change to No");
     expect(settingChangeLabel("someNewKey", "3")).toBe("Somenewkey: change to 3");
   });
 

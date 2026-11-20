@@ -34,6 +34,18 @@ export class RoadmapIdeaDraft extends BaseWithoutTenantEntity {
   @Column({ type: 'varchar', length: 10, default: 'typed' })
   captureMode!: string;
 
+  /**
+   * When the Roadmap cutover (Roadmap v2 P6) copied this draft into a private plan draft. The
+   * row is labelled, never deleted, so turning Roadmap off shows it unchanged; a later cutover
+   * run and the old planning migrator both skip it.
+   */
+  @Column({ type: 'timestamptz', nullable: true })
+  migratedAt?: Date | null;
+
+  /** The plan session it was copied into. No FK: the draft outlives an expiry purge of it. */
+  @Column({ type: 'uuid', nullable: true })
+  migratedToId?: string | null;
+
   @DeleteDateColumn()
   deletedAt?: Date;
 }

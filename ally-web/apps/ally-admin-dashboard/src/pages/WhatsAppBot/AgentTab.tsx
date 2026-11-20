@@ -2,15 +2,8 @@ import React from "react";
 
 import { toast } from "sonner";
 
-import {
-  InlineNotification,
-  RadioButton,
-  RadioButtonGroup,
-  Select,
-  SelectItem,
-  Slider,
-} from "@ally-ui-mono/ui-shared";
-import { useGetChatbotsQuery, useGetLlmModelsQuery, useUpdateChatbotMutation } from "@api";
+import { RadioButton, RadioButtonGroup, Select, SelectItem, Slider } from "@ally-ui-mono/ui-shared";
+import { useGetLlmModelsQuery, useUpdateChatbotMutation } from "@api";
 import { Button, EntityField } from "@components";
 import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
@@ -43,8 +36,6 @@ export const AgentTab: React.FC<{ bot: Chatbot; canEdit: boolean; onTest: () => 
   canEdit,
   onTest,
 }) => {
-  // Platform admins only: the same signal the chatbot pages use for every platform-wide control.
-  const { data: list } = useGetChatbotsQuery();
   const { draft, setDraft, dirty } = useTabDraft(bot, answersPart);
   useReportUnsaved("agent", dirty);
   const [save, { isLoading: isSaving }] = useUpdateChatbotMutation();
@@ -70,10 +61,6 @@ export const AgentTab: React.FC<{ bot: Chatbot; canEdit: boolean; onTest: () => 
 
   return (
     <div className="flex flex-col gap-6 max-w-3xl">
-      {list?.canCreate && bot.effectiveRuntime === "v1" && (
-        <InlineNotification kind="info" title={t.agentOff} lowContrast hideCloseButton />
-      )}
-
       <Card title={t.answersTitle} subtitle={t.answersIntro}>
         <EntityField label={t.answerModeLabel}>
           <RadioButtonGroup

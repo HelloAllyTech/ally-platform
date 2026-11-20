@@ -154,9 +154,10 @@ export class ChatbotSettingsService {
     }
     if (!override || !Object.keys(override).length) return global;
     // `abilities` stays on the bot's stored override, where the gateway reads it (chunk 3b), and so
-    // does `memory` (chunk 8a).
+    // do `memory` (chunk 8a) and `timeZone` (chunk 6b).
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { rateLimit, retrieval, abilities, memory, ...plain } = override;
+    const { rateLimit, retrieval, abilities, memory, timeZone, ...plain } =
+      override;
     const tighter = (base: number, value: number | undefined) =>
       typeof value === 'number' && value > 0 ? Math.min(base, value) : base;
     return {
@@ -168,10 +169,8 @@ export class ChatbotSettingsService {
         override.crisisClassifierEnabled === true,
       consentRequired:
         global.consentRequired || override.consentRequired === true,
-      // Platform-wide only. The per-bot settings body is not checked key by key, so a bot's jsonb
-      // could otherwise switch the new engine on for itself past the kill switch.
-      agentRuntimeAllowed: global.agentRuntimeAllowed,
-      // The shared store's switches are platform-wide for the same reason.
+      // The shared store's switches are platform-wide only: the per-bot settings body is not
+      // checked key by key, so a bot's jsonb could otherwise switch them on for itself.
       sharedStoreWrites: global.sharedStoreWrites,
       readHistoryFrom: global.readHistoryFrom,
       botPagePublicAllowed: global.botPagePublicAllowed,
@@ -263,8 +262,9 @@ export class ChatbotSettingsService {
 }
 
 /**
- * Whether a settings write changes a key only a platform admin may set: "Show typing" (which also
- * turns on read receipts), and what the agent may do (`abilities`, chunk 3b). Leaving it as stored,
+ * Whether a settings write changes a key only the bot's owners may set (A1; platform admins before):
+ * "Show typing" (which also turns on read receipts), and what the agent may do (`abilities`, chunk
+ * 3b, `hand_over` included). Leaving it as stored,
  * or leaving it out when it was never set, is not a change, so a bot editor's save round-trips it.
  */
 export function changesAdminOnlySetting(

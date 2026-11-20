@@ -35,7 +35,12 @@ BRIEF_DESCRIPTION = (
     "Pass this chat to a person on the team. Use it when someone asks to talk to a "
     "person, when you can't help with what they need and the team can, or when "
     "they're unhappy with your answers. Never for someone at risk: that is handled "
-    "before you. Write one line for the team about what they need."
+    "before you."
+)
+#: Chunk 6b, item 11: the summary's own description.
+BRIEF_SUMMARY = (
+    "One sentence, at most 160 characters, saying what the person needs, in plain "
+    "words. Don't say which channel the chat is on: the team sees it."
 )
 
 
@@ -122,9 +127,11 @@ class TestOffered:
         assert (tool.kind, tool.risk, tool.ends_run) == ("gateway", "medium", True)
         assert list(tool.input_model.model_fields) == ["summary"]
 
-    def test_the_summary_is_one_line_clipped_to_300(self):
+    def test_the_summary_is_one_line_clipped_to_160_at_a_word(self):
         assert HandOverInput(summary="a\nb   c").summary == "a b c"
-        assert len(HandOverInput(summary="x" * 500).summary) == 300
+        assert len(HandOverInput(summary="x" * 500).summary) == 160
+        words = HandOverInput(summary="Wants a call back " * 20).summary
+        assert len(words) <= 160 and words.endswith(" call")
         assert HandOverInput().summary == ""
 
     @pytest.mark.asyncio
@@ -134,8 +141,9 @@ class TestOffered:
             await run_with(gateway=FakeGateway(), gateway_tools=["hand_over"])
         call = llm.calls[0]
         assert offered(call) == ["reply", "search_knowledge", "hand_over"]
-        assert f"- `hand_over`: {BRIEF_DESCRIPTION} Input: `summary`: summary." in (
-            call["prompt"]
+        assert (
+            f"- `hand_over`: {BRIEF_DESCRIPTION} Input: `summary`: {BRIEF_SUMMARY}."
+            in call["prompt"]
         )
 
 

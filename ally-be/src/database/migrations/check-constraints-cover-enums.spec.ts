@@ -1,5 +1,24 @@
 import { readdirSync, readFileSync } from 'fs';
 import {
+  ItemLinkSource,
+  ItemLinkState,
+  ItemReleaseState,
+} from '../../product-roadmap/enum/item-release.enum';
+import {
+  ReleasePolicyBreakerEvent,
+  ReleasePolicyComparison,
+  ReleasePolicyDecision,
+  ReleasePolicyLogKind,
+  ReleasePolicyMode,
+  ReleasePolicyOrigin,
+  ReleasePolicyOutcome,
+} from '../../product-roadmap/enum/release-policy.enum';
+import { RELEASE_POLICY_SERVICES } from '../../product-roadmap/constants/release-policy.constants';
+import {
+  NO_RELEASE_SERVICE,
+  RELEASE_SERVICE_KEYS,
+} from '../../release/constants/release-services.constants';
+import {
   DebriefFeedbackKind,
   DebriefFeedbackStatus,
   DebriefFlagReason,
@@ -16,6 +35,21 @@ import {
   DebriefAgreementMeasure,
 } from '../../debrief/enum/debrief-review.enum';
 import { join } from 'path';
+import {
+  BillingModelType,
+  BillingStatus,
+  CostAlertKind,
+  CounterSubject,
+  PriceUnit,
+  SeatCycle,
+  SeatKind,
+  SeatStatus,
+  SubscriptionStatus,
+  UsageChannel,
+  UsageKind,
+  WhatsAppRateCategory,
+} from '../../billing/enum/billing.enum';
+import { TokenGrantStatus } from '../../billing/entity/token-grant.entity';
 import {
   ConversationChannel,
   ConversationMessageRole,
@@ -80,6 +114,8 @@ import {
   PlanEventKind,
   PlanNotificationKind,
   PlanStage,
+  RoadmapNotificationKind,
+  RoadmapWatchLevel,
 } from '../../product-planning/enum/product-planning.enum';
 import {
   CourseCopilotEventType,
@@ -104,6 +140,10 @@ import {
   ROADMAP_CATEGORIES,
   ROADMAP_STAGES,
 } from '../../public-roadmap/constants/public-roadmap.constants';
+import {
+  RoadmapOpportunitySource,
+  RoadmapReviewState,
+} from '../../product-roadmap/enum/roadmap-opportunity.enum';
 import {
   FhsAssessmentStatus,
   FhsBenchmarkStatus,
@@ -305,7 +345,13 @@ describe('CHECK constraints cover their enums', () => {
     ['CHK_plan_spend_entries_stage', Object.values(PlanStage)],
     ['CHK_builder_sessions_plan_stage', Object.values(PlanStage)],
     ['CHK_roadmap_opportunities_plan_stage', Object.values(PlanStage)],
+    [
+      'CHK_roadmap_opportunities_review_state',
+      Object.values(RoadmapReviewState),
+    ],
     ['CHK_plan_notifications_kind', Object.values(PlanNotificationKind)],
+    ['CHK_roadmap_notifications_kind', Object.values(RoadmapNotificationKind)],
+    ['CHK_roadmap_watches_level', Object.values(RoadmapWatchLevel)],
     ['CHK_builder_messages_role', Object.values(BuilderMessageRole)],
     ['CHK_builder_build_runs_status', Object.values(BuilderRunStatus)],
     ['CHK_builder_build_runs_mode', Object.values(BuilderRunMode)],
@@ -500,11 +546,52 @@ describe('CHECK constraints cover their enums', () => {
     ['CHK_chatbot_pages_status', Object.values(BotPageStatus)],
     ['CHK_chatbot_pages_access', Object.values(BotPageAccess)],
     ['CHK_chatbot_page_access_kind', Object.values(BotPageAccessKind)],
+    // Costs and models (Agents v2, CR1 Part A).
+    ['CHK_billing_models_type', Object.values(BillingModelType)],
+    ['CHK_billing_models_status', Object.values(BillingStatus)],
+    ['CHK_billing_model_prices_unit', Object.values(PriceUnit)],
+    ['CHK_whatsapp_rates_category', Object.values(WhatsAppRateCategory)],
+    ['CHK_whatsapp_rates_status', Object.values(BillingStatus)],
+    ['CHK_usage_events_channel', Object.values(UsageChannel)],
+    ['CHK_usage_events_kind', Object.values(UsageKind)],
+    ['CHK_cost_alerts_kind', Object.values(CostAlertKind)],
+    ['CHK_token_grants_status', Object.values(TokenGrantStatus)],
+    // Plans and seats (CR1 Part C).
+    ['CHK_subscriptions_status', Object.values(SubscriptionStatus)],
+    ['CHK_seats_kind', Object.values(SeatKind)],
+    ['CHK_seats_cycle', Object.values(SeatCycle)],
+    ['CHK_seats_status', Object.values(SeatStatus)],
+    ['CHK_usage_counters_subject', Object.values(CounterSubject)],
     // Agent-first onboarding (Agents v2, chunk 20a).
     ['CHK_bot_drafts_status', Object.values(BotDraftStatus)],
     ['CHK_bot_drafts_step', Object.values(BotDraftStep)],
     ['CHK_bot_drafts_safety_pack', Object.values(SafetyPackId)],
     ['CHK_chatbots_safety_pack', Object.values(SafetyPackId)],
+    // Roadmap release tracking (Roadmap v2, P1).
+    ['CHK_item_linked_prs_source', Object.values(ItemLinkSource)],
+    ['CHK_item_linked_prs_state', Object.values(ItemLinkState)],
+    ['CHK_item_releases_state', Object.values(ItemReleaseState)],
+    [
+      'CHK_item_releases_service',
+      [...RELEASE_SERVICE_KEYS, NO_RELEASE_SERVICE],
+    ],
+    // Who filed an opportunity, including the cutover's migrated sessions (Roadmap v2, P6).
+    ['CHK_roadmap_opps_source', Object.values(RoadmapOpportunitySource)],
+    // The auto-release policy's shadow log (Roadmap v2, P5).
+    ['CHK_release_policy_log_kind', Object.values(ReleasePolicyLogKind)],
+    ['CHK_release_policy_log_mode', Object.values(ReleasePolicyMode)],
+    ['CHK_release_policy_log_service', [...RELEASE_POLICY_SERVICES]],
+    ['CHK_release_policy_log_decision', Object.values(ReleasePolicyDecision)],
+    [
+      'CHK_release_policy_log_breaker_event',
+      Object.values(ReleasePolicyBreakerEvent),
+    ],
+    ['CHK_release_policy_log_outcome', Object.values(ReleasePolicyOutcome)],
+    ['CHK_release_policy_log_origin', Object.values(ReleasePolicyOrigin)],
+    [
+      'CHK_release_policy_log_comparison',
+      Object.values(ReleasePolicyComparison),
+    ],
   ])('%s accepts every enum value', (constraint, values) => {
     const allowed = allowedValues(constraint as string);
     const missing = (values as string[]).filter((v) => !allowed.includes(v));

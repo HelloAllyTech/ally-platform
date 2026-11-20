@@ -7,8 +7,9 @@ from __future__ import annotations
 import time
 from typing import Any, Dict, Literal, Tuple, Union
 
-from app.core.agent_runtime import conversation, memory
+from app.core.agent_runtime import activity, conversation, memory
 from app.core.agent_runtime.budget import (
+    MAX_REVISIONS,
     MAX_TOOL_STEPS,
     MUST_SEARCH_AFTER,
     REWRITE_RESERVE_SECONDS,
@@ -25,6 +26,7 @@ from app.core.agent_runtime.tools import gateway_tools, search_tools
 from app.core.agent_runtime.trace import Node, StatusCode, trace_step, traced
 from app.core.config import settings
 from app.core.knowledge_agent.agent import KnowledgeAgentService
+from app.core.llm_usage.scope import set_step
 from app.exceptions.custom_exceptions import LLMInvocationFailedException
 
 
@@ -46,26 +48,19 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
     @traced("agent", _summary, _announce)
     async def agent(state: AgentState) -> Dict[str, Any]:
         bot = state["bot"]
+        # Usage attribution (CR1): this node's model calls are agent step N of the
+        # run. Set for this node's context only; without the X-Ally-Usage header
+        # the run's own ids start the scope.
+        set_step(
+            (state.get("agent_calls") or 0) + 1,
+            run_id=state.get("run_id"),
+            chatbot_id=state.get("chatbot_id"),
+            conversation_id=state.get("conversation_id"),
+        )
         start: Dict[str, Any] = {}
-        if not state.get("agent_calls"):
-            # First step of the run: the working keys the rest of the path reads.
-            start = {
-                "limits": service.resolve_limits(**bot.get("limits", {})),
-                "passages": [],
-                "tool_calls": [],
-                "revisions": 0,
-                "started_at": time.time(),
-            }
-            omitted = bot.get("gateway_omitted") or []
-            if omitted:
-                # List tools over the cap of 12 (chunk 6), named once per run.
-                start["trace"] = [
-                    trace_step(
-                        "tools",
-                        time.monotonic(),
-                        "list tools left out (over 12): " + ", ".join(omitted),
-                    )
-                ]
+        # First step of the run, unless the search before it (chunk H1) set it up.
+        if not state.get("agent_calls") and not state.get("started_at"):
+            start = first_step_keys(service, state)
         budget = search_budget(state)
         # Past the caps the schema itself offers only `reply`. Searches keep their
         # own limit; gateway tools (chunk 3b) are offered while a tool step of any
@@ -73,14 +68,11 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
         offered_searches = search_tools(bot) if budget > 0 else []
         # A gateway tool that failed isn't offered again this run: it's shown as
         # not done, and calling it again would only spend the run's time (each
-        # call may wait 5 s) and run it past its cap. One that succeeded may run
+        # call may wait 5 s) and run it past its cap. A single `invalid_value` (a
+        # shortened id) gets one more try (chunk 6b). One that succeeded may run
         # again within the step cap (chunk 6): find can look at Thursday, then
         # Friday. `hand_over` ends the run when it succeeds.
-        failed = {
-            call.get("tool")
-            for call in state.get("tool_calls") or []
-            if not is_search(call) and not call.get("ok")
-        }
+        failed = failed_tools(state) | answered_finds(state)
         offered_gateway = (
             [tool for tool in gateway_tools(bot) if tool.name not in failed]
             if steps_left(state)
@@ -114,20 +106,37 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
                 timeout=_time_left(started_at, state),
             )
 
+        final_draft: Dict[str, Any] = {}
         try:
             step, meta = await step_once(must_search)
         except LLMInvocationFailedException:
             # A step that doesn't fit the schema (forced to search but replied, or
             # a search with no query) would fail the run, and v1 would answer.
             # Asked once more, unforced, while there's time for it (chunk 20a-2).
-            if _time_left(started_at, state) < REWRITE_RESERVE_SECONDS:
+            if _time_left(started_at, state) >= REWRITE_RESERVE_SECONDS:
+                step, meta = await step_once(False)
+            elif must_search and state.get("agent_step"):
+                # Forced to search, it replied anyway, and there's no time to ask
+                # again (chunk 6b): the reply it stands by is the draft it was sent
+                # back for. That draft goes through the check once more, as final,
+                # and the run never fails for it.
+                step = dict(state["agent_step"])
+                meta = dict(state.get("agent_meta") or {})
+                final_draft = {"revisions": MAX_REVISIONS}
+            else:
                 raise
-            step, meta = await step_once(False)
         # What the step asked to remember (chunk 8a): collected, returned with the
         # result, never stored here. The trace gets counts, never the text.
-        writes = memory.collect(
-            state.get("memory_writes") or [], step, memory.remember_mode(bot)
+        # A draft reused as final (above) had its memory collected already.
+        writes = (
+            list(state.get("memory_writes") or [])
+            if final_draft
+            else memory.collect(
+                state.get("memory_writes") or [], step, memory.remember_mode(bot)
+            )
         )
+        if (step.get("action") or REPLY_ACTION) == REPLY_ACTION:
+            activity.writing(bot)  # the live step "Writing a reply…" (chunk 6b)
         added = writes[len(state.get("memory_writes") or []) :]
         if added:
             start["trace"] = [
@@ -136,6 +145,7 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
             ]
         return {
             **start,
+            **final_draft,
             "memory_writes": writes,
             "agent_step": json_safe(step),
             "agent_meta": json_safe(meta),
@@ -147,6 +157,65 @@ def make_agent_node(service: KnowledgeAgentService) -> Node:
         }
 
     return agent
+
+
+#: A failure that a second call may fix (chunk 6b): a value the tool refused as
+#: written, most often an id the model shortened. The tool stays offered once more.
+RETRYABLE_ERRORS = frozenset({"invalid_value"})
+
+
+def failed_tools(state: AgentState) -> set:
+    """The gateway tools not offered again this run: any that failed, except one
+    whose only failure so far is a single retryable error (`RETRYABLE_ERRORS`)."""
+    failures: Dict[str, list] = {}
+    for call in state.get("tool_calls") or []:
+        if not is_search(call) and not call.get("ok"):
+            failures.setdefault(call.get("tool"), []).append(call.get("error"))
+    return {
+        tool
+        for tool, errors in failures.items()
+        if not (len(errors) == 1 and errors[0] in RETRYABLE_ERRORS)
+    }
+
+
+def answered_finds(state: AgentState) -> set:
+    """Finds that already returned the nearest entries this run (chunk 6b, item 3):
+    nothing was at the time asked, and the nearest (the latest that day, the next
+    day's same stretch) are the answer. Looking again only cost a model step and ran
+    "Thursday evening" past the run's cap."""
+    return {
+        call.get("tool")
+        for call in state.get("tool_calls") or []
+        if call.get("list_kind") == "find" and call.get("ok") and call.get("nearest")
+    }
+
+
+def first_step_keys(
+    service: KnowledgeAgentService, state: AgentState
+) -> Dict[str, Any]:
+    """The working keys a run's first step sets, which the rest of the path reads."""
+    bot = state["bot"]
+    start: Dict[str, Any] = {
+        "limits": service.resolve_limits(**bot.get("limits", {})),
+        # The previous message's list entries (chunk 6b), so a confirmation can book
+        # without looking the slot up again.
+        "passages": list(state.get("carried_records") or []),
+        "tool_calls": [],
+        "activity": [],
+        "revisions": 0,
+        "started_at": time.time(),
+    }
+    omitted = bot.get("gateway_omitted") or []
+    if omitted:
+        # List tools over the cap of 12 (chunk 6), named once per run.
+        start["trace"] = [
+            trace_step(
+                "tools",
+                time.monotonic(),
+                "list tools left out (over 12): " + ", ".join(omitted),
+            )
+        ]
+    return start
 
 
 def _time_left(started_at: float, state: AgentState) -> float:

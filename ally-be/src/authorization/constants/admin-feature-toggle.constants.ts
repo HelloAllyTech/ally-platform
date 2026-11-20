@@ -85,7 +85,6 @@ export enum FeatureToggleKey {
   // Analytics (route itself is SUPER_ADMIN-tier; two sub-tabs are SDA-only)
   ANALYTICS = 'analytics',
   ANALYTICS_AGENT = 'analytics_agent',
-  ANALYTICS_SUGGESTIONS = 'analytics_suggestions',
   UX_SIGNALS = 'ux_signals',
 
   // Platform config (formerly SUPER_DUPER_ADMIN-only)
@@ -93,6 +92,9 @@ export enum FeatureToggleKey {
   CHARACTER_LIBRARY = 'character_library',
   MANAGE_STT_CONFIGS = 'manage_stt_configs',
   MANAGE_LLM_MODEL_CATALOG = 'manage_llm_model_catalog',
+  // Agents v2 CR1: Ally admin → Models (prices), Costs, Plans, and each user's Tokens and Plan.
+  // Dollars live behind this key only; customers and owners never see them.
+  MANAGE_COSTS = 'manage_costs',
   MANAGE_GUARDRAILS = 'manage_guardrails',
   MANAGE_TOOLTIPS = 'manage_tooltips',
   SETTINGS = 'settings',
@@ -111,22 +113,6 @@ export enum FeatureToggleKey {
   // Product Roadmap management surface (view/vote stay permission-gated for
   // everyone; only the manage surface was SDA-exclusive)
   PRODUCT_ROADMAP_MANAGE = 'product_roadmap_manage',
-
-  // Product Roadmap quick add: file an opportunity straight onto the board,
-  // skipping the guided interview and its readiness gate. A trusted-curator
-  // shortcut, not a filing tier — the interview stays the only door for
-  // everyone else. No backfill migration grants it by group; it is handed to
-  // named admins (see *-GrantProductRoadmapQuickAddToggle) and otherwise
-  // per-admin from Admin User Management.
-  PRODUCT_ROADMAP_QUICK_ADD = 'product_roadmap_quick_add',
-
-  // Product Planning (plans/roadmap-owns-planning rev 5.2 §B.12): the two roles
-  // of the idea-to-outcome plan. IDEAS is the author's door (park, work up and
-  // file an idea, through the plan or today's copilot interview and quick add);
-  // LEAD takes a filed idea through PRD, design, build, launch and outcome.
-  // Both platformOnly: an org-restricted admin is excluded from the whole flow.
-  PRODUCT_PLANNING_IDEAS = 'product_planning_ideas',
-  PRODUCT_PLANNING_LEAD = 'product_planning_lead',
 
   // Admin-of-admins surfaces (formerly SUPER_DUPER_ADMIN-only)
   ADMIN_USER_MANAGEMENT = 'admin_user_management',
@@ -154,6 +140,11 @@ export enum FeatureToggleKey {
 
   // Builder: the PRD-interview + coding agent that opens PRs
   BUILDER = 'builder',
+
+  // PM Agent (docs/pm-agent.md): the admin AI product manager whose accepted
+  // recommendations are built by Builder. Backfilled ON for the platform tier by
+  // migration 1982000000000; the agent itself ships switched off.
+  PM_AGENT = 'pm_agent',
 
   // Course Copilot: the agent that interviews a trainer and builds a whole
   // DRAFT course (Track 2.0) from the answers, then edits it on request.
@@ -363,20 +354,11 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
     platformOnly: true,
   },
   {
-    key: FeatureToggleKey.ANALYTICS_SUGGESTIONS,
-    label: 'Analytics — Suggestions',
-    description:
-      'The Analytics Suggestions sub-tab, on top of general Analytics access.',
-    legacyGrants: SDA_ONLY,
-    // Built from platform-wide analytics.
-    platformOnly: true,
-  },
-  {
     key: FeatureToggleKey.UX_SIGNALS,
     label: 'UX Signals',
     description:
-      'The PostHog UX scan that files findings to Bug Hunter and suggestions ' +
-      'to the Analytics Suggestions queue, plus its "Scan now" control.',
+      'The PostHog UX scan that files findings to Bug Hunter and improvement ' +
+      'signals for the PM Agent, plus its "Scan now" control.',
     legacyGrants: SDA_ONLY,
     // Scans every user's PostHog sessions across the platform.
     platformOnly: true,
@@ -404,6 +386,15 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
     label: 'Language Model Catalog',
     description: 'Manage the LLM model catalog available to scenarios.',
     legacyGrants: SDA_ONLY,
+  },
+  {
+    key: FeatureToggleKey.MANAGE_COSTS,
+    label: 'Costs, plans and tokens',
+    description:
+      'Models and prices, what each assistant costs Ally, plans and seats, and custom logins\u2019 token allowances.',
+    legacyGrants: SDA_ONLY,
+    // Ally's own books: every organisation's assistants at once.
+    platformOnly: true,
   },
   {
     key: FeatureToggleKey.MANAGE_GUARDRAILS,
@@ -446,9 +437,10 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
   },
   {
     key: FeatureToggleKey.WHATSAPP_BOT,
-    label: 'WhatsApp Bot',
+    // Called Assistants everywhere people see it (6b); the key stays whatsapp_bot.
+    label: 'Assistants',
     description:
-      'Manage the WhatsApp Q&A bot: templates, conversations, unanswered queue and analytics.',
+      'Create assistants and see Assistants in the menu. Anyone can open an assistant whose team they are on without this.',
     legacyGrants: SDA_ONLY,
     // The platform number and global settings span every organization, but each organization
     // can connect its own number. An org-restricted admin reaches only the @OrgScopedRoute
@@ -472,42 +464,6 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
     description:
       'Stage transitions, editing/deleting any opportunity, taxonomy, split/merge, month-board lane moves, and pinning a saved view for everyone. Viewing and voting stay open to every admin. Opening a card in Builder is not part of this — it follows the Builder toggle.',
     legacyGrants: SDA_ONLY,
-  },
-  {
-    key: FeatureToggleKey.PRODUCT_ROADMAP_QUICK_ADD,
-    label: 'Product Roadmap — Quick Add',
-    description:
-      'File an opportunity directly onto the roadmap with a plain form, skipping the guided interview and its readiness check. For curators who already know what belongs on the board; everyone else keeps filing through the interview.',
-    // Inert, like every key added after the role-collapse cutover: no
-    // migration reads it, and nobody is granted the key by group.
-    legacyGrants: SDA_ONLY,
-  },
-  {
-    key: FeatureToggleKey.PRODUCT_PLANNING_IDEAS,
-    label: 'Product Planning — Ideas',
-    description:
-      'Park ideas, work them up with the planning copilot and file them to the roadmap. Drafts stay private until you file. Also required for Quick Add.',
-    // Inert, like every key added after the role-collapse cutover. ON by
-    // default so every platform admin who can file today still can; switch it
-    // off per admin to remove their filing door.
-    legacyGrants: ALL_ADMIN_TIERS,
-    defaultEnabled: true,
-    // Org-restricted admins sit outside planning (rev 5.2), but NOT via
-    // `platformOnly`: every platform admin holds this key by default, so
-    // platformOnly would make getEnabledKeys run its restriction lookup (an
-    // uncached count) on every toggle check for every admin. The restriction
-    // is enforced where planning happens instead — PlanAccessService, and
-    // getVisibleKeys for the console. See DEFAULT_KEYS_WITHHELD_FROM_RESTRICTED.
-  },
-  {
-    key: FeatureToggleKey.PRODUCT_PLANNING_LEAD,
-    label: 'Product Planning — Lead',
-    description:
-      "Take on filed ideas and lead them through PRD, design, build, launch and outcome review. Can approve paid design and build runs within a plan's budget.",
-    // Inert: granted per admin from Admin User Management. Nobody holds it
-    // until the plan flow launches (one launch, no pilot cohort).
-    legacyGrants: SDA_ONLY,
-    platformOnly: true,
   },
   {
     key: FeatureToggleKey.ADMIN_USER_MANAGEMENT,
@@ -577,6 +533,17 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
     description:
       'Interview an agent into a PRD, then have it build the feature and open pull requests for review — from the Builder tab or from a Product Roadmap card.',
     legacyGrants: SUPER_ADMIN_TIER,
+  },
+  {
+    key: FeatureToggleKey.PM_AGENT,
+    label: 'PM Agent',
+    description:
+      "Review the AI product manager's recommendations and questions, file the ones you accept to the Product Roadmap, and configure its budget, queue and memory.",
+    // Backfilled ON for platform-tier admins by 1982000000000-CreatePmAgent; inert like
+    // every key added after the role-collapse cutover.
+    legacyGrants: SUPER_ADMIN_TIER,
+    // Reads every organisation's aggregates and ships platform-wide changes.
+    platformOnly: true,
   },
   {
     key: FeatureToggleKey.CONTEXT_LIBRARY,
@@ -738,15 +705,6 @@ export function isPlatformOnlyToggle(key: string): boolean {
     (definition) => definition.key === key && definition.platformOnly === true,
   );
 }
-
-/**
- * Default-on keys an org-restricted admin must still not use. Not `platformOnly`
- * (see PRODUCT_PLANNING_IDEAS for why); the owning service enforces it, and
- * FeatureToggleService.getVisibleKeys leaves them out of the caller's own list
- * so the console hides what the service would refuse.
- */
-export const DEFAULT_KEYS_WITHHELD_FROM_RESTRICTED: readonly FeatureToggleKey[] =
-  [FeatureToggleKey.PRODUCT_PLANNING_IDEAS];
 
 /** Keys a platform admin holds while they have no row — see FeatureToggleDefinition.defaultEnabled. */
 export const DEFAULT_ENABLED_FEATURE_TOGGLE_KEYS: FeatureToggleKey[] =

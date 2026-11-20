@@ -14,7 +14,9 @@ Both share:
   (`MEMORY_NAMESPACE`), loaded at the start of every run (`memory=`). The weekly
   run and the conversation read and write the same file, so what a person tells
   the agent in the console is there for the next weekly run, and the reverse;
-- skills: `/skills/` is this package's `skills/` folder, read-only;
+- skills: `/skills/` holds each skill's live Skills Store text
+  (`debrief_pm_skill_<name>`; this package's `skills/` folder is the
+  default), written into the store before every run, read-only to the agent;
 - drafts: every other path is scratch state for this thread only.
 
 What differs is the tool set, the instructions, the thread and `interrupt_on`:
@@ -32,7 +34,6 @@ from typing import Any, Awaitable, Callable, Dict, List, Literal, Optional
 from deepagents import FilesystemPermission, create_deep_agent
 from deepagents.backends import (
     CompositeBackend,
-    FilesystemBackend,
     StateBackend,
     StoreBackend,
 )
@@ -59,6 +60,18 @@ from app.core.pm_agent.store import MEMORY_NAMESPACE
 from app.core.pm_agent.tools import SUBAGENT_READ_TOOLS
 
 SKILLS_DIR = Path(__file__).parent / "skills"
+#: Where `/skills/` lives in the store: the live skill texts, rewritten from
+#: the Skills Store at the start of every run (`seed_skills`).
+SKILLS_NAMESPACE = ("debrief_pm_skills",)
+#: Each skill's Skills Store code; its SKILL.md here is the default.
+SKILL_PROMPT_CODES = {
+    "builder-brief": "debrief_pm_skill_builder_brief",
+    "prompt-change": "debrief_pm_skill_prompt_change",
+    "registry-agent": "debrief_pm_skill_registry_agent",
+}
+#: The subagents' Skills Store codes (the reviewer's is pinned).
+INVESTIGATOR_PROMPT_CODE = "debrief_pm_investigator_system"
+REVIEWER_PROMPT_CODE = "debrief_pm_reviewer_system"
 MEMORY_FILE = "/memories/AGENTS.md"
 REVIEWER = "reviewer"
 #: The gateway call that stores the reviewer's verdict (code calls it, never a model).
@@ -73,6 +86,7 @@ hypotheses, and what people told you in the console that should shape later work
 forever.
 """
 
+#: `debrief_pm_investigator_system`'s default.
 INVESTIGATOR_PROMPT = """\
 You investigate one problem for the Debrief PM agent and report back. You can query \
 the redacted reporting views, read expert comments and the metric failure points. \
@@ -81,6 +95,7 @@ comment ids that bear on it, and your best explanation with how sure you are. \
 Never paste learner words; cite ids instead. Keep the report under 300 words.\
 """
 
+#: `debrief_pm_reviewer_system`'s default (pinned: it defines a safe change).
 REVIEWER_PROMPT = """\
 You review one change the Debrief PM agent proposed, before it is tried on \
 learners. You get its id and nothing else: read it with change_read (its \
@@ -256,9 +271,32 @@ def build_backend(store: BaseStore) -> CompositeBackend:
             "/memories/": StoreBackend(
                 namespace=lambda _rt: MEMORY_NAMESPACE, store=store
             ),
-            "/skills/": FilesystemBackend(root_dir=SKILLS_DIR, virtual_mode=True),
+            "/skills/": StoreBackend(
+                namespace=lambda _rt: SKILLS_NAMESPACE, store=store
+            ),
         },
     )
+
+
+def prompt_text(prompts: Optional[Dict[str, Any]], code: str) -> Optional[str]:
+    """A live Skills Store text ally-be sent (a string or `{prompt}`), or None."""
+    entry = (prompts or {}).get(code)
+    if isinstance(entry, dict):
+        entry = entry.get("prompt")
+    return entry if isinstance(entry, str) and entry.strip() else None
+
+
+async def seed_skills(
+    store: BaseStore, prompts: Optional[Dict[str, Any]] = None
+) -> None:
+    """Write every skill's SKILL.md into `/skills/`: the live text when ally-be
+    sent it, else the packaged default. Deep Agents' skills middleware reads
+    them from the store like any other backend; the agent cannot write there."""
+    for name, code in SKILL_PROMPT_CODES.items():
+        text = (
+            prompt_text(prompts, code) or (SKILLS_DIR / name / "SKILL.md").read_text()
+        )
+        await store.aput(SKILLS_NAMESPACE, f"/{name}/SKILL.md", create_file_data(text))
 
 
 async def seed_memory(store: BaseStore) -> None:
@@ -282,6 +320,7 @@ def build_pm_deep_agent(
     label: str = "main",
     interrupt_on: Optional[Dict[str, bool | InterruptOnConfig]] = None,
     context_schema: Optional[type] = None,
+    prompts: Optional[Dict[str, Any]] = None,
 ):
     """The one PM agent harness: same memory, skills, subagents and run guard for
     every caller; the caller picks the tools, instructions and `interrupt_on`."""
@@ -296,7 +335,8 @@ def build_pm_deep_agent(
             "metrics) and returns findings. Only for questions that need several "
             "lookups; give it the whole question in one go."
         ),
-        "system_prompt": INVESTIGATOR_PROMPT,
+        "system_prompt": prompt_text(prompts, INVESTIGATOR_PROMPT_CODE)
+        or INVESTIGATOR_PROMPT,
         "tools": read_tools,
         "model": models[first],
         "middleware": [PmRunGuard(ledger, models, primary, backup, "investigator")],
@@ -312,7 +352,7 @@ def build_pm_deep_agent(
             "every language and organisation it reaches, and whether it could hurt "
             "safety. Its verdict sets the change's confidence."
         ),
-        "system_prompt": REVIEWER_PROMPT,
+        "system_prompt": prompt_text(prompts, REVIEWER_PROMPT_CODE) or REVIEWER_PROMPT,
         "tools": read_tools,
         "model": models[first],
         "middleware": [PmRunGuard(ledger, models, primary, backup, "reviewer")],
@@ -354,9 +394,11 @@ def build_pm_agent(
     store: BaseStore,
     checkpointer: Optional[BaseCheckpointSaver],
     gateway: Gateway,
+    prompts: Optional[Dict[str, Any]] = None,
 ):
     """The weekly (monthly, questions) run: never pauses."""
     return build_pm_deep_agent(
+        prompts=prompts,
         ledger=ledger,
         tools=tools,
         models=models,

@@ -7,6 +7,7 @@ import { Close, TooltipIcon } from "@assets";
 import { en, FORM_FIELD_IDS, MEMORIES_SIZE_WARNING_CHARS } from "@constants";
 import type { ScenarioMemory } from "@types";
 
+import { useConfirm } from "../confirm-dialog";
 import { FormLabel } from "../form-label";
 import { blankMemory, memoriesCharacterCount } from "./memoryUtils";
 import { useMapMemories } from "./useMemoriesAutoMap";
@@ -55,9 +56,16 @@ export const MemoriesEditor: FC<MemoriesEditorProps> = ({
   const knowledgeSources =
     (useWatch({ control, name: FORM_FIELD_IDS.KNOWLEDGE_SOURCE }) as unknown[] | undefined) ?? [];
   const canRemap = !readOnly && !isMapping && knowledgeSources.length > 0;
-  const remap = () => {
+  const { confirm, dialog: confirmDialog } = useConfirm();
+  const remap = async () => {
     // Replaces every memory, including edits made since the last mapping.
-    if (window.confirm(t.remapConfirm)) void runMapping({ replace: true });
+    const ok = await confirm({
+      title: t.remapTitle,
+      consequence: t.remapConfirm,
+      irreversible: true,
+      confirmLabel: t.remapAction,
+    });
+    if (ok) void runMapping({ replace: true });
   };
 
   const ladder = useMemo(() => ladderOrder(states.filter(state => !!state?.id)), [states]);
@@ -87,6 +95,7 @@ export const MemoriesEditor: FC<MemoriesEditorProps> = ({
 
   return (
     <div className="flex w-full flex-col gap-3" data-testid="memories-editor">
+      {confirmDialog}
       <FormLabel isMandatory={isMandatory}>{label}</FormLabel>
       <div className="flex flex-col gap-1 text-sm text-typography-600">
         <p>{t.help}</p>
@@ -97,7 +106,7 @@ export const MemoriesEditor: FC<MemoriesEditorProps> = ({
         <div>
           <button
             type="button"
-            onClick={remap}
+            onClick={() => void remap()}
             className="text-sm text-primary-600 underline-offset-2 hover:underline"
             data-testid="memories-remap"
           >

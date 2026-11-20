@@ -224,6 +224,16 @@ def _format_live_notes(live_notes: Optional[List[str]]) -> str:
     return "\n".join(f"- {note}" for note in cleaned)
 
 
+def _output_name(output_class: Any) -> Optional[str]:
+    """A loggable name for a structured-output target: a Pydantic class, or a
+    JSON schema dict (named by its title)."""
+    if output_class is None:
+        return None
+    if isinstance(output_class, dict):
+        return str(output_class.get("title") or "json_schema")
+    return getattr(output_class, "__name__", type(output_class).__name__)
+
+
 def _structured_summary_template_path(session_mode: Optional[str]) -> str:
     """Pick prompt template for post-call structured summary (scribe vs dictation)."""
     if session_mode and str(session_mode).upper() == SCRIBE_SESSION_MODE_DICTATION:
@@ -251,6 +261,50 @@ MAX_SUMMARY_INPUT_WORDS = 8000
 SUMMARY_CONDENSE_CHUNK_WORDS = 2000
 # The condense (map) step's instruction, a Skills Store prompt.
 CONDENSE_CHUNK_PROMPT_PATH = "summary/condense_chunk"
+
+# Two turns whose start times differ by less than this are the same turn.
+_OVERLAP_TOLERANCE_SECONDS = 0.5
+
+
+def merge_diarized_chunks(chunks: List[List[Any]]) -> List[Any]:
+    """Join per-chunk diarization output in order, without the overlap.
+
+    split_text_by_length prepends the tail of each chunk to the next one so
+    the model has context for who is speaking. The model diarizes those
+    overlap lines again, so a plain concatenation repeats every boundary turn
+    — counsellors saw the same exchange twice and the summary read out of
+    order. A turn from a later chunk that starts at or before the last turn
+    already kept is that overlap, and is dropped.
+
+    The dedupe only runs when the timestamps are usable: if it would drop a
+    chunk's every turn (e.g. the model returned 0.0 for all start times),
+    that chunk is kept whole rather than lost.
+    """
+    merged: List[Any] = []
+    for index, messages in enumerate(chunks):
+        messages = list(messages or [])
+        if index == 0 or not merged:
+            merged.extend(messages)
+            continue
+        last_start = max(getattr(m, "start_time", 0.0) or 0.0 for m in merged)
+        kept = [
+            m
+            for m in messages
+            if (getattr(m, "start_time", 0.0) or 0.0)
+            > last_start + _OVERLAP_TOLERANCE_SECONDS
+        ]
+        if last_start <= 0 or not kept:
+            kept = messages
+        dropped = len(messages) - len(kept)
+        if dropped:
+            logger.info(
+                "Diarization merge: dropped %s overlap turn(s) at chunk %s",
+                dropped,
+                index + 1,
+            )
+        merged.extend(kept)
+    return merged
+
 
 _TIMESTAMP_REGEX = re.compile(r"\[\d{1,2}:\d{2}(:\d{2})?\]")
 
@@ -457,7 +511,7 @@ class OpenAITextGenerationService(BaseTextGenerationService[ChatOpenAI]):
 
         logger.debug(
             "_invoke_llm: waiting for rate_limiter (output_class=%s)",
-            output_class.__name__ if output_class else None,
+            _output_name(output_class),
         )
         await rate_limiter.acquire()
 
@@ -475,7 +529,7 @@ class OpenAITextGenerationService(BaseTextGenerationService[ChatOpenAI]):
 
             logger.info(
                 "_invoke_llm: calling llm.ainvoke (output_class=%s)",
-                output_class.__name__ if output_class else None,
+                _output_name(output_class),
             )
             # Best-effort token-usage capture: a callback aggregates usage even
             # when with_structured_output drops the raw AIMessage. Guarded so a
@@ -556,7 +610,7 @@ class OpenAITextGenerationService(BaseTextGenerationService[ChatOpenAI]):
                         logger.warning(
                             "_invoke_llm: model output was too long and could "
                             "not be parsed (output_class=%s): %s",
-                            output_class.__name__ if output_class else None,
+                            _output_name(output_class),
                             str(e),
                         )
                         raise LLMInvocationFailedException(
@@ -567,7 +621,7 @@ class OpenAITextGenerationService(BaseTextGenerationService[ChatOpenAI]):
                         "_invoke_llm: unexpected %s during llm.ainvoke "
                         "(output_class=%s): %s",
                         type(e).__name__,
-                        output_class.__name__ if output_class else None,
+                        _output_name(output_class),
                         str(e),
                     )
                     raise LLMInvocationFailedException(
@@ -936,6 +990,60 @@ class OpenAITextGenerationService(BaseTextGenerationService[ChatOpenAI]):
             setattr(response, key, value)
 
         return response
+
+    async def generate_note_draft(
+        self,
+        chat_history: List[Any],
+        request: Any,
+        session_mode: Optional[str] = None,
+        prompts: Optional[Dict[str, Any]] = None,
+        segments_text: Optional[str] = None,
+    ) -> Any:
+        """Scribe v2: build the canonical transcript from the STT segments (or
+        fall back to the diarized turns) and run the note harness on it.
+
+        `request` is a NoteHarnessRequest. Returns a HarnessReport; a failure is
+        recorded on the report, never raised, so a shadow run can't affect the
+        v1 summary.
+        """
+        from app.core.note_harness.canonical import ROLES_PATH
+        from app.core.note_harness.harness import (
+            GENERATE_PATH,
+            MAP_SEGMENT_PATH,
+            REPAIR_PATH,
+        )
+        from app.core.note_harness.pipeline import run_note_pipeline
+
+        tasks = {
+            GENERATE_PATH: LLMTask.SCRIBE_NOTE.value,
+            MAP_SEGMENT_PATH: LLMTask.SCRIBE_NOTE_MAP.value,
+            REPAIR_PATH: LLMTask.SCRIBE_NOTE_REPAIR.value,
+            ROLES_PATH: LLMTask.SCRIBE_NOTE_ROLES.value,
+        }
+
+        def render(path: str, **variables: Any) -> str:
+            return load_and_format(path, prompts=prompts, **variables)
+
+        async def invoke(
+            prompt: str, schema: Dict[str, Any], path: str, max_tokens: int
+        ) -> Dict[str, Any]:
+            # max_tokens is recorded on the budget; the client's own limit
+            # applies until the eval settles the model (DESIGN §6.8).
+            return await self._invoke_llm(
+                prompt,
+                cast(Any, schema),
+                task=tasks[path],
+                llm_override=self._client_for(path, prompts),
+            )
+
+        return await run_note_pipeline(
+            render,
+            invoke,
+            request,
+            session_mode,
+            segments_text=segments_text,
+            fallback_messages=chat_history,
+        )
 
     def _chat_history_to_str(self, chat_history: List[ChatMessage]) -> str:
         return "\n".join([f"{msg.role}: {msg.content}" for msg in chat_history])
@@ -1340,19 +1448,12 @@ class OpenAITextGenerationService(BaseTextGenerationService[ChatOpenAI]):
                     f"Failed to process chunks: {failed_chunks}"
                 )
 
-            # Combine messages from all chunks in original order
-            # This maintains the conversation flow and timing sequence
-            combined_messages = []
-            total_messages = 0
-
-            for i, result in enumerate(results):
-                if isinstance(result, StructuredDiarization):
-                    chunk_messages = result.messages
-                    combined_messages.extend(chunk_messages)
-                    total_messages += len(chunk_messages)
-                    logger.debug(
-                        f"Added {len(chunk_messages)} messages from chunk {i + 1}"
-                    )
+            # Combine messages from all chunks in original order, dropping the
+            # turns each chunk re-diarized from the previous chunk's overlap.
+            combined_messages = merge_diarized_chunks(
+                [r.messages for r in results if isinstance(r, StructuredDiarization)]
+            )
+            total_messages = len(combined_messages)
 
             logger.info(
                 f"All chunks diarized and merged successfully. "

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 
 import {
   useAnswerGapMutation,
+  useGetAssistantHomeQuery,
   useGetHistoryQuery,
   useGetCheckupQuery,
   useMarkNotOfferedMutation,
@@ -19,6 +20,8 @@ import { HOME } from "../copy";
 import { dateTime } from "../dates";
 import { Collapsed, Group, SectionHead } from "../fields";
 import { CheckupCases } from "./CheckupCases";
+import { packChangeLine } from "./Safety";
+import { planLimitMessage } from "../../Plan/limits";
 
 import type { SectionProps } from "./props";
 
@@ -72,6 +75,8 @@ export const CheckupSection: React.FC<Pick<SectionProps, "bot" | "canEdit">> = (
 }) => {
   const [polling, setPolling] = useState(false);
   const checkup = useGetCheckupQuery(bot.id, { pollingInterval: polling ? POLL_MS : 0 });
+  // Q3-fast: a pack the owner changed shows here too, since the checkup's safety questions follow it.
+  const packLine = packChangeLine(useGetAssistantHomeQuery(bot.id).data?.safety.packChange);
   // Changes by chat and by hand alike (chunk 20d-2's History).
   const { data: changes } = useGetHistoryQuery(bot.id);
   const [run, runState] = useRunCheckupMutation();
@@ -91,7 +96,9 @@ export const CheckupSection: React.FC<Pick<SectionProps, "bot" | "canEdit">> = (
     const result = await run(only ? { id: bot.id, only } : bot.id);
     if ("error" in result) {
       const status = (result.error as { status?: number }).status;
-      setNote(status === 429 ? t.blocked.limit : t.blocked.start);
+      setNote(
+        planLimitMessage(result.error) ?? (status === 429 ? t.blocked.limit : t.blocked.start),
+      );
     } else {
       setCompared(true);
     }
@@ -104,35 +111,42 @@ export const CheckupSection: React.FC<Pick<SectionProps, "bot" | "canEdit">> = (
   const compare = checkup.data?.compare;
 
   const head = (
-    <SectionHead
-      title={HOME.sections.checkup}
-      subtitle={c.intro}
-      help={HOME.subtitles.checkup}
-      action={
-        canEdit && (
-          <div className="ally-btn-row">
-            <Button
-              variant={ButtonVariant.TERTIARY}
-              size="sm"
-              type="button"
-              onClick={() => void start("failed")}
-              disabled={running || runState.isLoading || !view}
-            >
-              {c.runs.failed}
-            </Button>
-            <Button
-              variant={ButtonVariant.PRIMARY}
-              size="sm"
-              type="button"
-              onClick={() => void start()}
-              disabled={running || runState.isLoading}
-            >
-              {c.runs.all}
-            </Button>
-          </div>
-        )
-      }
-    />
+    <>
+      <SectionHead
+        title={HOME.sections.checkup}
+        subtitle={c.intro}
+        help={HOME.subtitles.checkup}
+        action={
+          canEdit && (
+            <div className="ally-btn-row">
+              <Button
+                variant={ButtonVariant.TERTIARY}
+                size="sm"
+                type="button"
+                onClick={() => void start("failed")}
+                disabled={running || runState.isLoading || !view}
+              >
+                {c.runs.failed}
+              </Button>
+              <Button
+                variant={ButtonVariant.PRIMARY}
+                size="sm"
+                type="button"
+                onClick={() => void start()}
+                disabled={running || runState.isLoading}
+              >
+                {c.runs.all}
+              </Button>
+            </div>
+          )
+        }
+      />
+      {packLine && (
+        <p className="ally-small" data-testid="checkup-pack-changed">
+          {packLine}
+        </p>
+      )}
+    </>
   );
 
   const howItWorks = (
@@ -227,11 +241,16 @@ export const CheckupSection: React.FC<Pick<SectionProps, "bot" | "canEdit">> = (
             </div>
             <div>
               <h3 className="ally-heading">
-                {view.totals.gaps === 1
-                  ? fill(c.summaryGap, { clients })
-                  : view.totals.gaps
-                    ? fill(t.summaryGaps, { clients, gaps: view.totals.gaps })
-                    : fill(t.summaryClear, { clients })}
+                {view.gate && !view.gate.ready
+                  ? fill(c.summaryNeedFix, {
+                      n: view.gate.needFix,
+                      total: view.gate.questions,
+                    })
+                  : view.totals.gaps === 1
+                    ? fill(c.summaryGap, { clients })
+                    : view.totals.gaps
+                      ? fill(t.summaryGaps, { clients, gaps: view.totals.gaps })
+                      : fill(t.summaryClear, { clients })}
               </h3>
               {view.totals.gaps > 0 && (
                 <p className="ally-body">

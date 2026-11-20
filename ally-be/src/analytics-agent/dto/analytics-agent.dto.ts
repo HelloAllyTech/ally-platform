@@ -3,13 +3,17 @@ import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
+  IsIn,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
   MinLength,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { AGENT_LIMITS } from '../constants/analytics-agent.constants';
+import type { AnalyticsAgentFeedback } from '../entity/analytics-agent-message.entity';
 
 /**
  * One prior exchange in the conversation, replayed by the client.
@@ -73,6 +77,17 @@ export class AskAnalyticsAgentDto {
   @ValidateNested({ each: true })
   @Type(() => AnalyticsAgentTurnDto)
   history?: AnalyticsAgentTurnDto[];
+
+  @ApiProperty({
+    description:
+      'The saved conversation this question continues. Omit to start a new one ' +
+      '(titled with this question); the response carries its id. Must be one of ' +
+      "the caller's own conversations, else 404.",
+    required: false,
+  })
+  @IsOptional()
+  @IsUUID()
+  conversationId?: string;
 }
 
 /**
@@ -222,6 +237,91 @@ export class AskAnalyticsAgentResponseDto {
 
   @ApiProperty({ type: AnalyticsAgentProvenanceDto })
   provenance!: AnalyticsAgentProvenanceDto;
+
+  @ApiProperty({
+    description:
+      'The saved conversation this turn belongs to — new if the request had no ' +
+      '`conversationId`. Absent only if saving the turn failed; the answer is ' +
+      'still returned, it just will not appear in the history.',
+    required: false,
+  })
+  conversationId?: string;
+
+  @ApiProperty({
+    description:
+      'The id of the saved turn, which is what feedback is recorded against. ' +
+      'Absent only if saving the turn failed, in which case there is nothing to rate.',
+    required: false,
+  })
+  messageId?: string;
+}
+
+/** The reader's rating of one answer, or null to take a rating back. */
+export class SetAnalyticsAgentFeedbackDto {
+  @ApiProperty({
+    enum: ['up', 'down'],
+    nullable: true,
+    description:
+      '`up` or `down` records the rating; `null` clears it. Feedback is optional ' +
+      'and a rating can be changed or withdrawn at any time.',
+  })
+  // `null` is a valid value here (it clears the rating), so validation only
+  // applies to anything else. A missing field is not null and is rejected.
+  @ValidateIf((_, value) => value !== null)
+  @IsIn(['up', 'down'])
+  feedback!: AnalyticsAgentFeedback | null;
+}
+
+/** What was saved after a rating was set or cleared. */
+export class AnalyticsAgentFeedbackResponseDto {
+  @ApiProperty() messageId!: string;
+
+  @ApiProperty({ enum: ['up', 'down'], nullable: true })
+  feedback!: AnalyticsAgentFeedback | null;
+}
+
+/** A saved conversation as listed in the sidebar — no turns. */
+export class AnalyticsAgentConversationSummaryDto {
+  @ApiProperty() id!: string;
+
+  @ApiProperty({ description: 'The first question asked in the conversation' })
+  title!: string;
+
+  @ApiProperty({ description: 'ISO timestamp' }) createdAt!: string;
+
+  @ApiProperty({ description: 'ISO timestamp of the latest turn' })
+  updatedAt!: string;
+}
+
+/** One saved turn: the question and the agent's reply exactly as it was shown. */
+export class AnalyticsAgentConversationMessageDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() question!: string;
+  @ApiProperty({ description: 'See `AnalyticsAgentOutcome`' })
+  outcome!: string;
+
+  @ApiProperty({
+    description: 'The full response as it was returned when asked',
+    type: AskAnalyticsAgentResponseDto,
+  })
+  response!: AskAnalyticsAgentResponseDto;
+
+  @ApiProperty({
+    enum: ['up', 'down'],
+    nullable: true,
+    description: "The reader's thumbs up / down on this answer; null if none.",
+  })
+  feedback!: AnalyticsAgentFeedback | null;
+
+  @ApiProperty({ description: 'ISO timestamp' }) createdAt!: string;
+}
+
+export class AnalyticsAgentConversationDetailDto extends AnalyticsAgentConversationSummaryDto {
+  @ApiProperty({
+    description: 'Every turn, oldest first',
+    type: [AnalyticsAgentConversationMessageDto],
+  })
+  messages!: AnalyticsAgentConversationMessageDto[];
 }
 
 /** One table in the readable catalogue, for the "what can I ask about?" panel. */

@@ -95,6 +95,18 @@ export class ListRoleplaySessionLogsQueryDto {
 
   @ApiProperty({
     required: false,
+    description:
+      'Restrict to sessions of one scenario (scenario_sessions.scenarioId). ' +
+      'Used by Analytics links, which know the scenario id but not its title.',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  scenarioId?: number;
+
+  @ApiProperty({
+    required: false,
     enum: RoleplaySessionLogSortBy,
     default: RoleplaySessionLogSortBy.CREATED_AT,
   })

@@ -30,14 +30,16 @@ export enum RoadmapOpportunityStage {
 }
 
 /**
- * Who filed it — 'staff' (somebody internal, and every pre-existing row) or 'consumer' (an
- * app user). Answers "who", not "through which client": a bug report is stamped from the
+ * Who filed it — 'staff' (somebody internal, and every pre-existing row), 'consumer' (an
+ * app user) or 'pm_agent' (the PM Agent, from a card an admin accepted). Answers "who", not "through which client": a bug report is stamped from the
  * reporter's own roles server-side, so an admin filing from helpline still reads as staff.
  * Admin-side display/filtering only, mirrors ally-be's RoadmapOpportunitySource.
  */
 export enum RoadmapOpportunitySource {
   STAFF = "staff",
   CONSUMER = "consumer",
+  /** Filed by the PM Agent from an accepted card; the creator reads "Product Manager Agent". */
+  PM_AGENT = "pm_agent",
 }
 
 /**
@@ -228,6 +230,8 @@ export interface RoadmapOpportunitiesQuery {
   createdBy?: number[];
   /** Only opportunities that would back a colleague the caller hasn't backed lately. */
   newToMe?: boolean;
+  /** Unowned or unsized — the Inbox's definition of "needs a decision". */
+  needsTriage?: boolean;
   dateFrom?: string;
   dateTo?: string;
   releasedFrom?: string;
@@ -236,6 +240,7 @@ export interface RoadmapOpportunitiesQuery {
   priorityMax?: number;
   sortBy?:
     | "composite"
+    | "triage"
     | "priority"
     | "voters"
     | "createdAt"
@@ -608,6 +613,14 @@ export interface RoadmapViewState {
    * rather than treat undefined as a distinct third state.
    */
   layout?: RoadmapBoardLayout;
+  /** Archived rows are hidden unless this is on. Absent = hidden, so older views are unchanged. */
+  showArchived?: boolean;
+  /**
+   * Roadmap v2's Queue filters, as the URL-safe query params of `GET /v1/roadmap/items` (P2
+   * contract). Only views saved from the new Queue carry it; the old board ignores the key, and
+   * the Queue lists only views that have it.
+   */
+  queue?: Record<string, string>;
 }
 
 export interface RoadmapSavedView {

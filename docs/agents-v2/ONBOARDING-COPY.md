@@ -16,20 +16,62 @@ Think of a calm, capable product designer sitting next to the owner: specific, w
 
 ## 1. Start (`/new`)
 
+The first screen offers four ways to begin, as cards. Picking one shows that way's input, with Back to the cards and × (top right) back to the assistants list.
+
 - **Title:** Build an assistant that knows your business
-- **Subtitle:** Share your website. We'll read it, ask a few questions, and have a tested assistant ready to share in about 5 minutes.
+- **Subtitle:** Choose how you'd like to start. We'll ask a few questions and have a tested assistant ready to share in about 5 minutes.
+- **Cards label (screen readers):** How would you like to start?
+- **Cards, in order:**
+  - Your website: We read your pages and learn what you offer.
+  - Your documents: Upload a brochure, price list or FAQ.
+  - Describe your business: Write a few sentences in your own words.
+  - Interview me: Answer a few questions and we'll build it from that.
+- **Close button (screen readers):** Close and go back to your assistants
+- **Footnote:** We only read the pages you point us to. Nothing is published until you choose to.
+
+### Your website
+
+- **Subtitle:** Share your website. We'll read it and learn what you offer.
 - **Input placeholder:** yourbusiness.com
 - **Primary button:** Start with my website
-- **Secondary options:**
-  - Upload documents instead
-  - Describe my business instead
-- **Footnote:** We only read the pages you point us to. Nothing is published until you choose to.
+
+### Your documents
+
+- **Title:** Upload your documents
+- **Subtitle:** A brochure, price list or FAQ is a good place to start.
+- **Choose button:** Choose files
+- **Limits:** PDFs, Word documents and text files, up to 10 at a time, 20 MB each.
+- **Remove a chosen file (screen readers):** Remove {name}
+- **Primary button:** Start with these documents
+
+### Describe your business
+
+- **Prompt:** Tell me what your business does, who you help, and what people usually ask you. A few sentences is plenty.
+- **Placeholder:** What does your business do, who do you help, and what do people usually ask?
+- **Button:** Continue
+
+### Interview me
+
+- **Title:** Let us interview you
+- **Subtitle:** We'll ask about your business one question at a time. Answer in your own words, and skip anything you'd rather not share.
+- **Button:** Start the interview
+
+The interview screen itself shows the builder's latest question as its heading.
+
+- **Answer box label (screen readers):** Your answer
+- **Answer placeholder:** Type your answer here
+- **Send button:** Send
+- **Finish button (goes on to "What we learned"):** That's everything
 
 ## 2. The builder's opening message
 
 > Hi, I'm here to set up your assistant with you. Paste your website and I'll start reading. You can watch what I find on the right.
 
 **Chips:** Use my website · Upload documents · Describe it instead
+
+**Opening message when they choose "Interview me":**
+
+> Hi, I'll ask you about your business one question at a time, and you can watch what I learn on the right. Answer in your own words, and skip anything you'd rather not share. To begin: what does your business do, and who do you help?
 
 **If they choose "Describe it":**
 
@@ -245,7 +287,7 @@ Think of a calm, capable product designer sitting next to the owner: specific, w
 - **Saved indicator:** Saved
 - **Back button:** Back
 - **Footer, left:** Step {n} of {total} · {step name}
-- **Step names:** Start · Reading your website · What we learned · Safety · A few questions · Choose a design · Building · Make it yours · Checkup · Share
+- **Step names:** Start · Interview · Reading your website · What we learned · Safety · A few questions · Choose a design · Building · Make it yours · Checkup · Share
 - **Order:** Choose a design → Building → Make it yours (edits the assistant just built) → Checkup → Share. Until the checkup exists, Make it yours goes straight to Share.
 - **Footer, right:** Your progress is saved. You can come back any time.
 - **Enter hint:** press Enter ↵
@@ -480,6 +522,7 @@ says when a save can't be made. More lines for the home's sections are added her
 - **Comparison:** vs {value} last week
 - **Unanswered list title:** Questions it didn't know
 - **Unanswered action:** Answer it
+- **Booking steps, apart from it** *(added in Q3d)*: Couldn't complete a booking · From the last 7 days. These were part of a booking, not questions to answer.
 - **Thumbs-down list title:** Answers people weren't happy with
 - **Thumbs-down actions:** Correct this · It was fine
 - **Checkup card:** Last checkup: {passed} of {total} answered well · View checkup
@@ -582,13 +625,13 @@ says when a save can't be made. More lines for the home's sections are added her
 - **Something else prompt:** What should your assistant help with? A sentence or two is plenty.
 - **Defaults confirmation:** I've set it up for {purpose}: {defaults}. You can change any of this on the next screen.
 - **Honest limits:**
-  - Enquiries: It can't book or take payments yet. It sends you each new enquiry by email.
+  - Enquiries: It can't take payments yet. It sends you each new enquiry by email, and books when you add an Appointments list.
   - Training: It doesn't keep track of each person's progress yet.
 - **What each purpose will and won't do** *(added in 20a-2; fixed in code, so a card never promises what doesn't work)*:
-  - Answer questions. It will: Answer questions from your information · Link each answer to where it came from · Say plainly when it doesn't know. It won't: Book, take orders or take payments
-  - Bring in customers. It will: Recommend the service that fits · Ask one question at a time · Pass each person's name and number to you. It won't: Book, take orders or take payments · Promise discounts or slots you haven't listed
+  - Answer questions. It will: Answer questions from your information · Link each answer to where it came from · Say plainly when it doesn't know. It won't: Take payments
+  - Bring in customers. It will: Recommend the service that fits · Ask one question at a time · Pass each person's name and number to you. It won't: Take payments · Promise discounts or slots you haven't listed
   - Train my team. It will: Explain your procedures in short steps · Quiz your team when they ask · Link each answer to your documents. It won't: Make up a procedure
-  - Guide people step by step. It will: Give one step at a time · Check each step is done before the next · Keep your steps in order, safety steps included. It won't: Skip or reorder steps · Book, take orders or take payments
+  - Guide people step by step. It will: Give one step at a time · Check each step is done before the next · Keep your steps in order, safety steps included. It won't: Skip or reorder steps · Take payments
 - **Sample exchanges when the builder's own don't fit** *(added in 20a-2)*:
   - Answer questions: "What are your opening hours?" / "Here's when we're open, from our website."
   - Bring in customers: "Which service would suit me?" / "Happy to help. What are you looking for help with?"
@@ -703,7 +746,8 @@ says when a save can't be made. More lines for the home's sections are added her
 
 - **Change panel:** Describe a change in your own words. I'll show exactly what will change. Nothing changes until you approve it, and you can undo it. · What I can change · Welcome message · Tone · Languages · Business details · Your instructions · Topics to avoid · Quick replies · Pages it knows · What I can't change · Safety rules: these can only be added to. · Who can open your page: that's in Share. · Not this · Change · History · You changed your assistant. Run a checkup to see the effect. · Run checkup · Nothing has changed yet. · From the Change panel · Edited by hand · Undo · Restore · Undone · {who} · {when}
 - **Field names in the History:** Business name · Your assistant's name · The introduction · The tone · Your instructions · What it says when it doesn't know · The disclaimer · What it says when someone may be at risk · Suggested questions · Topics to avoid · Questions before the chat · Limits · Languages · Your page · Who can open your page · When someone asks for a person · The website bubble · Who can message it on WhatsApp · What it says when someone sends too many messages · What it says to a number it doesn't know · What it says when it can't read a message · Your own rules
-- **How it works:** Everything your assistant follows, in the order it applies. You can edit the parts marked as yours. · Set by Ally to keep answers accurate and safe. You can add to safety rules, not remove them. · Yours · Set by Ally · Show exact text · Hide exact text · Show the full instructions · Hide the full instructions · This is the whole text your assistant gets, with your parts highlighted. Where it says {question}, it gets the visitor's message; the parts of your pages it finds go in for each question. · Edit · Edit in {section} · {n} of {max} characters · Saved. Your assistant still follows its safety and base rules first, so text that tries to override them has no effect. · We couldn't load this. Try again in a moment. · Nothing here yet. · your kind of practice · answering questions · Anything else it should know or do
+- **How it works:** Everything your assistant follows, in the order it applies. You can edit the parts marked as yours. · Set by Ally to keep answers accurate and safe. You can add to safety rules, not remove them. · Yours · Set by Ally · Show exact text · Hide exact text (your own parts only; Ally's layers show their summary, 17 Nov 2026) · Edit in {section} · {n} of {max} characters · Saved. Your assistant still follows its safety and base rules first, so text that tries to override them has no effect. · We couldn't load this. Try again in a moment. · Nothing here yet. · your kind of practice · answering questions · Anything else it should know or do
+- **How it works, the list tools** (under How it finds answers, one line per list): {list}: {can} entries. · look up · add · change (e.g. "Leads: look up, add and change entries.")
 - **How it works, Ally's base rules:** Ally's base rules · Answer from your pages, say where each answer came from, never make things up, and say plainly when it doesn't know.
 - **How it works, Safety rules:** Safety rules · Always on for {pack}. Your own rules are added after Ally's.
 - **How it works, What it's for:** What it's for · Set by the purpose you chose: {purpose}. Change it by choosing another purpose.
@@ -717,6 +761,12 @@ says when a save can't be made. More lines for the home's sections are added her
 - **How it works, in the section list (20d-2):** How it works · Everything your assistant follows, and the parts you can change.
 - **Your instructions, when the check can't run (20d-2, at approval):** Couldn't check this right now. Try again in a minute.
 - **When someone may be at risk, before the owner writes their own (20d-2, at approval):** From your safety rules. This is what it says now, and you can add to it.
+- **How it works, each list's playbook (Q3-fast Part 2b):** Because you added {list}, your assistant finds free times, confirms the exact time and books it. · Because you added {list}, your assistant offers to take people's details when it can't fully answer, and saves them once they share them. · Because you added {list}, your assistant looks up only the person's own entries and explains what their status means. · Because you added {list}, your assistant quotes it exactly as listed and never invents availability.
+- **Lists, What your assistant can do, the owner's own line (Q3-fast Part 2b):** How should your assistant use this list? · Optional. For example: "Always mention the size chart". It can't change your safety rules. · Save · Saved
+- **Reading uploaded documents (Q3-fast):** Reading your documents · Reading your documents… · This usually takes under a minute. We'll show what we learned as soon as it's done.
+- **Reading your website, pages we couldn't read (Q3-fast Part 3):** We couldn't read these pages · They showed an error or a security check instead of their content, so we kept nothing from them. · When it happens on the first page: The site showed our reader an error or a security check instead of its pages. · {domain} showed our reader an error or a security check instead of its pages. Upload documents or describe your business instead.
+- **Checkup and publishing, the quality gate (Q3-fast Part 3):** {n} of {total} questions need a fix. Answer the ones it couldn't, or look at what went wrong in Checkup once it's live. · Publish anyway · {n} of {total} questions need a fix (Checkup heading) · {n} need a fix (Overview, after "Last checkup") · From the server, before publishing: {n} of {total} questions need a fix: your assistant answered {pct}% of its questions well, and we suggest at least 70% before you publish. Publish anyway? · "You're ready to try it yourself" shows only when every safety question passed and at least 70% of the rest did.
+- **Safety, correcting the pack (Q3-fast Part 1, owners only; for review at stop 1):** This isn't right for my business · Which safety rules fit your business? · Less strict · Why is this right for your business? · These rules are less strict than the ones you have now. Your reason is kept with the change, and your checkup will show it. · Please say a little more (at least 10 characters). · Change safety rules · Cancel · Safety rules changed by you on {date}. · Safety rules changed by you on {date}: “{reason}”
 - **Overview numbers, with the 7 / 30 days switch (20d-2, at approval):** Your numbers · Show the last · 7 days · 30 days
 - **Overview, All numbers (CL1, replacing the classic usage tab; opens in place under the numbers):** See all numbers · Hide all numbers · Show the last · 7 days · 30 days · 90 days · Messages in · People · Didn't know · Of the questions it was asked · Too few questions to say · Typical reply time · 1 in 20 took {s} s or longer · {s} s · What happened to each message · Answered · Didn't know · Asked to clarify · Safety replies · From numbers it didn't recognise · Errors on our side · Other · Replies per day · {day}: {n} replies · Languages · Language · Questions · Documents it used most · {n} times · Not used in this period: 1 document · Not used in this period: {n} documents · No messages in this period yet. · We couldn't load these numbers. · Try again
 - **The header's `···` menu, staff only (CL1, replacing the classic view's Settings tab):** Settings · This assistant's own engine settings. Only platform admins see this.
@@ -995,7 +1045,7 @@ says when a save can't be made. More lines for the home's sections are added her
 - Example
 - Add
 - Add a {detail}
-- Keep at least one.
+- Add at least one of your own.
 - Add the times people can book
 - Pick the days and hours. You can change or remove any of them later.
 - What can your assistant do with {list}?
@@ -1061,7 +1111,7 @@ says when a save can't be made. More lines for the home's sections are added her
 
 - What it can't do yet
 - It books into your {list} list. It can't take payments yet.
-- It can't book or take payments yet. It sends you each new enquiry by email.
+- It can't take payments yet. It sends you each new enquiry by email, and books when you add an Appointments list.
 - It doesn't keep track of each person's progress yet.
 
 ## 28. Memory (8a)
@@ -1171,6 +1221,13 @@ says when a save can't be made. More lines for the home's sections are added her
 - When someone asks for a person, your assistant tells them your team has been asked, and lets you know.
 - Change in Share
 
+Whether it may hand over at all (A1: the assistant's owners decide; Ally's platform admins did before):
+
+- Can your assistant hand a chat to your team?
+- On: when someone asks for a person, it hands the chat to your team. Off: it keeps answering itself.
+- Only this assistant's owners can change this.
+- That didn't save. Try again.
+
 **A list's menu:**
 
 - More for {list}
@@ -1207,3 +1264,29 @@ says when a save can't be made. More lines for the home's sections are added her
 - Open Tools
 - Turn it on in Tools
 - Change this in Tools
+
+## 30. Live steps and the time zone (6b)
+
+**On the bot page and in the bubble, while the assistant works** (one line at a time, each shown for at least 400 ms; `{business}` is the page's title, `{list}` a list's name as the owner wrote it, `{when}` a day and time like "Thu 19 Nov, 11:00"):
+- Reading your message…
+- Searching {business}'s information…
+- Checking free times… (a list of times: slots, times, availability) / Looking in {list}… / Looking it up…
+- Booking {when}… / Saving your details… (a list that takes details, such as Leads)
+- Updating your booking… / Cancelling your booking…
+- Passing this to the team…
+- Writing a reply…
+- Still working on it… (after 12 s with no new step)
+
+**After the reply, one quiet line that opens to the list:**
+- Searched {business}'s information · Checked free times · Looked in {list} · Looked it up · Booked {when} · Saved your details · Updated your booking · Cancelled your booking · Passed this to the team
+- For screen readers: Show what I did / Hide what I did
+
+**The confirmation card** (from the stored entry): Booked / Changed / Cancelled · {list}, then the day and time, then up to three details.
+
+Never shown: tool or field names, ids, what was searched for, memory, or a refusal's code. A crisis or Safety reply shows no steps.
+
+**How it works → the business layer:**
+- Time zone
+- Where your business is. Your lists' times, what your assistant calls today, and Repeat weekly use it.
+
+Hindi for all of the bot page's lines is in `botPage/copy/hi.ts`, marked "needs review".

@@ -84,6 +84,30 @@ class TestLearned:
         assert op.value["section"] == "hours"
 
 
+class TestStricterPack:
+    """Q3-fast stop 1: a stricter pack the owner asks for is proposed to ally-be,
+    which applies it only when it is stricter. An unknown id is never passed on."""
+
+    @pytest.mark.asyncio
+    async def test_a_stricter_pack_asked_for_is_proposed(self):
+        fake = FakeLLM(
+            ConverseOut=[
+                {"message": "Care for young people is now on.", "safety_pack": "minors"}
+            ]
+        )
+        res = await run(
+            request("learned", message="Some of our students are under 18"), fake
+        )
+        assert res.stricter_pack == "minors"
+
+    @pytest.mark.asyncio
+    async def test_no_pack_and_unknown_ids_propose_nothing(self):
+        for value in ("", "kids_only"):
+            fake = FakeLLM(ConverseOut=[{"message": "Noted.", "safety_pack": value}])
+            res = await run(request("learned", message="hello"), fake)
+            assert res.stricter_pack is None
+
+
 class TestGaps:
     @pytest.mark.asyncio
     async def test_skip_records_the_answer_and_asks_the_next(self):
@@ -136,6 +160,64 @@ class TestGaps:
         )
         assert res.asking == "fees" and res.answer == ""
         assert "Add it now" not in res.chips
+
+    @pytest.mark.asyncio
+    async def test_a_typed_answer_is_saved_when_the_model_leaves_answer_empty(self):
+        # Prod, 18 Nov: "Okay — I can add your fees", and the fees were never saved.
+        fake = FakeLLM(ConverseOut=[{"message": "Okay — I can add your fees."}])
+        res = await run(
+            request(
+                "gaps",
+                gaps=GAPS,
+                pending="fees",
+                message="₹1,500 for a 50-minute session",
+            ),
+            fake,
+        )
+        assert paths(res)["/ownerNotes"] == (
+            "Your fees: ₹1,500 for a 50-minute session"
+        )
+        assert res.answer == "₹1,500 for a 50-minute session"
+        assert res.asking == "cancellation"
+        assert res.message.startswith("Done. I added that to your notes.\n\n")
+
+    @pytest.mark.asyncio
+    async def test_the_details_the_model_noted_are_the_answer(self):
+        fake = FakeLLM(
+            ConverseOut=[
+                {
+                    "message": "Okay — I can add your fees.",
+                    "owner_facts": [{"section": "prices", "text": "Rs 1500 a session"}],
+                }
+            ]
+        )
+        res = await run(
+            request("gaps", gaps=GAPS, pending="fees", message="its 1500 per session"),
+            fake,
+        )
+        assert paths(res)["/ownerNotes"] == "Your fees: Rs 1500 a session"
+
+    @pytest.mark.asyncio
+    async def test_an_answer_typed_with_add_it_now_is_saved(self):
+        fake = FakeLLM(ConverseOut=[{"message": "Okay.", "answer": "₹1,500"}])
+        res = await run(
+            request(
+                "gaps", gaps=GAPS, pending="fees", chip="Add it now", message="₹1,500"
+            ),
+            fake,
+        )
+        assert paths(res)["/ownerNotes"] == "Your fees: ₹1,500"
+        assert res.asking == "cancellation"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "typed", ["What should I write here?", "not sure", "ok", "Do I need this"]
+    )
+    async def test_a_question_or_non_answer_is_not_saved(self, typed):
+        fake = FakeLLM(ConverseOut=[{"message": "Most clinics list a range."}])
+        res = await run(request("gaps", gaps=GAPS, pending="fees", message=typed), fake)
+        assert "/ownerNotes" not in paths(res)
+        assert res.asking == "fees" and res.answer == ""
 
     @pytest.mark.asyncio
     async def test_languages_become_tags(self):

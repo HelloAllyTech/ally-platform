@@ -468,6 +468,12 @@ export class OpportunityInterviewGateDto {
 export class OpportunityInterviewDraftDto {
   @ApiProperty() description!: string;
 
+  @ApiPropertyOptional({
+    description:
+      "A short title the copilot suggests for the idea; the Roadmap v2 draft page offers it beside the author's words",
+  })
+  title?: string;
+
   @ApiProperty({
     nullable: true,
     description: 'One of the live product goal names, or null when none fit',
@@ -476,6 +482,60 @@ export class OpportunityInterviewDraftDto {
 
   @ApiProperty({ enum: RoadmapOpportunityEffort, nullable: true })
   effort!: RoadmapOpportunityEffort | null;
+}
+
+/** One graded quality dimension. */
+export class OpportunityQualityDimensionDto {
+  @ApiProperty({ description: 'A ROADMAP_QUALITY_DIMENSIONS id' }) id!: string;
+  @ApiProperty() label!: string;
+  @ApiProperty({
+    description:
+      '0 absent · 1 vague · 2 adequate · 3 specific · 4 specific and evidenced',
+  })
+  score!: number;
+  @ApiProperty({ description: 'Share of the 100-point score' }) weight!: number;
+  @ApiProperty({
+    description:
+      'Score this dimension must reach for the idea to pass, whatever the total',
+  })
+  floor!: number;
+  @ApiProperty({
+    description: 'What earned the grade, or the one thing that would raise it',
+  })
+  note!: string;
+}
+
+/** The quality verdict. Computed server-side from the model's per-dimension grades. */
+export class OpportunityQualityDto {
+  @ApiProperty({ description: '0-100' }) score!: number;
+  @ApiProperty() passScore!: number;
+  @ApiProperty() scaleMax!: number;
+  @ApiProperty({
+    description:
+      'Score at the pass mark and no floored dimension below its floor',
+  })
+  passed!: boolean;
+  @ApiProperty({ type: [OpportunityQualityDimensionDto] })
+  dimensions!: OpportunityQualityDimensionDto[];
+  @ApiProperty({
+    nullable: true,
+    description: 'The dimension to strengthen next',
+  })
+  weakest!: string | null;
+}
+
+/** One independently fileable slice of a too-big idea, with its own signed token. */
+export class OpportunityInterviewSliceDto {
+  @ApiPropertyOptional({ nullable: true }) title!: string | null;
+  @ApiProperty() description!: string;
+  @ApiProperty({ nullable: true }) productGoal!: string | null;
+  @ApiProperty({ enum: RoadmapOpportunityEffort })
+  effort!: RoadmapOpportunityEffort;
+  @ApiProperty({
+    nullable: true,
+    description: 'Signed readiness verdict for exactly this slice',
+  })
+  readinessToken!: string | null;
 }
 
 export class OpportunityInterviewTurnResponseDto {
@@ -487,7 +547,7 @@ export class OpportunityInterviewTurnResponseDto {
   @ApiProperty({
     type: [OpportunityInterviewGateDto],
     description:
-      'One entry per readiness criterion, in the criteria order — the same five the filing ' +
+      'One entry per readiness criterion, in the criteria order — the same ones the filing ' +
       'gate grades, so a completed interview cannot produce a draft that gate would reject.',
   })
   gates!: OpportunityInterviewGateDto[];
@@ -507,6 +567,17 @@ export class OpportunityInterviewTurnResponseDto {
    */
   @ApiPropertyOptional({ nullable: true })
   readinessToken!: string | null;
+
+  /** The 0-100 quality grade after this turn, with each dimension. Always present. */
+  @ApiProperty({ type: OpportunityQualityDto })
+  quality!: OpportunityQualityDto;
+
+  /**
+   * Set instead of `draft` when the idea is too big for one filing (XL/XXL) or is really several
+   * independent ideas: two to five slices, each fileable on its own. Empty otherwise.
+   */
+  @ApiProperty({ type: [OpportunityInterviewSliceDto] })
+  slices!: OpportunityInterviewSliceDto[];
 
   /**
    * The copilot's working brief after this turn: strategic fit, reach, evidence it found,

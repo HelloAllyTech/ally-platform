@@ -412,6 +412,88 @@ export class SettingsController {
     );
   }
 
+  @Get('scribe-note-harness-shadow-enabled')
+  @ApiOperation({
+    summary:
+      'Get whether the Scribe v2 note harness runs in shadow for the org (superadmin only)',
+  })
+  @ApiQuery({ name: 'tenantId', required: false, type: String })
+  @ApiResponse({ status: 200 })
+  @RequireFeatureToggle(FeatureToggleKey.USERS, {
+    permissions: [PERMISSIONS.EDIT_SETTINGS_CUSTOM_FIELD_TYPES],
+  })
+  getScribeNoteHarnessShadowEnabled(@Query('tenantId') tenantId?: string) {
+    return this.service.getScribeNoteHarnessShadowEnabled(tenantId);
+  }
+
+  @Put('scribe-note-harness-shadow-enabled')
+  @ApiOperation({
+    summary:
+      'Run the Scribe v2 note harness in shadow for the org: drafts are stored for comparison, never shown (superadmin only)',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        tenantId: { type: 'string' },
+        enabled: { type: 'boolean' },
+      },
+    },
+  })
+  @ApiResponse({ status: 200 })
+  @RequireFeatureToggle(FeatureToggleKey.USERS, {
+    permissions: [PERMISSIONS.EDIT_SETTINGS_CUSTOM_FIELD_TYPES],
+  })
+  updateScribeNoteHarnessShadowEnabled(
+    @Body() body: { tenantId: string; enabled: boolean },
+  ) {
+    return this.service.updateScribeNoteHarnessShadowEnabled(
+      body.tenantId,
+      body.enabled,
+    );
+  }
+
+  @Get('scribe-segmented-recording-enabled')
+  @ApiOperation({
+    summary:
+      'Get whether Scribe recordings are uploaded as segments for the org (superadmin only)',
+  })
+  @ApiQuery({ name: 'tenantId', required: false, type: String })
+  @ApiResponse({ status: 200 })
+  @RequireFeatureToggle(FeatureToggleKey.USERS, {
+    permissions: [PERMISSIONS.EDIT_SETTINGS_CUSTOM_FIELD_TYPES],
+  })
+  getScribeSegmentedRecordingEnabled(@Query('tenantId') tenantId?: string) {
+    return this.service.getScribeSegmentedRecordingEnabled(tenantId);
+  }
+
+  @Put('scribe-segmented-recording-enabled')
+  @ApiOperation({
+    summary:
+      'Record Scribe sessions as segments uploaded straight to S3 for the org, instead of over the live socket (superadmin only)',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        tenantId: { type: 'string' },
+        enabled: { type: 'boolean' },
+      },
+    },
+  })
+  @ApiResponse({ status: 200 })
+  @RequireFeatureToggle(FeatureToggleKey.USERS, {
+    permissions: [PERMISSIONS.EDIT_SETTINGS_CUSTOM_FIELD_TYPES],
+  })
+  updateScribeSegmentedRecordingEnabled(
+    @Body() body: { tenantId: string; enabled: boolean },
+  ) {
+    return this.service.updateScribeSegmentedRecordingEnabled(
+      body.tenantId,
+      body.enabled,
+    );
+  }
+
   @Put('custom-field-types')
   @ApiOperation({
     summary: 'Update enabled custom field types (superadmin only)',

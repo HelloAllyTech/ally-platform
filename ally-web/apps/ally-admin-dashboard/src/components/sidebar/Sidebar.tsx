@@ -17,6 +17,7 @@ import {
   Chat,
   ChatBot,
   Chemistry,
+  Currency,
   MachineLearningModel,
   Roadmap,
   Close,
@@ -34,7 +35,7 @@ import {
   Terminal,
   Tools,
 } from "@icons";
-import { LibraryBig } from "lucide-react";
+import { Compass, LibraryBig, TrendingUp } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -65,12 +66,19 @@ import { UserModal } from "@components";
 // neighbour and several suites mock it wholesale.
 import { AgentAvatar } from "@components/agent-avatar";
 import { ColorModeToggle } from "@components/color-mode-toggle/ColorModeToggle";
+import { useCommandPalette } from "@components/command-palette/CommandPaletteContext";
 import { IdeaCaptureLauncher } from "@components/idea-capture/IdeaCapture";
 import { NotificationBell } from "@components/notification-bell/NotificationBell";
+import { ReduceMotionMenuItem } from "@components/reduce-motion/ReduceMotionMenuItem";
+import type { NavigationItem } from "@components/types";
 import { SIDEBAR_ITEMS, ROUTES, en, profileSettings, USER_MODAL_FIELDS_IDS } from "@constants";
 import { useClickOutside, useUser } from "@hooks";
+import { isNavItemActive } from "@utils/navigation";
 
 import { BuilderNavBadge } from "./BuilderNavBadge";
+import { PlanMenuItem } from "./PlanMenuItem";
+import { PmAgentNavBadge } from "./PmAgentNavBadge";
+import { RoadmapNavBadge } from "./RoadmapNavBadge";
 import { SortableNavItem } from "./SortableNavItem";
 import { FeatureToggleKey } from "../../constants/featureToggles";
 
@@ -160,7 +168,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
     const oldIndex = ids.indexOf(String(active.id));
     const newIndex = ids.indexOf(String(over.id));
     if (oldIndex === -1 || newIndex === -1) return;
-
     reorderSidebar(arrayMove(ids, oldIndex, newIndex));
   };
 
@@ -181,6 +188,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
     (isHoverExpandEnabled ? (isPinned && !isRouteForceCollapsed) || isHovered : isExpanded);
   const [openSettings, setOpenSettings] = useState(false);
   const [navSearch, setNavSearch] = useState("");
+  const palette = useCommandPalette();
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -221,11 +229,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
-
-  const handleNavigation = (path: string) => {
-    navigate(path);
-    onMobileClose?.();
-  };
 
   const handleUserMenuToggle = () => {
     setIsUserMenuOpen(!isUserMenuOpen);
@@ -291,6 +294,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
         return <Mic />;
       case SIDEBAR_ITEMS.LLM_MODEL_CATALOG:
         return <MachineLearningModel size={20} />;
+      // CR1: the price list, and what it all costs.
+      case SIDEBAR_ITEMS.BILLING_MODELS:
+        return <Currency size={20} />;
+      case SIDEBAR_ITEMS.BILLING_COSTS:
+        return <BarChart3 size={20} />;
+      case SIDEBAR_ITEMS.BILLING_PLANS:
+        return <Catalog size={20} />;
       case SIDEBAR_ITEMS.AI_TASKS:
         return <Catalog size={20} />;
       case SIDEBAR_ITEMS.SCENARIO_LANGUAGES:
@@ -313,6 +323,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
         return <BarChart3 size={20} />;
       case SIDEBAR_ITEMS.DEBRIEFS:
         return <Report size={20} />;
+      // Drift is a measure over time, so a trend line — not Analytics' bars.
+      case SIDEBAR_ITEMS.CONVERSATION_DRIFT:
+        return <TrendingUp size={20} strokeWidth={1.5} aria-hidden />;
       case SIDEBAR_ITEMS.AGENT_TEST_CASES:
         return <Flag size={20} />;
       case SIDEBAR_ITEMS.COMPETENCIES:
@@ -323,6 +336,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
         return <Chemistry size={20} />;
       case SIDEBAR_ITEMS.BUILDER:
         return <Tools size={20} />;
+      case SIDEBAR_ITEMS.PM_AGENT:
+        return <Compass size={20} strokeWidth={1.5} aria-hidden />;
       // Sparkles, the same glyph the autofill buttons use for "the AI writes this for you" — and
       // not Builder's Tools, since the two agents sit side by side in the nav.
       case SIDEBAR_ITEMS.COURSE_COPILOT:
@@ -337,6 +352,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
         return <LibraryBig size={20} strokeWidth={1.5} aria-hidden />;
       case SIDEBAR_ITEMS.PRODUCT_ROADMAP:
         return <Roadmap size={20} />;
+      // The same glyph: it is the same Roadmap, rebuilt, and replaces the entry above at cutover.
+      case SIDEBAR_ITEMS.ROADMAP_V2:
+        return <Roadmap size={20} />;
+      case SIDEBAR_ITEMS.USER_INTERVIEWS:
+        return <Users size={20} />;
       case SIDEBAR_ITEMS.SETTINGS:
         return <Settings size={20} />;
       // Deliberately NOT the List icon that ROLEPLAY_SESSION_LOGS uses. These are raw CloudWatch
@@ -376,6 +396,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
     switch (id) {
       case SIDEBAR_ITEMS.BUILDER:
         return <BuilderNavBadge />;
+      case SIDEBAR_ITEMS.PM_AGENT:
+        return <PmAgentNavBadge />;
+      case SIDEBAR_ITEMS.ROADMAP_V2:
+        return <RoadmapNavBadge />;
       // The inbox lives in AI Chatbots (chunk 11a): its unread chats show on that tab.
       case SIDEBAR_ITEMS.WHATSAPP_BOT:
         return <InboxNavBadge />;
@@ -384,79 +408,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
     }
   };
 
-  const isTabItemActive = (path: string) => {
-    switch (path) {
-      case ROUTES.SIMULATION_STUDIO:
-        return (
-          location.pathname.includes(ROUTES.SIMULATION_STUDIO) ||
-          location.pathname.includes(ROUTES.CREATE_SIMULATION)
-        );
-      case ROUTES.USER_MANAGEMENT:
-        return location.pathname.includes(ROUTES.USER_MANAGEMENT);
-      case ROUTES.MANAGE_EVENTS:
-        return location.pathname.includes(ROUTES.MANAGE_EVENTS);
-      case ROUTES.CHARACTER_LIBRARY:
-        return location.pathname.includes(ROUTES.CHARACTER_LIBRARY);
-      case ROUTES.COMPONENT_LIBRARY:
-        return location.pathname.includes(ROUTES.COMPONENT_LIBRARY);
-      case ROUTES.MANAGE_SCENARIO_LANGUAGES:
-        return location.pathname.includes(ROUTES.MANAGE_SCENARIO_LANGUAGES);
-      case ROUTES.MANAGE_SCENARIO_VOICES:
-        return location.pathname.includes(ROUTES.MANAGE_SCENARIO_VOICES);
-      case ROUTES.MANAGE_STT_CONFIGS:
-        return location.pathname.includes(ROUTES.MANAGE_STT_CONFIGS);
-      case ROUTES.MANAGE_LLM_MODEL_CATALOG:
-        return location.pathname.includes(ROUTES.MANAGE_LLM_MODEL_CATALOG);
-      case ROUTES.AI_TASKS:
-        return location.pathname.includes(ROUTES.AI_TASKS);
-      case ROUTES.DEBRIEFS:
-        return location.pathname.includes(ROUTES.DEBRIEFS);
-      case ROUTES.MANAGE_PROMPTS:
-        return location.pathname.includes(ROUTES.MANAGE_PROMPTS);
-      case ROUTES.MANAGE_GUARDRAILS:
-        return location.pathname.includes(ROUTES.MANAGE_GUARDRAILS);
-      case ROUTES.USER_BADGES:
-        return location.pathname.includes(ROUTES.USER_BADGES);
-      case ROUTES.MANAGE_TRANSLATIONS:
-        return location.pathname.includes(ROUTES.MANAGE_TRANSLATIONS);
-      case ROUTES.MANAGE_TOOLTIPS:
-        return location.pathname.includes(ROUTES.MANAGE_TOOLTIPS);
-      case ROUTES.BLOG:
-        return location.pathname.includes(ROUTES.BLOG);
-      case ROUTES.PRODUCT_UPDATES:
-        return location.pathname.includes(ROUTES.PRODUCT_UPDATES);
-      case ROUTES.ANALYTICS:
-        return location.pathname.includes(ROUTES.ANALYTICS);
-      case ROUTES.ROLEPLAY_SESSION_LOGS:
-        return location.pathname.includes(ROUTES.ROLEPLAY_SESSION_LOGS);
-      case ROUTES.AI_LAB:
-        return location.pathname.includes(ROUTES.AI_LAB);
-      // Matches the session detail route too, so the tab stays highlighted
-      // while you are inside a build rather than only on the list.
-      case ROUTES.BUILDER:
-        return location.pathname.includes(ROUTES.BUILDER);
-      // Matches the session and /new routes too, so the tab stays lit inside a session.
-      case ROUTES.COURSE_COPILOT:
-        return location.pathname.includes(ROUTES.COURSE_COPILOT);
-      case ROUTES.ALLY_CONSOLE:
-        return (
-          location.pathname === ROUTES.ALLY_CONSOLE ||
-          location.pathname.startsWith(`${ROUTES.ALLY_CONSOLE}/`)
-        );
-      case ROUTES.PRODUCT_ROADMAP:
-        return location.pathname.includes(ROUTES.PRODUCT_ROADMAP);
-      case ROUTES.SETTINGS:
-        return location.pathname.includes(ROUTES.SETTINGS);
-      default:
-        return false;
-    }
-  };
-
   const query = navSearch.trim().toLowerCase();
   const isSearching = query.length > 0;
   const displayedNavItems = isSearching
     ? filteredNavigationItems.filter(item => item.label.toLowerCase().includes(query))
     : filteredNavigationItems;
+
+  const isActive = (item: NavigationItem) =>
+    isNavItemActive(item, location.pathname, location.search);
 
   const sidebarItems = (
     <div className="flex-1 min-h-0 flex flex-col pt-4">
@@ -486,42 +445,39 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
           )}
         </div>
       )}
-      <nav className="flex-1 min-h-0 overflow-y-auto px-2 pb-4">
+      <nav aria-label={en.nav.mainNavLabel} className="flex-1 min-h-0 overflow-y-auto px-2 pb-4">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext
             items={displayedNavItems.map(item => item.id)}
             strategy={verticalListSortingStrategy}
           >
-            <ul className="space-y-1">
+            <ul>
               {displayedNavItems.map(item => (
                 <SortableNavItem
                   key={item.id}
                   item={item}
                   icon={renderIcon(item.id)}
-                  isActive={isTabItemActive(item.path)}
+                  isActive={isActive(item)}
                   isExpanded={showExpanded}
                   canReorder={canReorder && !isSearching}
-                  onNavigate={handleNavigation}
+                  onNavigate={onMobileClose}
                   badge={renderBadge(item.id)}
                 />
               ))}
             </ul>
-            {/* Signed in, permissions known, and no page to open: say so, not a blank sidebar. */}
-            {showExpanded &&
-              !isSearching &&
-              filteredNavigationItems.length === 0 &&
-              Boolean(permissions?.length) && (
-                <p
-                  data-testid="sidebar-no-access"
-                  className="px-3 py-2 text-sm text-typography-600"
-                >
-                  {en.common.noMenuAccess}
-                </p>
-              )}
-            {showExpanded && isSearching && displayedNavItems.length === 0 && (
-              <p className="px-3 py-2 text-sm text-typography-600">{en.common.noMenuResults}</p>
-            )}
           </SortableContext>
+          {/* Signed in, permissions known, and no page to open: say so, not a blank sidebar. */}
+          {showExpanded &&
+            !isSearching &&
+            filteredNavigationItems.length === 0 &&
+            Boolean(permissions?.length) && (
+              <p data-testid="sidebar-no-access" className="px-3 py-2 text-sm text-typography-600">
+                {en.common.noMenuAccess}
+              </p>
+            )}
+          {showExpanded && isSearching && displayedNavItems.length === 0 && (
+            <p className="px-3 py-2 text-sm text-typography-600">{en.common.noMenuResults}</p>
+          )}
         </DndContext>
       </nav>
     </div>
@@ -539,6 +495,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
         showExpanded ? "flex-row px-2" : "flex-col"
       }`}
     >
+      <button
+        type="button"
+        onClick={palette.open}
+        aria-label={en.nav.palette.open}
+        title={en.nav.palette.open}
+        data-testid="sidebar-palette-button"
+        className="inline-flex h-10 w-10 items-center justify-center rounded-md text-typography-700 hover:bg-background-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500"
+      >
+        <Search size={20} aria-hidden />
+      </button>
       <NotificationBell placement="above" />
       <IdeaCaptureLauncher />
       <ColorModeToggle />
@@ -548,9 +514,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
   const profileSection = (
     <>
       <div ref={containerRef} className="flex-shrink-0 border-t border-border-light py-4">
-        <div
+        <button
+          type="button"
           onClick={handleUserMenuToggle}
-          className="flex flex-row justify-between items-center h-8 py-0 cursor-pointer"
+          aria-haspopup="menu"
+          aria-expanded={isUserMenuOpen}
+          aria-label={user?.name ? `${user.name}, account menu` : "Account menu"}
+          data-testid="sidebar-profile-trigger"
+          className="flex w-full flex-row justify-between items-center py-0 cursor-pointer rounded-md text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500"
         >
           <div className="flex gap-2 items-center w-full justify-center object-cover">
             <div className="w-[40px] h-[40px] rounded-full overflow-hidden flex items-center justify-center">
@@ -581,23 +552,43 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
               <ArrowDown />
             </div>
           )}
-        </div>
+        </button>
 
         {/* User Menu Dropdown */}
         {isUserMenuOpen && (
           <div
-            onBlur={handleUserMenuToggle}
+            role="menu"
+            aria-label={en.auth.profileSettings}
+            onKeyDown={event => {
+              if (event.key === "Escape") setIsUserMenuOpen(false);
+            }}
+            onBlur={event => {
+              // Close only when focus leaves the menu entirely: tabbing between its own items
+              // must not dismiss it (a plain onBlur toggle did, on the first Tab).
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                setIsUserMenuOpen(false);
+              }
+            }}
             className={`absolute bottom-[10px] ${showExpanded ? "left-[230px]" : "left-[100px]"} min-w-[250px] max-md:left-3 max-md:right-3 max-md:bottom-24 max-md:min-w-0 z-[999] mb-2 bg-white border border-border-light rounded-lg shadow-lg`}
           >
             <div className="py-1">
               <button
+                role="menuitem"
                 onClick={handleProfileSettingClick}
                 className="flex flex-row items-center w-full px-4 py-2 gap-2 text-left text-sm text-typography-900 hover:bg-background-secondary"
               >
                 <ManageAccounts />
                 <span>{en.auth.profileSettings}</span>
               </button>
+              <PlanMenuItem
+                onOpen={path => {
+                  setIsUserMenuOpen(false);
+                  navigate(path);
+                }}
+              />
+              <ReduceMotionMenuItem />
               <button
+                role="menuitem"
                 onClick={handleLogout}
                 className="flex flex-row items-center w-full px-4 py-2 gap-2 text-left text-sm text-typography-900 hover:bg-background-secondary transition-colors"
               >
@@ -641,9 +632,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
         data-testid="admin-sidebar"
         onMouseEnter={() => isHoverExpandEnabled && setIsHovered(true)}
         onMouseLeave={() => isHoverExpandEnabled && setIsHovered(false)}
-        className={`flex flex-col h-dvh md:h-screen bg-white border-r border-border-light transition-all duration-200 fixed inset-y-0 left-0 z-50 max-w-[85vw] ${
+        className={`flex flex-col h-dvh md:h-screen bg-white border-r border-border-light transition-all duration-200 fixed inset-y-0 left-0 z-[70] max-w-[85vw] ${
           isOverlay ? "md:absolute shadow-xl" : "md:relative"
-        } ${isOverlay ? "md:z-50" : "md:z-auto"} md:max-w-none md:translate-x-0 md:visible ${
+        } md:max-w-none md:translate-x-0 md:visible ${
           isMobileOpen ? "translate-x-0" : "-translate-x-full invisible"
         } ${showExpanded ? "w-64" : "w-24"} p-[12px] font-primary`}
       >
@@ -689,7 +680,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
       </div>
       {isMobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          className="fixed inset-0 z-[60] bg-black/50 md:hidden"
           onClick={onMobileClose}
           aria-hidden="true"
           data-testid="admin-sidebar-overlay"

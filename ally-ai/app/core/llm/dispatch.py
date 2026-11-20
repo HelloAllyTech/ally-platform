@@ -31,10 +31,13 @@ from __future__ import annotations
 
 import re
 import time
-from typing import Any, Dict, Optional, Tuple, Type, TypeVar
+from contextvars import ContextVar
+from types import SimpleNamespace
+from typing import Any, Callable, Dict, Optional, Tuple, Type, TypeVar
 
 from pydantic import BaseModel
 
+from app.core.agent_runtime import stages
 from app.core.config import settings
 from app.core.llm.capture import call_started, reply_of, usage_reported
 from app.exceptions.custom_exceptions import LLMInvocationFailedException
@@ -433,6 +436,14 @@ def _emit_usage(
     usage_reported(usage[0], usage[1])
     try:
         from app.core.llm_usage.emitter import emit_llm_usage_blocking
+        from app.core.llm_usage.scope import usage_attribution
+
+        # Who the call was spent for (CR1): the request's X-Ally-Usage keys, the
+        # agent step and this call's seq, when a scope is active. Taken here, in
+        # the caller's context, so the numbering follows the calls' order.
+        attribution = usage_attribution()
+        if attribution:
+            metadata = {**attribution, **(metadata or {})}
 
         emit_llm_usage_blocking(
             provider=provider,
@@ -658,6 +669,141 @@ async def _generate_gemini(
     )
 
 
+#: How many times the OpenAI SDK may retry one request; None = its default (2).
+#: Chunk H1: 0 inside an agent run and the crisis check, whose callers give each
+#: call exactly the time that is left. The SDK's own retries stretched a 10.7 s
+#: timeout to 33 s, past the run's cap.
+SDK_RETRIES: ContextVar[Optional[int]] = ContextVar("llm_sdk_retries", default=None)
+
+
+async def _streamed(
+    client: Any,
+    kwargs: Dict[str, Any],
+    sink: Callable[[str], None],
+    task: Optional[str],
+    started: float,
+) -> Any:
+    """One OpenAI call, streamed (chunk H1): the reply text to `sink` as it comes,
+    and a response shaped like the non-streamed one, usage included."""
+    stream = await client.chat.completions.create(
+        **kwargs, stream=True, stream_options={"include_usage": True}
+    )
+    answer = AnswerStream(sink)
+    parts: list[str] = []
+    usage = None
+    finish = None
+    first = False
+    async for chunk in stream:
+        if getattr(chunk, "usage", None):
+            usage = chunk.usage
+        for choice in getattr(chunk, "choices", None) or []:
+            delta = getattr(getattr(choice, "delta", None), "content", None)
+            if delta:
+                if not first:
+                    first = True
+                    stages.stage(
+                        "model_first_content",
+                        task=task,
+                        ttft_ms=int((time.monotonic() - started) * 1000),
+                    )
+                parts.append(delta)
+                answer.feed(delta)
+            if getattr(choice, "finish_reason", None):
+                finish = choice.finish_reason
+    message = SimpleNamespace(content="".join(parts))
+    return SimpleNamespace(
+        usage=usage, choices=[SimpleNamespace(message=message, finish_reason=finish)]
+    )
+
+
+#: Where a structured call's reply text goes as it arrives (chunk H1 Part C). Set by
+#: the agent step; when set, an OpenAI call streams, and the top-level `answer`
+#: string of a step whose `action` is "reply" is passed on piece by piece. The
+#: parsed result is the same as without it.
+STREAM_ANSWER: ContextVar[Optional[Callable[[str], None]]] = ContextVar(
+    "llm_stream_answer", default=None
+)
+
+_ACTION = re.compile(r'"action"\s*:\s*"([^"\\]*)"')
+_ANSWER = re.compile(r'"answer"\s*:\s*"')
+_ESCAPES = {
+    "n": "\n",
+    "t": "\t",
+    "r": "",
+    '"': '"',
+    "\\": "\\",
+    "/": "/",
+    "b": "",
+    "f": "",
+}
+
+
+class AnswerStream:
+    """Reads a step's JSON as it streams and passes on its `answer` string, decoded,
+    once its `action` is "reply". Keys come in the schema's order (`action` first,
+    `answer` after the tool inputs), so the decision is known before the text."""
+
+    def __init__(self, sink: Callable[[str], None]) -> None:
+        self.sink = sink
+        self.buf = ""
+        self.pos: Optional[int] = None
+        self.off = False
+        self.done = False
+
+    def feed(self, text: str) -> None:
+        if self.off or self.done:
+            return
+        self.buf += text
+        if self.pos is None:
+            action = _ACTION.search(self.buf)
+            if not action:
+                return
+            if action.group(1) != "reply":
+                self.off = True
+                return
+            answer = _ANSWER.search(self.buf, action.end())
+            if not answer:
+                return
+            self.pos = answer.end()
+        out = []
+        i, buf = self.pos, self.buf
+        while i < len(buf):
+            char = buf[i]
+            if char == "\\":
+                if i + 1 >= len(buf):
+                    break
+                nxt = buf[i + 1]
+                if nxt == "u":
+                    if i + 6 > len(buf):
+                        break
+                    try:
+                        out.append(chr(int(buf[i + 2 : i + 6], 16)))
+                    except ValueError:
+                        pass
+                    i += 6
+                    continue
+                out.append(_ESCAPES.get(nxt, nxt))
+                i += 2
+                continue
+            if char == '"':
+                self.done = True
+                i += 1
+                break
+            out.append(char)
+            i += 1
+        self.pos = i
+        if out:
+            piece = "".join(out)
+            try:
+                piece = piece.encode("utf-16", "surrogatepass").decode("utf-16")
+            except UnicodeError:
+                piece = piece.encode("utf-8", "ignore").decode("utf-8", "ignore")
+            try:
+                self.sink(piece)
+            except Exception:  # noqa: BLE001 — a listener never fails the call
+                self.off = True
+
+
 async def _generate_openai(
     *,
     schema: Type[TSchema],
@@ -688,6 +834,9 @@ async def _generate_openai(
     same `schema.model_validate` every provider goes through.
     """
     client = _get_openai_client()
+    retries = SDK_RETRIES.get()
+    if retries is not None:
+        client = client.with_options(max_retries=retries)
 
     messages: list[Dict[str, Any]] = []
     if system:
@@ -720,9 +869,52 @@ async def _generate_openai(
     if timeout:
         kwargs["timeout"] = timeout
 
-    response = await client.chat.completions.create(**kwargs)
+    # Chunk H1: one stage line per model request inside an agent run (no-op
+    # elsewhere). Not streamed, so its first token arrives with the whole response.
+    stages.stage(
+        "model_request_start",
+        task=task,
+        model=model,
+        timeout_s=timeout or 0.0,
+        effort=kwargs.get("reasoning_effort") or "-",
+    )
+    request_started = time.monotonic()
+    sink = STREAM_ANSWER.get()
+    try:
+        if sink is None:
+            response = await client.chat.completions.create(**kwargs)
+        else:
+            response = await _streamed(client, kwargs, sink, task, request_started)
+    except BaseException as error:
+        stages.stage(
+            "model_request_end",
+            task=task,
+            ok=False,
+            error=type(error).__name__,
+            dur_ms=int((time.monotonic() - request_started) * 1000),
+        )
+        raise
 
     usage = getattr(response, "usage", None)
+    stages.stage(
+        "model_request_end",
+        task=task,
+        ok=True,
+        dur_ms=int((time.monotonic() - request_started) * 1000),
+        in_tokens=int(getattr(usage, "prompt_tokens", 0) or 0) if usage else -1,
+        out_tokens=int(getattr(usage, "completion_tokens", 0) or 0) if usage else -1,
+        reasoning_tokens=(
+            _count(
+                getattr(
+                    getattr(usage, "completion_tokens_details", None),
+                    "reasoning_tokens",
+                    None,
+                )
+            )
+            if usage
+            else -1
+        ),
+    )
     if usage is not None:
         prompt_tokens = int(getattr(usage, "prompt_tokens", 0) or 0)
         # Already includes reasoning tokens — unlike Gemini, OpenAI counts them

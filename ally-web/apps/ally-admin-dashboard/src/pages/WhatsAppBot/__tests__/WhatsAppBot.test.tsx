@@ -112,6 +112,7 @@ let mockArchived: { chatbots: Chatbot[] };
 
 vi.mock("@api", () => ({
   useGetChatbotsQuery: () => ({ data: mockList, isLoading: false, isError: false }),
+  useGetMyPlanQuery: () => ({ data: undefined }),
   useGetChatbotQuery: () => ({ data: mockBot, isLoading: false, isError: false }),
   useArchiveChatbotMutation: () => [mockArchive, { isLoading: false }],
   useRestoreChatbotMutation: () => [mockRestore, { isLoading: false }],
@@ -167,6 +168,13 @@ vi.mock("../ConnectorsTab", () => ({
 }));
 vi.mock("../CorpusTab", () => ({ CorpusTab: stub("library") }));
 vi.mock("../TemplatesTab", () => ({ TemplatesTab: stub("replies") }));
+vi.mock("../../Onboarding/OnboardingStart", () => ({
+  OnboardingStart: ({ onLeave }: { onLeave?: () => void }) => (
+    <button type="button" onClick={onLeave}>
+      Close
+    </button>
+  ),
+}));
 vi.mock("../AgentTab", () => ({ AgentTab: withRoles("agent") }));
 vi.mock("../ChatbotSettingsTab", () => ({ ChatbotSettingsTab: withRoles("settings") }));
 
@@ -300,9 +308,51 @@ describe("Chatbots home", () => {
     expect(screen.getByText("Nothing archived")).toBeTruthy();
   });
 
+  describe("first run, with no assistants", () => {
+    beforeEach(() => {
+      mockList = { chatbots: [], canCreate: true };
+      sessionStorage.clear();
+    });
+
+    it("opens the first step of building an assistant full screen", async () => {
+      renderAt("/chatbots");
+      expect(await screen.findByRole("button", { name: "Close" })).toBeTruthy();
+      expect(screen.getByTestId("first-assistant-overlay").getAttribute("aria-modal")).toBe("true");
+    });
+
+    it("closes back to the empty page, and stays closed", async () => {
+      const { unmount } = renderAt("/chatbots");
+      fireEvent.click(await screen.findByRole("button", { name: "Close" }));
+      expect(screen.queryByTestId("first-assistant-overlay")).toBeNull();
+      expect(screen.getByText("No chatbots yet")).toBeTruthy();
+      unmount();
+      renderAt("/chatbots");
+      expect(screen.queryByTestId("first-assistant-overlay")).toBeNull();
+    });
+
+    it("closes on Escape", async () => {
+      renderAt("/chatbots");
+      await screen.findByRole("button", { name: "Close" });
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(screen.queryByTestId("first-assistant-overlay")).toBeNull();
+    });
+
+    it("is not shown on other tabs, or to someone who cannot create assistants", () => {
+      renderAt("/chatbots?tab=archived");
+      expect(screen.queryByTestId("first-assistant-overlay")).toBeNull();
+    });
+
+    it("is not shown once an assistant exists", () => {
+      mockList = { chatbots: [bot()], canCreate: true };
+      renderAt("/chatbots");
+      expect(screen.queryByTestId("first-assistant-overlay")).toBeNull();
+    });
+  });
+
   it("tells a member with no bots who to ask", () => {
     mockList = { chatbots: [], canCreate: false };
     renderAt("/chatbots");
+    expect(screen.queryByTestId("first-assistant-overlay")).toBeNull();
     expect(screen.getByText("You haven't been added to a chatbot yet")).toBeTruthy();
   });
 });

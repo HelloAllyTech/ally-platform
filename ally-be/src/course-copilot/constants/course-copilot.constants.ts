@@ -63,11 +63,71 @@ export const COURSE_COPILOT_LIMITS = {
   annotationUnits: 60,
   annotationLabels: 6,
   journalPrompts: 3,
+  /** Scenes in a generated scenario quiz; the track allows 100, the manual aims for 5-12. */
+  scenarioQuizScenes: 20,
+  /** Items in a generated bucket sort; the track allows 30, the manual aims for 8-12. */
+  bucketSortItems: 20,
   reviewFindings: 10,
 } as const;
 
 /** Durations the interview offers, minutes. Anything else is still accepted. */
-export const COURSE_COPILOT_DURATION_OPTIONS = [30, 60, 120, 240];
+// ── Reference material ───────────────────────────────────────────────────────
+
+/**
+ * Limits on the files a trainer attaches to one session. A partner manual is rarely more than a
+ * few hundred pages; the character cap keeps one session's passages small enough to rank in
+ * memory on every writer call.
+ */
+export const COURSE_COPILOT_SOURCE_LIMITS = {
+  maxFiles: 10,
+  maxBytes: 50 * 1024 * 1024,
+  maxCharsPerSession: 2_000_000,
+  /** The interviewer's overview of every file, in its system context. */
+  overviewChars: 12_000,
+  /** Passages handed to one writer or planner call. */
+  referenceChars: 9_000,
+};
+
+/**
+ * How reference material may be used (decided 2026-11-19): take the CONTENT — facts, steps,
+ * examples, structure — and write it in your own words; key terms, the partner's own tool and
+ * programme names, and helpline numbers stay exactly as written.
+ */
+export const COURSE_COPILOT_SOURCE_RULES = {
+  interviewer:
+    'Use these files before asking the trainer anything: draft the brief from them (audience, ' +
+    "outcomes, the partner's terms, existing exercises) and ask only what they do not answer. " +
+    'Call search_sources for detail. The course should follow their content — facts, steps, ' +
+    "examples, structure — written in Ally's own words; key terms, the partner's own tool and " +
+    'programme names, and helpline numbers stay exactly as written. When the files and the ' +
+    'trainer disagree, the trainer wins.',
+  writer:
+    'REFERENCE MATERIAL — passages from files the trainer attached for this course. Base the ' +
+    'content on them: follow their facts, steps, examples and order, and do not contradict them. ' +
+    'Write in your own words, in the format asked for above; do not copy sentences. Keep key ' +
+    "terms, the partner's own tool and programme names, and helpline numbers exactly as written. " +
+    'If a passage is off-topic for this item, ignore it.',
+};
+
+/**
+ * Course lengths the interview offers. (Course Pilot's "under 30 minutes" is the TRAINER's time
+ * to build a course, not the course's length — its own example is a 90-minute course.)
+ */
+export const COURSE_COPILOT_DURATION_OPTIONS = [30, 60, 90, 120];
+/** Used for an hour-long course when the brief names no duration. */
+export const COURSE_COPILOT_DEFAULT_DURATION_MINUTES = 60;
+
+/**
+ * How an interview question may look (Course Pilot: choice-only steps). Checked on every
+ * question before the trainer sees it; a question that breaks one is sent back once.
+ */
+export const COURSE_COPILOT_QUESTION_LIMITS = {
+  minOptions: 2,
+  maxOptions: 5,
+  promptChars: 160,
+  /** The reply shown above a question: one short sentence, not an account of the work. */
+  replyChars: 220,
+};
 
 // ── Cost ────────────────────────────────────────────────────────────────────
 
@@ -92,6 +152,8 @@ export const COURSE_COPILOT_JOB_COST_ESTIMATE_USD: Record<
   [CourseCopilotJobKind.QUIZ]: 0.08,
   [CourseCopilotJobKind.JOURNAL]: 0.01,
   [CourseCopilotJobKind.ANNOTATED_ARTIFACT]: 0.1,
+  [CourseCopilotJobKind.BRANCHING_SCENARIO]: 0.1,
+  [CourseCopilotJobKind.BUCKET_SORT]: 0.05,
   [CourseCopilotJobKind.GAME]: 0,
   [CourseCopilotJobKind.VIDEO]: 0,
   [CourseCopilotJobKind.ROLEPLAY_NEW]: 0.6,
@@ -113,6 +175,8 @@ export const COURSE_COPILOT_DEFAULT_ITEM_MINUTES: Record<string, number> = {
   QUIZ: 5,
   JOURNAL: 4,
   ANNOTATED_ARTIFACT: 8,
+  BRANCHING_SCENARIO: 8,
+  BUCKET_SORT: 4,
   ROLEPLAY: 12,
   CASE: 25,
   GAME: 3,
@@ -129,10 +193,13 @@ export const COURSE_COPILOT_PROMPTS = {
   QUIZ_WRITER: 'course_copilot_quiz_writer',
   JOURNAL_WRITER: 'course_copilot_journal_writer',
   ANNOTATION_WRITER: 'course_copilot_annotation_writer',
+  SCENARIO_QUIZ_WRITER: 'course_copilot_scenario_quiz_writer',
+  BUCKET_SORT_WRITER: 'course_copilot_bucket_sort_writer',
   COURSE_META: 'course_copilot_course_meta',
   COURSE_REVIEWER: 'course_copilot_course_reviewer',
   HISTORY_SUMMARY: 'course_copilot_history_summary',
   ROLEPLAY_BRIEF: 'course_copilot_roleplay_brief',
+  ROLEPLAY_FIT_CHECK: 'course_copilot_roleplay_fit_check',
   IMAGE_PROMPT: 'course_copilot_image_prompt',
   LANDING_PAGE_WRITER: 'course_copilot_landing_page_writer',
   ALLY_NOTES_WRITER: 'course_copilot_ally_notes_writer',
@@ -146,10 +213,13 @@ export const COURSE_COPILOT_AI_TASKS = {
   QUIZ: 'course-copilot-quiz',
   JOURNAL: 'course-copilot-journal',
   ANNOTATION: 'course-copilot-annotation',
+  SCENARIO_QUIZ: 'course-copilot-scenario-quiz',
+  BUCKET_SORT: 'course-copilot-bucket-sort',
   META: 'course-copilot-meta',
   REVIEW: 'course-copilot-review',
   SUMMARY: 'course-copilot-summary',
   ROLEPLAY_BRIEF: 'course-copilot-roleplay-brief',
+  ROLEPLAY_FIT_CHECK: 'course-copilot-roleplay-fit-check',
   IMAGE_PROMPT: 'course-copilot-image-prompt',
   IMAGE: 'course-copilot-image',
   LANDING_PAGE: 'course-copilot-landing-page',

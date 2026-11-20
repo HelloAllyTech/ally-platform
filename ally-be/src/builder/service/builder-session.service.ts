@@ -31,10 +31,15 @@ import {
   BUILDER_ACTIVE_STATUSES,
   BUILDER_ARCHIVABLE_STATUSES,
   BuilderPrdVersionAuthor,
+  BuilderSessionKind,
   BuilderSessionStatus,
 } from '../enum/builder.enum';
 import { BuilderPrdReadiness } from '../type/builder-prd.type';
-import { builderRequesters } from '../util/builder-requesters.registry';
+import { planGateRegistry } from 'src/product-planning/service/plan-gate.registry';
+import {
+  builderRequesters,
+  PM_AGENT_REQUESTER,
+} from '../util/builder-requesters.registry';
 
 export type BuilderSessionListItem = BuilderSession & {
   createdByName: string | null;
@@ -170,6 +175,10 @@ export class BuilderSessionService {
         handoffContext: this.boundHandoff(params.handoffContext),
         requestedBy: params.requestedBy ?? null,
         requestRef: params.requestRef ?? null,
+        // The PM Agent's builds merge and release on their own (docs/pm-agent.md); every
+        // other session keeps the global switches.
+        autonomyOverride:
+          params.requestedBy === PM_AGENT_REQUESTER ? 'auto' : null,
         createdBy: userId,
         updatedBy: userId,
       }),
@@ -230,6 +239,37 @@ export class BuilderSessionService {
       { handoffContext: text },
     );
     return !!result.affected;
+  }
+
+  /**
+   * Put one block in front of a session's hand-off, once. The one exception to "frozen once
+   * written": Roadmap's Start planning dates the idea as it stands then, before the planning
+   * interview's first turn, so no turn has cached the older prefix yet. `marker` is text the
+   * block contains; a hand-off already holding it is left alone, so a second press, or two
+   * racing, write it once. Bounded to BUILDER_HANDOFF_CONTEXT_MAX like every hand-off, from
+   * the end, so the new block survives. Resolves true when it wrote.
+   */
+  async prependHandoffBlock(
+    sessionId: string,
+    block: string,
+    marker: string,
+  ): Promise<boolean> {
+    const text = (block ?? '').trim();
+    if (!text || !marker || !text.includes(marker)) return false;
+    const rows: unknown = await this.sessionRepository.query(
+      `UPDATE "builder_sessions"
+          SET "handoffContext" = left($2 || COALESCE(E'\\n\\n' || "handoffContext", ''), $4)
+        WHERE id = $1
+          AND ("handoffContext" IS NULL OR strpos("handoffContext", $3) = 0)
+        RETURNING id`,
+      [sessionId, text, marker, BUILDER_HANDOFF_CONTEXT_MAX],
+    );
+    const list = Array.isArray(rows)
+      ? Array.isArray(rows[0])
+        ? rows[0]
+        : rows
+      : [];
+    return list.length > 0;
   }
 
   /**
@@ -557,6 +597,15 @@ export class BuilderSessionService {
       // message append on (sessionId, seq).
       await this.sessionRepository.update({ id: session.id }, { status: next });
       session.status = next;
+      // A plan's PRD reading ready for the first time runs the specialist
+      // reviewers it needs (audit 2026-11-19, rec 2). In the background: the
+      // turn or save that tipped it is not held up by them.
+      if (
+        next === BuilderSessionStatus.PRD_READY &&
+        session.kind === BuilderSessionKind.PLAN
+      ) {
+        planGateRegistry.prdReadied(session.id);
+      }
     }
     return next;
   }

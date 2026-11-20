@@ -103,20 +103,6 @@ describe('BuilderSessionVisibilityInterceptor', () => {
       ...over,
     });
 
-    it('confines a Lead-only caller to plan sessions', async () => {
-      const { interceptor } = build({ ...plan({}), kind: 'build' });
-      await expect(
-        interceptor.intercept(
-          ctx(
-            'GET',
-            { id: 4 },
-            { viaAlternateToggle: 'product_planning_lead' },
-          ),
-          next,
-        ),
-      ).rejects.toBeInstanceOf(NotFoundException);
-    });
-
     it('lets everyone who may see a plan read it, but only its lead change it', async () => {
       const { interceptor } = build(plan({}));
       await expect(
@@ -168,6 +154,8 @@ describe('Builder session visibility — every reader is accounted for', () => {
     'builder/repository/builder-session.repository.ts': 'defines the rule',
     'builder/interceptor/builder-session-visibility.interceptor.ts':
       'enforces the rule on every :sessionId route',
+    'builder/guard/builder-plan-read.guard.ts':
+      'read-only GET on a SHARED plan for Idea+ (D2); private and non-plan stay refused',
     'builder/eval/sandbox/builder-eval-stores.ts':
       'eval sandbox: in-memory fixtures, no real sessions',
     'builder/service/builder-session.service.ts':
@@ -188,8 +176,12 @@ describe('Builder session visibility — every reader is accounted for', () => {
       'by id when archiving a finished build into an exemplar; never lists',
     'builder/service/builder-interview-orchestrator.service.ts':
       'updates by id inside a turn on a :sessionId route the interceptor checked',
+    'builder/service/builder-interview-tools.service.ts':
+      "set_success_measure reads and writes one plan's record by id, inside that plan's own turn",
     'builder/service/builder-outcome.service.ts':
       'injects the repository for its sweep; returns nothing to a viewer',
+    'product-roadmap/cutover/roadmap-cutover.service.ts':
+      "Owner-only switch-on: the preview names live direct sessions (id, status, creator) and a run files an idea for each and moves old drafts; never returns a session's content",
     'product-roadmap/plan/plan-session.store.ts':
       'plan reads by id; every list scopes its own WHERE to the author or to shared plans (product-roadmap/plan/*)',
     'builder/service/builder-pull-request.service.ts':

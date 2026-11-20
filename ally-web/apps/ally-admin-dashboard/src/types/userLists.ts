@@ -79,6 +79,8 @@ export interface ListSettings {
   title_field?: string;
   default_sort?: string;
   person_field?: string;
+  /** The owner's own line: how the assistant should use this list (Q3-fast Part 2b). */
+  instruction?: string;
 }
 
 export interface UserList {

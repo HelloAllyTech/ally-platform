@@ -223,6 +223,9 @@ export interface LearnBehaviorInstructionData {
 
 export interface LearnBehaviorInstruction {
   behaviorInstructionId: string;
+  /** Points the agent applied for this detection (its ScoreKeeper delta). */
+  score?: number;
+  category?: string;
 }
 
 export interface LearnEventData {

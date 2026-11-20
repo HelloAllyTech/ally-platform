@@ -28,6 +28,12 @@ export const USER_LISTS = {
     handoverBody:
       "When someone asks for a person, your assistant tells them your team has been asked, and lets you know.",
     handoverChange: "Change in Share",
+    // A1: whether the assistant may hand a chat to a person moved from Ally to the owners.
+    handoverAbility: "Can your assistant hand a chat to your team?",
+    handoverAbilityHint:
+      "On: when someone asks for a person, it hands the chat to your team. Off: it keeps answering itself.",
+    handoverAbilityOwners: "Only this assistant's owners can change this.",
+    handoverAbilityFailed: "That didn't save. Try again.",
   },
 
   listMenu: {
@@ -277,6 +283,12 @@ export const USER_LISTS = {
     firstNote:
       "Your assistant will book only after the person confirms. Check new entries for the first few days.",
     gotIt: "Got it",
+    // Q3-fast Part 2b: the owner's own line for the list, under its playbook.
+    instructionLabel: "How should your assistant use this list?",
+    instructionHint:
+      'Optional. For example: "Always mention the size chart". It can\'t change your safety rules.',
+    instructionSave: "Save",
+    instructionSaved: "Saved",
   },
 
   setup: {
@@ -308,7 +320,7 @@ export const USER_LISTS = {
     example: "Example",
     addChoice: "Add",
     choicePlaceholder: "Add a {detail}",
-    needOne: "Keep at least one.",
+    needOne: "Add at least one of your own.",
     timesTitle: "Add the times people can book",
     timesBody: "Pick the days and hours. You can change or remove any of them later.",
     assistantTitle: "What can your assistant do with {list}?",
@@ -376,7 +388,8 @@ export const USER_LISTS = {
     limitLabel: "What it can't do yet",
     books: "It books into your {list} list. It can't take payments yet.",
     /** The purposes' honest limits, as onboarding's cards have them (deck §24). */
-    enquiries: "It can't book or take payments yet. It sends you each new enquiry by email.",
+    enquiries:
+      "It can't take payments yet. It sends you each new enquiry by email, and books when you add an Appointments list.",
     training: "It doesn't keep track of each person's progress yet.",
   },
 };

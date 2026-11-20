@@ -64,6 +64,36 @@ class TestExtract:
 
 class TestLenient:
     @pytest.mark.asyncio
+    async def test_a_fact_about_the_site_failing_is_never_stored(self):
+        # B16 (17 Nov): "Website returned '403 Forbidden'" shown under About.
+        errors = [
+            "Website returned '403 Forbidden' when accessed.",
+            "Access denied to this page.",
+            "The page shows a captcha security check.",
+            "404 - Page not found.",
+            "Please enable JavaScript and cookies to continue.",
+            "Email customer care at [email protected] for returns.",
+        ]
+        kept = [
+            "Open 24 hours; call 040 2345 6789.",
+            "Room 403 is the X-ray department.",
+        ]
+        fake = FakeLLM(
+            ExtractOut=[
+                {
+                    "facts": [
+                        {"section": "about", "text": text, "page": 1}
+                        for text in errors + kept
+                    ]
+                }
+            ]
+        )
+        with patch(f"{TASKS}.generate_structured", fake):
+            res = await tasks.extract(ExtractRequest(pages=PAGES, known=[]))
+        assert [f.text for f in res.facts] == kept
+        assert res.dropped == len(errors)
+
+    @pytest.mark.asyncio
     async def test_an_unknown_section_drops_one_fact_not_the_batch(self):
         fake = FakeLLM(
             ExtractOut=[

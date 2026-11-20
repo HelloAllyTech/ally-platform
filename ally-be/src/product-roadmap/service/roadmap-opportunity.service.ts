@@ -7,7 +7,7 @@ import {
   UnprocessableEntityException,
   Optional,
 } from '@nestjs/common';
-import { In, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { LoggerService } from 'src/logger/logger.service';
 import { User } from 'src/user/entity/user.entity';
@@ -37,9 +37,11 @@ import {
   RoadmapReferenceImage,
 } from '../entity/roadmap-opportunity.entity';
 import {
+  PM_AGENT_AUTHOR_NAME,
   RoadmapOpportunitySource,
   RoadmapOpportunityStage,
   RoadmapOpportunityType,
+  RoadmapReviewState,
 } from '../enum/roadmap-opportunity.enum';
 import {
   RoadmapOpportunityRepository,
@@ -47,8 +49,11 @@ import {
 } from '../repository/roadmap-opportunity.repository';
 import { RoadmapAllocationRepository } from '../repository/roadmap-allocation.repository';
 import {
+  ROADMAP_LIMITS,
   BUG_REPORT_DEFAULT_PRODUCT_GOAL,
   ROADMAP_FILEABLE_EFFORTS,
+  ROADMAP_QUALITY_PASS_SCORE,
+  ROADMAP_SINGLE_IDEA_EFFORTS,
   ROADMAP_OWNER_EMAILS,
   ROADMAP_READINESS_REQUIRE_TOKEN,
   ROADMAP_REFERENCE_IMAGE_MAX_SIZE_BYTES,
@@ -78,6 +83,8 @@ import {
   normaliseFilingInterview,
   normaliseOpportunityBrief,
 } from '../util/roadmap-brief.util';
+import { RoadmapAiService } from './roadmap-ai.service';
+import { joinDescription } from '../item/roadmap-item-query.util';
 import { RoadmapGoalImpactService } from './roadmap-goal-impact.service';
 import { RoadmapStrategyGoalService } from './roadmap-strategy-goal.service';
 import { RoadmapVectorService } from './roadmap-vector.service';
@@ -111,11 +118,31 @@ export class RoadmapOpportunityService {
     private readonly readinessToken: RoadmapReadinessTokenService,
     private readonly repoClassifier: BugHunterRepoClassifierService,
     private readonly missClassifier: BugHunterMissClassifierService,
-    // Bug Hunter v2 (chunk 10): a filed bug also enters v2's queue. Optional, so
-    // the tests that build this service by hand and any module without v2 work as
-    // before.
+    private readonly roadmapAi: RoadmapAiService,
+    // Bug Hunter v2 (chunk 10): a filed bug also enters v2's queue. Optional and
+    // last, so the tests that build this service by hand and any module without v2
+    // work as before.
     @Optional() private readonly bugHunterV2?: BugHunterBoardService,
   ) {}
+
+  /** `title`, a blank line, then the summary: how a titled idea is stored in `description`. */
+  private async storedText(
+    dto: Omit<CreateOpportunityDto, 'title'> & { title?: string },
+  ): Promise<string> {
+    const body = dto.description.trim();
+    if (dto.type === RoadmapOpportunityType.BUG) return body;
+    const title =
+      (dto.title ?? '').replace(/\s+/g, ' ').trim() ||
+      (await this.roadmapAi.suggestTitle(body));
+    if (!title) throw new BadRequestException('An idea needs a title.');
+    const text = joinDescription(title, body);
+    if (text.length > ROADMAP_LIMITS.STORED_TEXT_MAX) {
+      throw new BadRequestException(
+        `The title and summary together can be at most ${ROADMAP_LIMITS.STORED_TEXT_MAX} characters.`,
+      );
+    }
+    return text;
+  }
 
   async list(
     userId: number,
@@ -171,6 +198,9 @@ export class RoadmapOpportunityService {
     if (!existing) throw new NotFoundException(`Opportunity ${id} not found`);
     await this.opportunityRepository.update(id, {
       directorStarred: starred,
+      // Who gave the star (Roadmap v2, D16). Written beside the flag so the attribution the
+      // P0 migration backfilled stays true until the Owner star replaces this route.
+      starredByUserId: starred ? userId : null,
       updatedBy: userId,
     });
     this.strategyGoalService.invalidate(userId);
@@ -224,7 +254,9 @@ export class RoadmapOpportunityService {
    */
   async create(
     userId: number,
-    dto: CreateOpportunityDto,
+    // `title` is required over HTTP (CreateOpportunityDto) but optional here: a caller filing on
+    // someone's behalf may leave it out and have one written — see storedText.
+    dto: Omit<CreateOpportunityDto, 'title'> & { title?: string },
     extra?: {
       source?: RoadmapOpportunitySource;
       tenantId?: string | null;
@@ -249,6 +281,12 @@ export class RoadmapOpportunityService {
        * property of the IDEA-filing path, not of this table.
        */
       enforceReadiness?: boolean;
+      /**
+       * Roadmap v2's Submit only: the code its draft was given when New idea created it
+       * (session-first, §4.2), so the idea keeps one code for life. Allocated from the same
+       * sequence as the column default. Everyone else leaves it out and the default fires.
+       */
+      code?: string;
     },
   ): Promise<OpportunityResponseDto> {
     // Assigning at filing time is a MANAGE action on a route gated at the VOTE tier, so it is
@@ -289,9 +327,15 @@ export class RoadmapOpportunityService {
         ? normaliseFilingInterview(dto.interviewTranscript)
         : null;
 
+    // Every new IDEA has a title. The form and the draft's Submit send one; a caller that files
+    // on someone's behalf (the PM Agent) sends none, so one is written here rather than refused.
+    // A bug keeps its text as one block, as before: a bug report is a guided prompt, not a
+    // titled idea.
+    const storedText = await this.storedText(dto);
+
     const saved = await this.opportunityRepository.save(
       this.opportunityRepository.create({
-        description: dto.description.trim(),
+        description: storedText,
         type: dto.type,
         productGoal: dto.productGoal,
         // `?? null` so an omitted effort files as unsized rather than undefined — the column
@@ -307,6 +351,7 @@ export class RoadmapOpportunityService {
         referenceImages,
         brief,
         interviewTranscript,
+        ...(extra?.code ? { code: extra.code } : {}),
         createdBy: userId,
         updatedBy: userId,
         source: extra?.source ?? RoadmapOpportunitySource.STAFF,
@@ -422,7 +467,10 @@ export class RoadmapOpportunityService {
    * hatch had nothing left to open, and a gate with no client asking to bypass it should not
    * keep the bypass.
    */
-  private assertReady(userId: number, dto: CreateOpportunityDto): void {
+  private assertReady(
+    userId: number,
+    dto: Omit<CreateOpportunityDto, 'title'> & { title?: string },
+  ): void {
     if (!dto.readinessToken) {
       if (ROADMAP_READINESS_REQUIRE_TOKEN) {
         throw new BadRequestException(
@@ -453,11 +501,99 @@ export class RoadmapOpportunityService {
       (ROADMAP_FILEABLE_EFFORTS as readonly string[]).includes(dto.effort);
     if (!effortFileable) failed.push('size');
 
+    // A token that carries a quality score came from the interview, which holds its ideas to
+    // the quality bar: the score must reach the pass mark and the size must be one an idea can
+    // be filed at on its own (XL and XXL are split first). Applied here, to the signed score and
+    // the effort being filed, so it holds whatever a client sends. System filings (the PM Agent)
+    // carry no score and keep the wider rule above.
+    if (typeof verdict.qualityScore === 'number') {
+      if (verdict.qualityScore < ROADMAP_QUALITY_PASS_SCORE) {
+        failed.push('quality');
+      }
+      if (
+        dto.effort != null &&
+        !(ROADMAP_SINGLE_IDEA_EFFORTS as readonly string[]).includes(dto.effort)
+      ) {
+        failed.push('split_needed');
+      }
+    }
+
     if (failed.length > 0) {
       throw new BadRequestException(
         `This opportunity is not ready to file yet (${failed.join(', ')}). ` +
           `Keep the interview going until every item is met.`,
       );
+    }
+  }
+
+  /**
+   * The Roadmap cutover's one filing door (Roadmap v2 P6, plans/roadmap-builder-merge §6): an
+   * idea for an in-flight direct Builder session that never had one, so every live build sits
+   * on the Roadmap from switch-on day.
+   *
+   * A labelled path of its own rather than a flag on `create()`:
+   * - it runs inside the cutover's transaction (`manager`), so the idea, its link to the
+   *   session and the flag commit or fail together;
+   * - the readiness gate does not apply, because the work is already under way and the idea
+   *   records it rather than proposing it — the row says so with
+   *   `source = 'migrated_builder_session'`;
+   * - it is already accepted (`reviewState`), Prioritised (as "Open in Builder Agent" makes a
+   *   linked idea) and linked by `builderSessionId`, the same column every other link uses.
+   *   `UQ_roadmap_opps_builder_session` is the backstop against a second idea for one session.
+   *
+   * The vector index and goal-impact assessment run after the commit, best-effort, through
+   * `afterMigratedFiling` — as `create()` runs them after its own save.
+   */
+  async fileMigratedBuilderSession(
+    manager: EntityManager,
+    input: {
+      sessionId: string;
+      description: string;
+      productGoal: string;
+      /** The session's creator: the idea's author, and its lead. */
+      creatorUserId: number;
+      /** The Owner running the cutover: the reviewer of record. */
+      actorUserId: number;
+    },
+  ): Promise<{ id: string; code: string }> {
+    const repository = manager.getRepository(RoadmapOpportunity);
+    const saved = await repository.save(
+      repository.create({
+        description: input.description,
+        type: RoadmapOpportunityType.IDEA,
+        stage: RoadmapOpportunityStage.PRIORITISED,
+        productGoal: input.productGoal,
+        effort: null,
+        ownerUserId: null,
+        referenceImages: [],
+        builderSessionId: input.sessionId,
+        reviewState: RoadmapReviewState.ACCEPTED,
+        reviewedBy: input.actorUserId,
+        reviewedAt: new Date(),
+        createdBy: input.creatorUserId,
+        updatedBy: input.actorUserId,
+        source: RoadmapOpportunitySource.MIGRATED_BUILDER_SESSION,
+        tenantId: null,
+        reporterContext: null,
+      }),
+    );
+    // `code` comes from the column default; read it back inside the same transaction.
+    const [row] = await manager.query(
+      `SELECT code FROM "roadmap_opportunities" WHERE id = $1`,
+      [saved.id],
+    );
+    return { id: saved.id, code: String(row?.code ?? saved.code ?? '') };
+  }
+
+  /**
+   * What `create()` does after its save, for ideas the cutover filed: index each one for the
+   * duplicate check and score it against the strategy. Both are best-effort and swallow their
+   * own failures, so a model outage never undoes a committed cutover.
+   */
+  async afterMigratedFiling(ids: string[], actorUserId: number): Promise<void> {
+    for (const id of ids) {
+      await this.vectorService.indexQuietly(id);
+      await this.goalImpactService.assessQuietly(id, actorUserId);
     }
   }
 
@@ -600,8 +736,10 @@ export class RoadmapOpportunityService {
     }
 
     if (dto.stage !== undefined) {
-      patch.stage = dto.stage;
-      patch.releasedAt = this.resolveReleasedAt(existing, dto.stage);
+      // A retired stage value never reaches here: the DTO's @IsEnum rejects it with a 400.
+      const nextStage = dto.stage;
+      patch.stage = nextStage;
+      patch.releasedAt = this.resolveReleasedAt(existing, nextStage);
     }
 
     if (
@@ -798,7 +936,12 @@ export class RoadmapOpportunityService {
       source: row.source,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
-      creator: users.get(row.createdBy) ?? this.unknownUser(row.createdBy),
+      // A PM Agent filing is authored by the agent; `createdBy` (the admin who accepted the
+      // card) stays on the row for audit but is not who the board says posted it.
+      creator:
+        row.source === RoadmapOpportunitySource.PM_AGENT
+          ? { id: row.createdBy, email: '', name: PM_AGENT_AUTHOR_NAME }
+          : (users.get(row.createdBy) ?? this.unknownUser(row.createdBy)),
     }));
   }
 
@@ -876,7 +1019,7 @@ export class RoadmapOpportunityService {
    * The shared assets bucket, the same one blog headers and badge icons live in.
    *
    * Resolved per call rather than in the constructor: reading configuration at construction time
-   * is module-load-time work, and this module is imported by AnalyticsSuggestions — a missing
+   * is module-load-time work, and this module is imported by other feature modules — a missing
    * env var would take down suites that never touch an image. Failing here fails only the
    * request that actually needed a bucket.
    */

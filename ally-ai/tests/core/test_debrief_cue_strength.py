@@ -228,3 +228,88 @@ class TestDropPossibleImportantMoment:
             [],
         )
         assert dropped is None
+
+
+# --- word_list_raises (roleplay risk cue contract) ---------------------------
+
+
+def test_word_list_off_means_the_readers_own_judgement_decides():
+    from app.core.debrief.cue_strength import cue_strength
+
+    # Default: today's behaviour exactly.
+    assert cue_strength({"category": "hopelessness", "quote": "I want to die"}) == (
+        "clear"
+    )
+    harmful = {"category": "suicide_or_self_harm", "strength": "possible"}
+    assert cue_strength(harmful) == "clear"
+    off = {"word_list_raises": False}
+    # No word list, no always-clear categories: the reader's strength.
+    assert (
+        cue_strength({"category": "hopelessness", "quote": "I want to die"}, **off)
+        == "clear"
+    )  # the reader gave no strength: clear, as before
+    assert (
+        cue_strength(
+            {
+                "category": "hopelessness",
+                "quote": "I want to die",
+                "strength": "possible",
+            },
+            **off,
+        )
+        == "possible"
+    )
+    assert (
+        cue_strength(
+            {"category": "suicide_or_self_harm", "strength": "possible"}, **off
+        )
+        == "possible"
+    )
+    assert cue_strength({"category": "harm_to_others", "strength": "clear"}, **off) == (
+        "clear"
+    )
+    assert cue_strength({"category": "something_new"}, **off) == "clear"
+
+
+def test_with_strength_threads_the_flag():
+    from app.core.debrief.cue_strength import with_strength
+
+    cues = [
+        {
+            "category": "suicide_or_self_harm",
+            "quote": "I want to die",
+            "strength": "possible",
+        }
+    ]
+    assert with_strength(cues)[0]["strength"] == "clear"
+    assert with_strength(cues, False)[0]["strength"] == "possible"
+
+
+def test_turn_is_clear_without_the_word_list_still_follows_other_signals():
+    from app.core.debrief.cue_strength import split_missed_cues, turn_is_clear
+
+    quote = "I want to die"
+    assert turn_is_clear(2, quote, [], [])
+    assert not turn_is_clear(2, quote, [], [], word_list_raises=False)
+    # The Evaluator and the reader still decide.
+    assert turn_is_clear(2, quote, [{"turn_index": 2}], [], word_list_raises=False)
+    assert turn_is_clear(
+        2, quote, [], [{"turn_index": 2, "strength": "clear"}], word_list_raises=False
+    )
+    cue = {"turn_index": 2, "quote": quote, "clear": False}
+    clear, possible = split_missed_cues([cue], [], word_list_raises=False)
+    assert not clear and possible == [cue]
+    clear, possible = split_missed_cues([cue], [])
+    assert clear == [cue]
+
+
+def test_drop_possible_important_moment_respects_the_flag():
+    from app.core.debrief.cue_strength import drop_possible_important_moment
+
+    cards = {"important_moment": {"turn_index": 2, "quote": "I want to die"}}
+    kept, dropped = drop_possible_important_moment(cards, [], [])
+    assert kept is cards and dropped is None
+    kept, dropped = drop_possible_important_moment(
+        cards, [], [], word_list_raises=False
+    )
+    assert kept["important_moment"] is None and dropped["turn_index"] == 2

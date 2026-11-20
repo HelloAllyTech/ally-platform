@@ -106,18 +106,23 @@ def progress_summary(res: Dict[str, Any]) -> str:
     )
 
 
-def evaluator_summary(res: Dict[str, Any]) -> str:
+def evaluator_summary(
+    res: Dict[str, Any], hard_fails: Optional[List[Dict[str, Any]]] = None
+) -> str:
+    """The Evaluator's one-line result. ``hard_fails`` is what the run counts
+    (see ``cue_strength.effective_hard_fails``); without it, the raw list."""
     ev = res["evaluation"]
+    fails = ev["hard_fails"] if hard_fails is None else hard_fails
     overall = compute_overall(
         {d["dimension"]: d["score"] for d in ev["dimensions"]},
-        len(ev["hard_fails"]),
+        len(fails),
     )
     return "; ".join(
         [
             f"{fmt1(overall)} overall" if overall is not None else "no overall score",
             (
-                "hard fails: " + ", ".join(h["code"] for h in ev["hard_fails"])
-                if ev["hard_fails"]
+                "hard fails: " + ", ".join(h["code"] for h in fails)
+                if fails
                 else "no hard fail"
             ),
             n(len(ev.get("fixes") or []), "fix note"),

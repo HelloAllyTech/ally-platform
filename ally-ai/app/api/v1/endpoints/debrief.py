@@ -29,8 +29,12 @@ from app.core.debrief_graph.context import DebriefRunContext
 from app.core.debrief_graph.gateway import HttpGateway
 from app.core.debrief_graph.graph import get_debrief_graph
 from app.core.debrief_graph.runner import run_debrief
-from app.core.debrief_graph.schemas import DebriefRunRequest, DebriefRunResponse
-from app.core.debrief_graph.step_functions import InProcessSteps
+from app.core.debrief_graph.schemas import (
+    CONTRACT_VERSION,
+    DebriefRunRequest,
+    DebriefRunResponse,
+)
+from app.core.debrief_graph.step_wire import InProcessSteps
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -49,7 +53,11 @@ def get_graph():
     return get_debrief_graph()
 
 
-@router.post("/runs", response_model=DebriefRunResponse)
+@router.post(
+    "/runs",
+    response_model=DebriefRunResponse,
+    response_model_exclude_unset=True,
+)
 async def debrief_run(
     req: DebriefRunRequest, graph=Depends(get_graph)
 ) -> DebriefRunResponse:
@@ -77,7 +85,10 @@ async def debrief_run(
         gateway=HttpGateway(req.gateway_url, req.run_token),
     )
     result = await run_debrief(graph, ctx, resume=req.resume)
-    return DebriefRunResponse(**result)
+    # `exclude_unset` keeps every shape exactly as the graph built it (no null or empty
+    # keys added by the typed models); the version is set explicitly so it is always
+    # sent.
+    return DebriefRunResponse(**{**result, "contract_version": CONTRACT_VERSION})
 
 
 # --- The safety-recall gate --------------------------------------------------------

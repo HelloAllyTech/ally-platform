@@ -4,6 +4,7 @@ import { BotPageApiError, botPageApi } from "./api";
 import { Turnstile } from "./components/Turnstile";
 import { fill, pickCopy, type BotPageCopy } from "./copy";
 import { bridge, type EmbedContext, type ToLoader } from "./embed";
+import { useLiveSteps } from "./liveSteps";
 import { AccessCode, AccessEmail } from "./screens/Access";
 import { Chat, type ChatItem, type PendingReply } from "./screens/Chat";
 import { Cover } from "./screens/Cover";
@@ -87,6 +88,8 @@ export function BotPageApp({
   const [signedInAs, setSignedInAs] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatItem[]>([]);
   const [pending, setPending] = useState<PendingReply | null>(null);
+  // The assistant's live steps while it works (chunk 6b).
+  const live = useLiveSteps();
   const [returnedDraft, setReturnedDraft] = useState<{ text: string } | null>(null);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -421,6 +424,7 @@ export function BotPageApp({
     const local: ChatItem = { id: `local-${Date.now()}`, role: "user", text, citations: [] };
     setMessages(m => [...m, local]);
     setPending({ status: null, text: "" });
+    live.start();
     setReturnedDraft(null);
 
     // Tokens arrive in one burst once the checks clear; they are revealed at reading pace.
@@ -459,15 +463,24 @@ export function BotPageApp({
           slug,
           text,
           {
-            onStatus: code => setPending(p => (p ? { ...p, status: code } : p)),
+            onStatus: code => {
+              // A draft sent back to be rewritten (chunk H1): its streamed text goes.
+              if (code === "rewriting") {
+                target = "";
+                shown = 0;
+              }
+              setPending(p => (p ? { ...p, status: code } : p));
+            },
             onToken: piece => {
               target += piece;
             },
+            onActivity: step => live.push(step),
           },
           controller.signal,
         );
         await finishReveal();
         clearInterval(timer);
+        live.stop();
         setPending(null);
         if (connectedTo.current !== final.conversationId) setStreamKey(k => k + 1);
         // A team member has this chat: no reply now; theirs arrives on the visitor stream.
@@ -480,10 +493,14 @@ export function BotPageApp({
             text: final.reply,
             citations: final.citations,
             rateable: final.rateable,
+            steps: final.steps,
+            confirmation: final.confirmation,
           },
         ]);
       } catch (err) {
         clearInterval(timer);
+        // A failed run ends its steps quietly; the error, if any, is the page's usual one.
+        live.stop();
         setPending(null);
         if (controller.signal.aborted) return;
         if (err instanceof BotPageApiError && err.status > 0) {
@@ -579,7 +596,7 @@ export function BotPageApp({
           page={page}
           copy={copy}
           messages={messages}
-          pending={pending}
+          pending={pending ? { ...pending, step: live.current, slow: live.slow } : null}
           onSend={send}
           onNewChat={() => void newChat()}
           busy={busy}

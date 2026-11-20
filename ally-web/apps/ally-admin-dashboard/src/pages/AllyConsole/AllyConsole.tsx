@@ -52,6 +52,44 @@ const ALL_TAB_ITEMS = [
 const VALID_TABS = new Set<string>(ALL_TAB_ITEMS.map(tab => tab.id));
 
 /**
+ * The twelve tabs, grouped by what the operator is doing: watching, shipping a
+ * change, or configuring. A flat row of twelve put "Crisis copy" beside
+ * "Overview" with nothing to say they are different kinds of job. Every tab is
+ * in exactly one group; a tab missing here would fall into the last.
+ */
+const TAB_GROUPS: Array<{ id: string; label: string; tabs: AllyConsoleTab[] }> = [
+  {
+    id: "monitor",
+    label: en.allyConsole.groups.monitor,
+    tabs: [
+      AllyConsoleTab.OVERVIEW,
+      AllyConsoleTab.CONVERSATIONS,
+      AllyConsoleTab.ALERTS,
+      AllyConsoleTab.BASELINE,
+    ],
+  },
+  {
+    id: "release",
+    label: en.allyConsole.groups.release,
+    tabs: [AllyConsoleTab.RELEASES, AllyConsoleTab.EVALS, AllyConsoleTab.PLAYGROUND],
+  },
+  {
+    id: "configure",
+    label: en.allyConsole.groups.configure,
+    tabs: [
+      AllyConsoleTab.CONFIGURATION,
+      AllyConsoleTab.SETTINGS,
+      AllyConsoleTab.CRISIS_COPY,
+      AllyConsoleTab.LIBRARY,
+      AllyConsoleTab.ADVICE,
+    ],
+  },
+];
+
+const groupOf = (tab: string) =>
+  TAB_GROUPS.find(g => (g.tabs as string[]).includes(tab)) ?? TAB_GROUPS[TAB_GROUPS.length - 1];
+
+/**
  * The Ally Console: the Ally team's control room for the AI course companion.
  *
  * The route is gated on the `ally_guide` toggle AND the view permission (see RouteLayout); every
@@ -76,6 +114,18 @@ export const AllyConsole: React.FC = () => {
   }, [searchParams]);
 
   const go = (tab: AllyConsoleTab) => setSearchParams({ tab });
+
+  // The tab row shows only the active group's tabs. The Playground may be
+  // filtered out above, so a group can be empty for some admins.
+  const activeGroup = groupOf(activeTab);
+  const groupItems = useMemo(
+    () =>
+      activeGroup.tabs
+        .map(id => tabItems.find(item => item.id === id))
+        .filter((item): item is (typeof tabItems)[number] => !!item),
+    [activeGroup, tabItems],
+  );
+  const visibleGroups = TAB_GROUPS.filter(g => g.tabs.some(id => tabItems.some(i => i.id === id)));
 
   const renderTab = () => {
     switch (activeTab) {
@@ -118,8 +168,34 @@ export const AllyConsole: React.FC = () => {
       <p className="max-w-3xl pb-4 pt-1 text-sm text-typography-700 md:pb-6">
         {en.allyConsole.intro}
       </p>
+      <div
+        role="group"
+        aria-label={en.allyConsole.groups.label}
+        className="mb-3 flex flex-wrap gap-2"
+      >
+        {visibleGroups.map(group => {
+          const first = group.tabs.find(id => tabItems.some(i => i.id === id));
+          const selected = group.id === activeGroup.id;
+          return (
+            <button
+              key={group.id}
+              type="button"
+              data-testid={`group-${group.id}`}
+              aria-pressed={selected}
+              onClick={() => first && go(first)}
+              className={`rounded-full border px-3 py-1 text-sm ${
+                selected
+                  ? "border-primary-500 bg-primary-50 font-medium text-typography-900"
+                  : "border-border-light bg-white text-typography-700 hover:bg-neutral-50"
+              }`}
+            >
+              {group.label}
+            </button>
+          );
+        })}
+      </div>
       <Tabs
-        items={tabItems}
+        items={groupItems}
         activeId={activeTab}
         onChange={id => setSearchParams({ tab: id })}
         showCount={false}

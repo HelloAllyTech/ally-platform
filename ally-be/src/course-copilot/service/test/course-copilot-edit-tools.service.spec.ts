@@ -115,7 +115,12 @@ describe('CourseCopilotEditToolsService', () => {
   let library: { getActiveScenarios: jest.Mock; getActiveCase: jest.Mock };
   let executor: { specialistContext: jest.Mock };
   let specialists: Record<
-    'article' | 'quiz' | 'journal' | 'annotation',
+    | 'article'
+    | 'quiz'
+    | 'journal'
+    | 'annotation'
+    | 'scenarioQuiz'
+    | 'bucketSort',
     { generate: jest.Mock }
   >;
   let tenantRows: { id: string; name: string }[];
@@ -241,6 +246,8 @@ describe('CourseCopilotEditToolsService', () => {
       quiz: { generate: jest.fn() },
       journal: { generate: jest.fn() },
       annotation: { generate: jest.fn() },
+      scenarioQuiz: { generate: jest.fn() },
+      bucketSort: { generate: jest.fn() },
     };
 
     const structure = new CourseCopilotStructureService(
@@ -267,6 +274,8 @@ describe('CourseCopilotEditToolsService', () => {
       specialists.quiz as any,
       specialists.journal as any,
       specialists.annotation as any,
+      specialists.scenarioQuiz as any,
+      specialists.bucketSort as any,
     );
   };
 
@@ -1698,6 +1707,68 @@ describe('CourseCopilotEditToolsService', () => {
         ).ok,
       ).toBe(false);
       expect(store.item('I-rp').scenarioId).toBe(6);
+    });
+  });
+
+  describe('editing a published course', () => {
+    beforeEach(() => {
+      store.track.status = 'ACTIVE';
+    });
+
+    it('asks once before the first change, and changes nothing yet', async () => {
+      const outcome = await run('update_course_meta', { title: 'New title' });
+
+      const question = questionOf(outcome);
+      expect(outcome.endTurn).toBe(true);
+      expect(question.prompt).toContain('is published');
+      expect(question.options).toEqual([
+        {
+          id: 'confirm',
+          label: 'Yes, change the live course',
+          recommended: true,
+        },
+        { id: 'cancel', label: 'Not now' },
+      ]);
+      expect(question.rationale).toContain('duplicate the course');
+      expect(trackService.updateTrack).not.toHaveBeenCalled();
+    });
+
+    it('makes the change once confirmed, and does not ask again this session', async () => {
+      const questionId = questionOf(
+        await run('update_course_meta', { title: 'New title' }),
+      ).id;
+      nextTurn();
+
+      await run(
+        'update_course_meta',
+        { title: 'New title' },
+        { questionId, selectedOptionIds: ['confirm'] },
+      );
+      expect(trackService.updateTrack).toHaveBeenCalledWith(
+        'track-1',
+        expect.objectContaining({ title: 'New title' }),
+      );
+      expect(dbMetadata.liveEditsConfirmedFor).toBe('track-1');
+
+      nextTurn();
+      trackService.updateTrack.mockClear();
+      const second = await run('update_course_meta', { title: 'Another' });
+      expect(second.modelResult.awaitingConfirmation).toBeUndefined();
+      expect(trackService.updateTrack).toHaveBeenCalled();
+    });
+
+    it('never asks before reading, publishing or duplicating', async () => {
+      for (const tool of ['get_course_outline', 'publish_course']) {
+        const outcome = await run(tool);
+        expect(outcome.modelResult.awaitingConfirmation).toBeUndefined();
+      }
+    });
+
+    it('does not ask for a draft course', async () => {
+      store.track.status = 'DRAFT';
+      const outcome = await run('update_course_meta', { title: 'Draft title' });
+      expect(outcome.modelResult.awaitingConfirmation).toBeUndefined();
+      expect(trackService.updateTrack).toHaveBeenCalled();
     });
   });
 

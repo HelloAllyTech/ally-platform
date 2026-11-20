@@ -1,3 +1,5 @@
+import time
+
 """The Debrief graph reproduces ally-be's runner: the recipe, the budget and its
 fallback rungs, the backup model and the circuit breaker, the check → evaluate ⇄
 revise loop, the deadline, every ending, and a resume that pays for nothing twice.
@@ -68,6 +70,47 @@ class TestCueStrength:
         assert result["workspace"]["safety"]["risk_cues"][0]["category"] == (
             "hopelessness"
         )
+
+
+class TestThinSessionGate:
+    """A session with too little said to coach on reads the safety reader first
+    and ends as "too short", unless the learner sounds distressed (then the
+    whole debrief runs)."""
+
+    async def test_a_thin_session_ends_too_short_without_the_analyst_or_writer(
+        self, steps, gateway
+    ):
+        result = await run(steps, gateway, session={**SESSION, "thin": True})
+
+        assert result["status"] == "skipped"
+        assert result["skip_reason"] == "too_short"
+        assert steps.count("safety-reader") == 1
+        assert steps.count("analyst") == 0
+        assert steps.count("writer") == 0
+        assert steps.count("evaluator") == 0
+
+    async def test_a_thin_session_with_a_distressed_learner_is_debriefed(
+        self, steps, gateway
+    ):
+        steps.answers["safety-reader"] = {
+            "risk_cues": [],
+            "learner_distress": [
+                {"turn_index": 1, "quote": "I can't do this, I'm overwhelmed."}
+            ],
+        }
+        result = await run(steps, gateway, session={**SESSION, "thin": True})
+
+        assert result["status"] in ("published", "below_bar")
+        assert result["learner_distress"] is True
+        assert steps.count("safety-reader") == 1
+        assert steps.count("analyst") == 1
+        assert steps.count("writer") >= 1
+
+    async def test_a_session_that_is_not_thin_is_unchanged(self, steps, gateway):
+        result = await run(steps, gateway, session={**SESSION, "thin": False})
+
+        assert result["status"] == "published"
+        assert steps.count("analyst") == 1
 
 
 class TestStandardRun:
@@ -312,6 +355,43 @@ class TestEndings:
         )
         assert steps.count("reviser") == 0
 
+    async def test_no_model_step_starts_past_the_deadline(self, steps, gateway):
+        # The clock jumps past the deadline once the Writer has answered: the draft is
+        # checked by code but never scored or revised, and goes out below the bar for
+        # review.
+        def clock():
+            return 10_000_000.0 if steps.count("writer") else 0.0
+
+        result = await run(steps, gateway, clock=clock)
+
+        assert steps.count("writer") == 1
+        assert steps.count("evaluator") == 0
+        assert steps.count("reviser") == 0
+        evaluator = [s for s in result["steps"] if s["step"] == "evaluator"][0]
+        assert (evaluator["status"], evaluator["note"]) == ("skipped", "deadline")
+        assert result["status"] == "below_bar"
+        assert result["cards"] is not None
+        assert result["workspace"]["decision"]["reviewReason"] == "not_evaluated"
+
+    async def test_a_model_call_is_cut_off_where_ally_be_gives_up_on_the_run(
+        self, steps, gateway
+    ):
+        # ally-be treats a run still going at deadline + margin as dead and starts it
+        # again, so a call that would outlive that is cut off instead of running on (and
+        # being paid twice).
+        steps.delay["safety-reader"] = 5.0
+
+        def clock():
+            # The run starts at 1 s; once the Safety reader has been called it is hours
+            # later.
+            return 10_000_000.0 if steps.calls else 1_000.0
+
+        t0 = time.monotonic()
+        result = await run(steps, gateway, clock=clock)
+
+        assert time.monotonic() - t0 < 3.0
+        assert result["status"] != "published"
+
     async def test_missed_risk_cue_is_shown_and_sent_to_urgent_review(
         self, steps, gateway
     ):
@@ -333,14 +413,14 @@ class TestPossibleMissedCue:
     """A missed cue holds the debrief only when it is clear (cue_strength):
     one every signal reads as possible publishes and goes to review."""
 
-    def _read(self, steps, quote, category="hopelessness"):
+    def _read(self, steps, quote, category="hopelessness", response="missed"):
         steps.answers["safety-reader"] = {
             "risk_cues": [
                 {
                     "turn_index": 2,
                     "quote": quote,
                     "category": category,
-                    "learner_response": "missed",
+                    "learner_response": response,
                 }
             ],
             "learner_distress": [],
@@ -369,6 +449,20 @@ class TestPossibleMissedCue:
         assert result["status"] == "below_bar"
         assert result["evaluator_hard_fails"] == []
         assert "possible risk cue" in result["workspace"]["decision"]["why"]
+
+    async def test_a_possible_cue_the_learner_explored_is_published(
+        self, steps, gateway
+    ):
+        # The learner stayed with it, so a debrief that leaves it out needs no
+        # review: published, not below the bar.
+        quote = "अभी कुछ करने का मन नहीं करता"
+        self._read(steps, quote, response="explored")
+        self._evaluator(steps, quote, clear=False)
+        result = await run(steps, gateway, bundle=bundle(deadlineMs=20_000))
+
+        assert result["status"] == "published"
+        assert result["evaluator_hard_fails"] == []
+        assert result["workspace"]["decision"]["possibleMissedCues"] == []
 
     async def test_the_evaluator_calling_it_clear_goes_to_urgent_review(
         self, steps, gateway
@@ -556,7 +650,8 @@ class TestModels:
     ):
         monkeypatch.setitem(constants.STEP_TIMEOUT_S, "safety-reader", 0.05)
         monkeypatch.setattr(
-            "app.core.debrief_graph.model_step.STEP_TIMEOUT_S", constants.STEP_TIMEOUT_S
+            "app.core.debrief_graph.model_step_node.STEP_TIMEOUT_S",
+            constants.STEP_TIMEOUT_S,
         )
         steps.delay["safety-reader"] = 1.0
         result = await run(steps, gateway)

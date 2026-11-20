@@ -27,6 +27,9 @@ import { SettingsSection } from "../consoleRoutes";
 import { TruncatedTitle } from "../consoleRows";
 import { BackLink, ConsoleTag, Tile } from "../consoleUi";
 import { useDebriefAccess } from "../debriefAccess";
+import { AgentsSection } from "./AgentsSection";
+import { ClinicalListsSection } from "./ClinicalListsSection";
+import { LearnerFeaturesSection } from "./LearnerFeaturesSection";
 import { OrganisationsSection } from "./OrganisationsSection";
 import { PinnedRulesSection } from "./PinnedRulesSection";
 import { SchedulesSection } from "./SchedulesSection";
@@ -47,10 +50,12 @@ const TABS: SettingsSection[] = [
   "autonomy",
   "weights",
   "pinned",
+  "learner",
+  "clinical",
   "progress",
 ];
 /** The tabs that move into More below lg (1056px), last first, so the tab row never wraps. */
-const NARROW_MORE: SettingsSection[] = ["weights", "pinned", "progress"];
+const NARROW_MORE: SettingsSection[] = ["weights", "pinned", "learner", "clinical", "progress"];
 
 const Section: React.FC<{
   id: SettingsSection;
@@ -226,9 +231,13 @@ export const DebriefSettingsPage: React.FC = () => {
   const views: SettingsSection[] = [
     ...TABS,
     ...(schedules ? (["schedules"] as const) : []),
+    "agents",
     "guidance",
   ];
-  const hash = location.hash.slice(1) as SettingsSection;
+  // `?category=agents` opens the Agents section.
+  const category = new URLSearchParams(location.search).get("category");
+  const fromBanner = !location.hash && category === "agents" ? ("agents" as const) : null;
+  const hash = (location.hash.slice(1) || fromBanner) as SettingsSection;
   const current: SettingsSection = views.includes(hash) ? hash : TABS[0];
   const to = (id: SettingsSection) => ({
     pathname: location.pathname,
@@ -301,6 +310,7 @@ export const DebriefSettingsPage: React.FC = () => {
               onClick={() => navigate(to("schedules"))}
             />
           )}
+          <OverflowMenuItem itemText={s.nav.agents} onClick={() => navigate(to("agents"))} />
           {canOpenGuidance && (
             <OverflowMenuItem
               itemText={s.guidanceLink}
@@ -339,7 +349,17 @@ export const DebriefSettingsPage: React.FC = () => {
         )}
         {current === "pinned" && (
           <Section id="pinned" title={s.nav.pinned} help={s.pinnedHelp}>
-            <PinnedRulesSection canAsk={access.approvePinnedRule} />
+            <PinnedRulesSection />
+          </Section>
+        )}
+        {current === "learner" && (
+          <Section id="learner" title={s.nav.learner} help={s.learnerHelp}>
+            <LearnerFeaturesSection canEdit={access.settings} />
+          </Section>
+        )}
+        {current === "clinical" && (
+          <Section id="clinical" title={s.nav.clinical} help={s.clinicalHelp}>
+            <ClinicalListsSection canEdit={access.clinicalLists} />
           </Section>
         )}
         {current === "progress" && (
@@ -354,6 +374,11 @@ export const DebriefSettingsPage: React.FC = () => {
         {current === "schedules" && (
           <Section id="schedules" title={s.nav.schedules} help={s.schedulesHelp}>
             <SchedulesSection />
+          </Section>
+        )}
+        {current === "agents" && (
+          <Section id="agents" title={s.nav.agents} help={s.agentsHelp}>
+            <AgentsSection />
           </Section>
         )}
         {/* Old links (settingsPath("guidance"), the console's former Knowledge tab) land here. */}

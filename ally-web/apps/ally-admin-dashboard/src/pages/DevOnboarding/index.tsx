@@ -46,6 +46,7 @@ function stageState(stage: Stage): {
   const view = baseView();
   const index = STAGES.indexOf(stage);
   const passed: PassedScreens = {
+    interview: true,
     reading: index >= STAGES.indexOf("learned"),
     safety: index >= STAGES.indexOf("question-1"),
     built: index >= STAGES.indexOf("make"),
@@ -190,7 +191,18 @@ const DevOnboarding: React.FC = () => {
       publicAllowed: false,
       published: stage === "live" ? PUBLISHED : null,
       publishing: false,
-      mustPass: null,
+      // `?gate=below` (Q3-fast): Share as publishing below the checkup's quality gate answers.
+      mustPass:
+        stage === "share" && params.get("gate") === "below"
+          ? {
+              message:
+                "8 of 14 questions need a fix: your assistant answered 38% of its questions well, and we suggest at least 70% before you publish. Publish anyway?",
+              questions: [],
+              access: "invite",
+              emails: ["asha@example.com"],
+              belowGate: true,
+            }
+          : null,
       canvasVersion: 0,
       say: advance,
       chooseChip: advance,

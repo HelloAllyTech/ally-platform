@@ -1,0 +1,304 @@
+import { ROADMAP_READINESS_CRITERIA } from '../constants/product-roadmap.constants';
+import { isSingleIdeaEffort } from '../util/roadmap-quality.util';
+import type { PlanIdeaState } from 'src/product-planning/type/plan-record.type';
+
+/**
+ * The checks in the order the draft page lists them (§4.2: who, the pain, why,
+ * goal before solution, what changes — then, since 2026-11-20, strategic fit,
+ * how we'd know, and the scope line). The ids are the filing gate's own
+ * criteria, so a draft that passes here passes the gate.
+ */
+export const DRAFT_CHECK_ORDER = [
+  'who_it_affects',
+  'pain_or_gain',
+  'clear_why',
+  'goal_before_solution',
+  'outcome',
+  'strategic_fit',
+  'success_signal',
+  'scope_boundary',
+] as const;
+export type DraftCheckId = (typeof DRAFT_CHECK_ORDER)[number];
+
+/** "Fill it in yourself" (§4.13): one short field per check. */
+export const SELF_CHECK_FIELDS: Record<
+  'who' | 'pain' | 'why' | 'goal' | 'outcome',
+  { check: DraftCheckId; label: string }
+> = {
+  who: { check: 'who_it_affects', label: "Who it's for" },
+  pain: { check: 'pain_or_gain', label: 'The pain' },
+  why: { check: 'clear_why', label: 'Why it matters' },
+  goal: { check: 'goal_before_solution', label: 'The goal' },
+  outcome: { check: 'outcome', label: "How we'd know it worked" },
+};
+export const SELF_CHECK_FIELD_MAX = 200;
+
+/** Two failed copilot turns in a row offer Fill it in yourself (§4.13). */
+export const SELF_CHECK_AFTER_FAILURES = 2;
+
+export interface DraftCheck {
+  id: DraftCheckId;
+  label: string;
+  hint: string;
+  met: boolean;
+  source: 'agent' | 'self' | null;
+  evidence: {
+    quote: string;
+    from: 'text' | 'answer';
+    messageId?: string;
+  } | null;
+  note: string | null;
+  reopened: boolean;
+}
+
+/** An author answer the agent may have quoted. */
+export interface QuotableAnswer {
+  id: string;
+  text: string;
+}
+
+/**
+ * How two pieces of text are compared for a quote: case, curly quotes,
+ * dashes and runs of whitespace don't matter, and trailing punctuation on the
+ * quote is ignored. Anything else (a paraphrase, an ellipsis) does not match.
+ */
+export function normaliseForQuote(text: string): string {
+  return (text ?? '')
+    .toLowerCase()
+    .replace(/[‘’]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/[–—]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/[\s.,;:!?]+$/, '');
+}
+
+/** Where a quote is found: the idea text first, then the author's answers. */
+export function locateQuote(
+  quote: string,
+  text: string,
+  answers: QuotableAnswer[],
+): DraftCheck['evidence'] {
+  const needle = normaliseForQuote(quote);
+  if (needle.length < 3) return null;
+  if (normaliseForQuote(text).includes(needle)) return { quote, from: 'text' };
+  for (const answer of answers) {
+    if (normaliseForQuote(answer.text).includes(needle)) {
+      return { quote, from: 'answer', messageId: answer.id };
+    }
+  }
+  return null;
+}
+
+/**
+ * The checks as the draft page shows them. Pure.
+ *
+ * - "Fill it in yourself" wins: each field is its own evidence.
+ * - Otherwise the agent's last verdict, unless the author reopened the check.
+ * - A check the agent met with a quote stays met only while those words are
+ *   still in the idea or the author's answers: editing away the sentence that
+ *   met a check reopens it (§4.13 "checks show their evidence"). A met check
+ *   whose quote was never found keeps its tick with no highlight.
+ */
+export function draftChecks(
+  idea: PlanIdeaState | undefined,
+  text: string,
+  answers: QuotableAnswer[],
+): DraftCheck[] {
+  const criteria = new Map<string, { label: string; hint: string }>(
+    ROADMAP_READINESS_CRITERIA.map((c) => [
+      c.id,
+      { label: c.label, hint: c.hint },
+    ]),
+  );
+  const reopened = new Set(idea?.reopened ?? []);
+  const gates = new Map((idea?.gates ?? []).map((g) => [g.id, g]));
+  return DRAFT_CHECK_ORDER.map((id) => {
+    const base = {
+      id,
+      label: criteria.get(id)?.label ?? id,
+      hint: criteria.get(id)?.hint ?? '',
+    };
+    // "Fill it in yourself" no longer meets a check (lifecycle 2026-11-18): a draft is finished
+    // by its interview, so only the idea agent's verdicts count. Old self-filled answers are
+    // ignored, and the agent checks those drafts again on the next turn.
+    const gate = gates.get(id);
+    if (reopened.has(id)) {
+      return {
+        ...base,
+        met: false,
+        source: null,
+        evidence: null,
+        note: gate?.note ?? null,
+        reopened: true,
+      };
+    }
+    if (!gate?.met) {
+      return {
+        ...base,
+        met: false,
+        source: null,
+        evidence: null,
+        note: gate?.note ?? null,
+        reopened: false,
+      };
+    }
+    const quote = idea?.evidence?.[id];
+    if (!quote) {
+      return {
+        ...base,
+        met: true,
+        source: 'agent' as const,
+        evidence: null,
+        note: gate.note ?? null,
+        reopened: false,
+      };
+    }
+    const found = locateQuote(quote, text, answers);
+    return found
+      ? {
+          ...base,
+          met: true,
+          source: 'agent' as const,
+          evidence: found,
+          note: gate.note ?? null,
+          reopened: false,
+        }
+      : {
+          ...base,
+          met: false,
+          source: null,
+          evidence: null,
+          note: 'The words that met this were edited out of the idea.',
+          reopened: false,
+        };
+  });
+}
+
+/**
+ * The quotes from one copilot turn worth keeping: only those found verbatim
+ * now, so a later edit can be told apart from a quote that never matched.
+ */
+export function verifiedEvidence(
+  evidence: Record<string, string>,
+  text: string,
+  answers: QuotableAnswer[],
+): Record<string, string> {
+  const kept: Record<string, string> = {};
+  for (const [id, quote] of Object.entries(evidence ?? {})) {
+    if (locateQuote(quote, text, answers)) kept[id] = quote;
+  }
+  return kept;
+}
+
+/** The description filed at Submit: the text, plus the self-check fields when used. */
+export function composeDescription(
+  text: string,
+  selfCheck: Record<string, string> | null | undefined,
+): string {
+  const body = (text ?? '').trim();
+  if (!selfCheck) return body;
+  const lines = Object.values(SELF_CHECK_FIELDS)
+    .map(({ check, label }) => {
+      const value = (selfCheck[check] ?? '').replace(/\s+/g, ' ').trim();
+      return value ? `${label}: ${value}` : null;
+    })
+    .filter((line): line is string => !!line);
+  return lines.length ? `${body}\n\n${lines.join('\n')}` : body;
+}
+
+export function firstLine(text: string): string {
+  const line = (text ?? '').trim().split('\n')[0].trim();
+  return (line || 'New idea').slice(0, 120);
+}
+
+/** A suggested title kept to about a headline. */
+export const PROPOSED_TITLE_MAX = 80;
+
+/** "What will be submitted" (audit rec. 6): the idea agent's statement and a short title. */
+export interface DraftProposal {
+  title: string;
+  statement: string;
+}
+
+/**
+ * A title from a statement, for when the agent gave none: its first sentence, cut at a word to
+ * PROPOSED_TITLE_MAX. Pure.
+ */
+export function suggestTitle(statement: string): string {
+  const flat = (statement ?? '').replace(/\s+/g, ' ').trim();
+  const sentence = flat.split(/(?<=[.!?])\s/)[0] ?? flat;
+  if (sentence.length <= PROPOSED_TITLE_MAX) {
+    return sentence.replace(/[.!?]+$/, '');
+  }
+  const cut = sentence.slice(0, PROPOSED_TITLE_MAX);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > 20 ? cut.slice(0, space) : cut).replace(/[,;:]+$/, '')}…`;
+}
+
+/** The agent's proposal for a draft, or null until it has written a statement. Pure. */
+export function draftProposal(
+  idea: PlanIdeaState | undefined | null,
+): DraftProposal | null {
+  const statement = (idea?.draft?.description ?? '').trim();
+  if (!statement) return null;
+  const given = (idea?.draft?.title ?? '').replace(/\s+/g, ' ').trim();
+  return { title: given || suggestTitle(statement), statement };
+}
+
+/**
+ * Why a draft whose checks are all met still cannot be submitted, or null when nothing stops it.
+ * Pure, and the one place the quality bar is applied to a draft, so the page's `canSubmit` and
+ * Submit itself can never disagree.
+ *
+ * In order: already split (its slices are the ideas now) → quality bar not reached → no draft
+ * from the interview (slices proposed, or never sized) → a size one idea cannot be filed at.
+ */
+export function submitBlock(idea: PlanIdeaState | undefined | null): {
+  code: 'already_split' | 'quality_below_bar' | 'needs_split' | 'not_sized';
+  message: string;
+  extra?: Record<string, unknown>;
+} | null {
+  if (idea?.splitInto?.length) {
+    return {
+      code: 'already_split',
+      message:
+        'This idea was split. Submit the new drafts it was split into instead.',
+    };
+  }
+  const quality = idea?.quality;
+  if (!quality?.passed) {
+    return {
+      code: 'quality_below_bar',
+      message: quality
+        ? `Not at the bar yet: ${quality.score} of ${quality.passScore} needed.`
+        : 'The idea agent has not graded this idea yet.',
+      extra: {
+        score: quality?.score ?? null,
+        passScore: quality?.passScore ?? null,
+        weakest: quality?.weakest ?? null,
+      },
+    };
+  }
+  if (!idea?.draft) {
+    return (idea?.slices?.length ?? 0) >= 2
+      ? {
+          code: 'needs_split',
+          message:
+            'This is bigger than one idea. Split it, then submit each part.',
+        }
+      : {
+          code: 'not_sized',
+          message:
+            'The idea agent could not size this yet. Say what is in scope and what is not.',
+        };
+  }
+  if (!isSingleIdeaEffort(idea.draft.effort)) {
+    return {
+      code: 'needs_split',
+      message:
+        'This is too big for one idea. Split it into parts that can ship on their own.',
+    };
+  }
+  return null;
+}

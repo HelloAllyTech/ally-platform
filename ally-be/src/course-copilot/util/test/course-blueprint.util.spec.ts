@@ -254,6 +254,7 @@ describe('normaliseBlueprint', () => {
   });
 
   describe('completion criteria', () => {
+    const BOTH = { completionLogic: 'SCORE_AND_DURATION' };
     it('fills type defaults and drops keys the type never reads', () => {
       const blueprint = normaliseBlueprint(
         rawPlan([
@@ -307,13 +308,56 @@ describe('normaliseBlueprint', () => {
       expect(
         blueprint.sections[0].items.map((item) => item.completionCriteria),
       ).toEqual([
-        { minScore: 0, minDurationSeconds: 120 },
-        { minScore: 55 },
-        { minScore: 40 },
-        { minScore: 50 },
-        { minScore: 60 },
+        { ...BOTH, minScore: 0, minDurationSeconds: 120 },
+        { ...BOTH, minScore: 55 },
+        { ...BOTH, minScore: 40 },
+        { ...BOTH, minScore: 50 },
+        { ...BOTH, minScore: 60 },
         undefined,
-        { minScore: 75 },
+        { ...BOTH, minScore: 75 },
+      ]);
+    });
+
+    it('keeps a roleplay completionLogic and drops the gates it never reads', () => {
+      const criteria = {
+        minScore: 70,
+        minDurationSeconds: 90,
+      };
+      const blueprint = normaliseBlueprint(
+        rawPlan([
+          rawItem('ROLEPLAY', {
+            completionCriteria: { ...criteria, completionLogic: 'SCORE' },
+          }),
+          rawItem('ROLEPLAY', {
+            completionCriteria: { ...criteria, completionLogic: 'duration' },
+          }),
+          rawItem('ROLEPLAY', {
+            completionCriteria: {
+              ...criteria,
+              completionLogic: 'SCORE_AND_DURATION',
+            },
+          }),
+          rawItem('ROLEPLAY', {
+            completionCriteria: {
+              ...criteria,
+              completionLogic: 'PARTICIPATION',
+            },
+          }),
+          rawItem('ROLEPLAY', {
+            completionCriteria: { ...criteria, completionLogic: 'WHENEVER' },
+          }),
+        ]),
+        brief(),
+      );
+      expect(
+        blueprint.sections[0].items.map((item) => item.completionCriteria),
+      ).toEqual([
+        { completionLogic: 'SCORE', minScore: 70 },
+        { completionLogic: 'DURATION', minDurationSeconds: 90 },
+        { completionLogic: 'SCORE_AND_DURATION', ...criteria },
+        { completionLogic: 'PARTICIPATION' },
+        // Unknown logic: the default rule, both gates.
+        { completionLogic: 'SCORE_AND_DURATION', ...criteria },
       ]);
     });
 

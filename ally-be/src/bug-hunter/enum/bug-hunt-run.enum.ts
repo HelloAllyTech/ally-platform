@@ -1,6 +1,6 @@
 /**
  * Stored as `character varying` with a CHECK constraint, per repo convention
- * (see AnalyticsSuggestionStatus) — not a Postgres enum.
+ * — not a Postgres enum.
  */
 export enum BugHuntTrigger {
   SCHEDULED = 'scheduled',

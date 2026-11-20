@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import axios from 'axios';
-import { In, IsNull, Not, Repository } from 'typeorm';
+import { In, IsNull, Not, Raw, Repository } from 'typeorm';
 import { AppConfigService } from '../../config/config.service';
 import { LoggerService } from '../../logger/logger.service';
 import {
@@ -19,6 +19,7 @@ import { DebriefCards, renderCards } from '../util/debrief-cards.util';
 import { guidancePassage } from '../util/debrief-guidance.util';
 import { ClChunk } from '../../context-library/entity/cl-chunk.entity';
 import { DebriefContextRepository } from './debrief-context.repository';
+import { DebriefLanguageJudgeService } from './debrief-language-judge.service';
 import {
   DebriefRunLogsService,
   JudgeCallLog,
@@ -40,6 +41,9 @@ export const DEBRIEF_JUDGE_INSTRUCTIONS_CODE = 'debrief_quality_judge_system';
  * claim is never taken over; a claim left by a crashed worker frees after it.
  */
 export const JUDGE_CLAIM_STALE_MINUTES = 15;
+/** A run the judge failed on is tried again after this long, doubling each failure up to the cap. */
+export const JUDGE_RETRY_BASE_MINUTES = 15;
+export const JUDGE_RETRY_MAX_MINUTES = 24 * 60;
 
 export interface RunJudgment {
   model: string;
@@ -58,6 +62,19 @@ export interface RunJudgment {
  * the run (`workspace.judge`), because `debrief_quality_judgment` is keyed one
  * row per session per judge and today's debrief already holds that slot.
  */
+/**
+ * The WHERE for runs the judge still has to score. TypeORM hands `Raw` the column as `w` and only
+ * quotes it when a space, comma or parenthesis follows it: `${w}->>'x'` is left unquoted and Postgres
+ * fails with "missing FROM-clause entry", so every `->>` here has a space before it.
+ */
+export const judgePendingSql = (w: string): string =>
+  `NOT (coalesce(${w}, '{}'::jsonb) ? 'judge')
+            AND (${w} ->> 'judgeFailedAt' IS NULL
+                 OR (${w} ->> 'judgeFailedAt')::timestamptz
+                      < now() - make_interval(mins => LEAST(${JUDGE_RETRY_MAX_MINUTES},
+                          ${JUDGE_RETRY_BASE_MINUTES}
+                          * power(2, LEAST(COALESCE((${w} ->> 'judgeFailures')::int, 1), 8) - 1))::int))`;
+
 @Injectable()
 export class DebriefRunJudgeService {
   private readonly logger = LoggerService.getInstance(
@@ -70,6 +87,7 @@ export class DebriefRunJudgeService {
     private readonly context: DebriefContextRepository,
     private readonly config: AppConfigService,
     private readonly agentLogs: DebriefRunLogsService,
+    private readonly language: DebriefLanguageJudgeService,
   ) {}
 
   /**
@@ -93,6 +111,10 @@ export class DebriefRunJudgeService {
       DEBRIEF_JUDGE_INSTRUCTIONS_CODE,
       null,
     );
+    const riskCueDefinition = await this.context.promptText(
+      DEBRIEF_PROMPT_CODES.riskCueDefinition,
+      null,
+    );
     const guidance = await this.guidanceSeen(run);
     // Judging a stored score is exclusive: "Debrief now" and the drain must
     // never both pay for one run, nor overwrite each other's score.
@@ -106,6 +128,7 @@ export class DebriefRunJudgeService {
         session,
         rubric,
         judgeInstructions,
+        riskCueDefinition,
         guidance,
       });
     } finally {
@@ -123,10 +146,15 @@ export class DebriefRunJudgeService {
       judgeInstructions: Awaited<
         ReturnType<DebriefContextRepository['promptText']>
       >;
+      riskCueDefinition?: string | null;
       guidance: string | null;
     },
   ): Promise<RunJudgment | null> {
     const { transcript, session, rubric, judgeInstructions, guidance } = input;
+    // The roleplay's own risk-cue wording when its option has one; else the pinned definition.
+    const riskCueDefinition =
+      (run.workspace?.riskCueOption?.wording as string | null | undefined) ||
+      (input.riskCueDefinition ?? null);
     const { apiUrl, outboundApiKey } = this.config.ai;
     const res = await withJudgeSlot(() =>
       axios.post(
@@ -138,6 +166,13 @@ export class DebriefRunJudgeService {
           learner_level: session?.learnerLevel ?? null,
           rubric,
           judge_instructions: judgeInstructions,
+          risk_cue_definition: riskCueDefinition,
+          // What this roleplay expects of the learner: the judge's practice-alignment reads it.
+          roleplay_expectations: expectationsFor(session),
+          speaker_labels:
+            (run.workspace?.speakerLabels as string | undefined) === 'neutral'
+              ? 'neutral'
+              : 'legacy',
           history: (run.workspace?.history as string | null) ?? null,
           guidance,
           scenario_session_id: run.scenarioSessionId,
@@ -175,10 +210,17 @@ export class DebriefRunJudgeService {
       await this.runs.query(
         `UPDATE debrief_runs
             SET workspace = (coalesce(workspace, '{}'::jsonb) - 'judgeClaimedAt')
-                  || jsonb_build_object('judge', $2::jsonb)
+                  || jsonb_build_object('judge', $2::jsonb),
+                "judgeOverall" = $3, "judgeModel" = $4, "judgePromptVersion" = $5
           WHERE id = $1 AND (workspace->'judge') IS NULL
           RETURNING id`,
-        [run.id, JSON.stringify(judgment)],
+        [
+          run.id,
+          JSON.stringify(judgment),
+          judgment.overall,
+          judgment.model.slice(0, 80),
+          judgment.promptVersion.slice(0, 80),
+        ],
       ),
     );
     if (!stored.length) return this.storedJudgment(run);
@@ -200,6 +242,10 @@ export class DebriefRunJudgeService {
       );
     }
     run.workspace = { ...run.workspace, judge: judgment };
+    run.judgeOverall =
+      judgment.overall == null ? null : String(judgment.overall);
+    run.judgeModel = judgment.model.slice(0, 80);
+    run.judgePromptVersion = judgment.promptVersion.slice(0, 80);
     return judgment;
   }
 
@@ -284,6 +330,13 @@ export class DebriefRunJudgeService {
           DebriefRunStatus.NEEDS_PERSON,
         ]),
         cards: Not(IsNull()),
+        // Only runs with no score: taking the newest runs and skipping the
+        // scored ones starved every older run (one cleared for re-scoring
+        // after a rubric change was never reached).
+        // And not one that failed lately: a run the judge cannot score would otherwise sit among
+        // the newest and, with enough of them, keep every older run from being reached. A failure
+        // waits 15 min, then 30, 60 … up to a day before it is tried again.
+        workspace: Raw(judgePendingSql),
       },
       order: { createdAt: 'DESC' },
       take: limit * 3,
@@ -299,9 +352,36 @@ export class DebriefRunJudgeService {
         this.logger.warn(
           `[debrief] judging run ${run.id} failed: ${(e as Error).message}`,
         );
+        await this.noteFailure(run.id);
       }
     }
+    // The language check runs after the quality judge, in its own guard: it can neither fail
+    // nor delay the quality judge, and its count is not the drain's (judged runs only).
+    await this.language
+      .drain(limit)
+      .catch((e: Error) =>
+        this.logger.warn(`[debrief] language check drain failed: ${e.message}`),
+      );
     return n;
+  }
+
+  /** Counts a failed attempt, so the drain backs off from this run (see `drain`). */
+  private async noteFailure(runId: string): Promise<void> {
+    await this.runs
+      .query(
+        `UPDATE debrief_runs
+            SET workspace = coalesce(workspace, '{}'::jsonb)
+                  || jsonb_build_object(
+                       'judgeFailures', COALESCE((workspace->>'judgeFailures')::int, 0) + 1,
+                       'judgeFailedAt', now())
+          WHERE id = $1 AND (workspace->'judge') IS NULL`,
+        [runId],
+      )
+      .catch((e: Error) =>
+        this.logger.warn(
+          `[debrief] noting the judge failure on run ${runId} failed: ${e.message}`,
+        ),
+      );
   }
 }
 
@@ -318,4 +398,34 @@ function claimIsLive(claimedAt: unknown): boolean {
   return (
     Number.isFinite(t) && Date.now() - t < JUDGE_CLAIM_STALE_MINUTES * 60_000
   );
+}
+
+/** The roleplay's expectations for the judge; null when it lists none (today's wording then). */
+export function expectationsFor(
+  session:
+    | {
+        helpfulBehaviours?: string[];
+        unhelpfulBehaviours?: string[];
+        competencies?: Array<{
+          name: string;
+          helpful: string[];
+          unhelpful: string[];
+        }>;
+      }
+    | null
+    | undefined,
+): {
+  helpful_behaviours: string[];
+  unhelpful_behaviours: string[];
+  competencies: Array<{ name: string; helpful: string[]; unhelpful: string[] }>;
+} | null {
+  const helpful = session?.helpfulBehaviours ?? [];
+  const unhelpful = session?.unhelpfulBehaviours ?? [];
+  const competencies = session?.competencies ?? [];
+  if (!helpful.length && !unhelpful.length && !competencies.length) return null;
+  return {
+    helpful_behaviours: helpful,
+    unhelpful_behaviours: unhelpful,
+    competencies,
+  };
 }

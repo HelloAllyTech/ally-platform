@@ -50,6 +50,27 @@ class ListToolDefinition(BaseModel):
     description: str = Field("", max_length=2000)
     input_schema: Dict[str, Any] = Field(default_factory=dict)
     kind: Literal["find", "create", "update"]
+    #: The list's name as the owner wrote it ("Slots"), for the live steps on the
+    #: bot page (chunk 6b). Never shown to the model.
+    list_name: str = Field("", max_length=120)
+    #: A create on a list with a person or phone field (Leads, Callback requests):
+    #: it saves the person's details for the team (chunk 6b).
+    takes_details: bool = False
+    #: What the list's tools do, so the run gets that kind's playbook (Q3-fast Part
+    #: 2b): booking, details, orders or reference. Set by ally-be per list.
+    playbook: Optional[Literal["booking", "details", "orders", "reference"]] = None
+    #: The owner's own line for this list ("How should your assistant use this
+    #: list?"), added under its playbook as the owner's layer.
+    instruction: str = Field("", max_length=300)
+
+    def as_bot_definition(self) -> Dict[str, Any]:
+        """The definition as the run keeps it: the 6b and Q3-fast fields only when
+        set, so a definition without them is exactly what it was before."""
+        data = self.model_dump(mode="json")
+        for key in ("list_name", "takes_details", "playbook", "instruction"):
+            if not data.get(key):
+                data.pop(key, None)
+        return data
 
 
 AgentGateway.model_rebuild()
@@ -89,11 +110,28 @@ class AgentRunRequest(KnowledgeAnswerRequest):
         None, max_length=200, description="Recorded with the run; not used to answer"
     )
     runtime_version: str = Field("v2", max_length=16)
+    run_timeout_s: Optional[float] = Field(
+        None,
+        gt=0,
+        le=60,
+        description=(
+            "The run's hard cap in seconds (chunk H1), named by ally-be, which waits a "
+            "little longer. Unset: AGENT_RUNTIME__RUN_TIMEOUT_SECONDS."
+        ),
+    )
     log_retrieval: bool = Field(
         True,
         description=(
             "False skips the retrieval log for this run, for a caller that has "
             "already logged the same message."
+        ),
+    )
+    activity: bool = Field(
+        False,
+        description=(
+            "Emit `activity` events and return `activity` (chunk 6b), for the bot "
+            "page's and Try it's live steps. Off for WhatsApp and every other caller, "
+            "whose events and response are unchanged."
         ),
     )
     knowledge_topics: List[str] = Field(
@@ -135,6 +173,30 @@ class AgentRunRequest(KnowledgeAnswerRequest):
     person_name: Optional[str] = Field(
         None, max_length=80, description="The person's name, when it is known."
     )
+    business_contact: Optional[str] = Field(
+        None,
+        max_length=200,
+        description=(
+            "Q3-fast Part 2: how to reach the business, from its sources (a phone "
+            "number and an email). A decline gives it when the owner's decline "
+            "wording carries no contact of its own."
+        ),
+    )
+    mood: Optional[Literal["upset"]] = Field(
+        None,
+        description=(
+            "Q3-fast Part 1: ally-be's crisis check found the person upset, not at "
+            "risk. The reply opens warmly. Absent otherwise."
+        ),
+    )
+    support_helplines: Optional[str] = Field(
+        None,
+        max_length=300,
+        description=(
+            "The business's helplines, for the upset section's support line on "
+            "health and mental-health assistants. Absent: Tele-MANAS."
+        ),
+    )
     before_chat: List["BeforeChatAnswer"] = Field(
         default_factory=list,
         max_length=6,
@@ -174,17 +236,26 @@ class AgentRunRequest(KnowledgeAnswerRequest):
             "knowledge_topics": list(self.knowledge_topics),
             "decline_text": self.decline_text,
         }
+        if self.activity:
+            bot["activity"] = True
         if self.gateway:
             bot["gateway_tools"] = list(self.gateway.tools)
             # Only when there are some, so a run without list tools is today's.
             if self.gateway.definitions:
                 bot["gateway_definitions"] = [
-                    d.model_dump(mode="json") for d in self.gateway.definitions
+                    d.as_bot_definition() for d in self.gateway.definitions
                 ]
             if self.gateway.omitted:
                 bot["gateway_omitted"] = list(self.gateway.omitted)
             if self.gateway.definitions and self.gateway.today:
                 bot["gateway_today"] = self.gateway.today
+        if self.business_contact:
+            bot["business_contact"] = self.business_contact
+        # Q3-fast Part 1: only when upset, so every other run is today's.
+        if self.mood:
+            bot["mood"] = self.mood
+            if self.support_helplines:
+                bot["support_helplines"] = self.support_helplines
         # Chunk 8a: each only when present, so a run without them is today's.
         if self.memory is not None:
             bot["memory"] = self.memory.model_dump(mode="json")
@@ -278,6 +349,17 @@ class AgentRunResponse(KnowledgeAnswerResponse):
         ),
     )
 
+    activity: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description=(
+            'What the run did, for the bot page\'s "what I did" line and its '
+            "confirmation card (chunk 6b): each step that succeeded, as a kind "
+            "(search, find, create, update, cancel, hand_over), the list's name and a "
+            "record's title; a write also carries the record's id, which ally-be uses "
+            "to read the stored record and never shows. Sent only when there are some."
+        ),
+    )
+
     @model_serializer(mode="wrap")
     def _handover_only_when_set(
         self, handler: SerializerFunctionWrapHandler
@@ -287,6 +369,8 @@ class AgentRunResponse(KnowledgeAnswerResponse):
         data = handler(self)
         if not data.get("handover"):
             data.pop("handover", None)
+        if not data.get("activity"):
+            data.pop("activity", None)
         if not data.get("memory_writes"):
             data.pop("memory_writes", None)
         else:

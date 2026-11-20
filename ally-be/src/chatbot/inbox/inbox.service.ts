@@ -52,21 +52,21 @@ export class InboxService {
     private readonly access: ChatbotAccessService,
   ) {}
 
-  /** The assistants whose chats the caller can see (`null`: every one). */
-  scope(): Promise<string[] | null> {
+  /** The assistants whose chats the caller can see: the ones they are a member of. */
+  scope(): Promise<string[]> {
     return this.access.accessibleChatbotIds(userId());
   }
 
   async list(filters: InboxFilters = {}): Promise<InboxItem[]> {
     const ids = await this.scope();
-    if (ids && !ids.length) return [];
+    if (!ids.length) return [];
     const params: unknown[] = [userId()];
     const where: string[] = [];
     const add = (sql: string, value: unknown) => {
       params.push(value);
       where.push(sql.replace('?', `$${params.length}`));
     };
-    if (ids) add('c.chatbot_id = ANY(?::uuid[])', ids);
+    add('c.chatbot_id = ANY(?::uuid[])', ids);
     if (filters.chatbotId) add('c.chatbot_id = ?', filters.chatbotId);
     // The website widget's chats are web chats marked `source.kind = widget` (chunk 13): "Website"
     // shows only those, and "Bot page" the rest.
@@ -123,7 +123,7 @@ export class InboxService {
     safety: number;
   }> {
     const ids = await this.scope();
-    if (ids && !ids.length) return { unread: 0, needsPerson: 0, safety: 0 };
+    if (!ids.length) return { unread: 0, needsPerson: 0, safety: 0 };
     const [row] = (await this.dataSource.query(
       `SELECT
          COUNT(*) FILTER (WHERE EXISTS (
@@ -138,8 +138,8 @@ export class InboxService {
          LEFT JOIN chatbot_conversation_reads r
                 ON r.conversation_id = c.id AND r.user_id = $1
         WHERE c.last_message_at >= now() - interval '30 days'
-          ${ids ? 'AND c.chatbot_id = ANY($2::uuid[])' : ''}`,
-      ids ? [userId(), ids] : [userId()],
+          AND c.chatbot_id = ANY($2::uuid[])`,
+      [userId(), ids],
     )) as { unread: string; needs_person: string; safety: string }[];
     return {
       unread: Number(row?.unread ?? 0),

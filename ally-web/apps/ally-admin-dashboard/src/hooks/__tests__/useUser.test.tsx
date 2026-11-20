@@ -83,6 +83,7 @@ vi.mock("@api", () => ({
   useLazyGetUserPreferencesQuery: () => [vi.fn(), { isLoading: false }],
   useUpdateUserPreferencesMutation: () => [vi.fn()],
   useGetCharacterLibraryEnabledQuery: () => ({ data: false, isLoading: false }),
+  useGetRoadmapMeRoleQuery: () => ({ data: undefined, isLoading: false }),
   baseAPI: {
     injectEndpoints: vi.fn(() => ({})),
     reducerPath: "api",
@@ -547,12 +548,13 @@ describe("useUser", () => {
       // by role, so only the permission-gated tabs remain.
       expect(result.current.filteredNavigationItems).toHaveLength(6);
       expect(result.current.filteredNavigationItems.map(item => item.id)).toEqual([
+        // The default order is the sidebar's: Create, People, then AI & Languages.
         SIDEBAR_ITEMS.SIMULATION_STUDIO,
         SIDEBAR_ITEMS.EVENTS,
-        SIDEBAR_ITEMS.SCENARIO_VOICES,
-        SIDEBAR_ITEMS.PROMPTS,
-        SIDEBAR_ITEMS.TRANSLATIONS,
         SIDEBAR_ITEMS.USERS,
+        SIDEBAR_ITEMS.PROMPTS,
+        SIDEBAR_ITEMS.SCENARIO_VOICES,
+        SIDEBAR_ITEMS.TRANSLATIONS,
       ]);
     });
 
@@ -573,9 +575,9 @@ describe("useUser", () => {
 
       expect(result.current.filteredNavigationItems.map(item => item.id)).toEqual([
         SIDEBAR_ITEMS.SIMULATION_STUDIO,
-        SIDEBAR_ITEMS.SCENARIO_VOICES,
-        SIDEBAR_ITEMS.PROMPTS,
         SIDEBAR_ITEMS.USERS,
+        SIDEBAR_ITEMS.PROMPTS,
+        SIDEBAR_ITEMS.SCENARIO_VOICES,
       ]);
     });
 

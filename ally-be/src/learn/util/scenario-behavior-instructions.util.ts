@@ -10,6 +10,20 @@ import {
 } from '../constants/scenario-behavior-instuctions.constants';
 import { FormattedBehaviorInstructionForLivekit } from '../type/scenario-behavior-instructions.type';
 
+/**
+ * The points one detection of a behaviour instruction is worth: the authored
+ * score, or the category default when none was set (NULL on every row that
+ * pre-dates the column, and on rows whose author left the default).
+ */
+export const resolveBehaviorInstructionScore = (
+  category: BehaviorInstructionCategory,
+  score?: number | null,
+): number =>
+  score ??
+  (category === BehaviorInstructionCategory.SHOULD_DO
+    ? BEHAVIOR_INSTRUCTION_SHOULD_DO_SCORE
+    : BEHAVIOR_INSTRUCTION_SHOULD_NOT_DO_SCORE);
+
 export const formattedScenarioBehaviorInstructionsResponse = ({
   behaviorInstructions,
   behaviorMappings,
@@ -48,6 +62,7 @@ export const formattedScenarioBehaviorInstructionsResponse = ({
       return {
         id: instruction.id,
         category: instruction.category,
+        score: instruction.score ?? null,
         behaviors: behaviorsForInstruction,
         stateInstructions: instruction.stateInstructions,
       };
@@ -60,10 +75,10 @@ export const formatBehaviorInstructionsForLivekitMetadata = (
   behaviorInstructions: BehaviorInstructionWithBehaviorsDto[],
 ): FormattedBehaviorInstructionForLivekit[] => {
   return behaviorInstructions.map((instruction) => {
-    const score =
-      instruction.category === BehaviorInstructionCategory.SHOULD_DO
-        ? BEHAVIOR_INSTRUCTION_SHOULD_DO_SCORE
-        : BEHAVIOR_INSTRUCTION_SHOULD_NOT_DO_SCORE;
+    const score = resolveBehaviorInstructionScore(
+      instruction.category,
+      instruction.score,
+    );
 
     return {
       category: instruction.category,

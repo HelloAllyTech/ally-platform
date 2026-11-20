@@ -2,6 +2,7 @@ import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 import { BaseWithoutTenantEntity } from 'src/common/entity/base-without-tenant.entity';
 import {
   DebriefCommentAnchor,
+  DebriefCommentSource,
   DebriefCommentStatus,
   DebriefCommentTag,
 } from '../enum/debrief-review.enum';
@@ -79,4 +80,12 @@ export class DebriefReviewComment extends BaseWithoutTenantEntity {
 
   @Column({ type: 'uuid', nullable: true })
   repeatOfId?: string | null;
+
+  /** Who wrote it (migration 1984800000000). For a learner's comment `reviewerId` is the learner. */
+  @Column({
+    type: 'varchar',
+    length: 10,
+    default: DebriefCommentSource.EXPERT,
+  })
+  source!: DebriefCommentSource;
 }

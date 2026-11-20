@@ -159,6 +159,8 @@ const useGetCourseImpactQuery = vi.fn();
 vi.mock("@api", () => ({
   useGetCourseImpactQuery: (arg: unknown) => useGetCourseImpactQuery(arg),
   useGetTenantsQuery: () => ({ data: { data: [{ id: "org-1", name: "Org One" }] } }),
+  // AAQ-255, mounted on the same sub-tab; not under test here.
+  useGetAssessmentAttemptsQuery: () => ({ data: undefined, isLoading: false, isError: false }),
 }));
 
 import { CourseImpactSubTab } from "../tabs/CourseImpactSubTab";

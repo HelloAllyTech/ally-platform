@@ -14,6 +14,9 @@ import { DebriefRunMode, DebriefRunStatus } from '../enum/debrief-run.enum';
 /** The gateway tools ally-ai's debrief graph may call back (CONTRACT.md §2). */
 export const DEBRIEF_GATEWAY_TOOLS = [
   'guidance_search',
+  // The guidance agent's other two (CONTRACT.md §2): browse the index, fetch entries by code.
+  'guidance_index',
+  'guidance_fetch',
   'run_checks',
   'render_cards',
   'finalise_cards',
@@ -66,6 +69,8 @@ export const PM_AGENT_GATEWAY_TOOLS = [
   'comments_read',
   'reporting_query',
   'metrics_view',
+  // Debrief Guidance analytics (lookup + guidance agent): read only.
+  'guidance_report',
   'idea_propose',
   'release_draft',
   'ladder_start_quick_test',
@@ -80,6 +85,9 @@ export const PM_AGENT_GATEWAY_TOOLS = [
   // The reviewer subagent's verdict on one change, posted by ally-ai's code
   // (never a model tool): it sets the change's confidence.
   'change_review_record',
+  // Read any Debrief prompt's live text (the risk cue definition, a pinned
+  // rule, a step's instructions): read only, so every run and turn may.
+  'prompt_read',
 ] as const;
 /**
  * The PM agent conversation's own tools (V2_AUTONOMY C2), served by
@@ -138,6 +146,8 @@ export interface DebriefRunClaims {
   sessionId: string;
   tools: string[];
   exp: number;
+  /** The release's `guidanceTools` (per step); absent: `GUIDANCE_TOOLS_DEFAULT`. */
+  guidanceTools?: Record<string, string[]>;
   /** `reply` for an Ask Ally token; absent for a debrief run's. */
   scope?: 'reply';
   /** Reply tokens only: the learner whose history the tools may read. */
@@ -178,11 +188,18 @@ export class DebriefRunTokenService {
     runId: string,
     sessionId: string,
     tools: readonly string[] = DEBRIEF_GATEWAY_TOOLS,
+    guidanceTools?: Record<string, string[]> | null,
   ): string {
-    return jwt.sign({ runId, sessionId, tools: [...tools] }, this.secret(), {
-      algorithm: 'HS256',
-      expiresIn: RUN_TOKEN_TTL_S,
-    });
+    return jwt.sign(
+      {
+        runId,
+        sessionId,
+        tools: [...tools],
+        ...(guidanceTools ? { guidanceTools } : {}),
+      },
+      this.secret(),
+      { algorithm: 'HS256', expiresIn: RUN_TOKEN_TTL_S },
+    );
   }
 
   /**

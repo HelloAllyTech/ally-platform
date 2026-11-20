@@ -33,9 +33,6 @@ vi.mock("@api", async importOriginal => ({
   useRunPmAgentMutation: () => [vi.fn(), { isLoading: false }],
   useBuildDebriefTestSetsMutation: () => [vi.fn(), { isLoading: false }],
   useDecideIdeaMutation: () => [vi.fn(), { isLoading: false }],
-  useApprovePinnedRuleMutation: () => [vi.fn(), { isLoading: false }],
-  useRejectPinnedRuleMutation: () => [vi.fn(), { isLoading: false }],
-  useWithdrawPinnedRuleMutation: () => [vi.fn(), { isLoading: false }],
   useScreenIdeaMutation: () => [vi.fn(), { isLoading: false }],
   useAskIdeaQuestionMutation: () => [vi.fn(), { isLoading: false }],
   useStartIdeaStepMutation: () => [vi.fn(), { isLoading: false }],
@@ -215,7 +212,7 @@ const Where = () => {
 
 const renderAt = (search: string) =>
   render(
-    <MemoryRouter initialEntries={[`/debriefs/pm-agent${search}`]}>
+    <MemoryRouter initialEntries={[`/debriefs/changes${search}`]}>
       <PmAgentPage />
       <Where />
     </MemoryRouter>,
@@ -250,13 +247,13 @@ beforeEach(() => {
 });
 
 describe("Changes › Reports", () => {
-  it("is a tab between Changes and Test sets, with no Run the PM agent now", () => {
+  it("is a tab between Changes and Test sets, with no Run the Debrief PM agent now", () => {
     renderAt("?view=reports&kind=monthly&period=2026-10");
-    const tabs = within(screen.getByRole("navigation", { name: "PM agent" }))
+    const tabs = within(screen.getByRole("navigation", { name: "Debrief PM agent" }))
       .getAllByRole("link")
       .map(a => a.textContent);
-    expect(tabs).toEqual(["Changes", "Reports", "Test sets"]);
-    expect(screen.queryByRole("button", { name: "Run the PM agent now" })).toBeNull();
+    expect(tabs).toEqual(["Changes", "Reports", "Test sets", "Learner comments"]);
+    expect(screen.queryByRole("button", { name: "Run the Debrief PM agent now" })).toBeNull();
     expect(screen.getByRole("link", { name: "Reports" })).toHaveAttribute("aria-current", "page");
   });
 
@@ -270,11 +267,11 @@ describe("Changes › Reports", () => {
     expect(screen.getByTestId("pm-report-title")).toHaveClass("truncate");
     // The page header keeps one row at lg; below lg the actions take a second row on purpose.
     expect(screen.getByTestId("pm-header")).toHaveClass("min-[1056px]:flex-nowrap");
-    expect(screen.getByRole("heading", { level: 1 })).toHaveAttribute("title", "PM agent");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveAttribute("title", "Debrief PM agent");
     const changed = screen.getByTestId("pm-report-changed");
     expect(changed).toHaveTextContent("What changed this month");
     expect(changed).toHaveTextContent(
-      "Taken from the records of changes, not written by the PM agent.",
+      "Taken from the records of changes, not written by the Debrief PM agent.",
     );
     // v2 tiles (ReportsV2): live on its own, waited for a person, undone, stopped, being built.
     expect(screen.getByTestId("pm-report-tile-live")).toHaveTextContent(
@@ -298,11 +295,11 @@ describe("Changes › Reports", () => {
     // A change's row opens it in Changes; a release without one opens Changes.
     expect(within(live).getByRole("link", { name: "12345678" })).toHaveAttribute(
       "href",
-      "/debriefs/pm-agent?change=1234567890ab",
+      "/debriefs/changes?change=1234567890ab",
     );
     expect(within(live).getByRole("link", { name: "v6" })).toHaveAttribute(
       "href",
-      "/debriefs/pm-agent",
+      "/debriefs/changes",
     );
     expect(screen.getByTestId("pm-report-list-reverted")).toHaveTextContent(
       "Undone automatically · 22 Oct · a learner try-out missed a risk cue",
@@ -311,17 +308,17 @@ describe("Changes › Reports", () => {
     expect(rejected).toHaveTextContent("Turned down by Tanuja · “depends on the organisation”");
     expect(rejected).toHaveTextContent("Withdrawn by Asha");
     expect(screen.getByTestId("pm-report-budget")).toHaveTextContent(
-      "$24.80 of $40.00 spent: tests $19.70, PM agent runs $5.10",
+      "$24.80 of $40.00 spent: tests $19.70, Debrief PM agent runs $5.10",
     );
-    expect(screen.getByText("The PM agent's review")).toBeInTheDocument();
+    expect(screen.getByText("The Debrief PM agent's review")).toBeInTheDocument();
     expect(
-      screen.getByText("Written by the PM agent from the month's evidence."),
+      screen.getByText("Written by the Debrief PM agent from the month's evidence."),
     ).toBeInTheDocument();
     expect(screen.getByTestId("pm-report-review").querySelectorAll("p")).toHaveLength(2);
     expect(screen.getByRole("button", { name: "Download as PDF" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "All changes" })).toHaveAttribute(
       "href",
-      "/debriefs/pm-agent",
+      "/debriefs/changes",
     );
   });
 
@@ -337,7 +334,7 @@ describe("Changes › Reports", () => {
     );
     expect(screen.getByTestId("pm-report-changed")).toBeInTheDocument();
     expect(screen.getByTestId("pm-report-review-pending")).toHaveTextContent(
-      "The PM agent's review is published on the 1st.",
+      "The Debrief PM agent's review is published on the 1st.",
     );
   });
 
@@ -405,7 +402,7 @@ describe("Changes › Reports", () => {
     expect(screen.getByTestId("pm-report-title")).toHaveTextContent("Week of 9 Nov");
     expect(screen.getByTestId("pm-report-changed")).toBeInTheDocument();
     expect(screen.getByTestId("pm-report-review-pending")).toHaveTextContent(
-      "The PM agent's report is written on Monday.",
+      "The Debrief PM agent's report is written on Monday.",
     );
     expect(screen.getByRole("button", { name: "Next week" })).toBeDisabled();
   });
@@ -414,7 +411,7 @@ describe("Changes › Reports", () => {
     h.reports.mockReturnValue(ok([]));
     renderAt("?view=reports");
     expect(screen.getByTestId("pm-reports-empty")).toHaveTextContent(
-      "The PM agent hasn't written a report yet. Weekly reports appear after its first weekly run.",
+      "The Debrief PM agent hasn't written a report yet. Weekly reports appear after its first weekly run.",
     );
   });
 

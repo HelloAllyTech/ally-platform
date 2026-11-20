@@ -116,12 +116,6 @@ export interface WhatsAppBotSettings {
   platformChatbotId?: string | null;
 
   /**
-   * The platform's emergency switch for the Agents v2 engine. Off, every bot answers with v1 —
-   * rollback is this switch, not a deploy. Platform-wide only: a bot's settings cannot turn it on.
-   */
-  agentRuntimeAllowed: boolean;
-
-  /**
    * Show WhatsApp's typing dots while the bot works on a reply. Meta's call for them also marks the
    * message read (blue ticks), so it is a product choice per bot. On unless set to `false`; only a
    * platform admin can change it.
@@ -202,8 +196,8 @@ export const DEFAULT_WHATSAPP_SETTINGS: WhatsAppBotSettings = {
   crisisEscalationText:
     'It sounds like this may be urgent. This assistant cannot help with a crisis. Please ' +
     'contact a supervisor or a crisis line now: {helpline_numbers}',
-  fallbackText:
-    'Something went wrong on my side and I could not answer that. Please try again in a moment.',
+  // Chunk H1 Part D: the current run-failed reply, not the old error text.
+  fallbackText: "Sorry, I couldn't answer that just now. Please try again.",
   unrecognisedNumberText:
     'I am sorry — I cannot recognise this number, so I am not able to answer from your ' +
     "organisation's reference material. Ask your supervisor or your Ally administrator to add " +
@@ -220,7 +214,7 @@ export const DEFAULT_WHATSAPP_SETTINGS: WhatsAppBotSettings = {
     topK: 8,
     minSimilarity: 0.35,
     declineSimilarity: 0.42,
-    maxPassages: 5,
+    maxPassages: 8,
     maxContextTokens: 3000,
     similarityBand: 0.08,
     translateQuery: true,
@@ -235,7 +229,6 @@ export const DEFAULT_WHATSAPP_SETTINGS: WhatsAppBotSettings = {
   retentionDays: 180,
   crisisClassifierEnabled: true,
   helplineNumbers: '',
-  agentRuntimeAllowed: false,
   sharedStoreWrites: false,
   readHistoryFrom: 'wa',
   botPagePublicAllowed: false,

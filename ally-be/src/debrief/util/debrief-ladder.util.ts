@@ -184,6 +184,7 @@ export const SAFETY_RECALL_REPS = 3;
  */
 export const NON_LEARNER_VISIBLE_PROMPTS: readonly string[] = [
   'debrief_quality_judge_system',
+  'debrief_language_judge_rubric',
   'debrief_improver_system',
 ];
 /** Settings that only move money between runs, never what one run writes. */
@@ -191,6 +192,7 @@ export const NON_LEARNER_VISIBLE_SETTINGS: readonly string[] = [
   'runFloorUsd',
   'poolPerSessionUsd',
   'monthlyCapUsd',
+  'languageJudgeSampleRate',
 ];
 
 /**

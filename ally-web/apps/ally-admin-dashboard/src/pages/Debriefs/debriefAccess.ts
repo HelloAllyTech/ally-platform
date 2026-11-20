@@ -33,7 +33,6 @@ export interface DebriefAccess {
   verdict: boolean;
   /** Approve, put live, reject, run now, quick checks, questions. */
   pmAgent: boolean;
-  approvePinnedRule: boolean;
   testSets: boolean;
   releases: boolean;
   switchOn: boolean;
@@ -42,6 +41,8 @@ export interface DebriefAccess {
   settings: boolean;
   /** Agent logs: every agent's exact input and reply (the Ally team only). */
   agentLogs: boolean;
+  /** Settings › Clinical lists: the clinical advisor and the owner. */
+  clinicalLists: boolean;
 }
 
 /** ally-be's `viewer` in the console's words. */
@@ -56,13 +57,13 @@ export const accessFromViewer = (viewer: DebriefViewer): DebriefAccess => ({
   escalate: viewer.can.escalate,
   verdict: viewer.can.verdict,
   pmAgent: viewer.can.pmAgent,
-  approvePinnedRule: viewer.can.approvePinnedRule,
   testSets: viewer.can.testSets,
   releases: viewer.can.releases,
   switchOn: viewer.can.switchOrgOn,
   emergencyStop: viewer.can.emergencyStop,
   settings: viewer.can.ownerSettings,
   agentLogs: !!viewer.can.agentLogs,
+  clinicalLists: !!viewer.can.clinicalLists,
 });
 
 /** The same rules from the user's permissions, for before a payload has said. */
@@ -83,13 +84,13 @@ export const debriefAccessFor = (permissions: string[] | undefined): DebriefAcce
     escalate: team,
     verdict: advisor,
     pmAgent: team,
-    approvePinnedRule: advisor || owner,
     testSets: team,
     releases: team,
     switchOn: owner,
     emergencyStop: team,
     settings: owner,
     agentLogs: allyTeam,
+    clinicalLists: advisor || owner,
   };
 };
 

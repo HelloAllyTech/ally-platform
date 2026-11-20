@@ -41,6 +41,8 @@ export const ApiEndpoints = {
       `/v1/learn/admin/tracks/items/${trackItemId}/branching-reset`,
     REOPEN_ROLEPLAY_ASSESSMENT: (trackItemId: string) =>
       `/v1/learn/admin/tracks/items/${trackItemId}/assessment-reopen`,
+    COURSE_ASSESSMENT_PAIRS: (trackId: string) =>
+      `/v1/tenant-analytics/courses/${trackId}/assessment-pairs`,
     LEARNER_ENROLLMENTS: (userId: number) => `/v1/learn/admin/learners/${userId}/enrollments`,
     REMOVE_LEARNER_ENROLLMENT: (userId: number, trackEnrollmentId: string) =>
       `/v1/learn/admin/learners/${userId}/enrollments/${trackEnrollmentId}`,
@@ -234,6 +236,7 @@ export const ApiEndpoints = {
     // The Debrief agent's debrief for one of the caller's own sessions.
     GET_LEARNER_DEBRIEF: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}`,
     HELPFUL: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}/helpful`,
+    COMMENTS: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}/comments`,
     PULSE: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}/pulse`,
     FLAGS: (sessionId: string) => `/v1/debriefs/sessions/${sessionId}/flags`,
     FLAG: (sessionId: string, flagId: string) =>
@@ -348,6 +351,8 @@ export const ApiEndpoints = {
     GET_PUBLIC_BLOGS: "/v1/blog/public",
     GET_PUBLIC_BLOG_TAGS: "/v1/blog/public/tags",
     GET_PUBLIC_BLOG_BY_SLUG: (slug: string) => `/v1/blog/public/${slug}`,
+    GET_BLOG_REVIEW: (token: string) => `/v1/blog-review/${token}`,
+    CREATE_BLOG_REVIEW_SUGGESTION: (token: string) => `/v1/blog-review/${token}/suggestions`,
   },
   CHANGELOG: {
     // Public (ungated) changelog reads for the /blog/changelog page.

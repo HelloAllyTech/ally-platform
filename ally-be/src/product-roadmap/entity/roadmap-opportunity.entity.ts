@@ -12,6 +12,7 @@ import {
   RoadmapOpportunitySource,
   RoadmapOpportunityStage,
   RoadmapOpportunityType,
+  RoadmapReviewState,
 } from '../enum/roadmap-opportunity.enum';
 import {
   RoadmapFilingInterviewMessage,
@@ -268,6 +269,49 @@ export class RoadmapOpportunity extends BaseWithoutTenantEntity {
    */
   @Column({ type: 'boolean', default: false })
   directorStarred!: boolean;
+
+  /**
+   * Who starred it (D16: any Owner can star, and the star shows who gave it). Backfilled from
+   * the Prod Director for every existing star, and kept in step with `directorStarred` by the
+   * director-star route until cutover. The rank still reads `directorStarred`.
+   */
+  @Column({ type: 'int', nullable: true })
+  starredByUserId?: number | null;
+
+  /**
+   * The Owner's review (D10). Explicit `varchar` because a nullable enum union reflects as
+   * `Object` and fails TypeORM boot. See RoadmapReviewState for what NULL means.
+   */
+  @Column({ type: 'varchar', length: 10, nullable: true })
+  reviewState?: RoadmapReviewState | null;
+
+  @Column({ type: 'int', nullable: true })
+  reviewedBy?: number | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  reviewedAt?: Date | null;
+
+  /**
+   * Why it was declined, in one line. Shown to the AUTHOR ONLY (D10, [FP-0992]); everyone
+   * else sees "Declined". Never put it on a shared response or a broadcast.
+   */
+  @Column({ type: 'text', nullable: true })
+  declineReason?: string | null;
+
+  /**
+   * The Owner kept this idea when the old-and-quiet sweep pulled it up for review (To do, idea-to-
+   * plan audit rec 9), so the sweep does not offer it again. Set only by an Owner's click; the
+   * sweep itself never changes an idea.
+   */
+  @Column({ type: 'timestamptz', nullable: true })
+  sweepKeptAt?: Date | null;
+
+  @Column({ type: 'int', nullable: true })
+  sweepKeptBy?: number | null;
+
+  /** Filed with "Fill it in yourself" rather than the copilot's check (§5.7b); shown in triage. */
+  @Column({ type: 'boolean', default: false })
+  selfChecked!: boolean;
 
   /**
    * Manual rank WITHIN a lane, ascending. Not globally meaningful — two cards in different

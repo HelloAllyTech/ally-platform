@@ -13,6 +13,8 @@ import { ScenarioCharacterModule } from 'src/scenario-character/scenario-charact
 import { TrackModule } from 'src/track/track.module';
 import { CourseCopilotController } from './controller/course-copilot.controller';
 import { CourseCopilotEvent } from './entity/course-copilot-event.entity';
+import { CourseCopilotSource } from './entity/course-copilot-source.entity';
+import { CourseCopilotSourcesService } from './service/course-copilot-sources.service';
 import { CourseCopilotJob } from './entity/course-copilot-job.entity';
 import { CourseCopilotMessage } from './entity/course-copilot-message.entity';
 import { CourseCopilotSession } from './entity/course-copilot-session.entity';
@@ -35,6 +37,10 @@ import { CourseCopilotLandingPageService } from './service/course-copilot-landin
 import { CourseCopilotAllyNotesService } from './service/course-copilot-ally-notes.service';
 import { AllyNotesSpecialist } from './service/specialists/ally-notes.specialist';
 import { CourseCopilotLibraryService } from './service/course-copilot-library.service';
+import { CourseCopilotLearnerProfileService } from './service/course-copilot-learner-profile.service';
+import { CourseCopilotExampleCourseService } from './service/course-copilot-example-course.service';
+import { CourseCopilotDesignGuidanceService } from './service/course-copilot-design-guidance.service';
+import { CourseCopilotLearnerResultsService } from './service/course-copilot-learner-results.service';
 import { CourseCopilotMediaService } from './service/course-copilot-media.service';
 import { CourseCopilotOrchestratorService } from './service/course-copilot-orchestrator.service';
 import { CourseCopilotSchedulerRegistrationService } from './service/course-copilot-scheduler-registration.service';
@@ -42,6 +48,8 @@ import { CourseCopilotSessionService } from './service/course-copilot-session.se
 import { CourseCopilotStructureService } from './service/course-copilot-structure.service';
 import { CourseCopilotToolsService } from './service/course-copilot-tools.service';
 import { AnnotationSpecialist } from './service/specialists/annotation.specialist';
+import { ScenarioQuizSpecialist } from './service/specialists/scenario-quiz.specialist';
+import { BucketSortSpecialist } from './service/specialists/bucket-sort.specialist';
 import { ArticleSpecialist } from './service/specialists/article.specialist';
 import { BlueprintPlannerSpecialist } from './service/specialists/blueprint-planner.specialist';
 import { CourseMetaSpecialist } from './service/specialists/course-meta.specialist';
@@ -51,6 +59,7 @@ import { JournalSpecialist } from './service/specialists/journal.specialist';
 import { LandingPageSpecialist } from './service/specialists/landing-page.specialist';
 import { QuizSpecialist } from './service/specialists/quiz.specialist';
 import { RoleplayBriefSpecialist } from './service/specialists/roleplay-brief.specialist';
+import { RoleplayFitCheckSpecialist } from './service/specialists/roleplay-fit-check.specialist';
 import { SpecialistLlmService } from './service/specialists/specialist-llm.service';
 
 /**
@@ -67,6 +76,7 @@ import { SpecialistLlmService } from './service/specialists/specialist-llm.servi
       CourseCopilotMessage,
       CourseCopilotJob,
       CourseCopilotEvent,
+      CourseCopilotSource,
     ]),
     // WebSocketAuthMiddleware for the /course-copilot gateway.
     AuthModule,
@@ -94,12 +104,17 @@ import { SpecialistLlmService } from './service/specialists/specialist-llm.servi
     CourseCopilotGateway,
     CourseCopilotBriefService,
     CourseCopilotLibraryService,
+    CourseCopilotLearnerProfileService,
+    CourseCopilotExampleCourseService,
+    CourseCopilotDesignGuidanceService,
+    CourseCopilotLearnerResultsService,
     CourseCopilotCostService,
     CourseCopilotStructureService,
     CourseCopilotSessionService,
     CourseCopilotMediaService,
     CourseCopilotBlueprintService,
     CourseCopilotJobExecutorService,
+    CourseCopilotSourcesService,
     CourseCopilotBuildService,
     CourseCopilotEditToolsService,
     CourseCopilotToolsService,
@@ -113,10 +128,13 @@ import { SpecialistLlmService } from './service/specialists/specialist-llm.servi
     QuizSpecialist,
     JournalSpecialist,
     AnnotationSpecialist,
+    ScenarioQuizSpecialist,
+    BucketSortSpecialist,
     CourseMetaSpecialist,
     CourseReviewSpecialist,
     ImagePromptSpecialist,
     RoleplayBriefSpecialist,
+    RoleplayFitCheckSpecialist,
     LandingPageSpecialist,
     AllyNotesSpecialist,
   ],

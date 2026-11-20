@@ -24,6 +24,10 @@ class PmAgentRunRequest(BaseModel):
     budget_usd: float = Field(ge=0)
     #: The live `debrief_improver_system` text; None uses the default.
     system_prompt: Optional[str] = None
+    #: Live Skills Store texts by code: the subagents
+    #: (`debrief_pm_investigator_system`, `debrief_pm_reviewer_system`) and the
+    #: skills (`debrief_pm_skill_<name>`). A missing one uses the default.
+    prompts: Optional[Dict[str, Any]] = None
     #: Everything ally-be packed for this run (spec C1): comments, metric failure
     #: points, judge/Evaluator results, learner flags, reporting library and catalogue,
     #: editable prompts and settings, last run's outcomes, budget and autonomy.
@@ -69,8 +73,7 @@ class PmConversationRequest(BaseModel):
     #: ally-be's id for this turn (the person's message id): the agent token's
     #: run id, so every action the turn takes is tied to the person's words.
     turn_id: str
-    #: The checkpoint thread: one per console thread (`debrief-pm-conversation`,
-    #: and `debrief-pm-conversation:pinned-rules` for the clinical advisor).
+    #: The checkpoint thread: one per console thread (`debrief-pm-conversation`).
     thread_id: str = Field(
         "debrief-pm-conversation",
         pattern=r"^debrief-pm-conversation(:[a-z0-9-]{1,40})?$",

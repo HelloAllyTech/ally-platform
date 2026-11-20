@@ -1,0 +1,167 @@
+{
+  "language": "hi-IN",
+  "writer_model": "gemini-3-flash-preview",
+  "scenario": "A father is exhausted and ashamed because he shouted at his ten-year-old son; he wants to be a calmer parent but does not know how.",
+  "transcript": [
+    {
+      "turn_index": 1,
+      "role": "counselor",
+      "text": "नमस्ते। आप आज क्या बात करना चाहेंगे?"
+    },
+    {
+      "turn_index": 2,
+      "role": "client",
+      "text": "नमस्ते। मैं बहुत थका हुआ और शर्मिंदा महसूस कर रहा हूँ। मैंने आज अपने दस साल के बेटे पर चिल्ला दिया।"
+    },
+    {
+      "turn_index": 3,
+      "role": "counselor",
+      "text": "आप थका हुआ और शर्मिंदा महसूस कर रहे हैं क्योंकि आपने अपने बेटे पर चिल्लाया। यह सुनना मुश्किल है।"
+    },
+    {
+      "turn_index": 4,
+      "role": "client",
+      "text": "हाँ, मैं एक शांत पिता बनना चाहता हूँ। पर मुझे समझ नहीं आ रहा कि कैसे।"
+    },
+    {
+      "turn_index": 5,
+      "role": "counselor",
+      "text": "आप शांत पिता बनना चाहते हैं। क्या आप बता सकते हैं कि आज क्या हुआ जिससे आपको इतना गुस्सा आया?"
+    },
+    {
+      "turn_index": 6,
+      "role": "client",
+      "text": "काम का बहुत दबाव था। फिर उसने अपना होमवर्क नहीं किया। मेरा धैर्य जवाब दे गया।"
+    },
+    {
+      "turn_index": 7,
+      "role": "counselor",
+      "text": "तो, क्या आपको लगता है कि काम का तनाव ही मुख्य कारण था?"
+    },
+    {
+      "turn_index": 8,
+      "role": "client",
+      "text": "हाँ, तनाव तो था। पर मुझे अपने व्यवहार पर बहुत अफ़सोस है। मैं ऐसा नहीं करना चाहता था।"
+    },
+    {
+      "turn_index": 9,
+      "role": "counselor",
+      "text": "आप अपने व्यवहार पर अफ़सोस कर रहे हैं और बदलना चाहते हैं। एक शांत पिता बनने के लिए आप क्या कल्पना करते हैं?"
+    },
+    {
+      "turn_index": 10,
+      "role": "client",
+      "text": "मैं चाहता हूँ कि मैं उससे प्यार से बात करूँ। उसे समझा सकूँ, चिल्लाऊँ नहीं। मैं चाहता हूँ कि वह मुझसे डरे नहीं।"
+    },
+    {
+      "turn_index": 11,
+      "role": "counselor",
+      "text": "यह बहुत अच्छी बात है। आपको अपने बेटे से खुलकर बात करनी चाहिए। उसे समझाना चाहिए कि आप क्यों गुस्सा हुए।"
+    },
+    {
+      "turn_index": 12,
+      "role": "client",
+      "text": "हाँ, शायद। पर मुझे नहीं पता कि शुरुआत कैसे करूँ। मुझे डर है कि मैं फिर से वही गलती करूँगा।"
+    }
+  ],
+  "cards": {
+    "opening": "आपने क्लाइंट के पश्चाताप और शर्म को बहुत संवेदनशीलता के साथ सुना। आपने उन्हें यह महसूस कराया कि आप उनके संघर्ष को समझ रहे हैं।",
+    "important_moment": null,
+    "what_worked": [
+      {
+        "skill": "Reflects feelings",
+        "turn_index": 3,
+        "quote": "आप थका हुआ और शर्मिंदा महसूस कर रहे हैं क्योंकि आपने अपने बेटे पर चिल्लाया। यह सुनना मुश्किल है।",
+        "lead": "भावनाओं को समझना",
+        "body": "आपने उनकी थकान और शर्म को बहुत अच्छी तरह से पहचाना जिससे उन्हें अपनी बात कहने में आसानी हुई।"
+      },
+      {
+        "skill": "Uses open-ended questions",
+        "turn_index": 1,
+        "quote": "नमस्ते। आप आज क्या बात करना चाहेंगे?",
+        "lead": "बातचीत की खुली शुरुआत",
+        "body": "खुले सवालों के उपयोग से क्लाइंट को बिना किसी दबाव के अपनी समस्या विस्तार से बताने का मौका मिला।"
+      },
+      {
+        "skill": "Reflects feelings and desire",
+        "turn_index": 9,
+        "quote": "आप अपने व्यवहार पर अफ़सोस कर रहे हैं और बदलना चाहते हैं। एक शांत पिता बनने के लिए आप क्या कल्पना करते हैं?",
+        "lead": "बदलाव की इच्छा को पहचानना",
+        "body": "आपने न केवल उनके दुख को समझा बल्कि बेहतर पिता बनने की उनकी चाहत को भी सराहा जो उन्हें आगे बढ़ने की प्रेरणा देती है।"
+      }
+    ],
+    "work_on_this": [
+      {
+        "skill": "Avoids giving unrequested advice",
+        "turn_index": 11,
+        "quote": "यह बहुत अच्छी बात है। आपको अपने बेटे से खुलकर बात करनी चाहिए। उसे समझाना चाहिए कि आप क्यों गुस्सा हुए।",
+        "lead": "सलाह देने में जल्दबाजी न करना",
+        "why": "जब हम समाधान जल्दी पेश करते हैं तो क्लाइंट घबरा सकते हैं। उन्हें खुद रास्ता खोजने देने से उनका आत्मविश्वास बढ़ता है।",
+        "try_saying": "जब आप उनसे बात करने के बारे में सोचते हैं तो आपके मन में किस तरह के डर आते हैं?",
+        "scenario_id": null
+      },
+      {
+        "skill": "Explores root causes",
+        "turn_index": 7,
+        "quote": "तो, क्या आपको लगता है कि काम का तनाव ही मुख्य कारण था?",
+        "lead": "गहराई से探索 करने के लिए खुले सवाल",
+        "why": "बंद सवालों का जवाब केवल हाँ या नहीं में मिलता है जिससे बातचीत की गहराई कम हो सकती है।",
+        "try_saying": "तनाव के अलावा आपको और क्या लगता है कि उस समय आपके मन में क्या चल रहा था?",
+        "scenario_id": null
+      }
+    ],
+    "practise_next": {
+      "skill": "Avoids giving unrequested advice",
+      "reason": "क्लाइंट को अपने समाधान खुद खोजने में मदद करने से वे बदलाव के लिए अधिक तैयार और सक्षम महसूस करते हैं।",
+      "scenario_id": null,
+      "try_next": null
+    },
+    "skill_words": [
+      {
+        "skill": "Reflects feelings",
+        "word": "strength"
+      },
+      {
+        "skill": "Uses open-ended questions",
+        "word": "strength"
+      },
+      {
+        "skill": "Explores root causes",
+        "word": "keep_practising"
+      },
+      {
+        "skill": "Reflects feelings and desire",
+        "word": "strength"
+      },
+      {
+        "skill": "Avoids giving unrequested advice",
+        "word": "keep_practising"
+      }
+    ],
+    "skill_labels": [
+      {
+        "skill": "Reflects feelings",
+        "label": "भावनाओं को समझना"
+      },
+      {
+        "skill": "Uses open-ended questions",
+        "label": "खुले सवाल पूछना"
+      },
+      {
+        "skill": "Explores root causes",
+        "label": "जड़ तक पहुँचना"
+      },
+      {
+        "skill": "Reflects feelings and desire",
+        "label": "भावनाओं और इच्छाओं को पहचानना"
+      },
+      {
+        "skill": "Avoids giving unrequested advice",
+        "label": "बिना माँगी सलाह से बचना"
+      }
+    ],
+    "reflective_question": "जब क्लाइंट ने कहा कि उन्हें डर है कि वे फिर से वही गलती करेंगे तो आप उनकी इस चिंता को और गहराई से कैसे समझ सकते थे?",
+    "progress_note": null
+  },
+  "rule_checks": "passed"
+}

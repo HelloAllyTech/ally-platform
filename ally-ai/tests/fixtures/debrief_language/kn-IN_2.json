@@ -1,0 +1,159 @@
+{
+  "language": "kn-IN",
+  "writer_model": "gemini-3-flash-preview",
+  "scenario": "A father is exhausted and ashamed because he shouted at his ten-year-old son; he wants to be a calmer parent but does not know how.",
+  "transcript": [
+    {
+      "turn_index": 1,
+      "role": "counselor",
+      "text": "ನಮಸ್ಕಾರ. ನೀವು ಇಂದು ಏನು ಮಾತನಾಡಲು ಬಯಸುತ್ತೀರಿ?"
+    },
+    {
+      "turn_index": 2,
+      "role": "client",
+      "text": "ನನ್ನ ಮಗನ ಮೇಲೆ ಕೂಗಾಡಿದೆ. ನನಗೆ ತುಂಬಾ ನಾಚಿಕೆಯಾಗುತ್ತಿದೆ ಮತ್ತು ಬೇಸರವಾಗಿದೆ."
+    },
+    {
+      "turn_index": 3,
+      "role": "counselor",
+      "text": "ನಿಮ್ಮ ಮಗನ ಮೇಲೆ ಕೂಗಾಡಿದ್ದಕ್ಕೆ ನಿಮಗೆ ನಾಚಿಕೆ ಮತ್ತು ಬೇಸರವಾಗಿದೆ ಎಂದು ಕೇಳಿ ಬೇಸರವಾಯಿತು."
+    },
+    {
+      "turn_index": 4,
+      "role": "client",
+      "text": "ಹೌದು. ನಾನು ಶಾಂತವಾಗಿರಲು ಬಯಸುತ್ತೇನೆ, ಆದರೆ ಹೇಗೆ ಎಂದು ನನಗೆ ಗೊತ್ತಿಲ್ಲ."
+    },
+    {
+      "turn_index": 5,
+      "role": "counselor",
+      "text": "ಶಾಂತವಾಗಿರಲು ಬಯಸುತ್ತೀರಿ, ಆದರೆ ಅದು ಹೇಗೆ ಸಾಧ್ಯ ಎಂದು ನಿಮಗೆ ತಿಳಿದಿಲ್ಲ ಎನ್ನುತ್ತಿದ್ದೀರಿ. ಇದರ ಬಗ್ಗೆ ಇನ್ನಷ್ಟು ಹೇಳುತ್ತೀರಾ?"
+    },
+    {
+      "turn_index": 6,
+      "role": "client",
+      "text": "ನಾನು ತುಂಬಾ ಸುಸ್ತಾಗಿದ್ದೇನೆ. ಸಣ್ಣ ವಿಷಯಗಳಿಗೂ ಕೋಪ ಬರುತ್ತದೆ. ನಂತರ ಪಶ್ಚಾತ್ತಾಪ ಪಡುತ್ತೇನೆ."
+    },
+    {
+      "turn_index": 7,
+      "role": "counselor",
+      "text": "ನಿಮಗೆ ಸುಸ್ತಾಗಿರುವುದರಿಂದ ಕೋಪ ಬರುತ್ತದೆ ಎನ್ನುತ್ತಿದ್ದೀರಿ. ಕೋಪ ಬಂದಾಗ ಒಂದು ಕ್ಷಣ ನಿಲ್ಲಿಸಿ, ದೀರ್ಘ ಉಸಿರು ತೆಗೆದುಕೊಳ್ಳಲು ಪ್ರಯತ್ನಿಸಿ."
+    },
+    {
+      "turn_index": 8,
+      "role": "client",
+      "text": "ಅದು ಹೇಳಿದಷ್ಟು ಸುಲಭವಲ್ಲ. ಆ ಕ್ಷಣದಲ್ಲಿ ನನಗೆ ಏನೂ ನೆನಪಾಗುವುದಿಲ್ಲ."
+    },
+    {
+      "turn_index": 9,
+      "role": "counselor",
+      "text": "ಆ ಕ್ಷಣದಲ್ಲಿ ನಿಮಗೆ ಏನೂ ನೆನಪಾಗುವುದಿಲ್ಲ ಎಂದು ಹೇಳುತ್ತಿದ್ದೀರಿ. ಅದು ಕಷ್ಟಕರ ಎಂದು ಅರ್ಥವಾಗುತ್ತಿದೆ."
+    },
+    {
+      "turn_index": 10,
+      "role": "client",
+      "text": "ನನ್ನ ಮಗನಿಗೆ ಹತ್ತು ವರ್ಷ. ಅವನಿಗೆ ನನ್ನ ವರ್ತನೆ ನೋವುಂಟು ಮಾಡುತ್ತದೆ ಎಂದು ನನಗೆ ಗೊತ್ತು."
+    },
+    {
+      "turn_index": 11,
+      "role": "counselor",
+      "text": "ನಿಮ್ಮ ಮಗನಿಗೆ ನೋವಾಗುತ್ತದೆ ಎಂದು ನಿಮಗೆ ಅನಿಸುತ್ತಿದೆ. ನಿಮ್ಮ ಮಗನೊಂದಿಗೆ ನಿಮ್ಮ ಸಂಬಂಧ ಹೇಗಿದೆ?"
+    },
+    {
+      "turn_index": 12,
+      "role": "client",
+      "text": "ಅವನು ನನ್ನನ್ನು ಪ್ರೀತಿಸುತ್ತಾನೆ, ಆದರೆ ನನ್ನ ಕೋಪದಿಂದ ಅವನು ದೂರವಾಗುತ್ತಿದ್ದಾನೆ ಎಂದು ಅನಿಸುತ್ತದೆ."
+    }
+  ],
+  "cards": {
+    "opening": "ನಿಮ್ಮ ಈ ಸಂಭಾಷಣೆಯು ಕ್ಲೈಂಟ್ ತನ್ನ ಮನಸ್ಸಿನ ನೋವನ್ನು ಮತ್ತು ಪಶ್ಚಾತ್ತಾಪವನ್ನು ಮುಕ್ತವಾಗಿ ಹೇಳಿಕೊಳ್ಳಲು ಸಹಾಯ ಮಾಡಿತು. ನೀವು ಅವಳ ಭಾವನೆಗಳನ್ನು ಬಹಳ ಸಹಾನುಭೂತಿಯಿಂದ ಆಲಿಸಿದ್ದೀರಿ.",
+    "important_moment": null,
+    "what_worked": [
+      {
+        "skill": "Reflecting feelings",
+        "turn_index": 3,
+        "quote": "ನಿಮ್ಮ ಮಗನ ಮೇಲೆ ಕೂಗಾಡಿದ್ದಕ್ಕೆ ನಿಮಗೆ ನಾಚಿಕೆ ಮತ್ತು ಬೇಸರವಾಗಿದೆ ಎಂದು ಕೇಳಿ ಬೇಸರವಾಯಿತು.",
+        "lead": "ಭಾವನೆಗಳನ್ನು ಬಹಳ ಚೆನ್ನಾಗಿ ಪ್ರತಿಬಿಂಬಿಸಿದ್ದೀರಿ.",
+        "body": "ಅವಳ ನಾಚಿಕೆ ಮತ್ತು ಬೇಸರದ ಭಾವನೆಗಳನ್ನು ನೀವು ಸರಿಯಾಗಿ ಗುರುತಿಸಿದಿರಿ. ಇದರಿಂದ ಅವಳಿಗೆ ನೀವು ತನ್ನ ಮಾತನ್ನು ಗಮನವಿಟ್ಟು ಕೇಳುತ್ತಿದ್ದೀರಿ ಎಂಬ ಭರವಸೆ ಸಿಕ್ಕಿತು."
+      },
+      {
+        "skill": "Exploring impact on relationships",
+        "turn_index": 11,
+        "quote": "ನಿಮ್ಮ ಮಗನಿಗೆ ನೋವಾಗುತ್ತದೆ ಎಂದು ನಿಮಗೆ ಅನಿಸುತ್ತಿದೆ. ನಿಮ್ಮ ಮಗನೊಂದಿಗೆ ನಿಮ್ಮ ಸಂಬಂಧ ಹೇಗಿದೆ?",
+        "lead": "ಸಂಬಂಧಗಳ ಮೇಲಿನ ಪ್ರಭಾವವನ್ನು ಅನ್ವೇಷಿಸುವುದು.",
+        "body": "ಅವಳು ತನ್ನ ಮಗನ ಬಗ್ಗೆ ಆತಂಕ ವ್ಯಕ್ತಪಡಿಸಿದಾಗ ನೀವು ಅವರ ಸಂಬಂಧದ ಬಗ್ಗೆ ಕೇಳಿದ್ದು ಬಹಳ ಮುಖ್ಯವಾಗಿತ್ತು. ಇದು ಸಮಸ್ಯೆಯ ಮೂಲವನ್ನು ಅರ್ಥಮಾಡಿಕೊಳ್ಳಲು ಸಹಾಯ ಮಾಡಿತು."
+      }
+    ],
+    "work_on_this": [
+      {
+        "skill": "Exploring client's experience before offering solutions",
+        "turn_index": 7,
+        "quote": "ನಿಮಗೆ ಸುಸ್ತಾಗಿರುವುದರಿಂದ ಕೋಪ ಬರುತ್ತದೆ ಎನ್ನುತ್ತಿದ್ದೀರಿ. ಕೋಪ ಬಂದಾಗ ಒಂದು ಕ್ಷಣ ನಿಲ್ಲಿಸಿ, ದೀರ್ಘ ಉಸಿರು ತೆಗೆದುಕೊಳ್ಳಲು ಪ್ರಯತ್ನಿಸಿ.",
+        "lead": "ಸಲಹೆ ನೀಡುವ ಮುನ್ನ ಅನುಭವವನ್ನು ಅನ್ವೇಷಿಸಿ.",
+        "why": "ಕ್ಲೈಂಟ್ ಇನ್ನು ತನ್ನ ಪರಿಸ್ಥಿತಿಯನ್ನು ವಿವರಿಸುತ್ತಿರುವಾಗಲೇ ಸಲಹೆ ನೀಡುವುದರಿಂದ ಅವರು ತಮ್ಮ ಕಷ್ಟವನ್ನು ನೀವು ಸರಿಯಾಗಿ ಅರ್ಥ ಮಾಡಿಕೊಂಡಿಲ್ಲ ಎಂದು ಭಾವಿಸುವ ಸಾಧ್ಯತೆ ಇರುತ್ತದೆ.",
+        "try_saying": "ಆ ಕ್ಷಣದಲ್ಲಿ ನಿಮ್ಮ ಮನಸ್ಸಿನಲ್ಲಿ ಏನು ನಡೆಯುತ್ತಿರುತ್ತದೆ ಎಂಬ ಬಗ್ಗೆ ಇನ್ನಷ್ಟು ಹೇಳುತ್ತೀರಾ?",
+        "scenario_id": null
+      }
+    ],
+    "practise_next": {
+      "skill": "Exploring client's experience before offering solutions",
+      "reason": "ಸಮಸ್ಯೆಗೆ ಪರಿಹಾರವನ್ನು ಹುಡುಕುವ ಮೊದಲು ಕ್ಲೈಂಟ್‌ನ ಪರಿಸ್ಥಿತಿಯನ್ನು ಸಂಪೂರ್ಣವಾಗಿ ಅರ್ಥ ಮಾಡಿಕೊಳ್ಳುವುದು ಅವರಿಗೆ ನಾವು ಹೆಚ್ಚು ಹತ್ತಿರವಾಗಲು ಸಹಾಯ ಮಾಡುತ್ತದೆ.",
+      "scenario_id": null,
+      "try_next": null
+    },
+    "skill_words": [
+      {
+        "skill": "Opening the session",
+        "word": "strength"
+      },
+      {
+        "skill": "Reflecting feelings",
+        "word": "strength"
+      },
+      {
+        "skill": "Reflecting content and inviting elaboration",
+        "word": "strength"
+      },
+      {
+        "skill": "Exploring client's experience before offering solutions",
+        "word": "keep_practising"
+      },
+      {
+        "skill": "Validating client's difficulty",
+        "word": "strength"
+      },
+      {
+        "skill": "Exploring impact on relationships",
+        "word": "strength"
+      }
+    ],
+    "skill_labels": [
+      {
+        "skill": "Opening the session",
+        "label": "ಅಧಿವೇಶನವನ್ನು ಪ್ರಾರಂಭಿಸುವುದು"
+      },
+      {
+        "skill": "Reflecting feelings",
+        "label": "ಭಾವನೆಗಳನ್ನು ಪ್ರತಿಬಿಂಬಿಸುವುದು"
+      },
+      {
+        "skill": "Reflecting content and inviting elaboration",
+        "label": "ವಿಷಯವನ್ನು ಪ್ರತಿಬಿಂಬಿಸುವುದು ಮತ್ತು ವಿವರಣೆಗೆ ಆಹ್ವಾನಿಸುವುದು"
+      },
+      {
+        "skill": "Exploring client's experience before offering solutions",
+        "label": "ಸಲಹೆ ನೀಡುವ ಮುನ್ನ ಅನುಭವ ಅನ್ವೇಷಿಸುವುದು"
+      },
+      {
+        "skill": "Validating client's difficulty",
+        "label": "ಕಷ್ಟವನ್ನು ದೃಢೀಕರಿಸುವುದು"
+      },
+      {
+        "skill": "Exploring impact on relationships",
+        "label": "ಸಂಬಂಧಗಳ ಪ್ರಭಾವವನ್ನು ಅನ್ವೇಷಿಸುವುದು"
+      }
+    ],
+    "reflective_question": "ಕ್ಲೈಂಟ್ ತನ್ನ ಸುಸ್ತಿನ ಬಗ್ಗೆ ಹೇಳಿದಾಗ, ಆ ಸುಸ್ತಿನ ಬಗ್ಗೆ ಇನ್ನು ಹೆಚ್ಚಿನ ವಿವರ ಕೇಳಿದ್ದರೆ ಅದು ಅವಳ ಭಾವನೆಗಳನ್ನು ಇನ್ನು ಚೆನ್ನಾಗಿ ಅರ್ಥಮಾಡಿಕೊಳ್ಳಲು ಹೇಗೆ ಸಹಾಯ ಮಾಡುತ್ತಿತ್ತು ಎಂದು ನೀವು ಭಾವಿಸುತ್ತೀರಿ?",
+    "progress_note": null
+  },
+  "rule_checks": "passed"
+}

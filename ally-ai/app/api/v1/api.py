@@ -9,6 +9,7 @@ from app.api.v1.endpoints import (
     context_chunk,
     conversation,
     debrief,
+    debrief_language,
     debrief_quality,
     drift,
     feedback_groundedness,
@@ -93,4 +94,9 @@ api_router.include_router(
 )
 api_router.include_router(
     round_trip.router, prefix="/round-trip-wer", tags=["language_quality"]
+)
+api_router.include_router(
+    debrief_language.router,
+    prefix="/debrief-language",
+    tags=["debrief-language"],
 )

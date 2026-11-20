@@ -2,10 +2,12 @@ import { HttpException, Injectable, Optional } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { DataSource } from 'typeorm';
 import {
-  DEBRIEF_AGENT_KEY,
   DEBRIEF_ORCHESTRATOR_PROMPT_CODES,
+  DEBRIEF_PROMPT_CODES,
 } from '../constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
 import { pmAgentAutonomy } from '../constants/debrief-owner-settings.constants';
+import { ROLEPLAY_FIELDS_KEY } from '../constants/debrief-roleplay-fields.constants';
 import { DebriefAutonomyService } from './debrief-autonomy.service';
 import { DebriefNotifier } from './debrief-notifier.service';
 import { parseMetricsFilter } from '../util/debrief-metrics-filter.util';
@@ -29,6 +31,7 @@ import {
   introducesSessionText,
   ROUTE_KIND,
   settingRefusal,
+  settingValueText,
   stripQuotes,
 } from '../util/debrief-pm-agent-rules.util';
 import {
@@ -36,6 +39,7 @@ import {
   PmAgentGatewayTool,
 } from './debrief-run-token.service';
 import { DebriefContextRepository } from './debrief-context.repository';
+import { DebriefGuidanceMetricsService } from './debrief-guidance-metrics.service';
 import { DebriefMetricsService } from './debrief-metrics.service';
 import { DebriefPmAgentService } from './debrief-pm-agent.service';
 import { DebriefReportingService } from './debrief-reporting.service';
@@ -73,7 +77,10 @@ export function changeConfidence(v: unknown): {
   if (c.level === 'high' || c.level === 'low') {
     return { level: c.level, why: why || 'No reason given.' };
   }
-  return { level: 'low', why: 'The PM agent did not say how sure it is.' };
+  return {
+    level: 'low',
+    why: 'The Debrief PM agent did not say how sure it is.',
+  };
 }
 
 /** A change's confidence until its reviewer has answered: it waits for a person. */
@@ -169,6 +176,8 @@ export class DebriefPmAgentToolsService {
     /** What the agent may do alone per kind and step (PRD §12). */
     @Optional() private readonly autonomy?: DebriefAutonomyService,
     @Optional() private readonly notifier?: DebriefNotifier,
+    @Optional()
+    private readonly guidanceMetrics?: DebriefGuidanceMetricsService,
   ) {}
 
   async call(
@@ -181,10 +190,14 @@ export class DebriefPmAgentToolsService {
       switch (tool) {
         case 'comments_read':
           return await this.reviews.commentsForAgent(b);
+        case 'prompt_read':
+          return await this.promptRead(b);
         case 'reporting_query':
           return (await this.reporting.query(text(b.sql, 8000))) as any;
         case 'metrics_view':
           return await this.metricsView(b);
+        case 'guidance_report':
+          return await this.guidanceReport(b);
         case 'idea_propose':
           return await this.ideaPropose(claims, b);
         case 'release_draft':
@@ -207,7 +220,7 @@ export class DebriefPmAgentToolsService {
           return await this.reviewRecord(claims, b);
         default:
           // The conversation's tools are DebriefPmConversationService's.
-          return refuse(`${tool} is not a PM agent run tool`);
+          return refuse(`${tool} is not a Debrief PM agent run tool`);
       }
     } catch (e) {
       if (e instanceof Refused) {
@@ -268,6 +281,18 @@ export class DebriefPmAgentToolsService {
     };
   }
 
+  /**
+   * Debrief Guidance analytics (lookup and guidance agent): the Console's
+   * `guidance-metrics` payload. Counts, timings and entry titles only.
+   */
+  async guidanceReport(b: Record<string, any>) {
+    if (!this.guidanceMetrics) refuse('guidance analytics are not available');
+    return (await this.guidanceMetrics!.report({
+      days: b.days,
+      mode: b.mode,
+    })) as unknown as Record<string, unknown>;
+  }
+
   // --- ideas ------------------------------------------------------------------------
 
   private async idea(
@@ -290,7 +315,7 @@ export class DebriefPmAgentToolsService {
 
   private async requireOn(): Promise<void> {
     if (pmAgentAutonomy(await this.ownerSettings.get()) === 'off') {
-      refuse('the PM agent is switched off (autonomy mode off)');
+      refuse('the Debrief PM agent is switched off (autonomy mode off)');
     }
   }
 
@@ -462,6 +487,32 @@ export class DebriefPmAgentToolsService {
 
   // --- route A ------------------------------------------------------------------------
 
+  /**
+   * A Debrief prompt's live text, as the next run reads it: the version the
+   * live release pins, else the Skills Store's current one. Debrief prompts
+   * only; read-only (review 2026-11-16: the PM agent could not read the risk
+   * cue definition).
+   */
+  async promptRead(b: Record<string, any>) {
+    const code = text(b.code, 120);
+    const known = [
+      ...new Set([
+        ...Object.values(DEBRIEF_PROMPT_CODES),
+        // The independent judge's instructions (debrief-run-judge.service).
+        'debrief_quality_judge_system',
+        'debrief_language_judge_rubric',
+      ]),
+    ];
+    if (!known.includes(code)) {
+      refuse(`unknown prompt code; known: ${known.join(', ')}`);
+    }
+    const { bundle } = await this.pm.gaBundle();
+    const pinned = bundle.prompts?.[code] ?? null;
+    const live = await this.context.promptText(code, pinned);
+    if (live == null) refuse(`${code} has no live text`);
+    return { code, version: pinned ?? 'current', text: live };
+  }
+
   async releaseDraft(claims: DebriefAgentClaims, b: Record<string, any>) {
     await this.requireOn();
     const idea = await this.idea(claims, b.idea_id, 'A');
@@ -492,12 +543,17 @@ export class DebriefPmAgentToolsService {
         replace: b.replace,
       };
     } else if (kind === 'setting') {
-      const r = settingRefusal(b.setting_key, b.setting_value);
+      // roleplayFields is a list: it travels in setting_fields (setting_value is a number).
+      const value =
+        b.setting_key === ROLEPLAY_FIELDS_KEY
+          ? b.setting_fields
+          : b.setting_value;
+      const r = settingRefusal(b.setting_key, value);
       if (r) throw new Refused(r);
       change = {
         ideaKind: 'setting',
         settingKey: b.setting_key,
-        settingValue: String(Number(b.setting_value)),
+        settingValue: settingValueText(b.setting_key, value),
       };
       lessonKind = 'policy';
     } else if (kind === 'registry_agent') {
@@ -676,7 +732,7 @@ export class DebriefPmAgentToolsService {
   async quickTest(claims: DebriefAgentClaims, b: Record<string, any>) {
     const mode = pmAgentAutonomy(await this.ownerSettings.get());
     if (mode === 'off')
-      refuse('the PM agent is switched off (autonomy mode off)');
+      refuse('the Debrief PM agent is switched off (autonomy mode off)');
     const idea = await this.idea(claims, b.idea_id, 'A');
     const kind = idea.change?.ideaKind;
     if (kind === 'registry_agent') {
@@ -834,7 +890,7 @@ export class DebriefPmAgentToolsService {
     });
     // FR-54: every route-D proposal tells the owner.
     await this.notifier?.owner({
-      title: 'Debriefs: the PM agent has a question for a person',
+      title: 'Debriefs: the Debrief PM agent has a question for a person',
       body: `${idea.text} (${topic})`,
       data: { ideaId: idea.id },
     });
@@ -918,7 +974,7 @@ export class DebriefPmAgentToolsService {
     });
     // FR-54: every route-D proposal tells the owner.
     await this.notifier?.owner({
-      title: 'Debriefs: the PM agent proposes a Debrief Guidance entry',
+      title: 'Debriefs: the Debrief PM agent proposes a Debrief Guidance entry',
       body: `${action === 'change' ? `A change to ${existing!.code}` : 'A new entry'}: ${title}`,
       data: { ideaId: idea.id },
     });

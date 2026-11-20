@@ -43,8 +43,14 @@ export class BotDraftEntity extends BaseWithoutTenantEntity {
     website?: string;
     uploads?: string[];
     description?: string;
+    /** Started with "Interview me": the owner's answers in chat are what gets learned. */
+    interview?: boolean;
     /** The "Owner notes" document publish wrote, so publishing again updates it. */
     ownerNotesDocumentId?: string | null;
+    /** The "What we learned" document: the learned facts, one passage each (Q3-fast Part 2). */
+    learnedFactsDocumentId?: string | null;
+    /** Uploads still being read for "What we learned"; the draft shows "reading" until none. */
+    readingDocuments?: string[];
     /** The placeholder name the draft started with, until the site or the owner names it. */
     autoName?: string | null;
     /** The pages the owner chose to read (chunk 20a-2); reused when the site is read again. */

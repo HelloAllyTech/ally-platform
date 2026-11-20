@@ -35,6 +35,11 @@ vi.mock("sonner", () => ({ toast: { info: vi.fn(), error: vi.fn(), success: vi.f
 vi.mock("@ally-ui-mono/ui-shared", () => ({ logger: { info: vi.fn(), error: vi.fn() } }));
 
 vi.mock("@api", () => ({
+  // Segmented recording off: these tests cover the socket path.
+  useGetScribeRecordingConfigQuery: () => ({ data: { enabled: false }, isLoading: false }),
+  useStartScribeRecordingMutation: () => [vi.fn()],
+  useGetSegmentUploadUrlMutation: () => [vi.fn()],
+  useFinalizeScribeRecordingMutation: () => [vi.fn()],
   useEndCallMutation: () => [vi.fn(), { isLoading: false }],
   useLazyGetCounsellorChatQuery: () => [
     vi.fn(() => Promise.resolve({ data: counsellorChat.current })),

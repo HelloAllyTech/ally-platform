@@ -1,5 +1,7 @@
 # Debrief harness: the ally-be ↔ ally-ai contract
 
+Words used here (change, release, bundle, recipe, plan, step, agent) are defined in [GLOSSARY.md](GLOSSARY.md).
+
 Status: being built (2026-11-10); Ask Ally (§5) moved 2026-11-11. Design: `~/projects/Ally/ally-debrief-orchestrator-spec.md` (Parts A, D, E; Ask Ally §A10, §D2 step 4).
 
 The Debrief agent moves from ally-be's `DebriefRunnerService` to a LangGraph graph in ally-ai. **The graph
@@ -42,7 +44,14 @@ stored result.
     "expected_behaviours": ["Empathy"],                                     // named competencies only, never a custom code
     "helpful_behaviours": ["Asks open questions"],                          // the roleplay's SHOULD_DO + custom competencies' HELPFUL
     "unhelpful_behaviours": ["Gives advice too early"],                     // the roleplay's SHOULD_NOT_DO + custom competencies' UNHELPFUL
-    "competencies": [ { "name": "Empathy", "helpful": ["Reflects feelings"], "unhelpful": [] } ]   // named only; behaviours may be empty
+    "competencies": [ { "name": "Empathy", "helpful": ["Reflects feelings"], "unhelpful": [] } ],  // named only; behaviours may be empty
+    // The organisation's skill frameworks, merged (every active `skill_framework` Context Library entry it can read; no roleplay choice,
+    // no built-in fallback) and the roleplay's risk-cue option (spec DEBRIEF_ACROSS_ROLEPLAYS). All optional; ABSENT or no skills = no framework.
+    "framework": { "id": "DG-0100", "name": "Foundational helping skills", "foundational": true,
+                   "skills": [ { "key": "verbal", "name": "Verbal communication" } ],   // the Analyst writes the exact key (or name); no keyword matching
+                   "areas": [ { "name": "Listening Engagement", "description": "..." } ] },   // no skills = "none"; no areas = no coverage chart
+    "risk_cue": { "key": "standard", "name": "Standard", "handling": "alarm | assessed", "word_list_raises": true },
+    "speaker_labels": "legacy | neutral"                                    // neutral: LEARNER / CHARACTER; set with the release whose prompt texts are neutral (`bundle.settings.neutralWording`)
   },
   "transcript": [ { "turn_index": 0, "role": "counselor | client", "text": "...", "message_id": "..." } ],
   "context": {
@@ -80,6 +89,25 @@ Response:
 }
 ```
 
+**Skill framework and risk-cue option (spec DEBRIEF_ACROSS_ROLEPLAYS).** `session.framework` (the merged `skill_framework` entries the learner's
+organisation can read; empty when there are none, and the 14 foundational skills are only data in such an entry) is what the graph
+names wherever it needs skills: the Analyst's `{{skill_framework}}`, the progress agent's allowed keys (with
+`context.progress_profile.skill_names`, which adds the roleplay's named competencies), the SKILL COVERAGE areas and the
+Foundational Skills levels (used only when `framework.foundational`). `session.risk_cue` sets `word_list_raises` (the word
+list may raise a cue to clear; nothing ever lowers one; `false` leaves the Safety reader's own `strength` as the only
+judgement, no word list and no always-clear categories) and `handling`: under `assessed` the Safety reader also returns
+`part_of_practice` for each cue (its own judgement of whether the cue is the skill being practised; under `alarm` it is
+ignored). Cues it marks true are handled in the coaching cards (no important-moment card, no uncovered-cue check, no support
+lines), every other cue keeps the alarm path. The Writer, Reviser and Evaluator's fix notes get `{{risk_handling}}`, and
+`POST /gateway/checks` carries `risk_handling` and each cue's `part_of_practice`. The response's `has_alarm_risk_cue` says
+whether any cue stayed on the alarm path. The Evaluator also judges progress claims against `PROGRESS` (an unsupported
+"consistent strength" is a hard fail; no keyword list). The
+definition of a risk cue always arrives through `prompts["debrief_risk_cue_definition"]` (one pinned definition; a roleplay no longer carries its own wording).
+A roleplay's choice is one yes/no (Studio: "Is handling a risk conversation the skill practised here?", saved as `scenarios.metadata.debriefRiskCueOption` = `part_of_practice` or unset). `word_list_raises` is always true. The run records
+`workspace.frameworkUsed` (id, ids, name, area names) and `workspace.riskCueOption` (key, version, handling, support-lines flag, wording); the graph adds its own `workspace.framework`, `risk_cue` and `speaker_labels`.
+
+**Learner view `followUp` (2026-11-18).** `GET /debriefs/sessions/:id` answers `followUp: true` (absent otherwise, so older apps ignore it) when a clear risk cue is still left out of the debrief the learner reads: the run has `hasRiskCue` and its best draft failed the `risk_cue_uncovered` check, the Evaluator raised the `missed_risk_cue` hard fail, or `workspace.decision.reviewReason` is `missed_risk_cue` (`needsFollowUp` in debrief-agent.service.ts; only ever raised for clear cues). The debrief is shown exactly as before ("no debrief is held", 2026-11-16); the apps add a kind notice next to the support lines (`postSim.debriefCards.followUp.*`).
+
 **Language (v9 FR-39; moved into the graph 2026-11-11, spec §D1).** ally-be sends what it knows: the session's
 configured language (its default `en` when none is recorded), `language_recorded`, and `language_source:
 "recorded"` (null when not recorded). Before any step, the graph settles the language
@@ -94,6 +122,29 @@ language; the response's `language` and `workspace.languageSource` carry it, and
 
 Field meanings and values are exactly today's `DebriefRun` columns and workspace keys, so ally-be's apply step,
 the Console, the metrics and the PM agent's reporting views read them unchanged.
+
+### Versioning and tolerance (2026-11-19)
+
+Both sides carry `contract_version` (an integer, now **1**) on `POST /debrief/runs`: ally-be sends it in
+the request, ally-ai answers with it. A missing value means 1, so an older side still works during a
+deploy. Bump it only for a change the other side cannot tolerate; adding an optional field is not one.
+
+- **Unknown fields pass through.** ally-ai's response models allow extras (`extra='allow'`, never
+  `forbid`) and the route sends `exclude_unset`, so a card, step or hard fail has exactly the keys the
+  graph built. ally-be keeps unknown fields too.
+- **Typed on the ally-ai side:** `cards` (`lead`, `what_worked`, `work_on_this`, `important_moment`,
+  `practise_next`), `steps[]` (`step`, `label`, `status`, `startedAt`, `ms`), `evaluator_hard_fails[]` and
+  `check_failures[]` (a `code` is required). `workspace`, `bundle`, `session` and `context` stay plain
+  objects on purpose: ally-be owns their keys.
+- **ally-be reads the response through `normaliseGraphResponse`** (`debrief-graph-contract.util.ts`): a
+  wrongly shaped optional field is dropped with a warning that names its path; a response with no
+  `status`, or non-object `cards` for a debrief that is shown, is a **contract error**: the graph client
+  throws a graph error with status 422, so the run ends as failed (and is retried or falls back) instead
+  of being left for the sweeper or half-applied. A `contract_version` above the one ally-be reads logs a
+  warning.
+- **One fixture, two tests.** `contract-fixture-response.json` in this folder is read by ally-ai's
+  `tests/core/debrief_graph/test_contract_fixture.py` and ally-be's `debrief-graph-contract.spec.ts`. If
+  one side changes what it sends or can read, a test fails; change the fixture and both tests together.
 
 ## 2. Gateway tools — `POST {gateway_url}/tools/:name` (ally-be)
 
@@ -123,7 +174,8 @@ above. Builder and Bug Hunter are never given a token, so they never receive com
 |---|---|---|
 | `comments_read` | `{ "since"?: ISO date (exclusive, on `created_at`), "status"?: "open" \| "resolved" (default both), "ids"?: [uuid, ...], "limit"?: 1–200 (default 100) }` | `{ "comments": [ { "id", "run_id", "session_type", "language", "anchor": { "kind": "transcript" \| "card" \| "debrief", "turn_index", "section", "span_start", "span_end" }, "quoted_text", "body", "tag", "status", "idea": { "id", "status" } \| null, "repeat_of_id", "created_at", "replies": [ { "id", "body", "tag", "created_at" } ] } ], "next_since": ISO \| null }` — expert comment threads, oldest first (spec D8). Never the transcript, the cards or who wrote a comment. `next_since` is set when the page was full; pass it back as `since` |
 | `reporting_query` | `{ "sql": "SELECT …" }` | `ReportingQueryResult` `{ sql, ok, rows?, truncated?, refused? }` — the existing Analytics Agent guard and read-only executor over the redacted `debrief_reporting.*` views only. A refused query answers `refused` (the agent reads it as a tool error) |
-| `metrics_view` | `{ "weeks"?: 4–52 (default 8), "language"?, "recipe"?, …metric filters }` | `{ weeks, failure_points: [ { kind, name, segment, value, n, target, why } ], metrics: { <name>: value }, metric_names }` — spec C2 failure points from `DebriefMetricsService.view()` (`debrief-metric-failures.util.ts`): experience rates off the v9 targets (all, per language, per device), guardrails (hard-fail and thumbs-down above pre-launch, fabricated quotes, judge median below 8), efficiency drift (cost, revision rounds, visible seconds), steering falling, stages failing. Thin samples (n < 20) are left out |
+| `metrics_view` | `{ "weeks"?: 4–52 (default 8), "language"?, "recipe"?, …metric filters }` | `{ weeks, failure_points: [ { kind, name, segment, value, n, target, why } ], metrics: { <name>: value }, metric_names }` — spec C2 failure points from `DebriefMetricsService.view()` (`debrief-metric-failures.util.ts`): experience rates off the v9 targets (all, per language, per device), guardrails (hard-fail and thumbs-down above pre-launch, fabricated quotes, judge median below 8), efficiency drift (cost, revision rounds, visible seconds), steering falling, stages failing, and language faults in the debrief text (`language_issue_rate`, at most 0.2, overall and per language). Thin samples (n < 20) are left out |
+| `guidance_report` | `{ "days"?: 1–90 (default 30), "mode"?: "all"\|"live"\|"shadow" (default all) }` | The Console's guidance-metrics payload (below), unchanged. Read only; counts, timings and entry titles, no transcript text |
 | `idea_propose` | `{ "problem": { title, summary, comment_ids[], metrics: [ { name, value, segment? } ] }, "route": "A"\|"B"\|"C"\|"D", "title", "hypothesis", "expected_effect": { metric, direction: "up"\|"down", by?, note? }, "confidence": { level: "high"\|"low", why } }` | `{ idea_id, route, linked_comments, unknown_comment_ids, baseline: { metric, value }, next }` — writes an `agent_lessons` idea (`change.route`, `change.ideaKind` = `route_a` / `needs_code` / `defect` / `needs_person`; `evidence.problem`, `commentIds`, `metrics`, `forecast` with the named metric's value now, `confidence` `{level, why}` (V2_AUTONOMY A2; one left out is stored as low, so it never skips the always-ask list); `release_draft` may restate it), links the cited comments (`DebriefReviewService.linkIdea`). Refused: no evidence (no existing comment id and no metric), a metric not in `PM_AGENT_METRICS`, more than 5 ideas in one run, a duplicate, autonomy off |
 | `release_draft` | `{ "idea_id", "kind": "prompt_edit"\|"setting"\|"registry_agent", prompt_code/find/replace \| setting_key/setting_value \| agent: { id, description, use_when, skip_when, prompt, tools[], scopes[], eval_cases, model? } }` | `{ ok, idea_id, kind, next }` — route A only; draft only (nothing reaches learners). Refused: the never-list (C4: the rubric and judge prompts, the Safety reader, the PM agent's own instructions, budgets, `passScore`, every owner setting), prompts outside `PM_AGENT_EDITABLE_PROMPTS` (orchestrator prompts only while GA runs the orchestrator), a `find` not exactly once in the live text, a change to `{variables}`, settings outside `PM_AGENT_SETTINGS` ranges, a change that does not apply to GA or fails bundle validation; FR-53 for registry agents (registered tools and A2 scopes only, ≥ 10 eval cases, ≤ 10 experimental, approved model). Registry agents are stored as drafts: the build defines the agents a release can enable, so they are not tested yet |
 | `ladder_start_quick_test` | `{ "idea_id" }` | `{ status: "running", startedAt, note }` — requests `DebriefPmAgentService.screen` (the deterministic ladder: quick test → gate → paired trials → canary watch; a person starts the canary and promotes). Refused: autonomy `propose_only` (a person starts it in the Console) or `off`, no drafted change, a registry agent, the learning budget spent, a quick test already running |
@@ -181,9 +233,12 @@ Recorded by the ally-be build (2026-11-10).
    `estimateStepCostUsd`, and the runner's narration helpers). Check 7 in §4 (legacy vs graph side by side)
    can only be done against a build from before this change (e.g. master at `e9c1e7123`).
 2. **`session` keys** are the snake_case of `DebriefSessionContext`: `id, tenant_id, counselor_id, status,
-   language, language_source, language_recorded, learner_level, learner_turns, scenario_id, scenario
+   language, language_source, language_recorded, learner_level, learner_turns, learner_words, thin, scenario_id, scenario
    ({title, description}), expected_behaviours, helpful_behaviours, unhelpful_behaviours, competencies,
-   assessment, in_case` (the last four: see "What the roleplay expects" below).
+   assessment, in_case` (the last four: see "What the roleplay expects" below). `thin` is true when the learner
+   said too little to coach on (fewer than 3 turns or 40 words, `THIN_SESSION`): the graph then reads the safety
+   reader first and ends the run as `skipped` / `too_short` unless the learner sounds distressed (then the Analyst
+   and the rest run as usual).
 3. **`transcript` turns** are `{turn_index, role, text}` (no `message_id`: the transcript ally-be builds has none).
 4. **`context` values** are passed exactly as ally-be's readers return them: `past_work_on_this` is
    `[{date, skill, point}]`, `case_memory` a string or null, `cohort` `{trainees, skills: [{skill, how_often}]}`
@@ -209,6 +264,77 @@ Recorded by the ally-be build (2026-11-10).
 12. **Gateway errors**: 401 for a missing, malformed, wrongly signed or expired token; 403 for a tool not in
     `tools` or a run that does not exist, is for another session, or is not `running`; 404 for an unknown tool.
 13. **Timeout**: ally-be waits `riskDeadlineMs + 60 s` (the bundle's settings with run overrides) for the graph.
+
+### Settings › Agents (2026-11-17)
+
+Both under `/api/v1/debriefs/agents-config`. Read: Debrief console read access (`DebriefRead`). Change: the Debrief owner's `manage:admin:debrief-settings` (`DebriefAct('ownerSettings')`); `canEdit` mirrors it. A change is never a live edit: it makes a DRAFT release and a person's proposed change (`DebriefReleasesService.proposeBundle`, the path "Propose a change" uses), so it climbs the same ladder as the PM agent's changes. Every read is of the CURRENT GA release (no cache).
+
+`GET /v1/debriefs/agents-config` -> 200
+
+```
+{ "release": {"id","version","status"},          // live GA; id/version null and status "seed" when running the code seed
+  "canEdit": boolean,
+  "canary": {"id","version","share"} | null,     // share = % of new sessions
+  "recipes": [ {"key","shortForm","maxRevisionRounds",
+                "steps":[{"step","label","model"|null,"backupModel"|null,"promptCode"|null,"optional"}]} ],
+  "settings": {"guidanceAgentMaxCalls":3,"guidanceTools":{"guidance_agent":[..],"writer":[],"reviser":[]}},
+  "limits": {"guidanceAgentMaxCalls":{"min":0,"max":5},"guidanceToolSteps":[..],"guidanceToolNames":[..]},
+  "orchestratorAgents": [ {"id","version","enabled"} ],   // every registry agent; enabled = in the live release
+  "models": [ {"id","provider","label"} ],                // approved, active, priced; the only ones to offer
+  "pendingDraft": null | {"id","version","status","note","author":{"kind":"pm_agent|person|system","name":string|null}},
+  "recentChanges": [ {"releaseId","version","status","author":{kind,name},"at":ISO,"summary":["Setting · Guidance tools","Model · writer"],"source":"pm_agent|person|seed"} ]  // last 10 releases, newest first, each against its parent
+}
+```
+
+`POST /v1/debriefs/agents-config/changes` body `{ "changes": [ {"kind":"model","recipe","step","model","backupModel"|null} | {"kind":"setting","key":"guidanceAgentMaxCalls"|"guidanceTools","value"} | {"kind":"orchestrator_agent","id","enabled"} ], "note": "<=500 chars" }`
+-> 201 `{ "draft": {"id","version","status","note","author"}, "waitsForPerson": boolean, "reason": string|null }`.
+`waitsForPerson` follows the owner setting "New models or providers" (`askModels`) and the locked always-ask kinds (`alwaysAsk`); the draft is made either way. -> 400 `{ "message", "refusals":[{"index","reason"}] }` with nothing created when any change is refused (unknown recipe or step, a step with no model slot such as `checks` and `guidance_lookup`, a model not on the approved list, bad `guidanceTools`, `guidanceAgentMaxCalls` outside 0–5, unknown registry agent, or a bundle that fails `validateDebriefBundle`). -> 403 without the permission.
+
+### Guidance tools and the guidance agent (2026-11-17)
+
+Agentic RAG: a bounded tool loop browses an index of Debrief Guidance and fetches more before the Writer. Any
+Debrief step can be given the tools; the tools belong to no one agent. All three are `POST /tools/<name>` with
+the run token, in every debrief run's token. Every call may carry `"step"` (the calling step's name, e.g.
+`guidance_agent`, `writer`, `reviser`); without one, `guidance_index` / `guidance_fetch` are the `guidance_agent`'s
+and `guidance_search` is the plain lookup (always allowed, unchanged).
+
+- **`guidance_index`** `{ "step"? }` -> `{ "version": "<12-hex>", "entries": [ { "code": "DG-0012", "kind": "level_guide|style_guide|practice_guideline|protocol|...|null", "level": ["lay"], "title": "<=120 chars (protocol keeps the ORGANISATION PROTOCOL: label)", "hint": "<=160 chars: the entry's situations joined with \"; \", else the first sentence of body/statement" } ] }`.
+  Active Debrief Guidance the run's organisation may read (global, or its tenant in `tenantIds`; a non-UUID tenant
+  reads global only), never `skill_framework`, sorted by code. Cached in memory per tenant; every call runs one
+  `SELECT count(*), max("updatedAt")` over the collection's active chunks and reuses the cache only while that is
+  unchanged (an edit, delete or add in the Context Library shows on the next call). `version` is that signature
+  hashed. Never throws: `{ "version": "unavailable", "entries": [], "unavailable": true }`.
+- **`guidance_search`** unchanged: `{ "topics": [ { "situation" } ], "per_moment" }` -> `{ passages, no_confident_match }`.
+- **`guidance_fetch`** `{ "codes": ["DG-0012", ...], "step"? }` (at most 5, extra ignored; codes trimmed,
+  case-insensitive) -> `{ "passages": [ { "id", "code", "title", "text", "citation", "band": "direct" } ], "not_found": ["DG-9999"] }`.
+  Only entries the organisation may read, active, not `skill_framework`; a hidden code is simply `not_found`.
+  Never throws: `{ "passages": [], "not_found": <codes>, "unavailable": true }`. A fetch records a Context Library
+  usage event (`read`, with the step); index and search/fetch also log a debug line (step, tool, count; no text).
+- **Per-step enforcement:** the run token carries `settings.guidanceTools`; a call whose `step` is not enabled for
+  that tool is refused with 403 (ally-ai hands the model the error). A malformed step name is 403 too.
+- **Settings** (release `settings`, both optional so older releases work): `guidanceAgentMaxCalls` (integer 0-5,
+  default 3; tool calls per run; 0 = the agent is off; PM-agent range `PM_AGENT_SETTINGS`) and `guidanceTools`, an
+  object keyed by step, each a list drawn from
+  `guidance_index`, `guidance_search`, `guidance_fetch`. Valid keys today: `guidance_agent`, `writer`,
+  `reviser` (`GUIDANCE_TOOL_STEPS`: a step enters that list when ally-ai wires the toolbox into it, so nothing can be
+  switched on that does nothing). Absent = `{ "guidance_agent": [all three] }` (writer and reviser off). New seed
+  releases ship `guidance_agent` all three and `writer`, `reviser` empty. To try the Writer or Reviser with tools in
+  a replay: `settingOverrides: { "guidanceTools": { "guidance_agent": [...], "writer": ["guidance_index", "guidance_fetch"] } }`
+  (the override replaces the whole map).
+- **Model and prompt:** `DEBRIEF_MODELS.guidanceAgent = gemini-2.5-flash`, run as the optional recipe step
+  `guidance_agent` (label "Choosing guidance…", in the standard and short seed recipes, after `guidance_lookup` in
+  standard). It is a model step like the others: a release may change its model or backup, the organisation
+  provider allowlist is applied to it (substituted or blocked), and a release without the step stays valid
+  (`guidanceAgentMaxCalls`/`guidanceTools` still govern whether it runs). Skills Store prompt `debrief_guidance_agent_system`, variables `guidance_index`, `moments`, `skills`,
+  `baseline_passages`, `learner_level`, `max_calls` (`moments` required); sent to ally-ai with the graph's prompts.
+  AI task registry row `debrief-guidance-agent`.
+- **Guidance: lookup off / agent as the mechanism (ally-ai):** the lookup's per-moment `guidance_search` calls run
+  concurrently (results in moment order). With `guidancePassagesPerMoment` 0 the guidance agent is the mechanism: on
+  the orchestrated path it is not offered to the planner (nor is `guidance_lookup`) and runs as the fixed step after
+  dispatch for any session with pivotal moments; with it above 0 the planner may choose or skip the agent as before.
+  `workspace` gains `guidanceMode` (`both|lookup|agent|none`: what produced passages this run), `guidanceGiven`
+  (`[{ "code", "via" }]` for every passage handed to the Writer, deduped by code, `via` = `lookup|agent_search|
+  agent_fetch|writer|reviser`) and `guidanceTimings` (`{ "lookupMs", "agentMs" }`, null when that node did not run).
 
 ### Recorded by the ally-ai build (2026-11-10)
 
@@ -254,7 +380,7 @@ Recorded by the ally-be build (2026-11-10).
 
 Gopi: "as much as possible the learner should get the debrief; in the worst case fall back to the old debrief
 (today's debrief)". Nothing leaves the learner on "working", "on its way" or "taking longer" for good:
-
+ The seed default is now `guidancePassagesPerMoment` 0 (2026-11-17): in a local comparison on eight sessions the agent alone matched the lookup plus agent on judge score (paired mean difference -0.07, noise) and cost, and was 5-16 s faster; the Guidance analytics (Analytics › Debriefs) show whether the entries it chooses differ.
 - **Past the month's cap.** A **live** run whose ceiling (the cap, what is left of it, or the session budget) is
   below `settings.runFloorUsd` runs with `ceiling_usd = runFloorUsd` and `allow_over_ceiling: true`; when the
   month's cap is what stopped it, ally-be marks `workspace.overCap = true` and `workspace.overCapSpend
@@ -319,8 +445,9 @@ ally-be sends the roleplay's own SHOULD_DO / SHOULD_NOT_DO behaviours (`scenario
 same ones today's debrief reads) as `helpful_behaviours` / `unhelpful_behaviours`, adds each custom
 competency's HELPFUL / UNHELPFUL behaviours to them without duplicates (never its code), and sends named
 competencies in `competencies` as labels with their own behaviours when they have any. `expected_behaviours`
-keeps only the named competencies (cohort stats and other name readers). The Analyst gets a code-owned
-ROLEPLAY EXPECTATIONS line and a `<roleplay_expectations>` block: assess each behaviour the counsellor had the
+keeps only the named competencies (cohort stats and other name readers). The Analyst gets the data line
+`ROLEPLAY EXPECTATIONS: given.`, the no-codes line and a `<roleplay_expectations>` block; its prompt's ROLEPLAY
+EXPECTATIONS paragraph (moved there 2026-11-16) says: assess each behaviour the counsellor had the
 opportunity for (shown the helpful, avoided the unhelpful); a competency is a label for grouping or naming,
 assessed through its behaviours; one with no behaviours may be interpreted from its name, said in the note
 with lower confidence; name evidence by the competency's name or the behaviour itself; never output a code.
@@ -362,9 +489,26 @@ category or with clear words; the Evaluator listed it and did not answer `clear:
 of the meaning, in any language); or the word list in `cue_strength.py` matches its quote. Otherwise it is
 **possible**. No signal can lower another's clear (`turn_is_clear`).
 
-- **Evaluator:** its risk cues carry `clear` (`EvaluatorRiskCue`; the independent judge's schema is unchanged).
+**One definition (2026-11-16).** What clear and possible mean lives in one pinned Skills Store prompt,
+`debrief_risk_cue_definition` (guard; default `ally-be/src/prompts/debrief/risk_cue_definition.txt`, fallback
+`app/core/debrief/risk_cue_definition.py`). ally-be sends its live text in the run's `prompts` (it is in the
+graph's prompt codes, so a release can pin it) and to `POST /debrief-quality/judge` as `risk_cue_definition`.
+ally-ai adds it once, as a `RISK CUE DEFINITION:` block, to the Safety reader, the Writer, the Reviser, the
+Evaluator and the independent judge; the Writer's RISK CUES section, the rubric and the `clear` field's
+description point to it instead of repeating it. The Safety reader also returns `strength` per cue, by the
+definition, with recall unchanged ("when unsure, INCLUDE"; unsure strength is clear). The final strength
+(`cue_strength`) is clear when the reader says clear, the category is a clear one, or the word list matches
+(English, Hindi, Tamil, Kannada, Marathi, Malayalam; the list only raises). A cue the reader gave no strength
+reads as before. The judge (`DEBRIEF_QUALITY_JUDGE.PROMPT_VERSION` v2) lists cues with `clear` and hard-fails
+`missed_risk_cue` only for a missed clear one; the Evaluator keeps listing every missed cue for
+`split_missed_cues`. Ask Ally's distress read uses ally-ai's default definition.
+
+- **Evaluator:** its risk cues carry `clear` (`EvaluatorRiskCue`; since 2026-11-16 the judge's `RiskCue` carries it too).
   A missed clear cue is the `missed_risk_cue` hard fail. A missed possible cue
-  drops that hard fail; the run publishes as `below_bar` and is sent to review.
+  drops that hard fail. The run is sent to review (published as `below_bar`) only when the learner missed or
+  dismissed that cue (the Safety reader's `learner_response` is `missed` or `harmful`, or it has no entry for
+  that turn); a possible cue the learner explored or acknowledged needs no review (2026-11-18). The
+  Evaluator's step line shows the hard fails the run counts (`cue_strength.effective_hard_fails`).
 - **No debrief is held (2026-11-16):** when the best draft fails the bar for any reason (a blocking check, no score,
   or a missed clear risk cue), `decide` still publishes it as `below_bar`, with `workspace.decision.reviewReason`
   `checks_failed` / `not_evaluated` / `missed_risk_cue`. `missed_risk_cue` puts the run at the top of the Console
@@ -376,6 +520,83 @@ of the meaning, in any language); or the word list in `cue_strength.py` matches 
 - **Skill labels:** a debrief not in English carries `cards.skill_labels: [{skill, label}]`, written by the
   Writer and Reviser. `skill` stays as the evidence map names it (progress and metrics match on it); the
   learner and supervisor views and Listen show the label (`withSkillLabels` in ally-be).
+
+### Wording in prompts, data in code (2026-11-16)
+
+**Rule: wording and policy live in the prompt text (the Skills Store); code adds only data lines, format lines
+it parses, and safety lines a code check enforces.** A clinical lead changes how debriefs coach by publishing a
+prompt version, never by a code change. The data lines ally-ai adds after each step's live prompt, and the
+prompt section that says what to do with each:
+
+| Step | Data line (code) | Wording (prompt section) |
+|---|---|---|
+| Writer | `POSSIBLE RISK CUES: turns 5, 7.` | `debrief_writer_system` POSSIBLE RISK CUES |
+| Writer | `MISSED FEELINGS: turns 5.` | MISSED FEELINGS |
+| Writer | `COURSE: this session is part of a course; set practise_next.scenario_id to <id>; try_next applies, at most 3 items.` | PRACTISE THIS AGAIN (outside a course `try_next` is null) |
+| Writer | `CASE: this session continues a case.` + `CASE MEMORY:` block | CASE |
+| Writer | `MIXED EVIDENCE: <skill>; <skill>.` (behaviours whose `detector_agreement` is `disagrees`) | MIXED EVIDENCE |
+| Writer | `COHORT: given.` + `<cohort>` | COHORT |
+| Writer, Reviser | `FINDINGS: given.` + `<findings>` | the FINDINGS paragraph |
+| Analyst | `ROLEPLAY EXPECTATIONS: given.` + the no-codes line + `<roleplay_expectations>` | `debrief_analyst_system` ROLEPLAY EXPECTATIONS |
+| Analyst | `CASE: this session continues a case. Write case_memory_update: …` (format) + `CASE MEMORY:` | CASE (about the client only, never the trainee) |
+| Analyst | `LIVE DETECTIONS: given. For each behaviour it lists, set detector_agreement.` + `<live_detections>` | LIVE DETECTIONS |
+| Progress reader | `<past_work_on_this_points>` (with `learner_note`, `ally_decision`, `ally_reason`, `source`) | `debrief_progress_reader_system` HOW TO USE WHAT PEOPLE SAID ABOUT EARLIER DEBRIEFS |
+| Progress agent | `<learner_profile>.past_points` (same fields) | `debrief_progress_system` WHAT PEOPLE SAID ABOUT PAST POINTS |
+| Ask Ally | `REPLY LIMIT: 120 words.` (last line) | `debrief_reply_system` LENGTH |
+
+Since step 5 (below) these data lines are filled into the prompts' `{{placeholders}}` rather than appended; `given` markers became the blocks themselves, and an absent value reads `none`.
+
+Code-kept safety lines are unchanged: `RISK CUES TO COVER: turns …` with `drop_possible_important_moment`, the
+no-codes line (`custom_code` check), no turn numbers, the try_next cap (`TRY_NEXT_MAX`), SCRIPT and SKILL LABELS.
+A new blocking card check, `compares_learner`, fails card text that compares the learner with others (a share of
+trainees, "most trainees did better", "other learners", "compared with others", ranks, top/bottom, above/below
+average); "many find this moment hard" passes. The proposed prompt versions, with anchors for the live text, are
+in `docs/debrief-harness/proposals/2026-11-16-wording-to-prompts.json`.
+
+**Every Debrief prompt has a code (step 4, 2026-11-16).**
+
+- **Evaluator:** `debrief_evaluator_system` (pinned, guard) is what it is told last, its own code rather than the
+  judge's `debrief_quality_judge_system`: the judge is a measuring instrument labelled by a version in code, and
+  the Evaluator decides what learners read, so neither may move the other. `debrief_evaluator_fix_system` holds
+  CLEAR OR NOT and FIX NOTES; code adds `PASS BAR: <passScore>` (the release setting) and the `FIX SECTIONS:`
+  names the Reviser's critique is keyed by. The graph body carries `system_prompt`, `fix_prompt`, `pass_score`.
+- **Planner:** `debrief_planner_agents` holds each agent's `description` / `use_when` / `skip_when` as
+  `## <id>` sections; ally-ai merges them over the manifest's card (ids and machine fields stay in code; an
+  agent or field the text leaves out keeps the manifest's). The top-up is the data line `TOP-UP: given.`; its
+  meaning is `debrief_planner_system`'s TOP-UP paragraph.
+- **PM agent:** `debrief_pm_investigator_system`, `debrief_pm_reviewer_system` (pinned, guard) and one
+  `debrief_pm_skill_<name>` per skill (the whole SKILL.md). ally-be sends them as `prompts` on
+  `POST /pm-agent/runs` and merged into the conversation's `prompts`; ally-ai writes each skill into the
+  store namespace `debrief_pm_skills` before every run, and `/skills/` is a `StoreBackend` over it (read-only to
+  the agent, loaded by Deep Agents' own skills middleware). A missing text uses the packaged default.
+- **Flag answer:** "at most three short sentences" is `ally_ai_debrief_flag_answer_system`'s; `problem_with`
+  sends back a reply of more than three sentences (`REPLY_MAX_SENTENCES`).
+- **Ask Ally:** tool docstrings are short; when to use each tool is the reply prompt's TOOLS section ("never the
+  learner's own words" is still enforced by `clean_topic`). ally-be sends `THEIR ORGANISATION:` as a data label;
+  how to use it is the reply prompt's THEIR ORGANISATION paragraph.
+- **Clinical lists:** the score, diagnosis and jargon checks read word lists per language from
+  `debrief_owner_settings.clinicalLists` (`GET/PUT /debriefs/console/settings/clinical-lists`; edit: the clinical
+  advisor or the owner, `clinicalLists` action; audited as `DEBRIEF_SETTINGS_CHANGED`), with a one-minute cache
+  and the defaults when unreadable. English applies to every language. Entries are plain words or phrases,
+  escaped and matched case-insensitively at word boundaries; the numeric score shapes stay in code.
+
+**Placeholders (step 5, 2026-11-16).** The Debrief prompts that get runtime data carry ally-be's `{{name}}`
+placeholders at the end of their text (the fixed wording first, so the prefix stays cacheable): the Safety
+reader, Analyst, Progress reader, Progress agent, Writer, Reviser, the rubric (Evaluator and judge),
+`debrief_evaluator_fix_system`, the planner, the three registry agents and Ask Ally's reply. Each contract in
+`prompt-contracts.ts` declares every variable; the required ones are `{{transcript}}` wherever the model reads
+it, `{{risk_cue_definition}}` wherever it is injected, `{{risk_cue_turns}}` for the Writer and the Reviser (the
+Reviser now gets it too), `{{safety_reading}}` for the Writer, `{{debrief}}` for the rubric and the reply,
+`{{reply_word_limit}}` for the reply (the template's last line), `{{pass_bar}}`/`{{fix_sections}}` for the fix
+notes. The Skills Store refuses a version missing one (422 `SKILLS_STORE_CONTRACT_VIOLATION`). ally-ai fills them
+with `ally-ai/app/core/debrief/render.py` (one pass, values never re-scanned, literal braces need no escaping; ally-ai's
+`load_and_format` uses `str.format` and cannot read `{{name}}`); ally-be fills the reply with `renderPrompt`. An
+absent value renders as `none` (small values and blocks the prompt names) or empty (the planner's top-up blocks).
+Format and safety lines the code checks are one variable, `{{checked_rules}}` (`{{findings_rules}}` for the
+registry agents). **No backward compatibility:** a live text missing a required variable fails the step with an
+error naming the prompt code and the variable (`PromptVariableMissing` → `StepError` 500; Ask Ally answers
+"try again"); the run's retry and the fallback to today's debrief handle it. The flag answer and the PM
+conversation append no data to their system text and are unchanged.
 
 ## 5. Ask Ally — `POST /api/v1/ask-ally/replies` (ally-ai)
 
@@ -398,7 +619,7 @@ Auth: the service `X-API-Key`. Request:
   "reply": { "provider": "gemini | openai | anthropic", "model": "gemini-2.5-flash", "maxTokens": 900,
              "budgetUsd": 0.05, "maxTurns": 4 },                 // the release bundle's `reply`; the two limits optional
   "prices": { "<reply model>": { "input_per_m": 0.3, "output_per_m": 2.5 } },   // unpriced = the reply never runs
-  "system": "...",                      // built by ally-be: live reply prompt, debrief, transcript, org wording, length rule
+  "system": "...",                      // built by ally-be: live reply prompt, debrief, transcript, org wording, then `REPLY LIMIT: 120 words.` last
   "history": [ { "role": "user | assistant", "content": "..." } ],             // the thread's last 10, oldest first
   "message": "the learner's new message",
   "run_token": "<JWT, scope reply>",
@@ -437,6 +658,10 @@ Limits and behaviour:
   words; `stoppedBy` says which. `ModelCallLimitMiddleware` is a backstop that is never reached.
 - **Budget:** `budgetUsd` (default and ceiling $0.05), from each pass's token usage and `prices`.
 - **Session budget (ally-be, 2026-11-16):** one session's debrief run and all its Ask Ally replies share `settings.sessionBudgetUsd` (default $1.00; the run's ceiling is clamped to it). ally-be sends each reply `budgetUsd` = the smallest of the release's reply budget, $0.05, what the session has left and what the month's cap has left, and keeps the session's running total on `workspace.askAllySpentUsd` (the month's spend counts it too). With under $0.01 left, `settings.maxRepliesPerSession` replies already given (default 20), or the month's cap spent, ally-be calls no model: the learner gets `REPLY_LIMIT` in the debrief's language on a `done` event carrying `limit: "session" | "month"`. The crisis screen still answers first.
+- **Length (2026-11-16):** the system text ends with the data line `REPLY LIMIT: 120 words.` (`REPLY_MAX_WORDS`);
+  how to write short is the reply prompt's LENGTH section. ally-be's `replyCheckFailures` fails a reply over the
+  cap (`reply_too_long`: whitespace-separated words; Han/Kana at 2 characters a word and Thai/Lao/Khmer/Myanmar at
+  4, scripts written without spaces) and replaces it like any other failed reply check.
 - **Tools:** each must answer within 1.5 s; a failed or slow tool is told to the model as "This is unavailable right
   now. Answer from the debrief and the session." (`ToolErrorMiddleware`) and recorded `ok: false`. `search_guidance`
   calls `guidance_search` with one topic `{situation: <topic, at most 10 words>}` and `per_moment: 3`;
@@ -608,7 +833,7 @@ for each promoted idea that has stood 14 days, the named metric now against the 
 (`POST /v1/debriefs/console/pm-agent/ideas/:id/questions`), ally-be queues a short run with `review: "questions"`,
 `inputs: { open_questions: [ { idea_id, question_id, title, question, at } ], ideas: [ ... ] }`, a budget of
 min(`pmAgentRunCapUsd`, $0.50, learning budget left), and only the tools `questions_read`, `question_answer`,
-`reporting_query`, `comments_read`, `metrics_view`. One run at a time; a question that arrives during a run is
+`reporting_query`, `comments_read`, `metrics_view`, `guidance_report`. One run at a time; a question that arrives during a run is
 answered after it. Skipped while `pmAgentEnabled` is off or the learning budget is spent. Its `curator_run` row carries
 `review: "questions"` and is not shown as the latest report. Weekly and monthly runs also get both tools and
 `open_questions`. Gateway tools: `questions_read {}` → `{ questions: [...] }`; `question_answer { idea_id,
@@ -665,9 +890,7 @@ V2_AUTONOMY C1–C5. One person's message in the console's shared thread, answer
   reviewer (§7d), both with read-only gateway tools (`SUBAGENT_READ_TOOLS`) and every file write denied;
 - **guard**: `PmRunGuard` (model then backup with the circuit breaker, the turn's budget, `llm_usage` as
   `debrief_improver`, step records); LangSmith off;
-- **thread**: the Postgres checkpointer, thread id `debrief-pm-conversation` (the console's shared thread) or
-  `debrief-pm-conversation:pinned-rules` (the clinical advisor's turns, so an advisor's answer never draws on the
-  rest of the thread, C4). Each turn continues from the checkpoint; ally-be sends only the new message.
+- **thread**: the Postgres checkpointer, thread id `debrief-pm-conversation` (the console's one shared thread). Each turn continues from the checkpoint; ally-be sends only the new message.
   `debrief_pm_messages` stays the record the console reads. `503` when the checkpoint database could not be opened.
 
 Instructions: Skills Store `ally_ai_debrief_pm_conversation_system` (default
@@ -676,7 +899,7 @@ Instructions: Skills Store `ally_ai_debrief_pm_conversation_system` (default
 ```jsonc
 {
   "turn_id": "uuid",                 // the person's message id; also the agent token's agentRunId
-  "thread_id": "debrief-pm-conversation" | "debrief-pm-conversation:pinned-rules",
+  "thread_id": "debrief-pm-conversation",
   "model": "gemini-2.5-pro", "backup_model": "gemini-2.5-flash", "prices": { ... },
   "budget_usd": 0.25,                // min(pmAgentRunCapUsd, 0.25, learning budget left)
   "message": "...", "author": "Asha",
@@ -791,3 +1014,65 @@ rule (`debrief-ladder.util.ts` `gateResult`), and also fails it when the judge m
 challenger debrief on the gate set `missed_risk_cue`. The reading is kept on the idea's
 `evidence.gate.safetyRecall` (with `cases`, `planted`, `model`, `ranAt`) and is what Analytics › Debriefs
 shows as "Safety recall on the seeded set" (CONSOLE_API.md).
+
+## Debrief Guidance analytics
+
+`GET /v1/debriefs/console/guidance-metrics?days=30&mode=all` (`@DebriefRead()`, the same read permission as `metrics`;
+`days` 1–90, default 30; `mode` `all` = live + shadow | `live` | `shadow`; replays are never counted). The PM agent reads
+the same payload with `guidance_report`. Served by `DebriefGuidanceMetricsService`; aggregation in
+`debrief-guidance-metrics.util.ts`. The newest 5000 non-skipped runs in the window are read. Aggregate only: no
+transcript text, quotes or learner data; entries carry their library title and kind.
+
+```
+{ window: { from, to, days }, mode,
+  runs: { total, withAgent, withLookup, agentOnly, lookupOnly, neither },
+  planner: { decided, chose, skipped, skipReasons: [ { why, count } ] },   // top 5, planner `considered` why_not for guidance_agent
+  tools: [ { step, tool, calls, ok, avgMs, p90Ms, avgCodes } ],           // per step + tool, from workspace.guidanceCalls
+  entries: [ { code, title, kind|null, fetched, given, runs } ],          // top 15 by given
+  latency: { lookup: { n, p50Ms, p90Ms }, agent: { n, p50Ms, p90Ms } },
+  compare: { withAgent: { n, avgJudge|null, avgCostUsd|null }, withoutAgent: { … } },
+  daily: [ { date, runs, withAgent, avgLookupMs|null, avgAgentMs|null } ] }
+```
+
+Sources, newer field first, older run falls back: `workspace.guidanceMode` (`both|lookup|agent|none`) → agent ran =
+`guidance_agent` calls or a `guidance_agent` log of kind `model` (the planner's marker entry is kind `code` and does not
+count), lookup ran = a `guidance_lookup` log; `workspace.guidanceTimings {lookupMs, agentMs}` → the step log `ms` (agent:
+sum of its call `ms`); `workspace.guidanceGiven [{code, via}]` → codes in `workspace.passages`. `fetched` counts codes a
+`guidance_fetch` call returned (index and search lists are not fetches); `given` counts runs where the code reached the
+Writer; `runs` counts runs where it was fetched or given. `planner.decided` = runs whose planner chose the agent
+(`actions`) or listed it in `considered`. Judge = `evaluatorOverall`, else `workspace.judge.overall`; cost =
+`estimatedCostUsd`.
+
+## Debrief language check
+
+A second, separate judge on a debrief's own text: **is it written well in the session's language?** (Not whether the
+coaching is good: that is the debrief-quality judge. Not the roleplay client's language: that is the language-quality
+judge, on the client's turns.) Findings only, no score.
+
+- **ally-ai** `POST /api/v1/debrief-language/judge` (`app/core/debrief_language/`, task `debrief_language_judge`,
+  settings `DEBRIEF_LANGUAGE_JUDGE` provider/model/`PROMPT_VERSION`). Request: `sections` (`{section, text}`: the visible
+  text only, `languageSections` in ally-be), `language`, `language_config` (`languages.evalConfig`: label, variety,
+  diglossia, code-switch partners; all optional), `quoted_turns` (only the transcript turns the cards cite), `rubric` (the
+  pinned Skills Store text, else the code default). Response: `judge_model`, `judge_prompt_version`, `answered`,
+  `findings: [{section, error_type, evidence_quote, note}]`, `dropped`, `log`. Pinned model, temperature 0, never falls back,
+  a different model family from the Writer.
+- **Closed error types:** `wrong_language`, `script_mix`, `untranslated_chunk`, `quote_altered`, `stiff_register`,
+  `literal_translation`, `grammar_or_agreement`, `meaning_drift`. Code, not the model, enforces them: an unknown type, a
+  quote not found in the debrief text, an over-long quote or a duplicate is dropped and counted in `dropped`.
+  `answered: false` (no usable reply) is never stored as "no problems".
+- **ally-be** table `debrief_language_judgments` (migration 1984700000000): one row per run (`runId` unique, cascade),
+  `language`, `judgeModel`, `judgePromptVersion`, `findings` jsonb, `findingCount`, `types` text[], `judgedAt`. Written by
+  `DebriefLanguageJudgeService`; a normal call never overwrites, a deliberate re-judge (`force`) replaces the row. Ledger family
+  `debrief-language` (3 attempts, 60 min apart).
+- **When it runs:** only in the background `debrief-judge` drain, after the quality judge, inside its own guard; never in the
+  learner's wait, never on the run or publish path, and a failure there cannot fail or delay the quality judge. The share of
+  runs it reads is the release setting `languageJudgeSampleRate` (0 to 1, absent = 1; a person's setting, not the PM agent's),
+  chosen by a hash of the run id so a retry decides the same way.
+- **Metrics:** `quality.byLanguage[].languageProblem = { checked, notChecked, withFinding: Rate, byType: {type: debriefs} }`
+  (same Wilson interval as every rate). Failure point `language_issue_rate` (`language_off_target`), at most 0.2, overall and
+  per language, only past the 20-debrief floor. Metric name `language_issue_rate` (down is better).
+- **PM agent:** a consumer through the redacted views only: `debrief_reporting.language_checks` (one row per checked run) and
+  `debrief_reporting.language_findings` (language x error_type x card section, one row per finding). No quote, no note, no
+  learner text, no names. No new tool and no write access: it proposes general Writer-prompt changes through the normal ladder.
+- **Gate:** `ally-ai/scripts/debrief_language_perturbations.py` (planted faults, look-alike non-faults, flip rate, a
+  second judge for agreement); see the script's header for thresholds. The judge is trusted only while it passes.

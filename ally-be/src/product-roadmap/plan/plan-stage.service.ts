@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Not, Repository } from 'typeorm';
 import { BuilderSessionService } from 'src/builder/service/builder-session.service';
@@ -9,6 +9,7 @@ import {
 } from 'src/builder/enum/builder.enum';
 import { PlanEventService } from 'src/product-planning/service/plan-event.service';
 import { PlanNotificationService } from 'src/product-planning/service/plan-notification.service';
+import { RoadmapIdeaNoticeService } from 'src/product-planning/service/roadmap-idea-notice.service';
 import {
   PlanEventKind,
   PlanNotificationKind,
@@ -23,6 +24,11 @@ import { RoadmapOpportunityStage } from '../enum/roadmap-opportunity.enum';
 import { PlanSession, PlanSessionStore } from './plan-session.store';
 import { PlanReadinessService } from './plan-readiness.service';
 import { checkFactsHash } from './plan-check.service';
+
+/** What getSessionDetail returns, for callers that pass it in. */
+export type PlanSessionDetail = Awaited<
+  ReturnType<BuilderSessionService['getSessionDetail']>
+>;
 
 const BUILD_STATUSES: string[] = [
   BuilderSessionStatus.BUILDING,
@@ -50,9 +56,23 @@ export class PlanStageService {
     private readonly notifications: PlanNotificationService,
     @InjectRepository(RoadmapOpportunity)
     private readonly opportunities: Repository<RoadmapOpportunity>,
+    /**
+     * The plan-ready notice (idea-to-plan audit rec 8). Optional so specs that
+     * build this positionally need not pass it; typed as the class so DI
+     * resolves it. Never throws.
+     */
+    @Optional()
+    private readonly ideaNotices?: RoadmapIdeaNoticeService,
   ) {}
 
-  async facts(plan: PlanSession): Promise<PlanStageFacts> {
+  /**
+   * `preloaded` is the session detail when the caller already read it (the
+   * Roadmap v2 idea page), so one page load reads the PRD once.
+   */
+  async facts(
+    plan: PlanSession,
+    preloaded?: PlanSessionDetail | null,
+  ): Promise<PlanStageFacts> {
     const record = plan.plan ?? {};
     const opportunity = record.opportunityId
       ? await this.opportunities.findOne({
@@ -64,11 +84,12 @@ export class PlanStageService {
 
     let prdReady = false;
     let designApproved = false;
-    if (!isPrivate && plan.leadUserId) {
-      const detail = await this.builderSessions.getSessionDetail(
-        plan.id,
-        plan.createdBy,
-      );
+    // The PRD and design are assessed once planning is under way: an Owner
+    // plans before anyone is assigned to build it (lifecycle 2026-11-18).
+    if (!isPrivate && (plan.leadUserId || record.planningStarted === true)) {
+      const detail =
+        preloaded ??
+        (await this.builderSessions.getSessionDetail(plan.id, plan.createdBy));
       prdReady = (
         await this.readiness.assess(
           plan,
@@ -94,6 +115,7 @@ export class PlanStageService {
       launched: !!record.launch?.launchedAt,
       reviewsDue: record.reviews?.dueDates.length ?? 0,
       reviewsDone: record.reviews?.done ?? 0,
+      planningStarted: record.planningStarted === true,
     };
   }
 
@@ -124,6 +146,7 @@ export class PlanStageService {
     });
     await this.onEnter(plan, next, actorUserId);
     await this.announce(plan, next);
+    await this.ideaNotices?.stageEntered(sessionId, next);
     return next;
   }
 

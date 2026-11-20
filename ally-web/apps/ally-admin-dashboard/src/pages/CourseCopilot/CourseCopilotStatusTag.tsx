@@ -16,21 +16,35 @@ const STATUS_CLASSES: Record<CourseCopilotSessionStatus, string> = {
   ARCHIVED: "bg-neutral-100 text-neutral-600",
 };
 
+/** Stronger than Editing's green: the course is in front of learners. */
+const PUBLISHED_CLASSES = "bg-success-600 text-white";
+
 /**
  * A session's status as a pill.
  *
  * A styled span, not Carbon's `<Tag>`: Tag renders a `<button>`, and the sessions list puts this
  * inside a clickable card (a button in a button is invalid DOM and steals the click).
  */
-export const CourseCopilotStatusTag: React.FC<{ status: CourseCopilotSessionStatus }> = ({
-  status,
-}) => (
-  <span
-    className={[
-      "inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium",
-      STATUS_CLASSES[status] ?? "bg-neutral-100 text-neutral-600",
-    ].join(" ")}
-  >
-    {en.courseCopilot.status[status] ?? status}
-  </span>
-);
+export const CourseCopilotStatusTag: React.FC<{
+  status: CourseCopilotSessionStatus;
+  /**
+   * The course is live. Shown as "Published" in place of "Editing" — once learners can see the
+   * course, that is the fact that matters most. A build or a failure still wins: those need
+   * the trainer whatever the course's state.
+   */
+  published?: boolean;
+}> = ({ status, published = false }) => {
+  const isPublished = published && (status === "EDITING" || status === "ARCHIVED");
+  return (
+    <span
+      className={[
+        "inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium",
+        isPublished
+          ? PUBLISHED_CLASSES
+          : (STATUS_CLASSES[status] ?? "bg-neutral-100 text-neutral-600"),
+      ].join(" ")}
+    >
+      {isPublished ? en.courseCopilot.publishedTag : (en.courseCopilot.status[status] ?? status)}
+    </span>
+  );
+};

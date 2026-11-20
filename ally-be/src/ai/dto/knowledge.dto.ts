@@ -156,6 +156,10 @@ export interface AgentGatewayBlock {
     description: string;
     input_schema: { type: 'object'; properties: Record<string, unknown> };
     kind: 'find' | 'create' | 'update';
+    /** The list's name as the owner wrote it, for the live steps (chunk 6b). */
+    list_name?: string;
+    /** A create that saves the person's details for the team (chunk 6b). */
+    takes_details?: boolean;
   }[];
   /** List tools the bot has on that didn't fit under the cap; named in the run's trace. */
   omitted?: string[];
@@ -174,6 +178,21 @@ export interface AgentRunRequest extends KnowledgeAnswerRequest {
   /** At most 200 characters. */
   chatbot_id?: string;
   runtime_version: 'v2';
+  /**
+   * The run's hard cap in seconds (chunk H1). ally-be waits a little longer than this, so ally-ai's
+   * cap always fires first; the run token expires with it.
+   */
+  run_timeout_s?: number;
+  /**
+   * Q3-fast Part 1: the crisis check found the person upset, not at risk. The agent's reply opens
+   * warmly (and, on health and mental-health assistants, gently names the support there is).
+   * Absent otherwise.
+   */
+  mood?: 'upset';
+  /** How to reach the business, from its sources (Q3-fast Part 2), for declines. */
+  business_contact?: string;
+  /** With `mood`: the business's helplines, for the support line on health assistants. */
+  support_helplines?: string;
   /**
    * Titles of the bot's documents, so the agent can say what it covers. At most 50; ally-ai
    * cuts each title to 200 characters.
@@ -200,6 +219,31 @@ export interface AgentRunRequest extends KnowledgeAnswerRequest {
    * than their name, never their phone or email. At most 6, each part 120 characters.
    */
   before_chat?: { label: string; value: string }[];
+  /**
+   * Live steps (chunk 6b): `activity` events while it runs and `activity` in the response. Sent
+   * only for the bot page's and Try it's streamed runs; WhatsApp never asks for them.
+   */
+  activity?: boolean;
+}
+
+/** What a run did, or is doing, as the bot page shows it (chunk 6b; ally-ai `activity.py`). */
+export type AgentActivityKind =
+  | 'search'
+  | 'find'
+  | 'create'
+  | 'update'
+  | 'cancel'
+  | 'hand_over'
+  | 'writing';
+
+export interface AgentActivity {
+  kind: AgentActivityKind;
+  /** The list's name as the owner wrote it. */
+  list?: string;
+  /** A record's title: the day and time a booking is for. */
+  title?: string;
+  /** A write's record, for the confirmation card. Never shown to a visitor. */
+  record_id?: string;
 }
 
 /** One memory write a run asks for (chunk 8a); ally-be checks and applies it after the reply. */
@@ -246,6 +290,8 @@ export interface AgentRunResponse extends KnowledgeAnswerResponse {
   handover?: boolean;
   /** What the run asked to remember (chunk 8a). Absent when nothing. */
   memory_writes?: AgentMemoryWrite[];
+  /** What the run did, when the request asked for live steps (chunk 6b). */
+  activity?: AgentActivity[];
 }
 
 /** ally-ai `/agent/memory-check` (chunk 8a). */
@@ -360,9 +406,28 @@ export interface CrisisCheckResponse {
    */
   confidence: number;
   failed: boolean;
+  /**
+   * Q3-fast Part 1: which reply the message needs. `at_risk` and `emergency` get a fixed reply at
+   * once (`is_crisis` is true for both); `upset` is answered by the run, warmly; `none` normally.
+   * Absent from an older ally-ai: read it with `crisisLevelOf`.
+   */
+  level?: 'at_risk' | 'emergency' | 'upset' | 'none';
+  /** Suicide or self-harm is present too: an emergency reply adds the at-risk line. */
+  self_harm?: boolean;
   provider?: string;
   model?: string;
 }
+
+/** The verdict's level, or one read from `is_crisis` when ally-ai sent none (Q3-fast Part 1). */
+export const crisisLevelOf = (
+  verdict: Pick<CrisisCheckResponse, 'is_crisis' | 'level'> | null | undefined,
+): NonNullable<CrisisCheckResponse['level']> => {
+  if (!verdict) return 'none';
+  if (verdict.is_crisis) {
+    return verdict.level === 'emergency' ? 'emergency' : 'at_risk';
+  }
+  return verdict.level === 'upset' ? 'upset' : 'none';
+};
 
 /** What a streamed run is doing now (ally-ai `trace.STATUS_LABELS`). */
 type AgentStatusCode =
@@ -391,4 +456,5 @@ export type AgentStreamEvent =
       };
     }
   | { event: 'step'; data: AgentTraceStep }
+  | { event: 'activity'; data: AgentActivity }
   | { event: 'token'; data: { text: string } };

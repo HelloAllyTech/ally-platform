@@ -13,6 +13,7 @@ import { Button, CheckRow, GapCard, PrimaryButton, Question } from "@components/
 import { COPY, fill } from "./copy";
 import { accuracyPct, gapsOf, hasTotals, statusOf } from "../AssistantHome/checkup";
 import { TryIt } from "../AssistantHome/TryIt";
+import { planLimitMessage } from "../Plan/limits";
 
 import type { BotDraftView } from "./types";
 import type { CheckupRunView } from "../../types/checkup";
@@ -69,7 +70,9 @@ export const CheckupScreen: React.FC<{ view: BotDraftView; onContinue: () => voi
         setRunId(run.id);
       })
       .catch((err: { status?: number }) =>
-        setError(err?.status === 429 ? t.blocked.limit : t.blocked.start),
+        setError(
+          planLimitMessage(err) ?? (err?.status === 429 ? t.blocked.limit : t.blocked.start),
+        ),
       );
   }, [runId, chatbotId, start, view.id]);
 
@@ -200,7 +203,13 @@ export const CheckupScreen: React.FC<{ view: BotDraftView; onContinue: () => voi
           />
         ))}
       </ul>
-      {totals && !gaps.length && <p className="ally-body">{t.allClear}</p>}
+      {/* "You're ready" only above the publish gate (Q3-fast Part 3, B18). */}
+      {totals && result?.gate?.ready && !gaps.length && <p className="ally-body">{t.allClear}</p>}
+      {totals && result?.gate && !result.gate.ready && (
+        <p className="ally-body" data-testid="checkup-need-fix">
+          {fill(t.needFix, { n: result.gate.needFix, total: result.gate.questions })}
+        </p>
+      )}
       <div className="ally-btn-row">
         {totals && gaps.length > 0 ? (
           <PrimaryButton onClick={() => setAnswering(true)}>

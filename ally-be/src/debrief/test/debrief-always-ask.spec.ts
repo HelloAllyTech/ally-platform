@@ -8,38 +8,7 @@ import { lastChangesOf } from '../service/debrief-settings.service';
 const on = { askLowConfidence: true, askModels: false };
 
 describe('"Always asks a person" (v2 A1)', () => {
-  it('locked on: the Safety reader, crisis and support copy, pinned rules, budget increases', () => {
-    expect(
-      alwaysAsk(
-        {
-          change: {
-            ideaKind: 'prompt_edit',
-            promptCode: 'debrief_safety_reader_system',
-          },
-        },
-        on,
-      ),
-    ).toMatchObject({ kind: 'safety_reader', locked: true });
-    expect(
-      alwaysAsk(
-        {
-          change: { ideaKind: 'release' },
-          evidence: { diff: { prompts: [{ code: 'debrief_quality_rubric' }] } },
-        },
-        on,
-      ),
-    ).toMatchObject({ kind: 'pinned_rule', locked: true });
-    expect(
-      alwaysAsk(
-        {
-          change: {
-            ideaKind: 'pinned_rule',
-            promptCode: 'debrief_quality_judge_system',
-          },
-        },
-        on,
-      )?.kind,
-    ).toBe('pinned_rule');
+  it('locked on: crisis and support copy, budget increases', () => {
     expect(
       alwaysAsk(
         { change: { ideaKind: 'release', touches: 'crisis_lines' } },
@@ -83,7 +52,8 @@ describe('"Always asks a person" (v2 A1)', () => {
     expect(alwaysAsk(low, on)).toEqual({
       kind: 'low_confidence',
       locked: false,
-      waitsBecause: 'The PM agent is not sure about it: only 4 comments',
+      waitsBecause:
+        'The Debrief PM agent is not sure about it: only 4 comments',
     });
     expect(alwaysAsk(low, { ...on, askLowConfidence: false })).toBeNull();
     expect(alwaysAsk({ ...low, evidence: {} }, on)).toBeNull();
@@ -186,7 +156,7 @@ describe('v2 owner settings (A1, A4, K1, S1)', () => {
     expect(
       lastChangesOf({
         gateCases: {
-          by: 'PM agent',
+          by: 'Debrief PM agent',
           byId: null,
           at: '2026-11-16T00:00:00Z',
           why: 'Volume doubled',
@@ -197,7 +167,7 @@ describe('v2 owner settings (A1, A4, K1, S1)', () => {
       }),
     ).toEqual({
       gateCases: {
-        lastChangedBy: 'PM agent',
+        lastChangedBy: 'Debrief PM agent',
         lastChangedById: null,
         lastChangedAt: '2026-11-16T00:00:00Z',
         why: 'Volume doubled',

@@ -10,6 +10,7 @@ import {
   BotDraftStatus,
   BotDraftStep,
   DesignId,
+  LearnedSection,
   PurposeId,
   SafetyPackId,
 } from '../enum/bot-draft.enum';
@@ -79,7 +80,12 @@ function harness(
     },
     pageAccess: { add: jest.fn(async () => ({ added: 0, skipped: 0 })) },
     knowledge: {
-      createForChatbot: jest.fn(async () => ({ id: 'notes-1' })),
+      // One id per document: Owner notes, and (Q3-fast) the learned facts.
+      createForChatbot: jest.fn(
+        async (_bot: string, dto: { title: string }) => ({
+          id: dto.title === 'What we learned' ? 'learned-1' : 'notes-1',
+        }),
+      ),
       updateForChatbot: jest.fn(async () => ({})),
     },
     chatbots: { update: jest.fn(async () => ({})) },
@@ -229,13 +235,65 @@ describe('BotDraftPublishService', () => {
     expect(h.fakes.settings.updateChatbotSettings).toHaveBeenCalledTimes(2);
   });
 
+  it('rewrites the learned facts when the draft changes, as the owner outside a request (Q3-fast)', async () => {
+    const h = harness();
+    await h.service.onLearnedFactsChanged({
+      chatbotId: 'bot-1',
+      documentId: 'learned-1',
+      ownerUserId: 7,
+      tenantId: 'tenant-1',
+      facts: [
+        {
+          id: 'f1',
+          section: LearnedSection.HOURS,
+          text: 'Open 9 to 5',
+          sourceUrl: 'https://s.example/contact',
+          sourceTitle: 'Contact | Sunrise',
+        },
+      ],
+    });
+    expect(h.fakes.knowledge.updateForChatbot).toHaveBeenCalledWith(
+      'bot-1',
+      'learned-1',
+      { text: 'Hours, Contact\nOpen 9 to 5.' },
+    );
+    // A failure is logged, never thrown at the save that caused it.
+    h.fakes.knowledge.updateForChatbot.mockRejectedValueOnce(new Error('gone'));
+    await expect(
+      h.service.onLearnedFactsChanged({
+        chatbotId: 'bot-1',
+        documentId: 'learned-1',
+        ownerUserId: 7,
+        tenantId: null,
+        facts: [
+          {
+            id: 'f1',
+            section: LearnedSection.HOURS,
+            text: 'Open 9 to 5',
+            sourceUrl: 'x',
+          },
+        ],
+      }),
+    ).resolves.toBeUndefined();
+  });
+
   it('publishing again converges the same page and notes, with nothing duplicated', async () => {
     const h = harness();
     await h.publish({ access: 'invite', emails: ['asha@example.com'] });
     h.fakes.botPages.view.mockResolvedValue({ slug: 'sunrise-mind-2' });
     await h.publish({ access: 'invite', emails: ['asha@example.com'] });
 
-    expect(h.fakes.knowledge.createForChatbot).toHaveBeenCalledTimes(1);
+    // Each document once (Owner notes, and since Q3-fast the learned facts); then updated.
+    expect(
+      h.fakes.knowledge.createForChatbot.mock.calls.map(
+        (call) => (call as unknown as [string, { title: string }])[1].title,
+      ),
+    ).toEqual(['Owner notes', 'What we learned']);
+    expect(h.fakes.knowledge.updateForChatbot).toHaveBeenCalledWith(
+      'bot-1',
+      'learned-1',
+      expect.objectContaining({ text: expect.stringContaining('\n') }),
+    );
     expect(h.fakes.knowledge.updateForChatbot).toHaveBeenCalledWith(
       'bot-1',
       'notes-1',

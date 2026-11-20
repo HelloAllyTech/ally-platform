@@ -46,14 +46,24 @@ def normalise_detail(detail: str) -> str:
     return re.sub(r"[\s+-]", "", detail)
 
 
+# An amount of money ("Rs. 1,600", "₹ 500", "INR 2,000.50"): a price, never a phone
+# number (chunk 6b, Sunrise C4). Taken out before phone numbers are looked for.
+_AMOUNT = re.compile(
+    r"(?:\brs\.?|\binr\b|₹|\$|€|£)\s*\d[\d,]*(?:\.\d+)?|\b\d[\d,]*(?:\.\d+)?\s*%",
+    re.IGNORECASE,
+)
+
+
 def contact_details(text: str) -> List[str]:
-    """Phone numbers, links and emails in `text`, as written."""
+    """Phone numbers, links and emails in `text`, as written. Amounts of money and
+    percentages are not phone numbers."""
     text = text or ""
     emails = _EMAIL.findall(text)
     without_emails = _EMAIL.sub(" ", text)
     links = _URL.findall(without_emails)
     without_links = _URL.sub(" ", without_emails)
-    return [*emails, *links, *_PHONE.findall(without_links)]
+    without_amounts = _AMOUNT.sub(" ", without_links)
+    return [*emails, *links, *_PHONE.findall(without_amounts)]
 
 
 def without_contact_details(text: str) -> str:
@@ -69,7 +79,18 @@ def unsupported_details(text: str, passages: Sequence[Dict[str, Any]]) -> List[s
     return [d for d in contact_details(text) if normalise_detail(d) not in corpus]
 
 
-SENTENCE_END = re.compile(r"(?<=[.!?।])\s+")
+# A sentence ends at ., ! ? or । and a space, but not after a short form that
+# takes a full stop: "Rs. 500" and "Dr. Mehta" are one sentence (chunk 6b: "Rs."
+# split a price from its number, and the number's half was dropped). "No." only
+# before a number ("No. 5").
+SENTENCE_END = re.compile(
+    r"(?<=[.!?।])"
+    r"(?<!\brs\.)(?<!\binr\.)(?<!\bdr\.)(?<!\bmr\.)(?<!\bmrs\.)(?<!\bms\.)"
+    r"(?<!\bst\.)(?<!\bvs\.)(?<!\bapprox\.)(?<!\be\.g\.)(?<!\bi\.e\.)"
+    r"(?!(?<=\bno\.)\s+\d)"
+    r"\s+",
+    re.IGNORECASE,
+)
 
 
 def without_sentences(text: str, keep: Callable[[str], bool]) -> str:
@@ -115,6 +136,32 @@ def plain_text(text: str) -> str:
     return _MD_HEADING.sub("", text).strip()
 
 
+# Citation leftovers in a sent reply (chunk H1 Part D): "[1]", "[2][3]", "[1, 4]",
+# "Sources: [1], [2]", "(Source: [1])", "(Sources:)" and the ")" a stripped "(Source:
+# [1])" leaves after a full stop. Sources show as chips beside the reply.
+_SOURCE_LIST = re.compile(
+    r"\(?\s*\b(?:sources?|see)\s*:\s*(?:\[\d+\](?:\s*,\s*|\s+)?)*\s*\)?\.?",
+    re.IGNORECASE,
+)
+_MARKS = re.compile(r"\s*\[\d+(?:\s*,\s*\d+)*\](?:\s*\[\d+(?:\s*,\s*\d+)*\])*")
+_EMPTY_PARENS = re.compile(r"\(\s*\)")
+_STRAY_CLOSE = re.compile(r"(?<=[.!?])\)")
+
+
+def without_citation_marks(text: str) -> str:
+    """A reply as it is sent: no citation numbers or "Sources:" lists in the text."""
+    text = _SOURCE_LIST.sub(
+        lambda m: "" if re.search(r"\[\d|:\s*\)?\.?$", m.group(0)) else m.group(0),
+        text or "",
+    )
+    text = _MARKS.sub("", text)
+    text = _EMPTY_PARENS.sub("", text)
+    text = _STRAY_CLOSE.sub("", text)
+    text = re.sub(r"[ \t]+([.,;:!?])", r"\1", text)
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    return re.sub(r"[ \t]+\n", "\n", text).strip()
+
+
 # Crisis wording. Said once, when the bot introduces itself; small talk later in a
 # conversation doesn't repeat it, and nothing repeats "not a crisis service".
 _CRISIS = re.compile(r"crisis|emergency|helpline|tele-?manas", re.IGNORECASE)
@@ -149,9 +196,61 @@ def without_repeated_crisis_wording(text: str, turn_type: str) -> str:
 _MENTIONS_SOURCES = re.compile(
     r"reference material|knowledge ?base|\bpassages?\b"
     r"|\b(?:my|the|our|these|those|provided|given|diye gaye)"
-    r"\s+(?:documents|docs|sources)\b",
+    r"\s+(?:documents|docs|sources)\b"
+    # Q3-fast Part 2 (17 Nov C2): the forms that reached customers.
+    r"|\bprovided\s+(?:[\w-]+\s+){0,2}"
+    r"(?:materials?|information|info|content|text|details|pages?)\b"
+    r"|\b(?:in|from)\s+(?:the\s+)?(?:information|info|materials?|content)"
+    r"\s+(?:i|we)\s+(?:can\s+(?:see|access)|have(?:\s+access\s+to)?|was\s+given)\b"
+    r"|\bin\s+(?:my|our|the)\s+"
+    r"(?:materials|records|system|help\s+(?:pages|docs|documents))\b"
+    r"|\bif\s+i\s+(?:don['’]?t|do\s+not)\s+know\s+the\s+answer\b",
     re.IGNORECASE,
 )
+
+# Q3-fast Part 2: the internal voice's usual opener, rewritten into a person's words
+# rather than sent back. "The provided passages do not say whether X" → "I don't know
+# whether X"; "The provided Scripbox materials don't describe X" → "I don't have
+# information on X".
+_SOURCES_NOUN = (
+    r"(?:the\s+)?provided\s+(?:[\w-]+\s+){0,2}"
+    r"(?:materials?|passages?|information|info|documents?|docs|sources?|content|pages?)"
+)
+_NOT = r"(?:do(?:es)?\s+not|do(?:es)?n['’]?t)"
+_SOURCE_OPENERS = (
+    (
+        re.compile(
+            rf"\b{_SOURCES_NOUN}\s+{_NOT}\s+(?:say|state|specify|confirm|tell\s+me)"
+            r"(?=\s+(?:whether|if|what|how|when|where|which|who|why)\b)",
+            re.IGNORECASE,
+        ),
+        "I don't know",
+    ),
+    (
+        re.compile(
+            rf"\b{_SOURCES_NOUN}\s+{_NOT}\s+(?:describe|cover|include|mention|list"
+            r"|have|contain|give|say\s+anything\s+about)\b",
+            re.IGNORECASE,
+        ),
+        "I don't have information on",
+    ),
+    (
+        re.compile(
+            r"\bif\s+i\s+(?:don['’]?t|do\s+not)\s+know\s+the\s+answer,?\s*", re.I
+        ),
+        "",
+    ),
+)
+
+
+def in_a_persons_words(text: str) -> str:
+    """The internal voice's openers rewritten (Q3-fast Part 2), each sentence then
+    starting with a capital."""
+    for pattern, words in _SOURCE_OPENERS:
+        text = pattern.sub(words, text or "")
+    return re.sub(
+        r"(^|[.!?।]\s+)([a-z])", lambda m: m.group(1) + m.group(2).upper(), text
+    ).strip()
 
 
 def mentions_sources(text: str) -> bool:
@@ -163,7 +262,11 @@ def mentions_sources(text: str) -> bool:
 # whole model call.
 _SOURCE_PHRASE = re.compile(
     r"\s*,?\s*\b(?:in|from|within)\s+(?:my|the|our)\s+"
-    r"(?:reference\s+materials?|references|documents|docs|knowledge\s*base|sources)\b"
+    r"(?:reference\s+materials?|references|documents|docs|knowledge\s*base|sources"
+    r"|materials|records|system|help\s+(?:pages|docs|documents))\b"
+    # Q3-fast Part 2: "…to Pune in the information I can see" → "…to Pune".
+    r"|\s*,?\s*\b(?:in|from)\s+(?:the\s+)?(?:information|info|materials?|content)"
+    r"\s+(?:i|we)\s+(?:can\s+(?:see|access)|have(?:\s+access\s+to)?)\b"
     r"|\s*\b(?:meri|mere|hamari|hamare)\s+(?:reference\s+materials?|documents)\s+"
     r"(?:mein|me)\b",
     re.IGNORECASE,
@@ -176,14 +279,31 @@ _SOURCE_PHRASE = re.compile(
 _PASSAGE_REF = re.compile(
     r"\s*(?:[—–-]\s*)?\(?\s*(?:see\s+)?(?:(?:these|the|those)\s+)?"
     r"(?:details|sources?|passages?|references?)(?:\s+here)?\s*:?\s*"
-    r"\d{1,2}(?:\s*(?:,|and|&|–|-)\s*\d{1,2})*\s*\)?(?!\s*[^\W\d_%₹$])",
+    r"\d{1,2}(?!\d)(?:\s*(?:,|and|&|–|-)\s*\d{1,2}(?!\d))*\s*\)?"
+    r"(?!\s*[^\W\d_%₹$])(?![\d,.]\d)",
     re.IGNORECASE,
+)
+
+
+# A lead-in left pointing at nothing once its citation or id was cut (chunk 6b):
+# "See the slot info:." or "Details here:" at the end. Short and ending in a colon
+# with nothing after it, it goes whole.
+_DANGLING_LEAD_IN = re.compile(
+    r"(?:^|(?<=[.!?।])[ \t]+|(?<=\n))"
+    r"(?:(?:please\s+)?(?:see|check|find|view|here(?:'s|\s+is|\s+are)?)\b"
+    r"[^.!?:\n]{0,40}"
+    r"|[^.!?:\n]{0,30}\b(?:info|information|details|below|here)\b[^.!?:\n]{0,10})"
+    # ":." anywhere, or a colon with nothing after it at the end.
+    r"[ \t]*:[ \t]*(?:[.!?]|(?![\s\S]*\S))",
+    re.IGNORECASE | re.MULTILINE,
 )
 
 
 def without_source_phrases(text: str) -> str:
     text = _SOURCE_PHRASE.sub("", text or "")
     text = _PASSAGE_REF.sub("", text)
+    text = _DANGLING_LEAD_IN.sub("", text)
+    text = re.sub(r"[ \t]{2,}", " ", text).strip()
     return re.sub(r"\s+([.,;!?।])", r"\1", text)
 
 

@@ -1,12 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/navigation/home_tab_navigation.dart';
 import '../../../core/navigation/tab_config.dart';
@@ -29,6 +32,9 @@ import '../../../core/app_update/force_update.dart';
 import '../../roleplay/presentation/call_modals.dart';
 import '../data/chat_models.dart';
 import '../data/chat_repository.dart';
+import '../data/pcm_segmenter.dart';
+import '../data/segment_uploader.dart';
+import '../data/segmented_recording_repository.dart';
 import '../data/transcript_logic.dart';
 import 'audio_waveform.dart';
 import 'call_transcript_item.dart';
@@ -184,6 +190,22 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> w
 
   /// RN's temporary SCRIBE_START_DIAGNOSTIC timers (5s and 15s).
   final List<Timer> _diagnosticTimers = [];
+
+  // Segmented recording (the org's switch, GET /scribe-recordings/config):
+  // audio is cut into ~30 s WAV segments, kept on disk and uploaded straight
+  // to S3, instead of streamed over the socket. A dropped socket, a dead
+  // network, a deploy or a killed app then loses nothing; the socket stays
+  // for the live features only.
+  bool _isRecordingConfigLoaded = false;
+  bool _isSegmented = false;
+  int _segmentSeconds = 30;
+  bool _isSegmentedStarting = false;
+  PcmSegmenter? _segmenter;
+  SegmentUploader? _uploader;
+  static String _nextSegmentKey(int chatId) => 'scribe_next_segment_$chatId';
+
+  Future<Directory> _segmentDirectory() async =>
+      Directory('${(await getApplicationDocumentsDirectory()).path}/scribe_segments');
   final Set<int> _diagnosticSent = {};
 
   @override
@@ -204,12 +226,13 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> w
     _offlineSubscription = ref.listenManual<AsyncValue<bool>>(isOfflineProvider, (_, next) {
       final offline = next.value ?? false;
       _isOffline = offline;
-      if (offline && !_isWebMicrophoneMode && mounted) {
+      if (offline && !_isWebMicrophoneMode && !(_isSegmented && _chatId != null) && mounted) {
         setState(() => _disconnectedType = DisconnectedType.network);
       }
     }, fireImmediately: true);
 
     if (_chatId == null) _armChatIdTimeout();
+    _loadRecordingConfig();
     _connectSocket();
     if (!_isWebMicrophoneMode) _requestMicrophone();
     // 5s matches when the microphone-failure view appears; 15s catches
@@ -221,6 +244,67 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> w
 
   /// RN `SCRIBE_START_DIAGNOSTIC`: once per mark, unless the session really
   /// started (audio chat emitted with a chat id), report the start gates.
+  Future<void> _loadRecordingConfig() async {
+    final config = await ref.read(scribeRecordingConfigProvider.future);
+    if (!mounted) return;
+    setState(() {
+      _isRecordingConfigLoaded = true;
+      _isSegmented = config.enabled;
+      _segmentSeconds = config.segmentSeconds;
+    });
+    if (_isSegmented) {
+      // Segments a killed app or a dead network left behind.
+      unawaited(
+        _segmentDirectory().then(
+          (dir) => SegmentUploader.resumePending(
+            repository: ref.read(segmentedRecordingRepositoryProvider),
+            directory: dir,
+            exceptChatId: _chatId,
+          ),
+        ),
+      );
+    }
+    _maybeEmitStartAudioChat();
+  }
+
+  /// Start (or, for a chat already in progress, resume) a segmented recording:
+  /// the chat is created over REST rather than the socket's startAudioChat.
+  Future<void> _startSegmentedRecording() async {
+    if (_isSegmentedStarting || _segmenter != null) return;
+    _isSegmentedStarting = true;
+    try {
+      var chatId = _chatId;
+      if (chatId == null) {
+        chatId = await ref.read(segmentedRecordingRepositoryProvider).start();
+        if (!mounted) return;
+        _chatIdTimeoutTimer?.cancel();
+        setState(() => _chatId = chatId);
+        // Same hydration USER_JOINED does on the socket path.
+        unawaited(_onUserJoined({'payload': {'chatId': chatId}}));
+      }
+      final prefs = await SharedPreferences.getInstance();
+      final id = chatId;
+      final uploader = SegmentUploader(
+        chatId: id,
+        repository: ref.read(segmentedRecordingRepositoryProvider),
+        directory: await _segmentDirectory(),
+      );
+      _uploader = uploader;
+      _segmenter = PcmSegmenter(
+        segmentSeconds: _segmentSeconds,
+        startIndex: prefs.getInt(_nextSegmentKey(id)) ?? 0,
+        onSegment: (index, wav) {
+          unawaited(prefs.setInt(_nextSegmentKey(id), index + 1));
+          unawaited(uploader.enqueue(index, wav));
+        },
+      );
+    } catch (_) {
+      if (mounted && _chatId == null) setState(() => _disconnectedType = DisconnectedType.microphoneFailure);
+    } finally {
+      _isSegmentedStarting = false;
+    }
+  }
+
   Future<void> _sendStartDiagnostic(int afterMs) async {
     if (!mounted || _diagnosticSent.contains(afterMs)) return;
     if (_isAudioChatEmitted && _chatId != null) return;
@@ -261,6 +345,9 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> w
       timer.cancel();
     }
     _isIntentionalDisconnect = true;
+    // Leaving without End: put the last partial segment on disk too; it is
+    // uploaded with the rest and the server finishes the recording.
+    _segmenter?.flush();
     if (_hasStartedRecording) _recorder.stop();
     _recorder.dispose();
     _socketService.disconnect();
@@ -305,10 +392,13 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> w
       },
       onDisconnect: (reason) {
         if (!mounted || _isIntentionalDisconnect || _isWebMicrophoneMode) return;
+        // A segmented recording doesn't use the socket: only the live features pause.
+        if (_isSegmented && _chatId != null) return;
         setState(() => _disconnectedType = _isOffline ? DisconnectedType.network : DisconnectedType.socket);
       },
       onConnectionError: (error) {
         if (!mounted || _isWebMicrophoneMode) return;
+        if (_isSegmented && _chatId != null) return;
         setState(() => _disconnectedType = DisconnectedType.socket);
       },
       eventCallbacks: {
@@ -405,6 +495,10 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> w
     );
     // Deliberately NOT gated on the socket's connected state: socket.io
     // buffers frames across a transient disconnect (RN's own warning).
+    if (_isSegmented) {
+      if (!_isCallPaused) _segmenter?.add(chunk);
+      return;
+    }
     final chatId = _chatId;
     if (!_isCallPaused && !_isWebMicrophoneMode && chatId != null) {
       _socketService.emit(SocketEvent.audioMessage, {'audioData': base64Encode(chunk), 'chatId': chatId});
@@ -413,6 +507,12 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> w
 
   /// RN `isAudioSessionReady && !isAudioChatEmitted`.
   void _maybeEmitStartAudioChat() {
+    // Which path this org uses isn't known yet.
+    if (!_isRecordingConfigLoaded) return;
+    if (_isSegmented) {
+      if (_isPermissionGranted && !_isWebMicrophoneMode) unawaited(_startSegmentedRecording());
+      return;
+    }
     if (!_isPermissionGranted || !_isMicrophoneModeSessionCreated || _isWebMicrophoneMode || _isAudioChatEmitted) {
       return;
     }
@@ -559,6 +659,18 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> w
         _hasStartedRecording = false;
       }
       await ForegroundRecordingService.stop();
+      final segmenter = _segmenter;
+      final uploader = _uploader;
+      if (_isSegmented && segmenter != null && uploader != null) {
+        // Finalize ends the chat and starts transcription. Even if it fails
+        // here, the segments are on disk/in S3 and the server finishes the
+        // recording itself.
+        segmenter.flush();
+        await uploader.finish(segmentCount: segmenter.nextIndex, durationSeconds: segmenter.recordedSeconds);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(_nextSegmentKey(chatId));
+        return;
+      }
       await ref.read(chatRepositoryProvider).endCall(chatId);
     } catch (_) {
       // RN redirects on `isEndCallError` too.

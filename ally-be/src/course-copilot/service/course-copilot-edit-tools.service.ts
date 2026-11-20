@@ -15,6 +15,7 @@ import { TrackTranslationService } from 'src/track/service/track-translation.ser
 import { TrackWithStructure } from 'src/track/service/track-shared.service';
 import {
   TrackItemCompletionCriteria,
+  TrackItemCompletionLogic,
   TrackItemType,
   TrackStatus,
   VideoSource,
@@ -45,6 +46,8 @@ import { ArticleSpecialist } from './specialists/article.specialist';
 import { QuizSpecialist } from './specialists/quiz.specialist';
 import { JournalSpecialist } from './specialists/journal.specialist';
 import { AnnotationSpecialist } from './specialists/annotation.specialist';
+import { ScenarioQuizSpecialist } from './specialists/scenario-quiz.specialist';
+import { BucketSortSpecialist } from './specialists/bucket-sort.specialist';
 import { CourseCopilotStructureService } from './course-copilot-structure.service';
 import {
   COURSE_COPILOT_ANALYTICS_EVENTS,
@@ -62,6 +65,8 @@ const INLINE_TYPES = new Set<string>([
   TrackItemType.QUIZ,
   TrackItemType.JOURNAL,
   TrackItemType.ANNOTATED_ARTIFACT,
+  TrackItemType.BRANCHING_SCENARIO,
+  TrackItemType.BUCKET_SORT,
 ]);
 
 const CONFIRM = 'confirm';
@@ -158,9 +163,11 @@ export const EDIT_TOOL_DEFINITIONS: AgentToolDefinition[] = [
     name: 'add_item',
     description:
       'Add an item after afterItemId (or at the end of the section). ARTICLE / QUIZ / JOURNAL / ' +
-      'ANNOTATED_ARTIFACT are written now from `spec` + `purpose` (e.g. quiz {questionCount, ' +
-      'difficulty, questionTypes}; article {outline, wordTarget, questionCount, withImage}; ' +
-      'journal {focus}; annotation {focus, behaviourLabels}). GAME needs spec.gameKey. VIDEO needs ' +
+      'ANNOTATED_ARTIFACT / BRANCHING_SCENARIO / BUCKET_SORT are written now from `spec` + `purpose` ' +
+      '(e.g. quiz {questionCount, difficulty, questionTypes}; article {outline, wordTarget, ' +
+      'questionCount, withImage}; journal {focus}; annotation {focus, behaviourLabels}; scenario ' +
+      'quiz (BRANCHING_SCENARIO) {focus, sceneCount, persona}; bucket sort {focus, itemCount, ' +
+      'buckets}). GAME needs spec.gameKey. VIDEO needs ' +
       'spec.url. ROLEPLAY: pass scenarioId to use a library roleplay, or spec {personaBrief, ' +
       'taskClass, languageIds?, minScore?, triggerWarningIds?, characterId?} to create one — that ' +
       'runs in the background (a few minutes) and appears when ready. CASE needs an existing caseId.',
@@ -185,7 +192,7 @@ export const EDIT_TOOL_DEFINITIONS: AgentToolDefinition[] = [
     description:
       'Rewrite an item with precise instructions ("make it harder", "add two questions on ' +
       'consent"), keeping its id and position. Works for ARTICLE, QUIZ, JOURNAL, ' +
-      'ANNOTATED_ARTIFACT now; for ROLEPLAY it builds a replacement roleplay in the background.',
+      'ANNOTATED_ARTIFACT, BRANCHING_SCENARIO, BUCKET_SORT now; for ROLEPLAY it builds a replacement roleplay in the background.',
     input_schema: {
       type: 'object',
       properties: { itemId: id, instructions: { type: 'string' } },
@@ -231,9 +238,12 @@ export const EDIT_TOOL_DEFINITIONS: AgentToolDefinition[] = [
   {
     name: 'set_completion_rule',
     description:
-      'What a learner must achieve to complete an item: ROLEPLAY {minScore 0-100, ' +
-      'minDurationSeconds}, CASE {minScore}, QUIZ / ANNOTATED_ARTIFACT {passScore 0-100}, VIDEO ' +
-      '{watchPct 1-100}, ARTICLE {minReadSeconds}. GAME has none.',
+      'What a learner must achieve to complete an item: ROLEPLAY {completionLogic, minScore 0-100, ' +
+      'minDurationSeconds} where completionLogic is SCORE, DURATION, SCORE_AND_DURATION (the ' +
+      'default: both gates) or PARTICIPATION (completes on launch, no gate); minDurationSeconds 0 = ' +
+      'no minimum, omitted = the platform default. CASE {minScore}, QUIZ / ANNOTATED_ARTIFACT ' +
+      '{passScore 0-100}, BRANCHING_SCENARIO {passScore 0-100, 0 = explore}, VIDEO {watchPct 1-100}, ' +
+      'ARTICLE {minReadSeconds}. GAME and BUCKET_SORT have none.',
     input_schema: {
       type: 'object',
       properties: { itemId: id, completionCriteria: { type: 'object' } },
@@ -313,6 +323,20 @@ export const EDIT_TOOL_NAMES = new Set(
 export const READ_ONLY_EDIT_TOOLS = new Set(['get_course_outline', 'get_item']);
 
 /**
+ * Tools that do not change what learners see, or that carry their own
+ * confirmation: they never ask "this course is live — change it?".
+ * Duplicating is the way AROUND editing a live course, so it must never be
+ * behind that question.
+ */
+const LIVE_EDIT_EXEMPT_TOOLS = new Set([
+  ...READ_ONLY_EDIT_TOOLS,
+  'list_organisations',
+  'assign_to_tenants',
+  'publish_course',
+  'duplicate_course',
+]);
+
+/**
  * The edit loop: course-aware tools that change a course in place.
  *
  * Every write re-reads the course under the session's structure lock, mutates
@@ -349,6 +373,8 @@ export class CourseCopilotEditToolsService {
     private readonly quiz: QuizSpecialist,
     private readonly journal: JournalSpecialist,
     private readonly annotation: AnnotationSpecialist,
+    private readonly scenarioQuiz: ScenarioQuizSpecialist,
+    private readonly bucketSort: BucketSortSpecialist,
     @Optional() private readonly analytics?: CourseCopilotAnalyticsService,
   ) {}
 
@@ -367,6 +393,8 @@ export class CourseCopilotEditToolsService {
     // then a locked course or a validator rejection reaches the model as a
     // raw exception instead of a refusal it knows how to explain.
     try {
+      const liveCheck = await this.confirmLiveEdit(name, input, context);
+      if (liveCheck) return liveCheck;
       switch (name) {
         case 'get_course_outline':
           return await this.getOutline(context);
@@ -985,15 +1013,22 @@ export class CourseCopilotEditToolsService {
       item.completionCriteria = { ...(item.completionCriteria ?? {}), ...rule };
       // Quiz and annotation pass marks live on the content too, and the save
       // copies content → rule, so both must move together.
+      // A quiz or annotation without settings keeps none (nothing is invented); a scenario
+      // quiz's pass mark lives only in its settings, so it always gets one.
       if (
         rule.passScore !== undefined &&
-        (item.type === TrackItemType.QUIZ ||
+        item.content &&
+        (((item.type === TrackItemType.QUIZ ||
           item.type === TrackItemType.ANNOTATED_ARTIFACT) &&
-        item.content?.settings
+          item.content.settings) ||
+          item.type === TrackItemType.BRANCHING_SCENARIO)
       ) {
         item.content = {
           ...item.content,
-          settings: { ...item.content.settings, passScore: rule.passScore },
+          settings: {
+            ...(item.content.settings ?? {}),
+            passScore: rule.passScore,
+          },
         };
       }
     });
@@ -1316,6 +1351,48 @@ export class CourseCopilotEditToolsService {
   }
 
   /**
+   * A published course changes for learners the moment an edit is saved —
+   * there is no draft copy. So the first change to a live course in a session
+   * asks the trainer first, once; the answer is remembered for that course
+   * for the rest of the session. Null means go ahead.
+   */
+  private async confirmLiveEdit(
+    name: string,
+    input: Record<string, any>,
+    context: CourseCopilotToolContext,
+  ): Promise<CourseCopilotToolOutcome | null> {
+    const trackId = context.session.trackId!;
+    if (LIVE_EDIT_EXEMPT_TOOLS.has(name)) return null;
+    if (context.session.metadata?.liveEditsConfirmedFor === trackId) {
+      return null;
+    }
+    const track = await this.structureService.getTrack(trackId);
+    if (track.status !== TrackStatus.ACTIVE) return null;
+
+    const ask = await this.confirmOrAsk(
+      context,
+      'edit_live_course',
+      { tool: name, input },
+      {
+        prompt: `"${track.title}" is published. Change the live course? Learners will see your changes straight away.`,
+        confirmLabel: 'Yes, change the live course',
+        rationale:
+          'There is no draft copy of a published course: each change is live as soon as it is saved. ' +
+          'To work on it without learners seeing changes, choose "Not now" and ask me to duplicate the course.',
+      },
+    );
+    if (ask) return ask;
+    await this.sessionService.patchMetadata(context.session.id, {
+      liveEditsConfirmedFor: trackId,
+    });
+    context.session.metadata = {
+      ...(context.session.metadata ?? {}),
+      liveEditsConfirmedFor: trackId,
+    };
+    return null;
+  }
+
+  /**
    * Null when the trainer's message in THIS turn confirmed THIS action;
    * otherwise a confirmation question that ends the turn. The pending
    * confirmation is stored, so the action carried out is the one that was
@@ -1447,6 +1524,10 @@ export class CourseCopilotEditToolsService {
         return this.journal;
       case TrackItemType.ANNOTATED_ARTIFACT:
         return this.annotation;
+      case TrackItemType.BRANCHING_SCENARIO:
+        return this.scenarioQuiz;
+      case TrackItemType.BUCKET_SORT:
+        return this.bucketSort;
       default:
         throw new BadRequestException(`${type} items are not generated.`);
     }
@@ -1493,18 +1574,29 @@ export class CourseCopilotEditToolsService {
     };
     const rule: TrackItemCompletionCriteria = {};
     switch (type) {
-      case TrackItemType.ROLEPLAY:
+      case TrackItemType.ROLEPLAY: {
+        const logic =
+          typeof source.completionLogic === 'string'
+            ? source.completionLogic.trim().toUpperCase()
+            : '';
+        if (
+          (Object.values(TrackItemCompletionLogic) as string[]).includes(logic)
+        ) {
+          rule.completionLogic = logic as TrackItemCompletionLogic;
+        }
         if (pct(source.minScore) !== undefined)
           rule.minScore = pct(source.minScore);
         if (seconds(source.minDurationSeconds) !== undefined)
           rule.minDurationSeconds = seconds(source.minDurationSeconds);
         break;
+      }
       case TrackItemType.CASE:
         if (pct(source.minScore) !== undefined)
           rule.minScore = pct(source.minScore);
         break;
       case TrackItemType.QUIZ:
       case TrackItemType.ANNOTATED_ARTIFACT:
+      case TrackItemType.BRANCHING_SCENARIO:
         if (pct(source.passScore) !== undefined)
           rule.passScore = pct(source.passScore);
         break;

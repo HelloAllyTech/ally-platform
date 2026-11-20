@@ -1,6 +1,8 @@
 import { FeatureToggleKey, Permissions } from "@constants";
 import { hasFeature } from "@utils";
 
+import type { RoadmapRole } from "../../../types/roadmapV2";
+
 /**
  * Whether this reader gets the roadmap's manage affordances: stage transitions, editing or
  * deleting anyone's opportunity, the goal taxonomy, split/merge, month-board lane moves, pinning
@@ -46,49 +48,67 @@ export const canOpenRoadmapBuilder = (
   hasFeature(features, FeatureToggleKey.BUILDER);
 
 /**
- * Whether this reader gets the header's quick-add door: a plain form that files straight onto
- * the board, skipping the guided interview and its readiness check.
+ * The Roadmap role these toggles and permissions resolve to, read the way ally-be's
+ * RoadmapRoleService reads them (roleFromGrants): Owner is Manage, Builder is Builder, Idea is
+ * the board's tab, each paired with its permission, and the highest one held wins. An
+ * org-restricted admin is a Viewer at most, whatever else they hold.
  *
- * The VOTE permission (the tier that may file at all) AND the `product_roadmap_quick_add`
- * toggle, in the order ally-be's `POST opportunities/quick` checks them. Independent of
- * canManageRoadmap on purpose: quick add is a filing shortcut for a named few, not board
- * curation, and tying it to MANAGE would hand every curator the bypass or every quick-adder the
- * board.
- *
- * Fails closed the same way as the others: an empty `features` (toggle fetch failed) hides the
- * button rather than showing one that answers 403.
+ * Mirrors the server because `GET /v1/roadmap/me/role` answers 404 while `roadmap_v2` is off,
+ * and the filing, quick-add and lead doors need the role either way. The server re-checks every
+ * door; this only decides what is shown. Fails closed: an empty `features` is "none".
  */
-export const canQuickAddRoadmap = (
+export const roadmapRoleFor = (
   permissions: string[] | undefined,
   features: string[] | undefined,
-): boolean =>
-  canFileIdeas(permissions, features) &&
-  hasFeature(features, FeatureToggleKey.PRODUCT_ROADMAP_QUICK_ADD);
+  restricted = false,
+): RoadmapRole => {
+  const roadmap =
+    !!permissions?.includes(Permissions.VIEW_PRODUCT_ROADMAP) &&
+    hasFeature(features, FeatureToggleKey.PRODUCT_ROADMAP);
+  const builder = canOpenRoadmapBuilder(permissions, features);
+  const manage = canManageRoadmap(permissions, features);
+  if (restricted) return roadmap || builder || manage ? "viewer" : "none";
+  if (manage) return "owner";
+  if (builder) return "builder";
+  if (roadmap) return "idea";
+  return "none";
+};
+
+const ROLE_RANK: Record<RoadmapRole, number> = {
+  none: 0,
+  viewer: 1,
+  idea: 2,
+  builder: 3,
+  owner: 4,
+};
+
+const atLeast = (role: RoadmapRole, floor: RoadmapRole): boolean =>
+  ROLE_RANK[role] >= ROLE_RANK[floor];
 
 /**
- * Whether this reader may file an idea at all: the guided interview, idea capture (park it) and,
- * with its own toggle on top, quick add.
+ * Whether this reader may file an idea at all: the guided interview and idea capture.
  *
- * The VOTE permission AND the `product_planning_ideas` toggle, the pair ally-be checks on every
- * filing door. The toggle is on by default for platform admins and platform-only, so an
- * org-restricted admin, or one whose Ideas toggle was switched off, sees no filing button rather
- * than one that answers 403. Viewing and voting are unaffected.
+ * The VOTE permission AND the Idea role (or above), the pair ally-be checks on every filing
+ * door. An org-restricted admin, or one with no Roadmap role, sees no filing button rather than
+ * one that answers 403. Viewing and voting are unaffected.
  *
  * Fails closed: an empty `features` (toggle fetch failed) hides the doors.
  */
 export const canFileIdeas = (
   permissions: string[] | undefined,
   features: string[] | undefined,
+  restricted = false,
 ): boolean =>
   !!permissions?.includes(Permissions.VOTE_PRODUCT_ROADMAP) &&
-  hasFeature(features, FeatureToggleKey.PRODUCT_PLANNING_IDEAS);
+  atLeast(roadmapRoleFor(permissions, features, restricted), "idea");
 
 /**
- * Whether this reader gets the planning Lead's tabs (Needs a lead, Signals) and actions.
- *
- * The `product_planning_lead` toggle alone: it is platform-only on the server, so an
- * org-restricted admin never holds it here either. Every lead action is checked again on the
- * server; this only decides what is shown. Fails closed on an empty `features`.
+ * Whether this reader gets the planning lead's tabs (Needs a lead, Signals) and actions: the
+ * Builder role or above. Every lead action is checked again on the server; this only decides
+ * what is shown. Fails closed on an empty `features`.
  */
-export const canLeadRoadmapPlans = (features: string[] | undefined): boolean =>
-  hasFeature(features, FeatureToggleKey.PRODUCT_PLANNING_LEAD);
+export const canLeadRoadmapPlans = (
+  permissions: string[] | undefined,
+  features: string[] | undefined,
+  restricted = false,
+): boolean => atLeast(roadmapRoleFor(permissions, features, restricted), "builder");

@@ -297,9 +297,9 @@ export function buildClusters(
  * per-merge drafter.
  */
 const STAFF_ONLY_PATHS = [
-  /^src\/(bug-hunter|builder|product-roadmap|analytics|analytics-agent|analytics-suggestions|ux-signals|mobile-releases|lab|logs|release|github|changelog|product-updates|blog)\//,
+  /^src\/(bug-hunter|builder|product-roadmap|analytics|analytics-agent|pm-agent|ux-signals|mobile-releases|lab|logs|release|github|changelog|product-updates|blog)\//,
   /^src\/llm\/constants\/ai-task-registry/,
-  /^apps\/ally-admin-dashboard\/src\/pages\/(AILab|AiTasks|Analytics|Blog|BugHunter|Builder|DesignSystem|LanguageGlossary|LlmModelCatalog|Logs|MobileReleases|ProductRoadmap|ProductUpdates|PromptManagement|SttConfigs|SuperAdmins|Tooltips|TranslationManagement)\//,
+  /^apps\/ally-admin-dashboard\/src\/pages\/(AILab|AiTasks|Analytics|Blog|BugHunter|Builder|DesignSystem|LanguageGlossary|LlmModelCatalog|Logs|MobileReleases|ProductRoadmap|ProductUpdates|PmAgent|PromptManagement|SttConfigs|SuperAdmins|Tooltips|TranslationManagement)\//,
   /(^|\/)scripts\//,
 ];
 

@@ -57,7 +57,7 @@ describe('the learning-budget month is India time everywhere', () => {
     expect(istMonthElapsed(new Date('2026-11-30T18:30:00Z'))).toBe(0);
   });
 
-  it('counts it in December in the PM agent strip and in Reports', async () => {
+  it('counts it in December in the Debrief PM agent strip and in Reports', async () => {
     const rows = [{ at: LATE_NOV_UTC, usd: 2 }];
 
     // PM agent › Ideas strip, read on 10 December.

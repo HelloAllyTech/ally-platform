@@ -1,12 +1,13 @@
 """The graph's deciding nodes: recipe and budget, the gates in front of each
 paid step, guidance, the rule checks, scoring, the decision and the ending.
 
-The model steps themselves are built in `model_steps.py`; every node here
+The model steps themselves are built in `model_step_inputs.py`; every node here
 routes with a typed `Command` or follows its static edge.
 """
 
 from __future__ import annotations
 
+import asyncio
 import math
 from typing import Any, Dict, List, Literal, Optional
 
@@ -15,7 +16,8 @@ from langgraph.types import Command
 
 from app.core.debrief.cue_strength import (
     drop_possible_important_moment,
-    split_missed_cues,
+    effective_hard_fails,
+    needs_review,
     with_strength,
 )
 from app.core.debrief_graph import inputs as body
@@ -23,6 +25,8 @@ from app.core.debrief_graph.agent_logs import code_log, origin_of
 from app.core.debrief_graph.budget import budget_left, estimate_step_cost_usd
 from app.core.debrief_graph.constants import (
     DEFAULT_ADVISORY_CHECKS,
+    DEFAULT_DEADLINE_MS,
+    DEFAULT_PASS_SCORE,
     PROMPT_CODES,
     FallbackRung,
     Recipe,
@@ -39,6 +43,7 @@ from app.core.debrief_graph.drafts import (
     meets_bar,
     passes_checks,
 )
+from app.core.debrief_graph.guidance_toolbox import guidance_record
 from app.core.debrief_graph.narration import n
 from app.core.debrief_graph.records import iso, js_len, progress_event, skipped
 from app.core.debrief_graph.registry import (  # noqa: F401 - registers them
@@ -250,12 +255,18 @@ async def plan(
             }
         if memory:
             floor = floor_data_agent({**base, **probe}, ctx, "case_memory")
+    # A thin session (the learner said too little to coach on) reads the safety
+    # reader first: the Analyst waits for it, so a session that ends as "too
+    # short" never pays for it. Its cost is still reserved, so the budget logic
+    # is the same whichever way the gate goes.
+    thin = bool(ctx.sess("thin"))
     if analyst_step:
         analyst_est = _reserve(ctx, estimated, analyst_step, ctx.transcript_chars)
         if analyst_est is not None:
             estimated += analyst_est
             reserved["analyst#0"] = analyst_est
-            goto.append("analyst")
+            if not thin:
+                goto.append("analyst")
     plan_log = _plan_log(
         ctx,
         t0,
@@ -272,6 +283,7 @@ async def plan(
             "workspace": {**workspace, **floor.get("workspace", {})},
             "estimated": estimated,
             "reserved": reserved,
+            "thin_gate": thin,
             # The plan first, then a floor data agent it applied.
             "logs": [plan_log] + floor.get("logs", []),
         },
@@ -300,7 +312,16 @@ def floor_data_agent(state: State, ctx: Ctx, agent: str) -> Dict[str, Any]:
 
 async def after_reading(
     state: State, runtime: Runtime[Ctx]
-) -> Command[Literal["progress_reader", "guidance_lookup", "profile", "finish"]]:
+) -> Command[
+    Literal[
+        "progress_reader",
+        "guidance_lookup",
+        "profile",
+        "finish",
+        "analyst",
+        "after_reading",
+    ]
+]:
     ctx = runtime.context
     results = state.get("results") or {}
     safety_res = results.get("safety-reader#0")
@@ -312,11 +333,31 @@ async def after_reading(
         # Each cue keeps every field the reader returned, plus how sure it is
         # (cue_strength.py): only a clear cue must become the important moment.
         # Every cue still counts for has_risk_cue below.
-        "risk_cues": with_strength(safety_res.get("risk_cues") or []),
+        "risk_cues": with_strength(
+            safety_res.get("risk_cues") or [], ctx.risk_cue["word_list_raises"]
+        ),
         "learner_distress": safety_res.get("learner_distress") or [],
     }
     analyst_step = ctx.step_of(state["recipe_key"], Step.ANALYST)
     analyst_res = results.get("analyst#0")
+    if state.get("thin_gate"):
+        # The thin-session gate: only the safety reader has run. A learner who
+        # sounds distressed is still debriefed (the Analyst runs now and this
+        # node is reached again with the gate off); anyone else ends here as
+        # "too short", and the Analyst and Writer never run.
+        if not safety["learner_distress"]:
+            return _end(
+                Status.SKIPPED,
+                "too_short",
+                safety=safety,
+                has_risk_cue=len(safety["risk_cues"]) > 0,
+                learner_distress=False,
+                workspace={"safety": safety},
+            )
+        update_gate: Dict[str, Any] = {"thin_gate": False, "safety": safety}
+        if analyst_step and "analyst#0" in (state.get("reserved") or {}):
+            return Command(update=update_gate, goto="analyst")
+        return Command(update=update_gate, goto="after_reading")
     evidence = (analyst_res or {}).get("evidence") or {}
     estimated = state.get("estimated", 0.0)
     rung = 0
@@ -330,7 +371,16 @@ async def after_reading(
         "evidence": evidence,
         "has_risk_cue": len(safety["risk_cues"]) > 0,
         "learner_distress": len(safety["learner_distress"]) > 0,
-        "workspace": {"safety": safety, "evidence": evidence},
+        "workspace": {
+            "safety": safety,
+            "evidence": evidence,
+            # What this run used (ally-be stores it with the run).
+            "risk_cue": {
+                k: ctx.risk_cue[k] for k in ("key", "handling", "word_list_raises")
+            },
+            "framework": {k: ctx.framework[k] for k in ("id", "name", "foundational")},
+            "speaker_labels": ctx.speaker_labels,
+        },
         "progress": None,
         "progress_result": None,
         "history": None,
@@ -392,7 +442,12 @@ def _passage(p: Dict[str, Any]) -> Dict[str, str]:
     title = p.get("title") or (
         citation.get("title") if isinstance(citation, dict) else citation
     )
-    return {"title": str(title or p.get("code") or ""), "text": p.get("text") or ""}
+    return {
+        "title": str(title or p.get("code") or ""),
+        "text": p.get("text") or "",
+        "code": str(p.get("code") or ""),
+        "via": "lookup",
+    }
 
 
 async def guidance_lookup(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]:
@@ -426,23 +481,33 @@ async def guidance_lookup(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]
         citations: List[Dict[str, str]] = []
         lookups = 0
         stopped: Optional[str] = None
+        # The time guard runs per moment before anything starts (as it did
+        # between sequential calls); the searches then run concurrently.
+        todo: List[Dict[str, Any]] = []
         for m in moments:
             if not (m or {}).get("summary"):
                 continue
             if ctx.time_left_ms(state.get("has_risk_cue", False)) < (
-                ctx.setting("deadlineMs", 150_000) / 2
+                ctx.setting("deadlineMs", DEFAULT_DEADLINE_MS) / 2
             ):
                 update["rung"] = int(FallbackRung.ONE_GUIDANCE_LOOKUP)
                 stopped = "Stopped early to keep time for writing."
                 break
-            lookups += 1
+            todo.append(m)
+
+        async def search(m: Dict[str, Any]) -> Dict[str, Any]:
             try:
-                found = await ctx.gateway.call(
+                return await ctx.gateway.call(
                     "guidance_search",
                     {"topics": [{"situation": m["summary"]}], "per_moment": per_moment},
                 )
             except Exception:  # noqa: BLE001 - guidance never stops a debrief
-                found = {"unavailable": True, "passages": []}
+                return {"unavailable": True, "passages": []}
+
+        # Results come back in moment order; the first unreachable gateway ends
+        # the walk, so the later moments' answers are dropped as before.
+        for found in await asyncio.gather(*(search(m) for m in todo)):
+            lookups += 1
             # "No confident match" is nothing, not a weak passage to lean on.
             for p in (
                 [] if found.get("no_confident_match") else found.get("passages") or []
@@ -526,7 +591,16 @@ async def guidance_lookup(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]
             )
         ]
         update["passages"] = passages
-        update["workspace"] = {"passages": seen}
+        update["workspace"] = {
+            "passages": seen,
+            **guidance_record(
+                passages,
+                {
+                    **(((state.get("workspace") or {}).get("guidanceTimings")) or {}),
+                    "lookupMs": round(ctx.clock() - t0),
+                },
+            ),
+        }
     if state.get("progress"):
         update["workspace"] = {
             **update.get("workspace", {}),
@@ -596,6 +670,9 @@ async def checks(
         "language": ctx.language,
         "short_form": bool(recipe.get("shortForm")),
         "has_progress": bool(state.get("progress")),
+        # Under `assessed`, a cue the reader marked part_of_practice needs no
+        # important_moment card (the cue objects in `safety` carry the flag).
+        "risk_handling": ctx.risk_cue["handling"],
     }
     answer = await ctx.gateway.call("run_checks", check_input)
     fails = [_failure(f) for f in answer.get("failures") or []]
@@ -659,6 +736,15 @@ async def checks(
     debrief = (await ctx.gateway.call("render_cards", {"cards": cur["cards"]}))["text"]
     rubric = ctx.prompt(PROMPT_CODES["rubric"])
     evaluator_step = ctx.step_of(state["recipe_key"], Step.EVALUATOR)
+    # No model step starts past the run's deadline: ally-be treats a run that outlives
+    # it (plus its margin) as dead and starts it again, so a step begun now would be
+    # paid for twice. The draft stands and goes to `decide` unevaluated (below the bar,
+    # sent to review).
+    if evaluator_step and ctx.time_left_ms(state.get("has_risk_cue", False)) <= 0:
+        steps.append(skipped(ctx, estimated, evaluator_step, "deadline"))
+        return Command(
+            update={**update, "steps": steps, "current": current}, goto="score_draft"
+        )
     est = _reserve(
         ctx,
         estimated,
@@ -703,13 +789,12 @@ async def score_draft(
         # A missed cue holds the debrief only when it is clear; one that every
         # signal reads as possible (low mood, burden, grief, guilt) is sent to
         # review with the debrief published (cue_strength.split_missed_cues).
-        clear_missed, possible_missed = split_missed_cues(
+        hard_fails, clear_missed, possible_missed = effective_hard_fails(
+            ev["hard_fails"],
             ev.get("risk_cues") or [],
             (state.get("safety") or {}).get("risk_cues") or [],
+            ctx.risk_cue["word_list_raises"],
         )
-        hard_fails = ev["hard_fails"]
-        if possible_missed and not clear_missed:
-            hard_fails = [h for h in hard_fails if h["code"] != "missed_risk_cue"]
         evaluation = {
             "overall": compute_overall(
                 {d["dimension"]: d["score"] for d in ev["dimensions"]},
@@ -718,9 +803,14 @@ async def score_draft(
             "hardFails": hard_fails,
             "fixes": ev.get("fixes") or [],
             "dimensions": ev["dimensions"],
+            # Only the ones a person should look at: a possible cue the learner
+            # handled well and the debrief left out needs no review.
             "possibleMissedCues": [
                 {"turn_index": c.get("turn_index"), "quote": c.get("quote")}
-                for c in possible_missed
+                for c in needs_review(
+                    possible_missed,
+                    (state.get("safety") or {}).get("risk_cues") or [],
+                )
             ],
             "riskCues": ev.get("risk_cues") or [],
         }
@@ -738,9 +828,9 @@ async def score_draft(
         "hardFails": [h["code"] for h in evaluation["hardFails"]] if evaluation else [],
         "checks": [c["code"] for c in draft["checks"]],
     }
-    again = not meets_bar(best, advisory, ctx.setting("passScore", 8)) and state.get(
-        "round", 0
-    ) < _max_rounds(state, ctx)
+    again = not meets_bar(
+        best, advisory, ctx.setting("passScore", DEFAULT_PASS_SCORE)
+    ) and state.get("round", 0) < _max_rounds(state, ctx)
     goto = "revise_gate" if again else "decide"
     if (
         again
@@ -750,7 +840,7 @@ async def score_draft(
     ):
         # D3: the first failed evaluation gets one evidence top-up first.
         goto = "top_up"
-    pass_score = ctx.setting("passScore", 8)
+    pass_score = ctx.setting("passScore", DEFAULT_PASS_SCORE)
     log = code_log(
         ctx,
         "score_draft",
@@ -828,7 +918,7 @@ async def decide(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]:
     ctx = runtime.context
     best = state["best"]
     advisory = set(state.get("advisory") or [])
-    pass_score = ctx.setting("passScore", 8)
+    pass_score = ctx.setting("passScore", DEFAULT_PASS_SCORE)
     rnd = state.get("round", 0)
     ev = best.get("evaluation")
     options = body.practice_options(ctx)
@@ -857,6 +947,7 @@ async def decide(state: State, runtime: Runtime[Ctx]) -> Dict[str, Any]:
             cards,
             ev.get("riskCues") or [],
             (state.get("safety") or {}).get("risk_cues") or [],
+            ctx.risk_cue["word_list_raises"],
         )
     final = await ctx.gateway.call(
         "finalise_cards", {"cards": cards, "offered": offered, "fallback": fallback}

@@ -273,14 +273,14 @@ async def test_the_thread_continues_from_its_checkpoint():
     assert second[-1] == "Asha: Which one?"
     state = await saver.aget_tuple({"configurable": {"thread_id": THREAD}})
     assert state is not None
-    # Another thread id is another thread (the clinical advisor's).
+    # Another thread id is another thread.
     model = Recording(script=[ai("ok")])
     await turn(
         model,
         FakeGateway(),
         saver,
         store,
-        thread_id="debrief-pm-conversation:pinned-rules",
+        thread_id="debrief-pm-conversation:other",
         about=None,
     )
     humans = [m for m in model.calls[0]["messages"] if m.type == "human"]

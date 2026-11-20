@@ -39,6 +39,8 @@ export const INLINE_ITEM_TYPES: CourseItemType[] = [
   "QUIZ",
   "JOURNAL",
   "ANNOTATED_ARTIFACT",
+  "BRANCHING_SCENARIO",
+  "BUCKET_SORT",
   "GAME",
 ];
 

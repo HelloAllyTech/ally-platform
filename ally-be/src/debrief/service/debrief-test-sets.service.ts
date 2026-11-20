@@ -8,7 +8,7 @@ import {
   settledEndedSessionPredicate,
 } from '../../analytics/util/session-eligibility.util';
 import { debriefOverallSql } from '../../analytics/constants/debrief-quality.constants';
-import { DEBRIEF_AGENT_KEY } from '../constants/debrief-release.constants';
+import { DEBRIEF_AGENT_KEY } from '../../common/constants/debrief-agent.constants';
 import { lengthBand } from '../util/debrief-metrics.util';
 
 export { lengthBand };
@@ -35,10 +35,10 @@ export enum DebriefTestSet {
 
 const SUITE_NAMES: Record<DebriefTestSet, string> = {
   [DebriefTestSet.OPEN]:
-    'Debrief: practice sessions (the PM agent tries ideas)',
+    'Debrief: practice sessions (the Debrief PM agent tries ideas)',
   [DebriefTestSet.GATE]: 'Debrief: test sessions (decide what goes further)',
   [DebriefTestSet.SEALED]:
-    'Debrief: sealed sessions (never shown to the PM agent)',
+    'Debrief: sealed sessions (never shown to the Debrief PM agent)',
 };
 
 /** Split by a hash of the session id, so a session's set never changes. */

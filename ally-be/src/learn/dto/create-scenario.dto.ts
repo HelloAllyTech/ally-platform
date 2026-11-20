@@ -1,5 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { RISK_CUE_CHOICE_KEYS } from '../constants/scenario-risk-cue-choice.constants';
 import {
+  IsIn,
   IsString,
   IsNotEmpty,
   IsOptional,
@@ -753,6 +755,20 @@ export class CreateScenarioDto {
   @IsOptional()
   @IsBoolean()
   pauseEnabled?: boolean;
+
+  @ApiProperty({
+    description:
+      'Is handling a risk conversation the skill practised in this roleplay? ' +
+      '"part_of_practice" = yes (the Debrief coaches how the learner assessed and responded), ' +
+      'anything else or null = Standard (a risk cue is a safety moment).',
+    example: 'part_of_practice',
+    required: false,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  @IsIn(RISK_CUE_CHOICE_KEYS)
+  debriefRiskCueOption?: string | null;
 
   @ApiProperty({
     description: 'Enable current state for the scenario',

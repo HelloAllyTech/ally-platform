@@ -48,6 +48,38 @@ export enum PlanEventKind {
   OUTCOME_REVIEWED = 'outcome_reviewed',
   CLOSED = 'closed',
   REOPENED = 'reopened',
+  /**
+   * An inline edit on the Roadmap v2 idea page (§4.11): title, goal, summary,
+   * lead or planned month. `detail` is { field, from?, to? }.
+   */
+  ITEM_EDITED = 'item_edited',
+  /** The Owner accepted, declined or reopened a submitted idea (D10). detail: { decision, undo? }. */
+  REVIEWED = 'reviewed',
+  /** The Owner picked or changed the lead (D11). detail: { from, to }. */
+  LEAD_ASSIGNED = 'lead_assigned',
+  /** The lead handed the idea back to the Owner (D11). detail: { note? }. */
+  LEAD_HANDED_BACK = 'lead_handed_back',
+  /** Start planning: the plan interview begins in the same session (§2.1a). */
+  PLANNING_STARTED = 'planning_started',
+  /** "Use this answer": the settler chose between conflicting answers (D13). */
+  ANSWER_SETTLED = 'answer_settled',
+  /**
+   * The build brief went to Claude Code (D18, §4.5b). `detail` is { tool }.
+   * The idea's PRs carrying its code then drive release (linkDrivesRelease).
+   */
+  EXTERNAL_BUILD = 'external_build',
+  /** The Owner closed the plan: the idea can now take a builder. */
+  PLAN_CLOSED = 'plan_closed',
+  /** The Owner reopened a closed plan (only while nobody leads the idea). */
+  PLAN_REOPENED = 'plan_reopened',
+  /** The builder chose or switched how it is built. detail: { from, to }. */
+  BUILD_MODE_SET = 'build_mode_set',
+  /** The builder or an Owner marked the idea Released. detail: { liveAt? }. */
+  MARKED_RELEASED = 'marked_released',
+  /** Someone took the plan interview (Owner or the idea's author). detail: { as, resumed? }. */
+  PLAN_CLAIMED = 'plan_claimed',
+  /** The holder handed the plan interview back, unfinished or before starting. detail: { as, started }. */
+  PLAN_RELEASED = 'plan_released',
 }
 
 /** What a plan notification says (plan_notifications.kind). */
@@ -69,4 +101,48 @@ export enum PlanNotificationKind {
   AUTHOR_ANSWERED = 'author_answered',
   CEILING_WARNING = 'ceiling_warning',
   CHECK_FINDING = 'check_finding',
+}
+
+/**
+ * What a Roadmap v2 notification is about (roadmap_notifications.kind): the
+ * §4.8 events, plus `budget` (a ceiling reached) and `activity` (anything
+ * else an older writer reports, delivered to its original recipient only).
+ */
+export enum RoadmapNotificationKind {
+  SUBMITTED = 'submitted',
+  ACCEPTED = 'accepted',
+  DECLINED = 'declined',
+  LEAD_ASSIGNED = 'lead_assigned',
+  ASSIGNED_TO_YOU = 'assigned_to_you',
+  HANDED_BACK = 'handed_back',
+  AGENT_QUESTION = 'agent_question',
+  MENTION = 'mention',
+  ANSWERS_CONFLICT = 'answers_conflict',
+  DECISION_NEEDED = 'decision_needed',
+  SHIPPED = 'shipped',
+  OUTCOME_REVIEWED = 'outcome_reviewed',
+  RELEASE_HELD = 'release_held',
+  RELEASE_FAILED = 'release_failed',
+  BREAKER_OPEN = 'breaker_open',
+  BUDGET = 'budget',
+  ACTIVITY = 'activity',
+  /** The PRD first reads ready: the plan is there to read before it closes. */
+  PLAN_READY = 'plan_ready',
+  /** An Owner closed the plan: the idea now waits for a builder. */
+  PLAN_CLOSED = 'plan_closed',
+  /** New comments on an idea you follow; one unread notice per idea, however many arrive. */
+  COMMENT = 'comment',
+  /** Someone answered the planning agent's question: told to the planner. */
+  QUESTION_ANSWERED = 'question_answered',
+  /** The author's nudge after submitting: expand it yourself, or ask an Owner to. */
+  PLAN_OFFERED = 'plan_offered',
+  /** The author handed the plan interview to the Owners, before or part-way through. */
+  PLAN_HANDED_OVER = 'plan_handed_over',
+}
+
+/** How closely someone follows one idea (§4.8). */
+export enum RoadmapWatchLevel {
+  ALL = 'all',
+  MILESTONES = 'milestones',
+  NONE = 'none',
 }

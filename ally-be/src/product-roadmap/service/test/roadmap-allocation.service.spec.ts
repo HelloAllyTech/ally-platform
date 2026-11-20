@@ -99,6 +99,34 @@ describe('RoadmapAllocationService', () => {
 
   afterEach(() => jest.clearAllMocks());
 
+  describe('the voter watch (Roadmap v2, §4.8)', () => {
+    it('adds a milestones watch after a vote commits', async () => {
+      const watchOnVote = jest.fn().mockResolvedValue(undefined);
+      (service as any).inbox = { watchOnVote };
+      givenExistingAllocation(null);
+      grantRepository.availableBalance.mockResolvedValue(40);
+
+      await service.setVotes(USER, OPP_ID, 3);
+
+      expect(watchOnVote).toHaveBeenCalledWith(USER, OPP_ID);
+    });
+
+    it('adds nothing when the vote is withdrawn or refused', async () => {
+      const watchOnVote = jest.fn().mockResolvedValue(undefined);
+      (service as any).inbox = { watchOnVote };
+      givenExistingAllocation(30);
+      await service.setVotes(USER, OPP_ID, 0);
+
+      givenExistingAllocation(null);
+      grantRepository.availableBalance.mockResolvedValue(1);
+      await expect(service.setVotes(USER, OPP_ID, 5)).rejects.toBeInstanceOf(
+        UnprocessableEntityException,
+      );
+
+      expect(watchOnVote).not.toHaveBeenCalled();
+    });
+  });
+
   describe('the vote-grant balance', () => {
     it('allows spending exactly the available balance', async () => {
       givenExistingAllocation(null);
@@ -244,8 +272,6 @@ describe('RoadmapAllocationService', () => {
 
   describe('the stage rule', () => {
     it.each([
-      RoadmapOpportunityStage.PRIORITISED,
-      RoadmapOpportunityStage.UNDER_DEVELOPMENT,
       RoadmapOpportunityStage.RELEASED,
       RoadmapOpportunityStage.ARCHIVED,
     ])('rejects a vote on a %s opportunity with 409', async (stage) => {
@@ -257,7 +283,53 @@ describe('RoadmapAllocationService', () => {
       expect(manager.save).not.toHaveBeenCalled();
     });
 
-    it('allows a vote on a new opportunity', async () => {
+    it("follows the idea's stage, not the legacy board stage: a prioritised idea nobody leads still takes votes", async () => {
+      givenExistingAllocation(null, RoadmapOpportunityStage.PRIORITISED);
+      await expect(service.setVotes(USER, OPP_ID, 5)).resolves.toMatchObject({
+        votes: 5,
+      });
+    });
+
+    it('locks a declined idea', async () => {
+      manager.findOne.mockImplementation(async (entity: unknown) =>
+        entity === RoadmapOpportunity
+          ? {
+              id: OPP_ID,
+              stage: RoadmapOpportunityStage.NEW,
+              type: RoadmapOpportunityType.IDEA,
+              reviewState: 'declined',
+            }
+          : null,
+      );
+      await expect(service.setVotes(USER, OPP_ID, 5)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+    });
+
+    it('locks an idea once a lead holds it, and one whose plan is closed', async () => {
+      manager.findOne.mockImplementation(async (entity: unknown) =>
+        entity === RoadmapOpportunity
+          ? {
+              id: OPP_ID,
+              stage: RoadmapOpportunityStage.NEW,
+              type: RoadmapOpportunityType.IDEA,
+              builderSessionId: 's1',
+            }
+          : null,
+      );
+      manager.query.mockResolvedValueOnce([{ leadUserId: 7, closed: null }]);
+      await expect(service.setVotes(USER, OPP_ID, 5)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+      manager.query.mockResolvedValueOnce([
+        { leadUserId: null, closed: { at: 'x' } },
+      ]);
+      await expect(service.setVotes(USER, OPP_ID, 5)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+    });
+
+    it('takes votes on a new idea nobody leads', async () => {
       givenExistingAllocation(null, RoadmapOpportunityStage.NEW);
       await expect(service.setVotes(USER, OPP_ID, 5)).resolves.toMatchObject({
         votes: 5,

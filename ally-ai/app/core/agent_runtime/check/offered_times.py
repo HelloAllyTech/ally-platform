@@ -49,7 +49,9 @@ _DAY_MONTH = re.compile(rf"\b(\d{{1,2}})(?:st|nd|rd|th)?\s+{_MONTH}", re.IGNOREC
 _MONTH_DAY = re.compile(rf"\b{_MONTH}\s+(\d{{1,2}})(?:st|nd|rd|th)?\b", re.IGNORECASE)
 _OFFER = re.compile(
     r"\b(?:free|available|availability|open\s+(?:slots?|times?)|book|booked|booking|"
-    r"slots?|alternatives?|instead|options?|appointments?|reserve|reserved|times?)\b",
+    r"slots?|alternatives?|instead|options?|appointments?|reserve|reserved|times?|"
+    # "The latest is 16:00, or Friday has 18:00" (chunk 6b): nearest times offered.
+    r"latest|earliest|nearest)\b",
     re.IGNORECASE,
 )
 _LIST_ITEM = re.compile(r"^\s*(?:[-•*·]|\d{1,2}[.)])\s+")

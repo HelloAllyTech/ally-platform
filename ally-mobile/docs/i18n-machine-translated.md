@@ -161,3 +161,18 @@ Added 2026-11-16 for the learner Debrief fixes (back to the course, Ally's flag 
 | `postSim.debriefCards.flag.answer.label` | Ally's answer: | Ally का जवाब: | ಆಲಿಯ ಉತ್ತರ: | अ‍ॅलीचे उत्तर: | ஆலியின் பதில்: |
 | `postSim.debriefCards.flag.answer.kept` | Ally looked at this again and kept it. | Ally ने इसे फिर से देखा और इसे वैसा ही रखा। | ಆಲಿ ಇದನ್ನು ಮತ್ತೆ ನೋಡಿ ಹಾಗೆಯೇ ಉಳಿಸಿದೆ. | अ‍ॅलीने हे पुन्हा पाहिले आणि तसेच ठेवले. | ஆலி இதை மீண்டும் பார்த்து அப்படியே வைத்தது. |
 | `postSim.debriefCards.flag.answer.corrected` | Ally looked at this again and changed it. | Ally ने इसे फिर से देखा और इसे बदल दिया। | ಆಲಿ ಇದನ್ನು ಮತ್ತೆ ನೋಡಿ ಬದಲಾಯಿಸಿದೆ. | अ‍ॅलीने हे पुन्हा पाहिले आणि बदलले. | ஆலி இதை மீண்டும் பார்த்து மாற்றியது. |
+
+## Debrief: collapsing, retitles, breathing, Reminders (2026-11-18)
+
+Written for this app (no RN source). Needs a native speaker's read. Keys: `postSim.debriefCards.workOnThis` (retitled "What to strengthen"), `postSim.debriefCards.practiseNext` and `postSim.debriefCards.practise.next` (retitled "Try this in your next practice"), `postSim.debriefCards.working.breatheStart`, `.breatheStop`, `.breatheCalm`, and `simulationPage.fromLastDebrief`.
+
+## Debrief: "we're taking a closer look" notice (2026-11-18)
+
+Shown when a clear risk cue is still left out of a debrief (the debrief itself is shown as before). Written by Claude for this app and the web helpline (`ally-web/apps/ally-helpline-dashboard/src/i18n/locales`, same keys, same text); there is no separate machine-translation note for the web helpline, so this is the record for both. It deliberately promises no contact: it says someone from the team is checking the debrief, in the same words the `onItsWay` string uses for "the Ally team". Needs a native speaker's read.
+
+| Key | English | Hindi | Kannada | Marathi | Tamil |
+|---|---|---|---|---|---|
+| `postSim.debriefCards.followUp.title` | We're taking a closer look | हम इसे और ध्यान से देख रहे हैं | ನಾವು ಇದನ್ನು ಇನ್ನಷ್ಟು ಹತ್ತಿರದಿಂದ ನೋಡುತ್ತಿದ್ದೇವೆ | आम्ही हे अधिक काळजीपूर्वक पाहत आहोत | நாங்கள் இதை இன்னும் உன்னிப்பாகப் பார்க்கிறோம் |
+| `postSim.debriefCards.followUp.body` | Something important came up in this session, so someone from the Ally team is checking this debrief more closely. | इस सेशन में कुछ अहम बात सामने आई, इसलिए Ally टीम का कोई सदस्य इस डीब्रीफ़ को और ध्यान से देख रहा है। | ಈ ಸೆಷನ್‌ನಲ್ಲಿ ಮುಖ್ಯವಾದದ್ದೇನೋ ಬಂದ ಕಾರಣ, ಆಲಿ ತಂಡದ ಒಬ್ಬರು ಈ ಡೀಬ್ರೀಫ್ ಅನ್ನು ಇನ್ನಷ್ಟು ಹತ್ತಿರದಿಂದ ಪರಿಶೀಲಿಸುತ್ತಿದ್ದಾರೆ. | या सत्रात काहीतरी महत्त्वाचे समोर आले, म्हणून अ‍ॅली टीममधील कोणीतरी ही डीब्रीफ अधिक काळजीपूर्वक तपासत आहे. | இந்த அமர்வில் முக்கியமான ஒன்று வந்ததால், ஆலி குழுவில் ஒருவர் இந்த டீப்ரீஃப்பை இன்னும் உன்னிப்பாகச் சரிபார்க்கிறார். |
+| `postSim.debriefCards.followUp.support` | If you need support right now, the support lines in this debrief are open any time. | अगर आपको अभी सहायता चाहिए, तो इस डीब्रीफ़ में दी गई सहायता लाइनें हर समय खुली हैं। | ನಿಮಗೆ ಈಗ ಬೆಂಬಲ ಬೇಕಿದ್ದರೆ, ಈ ಡೀಬ್ರೀಫ್‌ನಲ್ಲಿರುವ ಸಹಾಯ ಸಂಖ್ಯೆಗಳು ಯಾವಾಗಲೂ ತೆರೆದಿರುತ್ತವೆ. | तुम्हाला आत्ता मदतीची गरज असल्यास, या डीब्रीफमधील मदत लाइन्स कधीही उपलब्ध आहेत. | இப்போது உங்களுக்கு ஆதரவு தேவைப்பட்டால், இந்த டீப்ரீஃப்பில் உள்ள உதவி எண்கள் எப்போதும் திறந்திருக்கும். |
+

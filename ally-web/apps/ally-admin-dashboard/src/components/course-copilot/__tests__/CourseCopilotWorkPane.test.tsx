@@ -9,6 +9,11 @@ vi.mock("@components", () => ({ cellTypes: {} }));
 
 // The panels have their own tests; here they only say which one is showing and what they were
 // handed. BriefPanel can be made to throw, to prove one bad panel does not take the pane down.
+vi.mock("../ReferenceFiles", () => ({
+  ReferenceFiles: ({ lockedReason }: any) => (
+    <div data-testid="reference-files">{lockedReason ?? ""}</div>
+  ),
+}));
 vi.mock("../BriefPanel", () => ({
   BriefPanel: (props: any) => {
     if (props.brief?.seed === "boom") throw new Error("malformed brief");
@@ -111,7 +116,10 @@ const handlers = () => ({
   onSendMessage: vi.fn(),
 });
 
-const setup = (detail: CourseCopilotSessionDetail, overrides: Partial<CourseCopilotWorkPaneProps> = {}) => {
+const setup = (
+  detail: CourseCopilotSessionDetail,
+  overrides: Partial<CourseCopilotWorkPaneProps> = {},
+) => {
   const props: CourseCopilotWorkPaneProps = { detail, ...handlers(), ...overrides };
   const utils = render(<CourseCopilotWorkPane {...props} />);
   return {
@@ -125,7 +133,11 @@ const setup = (detail: CourseCopilotSessionDetail, overrides: Partial<CourseCopi
 const shown = () =>
   ["brief", "blueprint", "build", "course"].find(name => screen.queryByTestId(`${name}-panel`));
 
-const tab = (name: string) => screen.getByRole("tab", { name: new RegExp(`^${name}`) });
+// `hidden`: with a single tab the tab bar is hidden, but the tab is still the selected one.
+const tab = (name: string) =>
+  screen.getByRole("tab", { name: new RegExp(`^${name}`), hidden: true });
+const queryTab = (name: string) =>
+  screen.queryByRole("tab", { name: new RegExp(`^${name}`), hidden: true });
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -143,7 +155,10 @@ describe("CourseCopilotWorkPane — default tab per status", () => {
     setup(detailIn(status));
 
     expect(shown()).toBe(expected);
-    expect(tab(expected[0].toUpperCase() + expected.slice(1))).toHaveAttribute("aria-selected", "true");
+    expect(tab(expected[0].toUpperCase() + expected.slice(1))).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
   });
 
   it("opens an archived session with no course on the brief", () => {
@@ -153,13 +168,14 @@ describe("CourseCopilotWorkPane — default tab per status", () => {
 });
 
 describe("CourseCopilotWorkPane — which tabs are available", () => {
-  it("enables only the tabs whose data exists", () => {
+  it("shows only the tabs whose data exists, and no tab bar for a single tab", () => {
     setup(makeDetail({ status: "INTERVIEWING" }));
 
-    expect(tab("Brief")).toBeEnabled();
-    expect(tab("Blueprint")).toBeDisabled();
-    expect(tab("Build")).toBeDisabled();
-    expect(tab("Course")).toBeDisabled();
+    expect(tab("Brief")).toBeInTheDocument();
+    expect(queryTab("Blueprint")).toBeNull();
+    expect(queryTab("Build")).toBeNull();
+    expect(queryTab("Course")).toBeNull();
+    expect(screen.queryByRole("tablist")).toBeNull();
   });
 
   it("lets the trainer look back at the approved blueprint and the build once editing", () => {
@@ -334,9 +350,9 @@ describe("CourseCopilotWorkPane — tab strip", () => {
     expect(shown()).toBe("course");
   });
 
-  it("does not let a click select a disabled tab", () => {
+  it("does not offer a tab with nothing in it", () => {
     setup(makeDetail({ status: "INTERVIEWING" }));
-    fireEvent.click(tab("Course"));
+    expect(queryTab("Course")).toBeNull();
     expect(shown()).toBe("brief");
   });
 });

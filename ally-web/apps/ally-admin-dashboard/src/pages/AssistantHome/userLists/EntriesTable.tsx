@@ -31,6 +31,9 @@ import { RepeatWeekly } from "./RepeatWeekly";
 import { PHONE, useMedia } from "./useMedia";
 
 const t = () => HOME.userLists;
+/** How often an open list checks for new entries. */
+const ENTRIES_POLL_MS = 10_000;
+
 export const PAGE_SIZE = 50;
 const SEARCHABLE = new Set(["text", "long_text", "phone", "email", "url"]);
 
@@ -81,7 +84,11 @@ export const EntriesTable: React.FC<{
     }),
     [filters, search, sort],
   );
-  const first = useGetListEntriesQuery({ id: bot.id, key: list.key, query });
+  // New entries show without a reload (chunk H1 Part D): the assistant books from another tab.
+  const first = useGetListEntriesQuery(
+    { id: bot.id, key: list.key, query },
+    { pollingInterval: ENTRIES_POLL_MS, refetchOnFocus: true, skipPollingIfUnfocused: true },
+  );
   const [loadMore, moreState] = useLazyGetListEntriesQuery();
 
   // A new first page (a change, a filter, a refetch) starts the paging again.

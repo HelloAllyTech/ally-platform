@@ -9,9 +9,30 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from app.core.debrief_graph.constants import PROMPT_CODES, Recipe, Step
+from app.core.debrief import framework
+from app.core.debrief_graph.constants import (
+    DEFAULT_PASS_SCORE,
+    PROMPT_CODES,
+    Recipe,
+    Step,
+)
 from app.core.debrief_graph.context import DebriefRunContext as Ctx
+from app.core.debrief_graph.guidance_toolbox import for_writer as passages_for_writer
 from app.core.debrief_graph.state import DebriefState as State
+
+
+def contract_extras(ctx: Ctx, *keys: str) -> Dict[str, Any]:
+    """The optional contract fields the session carries (framework, risk_cue,
+    speaker_labels), normalised, for a step body. A field the session does not
+    carry is left out, so an absent contract builds exactly the bodies it did
+    before."""
+    getters = {
+        "framework": framework.framework_of,
+        "risk_cue": framework.risk_cue_of,
+        "speaker_labels": framework.speaker_labels_of,
+    }
+    session = getattr(ctx, "session", None) or {}
+    return {k: getters[k](session) for k in keys if framework.session_has(session, k)}
 
 
 def recipe(state: State, ctx: Ctx) -> Dict[str, Any]:
@@ -58,6 +79,20 @@ def safety_body(state: State, ctx: Ctx) -> Dict[str, Any]:
         "transcript": ctx.transcript,
         "language": ctx.language,
         "system_prompt": ctx.prompt(PROMPT_CODES["safety_reader"]),
+        "risk_cue_definition": ctx.prompt(PROMPT_CODES["risk_cue_definition"]),
+        **contract_extras(ctx, "risk_cue", "speaker_labels"),
+        **practice_context(ctx),
+    }
+
+
+def practice_context(ctx: Ctx) -> Dict[str, Any]:
+    """What the Safety reader needs to say which cues are part of the practice:
+    only for a roleplay whose risk cues are assessed."""
+    if ctx.risk_cue["handling"] != "assessed":
+        return {}
+    return {
+        "scenario": ctx.sess("scenario") or {},
+        "roleplay_expectations": roleplay_expectations(ctx) or {},
     }
 
 
@@ -74,6 +109,7 @@ def analyst_body(state: State, ctx: Ctx) -> Dict[str, Any]:
         "live_detections": live_detections(state, ctx),
         "case_memory": case_memory(state, ctx),
         "system_prompt": ctx.prompt(PROMPT_CODES["analyst"]),
+        **contract_extras(ctx, "framework", "speaker_labels"),
     }
 
 
@@ -94,9 +130,10 @@ def progress_agent_body(state: State, ctx: Ctx) -> Dict[str, Any]:
     return {
         "evidence": evidence,
         "profile": profile,
-        "this_session": agent_input(profile, evidence),
+        "this_session": agent_input(profile, evidence, ctx.skill_names()),
         "language": ctx.language,
         "system_prompt": ctx.prompt(PROMPT_CODES["progress"]),
+        **contract_extras(ctx, "framework"),
     }
 
 
@@ -137,16 +174,37 @@ def writer_body(state: State, ctx: Ctx) -> Dict[str, Any]:
         "evidence": state.get("evidence") or {},
         "safety": state["safety"],
         "transcript": ctx.transcript,
-        "passages": state.get("passages") or [],
+        "passages": passages_for_writer(state.get("passages")),
         "progress": state.get("progress"),
         "language": ctx.language,
         "learner_level": ctx.sess("learner_level"),
         "short": bool(r.get("shortForm")),
         "system_prompt": ctx.prompt(PROMPT_CODES["writer"]),
+        "risk_cue_definition": ctx.prompt(PROMPT_CODES["risk_cue_definition"]),
+        **contract_extras(ctx, "risk_cue", "speaker_labels"),
     }
     if state.get("orchestrated"):
         out["findings"] = writer_findings(state) or None
     return out
+
+
+def roleplay_expectations(ctx: Ctx) -> Optional[Dict[str, Any]]:
+    """The roleplay's own expectations for the Evaluator's practice_alignment
+    (None when the roleplay lists none, so the wording stays today's)."""
+    helpful = [b for b in ctx.sess("helpful_behaviours") or [] if b]
+    unhelpful = [b for b in ctx.sess("unhelpful_behaviours") or [] if b]
+    named = [
+        c
+        for c in ctx.sess("competencies") or []
+        if isinstance(c, dict) and c.get("name")
+    ]
+    if not (helpful or unhelpful or named):
+        return None
+    return {
+        "helpful_behaviours": helpful,
+        "unhelpful_behaviours": unhelpful,
+        "competencies": named,
+    }
 
 
 def evaluator_body(state: State, ctx: Ctx) -> Dict[str, Any]:
@@ -157,6 +215,18 @@ def evaluator_body(state: State, ctx: Ctx) -> Dict[str, Any]:
         "history": state.get("history"),
         "language": ctx.language,
         "learner_level": ctx.sess("learner_level"),
+        "risk_cue_definition": ctx.prompt(PROMPT_CODES["risk_cue_definition"]),
+        "system_prompt": ctx.prompt(PROMPT_CODES["evaluator"]),
+        "fix_prompt": ctx.prompt(PROMPT_CODES["evaluator_fix"]),
+        "pass_score": ctx.setting("passScore", DEFAULT_PASS_SCORE),
+        # What the debrief may claim over time (null: nothing).
+        "progress": state.get("progress"),
+        **contract_extras(ctx, "risk_cue", "speaker_labels"),
+        **(
+            {"roleplay_expectations": exp}
+            if (exp := roleplay_expectations(ctx))
+            else {}
+        ),
     }
 
 
@@ -205,6 +275,16 @@ def reviser_body(state: State, ctx: Ctx) -> Dict[str, Any]:
         "excerpts": excerpts(state, ctx),
         "language": ctx.language,
         "system_prompt": ctx.prompt(PROMPT_CODES["reviser"]),
+        # The clear cues it must keep covered (RISK CUES TO COVER).
+        "safety": state.get("safety") or {},
+        "risk_cue_definition": ctx.prompt(PROMPT_CODES["risk_cue_definition"]),
+        **contract_extras(ctx, "risk_cue", "speaker_labels"),
+        # Guidance the tool phase fetched for the Reviser (only when it did).
+        **(
+            {"passages": passages_for_writer(state["tool_passages"])}
+            if state.get("tool_passages")
+            else {}
+        ),
         # What the evidence top-up found (D3), for an orchestrated run only.
         **(
             {

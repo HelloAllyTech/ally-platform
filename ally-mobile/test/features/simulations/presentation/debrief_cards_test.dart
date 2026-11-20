@@ -131,6 +131,14 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Opens the cards that start collapsed (What worked, skills, progress).
+  Future<void> expandCollapsed(WidgetTester tester) async {
+    for (final title in ['What worked', 'Your skills in this session', 'Your progress']) {
+      final heading = find.text(title);
+      if (heading.evaluate().isNotEmpty) await tapVisible(tester, heading);
+    }
+  }
+
   group('today\'s debrief stays unchanged', () {
     testWidgets('when the organisation isn\'t switched on (not_available)', (tester) async {
       await h.pump(tester);
@@ -187,12 +195,18 @@ void main() {
     );
     expect(find.text('Other moments like this'), findsOneWidget);
     expect(find.text('You stayed with her when it got hard.'), findsOneWidget);
+    // The secondary cards start collapsed: their headings show, their contents don't.
     expect(find.text('What worked'), findsOneWidget);
+    expect(find.text('Your skills in this session'), findsOneWidget);
+    expect(find.text('Your progress'), findsOneWidget);
+    expect(find.text('You named the feeling.'), findsNothing);
+    expect(find.text('A strength today'), findsNothing);
+    await expandCollapsed(tester);
     expect(find.text('You named the feeling.'), findsOneWidget);
-    expect(find.text('Work on this'), findsOneWidget);
+    expect(find.text('What to strengthen'), findsOneWidget);
     expect(find.byKey(const Key('debrief-try-saying')), findsOneWidget);
     expect(find.textContaining('Try saying:', findRichText: true), findsOneWidget);
-    expect(find.text('Practise this next'), findsOneWidget);
+    expect(find.text('Try this in your next practice'), findsOneWidget);
     expect(find.text('A strength today'), findsOneWidget);
     expect(find.text('Keep practising'), findsOneWidget);
     expect(find.text("Didn't come up today"), findsOneWidget);
@@ -245,6 +259,7 @@ void main() {
       ],
     });
     await h.pump(tester);
+    await expandCollapsed(tester);
 
     expect(find.text('You named the feeling.'), findsNothing);
     expect(find.text('You slowed down.'), findsOneWidget);
@@ -307,6 +322,7 @@ void main() {
     });
     when(() => h.learnerDebrief.undoFlag('session-1', 'f1')).thenAnswer((_) async => flags.clear());
     await h.pump(tester);
+    await expandCollapsed(tester);
 
     final practiseFlag = find.byKey(const ValueKey('debrief-flag-practise_next'));
     await tapVisible(tester, find.descendant(of: practiseFlag, matching: find.byKey(const Key('debrief-flag-open'))));
@@ -608,10 +624,10 @@ void main() {
       expect(find.text('COURSE_ITEM:t1:item-1'), findsOneWidget);
     });
 
-    testWidgets('outside a course the card stays "Practise this next" with no list', (tester) async {
+    testWidgets('outside a course the card stays "Try this in your next practice" with no list', (tester) async {
       stubDebrief(withPractice({'id': 42, 'title': 'Again'}));
       await h.pump(tester);
-      expect(find.text('Practise this next'), findsNWidgets(2));
+      expect(find.text('Try this in your next practice'), findsNWidgets(2));
       expect(find.byKey(const Key('debrief-practise-try')), findsNothing);
     });
   });
@@ -781,6 +797,34 @@ void main() {
       expect(find.byKey(const Key('debrief-card-support')), findsNothing);
     });
 
+    testWidgets('a clear risk cue still left out adds a kind follow-up notice, and the debrief is unchanged', (tester) async {
+      stubDebrief({...readyDebriefJson(), 'riskCue': true, 'followUp': true, 'supportLines': [_supportLine]});
+      await h.pump(tester);
+
+      expect(find.byKey(const Key('debrief-follow-up')), findsOneWidget);
+      expect(find.text("Something important came up"), findsOneWidget);
+      expect(
+        find.text(
+          'Something important came up in this session, and this debrief may not cover it fully.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.text('If you need support right now, the support lines in this debrief are open any time.'),
+        findsOneWidget,
+      );
+      // Nothing else changes: the cards are still there.
+      expect(find.byKey(const Key('debrief-card-important-moment')), findsOneWidget);
+    });
+
+    testWidgets('no follow-up flag: no notice', (tester) async {
+      stubDebrief({...readyDebriefJson(), 'riskCue': true, 'supportLines': [_supportLine]});
+      await h.pump(tester);
+
+      expect(find.byKey(const Key('debrief-follow-up')), findsNothing);
+      expect(find.text("Something important came up"), findsNothing);
+    });
+
     testWidgets('a support line is a tel: link', (tester) async {
       final launcher = _FakeUrlLauncherPlatform();
       final previous = UrlLauncherPlatform.instance;
@@ -818,7 +862,7 @@ void main() {
     expect(find.byKey(const Key('debrief-practise-this')), findsNothing);
     final next = find.byKey(const Key('debrief-practise-next'));
     expect(next, findsOneWidget);
-    expect(find.text('Practise this next'), findsNWidgets(2)); // card title + button
+    expect(find.text('Try this in your next practice'), findsNWidgets(2)); // card title + button
     expect(find.bySemanticsLabel('Practise this in the roleplay "Supporting a grieving parent"'), findsOneWidget);
     await tapVisible(tester, next);
     expect(find.text('SIMULATION_DETAILS:42'), findsOneWidget);
@@ -1419,6 +1463,26 @@ void main() {
       expect(find.byKey(const Key('debrief-working-static')), findsOneWidget);
       expect(find.byType(CircularProgressIndicator), findsNothing);
       expect(find.textContaining('%'), findsNothing);
+    });
+
+    testWidgets('working: breathing is the learner\'s choice, and can be stopped', (tester) async {
+      tester.platformDispatcher.accessibilityFeaturesTestValue = const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+      stubDebrief({'state': 'working'});
+      await h.pump(tester);
+
+      // Never started for them.
+      expect(find.byKey(const Key('breathing-pacer')), findsNothing);
+      await tester.tap(find.byKey(const Key('debrief-breathe-start')));
+      await tester.pump();
+      expect(find.byKey(const Key('breathing-pacer')), findsOneWidget);
+      // Reduced motion: no animation, a calm line instead of the changing label.
+      expect(find.text('Breathe in slowly, then out'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('debrief-breathe-stop')));
+      await tester.pump();
+      expect(find.byKey(const Key('breathing-pacer')), findsNothing);
+      expect(find.byKey(const Key('debrief-breathe-start')), findsOneWidget);
     });
 
     testWidgets('working without steps reads "Reading your session…"; polls until ready', (tester) async {

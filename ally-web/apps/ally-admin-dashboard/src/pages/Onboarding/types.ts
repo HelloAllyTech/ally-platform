@@ -95,7 +95,7 @@ export interface BotDraftView {
   step: BotDraftStep;
   version: number;
   chatbotId: string | null;
-  source: { website: string | null; description: string | null };
+  source: { website: string | null; description: string | null; interview?: boolean };
   crawl: {
     status: "idle" | "running" | "done" | "partial" | "failed";
     domain: string | null;
@@ -103,6 +103,8 @@ export interface BotDraftView {
     finishedAt: string | null;
     pagesRead: number;
     pages: { url: string; title: string | null }[];
+    /** Pages that answered with an error, block or captcha; nothing kept (Q3-fast Part 3). */
+    notRead?: { url: string; title: string | null }[];
     findings: string[];
     brand: { logoUrl: string | null; accentColour: string | null } | null;
     problem: string | null;

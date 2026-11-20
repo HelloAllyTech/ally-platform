@@ -47,6 +47,39 @@ export interface BuilderCapability {
 
 export const BUILDER_CAPABILITIES: BuilderCapability[] = [
   {
+    id: 'billing',
+    name: 'Costs, tokens, plans and seats',
+    whatItIs:
+      'What every assistant costs Ally (each AI call and WhatsApp message priced from a versioned ' +
+      'model list), token allowances for custom logins, and plans, seats and monthly limits for ' +
+      'chatbot creators, checked before each run with crisis replies always going out.',
+    reuseWhen:
+      'Something needs to know what an AI call or a WhatsApp message cost, to meter or cap usage ' +
+      'per customer or per assistant, to add a plan, a seat type or a limit, or to price a new model.',
+    extendVia:
+      'A new metered call: send it inside a usage context (billing/context/usage-context.ts) and map ' +
+      'its ally-ai endpoint in ENDPOINT_USAGE_KIND. A new limit: a counter subject in LimitsService.',
+    modules: ['ally-be:src/billing'],
+    adminRoute: '/billing/costs',
+    keywords: [
+      'cost',
+      'costs',
+      'pricing',
+      'price per token',
+      'model price',
+      'tokens',
+      'token allowance',
+      'plan',
+      'plans',
+      'seat',
+      'seats',
+      'usage limit',
+      'quota',
+      'billing',
+      'metering',
+    ],
+  },
+  {
     id: 'auto-improve',
     name: 'Auto-improve (Skills Store → Auto-improve tab)',
     whatItIs:
@@ -218,11 +251,7 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
     reuseWhen:
       'A request wants a new chart, metric or dashboard for admins. Add a chart to the registry ' +
       'and an endpoint; do not build a separate dashboard page.',
-    modules: [
-      'ally-be:src/analytics',
-      'ally-be:src/analytics-agent',
-      'ally-be:src/analytics-suggestions',
-    ],
+    modules: ['ally-be:src/analytics', 'ally-be:src/analytics-agent'],
     adminRoute: '/analytics',
     keywords: ['chart', 'dashboard', 'metric', 'report', 'analytics', 'kpi'],
   },
@@ -362,12 +391,12 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
   },
   {
     id: 'debrief-agent',
-    name: 'Debrief agent and its PM agent (admin Debriefs)',
+    name: 'Debrief agent and its Debrief PM agent (admin Debriefs)',
     whatItIs:
       'Writes the debrief a learner reads after a roleplay by following a recipe of steps ' +
       '(Safety reader, Analyst, Progress reader, Guidance lookup, Writer, rule checks, Evaluator, ' +
       'Reviser) under a budget and deadline, with a fallback ladder; runs in shadow beside ' +
-      "today's debrief and live for organisations switched on. The PM agent reads aggregate " +
+      "today's debrief and live for organisations switched on. The Debrief PM agent reads aggregate " +
       'signals daily, proposes prompt and setting changes, tries them on test sets built from ' +
       'real sessions, and a person approves each new release. Runs on the agent harness ' +
       '(agentKey debrief).',
@@ -659,7 +688,7 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
       'A request wants a bot that answers questions from documents, or to reach users on WhatsApp ' +
       'or another messaging channel.',
     modules: ['ally-be:src/chatbot', 'ally-be:src/whatsapp'],
-    adminRoute: '/chatbots',
+    adminRoute: '/assistants',
     keywords: [
       'whatsapp',
       'chatbot',
@@ -682,7 +711,7 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
     extendVia:
       'The draft step machine and BotDraftService (later steps are added, not forked).',
     modules: ['ally-be:src/bot-draft', 'ally-ai:app/core/builder'],
-    adminRoute: '/chatbots/new',
+    adminRoute: '/assistants/new',
     keywords: [
       'onboarding',
       'new assistant',
@@ -1138,6 +1167,29 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
       'writing its own client.',
     modules: ['ally-be:src/github'],
     keywords: ['github', 'workflow', 'pull request', 'release tag'],
+  },
+  {
+    id: 'pm-agent',
+    name: 'PM Agent (AI product manager)',
+    whatItIs:
+      'An admin feed of at most N recommendation or question cards drafted from analytics, code ' +
+      'and strategy; accepting a recommendation compiles it into a Builder session that builds, ' +
+      'merges and releases it.',
+    reuseWhen:
+      'A request wants the platform to suggest what to build next, to queue cards for an admin ' +
+      'to accept or reject, or to hand an accepted idea to Builder automatically.',
+    extendVia:
+      'PM_AGENT_RUN_TRIGGER (the generation pipeline) and PmAgentCardRepository for new cards.',
+    modules: ['ally-be:src/pm-agent'],
+    docs: ['ally-be:docs/pm-agent.md'],
+    adminRoute: '/pm-agent',
+    keywords: [
+      'pm agent',
+      'product manager',
+      'recommendation',
+      'suggestion',
+      'what to build',
+    ],
   },
 ];
 

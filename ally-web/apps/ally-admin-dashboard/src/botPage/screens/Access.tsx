@@ -134,6 +134,9 @@ export function AccessCode({
           {busy ? copy.loading : copy.access.verify}
         </PrimaryButton>
         <ErrorText>{error}</ErrorText>
+        <p className="bp-small bp-muted" style={{ margin: 0 }}>
+          {copy.access.noCode}
+        </p>
         <div className="bp-links">
           <TextButton
             onClick={() => {

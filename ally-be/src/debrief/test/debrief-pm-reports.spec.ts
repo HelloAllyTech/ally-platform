@@ -11,7 +11,7 @@ import {
   weekOf,
 } from '../util/debrief-pm-reports.util';
 
-describe('PM agent reports: period maths (India time)', () => {
+describe('Debrief PM agent reports: period maths (India time)', () => {
   it('bounds a month by IST midnights', () => {
     const { from, to } = periodBounds('monthly', '2026-10');
     expect(from.toISOString()).toBe('2026-09-30T18:30:00.000Z');
@@ -64,7 +64,7 @@ describe('PM agent reports: period maths (India time)', () => {
   });
 });
 
-describe('PM agent reports: still standing at 14 days', () => {
+describe('Debrief PM agent reports: still standing at 14 days', () => {
   const live = { at: new Date('2026-10-06T05:00:00Z'), version: 5 };
   const day = (n: number) => new Date(live.at.getTime() + n * 86_400_000);
 
@@ -241,7 +241,7 @@ function build(opts: { empty?: boolean; thisWeek?: boolean } = {}) {
   return { svc, calls };
 }
 
-describe('PM agent reports: what changed', () => {
+describe('Debrief PM agent reports: what changed', () => {
   const now = new Date('2026-11-13T06:00:00Z');
 
   it('counts and lists a month from the records', async () => {
@@ -382,7 +382,7 @@ describe('PM agent reports: what changed', () => {
   });
 });
 
-describe('PM agent reports: the list', () => {
+describe('Debrief PM agent reports: the list', () => {
   const now = new Date('2026-11-13T06:00:00Z');
 
   it('lists weekly reports and months, newest first', async () => {

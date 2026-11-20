@@ -93,6 +93,27 @@ export interface PublicFinal {
   rateable?: boolean;
   /** A team member has this chat (chunk 11a): no reply now; theirs arrives on the visitor stream. */
   held?: boolean;
+  /** What the assistant did for this reply (chunk 6b); absent for a crisis or Safety reply. */
+  steps?: PublicStep[];
+  /** A booking or change made in this reply, from the stored record (chunk 6b). */
+  confirmation?: PublicConfirmation;
+}
+
+/**
+ * One step of what the assistant is doing or did (chunk 6b). `label` is a list's name, or the day
+ * and time a booking is for; never an id, a tool's name or what was searched for.
+ */
+export interface PublicStep {
+  kind: "search" | "find" | "create" | "update" | "cancel" | "hand_over" | "writing";
+  label?: string;
+}
+
+/** The card under a reply that booked or changed something (chunk 6b). */
+export interface PublicConfirmation {
+  action: "create" | "update" | "cancel";
+  list: string;
+  title: string;
+  details: { label: string; value: string }[];
 }
 
 /** What the visitor stream carries (chunk 11a). */

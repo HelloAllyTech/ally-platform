@@ -13,12 +13,13 @@ export const AGENT_RUNTIME_DEGRADED_TYPE = 'Chatbot Agent Runtime Degraded';
 export const AGENT_RUNTIME_ALERT_WINDOW_MS = 10 * 60_000;
 
 /**
- * Rate-limits the alert a v2 bot raises when `/agent/run` fails and v1 answers instead.
+ * Rate-limits the alert a bot raises when `/agent/run` fails and the fixed run-failed reply goes
+ * out (Q3-fast: never v1).
  *
- * Unthrottled, a runtime that is down — or switched off on purpose in ally-ai while a bot is still
- * set to v2 — pages once per message, and an alert channel that fires on every message stops being
- * read. So one alert per bot and failure reason per window, carrying how many messages fell back
- * since the last one, so the count is not lost with the alerts it replaces.
+ * Unthrottled, a runtime that is down — or switched off on purpose in ally-ai — pages once per
+ * message, and an alert channel that fires on every message stops being read. So one alert per bot
+ * and failure reason per window, carrying how many messages failed since the last one, so the
+ * count is not lost with the alerts it replaces.
  *
  * In memory and per instance: N instances can each send one per window. Good enough for a signal
  * whose job is "someone look at this"; nothing here is a record.
@@ -62,12 +63,12 @@ export class AgentRuntimeAlertThrottle {
       timestamp: new Date(now).toISOString(),
       path: 'chatbot/agent-runtime-degraded',
       message:
-        `The Agents v2 engine failed for chatbot "${chatbot.name}" (reason: ${reason}), so v1 ` +
-        `answered instead. ${count === 1 ? '1 message' : `${count} messages`} fell back to v1 ` +
-        `since the last alert for this bot and reason (at most one alert every ` +
+        `The Agents v2 engine failed for chatbot "${chatbot.name}" (reason: ${reason}), so the ` +
+        `person got the fixed "couldn't answer that just now" reply. ` +
+        `${count === 1 ? '1 message' : `${count} messages`} got it since the last alert for ` +
+        `this bot and reason (at most one alert every ` +
         `${AGENT_RUNTIME_ALERT_WINDOW_MS / 60_000} minutes). Check ally-ai's /agent/run ` +
-        `(AGENT_RUNTIME__ENABLED and its logs), or move the bot back to v1 — or turn off ` +
-        `"Allow the new engine" in Defaults for every bot.`,
+        `(AGENT_RUNTIME__ENABLED and its logs).`,
       type: AGENT_RUNTIME_DEGRADED_TYPE,
     } as NotificationErrorType;
   }

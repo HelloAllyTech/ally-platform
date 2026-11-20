@@ -35,6 +35,7 @@ export function draftView(draft: BotDraftEntity) {
     source: {
       website: draft.source?.website ?? null,
       description: draft.source?.description ?? null,
+      interview: draft.source?.interview === true,
     },
     crawl: {
       status: crawl.status,
@@ -44,6 +45,12 @@ export function draftView(draft: BotDraftEntity) {
       pagesRead: crawl.pages.filter((p) => p.status === 'read').length,
       pages: crawl.pages
         .filter((p) => p.status === 'read')
+        .map((p) => ({ url: p.url, title: p.title })),
+      // "We couldn't read these pages" (Q3-fast Part 3): an error status, or an error, block or
+      // captcha page served as a 200. Nothing from them was kept.
+      notRead: crawl.pages
+        .filter((p) => p.status === 'failed' && p.reason)
+        .slice(0, 20)
         .map((p) => ({ url: p.url, title: p.title })),
       findings: crawl.findings ?? [],
       brand: crawl.brand ?? null,

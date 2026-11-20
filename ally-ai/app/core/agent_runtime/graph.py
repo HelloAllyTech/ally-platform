@@ -3,6 +3,7 @@
 One loop serves every bot: the agent reads the turn and decides whether to search;
 a draft the check refuses goes back to it once.
 
+    START ─(a question the bot can search)→ presearch ─→ agent   (chunk H1)
     START → agent ─(tool call, budget left)→ tools ─→ agent
                   │                                └─(hand_over done)→ END
                   └─(reply)→ check ─(refused, first time)→ agent
@@ -36,10 +37,13 @@ from app.core.agent_runtime.nodes import (
     route_after_check,
     route_after_tools,
 )
+from app.core.agent_runtime.nodes.presearch import make_presearch_node, route_from_start
 from app.core.agent_runtime.state import RUN_SCOPED_KEYS, AgentState, BotConfig
+from app.core.agent_runtime.tools.confirmed import is_plain_yes
 from app.core.agent_runtime.trace import summarise_run
 from app.core.config import settings
 from app.core.knowledge_agent.agent import KnowledgeAgentService
+from app.core.llm_usage.scope import current_scope, use_scope
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -55,8 +59,10 @@ def build_graph(
     graph.add_node("agent", make_agent_node(service))
     graph.add_node("tools", make_tools_node(service))
     graph.add_node("check", make_agent_check_node(service))
+    graph.add_node("presearch", make_presearch_node(service))
 
-    graph.add_edge(START, "agent")
+    graph.add_conditional_edges(START, route_from_start, ["presearch", "agent"])
+    graph.add_edge("presearch", "agent")
     graph.add_conditional_edges("agent", route_after_agent, ["tools", "check"])
     graph.add_conditional_edges("tools", route_after_tools, ["agent", END])
     graph.add_conditional_edges("check", route_after_check, ["agent", END])
@@ -84,6 +90,24 @@ async def close_agent_runtime() -> None:
     """Shutdown: close the checkpointer and drop the graph that held it."""
     await close_checkpointer()
     get_agent_graph.cache_clear()
+
+
+#: At most this many list entries carry over from the previous message (chunk 6b).
+MAX_CARRIED_RECORDS = 10
+
+
+async def _previous_records(graph: CompiledStateGraph, config: Dict[str, Any]) -> list:
+    """The list entries the conversation's previous run found or wrote (chunk 6b),
+    renumbered from 1: a confirmation that follows ("yes, book it") books from them
+    without a find first. Documents' passages never carry over; a failed read
+    carries nothing."""
+    try:
+        snapshot = await graph.aget_state(config)
+    except Exception:  # a missing or unreadable checkpoint: start fresh
+        return []
+    values = getattr(snapshot, "values", None) or {}
+    records = [p for p in values.get("passages") or [] if p.get("record_id")]
+    return records[-MAX_CARRIED_RECORDS:]
 
 
 async def run_agent(
@@ -123,6 +147,11 @@ async def run_agent(
         "run_name": "agent_run",
         "metadata": {"run_id": run_id, "chatbot_id": chatbot_id},
     }
+    # Only for a plain yes ("perfect, book it"): that's the message that repeated
+    # the look-up. A new question looks things up afresh, so the assistant never
+    # books from what it showed before without being asked to (chunk 6b).
+    if bot.get("gateway_definitions") and is_plain_yes(question):
+        inputs["carried_records"] = await _previous_records(graph, config) or None
     # recursion_limit is LangGraph's default of 25 supersteps. A run takes at most
     # about 20: MAX_TOOL_CALLS (bounded at 8) agent→tools rounds (and at most
     # MAX_TOOL_STEPS, 4, of any kind since chunk 3b), then the agent, check and
@@ -135,7 +164,19 @@ async def run_agent(
     # nodes' custom events when someone is listening.
     modes = ["values", "custom"] if on_event else ["values"]
     state: AgentState = {}  # type: ignore[typeddict-item]
-    with tracing_context(enabled=False):
+    # Usage attribution (CR1): ally-be's X-Ally-Usage header normally set the
+    # scope already; without it the run's own ids start one, so its rows are
+    # still tied to the run and share one seq counter.
+    fallback_scope = (
+        None
+        if current_scope()
+        else {
+            "run_id": run_id,
+            "chatbot_id": chatbot_id,
+            "conversation_id": conversation_id,
+        }
+    )
+    with tracing_context(enabled=False), use_scope(**(fallback_scope or {})):
         async for mode, chunk in graph.astream(
             inputs,
             config,

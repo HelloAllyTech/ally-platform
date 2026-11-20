@@ -34,6 +34,7 @@ export * from "./Logs/Logs";
 export * from "./MobileReleases/MobileReleases";
 export * from "./BugHunter";
 export * from "./Builder";
+export * from "./PmAgent";
 export * from "./CourseCopilot";
 export * from "./Onboarding";
 export * from "./AgentTestCases/AgentTestCases";
@@ -48,9 +49,12 @@ export * from "./RoleplaySessionLogs/RoleplaySessionLogDetail";
 export * from "./Terms/Terms";
 export * from "./Privacy/Privacy";
 export * from "./ProductRoadmap";
+export * from "./Roadmap";
 export * from "./WhatsAppBot";
 // NOTE: Analytics is intentionally NOT re-exported here. It pulls in IBM Carbon
 // + Carbon Charts (+ d3) and its own scoped stylesheet; keeping it out of this
 // eagerly-imported barrel lets RouteLayout lazy-load it as a separate chunk so
 // those heavy deps load only when a super-admin opens the Analytics tab.
+export * from "./Providers/Providers";
+export * from "./Providers/PrecedenceExplainer";
 export * from "./BugHunterV2";

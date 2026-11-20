@@ -39,4 +39,12 @@ export class DebriefOwnerSettings extends BaseWithoutTenantEntity {
    */
   @Column({ type: 'jsonb', nullable: true })
   changes?: Record<string, any> | null;
+
+  /**
+   * Settings › Clinical lists (migration 1981901800000): the words behind
+   * the score, diagnosis and jargon checks, `{kind: {language: string[]}}`,
+   * only what a person changed. Read through DebriefClinicalListsService.
+   */
+  @Column({ type: 'jsonb', nullable: true })
+  clinicalLists?: Record<string, any> | null;
 }

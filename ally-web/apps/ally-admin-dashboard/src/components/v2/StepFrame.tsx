@@ -12,6 +12,8 @@ export interface StepFrameLabels {
   /** "Your progress is saved. You can come back any time." */
   progressSaved: string;
   progressLabel: string;
+  /** Accessible name of the close (×) button; only needed when `onClose` is passed. */
+  close?: string;
 }
 
 /** Widths from DESIGN.md §2: one question 640, results 760–920, design cards 1080. */
@@ -31,6 +33,8 @@ export const StepFrame: React.FC<{
   canGoBack?: boolean;
   onBack?: () => void;
   onLeave?: () => void;
+  /** Shows a close (×) button at the top right that leaves the flow. */
+  onClose?: () => void;
   saved?: boolean;
   /** "Tell me something else", under the screen. */
   below?: React.ReactNode;
@@ -44,6 +48,7 @@ export const StepFrame: React.FC<{
   canGoBack = false,
   onBack,
   onLeave,
+  onClose,
   saved = true,
   below,
   children,
@@ -71,7 +76,7 @@ export const StepFrame: React.FC<{
           <div className="ally-frame__brand">
             <a
               className="ally-frame__logo"
-              href={absoluteAppUrl("/chatbots")}
+              href={absoluteAppUrl("/assistants")}
               onClick={event => {
                 if (!onLeave) return;
                 event.preventDefault();
@@ -92,6 +97,16 @@ export const StepFrame: React.FC<{
               </Button>
             )}
             {saved && <span className="ally-saved">{labels.saved}</span>}
+            {onClose && (
+              <button
+                type="button"
+                className="ally-frame__close ally-press"
+                aria-label={labels.close ?? "Close"}
+                onClick={onClose}
+              >
+                <span aria-hidden="true">×</span>
+              </button>
+            )}
           </div>
         </div>
         <ProgressBar value={progress} label={labels.progressLabel} />

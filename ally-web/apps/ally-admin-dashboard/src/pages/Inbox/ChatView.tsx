@@ -331,6 +331,13 @@ export const ChatView: React.FC<{
             value={text}
             disabled={windowClosed}
             onChange={event => setText(event.target.value)}
+            onKeyDown={event => {
+              // Enter sends; Shift+Enter adds a line. Skip while an IME is composing.
+              if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                event.preventDefault();
+                event.currentTarget.form?.requestSubmit();
+              }
+            }}
           />
           <Button
             variant={ButtonVariant.PRIMARY}

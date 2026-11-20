@@ -127,8 +127,12 @@ describe('debrief schedules: defaults are the old @Cron ticks', () => {
   const due = (key: string) =>
     nextRunAt(scheduleJob(key)!.defaults, after).toISOString();
 
-  it('every job is on, with the frequency and time it had', () => {
-    expect(DEBRIEF_SCHEDULE_JOBS.every((j) => j.defaults.enabled)).toBe(true);
+  it('every job is on but the one that deletes data, with the frequency and time it had', () => {
+    expect(
+      DEBRIEF_SCHEDULE_JOBS.filter((j) => !j.defaults.enabled).map(
+        (j) => j.key,
+      ),
+    ).toEqual(['debrief-run-log-retention']);
     expect(due('debrief-agent-drain')).toBe('2026-11-12T10:10:00.000Z');
     expect(due('debrief-stuck-sweep')).toBe('2026-11-12T10:10:00.000Z');
     expect(due('debrief-console-alerts')).toBe('2026-11-12T10:30:00.000Z');
@@ -454,7 +458,7 @@ describe('DebriefScheduleService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('a PM agent frequency change needs the budget confirmation, with the spend effect', async () => {
+  it('a Debrief PM agent frequency change needs the budget confirmation, with the spend effect', async () => {
     await svc.rows(now);
     const err = await svc
       .update('debrief-pm-agent', { frequency: 'daily' }, 1, false, now)
@@ -473,7 +477,7 @@ describe('DebriefScheduleService', () => {
     });
   });
 
-  it('a time change on the PM agent, or any change to other jobs, needs no confirmation', async () => {
+  it('a time change on the Debrief PM agent, or any change to other jobs, needs no confirmation', async () => {
     await svc.rows(now);
     await svc.update('debrief-pm-agent', { time: '09:00' }, 1, false, now);
     await svc.update(

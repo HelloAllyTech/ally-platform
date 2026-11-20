@@ -41,6 +41,11 @@ import { PlanView, PlanViewService } from './plan-view.service';
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const NUDGE_AFTER_DAYS = 7;
 export const RELEASE_AFTER_DAYS = 14;
+/**
+ * How the idle hand-back's note starts. P8's Measures counts idle-lead
+ * releases by it (`plan_events.detail.note`), so keep the two together.
+ */
+export const IDLE_RELEASE_NOTE_PREFIX = 'No activity for';
 
 /** A row of the Needs a lead queue. */
 export interface PlanQueueItem {
@@ -75,6 +80,9 @@ export interface PlanCatchUp {
  * measure). The PRD itself is written in the plan's Builder session, which a
  * Lead reaches through the Lead toggle (see BuilderSessionVisibilityInterceptor).
  */
+const OWNER_ONLY_ASSIGN = 'Only an Owner assigns who builds an idea.';
+const OWNER_ONLY_CLOSE = 'Only an Owner closes, confirms or reopens an idea.';
+
 @Injectable()
 export class PlanLeadService {
   constructor(
@@ -129,10 +137,13 @@ export class PlanLeadService {
       );
   }
 
-  /** Take this on: one atomic claim; the loser is told who won. */
+  /**
+   * Take this on: one atomic claim; the loser is told who won. Only an Owner
+   * (lifecycle 2026-11-18): Builders don't claim ideas, an Owner assigns them.
+   */
   async takeOn(sessionId: string, userId: number): Promise<PlanView> {
     await this.settings.assertEnabled();
-    await this.access.assertLead(userId);
+    await this.access.assertOwner(userId, OWNER_ONLY_ASSIGN);
     const plan = await this.sharedPlan(sessionId);
     if (plan.plan.closed)
       throw new BadRequestException('Reopen this plan before taking it on.');
@@ -191,6 +202,10 @@ export class PlanLeadService {
   ): Promise<{ nudged: number; released: number }> {
     const settings = await this.settings.get();
     if (!settings.enabled) return { nudged: 0, released: 0 };
+    // Roadmap v2 (D11, plan §4.10): the Owner assigns the lead, so nothing is unassigned
+    // automatically. An idle lead shows as "Reassign?" in the Owner's To triage instead, and
+    // the old Lead toggle no longer decides who may lead (a Builder may not hold it).
+    const ownerAssigns = (await this.settings.getRoadmapV2()).enabled;
     const led = await this.store.repository
       .createQueryBuilder('s')
       .addSelect('s.plan')
@@ -206,7 +221,10 @@ export class PlanLeadService {
         plan.status === BuilderSessionStatus.BUILDING ||
         plan.status === BuilderSessionStatus.WAITING_FOR_INPUT;
       if (live || plan.plan?.closed) continue;
-      if (!(await this.access.canLead(plan.leadUserId as number))) {
+      if (
+        !ownerAssigns &&
+        !(await this.access.canLead(plan.leadUserId as number))
+      ) {
         await this.release(
           plan,
           null,
@@ -217,12 +235,12 @@ export class PlanLeadService {
         continue;
       }
       const quietDays = (now.getTime() - plan.updatedAt.getTime()) / DAY_MS;
-      if (quietDays >= RELEASE_AFTER_DAYS) {
+      if (quietDays >= RELEASE_AFTER_DAYS && !ownerAssigns) {
         await this.release(
           plan,
           null,
           PlanEventKind.AUTO_RELEASED,
-          `No activity for ${RELEASE_AFTER_DAYS} days.`,
+          `${IDLE_RELEASE_NOTE_PREFIX} ${RELEASE_AFTER_DAYS} days.`,
         );
         released++;
       } else if (quietDays >= NUDGE_AFTER_DAYS && !plan.plan?.nudgedAt) {
@@ -240,8 +258,9 @@ export class PlanLeadService {
   }
 
   /**
-   * Close as not pursuing. Above the vote threshold a second Lead must confirm
-   * (rev 5.2 decision 4); until then the plan waits in the queue.
+   * Close as not pursuing (an Owner). The old rule that a second Lead confirms
+   * above the vote threshold (rev 5.2 decision 4) is gone: only an Owner
+   * closes now. confirmClose stays for closes already waiting.
    */
   async close(
     sessionId: string,
@@ -249,11 +268,9 @@ export class PlanLeadService {
     reason: string,
   ): Promise<PlanView> {
     await this.settings.assertEnabled();
-    await this.access.assertLead(userId);
+    // Closing as not pursuing is declining it: the Owner's call only.
+    await this.access.assertOwner(userId, OWNER_ONLY_CLOSE);
     const plan = await this.sharedPlan(sessionId);
-    if (plan.leadUserId && plan.leadUserId !== userId) {
-      throw new ForbiddenException('Only this plan’s lead can close it.');
-    }
     if (plan.plan.closed && !plan.plan.closed.pendingConfirmation) {
       return this.view.render(plan, userId);
     }
@@ -262,13 +279,10 @@ export class PlanLeadService {
       throw new BadRequestException(
         'Say why, in a sentence the author will read.',
       );
-    const settings = await this.settings.get();
-    const votes = plan.plan.opportunityId
-      ? ((await this.votesFor([plan.plan.opportunityId])).get(
-          plan.plan.opportunityId,
-        ) ?? 0)
-      : 0;
-    const needsSecond = votes > settings.closeConfirmVotes;
+    // Only an Owner closes now, and today there is one Owner: a second-person
+    // confirmation above the vote threshold would leave the close pending
+    // forever. The Owner's decision stands on its own, as a decline does.
+    const needsSecond = false;
     await this.store.patchPlan(sessionId, {
       closed: {
         at: new Date().toISOString(),
@@ -284,13 +298,11 @@ export class PlanLeadService {
 
   async confirmClose(sessionId: string, userId: number): Promise<PlanView> {
     await this.settings.assertEnabled();
-    await this.access.assertLead(userId);
+    await this.access.assertOwner(userId, OWNER_ONLY_CLOSE);
     const plan = await this.sharedPlan(sessionId);
     const closed = plan.plan.closed;
     if (!closed?.pendingConfirmation)
       throw new BadRequestException('Nothing is waiting for confirmation.');
-    if (closed.by === userId)
-      throw new ForbiddenException('A second Lead must confirm this close.');
     await this.store.patchPlan(sessionId, {
       closed: { ...closed, pendingConfirmation: false, confirmedBy: userId },
     });
@@ -300,7 +312,7 @@ export class PlanLeadService {
 
   async reopen(sessionId: string, userId: number): Promise<PlanView> {
     await this.settings.assertEnabled();
-    await this.access.assertLead(userId);
+    await this.access.assertOwner(userId, OWNER_ONLY_CLOSE);
     const plan = await this.sharedPlan(sessionId);
     if (!plan.plan.closed) return this.view.render(plan, userId);
     await this.store.patchPlan(sessionId, { closed: null });
@@ -381,7 +393,7 @@ export class PlanLeadService {
     userId: number,
     tags: PlanImpactTagId[],
   ): Promise<PlanView> {
-    const plan = await this.ledBy(sessionId, userId);
+    const plan = await this.planWork(sessionId, userId);
     const merged = mergeImpactTags(
       plan.plan.impactTags ?? [],
       tags,
@@ -416,7 +428,7 @@ export class PlanLeadService {
     measure: PlanSuccessMeasure,
     changeReason?: string,
   ): Promise<PlanView> {
-    const plan = await this.ledBy(sessionId, userId);
+    const plan = await this.planWork(sessionId, userId);
     const frozen = !!plan.plan.measureFrozenAt;
     if (frozen && !(changeReason ?? '').trim()) {
       throw new BadRequestException(
@@ -506,7 +518,7 @@ export class PlanLeadService {
     userId: number,
     only?: PlanCheckKind,
   ): Promise<PlanCheck[]> {
-    const plan = await this.ledBy(sessionId, userId);
+    const plan = await this.planWork(sessionId, userId);
     const detail = await this.builderSessions.getSessionDetail(
       sessionId,
       plan.createdBy,
@@ -524,14 +536,17 @@ export class PlanLeadService {
     findingId: string,
     resolution: { kind: 'fixed' | 'dismissed'; reason: string },
   ): Promise<PlanCheck[]> {
-    const plan = await this.ledBy(sessionId, userId);
-    await this.checks.resolve(plan, userId, kind, findingId, resolution);
+    const plan = await this.planWork(sessionId, userId);
+    // planWork has already checked the caller: the lead, or an Owner.
+    await this.checks.resolve(plan, userId, kind, findingId, resolution, {
+      authorised: true,
+    });
     await this.stage.sync(sessionId, userId);
     return this.checks.list(sessionId);
   }
 
   async listChecks(sessionId: string, userId: number): Promise<PlanCheck[]> {
-    await this.settings.assertEnabled();
+    await this.assertPlanWorkOn();
     const plan = await this.sharedPlan(sessionId);
     if (!(await this.access.canRead(plan, userId)))
       throw new NotFoundException('Plan not found');
@@ -601,16 +616,48 @@ export class PlanLeadService {
     return plan;
   }
 
+  /**
+   * The plan's own work (impact tags, the success measure, asking the author,
+   * checks): its assigned builder, or an Owner, who plans it before anyone is
+   * assigned (lifecycle 2026-11-18).
+   */
   private async ledBy(sessionId: string, userId: number): Promise<PlanSession> {
     await this.settings.assertEnabled();
     await this.access.assertLead(userId);
     const plan = await this.sharedPlan(sessionId);
-    if (plan.leadUserId !== userId) {
+    if (plan.leadUserId !== userId && !(await this.access.isOwner(userId))) {
       throw new ForbiddenException(
-        'Only this plan’s lead can do that. Take it on first.',
+        'Only an Owner or the builder assigned to this idea can do that.',
       );
     }
     return plan;
+  }
+
+  /**
+   * The plan's success measure, impact tags and specialist checks, which the
+   * Owner-led flow needs (audit 2026-11-19, rec 2): reachable while either
+   * the old planning flag or `roadmap_v2` is on, so turning the Owner-led
+   * flow on does not need the rest of the old planning flow switched on.
+   * Same people as ledBy: the assigned builder, or an Owner.
+   */
+  private async planWork(
+    sessionId: string,
+    userId: number,
+  ): Promise<PlanSession> {
+    await this.assertPlanWorkOn();
+    await this.access.assertLead(userId);
+    const plan = await this.sharedPlan(sessionId);
+    if (plan.leadUserId !== userId && !(await this.access.isOwner(userId))) {
+      throw new ForbiddenException(
+        'Only an Owner or the builder assigned to this idea can do that.',
+      );
+    }
+    return plan;
+  }
+
+  private async assertPlanWorkOn(): Promise<void> {
+    if ((await this.settings.get()).enabled) return;
+    await this.settings.assertRoadmapV2();
   }
 
   private async votesFor(

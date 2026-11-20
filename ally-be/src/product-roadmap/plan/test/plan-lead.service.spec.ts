@@ -52,6 +52,8 @@ function build(
     },
     access: {
       assertLead: jest.fn(),
+      assertOwner: jest.fn(),
+      isOwner: jest.fn(async () => true),
       canLead: jest.fn(async () => true),
       canRead: jest.fn(async () => true),
     },
@@ -60,6 +62,7 @@ function build(
     settings: {
       assertEnabled: jest.fn(),
       get: jest.fn(async () => ({ enabled: true, closeConfirmVotes: 10 })),
+      getRoadmapV2: jest.fn(async () => ({ enabled: false })),
     },
     spend: { summarize: jest.fn(async () => ({ totalUsd: 0 })) },
     dataSource: {
@@ -110,7 +113,7 @@ describe('PlanLeadService', () => {
     );
   });
 
-  it('closes directly under the vote threshold', async () => {
+  it('closes directly as not pursuing (an Owner)', async () => {
     const { service, deps, plan } = build({ leadUserId: 4 });
     await service.close(
       'p1',
@@ -129,7 +132,7 @@ describe('PlanLeadService', () => {
     );
   });
 
-  it('needs a second Lead above the threshold, and never the same one', async () => {
+  it('closes above the vote threshold with no second person: only an Owner closes now', async () => {
     const { service, deps, plan } = build(
       { leadUserId: 4 },
       {
@@ -143,20 +146,27 @@ describe('PlanLeadService', () => {
       4,
       'Overlaps with the re-entry work already planned.',
     );
-    expect(plan().plan.closed.pendingConfirmation).toBe(true);
-    expect(deps.events.record).not.toHaveBeenCalledWith(
-      expect.objectContaining({ kind: 'closed' }),
-    );
-    await expect(service.confirmClose('p1', 4)).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
-    await service.confirmClose('p1', 5);
-    expect(plan().plan.closed).toMatchObject({
-      pendingConfirmation: false,
-      confirmedBy: 5,
-    });
+    expect(plan().plan.closed.pendingConfirmation).toBe(false);
     expect(deps.events.record).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'closed' }),
+    );
+  });
+
+  it('refuses take-on, close and reopen to anyone but an Owner', async () => {
+    const { service, deps } = build({ leadUserId: null });
+    deps.access.assertOwner.mockRejectedValue(new ForbiddenException('no'));
+    await expect(service.takeOn('p1', 4)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    await expect(
+      service.close(
+        'p1',
+        4,
+        'Overlaps with the re-entry work already planned.',
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.reopen('p1', 4)).rejects.toBeInstanceOf(
+      ForbiddenException,
     );
   });
 
@@ -219,6 +229,33 @@ describe('PlanLeadService', () => {
     const { service, deps } = build({}, { led: [lead] });
     deps.access.canLead.mockResolvedValue(false);
     expect((await service.sweepLeads()).released).toBe(1);
+  });
+
+  it('with roadmap_v2 on, nudges but never hands a plan back (D11)', async () => {
+    const now = new Date('2026-11-17T00:00:00Z');
+    const plan = (id: string, days: number) => ({
+      id,
+      title: id,
+      createdBy: 1,
+      leadUserId: 4,
+      status: 'PRD_READY',
+      updatedAt: new Date(now.getTime() - days * DAY),
+      plan: {},
+    });
+    const { service, deps } = build({}, { led: [plan('a', 8), plan('b', 15)] });
+    deps.settings.getRoadmapV2.mockResolvedValue({ enabled: true });
+    deps.access.canLead.mockResolvedValue(false);
+    const result = await service.sweepLeads(now);
+    expect(result.released).toBe(0);
+    expect(deps.events.record).not.toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'auto_released' }),
+    );
+    expect(deps.notifications.notify).toHaveBeenCalledWith(
+      4,
+      'a',
+      'nudge',
+      expect.any(String),
+    );
   });
 
   it('lets only the author answer, and only a question that was asked', async () => {

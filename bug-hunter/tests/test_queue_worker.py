@@ -175,8 +175,6 @@ def test_board_status_of_each_graph_outcome() -> None:
 
 
 def test_a_suggested_fix_lands_in_needs_you_with_its_report(config) -> None:
-    from bug_hunter import spend
-
     queue, runs, reports, ledger = (
         InMemoryQueue(),
         Runs(),
@@ -200,7 +198,8 @@ def test_a_suggested_fix_lands_in_needs_you_with_its_report(config) -> None:
     )
     assert row.report_id == reports.rows[0].id
     assert reports.rows[0].source == "reported"
-    assert spend.total_for("2026-11-16", path=ledger) > 0
+    # The run records its cost on the real clock, so check the ledger, not a fixed day.
+    assert sum(e.usd for e in ledger.entries()) > 0
 
 
 def test_a_run_that_raises_is_failed_with_the_reason_and_can_be_retried(config) -> None:

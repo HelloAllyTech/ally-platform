@@ -2,6 +2,7 @@ import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
 import {
   DebriefFlagReason,
   DebriefPulseQuestion,
+  DebriefSelectionComment,
   LearnerDebriefView,
   SupervisorDebriefView,
 } from "@types";
@@ -55,6 +56,20 @@ const learnerDebriefAPI = baseAPI.injectEndpoints({
         url: ApiEndpoints.DEBRIEFS.HELPFUL(sessionId),
         method: HttpMethod.PUT,
         body: { helpful },
+      }),
+      invalidatesTags: (_r, _e, { sessionId }) => [
+        { type: TAG_TYPES.LEARNER_DEBRIEF, id: sessionId },
+      ],
+    }),
+    /** Comments on selected words, and an optional overall comment, sent together (web only). */
+    addDebriefComments: builder.mutation<
+      { saved: number },
+      { sessionId: string; overall?: string; items: DebriefSelectionComment[] }
+    >({
+      query: ({ sessionId, overall, items }) => ({
+        url: ApiEndpoints.DEBRIEFS.COMMENTS(sessionId),
+        method: HttpMethod.POST,
+        body: { ...(overall ? { overall } : {}), items },
       }),
       invalidatesTags: (_r, _e, { sessionId }) => [
         { type: TAG_TYPES.LEARNER_DEBRIEF, id: sessionId },
@@ -151,6 +166,7 @@ export const {
   useReportDebriefEventMutation,
   useGetLearnerDebriefQuery,
   useSetDebriefHelpfulMutation,
+  useAddDebriefCommentsMutation,
   useFlagDebriefCardMutation,
   useUndoDebriefFlagMutation,
 } = learnerDebriefAPI;
