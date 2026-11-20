@@ -16,6 +16,7 @@ import { LOCAL_STORAGE_KEYS, ROUTES, en } from "@constants";
 import { useAdminPageView } from "@hooks/useAdminAnalytics";
 import { useAssistantOnly } from "@hooks/useAssistantOnly";
 import { UploadDockHost } from "@pages/ContextLibrary/upload/UploadDock";
+import { DirectoryHeader } from "@pages/Directory/DirectoryHeader";
 import { Login } from "@pages/Login/Login";
 
 import { PageBreadcrumbs } from "./PageBreadcrumbs";
@@ -65,8 +66,12 @@ const SignedInShell: React.FC = () => {
   const { assistantOnly, adminHome } = useAssistantOnly();
   // The assistants area (the list and every page under it: New assistant, one assistant's home,
   // onboarding) shows no side navigation, for anyone. `/assistants-x` is not under it.
+  const inDirectory = pathname === ROUTES.DIRECTORY || pathname.startsWith(`${ROUTES.DIRECTORY}/`);
+  // The directory is the same kind of area: no side navigation, its own slim header.
   const hideSidebar =
-    pathname === ROUTES.WHATSAPP_BOT || pathname.startsWith(`${ROUTES.WHATSAPP_BOT}/`);
+    pathname === ROUTES.WHATSAPP_BOT ||
+    pathname.startsWith(`${ROUTES.WHATSAPP_BOT}/`) ||
+    inDirectory;
   // A URL the table does not know is either a redirect (no title to set) or the 404, which sets its own.
   useDocumentTitle(meta.known ? meta.title : undefined, meta.known);
 
@@ -90,13 +95,13 @@ const SignedInShell: React.FC = () => {
     // Every assistants page stays open, New assistant included: that page checks the Assistants
     // switch itself, so someone with it can create one and someone without it is told so.
     // Plan and usage is theirs too: with no Sidebar, the slim header is its only way in.
-    if (!pathname.startsWith(ROUTES.WHATSAPP_BOT) && pathname !== ROUTES.MY_PLAN) {
+    if (!pathname.startsWith(ROUTES.WHATSAPP_BOT) && pathname !== ROUTES.MY_PLAN && !inDirectory) {
       return <Navigate to={ROUTES.WHATSAPP_BOT} replace />;
     }
     return (
       <ShellContext.Provider value>
         <div className="flex h-dvh flex-col bg-white" data-testid="assistant-only-shell">
-          <AssistantOnlyHeader />
+          {inDirectory ? <DirectoryHeader /> : <AssistantOnlyHeader />}
           <main
             id="admin-main-content"
             tabIndex={-1}
@@ -162,7 +167,8 @@ const SignedInShell: React.FC = () => {
               )}
               {/* The assistants area has no Sidebar, so no account menu: the slim header carries
                   Plan and usage, Log out and the way back to the rest of Ally admin. */}
-              {hideSidebar && <AssistantOnlyHeader adminHome={adminHome} />}
+              {hideSidebar &&
+                (inDirectory ? <DirectoryHeader /> : <AssistantOnlyHeader adminHome={adminHome} />)}
               {/* Full-bleed pages draw their own frame to the edges, so no trail above them. */}
               {meta.known && !meta.fullBleed && <PageBreadcrumbs crumbs={meta.crumbs} />}
               <div

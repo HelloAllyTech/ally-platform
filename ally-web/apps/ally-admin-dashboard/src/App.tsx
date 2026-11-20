@@ -3,10 +3,15 @@ import { Toaster } from "sonner";
 import { AllyThemeProvider } from "@ally-ui-mono/ui-shared";
 import { LogViewer } from "@components/log-viewer";
 import { useColorMode } from "@hooks/useColorMode";
+import { PublicDirectoryByHost } from "@pages/Directory/PublicDirectory";
 import { RouteLayout } from "@routes/RouteLayout";
+
+import { isCustomDirectoryHost } from "./utils/directoryHost";
 
 export function App() {
   const { isDark } = useColorMode();
+  // A directory owner's own domain serves their collection's page and nothing of the admin app.
+  if (isCustomDirectoryHost()) return <PublicDirectoryByHost />;
   const toastOptions = {
     style: {
       transform: "translateZ(0)",

@@ -1243,6 +1243,18 @@ Agents v2 chunk CR1 (notes: `../docs/agents-v2/CHUNK-CR1-NOTES.md`). **Not multi
 
 ---
 
+### 3.25 Resources directory (`directory`)
+
+Not tenant-scoped on purpose: public entries are readable by every signed-in user and a collection's landing page is public. `owner_id` (a user id) gates every edit.
+
+| Table | Key columns | Notes |
+| --- | --- | --- |
+| `directory_entries` | PK `id`, `owner_id`, `title`, `category`, `organization`, contact fields, `tags` / `languages` (jsonb arrays), `visibility` (`public` \| `private`, default private) | One resource. Private ones are readable only by the owner; a public one is editable only by the owner. |
+| `directory_collections` | PK `id`, `owner_id`, `name`, `slug`, `published`, `settings` (jsonb), `custom_domain`, `domain_verification_token`, `domain_verified_at` | A saved view with a public page at `/d/<slug>`. `lower(slug)` and `lower(custom_domain)` are unique. The page answers 404 until `published`; a domain answers only once `domain_verified_at` is set (TXT record `_ally-directory.<domain>`). |
+| `directory_collection_entries` | PK `id`, `collection_id`, `entry_id` (both FK, cascade) | Unique per pair. A collection shows its public entries plus the owner's own private ones. |
+
+---
+
 ## 4. Weaviate (vector DB — `ally-ai`)
 
 Defined in `ally-ai/app/core/vector_db/constants.py`; migrations in `ally-ai/app/migrations/`.

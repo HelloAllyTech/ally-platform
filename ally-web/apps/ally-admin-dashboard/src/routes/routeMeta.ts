@@ -254,6 +254,14 @@ const buildTable = (): RouteMetaEntry[] => {
       section: "product",
       fullBleed: true,
     },
+    { path: ROUTES.DIRECTORY, title: "Resources directory", section: "product", fullBleed: true },
+    {
+      path: ROUTES.DIRECTORY_COLLECTION,
+      title: "Collection",
+      section: "product",
+      parent: ROUTES.DIRECTORY,
+      fullBleed: true,
+    },
     {
       path: ROUTES.CHATBOT_NEW,
       title: p.chatbotNew,
