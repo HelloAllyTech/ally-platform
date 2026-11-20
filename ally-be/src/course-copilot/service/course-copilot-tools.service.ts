@@ -897,7 +897,8 @@ export class CourseCopilotToolsService {
           estimate: response.estimate,
           problems: response.problems,
           // Also read by the turn receipt ("Blueprint drafted (v1) · planned with …").
-          planning: planningNote(response.planningContext).replace(/^ · /, '') || null,
+          planning:
+            planningNote(response.planningContext).replace(/^ · /, '') || null,
           note:
             'The trainer now sees the blueprint and approves it in the panel. In one or two ' +
             'sentences, say what shape you chose and why; mention any problem they must fix. ' +
