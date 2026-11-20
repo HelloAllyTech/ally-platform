@@ -50,6 +50,10 @@ import {
 import { CourseCopilotStructureService } from './course-copilot-structure.service';
 import { CourseCopilotSessionService } from './course-copilot-session.service';
 import { CourseCopilotLibraryService } from './course-copilot-library.service';
+import {
+  DEFAULT_BREATHING_EXERCISE,
+  matchTriggerWarnings,
+} from '../util/item-defaults.util';
 
 const textOf = (html: unknown, max = 4_000): string => {
   const text =
@@ -310,6 +314,13 @@ export class CourseCopilotJobExecutorService {
 
   // ── No-model items ───────────────────────────────────────────────────────
 
+  /** Trigger warnings as real ids (see matchTriggerWarnings). */
+  private async resolveTriggerWarningIds(raw: unknown[]): Promise<string[]> {
+    if (!raw.length) return [];
+    const warnings = await this.library.listTriggerWarnings().catch(() => []);
+    return matchTriggerWarnings(raw, warnings);
+  }
+
   private gameContent(item: CourseBlueprintItem): CourseCopilotJobResult {
     const requested = String(item?.spec?.gameKey ?? '');
     const gameKey = (Object.values(TrackGameKey) as string[]).includes(
@@ -321,6 +332,10 @@ export class CourseCopilotJobExecutorService {
       gameKey,
       ...(typeof item?.spec?.intro === 'string' && item.spec.intro.trim()
         ? { intro: item.spec.intro.trim() }
+        : {}),
+      // The breathing exercise needs its box timings; Studio's defaults (4-4-4-4, four rounds).
+      ...(gameKey === TrackGameKey.BREATHING_EXERCISE
+        ? { breathingExercise: { ...DEFAULT_BREATHING_EXERCISE } }
         : {}),
     };
     validateTrackItemContent({
@@ -435,6 +450,9 @@ export class CourseCopilotJobExecutorService {
       (brief.look?.articleImages ?? 'none') !== 'none' ||
       brief.look?.cover === 'generate';
 
+    const triggerWarningIds = Array.isArray(spec.triggerWarningIds)
+      ? await this.resolveTriggerWarningIds(spec.triggerWarningIds)
+      : undefined;
     const created = await this.structureService.asOwner(session, () =>
       this.chain.buildScenarioFromBrief(
         {
@@ -448,9 +466,7 @@ export class CourseCopilotJobExecutorService {
           personaAge: actor.personaAge,
           difficultyLevel:
             (actor.difficultyLevel as ScenarioDifficultyLevel) ?? undefined,
-          triggerWarningIds: Array.isArray(spec.triggerWarningIds)
-            ? spec.triggerWarningIds.map(String)
-            : undefined,
+          triggerWarningIds,
           coverImageUrl: imageryOn ? (track?.coverImageUrl ?? null) : null,
           titleHint: actor.title ?? item.title,
           characterId: newCharacter ? undefined : casting.characterId,
