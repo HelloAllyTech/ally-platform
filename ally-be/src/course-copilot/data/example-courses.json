@@ -1,0 +1,753 @@
+[
+  {
+    "id": "supportive-listening-how-to-help-someone-feel-heard",
+    "sourceTrackId": "1656a44b-0a6a-4641-a3f8-386d1815495b",
+    "title": "Supportive Listening: How to help someone feel heard",
+    "summary": "A quick intro! When someone close to us is struggling, we want to help, so we jump in with advice, \"don't worry\", or a quick fix. Often, what helps more is simpler: listening so they feel heard. In this course, you'll practise exactly that. You'll meet someone going through a tough time and talk to them out loud, in voice conversations that respond to what you say. Who it's for Anyone who wants to be there for friends and family when they're struggling. Beginner level, no experience needed! What you'll be able to do • Ask open questions that keep someone talking • Help someone say how they fe…",
+    "progressionMode": "SEQUENTIAL",
+    "sectionCount": 3,
+    "itemCount": 20,
+    "typeCounts": {
+      "ARTICLE": 7,
+      "QUIZ": 2,
+      "ROLEPLAY": 2,
+      "JOURNAL": 3,
+      "VIDEO": 2,
+      "ANNOTATED_ARTIFACT": 1,
+      "BUCKET_SORT": 1,
+      "BRANCHING_SCENARIO": 1,
+      "GAME": 1
+    },
+    "sections": [
+      {
+        "title": "Section 1",
+        "items": [
+          {
+            "type": "ARTICLE",
+            "title": "Why this course",
+            "size": "63 words"
+          },
+          {
+            "type": "ARTICLE",
+            "title": "How it works",
+            "size": "62 words"
+          },
+          {
+            "type": "ARTICLE",
+            "title": "Looking after yourself",
+            "size": "65 words"
+          },
+          {
+            "type": "QUIZ",
+            "title": "How do you see it?",
+            "size": "1 question",
+            "rule": "passScore 0"
+          },
+          {
+            "type": "QUIZ",
+            "title": "What would you say?",
+            "size": "5 questions",
+            "note": "Five quick situations. Pick the reply you think helps most. This is a starting point, not a test, so go with your gut.",
+            "rule": "passScore 0"
+          },
+          {
+            "type": "ARTICLE",
+            "title": "Meet Kavya",
+            "size": "76 words"
+          },
+          {
+            "type": "ROLEPLAY",
+            "title": "Kavya comes home quiet",
+            "size": "voice roleplay",
+            "rule": "completionLogic SCORE_AND_DURATION"
+          },
+          {
+            "type": "JOURNAL",
+            "title": "How was that?",
+            "size": "2 prompts",
+            "note": "Just for you: nobody else can see what you write here."
+          }
+        ]
+      },
+      {
+        "title": "Section 2",
+        "items": [
+          {
+            "type": "ARTICLE",
+            "title": "Two weeks later: Thursday stand-up",
+            "size": "108 words"
+          },
+          {
+            "type": "VIDEO",
+            "title": "Neha talks to Kavya: Version A",
+            "size": "2 min video, 2 pauses with a question",
+            "rule": "watchPct 70"
+          },
+          {
+            "type": "VIDEO",
+            "title": "Neha talks to Kavya: Version B",
+            "size": "3 min video, 2 pauses with a question",
+            "rule": "watchPct 70"
+          },
+          {
+            "type": "ANNOTATED_ARTIFACT",
+            "title": "Spot the listening",
+            "size": "16 lines to mark with 7 labels",
+            "note": "It's Friday lunch. Neha is talking to Kavya again. Read the conversation and tap the lines where Neha does one of the things below. Not every line needs a labe…",
+            "rule": "passScore 70"
+          },
+          {
+            "type": "BUCKET_SORT",
+            "title": "Listening or not?",
+            "size": "12 items into Keeps her talking / Shuts her down",
+            "note": "Kavya has just said: 'He called my work careless in front of everyone. And my appraisal is in two weeks.' Sort each reply: does it keep her talking, or shut he…"
+          },
+          {
+            "type": "BRANCHING_SCENARIO",
+            "title": "What happens next?",
+            "size": "9 scenes, 3 endings",
+            "note": "It's Friday morning. You're making chai when Kavya comes into the kitchen. Each choice changes where the conversation goes, and there's no single right path. T…",
+            "rule": "passScore 70"
+          },
+          {
+            "type": "ARTICLE",
+            "title": "What would you say?",
+            "size": "68 words",
+            "rule": "minReadSeconds 45"
+          },
+          {
+            "type": "ROLEPLAY",
+            "title": "Your turn with Kavya",
+            "size": "voice roleplay",
+            "rule": "minScore 120, completionLogic SCORE_AND_DURATION"
+          },
+          {
+            "type": "JOURNAL",
+            "title": "What you noticed",
+            "size": "2 prompts"
+          }
+        ]
+      },
+      {
+        "title": "Section 3",
+        "items": [
+          {
+            "type": "ARTICLE",
+            "title": "Three things to take with you",
+            "size": "127 words, 3 inline checks"
+          },
+          {
+            "type": "GAME",
+            "title": "Breather",
+            "size": "game: SPROUT",
+            "note": "Nice work getting through Kavya's story. Take a minute if you'd like."
+          },
+          {
+            "type": "JOURNAL",
+            "title": "Wrapping up this module",
+            "size": "1 prompt"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "gatekeeper-training",
+    "sourceTrackId": "1e5b64eb-f75d-4bbc-ba81-5a1d5cb29487",
+    "title": "[test] Gatekeeper Training [Course Variant 1]",
+    "summary": "Learn to notice early warning signs, open supportive conversations, and connect students to institutional help. As an educator in a high-pressure coaching environment, you’re often the first to see when a student is carrying too much. This training doesn’t ask you to diagnose or counsel. It helps you do the part that’s already yours: noticing, asking, and making sure the student reaches the right person. Through short interactive exercises, real dialogue breakdowns and voice roleplays, you’ll practise: spotting warning signs due direct and indirect cues initiating a conversation with a studen…",
+    "progressionMode": "SEQUENTIAL",
+    "sectionCount": 12,
+    "itemCount": 84,
+    "typeCounts": {
+      "ARTICLE": 30,
+      "QUIZ": 16,
+      "ROLEPLAY": 9,
+      "GAME": 9,
+      "JOURNAL": 4,
+      "BRANCHING_SCENARIO": 8,
+      "BUCKET_SORT": 4,
+      "ANNOTATED_ARTIFACT": 4
+    },
+    "sections": [
+      {
+        "title": "Section 1",
+        "items": [
+          {
+            "type": "ARTICLE",
+            "title": "Welcome",
+            "size": "126 words",
+            "note": "A two-minute hello: what this course is for, and what it isn't."
+          },
+          {
+            "type": "ARTICLE",
+            "title": "How this course works",
+            "size": "355 words",
+            "note": "Sections, practice conversations, feedback, and who sees what"
+          },
+          {
+            "type": "ARTICLE",
+            "title": "Before we begin: ensuring safety",
+            "size": "326 words",
+            "note": "What this course talks about, and the exact steps to connect a student to care."
+          },
+          {
+            "type": "QUIZ",
+            "title": "Try out a quiz!",
+            "size": "3 questions",
+            "note": "Three quick questions to get used to the quiz format. Nothing is graded.",
+            "rule": "passScore 0"
+          },
+          {
+            "type": "ROLEPLAY",
+            "title": "Try out a roleplay!",
+            "size": "voice roleplay",
+            "rule": "completionLogic PARTICIPATION"
+          }
+        ]
+      },
+      {
+        "title": "Section 11",
+        "items": [
+          {
+            "type": "QUIZ",
+            "title": "Where you are now: questions",
+            "size": "27 questions",
+            "note": "There are no wrong answers in the first part, and you won’t see scores. These questions help us see where you're starting from, so we can see what the course c…",
+            "rule": "passScore 0"
+          },
+          {
+            "type": "ARTICLE",
+            "title": "Before your first conversation",
+            "size": "161 words",
+            "note": "What's coming next"
+          },
+          {
+            "type": "ROLEPLAY",
+            "title": "Your starting point: a conversation with Arjun",
+            "size": "voice roleplay",
+            "rule": "assessmentMode true, assessmentPhase PRE, completionLogic SCORE, minLearnerTurns 10, assessmentPairKey eab47bc9-12d5-43dc-b28c-899bd24872d5, showResultsToLearner false"
+          },
+          {
+            "type": "ARTICLE",
+            "title": "A moment to check in",
+            "size": "51 words",
+            "note": "A short pause after that conversation"
+          },
+          {
+            "type": "GAME",
+            "title": "Breathing Exercise",
+            "size": "game: BREATHING_EXERCISE"
+          },
+          {
+            "type": "JOURNAL",
+            "title": "What you want from this course",
+            "size": "1 prompt",
+            "note": "This reflecting exercise remains private and only you see what you write here."
+          }
+        ]
+      },
+      {
+        "title": "Section 2",
+        "items": [
+          {
+            "type": "ARTICLE",
+            "title": "Before the next story",
+            "size": "93 words",
+            "note": "What's coming, and a way to skip it if you need to."
+          },
+          {
+            "type": "BRANCHING_SCENARIO",
+            "title": "A week in your shoes",
+            "size": "10 scenes, 2 endings",
+            "note": "A story where you're the student. Choose what you do."
+          },
+          {
+            "type": "GAME",
+            "title": "Breathing Exercise",
+            "size": "game: BREATHING_EXERCISE",
+            "note": "That story may have stayed with you. That's a sign you were paying attention to what a student might feel. Take a moment before moving on."
+          },
+          {
+            "type": "BUCKET_SORT",
+            "title": "Myth or fact?",
+            "size": "8 items into Myth / Fact",
+            "note": "Sort eight statements people often believe about student suicide."
+          },
+          {
+            "type": "ARTICLE",
+            "title": "Talk it over: myths",
+            "size": "135 words",
+            "note": "Which myths do teachers and parents believe most? Share your view."
+          },
+          {
+            "type": "ARTICLE",
+            "title": "What the numbers show, and don't",
+            "size": "171 words, 1 inline checks",
+            "note": "What national data tells us about student distress in India, and what official numbers miss."
+          },
+          {
+            "type": "BRANCHING_SCENARIO",
+            "title": "Who might be at risk?",
+            "size": "5 scenes, 4 endings",
+            "note": "Three students. One question.",
+            "rule": "passScore 100"
+          },
+          {
+            "type": "ARTICLE",
+            "title": "Where risk comes from",
+            "size": "270 words"
+          },
+          {
+            "type": "ANNOTATED_ARTIFACT",
+            "title": "Ravi's story",
+            "size": "6 lines to mark with 5 labels",
+            "note": "Read Ravi's story and mark what might put him at risk. Which lines show something that might raise his risk? Label each by level.",
+            "rule": "passScore 70"
+          },
+          {
+            "type": "ANNOTATED_ARTIFACT",
+            "title": "Ishita's story",
+            "size": "8 lines to mark with 5 labels",
+            "note": "A different student, a different mix.",
+            "rule": "passScore 70"
+          },
+          {
+            "type": "ARTICLE",
+            "title": " What risk does and doesn't tell you ",
+            "size": "123 words, 2 inline checks",
+            "note": "Four takeaways, with a quick question after each pair."
+          }
+        ]
+      },
+      {
+        "title": "Section 3",
+        "items": [
+          {
+            "type": "BUCKET_SORT",
+            "title": "What helps students ask for help?",
+            "size": "10 items into Makes it easier / Gets in the way",
+            "note": "Some things make it easier for a student to ask for help. Others get in the way. Sort each one."
+          },
+          {
+            "type": "BUCKET_SORT",
+            "title": "What's yours to do?",
+            "size": "9 items into My role / Not my role",
+            "note": "Sort what's part of your role and what isn't."
+          },
+          {
+            "type": "QUIZ",
+            "title": "\"Promise you won't tell\"",
+            "size": "4 questions",
+            "rule": "passScore 70"
+          },
+          {
+            "type": "ARTICLE",
+            "title": "Your role, and what holds teachers back",
+            "size": "452 words, 2 inline checks",
+            "note": "Four common hesitations and the facts behind them."
+          },
+          {
+            "type": "QUIZ",
+            "title": "Explain it to a colleague",
+            "size": "1 question",
+            "note": "Put it in your own words",
+            "rule": "passScore 80"
+          }
+        ]
+      },
+      {
+        "title": "Section 4",
+        "items": [
+          {
+            "type": "QUIZ",
+            "title": "Warm-up",
+            "size": "3 questions",
+            "note": "Three quick questions to review key concepts from last time.",
+            "rule": "passScore 70"
+          },
+          {
+            "type": "ARTICLE",
+            "title": "What warning signs look like",
+            "size": "463 words, 6 inline checks",
+            "note": "Six short parts, each with one question."
+          },
+          {
+            "type": "ARTICLE",
+            "title": "Talk it over: how students say it",
+            "size": "131 words",
+            "note": "The words students around you use when they're low. Words only, no names."
+          },
+          {
+            "type": "BRANCHING_SCENARIO",
+            "title": "Three weeks with Rohan",
+            "size": "6 scenes, 2 endings",
+            "note": "You're Rohan's teacher. Decide what to do as things change.",
+            "rule": "passScore 100"
+          }
+        ]
+      },
+      {
+        "title": "Section 5",
+        "items": [
+          {
+            "type": "ARTICLE",
+            "title": "Before you read",
+            "size": "109 words",
+            "note": "What is coming in this section"
+          },
+          {
+            "type": "ARTICLE",
+            "title": "Two weeks with Alfiya",
+            "size": "188 words, 4 inline checks",
+            "note": "Short observations across two weeks, with a check after each moment."
+          },
+          {
+            "type": "QUIZ",
+            "title": "Tell the counselor what you noticed",
+            "size": "1 question",
+            "note": "Describe what you saw, in your own words.",
+            "rule": "passScore 80"
+          },
+          {
+            "type": "ANNOTATED_ARTIFACT",
+            "title": "Spot the signs in a conversation",
+            "size": "16 lines to mark with 4 labels",
+            "note": "Read a conversation and mark the warning signs as they come up.",
+            "rule": "passScore 70"
+          },
+          {
+            "type": "GAME",
+            "title": "Breathing Exercise",
+            "size": "game: BREATHING_EXERCISE",
+            "note": "That section asked you to look closely at things that are hard to see and sit with. If any of it felt familiar—from a student in your past, someone in your per…"
+          }
+        ]
+      },
+      {
+        "title": "Section 6",
+        "items": [
+          {
+            "type": "ARTICLE",
+            "title": "What to do when you're worried",
+            "size": "258 words",
+            "note": "Five steps to keep with you when a student may be at risk."
+          },
+          {
+            "type": "QUIZ",
+            "title": "The five steps",
+            "size": "2 questions",
+            "rule": "passScore 100"
+          },
+          {
+            "type": "ARTICLE",
+            "title": "Before the next conversation",
+            "size": "96 words",
+            "note": "What's coming."
+          },
+          {
+            "type": "ROLEPLAY",
+            "title": "A worried classmate",
+            "size": "voice roleplay",
+            "note": "This is your first practice conversation that unlocks what comes next: you'll need a minimum score to move forward. If you don't reach it, read your debrief, e…",
+            "rule": "minScore 60, completionLogic SCORE"
+          },
+          {
+            "type": "GAME",
+            "title": "Breathing Exercise",
+            "size": "game: BREATHING_EXERCISE",
+            "note": "Hearing that someone is worried about a student can be unsettling, even in practice. Being asked by an anxious student to keep an absolute secret can also pull…"
+          },
+          {
+            "type": "JOURNAL",
+            "title": "Looking back",
+            "size": "2 prompts",
+            "note": "Your response is completely private. Nobody else can view your journal entries."
+          }
+        ]
+      },
+      {
+        "title": "Section 7",
+        "items": [
+          {
+            "type": "ARTICLE",
+            "title": "Starting the conversation",
+            "size": "107 words",
+            "note": "What is in this section"
+          },
+          {
+            "type": "BRANCHING_SCENARIO",
+            "title": "Warm-up",
+            "size": "7 scenes, 3 endings",
+            "rule": "passScore 100"
+          },
+          {
+            "type": "BRANCHING_SCENARIO",
+            "title": "Observe: Richa talks to Rohan",
+            "size": "6 scenes, 1 endings",
+            "note": "Rohan usually sits in the front row, but for the past two weeks he has moved to the back, stopped asking questions, and dropped 60 ranks on the test. Ms Richa …"
+          },
+          {
+            "type": "BRANCHING_SCENARIO",
+            "title": "Observe: Meetali talks to Rohan",
+            "size": "7 scenes, 1 endings",
+            "note": "Rohan usually sits in the front row, but for the past two weeks he has moved to the back, stopped asking questions, and dropped 60 ranks on the test. Ms Meetal…",
+            "rule": "passScore 70"
+          },
+          {
+            "type": "QUIZ",
+            "title": "Quick check: What made the difference?",
+            "size": "2 questions",
+            "note": "2 questions analysing Ms Mehta's two approaches.",
+            "rule": "passScore 70"
+          },
+          {
+            "type": "BRANCHING_SCENARIO",
+            "title": "Where and when to start",
+            "size": "7 scenes, 2 endings",
+            "note": "You want to check in with Rohan today. Choose the right setting and timing.",
+            "rule": "passScore 100"
+          },
+          {
+            "type": "BUCKET_SORT",
+            "title": "Helpful, unhelpful, or harmful?",
+            "size": "10 items into Helpful / Unhelpful / Harmful",
+            "note": "Sort each opening line by how it's likely to land with a student who's struggling."
+          },
+          {
+            "type": "QUIZ",
+            "title": "Your first words",
+            "size": "1 question",
+            "note": "Write what you'd say to open the conversation.",
+            "rule": "passScore 70"
+          },
+          {
+            "type": "ROLEPLAY",
+            "title": "Talking with Kabir",
+            "size": "voice roleplay",
+            "rule": "minScore 60, completionLogic SCORE"
+          },
+          {
+            "type": "GAME",
+            "title": "Breathing Exercise",
+            "size": "game: BREATHING_EXERCISE"
+          },
+          {
+            "type": "ARTICLE",
+            "title": "Talk it over: opening lines",
+            "size": "132 words",
+            "note": "Share an opening line that works in your language and setting."
+          },
+          {
+            "type": "ROLEPLAY",
+            "title": "Talking with Ananya",
+            "size": "voice roleplay",
+            "rule": "minScore 60, completionLogic SCORE"
+          },
+          {
+            "type": "ARTICLE",
+            "title": "A moment to check in",
+            "size": "59 words",
+            "note": "A short pause before the next section."
+          }
+        ]
+      },
+      {
+        "title": "Section 8",
+        "items": [
+          {
+            "type": "ARTICLE",
+            "title": "Listening what's underneath",
+            "size": "135 words",
+            "note": "What is in this section"
+          },
+          {
+            "type": "QUIZ",
+            "title": "Cues and openings",
+            "size": "3 questions",
+            "rule": "passScore 70"
+          },
+          {
+            "type": "ANNOTATED_ARTIFACT",
+            "title": "What made it work?",
+            "size": "14 lines to mark with 3 labels",
+            "note": "Read a good conversation and label what the teacher does",
+            "rule": "passScore 70"
+          },
+          {
+            "type": "ARTICLE",
+            "title": "Catching what slips out",
+            "size": "103 words, 2 inline checks",
+            "note": "Read how a teacher notices a passing remark during a casual conversation and gently explores it."
+          },
+          {
+            "type": "QUIZ",
+            "title": "Your next line: \"Doesn't matter\"",
+            "size": "1 question",
+            "note": "One thing a student says. Write what you'd say next.",
+            "rule": "passScore 70"
+          },
+          {
+            "type": "QUIZ",
+            "title": "Your next line: \"Better off\"",
+            "size": "1 question",
+            "note": "One thing a student says. Write what you'd say next.",
+            "rule": "passScore 70"
+          },
+          {
+            "type": "QUIZ",
+            "title": "Your next line: \"Not my problem soon\"",
+            "size": "1 question",
+            "note": "One thing a student says. Write what you'd say next.",
+            "rule": "passScore 70"
+          },
+          {
+            "type": "ROLEPLAY",
+            "title": "Talking with Rohan",
+            "size": "voice roleplay",
+            "rule": "minScore 120, completionLogic SCORE"
+          },
+          {
+            "type": "GAME",
+            "title": "Breathing Exercise",
+            "size": "game: BREATHING_EXERCISE",
+            "note": "Picking up on a cue means choosing to sit with something heavy instead of moving past it. That takes real emotional presence, even in a training exercise. Take…"
+          }
+        ]
+      },
+      {
+        "title": "Section 9",
+        "items": [
+          {
+            "type": "ARTICLE",
+            "title": "Observe: \"I'm fine, ma'am\"",
+            "size": "189 words, 2 inline checks",
+            "note": "Read how a teacher stays present with a student who insists she is fine, without pushing or abandoning her."
+          },
+          {
+            "type": "QUIZ",
+            "title": "A better reply",
+            "size": "1 question",
+            "note": "A reply that shuts down conversation. Rewrite it using an open question or reflection.",
+            "rule": "passScore 70"
+          },
+          {
+            "type": "ARTICLE",
+            "title": "Before you talk with Sneha",
+            "size": "116 words",
+            "note": "What is coming in the next practice conversation."
+          },
+          {
+            "type": "ROLEPLAY",
+            "title": "Talking with Sneha",
+            "size": "voice roleplay",
+            "rule": "minScore 140, completionLogic SCORE"
+          },
+          {
+            "type": "GAME",
+            "title": "Breathing Exercise",
+            "size": "game: BREATHING_EXERCISE",
+            "note": "Sitting with someone who keeps their guard up can leave you feeling frustrated, helpless, or second-guessing what you said. That is how practice works: a conve…"
+          },
+          {
+            "type": "JOURNAL",
+            "title": "Looking back at resistance",
+            "size": "1 prompt"
+          }
+        ]
+      },
+      {
+        "title": "Section 10",
+        "items": [
+          {
+            "type": "ARTICLE",
+            "title": "What's next",
+            "size": "130 words",
+            "note": "What is coming in this final section"
+          },
+          {
+            "type": "ROLEPLAY",
+            "title": "Talking with Sneha, a few weeks later",
+            "size": "voice roleplay",
+            "rule": "minScore 120, completionLogic SCORE"
+          },
+          {
+            "type": "GAME",
+            "title": "Breathing Exercise",
+            "size": "game: BREATHING_EXERCISE"
+          },
+          {
+            "type": "BRANCHING_SCENARIO",
+            "title": "Bringing it together",
+            "size": "10 scenes, 3 endings",
+            "rule": "passScore 100"
+          },
+          {
+            "type": "ARTICLE",
+            "title": "Looking after yourself",
+            "size": "225 words, 2 inline checks",
+            "note": "How supporting distressed students affects teachers, and the limits of your responsibility."
+          },
+          {
+            "type": "ARTICLE",
+            "title": "Talk it over: after a hard day",
+            "size": "133 words",
+            "note": "One small thing you do to steady yourself."
+          },
+          {
+            "type": "ARTICLE",
+            "title": "The 5-Step Gatekeeper Pocket Guide",
+            "size": "442 words",
+            "note": "A quick-reference summary of the protocol to keep with you. 2 minutes."
+          }
+        ]
+      },
+      {
+        "title": "Section 12",
+        "items": [
+          {
+            "type": "QUIZ",
+            "title": "Where you are now",
+            "size": "27 questions",
+            "note": "Now that you have completed the training, answer these questions based on where you stand today. Compare your thoughts now with where you began. Answer honestl…",
+            "rule": "passScore 0"
+          },
+          {
+            "type": "ARTICLE",
+            "title": "Before your final conversation",
+            "size": "122 words"
+          },
+          {
+            "type": "ROLEPLAY",
+            "title": "Where you are now: a conversation with Sahib",
+            "size": "voice roleplay",
+            "rule": "assessmentMode true, assessmentPhase POST, completionLogic SCORE, minLearnerTurns 10, assessmentPairKey eab47bc9-12d5-43dc-b28c-899bd24872d5, showResultsToLearner false"
+          },
+          {
+            "type": "GAME",
+            "title": "Breathing Exercise",
+            "size": "game: BREATHING_EXERCISE",
+            "note": "You have completed the final practice conversation. Take a minute to unwind and let your breathing settle."
+          },
+          {
+            "type": "JOURNAL",
+            "title": "Looking ahead",
+            "size": "3 prompts"
+          },
+          {
+            "type": "QUIZ",
+            "title": "Tell us what you thought",
+            "size": "3 questions",
+            "note": "A few questions about the course, to help us improve it. Your answers help us make this course better for other teachers. Be as honest as you like.",
+            "rule": "passScore 0"
+          },
+          {
+            "type": "ARTICLE",
+            "title": "Course complete: You are a gatekeeper",
+            "size": "151 words"
+          }
+        ]
+      }
+    ]
+  }
+]
