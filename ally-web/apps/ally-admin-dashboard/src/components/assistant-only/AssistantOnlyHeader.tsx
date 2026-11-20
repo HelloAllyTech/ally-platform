@@ -37,11 +37,12 @@ const PlanLink: React.FC = () => {
 };
 
 /**
- * The only frame around an assistant for someone whose way in is its team (chunk 6b, item 31): no
- * Sidebar and no other page, just who they are, their Plan and usage, and Log out. The assistant
- * switcher is in each assistant's own header, beside its name.
+ * The frame around the assistants area, which has no Sidebar for anyone. For someone whose way in
+ * is an assistant's team (chunk 6b, item 31) it is all there is: who they are, their Plan and
+ * usage, and Log out. Someone with other Ally admin pages also gets the way back to them
+ * (`adminHome`). The assistant switcher is in each assistant's own header, beside its name.
  */
-export const AssistantOnlyHeader: React.FC = () => {
+export const AssistantOnlyHeader: React.FC<{ adminHome?: string | null }> = ({ adminHome }) => {
   const { user, logout } = useUser();
   const { pathname } = useLocation();
   const name = user?.email ?? "";
@@ -51,6 +52,11 @@ export const AssistantOnlyHeader: React.FC = () => {
       data-testid="assistant-only-header"
       className="flex h-12 shrink-0 items-center justify-end gap-3 border-b border-border-light bg-white px-4"
     >
+      {adminHome && (
+        <Link to={adminHome} className={`${linkClass} mr-auto`} data-testid="assistants-to-admin">
+          {en.assistantsShell.toAllyAdmin}
+        </Link>
+      )}
       {onPlan ? (
         <Link
           to={ROUTES.WHATSAPP_BOT}

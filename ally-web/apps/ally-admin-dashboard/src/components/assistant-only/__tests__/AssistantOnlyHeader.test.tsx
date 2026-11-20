@@ -16,10 +16,10 @@ vi.mock("@hooks", () => ({
   useUser: () => ({ user: { email: "asha@clinic.example" }, logout: vi.fn() }),
 }));
 
-const renderAt = (path: string) =>
+const renderAt = (path: string, adminHome?: string) =>
   render(
     <MemoryRouter initialEntries={[path]}>
-      <AssistantOnlyHeader />
+      <AssistantOnlyHeader adminHome={adminHome} />
     </MemoryRouter>,
   );
 
@@ -55,6 +55,20 @@ describe("AssistantOnlyHeader", () => {
     plan.data = { isCreator: false, tokens: null };
     renderAt("/assistants");
     expect(screen.queryByRole("link", { name: "Plan and usage" })).not.toBeInTheDocument();
+  });
+
+  it("gives someone with other Ally admin pages the way back to them", () => {
+    renderAt("/assistants", "/simulation-studio");
+    expect(screen.getByRole("link", { name: "Back to Ally admin" })).toHaveAttribute(
+      "href",
+      "/simulation-studio",
+    );
+    expect(screen.getByRole("link", { name: "Plan and usage" })).toBeInTheDocument();
+  });
+
+  it("offers no way back to someone who has only their assistants", () => {
+    renderAt("/assistants");
+    expect(screen.queryByRole("link", { name: "Back to Ally admin" })).not.toBeInTheDocument();
   });
 
   it("on Plan and usage, offers the way back to their assistants instead", () => {

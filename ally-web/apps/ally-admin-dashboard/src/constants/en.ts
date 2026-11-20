@@ -1800,6 +1800,8 @@ export const en = {
     /** Someone who only has their assistant (chunk 6b): the one thing in its frame. */
     logOut: "Log out",
     toYourAssistants: "Go to your assistants",
+    /** Someone with other Ally admin pages, inside the assistants area (no Sidebar there). */
+    toAllyAdmin: "Back to Ally admin",
     /** The login screen a signed-out visitor sees on any /assistants page (its own wording and layout). */
     login: {
       headline: "Build and manage your own custom ",

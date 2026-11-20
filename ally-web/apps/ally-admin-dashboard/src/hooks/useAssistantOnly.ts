@@ -13,7 +13,12 @@ import { deriveNavigationItems } from "@utils/navigation";
  * other page. `ready` is false until their permissions and switches are known, so an admin never
  * sees the Sidebar disappear while those load.
  */
-export function useAssistantOnly(): { ready: boolean; assistantOnly: boolean } {
+export function useAssistantOnly(): {
+  ready: boolean;
+  assistantOnly: boolean;
+  /** Their first page outside Assistants: where the assistants area's top bar leads back to. */
+  adminHome: string | null;
+} {
   const permissions = useGetPermissionsQuery();
   const features = useGetFeatureTogglesQuery();
   const preferences = useGetUserPreferencesQuery();
@@ -24,7 +29,7 @@ export function useAssistantOnly(): { ready: boolean; assistantOnly: boolean } {
     !permissions.isError &&
     !features.isError &&
     !preferences.isLoading;
-  if (!ready) return { ready, assistantOnly: false };
+  if (!ready) return { ready, assistantOnly: false, adminHome: null };
   const items = deriveNavigationItems({
     permissions: permissions.data ?? [],
     features: features.data ?? [],
@@ -34,5 +39,6 @@ export function useAssistantOnly(): { ready: boolean; assistantOnly: boolean } {
   return {
     ready,
     assistantOnly: items.every(item => item.id === SIDEBAR_ITEMS.WHATSAPP_BOT),
+    adminHome: items.find(item => item.id !== SIDEBAR_ITEMS.WHATSAPP_BOT)?.path ?? null,
   };
 }

@@ -31,14 +31,23 @@ vi.mock("@components/scenario-reports-socket-provider/ScenarioReportsSocketProvi
 vi.mock("@pages/ContextLibrary/upload/UploadDock", () => ({ UploadDockHost: () => null }));
 vi.mock("@ally-ui-mono/ui-shared", () => ({ InlineLoading: () => <div>loading…</div> }));
 const access = vi.hoisted(() => ({ assistantOnly: false, calls: 0 }));
+const ADMIN_HOME = "/manage-prompts";
 vi.mock("@hooks/useAssistantOnly", () => ({
   useAssistantOnly: () => {
     access.calls += 1;
-    return { ready: true, assistantOnly: access.assistantOnly };
+    return {
+      ready: true,
+      assistantOnly: access.assistantOnly,
+      adminHome: access.assistantOnly ? null : "/manage-prompts",
+    };
   },
 }));
 vi.mock("@components/assistant-only/AssistantOnlyHeader", () => ({
-  AssistantOnlyHeader: () => <header data-testid="assistant-only-header">Log out</header>,
+  AssistantOnlyHeader: ({ adminHome }: { adminHome?: string | null }) => (
+    <header data-testid="assistant-only-header" data-admin-home={adminHome ?? ""}>
+      Log out
+    </header>
+  ),
 }));
 vi.mock("@pages/Login/Login", async () => {
   const { useLocation } = await import("react-router-dom");
@@ -203,7 +212,7 @@ describe("AdminShell", () => {
       renderShell("/assistants");
       expect(screen.getByText("assistants")).toBeInTheDocument();
       expect(screen.queryByTestId("stub-sidebar")).not.toBeInTheDocument();
-      expect(screen.getByTestId("assistant-only-header")).toBeInTheDocument();
+      expect(screen.getByTestId("assistant-only-header")).toHaveAttribute("data-admin-home", "");
     });
 
     it("can open New assistant: that page checks the Assistants switch itself", () => {
@@ -230,7 +239,12 @@ describe("AdminShell", () => {
       renderShell(path);
       expect(screen.queryByTestId("stub-sidebar")).not.toBeInTheDocument();
       expect(screen.queryByTestId("admin-mobile-menu-button")).not.toBeInTheDocument();
-      expect(screen.queryByTestId("assistant-only-header")).not.toBeInTheDocument();
+      // With no Sidebar there is no account menu: the slim header is their Log out, their Plan
+      // and usage, and the way back to their other pages.
+      expect(screen.getByTestId("assistant-only-header")).toHaveAttribute(
+        "data-admin-home",
+        ADMIN_HOME,
+      );
       cleanup();
     }
     renderShell("/assistants/new");

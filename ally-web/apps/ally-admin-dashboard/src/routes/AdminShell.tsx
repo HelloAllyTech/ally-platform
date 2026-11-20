@@ -62,7 +62,7 @@ const SignedInShell: React.FC = () => {
   const meta = resolveRouteMeta(pathname, search);
   // Usage tracking: one `admin_page_viewed` per route change (route pattern only, never ids).
   useAdminPageView(pathname);
-  const { assistantOnly } = useAssistantOnly();
+  const { assistantOnly, adminHome } = useAssistantOnly();
   // The assistants area (the list and every page under it: New assistant, one assistant's home,
   // onboarding) shows no side navigation, for anyone. `/assistants-x` is not under it.
   const hideSidebar =
@@ -160,6 +160,9 @@ const SignedInShell: React.FC = () => {
                   </div>
                 </div>
               )}
+              {/* The assistants area has no Sidebar, so no account menu: the slim header carries
+                  Plan and usage, Log out and the way back to the rest of Ally admin. */}
+              {hideSidebar && <AssistantOnlyHeader adminHome={adminHome} />}
               {/* Full-bleed pages draw their own frame to the edges, so no trail above them. */}
               {meta.known && !meta.fullBleed && <PageBreadcrumbs crumbs={meta.crumbs} />}
               <div
