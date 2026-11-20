@@ -574,10 +574,10 @@ export class DebriefAgentService implements OnModuleInit {
   }
 
   /**
-   * The Slack post for a missed risk cue. The urgent review itself does not depend on it: the run
-   * carries `decision.reviewReason = 'missed_risk_cue'`, which the Console lists first and the
-   * overdue notice follows; and a post that failed here is made again by the safety sweep. So a
-   * failure is logged at error and never stops the run.
+   * The Slack post for a missed risk cue, for the safety contact when the owner has set one. The run
+   * carries `decision.reviewReason = 'missed_risk_cue'` (no urgent review since 2026-11-20: nobody
+   * reviews by hand, the PM agent learns from it); a post that failed here is made again by the
+   * safety sweep. So a failure is logged at error and never stops the run.
    */
   private postMissedRiskCue(run: DebriefRun): void {
     void Promise.resolve(this.slack?.missedRiskCue(run)).catch((e: Error) =>
