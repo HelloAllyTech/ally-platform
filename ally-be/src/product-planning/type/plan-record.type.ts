@@ -162,6 +162,38 @@ export interface PlanIdeaState {
   readinessToken?: string | null;
   lastTurnAt?: string;
 
+  // ── The quality bar (2026-11-20; wiki/product/idea-quality.md) ──
+  /** The last turn's graded quality: computed server-side, never the model's own total. */
+  quality?: {
+    score: number;
+    passScore: number;
+    scaleMax: number;
+    passed: boolean;
+    weakest: string | null;
+    dimensions: {
+      id: string;
+      label: string;
+      score: number;
+      weight: number;
+      floor: number;
+      note: string;
+    }[];
+  } | null;
+  /**
+   * The interview's proposed split of a too-big idea (no tokens: a slice is signed afresh when
+   * it is submitted). Empty when none.
+   */
+  slices?: {
+    title: string | null;
+    description: string;
+    effort: string;
+    productGoal: string | null;
+  }[];
+  /** Sibling drafts created from this one by Split; this draft can no longer be submitted. */
+  splitInto?: { code: string; title: string }[];
+  /** The draft this one was split from. */
+  splitFrom?: string | null;
+
   // ── Roadmap v2 draft page (P3) ──
   /** Verbatim words that met each check, keyed by check id (Check my idea, §4.13). */
   evidence?: Record<string, string>;

@@ -460,6 +460,7 @@ export const ApiEndpoints = {
     DRAFT_TURN: (code: string) => `/v1/roadmap/drafts/${encodeURIComponent(code)}/turn`,
     DRAFT_REOPEN_CHECK: (code: string, checkId: string) =>
       `/v1/roadmap/drafts/${encodeURIComponent(code)}/checks/${encodeURIComponent(checkId)}/reopen`,
+    DRAFT_SPLIT: (code: string) => `/v1/roadmap/drafts/${encodeURIComponent(code)}/split`,
     DRAFT_SELF_CHECK: (code: string) => `/v1/roadmap/drafts/${encodeURIComponent(code)}/self-check`,
     DRAFT_SIMILAR: (code: string) => `/v1/roadmap/drafts/${encodeURIComponent(code)}/similar`,
     DRAFT_ADD_TO: (code: string, target: string) =>

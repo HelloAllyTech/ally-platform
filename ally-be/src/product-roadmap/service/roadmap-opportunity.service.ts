@@ -50,6 +50,8 @@ import {
   ROADMAP_LIMITS,
   BUG_REPORT_DEFAULT_PRODUCT_GOAL,
   ROADMAP_FILEABLE_EFFORTS,
+  ROADMAP_QUALITY_PASS_SCORE,
+  ROADMAP_SINGLE_IDEA_EFFORTS,
   ROADMAP_OWNER_EMAILS,
   ROADMAP_READINESS_REQUIRE_TOKEN,
   ROADMAP_REFERENCE_IMAGE_MAX_SIZE_BYTES,
@@ -483,6 +485,23 @@ export class RoadmapOpportunityService {
       dto.effort != null &&
       (ROADMAP_FILEABLE_EFFORTS as readonly string[]).includes(dto.effort);
     if (!effortFileable) failed.push('size');
+
+    // A token that carries a quality score came from the interview, which holds its ideas to
+    // the quality bar: the score must reach the pass mark and the size must be one an idea can
+    // be filed at on its own (XL and XXL are split first). Applied here, to the signed score and
+    // the effort being filed, so it holds whatever a client sends. System filings (the PM Agent)
+    // carry no score and keep the wider rule above.
+    if (typeof verdict.qualityScore === 'number') {
+      if (verdict.qualityScore < ROADMAP_QUALITY_PASS_SCORE) {
+        failed.push('quality');
+      }
+      if (
+        dto.effort != null &&
+        !(ROADMAP_SINGLE_IDEA_EFFORTS as readonly string[]).includes(dto.effort)
+      ) {
+        failed.push('split_needed');
+      }
+    }
 
     if (failed.length > 0) {
       throw new BadRequestException(

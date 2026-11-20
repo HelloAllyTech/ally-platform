@@ -1242,7 +1242,7 @@ export const ProductRoadmap: React.FC = () => {
 
             There is ONE new-opportunity door, and it is the guided interview. The blank form
             with its run-it-yourself readiness check and manager override was retired: the
-            interview grades the same five criteria as it goes, so it reaches a fileable draft
+            interview grades the same criteria as it goes, so it reaches a fileable draft
             without the filer doing the reframing alone, and two doors to one act made people
             pick before they knew which they needed.
           */}
