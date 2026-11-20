@@ -378,6 +378,8 @@ export const ApiEndpoints = {
     LIST: "/v1/product-updates",
     STATUS: "/v1/product-updates/status",
     RUN: "/v1/product-updates/run",
+    DIGEST_RECIPIENTS: "/v1/product-updates/digest-recipients",
+    DIGEST_RECIPIENT: (id: string) => `/v1/product-updates/digest-recipients/${id}`,
     GET: (id: string) => `/v1/product-updates/${id}`,
     UPDATE: (id: string) => `/v1/product-updates/${id}`,
   },

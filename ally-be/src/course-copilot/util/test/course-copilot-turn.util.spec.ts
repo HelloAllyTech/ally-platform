@@ -109,6 +109,7 @@ describe('courseCopilotQuestionProblems (Course Pilot: choice-only steps)', () =
 });
 
 describe('describeCourseCopilotChanges: blueprint planning', () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const {
     describeCourseCopilotChanges,
   } = require('../course-copilot-turn.util');

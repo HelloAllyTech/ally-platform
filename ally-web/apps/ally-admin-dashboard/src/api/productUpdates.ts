@@ -107,6 +107,16 @@ export type UpdateProductUpdateBody = Partial<
   >
 >;
 
+export interface DigestRecipient {
+  id: string;
+  email: string;
+  addedAt: string;
+}
+
+export interface DigestRecipientsResponse {
+  recipients: DigestRecipient[];
+}
+
 export const productUpdatesAPI = baseAPI.injectEndpoints({
   endpoints: builder => ({
     getProductUpdates: builder.query<GetProductUpdatesResponse, GetProductUpdatesParams>({
@@ -123,6 +133,28 @@ export const productUpdatesAPI = baseAPI.injectEndpoints({
         method: HttpMethod.GET,
       }),
       providesTags: [TAG_TYPES.PRODUCT_UPDATES],
+    }),
+    getDigestRecipients: builder.query<DigestRecipientsResponse, void>({
+      query: () => ({
+        url: ApiEndpoints.PRODUCT_UPDATES.DIGEST_RECIPIENTS,
+        method: HttpMethod.GET,
+      }),
+      providesTags: [TAG_TYPES.PRODUCT_UPDATES],
+    }),
+    addDigestRecipient: builder.mutation<DigestRecipientsResponse, { email: string }>({
+      query: body => ({
+        url: ApiEndpoints.PRODUCT_UPDATES.DIGEST_RECIPIENTS,
+        method: HttpMethod.POST,
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.PRODUCT_UPDATES],
+    }),
+    removeDigestRecipient: builder.mutation<DigestRecipientsResponse, string>({
+      query: id => ({
+        url: ApiEndpoints.PRODUCT_UPDATES.DIGEST_RECIPIENT(id),
+        method: HttpMethod.DELETE,
+      }),
+      invalidatesTags: [TAG_TYPES.PRODUCT_UPDATES],
     }),
     getProductUpdate: builder.query<ProductUpdate, string>({
       query: id => ({
@@ -186,6 +218,9 @@ export const {
   useGetProductUpdatesQuery,
   useGetProductUpdatesStatusQuery,
   useGetProductUpdateQuery,
+  useGetDigestRecipientsQuery,
+  useAddDigestRecipientMutation,
+  useRemoveDigestRecipientMutation,
   useRunProductUpdatesMutation,
   useUpdateProductUpdateMutation,
 } = productUpdatesAPI;

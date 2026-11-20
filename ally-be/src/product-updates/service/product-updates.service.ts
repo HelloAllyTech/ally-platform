@@ -2,7 +2,6 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { IsNull, Not } from 'typeorm';
 
 import { ExecutionManager } from 'src/common/execution/execution-manager';
-import { AppConfigService } from 'src/config/config.service';
 import { NotFoundException } from 'src/exception/custom.exception';
 import { LoggerService } from 'src/logger/logger.service';
 
@@ -20,6 +19,7 @@ import {
 import { ProductUpdate } from '../entity/product-update.entity';
 import { ProductUpdateSourceRepository } from '../repository/product-update-source.repository';
 import { ProductUpdateRepository } from '../repository/product-update.repository';
+import { ProductUpdateRecipientsService } from './product-update-recipients.service';
 import { ProductUpdatePipelineService } from './product-update-pipeline.service';
 
 const PUBLIC_DEFAULT_LIMIT = 30;
@@ -42,7 +42,7 @@ export class ProductUpdatesService {
     private readonly updateRepository: ProductUpdateRepository,
     private readonly sourceRepository: ProductUpdateSourceRepository,
     private readonly pipeline: ProductUpdatePipelineService,
-    private readonly configService: AppConfigService,
+    private readonly recipients: ProductUpdateRecipientsService,
   ) {}
 
   async listPublic(
@@ -157,7 +157,7 @@ export class ProductUpdatesService {
   }
 
   async status(): Promise<ProductUpdatesStatusDto> {
-    const [sources, total, publicCount, waiting, lastRun, running] =
+    const [sources, total, publicCount, waiting, lastRun, running, digestTo] =
       await Promise.all([
         this.sourceRepository.countByStatus(),
         this.updateRepository.count(),
@@ -167,10 +167,11 @@ export class ProductUpdatesService {
         this.updateRepository.count({ where: { liveAt: IsNull() } }),
         this.pipeline.lastRun(),
         this.pipeline.isRunning(),
+        this.recipients.effective(),
       ]);
     return {
       enabled: this.pipeline.enabled,
-      digestConfigured: this.configService.productUpdates.digestTo.length > 0,
+      digestConfigured: digestTo.length > 0,
       sources,
       updates: { total, public: publicCount, waiting },
       running,
