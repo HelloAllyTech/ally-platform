@@ -76,6 +76,8 @@ Routes: `GET v1/assistant-templates` (before a setup starts), `GET v1/chatbots/:
 
 ## Decisions
 
+- **Shipped below 70% on two templates** (Shehbaz, 20 Nov): helpline and services at 57%, the causes documented above; fixes go to Q4 (grader) and a follow-up (checkups as a known person).
+- **Playwright beyond the template spec wasn't rerun** after the last fixes (Shehbaz, 20 Nov); CI runs the whole suite.
 - **At the plan (Shehbaz, 20 Nov):** setup answers become real entries, skipped ones get neutral examples marked as such; Menu joins the ready-made picker, the ten organisation lists are template-only.
 - **The shared source lives in ally-be** and is imported (ally-be's `tsconfig` gains `resolveJsonModule`, so the build emits it). ally-web's copy is checked byte for byte.
 - **Add from a template is owners only:** it can raise the pack and turn hand-over on, both owners' switches. The A1 route walk's owner list gains this route.

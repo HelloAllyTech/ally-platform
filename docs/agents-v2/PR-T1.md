@@ -33,6 +33,13 @@ Owners start from a whole use case instead of assembling an assistant from parts
 
 **Crisis set** on the helpline assistant: 0 misses; every crisis reply carried the helpline's own number beside the national ones. The 5 must-pass failures are the platform's crisis layer over-calling look-alikes (four) and "your local crisis line" in a medicine decline (one), not the template. What's left below 70% and why: `CHUNK-T1-NOTES.md` → Results.
 
+**Shipped with the shortfall documented** (Shehbaz, 20 Nov): helpline and services stay at 57% until the grader fix (Q4) and checkups as a known person.
+
+## Checks
+
+- ally-be: 1,301 suites, 19,140 tests pass (22 Postgres suites skip without a database); lint and typecheck clean. Postgres specs on `ally_t1_test`: templates 27/27, lists 141/141 (`bot-draft.pg.spec.ts` "publishing twice converges…" fails on master too).
+- ally-web (Node 22): 704 test files pass; typecheck clean. Playwright `templates.e2e.ts` 8/8 at 1440 and 390; the rest of the e2e suite wasn't rerun after the last fixes (skipped at Shehbaz's request; CI runs it).
+
 ## Decisions
 
 - Setup answers become real entries; skipped ones get neutral examples marked as such (Shehbaz, at the plan).
