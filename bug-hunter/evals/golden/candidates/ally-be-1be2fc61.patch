@@ -1,0 +1,50 @@
+diff --git a/ally-be/src/ai/dto/ai.request.dto.ts b/ally-be/src/ai/dto/ai.request.dto.ts
+index e20fd7142..0458add7d 100644
+--- a/ally-be/src/ai/dto/ai.request.dto.ts
++++ b/ally-be/src/ai/dto/ai.request.dto.ts
+@@ -16,6 +16,9 @@ export type PromptOverride =
+       model?: string;
+       /** Prompt-level LLM sampling temperature override (0–2), honored by ally-ai. */
+       temperature?: number;
++      /** The Skills Store version this text is, for the runtime's [PROMPT_SOURCE] log. */
++      version?: number | null;
++      contentHash?: string;
+     };
+ 
+ export type GenerateSummaryRequest = {
+diff --git a/ally-be/src/learn/service/scenario-session-evaluation.service.ts b/ally-be/src/learn/service/scenario-session-evaluation.service.ts
+index 504bdb2e5..04e8f58c1 100644
+--- a/ally-be/src/learn/service/scenario-session-evaluation.service.ts
++++ b/ally-be/src/learn/service/scenario-session-evaluation.service.ts
+@@ -100,6 +100,9 @@ export class ScenarioSessionEvaluationService {
+       prompts[row.promptCode] = {
+         prompt: text,
+         availableVariables: row.availableVariables ?? [],
++        // What identifies the text that ran, for ai-learn's [PROMPT_SOURCE] log.
++        version: row.version ?? null,
++        ...(row.contentHash ? { contentHash: row.contentHash } : {}),
+         ...(row.provider ? { provider: row.provider } : {}),
+         ...(row.model ? { model: row.model } : {}),
+         ...(typeof row.temperature === 'number'
+diff --git a/ally-be/src/learn/service/test/scenario-session-evaluation.service.spec.ts b/ally-be/src/learn/service/test/scenario-session-evaluation.service.spec.ts
+index 002cad30c..774823e2a 100644
+--- a/ally-be/src/learn/service/test/scenario-session-evaluation.service.spec.ts
++++ b/ally-be/src/learn/service/test/scenario-session-evaluation.service.spec.ts
+@@ -8,6 +8,8 @@ const JUDGE_ROW = {
+   promptCode: 'ally_ai_learn_evaluation_actor_goal_system',
+   prompt: 'Judge {goals_block}\n',
+   availableVariables: ['goals_block'],
++  version: 3,
++  contentHash: 'hash-3',
+   model: 'gpt-4.1',
+ };
+ 
+@@ -142,6 +144,8 @@ describe('ScenarioSessionEvaluationService — triggerForSession idempotency', (
+           ally_ai_learn_evaluation_actor_goal_system: {
+             prompt: 'Judge {goals_block}',
+             availableVariables: ['goals_block'],
++            version: 3,
++            contentHash: 'hash-3',
+             model: 'gpt-4.1',
+           },
+         },

@@ -1,0 +1,81 @@
+diff --git a/apps/ally-admin-dashboard/src/components/agent-chat/ChatMessage.tsx b/apps/ally-admin-dashboard/src/components/agent-chat/ChatMessage.tsx
+index e41ce73118..50d09ee110 100644
+--- a/apps/ally-admin-dashboard/src/components/agent-chat/ChatMessage.tsx
++++ b/apps/ally-admin-dashboard/src/components/agent-chat/ChatMessage.tsx
+@@ -157,7 +157,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
+                     kind="tertiary"
+                     size="sm"
+                     disabled={disabled}
+-                    onClick={() => onSendSuggestion(strings.applyFindingMessage(finding.note))}
++                    onClick={() =>
++                      onSendSuggestion(strings.applyFindingMessage(finding.note, finding.itemId))
++                    }
+                   >
+                     {strings.applyFinding}
+                   </Button>
+diff --git a/apps/ally-admin-dashboard/src/components/agent-chat/__tests__/ChatMessage.test.tsx b/apps/ally-admin-dashboard/src/components/agent-chat/__tests__/ChatMessage.test.tsx
+index f381788d7b..8daa0898a6 100644
+--- a/apps/ally-admin-dashboard/src/components/agent-chat/__tests__/ChatMessage.test.tsx
++++ b/apps/ally-admin-dashboard/src/components/agent-chat/__tests__/ChatMessage.test.tsx
+@@ -118,7 +118,7 @@ describe("agent-chat ChatMessage", () => {
+ 
+       fireEvent.click(screen.getByText(strings.applyFinding));
+       expect(onSendSuggestion).toHaveBeenCalledWith(
+-        strings.applyFindingMessage("Quiz 2.3 has a single answer key."),
++        strings.applyFindingMessage("Quiz 2.3 has a single answer key.", "i1"),
+       );
+     });
+ 
+diff --git a/apps/ally-admin-dashboard/src/constants/en.ts b/apps/ally-admin-dashboard/src/constants/en.ts
+index 3f23980530..1aee7f50a0 100644
+--- a/apps/ally-admin-dashboard/src/constants/en.ts
++++ b/apps/ally-admin-dashboard/src/constants/en.ts
+@@ -4428,7 +4428,9 @@ export const en = {
+       findingFix: "Fix",
+       findingConsider: "Consider",
+       applyFinding: "Apply",
+-      applyFindingMessage: (note: string) => `Apply this change: ${note}`,
++      // The item id lets the copilot act on the right item without guessing.
++      applyFindingMessage: (note: string, itemId?: string) =>
++        `Apply this review finding${itemId ? ` (item ${itemId})` : ""}: ${note}`,
+       suggestedActionsLabel: "Suggested next steps",
+     },
+ 
+diff --git a/apps/ally-admin-dashboard/src/hooks/useCourseCopilotStream.ts b/apps/ally-admin-dashboard/src/hooks/useCourseCopilotStream.ts
+index 68088531e9..c9cf0a973f 100644
+--- a/apps/ally-admin-dashboard/src/hooks/useCourseCopilotStream.ts
++++ b/apps/ally-admin-dashboard/src/hooks/useCourseCopilotStream.ts
+@@ -120,6 +120,15 @@ export const parseSseBuffer = (
+ /** Strips the deterministic answer prefix the server adds to a user turn. */
+ const ANSWER_PREFIX_RE = /^\[answers question [^\]]+\]\s*/i;
+ 
++/**
++ * …and the structured-answer suffix (" [selected ids: a | custom: \"…\"]"),
++ * which is for the model, not the trainer: the card shows the labels.
++ */
++const ANSWER_SUFFIX_RE = /\s*\[(?:none of these|selected ids:|custom:)[^\]]*\]\s*$/i;
++
++const answerText = (content: string | null | undefined): string =>
++  (content ?? "").replace(ANSWER_PREFIX_RE, "").replace(ANSWER_SUFFIX_RE, "");
++
+ /** A persisted tool result's `summary`, when it has one — the resume path's version of a tool note. */
+ const summaryOf = (result: unknown): string | null => {
+   if (!result || typeof result !== "object") return null;
+@@ -152,7 +161,7 @@ export const mapServerMessagesToFeed = (
+     const questionId = row.metadata?.questionId;
+     if (row.role === "user" && questionId) {
+       answersByQuestionId.set(String(questionId), {
+-        text: (row.content ?? "").replace(ANSWER_PREFIX_RE, ""),
++        text: answerText(row.content),
+         answer: row.metadata?.answer,
+       });
+     }
+@@ -166,7 +175,7 @@ export const mapServerMessagesToFeed = (
+   safeRows.forEach((row, index) => {
+     const baseId = `srv_${row.id ?? row.seq ?? index}`;
+     const metadata = row.metadata ?? {};
+-    const content = (row.content ?? "").replace(ANSWER_PREFIX_RE, "");
++    const content = answerText(row.content);
+ 
+     if (row.role === "user") {
+       // The hidden kickoff turn was never shown as a bubble when it was sent; showing it on resume

@@ -368,6 +368,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
       // shipped versions and the pipeline that ships them, not raw log output.
       case SIDEBAR_ITEMS.MOBILE_RELEASES:
         return <Mobile size={20} />;
+      case SIDEBAR_ITEMS.BUG_HUNTER_V2:
+        return <Report size={20} />;
       case SIDEBAR_ITEMS.WHATSAPP_BOT:
         return <Chat size={20} />;
       // Bug Hunter is the one tab that is a *someone* rather than a section:

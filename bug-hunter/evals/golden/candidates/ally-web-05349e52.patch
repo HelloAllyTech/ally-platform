@@ -1,0 +1,150 @@
+diff --git a/apps/ally-helpline-dashboard/src/pages/track-player/TrackPlayer.tsx b/apps/ally-helpline-dashboard/src/pages/track-player/TrackPlayer.tsx
+index 9734abc6a1..a5d94527e6 100644
+--- a/apps/ally-helpline-dashboard/src/pages/track-player/TrackPlayer.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/track-player/TrackPlayer.tsx
+@@ -258,6 +258,8 @@ export const TrackPlayer: FC = () => {
+     <div className="fixed inset-0 z-40 flex h-[100dvh] w-full flex-col bg-white font-primary">
+       <PlayerTopBar
+         sectionTitle={nav.current?.sectionTitle ?? ""}
++        itemTitle={nav.current?.item.title ?? ""}
++        itemDescription={nav.current?.item.description ?? null}
+         sectionItems={sectionItems}
+         currentItemId={itemId}
+         overallPct={nav.overallPct}
+@@ -283,12 +285,6 @@ export const TrackPlayer: FC = () => {
+             }}
+             className="h-full min-h-0"
+           >
+-            <div className="p-4">
+-              {nav.current && <h1 className="text-2xl font-bold">{nav.current.item.title}</h1>}
+-              {nav.current?.item.description && (
+-                <p className="text-gray-600 mt-2">{nav.current.item.description}</p>
+-              )}
+-            </div>
+             {hasDiscussion ? (
+               <div data-testid="track-item-scroll" className="h-full min-h-0 overflow-y-auto">
+                 <div className="h-full min-h-0">
+diff --git a/apps/ally-helpline-dashboard/src/pages/track-player/__tests__/TrackPlayer.test.tsx b/apps/ally-helpline-dashboard/src/pages/track-player/__tests__/TrackPlayer.test.tsx
+index 773d4a7aa2..da780efaf5 100644
+--- a/apps/ally-helpline-dashboard/src/pages/track-player/__tests__/TrackPlayer.test.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/track-player/__tests__/TrackPlayer.test.tsx
+@@ -1,6 +1,6 @@
+ 
+ import { vi } from "vitest";
+-import { render, screen } from "@testing-library/react";
++import { render, screen, waitFor } from "@testing-library/react";
+ import { MemoryRouter, Route, Routes } from "react-router-dom";
+ import { Provider } from "react-redux";
+ import { store } from "@store";
+@@ -56,8 +56,11 @@ const mockTrackDetail: TrackDetail = {
+   ],
+ };
+ 
++// RTK Query's trigger returns a thenable carrying `unwrap()` synchronously —
++// the player calls `startTrackItem(...).unwrap()`, so the trigger itself must
++// not be a bare promise or the item falls into its load-error state.
+ const mockStartTrackItemMutation = [
+-  vi.fn().mockResolvedValue({
++  vi.fn().mockReturnValue({
+     unwrap: vi.fn().mockResolvedValue({
+       type: TrackItemType.ARTICLE,
+       html: "<p>Hello</p>",
+@@ -66,7 +69,7 @@ const mockStartTrackItemMutation = [
+ ];
+ 
+ describe("TrackPlayer", () => {
+-  it("should display the item title and description", () => {
++  it("shows the item title and description in the header without hiding the player footer", async () => {
+     (api.useGetLearnTrackDetailQuery as vi.Mock).mockReturnValue({
+       data: mockTrackDetail,
+       isError: false,
+@@ -84,7 +87,16 @@ describe("TrackPlayer", () => {
+       </Provider>
+     );
+ 
+-    expect(screen.getByText("Test Item Title")).toBeInTheDocument();
++    expect(screen.getByRole("heading", { level: 1, name: "Test Item Title" })).toBeInTheDocument();
+     expect(screen.getByText("Test Item Description")).toBeInTheDocument();
++    // The section title stays as the eyebrow above the item title.
++    expect(screen.getByText("Test Section")).toBeInTheDocument();
++
++    // The header must not displace the player: the article's bottom bar
++    // (its completion control) is still rendered once the item loads. jsdom
++    // has no scroll extent, so the short-article path makes it "Mark as read".
++    await waitFor(() =>
++      expect(screen.getByRole("button", { name: "Mark as read" })).toBeInTheDocument(),
++    );
+   });
+ });
+diff --git a/apps/ally-helpline-dashboard/src/pages/track-player/components/PlayerTopBar.tsx b/apps/ally-helpline-dashboard/src/pages/track-player/components/PlayerTopBar.tsx
+index 051ffa8392..d8d953fb4e 100644
+--- a/apps/ally-helpline-dashboard/src/pages/track-player/components/PlayerTopBar.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/track-player/components/PlayerTopBar.tsx
+@@ -9,6 +9,10 @@ import { SegmentedProgressRail } from "./SegmentedProgressRail";
+ 
+ interface PlayerTopBarProps {
+   sectionTitle: string;
++  /** The component's own title — the heading; the section title is its eyebrow. */
++  itemTitle: string;
++  /** The author's description of the component, when they wrote one. */
++  itemDescription: string | null;
+   sectionItems: FlatTrackItem[];
+   currentItemId: string;
+   overallPct: number;
+@@ -17,11 +21,16 @@ interface PlayerTopBarProps {
+ }
+ 
+ /**
+- * Full-screen player header: exit button, current section title, the
+- * segmented progress rail for the section and the overall completion %.
++ * Full-screen player header: exit button, section eyebrow + current item
++ * title, the item's description, the segmented progress rail for the
++ * section and the overall completion %. The item title and description live
++ * here rather than inside the players so every component type shows them
++ * and the players keep their full-height layout and bottom bars.
+  */
+ export const PlayerTopBar: FC<PlayerTopBarProps> = ({
+   sectionTitle,
++  itemTitle,
++  itemDescription,
+   sectionItems,
+   currentItemId,
+   overallPct,
+@@ -40,13 +49,17 @@ export const PlayerTopBar: FC<PlayerTopBarProps> = ({
+         >
+           <Close className="h-4 w-4" />
+         </button>
+-        <h1 className="min-w-0 flex-1 truncate text-base font-medium text-typography-900">
+-          {sectionTitle}
+-        </h1>
++        <div className="min-w-0 flex-1">
++          <p className="truncate text-xs text-typography-700">{sectionTitle}</p>
++          <h1 className="truncate text-base font-medium text-typography-900">{itemTitle}</h1>
++        </div>
+         <span className="flex-shrink-0 text-xs text-typography-700">
+           {t("tracks2.player.overallProgress", { pct: overallPct })}
+         </span>
+       </div>
++      {itemDescription && (
++        <p className="mb-2 line-clamp-2 text-sm text-typography-700">{itemDescription}</p>
++      )}
+       <SegmentedProgressRail
+         sectionItems={sectionItems}
+         currentItemId={currentItemId}
+diff --git a/apps/ally-helpline-dashboard/src/pages/track-player/components/players/RoleplayItemPlayer.tsx b/apps/ally-helpline-dashboard/src/pages/track-player/components/players/RoleplayItemPlayer.tsx
+index c5e3ef2c12..2167a3fc6d 100644
+--- a/apps/ally-helpline-dashboard/src/pages/track-player/components/players/RoleplayItemPlayer.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/track-player/components/players/RoleplayItemPlayer.tsx
+@@ -112,9 +112,9 @@ export const RoleplayItemPlayer: FC<RoleplayItemPlayerProps> = ({
+   const coverImage = isCase ? caseDetails?.coverImageUrl : scenario?.coverImageUrl;
+   // The full brief, rendered under the card. The card itself clamps its blurb
+   // to two lines and drops it entirely when trigger warnings are present, so
+-  // it can't be the only place the challenge description lives.
+-  const challengeDescription =
+-    (isCase ? caseDetails?.description : scenario?.description) || item.description;
++  // it can't be the only place the challenge description lives. The item's
++  // own description is the player header's job (PlayerTopBar), not this one.
++  const challengeDescription = isCase ? caseDetails?.description : scenario?.description;
+ 
+   const launch = async () => {
+     persistTrackContext({ trackId, itemId: item.id });

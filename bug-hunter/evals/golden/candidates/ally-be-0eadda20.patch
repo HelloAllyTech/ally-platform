@@ -1,0 +1,36 @@
+diff --git a/src/learn/controller/test/learn.controller.spec.ts b/src/learn/controller/test/learn.controller.spec.ts
+index a673c234ba..0d596c8bd9 100644
+--- a/src/learn/controller/test/learn.controller.spec.ts
++++ b/src/learn/controller/test/learn.controller.spec.ts
+@@ -597,7 +597,7 @@ describe('LearnController', () => {
+         ...mockScenarioSessionResponse,
+         hasFeedback: true,
+         reviewId: 'review-id',
+-        ReviewStatus: ReviewStatus.HIDDEN,
++        reviewStatus: ReviewStatus.HIDDEN,
+       };
+       scenarioSessionService.getScenarioSession.mockResolvedValue(mockSession);
+ 
+diff --git a/src/learn/service/scenario-session.service.ts b/src/learn/service/scenario-session.service.ts
+index 36886ed87f..43ab535547 100644
+--- a/src/learn/service/scenario-session.service.ts
++++ b/src/learn/service/scenario-session.service.ts
+@@ -166,7 +166,17 @@ export class ScenarioSessionService {
+ 
+     const hasFeedback = !!feedback;
+ 
+-    return { ...scenarioSession, hasFeedback };
++    const review =
++      await this.reviewSharedService.getReviewByScenarioSessionId(
++        scenarioSessionId,
++      );
++
++    return {
++      ...scenarioSession,
++      hasFeedback,
++      reviewId: review?.id,
++      reviewStatus: review?.status,
++    };
+   }
+ 
+   async startScenarioSession(

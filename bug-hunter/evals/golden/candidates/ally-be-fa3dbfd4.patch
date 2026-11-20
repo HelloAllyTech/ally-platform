@@ -1,0 +1,209 @@
+diff --git a/src/tooltip/controller/test/tooltip.controller.i18n.spec.ts b/src/tooltip/controller/test/tooltip.controller.i18n.spec.ts
+new file mode 100644
+index 0000000000..cb365439df
+--- /dev/null
++++ b/src/tooltip/controller/test/tooltip.controller.i18n.spec.ts
+@@ -0,0 +1,57 @@
++import { Test, TestingModule } from '@nestjs/testing';
++
++import { TooltipController } from '../tooltip.controller';
++import { TooltipService } from '../../service/tooltip.service';
++import { PermissionsService } from 'src/authorization/service/permissions.service';
++import { UserService } from 'src/user/service/user.service';
++import { AppConfigService } from 'src/config/config.service';
++import { FeatureToggleService } from 'src/authorization/service/feature-toggle.service';
++import { TenantFeatureService } from 'src/authorization/service/tenant-feature.service';
++
++describe('TooltipController i18n', () => {
++  let controller: TooltipController;
++  let tooltipService: TooltipService;
++
++  beforeEach(async () => {
++    const module: TestingModule = await Test.createTestingModule({
++      controllers: [TooltipController],
++      providers: [
++        {
++          provide: TooltipService,
++          useValue: {
++            getActiveTooltips: jest.fn(),
++          },
++        },
++        {
++          provide: PermissionsService,
++          useValue: { checkPermission: jest.fn(), getUserRoles: jest.fn() },
++        },
++        {
++          provide: UserService,
++          useValue: { get: jest.fn() },
++        },
++        {
++          provide: AppConfigService,
++          useValue: {},
++        },
++        {
++          provide: FeatureToggleService,
++          useValue: { hasToggle: jest.fn().mockResolvedValue(true) },
++        },
++        {
++          provide: TenantFeatureService,
++          useValue: { isEnabledForTenant: jest.fn().mockResolvedValue(false) },
++        },
++      ],
++    }).compile();
++
++    controller = module.get<TooltipController>(TooltipController);
++    tooltipService = module.get<TooltipService>(TooltipService);
++  });
++
++  it('should call service with language code', async () => {
++    const lang = 'es';
++    await controller.getActiveTooltips(lang);
++    expect(tooltipService.getActiveTooltips).toHaveBeenCalledWith(lang);
++  });
++});
+diff --git a/src/tooltip/controller/tooltip.controller.ts b/src/tooltip/controller/tooltip.controller.ts
+index b8c2644791..257a4ec033 100644
+--- a/src/tooltip/controller/tooltip.controller.ts
++++ b/src/tooltip/controller/tooltip.controller.ts
+@@ -28,8 +28,8 @@ export class TooltipController {
+   @Get('active')
+   @Public()
+   @ApiOperation({ summary: 'Get all active tooltips (public)' })
+-  async getActiveTooltips() {
+-    return this.tooltipService.getActiveTooltips();
++  async getActiveTooltips(@Query('languageCode') languageCode?: string) {
++    return this.tooltipService.getActiveTooltips(languageCode);
+   }
+ 
+   @Get()
+diff --git a/src/tooltip/service/test/tooltip.service.spec.ts b/src/tooltip/service/test/tooltip.service.spec.ts
+index 327e1989f4..68f41bfcfb 100644
+--- a/src/tooltip/service/test/tooltip.service.spec.ts
++++ b/src/tooltip/service/test/tooltip.service.spec.ts
+@@ -8,6 +8,7 @@ import { CreateTooltipDto } from '../../dto/create-tooltip.dto';
+ import { UpdateTooltipDto } from '../../dto/update-tooltip.dto';
+ import { NotFoundException } from 'src/exception/custom.exception';
+ import { ExecutionManager } from 'src/common/execution/execution-manager';
++import { SharedLanguageService } from 'src/language/service/shared-language.service';
+ 
+ describe('TooltipService', () => {
+   let service: TooltipService;
+@@ -46,6 +47,13 @@ describe('TooltipService', () => {
+             createUpdateTooltipTranslations: jest
+               .fn()
+               .mockResolvedValue(undefined),
++            getTooltipsWithTranslations: jest.fn(),
++          },
++        },
++        {
++          provide: SharedLanguageService,
++          useValue: {
++            getLanguageByLanguageCode: jest.fn(),
+           },
+         },
+       ],
+@@ -309,5 +317,61 @@ describe('TooltipService', () => {
+ 
+       expect(result).toEqual([]);
+     });
++
++    it('should return translated tooltips when language code is provided', async () => {
++      const activeTooltips = [mockTooltip];
++      tooltipRepository.getActiveTooltips.mockResolvedValue(activeTooltips);
++      const language = {
++        id: 2,
++        value: 'es',
++        label: 'Spanish',
++        translationCode: 'es',
++        active: true,
++        llmProviderConfig: {},
++        sttProviderConfig: {},
++        evalConfig: {},
++        createdAt: new Date(),
++        updatedAt: new Date(),
++      };
++      const sharedLanguageService = service[
++        'sharedLanguageService'
++      ] as jest.Mocked<SharedLanguageService>;
++      sharedLanguageService.getLanguageByLanguageCode.mockResolvedValue(
++        language,
++      );
++      const translatedTooltips = [{ ...mockTooltip, tipText: 'translated' }];
++      translationService.getTooltipsWithTranslations.mockResolvedValue(
++        translatedTooltips,
++      );
++
++      const result = await service.getActiveTooltips('es');
++
++      expect(
++        sharedLanguageService.getLanguageByLanguageCode,
++      ).toHaveBeenCalledWith('es');
++      expect(
++        translationService.getTooltipsWithTranslations,
++      ).toHaveBeenCalledWith(activeTooltips, language.id);
++      expect(result).toEqual(translatedTooltips);
++    });
++
++    it('should return untranslated tooltips when language code is invalid', async () => {
++      const activeTooltips = [mockTooltip];
++      tooltipRepository.getActiveTooltips.mockResolvedValue(activeTooltips);
++      const sharedLanguageService = service[
++        'sharedLanguageService'
++      ] as jest.Mocked<SharedLanguageService>;
++      sharedLanguageService.getLanguageByLanguageCode.mockResolvedValue(null);
++
++      const result = await service.getActiveTooltips('invalid');
++
++      expect(
++        sharedLanguageService.getLanguageByLanguageCode,
++      ).toHaveBeenCalledWith('invalid');
++      expect(
++        translationService.getTooltipsWithTranslations,
++      ).not.toHaveBeenCalled();
++      expect(result).toEqual(activeTooltips);
++    });
+   });
+ });
+diff --git a/src/tooltip/service/tooltip.service.ts b/src/tooltip/service/tooltip.service.ts
+index 173e10bd50..2c86837c3f 100644
+--- a/src/tooltip/service/tooltip.service.ts
++++ b/src/tooltip/service/tooltip.service.ts
+@@ -4,6 +4,7 @@ import { ExecutionManager } from 'src/common/execution/execution-manager';
+ import isDuplicateKeyException, {
+   NotFoundException,
+ } from 'src/exception/custom.exception';
++import { SharedLanguageService } from 'src/language/service/shared-language.service';
+ 
+ import { CreateTooltipDto } from '../dto/create-tooltip.dto';
+ import { UpdateTooltipDto } from '../dto/update-tooltip.dto';
+@@ -23,6 +24,7 @@ export class TooltipService {
+   constructor(
+     private readonly tooltipRepository: TooltipRepository,
+     private readonly translationService: TooltipTranslationService,
++    private readonly sharedLanguageService: SharedLanguageService,
+   ) {}
+ 
+   async createTooltip(createDto: CreateTooltipDto): Promise<Tooltip> {
+@@ -81,7 +83,20 @@ export class TooltipService {
+     return this.tooltipRepository.getTooltips(search, options);
+   }
+ 
+-  async getActiveTooltips() {
+-    return this.tooltipRepository.getActiveTooltips();
++  async getActiveTooltips(languageCode?: string) {
++    const tooltips = await this.tooltipRepository.getActiveTooltips();
++    if (languageCode) {
++      const language =
++        await this.sharedLanguageService.getLanguageByLanguageCode(
++          languageCode,
++        );
++      if (language) {
++        return this.translationService.getTooltipsWithTranslations(
++          tooltips as Tooltip[],
++          language.id,
++        );
++      }
++    }
++    return tooltips;
+   }
+ }

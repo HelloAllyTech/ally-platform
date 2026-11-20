@@ -1,0 +1,83 @@
+diff --git a/apps/ally-admin-dashboard/src/pages/LanguageManagement/LanguageManagement.tsx b/apps/ally-admin-dashboard/src/pages/LanguageManagement/LanguageManagement.tsx
+index 178c533338..c4f8b132c6 100644
+--- a/apps/ally-admin-dashboard/src/pages/LanguageManagement/LanguageManagement.tsx
++++ b/apps/ally-admin-dashboard/src/pages/LanguageManagement/LanguageManagement.tsx
+@@ -2,12 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
+ 
+ import { toast } from "sonner";
+ 
+-import {
+-  useGetLanguagesQuery,
+-  useCreateLanguageMutation,
+-  useUpdateLanguageMutation,
+-  useBackfillLanguageGlossariesMutation,
+-} from "@api";
++import { useGetLanguagesQuery, useCreateLanguageMutation, useUpdateLanguageMutation } from "@api";
+ import { NotionTable, ListToolbar, LanguageManagementSidePanel } from "@components";
+ import { ButtonVariant } from "@components/types";
+ import { en, SCENARIO_LANGUAGE_COLUMNS, SORT_BY, SORT_ORDER } from "@constants";
+@@ -56,29 +51,6 @@ export const ScenarioLanguages: React.FC = () => {
+   }, [searchQuery]);
+ 
+   const [createLanguage] = useCreateLanguageMutation();
+-  const [backfillGlossaries, { isLoading: isBackfillingGlossaries }] =
+-    useBackfillLanguageGlossariesMutation();
+-
+-  const handleBackfillGlossaries = async () => {
+-    try {
+-      const outcomes = await backfillGlossaries().unwrap();
+-      const failed = outcomes.filter(o => o.error);
+-      const generated = outcomes.length - failed.length;
+-      if (failed.length > 0) {
+-        toast.warning(
+-          `Draft glossaries generated for ${generated}/${outcomes.length} languages; failed: ${failed
+-            .map(o => o.value)
+-            .join(", ")}`,
+-        );
+-      } else {
+-        toast.success(
+-          `Draft glossaries generated for ${generated} languages — review before publishing`,
+-        );
+-      }
+-    } catch {
+-      toast.error("Glossary backfill failed");
+-    }
+-  };
+   const [updateLanguage] = useUpdateLanguageMutation();
+ 
+   // Handle data updates when query data changes
+@@ -316,11 +288,6 @@ export const ScenarioLanguages: React.FC = () => {
+             variant: ButtonVariant.PRIMARY,
+             onClick: handleNewLanguageClick,
+           }}
+-          secondaryAction={{
+-            label: isBackfillingGlossaries ? "Generating glossaries…" : "Generate glossaries (all)",
+-            variant: ButtonVariant.SECONDARY,
+-            onClick: handleBackfillGlossaries,
+-          }}
+         />
+         <div className="flex flex-col gap-4 h-[calc(100vh-100px)] relative mt-[20px]">
+           <NotionTable
+diff --git a/apps/ally-admin-dashboard/src/pages/LanguageManagement/__tests__/LanguageManagement.test.tsx b/apps/ally-admin-dashboard/src/pages/LanguageManagement/__tests__/LanguageManagement.test.tsx
+index 3e6ca970ed..8611cd5b00 100644
+--- a/apps/ally-admin-dashboard/src/pages/LanguageManagement/__tests__/LanguageManagement.test.tsx
++++ b/apps/ally-admin-dashboard/src/pages/LanguageManagement/__tests__/LanguageManagement.test.tsx
+@@ -6,7 +6,6 @@ vi.mock("@api", () => ({
+   useGetLanguagesQuery: vi.fn(),
+   useCreateLanguageMutation: vi.fn(),
+   useUpdateLanguageMutation: vi.fn(),
+-  useBackfillLanguageGlossariesMutation: vi.fn(),
+ }));
+ 
+ import * as api from "@api";
+@@ -116,10 +115,6 @@ describe("Languages Page", () => {
+       vi.fn().mockResolvedValue({ data: mockLanguages[0] }),
+       {},
+     ]);
+-    (api.useBackfillLanguageGlossariesMutation as any).mockReturnValue([
+-      vi.fn().mockResolvedValue({ data: [] }),
+-      { isLoading: false },
+-    ]);
+   });
+ 
+   it("should render the languages page", () => {

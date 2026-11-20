@@ -1,0 +1,111 @@
+diff --git a/src/session-event/service/session-event.service.ts b/src/session-event/service/session-event.service.ts
+index f135b3421a..6d85dff1e4 100644
+--- a/src/session-event/service/session-event.service.ts
++++ b/src/session-event/service/session-event.service.ts
+@@ -4,7 +4,7 @@ import {
+   NotFoundException,
+ } from '@nestjs/common';
+ import { v4 } from 'uuid';
+-import { DataSource, In } from 'typeorm';
++import { DataSource, In, Not } from 'typeorm';
+ 
+ import { SessionEvents } from '../entity/session-events.entity';
+ import { ScenarioEvents } from 'src/learn/entity/scenario-events.entity';
+@@ -295,26 +295,31 @@ export class SessionEventService {
+   }
+ 
+   async deleteSessionEvents(eventIds: string[]): Promise<boolean> {
+-    // Do not allow PASSIVE events to be deleted
+-    const activeEvents = await this.sessionEventRepository.find({
++    // Do not allow PASSIVE events and system events to be deleted
++    const deletableEvents = await this.sessionEventRepository.find({
+       select: ['id'],
+       where: {
+         id: In(eventIds),
+         visibilityType: SessionEventVisibilityType.ACTIVE,
++        detectionType: Not(In(SYSTEM_EVENT_DETECTION_TYPES)),
+       },
+     });
+ 
+-    const activeEventsIds: string[] = activeEvents.map((event) => event.id);
+-    if (activeEventsIds.length === 0) {
+-      throw new BadRequestException('No active events found to delete');
++    const deletableEventsIds: string[] = deletableEvents.map(
++      (event) => event.id,
++    );
++    if (deletableEventsIds.length === 0) {
++      throw new BadRequestException(
++        'Cannot delete: the specified events are either inactive or system-generated',
++      );
+     }
+ 
+     await this.dataSource.transaction(async (em) => {
+       await em.getRepository(SessionEvents).softDelete({
+-        id: In(activeEventsIds),
++        id: In(deletableEventsIds),
+       });
+       await em.getRepository(ScenarioEvents).softDelete({
+-        eventId: In(activeEventsIds),
++        eventId: In(deletableEventsIds),
+       });
+     });
+     return true;
+diff --git a/src/session-event/service/test/session-event.service.spec.ts b/src/session-event/service/test/session-event.service.spec.ts
+index d5590ca44f..5b94369a76 100644
+--- a/src/session-event/service/test/session-event.service.spec.ts
++++ b/src/session-event/service/test/session-event.service.spec.ts
+@@ -1347,6 +1347,7 @@ describe('SessionEventService', () => {
+         where: {
+           id: expect.any(Object),
+           visibilityType: SessionEventVisibilityType.ACTIVE,
++          detectionType: expect.any(Object),
+         },
+       });
+       expect(mockTransaction).toHaveBeenCalled();
+@@ -1395,7 +1396,7 @@ describe('SessionEventService', () => {
+       repository.find.mockResolvedValue([]);
+ 
+       await expect(service.deleteSessionEvents(eventIds)).rejects.toThrow(
+-        'No active events found to delete',
++        'Cannot delete: the specified events are either inactive or system-generated',
+       );
+       expect(mockTransaction).not.toHaveBeenCalled();
+     });
+@@ -1414,11 +1415,11 @@ describe('SessionEventService', () => {
+       expect(mockTransaction).toHaveBeenCalled();
+     });
+ 
+-    it('should only delete ACTIVE events, not PASSIVE events', async () => {
++    it('should only delete ACTIVE non-system events', async () => {
+       const eventIds = ['event-1', 'event-2', 'event-3'];
+-      const activeEvents = [{ id: 'event-1' }, { id: 'event-2' }]; // Only 2 active
++      const deletableEvents = [{ id: 'event-1' }, { id: 'event-2' }]; // Only 2 deletable
+ 
+-      repository.find.mockResolvedValue(activeEvents as any);
++      repository.find.mockResolvedValue(deletableEvents as any);
+ 
+       const result = await service.deleteSessionEvents(eventIds);
+ 
+@@ -1427,19 +1428,20 @@ describe('SessionEventService', () => {
+         where: {
+           id: expect.any(Object),
+           visibilityType: SessionEventVisibilityType.ACTIVE,
++          detectionType: expect.any(Object),
+         },
+       });
+       expect(mockTransaction).toHaveBeenCalled();
+       expect(result).toBe(true);
+     });
+ 
+-    it('should throw BadRequestException when no ACTIVE events found', async () => {
++    it('should throw BadRequestException when no deletable events found', async () => {
+       const eventIds = ['event-1', 'event-2'];
+ 
+       repository.find.mockResolvedValue([]);
+ 
+       await expect(service.deleteSessionEvents(eventIds)).rejects.toThrow(
+-        'No active events found to delete',
++        'Cannot delete: the specified events are either inactive or system-generated',
+       );
+       expect(repository.find).toHaveBeenCalled();
+       expect(mockTransaction).not.toHaveBeenCalled();

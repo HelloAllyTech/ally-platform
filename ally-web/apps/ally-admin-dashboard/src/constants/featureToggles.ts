@@ -56,6 +56,7 @@ export const FeatureToggleKey = {
   ADMIN_USER_MANAGEMENT: "admin_user_management",
   MULTI_TENANT_ALLOWLIST_MANAGEMENT: "multi_tenant_allowlist_management",
   BUG_HUNTER: "bug_hunter",
+  BUG_HUNTER_V2_VERDICTS: "bug_hunter_v2_verdicts",
   /** Signs off clinical guidance in Debriefs → Knowledge (the clinical advisor). */
   DEBRIEF_CLINICAL_SIGN_OFF: "debrief_clinical_sign_off",
   /** Debriefs › Settings › Schedules: engineering, granted person by person. Mirrors ally-be. */
@@ -141,6 +142,7 @@ export const buildSidebarItemFeatureKeyMap = (
     [sidebarItems.MOBILE_RELEASES, FeatureToggleKey.MOBILE_RELEASES],
     [sidebarItems.WHATSAPP_BOT, FeatureToggleKey.WHATSAPP_BOT],
     [sidebarItems.BUG_HUNTER, FeatureToggleKey.BUG_HUNTER],
+    [sidebarItems.BUG_HUNTER_V2, FeatureToggleKey.BUG_HUNTER_V2_VERDICTS],
     [sidebarItems.BUILDER, FeatureToggleKey.BUILDER],
     [sidebarItems.PM_AGENT, FeatureToggleKey.PM_AGENT],
     [sidebarItems.ANALYTICS, FeatureToggleKey.ANALYTICS],
@@ -212,6 +214,7 @@ export const FEATURE_TOGGLE_KEY_TO_SECTION: Record<string, FeatureToggleSection>
   [FeatureToggleKey.WHATSAPP_BOT]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
   [FeatureToggleKey.OPERATIONAL_ADMIN_ACTIONS]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
   [FeatureToggleKey.BUG_HUNTER]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
+  [FeatureToggleKey.BUG_HUNTER_V2_VERDICTS]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
   [FeatureToggleKey.BUILDER]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
   [FeatureToggleKey.PM_AGENT]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
   [FeatureToggleKey.CONTEXT_LIBRARY]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,

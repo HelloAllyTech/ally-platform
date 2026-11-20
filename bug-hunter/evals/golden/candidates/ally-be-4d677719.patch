@@ -1,0 +1,85 @@
+diff --git a/src/builder/service/builder-build.service.ts b/src/builder/service/builder-build.service.ts
+index fd51a91951..256c0d0ca9 100644
+--- a/src/builder/service/builder-build.service.ts
++++ b/src/builder/service/builder-build.service.ts
+@@ -30,6 +30,7 @@ import { BuilderExemplarService } from './builder-exemplar.service';
+ import { BuilderEpicService } from './builder-epic.service';
+ import { BuilderPrdService } from './builder-prd.service';
+ import { BuilderTechnicalDesign } from '../type/builder-prd.type';
++import { isBuilderRepo } from '../constants/builder-repos.constants';
+ import {
+   computeDesignReadiness,
+   createDraftingDesign,
+@@ -411,7 +412,22 @@ export class BuilderBuildService {
+       );
+     }
+ 
+-    const repos = session.repos ?? [];
++    // The start dialog is the only place that saves repos onto the session,
++    // and it stays locked until the design is approved — so a session that
++    // has never been built has none here. The PRD's technical plan names the
++    // repos it changes (the same list the dialog pre-checks), so the design
++    // reads those, and they are saved so the dialog and the build agree.
++    let repos = session.repos ?? [];
++    if (!repos.length) {
++      repos = [
++        ...new Set(
++          (doc.draft.technicalPlan?.repos ?? [])
++            .map((plan) => plan.repo)
++            .filter((repo): repo is string => Boolean(repo))
++            .filter(isBuilderRepo),
++        ),
++      ];
++    }
+     if (!repos.length) {
+       throw new BadRequestException(
+         'No repos chosen — the designer has nothing to read.',
+@@ -424,6 +440,11 @@ export class BuilderBuildService {
+       );
+     }
+ 
++    if (!session.repos?.length) {
++      await this.sessionRepository.update({ id: session.id }, { repos });
++      session.repos = repos;
++    }
++
+     await this.assertWithinConcurrency(settings.maxConcurrentBuilds);
+     this.assertWithinBudget(session, settings.maxRunnerMinutes);
+ 
+diff --git a/src/builder/service/test/builder-build.service.spec.ts b/src/builder/service/test/builder-build.service.spec.ts
+index 08cac21cda..874fa07f20 100644
+--- a/src/builder/service/test/builder-build.service.spec.ts
++++ b/src/builder/service/test/builder-build.service.spec.ts
+@@ -1952,6 +1952,32 @@ describe('BuilderBuildService', () => {
+         expect(sessionRepository.update).not.toHaveBeenCalled();
+       });
+ 
++      // The start dialog saves repos only on a build, and a build waits on an
++      // approved design — so a never-built session reaches here with none.
++      it("reads the PRD's planned repos when the session has none, and saves them", async () => {
++        const session = readySession({ repos: [] });
++
++        await service.startDesign(session as any, 7);
++
++        expect(sessionRepository.update).toHaveBeenCalledWith(
++          { id: session.id },
++          { repos: ['ally-be'] },
++        );
++        expect(github.dispatchWorkflow).toHaveBeenCalled();
++      });
++
++      it('still refuses when neither the session nor the PRD names a repo', async () => {
++        prdService.getOrCreateDoc.mockResolvedValue({
++          id: 'doc-1',
++          draft: { requirements: [], technicalPlan: { repos: [] } },
++        });
++
++        await expect(
++          service.startDesign(readySession({ repos: [] }) as any, 7),
++        ).rejects.toThrow(/No repos chosen/);
++        expect(github.dispatchWorkflow).not.toHaveBeenCalled();
++      });
++
+       it('fails the design, not the session, when the dispatch throws', async () => {
+         github.dispatchWorkflow.mockRejectedValue(new Error('GitHub down'));
+         // The second read sees the drafting design the first call wrote.

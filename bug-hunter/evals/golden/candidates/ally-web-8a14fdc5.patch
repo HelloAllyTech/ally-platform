@@ -1,0 +1,120 @@
+diff --git a/apps/ally-admin-dashboard/src/routes/RouteLayout.tsx b/apps/ally-admin-dashboard/src/routes/RouteLayout.tsx
+index aabf4b2611..79f22a75e9 100644
+--- a/apps/ally-admin-dashboard/src/routes/RouteLayout.tsx
++++ b/apps/ally-admin-dashboard/src/routes/RouteLayout.tsx
+@@ -359,7 +359,7 @@ export const RouteLayout: React.FC = () => {
+         <Route
+           path={ROUTES.ROLEPLAY_SESSION_LOGS}
+           element={
+-            <PrivateLayout requiredRole={SUPER_DUPER_ADMIN_ROLES}>
++            <PrivateLayout requiredRole={SUPER_ADMIN_ROLES}>
+               <RoleplaySessionLogs />
+             </PrivateLayout>
+           }
+@@ -367,7 +367,7 @@ export const RouteLayout: React.FC = () => {
+         <Route
+           path={ROUTES.ROLEPLAY_SESSION_LOG_DETAIL(":id")}
+           element={
+-            <PrivateLayout requiredRole={SUPER_DUPER_ADMIN_ROLES}>
++            <PrivateLayout requiredRole={SUPER_ADMIN_ROLES}>
+               <RoleplaySessionLogDetail />
+             </PrivateLayout>
+           }
+diff --git a/apps/ally-admin-dashboard/src/utils/__tests__/navigation.test.ts b/apps/ally-admin-dashboard/src/utils/__tests__/navigation.test.ts
+index 4ce302811c..4c185f5c26 100644
+--- a/apps/ally-admin-dashboard/src/utils/__tests__/navigation.test.ts
++++ b/apps/ally-admin-dashboard/src/utils/__tests__/navigation.test.ts
+@@ -104,8 +104,8 @@ describe("deriveNavigationItems", () => {
+     expect(ids).toContain(SIDEBAR_ITEMS.ANALYTICS);
+     expect(ids).toContain(SIDEBAR_ITEMS.COMPETENCIES);
+     expect(ids).toContain(SIDEBAR_ITEMS.AI_LAB);
++    expect(ids).toContain(SIDEBAR_ITEMS.ROLEPLAY_SESSION_LOGS);
+     // Super-duper-admin-only tabs are hidden from a plain super-admin.
+-    expect(ids).not.toContain(SIDEBAR_ITEMS.ROLEPLAY_SESSION_LOGS);
+     expect(ids).not.toContain(SIDEBAR_ITEMS.SETTINGS);
+     expect(ids).not.toContain(SIDEBAR_ITEMS.AGENT_TEST_CASES);
+     expect(ids).not.toContain(SIDEBAR_ITEMS.CHARACTER_LIBRARY);
+@@ -124,6 +124,7 @@ describe("deriveNavigationItems", () => {
+     expect(result.map(i => i.id)).toEqual([
+       SIDEBAR_ITEMS.ANALYTICS,
+       SIDEBAR_ITEMS.COMPETENCIES,
++      SIDEBAR_ITEMS.ROLEPLAY_SESSION_LOGS,
+       SIDEBAR_ITEMS.AI_LAB,
+     ]);
+   });
+@@ -192,7 +193,7 @@ describe("deriveNavigationItems", () => {
+     expect(ids).not.toContain(SIDEBAR_ITEMS.USER_BADGES);
+   });
+ 
+-  it("exposes Roleplay Session Logs only to super-duper-admins", () => {
++  it("exposes Roleplay Session Logs to both super-admin tiers but not to a regular admin", () => {
+     const superDuperAdmin = deriveNavigationItems({
+       permissions: [Permissions.EDIT_SCENARIO],
+       role: UserRole.SUPER_DUPER_ADMIN,
+@@ -200,13 +201,13 @@ describe("deriveNavigationItems", () => {
+     });
+     expect(superDuperAdmin.map(i => i.id)).toContain(SIDEBAR_ITEMS.ROLEPLAY_SESSION_LOGS);
+ 
+-    // A plain super-admin no longer sees Roleplay Session Logs.
++    // A plain super-admin sees it too — it is a read-only cross-tenant view.
+     const superAdmin = deriveNavigationItems({
+       permissions: [Permissions.EDIT_SCENARIO],
+       role: UserRole.SUPER_ADMIN,
+       savedOrder: undefined,
+     });
+-    expect(superAdmin.map(i => i.id)).not.toContain(SIDEBAR_ITEMS.ROLEPLAY_SESSION_LOGS);
++    expect(superAdmin.map(i => i.id)).toContain(SIDEBAR_ITEMS.ROLEPLAY_SESSION_LOGS);
+ 
+     const admin = deriveNavigationItems({
+       permissions: [Permissions.EDIT_SCENARIO],
+@@ -232,7 +233,6 @@ describe("deriveNavigationItems", () => {
+         SIDEBAR_ITEMS.TOOLTIPS,
+         SIDEBAR_ITEMS.USER_BADGES,
+         SIDEBAR_ITEMS.AGENT_TEST_CASES,
+-        SIDEBAR_ITEMS.ROLEPLAY_SESSION_LOGS,
+         SIDEBAR_ITEMS.SETTINGS,
+       ]),
+     );
+@@ -241,6 +241,7 @@ describe("deriveNavigationItems", () => {
+     expect(byId.get(SIDEBAR_ITEMS.ANALYTICS)?.superDuperAdminOnly).toBeFalsy();
+     expect(byId.get(SIDEBAR_ITEMS.COMPETENCIES)?.superDuperAdminOnly).toBeFalsy();
+     expect(byId.get(SIDEBAR_ITEMS.AI_LAB)?.superDuperAdminOnly).toBeFalsy();
++    expect(byId.get(SIDEBAR_ITEMS.ROLEPLAY_SESSION_LOGS)?.superDuperAdminOnly).toBeFalsy();
+     expect(byId.get(SIDEBAR_ITEMS.SIMULATION_STUDIO)?.superDuperAdminOnly).toBeFalsy();
+   });
+ 
+diff --git a/apps/ally-admin-dashboard/src/utils/navigation.ts b/apps/ally-admin-dashboard/src/utils/navigation.ts
+index df5b72e574..a997309ef1 100644
+--- a/apps/ally-admin-dashboard/src/utils/navigation.ts
++++ b/apps/ally-admin-dashboard/src/utils/navigation.ts
+@@ -26,7 +26,6 @@ const buildSuperDuperAdminOnlyItems = (): Set<string> =>
+     SIDEBAR_ITEMS.TOOLTIPS,
+     SIDEBAR_ITEMS.USER_BADGES,
+     SIDEBAR_ITEMS.AGENT_TEST_CASES,
+-    SIDEBAR_ITEMS.ROLEPLAY_SESSION_LOGS,
+     SIDEBAR_ITEMS.SETTINGS,
+   ]);
+ 
+@@ -165,10 +164,10 @@ export const applySavedOrder = (
+  * user's "first tab" — used both to render the sidebar and to pick the default
+  * landing route after login. Tabs fall into three gating tiers:
+  *  - Super-duper-admin only (Characters, Languages, Guardrails, Tooltips,
+- *    Badges, Agent Test Cases, Roleplay Session Logs, Super Duper Admins,
+- *    Settings): shown solely to SUPER_DUPER_ADMIN, independent of permissions.
+- *  - Super-admin tier (Analytics, Competencies, AI Lab): shown to both
+- *    super-admin roles, independent of permissions.
++ *    Badges, Agent Test Cases, Super Duper Admins, Settings): shown solely to
++ *    SUPER_DUPER_ADMIN, independent of permissions.
++ *  - Super-admin tier (Analytics, Competencies, AI Lab, Roleplay Session Logs):
++ *    shown to both super-admin roles, independent of permissions.
+  *  - Permission-gated (everything else): shown once permissions are loaded and
+  *    the user holds the required permission.
+  * The single-pass filter preserves each tab's natural order from
+@@ -209,6 +208,7 @@ export const deriveNavigationItems = ({
+       case SIDEBAR_ITEMS.ANALYTICS:
+       case SIDEBAR_ITEMS.COMPETENCIES:
+       case SIDEBAR_ITEMS.AI_LAB:
++      case SIDEBAR_ITEMS.ROLEPLAY_SESSION_LOGS:
+         return isSuperAdmin;
+ 
+       // Permission-gated tabs require permissions to be loaded; until then

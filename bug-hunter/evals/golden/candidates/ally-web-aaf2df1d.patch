@@ -1,0 +1,60 @@
+diff --git a/apps/ally-admin-dashboard/src/components/competency/Competency.tsx b/apps/ally-admin-dashboard/src/components/competency/Competency.tsx
+index 8020c76bb7..dd75122014 100644
+--- a/apps/ally-admin-dashboard/src/components/competency/Competency.tsx
++++ b/apps/ally-admin-dashboard/src/components/competency/Competency.tsx
+@@ -417,6 +417,14 @@ export const Competency: React.FC<CompetencyProps> = ({
+       const selectedNow =
+         (formMethods.getValues("competency") as CompetencyType | undefined)?.id ?? null;
+       if (selectedNow !== competencyId) {
++        // The author picked something else while this was in flight, so the
++        // custom just materialised above is already orphaned — nothing will
++        // ever reference it again. Clean it up rather than leaving it behind.
++        try {
++          await deleteCompetency(custom.id).unwrap();
++        } catch {
++          // Non-fatal: worst case an unused custom lingers.
++        }
+         baselineRef.current = null;
+         return;
+       }
+diff --git a/apps/ally-admin-dashboard/src/components/competency/__tests__/Competency.test.tsx b/apps/ally-admin-dashboard/src/components/competency/__tests__/Competency.test.tsx
+index dc42a36481..1a55a1f8bc 100644
+--- a/apps/ally-admin-dashboard/src/components/competency/__tests__/Competency.test.tsx
++++ b/apps/ally-admin-dashboard/src/components/competency/__tests__/Competency.test.tsx
+@@ -34,6 +34,7 @@ const behavioursById: Record<string, { helpful: any[]; unhelpful: any[] }> = {
+ const mockCreateCompetency = vi.fn();
+ const mockSetCompetencyBehaviours = vi.fn();
+ const mockFetchBehaviours = vi.fn();
++const mockDeleteCompetency = vi.fn();
+ 
+ vi.mock("@api", () => {
+   // The @constants barrel transitively wires up the configured store, so the
+@@ -55,7 +56,7 @@ vi.mock("@api", () => {
+     useCreateCompetencyMutation: () => [mockCreateCompetency],
+     useSetCompetencyBehavioursMutation: () => [mockSetCompetencyBehaviours],
+     useUpdateCompetencyMutation: () => [vi.fn()],
+-    useDeleteCompetencyMutation: () => [vi.fn()],
++    useDeleteCompetencyMutation: () => [mockDeleteCompetency],
+     useGetActiveTooltipsQuery: () => ({ data: [] }),
+   };
+ });
+@@ -144,6 +145,7 @@ beforeEach(() => {
+     unwrap: async () => ({ id: "c-custom", name: "7_custom_1", isCustom: true }),
+   }));
+   mockSetCompetencyBehaviours.mockImplementation(() => ({ unwrap: async () => ({}) }));
++  mockDeleteCompetency.mockImplementation(() => ({ unwrap: async () => ({}) }));
+ });
+ 
+ afterEach(() => {
+@@ -206,6 +208,11 @@ describe("Competency — picking a competency", () => {
+ 
+     expect(competencyValue()?.id).toBe("c-risk");
+     expect(triggerLabel()).toBe("Risk Assessment");
++
++    // The custom competency materialised mid-flight is now orphaned — nothing
++    // ever references "c-custom" again — so it must be cleaned up server-side
++    // instead of being left behind as clutter.
++    expect(mockDeleteCompetency).toHaveBeenCalledWith("c-custom");
+   });
+ 
+   it("still materialises and selects a custom competency for a hand-edited rubric", async () => {

@@ -1,0 +1,185 @@
+diff --git a/apps/ally-helpline-dashboard/src/components/star-rating/StarRating.tsx b/apps/ally-helpline-dashboard/src/components/star-rating/StarRating.tsx
+index ad6080d3bb..517298400f 100644
+--- a/apps/ally-helpline-dashboard/src/components/star-rating/StarRating.tsx
++++ b/apps/ally-helpline-dashboard/src/components/star-rating/StarRating.tsx
+@@ -18,9 +18,10 @@ export const StarRating: FC<StarRatingProps> = ({ rating, setRating }) => {
+           variant={ButtonVariant.ICON}
+           className={`text-2xl sm:text-3xl !p-0`}
+         >
+-          {/* Empty stars use a visible neutral grey (not white) so they don't
+-              disappear against the light modal/background. */}
+-          <StarYellowIcon fill={star <= rating ? "#F9CC49" : "#E0E0E0"} />
++          {/* Empty stars need a mid grey (Carbon gray-50) so they stay clearly
++              visible against the light modal/background — gray-20 (#E0E0E0) was
++              too faint to see. Selected stars are gold. */}
++          <StarYellowIcon fill={star <= rating ? "#F9CC49" : "#8D8D8D"} />
+         </Button>
+       ))}
+     </div>
+diff --git a/apps/ally-helpline-dashboard/src/components/star-rating/__test__/StarRating.test.tsx b/apps/ally-helpline-dashboard/src/components/star-rating/__test__/StarRating.test.tsx
+index d8de39a282..66cac8189c 100644
+--- a/apps/ally-helpline-dashboard/src/components/star-rating/__test__/StarRating.test.tsx
++++ b/apps/ally-helpline-dashboard/src/components/star-rating/__test__/StarRating.test.tsx
+@@ -91,19 +91,19 @@ describe("StarRating", () => {
+     renderComponent({ rating: 0 });
+     const stars = screen.getAllByTestId("star-yellow-icon");
+     stars.forEach(star => {
+-      expect(star).toHaveAttribute("data-fill", "#E0E0E0");
++      expect(star).toHaveAttribute("data-fill", "#8D8D8D");
+     });
+   });
+ 
+   it("should render stars with correct fill colors when rating is 3", () => {
+     renderComponent({ rating: 3 });
+     const stars = screen.getAllByTestId("star-yellow-icon");
+-    // First 3 stars should be filled (yellow), last 2 should be empty (white)
++    // First 3 stars should be filled (yellow), last 2 should be empty (grey)
+     expect(stars[0]).toHaveAttribute("data-fill", "#F9CC49");
+     expect(stars[1]).toHaveAttribute("data-fill", "#F9CC49");
+     expect(stars[2]).toHaveAttribute("data-fill", "#F9CC49");
+-    expect(stars[3]).toHaveAttribute("data-fill", "#E0E0E0");
+-    expect(stars[4]).toHaveAttribute("data-fill", "#E0E0E0");
++    expect(stars[3]).toHaveAttribute("data-fill", "#8D8D8D");
++    expect(stars[4]).toHaveAttribute("data-fill", "#8D8D8D");
+   });
+ 
+   it("should render all stars filled when rating is 5", () => {
+@@ -118,10 +118,10 @@ describe("StarRating", () => {
+     renderComponent({ rating: 1 });
+     const stars = screen.getAllByTestId("star-yellow-icon");
+     expect(stars[0]).toHaveAttribute("data-fill", "#F9CC49");
+-    expect(stars[1]).toHaveAttribute("data-fill", "#E0E0E0");
+-    expect(stars[2]).toHaveAttribute("data-fill", "#E0E0E0");
+-    expect(stars[3]).toHaveAttribute("data-fill", "#E0E0E0");
+-    expect(stars[4]).toHaveAttribute("data-fill", "#E0E0E0");
++    expect(stars[1]).toHaveAttribute("data-fill", "#8D8D8D");
++    expect(stars[2]).toHaveAttribute("data-fill", "#8D8D8D");
++    expect(stars[3]).toHaveAttribute("data-fill", "#8D8D8D");
++    expect(stars[4]).toHaveAttribute("data-fill", "#8D8D8D");
+   });
+ 
+   // --- Interaction Tests ---
+@@ -170,16 +170,16 @@ describe("StarRating", () => {
+     const { rerender } = renderComponent({ rating: 0 });
+     let stars = screen.getAllByTestId("star-yellow-icon");
+     stars.forEach(star => {
+-      expect(star).toHaveAttribute("data-fill", "#E0E0E0");
++      expect(star).toHaveAttribute("data-fill", "#8D8D8D");
+     });
+ 
+     rerender(<StarRating rating={2} setRating={mockSetRating} />);
+     stars = screen.getAllByTestId("star-yellow-icon");
+     expect(stars[0]).toHaveAttribute("data-fill", "#F9CC49");
+     expect(stars[1]).toHaveAttribute("data-fill", "#F9CC49");
+-    expect(stars[2]).toHaveAttribute("data-fill", "#E0E0E0");
+-    expect(stars[3]).toHaveAttribute("data-fill", "#E0E0E0");
+-    expect(stars[4]).toHaveAttribute("data-fill", "#E0E0E0");
++    expect(stars[2]).toHaveAttribute("data-fill", "#8D8D8D");
++    expect(stars[3]).toHaveAttribute("data-fill", "#8D8D8D");
++    expect(stars[4]).toHaveAttribute("data-fill", "#8D8D8D");
+   });
+ 
+   // --- Edge Cases ---
+@@ -194,7 +194,7 @@ describe("StarRating", () => {
+     rerender(<StarRating rating={0} setRating={mockSetRating} />);
+     stars = screen.getAllByTestId("star-yellow-icon");
+     stars.forEach(star => {
+-      expect(star).toHaveAttribute("data-fill", "#E0E0E0");
++      expect(star).toHaveAttribute("data-fill", "#8D8D8D");
+     });
+   });
+ 
+@@ -202,7 +202,7 @@ describe("StarRating", () => {
+     const { rerender } = renderComponent({ rating: 0 });
+     let stars = screen.getAllByTestId("star-yellow-icon");
+     stars.forEach(star => {
+-      expect(star).toHaveAttribute("data-fill", "#E0E0E0");
++      expect(star).toHaveAttribute("data-fill", "#8D8D8D");
+     });
+ 
+     rerender(<StarRating rating={5} setRating={mockSetRating} />);
+@@ -216,13 +216,13 @@ describe("StarRating", () => {
+     const { rerender } = renderComponent({ rating: 4 });
+     let stars = screen.getAllByTestId("star-yellow-icon");
+     expect(stars[3]).toHaveAttribute("data-fill", "#F9CC49");
+-    expect(stars[4]).toHaveAttribute("data-fill", "#E0E0E0");
++    expect(stars[4]).toHaveAttribute("data-fill", "#8D8D8D");
+ 
+     rerender(<StarRating rating={2} setRating={mockSetRating} />);
+     stars = screen.getAllByTestId("star-yellow-icon");
+-    expect(stars[2]).toHaveAttribute("data-fill", "#E0E0E0");
+-    expect(stars[3]).toHaveAttribute("data-fill", "#E0E0E0");
+-    expect(stars[4]).toHaveAttribute("data-fill", "#E0E0E0");
++    expect(stars[2]).toHaveAttribute("data-fill", "#8D8D8D");
++    expect(stars[3]).toHaveAttribute("data-fill", "#8D8D8D");
++    expect(stars[4]).toHaveAttribute("data-fill", "#8D8D8D");
+   });
+ 
+   it("should maintain correct button structure across rating changes", () => {
+diff --git a/apps/ally-helpline-dashboard/src/components/star-rating/__test__/__snapshots__/StarRating.test.tsx.snap b/apps/ally-helpline-dashboard/src/components/star-rating/__test__/__snapshots__/StarRating.test.tsx.snap
+index 522739e5e4..31be2a08d0 100644
+--- a/apps/ally-helpline-dashboard/src/components/star-rating/__test__/__snapshots__/StarRating.test.tsx.snap
++++ b/apps/ally-helpline-dashboard/src/components/star-rating/__test__/__snapshots__/StarRating.test.tsx.snap
+@@ -11,7 +11,7 @@ exports[`StarRating > should match snapshot when fully rendered 1`] = `
+       data-variant="icon"
+     >
+       <svg
+-        data-fill="#E0E0E0"
++        data-fill="#8D8D8D"
+         data-testid="star-yellow-icon"
+       />
+     </button>
+@@ -21,7 +21,7 @@ exports[`StarRating > should match snapshot when fully rendered 1`] = `
+       data-variant="icon"
+     >
+       <svg
+-        data-fill="#E0E0E0"
++        data-fill="#8D8D8D"
+         data-testid="star-yellow-icon"
+       />
+     </button>
+@@ -31,7 +31,7 @@ exports[`StarRating > should match snapshot when fully rendered 1`] = `
+       data-variant="icon"
+     >
+       <svg
+-        data-fill="#E0E0E0"
++        data-fill="#8D8D8D"
+         data-testid="star-yellow-icon"
+       />
+     </button>
+@@ -41,7 +41,7 @@ exports[`StarRating > should match snapshot when fully rendered 1`] = `
+       data-variant="icon"
+     >
+       <svg
+-        data-fill="#E0E0E0"
++        data-fill="#8D8D8D"
+         data-testid="star-yellow-icon"
+       />
+     </button>
+@@ -51,7 +51,7 @@ exports[`StarRating > should match snapshot when fully rendered 1`] = `
+       data-variant="icon"
+     >
+       <svg
+-        data-fill="#E0E0E0"
++        data-fill="#8D8D8D"
+         data-testid="star-yellow-icon"
+       />
+     </button>
+@@ -100,7 +100,7 @@ exports[`StarRating > should match snapshot when rating is 3 1`] = `
+       data-variant="icon"
+     >
+       <svg
+-        data-fill="#E0E0E0"
++        data-fill="#8D8D8D"
+         data-testid="star-yellow-icon"
+       />
+     </button>
+@@ -110,7 +110,7 @@ exports[`StarRating > should match snapshot when rating is 3 1`] = `
+       data-variant="icon"
+     >
+       <svg
+-        data-fill="#E0E0E0"
++        data-fill="#8D8D8D"
+         data-testid="star-yellow-icon"
+       />
+     </button>

@@ -1,0 +1,69 @@
+diff --git a/src/learn/service/scenario.service.ts b/src/learn/service/scenario.service.ts
+index a4ff87f14b..131f60bc32 100644
+--- a/src/learn/service/scenario.service.ts
++++ b/src/learn/service/scenario.service.ts
+@@ -1709,6 +1709,8 @@ export class ScenarioService {
+             feedbackStatus: item.feedbackStatus,
+             message: item.message,
+             score: item.score,
++            detectionConfig: item.detectionConfig,
++            checklistVisibilityStatus: item.checklistVisibilityStatus,
+           }),
+         );
+         await scenarioEventRepo.save(newScenarioEvents);
+diff --git a/src/learn/service/test/scenario.service.spec.ts b/src/learn/service/test/scenario.service.spec.ts
+index 60c7063c8b..f67d5b7773 100644
+--- a/src/learn/service/test/scenario.service.spec.ts
++++ b/src/learn/service/test/scenario.service.spec.ts
+@@ -4234,6 +4234,16 @@ describe('ScenarioService', () => {
+             feedbackStatus: true,
+             message: 'Great job!',
+             score: 85,
++            detectionConfig: {
++              maxOccurrences: 3,
++              minGapTime: 10,
++              occurrenceInterval: 60,
++              startTime: 0,
++              endTime: 300,
++              minScore: 0,
++              maxScore: 100,
++            },
++            checklistVisibilityStatus: true,
+           },
+           {
+             id: 2,
+@@ -4246,6 +4256,8 @@ describe('ScenarioService', () => {
+             feedbackStatus: false,
+             message: 'Session terminated',
+             score: 0,
++            detectionConfig: null,
++            checklistVisibilityStatus: false,
+           },
+         ];
+ 
+@@ -4398,6 +4410,16 @@ describe('ScenarioService', () => {
+               feedbackStatus: true,
+               message: 'Great job!',
+               score: 85,
++              detectionConfig: {
++                maxOccurrences: 3,
++                minGapTime: 10,
++                occurrenceInterval: 60,
++                startTime: 0,
++                endTime: 300,
++                minScore: 0,
++                maxScore: 100,
++              },
++              checklistVisibilityStatus: true,
+             }),
+             expect.objectContaining({
+               scenarioId: 2,
+@@ -4408,6 +4430,8 @@ describe('ScenarioService', () => {
+               feedbackStatus: false,
+               message: 'Session terminated',
+               score: 0,
++              detectionConfig: null,
++              checklistVisibilityStatus: false,
+             }),
+           ]),
+         );

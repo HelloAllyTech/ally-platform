@@ -142,6 +142,7 @@ import { RoadmapSweepController } from './review/roadmap-sweep.controller';
 import { RoadmapSweepService } from './review/roadmap-sweep.service';
 import { RoadmapMetricsController } from './metrics/roadmap-metrics.controller';
 import { RoadmapMetricsService } from './metrics/roadmap-metrics.service';
+import { BugHunterApprovalsModule } from 'src/bug-hunter-approvals/bug-hunter-approvals.module';
 
 /**
  * Product Roadmap — the internal vote-based prioritisation board, rebuilt from the standalone
@@ -241,6 +242,11 @@ import { RoadmapMetricsService } from './metrics/roadmap-metrics.service';
      * checks a stored image really is one of our own uploads.
      */
     AwsModule,
+    /**
+     * BugHunterBoardService — a filed bug also enters Bug Hunter v2's queue (chunk 10).
+     * Safe to import: that module imports only AuditModule, nothing that reaches back here.
+     */
+    BugHunterApprovalsModule,
   ],
   controllers: [
     // Roadmap v2 (plans/roadmap-builder-merge): 404 while roadmap_v2 is off.

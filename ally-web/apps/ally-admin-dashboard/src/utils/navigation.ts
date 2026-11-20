@@ -172,6 +172,12 @@ const buildNavigationItems = (): NavigationItem[] => {
       section: "product",
     },
     { id: S.BUG_HUNTER, label: l.bugHunter, path: ROUTES.BUG_HUNTER, section: "product" },
+    {
+      id: S.BUG_HUNTER_V2,
+      label: en.bugHunterV2.tabLabel,
+      path: ROUTES.BUG_HUNTER_V2,
+      section: "product",
+    },
     { id: S.PM_AGENT, label: en.pmAgent.tabLabel, path: ROUTES.PM_AGENT, section: "product" },
     { id: S.BUILDER, label: l.builder, path: ROUTES.BUILDER, section: "product" },
     {

@@ -1,0 +1,121 @@
+diff --git a/ally-be/src/ux-signals/service/test/ux-signals.service.spec.ts b/ally-be/src/ux-signals/service/test/ux-signals.service.spec.ts
+index 7d0c1e35d9..4bc23a321d 100644
+--- a/ally-be/src/ux-signals/service/test/ux-signals.service.spec.ts
++++ b/ally-be/src/ux-signals/service/test/ux-signals.service.spec.ts
+@@ -149,28 +149,29 @@ describe('UxSignalsService', () => {
+     );
+   });
+ 
+-  it('fails the scan, rather than recording a clean run, when every detector failed', async () => {
++  it('returns a failed outcome without throwing when every detector failed', async () => {
+     // A total PostHog outage must not look like a quiet night: zero signals here
+     // means the scan could not look at anything, not that nothing was wrong.
++    const failedDetectors = [
++      UxSignalDetector.API_ERROR_SPIKE,
++      UxSignalDetector.ERROR_LOOP,
++      UxSignalDetector.RAGE_CLICK_CLUSTER,
++      UxSignalDetector.DEAD_CLICK_CLUSTER,
++      UxSignalDetector.ROUTE_ABANDONMENT,
++      UxSignalDetector.ZERO_RESULT_SEARCH,
++      UxSignalDetector.FUNNEL_DROPOFF,
++    ];
+     detect.mockResolvedValue({
+       signals: [],
+-      failedDetectors: [
+-        UxSignalDetector.API_ERROR_SPIKE,
+-        UxSignalDetector.ERROR_LOOP,
+-        UxSignalDetector.RAGE_CLICK_CLUSTER,
+-        UxSignalDetector.DEAD_CLICK_CLUSTER,
+-        UxSignalDetector.ROUTE_ABANDONMENT,
+-        UxSignalDetector.ZERO_RESULT_SEARCH,
+-        UxSignalDetector.FUNNEL_DROPOFF,
+-      ],
++      failedDetectors,
+       totalDetectors: 7,
+     });
+ 
+-    await expect(
+-      service.runScan(UxSignalScanTrigger.SCHEDULED),
+-    ).rejects.toThrow(ServiceUnavailableException);
++    const outcome = await service.runScan(UxSignalScanTrigger.SCHEDULED);
+ 
+     expect(triage).not.toHaveBeenCalled();
++    expect(outcome.signalsDetected).toBe(0);
++    expect(outcome.failedDetectors).toEqual(failedDetectors);
+     expect(updateScan).toHaveBeenCalledWith(
+       'scan-1',
+       expect.objectContaining({
+@@ -183,10 +184,10 @@ describe('UxSignalsService', () => {
+   it('fails the scan, with the reason on the row, when triage is unparseable', async () => {
+     triage.mockResolvedValue(null);
+ 
+-    await expect(
+-      service.runScan(UxSignalScanTrigger.MANUAL, 1),
+-    ).rejects.toThrow(ServiceUnavailableException);
++    const outcome = await service.runScan(UxSignalScanTrigger.MANUAL, 1);
+ 
++    expect(outcome.signalsDetected).toBe(0);
++    expect(outcome.findingsCreated).toBe(0);
+     expect(write).not.toHaveBeenCalled();
+     expect(updateScan).toHaveBeenCalledWith(
+       'scan-1',
+diff --git a/ally-be/src/ux-signals/service/ux-signals.service.ts b/ally-be/src/ux-signals/service/ux-signals.service.ts
+index 21c2bdf940..9fca9c5300 100644
+--- a/ally-be/src/ux-signals/service/ux-signals.service.ts
++++ b/ally-be/src/ux-signals/service/ux-signals.service.ts
+@@ -170,18 +170,32 @@ export class UxSignalsService {
+   private async executeScan(scan: UxSignalScan): Promise<UxScanOutcome> {
+     const { windowFrom, windowTo } = scan;
+     const userId = scan.startedBy ?? null;
++    let failedDetectors: UxSignalKind[] = [];
+ 
+     try {
+-      const { signals, failedDetectors, totalDetectors } =
+-        await this.detector.detect(windowFrom, windowTo);
++      const detectionResult = await this.detector.detect(windowFrom, windowTo);
++      failedDetectors = detectionResult.failedDetectors as UxSignalKind[];
++      const { signals, totalDetectors } = detectionResult;
+ 
+       // Every detector failing means PostHog itself could not be read, not that
+       // the week was quiet — recording that as a clean, zero-signal scan is
+       // exactly the half-run-looks-clean failure this method exists to prevent.
+       if (failedDetectors.length === totalDetectors) {
+-        throw new ServiceUnavailableException(
+-          `All ${totalDetectors} UX signal detectors failed; PostHog appears to be unreachable. No signals could be read for this window.`,
+-        );
++        const errorMessage = `All ${totalDetectors} UX signal detectors failed; PostHog appears to be unreachable. No signals could be read for this window.`;
++        await this.scanRepository.update(scan.id, {
++          status: UxSignalScanStatus.FAILED,
++          error: errorMessage,
++          metadata: { failedDetectors },
++          finishedAt: new Date(),
++        });
++        return {
++          scanId: scan.id,
++          signalsDetected: 0,
++          findingsCreated: 0,
++          suggestionsCreated: 0,
++          skippedDuplicates: 0,
++          failedDetectors,
++        };
+       }
+ 
+       // Zero signals is a real, healthy answer — the week was quiet. Recording it
+@@ -231,8 +245,16 @@ export class UxSignalsService {
+           2000,
+         ),
+         finishedAt: new Date(),
++        metadata: { failedDetectors },
+       });
+-      throw error;
++      return {
++        scanId: scan.id,
++        signalsDetected: 0,
++        findingsCreated: 0,
++        suggestionsCreated: 0,
++        skippedDuplicates: 0,
++        failedDetectors,
++      };
+     }
+   }
+ 

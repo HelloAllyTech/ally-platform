@@ -1,0 +1,126 @@
+diff --git a/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/SummaryFieldInput.tsx b/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/SummaryFieldInput.tsx
+index 0d3efd56a9..b88b4a85d0 100644
+--- a/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/SummaryFieldInput.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/SummaryFieldInput.tsx
+@@ -141,26 +141,44 @@ const SummaryFieldInput: FC<SummaryFieldInputProps> = ({
+           {showLabel && (
+             <span className="font-medium text-lg text-typography-800">{`${field.label}: `}</span>
+           )}
+-          <TextField
+-            value={isEnhancing ? "" : value || ""}
+-            onChange={e => onChange(field.key, e.target.value)}
+-            multiline
+-            rows={field.key === SummaryFieldKey.SessionSummary ? 10 : 4}
+-            className="w-full"
+-            inputStyles={{
+-              color: field.isEditable ? "#1A1A1A" : "#9CA3AF",
+-              fontSize: "16px",
+-              fontFamily: "IBM_Plex_Serif",
+-              cursor: isEnhancing ? "not-allowed" : "auto",
+-            }}
+-            placeholder={isEnhancing ? "" : field.placeholder}
+-            showBorder={false}
+-            InputProps={{
+-              readOnly: disabled,
+-              startAdornment: enhanceStartAdornment,
+-              endAdornment: enhanceEndAdornment,
+-            }}
+-          />
++          {disabled ? (
++            // Read-only display: a bordered, focusable textarea invites the
++            // reader to click into it expecting to edit or select text, then
++            // nothing happens — the dead-click source on /scribe-logs for
++            // read-only narrative sections like "Objective Observations" and
++            // "Plans for Next Call". Match the Text/Number case below and
++            // render plain wrapping text instead.
++            <span
++              className="font-primary whitespace-pre-wrap break-words"
++              style={{
++                color: field.isEditable ? "#1A1A1A" : "#9CA3AF",
++                fontSize: "16px",
++                fontFamily: "IBM_Plex_Serif",
++              }}
++            >
++              {value || "--"}
++            </span>
++          ) : (
++            <TextField
++              value={isEnhancing ? "" : value || ""}
++              onChange={e => onChange(field.key, e.target.value)}
++              multiline
++              rows={field.key === SummaryFieldKey.SessionSummary ? 10 : 4}
++              className="w-full"
++              inputStyles={{
++                color: field.isEditable ? "#1A1A1A" : "#9CA3AF",
++                fontSize: "16px",
++                fontFamily: "IBM_Plex_Serif",
++                cursor: isEnhancing ? "not-allowed" : "auto",
++              }}
++              placeholder={isEnhancing ? "" : field.placeholder}
++              showBorder={false}
++              InputProps={{
++                startAdornment: enhanceStartAdornment,
++                endAdornment: enhanceEndAdornment,
++              }}
++            />
++          )}
+         </div>
+       );
+     case FieldType.Number:
+diff --git a/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/__tests__/SummaryFieldInput.test.tsx b/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/__tests__/SummaryFieldInput.test.tsx
+new file mode 100644
+index 0000000000..d45bb8fbfe
+--- /dev/null
++++ b/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/__tests__/SummaryFieldInput.test.tsx
+@@ -0,0 +1,51 @@
++import { render, screen } from "@testing-library/react";
++import { describe, expect, it, vi } from "vitest";
++
++import { SummaryFieldKey } from "@types";
++
++import SummaryFieldInput from "../SummaryFieldInput";
++import { FieldType, SummaryField, SummarySectionKey } from "../../types";
++
++describe("SummaryFieldInput", () => {
++  const multilineField: SummaryField = {
++    isEditable: true,
++    key: SummaryFieldKey.ObjectiveObservations,
++    label: "Objective Observations",
++    sectionKey: SummarySectionKey.ObjectiveObservations,
++    type: FieldType.Multiline,
++  };
++
++  // Regression for the /scribe-logs dead-click cluster: read-only narrative
++  // sections ("Objective Observations", "Plans for Next Call") were rendered
++  // as a fully interactive-looking text box (bordered, focusable, blinking
++  // cursor) even though typing into it did nothing, so supervisors reviewing
++  // a session they can't edit kept clicking into it expecting a response.
++  it("renders a disabled Multiline field as plain read-only text, not an editable-looking textbox", () => {
++    render(
++      <SummaryFieldInput
++        field={multilineField}
++        value="Client reported feeling calmer by the end of the call."
++        disabled
++        onChange={vi.fn()}
++      />,
++    );
++
++    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
++    expect(
++      screen.getByText("Client reported feeling calmer by the end of the call."),
++    ).toBeInTheDocument();
++  });
++
++  it("still renders an editable textbox for a Multiline field that is not disabled", () => {
++    render(
++      <SummaryFieldInput
++        field={multilineField}
++        value="Draft notes"
++        disabled={false}
++        onChange={vi.fn()}
++      />,
++    );
++
++    expect(screen.getByRole("textbox")).toBeInTheDocument();
++  });
++});

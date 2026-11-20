@@ -1,0 +1,26 @@
+diff --git a/src/learn/repository/scenario-events.repository.ts b/src/learn/repository/scenario-events.repository.ts
+index dc6ddd0bbb..ba5875d6d3 100644
+--- a/src/learn/repository/scenario-events.repository.ts
++++ b/src/learn/repository/scenario-events.repository.ts
+@@ -110,7 +110,7 @@ export class ScenarioEventsRepository extends Repository<ScenarioEvents> {
+         scenarioId,
+       })
+       .andWhere(
+-        '(scenarioEvent.checklistVisibilityStatus = :checklistVisible OR scenarioSessionEvent.id IS NOT NULL)',
++        '(scenarioEvent.checklistVisibilityStatus = :checklistVisible)',
+         { checklistVisible: true },
+       )
+       .setParameters({
+diff --git a/src/learn/repository/test/scenario-events.repository.spec.ts b/src/learn/repository/test/scenario-events.repository.spec.ts
+index 5759e98d32..898a6380e2 100644
+--- a/src/learn/repository/test/scenario-events.repository.spec.ts
++++ b/src/learn/repository/test/scenario-events.repository.spec.ts
+@@ -533,7 +533,7 @@ describe('ScenarioEventsRepository', () => {
+         { scenarioId },
+       );
+       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+-        '(scenarioEvent.checklistVisibilityStatus = :checklistVisible OR scenarioSessionEvent.id IS NOT NULL)',
++        '(scenarioEvent.checklistVisibilityStatus = :checklistVisible)',
+         { checklistVisible: true },
+       );
+       expect(mockQueryBuilder.setParameters).toHaveBeenCalledWith({

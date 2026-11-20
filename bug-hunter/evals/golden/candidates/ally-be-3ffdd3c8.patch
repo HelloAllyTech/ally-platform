@@ -1,0 +1,122 @@
+diff --git a/ally-be/src/prompt/service/prompt-translation.service.ts b/ally-be/src/prompt/service/prompt-translation.service.ts
+index 5762e6244..c7297c3dd 100644
+--- a/ally-be/src/prompt/service/prompt-translation.service.ts
++++ b/ally-be/src/prompt/service/prompt-translation.service.ts
+@@ -12,7 +12,10 @@ import { PromptSharedService } from './prompt-shared.service';
+ import { PromptTranslationProviderService } from './prompt-translation-provider.service';
+ import { PromptTranslationTargetsService } from './prompt-translation-targets.service';
+ import { SharedLanguageService } from 'src/language/service/shared-language.service';
+-import { validateTranslationTokens } from '../util/translation-token-guard.util';
++import {
++  normaliseTranslationTokens,
++  validateTranslationTokens,
++} from '../util/translation-token-guard.util';
+ import {
+   AGENT_TEMPLATE_TRANSLATION_PROMPT_CODE,
+   MAX_TRANSLATION_ATTEMPTS,
+@@ -491,7 +494,8 @@ export class PromptTranslationService {
+           await this.translationRepository.update(
+             { promptId, languageId, sourceHash },
+             {
+-              translatedPrompt: output,
++              // Stored with its tokens written exactly, so every variable fills.
++              translatedPrompt: normaliseTranslationTokens(output),
+               status: PromptTranslationStatus.READY,
+               sourceHash,
+               provider: engine.provider,
+diff --git a/ally-be/src/prompt/service/test/prompt-translation.service.spec.ts b/ally-be/src/prompt/service/test/prompt-translation.service.spec.ts
+index a3447a918..1a20c82e4 100644
+--- a/ally-be/src/prompt/service/test/prompt-translation.service.spec.ts
++++ b/ally-be/src/prompt/service/test/prompt-translation.service.spec.ts
+@@ -142,6 +142,22 @@ describe('PromptTranslationService.translateOne', () => {
+     );
+   });
+ 
++  // The guard tolerates `{ name }`, but the runtimes only fill `{name}`: a
++  // translation stored as written would never have its variables filled.
++  it('stores a translation with its tokens written exactly', async () => {
++    translate.mockResolvedValue('आप { name } हैं, एक नर्स। [ laughs ]');
++
++    const result = await service.translateOne(promptId, languageId);
++
++    expect(result.status).toBe(PromptTranslationStatus.READY);
++    expect(update).toHaveBeenCalledWith(
++      { promptId, languageId, sourceHash: `hash:${englishBody.length}` },
++      expect.objectContaining({
++        translatedPrompt: 'आप {name} हैं, एक नर्स। [laughs]',
++      }),
++    );
++  });
++
+   it('fills {{languageName}} with the target language label', async () => {
+     translate.mockResolvedValue('आप {name} हैं [laughs]');
+ 
+diff --git a/ally-be/src/prompt/util/test/translation-token-guard.util.spec.ts b/ally-be/src/prompt/util/test/translation-token-guard.util.spec.ts
+index 7fd4d17bc..5214acf91 100644
+--- a/ally-be/src/prompt/util/test/translation-token-guard.util.spec.ts
++++ b/ally-be/src/prompt/util/test/translation-token-guard.util.spec.ts
+@@ -1,6 +1,7 @@
+ import {
+   extractPlaceholders,
+   extractAudioTags,
++  normaliseTranslationTokens,
+   validateTranslationTokens,
+ } from '../translation-token-guard.util';
+ 
+@@ -117,4 +118,35 @@ describe('translation-token-guard', () => {
+       });
+     });
+   });
++
++  describe('normaliseTranslationTokens', () => {
++    it('writes spaced placeholders and audio tags exactly', () => {
++      expect(
++        normaliseTranslationTokens(
++          'नमस्ते { name }, {age } [ laughs ] [sigh ]',
++        ),
++      ).toBe('नमस्ते {name}, {age} [laughs] [sigh]');
++    });
++
++    it('keeps double-brace placeholders double-braced', () => {
++      expect(normaliseTranslationTokens('Hi {{ name }}')).toBe('Hi {{name}}');
++    });
++
++    it('leaves JSON braces, capitalised brackets and exact tokens alone', () => {
++      const text = 'Return {"k": 1} for [Section 2], {name} and [laughs].';
++      expect(normaliseTranslationTokens(text)).toBe(text);
++    });
++
++    it('makes a tolerated translation render like the source', () => {
++      const source = 'You are {name}. [laughs]';
++      const output = 'आप { name } हैं। [ laughs ]';
++      expect(validateTranslationTokens(source, output).ok).toBe(true);
++      expect(extractPlaceholders(normaliseTranslationTokens(output))).toEqual(
++        extractPlaceholders(source),
++      );
++      expect(normaliseTranslationTokens(output)).toBe(
++        'आप {name} हैं। [laughs]',
++      );
++    });
++  });
+ });
+diff --git a/ally-be/src/prompt/util/translation-token-guard.util.ts b/ally-be/src/prompt/util/translation-token-guard.util.ts
+index 32ccf7831..0e454ed30 100644
+--- a/ally-be/src/prompt/util/translation-token-guard.util.ts
++++ b/ally-be/src/prompt/util/translation-token-guard.util.ts
+@@ -100,3 +100,16 @@ export function validateTranslationTokens(
+ 
+   return { ok, placeholders, audioTags };
+ }
++
++/**
++ * The output with every placeholder and audio tag written exactly: `{ name }`
++ * becomes `{name}`, `[ laughs ]` becomes `[laughs]`. The guard above tolerates
++ * stray whitespace inside a token, but the runtimes only fill `{name}`, so a
++ * translation is stored normalised or its variables would never be filled.
++ */
++export function normaliseTranslationTokens(output: string): string {
++  if (!output || typeof output !== 'string') return output;
++  return output
++    .replace(PLACEHOLDER_RE, (_, name: string) => `{${name.trim()}}`)
++    .replace(AUDIO_TAG_RE, (_, tag: string) => `[${tag.trim()}]`);
++}

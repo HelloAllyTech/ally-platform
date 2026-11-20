@@ -1,0 +1,261 @@
+diff --git a/src/track/repository/test/track-progress-dashboard.repository.spec.ts b/src/track/repository/test/track-progress-dashboard.repository.spec.ts
+new file mode 100644
+index 0000000000..c3769a8e4c
+--- /dev/null
++++ b/src/track/repository/test/track-progress-dashboard.repository.spec.ts
+@@ -0,0 +1,75 @@
++import { DataSource } from 'typeorm';
++import { TrackProgressDashboardRepository } from '../track-progress-dashboard.repository';
++
++describe('TrackProgressDashboardRepository.getRoleplayFeedback', () => {
++  const ENROLLMENT_ID = 'enr-1';
++
++  let query: jest.Mock;
++  let repository: TrackProgressDashboardRepository;
++
++  beforeEach(() => {
++    query = jest.fn().mockResolvedValue([]);
++    repository = new TrackProgressDashboardRepository({
++      query,
++    } as unknown as DataSource);
++  });
++
++  /**
++   * One evaluated attempt whose two scores disagree, exactly as the reported
++   * session did: the learner scored 60, and the actor-evaluation judge's
++   * composite for the same transcript was 78. Keys are the query's own
++   * aliases, which is what pg hands back.
++   */
++  const rawRow = () => ({
++    trackItemId: 'item-1',
++    trackItemTitle: 'Practice: an upset client',
++    scenarioSessionId: 'sess-1',
++    sessionScore: 60,
++    compositeScore: 78,
++    occurredAt: '2026-09-16T00:00:00.000Z',
++    skillCoverage: [{ category: 'Listening Engagement', percentage: 80 }],
++    evaluationMarkdown: '## What worked\nGood rapport building.',
++  });
++
++  it('reads the score off the session, not the actor-evaluation composite', async () => {
++    await repository.getRoleplayFeedback(ENROLLMENT_ID);
++
++    const [sql] = query.mock.calls[0];
++    // `scenario_sessions.score` is the learner's roleplay score — the meter
++    // they watched, the gate `meetsMinimumScore` applies, and the number
++    // Roleplay Logs and Track Overview both show. Selecting the judge's
++    // composite here is what made the same session read 60 in one view and
++    // 78 in the other.
++    expect(sql).toContain('s."score"');
++    expect(sql).toContain('AS "sessionScore"');
++    expect(sql).not.toContain('AS "compositeScore"');
++  });
++
++  it('returns the learner score for an attempt whose judge composite differs', async () => {
++    query.mockResolvedValue([rawRow()]);
++
++    const rows = await repository.getRoleplayFeedback(ENROLLMENT_ID);
++
++    expect(rows).toHaveLength(1);
++    expect(rows[0].sessionScore).toBe(60);
++  });
++
++  it('keeps a negative roleplay score as-is rather than treating it as absent', async () => {
++    // A roleplay score is a SUM over scenario_session_events.score and detected
++    // events carry penalties, so the learner-facing meter runs -100..100 (see
++    // meetsMinimumScore). A negative score is an ordinary outcome.
++    query.mockResolvedValue([{ ...rawRow(), sessionScore: -20 }]);
++
++    const rows = await repository.getRoleplayFeedback(ENROLLMENT_ID);
++
++    expect(rows[0].sessionScore).toBe(-20);
++  });
++
++  it('surfaces an unscored session as null, never as 0', async () => {
++    query.mockResolvedValue([{ ...rawRow(), sessionScore: null }]);
++
++    const rows = await repository.getRoleplayFeedback(ENROLLMENT_ID);
++
++    expect(rows[0].sessionScore).toBeNull();
++  });
++});
+diff --git a/src/track/repository/track-progress-dashboard.repository.ts b/src/track/repository/track-progress-dashboard.repository.ts
+index c5ed326fa1..bf127e9dd9 100644
+--- a/src/track/repository/track-progress-dashboard.repository.ts
++++ b/src/track/repository/track-progress-dashboard.repository.ts
+@@ -10,7 +10,24 @@ export interface RoleplayFeedbackRow {
+   trackItemId: string;
+   trackItemTitle: string | null;
+   scenarioSessionId: string;
+-  compositeScore: number | null;
++  /**
++   * The learner's roleplay score for THIS attempt — `scenario_sessions.score`,
++   * the platform's one learner-facing roleplay number: the -100..100 meter the
++   * learner watched during the session, the value `meetsMinimumScore` gates
++   * item completion on, the `score` column in super-admin Roleplay Logs, and
++   * the per-item `score` on Track Overview.
++   *
++   * Deliberately NOT `scenario_session_details.compositeScore`, which this
++   * dashboard used to report. That is the actor-evaluation composite —
++   * round(mean(applicable metrics)) from the LLM judge over the globally
++   * configured agent test cases, on its own 0..100 scale — and it feeds
++   * super-admin Roleplay Logs' evaluation panel and the analytics quality
++   * surfaces. Reading it here made the same finished roleplay carry two
++   * different "scores" for the same learner across two views of the same
++   * course, and the one the course progress dashboard showed was not the one
++   * that decided whether the item completed.
++   */
++  sessionScore: number | null;
+   occurredAt: string | null;
+   skillCoverage: { category: string; percentage: number }[] | null;
+   evaluationMarkdown: string | null;
+@@ -51,7 +68,7 @@ export class TrackProgressDashboardRepository {
+         tip."trackItemId"                       AS "trackItemId",
+         ti.title                                  AS "trackItemTitle",
+         s.id                                       AS "scenarioSessionId",
+-        d."compositeScore"                        AS "compositeScore",
++        s."score"                                 AS "sessionScore",
+         d.summary->'feedback'->'skillCoverage'    AS "skillCoverage",
+         d."evaluationMarkdown"                    AS "evaluationMarkdown",
+         COALESCE(s."startedAt", s."createdAt")     AS "occurredAt"
+@@ -63,6 +80,10 @@ export class TrackProgressDashboardRepository {
+         AND ti.type = $2
+         AND s."eventStatus" = $3
+         AND d."evaluationStatus" = $4
++        -- Still an "was this attempt judged at all?" predicate, not the score
++        -- source: the skillCoverage/markdown feedback this dashboard
++        -- consolidates only exists for a judged session. The score it reports
++        -- comes from the session row above.
+         AND d."compositeScore" IS NOT NULL
+         AND ${countableSessionPredicate('s')}
+       ORDER BY "occurredAt" ASC
+@@ -80,7 +101,7 @@ export class TrackProgressDashboardRepository {
+       trackItemId: String(r.trackItemId),
+       trackItemTitle: (r.trackItemTitle as string | null) ?? null,
+       scenarioSessionId: String(r.scenarioSessionId),
+-      compositeScore: this.num(r.compositeScore),
++      sessionScore: this.num(r.sessionScore),
+       occurredAt: this.iso(r.occurredAt),
+       skillCoverage: this.parseSkillCoverage(r.skillCoverage),
+       evaluationMarkdown: (r.evaluationMarkdown as string | null) ?? null,
+diff --git a/src/track/service/test/track-progress-dashboard.service.spec.ts b/src/track/service/test/track-progress-dashboard.service.spec.ts
+index 02e74ceb8f..eb209f563e 100644
+--- a/src/track/service/test/track-progress-dashboard.service.spec.ts
++++ b/src/track/service/test/track-progress-dashboard.service.spec.ts
+@@ -43,7 +43,7 @@ describe('TrackProgressDashboardService.getDashboard', () => {
+ 
+   const roleplayRow = (
+     overrides: Partial<{
+-      compositeScore: number | null;
++      sessionScore: number | null;
+       skillCoverage: { category: string; percentage: number }[] | null;
+       evaluationMarkdown: string | null;
+     }> = {},
+@@ -51,7 +51,7 @@ describe('TrackProgressDashboardService.getDashboard', () => {
+     trackItemId: 'item-1',
+     trackItemTitle: 'Practice: an upset client',
+     scenarioSessionId: 'sess-1',
+-    compositeScore: 80,
++    sessionScore: 80,
+     occurredAt: '2026-08-02T00:00:00.000Z',
+     skillCoverage: [{ category: 'Listening Engagement', percentage: 80 }],
+     evaluationMarkdown: '## What worked\nGood rapport building.',
+@@ -185,10 +185,10 @@ describe('TrackProgressDashboardService.getDashboard', () => {
+     expect(result.skillCategories.every((c) => c.sampleSize === 1)).toBe(true);
+   });
+ 
+-  it('averages compositeScore across evaluated roleplay sessions', async () => {
++  it('averages the roleplay score across evaluated roleplay sessions', async () => {
+     trackProgressDashboardRepository.getRoleplayFeedback.mockResolvedValue([
+-      roleplayRow({ compositeScore: 80 }),
+-      roleplayRow({ compositeScore: 60 }),
++      roleplayRow({ sessionScore: 80 }),
++      roleplayRow({ sessionScore: 60 }),
+     ]);
+ 
+     const result = await service.getDashboard(TRACK_ID);
+@@ -197,6 +197,22 @@ describe('TrackProgressDashboardService.getDashboard', () => {
+     expect(result.averageCompositeScore).toBe(70);
+   });
+ 
++  it('reports the learner roleplay score per session, matching Roleplay Logs', async () => {
++    // The reported session: Roleplay Logs showed 60 (scenario_sessions.score,
++    // the score the learner earned and the one the item's minScore gate was
++    // applied to) while this dashboard showed 78 — the actor-evaluation
++    // judge's composite for the same transcript. Same roleplay, two numbers,
++    // both labelled "score". The dashboard must report the learner's.
++    trackProgressDashboardRepository.getRoleplayFeedback.mockResolvedValue([
++      roleplayRow({ sessionScore: 60 }),
++    ]);
++
++    const result = await service.getDashboard(TRACK_ID);
++
++    expect(result.roleplaySessions.map((s) => s.compositeScore)).toEqual([60]);
++    expect(result.averageCompositeScore).toBe(60);
++  });
++
+   it('passes evaluationMarkdown through per session, including null', async () => {
+     trackProgressDashboardRepository.getRoleplayFeedback.mockResolvedValue([
+       roleplayRow({ evaluationMarkdown: 'Great work on rapport.' }),
+diff --git a/src/track/service/track-progress-dashboard.service.ts b/src/track/service/track-progress-dashboard.service.ts
+index c2ab187170..867127f197 100644
+--- a/src/track/service/track-progress-dashboard.service.ts
++++ b/src/track/service/track-progress-dashboard.service.ts
+@@ -83,7 +83,7 @@ export class TrackProgressDashboardService {
+       );
+ 
+     const evaluatedScores = roleplayRows
+-      .map((row) => row.compositeScore)
++      .map((row) => row.sessionScore)
+       .filter((score): score is number => score !== null);
+ 
+     return {
+@@ -101,6 +101,12 @@ export class TrackProgressDashboardService {
+       lastActivityAt: enrollment.lastActivityAt?.toISOString() ?? null,
+       sections,
+       evaluatedRoleplaySessionCount: roleplayRows.length,
++      // `averageCompositeScore` / `compositeScore` keep their wire names — a
++      // released ally-web build reads both keys verbatim — but now carry the
++      // learner's own roleplay score (see RoleplayFeedbackRow.sessionScore),
++      // so this dashboard agrees with Roleplay Logs, Track Overview and the
++      // score that gated the item instead of reporting the actor-evaluation
++      // composite as the learner's score.
+       averageCompositeScore: evaluatedScores.length
+         ? Math.round(
+             evaluatedScores.reduce((sum, score) => sum + score, 0) /
+@@ -112,7 +118,7 @@ export class TrackProgressDashboardService {
+         trackItemId: row.trackItemId,
+         trackItemTitle: row.trackItemTitle,
+         scenarioSessionId: row.scenarioSessionId,
+-        compositeScore: row.compositeScore,
++        compositeScore: row.sessionScore,
+         occurredAt: row.occurredAt,
+         evaluationMarkdown: row.evaluationMarkdown,
+       })),
+diff --git a/src/track/type/track-progress-dashboard.type.ts b/src/track/type/track-progress-dashboard.type.ts
+index b692aa31e7..95f543ca71 100644
+--- a/src/track/type/track-progress-dashboard.type.ts
++++ b/src/track/type/track-progress-dashboard.type.ts
+@@ -42,6 +42,14 @@ export interface TrackRoleplaySessionFeedback {
+   trackItemId: string;
+   trackItemTitle: string | null;
+   scenarioSessionId: string;
++  /**
++   * The learner's roleplay score for this attempt (`scenario_sessions.score`)
++   * — the same number Roleplay Logs and Track Overview show for it.
++   *
++   * The key is still named `compositeScore` only because a released ally-web
++   * build reads it by that name; it no longer carries
++   * `scenario_session_details.compositeScore`. Rename on both sides together.
++   */
+   compositeScore: number | null;
+   occurredAt: string | null;
+   /** Human-readable judge feedback for this session (markdown). */
+@@ -60,6 +68,7 @@ export interface TrackProgressDashboard {
+   lastActivityAt: string | null;
+   sections: TrackProgressSectionSummary[];
+   evaluatedRoleplaySessionCount: number;
++  /** Mean of the per-session scores above; same naming caveat as they carry. */
+   averageCompositeScore: number | null;
+   skillCategories: TrackSkillCategoryFeedback[];
+   roleplaySessions: TrackRoleplaySessionFeedback[];

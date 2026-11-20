@@ -1,0 +1,204 @@
+diff --git a/src/learn/learn.module.ts b/src/learn/learn.module.ts
+index 7126746e9e..0290eeec42 100644
+--- a/src/learn/learn.module.ts
++++ b/src/learn/learn.module.ts
+@@ -115,6 +115,7 @@ import { RoomMetadataStoreService } from './service/room-metadata-store.service'
+ import { AgentTestCaseController } from './controller/agent-test-case.controller';
+ import { CompetencyBehavior } from './entity/competency-behavior.entity';
+ import { CompetencyBehaviorRepository } from './repository/competency-behavior.repository';
++import { RoleplaySpecRepository } from '../roleplay-studio/repository/roleplay-spec.repository';
+ import { BehaviorTranslation } from './entity/behavior-translation.entity';
+ import { ScenarioBehaviorInstructionTranslation } from './entity/scenario-behavior-instruction-translation.entity';
+ import { BehaviorTranslationRepository } from './repository/behavior-translation.repository';
+@@ -264,6 +265,7 @@ import { TranscriptTranslationModule } from 'src/transcript-translation/transcri
+     CompetencyService,
+     CompetencyRepository,
+     CompetencyBehaviorRepository,
++    RoleplaySpecRepository,
+     AgentTestCaseService,
+     AgentTestCaseRepository,
+     ScenarioSessionEvaluationService,
+diff --git a/src/learn/repository/scenario.repository.ts b/src/learn/repository/scenario.repository.ts
+index cd9e6f9132..93a7273ceb 100644
+--- a/src/learn/repository/scenario.repository.ts
++++ b/src/learn/repository/scenario.repository.ts
+@@ -341,4 +341,16 @@ export class ScenariosRepository extends Repository<Scenarios> {
+     const validColumns = Object.values(ScenarioSortBy);
+     return validColumns.includes(sortBy as ScenarioSortBy) ? sortBy : null;
+   }
++
++  // Soft-deleted scenarios are excluded automatically (query builder filters
++  // on deletedAt IS NULL for entities with a @DeleteDateColumn).
++  async existsWithCompetencyId(competencyId: string): Promise<boolean> {
++    const count = await this.createQueryBuilder('scenario')
++      .where('scenario.competencyId = :competencyId', { competencyId })
++      .orWhere('scenario.competencyIds @> :competencyIdJson', {
++        competencyIdJson: JSON.stringify([competencyId]),
++      })
++      .getCount();
++    return count > 0;
++  }
+ }
+diff --git a/src/learn/service/competency.service.ts b/src/learn/service/competency.service.ts
+index bfd286094a..f935dc0a56 100644
+--- a/src/learn/service/competency.service.ts
++++ b/src/learn/service/competency.service.ts
+@@ -1,9 +1,12 @@
+ import {
++  ConflictException,
+   ForbiddenException,
+   Injectable,
+   NotFoundException,
+ } from '@nestjs/common';
+ import { CompetencyRepository } from '../repository/competency.repository';
++import { ScenariosRepository } from '../repository/scenario.repository';
++import { RoleplaySpecRepository } from '../../roleplay-studio/repository/roleplay-spec.repository';
+ import {
+   CreateCompetencyDto,
+   CreateCompetencyResponseDto,
+@@ -42,6 +45,8 @@ export class CompetencyService {
+     private readonly competencyRepository: CompetencyRepository,
+     private readonly competencyBehaviorRepository: CompetencyBehaviorRepository,
+     private readonly behaviorRepository: BehaviorRepository,
++    private readonly scenariosRepository: ScenariosRepository,
++    private readonly roleplaySpecRepository: RoleplaySpecRepository,
+   ) {}
+ 
+   async createCompetency(
+@@ -158,6 +163,17 @@ export class CompetencyService {
+       throw new NotFoundException(`Competency with id ${id} not found`);
+     }
+     this.assertCanManage(competency, userId);
++
++    const [usedByScenario, usedByRoleplaySpec] = await Promise.all([
++      this.scenariosRepository.existsWithCompetencyId(id),
++      this.roleplaySpecRepository.existsWithCompetencyId(id),
++    ]);
++    if (usedByScenario || usedByRoleplaySpec) {
++      throw new ConflictException(
++        'This competency is still assigned to a scenario or roleplay and cannot be deleted',
++      );
++    }
++
+     await this.competencyRepository.delete(id);
+   }
+ 
+diff --git a/src/learn/service/test/competency.service.spec.ts b/src/learn/service/test/competency.service.spec.ts
+index 38413f7623..7f84a9b7c7 100644
+--- a/src/learn/service/test/competency.service.spec.ts
++++ b/src/learn/service/test/competency.service.spec.ts
+@@ -1,9 +1,15 @@
+ import { Test, TestingModule } from '@nestjs/testing';
+-import { ForbiddenException, NotFoundException } from '@nestjs/common';
++import {
++  ConflictException,
++  ForbiddenException,
++  NotFoundException,
++} from '@nestjs/common';
+ import { CompetencyService } from '../competency.service';
+ import { CompetencyRepository } from '../../repository/competency.repository';
+ import { CompetencyBehaviorRepository } from '../../repository/competency-behavior.repository';
+ import { BehaviorRepository } from '../../repository/behavior.repository';
++import { ScenariosRepository } from '../../repository/scenario.repository';
++import { RoleplaySpecRepository } from '../../../roleplay-studio/repository/roleplay-spec.repository';
+ import { Competency } from '../../entity/competency.entity';
+ 
+ describe('CompetencyService (custom competencies)', () => {
+@@ -11,6 +17,8 @@ describe('CompetencyService (custom competencies)', () => {
+   let competencyRepository: jest.Mocked<CompetencyRepository>;
+   let competencyBehaviorRepository: jest.Mocked<CompetencyBehaviorRepository>;
+   let behaviorRepository: jest.Mocked<BehaviorRepository>;
++  let scenariosRepository: jest.Mocked<ScenariosRepository>;
++  let roleplaySpecRepository: jest.Mocked<RoleplaySpecRepository>;
+ 
+   const makeCompetency = (overrides: Partial<Competency> = {}): Competency =>
+     ({
+@@ -63,6 +71,18 @@ describe('CompetencyService (custom competencies)', () => {
+             ),
+           },
+         },
++        {
++          provide: ScenariosRepository,
++          useValue: {
++            existsWithCompetencyId: jest.fn().mockResolvedValue(false),
++          },
++        },
++        {
++          provide: RoleplaySpecRepository,
++          useValue: {
++            existsWithCompetencyId: jest.fn().mockResolvedValue(false),
++          },
++        },
+       ],
+     }).compile();
+ 
+@@ -70,6 +90,8 @@ describe('CompetencyService (custom competencies)', () => {
+     competencyRepository = module.get(CompetencyRepository);
+     competencyBehaviorRepository = module.get(CompetencyBehaviorRepository);
+     behaviorRepository = module.get(BehaviorRepository);
++    scenariosRepository = module.get(ScenariosRepository);
++    roleplaySpecRepository = module.get(RoleplaySpecRepository);
+   });
+ 
+   afterEach(() => jest.clearAllMocks());
+@@ -285,4 +307,39 @@ describe('CompetencyService (custom competencies)', () => {
+       );
+     });
+   });
++
++  describe('deleteCompetency (reference checks)', () => {
++    beforeEach(() => {
++      competencyRepository.getCompetencyById.mockResolvedValue(
++        makeCompetency(),
++      );
++    });
++
++    it('blocks deletion when a scenario still references the competency', async () => {
++      scenariosRepository.existsWithCompetencyId.mockResolvedValue(true);
++
++      await expect(service.deleteCompetency('comp-1', 42)).rejects.toThrow(
++        ConflictException,
++      );
++      expect(competencyRepository.delete).not.toHaveBeenCalled();
++    });
++
++    it('blocks deletion when a roleplay spec still references the competency', async () => {
++      roleplaySpecRepository.existsWithCompetencyId.mockResolvedValue(true);
++
++      await expect(service.deleteCompetency('comp-1', 42)).rejects.toThrow(
++        ConflictException,
++      );
++      expect(competencyRepository.delete).not.toHaveBeenCalled();
++    });
++
++    it('allows deletion when nothing references the competency', async () => {
++      scenariosRepository.existsWithCompetencyId.mockResolvedValue(false);
++      roleplaySpecRepository.existsWithCompetencyId.mockResolvedValue(false);
++
++      await service.deleteCompetency('comp-1', 42);
++
++      expect(competencyRepository.delete).toHaveBeenCalledWith('comp-1');
++    });
++  });
+ });
+diff --git a/src/roleplay-studio/repository/roleplay-spec.repository.ts b/src/roleplay-studio/repository/roleplay-spec.repository.ts
+index 0fce99186b..52b586d909 100644
+--- a/src/roleplay-studio/repository/roleplay-spec.repository.ts
++++ b/src/roleplay-studio/repository/roleplay-spec.repository.ts
+@@ -34,4 +34,16 @@ export class RoleplaySpecRepository extends Repository<RoleplaySpec> {
+     qb.orderBy('spec.updatedAt', 'DESC');
+     return qb.getManyAndCount();
+   }
++
++  // Soft-deleted specs are excluded automatically (query builder filters on
++  // deletedAt IS NULL for entities with a @DeleteDateColumn).
++  async existsWithCompetencyId(competencyId: string): Promise<boolean> {
++    const count = await this.createQueryBuilder('spec')
++      .where('spec.competencyId = :competencyId', { competencyId })
++      .orWhere('spec.competencyIds @> :competencyIdJson', {
++        competencyIdJson: JSON.stringify([competencyId]),
++      })
++      .getCount();
++    return count > 0;
++  }
+ }

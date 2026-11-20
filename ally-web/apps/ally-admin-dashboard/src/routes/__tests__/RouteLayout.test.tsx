@@ -76,6 +76,9 @@ vi.mock("@pages", () => ({
   DebriefConsole: () => <div>DebriefConsolePage</div>,
   DebriefSessionPage: () => <div>DebriefSessionPage</div>,
   AgentLogsPage: () => <div>AgentLogsPage</div>,
+  BugHunterV2Board: () => <div>BugHunterV2ReportsPage</div>,
+  BugHunterV2ReportDetail: () => <div>BugHunterV2ReportDetailPage</div>,
+  BugHunterV2V1Bug: () => <div>BugHunterV2V1BugPage</div>,
   PmAgentPage: () => <div>PmAgentPage</div>,
   DebriefSettingsPage: () => <div>DebriefSettingsPage</div>,
   Competencies: () => <div>CompetenciesPage</div>,
@@ -290,6 +293,22 @@ describe("RouteLayout", () => {
     window.history.pushState({}, "", ROUTES.COURSE_COPILOT_SESSION("abc-123"));
     render(<RouteLayout />);
     expect(screen.getByText("CourseCopilotSessionPage")).toBeInTheDocument();
+  });
+
+  it("gates every Bug Hunter v2 route on the bug_hunter_v2_verdicts toggle", () => {
+    for (const [path, page] of [
+      [ROUTES.BUG_HUNTER_V2, "BugHunterV2ReportsPage"],
+      [ROUTES.BUG_HUNTER_V2_REPORT(7), "BugHunterV2ReportDetailPage"],
+      [ROUTES.BUG_HUNTER_V2_V1_BUG("f-1"), "BugHunterV2V1BugPage"],
+    ] as const) {
+      privateLayoutCalls.props.length = 0;
+      window.history.pushState({}, "", path);
+      render(<RouteLayout />);
+      expect(screen.getByText(page)).toBeInTheDocument();
+      expect(privateLayoutCalls.props.at(-1)?.requiredFeature).toBe(
+        FeatureToggleKey.BUG_HUNTER_V2_VERDICTS,
+      );
+    }
   });
 
   it("renders a run's Agent logs at /debriefs/sessions/:runId/logs, not the session route", () => {

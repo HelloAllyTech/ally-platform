@@ -57,6 +57,9 @@ import {
   Logs,
   MobileReleases,
   BugHunter,
+  BugHunterV2ReportDetail,
+  BugHunterV2V1Bug,
+  BugHunterV2Board,
   Builder,
   BuilderEval,
   BuilderKnowledge,
@@ -839,6 +842,31 @@ export const RouteLayout: React.FC = () => {
             element={
               <PrivateLayout requiredFeature={FeatureToggleKey.BUG_HUNTER}>
                 <BugHunter />
+              </PrivateLayout>
+            }
+          />
+          {/* Bug Hunter v2: the board, the old Bug Hunter's bugs read-only, and reports. */}
+          <Route
+            path={ROUTES.BUG_HUNTER_V2}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.BUG_HUNTER_V2_VERDICTS}>
+                <BugHunterV2Board />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.BUG_HUNTER_V2_V1_BUG(":findingId")}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.BUG_HUNTER_V2_VERDICTS}>
+                <BugHunterV2V1Bug />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.BUG_HUNTER_V2_REPORT(":id")}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.BUG_HUNTER_V2_VERDICTS}>
+                <BugHunterV2ReportDetail />
               </PrivateLayout>
             }
           />

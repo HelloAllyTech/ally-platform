@@ -1,0 +1,191 @@
+diff --git a/ally-ai-learn/app/core/events/event_types/helper_paraphrased/helper_paraphrased_event.py b/ally-ai-learn/app/core/events/event_types/helper_paraphrased/helper_paraphrased_event.py
+index f45b92ed9..0ed55fe80 100644
+--- a/ally-ai-learn/app/core/events/event_types/helper_paraphrased/helper_paraphrased_event.py
++++ b/ally-ai-learn/app/core/events/event_types/helper_paraphrased/helper_paraphrased_event.py
+@@ -3,7 +3,7 @@ Helper paraphrased event using OpenAI LLM to detect if counselor
+ paraphrased the agent's previous message.
+ """
+ 
+-from typing import List, Optional
++from typing import List
+ 
+ from openai import AsyncOpenAI
+ from openai.types.chat import (
+@@ -50,9 +50,6 @@ class HelperParaphrasedEvent(BaseEvent):
+         visibility_type=None,
+         detection_type: DetectionType = DetectionType.HELPER_PARAPHRASED,
+         model: str = "gpt-4o-mini",
+-        embedding_client: Optional[
+-            object
+-        ] = None,  # Kept for backward compatibility but unused
+         **kwargs,
+     ) -> "HelperParaphrasedEvent":
+         """
+@@ -64,7 +61,6 @@ class HelperParaphrasedEvent(BaseEvent):
+             visibility_type: Visibility type (optional)
+             detection_type: Detection type (defaults to HELPER_PARAPHRASED)
+             model: OpenAI model name (defaults to "gpt-4o-mini")
+-            embedding_client: Deprecated - kept for backward compatibility but unused
+             **kwargs: Other BaseEvent fields (score, emoji, show_feedback, etc.)
+         """
+         inst = cls.model_construct(
+@@ -124,16 +120,9 @@ class HelperParaphrasedEvent(BaseEvent):
+             return False
+ 
+         # Use OpenAI LLM to evaluate if counselor paraphrased agent
+-        try:
+-            is_paraphrase = await self._evaluate_paraphrase(
+-                last_agent_msg.content, counselor_msg.content
+-            )
+-        except Exception as e:
+-            logger.exception(
+-                f"[HELPER_PARAPHRASED] Event '{self.event_id}': "
+-                f"Failed to evaluate paraphrase with LLM: {e}"
+-            )
+-            return False
++        is_paraphrase = await self._evaluate_paraphrase(
++            last_agent_msg.content, counselor_msg.content
++        )
+ 
+         return is_paraphrase
+ 
+@@ -159,49 +148,44 @@ class HelperParaphrasedEvent(BaseEvent):
+         if not agent_message.strip() or not counselor_message.strip():
+             return False
+ 
+-        try:
+-            # Use OpenAI's native client to avoid LiveKit streaming issue
+-            # Livekit has known issue where all messages wrapped in
+-            # AIMessageChunk will be spoken by the agent
+-            # See: https://github.com/livekit/agents/issues/2836
+-            # Use same pattern as OpenAILLMClient: api_key or settings.OPENAI_API_KEY
+-            api_key = settings.OPENAI_API_KEY
+-            if not api_key:
+-                raise ValueError("OpenAI requires OPENAI_API_KEY in settings")
+-            client = AsyncOpenAI(api_key=api_key)
++        # Use OpenAI's native client to avoid LiveKit streaming issue
++        # Livekit has known issue where all messages wrapped in
++        # AIMessageChunk will be spoken by the agent
++        # See: https://github.com/livekit/agents/issues/2836
++        # Use same pattern as OpenAILLMClient: api_key or settings.OPENAI_API_KEY
++        api_key = settings.OPENAI_API_KEY
++        if not api_key:
++            raise ValueError("OpenAI requires OPENAI_API_KEY in settings")
++        client = AsyncOpenAI(api_key=api_key)
+ 
+-            system_prompt, user_prompt = get_paraphrase_evaluation_prompt(
+-                agent_message, counselor_message
+-            )
++        system_prompt, user_prompt = get_paraphrase_evaluation_prompt(
++            agent_message, counselor_message
++        )
+ 
+-            messages = [
+-                ChatCompletionSystemMessageParam(content=system_prompt, role="system"),
+-                ChatCompletionUserMessageParam(content=user_prompt, role="user"),
+-            ]
++        messages = [
++            ChatCompletionSystemMessageParam(content=system_prompt, role="system"),
++            ChatCompletionUserMessageParam(content=user_prompt, role="user"),
++        ]
+ 
+-            # Use beta.chat.completions.parse for structured output without streaming
+-            # This returns pure structured data that won't be spoken by the agent
+-            completion = await client.beta.chat.completions.parse(
+-                model=self.model,
+-                messages=messages,
+-                response_format=ParaphraseResult,
+-            )
+-            # Recorded as soon as the call returns, before parsing. No
+-            # explicit room: this only runs inside a graph node (or a task spawned
+-            # from one), where the room context var is set.
+-            from app.core.llm_usage.emitter import emit_openai_usage
+-            from app.core.llm_usage.tasks import LLMTask
++        # Use beta.chat.completions.parse for structured output without streaming
++        # This returns pure structured data that won't be spoken by the agent
++        completion = await client.beta.chat.completions.parse(
++            model=self.model,
++            messages=messages,
++            response_format=ParaphraseResult,
++        )
++        # Recorded as soon as the call returns, before parsing. No
++        # explicit room: this only runs inside a graph node (or a task spawned
++        # from one), where the room context var is set.
++        from app.core.llm_usage.emitter import emit_openai_usage
++        from app.core.llm_usage.tasks import LLMTask
+ 
+-            emit_openai_usage(
+-                completion,
+-                task=LLMTask.HELPER_PARAPHRASED.value,
+-                model=self.model,
+-                provider="openai",
+-            )
++        emit_openai_usage(
++            completion,
++            task=LLMTask.HELPER_PARAPHRASED.value,
++            model=self.model,
++            provider="openai",
++        )
+ 
+-            result = completion.choices[0].message.parsed
+-            return result.is_paraphrase
+-
+-        except Exception as e:
+-            logger.exception(f"Failed to evaluate paraphrase with LLM: {e}")
+-            return False
++        result = completion.choices[0].message.parsed
++        return result.is_paraphrase
+diff --git a/ally-ai-learn/app/core/events/factory.py b/ally-ai-learn/app/core/events/factory.py
+index a700582f4..0421be1e0 100644
+--- a/ally-ai-learn/app/core/events/factory.py
++++ b/ally-ai-learn/app/core/events/factory.py
+@@ -340,7 +340,6 @@ def _create_event_by_detection_type(
+                 visibility_type=visibility_type,
+                 detection_type=detection_type,
+                 data=helper_paraphrased_data,
+-                embedding_client=embedding_client,
+                 **common_fields,
+             )
+ 
+diff --git a/ally-ai-learn/tests/unit/events/test_helper_paraphrased_event.py b/ally-ai-learn/tests/unit/events/test_helper_paraphrased_event.py
+index 27e9900f5..528f96ee0 100644
+--- a/ally-ai-learn/tests/unit/events/test_helper_paraphrased_event.py
++++ b/ally-ai-learn/tests/unit/events/test_helper_paraphrased_event.py
+@@ -199,8 +199,8 @@ class TestHelperParaphrasedEvent:
+             ChatMessage(role="counselor", content="I'm fine"),
+         ]
+ 
+-        result = await event.detect_event(conversations)
+-        assert result is False
++        with pytest.raises(Exception, match="LLM API error"):
++            await event.detect_event(conversations)
+ 
+     @pytest.mark.asyncio
+     @patch(
+@@ -337,3 +337,26 @@ class TestHelperParaphrasedEvent:
+ 
+         # Should not call LLM for empty messages
+         mock_async_openai.assert_not_called()
++
++    @pytest.mark.asyncio
++    @patch(
++        "app.core.events.event_types.helper_paraphrased"
++        ".helper_paraphrased_event.settings.OPENAI_API_KEY",
++        None,
++    )
++    async def test_detect_event_raises_value_error_if_api_key_is_not_set(
++        self,
++    ):
++        """Test that a ValueError is raised if OPENAI_API_KEY is not set."""
++        data = HelperParaphrasedData()
++        event = HelperParaphrasedEvent.create(event_id="test_event", data=data)
++
++        conversations = [
++            ChatMessage(role="client", content="Test agent message"),
++            ChatMessage(role="counselor", content="Test counselor message"),
++        ]
++
++        with pytest.raises(
++            ValueError, match="OpenAI requires OPENAI_API_KEY in settings"
++        ):
++            await event.detect_event(conversations)

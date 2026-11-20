@@ -351,6 +351,25 @@ describe("deriveNavigationItems", () => {
     expect(ids).not.toContain(SIDEBAR_ITEMS.DEBRIEFS);
   });
 
+  it("shows Bug Hunter v2 only to a holder of the bug_hunter_v2_verdicts toggle", () => {
+    const withToggle = deriveNavigationItems({
+      permissions: [],
+      features: [FeatureToggleKey.BUG_HUNTER_V2_VERDICTS],
+      savedOrder: undefined,
+    });
+    expect(withToggle.find(i => i.id === SIDEBAR_ITEMS.BUG_HUNTER_V2)?.path).toBe(
+      ROUTES.BUG_HUNTER_V2,
+    );
+    // the old Bug Hunter's toggle does not open the v2 page, and the other way round
+    const oldToggle = deriveNavigationItems({
+      permissions: [],
+      features: [FeatureToggleKey.BUG_HUNTER],
+      savedOrder: undefined,
+    }).map(i => i.id);
+    expect(oldToggle).not.toContain(SIDEBAR_ITEMS.BUG_HUNTER_V2);
+    expect(withToggle.map(i => i.id)).not.toContain(SIDEBAR_ITEMS.BUG_HUNTER);
+  });
+
   it("shows PM Agent only to a holder of the pm_agent toggle", () => {
     const withToggle = deriveNavigationItems({
       permissions: [],

@@ -1,0 +1,201 @@
+diff --git a/apps/ally-helpline-dashboard/src/pages/calls/components/AdminLogsTable.tsx b/apps/ally-helpline-dashboard/src/pages/calls/components/AdminLogsTable.tsx
+index 0e7a0bbb1f..21a1e1bd8c 100644
+--- a/apps/ally-helpline-dashboard/src/pages/calls/components/AdminLogsTable.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/calls/components/AdminLogsTable.tsx
+@@ -63,6 +63,7 @@ import {
+   getModeChipConfig,
+   reconcileLogsById,
+   patchRowCustomFieldValues,
++  buildCounsellorFilterOptions,
+   DenormalizedCustomFieldValue,
+ } from "./utils";
+ 
+@@ -481,11 +482,7 @@ const AdminLogsTable: FC<LogsTableProps> = ({ refreshKey, sessionType, className
+       icon: <UserIcon />,
+       filterable: true,
+       filterType: FilterType.MULTISELECT,
+-      filterOptions:
+-        simulationFilterOptions?.counselors?.map(counselor => ({
+-          label: counselor.name,
+-          value: String(counselor.id),
+-        })) || [],
++      filterOptions: buildCounsellorFilterOptions(simulationFilterOptions?.counselors ?? []),
+     },
+     {
+       key: "dateAndTime",
+diff --git a/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/AdminLogsTable.test.tsx b/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/AdminLogsTable.test.tsx
+index 9543409e74..09aac94d87 100644
+--- a/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/AdminLogsTable.test.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/AdminLogsTable.test.tsx
+@@ -181,7 +181,11 @@ vi.mock("@utils", () => ({
+   getSimulationScoreDisplay: vi.fn((score: number) => `${score}/100`),
+ }));
+ 
+-vi.mock("../utils", () => ({
++// Partial mock: the chip-config helpers are stubbed for readable assertions,
++// but everything else — notably buildCounsellorFilterOptions, which runs on
++// every render — keeps its real implementation.
++vi.mock("../utils", async importOriginal => ({
++  ...((await importOriginal()) as Record<string, unknown>),
+   getSourceChipConfig: vi.fn((source: string) => ({
+     label: source || "Unknown",
+     variant: "default",
+@@ -393,8 +397,8 @@ describe("AdminLogsTable", () => {
+     vi.mocked(useGetAdminSimulationLogFiltersQuery).mockReturnValue({
+       data: {
+         counselors: [
+-          { id: 7, name: "Asha" },
+-          { id: 12, name: "Ravi" },
++          { id: 7, name: "Asha", email: "asha@example.com" },
++          { id: 12, name: "Ravi", email: "ravi@example.com" },
+         ],
+         scenarios: [
+           { id: 3, title: "Crisis call" },
+@@ -1365,6 +1369,29 @@ describe("AdminLogsTable", () => {
+       ]);
+     });
+ 
++    it("distinguishes two people who share a display name", async () => {
++      vi.mocked(useGetAdminSimulationLogFiltersQuery).mockReturnValue({
++        data: {
++          counselors: [
++            { id: 99, name: "Shubham Bhoite", email: "a@example.com" },
++            { id: 123, name: "Shubham Bhoite", email: "b@example.com" },
++            { id: 7, name: "Asha", email: "asha@example.com" },
++          ],
++          scenarios: [],
++        },
++        isLoading: false,
++      } as any);
++
++      renderComponent(SessionType.SIMULATION, undefined, simulationFilterState);
++      await waitFor(() => expect(tableProps.current).not.toBeNull());
++
++      expect(columnFor("counsellorName").filterOptions).toEqual([
++        { label: "Shubham Bhoite (a@example.com)", value: "99" },
++        { label: "Shubham Bhoite (b@example.com)", value: "123" },
++        { label: "Asha", value: "7" },
++      ]);
++    });
++
+     it("sends the selected people and role plays as id lists", async () => {
+       renderComponent(SessionType.SIMULATION, undefined, simulationFilterState);
+       await waitFor(() => expect(tableProps.current).not.toBeNull());
+diff --git a/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/counsellorFilterOptions.test.ts b/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/counsellorFilterOptions.test.ts
+new file mode 100644
+index 0000000000..e6e0fcf1da
+--- /dev/null
++++ b/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/counsellorFilterOptions.test.ts
+@@ -0,0 +1,64 @@
++import { describe, it, expect } from "vitest";
++
++import { buildCounsellorFilterOptions } from "../utils";
++
++describe("buildCounsellorFilterOptions", () => {
++  it("leaves unique names alone", () => {
++    expect(
++      buildCounsellorFilterOptions([
++        { id: 7, name: "Asha", email: "asha@example.com" },
++        { id: 12, name: "Ravi", email: "ravi@example.com" },
++      ]),
++    ).toEqual([
++      { label: "Asha", value: "7" },
++      { label: "Ravi", value: "12" },
++    ]);
++  });
++
++  it("appends the email only to the names that repeat", () => {
++    // The shape that made this necessary: one production tenant has three
++    // accounts called "Sandeep Malhotra" alongside ordinary unique names.
++    const options = buildCounsellorFilterOptions([
++      { id: 118, name: "Sandeep Malhotra", email: "s1@example.com" },
++      { id: 3, name: "Sandeep Malhotra", email: "s2@example.com" },
++      { id: 57, name: "Sandeep Malhotra", email: "s3@example.com" },
++      { id: 42, name: "Asha", email: "asha@example.com" },
++    ]);
++
++    expect(options).toEqual([
++      { label: "Sandeep Malhotra (s1@example.com)", value: "118" },
++      { label: "Sandeep Malhotra (s2@example.com)", value: "3" },
++      { label: "Sandeep Malhotra (s3@example.com)", value: "57" },
++      { label: "Asha", value: "42" },
++    ]);
++  });
++
++  it("keeps every duplicate as its own option, so ids are never merged", () => {
++    // The bug this guards: two "Shubham Bhoite" accounts hold 1 and 328
++    // sessions. Collapsing them would silently pick one.
++    const options = buildCounsellorFilterOptions([
++      { id: 99, name: "Shubham Bhoite", email: "a@example.com" },
++      { id: 123, name: "Shubham Bhoite", email: "b@example.com" },
++    ]);
++
++    expect(options).toHaveLength(2);
++    expect(options.map(o => o.value)).toEqual(["99", "123"]);
++    expect(new Set(options.map(o => o.label)).size).toBe(2);
++  });
++
++  it("falls back to the bare name when a duplicate has no email", () => {
++    const options = buildCounsellorFilterOptions([
++      { id: 1, name: "Asha", email: "asha@example.com" },
++      { id: 2, name: "Asha" },
++    ]);
++
++    expect(options).toEqual([
++      { label: "Asha (asha@example.com)", value: "1" },
++      { label: "Asha", value: "2" },
++    ]);
++  });
++
++  it("handles an empty list", () => {
++    expect(buildCounsellorFilterOptions([])).toEqual([]);
++  });
++});
+diff --git a/apps/ally-helpline-dashboard/src/pages/calls/components/utils.ts b/apps/ally-helpline-dashboard/src/pages/calls/components/utils.ts
+index a7a8839c90..3e2cbaf120 100644
+--- a/apps/ally-helpline-dashboard/src/pages/calls/components/utils.ts
++++ b/apps/ally-helpline-dashboard/src/pages/calls/components/utils.ts
+@@ -152,3 +152,30 @@ export const patchRowCustomFieldValues = <
+     changed.forEach(v => byField.set(v.fieldDefinitionId, v));
+     return { ...row, customFieldValues: Array.from(byField.values()) };
+   });
++
++/**
++ * Filter options for the roleplay logs' Counsellor column.
++ *
++ * Display names are not unique within a tenant: production has three separate
++ * accounts named "Sandeep Malhotra", plus two more duplicated names. Rendering
++ * those as identical rows gave an admin no way to tell which person they were
++ * picking — the value is the user id, so the two rows select genuinely
++ * different sessions while reading exactly the same.
++ *
++ * The email is appended only to the names that actually repeat. Disambiguating
++ * every row would put an address beside thirty names that never needed one, and
++ * the name is what an admin is scanning for.
++ */
++export const buildCounsellorFilterOptions = (
++  counselors: { id: number; name: string; email?: string }[],
++): { label: string; value: string }[] => {
++  const timesSeen = counselors.reduce<Record<string, number>>((acc, c) => {
++    acc[c.name] = (acc[c.name] ?? 0) + 1;
++    return acc;
++  }, {});
++
++  return counselors.map(c => ({
++    label: timesSeen[c.name] > 1 && c.email ? `${c.name} (${c.email})` : c.name,
++    value: String(c.id),
++  }));
++};
+diff --git a/apps/ally-helpline-dashboard/src/types/learn.ts b/apps/ally-helpline-dashboard/src/types/learn.ts
+index 5f890c8f2e..47512f3f36 100644
+--- a/apps/ally-helpline-dashboard/src/types/learn.ts
++++ b/apps/ally-helpline-dashboard/src/types/learn.ts
+@@ -234,7 +234,7 @@ export type GetAdminSimulationLogsResponse = {
+  * session and nobody who has practised is missing from their own logs' filter.
+  */
+ export type GetAdminSimulationLogFiltersResponse = {
+-  counselors: { id: number; name: string }[];
++  counselors: { id: number; name: string; email?: string }[];
+   scenarios: { id: number; title: string }[];
+ };
+ export interface SimulationSummary {

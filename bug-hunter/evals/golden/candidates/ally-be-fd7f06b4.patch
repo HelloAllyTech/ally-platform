@@ -1,0 +1,111 @@
+diff --git a/src/roleplay-studio/repository/copilot-message.repository.ts b/src/roleplay-studio/repository/copilot-message.repository.ts
+index cbb1f96dcc..2ac93bc212 100644
+--- a/src/roleplay-studio/repository/copilot-message.repository.ts
++++ b/src/roleplay-studio/repository/copilot-message.repository.ts
+@@ -33,20 +33,27 @@ export class CopilotMessageRepository extends Repository<CopilotMessage> {
+     },
+   ): Promise<CopilotMessage> {
+     return this.dataSource.transaction(async (em) => {
+-      const rows: { lastMessageSeq: number }[] = await em.query(
++      // EntityManager.query() returns a `[rows, affectedCount]` tuple for a
++      // RETURNING UPDATE on Postgres — NOT a bare rows array. Reading row 0 off
++      // the tuple yields the inner rows array (whose `.lastMessageSeq` is
++      // undefined), which made this throw session_not_found on every append even
++      // when the UPDATE matched. Unwrap the tuple (guarding the bare-array shape
++      // some driver/TypeORM versions return).
++      const result = await em.query(
+         `UPDATE "copilot_sessions"
+             SET "lastMessageSeq" = "lastMessageSeq" + 1, "updatedAt" = now()
+           WHERE id = $1
+           RETURNING "lastMessageSeq"`,
+         [sessionId],
+       );
++      const rows: { lastMessageSeq: number }[] = Array.isArray(result?.[0])
++        ? result[0]
++        : result;
+       const seq = rows?.[0]?.lastMessageSeq;
+       if (seq === undefined) {
+-        // NotFoundException (not a bare Error) so the stream controller can tag
+-        // the SSE error frame `session_not_found` and the client can recover by
+-        // re-creating the session. Reachable if the session row disappears
+-        // between the orchestrator's getSession check and this append (e.g. a
+-        // local DB reset mid-turn).
++        // Genuinely no such session row (UPDATE matched 0 rows). NotFoundException
++        // (not a bare Error) so the stream controller tags the SSE error frame
++        // `session_not_found` and the client can recover by re-creating it.
+         throw new NotFoundException(`Copilot session not found: ${sessionId}`);
+       }
+       const repo = em.getRepository(CopilotMessage);
+diff --git a/src/roleplay-studio/repository/test/copilot-message.repository.spec.ts b/src/roleplay-studio/repository/test/copilot-message.repository.spec.ts
+new file mode 100644
+index 0000000000..02614091b4
+--- /dev/null
++++ b/src/roleplay-studio/repository/test/copilot-message.repository.spec.ts
+@@ -0,0 +1,67 @@
++import { Test, TestingModule } from '@nestjs/testing';
++import { NotFoundException } from '@nestjs/common';
++import { DataSource } from 'typeorm';
++import { CopilotMessageRepository } from '../copilot-message.repository';
++import { CopilotMessageRole } from '../../enum/copilot-message-role.enum';
++
++/**
++ * Regression coverage for appendMessage's handling of EntityManager.query()'s
++ * return shape. On Postgres a RETURNING UPDATE comes back as a
++ * `[rows, affectedCount]` tuple, not a bare rows array — misreading it made
++ * every append throw session_not_found even when the UPDATE matched a row.
++ */
++describe('CopilotMessageRepository.appendMessage', () => {
++  let repository: CopilotMessageRepository;
++  let queryMock: jest.Mock;
++  let saveMock: jest.Mock;
++
++  const sessionId = '8231bdb4-7b89-4b7f-89c6-4648dbb64fa6';
++  const message = {
++    role: CopilotMessageRole.USER,
++    content: 'hello',
++    createdBy: 1,
++  };
++
++  const buildRepo = (queryResult: unknown) => {
++    queryMock = jest.fn().mockResolvedValue(queryResult);
++    saveMock = jest.fn().mockImplementation((entity) => Promise.resolve(entity));
++    const em = {
++      query: queryMock,
++      getRepository: jest.fn().mockReturnValue({
++        create: jest.fn().mockImplementation((entity) => entity),
++        save: saveMock,
++      }),
++    };
++    const mockDataSource = {
++      createEntityManager: jest.fn().mockReturnValue({}),
++      transaction: jest.fn().mockImplementation((cb) => cb(em)),
++    } as unknown as DataSource;
++    return new CopilotMessageRepository(mockDataSource);
++  };
++
++  it('unwraps the [rows, affectedCount] tuple and appends with the returned seq', async () => {
++    repository = buildRepo([[{ lastMessageSeq: 5 }], 1]);
++
++    const saved = await repository.appendMessage(sessionId, message);
++
++    expect(saveMock).toHaveBeenCalledTimes(1);
++    expect(saved).toMatchObject({ sessionId, seq: 5, content: 'hello' });
++  });
++
++  it('also handles a bare rows array (driver/version variance)', async () => {
++    repository = buildRepo([{ lastMessageSeq: 7 }]);
++
++    const saved = await repository.appendMessage(sessionId, message);
++
++    expect(saved).toMatchObject({ sessionId, seq: 7 });
++  });
++
++  it('throws NotFoundException with the id when the UPDATE matched no rows', async () => {
++    repository = buildRepo([[], 0]);
++
++    await expect(repository.appendMessage(sessionId, message)).rejects.toThrow(
++      new NotFoundException(`Copilot session not found: ${sessionId}`),
++    );
++    expect(saveMock).not.toHaveBeenCalled();
++  });
++});

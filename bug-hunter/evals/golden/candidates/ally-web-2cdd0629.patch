@@ -1,0 +1,57 @@
+diff --git a/apps/ally-helpline-dashboard/src/pages/post-simulation-summary/PostSimulationSummary.tsx b/apps/ally-helpline-dashboard/src/pages/post-simulation-summary/PostSimulationSummary.tsx
+index 7b6237db20..1a8dd69940 100644
+--- a/apps/ally-helpline-dashboard/src/pages/post-simulation-summary/PostSimulationSummary.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/post-simulation-summary/PostSimulationSummary.tsx
+@@ -1,4 +1,4 @@
+-import { FC, useState } from "react";
++import { FC, useEffect, useRef, useState } from "react";
+ 
+ import { Tab, Tabs } from "@mui/material";
+ import { differenceInMinutes } from "date-fns";
+@@ -109,7 +109,17 @@ export const PostSimulationSummary: FC = () => {
+ 
+   const [selectedTab, setSelectedTab] = useState<number>(tabList?.[0].id);
+   const [shareForReview, setShareForReview] = useState<boolean>(false);
+-  const [showFeedbackDialog, setShowFeedbackDialog] = useState<boolean>(true);
++  const [showFeedbackDialog, setShowFeedbackDialog] = useState<boolean>(false);
++  const feedbackDialogEvaluatedRef = useRef<boolean>(false);
++
++  useEffect(() => {
++    if (summaryData && !feedbackDialogEvaluatedRef.current) {
++      feedbackDialogEvaluatedRef.current = true;
++      if (!summaryData.hasFeedback) {
++        setShowFeedbackDialog(true);
++      }
++    }
++  }, [summaryData]);
+ 
+   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+     setSelectedTab(newValue);
+diff --git a/apps/ally-helpline-dashboard/src/pages/post-simulation-summary/__tests__/__snapshots__/PostSimulationSummary.test.tsx.snap b/apps/ally-helpline-dashboard/src/pages/post-simulation-summary/__tests__/__snapshots__/PostSimulationSummary.test.tsx.snap
+index 5980d53ebd..c7497e9bc7 100644
+--- a/apps/ally-helpline-dashboard/src/pages/post-simulation-summary/__tests__/__snapshots__/PostSimulationSummary.test.tsx.snap
++++ b/apps/ally-helpline-dashboard/src/pages/post-simulation-summary/__tests__/__snapshots__/PostSimulationSummary.test.tsx.snap
+@@ -8,11 +8,6 @@ exports[`PostSimulationSummary Component > Snapshot Testing > should match snaps
+     <div
+       class="flex h-[100dvh] min-h-0 w-full flex-col items-center overflow-hidden bg-white pb-10"
+     >
+-      <div
+-        data-id="123"
+-        data-session-type="simulation"
+-        data-testid="feedback-dialog"
+-      />
+       <div
+         class="relative flex min-h-0 w-full max-w-4xl flex-1 flex-col gap-6 self-center px-4 pb-8 sm:pb-16 sm:px-6 items-center"
+         data-animate="visible"
+@@ -183,11 +178,6 @@ exports[`PostSimulationSummary Component > Snapshot Testing > should match snaps
+     <div
+       class="flex h-[100dvh] min-h-0 w-full flex-col items-center overflow-hidden bg-white pb-10"
+     >
+-      <div
+-        data-id="789"
+-        data-session-type="simulation"
+-        data-testid="feedback-dialog"
+-      />
+       <div
+         class="relative flex min-h-0 w-full max-w-4xl flex-1 flex-col gap-6 self-center px-4 pb-8 sm:pb-16 sm:px-6 items-center"
+         data-animate="visible"

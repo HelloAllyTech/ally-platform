@@ -1,0 +1,234 @@
+diff --git a/apps/ally-admin-dashboard/src/pages/ProductRoadmap/MergeDrawer.tsx b/apps/ally-admin-dashboard/src/pages/ProductRoadmap/MergeDrawer.tsx
+index fe7ec09791..a8daa5c46e 100644
+--- a/apps/ally-admin-dashboard/src/pages/ProductRoadmap/MergeDrawer.tsx
++++ b/apps/ally-admin-dashboard/src/pages/ProductRoadmap/MergeDrawer.tsx
+@@ -1,18 +1,22 @@
+ import React, { useMemo, useState } from "react";
+ 
++import { Add, Close, Search } from "@icons";
+ import { toast } from "sonner";
+ 
+ import { TextArea } from "@ally-ui-mono/ui-shared";
+ import { useGetRoadmapOpportunitiesQuery, useMergeRoadmapOpportunitiesMutation } from "@api";
+ import { Button } from "@components";
+ import { ButtonVariant } from "@components/types";
+-import { Add, Close, Search } from "@icons";
+ import { RoadmapOpportunity } from "@types";
+ 
+ const DESCRIPTION_MAX = 1000;
+ /** Enough to find something by code or a distinctive phrase without paging. */
+ const RESULT_LIMIT = 20;
+ 
++/** The default primary: whichever pick people have actually voted on and shared the most. */
++const highestScoring = (list: RoadmapOpportunity[]) =>
++  list.reduce((best, o) => (o.priorityScore > best.priorityScore ? o : best), list[0]);
++
+ interface MergeDrawerProps {
+   onClose: () => void;
+   /** Opens the merged opportunity's own drawer, where every remaining setting already lives. */
+@@ -51,6 +55,8 @@ export const MergeDrawer: React.FC<MergeDrawerProps> = ({ onClose, onMerged }) =
+   const [search, setSearch] = useState("");
+   const [picked, setPicked] = useState<RoadmapOpportunity[]>([]);
+   const [primaryId, setPrimaryId] = useState<string | null>(null);
++  /** Once the manager picks a radio button by hand, stop overriding their choice on later adds. */
++  const [primaryManuallySet, setPrimaryManuallySet] = useState(false);
+   /** Null until the user edits it, so the prefill can follow a changed primary. */
+   const [descriptionOverride, setDescriptionOverride] = useState<string | null>(null);
+   const [isSearchOpen, setIsSearchOpen] = useState(true);
+@@ -76,9 +82,9 @@ export const MergeDrawer: React.FC<MergeDrawerProps> = ({ onClose, onMerged }) =
+   const add = (opportunity: RoadmapOpportunity) => {
+     setPicked(current => {
+       const next = [...current, opportunity];
+-      // First pick becomes the primary; later picks only take over if they outscore it, matching
+-      // the "highest score survives" default without overriding a deliberate choice.
+-      if (primaryId === null) setPrimaryId(opportunity.id);
++      // Re-evaluate the highest-scoring pick on every add, unless the manager already made a
++      // deliberate choice via the radio button.
++      if (!primaryManuallySet) setPrimaryId(highestScoring(next).id);
+       return next;
+     });
+     setSearch("");
+@@ -86,9 +92,12 @@ export const MergeDrawer: React.FC<MergeDrawerProps> = ({ onClose, onMerged }) =
+   };
+ 
+   const remove = (id: string) => {
+-    setPicked(current => current.filter(o => o.id !== id));
++    const next = picked.filter(o => o.id !== id);
++    setPicked(next);
+     if (primaryId === id) {
+-      setPrimaryId(null);
++      // The manual choice is gone with it; fall back to the highest-scoring survivor.
++      setPrimaryManuallySet(false);
++      setPrimaryId(next.length > 0 ? highestScoring(next).id : null);
+       // Drop a prefilled description that came from the primary being removed; a hand-edited one
+       // is the user's and stays.
+       setDescriptionOverride(current => current);
+@@ -151,6 +160,7 @@ export const MergeDrawer: React.FC<MergeDrawerProps> = ({ onClose, onMerged }) =
+                       checked={isPrimary}
+                       onChange={() => {
+                         setPrimaryId(opportunity.id);
++                        setPrimaryManuallySet(true);
+                         // Re-prefill from the new primary unless the text was hand-edited.
+                         setDescriptionOverride(current => current);
+                       }}
+@@ -161,7 +171,9 @@ export const MergeDrawer: React.FC<MergeDrawerProps> = ({ onClose, onMerged }) =
+                       <div className="text-typography-secondary flex items-center gap-2 text-xs tabular-nums">
+                         <span>{opportunity.code}</span>
+                         <span>{opportunity.priorityScore} votes</span>
+-                        {isPrimary && <span className="text-primary-500">keeps code & comments</span>}
++                        {isPrimary && (
++                          <span className="text-primary-500">keeps code & comments</span>
++                        )}
+                       </div>
+                       <p className="text-typography-primary line-clamp-2 text-sm">
+                         {opportunity.description}
+@@ -246,10 +258,9 @@ export const MergeDrawer: React.FC<MergeDrawerProps> = ({ onClose, onMerged }) =
+               />
+ 
+               <p className="text-typography-secondary text-sm">
+-                {picked.length} opportunities → 1. Votes roll up per person per month, so the
+-                merged opportunity ends on{" "}
+-                <span className="tabular-nums">{combinedScore}</span> votes. Comments move across;
+-                the others are removed from the board.
++                {picked.length} opportunities → 1. Votes roll up per person per month, so the merged
++                opportunity ends on <span className="tabular-nums">{combinedScore}</span> votes.
++                Comments move across; the others are removed from the board.
+               </p>
+             </>
+           )}
+@@ -263,9 +274,7 @@ export const MergeDrawer: React.FC<MergeDrawerProps> = ({ onClose, onMerged }) =
+               {isLoading ? "Merging…" : `Merge ${picked.length || ""}`.trim()}
+             </Button>
+             {picked.length < 2 && (
+-              <span className="text-typography-secondary text-sm">
+-                Pick at least two to merge.
+-              </span>
++              <span className="text-typography-secondary text-sm">Pick at least two to merge.</span>
+             )}
+           </div>
+         </div>
+diff --git a/apps/ally-admin-dashboard/src/pages/ProductRoadmap/__tests__/MergeDrawer.test.tsx b/apps/ally-admin-dashboard/src/pages/ProductRoadmap/__tests__/MergeDrawer.test.tsx
+new file mode 100644
+index 0000000000..ae33063eff
+--- /dev/null
++++ b/apps/ally-admin-dashboard/src/pages/ProductRoadmap/__tests__/MergeDrawer.test.tsx
+@@ -0,0 +1,119 @@
++import { fireEvent, render, screen } from "@testing-library/react";
++import { describe, expect, it, vi } from "vitest";
++
++import {
++  RoadmapOpportunity,
++  RoadmapOpportunitySource,
++  RoadmapOpportunityStage,
++  RoadmapOpportunityType,
++} from "@types";
++
++import { MergeDrawer } from "../MergeDrawer";
++
++const mockMerge = vi.fn();
++
++/** Reassigned mid-test so the mocked search hook can return a different result set per search. */
++let searchResults: RoadmapOpportunity[] = [];
++
++vi.mock("@api", () => ({
++  useGetRoadmapOpportunitiesQuery: () => ({ data: { items: searchResults }, isFetching: false }),
++  useMergeRoadmapOpportunitiesMutation: () => [mockMerge, { isLoading: false }],
++}));
++
++vi.mock("@components", () => ({
++  Button: ({ children, onClick, disabled }: any) => (
++    <button onClick={onClick} disabled={disabled}>
++      {children}
++    </button>
++  ),
++}));
++
++vi.mock("@components/types", () => ({
++  ButtonVariant: { PRIMARY: "primary", SECONDARY: "secondary", TEXT: "text" },
++}));
++
++vi.mock("@icons", () => ({
++  Add: () => null,
++  Close: () => null,
++  Search: () => null,
++}));
++
++vi.mock("@ally-ui-mono/ui-shared", () => ({
++  TextArea: ({ value, onChange, labelText }: any) => (
++    <label>
++      {labelText}
++      <textarea aria-label={labelText} value={value} onChange={onChange} />
++    </label>
++  ),
++}));
++
++vi.mock("sonner", () => ({
++  toast: { success: vi.fn(), error: vi.fn() },
++}));
++
++const opportunity = (
++  id: string,
++  code: string,
++  priorityScore: number,
++  description: string,
++): RoadmapOpportunity =>
++  ({
++    id,
++    description,
++    type: RoadmapOpportunityType.IDEA,
++    stage: RoadmapOpportunityStage.NEW,
++    productGoal: "Engagement & Usability",
++    owner: null,
++    prd: null,
++    claudePrompt: null,
++    releasedAt: null,
++    code,
++    queueRank: null,
++    builderSessionId: null,
++    plannedMonth: null,
++    boardPosition: 0,
++    effectiveMonth: null,
++    monthPinned: false,
++    priorityScore,
++    myVotes: 0,
++    commentCount: 0,
++    source: RoadmapOpportunitySource.STAFF,
++    createdAt: "2026-08-01T00:00:00.000Z",
++    updatedAt: "2026-08-01T00:00:00.000Z",
++    creator: null,
++  }) as RoadmapOpportunity;
++
++describe("MergeDrawer", () => {
++  /**
++   * The bug: the docblock and add()'s own comment both claim the primary "defaults to the
++   * highest-scoring pick," but add() only ever sets primaryId on the very first pick. Finding
++   * the low-vote duplicate before the popular original silently keeps the low-vote one's OPP
++   * code, comments and shareable link unless the manager notices and manually flips the radio.
++   */
++  it("defaults the primary to the highest-scoring pick, even when a low-vote duplicate is added first", () => {
++    const lowVote = opportunity("low", "OPP-0001", 3, "Low vote duplicate");
++    const popular = opportunity("popular", "OPP-0002", 250, "The popular original");
++
++    searchResults = [lowVote];
++    render(<MergeDrawer onClose={vi.fn()} onMerged={vi.fn()} />);
++
++    fireEvent.change(screen.getByLabelText(/search opportunities to merge/i), {
++      target: { value: "low" },
++    });
++    fireEvent.click(screen.getByRole("button", { name: /OPP-0001/ }));
++
++    fireEvent.click(screen.getByText(/add another/i));
++    searchResults = [popular];
++    fireEvent.change(screen.getByLabelText(/search opportunities to merge/i), {
++      target: { value: "popular" },
++    });
++    fireEvent.click(screen.getByRole("button", { name: /OPP-0002/ }));
++
++    expect(
++      screen.getByLabelText(`Keep ${popular.code} as the surviving opportunity`),
++    ).toBeChecked();
++    expect(
++      screen.getByLabelText(`Keep ${lowVote.code} as the surviving opportunity`),
++    ).not.toBeChecked();
++  });
++});

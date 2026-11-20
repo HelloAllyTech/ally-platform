@@ -1,0 +1,75 @@
+diff --git a/src/learn/controller/learn.controller.ts b/src/learn/controller/learn.controller.ts
+index af82bccf95..d68b96f5dc 100644
+--- a/src/learn/controller/learn.controller.ts
++++ b/src/learn/controller/learn.controller.ts
+@@ -188,18 +188,21 @@ export class LearnController {
+     @Param('id') id: number,
+     @Query('languageCode') languageCode?: string,
+   ): Promise<GetScenarioResponse> {
+-    return this.scenarioService.getScenario(id, {
+-      select: [
+-        'id',
+-        'title',
+-        'scenario',
+-        'description',
+-        'coverImageUrl',
+-        'coverVideoUrl',
+-        'status',
+-      ],
++    return this.scenarioService.getScenario(
++      id,
++      {
++        select: [
++          'id',
++          'title',
++          'scenario',
++          'description',
++          'coverImageUrl',
++          'coverVideoUrl',
++          'status',
++        ],
++      },
+       languageCode,
+-    });
++    );
+   }
+ 
+   @Public()
+diff --git a/src/learn/controller/test/learn.controller.spec.ts b/src/learn/controller/test/learn.controller.spec.ts
+index 4d75f7dc22..3637c302cc 100644
+--- a/src/learn/controller/test/learn.controller.spec.ts
++++ b/src/learn/controller/test/learn.controller.spec.ts
+@@ -388,18 +388,21 @@ describe('LearnController', () => {
+       const result = await controller.getScenario(scenarioId, 'mr');
+ 
+       expect(result).toEqual(mockScenarioResponse);
+-      expect(scenarioService.getScenario).toHaveBeenCalledWith(scenarioId, {
+-        select: [
+-          'id',
+-          'title',
+-          'scenario',
+-          'description',
+-          'coverImageUrl',
+-          'coverVideoUrl',
+-          'status',
+-        ],
+-        languageCode: 'mr',
+-      });
++      expect(scenarioService.getScenario).toHaveBeenCalledWith(
++        scenarioId,
++        {
++          select: [
++            'id',
++            'title',
++            'scenario',
++            'description',
++            'coverImageUrl',
++            'coverVideoUrl',
++            'status',
++          ],
++        },
++        'mr',
++      );
+     });
+   });
+ 

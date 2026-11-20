@@ -1,0 +1,159 @@
+diff --git a/src/llm-agent/service/llm-completion.service.ts b/src/llm-agent/service/llm-completion.service.ts
+index 47568db17e..36623b2758 100644
+--- a/src/llm-agent/service/llm-completion.service.ts
++++ b/src/llm-agent/service/llm-completion.service.ts
+@@ -1,7 +1,7 @@
+ import { Injectable, Logger } from '@nestjs/common';
+ import { LlmUsageService } from 'src/analytics/service/llm-usage.service';
+ import { LlmTask } from 'src/learn/enum/llm-task.enum';
+-import { tierForAiTask } from 'src/llm/constants/ai-task-registry.constants';
++import { callConfigForAiTask } from 'src/llm/constants/ai-task-registry.constants';
+ import {
+   LlmTargetResolverService,
+   LlmTargetSource,
+@@ -105,11 +105,16 @@ export class LlmCompletionService {
+   ) {}
+ 
+   async complete(request: LlmCompletionRequest): Promise<LlmCompletionResult> {
++    // Read from the registry row, not passed in: the AI Tasks screen shows the
++    // same values, and two sources would eventually disagree. Both fields come
++    // from one lookup — fetching them separately is how `neverFallback` got
++    // left out, which let a preview pass for a model that does not exist.
++    const { tier, neverFallback } = callConfigForAiTask(request.taskId);
++
+     const target = await this.resolver.resolve({
+       taskId: request.taskId,
+-      // Read from the registry row, not passed in: the AI Tasks screen shows
+-      // the same value, and two sources would eventually disagree.
+-      tier: tierForAiTask(request.taskId),
++      tier,
++      neverFallback,
+       promptCode: request.promptCode,
+       model: request.model,
+       provider: request.provider,
+diff --git a/src/llm-agent/service/test/llm-completion.service.spec.ts b/src/llm-agent/service/test/llm-completion.service.spec.ts
+index 4a72ca97a0..48b1e16a57 100644
+--- a/src/llm-agent/service/test/llm-completion.service.spec.ts
++++ b/src/llm-agent/service/test/llm-completion.service.spec.ts
+@@ -218,6 +218,75 @@ describe('LlmCompletionService', () => {
+     });
+   });
+ 
++  describe('reading the registry row, not just the resolved target', () => {
++    /**
++     * The gap both real bugs slipped through: every test above mocks the
++     * resolver, so they prove the service HONOURS `fallbackEnabled` without
++     * proving anything about where that value comes from. It came from
++     * nowhere — `neverFallback` sat on the registry row, was read by the AI
++     * Tasks screen, and was never passed into the resolver. So the AI Lab run
++     * and the LLM preview, the two calls whose entire purpose is testing one
++     * named model, fell back silently: a preview returned ok:true for
++     * `gpt-4o-mini-does-not-exist` having quietly answered from gpt-4o-mini.
++     */
++    const capturingService = () => {
++      const resolved: any[] = [];
++      const resolver = {
++        resolve: jest.fn(async (opts: any) => {
++          resolved.push(opts);
++          return {
++            provider: 'openai',
++            model: 'gpt-4o-mini',
++            source: LlmTargetSource.TIER,
++            fallbackEnabled: !opts.neverFallback,
++            tierModel: 'gpt-4o-mini',
++          };
++        }),
++      };
++      const factory = {
++        create: jest.fn(() => ({
++          name: 'openai',
++          stream: () => streamOf('ok')(),
++        })),
++        isConfigured: jest.fn(() => true),
++      };
++      const service = new LlmCompletionService(
++        resolver as any,
++        factory as any,
++        { record: jest.fn() } as any,
++      );
++      return { service, resolved };
++    };
++
++    it.each(['ai-lab-run', 'llm-preview'])(
++      'carries neverFallback from the %s row into resolution',
++      async (taskId) => {
++        const { service, resolved } = capturingService();
++
++        await service.complete({ ...request, taskId, task: null });
++
++        expect(resolved[0].neverFallback).toBe(true);
++      },
++    );
++
++    it('leaves neverFallback off for a task that allows degrading', async () => {
++      const { service, resolved } = capturingService();
++
++      await service.complete({ ...request, taskId: 'track-quiz-grading' });
++
++      expect(resolved[0].neverFallback).toBe(false);
++    });
++
++    it('takes the tier from the row rather than the caller', async () => {
++      const { service, resolved } = capturingService();
++
++      // voice-note-extract is the FAST tier; a caller cannot override it.
++      await service.complete({ ...request, taskId: 'voice-note-extract' });
++
++      expect(resolved[0].tier).toBe('fast');
++    });
++  });
++
+   describe('when it must NOT fall back', () => {
+     it('rethrows a 400 — the request was rejected, not the provider', async () => {
+       const badRequest = Object.assign(new Error('bad shape'), { status: 400 });
+diff --git a/src/llm/constants/ai-task-registry.constants.ts b/src/llm/constants/ai-task-registry.constants.ts
+index 2f6d413895..67c995edc4 100644
+--- a/src/llm/constants/ai-task-registry.constants.ts
++++ b/src/llm/constants/ai-task-registry.constants.ts
+@@ -1150,15 +1150,27 @@ export const AI_TASK_REGISTRY_EXEMPT_TASKS: ReadonlySet<LlmTask> = new Set([
+ ]);
+ 
+ /**
+- * The tier a task resolves at, read by `LlmCompletionService` so a call site
+- * cannot declare one thing while this screen displays another.
++ * Everything `LlmCompletionService` needs from a task's registry row.
++ *
++ * Returned together, and deliberately not as two lookups. `neverFallback` used
++ * to be fetched separately and was simply never wired in, so the two rows that
++ * set it — the AI Lab run and the LLM preview, the two calls whose whole point
++ * is testing ONE named model — silently fell back anyway. A preview then
++ * reported `ok: true` for a model that does not exist, having quietly tested a
++ * different one. One lookup makes forgetting the second field impossible.
+  *
+  * Throws rather than defaulting for an unknown id. A caller reaching here with
+  * a taskId that has no row is a call with no registry entry — the exact gap the
+  * CI guards exist to close — and quietly serving it the cheap tier would hide
+  * that instead of surfacing it.
+  */
+-export const tierForAiTask = (taskId: string): LlmModelTier => {
++export interface AiTaskCallConfig {
++  tier: LlmModelTier;
++  /** True when a substitute model would make the result a lie, not a degradation. */
++  neverFallback: boolean;
++}
++
++export const callConfigForAiTask = (taskId: string): AiTaskCallConfig => {
+   const entry = AI_TASK_REGISTRY.find((row) => row.id === taskId);
+   if (!entry?.tier) {
+     throw new Error(
+@@ -1166,5 +1178,9 @@ export const tierForAiTask = (taskId: string): LlmModelTier => {
+         `a tier to the existing one) in ai-task-registry.constants.ts.`,
+     );
+   }
+-  return entry.tier;
++  return { tier: entry.tier, neverFallback: Boolean(entry.neverFallback) };
+ };
++
++/** The tier alone, for callers that only need a default model. */
++export const tierForAiTask = (taskId: string): LlmModelTier =>
++  callConfigForAiTask(taskId).tier;

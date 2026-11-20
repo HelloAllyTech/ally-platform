@@ -867,6 +867,19 @@ export const ApiEndpoints = {
     HISTORY: "/v1/pm-agent/history",
     HEALTH: "/v1/pm-agent/health",
   },
+  // Bug Hunter v2 (bug-hunter/ at the repo root): suggested fixes, escalations and the
+  // two-part verdict that teaches it. Separate from the old Bug Hunter's endpoints.
+  BUG_HUNTER_V2: {
+    REPORTS: "/v1/bug-hunter-approvals/reports",
+    REPORT: (id: number) => `/v1/bug-hunter-approvals/reports/${id}`,
+    VERDICT: (id: number) => `/v1/bug-hunter-approvals/reports/${id}/verdict`,
+    SETTINGS: "/v1/bug-hunter-approvals/settings",
+    MODE: "/v1/bug-hunter-approvals/settings/mode",
+    BUGS: "/v1/bug-hunter-approvals/bugs",
+    START: (id: number) => `/v1/bug-hunter-approvals/bugs/${id}/start`,
+    V1_BUG: (findingId: string) =>
+      `/v1/bug-hunter-approvals/bugs/v1/${encodeURIComponent(findingId)}`,
+  },
   BUG_HUNTER: {
     SETTINGS: "/v1/bug-hunter/settings",
     MODEL_SETTINGS: "/v1/bug-hunter/settings/models",
@@ -1464,6 +1477,9 @@ export const ROUTES = {
   ROADMAP_IDEA: (code: string) => `/roadmap/i/${code}`,
   BUG_HUNTER: "/bug-hunter",
   PM_AGENT: "/pm-agent",
+  BUG_HUNTER_V2: "/bug-hunter-v2",
+  BUG_HUNTER_V2_REPORT: (id: string | number) => `/bug-hunter-v2/${id}`,
+  BUG_HUNTER_V2_V1_BUG: (findingId: string) => `/bug-hunter-v2/v1/${findingId}`,
   BUILDER: "/builder",
   BUILDER_SESSION: (id: string) => `/builder/${id}`,
   BUILDER_SETTINGS: "/builder/settings",
@@ -1703,6 +1719,7 @@ export const TAG_TYPES = {
   ANALYTICS_AGENT_AUDITS: "analyticsAgentAudits",
   ANALYTICS_AGENT_AUTOMATION: "analyticsAgentAutomation",
   ANALYTICS_CHART_PREFERENCES: "analyticsChartPreferences",
+  BUG_HUNTER_V2_REPORTS: "bugHunterV2Reports",
   BUG_HUNTER_SETTINGS: "bugHunterSettings",
   // Also registered in baseApi.ts's `tagTypes` — an unregistered tag is
   // silently ignored and its invalidation never fires.

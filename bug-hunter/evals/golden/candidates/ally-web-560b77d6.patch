@@ -1,0 +1,44 @@
+diff --git a/apps/ally-admin-dashboard/src/components/organization-access-details/ScribeSettings.tsx b/apps/ally-admin-dashboard/src/components/organization-access-details/ScribeSettings.tsx
+index c7c82ba4d8..fb2699b8cd 100644
+--- a/apps/ally-admin-dashboard/src/components/organization-access-details/ScribeSettings.tsx
++++ b/apps/ally-admin-dashboard/src/components/organization-access-details/ScribeSettings.tsx
+@@ -1,5 +1,6 @@
+ import { FC, useState, useEffect } from "react";
+ 
++import { FEATURE_FLAGS_MAP } from "@ally-ui-mono/ui-shared/featureFlag";
+ import { useGetSummarySectionsQuery } from "@api";
+ import { ArrowSolid } from "@assets";
+ import { ToggleSwitch, Accordion } from "@components";
+@@ -159,6 +160,14 @@ export const ScribeSettings: FC<ScribeSettingsProps> = ({ tenantId }) => {
+     );
+   };
+ 
++  if (!FEATURE_FLAGS_MAP.SCRIBE_SETTINGS_FLAG) {
++    return (
++      <div className="flex-1 flex flex-col gap-4 overflow-hidden min-h-0 w-1/2 mt-4 pb-6">
++        Scribe settings is not enabled
++      </div>
++    );
++  }
++
+   if (isSummarySectionsLoading) {
+     return <ScribeSettingsSkeleton />;
+   }
+diff --git a/apps/ally-admin-dashboard/src/components/organization-access-details/__tests__/ScribeSettings.test.tsx b/apps/ally-admin-dashboard/src/components/organization-access-details/__tests__/ScribeSettings.test.tsx
+index 5fab883224..99244d0124 100644
+--- a/apps/ally-admin-dashboard/src/components/organization-access-details/__tests__/ScribeSettings.test.tsx
++++ b/apps/ally-admin-dashboard/src/components/organization-access-details/__tests__/ScribeSettings.test.tsx
+@@ -3,6 +3,13 @@ import { vi, describe, it, expect, beforeEach } from "vitest";
+ 
+ import { ScribeSettings } from "../ScribeSettings";
+ 
++// Mock feature flags
++vi.mock("@ally-ui-mono/ui-shared/featureFlag", () => ({
++  FEATURE_FLAGS_MAP: {
++    SCRIBE_SETTINGS_FLAG: true,
++  },
++}));
++
+ // Mock the components
+ vi.mock("@components", () => ({
+   ToggleSwitch: ({ enabled, onChange, label }: any) => (

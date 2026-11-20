@@ -5,6 +5,7 @@ import {
   InternalServerErrorException,
   NotFoundException,
   UnprocessableEntityException,
+  Optional,
 } from '@nestjs/common';
 import { EntityManager, In, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -18,6 +19,7 @@ import {
   BugFindingSeverity,
 } from 'src/bug-hunter/enum/bug-finding.enum';
 import { BugHunterRepoClassifierService } from 'src/bug-hunter/service/bug-hunter-repo-classifier.service';
+import { BugHunterBoardService } from 'src/bug-hunter-approvals/service/bug-hunter-board.service';
 import { BugHunterMissClassifierService } from 'src/bug-hunter/service/bug-hunter-miss-classifier.service';
 import { BUG_FINDING_DESCRIPTION_MAX_LENGTH } from 'src/bug-hunter/constants/bug-hunter.constants';
 import {
@@ -117,6 +119,10 @@ export class RoadmapOpportunityService {
     private readonly repoClassifier: BugHunterRepoClassifierService,
     private readonly missClassifier: BugHunterMissClassifierService,
     private readonly roadmapAi: RoadmapAiService,
+    // Bug Hunter v2 (chunk 10): a filed bug also enters v2's queue. Optional and
+    // last, so the tests that build this service by hand and any module without v2
+    // work as before.
+    @Optional() private readonly bugHunterV2?: BugHunterBoardService,
   ) {}
 
   /** `title`, a blank line, then the summary: how a titled idea is stored in `description`. */
@@ -369,6 +375,7 @@ export class RoadmapOpportunityService {
     // already committed. See BugHunterModule's doc for why this is a raw repository
     // injection rather than a call into BugHunterModule (avoids a circular import).
     if (dto.type === RoadmapOpportunityType.BUG) {
+      let v2Repo: string | null = extra?.repo ?? null;
       try {
         // Classified once, here, instead of leaving `repo` null: every one of
         // Bug Hunter's 5 nightly sweeps used to independently spend a full
@@ -388,6 +395,7 @@ export class RoadmapOpportunityService {
         const repo =
           extra?.repo ??
           (await this.repoClassifier.classifyRepo(saved.description)).repo;
+        v2Repo = repo ?? null;
         const finding = await this.bugFindingRepository.save(
           this.bugFindingRepository.create({
             source: BugFindingSource.REPORTED_BUG,
@@ -411,6 +419,13 @@ export class RoadmapOpportunityService {
           }`,
         );
       }
+      // Bug Hunter v2's queue, independent of the v1 finding above: its mode decides
+      // whether and when the bug is worked on. Swallows its own failures.
+      await this.bugHunterV2?.enqueueReported({
+        opportunityId: saved.id,
+        description: saved.description,
+        repo: v2Repo,
+      });
     }
 
     const response = await this.findOne(userId, saved.id);

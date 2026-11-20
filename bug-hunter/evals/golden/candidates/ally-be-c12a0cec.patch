@@ -1,0 +1,275 @@
+diff --git a/src/helpline/constants/helpline-settings.defaults.ts b/src/helpline/constants/helpline-settings.defaults.ts
+index c14f38aaee..971f83c251 100644
+--- a/src/helpline/constants/helpline-settings.defaults.ts
++++ b/src/helpline/constants/helpline-settings.defaults.ts
+@@ -59,27 +59,32 @@ export const HELPLINE_DEFAULT_SETTINGS: HelplineSettings = {
+     {
+       key: 'presenting_concern',
+       label: 'Presenting concern',
+-      description: 'What they came to talk about',
++      description:
++        "What they came to talk about, in their words. Write 'Not discussed' if it wasn't.",
+     },
+     {
+       key: 'feelings',
+       label: 'Feelings',
+-      description: 'How they are feeling',
++      description:
++        "How they said they are feeling. Write 'Not discussed' if they didn't say.",
+     },
+     {
+       key: 'risk',
+       label: 'Risk',
+-      description: 'Any risk discussed, and what was agreed',
++      description:
++        "Any risk they disclosed (thoughts, plan, means) and what was agreed about safety. Write 'None disclosed' if there was none.",
+     },
+     {
+       key: 'supports',
+       label: 'Supports',
+-      description: 'What they have tried and who supports them',
++      description:
++        "What they have tried and the people who support them, as they described them. Warning signs are not supports. Write 'Not discussed' if it wasn't.",
+     },
+     {
+       key: 'next_step',
+       label: 'Next step',
+-      description: 'Agreed next step',
++      description:
++        "A next step the talker actually agreed to in the chat. Write 'None agreed' if there wasn't one — never suggest one.",
+     },
+   ],
+ };
+diff --git a/src/helpline/controller/helpline.controller.ts b/src/helpline/controller/helpline.controller.ts
+index db145b89f7..85e01359c3 100644
+--- a/src/helpline/controller/helpline.controller.ts
++++ b/src/helpline/controller/helpline.controller.ts
+@@ -38,6 +38,7 @@ import {
+   HelplineTenantParam,
+   RequireHelplineEnabled,
+   RequireHelplineEnabledForChat,
++  RequireHelplineEnabledOrContinuing,
+ } from '../guard/helpline-enabled.guard';
+ import { HelplineClaimService } from '../service/helpline-claim.service';
+ import { HelplineListenerService } from '../service/helpline-listener.service';
+@@ -115,7 +116,7 @@ export class HelplineController {
+     };
+   }
+ 
+-  @RequireHelplineEnabled()
++  @RequireHelplineEnabledOrContinuing()
+   @AuthPermissions([PERMISSIONS.VIEW_HELPLINE_LOBBY])
+   @Get('me')
+   me(
+diff --git a/src/helpline/controller/test/helpline-controller-guards.spec.ts b/src/helpline/controller/test/helpline-controller-guards.spec.ts
+index 8a6936472a..3ea39fc4f7 100644
+--- a/src/helpline/controller/test/helpline-controller-guards.spec.ts
++++ b/src/helpline/controller/test/helpline-controller-guards.spec.ts
+@@ -9,6 +9,7 @@ import { CustomThrottlerGuard } from 'src/rate-limit/guard/custom-throttler.guar
+ import {
+   HelplineChatScopedGuard,
+   HelplineEnabledGuard,
++  HelplineEnabledOrContinuingGuard,
+ } from '../../guard/helpline-enabled.guard';
+ import { HelplineGuestGuard } from '../../guard/helpline-guest.guard';
+ import { HelplineAdminController } from '../helpline-admin.controller';
+@@ -81,7 +82,9 @@ describe('helpline controller guards', () => {
+         const gate = guards.indexOf(
+           CHAT_SCOPED_ROUTES.includes(name)
+             ? HelplineChatScopedGuard
+-            : HelplineEnabledGuard,
++            : name === 'me'
++              ? HelplineEnabledOrContinuingGuard
++              : HelplineEnabledGuard,
+         );
+         expect(jwt).toBeGreaterThanOrEqual(0);
+         expect(perms).toBeGreaterThan(jwt);
+@@ -97,6 +100,22 @@ describe('helpline controller guards', () => {
+       },
+     );
+ 
++    it('only `me` uses the enabled-or-continuing gate', () => {
++      const using = handlers(HelplineController)
++        .filter(([, handler]) =>
++          guardsOf(handler as object).includes(
++            HelplineEnabledOrContinuingGuard,
++          ),
++        )
++        .map(([name]) => name);
++      expect(using).toEqual(['me']);
++      expect(
++        guardsOf(HelplineController.prototype.me).filter(
++          (g) => g === HelplineEnabledGuard,
++        ),
++      ).toEqual([]);
++    });
++
+     it('`enabled` is authenticated-only and never gated (it IS the nav gate)', () => {
+       const guards = guardsOf(HelplineController.prototype.enabled);
+       expect(guards).toContain(JwtGuard);
+diff --git a/src/helpline/guard/helpline-enabled.guard.ts b/src/helpline/guard/helpline-enabled.guard.ts
+index ef47202081..9423548975 100644
+--- a/src/helpline/guard/helpline-enabled.guard.ts
++++ b/src/helpline/guard/helpline-enabled.guard.ts
+@@ -146,6 +146,40 @@ export class HelplineChatScopedGuard implements CanActivate {
+   }
+ }
+ 
++/**
++ * For `GET me` only: exactly HelplineEnabledGuard while the helpline is on.
++ * While it is OFF, a listener who is still the listener of record of an
++ * ACTIVE chat passes, so the chat view keeps the org's escalation checklist,
++ * support contact and summary fields for the conversation they are finishing.
++ * Profile and presence writes stay on the plain gate (going Available is new
++ * work).
++ */
++@Injectable()
++export class HelplineEnabledOrContinuingGuard implements CanActivate {
++  constructor(
++    private readonly tenantFeatureService: TenantFeatureService,
++    private readonly tenantService: HelplineTenantService,
++    private readonly chats: HelplineChatRepository,
++  ) {}
++
++  async canActivate(context: ExecutionContext): Promise<boolean> {
++    const request = context.switchToHttp().getRequest();
++    const user = requireUser(request);
++    const enabled = await this.tenantFeatureService.isEnabledForTenant(
++      PreferenceName.TEXT_HELPLINE_ENABLED,
++      user.tenantId,
++    );
++    const tenant = await this.tenantService.resolve(user.tenantId);
++    if (!tenant) throw helplineDisabled();
++    if (!enabled) {
++      const active = await this.chats.listActiveForListener(tenant.id, user.id);
++      if (active.length === 0) throw helplineDisabled();
++    }
++    request.helplineTenant = tenant;
++    return true;
++  }
++}
++
+ /** Place ABOVE `@AuthPermissions(...)` (see HelplineEnabledGuard). */
+ export const RequireHelplineEnabled = () =>
+   applyDecorators(UseGuards(HelplineEnabledGuard));
+@@ -157,6 +191,10 @@ export const RequireHelplineEnabled = () =>
+ export const RequireHelplineEnabledForChat = () =>
+   applyDecorators(UseGuards(HelplineChatScopedGuard));
+ 
++/** For `GET me` (see HelplineEnabledOrContinuingGuard). Place ABOVE `@AuthPermissions(...)`. */
++export const RequireHelplineEnabledOrContinuing = () =>
++  applyDecorators(UseGuards(HelplineEnabledOrContinuingGuard));
++
+ /** The tenant HelplineEnabledGuard resolved for this request. */
+ export const HelplineTenantParam = createParamDecorator(
+   (_: unknown, ctx: ExecutionContext): HelplineTenant =>
+diff --git a/src/helpline/guard/test/helpline-disabled-continuation.spec.ts b/src/helpline/guard/test/helpline-disabled-continuation.spec.ts
+index 087ef18d61..3adcaec12d 100644
+--- a/src/helpline/guard/test/helpline-disabled-continuation.spec.ts
++++ b/src/helpline/guard/test/helpline-disabled-continuation.spec.ts
+@@ -7,6 +7,7 @@ import { HelplineSocketAuthService } from '../../gateway/helpline-socket-auth.se
+ import {
+   HELPLINE_DISABLED_GRACE_MS,
+   HelplineChatScopedGuard,
++  HelplineEnabledOrContinuingGuard,
+   listenerMayContinue,
+ } from '../helpline-enabled.guard';
+ 
+@@ -312,3 +313,54 @@ describe('gateway while disabled', () => {
+     ).resolves.toEqual({ ok: true, presence: 'AWAY' });
+   });
+ });
++
++describe('HelplineEnabledOrContinuingGuard (GET me)', () => {
++  const build = (enabled: boolean, activeChats: unknown[]) => {
++    const chats = {
++      listActiveForListener: jest.fn().mockResolvedValue(activeChats),
++    };
++    const guard = new HelplineEnabledOrContinuingGuard(
++      { isEnabledForTenant: jest.fn().mockResolvedValue(enabled) } as never,
++      { resolve: jest.fn().mockResolvedValue(TENANT) } as never,
++      chats as never,
++    );
++    const run = (userId: number) => {
++      const request: Record<string, unknown> = {
++        user: { id: userId, tenantId: 'acme' },
++      };
++      return {
++        request,
++        result: guard.canActivate({
++          switchToHttp: () => ({ getRequest: () => request }),
++        } as never),
++      };
++    };
++    return { run, chats };
++  };
++
++  it('enabled: passes without looking at chats', async () => {
++    const { run, chats } = build(true, []);
++    const { request, result } = run(SUPERVISOR);
++    await expect(result).resolves.toBe(true);
++    expect(request.helplineTenant).toBe(TENANT);
++    expect(chats.listActiveForListener).not.toHaveBeenCalled();
++  });
++
++  it('disabled: a listener still holding an ACTIVE chat passes, tenant-scoped', async () => {
++    const { run, chats } = build(false, [chat()]);
++    const { request, result } = run(LISTENER);
++    await expect(result).resolves.toBe(true);
++    expect(chats.listActiveForListener).toHaveBeenCalledWith(
++      TENANT.id,
++      LISTENER,
++    );
++    expect(request.helplineTenant).toBe(TENANT);
++  });
++
++  it('disabled: anyone without an active chat gets HELPLINE_DISABLED', async () => {
++    const { run } = build(false, []);
++    expect(await errorCode(run(SUPERVISOR).result)).toBe(
++      ErrorCode.HELPLINE_DISABLED,
++    );
++  });
++});
+diff --git a/src/helpline/helpline.module.ts b/src/helpline/helpline.module.ts
+index d1daaf5882..8066934b88 100644
+--- a/src/helpline/helpline.module.ts
++++ b/src/helpline/helpline.module.ts
+@@ -26,6 +26,7 @@ import { HelplineSocketAuthService } from './gateway/helpline-socket-auth.servic
+ import {
+   HelplineChatScopedGuard,
+   HelplineEnabledGuard,
++  HelplineEnabledOrContinuingGuard,
+ } from './guard/helpline-enabled.guard';
+ import { HelplineGuestGuard } from './guard/helpline-guest.guard';
+ import { HelplineChatRepository } from './repository/helpline-chat.repository';
+@@ -142,6 +143,7 @@ import { HelplineTenantService } from './service/helpline-tenant.service';
+     HelplineAdminService,
+     HelplineEnabledGuard,
+     HelplineChatScopedGuard,
++    HelplineEnabledOrContinuingGuard,
+     HelplineGuestGuard,
+     HelplineSocketAuthService,
+     HelplineChatGateway,
+diff --git a/src/helpline/service/test/helpline-summary.service.spec.ts b/src/helpline/service/test/helpline-summary.service.spec.ts
+index fde5f87b07..86d461f3f8 100644
+--- a/src/helpline/service/test/helpline-summary.service.spec.ts
++++ b/src/helpline/service/test/helpline-summary.service.spec.ts
+@@ -139,9 +139,17 @@ describe('helpline summaries', () => {
+       expect(keys).toEqual(
+         HELPLINE_DEFAULT_SETTINGS.summaryFields.map((f) => f.key),
+       );
++      const riskField = HELPLINE_DEFAULT_SETTINGS.summaryFields.find(
++        (f) => f.key === 'risk',
++      )!;
+       expect(descriptions.risk).toBe(
+-        'Risk: Any risk discussed, and what was agreed',
++        `${riskField.label}: ${riskField.description}`,
+       );
++      // The defaults tell the model to say so rather than invent: a live
++      // walk-through got a made-up "next step" and a warning sign listed as
++      // a support.
++      expect(descriptions.next_step).toContain('None agreed');
++      expect(descriptions.supports).toContain('Warning signs are not supports');
+       const [sql, params] = summaries.query.mock.calls[0];
+       expect(sql).toContain(`"helpline_chat_summaries"."edited_by" IS NULL`);
+       expect(sql).toContain(`"erased_at" IS NOT NULL`);

@@ -1,0 +1,81 @@
+diff --git a/src/health/controller/health.controller.ts b/src/health/controller/health.controller.ts
+index 023486ff3f..73b3146afe 100644
+--- a/src/health/controller/health.controller.ts
++++ b/src/health/controller/health.controller.ts
+@@ -84,7 +84,7 @@ export class HealthController {
+       return {
+         redis: { status: 'up', responseTimeMs: Date.now() - startedAt },
+       };
+-    } catch (error) {
++    } catch {
+       // First ping failed. Wait a moment and try one more time — a transient
+       // blip should not fail the whole health check.
+       await new Promise((resolve) => setTimeout(resolve, 200));
+@@ -93,7 +93,7 @@ export class HealthController {
+         return {
+           redis: { status: 'up', responseTimeMs: Date.now() - startedAt },
+         };
+-      } catch {
++      } catch (error) {
+         const reason = error instanceof Error ? error.message : 'unknown error';
+         this.logger.error(`Health check: Redis is unreachable — ${reason}`);
+         // Terminus turns a `down` indicator into a 503 for the whole endpoint,
+diff --git a/src/health/controller/test/health.controller.spec.ts b/src/health/controller/test/health.controller.spec.ts
+index 211fcaa6db..e17d5aba6d 100644
+--- a/src/health/controller/test/health.controller.spec.ts
++++ b/src/health/controller/test/health.controller.spec.ts
+@@ -29,18 +29,25 @@ describe('HealthController', () => {
+                 const results = await Promise.all(
+                   checks.map((check) => check()),
+                 );
+-                const combined = results.reduce(
+-                  (acc: HealthIndicatorResult, one: HealthIndicatorResult) => ({
+-                    ...acc,
+-                    ...one,
+-                  }),
+-                  {},
+-                );
++                const combinedInfo: HealthIndicatorResult = {};
++                const combinedError: HealthIndicatorResult = {};
++                let isOk = true;
++
++                for (const result of results) {
++                  for (const key in result) {
++                    if (result[key].status === 'down') {
++                      isOk = false;
++                      combinedError[key] = result[key];
++                    }
++                    combinedInfo[key] = result[key];
++                  }
++                }
++
+                 return {
+-                  status: 'ok',
+-                  info: combined,
+-                  error: {},
+-                  details: combined,
++                  status: isOk ? 'ok' : 'error',
++                  info: combinedInfo,
++                  error: combinedError,
++                  details: combinedInfo,
+                 };
+               },
+             ),
+@@ -98,4 +105,17 @@ describe('HealthController', () => {
+ 
+     expect(health.info?.redis?.status).toBe('down');
+   });
++
++  it('returns the second error when redis check fails twice', async () => {
++    const firstError = new Error('First timeout');
++    const secondError = new Error('Second timeout');
++    (redis.ping as jest.Mock)
++      .mockRejectedValueOnce(firstError)
++      .mockRejectedValueOnce(secondError);
++
++    const health = await controller.check();
++
++    expect(health.info?.redis?.status).toBe('down');
++    expect(health.error?.redis?.reason).toBe('Second timeout');
++  });
+ });

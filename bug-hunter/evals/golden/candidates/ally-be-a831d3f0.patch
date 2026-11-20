@@ -1,0 +1,157 @@
+diff --git a/src/product-roadmap/service/roadmap-copilot-product-map.service.ts b/src/product-roadmap/service/roadmap-copilot-product-map.service.ts
+index 7766907124..2110717afa 100644
+--- a/src/product-roadmap/service/roadmap-copilot-product-map.service.ts
++++ b/src/product-roadmap/service/roadmap-copilot-product-map.service.ts
+@@ -13,6 +13,27 @@ import { ROADMAP_COPILOT_PRODUCT_MAP } from '../constants/product-roadmap.consta
+ /** The wiki's own one-line-per-page index, generated from page frontmatter. */
+ const WIKI_ROUTING_PATH = 'wiki/ROUTING.md';
+ 
++/**
++ * Wiki index sections about working ON the codebase rather than what the product is — the
++ * deprecated product-practice pages (Stacks replaced them), contributing, agent memory, the
++ * skill template, the knowledge base's own meta pages.
++ */
++const WIKI_SECTIONS_DROPPED =
++  /deprecated|contributing|agent memory|skills|start here|don.t load/i;
++
++/** Root files that are process boilerplate in every repo, or a copy of the wiki index. */
++const ROOT_DOCS_DROPPED = new Set([
++  'AGENTS.md',
++  'CODE_OF_CONDUCT.md',
++  'CONTRIBUTING.md',
++  'DEPLOYMENT.md',
++  'DOCKER_TESTING_SETUP.md',
++  'SECURITY.md',
++  'TESTING.md',
++  'WIKI-ROUTING.md',
++  'pr_body.md',
++]);
++
+ interface MapSection {
+   text: string;
+   /** False when a source could not be read — the result is then cached only briefly. */
+@@ -192,9 +213,10 @@ export class RoadmapCopilotProductMapService {
+   }
+ 
+   /**
+-   * The wiki's routing index, minus its preamble (fetch instructions for humans) and minus
+-   * any section marked DEPRECATED — the old product-practice pages, which Stacks replaced and
+-   * which would otherwise be offered as current guidance.
++   * The wiki's routing index, minus its preamble (fetch instructions for humans), its footer,
++   * and the sections about working on the codebase rather than what it is — above all the
++   * DEPRECATED product-practice pages, which Stacks replaced and which would otherwise be
++   * offered as current guidance. Headings are demoted to sit under this section's own.
+    */
+   private async wikiIndex(): Promise<MapSection> {
+     const header = `### The wiki — read with wiki_read, path "wiki/" + the path below (e.g. "wiki/platform/architecture.md")`;
+@@ -209,11 +231,20 @@ export class RoadmapCopilotProductMapService {
+         complete: false,
+       };
+     }
+-    const sections = result.content.split(/^(?=## )/m);
++    const sections: string[] = result.content.split(/^(?=## )/m);
+     const kept = sections
+-      .filter((section: string) => section.startsWith('## '))
++      .filter((section) => section.startsWith('## '))
+       .filter(
+-        (section: string) => !/^## [^\n]*deprecated/i.test(section.trim()),
++        (section) =>
++          !WIKI_SECTIONS_DROPPED.test(section.slice(0, section.indexOf('\n'))),
++      )
++      .map((section) =>
++        section
++          .replace(/^## /, '#### ')
++          .split('\n')
++          // The footer is an italic page/word count for people choosing what to load.
++          .filter((line) => !/^_.*_$/.test(line.trim()))
++          .join('\n'),
+       )
+       .join('')
+       .trim();
+@@ -243,7 +274,9 @@ export class RoadmapCopilotProductMapService {
+           result?.message ?? result?.error ?? 'unknown error',
+         )})`;
+       }
+-      const files: string[] = Array.isArray(result.files) ? result.files : [];
++      const files: string[] = (
++        Array.isArray(result.files) ? result.files : []
++      ).filter((path: string) => !ROOT_DOCS_DROPPED.has(path));
+       if (!files.length) return `- ${repo}: no markdown docs`;
+       const shown = files.slice(0, ROADMAP_COPILOT_PRODUCT_MAP.DOCS_PER_REPO);
+       const more = files.length - shown.length;
+diff --git a/src/product-roadmap/service/roadmap-copilot-tools.service.ts b/src/product-roadmap/service/roadmap-copilot-tools.service.ts
+index e214c76b42..e0d94530f1 100644
+--- a/src/product-roadmap/service/roadmap-copilot-tools.service.ts
++++ b/src/product-roadmap/service/roadmap-copilot-tools.service.ts
+@@ -203,7 +203,8 @@ export class RoadmapCopilotToolsService {
+           'pages, and the wiki — and get back matching file paths. The quickest way to learn ' +
+           'how an area works today, what it is called and why it is built that way. Read the ' +
+           'one or two that look right with github_read_file (or wiki_read for the wiki). ' +
+-          'Matches words, not meaning: use the names the product map uses.',
++          'Every word must match, so search one to three words — a screen label or feature ' +
++          'name from the product map — never a sentence.',
+         input_schema: {
+           type: 'object',
+           properties: {
+@@ -223,7 +224,8 @@ export class RoadmapCopilotToolsService {
+           'Search the Ally codebase and get back matching file paths. Use it to learn how an ' +
+           'area works today when the docs do not say, and to check whether something already ' +
+           'exists, half-exists, or lives behind a feature toggle — not to design the build. ' +
+-          'Matches exact words and identifiers; the product map tells you which to search for.',
++          'Every word must match, so search one identifier or one to three words. A ' +
++          "screen's feature-toggle key from the product map finds its route and controller.",
+         input_schema: {
+           type: 'object',
+           properties: {
+diff --git a/src/product-roadmap/service/test/roadmap-copilot-product-map.service.spec.ts b/src/product-roadmap/service/test/roadmap-copilot-product-map.service.spec.ts
+index ea02850302..999f694d7d 100644
+--- a/src/product-roadmap/service/test/roadmap-copilot-product-map.service.spec.ts
++++ b/src/product-roadmap/service/test/roadmap-copilot-product-map.service.spec.ts
+@@ -21,6 +21,16 @@ const ROUTING = [
+   '',
+   '- `repos/ally-be.md` (4046w) — ally-be is the multi-tenant NestJS backend…',
+   '',
++  '## Contributing & setup',
++  '',
++  '- `contributing/guide.md` (767w) — Branch naming, commit conventions…',
++  '',
++  "## Don't load these for a task",
++  '',
++  '- `log.md` — append-only history',
++  '',
++  '_43 pages, 73,221 words total._',
++  '',
+ ].join('\n');
+ 
+ const pack = (repo: string, body: string) => ({
+@@ -93,12 +103,28 @@ describe('RoadmapCopilotProductMapService', () => {
+     expect(text).toMatch(/ahead of what users have/);
+   });
+ 
+-  it('drops the deprecated wiki section and the index preamble', async () => {
++  it('keeps the wiki pages about the product and drops the ones about working on it', async () => {
+     const text = await build().service.render();
+ 
++    expect(text).toContain('#### Platform & architecture');
++    expect(text).toContain('#### Per-repo pages');
++    // Deprecated product practice (Stacks replaced it), process pages, meta pages, preamble.
+     expect(text).not.toContain('product/ui.md');
++    expect(text).not.toContain('contributing/guide.md');
++    expect(text).not.toContain('log.md');
+     expect(text).not.toContain('Fetch as');
+-    expect(text).toContain('## Per-repo pages');
++    expect(text).not.toContain('73,221 words');
++  });
++
++  it('leaves process boilerplate out of the repo docs list', async () => {
++    const text = await build({
++      docs: () => ({
++        ok: true,
++        files: ['README.md', 'CONTRIBUTING.md', 'AGENTS.md', 'DATA_SCHEMA.md'],
++      }),
++    }).service.render();
++
++    expect(text).toContain('- ally-be: README.md, DATA_SCHEMA.md\n');
+   });
+ 
+   /**
