@@ -6,6 +6,7 @@ import { ButtonVariant } from "@components/types";
 import { Skeleton } from "@components/v2";
 import type { UserList } from "@types";
 
+import { TEMPLATE_COPY } from "../../Templates/copy";
 import { HOME, fill } from "../copy";
 import { CollapsibleGroup, SectionHead } from "../fields";
 import { AssistantBlock, assistantSummary } from "./AssistantBlock";
@@ -18,6 +19,7 @@ import { ListMenu } from "./ListMenu";
 import { NewListForm } from "./NewListForm";
 import { ReadyMadeSetup } from "./ReadyMadeSetup";
 import { RulesBlock } from "./RulesBlock";
+import { TemplateAdd } from "./TemplateAdd";
 import { MemorySettings } from "../sections/MemorySettings";
 import { Sheet } from "../ui/Sheet";
 
@@ -27,7 +29,7 @@ import "./lists.css";
 
 const t = () => HOME.userLists;
 
-type Mode = { kind: "lists" } | { kind: "setup" } | { kind: "scratch" };
+type Mode = { kind: "lists" } | { kind: "setup" } | { kind: "scratch" } | { kind: "template" };
 
 /**
  * Lists (chunk 5b): the owner's own tables. No lists yet: two ways to start. With lists: a tab
@@ -73,6 +75,12 @@ export const ListsSection: React.FC<SectionProps> = ({
             if (key) setOpen(key);
           }}
           tryIt={tryIt}
+        />
+      ) : mode.kind === "template" ? (
+        <TemplateAdd
+          bot={bot}
+          onClose={() => setMode({ kind: "lists" })}
+          onRunCheckup={() => go("checkup")}
         />
       ) : mode.kind === "scratch" ? (
         <NewListForm
@@ -126,6 +134,7 @@ export const ListsSection: React.FC<SectionProps> = ({
               canEdit={canEdit}
               onReadyMade={() => setMode({ kind: "setup" })}
               onScratch={() => setMode({ kind: "scratch" })}
+              onTemplate={canManage ? () => setMode({ kind: "template" }) : undefined}
             />
           )}
         </>
@@ -144,6 +153,14 @@ export const ListsSection: React.FC<SectionProps> = ({
                 setAdding(false);
                 setMode({ kind: "scratch" });
               }}
+              onTemplate={
+                canManage
+                  ? () => {
+                      setAdding(false);
+                      setMode({ kind: "template" });
+                    }
+                  : undefined
+              }
             />
           </div>
         </Sheet>
@@ -152,11 +169,28 @@ export const ListsSection: React.FC<SectionProps> = ({
   );
 };
 
-const StartChoices: React.FC<{ onReadyMade: () => void; onScratch: () => void }> = ({
-  onReadyMade,
-  onScratch,
-}) => (
+const StartChoices: React.FC<{
+  onReadyMade: () => void;
+  onScratch: () => void;
+  /** Owners: Add from a template (T1). */
+  onTemplate?: () => void;
+}> = ({ onReadyMade, onScratch, onTemplate }) => (
   <div className="ally-lists__starts">
+    {onTemplate && (
+      <Button
+        variant={ButtonVariant.TEXT}
+        type="button"
+        className="ally-lists__start ally-press !h-auto"
+        onClick={onTemplate}
+        data-testid="lists-start-template"
+      >
+        <span className="ally-lists__start-icon" aria-hidden="true">
+          🧩
+        </span>
+        <span className="ally-lists__start-title">{TEMPLATE_COPY.tools.title}</span>
+        <span className="ally-small">{TEMPLATE_COPY.tools.hint}</span>
+      </Button>
+    )}
     <Button
       variant={ButtonVariant.TEXT}
       type="button"
@@ -188,7 +222,8 @@ const EmptyLists: React.FC<{
   canEdit: boolean;
   onReadyMade: () => void;
   onScratch: () => void;
-}> = ({ canEdit, onReadyMade, onScratch }) => (
+  onTemplate?: () => void;
+}> = ({ canEdit, onReadyMade, onScratch, onTemplate }) => (
   <div className="ally-card ally-lists__empty" data-testid="lists-empty">
     <div className="ally-lists__empty-art" aria-hidden="true">
       <span />
@@ -197,7 +232,9 @@ const EmptyLists: React.FC<{
     </div>
     <h3 className="ally-lists__empty-title">{t().empty.title}</h3>
     <p className="ally-lists__empty-body">{t().empty.body}</p>
-    {canEdit && <StartChoices onReadyMade={onReadyMade} onScratch={onScratch} />}
+    {canEdit && (
+      <StartChoices onReadyMade={onReadyMade} onScratch={onScratch} onTemplate={onTemplate} />
+    )}
   </div>
 );
 

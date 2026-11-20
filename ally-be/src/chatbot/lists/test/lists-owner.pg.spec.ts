@@ -213,7 +213,7 @@ describePg('Lists, the owner’s section (Postgres)', () => {
 
     it('lists the catalogue grouped, with the options to fill in', () => {
       const { groups } = owner.catalogue();
-      expect(groups.flatMap((g) => g.items)).toHaveLength(14);
+      expect(groups.flatMap((g) => g.items)).toHaveLength(15);
       const appointments = groups[0].items[0];
       expect(appointments).toMatchObject({
         name: 'appointments',

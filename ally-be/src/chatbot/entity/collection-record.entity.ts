@@ -5,7 +5,9 @@ import { BaseWithoutTenantEntity } from '../../common/entity/base-without-tenant
 export type RecordActorRef =
   | { kind: 'user'; user_id: number }
   | { kind: 'import'; user_id: number | null }
-  | { kind: 'agent'; run_id: string };
+  | { kind: 'agent'; run_id: string }
+  // T1: written by a use-case template; `example` marks a neutral example to replace.
+  | { kind: 'template'; template_id: string; example?: true };
 
 /**
  * One entry of one list (chunk 5a). Every list of every bot shares this table; `data` holds the

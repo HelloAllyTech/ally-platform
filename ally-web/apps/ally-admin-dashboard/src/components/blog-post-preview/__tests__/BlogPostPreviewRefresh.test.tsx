@@ -50,7 +50,9 @@ describe("BlogPostPreview refresh", () => {
 
   it("re-reads the saved post and says it is the saved version for unsaved previews", async () => {
     state.load.mockResolvedValue({ data: savedPost });
-    render(<BlogPostPreview post={base} saved={{ id: "p1", slug: "s" }} unsaved onClose={vi.fn()} />);
+    render(
+      <BlogPostPreview post={base} saved={{ id: "p1", slug: "s" }} unsaved onClose={vi.fn()} />,
+    );
     expect(screen.queryByText(/Showing the saved version/)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
     expect(await screen.findByRole("heading", { name: "Saved title" })).toBeInTheDocument();

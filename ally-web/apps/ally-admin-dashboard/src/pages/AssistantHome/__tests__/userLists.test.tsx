@@ -194,6 +194,16 @@ describe("no lists yet", () => {
     expect(screen.getByRole("button", { name: new RegExp(t.empty.scratch) })).toBeTruthy();
   });
 
+  it("offers owners a whole use case from a template; editors don't see it (T1)", () => {
+    const owner = render(
+      <ListsSection bot={BOT} home={{} as never} canEdit canManage go={vi.fn()} />,
+    );
+    expect(owner.getByTestId("lists-start-template").textContent).toContain("Add from a template");
+    owner.unmount();
+    render(<ListsSection bot={BOT} home={{} as never} canEdit canManage={false} go={vi.fn()} />);
+    expect(screen.queryByTestId("lists-start-template")).toBeNull();
+  });
+
   it("guides a ready-made list: choose installs it, then Make it yours, then times", async () => {
     h.results.install = () => {
       h.lists.current = [SLOTS, APPOINTMENTS];

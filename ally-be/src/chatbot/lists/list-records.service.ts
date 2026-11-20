@@ -99,6 +99,17 @@ function cast(field: CollectionField): string {
   }
 }
 
+/** A template's example stops being one once the owner changes it (T1). */
+function unlessChanged(
+  creator: RecordCreator | null,
+  record: Pick<CollectionRecord, 'version'>,
+): RecordCreator | null {
+  if (!creator?.example || record.version <= 1) return creator;
+  const rest = { ...creator };
+  delete rest.example;
+  return rest;
+}
+
 /**
  * The lists engine (Agents v2, chunk 5a): every read and write of a list's records, for every
  * caller. The owner API, CSV import and the agent's tools (chunk 6) all come through here, so a
@@ -1334,7 +1345,11 @@ export class ListRecordsService {
     for (const r of records) {
       const ref = r.createdBy;
       if (ref?.kind === 'agent' && ref.run_id) runIds.add(ref.run_id);
-      if (ref && ref.kind !== 'agent' && typeof ref.user_id === 'number') {
+      if (
+        ref &&
+        (ref.kind === 'user' || ref.kind === 'import') &&
+        typeof ref.user_id === 'number'
+      ) {
         userIds.add(ref.user_id);
       }
     }
@@ -1368,6 +1383,9 @@ export class ListRecordsService {
           kind: 'agent',
           ...(conversation ? { conversation_id: conversation } : {}),
         };
+      }
+      if (ref.kind === 'template') {
+        return { kind: 'template', ...(ref.example ? { example: true } : {}) };
       }
       const name =
         typeof ref.user_id === 'number' ? names.get(ref.user_id) : undefined;
@@ -1451,7 +1469,9 @@ export class ListRecordsService {
         contact_id: record.contactId ?? null,
         created_at: iso(record.createdAt)!,
         updated_at: iso(record.updatedAt)!,
-        ...(creators ? { created_by: creators(record.createdBy) } : {}),
+        ...(creators
+          ? { created_by: unlessChanged(creators(record.createdBy), record) }
+          : {}),
         ...(record.deletedAt !== undefined
           ? { deleted_at: iso(record.deletedAt) }
           : {}),

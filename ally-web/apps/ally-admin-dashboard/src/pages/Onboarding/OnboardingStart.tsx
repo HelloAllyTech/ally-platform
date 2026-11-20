@@ -2,23 +2,27 @@ import React, { useRef, useState } from "react";
 
 import { useNavigate } from "react-router-dom";
 
+import { useGetTemplateCatalogueQuery } from "@api";
 import { Button, PrimaryButton, Question, StepFrame } from "@components/v2";
 import { ROUTES } from "@constants";
 
 import { COPY, fill } from "./copy";
 import { ACCEPTED_FILES, filesProblem } from "./useDraftUpload";
 import { useOnboardingStart } from "./useOnboardingStart";
+import { TemplateSetup } from "../Templates/TemplateSetup";
 
 /** Before the read, the flow's length is a guess: the screenshots' typical twelve steps. */
 const TYPICAL_STEPS = 12;
 
-type StartMode = "choose" | "website" | "documents" | "describe" | "interview";
+type StartMode = "choose" | "website" | "documents" | "describe" | "interview" | "template";
 
 const METHODS: { id: Exclude<StartMode, "choose">; icon: string }[] = [
   { id: "website", icon: "🌐" },
   { id: "documents", icon: "📄" },
   { id: "describe", icon: "✏️" },
   { id: "interview", icon: "💬" },
+  // T1: a whole use case set up from one choice.
+  { id: "template", icon: "🧩" },
 ];
 
 const formStyle = { display: "flex", flexDirection: "column", gap: 14 } as const;
@@ -41,6 +45,7 @@ export const OnboardingStart: React.FC<{
   const [files, setFiles] = useState<File[]>([]);
   const [fileProblem, setFileProblem] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const templates = useGetTemplateCatalogueQuery(undefined, { skip: mode !== "template" });
 
   const open = (id: string | null) => {
     if (id) navigate(ROUTES.CHATBOT_NEW_SESSION(id));
@@ -233,6 +238,20 @@ export const OnboardingStart: React.FC<{
             {COPY.start.interviewButton}
           </PrimaryButton>
         </Question>
+      )}
+
+      {mode === "template" && (
+        <TemplateSetup
+          catalogue={templates.data}
+          loading={templates.isLoading}
+          failed={templates.isError}
+          onRetry={() => void templates.refetch()}
+          askName
+          busy={start.busy}
+          onSubmit={async (template, answers, name) =>
+            open(await start.startWithTemplate(template.id, answers, name))
+          }
+        />
       )}
 
       {(start.error || fileProblem) && (
