@@ -50,7 +50,6 @@ export * from "./RoleplaySessionLogs/RoleplaySessionLogs";
 export * from "./RoleplaySessionLogs/RoleplaySessionLogDetail";
 export * from "./Terms/Terms";
 export * from "./Privacy/Privacy";
-export * from "./ProductRoadmap";
 export * from "./Roadmap";
 export * from "./WhatsAppBot";
 // NOTE: Analytics is intentionally NOT re-exported here. It pulls in IBM Carbon

@@ -16,7 +16,7 @@ interface UseSpeechCaptureOptions {
   /** Called with each transcribed phrase, in the order it was spoken. */
   onFinal: (text: string) => void;
   /** Turns one recorded clip into text ('' when nothing intelligible was said). */
-  transcribe: (clip: Blob) => Promise<string>;
+  transcribe: (clip: Blob, durationMs: number) => Promise<string>;
   /** A clip could not be transcribed. Its words are lost; later ones still arrive. */
   onError?: () => void;
 }
@@ -121,14 +121,14 @@ export const useSpeechCapture = ({ onFinal, transcribe, onError }: UseSpeechCapt
   }, []);
 
   const send = useCallback(
-    (blob: Blob, generation: number) => {
+    (blob: Blob, generation: number, durationMs: number) => {
       // Recorded before a cancel(): never sent, and never given a place in the order.
       if (generation !== generationRef.current) return;
       const seq = nextSeqRef.current;
       nextSeqRef.current += 1;
       setPendingClips(count => count + 1);
       const work = callbacks.current
-        .transcribe(blob)
+        .transcribe(blob, durationMs)
         .then(
           text => text.trim(),
           () => {
@@ -161,7 +161,9 @@ export const useSpeechCapture = ({ onFinal, transcribe, onError }: UseSpeechCapt
           window.clearTimeout(giveUp);
           const type = clip.recorder.mimeType || clip.chunks[0]?.type || "audio/webm";
           const blob = new Blob(clip.chunks, { type });
-          if (clip.heardSpeech && blob.size > 0) send(blob, generation);
+          if (clip.heardSpeech && blob.size > 0) {
+            send(blob, generation, Math.max(1, Date.now() - clip.startedAt));
+          }
           resolve();
         };
         try {

@@ -352,9 +352,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
       // Catalog (Component Library's) or Document (Blog's), which sit nearby in the nav.
       case SIDEBAR_ITEMS.CONTEXT_LIBRARY:
         return <LibraryBig size={20} strokeWidth={1.5} aria-hidden />;
-      case SIDEBAR_ITEMS.PRODUCT_ROADMAP:
-        return <Roadmap size={20} />;
-      // The same glyph: it is the same Roadmap, rebuilt, and replaces the entry above at cutover.
       case SIDEBAR_ITEMS.ROADMAP_V2:
         return <Roadmap size={20} />;
       case SIDEBAR_ITEMS.USER_INTERVIEWS:

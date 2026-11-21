@@ -12,7 +12,7 @@ import type { RoadmapItemRow } from "@types";
 
 import { RoadmapIconButton } from "./RoadmapIconButton";
 import { dialogVariants, motionTransition, useReducedMotionPreference } from "../../../motion";
-import { useDebouncedValue } from "../../ProductRoadmap/useDebouncedValue";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { stageWord } from "../utils/copy";
 
 type Entry =
