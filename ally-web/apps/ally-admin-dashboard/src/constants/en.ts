@@ -1815,7 +1815,7 @@ export const en = {
     toAllyAdmin: "Back to Ally admin",
     /** The login screen a signed-out visitor sees on any /assistants page (its own wording and layout). */
     login: {
-      headline: "A world-class chatbot for your nonprofit, ",
+      headline: "A chatbot your community can trust, ",
       headlineEmphasis: "built without code.",
       /** The wordmark at the top left: "Ally" and, in the orange block, "chatbots". */
       sendCode: "Send code",
