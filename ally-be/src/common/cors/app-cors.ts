@@ -16,6 +16,19 @@ export function isWidgetRoute(url: string | undefined): boolean {
 }
 
 /**
+ * The directory's public landing-page reads (`/api/v1/public/directory/collections/<slug>` and
+ * `/domains/<host>`). A collection's page can be served from the owner's own domain, so any origin
+ * may read these two GETs. They carry no cookies or tokens and expose only what the owner
+ * published, so they are answered with `*` and no credentials, never the app's allow-list.
+ */
+const DIRECTORY_PUBLIC_ROUTE =
+  /^\/api\/v1\/public\/directory\/(?:collections|domains)\/[^/?#]+(?:\?[^#]*)?$/;
+
+export function isDirectoryPublicRoute(url: string | undefined): boolean {
+  return DIRECTORY_PUBLIC_ROUTE.test(url ?? '');
+}
+
+/**
  * The app's CORS: the `ALLOWED_ORIGINS` list, with credentials, for every route but the widget's.
  * Leaving the widget's routes out only removes this layer's headers (`origin: false`); it never
  * allows anything, so a path that matched by mistake would fail closed.
@@ -37,6 +50,14 @@ export function appCorsDelegate(allowedOrigins: () => string[]) {
     req: { url?: string },
     callback: (error: Error | null, options: CorsOptions) => void,
   ): void => {
-    callback(null, isWidgetRoute(req.url) ? { origin: false } : options);
+    if (isWidgetRoute(req.url)) return callback(null, { origin: false });
+    if (isDirectoryPublicRoute(req.url)) {
+      return callback(null, {
+        origin: '*',
+        credentials: false,
+        methods: ['GET'],
+      });
+    }
+    callback(null, options);
   };
 }

@@ -326,6 +326,14 @@ out which meaning is in play before you change anything.
 **Code:** `ally-be/src/chatbot/` · `ally-be/src/whatsapp/` · `ally-be/src/bot-draft/` · `ally-ai/app/core/agent_runtime/` · `ally-ai/app/core/builder/` · `ally-ai/app/core/memory_lines/` · `ally-ai/app/core/checkup/` · `ally-web/apps/ally-admin-dashboard/src/pages/WhatsAppBot/` · `ally-web/apps/ally-admin-dashboard/src/pages/AssistantHome/` · `ally-web/apps/ally-admin-dashboard/src/pages/DevAssistantHome/` · `ally-web/apps/ally-admin-dashboard/src/pages/DevV2Components/` · `ally-web/apps/ally-admin-dashboard/src/pages/Inbox/` · `ally-web/apps/ally-admin-dashboard/src/pages/DevInbox/` · `ally-web/apps/ally-admin-dashboard/src/pages/Onboarding/` · `ally-web/apps/ally-admin-dashboard/src/pages/DevOnboarding/` · `ally-web/apps/ally-admin-dashboard/src/pages/Templates/`
 **Deep doc:** [Agents v2 context](https://github.com/HelloAllyTech/ally-platform/blob/master/docs/agents-v2/CONTEXT.md) · [ally-be](../repos/ally-be.md)
 
+### Resources directory
+<!-- concept: directory -->
+**Is:** A product for mental health organisations to build and publish their own resources directory. Anyone signed in adds entries (private or public), saves public entries and their own into collections, and publishes each collection as a public landing page, optionally on its own domain.
+**Also called:** Directory, `/admin/directory`, collection (a saved view) · **Not to be confused with:** the [Knowledge base](#knowledge-base) and [Assistants](#assistants), which answer questions from documents; this lists services.
+**Composed of:** ally-be `directory` — entries, collections and the join between them; ownership decides edits (an entry is editable only by its owner, a collection only by its owner). Public reads (`/v1/public/directory/…`) need no sign-in and answer 404 for anything unpublished or unverified. A custom domain is proved by a TXT record, then served by the admin app, which renders only the collection's page when opened on a host that is not Ally's own. The admin area has no side navigation and its own login, like Assistants.
+**Status:** Live — no feature toggle: open to any signed-in user. Custom-domain TLS needs the web front door to ask `/v1/public/directory/domain-check` before issuing a certificate
+**Code:** `ally-be/src/directory/` · `ally-web/apps/ally-admin-dashboard/src/pages/Directory/`
+
 ### Public content channels
 <!-- concept: public-content -->
 **Is:** The signed-out pages Ally publishes to anyone: blog, product-updates feed, changelog, public roadmap, legal pages, and a trial conversational homepage.
@@ -334,6 +342,15 @@ out which meaning is in play before you change anything.
 **Status:** Live — gate: `FeatureToggleKey.BLOG`, `FeatureToggleKey.PRODUCT_UPDATES` (both defaultEnabled), `FeatureToggleKey.SETTINGS` for the legal and roadmap editors; the product-updates pipeline needs env `PRODUCT_UPDATES_ENABLED=true` (default false); home-v2 is Dark (unlinked)
 **Code:** `ally-be/src/blog/` · `ally-be/src/product-updates/` · `ally-be/src/changelog/` · `ally-be/src/public-roadmap/` · `ally-web/apps/ally-admin-dashboard/src/pages/Blog/` · `ally-web/apps/ally-admin-dashboard/src/pages/ProductUpdates/` · `ally-web/apps/ally-admin-dashboard/src/pages/Privacy/` · `ally-web/apps/ally-admin-dashboard/src/pages/Terms/` · `ally-web/apps/ally-admin-dashboard/src/pages/Settings/` · `ally-web/apps/ally-helpline-dashboard/src/pages/blog/` · `ally-web/apps/ally-helpline-dashboard/src/pages/legal/` · `ally-web/apps/ally-helpline-dashboard/src/pages/home-v2/`
 **Deep doc:** [ally-changelog](../repos/ally-changelog.md)
+
+### Landing pages
+<!-- concept: landing-pages -->
+**Is:** Public, campaign-facing pages an organization's platform admin designs in the admin console and publishes at `/<tenant code>/<slug>` on the consumer app, with a draft that stays private until published.
+**Also called:** campaign page, `/<tenant code>/<slug>` · **Not to be confused with:** a Track's course landing page (`tracks.landingPage`, the outline shown before a learner starts a course); the public `/blog` pages.
+**Composed of:** ally-be `landing-page` (one `landing_pages` row per page: `config` draft and `published_config` live copy, a normaliser that keeps text plain and image addresses to our own storage, publish checks, a signed-out read); one page component in `ui-shared` that both apps draw (three templates, five languages, click-to-edit text and images when `editable`); the consumer app route that serves a published page and hands any other two-part address to the app's own routes; the admin Landing pages tab, whose editor is the page itself under one toolbar (template, Save, Publish, Latest version / Live).
+**Status:** Dark — gate: `FeatureToggleKey.LANDING_PAGES` (platform-only: not for an admin limited to some organizations; on for SUPER_ADMIN and SUPER_DUPER_ADMIN by migration, granted to a PLATFORM_ADMIN from the Ally admins tab) plus permissions `view:landing-pages` / `edit:landing-page` / `delete:landing-page`; nothing links to a page until an admin publishes one. The sign-up switch on a page is stored but sign-up itself is not built.
+**Code:** `ally-be/src/landing-page/` · `ally-web/libs/ui-shared/src/lib/landing-page/` · `ally-web/apps/ally-helpline-dashboard/src/pages/landing-public/` · `ally-web/apps/ally-admin-dashboard/src/pages/LandingPages/`
+**Deep doc:** [ally-be](../repos/ally-be.md)
 
 ### Notifications
 <!-- concept: notifications -->

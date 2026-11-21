@@ -1,7 +1,11 @@
 import * as cors from 'cors';
 import * as express from 'express';
 import * as request from 'supertest';
-import { appCorsDelegate, isWidgetRoute } from '../app-cors';
+import {
+  appCorsDelegate,
+  isDirectoryPublicRoute,
+  isWidgetRoute,
+} from '../app-cors';
 
 const ADMIN = 'https://admin.ally.test';
 const OWNER_SITE = 'https://sunrisemind.in';
@@ -85,5 +89,37 @@ describe('app CORS', () => {
         expect(res.headers['access-control-allow-credentials']).toBeUndefined();
       }
     });
+  });
+});
+
+describe('directory public CORS', () => {
+  it.each([
+    '/api/v1/public/directory/collections/my-list',
+    '/api/v1/public/directory/domains/resources.example.org?x=1',
+  ])('matches %s', (url) => {
+    expect(isDirectoryPublicRoute(url)).toBe(true);
+  });
+
+  it.each([
+    '/api/v1/public/directory/collections',
+    '/api/v1/public/directory/collections/a/b',
+    '/api/v1/public/directory/domain-check?domain=x.org',
+    '/api/v1/directory/collections/abc',
+    '/api/v1/public/directory/collections/../../chatbots',
+  ])('does not match %s', (url) => {
+    expect(isDirectoryPublicRoute(url)).toBe(false);
+  });
+
+  it('answers any origin, with no credentials', async () => {
+    const app = express();
+    app.use(cors(appCorsDelegate(() => [ADMIN]) as never));
+    app.get('/api/v1/public/directory/collections/:slug', (_req, res) =>
+      res.json({ ok: true }),
+    );
+    const res = await request(app)
+      .get('/api/v1/public/directory/collections/x')
+      .set('Origin', 'https://resources.example.org');
+    expect(res.headers['access-control-allow-origin']).toBe('*');
+    expect(res.headers['access-control-allow-credentials']).toBeUndefined();
   });
 });
