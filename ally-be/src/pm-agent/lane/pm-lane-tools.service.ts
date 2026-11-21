@@ -99,8 +99,9 @@ const OWN_TOOLS: Record<string, AgentToolDefinition> = {
     name: PmTool.UX_SIGNALS_LIST,
     description:
       'UX Signals findings (rage/dead clicks, abandoned routes, zero-result searches, funnel ' +
-      'drop-off), aggregated, with first/last seen dates. Each finding is its own evidence ' +
-      'item. Check the dates before stating anything in the present tense.',
+      'drop-off), aggregated, and security audit findings (source `security_audit`, with ' +
+      'severity, file and fix in `metrics`), with first/last seen dates. Each finding is its ' +
+      'own evidence item. Check the dates before stating anything in the present tense.',
     input_schema: {
       type: 'object',
       properties: {
@@ -418,9 +419,12 @@ export class PmLaneToolsService implements PmToolbox {
         lastSeenAt: row.lastSeenAt,
       };
       const ref = await this.record(ctx.runId, {
-        source: 'ux_signals',
+        source: row.source,
         kind: 'finding',
-        label: `UX signal: ${row.title}`,
+        label:
+          row.source === 'security_audit'
+            ? `Security audit: ${row.title}`
+            : `UX signal: ${row.title}`,
         query: { signalId: row.id, detector: row.detector, key: row.key },
         snapshot,
       });
