@@ -50,12 +50,19 @@ export class PlanViewService {
     const capReached =
       spendState.capMicros !== null &&
       spendState.usedMicros >= spendState.capMicros;
-    const usagePercent = monthlyUsage
-      ? Math.min(
-          100,
-          Math.floor((monthlyUsage.used / monthlyUsage.limit) * 100),
-        )
-      : 0;
+    // From the integer micros, as SpendCapService counts, not the dollar floats:
+    // 8.04 / 10.05 * 100 is 79.999... in floating point, which floored to 79 and hid
+    // the 80% warning at exactly 80%.
+    const usagePercent =
+      spendState.capMicros !== null
+        ? Math.min(
+            100,
+            Math.floor(
+              (Number(spendState.usedMicros) * 100) /
+                Number(spendState.capMicros),
+            ),
+          )
+        : 0;
     const published = await this.plans.publishedCount(userId);
     const assistants: Array<{ id: string; name: string; status: string }> =
       await this.dataSource.query(
