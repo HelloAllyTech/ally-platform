@@ -1,3 +1,3 @@
 // Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
 
-exports[`Custom logins as Assistant owners (CR1 walk test) counts the routes any signed-in user reaches 1`] = `130`;
+exports[`Custom logins as Assistant owners (CR1 walk test) counts the routes any signed-in user reaches 1`] = `146`;
