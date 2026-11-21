@@ -104,8 +104,9 @@ const OWN_TOOLS: Record<string, AgentToolDefinition> = {
     name: PmTool.UX_SIGNALS_LIST,
     description:
       'UX Signals findings (rage/dead clicks, abandoned routes, zero-result searches, funnel ' +
-      'drop-off), aggregated, with first/last seen dates. Each finding is its own evidence ' +
-      'item. Check the dates before stating anything in the present tense.',
+      'drop-off), aggregated, and security audit findings (source `security_audit`, with ' +
+      'severity, file and fix in `metrics`), with first/last seen dates. Each finding is its ' +
+      'own evidence item. Check the dates before stating anything in the present tense.',
     input_schema: {
       type: 'object',
       properties: {
@@ -398,9 +399,9 @@ export class PmLaneToolsService implements PmToolbox {
     const since = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000);
     const rows = await this.signals.find({
       where: {
-        // This table also holds other sources' evidence (dead code): a UX signal is only
-        // ever a ux_signals row, or the lane would cite a code report as telemetry.
-        source: 'ux_signals',
+        // This table also holds dead-code evidence, which has its own tool: leave it out,
+        // or the lane would cite a code report as telemetry. UX and security-audit rows stay.
+        source: In(['ux_signals', 'security_audit']),
         status: In([PmSignalStatus.NEW, PmSignalStatus.USED]),
         lastSeenAt: MoreThan(since),
       },
@@ -446,9 +447,12 @@ export class PmLaneToolsService implements PmToolbox {
         lastSeenAt: row.lastSeenAt,
       };
       const ref = await this.record(ctx.runId, {
-        source: 'ux_signals',
+        source: row.source,
         kind: 'finding',
-        label: `UX signal: ${row.title}`,
+        label:
+          row.source === 'security_audit'
+            ? `Security audit: ${row.title}`
+            : `UX signal: ${row.title}`,
         query: { signalId: row.id, detector: row.detector, key: row.key },
         snapshot,
       });

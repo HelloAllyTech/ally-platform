@@ -73,4 +73,16 @@ describe('dead_code_list lane tool', () => {
     expect(out.evidence).toEqual([]);
     expect(out.modelResult).toContain('nothing to cite');
   });
+
+  it('keeps dead code out of ux_signals_list but leaves UX and security-audit rows in', async () => {
+    const { service, find } = build([]);
+
+    await service.execute(PmTool.UX_SIGNALS_LIST, {}, {
+      runId: 'run-1',
+    } as never);
+
+    const sources = find.mock.calls[0][0].where.source._value;
+    expect(sources).toEqual(['ux_signals', 'security_audit']);
+    expect(sources).not.toContain('dead_code');
+  });
 });

@@ -255,7 +255,7 @@ Persister.
 - **Lanes**: `analytics`, `ux_signals` (skipped when `pm_agent_signals` has nothing from the last 45 days),
   `code_health`, `infra_cost`, `strategy_content`, `revisions`. Each = its prompt + an allow-list of read-only tools
   (`src/pm-agent/lane/pm-lane-definitions.ts`). Tools: `analytics_section` (the 15 AnalyticsModule aggregates, compacted),
-  `ux_signals_list` (`pm_agent_signals` rows with `source = 'ux_signals'` only — UX Signals internals are not imported), `dead_code_list` (code_health lane only; `pm_agent_signals` rows with `source = 'dead_code'`, see below), `llm_usage_summary`,
+  `ux_signals_list` (`pm_agent_signals` only — UX Signals internals are not imported; also returns `source = security_audit` rows, see below), `dead_code_list` (code_health lane only; `pm_agent_signals` rows with `source = 'dead_code'`, see below), `llm_usage_summary`,
   `ai_task_registry`, `product_goals`, and the roadmap copilot's read tools (roadmap, interviews, Bug Hunter findings,
   docs, GitHub code, wiki) resolved lazily from `RoadmapCopilotToolsService`. Left out: `analytics_ask` (a second
   billed agent), Context Library principles (attributed to the copilot), the AWS logs proxy (`LogsService` is not
@@ -440,3 +440,13 @@ stores evidence: one `pm_agent_signals` row per module (`source = 'dead_code'`, 
 - **Prompt.** The lane works from the tool's own description (check callers, one module per card). A sentence in the
   `pm_agent_lane_code_health` prompt pointing the lane at `dead_code_list` is an optional Skills Store edit (`prompts push`),
   not a Git change: live prompt text lives in the Skills Store, and CI refuses edits to the default `.txt` without a contract change.
+
+## Security audit signals
+
+The weekly `security-audit.yml` workflow posts its MEDIUM-or-higher findings to
+`POST /api/v1/internal/pm-agent/signals/security-audit` (`x-api-key`, `PmSecuritySignalController`). Each becomes a
+`pm_agent_signals` row with `source = security_audit`, keyed by service + file + normalised title (so the line
+number moving does not duplicate it). Re-posts refresh `lastSeenAt`; a dismissed signal is never reopened; LOW is
+dropped. The row's `metrics` carry `file`, `line`, `fix` and the run URL, so these details reach the agent's lane
+and any card that cites them. Nothing here creates a card or a roadmap item; the agent's gates and an admin's
+accept do. Needs `PM_AGENT` on and `pm_agent_settings.enabled` to have any effect.
