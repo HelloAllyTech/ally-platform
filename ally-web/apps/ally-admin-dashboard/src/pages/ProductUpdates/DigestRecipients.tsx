@@ -56,7 +56,7 @@ export const DigestRecipients: FC = () => {
 
   return (
     <section
-      className="mt-4 md:mt-6 p-4 border border-border-light bg-background-secondary"
+      className="mt-4 md:mt-6 p-4 shrink-0 border border-border-light bg-background-secondary"
       data-testid="digest-recipients"
     >
       <h2 className="text-base text-typography-900 font-secondary">{t.title}</h2>
@@ -107,7 +107,7 @@ export const DigestRecipients: FC = () => {
         ) : recipients.length === 0 ? (
           <p className="text-sm text-typography-700">{t.empty}</p>
         ) : (
-          <ul className="flex flex-col divide-y divide-border-light">
+          <ul className="flex flex-col divide-y divide-border-light max-h-48 overflow-y-auto custom-scrollbar">
             {recipients.map(recipient => (
               <li
                 key={recipient.id}
