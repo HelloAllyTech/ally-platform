@@ -219,6 +219,6 @@ jobs:
                | {severity: (.severity|ascii_downcase), title, service: $svc, file, line: (.line // null), what, impact, fix}
                | with_entries(select(.value != null)) ]}' /tmp/audit-findings.json > /tmp/pm-payload.json
           echo "Posting $(jq '.findings|length' /tmp/pm-payload.json) finding(s)."
-          curl -sS -m 60 -X POST "$ALLY_BE_API_URL/api/v1/pm-agent/signals/security-audit" \
+          curl -sS -m 60 -X POST "$ALLY_BE_API_URL/api/v1/internal/pm-agent/signals/security-audit" \
             -H "Content-Type: application/json" -H "x-api-key: $ALLY_BE_API_KEY" \
             -d @/tmp/pm-payload.json || echo "::warning::Could not reach ally-be."

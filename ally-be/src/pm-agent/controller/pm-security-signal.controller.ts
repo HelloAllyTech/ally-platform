@@ -13,7 +13,7 @@ import { PmSecuritySignalService } from '../service/pm-security-signal.service';
  * table with the admin (JWT) PM Agent routes.
  */
 @ApiTags('PM Agent')
-@Controller('v1/pm-agent/signals')
+@Controller('v1/internal/pm-agent/signals')
 @UseGuards(ApiAuthGuard)
 @ApiSecurity('api-key')
 export class PmSecuritySignalController {

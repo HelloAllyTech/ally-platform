@@ -427,7 +427,7 @@ predicate: { categories?, lanes?, sizes?, risks?, words? }, citedRefs? }`. Unkno
 ## Security audit signals
 
 The weekly `security-audit.yml` workflow posts its MEDIUM-or-higher findings to
-`POST /api/v1/pm-agent/signals/security-audit` (`x-api-key`, `PmSecuritySignalController`). Each becomes a
+`POST /api/v1/internal/pm-agent/signals/security-audit` (`x-api-key`, `PmSecuritySignalController`). Each becomes a
 `pm_agent_signals` row with `source = security_audit`, keyed by service + file + normalised title (so the line
 number moving does not duplicate it). Re-posts refresh `lastSeenAt`; a dismissed signal is never reopened; LOW is
 dropped. The row's `metrics` carry `file`, `line`, `fix` and the run URL, so these details reach the agent's lane
