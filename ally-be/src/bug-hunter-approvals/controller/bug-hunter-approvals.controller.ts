@@ -19,7 +19,13 @@ import {
 } from '@nestjs/swagger';
 import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorator';
 import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
-import { ListBugsQueryDto, StartBugDto, UpdateModeDto } from '../dto/board.dto';
+import {
+  BulkBugsDto,
+  DismissBugDto,
+  ListBugsQueryDto,
+  StartBugDto,
+  UpdateModeDto,
+} from '../dto/board.dto';
 import { CreateVerdictDto, ListReportsQueryDto } from '../dto/verdict.dto';
 import { BugHunterApprovalsService } from '../service/bug-hunter-approvals.service';
 import { BugHunterBoardService } from '../service/bug-hunter-board.service';
@@ -84,6 +90,58 @@ export class BugHunterApprovalsController {
     @Req() req: any,
   ) {
     return this.board.start(id, dto, Number(req.user?.id));
+  }
+
+  @Post('bugs/bulk')
+  @RequireFeatureToggle(FeatureToggleKey.BUG_HUNTER_V2_VERDICTS)
+  @ApiOperation({ summary: 'Put me on / Dismiss several bugs (audited each)' })
+  bulk(@Body() dto: BulkBugsDto, @Req() req: any) {
+    return this.board.bulk(
+      dto.action,
+      dto.ids,
+      dto.reason,
+      Number(req.user?.id),
+    );
+  }
+
+  @Post('bugs/:id/dismiss')
+  @RequireFeatureToggle(FeatureToggleKey.BUG_HUNTER_V2_VERDICTS)
+  @ApiOperation({
+    summary: 'Dismiss with a reason (audited; may record a verdict)',
+  })
+  dismiss(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: DismissBugDto,
+    @Req() req: any,
+  ) {
+    return this.board.dismiss(id, dto, Number(req.user?.id));
+  }
+
+  @Post('bugs/:id/open-pr')
+  @RequireFeatureToggle(FeatureToggleKey.BUG_HUNTER_V2_VERDICTS)
+  @ApiOperation({
+    summary: 'Open a draft PR from a suggested fix (queued for the worker)',
+  })
+  openPr(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    return this.board.openPr(id, Number(req.user?.id));
+  }
+
+  @Post('bugs/:id/merge')
+  @RequireFeatureToggle(FeatureToggleKey.BUG_HUNTER_V2_VERDICTS)
+  @ApiOperation({
+    summary: "Merge the bug's PR (a person's click; records the verdict)",
+  })
+  merge(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    return this.board.merge(id, Number(req.user?.id));
+  }
+
+  @Post('bugs/:id/release')
+  @RequireFeatureToggle(FeatureToggleKey.BUG_HUNTER_V2_VERDICTS)
+  @ApiOperation({
+    summary: "Release a merged fix (the app's production-release workflow)",
+  })
+  release(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    return this.board.release(id, Number(req.user?.id));
   }
 
   @Get('reports')

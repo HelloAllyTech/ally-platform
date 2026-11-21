@@ -9,7 +9,12 @@ import { CreateVerdictDto, ListReportsQueryDto } from '../dto/verdict.dto';
 import { BughunterDbService } from './bughunter-db.service';
 
 /** Reports a human judges: a verified suggested fix, or an escalation. */
-export const JUDGEABLE_STATUSES = ['suggested_fix', 'escalated'];
+// awaiting_human: a run that opened its own draft PR (chunk 11), judged on Merge
+export const JUDGEABLE_STATUSES = [
+  'suggested_fix',
+  'escalated',
+  'awaiting_human',
+];
 
 export interface ReportListItem {
   id: number;

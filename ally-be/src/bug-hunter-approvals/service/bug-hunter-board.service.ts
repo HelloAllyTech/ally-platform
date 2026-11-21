@@ -12,18 +12,46 @@ import {
   BoardTab,
   BugHunterV2Mode,
   BUG_HUNTER_V2_APPS,
+  DismissBugDto,
+  DismissReason,
   ListBugsQueryDto,
   StartBugDto,
 } from '../dto/board.dto';
+import { GithubActionsService } from 'src/github/service/github-actions.service';
+import { resolveReleaseTarget } from 'src/release/constants/release-targets.constants';
+import { ProductionReleaseService } from 'src/release/service/production-release.service';
+import { BugHunterApprovalsService } from './bug-hunter-approvals.service';
 import { BughunterDbService } from './bughunter-db.service';
 
 /** Board tab -> the `bughunter.bugs` statuses it shows. */
 export const TAB_STATUSES: Record<BoardTab, string[]> = {
   needs_you: ['needs_you'],
   failed: ['failed'],
-  in_progress: ['queued', 'running'],
+  // a draft PR is still Bug Hunter's case until a person merges it (as on v1's board)
+  in_progress: ['queued', 'running', 'pr_open'],
   backlog: ['backlog'],
-  done: ['done'],
+  done: ['done', 'merged', 'released'],
+};
+
+/** Statuses an admin may dismiss from (chunk 11). */
+const DISMISSABLE = ['backlog', 'needs_you', 'failed', 'pr_open'];
+
+/** What a dismissal teaches, when the bug has a report to judge (chunk 11). */
+const DISMISS_VERDICT: Partial<
+  Record<
+    DismissReason,
+    { diagnosis: 'not_a_bug' | 'wrong'; fix: 'none' | 'wrong' }
+  >
+> = {
+  not_a_bug: { diagnosis: 'not_a_bug', fix: 'none' },
+  wrong_diagnosis: { diagnosis: 'wrong', fix: 'wrong' },
+};
+
+const DISMISS_LABEL: Record<DismissReason, string> = {
+  not_a_bug: 'not a bug',
+  duplicate: 'duplicate',
+  wont_fix: "won't fix",
+  wrong_diagnosis: 'wrong diagnosis',
 };
 
 /** Statuses an admin may start from: Start fix (backlog) and Retry (failed). */
@@ -53,6 +81,9 @@ export interface BoardBug {
   reason: string | null;
   severity: string | null;
   prUrl: string | null;
+  reportStatus: string | null;
+  releaseTag: string | null;
+  lastAction: { status: string; result: string | null } | null;
   reportId: number | null;
   runId: string | null;
   attempts: number;
@@ -112,8 +143,13 @@ const V2_STATUS_TAB: Record<string, BoardTab> = Object.fromEntries(
 export const BOARD_ROWS_SQL = `
   SELECT 'v2' AS origin, b.id, NULL::text AS v1_finding_id, b.source, b.app, b.title,
          b.description, b.status, ${caseOf('b.status', V2_STATUS_TAB, 'backlog')} AS tab,
-         b.reason, NULL::text AS severity, NULL::text AS pr_url, b.report_id, b.run_id,
-         b.attempts, b.created_at, b.started_at, b.finished_at
+         b.reason, NULL::text AS severity, b.pr_url, b.report_id, b.run_id,
+         b.attempts, b.created_at, b.started_at, b.finished_at,
+         (SELECT r.status FROM bughunter.reports r WHERE r.id = b.report_id)
+           AS report_status,
+         b.release_tag,
+         (SELECT a.status || '|' || coalesce(a.result, '') FROM bughunter.actions a
+           WHERE a.bug_id = b.id ORDER BY a.id DESC LIMIT 1) AS last_action
     FROM bughunter.bugs b
   UNION ALL
   SELECT 'v1', NULL, f.id::text, 'v1:' || f.source, f.repo, f.title, f.description,
@@ -124,7 +160,8 @@ export const BOARD_ROWS_SQL = `
          coalesce(f.released_at, f.decided_at, f.cancelled_at,
                   CASE WHEN f.status IN ('merged', 'released', 'dismissed', 'rejected',
                                          'cancelled') THEN f."updatedAt" END)
-           AT TIME ZONE 'UTC'
+           AT TIME ZONE 'UTC',
+         NULL, f.release_tag, NULL
     FROM public.bug_findings f
    WHERE f.parent_finding_id IS NULL
      AND NOT (f.reported_bug_id IS NOT NULL AND EXISTS (
@@ -148,6 +185,11 @@ export class BugHunterBoardService {
     private readonly db: BughunterDbService,
     private readonly audit: AuditLogService,
     private readonly dataSource: DataSource,
+    // chunk 11: Merge and Release reuse the old Bug Hunter's GitHub services, and a
+    // Merge or a Dismiss fills in the verdict
+    private readonly github?: GithubActionsService,
+    private readonly releases?: ProductionReleaseService,
+    private readonly verdicts?: BugHunterApprovalsService,
   ) {}
 
   async settings() {
@@ -230,6 +272,16 @@ export class BugHunterBoardService {
           reason: r.reason ?? null,
           severity: r.severity ?? null,
           prUrl: r.pr_url ?? null,
+          reportStatus: r.report_status ?? null,
+          releaseTag: r.release_tag ?? null,
+          // the latest Open PR request: pending, or how it ended
+          lastAction: r.last_action
+            ? {
+                status: String(r.last_action).split('|')[0],
+                result:
+                  String(r.last_action).split('|').slice(1).join('|') || null,
+              }
+            : null,
           reportId: r.report_id ? Number(r.report_id) : null,
           runId: r.run_id ?? null,
           attempts: Number(r.attempts ?? 0),
@@ -351,6 +403,207 @@ export class BugHunterBoardService {
    * Bug Hunter v2 is set up in this database. The worker decides when it runs
    * (the mode); the reporter's text is scrubbed before any model sees it.
    */
+  // ── chunk 11: the old Bug Hunter's buttons ────────────────────────────
+
+  private async bugOr404(id: number) {
+    const ds = await this.db.get();
+    const [bug] = await ds.query(
+      `SELECT b.id, b.status, b.app, b.title, b.report_id, b.pr_url, b.pr_number,
+              r.status AS report_status, r.patch_diff
+         FROM bughunter.bugs b LEFT JOIN bughunter.reports r ON r.id = b.report_id
+        WHERE b.id = $1`,
+      [id],
+    );
+    if (!bug) throw new NotFoundException('No such bug.');
+    return { ds, bug };
+  }
+
+  /** Dismiss with a reason: the bug goes to Done; not-a-bug and wrong teach a verdict. */
+  async dismiss(id: number, dto: DismissBugDto, userId: number) {
+    const { ds, bug } = await this.bugOr404(id);
+    if (!DISMISSABLE.includes(bug.status)) {
+      throw new ConflictException(
+        bug.status === 'queued' || bug.status === 'running'
+          ? 'This bug is being worked on. Wait for the run to end.'
+          : 'This bug is already closed.',
+      );
+    }
+    const teaches = DISMISS_VERDICT[dto.reason];
+    const reportId = bug.report_id ? Number(bug.report_id) : null;
+    if (teaches && reportId && this.verdicts) {
+      await this.verdicts
+        .recordVerdict(
+          reportId,
+          {
+            diagnosis: teaches.diagnosis,
+            fix: bug.patch_diff ? teaches.fix : 'none',
+            reason:
+              dto.note?.trim() ||
+              `Dismissed by an admin: ${DISMISS_LABEL[dto.reason]}.`,
+          },
+          userId,
+        )
+        .catch((error: unknown) =>
+          // a report that is not judgeable (no bug, duplicate) still dismisses
+          this.logger.warn(
+            `No verdict for dismissed bug ${id}: ${(error as Error)?.message}`,
+          ),
+        );
+    }
+    await ds.query(
+      `UPDATE bughunter.bugs
+          SET status = 'done', dismissed_reason = $2, reason = $3,
+              finished_at = now(), updated_at = now()
+        WHERE id = $1`,
+      [
+        id,
+        dto.reason,
+        `dismissed: ${DISMISS_LABEL[dto.reason]}${dto.note ? ` (${dto.note.trim().slice(0, 200)})` : ''}`,
+      ],
+    );
+    await this.audit.log({
+      eventType: 'BUG_HUNTER_V2_BUG_DISMISSED',
+      userId,
+      details: { bugId: id, from: bug.status, reason: dto.reason },
+    });
+    return { id, status: 'done' };
+  }
+
+  /** Put me on / Dismiss several bugs: each one's own result, like v1's bulk bar. */
+  async bulk(
+    action: 'start' | 'dismiss',
+    ids: number[],
+    reason: DismissReason | undefined,
+    userId: number,
+  ) {
+    if (action === 'dismiss' && !reason) {
+      throw new BadRequestException('Pick a reason to dismiss these bugs.');
+    }
+    const results: Array<{ id: number; ok: boolean; message?: string }> = [];
+    for (const id of [...new Set(ids)]) {
+      try {
+        if (action === 'start') await this.start(id, {}, userId);
+        else await this.dismiss(id, { reason: reason! }, userId);
+        results.push({ id, ok: true });
+      } catch (error) {
+        results.push({ id, ok: false, message: (error as Error)?.message });
+      }
+    }
+    return { action, results, done: results.filter((r) => r.ok).length };
+  }
+
+  /** Open PR on a suggested fix: queued for the worker, which has git and GitHub. */
+  async openPr(id: number, userId: number) {
+    const { ds, bug } = await this.bugOr404(id);
+    if (bug.pr_url) {
+      throw new ConflictException('This bug already has a PR.');
+    }
+    if (bug.status !== 'needs_you' || bug.report_status !== 'suggested_fix') {
+      throw new ConflictException(
+        'Only a suggested fix can be opened as a PR.',
+      );
+    }
+    if (!bug.patch_diff) {
+      throw new BadRequestException(
+        'This report has no patch to open a PR from.',
+      );
+    }
+    await ds.query(
+      `INSERT INTO bughunter.actions (bug_id, kind, requested_by)
+       VALUES ($1, 'open_pr', $2) ON CONFLICT DO NOTHING`,
+      [id, userId],
+    );
+    await this.audit.log({
+      eventType: 'BUG_HUNTER_V2_PR_REQUESTED',
+      userId,
+      details: { bugId: id },
+    });
+    return { id, queued: true };
+  }
+
+  /** Merge an open PR (a person's click, never automatic); it records the verdict. */
+  async merge(id: number, userId: number) {
+    const { ds, bug } = await this.bugOr404(id);
+    if (bug.status !== 'pr_open' || !bug.pr_number) {
+      throw new ConflictException('Only a bug with an open PR can be merged.');
+    }
+    if (!this.github) {
+      throw new BadRequestException('GitHub is not available here.');
+    }
+    const result = await this.github.mergePullRequest(
+      bug.app,
+      Number(bug.pr_number),
+      `fix(${bug.app}): ${bug.title}`.slice(0, 120),
+    );
+    if (!result.merged) {
+      throw new ConflictException(
+        `GitHub did not merge PR #${bug.pr_number}: ${result.message ?? 'no reason given'}`,
+      );
+    }
+    await ds.query(
+      `UPDATE bughunter.bugs
+          SET status = 'merged', merged_at = now(), merged_by = $2, reason = NULL,
+              finished_at = now(), updated_at = now()
+        WHERE id = $1`,
+      [id, userId],
+    );
+    if (bug.report_id && this.verdicts) {
+      await this.verdicts
+        .recordVerdict(
+          Number(bug.report_id),
+          {
+            diagnosis: 'correct',
+            fix: 'worked',
+            reason: 'Merged by an admin as Bug Hunter wrote it.',
+          },
+          userId,
+        )
+        .catch((error: unknown) =>
+          this.logger.warn(
+            `No verdict for merged bug ${id}: ${(error as Error)?.message}`,
+          ),
+        );
+    }
+    await this.audit.log({
+      eventType: 'BUG_HUNTER_V2_PR_MERGED',
+      userId,
+      details: { bugId: id, pr: Number(bug.pr_number) },
+    });
+    return { id, status: 'merged' };
+  }
+
+  /** Release a merged fix: the app's production-release workflow, as v1 does. */
+  async release(id: number, userId: number) {
+    const { ds, bug } = await this.bugOr404(id);
+    if (bug.status !== 'merged') {
+      throw new ConflictException('Only a merged fix can be released.');
+    }
+    if (!this.releases) {
+      throw new BadRequestException('Releases are not available here.');
+    }
+    const firstFile = /^\+\+\+ [a-z]\/(.+)$/m.exec(bug.patch_diff ?? '')?.[1];
+    const target = resolveReleaseTarget(bug.app, firstFile);
+    if (!target) {
+      throw new BadRequestException(
+        `Bug Hunter can't tell which ${bug.app} deployable this fix ships in. Release it from the Releases page.`,
+      );
+    }
+    const { tag } = await this.releases.dispatch(target, 'master');
+    await ds.query(
+      `UPDATE bughunter.bugs
+          SET status = 'released', released_at = now(), released_by = $2,
+              release_tag = $3, updated_at = now()
+        WHERE id = $1`,
+      [id, userId, tag],
+    );
+    await this.audit.log({
+      eventType: 'BUG_HUNTER_V2_RELEASED',
+      userId,
+      details: { bugId: id, tag, workflow: target.workflow },
+    });
+    return { id, status: 'released', tag };
+  }
+
   async enqueueReported(input: {
     opportunityId: string;
     description: string;

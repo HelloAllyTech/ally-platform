@@ -14,6 +14,11 @@ const api = vi.hoisted(() => ({
   setMode: vi.fn(),
   start: vi.fn(),
   v1Query: vi.fn(),
+  dismiss: vi.fn(),
+  bulk: vi.fn(),
+  openPr: vi.fn(),
+  merge: vi.fn(),
+  release: vi.fn(),
 }));
 
 vi.mock("@api", async importOriginal => ({
@@ -25,6 +30,11 @@ vi.mock("@api", async importOriginal => ({
   useGetBugHunterV2ReportQuery: (id: unknown) => api.reportQuery(id),
   useGetBugHunterV2V1BugQuery: (id: unknown) => api.v1Query(id),
   useRecordBugHunterV2VerdictMutation: () => [api.record, { isLoading: false }],
+  useDismissBugHunterV2BugMutation: () => [api.dismiss, { isLoading: false }],
+  useBulkBugHunterV2BugsMutation: () => [api.bulk, { isLoading: false }],
+  useOpenBugHunterV2PrMutation: () => [api.openPr, { isLoading: false }],
+  useMergeBugHunterV2PrMutation: () => [api.merge, { isLoading: false }],
+  useReleaseBugHunterV2BugMutation: () => [api.release, { isLoading: false }],
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
@@ -71,6 +81,10 @@ beforeEach(() => {
   api.start.mockReturnValue({ unwrap: () => Promise.resolve({}) });
   api.record.mockReset();
   api.record.mockReturnValue({ unwrap: () => Promise.resolve({}) });
+  for (const fn of [api.dismiss, api.bulk, api.openPr, api.merge, api.release]) {
+    fn.mockReset();
+    fn.mockReturnValue({ unwrap: () => Promise.resolve({ done: 1, results: [] }) });
+  }
 });
 
 const board = strings.board;
@@ -219,6 +233,93 @@ describe("Bug Hunter v2 board", () => {
     fireEvent.click(screen.getByTestId("bug-row-v1-f-1"));
     // Opens inside v2, not the old Bug Hunter.
     expect(screen.getByText("v1 bug page")).toBeInTheDocument();
+  });
+
+  describe("chunk 11: the old Bug Hunter's buttons", () => {
+    const show = (items: unknown[], tab = "needs_you") => {
+      api.settingsQuery.mockReturnValue(settingsOf());
+      api.bugsQuery.mockReturnValue({ data: { tab, counts: counts(), items } });
+      renderBoard();
+    };
+
+    it("offers Open PR on a suggested fix, and says when it is being opened", () => {
+      show([bugRow({ status: "needs_you", reportStatus: "suggested_fix", reportId: 9 })]);
+      fireEvent.click(screen.getByRole("button", { name: board.openPr }));
+      expect(api.openPr).toHaveBeenCalledWith(1);
+    });
+
+    it("shows the request while the worker opens the PR, and why one failed", () => {
+      show([
+        bugRow({
+          status: "needs_you",
+          reportStatus: "suggested_fix",
+          lastAction: { status: "pending", result: null },
+        }),
+        bugRow({
+          id: 2,
+          status: "needs_you",
+          reportStatus: "suggested_fix",
+          lastAction: { status: "failed", result: "the patch no longer applies" },
+        }),
+      ]);
+      expect(screen.getByText(board.openingPr)).toBeInTheDocument();
+      expect(screen.getByText(/the patch no longer applies/)).toBeInTheDocument();
+    });
+
+    it("no Open PR for an escalation", () => {
+      show([bugRow({ status: "needs_you", reportStatus: "escalated" })]);
+      expect(screen.queryByRole("button", { name: board.openPr })).not.toBeInTheDocument();
+    });
+
+    it("an open PR has View PR and Merge (after a confirm)", () => {
+      vi.spyOn(window, "confirm").mockReturnValue(true);
+      show([bugRow({ status: "pr_open", prUrl: "https://github.com/o/r/pull/5" })], "in_progress");
+      expect(screen.getByRole("link", { name: board.viewPr })).toHaveAttribute(
+        "href",
+        "https://github.com/o/r/pull/5",
+      );
+      fireEvent.click(screen.getByRole("button", { name: board.merge }));
+      expect(window.confirm).toHaveBeenCalledWith(board.mergeConfirm);
+      expect(api.merge).toHaveBeenCalledWith(1);
+    });
+
+    it("a merged fix has Release; a released one shows its tag", () => {
+      vi.spyOn(window, "confirm").mockReturnValue(true);
+      show(
+        [
+          bugRow({ status: "merged", prUrl: "https://github.com/o/r/pull/5" }),
+          bugRow({ id: 2, status: "released", releaseTag: "be-v1.300.1" }),
+        ],
+        "done",
+      );
+      fireEvent.click(screen.getByRole("button", { name: board.release }));
+      expect(api.release).toHaveBeenCalledWith(1);
+      expect(screen.getByText("Released as be-v1.300.1")).toBeInTheDocument();
+    });
+
+    it("Dismiss needs a reason, and sends the note", () => {
+      show([bugRow({ status: "needs_you" })]);
+      fireEvent.click(screen.getByRole("button", { name: board.dismiss }));
+      const confirm = screen.getByRole("button", { name: board.dismissConfirm });
+      expect(confirm).toBeDisabled();
+      fireEvent.change(screen.getByLabelText(board.dismissTitle), {
+        target: { value: "not_a_bug" },
+      });
+      fireEvent.change(screen.getByLabelText(board.dismissNote), {
+        target: { value: "expected" },
+      });
+      fireEvent.click(confirm);
+      expect(api.dismiss).toHaveBeenCalledWith({ id: 1, reason: "not_a_bug", note: "expected" });
+    });
+
+    it("bulk: select rows, then Put me on them", () => {
+      show([bugRow(), bugRow({ id: 2 }), bugRow({ id: 3, status: "running" })], "backlog");
+      // select-all plus the two startable rows: a running bug has no checkbox
+      expect(screen.getAllByRole("checkbox")).toHaveLength(3);
+      fireEvent.click(screen.getByLabelText(board.selectAll));
+      fireEvent.click(screen.getByRole("button", { name: "Put me on 2" }));
+      expect(api.bulk).toHaveBeenCalledWith({ action: "start", ids: [1, 2], reason: undefined });
+    });
   });
 
   it("explains a missing Bug Hunter database instead of a generic error", () => {

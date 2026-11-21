@@ -875,6 +875,11 @@ export const ApiEndpoints = {
     MODE: "/v1/bug-hunter-approvals/settings/mode",
     BUGS: "/v1/bug-hunter-approvals/bugs",
     START: (id: number) => `/v1/bug-hunter-approvals/bugs/${id}/start`,
+    DISMISS: (id: number) => `/v1/bug-hunter-approvals/bugs/${id}/dismiss`,
+    BULK: "/v1/bug-hunter-approvals/bugs/bulk",
+    OPEN_PR: (id: number) => `/v1/bug-hunter-approvals/bugs/${id}/open-pr`,
+    MERGE: (id: number) => `/v1/bug-hunter-approvals/bugs/${id}/merge`,
+    RELEASE: (id: number) => `/v1/bug-hunter-approvals/bugs/${id}/release`,
     V1_BUG: (findingId: string) =>
       `/v1/bug-hunter-approvals/bugs/v1/${encodeURIComponent(findingId)}`,
   },

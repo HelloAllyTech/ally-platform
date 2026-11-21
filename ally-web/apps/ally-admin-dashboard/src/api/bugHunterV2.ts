@@ -1,6 +1,7 @@
 import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
 import {
   BugHunterV2Board,
+  BugHunterV2DismissReason,
   BugHunterV2Mode,
   BugHunterV2ReportDetail,
   BugHunterV2Settings,
@@ -52,6 +53,36 @@ export const bugHunterV2API = baseAPI.injectEndpoints({
       }),
       providesTags: [TAG_TYPES.BUG_HUNTER_V2_REPORTS],
     }),
+    dismissBugHunterV2Bug: builder.mutation<
+      unknown,
+      { id: number; reason: BugHunterV2DismissReason; note?: string }
+    >({
+      query: ({ id, ...body }) => ({
+        url: ApiEndpoints.BUG_HUNTER_V2.DISMISS(id),
+        method: HttpMethod.POST,
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.BUG_HUNTER_V2_REPORTS],
+    }),
+    bulkBugHunterV2Bugs: builder.mutation<
+      { done: number; results: { id: number; ok: boolean; message?: string }[] },
+      { action: "start" | "dismiss"; ids: number[]; reason?: BugHunterV2DismissReason }
+    >({
+      query: body => ({ url: ApiEndpoints.BUG_HUNTER_V2.BULK, method: HttpMethod.POST, body }),
+      invalidatesTags: [TAG_TYPES.BUG_HUNTER_V2_REPORTS],
+    }),
+    openBugHunterV2Pr: builder.mutation<unknown, number>({
+      query: id => ({ url: ApiEndpoints.BUG_HUNTER_V2.OPEN_PR(id), method: HttpMethod.POST }),
+      invalidatesTags: [TAG_TYPES.BUG_HUNTER_V2_REPORTS],
+    }),
+    mergeBugHunterV2Pr: builder.mutation<unknown, number>({
+      query: id => ({ url: ApiEndpoints.BUG_HUNTER_V2.MERGE(id), method: HttpMethod.POST }),
+      invalidatesTags: [TAG_TYPES.BUG_HUNTER_V2_REPORTS],
+    }),
+    releaseBugHunterV2Bug: builder.mutation<{ tag?: string }, number>({
+      query: id => ({ url: ApiEndpoints.BUG_HUNTER_V2.RELEASE(id), method: HttpMethod.POST }),
+      invalidatesTags: [TAG_TYPES.BUG_HUNTER_V2_REPORTS],
+    }),
     getBugHunterV2Report: builder.query<BugHunterV2ReportDetail, number>({
       query: id => ({ url: ApiEndpoints.BUG_HUNTER_V2.REPORT(id), method: HttpMethod.GET }),
       providesTags: [TAG_TYPES.BUG_HUNTER_V2_REPORTS],
@@ -72,6 +103,11 @@ export const {
   useSetBugHunterV2ModeMutation,
   useGetBugHunterV2BugsQuery,
   useStartBugHunterV2BugMutation,
+  useDismissBugHunterV2BugMutation,
+  useBulkBugHunterV2BugsMutation,
+  useOpenBugHunterV2PrMutation,
+  useMergeBugHunterV2PrMutation,
+  useReleaseBugHunterV2BugMutation,
   useGetBugHunterV2ReportQuery,
   useGetBugHunterV2V1BugQuery,
   useRecordBugHunterV2VerdictMutation,

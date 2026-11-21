@@ -1,12 +1,15 @@
 import { Module } from '@nestjs/common';
 import { AuditModule } from 'src/audit/audit.module';
+import { GithubModule } from 'src/github/github.module';
+import { ReleaseModule } from 'src/release/release.module';
 import { BugHunterApprovalsController } from './controller/bug-hunter-approvals.controller';
 import { BugHunterApprovalsService } from './service/bug-hunter-approvals.service';
 import { BugHunterBoardService } from './service/bug-hunter-board.service';
 import { BughunterDbService } from './service/bughunter-db.service';
 
 @Module({
-  imports: [AuditModule],
+  // chunk 11: Merge and Release reuse the old Bug Hunter's GitHub services
+  imports: [AuditModule, GithubModule, ReleaseModule],
   controllers: [BugHunterApprovalsController],
   providers: [
     BugHunterApprovalsService,

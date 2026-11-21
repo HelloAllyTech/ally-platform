@@ -18,6 +18,7 @@ import { BughunterDbService } from '../service/bughunter-db.service';
 /** `bughunter.bugs` and `bughunter.settings` in memory, answering the SQL by shape. */
 class FakeBoardDb {
   bugs: any[] = [];
+  actions: any[] = [];
   /** The old Bug Hunter's `public.bug_findings`, top-level rows only. */
   findings: any[] = [];
   events: any[] = [];
@@ -83,6 +84,61 @@ class FakeBoardDb {
     }
     if (s.startsWith('SELECT stage, summary')) {
       return this.events.filter((e) => e.finding_id === params[0]);
+    }
+    if (s.startsWith('SELECT b.id, b.status, b.app, b.title, b.report_id')) {
+      return this.bugs
+        .filter((b) => b.id === params[0])
+        .map((b) => ({
+          ...b,
+          report_status: b.report_status ?? null,
+          patch_diff: b.patch_diff ?? null,
+        }));
+    }
+    if (
+      s.startsWith(
+        "UPDATE bughunter.bugs SET status = 'done', dismissed_reason",
+      )
+    ) {
+      Object.assign(
+        this.bugs.find((b) => b.id === params[0]),
+        {
+          status: 'done',
+          dismissed_reason: params[1],
+          reason: params[2],
+        },
+      );
+      return [];
+    }
+    if (s.startsWith("UPDATE bughunter.bugs SET status = 'merged'")) {
+      Object.assign(
+        this.bugs.find((b) => b.id === params[0]),
+        {
+          status: 'merged',
+          merged_by: params[1],
+        },
+      );
+      return [];
+    }
+    if (s.startsWith("UPDATE bughunter.bugs SET status = 'released'")) {
+      Object.assign(
+        this.bugs.find((b) => b.id === params[0]),
+        {
+          status: 'released',
+          released_by: params[1],
+          release_tag: params[2],
+        },
+      );
+      return [];
+    }
+    if (s.startsWith('INSERT INTO bughunter.actions')) {
+      if (!this.actions.some((a) => a.bug_id === params[0])) {
+        this.actions.push({
+          bug_id: params[0],
+          kind: 'open_pr',
+          by: params[1],
+        });
+      }
+      return [];
     }
     if (s.startsWith('INSERT INTO bughunter.bugs')) {
       if (this.failInsert) throw new Error('connection reset');
@@ -188,16 +244,27 @@ const bug = (
 describe('BugHunterBoardService', () => {
   let fake: FakeBoardDb;
   let audit: { log: jest.Mock };
+  let github: { mergePullRequest: jest.Mock };
+  let releases: { dispatch: jest.Mock };
+  let verdicts: { recordVerdict: jest.Mock };
   let service: BugHunterBoardService;
 
   beforeEach(() => {
     fake = new FakeBoardDb();
     audit = { log: jest.fn() };
+    github = {
+      mergePullRequest: jest.fn(async () => ({ merged: true, message: null })),
+    };
+    releases = { dispatch: jest.fn(async () => ({ tag: 'be-v1.300.1' })) };
+    verdicts = { recordVerdict: jest.fn(async () => ({})) };
     const db = { get: async () => fake } as unknown as BughunterDbService;
     service = new BugHunterBoardService(
       db,
       audit as any,
       fake as unknown as DataSource,
+      github as any,
+      releases as any,
+      verdicts as any,
     );
   });
 
@@ -205,9 +272,9 @@ describe('BugHunterBoardService', () => {
     expect(TAB_STATUSES).toEqual({
       needs_you: ['needs_you'],
       failed: ['failed'],
-      in_progress: ['queued', 'running'],
+      in_progress: ['queued', 'running', 'pr_open'],
       backlog: ['backlog'],
-      done: ['done'],
+      done: ['done', 'merged', 'released'],
     });
   });
 
@@ -381,6 +448,139 @@ describe('BugHunterBoardService', () => {
     );
     await service.start(1, { app: 'ally-be' }, 7);
     expect(fake.bugs[0]).toMatchObject({ status: 'queued', app: 'ally-be' });
+  });
+
+  describe("chunk 11: the old Bug Hunter's buttons", () => {
+    const DIFF = '+++ w/ally-be/src/billing/x.ts\n';
+
+    it('Dismiss closes a bug with the reason, and not-a-bug teaches a verdict', async () => {
+      fake.bugs = [bug(1, 'needs_you', { report_id: 9, patch_diff: DIFF })];
+      await service.dismiss(
+        1,
+        { reason: 'not_a_bug', note: 'expected rounding' },
+        7,
+      );
+      expect(fake.bugs[0]).toMatchObject({
+        status: 'done',
+        dismissed_reason: 'not_a_bug',
+        reason: 'dismissed: not a bug (expected rounding)',
+      });
+      expect(verdicts.recordVerdict).toHaveBeenCalledWith(
+        9,
+        { diagnosis: 'not_a_bug', fix: 'none', reason: 'expected rounding' },
+        7,
+      );
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({ eventType: 'BUG_HUNTER_V2_BUG_DISMISSED' }),
+      );
+    });
+
+    it("a duplicate or won't-fix dismissal records no verdict", async () => {
+      fake.bugs = [bug(1, 'backlog'), bug(2, 'needs_you', { report_id: 3 })];
+      await service.dismiss(1, { reason: 'duplicate' }, 7);
+      await service.dismiss(2, { reason: 'wont_fix' }, 7);
+      expect(verdicts.recordVerdict).not.toHaveBeenCalled();
+      expect(fake.bugs.map((b) => b.status)).toEqual(['done', 'done']);
+    });
+
+    it('never dismisses a bug that is running or already closed', async () => {
+      fake.bugs = [bug(1, 'running'), bug(2, 'merged')];
+      await expect(
+        service.dismiss(1, { reason: 'duplicate' }, 7),
+      ).rejects.toBeInstanceOf(ConflictException);
+      await expect(
+        service.dismiss(2, { reason: 'duplicate' }, 7),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('bulk reports each bug on its own and needs a reason to dismiss', async () => {
+      fake.bugs = [bug(1, 'backlog'), bug(2, 'running')];
+      const out = await service.bulk('start', [1, 2, 1], undefined, 7);
+      expect(out.done).toBe(1);
+      expect(out.results.map((r) => [r.id, r.ok])).toEqual([
+        [1, true],
+        [2, false],
+      ]);
+      await expect(
+        service.bulk('dismiss', [1], undefined, 7),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('Open PR queues one action for a suggested fix only', async () => {
+      fake.bugs = [
+        bug(1, 'needs_you', {
+          report_status: 'suggested_fix',
+          patch_diff: DIFF,
+        }),
+        bug(2, 'needs_you', { report_status: 'escalated' }),
+        bug(3, 'pr_open', { pr_url: 'https://github.com/o/r/pull/1' }),
+      ];
+      await service.openPr(1, 7);
+      await service.openPr(1, 7); // a second click is a no-op
+      expect(fake.actions).toEqual([{ bug_id: 1, kind: 'open_pr', by: 7 }]);
+      await expect(service.openPr(2, 7)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+      await expect(service.openPr(3, 7)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+    });
+
+    it('Merge squash-merges the PR, moves the bug to Done and records the verdict', async () => {
+      fake.bugs = [bug(1, 'pr_open', { pr_number: 42, report_id: 9 })];
+      await service.merge(1, 7);
+      expect(github.mergePullRequest).toHaveBeenCalledWith(
+        'ally-web',
+        42,
+        'fix(ally-web): bug 1',
+      );
+      expect(fake.bugs[0]).toMatchObject({ status: 'merged', merged_by: 7 });
+      expect(verdicts.recordVerdict).toHaveBeenCalledWith(
+        9,
+        expect.objectContaining({ diagnosis: 'correct', fix: 'worked' }),
+        7,
+      );
+    });
+
+    it("shows GitHub's refusal and leaves the bug as it was", async () => {
+      github.mergePullRequest.mockResolvedValueOnce({
+        merged: false,
+        message: 'At least 1 approving review is required',
+      });
+      fake.bugs = [bug(1, 'pr_open', { pr_number: 42 })];
+      await expect(service.merge(1, 7)).rejects.toThrow('approving review');
+      expect(fake.bugs[0].status).toBe('pr_open');
+      expect(verdicts.recordVerdict).not.toHaveBeenCalled();
+    });
+
+    it("Release dispatches the app's release workflow for a merged fix", async () => {
+      fake.bugs = [
+        bug(1, 'merged', {
+          app: 'ally-be',
+          patch_diff: '+++ w/ally-be/src/billing/x.ts\n',
+        }),
+        bug(2, 'pr_open'),
+      ];
+      const out = await service.release(1, 7);
+      expect(releases.dispatch).toHaveBeenCalledWith(
+        expect.objectContaining({ repo: expect.any(String) }),
+        'master',
+      );
+      expect(out).toMatchObject({ status: 'released', tag: 'be-v1.300.1' });
+      await expect(service.release(2, 7)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+    });
+
+    it("won't guess which ally-web frontend to release", async () => {
+      fake.bugs = [
+        bug(1, 'merged', { patch_diff: '+++ w/ally-web/libs/x.ts\n' }),
+      ];
+      await expect(service.release(1, 7)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(releases.dispatch).not.toHaveBeenCalled();
+    });
   });
 
   describe('enqueueReported (the roadmap "file a bug" hook)', () => {

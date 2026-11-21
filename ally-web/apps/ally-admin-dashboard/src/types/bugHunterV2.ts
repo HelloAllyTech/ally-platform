@@ -76,8 +76,14 @@ export type BugHunterV2BugStatus =
   | "queued"
   | "running"
   | "needs_you"
+  | "pr_open"
+  | "merged"
+  | "released"
   | "failed"
   | "done";
+
+/** Why an admin dismissed a bug (chunk 11). */
+export type BugHunterV2DismissReason = "not_a_bug" | "duplicate" | "wont_fix" | "wrong_diagnosis";
 
 export interface BugHunterV2Settings {
   mode: BugHunterV2Mode;
@@ -105,6 +111,11 @@ export interface BugHunterV2Bug {
   reason: string | null;
   severity: string | null;
   prUrl: string | null;
+  /** The report's outcome: suggested_fix is what Open PR applies to. */
+  reportStatus?: string | null;
+  releaseTag?: string | null;
+  /** The latest Open PR request: pending, done (the PR link) or failed (why). */
+  lastAction?: { status: string; result: string | null } | null;
   reportId: number | null;
   runId: string | null;
   attempts: number;
