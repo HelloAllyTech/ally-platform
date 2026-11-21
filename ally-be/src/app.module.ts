@@ -72,6 +72,7 @@ import { AuditModule } from './audit/audit.module';
 import { CustomFieldsModule } from './custom-fields/custom-fields.module';
 import { DynamicI18nModule } from './dynamic-i18n/dynamic-i18n.module';
 import { TooltipModule } from './tooltip/tooltip.module';
+import { DirectoryModule } from './directory/directory.module';
 import { RoleplaySessionLogsModule } from './roleplay-session-logs/roleplay-session-logs.module';
 import { BlogModule } from './blog/blog.module';
 import { LandingPageModule } from './landing-page/landing-page.module';
@@ -166,6 +167,7 @@ import { DebriefFeedbackModule } from './debrief-feedback/debrief-feedback.modul
     CustomFieldsModule,
     DynamicI18nModule,
     TooltipModule,
+    DirectoryModule,
     RoleplaySessionLogsModule,
     BlogModule,
     LandingPageModule,

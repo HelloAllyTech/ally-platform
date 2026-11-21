@@ -2,7 +2,7 @@
 title: ally-be — Core Backend
 tags: [repo, backend, nestjs, api]
 summary: ally-be is the multi-tenant NestJS backend that owns Ally's primary PostgreSQL database and orchestrates auth, real-time voice sessions, the audio/transcription pipeline, AI-driven feedback, and analytics for the counselor-training platform.
-last_reconciled: 2026-11-18
+last_reconciled: 2026-11-20
 ---
 
 # ally-be — Core Backend
@@ -92,6 +92,7 @@ Feature modules live under `src/<domain>/` (controllers, services, DTOs, and `en
 - `bot-draft/` — setting a chatbot up and running it afterwards: onboarding sessions with ally-ai's builder (crawl, facts with sources, purposes, publish), the checkups (questions, runs, results), the assistant's home (each field saved on its own with a version), change-by-chat with history and undo, and the live scorecard.
 
 **Costs, plans, seats and the spend cap**
+- `directory/` — the mental health resources directory (admin app `/directory`). Entries (public or private), collections (saved views) and the join between them, with no tenant scope: any signed-in user adds entries, and ownership alone decides who can edit an entry or a collection. A collection can have a public landing page and a custom domain proved by a DNS TXT record; the public reads (`v1/public/directory/…`) need no sign-in, answer 404 for anything unpublished or unverified, and the two page reads are CORS-open so an owner's own domain can call them. `domain-check` lets the web front door ask whether to issue a certificate for a host.
 - `billing/` — a global module: prices every assistant AI call (from the `llm_usage` SQS feed, tagged with the run through the `X-Ally-Usage` header ally-be sends on each ally-ai call) and every billable WhatsApp message into `usage_events`, from versioned prices in `billing_models`; Ally admin → Models and Costs, with budget and spike alerts (`manage_costs`). Chatbot creators' plans, seats and monthly limits, and the spend cap: a monthly dollar cap per creator (from their plan, or their own) that replaced token allowances. `LimitsService` checks every limit before a run, and a limited run still gets its crisis check. Owners see counts only (`v1/me/plan`), never dollars. Notes: `docs/agents-v2/CHUNK-CR1-NOTES.md` and `CHUNK-CR3-NOTES.md` in the platform repo.
 
 **Agents that build**
@@ -172,7 +173,7 @@ Role and permission lookups are cached in Redis (`user:roles:<id>`, `user:groups
   - `sqs-learn-message-and-event-queue` — learning messages and events from ally-ai-learn.
   - `whatsapp-inbound` (+ `-dlq`) — one message per inbound WhatsApp message. A standard queue, not FIFO: dedupe lives in Postgres (unique `provider_message_id`), and FIFO's 5-minute dedupe window is far shorter than Meta's retry window.
   - `kb-ingest` (+ `-dlq`) — corpus extraction, chunking and indexing.
-- **ally-web / ally-mobile** — consume the versioned REST API plus the Socket.IO gateways above. CORS origins are configured via `ALLOWED_ORIGINS` (defaults include the landing page :3000, helpline dashboard :8080, admin dashboard :8081). The website widget's two public routes are the exception: owners' own sites call them, so they answer CORS themselves, only for each chatbot's allowed websites.
+- **ally-web / ally-mobile** — consume the versioned REST API plus the Socket.IO gateways above. CORS origins are configured via `ALLOWED_ORIGINS` (defaults include the landing page :3000, helpline dashboard :8080, admin dashboard :8081). The website widget's two public routes are the exception: owners' own sites call them, so they answer CORS themselves, only for each chatbot's allowed websites. The directory's two landing-page reads are open to any origin (no cookies or tokens), because a collection's page can be served from its owner's own domain.
 - **Redis message broker** — pub/sub for inter-service event delivery (`message-broker/`).
 - **Metabase** — analytics dashboards via `METABASE_URL` / `METABASE_API_KEY`.
 - **AWS SES** — transactional email.

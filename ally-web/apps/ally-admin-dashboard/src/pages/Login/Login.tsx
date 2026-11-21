@@ -26,6 +26,7 @@ import { afterLoginPath, validateEmail, openLinkInNewTab } from "@utils";
 import { Capabilities } from "./Capabilities";
 import { LegalDrawer, LegalKind } from "./LegalDrawer";
 import { UseCases } from "./UseCases";
+import { DIR } from "../Directory/copy";
 
 const RESEND_CODE_COUNTDOWN = 60; // 60 seconds
 const DEFAULT_EXPIRES_IN = 10; // 10 minutes
@@ -53,10 +54,16 @@ export const Login: React.FC = () => {
   const isAssistantsLogin =
     location.pathname === ROUTES.WHATSAPP_BOT ||
     location.pathname.startsWith(`${ROUTES.WHATSAPP_BOT}/`);
+  // The resources directory has its own login in the same layout: its own words and colour.
+  const isDirectoryLogin =
+    location.pathname === ROUTES.DIRECTORY || location.pathname.startsWith(`${ROUTES.DIRECTORY}/`);
+  const hasOwnLogin = isAssistantsLogin || isDirectoryLogin;
   // Ink on paper: the assistants login's black button on its cream page.
-  const assistantsButton = isAssistantsLogin
-    ? "!bg-[#4338CA] !text-[#FFFFFF] hover:!bg-[#4338CA]/90 disabled:!bg-[#4338CA]/30"
-    : "";
+  const assistantsButton = isDirectoryLogin
+    ? "!bg-[#0F766E] !text-[#FFFFFF] hover:!bg-[#0F766E]/90 disabled:!bg-[#0F766E]/30"
+    : isAssistantsLogin
+      ? "!bg-[#4338CA] !text-[#FFFFFF] hover:!bg-[#4338CA]/90 disabled:!bg-[#4338CA]/30"
+      : "";
   const { user } = useSelector((state: RootState) => state.user);
 
   const [loginSection, setLoginSection] = useState<any>(LoginSection.EMAIL);
@@ -71,7 +78,7 @@ export const Login: React.FC = () => {
   const focusEmail = useCallback(() => {
     document.querySelector<HTMLInputElement>('input[type="email"]')?.focus();
   }, []);
-  const [rememberMe, setRememberMe] = useState<boolean>(isAssistantsLogin);
+  const [rememberMe, setRememberMe] = useState<boolean>(hasOwnLogin);
 
   const [
     generateOTP,
@@ -222,8 +229,14 @@ export const Login: React.FC = () => {
   };
 
   const getLoginSection = () => {
-    if (loginSection === LoginSection.EMAIL && isAssistantsLogin) {
-      const copy = en.assistantsShell.login;
+    if (loginSection === LoginSection.EMAIL && hasOwnLogin) {
+      const copy = isDirectoryLogin
+        ? {
+            ...en.assistantsShell.login,
+            headline: DIR.login.headline,
+            headlineEmphasis: DIR.login.headlineEmphasis,
+          }
+        : en.assistantsShell.login;
       const hasGoogle = Boolean(import.meta.env.VITE_GOOGLE_AUTH_CLIENT_ID);
       return (
         <motion.div
@@ -239,10 +252,17 @@ export const Login: React.FC = () => {
         >
           <h1 className="font-secondary text-[30px] font-semibold leading-[1.1] tracking-[-0.03em] text-[#1E1B4B] sm:text-4xl md:text-5xl">
             {copy.headline}
-            <span className="mt-2 inline-block bg-[#5B4BFF] px-2.5 pb-1 pt-0.5 leading-none text-[#FFFFFF]">
+            <span
+              className={`mt-2 inline-block px-2.5 pb-1 pt-0.5 leading-none text-[#FFFFFF] ${
+                isDirectoryLogin ? "bg-[#0F766E]" : "bg-[#5B4BFF]"
+              }`}
+            >
               {copy.headlineEmphasis}
             </span>
           </h1>
+          {isDirectoryLogin && (
+            <p className="max-w-xl text-lg text-[#1E1B4B]/70">{DIR.login.blurb}</p>
+          )}
           <TextField
             fieldSize="medium"
             type="email"
@@ -307,10 +327,14 @@ export const Login: React.FC = () => {
               {en.auth.privacyPolicy}.
             </button>
           </p>
-          <div className="mt-3">
-            <UseCases onStart={focusEmail} />
-          </div>
-          <Capabilities />
+          {!isDirectoryLogin && (
+            <>
+              <div className="mt-3">
+                <UseCases onStart={focusEmail} />
+              </div>
+              <Capabilities />
+            </>
+          )}
         </motion.div>
       );
     }
@@ -490,11 +514,13 @@ export const Login: React.FC = () => {
   const isSubmitDisabled =
     loginSection === LoginSection.EMAIL ? !email || !!emailError : !otp || otp.length < 4;
 
-  if (isAssistantsLogin) {
+  if (hasOwnLogin) {
     return (
       <div
-        className="flex min-h-dvh flex-col items-center overflow-hidden bg-[#F6F5FF] px-6 font-primary text-[#1E1B4B]"
-        data-testid="assistants-login"
+        className={`flex min-h-dvh flex-col items-center overflow-hidden px-6 font-primary text-[#1E1B4B] ${
+          isDirectoryLogin ? "bg-[#F2FAF8]" : "bg-[#F6F5FF]"
+        }`}
+        data-testid={isDirectoryLogin ? "directory-login" : "assistants-login"}
       >
         {/* Wordmark: the product name, top left of the same column as everything below it, so
             the wordmark, headline and form share one left edge. */}
@@ -503,9 +529,15 @@ export const Login: React.FC = () => {
             className="flex items-center gap-2 font-secondary text-2xl font-semibold tracking-[-0.03em] md:text-3xl"
             data-testid="assistants-login-wordmark"
           >
-            <span>{en.assistantsShell.login.wordmarkName}</span>
-            <span className="bg-[#5B4BFF] px-2 pb-0.5 leading-tight text-[#FFFFFF]">
-              {en.assistantsShell.login.wordmarkProduct}
+            <span>
+              {isDirectoryLogin ? DIR.wordmarkName : en.assistantsShell.login.wordmarkName}
+            </span>
+            <span
+              className={`px-2 pb-0.5 leading-tight text-[#FFFFFF] ${
+                isDirectoryLogin ? "bg-[#0F766E]" : "bg-[#5B4BFF]"
+              }`}
+            >
+              {isDirectoryLogin ? DIR.product : en.assistantsShell.login.wordmarkProduct}
             </span>
           </div>
         </div>

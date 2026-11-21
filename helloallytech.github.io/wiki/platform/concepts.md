@@ -326,6 +326,14 @@ out which meaning is in play before you change anything.
 **Code:** `ally-be/src/chatbot/` · `ally-be/src/whatsapp/` · `ally-be/src/bot-draft/` · `ally-ai/app/core/agent_runtime/` · `ally-ai/app/core/builder/` · `ally-ai/app/core/memory_lines/` · `ally-ai/app/core/checkup/` · `ally-web/apps/ally-admin-dashboard/src/pages/WhatsAppBot/` · `ally-web/apps/ally-admin-dashboard/src/pages/AssistantHome/` · `ally-web/apps/ally-admin-dashboard/src/pages/DevAssistantHome/` · `ally-web/apps/ally-admin-dashboard/src/pages/DevV2Components/` · `ally-web/apps/ally-admin-dashboard/src/pages/Inbox/` · `ally-web/apps/ally-admin-dashboard/src/pages/DevInbox/` · `ally-web/apps/ally-admin-dashboard/src/pages/Onboarding/` · `ally-web/apps/ally-admin-dashboard/src/pages/DevOnboarding/` · `ally-web/apps/ally-admin-dashboard/src/pages/Templates/`
 **Deep doc:** [Agents v2 context](https://github.com/HelloAllyTech/ally-platform/blob/master/docs/agents-v2/CONTEXT.md) · [ally-be](../repos/ally-be.md)
 
+### Resources directory
+<!-- concept: directory -->
+**Is:** A product for mental health organisations to build and publish their own resources directory. Anyone signed in adds entries (private or public), saves public entries and their own into collections, and publishes each collection as a public landing page, optionally on its own domain.
+**Also called:** Directory, `/admin/directory`, collection (a saved view) · **Not to be confused with:** the [Knowledge base](#knowledge-base) and [Assistants](#assistants), which answer questions from documents; this lists services.
+**Composed of:** ally-be `directory` — entries, collections and the join between them; ownership decides edits (an entry is editable only by its owner, a collection only by its owner). Public reads (`/v1/public/directory/…`) need no sign-in and answer 404 for anything unpublished or unverified. A custom domain is proved by a TXT record, then served by the admin app, which renders only the collection's page when opened on a host that is not Ally's own. The admin area has no side navigation and its own login, like Assistants.
+**Status:** Live — no feature toggle: open to any signed-in user. Custom-domain TLS needs the web front door to ask `/v1/public/directory/domain-check` before issuing a certificate
+**Code:** `ally-be/src/directory/` · `ally-web/apps/ally-admin-dashboard/src/pages/Directory/`
+
 ### Public content channels
 <!-- concept: public-content -->
 **Is:** The signed-out pages Ally publishes to anyone: blog, product-updates feed, changelog, public roadmap, legal pages, and a trial conversational homepage.
