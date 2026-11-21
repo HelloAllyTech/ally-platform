@@ -116,7 +116,8 @@ export const RoadmapQueuePage: React.FC = () => {
   const baseKey = JSON.stringify(baseQuery);
   useEffect(() => setCursor(undefined), [baseKey]);
   const query = useMemo(() => (cursor ? { ...baseQuery, cursor } : baseQuery), [baseQuery, cursor]);
-  const { data, isLoading, isFetching, isError, refetch } = useGetRoadmapItemsQuery(query);
+  const { data, currentData, isLoading, isFetching, isError, refetch } =
+    useGetRoadmapItemsQuery(query);
 
   // The To do count on its tab: how many ideas are in the Backlog.
   const { data: backlog } = useGetRoadmapItemsQuery({ view: "all", stage: "backlog" });
@@ -425,6 +426,8 @@ export const RoadmapQueuePage: React.FC = () => {
         held={held}
         onRelease={() => setReleaseToken(t => t + 1)}
         releaseToken={releaseToken}
+        listKey={baseKey}
+        settled={currentData !== undefined}
         onLoadMore={() => {
           if (data && "rows" in data && data.nextCursor) setCursor(data.nextCursor);
         }}

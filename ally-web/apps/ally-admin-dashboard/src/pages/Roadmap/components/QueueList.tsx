@@ -80,6 +80,10 @@ interface QueueListProps extends QueueRowActions {
   onRelease: () => void;
   /** Changes when the reader asks for the new order: the held snapshot is retaken. */
   releaseToken?: number;
+  /** Identifies the list being asked for (the request, less its page). A new key is a new list. */
+  listKey?: string;
+  /** True once `data` is the answer to the current request, not the previous one kept on screen. */
+  settled?: boolean;
   onLoadMore?: () => void;
   /** The rows in display order, for J/K. */
   onVisibleCodes?: (codes: string[]) => void;
@@ -114,6 +118,8 @@ export const QueueList: React.FC<QueueListProps> = ({
   held,
   onRelease,
   releaseToken = 0,
+  listKey,
+  settled = true,
   onLoadMore,
   onVisibleCodes,
   ...actions
@@ -126,9 +132,13 @@ export const QueueList: React.FC<QueueListProps> = ({
   const [snapshot, setSnapshot] = useState<QueueSection[] | null>(null);
   const liveRef = useRef(liveSections);
   liveRef.current = liveSections;
+  // A snapshot belongs to the list it was taken from. Switching tab, filter or sort while an idea
+  // is open (so the list is held) asks for a different list; freezing against the old snapshot
+  // marked every row of the new one as "new, wait" and showed an empty list. So the snapshot is
+  // dropped when the request changes and retaken once the new list has actually arrived.
   useEffect(() => {
-    setSnapshot(held ? liveRef.current : null);
-  }, [held, view, releaseToken]);
+    setSnapshot(held && settled ? liveRef.current : null);
+  }, [held, view, releaseToken, listKey, settled]);
 
   const display = useMemo(() => {
     let orderChanged = false;
