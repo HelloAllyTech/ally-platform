@@ -41,7 +41,7 @@ export const LegalDrawer: React.FC<LegalDrawerProps> = ({ kind, onClose }) => {
           <p className="text-typography-500">Loading…</p>
         ) : html ? (
           <div
-            className="prose prose-sm max-w-none break-words text-typography-800 [&_img]:h-auto [&_img]:max-w-full [&_pre]:overflow-x-auto [&_table]:block [&_table]:overflow-x-auto [&_h1]:my-2 [&_h1]:text-xl [&_h1]:font-bold [&_h2]:my-1.5 [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:my-1 [&_h3]:text-base [&_h3]:font-semibold [&_p]:my-2 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-0.5 [&_blockquote]:my-2 [&_blockquote]:border-l-4 [&_blockquote]:border-[#5B4BFF] [&_blockquote]:pl-4 [&_blockquote]:italic"
+            className="prose prose-sm max-w-none break-words text-typography-800 [&_img]:h-auto [&_img]:max-w-full [&_pre]:overflow-x-auto [&_table]:block [&_table]:overflow-x-auto [&_h1]:my-2 [&_h1]:text-xl [&_h1]:font-bold [&_h2]:my-1.5 [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:my-1 [&_h3]:text-base [&_h3]:font-semibold [&_p]:my-2 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-0.5 [&_blockquote]:my-2 [&_blockquote]:border-l-4 [&_blockquote]:border-[#C4532D] [&_blockquote]:pl-4 [&_blockquote]:italic"
             dangerouslySetInnerHTML={{ __html: html }}
           />
         ) : (

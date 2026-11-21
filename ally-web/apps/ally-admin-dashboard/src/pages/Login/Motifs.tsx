@@ -2,25 +2,25 @@ import React, { useId } from "react";
 
 /** The colours the assistants login is drawn in. */
 export const PALETTE = {
-  /** Deep indigo: text and the few solid shapes. */
-  ink: "#1E1B4B",
+  /** Warm espresso ink: text and the few solid shapes. */
+  ink: "#2B2520",
   /** The page: a lavender-tinted white. */
-  cream: "#F6F5FF",
+  cream: "#FAF6EE",
   /** White: panels, bubbles, text on the accent. */
-  ivory: "#FFFFFF",
-  /** Electric violet: the accent. */
-  accent: "#5B4BFF",
-  peach: "#FFD6BA",
-  butter: "#FFE9A8",
-  mint: "#BFEBD7",
-  lilac: "#D9CCFF",
-  pink: "#FFC9DE",
-  sky: "#3D8BFF",
-  rose: "#FF5E9C",
+  ivory: "#FFFDF9",
+  /** Clay: the accent. */
+  accent: "#C4532D",
+  peach: "#F8D9C0",
+  butter: "#F6E3A8",
+  mint: "#CFE3CF",
+  lilac: "#E3D8EE",
+  pink: "#F5CFD0",
+  sky: "#4F7C8A",
+  rose: "#C95F6E",
   /** The sun in the helpline motif. */
-  sun: "#FF7A59",
+  sun: "#E8794A",
   /** A quiet tile fill. */
-  sand: "#E6E4F7",
+  sand: "#EDE5D6",
 } as const;
 
 export interface Tone {
@@ -32,7 +32,7 @@ export interface Tone {
   soft: string;
 }
 
-const onPastel = (bg: string): Tone => ({ bg, fg: PALETTE.ink, soft: "rgba(30,27,75,0.75)" });
+const onPastel = (bg: string): Tone => ({ bg, fg: PALETTE.ink, soft: "rgba(43,37,32,0.75)" });
 
 export const TONES: Record<string, Tone> = {
   helpline: onPastel(PALETTE.peach),
