@@ -12,6 +12,10 @@
 #   OPENAI_API_KEY        — used by opencode when the model is an OpenAI one
 #   GEMINI_API_KEY        — used when the model is a Gemini one
 #   SECURITY_AUDIT_MODEL  — (variable) opencode model id, e.g. "openai/<model>"
+#   ALLY_BE_API_KEY       — optional; ally-be's platform API_KEY. With the
+#   ALLY_BE_API_URL       — (variable) ally-be base URL, MEDIUM+ findings are filed as PM Agent
+#                           signals, which the PM Agent may turn into roadmap cards.
+#                           Both unset: the step is skipped.
 
 name: Security Audit
 run-name: "Security Audit · ${{ inputs.repo || 'every service' }} · ${{ inputs.deep || 'false' }}"
@@ -114,11 +118,11 @@ jobs:
               SCOPE="no changes in the last 7 days — only skim auth guards, controllers and gateways as a baseline"
             fi
           fi
-          export SERVICE SCOPE DATE="$(date -u +%F)" REPORT=/tmp/audit-report.md
+          export SERVICE SCOPE DATE="$(date -u +%F)" REPORT=/tmp/audit-report.md FINDINGS=/tmp/audit-findings.json
           python3 - <<'PY' > /tmp/audit-prompt.txt
           import os
           t = open("scripts/security-audit/prompt.md").read()
-          for k in ("SERVICE", "SCOPE", "DATE", "REPORT"):
+          for k in ("SERVICE", "SCOPE", "DATE", "REPORT", "FINDINGS"):
               t = t.replace("__%s__" % k, os.environ[k].replace("\\n", "\n"))
           print(t)
           PY
@@ -168,6 +172,13 @@ jobs:
             -e 's/gh[pousr]_[A-Za-z0-9]{30,}/[REDACTED]/g' \
             -e 's/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/[REDACTED]/g' \
             /tmp/audit-report.md
+          [ -s /tmp/audit-findings.json ] && sed -E -i \
+            -e 's/(sk|pk|rk)-[A-Za-z0-9_-]{16,}/[REDACTED]/g' \
+            -e 's/AKIA[0-9A-Z]{16}/[REDACTED]/g' \
+            -e 's/AIza[0-9A-Za-z_-]{30,}/[REDACTED]/g' \
+            -e 's/gh[pousr]_[A-Za-z0-9]{30,}/[REDACTED]/g' \
+            -e 's/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/[REDACTED]/g' \
+            /tmp/audit-findings.json || true
 
       - name: Open the findings issue
         env:
@@ -186,3 +197,28 @@ jobs:
           head -c 60000 /tmp/issue-body.md > /tmp/issue-body-trimmed.md
           gh issue create --title "Security audit — $SERVICE — $DATE" \
             --label security-audit --body-file /tmp/issue-body-trimmed.md
+
+      - name: File findings with the PM Agent
+        # MEDIUM and above become PM Agent signals (ally-be drops LOW and dedupes weekly
+        # repeats). Best-effort: a failure here never fails the audit — the issue is the record.
+        env:
+          ALLY_BE_API_KEY: ${{ secrets.ALLY_BE_API_KEY }}
+          ALLY_BE_API_URL: ${{ vars.ALLY_BE_API_URL }}
+        run: |
+          set -uo pipefail
+          if [ -z "${ALLY_BE_API_KEY:-}" ] || [ -z "${ALLY_BE_API_URL:-}" ]; then
+            echo "ALLY_BE_API_URL / ALLY_BE_API_KEY not set — skipping the PM Agent."; exit 0
+          fi
+          if ! jq -e 'type=="array"' /tmp/audit-findings.json >/dev/null 2>&1; then
+            echo "No valid findings JSON — skipping the PM Agent."; exit 0
+          fi
+          jq --arg svc "$SERVICE" \
+             --arg run "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{runUrl: $run, findings: [ .[]
+               | select((.severity|ascii_downcase) as $s | ["critical","high","medium"] | index($s))
+               | {severity: (.severity|ascii_downcase), title, service: $svc, file, line: (.line // null), what, impact, fix}
+               | with_entries(select(.value != null)) ]}' /tmp/audit-findings.json > /tmp/pm-payload.json
+          echo "Posting $(jq '.findings|length' /tmp/pm-payload.json) finding(s)."
+          curl -sS -m 60 -X POST "$ALLY_BE_API_URL/api/v1/pm-agent/signals/security-audit" \
+            -H "Content-Type: application/json" -H "x-api-key: $ALLY_BE_API_KEY" \
+            -d @/tmp/pm-payload.json || echo "::warning::Could not reach ally-be."

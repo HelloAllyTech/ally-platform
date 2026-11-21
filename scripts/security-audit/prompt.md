@@ -5,7 +5,7 @@ counselor training product). Service: `__SERVICE__`. Scope: __SCOPE__.
 
 ## Hard rules
 - READ-ONLY. Do not modify, commit, or push anything in the repository. Do not call the network.
-- Write your report ONLY to `__REPORT__` (a path outside the checkout).
+- Write your report ONLY to `__REPORT__` and the machine-readable list ONLY to `__FINDINGS__` (both paths outside the checkout).
 - NEVER put a secret value, token, key, or real PHI in the report. Name the file and line, and say what kind of secret it is, never its value.
 - Report only what you verified by reading the code. For each finding, open the file and confirm the path is reachable. No speculation; if unsure, list it under "Needs a human look" instead.
 - Other services are readable at `/tmp/siblings/<service>` for tracing a call across services.
@@ -42,3 +42,8 @@ counselor training product). Service: `__SERVICE__`. Scope: __SCOPE__.
 - one line per area from the list above, "no issues found" where true
 ```
 Order findings by severity. If there are none, say so plainly; do not invent any.
+
+## Machine-readable findings
+Also write `__FINDINGS__`: a JSON array with one object per finding in the report, in the same order:
+`{"severity":"critical|high|medium|low","title":"...","file":"path/relative/to/service","line":123,"what":"...","impact":"...","fix":"..."}`
+`title` is a short plain description (no secret values). `file` is relative to the service folder. Write `[]` if there are no findings. Valid JSON only, no commentary.
