@@ -119,12 +119,29 @@ def scan_knip(repo: str, cfg: dict) -> list[dict]:
         data = json.loads(out.stdout)
     except json.JSONDecodeError:
         sys.exit(f"knip failed in {repo}:\n{out.stderr or out.stdout}")
+    return parse_knip(data, repo)
+
+
+# What a human could delete. knip also reports enum members, duplicate exports, unlisted and
+# unused dependencies, binaries and unresolved imports; those are noisy here (every repo has
+# its own dependency hygiene story) and not a "delete this" PR, so they are not reported.
+KNIP_BUCKETS = (("exports", "export"), ("types", "type"), ("classMembers", "method"))
+
+
+def parse_knip(data: dict, repo: str) -> list[dict]:
+    """Turn `knip --reporter json` output into findings.
+
+    The real shape (knip 6) is {"issues": [{"file": ..., "files": [{"name": ...}],
+    "exports": [{"name", "line", ...}], "types": [...], ...}]}: there is NO top-level
+    "files" key. A file knip says is unused arrives as an issue whose own `files` list
+    names itself.
+    """
     found = []
-    for f in data.get("files", []):
-        found.append(finding(repo, "file", f"{repo}/{f}", "(whole file)"))
     for issue in data.get("issues", []):
         path = f"{repo}/{issue['file']}"
-        for bucket, kind in (("exports", "export"), ("types", "type"), ("classMembers", "method")):
+        for item in issue.get("files", []):
+            found.append(finding(repo, "file", f"{repo}/{item['name']}", "(whole file)"))
+        for bucket, kind in KNIP_BUCKETS:
             for item in issue.get(bucket, []):
                 found.append(finding(repo, kind, path, item["name"], item.get("line")))
     return found
