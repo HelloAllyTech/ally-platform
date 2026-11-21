@@ -83,3 +83,22 @@ export const PM_AGENT_RECONCILE_INTERVAL = '5min';
  */
 export const PM_OUTBOX_LOCK_NAMESPACE = 1982000;
 export const PM_OUTBOX_LOCK_KEY = 1;
+
+/** `pm_agent_signals.source` for the weekly dead-code report (scripts/dead_code.py --publish). */
+export const DEAD_CODE_SIGNAL_SOURCE = 'dead_code';
+
+/**
+ * A dead-code signal older than this has not been re-published, so the module was cleaned up
+ * (or the report stopped running). The lane tool leaves it out rather than cite stale counts.
+ * The report publishes weekly; this gives it one missed run of slack.
+ */
+export const DEAD_CODE_SIGNAL_FRESH_DAYS = 10;
+
+/** Bounds for one published module: the report is bounded text, never a code dump. */
+export const DEAD_CODE_LIMITS = {
+  GROUPS_MAX: 400,
+  KEY_MAX: 160,
+  TITLE_MAX: 200,
+  ITEMS_MAX: 40,
+  ITEM_MAX: 200,
+} as const;

@@ -255,7 +255,7 @@ Persister.
 - **Lanes**: `analytics`, `ux_signals` (skipped when `pm_agent_signals` has nothing from the last 45 days),
   `code_health`, `infra_cost`, `strategy_content`, `revisions`. Each = its prompt + an allow-list of read-only tools
   (`src/pm-agent/lane/pm-lane-definitions.ts`). Tools: `analytics_section` (the 15 AnalyticsModule aggregates, compacted),
-  `ux_signals_list` (`pm_agent_signals` only — UX Signals internals are not imported; also returns `source = security_audit` rows, see below), `llm_usage_summary`,
+  `ux_signals_list` (`pm_agent_signals` only — UX Signals internals are not imported; also returns `source = security_audit` rows, see below), `dead_code_list` (code_health lane only; `pm_agent_signals` rows with `source = 'dead_code'`, see below), `llm_usage_summary`,
   `ai_task_registry`, `product_goals`, and the roadmap copilot's read tools (roadmap, interviews, Bug Hunter findings,
   docs, GitHub code, wiki) resolved lazily from `RoadmapCopilotToolsService`. Left out: `analytics_ask` (a second
   billed agent), Context Library principles (attributed to the copilot), the AWS logs proxy (`LogsService` is not
@@ -285,7 +285,7 @@ sensible_defaults, consistent_with_memory_and_strategy, buildable, honest_risk`,
 - **Persister** (`PmAgentPipelineStore.persistCard`, the only card writer): one transaction under advisory xact lock
   `(1982000, 3)`: skip if the version hash exists in this run or among open cards; stop at the cap; insert the card
   (`open`, `openedAt`, `versionHash`, `questionKey`, `rank`, `evidenceFreshness`, version = original + 1 for a
-  revision) and a `created` event whose `detail.lane` is what lane learning reads; mark cited UX signals `used`.
+  revision) and a `created` event whose `detail.lane` is what lane learning reads; mark cited UX and dead-code signals `used`.
   Then `card.updated`/`state.updated`.
 - **Learning**: each run recomputes per-category and per-lane scores from `pm_agent_outcomes` (180-day lookback,
   30-day half-life; accepted = +1, shipped +1.5, failed/reverted/rejected = −1, feedback = +0.25/−0.75; questions
@@ -423,6 +423,23 @@ predicate: { categories?, lanes?, sizes?, risks?, words? }, citedRefs? }`. Unkno
 - **Settings**: `lessonsEnabled`, `lessonsWeekday` (whole number 0–6) in `GET`/`PATCH /settings` (and `GET /state`).
 - **Health**: `activeLessons`, `proposedLessons`, `lessonAgreementDelta` (mean `agreementAfter − agreementBefore` over
   active lessons with an eval, 3 dp; null when none).
+
+## Dead-code signals (code_health lane)
+
+The weekly `Dead code` workflow (`.github/workflows/dead-code.yml`, `scripts/dead_code.py --publish`) scans the Python
+repos for unused code, groups the findings by module and posts them to `POST /v1/pm-agent/signals/dead-code`. That route is
+`x-api-key` guarded (`ApiAuthGuard`, the platform `API_KEY`), in its own controller (`PmAgentDeadCodeController`), and only
+stores evidence: one `pm_agent_signals` row per module (`source = 'dead_code'`, key = module path), counts and up to 40 items in `metrics`.
+
+- **A refresh** updates counts and `lastSeenAt`, never `status`: a module already used for a card, or dismissed, stays decided.
+- **Cleaned-up code ages out**: the `dead_code_list` tool only returns `new` rows seen in the last 10 days
+  (`DEAD_CODE_SIGNAL_FRESH_DAYS`), so a module that stops appearing disappears without anything deleting it.
+- **The card is the PM Agent's call.** The `code_health` lane reads the module's callers first (static analysis finds
+  candidates, not proof), proposes one module per card, and an admin accepting the card files the roadmap ticket the usual way.
+  Nothing on this path files a ticket by itself. It does nothing while the PM Agent is off (`pm_agent_settings.enabled`).
+- **Prompt.** The lane works from the tool's own description (check callers, one module per card). A sentence in the
+  `pm_agent_lane_code_health` prompt pointing the lane at `dead_code_list` is an optional Skills Store edit (`prompts push`),
+  not a Git change: live prompt text lives in the Skills Store, and CI refuses edits to the default `.txt` without a contract change.
 
 ## Security audit signals
 
