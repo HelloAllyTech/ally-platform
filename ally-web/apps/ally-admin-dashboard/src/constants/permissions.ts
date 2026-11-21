@@ -122,7 +122,6 @@ export const SIDEBAR_ITEMS = {
   CONVERSATION_DRIFT: "conversation-drift",
   DEBRIEFS: "debriefs",
   AGENT_TEST_CASES: "agent-test-cases",
-  PRODUCT_ROADMAP: "product-roadmap",
   /** Roadmap v2, shown only while `roadmap_v2` is on (GET /v1/roadmap/me/role succeeds). */
   ROADMAP_V2: "roadmap-v2",
   /** User Interviews, its own entry while `roadmap_v2` is on (D14); inside the old board before. */

@@ -41,7 +41,6 @@ import {
   LandingPageEditor,
   LandingPages,
   AILab,
-  ProductRoadmap,
   RoadmapDraftsPage,
   RoadmapAgentPage,
   RoadmapBugsPage,
@@ -685,9 +684,10 @@ export const RouteLayout: React.FC = () => {
                 requiredPermissions={[Permissions.VIEW_PRODUCT_ROADMAP]}
                 requiredFeature={FeatureToggleKey.PRODUCT_ROADMAP}
               >
-                {/* With roadmap_v2 on, old links land on the Roadmap (§5.7). */}
+                {/* Old Product Roadmap links land on the Roadmap (§5.7). Someone with no Roadmap
+                    role is sent there too: the Roadmap's own gate answers them with not-found. */}
                 <RoadmapLegacyRedirect from="productRoadmap">
-                  <ProductRoadmap />
+                  <Navigate to={ROUTES.ROADMAP} replace />
                 </RoadmapLegacyRedirect>
               </PrivateLayout>
             }
