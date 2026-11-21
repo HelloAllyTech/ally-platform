@@ -2,6 +2,9 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { V2_FEATURES } from "../../BugHunterV2/v2Backend";
+import { BugHunterBackendProvider } from "../bugHunterBackend";
+
 // Mock API hooks — mode state, the findings table, and run history all come entirely from these.
 vi.mock("@api", () => ({
   // The header's ⋯ menu holds the UX Signals scan. The menu item is absent
@@ -314,6 +317,24 @@ describe("BugHunter", () => {
     expect(screen.getByTestId("tab-notebook")).toBeInTheDocument();
     expect(screen.queryByTestId("tab-about")).not.toBeInTheDocument();
     expect(screen.queryByTestId("tab-performance")).not.toBeInTheDocument();
+  });
+
+  // Bug Hunter v2 renders this same page through a provider (chunk 11): the parts it
+  // has no equivalent for are hidden, and acting on bugs needs v2's toggle.
+  it("under Bug Hunter v2's backend: no Notebook, and the old toggle cannot act", () => {
+    onDuty();
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <BugHunterBackendProvider value={{ hooks: {}, features: V2_FEATURES }}>
+          <BugHunter />
+        </BugHunterBackendProvider>
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId("tab-work")).toBeInTheDocument();
+    expect(screen.queryByTestId("tab-notebook")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bug Hunter");
+    // the header says nothing about sweeps v2 doesn't run
+    expect(screen.getByTestId("bug-hunter-status-line")).not.toHaveTextContent(/sweep/i);
   });
 
   it("opens About in a side panel from the help button, with every question in it", () => {

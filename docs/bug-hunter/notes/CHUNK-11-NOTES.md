@@ -82,3 +82,22 @@ PR open (In progress) --Merge (ally-be, v1 GithubActionsService)--> merged (Done
 - **Merge and Release locally** need ally-be's GITHUB_TOKEN (v1's credential).
 - A PR merged or closed in GitHub directly is not noticed yet (v1 has a reconcile
   pass); later.
+
+## The exact-match page (user, 2026-11-21: "follow old bug hunter ui exact match")
+
+`/bug-hunter-v2` now renders the old Bug Hunter's page itself (`BugHunterV2Page`), not a
+copy. The old components import their data hooks from `pages/BugHunter/bugHunterBackend.tsx`,
+which calls the provider's implementation and the old hook otherwise, so `/bug-hunter`
+is unchanged. `pages/BugHunterV2/v2Backend.ts` supplies v2's:
+
+- the list is v2's queue (ally-be `compat` routes, ids `v2-<n>`, built through v1's own
+  `toFindingDto`) then the old history from the old API, a reported bug counted once;
+- buttons route by id: on a v2 bug, Approve = Open PR (suggested fix) or Put me on it,
+  Put me on it = Start, Decline = Dismiss (reasons mapped), Merge / Release = v2's; on an
+  old finding they stay the old Bug Hunter's;
+- hidden on v2 (user's choice): Notebook / feature map, sweeps and run history, Today,
+  UX scan, answer, edit description, cancel, stage pinning;
+- the mode select's "AI" is v2's autonomous; acting needs `bug_hunter_v2_verdicts`.
+
+The earlier five-tab v2 board (`BugHunterV2Board`) is no longer routed; the report and
+v1-bug detail pages remain.

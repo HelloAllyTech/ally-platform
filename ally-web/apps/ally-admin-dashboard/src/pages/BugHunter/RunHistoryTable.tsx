@@ -11,13 +11,13 @@ import {
   TableRow,
   Tooltip,
 } from "@ally-ui-mono/ui-shared";
-import { useGetBugHuntRunQuery, useGetBugHuntRunsQuery } from "@api";
 import { TooltipIcon } from "@assets";
 import { EmptyState } from "@components";
 import { en, ROUTES } from "@constants";
 import { BugHuntRun, BugHuntTrigger } from "@types";
 import { formatDateTime, formatTimestamp } from "@utils";
 
+import { useGetBugHuntRunQuery, useGetBugHuntRunsQuery } from "./bugHunterBackend";
 import { useBugHunterUrlState } from "./bugHunterUrlState";
 import { BUG_HUNT_EVENT_STAGE_LABELS } from "./bugHuntEventLabels";
 import { BugHuntStatusBadge } from "./BugHuntStatusBadge";

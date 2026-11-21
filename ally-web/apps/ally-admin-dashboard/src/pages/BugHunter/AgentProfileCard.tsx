@@ -5,12 +5,6 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { Button, OverflowMenu, OverflowMenuItem } from "@ally-ui-mono/ui-shared";
-import {
-  useGetBugFindingsQuery,
-  useGetBugHunterSettingsQuery,
-  useGetBugHuntRunsQuery,
-  useUpdateBugHunterSettingsMutation,
-} from "@api";
 import { ActionConfirmationPopup } from "@components/action-confirmation-popup";
 // Direct path rather than the @components barrel: several suites on this page
 // mock that barrel wholesale, and reaching past it keeps the avatar real in
@@ -21,6 +15,13 @@ import { BugFinding, BugHunterMode, BugHuntRun, BugHuntRunStatus, BugHuntTrigger
 
 import { AgentStatusKind, deriveAgentStatus } from "./agentPersona";
 import { BrailleSpinner } from "./BrailleSpinner";
+import {
+  useBugHunterFeatures,
+  useGetBugFindingsQuery,
+  useGetBugHuntRunsQuery,
+  useGetBugHunterSettingsQuery,
+  useUpdateBugHunterSettingsMutation,
+} from "./bugHunterBackend";
 import { FeatureMapRefreshDialog } from "./FeatureMapPanel";
 import { IN_FLIGHT_STATUSES } from "./lifecycleBucket";
 import { useUxSignalScan } from "./useUxSignalScan";
@@ -128,6 +129,7 @@ export const AgentProfileCard: FC<AgentProfileCardProps> = ({
   canTriage,
 }) => {
   const navigate = useNavigate();
+  const backendFeatures = useBugHunterFeatures();
   const { data: settings, isLoading, isError } = useGetBugHunterSettingsQuery();
   const [updateSettings, { isLoading: isUpdating }] = useUpdateBugHunterSettingsMutation();
   const uxScan = useUxSignalScan();
@@ -207,8 +209,10 @@ export const AgentProfileCard: FC<AgentProfileCardProps> = ({
               </button>
             </>
           )}
-          {(status.kind !== "working" || fixingCount > 0) && <span aria-hidden="true"> · </span>}
-          {liveSweep ? (
+          {backendFeatures.sweeps && (status.kind !== "working" || fixingCount > 0) && (
+            <span aria-hidden="true"> · </span>
+          )}
+          {!backendFeatures.sweeps ? null : liveSweep ? (
             <span>{en.bugHunter.headerSweepingNow.replace("{repo}", liveSweep.repo)}</span>
           ) : lastSweepAt ? (
             <span title={new Date(lastSweepAt).toLocaleString()}>
@@ -279,7 +283,7 @@ export const AgentProfileCard: FC<AgentProfileCardProps> = ({
             itemText={en.bugHunter.settingsLink}
             onClick={() => navigate(`${ROUTES.SETTINGS}?tab=ai-models`)}
           />
-          {uxScan.canScan && (
+          {backendFeatures.uxScan && uxScan.canScan && (
             <OverflowMenuItem
               className="!h-auto !py-2"
               disabled={uxScan.isBusy}
@@ -297,7 +301,7 @@ export const AgentProfileCard: FC<AgentProfileCardProps> = ({
               }
             />
           )}
-          {canTriage && (
+          {canTriage && backendFeatures.featureMap && (
             <OverflowMenuItem
               itemText={en.bugHunter.menuMapFeatures}
               onClick={() => setMappingFeatures(true)}

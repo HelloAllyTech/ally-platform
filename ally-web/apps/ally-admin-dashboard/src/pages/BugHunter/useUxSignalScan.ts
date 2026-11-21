@@ -3,11 +3,13 @@ import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "sonner";
 
-import { baseAPI, useGetUxSignalScansQuery, useScanUxSignalsMutation } from "@api";
+import { baseAPI } from "@api";
 import { en, FeatureToggleKey, TAG_TYPES } from "@constants";
 import { RootState } from "@store";
 import { UxSignalScan, UxSignalScanStatus } from "@types";
 import { hasFeature } from "@utils";
+
+import { useGetUxSignalScansQuery, useScanUxSignalsMutation } from "./bugHunterBackend";
 
 /**
  * How often the hook asks the scan log whether the run it is following has

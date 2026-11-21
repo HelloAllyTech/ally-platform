@@ -5,13 +5,14 @@ import { Navigate, useSearchParams } from "react-router-dom";
 
 import { SidePanel, Tabs } from "@ally-ui-mono/ui-shared";
 import { ContextCollectionLink } from "@components/context-collection-link";
-import { en, FeatureToggleKey, ROUTES } from "@constants";
+import { en, ROUTES } from "@constants";
 import { RootState } from "@store";
 import { hasFeature } from "@utils";
 
 import { AboutAgent } from "./AboutAgent";
 import { AgentProfileCard } from "./AgentProfileCard";
 import { BugFindingsTable } from "./BugFindingsTable";
+import { useBugHunterFeatures } from "./bugHunterBackend";
 import { BUG_HUNTER_PARAM } from "./bugHunterUrlState";
 import { FeatureMapPanel } from "./FeatureMapPanel";
 import { KeyboardShortcutSheet } from "./KeyboardShortcutSheet";
@@ -100,7 +101,8 @@ export const BugHunter: FC = () => {
    * Resolved once here and threaded down, rather than re-derived in each
    * component: two copies of an authorisation rule is one copy too many.
    */
-  const canTriage = hasFeature(features, FeatureToggleKey.BUG_HUNTER);
+  const backendFeatures = useBugHunterFeatures();
+  const canTriage = hasFeature(features, backendFeatures.triageFeature);
 
   /**
    * The open section. An unrecognised `?section=` falls back to Work rather
@@ -158,9 +160,11 @@ export const BugHunter: FC = () => {
       // linked) and the feature map. Its own tab: it is neither today's work nor
       // a metric, and a reader who wants to teach the agent something should not
       // have to hunt for where.
-      { id: SECTION.notebook, label: en.bugHunter.sectionNotebook },
+      ...(backendFeatures.notebook
+        ? [{ id: SECTION.notebook, label: en.bugHunter.sectionNotebook }]
+        : []),
     ],
-    [],
+    [backendFeatures.notebook],
   );
 
   if (rawSection === RETIRED_PERFORMANCE_SECTION) {
@@ -188,7 +192,7 @@ export const BugHunter: FC = () => {
         </div>
       )}
 
-      {section === SECTION.notebook && (
+      {section === SECTION.notebook && backendFeatures.notebook && (
         <div className="mt-6 flex-1">
           <div className="max-w-3xl">
             <ContextCollectionLink

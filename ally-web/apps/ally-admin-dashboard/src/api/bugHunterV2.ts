@@ -1,5 +1,12 @@
 import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
 import {
+  BugFindingDecisionReason,
+  BugFindingDetail,
+  BugHuntDecision,
+  BugHunterMode,
+  BugHunterSettings,
+  ListBugFindingsQuery,
+  ListBugFindingsResponse,
   BugHunterV2Board,
   BugHunterV2DismissReason,
   BugHunterV2Mode,
@@ -83,6 +90,82 @@ export const bugHunterV2API = baseAPI.injectEndpoints({
       query: id => ({ url: ApiEndpoints.BUG_HUNTER_V2.RELEASE(id), method: HttpMethod.POST }),
       invalidatesTags: [TAG_TYPES.BUG_HUNTER_V2_REPORTS],
     }),
+    // ── the old Bug Hunter's shapes over v2's queue (chunk 11, the exact-match page) ──
+    getBugHunterV2CompatSettings: builder.query<BugHunterSettings, void>({
+      query: () => ({ url: ApiEndpoints.BUG_HUNTER_V2.COMPAT_SETTINGS, method: HttpMethod.GET }),
+      providesTags: [TAG_TYPES.BUG_HUNTER_V2_REPORTS],
+    }),
+    updateBugHunterV2CompatSettings: builder.mutation<BugHunterSettings, { mode: BugHunterMode }>({
+      query: body => ({
+        url: ApiEndpoints.BUG_HUNTER_V2.COMPAT_SETTINGS,
+        method: HttpMethod.PUT,
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.BUG_HUNTER_V2_REPORTS],
+    }),
+    getBugHunterV2CompatFindings: builder.query<
+      ListBugFindingsResponse,
+      ListBugFindingsQuery | void
+    >({
+      query: q => ({
+        url: ApiEndpoints.BUG_HUNTER_V2.COMPAT_FINDINGS,
+        method: HttpMethod.GET,
+        params: q ? { limit: q.limit, offset: q.offset } : undefined,
+      }),
+      providesTags: [TAG_TYPES.BUG_HUNTER_V2_REPORTS],
+    }),
+    getBugHunterV2CompatFinding: builder.query<BugFindingDetail, string>({
+      query: id => ({ url: ApiEndpoints.BUG_HUNTER_V2.COMPAT_FINDING(id), method: HttpMethod.GET }),
+      providesTags: [TAG_TYPES.BUG_HUNTER_V2_REPORTS],
+    }),
+    getBugHunterV2CompatDecisions: builder.query<BugHuntDecision[], string>({
+      query: id => ({
+        url: ApiEndpoints.BUG_HUNTER_V2.COMPAT_FINDING_ACTION(id, "decisions"),
+        method: HttpMethod.GET,
+      }),
+    }),
+    approveBugHunterV2Compat: builder.mutation<BugFindingDetail, string>({
+      query: id => ({
+        url: ApiEndpoints.BUG_HUNTER_V2.COMPAT_FINDING_ACTION(id, "approve"),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: [TAG_TYPES.BUG_HUNTER_V2_REPORTS],
+    }),
+    rejectBugHunterV2Compat: builder.mutation<
+      BugFindingDetail,
+      { id: string; reason: BugFindingDecisionReason; note?: string }
+    >({
+      query: ({ id, reason, note }) => ({
+        url: ApiEndpoints.BUG_HUNTER_V2.COMPAT_FINDING_ACTION(id, "reject"),
+        method: HttpMethod.POST,
+        body: { reason, ...(note?.trim() ? { note: note.trim() } : {}) },
+      }),
+      invalidatesTags: [TAG_TYPES.BUG_HUNTER_V2_REPORTS],
+    }),
+    startBugHunterV2Compat: builder.mutation<
+      BugFindingDetail,
+      { id: string; repo?: string; force?: boolean }
+    >({
+      query: ({ id }) => ({
+        url: ApiEndpoints.BUG_HUNTER_V2.COMPAT_FINDING_ACTION(id, "fix-session"),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: [TAG_TYPES.BUG_HUNTER_V2_REPORTS],
+    }),
+    mergeBugHunterV2Compat: builder.mutation<BugFindingDetail, { id: string; force?: boolean }>({
+      query: ({ id }) => ({
+        url: ApiEndpoints.BUG_HUNTER_V2.COMPAT_FINDING_ACTION(id, "merge"),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: [TAG_TYPES.BUG_HUNTER_V2_REPORTS],
+    }),
+    releaseBugHunterV2Compat: builder.mutation<BugFindingDetail, string>({
+      query: id => ({
+        url: ApiEndpoints.BUG_HUNTER_V2.COMPAT_FINDING_ACTION(id, "release"),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: [TAG_TYPES.BUG_HUNTER_V2_REPORTS],
+    }),
     getBugHunterV2Report: builder.query<BugHunterV2ReportDetail, number>({
       query: id => ({ url: ApiEndpoints.BUG_HUNTER_V2.REPORT(id), method: HttpMethod.GET }),
       providesTags: [TAG_TYPES.BUG_HUNTER_V2_REPORTS],
@@ -108,6 +191,16 @@ export const {
   useOpenBugHunterV2PrMutation,
   useMergeBugHunterV2PrMutation,
   useReleaseBugHunterV2BugMutation,
+  useGetBugHunterV2CompatSettingsQuery,
+  useUpdateBugHunterV2CompatSettingsMutation,
+  useGetBugHunterV2CompatFindingsQuery,
+  useGetBugHunterV2CompatFindingQuery,
+  useGetBugHunterV2CompatDecisionsQuery,
+  useApproveBugHunterV2CompatMutation,
+  useRejectBugHunterV2CompatMutation,
+  useStartBugHunterV2CompatMutation,
+  useMergeBugHunterV2CompatMutation,
+  useReleaseBugHunterV2CompatMutation,
   useGetBugHunterV2ReportQuery,
   useGetBugHunterV2V1BugQuery,
   useRecordBugHunterV2VerdictMutation,

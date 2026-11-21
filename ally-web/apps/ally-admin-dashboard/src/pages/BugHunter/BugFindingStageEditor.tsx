@@ -3,12 +3,12 @@ import React, { useState } from "react";
 import { toast } from "sonner";
 
 import { Button, Select, SelectItem, Tooltip } from "@ally-ui-mono/ui-shared";
-import { useSetBugFindingStageMutation } from "@api";
 import { TooltipIcon } from "@assets";
 import { en } from "@constants";
 import { BugFindingStage } from "@types";
 
 import { BUG_FINDING_STAGE_LABELS } from "./bugFindingLabels";
+import { useSetBugFindingStageMutation } from "./bugHunterBackend";
 
 const STAGE_ORDER: BugFindingStage[] = [
   BugFindingStage.NEW,

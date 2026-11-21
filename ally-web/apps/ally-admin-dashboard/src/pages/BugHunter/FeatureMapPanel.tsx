@@ -3,17 +3,17 @@ import { FC, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { Button, Select, SelectItem, SidePanel, TextArea, Tooltip } from "@ally-ui-mono/ui-shared";
-import {
-  useGetBugHunterFeatureMapsQuery,
-  useRefreshBugHunterFeatureMapsMutation,
-  useRemoveBugHunterFeatureMapMutation,
-} from "@api";
 import { TooltipIcon } from "@assets";
 import { ActionConfirmationPopup } from "@components/action-confirmation-popup";
 import { en } from "@constants";
 import { BugHunterFeatureCard } from "@types";
 import { formatDate } from "@utils";
 
+import {
+  useGetBugHunterFeatureMapsQuery,
+  useRefreshBugHunterFeatureMapsMutation,
+  useRemoveBugHunterFeatureMapMutation,
+} from "./bugHunterBackend";
 import { BUG_HUNTER_REPOS } from "./repos";
 
 const ALL_REPOS = "__all__";

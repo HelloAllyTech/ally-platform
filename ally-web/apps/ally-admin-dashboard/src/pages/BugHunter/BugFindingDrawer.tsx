@@ -13,18 +13,6 @@ import {
   SidePanel,
   TextArea,
 } from "@ally-ui-mono/ui-shared";
-import {
-  useAnswerBugFindingMutation,
-  useApproveBugFindingMutation,
-  useCancelBugFixSessionMutation,
-  useEditBugFindingDescriptionMutation,
-  useGetBugFindingDecisionsQuery,
-  useGetBugFindingQuery,
-  useMergeBugFindingMutation,
-  useRejectBugFindingMutation,
-  useReleaseBugFindingMutation,
-  useStartBugFixSessionMutation,
-} from "@api";
 import { ActionConfirmationPopup } from "@components/action-confirmation-popup";
 import { AgentAvatar } from "@components/agent-avatar";
 import { en } from "@constants";
@@ -50,6 +38,19 @@ import {
 } from "./bugFindingLabels";
 import { BugFindingStageEditor } from "./BugFindingStageEditor";
 import { BugFindingStatusBadge } from "./BugFindingStatusBadge";
+import {
+  useAnswerBugFindingMutation,
+  useApproveBugFindingMutation,
+  useBugHunterFeatures,
+  useCancelBugFixSessionMutation,
+  useEditBugFindingDescriptionMutation,
+  useGetBugFindingDecisionsQuery,
+  useGetBugFindingQuery,
+  useMergeBugFindingMutation,
+  useRejectBugFindingMutation,
+  useReleaseBugFindingMutation,
+  useStartBugFixSessionMutation,
+} from "./bugHunterBackend";
 import { DecisionLogList } from "./DecisionLog";
 import { canSubmitDecline, DeclineReasonPicker } from "./DeclineReasonPicker";
 import { DrawerSection } from "./DrawerSection";
@@ -265,6 +266,8 @@ const foundAgo = (finding: BugFindingDetail): string | null => {
  * BugFixSessionService for the full reasoning.
  */
 export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTriage }) => {
+  // Bug Hunter v2 renders this same drawer; a part its backend doesn't support is hidden.
+  const backendFeatures = useBugHunterFeatures();
   // A dispatched session or release is reconciled server-side minutes later,
   // and there is no push channel for a single finding — the SSE stream is
   // per-run, and a release outlives its run entirely. So the drawer polls, but
@@ -391,6 +394,7 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
   // makes a round trip just to be told 403.
   const canStopSession = finding
     ? canTriage &&
+      backendFeatures.cancelFixSession &&
       (finding.status === BugFindingStatus.QUEUED || finding.status === BugFindingStatus.FIXING)
     : false;
 
@@ -398,7 +402,9 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
   // `buildFixSessionPrompt`), so the edit is offered exactly where a fix
   // session can still start from it, mirroring the backend's own gate.
   const canEditDescription = finding
-    ? canTriage && BUG_FINDING_DESCRIPTION_EDITABLE_STATUSES.includes(finding.status)
+    ? canTriage &&
+      backendFeatures.editDescription &&
+      BUG_FINDING_DESCRIPTION_EDITABLE_STATUSES.includes(finding.status)
     : false;
 
   const draftTooLong = (descriptionDraft?.trim().length ?? 0) > BUG_FINDING_DESCRIPTION_MAX_LENGTH;
@@ -592,7 +598,7 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
               onClick={() => setDescriptionDraft(finding.description)}
             />
           )}
-          {canTriage && (
+          {canTriage && backendFeatures.stageEditor && (
             <OverflowMenuItem
               itemText={en.bugHunter.stageEditLabel}
               onClick={() => setStageEditorOpen(true)}
@@ -699,7 +705,7 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
                   <p className="text-sm text-typography-700 whitespace-pre-wrap break-words border-l-2 border-border-light pl-3">
                     {finding.escalationAnswer}
                   </p>
-                ) : canTriage ? (
+                ) : canTriage && backendFeatures.answer ? (
                   <TextArea
                     id={`bug-finding-answer-${finding.id}`}
                     labelText={en.bugHunter.drawerAnswerLabel}
@@ -757,6 +763,7 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
               )}
 
               {canTriage &&
+                backendFeatures.answer &&
                 finding.status === BugFindingStatus.NEEDS_INPUT &&
                 finding.escalationQuestion &&
                 !finding.escalationAnswer && (

@@ -3,15 +3,15 @@ import { FC, useState } from "react";
 import { toast } from "sonner";
 
 import { Button, Tooltip } from "@ally-ui-mono/ui-shared";
-import {
-  useApproveBugFindingMutation,
-  useRejectBugFindingMutation,
-  useStartBugFixSessionMutation,
-} from "@api";
 import { ActionConfirmationPopup } from "@components/action-confirmation-popup";
 import { en } from "@constants";
 import { BugFinding, BugFindingDecisionReason } from "@types";
 
+import {
+  useApproveBugFindingMutation,
+  useRejectBugFindingMutation,
+  useStartBugFixSessionMutation,
+} from "./bugHunterBackend";
 import { canSubmitDecline, DeclineReasonPicker } from "./DeclineReasonPicker";
 import { BulkOutcome, eligibleFor, MAX_NAMED_FAILURES, TriageAction } from "./triage";
 

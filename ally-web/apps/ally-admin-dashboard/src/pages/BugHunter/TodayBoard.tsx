@@ -1,10 +1,11 @@
 import { FC } from "react";
 
 import { Tooltip } from "@ally-ui-mono/ui-shared";
-import { useGetBugHunterTodayQuery } from "@api";
 import { TooltipIcon } from "@assets";
 import { en } from "@constants";
 import { BugHunterToday, BugHunterTodayRepo } from "@types";
+
+import { useGetBugHunterTodayQuery } from "./bugHunterBackend";
 
 /** Refresh cadence. The board is a glance, not a live feed; a minute is plenty and cheap. */
 export const TODAY_BOARD_POLL_MS = 60_000;

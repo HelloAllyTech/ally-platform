@@ -12,13 +12,6 @@ import {
   TableRow,
   Tooltip,
 } from "@ally-ui-mono/ui-shared";
-import {
-  useApproveBugFindingMutation,
-  useGetBugFindingsQuery,
-  useGetBugHuntRunQuery,
-  useRejectBugFindingMutation,
-  useStartBugFixSessionMutation,
-} from "@api";
 // Reached past the barrel on purpose. Importing the barrel pulls @constants,
 // which reads `cellTypes` back off it at module-eval time — a test that needs
 // the real boundary while stubbing the barrel deadlocks on that cycle. Same
@@ -40,6 +33,14 @@ import { BrailleSpinner } from "./BrailleSpinner";
 import { BugFindingDrawer } from "./BugFindingDrawer";
 import { BUG_FINDING_SEVERITY_LABELS, BUG_FINDING_SOURCE_LABELS } from "./bugFindingLabels";
 import { BugFindingStatusBadge } from "./BugFindingStatusBadge";
+import {
+  useApproveBugFindingMutation,
+  useBugHunterFeatures,
+  useGetBugFindingsQuery,
+  useGetBugHuntRunQuery,
+  useRejectBugFindingMutation,
+  useStartBugFixSessionMutation,
+} from "./bugHunterBackend";
 import { PAGE_SIZES, PageSize, useBugHunterUrlState } from "./bugHunterUrlState";
 import { BulkTriageBar } from "./BulkTriageBar";
 import { canSubmitDecline, DeclineReasonPicker } from "./DeclineReasonPicker";
@@ -447,6 +448,7 @@ export const BugFindingsTable: FC<BugFindingsTableProps> = ({
   canTriage,
   initialLimit = FINDINGS_BASE_LIMIT,
 }) => {
+  const backendFeatures = useBugHunterFeatures();
   const {
     bug: selectedId,
     bucket: linkedBucket,
@@ -562,7 +564,9 @@ export const BugFindingsTable: FC<BugFindingsTableProps> = ({
    * in the shift log should not pay a request for a banner that never renders.
    * The shift log has usually already cached this entry by the time they do.
    */
-  const { data: scopedRun } = useGetBugHuntRunQuery(run ?? "", { skip: !run });
+  const { data: scopedRun } = useGetBugHuntRunQuery(run ?? "", {
+    skip: !run || !backendFeatures.sweeps,
+  });
 
   // Memoised because `data?.items ?? []` is a fresh array identity every render:
   // without it the view below (filter, sort, duplicate scan, page slice) would

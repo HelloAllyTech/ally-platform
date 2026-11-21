@@ -1,6 +1,5 @@
 import { FC } from "react";
 
-import { useGetBugHuntRunDecisionsQuery } from "@api";
 import { en } from "@constants";
 import { BugHuntDecision } from "@types";
 import { formatTimestamp } from "@utils";
@@ -13,6 +12,7 @@ import {
   formatDecisionPick,
   sortDecisions,
 } from "./bugDecisionLabels";
+import { useGetBugHuntRunDecisionsQuery } from "./bugHunterBackend";
 
 const sentenceCase = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
 

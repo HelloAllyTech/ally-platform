@@ -877,6 +877,12 @@ export const ApiEndpoints = {
     START: (id: number) => `/v1/bug-hunter-approvals/bugs/${id}/start`,
     DISMISS: (id: number) => `/v1/bug-hunter-approvals/bugs/${id}/dismiss`,
     BULK: "/v1/bug-hunter-approvals/bugs/bulk",
+    // the old Bug Hunter's API shape over v2's queue (the exact-match page)
+    COMPAT_SETTINGS: "/v1/bug-hunter-approvals/compat/settings",
+    COMPAT_FINDINGS: "/v1/bug-hunter-approvals/compat/findings",
+    COMPAT_FINDING: (id: string) => `/v1/bug-hunter-approvals/compat/findings/${id}`,
+    COMPAT_FINDING_ACTION: (id: string, action: string) =>
+      `/v1/bug-hunter-approvals/compat/findings/${id}/${action}`,
     OPEN_PR: (id: number) => `/v1/bug-hunter-approvals/bugs/${id}/open-pr`,
     MERGE: (id: number) => `/v1/bug-hunter-approvals/bugs/${id}/merge`,
     RELEASE: (id: number) => `/v1/bug-hunter-approvals/bugs/${id}/release`,
