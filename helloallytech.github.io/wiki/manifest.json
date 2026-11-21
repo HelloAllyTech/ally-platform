@@ -16,6 +16,21 @@
       "skip_reason": "session handoff state — not task context"
     },
     {
+      "path": "contributing/dead-code.md",
+      "title": "Dead Code Tracking",
+      "summary": "How Ally finds unused code, why new dead code fails a PR, and what to do when the tool is wrong.",
+      "tags": [
+        "contributing",
+        "quality",
+        "cleanup",
+        "ci"
+      ],
+      "last_reconciled": "2026-11-20",
+      "words": 337,
+      "url": "https://tech.helloally.ai/#/wiki/contributing/dead-code.md",
+      "skip_reason": ""
+    },
+    {
       "path": "contributing/dev-setup.md",
       "title": "Developer Setup",
       "summary": "How to clone all Ally repositories and start the full local development environment.",
@@ -114,7 +129,7 @@
       "summary": "",
       "tags": [],
       "last_reconciled": "",
-      "words": 845,
+      "words": 871,
       "url": "https://tech.helloally.ai/#/wiki/index.md",
       "skip_reason": "human navigation catalog — ROUTING.md supersedes it for agents"
     },
@@ -127,7 +142,7 @@
         "log"
       ],
       "last_reconciled": "",
-      "words": 14267,
+      "words": 14306,
       "url": "https://tech.helloally.ai/#/wiki/log.md",
       "skip_reason": "append-only history — read only when auditing what changed"
     },
@@ -275,7 +290,7 @@
         "reference"
       ],
       "last_reconciled": "2026-11-18",
-      "words": 10715,
+      "words": 10726,
       "url": "https://tech.helloally.ai/#/wiki/platform/concepts.md",
       "skip_reason": ""
     },

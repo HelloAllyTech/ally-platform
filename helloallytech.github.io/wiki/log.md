@@ -9,6 +9,11 @@ summary: A chronological log tracking all wiki updates and modifications.
 This is an append-only log of modifications, updates, and indexing runs performed on the wiki. All logs use the parseable prefix format: `## [YYYY-MM-DD] action | description`.
 
 
+## [2026-11-20] create | `contributing/dead-code.md`: dead-code scan, baseline ratchet and weekly report (`scripts/dead_code.py`).
+
+## [2026-11-20] update | Dead code now feeds the PM Agent: weekly module report → `pm_agent_signals` (`dead_code`) → `code_health` lane card → roadmap ticket on accept.
+
+
 ## [2026-11-18] update | Doc drift fixed: deploy, releases, docs system, ally-be roles — all re-checked against the code.
 
 - `platform/architecture.md` §Deployment: production (all three services and both dashboards) deploys through the `deploy-metal01` Ansible action since the 2026-11-07 cutover, migrations inside the playbook; the manual `deploy-*.yml` workflows still point at the pre-cutover ECS/CloudFront path.

@@ -1,0 +1,63 @@
+name: Dead code
+
+# Keeps unused code from piling up. Two halves (spec: scripts/dead_code.py):
+#   * PR gate  — fails if the PR ADDS dead code that is not in scripts/dead-code-baseline.json.
+#                Existing debt never blocks anyone; only new debt does.
+#   * Weekly   — publishes the findings, grouped by module, to the PM Agent, which can turn
+#                a module into a roadmap card. The roadmap is the cleanup queue.
+#
+# Only Python repos are scanned today (vulture). The TypeScript repos (knip) are wired
+# in scripts/dead_code.py but need knip added as a pinned devDependency first; see wiki.
+
+on:
+  pull_request:
+    paths:
+      - "ally-ai/app/**"
+      - "ally-ai-learn/app/**"
+      - "scripts/dead_code.py"
+      - "scripts/dead-code*.json"
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dead-code:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install 'vulture==2.14'
+
+      - name: Scan
+        id: scan
+        run: |
+          set -uo pipefail
+          for repo in ally-ai ally-ai-learn; do
+            python3 scripts/dead_code.py --repo "$repo" --check > "report-$repo.md"
+            echo "$repo=$?" >> status.txt
+          done
+          cat report-*.md | tee full-report.md >> "$GITHUB_STEP_SUMMARY"
+          ! grep -q '=1' status.txt
+
+      # Weekly only, and only on the schedule/manual run: a PR never publishes. The report goes
+      # to ally-be, which stores it as PM Agent evidence; the PM Agent's code_health lane may
+      # turn a module into a card, and an admin accepting that card files the roadmap ticket.
+      # Same secret and variable bug-hunt-sweep.yml uses to reach ally-be.
+      - name: Publish modules to the PM Agent
+        if: always() && github.event_name != 'pull_request'
+        env:
+          ALLY_BE_API_KEY: ${{ secrets.ALLY_BE_API_KEY }}
+          ALLY_BE_API_URL: ${{ vars.ALLY_BE_API_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "$ALLY_BE_API_URL" ] || [ -z "$ALLY_BE_API_KEY" ]; then
+            echo "::warning::ALLY_BE_API_URL / ALLY_BE_API_KEY not set; dead code was not published."
+            exit 0
+          fi
+          python3 scripts/dead_code.py --publish
