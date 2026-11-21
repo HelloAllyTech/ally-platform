@@ -10,6 +10,20 @@ export const errMsg = (error: unknown, fallback: string): string => {
   return fallback;
 };
 
+/**
+ * Run `fn`, then hand its result to `after` when there is one. `fn` always runs.
+ *
+ * Not `after?.(await fn())`: optional chaining skips the whole call, arguments included, when
+ * `after` is undefined, so `fn` would never run. That is how "Use this domain" once did nothing.
+ */
+export const runThen = async <T,>(
+  fn: () => Promise<T>,
+  after?: (value: T) => void,
+): Promise<void> => {
+  const value = await fn();
+  after?.(value);
+};
+
 export const copyText = async (value: string, ok: string) => {
   try {
     await navigator.clipboard.writeText(value);
