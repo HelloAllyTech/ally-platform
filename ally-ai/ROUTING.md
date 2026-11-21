@@ -54,7 +54,7 @@ Fetch as `https://tech.helloally.ai/#/wiki/<path>`, or raw Markdown at `https://
 
 ## Contributing & setup
 
-- `contributing/dead-code.md` (337w) — How Ally finds unused code, why new dead code fails a PR, and what to…
+- `contributing/dead-code.md` (674w) — How Ally finds unused code in the Python and TypeScript repos, why new dead code…
 - `contributing/dev-setup.md` (1372w) — How to clone all Ally repositories and start the full local development environment
 - `contributing/docs-system.md` (1439w) — How Ally's documentation is routed, deduplicated, enforced in CI, and kept current inside the ally-platform…
 - `contributing/guide.md` (1193w) — Branch naming, commit conventions, code standards, and the pull-request process shared across all Ally repositories
@@ -82,4 +82,4 @@ Fetch as `https://tech.helloally.ai/#/wiki/<path>`, or raw Markdown at `https://
 - `index.md` — human navigation catalog — ROUTING.md supersedes it for agents
 - `log.md` — append-only history — read only when auditing what changed
 
-_49 pages, 103,389 words total. Loading all of it would cost roughly 137,852 tokens — which is the entire reason this index exists._
+_49 pages, 103,814 words total. Loading all of it would cost roughly 138,418 tokens — which is the entire reason this index exists._

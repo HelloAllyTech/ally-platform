@@ -44,5 +44,28 @@ class ParseKnipTest(unittest.TestCase):
         self.assertEqual(dead_code.parse_knip({}, "ally-web"), [])
 
 
+class GroupByModuleTest(unittest.TestCase):
+    def test_depth_is_per_repo(self):
+        found = [
+            dead_code.finding("ally-be", "export", "ally-be/src/debrief/util/a.ts", "x"),
+            dead_code.finding("ally-be", "export", "ally-be/src/debrief/service/b.ts", "y"),
+            dead_code.finding(
+                "ally-web", "file", "ally-web/apps/admin/src/pages/Logs/a.tsx", "(whole file)"
+            ),
+            dead_code.finding(
+                "ally-web", "file", "ally-web/apps/admin/src/pages/Users/b.tsx", "(whole file)"
+            ),
+        ]
+        keys = {g["key"]: g["count"] for g in dead_code.group_by_module(
+            found, depths={"ally-be": 3, "ally-web": 6}
+        )}
+        # one Nest module (both sub-folders), but two separate web feature folders
+        self.assertEqual(
+            keys,
+            {"ally-be/src/debrief": 2, "ally-web/apps/admin/src/pages/Logs": 1,
+             "ally-web/apps/admin/src/pages/Users": 1},
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

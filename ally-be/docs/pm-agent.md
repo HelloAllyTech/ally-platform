@@ -427,9 +427,11 @@ predicate: { categories?, lanes?, sizes?, risks?, words? }, citedRefs? }`. Unkno
 ## Dead-code signals (code_health lane)
 
 The weekly `Dead code` workflow (`.github/workflows/dead-code.yml`, `scripts/dead_code.py --publish`) scans the Python
-repos for unused code, groups the findings by module and posts them to `POST /v1/pm-agent/signals/dead-code`. That route is
+repos (vulture) and the TypeScript repos, `ally-be` and `ally-web` (knip), for unused code, groups the findings by module and posts them to `POST /v1/pm-agent/signals/dead-code`. That route is
 `x-api-key` guarded (`ApiAuthGuard`, the platform `API_KEY`), in its own controller (`PmAgentDeadCodeController`), and only
 stores evidence: one `pm_agent_signals` row per module (`source = 'dead_code'`, key = module path), counts and up to 40 items in `metrics`.
+A module is one reviewable directory: `ally-be/src/<module>` for ally-be, a feature folder for ally-web, four path segments for the Python repos.
+Known limit: it is static analysis, so it cannot see dynamic dispatch (the knip configs list the entry points this codebase loads by glob or by name, but a new loader pattern shows up as false candidates); the lane's caller check is the safeguard.
 
 - **A refresh** updates counts and `lastSeenAt`, never `status`: a module already used for a card, or dismissed, stays decided.
 - **Cleaned-up code ages out**: the `dead_code_list` tool only returns `new` rows seen in the last 10 days

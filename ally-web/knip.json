@@ -1,15 +1,9 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignoreExportsUsedInFile": true,
-  "ignoreDependencies": [
-    ".*"
-  ],
-  "ignoreBinaries": [
-    ".*"
-  ],
-  "ignoreUnresolved": [
-    ".*"
-  ],
+  "ignoreDependencies": [".*"],
+  "ignoreBinaries": [".*"],
+  "ignoreUnresolved": [".*"],
   "workspaces": {
     ".": {
       "entry": [
@@ -26,131 +20,51 @@
         "apps/ally-admin-dashboard/src/botPage/main.tsx",
         "apps/ally-admin-dashboard/src/test-setup.ts"
       ],
-      "project": [
-        "scripts/*.mjs",
-        "*.{js,ts}",
-        "apps/ally-admin-dashboard/**/*.{ts,tsx,js}"
-      ]
+      "project": ["scripts/*.mjs", "*.{js,ts}", "apps/ally-admin-dashboard/**/*.{ts,tsx,js}"]
     },
     "apps/ally-helpline-dashboard": {
-      "entry": [
-        "src/main.tsx",
-        "*.config.{js,ts,cjs,mjs}"
-      ],
-      "project": [
-        "src/**/*.{ts,tsx}",
-        "*.{js,ts,cjs,mjs}"
-      ]
+      "entry": ["src/main.tsx", "*.config.{js,ts,cjs,mjs}"],
+      "project": ["src/**/*.{ts,tsx}", "*.{js,ts,cjs,mjs}"]
     },
     "libs/ui-shared": {
-      "entry": [
-        "src/index.ts",
-        "src/test-setup.ts"
-      ],
-      "project": [
-        "src/**/*.{ts,tsx}"
-      ]
+      "entry": ["src/index.ts", "src/test-setup.ts"],
+      "project": ["src/**/*.{ts,tsx}"]
     }
   },
   "paths": {
-    "@src/*": [
-      "apps/ally-admin-dashboard/src/*"
-    ],
-    "@icons": [
-      "apps/ally-admin-dashboard/src/components/icons"
-    ],
-    "@components": [
-      "apps/ally-admin-dashboard/src/components"
-    ],
-    "@components/*": [
-      "apps/ally-admin-dashboard/src/components/*"
-    ],
-    "@containers": [
-      "apps/ally-admin-dashboard/src/containers"
-    ],
-    "@containers/*": [
-      "apps/ally-admin-dashboard/src/containers/*"
-    ],
-    "@api": [
-      "apps/ally-admin-dashboard/src/api"
-    ],
-    "@api/*": [
-      "apps/ally-admin-dashboard/src/api/*"
-    ],
-    "@pages": [
-      "apps/ally-admin-dashboard/src/pages"
-    ],
-    "@pages/*": [
-      "apps/ally-admin-dashboard/src/pages/*"
-    ],
-    "@utils": [
-      "apps/ally-admin-dashboard/src/utils"
-    ],
-    "@utils/*": [
-      "apps/ally-admin-dashboard/src/utils/*"
-    ],
-    "@assets": [
-      "apps/ally-admin-dashboard/src/assets"
-    ],
-    "@assets/*": [
-      "apps/ally-admin-dashboard/src/assets/*"
-    ],
-    "@hooks": [
-      "apps/ally-admin-dashboard/src/hooks"
-    ],
-    "@hooks/*": [
-      "apps/ally-admin-dashboard/src/hooks/*"
-    ],
-    "@constants": [
-      "apps/ally-admin-dashboard/src/constants"
-    ],
-    "@constants/*": [
-      "apps/ally-admin-dashboard/src/constants/*"
-    ],
-    "@types": [
-      "apps/ally-admin-dashboard/src/types"
-    ],
-    "@types/*": [
-      "apps/ally-admin-dashboard/src/types/*"
-    ],
-    "@routes": [
-      "apps/ally-admin-dashboard/src/routes"
-    ],
-    "@routes/*": [
-      "apps/ally-admin-dashboard/src/routes/*"
-    ],
-    "@store": [
-      "apps/ally-admin-dashboard/src/store"
-    ],
-    "@store/*": [
-      "apps/ally-admin-dashboard/src/store/*"
-    ],
-    "@reducer": [
-      "apps/ally-admin-dashboard/src/reducer"
-    ],
-    "@reducer/*": [
-      "apps/ally-admin-dashboard/src/reducer/*"
-    ],
-    "@ui-shared/*": [
-      "libs/ui-shared/src/*"
-    ],
-    "@ally-ui-mono/ui-shared/*": [
-      "libs/ui-shared/src/*"
-    ],
-    "@ally-ui-mono/ui-shared": [
-      "libs/ui-shared/src/index.ts"
-    ],
-    "@analytics": [
-      "libs/ui-shared/src/lib/analytics"
-    ],
-    "@analytics/*": [
-      "libs/ui-shared/src/lib/analytics/*"
-    ]
+    "@src/*": ["apps/ally-admin-dashboard/src/*"],
+    "@icons": ["apps/ally-admin-dashboard/src/components/icons"],
+    "@components": ["apps/ally-admin-dashboard/src/components"],
+    "@components/*": ["apps/ally-admin-dashboard/src/components/*"],
+    "@containers": ["apps/ally-admin-dashboard/src/containers"],
+    "@containers/*": ["apps/ally-admin-dashboard/src/containers/*"],
+    "@api": ["apps/ally-admin-dashboard/src/api"],
+    "@api/*": ["apps/ally-admin-dashboard/src/api/*"],
+    "@pages": ["apps/ally-admin-dashboard/src/pages"],
+    "@pages/*": ["apps/ally-admin-dashboard/src/pages/*"],
+    "@utils": ["apps/ally-admin-dashboard/src/utils"],
+    "@utils/*": ["apps/ally-admin-dashboard/src/utils/*"],
+    "@assets": ["apps/ally-admin-dashboard/src/assets"],
+    "@assets/*": ["apps/ally-admin-dashboard/src/assets/*"],
+    "@hooks": ["apps/ally-admin-dashboard/src/hooks"],
+    "@hooks/*": ["apps/ally-admin-dashboard/src/hooks/*"],
+    "@constants": ["apps/ally-admin-dashboard/src/constants"],
+    "@constants/*": ["apps/ally-admin-dashboard/src/constants/*"],
+    "@types": ["apps/ally-admin-dashboard/src/types"],
+    "@types/*": ["apps/ally-admin-dashboard/src/types/*"],
+    "@routes": ["apps/ally-admin-dashboard/src/routes"],
+    "@routes/*": ["apps/ally-admin-dashboard/src/routes/*"],
+    "@store": ["apps/ally-admin-dashboard/src/store"],
+    "@store/*": ["apps/ally-admin-dashboard/src/store/*"],
+    "@reducer": ["apps/ally-admin-dashboard/src/reducer"],
+    "@reducer/*": ["apps/ally-admin-dashboard/src/reducer/*"],
+    "@ui-shared/*": ["libs/ui-shared/src/*"],
+    "@ally-ui-mono/ui-shared/*": ["libs/ui-shared/src/*"],
+    "@ally-ui-mono/ui-shared": ["libs/ui-shared/src/index.ts"],
+    "@analytics": ["libs/ui-shared/src/lib/analytics"],
+    "@analytics/*": ["libs/ui-shared/src/lib/analytics/*"]
   },
   "ignoreIssues": {
-    "**/index.{ts,tsx}": [
-      "exports",
-      "types"
-    ]
+    "**/index.{ts,tsx}": ["exports", "types"]
   }
 }

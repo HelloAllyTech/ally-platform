@@ -13,18 +13,9 @@
     "src/**/scripts/*.ts",
     "src/**/*.e2e-spec.ts"
   ],
-  "project": [
-    "src/**/*.ts",
-    "scripts/**/*.{ts,js,mjs}"
-  ],
-  "ignoreDependencies": [
-    ".*"
-  ],
-  "ignoreBinaries": [
-    ".*"
-  ],
-  "ignoreUnresolved": [
-    ".*"
-  ],
+  "project": ["src/**/*.ts", "scripts/**/*.{ts,js,mjs}"],
+  "ignoreDependencies": [".*"],
+  "ignoreBinaries": [".*"],
+  "ignoreUnresolved": [".*"],
   "ignoreExportsUsedInFile": true
 }

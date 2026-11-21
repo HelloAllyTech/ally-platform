@@ -52,12 +52,14 @@
     "ally-be": {
       "scanner": "knip",
       "gate": true,
-      "enabled": true
+      "enabled": true,
+      "group_depth": 3
     },
     "ally-web": {
       "scanner": "knip",
       "gate": true,
-      "enabled": true
+      "enabled": true,
+      "group_depth": 6
     }
   },
   "ignore": [
