@@ -15,12 +15,13 @@ milestone, CONTEXT.md rule 8), whatever the mode.
 
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass
 from datetime import datetime
 from datetime import time as dtime
 from datetime import timezone
-from typing import Callable
+from typing import Any, Callable
 
 from bug_hunter import spend
 from bug_hunter.config import BugHunterConfig
@@ -68,8 +69,11 @@ def work_once(
     state: SignalState | None = None,
     reports_repo: PrivateReportsRepo | None = None,
     now: datetime | None = None,
+    open_pr: Callable[[Report], str] | None = None,
 ) -> WorkResult:
     now = now or datetime.now(timezone.utc)
+    if open_pr is not None and (state is None or is_enabled(state)):
+        do_actions(queue, reports, open_pr)
     # First, a bug whose worker died mid-run goes to Failed with the reason, so Retry
     # works; otherwise it would sit in In progress for ever. Cleanup, so in every mode.
     queue.fail_abandoned(
@@ -140,14 +144,80 @@ def work_once(
         )
     elif status == "done":
         reason = "no bug" if outcome.status == "closed_not_bug" else "duplicate"
+    pr_url = real_pr_url(outcome.details.get("pr_url"))
+    pr_fields: dict[str, Any] = {}
+    if pr_url:
+        # the strict gate opened a draft PR: it is still Bug Hunter's case until a
+        # person merges it (In progress, as on the old board)
+        status = "pr_open"
+        pr_fields = {
+            "pr_url": pr_url,
+            "pr_number": pr_number(pr_url),
+            "pr_opened_by": "agent",
+        }
+    elif status == "needs_you" and outcome.details.get("pr_gate_blockers"):
+        reason = "asks you before a PR: " + "; ".join(
+            outcome.details["pr_gate_blockers"]
+        )
     queue.finish(
         bug.id,
         status,
-        reason=reason,
+        reason=reason[:500] if reason else None,
         run_id=outcome.run_id or None,
         report_id=saved.id,
+        **pr_fields,
     )
     return WorkResult("ran", bug.id, status, reason, outcome.cost_usd)
+
+
+def real_pr_url(url: Any) -> str | None:
+    """A PR link, not the dry-run client's placeholder."""
+    return url if isinstance(url, str) and "/pull/" in url else None
+
+
+def pr_number(url: str) -> int | None:
+    match = re.search(r"/pull/(\d+)", url)
+    return int(match.group(1)) if match else None
+
+
+def do_actions(
+    queue: BugQueue,
+    reports: ReportStore,
+    open_pr: Callable[[Report], str],
+) -> list[tuple[int, str, str]]:
+    """Run what admins asked for (chunk 11): today, Open PR on a suggested fix.
+
+    Each action ends done (the PR link) or failed (why), and the bug moves to
+    In progress with its PR. Returns (action id, status, result) per action."""
+    from bug_hunter.queue.actions import ActionRefused
+
+    results = []
+    for action in queue.pending_actions():
+        bug = queue.get(action.bug_id)
+        report = reports.get(bug.report_id) if bug and bug.report_id else None
+        if action.kind != "open_pr" or bug is None or report is None:
+            status, result = "failed", "no suggested fix to open a PR from"
+        elif bug.pr_url:
+            status, result = "done", bug.pr_url  # opened already: a no-op
+        else:
+            try:
+                url = open_pr(report)
+                status, result = "done", url
+                queue.finish(
+                    bug.id,
+                    "pr_open",
+                    reason=None,
+                    pr_url=url,
+                    pr_number=pr_number(url),
+                    pr_opened_by="admin",
+                )
+            except ActionRefused as exc:
+                status, result = "failed", str(exc)
+            except Exception as exc:  # noqa: BLE001 - recorded on the action
+                status, result = "failed", f"{type(exc).__name__}: {exc}"[:500]
+        queue.finish_action(action.id, status, result)
+        results.append((action.id, status, result))
+    return results
 
 
 def work_loop(

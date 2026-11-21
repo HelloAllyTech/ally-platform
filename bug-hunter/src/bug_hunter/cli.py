@@ -824,12 +824,11 @@ def run_cmd(
     if bool(issue_text) == bool(commit):
         typer.echo("give exactly one of --issue-text or --commit", err=True)
         raise typer.Exit(code=1)
-    if push and config.limits.pr.output_mode != "pr":
+    if push and config.limits.pr.output_mode not in ("auto", "pr"):
         typer.echo(
-            "--push needs pr.output_mode: pr in config/limits.yaml; it is "
-            f"{config.limits.pr.output_mode!r} (a run ends with a suggested-fix "
-            "report). Switching to pr requires a holdout milestone with >= 60% fix "
-            "pass (docs/bug-hunter/CONTEXT.md).",
+            "--push needs pr.output_mode: auto (the strict gate) or pr in "
+            f"config/limits.yaml; it is {config.limits.pr.output_mode!r} (a run ends "
+            "with a suggested-fix report). See rule 8 in docs/bug-hunter/CONTEXT.md.",
             err=True,
         )
         raise typer.Exit(code=1)
@@ -1669,10 +1668,18 @@ def worker_cmd(
     with contextlib.ExitStack() as stack:
         memory = stack.enter_context(open_memory(config))
         start_run = make_start_run(config, real_graph_run, memory=memory)
+        open_pr = _open_pr_action(config)
 
         def one():
             return work_once(
-                config, settings, queue, reports, ledger, start_run, state=state
+                config,
+                settings,
+                queue,
+                reports,
+                ledger,
+                start_run,
+                state=state,
+                open_pr=open_pr,
             )
 
         if once:
@@ -1688,6 +1695,37 @@ def worker_cmd(
             work_loop(one, interval_s=interval, log=typer.echo)
         except KeyboardInterrupt:
             typer.echo("worker stopped")
+
+
+def _open_pr_action(config):
+    """Open PR (an admin's click, chunk 11): rebuild the suggested fix from its report
+    on origin/master and open a draft PR with `gh`. Refuses (the action fails with
+    the reason) when `gh` has neither the App's token nor a login."""
+    from bug_hunter.graph.github import UnavailableGitHub, github_client
+    from bug_hunter.queue.actions import ActionRefused, open_pr_from_report
+    from bug_hunter.runs import RUNS_DIR
+    from bug_hunter.tools.git import Git
+
+    def open_pr(report):
+        git = Git(config.repo_root)
+        git._git(["fetch", "--quiet", "origin", "master"])
+        client = github_client(
+            True, lambda name, text: Path(name), git=git, repo=config.limits.pr.repo
+        )
+        if isinstance(client, UnavailableGitHub):
+            raise ActionRefused(
+                "GitHub is not set up for Bug Hunter (no BUGHUNTER_GITHUB_TOKEN and "
+                "no gh login)"
+            )
+        return open_pr_from_report(
+            report,
+            git=git,
+            github=client,
+            app_path=config.app(report.app).path,
+            runs_dir=RUNS_DIR,
+        )
+
+    return open_pr
 
 
 @app.command("pause")

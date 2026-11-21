@@ -2,7 +2,7 @@
 
 Read this file, then `spec.md`, then the current chunk brief, before any Bug Hunter v2 work.
 
-**Current chunk: 10 — `docs/bug-hunter/chunks/chunk-10.md`** (01–07 and 09 done; 08 done except what waits on infra: `notes/CHUNK-08-NOTES.md`; chunk 11 = fix quality, then finding quality, then cost)
+**Current chunk: 11 — `docs/bug-hunter/chunks/chunk-11.md`** (01–07, 09 and 10 done; 08 done except what waits on infra: `notes/CHUNK-08-NOTES.md`; chunk 12 = fix quality, then finding quality, then cost, starting from the 2026-11-21 dev baseline)
 
 ## What we are building
 
@@ -23,7 +23,7 @@ These are product requirements. Every chunk must keep them true, and tests must 
 5. **"No bug" is a correct answer.** Every prompt says so. The agent is never rewarded for finding something.
 6. **Never change the app's tests to make a fix pass.** The agent may add tests. It may not delete, skip, or loosen existing ones.
 7. **Bounded work.** Max 3 fix attempts per bug, a token and wall-clock budget per run, and a cap on PRs opened per day (default 3).
-8. **Suggested fixes until the holdout says otherwise.** `pr.output_mode` in `config/limits.yaml` is `suggested_fix` (the default) or `pr`. In `suggested_fix` a successful run ends with a report (root cause, the verified failing test, the suggested patch, reviewer notes) and never creates a branch, a PR or an approval request; `run --push` refuses. **Switching to `pr` requires a holdout milestone run with at least 60% fix pass** (oracle, on the holdout split, reported in the milestone results), and the user's explicit go-ahead. Dev-set numbers never qualify. (User, 2026-11-13.)
+8. **PRs only through the strict gate, merges only by a person.** `pr.output_mode` in `config/limits.yaml` is `suggested_fix`, `auto` or `pr`. In `auto` (user, 2026-11-21, replacing the holdout-milestone rule of 2026-11-13) a run opens a **draft** PR on its own only when every condition of the strict gate holds: the failing test now passes with the fix, verify is green (tests, lint, typecheck), the review approves with no open counterexample, confidence is high, risk is low, the diff is at most `max_fix_lines_changed` lines, no guarded path is touched, the finding is not a security, tenant or data-exposure one, and fewer than `sweep.max_prs_per_day` PRs were opened today. Otherwise the run ends as a suggested fix in Needs you, where an admin may press **Open PR**. Merge and Release are always an admin's buttons; `auto_merge` stays off. Security, auth, tenant and data-exposure findings never become public PRs, from either path.
 
 ## How to work (rules for Claude Code building this)
 

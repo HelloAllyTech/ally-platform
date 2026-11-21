@@ -37,6 +37,7 @@ PROVIDERS: tuple[str, ...] = ("openai", "google_genai", "anthropic")
 ENV_MODEL_PREFIX = "BUGHUNTER_MODEL_"
 ENV_REPO_ROOT = "BUGHUNTER_REPO_ROOT"
 ENV_CONFIG_DIR = "BUGHUNTER_CONFIG_DIR"
+ENV_PR_OUTPUT_MODE = "BUGHUNTER_PR_OUTPUT_MODE"  # overrides pr.output_mode
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]  # bug-hunter/
 DEFAULT_CONFIG_DIR = PACKAGE_ROOT / "config"
@@ -285,7 +286,7 @@ class ApprovalLimits(_Strict):
     expiry_days: int = Field(default=7, ge=1)
 
 
-OutputMode = Literal["suggested_fix", "pr"]
+OutputMode = Literal["suggested_fix", "auto", "pr"]
 
 
 class PrConfig(_Strict):
@@ -294,6 +295,8 @@ class PrConfig(_Strict):
     # patch, reviewer notes), never a PR or an approval request. Switching to pr
     # needs a holdout milestone with >= 60% fix pass (docs/bug-hunter/CONTEXT.md).
     output_mode: OutputMode = "suggested_fix"
+    # where PRs open (chunk 11); never the default branch as head
+    repo: str = "HelloAllyTech/ally-platform"
 
 
 class SandboxLimits(_Strict):
@@ -498,6 +501,17 @@ def load_config(
     apps = _load_model(config_dir / "apps.yaml", AppsConfig)
     models = _load_model(config_dir / "models.yaml", ModelsConfig)
     limits = _load_model(config_dir / "limits.yaml", LimitsConfig)
+    mode = env.get(ENV_PR_OUTPUT_MODE)
+    if mode:
+        # a switch without editing limits.yaml, e.g. suggested_fix to stop auto-PRs
+        if mode not in OutputMode.__args__:  # type: ignore[attr-defined]
+            raise ConfigError(
+                f"{ENV_PR_OUTPUT_MODE}={mode!r}: expected one of "
+                + ", ".join(OutputMode.__args__)  # type: ignore[attr-defined]
+            )
+        limits = limits.model_copy(
+            update={"pr": limits.pr.model_copy(update={"output_mode": mode})}
+        )
 
     return BugHunterConfig(
         apps=apps,

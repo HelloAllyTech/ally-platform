@@ -18,10 +18,21 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Protocol
 
+from bug_hunter.queue.actions import Action
 from bug_hunter.signals.base import Candidate
 
 MODES = ("off", "manual", "autonomous")
-STATUSES = ("backlog", "queued", "running", "needs_you", "failed", "done")
+STATUSES = (
+    "backlog",
+    "queued",
+    "running",
+    "needs_you",
+    "pr_open",
+    "merged",
+    "released",
+    "failed",
+    "done",
+)
 # graph status (graph/state.py Status) -> board status; anything else is "failed"
 NEEDS_YOU = ("suggested_fix", "escalated", "rejected", "awaiting_human", "pr_opened")
 DONE = ("closed_not_bug", "closed_duplicate")
@@ -68,6 +79,11 @@ class Bug:
     created_at: datetime = field(default_factory=_now)
     started_at: datetime | None = None
     finished_at: datetime | None = None
+    # chunk 11: the bug's draft PR, opened by the strict gate or an admin's Open PR
+    pr_url: str | None = None
+    pr_number: int | None = None
+    pr_opened_at: datetime | None = None
+    pr_opened_by: str | None = None  # agent | admin
 
     @classmethod
     def from_candidate(cls, c: Candidate) -> "Bug":
@@ -124,6 +140,15 @@ class BugQueue(Protocol):
 
     def note_waiting(self, reason: str, mode: str) -> None: ...
 
+    def prs_opened_since(self, since: datetime) -> int: ...
+
+    def get(self, bug_id: int) -> Bug | None: ...
+
+    # chunk 11: what an admin asked for that needs git and GitHub
+    def pending_actions(self) -> list["Action"]: ...
+
+    def finish_action(self, action_id: int, status: str, result: str) -> None: ...
+
     # bugs left `running` by a worker that died (crash, kill, a laptop that slept)
     def fail_abandoned(
         self, limit_s: Callable[[str | None], int], now: datetime | None = None
@@ -167,6 +192,20 @@ class InMemorySettings:
 class InMemoryQueue:
     def __init__(self) -> None:
         self.rows: list[Bug] = []
+        self.actions: list[Action] = []
+        self.action_results: dict[int, tuple[str, str]] = {}
+
+    def get(self, bug_id: int) -> Bug | None:
+        return next((b for b in self.rows if b.id == bug_id), None)
+
+    def prs_opened_since(self, since: datetime) -> int:
+        return sum(1 for b in self.rows if b.pr_opened_at and b.pr_opened_at >= since)
+
+    def pending_actions(self) -> list[Action]:
+        return [a for a in self.actions if a.id not in self.action_results]
+
+    def finish_action(self, action_id: int, status: str, result: str) -> None:
+        self.action_results[action_id] = (status, result)
 
     def add(self, bug: Bug) -> bool:
         if any(b.signal_key == bug.signal_key for b in self.rows):
@@ -198,6 +237,8 @@ class InMemoryQueue:
         b.finished_at = _now()
         for k, v in fields.items():
             setattr(b, k, v)
+        if fields.get("pr_url"):
+            b.pr_opened_at = b.pr_opened_at or _now()
 
     def note_waiting(self, reason: str, mode: str) -> None:
         for b in self.rows:
@@ -316,10 +357,47 @@ class PostgresQueue:
         ).fetchone()
         return int(row["n"])
 
+    def get(self, bug_id: int) -> Bug | None:
+        row = self.conn.execute(
+            "SELECT * FROM bughunter.bugs WHERE id = %s", (bug_id,)
+        ).fetchone()
+        return self._row(row) if row else None
+
+    def prs_opened_since(self, since: datetime) -> int:
+        row = self.conn.execute(
+            "SELECT count(*) AS n FROM bughunter.bugs WHERE pr_opened_at >= %s",
+            (since,),
+        ).fetchone()
+        return int(row["n"])
+
+    def pending_actions(self) -> list[Action]:
+        rows = self.conn.execute(
+            "SELECT id, bug_id, kind, requested_by FROM bughunter.actions "
+            "WHERE status = 'pending' ORDER BY id"
+        ).fetchall()
+        return [Action(**r) for r in rows]
+
+    def finish_action(self, action_id: int, status: str, result: str) -> None:
+        self.conn.execute(
+            "UPDATE bughunter.actions SET status = %s, result = %s, "
+            "finished_at = now() WHERE id = %s AND status = 'pending'",
+            (status, result[:2000], action_id),
+        )
+
     def finish(self, bug_id: int, status: str, **fields: Any) -> None:
-        allowed = {"reason", "run_id", "report_id", "app"}
+        allowed = {
+            "reason",
+            "run_id",
+            "report_id",
+            "app",
+            "pr_url",
+            "pr_number",
+            "pr_opened_by",
+        }
         sets = ["status = %(status)s", "finished_at = now()", "updated_at = now()"]
         sets += [f"{k} = %({k})s" for k in fields if k in allowed]
+        if fields.get("pr_url"):
+            sets.append("pr_opened_at = coalesce(pr_opened_at, now())")
         self.conn.execute(
             f"UPDATE bughunter.bugs SET {', '.join(sets)} WHERE id = %(id)s",
             {"status": status, "id": bug_id, **fields},

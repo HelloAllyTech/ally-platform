@@ -49,6 +49,8 @@ class GraphDeps:
     approvals: Any = None  # ApprovalStore; None -> in memory (tests) or Postgres (CLI)
     memory: Any = None  # memory.store.Memory; None -> no long-term memory this run
     push: bool = False  # real pushes need --push and the GitHub App
+    # PRs Bug Hunter opened today, for the strict gate's daily cap (chunk 11)
+    prs_opened_today: Callable[[], int] | None = None
     # builds a runner for a clean checkout (baseline on untouched code); tests fake it
     baseline_runner: Callable[[Path, Path], Any] | None = None
 
@@ -104,7 +106,12 @@ class GraphDeps:
         if self.github is None:
             from bug_hunter.graph.github import github_client
 
-            self.github = github_client(self.push, self.write_artefact)
+            self.github = github_client(
+                self.push,
+                self.write_artefact,
+                git=self.git,
+                repo=self.config.limits.pr.repo,
+            )
         return self.github
 
     def approval_store(self):

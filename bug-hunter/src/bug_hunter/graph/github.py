@@ -1,16 +1,20 @@
 """GitHub access for open_pr and escalate, behind an interface tests can fake.
 
 The default is **dry-run**: nothing leaves the machine; the branch diff, the PR body
-and the issue body are written to the run's artefacts. A real client needs the
-"Ally Bug Hunter" GitHub App (spec §15), which does not exist yet: ``UnavailableGitHub``
-refuses with a clear message so a misconfigured run can never push by accident.
+and the issue body are written to the run's artefacts. With ``push``, ``GhCliGitHub``
+(chunk 11) uses `gh`, authenticated by the GitHub App's token or a developer's login;
+without either, ``UnavailableGitHub`` refuses with a clear message so a misconfigured
+run can never push by accident.
 """
 
 from __future__ import annotations
 
+import os
+import re
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Protocol
+from typing import Any, Callable, Protocol
 
 
 class GitHubUnavailable(RuntimeError):
@@ -117,10 +121,117 @@ class UnavailableGitHub:
         raise AssertionError("unreachable")
 
 
+ENV_TOKEN = "BUGHUNTER_GITHUB_TOKEN"  # the App's installation token on the VM
+
+Runner = Callable[
+    [list[str], dict[str, str] | None], "subprocess.CompletedProcess[str]"
+]
+
+
+def _run(
+    args: list[str], env: dict[str, str] | None
+) -> "subprocess.CompletedProcess[str]":
+    return subprocess.run(args, capture_output=True, text=True, env=env, timeout=120)
+
+
+@dataclass
+class GhCliGitHub:
+    """The real client (chunk 11): `gh` for PRs, the run's Git for the push.
+
+    Authenticated by ``BUGHUNTER_GITHUB_TOKEN`` (the GitHub App's installation token
+    on the VM) or, on a developer's machine, their own ``gh`` login. Only draft PRs
+    against ``base``; pushes go through ``Git.push``, which refuses anything but a
+    ``bughunter/`` branch. Escalations are never filed here: nothing about a finding
+    goes to the public repo (the private reports repo has them), so an escalation
+    issue is written to the run's artefacts only.
+    """
+
+    repo: str
+    git: Any
+    write_artefact: Callable[[str, str], Path]
+    base: str = "master"
+    name: str = "github"
+    run: Runner = field(default=_run)
+
+    def _env(self) -> dict[str, str]:
+        env = dict(os.environ)
+        if env.get(ENV_TOKEN):
+            env["GH_TOKEN"] = env[ENV_TOKEN]
+        return env
+
+    def _gh(self, *args: str) -> str:
+        result = self.run(["gh", *args, "-R", self.repo], self._env())
+        if result.returncode != 0:
+            raise GitHubUnavailable(
+                f"gh {args[0]} {args[1] if len(args) > 1 else ''} failed: "
+                f"{(result.stderr or result.stdout).strip()[-300:]}"
+            )
+        return result.stdout.strip()
+
+    def push_branch(self, worktree: Path, branch: str) -> None:
+        self.git.push(worktree, branch)
+
+    def open_draft_pr(self, branch: str, title: str, body: str) -> PullRequest:
+        if branch in (self.base, "main", "master"):
+            raise GitHubUnavailable(f"refusing to open a PR from {branch!r}")
+        url = self._gh(
+            "pr",
+            "create",
+            "--draft",
+            "--base",
+            self.base,
+            "--head",
+            branch,
+            "--title",
+            title,
+            "--body",
+            body,
+        ).splitlines()[-1]
+        match = re.search(r"/pull/(\d+)", url)
+        return PullRequest(
+            number=int(match.group(1)) if match else None,
+            url=url,
+            branch=branch,
+            draft=True,
+        )
+
+    def mark_ready(self, pr: PullRequest, auto_merge: bool) -> None:
+        # auto_merge stays off (CONTEXT.md rule 8): merging is an admin's button
+        self._gh("pr", "ready", str(pr.number or pr.branch))
+
+    def close_pr(self, pr: PullRequest, reason: str) -> None:
+        self._gh("pr", "close", str(pr.number or pr.branch), "--comment", reason)
+
+    def create_or_update_issue(
+        self, title: str, body: str, labels: list[str], existing: str | None
+    ) -> Issue:
+        self.write_artefact(
+            "escalation-issue.md", f"# {title}\n\nlabels: {', '.join(labels)}\n\n{body}"
+        )
+        return Issue(number=None, url="private-reports-only")
+
+
+def gh_ready(run: Runner = _run) -> bool:
+    """Whether `gh` is installed and can reach GitHub with a token or a login."""
+    env = dict(os.environ)
+    if env.get(ENV_TOKEN):
+        env["GH_TOKEN"] = env[ENV_TOKEN]
+    try:
+        return run(["gh", "auth", "status"], env).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
 def github_client(
-    push: bool, write_artefact: Callable[[str, str], Path]
+    push: bool,
+    write_artefact: Callable[[str, str], Path],
+    git: Any = None,
+    repo: str = "",
+    ready: Callable[[], bool] = gh_ready,
 ) -> GitHubClient:
-    """Dry-run unless ``push`` is asked for; the real client arrives with the App."""
+    """Dry-run unless ``push`` is asked for; then `gh`, if it is set up."""
     if not push:
         return DryRunGitHub(write_artefact)
+    if git is not None and repo and ready():
+        return GhCliGitHub(repo=repo, git=git, write_artefact=write_artefact)
     return UnavailableGitHub()

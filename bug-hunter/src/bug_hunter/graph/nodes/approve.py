@@ -40,7 +40,24 @@ def make_open_pr_node(deps: GraphDeps):
                 # local branch + commit are real; only the push is behind --push
                 if deps.git.current_branch(deps.worktree) != branch:
                     deps.git.create_branch(deps.worktree, deps.app, slug)
-                deps.git.commit(deps.worktree, title, state.patch.files_changed)
+                prefix = (
+                    ""
+                    if deps.app_root == deps.worktree
+                    else deps.config.app(deps.app).path + "/"
+                )
+
+                def repo_rel(path: str) -> str:
+                    # the fix lists repo paths; the repro test is app-relative
+                    return (
+                        path if not prefix or path.startswith(prefix) else prefix + path
+                    )
+
+                paths = [repo_rel(p) for p in state.patch.files_changed]
+                if state.repro:
+                    test = repo_rel(state.repro.test_path)
+                    if test not in paths:
+                        paths.append(test)  # the failing test ships with the fix
+                deps.git.commit(deps.worktree, title, paths)
                 client.push_branch(deps.worktree, branch)
             pr = client.open_draft_pr(branch, title, body)
         except GitHubUnavailable as exc:

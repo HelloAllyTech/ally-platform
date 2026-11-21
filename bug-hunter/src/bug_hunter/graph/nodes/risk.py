@@ -120,6 +120,22 @@ def make_risk_gate_node(deps: GraphDeps):
             )
         else:
             deps.scratchpad.append_note(f"risk_gate: {level}")
+            if deps.config.limits.pr.output_mode == "auto":
+                from bug_hunter.graph.pr_gate import strict_gate_blockers
+
+                limits = deps.config.limits
+                blockers = strict_gate_blockers(
+                    state.model_copy(update={"risk_level": level}),
+                    max_lines=limits.run.max_fix_lines_changed,
+                    max_prs_per_day=limits.sweep.max_prs_per_day,
+                    prs_today=deps.prs_opened_today() if deps.prs_opened_today else 0,
+                )
+                update["pr_gate_blockers"] = blockers
+                deps.scratchpad.append_note(
+                    "pr_gate: open"
+                    if not blockers
+                    else f"pr_gate: ask a person: {'; '.join(blockers)}"
+                )
         return update
 
     return risk_gate

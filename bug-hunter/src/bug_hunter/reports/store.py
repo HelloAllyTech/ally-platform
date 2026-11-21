@@ -50,6 +50,8 @@ class ReportStore(Protocol):
 
     def for_day(self, day: str) -> list[Report]: ...
 
+    def get(self, report_id: int) -> Report | None: ...
+
     def keys_seen(self, keys: list[str]) -> set[str]: ...
 
 
@@ -64,6 +66,9 @@ class InMemoryReports:
 
     def for_day(self, day: str) -> list[Report]:
         return [r for r in self.rows if r.day == day]
+
+    def get(self, report_id: int) -> Report | None:
+        return next((r for r in self.rows if r.id == report_id), None)
 
     def keys_seen(self, keys: list[str]) -> set[str]:
         return {r.signal_key for r in self.rows if r.signal_key in set(keys)}
@@ -120,6 +125,12 @@ class PostgresReports:
             d,
         ).fetchone()
         return self._row(row)
+
+    def get(self, report_id: int) -> Report | None:
+        row = self.conn.execute(
+            "SELECT * FROM bughunter.reports WHERE id = %s", (report_id,)
+        ).fetchone()
+        return self._row(row) if row else None
 
     def for_day(self, day: str) -> list[Report]:
         rows = self.conn.execute(

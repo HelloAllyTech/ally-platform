@@ -26,12 +26,13 @@ def test_run_requires_exactly_one_signal() -> None:
     assert result.exit_code == 1 and "--app is required" in result.output
 
 
-def test_push_is_refused_in_suggested_fix_mode() -> None:
+def test_push_is_refused_in_suggested_fix_mode(monkeypatch) -> None:
+    monkeypatch.setenv("BUGHUNTER_PR_OUTPUT_MODE", "suggested_fix")
     result = runner.invoke(
         app, ["run", "--app", "ally-be", "--issue-text", "x", "--push"]
     )
     assert result.exit_code == 1
-    assert "pr.output_mode: pr" in result.output and "60% fix pass" in result.output
+    assert "pr.output_mode: auto" in result.output and "rule 8" in result.output
 
 
 def test_replay_reports_an_unreachable_checkpoint_database(monkeypatch) -> None:

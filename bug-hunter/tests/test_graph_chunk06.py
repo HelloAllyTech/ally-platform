@@ -271,8 +271,15 @@ def test_happy_path_to_dry_run_pr_and_approval(config, repo, tmp_path) -> None:
     assert deps.approval_store().get("run-c06").status == "approved"
 
 
-def test_default_output_mode_is_suggested_fix(config) -> None:
-    assert config.limits.pr.output_mode == "suggested_fix"
+def test_output_mode_is_the_strict_gate_and_the_code_default_is_suggested_fix(
+    config,
+) -> None:
+    from bug_hunter.config import PrConfig
+
+    # user, 2026-11-21: draft PRs only through the strict gate (rule 8)
+    assert config.limits.pr.output_mode == "auto"
+    assert config.limits.pr.auto_merge is False
+    assert PrConfig().output_mode == "suggested_fix"
 
 
 def test_suggested_fix_mode_ends_with_a_report_and_no_pr(

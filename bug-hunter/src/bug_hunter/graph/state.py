@@ -230,6 +230,8 @@ class BugState(BaseModel):
     repro_attempts: int = 0  # submitted tests that passed or ran nothing, bounced back
     status: Status = "new"
     stop_reason: str | None = None  # budget exceeded, cannot reproduce, …
+    # output_mode auto: why the strict gate kept this fix from opening a PR (chunk 11)
+    pr_gate_blockers: list[str] = Field(default_factory=list)
     pr_url: str | None = None
     pr_branch: str | None = None
     approval_id: str | None = None

@@ -48,6 +48,9 @@ def details_from_state(state: Any, artefacts: Path) -> dict[str, Any]:
         "risk_level": getattr(state, "risk_level", None),
         "stop_reason": getattr(state, "stop_reason", None),
         "severity": finding.severity if finding is not None else None,
+        # chunk 11: the draft PR, or why the strict gate asked a person instead
+        "pr_url": getattr(state, "pr_url", None),
+        "pr_gate_blockers": list(getattr(state, "pr_gate_blockers", None) or []),
     }
     if repro is not None:
         source = Path(artefacts) / "suggested-fix.md"
@@ -156,6 +159,21 @@ def real_graph_run(config, app, ref, signal, memory):
                 config, run, app, "issue", ref=ref, checkpointer=saver
             )
             deps.memory = memory
+            if config.limits.pr.output_mode in ("auto", "pr"):
+                # chunk 11: a run may open a real draft PR (auto: only through the
+                # strict gate), and its approval row is durable
+                from datetime import datetime, timezone
+
+                from bug_hunter.graph.approvals import PostgresApprovals
+                from bug_hunter.graph.checkpointer import db_url
+                from bug_hunter.queue.store import PostgresQueue
+                from bug_hunter.queue.worker import day_start
+
+                deps.push = True
+                deps.approvals = PostgresApprovals(db_url())
+                deps.prs_opened_today = lambda: PostgresQueue(
+                    db_url()
+                ).prs_opened_since(day_start(datetime.now(timezone.utc)))
             state = run_graph(build_graph(deps, saver), deps, signal)
             run_id = run.run_id
         return run_id, state, run.kept_artefacts

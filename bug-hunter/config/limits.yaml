@@ -27,13 +27,15 @@ signals:
   log_groups: {}              # app -> [CloudWatch log groups]; filled on the VM (read-only creds)
 approval:
   expiry_days: 7
-# Pull requests (chunk 06). push is a CLI flag, never a default; auto_merge stays off until chunk 09.
+# Pull requests (chunk 06, chunk 11). Merging is always a person's button: auto_merge off.
 pr:
   auto_merge: false
-  # suggested_fix (default): a verified, reviewed fix ends as a report with the patch;
-  # no branch, no PR, no approval row. pr: draft PR + human approval. Switching to pr
-  # needs a holdout milestone with >= 60% fix pass (docs/bug-hunter/CONTEXT.md).
-  output_mode: suggested_fix
+  # suggested_fix: every fix ends as a report, never a PR. auto (user, 2026-11-21): a
+  # run opens a draft PR on its own only through the strict gate (CONTEXT.md rule 8),
+  # otherwise it asks in Needs you, where an admin may press Open PR. pr: every
+  # passing run opens one (not used).
+  output_mode: auto
+  repo: HelloAllyTech/ally-platform
 sandbox:
   cpus: 2
   memory_mb: 8192            # ally-web's three Vitest suites run a 5 GB Node heap each

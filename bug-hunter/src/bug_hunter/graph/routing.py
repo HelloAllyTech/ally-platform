@@ -81,6 +81,9 @@ def after_risk_gate(state: BugState, output_mode: str = "suggested_fix") -> str:
         return "escalate"
     if state.disputed:  # a disputed counterexample never becomes a PR
         return "suggest_fix"
+    if output_mode == "auto":
+        # the risk gate filled in pr_gate_blockers; open only when none
+        return "suggest_fix" if state.pr_gate_blockers else "open_pr"
     return "open_pr" if output_mode == "pr" else "suggest_fix"
 
 
