@@ -23,13 +23,19 @@ SAFETY_KEYWORDS = (
 _KEYWORD_RE = re.compile("|".join(re.escape(k) for k in SAFETY_KEYWORDS), re.IGNORECASE)
 
 
+# A comment-only line ("// … guardrail …", "# …", " * …"): a mention, not a change to
+# safety behaviour (chunk 12, user 2026-11-21). Code lines still count.
+_COMMENT_ONLY_RE = re.compile(r"^[+-]\s*(?://|#|/\*|\*|<!--)")
+
+
 def keyword_hits(changed_lines: Iterable[str]) -> list[str]:
-    """Added or removed diff lines that mention a safety keyword."""
+    """Added or removed code lines that mention a safety keyword (comments excepted)."""
     hits = []
     for line in changed_lines:
         if (
             line[:1] in "+-"
             and not line.startswith(("+++", "---"))
+            and not _COMMENT_ONLY_RE.match(line)
             and _KEYWORD_RE.search(line)
         ):
             hits.append(line.strip()[:120])

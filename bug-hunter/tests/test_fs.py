@@ -137,3 +137,9 @@ def test_write_test_file_rules(ws: Workspace, worktree: Path) -> None:
         ws.write_test_file("../ally-ai/tests/test_new.py", "x")
     with pytest.raises(PathDenied):
         ws.write_test_file(".env.test", "x")
+    # chunk 12: pytest cannot import a dotted module name ("x.repro.py")
+    with pytest.raises(FsError, match="cannot contain dots"):
+        ws.write_test_file("src/user/test/test_user.repro.py", "def test_x(): pass\n")
+    assert ws.write_test_file(
+        "src/user/test/test_user_repro.py", "def test_x(): pass\n"
+    ).startswith("wrote")

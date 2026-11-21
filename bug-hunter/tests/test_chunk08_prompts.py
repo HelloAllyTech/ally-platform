@@ -75,10 +75,19 @@ def test_approved_prompts_are_registered(config) -> None:
     from bug_hunter.graph.prompts import load_prompt
 
     prompts = config.models.prompts
-    assert prompts["triage"] == "v4" and prompts["investigate"] == "v4"
-    assert prompts["review"] == "v5" and prompts["falsifier"] == "v2"
+    # chunk 12 (user, 2026-11-21): investigate v5, reproduce v6, review v6
+    assert prompts["triage"] == "v4" and prompts["investigate"] == "v5"
+    assert prompts["review"] == "v6" and prompts["falsifier"] == "v2"
+    assert prompts["reproduce"] == "v6"
     assert all(prompts[n] == "v1" for n in LENS_NODES)
-    for node in (*LENS_NODES, "falsifier", "triage", "investigate", "review"):
+    for node in (
+        *LENS_NODES,
+        "falsifier",
+        "triage",
+        "investigate",
+        "review",
+        "reproduce",
+    ):
         load_prompt(config, node)  # loads and has its inputs header
     assert config.model_for("lens").model == "gpt-5-mini"
     assert config.model_for("falsifier").model == "gemini-2.5-pro"
@@ -91,3 +100,25 @@ def test_approved_wording_changes() -> None:
     assert "never proof that the behaviour is intended" in falsifier
     logic = (PROMPTS_DIR / "lens_logic.v1.md").read_text()
     assert "weakens crisis detection, guardrails or safety escalation" in logic
+
+
+def test_chunk12_approved_wording() -> None:
+    """The exact sentences the user approved on 2026-11-21 (baseline patterns)."""
+    investigate = (PROMPTS_DIR / "investigate.v5.md").read_text()
+    assert "grep that other side (ally-be, ally-ai, the" in investigate
+    assert "write 'unverified:' in the hypothesis" in investigate
+    assert (
+        "invisible characters, duplicate module copies, version mismatches"
+        in investigate
+    )
+    assert "the finding must cover all of them, or name the" in investigate
+    reproduce = (PROMPTS_DIR / "reproduce.v6.md").read_text()
+    assert "an absence check or an upper" in reproduce
+    assert "Never give a fake the misbehaviour your hypothesis needs." in reproduce
+    assert "include the whole Unicode category and every position" in reproduce
+    review = (PROMPTS_DIR / "review.v6.md").read_text()
+    assert (
+        "Never approve with a note that a reported symptom is out of scope." in review
+    )
+    assert "or only a test mock produces it" in review
+    assert "write it as a counterexample," in review

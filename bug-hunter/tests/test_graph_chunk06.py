@@ -535,6 +535,18 @@ def test_risk_rules() -> None:
     assert keyword_hits(
         ["+  if (isCrisis) {", "-  guardrail()", "+ const x = 1", "--- a/f"]
     ) == ["+  if (isCrisis) {", "-  guardrail()"]
+    # chunk 12: a comment that mentions a keyword is not a change to safety behaviour
+    # (the baseline escalated "// 16:9 landscape to match the default prompt's
+    # guardrail"); the same word in code still escalates
+    assert keyword_hits(
+        [
+            "+    // 16:9 landscape to match the default prompt's guardrail",
+            "+  # crisis copy lives elsewhere",
+            "+   * emergency contacts are listed below",
+            "+  /* self-harm wording */",
+            "+  const banner = applyGuardrail(prompt) // tidy",
+        ]
+    ) == ["+  const banner = applyGuardrail(prompt) // tidy"]
     assert (
         risk_level(
             human_only_reasons=["x"],

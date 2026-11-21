@@ -269,6 +269,13 @@ class Workspace:
                 f"{path}: not a test location for {self.app} "
                 f"(allowed: {', '.join(self.config.app(self.app).test_dirs)})"
             )
+        if target.suffix == ".py" and "." in target.stem:
+            # chunk 12: pytest cannot import "x.repro.py" as a module, so collection
+            # fails and the case reads as "could not reproduce" (baseline 1065743a)
+            raise FsError(
+                f"{path}: a Python test module name cannot contain dots; name it like "
+                f"test_<thing>_repro.py"
+            )
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content, encoding="utf-8")
         shown = self._display(target)
