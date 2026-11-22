@@ -2,7 +2,9 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import {
   asksForPerson,
+  autoHandBackMessage,
   HANDOVER_COPY,
+  handoverLanguageOf,
   handoverMessage,
   HANDOVER_DEFAULTS,
   openNow,
@@ -68,7 +70,7 @@ describe('what the visitor is told', () => {
   });
 
   it('out of hours: when they are back', () => {
-    expect(openNow(weekdays, evening)).toEqual({
+    expect(openNow(weekdays, evening)).toMatchObject({
       open: false,
       back: '9 am tomorrow',
     });
@@ -78,12 +80,12 @@ describe('what the visitor is told', () => {
       "The team is away now. They'll reply when they're back at 9 am tomorrow.",
     );
     // Friday evening: back on Monday.
-    expect(openNow(weekdays, new Date('2026-11-13T14:30:00Z'))).toEqual({
+    expect(openNow(weekdays, new Date('2026-11-13T14:30:00Z'))).toMatchObject({
       open: false,
       back: '9 am on Monday',
     });
     // Before opening the same day.
-    expect(openNow(weekdays, new Date('2026-11-12T02:00:00Z'))).toEqual({
+    expect(openNow(weekdays, new Date('2026-11-12T02:00:00Z'))).toMatchObject({
       open: false,
       back: '9 am today',
     });
@@ -122,5 +124,59 @@ describe('the hand-over wording', () => {
     for (const line of Object.values(HANDOVER_COPY)) {
       expect(deck).toContain(line);
     }
+  });
+});
+
+describe("the hand-over lines in the person's language (Q4 G1)", () => {
+  const morning = new Date('2026-11-12T04:30:00Z');
+  const evening = new Date('2026-11-12T14:30:00Z');
+  const friday = new Date('2026-11-13T14:30:00Z');
+  const weekdays = {
+    timeZone: 'Asia/Kolkata',
+    days: [1, 2, 3, 4, 5],
+    from: '09:00',
+    to: '18:00',
+  };
+
+  it('in hours, in Hindi and Hinglish, with the usual reply-within words translated', () => {
+    expect(handoverMessage(HANDOVER_DEFAULTS, morning, 'hi')).toBe(
+      'मैंने टीम से इस बातचीत में जुड़ने के लिए कह दिया है। वे आमतौर पर कुछ घंटों में जवाब देते हैं।',
+    );
+    expect(handoverMessage(HANDOVER_DEFAULTS, morning, 'hi-latn')).toBe(
+      'Maine team ko is chat mein judne ke liye keh diya hai. Woh aam taur par kuch ghanton mein reply karte hain.',
+    );
+  });
+
+  it("the owner's own words aren't put mid-sentence in English", () => {
+    const own = { ...HANDOVER_DEFAULTS, replyWithin: 'by lunchtime' };
+    expect(handoverMessage(own, morning, 'hi')).not.toMatch(/lunchtime/);
+    expect(handoverMessage(own, morning, 'hi-latn')).toMatch(/jald hi/);
+  });
+
+  it('out of hours: when they are back, tomorrow or on a weekday', () => {
+    const away = { ...HANDOVER_DEFAULTS, hours: weekdays };
+    expect(handoverMessage(away, evening, 'hi')).toBe(
+      'टीम अभी उपलब्ध नहीं है। वे कल 9 am वापस आकर जवाब देंगे।',
+    );
+    expect(handoverMessage(away, friday, 'hi')).toContain('सोमवार को 9 am');
+    expect(handoverMessage(away, friday, 'hi-latn')).toContain(
+      'Monday ko 9 am',
+    );
+  });
+
+  it('English stays as it was', () => {
+    expect(handoverMessage(HANDOVER_DEFAULTS, morning, 'en')).toBe(
+      handoverMessage(HANDOVER_DEFAULTS, morning),
+    );
+    expect(autoHandBackMessage()).toBe(HANDOVER_COPY.autoHandBack);
+    expect(autoHandBackMessage('hi')).toMatch(/टीम इस बार/);
+  });
+
+  it('a stored language becomes a line language', () => {
+    expect(handoverLanguageOf('hi')).toBe('hi');
+    expect(handoverLanguageOf('hi-Latn')).toBe('hi-latn');
+    expect(handoverLanguageOf('hinglish')).toBe('hi-latn');
+    expect(handoverLanguageOf('ta')).toBe('en');
+    expect(handoverLanguageOf(null)).toBe('en');
   });
 });

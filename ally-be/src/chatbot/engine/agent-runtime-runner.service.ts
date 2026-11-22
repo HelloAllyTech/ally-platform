@@ -1,4 +1,5 @@
 import { usageContext } from 'src/billing/context/usage-context';
+import { crisisHelplines } from './crisis-helplines';
 import { Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -227,7 +228,8 @@ export class AgentRuntimeRunner {
       let firstToken = false;
       if (options.mood) {
         body.mood = options.mood;
-        const helplines = turn.settings.helplineNumbers?.trim();
+        // Q4 G7: only the numbers the owner confirmed for crisis replies.
+        const helplines = crisisHelplines(turn.settings);
         if (helplines) body.support_helplines = helplines.slice(0, 300);
       }
       const streamed = streamedRun;

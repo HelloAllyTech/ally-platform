@@ -274,6 +274,16 @@ export const PACK_FOR_INDUSTRY: Record<Industry, SafetyPackId> = {
   [Industry.OTHER]: SafetyPackId.STANDARD,
 };
 
+/** A less strict pack needs the owner's reason, at least this long (home and setup, Q4 A3). */
+export const MIN_PACK_REASON = 10;
+
+/** The packs a health industry brings (Q4 A2): its own care, never replaced by a topic. */
+const HEALTH_PACKS: ReadonlySet<string> = new Set([
+  SafetyPackId.MEDICAL,
+  SafetyPackId.PHARMACY,
+  SafetyPackId.MENTAL_HEALTH,
+]);
+
 /** Care topic → pack. */
 const PACK_FOR_TOPIC: Record<CareTopic, SafetyPackId> = {
   [CareTopic.MENTAL_HEALTH]: SafetyPackId.MENTAL_HEALTH,
@@ -291,12 +301,15 @@ export function packForBusiness(
   industry: Industry | string | null | undefined,
   topics: (CareTopic | string)[] = [],
 ): SafetyPackId {
-  const candidates = [
-    PACK_FOR_INDUSTRY[industry as Industry] ?? SafetyPackId.STANDARD,
-    ...topics
-      .map((topic) => PACK_FOR_TOPIC[topic as CareTopic])
-      .filter((id): id is SafetyPackId => Boolean(id)),
-  ];
+  const own = PACK_FOR_INDUSTRY[industry as Industry] ?? SafetyPackId.STANDARD;
+  const fromTopics = topics
+    .map((topic) => PACK_FOR_TOPIC[topic as CareTopic])
+    .filter((id): id is SafetyPackId => Boolean(id))
+    // Q4 A2 (20 Nov: Cloudnine, a maternity hospital, got Mental health from its psychology
+    // service): a health industry (medical, pharmacy, mental health) keeps its own pack: those and
+    // young people guard different risks, so a topic among them never replaces the industry's.
+    .filter((id) => !(HEALTH_PACKS.has(own) && NOT_INTERCHANGEABLE.has(id)));
+  const candidates = [own, ...fromTopics];
   return candidates.reduce((best, id) =>
     SAFETY_PACKS[id].strength > SAFETY_PACKS[best].strength ? id : best,
   );

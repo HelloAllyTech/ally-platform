@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, TypeVar
 
 from pydantic import BaseModel
 
+from app.core.agent_runtime.check.safety import clinical_advice
 from app.core.builder import catalogue, purposes
 from app.core.builder.grounding import sample_grounded, split_turn, ungrounded
 from app.core.builder.prompt import (
@@ -340,6 +341,22 @@ async def propose_purposes(
     return cards
 
 
+#: A visitor line about risk or an emergency (Q4 3c), in English, Hindi and Hinglish.
+_RISKY = re.compile(
+    r"suicid|kill (?:my|him|her)self|end (?:it all|my life)|self[- ]harm|hurt(?:ing)? "
+    r"myself|cut(?:ting)? myself|don'?t want to (?:live|be alive)|want to die|"
+    r"no reason to live|overdose|can'?t breathe|chest pain|unconscious|bleeding "
+    r"heavily|jeene ka mann nahi|marna chahta|marna chahti|khud ko (?:nuksan|"
+    r"khatam)|जीने का मन नहीं|मरना चाहता|मरना चाहती|आत्महत्या|खुद को (?:नुकसान|खत्म)",
+    re.IGNORECASE,
+)
+
+
+def risky_sample(text: str) -> bool:
+    """Whether a sample's visitor line is about risk or an emergency (Q4 3c)."""
+    return bool(_RISKY.search(text or ""))
+
+
 def _purpose_card(
     purpose_id: PurposeId, proposal: Any, source: str, recommended: bool
 ) -> DesignCard:
@@ -356,6 +373,11 @@ def _purpose_card(
         or not assistant
         or catalogue.overpromises(assistant)
         or not sample_grounded(f"{visitor}\n{assistant}", source)
+        # Q4 3c (NGO baseline: iCall's sample answered a self-harm message by asking
+        # for a name and number): a sample is never about risk or an emergency, and
+        # never gives clinical advice; the catalogue's safe sample is used instead.
+        or risky_sample(visitor)
+        or clinical_advice(assistant)
     ):
         sample = [{"from": who, "text": text} for who, text in purpose.default_sample]
     else:

@@ -120,6 +120,8 @@ def make_agent_check_node(service: KnowledgeAgentService) -> Node:
             refused=refused,
             business_contact=state["bot"].get("business_contact") or "",
             memory_on="memory" in state["bot"],
+            channel=state["bot"].get("channel") or "",
+            crisis_line=state["bot"].get("support_helplines") or "",
             found_nothing=any(
                 call.get("nearest") or not (call.get("added") or call.get("aggregate"))
                 for call in finds

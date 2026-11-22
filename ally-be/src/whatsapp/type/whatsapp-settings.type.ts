@@ -110,6 +110,25 @@ export interface WhatsAppBotSettings {
   helplineNumbers: string;
 
   /**
+   * Where `helplineNumbers` came from (Q4 G7): the owner in Safety, a template's answer, or setup.
+   * Unset on values saved before Q4, which count as the owner's.
+   */
+  helplineSource?: 'owner' | 'template' | 'setup' | null;
+
+  /**
+   * When the owner confirmed `helplineNumbers` for crisis replies (Q4 G7). A number from a template
+   * or setup is never added to a crisis reply until the owner confirms it in Safety.
+   */
+  helplineConfirmedAt?: string | null;
+
+  /**
+   * One practical-help line the owner approved, sent after the fixed at-risk reply (Q4 G7), e.g. a
+   * food-rescue NGO's "Tell me your area and I'll point you to the nearest chapter." Never after an
+   * emergency reply.
+   */
+  crisisPracticalLine?: string | null;
+
+  /**
    * The chatbot that answers the platform number configured in env vars, which has no connector
    * row. Unset: the platform number does not reply.
    */

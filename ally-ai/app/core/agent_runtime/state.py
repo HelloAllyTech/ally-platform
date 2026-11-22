@@ -101,6 +101,9 @@ class RunWorking(TypedDict, total=False):
     fallback_result: Optional[Dict[str, Any]]
     # What the run asked to remember (chunk 8a): returned, never stored here.
     memory_writes: List[Dict[str, Any]]
+    #: The run passed the chat to a person (`hand_over`, Q4 G1). The run goes on, so the
+    #: reply still answers what it can; ally-be adds its hand-over line after it.
+    handed_over: bool
     #: What the run did, step by step, as the bot page shows it (chunk 6b,
     #: activity.py): each with `ok`, and a write's record id.
     activity: List[Dict[str, Any]]

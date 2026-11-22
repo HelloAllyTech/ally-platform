@@ -446,4 +446,57 @@ describe('BotDraftService', () => {
     );
     expect(again.safetyPack).toBe(SafetyPackId.MENTAL_HEALTH);
   });
+
+  describe('the owner corrects the pack in setup (Q4 A3)', () => {
+    const onMentalHealth = async () => {
+      const h = harness();
+      const draft = await h.service.setSafety(
+        h.draft(),
+        Industry.REAL_ESTATE,
+        SafetyPackId.MENTAL_HEALTH,
+      );
+      return { h, draft };
+    };
+
+    it('less strict needs a reason, which is recorded with the change', async () => {
+      const { h, draft } = await onMentalHealth();
+      await expect(
+        h.service.correctPack(draft, SafetyPackId.STANDARD, ''),
+      ).rejects.toMatchObject({ response: { errorCode: 'reason_required' } });
+      const fixed = await h.service.correctPack(
+        draft,
+        SafetyPackId.STANDARD,
+        "We're a coworking space, not mental health",
+      );
+      expect(fixed.safetyPack).toBe(SafetyPackId.STANDARD);
+      expect(fixed.draftConfig.safetyPackId).toBe(SafetyPackId.STANDARD);
+      expect(fixed.draftConfig.packChange).toMatchObject({
+        from: 'mental_health',
+        to: 'standard',
+        lessStrict: true,
+        reason: "We're a coworking space, not mental health",
+      });
+      // The old pack's disclaimer goes with it.
+      expect(fixed.draftConfig.branding.disclaimer ?? '').not.toContain(
+        SAFETY_PACKS.mental_health.disclaimer,
+      );
+    });
+
+    it('stricter applies at once, with no reason', async () => {
+      const h = harness();
+      const fixed = await h.service.correctPack(
+        h.draft(),
+        SafetyPackId.MEDICAL,
+      );
+      expect(fixed.safetyPack).toBe(SafetyPackId.MEDICAL);
+      expect(fixed.draftConfig.packChange?.lessStrict).toBe(false);
+    });
+
+    it('an unknown pack is refused', async () => {
+      const h = harness();
+      await expect(
+        h.service.correctPack(h.draft(), 'magic'),
+      ).rejects.toMatchObject({ response: { errorCode: 'invalid_pack' } });
+    });
+  });
 });

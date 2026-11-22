@@ -13,7 +13,13 @@ export type CheckupTrigger =
   | 'after_change'
   | 'eval'
   /** "Try this one" (chunk 20d-2): one question, never the latest checkup. */
-  | 'try';
+  | 'try'
+  /**
+   * Publishing's safety recheck (Q4 A0): the failed safety questions asked again in the
+   * background while the page polls. Never the latest checkup, so it can't replace the run the
+   * 70% gate reads.
+   */
+  | 'recheck';
 /** What should happen, in the owner's words (chunk 20d-2); each maps onto the grader's `expect`. */
 export type CheckupOutcomeChoice =
   | 'answer'

@@ -11,6 +11,8 @@ from app.core.agent_runtime.check.fixes import (
     WORDING_FIXES,
     add_fallback_contact,
     cite_offered_times,
+    drop_channel_talk,
+    give_crisis_numbers,
 )
 from app.core.agent_runtime.check.organisation import Organisation
 from app.core.agent_runtime.check.personal import about_the_person
@@ -64,6 +66,8 @@ def check_reply(
     refused: Sequence[str] = (),
     business_contact: str = "",
     memory_on: bool = True,
+    channel: str = "",
+    crisis_line: str = "",
 ) -> Tuple[AnswerResult, Optional[Rejection]]:
     """The run's result, and the rejection reason when the check refused the draft;
     None when it went through as the model meant it.
@@ -99,6 +103,8 @@ def check_reply(
         refused=tuple(refused),
         business_contact=(business_contact or "").strip(),
         memory_on=memory_on,
+        channel=(channel or "").strip().lower(),
+        crisis_line=(crisis_line or "").strip(),
     )
     verdict = _read_draft(step, ctx)
     say_memory_is_off(verdict, ctx)
@@ -115,6 +121,9 @@ def check_reply(
     if verdict.intent != AgentIntent.DECLINE or verdict.model_declined:
         for fix in WORDING_FIXES:
             fix(verdict, ctx)
+    # On every reply, declines included (Q4 G2, G7).
+    drop_channel_talk(verdict, ctx)
+    give_crisis_numbers(verdict, ctx)
     add_fallback_contact(verdict, ctx)
     result = _build_result(verdict, step, meta, ctx, language, retrieval)
     return result, verdict.rejection

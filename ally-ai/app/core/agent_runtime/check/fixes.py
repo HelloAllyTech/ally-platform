@@ -389,6 +389,81 @@ def _decline_if_nothing_left(verdict: Verdict, ctx: CheckContext) -> None:
         verdict.intent, verdict.keeps_text = AgentIntent.DECLINE, False
 
 
+#: A sentence about another channel's rules or the assistant's own instructions
+#: (Q4 G2, Round 7 R4: "(On WhatsApp I won't ask for your phone number…" and "WhatsApp
+#: par humare paas aapka number hai" on the web page).
+#: Only the assistant's own WhatsApp rule (it has their number there), never a fact
+#: about the organisation such as "You can book on WhatsApp".
+_CHANNEL_TALK = re.compile(
+    r"\bon whatsapp,? (I|we)\b"
+    r"|\b(already|we) ha(?:ve|s) your (?:phone |mobile )?number\b"
+    r"|\bwhatsapp (?:par|pe|mein) (?:humare|hamare|hamaare) paas\b"
+    r"|\baapka (?:phone )?number (?:humare|hamare) paas\b",
+    re.IGNORECASE,
+)
+_OWN_RULES_TALK = re.compile(
+    r"\b(my|the) (instructions|system prompt|rules I follow)\b"
+    r"|\bI(?:'m| am) (told|instructed|not allowed) to\b"
+    r"|\bI (won'?t|will not|don'?t) ask for your (phone|number|mobile)\b",
+    re.IGNORECASE,
+)
+
+
+def drop_channel_talk(verdict: Verdict, ctx: CheckContext) -> None:
+    """Removed, not sent back (Q4 G2): talk of the assistant's own rules, and of
+    WhatsApp anywhere but on WhatsApp. If nothing else is left, the reply stays."""
+
+    def talks(sentence: str) -> bool:
+        if _OWN_RULES_TALK.search(sentence):
+            return True
+        return ctx.channel != "whatsapp" and bool(_CHANNEL_TALK.search(sentence))
+
+    if any(talks(s) for s in SENTENCE_END.split(verdict.answer)):
+        verdict.answer = (
+            without_sentences(verdict.answer, lambda s: not talks(s)) or verdict.answer
+        )
+
+
+#: "I don't have our crisis contact numbers here" (Q4 G7, Round 7 #6: at 2am).
+_NO_CRISIS_NUMBERS = re.compile(
+    r"\b(don'?t|do not|doesn'?t|does not)\s+have\s+(our |any |the |a )?"
+    r"(crisis|emergency|helpline|support)\s+(contact\s+)?(numbers?|lines?|details)"
+    r"|(crisis|helpline|emergency)\s+(numbers?|number)\s+(nahi|nahin|नहीं)",
+    re.IGNORECASE,
+)
+#: Fixed text (Q4 G7; in Q4-PROMPTS.md for review): the national numbers, then the
+#: organisation's own confirmed line when there is one.
+CRISIS_NUMBERS_EN = (
+    "If you need someone to talk to now, you can call Tele-MANAS on 14416 "
+    "(free, 24×7), or 112 if you're in danger."
+)
+CRISIS_NUMBERS_HI = (
+    "अगर आपको अभी किसी से बात करनी है, तो Tele-MANAS को 14416 पर कॉल करें "
+    "(मुफ़्त, 24×7), या ख़तरे में हों तो 112 पर।"
+)
+CRISIS_LINE_EN = " You can also reach {organisation} on {line}."
+CRISIS_LINE_HI = " आप {organisation} से {line} पर भी संपर्क कर सकते हैं।"
+_DEVANAGARI = re.compile(r"[\u0900-\u097F]")
+
+
+def give_crisis_numbers(verdict: Verdict, ctx: CheckContext) -> None:
+    """A reply never says it has no crisis numbers (Q4 G7): that sentence becomes
+    the national numbers, and the organisation's own confirmed line."""
+    sentences = SENTENCE_END.split(verdict.answer)
+    if not any(_NO_CRISIS_NUMBERS.search(s) for s in sentences):
+        return
+    hindi = bool(_DEVANAGARI.search(verdict.answer))
+    numbers = CRISIS_NUMBERS_HI if hindi else CRISIS_NUMBERS_EN
+    if ctx.crisis_line:
+        terms = ctx.organisation.terms
+        organisation = terms[0] if terms else ("टीम" if hindi else "the team")
+        numbers += (CRISIS_LINE_HI if hindi else CRISIS_LINE_EN).format(
+            organisation=organisation, line=ctx.crisis_line
+        )
+    kept = without_sentences(verdict.answer, lambda s: not _NO_CRISIS_NUMBERS.search(s))
+    verdict.answer = f"{kept} {numbers}".strip() if kept else numbers
+
+
 #: Applied in this order to every reply that isn't a decline the check forced.
 WORDING_FIXES: Tuple[Callable[[Verdict, CheckContext], None], ...] = (
     _drop_record_ids,

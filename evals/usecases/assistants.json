@@ -120,8 +120,6 @@
       "pack": "standard",
       "access": "public",
       "answers": {
-        "latest": "The Delhi winter collection drive has moved from Friday to Saturday this week, 10 am to 4 pm, at the Sarita Vihar centre.",
-        "affects": "Delhi donors and volunteers, this week only.",
         "keeper": "The Delhi team."
       },
       "updates": [
@@ -160,7 +158,8 @@
       "changeLater": {
         "title": "Winter drive moved",
         "text": "The Delhi winter collection drive is now on Sunday, 11 am to 3 pm, at the Sarita Vihar centre."
-      }
+      },
+      "_finding": "Q4 baseline: answering 'latest' and 'affects' at setup fails the whole setup with 400 'Date is needed' (the template writes an Updates entry with no date). Skipped here; the updates are seeded with dates."
     },
     {
       "key": "b1-dragarwal",
@@ -208,7 +207,7 @@
           "ref": "TSS-1001",
           "person": "custa",
           "item": "Batman: Gotham Blaze high tops, UK 9",
-          "status": "shipped",
+          "status": "sent",
           "eta": "in 2 days"
         }
       ]

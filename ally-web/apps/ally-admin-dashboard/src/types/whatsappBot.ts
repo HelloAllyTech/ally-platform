@@ -340,6 +340,14 @@ export interface WaOrgSettings {
    */
   abilities?: Partial<Record<string, "do_it" | "never">>;
   helplineNumbers?: string;
+  /** Where the helpline came from (Q4 G7); set by the server, never sent. */
+  helplineSource?: "owner" | "template" | "setup" | null;
+  /** When the owner confirmed it for crisis replies (Q4 G7); set by the server. */
+  helplineConfirmedAt?: string | null;
+  /** Sent only by "Use it in crisis replies" (Q4 G7); never stored. */
+  helplineConfirm?: boolean;
+  /** The owner's one practical-help line after the at-risk reply (Q4 G7). */
+  crisisPracticalLine?: string;
   disclaimerText?: string;
   crisisEscalationText?: string;
   fallbackText?: string;

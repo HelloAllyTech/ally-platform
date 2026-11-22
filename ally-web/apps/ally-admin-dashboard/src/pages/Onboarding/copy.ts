@@ -415,6 +415,11 @@ export const COPY = {
   share: {
     goLiveAnyway: "Go live anyway",
     publishAnyway: "Publish anyway",
+    // Q4 A0: publishing's safety recheck, polled while it runs.
+    safetyProgress: (done: number, total: number) =>
+      total > 1 ? `Checked ${done} of ${total}.` : "",
+    safetyAnswer: "Its answer:",
+    checkAgain: "Check again",
     title: "Who can use it?",
     public: "Anyone with the link",
     publicHelp: "Best for your website, Instagram or WhatsApp status.",

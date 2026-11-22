@@ -31,6 +31,7 @@ import {
   CreateBotDraftDto,
   DescribeBotDraftDto,
   PatchBotDraftDto,
+  CorrectBotDraftPackDto,
   PublishBotDraftDto,
   UndoBotDraftDto,
   PageChoiceDto,
@@ -343,6 +344,25 @@ export class BotDraftController {
     return draftView(await this.drafts.back(await this.drafts.get(id)));
   }
 
+  @Post(':id/pack')
+  @AssistantScope('service')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
+  @ApiOperation({
+    summary:
+      '"This isn\'t right for my business": choose the safety pack in setup (Q4 A3)',
+    description:
+      "Stricter at once; less strict only with the owner's reason (reason_required), recorded with the change and kept on the assistant when it is published.",
+  })
+  async correctPack(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CorrectBotDraftPackDto,
+  ) {
+    const draft = await this.drafts.get(id);
+    return draftView(
+      await this.drafts.correctPack(draft, dto.pack, dto.reason ?? null),
+    );
+  }
+
   @Post(':id/publish')
   @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
@@ -365,7 +385,11 @@ export class BotDraftController {
         draft,
         Boolean(dto.confirmMustPass),
       );
-      await this.checkup.assertCanPublish(draft, Boolean(dto.publishAnyway));
+      await this.checkup.assertCanPublish(
+        draft,
+        Boolean(dto.publishAnyway),
+        Boolean(dto.recheckSafety),
+      );
     }
     return this.publisher.publish(draft, dto);
   }

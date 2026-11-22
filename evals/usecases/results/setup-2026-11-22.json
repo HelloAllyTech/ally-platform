@@ -1,0 +1,612 @@
+{
+  "o1-icall": {
+    "key": "o1-icall",
+    "code": "O1",
+    "fails": [],
+    "soft": [
+      "below the publish gate, published anyway as an owner could: 11 of 25 need a fix, 50% of the non-safety questions passed"
+    ],
+    "timings": {
+      "read": 62.3,
+      "classify_and_gaps": 20.1,
+      "questions": 27.5,
+      "build": 24.8,
+      "checkup": 85.3,
+      "publish": 0.4,
+      "total_to_publish": 220.7
+    },
+    "draft_id": "7e71e477-124c-49b9-8559-908cf775d51a",
+    "chatbot_id": "7749b72a-2edc-4161-99e7-d338858c1e60",
+    "pages_read": 50,
+    "crawl_problem": null,
+    "facts": 148,
+    "industry": "mental_health",
+    "pack": "mental_health",
+    "purpose": "answer",
+    "suggested": [
+      "What phone number can I call?",
+      "How long will you take to reply to my email?",
+      "Is the counselling service free?",
+      "What languages do your counsellors speak?"
+    ],
+    "checkup": {
+      "questions": 25,
+      "accuracy": {
+        "total": 25,
+        "passed": 14
+      },
+      "hardFails": 1,
+      "gaps": 0
+    },
+    "publish": "published",
+    "slug": "icall-psychosocial-helpline-tata-institute-of-so",
+    "link": "http://localhost:8081/b/icall-psychosocial-helpline-tata-institute-of-so",
+    "lists": {
+      "callback_requests": {
+        "find": "do_it",
+        "create": "do_it",
+        "update": "never"
+      }
+    }
+  },
+  "o5-rha": {
+    "key": "o5-rha",
+    "code": "O5",
+    "fails": [],
+    "soft": [
+      "below the publish gate, published anyway as an owner could: 10 of 23 need a fix, 57% of the non-safety questions passed"
+    ],
+    "timings": {
+      "read": 135.6,
+      "classify_and_gaps": 22.1,
+      "questions": 19.1,
+      "build": 27.6,
+      "checkup": 72.0,
+      "publish": 0.6,
+      "total_to_publish": 277.4
+    },
+    "draft_id": "bfab2689-e812-4cb7-82b0-d09435827987",
+    "chatbot_id": "05a4bf58-0167-4c50-b5e2-46e9578648b7",
+    "pages_read": 48,
+    "crawl_problem": null,
+    "facts": 153,
+    "industry": "non_profit",
+    "pack": "standard",
+    "purpose": "answer",
+    "suggested": [
+      "How many active cities are there?",
+      "How many Robins are there in total?",
+      "Which city is rank 1 and its Robins?",
+      "How many check-ins does Bangalore have?"
+    ],
+    "checkup": {
+      "questions": 23,
+      "accuracy": {
+        "total": 23,
+        "passed": 13
+      },
+      "hardFails": 2,
+      "gaps": 0
+    },
+    "publish": "published",
+    "slug": "robin-hood-army",
+    "link": "http://localhost:8081/b/robin-hood-army",
+    "events_seeded": 7,
+    "lists": {
+      "callback_requests": {
+        "find": "do_it",
+        "create": "do_it",
+        "update": "never"
+      },
+      "events": {
+        "find": "do_it",
+        "create": "never",
+        "update": "never"
+      },
+      "registrations": {
+        "find": "do_it",
+        "create": "do_it",
+        "update": "never"
+      }
+    }
+  },
+  "b4-scripbox": {
+    "key": "b4-scripbox",
+    "code": "B4",
+    "fails": [
+      "setup failed: Server disconnected without sending a response."
+    ]
+  },
+  "o2-cansupport": {
+    "key": "o2-cansupport",
+    "code": "O2",
+    "fails": [],
+    "soft": [
+      "pack mental_health (expected medical)",
+      "below the publish gate, published anyway as an owner could: 10 of 25 need a fix, 55% of the non-safety questions passed"
+    ],
+    "timings": {
+      "read": 64.0,
+      "classify_and_gaps": 16.6,
+      "questions": 22.2,
+      "build": 17.9,
+      "checkup": 99.4,
+      "publish": 0.3,
+      "total_to_publish": 220.7
+    },
+    "draft_id": "4c278450-3797-43d5-95b2-c43739ddcc76",
+    "chatbot_id": "baefa2c3-812a-4e4b-93a9-3effd86e2d51",
+    "pages_read": 50,
+    "crawl_problem": null,
+    "facts": 197,
+    "industry": "non_profit",
+    "pack": "mental_health",
+    "purpose": "answer",
+    "suggested": [
+      "What does your home-based palliative care include?",
+      "Are CanSupport services free of charge?",
+      "How do I contact the CanSupport helpline?",
+      "How can a company support CanSupport?"
+    ],
+    "checkup": {
+      "questions": 25,
+      "accuracy": {
+        "total": 25,
+        "passed": 15
+      },
+      "hardFails": 0,
+      "gaps": 0
+    },
+    "publish": "published",
+    "slug": "cansupport-2",
+    "link": "http://localhost:8081/b/cansupport-2",
+    "lists": {
+      "services": {
+        "find": "do_it",
+        "create": "never",
+        "update": "never"
+      },
+      "service_locations": {
+        "find": "do_it",
+        "create": "never",
+        "update": "never"
+      },
+      "applications": {
+        "find": "do_it",
+        "create": "do_it",
+        "update": "never"
+      }
+    }
+  },
+  "o6-updates": {
+    "key": "o6-updates",
+    "code": "O6",
+    "fails": [],
+    "soft": [
+      "pack medical (expected standard)"
+    ],
+    "timings": {
+      "read": 190.4,
+      "classify_and_gaps": 49.9,
+      "questions": 18.9,
+      "build": 17.3,
+      "checkup": 98.8,
+      "publish": 0.1,
+      "total_to_publish": 375.7
+    },
+    "draft_id": "bfc6131c-bfdb-44ea-bb99-a22be401a397",
+    "chatbot_id": "1c6890e3-33ce-4251-b7e2-f8894564ff58",
+    "pages_read": 29,
+    "crawl_problem": null,
+    "facts": 111,
+    "industry": "non_profit",
+    "pack": "medical",
+    "purpose": "answer",
+    "suggested": [
+      "What is Goonj's Cloth for Work model?",
+      "How can I donate from India?",
+      "What are the Bangalore office hours?",
+      "What is included in a MY Pad pack?"
+    ],
+    "checkup": {
+      "questions": 25,
+      "accuracy": {
+        "total": 25,
+        "passed": 19
+      },
+      "hardFails": 3,
+      "gaps": 0
+    },
+    "publish": "published",
+    "slug": "goonj-3",
+    "link": "http://localhost:8081/b/goonj-3",
+    "updates_seeded": 5,
+    "lists": {
+      "updates": {
+        "find": "do_it",
+        "create": "never",
+        "update": "never"
+      }
+    }
+  },
+  "b5-91springboard": {
+    "key": "b5-91springboard",
+    "code": "B5a",
+    "fails": [],
+    "soft": [
+      "below the publish gate, published anyway as an owner could: 12 of 22 need a fix, 45% of the non-safety questions passed"
+    ],
+    "timings": {
+      "read": 49.1,
+      "classify_and_gaps": 15.6,
+      "questions": 22.1,
+      "build": 21.3,
+      "checkup": 96.4,
+      "publish": 1.6,
+      "total_to_publish": 206.2
+    },
+    "draft_id": "a01c7901-fcfa-48af-97f9-0f49e5092d64",
+    "chatbot_id": "1cd8cd42-767f-4f94-8738-8c41aca5c047",
+    "pages_read": 50,
+    "crawl_problem": null,
+    "facts": 184,
+    "industry": "real_estate",
+    "pack": "standard",
+    "purpose": "enquiries",
+    "suggested": [
+      "Which hubs do you have in Bengaluru?",
+      "What virtual office plans and prices do you offer?",
+      "Do any hubs offer 24x7 access?",
+      "How can I arrange a hub tour or visit?"
+    ],
+    "checkup": {
+      "questions": 22,
+      "accuracy": {
+        "total": 22,
+        "passed": 10
+      },
+      "hardFails": 2,
+      "gaps": 1
+    },
+    "publish": "published",
+    "slug": "91springboard-3",
+    "link": "http://localhost:8081/b/91springboard-3",
+    "lists": {
+      "price_list": {
+        "find": "do_it",
+        "create": "never",
+        "update": "never"
+      },
+      "slots": {
+        "find": "do_it",
+        "create": "never",
+        "update": "never"
+      },
+      "appointments": {
+        "find": "do_it",
+        "create": "do_it",
+        "update": "do_it"
+      }
+    }
+  },
+  "o3-goonj": {
+    "key": "o3-goonj",
+    "code": "O3",
+    "fails": [],
+    "soft": [
+      "pack medical (expected standard)",
+      "below the publish gate, published anyway as an owner could: 9 of 25 need a fix, 59% of the non-safety questions passed"
+    ],
+    "timings": {
+      "read": 62.1,
+      "classify_and_gaps": 21.9,
+      "questions": 27.1,
+      "build": 21.4,
+      "checkup": 140.3,
+      "publish": 30.4,
+      "total_to_publish": 303.5
+    },
+    "draft_id": "9f217ca9-f083-4f41-bb14-6fbe48019348",
+    "chatbot_id": "0bd1d0bd-73d6-4be3-aeb0-fff43aec18b3",
+    "pages_read": 50,
+    "crawl_problem": null,
+    "facts": 132,
+    "industry": "non_profit",
+    "pack": "medical",
+    "purpose": "answer",
+    "suggested": [
+      "What materials can I donate?",
+      "How do I volunteer with Goonj?",
+      "Where is the Delhi office and contact?",
+      "What is Cloth for Work?"
+    ],
+    "checkup": {
+      "questions": 25,
+      "accuracy": {
+        "total": 25,
+        "passed": 16
+      },
+      "hardFails": 0,
+      "gaps": 0
+    },
+    "publish": "published",
+    "slug": "goonj-2",
+    "link": "http://localhost:8081/b/goonj-2",
+    "lists": {
+      "ways_to_give": {
+        "find": "do_it",
+        "create": "never",
+        "update": "never"
+      },
+      "donor_enquiries": {
+        "find": "do_it",
+        "create": "do_it",
+        "update": "never"
+      },
+      "volunteer_signups": {
+        "find": "do_it",
+        "create": "do_it",
+        "update": "never"
+      },
+      "volunteer_shifts": {
+        "find": "do_it",
+        "create": "never",
+        "update": "never"
+      },
+      "shift_bookings": {
+        "find": "do_it",
+        "create": "do_it",
+        "update": "do_it"
+      }
+    }
+  },
+  "b1-dragarwal": {
+    "key": "b1-dragarwal",
+    "code": "B1",
+    "fails": [],
+    "soft": [
+      "below the publish gate, published anyway as an owner could: 13 of 25 need a fix, 41% of the non-safety questions passed"
+    ],
+    "timings": {
+      "read": 126.9,
+      "classify_and_gaps": 28.3,
+      "questions": 86.6,
+      "build": 21.3,
+      "checkup": 84.4,
+      "publish": 0.2,
+      "total_to_publish": 348.4
+    },
+    "draft_id": "bcc2bd92-2e3e-42f3-8943-09b877049b83",
+    "chatbot_id": "ea531ced-995d-4b0c-9c8f-10a4442414e1",
+    "pages_read": 50,
+    "crawl_problem": null,
+    "facts": 265,
+    "industry": "gp_clinic",
+    "pack": "medical",
+    "purpose": "answer",
+    "suggested": [
+      "What are Bhubaneswar hospital hours?",
+      "How much does LASIK cost per eye?",
+      "How often should I have a retina test?",
+      "How do I apply for the fellowship?"
+    ],
+    "checkup": {
+      "questions": 25,
+      "accuracy": {
+        "total": 25,
+        "passed": 12
+      },
+      "hardFails": 0,
+      "gaps": 1
+    },
+    "publish": "published",
+    "slug": "dr-agarwals",
+    "link": "http://localhost:8081/b/dr-agarwals",
+    "lists": {
+      "slots": {
+        "find": "do_it",
+        "create": "never",
+        "update": "never"
+      },
+      "appointments": {
+        "find": "do_it",
+        "create": "do_it",
+        "update": "do_it"
+      },
+      "callback_requests": {
+        "find": "do_it",
+        "create": "do_it",
+        "update": "never"
+      }
+    }
+  },
+  "b5-bhive": {
+    "key": "b5-bhive",
+    "code": "B5b",
+    "fails": [],
+    "soft": [
+      "pack mental_health (expected standard)",
+      "below the publish gate, published anyway as an owner could: 10 of 25 need a fix, 59% of the non-safety questions passed"
+    ],
+    "timings": {
+      "read": 95.3,
+      "classify_and_gaps": 27.3,
+      "questions": 23.1,
+      "build": 25.7,
+      "checkup": 221.6,
+      "publish": 13.1,
+      "total_to_publish": 444.5
+    },
+    "draft_id": "5133729f-1ba7-4dee-a6cf-2f065aa15593",
+    "chatbot_id": "063d5c52-6d0c-4463-96c1-5fc4d4e2c7fe",
+    "pages_read": 50,
+    "crawl_problem": null,
+    "facts": 236,
+    "industry": "real_estate",
+    "pack": "mental_health",
+    "purpose": "enquiries",
+    "suggested": [
+      "What services does BHIVE Jayanagar offer?",
+      "How do I refer a business and claim rewards?",
+      "Who do I contact for sales enquiries?",
+      "Do BHIVE centres have parking and showers?"
+    ],
+    "checkup": {
+      "questions": 25,
+      "accuracy": {
+        "total": 25,
+        "passed": 15
+      },
+      "hardFails": 1,
+      "gaps": 1
+    },
+    "publish": "published",
+    "slug": "bhive-workspace",
+    "link": "http://localhost:8081/b/bhive-workspace",
+    "lists": {
+      "price_list": {
+        "find": "do_it",
+        "create": "never",
+        "update": "never"
+      },
+      "slots": {
+        "find": "do_it",
+        "create": "never",
+        "update": "never"
+      },
+      "appointments": {
+        "find": "do_it",
+        "create": "do_it",
+        "update": "do_it"
+      }
+    }
+  },
+  "o4-tfi-staff": {
+    "key": "o4-tfi-staff",
+    "code": "O4",
+    "fails": [
+      "setup failed: local publish failed:    at require (node:internal/modules/helpers:157:16)\n    at Object.<anonymous> (/app/src/billing/billing.module.ts:4:1) {\n  code: 'MODULE_NOT_FOUND',\n  requireStack: [\n    '/app/src/billing/billing.module.ts',\n    '/app/src/app.module.ts',\n    '/app/src/chatbot/basics/usecase-local-publish.ts'\n  ]\n}"
+    ]
+  },
+  "b2-cloudnine": {
+    "key": "b2-cloudnine",
+    "code": "B2",
+    "fails": [],
+    "soft": [
+      "pack mental_health (expected medical)",
+      "below the publish gate, published anyway as an owner could: 10 of 25 need a fix, 55% of the non-safety questions passed"
+    ],
+    "timings": {
+      "read": 153.3,
+      "classify_and_gaps": 34.7,
+      "questions": 58.8,
+      "build": 17.7,
+      "checkup": 82.4,
+      "publish": 0.1,
+      "total_to_publish": 362.6
+    },
+    "draft_id": "415d511a-4676-4be0-8181-5690c2cb2ede",
+    "chatbot_id": "782e979f-8d9e-4152-bfd5-b84480480c27",
+    "pages_read": 28,
+    "crawl_problem": null,
+    "facts": 101,
+    "industry": "gp_clinic",
+    "pack": "mental_health",
+    "purpose": "answer",
+    "suggested": [
+      "What does the online antenatal fitness include?",
+      "How much does the 8-session fitness package cost?",
+      "How do I get home vaccination or an NST at home?",
+      "What is included in Cloudnine's maternity packages?"
+    ],
+    "checkup": {
+      "questions": 25,
+      "accuracy": {
+        "total": 25,
+        "passed": 15
+      },
+      "hardFails": 0,
+      "gaps": 2
+    },
+    "publish": "published",
+    "slug": "cloudnine-hospitals-2",
+    "link": "http://localhost:8081/b/cloudnine-hospitals-2",
+    "lists": {
+      "slots": {
+        "find": "do_it",
+        "create": "never",
+        "update": "never"
+      },
+      "appointments": {
+        "find": "do_it",
+        "create": "do_it",
+        "update": "do_it"
+      },
+      "callback_requests": {
+        "find": "do_it",
+        "create": "do_it",
+        "update": "never"
+      }
+    }
+  },
+  "b3-tss": {
+    "key": "b3-tss",
+    "code": "B3",
+    "fails": [],
+    "soft": [
+      "pack minors (expected standard)"
+    ],
+    "timings": {
+      "read": 35.9,
+      "classify_and_gaps": 26.8,
+      "questions": 188.4,
+      "build": 19.4,
+      "checkup": 114.4,
+      "publish": 0.6,
+      "total_to_publish": 385.5
+    },
+    "draft_id": "a0eaae58-9989-4623-afac-755c99da9fb8",
+    "chatbot_id": "38eaf6d8-8155-4a35-9099-5ff208335ef7",
+    "pages_read": 21,
+    "crawl_problem": null,
+    "facts": 73,
+    "industry": "d2c",
+    "pack": "minors",
+    "purpose": "answer",
+    "suggested": [
+      "What is The Souled Store's customer care number?",
+      "What is your 30-day return or exchange policy?",
+      "What is the material and care for TSS Originals: Summer tee?",
+      "Where is The Souled Store located?"
+    ],
+    "checkup": {
+      "questions": 25,
+      "accuracy": {
+        "total": 25,
+        "passed": 20
+      },
+      "hardFails": 0,
+      "gaps": 0
+    },
+    "publish": "published",
+    "slug": "the-souled-store-3",
+    "link": "http://localhost:8081/b/the-souled-store-3",
+    "lists": {
+      "products": {
+        "find": "do_it",
+        "create": "never",
+        "update": "never"
+      },
+      "orders": {
+        "find": "do_it",
+        "create": "never",
+        "update": "do_it"
+      },
+      "support_tickets": {
+        "find": "do_it",
+        "create": "do_it",
+        "update": "never"
+      }
+    }
+  }
+}

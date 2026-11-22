@@ -1,6 +1,7 @@
 import React from "react";
 
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 // `@constants` first: the admin app's barrel does module-load-time work.
@@ -441,14 +442,17 @@ describe("Building", () => {
 describe("Share", () => {
   it("asks once before going live while a template's examples are still in a list (T1)", () => {
     const onPublish = vi.fn();
+    // Round 8 N2: under the app's base path (production's /admin) the link keeps it.
     render(
-      <ShareScreen
-        view={view({ step: "share", chatbotId: "bot-1" } as Partial<BotDraftView>)}
-        publicAllowed={false}
-        publishing={false}
-        onPublish={onPublish}
-        examplesLeft={{ total: 2, lists: [{ key: "price_list", name: "Price list", count: 2 }] }}
-      />,
+      <MemoryRouter basename="/admin" initialEntries={["/admin/assistants/new"]}>
+        <ShareScreen
+          view={view({ step: "share", chatbotId: "bot-1" } as Partial<BotDraftView>)}
+          publicAllowed={false}
+          publishing={false}
+          onPublish={onPublish}
+          examplesLeft={{ total: 2, lists: [{ key: "price_list", name: "Price list", count: 2 }] }}
+        />
+      </MemoryRouter>,
     );
     fireEvent.click(screen.getByRole("radio", { name: new RegExp(COPY.share.organisation) }));
     fireEvent.click(screen.getByText(COPY.share.publish));
@@ -457,10 +461,53 @@ describe("Share", () => {
       TEMPLATE_COPY.publishWarning,
     );
     expect(screen.getByText(TEMPLATE_COPY.replaceThem).getAttribute("href")).toBe(
-      "/assistants/bot-1?section=lists&tool=price_list",
+      "/admin/assistants/bot-1?section=lists&tool=price_list",
     );
     fireEvent.click(screen.getByText(TEMPLATE_COPY.publishAnyway));
     expect(onPublish).toHaveBeenCalledWith("organisation", []);
+  });
+
+  it("shows the safety recheck's progress, then the question that still fails (Q4 A0)", () => {
+    const share = (
+      safety: React.ComponentProps<typeof ShareScreen>["safety"],
+      onCheckAgain = vi.fn(),
+    ) =>
+      render(
+        <ShareScreen
+          view={view({ step: "share" })}
+          publicAllowed={false}
+          publishing={false}
+          onPublish={vi.fn()}
+          safety={safety}
+          onCheckAgain={onCheckAgain}
+        />,
+      );
+    const { unmount } = share({
+      status: "checking",
+      message: "Checking a safety answer again before you publish. This takes about a minute.",
+      done: 1,
+      total: 2,
+      questions: [],
+    });
+    expect(screen.getByTestId("publish-safety").textContent).toContain("Checked 1 of 2.");
+    expect(screen.queryByText(COPY.share.checkAgain)).toBeNull();
+    unmount();
+    const again = vi.fn();
+    share(
+      {
+        status: "failed",
+        message: "A safety question still doesn't pass.",
+        done: 1,
+        total: 1,
+        questions: [{ question: "Can you tell me if I have depression?", reply: "You may." }],
+      },
+      again,
+    );
+    const card = screen.getByTestId("publish-safety");
+    expect(card.textContent).toContain("Can you tell me if I have depression?");
+    expect(card.textContent).toContain(`${COPY.share.safetyAnswer} “You may.”`);
+    fireEvent.click(screen.getByText(COPY.share.checkAgain));
+    expect(again).toHaveBeenCalled();
   });
 
   it("asks before going live when an owner's Must pass question failed (chunk 20d-2)", () => {

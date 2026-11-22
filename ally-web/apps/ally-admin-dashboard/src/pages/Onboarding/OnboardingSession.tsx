@@ -130,7 +130,15 @@ export const OnboardingView: React.FC<{
           </>
         );
       case "safety":
-        return <SafetyScreen view={view} line={flow.line} onContinue={() => s.pass("safety")} />;
+        return (
+          <SafetyScreen
+            view={view}
+            line={flow.line}
+            onContinue={() => s.pass("safety")}
+            onChoosePack={s.choosePack}
+            choosing={s.choosingPack}
+          />
+        );
       case "question":
         return (
           <QuestionScreen
@@ -189,6 +197,8 @@ export const OnboardingView: React.FC<{
             publicAllowed={s.publicAllowed}
             publishing={s.publishing}
             onPublish={(access, emails) => void s.publish(access, emails)}
+            safety={s.safety}
+            onCheckAgain={s.checkSafetyAgain}
             mustPass={
               s.mustPass && {
                 message: s.mustPass.message,

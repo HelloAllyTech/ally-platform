@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 
+import { Link } from "react-router-dom";
+
 import type { PublishUse } from "@api";
 import { AssistantLine, Button, PrimaryButton, Question, useEnterToSubmit } from "@components/v2";
 import type { TemplateOrigin } from "@types";
@@ -34,8 +36,28 @@ export const ShareScreen: React.FC<{
   publishUse?: PublishUse | null;
   /** A template's examples still in its lists (T1): asked about once before going live. */
   examplesLeft?: TemplateOrigin["examples_left"] | null;
+  /** Publishing's safety recheck (Q4 A0): its progress, or the question that still fails. */
+  safety?: {
+    status: "checking" | "failed";
+    message: string;
+    done: number;
+    total: number;
+    questions: { question: string; reply?: string }[];
+  } | null;
+  onCheckAgain?: () => void;
   onPublish: (access: Access, emails: string[]) => void;
-}> = ({ view, publicAllowed, publishing, line, onPublish, mustPass, publishUse, examplesLeft }) => {
+}> = ({
+  view,
+  publicAllowed,
+  publishing,
+  line,
+  onPublish,
+  mustPass,
+  publishUse,
+  examplesLeft,
+  safety,
+  onCheckAgain,
+}) => {
   const [access, setAccess] = useState<Access>(view.draft.access.mode ?? "invite");
   const [emails, setEmails] = useState(view.draft.access.emails.join(", "));
   const options: { id: Access; label: string; help: string; disabled?: boolean }[] = [
@@ -102,6 +124,39 @@ export const ShareScreen: React.FC<{
             <span className="ally-field__hint">{COPY.share.emailsHelp}</span>
           </div>
         )}
+        {safety && (
+          <div
+            className="ally-card ally-must-pass"
+            role={safety.status === "failed" ? "alert" : "status"}
+            aria-live="polite"
+            data-testid="publish-safety"
+          >
+            <p className="ally-body">{safety.message}</p>
+            {safety.status === "checking" && (
+              <p className="ally-small">{COPY.share.safetyProgress(safety.done, safety.total)}</p>
+            )}
+            {safety.status === "failed" && safety.questions.length > 0 && (
+              <ul className="ally-small">
+                {safety.questions.map(q => (
+                  <li key={q.question}>
+                    “{q.question}”
+                    {q.reply && (
+                      <>
+                        <br />
+                        {COPY.share.safetyAnswer} “{q.reply}”
+                      </>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {safety.status === "failed" && onCheckAgain && (
+              <Button disabled={publishing} onClick={onCheckAgain}>
+                {COPY.share.checkAgain}
+              </Button>
+            )}
+          </div>
+        )}
         {mustPass && (
           <div className="ally-card ally-must-pass" role="alert" data-testid="must-pass">
             <p className="ally-body">{mustPass.message}</p>
@@ -132,14 +187,15 @@ export const ShareScreen: React.FC<{
             <p className="ally-body">{TEMPLATE_COPY.publishWarning}</p>
             <div className="ally-templates__actions">
               {view.chatbotId && (
-                <a
+                // Round 8 N2: a router link, so the app's base path (/admin on production) is kept.
+                <Link
                   className="ally-link"
-                  href={`/assistants/${view.chatbotId}?section=lists&tool=${encodeURIComponent(
+                  to={`/assistants/${view.chatbotId}?section=lists&tool=${encodeURIComponent(
                     examplesLeft?.lists[0]?.key ?? "",
                   )}`}
                 >
                   {TEMPLATE_COPY.replaceThem}
-                </a>
+                </Link>
               )}
               <Button
                 disabled={publishing}

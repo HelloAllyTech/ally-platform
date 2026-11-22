@@ -318,6 +318,38 @@ class TestPurposes:
         assert not any(c.coming_soon for c in res.designs)
 
     @pytest.mark.asyncio
+    async def test_a_sample_about_risk_or_with_clinical_advice_is_replaced(self):
+        """Q4 3c: previews show the safe pattern on sensitive packs."""
+        fake = FakeLLM(
+            PurposesOut=[
+                {
+                    "recommended": "answer",
+                    "cards": [
+                        {
+                            "id": "enquiries",
+                            "best_for": "People who need support",
+                            "visitor_line": "I don't want to live anymore",
+                            "assistant_line": "Can I take your name and number?",
+                        },
+                        {
+                            "id": "guide",
+                            "best_for": "Families",
+                            "visitor_line": "How do I manage pain at home?",
+                            "assistant_line": "Increase the morphine dose to 10 mg.",
+                        },
+                    ],
+                }
+            ]
+        )
+        res = await run(request("design", industry="mental_health"), fake)
+        cards = {c.id: c for c in res.designs}
+        for purpose_id in ("enquiries", "guide"):
+            default = purposes.PURPOSES[PurposeId(purpose_id)].default_sample
+            assert [line["text"] for line in cards[purpose_id].sample] == [
+                text for _who, text in default
+            ]
+
+    @pytest.mark.asyncio
     async def test_the_recommendation_is_one_of_the_two_best_for_the_business(self):
         fake = FakeLLM(PurposesOut=[{"recommended": "training", "cards": []}])
         res = await run(request("design", industry="diagnostic_lab"), fake)

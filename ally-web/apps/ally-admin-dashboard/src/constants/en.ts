@@ -2208,6 +2208,17 @@ export const en = {
       showTypingHelp:
         "Shows the typing dots while the assistant works on a reply. WhatsApp also marks the person's message as read (blue ticks). Only Ally admins can change this.",
       helplineHelp: "Shown in the crisis reply wherever it says {helpline_numbers}.",
+      // Q4 G7: a number a template or setup wrote waits for the owner's say-so.
+      helplineUnconfirmed: (from: string) =>
+        `Not used in crisis replies yet (from ${from}). Until you confirm it, crisis replies give only the national numbers.`,
+      helplineFrom: { template: "your template's answer", setup: "your setup" } as Record<
+        string,
+        string
+      >,
+      helplineConfirm: "Use it in crisis replies",
+      practicalLineLabel: "After the crisis reply (optional)",
+      practicalLineHelp:
+        "One line of practical help sent after the fixed reply to someone who may be at risk, for example: Tell me your area and I'll point you to the nearest chapter. Never after an emergency reply.",
       crisisClassifierHelp:
         "Can only be turned on here. Ally keeps it on for everyone who needs it.",
       consentLabel: "Ask for consent before answering",

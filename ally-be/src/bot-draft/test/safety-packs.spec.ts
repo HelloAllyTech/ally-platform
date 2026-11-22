@@ -149,3 +149,16 @@ describe('newHelplines (chunk H1)', () => {
     expect(newHelplines('', already)).toBe('');
   });
 });
+
+describe('a health industry keeps its own pack (Q4 A2)', () => {
+  it('a maternity hospital with a psychology service stays Medical', () => {
+    expect(packForBusiness('gp_clinic', ['mental_health', 'medical'])).toBe(
+      'medical',
+    );
+  });
+  it('a therapy practice that mentions medicines stays Mental health', () => {
+    expect(packForBusiness('mental_health', ['medicines'])).toBe(
+      'mental_health',
+    );
+  });
+});

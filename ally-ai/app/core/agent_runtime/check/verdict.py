@@ -69,6 +69,12 @@ class CheckContext:
     #: The bot remembers people between chats (chunk 8a's memory on). Off, a "please
     #: remember…" gets a plain "I can't" (Q3-fast Part 2, 17 Nov M2).
     memory_on: bool = True
+    #: The channel the reply goes to ("whatsapp", "web", "preview"…; Q4 G2): talk of
+    #: another channel's rules is removed.
+    channel: str = ""
+    #: The organisation's own line the owner confirmed for crisis replies (Q4 G7),
+    #: given with the national numbers when a reply says it has none.
+    crisis_line: str = ""
 
     @property
     def found(self) -> List[Dict[str, Any]]:

@@ -39,7 +39,7 @@ import {
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..', '..');
 const require = createRequire(join(root, 'ally-be', 'package.json'));
-const { Client } = require('pg');
+const { Pool } = require('pg');
 
 // ---------------------------------------------------------------- arguments and environment
 const argv = process.argv.slice(2);
@@ -111,7 +111,8 @@ const sets = readdirSync(join(here, 'sets'))
   .filter((s) => !ONLY.size || ONLY.has(s.file) || ONLY.has(s.assistant));
 
 // ---------------------------------------------------------------- database
-const db = new Client({
+const db = new Pool({
+  max: 8,
   host: env.DB_HOST === 'postgres' ? 'localhost' : env.DB_HOST,
   port: env.DB_HOST === 'postgres' ? 5477 : Number(env.DB_PORT),
   database: env.DB_DATABASE,
@@ -164,17 +165,27 @@ async function turnFacts({ chatbotId, messageId, conversationId, since, list, ca
 }
 
 // ---------------------------------------------------------------- the bot page, as a visitor
+const rnd = () => 1 + Math.floor(Math.random() * 254);
+
 class Visitor {
   constructor(slug, email) {
     this.slug = slug;
     this.email = email;
+    // Each visitor is its own person, from its own address, as real visitors are: the page's
+    // per-address limits (20 new sessions an hour) would otherwise refuse the suite after 20 cases.
+    // Locally the app trusts one proxy hop, so this is the address it sees; behind a real load
+    // balancer the balancer's own entry wins, so it can't be used to get round the limits there.
+    this.ip = `10.${rnd()}.${rnd()}.${rnd()}`;
     this.cookies = new Map();
     this.ready = false;
     this.refused = false;
   }
 
   headers(json = true) {
-    const h = { cookie: [...this.cookies].map(([k, v]) => `${k}=${v}`).join('; ') };
+    const h = {
+      cookie: [...this.cookies].map(([k, v]) => `${k}=${v}`).join('; '),
+      'x-forwarded-for': this.ip,
+    };
     if (json) h['content-type'] = 'application/json';
     return h;
   }
@@ -552,7 +563,6 @@ function report(results) {
 
 // ---------------------------------------------------------------- main
 async function main() {
-  await db.connect();
   const jobs = [];
   for (let run = 1; run <= REPEAT; run++) for (const set of sets) jobs.push({ set, run });
   const results = [];

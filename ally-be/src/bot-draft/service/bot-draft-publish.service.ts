@@ -320,7 +320,12 @@ export class BotDraftPublishService {
       safetyPack: pack?.id ?? null,
       safetyPackVersion: pack?.version ?? draft.safetyPackVersion ?? null,
       // Topics to avoid are set on the assistant itself (Make it yours, the home), so kept.
-      rules: { ...(chatbot.rules ?? {}), never: config.extraNever },
+      rules: {
+        ...(chatbot.rules ?? {}),
+        never: config.extraNever,
+        // Q4 A3: the owner's correction of the pack in setup, as the home records it.
+        ...(config.packChange ? { packChange: config.packChange } : {}),
+      },
       purpose: purposeOf(config),
       purposeNote:
         purposeOf(config) === PurposeId.CUSTOM

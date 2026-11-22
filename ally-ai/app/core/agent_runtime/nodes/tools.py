@@ -124,6 +124,11 @@ def make_tools_node(service: KnowledgeAgentService) -> Node:
                         )
                     )
                 }
+            elif tool.name == "hand_over" and result.record.get("ok"):
+                # Q4 G1 (Round 7 R1): the hand-over never replaces the answer. The run
+                # goes on, so the reply answers what it can; the result says
+                # `handover`, and ally-be adds its hand-over line after the reply.
+                update = {"handed_over": True}
             elif tool.ends_run and result.record.get("ok"):
                 update = {
                     "result": json_safe(_handover_result(service, state, step, tool))

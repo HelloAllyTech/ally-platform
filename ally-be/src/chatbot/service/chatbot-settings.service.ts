@@ -25,6 +25,7 @@ import {
  * The defaults every chatbot inherits (the `whatsapp_bot` settings row) and each bot's changes on
  * top of them.
  */
+import { ownerHelplineFields } from '../engine/crisis-helplines';
 @Injectable()
 export class ChatbotSettingsService {
   private readonly logger = LoggerService.getInstance(
@@ -86,8 +87,10 @@ export class ChatbotSettingsService {
    * leaving a field out; empty text is dropped for the same reason.
    */
   async updateChatbotSettings(
-    chatbot: Pick<Chatbot, 'id'> & Partial<Pick<Chatbot, 'safetyPack'>>,
+    chatbot: Pick<Chatbot, 'id'> &
+      Partial<Pick<Chatbot, 'safetyPack' | 'settings'>>,
     overrides: ChatbotSettingsOverride,
+    options: { byOwner?: boolean } = {},
   ): Promise<ChatbotSettingsView> {
     // A safety pack's settings can't be turned off (chunk 20a): refused, not silently floored, so
     // the editor knows why the switch didn't move.
@@ -119,7 +122,17 @@ export class ChatbotSettingsService {
       );
     }
     const userId = Number(ExecutionManager.getUserId() ?? 0);
-    const settings = cleanOverride(overrides);
+    // Q4 G7: whose the helpline is. Only the owner's own save can make it theirs (a changed number,
+    // or "Use this number in crisis replies"); a client never sets the source itself.
+    const { helplineConfirm, ...rest } = overrides ?? {};
+    const helpline = options.byOwner
+      ? ownerHelplineFields(
+          chatbot.settings,
+          { helplineNumbers: rest.helplineNumbers, helplineConfirm },
+          new Date(),
+        )
+      : {};
+    const settings = cleanOverride({ ...rest, ...helpline });
     await this.chatbotRepository.update(
       { id: chatbot.id },
       { settings, updatedBy: userId },

@@ -296,6 +296,14 @@ export class PublishBotDraftDto {
   @IsOptional()
   @IsBoolean()
   publishAnyway?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Ask the safety questions that failed once more (Q4 A0), after a recheck that still failed or could not finish. Without it, publishing again reports the last recheck.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  recheckSafety?: boolean;
 }
 
 /** "Choose pages" (chunk 20a-2): path patterns; no includes means every page. */
@@ -313,4 +321,21 @@ export class PageChoiceDto {
   @IsString({ each: true })
   @MaxLength(200, { each: true })
   exclude!: string[];
+}
+
+/** "This isn't right for my business" in setup (Q4 A3). */
+export class CorrectBotDraftPackDto {
+  @ApiProperty({ description: 'The pack to use: a safety pack id' })
+  @IsString()
+  @MaxLength(32)
+  pack!: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Why, required for a less strict pack (at least 10 characters)',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  reason?: string;
 }

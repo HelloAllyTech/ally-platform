@@ -192,7 +192,9 @@ export class ChatbotController {
       // Typing and abilities (hand_over) belong to the bot's owners (A1).
       await this.access.assert(id, ChatbotMemberRole.OWNER);
     }
-    return this.settings.updateChatbotSettings(chatbot, dto.settings);
+    return this.settings.updateChatbotSettings(chatbot, dto.settings, {
+      byOwner: true,
+    });
   }
 
   // ── knowledge ─────────────────────────────────────────────────────────

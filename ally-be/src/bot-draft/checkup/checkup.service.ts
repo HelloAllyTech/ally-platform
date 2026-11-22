@@ -787,6 +787,80 @@ export class CheckupService {
     return (await this.viewOf(run.id)).results;
   }
 
+  /**
+   * Publishing's safety recheck (Q4 A0): the safety questions that failed, asked once more in the
+   * background, graded exactly as a full run is (with the owner's decline wording and the
+   * assistant's own setup). The caller returns at once and the page polls the run.
+   */
+  async startRecheck(
+    chatbotId: string,
+    caseIds: string[],
+    draftId: string,
+  ): Promise<ChatbotCheckupRun> {
+    const { chatbot } = await this.access.assert(
+      chatbotId,
+      ChatbotMemberRole.EDITOR,
+    );
+    await this.limits?.assertOwnerRun(
+      chatbot.createdBy,
+      `checkup:${chatbotId}:${randomUUID()}`,
+      'checkup',
+    );
+    const cases = await this.cases.find({
+      where: { chatbotId, id: In(caseIds), deletedAt: IsNull() },
+    });
+    const run = await this.runs.save(
+      this.runs.create({
+        chatbotId,
+        draftId,
+        trigger: 'recheck',
+        status: 'running',
+        total: cases.length,
+        done: 0,
+        asked: 0,
+        phase: 'asking',
+        only: 'all',
+        startedBy: Number(ExecutionManager.getUserId() ?? 0) || null,
+      }),
+    );
+    const declineText = this.settings
+      ? ((await this.settings.getForChatbot(chatbot)).declineText ?? '')
+      : '';
+    const about = [chatbot?.persona?.greeting, chatbot?.persona?.systemPrompt]
+      .filter(Boolean)
+      .join('\n');
+    void this.execute(run, cases, 1, { declineText, about }).catch(
+      async (error: unknown) => {
+        this.logger.error(
+          `Safety recheck ${run.id} failed: ${error instanceof Error ? error.name : 'error'}`,
+        );
+        await this.runs.update(
+          { id: run.id },
+          { status: 'failed', finishedAt: new Date() },
+        );
+      },
+    );
+    return run;
+  }
+
+  /** The draft's latest safety recheck started after `since` (the checkup it rechecks). */
+  async latestRecheck(
+    chatbotId: string,
+    draftId: string,
+    since: Date,
+  ): Promise<CheckupRunView | null> {
+    const run = await this.runs.findOne({
+      where: {
+        chatbotId,
+        draftId,
+        trigger: 'recheck',
+        startedAt: MoreThan(since),
+      },
+      order: { startedAt: 'DESC' },
+    });
+    return run ? this.viewOf(run.id) : null;
+  }
+
   /** The latest finished-or-running run of the assistant's own questions, for a draft or any. */
   async latestFor(
     chatbotId: string,

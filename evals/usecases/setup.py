@@ -129,7 +129,10 @@ def seed_updates(api: Api, chatbot_id: str, updates: List[Dict[str, Any]], today
 def local_publish(draft_id: str, access: str, emails: List[str]) -> Dict[str, Any]:
     """The test-only route around a held publish (development stacks only)."""
     command = [
-        "docker", "exec", "ally-be-app-1", "npm", "run", "-s", "usecases:local-publish", "--",
+        # The container runs a prebuilt dist/, so the script runs from source.
+        "docker", "exec", "ally-be-app-1", "npx", "ts-node", "--transpile-only",
+        "-r", "tsconfig-paths/register",
+        "src/chatbot/basics/usecase-local-publish.ts",
         "--draft", draft_id, "--access", access,
     ]
     if emails:
@@ -161,8 +164,17 @@ def set_up(api: Api, a: Dict[str, Any], args: argparse.Namespace, today: dt.date
     r["facts"] = len(view["learned"]["facts"])
 
     for doc in a.get("documents", []):
+        before = len(api.get(f"/bot-drafts/{draft_id}")["transcript"])
         add_document(api, draft_id, r["chatbot_id"], HERE / doc)
-        wait_for_reading(api, draft_id)
+        # The document is read in the background; "Looks right" sent before its own
+        # builder message arrives doesn't move setup on (found at the Q4 baseline).
+        deadline = time.monotonic() + 300
+        while time.monotonic() < deadline:
+            view = api.get(f"/bot-drafts/{draft_id}")
+            if any(e["role"] == "builder" for e in view["transcript"][before:]):
+                break
+            time.sleep(2)
+        r["facts_with_documents"] = len(view["learned"]["facts"])
 
     final, seconds = api.say(draft_id, {"chip": "Looks right"})
     r["timings"]["classify_and_gaps"] = round(seconds, 1)
@@ -216,8 +228,11 @@ def set_up(api: Api, a: Dict[str, Any], args: argparse.Namespace, today: dt.date
         r["fails"] += held["fails"]
         r["publish"] = "held: " + "; ".join(held["fails"])
         if args.local_publish_held:
-            published = local_publish(draft_id, body_access, emails if body_access == "invite" else [])
-            r["publish"] += " → published locally for measuring (test-only)"
+            try:
+                published = local_publish(draft_id, body_access, emails if body_access == "invite" else [])
+                r["publish"] += " → published locally for measuring (test-only)"
+            except Exception as error:  # noqa: BLE001 — keep what setup found
+                r["fails"].append(f"local publish failed: {str(error)[-200:]}")
     else:
         r["publish"] = "published"
     if published:

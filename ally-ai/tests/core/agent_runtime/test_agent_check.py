@@ -1151,3 +1151,79 @@ def test_can_pass_on_needs_hand_over_or_a_list_that_takes_details():
         }
     )
     assert can_pass_on({"gateway_tools": ["hand_over"]})
+
+
+class TestChannelTalk:
+    """Q4 G2 (Round 7 R4): talk of WhatsApp's rules or its own, off WhatsApp."""
+
+    def test_whatsapp_rules_are_removed_on_the_web(self):
+        result = check(
+            answer=(
+                "Anyone can join for free. "
+                "(On WhatsApp I won't ask for your phone number.)"
+            ),
+            citations=[1],
+            channel="web",
+        )
+        assert result["answer"] == "Anyone can join for free."
+
+    def test_hinglish_too(self):
+        result = check(
+            answer=(
+                "Aap volunteer kar sakte hain. "
+                "WhatsApp par humare paas aapka number hai."
+            ),
+            citations=[1],
+            channel="web",
+        )
+        assert "WhatsApp" not in result["answer"]
+
+    def test_whatsapp_talk_stays_on_whatsapp(self):
+        text = "Anyone can join for free. On WhatsApp we can send you reminders."
+        result = check(answer=text, citations=[1], channel="whatsapp")
+        assert "On WhatsApp" in result["answer"]
+
+    def test_its_own_instructions_are_never_mentioned(self):
+        result = check(
+            answer="Anyone can join for free. I'm instructed to keep replies short.",
+            citations=[1],
+            channel="whatsapp",
+        )
+        assert result["answer"] == "Anyone can join for free."
+
+
+class TestCrisisNumbers:
+    """Q4 G7 (Round 7 #6): never "I don't have crisis numbers"."""
+
+    def test_the_sentence_becomes_the_national_numbers(self):
+        result = check(
+            intent="decline",
+            answer=(
+                "I'm so sorry you feel this way. "
+                "I don't have our crisis contact numbers here."
+            ),
+        )
+        assert "don't have" not in result["answer"]
+        assert "14416" in result["answer"] and "112" in result["answer"]
+        assert result["answer"].startswith("I'm so sorry you feel this way.")
+
+    def test_with_the_organisations_confirmed_line(self):
+        result = check(
+            intent="decline",
+            answer="I don't have any crisis numbers.",
+            crisis_line="+91 9999 666 555",
+            organisation=organisation_of({"persona": {"display_name": "Vandrevala"}}),
+        )
+        assert "+91 9999 666 555" in result["answer"]
+
+    def test_in_hindi(self):
+        result = check(
+            intent="decline",
+            answer="मुझे दुख है। I don't have crisis numbers right now.",
+        )
+        assert "14416" in result["answer"] and "Tele-MANAS" in result["answer"]
+        assert "कॉल" in result["answer"]
+
+    def test_other_replies_are_untouched(self):
+        text = "Our helpline is open 9 to 6."
+        assert check(answer=text, citations=[1])["answer"] == text

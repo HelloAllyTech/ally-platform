@@ -1,8 +1,9 @@
 """`hand_over` (chunk 3b): pass the chat to a person on the team.
 
 ally-be marks the conversation Needs a person (reason `assistant`), keeps the
-summary for the team and tells the inbox; the run then ends, and ally-be replies
-with its hand-over message. Off for every bot unless a platform admin turns it on.
+summary for the team and tells the inbox. The run then goes on (Q4 G1: a
+hand-over never replaces an answer): the reply answers what it can, and ally-be
+adds its hand-over line, in the person's language, after it.
 """
 
 from __future__ import annotations
@@ -51,5 +52,4 @@ TOOL = gateway_tool(
     DESCRIPTION,
     HandOverInput,
     risk="medium",
-    ends_run=True,
 )
