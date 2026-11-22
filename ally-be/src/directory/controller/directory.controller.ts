@@ -10,6 +10,7 @@ import {
   Post,
   Put,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -19,6 +20,7 @@ import {
 } from '@nestjs/swagger';
 import { CallerScopedRoute } from '../../auth/decorators/caller-scoped-route.decorator';
 import { CurrentUser } from '../../auth/decorators/user.decorator';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import type { TokenUser } from '../../auth/type/auth.types';
 import {
   CreateDirectoryCollectionDto,
@@ -38,6 +40,7 @@ import { DirectoryService, EntryScope } from '../service/directory.service';
 @ApiBearerAuth()
 @ApiSecurity('access-token')
 @Controller('v1/directory')
+@UseGuards(JwtAuthGuard)
 @CallerScopedRoute()
 export class DirectoryController {
   constructor(private readonly service: DirectoryService) {}
