@@ -65,6 +65,27 @@ describe("TemplateSetup", () => {
     expect(within(clinic).getByText("Asks you 3 questions")).toBeTruthy();
   });
 
+  it("draws a motif for a business template it knows, and falls back to the emoji otherwise", () => {
+    const catalogue: TemplateCatalogue = {
+      ...CATALOGUE,
+      groups: [
+        CATALOGUE.groups[0],
+        {
+          id: "businesses",
+          name: "For businesses",
+          templates: [card("clinic", "businesses"), card("brand_new", "businesses")],
+        },
+      ],
+    };
+    render(<TemplateSetup catalogue={catalogue} onSubmit={vi.fn()} />);
+    const clinic = screen.getByTestId("template-card-clinic");
+    expect(clinic.querySelector("svg.ally-templates__motif")).toBeTruthy();
+    expect(within(clinic).queryByText("🩺")).toBeNull();
+    const unknown = screen.getByTestId("template-card-brand_new");
+    expect(unknown.querySelector("svg")).toBeNull();
+    expect(within(unknown).getByText("🩺")).toBeTruthy();
+  });
+
   it("asks the setup questions, each skippable, and sends only what was answered", () => {
     const onSubmit = vi.fn();
     render(<TemplateSetup catalogue={CATALOGUE} askName onSubmit={onSubmit} />);
