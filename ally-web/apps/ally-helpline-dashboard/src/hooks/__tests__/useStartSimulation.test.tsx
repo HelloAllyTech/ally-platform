@@ -258,28 +258,82 @@ describe("useStartSimulation", () => {
     expect(toast.error).toHaveBeenCalledWith("You are not authorized to start this simulation");
   });
 
-  it("should handle 400 error and end previous simulation", async () => {
-    const mockError = {
+  describe("when an earlier roleplay is still active", () => {
+    const activeSessionError = {
       data: { statusCode: 400, entityId: "old-session-123" },
     };
+    const startedData = {
+      scenarioSession: { id: "new-session-456", startedAt: "2026-11-22T06:06:45.000Z" },
+      scenario: { id: 1, title: "Test Scenario" },
+      accessToken: { token: "test-token", serverUrl: "wss://test.livekit.io" },
+    };
+    const params = { scenarioId: 1, scenarioPathSessionItemId: "path-123", languageId: 1 };
 
-    mockStartSimulationMutation.mockResolvedValue({ data: null, error: mockError });
-    mockEndSimulation.mockResolvedValue({});
+    it("ends the earlier session, retries once and opens the new roleplay", async () => {
+      mockStartSimulationMutation
+        .mockResolvedValueOnce({ data: null, error: activeSessionError })
+        .mockResolvedValueOnce({ data: startedData });
+      mockEndSimulation.mockResolvedValue({ data: {} });
 
-    const { result } = renderHook(() => useStartSimulation(), { wrapper });
-
-    await act(async () => {
-      await result.current.startSimulation({
-        params: {
-          scenarioId: 1,
-          scenarioPathSessionItemId: "path-123",
-          languageId: 1,
-        },
+      const { result } = renderHook(() => useStartSimulation({ onSuccess: mockOnSuccess }), {
+        wrapper,
       });
+      await act(async () => {
+        await result.current.startSimulation({ params });
+      });
+
+      expect(mockEndSimulation).toHaveBeenCalledWith({ sessionId: "old-session-123" });
+      expect(mockStartSimulationMutation).toHaveBeenCalledTimes(2);
+      expect(mockStartSimulationMutation.mock.calls[1][0]).toEqual(
+        mockStartSimulationMutation.mock.calls[0][0],
+      );
+      expect(mockOnSuccess).toHaveBeenCalled();
+      expect(mockNavigate).toHaveBeenCalledWith("/simulation/new-session-456/Test Scenario", {
+        replace: false,
+      });
+      expect(toast.error).not.toHaveBeenCalled();
+      expect(result.current.isStarting).toBe(false);
     });
 
-    expect(mockEndSimulation).toHaveBeenCalledWith({ sessionId: "old-session-123" });
-    expect(toast.success).toHaveBeenCalledWith("Previous simulation ended. Starting new one...");
+    it("does not retry when ending the earlier session fails", async () => {
+      mockStartSimulationMutation.mockResolvedValue({ data: null, error: activeSessionError });
+      mockEndSimulation.mockResolvedValue({ error: { status: 500 } });
+
+      const { result } = renderHook(() => useStartSimulation({ onError: mockOnError }), {
+        wrapper,
+      });
+      await act(async () => {
+        await result.current.startSimulation({ params });
+      });
+
+      expect(mockStartSimulationMutation).toHaveBeenCalledTimes(1);
+      expect(toast.error).toHaveBeenCalledWith(
+        "We couldn't end your previous roleplay. Please try again.",
+      );
+      expect(mockOnError).toHaveBeenCalled();
+      expect(mockNavigate).not.toHaveBeenCalled();
+      expect(result.current.isStarting).toBe(false);
+    });
+
+    it("retries only once if the start is still blocked", async () => {
+      mockStartSimulationMutation.mockResolvedValue({ data: null, error: activeSessionError });
+      mockEndSimulation.mockResolvedValue({ data: {} });
+
+      const { result } = renderHook(() => useStartSimulation({ onError: mockOnError }), {
+        wrapper,
+      });
+      await act(async () => {
+        await result.current.startSimulation({ params });
+      });
+
+      expect(mockEndSimulation).toHaveBeenCalledTimes(1);
+      expect(mockStartSimulationMutation).toHaveBeenCalledTimes(2);
+      expect(toast.error).toHaveBeenCalledWith(
+        "You already have a roleplay in progress. End it before starting a new one.",
+      );
+      expect(mockOnError).toHaveBeenCalled();
+      expect(mockNavigate).not.toHaveBeenCalled();
+    });
   });
 
   it("should handle generic error", async () => {
