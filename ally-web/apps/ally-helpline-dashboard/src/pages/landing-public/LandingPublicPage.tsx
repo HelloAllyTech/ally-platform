@@ -1,6 +1,12 @@
 import { FC, ReactNode, useState } from "react";
 
-import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
+import {
+  Navigate,
+  UNSAFE_RouteContext,
+  useLocation,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
 
 import {
   LANDING_CARD_KEYS,
@@ -48,6 +54,20 @@ export const chooseInitialLanguage = (
   return config.languages.default;
 };
 
+/**
+ * The route context of the app's root. Rendered under this route, the fallback's own
+ * <Routes> would match only what is left after `/:tenantCode/:slug` (for
+ * /simulation/<id>/<title>, just "/<title>"), so every app address of three or more
+ * parts fell through to the catch-all and landed on Learn. Under this context they
+ * match the whole address again, exactly as they do under the root `/*` route.
+ */
+const ROOT_ROUTE_CONTEXT = { outlet: null, matches: [], isDataRoute: false };
+
+/** Hands the address back to the app, matched from the root. */
+const AppFallback: FC<{ children: ReactNode }> = ({ children }) => (
+  <UNSAFE_RouteContext.Provider value={ROOT_ROUTE_CONTEXT}>{children}</UNSAFE_RouteContext.Provider>
+);
+
 /** How long an address that turned out not to be a landing page is not asked about again. */
 const MISSING_TTL_MS = 60_000;
 const missing = new Map<string, number>();
@@ -80,7 +100,7 @@ export const LandingPublicPage: FC<LandingPublicPageProps> = ({ fallback }) => {
     { skip: reserved || knownMissing },
   );
 
-  if (reserved || knownMissing) return <>{fallback}</>;
+  if (reserved || knownMissing) return <AppFallback>{fallback}</AppFallback>;
 
   if (isLoading) {
     return <div className="min-h-screen" role="status" aria-label="Loading" aria-busy="true" />;
@@ -94,7 +114,7 @@ export const LandingPublicPage: FC<LandingPublicPageProps> = ({ fallback }) => {
       // an effect would never run, and every restart would ask the server the same question.
       // The write is idempotent, so a repeated render does no harm.
       missing.set(key, Date.now());
-      return <>{fallback}</>;
+      return <AppFallback>{fallback}</AppFallback>;
     }
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-3 p-6 text-center">
