@@ -349,3 +349,38 @@ class TestCrisisCheckEndpoint(_ResolvedKeyAPITest):
             )
 
         assert response.status_code == 200
+
+    # Q4: the use-case suite's --classifier-fail, development only.
+    @pytest.mark.parametrize("env", ["DEV", "DEVELOPMENT"])
+    def test_debug_crisis_fail_answers_failed_in_development(
+        self, client: TestClient, monkeypatch, env
+    ):
+        from app.core.config import settings
+
+        monkeypatch.setattr(settings.AGENT_RUNTIME, "DEBUG_CRISIS_FAIL", True)
+        monkeypatch.setattr(settings.ENV, "ENV", env)
+        with patch(f"{SERVICE}.classify_crisis") as classify:
+            response = client.post(
+                "/api/v1/knowledge-agent/crisis-check", json={"message": "hi"}
+            )
+
+        assert response.status_code == 200
+        assert response.json()["failed"] is True
+        classify.assert_not_called()
+
+    @pytest.mark.parametrize("env", ["PROD", "PRODUCTION", "STG", "anything"])
+    def test_debug_crisis_fail_is_ignored_outside_development(
+        self, client: TestClient, monkeypatch, env
+    ):
+        from app.core.config import settings
+
+        monkeypatch.setattr(settings.AGENT_RUNTIME, "DEBUG_CRISIS_FAIL", True)
+        monkeypatch.setattr(settings.ENV, "ENV", env)
+        with patch(f"{SERVICE}.classify_crisis") as classify:
+            classify.return_value = self.VERDICT
+            response = client.post(
+                "/api/v1/knowledge-agent/crisis-check", json={"message": "hi"}
+            )
+
+        assert response.json()["failed"] is False
+        classify.assert_called_once()

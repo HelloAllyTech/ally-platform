@@ -8,6 +8,7 @@ from typing import Iterator
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from app.core.agent_runtime.stages import debug_crisis_fail
 from app.core.dependencies import get_knowledge_agent_service
 from app.core.knowledge_agent.agent import KnowledgeAgentService
 from app.exceptions.custom_exceptions import (
@@ -143,6 +144,10 @@ async def crisis_check(
     wrong" to a message that may be a crisis, which is the worst available outcome. On
     failure the keyword rules are what still hold.
     """
+    if debug_crisis_fail():
+        # Test only, development only: the use-case suite's --classifier-fail.
+        logger.warning("Crisis check failed on purpose (DEBUG_CRISIS_FAIL)")
+        return CrisisCheckResponse(failed=True)
     try:
         verdict = await service.classify_crisis(
             payload.message, history=payload.history, prompts=payload.prompts

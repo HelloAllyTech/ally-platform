@@ -80,6 +80,14 @@ def debug_tool_delay_seconds() -> float:
     return seconds
 
 
+def debug_crisis_fail() -> bool:
+    """The test-only failing crisis check: off unless set, and always off outside a
+    development environment, whatever is set."""
+    if not settings.AGENT_RUNTIME.DEBUG_CRISIS_FAIL:
+        return False
+    return str(settings.ENV.ENV).upper() in (ENV.DEV.value, ENV.DEVELOPMENT.value)
+
+
 async def debug_tool_delay(when: str, tool: str) -> None:
     """Sleep inside a gateway call, `before` or `after` ally-be does the work, when
     the test-only delay is on for that side."""

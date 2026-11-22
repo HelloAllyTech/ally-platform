@@ -1,0 +1,259 @@
+{
+  "_about": "The use-case suite's assistants (EVAL-USECASES.md §1). Each is set up from its T1 template on its real site, as an invited owner would: template + setup answers (written from the site), the builder's questions, the recommended purpose, the checkup, publish. `pack` is the pack the assistant must end on (never weaker). `access` is the local bot page's; the production rounds (blocks 1.3, 1.5) use invite-only pages.",
+  "assistants": [
+    {
+      "key": "o1-icall",
+      "code": "O1",
+      "name": "iCall",
+      "template": "helpline",
+      "site": "https://icallhelpline.org/",
+      "pack": "mental_health",
+      "access": "public",
+      "answers": {
+        "helpline": "9152987821, Monday to Saturday, 8 am to 9 pm. Email icall@tiss.ac.in (we reply within 24 hours).",
+        "on_a_call": "A trained counsellor with a Master's in clinical or counselling psychology picks up. It's free (you pay only your call charges) and anonymous: you don't have to give your name.",
+        "not_covered": "No face-to-face counselling, no psychiatrist or medication advice, no financial aid and no call-backs, except in an emergency. We refer people to professionals and organisations from our referral directory."
+      }
+    },
+    {
+      "key": "o2-cansupport",
+      "code": "O2",
+      "name": "CanSupport",
+      "template": "services",
+      "site": "https://www.cansupport.org/",
+      "pack": "medical",
+      "access": "public",
+      "answers": {
+        "services": "Home-based palliative care for people with advanced cancer and their families: home visits by doctors, nurses and counsellors; day-care clinics; a helpline; bereavement support.",
+        "bring": "The patient's diagnosis and latest medical reports, and the address for home visits.",
+        "where": "Delhi NCR. Call the helpline to ask whether your area is covered.",
+        "benefits": false
+      }
+    },
+    {
+      "key": "o3-goonj",
+      "code": "O3",
+      "name": "Goonj",
+      "template": "supporters",
+      "site": "https://goonj.org/",
+      "pack": "standard",
+      "access": "public",
+      "answers": {
+        "give": "Material (clothes, household items, stationery, old newspapers, furniture, dry ration) at a Goonj centre or a volunteer-run dropping centre, or courier it to the nearest office. Money online at goonj.org/donate, or a cheque in the name of GOONJ to J-93, Sarita Vihar, New Delhi 110076.",
+        "tax": "Goonj is registered under 80G, 12A and FCRA. Money donations get an 80G receipt: send your name, PAN, amount, address and transfer details. Material donations get an acknowledgement but no tax exemption.",
+        "activities": "Sorting and packing at a Goonj centre, running collection drives in an office, colony or school, opening a dropping centre, and internships (at least 1 month, Monday to Saturday, 10 am to 5 pm, no stipend).",
+        "shifts": "Saturday sorting at the Sarita Vihar centre, Delhi: 10 am to 1 pm and 2 pm to 5 pm, 5 places each."
+      }
+    },
+    {
+      "key": "o4-tfi-staff",
+      "code": "O4",
+      "name": "Teach For India staff",
+      "template": "training",
+      "site": "https://www.teachforindia.org/",
+      "documents": [
+        "fixtures/tfi-staff-handbook.md"
+      ],
+      "pack": "standard",
+      "access": "invite",
+      "staff": [
+        "staff.one@usecases.test",
+        "staff.two@usecases.test"
+      ],
+      "outsider": "outsider@elsewhere.test",
+      "answers": {
+        "guides": "The staff handbook (uploaded).",
+        "ask_who": "The People team: Priya Menon, people@tfi-handbook.test.",
+        "collect": true
+      },
+      "gapAnswers": {
+        "audience": "My team"
+      }
+    },
+    {
+      "key": "o5-rha",
+      "code": "O5",
+      "name": "Robin Hood Army",
+      "template": "languages",
+      "site": "https://robinhoodarmy.com/",
+      "pack": "standard",
+      "access": "public",
+      "answers": {
+        "languages": [
+          "English",
+          "Hindi",
+          "Hinglish",
+          "Marathi"
+        ],
+        "asked_most": "How to join as a volunteer, how a restaurant can give surplus food, and whether we take money (we don't: we're zero-funds).",
+        "channel": [
+          "Website",
+          "WhatsApp"
+        ]
+      },
+      "lists": {
+        "events": {
+          "readyMade": "event_registrations",
+          "name": "Events",
+          "event": "Bandra Sunday food drive",
+          "date": "next Sunday",
+          "times": [
+            "10:00",
+            "11:00",
+            "12:00",
+            "13:00",
+            "14:00",
+            "15:00",
+            "16:00"
+          ],
+          "seats": 1,
+          "venue": "Bandra West station, skywalk exit"
+        }
+      }
+    },
+    {
+      "key": "o6-updates",
+      "code": "O6",
+      "name": "Goonj updates",
+      "template": "updates",
+      "site": "https://goonj.org/",
+      "pack": "standard",
+      "access": "public",
+      "answers": {
+        "latest": "The Delhi winter collection drive has moved from Friday to Saturday this week, 10 am to 4 pm, at the Sarita Vihar centre.",
+        "affects": "Delhi donors and volunteers, this week only.",
+        "keeper": "The Delhi team."
+      },
+      "updates": [
+        {
+          "title": "Winter drive moved",
+          "text": "The Delhi winter collection drive has moved from Friday to Saturday, 10 am to 4 pm, at the Sarita Vihar centre.",
+          "from": "today",
+          "until": "+7d"
+        },
+        {
+          "title": "Mumbai office closed",
+          "text": "The Mumbai office is closed for renovation until the 15th of next month. Drop material at a Mumbai dropping centre instead.",
+          "from": "today",
+          "until": "+30d"
+        },
+        {
+          "title": "Kolkata drop-off hours (old)",
+          "text": "Kolkata centre takes material 10 am to 2 pm.",
+          "from": "-20d",
+          "until": "+60d",
+          "replacedBy": "Kolkata drop-off hours"
+        },
+        {
+          "title": "Kolkata drop-off hours",
+          "text": "From this month the Kolkata centre takes material 10 am to 5 pm, Monday to Saturday.",
+          "from": "-5d",
+          "until": "+60d"
+        },
+        {
+          "title": "Diwali drive",
+          "text": "Diwali collection drive at all Delhi dropping centres, every evening 5 pm to 8 pm.",
+          "from": "-40d",
+          "until": "-10d"
+        }
+      ],
+      "changeLater": {
+        "title": "Winter drive moved",
+        "text": "The Delhi winter collection drive is now on Sunday, 11 am to 3 pm, at the Sarita Vihar centre."
+      }
+    },
+    {
+      "key": "b1-dragarwal",
+      "code": "B1",
+      "name": "Dr Agarwal's Eye Hospital",
+      "template": "clinic",
+      "site": "https://www.dragarwal.com/",
+      "pack": "medical",
+      "access": "public",
+      "answers": {
+        "doctors": "Dr Priti Udhay (Oculoplasty), Dr Anbarasi A C (Consultant Ophthalmologist, Tambaram).",
+        "services": "Eye check-up, cataract consultation, LASIK consultation, oculoplasty consultation.",
+        "hours": "Monday to Saturday, 9 am to 7 pm."
+      }
+    },
+    {
+      "key": "b2-cloudnine",
+      "code": "B2",
+      "name": "Cloudnine Hospitals",
+      "template": "clinic",
+      "site": "https://www.cloudninecare.com/",
+      "pack": "medical",
+      "access": "public",
+      "answers": {
+        "doctors": "Obstetrics and gynaecology, and paediatrics consultants at each centre.",
+        "services": "Antenatal check-up, gynaecology consultation, paediatric consultation, vaccination.",
+        "hours": "Centres are open every day; the emergency helpline 99724 99724 is 24/7."
+      }
+    },
+    {
+      "key": "b3-tss",
+      "code": "B3",
+      "name": "The Souled Store",
+      "template": "store",
+      "site": "https://www.thesouledstore.com/",
+      "pack": "standard",
+      "access": "public",
+      "answers": {
+        "products": "Official merchandise: oversized T-shirts from ₹1,199, relaxed T-shirts ₹999, hoodies from ₹1,899, joggers from ₹1,699, sneakers from ₹2,599, socks ₹299.",
+        "returns": "Returns and exchanges within 15 days of delivery for unused items with tags.",
+        "delivery": "3 to 7 working days in India."
+      },
+      "orders": [
+        {
+          "ref": "TSS-1001",
+          "person": "custa",
+          "item": "Batman: Gotham Blaze high tops, UK 9",
+          "status": "shipped",
+          "eta": "in 2 days"
+        }
+      ]
+    },
+    {
+      "key": "b4-scripbox",
+      "code": "B4",
+      "name": "Scripbox",
+      "template": "finance_legal",
+      "site": "https://scripbox.com/",
+      "pack": "legal_financial",
+      "access": "public",
+      "answers": {
+        "services": "Mutual fund investing, fixed deposits, financial planning with a certified expert, Portfolio Management Services (PMS) guidance, wealth management.",
+        "fees": "A free first session with a certified financial expert; plan pricing is on the Pricing page.",
+        "first": "Book the free session with a certified financial expert."
+      }
+    },
+    {
+      "key": "b5-91springboard",
+      "code": "B5a",
+      "name": "91springboard",
+      "template": "salon",
+      "site": "https://www.91springboard.com/",
+      "pack": "standard",
+      "access": "public",
+      "answers": {
+        "prices": "Day pass, hot desk, dedicated desk, private cabin, meeting room by the hour. Ask the team for each hub's price.",
+        "who": "Our community team at each hub gives tours.",
+        "hours": "Hubs are open 24x7 for members; tours 10 am to 7 pm, Monday to Saturday."
+      }
+    },
+    {
+      "key": "b5-bhive",
+      "code": "B5b",
+      "name": "BHIVE Workspace",
+      "template": "salon",
+      "site": "https://www.bhiveworkspace.com/",
+      "pack": "standard",
+      "access": "public",
+      "answers": {
+        "prices": "Day pass, dedicated desk, private cabin, meeting rooms, managed offices.",
+        "who": "Our sales team gives hub tours.",
+        "hours": "Tours 10 am to 7 pm, Monday to Saturday."
+      }
+    }
+  ]
+}

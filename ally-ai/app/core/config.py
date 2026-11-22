@@ -179,6 +179,10 @@ class AgentRuntimeSettings(BaseModel):
     DEBUG_TOOL_DELAY_WHEN: Literal["before", "after"] = "before"
     # Only tools whose name starts with this ("create_", "update_"); empty = every tool.
     DEBUG_TOOL_DELAY_ONLY: str = ""
+    # Test only (chunk Q4, the use-case suite's --classifier-fail): the crisis check
+    # answers `failed` without calling the model, so ally-be's keyword rules decide, as
+    # when the classifier times out. Ignored outside a development environment.
+    DEBUG_CRISIS_FAIL: bool = False
 
 
 class BuilderSettings(BaseModel):
