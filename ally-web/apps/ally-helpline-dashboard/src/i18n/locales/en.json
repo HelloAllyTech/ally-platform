@@ -3747,5 +3747,111 @@
     "saved": "Branding saved",
     "failedToSave": "Could not save branding",
     "saving": "Saving..."
+  },
+  "statisticsLibrary": {
+    "tagline": "How your organisation is using Ally, and where to step in.",
+    "customise": "Customise",
+    "done": "Done",
+    "addCharts": "Add charts",
+    "customiseHint": "Drag a card by its grip to move it. Remove a card with the cross. Changes save automatically.",
+    "removeAria": "Remove {{title}} from dashboard",
+    "saveFailed": "Could not save your layout. Try again.",
+    "emptyDashboard": "Your dashboard is empty. Choose Customise, then Add charts, to pick from the library.",
+    "usage": {
+      "measure": "Measure",
+      "measures": {
+        "activeUsers": "Active learners",
+        "simulationsCompleted": "Simulations completed",
+        "newLearners": "New learners"
+      }
+    },
+    "card": {
+      "unavailable": "Not available yet.",
+      "couldNotLoad": "Could not load this chart",
+      "couldNotLoadDetail": "Your other charts are fine.",
+      "retry": "Try again",
+      "sparseNote": "Small sample: showing counts only.",
+      "loading": "Loading this chart"
+    },
+    "library": {
+      "title": "Chart library",
+      "description": "Add charts to your dashboard. Charts your organisation has no data for yet are greyed, with the reason.",
+      "search": "Search charts",
+      "searchPlaceholder": "For example: sessions, courses",
+      "filterByGroup": "Filter by group",
+      "close": "Close library",
+      "add": "Add",
+      "added": "Added",
+      "unavailable": "Unavailable",
+      "countsOnly": "Counts only: the sample is small",
+      "addAria": "Add {{title}} to dashboard",
+      "noResults": "No charts match.",
+      "contactTeam": "Need a chart that is not here? Contact the Ally team and we will add it to your library.",
+      "groups": {
+        "all": "All",
+        "activity": "Activity",
+        "learners": "Learners",
+        "courses": "Courses",
+        "outcomes": "Outcomes",
+        "learnerVoice": "Learner voice",
+        "reviews": "Reviews"
+      }
+    },
+    "title": "Statistics",
+    "minutesShort": "min",
+    "headline": {
+      "activeLearners": "Active learners",
+      "registeredLearners": "Registered learners",
+      "simulationsCompleted": "Simulations completed",
+      "practiceTime": "Practice time per learner",
+      "noLearners": "No learners yet",
+      "activeShare": "{{percent}}% of registered learners",
+      "joined": "{{count}} joined in this period",
+      "perActiveLearner": "{{count}} per active learner",
+      "practiceNote": "Average over active learners"
+    },
+    "status": {
+      "none": "No learners yet.",
+      "truncated": "Showing the first {{count}} learners.",
+      "seeLearners": "See the {{count}} learners who have stopped or not started"
+    },
+    "top": {
+      "none": "No practice in this period yet."
+    },
+    "attention": {
+      "none": "No learners have gone quiet.",
+      "showing": "Showing {{shown}} of {{total}}"
+    },
+    "mostUsed": {
+      "none": "No simulations completed in this period."
+    },
+    "takeaway": {
+      "status": "{{active}} of {{total}} learners practised in the last 14 days. {{needNudge}} could use a nudge.",
+      "top": "{{name}} leads with {{hours}} hours of practice.",
+      "attention": "{{count}} learners have gone quiet after practising.",
+      "usageNone": "No learners practised in this period.",
+      "mostUsed": "{{title}} is the most practised, with {{count}} sessions.",
+      "learnerTable": "{{count}} learners in this organisation.",
+      "courseTable": "{{count}} courses in this organisation.",
+      "usagePeak": "Active learners peaked at {{peak}} on {{bucket}}."
+    },
+    "table": {
+      "learner": "Learner",
+      "status": "Status",
+      "lastPractised": "Last practised",
+      "sessions": "Sessions",
+      "coursesCompleted": "Courses completed",
+      "course": "Course",
+      "assigned": "Assigned",
+      "started": "Started",
+      "completed": "Completed",
+      "medianDays": "Median days to finish",
+      "stalled": "Stalled",
+      "search": "Search",
+      "searchPlaceholder": "Name or email",
+      "showing": "Showing {{from}} to {{to}} of {{total}}",
+      "previous": "Previous",
+      "next": "Next"
+    }
   }
 }

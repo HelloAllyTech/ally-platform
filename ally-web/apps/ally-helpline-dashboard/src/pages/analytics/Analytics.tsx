@@ -3,7 +3,11 @@ import { FunctionComponent, Suspense, lazy, useEffect, useMemo, useState } from 
 import { useTranslation } from "react-i18next";
 
 import { logger } from "@ally-ui-mono/ui-shared";
-import { useLazyGetDashboardsQuery, useLazyGetDashboardUrlQuery } from "@api";
+import {
+  useGetStatisticsChartLibraryQuery,
+  useLazyGetDashboardsQuery,
+  useLazyGetDashboardUrlQuery,
+} from "@api";
 import { NoAnalytics } from "@assets";
 import { ToggleButtonGroup } from "@components";
 import { AnalyticsType, Permissions } from "@constants";
@@ -13,7 +17,9 @@ import { getAnalyticsTypeOptions, ANALYTICS_DASHBOARD_REFRESH_INTERVAL } from ".
 
 // Native (Carbon charts) Organization Metrics section — replaces the Metabase
 // org dashboard. Lazy so the charts bundle only loads when the toggle is used.
-const OrganizationMetrics = lazy(() => import("./OrganizationMetrics"));
+// OrganizationStatistics shows the chart-library dashboard for tenants it is
+// switched on for and the existing Organization Metrics view for everyone else.
+const OrganizationMetrics = lazy(() => import("./OrganizationStatistics"));
 
 export const Analytics: FunctionComponent = () => {
   const { t } = useTranslation();
@@ -49,6 +55,17 @@ export const Analytics: FunctionComponent = () => {
   );
 
   const showNativeOrgMetrics = analyticsType === AnalyticsType.Org && canViewNativeOrgMetrics;
+
+  // The page heading follows the nav ("Statistics") once the chart-library
+  // dashboard is on for this tenant. RTK Query shares this cache entry with
+  // OrganizationStatistics, so it costs no extra request.
+  const { data: statisticsLibrary } = useGetStatisticsChartLibraryQuery(undefined, {
+    skip: !canViewNativeOrgMetrics,
+  });
+  const pageTitle =
+    showNativeOrgMetrics && statisticsLibrary?.enabled
+      ? t("statisticsLibrary.title")
+      : t("analytics.title");
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -116,7 +133,7 @@ export const Analytics: FunctionComponent = () => {
           className="text-typography-900 font-secondary text-2xl font-[500] flex items-center gap-2 mb-2"
           data-testid="analytics-title"
         >
-          {t("analytics.title")}
+          {pageTitle}
         </div>
         {analyticsToggleOptions?.length > 1 && (
           <ToggleButtonGroup
