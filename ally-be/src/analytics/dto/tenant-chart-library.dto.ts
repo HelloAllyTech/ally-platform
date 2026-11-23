@@ -5,6 +5,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -73,6 +74,19 @@ export class TenantChartQueryDto {
   @IsString()
   @MaxLength(100)
   search?: string;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'IANA time zone for charts that group by time of day, for example Asia/Kolkata. Defaults to UTC.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  @Matches(/^[A-Za-z0-9_+\-]+(\/[A-Za-z0-9_+\-]+){0,2}$/, {
+    message: 'timezone must look like Asia/Kolkata',
+  })
+  timezone?: string;
 
   @ApiProperty({ required: false, minimum: 1, maximum: 200 })
   @IsOptional()

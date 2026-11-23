@@ -17,6 +17,10 @@ import {
 } from '../dto/tenant-chart-library.dto';
 import { TenantCapabilitiesRepository } from '../repository/tenant-capabilities.repository';
 import { TenantOutcomesRepository } from '../repository/tenant-outcomes.repository';
+import {
+  SESSION_LENGTH_BOUNDS_MINUTES,
+  TenantPracticeRepository,
+} from '../repository/tenant-practice.repository';
 import { resolveAnalyticsWindow } from '../util/analytics-window.util';
 import {
   ChartAvailability,
@@ -29,6 +33,8 @@ import { TenantAnalyticsService } from './tenant-analytics.service';
 /** Controls a chart handler may read. Absent = the chart's own default. */
 export interface TenantChartParams {
   range?: AnalyticsRange;
+  /** IANA time zone for charts that group by time of day. */
+  timezone?: string;
   search?: string;
   limit?: number;
   offset?: number;
@@ -47,6 +53,11 @@ const TREND_THRESHOLD_POINTS = 5;
 /** A scenario needs this many scored sessions before its average is shown. */
 const SCENARIO_MIN_SESSIONS = 3;
 const SCENARIO_LIMIT = 8;
+/** A quiz needs this many attempts before its pass rate is shown. */
+const QUIZ_MIN_ATTEMPTS = 3;
+const QUIZ_LIMIT = 8;
+/** Used when the caller's time zone is missing or not recognised. */
+const FALLBACK_TIMEZONE = 'UTC';
 /** The learner-usage page limit: the most learners a status count reads. */
 const STATUS_COUNT_LEARNER_CAP = 200;
 const TOP_LEARNERS_LIMIT = 6;
@@ -59,6 +70,60 @@ export interface LearnerStatusCountsData {
   /** True when the organisation has more learners than were counted. */
   truncated: boolean;
   counts: Record<LearnerUsageStatus, number>;
+}
+
+export interface PracticeHeatmapData {
+  /** Seven rows, Monday first; eight columns of three hours, midnight first. */
+  cells: number[][];
+  sessions: number;
+  /** The time zone the hours are in. */
+  timezone: string;
+}
+
+export interface SessionLengthData {
+  /** Counts per band; `boundsMinutes` are the upper limits of every band but the last. */
+  bins: number[];
+  boundsMinutes: number[];
+  sessions: number;
+  medianMinutes: number | null;
+}
+
+export interface ActivationData {
+  stages: Array<{
+    key: 'registered' | 'started' | 'practisedThreeTimes' | 'activeRecently';
+    count: number;
+  }>;
+}
+
+export interface RegularityData {
+  regular: number;
+  occasional: number;
+  bursty: number;
+  total: number;
+  weeks: number;
+}
+
+export interface QuizPassData {
+  rows: Array<{ title: string; attempts: number; passRatePercent: number }>;
+}
+
+export interface ItemFormatData {
+  rows: Array<{
+    type: string;
+    reached: number;
+    completed: number;
+    completedPercent: number;
+  }>;
+}
+
+export interface SkillChangeData {
+  /** Weakest latest level first. */
+  rows: Array<{
+    skill: string;
+    first: number;
+    latest: number;
+    learners: number;
+  }>;
 }
 
 export interface ScoreDistributionData {
@@ -148,6 +213,7 @@ export class TenantChartLibraryService {
     private readonly capabilitiesRepo: TenantCapabilitiesRepository,
     private readonly tenantAnalytics: TenantAnalyticsService,
     private readonly outcomesRepo: TenantOutcomesRepository,
+    private readonly practiceRepo: TenantPracticeRepository,
   ) {
     this.handlers = {
       // Headline numbers: the summary block of organization-metrics, plus the
@@ -199,6 +265,20 @@ export class TenantChartLibraryService {
       'TSQ-026': (tenantId, p, code) => this.ratings(tenantId, code, p),
       // How many completed sessions have been shared for review.
       'TSQ-027': (tenantId, p, code) => this.reviewCoverage(tenantId, code, p),
+      // When learners practise: sessions by weekday and time of day.
+      'TSQ-005': (tenantId, p, code) => this.practiceHeatmap(tenantId, code, p),
+      // How long completed sessions run, in bands, with the median.
+      'TSQ-006': (tenantId, p, code) => this.sessionLengths(tenantId, code, p),
+      // Registered, started, practised three times, active in the last 14 days.
+      'TSQ-011': (tenantId, _p, code) => this.activation(tenantId, code),
+      // Learners by how many of the period's weeks they practised in.
+      'TSQ-012': (tenantId, p, code) => this.regularity(tenantId, code, p),
+      // For each kind of course item, how many reached it and finished it.
+      'TSQ-018': (tenantId, _p, code) => this.itemFormats(tenantId, code),
+      // Quizzes with a few attempts, lowest pass rate first.
+      'TSQ-019': (tenantId, p, code) => this.quizPassRates(tenantId, code, p),
+      // Average skill level, each learner's first slice against their latest.
+      'TSQ-024': (tenantId, _p, code) => this.skillChange(tenantId, code),
       // Most-used simulations.
       'TSQ-003': async (tenantId, p) =>
         (
@@ -382,6 +462,127 @@ export class TenantChartLibraryService {
         daysSinceLastActivity: row.daysSinceLastActivity,
       })),
     };
+  }
+
+  private async practiceHeatmap(
+    tenantId: string,
+    code: string,
+    p: TenantChartParams,
+  ): Promise<PracticeHeatmapData> {
+    const { start, endExclusive } = this.windowFor(
+      p.range ?? DEFAULT_CHART_RANGE,
+    );
+    const run = (timezone: string) =>
+      this.practiceRepo.getPracticeHeatmap(
+        tenantId,
+        code,
+        start,
+        endExclusive,
+        timezone,
+      );
+    const requested = p.timezone ?? FALLBACK_TIMEZONE;
+    try {
+      return { ...(await run(requested)), timezone: requested };
+    } catch (error) {
+      // An unknown time zone makes Postgres refuse the query. Fall back to UTC
+      // rather than failing the chart, and say which zone the hours are in.
+      if (requested === FALLBACK_TIMEZONE) throw error;
+      this.logger.info(`Unknown time zone "${requested}", using UTC`);
+      return { ...(await run(FALLBACK_TIMEZONE)), timezone: FALLBACK_TIMEZONE };
+    }
+  }
+
+  private async sessionLengths(
+    tenantId: string,
+    code: string,
+    p: TenantChartParams,
+  ): Promise<SessionLengthData> {
+    const { start, endExclusive } = this.windowFor(
+      p.range ?? DEFAULT_CHART_RANGE,
+    );
+    const lengths = await this.practiceRepo.getSessionLengths(
+      tenantId,
+      code,
+      start,
+      endExclusive,
+    );
+    return { ...lengths, boundsMinutes: SESSION_LENGTH_BOUNDS_MINUTES };
+  }
+
+  private async activation(
+    tenantId: string,
+    code: string,
+  ): Promise<ActivationData> {
+    const counts = await this.practiceRepo.getActivationCounts(tenantId, code);
+    return {
+      stages: [
+        { key: 'registered', count: counts.registered },
+        { key: 'started', count: counts.started },
+        { key: 'practisedThreeTimes', count: counts.practisedThreeTimes },
+        { key: 'activeRecently', count: counts.activeRecently },
+      ],
+    };
+  }
+
+  private async regularity(
+    tenantId: string,
+    code: string,
+    p: TenantChartParams,
+  ): Promise<RegularityData> {
+    const { start, endExclusive } = this.windowFor(
+      p.range ?? DEFAULT_CHART_RANGE,
+    );
+    const counts = await this.practiceRepo.getRegularityCounts(
+      tenantId,
+      code,
+      start,
+      endExclusive,
+    );
+    return {
+      ...counts,
+      total: counts.regular + counts.occasional + counts.bursty,
+    };
+  }
+
+  private async itemFormats(
+    tenantId: string,
+    code: string,
+  ): Promise<ItemFormatData> {
+    const rows = await this.practiceRepo.getItemFormatDropoff(tenantId, code);
+    return {
+      rows: rows.map((r) => ({
+        ...r,
+        completedPercent:
+          r.reached > 0 ? Math.round((r.completed / r.reached) * 100) : 0,
+      })),
+    };
+  }
+
+  private async quizPassRates(
+    tenantId: string,
+    code: string,
+    p: TenantChartParams,
+  ): Promise<QuizPassData> {
+    const { start, endExclusive } = this.windowFor(
+      p.range ?? DEFAULT_CHART_RANGE,
+    );
+    return {
+      rows: await this.practiceRepo.getQuizPassRates(
+        tenantId,
+        code,
+        start,
+        endExclusive,
+        QUIZ_MIN_ATTEMPTS,
+        QUIZ_LIMIT,
+      ),
+    };
+  }
+
+  private async skillChange(
+    tenantId: string,
+    code: string,
+  ): Promise<SkillChangeData> {
+    return { rows: await this.practiceRepo.getSkillChange(tenantId, code) };
   }
 
   /** The `[start, endExclusive)` window for a range; `all` runs from the epoch. */

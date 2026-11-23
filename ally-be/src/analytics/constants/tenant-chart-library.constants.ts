@@ -153,12 +153,18 @@ export const CAPABILITY_LABELS: Record<
     singular: 'week with activity in the last 90 days',
     plural: 'weeks with activity in the last 90 days',
   },
-  courseEnrolments: { singular: 'course enrolment', plural: 'course enrolments' },
+  courseEnrolments: {
+    singular: 'course enrolment',
+    plural: 'course enrolments',
+  },
   courseCompletions: {
     singular: 'course completion',
     plural: 'course completions',
   },
-  scoredQuizItems: { singular: 'scored quiz item', plural: 'scored quiz items' },
+  scoredQuizItems: {
+    singular: 'scored quiz item',
+    plural: 'scored quiz items',
+  },
   reviews: { singular: 'session review', plural: 'session reviews' },
   cohorts: { singular: 'group', plural: 'groups' },
   skillScoredCuts: {
@@ -277,7 +283,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     sources: ['research'],
     scopes: ['organisation'],
     needs: [{ signal: 'sessions90', min: 50, sparseMin: 10 }],
-    live: false,
+    live: true,
   }),
   entry({
     id: 'TSQ-006',
@@ -289,7 +295,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     sources: ['research'],
     scopes: ['organisation'],
     needs: [{ signal: 'sessions90', min: 10, sparseMin: 1 }],
-    live: false,
+    live: true,
   }),
   entry({
     id: 'TSQ-007',
@@ -330,14 +336,15 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
   entry({
     id: 'TSQ-011',
     title: 'Activation funnel',
-    question: 'How many new learners get from sign-up to regular practice, and do they come back?',
+    question:
+      'How many new learners get from sign-up to regular practice, and do they come back?',
     group: 'learners',
     shape: 'stage_funnel',
     size: 'm',
     sources: ['research'],
     scopes: ['organisation'],
     needs: [],
-    live: false,
+    live: true,
   }),
   entry({
     id: 'TSQ-012',
@@ -349,7 +356,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     sources: ['research'],
     scopes: ['organisation'],
     needs: [{ signal: 'weeksWithActivity90', min: 4, sparseMin: 1 }],
-    live: false,
+    live: true,
   }),
   entry({
     id: 'TSQ-013',
@@ -421,7 +428,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     sources: ['research'],
     scopes: ['organisation'],
     needs: [{ signal: 'courseEnrolments', min: 5, sparseMin: 1 }],
-    live: false,
+    live: true,
   }),
   entry({
     id: 'TSQ-019',
@@ -433,7 +440,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     sources: ['research'],
     scopes: ['organisation'],
     needs: [{ signal: 'scoredQuizItems', min: 10, sparseMin: 1 }],
-    live: false,
+    live: true,
   }),
   entry({
     id: 'TSQ-020',
@@ -456,7 +463,9 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     size: 'm',
     sources: ['research'],
     scopes: ['organisation'],
-    needs: [{ signal: 'learnersWithRepeatScoredSessions', min: 5, sparseMin: 1 }],
+    needs: [
+      { signal: 'learnersWithRepeatScoredSessions', min: 5, sparseMin: 1 },
+    ],
     live: true,
   }),
   entry({
@@ -486,14 +495,18 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
   entry({
     id: 'TSQ-024',
     title: 'Skills before and after',
-    question: 'Are learners getting better at the skills, and which are weakest?',
+    question:
+      'Are learners getting better at the skills, and which are weakest?',
     group: 'outcomes',
     shape: 'before_after',
     size: 'm',
     sources: ['doc'],
     scopes: ['organisation', 'course'],
-    needs: [{ signal: 'skillScoredCuts', min: 10, sparseMin: 1 }, { signal: 'skillScoredLearners', min: 5, sparseMin: 1 }],
-    live: false,
+    needs: [
+      { signal: 'skillScoredCuts', min: 10, sparseMin: 1 },
+      { signal: 'skillScoredLearners', min: 5, sparseMin: 1 },
+    ],
+    live: true,
   }),
   entry({
     id: 'TSQ-026',
@@ -568,7 +581,8 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     scopes: ['organisation'],
     needs: [],
     live: false,
-    blockedBy: 'Needs sessions assigned to reviewers and a waiting-time measure',
+    blockedBy:
+      'Needs sessions assigned to reviewers and a waiting-time measure',
   }),
   entry({
     id: 'TSQ-036',
@@ -593,7 +607,8 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     scopes: ['organisation'],
     needs: [],
     live: false,
-    blockedBy: 'Needs enough organisations to anonymise, and an agreed set of measures',
+    blockedBy:
+      'Needs enough organisations to anonymise, and an agreed set of measures',
   }),
   entry({
     id: 'TSQ-038',
@@ -647,7 +662,8 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
   entry({
     id: 'TSQ-042',
     title: 'Course performance since launch',
-    question: 'How has the course performed since launch, and how many have completed?',
+    question:
+      'How has the course performed since launch, and how many have completed?',
     group: 'courses',
     shape: 'rate_over_time',
     size: 'wide',
@@ -708,7 +724,8 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
   entry({
     id: 'TSQ-047',
     title: 'Module difficulty',
-    question: 'Which modules are easiest and which are hardest, and do learners get through the hard ones?',
+    question:
+      'Which modules are easiest and which are hardest, and do learners get through the hard ones?',
     group: 'courses',
     shape: 'ranking',
     size: 'm',
@@ -757,7 +774,8 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
   entry({
     id: 'TSQ-053',
     title: 'Roleplay length and attempts',
-    question: 'How long does each roleplay take, and how many attempts before passing?',
+    question:
+      'How long does each roleplay take, and how many attempts before passing?',
     group: 'outcomes',
     shape: 'ranking',
     size: 'm',
@@ -775,7 +793,9 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     size: 'm',
     sources: ['doc', 'research'],
     scopes: ['organisation'],
-    needs: [{ signal: 'learnersWithRepeatScoredSessions', min: 5, sparseMin: 1 }],
+    needs: [
+      { signal: 'learnersWithRepeatScoredSessions', min: 5, sparseMin: 1 },
+    ],
     live: false,
   }),
   entry({
@@ -802,7 +822,8 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     scopes: ['organisation'],
     needs: [],
     live: false,
-    blockedBy: 'Needs theme analysis of comments and journals, and a privacy decision',
+    blockedBy:
+      'Needs theme analysis of comments and journals, and a privacy decision',
   }),
   entry({
     id: 'TSQ-062',
@@ -893,7 +914,8 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
   entry({
     id: 'TSQ-073',
     title: 'Practice-time mix',
-    question: 'How is practice time spread across light, regular and heavy learners?',
+    question:
+      'How is practice time spread across light, regular and heavy learners?',
     group: 'learners',
     shape: 'parts_of_whole',
     size: 'm',
@@ -958,28 +980,42 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
  */
 export const RETIRED_TENANT_CHARTS: Record<string, string> = {
   'TSQ-004': 'Covered by the change notes on the headline tiles (TSQ-001).',
-  'TSQ-010': 'Same data as the learner status bar (TSQ-007), split a little finer.',
-  'TSQ-025': 'Covered by Skills before and after (TSQ-024), sorted weakest first.',
+  'TSQ-010':
+    'Same data as the learner status bar (TSQ-007), split a little finer.',
+  'TSQ-025':
+    'Covered by Skills before and after (TSQ-024), sorted weakest first.',
   'TSQ-028': 'Merged into Seats in use (TSQ-029).',
-  'TSQ-031': 'Merged into Completion against target (TSQ-030), which gains a course choice.',
-  'TSQ-032': 'A health tag is a column of the course table (TSQ-013), added once targets exist.',
-  'TSQ-033': 'Merged into Module funnel (TSQ-045), which can show every course side by side.',
+  'TSQ-031':
+    'Merged into Completion against target (TSQ-030), which gains a course choice.',
+  'TSQ-032':
+    'A health tag is a column of the course table (TSQ-013), added once targets exist.',
+  'TSQ-033':
+    'Merged into Module funnel (TSQ-045), which can show every course side by side.',
   'TSQ-048': 'Merged into Module difficulty (TSQ-047).',
-  'TSQ-052': 'A table view of Hardest and easiest scenarios (TSQ-022), added as columns there.',
-  'TSQ-054': 'Merged into Skills by course (TSQ-036), which can show roleplays within a course.',
-  'TSQ-056': 'Merged into Session scores (TSQ-020), which gains a by-roleplay view.',
-  'TSQ-057': 'A slope view of Improving, holding or declining (TSQ-021), added there later.',
-  'TSQ-060': 'Clinician checks are not held per organisation; platform quality, not an admin decision.',
+  'TSQ-052':
+    'A table view of Hardest and easiest scenarios (TSQ-022), added as columns there.',
+  'TSQ-054':
+    'Merged into Skills by course (TSQ-036), which can show roleplays within a course.',
+  'TSQ-056':
+    'Merged into Session scores (TSQ-020), which gains a by-roleplay view.',
+  'TSQ-057':
+    'A slope view of Improving, holding or declining (TSQ-021), added there later.',
+  'TSQ-060':
+    'Clinician checks are not held per organisation; platform quality, not an admin decision.',
   'TSQ-061': 'Merged into Summary in a sentence or two (TSQ-040).',
   'TSQ-067': 'Merged into Unhelpful responses over time (TSQ-051).',
   'TSQ-068': 'Merged into Early and later words (TSQ-058).',
   'TSQ-069': 'Merged into Feedback uptake (TSQ-082).',
   'TSQ-071': 'Merged into Ratings and comments (TSQ-026).',
-  'TSQ-074': 'XP ladder position is a gamification detail, not an admin decision; the learner table shows level.',
-  'TSQ-075': 'Merged into Activation funnel (TSQ-011), which ends at still active.',
+  'TSQ-074':
+    'XP ladder position is a gamification detail, not an admin decision; the learner table shows level.',
+  'TSQ-075':
+    'Merged into Activation funnel (TSQ-011), which ends at still active.',
   'TSQ-077': 'Merged into Course performance since launch (TSQ-042).',
-  'TSQ-079': 'Competencies and helping skills overlap; skills are covered by TSQ-024.',
-  'TSQ-081': 'Product quality of the debrief, not an admin decision; tracked in the platform console.',
+  'TSQ-079':
+    'Competencies and helping skills overlap; skills are covered by TSQ-024.',
+  'TSQ-081':
+    'Product quality of the debrief, not an admin decision; tracked in the platform console.',
 };
 
 /** `tenants.settings` path that turns the new Statistics page on for one tenant. */

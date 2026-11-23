@@ -1,6 +1,7 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { TenantCapabilitiesRepository } from '../../repository/tenant-capabilities.repository';
 import { TenantOutcomesRepository } from '../../repository/tenant-outcomes.repository';
+import { TenantPracticeRepository } from '../../repository/tenant-practice.repository';
 import { TenantCapabilities } from '../../util/tenant-chart-library.util';
 import { TenantAnalyticsService } from '../tenant-analytics.service';
 import { TenantChartLibraryService } from '../tenant-chart-library.service';
@@ -29,6 +30,7 @@ describe('TenantChartLibraryService', () => {
   let repo: jest.Mocked<TenantCapabilitiesRepository>;
   let analytics: jest.Mocked<TenantAnalyticsService>;
   let outcomes: jest.Mocked<TenantOutcomesRepository>;
+  let practice: jest.Mocked<TenantPracticeRepository>;
   let service: TenantChartLibraryService;
 
   beforeEach(() => {
@@ -49,7 +51,21 @@ describe('TenantChartLibraryService', () => {
       getRatingCounts: jest.fn(),
       getReviewCoverage: jest.fn(),
     } as unknown as jest.Mocked<TenantOutcomesRepository>;
-    service = new TenantChartLibraryService(repo, analytics, outcomes);
+    practice = {
+      getPracticeHeatmap: jest.fn(),
+      getSessionLengths: jest.fn(),
+      getActivationCounts: jest.fn(),
+      getRegularityCounts: jest.fn(),
+      getQuizPassRates: jest.fn(),
+      getItemFormatDropoff: jest.fn(),
+      getSkillChange: jest.fn(),
+    } as unknown as jest.Mocked<TenantPracticeRepository>;
+    service = new TenantChartLibraryService(
+      repo,
+      analytics,
+      outcomes,
+      practice,
+    );
   });
 
   const enabled = () =>
@@ -88,18 +104,25 @@ describe('TenantChartLibraryService', () => {
         'TSQ-001',
         'TSQ-002',
         'TSQ-003',
+        'TSQ-005',
+        'TSQ-006',
         'TSQ-007',
         'TSQ-008',
         'TSQ-009',
+        'TSQ-011',
+        'TSQ-012',
         'TSQ-013',
         'TSQ-014',
         'TSQ-015',
         'TSQ-016',
         'TSQ-017',
+        'TSQ-018',
+        'TSQ-019',
         'TSQ-020',
         'TSQ-021',
         'TSQ-022',
         'TSQ-023',
+        'TSQ-024',
         'TSQ-026',
         'TSQ-027',
       ]);
@@ -141,13 +164,13 @@ describe('TenantChartLibraryService', () => {
       await expect(
         service.getChartData(TENANT, 'TSQ-999', {}),
       ).rejects.toBeInstanceOf(NotFoundException);
-      // TSQ-005 (weekday and hour) is planned: the id exists, nothing is offered.
+      // TSQ-036 (skills by course) is planned: the id exists, nothing is offered.
       await expect(
-        service.getChartData(TENANT, 'TSQ-005', {}),
+        service.getChartData(TENANT, 'TSQ-036', {}),
       ).rejects.toBeInstanceOf(NotFoundException);
-      // TSQ-028 (seats) is blocked on a seat model.
+      // TSQ-029 (seats) is blocked on a seat model.
       await expect(
-        service.getChartData(TENANT, 'TSQ-028', {}),
+        service.getChartData(TENANT, 'TSQ-029', {}),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
 
@@ -545,6 +568,172 @@ describe('TenantChartLibraryService', () => {
         service.getChartData(TENANT, 'TSQ-027', {}),
       ).rejects.toBeInstanceOf(ForbiddenException);
       expect(outcomes.getReviewCoverage).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('practice and course-progress charts', () => {
+    const ready = () => {
+      enabled();
+      repo.getCapabilities.mockResolvedValue(
+        caps({
+          sessions90: 400,
+          weeksWithActivity90: 12,
+          courseEnrolments: 30,
+          scoredQuizItems: 50,
+          skillScoredCuts: 40,
+          skillScoredLearners: 14,
+        }),
+      );
+    };
+
+    it('TSQ-005 groups sessions by weekday and time of day in the caller time zone', async () => {
+      ready();
+      const cells = Array.from({ length: 7 }, () => Array(8).fill(0));
+      practice.getPracticeHeatmap.mockResolvedValue({ cells, sessions: 0 });
+      const out = await service.getChartData(TENANT, 'TSQ-005', {
+        timezone: 'Asia/Kolkata',
+      });
+      expect(out.data).toEqual({
+        cells,
+        sessions: 0,
+        timezone: 'Asia/Kolkata',
+      });
+      expect(practice.getPracticeHeatmap).toHaveBeenCalledWith(
+        TENANT,
+        'internal1',
+        expect.any(Date),
+        expect.any(Date),
+        'Asia/Kolkata',
+      );
+    });
+
+    it('TSQ-005 uses UTC when no time zone is given', async () => {
+      ready();
+      practice.getPracticeHeatmap.mockResolvedValue({ cells: [], sessions: 0 });
+      const out = await service.getChartData(TENANT, 'TSQ-005', {});
+      expect((out.data as { timezone: string }).timezone).toBe('UTC');
+    });
+
+    it('TSQ-005 falls back to UTC, and says so, when the time zone is not recognised', async () => {
+      ready();
+      practice.getPracticeHeatmap
+        .mockRejectedValueOnce(
+          new Error('time zone "Nope/Zone" not recognized'),
+        )
+        .mockResolvedValueOnce({ cells: [], sessions: 0 });
+      const out = await service.getChartData(TENANT, 'TSQ-005', {
+        timezone: 'Nope/Zone',
+      });
+      expect((out.data as { timezone: string }).timezone).toBe('UTC');
+      expect(practice.getPracticeHeatmap).toHaveBeenCalledTimes(2);
+    });
+
+    it('TSQ-005 does not hide a real failure when UTC itself fails', async () => {
+      ready();
+      practice.getPracticeHeatmap.mockRejectedValue(new Error('db down'));
+      await expect(service.getChartData(TENANT, 'TSQ-005', {})).rejects.toThrow(
+        'db down',
+      );
+    });
+
+    it('TSQ-006 returns the length bands with their bounds', async () => {
+      ready();
+      practice.getSessionLengths.mockResolvedValue({
+        bins: [5, 4, 3, 2, 1, 1, 0],
+        sessions: 16,
+        medianMinutes: 4,
+      });
+      const out = await service.getChartData(TENANT, 'TSQ-006', {});
+      expect(out.data).toEqual({
+        bins: [5, 4, 3, 2, 1, 1, 0],
+        sessions: 16,
+        medianMinutes: 4,
+        boundsMinutes: [2, 5, 10, 15, 20, 30],
+      });
+    });
+
+    it('TSQ-011 returns the four activation stages in order', async () => {
+      ready();
+      practice.getActivationCounts.mockResolvedValue({
+        registered: 29,
+        started: 16,
+        practisedThreeTimes: 15,
+        activeRecently: 4,
+      });
+      const out = await service.getChartData(TENANT, 'TSQ-011', {});
+      expect(out.data).toEqual({
+        stages: [
+          { key: 'registered', count: 29 },
+          { key: 'started', count: 16 },
+          { key: 'practisedThreeTimes', count: 15 },
+          { key: 'activeRecently', count: 4 },
+        ],
+      });
+    });
+
+    it('TSQ-012 adds the total to the regularity counts', async () => {
+      ready();
+      practice.getRegularityCounts.mockResolvedValue({
+        regular: 0,
+        occasional: 9,
+        bursty: 5,
+        weeks: 13,
+      });
+      const out = await service.getChartData(TENANT, 'TSQ-012', {});
+      expect(out.data).toEqual({
+        regular: 0,
+        occasional: 9,
+        bursty: 5,
+        weeks: 13,
+        total: 14,
+      });
+    });
+
+    it('TSQ-018 adds the share finished for each kind of item', async () => {
+      ready();
+      practice.getItemFormatDropoff.mockResolvedValue([
+        { type: 'ROLEPLAY', reached: 115, completed: 106 },
+        { type: 'GAME', reached: 0, completed: 0 },
+      ]);
+      const out = await service.getChartData(TENANT, 'TSQ-018', {});
+      expect(out.data).toEqual({
+        rows: [
+          {
+            type: 'ROLEPLAY',
+            reached: 115,
+            completed: 106,
+            completedPercent: 92,
+          },
+          { type: 'GAME', reached: 0, completed: 0, completedPercent: 0 },
+        ],
+      });
+    });
+
+    it('TSQ-019 asks for quizzes with at least three attempts, lowest pass rate first', async () => {
+      ready();
+      practice.getQuizPassRates.mockResolvedValue([
+        { title: 'Quiz A', attempts: 13, passRatePercent: 31 },
+      ]);
+      const out = await service.getChartData(TENANT, 'TSQ-019', {});
+      expect(out.data).toEqual({
+        rows: [{ title: 'Quiz A', attempts: 13, passRatePercent: 31 }],
+      });
+      expect(practice.getQuizPassRates).toHaveBeenCalledWith(
+        TENANT,
+        'internal1',
+        expect.any(Date),
+        expect.any(Date),
+        3,
+        8,
+      );
+    });
+
+    it('TSQ-024 returns each skill first against latest', async () => {
+      ready();
+      const rows = [{ skill: 'verbal', first: 3, latest: 3.9, learners: 14 }];
+      practice.getSkillChange.mockResolvedValue(rows);
+      const out = await service.getChartData(TENANT, 'TSQ-024', {});
+      expect(out.data).toEqual({ rows });
     });
   });
 
