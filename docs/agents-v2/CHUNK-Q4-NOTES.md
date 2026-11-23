@@ -75,12 +75,15 @@ Everything below moves after launch. Part 2 finishes only G+9, H5, H6, H7, H9, H
 - **H11:** setup's gap questions fit the purpose.
 - **H13:** speed on the live production path, and the gap to the local suite.
 - **H14:** the five demo assistants as `demo-*.json` sets.
+- **G+12, "see a doctor today" (Shehbaz, 23 Nov):** E2 and F5 ship (fewer false emergency replies: the stump case got the emergency reply once in 6 runs, not every time), and the reply is safe (no false all-clear, no diagnosis, points to a doctor or emergency care: 3 of 3), but it doesn't say "see a doctor today" with when to go to emergency: the Medical pack's decline rules win over the doctor-today rule. Plan: a fixed caring-decline line for symptom messages on Medical packs, as E1 does for diagnosis requests (wording to approve).
 - **E25b:** setup steps under load ("Something went wrong" with several setups at once; the database pool), tested with 5 setups at once (moved by Shehbaz, 23 Nov).
 - **E26 and E27:** the grader's 95% hand-rulings agreement set; checkup counts that add up, and every pack's safety questions.
 - **Answer quality to 85%:** the 28 misses in "For Phase 3" below (75% now under the grader that reads everything).
 - **H12's two not reproduced:** Try it labelled "Your business" during setup (the placeholder name is replaced only when reading finds a business name), and the customer page's address showing /admin/b/… on production.
 
 ## Status by item (23 Nov, after the single measurement `2026-11-23-after-C-1`)
+
+> Written before part 2. What part 2 did and what moved after launch: `PR-Q4.md` and "After launch" above.
 
 | Item | Status |
 |---|---|
