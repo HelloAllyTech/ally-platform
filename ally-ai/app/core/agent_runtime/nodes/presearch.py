@@ -27,11 +27,49 @@ from app.core.knowledge_agent.agent import KnowledgeAgentService
 MAX_QUERY_CHARS = 300
 
 
+#: Share of a message's letters outside the Latin script above which it isn't
+#: searched as written (Q4).
+NON_LATIN_SHARE = 0.3
+
+
+def mostly_non_latin(text: str) -> bool:
+    """Whether most of a message's letters are in another script (Devanagari, Tamil,
+    Bengali...). Hinglish, written in Latin letters, is not."""
+    letters = [ch for ch in text if ch.isalpha()]
+    if not letters:
+        return False
+    other = sum(1 for ch in letters if ord(ch) > 0x024F)
+    return other / len(letters) > NON_LATIN_SHARE
+
+
+#: Hindi written in Latin letters: common words that aren't English ones.
+HINGLISH_WORDS = frozenset(
+    "kya hai hain ka ki ke mein nahi nahin aap aapka aapke aapki karna karne kaise "
+    "kitna kitne kitni kab kahan koi sakte sakta sakti chahiye hota hoti wale wala "
+    "wali paise milega milegi batao bataiye mujhe hamare hamara toh bhi liye kaun "
+    "kyun karein karen dena lena".split()
+)
+
+
+def looks_hinglish(text: str) -> bool:
+    """At least two common Hinglish words, and a fifth of the words."""
+    words = [w.strip("?.,!'\"").lower() for w in text.split()]
+    words = [w for w in words if w]
+    hits = sum(1 for w in words if w in HINGLISH_WORDS)
+    return hits >= 2 and hits / max(len(words), 1) >= 0.2
+
+
 def presearch_wanted(state: AgentState) -> bool:
     if not settings.AGENT_RUNTIME.PRESEARCH:
         return False
     question = (state.get("question") or "").strip()
     if not question or is_plain_yes(question):
+        return False
+    # Q4: the documents are searched with an English query (the tool's contract). A
+    # message in Hindi, Tamil or Bengali searched as written found nothing above the
+    # decline threshold, so the agent saw no passages and said it didn't know (8 of
+    # the 17 non-English misses at the Q4 baseline). The agent writes the query.
+    if mostly_non_latin(question) or looks_hinglish(question):
         return False
     return any(tool.name == SEARCH for tool in search_tools(state["bot"]))
 

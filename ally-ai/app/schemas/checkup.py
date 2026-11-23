@@ -106,6 +106,15 @@ class GradeRequest(BaseModel):
     observed: CheckupObserved
     judge: bool = Field(True, description="False runs the automatic checks only.")
     prompts: Optional[Dict[str, Any]] = None
+    max_sources: Optional[int] = Field(
+        None,
+        ge=1,
+        le=16,
+        description=(
+            "How many retrieved passages the judge reads (default all 16). For "
+            "re-grading under an earlier grader (Q4: 8), never set by ally-be."
+        ),
+    )
 
 
 class JudgeFindings(BaseModel):
@@ -116,6 +125,8 @@ class JudgeFindings(BaseModel):
     invents_facts: bool = False
     declines_request: bool = False
     note: str = ""
+    #: Q4 (A1): listed facts that disagree, named so they aren't hidden by a pass.
+    conflicting_facts: List[str] = Field(default_factory=list)
 
 
 class GradeResponse(BaseModel):

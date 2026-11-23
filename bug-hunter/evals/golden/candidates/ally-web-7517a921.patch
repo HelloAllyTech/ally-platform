@@ -1,0 +1,227 @@
+diff --git a/apps/ally-helpline-dashboard/src/pages/track-player/components/players/VideoItemPlayer.tsx b/apps/ally-helpline-dashboard/src/pages/track-player/components/players/VideoItemPlayer.tsx
+index 63261a8967..db535a1eb2 100644
+--- a/apps/ally-helpline-dashboard/src/pages/track-player/components/players/VideoItemPlayer.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/track-player/components/players/VideoItemPlayer.tsx
+@@ -19,6 +19,7 @@ interface VideoItemPlayerProps {
+ /** Minimal shape of the YouTube IFrame API we touch. */
+ interface YTPlayer {
+   getCurrentTime: () => number;
++  getDuration: () => number;
+   destroy: () => void;
+ }
+ interface YTNamespace {
+@@ -85,9 +86,13 @@ export const VideoItemPlayer: FC<VideoItemPlayerProps> = ({
+   const [reportVideoProgress] = useReportVideoProgressMutation();
+   const [completed, setCompleted] = useState(alreadyCompleted);
+   const requiredPct = Math.round(payload.requiredWatchPct ?? 0);
++  // YouTube/Vimeo embeds rarely have a stored durationSeconds (the admin
++  // editor has no way to set one) — prefer the real duration the player
++  // itself reports once ready, falling back to the stored value until then.
++  const [duration, setDuration] = useState(payload.durationSeconds ?? 0);
+ 
+   const { recordTime, recordPct, flush, watchedPct } = useVideoWatchProgress({
+-    durationSeconds: payload.durationSeconds,
++    durationSeconds: duration,
+     initialMaxWatchedPct: payload.maxWatchedPct ?? 0,
+     disabled: completed,
+     onReport: async pct => {
+@@ -147,12 +152,24 @@ export const VideoItemPlayer: FC<VideoItemPlayerProps> = ({
+ 
+   if (payload.source === "youtube") {
+     return (
+-      <YouTubeVideo url={payload.url} onTime={recordTime} controls={renderTrackedControls()} />
++      <YouTubeVideo
++        url={payload.url}
++        onTime={recordTime}
++        onDuration={setDuration}
++        controls={renderTrackedControls()}
++      />
+     );
+   }
+ 
+   if (payload.source === "vimeo") {
+-    return <VimeoVideo url={payload.url} onTime={recordTime} controls={renderTrackedControls()} />;
++    return (
++      <VimeoVideo
++        url={payload.url}
++        onTime={recordTime}
++        onDuration={setDuration}
++        controls={renderTrackedControls()}
++      />
++    );
+   }
+ 
+   // loom / unknown — no reliable time API; foreground timer + explicit button.
+@@ -175,12 +192,15 @@ export const VideoItemPlayer: FC<VideoItemPlayerProps> = ({
+ const YouTubeVideo: FC<{
+   url: string;
+   onTime: (t: number) => void;
++  onDuration: (d: number) => void;
+   controls: React.ReactNode;
+-}> = ({ url, onTime, controls }) => {
++}> = ({ url, onTime, onDuration, controls }) => {
+   const hostRef = useRef<HTMLDivElement>(null);
+   const playerRef = useRef<YTPlayer | null>(null);
+   const onTimeRef = useRef(onTime);
+   onTimeRef.current = onTime;
++  const onDurationRef = useRef(onDuration);
++  onDurationRef.current = onDuration;
+ 
+   useEffect(() => {
+     const id = youtubeId(url);
+@@ -196,6 +216,13 @@ const YouTubeVideo: FC<{
+         playerVars: { rel: 0, modestbranding: 1 },
+         events: {
+           onReady: () => {
++            // The stored durationSeconds is usually absent for embeds (the
++            // admin editor has no field for it) — the player itself is the
++            // authoritative source once its metadata has loaded.
++            const duration = playerRef.current?.getDuration?.();
++            if (typeof duration === "number" && duration > 0) {
++              onDurationRef.current(duration);
++            }
+             poll = setInterval(() => {
+               const time = playerRef.current?.getCurrentTime?.();
+               if (typeof time === "number") onTimeRef.current(time);
+@@ -230,17 +257,28 @@ const YouTubeVideo: FC<{
+ const VimeoVideo: FC<{
+   url: string;
+   onTime: (t: number) => void;
++  onDuration: (d: number) => void;
+   controls: React.ReactNode;
+-}> = ({ url, onTime, controls }) => {
++}> = ({ url, onTime, onDuration, controls }) => {
+   const hostRef = useRef<HTMLDivElement>(null);
+   const onTimeRef = useRef(onTime);
+   onTimeRef.current = onTime;
++  const onDurationRef = useRef(onDuration);
++  onDurationRef.current = onDuration;
+ 
+   useEffect(() => {
+     const host = hostRef.current;
+     if (!host) return undefined;
+     // `id` accepts a full video URL (VideoId = string | number | VimeoUrl).
+     const player = new Vimeo(host, { id: url, responsive: true });
++    // Same reasoning as YouTube: the player's own duration is authoritative
++    // since embeds are rarely saved with a stored durationSeconds.
++    player
++      .getDuration()
++      .then(d => {
++        if (typeof d === "number" && d > 0) onDurationRef.current(d);
++      })
++      .catch(() => undefined);
+     const handler = (data: { seconds: number }) => onTimeRef.current(data.seconds);
+     player.on("timeupdate", handler);
+     return () => {
+diff --git a/apps/ally-helpline-dashboard/src/pages/track-player/components/players/__tests__/VideoItemPlayer.test.tsx b/apps/ally-helpline-dashboard/src/pages/track-player/components/players/__tests__/VideoItemPlayer.test.tsx
+index d8b9055008..01a8172376 100644
+--- a/apps/ally-helpline-dashboard/src/pages/track-player/components/players/__tests__/VideoItemPlayer.test.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/track-player/components/players/__tests__/VideoItemPlayer.test.tsx
+@@ -1,5 +1,5 @@
+-import { render, screen } from "@testing-library/react";
+-import { describe, expect, it, vi } from "vitest";
++import { act, render, screen } from "@testing-library/react";
++import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+ 
+ import { VideoItemPlayer } from "../VideoItemPlayer";
+ import { StartVideoItemPayload, TrackItemType } from "../../../../../types/tracks";
+@@ -95,3 +95,99 @@ describe("VideoItemPlayer", () => {
+     expect(screen.getByText("Mark as watched")).toBeDisabled();
+   });
+ });
++
++describe("VideoItemPlayer — YouTube embed with no stored durationSeconds", () => {
++  // Regression test: embedded (YouTube/Vimeo) videos are almost never saved
++  // with a durationSeconds (the admin editor has no field for it), which
++  // used to leave watchedPct permanently stuck at 0 — the player must fall
++  // back to the duration the YouTube IFrame API itself reports.
++  class MockYTPlayer {
++    static instances: MockYTPlayer[] = [];
++    currentTime = 0;
++    duration: number;
++    onReady?: () => void;
++
++    constructor(_el: HTMLElement, opts: { events?: { onReady?: () => void } }, duration: number) {
++      this.duration = duration;
++      this.onReady = opts.events?.onReady;
++      MockYTPlayer.instances.push(this);
++    }
++
++    getCurrentTime() {
++      return this.currentTime;
++    }
++
++    getDuration() {
++      return this.duration;
++    }
++
++    destroy() {
++      // no-op
++    }
++  }
++
++  beforeEach(() => {
++    MockYTPlayer.instances = [];
++    (window as unknown as { YT: unknown }).YT = {
++      Player: class extends MockYTPlayer {
++        constructor(el: HTMLElement, opts: { events?: { onReady?: () => void } }) {
++          super(el, opts, 176);
++        }
++      },
++    };
++  });
++
++  afterEach(() => {
++    delete (window as unknown as { YT?: unknown }).YT;
++    vi.useRealTimers();
++  });
++
++  it("recovers a nonzero watched percentage from the player's own duration", async () => {
++    const payload: StartVideoItemPayload = {
++      type: TrackItemType.VIDEO,
++      trackItemProgressId: "progress-2",
++      source: "youtube",
++      url: "https://www.youtube.com/watch?v=abc123",
++      durationSeconds: 0,
++      requiredWatchPct: 90,
++      maxWatchedPct: 0,
++    };
++
++    const { container } = render(
++      <VideoItemPlayer
++        payload={payload}
++        itemId="item-2"
++        trackId="track-1"
++        alreadyCompleted={false}
++      />,
++    );
++
++    // Let the loadYouTubeApi().then(...) microtask construct the player.
++    await act(async () => {
++      await Promise.resolve();
++    });
++
++    const instance = MockYTPlayer.instances[0];
++    expect(instance).toBeDefined();
++
++    vi.useFakeTimers();
++    act(() => {
++      instance.onReady?.();
++    });
++
++    // Simulate watching ~91% of the 176s video via the 1s poll.
++    for (let t = 0; t <= 160; t += 1) {
++      instance.currentTime = t;
++      act(() => {
++        vi.advanceTimersByTime(1000);
++      });
++    }
++
++    const bar = container.querySelector<HTMLDivElement>(".bg-primary-500");
++    expect(bar).not.toBeNull();
++    // Before the fix this stayed "0%" forever because durationSeconds was
++    // undefined, so watchedPctFromSeconds always returned 0.
++    expect(bar?.style.width).not.toBe("0%");
++    expect(parseInt(bar?.style.width ?? "0", 10)).toBeGreaterThanOrEqual(90);
++  });
++});

@@ -31,17 +31,24 @@ GATEWAY = {
     "token": TOKEN,
     "tools": ["hand_over"],
 }
+#: Q4 G1, as approved in Q4-PROMPTS.md A2.
 BRIEF_DESCRIPTION = (
-    "Pass this chat to a person on the team. Use it when someone asks to talk to a "
-    "person, when you can't help with what they need and the team can, or when "
-    "they're unhappy with your answers. Never for someone at risk: that is handled "
-    "before you."
+    "Pass this chat to a person on the team. Use it only when someone asks to talk "
+    "to a person, or when they're unhappy after you've answered. Not because you "
+    "can't answer: then say so and give the organisation's contact. After it, still "
+    "reply: answer whatever you can from the information, in their language. Don't "
+    "say you've passed the chat on; that line is added for you. Never for someone at "
+    "risk: that is handled before you."
 )
 #: Chunk 6b, item 11: the summary's own description.
 BRIEF_SUMMARY = (
     "One sentence, at most 160 characters, saying what the person needs, in plain "
     "words. Don't say which channel the chat is on: the team sees it."
 )
+
+
+#: The reply the model writes after handing over (Q4 G1): the run goes on.
+AFTER = reply("decline", "I can't change your bill here; the team will look at it.")
 
 
 def hand_over(summary="Wants a call back about a bill.", language="en"):
@@ -124,7 +131,8 @@ class TestOffered:
     def test_hand_over_is_built_as_the_brief_says(self):
         tool = REGISTRY["hand_over"]
         assert tool.description == BRIEF_DESCRIPTION == DESCRIPTION
-        assert (tool.kind, tool.risk, tool.ends_run) == ("gateway", "medium", True)
+        # Q4 G1: it no longer ends the run; the reply still answers.
+        assert (tool.kind, tool.risk, tool.ends_run) == ("gateway", "medium", False)
         assert list(tool.input_model.model_fields) == ["summary"]
 
     def test_the_summary_is_one_line_clipped_to_160_at_a_word(self):
@@ -149,9 +157,10 @@ class TestOffered:
 
 class TestHandOver:
     @pytest.mark.asyncio
-    async def test_ends_the_run_with_handover(self, run_with):
+    async def test_hands_over_then_still_answers(self, run_with):
+        """Q4 G1 (Round 7 R1): the hand-over never replaces the answer."""
         gateway = FakeGateway()
-        llm = FakeLLM(hand_over())
+        llm = FakeLLM(hand_over(), AFTER, AFTER)
         with patch(f"{CONVERSATION}.generate_structured", llm):
             state = await run_with(gateway=gateway, gateway_tools=["hand_over"])
         assert gateway.calls == [
@@ -162,17 +171,11 @@ class TestHandOver:
                 "input": {"summary": "Wants a call back about a bill."},
             }
         ]
-        # No further model step and no check after it.
-        assert nodes(state) == ["agent", "tool"]
-        assert len(llm.calls) == 1
-        assert state["trace"][-1]["summary"] == "hand_over: ok"
-        result = state["result"]
-        assert result["handover"] is True
-        assert (result["intent"], result["answer"], result["citations"]) == (
-            "decline",
-            "",
-            [],
-        )
+        # The model writes its reply after the hand-over, and it is checked.
+        assert nodes(state)[:3] == ["agent", "tool", "agent"]
+        assert state["trace"][1]["summary"] == "hand_over: ok"
+        assert state["handed_over"] is True
+        assert state["result"]["answer"] == AFTER["answer"]
         assert state["tool_calls"] == [
             {"tool": "hand_over", "kind": "gateway", "ok": True}
         ]
@@ -181,11 +184,11 @@ class TestHandOver:
     async def test_its_step_is_its_index_in_the_run(self, run_with, chunk_service):
         chunk_service.search.return_value = [passage(CHUNK_A, 0.7)]
         gateway = FakeGateway()
-        llm = FakeLLM(search("bill"), hand_over())
+        llm = FakeLLM(search("bill"), hand_over(), AFTER, AFTER)
         with patch(f"{CONVERSATION}.generate_structured", llm):
             state = await run_with(gateway=gateway, gateway_tools=["hand_over"])
         assert gateway.calls[0]["step"] == 1
-        assert state["result"]["handover"] is True
+        assert state["handed_over"] is True
 
     @pytest.mark.asyncio
     async def test_a_failure_is_read_by_the_agent_never_a_crash(self, run_with):
@@ -221,12 +224,12 @@ class TestHandOver:
 class TestBudget:
     @pytest.mark.asyncio
     async def test_nothing_new_ends_searching_but_not_gateway_tools(self, run_with):
-        llm = FakeLLM(search("bill"), hand_over())
+        llm = FakeLLM(search("bill"), hand_over(), AFTER, AFTER)
         with patch(f"{CONVERSATION}.generate_structured", llm):
             state = await run_with(gateway=FakeGateway(), gateway_tools=["hand_over"])
         # The search found nothing new: the next step offers hand_over, not search.
         assert offered(llm.calls[1]) == ["reply", "hand_over"]
-        assert state["result"]["handover"] is True
+        assert state["handed_over"] is True
 
     @pytest.mark.asyncio
     async def test_search_keeps_its_limit_and_statuses(self, run_with, chunk_service):
@@ -394,14 +397,16 @@ class TestEndpoint:
         gateway = FakeGateway()
         body = {**BODY, "conversation_id": "conv-h", "gateway": GATEWAY}
         caplog.set_level(logging.DEBUG)
-        with patch(f"{CONVERSATION}.generate_structured", FakeLLM(hand_over())):
+        llm = FakeLLM(hand_over(), AFTER, AFTER)
+        with patch(f"{CONVERSATION}.generate_structured", llm):
             with self._patched(gateway):
                 response = client.post(URL, json=body)
         assert response.status_code == 200
         data = response.json()
+        # Q4 G1: handed over, and the reply still answers.
         assert data["handover"] is True
-        assert data["answer"] == ""
-        assert [s["summary"] for s in data["trace"]][-1] == "hand_over: ok"
+        assert data["answer"] == AFTER["answer"]
+        assert "hand_over: ok" in [s["summary"] for s in data["trace"]]
         assert TOKEN not in response.text
         assert TOKEN not in caplog.text
 
@@ -411,7 +416,8 @@ class TestEndpoint:
             **{**BODY, "conversation_id": "conv-t", "gateway": GATEWAY}
         )
         gateway = FakeGateway()
-        with patch(f"{CONVERSATION}.generate_structured", FakeLLM(hand_over())):
+        llm = FakeLLM(hand_over(), AFTER, AFTER)
+        with patch(f"{CONVERSATION}.generate_structured", llm):
             with self._patched(gateway):
                 response = await runner.execute(graph, payload)
         stored = await get_run_state("conv-t", response.run_id, graph=graph)
@@ -436,13 +442,14 @@ class TestEndpoint:
             data = client.post(URL, json=BODY).json()
         assert "handover" not in data
 
-    def test_streaming_a_hand_over_sends_no_tokens_and_final_carries_it(self, client):
+    def test_streaming_a_hand_over_final_carries_it_and_the_answer(self, client):
         body = {**BODY, "conversation_id": "conv-s", "gateway": GATEWAY}
-        with patch(f"{CONVERSATION}.generate_structured", FakeLLM(hand_over())):
+        llm = FakeLLM(hand_over(), AFTER, AFTER)
+        with patch(f"{CONVERSATION}.generate_structured", llm):
             with self._patched(FakeGateway()):
                 evts = events(client.post(STREAM_URL, json=body))
-        assert "token" not in names(evts)
         statuses = [data["code"] for name, data in evts if name == "status"]
         assert "searching" not in statuses and "found" not in statuses
         assert names(evts)[-1] == "final"
         assert evts[-1][1]["handover"] is True
+        assert evts[-1][1]["answer"] == AFTER["answer"]

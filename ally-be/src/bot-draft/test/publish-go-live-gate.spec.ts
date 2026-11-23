@@ -96,7 +96,11 @@ describe('POST /v1/bot-drafts/:id/publish and the go-live gate', () => {
       response: { errorCode: 'checkup_needed' },
     });
     expect(h.checkupCases.assertMustPassConfirmed).toHaveBeenCalled();
-    expect(h.checkup.assertCanPublish).toHaveBeenCalledWith(draft, false);
+    expect(h.checkup.assertCanPublish).toHaveBeenCalledWith(
+      draft,
+      false,
+      false,
+    );
     expect(h.publisher.publish).not.toHaveBeenCalled();
   });
 

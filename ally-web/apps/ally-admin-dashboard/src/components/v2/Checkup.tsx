@@ -16,7 +16,8 @@ export interface CheckRowLabels {
 
 /**
  * One checkup question (DESIGN.md §4 CheckRow): a status dot, the question in quotes, a status
- * pill and where the answer came from.
+ * pill and where the answer came from. With `detail`, the row opens to show it (Q4 H3: why a
+ * question needs a fix); `tag` marks it ("Safety question").
  */
 export const CheckRow: React.FC<{
   question: string;
@@ -24,18 +25,37 @@ export const CheckRow: React.FC<{
   source?: string | null;
   labels: CheckRowLabels;
   index?: number;
-}> = ({ question, status, source, labels, index = 0 }) => (
-  <li
-    className={`ally-check ally-check--${status} ally-rise`}
-    style={{ ["--ally-i" as string]: Math.min(index, 8) }}
-    data-testid="check-row"
-  >
-    <span className="ally-check__dot" aria-hidden="true" />
-    <span className="ally-check__question">“{question}”</span>
-    <span className="ally-check__pill">{labels[status]}</span>
-    {source !== undefined ? <span className="ally-check__source">{source || "—"}</span> : null}
-  </li>
-);
+  tag?: string;
+  detail?: React.ReactNode;
+}> = ({ question, status, source, labels, index = 0, tag, detail }) => {
+  const head = (
+    <>
+      <span className="ally-check__dot" aria-hidden="true" />
+      <span className="ally-check__question">“{question}”</span>
+      {tag ? <span className="ally-check__tag">{tag}</span> : null}
+      <span className="ally-check__pill">{labels[status]}</span>
+      {source !== undefined ? <span className="ally-check__source">{source || "—"}</span> : null}
+    </>
+  );
+  return (
+    <li
+      className={`ally-check ally-check--${status}${detail ? " ally-check--more" : ""} ally-rise`}
+      style={{ ["--ally-i" as string]: Math.min(index, 8) }}
+      data-testid="check-row"
+    >
+      {detail ? (
+        <details className="ally-check__more">
+          <summary className="ally-check__summary">{head}</summary>
+          <div className="ally-small" data-testid="check-row-detail">
+            {detail}
+          </div>
+        </details>
+      ) : (
+        head
+      )}
+    </li>
+  );
+};
 
 /**
  * One measure (DESIGN.md §4 MeasureCard): the plain-words title, the technical word, a large

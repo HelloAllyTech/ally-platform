@@ -116,14 +116,36 @@ export const packChangeLine = (change: HomeSafety["packChange"]): string | null 
  * is kept with the change. The setup chat still can't weaken a pack: only this owner action can.
  */
 export const PackChooser: React.FC<{ botId: string; safety: HomeSafety }> = ({ botId, safety }) => {
+  const [changePack, state] = useChangeSafetyPackMutation();
+  return (
+    <PackChoices
+      choices={safety.choices ?? []}
+      currentId={safety.pack?.id ?? null}
+      busy={state.isLoading}
+      onChange={async (pack, reason) => {
+        await changePack({ id: botId, pack, ...(reason ? { reason } : {}) }).unwrap();
+      }}
+    />
+  );
+};
+
+/**
+ * The choices themselves, shared by the home and setup's safety screen (Q4 A3): `onChange` rejects
+ * with the server's message when the change is refused.
+ */
+export const PackChoices: React.FC<{
+  choices: { id: string; name: string; summary: string; lessStrict: boolean }[];
+  currentId: string | null;
+  busy: boolean;
+  onChange: (pack: string, reason?: string) => Promise<void>;
+}> = ({ choices, currentId, busy, onChange }) => {
   const [open, setOpen] = useState(false);
   const [choice, setChoice] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [changePack, state] = useChangeSafetyPackMutation();
   const groupId = useId();
   const reasonId = useId();
-  const options = (safety.choices ?? []).filter(option => option.id !== safety.pack?.id);
+  const options = choices.filter(option => option.id !== currentId);
   const picked = options.find(option => option.id === choice);
   const needsReason = Boolean(picked?.lessStrict);
   const tooShort = needsReason && reason.trim().length < MIN_REASON;
@@ -149,11 +171,7 @@ export const PackChooser: React.FC<{ botId: string; safety: HomeSafety }> = ({ b
         if (!picked || tooShort) return;
         setError(null);
         try {
-          await changePack({
-            id: botId,
-            pack: picked.id,
-            ...(needsReason ? { reason: reason.trim() } : {}),
-          }).unwrap();
+          await onChange(picked.id, needsReason ? reason.trim() : undefined);
           setOpen(false);
           setChoice(null);
           setReason("");
@@ -202,7 +220,7 @@ export const PackChooser: React.FC<{ botId: string; safety: HomeSafety }> = ({ b
         <Button
           variant={ButtonVariant.PRIMARY}
           type="submit"
-          disabled={!picked || tooShort || state.isLoading}
+          disabled={!picked || tooShort || busy}
         >
           {t.change}
         </Button>

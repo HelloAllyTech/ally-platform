@@ -311,11 +311,23 @@ export class MemoryService {
     pending: PendingMemory | undefined;
     repliedAt?: number;
   }): Promise<MemoryApplied | null> {
-    const { chatbot, conversationId, runId, pending } = input;
-    if (!pending?.writes.length || !runId) return null;
+    const { chatbot, conversationId, runId } = input;
+    let pending = input.pending;
+    if (!runId) return null;
     if (isPreviewConversation(conversationId) || !UUID.test(conversationId)) {
       return null;
     }
+    // Q4 G6 (Round 7 M1: the name and business from a callback forgotten in the next chat): a turn
+    // that ends in a consent question or a write rarely reaches `remember`, so what a saved entry
+    // says about the person is added from the run's own writes.
+    const fromWrites = await this.fromListWrites(chatbot.id, runId);
+    if (fromWrites.length) {
+      pending = {
+        writes: [...(pending?.writes ?? []), ...fromWrites],
+        refs: pending?.refs ?? {},
+      };
+    }
+    if (!pending?.writes.length) return null;
     try {
       const sent = await this.deliveredReply(chatbot.id, conversationId, runId);
       if (!sent) return null;
@@ -343,6 +355,45 @@ export class MemoryService {
         }`,
       );
       return null;
+    }
+  }
+
+  /**
+   * What this run's saved entries say about the person (Q4 G6): the name they gave, and what they
+   * asked for, as an open item. Nothing when the run saved nothing.
+   */
+  private async fromListWrites(
+    chatbotId: string,
+    runId: string,
+  ): Promise<AgentMemoryWrite[]> {
+    try {
+      const rows = (await this.dataSource.query(
+        `SELECT input, result FROM tool_runs
+          WHERE chatbot_id = $1 AND run_id = $2 AND status = 'ok' AND tool ~ '^create_'
+          ORDER BY step`,
+        [chatbotId, runId],
+      )) as {
+        input: Record<string, unknown> | null;
+        result: { passages?: { title?: string }[] } | null;
+      }[];
+      const writes: AgentMemoryWrite[] = [];
+      for (const row of rows) {
+        const name = String(row.input?.person_name ?? '').trim();
+        if (name && !/^(try it|test visitor|a contact)$/i.test(name)) {
+          writes.push({ op: 'name', text: name.slice(0, 80) });
+        }
+        const title = String(row.result?.passages?.[0]?.title ?? '').trim();
+        if (title) {
+          writes.push({
+            op: 'add',
+            section: 'open_items',
+            text: `Asked for: ${title}`.slice(0, 200),
+          });
+        }
+      }
+      return writes;
+    } catch {
+      return [];
     }
   }
 

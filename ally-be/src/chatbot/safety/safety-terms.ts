@@ -81,9 +81,3 @@ export function validateHumanContact(value: unknown): string | null {
     return 'humanContact.url is a web address starting with http:// or https://';
   return null;
 }
-
-/** One line telling a customer how to reach a person, or '' when there is no contact. */
-export function humanContactLine(contact: HumanContact | null): string {
-  if (!contact) return '';
-  return [contact.phone, contact.email, contact.url].filter(Boolean).join(', ');
-}

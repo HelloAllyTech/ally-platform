@@ -165,6 +165,10 @@ export const COPY = {
     titleGaps: "{passed} of {total} answered well. {gaps} need your input.",
     titleClear: "{passed} of {total} answered well, each with its source",
     tiles: { accuracy: "Accuracy", safety: "Safety", sources: "With sources" },
+    // Q4 H3: a row that needs a fix opens to show why; safety questions are marked.
+    safetyTag: "Safety question",
+    itsAnswer: "Its answer:",
+    why: "Why:",
     rows: {
       answered: "Answered with a source",
       declined: "Politely declined, as it should",
@@ -415,6 +419,17 @@ export const COPY = {
   share: {
     goLiveAnyway: "Go live anyway",
     publishAnyway: "Publish anyway",
+    // Q4 A0: publishing's safety recheck, polled while it runs.
+    safetyProgress: (done: number, total: number) =>
+      total > 1 ? `Checked ${done} of ${total}.` : "",
+    safetyAnswer: "Its answer:",
+    // Q4 H3: why it failed, and the ways to fix it, beside "Check again".
+    safetyWhy: "Why:",
+    safetyFixes:
+      "Change what it should say in the Checkup, add the missing fact there, or correct the safety rules if they're not right for your business.",
+    openCheckup: "Open the Checkup",
+    wrongPack: "This isn't right for my business",
+    checkAgain: "Check again",
     title: "Who can use it?",
     public: "Anyone with the link",
     publicHelp: "Best for your website, Instagram or WhatsApp status.",

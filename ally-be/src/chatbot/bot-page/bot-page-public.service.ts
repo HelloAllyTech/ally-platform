@@ -32,6 +32,7 @@ import {
   BotPageVerifyDto,
 } from '../dto/bot-page.dto';
 import { isFailedRun } from '../engine/agent-runtime';
+import { crisisHelplines } from '../engine/crisis-helplines';
 import { ChatbotEngineService } from '../engine/chatbot-engine.service';
 import type {
   ChatbotDecision,
@@ -414,9 +415,9 @@ export class BotPagePublicService {
       language: settings.language,
       turnstileSiteKey:
         page.access === BotPageAccess.PUBLIC ? this.turnstile.siteKey : null,
-      // The builder's own numbers only (R6): never the platform's defaults.
+      // The builder's own numbers only (R6): never the platform's defaults. Q4 G7: confirmed ones.
       crisis: {
-        numbers: available.chatbot.settings?.helplineNumbers?.trim() || null,
+        numbers: crisisHelplines(available.chatbot.settings) || null,
         helplineUrl: CRISIS_LINK,
       },
       ...this.notices(available),

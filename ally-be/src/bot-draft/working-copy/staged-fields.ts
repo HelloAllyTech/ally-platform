@@ -43,9 +43,6 @@ export const SAFETY_RELEVANT: ReadonlySet<string> = new Set<string>([
   SOURCES_FIELD,
 ]);
 
-export const isStagedField = (field: string): field is StagedField =>
-  (STAGED_FIELDS as readonly string[]).includes(field);
-
 /**
  * The working-copy fields an owner may edit one at a time (per-field versions). Everything the
  * owner could already patch on the draft except `access`, which is an operational control.

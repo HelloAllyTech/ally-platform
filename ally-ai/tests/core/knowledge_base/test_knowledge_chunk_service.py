@@ -48,6 +48,15 @@ def make_item(chunk_id: str, text: str, **overrides):
     return item
 
 
+@pytest.fixture(autouse=True)
+def vector_only(monkeypatch):
+    """The vector path; keyword search and neighbours (Q4) have their own tests."""
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings.KNOWLEDGE_AGENT, "HYBRID_SEARCH", False)
+    monkeypatch.setattr(settings.KNOWLEDGE_AGENT, "NEIGHBOUR_CHUNKS", False)
+
+
 class TestKnowledgeChunkService:
     @pytest.fixture
     def vector_db(self):

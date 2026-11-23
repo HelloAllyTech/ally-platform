@@ -41,6 +41,9 @@ export type ChatbotSettingsOverride = Partial<
     WhatsAppBotSettings,
     | 'enabled'
     | 'helplineNumbers'
+    | 'helplineSource'
+    | 'helplineConfirmedAt'
+    | 'crisisPracticalLine'
     | 'disclaimerText'
     | 'crisisEscalationText'
     | 'fallbackText'
@@ -106,6 +109,11 @@ export type ChatbotSettingsOverride = Partial<
   archivedMessage?: string;
   /** Stage 4: how a customer reaches a person (go-live requires one); `safety/safety-terms.ts`. */
   humanContact?: { phone?: string; email?: string; url?: string };
+  /**
+   * Sent by the owner's Safety screen, never stored (Q4 G7): "Use this number in crisis replies".
+   * Saving a changed number confirms it too.
+   */
+  helplineConfirm?: boolean;
 };
 
 export interface ChatbotSettingsView {

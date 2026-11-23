@@ -8,10 +8,10 @@ Nothing here has run against production or real data. Stage 0 fakes (email, What
 
 ## 1. Code map
 
-Paths are under `ally-be/src/` unless prefixed. Migration ids 1986500000000 to 1987600000000 are all additive (expand step).
+Paths are under `ally-be/src/` unless prefixed. Migration ids 1986540000000 to 1987600000000 are all additive (expand step).
 
 ### Stage 1: foundations (roles, invites, agreement, flags, outbox)
-- Migrations: `1986500000000-ChatbotMemberRoleSets` (`chatbot_members.roles text[]`, trigger keeps old `role`), `1986500000100-CreateChatbotInvitesAndAssistantMember` (invites, `ASSISTANT_MEMBER` login role), `1986500000200-CreateResponderAgreements`, `1986600000000-AddCrisisFlagsAndAlertOutbox` (flag columns on `chatbot_conversations`, `alert_outbox`).
+- Migrations: `1986540000000-ChatbotMemberRoleSets` (`chatbot_members.roles text[]`, trigger keeps old `role`), `1986540000100-CreateChatbotInvitesAndAssistantMember` (invites, `ASSISTANT_MEMBER` login role), `1986540000200-CreateResponderAgreements`, `1986600000000-AddCrisisFlagsAndAlertOutbox` (flag columns on `chatbot_conversations`, `alert_outbox`).
 - `chatbot/access/chatbot-roles.ts` (role set, dual-write), `chatbot-member.guard.ts`, `chatbot-role.decorator.ts`, `backfill-owners.ts`, `staff-access-matrix.ts`.
 - `chatbot/members/`: `chatbot-members.service.ts`, `chatbot-invites.service.ts`, `chatbot-team.controller.ts`, `responder-agreement.service.ts`, `members.copy.ts`.
 - `chatbot/entity/`: `chatbot-invite`, `responder-agreement`, `chatbot-access-grant`.

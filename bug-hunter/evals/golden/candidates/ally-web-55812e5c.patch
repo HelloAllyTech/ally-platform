@@ -1,0 +1,63 @@
+diff --git a/apps/ally-admin-dashboard/src/api/auth.ts b/apps/ally-admin-dashboard/src/api/auth.ts
+index dbbe4d41cf..3370425fea 100644
+--- a/apps/ally-admin-dashboard/src/api/auth.ts
++++ b/apps/ally-admin-dashboard/src/api/auth.ts
+@@ -195,6 +195,7 @@ const authAPI = baseAPI.injectEndpoints({
+         method: HttpMethod.POST,
+         body,
+       }),
++      invalidatesTags: [TAG_TYPES.USER_PREFERENCES],
+     }),
+   }),
+ });
+diff --git a/apps/ally-admin-dashboard/src/routes/PrivateLayout.tsx b/apps/ally-admin-dashboard/src/routes/PrivateLayout.tsx
+index 10e8a0df74..e350e94805 100644
+--- a/apps/ally-admin-dashboard/src/routes/PrivateLayout.tsx
++++ b/apps/ally-admin-dashboard/src/routes/PrivateLayout.tsx
+@@ -3,12 +3,12 @@ import React, { useEffect } from "react";
+ import { useDispatch } from "react-redux";
+ import { Navigate } from "react-router-dom";
+ 
+-import { useGetUserQuery, useGetPermissionsQuery } from "@api";
++import { useGetUserQuery, useGetPermissionsQuery, useGetUserPreferencesQuery } from "@api";
+ import { Sidebar, AccessDenied } from "@components";
+ import ReportUploadProgressDialog from "@components/report-upload-progress-dialog/ReportUploadProgressDialog";
+ import { ScenarioReportsSocketProvider } from "@components/scenario-reports-socket-provider/ScenarioReportsSocketProvider";
+ import { LOCAL_STORAGE_KEYS, ROUTES, Permissions, UserRole } from "@constants";
+-import { setUser, setPermissions } from "@reducer";
++import { setUser, setPermissions, setPreferences } from "@reducer";
+ import { hasPermissions } from "@utils";
+ 
+ interface PrivateLayoutProps {
+@@ -29,13 +29,18 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
+ 
+   const { data: userData, isLoading: isUserLoading } = useGetUserQuery();
+   const { data: permissions, isLoading: isPermissionsLoading } = useGetPermissionsQuery();
++  // Restore saved preferences (e.g. sidebar order) on refresh. Not part of the
++  // loading gate below: roles without view:user:preferences get a 403, leaving
++  // `userPreferences` undefined, and the layout simply falls back to defaults.
++  const { data: userPreferences } = useGetUserPreferencesQuery();
+ 
+   const dispatch = useDispatch();
+ 
+   useEffect(() => {
+     if (userData) dispatch(setUser(userData));
+     if (permissions) dispatch(setPermissions(permissions));
+-  }, [userData, permissions]);
++    if (userPreferences) dispatch(setPreferences(userPreferences));
++  }, [userData, permissions, userPreferences]);
+ 
+   if (!isAuthenticated) {
+     return <Navigate to={ROUTES.LOGIN} replace />;
+diff --git a/apps/ally-admin-dashboard/src/routes/__tests__/PrivateLayout.test.tsx b/apps/ally-admin-dashboard/src/routes/__tests__/PrivateLayout.test.tsx
+index 59480fb58b..1475248615 100644
+--- a/apps/ally-admin-dashboard/src/routes/__tests__/PrivateLayout.test.tsx
++++ b/apps/ally-admin-dashboard/src/routes/__tests__/PrivateLayout.test.tsx
+@@ -41,6 +41,7 @@ vi.mock("@store", () => ({
+ vi.mock("@api", () => ({
+   useGetUserQuery: () => ({ data: { id: 1 }, isLoading: false }),
+   useGetPermissionsQuery: () => ({ data: [Permissions.EDIT_USER], isLoading: false }),
++  useGetUserPreferencesQuery: () => ({ data: undefined, isLoading: false }),
+   useLazyGetUserQuery: () => [vi.fn().mockResolvedValue({ data: { id: 1 } }), { isLoading: false }],
+   useLazyGetPermissionsQuery: () => [
+     vi.fn().mockResolvedValue({ data: [Permissions.EDIT_USER] }),

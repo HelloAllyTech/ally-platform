@@ -34,7 +34,7 @@ describe('Safety packs: clean declines (SP1)', () => {
       'never list the services or tests the business offers',
     );
     // Medical 3: Q3-fast added the business's own published information.
-    expect(SAFETY_PACKS[id].version).toBe(id === SafetyPackId.MEDICAL ? 3 : 2);
+    expect(SAFETY_PACKS[id].version).toBe(id === SafetyPackId.MEDICAL ? 4 : 2); // Medical: Q3-fast, then Q4 G+12
   });
 
   it('adds the helpline and the booking offer only when the bot has them', () => {

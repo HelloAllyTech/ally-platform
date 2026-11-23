@@ -13,13 +13,6 @@ export const SAFETY_TEXT_KINDS = [
 ] as const;
 export type SafetyTextKind = (typeof SAFETY_TEXT_KINDS)[number];
 
-/** The curated languages (D5): their fixed texts are always used, never a stored translation. */
-export const CURATED_LANGUAGES: readonly ReplyLanguage[] = [
-  'en',
-  'hi',
-  'hi-latn',
-];
-
 export function curatedLanguageOf(
   language: string | null | undefined,
 ): ReplyLanguage | null {

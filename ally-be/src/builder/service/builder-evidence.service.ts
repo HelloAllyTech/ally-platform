@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { LoggerService } from 'src/logger/logger.service';
 import { AnalyticsAgentService } from 'src/analytics-agent/service/analytics-agent.service';
-import { BugFindingService } from 'src/bug-hunter/service/bug-finding.service';
+import { BugHunterBoardService } from 'src/bug-hunter-approvals/service/bug-hunter-board.service';
 import { LogsService } from 'src/logs/logs.service';
 import { UxSignalReadService } from 'src/ux-signals/service/ux-signal-read.service';
 import { AwsLogServiceKey } from 'src/config/config.service';
@@ -45,7 +45,7 @@ export class BuilderEvidenceService {
   constructor(
     private readonly analyticsAgent: AnalyticsAgentService,
     private readonly logsService: LogsService,
-    private readonly bugFindingService: BugFindingService,
+    private readonly bugHunter: BugHunterBoardService,
     private readonly uxSignalRead: UxSignalReadService,
   ) {}
 
@@ -132,7 +132,7 @@ export class BuilderEvidenceService {
   async openFindings(repo?: string): Promise<any> {
     try {
       const findings = await this.withDeadline(
-        this.bugFindingService.listOpenForRepo(repo?.trim() || undefined),
+        this.bugHunter.openBugs(repo?.trim() || undefined),
         BUILDER_EVIDENCE_TIMEOUT_MS,
       );
       return {

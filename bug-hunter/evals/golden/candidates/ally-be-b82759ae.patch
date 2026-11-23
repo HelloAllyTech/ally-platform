@@ -1,0 +1,39 @@
+diff --git a/ally-be/src/scenario-character/constants/character-interview.constants.ts b/ally-be/src/scenario-character/constants/character-interview.constants.ts
+index 3a7259452..30baf01d6 100644
+--- a/ally-be/src/scenario-character/constants/character-interview.constants.ts
++++ b/ally-be/src/scenario-character/constants/character-interview.constants.ts
+@@ -41,7 +41,7 @@ export const CHARACTER_INTERVIEW_MAX_TRUNCATION_RETRIES = 2;
+  * partial result, so the fix is to send the identical request again rather
+  * than to tell the model anything: two retries put a turn's odds past 95%.
+  */
+-export const CHARACTER_INTERVIEW_MAX_INVALID_TOOL_CALL_RETRIES = 2;
++export const CHARACTER_INTERVIEW_MAX_INVALID_TOOL_CALL_RETRIES = 4;
+ 
+ /**
+  * Per-tenant interview caps. These bound LLM spend now that the agent is
+diff --git a/ally-be/src/scenario-character/constants/test/character-interview.constants.spec.ts b/ally-be/src/scenario-character/constants/test/character-interview.constants.spec.ts
+new file mode 100644
+index 000000000..1da2e63d8
+--- /dev/null
++++ b/ally-be/src/scenario-character/constants/test/character-interview.constants.spec.ts
+@@ -0,0 +1,7 @@
++import { CHARACTER_INTERVIEW_MAX_INVALID_TOOL_CALL_RETRIES } from '../character-interview.constants';
++
++describe('Character Interview Constants', () => {
++  it('should have the correct value for CHARACTER_INTERVIEW_MAX_INVALID_TOOL_CALL_RETRIES', () => {
++    expect(CHARACTER_INTERVIEW_MAX_INVALID_TOOL_CALL_RETRIES).toBe(4);
++  });
++});
+diff --git a/ally-be/src/scenario-character/service/test/character-interview-orchestrator.service.spec.ts b/ally-be/src/scenario-character/service/test/character-interview-orchestrator.service.spec.ts
+index 5093a9b33..276087ae6 100644
+--- a/ally-be/src/scenario-character/service/test/character-interview-orchestrator.service.spec.ts
++++ b/ally-be/src/scenario-character/service/test/character-interview-orchestrator.service.spec.ts
+@@ -355,7 +355,7 @@ describe('CharacterInterviewOrchestratorService — truncated turns', () => {
+     // Not reported as an empty turn — the two are indistinguishable from the
+     // response alone but need different advice.
+     expect(error?.data.message).toContain('could not read');
+-    expect(streamMock).toHaveBeenCalledTimes(3);
++    expect(streamMock).toHaveBeenCalledTimes(5);
+     expect(appendMessage.mock.calls[1][1].metadata.errored).toBe(true);
+   });
+ 

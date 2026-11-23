@@ -9,7 +9,7 @@ import type {
 } from "@types";
 
 import { TEMPLATE_COPY as C, fillIn } from "./copy";
-import { Motif, TONES } from "../Login/Motifs";
+import { BUSINESS_TONES, Motif, TONES, hasMotif } from "../Login/Motifs";
 
 import "./templates.css";
 
@@ -129,8 +129,11 @@ export const TemplateSetup: React.FC<{
 };
 
 const Card: React.FC<{ card: TemplateCard; onChoose: () => void }> = ({ card, onChoose }) => {
-  const organisation = card.group === "organisations";
-  const tone = organisation ? TONES[card.icon] : undefined;
+  // Organisation templates name their motif in `icon`; business ones carry an emoji there,
+  // so their motif is keyed by template id.
+  const artKey = card.group === "organisations" ? card.icon : card.id;
+  const drawn = hasMotif(artKey);
+  const tone = TONES[artKey] ?? BUSINESS_TONES[artKey];
   const lists = card.lists.map(l => l.name).join(", ");
   return (
     <button
@@ -144,8 +147,8 @@ const Card: React.FC<{ card: TemplateCard; onChoose: () => void }> = ({ card, on
         aria-hidden="true"
         style={tone ? { background: tone.bg } : undefined}
       >
-        {organisation ? (
-          <Motif id={card.icon} className="ally-templates__motif" />
+        {drawn ? (
+          <Motif id={artKey} className="ally-templates__motif" />
         ) : (
           <span className="ally-templates__emoji">{card.icon}</span>
         )}

@@ -1,12 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 
-import { BugFindingRepository } from 'src/bug-hunter/repository/bug-finding.repository';
-import {
-  BugFindingSeverity,
-  BugFindingSource,
-  BugFindingStatus,
-} from 'src/bug-hunter/enum/bug-finding.enum';
+import { BugHunterBoardService } from 'src/bug-hunter-approvals/service/bug-hunter-board.service';
+import { BugFindingSeverity } from 'src/bug-hunter/enum/bug-finding.enum';
 import { PmAgentSignal } from 'src/pm-agent/entity/pm-agent-signal.entity';
 
 import { UxSignalWriterService } from '../ux-signal-writer.service';
@@ -20,8 +16,8 @@ import { TriagedItem } from '../../ux-signals.types';
  */
 describe('UxSignalWriterService', () => {
   let service: UxSignalWriterService;
-  let findOpenByDedupeKey: jest.Mock;
-  let saveFinding: jest.Mock;
+  /** Bug Hunter's queue: true for a new key, false for one already queued. */
+  let enqueueSignal: jest.Mock;
   /** Every (sql, params) the signal repository ran, in order. */
   let signalQuery: jest.Mock;
 
@@ -54,8 +50,12 @@ describe('UxSignalWriterService', () => {
   });
 
   beforeEach(async () => {
-    findOpenByDedupeKey = jest.fn().mockResolvedValue(null);
-    saveFinding = jest.fn(async (row) => row);
+    const queued = new Set<string>();
+    enqueueSignal = jest.fn(async (input: { key: string }) => {
+      const fresh = !queued.has(input.key);
+      queued.add(input.key);
+      return fresh;
+    });
     // Stands in for Postgres' ON CONFLICT (source, key): the first insert of a
     // key reports inserted=true, a repeat reports inserted=false.
     const keys = new Set<string>();
@@ -69,14 +69,7 @@ describe('UxSignalWriterService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UxSignalWriterService,
-        {
-          provide: BugFindingRepository,
-          useValue: {
-            findOpenByDedupeKey,
-            create: (row: unknown) => row,
-            save: saveFinding,
-          },
-        },
+        { provide: BugHunterBoardService, useValue: { enqueueSignal } },
         {
           provide: getRepositoryToken(PmAgentSignal),
           useValue: { query: signalQuery },
@@ -89,40 +82,35 @@ describe('UxSignalWriterService', () => {
 
   afterEach(() => jest.clearAllMocks());
 
-  it('files a bug as a NEW ux_signal finding with the route as its symbol', async () => {
-    // symbol is the whole reason UX findings dedupe precisely: they carry no
-    // file, so without it the key falls back to a fingerprint of LLM prose.
+  it("files a bug into Bug Hunter's queue with the route as its symbol", async () => {
     const result = await service.write([bug()], scan);
 
     expect(result.findingsCreated).toBe(1);
-    const saved = saveFinding.mock.calls[0][0];
-    expect(saved.source).toBe(BugFindingSource.UX_SIGNAL);
-    expect(saved.status).toBe(BugFindingStatus.NEW);
-    expect(saved.symbol).toBe('/inbox|element "Retry"');
-    expect(saved.dedupeKey).toEqual(expect.any(String));
-    // repo has to be set outright or the drawer's fix-session button cannot work.
-    expect(saved.repo).toBe('ally-web');
-    // Never claim a verification that did not happen.
-    expect(saved.proven).toBe(false);
+    const queued = enqueueSignal.mock.calls[0][0];
+    expect(queued).toMatchObject({
+      source: 'ux_signal',
+      // the app has to be set outright: every UX signal is the helpline frontend's
+      app: 'ally-web',
+      symbol: '/inbox|element "Retry"',
+      severity: BugFindingSeverity.HIGH,
+    });
+    expect(queued.key).toEqual(expect.any(String));
   });
 
-  it('counts an already-open bug as a skipped duplicate instead of re-filing', async () => {
-    findOpenByDedupeKey.mockResolvedValue({ id: 'existing' });
-
+  it('counts an already-queued bug as a skipped duplicate instead of re-filing', async () => {
+    await service.write([bug()], scan);
     const result = await service.write([bug()], scan);
 
     expect(result.findingsCreated).toBe(0);
     expect(result.skippedDuplicates).toBe(1);
-    expect(saveFinding).not.toHaveBeenCalled();
   });
 
   it('derives the same dedupe key from a reworded description of one bug', async () => {
     // The model rewords freely between runs. Two descriptions of the same
     // route+control must collapse, or the queue grows a row a night.
     await service.write([bug()], scan);
-    const firstKey = saveFinding.mock.calls[0][0].dedupeKey;
+    const firstKey = enqueueSignal.mock.calls[0][0].key;
 
-    saveFinding.mockClear();
     await service.write(
       [
         bug({
@@ -133,7 +121,7 @@ describe('UxSignalWriterService', () => {
       scan,
     );
 
-    expect(saveFinding.mock.calls[0][0].dedupeKey).toBe(firstKey);
+    expect(enqueueSignal.mock.calls[1][0].key).toBe(firstKey);
   });
 
   it('files an improvement as a new ux_signals signal', async () => {
@@ -174,7 +162,7 @@ describe('UxSignalWriterService', () => {
   it('keeps filing the rest of a scan when one row fails', async () => {
     // One malformed item must not discard the whole scan's work — the queues
     // are the deliverable, and a scan is not cheap to re-run.
-    saveFinding.mockRejectedValueOnce(new Error('constraint violation'));
+    enqueueSignal.mockRejectedValueOnce(new Error('constraint violation'));
 
     const result = await service.write([bug(), improvement()], scan);
 
@@ -182,12 +170,12 @@ describe('UxSignalWriterService', () => {
     expect(result.suggestionsCreated).toBe(1);
   });
 
-  it('puts the route and the model confidence into the finding evidence', async () => {
-    // An admin reading the drawer should see how sure the pipeline was; hiding
+  it('puts the route and the model confidence into the bug description', async () => {
+    // An admin reading the bug should see how sure the pipeline was; hiding
     // it would invite more trust than the finding earned.
     await service.write([bug()], scan);
 
-    const evidence: string = saveFinding.mock.calls[0][0].evidence;
+    const evidence: string = enqueueSignal.mock.calls[0][0].description;
     expect(evidence).toContain('Route: /inbox');
     expect(evidence).toContain('Confidence: high');
     expect(evidence).toContain('9 rage clicks across 5 sessions');

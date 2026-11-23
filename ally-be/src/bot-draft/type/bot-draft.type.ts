@@ -39,6 +39,11 @@ export interface BotDraft {
   declineText: string;
   /** Set by the server from the industry; patches can't change it. */
   safetyPackId: SafetyPackId;
+  /**
+   * The owner's correction of the pack in setup (Q4 A3, "This isn't right for my business"):
+   * copied to the assistant's rules when it's published, as the home records its own changes.
+   */
+  packChange?: import('../../chatbot/entity/chatbot.entity').PackChange | null;
   /** The owner's own rules, on top of the pack's. */
   extraNever: string[];
   branding: BotPageBranding;

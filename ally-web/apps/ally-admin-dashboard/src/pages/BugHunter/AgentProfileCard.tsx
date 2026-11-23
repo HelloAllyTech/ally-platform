@@ -1,14 +1,12 @@
 import { FC, useState } from "react";
 
-import { HelpIcon, ThreeDot } from "@icons";
-import { useNavigate } from "react-router-dom";
+import { HelpIcon } from "@icons";
 import { toast } from "sonner";
 
-import { Button, OverflowMenu, OverflowMenuItem } from "@ally-ui-mono/ui-shared";
+import { Button } from "@ally-ui-mono/ui-shared";
 import {
   useGetBugFindingsQuery,
   useGetBugHunterSettingsQuery,
-  useGetBugHuntRunsQuery,
   useUpdateBugHunterSettingsMutation,
 } from "@api";
 import { ActionConfirmationPopup } from "@components/action-confirmation-popup";
@@ -16,14 +14,12 @@ import { ActionConfirmationPopup } from "@components/action-confirmation-popup";
 // mock that barrel wholesale, and reaching past it keeps the avatar real in
 // them — the same treatment ErrorBoundary gets in BugFindingsTable.
 import { AgentAvatar } from "@components/agent-avatar";
-import { en, ROUTES } from "@constants";
-import { BugFinding, BugHunterMode, BugHuntRun, BugHuntRunStatus, BugHuntTrigger } from "@types";
+import { en } from "@constants";
+import { BugFinding, BugHunterMode } from "@types";
 
 import { AgentStatusKind, deriveAgentStatus } from "./agentPersona";
 import { BrailleSpinner } from "./BrailleSpinner";
-import { FeatureMapRefreshDialog } from "./FeatureMapPanel";
 import { IN_FLIGHT_STATUSES } from "./lifecycleBucket";
-import { useUxSignalScan } from "./useUxSignalScan";
 
 const MODE_ORDER: BugHunterMode[] = [BugHunterMode.OFF, BugHunterMode.MANUAL, BugHunterMode.AI];
 
@@ -68,29 +64,11 @@ const STATE_STYLES: Record<AgentStatusKind, string> = {
   on_shift: "text-typography-900",
 };
 
-const SWEEP_TRIGGERS: BugHuntTrigger[] = [BugHuntTrigger.SCHEDULED, BugHuntTrigger.MANUAL];
-
-/**
- * "12m ago", "6h ago", "3d ago". Unit letters untranslated, like the table's
- * Age column — the admin console is English-only, and a header sentence has
- * no room for "6 hours ago".
- */
-export const formatAgo = (iso: string, now: number = Date.now()): string => {
-  const minutes = Math.max(0, Math.floor((now - new Date(iso).getTime()) / 60_000));
-  if (minutes < 1) return en.bugHunter.headerJustNow;
-  if (minutes < 60) return en.bugHunter.headerAgo.replace("{span}", `${minutes}m`);
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return en.bugHunter.headerAgo.replace("{span}", `${hours}h`);
-  return en.bugHunter.headerAgo.replace("{span}", `${Math.floor(hours / 24)}d`);
-};
-
 export interface AgentProfileCardProps {
   /** Opens the In progress tab — what "Fixing N now" links to. */
   onShowInProgress: () => void;
   /** Opens the About panel. */
   onShowHelp: () => void;
-  /** Whether this reader may start a feature-map run — the menu leaves the item out otherwise. */
-  canTriage: boolean;
 }
 
 /**
@@ -117,20 +95,13 @@ export interface AgentProfileCardProps {
  *   Autonomous — and still confirm-before-flip: it decides what happens to
  *   every bug the pipeline is about to find, and landing on the wrong one
  *   shouldn't be a misclick. This stays the one place the kill switch lives.
- * - **The ⋯ menu holds what is used rarely** — Model settings, "Scan UX signals
- *   now" with its last-scan line, and "Map features now" — per *Default
- *   to Common Case, Hide Alternatives*: discoverable, not in the way.
+ * - **No ⋯ menu.** It held the old Bug Hunter's model settings, UX scan and
+ *   feature map; all three left with that engine.
  * - **Help** opens About in a side panel, so About is no longer a tab.
  */
-export const AgentProfileCard: FC<AgentProfileCardProps> = ({
-  onShowInProgress,
-  onShowHelp,
-  canTriage,
-}) => {
-  const navigate = useNavigate();
+export const AgentProfileCard: FC<AgentProfileCardProps> = ({ onShowInProgress, onShowHelp }) => {
   const { data: settings, isLoading, isError } = useGetBugHunterSettingsQuery();
   const [updateSettings, { isLoading: isUpdating }] = useUpdateBugHunterSettingsMutation();
-  const uxScan = useUxSignalScan();
 
   // Identical query args to BugFindingsTable's initial state and to
   // RunHistoryTable's, so these share one RTK Query cache entry each rather
@@ -139,21 +110,11 @@ export const AgentProfileCard: FC<AgentProfileCardProps> = ({
     { status: "all", limit: 100 },
     { pollingInterval: 15_000 },
   );
-  const { data: runsData } = useGetBugHuntRunsQuery(undefined, { pollingInterval: 10_000 });
 
   const [pendingMode, setPendingMode] = useState<BugHunterMode | null>(null);
-  const [mappingFeatures, setMappingFeatures] = useState(false);
 
   const findings: BugFinding[] = findingsData?.items ?? [];
-  const runs: BugHuntRun[] = runsData?.items ?? [];
-  // Newest first whatever order the endpoint returns, so "last sweep" can't
-  // quietly become "some sweep".
-  const sweeps = runs
-    .filter(run => SWEEP_TRIGGERS.includes(run.trigger))
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  const liveSweep = sweeps.find(run => run.status === BugHuntRunStatus.RUNNING) ?? null;
-  const lastSweep = sweeps.find(run => run.status !== BugHuntRunStatus.RUNNING) ?? null;
-  const status = deriveAgentStatus({ mode: settings?.mode, findings, liveRun: liveSweep });
+  const status = deriveAgentStatus({ mode: settings?.mode, findings, liveRun: null });
   const fixingCount = findings.filter(finding =>
     IN_FLIGHT_STATUSES.includes(finding.status),
   ).length;
@@ -170,7 +131,6 @@ export const AgentProfileCard: FC<AgentProfileCardProps> = ({
   };
 
   const labels = modeLabels();
-  const lastSweepAt = lastSweep ? (lastSweep.finishedAt ?? lastSweep.createdAt) : null;
 
   return (
     <section className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-border-light bg-white px-4 py-2.5">
@@ -206,16 +166,6 @@ export const AgentProfileCard: FC<AgentProfileCardProps> = ({
                 {en.bugHunter.headerFixingNow.replace("{count}", String(fixingCount))}
               </button>
             </>
-          )}
-          {(status.kind !== "working" || fixingCount > 0) && <span aria-hidden="true"> · </span>}
-          {liveSweep ? (
-            <span>{en.bugHunter.headerSweepingNow.replace("{repo}", liveSweep.repo)}</span>
-          ) : lastSweepAt ? (
-            <span title={new Date(lastSweepAt).toLocaleString()}>
-              {en.bugHunter.headerLastSweep.replace("{when}", formatAgo(lastSweepAt))}
-            </span>
-          ) : (
-            <span>{en.bugHunter.headerNoSweepYet}</span>
           )}
         </p>
       )}
@@ -260,50 +210,6 @@ export const AgentProfileCard: FC<AgentProfileCardProps> = ({
           renderIcon={HelpIcon}
           onClick={onShowHelp}
         />
-
-        {/* Carbon's OverflowMenu rather than a bespoke popover: keyboard
-            navigation, click-outside and focus return come with it.
-            `iconDescription` is what names the trigger. */}
-        <OverflowMenu
-          size="sm"
-          flipped
-          align="bottom"
-          renderIcon={ThreeDot}
-          iconDescription={en.bugHunter.headerMenuLabel}
-          // Wider than Carbon's 10rem, and rows that can grow: the scan item
-          // carries its last-scan line under the label.
-          menuOptionsClass="!w-72 [&_li]:!h-auto"
-          data-testid="bug-hunter-header-menu"
-        >
-          <OverflowMenuItem
-            itemText={en.bugHunter.settingsLink}
-            onClick={() => navigate(`${ROUTES.SETTINGS}?tab=ai-models`)}
-          />
-          {uxScan.canScan && (
-            <OverflowMenuItem
-              className="!h-auto !py-2"
-              disabled={uxScan.isBusy}
-              onClick={() => void uxScan.runScan()}
-              itemText={
-                <span className="flex flex-col items-start gap-0.5 whitespace-normal text-left">
-                  <span>
-                    {uxScan.isBusy ? en.uxSignals.scanning : en.bugHunter.menuScanUxSignals}
-                  </span>
-                  {/* The last-scan line, so a scan that has been failing
-                      quietly for a fortnight is visible to whoever opens this
-                      menu, and a fresh one doesn't invite a redundant run. */}
-                  <span className="text-xs text-typography-500">{uxScan.lastScanLine}</span>
-                </span>
-              }
-            />
-          )}
-          {canTriage && (
-            <OverflowMenuItem
-              itemText={en.bugHunter.menuMapFeatures}
-              onClick={() => setMappingFeatures(true)}
-            />
-          )}
-        </OverflowMenu>
       </div>
 
       {pendingMode !== null && (
@@ -316,8 +222,6 @@ export const AgentProfileCard: FC<AgentProfileCardProps> = ({
           secondaryButton={{ label: en.bugHunter.cancel, onClick: () => setPendingMode(null) }}
         />
       )}
-
-      {mappingFeatures && <FeatureMapRefreshDialog onClose={() => setMappingFeatures(false)} />}
     </section>
   );
 };

@@ -31,10 +31,6 @@ const currentUserId = (): number => Number(ExecutionManager.getUserId() ?? 0);
 export const INVITE_TTL_DAYS = 7;
 /** Pending invites one chatbot may have at once. */
 export const MAX_PENDING_INVITES = 200;
-export {
-  CHATBOT_INVITE_CREATED_EVENT,
-  type ChatbotInviteCreatedEvent,
-} from '../../notification/type/chatbot-invite.event';
 
 /**
  * Roles that already sign in to the admin portal. An invited existing account holding none of

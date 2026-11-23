@@ -178,7 +178,6 @@ const buildNavigationItems = (): NavigationItem[] => {
     },
     { id: S.AI_LAB, label: l.aiLab, path: ROUTES.AI_LAB, section: "ai-languages" },
     // Product
-    { id: S.PRODUCT_ROADMAP, label: l.roadmap, path: ROUTES.PRODUCT_ROADMAP, section: "product" },
     { id: S.ROADMAP_V2, label: l.roadmapV2, path: ROUTES.ROADMAP, section: "product" },
     {
       id: S.USER_INTERVIEWS,
@@ -186,7 +185,12 @@ const buildNavigationItems = (): NavigationItem[] => {
       path: ROUTES.USER_INTERVIEWS,
       section: "product",
     },
-    { id: S.BUG_HUNTER, label: l.bugHunter, path: ROUTES.BUG_HUNTER, section: "product" },
+    {
+      id: S.BUG_HUNTER_V2,
+      label: en.bugHunterV2.tabLabel,
+      path: ROUTES.BUG_HUNTER_V2,
+      section: "product",
+    },
     { id: S.PM_AGENT, label: en.pmAgent.tabLabel, path: ROUTES.PM_AGENT, section: "product" },
     { id: S.BUILDER, label: l.builder, path: ROUTES.BUILDER, section: "product" },
     {
@@ -490,11 +494,6 @@ export const deriveNavigationItems = ({
               (permissions!.includes(Permissions.SYSTEM_ACCESS) ||
                 permissions!.includes(Permissions.REVIEW_DEBRIEFS) ||
                 permissions!.includes(Permissions.MANAGE_DEBRIEF_SETTINGS))
-            );
-          case SIDEBAR_ITEMS.PRODUCT_ROADMAP:
-            return (
-              permissions!.includes(Permissions.VIEW_PRODUCT_ROADMAP) &&
-              hasFeature(features, FeatureToggleKey.PRODUCT_ROADMAP)
             );
           // Same grant as the board, and only while the flag is on (the role read succeeded).
           case SIDEBAR_ITEMS.ROADMAP_V2:

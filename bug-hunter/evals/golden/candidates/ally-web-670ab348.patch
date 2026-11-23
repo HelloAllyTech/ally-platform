@@ -1,0 +1,252 @@
+diff --git a/apps/ally-admin-dashboard/src/pages/Login/Login.tsx b/apps/ally-admin-dashboard/src/pages/Login/Login.tsx
+index d8741f2d69..b6cc198d3a 100644
+--- a/apps/ally-admin-dashboard/src/pages/Login/Login.tsx
++++ b/apps/ally-admin-dashboard/src/pages/Login/Login.tsx
+@@ -1,5 +1,6 @@
+ import React, { useState, useEffect, useCallback } from "react";
+ 
++import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
+ import { AnimatePresence, motion } from "framer-motion";
+ import { useSelector } from "react-redux";
+ import { useNavigate } from "react-router-dom";
+@@ -166,7 +167,9 @@ export const Login: React.FC = () => {
+           navigate("/");
+         }
+       } else {
+-        toast.error("Failed to sign in with Google");
++        const error = response.error as FetchBaseQueryError;
++        const errorData = error.data as { message: string } | undefined;
++        toast.error(errorData?.message ?? "Failed to sign in with Google");
+       }
+     } catch {
+       toast.error("Failed to sign in with Google");
+diff --git a/apps/ally-helpline-dashboard/src/pages/achievements-view-all/AchievementsViewAll.tsx b/apps/ally-helpline-dashboard/src/pages/achievements-view-all/AchievementsViewAll.tsx
+index 1814e84555..8aeaaffa32 100644
+--- a/apps/ally-helpline-dashboard/src/pages/achievements-view-all/AchievementsViewAll.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/achievements-view-all/AchievementsViewAll.tsx
+@@ -7,7 +7,7 @@ import { FEATURE_FLAGS_MAP } from "@ally-ui-mono/ui-shared/featureFlag";
+ import { useGetAvailableBadgesQuery } from "@api";
+ import { ArrowLeft, Info, NoResults } from "@assets";
+ import { AchievementItem, FallbackUI, ToggleButtonGroup } from "@components";
+-import { ROUTES, navBarOptions, toolTipStyles } from "@constants";
++import { toolTipStyles } from "@constants";
+ import { AchievementItemData, BadgeCategory, LockedStatus } from "@types";
+ 
+ // Badge type display labels
+@@ -51,9 +51,7 @@ export const AchievementsViewAll: FC = () => {
+   const location = useLocation();
+   const [activeFilter, setActiveFilter] = useState("ALL");
+ 
+-  const isFromNavbar =
+-    location.pathname === ROUTES.ACHIEVEMENTS_VIEW_ALL ||
+-    navBarOptions.some(option => option.path === location.pathname);
++  const isFromLeaderboard = location.state?.from === "leaderboard";
+ 
+   const {
+     data: badgesData = [],
+@@ -122,7 +120,7 @@ export const AchievementsViewAll: FC = () => {
+     return (
+       <div className="flex flex-col gap-3 w-full">
+         <div className="flex flex-row items-center gap-3 sm:gap-[18px]">
+-          {!isFromNavbar && (
++          {isFromLeaderboard && (
+             <button
+               onClick={() => navigate(-1)}
+               className="p-2 -m-2 hover:bg-gray-100 rounded-full transition-colors"
+diff --git a/apps/ally-helpline-dashboard/src/pages/achievements-view-all/__tests__/AchievementsViewAll.test.tsx b/apps/ally-helpline-dashboard/src/pages/achievements-view-all/__tests__/AchievementsViewAll.test.tsx
+index ff05e989be..36448bcbd1 100644
+--- a/apps/ally-helpline-dashboard/src/pages/achievements-view-all/__tests__/AchievementsViewAll.test.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/achievements-view-all/__tests__/AchievementsViewAll.test.tsx
+@@ -30,6 +30,7 @@ const {
+   mockUseDeleteProfileImageMutation,
+   mockUseUploadProfileImageMutation,
+   mockUseUser,
++  mockLocation,
+ } = vi.hoisted(() => ({
+   mockUseGetAvailableBadgesQuery: vi.fn(),
+   mockNavigate: vi.fn(),
+@@ -45,6 +46,7 @@ const {
+   mockUseDeleteProfileImageMutation: vi.fn(),
+   mockUseUploadProfileImageMutation: vi.fn(),
+   mockUseUser: vi.fn(),
++  mockLocation: { state: null, pathname: "/achievements", search: "", hash: "" },
+ }));
+ 
+ // Mock API
+@@ -70,6 +72,7 @@ vi.mock("react-router-dom", async () => {
+   return {
+     ...actual,
+     useNavigate: () => mockNavigate,
++    useLocation: () => mockLocation,
+   };
+ });
+ 
+@@ -256,6 +259,7 @@ const TestWrapper = ({ children }: { children: React.ReactNode }) => (
+ describe("AchievementsViewAll Component", () => {
+   beforeEach(() => {
+     vi.clearAllMocks();
++    mockLocation.state = null;
+     mockUseGetAvailableBadgesQuery.mockReturnValue(defaultQueryReturn);
+     mockUseGetMyBadgesQuery.mockReturnValue({
+       data: { data: [] },
+@@ -314,6 +318,7 @@ describe("AchievementsViewAll Component", () => {
+     });
+ 
+     it("renders the back button", () => {
++      mockLocation.state = { from: "leaderboard" };
+       render(
+         <TestWrapper>
+           <AchievementsViewAll />
+@@ -633,6 +638,7 @@ describe("AchievementsViewAll Component", () => {
+    */
+   describe("Navigation", () => {
+     it("navigates back when back button is clicked", () => {
++      mockLocation.state = { from: "leaderboard" };
+       render(
+         <TestWrapper>
+           <AchievementsViewAll />
+@@ -827,6 +833,7 @@ describe("AchievementsViewAll Component", () => {
+    */
+   describe("Accessibility", () => {
+     it("has accessible back button with aria-label", () => {
++      mockLocation.state = { from: "leaderboard" };
+       render(
+         <TestWrapper>
+           <AchievementsViewAll />
+diff --git a/apps/ally-helpline-dashboard/src/pages/auth/Login.tsx b/apps/ally-helpline-dashboard/src/pages/auth/Login.tsx
+index 3011042889..130bab8f84 100644
+--- a/apps/ally-helpline-dashboard/src/pages/auth/Login.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/auth/Login.tsx
+@@ -206,6 +206,7 @@ export const Login: FunctionComponent = () => {
+           navigate(ROUTES.SUSPENDED_USER);
+           return;
+         }
++        toast.error(errorData?.message ?? "Failed to sign in with Google");
+       } else {
+         toast.error("Failed to sign in with Google");
+       }
+diff --git a/apps/ally-helpline-dashboard/src/pages/leaderboard/Leaderboard.tsx b/apps/ally-helpline-dashboard/src/pages/leaderboard/Leaderboard.tsx
+index 92e00e4e9b..77c029e2c2 100644
+--- a/apps/ally-helpline-dashboard/src/pages/leaderboard/Leaderboard.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/leaderboard/Leaderboard.tsx
+@@ -98,7 +98,7 @@ export const Leaderboard = () => {
+   }, [leaderboardData.length, leaderBoardList]);
+ 
+   const handleViewAllBadges = () => {
+-    navigate(ROUTES.ACHIEVEMENTS_VIEW_ALL);
++    navigate(ROUTES.ACHIEVEMENTS_VIEW_ALL, { state: { from: "leaderboard" } });
+   };
+ 
+   const getBadgesList = () => {
+diff --git a/apps/ally-helpline-dashboard/src/routes/HybridRouteLayout.tsx b/apps/ally-helpline-dashboard/src/routes/HybridRouteLayout.tsx
+index d60d2bf28e..d7b712a626 100644
+--- a/apps/ally-helpline-dashboard/src/routes/HybridRouteLayout.tsx
++++ b/apps/ally-helpline-dashboard/src/routes/HybridRouteLayout.tsx
+@@ -8,7 +8,6 @@ import { NavbarWrapper } from "./components";
+ 
+ const HybridRouteLayout: FC = () => {
+   const { isAuthenticated } = useUser();
+-
+   useAutoActiveCallRedirect(isAuthenticated);
+ 
+   return (
+diff --git a/apps/ally-helpline-dashboard/src/routes/PrivateRouteLayout.tsx b/apps/ally-helpline-dashboard/src/routes/PrivateRouteLayout.tsx
+index 4d0361ceb1..3059177916 100644
+--- a/apps/ally-helpline-dashboard/src/routes/PrivateRouteLayout.tsx
++++ b/apps/ally-helpline-dashboard/src/routes/PrivateRouteLayout.tsx
+@@ -1,8 +1,8 @@
+ import { FC, useEffect } from "react";
+ 
+-import { Route, Routes, Navigate, useNavigate, useLocation } from "react-router-dom";
++import { Route, Routes, Navigate, useNavigate } from "react-router-dom";
+ 
+-import { FEATURE_FLAGS_MAP, logger } from "@ally-ui-mono/ui-shared";
++import { logger } from "@ally-ui-mono/ui-shared";
+ import { useGetChatTypesQuery } from "@api";
+ import {
+   LOCAL_STORAGE_KEYS,
+@@ -11,7 +11,7 @@ import {
+   ROUTES,
+   CALL_PERMISSIONS,
+ } from "@constants";
+-import { useUser, useAutoActiveCallRedirect, useAchievementBadgeModal } from "@hooks";
++import { useUser, useAutoActiveCallRedirect } from "@hooks";
+ import {
+   Calls,
+   Analytics,
+@@ -35,7 +35,6 @@ import {
+   hasPermissions,
+   hasSessionLogsPermission,
+   hasReviewPermission,
+-  isPathExcluded,
+ } from "@utils";
+ 
+ import { NavbarWrapper, PermissionGuardedRoute } from "./components";
+@@ -43,14 +42,7 @@ import { NavbarWrapper, PermissionGuardedRoute } from "./components";
+ const PrivateRouteLayout: FC = () => {
+   const { user, checkAuth, permissions, isAuthenticated } = useUser();
+   const navigate = useNavigate();
+-  const location = useLocation();
+   useAutoActiveCallRedirect(isAuthenticated);
+-  const { BadgeModal } = useAchievementBadgeModal();
+-
+-  const shouldShowBadgeModal =
+-    isAuthenticated &&
+-    FEATURE_FLAGS_MAP.BADGES_FLAG &&
+-    !isPathExcluded(location.pathname, [ROUTES.SIMULATION, ROUTES.CALLS]);
+ 
+   const hasChatTypePermissions = hasPermissions(permissions, Permissions.VIEW_CHAT_TYPES);
+   const { data: chatTypes } = useGetChatTypesQuery(undefined, {
+@@ -234,7 +226,6 @@ const PrivateRouteLayout: FC = () => {
+         />
+         <Route path="*" element={<Navigate to="/" replace />} />
+       </Routes>
+-      {shouldShowBadgeModal && BadgeModal}
+     </NavbarWrapper>
+   );
+ };
+diff --git a/apps/ally-helpline-dashboard/src/routes/components/NavbarWrapper.tsx b/apps/ally-helpline-dashboard/src/routes/components/NavbarWrapper.tsx
+index 9306697ee6..3ef5566cd3 100644
+--- a/apps/ally-helpline-dashboard/src/routes/components/NavbarWrapper.tsx
++++ b/apps/ally-helpline-dashboard/src/routes/components/NavbarWrapper.tsx
+@@ -3,21 +3,29 @@ import { FC, useEffect, useMemo, useState } from "react";
+ import { MenuIcon } from "lucide-react";
+ import { matchPath, useLocation, useNavigate } from "react-router-dom";
+ 
++import { FEATURE_FLAGS_MAP } from "@ally-ui-mono/ui-shared";
+ import { NavSideBar } from "@components";
+-import { excludeNavBar, navBarOptions, TabId, LOCAL_STORAGE_KEYS } from "@constants";
+-import { useUser } from "@hooks";
++import { excludeNavBar, navBarOptions, TabId, LOCAL_STORAGE_KEYS, ROUTES } from "@constants";
++import { useUser, useAchievementBadgeModal } from "@hooks";
+ import { isPathExcluded } from "@utils";
+ 
+ import UploadProgressDialog from "./UploadProgressDialog";
+ 
+ // TODO: Rename to LayoutWrapper
+ const NavbarWrapper: FC<{ children: React.ReactNode }> = ({ children }) => {
+-  const { user, checkAuth } = useUser();
++  const { user, checkAuth, isAuthenticated } = useUser();
+   const { pathname } = useLocation();
+   const navigate = useNavigate();
+ 
+   const [isSidebarOpen, setSidebarOpen] = useState<boolean>(false);
+ 
++  const { BadgeModal } = useAchievementBadgeModal();
++
++  const shouldShowBadgeModal =
++    isAuthenticated &&
++    FEATURE_FLAGS_MAP.BADGES_FLAG &&
++    !isPathExcluded(pathname, [ROUTES.SIMULATION, ROUTES.CALLS]);
++
+   useEffect(() => {
+     // checkAuth only for logged in users
+     // TODO: try to optimize this
+@@ -61,6 +69,7 @@ const NavbarWrapper: FC<{ children: React.ReactNode }> = ({ children }) => {
+           </button>
+           {children}
+           <UploadProgressDialog />
++          {shouldShowBadgeModal && BadgeModal}
+         </div>
+       </div>
+     </div>

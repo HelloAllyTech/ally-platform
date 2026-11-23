@@ -176,16 +176,16 @@ export const Capabilities: React.FC = () => {
     <section
       aria-label={heading}
       data-testid="capabilities"
-      className="mt-4 flex flex-col gap-4 border-t border-[#1E1B4B]/20 pt-6"
+      className="mt-4 flex flex-col gap-4 border-t border-[#2B2520]/20 pt-6"
     >
-      <h2 className="text-base font-semibold text-[#1E1B4B]">{heading}</h2>
-      <ul className="m-0 grid list-none grid-cols-2 border-l border-t border-[#1E1B4B]/20 p-0 sm:grid-cols-3">
+      <h2 className="text-base font-semibold text-[#2B2520]">{heading}</h2>
+      <ul className="m-0 grid list-none grid-cols-2 border-l border-t border-[#2B2520]/20 p-0 sm:grid-cols-3">
         {items.map((item, index) => {
           const hover = HOVERS[index % HOVERS.length];
           return (
             <li
               key={item.id}
-              className="group flex flex-col gap-2 border-b border-r border-[#1E1B4B]/20 p-4 text-[#1E1B4B] transition-colors duration-200 hover:!bg-[var(--hover-bg)] hover:!text-[var(--hover-fg)]"
+              className="group flex flex-col gap-2 border-b border-r border-[#2B2520]/20 p-4 text-[#2B2520] transition-colors duration-200 hover:!bg-[var(--hover-bg)] hover:!text-[var(--hover-fg)]"
               style={{ "--hover-bg": hover.bg, "--hover-fg": hover.fg } as React.CSSProperties}
             >
               <Glyph

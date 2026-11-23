@@ -50,7 +50,6 @@ export * from "./RoleplaySessionLogs/RoleplaySessionLogs";
 export * from "./RoleplaySessionLogs/RoleplaySessionLogDetail";
 export * from "./Terms/Terms";
 export * from "./Privacy/Privacy";
-export * from "./ProductRoadmap";
 export * from "./Roadmap";
 export * from "./BuilderHome";
 export * from "./WhatsAppBot";
@@ -60,3 +59,4 @@ export * from "./WhatsAppBot";
 // those heavy deps load only when a super-admin opens the Analytics tab.
 export * from "./Providers/Providers";
 export * from "./Providers/PrecedenceExplainer";
+export * from "./BugHunterV2";

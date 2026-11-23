@@ -1,7 +1,5 @@
 import { ApiPropertyOptional, ApiProperty } from '@nestjs/swagger';
 import {
-  ArrayMaxSize,
-  IsArray,
   IsEnum,
   IsOptional,
   IsString,
@@ -10,11 +8,7 @@ import {
   MaxLength,
 } from 'class-validator';
 import { BotImageKind } from '../entity/bot-image.entity';
-import {
-  BOT_PAGE_BOUNDS,
-  HEX_COLOUR,
-  MAX_GALLERY_IMAGES,
-} from '../type/bot-page.type';
+import { BOT_PAGE_BOUNDS, HEX_COLOUR } from '../type/bot-page.type';
 
 export class UploadBotImageDto {
   @ApiProperty({ enum: BotImageKind })
@@ -35,20 +29,6 @@ export class UpdateBotImageDto {
   @IsString()
   @MaxLength(300)
   alt!: string;
-}
-
-export class BotPageLandingImagesDto {
-  @ApiPropertyOptional({ nullable: true })
-  @IsOptional()
-  @IsUUID()
-  hero?: string | null;
-
-  @ApiPropertyOptional({ type: [String] })
-  @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(MAX_GALLERY_IMAGES)
-  @IsUUID('all', { each: true })
-  gallery?: string[];
 }
 
 /**

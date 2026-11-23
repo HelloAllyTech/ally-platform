@@ -126,7 +126,6 @@ export const SIDEBAR_ITEMS = {
   CONVERSATION_DRIFT: "conversation-drift",
   DEBRIEFS: "debriefs",
   AGENT_TEST_CASES: "agent-test-cases",
-  PRODUCT_ROADMAP: "product-roadmap",
   /** Roadmap v2, shown only while `roadmap_v2` is on (GET /v1/roadmap/me/role succeeds). */
   ROADMAP_V2: "roadmap-v2",
   /** User Interviews, its own entry while `roadmap_v2` is on (D14); inside the old board before. */
@@ -145,6 +144,7 @@ export const SIDEBAR_ITEMS = {
   ASSISTANT_DEFAULTS: "assistant-defaults",
   BUG_HUNTER: "bug-hunter",
   PM_AGENT: "pm-agent",
+  BUG_HUNTER_V2: "bug-hunter-v2",
   BUILDER: "builder",
   CONTEXT_LIBRARY: "context-library",
   COURSE_COPILOT: "course-copilot",

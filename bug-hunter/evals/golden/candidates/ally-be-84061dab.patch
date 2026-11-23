@@ -1,0 +1,34 @@
+diff --git a/src/bug-hunter/controller/bug-hunter.controller.ts b/src/bug-hunter/controller/bug-hunter.controller.ts
+index 640b896510..92afed5a07 100644
+--- a/src/bug-hunter/controller/bug-hunter.controller.ts
++++ b/src/bug-hunter/controller/bug-hunter.controller.ts
+@@ -187,7 +187,7 @@ export class BugHunterController {
+       source: query.source,
+       repo: query.repo,
+       runId: query.runId,
+-      limit: query.limit ?? 50,
++      limit: query.limit ?? 1000,
+       offset: query.offset ?? 0,
+     });
+     const enriched = await this.bugFindingService.enrich(items);
+diff --git a/src/bug-hunter/controller/test/bug-hunter.controller.spec.ts b/src/bug-hunter/controller/test/bug-hunter.controller.spec.ts
+index 75a74f6938..a62f259267 100644
+--- a/src/bug-hunter/controller/test/bug-hunter.controller.spec.ts
++++ b/src/bug-hunter/controller/test/bug-hunter.controller.spec.ts
+@@ -130,7 +130,15 @@ describe('BugHunterController', () => {
+       await controller.listFindings({ status: 'all' } as never);
+ 
+       expect(bugFindingService.list).toHaveBeenCalledWith(
+-        expect.objectContaining({ runId: undefined, limit: 50, offset: 0 }),
++        expect.objectContaining({ runId: undefined, limit: 1000, offset: 0 }),
++      );
++    });
++
++    it('uses a default limit of 1000 when no limit is specified', async () => {
++      await controller.listFindings({ status: 'all' } as never);
++
++      expect(bugFindingService.list).toHaveBeenCalledWith(
++        expect.objectContaining({ limit: 1000, offset: 0 }),
+       );
+     });
+   });

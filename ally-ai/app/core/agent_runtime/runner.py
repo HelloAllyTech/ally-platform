@@ -78,8 +78,10 @@ def build_response(state: AgentState, run_id: str) -> AgentRunResponse:
     }
     # Sent without citation numbers (chunk H1 Part D); sources stay as chips.
     answer = without_citation_marks(result.get("answer") or "")
+    # The run passed the chat on and then still answered (Q4 G1).
+    handover = bool(result.get("handover") or state.get("handed_over"))
     return AgentRunResponse(
-        **{**result, "answer": answer, "retrieval": retrieval},
+        **{**result, "answer": answer, "retrieval": retrieval, "handover": handover},
         run_id=run_id,
         trace=state.get("trace") or [],
         memory_writes=state.get("memory_writes") or [],

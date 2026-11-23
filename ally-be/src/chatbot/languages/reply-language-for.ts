@@ -44,12 +44,3 @@ export function replyLanguageFor(
   if (sameBase) return sameBase;
   return enabled[0];
 }
-
-/** Whether a detected language is one the chatbot replies in (exact or same base language). */
-export function isEnabledLanguage(
-  chatbot: LanguageChatbot,
-  detected: string | null | undefined,
-): boolean {
-  if (!detected?.trim()) return false;
-  return enabledLanguagesOf(chatbot).some((l) => base(l) === base(detected));
-}

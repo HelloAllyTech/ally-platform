@@ -32,7 +32,6 @@ import {
   readAnalyticsUrlState,
   writeAnalyticsUrlState,
 } from "./analyticsUrlState";
-import { BugAgentPerformance } from "./BugAgentPerformance";
 import { ChartIdsVisibleContext } from "./chartKit";
 import { CodingAgentCost } from "./CodingAgentCost";
 import { FixSessionEngineCost } from "./FixSessionEngineCost";
@@ -102,8 +101,6 @@ interface TabDef {
 export const ANALYTICS_TAB_PARAM = "tab";
 /** The Debriefs tab's id, exported so the Debrief Console can send its old Metrics links here. */
 export const ANALYTICS_DEBRIEFS_TAB_ID = "debriefs";
-/** The Bug Agent tab's id, exported so the Bug Hunter page can link to it. */
-export const ANALYTICS_BUG_AGENT_TAB_ID = "bug-agent-performance";
 
 const TABS: TabDef[] = [
   // Highlights is the whole-platform picture; it absorbed the former separate
@@ -242,12 +239,6 @@ const TABS: TabDef[] = [
         <FixSessionEngineCost />
       </div>
     ),
-  },
-  {
-    id: ANALYTICS_BUG_AGENT_TAB_ID,
-    label: "Bug Agent",
-    uses: { language: false, range: true },
-    render: f => <BugAgentPerformance {...f} />,
   },
   {
     id: "scribe",

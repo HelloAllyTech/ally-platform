@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   useArchiveChatbotMutation,
   useApplyDraftTemplateMutation,
   useBackBotDraftMutation,
   useDescribeBotDraftMutation,
+  useCorrectBotDraftPackMutation,
   useGetBotPageQuery,
+  useLazyGetCheckupRunQuery,
   usePatchBotDraftMutation,
   usePublishBotDraftMutation,
 } from "@api";
@@ -121,7 +123,25 @@ export interface OnboardingSession {
     emails: string[],
     confirmMustPass?: boolean,
     publishAnyway?: boolean,
+    recheckSafety?: boolean,
   ) => Promise<void>;
+  /**
+   * Publishing's safety recheck (Q4 A0): `checking` while the failed safety questions are asked
+   * again (the page polls the run and publishes when it ends), `failed` with each question and
+   * its answer when one still fails.
+   */
+  safety: {
+    status: "checking" | "failed";
+    message: string;
+    done: number;
+    total: number;
+    questions: { question: string; reply?: string; reasons?: string[] }[];
+  } | null;
+  /** "Check again" after a failed safety recheck. */
+  checkSafetyAgain: () => void;
+  /** "This isn't right for my business" (Q4 A3): rejects when refused (a reason is needed). */
+  choosePack: (pack: string, reason?: string) => Promise<void>;
+  choosingPack: boolean;
   /**
    * Asked before going live: an owner's own Must pass question failed (chunk 20d-2), or the
    * checkup is below the quality gate (Q3-fast Part 3, `belowGate`).
@@ -145,7 +165,8 @@ export interface OnboardingSession {
   /** Show a screen again (the safety screen), when the draft's step still allows it. */
   reopen?: (screen: keyof PassedScreens) => void;
   /** Move past the reading result, the safety screen or "Make it yours". */
-  pass: (screen: keyof PassedScreens) => void;
+  /** Marks a browser-only screen done, or not done (`false`) to go back to it (Q4 H3). */
+  pass: (screen: keyof PassedScreens, done?: boolean) => void;
   /** Back from the current screen: a browser-only screen, else the server's step back. */
   backScreen: () => Promise<void>;
   /** "Start from a template" after the site was read (T1): what it did, or null if refused. */
@@ -163,6 +184,9 @@ export interface OnboardingSession {
   discard: () => Promise<boolean>;
 }
 
+/** How often the page asks how publishing's safety recheck is going (Q4 A0). */
+const RECHECK_POLL_MS = 3000;
+
 /**
  * Everything the onboarding session decides (chunk 20a), apart from how it looks: the draft and
  * its live events (`useBotDraftSession`), the chat as rows, which canvas sections a step shows,
@@ -177,6 +201,16 @@ export const useOnboardingSession = (
   const { view, sending, working, send, setView } = session;
   const [publishedNow, setPublished] = useState<PublishResult | null>(null);
   const [mustPass, setMustPass] = useState<OnboardingSession["mustPass"]>(null);
+  const [safety, setSafety] = useState<OnboardingSession["safety"]>(null);
+  const [recheckRunId, setRecheckRunId] = useState<string | null>(null);
+  const lastPublish = useRef<{
+    access: PublishResult["access"];
+    emails: string[];
+    confirmMustPass: boolean;
+    publishAnyway: boolean;
+  } | null>(null);
+  const [pollRun] = useLazyGetCheckupRunQuery();
+  const [correctPack, { isLoading: choosingPack }] = useCorrectBotDraftPackMutation();
   const [patchDraft] = usePatchBotDraftMutation();
   const [goBack] = useBackBotDraftMutation();
   const [applyDraftTemplate] = useApplyDraftTemplateMutation();
@@ -296,6 +330,116 @@ export const useOnboardingSession = (
     [view, stored, watched],
   );
 
+  const publish: OnboardingSession["publish"] = async (
+    access,
+    emails,
+    confirmMustPass = false,
+    publishAnyway = false,
+    recheckSafety = false,
+  ) => {
+    if (!view) return;
+    lastPublish.current = { access, emails, confirmMustPass, publishAnyway };
+    try {
+      setPublished(
+        await publishDraft({
+          id: view.id,
+          access,
+          emails,
+          ...(confirmMustPass ? { confirmMustPass: true } : {}),
+          ...(publishAnyway ? { publishAnyway: true } : {}),
+          ...(recheckSafety ? { recheckSafety: true } : {}),
+        }).unwrap(),
+      );
+      setMustPass(null);
+      setSafety(null);
+      setRecheckRunId(null);
+      void session.reload();
+    } catch (err) {
+      // An owner's own Must pass question failed (chunk 20d-2): ask, then go live if they say so.
+      const data = (err as { data?: { errorCode?: string; message?: string; details?: unknown } })
+        ?.data;
+      if (data?.errorCode === "must_pass_failed") {
+        const details = data.details as { questions?: { question: string }[] } | undefined;
+        setMustPass({
+          message: data.message ?? "",
+          questions: (details?.questions ?? []).map(q => q.question),
+          access,
+          emails,
+        });
+        return;
+      }
+      // Q4 A0: the failed safety questions are being asked again; poll, then publish again.
+      if (data?.errorCode === "safety_recheck" || data?.errorCode === "safety_failed") {
+        const details = (data.details ?? {}) as {
+          recheckRunId?: string;
+          done?: number;
+          total?: number;
+          questions?: { question: string; reply?: string }[];
+        };
+        const checking = data.errorCode === "safety_recheck";
+        setSafety({
+          status: checking ? "checking" : "failed",
+          message: data.message ?? "",
+          done: details.done ?? 0,
+          total: details.total ?? details.questions?.length ?? 0,
+          questions: details.questions ?? [],
+        });
+        setRecheckRunId(checking ? (details.recheckRunId ?? null) : null);
+        return;
+      }
+      setSafety(null);
+      setRecheckRunId(null);
+      // Below the checkup's quality gate (Q3-fast Part 3): the score, then Publish anyway.
+      if (data?.errorCode === "checkup_below_gate") {
+        setMustPass({
+          message: data.message ?? "",
+          questions: [],
+          access,
+          emails,
+          belowGate: true,
+          confirmedMustPass: confirmMustPass,
+        });
+        return;
+      }
+      onError(errorText(err));
+    }
+  };
+
+  /** "Check again" after a failed safety recheck (Q4 A0). */
+  const checkSafetyAgain = () => {
+    const last = lastPublish.current;
+    if (last)
+      void publish(last.access, last.emails, last.confirmMustPass, last.publishAnyway, true);
+  };
+
+  // Q4 A0: while the safety recheck runs, poll its run; when it ends, publish again with the
+  // same choices, which goes on to the 70% gate or says which question still fails.
+  useEffect(() => {
+    if (!recheckRunId || !view?.chatbotId) return undefined;
+    const chatbotId = view.chatbotId;
+    let stopped = false;
+    const timer = setInterval(async () => {
+      const run = await pollRun({ id: chatbotId, runId: recheckRunId })
+        .unwrap()
+        .catch(() => null);
+      if (stopped || !run) return;
+      if (run.run.status === "running") {
+        setSafety(current => current && { ...current, done: run.run.done, total: run.run.total });
+        return;
+      }
+      stopped = true;
+      clearInterval(timer);
+      setRecheckRunId(null);
+      const last = lastPublish.current;
+      if (last) void publish(last.access, last.emails, last.confirmMustPass, last.publishAnyway);
+    }, RECHECK_POLL_MS);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- publish reads the latest view
+  }, [recheckRunId, view?.chatbotId]);
+
   return {
     view,
     reading: session.reading,
@@ -335,7 +479,7 @@ export const useOnboardingSession = (
     passed: passedNow,
     refresh: session.reload,
     reopen: screen => pass(screen, false),
-    pass: screen => pass(screen),
+    pass: (screen, done = true) => pass(screen, done),
     applyTemplate: async (template, answers) => {
       if (!view) return null;
       try {
@@ -380,48 +524,14 @@ export const useOnboardingSession = (
       view?.chatbotId
         ? attempt(() => archiveChatbot(view.chatbotId!).unwrap())
         : Promise.resolve(false),
-    publish: async (access, emails, confirmMustPass = false, publishAnyway = false) => {
+    safety,
+    checkSafetyAgain,
+    choosePack: async (pack: string, reason?: string) => {
       if (!view) return;
-      try {
-        setPublished(
-          await publishDraft({
-            id: view.id,
-            access,
-            emails,
-            ...(confirmMustPass ? { confirmMustPass: true } : {}),
-            ...(publishAnyway ? { publishAnyway: true } : {}),
-          }).unwrap(),
-        );
-        setMustPass(null);
-        void session.reload();
-      } catch (err) {
-        // An owner's own Must pass question failed (chunk 20d-2): ask, then go live if they say so.
-        const data = (err as { data?: { errorCode?: string; message?: string; details?: unknown } })
-          ?.data;
-        if (data?.errorCode === "must_pass_failed") {
-          const details = data.details as { questions?: { question: string }[] } | undefined;
-          setMustPass({
-            message: data.message ?? "",
-            questions: (details?.questions ?? []).map(q => q.question),
-            access,
-            emails,
-          });
-          return;
-        }
-        // Below the checkup's quality gate (Q3-fast Part 3): the score, then Publish anyway.
-        if (data?.errorCode === "checkup_below_gate") {
-          setMustPass({
-            message: data.message ?? "",
-            questions: [],
-            access,
-            emails,
-            belowGate: true,
-            confirmedMustPass: confirmMustPass,
-          });
-          return;
-        }
-        onError(errorText(err));
-      }
+      const next = await correctPack({ id: view.id, pack, ...(reason ? { reason } : {}) }).unwrap();
+      setView(next);
     },
+    choosingPack,
+    publish,
   };
 };

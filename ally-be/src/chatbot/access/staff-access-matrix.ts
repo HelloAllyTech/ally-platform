@@ -172,9 +172,6 @@ export const STAFF_LIST_SCOPE_HANDLERS = [
   'InboxController.counts',
 ] as const;
 
-export const staffMatrixKey = (controller: string, handler: string) =>
-  `${controller}.${handler}`;
-
 /** The staff policy for one request; anything unlisted, or an unknown parameter value, is `deny`. */
 export function staffPolicyFor(
   key: string,

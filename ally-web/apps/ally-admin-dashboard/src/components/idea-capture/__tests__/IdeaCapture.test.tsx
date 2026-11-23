@@ -3,17 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   createDraft: vi.fn(),
-  createV2Draft: vi.fn(),
-  startPlan: vi.fn(),
-  planning: { on: false },
   navigate: vi.fn(),
-  roadmapV2: { on: false },
-  transcribeClip: vi.fn(),
+  dictate: vi.fn(),
   track: vi.fn(),
   speechState: { status: "listening", transcribing: true },
   speech: {
     onFinal: (_text: string) => undefined as void,
-    transcribe: (_clip: Blob) => Promise.resolve(""),
+    transcribe: (_clip: Blob, _durationMs: number) => Promise.resolve(""),
     start: vi.fn(),
     stop: vi.fn(),
     pause: vi.fn(),
@@ -39,35 +35,26 @@ vi.mock("@hooks", () => ({
     permissions: ["vote:admin:product-roadmap"],
     features: ["product_roadmap"],
     user: { restrictedTenantIds: null },
-    isRoadmapV2On: mocks.roadmapV2.on,
   }),
 }));
 vi.mock("@constants", () => ({
   ROUTES: {
-    PRODUCT_ROADMAP: "/product-roadmap",
     ROADMAP_IDEA: (code: string) => `/roadmap/i/${code}`,
   },
 }));
-vi.mock("@types", () => ({ IDEA_DRAFT_TEXT_MAX: 4000 }));
-vi.mock("../../../pages/ProductRoadmap/utils/access", () => ({
+vi.mock("../../../pages/Roadmap/utils/access", () => ({
   canFileIdeas: (permissions: string[] = [], features: string[] = []) =>
     permissions.includes("vote:admin:product-roadmap") && features.includes("product_roadmap"),
 }));
-vi.mock("@api", () => ({
-  useCreateRoadmapIdeaDraftMutation: () => [mocks.createDraft, { isLoading: false }],
-  useTranscribeRoadmapIdeaMutation: () => [mocks.transcribeClip],
-}));
 vi.mock("../../../api/roadmapV2Flow", () => ({
-  useCreateRoadmapDraftMutation: () => [mocks.createV2Draft, { isLoading: false }],
+  useCreateRoadmapDraftMutation: () => [mocks.createDraft, { isLoading: false }],
+  useRoadmapDictateMutation: () => [mocks.dictate],
 }));
-vi.mock("../../../api/productPlanning", () => ({
-  useGetPlanSettingsQuery: () => ({ data: { enabled: mocks.planning.on } }),
-  useStartPlanMutation: () => [mocks.startPlan, { isLoading: false }],
-}));
+vi.mock("../../../types/roadmapV2Flow", () => ({ ROADMAP_IDEA_TEXT_MAX: 4000 }));
 vi.mock("@hooks/useSpeechCapture", () => ({
   useSpeechCapture: (options: {
     onFinal: (t: string) => void;
-    transcribe: (b: Blob) => Promise<string>;
+    transcribe: (b: Blob, durationMs: number) => Promise<string>;
   }) => {
     mocks.speech.onFinal = options.onFinal;
     mocks.speech.transcribe = options.transcribe;
@@ -94,11 +81,7 @@ describe("IdeaCaptureLauncher", () => {
     vi.clearAllMocks();
     mocks.speechState.status = "listening";
     mocks.speechState.transcribing = true;
-    mocks.roadmapV2.on = false;
-    mocks.planning.on = false;
-    mocks.startPlan.mockReturnValue({ unwrap: () => Promise.resolve({ id: "p1" }) });
-    mocks.createDraft.mockReturnValue({ unwrap: () => Promise.resolve({ id: "d1" }) });
-    mocks.createV2Draft.mockReturnValue({ unwrap: () => Promise.resolve({ code: "RM-7" }) });
+    mocks.createDraft.mockReturnValue({ unwrap: () => Promise.resolve({ code: "RM-7" }) });
   });
 
   it("starts the mic as it opens", () => {
@@ -107,16 +90,21 @@ describe("IdeaCaptureLauncher", () => {
     expect(mocks.speech.start).toHaveBeenCalledTimes(1);
   });
 
-  it("sends each recorded clip to the transcribe endpoint as multipart audio", async () => {
-    mocks.transcribeClip.mockReturnValue({ unwrap: () => Promise.resolve({ text: "hello" }) });
+  it("sends each recorded clip to dictation as multipart audio with its length", async () => {
+    mocks.dictate.mockReturnValue({
+      unwrap: () => Promise.resolve({ text: "hello", durationMs: 1800 }),
+    });
     render(<IdeaCaptureLauncher />);
     fireEvent.click(screen.getByTestId("idea-capture-button"));
 
-    const text = await mocks.speech.transcribe(new Blob(["a"], { type: "audio/mp4" }));
+    const text = await mocks.speech.transcribe(new Blob(["a"], { type: "audio/mp4" }), 1800);
 
     expect(text).toBe("hello");
-    const body = mocks.transcribeClip.mock.calls[0][0] as FormData;
+    const body = mocks.dictate.mock.calls[0][0] as FormData;
     expect((body.get("audio") as File).name).toBe("idea.mp4");
+    expect(body.get("durationMs")).toBe("1800");
+    // No draft exists yet, so the mic is not charged to one.
+    expect(body.get("code")).toBeNull();
   });
 
   it("Save waits for the last phrase to be transcribed and saves it", async () => {
@@ -135,7 +123,7 @@ describe("IdeaCaptureLauncher", () => {
     expect(mocks.speech.stop).toHaveBeenCalled();
     expect(mocks.speech.finish).toHaveBeenCalled();
     expect(mocks.createDraft).toHaveBeenCalledWith({
-      rawText: "what if call notes wrote themselves",
+      text: "what if call notes wrote themselves",
       captureMode: "voice",
     });
   });
@@ -190,50 +178,21 @@ describe("IdeaCaptureLauncher", () => {
     expect(screen.queryByText(/Writing down what you said/)).toBeNull();
   });
 
-  describe("after Save, one pipeline whichever surface opened it", () => {
-    const saveTyped = async () => {
-      mocks.speech.finish.mockReset();
-      vi.useFakeTimers();
-      localStorage.setItem("ally-admin-idea-capture-unsent", "typed idea");
-      mocks.speechState.transcribing = false;
-      render(<IdeaCaptureLauncher />);
-      fireEvent.click(screen.getByTestId("idea-capture-button"));
-      await act(async () => fireEvent.click(screen.getByRole("button", { name: /Save idea/ })));
-      act(() => {
-        vi.advanceTimersByTime(1200);
-      });
-      vi.useRealTimers();
-    };
-
-    it("opens the new draft's own page when Roadmap v2 is on", async () => {
-      mocks.roadmapV2.on = true;
-      await saveTyped();
-      expect(mocks.createV2Draft).toHaveBeenCalledWith({
-        text: "typed idea",
-        captureMode: "typed",
-      });
-      expect(mocks.createDraft).not.toHaveBeenCalled();
-      expect(mocks.navigate).toHaveBeenCalledWith("/roadmap/i/RM-7");
+  it("opens the new draft's own page after Save", async () => {
+    mocks.speech.finish.mockReset();
+    vi.useFakeTimers();
+    localStorage.setItem("ally-admin-idea-capture-unsent", "typed idea");
+    mocks.speechState.transcribing = false;
+    render(<IdeaCaptureLauncher />);
+    fireEvent.click(screen.getByTestId("idea-capture-button"));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: /Save idea/ })));
+    act(() => {
+      vi.advanceTimersByTime(1200);
     });
+    vi.useRealTimers();
 
-    it("lands in My drafts before the cutover", async () => {
-      await saveTyped();
-      expect(mocks.createDraft).toHaveBeenCalledWith({
-        rawText: "typed idea",
-        captureMode: "typed",
-      });
-      expect(mocks.createV2Draft).not.toHaveBeenCalled();
-      expect(mocks.navigate).toHaveBeenCalledWith("/product-roadmap?tab=drafts");
-    });
-
-    it("parks the idea as a plan and opens My ideas when planning is on", async () => {
-      mocks.planning.on = true;
-      await saveTyped();
-      expect(mocks.startPlan).toHaveBeenCalledWith({ text: "typed idea", park: true });
-      expect(mocks.createDraft).not.toHaveBeenCalled();
-      expect(mocks.createV2Draft).not.toHaveBeenCalled();
-      expect(mocks.navigate).toHaveBeenCalledWith("/product-roadmap?tab=my-ideas");
-    });
+    expect(mocks.createDraft).toHaveBeenCalledWith({ text: "typed idea", captureMode: "typed" });
+    expect(mocks.navigate).toHaveBeenCalledWith("/roadmap/i/RM-7");
   });
 
   describe("analytics", () => {

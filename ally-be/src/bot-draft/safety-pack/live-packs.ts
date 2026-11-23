@@ -15,24 +15,17 @@ export interface LivePackEntry {
 }
 
 let live = new Map<string, LivePackEntry>();
-let loadedAt: number | null = null;
 
 export function setLivePacks(entries: LivePackEntry[]): void {
   live = new Map(entries.map((entry) => [entry.pack.id, entry]));
-  loadedAt = Date.now();
 }
 
 export function clearLivePacks(): void {
   live = new Map();
-  loadedAt = null;
 }
 
 export function livePack(id: string): LivePackEntry | undefined {
   return live.get(id);
-}
-
-export function livePacksLoadedAt(): number | null {
-  return loadedAt;
 }
 
 /**

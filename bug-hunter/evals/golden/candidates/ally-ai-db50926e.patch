@@ -1,0 +1,95 @@
+diff --git a/ally-ai/app/core/summaries/summary_service.py b/ally-ai/app/core/summaries/summary_service.py
+index f9bfff5a31..0b4b8a8506 100644
+--- a/ally-ai/app/core/summaries/summary_service.py
++++ b/ally-ai/app/core/summaries/summary_service.py
+@@ -130,6 +130,35 @@ class SummaryService:
+                 "Failed to generate the summary. Please try again later."
+             ) from e
+ 
++        except Exception as e:
++            processing_time_ms = int((time.time() - start_time) * 1000)
++
++            # Log error
++            await phi_logger.log(
++                PHILogEvent(
++                    chat_id=str(chat_id) if chat_id else None,
++                    audit_id=None,  # Will be set by caller
++                    event_type=PHIEvents.SYSTEM_ERROR,
++                    details={
++                        "error": "An unexpected error occurred during summary "
++                        f"generation: {type(e).__name__}",
++                        "component": "SummaryService",
++                        "method": "generate_summary_and_tags",
++                        "exception_type": type(e).__name__,
++                        "chat_history_count": len(chat_history),
++                        "processing_time_ms": processing_time_ms,
++                    },
++                )
++            )
++
++            logger.exception(
++                "An unexpected error occurred during summary generation: %s",
++                type(e).__name__,
++            )
++            raise SummarizationFailedException(
++                "Failed to generate the summary. Please try again later."
++            ) from e
++
+     async def enhance_content(
+         self,
+         content: str,
+diff --git a/ally-ai/tests/core/summaries/test_summary_service.py b/ally-ai/tests/core/summaries/test_summary_service.py
+index 00f89721b6..e951f5f752 100644
+--- a/ally-ai/tests/core/summaries/test_summary_service.py
++++ b/ally-ai/tests/core/summaries/test_summary_service.py
+@@ -414,3 +414,50 @@ class TestSummaryService:
+ 
+         call_args = mock_text_generation_service.generate_scenario_evaluation.call_args
+         assert call_args[1]["usage_task"] is None
++
++    @pytest.mark.asyncio
++    async def test_generate_summary_and_tags_with_raw_llm_usage(
++        self, summary_service, mock_text_generation_service, sample_chat_messages
++    ):
++        """Test that raw LLM usage data in the response is handled gracefully."""
++        # Setup mocks
++        expected_response = SummaryNoteAndTagsResponse(
++            session_summary="Test summary",
++            tags=[Tag(tag="anxiety", positivity_rating=2)],
++            call_quality=85,
++            llm_usage={
++                "completion_tokens": 50,
++                "prompt_tokens": 10,
++                "total_tokens": 60,
++            },
++        )
++        mock_text_generation_service.generate_summary_notes.return_value = (
++            expected_response
++        )
++
++        # Execute
++        result = await summary_service.generate_summary_and_tags(sample_chat_messages)
++
++        # Assert
++        assert result.session_summary == expected_response.session_summary
++        assert result.tags == expected_response.tags
++        assert result.call_quality == expected_response.call_quality
++        # Verify that the llm_usage is present but not part of the core data
++        assert not hasattr(result, "llm_usage")
++
++    @pytest.mark.asyncio
++    async def test_generate_summary_and_tags_parsing_error(
++        self, summary_service, mock_text_generation_service, sample_chat_messages
++    ):
++        """Test summary generation with a generic parsing error."""
++        # Setup mocks
++        mock_text_generation_service.generate_summary_notes.side_effect = Exception(
++            "A generic parsing error occurred"
++        )
++
++        # Execute and assert
++        with pytest.raises(SummarizationFailedException) as exc_info:
++            await summary_service.generate_summary_and_tags(sample_chat_messages)
++
++        assert "Failed to generate the summary" in str(exc_info.value)
++        assert isinstance(exc_info.value.__cause__, Exception)

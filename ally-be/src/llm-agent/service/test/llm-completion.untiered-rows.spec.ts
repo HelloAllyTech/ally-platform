@@ -1,12 +1,6 @@
 import { LlmTask } from 'src/learn/enum/llm-task.enum';
 import { LlmTargetResolverService } from 'src/llm/service/llm-target-resolver.service';
 import { BUILDER_AI_TASKS } from 'src/builder/constants/builder.constants';
-import {
-  BUG_HUNTER_CLASSIFY_MISS_TASK_ID,
-  BUG_HUNTER_CLASSIFY_REPO_TASK_ID,
-  BUG_HUNTER_DECIDE_TASK_ID,
-  BUG_HUNTER_REVIEW_STUDY_TASK_ID,
-} from 'src/bug-hunter/constants/bug-hunter.constants';
 import { LlmCompletionService } from '../llm-completion.service';
 
 /**
@@ -62,10 +56,8 @@ describe('LlmCompletionService — calls that name a model on an untiered row', 
     BUILDER_AI_TASKS.EPIC_DECOMPOSITION,
     BUILDER_AI_TASKS.OUTCOME_CATEGORISE,
     BUILDER_AI_TASKS.CONTEXT_SELECTION,
-    BUG_HUNTER_CLASSIFY_REPO_TASK_ID,
-    BUG_HUNTER_CLASSIFY_MISS_TASK_ID,
-    BUG_HUNTER_REVIEW_STUDY_TASK_ID,
-    BUG_HUNTER_DECIDE_TASK_ID,
+    // Bug Hunter's repo classifier (the only old Bug Hunter AI call kept)
+    'bug-hunter-repo-classifier',
   ])('%s runs on the model its call names', async (taskId) => {
     const { service, created } = build();
 
@@ -88,7 +80,7 @@ describe('LlmCompletionService — calls that name a model on an untiered row', 
 
     await expect(
       service.complete({
-        taskId: BUG_HUNTER_DECIDE_TASK_ID,
+        taskId: 'bug-hunter-repo-classifier',
         task: LlmTask.BUG_HUNTER,
         model: 'gemini-2.5-flash',
         prompt: 'hello',

@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { useGetRoadmapOpportunityQuery, useGetRoadmapVoteBudgetQuery } from "@api";
 import { en } from "@constants";
 
-import { VoteButton } from "../../ProductRoadmap/VoteButton";
+import { VoteButton } from "./VoteButton";
 import { useRoadmapVote } from "../hooks/useRoadmapVote";
 
 interface VoteControlProps {

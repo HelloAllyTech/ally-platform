@@ -167,13 +167,28 @@ def replace(path: str, value: Any) -> PatchOp:
     return PatchOp(op="replace", path=path, value=value)
 
 
+#: What a model writes for "no change" in a free-text field (Q4 N1, Round 8: Vandrevala
+#: published at /b/unchanged, and a reply said "you can reach unchanged on +91…").
+_PLACEHOLDER = re.compile(
+    r"^[\s\"'(\[]*(unchanged|no change|not changed|same|keep|keep it|none|n/?a|null|"
+    r"empty|nil|-+|—|tbd|placeholder|leave (it )?(as is|empty|unchanged))[\s\"').\]]*$",
+    re.IGNORECASE,
+)
+
+
+def proposed(value: str) -> str:
+    """A proposed free-text value, or "" when it only says "no change"."""
+    text = (value or "").strip()
+    return "" if not text or _PLACEHOLDER.match(text) else text
+
+
 def proposal_patches(out: ConverseOut, source: str) -> List[PatchOp]:
     """The conversation step's proposed changes, as patches."""
     patches: List[PatchOp] = []
-    if out.name.strip():
-        patches.append(replace("/name", out.name.strip()[:120]))
-    if out.assistant_name.strip():
-        name = out.assistant_name.strip()[:60]
+    if proposed(out.name):
+        patches.append(replace("/name", proposed(out.name)[:120]))
+    if proposed(out.assistant_name):
+        name = proposed(out.assistant_name)[:60]
         patches.append(replace("/assistantName", name))
         patches.append(replace("/branding/assistantName", name))
     if out.tone != Tone.UNCHANGED:
@@ -182,7 +197,7 @@ def proposal_patches(out: ConverseOut, source: str) -> List[PatchOp]:
         tags = language_tags(", ".join(out.languages))
         if tags:
             patches.append(replace("/languages", tags))
-    decline = grounding.keep_grounded(out.decline_text.strip(), source)
+    decline = grounding.keep_grounded(proposed(out.decline_text), source)
     if decline:
         patches.append(replace("/declineText", decline[:600]))
     return patches
@@ -214,7 +229,7 @@ def draft_patches(
     """The drafted assistant, as patches. Any sentence with a number we were never
     given is dropped; pre-chat questions only for Bring in customers."""
     patches: List[PatchOp] = []
-    name = " ".join(out.assistant_name.split())[:60]
+    name = proposed(" ".join(out.assistant_name.split()))[:60]
     if name:
         patches += [
             replace("/assistantName", name),

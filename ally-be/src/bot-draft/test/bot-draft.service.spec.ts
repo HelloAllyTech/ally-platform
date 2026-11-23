@@ -7,7 +7,7 @@ import {
   LearnedSection,
   SafetyPackId,
 } from '../enum/bot-draft.enum';
-import { SAFETY_PACKS } from '../safety-pack/safety-packs';
+import { STAFF_PACK_REASON, SAFETY_PACKS } from '../safety-pack/safety-packs';
 import { LEARNED_FACTS_CHANGED } from '../service/learned-facts-document';
 import {
   BotDraftService,
@@ -445,5 +445,116 @@ describe('BotDraftService', () => {
       SafetyPackId.STANDARD,
     );
     expect(again.safetyPack).toBe(SafetyPackId.MENTAL_HEALTH);
+  });
+
+  it('never writes a placeholder ("unchanged") as a name (Q4 N1)', async () => {
+    const h = harness();
+    const draft = h.draft();
+    const { draft: after } = await h.service.applyPatch(
+      draft,
+      [
+        { op: 'replace', path: '/assistantName', value: 'unchanged' },
+        { op: 'replace', path: '/name', value: 'unchanged' },
+        { op: 'replace', path: '/introduction', value: 'Hello there.' },
+      ],
+      BotDraftActor.BUILDER,
+      { target: 'draft' },
+    );
+    expect(after.draftConfig.assistantName).toBe(
+      draft.draftConfig.assistantName,
+    );
+    expect(after.draftConfig.name).toBe(draft.draftConfig.name);
+    expect(after.draftConfig.introduction).toBe('Hello there.');
+  });
+
+  describe('the owner corrects the pack in setup (Q4 A3)', () => {
+    const onMentalHealth = async () => {
+      const h = harness();
+      const draft = await h.service.setSafety(
+        h.draft(),
+        Industry.REAL_ESTATE,
+        SafetyPackId.MENTAL_HEALTH,
+      );
+      return { h, draft };
+    };
+
+    it('less strict needs a reason, which is recorded with the change', async () => {
+      const { h, draft } = await onMentalHealth();
+      await expect(
+        h.service.correctPack(draft, SafetyPackId.STANDARD, ''),
+      ).rejects.toMatchObject({ response: { errorCode: 'reason_required' } });
+      const fixed = await h.service.correctPack(
+        draft,
+        SafetyPackId.STANDARD,
+        "We're a coworking space, not mental health",
+      );
+      expect(fixed.safetyPack).toBe(SafetyPackId.STANDARD);
+      expect(fixed.draftConfig.safetyPackId).toBe(SafetyPackId.STANDARD);
+      expect(fixed.draftConfig.packChange).toMatchObject({
+        from: 'mental_health',
+        to: 'standard',
+        lessStrict: true,
+        reason: "We're a coworking space, not mental health",
+      });
+      // The old pack's disclaimer goes with it.
+      expect(fixed.draftConfig.branding.disclaimer ?? '').not.toContain(
+        SAFETY_PACKS.mental_health.disclaimer,
+      );
+    });
+
+    it('stricter applies at once, with no reason', async () => {
+      const h = harness();
+      const fixed = await h.service.correctPack(
+        h.draft(),
+        SafetyPackId.MEDICAL,
+      );
+      expect(fixed.safetyPack).toBe(SafetyPackId.MEDICAL);
+      expect(fixed.draftConfig.packChange?.lessStrict).toBe(false);
+    });
+
+    it('an unknown pack is refused', async () => {
+      const h = harness();
+      await expect(
+        h.service.correctPack(h.draft(), 'magic'),
+      ).rejects.toMatchObject({ response: { errorCode: 'invalid_pack' } });
+    });
+  });
+
+  describe("a staff assistant's pack follows its readers (Q4 H4)", () => {
+    it('made "Train my team" after a sector pack was chosen: Standard, with the reason', async () => {
+      const h = harness();
+      const draft = await h.service.setSafety(
+        h.draft(),
+        Industry.MENTAL_HEALTH,
+        SafetyPackId.MENTAL_HEALTH,
+      );
+      const { draft: saved } = await h.service.applyPatch(
+        draft,
+        [{ op: 'replace', path: '/purpose', value: 'training' }],
+        BotDraftActor.OWNER,
+        { target: 'draft' },
+      );
+      expect(saved.draftConfig.safetyPackId).toBe(SafetyPackId.STANDARD);
+      expect(saved.draftConfig.packChange).toMatchObject({
+        from: 'mental_health',
+        to: 'standard',
+        reason: STAFF_PACK_REASON,
+      });
+    });
+
+    it('never undoes a pack the owner chose', async () => {
+      const h = harness();
+      const chosen = await h.service.correctPack(
+        h.draft(),
+        SafetyPackId.MENTAL_HEALTH,
+      );
+      const { draft: saved } = await h.service.applyPatch(
+        chosen,
+        [{ op: 'replace', path: '/purpose', value: 'training' }],
+        BotDraftActor.OWNER,
+        { target: 'draft' },
+      );
+      expect(saved.draftConfig.safetyPackId).toBe(SafetyPackId.MENTAL_HEALTH);
+    });
   });
 });

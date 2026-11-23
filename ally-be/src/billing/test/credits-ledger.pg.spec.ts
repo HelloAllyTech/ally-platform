@@ -289,8 +289,17 @@ describePg('Billing: credits ledger (Postgres)', () => {
       [new Date().toISOString().slice(0, 10)],
     );
     ledger.invalidate();
-    expect(await customerTurn('run-feed')).toBe('out_of_credits');
-    expect((await ledger.openBudget(bot))!.reserved).toBe(0);
+    // The block is on in production only, or where the switch turns it on (ledger.service.ts).
+    const before = process.env.ASSISTANT_CREDITS_BLOCK_ON_FEED_OFF;
+    process.env.ASSISTANT_CREDITS_BLOCK_ON_FEED_OFF = 'true';
+    try {
+      expect(await customerTurn('run-feed')).toBe('out_of_credits');
+      expect((await ledger.openBudget(bot))!.reserved).toBe(0);
+    } finally {
+      if (before === undefined)
+        delete process.env.ASSISTANT_CREDITS_BLOCK_ON_FEED_OFF;
+      else process.env.ASSISTANT_CREDITS_BLOCK_ON_FEED_OFF = before;
+    }
   });
 
   it('a missing payer counts as blocked, never as free', async () => {

@@ -3,6 +3,7 @@ import { ForbiddenException } from '@nestjs/common';
 import { TenantAnalyticsController } from '../tenant-analytics.controller';
 import { AnalyticsService } from '../../service/analytics.service';
 import { TenantAnalyticsService } from '../../service/tenant-analytics.service';
+import { TenantChartLibraryService } from '../../service/tenant-chart-library.service';
 import { CourseAssessmentReportService } from '../../service/course-assessment-report.service';
 import { DataSource } from 'typeorm';
 import { Reflector } from '@nestjs/core';
@@ -39,6 +40,14 @@ describe('TenantAnalyticsController', () => {
         {
           provide: TenantAnalyticsService,
           useValue: mockTenantAnalyticsService,
+        },
+        {
+          provide: TenantChartLibraryService,
+          useValue: {
+            getLibrary: jest.fn(),
+            getCapabilities: jest.fn(),
+            getChartData: jest.fn(),
+          },
         },
         {
           provide: CourseAssessmentReportService,

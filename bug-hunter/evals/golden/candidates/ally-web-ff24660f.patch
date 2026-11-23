@@ -1,0 +1,145 @@
+diff --git a/apps/ally-helpline-dashboard/src/components/debrief-tab/__tests__/SupervisorNote.test.tsx b/apps/ally-helpline-dashboard/src/components/debrief-tab/__tests__/SupervisorNote.test.tsx
+index 19f4780b45..84bb5abf67 100644
+--- a/apps/ally-helpline-dashboard/src/components/debrief-tab/__tests__/SupervisorNote.test.tsx
++++ b/apps/ally-helpline-dashboard/src/components/debrief-tab/__tests__/SupervisorNote.test.tsx
+@@ -50,7 +50,9 @@ describe("SupervisorNote", () => {
+ 
+   it("turns an anchor into a chip carrying its message id", () => {
+     const onOpenMoment = vi.fn();
+-    render(<SupervisorNote note="Right here [[msg:abc-123]] you paused." onOpenMoment={onOpenMoment} />);
++    render(
++      <SupervisorNote note="Right here [[msg:abc-123]] you paused." onOpenMoment={onOpenMoment} />,
++    );
+ 
+     fireEvent.click(screen.getByRole("button", { name: "See this moment" }));
+ 
+@@ -117,7 +119,9 @@ describe("SupervisorNote", () => {
+   it("renders the closing without a heading", () => {
+     render(
+       <SupervisorNote
+-        note={"## [try_next]\nAsk one more question.\n\n## [closing]\nReply and we'll talk it through."}
++        note={
++          "## [try_next]\nAsk one more question.\n\n## [closing]\nReply and we'll talk it through."
++        }
+       />,
+     );
+ 
+@@ -130,7 +134,9 @@ describe("SupervisorNote", () => {
+     // through" next to no composer reads as a broken screen.
+     render(
+       <SupervisorNote
+-        note={"## [try_next]\nAsk one more question.\n\n## [closing]\nReply and we'll talk it through."}
++        note={
++          "## [try_next]\nAsk one more question.\n\n## [closing]\nReply and we'll talk it through."
++        }
+         hideClosing
+       />,
+     );
+@@ -183,4 +189,15 @@ describe("SupervisorNote", () => {
+     fireEvent.click(chips[1]);
+     expect(onOpenMoment).toHaveBeenCalledWith("2");
+   });
++  it("never leaves a machine key in the prose when the model wrote it inline", () => {
++    render(
++      <SupervisorNote note="## [what_it_cost] You suggested solutions early instead of waiting." />,
++    );
++
++    const rendered = screen.getByTestId("supervisor-note").textContent ?? "";
++    expect(screen.getByText("What it cost")).toBeInTheDocument();
++    expect(rendered).not.toContain("[what_it_cost]");
++    expect(rendered).not.toContain("##");
++    expect(rendered).toContain("You suggested solutions early instead of waiting.");
++  });
+ });
+diff --git a/apps/ally-helpline-dashboard/src/components/debrief-tab/__tests__/debriefSections.test.ts b/apps/ally-helpline-dashboard/src/components/debrief-tab/__tests__/debriefSections.test.ts
+index 506664af30..320e958b2b 100644
+--- a/apps/ally-helpline-dashboard/src/components/debrief-tab/__tests__/debriefSections.test.ts
++++ b/apps/ally-helpline-dashboard/src/components/debrief-tab/__tests__/debriefSections.test.ts
+@@ -63,6 +63,47 @@ describe("parseDebriefSections", () => {
+     ]);
+   });
+ 
++  it("lifts a key the model wrote inline with its first sentence", () => {
++    // The drift that actually reached learners: the marker arrived at the head
++    // of the paragraph rather than on a line of its own, so the note read
++    // "## [what_worked] You effectively acknowledged…" on screen.
++    const inlineNote = [
++      "Sandeep, today we focused on deepening emotional exploration.",
++      "",
++      "## [what_worked] You effectively acknowledged the client's challenges.",
++      "",
++      "## [what_it_cost] There were moments where you suggested solutions early.",
++      "",
++      "## [try_next] Try prompting the client to reflect more.",
++      "",
++      "## [closing] Feel free to reach out.",
++    ].join("\n");
++
++    const sections = parseDebriefSections(inlineNote);
++
++    expect(sections.map(section => section.key)).toEqual([
++      null,
++      "what_worked",
++      "what_it_cost",
++      "try_next",
++      "closing",
++    ]);
++    expect(sections[1].paragraphs).toEqual([
++      "You effectively acknowledged the client's challenges.",
++    ]);
++    expect(sections.flatMap(section => section.paragraphs).join(" ")).not.toContain("[");
++  });
++
++  it("leaves prose alone when a key-like word opens a sentence without brackets", () => {
++    // Only a bracketed key is lifted mid-prose. "Closing that door early…" is a
++    // sentence, not a marker, and must not lose its first word to a heading.
++    const sections = parseDebriefSections("Closing that door early cost you the moment.");
++
++    expect(sections).toEqual([
++      { key: null, paragraphs: ["Closing that door early cost you the moment."] },
++    ]);
++  });
++
+   it("keeps a heading attached to prose on the very next line", () => {
+     const sections = parseDebriefSections("## [what_worked]\nYou named the feeling first.");
+ 
+diff --git a/apps/ally-helpline-dashboard/src/components/debrief-tab/debriefSections.ts b/apps/ally-helpline-dashboard/src/components/debrief-tab/debriefSections.ts
+index b1cd03a296..07f7c4eba6 100644
+--- a/apps/ally-helpline-dashboard/src/components/debrief-tab/debriefSections.ts
++++ b/apps/ally-helpline-dashboard/src/components/debrief-tab/debriefSections.ts
+@@ -47,6 +47,21 @@ const SECTION_HEADING = new RegExp(
+   "i",
+ );
+ 
++/**
++ * The same key when the model wrote it inline instead of on a line of its own —
++ * `## [what_worked] You effectively acknowledged…`. The prompt is explicit that
++ * a marker line carries nothing but the marker, but this is the drift that
++ * actually reached learners, and the honest fallback for it is the section
++ * heading rather than a machine key left sitting in the prose. Brackets are
++ * required here, unlike SECTION_HEADING: mid-prose the brackets are the only
++ * thing separating a marker from a sentence that happens to open with a word
++ * like "closing".
++ */
++const INLINE_SECTION_HEADING = new RegExp(
++  `^\\s*(?:#{1,6}\\s*)?(?:\\*\\*|__)?\\s*\\[\\s*(${SECTION_KEYS.join("|")})\\s*\\]\\s*(?:\\*\\*|__)?\\s*:?\\s*`,
++  "i",
++);
++
+ export const isLabelledSectionKey = (
+   key: DebriefSectionKey | null,
+ ): key is (typeof LABELLED_SECTION_KEYS)[number] =>
+@@ -94,6 +109,13 @@ export const parseDebriefSections = (note: string): DebriefSection[] => {
+       key = heading[1].toLowerCase() as DebriefSectionKey;
+       continue;
+     }
++    const inline = line.match(INLINE_SECTION_HEADING);
++    if (inline) {
++      flushSection();
++      key = inline[1].toLowerCase() as DebriefSectionKey;
++      lines.push(line.slice(inline[0].length));
++      continue;
++    }
+     if (!line.trim()) {
+       flushParagraph();
+       continue;

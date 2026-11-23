@@ -1,0 +1,163 @@
+diff --git a/apps/ally-helpline-dashboard/src/components/character-library/CharacterFormPanel.tsx b/apps/ally-helpline-dashboard/src/components/character-library/CharacterFormPanel.tsx
+index b1d8806392..71f2e883c8 100644
+--- a/apps/ally-helpline-dashboard/src/components/character-library/CharacterFormPanel.tsx
++++ b/apps/ally-helpline-dashboard/src/components/character-library/CharacterFormPanel.tsx
+@@ -127,6 +127,12 @@ interface CharacterFormPanelProps {
+    * nothing here for them to change.
+    */
+   readOnly?: boolean;
++  /**
++   * Display names for voice ids, keyed by voice id. The interview page builds
++   * this from the voice questions the admin answered, since a tenant ADMIN
++   * cannot read the voice catalog (`view:scenario-voices`) to look names up.
++   */
++  voiceLabels?: Record<string, string>;
+ }
+ 
+ /**
+@@ -137,10 +143,11 @@ interface CharacterFormPanelProps {
+  * app only ever creates a new row or shows an existing one read-only — it
+  * never offers an affordance the backend would reject.
+  *
+- * Voice selection and cover image/video are intentionally left out of this
+- * first pass — they call additional endpoints (scenario voices, file-upload
+- * URL signing) whose permission gates for a tenant ADMIN haven't been
+- * verified yet. Add them once that's confirmed.
++ * Voice is shown and saved but never picked here: a tenant ADMIN cannot read
++ * the voice catalog (`view:scenario-voices`), so the only voices this form
++ * holds are the ones the admin chose in the interview. Cover image/video are
++ * left out too — file-upload URL signing's gate for a tenant ADMIN hasn't
++ * been verified yet.
+  */
+ export const CharacterFormPanel: React.FC<CharacterFormPanelProps> = ({
+   isOpen,
+@@ -148,6 +155,7 @@ export const CharacterFormPanel: React.FC<CharacterFormPanelProps> = ({
+   onSave,
+   initialCharacter,
+   readOnly = false,
++  voiceLabels = {},
+ }) => {
+   const [formData, setFormData] = useState<CharacterData>(initialCharacter || emptyCharacter);
+   const [createCharacter, { isLoading: isCreating }] = useCreateCharacterMutation();
+@@ -168,6 +176,7 @@ export const CharacterFormPanel: React.FC<CharacterFormPanelProps> = ({
+   const languageTabs = useMemo(() => {
+     const stored = new Set(
+       [
++        ...Object.keys(formData.voices ?? {}),
+         ...Object.keys(formData.languageCharacteristics ?? {}),
+         ...Object.keys(formData.linguisticStyleSamples ?? {}),
+       ].filter(Boolean),
+@@ -187,6 +196,7 @@ export const CharacterFormPanel: React.FC<CharacterFormPanelProps> = ({
+     return [...offered, ...retired];
+   }, [
+     catalogLanguages,
++    formData.voices,
+     formData.languageCharacteristics,
+     formData.linguisticStyleSamples,
+     readOnly,
+@@ -333,6 +343,12 @@ export const CharacterFormPanel: React.FC<CharacterFormPanelProps> = ({
+         ),
+         // Drop knowledge sources with no title rather than sending the
+         // backend one it rejects (400).
++        // The voice the admin chose per language in the interview. Before
++        // this was sent, a character built by interview was saved with no
++        // voice at all, despite the admin having picked one.
++        voices: Object.fromEntries(
++          Object.entries(formData.voices ?? {}).filter(([, voiceId]) => Boolean(voiceId)),
++        ),
+         knowledgeSources: (formData.knowledgeSources || []).filter(
+           source => source.title.trim() !== "",
+         ),
+@@ -545,6 +561,14 @@ export const CharacterFormPanel: React.FC<CharacterFormPanelProps> = ({
+                 </div>
+               )}
+ 
++              {formData.voices?.[activeLanguageId] && (
++                <Field label={strings.voice}>
++                  <span className="text-base text-typography-800">
++                    {voiceLabels[formData.voices[activeLanguageId]] ?? strings.voiceSelected}
++                  </span>
++                </Field>
++              )}
++
+               <Field label={strings.languageStyle}>
+                 <TextArea
+                   id="character-language-characteristics"
+diff --git a/apps/ally-helpline-dashboard/src/components/character-library/__tests__/CharacterFormPanel.test.tsx b/apps/ally-helpline-dashboard/src/components/character-library/__tests__/CharacterFormPanel.test.tsx
+index 6709d741d5..87def71638 100644
+--- a/apps/ally-helpline-dashboard/src/components/character-library/__tests__/CharacterFormPanel.test.tsx
++++ b/apps/ally-helpline-dashboard/src/components/character-library/__tests__/CharacterFormPanel.test.tsx
+@@ -121,5 +121,25 @@ describe("CharacterFormPanel", () => {
+     expect(payload.languageCharacteristics).toEqual({ "1": "Warm, measured", "2": "Hinglish" });
+     expect(payload.linguisticStyleSamples).toEqual({ "1": ["Hello there"], "2": ["Kaise ho?"] });
+     expect(payload).not.toHaveProperty("id");
++    // The voice the admin chose in the interview is kept, not dropped.
++    expect(payload.voices).toEqual({ "1": "3f1c2a9e-1b2c-4d5e-8f90-123456789abc" });
++  });
++
++  it("shows the interview's chosen voice by name on the language it was chosen for", () => {
++    render(
++      <CharacterFormPanel
++        isOpen
++        onClose={vi.fn()}
++        onSave={vi.fn()}
++        initialCharacter={interviewDraft}
++        voiceLabels={{ "3f1c2a9e-1b2c-4d5e-8f90-123456789abc": "Anushka — English" }}
++      />,
++    );
++
++    expect(screen.getByText("Anushka — English")).toBeInTheDocument();
++
++    // Hindi has no voice in this draft, so no voice row is shown there.
++    fireEvent.click(screen.getByRole("tab", { name: "Hindi" }));
++    expect(screen.queryByText("Anushka — English")).not.toBeInTheDocument();
+   });
+ });
+diff --git a/apps/ally-helpline-dashboard/src/constants/characterLibraryStrings.ts b/apps/ally-helpline-dashboard/src/constants/characterLibraryStrings.ts
+index abd093d8d2..a70ebc376f 100644
+--- a/apps/ally-helpline-dashboard/src/constants/characterLibraryStrings.ts
++++ b/apps/ally-helpline-dashboard/src/constants/characterLibraryStrings.ts
+@@ -23,6 +23,7 @@ export const characterLibraryStrings = {
+   close: "Close",
+   voice: "Voice",
+   selectVoice: "Select voice",
++  voiceSelected: "Voice selected",
+   languageStyle: "Language style",
+   enterLanguageStyle: "Describe the character's dialect, register, or code-mixing style",
+   dialectSamples: "Dialect samples",
+diff --git a/apps/ally-helpline-dashboard/src/pages/character-library/CharacterInterview.tsx b/apps/ally-helpline-dashboard/src/pages/character-library/CharacterInterview.tsx
+index a2a218c74b..dccff33209 100644
+--- a/apps/ally-helpline-dashboard/src/pages/character-library/CharacterInterview.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/character-library/CharacterInterview.tsx
+@@ -1,4 +1,4 @@
+-import React, { useCallback, useEffect, useRef, useState } from "react";
++import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+ 
+ import { useNavigate } from "react-router-dom";
+ import { toast } from "sonner";
+@@ -140,6 +140,17 @@ export const CharacterInterview: React.FC = () => {
+     void sendMessage("Let's begin.", undefined, true);
+   }, [needsKickoff, sessionId, isBooting, sendMessage]);
+ 
++  // Voice questions offer one option per voice (id = voice id, label =
++  // "Name — Language"), so the answered cards are where the review form gets
++  // a name for the voice it is about to save.
++  const voiceLabels = useMemo(() => {
++    const labels: Record<string, string> = {};
++    for (const message of messages) {
++      for (const option of message.question?.options ?? []) labels[option.id] = option.label;
++    }
++    return labels;
++  }, [messages]);
++
+   useEffect(() => {
+     const node = scrollRef.current;
+     if (node) node.scrollTop = node.scrollHeight;
+@@ -264,6 +275,7 @@ export const CharacterInterview: React.FC = () => {
+         onClose={() => setIsReviewOpen(false)}
+         onSave={() => navigate(ROUTES.CHARACTER_LIBRARY)}
+         initialCharacter={draftCharacter}
++        voiceLabels={voiceLabels}
+       />
+ 
+       <ConfirmationDialog

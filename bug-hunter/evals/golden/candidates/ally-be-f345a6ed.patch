@@ -1,0 +1,29 @@
+diff --git a/src/builder/controller/builder-pipeline.controller.spec.ts b/src/builder/controller/builder-pipeline.controller.spec.ts
+index 0846232750..d5c8c74c38 100644
+--- a/src/builder/controller/builder-pipeline.controller.spec.ts
++++ b/src/builder/controller/builder-pipeline.controller.spec.ts
+@@ -83,7 +83,11 @@ describe('BuilderPipelineController', () => {
+     const runId = uuidv4();
+     const engine = 'test-engine';
+     const model = 'test-model';
+-    const mockRun = await mockBuilderBuildService.getRunOrFail(runId);
++    // Non-null asserted: the mock is a Partial<BuilderBuildService>, so every
++    // member is optional to the type checker even though this one is always
++    // provided in beforeEach. Without it the Docker build fails on a strict
++    // type error that ts-jest does not raise.
++    const mockRun = await mockBuilderBuildService.getRunOrFail!(runId);
+ 
+     const dto: RecordBuilderRunModelDto = { engine, model };
+ 
+diff --git a/src/builder/service/builder-build.service.ts b/src/builder/service/builder-build.service.ts
+index 8e6233a9ab..e247213f2d 100644
+--- a/src/builder/service/builder-build.service.ts
++++ b/src/builder/service/builder-build.service.ts
+@@ -32,6 +32,7 @@ import { BuilderNotificationService } from './builder-notification.service';
+ import { BuilderExemplarService } from './builder-exemplar.service';
+ import { BuilderEpicService } from './builder-epic.service';
+ import { BuilderPrdService } from './builder-prd.service';
++import { RecordBuilderRunModelDto } from '../dto/builder-pipeline.dto';
+ import {
+   BUILDER_RUN_ACTIVE_STATUSES,
+   BuilderEventType,

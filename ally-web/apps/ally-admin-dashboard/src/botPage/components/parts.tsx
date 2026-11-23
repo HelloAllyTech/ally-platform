@@ -353,7 +353,10 @@ export function ConfirmationCard({
     <section className="bp-card" data-testid="confirmation-card" aria-label={confirmation.list}>
       <p className="bp-card__what" data-action={confirmation.action}>
         <CheckIcon />
-        {copy.steps.card[confirmation.action]} · {confirmation.list}
+        {confirmation.headline
+          ? copy.steps.headline[confirmation.headline]
+          : copy.steps.card[confirmation.action]}{" "}
+        · {confirmation.list}
       </p>
       <p className="bp-card__when">{when}</p>
       {confirmation.details.length > 0 && (

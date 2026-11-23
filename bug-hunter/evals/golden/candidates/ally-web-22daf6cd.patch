@@ -1,0 +1,79 @@
+diff --git a/libs/ui-shared/src/__tests__/SimulationTimer.test.tsx b/libs/ui-shared/src/__tests__/SimulationTimer.test.tsx
+new file mode 100644
+index 0000000000..acc0788789
+--- /dev/null
++++ b/libs/ui-shared/src/__tests__/SimulationTimer.test.tsx
+@@ -0,0 +1,60 @@
++import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
++import { render, screen, act } from '@testing-library/react';
++import { SimulationTimer } from '../lib/simulation/SimulationTimer';
++
++describe('SimulationTimer', () => {
++  beforeEach(() => {
++    vi.useFakeTimers();
++  });
++
++  afterEach(() => {
++    vi.runOnlyPendingTimers();
++    vi.useRealTimers();
++  });
++
++  it('should call onWarning when the warning threshold is reached', () => {
++    const onWarningMock = vi.fn();
++    const onTimeLimitMock = vi.fn();
++    const startTime = new Date(Date.now() - (60 - 0.5) * 1000).toISOString(); // 59.5 seconds ago
++
++    act(() => {
++      render(
++        <SimulationTimer
++          onWarning={onWarningMock}
++          onTimeLimit={onTimeLimitMock}
++          startTime={startTime}
++          timeLimit={60} // 1 minute in seconds
++        />
++      );
++    });
++
++    act(() => {
++      vi.advanceTimersByTime(1000); // Advance by 1 second
++    });
++    expect(onWarningMock).toHaveBeenCalledTimes(1);
++    expect(onTimeLimitMock).not.toHaveBeenCalled();
++  });
++
++  it('should call onTimeLimit when the time limit is reached', () => {
++    const onWarningMock = vi.fn();
++    const onTimeLimitMock = vi.fn();
++    const startTime = new Date(Date.now() - (60 + 10) * 1000).toISOString(); // 70 seconds ago
++
++    act(() => {
++      render(
++        <SimulationTimer
++          onWarning={onWarningMock}
++          onTimeLimit={onTimeLimitMock}
++          startTime={startTime}
++          timeLimit={60} // 1 minute in seconds
++        />
++      );
++    });
++
++    act(() => {
++      vi.advanceTimersByTime(16000); // Advance past the 15-second grace period (70 + 16 = 86 seconds total)
++    });
++    expect(onTimeLimitMock).toHaveBeenCalledTimes(1);
++    expect(onWarningMock).toHaveBeenCalledTimes(1); // Warning should have been called before
++  });
++});
+diff --git a/libs/ui-shared/src/lib/simulation/SimulationTimer.tsx b/libs/ui-shared/src/lib/simulation/SimulationTimer.tsx
+index 29c2a862b7..27f8dfcdd9 100644
+--- a/libs/ui-shared/src/lib/simulation/SimulationTimer.tsx
++++ b/libs/ui-shared/src/lib/simulation/SimulationTimer.tsx
+@@ -55,7 +55,7 @@ export const SimulationTimer: FC<SimulationTimerProps> = ({
+     }, 1000);
+ 
+     return () => clearInterval(interval);
+-  }, [startTime]);
++  }, [startTime, onTimeLimit, onWarning, timeLimit]);
+ 
+   const formatTime = (totalSeconds: number) => {
+     const hours = Math.floor(totalSeconds / 3600);

@@ -1,0 +1,106 @@
+diff --git a/src/chat/gateway/microphone-chat.gateway.ts b/src/chat/gateway/microphone-chat.gateway.ts
+index 0e79c6a898..e28ac2e5cd 100644
+--- a/src/chat/gateway/microphone-chat.gateway.ts
++++ b/src/chat/gateway/microphone-chat.gateway.ts
+@@ -262,22 +262,26 @@ export class MicrophoneChatGateway
+       );
+     });
+ 
+-    client.on('disconnect', () => {
+-      this.logger.info(
+-        `Client disconnected from microphone chat: ${client.id}`,
+-      );
+-      this.handleDisconnect(client);
+-    });
++    // NOTE: do not add a `client.on('disconnect')` here. Nest already calls
++    // `handleDisconnect` for us via OnGatewayDisconnect; a manual listener made
++    // it run twice, concurrently, and both invocations read the session before
++    // either deleted it — which is why every disconnect logged its end attempt
++    // and its audit event twice.
+   }
+ 
+   async handleDisconnect(client: Socket) {
+-    this.logger.info(`Client disconnected: ${client.id}`);
++    this.logger.info(`Client disconnected from microphone chat: ${client.id}`);
+     const clientId = client.id;
+     const session = this.sessions[clientId];
+     if (!session) {
+       this.logger.error(`Session not found for client ${clientId}`);
+       return;
+     }
++    // Claim the session before any await. Two disconnect notifications for the
++    // same socket must not both reach endChat: the second one loses the race and
++    // fails with "Chat is not active", which reads in the audit trail as a
++    // failure to end a call that was in fact ended cleanly.
++    delete this.sessions[clientId];
+     // only chat will be ended if valid chatId is provided
+     // this will be triggered only from the platform where the chat is started
+     if (
+@@ -327,7 +331,6 @@ export class MicrophoneChatGateway
+         userId: session.userId,
+       },
+     );
+-    delete this.sessions[clientId];
+   }
+ 
+   sendMessagesToRoom(room: string, payload: MessagePayload) {
+diff --git a/src/chat/gateway/test/microphone-chat.gateway.spec.ts b/src/chat/gateway/test/microphone-chat.gateway.spec.ts
+index 6e61a57e03..c4450b31e3 100644
+--- a/src/chat/gateway/test/microphone-chat.gateway.spec.ts
++++ b/src/chat/gateway/test/microphone-chat.gateway.spec.ts
+@@ -235,13 +235,21 @@ describe('MicrophoneChatGateway', () => {
+         'connect_error',
+         expect.any(Function),
+       );
+-      expect(mockSocket.on).toHaveBeenCalledWith(
+-        'disconnect',
+-        expect.any(Function),
+-      );
+       expect(gatewayPrivate.sessions[mockSocket.id]).toBeDefined();
+     });
+ 
++    it('should NOT register its own disconnect listener', async () => {
++      await gateway.handleConnection(mockSocket);
++
++      // Nest already invokes handleDisconnect via OnGatewayDisconnect. A manual
++      // listener here made it run twice, concurrently, so every disconnect
++      // logged two end attempts and two audit events for one recording.
++      expect(mockSocket.on).not.toHaveBeenCalledWith(
++        'disconnect',
++        expect.any(Function),
++      );
++    });
++
+     it('should disconnect client when no user data is found', async () => {
+       mockSocket.data.user = null;
+ 
+@@ -251,18 +259,20 @@ describe('MicrophoneChatGateway', () => {
+       expect(mockSocket.join).not.toHaveBeenCalled();
+     });
+ 
+-    it('should call handleDisconnect when disconnect event is triggered', async () => {
+-      gatewayPrivate.handleDisconnect = jest.fn().mockResolvedValue(undefined);
+-
++    it('should end a recording only once when disconnect is delivered twice', async () => {
+       await gateway.handleConnection(mockSocket);
++      gatewayPrivate.sessions[mockSocket.id].chatId = 99;
+ 
+-      // Get the disconnect callback and call it
+-      const disconnectCallback = mockSocket.on.mock.calls.find(
+-        (call: any) => call[0] === 'disconnect',
+-      )[1];
+-      disconnectCallback();
++      // Both notifications arrive before either has finished. The session must
++      // be claimed before the first await, or the loser reaches endChat too and
++      // fails with "Chat is not active" — which the audit trail then reports as
++      // a failure to end a call that ended cleanly.
++      await Promise.all([
++        gateway.handleDisconnect(mockSocket),
++        gateway.handleDisconnect(mockSocket),
++      ]);
+ 
+-      expect(gatewayPrivate.handleDisconnect).toHaveBeenCalledWith(mockSocket);
++      expect(mockChatService.endChat).toHaveBeenCalledTimes(1);
+     });
+   });
+ 

@@ -1,0 +1,40 @@
+diff --git a/apps/ally-helpline-dashboard/src/pages/analytics/LearnerUsageTable.tsx b/apps/ally-helpline-dashboard/src/pages/analytics/LearnerUsageTable.tsx
+index 8acb574959..54c5f1ab9f 100644
+--- a/apps/ally-helpline-dashboard/src/pages/analytics/LearnerUsageTable.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/analytics/LearnerUsageTable.tsx
+@@ -319,12 +319,15 @@ export const LearnerUsageTable: FunctionComponent<LearnerUsageTableProps> = ({ r
+     {
+       // Score per minute, not per session: it separates the learner who earns
+       // steadily from the one who racks up minutes. Null (no measurable
+-      // practice) reads as "—", never 0, and the value can be negative.
++      // practice) reads as "—", never 0, and the value can be negative. Below
++      // 10 practice minutes the ratio is too noisy to be meaningful, so it's
++      // suppressed the same way regardless of what the backend returned.
+       key: "roleplayPointsPerMinute",
+       header: t("organizationMetrics.learnerUsage.columns.pointsPerMinute"),
+       tooltip: t("organizationMetrics.learnerUsage.tooltips.pointsPerMinute"),
+       sortable: true,
+-      render: (value: number | null) => (value == null ? "—" : value.toLocaleString()),
++      render: (value: number | null, row) =>
++        value == null || row.totalPracticeMinutes < 10 ? "—" : value.toLocaleString(),
+     },
+     {
+       // Items, not courses: a course-level percentage only moves on
+diff --git a/apps/ally-helpline-dashboard/src/pages/analytics/__tests__/LearnerUsageTable.test.tsx b/apps/ally-helpline-dashboard/src/pages/analytics/__tests__/LearnerUsageTable.test.tsx
+index 4f615dc608..afec685933 100644
+--- a/apps/ally-helpline-dashboard/src/pages/analytics/__tests__/LearnerUsageTable.test.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/analytics/__tests__/LearnerUsageTable.test.tsx
+@@ -165,6 +165,13 @@ describe("LearnerUsageTable", () => {
+     expect(cell(COL.pointsPerMin)).toBe("—");
+   });
+ 
++  it("em-dashes points-per-minute below the 10-minute measurement floor even when the backend returns a value", () => {
++    respondWith([row({ totalPracticeMinutes: 9.9, roleplayPointsPerMinute: 4 })]);
++    render(<LearnerUsageTable range="30d" />);
++
++    expect(cell(COL.pointsPerMin)).toBe("—");
++  });
++
+   it("renders a negative points-per-minute rather than hiding it", () => {
+     // Roleplay composite scores go below zero, so the rate can too.
+     respondWith([row({ roleplayPointsPerMinute: -2.4 })]);

@@ -821,6 +821,8 @@ class AgentPurposeEnquiriesCanBookInputs(PromptInputs):
 
     #: Where the chat is: "WhatsApp" or "the website".
     channel: str
+    #: Q4 G2: the WhatsApp-only phone rule on WhatsApp, empty elsewhere.
+    phone_rule: str = ""
 
 
 class AgentPurposeAnswerTakesDetailsInputs(PromptInputs):
@@ -841,6 +843,8 @@ class AgentPurposeAnswerTakesDetailsInputs(PromptInputs):
 
     #: Where the chat is: "WhatsApp" or "the website".
     channel: str
+    #: Q4 G2: the WhatsApp-only phone rule on WhatsApp, empty elsewhere.
+    phone_rule: str = ""
 
 
 class AgentMemoryInputs(PromptInputs):
@@ -898,6 +902,24 @@ class AgentUpsetSupportInputs(PromptInputs):
     any_time: str = ""
 
 
+class AgentUpsetNumbersInputs(PromptInputs):
+    """`agent/upset_numbers.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_agent_upset_numbers",
+        name="Chatbot Agent: Upset, numbers to give",
+        description=(
+            'Added after the upset section on every assistant (Q4 G7, Round 7: "I '
+            "don't have our crisis contact numbers here\" at 2am): the numbers it may "
+            "give if they ask for someone to talk to, or sound alone with it."
+        ),
+    )
+
+    #: Tele-MANAS and 112, then the organisation's own line when the owner
+    #: confirmed it for crisis replies.
+    numbers: str
+
+
 class AgentPlaybookBookingInputs(PromptInputs):
     """`agent/playbook_booking.txt`."""
 
@@ -931,6 +953,9 @@ class AgentPlaybookDetailsInputs(PromptInputs):
 
     #: The names of the lists this playbook covers, as the owner wrote them.
     lists: str
+    #: Q4 G2: " On WhatsApp, never ask for their phone number: the team already has
+    #: it." on WhatsApp, empty on every other channel.
+    phone_rule: str = ""
 
 
 class AgentPlaybookOrdersInputs(PromptInputs):

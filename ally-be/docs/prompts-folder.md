@@ -295,18 +295,9 @@ over accepting whatever arrived.
 A third shape sits between the two: a folder like `ux_signals/`,
 `bug_hunter/` or `product_updates/` holds the system prompt for a **single** call that a feature
 makes on demand or on a schedule, read through `getPromptByCode` like an agent prompt but not
-driving a conversation. `bug_hunter/classify_repo.txt`, `bug_hunter/classify_miss.txt`, `bug_hunter/decide.txt` and `bug_hunter/review_study.txt` (a second model reads a fix session's study of the feature, including who else reads the value it changes, before any code changes) are the
-plainest examples: one JSON answer each, and code validates the answer against a closed catalogue
-(dispatchable repos; miss reasons and senses; for `decide.txt`'s D1 the sense menu is per repo, so
-`locale_parity` is only offered where locale files exist; its D5–D7 answers for the orchestrator
-are checked against the move menu the same way, and a veto or a fixed point never asks the model
-at all) before anything is stored, so a model that invents a value is discarded rather than
-trusted. `product_updates/consolidate.txt` is the one whose output reaches a public page
-(app.helloally.ai/blog/changelog) with no human step, so its reply is validated field by field
-and code enforces what the prompt asks — public text carrying jargon is capped at low confidence so
-the team digest flags it — rather than trusting the model to comply. Since 2026-10-01 public is the
-default audience, staff-tool work included; internal is kept for work of no value to anyone, and a
-wrong call is corrected from the admin console's audience toggle.
+driving a conversation. `bug_hunter/classify_repo.txt` (picks the app of a filed bug that names none) is the plainest
+example: one JSON answer, and code validates the answer against a closed catalogue (Bug Hunter's
+apps). The old Bug Hunter's other single-call prompts were removed with its engine on 2026-11-23.
 
 `pm_agent/` holds the PM Agent's system prompts ([pm-agent.md](pm-agent.md)): one per analysis lane
 (`lane_analytics.txt`, `lane_ux_signals.txt`, `lane_code_health.txt`, `lane_infra_cost.txt`,

@@ -1,0 +1,38 @@
+diff --git a/apps/ally-admin-dashboard/src/components/roleplay-studio/improve/TestReportDetail.tsx b/apps/ally-admin-dashboard/src/components/roleplay-studio/improve/TestReportDetail.tsx
+index 60a5b306c1..c6aacc1fb2 100644
+--- a/apps/ally-admin-dashboard/src/components/roleplay-studio/improve/TestReportDetail.tsx
++++ b/apps/ally-admin-dashboard/src/components/roleplay-studio/improve/TestReportDetail.tsx
+@@ -5,7 +5,7 @@ import remarkGfm from "remark-gfm";
+ 
+ import { useGetRoleplayTestReportQuery } from "@api";
+ import { en } from "@constants";
+-import { useTranscriptDisclaimer } from "@hooks";
++import { useTranscriptDisclaimer } from "@hooks/useTranscriptDisclaimer";
+ import { RoleplayReportImproveStatus } from "@src/types/roleplayStudio";
+ 
+ import { roleplayMarkdownComponents } from "../markdownComponents";
+diff --git a/apps/ally-admin-dashboard/src/pages/RoleplaySessionLogs/RoleplaySessionLogDetail.tsx b/apps/ally-admin-dashboard/src/pages/RoleplaySessionLogs/RoleplaySessionLogDetail.tsx
+index 08c9b94938..62649028d9 100644
+--- a/apps/ally-admin-dashboard/src/pages/RoleplaySessionLogs/RoleplaySessionLogDetail.tsx
++++ b/apps/ally-admin-dashboard/src/pages/RoleplaySessionLogs/RoleplaySessionLogDetail.tsx
+@@ -6,7 +6,7 @@ import { useGetRoleplaySessionLogQuery } from "@api";
+ import { Button } from "@components";
+ import { ButtonVariant } from "@components/types";
+ import { ROUTES } from "@constants";
+-import { useTranscriptDisclaimer } from "@hooks";
++import { useTranscriptDisclaimer } from "@hooks/useTranscriptDisclaimer";
+ import { RoleplaySessionWeakMetric } from "@types";
+ import { formatDate } from "@utils";
+ 
+diff --git a/apps/ally-admin-dashboard/src/pages/RoleplaySessionLogs/__tests__/RoleplaySessionLogDetail.test.tsx b/apps/ally-admin-dashboard/src/pages/RoleplaySessionLogs/__tests__/RoleplaySessionLogDetail.test.tsx
+index 3a9b03bffd..77291306d8 100644
+--- a/apps/ally-admin-dashboard/src/pages/RoleplaySessionLogs/__tests__/RoleplaySessionLogDetail.test.tsx
++++ b/apps/ally-admin-dashboard/src/pages/RoleplaySessionLogs/__tests__/RoleplaySessionLogDetail.test.tsx
+@@ -25,6 +25,7 @@ vi.mock("@utils", () => ({
+ const getQueryMock = vi.fn();
+ vi.mock("@api", () => ({
+   useGetRoleplaySessionLogQuery: (...args: unknown[]) => getQueryMock(...args),
++  useGetI18nTranslationsQuery: () => ({ data: undefined }),
+ }));
+ 
+ import { RoleplaySessionLogDetail } from "../RoleplaySessionLogDetail";

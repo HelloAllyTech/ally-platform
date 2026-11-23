@@ -50,7 +50,7 @@ const ALL_FEATURE_GATED_KEYS = [
   FeatureToggleKey.SETTINGS,
   FeatureToggleKey.LOGS,
   FeatureToggleKey.WHATSAPP_BOT,
-  FeatureToggleKey.BUG_HUNTER,
+  FeatureToggleKey.BUG_HUNTER_V2_VERDICTS,
   FeatureToggleKey.ANALYTICS,
   FeatureToggleKey.COMPETENCIES,
   FeatureToggleKey.AI_LAB,
@@ -81,7 +81,7 @@ describe("deriveNavigationItems", () => {
     );
   });
 
-  it("shows Product Roadmap for a user holding only VIEW_PRODUCT_ROADMAP", () => {
+  it("shows Roadmap for a user holding only VIEW_PRODUCT_ROADMAP once the Roadmap role resolves", () => {
     // Deliberately permission-gated rather than feature-toggle-gated, because viewing and
     // voting are meant to reach a wider group than the manage surface. If someone moves the
     // tab into buildSidebarItemFeatureKeyMap, this fails.
@@ -89,19 +89,24 @@ describe("deriveNavigationItems", () => {
       permissions: [Permissions.VIEW_PRODUCT_ROADMAP],
       features: DEFAULT_TAB_KEYS,
       savedOrder: undefined,
+      roadmapV2: true,
     });
-    expect(result.map(i => i.id)).toEqual([SIDEBAR_ITEMS.PRODUCT_ROADMAP]);
-    expect(result[0].path).toBe(ROUTES.PRODUCT_ROADMAP);
+    expect(result.map(i => i.id)).toEqual([
+      SIDEBAR_ITEMS.ROADMAP_V2,
+      SIDEBAR_ITEMS.USER_INTERVIEWS,
+    ]);
+    expect(result[0].path).toBe(ROUTES.ROADMAP);
   });
 
-  it("hides Product Roadmap from a holder of every feature toggle who lacks the permission", () => {
+  it("hides Roadmap from a holder of every feature toggle who lacks the permission", () => {
     // Feature toggles alone must not unlock it — the permission grant is what does.
     const result = deriveNavigationItems({
       permissions: [],
       features: ALL_FEATURE_GATED_KEYS,
       savedOrder: undefined,
+      roadmapV2: true,
     });
-    expect(result.map(i => i.id)).not.toContain(SIDEBAR_ITEMS.PRODUCT_ROADMAP);
+    expect(result.map(i => i.id)).not.toContain(SIDEBAR_ITEMS.ROADMAP_V2);
   });
 
   it("no longer lists Product updates in the sidebar: it is a tab of the Roadmap's top menu", () => {
@@ -211,7 +216,7 @@ describe("deriveNavigationItems", () => {
     expect(ids).toContain(SIDEBAR_ITEMS.ANALYTICS);
     expect(ids).toContain(SIDEBAR_ITEMS.SCENARIO_LANGUAGES);
     expect(ids).toContain(SIDEBAR_ITEMS.WHATSAPP_BOT);
-    expect(ids).toContain(SIDEBAR_ITEMS.BUG_HUNTER);
+    expect(ids).toContain(SIDEBAR_ITEMS.BUG_HUNTER_V2);
   });
 
   // CR1: Models and Costs are the only screens with dollars; `manage_costs` alone opens them.
@@ -351,6 +356,24 @@ describe("deriveNavigationItems", () => {
       savedOrder: undefined,
     }).map(item => item.id);
     expect(ids).not.toContain(SIDEBAR_ITEMS.DEBRIEFS);
+  });
+
+  it("shows Bug Hunter only to a holder of the bug_hunter_v2_verdicts toggle", () => {
+    const withToggle = deriveNavigationItems({
+      permissions: [],
+      features: [FeatureToggleKey.BUG_HUNTER_V2_VERDICTS],
+      savedOrder: undefined,
+    });
+    expect(withToggle.find(i => i.id === SIDEBAR_ITEMS.BUG_HUNTER_V2)?.path).toBe(
+      ROUTES.BUG_HUNTER_V2,
+    );
+    // the old Bug Hunter's toggle no longer opens anything
+    const oldToggle = deriveNavigationItems({
+      permissions: [],
+      features: [FeatureToggleKey.BUG_HUNTER],
+      savedOrder: undefined,
+    }).map(i => i.id);
+    expect(oldToggle).not.toContain(SIDEBAR_ITEMS.BUG_HUNTER_V2);
   });
 
   it("shows PM Agent only to a holder of the pm_agent toggle", () => {
@@ -560,11 +583,6 @@ describe("deriveNavigationItems", () => {
         FeatureToggleKey.TRANSLATIONS,
       ],
       [SIDEBAR_ITEMS.BLOG, Permissions.VIEW_BLOGS, FeatureToggleKey.BLOG],
-      [
-        SIDEBAR_ITEMS.PRODUCT_ROADMAP,
-        Permissions.VIEW_PRODUCT_ROADMAP,
-        FeatureToggleKey.PRODUCT_ROADMAP,
-      ],
       [SIDEBAR_ITEMS.USERS, Permissions.VIEW_USERS, FeatureToggleKey.USERS],
     ] as const;
 
@@ -596,6 +614,7 @@ describe("sections", () => {
       features: Object.values(FeatureToggleKey),
       savedOrder: undefined,
       orgToggles: {},
+      roadmapV2: true,
     });
 
   it("gives every item a known section and lists sections in the agreed order", () => {
@@ -660,6 +679,7 @@ describe("sections", () => {
       features: Object.values(FeatureToggleKey),
       savedOrder: saved,
       orgToggles: {},
+      roadmapV2: true,
     });
     const sections = groupNavigationItems(items);
     expect(flattenNavSections(sections)).toHaveLength(base.length);

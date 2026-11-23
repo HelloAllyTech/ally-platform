@@ -4,7 +4,7 @@ import { useGetRoadmapOpportunityBriefQuery } from "@api";
 import { en } from "@constants";
 import type { RoadmapOpportunityBrief } from "@types";
 
-import { CopilotBrief } from "../../ProductRoadmap/CopilotBrief";
+import { CopilotBrief } from "./CopilotBrief";
 
 interface IdeaAgentFindingsProps {
   brief: RoadmapOpportunityBrief | null | undefined;

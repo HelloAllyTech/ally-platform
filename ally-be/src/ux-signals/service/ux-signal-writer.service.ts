@@ -4,12 +4,7 @@ import { Repository } from 'typeorm';
 import { createHash } from 'crypto';
 
 import { LoggerService } from 'src/logger/logger.service';
-import { BugFinding } from 'src/bug-hunter/entity/bug-finding.entity';
-import { BugFindingRepository } from 'src/bug-hunter/repository/bug-finding.repository';
-import {
-  BugFindingSource,
-  BugFindingStatus,
-} from 'src/bug-hunter/enum/bug-finding.enum';
+import { BugHunterBoardService } from 'src/bug-hunter-approvals/service/bug-hunter-board.service';
 import { PmAgentSignal } from 'src/pm-agent/entity/pm-agent-signal.entity';
 
 import {
@@ -54,7 +49,7 @@ export class UxSignalWriterService {
   );
 
   constructor(
-    private readonly bugFindingRepository: BugFindingRepository,
+    private readonly bugHunter: BugHunterBoardService,
     @InjectRepository(PmAgentSignal)
     private readonly signalRepository: Repository<PmAgentSignal>,
   ) {}
@@ -126,34 +121,21 @@ export class UxSignalWriterService {
     const description = item.body.slice(
       UX_SIGNAL_FIELD_LIMITS.DESCRIPTION * -1,
     );
-    const dedupeKey = BugFindingRepository.dedupeKey(
-      null,
-      BugFindingSource.UX_SIGNAL,
+    // The old Bug Hunter's identity, unchanged: one bug per route/target, whatever the
+    // wording (the model rewords freely between runs).
+    const norm = (v: string) => v.toLowerCase().replace(/\s+/g, ' ').trim();
+    const key = createHash('sha256')
+      .update(`::ux_signal::${norm(symbol)}`)
+      .digest('hex');
+    return this.bugHunter.enqueueSignal({
+      source: 'ux_signal',
+      key,
+      app: UX_SIGNAL_REPO,
+      title: item.title.slice(0, UX_SIGNAL_FIELD_LIMITS.TITLE),
+      description: `${description}\n\n${this.formatEvidence(item)}`,
+      severity: item.severity,
       symbol,
-      description,
-    );
-
-    const existing = await this.bugFindingRepository.findOpenByDedupeKey(
-      UX_SIGNAL_REPO,
-      dedupeKey,
-    );
-    if (existing) return false;
-
-    await this.bugFindingRepository.save(
-      this.bugFindingRepository.create({
-        source: BugFindingSource.UX_SIGNAL,
-        repo: UX_SIGNAL_REPO,
-        title: item.title.slice(0, UX_SIGNAL_FIELD_LIMITS.TITLE),
-        description,
-        symbol,
-        dedupeKey,
-        severity: item.severity,
-        evidence: this.formatEvidence(item),
-        proven: false,
-        status: BugFindingStatus.NEW,
-      } as Partial<BugFinding>),
-    );
-    return true;
+    });
   }
 
   /**

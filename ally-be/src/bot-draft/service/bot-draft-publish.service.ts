@@ -1,4 +1,6 @@
 import { PlanService } from 'src/billing/service/plan.service';
+import { ListOwnerService } from '../../chatbot/lists/list-owner.service';
+import { realName } from '../name-placeholders';
 import {
   BadRequestException,
   ConflictException,
@@ -94,6 +96,8 @@ export class BotDraftPublishService {
     @Optional() private readonly plans?: PlanService,
     // Stage 4: the go-live gate (D10), on publish like every other path. Optional for specs.
     @Optional() private readonly goLive?: GoLiveGateService,
+    // Q4 B10: "Bring in customers" gets its Callback requests list on publish.
+    @Optional() private readonly lists?: ListOwnerService,
   ) {}
 
   async publish(
@@ -178,6 +182,7 @@ export class BotDraftPublishService {
         ...enabledLanguagesPatch(config.languages),
       },
     );
+    await this.callbackListFor(updated, config);
     const ownerNotesDocumentId = await this.ownerNotes(draft, config);
     const learnedFactsDocumentId = await this.learnedFacts(draft);
 
@@ -205,9 +210,14 @@ export class BotDraftPublishService {
           // The logo is the page's stored image (`settings.brand.logo`, chunk 20d), never the
           // site's own URL: the page must not hotlink it.
           logoUrl: null,
-          title: config.branding.title.trim() || config.name,
-          assistantName:
-            config.branding.assistantName.trim() || config.assistantName,
+          title: realName(
+            config.branding.title,
+            realName(config.name, updated.name),
+          ),
+          assistantName: realName(
+            config.branding.assistantName,
+            realName(config.assistantName, updated.name),
+          ),
         },
         suggestedQuestions: config.suggestedQuestions,
         // Young people (Q3-fast Part 1): no name or contact questions before the chat.
@@ -328,6 +338,32 @@ export class BotDraftPublishService {
     }
   }
 
+  /**
+   * "Bring in customers" takes people's details for the team (Q4 B10, BHIVE: a live customer asking
+   * for a sales call was told "I can't pass your details"): on publish, an assistant with that
+   * purpose and no Callback requests list gets one, with Add entries at Do it. An existing list is
+   * left exactly as the owner set it. A failure leaves publishing as it was.
+   */
+  private async callbackListFor(chatbot: Chatbot, config: BotDraft) {
+    if (config.purpose !== PurposeId.ENQUIRIES || !this.lists) return;
+    try {
+      const [has] = await this.chatbots.manager.query(
+        `SELECT 1 FROM collections WHERE chatbot_id = $1 AND key = 'callback_requests' AND deleted_at IS NULL`,
+        [chatbot.id],
+      );
+      if (has) return;
+      const fresh = await this.chatbots.findOneByOrFail({ id: chatbot.id });
+      await this.lists.install(fresh, 'callback_requests');
+      await this.lists.setAbilities(chatbot.id, 'callback_requests', {
+        create: 'do_it',
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Callback requests list not added on publish for ${chatbot.id}: ${error instanceof Error ? error.name : 'error'}`,
+      );
+    }
+  }
+
   /** The chatbot as the draft describes it, with its safety pack and the owner's rules. */
   private async updateChatbot(
     chatbot: Chatbot,
@@ -337,11 +373,16 @@ export class BotDraftPublishService {
     accessMode?: ChatbotAccessMode,
   ): Promise<Chatbot> {
     const pack = packFor(config.safetyPackId);
+    // Q4 N1: never a placeholder ("unchanged") as the assistant's name.
+    const name = realName(
+      config.name,
+      realName(chatbot.name, 'Your assistant'),
+    );
     const patch: Partial<Chatbot> = {
-      name: config.name,
+      name,
       persona: {
         ...(chatbot.persona ?? {}),
-        displayName: config.assistantName,
+        displayName: realName(config.assistantName, name),
         systemPrompt: config.instructions,
         tone: config.tone,
         greeting: config.introduction,
@@ -351,7 +392,12 @@ export class BotDraftPublishService {
       safetyPack: pack?.id ?? null,
       safetyPackVersion: pack?.version ?? draft.safetyPackVersion ?? null,
       // Topics to avoid are set on the assistant itself (Make it yours, the home), so kept.
-      rules: { ...(chatbot.rules ?? {}), never: config.extraNever },
+      rules: {
+        ...(chatbot.rules ?? {}),
+        never: config.extraNever,
+        // Q4 A3: the owner's correction of the pack in setup, as the home records it.
+        ...(config.packChange ? { packChange: config.packChange } : {}),
+      },
       purpose: purposeOf(config),
       purposeNote:
         purposeOf(config) === PurposeId.CUSTOM

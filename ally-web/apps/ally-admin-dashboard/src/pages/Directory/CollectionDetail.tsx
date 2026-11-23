@@ -19,7 +19,7 @@ import { ButtonVariant } from "@components/types";
 import { ROUTES } from "@constants";
 
 import { DIR, placeOf } from "./copy";
-import { Badge, copyText, errMsg, Field, inputClass, publicPageUrl } from "./ui";
+import { Badge, copyText, errMsg, Field, inputClass, publicPageUrl, runThen } from "./ui";
 
 const D = DIR.detail;
 type Tab = "entries" | "page" | "domain";
@@ -229,7 +229,7 @@ const DomainPanel: React.FC<{ collection: DirectoryCollection }> = ({ collection
     after?: (c: DirectoryCollection) => void,
   ) => {
     try {
-      after?.(await fn());
+      await runThen(fn, after);
     } catch (error) {
       toast.error(errMsg(error, D.failed));
     }

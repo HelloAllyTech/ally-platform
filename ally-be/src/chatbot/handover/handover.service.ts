@@ -34,8 +34,10 @@ import { safetySettingsOf } from '../safety/safety-settings';
 import { personJoinedNotice } from '../safety/chat-notice';
 import { replyLanguageOf } from '../engine/reply-language';
 import {
+  autoHandBackMessage,
   fill,
   HANDOVER_COPY,
+  handoverLanguageOf,
   handoverMessage,
   handoverOf,
   type NeedsPersonReason,
@@ -158,7 +160,11 @@ export class HandoverService implements OnModuleInit {
         out = {
           ...decision,
           handledBy: WaHandledBy.HANDOVER,
-          body: handoverMessage(handoverOf(settings), now),
+          body: handoverMessage(
+            handoverOf(settings),
+            now,
+            handoverLanguageOf(decision.language),
+          ),
         };
         await this.markNeedsPerson(
           chatbot.id,
@@ -540,7 +546,14 @@ export class HandoverService implements OnModuleInit {
     channel: ConversationChannel,
     now: Date,
   ): Promise<void> {
-    const text = HANDOVER_COPY.autoHandBack;
+    // In the person's language (Q4 G1): the last thing they wrote.
+    const [last] = (await this.dataSource.query(
+      `SELECT language FROM chatbot_messages
+        WHERE conversation_id = $1 AND direction = 'inbound'
+        ORDER BY "createdAt" DESC LIMIT 1`,
+      [conversationId],
+    )) as { language: string | null }[];
+    const text = autoHandBackMessage(handoverLanguageOf(last?.language));
     try {
       if (channel === ConversationChannel.WHATSAPP) {
         if (!whatsappWindowOpen(await this.lastInboundAt(conversationId), now))

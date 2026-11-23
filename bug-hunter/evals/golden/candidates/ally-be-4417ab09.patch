@@ -1,0 +1,472 @@
+diff --git a/src/track/controller/test/track-admin.controller.ownership.spec.ts b/src/track/controller/test/track-admin.controller.ownership.spec.ts
+new file mode 100644
+index 0000000000..1e115a04a1
+--- /dev/null
++++ b/src/track/controller/test/track-admin.controller.ownership.spec.ts
+@@ -0,0 +1,118 @@
++import { ForbiddenException } from '@nestjs/common';
++import { TrackAdminController } from '../track-admin.controller';
++
++/**
++ * Every route that changes an existing course runs TrackService's ownership
++ * check first, so an organization-restricted admin cannot change a course
++ * someone else created (see TrackService.assertCallerMayEdit). The check
++ * itself is covered in track.service.spec; this pins the wiring.
++ */
++describe('TrackAdminController — course ownership for restricted admins', () => {
++  const TRACK_ID = '0b7f3c52-3a39-4f55-9a52-4a3c0f1f5a10';
++  let trackService: Record<string, jest.Mock>;
++  let trackTranslationService: Record<string, jest.Mock>;
++  let controller: TrackAdminController;
++
++  beforeEach(() => {
++    trackService = {
++      assertCallerMayEdit: jest
++        .fn()
++        .mockRejectedValue(
++          new ForbiddenException('You can only edit your own courses'),
++        ),
++      assertCallerMayMakeGlobal: jest.fn().mockResolvedValue(undefined),
++      createTrack: jest.fn(),
++      updateTrack: jest.fn(),
++      upsertStructure: jest.fn(),
++      deleteTrack: jest.fn(),
++      duplicateTrack: jest.fn(),
++    };
++    trackTranslationService = {
++      setLanguages: jest.fn(),
++      translate: jest.fn(),
++      updateFields: jest.fn(),
++      markReviewed: jest.fn(),
++      setMediaUrl: jest.fn(),
++      publish: jest.fn(),
++      unpublish: jest.fn(),
++    };
++    controller = new TrackAdminController(
++      trackService as any,
++      {} as any,
++      {} as any,
++      trackTranslationService as any,
++      {} as any,
++      {} as any,
++    );
++  });
++
++  const editingRoutes: [string, () => Promise<unknown>][] = [
++    ['updateTrack', () => controller.updateTrack(TRACK_ID, {})],
++    [
++      'upsertTrackStructure',
++      () => controller.upsertTrackStructure(TRACK_ID, { sections: [] } as any),
++    ],
++    [
++      'setTrackLanguages',
++      () => controller.setTrackLanguages(TRACK_ID, { languageIds: [] }),
++    ],
++    [
++      'translateTrack',
++      () => controller.translateTrack(TRACK_ID, { languageIds: [] } as any),
++    ],
++    [
++      'updateTrackTranslationFields',
++      () =>
++        controller.updateTrackTranslationFields(TRACK_ID, 2, {
++          edits: [],
++        } as any),
++    ],
++    [
++      'reviewTrackTranslation',
++      () => controller.reviewTrackTranslation(TRACK_ID, 2, {} as any),
++    ],
++    [
++      'setTrackTranslationMedia',
++      () => controller.setTrackTranslationMedia(TRACK_ID, 2, {} as any),
++    ],
++    [
++      'publishTrackTranslation',
++      () => controller.publishTrackTranslation(TRACK_ID, 2),
++    ],
++    [
++      'unpublishTrackTranslation',
++      () => controller.unpublishTrackTranslation(TRACK_ID, 2),
++    ],
++    ['deleteTrack', () => controller.deleteTrack(TRACK_ID)],
++    ['duplicateTrack', () => controller.duplicateTrack(TRACK_ID)],
++  ];
++
++  it.each(editingRoutes)(
++    '%s refuses before touching the course',
++    async (_route, call) => {
++      await expect(call()).rejects.toThrow(ForbiddenException);
++      expect(trackService.assertCallerMayEdit).toHaveBeenCalledWith(TRACK_ID);
++      for (const mock of [
++        ...Object.values(trackTranslationService),
++        trackService.updateTrack,
++        trackService.upsertStructure,
++        trackService.deleteTrack,
++        trackService.duplicateTrack,
++      ]) {
++        expect(mock).not.toHaveBeenCalled();
++      }
++    },
++  );
++
++  it('refuses to create a global course for a restricted admin', async () => {
++    trackService.assertCallerMayMakeGlobal.mockRejectedValue(
++      new ForbiddenException(),
++    );
++
++    await expect(
++      controller.createTrack({ title: 'T', isGlobal: true } as any),
++    ).rejects.toThrow(ForbiddenException);
++    expect(trackService.assertCallerMayMakeGlobal).toHaveBeenCalledWith(true);
++    expect(trackService.createTrack).not.toHaveBeenCalled();
++  });
++});
+diff --git a/src/track/controller/track-admin.controller.ts b/src/track/controller/track-admin.controller.ts
+index e49d3c4ac2..540824944c 100644
+--- a/src/track/controller/track-admin.controller.ts
++++ b/src/track/controller/track-admin.controller.ts
+@@ -186,6 +186,7 @@ export class TrackAdminController {
+   async createTrack(
+     @Body() createTrackDto: CreateTrackDto,
+   ): Promise<TrackSummaryResponseDto> {
++    await this.trackService.assertCallerMayMakeGlobal(createTrackDto.isGlobal);
+     return this.trackService.createTrack(createTrackDto);
+   }
+ 
+@@ -197,6 +198,8 @@ export class TrackAdminController {
+     @Param('id', ParseUUIDPipe) id: string,
+     @Body() updateTrackDto: UpdateTrackDto,
+   ): Promise<TrackSummaryResponseDto> {
++    await this.trackService.assertCallerMayEdit(id);
++    await this.trackService.assertCallerMayMakeGlobal(updateTrackDto.isGlobal);
+     return this.trackService.updateTrack(id, updateTrackDto);
+   }
+ 
+@@ -210,6 +213,7 @@ export class TrackAdminController {
+     @Param('id', ParseUUIDPipe) id: string,
+     @Body() dto: UpsertTrackStructureDto,
+   ): Promise<SuccessResponse> {
++    await this.trackService.assertCallerMayEdit(id);
+     return this.trackService.upsertStructure(id, dto);
+   }
+ 
+@@ -240,6 +244,7 @@ export class TrackAdminController {
+     @Param('id', ParseUUIDPipe) id: string,
+     @Body() dto: SetTrackLanguagesDto,
+   ) {
++    await this.trackService.assertCallerMayEdit(id);
+     return this.trackTranslationService.setLanguages(id, dto.languageIds);
+   }
+ 
+@@ -253,6 +258,7 @@ export class TrackAdminController {
+     @Param('id', ParseUUIDPipe) id: string,
+     @Body() dto: TranslateTrackDto,
+   ) {
++    await this.trackService.assertCallerMayEdit(id);
+     return this.trackTranslationService.translate(id, dto.languageIds);
+   }
+ 
+@@ -280,6 +286,7 @@ export class TrackAdminController {
+     @Param('languageId', ParseIntPipe) languageId: number,
+     @Body() dto: UpdateTrackTranslationFieldsDto,
+   ) {
++    await this.trackService.assertCallerMayEdit(id);
+     return this.trackTranslationService.updateFields(id, languageId, dto.edits);
+   }
+ 
+@@ -294,6 +301,7 @@ export class TrackAdminController {
+     @Param('languageId', ParseIntPipe) languageId: number,
+     @Body() dto: MarkTrackTranslationReviewedDto,
+   ) {
++    await this.trackService.assertCallerMayEdit(id);
+     return this.trackTranslationService.markReviewed(
+       id,
+       languageId,
+@@ -312,6 +320,7 @@ export class TrackAdminController {
+     @Param('languageId', ParseIntPipe) languageId: number,
+     @Body() dto: SetTrackTranslationMediaDto,
+   ): Promise<SuccessResponse> {
++    await this.trackService.assertCallerMayEdit(id);
+     await this.trackTranslationService.setMediaUrl(
+       id,
+       languageId,
+@@ -332,6 +341,7 @@ export class TrackAdminController {
+     @Param('id', ParseUUIDPipe) id: string,
+     @Param('languageId', ParseIntPipe) languageId: number,
+   ) {
++    await this.trackService.assertCallerMayEdit(id);
+     return this.trackTranslationService.publish(id, languageId);
+   }
+ 
+@@ -345,6 +355,7 @@ export class TrackAdminController {
+     @Param('id', ParseUUIDPipe) id: string,
+     @Param('languageId', ParseIntPipe) languageId: number,
+   ): Promise<SuccessResponse> {
++    await this.trackService.assertCallerMayEdit(id);
+     await this.trackTranslationService.unpublish(id, languageId);
+     return { success: true };
+   }
+@@ -355,6 +366,7 @@ export class TrackAdminController {
+   async deleteTrack(
+     @Param('id', ParseUUIDPipe) id: string,
+   ): Promise<SuccessResponse> {
++    await this.trackService.assertCallerMayEdit(id);
+     return this.trackService.deleteTrack(id);
+   }
+ 
+@@ -364,6 +376,7 @@ export class TrackAdminController {
+   async duplicateTrack(
+     @Param('id', ParseUUIDPipe) id: string,
+   ): Promise<TrackSummaryResponseDto> {
++    await this.trackService.assertCallerMayEdit(id);
+     return this.trackService.duplicateTrack(id);
+   }
+ 
+diff --git a/src/track/service/test/track.service.competencies.spec.ts b/src/track/service/test/track.service.competencies.spec.ts
+index 094fa0a5b4..28c6d61a20 100644
+--- a/src/track/service/test/track.service.competencies.spec.ts
++++ b/src/track/service/test/track.service.competencies.spec.ts
+@@ -14,6 +14,7 @@ import { TrackStatus } from '../../type/track.type';
+ import { TrackService } from '../track.service';
+ import { TrackSharedService } from '../track-shared.service';
+ import { TrackTranslationService } from '../track-translation.service';
++import { TenantScopeService } from 'src/authorization/service/tenant-scope.service';
+ 
+ const EMPATHY = '00000000-0000-4000-8000-000000000001';
+ const HOPE = '00000000-0000-4000-8000-000000000002';
+@@ -49,6 +50,11 @@ const dataSource = {
+ 
+ const trackSharedService = { getTrackWithStructure: jest.fn() };
+ 
++// An unrestricted caller unless a test says otherwise.
++const mockTenantScopeService = {
++  isRestricted: jest.fn().mockResolvedValue(false),
++};
++
+ describe('TrackService — course competency tag (tracks.competencyIds)', () => {
+   let service: TrackService;
+ 
+@@ -67,6 +73,10 @@ describe('TrackService — course competency tag (tracks.competencyIds)', () =>
+         { provide: ScenarioSharedService, useValue: {} },
+         { provide: CaseSharedService, useValue: {} },
+         { provide: TenantService, useValue: { findAll: jest.fn() } },
++        {
++          provide: TenantScopeService,
++          useValue: mockTenantScopeService,
++        },
+         {
+           provide: TrackTranslationService,
+           useValue: { handleSourceChanged: jest.fn() },
+diff --git a/src/track/service/test/track.service.landing-page.spec.ts b/src/track/service/test/track.service.landing-page.spec.ts
+index 17abbf3c53..6de0c9960a 100644
+--- a/src/track/service/test/track.service.landing-page.spec.ts
++++ b/src/track/service/test/track.service.landing-page.spec.ts
+@@ -14,6 +14,7 @@ import { normaliseTrackLandingPage } from '../../util/track-landing-page.util';
+ import { TrackService } from '../track.service';
+ import { TrackSharedService } from '../track-shared.service';
+ import { TrackTranslationService } from '../track-translation.service';
++import { TenantScopeService } from 'src/authorization/service/tenant-scope.service';
+ 
+ jest.mock('src/logger/logger.service', () => ({
+   LoggerService: {
+@@ -67,6 +68,11 @@ const dataSource = {
+ const SECTION_A = '00000000-0000-4000-8000-0000000000a1';
+ const SECTION_B = '00000000-0000-4000-8000-0000000000b2';
+ 
++// An unrestricted caller unless a test says otherwise.
++const mockTenantScopeService = {
++  isRestricted: jest.fn().mockResolvedValue(false),
++};
++
+ describe('TrackService — story landing page (tracks.landingPage)', () => {
+   let service: TrackService;
+ 
+@@ -86,6 +92,10 @@ describe('TrackService — story landing page (tracks.landingPage)', () => {
+         { provide: ScenarioSharedService, useValue: {} },
+         { provide: CaseSharedService, useValue: {} },
+         { provide: TenantService, useValue: { findAll: jest.fn() } },
++        {
++          provide: TenantScopeService,
++          useValue: mockTenantScopeService,
++        },
+         {
+           provide: TrackTranslationService,
+           useValue: { handleSourceChanged: jest.fn() },
+diff --git a/src/track/service/test/track.service.spec.ts b/src/track/service/test/track.service.spec.ts
+index d7bf5a67c7..8594cb7cfc 100644
+--- a/src/track/service/test/track.service.spec.ts
++++ b/src/track/service/test/track.service.spec.ts
+@@ -8,6 +8,9 @@ import { ScenarioSharedService } from 'src/learn/service/scenario-shared.service
+ import { CaseSharedService } from 'src/case/service/case-shared.service';
+ import { TenantService } from 'src/tenant/service/tenant.service';
+ import { TrackTranslationService } from '../track-translation.service';
++import { TenantScopeService } from 'src/authorization/service/tenant-scope.service';
++import { ExecutionManager } from 'src/common/execution/execution-manager';
++import { ForbiddenException, NotFoundException } from '@nestjs/common';
+ import { UpsertTrackStructureDto } from '../../dto/upsert-track-structure.dto';
+ import { TrackItemType } from '../../type/track.type';
+ import { QuizQuestionType } from '../../type/quiz.type';
+@@ -47,6 +50,11 @@ const mockTrackTranslationService = {
+   handleSourceChanged: jest.fn(),
+ };
+ 
++// An unrestricted caller unless a test says otherwise.
++const mockTenantScopeService = {
++  isRestricted: jest.fn().mockResolvedValue(false),
++};
++
+ describe('TrackService', () => {
+   let service: TrackService;
+ 
+@@ -67,6 +75,10 @@ describe('TrackService', () => {
+         },
+         { provide: CaseSharedService, useValue: mockCaseSharedService },
+         { provide: TenantService, useValue: mockTenantService },
++        {
++          provide: TenantScopeService,
++          useValue: mockTenantScopeService,
++        },
+         {
+           provide: TrackTranslationService,
+           useValue: mockTrackTranslationService,
+@@ -194,4 +206,71 @@ describe('TrackService', () => {
+       expect(newTrack.description).toBe('<p>Hello\nworld</p>');
+     });
+   });
++
++  describe('as a platform admin restricted to some organizations', () => {
++    const CALLER_ID = 31;
++
++    beforeEach(() => {
++      jest
++        .spyOn(ExecutionManager, 'getUserId')
++        .mockReturnValue(String(CALLER_ID));
++      mockTenantScopeService.isRestricted.mockResolvedValue(true);
++    });
++
++    afterEach(() => {
++      mockTenantScopeService.isRestricted.mockResolvedValue(false);
++      jest.restoreAllMocks();
++    });
++
++    it('may edit a course they created', async () => {
++      mockTrackRepository.findOne.mockResolvedValueOnce({
++        id: 't1',
++        createdBy: CALLER_ID,
++      });
++
++      await expect(service.assertCallerMayEdit('t1')).resolves.toBeUndefined();
++    });
++
++    it('may not edit a course someone else created', async () => {
++      mockTrackRepository.findOne.mockResolvedValueOnce({
++        id: 't1',
++        createdBy: 99,
++      });
++
++      await expect(service.assertCallerMayEdit('t1')).rejects.toThrow(
++        ForbiddenException,
++      );
++    });
++
++    it('gets a 404 for a course that does not exist', async () => {
++      mockTrackRepository.findOne.mockResolvedValueOnce(null);
++
++      await expect(service.assertCallerMayEdit('t1')).rejects.toThrow(
++        NotFoundException,
++      );
++    });
++
++    it('may not make a course global', async () => {
++      await expect(service.assertCallerMayMakeGlobal(true)).rejects.toThrow(
++        ForbiddenException,
++      );
++      await expect(
++        service.assertCallerMayMakeGlobal(false),
++      ).resolves.toBeUndefined();
++      await expect(
++        service.assertCallerMayMakeGlobal(undefined),
++      ).resolves.toBeUndefined();
++    });
++
++    it('leaves an unrestricted admin free to edit any course or make it global', async () => {
++      mockTenantScopeService.isRestricted.mockResolvedValue(false);
++      mockTrackRepository.findOne.mockClear();
++
++      await expect(service.assertCallerMayEdit('t1')).resolves.toBeUndefined();
++      await expect(
++        service.assertCallerMayMakeGlobal(true),
++      ).resolves.toBeUndefined();
++      expect(mockTrackRepository.findOne).not.toHaveBeenCalled();
++    });
++  });
+ });
+diff --git a/src/track/service/track.service.ts b/src/track/service/track.service.ts
+index b6d3bc1bbe..483b310af2 100644
+--- a/src/track/service/track.service.ts
++++ b/src/track/service/track.service.ts
+@@ -1,6 +1,7 @@
+ import {
+   BadRequestException,
+   ConflictException,
++  ForbiddenException,
+   Injectable,
+   NotFoundException,
+ } from '@nestjs/common';
+@@ -13,6 +14,7 @@ import { ScenarioStatus } from 'src/learn/type/scenario.type';
+ import { CaseSharedService } from 'src/case/service/case-shared.service';
+ import { Competency } from 'src/learn/entity/competency.entity';
+ import { TenantService } from 'src/tenant/service/tenant.service';
++import { TenantScopeService } from 'src/authorization/service/tenant-scope.service';
+ import { LoggerService } from 'src/logger/logger.service';
+ import { Track } from '../entity/track.entity';
+ import { TrackItem } from '../entity/track-item.entity';
+@@ -77,8 +79,47 @@ export class TrackService {
+     private readonly caseSharedService: CaseSharedService,
+     private readonly tenantService: TenantService,
+     private readonly trackTranslationService: TrackTranslationService,
++    private readonly tenantScopeService: TenantScopeService,
+   ) {}
+ 
++  /**
++   * A track is global content: the same row is served to every organization
++   * it is assigned to. A platform admin restricted to some organizations may
++   * therefore change only tracks they created — the rule roleplays already
++   * follow (ScenarioService) — and may not make one global, which assigns it
++   * to every organization at once. Everyone else is unaffected.
++   *
++   * Called by the admin controller ahead of every route that changes an
++   * existing track, its structure or its translations.
++   */
++  async assertCallerMayEdit(trackId: string): Promise<void> {
++    const userId = this.getUserId();
++    if (!(await this.tenantScopeService.isRestricted(userId))) {
++      return;
++    }
++    const track = await this.trackRepository.findOne({
++      where: { id: trackId },
++      select: ['id', 'createdBy'],
++    });
++    if (!track) {
++      throw new NotFoundException('Track not found');
++    }
++    if (track.createdBy !== userId) {
++      throw new ForbiddenException('You can only edit your own courses');
++    }
++  }
++
++  async assertCallerMayMakeGlobal(isGlobal?: boolean): Promise<void> {
++    if (isGlobal !== true) {
++      return;
++    }
++    if (await this.tenantScopeService.isRestricted(this.getUserId())) {
++      throw new ForbiddenException(
++        'Organization-restricted admins cannot make a course available to every organization',
++      );
++    }
++  }
++
+   async getTracks(filters?: TrackFilterOptions) {
+     if (filters?.tenantId) {
+       const tenant = await this.tenantService.findById(filters.tenantId);

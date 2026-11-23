@@ -9,7 +9,6 @@ vi.mock("@api", () => ({
   useApproveBugFindingMutation: () => [vi.fn(), { isLoading: false }],
   useRejectBugFindingMutation: () => [vi.fn(), { isLoading: false }],
   useStartBugFixSessionMutation: () => [vi.fn(), { isLoading: false }],
-  useGetBugHuntRunQuery: () => ({ data: undefined }),
 }));
 
 vi.mock("@assets", () => ({ TooltipIcon: () => <svg data-testid="tooltip-icon" /> }));

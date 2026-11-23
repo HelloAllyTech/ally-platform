@@ -26,6 +26,7 @@ let mockPermissions: string[] = [];
 vi.mock("@api", () => ({
   useLazyGetDashboardUrlQuery: () => [mockGetDashboardUrl],
   useLazyGetDashboardsQuery: () => [mockGetDashboards, { data: mockDashboardsData }],
+  useGetStatisticsChartLibraryQuery: () => ({ data: undefined }),
   useGetOrganizationMetricsQuery: () => ({
     data: undefined,
     isFetching: true,
@@ -52,7 +53,7 @@ vi.mock("@ally-ui-mono/ui-shared", () => ({
 // findByTestId's default wait under full-suite CPU contention (flaky, not a
 // logic bug) — mock it so this file only exercises Analytics.tsx's own
 // gating logic (tab visibility + native-vs-Metabase content selection).
-vi.mock("../OrganizationMetrics", () => ({
+vi.mock("../OrganizationStatistics", () => ({
   default: () => <div data-testid="organization-metrics-section" />,
 }));
 

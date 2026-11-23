@@ -199,6 +199,10 @@ const DevOnboardingFlow: React.FC = () => {
       published: stage === "live" ? PUBLISHED : null,
       publishing: false,
       // `?gate=below` (Q3-fast): Share as publishing below the checkup's quality gate answers.
+      safety: null,
+      checkSafetyAgain: () => undefined,
+      choosePack: async () => undefined,
+      choosingPack: false,
       mustPass:
         stage === "share" && params.get("gate") === "below"
           ? {

@@ -1,0 +1,270 @@
+diff --git a/apps/ally-helpline-dashboard/src/api/tracks.ts b/apps/ally-helpline-dashboard/src/api/tracks.ts
+index da8d4033cf..0e1096ddb7 100644
+--- a/apps/ally-helpline-dashboard/src/api/tracks.ts
++++ b/apps/ally-helpline-dashboard/src/api/tracks.ts
+@@ -11,6 +11,7 @@ import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
+ import {
+   AnnotationAttemptResult,
+   AnnotationMarkInput,
++  ArticleResourceEmbeddabilityResponse,
+   EnrollTrackResponse,
+   GetLearnTracksResponse,
+   GetNextTrackItemResponse,
+@@ -202,6 +203,17 @@ const tracksAPI = baseAPI.injectEndpoints({
+       invalidatesTags: ALL_TRACK_TAGS,
+     }),
+ 
++    /** Which of an article's resources must skip the embed and open in a new tab. */
++    getArticleResourceEmbeddability: builder.query<
++      ArticleResourceEmbeddabilityResponse,
++      { itemId: string }
++    >({
++      query: ({ itemId }) => ({
++        url: ApiEndpoints.TRACKS.RESOURCE_EMBEDDABILITY(itemId),
++        method: HttpMethod.GET,
++      }),
++    }),
++
+     /** Mark an article read (completes the item when criteria are met). */
+     markArticleRead: builder.mutation<TrackItemCompletionResult, { itemId: string }>({
+       query: ({ itemId }) => ({
+@@ -384,6 +396,7 @@ export const {
+   useEnrollTrackMutation,
+   useStartTrackItemMutation,
+   useMarkArticleReadMutation,
++  useGetArticleResourceEmbeddabilityQuery,
+   useReportVideoProgressMutation,
+   useSubmitQuizAttemptMutation,
+   useSubmitArticleQuestionAnswerMutation,
+diff --git a/apps/ally-helpline-dashboard/src/constants/api.ts b/apps/ally-helpline-dashboard/src/constants/api.ts
+index 601a368d03..8c6d1c76e8 100644
+--- a/apps/ally-helpline-dashboard/src/constants/api.ts
++++ b/apps/ally-helpline-dashboard/src/constants/api.ts
+@@ -123,6 +123,9 @@ export const ApiEndpoints = {
+     GET_NEXT_ITEM: (trackId: string) => `/v1/learn/tracks/${trackId}/next-item`,
+     START_ITEM: (itemId: string) => `/v1/learn/tracks/items/${itemId}/start`,
+     ARTICLE_READ: (itemId: string) => `/v1/learn/tracks/items/${itemId}/article-read`,
++    /** Per article resource: must it open in a new tab instead of embedded. */
++    RESOURCE_EMBEDDABILITY: (itemId: string) =>
++      `/v1/learn/tracks/items/${itemId}/resources/embeddability`,
+     ARTICLE_QUESTION_ANSWER: (itemId: string, questionId: string) =>
+       `/v1/learn/tracks/items/${itemId}/article-questions/${questionId}/answer`,
+     VIDEO_PROGRESS: (itemId: string) => `/v1/learn/tracks/items/${itemId}/video-progress`,
+diff --git a/apps/ally-helpline-dashboard/src/pages/track-player/components/players/ArticleItemPlayer.tsx b/apps/ally-helpline-dashboard/src/pages/track-player/components/players/ArticleItemPlayer.tsx
+index b32a452af7..2ad1a2f1b4 100644
+--- a/apps/ally-helpline-dashboard/src/pages/track-player/components/players/ArticleItemPlayer.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/track-player/components/players/ArticleItemPlayer.tsx
+@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
+ import { toast } from "sonner";
+ 
+ import { RichTextRenderer } from "@ally-ui-mono/ui-shared";
+-import { useMarkArticleReadMutation } from "@api";
++import { useGetArticleResourceEmbeddabilityQuery, useMarkArticleReadMutation } from "@api";
+ import { ArrowRight, TickGreenBackground } from "@assets";
+ import {
+   ArticleResource,
+@@ -15,7 +15,7 @@ import {
+ 
+ import { ArticleQuestionCard } from "./ArticleQuestionCard";
+ import { splitArticleHtml } from "./articleSegments";
+-import { ExternalResourceModal } from "./ExternalResourceModal";
++import { ExternalResourceModal, openInNewTab } from "./ExternalResourceModal";
+ 
+ interface ArticleItemPlayerProps {
+   payload: StartArticleItemPayload;
+@@ -72,6 +72,27 @@ export const ArticleItemPlayer: FC<ArticleItemPlayerProps> = ({
+   const [markArticleRead, { isLoading }] = useMarkArticleReadMutation();
+   const [fontScaleIndex, setFontScaleIndex] = useState(readStoredFontScaleIndex);
+   const [activeResource, setActiveResource] = useState<ArticleResource | null>(null);
++  const hasResources = (payload.resources?.length ?? 0) > 0;
++  const { data: embeddability } = useGetArticleResourceEmbeddabilityQuery(
++    { itemId },
++    { skip: !hasResources },
++  );
++
++  /**
++   * A resource the server found returning an error (a bot-check 403, a 404),
++   * refusing to be framed, or unreachable goes straight to a new tab — the
++   * embedded frame would show that error page and still report a normal
++   * load. Opened inside the click handler so the popup blocker allows it.
++   * Before the check answers, the embed's own stall fallback still applies.
++   */
++  const openResource = (resource: ArticleResource) => {
++    const verdict = embeddability?.resources.find(r => r.id === resource.id);
++    if (verdict?.openExternally) {
++      openInNewTab(resource.url);
++      return;
++    }
++    setActiveResource(resource);
++  };
+ 
+   const segments = useMemo(
+     () => splitArticleHtml(payload.html, payload.questions ?? []),
+@@ -221,7 +242,7 @@ export const ArticleItemPlayer: FC<ArticleItemPlayerProps> = ({
+           <div ref={sentinelRef} aria-hidden className="h-px w-full" />
+         </article>
+ 
+-        {payload.resources && payload.resources.length > 0 && (
++        {hasResources && payload.resources && (
+           <div className="mx-auto mt-8 max-w-[68ch] border-t border-border-light pt-6">
+             <h2 className="mb-3 text-sm font-semibold text-typography-900">
+               {t("tracks2.article.resourcesHeading")}
+@@ -231,7 +252,7 @@ export const ArticleItemPlayer: FC<ArticleItemPlayerProps> = ({
+                 <button
+                   key={resource.id}
+                   type="button"
+-                  onClick={() => setActiveResource(resource)}
++                  onClick={() => openResource(resource)}
+                   className="flex items-center justify-between gap-2 rounded-lg border border-border-light px-3 py-2 text-left text-sm font-medium text-primary-500 transition-colors hover:bg-background-secondary"
+                 >
+                   <span className="truncate">{resource.title}</span>
+diff --git a/apps/ally-helpline-dashboard/src/pages/track-player/components/players/ExternalResourceModal.tsx b/apps/ally-helpline-dashboard/src/pages/track-player/components/players/ExternalResourceModal.tsx
+index 395a7ef77a..14c7b5ddec 100644
+--- a/apps/ally-helpline-dashboard/src/pages/track-player/components/players/ExternalResourceModal.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/track-player/components/players/ExternalResourceModal.tsx
+@@ -21,7 +21,7 @@ interface ExternalResourceModalProps {
+  */
+ const EMBED_TIMEOUT_MS = 8000;
+ 
+-const openInNewTab = (url: string) => window.open(url, "_blank", "noopener,noreferrer");
++export const openInNewTab = (url: string) => window.open(url, "_blank", "noopener,noreferrer");
+ 
+ /**
+  * In-place view of a trainer-curated external resource, opened from an
+diff --git a/apps/ally-helpline-dashboard/src/pages/track-player/components/players/__tests__/ArticleItemPlayer.questions.test.tsx b/apps/ally-helpline-dashboard/src/pages/track-player/components/players/__tests__/ArticleItemPlayer.questions.test.tsx
+index ad48f9e342..1b8b3b16bf 100644
+--- a/apps/ally-helpline-dashboard/src/pages/track-player/components/players/__tests__/ArticleItemPlayer.questions.test.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/track-player/components/players/__tests__/ArticleItemPlayer.questions.test.tsx
+@@ -13,6 +13,7 @@ const submitArticleQuestionAnswer = vi.fn();
+ 
+ vi.mock("@api", () => ({
+   useMarkArticleReadMutation: () => [markArticleRead, { isLoading: false }],
++  useGetArticleResourceEmbeddabilityQuery: () => ({ data: undefined }),
+   useSubmitArticleQuestionAnswerMutation: () => [
+     submitArticleQuestionAnswer,
+     { isLoading: false },
+diff --git a/apps/ally-helpline-dashboard/src/pages/track-player/components/players/__tests__/ArticleItemPlayer.resources.test.tsx b/apps/ally-helpline-dashboard/src/pages/track-player/components/players/__tests__/ArticleItemPlayer.resources.test.tsx
+new file mode 100644
+index 0000000000..ed1ced370e
+--- /dev/null
++++ b/apps/ally-helpline-dashboard/src/pages/track-player/components/players/__tests__/ArticleItemPlayer.resources.test.tsx
+@@ -0,0 +1,99 @@
++import { fireEvent, render, screen } from "@testing-library/react";
++import { beforeEach, describe, expect, it, vi } from "vitest";
++
++import { ArticleItemPlayer } from "../ArticleItemPlayer";
++import {
++  ArticleResourceEmbeddabilityResponse,
++  StartArticleItemPayload,
++  TrackItemType,
++} from "../../../../../types/tracks";
++
++let embeddability: ArticleResourceEmbeddabilityResponse | undefined;
++const embeddabilityQuery = vi.fn(() => ({ data: embeddability }));
++
++vi.mock("@api", () => ({
++  useMarkArticleReadMutation: () => [vi.fn(), { isLoading: false }],
++  useSubmitArticleQuestionAnswerMutation: () => [vi.fn(), { isLoading: false }],
++  useGetArticleResourceEmbeddabilityQuery: (...args: unknown[]) =>
++    embeddabilityQuery(...(args as [])),
++}));
++
++vi.mock("@assets", () => ({
++  ArrowRight: () => <span />,
++  TickGreenBackground: () => <span />,
++}));
++
++vi.mock("@ally-ui-mono/ui-shared", () => ({
++  RichTextRenderer: ({ content }: { content: string }) => (
++    <div dangerouslySetInnerHTML={{ __html: content }} />
++  ),
++}));
++
++vi.mock("../ExternalResourceModal", () => ({
++  openInNewTab: vi.fn(),
++  ExternalResourceModal: ({ resource }: { resource: { title: string } }) => (
++    <div data-testid="embed-modal">{resource.title}</div>
++  ),
++}));
++
++const { openInNewTab } = await import("../ExternalResourceModal");
++
++const payload = (
++  resources: StartArticleItemPayload["resources"] = [
++    { id: "rg", title: "QACP Resource Book", url: "https://www.researchgate.net/x" },
++    { id: "wiki", title: "Counselling", url: "https://en.wikipedia.org/wiki/Counseling" },
++  ],
++): StartArticleItemPayload => ({
++  type: TrackItemType.ARTICLE,
++  trackItemProgressId: "progress-1",
++  html: "<p>Body</p>",
++  minReadSeconds: 0,
++  questions: [],
++  answeredQuestionCount: 0,
++  resources,
++});
++
++const renderPlayer = (p = payload()) =>
++  render(
++    <ArticleItemPlayer payload={p} itemId="item-1" alreadyCompleted={false} onCompleted={vi.fn()} />,
++  );
++
++describe("ArticleItemPlayer — resources", () => {
++  beforeEach(() => {
++    vi.clearAllMocks();
++    embeddability = undefined;
++  });
++
++  it("opens a resource the server flagged straight in a new tab", () => {
++    embeddability = {
++      resources: [
++        { id: "rg", openExternally: true },
++        { id: "wiki", openExternally: false },
++      ],
++    };
++    renderPlayer();
++    fireEvent.click(screen.getByText("QACP Resource Book"));
++    expect(openInNewTab).toHaveBeenCalledWith("https://www.researchgate.net/x");
++    expect(screen.queryByTestId("embed-modal")).toBeNull();
++  });
++
++  it("embeds a resource the server found embeddable", () => {
++    embeddability = { resources: [{ id: "wiki", openExternally: false }] };
++    renderPlayer();
++    fireEvent.click(screen.getByText("Counselling"));
++    expect(openInNewTab).not.toHaveBeenCalled();
++    expect(screen.getByTestId("embed-modal")).toHaveTextContent("Counselling");
++  });
++
++  it("falls back to the embed while the check has not answered", () => {
++    renderPlayer();
++    fireEvent.click(screen.getByText("QACP Resource Book"));
++    expect(openInNewTab).not.toHaveBeenCalled();
++    expect(screen.getByTestId("embed-modal")).toBeInTheDocument();
++  });
++
++  it("skips the check for an article without resources", () => {
++    renderPlayer(payload([]));
++    expect(embeddabilityQuery).toHaveBeenCalledWith({ itemId: "item-1" }, { skip: true });
++  });
++});
+diff --git a/apps/ally-helpline-dashboard/src/types/tracks.ts b/apps/ally-helpline-dashboard/src/types/tracks.ts
+index 55a09c6aa4..9c8f241235 100644
+--- a/apps/ally-helpline-dashboard/src/types/tracks.ts
++++ b/apps/ally-helpline-dashboard/src/types/tracks.ts
+@@ -605,6 +605,15 @@ export interface ArticleResource {
+   url: string;
+ }
+ 
++/**
++ * Response to `GET .../resources/embeddability`. The server requests each
++ * resource URL itself — a 403/bot-check, a framing block or any failure
++ * reads `openExternally: true`, which the embedded frame cannot report.
++ */
++export interface ArticleResourceEmbeddabilityResponse {
++  resources: { id: string; openExternally: boolean }[];
++}
++
+ export interface StartArticleItemPayload extends StartTrackItemBase {
+   type: TrackItemType.ARTICLE;
+   html: string;

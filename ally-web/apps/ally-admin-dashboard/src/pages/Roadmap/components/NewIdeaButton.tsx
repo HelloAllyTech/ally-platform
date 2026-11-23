@@ -6,8 +6,8 @@ import { createPortal } from "react-dom";
 import { IdeaCaptureLauncher } from "@components/idea-capture/IdeaCapture";
 import { en } from "@constants";
 
+import { ReportBugModal } from "./ReportBugModal";
 import { RoadmapIconButton } from "./RoadmapIconButton";
-import { ReportBugModal } from "../../ProductRoadmap/ReportBugModal";
 
 /**
  * The header's two ways to add: a bulb for an idea (the one shared idea-capture button, the same

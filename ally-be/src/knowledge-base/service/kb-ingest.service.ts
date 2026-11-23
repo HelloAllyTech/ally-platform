@@ -35,8 +35,6 @@ import { Chunk, chunkDocument } from '../util/chunker';
 
 /** The paused-job kind for indexing (stage 6, `credit_paused_jobs.kind`). */
 export const INDEXING_JOB = 'indexing';
-/** Stage 6: a document's status message while its indexing waits for credits. */
-export const KB_PAUSED_OUT_OF_CREDITS = KB_PAUSED_MESSAGES.out_of_credits;
 /** The resume sweep's name for documents left paused with no job row. */
 export const KB_PAUSED_SWEEP = 'paused-documents';
 

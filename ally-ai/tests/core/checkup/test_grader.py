@@ -303,7 +303,10 @@ async def test_the_judge_reads_the_cited_sources(judge):
 def test_source_texts_are_titled_and_capped():
     passages = [
         {"document_title": "Fees", "text": "x " * 2000},
-        *({"document_title": "P", "text": "y"} for _ in range(10)),
+        *(
+            {"document_title": "P", "text": "y"}
+            for _ in range(grader.MAX_SOURCE_PASSAGES + 5)
+        ),
         {"document_title": "Empty", "text": ""},
     ]
     texts = grader.source_texts(passages)
@@ -346,3 +349,23 @@ async def test_a_gap_the_information_covers_after_all_is_a_pass(judge):
         seen(reply="We run monthly workshops on stress and sleep."),
     )
     assert result.verdict == CheckupVerdict.PASS
+
+
+@pytest.mark.asyncio
+async def test_a_reply_with_either_conflicting_fact_passes_and_names_it(judge):
+    """Q4 A1: two pages disagree; either answer passes, and the conflict shows."""
+    judge({"conflicting_facts": ["conflicting facts: 8am-9pm vs 10am-8pm"]})
+    result = await grader.grade(
+        case(facts=["Open 8am-9pm", "Open 10am-8pm"]),
+        seen(reply="We're open 8am to 9pm."),
+    )
+    assert result.verdict == "pass"
+    assert "conflicting_facts" in result.reasons
+    assert result.judge.conflicting_facts == ["conflicting facts: 8am-9pm vs 10am-8pm"]
+
+
+def test_the_judge_reads_every_passage_a_run_retrieved_unless_capped():
+    many = seen(cited=False, passage_chunk_ids=[f"r{n}" for n in range(20)])
+    assert len(grader.source_chunk_ids(many)) == 16
+    # A re-grade under the earlier grader (Q4) reads 8.
+    assert grader.source_chunk_ids(many, 8) == [f"r{n}" for n in range(8)]

@@ -1,0 +1,42 @@
+diff --git a/ally-ai/app/core/agent_runtime/prompt.py b/ally-ai/app/core/agent_runtime/prompt.py
+index 8a68bb747..cc6dba3e0 100644
+--- a/ally-ai/app/core/agent_runtime/prompt.py
++++ b/ally-ai/app/core/agent_runtime/prompt.py
+@@ -25,10 +25,9 @@ AGENT_PROMPT_PATH = "agent/system"
+ #: messages); ten messages of a WhatsApp chat fit.
+ AGENT_HISTORY_CHARS = 3000
+ 
+-NO_TOPICS = (
+-    "(no topics listed: say you answer questions from the organisation's reference "
+-    "material)"
+-)
++#: Not "reference material": the check refuses a reply that talks about sources, so
++#: this line must not lead the model into saying it.
++NO_TOPICS = "(no topics listed: say you answer questions about the organisation)"
+ 
+ 
+ def format_topics(topics: Optional[Sequence[str]]) -> str:
+diff --git a/ally-ai/tests/core/agent_runtime/test_agent_check.py b/ally-ai/tests/core/agent_runtime/test_agent_check.py
+index dad59e2c5..20f6fc615 100644
+--- a/ally-ai/tests/core/agent_runtime/test_agent_check.py
++++ b/ally-ai/tests/core/agent_runtime/test_agent_check.py
+@@ -13,6 +13,7 @@ from app.core.agent_runtime.check import (
+     rejection_feedback,
+     unsupported_details,
+ )
++from app.core.agent_runtime.prompt import NO_TOPICS, format_topics
+ from tests.core.knowledge_agent.test_agent import CHUNK_A, CHUNK_B, passage
+ 
+ PASSAGES = [passage(CHUNK_A, 0.7), passage(CHUNK_B, 0.6)]
+@@ -397,6 +398,11 @@ class TestDeclineWithoutSearching:
+ 
+ 
+ class TestTalkAboutSources:
++    def test_the_no_topics_line_does_not_lead_to_talk_about_sources(self):
++        """Whatever the prompt tells the model to say, the check must let through."""
++        assert format_topics([]) == NO_TOPICS
++        assert not mentions_sources(NO_TOPICS)
++
+     @pytest.mark.parametrize(
+         "text",
+         [

@@ -192,8 +192,29 @@ describe('ChatbotEngineService: the crisis check reads earlier messages', () => 
       }),
     );
     expect(decision.handledBy).not.toBe(WaHandledBy.CRISIS);
-    expect(aiService.checkWhatsAppCrisis).toHaveBeenCalledTimes(1);
+    // With its history and on its own (Q4 H1); neither is a crisis.
+    expect(aiService.checkWhatsAppCrisis).toHaveBeenCalledTimes(2);
     expect(aiService.runAgent).toHaveBeenCalledTimes(1);
+  });
+
+  it('a message at risk on its own is never cleared by its history (Q4 H1)', async () => {
+    const h = setup();
+    h.aiService.checkWhatsAppCrisis.mockImplementation(
+      async (req: { history?: string[] }) =>
+        req.history?.length
+          ? { is_crisis: false, level: 'none', confidence: 0, signal: '' }
+          : {
+              is_crisis: true,
+              level: 'at_risk',
+              confidence: 0.8,
+              signal: 'nothing worth it',
+            },
+    );
+    const decision = await h.engine.respond(
+      stored({ text: 'Honestly some days I feel there is nothing worth it' }),
+    );
+    expect(h.aiService.checkWhatsAppCrisis).toHaveBeenCalledTimes(2);
+    expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
   });
 });
 

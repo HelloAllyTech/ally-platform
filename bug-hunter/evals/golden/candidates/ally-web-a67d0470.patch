@@ -1,0 +1,78 @@
+diff --git a/apps/ally-admin-dashboard/src/constants/SimulationCreator.ts b/apps/ally-admin-dashboard/src/constants/SimulationCreator.ts
+index 129156fae9..826c5c08e2 100644
+--- a/apps/ally-admin-dashboard/src/constants/SimulationCreator.ts
++++ b/apps/ally-admin-dashboard/src/constants/SimulationCreator.ts
+@@ -202,6 +202,17 @@ export const SIMULATION_CREATOR_FIELD_GROUPS: CreatorFieldGroups[] = [
+         fullWidth: true,
+         maxLength: 100,
+       },
++      {
++        id: "description",
++        label: "Challenge Description",
++        placeholder: "What is the primary learning goal?",
++        type: FORM_FIELD_TYPES.TEXT,
++        isMandatory: true,
++        multiline: true,
++        fullWidth: true,
++        maxLength: 1000,
++        regenerateType: REGENERATE_TYPE.DESCRIPTION,
++      },
+       {
+         id: "competency",
+         label: "Pick Competency",
+@@ -273,17 +284,6 @@ export const SIMULATION_CREATOR_FIELD_GROUPS: CreatorFieldGroups[] = [
+     id: SIMULATION_CREATOR_STEP_IDS.basicSettings,
+     label: "Basic Settings",
+     fields: [
+-      {
+-        id: "description",
+-        label: "Challenge Description",
+-        placeholder: "What is the primary learning goal?",
+-        type: FORM_FIELD_TYPES.TEXT,
+-        isMandatory: true,
+-        multiline: true,
+-        fullWidth: true,
+-        maxLength: 1000,
+-        regenerateType: REGENERATE_TYPE.DESCRIPTION,
+-      },
+       {
+         id: "prompt",
+         label: "Role instruction",
+diff --git a/apps/ally-admin-dashboard/src/utils/__tests__/createSimulation.test.ts b/apps/ally-admin-dashboard/src/utils/__tests__/createSimulation.test.ts
+index e39a738af1..573242c3a9 100644
+--- a/apps/ally-admin-dashboard/src/utils/__tests__/createSimulation.test.ts
++++ b/apps/ally-admin-dashboard/src/utils/__tests__/createSimulation.test.ts
+@@ -71,6 +71,17 @@ describe("createSimulation utils", () => {
+         expect(field?.isMandatory).toBe(true);
+       });
+ 
++      it("should have challenge description field in overview section", () => {
++        const section = getOverviewSection();
++        const field = section?.fields.find(f => f.id === "description");
++
++        expect(field).toBeDefined();
++        expect(field?.label).toBe("Challenge Description");
++        expect(field?.placeholder).toBe("What is the primary learning goal?");
++        expect(field?.type).toBe("text");
++        expect(field?.isMandatory).toBe(true);
++      });
++
+       it("should have coverImageUrl field correctly configured in overview section", () => {
+         const section = getOverviewSection();
+         const field = section?.fields.find(f => f.id === "coverImageUrl");
+@@ -80,6 +91,15 @@ describe("createSimulation utils", () => {
+         expect(field?.isMandatory).toBe(true);
+       });
+     });
++
++    describe("basic settings section fields", () => {
++      it("should not have challenge description field in basic settings section", () => {
++        const section = getCreateSimulationSubSectionById("basic-settings");
++        const field = section?.fields.find(f => f.id === "description");
++
++        expect(field).toBeUndefined();
++      });
++    });
+   });
+ 
+   describe("formatSimulationResponseData", () => {

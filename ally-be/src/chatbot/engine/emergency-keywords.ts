@@ -34,16 +34,67 @@ const RULES: RegExp[] = [
   ),
 ];
 
-/**
- * An emergency verdict from the keyword rules, or null. The phrase that matched is the signal,
- * verbatim, as the classifier gives it.
+/*
+ * Medical and maternity emergencies (Q4 A1): only on a medical assistant (the Medical pack, which
+ * maternity uses, and Pharmacy), and, as above, only when the classifier failed. Each rule needs
+ * what happened and a sign it is happening now, so a question about a symptom ("what causes chest
+ * pain in pregnancy?", "when will I feel my baby move?") stays a question.
  */
-export function emergencyByKeywords(
-  text: string | null | undefined,
+const NOW = String.raw`(?:having|has|have|got|getting|severe|bad(?:ly)?|sudden(?:ly)?|right now|now|since|for (?:an? )?(?:hour|few)|my|his|her|he'?s|she'?s|i'?m|abhi|bahut|achanak|तेज़|तेज|अभी|बहुत|अचानक|ho raha|ho rahi|हो रहा|हो रही)`;
+const CHEST = String.raw`(?:chest pain|pain in (?:my|his|her|the) chest|chest (?:is )?(?:hurting|tight)|seene (?:me|mein) (?:tez |bahut |zor ka )?dard|chhati (?:me|mein) (?:tez |bahut )?dard|सीने में (?:तेज़ |तेज |बहुत )?दर्द|छाती में (?:तेज़ |तेज |बहुत )?दर्द)`;
+const BREATHING = String.raw`(?:can'?t breathe|cannot breathe|can'?t breath|not breathing|stopped breathing|struggling to breathe|hard to breathe|gasping|saa?ns? nahi (?:aa|le)|saa?ns? (?:ruk|band)|साँस नहीं|सांस नहीं|साँस रुक|सांस रुक)`;
+const UNCONSCIOUS = String.raw`(?:unconscious|passed out|collapsed|not waking|won'?t wake|isn'?t waking|not responding|unresponsive|behosh|be-hosh|hosh nahi|बेहोश|होश नहीं)`;
+const SEIZURE = String.raw`(?:seizures?|having a fit|having fits|convuls\w*|jhatke aa|mirgi ka daura|daura pad|दौरा पड़|मिर्गी|झटके आ)`;
+const POISON = String.raw`(?:overdos\w*|poison\w*|swallowed (?:some |a lot of |all )?(?:my |his |her )?(?:pills|tablets|medicine|bleach|phenyl|kerosene|acid)|took (?:\d+|all|too many|a lot of)[^.!?\n]{0,20}(?:pills|tablets|sleeping)|zeh?e?r (?:kha|pi)|ज़हर|जहर|goliyan kha li|गोलियाँ खा ली|गोलियां खा ली)`;
+const STROKE = String.raw`(?:face (?:is )?(?:drooping|droops|dropped|fell)|slurred speech|can'?t speak (?:properly|clearly)?|one side (?:is )?(?:weak|numb|not moving)|(?:arm|leg) (?:went )?(?:weak|numb) on one side|lakwa|लकवा|muh tedha|मुँह टेढ़ा|मुंह टेढ़ा|bol nahi pa|बोल नहीं पा)`;
+const SEVERE_BURN = String.raw`(?:(?:burn(?:t|ed|s)?|scald(?:ed)?)[^.!?\n]{0,40}(?:skin (?:is )?(?:peeling|coming off)|blister|boiling|hot oil|fire|badly|severe)|(?:boiling|hot oil|fire)[^.!?\n]{0,40}burn|(?:jal gaya|jal gayi|jal gaye)[^.!?\n]{0,30}(?:tel|garam|aag|paani)|(?:garam|tel|aag|ubalte)[^.!?\n]{0,30}(?:jal gaya|jal gayi|jal gaye)|(?:तेल|आग|गरम)[^.!?\n]{0,30}जल (?:गया|गई|गए))`;
+const PREGNANT = String.raw`(?:pregnan\w*|weeks?|months? pregnant|mahine|mahina|garbh|गर्भ|महीने|महीना|प्रेग्नेंट)`;
+const WATERS = String.raw`(?:waters? (?:has |have )?(?:broke|broken|burst|leaking)|leaking (?:fluid|water)|paani (?:jaisa )?(?:discharge|nikal|gir)|thaili phat|पानी (?:जैसा )?(?:डिस्चार्ज|निकल|गिर)|थैली फट)`;
+const PREG_BLEEDING = String.raw`(?:bleeding|blood|spotting heavily|khoon|खून|ब्लीडिंग)`;
+const BABY_STILL = String.raw`(?:baby (?:isn'?t|is not|not|hasn'?t|has not|stopped|doesn'?t|is no longer) (?:moving|kicking|been moving)|no (?:baby )?movements?|baby ki (?:movement|harkat|halchal) (?:band|nahi|kam)|बच्चा (?:हिल|हिलना) (?:नहीं|बंद)|बच्चे की (?:हलचल|हरकत) (?:बंद|नहीं|कम))`;
+const HEAVY_BLEEDING = String.raw`(?:bleeding (?:heavily|a lot|badly|won'?t stop|not stopping|that won'?t stop)|(?:heavy|lot of|so much) bleeding|blood (?:won'?t|will not|isn'?t) stop\w*|bahut (?:zyada )?khoon|khoon (?:ruk nahi|nahi ruk|band nahi)|बहुत (?:ज़्यादा |ज्यादा )?खून|खून (?:नहीं रुक|रुक नहीं|बंद नहीं))`;
+
+const near = (a: string, b: string) =>
+  new RegExp(`${a}${NEAR}${b}|${b}${NEAR}${a}`, 'iu');
+
+/** Someone: a person the emergency is happening to. */
+const PERSON = String.raw`(?<![\p{L}\p{M}])(?:someone|somebody|some(?:one|body) here|a (?:man|woman|lady|guy|person|child|kid|boy|girl|baby|colleague|customer|member|visitor|student|patient|volunteer|worker|staff member)|he|she|they|him|her|my (?:\w+ )?(?:father|mother|dad|mum|mom|son|daughter|wife|husband|brother|sister|friend|baby|child|grandfather|grandmother|colleague)|papa|mummy|bhai|behen|koi|dadi|dada|nani|nana|wo|woh|vo|use|unhe|uncle|aunty|bete|beta|beti|bachcha|bachche|baccha|bacche|ladka|ladki|कोई|बेटे|बेटा|बेटी|बच्चा|बच्चे|पापा|मम्मी|दादी|दादा|नानी|नाना|वो|वह|उसे|उन्हें|उनको)(?![\p{L}\p{M}])`;
+const CHOKING = String.raw`(?:choking|choked|(?:something|food|a coin|a bone) (?:is )?stuck in (?:his|her|my|their|the) throat|gale me(?:in)? (?:kuch )?atak|गले में (?:कुछ )?अटक)`;
+const FIRE = String.raw`(?:(?:is|are|caught) on fire|fire (?:in|at) (?:the|our|my)|(?:a|the) fire (?:broke out|has started)|building is burning|aag lag|आग लग)`;
+const ATTACKED = String.raw`(?:(?:being |been |was |got )?(?:attacked|stabbed|assaulted)|beaten (?:up|badly)|(?:badly|seriously|very badly) (?:injured|hurt)|hit by a (?:car|bike|bus|truck|vehicle)|maar (?:diya|rahe|raha)|chaku (?:maar|mara)|हमला|चाकू मार)`;
+
+/**
+ * Life-threatening emergencies (Q4, approved 23 Nov): on every assistant, whatever its pack, and
+ * they decide on their own (`lifeThreatening`): a coworking hub's "someone collapsed in the hub
+ * and isn't breathing" went to an answer when the classifier missed it. Each needs a person or a
+ * sign it's happening now, so "the deal collapsed" or "what is a seizure?" stays a question.
+ */
+export const LIFE_RULES: RegExp[] = [
+  new RegExp(BREATHING, 'iu'),
+  near(PERSON, UNCONSCIOUS),
+  new RegExp(CHOKING, 'iu'),
+  new RegExp(HEAVY_BLEEDING, 'iu'),
+  near(CHEST, NOW),
+  near(PERSON, SEIZURE),
+  new RegExp(POISON, 'iu'),
+  new RegExp(STROKE, 'iu'),
+  new RegExp(SEVERE_BURN, 'iu'),
+  new RegExp(FIRE, 'iu'),
+  new RegExp(ATTACKED, 'iu'),
+];
+
+/** Maternity rules (Q4 A1): only on a medical assistant. */
+export const MEDICAL_RULES: RegExp[] = [
+  new RegExp(WATERS, 'iu'),
+  near(PREGNANT, PREG_BLEEDING),
+  new RegExp(BABY_STILL, 'iu'),
+];
+
+function verdictFrom(
+  rules: RegExp[],
+  said: string,
 ): CrisisCheckResponse | null {
-  const said = (text ?? '').trim();
-  if (!said) return null;
-  for (const rule of RULES) {
+  for (const rule of rules) {
     const match = rule.exec(said);
     if (match) {
       return {
@@ -52,8 +103,90 @@ export function emergencyByKeywords(
         signal: match[0].trim().slice(0, 200),
         confidence: 1,
         failed: false,
-      };
+      } as CrisisCheckResponse;
     }
   }
   return null;
+}
+
+/**
+ * A life-threatening emergency by the keyword rules, on any assistant: it decides without the
+ * classifier, so the emergency reply goes out at once.
+ */
+export function lifeThreatening(
+  text: string | null | undefined,
+): CrisisCheckResponse | null {
+  const said = (text ?? '').trim();
+  return said ? verdictFrom(LIFE_RULES, said) : null;
+}
+
+/** The packs whose assistants get the medical and maternity rules (Q4 A1). */
+export const MEDICAL_PACKS = new Set(['medical', 'pharmacy']);
+
+/**
+ * An emergency verdict from the keyword rules, or null. The phrase that matched is the signal,
+ * verbatim, as the classifier gives it. The eye rules apply on every assistant; the medical and
+ * maternity rules on a medical assistant (`pack`).
+ */
+export function emergencyByKeywords(
+  text: string | null | undefined,
+  pack?: string | null,
+): CrisisCheckResponse | null {
+  const said = (text ?? '').trim();
+  if (!said) return null;
+  const rules = MEDICAL_PACKS.has(String(pack ?? ''))
+    ? [...RULES, ...LIFE_RULES, ...MEDICAL_RULES]
+    : [...RULES, ...LIFE_RULES];
+  return verdictFrom(rules, said);
+}
+
+/*
+ * Indirect hopelessness (Q4 H1, Sukoon live: "Honestly some days I feel there's no point to
+ * anything" after a booking got "Please contact the team"). On a mental-health assistant these are
+ * at risk, and decide at once like the life-threatening rules.
+ */
+const HOPELESS = String.raw`(?:no point (?:to|in) (?:anything|everything|living|life|going on|trying)|what'?s the point(?: of (?:anything|living|life|it all|going on|trying)(?: anymore)?| anymore|(?=\s*(?:[.?!,…]|$)))|(?:don'?t|do not) want to (?:wake up|be here|exist|live|go on)(?: anymore)?|tired of (?:everything|living|life|being alive)|no reason to (?:live|go on|keep going)|better off without me|can'?t (?:go on|do this) anymore|(?:kisi cheez|kuch bhi|zindagi) ka koi matlab nahi|koi matlab nahi (?:lagta|hai)|(?:uthne|jeene) ka (?:mann|man|dil) nahi|jeena nahi (?:chahta|chahti)|sab khatam karna|कोई मतलब नहीं|जीने का मन नहीं|उठने का मन नहीं|जीना नहीं चाहता|जीना नहीं चाहती)`;
+
+/** The packs whose assistants treat indirect hopelessness as at risk (Q4 H1). */
+export const HOPELESS_PACKS = new Set(['mental_health']);
+
+export function atRiskByKeywords(
+  text: string | null | undefined,
+  pack?: string | null,
+): CrisisCheckResponse | null {
+  const said = (text ?? '').trim();
+  if (!said || !HOPELESS_PACKS.has(String(pack ?? ''))) return null;
+  const match = new RegExp(HOPELESS, 'iu').exec(said);
+  return match
+    ? ({
+        is_crisis: true,
+        level: 'at_risk',
+        signal: match[0].trim().slice(0, 200),
+        confidence: 1,
+        failed: false,
+      } as CrisisCheckResponse)
+    : null;
+}
+
+const SEVERITY: Record<string, number> = {
+  emergency: 3,
+  at_risk: 2,
+  upset: 1,
+  none: 0,
+};
+
+/**
+ * The more severe of two verdicts (Q4 H1: the latest message judged with its history and on its
+ * own; a message at risk on its own is never cleared by its context). A failed one never wins over
+ * one that answered.
+ */
+export function moreSevere(
+  a: CrisisCheckResponse | null,
+  b: CrisisCheckResponse | null,
+): CrisisCheckResponse | null {
+  if (!a || a.failed) return b && !b.failed ? b : (a ?? b);
+  if (!b || b.failed) return a;
+  const level = (v: CrisisCheckResponse) =>
+    SEVERITY[v.level ?? (v.is_crisis ? 'at_risk' : 'none')] ?? 0;
+  return level(b) > level(a) ? b : a;
 }

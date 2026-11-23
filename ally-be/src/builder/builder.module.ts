@@ -9,7 +9,7 @@ import { BuilderSlackController } from './controller/builder-slack.controller';
 import { BuilderSlackService } from './service/builder-slack.service';
 import { AuthModule } from 'src/auth/auth.module';
 import { GithubModule } from 'src/github/github.module';
-import { BugHunterModule } from 'src/bug-hunter/bug-hunter.module';
+import { BugHunterApprovalsModule } from 'src/bug-hunter-approvals/bug-hunter-approvals.module';
 import { AnalyticsAgentModule } from 'src/analytics-agent/analytics-agent.module';
 import { LogsModule } from 'src/logs/logs.module';
 import { UxSignalsModule } from 'src/ux-signals/ux-signals.module';
@@ -176,7 +176,7 @@ import { BuilderPlanConversationService } from './service/builder-plan-conversat
     // For BugFindingService only: the evidence service reads open findings.
     // A domain dependency, unlike the GitHub client that used to be smuggled
     // through this same import.
-    BugHunterModule,
+    BugHunterApprovalsModule,
     // Lane A evidence sources: production numbers, production errors. Read
     // through each owner's own service rather than its HTTP surface, which is
     // gated for a logged-in human.

@@ -356,9 +356,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
       // Catalog (Component Library's) or Document (Blog's), which sit nearby in the nav.
       case SIDEBAR_ITEMS.CONTEXT_LIBRARY:
         return <LibraryBig size={20} strokeWidth={1.5} aria-hidden />;
-      case SIDEBAR_ITEMS.PRODUCT_ROADMAP:
-        return <Roadmap size={20} />;
-      // The same glyph: it is the same Roadmap, rebuilt, and replaces the entry above at cutover.
       case SIDEBAR_ITEMS.ROADMAP_V2:
         return <Roadmap size={20} />;
       case SIDEBAR_ITEMS.USER_INTERVIEWS:
@@ -383,7 +380,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
       // glyph it used to have said "bugs live here", which is what every other
       // tab's icon says about its subject — this one says who is working on
       // them.
-      case SIDEBAR_ITEMS.BUG_HUNTER:
+      case SIDEBAR_ITEMS.BUG_HUNTER_V2:
         return <AgentAvatar size="xs" label={en.bugHunter.agentName} />;
       default:
         return null;

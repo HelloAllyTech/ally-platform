@@ -1,0 +1,169 @@
+diff --git a/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx b/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx
+index e832783397..68bff9e671 100644
+--- a/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx
++++ b/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx
+@@ -77,9 +77,7 @@ const CommentCard = ({
+   const [createComment, { data: createCommentData }] = useCreateCommentMutation();
+   const { reviewId } = useParams<{ reviewId: string }>();
+   const isMyComment =
+-    user?.id != null &&
+-    comment?.createdBy?.id != null &&
+-    String(user.id) === String(comment.createdBy.id);
++    user?.id != null && comment?.createdBy?.id != null && user.id === comment.createdBy.id;
+ 
+   const [repliesOffset, setRepliesOffset] = useState(0);
+   const [hasMoreReplies, setHasMoreReplies] = useState(true);
+@@ -134,7 +132,7 @@ const CommentCard = ({
+           id: createCommentData.reply.id,
+           content: replyText,
+           createdBy: {
+-            id: String(user?.id),
++            id: user?.id,
+             name: user?.name ?? "",
+             profileImage: user?.profileImageUrl ?? null,
+           },
+diff --git a/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/CommentCard.test.tsx b/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/CommentCard.test.tsx
+index e02247d501..a28944480b 100644
+--- a/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/CommentCard.test.tsx
++++ b/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/CommentCard.test.tsx
+@@ -204,7 +204,7 @@ describe("CommentCard Component", () => {
+   const mockComment = {
+     id: "1",
+     createdBy: {
+-      id: "1",
++      id: 1,
+       name: "John Doe",
+       profileImage: "https://example.com/profile.jpg",
+     },
+@@ -685,7 +685,7 @@ describe("CommentCard Component", () => {
+     it("should open confirmation popover when delete is clicked for own comment", async () => {
+       const myComment = {
+         ...mockComment,
+-        createdBy: { ...mockComment.createdBy, id: "999" }, // current user id from mockStore
++        createdBy: { ...mockComment.createdBy, id: 999 }, // current user id from mockStore
+         createdAt: new Date().toISOString(), // not expired
+       };
+       renderWithProvider(<CommentCard comment={myComment} />);
+@@ -705,7 +705,7 @@ describe("CommentCard Component", () => {
+     it("should call deleteComment only after confirming in the popover", async () => {
+       const myComment = {
+         ...mockComment,
+-        createdBy: { ...mockComment.createdBy, id: "999" }, // current user id from mockStore
++        createdBy: { ...mockComment.createdBy, id: 999 }, // current user id from mockStore
+         createdAt: new Date().toISOString(), // not expired
+       };
+       renderWithProvider(<CommentCard comment={myComment} />);
+@@ -729,7 +729,7 @@ describe("CommentCard Component", () => {
+     it("should close confirmation popover when cancel is clicked", async () => {
+       const myComment = {
+         ...mockComment,
+-        createdBy: { ...mockComment.createdBy, id: "999" },
++        createdBy: { ...mockComment.createdBy, id: 999 },
+         createdAt: new Date().toISOString(),
+       };
+       renderWithProvider(<CommentCard comment={myComment} />);
+@@ -756,7 +756,7 @@ describe("CommentCard Component", () => {
+     it("should display correct title for comment delete confirmation", async () => {
+       const myComment = {
+         ...mockComment,
+-        createdBy: { ...mockComment.createdBy, id: "999" },
++        createdBy: { ...mockComment.createdBy, id: 999 },
+         createdAt: new Date().toISOString(),
+       };
+       renderWithProvider(<CommentCard comment={myComment} />);
+@@ -774,7 +774,7 @@ describe("CommentCard Component", () => {
+     it("should display correct title for reply delete confirmation when onDelete is provided", async () => {
+       const myComment = {
+         ...mockComment,
+-        createdBy: { ...mockComment.createdBy, id: "999" },
++        createdBy: { ...mockComment.createdBy, id: 999 },
+         createdAt: new Date().toISOString(),
+       };
+       const onDeleteMock = vi.fn();
+@@ -793,7 +793,7 @@ describe("CommentCard Component", () => {
+     it("should call onDelete callback after successful deletion", async () => {
+       const myComment = {
+         ...mockComment,
+-        createdBy: { ...mockComment.createdBy, id: "999" },
++        createdBy: { ...mockComment.createdBy, id: 999 },
+         createdAt: new Date().toISOString(),
+       };
+       const onDeleteMock = vi.fn();
+@@ -886,7 +886,7 @@ describe("CommentCard Component", () => {
+     it("should show Edit option for own comments within 10 minutes", async () => {
+       const myComment = {
+         ...mockComment,
+-        createdBy: { ...mockComment.createdBy, id: "999" },
++        createdBy: { ...mockComment.createdBy, id: 999 },
+         createdAt: new Date().toISOString(),
+       };
+       renderWithProvider(<CommentCard comment={myComment} />);
+@@ -899,7 +899,7 @@ describe("CommentCard Component", () => {
+     it("should call onUpdateComment after successful edit", async () => {
+       const myComment = {
+         ...mockComment,
+-        createdBy: { ...mockComment.createdBy, id: "999" },
++        createdBy: { ...mockComment.createdBy, id: 999 },
+         createdAt: new Date().toISOString(),
+       };
+       const onUpdateCommentMock = vi.fn();
+diff --git a/apps/ally-helpline-dashboard/src/components/feed-card/types.ts b/apps/ally-helpline-dashboard/src/components/feed-card/types.ts
+index 2d0995d5eb..2eb1fba7bd 100644
+--- a/apps/ally-helpline-dashboard/src/components/feed-card/types.ts
++++ b/apps/ally-helpline-dashboard/src/components/feed-card/types.ts
+@@ -36,7 +36,7 @@ export interface FeedApiResponse {
+ export interface Comment {
+   id: string;
+   createdBy: {
+-    id: string;
++    id: number;
+     name: string;
+     profileImage?: string;
+   };
+diff --git a/apps/ally-helpline-dashboard/src/components/review-comments-sidepanel/__tests__/ReviewCommentsSidepanel.test.tsx b/apps/ally-helpline-dashboard/src/components/review-comments-sidepanel/__tests__/ReviewCommentsSidepanel.test.tsx
+index 62fd7cd9a6..280094fd1f 100644
+--- a/apps/ally-helpline-dashboard/src/components/review-comments-sidepanel/__tests__/ReviewCommentsSidepanel.test.tsx
++++ b/apps/ally-helpline-dashboard/src/components/review-comments-sidepanel/__tests__/ReviewCommentsSidepanel.test.tsx
+@@ -197,6 +197,11 @@ describe("ReviewCommentsSidepanel Component", () => {
+ 
+   const defaultProps = {
+     threads: mockThreads,
++    generalComments: [],
++    setComments: vi.fn(),
++    isGeneralCommentsLoading: false,
++    handleGeneralCommentsLoadMore: vi.fn(),
++    hasMoreGeneralComments: false,
+     totalComments: 3,
+     onCommentClick: mockOnCommentClick,
+   };
+@@ -241,7 +246,7 @@ describe("ReviewCommentsSidepanel Component", () => {
+     });
+ 
+     it("should display '0 Comments' when totalComments is undefined", async () => {
+-      renderWithProviders(<ReviewCommentsSidepanel threads={[]} />);
++      renderWithProviders(<ReviewCommentsSidepanel {...defaultProps} threads={[]} />);
+       await waitFor(() => {
+         expect(screen.getByText("0 Comments")).toBeInTheDocument();
+       });
+@@ -309,7 +314,7 @@ describe("ReviewCommentsSidepanel Component", () => {
+   // --- Click Handler Tests ---
+   describe("Click Handler", () => {
+     it("should use default empty function when onCommentClick not provided", async () => {
+-      renderWithProviders(<ReviewCommentsSidepanel threads={mockThreads} />);
++      renderWithProviders(<ReviewCommentsSidepanel {...defaultProps} threads={mockThreads} />);
+       await waitFor(() => {
+         expect(screen.getByTestId("thread-card-thread-1")).toBeInTheDocument();
+       });
+diff --git a/apps/ally-helpline-dashboard/src/types/reviews.ts b/apps/ally-helpline-dashboard/src/types/reviews.ts
+index 50c8a74246..48c025ca24 100644
+--- a/apps/ally-helpline-dashboard/src/types/reviews.ts
++++ b/apps/ally-helpline-dashboard/src/types/reviews.ts
+@@ -93,7 +93,7 @@ export interface GetReviewsReactionsInput {
+ export interface CommentItem {
+   id: string;
+   createdBy: {
+-    id: string;
++    id: number;
+     name: string;
+     profileImage: string | null;
+   };

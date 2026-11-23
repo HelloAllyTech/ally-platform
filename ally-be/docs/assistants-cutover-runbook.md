@@ -181,13 +181,13 @@ sign-off in the notes file, and the snapshot of step 3 confirmed `available`. Ow
 
 Run 7b before 7c is not required, but run 7d last: it is the change customers see.
 
-## 4. Migrations in this release (ids 1986500000000 to 1987200999999 present in `src/database/migrations`)
+## 4. Migrations in this release (ids 1986540000000 to 1987600999999 present in `src/database/migrations`)
 
 All additive (expand step). Run by the release workflow, not by hand.
 
-- `1986500000000-ChatbotMemberRoleSets`: `chatbot_members.roles text[]`, backfilled from the old `role`, kept in step by a trigger.
-- `1986500000100-CreateChatbotInvitesAndAssistantMember`: invites table and the `ASSISTANT_MEMBER` login role.
-- `1986500000200-CreateResponderAgreements`: one row per person and agreement version.
+- `1986540000000-ChatbotMemberRoleSets`: `chatbot_members.roles text[]`, backfilled from the old `role`, kept in step by a trigger.
+- `1986540000100-CreateChatbotInvitesAndAssistantMember`: invites table and the `ASSISTANT_MEMBER` login role.
+- `1986540000200-CreateResponderAgreements`: one row per person and agreement version.
 - `1986600000000-AddCrisisFlagsAndAlertOutbox`: crisis flag columns on `chatbot_conversations`, the `crisis` needs-a-person reason, the `alert_outbox` table.
 - `1986700000000-CreateCreditsLedger`: billing accounts, grants, chatbot budgets, reservations, end persons, per-person spend, and five nullable columns on `usage_events`.
 - `1986800000000-WorkingCopyBlankChatbotsTemplates`: `bot_drafts` becomes the working copy (`live_at` and related), blank chatbots, templates.

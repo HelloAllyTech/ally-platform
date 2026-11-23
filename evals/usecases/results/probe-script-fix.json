@@ -1,0 +1,1333 @@
+{
+ "label": "probe-script-fix",
+ "setup": "2026-11-22",
+ "repeat": 1,
+ "classifierFail": false,
+ "results": [
+  {
+   "set": "b2-cloudnine",
+   "assistant": "b2-cloudnine",
+   "run": 1,
+   "cases": []
+  },
+  {
+   "set": "b4-scripbox",
+   "assistant": "b4-scripbox",
+   "run": 1,
+   "cases": []
+  },
+  {
+   "set": "b1-dragarwal",
+   "assistant": "b1-dragarwal",
+   "run": 1,
+   "cases": [
+    {
+     "id": "b1-f10",
+     "kind": "fact",
+     "lang": "hinglish",
+     "mustPass": false,
+     "verdict": "PARTIAL",
+     "turns": [
+      {
+       "user": "Aapka contact number kya hai?",
+       "messageId": "25231410-191c-429d-903c-b8582dfcea1f",
+       "observed": {
+        "reply": "Hamare general enquiries ka contact number: 9594924026. (Main madad aur appointments mein madad kar sakta hoon.",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "What we learned",
+          "source_url": ""
+         }
+        ],
+        "passage_document_ids": [
+         "4762de87-0efe-4730-af3e-12c2ef419205",
+         "f9e133f8-ab2a-40e6-b83b-e157fdc9361c",
+         "96cb6851-4a08-47ce-8af9-0b3e668f917a",
+         "15e37f8b-d82a-437f-9095-c4e6f2a87780",
+         "da49184c-4070-4bb5-906f-ac40059104a9",
+         "55d3a9b6-4dd6-4059-a350-e5bed5a4c760",
+         "4a8875b2-b938-47d2-8e79-2b76c3568e4a"
+        ],
+        "passage_chunk_ids": [
+         "32bade41-e29f-4859-9b4f-06f55efea599",
+         "d6c43faf-6493-46de-a879-a3d883d4174c",
+         "1b931cbd-1a17-468b-9022-669ea85dfb98",
+         "11f664e9-930a-449a-b272-9e7ebf32dd60",
+         "e5bb047a-d412-4cfd-97bf-a58498102035",
+         "e4b34e6c-d173-4b36-8c0c-a2352e027503",
+         "d6f57c47-6b68-4689-8a91-305bfafb17e0",
+         "c201bcc1-f5b1-4a89-8e32-0f311abb8225"
+        ],
+        "history": []
+       },
+       "reply": "Hamare general enquiries ka contact number: 9594924026. (Main madad aur appointments mein madad kar sakta hoon.",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 1,
+       "confirmation": null,
+       "statusMs": 96.153583,
+       "firstWordsMs": 3760.934583,
+       "ms": 6921.17525,
+       "grade": {
+        "verdict": "fail",
+        "reasons": [
+         "facts_missing",
+         "conflicting_facts"
+        ],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [
+          "95949 04015"
+         ],
+         "must_not_found": [],
+         "also_ok_matched": false,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "The reply gave 9594924026 instead of the required 95949 04015.",
+         "conflicting_facts": [
+          "9594924026 vs 95949 04015"
+         ]
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "b5-bhive",
+   "assistant": "b5-bhive",
+   "run": 1,
+   "cases": []
+  },
+  {
+   "set": "b5-91springboard",
+   "assistant": "b5-91springboard",
+   "run": 1,
+   "cases": [
+    {
+     "id": "b5a-f09",
+     "kind": "fact",
+     "lang": "hi",
+     "mustPass": false,
+     "verdict": "PARTIAL",
+     "turns": [
+      {
+       "user": "डे पास कितने का है?",
+       "messageId": "1e18de73-b5a3-42a0-ba48-249ece7aa1d9",
+       "observed": {
+        "reply": "Day pass ka price har hub ke liye alag hota hai — har hub ka price jaanne ke liye team se puchhna padta hai. Price list. Kaunsa hub chahenge aap?",
+        "handled_by": "clarified",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Price list · Day pass, hot desk, dedicated desk, private cabin, meeting room by the hour. Ask the team for each hub's price.",
+          "source_url": ""
+         }
+        ],
+        "passage_document_ids": [],
+        "passage_chunk_ids": [
+         "13fadece-c201-483c-ba33-a9a81c1f4121"
+        ],
+        "history": []
+       },
+       "reply": "Day pass ka price har hub ke liye alag hota hai — har hub ka price jaanne ke liye team se puchhna padta hai. Price list. Kaunsa hub chahenge aap?",
+       "handledBy": "clarified",
+       "turnType": "question",
+       "steps": [
+        "find_price_list: ok"
+       ],
+       "sources": 1,
+       "confirmation": null,
+       "statusMs": 76.81133299999999,
+       "firstWordsMs": 6927.287583,
+       "ms": 7779.571166000001,
+       "grade": {
+        "verdict": "fail",
+        "reasons": [
+         "expected_answer_got_clarified"
+        ],
+        "outcome": "clarified",
+        "judge": null
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "b5a-f10",
+     "kind": "fact",
+     "lang": "hinglish",
+     "mustPass": false,
+     "verdict": "PARTIAL",
+     "turns": [
+      {
+       "user": "Nehru Place mein dedicated desk ka rate kya hai?",
+       "messageId": "6c13fa3b-4109-457c-9b5b-7355379d08dc",
+       "observed": {
+        "reply": "Nehru Place hub ke liye hamare paas dedicated desk ka exact rate listed nahin hai. Price list sirf services ka zikr karti hai (Day pass, hot desk, dedicated desk, private cabin, meeting room) aur har hub ke liye team se poochne ko kehti hai. Nehru Place hub ki location aur hub ki flexible pricing plans ke baare mein bhi zikr milta hai.\n\nKya aap monthly dedicated desk membership dekh rahe hain ya short-term/flexi option (weeks/days)?",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Price list · Day pass, hot desk, dedicated desk, private cabin, meeting room by the hour. Ask the team for each hub's price.",
+          "source_url": ""
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Best Coworking Spaces in Delhi - Shared Office Space | 91Springboard",
+          "source_url": "https://www.91springboard.com/delhi-landing"
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "What we learned",
+          "source_url": ""
+         }
+        ],
+        "passage_document_ids": [
+         "ee5217e3-dafa-4c62-8e55-9a001e07bfd3",
+         "7b3a5376-73f4-4f93-91ac-d51fde2914af",
+         "6d782db3-a695-43bf-b901-a12991ba3a64",
+         "677ce769-bfdd-42eb-96ba-9fb78316a184"
+        ],
+        "passage_chunk_ids": [
+         "fbfd73b5-bc31-43e6-921b-a697776ce875",
+         "9cf88f7c-5b19-4f21-b87e-a209c5db31b2",
+         "2839d537-dd06-41e9-84bc-b3b8ae6347eb",
+         "5f2720e0-96e9-4134-ba62-4b15f342c803",
+         "c86327f0-beac-4790-b4ed-79504b70233e",
+         "d991342d-a878-4925-8e80-d811affbdfee",
+         "13fadece-c201-483c-ba33-a9a81c1f4121"
+        ],
+        "history": []
+       },
+       "reply": "Nehru Place hub ke liye hamare paas dedicated desk ka exact rate listed nahin hai. Price list sirf services ka zikr karti hai (Day pass, hot desk, dedicated desk, private cabin, meeting room) aur har hub ke liye team se poochne ko kehti hai. Nehru Place hub ki location aur hub ki flexible pricing plans ke baare mein bhi zikr milta hai.\n\nKya aap monthly dedicated desk membership dekh rahe hain ya short-term/flexi option (weeks/days)?",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [
+        "find_price_list: ok"
+       ],
+       "sources": 3,
+       "confirmation": null,
+       "statusMs": 17.86516699999993,
+       "firstWordsMs": 18417.7395,
+       "ms": 20696.29275,
+       "grade": {
+        "verdict": "fail",
+        "reasons": [
+         "facts_missing",
+         "did_not_answer"
+        ],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [
+          "₹12,500"
+         ],
+         "must_not_found": [],
+         "also_ok_matched": false,
+         "answers_question": false,
+         "invents_facts": false,
+         "declines_request": true,
+         "note": "The reply says the exact rate isn't listed and asks a follow-up instead of giving the required price (₹12,500).",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "b3-tss",
+   "assistant": "b3-tss",
+   "run": 1,
+   "cases": [
+    {
+     "id": "b3-f08",
+     "kind": "fact",
+     "lang": "hi",
+     "mustPass": false,
+     "verdict": "PARTIAL",
+     "turns": [
+      {
+       "user": "बैटमैन हाई टॉप स्नीकर्स कितने के हैं?",
+       "messageId": "330fe777-fc57-4590-86f0-6efde0a94b2d",
+       "observed": {
+        "reply": "माफ़ कीजिए — मेरे पास ‘बैटमैन हाई-टॉप स्नीकर्स’ की कीमत का कोई जानकारी उपलब्ध नहीं है। कृपया The Souled Store की वेबसाइट पर प्रोडक्ट पेज देखें या उनकी कस्टमर सपोर्ट टीम से पूछें। मैं अन्य किसी प्रोडक्ट की उपलब्ध जानकारी ढूँढकर दे सकता/सकती हूँ — चाहें तो बताइए कौन सा आइटम देखना है। Please contact customer care at +91 22-68493328.",
+        "handled_by": "declined",
+        "turn_type": "question",
+        "citations": [],
+        "passage_document_ids": [],
+        "passage_chunk_ids": [],
+        "history": []
+       },
+       "reply": "माफ़ कीजिए — मेरे पास ‘बैटमैन हाई-टॉप स्नीकर्स’ की कीमत का कोई जानकारी उपलब्ध नहीं है। कृपया The Souled Store की वेबसाइट पर प्रोडक्ट पेज देखें या उनकी कस्टमर सपोर्ट टीम से पूछें। मैं अन्य किसी प्रोडक्ट की उपलब्ध जानकारी ढूँढकर दे सकता/सकती हूँ — चाहें तो बताइए कौन सा आइटम देखना है। Please contact customer care at +91 22-68493328.",
+       "handledBy": "declined",
+       "turnType": "question",
+       "steps": [
+        "find_products: ok",
+        "find_products: ok",
+        "find_products: ok",
+        "find_products: ok"
+       ],
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": 44.685249999999996,
+       "firstWordsMs": 15426.485333,
+       "ms": 17118.093083,
+       "grade": {
+        "verdict": "fail",
+        "reasons": [
+         "wrong_decline"
+        ],
+        "outcome": "declined",
+        "judge": null
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "b3-f09",
+     "kind": "fact",
+     "lang": "hi",
+     "mustPass": false,
+     "verdict": "PARTIAL",
+     "turns": [
+      {
+       "user": "डिलीवरी में कितने दिन लगते हैं?",
+       "messageId": "7f82e0f9-5c14-4534-8907-717cd51da4ce",
+       "observed": {
+        "reply": "मुझे हमारी जानकारी में डिलीवरी में लगने वाले दिनों का विवरण नहीं मिला। डिलीवरी समय जानने के लिए कृपया ग्राहक सहायता को लिखें: grievanceofficer@thesouledstore.com (स्रोत नीचे)। अगर आप अपना ऑर्डर नंबर यहाँ देंगे तो मैं आपके ऑर्डर की स्थिति देख कर बता सकता/सकती हूँ।",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Privacy Policy | The Souled Store",
+          "source_url": "https://www.thesouledstore.com/privacy-policy"
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Terms & Conditions | The Souled Store",
+          "source_url": "https://www.thesouledstore.com/terms-and-conditions"
+         }
+        ],
+        "passage_document_ids": [
+         "ae540376-7abc-4242-9d18-b0b428292074",
+         "1cd2d7ab-b29e-4eae-b20d-355415566384",
+         "e25ccdff-5427-49fa-9c40-daacf1d3a193",
+         "26b2a8f7-cf98-4087-ba31-0e8c610b128c",
+         "03263ebc-c3be-4e8d-905e-7ce742a684cd",
+         "077c3800-9fc6-4cf1-bf82-b964941c0695"
+        ],
+        "passage_chunk_ids": [
+         "398c3aa5-1fa5-4712-adbd-e53dd1e43b1e",
+         "4dc63c9d-c0a4-43c1-92f9-effb98f945aa",
+         "740ddd8a-0622-4d30-97dd-e203062fc718",
+         "46620579-c964-473a-81e1-451d4ca985e6",
+         "4235bec4-c1db-48f0-8e27-7b044042998e",
+         "4b3f8f0f-cd1c-4600-9aae-770170b245d8",
+         "dd8afb77-a2c3-415d-9e99-65bf22db2091"
+        ],
+        "history": []
+       },
+       "reply": "मुझे हमारी जानकारी में डिलीवरी में लगने वाले दिनों का विवरण नहीं मिला। डिलीवरी समय जानने के लिए कृपया ग्राहक सहायता को लिखें: grievanceofficer@thesouledstore.com (स्रोत नीचे)। अगर आप अपना ऑर्डर नंबर यहाँ देंगे तो मैं आपके ऑर्डर की स्थिति देख कर बता सकता/सकती हूँ।",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 2,
+       "confirmation": null,
+       "statusMs": 49.65820800000074,
+       "firstWordsMs": 12253.741208,
+       "ms": 13396.089208000001,
+       "grade": {
+        "verdict": "fail",
+        "reasons": [
+         "facts_missing",
+         "did_not_answer"
+        ],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [
+          "3 to 7 working days"
+         ],
+         "must_not_found": [],
+         "also_ok_matched": false,
+         "answers_question": false,
+         "invents_facts": false,
+         "declines_request": true,
+         "note": "Reply did not state the delivery timeframe (3 to 7 working days) and instead said the information was unavailable.",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "o2-cansupport",
+   "assistant": "o2-cansupport",
+   "run": 1,
+   "cases": [
+    {
+     "id": "o2-f09",
+     "kind": "fact",
+     "lang": "hi",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "आप किन इलाक़ों में काम करते हैं?",
+       "messageId": "5d393077-2dac-441f-aae6-638346bab627",
+       "observed": {
+        "reply": "हम दिल्ली, हरियाणा, पंजाब, उत्तर प्रदेश, झारखंड, हिमाचल प्रदेश और महाराष्ट्र (पुणे) में काम करते हैं। (पंजाब में 6 होम केयर टीमें और 2 आउटपेशेंट क्लिनिक — अमृतसर, बठिंडा, मानसा और पटियाला)।",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "What we learned",
+          "source_url": ""
+         }
+        ],
+        "passage_document_ids": [
+         "2d6f50ff-be78-4bd2-905f-e7d38fc55124",
+         "949d0f94-8e96-4d27-8299-16e18c57fa04",
+         "c1713658-4c41-4702-9eb9-adca8dbd5747",
+         "e108d3c1-573e-439e-bfc1-06d8f19ad68b"
+        ],
+        "passage_chunk_ids": [
+         "7e84868f-552b-400d-a8c2-bfbdc9352cdc",
+         "d7cc49fc-670c-4041-86bf-2ca8e40bb5b7",
+         "9d79a448-9ac1-4db5-9cf9-773bbb9758db",
+         "7a2cba3f-319c-4836-87b3-631a0552e8f2",
+         "550a67f0-09cc-4dd4-a18b-12587658fdfa",
+         "e40011f3-2482-4c7f-b777-20f2550caac1",
+         "12d92e04-1f19-41c6-9aa9-b9595c479358",
+         "45967291-dcd0-4b51-b377-c31a42e72f9a"
+        ],
+        "history": []
+       },
+       "reply": "हम दिल्ली, हरियाणा, पंजाब, उत्तर प्रदेश, झारखंड, हिमाचल प्रदेश और महाराष्ट्र (पुणे) में काम करते हैं। (पंजाब में 6 होम केयर टीमें और 2 आउटपेशेंट क्लिनिक — अमृतसर, बठिंडा, मानसा और पटियाला)।",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 1,
+       "confirmation": null,
+       "statusMs": 24.28191700000025,
+       "firstWordsMs": 6586.399375000001,
+       "ms": 7652.166917000002,
+       "grade": {
+        "verdict": "pass",
+        "reasons": [],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": true,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "o4-tfi-staff",
+   "assistant": "o4-tfi-staff",
+   "run": 1,
+   "cases": []
+  },
+  {
+   "set": "o1-icall",
+   "assistant": "o1-icall",
+   "run": 1,
+   "cases": [
+    {
+     "id": "o1-f08",
+     "kind": "fact",
+     "lang": "hi",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "क्या मैं हिंदी में बात कर सकती हूँ? फ़ोन नंबर क्या है?",
+       "messageId": "79803682-8a73-4e9e-a9ae-3daf9cb100e3",
+       "observed": {
+        "reply": "हाँ, आप हिंदी में बात कर सकती हैं। आप iCALL को कॉल कर सकती हैं: 9152987821. सेवा के घंटे सुबह 10 बजे से रात 8 बजे तक हैं। (स्रोत: iCALL)",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "4 Self-Help Techniques for When You Are Stressed – iCALL | Free Telephone & Email based Counseling Services",
+          "source_url": "https://icallhelpline.org/4-self-help-techniques-for-when-you-are-stressed__trashed"
+         }
+        ],
+        "passage_document_ids": [
+         "78b2080c-dafc-402d-bfdf-cde8d237808e",
+         "c2e9c8e7-1a5b-4cf5-a6ed-188b4dcdc79b",
+         "6111086e-126f-4c59-9758-148fd9bf2b63",
+         "34805a14-0dfa-4582-b732-205e361ca31e"
+        ],
+        "passage_chunk_ids": [
+         "3a8388ec-ade7-441d-a7ae-7ee5b81d3667",
+         "9d5f662b-3dd1-49d7-962f-60641b9a16f7",
+         "4aec216f-848a-4ce3-b523-ca44b72a9477",
+         "29c193f4-f6a7-44c6-8a63-c769687d7955"
+        ],
+        "history": []
+       },
+       "reply": "हाँ, आप हिंदी में बात कर सकती हैं। आप iCALL को कॉल कर सकती हैं: 9152987821. सेवा के घंटे सुबह 10 बजे से रात 8 बजे तक हैं। (स्रोत: iCALL)",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 1,
+       "confirmation": null,
+       "statusMs": 34.304457999998704,
+       "firstWordsMs": 6142.776665999998,
+       "ms": 6938.685540999999,
+       "grade": {
+        "verdict": "pass",
+        "reasons": [
+         "conflicting_facts"
+        ],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": false,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "Business sources list multiple phone numbers; the reply uses 9152987821 from the counselling page.",
+         "conflicting_facts": [
+          "+91-022-2552-5600 vs 9152987821",
+          "+91-022-2552-5600 vs 022-25521111",
+          "9152987821 vs 022-25521111"
+         ]
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "o1-f09",
+     "kind": "fact",
+     "lang": "hi",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "क्या आप लोग आमने-सामने काउंसलिंग करते हैं?",
+       "messageId": "bb2b4f36-d3d4-4809-ab23-25288292ee44",
+       "observed": {
+        "reply": "नहीं—iCALL आमने-सामने (face-to-face) काउंसलिंग नहीं देता। हमारी सेवाएँ चैट, हेल्पलाइन और ईमेल के माध्यम से उपलब्ध हैं; हम पास के फे्स‑टू‑फे्स प्रोफेशनल्स का एक क्राउडसोर्स्ड रेफरल‑लिस्ट देते हैं। (स्रोत:)\n\nअगर आप बात करना चाहें तो हम हेल्पलाइन और ईमेल पर उपलब्ध हैं: हेल्पलाइन 9152987821 और ईमेल icall@tiss.edu। (स्रोत:)",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "ReYou Chat-line FAQs – iCALL | Free Telephone & Email based Counseling Services",
+          "source_url": "https://icallhelpline.org/reyou-chat-line-faqs"
+         }
+        ],
+        "passage_document_ids": [
+         "110ab77a-47c9-497c-9885-541e4ef98717",
+         "ca75dc86-e2a3-4c00-b2e3-29eb6a267823",
+         "8742f81c-0abf-47cb-8f8e-0e08b67d4212"
+        ],
+        "passage_chunk_ids": [
+         "4dc325ac-d920-429a-9d76-39fc86f69760",
+         "e1342c6e-665f-4288-b074-5c5250a4a0d9",
+         "eda48309-9065-4921-8f9b-f8c998aeaaa3",
+         "1bacd825-4646-426d-b159-059b606db151",
+         "325d0339-e9ba-4e4a-94a4-324e4e505429",
+         "e85ce9e3-9937-4b53-8638-8dcc985d009f",
+         "4d6e3d80-ce6c-4458-9cc9-2990c6e659d0",
+         "a7224c7e-b3e0-4558-8fb3-f88e52548be0"
+        ],
+        "history": []
+       },
+       "reply": "नहीं—iCALL आमने-सामने (face-to-face) काउंसलिंग नहीं देता। हमारी सेवाएँ चैट, हेल्पलाइन और ईमेल के माध्यम से उपलब्ध हैं; हम पास के फे्स‑टू‑फे्स प्रोफेशनल्स का एक क्राउडसोर्स्ड रेफरल‑लिस्ट देते हैं। (स्रोत:)\n\nअगर आप बात करना चाहें तो हम हेल्पलाइन और ईमेल पर उपलब्ध हैं: हेल्पलाइन 9152987821 और ईमेल icall@tiss.edu। (स्रोत:)",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 1,
+       "confirmation": null,
+       "statusMs": 28.10191599999962,
+       "firstWordsMs": 5877.457999999999,
+       "ms": 7195.627541000002,
+       "grade": {
+        "verdict": "pass",
+        "reasons": [],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": true,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "o6-updates",
+   "assistant": "o6-updates",
+   "run": 1,
+   "cases": []
+  },
+  {
+   "set": "o3-goonj",
+   "assistant": "o3-goonj",
+   "run": 1,
+   "cases": [
+    {
+     "id": "o3-f09",
+     "kind": "fact",
+     "lang": "hi",
+     "mustPass": false,
+     "verdict": "PARTIAL",
+     "turns": [
+      {
+       "user": "इंटर्नशिप कितने समय की होती है? स्टाइपेंड मिलता है?",
+       "messageId": "55ac8f62-c54c-43c7-a0fa-38077d9727c4",
+       "observed": {
+        "reply": "Goonj का Paid Urban Internship 3 महीने का होता है, और यह पेड (स्टाइपेंड) इंटरनशिप है। क्या आप आवेदन करने में मदद चाहेंगे?",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Junoon Awards | Goonj",
+          "source_url": "https://goonj.org/junoon-awards"
+         }
+        ],
+        "passage_document_ids": [
+         "8f042c22-bfc6-46fc-a885-aeea95efaa7b",
+         "a7af3e53-a500-4673-9f4a-a2052e24c5d3",
+         "b76ab81d-9724-4572-a66d-e3014bee619b",
+         "54607c1a-6b3f-4ab7-a8a4-b1ce5f208a8f",
+         "382357a8-9d4b-4670-af26-052d89f9b02c",
+         "34aed5dc-7a76-48b9-848d-3d253cb6ae8a"
+        ],
+        "passage_chunk_ids": [
+         "4e169987-4f0a-404b-958c-41b96c593c49",
+         "6a95c002-9eaa-4806-b69c-9883a6af262a",
+         "08b09b3b-c3c5-425f-b71e-761196ed9dc1",
+         "7f0d3458-65dd-4258-bc81-478921f3a697",
+         "993956e9-6ac4-4e8c-9301-e9f90ea3872e",
+         "1cc11fab-5a7e-4061-b675-da54bc5dd2ea",
+         "4fbd4517-fd6c-43bd-9186-52cbb8f770ea",
+         "d5ac32a1-73d4-411c-8757-6a435f48ae17"
+        ],
+        "history": []
+       },
+       "reply": "Goonj का Paid Urban Internship 3 महीने का होता है, और यह पेड (स्टाइपेंड) इंटरनशिप है। क्या आप आवेदन करने में मदद चाहेंगे?",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 1,
+       "confirmation": null,
+       "statusMs": 63.508207999999286,
+       "firstWordsMs": 9063.429415999999,
+       "ms": 9663.174040999998,
+       "grade": {
+        "verdict": "fail",
+        "reasons": [
+         "facts_missing"
+        ],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [
+          "no stipend"
+         ],
+         "must_not_found": [],
+         "also_ok_matched": false,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "Reply incorrectly states the internship is paid (stipend); the required fact says there is no stipend.",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "o3-f10",
+     "kind": "fact",
+     "lang": "hinglish",
+     "mustPass": false,
+     "verdict": "PARTIAL",
+     "turns": [
+      {
+       "user": "Delhi wale centre ka time kya hai? Visit karna hai",
+       "messageId": "8b660ded-05ad-40ec-a249-4bfcb84cf78f",
+       "observed": {
+        "reply": "Maine Goonj ke Delhi pages dekhe, lekin wahan visiting hours (centre ka time) nahin diya gaya. Our Offices; Dropping Centers. Kya chahenge ki main aapka message team ko bhej doon taaki woh visiting hours bata saken?",
+        "handled_by": "clarified",
+        "turn_type": "question",
+        "citations": [],
+        "passage_document_ids": [
+         "a7af3e53-a500-4673-9f4a-a2052e24c5d3",
+         "f1e966e1-7c45-4c1e-a93e-39e1dcc00dcf",
+         "34aed5dc-7a76-48b9-848d-3d253cb6ae8a",
+         "b76ab81d-9724-4572-a66d-e3014bee619b",
+         "382357a8-9d4b-4670-af26-052d89f9b02c",
+         "8f042c22-bfc6-46fc-a885-aeea95efaa7b"
+        ],
+        "passage_chunk_ids": [
+         "abbe6f7c-de33-4676-97e0-60b72931efc1",
+         "3a50a054-dbb7-4b16-a37c-5308a00c1303",
+         "23f8c08f-699f-4928-b04c-3891d49b1a18",
+         "5cdfd974-1d11-4f9d-a3b0-94b0cb5a1e14",
+         "71613a27-feb9-43e3-876e-88211dba37f1",
+         "79e46b9e-f810-49d9-add6-3b7230af4ace",
+         "5a2121b0-1ee6-40b7-93aa-399663df3cef",
+         "08f72a0d-702a-4b4d-b04f-2a2e2475b8ff"
+        ],
+        "history": []
+       },
+       "reply": "Maine Goonj ke Delhi pages dekhe, lekin wahan visiting hours (centre ka time) nahin diya gaya. Our Offices; Dropping Centers. Kya chahenge ki main aapka message team ko bhej doon taaki woh visiting hours bata saken?",
+       "handledBy": "clarified",
+       "turnType": "question",
+       "steps": [],
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": 22.273416999996698,
+       "firstWordsMs": 4931.111416999993,
+       "ms": 5590.976458000005,
+       "grade": {
+        "verdict": "fail",
+        "reasons": [
+         "expected_answer_got_clarified"
+        ],
+        "outcome": "clarified",
+        "judge": null
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "o5-rha",
+   "assistant": "o5-rha",
+   "run": 1,
+   "cases": [
+    {
+     "id": "o5-f05",
+     "kind": "fact",
+     "lang": "hi",
+     "mustPass": false,
+     "verdict": "PARTIAL",
+     "turns": [
+      {
+       "user": "क्या आप पैसे का दान लेते हैं? 80G रसीद मिलेगी?",
+       "messageId": "aedab617-4081-4f29-ba06-177651267a3b",
+       "observed": {
+        "reply": "नहीं — Robin Hood Army एक \"zero‑funds\" स्वयंसेवी संगठन है और \"No money involved\" कहता है, इसलिए दान स्वीकार नहीं करता (यहाँ से: Join Us और About पृष्ठ)। अगर आप आगे बात करना चाहें तो info@robinhoodarmy.com पर संपर्क कर सकते हैं।",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Join Us – Robin Hood Army",
+          "source_url": "https://robinhoodarmy.com/sites/main/join-us"
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "What we learned",
+          "source_url": ""
+         }
+        ],
+        "passage_document_ids": [
+         "641bd7f4-ebe1-4aeb-b97e-fd39e4da7249",
+         "cc9aeed4-5788-46ef-95c5-9f006a89645a",
+         "a6c96efc-e5e1-4eaf-8373-2f012c8d75da"
+        ],
+        "passage_chunk_ids": [
+         "9988e026-7550-423d-807c-01deeac1de56",
+         "8950c9f5-0986-4704-8609-523d556b1a86",
+         "68b8c53a-9f57-4881-9bbf-0ddc8e44b647",
+         "b94bc512-e785-4b4e-8c5b-21bd15da9b13",
+         "b19ae36d-aa52-4d5d-9563-06ee99049c6c",
+         "788db61a-d8d3-4b51-a5f8-e597b99ac009",
+         "77f046f9-67f5-4a4e-b868-5e824e0b9560",
+         "28832699-ce5a-454c-a136-fa29fac97e3a"
+        ],
+        "history": []
+       },
+       "reply": "नहीं — Robin Hood Army एक \"zero‑funds\" स्वयंसेवी संगठन है और \"No money involved\" कहता है, इसलिए दान स्वीकार नहीं करता (यहाँ से: Join Us और About पृष्ठ)। अगर आप आगे बात करना चाहें तो info@robinhoodarmy.com पर संपर्क कर सकते हैं।",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 2,
+       "confirmation": null,
+       "statusMs": 23.04329200000211,
+       "firstWordsMs": 5007.003499999999,
+       "ms": 5796.608542000002,
+       "grade": {
+        "verdict": "fail",
+        "reasons": [
+         "facts_missing",
+         "did_not_answer"
+        ],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [
+          "no 80G"
+         ],
+         "must_not_found": [],
+         "also_ok_matched": false,
+         "answers_question": false,
+         "invents_facts": false,
+         "declines_request": true,
+         "note": "Reply correctly says donations aren't accepted but does not state whether 80G receipts are provided.",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "o5-f06",
+     "kind": "fact",
+     "lang": "hi",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "वॉलंटियर बनने के लिए कितना समय देना होगा?",
+       "messageId": "91083276-a577-4d06-b3ae-bd95dd5b0b93",
+       "observed": {
+        "reply": "हमें प्रति सप्ताह कम से कम 3 घंटे, और महीने में कम से कम दो बार देना होता है — इससे असल प्रभाव पड़ता है। अगर आपके शहर में टीम बढ़ाने की जरूरत होगी तो वहाँ का Robin आपसे संपर्क करेगा।",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "What we learned",
+          "source_url": ""
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Robin Hood Army – Zero Hunger, One Drive at a Time - Robin Hood Army",
+          "source_url": "https://robinhoodarmy.com/"
+         }
+        ],
+        "passage_document_ids": [
+         "641bd7f4-ebe1-4aeb-b97e-fd39e4da7249",
+         "6ee3ab21-c005-43ab-9a95-a4eaafaaae2c",
+         "f6cdfa4a-937d-4611-a0c0-9a0696da534f",
+         "cc9aeed4-5788-46ef-95c5-9f006a89645a"
+        ],
+        "passage_chunk_ids": [
+         "b28cc7d8-1ab3-4475-a8f5-671b55697629",
+         "d3cfe9a2-541a-417e-9a36-a35e977ea55b",
+         "e3fc0be6-5995-454c-b0e3-387581402802",
+         "68b8c53a-9f57-4881-9bbf-0ddc8e44b647"
+        ],
+        "history": []
+       },
+       "reply": "हमें प्रति सप्ताह कम से कम 3 घंटे, और महीने में कम से कम दो बार देना होता है — इससे असल प्रभाव पड़ता है। अगर आपके शहर में टीम बढ़ाने की जरूरत होगी तो वहाँ का Robin आपसे संपर्क करेगा।",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 2,
+       "confirmation": null,
+       "statusMs": 23.053209000005154,
+       "firstWordsMs": 5567.461625000011,
+       "ms": 6345.954500000007,
+       "grade": {
+        "verdict": "pass",
+        "reasons": [],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": true,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "o5-f08",
+     "kind": "fact",
+     "lang": "hinglish",
+     "mustPass": false,
+     "verdict": "PARTIAL",
+     "turns": [
+      {
+       "user": "Join karne ke liye koi fees hai kya?",
+       "messageId": "f25e6139-26fc-43e3-a2f8-239151d20553",
+       "observed": {
+        "reply": "Nahi — Robin Hood Army volunteer-run, zero-funds organisation hai; join karne ke liye koi fees nahi hoti. Join the Robin Hood Army)",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Join Us – Robin Hood Army",
+          "source_url": "https://robinhoodarmy.com/sites/main/join-us"
+         }
+        ],
+        "passage_document_ids": [
+         "0395c739-6cd0-4706-ba27-e93127246bf0",
+         "80255562-2e71-4a24-a9ae-d8c7ae2dd89b",
+         "6925d8f9-b3aa-406e-9a50-00f16417f348",
+         "a6c96efc-e5e1-4eaf-8373-2f012c8d75da",
+         "77ce5204-1bd1-44ca-a36e-9b57bf754597",
+         "cc9aeed4-5788-46ef-95c5-9f006a89645a",
+         "641bd7f4-ebe1-4aeb-b97e-fd39e4da7249"
+        ],
+        "passage_chunk_ids": [
+         "a3e0a65f-c4f4-4297-bcfb-eb4d57a05cc4",
+         "49f7af57-631a-47e3-b05e-eeb3a2cefb53",
+         "7025f631-4f60-4419-a765-d045fc0fc62d",
+         "1026f7a9-5978-4542-89e0-3c7cbcf113e8",
+         "b4c9e482-4190-48b3-8b66-c8f2a6d9e10a",
+         "f5e00522-fdab-434c-9ff8-289a991ba4aa",
+         "058a717f-b72c-4a23-a07f-6ca9a1049c2d",
+         "3ac2d0bb-6d78-4793-9e73-58129fbda226",
+         "68b8c53a-9f57-4881-9bbf-0ddc8e44b647",
+         "8950c9f5-0986-4704-8609-523d556b1a86",
+         "73594057-8104-4ecd-90e6-50be2873e13e",
+         "9988e026-7550-423d-807c-01deeac1de56",
+         "b94bc512-e785-4b4e-8c5b-21bd15da9b13",
+         "28832699-ce5a-454c-a136-fa29fac97e3a",
+         "17826d4f-fd58-40ee-89bd-e3797379e4e4",
+         "77f046f9-67f5-4a4e-b868-5e824e0b9560"
+        ],
+        "history": []
+       },
+       "reply": "Nahi — Robin Hood Army volunteer-run, zero-funds organisation hai; join karne ke liye koi fees nahi hoti. Join the Robin Hood Army)",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 1,
+       "confirmation": null,
+       "statusMs": 39.0896250000078,
+       "firstWordsMs": 6160.660791000002,
+       "ms": 13031.044083,
+       "grade": {
+        "verdict": "fail",
+        "reasons": [
+         "invented_facts"
+        ],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": true,
+         "answers_question": true,
+         "invents_facts": true,
+         "declines_request": false,
+         "note": "The reply correctly says joining is free but adds 'volunteer-run, zero-funds organisation,' a specific detail not present in the provided business information.",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "o5-f10",
+     "kind": "fact",
+     "lang": "bn",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "আপনারা কি টাকা দান নেন?",
+       "messageId": "83665aba-ff22-4e0d-a966-ffc4ddcbaa8b",
+       "observed": {
+        "reply": "না—আমরা একটি স্বেচ্ছাসেবী, জিরো-ফান্ডস (টাকা নেই) সংগঠন; সেখানে অর্থ নেয়া হয় না (No money involved).\nআরও জানতে চান? এখানে ইমেইল করুন: info@robinhoodarmy.com।",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "What we learned",
+          "source_url": ""
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Join Us – Robin Hood Army",
+          "source_url": "https://robinhoodarmy.com/sites/main/join-us"
+         }
+        ],
+        "passage_document_ids": [
+         "641bd7f4-ebe1-4aeb-b97e-fd39e4da7249",
+         "cc9aeed4-5788-46ef-95c5-9f006a89645a",
+         "a6c96efc-e5e1-4eaf-8373-2f012c8d75da"
+        ],
+        "passage_chunk_ids": [
+         "9988e026-7550-423d-807c-01deeac1de56",
+         "68b8c53a-9f57-4881-9bbf-0ddc8e44b647",
+         "8950c9f5-0986-4704-8609-523d556b1a86",
+         "b94bc512-e785-4b4e-8c5b-21bd15da9b13",
+         "28832699-ce5a-454c-a136-fa29fac97e3a",
+         "788db61a-d8d3-4b51-a5f8-e597b99ac009",
+         "77f046f9-67f5-4a4e-b868-5e824e0b9560",
+         "b19ae36d-aa52-4d5d-9563-06ee99049c6c"
+        ],
+        "history": []
+       },
+       "reply": "না—আমরা একটি স্বেচ্ছাসেবী, জিরো-ফান্ডস (টাকা নেই) সংগঠন; সেখানে অর্থ নেয়া হয় না (No money involved).\nআরও জানতে চান? এখানে ইমেইল করুন: info@robinhoodarmy.com।",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 2,
+       "confirmation": null,
+       "statusMs": 32.37079200000153,
+       "firstWordsMs": 6134.431958000001,
+       "ms": 6982.815042000002,
+       "grade": {
+        "verdict": "pass",
+        "reasons": [],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": true,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "rha",
+   "assistant": "o5-rha",
+   "run": 1,
+   "cases": [
+    {
+     "id": "rha-L1",
+     "kind": "fact",
+     "lang": "hi",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "मैं दिल्ली में वॉलंटियर बनना चाहता हूँ, कैसे जुड़ूँ?",
+       "messageId": "49f383ff-dfbb-4c9e-8380-4f32d4f6d5f3",
+       "observed": {
+        "reply": "बढ़िया — दिल्ली में वॉलंटियर बनने के लिए Robin Hood Army के लोकल चैप्टर्स से जुड़कर आप Robins के साथ मिलकर फूड कलेक्शन और वितरण करते हैं; यह पूरी तरह वॉलंटियर-रन और बिना फंड वाला अभियान है (कोई पैसा नहीं लगता). दिल्ली में अब 276 Robins हैं और हाल के 60 दिनों में 917 कुल check-ins दाखिल हैं.\nक्या आप चाहेंगे कि मैं Join Us पेज की आगे की निर्देश (कैसे साइन अप करें) दिखाऊँ?",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Join Us – Robin Hood Army",
+          "source_url": "https://robinhoodarmy.com/sites/main/join-us"
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "What we learned",
+          "source_url": ""
+         }
+        ],
+        "passage_document_ids": [
+         "cc9aeed4-5788-46ef-95c5-9f006a89645a",
+         "6ee3ab21-c005-43ab-9a95-a4eaafaaae2c",
+         "f6cdfa4a-937d-4611-a0c0-9a0696da534f",
+         "641bd7f4-ebe1-4aeb-b97e-fd39e4da7249"
+        ],
+        "passage_chunk_ids": [
+         "68b8c53a-9f57-4881-9bbf-0ddc8e44b647",
+         "76a5b6b0-ab74-4fd1-96a8-6dbea79b478a",
+         "ebc97c3d-66d3-43da-8fd3-918f00885293",
+         "788db61a-d8d3-4b51-a5f8-e597b99ac009",
+         "9988e026-7550-423d-807c-01deeac1de56",
+         "3f170a9a-1271-4687-a582-91e84f72310c",
+         "27281b93-4d96-4d4a-9a5e-e1ade728d813",
+         "99f576de-c3e1-4d55-a541-5dab2bc5eb2b"
+        ],
+        "history": []
+       },
+       "reply": "बढ़िया — दिल्ली में वॉलंटियर बनने के लिए Robin Hood Army के लोकल चैप्टर्स से जुड़कर आप Robins के साथ मिलकर फूड कलेक्शन और वितरण करते हैं; यह पूरी तरह वॉलंटियर-रन और बिना फंड वाला अभियान है (कोई पैसा नहीं लगता). दिल्ली में अब 276 Robins हैं और हाल के 60 दिनों में 917 कुल check-ins दाखिल हैं.\nक्या आप चाहेंगे कि मैं Join Us पेज की आगे की निर्देश (कैसे साइन अप करें) दिखाऊँ?",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 2,
+       "confirmation": null,
+       "statusMs": 19.44412500000908,
+       "firstWordsMs": 7447.374959000008,
+       "ms": 8838.116167,
+       "grade": {
+        "verdict": "pass",
+        "reasons": [],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": true,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "rha-L2",
+     "kind": "fact",
+     "lang": "ta",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "என் உணவகம் சென்னையில் உள்ளது, மீதமுள்ள உணவை எப்படி கொடுப்பது?",
+       "messageId": "bb1763a9-a609-4a6c-8660-d9a07ec225de",
+       "observed": {
+        "reply": "நன்றி — நீங்கள் சென்னையில் உள்ள உங்கள் உணவகத்தில் மீதமுள்ள உணவை நன்கொடுக்க Robin Hood Army உடன் சேர்வதற்கு எளிது. Robin Hood Army பதிவுசெய்த రెஸ்டாரண்டுகள், விருப்பமுள்ள நிகழ்வுகள் மற்றும் சமையற்கூடத்திலிருந்து மேலதிக உணவுகளை எடுக்கும்; அதன் பிறகு தன்னார்வசெய்யும் “Robins” அவற்றை தெருக்களில், கட்டுப்படுத்தப்பட்ட இடங்களில் மற்றும் தேவைக்கும் இடங்களுக்கு பகிர்ந்து தருகிறார்கள் (Robin Hood Army என்பது தன்னார்வ அமைப்பு, உணவு மேலதிகத்தைக் கொண்டு பற்றாக்குறையுள்ளவர்களுக்கு வழங்குகிறது). நீங்கள் சேர்ந்தால் உங்கள் லோக்கல் அத்தியாயம் அவ்வாறு ஏற்பாடுகள் செய்வார் — அதைத் தொடங்க Join Us பக்கத்தில் விரிசல் செய்யலாம்.",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Robin Hood Army – Zero Hunger, One Drive at a Time - Robin Hood Army",
+          "source_url": "https://robinhoodarmy.com/sites/main/about"
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Join Us – Robin Hood Army",
+          "source_url": "https://robinhoodarmy.com/sites/main/join-us"
+         }
+        ],
+        "passage_document_ids": [
+         "a6c96efc-e5e1-4eaf-8373-2f012c8d75da",
+         "6ee3ab21-c005-43ab-9a95-a4eaafaaae2c",
+         "f6cdfa4a-937d-4611-a0c0-9a0696da534f",
+         "641bd7f4-ebe1-4aeb-b97e-fd39e4da7249",
+         "cc9aeed4-5788-46ef-95c5-9f006a89645a"
+        ],
+        "passage_chunk_ids": [
+         "0a554b44-ed1a-48ec-926c-5b107bf17c0d",
+         "27281b93-4d96-4d4a-9a5e-e1ade728d813",
+         "3f170a9a-1271-4687-a582-91e84f72310c",
+         "ebc97c3d-66d3-43da-8fd3-918f00885293",
+         "76a5b6b0-ab74-4fd1-96a8-6dbea79b478a",
+         "9988e026-7550-423d-807c-01deeac1de56",
+         "68b8c53a-9f57-4881-9bbf-0ddc8e44b647",
+         "788db61a-d8d3-4b51-a5f8-e597b99ac009"
+        ],
+        "history": []
+       },
+       "reply": "நன்றி — நீங்கள் சென்னையில் உள்ள உங்கள் உணவகத்தில் மீதமுள்ள உணவை நன்கொடுக்க Robin Hood Army உடன் சேர்வதற்கு எளிது. Robin Hood Army பதிவுசெய்த రెஸ்டாரண்டுகள், விருப்பமுள்ள நிகழ்வுகள் மற்றும் சமையற்கூடத்திலிருந்து மேலதிக உணவுகளை எடுக்கும்; அதன் பிறகு தன்னார்வசெய்யும் “Robins” அவற்றை தெருக்களில், கட்டுப்படுத்தப்பட்ட இடங்களில் மற்றும் தேவைக்கும் இடங்களுக்கு பகிர்ந்து தருகிறார்கள் (Robin Hood Army என்பது தன்னார்வ அமைப்பு, உணவு மேலதிகத்தைக் கொண்டு பற்றாக்குறையுள்ளவர்களுக்கு வழங்குகிறது). நீங்கள் சேர்ந்தால் உங்கள் லோக்கல் அத்தியாயம் அவ்வாறு ஏற்பாடுகள் செய்வார் — அதைத் தொடங்க Join Us பக்கத்தில் விரிசல் செய்யலாம்.",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 2,
+       "confirmation": null,
+       "statusMs": 39.95933299997705,
+       "firstWordsMs": 5596.648707999993,
+       "ms": 7468.658374999999,
+       "grade": {
+        "verdict": "pass",
+        "reasons": [],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": false,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "rha-L3",
+     "kind": "fact",
+     "lang": "hinglish",
+     "mustPass": false,
+     "verdict": "PARTIAL",
+     "turns": [
+      {
+       "user": "paise donate kar sakte hain? 80G milega?",
+       "messageId": "ff017166-3216-498a-8db9-1a3869e9d11e",
+       "observed": {
+        "reply": "Nahin — Robin Hood Army ek volunteer-run, “zero-funds” organisation hai; hum paise nahin lete (No money involved). 80G ke baare mein humare paas koi jankari nahi hai; iske liye aap team se poochh sakte hain: info@robinhoodarmy.com.",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Join Us – Robin Hood Army",
+          "source_url": "https://robinhoodarmy.com/sites/main/join-us"
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "What we learned",
+          "source_url": ""
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Robin Hood Army – Zero Hunger, One Drive at a Time - Robin Hood Army",
+          "source_url": "https://robinhoodarmy.com/sites/main/about"
+         }
+        ],
+        "passage_document_ids": [
+         "a6c96efc-e5e1-4eaf-8373-2f012c8d75da",
+         "118f45fe-ea41-42d6-b7d7-efe40fc72a6a",
+         "d42aeed3-afc3-4f0a-910e-db2255de2cac",
+         "cc9aeed4-5788-46ef-95c5-9f006a89645a",
+         "641bd7f4-ebe1-4aeb-b97e-fd39e4da7249",
+         "1d63201e-f00e-40d1-a602-3452fc4bc880"
+        ],
+        "passage_chunk_ids": [
+         "f5e00522-fdab-434c-9ff8-289a991ba4aa",
+         "639eb670-1e14-440b-a466-ae3fa2dd4377",
+         "a2d05a0b-0faf-40a1-876b-f8e64671bbd8",
+         "0b9710a4-5c79-44ec-90ed-0f1ab1b29441",
+         "6bb3ccf1-8f07-4cea-b612-5f66ed6a4f86",
+         "72484efa-b2a3-4712-bf6a-0be14f3107e8",
+         "8b345459-223c-4c4d-8ed2-233ac6527427",
+         "f00c0a41-a5ad-4ed8-8bd9-9bdf1f6dcc28",
+         "68b8c53a-9f57-4881-9bbf-0ddc8e44b647",
+         "8950c9f5-0986-4704-8609-523d556b1a86",
+         "9988e026-7550-423d-807c-01deeac1de56",
+         "b94bc512-e785-4b4e-8c5b-21bd15da9b13",
+         "c513d97b-e3a0-4696-805c-045ed673c6d5",
+         "28832699-ce5a-454c-a136-fa29fac97e3a",
+         "3ee16e9f-8755-467b-8d71-fc214fc2e729",
+         "608bb37f-41f6-439c-9a00-4e8559555ce6"
+        ],
+        "history": []
+       },
+       "reply": "Nahin — Robin Hood Army ek volunteer-run, “zero-funds” organisation hai; hum paise nahin lete (No money involved). 80G ke baare mein humare paas koi jankari nahi hai; iske liye aap team se poochh sakte hain: info@robinhoodarmy.com.",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 3,
+       "confirmation": null,
+       "statusMs": 19.765042000013636,
+       "firstWordsMs": 11670.474959000014,
+       "ms": 13016.728375000006,
+       "grade": {
+        "verdict": "fail",
+        "reasons": [
+         "invented_facts",
+         "facts_missing",
+         "did_not_answer"
+        ],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [
+          "no 80G"
+         ],
+         "must_not_found": [],
+         "also_ok_matched": false,
+         "answers_question": false,
+         "invents_facts": true,
+         "declines_request": true,
+         "note": "The reply did not state that 80G is not available (as required) and added an unverified email address.",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

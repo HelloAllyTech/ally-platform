@@ -1,0 +1,92 @@
+diff --git a/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx b/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx
+index 8c9e1a2b7d..5ab69a1cfc 100644
+--- a/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx
++++ b/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx
+@@ -171,11 +171,13 @@ const CommentCard = ({
+ 
+   const handleReplyClick = (e: React.MouseEvent) => {
+     e.stopPropagation();
++    if (comment?.hidden) return;
+     setShowReplyInput(prev => !prev);
+   };
+ 
+   const onReplyClick = async (e: React.MouseEvent) => {
+     e.stopPropagation();
++    if (comment?.hidden) return;
+     if (!showReplies && replyCount > 0 && replies.length === 0) {
+       try {
+         const data = await getReplies({
+diff --git a/apps/ally-helpline-dashboard/src/components/comment-thread/CommentThread.tsx b/apps/ally-helpline-dashboard/src/components/comment-thread/CommentThread.tsx
+index b1d274e14c..a7d54ed434 100644
+--- a/apps/ally-helpline-dashboard/src/components/comment-thread/CommentThread.tsx
++++ b/apps/ally-helpline-dashboard/src/components/comment-thread/CommentThread.tsx
+@@ -144,38 +144,35 @@ const CommentThread = ({
+   };
+ 
+   const handleToggleHide = (hidden: boolean, commentId: string) => {
+-    onCommentChange?.({
+-      comments: comments.map(comment =>
++    setComments?.(prev => {
++      const updatedComments = prev.map(comment =>
+         comment.id === commentId ? { ...comment, hidden } : comment,
+-      ),
+-      threadId: id,
++      );
++      onCommentChange?.({ comments: updatedComments, threadId: id });
++      return updatedComments;
+     });
+-    setComments?.(prev =>
+-      prev.map(comment => (comment.id === commentId ? { ...comment, hidden } : comment)),
+-    );
+   };
+ 
+   const onUpdateComment = (content: string, commentId: string) => {
+-    onCommentChange?.({
+-      comments: comments.map(comment =>
++    setComments?.(prev => {
++      const updatedComments = prev.map(comment =>
+         comment.id === commentId ? { ...comment, content } : comment,
+-      ),
+-      threadId: id,
++      );
++      onCommentChange?.({ comments: updatedComments, threadId: id });
++      return updatedComments;
+     });
+-    setComments?.(prev =>
+-      prev.map(comment => (comment.id === commentId ? { ...comment, content } : comment)),
+-    );
+   };
+ 
+   const handleDeleteComment = (commentId: string) => {
+     const currentComment = comments.find(comment => comment.id === commentId);
+     const replyCount = currentComment?.replyCount ?? 0;
+-    onCommentChange?.({
+-      comments: comments.filter(comment => comment.id !== commentId),
+-      threadId: id,
++    const currentLength = (comments ?? []).length;
++    setComments?.(prev => {
++      const filteredComments = prev.filter(comment => comment.id !== commentId);
++      onCommentChange?.({ comments: filteredComments, threadId: id });
++      return filteredComments;
+     });
+-    setComments?.(prev => prev.filter(comment => comment.id !== commentId));
+-    onDeleteComment((comments ?? []).length - 1, replyCount + 1);
++    onDeleteComment(currentLength - 1, replyCount + 1);
+   };
+ 
+   const handleDeleteReply = () => {
+diff --git a/apps/ally-helpline-dashboard/src/components/comment-thread/__tests__/CommentThread.test.tsx b/apps/ally-helpline-dashboard/src/components/comment-thread/__tests__/CommentThread.test.tsx
+index eaac30b713..f6c07e005c 100644
+--- a/apps/ally-helpline-dashboard/src/components/comment-thread/__tests__/CommentThread.test.tsx
++++ b/apps/ally-helpline-dashboard/src/components/comment-thread/__tests__/CommentThread.test.tsx
+@@ -177,7 +177,9 @@ describe("CommentThread Component", () => {
+ 
+   const mockOnCommentAddition = vi.fn();
+   const mockOnDeleteComment = vi.fn();
+-  const mockSetComments = vi.fn();
++  const mockSetComments = vi.fn(fn => {
++    if (typeof fn === "function") fn(mockComments);
++  });
+   const mockOnCommentChange = vi.fn();
+   const mockSetThreadsOffset = vi.fn();
+   const mockOnAddComment = vi.fn();

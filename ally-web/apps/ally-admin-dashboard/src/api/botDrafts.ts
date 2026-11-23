@@ -327,6 +327,18 @@ export const botDraftsApi = baseAPI.injectEndpoints({
       query: id => ({ url: ApiEndpoints.BOT_DRAFTS.BACK(id), method: HttpMethod.POST }),
     }),
 
+    /** "This isn't right for my business" in setup (Q4 A3): less strict needs a reason. */
+    correctBotDraftPack: builder.mutation<
+      BotDraftView,
+      { id: string; pack: string; reason?: string }
+    >({
+      query: ({ id, ...body }) => ({
+        url: ApiEndpoints.BOT_DRAFTS.PACK(id),
+        method: HttpMethod.POST,
+        body,
+      }),
+    }),
+
     addBotDraftDocument: builder.mutation<BotDraftView, { id: string; documentId: string }>({
       query: ({ id, documentId }) => ({
         url: ApiEndpoints.BOT_DRAFTS.DOCUMENTS(id),
@@ -354,6 +366,8 @@ export const botDraftsApi = baseAPI.injectEndpoints({
         confirmMustPass?: boolean;
         /** Publish below the checkup's quality gate, having seen the score (Q3-fast Part 3). */
         publishAnyway?: boolean;
+        /** Ask the safety questions that failed once more (Q4 A0): "Check again". */
+        recheckSafety?: boolean;
       }
     >({
       query: ({ id, ...body }) => ({
@@ -491,6 +505,7 @@ export const {
   usePatchBotDraftMutation,
   useUndoBotDraftMutation,
   useBackBotDraftMutation,
+  useCorrectBotDraftPackMutation,
   useAddBotDraftDocumentMutation,
   useDescribeBotDraftMutation,
   usePublishBotDraftMutation,

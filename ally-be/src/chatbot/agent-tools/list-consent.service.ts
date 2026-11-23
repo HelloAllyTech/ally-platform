@@ -17,6 +17,9 @@ const TURN_TTL_S = 120;
  * Where the offers wait (chunk H1 Part B): one per conversation, the latest, in Redis for a day. A
  * Redis failure fails closed: no offer is accepted, so nothing is written without a yes.
  */
+/** How long Try it's test bookings hold their slots (Q4 B4). */
+export const PREVIEW_HOLD_TTL_S = 60 * 60;
+
 @Injectable()
 export class ListConsentService {
   private readonly logger = LoggerService.getInstance(ListConsentService.name);
@@ -210,6 +213,42 @@ export class ListConsentService {
       this.logger.warn(
         `Could not clear the offer: ${error instanceof Error ? error.message : 'unknown'}`,
       );
+    }
+  }
+
+  /**
+   * Try it's test bookings hold their entries for the rest of that test chat (Q4 B4): a slot a
+   * test booking took is left out of "which slots are free?" and can't be test-booked again.
+   * Nothing is saved; the holds live in Redis for an hour. A Redis failure holds nothing.
+   */
+  async hold(
+    chatbotId: string,
+    conversationId: string,
+    ids: string[],
+  ): Promise<void> {
+    if (!ids.length) return;
+    try {
+      const held = await this.held(chatbotId, conversationId);
+      const next = [...new Set([...held, ...ids])].slice(-200);
+      await this.redis.set(
+        `bot:preview-holds:${chatbotId}:${conversationId}`,
+        JSON.stringify(next),
+        PREVIEW_HOLD_TTL_S,
+      );
+    } catch {
+      // Test only: a hold that can't be kept just isn't.
+    }
+  }
+
+  async held(chatbotId: string, conversationId: string): Promise<string[]> {
+    try {
+      const raw = await this.redis.get(
+        `bot:preview-holds:${chatbotId}:${conversationId}`,
+      );
+      const parsed: unknown = raw ? JSON.parse(String(raw)) : [];
+      return Array.isArray(parsed) ? parsed.map(String) : [];
+    } catch {
+      return [];
     }
   }
 }

@@ -119,12 +119,29 @@ def scan_knip(repo: str, cfg: dict) -> list[dict]:
         data = json.loads(out.stdout)
     except json.JSONDecodeError:
         sys.exit(f"knip failed in {repo}:\n{out.stderr or out.stdout}")
+    return parse_knip(data, repo)
+
+
+# What a human could delete. knip also reports enum members, duplicate exports, unlisted and
+# unused dependencies, binaries and unresolved imports; those are noisy here (every repo has
+# its own dependency hygiene story) and not a "delete this" PR, so they are not reported.
+KNIP_BUCKETS = (("exports", "export"), ("types", "type"), ("classMembers", "method"))
+
+
+def parse_knip(data: dict, repo: str) -> list[dict]:
+    """Turn `knip --reporter json` output into findings.
+
+    The real shape (knip 6) is {"issues": [{"file": ..., "files": [{"name": ...}],
+    "exports": [{"name", "line", ...}], "types": [...], ...}]}: there is NO top-level
+    "files" key. A file knip says is unused arrives as an issue whose own `files` list
+    names itself.
+    """
     found = []
-    for f in data.get("files", []):
-        found.append(finding(repo, "file", f"{repo}/{f}", "(whole file)"))
     for issue in data.get("issues", []):
         path = f"{repo}/{issue['file']}"
-        for bucket, kind in (("exports", "export"), ("types", "type"), ("classMembers", "method")):
+        for item in issue.get("files", []):
+            found.append(finding(repo, "file", f"{repo}/{item['name']}", "(whole file)"))
+        for bucket, kind in KNIP_BUCKETS:
             for item in issue.get(bucket, []):
                 found.append(finding(repo, kind, path, item["name"], item.get("line")))
     return found
@@ -195,11 +212,19 @@ ITEM_MAX = 200
 GROUP_DEPTH = 4  # repo/app/core/<module>: deep enough to be one PR, shallow enough to be few
 
 
-def group_by_module(found: list[dict], depth: int = GROUP_DEPTH) -> list[dict]:
-    """One group per module directory: the unit that becomes one roadmap ticket."""
+def group_by_module(
+    found: list[dict], depth: int = GROUP_DEPTH, depths: dict[str, int] | None = None
+) -> list[dict]:
+    """One group per module directory: the unit that becomes one roadmap ticket.
+
+    `depths` overrides the depth per repo (`group_depth` in the config): a NestJS module is
+    ally-be/src/<module> (3 segments), a web feature folder is ally-web/apps/<app>/src/
+    <area>/<feature> (6), while the Python repos are fine at the default.
+    """
     groups: dict[str, dict] = {}
     for f in found:
-        key = "/".join(f["path"].split("/")[:-1][:depth]) or f["repo"]
+        d = (depths or {}).get(f["repo"], depth)
+        key = "/".join(f["path"].split("/")[:-1][:d]) or f["repo"]
         g = groups.setdefault(
             key, {"key": key, "repo": f["repo"], "count": 0, "kinds": Counter(), "items": []}
         )
@@ -215,12 +240,13 @@ def group_by_module(found: list[dict], depth: int = GROUP_DEPTH) -> list[dict]:
     return sorted(out, key=lambda g: (-g["count"], g["key"]))[:GROUPS_MAX]
 
 
-def publish(found: list[dict]) -> None:
+def publish(found: list[dict], config: dict | None = None) -> None:
     url = os.environ.get("ALLY_BE_API_URL", "").rstrip("/")
     key = os.environ.get("ALLY_BE_API_KEY", "")
     if not url or not key:
         sys.exit("--publish needs ALLY_BE_API_URL and ALLY_BE_API_KEY in the environment")
-    groups = group_by_module(found)
+    depths = {r: c["group_depth"] for r, c in (config or {})["repos"].items() if "group_depth" in c}
+    groups = group_by_module(found, depths=depths)
     req = urllib.request.Request(
         f"{url}/api/v1/pm-agent/signals/dead-code",
         data=json.dumps({"groups": groups}).encode(),
@@ -253,7 +279,7 @@ def main() -> int:
         return 0
 
     if args.publish:
-        publish(found)
+        publish(found, config)
         return 0
 
     text, new = report(found, set(load_json(BASELINE_PATH, [])), args.repo)

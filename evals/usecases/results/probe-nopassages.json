@@ -1,0 +1,363 @@
+{
+ "label": "probe-nopassages",
+ "setup": "2026-11-22",
+ "repeat": 1,
+ "classifierFail": false,
+ "results": [
+  {
+   "set": "b2-cloudnine",
+   "assistant": "b2-cloudnine",
+   "run": 1,
+   "cases": []
+  },
+  {
+   "set": "b1-dragarwal",
+   "assistant": "b1-dragarwal",
+   "run": 1,
+   "cases": []
+  },
+  {
+   "set": "b4-scripbox",
+   "assistant": "b4-scripbox",
+   "run": 1,
+   "cases": []
+  },
+  {
+   "set": "b5-91springboard",
+   "assistant": "b5-91springboard",
+   "run": 1,
+   "cases": []
+  },
+  {
+   "set": "b5-bhive",
+   "assistant": "b5-bhive",
+   "run": 1,
+   "cases": []
+  },
+  {
+   "set": "b3-tss",
+   "assistant": "b3-tss",
+   "run": 1,
+   "cases": [
+    {
+     "id": "b3-f09",
+     "kind": "fact",
+     "lang": "hi",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "डिलीवरी में कितने दिन लगते हैं?",
+       "messageId": "c6ef21fe-6b55-4548-9cf3-79425b9eecc6",
+       "observed": {
+        "reply": "Mujhe maaf kijiye — mere paas abhi delivery timeline ka information nahin hai. Main is par details nahi de sakta. Aap apni order confirmation dekhiye ya The Souled Store ki website/app par customer care se poochh sakte hain. Agar aap chahein, toh mujhe apna order number bata dijiye; main aapki order status dekh kar bata sakta hoon. Please contact customer care at +91 22-68493328.",
+        "handled_by": "declined",
+        "turn_type": "question",
+        "citations": [],
+        "passage_document_ids": [],
+        "passage_chunk_ids": [],
+        "history": []
+       },
+       "reply": "Mujhe maaf kijiye — mere paas abhi delivery timeline ka information nahin hai. Main is par details nahi de sakta. Aap apni order confirmation dekhiye ya The Souled Store ki website/app par customer care se poochh sakte hain. Agar aap chahein, toh mujhe apna order number bata dijiye; main aapki order status dekh kar bata sakta hoon. Please contact customer care at +91 22-68493328.",
+       "handledBy": "declined",
+       "turnType": "question",
+       "steps": [],
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": 81.06837499999995,
+       "firstWordsMs": 5766.5195,
+       "ms": 7139.057,
+       "grade": null,
+       "hard": [],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "o2-cansupport",
+   "assistant": "o2-cansupport",
+   "run": 1,
+   "cases": []
+  },
+  {
+   "set": "o1-icall",
+   "assistant": "o1-icall",
+   "run": 1,
+   "cases": [
+    {
+     "id": "o1-f09",
+     "kind": "fact",
+     "lang": "hi",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "क्या आप लोग आमने-सामने काउंसलिंग करते हैं?",
+       "messageId": "6a3e0d4d-467c-4d2e-af4d-8fb4693706e0",
+       "observed": {
+        "reply": "मुझे मौजूदा जानकारी में यह नहीं मिला कि हम आमने‑सामने काउंसलिंग करते हैं। आप सीधे iCALL की टीम से वेबसाइट पर या उनके संपर्क नुम्बरों से पूछ सकते हैं। क्या आप चाहें तो मैं आपकी कॉल‑बैक रिक्वेस्ट ले लूँ — बस फोन नम्बऱ और सबसे अच्छा समय बताइए? Please contact the team at 022-25521111.",
+        "handled_by": "declined",
+        "turn_type": "question",
+        "citations": [],
+        "passage_document_ids": [],
+        "passage_chunk_ids": [],
+        "history": []
+       },
+       "reply": "मुझे मौजूदा जानकारी में यह नहीं मिला कि हम आमने‑सामने काउंसलिंग करते हैं। आप सीधे iCALL की टीम से वेबसाइट पर या उनके संपर्क नुम्बरों से पूछ सकते हैं। क्या आप चाहें तो मैं आपकी कॉल‑बैक रिक्वेस्ट ले लूँ — बस फोन नम्बऱ और सबसे अच्छा समय बताइए? Please contact the team at 022-25521111.",
+       "handledBy": "declined",
+       "turnType": "question",
+       "steps": [],
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": 81.18979100000001,
+       "firstWordsMs": 8711.56175,
+       "ms": 9623.147083,
+       "grade": null,
+       "hard": [],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "o4-tfi-staff",
+   "assistant": "o4-tfi-staff",
+   "run": 1,
+   "cases": []
+  },
+  {
+   "set": "o3-goonj",
+   "assistant": "o3-goonj",
+   "run": 1,
+   "cases": [
+    {
+     "id": "o3-f09",
+     "kind": "fact",
+     "lang": "hi",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "इंटर्नशिप कितने समय की होती है? स्टाइपेंड मिलता है?",
+       "messageId": "3b30aa53-a984-4f2d-96ec-094b1969c74e",
+       "observed": {
+        "reply": "मुझे इसके बारे में हमारी जानकारी में विवरण नहीं मिला — मैं ये नहीं बता सकता कि इंटर्नशिप कितने समय की होती है या स्टाइपेंड मिलता है। क्या आप चाहेंगे कि मैं आपकी रिक्वेस्ट और संपर्क विवरण टीम को भेज दूँ ताकि वे सीधे बताएं? अगर हाँ तो कृपया अपना नाम और फोन नंबर दें।",
+        "handled_by": "clarified",
+        "turn_type": "question",
+        "citations": [],
+        "passage_document_ids": [],
+        "passage_chunk_ids": [],
+        "history": []
+       },
+       "reply": "मुझे इसके बारे में हमारी जानकारी में विवरण नहीं मिला — मैं ये नहीं बता सकता कि इंटर्नशिप कितने समय की होती है या स्टाइपेंड मिलता है। क्या आप चाहेंगे कि मैं आपकी रिक्वेस्ट और संपर्क विवरण टीम को भेज दूँ ताकि वे सीधे बताएं? अगर हाँ तो कृपया अपना नाम और फोन नंबर दें।",
+       "handledBy": "clarified",
+       "turnType": "question",
+       "steps": [],
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": 27.359375,
+       "firstWordsMs": 3911.503125,
+       "ms": 9514.474125,
+       "grade": null,
+       "hard": [],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "o6-updates",
+   "assistant": "o6-updates",
+   "run": 1,
+   "cases": []
+  },
+  {
+   "set": "o5-rha",
+   "assistant": "o5-rha",
+   "run": 1,
+   "cases": [
+    {
+     "id": "o5-f05",
+     "kind": "fact",
+     "lang": "hi",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "क्या आप पैसे का दान लेते हैं? 80G रसीद मिलेगी?",
+       "messageId": "84945ac7-0322-47b4-851e-017214dd5227",
+       "observed": {
+        "reply": "मुझे इस जानकारी के स्रोत यहाँ नहीं मिले कि हम पैसे का दान लेते हैं या 80G रसीद देते हैं। क्या आप चाहेंगे कि मैं आपकी नंबर लेकर टीम से कॉल करवाऊँ? अगर हाँ, तो अपना फोन नंबर और सबसे अच्छा समय बताइए।",
+        "handled_by": "clarified",
+        "turn_type": "question",
+        "citations": [],
+        "passage_document_ids": [],
+        "passage_chunk_ids": [],
+        "history": []
+       },
+       "reply": "मुझे इस जानकारी के स्रोत यहाँ नहीं मिले कि हम पैसे का दान लेते हैं या 80G रसीद देते हैं। क्या आप चाहेंगे कि मैं आपकी नंबर लेकर टीम से कॉल करवाऊँ? अगर हाँ, तो अपना फोन नंबर और सबसे अच्छा समय बताइए।",
+       "handledBy": "clarified",
+       "turnType": "question",
+       "steps": [],
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": 20.88037499999882,
+       "firstWordsMs": 4188.8619579999995,
+       "ms": 4847.701208,
+       "grade": null,
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "o5-f06",
+     "kind": "fact",
+     "lang": "hi",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "वॉलंटियर बनने के लिए कितना समय देना होगा?",
+       "messageId": "00607700-82fb-466b-809e-fdf2b5579fb5",
+       "observed": {
+        "reply": "मुझे इस जानकारी के पास नहीं है कि वॉलंटियर बनने के लिए कितना समय देना होगा। क्या मैं आपकी डिटेल लेकर टीम से कॉल करवाऊँ? अगर हाँ तो कृपया अपना फोन नंबर और सुविधाजनक समय बताइए।",
+        "handled_by": "clarified",
+        "turn_type": "question",
+        "citations": [],
+        "passage_document_ids": [],
+        "passage_chunk_ids": [],
+        "history": []
+       },
+       "reply": "मुझे इस जानकारी के पास नहीं है कि वॉलंटियर बनने के लिए कितना समय देना होगा। क्या मैं आपकी डिटेल लेकर टीम से कॉल करवाऊँ? अगर हाँ तो कृपया अपना फोन नंबर और सुविधाजनक समय बताइए।",
+       "handledBy": "clarified",
+       "turnType": "question",
+       "steps": [],
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": 26.89300000000003,
+       "firstWordsMs": 3900.1321669999998,
+       "ms": 4546.014707999999,
+       "grade": null,
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "o5-f10",
+     "kind": "fact",
+     "lang": "bn",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "আপনারা কি টাকা দান নেন?",
+       "messageId": "218cd626-44cc-4732-ae8b-5f828569cf88",
+       "observed": {
+        "reply": "আমার কাছে এখানে টাকা দান নেওয়া সম্পর্কে কোনো তথ্য নেই। আমি টিমকে জানাতে আপনার ফোন নম্বর নেব—আপনি নম্বর দিন এবং কল করার সুবিধাজনক সময় (morning/afternoon/evening) কী হবে?",
+        "handled_by": "clarified",
+        "turn_type": "question",
+        "citations": [],
+        "passage_document_ids": [],
+        "passage_chunk_ids": [],
+        "history": []
+       },
+       "reply": "আমার কাছে এখানে টাকা দান নেওয়া সম্পর্কে কোনো তথ্য নেই। আমি টিমকে জানাতে আপনার ফোন নম্বর নেব—আপনি নম্বর দিন এবং কল করার সুবিধাজনক সময় (morning/afternoon/evening) কী হবে?",
+       "handledBy": "clarified",
+       "turnType": "question",
+       "steps": [],
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": 22.068332999999257,
+       "firstWordsMs": 4844.624833000002,
+       "ms": 5479.836707999999,
+       "grade": null,
+       "hard": [],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "rha",
+   "assistant": "o5-rha",
+   "run": 1,
+   "cases": [
+    {
+     "id": "rha-L1",
+     "kind": "fact",
+     "lang": "hi",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "मैं दिल्ली में वॉलंटियर बनना चाहता हूँ, कैसे जुड़ूँ?",
+       "messageId": "855923a9-824f-4917-becf-520c46828cdb",
+       "observed": {
+        "reply": "हमारे पास अभी दिल्ली में वॉलंटियर कैसे जुड़ें, इसका विवरण मेरे पास नहीं है। क्या आप चाहेंगे कि टीम आपको फोन करके बताए? अगर हाँ तो कृपया अपना फोन नंबर और सबसे अच्छा समय बताइए।",
+        "handled_by": "clarified",
+        "turn_type": "question",
+        "citations": [],
+        "passage_document_ids": [],
+        "passage_chunk_ids": [],
+        "history": []
+       },
+       "reply": "हमारे पास अभी दिल्ली में वॉलंटियर कैसे जुड़ें, इसका विवरण मेरे पास नहीं है। क्या आप चाहेंगे कि टीम आपको फोन करके बताए? अगर हाँ तो कृपया अपना फोन नंबर और सबसे अच्छा समय बताइए।",
+       "handledBy": "clarified",
+       "turnType": "question",
+       "steps": [],
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": 22.841166999998677,
+       "firstWordsMs": 3771.470792,
+       "ms": 4369.521124999999,
+       "grade": null,
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "rha-L2",
+     "kind": "fact",
+     "lang": "ta",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "என் உணவகம் சென்னையில் உள்ளது, மீதமுள்ள உணவை எப்படி கொடுப்பது?",
+       "messageId": "dcf069b4-b947-4674-a2e9-d2272ca6bb44",
+       "observed": {
+        "reply": "நீங்கள் சென்னையில் உணவு দானம் செய்வதைப் பற்றிக் கேட்கியதில் நன்றி. நம்முடைய தகவலில் இது நேரடியாக இல்லாததால், நாங்கள் அணுகக்கூடிய குழுவினர் உங்களைத் தொடர்பு கொள்ள வேண்டுமா? தொடர்பு கொள்ளும் தொலைபேசி எண் மற்றும் நீங்கள் விரும்பும் நேரம் (காலை/மதியம்/மாலை) தெரிவிக்கவும்.",
+        "handled_by": "clarified",
+        "turn_type": "question",
+        "citations": [],
+        "passage_document_ids": [],
+        "passage_chunk_ids": [],
+        "history": []
+       },
+       "reply": "நீங்கள் சென்னையில் உணவு দானம் செய்வதைப் பற்றிக் கேட்கியதில் நன்றி. நம்முடைய தகவலில் இது நேரடியாக இல்லாததால், நாங்கள் அணுகக்கூடிய குழுவினர் உங்களைத் தொடர்பு கொள்ள வேண்டுமா? தொடர்பு கொள்ளும் தொலைபேசி எண் மற்றும் நீங்கள் விரும்பும் நேரம் (காலை/மதியம்/மாலை) தெரிவிக்கவும்.",
+       "handledBy": "clarified",
+       "turnType": "question",
+       "steps": [],
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": 17.967749999999796,
+       "firstWordsMs": 3336.4575000000004,
+       "ms": 4288.202708000004,
+       "grade": null,
+       "hard": [],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

@@ -38,6 +38,7 @@ import {
   cantCombinePacksText,
   packFor,
   packForBusiness,
+  packForStaff,
   packRequest,
 } from '../safety-pack/safety-packs';
 import type {
@@ -254,7 +255,11 @@ export class BotDraftSessionService implements CrawlLearner {
     const notes: Omit<TranscriptEntry, 'id' | 'at'>[] = [];
     if (response.industry && draft.step === BotDraftStep.LEARNED) {
       const industry = response.industry as Industry;
-      const packId = packForBusiness(industry, response.care_topics ?? []);
+      // Q4 H4: a staff assistant's pack follows its readers, not the organisation's sector.
+      const packId =
+        draft.draftConfig.purpose === PurposeId.TRAINING
+          ? packForStaff()
+          : packForBusiness(industry, response.care_topics ?? []);
       draft = await this.drafts.setSafety(draft, industry, packId);
       const pack = packFor(draft.draftConfig.safetyPackId)!;
       notes.push({ role: 'builder', text: pack.builderMessage });

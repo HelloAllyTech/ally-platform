@@ -1,0 +1,84 @@
+diff --git a/src/database/migrations/1979510000000-ScrubImpersonationAuditPasswordHashes.ts b/src/database/migrations/1979510000000-ScrubImpersonationAuditPasswordHashes.ts
+new file mode 100644
+index 0000000000..916df88c2e
+--- /dev/null
++++ b/src/database/migrations/1979510000000-ScrubImpersonationAuditPasswordHashes.ts
+@@ -0,0 +1,34 @@
++import { MigrationInterface, QueryRunner } from 'typeorm';
++
++/**
++ * Removes the impersonated user's password hash from past
++ * SUPER_ADMIN_IMPERSONATE audit rows.
++ *
++ * Until ally-be#673, AuthService.impersonate selected the `password` column
++ * and logged the whole user object as `details.userDetails`, so every
++ * impersonation recorded that user's hash. The code no longer does; this
++ * clears the rows already in `audit_logs`. Everything else on the row — who
++ * was impersonated, when, from where — is the audit trail and stays.
++ *
++ * Copies already shipped to the CloudWatch audit log group cannot be edited
++ * from here; they age out with that group's retention.
++ *
++ * Irreversible by design: `down` cannot restore a hash and must not try.
++ */
++export class ScrubImpersonationAuditPasswordHashes1979510000000 implements MigrationInterface {
++  name = 'ScrubImpersonationAuditPasswordHashes1979510000000';
++
++  public async up(queryRunner: QueryRunner): Promise<void> {
++    await queryRunner.query(`
++      UPDATE "audit_logs"
++      SET "details" = "details" #- '{userDetails,password}'
++      WHERE "eventType" = 'SUPER_ADMIN_IMPERSONATE'
++        AND jsonb_typeof("details" -> 'userDetails') = 'object'
++        AND ("details" -> 'userDetails') ? 'password'
++    `);
++  }
++
++  public async down(): Promise<void> {
++    // Nothing to restore — see the class comment.
++  }
++}
+diff --git a/src/database/migrations/scrub-impersonation-audit-password-hashes.spec.ts b/src/database/migrations/scrub-impersonation-audit-password-hashes.spec.ts
+new file mode 100644
+index 0000000000..03f44b2683
+--- /dev/null
++++ b/src/database/migrations/scrub-impersonation-audit-password-hashes.spec.ts
+@@ -0,0 +1,38 @@
++import { QueryRunner } from 'typeorm';
++import { ScrubImpersonationAuditPasswordHashes1979510000000 } from './1979510000000-ScrubImpersonationAuditPasswordHashes';
++
++const run = async (direction: 'up' | 'down') => {
++  const queries: string[] = [];
++  const queryRunner = {
++    query: jest.fn(async (sql: string) => {
++      queries.push(sql);
++      return [];
++    }),
++  } as unknown as QueryRunner;
++  await new ScrubImpersonationAuditPasswordHashes1979510000000()[direction](
++    queryRunner,
++  );
++  return queries;
++};
++
++describe('ScrubImpersonationAuditPasswordHashes', () => {
++  it('removes only the password key, and only from impersonation rows', async () => {
++    const [scrub] = await run('up');
++
++    expect(scrub).toContain(`"details" #- '{userDetails,password}'`);
++    expect(scrub).toContain(`"eventType" = 'SUPER_ADMIN_IMPERSONATE'`);
++    expect(scrub).not.toMatch(/DELETE/i);
++  });
++
++  it('skips rows whose userDetails is not an object', async () => {
++    const [scrub] = await run('up');
++
++    expect(scrub).toContain(
++      `jsonb_typeof("details" -> 'userDetails') = 'object'`,
++    );
++  });
++
++  it('does nothing on the way down — a removed hash cannot be restored', async () => {
++    expect(await run('down')).toEqual([]);
++  });
++});

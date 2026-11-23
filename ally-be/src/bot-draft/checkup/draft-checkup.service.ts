@@ -340,6 +340,7 @@ export class DraftCheckupService {
   async assertCanPublish(
     draft: BotDraftEntity,
     publishAnyway = false,
+    recheckAgain = false,
   ): Promise<void> {
     const latest = await this.checkup.latestFor(draft.chatbotId!, draft.id);
     if (!latest || latest.run.status !== 'done') {
@@ -359,24 +360,69 @@ export class DraftCheckupService {
       (r) => r.safety && r.verdict !== 'pass',
     );
     if (!failedSafety.length) return this.assertQuality(latest, publishAnyway);
-    const again = await this.checkup.askNow(
-      draft.chatbotId!,
-      failedSafety.map((r) => r.caseId),
-      draft.id,
-    );
-    if (again.every((r) => r.verdict === 'pass'))
+
+    // Q4 A0: a safety question that failed is asked again in the background (it used to be
+    // asked inside this request, 35–60 s, and a second fail held publishing for good with
+    // "try again in a few minutes"). The page polls the recheck's run; publishing again
+    // after it passes goes on to the 70% gate, read from the full checkup as before.
+    const chatbotId = draft.chatbotId!;
+    const caseIds = [...new Set(failedSafety.map((r) => r.caseId))];
+    const questions = caseIds.map((caseId) => {
+      const r = failedSafety.find((x) => x.caseId === caseId)!;
+      return { caseId, question: r.question };
+    });
+    const since = new Date(latest.run.finishedAt ?? latest.run.startedAt);
+    let recheck = await this.checkup.latestRecheck(chatbotId, draft.id, since);
+    if (!recheck || (recheckAgain && recheck.run.status !== 'running')) {
+      const run = await this.checkup.startRecheck(chatbotId, caseIds, draft.id);
+      throw recheckRunning(run.id, 0, run.total, questions);
+    }
+    if (recheck.run.status === 'running') {
+      throw recheckRunning(
+        recheck.run.id,
+        recheck.run.done,
+        recheck.run.total,
+        questions,
+      );
+    }
+    const stillFailing = caseIds
+      .map(
+        (caseId) =>
+          recheck!.results.find((r) => r.caseId === caseId) ?? {
+            caseId,
+            question: questions.find((q) => q.caseId === caseId)!.question,
+            verdict: 'fail' as const,
+            reply: '',
+            reasons: ['not_asked'],
+          },
+      )
+      .filter((r) => r.verdict !== 'pass');
+    if (recheck.run.status === 'done' && !stillFailing.length) {
       return this.assertQuality(latest, publishAnyway);
+    }
+    recheck = recheck!;
     this.events.emit('exception', {
       statusCode: 409,
       timestamp: new Date().toISOString(),
       path: `/api/v1/bot-drafts/${draft.id}/publish`,
-      message: `Checkup safety question failed twice for chatbot ${draft.chatbotId}: publishing is held. Look at the run's results.`,
+      message: `Checkup safety question failed twice for chatbot ${chatbotId}: publishing is held until it passes. Look at the run's results.`,
       type: 'CHECKUP SAFETY',
     });
     throw new ConflictException({
-      errorCode: 'safety_recheck',
+      errorCode: 'safety_failed',
       message:
-        "We're double-checking a safety answer. Try again in a few minutes.",
+        recheck.run.status === 'done'
+          ? SAFETY_FAILED_MESSAGE
+          : SAFETY_UNFINISHED_MESSAGE,
+      details: {
+        recheckRunId: recheck.run.id,
+        questions: stillFailing.map((r) => ({
+          caseId: r.caseId,
+          question: r.question,
+          reply: r.reply,
+          reasons: r.reasons,
+        })),
+      },
     });
   }
 
@@ -421,6 +467,27 @@ export class DraftCheckupService {
     });
     await this.publisher.ownerNotes(saved, { ownerNotes });
   }
+}
+
+export const SAFETY_CHECKING_MESSAGE =
+  'Checking a safety answer again before you publish. This takes about a minute.';
+export const SAFETY_FAILED_MESSAGE =
+  "A safety question still doesn't pass, so this assistant can't be published yet. Look at its answer below, change what the assistant should say, then run the checkup again.";
+export const SAFETY_UNFINISHED_MESSAGE =
+  "We couldn't finish checking the safety answer. Check again, or run the checkup again.";
+
+/** Publishing's 409 while the safety recheck runs (Q4 A0): the page polls `recheckRunId`. */
+function recheckRunning(
+  recheckRunId: string,
+  done: number,
+  total: number,
+  questions: { caseId: string; question: string }[],
+): ConflictException {
+  return new ConflictException({
+    errorCode: 'safety_recheck',
+    message: SAFETY_CHECKING_MESSAGE,
+    details: { recheckRunId, status: 'checking', done, total, questions },
+  });
 }
 
 /** The contact in the owner's decline wording ("+91 20 0000 4400"), else "your team". */

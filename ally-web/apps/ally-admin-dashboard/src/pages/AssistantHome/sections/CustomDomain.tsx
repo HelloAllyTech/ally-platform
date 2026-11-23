@@ -81,9 +81,9 @@ const RecordStep: React.FC<{
             <dt>{label}</dt>
             <dd>
               <code>{value}</code>{" "}
-              <button type="button" className="ally-link" onClick={() => copy(value)}>
+              <Button variant={ButtonVariant.TERTIARY} onClick={() => copy(value)}>
                 {copied === value ? t.copied : t.copy}
-              </button>
+              </Button>
             </dd>
           </React.Fragment>
         ))}

@@ -4,6 +4,8 @@ import type { ListDefinitionView } from '../../lists/list-definitions.service';
 import {
   abilityFor,
   datedLists,
+  FIND_LIMIT_DAY,
+  FIND_LIMIT_DEFAULT,
   listDoneLine,
   listToolDefinitions,
   MAX_LIST_TOOLS,
@@ -282,12 +284,35 @@ describe('schemas', () => {
     expect(Object.keys(find.input_schema.properties)).not.toContain('notes');
   });
 
+  it('offers who a booking is for as for_person when the list has a Booked for detail (Q4 B13)', () => {
+    const withFor = {
+      ...appointments,
+      fields: [
+        ...appointments.fields,
+        field('booked_for', ListFieldType.TEXT, { agent_write: true }),
+      ],
+    };
+    const [, c, u] = listToolDefinitions(withFor, names, dated);
+    const keys = Object.keys(c.input_schema.properties);
+    expect(keys).toContain('for_person');
+    expect(keys).not.toContain('booked_for');
+    expect(c.input_schema.properties.for_person.description).toContain(
+      'someone else',
+    );
+    expect(Object.keys(u.input_schema.properties)).not.toContain('for_person');
+  });
+
   it('gives create the writable fields, never the person, and update an id', () => {
     expect(Object.keys(create.input_schema.properties)).toEqual([
       'slot',
       'service',
       'status',
+      // Q4 G6: the name the person gave, kept as theirs (never the person link itself).
+      'person_name',
     ]);
+    expect(create.input_schema.properties.person_name.description).toContain(
+      "The person's name",
+    );
     expect(create.input_schema.properties.slot.description).toContain(
       'the id of a slots entry from find_slots',
     );
@@ -713,5 +738,23 @@ describe('playbooks (Q3-fast Part 2b): what a list’s tools add', () => {
     expect(
       offeredListTools([slots], off, { knowsPerson: true }).definitions,
     ).toEqual([]);
+  });
+});
+
+describe('a find over a day (Q4 B7)', () => {
+  it('returns at least 8, so every free time up to 8 can be listed', () => {
+    const day = toListQuery(slots, {
+      starts_at_from: '2026-11-27T00:00:00Z',
+      starts_at_to: '2026-11-27T23:59:59Z',
+      limit: 5,
+    });
+    expect(day.limit).toBe(FIND_LIMIT_DAY);
+    expect(toListQuery(slots, { practitioner_contains: 'Rao' }).limit).toBe(
+      FIND_LIMIT_DEFAULT,
+    );
+    expect(
+      toListQuery(slots, { starts_at_from: '2026-11-27T00:00:00Z', limit: 10 })
+        .limit,
+    ).toBe(10);
   });
 });

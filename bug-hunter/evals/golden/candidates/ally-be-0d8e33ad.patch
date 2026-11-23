@@ -1,0 +1,72 @@
+diff --git a/src/learn/constants/scenario-mandatory-fields.constants.ts b/src/learn/constants/scenario-mandatory-fields.constants.ts
+index 126baceea9..bafce3d8c1 100644
+--- a/src/learn/constants/scenario-mandatory-fields.constants.ts
++++ b/src/learn/constants/scenario-mandatory-fields.constants.ts
+@@ -17,7 +17,6 @@ export const SCENARIO_MANDATORY_FIELDS: (keyof CreateScenarioDto)[] = [
+   'stateInstructions',
+   'behaviorInstructions',
+   'characterProfileText',
+-  'showScoreMeter',
+   'competencyId',
+ ];
+ 
+diff --git a/src/learn/repository/scenario.repository.ts b/src/learn/repository/scenario.repository.ts
+index 8db0030a2a..f9a4e2c348 100644
+--- a/src/learn/repository/scenario.repository.ts
++++ b/src/learn/repository/scenario.repository.ts
+@@ -15,6 +15,7 @@ import { TriggerWarnings } from '../entity/trigger-warnings.entity';
+ import { GetScenarioDto } from '../dto/get-scenario.dto';
+ import { ScenarioStatus, ScenarioSortBy } from '../type/scenario.type';
+ import { ScenarioTenants } from '../entity/scenario-tenants.entity';
++import { ScenarioBehaviorInstruction } from '../entity/scenario-behavior-instruction.entity';
+ import { GetScenarioResponse } from '../interface/session.interface';
+ 
+ @Injectable()
+@@ -139,6 +140,14 @@ export class ScenariosRepository extends Repository<Scenarios> {
+           .from(ScenarioSessions, 'scenarioSessions')
+           .where('scenarioSessions.scenarioId = scenario.id');
+       }, 'usage')
++      .addSelect((subQuery) => {
++        return subQuery
++          .select(
++            `COALESCE(json_agg(json_build_object('id', scenarioBehaviorInstruction.id, 'category', scenarioBehaviorInstruction.category, 'instructions', scenarioBehaviorInstruction.instructions)), '[]')`,
++          )
++          .from(ScenarioBehaviorInstruction, 'scenarioBehaviorInstruction')
++          .where('scenarioBehaviorInstruction.scenarioId = scenario.id');
++      }, 'behaviorInstructions')
+       .groupBy('scenario.id')
+       .addGroupBy('user.name');
+ 
+diff --git a/src/learn/repository/test/scenario-repository.spec.ts b/src/learn/repository/test/scenario-repository.spec.ts
+index 2b79a0c50e..0d0eea9323 100644
+--- a/src/learn/repository/test/scenario-repository.spec.ts
++++ b/src/learn/repository/test/scenario-repository.spec.ts
+@@ -227,7 +227,7 @@ describe('ScenariosRepository', () => {
+         'scenario',
+         'user.name',
+       ]);
+-      expect(mockQueryBuilder.addSelect).toHaveBeenCalledTimes(2); // usage + triggerWarnings
++      expect(mockQueryBuilder.addSelect).toHaveBeenCalledTimes(3);
+       expect(mockQueryBuilder.groupBy).toHaveBeenCalledWith('scenario.id');
+     });
+ 
+diff --git a/src/learn/service/scenario.service.ts b/src/learn/service/scenario.service.ts
+index fbd97d8b8e..17da71e177 100644
+--- a/src/learn/service/scenario.service.ts
++++ b/src/learn/service/scenario.service.ts
+@@ -201,7 +201,15 @@ export class ScenarioService {
+     const ACTIVE_SCENARIO_MANDATORY_FIELDS = getActiveScenarioMandatoryFields(
+       this.configService.featureFlag.stateBasedScenarioInstructions,
+     );
++
+     const missingFields = ACTIVE_SCENARIO_MANDATORY_FIELDS.filter((field) => {
++      if (field === 'behaviorInstructions') {
++        const instructions = item.behaviorInstructions;
++        return (
++          !instructions ||
++          (Array.isArray(instructions) && instructions.length === 0)
++        );
++      }
+       let value = undefined;
+ 
+       if (metadata.hasOwnProperty(field)) {

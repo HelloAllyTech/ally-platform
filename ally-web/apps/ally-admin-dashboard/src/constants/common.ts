@@ -715,7 +715,6 @@ export const ApiEndpoints = {
     XP_PER_MINUTE: "/v1/analytics/xp-per-minute",
     CODING_AGENT_COST: "/v1/analytics/coding-agent-cost",
     FIX_SESSION_ENGINE_COST: "/v1/analytics/fix-session-engine-cost",
-    BUG_AGENT_PERFORMANCE: "/v1/analytics/bug-agent-performance",
     QUALITY_SENTIMENT: "/v1/analytics/quality-sentiment",
     RAG_QUALITY: "/v1/analytics/rag-quality",
     CHART_PREFERENCES: "/v1/analytics/chart-preferences",
@@ -867,41 +866,18 @@ export const ApiEndpoints = {
     HISTORY: "/v1/pm-agent/history",
     HEALTH: "/v1/pm-agent/health",
   },
-  BUG_HUNTER: {
-    SETTINGS: "/v1/bug-hunter/settings",
-    MODEL_SETTINGS: "/v1/bug-hunter/settings/models",
-    RUNS: "/v1/bug-hunter/runs",
-    RUNS_TRIGGER: "/v1/bug-hunter/runs/trigger",
-    RUN_BY_ID: (id: string) => `/v1/bug-hunter/runs/${id}`,
-    RUN_STREAM: (id: string) => `/v1/bug-hunter/runs/${id}/stream`,
-    FINDINGS: "/v1/bug-hunter/findings",
-    FINDING_BY_ID: (id: string) => `/v1/bug-hunter/findings/${id}`,
-    FINDING_APPROVE: (id: string) => `/v1/bug-hunter/findings/${id}/approve`,
-    FINDING_REJECT: (id: string) => `/v1/bug-hunter/findings/${id}/reject`,
-    FINDING_ANSWER: (id: string) => `/v1/bug-hunter/findings/${id}/answer`,
-    FINDING_DESCRIPTION: (id: string) => `/v1/bug-hunter/findings/${id}/description`,
-    FINDING_STAGE: (id: string) => `/v1/bug-hunter/findings/${id}/stage`,
-    FINDING_BY_REPORTED_BUG: (opportunityId: string) =>
-      `/v1/bug-hunter/findings/by-reported-bug/${opportunityId}`,
-    FINDING_FIX_SESSION: (id: string) => `/v1/bug-hunter/findings/${id}/fix-session`,
-    FINDING_CANCEL_FIX_SESSION: (id: string) => `/v1/bug-hunter/findings/${id}/cancel-fix-session`,
-    FINDING_MERGE: (id: string) => `/v1/bug-hunter/findings/${id}/merge`,
-    FINDING_RELEASE: (id: string) => `/v1/bug-hunter/findings/${id}/release`,
-    TODAY: "/v1/bug-hunter/today",
-    METRICS_WRONG_FIXES: "/v1/bug-hunter/metrics/wrong-fixes",
-    METRICS_OPERATIONS: "/v1/bug-hunter/metrics/operations",
-    NOTIFICATIONS: "/v1/bug-hunter/notifications",
-    NOTIFICATION_READ: (id: string) => `/v1/bug-hunter/notifications/${id}/read`,
-    NOTIFICATIONS_READ_ALL: "/v1/bug-hunter/notifications/read-all",
-    FEATURE_MAPS: "/v1/bug-hunter/feature-maps",
-    FEATURE_MAPS_REFRESH: "/v1/bug-hunter/feature-maps/refresh",
-    FEATURE_MAP_REMOVE: (id: string) => `/v1/bug-hunter/feature-maps/${id}/remove`,
-    // The decision log, scoreboard and replay (OPP-0776, OPP-0783).
-    FINDING_DECISIONS: (id: string) => `/v1/bug-hunter/findings/${id}/decisions`,
-    RUN_DECISIONS: (id: string) => `/v1/bug-hunter/runs/${id}/decisions`,
-    SCOREBOARD: "/v1/bug-hunter/scoreboard",
-    DECISION_REPLAY: "/v1/bug-hunter/decisions/replay",
-    DECISION_OWNERS: "/v1/bug-hunter/decisions/owners",
+  // Bug Hunter v2 (bug-hunter/ at the repo root): suggested fixes, escalations and the
+  // two-part verdict that teaches it. Separate from the old Bug Hunter's endpoints.
+  BUG_HUNTER_V2: {
+    REPORTS: "/v1/bug-hunter-approvals/reports",
+    REPORT: (id: number) => `/v1/bug-hunter-approvals/reports/${id}`,
+    VERDICT: (id: number) => `/v1/bug-hunter-approvals/reports/${id}/verdict`,
+    // the old Bug Hunter's API shape over v2's queue (the exact-match page)
+    COMPAT_SETTINGS: "/v1/bug-hunter-approvals/compat/settings",
+    COMPAT_FINDINGS: "/v1/bug-hunter-approvals/compat/findings",
+    COMPAT_FINDING: (id: string) => `/v1/bug-hunter-approvals/compat/findings/${id}`,
+    COMPAT_FINDING_ACTION: (id: string, action: string) =>
+      `/v1/bug-hunter-approvals/compat/findings/${id}/${action}`,
   },
   // Context Library — ally-be src/context-library, docs/context-library/PLAN.md.
   CONTEXT_LIBRARY: {
@@ -1273,6 +1249,8 @@ export const ApiEndpoints = {
     MESSAGES_STREAM: (id: string) => `/v1/bot-drafts/${id}/messages/stream`,
     UNDO: (id: string) => `/v1/bot-drafts/${id}/undo`,
     BACK: (id: string) => `/v1/bot-drafts/${id}/back`,
+    /** "This isn't right for my business" in setup (Q4 A3). */
+    PACK: (id: string) => `/v1/bot-drafts/${id}/pack`,
     DOCUMENTS: (id: string) => `/v1/bot-drafts/${id}/documents`,
     DESCRIPTION: (id: string) => `/v1/bot-drafts/${id}/description`,
     PUBLISH: (id: string) => `/v1/bot-drafts/${id}/publish`,
@@ -1554,6 +1532,8 @@ export const ROUTES = {
   ROADMAP_IDEA: (code: string) => `/roadmap/i/${code}`,
   BUG_HUNTER: "/bug-hunter",
   PM_AGENT: "/pm-agent",
+  BUG_HUNTER_V2: "/bug-hunter-v2",
+  BUG_HUNTER_V2_REPORT: (id: string | number) => `/bug-hunter-v2/${id}`,
   BUILDER: "/builder",
   BUILDER_SESSION: (id: string) => `/builder/${id}`,
   BUILDER_SETTINGS: "/builder/settings",
@@ -1764,7 +1744,6 @@ export const TAG_TYPES = {
   // Product Roadmap. NOTE: every one of these must ALSO be listed in baseApi.ts's
   // `tagTypes` array — an unregistered tag makes invalidatesTags a silent no-op.
   PRODUCT_ROADMAP_OPPORTUNITIES: "productRoadmapOpportunities",
-  PRODUCT_PLANS: "productPlans",
   PRODUCT_ROADMAP_VOTE_BUDGET: "productRoadmapVoteBudget",
   PRODUCT_ROADMAP_BREADTH: "productRoadmapBreadth",
   PRODUCT_ROADMAP_FACETS: "productRoadmapFacets",
@@ -1798,6 +1777,7 @@ export const TAG_TYPES = {
   ANALYTICS_AGENT_AUDITS: "analyticsAgentAudits",
   ANALYTICS_AGENT_AUTOMATION: "analyticsAgentAutomation",
   ANALYTICS_CHART_PREFERENCES: "analyticsChartPreferences",
+  BUG_HUNTER_V2_REPORTS: "bugHunterV2Reports",
   BUG_HUNTER_SETTINGS: "bugHunterSettings",
   // Also registered in baseApi.ts's `tagTypes` — an unregistered tag is
   // silently ignored and its invalidation never fires.

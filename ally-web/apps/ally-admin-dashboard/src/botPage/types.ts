@@ -151,7 +151,21 @@ export interface PublicConfirmation {
   list: string;
   title: string;
   details: { label: string; value: string }[];
+  /** What happened, by what the list is for (Q4 G5). Older servers don't send it. */
+  headline?: CardHeadline;
 }
+
+export type CardHeadline =
+  | "booked"
+  | "registered"
+  | "callback"
+  | "application"
+  | "order"
+  | "request"
+  | "sent"
+  | "saved"
+  | "changed"
+  | "cancelled";
 
 /** What the visitor stream carries (chunk 11a). */
 export type VisitorEvent =

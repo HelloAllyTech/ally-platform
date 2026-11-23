@@ -1151,3 +1151,127 @@ def test_can_pass_on_needs_hand_over_or_a_list_that_takes_details():
         }
     )
     assert can_pass_on({"gateway_tools": ["hand_over"]})
+
+
+class TestChannelTalk:
+    """Q4 G2 (Round 7 R4): talk of WhatsApp's rules or its own, off WhatsApp."""
+
+    def test_whatsapp_rules_are_removed_on_the_web(self):
+        result = check(
+            answer=(
+                "Anyone can join for free. "
+                "(On WhatsApp I won't ask for your phone number.)"
+            ),
+            citations=[1],
+            channel="web",
+        )
+        assert result["answer"] == "Anyone can join for free."
+
+    def test_hinglish_too(self):
+        result = check(
+            answer=(
+                "Aap volunteer kar sakte hain. "
+                "WhatsApp par humare paas aapka number hai."
+            ),
+            citations=[1],
+            channel="web",
+        )
+        assert "WhatsApp" not in result["answer"]
+
+    def test_whatsapp_talk_stays_on_whatsapp(self):
+        text = "Anyone can join for free. On WhatsApp we can send you reminders."
+        result = check(answer=text, citations=[1], channel="whatsapp")
+        assert "On WhatsApp" in result["answer"]
+
+    def test_its_own_instructions_are_never_mentioned(self):
+        result = check(
+            answer="Anyone can join for free. I'm instructed to keep replies short.",
+            citations=[1],
+            channel="whatsapp",
+        )
+        assert result["answer"] == "Anyone can join for free."
+
+
+class TestCrisisNumbers:
+    """Q4 G7 (Round 7 #6): never "I don't have crisis numbers"."""
+
+    def test_the_sentence_becomes_the_national_numbers(self):
+        result = check(
+            intent="decline",
+            answer=(
+                "I'm so sorry you feel this way. "
+                "I don't have our crisis contact numbers here."
+            ),
+        )
+        assert "don't have" not in result["answer"]
+        assert "14416" in result["answer"] and "112" in result["answer"]
+        assert result["answer"].startswith("I'm so sorry you feel this way.")
+
+    def test_with_the_organisations_confirmed_line(self):
+        result = check(
+            intent="decline",
+            answer="I don't have any crisis numbers.",
+            crisis_line="+91 9999 666 555",
+            organisation=organisation_of({"persona": {"display_name": "Vandrevala"}}),
+        )
+        assert "+91 9999 666 555" in result["answer"]
+
+    def test_in_hindi(self):
+        result = check(
+            intent="decline",
+            answer="मुझे दुख है। I don't have crisis numbers right now.",
+        )
+        assert "14416" in result["answer"] and "Tele-MANAS" in result["answer"]
+        assert "कॉल" in result["answer"]
+
+    def test_other_replies_are_untouched(self):
+        text = "Our helpline is open 9 to 6."
+        assert check(answer=text, citations=[1])["answer"] == text
+
+
+def test_crisis_numbers_in_hinglish():
+    """Q4 B2: a Hinglish reply gets the Hinglish line."""
+    result = check(
+        intent="decline",
+        answer="Mujhe afsos hai aap pareshan hain. Crisis numbers nahi hain mere paas.",
+    )
+    assert "Tele-MANAS ko 14416 par call karein" in result["answer"]
+
+
+def test_an_upset_message_never_gets_only_a_contact_line():
+    """Q4 H1 (Sukoon live): "Please contact the team at care@…" to an upset message
+    gets 14416 and 112; when not upset, it stays as written."""
+    contact = "I hear you. Please contact our team for help with that."
+    result = check(intent="decline", answer=contact, upset=True)
+    assert result["answer"].startswith(contact)
+    assert "14416" in result["answer"] and "112" in result["answer"]
+    assert check(intent="decline", answer=contact)["answer"] == contact
+
+
+def test_an_assistant_that_books_never_offers_to_pass_name_and_phone():
+    """Q4 H9 (the demo build): after a booking, "Would you like me to pass your name
+    and phone to the team?" is trimmed; the booking question and other replies stay."""
+    booked = "Your session is booked for Tue 24 Nov, 7 pm."
+    offer = " Would you like me to pass your name and phone number to the team?"
+    result = check(answer=booked + offer, citations=[1], books=True)
+    assert result["answer"] == booked
+    also = " Or I can have the team call you back."
+    assert check(answer=booked + also, citations=[1], books=True)["answer"] == booked
+    # Without a list it books into (a callback-only assistant), the offer is right.
+    assert check(answer=booked + offer, citations=[1])["answer"] == booked + offer
+    ask = "Shall I book Tue 24 Nov, 7 pm for Priya Test?"
+    assert check(answer=ask, citations=[1], books=True)["answer"] == ask
+
+
+def test_never_offers_a_lookup_it_cannot_do():
+    """Q4 H8 (Haq Seva): "Status of my pension application from March?" never gets
+    "tell me the name so I can look it up" without a list of the person's records;
+    the offer goes and the reply is sent back to say where they can check."""
+    said = "Pension applications are handled by the district social welfare office."
+    offer = " Tell me your name and application number so I can look it up."
+    result, rejection = review(answer=said + offer, citations=[1])
+    assert result["answer"] == said
+    assert rejection == "no_lookup"
+    # With a list of their own records (orders, applications), the offer stands.
+    kept, none = review(answer=said + offer, citations=[1], looks_up=True)
+    assert kept["answer"] == said + offer and none is None

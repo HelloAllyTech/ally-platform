@@ -481,12 +481,14 @@ describe('ChatbotEngineService', () => {
       expect(emergency.alert?.message).toContain('a medical emergency');
     });
 
-    it('runs the crisis check once, alongside, with the same prompts', async () => {
+    it('runs the crisis check alongside, with the same prompts', async () => {
       aiService.runAgent.mockRejectedValueOnce(
         upstream(404, ErrorCode.AI_REQUEST_REJECTED),
       );
       await engine.respond(whatsapp());
-      expect(aiService.checkWhatsAppCrisis).toHaveBeenCalledTimes(1);
+      // Once with its history and once on its own when there is history (Q4 H1).
+      const calls = aiService.checkWhatsAppCrisis.mock.calls;
+      expect(calls.length).toBe(calls[0][0].history?.length ? 2 : 1);
       expect(aiService.checkWhatsAppCrisis.mock.calls[0][0].prompts).toEqual(
         aiService.runAgent.mock.calls[0][0].prompts,
       );

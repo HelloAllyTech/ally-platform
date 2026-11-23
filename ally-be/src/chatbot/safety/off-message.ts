@@ -2,6 +2,7 @@ import {
   FIND_A_HELPLINE_URL,
   fixedCrisisInformation,
 } from '../engine/blocked-notice';
+import { crisisHelplines } from '../engine/crisis-helplines';
 import type { ReplyLanguage } from '../engine/reply-language';
 import { ChatbotStatus } from '../enum/chatbot.enum';
 import { safetySettingsOf } from './safety-settings';
@@ -38,10 +39,8 @@ export function offMessage(
   const settings = chatbot.settings ?? {};
   const own = safetySettingsOf(settings as never).archivedMessage;
   const lead = own || DEFAULT_OFF_MESSAGE[language] || DEFAULT_OFF_MESSAGE.en;
-  const numbers =
-    typeof settings.helplineNumbers === 'string'
-      ? settings.helplineNumbers
-      : null;
+  // Q4 G7: only numbers the owner confirmed.
+  const numbers = crisisHelplines(settings as never) || null;
   const help = fixedCrisisInformation(numbers, language);
   // Locked: the crisis information always follows, unless the owner's words already carry it whole.
   return lead.includes(FIND_A_HELPLINE_URL) && lead.includes(help)

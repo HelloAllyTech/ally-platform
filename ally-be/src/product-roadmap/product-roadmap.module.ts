@@ -5,8 +5,6 @@ import { AiModule } from 'src/ai/ai.module';
 import { PromptModule } from 'src/prompt/prompt.module';
 import { LlmUsageModule } from 'src/analytics/llm-usage.module';
 import { User } from 'src/user/entity/user.entity';
-import { BugFinding } from 'src/bug-hunter/entity/bug-finding.entity';
-import { BugHuntEvent } from 'src/bug-hunter/entity/bug-hunt-event.entity';
 
 import { RoadmapAllocation } from './entity/roadmap-allocation.entity';
 import { RoadmapVoteGrant } from './entity/roadmap-vote-grant.entity';
@@ -101,8 +99,6 @@ import { RoadmapGoalImpactService } from './service/roadmap-goal-impact.service'
 import { RoadmapVectorService } from './service/roadmap-vector.service';
 import { RoadmapBuilderSchedulerRegistrationService } from './service/roadmap-builder-scheduler-registration.service';
 import { RoadmapVoteGrantSchedulerRegistrationService } from './service/roadmap-vote-grant-scheduler-registration.service';
-import { BugHunterRepoClassifierService } from 'src/bug-hunter/service/bug-hunter-repo-classifier.service';
-import { BugHunterMissClassifierService } from 'src/bug-hunter/service/bug-hunter-miss-classifier.service';
 
 import { RoadmapAdminController } from './controller/roadmap-admin.controller';
 import { RoadmapCollaborationController } from './controller/roadmap-collaboration.controller';
@@ -142,6 +138,8 @@ import { RoadmapSweepController } from './review/roadmap-sweep.controller';
 import { RoadmapSweepService } from './review/roadmap-sweep.service';
 import { RoadmapMetricsController } from './metrics/roadmap-metrics.controller';
 import { RoadmapMetricsService } from './metrics/roadmap-metrics.service';
+import { BugHunterApprovalsModule } from 'src/bug-hunter-approvals/bug-hunter-approvals.module';
+import { RepoClassifierService } from 'src/bug-hunter-approvals/service/repo-classifier.service';
 
 /**
  * Product Roadmap — the internal vote-based prioritisation board, rebuilt from the standalone
@@ -190,19 +188,13 @@ import { RoadmapMetricsService } from './metrics/roadmap-metrics.service';
       // Read-only: resolving createdBy ints to an email/name for responses. createdBy has no
       // FK, so this is a join done in the mapper rather than by the ORM.
       User,
-      // Written (not just read) by RoadmapOpportunityService.create() when type=bug — see
-      // there. Just the entity, not BugHunterModule, to avoid the circular-import trap.
-      BugFinding,
-      // Written by BugHunterMissClassifierService (below) when it records why a
-      // reported bug was not found first — a runless timeline event on the finding.
-      BugHuntEvent,
       // The Vision & strategy page is one row here (ROADMAP_STRATEGY_CONTEXT_SETTING). The
-      // entity rather than SettingsModule, for the same reason as BugFinding above: one row
+      // entity rather than SettingsModule: one row
       // read and written by one service needs no module graph behind it.
       GlobalSettings,
       // Release tracking (ItemReleaseService): its own two tables, and Builder's pull requests
       // read (never written) to link an opportunity's Builder work. The entity rather than a
-      // Builder repository export, the same treatment BugFinding gets above.
+      // Builder repository export (just the entity, no module graph).
       ItemLinkedPr,
       ItemRelease,
       BuilderPullRequest,
@@ -225,7 +217,7 @@ import { RoadmapMetricsService } from './metrics/roadmap-metrics.service';
     /**
      * BuilderSessionService — "Open in Builder Agent" on an opportunity.
      *
-     * The whole module rather than the entity (the treatment BugFinding gets above) because
+     * The whole module rather than the entity because
      * creating a session is real logic: slug allocation, the default budget ceiling and the
      * tenant caps all live in that service, and a roadmap-side INSERT would silently skip them.
      * Safe to import: nothing in Builder's graph reaches back here — only PmAgentModule
@@ -241,6 +233,11 @@ import { RoadmapMetricsService } from './metrics/roadmap-metrics.service';
      * checks a stored image really is one of our own uploads.
      */
     AwsModule,
+    /**
+     * BugHunterBoardService — a filed bug also enters Bug Hunter v2's queue (chunk 10).
+     * Safe to import: that module imports only AuditModule, nothing that reaches back here.
+     */
+    BugHunterApprovalsModule,
   ],
   controllers: [
     // Roadmap v2 (plans/roadmap-builder-merge): 404 while roadmap_v2 is off.
@@ -266,6 +263,9 @@ import { RoadmapMetricsService } from './metrics/roadmap-metrics.service';
     RoadmapReleaseController,
   ],
   providers: [
+    // Bug Hunter's repo classifier (moved from the old Bug Hunter): picks the app of a
+    // filed bug that names none. Its prompt and LLM services are imported above.
+    RepoClassifierService,
     RoadmapItemLookupService,
     // Roadmap v2's read model and its inline edits (P2).
     RoadmapItemReadService,
@@ -357,15 +357,6 @@ import { RoadmapMetricsService } from './metrics/roadmap-metrics.service';
     ReleasePolicySchedulerRegistrationService,
     RoadmapV2EnabledGuard,
     // Classifies a reported bug's repo at intake (RoadmapOpportunityService.create).
-    // Provided directly rather than importing BugHunterModule: it constructs
-    // itself from AppConfigService (global), PromptSharedService and
-    // LlmUsageService — both already imported above — so no heavier module
-    // import is needed, same reasoning as BugFinding being registered as just
-    // the entity above rather than the whole module.
-    BugHunterRepoClassifierService,
-    // Writes the miss record on a reported bug a moment after intake (OPP-0774).
-    // Provided directly for the same reason as the repo classifier above.
-    BugHunterMissClassifierService,
     // realtime
     RoadmapGateway,
   ],

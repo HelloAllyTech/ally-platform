@@ -533,7 +533,7 @@ out which meaning is in play before you change anything.
 **Also called:** Product Roadmap, opportunities, votes (formerly "coins"), Prod Director star · **Not to be confused with:** the public roadmap page ([Public content](#public-content)); a [Builder](#builder) `plan` session.
 **Composed of:** Opportunities, each with one `OPP-` code from draft to release, product goals, vote grants, saved views and stars. `product-planning` adds the Idea ⊂ Builder ⊂ Owner roles, plan sessions, spend ceilings, checks and notifications. The lifecycle is Draft → To do → Building → Released, or Declined: anyone drafts privately and submits once the interview passes — every readiness check met, a quality score of at least 65 of 100, and a size of S, M or L; a bigger idea is split into slices that each become their own draft; only an Owner edits a submitted idea, closes the plan and assigns a builder (that move is what makes it Building); the plan interview is run by an Owner or by the idea's own author (Idea role), one holder at a time — the author is nudged after submitting, can hand it to the Owners before or part-way through (and then cannot retake it), and an Owner can take any free interview; the builder picks Builder agent or outside and marks it Released, which nothing does automatically; only an Owner declines. ally-ai `roadmap` embeds opportunities for duplicate detection. Fed by [PM Agent](#pm-agent) and [Report a bug](#report-a-bug); feeds [Builder](#builder).
 **Status:** Live — gate: `FeatureToggleKey.PRODUCT_ROADMAP` (defaultEnabled; view and vote) / `FeatureToggleKey.PRODUCT_ROADMAP_MANAGE`. the v2 `Roadmap` pages are Live behind `builder_settings.roadmapV2Enabled` (switched on 2026-11-17); the older `ProductRoadmap` page remains until it is removed; plan routes also check `builder_settings.planningEnabled`
-**Code:** `ally-be/src/product-roadmap/` · `ally-be/src/product-planning/` · `ally-ai/app/core/roadmap/` · `ally-web/apps/ally-admin-dashboard/src/pages/ProductRoadmap/` · `ally-web/apps/ally-admin-dashboard/src/pages/Roadmap/`
+**Code:** `ally-be/src/product-roadmap/` · `ally-be/src/product-planning/` · `ally-ai/app/core/roadmap/` · `ally-web/apps/ally-admin-dashboard/src/pages/Roadmap/`
 **Deep doc:** [Roadmap idea quality](https://github.com/HelloAllyTech/ally-platform/blob/master/ally-be/docs/roadmap-idea-quality.md)
 
 ### PM Agent
@@ -547,12 +547,12 @@ out which meaning is in play before you change anything.
 
 ### Bug Hunter
 <!-- concept: bug-hunter -->
-**Is:** An autonomous find-and-fix agent: it sweeps the code for bugs, records *findings*, opens fix sessions that produce PRs, verifies and releases them.
-**Also called:** bug findings, hunt runs, sweeps, fix sessions
-**Composed of:** `bug_findings` and `bug_hunt_runs` with a policy service, PR review, held-PR watch and protection-drift checks. GitHub workflows `bug-hunt-sweep.yml` (scheduled), `bug-fix-session.yml` and `bug-hunter-evals.yml`. User reports from [Report a bug](#report-a-bug) and breakage from [UX Signals](#ux-signals) land as findings. Ships through [Releases](#releases).
-**Status:** Dark — gate: `FeatureToggleKey.BUG_HUNTER` + `bug_hunter_settings.mode` (`off` by default; `manual` | `ai`)
-**Code:** `ally-be/src/bug-hunter/` · `ally-web/apps/ally-admin-dashboard/src/pages/BugHunter/` · `.github/workflows/bug-hunt-sweep.yml`
-**Deep doc:** [Bug Hunter tools](https://github.com/HelloAllyTech/ally-platform/blob/master/ally-be/docs/bug-hunter-tools.md) · [Memory ADR](https://github.com/HelloAllyTech/ally-platform/blob/master/ally-be/docs/bug-hunter-memory-adr.md)
+**Is:** A find-and-fix agent: it takes a bug, investigates it, reproduces it with a failing test, writes a fix, verifies and reviews it, and leaves a suggested fix or a draft PR. Merge and Release are always a person's click.
+**Also called:** Bug Hunter v2, bug reports, runs; the old engine's *findings* and *sweeps* (retired 2026-11-23)
+**Composed of:** A LangGraph agent in `bug-hunter/` with its own Postgres schema `bughunter` (the `bugs` queue, run reports, verdicts) and a worker that takes bugs by mode. Sources: new commits, CI failures, production error logs, [Report a bug](#report-a-bug) and [UX Signals](#ux-signals). ally-be's `bug-hunter-approvals` module serves the admin page and its actions; the old engine's `bug_findings` history stays in ally-be as read-only data. Eval harness: `bug-hunter-evals.yml`. Ships through [Releases](#releases).
+**Status:** Dark — gate: `FeatureToggleKey.BUG_HUNTER_V2_VERDICTS` + the `bughunter` settings mode (`off` | `manual` | `autonomous`). The old engine's `FeatureToggleKey.BUG_HUNTER` gates nothing now
+**Code:** `bug-hunter/` · `ally-be/src/bug-hunter-approvals/` · `ally-be/src/bug-hunter/` (old engine's entities, read-only) · `ally-web/apps/ally-admin-dashboard/src/pages/BugHunter/` · `ally-web/apps/ally-admin-dashboard/src/pages/BugHunterV2/` (run report page)
+**Deep doc:** [Bug Hunter v2 context](https://github.com/HelloAllyTech/ally-platform/blob/master/docs/bug-hunter/CONTEXT.md)
 
 ### Report a bug
 <!-- concept: report-a-bug -->

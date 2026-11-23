@@ -99,3 +99,18 @@ def test_a_stage_inside_a_run_names_the_run_and_its_stage(caplog):
     assert "[AGENT STAGE] run=run-1 stage=tool_start t_ms=" in caplog.text
     assert "tool=find_slots" in caplog.text
     assert clock["active"] == "tool:find_slots"
+
+
+def test_the_failing_crisis_check_is_off_by_default():
+    assert settings.AGENT_RUNTIME.DEBUG_CRISIS_FAIL is False
+    assert stages.debug_crisis_fail() is False
+
+
+@pytest.mark.parametrize(
+    "env, expected",
+    [("DEV", True), ("development", True), ("PROD", False), ("STG", False)],
+)
+def test_the_failing_crisis_check_needs_development(monkeypatch, env, expected):
+    monkeypatch.setattr(settings.AGENT_RUNTIME, "DEBUG_CRISIS_FAIL", True)
+    monkeypatch.setattr(settings.ENV, "ENV", env)
+    assert stages.debug_crisis_fail() is expected

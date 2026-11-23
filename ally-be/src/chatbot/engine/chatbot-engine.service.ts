@@ -68,8 +68,14 @@ import { businessFacts } from './business-facts';
 import { agentAnswersInstead, isGreetingReply } from './keyword-skip';
 import { buildKnowledgeRequest, NO_DOCUMENTS } from './knowledge-request';
 import { stageLine, stageRunIdFor } from './agent-stage-log';
-import { emergencyByKeywords } from './emergency-keywords';
+import {
+  atRiskByKeywords,
+  emergencyByKeywords,
+  lifeThreatening,
+  moreSevere,
+} from './emergency-keywords';
 import { caringDecline } from './caring-decline';
+import { crisisHelplines } from './crisis-helplines';
 import { replyLanguageOf } from './reply-language';
 import { helplineNumbersWithExtras } from '../quick-replies/quick-reply-copy.service';
 import {
@@ -119,6 +125,8 @@ export const AGENT_PROMPT_CODES = [
   // When the crisis check finds the person upset, not at risk (Q3-fast Part 1).
   'ally_ai_agent_upset',
   'ally_ai_agent_upset_support',
+  // The numbers it may give an upset person, on every pack (Q4 G7).
+  'ally_ai_agent_upset_numbers',
   // What each kind of list tool adds, whatever the purpose (Q3-fast Part 2b).
   'ally_ai_agent_playbook_booking',
   'ally_ai_agent_playbook_details',
@@ -145,12 +153,12 @@ export function crisisTextFor(
   const own_ = Boolean(
     template?.chatbotId && template.chatbotId === turn.chatbot.id,
   );
-  // Stage 5 (D6): the chatbot's own numbers, then its copy's regional ones.
-  const numbers =
-    helplineNumbersWithExtras(
-      turn.settings.helplineNumbers,
-      own_ ? template?.extraNumbers : null,
-    ) || turn.settings.helplineNumbers;
+  // Stage 5 (D6): the chatbot's own numbers, then its copy's regional ones. Q4 G7: only numbers
+  // the owner confirmed in Safety.
+  const numbers = helplineNumbersWithExtras(
+    crisisHelplines(turn.settings),
+    own_ ? template?.extraNumbers : null,
+  );
   const fill = (text: string) =>
     text.replace(
       /\{helpline_numbers\}/g,
@@ -159,13 +167,16 @@ export function crisisTextFor(
   const ownTemplate = own_ ? template?.responseText?.trim() : '';
   const ownText = turn.chatbot.settings?.crisisEscalationText?.trim();
   const own = ownTemplate || ownText;
-  return crisisReply({
+  const reply = crisisReply({
     pack: turn.chatbot.safetyPack,
     helplineNumbers: numbers,
     own: own ? fill(own) : null,
     // In the person's language (Q3-fast Part 1, B3): fixed English, Hindi or Hinglish text.
     language: replyLanguageOf(turn.text ?? '', turn.language),
   });
+  // Q4 G7: the owner's one approved practical-help line, after the fixed reply.
+  const practical = turn.settings.crisisPracticalLine?.trim();
+  return practical ? `${reply}\n\n${practical}` : reply;
 }
 
 /** Purposes with a section of their own in the Skills Store (chunk 20a-2). */
@@ -342,8 +353,8 @@ export class ChatbotEngineService {
       const help = await this.safetyTranslations.crisisHelpFor(
         turn.chatbot.id,
         language,
-        // The builder's own numbers only (R6), as on the fixed notifications.
-        turn.chatbot.settings?.helplineNumbers ?? null,
+        // The builder's own numbers only (R6), as on the fixed notifications; Q4 G7: confirmed ones.
+        crisisHelplines(turn.chatbot.settings) || null,
       );
       if (curatedLanguageOf(help.language) || !help.reviewed) return decision;
       return { ...decision, body: `${decision.body}\n\n${help.text}` };
@@ -442,8 +453,8 @@ export class ChatbotEngineService {
   /** The fixed notification for a blocked state, in the person's language. */
   private blockedText(turn: ChatTurn, state: BlockedState): string {
     return blockedNotice(state, {
-      // The builder's own numbers only (R6): never the platform's defaults.
-      ownNumbers: turn.chatbot.settings?.helplineNumbers ?? null,
+      // The builder's own numbers only (R6): never the platform's defaults. Q4 G7: confirmed ones.
+      ownNumbers: crisisHelplines(turn.chatbot.settings) || null,
       language: replyLanguageOf(turn.text, turn.language),
     });
   }
@@ -489,7 +500,7 @@ export class ChatbotEngineService {
         business: turn.chatbot.name,
         contact: contactFromSources(
           await this.businessFacts(turn),
-          turn.settings.helplineNumbers,
+          crisisHelplines(turn.settings),
         ),
       });
     }
@@ -530,7 +541,11 @@ export class ChatbotEngineService {
       return (
         (await this.crisisOnly(turn)) ?? {
           handledBy: WaHandledBy.HANDOVER,
-          body: handoverMessage(handoverOf(turn.settings), new Date()),
+          body: handoverMessage(
+            handoverOf(turn.settings),
+            new Date(),
+            replyLanguageOf(turn.text ?? '', turn.language),
+          ),
           handover: 'asked',
         }
       );
@@ -807,14 +822,34 @@ export class ChatbotEngineService {
 
     // One fast check beside the run (Q3-fast Part 1). It never depends on the run: a failed run
     // still gets its verdict, and a rejected check never takes down an answer.
+    // Q4 H1: with history, the latest message is also judged on its own, in parallel, and the more
+    // severe verdict wins, so a message at risk on its own is never cleared by its context (8
+    // booking turns before "some days I feel there's no point to anything").
+    const crisisAsk = crisisRequest(turn, prompts);
     const classifier = settings.crisisClassifierEnabled
-      ? this.aiService.checkWhatsAppCrisis(crisisRequest(turn, prompts))
+      ? crisisAsk.history?.length
+        ? Promise.allSettled([
+            this.aiService.checkWhatsAppCrisis(crisisAsk),
+            this.aiService.checkWhatsAppCrisis({ message: turn.text, prompts }),
+          ]).then(([withHistory, alone]) => {
+            const value = (
+              r: PromiseSettledResult<CrisisCheckResponse | null>,
+            ) => (r.status === 'fulfilled' ? r.value : null);
+            if (
+              withHistory.status === 'rejected' &&
+              alone.status === 'rejected'
+            ) {
+              throw withHistory.reason;
+            }
+            return moreSevere(value(withHistory), value(alone));
+          })
+        : this.aiService.checkWhatsAppCrisis(crisisAsk)
       : Promise.resolve(null);
     const classified = settle(classifier);
     // When the classifier fails (chunk H1): the emergency keyword rules decide. A match is an
     // emergency verdict like the classifier's, so it takes the same fast path.
     const byKeywords = (): CrisisCheckResponse | null => {
-      const verdict = emergencyByKeywords(turn.text);
+      const verdict = emergencyByKeywords(turn.text, turn.chatbot.safetyPack);
       if (verdict) {
         this.logger.warn(
           `Crisis classifier failed for chatbot ${turn.chatbot.id}; an emergency keyword rule ` +
@@ -823,14 +858,27 @@ export class ChatbotEngineService {
       }
       return verdict;
     };
-    const crisisCheck: Promise<CrisisCheckResponse | null> = classifier.then(
-      (verdict) => (verdict?.failed ? (byKeywords() ?? verdict) : verdict),
-      (error: unknown) => {
-        const verdict = byKeywords();
-        if (verdict) return verdict;
-        throw error;
-      },
-    );
+    // Q4: a life-threatening emergency by the keyword rules decides at once, on any assistant,
+    // whatever the classifier says (it missed "someone collapsed in the hub and isn't breathing").
+    const urgent =
+      lifeThreatening(turn.text) ??
+      // Q4 H1: indirect hopelessness on a mental-health assistant.
+      atRiskByKeywords(turn.text, turn.chatbot.safetyPack);
+    if (urgent) {
+      this.logger.warn(
+        `Life-threatening emergency rule matched for chatbot ${turn.chatbot.id}; the emergency reply goes out`,
+      );
+    }
+    const crisisCheck: Promise<CrisisCheckResponse | null> = urgent
+      ? Promise.resolve(urgent)
+      : classifier.then(
+          (verdict) => (verdict?.failed ? (byKeywords() ?? verdict) : verdict),
+          (error: unknown) => {
+            const verdict = byKeywords();
+            if (verdict) return verdict;
+            throw error;
+          },
+        );
     if (settings.crisisClassifierEnabled) {
       this.logger.info(stageLine(runKey, startedAt, 'crisis_check_start'));
       crisisCheck.then(
@@ -929,9 +977,32 @@ export class ChatbotEngineService {
       (answerResult.status === 'fulfilled' &&
         answerResult.value.response.handover)
     ) {
+      // Q4 G1 (Round 7 R1): the hand-over never replaces an answer. The run goes on after
+      // `hand_over`, so what the assistant could answer comes first, then the hand-over line, in
+      // the person's language.
+      const line = handoverMessage(
+        handoverOf(settings),
+        new Date(),
+        replyLanguageOf(turn.text ?? '', turn.language),
+      );
+      const response =
+        answerResult.status === 'fulfilled'
+          ? answerResult.value.response
+          : null;
+      if (response?.answer?.trim()) {
+        const answered = this.toDecision(turn, response, ran, degradedAlert);
+        return {
+          ...answered,
+          handledBy: WaHandledBy.HANDOVER,
+          body: `${answered.body.trim()}\n\n${line}`,
+          handover: 'assistant',
+          unanswered: undefined,
+          ...(agent ? { agent } : {}),
+        };
+      }
       return {
         handledBy: WaHandledBy.HANDOVER,
-        body: handoverMessage(handoverOf(settings), new Date()),
+        body: line,
         handover: 'assistant',
         alert: degradedAlert,
         ...(agent ? { agent } : {}),
@@ -1036,7 +1107,7 @@ export class ChatbotEngineService {
         declineText: noAnswerReply(
           mode,
           replyLanguageOf(turn.text, turn.language),
-          { helplineNumbers: turn.chatbot.settings?.helplineNumbers ?? null },
+          { helplineNumbers: crisisHelplines(turn.chatbot.settings) || null },
         ),
       },
     };
@@ -1111,7 +1182,7 @@ export class ChatbotEngineService {
     if (answer.intent !== 'decline' || answer.answer?.trim()) return turn;
     const contact = contactFromSources(
       await this.businessFacts(turn),
-      turn.settings.helplineNumbers,
+      crisisHelplines(turn.settings),
     );
     // Upset, or a question about medicines (chunk H1 Part D): the approved warm line or polite
     // decline, never the generic "I don't know that".
@@ -1121,6 +1192,7 @@ export class ChatbotEngineService {
       language: replyLanguageOf(turn.text, turn.language),
       organisation: turn.chatbot.name,
       contact,
+      pack: turn.chatbot.safetyPack,
     });
     if (caring) {
       return { ...turn, settings: { ...turn.settings, declineText: caring } };
@@ -1165,11 +1237,11 @@ export class ChatbotEngineService {
             organisation: chatbot.name,
             emergencyNumber: emergencyNumberFrom(
               await this.businessFacts(turn),
-              turn.settings.helplineNumbers,
+              crisisHelplines(turn.settings),
             ),
             selfHarm: Boolean(crisis.self_harm),
             animal: aboutAnAnimal(turn.text),
-            helplineNumbers: turn.settings.helplineNumbers,
+            helplineNumbers: crisisHelplines(turn.settings) || null,
           })
         : crisisTextFor(turn),
       crisis: { level: emergency ? 2 : 1, path: 'classifier' },
@@ -1231,7 +1303,7 @@ export class ChatbotEngineService {
       turn.chatbot.name ?? '',
       contactFromSources(
         await this.businessFacts(turn),
-        turn.settings.helplineNumbers,
+        crisisHelplines(turn.settings),
       ),
     );
   }

@@ -34,6 +34,10 @@ import {
  * The defaults every chatbot inherits (the `whatsapp_bot` settings row) and each bot's changes on
  * top of them.
  */
+import {
+  crisisHelplines,
+  ownerHelplineFields,
+} from '../engine/crisis-helplines';
 @Injectable()
 export class ChatbotSettingsService {
   private readonly logger = LoggerService.getInstance(
@@ -95,8 +99,10 @@ export class ChatbotSettingsService {
    * leaving a field out; empty text is dropped for the same reason.
    */
   async updateChatbotSettings(
-    chatbot: Pick<Chatbot, 'id'> & Partial<Pick<Chatbot, 'safetyPack'>>,
+    chatbot: Pick<Chatbot, 'id'> &
+      Partial<Pick<Chatbot, 'safetyPack' | 'settings'>>,
     overrides: ChatbotSettingsOverride,
+    options: { byOwner?: boolean } = {},
   ): Promise<ChatbotSettingsView> {
     // A safety pack's settings can't be turned off (chunk 20a): refused, not silently floored, so
     // the editor knows why the switch didn't move.
@@ -149,7 +155,27 @@ export class ChatbotSettingsService {
       }
     }
     const userId = Number(ExecutionManager.getUserId() ?? 0);
-    const settings = cleanOverride(overrides);
+    // Q4 G7: whose the helpline is. Only the owner's own save can make it theirs (a changed number,
+    // or "Use this number in crisis replies"); a client never sets the source itself.
+    const { helplineConfirm, ...rest } = overrides ?? {};
+    const helpline = options.byOwner
+      ? ownerHelplineFields(
+          chatbot.settings,
+          { helplineNumbers: rest.helplineNumbers, helplineConfirm },
+          new Date(),
+        )
+      : {};
+    // Q4 B11 ("Change entries: Do it" didn't stick): what a settings screen doesn't edit (the
+    // list abilities, memory, the time zone) keeps its stored value when the screen leaves it out,
+    // so saving General can't put back a copy loaded before the list wizard changed it.
+    const kept = options.byOwner
+      ? Object.fromEntries(
+          (['abilities', 'memory', 'timeZone'] as const)
+            .filter((k) => rest[k] === undefined && chatbot.settings?.[k])
+            .map((k) => [k, chatbot.settings![k]]),
+        )
+      : {};
+    const settings = cleanOverride({ ...kept, ...rest, ...helpline });
     await this.chatbotRepository.update(
       { id: chatbot.id },
       { settings, updatedBy: userId },
@@ -305,7 +331,8 @@ export class ChatbotSettingsService {
   renderPlaceholders(text: string, settings: WhatsAppBotSettings): string {
     return text.replace(
       /\{helpline_numbers\}/g,
-      settings.helplineNumbers || DEFAULT_HELPLINE_PLACEHOLDER,
+      // Q4 G7: only numbers the owner confirmed.
+      crisisHelplines(settings) || DEFAULT_HELPLINE_PLACEHOLDER,
     );
   }
 }

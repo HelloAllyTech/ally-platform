@@ -1,0 +1,5 @@
+# Paths Bug Hunter v2's notes, chunk briefs and prompt examples name on purpose:
+# placeholders (CHUNK-NN), run artefacts kept outside the repo, files the old
+# Bug Hunter or earlier chunks removed, and example paths inside prompts.
+apps/ally-admin-dashboard/src/components/builder/__tests__/RaiseBudgetDialog.repro.test.tsx
+docs/bug-hunter/notes/CHUNK-NN-NOTES.md

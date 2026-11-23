@@ -15,9 +15,3 @@ export function affectedOf(result: unknown): number {
     return Number(result[1] ?? 0);
   return Array.isArray(result) ? result.length : 0;
 }
-
-export function rowsOf<T>(result: unknown): T[] {
-  if (Array.isArray(result) && Array.isArray(result[0]))
-    return result[0] as T[];
-  return Array.isArray(result) ? (result as T[]) : [];
-}

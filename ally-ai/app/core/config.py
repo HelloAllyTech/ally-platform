@@ -111,6 +111,15 @@ class KnowledgeAgentSettings(BaseModel):
     TOP_K: int = Field(8)
     MIN_SIMILARITY: float = Field(0.35)
     DECLINE_SIMILARITY: float = Field(0.42)
+    # Q4: keyword (BM25) search beside vector search, in one Weaviate hybrid query.
+    # On with neighbour chunks (Shehbaz, 23 Nov): 7 of the 8 exact-term misses found,
+    # search p50 69 ms (vector only: 4; alone, without neighbours, it found 2).
+    # ALPHA weighs the two: 1.0 is vector only.
+    HYBRID_SEARCH: bool = Field(True)
+    HYBRID_ALPHA: float = Field(0.5, ge=0.0, le=1.0)
+    # Q4: a found chunk takes its short neighbours on the same page (a name before
+    # its title, a number after "Call us", a list's items). False: as before.
+    NEIGHBOUR_CHUNKS: bool = Field(True)
     # Passages within this similarity of the best hit are kept; the rest are dropped
     # even if they cleared the floor. Stops one strong match from being diluted by seven
     # weak ones.
@@ -164,6 +173,8 @@ class AgentRuntimeSettings(BaseModel):
     # Search the question before the first model call (chunk H1), so a plain answer
     # takes one model call instead of two. False: the agent decides when to search.
     PRESEARCH: bool = Field(True)
+    # Q4 G3: ally-be's key facts are in every run's passages; False ignores them.
+    KEY_FACTS: bool = Field(True)
     # Conversation messages the agent reads, most recent last.
     MAX_HISTORY_MESSAGES: int = Field(10, ge=0, le=50)
     # Reasoning effort for the agent step on an OpenAI reasoning model (gpt-5 and
@@ -179,6 +190,10 @@ class AgentRuntimeSettings(BaseModel):
     DEBUG_TOOL_DELAY_WHEN: Literal["before", "after"] = "before"
     # Only tools whose name starts with this ("create_", "update_"); empty = every tool.
     DEBUG_TOOL_DELAY_ONLY: str = ""
+    # Test only (chunk Q4, the use-case suite's --classifier-fail): the crisis check
+    # answers `failed` without calling the model, so ally-be's keyword rules decide, as
+    # when the classifier times out. Ignored outside a development environment.
+    DEBUG_CRISIS_FAIL: bool = False
 
 
 class BuilderSettings(BaseModel):

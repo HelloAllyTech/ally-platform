@@ -1,0 +1,112 @@
+diff --git a/apps/ally-admin-dashboard/src/pages/Builder/BuilderSession.tsx b/apps/ally-admin-dashboard/src/pages/Builder/BuilderSession.tsx
+index 9dc70783b0..fd07c6d44c 100644
+--- a/apps/ally-admin-dashboard/src/pages/Builder/BuilderSession.tsx
++++ b/apps/ally-admin-dashboard/src/pages/Builder/BuilderSession.tsx
+@@ -33,6 +33,22 @@ import { BUILDER_STATUS_TAG_TYPE } from "./builderMotion";
+ /** The PRD is the build's source of truth while a run is reading it. */
+ const PRD_FROZEN: BuilderSessionStatus[] = ["BUILDING", "WAITING_FOR_INPUT"];
+ 
++/**
++ * Terminal states you can still build again from.
++ *
++ * CANCELLED belongs here and its absence was a dead end: stopping a build left
++ * a session with no way forward at all. The start control lives in the
++ * readiness panel, which stops rendering the moment a session has a build, and
++ * the header offered its retry only on FAILED — so the one deliberate act a
++ * person takes mid-build, pressing stop, was also the act that stranded the
++ * session. The PRD was still there, the branch was still there, and the only
++ * route back was to open a new session and re-run the interview.
++ *
++ * COMPLETED is deliberately NOT here. Its pull requests are open or merged, and
++ * a second build of finished work opens a competing set against the same PRD.
++ */
++const RESTARTABLE: BuilderSessionStatus[] = ["FAILED", "CANCELLED"];
++
+ /**
+  * One Builder session: the interview on the left, the living PRD on the right.
+  *
+@@ -273,9 +289,9 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
+       kind="primary"
+       size="md"
+       className="w-full"
+-      // Terminal blocks a fresh start, except FAILED — that's exactly the
+-      // state this same trigger is meant to retry from.
+-      disabled={isTerminal && effectiveStatus !== "FAILED"}
++      // Terminal blocks a fresh start, except the states a person would
++      // obviously want to build again from — see RESTARTABLE.
++      disabled={isTerminal && !RESTARTABLE.includes(effectiveStatus)}
+       onClick={() => setShowStartDialog(true)}
+     >
+       {effectiveStatus === "FAILED"
+@@ -310,7 +326,7 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
+           <Tag type={BUILDER_STATUS_TAG_TYPE[effectiveStatus]} size="sm">
+             {strings.status[effectiveStatus] ?? effectiveStatus}
+           </Tag>
+-          {effectiveStatus === "FAILED" ? (
++          {RESTARTABLE.includes(effectiveStatus) ? (
+             <Button kind="primary" size="sm" onClick={() => setShowStartDialog(true)}>
+               {strings.retryBuild}
+             </Button>
+diff --git a/apps/ally-admin-dashboard/src/pages/Builder/__tests__/BuilderSession.test.tsx b/apps/ally-admin-dashboard/src/pages/Builder/__tests__/BuilderSession.test.tsx
+index d148ba4df4..65818bef38 100644
+--- a/apps/ally-admin-dashboard/src/pages/Builder/__tests__/BuilderSession.test.tsx
++++ b/apps/ally-admin-dashboard/src/pages/Builder/__tests__/BuilderSession.test.tsx
+@@ -14,14 +14,18 @@ vi.mock("@ally-ui-mono/ui-shared", () => ({
+   Tag: ({ children }: any) => <span>{children}</span>,
+ }));
+ 
++// SteerComposer and CollapsibleAside render only in the build layout, which no
++// test reached until the restart cases below.
+ vi.mock("@components/builder", () => ({
+   BuildView: () => <div>BuildView</div>,
+   ChatComposer: () => <div>ChatComposer</div>,
+   ChatMessage: () => <div>ChatMessage</div>,
++  CollapsibleAside: ({ children }: any) => <div>{children}</div>,
+   ConfirmCancelDialog: () => null,
+   PrdDocPanel: () => <div>PrdDocPanel</div>,
+   ReadinessRing: () => <div>ReadinessRing</div>,
+   StartBuildDialog: () => null,
++  SteerComposer: () => <div>SteerComposer</div>,
+ }));
+ 
+ vi.mock("@components/error-boundary", () => ({
+@@ -116,4 +120,39 @@ describe("BuilderSession", () => {
+ 
+     expect(navigateMock).toHaveBeenCalledWith("/builder");
+   });
++
++  /**
++   * Stopping a build used to strand the session. The start control lives in the
++   * readiness panel, which stops rendering once a session has a build, and the
++   * header offered its retry only on FAILED — so pressing stop, the one
++   * deliberate mid-build action a person takes, was also the action that left
++   * the PRD and the branch with no route back into a build.
++   */
++  const terminal = (status: string) => {
++    sessionResult = {
++      data: { ...baseSession, status, currentStage: "CODING" },
++      isLoading: false,
++      isError: false,
++    };
++    render(<BuilderSession />);
++  };
++
++  it("offers a way back into a build after a stop", () => {
++    terminal("CANCELLED");
++    expect(screen.getByText("Retry build")).toBeTruthy();
++  });
++
++  it("still offers one after a failure", () => {
++    terminal("FAILED");
++    expect(screen.getByText("Retry build")).toBeTruthy();
++  });
++
++  /**
++   * Not from COMPLETED: its pull requests are open or merged, and a second
++   * build of finished work opens a competing set against the same PRD.
++   */
++  it("does not offer one on finished work", () => {
++    terminal("COMPLETED");
++    expect(screen.queryByText("Retry build")).toBeNull();
++  });
+ });

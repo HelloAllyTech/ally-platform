@@ -92,13 +92,6 @@ export const ASSISTANT_OWNER_PERMISSIONS: string[] = [
   'view:whatsapp-bot:analytics',
 ];
 
-/** What an invited Assistant member (Stage 1b) holds: reading and replying, nothing else. */
-export const ASSISTANT_MEMBER_PERMISSIONS: string[] = [
-  'view:whatsapp-bot',
-  'view:whatsapp-bot:conversations',
-  'edit:whatsapp-bot:conversations',
-];
-
 /**
  * Platform-level super-admin roles. SUPER_DUPER_ADMIN is a peer of SUPER_ADMIN:
  * it has identical access today and may gain extra capabilities later. Any

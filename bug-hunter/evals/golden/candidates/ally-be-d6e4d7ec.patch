@@ -1,0 +1,44 @@
+diff --git a/src/settings/service/settings.service.ts b/src/settings/service/settings.service.ts
+index da7e15799f..e831b8928f 100644
+--- a/src/settings/service/settings.service.ts
++++ b/src/settings/service/settings.service.ts
+@@ -772,9 +772,10 @@ export class SettingsService {
+       [PERMISSIONS.SYSTEM_ACCESS],
+     );
+     // Only a platform admin may grant this — a tenant admin must not be able to
+-    // switch on their own access.
++    // switch on their own access. The `??` on the staff branch matters: the
++    // helpline app's own Org Settings screen sends no tenantId at all.
+     const scopedTenantId = hasSystemAccess
+-      ? tenantId
++      ? (tenantId ?? ExecutionManager.getTenantId())
+       : ExecutionManager.getTenantId();
+     if (!scopedTenantId) throw new BadRequestException('Tenant ID is required');
+     const resolvedId = await this.resolveTenantCode(scopedTenantId);
+diff --git a/src/settings/service/test/settings.service.spec.ts b/src/settings/service/test/settings.service.spec.ts
+index f9b9787e25..11a0bf130a 100644
+--- a/src/settings/service/test/settings.service.spec.ts
++++ b/src/settings/service/test/settings.service.spec.ts
+@@ -1337,6 +1337,22 @@ describe('SettingsService', () => {
+         expect.objectContaining({ relatedId: mockTenantId }),
+       );
+     });
++
++    it('falls back to the caller tenant for a system-access character-library write', async () => {
++      const result = await service.updateCharacterLibraryEnabled(
++        undefined as unknown as string,
++        true,
++      );
++
++      expect(preferenceService.createPreference).toHaveBeenCalledWith(
++        expect.objectContaining({
++          name: PreferenceName.CHARACTER_LIBRARY_ENABLED,
++          relatedId: mockTenantId,
++          value: { enabled: true },
++        }),
++      );
++      expect(result).toEqual({ success: true });
++    });
+   });
+ 
+   describe('getEnabledCustomFieldTypes', () => {

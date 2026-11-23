@@ -2,47 +2,17 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Mock API hooks — mode state, the findings table, and run history all come entirely from these.
+// Mock API hooks — mode state and the findings table come entirely from these.
 vi.mock("@api", () => ({
-  // The header's ⋯ menu holds the UX Signals scan. The menu item is absent
-  // without the UX_SIGNALS toggle, which these tests do not grant — but the
-  // hook behind it still runs, so the mock has to supply its queries.
-  useScanUxSignalsMutation: vi.fn(() => [vi.fn(), { isLoading: false }]),
-  useGetUxSignalScansQuery: vi.fn(() => ({ data: { scans: [] } })),
-  // The hook invalidates the findings and suggestions queues itself, once it
-  // sees a scan finish — so it reaches for the store's util alongside the hooks.
-  baseAPI: { util: { invalidateTags: vi.fn() } },
   useGetBugHunterSettingsQuery: vi.fn(),
   useUpdateBugHunterSettingsMutation: vi.fn(),
-  useGetBugHuntRunsQuery: vi.fn(),
-  useGetBugHuntRunQuery: vi.fn(),
   useGetBugFindingsQuery: vi.fn(),
   useGetBugFindingQuery: vi.fn(),
   useApproveBugFindingMutation: vi.fn(() => [vi.fn(), { isLoading: false }]),
   useRejectBugFindingMutation: vi.fn(() => [vi.fn(), { isLoading: false }]),
-  useAnswerBugFindingMutation: vi.fn(() => [vi.fn(), { isLoading: false }]),
   useStartBugFixSessionMutation: vi.fn(() => [vi.fn(), { isLoading: false }]),
   useReleaseBugFindingMutation: vi.fn(() => [vi.fn(), { isLoading: false }]),
-  useCancelBugFixSessionMutation: vi.fn(() => [vi.fn(), { isLoading: false }]),
   useMergeBugFindingMutation: vi.fn(() => [vi.fn(), { isLoading: false }]),
-  // The Notebook tab's own hooks. Empty rather than absent: mounted only when
-  // that section is open, but the module mock has to supply them.
-  useGetBugHunterFeatureMapsQuery: () => ({
-    data: { cards: [] },
-    isLoading: false,
-    isError: false,
-  }),
-  useRefreshBugHunterFeatureMapsMutation: () => [vi.fn(), { isLoading: false }],
-  useRemoveBugHunterFeatureMapMutation: () => [vi.fn(), { isLoading: false }],
-}));
-
-// The notes link has its own test; here it only has to say which collection it opens.
-vi.mock("@components/context-collection-link", () => ({
-  ContextCollectionLink: ({ collection, copy }: any) => (
-    <a data-testid="notes-link" href={`/context-library?collection=${collection}`}>
-      {copy.title}
-    </a>
-  ),
 }));
 
 vi.mock("@utils", () => ({
@@ -52,11 +22,11 @@ vi.mock("@utils", () => ({
   hasFeature: (features: string[], key: string) => features.includes(key),
 }));
 
-// Holds the bug_hunter toggle by default, so every existing assertion below —
-// none of which is about the read/act split — keeps seeing the full triage
-// surface.
+// Holds Bug Hunter v2's toggle, so every assertion below — none of which is about
+// the read/act split — sees the full triage surface.
 vi.mock("react-redux", () => ({
-  useSelector: (selector: any) => selector({ user: { user: {}, features: ["bug_hunter"] } }),
+  useSelector: (selector: any) =>
+    selector({ user: { user: {}, features: ["bug_hunter_v2_verdicts"] } }),
   useDispatch: () => vi.fn(),
 }));
 
@@ -234,16 +204,6 @@ const mockSettingsQuery = (overrides: Record<string, unknown> = {}) => {
   });
 };
 
-const mockRunsQuery = (overrides: Record<string, unknown> = {}) => {
-  (api.useGetBugHuntRunsQuery as any).mockReturnValue({
-    data: { items: [] },
-    isLoading: false,
-    isError: false,
-    refetch: vi.fn(),
-    ...overrides,
-  });
-};
-
 const mockFindingsQuery = (overrides: Record<string, unknown> = {}) => {
   (api.useGetBugFindingsQuery as any).mockReturnValue({
     data: { items: [], count: 0 },
@@ -288,32 +248,16 @@ describe("BugHunter", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSettingsQuery();
-    mockRunsQuery();
     mockFindingsQuery();
     (api.useUpdateBugHunterSettingsMutation as any).mockReturnValue([
       vi.fn(() => ({ unwrap: () => Promise.resolve({}) })),
       { isLoading: false },
     ]);
-    (api.useGetBugHuntRunQuery as any).mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      isError: false,
-    });
   });
 
   it("leads with the one-line header rather than a page heading", () => {
     mountPage();
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bug Hunter");
-  });
-
-  // About left the strip for the header's help button on 2026-10-13.
-  it("has two sections, Work and Notebook", () => {
-    onDuty();
-    mountPage();
-    expect(screen.getByTestId("tab-work")).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByTestId("tab-notebook")).toBeInTheDocument();
-    expect(screen.queryByTestId("tab-about")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("tab-performance")).not.toBeInTheDocument();
   });
 
   it("opens About in a side panel from the help button, with every question in it", () => {
@@ -334,16 +278,16 @@ describe("BugHunter", () => {
     mountPage();
     fireEvent.click(screen.getByRole("button", { name: "About Bug Hunter" }));
     expect(screen.getByText(/On Autonomous \(AI mode\)/)).toBeInTheDocument();
-    expect(screen.getByText(/On Manual it waits/)).toBeInTheDocument();
+    expect(screen.getByText(/On Manual a bug waits/)).toBeInTheDocument();
   });
 
-  // The FAQ pointed at a messages inbox removed on 2026-10-01 and at a shift
-  // log that moved to Analytics.
+  // The FAQ pointed at a messages inbox removed on 2026-10-01, and at a shift log
+  // on Analytics that left with the old Bug Hunter.
   it("points About at where things are now", () => {
     mountPage();
     fireEvent.click(screen.getByRole("button", { name: "About Bug Hunter" }));
     expect(screen.getByText(/Under Needs you, the first tab of my bugs table/)).toBeInTheDocument();
-    expect(screen.getByText(/my shift log on Analytics → Bug Agent/)).toBeInTheDocument();
+    expect(screen.queryByText(/Analytics → Bug Agent/)).not.toBeInTheDocument();
     expect(screen.queryByText(/In my messages at the top of this page/)).not.toBeInTheDocument();
   });
 
@@ -351,48 +295,6 @@ describe("BugHunter", () => {
     mountPage("/?section=about");
     expect(screen.getByTestId("side-panel")).toBeInTheDocument();
     expect(screen.getByTestId("location").textContent).toBe("/");
-  });
-
-  // The numbers moved to Analytics → Bug Agent; an old link to the section
-  // still lands on them rather than on a blank Work tab.
-  it("redirects the retired ?section=performance to the Analytics Bug Agent tab", () => {
-    onDuty();
-    render(
-      <MemoryRouter initialEntries={["/bug-hunter?section=performance"]}>
-        <Routes>
-          <Route path="/bug-hunter" element={<BugHunter />} />
-          <Route path="/analytics" element={<LocationProbe />} />
-        </Routes>
-      </MemoryRouter>,
-    );
-    expect(screen.getByTestId("location").textContent).toBe("/analytics?tab=bug-agent-performance");
-  });
-
-  // The header holds the kill switch, so it must be reachable from every
-  // section rather than living on one of them.
-  it("keeps the header above the tabs, whichever section is open", () => {
-    onDuty();
-    mountPage();
-    fireEvent.click(screen.getByTestId("tab-notebook"));
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bug Hunter");
-    expect(screen.getByTestId("bug-hunter-mode-select")).toBeInTheDocument();
-  });
-
-  it("reads the open section out of the address bar, so a section is linkable", () => {
-    onDuty();
-    mountPage("/?section=notebook");
-    // The notes themselves live in the Context Library; the tab links to them.
-    expect(screen.getByTestId("notes-link")).toHaveTextContent("Bug Hunter Notes");
-    expect(screen.getByTestId("notes-link")).toHaveAttribute(
-      "href",
-      "/context-library?collection=bug_hunter_notes",
-    );
-  });
-
-  it("falls back to Work for a hand-edited section, rather than erroring", () => {
-    onDuty();
-    mountPage("/?section=telemetry");
-    expect(screen.getByTestId("tab-work")).toHaveAttribute("aria-pressed", "true");
   });
 
   /**
@@ -422,7 +324,7 @@ describe("BugHunter", () => {
     expect(screen.getByText("A bug awaiting your call")).toBeInTheDocument();
   });
 
-  it("takes Fixing N now to the In progress tab, from whichever section you are on", () => {
+  it("takes Fixing N now to the In progress tab, dropping an old ?section", () => {
     onDuty();
     mockFindingsQuery({
       data: {

@@ -202,6 +202,12 @@ function valueFor(
 }
 
 /** Entries from a line-per-entry answer; a required text detail left out repeats the first part. */
+/** A line that says what isn't done ("We never accept cash", "No walk-ins"): a rule. */
+const NEGATIVE =
+  /^\s*(?:we\s+|they\s+|it\s+)?(?:never|don'?t|do not|does not|doesn'?t|cannot|can'?t|won'?t|will not|are not|aren'?t|is not|isn'?t|not)\b|^\s*no\s+\w|\b(?:never|not)\s+(?:accept|take|allow|offer|do|give|provide)\b|\bnahi\b|\bnahin\b|नहीं/iu;
+
+export const isNegative = (line: string): boolean => NEGATIVE.test(line);
+
 function entriesFrom(
   definition: ReadyMadeList,
   columns: string[],
@@ -228,6 +234,15 @@ function entriesFrom(
           columns.includes(field.key)
         ) {
           values[field.key] = parts[0];
+        }
+        // Q4 G+15 (Uday Foundation's Campaigns setup did nothing; locally a 400 "Date is
+        // needed"): an update written in setup is dated today when the answer gives no date.
+        if (
+          field.required &&
+          values[field.key] === undefined &&
+          field.type === ListFieldType.DATE
+        ) {
+          values[field.key] = '@today';
         }
       }
       return values;
@@ -319,9 +334,17 @@ export function planInstall(
         case 'entries': {
           const definition = installed.get(to.list);
           if (!definition) break;
+          // Q4 H10 (demo build: "We never accept cash" under "How can people give?" became a
+          // giving method marked tax-exempt): a negative line is a rule the assistant knows,
+          // never an entry.
+          const lines = itemsOf(text, { commas: false });
+          const rules = lines.filter(isNegative);
+          for (const rule of rules) facts.push(`${q.ask} ${rule}`);
+          const kept = lines.filter((line) => !isNegative(line)).join('\n');
+          if (!kept.trim()) break;
           fromAnswers[to.list] = [
             ...(fromAnswers[to.list] ?? []),
-            ...entriesFrom(definition, to.columns, text),
+            ...entriesFrom(definition, to.columns, kept),
           ];
           break;
         }
@@ -380,7 +403,15 @@ export function planInstall(
   for (const { use } of lists) {
     const own = fromAnswers[use.key] ?? [];
     const rows = own.length
-      ? own.map((values) => ({ values, example: false }))
+      ? own.map((values) => ({
+          values: Object.fromEntries(
+            Object.entries(values).map(([k, v]) => [
+              k,
+              resolveWhen(v, zone, now),
+            ]),
+          ),
+          example: false,
+        }))
       : (use.examples ?? []).map((values) => ({
           values: Object.fromEntries(
             Object.entries(values).map(([k, v]) => [

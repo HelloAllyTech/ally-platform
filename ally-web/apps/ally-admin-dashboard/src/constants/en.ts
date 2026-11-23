@@ -80,9 +80,7 @@ export const en = {
       tooltips: "Tooltips",
       agentTestCases: "Agent Test Cases",
       aiLab: "AI Lab",
-      roadmap: "Roadmap",
-      // Roadmap v2, dark behind `roadmap_v2`. Shown beside the old entry until cutover (P6).
-      roadmapV2: "Roadmap (new)",
+      roadmapV2: "Roadmap",
       userInterviews: "User Interviews",
       bugHunter: "Bug Hunter",
       builder: "Builder",
@@ -1836,8 +1834,8 @@ export const en = {
     },
     /** The login screen a signed-out visitor sees on any /assistants page (its own wording and layout). */
     login: {
-      headline: "Build and manage your own custom ",
-      headlineEmphasis: "chatbots.",
+      headline: "A chatbot your community can trust, ",
+      headlineEmphasis: "built without code.",
       /** The wordmark at the top left: "Ally" and, in the orange block, "chatbots". */
       sendCode: "Send code",
       googleSignIn: "Sign in using Google",
@@ -2229,6 +2227,17 @@ export const en = {
       showTypingHelp:
         "Shows the typing dots while the assistant works on a reply. WhatsApp also marks the person's message as read (blue ticks). Only Ally admins can change this.",
       helplineHelp: "Shown in the crisis reply wherever it says {helpline_numbers}.",
+      // Q4 G7: a number a template or setup wrote waits for the owner's say-so.
+      helplineUnconfirmed: (from: string) =>
+        `Not used in crisis replies yet (from ${from}). Until you confirm it, crisis replies give only the national numbers.`,
+      helplineFrom: { template: "your template's answer", setup: "your setup" } as Record<
+        string,
+        string
+      >,
+      helplineConfirm: "Use it in crisis replies",
+      practicalLineLabel: "After the crisis reply (optional)",
+      practicalLineHelp:
+        "One line of practical help sent after the fixed reply to someone who may be at risk, for example: Tell me your area and I'll point you to the nearest chapter. Never after an emergency reply.",
       crisisClassifierHelp:
         "Can only be turned on here. Ally keeps it on for everyone who needs it.",
       consentLabel: "Ask for consent before answering",
@@ -3201,6 +3210,206 @@ export const en = {
     scanFailedReason: "The scan failed: {reason}",
     scanUnknownReason: "no reason was recorded",
   },
+  // Bug Hunter v2: read what it suggested or escalated, and judge it. Verdicts teach it.
+  bugHunterV2: {
+    tabLabel: "Bug Hunter",
+    title: "Bug Hunter v2 — reports to judge",
+    intro:
+      "Suggested fixes and escalations from Bug Hunter v2. Your verdict on the diagnosis and the fix teaches it what to repeat and what to avoid.",
+    filters: { open: "Waiting for a verdict", judged: "Judged", all: "All" },
+    columns: {
+      app: "App",
+      source: "Source",
+      outcome: "Outcome",
+      title: "Finding",
+      severity: "Severity",
+      confidence: "Confidence",
+      age: "Age",
+      verdict: "Verdict",
+    },
+    outcomes: { suggested_fix: "Suggested fix", escalated: "Escalated" },
+    sources: {
+      ci_failure: "CI failure",
+      issue: "Bug report",
+      error_log: "Production error",
+      commit_sweep: "Commit sweep",
+    },
+    empty: "Nothing waiting for a verdict.",
+    emptyFiltered: "No reports match.",
+    loadError: "Could not load Bug Hunter v2 reports.",
+    unavailable: "The Bug Hunter database is not connected in this environment.",
+    back: "All reports",
+    sections: {
+      finding: "Finding",
+      rootCause: "Root cause",
+      evidence: "Evidence",
+      repro: "Failing test",
+      reproHelp:
+        "Bug Hunter wrote this test and saw it fail on the unchanged code. A suggested fix makes it pass.",
+      failure: "Failure before the fix",
+      patch: "Suggested patch",
+      noPatch: "No patch: Bug Hunter stopped before fixing.",
+      review: "Reviewer",
+      stopReason: "Why it stopped",
+      history: "Verdict history",
+    },
+    verdict: {
+      title: "Your verdict",
+      amendTitle: "Change the verdict",
+      diagnosis: "Was the diagnosis right?",
+      diagnosisHelp:
+        "Correct: the real cause. Wrong: a real problem, but not this cause. Not a bug: the behaviour is intended or harmless.",
+      fix: "Did the fix work?",
+      fixHelp:
+        "Worked: merge as is. Needed edits: right idea, a person had to change it. Wrong: it does not fix the bug. None: there was no fix.",
+      diagnoses: { correct: "Correct", wrong: "Wrong", not_a_bug: "Not a bug" },
+      fixes: {
+        worked: "Worked",
+        needed_edits: "Needed edits",
+        wrong: "Wrong",
+        none: "No fix",
+      },
+      reason: "Reason",
+      reasonPlaceholder: "Why? Bug Hunter learns from this sentence.",
+      reasonRequired: "Write a reason before saving.",
+      submit: "Save verdict",
+      amend: "Save new verdict",
+      saved: "Verdict saved. Bug Hunter applies it within 15 minutes.",
+      saveError: "Could not save the verdict.",
+      conflict: "Someone else just saved a verdict. Reload to see it.",
+      current: "Current verdict",
+      superseded: "Replaced",
+      by: "by admin",
+    },
+    v1Bug: {
+      readOnly:
+        "Found or handled by the old Bug Hunter. Read-only here: Bug Hunter v2 does not run or change it.",
+      description: "What was reported",
+      evidence: "Evidence",
+      outcome: "Outcome",
+      question: "Question asked",
+      answer: "Answer",
+      decision: "Decision",
+      pr: "Pull request",
+      release: "Release",
+      history: "History",
+      noHistory: "No history recorded for this bug.",
+      none: "—",
+      loadError: "Could not load this bug.",
+    },
+    board: {
+      title: "Bug Hunter v2",
+      intro:
+        "Every bug, from any source, on one board. Reported bugs land here the moment someone files one. The mode decides whether Bug Hunter starts fixing on its own.",
+      modeLabel: "Mode",
+      modes: { off: "Off", manual: "Manual", autonomous: "Autonomous" },
+      modeHelp: {
+        off: "Nothing is collected and nothing runs. Bugs reported meanwhile wait in Backlog.",
+        manual:
+          "Bugs are collected into Backlog. A fix starts only when an admin presses Start fix.",
+        autonomous:
+          "Bug Hunter starts on every bug by itself, oldest first, within the daily run limit and the $15/day spend cap.",
+      },
+      modeTooltip:
+        "Fixes are suggestions in every mode: Bug Hunter writes a failing test and a patch for you to judge, and opens no pull requests yet.",
+      confirmAutonomous:
+        "Autonomous starts paid runs on its own (about $0.50–0.80 each, at most {limit} a day). Switch?",
+      confirm: "Switch",
+      cancel: "Cancel",
+      modeSaved: "Mode set to {mode}.",
+      modeError: "Could not change the mode.",
+      todayRuns: "{started} of {limit} runs started today",
+      tabs: {
+        needs_you: "Needs you",
+        failed: "Failed",
+        in_progress: "In progress",
+        backlog: "Backlog",
+        done: "Done",
+      },
+      empty: {
+        needs_you: "Nothing waiting for you.",
+        failed: "No failed runs.",
+        in_progress: "Nothing running.",
+        backlog: "The backlog is empty.",
+        done: "Nothing finished yet.",
+      },
+      columns: {
+        bug: "Bug",
+        source: "Source",
+        app: "App",
+        status: "Status",
+        age: "Reported",
+        action: "",
+      },
+      sources: {
+        reported: "Reported",
+        issue: "GitHub issue",
+        ci_failure: "CI failure",
+        error_log: "Production error",
+        commit_sweep: "Commit sweep",
+      },
+      statuses: {
+        backlog: "Backlog",
+        queued: "Queued",
+        running: "Running",
+        needs_you: "Needs you",
+        pr_open: "PR open",
+        merged: "Merged",
+        released: "Released",
+        failed: "Failed",
+        done: "Done",
+      },
+      runningSince: "Running since {time}",
+      queuedHint: "Starts when the worker is free",
+      startFix: "Put me on it",
+      retry: "Retry",
+      openPr: "Open PR",
+      openPrHelp:
+        "Bug Hunter opens a draft PR with this fix and its failing test. You still decide the merge.",
+      openingPr: "Opening the PR…",
+      openPrFailed: "Couldn't open the PR: {why}",
+      openPrError: "Could not ask for a PR.",
+      viewPr: "View PR",
+      merge: "Merge",
+      mergeConfirm: "Merge this PR into master?",
+      mergeError: "Could not merge: {why}",
+      merged: "Merged.",
+      release: "Release",
+      releaseConfirm: "Release this fix to production?",
+      releaseError: "Could not release: {why}",
+      releasedAs: "Released as {tag}",
+      dismiss: "Dismiss",
+      dismissTitle: "Why are you dismissing it?",
+      dismissReasons: {
+        not_a_bug: "Not a bug",
+        duplicate: "Duplicate",
+        wont_fix: "Won't fix",
+        wrong_diagnosis: "Wrong diagnosis",
+      },
+      dismissNote: "Note for Bug Hunter (optional)",
+      dismissConfirm: "Dismiss",
+      dismissError: "Could not dismiss this bug.",
+      dismissed: "Dismissed.",
+      selectRow: "Select {title}",
+      selectAll: "Select all",
+      bulkSelected: "{count} selected",
+      bulkStart: "Put me on {count}",
+      bulkDismiss: "Dismiss {count}",
+      bulkDone: "{done} of {total} done",
+      bulkError: "Could not update these bugs.",
+      clearSelection: "Clear",
+      pickApp: "Pick the app",
+      pickAppHelp:
+        "The reporter didn't say which app this is in. Pick one so Bug Hunter knows where to look.",
+      startError: "Could not start this bug.",
+      offHint: "Mode is Off: queued bugs wait until you switch to Manual or Autonomous.",
+      openReport: "Open report",
+      noApp: "—",
+      v1Badge: "v1",
+      v1Help:
+        "Found or handled by the old Bug Hunter. Shown here so the board has the whole history; Bug Hunter v2 does not run it.",
+    },
+  },
   bugHunter: {
     tabLabel: "Bug Hunter",
     // ── The character ────────────────────────────────────────────────────────
@@ -3335,36 +3544,36 @@ export const en = {
     faqTitle: "About me",
     faqWhatTitle: "What do you do?",
     faqWhatBody:
-      "Every night — and whenever you ask — I go through the Ally repos looking for bugs: failing or flaky tests, an LLM code-review pass over recent changes, production error signals, and the bugs your team has already reported on the product roadmap. Everything I find, and everything your team reports, lands in my bugs table below with its current status.",
+      "I take bugs from new commits on master, CI failures, production error logs, the bugs your team reports on the product roadmap, and UX signals. Each one goes through the same steps: I investigate it, reproduce it with a test that fails because of the bug, write a fix, check it, and have it reviewed independently. Everything I'm working on, and everything I've finished, is in my bugs table below.",
     faqModesTitle: "What's the difference between the two working styles?",
     faqModesBody:
-      'I discover and verify bugs the same way in both, on the same schedule. On Autonomous (AI mode) a bug I\'ve verified goes straight to the fix stage. On Manual it waits at "Pending approval" under Needs you until you approve it — I fix nothing without a click from you first.',
+      'I collect bugs the same way in both. On Autonomous (AI mode) I start them myself, oldest first. On Manual a bug waits in New until you open it and press "Put me on it".',
     faqTrivialTitle: "What do you fix on your own, and what do you just propose?",
     faqTrivialBody:
-      "I merge my own fix only in a narrow, pre-approved set of cases: a lint or type-only change, or a single-file fix backed by a new regression test that fails before it and passes after. I never touch migrations, auth and permission code, payment paths or other security-sensitive services on my own, however small the diff looks — those always come to you as a PR.",
+      "Nothing merges without you. When a fix passes every check (the failing test now passes, tests, lint and typecheck are green, the review approves, confidence is high, the risk is low, the diff is small and touches no guarded path) I open a draft PR on my own. Anything else comes to you as a suggested fix you can turn into a PR. Security, auth, tenant and data-exposure bugs never become public PRs.",
     faqFixNowTitle: "Can I get one specific bug fixed right now?",
     faqFixNowBody:
-      "Yes — open the bug and press \"Put me on it\". I'll work on that one immediately instead of waiting for tonight's sweep: I write a test that reproduces it, fix it, check the whole suite is still green, and open a PR — merging it myself only if nothing guarded is involved. If nobody has matched the bug to a codebase yet, I'll ask you which repo to open. I have to be on duty first.",
-    faqMultiRepoTitle: "What if a bug needs changes in more than one repo?",
+      'Yes. Open the bug and press "Put me on it". It goes to the front of my queue, even on Manual. I have to be on duty first.',
+    faqMultiRepoTitle: "What if a bug needs changes in more than one app?",
     faqMultiRepoBody:
-      'I handle it. I only have one repo checked out per session, so when I find that a complete fix needs work elsewhere too, I stop without committing anything and hand back a plan — one step per repo, in the order they have to ship. Then I work through it myself, one session at a time, each waiting for the one before it to merge. Once they\'re all merged you get one "Release to production" button, and I deploy them in that same order, waiting for each to go green before I start the next. If a step gets stuck I stop the whole plan there rather than building on something that never landed.',
+      "I fix one app per run. If a complete fix needs another app too, I say so in my report instead of opening a partial PR.",
     faqReleaseTitle: "How does a fix of yours reach users?",
     faqReleaseBody:
-      "Once it's merged, a \"Release to production\" button appears on the bug. Pressing it cuts the next patch version and runs that service's normal production release pipeline — the same one you'd trigger by hand, database migration and all. I never take that step myself: I can carry a fix as far as master, but putting it in front of real users stays your decision, and we record who made it.",
+      'Merge and Release are always your buttons. Once a PR of mine is merged, a "Release to production" button appears on the bug and runs that service\'s normal release pipeline. We record who pressed it.',
     faqReviewTitle: "Where do I review what you've found?",
     faqReviewBody:
-      "In my bugs table below — click any row to open it, approve or reject it, or answer a question I've asked. There's no separate review screen.",
+      "In my bugs table below. Click any row to open its report, then approve, open a PR, or dismiss it. Bugs from the old Bug Hunter are there too, read-only.",
     faqEscalationTitle: "Where do you tell me you're stuck?",
     faqEscalationBody:
-      'Under Needs you, the first tab of my bugs table. A bug that needs your approval waits there, and so does one where I\'ve asked you a question — it reads "Needs input", and its Answer button opens it so you can reply. Anything of mine that went red is under Failed. The count beside Bug Hunter in the sidebar is my unread notifications. A quiet, successful night gets no message at all, on purpose.',
-    faqReposTitle: "Which repos do you touch?",
-    faqReposBody: "ally-be, ally-web, ally-ai and ally-ai-learn.",
-    faqCostTitle: "What does a night of your work cost?",
+      "Under Needs you, the first tab of my bugs table. When I can't reproduce a bug or can't fix it safely, it reads \"Needs input\" and the report says what I found and why I stopped. Anything of mine that went red is under Failed.",
+    faqReposTitle: "Which apps do you touch?",
+    faqReposBody: "ally-be, ally-web, ally-ai, ally-ai-learn and ally-mobile.",
+    faqCostTitle: "What does your work cost?",
     faqCostBody:
-      "Every sweep's estimated token cost is in my shift log on Analytics → Bug Agent, from the same LLM usage data the platform's cost analytics use. What my fix sessions on one bug have cost is on that bug.",
+      "I keep to a daily run limit and a $15 a day spending cap. Past either, bugs wait where they are and start the next day.",
     faqOffTitle: "How do I stop you?",
     faqOffBody:
-      "Set my working style to Off at the top of the page. That blocks every trigger immediately — nightly and on-demand alike.",
+      "Set my working style to Off at the top of the page. I start nothing and collect nothing until you turn me back on.",
     // ── Findings table (the comprehensive bug table) ──────────────────────────
     findingColumnTitle: "Bug",
     findingColumnStatus: "Status",
@@ -3985,6 +4194,8 @@ export const en = {
     drawerReleaseFailedNotice:
       "Release {tag} went red. The fix is still merged to master — it just isn't deployed. Check the run, then ask me to retry.",
     drawerFixSessionFailedNotice: "The fix session failed. Start a new session to retry.",
+    drawerOldHistoryNotice:
+      "From the old Bug Hunter, which was retired on 23 November 2026. Its history is kept to read; nothing here can be changed.",
     drawerReleaseBlocked: "Why I can't release this from here",
     drawerReleaseTargetFallback: "this service",
     drawerViewReleaseRun: "View release run",
@@ -4123,7 +4334,6 @@ export const en = {
     // At most one per row, and only on rows that need a human (triage.ts
     // `nextStep`). Reject and "Put me on it" are in the drawer and the bulk bar.
     nextStepApprove: "Approve",
-    nextStepAnswer: "Answer",
     nextStepRetry: "Try again",
     nextStepMerge: "Merge",
     nextStepReview: "Review",
@@ -10331,70 +10541,6 @@ export const en = {
       label: "Reduce motion",
       help: "Replaces movement with quick fades. Your device's reduced-motion setting does this too.",
     },
-  },
-  /**
-   * Switch on Roadmap (Roadmap v2 P6): the Owner's switch-on action, on Builder settings while the
-   * flag is off and on Roadmap → Settings once it is on. Kept in one block.
-   */
-  roadmapV2Cutover: {
-    title: "Switch on Roadmap",
-    intro:
-      "Moves everyone onto one Roadmap tab for ideas and builds, at once. Check who gets which role and what moves, then switch it on.",
-    introOn:
-      "Roadmap is on. Run this again to move anything made through the old pages since: it only moves what hasn't moved yet.",
-    loading: "Checking who gets which role and what moves",
-    loadFailed: "Couldn't load the switch-on check.",
-    retry: "Try again",
-    rolesTitle: "Who gets which role",
-    rolesHelp:
-      "Builders lead ideas, start builds and merge pull requests on real code. Owners also accept ideas, assign leads and change these settings. Everyone else with Product Roadmap access gets the Idea role.",
-    owners: (n: number) => `Owners (${n})`,
-    builders: (n: number) => `Builders (${n})`,
-    nobody: "No one",
-    withoutAccess: (names: string) =>
-      `${names} will get the role but can't open the Roadmap: their Product Roadmap access is off. Give them a Roadmap role on Users.`,
-    movesTitle: "What moves",
-    drafts: (n: number) =>
-      n === 1
-        ? "1 parked idea becomes a private draft in its author's My drafts"
-        : `${n} parked ideas become private drafts in their authors' My drafts`,
-    sessions: (n: number, goal: string) =>
-      n === 1
-        ? `1 live Builder session gets an idea of its own, led by whoever started it, under ${goal}`
-        : `${n} live Builder sessions get an idea each, led by whoever started them, under ${goal}`,
-    sessionsHelp:
-      "Only sessions still running or waiting. Finished, failed, cancelled and archived sessions stay as they are and stay readable.",
-    reviews: (n: number) =>
-      n === 1
-        ? "1 idea filed before review existed is marked Accepted"
-        : `${n} ideas filed before review existed are marked Accepted`,
-    more: (n: number) => `and ${n} more`,
-    nothingToMove:
-      "Nothing to move: no parked ideas, no live Builder sessions without an idea, and every idea is reviewed.",
-    noGoal:
-      "Add a product goal in Product Roadmap settings first. Each live Builder session's idea is filed under one.",
-    switchOn: "Switch on Roadmap",
-    moveLeft: "Move what's left",
-    confirmTitle: "Switch everyone to Roadmap?",
-    confirmTitleOn: "Move what's left?",
-    confirmEveryone:
-      "Product Roadmap and Builder become one tab, Roadmap, for everyone with Roadmap access, the next time they load a page.",
-    confirmKept:
-      "Nothing is deleted. Switching Roadmap off in its settings brings Product Roadmap and Builder back with their data.",
-    confirm: "Switch on Roadmap",
-    confirmOn: "Move it",
-    cancel: "Cancel",
-    running: "Switching on…",
-    conflict: "Access changed since you looked. Review the list again.",
-    failed: "Couldn't switch Roadmap on. Nothing changed. Try again.",
-    doneTitle: "Roadmap is on",
-    doneSummary: (drafts: number, sessions: number, reviews: number) =>
-      `${drafts} ${drafts === 1 ? "draft" : "drafts"} moved, ${sessions} Builder ${
-        sessions === 1 ? "session" : "sessions"
-      } filed as ideas, ${reviews} ${reviews === 1 ? "idea" : "ideas"} marked Accepted.`,
-    openRoadmap: "Open Roadmap",
-    lastRun: (date: string, name: string | null) =>
-      name ? `Last run on ${date} by ${name}.` : `Last run on ${date}.`,
   },
   roadmapTriage: {
     shortcutsTitle: "Keyboard shortcuts",

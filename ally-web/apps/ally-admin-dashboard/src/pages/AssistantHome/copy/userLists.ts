@@ -288,6 +288,9 @@ export const USER_LISTS = {
     instructionHint:
       'Optional. For example: "Always mention the size chart". It can\'t change your safety rules.',
     instructionSave: "Save",
+    // Q4 H12 (P1-25): a warning at the limit instead of cutting the text silently.
+    instructionCount: (n: number) => `${n} of 300 characters`,
+    instructionTooLong: "That's longer than 300 characters. Shorten it to save it.",
     instructionSaved: "Saved",
   },
 
@@ -347,6 +350,8 @@ export const USER_LISTS = {
     countOne: "This adds 1 entry.",
     nothing: "That adds nothing. Check the days and times.",
     skipped: "{n} are already there, so they're skipped.",
+    // Q4 H12 (P2-1: "1 are already there").
+    skippedOne: "1 is already there, so it's skipped.",
     first: "The first few:",
     add: "Add them",
     adding: "Adding…",
@@ -381,7 +386,8 @@ export const USER_LISTS = {
   },
 
   tryIt: {
-    testOnly: "Test only: this wasn't saved.",
+    // Q4 B4: the same words as the reply's own line.
+    testOnly: "Test only, not saved: Try it never saves bookings or details.",
   },
 
   purpose: {

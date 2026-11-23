@@ -30,12 +30,13 @@ import {
   BugReportFrequency,
   BugReportImpact,
   BugReportSurface,
-} from 'src/bug-hunter/util/bug-report-brief.util';
+} from '../util/bug-report-brief.util';
 
-import {
-  BUG_FIX_SESSION_REPOS,
-  BugFixSessionRepo,
-} from 'src/bug-hunter/constants/bug-fix-session.constants';
+import { BUG_HUNTER_V2_APPS } from 'src/bug-hunter-approvals/dto/board.dto';
+
+/** The apps a reporter may name (Bug Hunter v2's apps). */
+const BUG_FIX_SESSION_REPOS = BUG_HUNTER_V2_APPS;
+type BugFixSessionRepo = (typeof BUG_HUNTER_V2_APPS)[number];
 import {
   RoadmapBoardGroupBy,
   RoadmapOpportunityEffort,

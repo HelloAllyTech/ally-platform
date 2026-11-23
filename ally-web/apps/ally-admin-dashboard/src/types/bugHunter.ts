@@ -19,34 +19,6 @@ export enum BugHuntTrigger {
 }
 
 /**
- * One feature card: how a user-facing feature works across repos, written by
- * the weekly read-only map run and read by every study before it opens a
- * file. `GET /v1/bug-hunter/feature-maps`.
- */
-export interface BugHunterFeatureCard {
-  id: string;
-  repo: string;
-  slug: string;
-  title: string;
-  summary: string;
-  /** Where the value the user sees comes from — labels and content are different cards. */
-  valueSource: "database" | "locale_file" | "config" | "code" | "external";
-  entryPoints: string[];
-  endpoints: string[];
-  dataHomes: string[];
-  writtenBy: string | null;
-  relatedRepos: string[];
-  gotchas: string[];
-  sourceSha: string | null;
-  runId: string | null;
-  updatedAt: string;
-}
-
-export interface ListBugHunterFeatureMapsResponse {
-  cards: BugHunterFeatureCard[];
-}
-
-/**
  * Repos a fix session can run in — i.e. those carrying `bug-fix-session.yml`.
  * Mirrors ally-be's BUG_FIX_SESSION_REPOS; the admin picks from these when the
  * bug has no repo of its own yet.
@@ -241,31 +213,6 @@ export interface BugCaseBudget {
   overriddenAt: string | null;
 }
 
-/** One repo's day on the Work tab's board — mirrors ally-be's `BugHunterTodayRepo`. */
-export interface BugHunterTodayRepo {
-  repo: string;
-  sweeps: { completed: number; failed: number; skipped: number; running: number };
-  found: number;
-  verified: number;
-  refuted: number;
-  fixSessions: { byPerson: number; byAgent: number; running: number; failed: number };
-  fixesPassed: number;
-  fixesFailed: number;
-  /** Fix PRs open right now, whatever day they were opened. */
-  prsOpen: number;
-  merged: number;
-  released: number;
-  spendUsd: number;
-}
-
-export interface BugHunterToday {
-  date: string;
-  timeZone: string;
-  since: string;
-  repos: BugHunterTodayRepo[];
-  totals: Omit<BugHunterTodayRepo, "repo">;
-}
-
 /** The Verifier's judgement on a fix PR — mirrors ally-be's `BugFixVerdict` (OPP-0779). */
 export interface BugFixVerdictCheck {
   name: string;
@@ -365,29 +312,10 @@ export const BUG_FINDING_FIX_SESSION_START_STATUSES: BugFindingStatus[] = [
   BugFindingStatus.CANCELLED,
 ];
 
-/**
- * Statuses the description may be rewritten from. Mirrors ally-be's
- * BUG_FINDING_DESCRIPTION_EDITABLE_STATUSES, which is itself the fix-session
- * start list — the edit is offered exactly where "Put me on it" is, because
- * the point of editing is to improve the brief that button hands over.
- */
-export const BUG_FINDING_DESCRIPTION_EDITABLE_STATUSES: BugFindingStatus[] =
-  BUG_FINDING_FIX_SESSION_START_STATUSES;
-
-/** Cap on an edited description. Mirrors ally-be's BUG_FINDING_DESCRIPTION_MAX_LENGTH. */
-export const BUG_FINDING_DESCRIPTION_MAX_LENGTH = 5000;
-
 export interface BugHunterSettings {
   mode: BugHunterMode;
   updatedBy: number | null;
   updatedAt: string;
-}
-
-/** Which CLI the sweep/fix session runs on, and which models it and its escalation subagent use. */
-export interface BugHunterModelSettings {
-  engine: string;
-  defaultModel: string;
-  escalationModel: string;
 }
 
 export interface BugHuntEvent {
@@ -597,32 +525,6 @@ export interface BugFinding {
   updatedAt: string;
 }
 
-/** How loud a notification is. Only ACTION_NEEDED means Bug Hunter has stopped and is waiting on you. */
-export enum BugHunterNotificationLevel {
-  INFO = "info",
-  PROBLEM = "problem",
-  ACTION_NEEDED = "action_needed",
-}
-
-export interface BugHunterNotification {
-  id: string;
-  findingId: string | null;
-  runId: string | null;
-  repo: string | null;
-  level: BugHunterNotificationLevel;
-  title: string;
-  body: string | null;
-  readAt: string | null;
-  readBy: number | null;
-  createdAt: string;
-}
-
-export interface ListBugHunterNotificationsResponse {
-  items: BugHunterNotification[];
-  /** Drives the badge — unread across all levels. */
-  unreadCount: number;
-}
-
 /** One repo's worth of a multi-repo fix. The array order IS the ship order. */
 /**
  * What a person has to do on a multi-repo plan — derived by the server from
@@ -704,67 +606,6 @@ export interface BugHuntRun {
   createdAt: string;
 }
 
-export interface BugHuntRunDetail extends BugHuntRun {
-  events: BugHuntEvent[];
-}
-
-export interface ListBugHuntRunsResponse {
-  items: BugHuntRun[];
-}
-
-/**
- * Where a roadmap bug went. Returned by the deep-link lookup so an
- * `?opportunity=<id>` link to a bug can redirect rather than 404.
- *
- * `findingId` is null when no finding was ever opened for that roadmap row — a
- * bug filed before Bug Hunter's table existed, or one whose inbox write failed
- * (that write is best-effort by design).
- */
-export interface BugFindingRef {
-  findingId: string | null;
-}
-
-// ── metrics (GET /v1/bug-hunter/metrics) ──────────────────────────────────
-
-export interface BugHunterOperationsDay {
-  /** YYYY-MM-DD in the database clock (UTC). */
-  date: string;
-  /** New findings filed that day — distinct bugs, child steps excluded. */
-  filed: number;
-  /** Of `filed`, now at a fix stage or beyond. */
-  accepted: number;
-  /** Of `filed`, now dismissed or rejected. */
-  declined: number;
-  /** Of `filed`, still new or pending approval. */
-  undecided: number;
-  /** Tokens and cost spent by runs that started that day, by trigger. Always every trigger. */
-  tokens: Record<BugHuntTrigger, BugHunterOperationsTokens>;
-}
-
-export interface BugHunterOperationsTokens {
-  runs: number;
-  inputTokens: number;
-  outputTokens: number;
-  costUsd: number;
-}
-
-export interface BugHunterOperationsMetrics {
-  windowDays: number;
-  since: string;
-  /** Every calendar day in the window, oldest first, zeros included. */
-  days: BugHunterOperationsDay[];
-  totals: {
-    filed: number;
-    accepted: number;
-    declined: number;
-    undecided: number;
-    inputTokens: number;
-    outputTokens: number;
-    costUsd: number;
-    runs: number;
-  };
-}
-
 // ── the decision log, scoreboard and replay (OPP-0776 / OPP-0783) ─────────
 
 /** The eight orchestration points — mirrors ally-be's `DecisionPoint`. */
@@ -792,32 +633,6 @@ export interface BugHuntDecision {
   createdAt: string;
 }
 
-export interface BugHunterScoreboardCounts {
-  filed: number;
-  accepted: number;
-  declined: number;
-  pending: number;
-}
-
-export interface BugHunterScoreboardRow extends BugHunterScoreboardCounts {
-  repo: string;
-  sense: string;
-  engine: string | null;
-  model: string | null;
-}
-
-export interface BugHunterScoreboardFixRow {
-  sessions: number;
-  merged: number;
-  failed: number;
-  passVerdicts: number;
-  failVerdicts: number;
-  /** Released and re-checked gone in production — link six of the chain. */
-  held: number;
-  /** Refused at the wrong layer, reverted, regressed or back in production. */
-  cameBack: number;
-}
-
 /** Mirrors ally-be's BugWrongFix: a fix that turned out wrong, by the chain link that broke. */
 export interface BugWrongFix {
   link: BugChainLink;
@@ -827,65 +642,4 @@ export interface BugWrongFix {
   sha: string | null;
   by: string | null;
   at: string;
-}
-
-/** `GET /v1/bug-hunter/metrics/wrong-fixes` */
-export interface BugHunterWrongFixSummary {
-  windowDays: number;
-  since: string;
-  total: number;
-  byLink: Record<BugChainLink, number>;
-  bySource: Record<BugWrongFix["source"], number>;
-  recent: {
-    findingId: string;
-    title: string;
-    repo: string | null;
-    link: BugChainLink;
-    source: BugWrongFix["source"];
-    reason: string;
-    prUrl: string | null;
-    at: string;
-  }[];
-}
-
-/** What each sense and model has produced on a repo — mirrors ally-be's `Scoreboard`. */
-export interface BugHunterScoreboard {
-  repo: string;
-  days: number;
-  since: string;
-  rows: BugHunterScoreboardRow[];
-  bySense: Record<string, BugHunterScoreboardCounts>;
-  byModel: Record<string, BugHunterScoreboardCounts>;
-  /** Keyed `engine/model`: what each pair did as a fixer. */
-  fixByModel: Record<string, BugHunterScoreboardFixRow>;
-}
-
-export interface BugHuntDecisionReplayPoint {
-  point: BugHuntDecisionPoint;
-  owner: BugHuntDecisionOwner;
-  fixed: boolean;
-  decisions: number;
-  withShadow: number;
-  agreed: number;
-  disagreed: number;
-  ownerWins: number;
-  shadowWins: number;
-  undecided: number;
-  vetoes: number;
-  flipThreshold: number;
-  verdict: "flip" | "keep" | "not_enough_cases" | "fixed";
-}
-
-export interface BugHuntDecisionReplay {
-  days: number;
-  since: string;
-  generatedAt: string;
-  points: BugHuntDecisionReplayPoint[];
-}
-
-export interface BugHuntDecisionOwners {
-  owners: Record<BugHuntDecisionPoint, BugHuntDecisionOwner>;
-  defaults: Record<BugHuntDecisionPoint, BugHuntDecisionOwner>;
-  fixed: BugHuntDecisionPoint[];
-  overrides: Record<string, string>;
 }

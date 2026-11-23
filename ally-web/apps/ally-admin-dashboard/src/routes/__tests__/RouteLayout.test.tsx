@@ -78,6 +78,7 @@ vi.mock("@pages", () => ({
   DebriefConsole: () => <div>DebriefConsolePage</div>,
   DebriefSessionPage: () => <div>DebriefSessionPage</div>,
   AgentLogsPage: () => <div>AgentLogsPage</div>,
+  BugHunterV2ReportDetail: () => <div>BugHunterV2ReportDetailPage</div>,
   PmAgentPage: () => <div>PmAgentPage</div>,
   DebriefSettingsPage: () => <div>DebriefSettingsPage</div>,
   Competencies: () => <div>CompetenciesPage</div>,
@@ -320,6 +321,31 @@ describe("RouteLayout", () => {
     window.history.pushState({}, "", ROUTES.COURSE_COPILOT_SESSION("abc-123"));
     render(<RouteLayout />);
     expect(screen.getByText("CourseCopilotSessionPage")).toBeInTheDocument();
+  });
+
+  it("gates every Bug Hunter v2 route on the bug_hunter_v2_verdicts toggle", () => {
+    for (const [path, page] of [
+      [ROUTES.BUG_HUNTER_V2, "BugHunterPage"],
+      [ROUTES.BUG_HUNTER_V2_REPORT(7), "BugHunterV2ReportDetailPage"],
+    ] as const) {
+      privateLayoutCalls.props.length = 0;
+      window.history.pushState({}, "", path);
+      render(<RouteLayout />);
+      expect(screen.getByText(page)).toBeInTheDocument();
+      expect(privateLayoutCalls.props.at(-1)?.requiredFeature).toBe(
+        FeatureToggleKey.BUG_HUNTER_V2_VERDICTS,
+      );
+    }
+  });
+
+  // The old Bug Hunter's address now opens v2's page, keeping the query (a ?bug= link).
+  it("sends /bug-hunter to the Bug Hunter v2 page, query and all", () => {
+    window.history.pushState({}, "", `${ROUTES.BUG_HUNTER}?bucket=done`);
+    render(<RouteLayout />);
+    expect(screen.getByText("BugHunterPage")).toBeInTheDocument();
+    expect(window.location.pathname + window.location.search).toBe(
+      `${ROUTES.BUG_HUNTER_V2}?bucket=done`,
+    );
   });
 
   it("renders a run's Agent logs at /debriefs/sessions/:runId/logs, not the session route", () => {

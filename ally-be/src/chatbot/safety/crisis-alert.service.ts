@@ -13,6 +13,7 @@ import {
   WaMessageDirection,
   WaMessageStatus,
 } from '../../whatsapp/enum/whatsapp.enum';
+import { crisisHelplines } from '../engine/crisis-helplines';
 import { replyLanguageOf } from '../engine/reply-language';
 import {
   ConversationChannel,
@@ -544,8 +545,10 @@ export class CrisisAlertService implements OnModuleInit {
     const said = await this.lastInbound(conversationId);
     let numbers: string | undefined;
     try {
-      numbers = (await this.settings.getForChatbot(chatbot as never))
-        .helplineNumbers;
+      // Q4 G7: only numbers the owner confirmed.
+      numbers = crisisHelplines(
+        await this.settings.getForChatbot(chatbot as never),
+      );
     } catch {
       numbers = undefined;
     }

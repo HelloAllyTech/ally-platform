@@ -92,6 +92,22 @@ class BeforeChatAnswer(BaseModel):
     value: str = Field(..., max_length=120)
 
 
+class KeyFacts(BaseModel):
+    """The assistant's key facts (Q4 G3), in every run's passages."""
+
+    facts: List[str] = Field(default_factory=list, max_length=10)
+    #: Each fact's chunk in "What we learned" (None where it isn't indexed yet).
+    chunk_ids: List[Optional[str]] = Field(default_factory=list, max_length=10)
+    document_id: Optional[str] = Field(None, max_length=64)
+    title: Optional[str] = Field(None, max_length=200)
+
+    @field_validator("facts")
+    @classmethod
+    def _trim(cls, facts: List[str]) -> List[str]:
+        # Trimmed, never dropped: chunk_ids line up with facts by position.
+        return [(f or "").strip()[:400] for f in facts]
+
+
 class AgentRunRequest(KnowledgeAnswerRequest):
     conversation_id: str = Field(
         ...,
@@ -206,6 +222,14 @@ class AgentRunRequest(KnowledgeAnswerRequest):
         ),
     )
 
+    key_facts: Optional[KeyFacts] = Field(
+        None,
+        description=(
+            "Up to 10 facts always in the run's passages (Q4 G3): contact, hours, "
+            "fees, what the organisation does and where."
+        ),
+    )
+
     def to_bot(self) -> BotConfig:
         """The `bot` block of the run's state. It names the gateway's tools but
         never holds the gateway's URL or token: state is checkpointed."""
@@ -265,6 +289,8 @@ class AgentRunRequest(KnowledgeAnswerRequest):
             bot["person_name"] = self.person_name.strip()
         if self.before_chat:
             bot["before_chat"] = [a.model_dump() for a in self.before_chat]
+        if self.key_facts and self.key_facts.facts:
+            bot["key_facts"] = self.key_facts.model_dump()
         return bot
 
     @field_validator("knowledge_topics")

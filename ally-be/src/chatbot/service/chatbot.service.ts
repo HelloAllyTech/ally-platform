@@ -1,5 +1,6 @@
 import { LedgerService } from 'src/billing/service/ledger.service';
 import { PlanService } from 'src/billing/service/plan.service';
+import { replyLanguageOf } from '../engine/reply-language';
 import {
   BadRequestException,
   ForbiddenException,
@@ -58,7 +59,6 @@ import {
 import { withFirstMessageParts } from '../engine/first-reply';
 import { startNotice } from '../safety/chat-notice';
 import { GoLiveGateService } from '../safety/go-live-gate.service';
-import { replyLanguageOf } from '../engine/reply-language';
 import type { ChatbotModelChoice } from '../type/chatbot.type';
 import { AGENT_RUNTIME_DEGRADED_TYPE } from './agent-runtime-alert-throttle.service';
 import { QuickReplyCopyService } from '../quick-replies/quick-reply-copy.service';
@@ -237,6 +237,13 @@ const EMPTY_STATS: ChatbotStats = {
  * Every method that takes a bot id goes through ChatbotAccessService first, so a bot the caller is
  * not a member of answers 404 everywhere.
  */
+/** After a Try it reply that booked or changed something (Q4 B4): fixed text, by language. */
+export const TEST_NOT_SAVED: Record<string, string> = {
+  en: '(Test only, not saved: Try it never saves bookings or details.)',
+  hi: '(सिर्फ़ टेस्ट, सेव नहीं हुआ: Try it में कुछ सेव नहीं होता।)',
+  'hi-latn': '(Sirf test, save nahi hua: Try it mein kuch save nahi hota.)',
+};
+
 @Injectable()
 export class ChatbotService {
   private readonly logger = LoggerService.getInstance(ChatbotService.name);
@@ -1112,6 +1119,13 @@ export class ChatbotService {
       usedDraft: Boolean(dto.draft),
     });
     result.previewWrite = await this.previewWrote(decision.agent?.runId);
+    if (result.previewWrite) {
+      // Q4 B4 (Round 6: "All set, booked" in Try it): the reply itself says nothing was saved.
+      const line =
+        TEST_NOT_SAVED[replyLanguageOf(dto.message ?? '', null)] ??
+        TEST_NOT_SAVED.en;
+      result.reply = `${result.reply.trim()}\n\n${line}`;
+    }
     const remember = wouldRemember(decision);
     if (remember.length) result.wouldRemember = remember;
     return result;

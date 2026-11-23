@@ -44,6 +44,12 @@ const DEFAULT_BUCKET_FOR: Record<AnalyticsRange, AnalyticsBucket> = {
   all: 'month',
 };
 
+/** Counts for the period immediately before the selected one. */
+export interface PreviousPeriodCounts {
+  activeUsers: number;
+  simulationsCompleted: number;
+}
+
 @Injectable()
 export class TenantAnalyticsService {
   private readonly logger = LoggerService.getInstance(
@@ -210,6 +216,37 @@ export class TenantAnalyticsService {
       ),
       mostUsedSimulations,
     };
+  }
+
+  /**
+   * Counts for the period just before the selected one, the same length, so the
+   * headline tiles can say "up 4 on the previous 90 days". Null for `all`, which
+   * has no earlier period to compare with.
+   */
+  async getPreviousPeriodCounts(
+    tenantId: string,
+    range: AnalyticsRange,
+  ): Promise<PreviousPeriodCounts | null> {
+    if (range === 'all') return null;
+    const { start, endExclusive } = resolveAnalyticsWindow(
+      { range },
+      {
+        defaultRange: '30d',
+        defaultBucketFor: (r) => DEFAULT_BUCKET_FOR[r],
+      },
+    );
+    const previousStart = new Date(
+      start.getTime() - (endExclusive.getTime() - start.getTime()),
+    );
+    const [activeUsers, simulationsCompleted] = await Promise.all([
+      withReportingQuerySlot(() =>
+        this.repo.getActiveUserCount(tenantId, previousStart, start),
+      ),
+      withReportingQuerySlot(() =>
+        this.repo.getCompletedSimulationCount(tenantId, previousStart, start),
+      ),
+    ]);
+    return { activeUsers, simulationsCompleted };
   }
 
   /**

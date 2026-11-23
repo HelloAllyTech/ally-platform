@@ -28,7 +28,7 @@ vi.mock("@api", async importOriginal => ({
   useSetRoadmapStarMutation: () => [mockStar],
   useSetRoadmapWatchMutation: () => [mockWatch],
 }));
-vi.mock("../../ProductRoadmap/VoteButton", () => ({
+vi.mock("../components/VoteButton", () => ({
   VoteButton: ({
     onSetVotes,
   }: {

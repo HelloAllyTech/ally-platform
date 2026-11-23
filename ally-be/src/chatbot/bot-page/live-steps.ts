@@ -2,6 +2,7 @@ import type {
   AgentActivity,
   AgentActivityKind,
 } from '../../ai/dto/knowledge.dto';
+import type { CardHeadline } from '../agent-tools/entry-words';
 import { WaHandledBy } from '../../whatsapp/enum/whatsapp.enum';
 import { AgentRuntimeUsed } from '../enum/chatbot.enum';
 import type { ChatbotDecision } from '../engine/chatbot-engine.types';
@@ -27,8 +28,10 @@ export interface PublicConfirmation {
   list: string;
   /** The record's title: the day and time for a booking. */
   title: string;
-  /** Up to three other details the person may see (service, practitioner, status). */
+  /** Up to four other details the person may see (when, where, service, status). */
   details: { label: string; value: string }[];
+  /** What happened, by what the list is for (Q4 G5): the page words it. */
+  headline?: CardHeadline;
 }
 
 const KINDS = new Set<AgentActivityKind>([

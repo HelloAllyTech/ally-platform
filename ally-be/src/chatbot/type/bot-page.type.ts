@@ -52,8 +52,6 @@ export const HEADING_STYLES = ['classic', 'modern', 'friendly'] as const;
 export type HeadingStyle = (typeof HEADING_STYLES)[number];
 export const BRAND_THEMES = ['light', 'dark', 'auto'] as const;
 export type BrandTheme = (typeof BRAND_THEMES)[number];
-/** Landing gallery slots (chunk 20e uses them). */
-export const MAX_GALLERY_IMAGES = 6;
 
 /**
  * The page's look (chunk 20d, DESIGN.md §7): images by `bot_images` id, the owner's colour and its

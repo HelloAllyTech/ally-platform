@@ -5,16 +5,13 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { ANALYTICS_EVENTS, ANALYTICS_PROPS, Tooltip, useAnalytics } from "@ally-ui-mono/ui-shared";
-import { useCreateRoadmapIdeaDraftMutation, useTranscribeRoadmapIdeaMutation } from "@api";
 import { ROUTES } from "@constants";
 import { useUser } from "@hooks";
 import { useSpeechCapture } from "@hooks/useSpeechCapture";
-import { IDEA_DRAFT_TEXT_MAX } from "@types";
 
 import { MicBulbIcon } from "./MicBulbIcon";
-import { useGetPlanSettingsQuery, useStartPlanMutation } from "../../api/productPlanning";
-import { useCreateRoadmapDraftMutation } from "../../api/roadmapV2Flow";
-import { canFileIdeas } from "../../pages/ProductRoadmap/utils/access";
+import { useCreateRoadmapDraftMutation, useRoadmapDictateMutation } from "../../api/roadmapV2Flow";
+import { canFileIdeas } from "../../pages/Roadmap/utils/access";
 import { ROADMAP_IDEA_TEXT_MAX } from "../../types/roadmapV2Flow";
 
 const UNSENT_KEY = "ally-admin-idea-capture-unsent";
@@ -57,8 +54,7 @@ const wordCount = (text: string) => (text.trim() ? text.trim().split(/\s+/).leng
  * WHAT IT IS FOR. Getting the raw first version of an idea out before it evaporates. It does NOT
  * file anything: Save makes a private draft and opens it, to be expanded until it is mature
  * enough to be submitted to the board (the readiness check is what puts it on the roadmap).
- * While Roadmap v2 is on the draft opens on its own page (`/roadmap/i/:code`); before cutover it
- * lands in the author's "My drafts" tab on the Product Roadmap.
+ * The draft opens on its own page (`/roadmap/i/:code`) and is listed under the Roadmap's Drafts tab.
  *
  * THE MIC STARTS ITSELF. Opening is the user gesture, so recording starts inside the click
  * handler — no second "start" tap between having the thought and saying it. The orb is the one
@@ -84,10 +80,10 @@ export const IdeaCaptureLauncher: React.FC<IdeaCaptureLauncherProps> = ({
   size = "md",
   className = "",
 }) => {
-  const { permissions, features, user, isRoadmapV2On } = useUser();
-  // One limit end to end (audit rec. 6): with Roadmap v2 on, what this box accepts is exactly what
-  // a draft and Submit accept, so nothing typed here is refused later. The older store keeps its own.
-  const textMax = isRoadmapV2On ? ROADMAP_IDEA_TEXT_MAX : IDEA_DRAFT_TEXT_MAX;
+  const { permissions, features, user } = useUser();
+  // One limit end to end (audit rec. 6): what this box accepts is exactly what a draft and Submit
+  // accept, so nothing typed here is refused later.
+  const textMax = ROADMAP_IDEA_TEXT_MAX;
   const textMaxRef = useRef(textMax);
   textMaxRef.current = textMax;
   // Parking an idea is filing's first step: the Idea role (or above), as ally-be checks.
@@ -122,23 +118,18 @@ export const IdeaCaptureLauncher: React.FC<IdeaCaptureLauncherProps> = ({
   const [finishing, setFinishing] = useState(false);
   const closeTimer = useRef<number | null>(null);
 
-  const [createLegacyDraft, { isLoading: isSavingLegacy }] = useCreateRoadmapIdeaDraftMutation();
-  const [createV2Draft, { isLoading: isSavingV2 }] = useCreateRoadmapDraftMutation();
-  // With Roadmap planning on, "My drafts" is replaced by "My ideas" (parked plans), so a draft
-  // saved to the older store would be invisible. Park it as a plan instead.
-  const { data: planSettings } = useGetPlanSettingsQuery(undefined, { skip: !allowed });
-  const planningOn = !!planSettings?.enabled;
-  const [startPlan, { isLoading: isSavingPlan }] = useStartPlanMutation();
-  const isSaving = isSavingLegacy || isSavingV2 || isSavingPlan;
-  const [transcribeClip] = useTranscribeRoadmapIdeaMutation();
+  const [createDraft, { isLoading: isSaving }] = useCreateRoadmapDraftMutation();
+  const [dictate] = useRoadmapDictateMutation();
 
+  // No `code`: this mic has no draft to charge yet; the server still checks the role.
   const transcribe = useCallback(
-    async (clip: Blob) => {
+    async (clip: Blob, durationMs: number) => {
       const body = new FormData();
       body.append("audio", clip, `idea.${clipExtension(clip.type)}`);
-      return (await transcribeClip(body).unwrap()).text;
+      body.append("durationMs", String(durationMs));
+      return (await dictate(body).unwrap()).text;
     },
-    [transcribeClip],
+    [dictate],
   );
 
   const onTranscribeError = useCallback(() => {
@@ -252,21 +243,11 @@ export const IdeaCaptureLauncher: React.FC<IdeaCaptureLauncherProps> = ({
     }
     const captureMode = usedVoice.current ? "voice" : "typed";
     try {
-      // One pipeline, two stores until cutover: both hand back a private draft to open.
-      let destination: string;
-      if (isRoadmapV2On) {
-        const draft = await createV2Draft({
-          text: rawText.slice(0, ROADMAP_IDEA_TEXT_MAX),
-          captureMode,
-        }).unwrap();
-        destination = ROUTES.ROADMAP_IDEA(draft.code);
-      } else if (planningOn) {
-        await startPlan({ text: rawText, park: true }).unwrap();
-        destination = `${ROUTES.PRODUCT_ROADMAP}?tab=my-ideas`;
-      } else {
-        await createLegacyDraft({ rawText, captureMode }).unwrap();
-        destination = `${ROUTES.PRODUCT_ROADMAP}?tab=drafts`;
-      }
+      const draft = await createDraft({
+        text: rawText.slice(0, ROADMAP_IDEA_TEXT_MAX),
+        captureMode,
+      }).unwrap();
+      const destination = ROUTES.ROADMAP_IDEA(draft.code);
       track(ANALYTICS_EVENTS.IDEA_CAPTURE_DRAFT_SAVED, {
         [ANALYTICS_PROPS.CAPTURE_MODE]: captureMode,
       });
@@ -284,19 +265,7 @@ export const IdeaCaptureLauncher: React.FC<IdeaCaptureLauncherProps> = ({
           "Could not save that idea. Your words are still here — try again.",
       );
     }
-  }, [
-    isSaving,
-    finishing,
-    speech,
-    isRoadmapV2On,
-    createV2Draft,
-    createLegacyDraft,
-    planningOn,
-    startPlan,
-    finishClose,
-    navigate,
-    track,
-  ]);
+  }, [isSaving, finishing, speech, createDraft, finishClose, navigate, track]);
 
   // Keyboard: Esc closes (safely), Cmd/Ctrl+Enter saves.
   useEffect(() => {

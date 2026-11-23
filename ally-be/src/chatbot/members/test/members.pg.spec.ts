@@ -21,7 +21,7 @@ jest.mock('src/common/execution/execution-manager', () => ({
 
 /**
  * Stage 1b on real Postgres (runs only with CHATBOT_STORE_TEST_DB, see shared-store.pg.ts; the
- * database must be migrated through 1986500000200):
+ * database must be migrated through 1986540000200):
  * - the role-set migration's trigger when an OLD instance writes only `role`;
  * - two owners removing each other at the same instant: one wins, the bot keeps an owner;
  * - an invite for an email that has an account in another organisation;

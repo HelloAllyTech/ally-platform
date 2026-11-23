@@ -1,0 +1,76 @@
+diff --git a/apps/ally-helpline-dashboard/src/hooks/__tests__/useFieldAutosave.test.tsx b/apps/ally-helpline-dashboard/src/hooks/__tests__/useFieldAutosave.test.tsx
+index 49cadadd19..b2b05c9545 100644
+--- a/apps/ally-helpline-dashboard/src/hooks/__tests__/useFieldAutosave.test.tsx
++++ b/apps/ally-helpline-dashboard/src/hooks/__tests__/useFieldAutosave.test.tsx
+@@ -113,6 +113,37 @@ describe("useFieldAutosave", () => {
+     expect(result.current.getPending()).toEqual({ summary: { keyConcerns: "typed" } });
+   });
+ 
++  it("retries a failed write on its own, without waiting for a new edit", async () => {
++    // Mirrors Create Note's dictation flow: fields are filled once from the
++    // transcript and flushed, then nothing else edits the form. If that one
++    // write fails, "Couldn't save — we'll keep trying" is a lie unless a retry
++    // actually fires without another edit ever arriving.
++    const onPersist = vi
++      .fn()
++      .mockRejectedValueOnce(new Error("boom"))
++      .mockResolvedValueOnce(undefined);
++    const { result } = renderHook(() => useFieldAutosave({ onPersist, delayMs: 100 }));
++
++    act(() => {
++      result.current.edit("summary", "keyConcerns", "typed");
++    });
++    await act(async () => {
++      vi.advanceTimersByTime(100);
++      await settle();
++    });
++    expect(result.current.saveState).toBe("error");
++    expect(onPersist).toHaveBeenCalledTimes(1);
++
++    await act(async () => {
++      vi.advanceTimersByTime(100);
++      await settle();
++    });
++
++    expect(onPersist).toHaveBeenCalledTimes(2);
++    expect(result.current.saveState).toBe("saved");
++    expect(result.current.isDirty).toBe(false);
++  });
++
+   it("does not drop a keystroke that lands while a write is in flight", async () => {
+     const gate = deferred();
+     const onPersist = vi.fn().mockReturnValueOnce(gate.promise).mockResolvedValue(undefined);
+diff --git a/apps/ally-helpline-dashboard/src/hooks/useFieldAutosave.ts b/apps/ally-helpline-dashboard/src/hooks/useFieldAutosave.ts
+index 0f6f1b90a3..c72823130a 100644
+--- a/apps/ally-helpline-dashboard/src/hooks/useFieldAutosave.ts
++++ b/apps/ally-helpline-dashboard/src/hooks/useFieldAutosave.ts
+@@ -97,6 +97,8 @@ export function useFieldAutosave({
+   onPersistRef.current = onPersist;
+   const enabledRef = useRef(enabled);
+   enabledRef.current = enabled;
++  const delayMsRef = useRef(delayMs);
++  delayMsRef.current = delayMs;
+ 
+   const hasPendingEdits = useCallback(() => !isEmpty(pendingRef.current), []);
+   const getPending = useCallback(() => clone(pendingRef.current), []);
+@@ -139,8 +141,19 @@ export function useFieldAutosave({
+         setSaveState(isEmpty(pendingRef.current) ? "saved" : "saving");
+       } catch {
+         // Keep the edits pending so the next flush retries them, and let the
+-        // caller surface the failure rather than pretending it saved.
++        // caller surface the failure rather than pretending it saved. The
++        // status label promises "we'll keep trying", so that has to be true
++        // even when nothing edits the form again afterwards — dictated fields
++        // are filled and flushed once, with no further keystrokes to trigger
++        // a retry naturally.
+         setSaveState("error");
++        if (enabledRef.current) {
++          clearTimer();
++          timerRef.current = setTimeout(() => {
++            timerRef.current = null;
++            void write().catch(() => {});
++          }, delayMsRef.current);
++        }
+         throw new Error("autosave failed");
+       }
+     })();

@@ -40,13 +40,13 @@ export const UseCases: React.FC<UseCasesProps> = ({ onStart }) => {
   return (
     <section aria-label={copy.useCasesHeading} className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold text-[#1E1B4B]">{copy.useCasesHeading}</h2>
+        <h2 className="text-base font-semibold text-[#2B2520]">{copy.useCasesHeading}</h2>
         <div className="hidden gap-2 sm:flex">
           <button
             type="button"
             onClick={() => scrollBy(-1)}
             aria-label={copy.previousCases}
-            className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-[#1E1B4B]/25 hover:bg-[#5B4BFF] hover:text-[#FFFFFF] hover:border-[#5B4BFF]"
+            className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-[#2B2520]/25 hover:bg-[#C4532D] hover:text-[#FFFFFF] hover:border-[#C4532D]"
           >
             <BackArrowIcon className="h-5 w-5" />
           </button>
@@ -54,7 +54,7 @@ export const UseCases: React.FC<UseCasesProps> = ({ onStart }) => {
             type="button"
             onClick={() => scrollBy(1)}
             aria-label={copy.nextCases}
-            className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-[#1E1B4B]/25 hover:bg-[#5B4BFF] hover:text-[#FFFFFF] hover:border-[#5B4BFF]"
+            className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-[#2B2520]/25 hover:bg-[#C4532D] hover:text-[#FFFFFF] hover:border-[#C4532D]"
           >
             <ArrowSolid className="h-5 w-5" />
           </button>
@@ -122,7 +122,7 @@ const UseCaseDetail: React.FC<{ item: UseCase; onStart?: () => void; onClose: ()
       </div>
       <div className="flex flex-col gap-8 px-6 py-8">
         <div className="flex flex-col gap-4">
-          <h3 className="text-sm font-semibold tracking-wide text-[#1E1B4B]/60">
+          <h3 className="text-sm font-semibold tracking-wide text-[#2B2520]/60">
             {copy.whatItDoes}
           </h3>
           <ol className="flex flex-col gap-4">
@@ -135,27 +135,27 @@ const UseCaseDetail: React.FC<{ item: UseCase; onStart?: () => void; onClose: ()
                 >
                   {String(index + 1).padStart(2, "0")}
                 </span>
-                <span className="text-lg leading-snug text-[#1E1B4B]">{point}</span>
+                <span className="text-lg leading-snug text-[#2B2520]">{point}</span>
               </li>
             ))}
           </ol>
         </div>
         <div className="flex flex-col gap-3">
-          <h3 className="text-sm font-semibold tracking-wide text-[#1E1B4B]/60">
+          <h3 className="text-sm font-semibold tracking-wide text-[#2B2520]/60">
             {copy.exampleHeading}
           </h3>
-          <div className="flex flex-col gap-3 bg-[#1E1B4B]/[0.05] p-4">
+          <div className="flex flex-col gap-3 bg-[#2B2520]/[0.05] p-4">
             <p
               className="max-w-[85%] self-end rounded-2xl rounded-br-sm px-4 py-3 text-base"
               style={{ background: tone.bg, color: tone.fg }}
             >
               {item.detail.example.question}
             </p>
-            <p className="max-w-[85%] self-start rounded-2xl rounded-bl-sm bg-white px-4 py-3 text-base text-[#1E1B4B]">
+            <p className="max-w-[85%] self-start rounded-2xl rounded-bl-sm bg-white px-4 py-3 text-base text-[#2B2520]">
               {item.detail.example.answer}
             </p>
           </div>
-          <p className="text-xs text-[#1E1B4B]/50">{copy.exampleNote}</p>
+          <p className="text-xs text-[#2B2520]/50">{copy.exampleNote}</p>
         </div>
         <button
           type="button"

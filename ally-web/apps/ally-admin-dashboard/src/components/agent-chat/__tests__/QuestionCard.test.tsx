@@ -46,9 +46,7 @@ describe("agent-chat QuestionCard", () => {
   });
 
   it("compact: folds the rationale behind a toggle and keeps descriptions to one line", () => {
-    const { container } = render(
-      <QuestionCard question={single()} onAnswer={vi.fn()} compact />,
-    );
+    const { container } = render(<QuestionCard question={single()} onAnswer={vi.fn()} compact />);
 
     const toggle = screen.getByText(strings.whyAsked);
     expect(toggle.tagName).toBe("SUMMARY");

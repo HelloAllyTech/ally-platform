@@ -1,0 +1,133 @@
+diff --git a/src/roleplay-studio/service/copilot-orchestrator.service.ts b/src/roleplay-studio/service/copilot-orchestrator.service.ts
+index 86a63bb70c..1deb1ca796 100644
+--- a/src/roleplay-studio/service/copilot-orchestrator.service.ts
++++ b/src/roleplay-studio/service/copilot-orchestrator.service.ts
+@@ -371,6 +371,21 @@ export class CopilotOrchestratorService {
+           }
+         }
+         stopReason = wrapUpMessage?.stop_reason ?? 'end_turn';
++
++        // The wrap-up pass has no retry budget behind it — if it is itself
++        // cut off, the partial text it produced is not a complete answer and
++        // must not be persisted as one.
++        if (stopReason === 'max_tokens') {
++          turnErrored = true;
++          turnError = COPILOT_TRUNCATION_ERROR;
++          yield {
++            event: 'error',
++            data: {
++              code: 'response_truncated',
++              message: COPILOT_TRUNCATION_ERROR,
++            },
++          };
++        }
+       }
+     } catch (error) {
+       turnErrored = true;
+diff --git a/src/roleplay-studio/service/test/copilot-orchestrator.service.spec.ts b/src/roleplay-studio/service/test/copilot-orchestrator.service.spec.ts
+index c85837686c..3fb757a667 100644
+--- a/src/roleplay-studio/service/test/copilot-orchestrator.service.spec.ts
++++ b/src/roleplay-studio/service/test/copilot-orchestrator.service.spec.ts
+@@ -244,6 +244,34 @@ describe('CopilotOrchestratorService', () => {
+     );
+   });
+ 
++  it('flags a truncated wrap-up pass instead of persisting it as a success', async () => {
++    // Same iteration-cap situation as the pass above, but this time the
++    // tool-less wrap-up call itself hits max_tokens. There is no retry left
++    // for it — it must not be saved as a normal, complete answer.
++    let counter = 0;
++    streamMock.mockImplementation(() => {
++      counter += 1;
++      return counter <= MAX_ITERATIONS
++        ? makeStream([toolUseBlock(`tu-${counter}`)], 'tool_use')
++        : makeStream(
++            [{ type: 'text', text: 'Got most of it, but cut o' }],
++            'max_tokens',
++          );
++    });
++
++    const frames = await collect();
++    const events = frames.map((frame) => frame.event);
++
++    expect(streamMock).toHaveBeenCalledTimes(MAX_ITERATIONS + 1);
++    const error = frames.find((frame) => frame.event === 'error');
++    expect(error?.data.code).toBe('response_truncated');
++    expect(events[events.length - 1]).toBe('done');
++
++    const assistantRow = appendMessage.mock.calls[1][1];
++    expect(assistantRow.metadata.errored).toBe(true);
++    expect(assistantRow.metadata.errorMessage).toContain('one part at a time');
++  });
++
+   it('ends the turn immediately when a tool requests endTurn (ask_trainer)', async () => {
+     streamMock.mockReturnValue(
+       makeStream(
+diff --git a/src/scenario-character/service/character-interview-orchestrator.service.ts b/src/scenario-character/service/character-interview-orchestrator.service.ts
+index 6b2ef0ac4c..078bffd7ef 100644
+--- a/src/scenario-character/service/character-interview-orchestrator.service.ts
++++ b/src/scenario-character/service/character-interview-orchestrator.service.ts
+@@ -346,6 +346,21 @@ export class CharacterInterviewOrchestratorService {
+           }
+         }
+         stopReason = wrapUpMessage?.stop_reason ?? 'end_turn';
++
++        // The wrap-up pass has no retry budget behind it — if it is itself
++        // cut off, the partial text it produced is not a complete answer and
++        // must not be persisted as one.
++        if (stopReason === 'max_tokens') {
++          turnErrored = true;
++          turnError = CHARACTER_INTERVIEW_TRUNCATION_ERROR;
++          yield {
++            event: 'error',
++            data: {
++              code: 'response_truncated',
++              message: CHARACTER_INTERVIEW_TRUNCATION_ERROR,
++            },
++          };
++        }
+       }
+     } catch (error) {
+       turnErrored = true;
+diff --git a/src/scenario-character/service/test/character-interview-orchestrator.service.spec.ts b/src/scenario-character/service/test/character-interview-orchestrator.service.spec.ts
+index c4bb247055..fb3d6f2b91 100644
+--- a/src/scenario-character/service/test/character-interview-orchestrator.service.spec.ts
++++ b/src/scenario-character/service/test/character-interview-orchestrator.service.spec.ts
+@@ -163,6 +163,37 @@ describe('CharacterInterviewOrchestratorService — truncated turns', () => {
+     );
+   });
+ 
++  it('flags a truncated wrap-up pass instead of persisting it as a success', async () => {
++    // The model keeps calling save_character_draft until the iteration cap is
++    // hit, triggering a tool-less wrap-up pass. If that wrap-up pass is itself
++    // cut off, there is no retry budget left for it — it must not be saved as
++    // a complete, successful reply.
++    let counter = 0;
++    streamMock.mockImplementation(() => {
++      counter += 1;
++      return counter <= MAX_ITERATIONS
++        ? makeStream([draftBlock(`tu-${counter}`)], 'tool_use')
++        : makeStream(
++            [{ type: 'text', text: 'Asha is mostly done, but cut o' }],
++            'max_tokens',
++          );
++    });
++
++    const frames = await collect();
++    const events = frames.map((frame) => frame.event);
++
++    expect(streamMock).toHaveBeenCalledTimes(MAX_ITERATIONS + 1);
++    const error = frames.find((frame) => frame.event === 'error');
++    expect(error?.data.code).toBe('response_truncated');
++    expect(events[events.length - 1]).toBe('done');
++
++    const assistantRow = appendMessage.mock.calls[1][1];
++    expect(assistantRow.metadata.errored).toBe(true);
++    expect(assistantRow.metadata.errorMessage).toContain(
++      'no character was created',
++    );
++  });
++
+   it('flags a turn that came back with nothing in it', async () => {
+     streamMock.mockReturnValue(makeStream([], 'end_turn'));
+ 

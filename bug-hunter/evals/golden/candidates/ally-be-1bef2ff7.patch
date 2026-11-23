@@ -1,0 +1,66 @@
+diff --git a/src/language/service/glossary-adherence.service.ts b/src/language/service/glossary-adherence.service.ts
+index 552d3865aa..8209ae9c80 100644
+--- a/src/language/service/glossary-adherence.service.ts
++++ b/src/language/service/glossary-adherence.service.ts
+@@ -178,19 +178,27 @@ export class GlossaryAdherenceService {
+     totalViolations: number;
+     violations: GlossaryAdherenceViolation[];
+   } | null> {
+-    const [session] = await this.dataSource.query(
+-      `SELECT id, NULLIF(metadata->>'languageId', '')::int AS "languageId"
++    const [sessionInfo] = await this.dataSource.query(
++      `SELECT id, metadata->>'languageId' AS "languageId"
+        FROM scenario_sessions WHERE id = $1::uuid`,
+       [scenarioSessionId],
+     );
+-    if (!session) {
++    if (!sessionInfo) {
+       throw new NotFoundException(`Session ${scenarioSessionId} not found`);
+     }
+-    if (!session.languageId) return null;
+ 
+-    const sections = await this.glossaryRepository.findPublishedByLanguage(
+-      session.languageId,
+-    );
++    if (!sessionInfo.languageId) return null;
++
++    const languageId = parseInt(sessionInfo.languageId, 10);
++    if (isNaN(languageId)) {
++      this.logger.warn(
++        `[GLOSSARY_ADHERENCE] Session ${scenarioSessionId} has non-integer languageId '${sessionInfo.languageId}'. Skipping.`,
++      );
++      return null;
++    }
++
++    const sections =
++      await this.glossaryRepository.findPublishedByLanguage(languageId);
+     const avoidTerms = this.parseAvoidTerms(sections);
+     if (avoidTerms.length === 0) return null;
+ 
+@@ -218,7 +226,7 @@ export class GlossaryAdherenceService {
+       Object.fromEntries(sections.map((s) => [s.sectionCode, s.version]));
+ 
+     return {
+-      languageId: session.languageId,
++      languageId,
+       glossaryVersions,
+       agentMessageCount: messages.length,
+       totalViolations: violations.reduce((sum, v) => sum + v.count, 0),
+diff --git a/src/language/service/test/glossary-adherence.service.spec.ts b/src/language/service/test/glossary-adherence.service.spec.ts
+index 4d6dfbc10a..2232b22d63 100644
+--- a/src/language/service/test/glossary-adherence.service.spec.ts
++++ b/src/language/service/test/glossary-adherence.service.spec.ts
+@@ -212,6 +212,13 @@ describe('GlossaryAdherenceService', () => {
+       expect(await service.analyzeSession('sess-1')).toBeNull();
+     });
+ 
++    it('returns null on a non-integer languageId in session metadata', async () => {
++      dataSource.query.mockResolvedValueOnce([
++        { id: 'sess-1', languageId: 'en' },
++      ]);
++      expect(await service.analyzeSession('sess-1')).toBeNull();
++    });
++
+     it('scans agent messages and upserts a report with start_metrics provenance', async () => {
+       dataSource.query
+         .mockResolvedValueOnce([sessionRow]) // session lookup

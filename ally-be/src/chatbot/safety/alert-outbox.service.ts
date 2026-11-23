@@ -4,7 +4,6 @@ import { DataSource } from 'typeorm';
 import { LoggerService } from '../../logger/logger.service';
 
 export type OutboxChannel = 'email' | 'whatsapp' | 'web' | 'slack';
-export type OutboxState = 'pending' | 'sending' | 'sent' | 'failed';
 
 export interface OutboxRow {
   id: string;

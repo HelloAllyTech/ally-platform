@@ -292,6 +292,8 @@ export const READY_MADE: ReadyMadeItem[] = [
             ['booked', 'confirmed', 'completed', 'cancelled', 'no_show'],
             agent,
           ),
+          // Q4 B13: when it's booked for someone else (a mother, a child); the client is who booked.
+          field('booked_for', 'Booked for', ListFieldType.TEXT, agent),
           field('notes', 'Notes', ListFieldType.LONG_TEXT, {
             privacy: NEVER_FROM_CHAT,
           }),
