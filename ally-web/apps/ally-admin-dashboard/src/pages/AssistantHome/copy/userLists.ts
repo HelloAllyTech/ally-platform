@@ -350,6 +350,8 @@ export const USER_LISTS = {
     countOne: "This adds 1 entry.",
     nothing: "That adds nothing. Check the days and times.",
     skipped: "{n} are already there, so they're skipped.",
+    // Q4 H12 (P2-1: "1 are already there").
+    skippedOne: "1 is already there, so it's skipped.",
     first: "The first few:",
     add: "Add them",
     adding: "Adding…",

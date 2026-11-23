@@ -1073,7 +1073,7 @@ says when a save can't be made. More lines for the home's sections are added her
 - This adds {n} {list}.
 - This adds 1 entry.
 - That adds nothing. Check the days and times.
-- {n} are already there, so they're skipped.
+- {n} are already there, so they're skipped. · 1 is already there, so it's skipped. (Q4 H12)
 - The first few:
 - Add them
 - Adding…
