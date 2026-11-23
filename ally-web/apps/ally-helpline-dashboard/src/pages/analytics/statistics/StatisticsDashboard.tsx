@@ -157,14 +157,16 @@ export const StatisticsDashboard: FunctionComponent<StatisticsDashboardProps> = 
             />
             {editing ? (
               <>
-                <button
-                  type="button"
-                  onClick={() => setDrawerOpen(open => !open)}
-                  className="min-h-11 rounded border border-[#264d8e] bg-white px-4 text-sm font-medium text-[#264d8e]"
-                  data-testid="statistics-add-charts"
-                >
-                  {t("statisticsLibrary.addCharts")}
-                </button>
+                {!drawerOpen && (
+                  <button
+                    type="button"
+                    onClick={() => setDrawerOpen(true)}
+                    className="min-h-11 rounded border border-[#264d8e] bg-white px-4 text-sm font-medium text-[#264d8e]"
+                    data-testid="statistics-add-charts"
+                  >
+                    {t("statisticsLibrary.addCharts")}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={finishEditing}
@@ -177,7 +179,11 @@ export const StatisticsDashboard: FunctionComponent<StatisticsDashboardProps> = 
             ) : (
               <button
                 type="button"
-                onClick={() => setEditing(true)}
+                onClick={() => {
+                  // Customising opens the chart library straight away.
+                  setEditing(true);
+                  setDrawerOpen(true);
+                }}
                 className="min-h-11 rounded border border-[#264d8e] bg-white px-4 text-sm font-medium text-[#264d8e]"
                 data-testid="statistics-customise"
               >
