@@ -1,5 +1,6 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { TenantCapabilitiesRepository } from '../../repository/tenant-capabilities.repository';
+import { TenantOutcomesRepository } from '../../repository/tenant-outcomes.repository';
 import { TenantCapabilities } from '../../util/tenant-chart-library.util';
 import { TenantAnalyticsService } from '../tenant-analytics.service';
 import { TenantChartLibraryService } from '../tenant-chart-library.service';
@@ -27,6 +28,7 @@ const caps = (over: Partial<TenantCapabilities> = {}): TenantCapabilities => ({
 describe('TenantChartLibraryService', () => {
   let repo: jest.Mocked<TenantCapabilitiesRepository>;
   let analytics: jest.Mocked<TenantAnalyticsService>;
+  let outcomes: jest.Mocked<TenantOutcomesRepository>;
   let service: TenantChartLibraryService;
 
   beforeEach(() => {
@@ -36,10 +38,18 @@ describe('TenantChartLibraryService', () => {
     } as unknown as jest.Mocked<TenantCapabilitiesRepository>;
     analytics = {
       getOrganizationMetrics: jest.fn(),
+      getPreviousPeriodCounts: jest.fn(),
       getLearnerUsage: jest.fn(),
       getCourseUsage: jest.fn(),
     } as unknown as jest.Mocked<TenantAnalyticsService>;
-    service = new TenantChartLibraryService(repo, analytics);
+    outcomes = {
+      getScoreDistribution: jest.fn(),
+      getLearnerTrendCounts: jest.fn(),
+      getScenarioScores: jest.fn(),
+      getRatingCounts: jest.fn(),
+      getReviewCoverage: jest.fn(),
+    } as unknown as jest.Mocked<TenantOutcomesRepository>;
+    service = new TenantChartLibraryService(repo, analytics, outcomes);
   });
 
   const enabled = () =>
@@ -81,8 +91,18 @@ describe('TenantChartLibraryService', () => {
         'TSQ-007',
         'TSQ-008',
         'TSQ-009',
+        'TSQ-010',
         'TSQ-013',
+        'TSQ-014',
+        'TSQ-015',
+        'TSQ-016',
+        'TSQ-017',
+        'TSQ-020',
+        'TSQ-021',
+        'TSQ-022',
         'TSQ-023',
+        'TSQ-026',
+        'TSQ-027',
       ]);
       const byId = Object.fromEntries(lib.charts.map((c) => [c.id, c]));
       expect(byId['TSQ-001'].state).toBe('available');
@@ -122,24 +142,38 @@ describe('TenantChartLibraryService', () => {
       await expect(
         service.getChartData(TENANT, 'TSQ-999', {}),
       ).rejects.toBeInstanceOf(NotFoundException);
-      // TSQ-010 (days since last activity) is reserved but has no handler yet.
+      // TSQ-005 (weekday and hour) is planned: the id exists, nothing is offered.
       await expect(
-        service.getChartData(TENANT, 'TSQ-010', {}),
+        service.getChartData(TENANT, 'TSQ-005', {}),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      // TSQ-028 (seats) is blocked on a seat model.
+      await expect(
+        service.getChartData(TENANT, 'TSQ-028', {}),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it('returns the headline numbers from organization-metrics, defaulting to 90 days', async () => {
       enabled();
       const summary = { simulationsCompleted: 12 };
+      const previous = { activeUsers: 3, simulationsCompleted: 9 };
       analytics.getOrganizationMetrics.mockResolvedValue({
         summary,
       } as never);
+      analytics.getPreviousPeriodCounts.mockResolvedValue(previous);
       const out = await service.getChartData(TENANT, 'TSQ-001', {});
       expect(analytics.getOrganizationMetrics).toHaveBeenCalledWith(
         TENANT,
         '90d',
       );
-      expect(out).toEqual({ id: 'TSQ-001', state: 'available', data: summary });
+      expect(analytics.getPreviousPeriodCounts).toHaveBeenCalledWith(
+        TENANT,
+        '90d',
+      );
+      expect(out).toEqual({
+        id: 'TSQ-001',
+        state: 'available',
+        data: { ...summary, previous },
+      });
       // A chart that needs nothing does not pay for the capabilities query.
       expect(repo.getCapabilities).not.toHaveBeenCalled();
     });
@@ -149,6 +183,7 @@ describe('TenantChartLibraryService', () => {
       analytics.getOrganizationMetrics.mockResolvedValue({
         summary: {},
       } as never);
+      analytics.getPreviousPeriodCounts.mockResolvedValue(null);
       await service.getChartData(TENANT, 'TSQ-001', { range: '30d' });
       expect(analytics.getOrganizationMetrics).toHaveBeenCalledWith(
         TENANT,
@@ -307,6 +342,231 @@ describe('TenantChartLibraryService', () => {
         limit: 5,
         offset: 0,
       });
+    });
+  });
+
+  describe('course and activity charts', () => {
+    const course = (over: Record<string, unknown>) => ({
+      id: 'c1',
+      title: 'Course',
+      learnersAssigned: 4,
+      learnersStarted: 0,
+      learnersAtLeast50: 0,
+      learnersCompleted100: 0,
+      inProgressStalled: 0,
+      ...over,
+    });
+    const withCourses = (rows: unknown[], count = rows.length) => {
+      enabled();
+      repo.getCapabilities.mockResolvedValue(caps({ courseEnrolments: 9 }));
+      analytics.getCourseUsage.mockResolvedValue({
+        data: rows,
+        count,
+      } as never);
+    };
+
+    it('TSQ-014 splits courses into in use and idle', async () => {
+      withCourses([
+        course({ id: 'a', learnersStarted: 2 }),
+        course({ id: 'b' }),
+        course({ id: 'c' }),
+      ]);
+      const out = await service.getChartData(TENANT, 'TSQ-014', {});
+      expect(out.data).toEqual({
+        total: 3,
+        inUse: 1,
+        idle: 2,
+        truncated: false,
+      });
+    });
+
+    it('TSQ-015 ranks courses by stalled learners and drops zeros', async () => {
+      withCourses([
+        course({ id: 'a', title: 'A', inProgressStalled: 1 }),
+        course({ id: 'b', title: 'B', inProgressStalled: 5 }),
+        course({ id: 'c', title: 'C', inProgressStalled: 0 }),
+      ]);
+      const out = await service.getChartData(TENANT, 'TSQ-015', {});
+      expect(out.data).toEqual({
+        truncated: false,
+        rows: [
+          { id: 'b', title: 'B', count: 5 },
+          { id: 'a', title: 'A', count: 1 },
+        ],
+      });
+    });
+
+    it('TSQ-016 ranks courses by learners assigned but not started', async () => {
+      withCourses([
+        course({ id: 'a', learnersAssigned: 10, learnersStarted: 4 }),
+        course({ id: 'b', learnersAssigned: 3, learnersStarted: 3 }),
+      ]);
+      const out = await service.getChartData(TENANT, 'TSQ-016', {});
+      expect(out.data).toEqual({
+        truncated: false,
+        rows: [{ id: 'a', title: 'Course', count: 6 }],
+      });
+    });
+
+    it('TSQ-017 sums the stages across courses and flags truncation', async () => {
+      withCourses(
+        [
+          course({
+            learnersAssigned: 10,
+            learnersStarted: 8,
+            learnersAtLeast50: 5,
+            learnersCompleted100: 2,
+          }),
+          course({
+            learnersAssigned: 6,
+            learnersStarted: 3,
+            learnersAtLeast50: 1,
+            learnersCompleted100: 1,
+          }),
+        ],
+        250,
+      );
+      const out = await service.getChartData(TENANT, 'TSQ-017', {});
+      expect(out.data).toEqual({
+        truncated: true,
+        stages: [
+          { key: 'assigned', count: 16 },
+          { key: 'started', count: 11 },
+          { key: 'halfway', count: 6 },
+          { key: 'completed', count: 3 },
+        ],
+      });
+    });
+
+    it('TSQ-010 bands learners by days since last activity', async () => {
+      enabled();
+      const row = (days: number | null) => ({ daysSinceLastActivity: days });
+      analytics.getLearnerUsage.mockResolvedValue({
+        count: 6,
+        data: [row(0), row(7), row(10), row(25), row(80), row(null)],
+      } as never);
+      const out = await service.getChartData(TENANT, 'TSQ-010', {});
+      expect(out.data).toEqual({
+        total: 6,
+        truncated: false,
+        bands: [
+          { key: 'week', count: 2 },
+          { key: 'fortnight', count: 1 },
+          { key: 'month', count: 1 },
+          { key: 'older', count: 1 },
+          { key: 'never', count: 1 },
+        ],
+      });
+    });
+  });
+
+  describe('outcome and feedback charts', () => {
+    const ready = () => {
+      enabled();
+      repo.getCapabilities.mockResolvedValue(
+        caps({
+          scoredSessions90: 40,
+          learnersWithRepeatScoredSessions: 9,
+          ratings: 30,
+          reviews: 4,
+        }),
+      );
+    };
+
+    it('TSQ-020 returns the score bins and the median', async () => {
+      ready();
+      const dist = {
+        bins: [0, 0, 0, 0, 3, 1, 13, 132, 171, 0],
+        sessions: 320,
+        median: 80,
+      };
+      outcomes.getScoreDistribution.mockResolvedValue(dist);
+      const out = await service.getChartData(TENANT, 'TSQ-020', {});
+      expect(out.data).toEqual(dist);
+      expect(outcomes.getScoreDistribution).toHaveBeenCalledWith(
+        TENANT,
+        'internal1',
+        expect.any(Date),
+        expect.any(Date),
+      );
+    });
+
+    it('TSQ-021 adds the total and the threshold to the trend counts', async () => {
+      ready();
+      outcomes.getLearnerTrendCounts.mockResolvedValue({
+        improving: 8,
+        holding: 5,
+        declining: 0,
+      });
+      const out = await service.getChartData(TENANT, 'TSQ-021', {});
+      expect(out.data).toEqual({
+        improving: 8,
+        holding: 5,
+        declining: 0,
+        total: 13,
+        threshold: 5,
+      });
+    });
+
+    it('TSQ-022 passes the minimum sessions and limit, lowest first', async () => {
+      ready();
+      outcomes.getScenarioScores.mockResolvedValue([
+        { scenarioId: 1, title: 'A', averageScore: 54, sessions: 5 },
+      ]);
+      const out = await service.getChartData(TENANT, 'TSQ-022', {});
+      expect(out.data).toEqual({
+        rows: [{ scenarioId: 1, title: 'A', averageScore: 54, sessions: 5 }],
+      });
+      expect(outcomes.getScenarioScores).toHaveBeenCalledWith(
+        TENANT,
+        'internal1',
+        expect.any(Date),
+        expect.any(Date),
+        3,
+        8,
+      );
+    });
+
+    it('TSQ-026 returns rating counts and no comments', async () => {
+      ready();
+      const ratings = { stars: [11, 5, 55, 36, 135], count: 242, average: 4.2 };
+      outcomes.getRatingCounts.mockResolvedValue(ratings);
+      const out = await service.getChartData(TENANT, 'TSQ-026', {});
+      expect(out.data).toEqual(ratings);
+    });
+
+    it('TSQ-027 returns how many completed sessions were shared for review', async () => {
+      ready();
+      outcomes.getReviewCoverage.mockResolvedValue({
+        completedSessions: 371,
+        reviewedSessions: 12,
+      });
+      const out = await service.getChartData(TENANT, 'TSQ-027', {});
+      expect(out.data).toEqual({
+        completedSessions: 371,
+        reviewedSessions: 12,
+      });
+    });
+
+    it('an organisation range of all time starts at the epoch', async () => {
+      ready();
+      outcomes.getRatingCounts.mockResolvedValue({
+        stars: [0, 0, 0, 0, 0],
+        count: 0,
+        average: null,
+      });
+      await service.getChartData(TENANT, 'TSQ-026', { range: 'all' });
+      const start = outcomes.getRatingCounts.mock.calls[0][2] as Date;
+      expect(start.getTime()).toBe(0);
+    });
+
+    it('refuses a chart the organisation cannot fill yet, as before', async () => {
+      enabled();
+      repo.getCapabilities.mockResolvedValue(caps({ reviews: 0 }));
+      await expect(
+        service.getChartData(TENANT, 'TSQ-027', {}),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(outcomes.getReviewCoverage).not.toHaveBeenCalled();
     });
   });
 

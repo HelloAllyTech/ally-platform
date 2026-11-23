@@ -16,6 +16,8 @@ import {
   TenantChartLibraryResponseDto,
 } from '../dto/tenant-chart-library.dto';
 import { TenantCapabilitiesRepository } from '../repository/tenant-capabilities.repository';
+import { TenantOutcomesRepository } from '../repository/tenant-outcomes.repository';
+import { resolveAnalyticsWindow } from '../util/analytics-window.util';
 import {
   ChartAvailability,
   TenantCapabilities,
@@ -35,12 +37,29 @@ export interface TenantChartParams {
 type ChartHandler = (
   tenantId: string,
   params: TenantChartParams,
+  /** The tenant's short code, the second spelling its varchar tenant columns may hold. */
+  tenantCode: string,
 ) => Promise<unknown>;
 
 const DEFAULT_CHART_RANGE: AnalyticsRange = '90d';
+/** A learner's score must move this many points (of 100) to count as up or down. */
+const TREND_THRESHOLD_POINTS = 5;
+/** A scenario needs this many scored sessions before its average is shown. */
+const SCENARIO_MIN_SESSIONS = 3;
+const SCENARIO_LIMIT = 8;
 /** The learner-usage page limit: the most learners a status count reads. */
 const STATUS_COUNT_LEARNER_CAP = 200;
 const TOP_LEARNERS_LIMIT = 6;
+const COURSE_READ_CAP = 200;
+const COURSE_RANKING_LIMIT = 6;
+/** Bands for days since last activity; the last band is learners who never started. */
+const ACTIVITY_BANDS: Array<{ key: string; maxDays: number }> = [
+  { key: 'week', maxDays: 7 },
+  { key: 'fortnight', maxDays: 14 },
+  { key: 'month', maxDays: 30 },
+  { key: 'older', maxDays: Number.POSITIVE_INFINITY },
+  { key: 'never', maxDays: Number.NEGATIVE_INFINITY },
+];
 const ATTENTION_LEARNERS_LIMIT = 5;
 
 export interface LearnerStatusCountsData {
@@ -48,6 +67,67 @@ export interface LearnerStatusCountsData {
   /** True when the organisation has more learners than were counted. */
   truncated: boolean;
   counts: Record<LearnerUsageStatus, number>;
+}
+
+export interface ScoreDistributionData {
+  /** Ten bins: 0-9, 10-19, ... 90-100. */
+  bins: number[];
+  sessions: number;
+  median: number | null;
+}
+
+export interface LearnerTrendData {
+  improving: number;
+  holding: number;
+  declining: number;
+  /** Learners with at least two scored sessions in the period. */
+  total: number;
+  /** Points a score must move to count as up or down. */
+  threshold: number;
+}
+
+export interface ScenarioScoresData {
+  rows: Array<{
+    scenarioId: number;
+    title: string;
+    averageScore: number;
+    sessions: number;
+  }>;
+}
+
+export interface RatingsData {
+  /** Index 0 is one star, index 4 is five stars. */
+  stars: number[];
+  count: number;
+  average: number | null;
+}
+
+export interface ReviewCoverageData {
+  completedSessions: number;
+  reviewedSessions: number;
+}
+
+export interface CoursesInUseData {
+  total: number;
+  inUse: number;
+  idle: number;
+  truncated: boolean;
+}
+
+export interface CourseRankingData {
+  truncated: boolean;
+  rows: Array<{ id: string; title: string; count: number }>;
+}
+
+export interface CourseFunnelData {
+  truncated: boolean;
+  stages: Array<{ key: string; count: number }>;
+}
+
+export interface DaysSinceActivityData {
+  total: number;
+  truncated: boolean;
+  bands: Array<{ key: string; count: number }>;
 }
 
 export interface TopLearnersData {
@@ -81,16 +161,19 @@ export class TenantChartLibraryService {
   constructor(
     private readonly capabilitiesRepo: TenantCapabilitiesRepository,
     private readonly tenantAnalytics: TenantAnalyticsService,
+    private readonly outcomesRepo: TenantOutcomesRepository,
   ) {
     this.handlers = {
-      // Headline numbers: the summary block of organization-metrics.
-      'TSQ-001': async (tenantId, p) =>
-        (
-          await this.tenantAnalytics.getOrganizationMetrics(
-            tenantId,
-            p.range ?? DEFAULT_CHART_RANGE,
-          )
-        ).summary,
+      // Headline numbers: the summary block of organization-metrics, plus the
+      // previous period's counts so the tiles can show the change.
+      'TSQ-001': async (tenantId, p) => {
+        const range = p.range ?? DEFAULT_CHART_RANGE;
+        const [metrics, previous] = await Promise.all([
+          this.tenantAnalytics.getOrganizationMetrics(tenantId, range),
+          this.tenantAnalytics.getPreviousPeriodCounts(tenantId, range),
+        ]);
+        return { ...metrics.summary, previous };
+      },
       // Usage over time: the per-bucket active-learner trend.
       'TSQ-002': async (tenantId, p) => {
         const m = await this.tenantAnalytics.getOrganizationMetrics(
@@ -111,6 +194,27 @@ export class TenantChartLibraryService {
       'TSQ-008': (tenantId, p) => this.topLearners(tenantId, p),
       // Learners who practised before and then went quiet, most overdue first.
       'TSQ-023': (tenantId, p) => this.learnersNeedingAttention(tenantId, p),
+      // Days since each learner last did anything, in bands.
+      'TSQ-010': (tenantId, p) => this.daysSinceLastActivity(tenantId, p),
+      // Courses someone has started versus courses nobody has.
+      'TSQ-014': (tenantId) => this.coursesInUse(tenantId),
+      // Courses ranked by learners stalled in them.
+      'TSQ-015': (tenantId) => this.coursesRankedBy(tenantId, 'stalled'),
+      // Courses ranked by learners assigned but not yet started.
+      'TSQ-016': (tenantId) => this.coursesRankedBy(tenantId, 'notStarted'),
+      // How far enrolments get: assigned, started, halfway, completed.
+      'TSQ-017': (tenantId) => this.courseFunnel(tenantId),
+      // How session scores spread, in ten bins, with the median.
+      'TSQ-020': (tenantId, p, code) =>
+        this.scoreDistribution(tenantId, code, p),
+      // Learners whose latest score is up, level or down on their first.
+      'TSQ-021': (tenantId, p, code) => this.learnerTrends(tenantId, code, p),
+      // Scenarios with enough scored sessions, lowest average first.
+      'TSQ-022': (tenantId, p, code) => this.scenarioScores(tenantId, code, p),
+      // Session ratings: how many of each star, and the average. No comments.
+      'TSQ-026': (tenantId, p, code) => this.ratings(tenantId, code, p),
+      // How many completed sessions have been shared for review.
+      'TSQ-027': (tenantId, p, code) => this.reviewCoverage(tenantId, code, p),
       // Most-used simulations.
       'TSQ-003': async (tenantId, p) =>
         (
@@ -212,7 +316,7 @@ export class TenantChartLibraryService {
       throw new ForbiddenException(availability.reason ?? 'Chart unavailable');
     }
 
-    const data = await handler(tenantId, params);
+    const data = await handler(tenantId, params, keys.code);
     return { id: entry.id, state: availability.state, data };
   }
 
@@ -293,6 +397,193 @@ export class TenantChartLibraryService {
         status: row.status,
         daysSinceLastActivity: row.daysSinceLastActivity,
       })),
+    };
+  }
+
+  /** The `[start, endExclusive)` window for a range; `all` runs from the epoch. */
+  private windowFor(range: AnalyticsRange): {
+    start: Date;
+    endExclusive: Date;
+  } {
+    if (range === 'all') {
+      return {
+        start: new Date(0),
+        endExclusive: new Date(Date.now() + 86_400_000),
+      };
+    }
+    const { start, endExclusive } = resolveAnalyticsWindow(
+      { range },
+      { defaultRange: DEFAULT_CHART_RANGE, defaultBucketFor: () => 'week' },
+    );
+    return { start, endExclusive };
+  }
+
+  private async scoreDistribution(
+    tenantId: string,
+    code: string,
+    p: TenantChartParams,
+  ): Promise<ScoreDistributionData> {
+    const { start, endExclusive } = this.windowFor(
+      p.range ?? DEFAULT_CHART_RANGE,
+    );
+    return this.outcomesRepo.getScoreDistribution(
+      tenantId,
+      code,
+      start,
+      endExclusive,
+    );
+  }
+
+  private async learnerTrends(
+    tenantId: string,
+    code: string,
+    p: TenantChartParams,
+  ): Promise<LearnerTrendData> {
+    const { start, endExclusive } = this.windowFor(
+      p.range ?? DEFAULT_CHART_RANGE,
+    );
+    const counts = await this.outcomesRepo.getLearnerTrendCounts(
+      tenantId,
+      code,
+      start,
+      endExclusive,
+      TREND_THRESHOLD_POINTS,
+    );
+    return {
+      ...counts,
+      total: counts.improving + counts.holding + counts.declining,
+      threshold: TREND_THRESHOLD_POINTS,
+    };
+  }
+
+  private async scenarioScores(
+    tenantId: string,
+    code: string,
+    p: TenantChartParams,
+  ): Promise<ScenarioScoresData> {
+    const { start, endExclusive } = this.windowFor(
+      p.range ?? DEFAULT_CHART_RANGE,
+    );
+    return {
+      rows: await this.outcomesRepo.getScenarioScores(
+        tenantId,
+        code,
+        start,
+        endExclusive,
+        SCENARIO_MIN_SESSIONS,
+        SCENARIO_LIMIT,
+      ),
+    };
+  }
+
+  private async ratings(
+    tenantId: string,
+    code: string,
+    p: TenantChartParams,
+  ): Promise<RatingsData> {
+    const { start, endExclusive } = this.windowFor(
+      p.range ?? DEFAULT_CHART_RANGE,
+    );
+    return this.outcomesRepo.getRatingCounts(
+      tenantId,
+      code,
+      start,
+      endExclusive,
+    );
+  }
+
+  private async reviewCoverage(
+    tenantId: string,
+    code: string,
+    p: TenantChartParams,
+  ): Promise<ReviewCoverageData> {
+    const { start, endExclusive } = this.windowFor(
+      p.range ?? DEFAULT_CHART_RANGE,
+    );
+    return this.outcomesRepo.getReviewCoverage(
+      tenantId,
+      code,
+      start,
+      endExclusive,
+    );
+  }
+
+  /** Every course for the tenant, read once. `truncated` when there are more. */
+  private async allCourses(tenantId: string) {
+    const usage = await this.tenantAnalytics.getCourseUsage(tenantId, {
+      limit: COURSE_READ_CAP,
+      offset: 0,
+    });
+    return { rows: usage.data, truncated: usage.count > usage.data.length };
+  }
+
+  private async coursesInUse(tenantId: string): Promise<CoursesInUseData> {
+    const { rows, truncated } = await this.allCourses(tenantId);
+    const inUse = rows.filter((c) => c.learnersStarted > 0).length;
+    return { total: rows.length, inUse, idle: rows.length - inUse, truncated };
+  }
+
+  private async coursesRankedBy(
+    tenantId: string,
+    measure: 'stalled' | 'notStarted',
+  ): Promise<CourseRankingData> {
+    const { rows, truncated } = await this.allCourses(tenantId);
+    const value = (c: (typeof rows)[number]) =>
+      measure === 'stalled'
+        ? c.inProgressStalled
+        : c.learnersAssigned - c.learnersStarted;
+    return {
+      truncated,
+      rows: rows
+        .map((c) => ({ id: c.id, title: c.title, count: value(c) }))
+        .filter((c) => c.count > 0)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, COURSE_RANKING_LIMIT),
+    };
+  }
+
+  /**
+   * Enrolments, not people: a learner in three courses counts three times.
+   * Summed across courses so the funnel reads as the organisation's whole
+   * course load; a per-course funnel is a later parameter.
+   */
+  private async courseFunnel(tenantId: string): Promise<CourseFunnelData> {
+    const { rows, truncated } = await this.allCourses(tenantId);
+    const sum = (pick: (c: (typeof rows)[number]) => number) =>
+      rows.reduce((n, c) => n + pick(c), 0);
+    return {
+      truncated,
+      stages: [
+        { key: 'assigned', count: sum((c) => c.learnersAssigned) },
+        { key: 'started', count: sum((c) => c.learnersStarted) },
+        { key: 'halfway', count: sum((c) => c.learnersAtLeast50) },
+        { key: 'completed', count: sum((c) => c.learnersCompleted100) },
+      ],
+    };
+  }
+
+  private async daysSinceLastActivity(
+    tenantId: string,
+    p: TenantChartParams,
+  ): Promise<DaysSinceActivityData> {
+    const usage = await this.tenantAnalytics.getLearnerUsage(tenantId, {
+      range: p.range ?? DEFAULT_CHART_RANGE,
+      limit: STATUS_COUNT_LEARNER_CAP,
+      offset: 0,
+    });
+    const bands = ACTIVITY_BANDS.map((band) => ({ key: band.key, count: 0 }));
+    usage.data.forEach((row) => {
+      const days = row.daysSinceLastActivity;
+      const index =
+        days == null
+          ? bands.length - 1
+          : ACTIVITY_BANDS.findIndex((b) => days <= b.maxDays);
+      bands[index === -1 ? bands.length - 2 : index].count += 1;
+    });
+    return {
+      total: usage.count,
+      truncated: usage.count > usage.data.length,
+      bands,
     };
   }
 

@@ -140,6 +140,7 @@ import { PlatformAnalyticsRepository } from './repository/platform-analytics.rep
 import { TenantAnalyticsRepository } from './repository/tenant-analytics.repository';
 import { TenantAnalyticsService } from './service/tenant-analytics.service';
 import { TenantCapabilitiesRepository } from './repository/tenant-capabilities.repository';
+import { TenantOutcomesRepository } from './repository/tenant-outcomes.repository';
 import { TenantChartLibraryService } from './service/tenant-chart-library.service';
 import { ScribeAnalyticsRepository } from './repository/scribe-analytics.repository';
 import { LlmUsageRepository } from './repository/llm-usage.repository';
@@ -372,6 +373,7 @@ import { TenantModule } from 'src/tenant/tenant.module';
     TenantAnalyticsService,
     TenantAnalyticsRepository,
     TenantCapabilitiesRepository,
+    TenantOutcomesRepository,
     TenantChartLibraryService,
     ScribeAnalyticsRepository,
     LlmUsageRepository,

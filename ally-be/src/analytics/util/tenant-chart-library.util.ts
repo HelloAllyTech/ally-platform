@@ -92,6 +92,12 @@ export function validateChartLibrary(
         `${entry.id}: chart "${entry.chart}" is not allowed for shape "${entry.shape}"`,
       );
     }
+    if (entry.sources.length === 0) {
+      problems.push(`${entry.id}: needs at least one source`);
+    }
+    if (entry.live && entry.blockedBy) {
+      problems.push(`${entry.id}: a live chart cannot be blocked`);
+    }
     entry.needs.forEach((r) => {
       if (r.min < 1) problems.push(`${entry.id}: ${r.signal} min must be >= 1`);
       if (r.sparseMin !== undefined && r.sparseMin >= r.min) {

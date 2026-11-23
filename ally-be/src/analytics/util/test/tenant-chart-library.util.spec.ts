@@ -32,8 +32,40 @@ describe('tenant chart library registry', () => {
     expect(validateChartLibrary()).toEqual([]);
   });
 
-  it('holds the 27 Release 1 charts', () => {
-    expect(TENANT_CHART_LIBRARY).toHaveLength(27);
+  it('holds every chart from the doc and the research: 82', () => {
+    expect(TENANT_CHART_LIBRARY).toHaveLength(82);
+  });
+
+  it('keeps the first-release ids 1 to 27 where they were', () => {
+    expect(TENANT_CHART_LIBRARY[0].id).toBe('TSQ-001');
+    expect(TENANT_CHART_LIBRARY[0].title).toBe('Headline numbers');
+    expect(TENANT_CHART_LIBRARY[26].id).toBe('TSQ-027');
+    expect(TENANT_CHART_LIBRARY[26].title).toBe('Sessions reviewed');
+  });
+
+  it('records where every chart came from', () => {
+    TENANT_CHART_LIBRARY.forEach((c) => {
+      expect(c.sources.length).toBeGreaterThan(0);
+    });
+    expect(TENANT_CHART_LIBRARY.some((c) => c.sources.includes('doc'))).toBe(
+      true,
+    );
+    expect(
+      TENANT_CHART_LIBRARY.some((c) => c.sources.includes('research')),
+    ).toBe(true);
+  });
+
+  it('never offers a blocked chart', () => {
+    TENANT_CHART_LIBRARY.filter((c) => c.blockedBy).forEach((c) => {
+      expect(c.live).toBe(false);
+    });
+  });
+
+  it('reports a live chart that is also blocked', () => {
+    const bad = [{ ...TENANT_CHART_LIBRARY[0], blockedBy: 'because' }];
+    expect(validateChartLibrary(bad)).toEqual(
+      expect.arrayContaining([expect.stringContaining('cannot be blocked')]),
+    );
   });
 
   it('allows at least one chart type for every shape', () => {
