@@ -36,6 +36,11 @@ T1's templates install lists and settings, but on 22 Nov they didn't fit the org
 - **Suggest the right template:** after reading, setup suggests the template that fits what was read (food rescue → Donors and volunteers or the new one; a helpline → Helpline), with the reason in one line, and the owner can choose another.
 - **The organisation templates' lists are ready-made lists too** (Volunteer sign-ups, Volunteer shifts, Donor enquiries, Ways to give, Applications, Services, Updates, Questions for the team), so an existing assistant can add them from Tools.
 
+## 3b. Template answers are used everywhere (Round 8)
+
+- **Setup's quick questions skip what the template already asked** (Akshaya Patra was asked how people donate and volunteer right after answering both).
+- **Template answers become facts the assistant uses,** including locations and hours (Jaipur Foot: "I don't have opening hours" though entered), and the **checkup is built around the template's use case** (Akshaya Patra's checkup asked about COVID meal costs, nothing about donating), graded against the owner's answers.
+
 ## 4. Installing on an existing assistant is explicit
 
 - **Tools → Add from a template** names the assistant ("Add Helpline and crisis support to Robin Hood Army?"), lists what it adds, and asks to confirm. `chatbot_template_installs` records who installed it and when; How it works shows both.
