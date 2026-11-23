@@ -22,6 +22,25 @@ API = "https://api.github.com"
 Opener = Callable[[urllib.request.Request], Any]
 
 
+class _DropAuthOnCrossHostRedirect(urllib.request.HTTPRedirectHandler):
+    """GitHub answers a job-log download with a redirect to a signed blob-storage URL.
+    urllib's stock handler copies every header onto the redirect, so the storage host
+    got our GitHub token and refused it (401 "Server failed to authenticate the
+    request"). The token is GitHub's: it never leaves for another host."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        new = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if new is not None and (
+            urllib.parse.urlsplit(newurl).netloc
+            != urllib.parse.urlsplit(req.full_url).netloc
+        ):
+            new.remove_header("Authorization")
+        return new
+
+
+_http = urllib.request.build_opener(_DropAuthOnCrossHostRedirect)
+
+
 class HttpGitHubReader:
     def __init__(
         self,
@@ -31,7 +50,7 @@ class HttpGitHubReader:
     ):
         self.token = token
         self.repo = repo
-        self.opener = opener or (lambda req: urllib.request.urlopen(req, timeout=60))
+        self.opener = opener or (lambda req: _http.open(req, timeout=60))
 
     def _get(self, path: str, params: dict[str, Any] | None = None, raw=False):
         url = f"{API}{path}"

@@ -7,6 +7,8 @@
 # What it does NOT do: secrets. Write /etc/bug-hunter/env and the GitHub App key by
 # hand afterwards (deploy/README.md lists both); nothing secret lives in this repo.
 set -euo pipefail
+# Run from a folder every user can read: steps run as bughunter (Poetry) fail in /root.
+cd /
 
 REPO_URL=https://github.com/HelloAllyTech/ally-platform.git
 CHECKOUT=/opt/ally-platform
@@ -46,23 +48,23 @@ install -d -o root -g bughunter -m 0750 /etc/bug-hunter
 # The checkout the agent reads and makes worktrees from. Public repo: fetch needs no auth.
 if [ ! -d "$CHECKOUT/.git" ]; then
   install -d -o bughunter -g bughunter "$CHECKOUT"
-  sudo -u bughunter git clone --quiet "$REPO_URL" "$CHECKOUT"
+  sudo -H -u bughunter git clone --quiet "$REPO_URL" "$CHECKOUT"
 fi
-sudo -u bughunter git -C "$CHECKOUT" fetch --quiet origin master
-sudo -u bughunter git -C "$CHECKOUT" checkout --quiet --detach origin/master
-sudo -u bughunter git -C "$CHECKOUT" config user.name "Bug Hunter"
-sudo -u bughunter git -C "$CHECKOUT" config user.email "bug-hunter@users.noreply.github.com"
-sudo -u bughunter gh auth setup-git --hostname github.com 2>/dev/null || \
-  sudo -u bughunter git config --global credential.https://github.com.helper '!gh auth git-credential'
+sudo -H -u bughunter git -C "$CHECKOUT" fetch --quiet origin master
+sudo -H -u bughunter git -C "$CHECKOUT" checkout --quiet --detach origin/master
+sudo -H -u bughunter git -C "$CHECKOUT" config user.name "Bug Hunter"
+sudo -H -u bughunter git -C "$CHECKOUT" config user.email "bug-hunter@users.noreply.github.com"
+sudo -H -u bughunter gh auth setup-git --hostname github.com 2>/dev/null || \
+  sudo -H -u bughunter git config --global credential.https://github.com.helper '!gh auth git-credential'
 
 # The package from poetry.lock, editable (config/ and prompts/ are read from the
 # checkout), with the VM extra (CloudWatch). Poetry itself lives in its own venv.
 [ -x /opt/bug-hunter/poetry/bin/poetry ] || {
-  sudo -u bughunter python3.12 -m venv /opt/bug-hunter/poetry
-  sudo -u bughunter /opt/bug-hunter/poetry/bin/pip install --quiet "poetry>=2,<3"
+  sudo -H -u bughunter python3.12 -m venv /opt/bug-hunter/poetry
+  sudo -H -u bughunter /opt/bug-hunter/poetry/bin/pip install --quiet "poetry>=2,<3"
 }
-[ -x "$VENV/bin/python" ] || sudo -u bughunter python3.12 -m venv "$VENV"
-sudo -u bughunter env VIRTUAL_ENV="$VENV" PATH="$VENV/bin:$PATH" \
+[ -x "$VENV/bin/python" ] || sudo -H -u bughunter python3.12 -m venv "$VENV"
+sudo -H -u bughunter env VIRTUAL_ENV="$VENV" PATH="$VENV/bin:$PATH" \
   /opt/bug-hunter/poetry/bin/poetry -C "$CHECKOUT/bug-hunter" install --only main --extras vm --no-interaction
 
 # systemd units: daily job, 15-minute poll, worker. Installed, not enabled: enable them
