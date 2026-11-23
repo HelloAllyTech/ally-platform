@@ -682,7 +682,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     id: 'TSQ-042',
     title: 'Course performance since launch',
     question:
-      'How has the course performed since launch, and how many have completed?',
+      'How have courses performed since launch, and how many have completed?',
     group: 'courses',
     shape: 'rate_over_time',
     size: 'wide',
@@ -694,7 +694,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
   entry({
     id: 'TSQ-043',
     title: 'Time to finish a course',
-    question: 'How long does this course take to finish?',
+    question: 'How long do courses take to finish?',
     group: 'courses',
     shape: 'distribution',
     size: 'm',
@@ -719,7 +719,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
   entry({
     id: 'TSQ-045',
     title: 'Module funnel',
-    question: 'At which module do learners drop off, in every course?',
+    question: 'At which module do learners drop off?',
     group: 'courses',
     shape: 'stage_funnel',
     size: 'm',
@@ -860,7 +860,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
   entry({
     id: 'TSQ-063',
     title: 'Practice rhythm',
-    question: 'How much have they practised, and how regularly?',
+    question: 'How much have learners practised, and how regularly?',
     group: 'learners',
     shape: 'multi_measure_rows',
     size: 'wide',
@@ -884,7 +884,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
   entry({
     id: 'TSQ-065',
     title: 'Skill trend',
-    question: 'Are they getting better at each skill?',
+    question: 'Are learners getting better at each skill?',
     group: 'outcomes',
     shape: 'value_by_step',
     size: 'wide',
