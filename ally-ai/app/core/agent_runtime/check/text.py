@@ -163,7 +163,25 @@ _STRAY = [
         re.IGNORECASE | re.MULTILINE,
     ),
     re.compile(r"\s*\(\s*देखें\s*:?\s*(?=[.)]|$)\)?"),
+    # Q4 C16 and 13b (the demo build): "(citations: 15, 14)", "[Citations: 2, 6, 1, 7]",
+    # "(Cited:.".
+    re.compile(
+        r"\s*[\[(]\s*(?:citations?|cited|sources?|refs?|references?)\s*:?\s*"
+        r"(?:\d{1,2}(?:\s*,\s*\d{1,2})*)?\s*[\])]?(?=\s*[.,;!?]|\s|$)",
+        re.IGNORECASE,
+    ),
+    # A lead-in left in an unclosed bracket: "(registered and audited:.", "(figures and
+    # breakdown:.".
+    re.compile(r"\s*\((?![^()\n]*\))[^()\n]{0,60}:\s*(?=[.!?]|$)"),
+    # The model's own aside in an unclosed bracket: "(I'll only need one of these.".
+    re.compile(
+        r"\s*\((?![^()\n]*\))\s*(?:i'?ll|i will|i need|i only|i'?m|i am|note|let me)\b"
+        r"[^()\n]*?(?=[.!?])",
+        re.IGNORECASE,
+    ),
 ]
+#: Any other unclosed bracket loses only the bracket: "(Please bring originals…".
+_UNCLOSED = re.compile(r"\((?![^()\n]*\))\s*")
 
 
 def without_citation_marks(text: str) -> str:
@@ -175,6 +193,7 @@ def without_citation_marks(text: str) -> str:
     text = _MARKS.sub("", text)
     for stray in _STRAY:
         text = stray.sub("", text)
+    text = _UNCLOSED.sub("", text)
     text = _EMPTY_PARENS.sub("", text)
     text = _STRAY_CLOSE.sub("", text)
     text = re.sub(r"[ \t]+([.,;:!?])", r"\1", text)

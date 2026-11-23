@@ -58,6 +58,32 @@ def test_citation_leftovers_are_removed(said, sent):
         ("BHIVE day pass ₹150 [cite 9] [cite 10].", "BHIVE day pass ₹150."),
         # A real count stays.
         ("We have 3 entries in May.", "We have 3 entries in May."),
+        # Q4 C16 and 13b: the demo build's examples and the measurement's.
+        ("It's free of cost. (citations: 15, 14)", "It's free of cost."),
+        ("Day pass ₹500 [Citations: 2, 6, 1, 7]", "Day pass ₹500"),
+        ("Our fees are ₹800 per session (Cited:.", "Our fees are ₹800 per session."),
+        (
+            "We are a registered trust (registered and audited:. See the report.",
+            "We are a registered trust. See the report.",
+        ),
+        (
+            "Annual spend was ₹2 crore (figures and breakdown:.",
+            "Annual spend was ₹2 crore.",
+        ),
+        (
+            "You can apply online or at the centre (I'll only need one of these.",
+            "You can apply online or at the centre.",
+        ),
+        (
+            "Bring your ID and ration card. (Please bring originals and one photocopy",
+            "Bring your ID and ration card. Please bring originals and one photocopy",
+        ),
+        # Ordinary brackets and the word "source" stay.
+        (
+            "Open 9 to 5 (Monday to Saturday). Call us (free).",
+            "Open 9 to 5 (Monday to Saturday). Call us (free).",
+        ),
+        ("The source of funds is donors.", "The source of funds is donors."),
     ],
 )
 def test_stray_citation_talk_is_removed(reply, sent):
