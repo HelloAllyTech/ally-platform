@@ -25,8 +25,25 @@ export type StatisticsChartGroup =
 
 export type StatisticsChartSize = "s" | "m" | "wide";
 
-/** What a chart can be drawn for. The page only offers the whole organisation. */
+/** What a chart can be drawn for. */
 export type StatisticsChartScope = "organisation" | "course" | "simulation" | "learner";
+
+/** A filter a card can offer: one course, one simulation or one learner. */
+export type StatisticsFilterKey = Exclude<StatisticsChartScope, "organisation">;
+
+export interface StatisticsChartFilter {
+  key: StatisticsFilterKey;
+  /** The card has no unfiltered view, so a choice is required. */
+  required: boolean;
+}
+
+/** The filters set on a card, by filter key: the id of the course, simulation or learner. */
+export type StatisticsFilterValues = Partial<Record<StatisticsFilterKey, string>>;
+
+export interface StatisticsScopeOption {
+  id: string;
+  label: string;
+}
 
 export interface StatisticsChartEntry {
   /** Stable id, for example `TSQ-001`. */
@@ -40,6 +57,8 @@ export interface StatisticsChartEntry {
   size: StatisticsChartSize;
   /** What the chart can be drawn for; always lists the whole organisation. */
   scopes: StatisticsChartScope[];
+  /** The filters the card offers. */
+  filters: StatisticsChartFilter[];
   state: StatisticsChartState;
   /** Why the chart is sparse or unavailable; null when available. */
   reason: string | null;
@@ -53,6 +72,8 @@ export interface StatisticsChartLibrary {
 
 export interface StatisticsChartResponse<T = unknown> {
   id: string;
+  /** Every filter the chart was drawn with, with names. */
+  filters?: Array<{ kind: StatisticsFilterKey; id: string; label: string }>;
   state: Exclude<StatisticsChartState, "unavailable">;
   data: T;
 }
@@ -62,6 +83,10 @@ export interface GetStatisticsChartRequest {
   range?: OrganizationMetricsRange;
   /** IANA time zone, for charts that group by time of day. */
   timezone?: string;
+  /** Filters, as the API takes them. */
+  scenarioId?: number;
+  courseId?: string;
+  learnerId?: number;
   /** Table charts only. */
   search?: string;
   limit?: number;
@@ -245,4 +270,44 @@ export interface CoursePerformanceData {
   weeks: Array<{ week: string; started: number; completed: number }>;
   enrolled: number;
   completed: number;
+}
+
+export interface GetStatisticsScopeOptionsRequest {
+  kind: StatisticsFilterKey;
+  search?: string;
+}
+
+/** TSQ-043 */
+export interface TimeToFinishData {
+  bins: number[];
+  boundsDays: number[];
+  completed: number;
+  medianDays: number | null;
+}
+
+/** TSQ-045 */
+export interface ModuleFunnelData {
+  rows: Array<{ sectionId: string; title: string; reached: number; completed: number }>;
+}
+
+/** TSQ-046 */
+export interface ModuleTimeData {
+  rows: Array<{ sectionId: string; title: string; medianMinutes: number; learners: number }>;
+}
+
+/** TSQ-053 */
+export interface RoleplayAttemptsData {
+  rows: Array<{
+    itemId: string;
+    title: string;
+    courseTitle: string | null;
+    learners: number;
+    averageAttempts: number | null;
+    averageMinutes: number | null;
+  }>;
+}
+
+/** TSQ-065 */
+export interface SkillTrendData {
+  skills: Array<{ skill: string; points: Array<{ slice: number; level: number }> }>;
 }

@@ -7,9 +7,10 @@ import { Button, InlineNotification, SkeletonPlaceholder } from "@ally-ui-mono/u
 interface StatCardProps {
   /** The question the card answers. It is the heading, not the chart's name. */
   title: string;
-  /** What the chart is drawn for, when it is not the whole organisation. */
   /** One plain-language sentence that says what the data shows. */
   takeaway?: string | null;
+  /** The card's filters, shown under the heading whatever state the chart is in. */
+  controls?: ReactNode;
   loading?: boolean;
   error?: boolean;
   onRetry?: () => void;
@@ -24,6 +25,7 @@ interface StatCardProps {
 export const StatCard: FunctionComponent<StatCardProps> = ({
   title,
   takeaway,
+  controls,
   loading = false,
   error = false,
   onRetry,
@@ -43,6 +45,7 @@ export const StatCard: FunctionComponent<StatCardProps> = ({
           </p>
         )}
       </header>
+      {controls}
       {loading ? (
         <div className="flex flex-col gap-2" role="status">
           <span className="text-sm text-typography-600">{t("statisticsLibrary.card.loading")}</span>

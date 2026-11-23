@@ -6,6 +6,8 @@ import {
   DEFAULT_LAYOUT_CAP,
   DEFAULT_LAYOUT_ORDER,
   buildDefaultLayout,
+  layoutKey,
+  parseLayoutKey,
   resolveDashboardLayout,
 } from "../layout";
 
@@ -18,6 +20,7 @@ const chart = (id: string, state: StatisticsChartState = "available"): Statistic
   chart: "tile",
   size: "m",
   scopes: ["organisation"],
+  filters: [],
   state,
   reason: state === "available" ? null : "because",
 });
@@ -98,5 +101,54 @@ describe("resolveDashboardLayout", () => {
   it("ignores non-string entries and a non-array value", () => {
     expect(resolveDashboardLayout(["TSQ-001", 5, null], offered)).toEqual(["TSQ-001"]);
     expect(resolveDashboardLayout("TSQ-001", offered)).toEqual(buildDefaultLayout(offered));
+  });
+});
+
+const filtered = (id: string, filters: StatisticsChartEntry["filters"]): StatisticsChartEntry => ({
+  ...chart(id, "available"),
+  filters,
+});
+
+describe("a card's filters are saved with it", () => {
+  const course = "8b3f2f0e-1c0a-4d6e-9a53-3d1c0d2f4a11";
+
+  it("round-trips a card with one or two filters", () => {
+    expect(layoutKey("TSQ-020", { course })).toBe(`TSQ-020?course=${course}`);
+    const two = layoutKey("TSQ-020", { course, simulation: "7" });
+    expect(two).toBe(`TSQ-020?course=${course}&simulation=7`);
+    expect(parseLayoutKey(two)).toEqual({
+      key: two,
+      id: "TSQ-020",
+      filters: { course, simulation: "7" },
+    });
+  });
+
+  it("reads a plain id as a card with no filter", () => {
+    expect(parseLayoutKey("TSQ-020")).toEqual({ key: "TSQ-020", id: "TSQ-020", filters: {} });
+    expect(layoutKey("TSQ-020", {})).toBe("TSQ-020");
+  });
+
+  it("rejects strings that are not a card key", () => {
+    ["", "TSQ-20", "TSQ-020?course=", "TSQ-020?team=1", "TSQ-020@course:1", "x?course=1"].forEach(
+      k => expect(parseLayoutKey(k), k).toBeNull(),
+    );
+  });
+
+  it("keeps a saved filter the card offers and drops one it does not", () => {
+    const charts = [filtered("TSQ-020", [{ key: "course", required: false }])];
+    const saved = [`TSQ-020?course=${course}&learner=4`];
+    expect(resolveDashboardLayout(saved, charts)).toEqual([`TSQ-020?course=${course}`]);
+  });
+
+  it("keeps a card whose filter was retired, without the filter", () => {
+    const charts = [filtered("TSQ-020", [])];
+    expect(resolveDashboardLayout([`TSQ-020?course=${course}`], charts)).toEqual(["TSQ-020"]);
+  });
+
+  it("shows a chart once, the first time it is saved", () => {
+    const charts = [filtered("TSQ-020", [{ key: "course", required: false }])];
+    expect(resolveDashboardLayout(["TSQ-020", `TSQ-020?course=${course}`], charts)).toEqual([
+      "TSQ-020",
+    ]);
   });
 });

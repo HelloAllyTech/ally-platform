@@ -66,6 +66,8 @@ export interface RoleplayAttemptsData {
     itemId: string;
     title: string;
     learners: number;
+    /** The course the roleplay is in; set when the card spans every course. */
+    courseTitle: string | null;
     averageAttempts: number | null;
     averageMinutes: number | null;
   }>;
@@ -83,6 +85,8 @@ export const FINISH_BOUNDS_DAYS = [1, 3, 7, 14, 30];
 const LEARNER_COURSE_LIMIT = 20;
 const MODULE_LIMIT = 30;
 const SKILL_TREND_SLICES = 12;
+/** Across the whole organisation a slice is drawn only when this many learners reached it. */
+const SKILL_TREND_MIN_LEARNERS = 3;
 
 /** Learners only, never staff or suspended accounts: the same rule every course card uses. */
 const LEARNER_ONLY = `u.status != 'SUSPENDED'
@@ -161,18 +165,20 @@ export class TenantScopeSummaryRepository {
     };
   }
 
-  /** How many days learners took to finish one course, in bands, with the median. */
+  /** How many days learners took to finish a course, in bands, with the median. All courses unless one is given. */
   async getTimeToFinish(
     tenantId: string,
     tenantCode: string,
-    courseId: string,
+    courseId?: string,
   ): Promise<TimeToFinishData> {
+    const params: unknown[] = [tenantId, tenantCode];
+    if (courseId) params.push(courseId);
     const rows: Array<{ days: string }> = await this.dataSource.query(
       `SELECT EXTRACT(EPOCH FROM (e."completedAt" - e."startedAt")) / 86400.0 AS days
          FROM track_enrollments e
          JOIN users u ON u.id = e."userId"
-        WHERE e."trackId" = $3::uuid
-          AND e."tenantId"::text IN ($1, $2)
+        WHERE e."tenantId"::text IN ($1, $2)
+          ${courseId ? 'AND e."trackId" = $3::uuid' : ''}
           AND e."deletedAt" IS NULL
           AND u.status != 'SUSPENDED'
           AND EXISTS (
@@ -181,7 +187,7 @@ export class TenantScopeSummaryRepository {
                 WHERE ug."userId" = u.id AND g.name = 'LEARNER'
               )
           AND e."completedAt" IS NOT NULL AND e."startedAt" IS NOT NULL`,
-      [tenantId, tenantCode, courseId],
+      params,
     );
     const days = rows.map((r) => Number(r.days)).sort((a, b) => a - b);
     const bins = Array.from({ length: FINISH_BOUNDS_DAYS.length + 1 }, () => 0);
@@ -208,10 +214,12 @@ export class TenantScopeSummaryRepository {
   async getPracticeRhythm(
     tenantId: string,
     tenantCode: string,
-    learnerId: number,
+    learnerId: number | undefined,
     start: Date,
     endExclusive: Date,
   ): Promise<MeasuresData> {
+    const params: unknown[] = [tenantId, tenantCode, start, endExclusive];
+    if (learnerId !== undefined) params.push(learnerId);
     const rows: Array<{
       completed: string;
       avg_score: string | null;
@@ -227,9 +235,9 @@ export class TenantScopeSummaryRepository {
          FROM scenario_sessions s
          LEFT JOIN scenario_session_details d ON d."scenarioSessionId" = s.id
         WHERE s.tenant_id::text IN ($1, $2)
-          AND s."counselorId" = $3
-          AND s."startedAt" >= $4 AND s."startedAt" < $5`,
-      [tenantId, tenantCode, learnerId, start, endExclusive],
+          AND s."startedAt" >= $3 AND s."startedAt" < $4
+          ${learnerId !== undefined ? 'AND s."counselorId" = $5' : ''}`,
+      params,
     );
     const r = rows[0];
     return {
@@ -498,38 +506,44 @@ export class TenantScopeSummaryRepository {
   async getRoleplayAttempts(
     tenantId: string,
     tenantCode: string,
-    courseId: string,
+    courseId?: string,
   ): Promise<RoleplayAttemptsData> {
+    const params: unknown[] = [tenantId, tenantCode];
+    if (courseId) params.push(courseId);
     const rows: Array<{
       item_id: string;
       title: string;
+      course_title: string;
       learners: string;
       avg_attempts: string | null;
       avg_minutes: string | null;
     }> = await this.dataSource.query(
-      `SELECT i.id::text AS item_id, i.title,
+      `SELECT i.id::text AS item_id, i.title, t.title AS course_title,
               COUNT(DISTINCT p.id) FILTER (WHERE p.status = 'COMPLETED') AS learners,
               AVG(p."attemptCount") FILTER (WHERE p.status = 'COMPLETED' AND p."attemptCount" > 0) AS avg_attempts,
               AVG(${sessionDurationMsExpr('s', 'd')}) / 60000.0 AS avg_minutes
          FROM track_items i
+         JOIN tracks t ON t.id = i."trackId" AND t."deletedAt" IS NULL
          JOIN track_item_progress p ON p."trackItemId" = i.id AND p."deletedAt" IS NULL
          JOIN track_enrollments e ON e.id = p."trackEnrollmentId" AND e."deletedAt" IS NULL
          JOIN users u ON u.id = e."userId"
          LEFT JOIN scenario_sessions s ON s."trackItemProgressId" = p.id
                                       AND s.status = 'ENDED' AND s."eventStatus" = 'COMPLETED'
          LEFT JOIN scenario_session_details d ON d."scenarioSessionId" = s.id
-        WHERE i."trackId" = $3::uuid AND i.type = 'ROLEPLAY' AND i."deletedAt" IS NULL
+        WHERE i.type = 'ROLEPLAY' AND i."deletedAt" IS NULL
+          ${courseId ? 'AND i."trackId" = $3::uuid' : ''}
           AND e."tenantId"::text IN ($1, $2)
           AND ${LEARNER_ONLY}
-        GROUP BY i.id, i.title, i."order"
-        ORDER BY i."order"
+        GROUP BY i.id, i.title, i."order", t.title
+        ${courseId ? 'ORDER BY i."order"' : 'ORDER BY COUNT(DISTINCT p.id) FILTER (WHERE p.status = \'COMPLETED\') DESC, t.title, i."order"'}
         LIMIT ${MODULE_LIMIT}`,
-      [tenantId, tenantCode, courseId],
+      params,
     );
     return {
       rows: rows.map((r) => ({
         itemId: r.item_id,
         title: r.title,
+        courseTitle: courseId ? null : r.course_title,
         learners: Number(r.learners),
         averageAttempts:
           r.avg_attempts == null
@@ -545,24 +559,31 @@ export class TenantScopeSummaryRepository {
   async getSkillTrend(
     tenantId: string,
     tenantCode: string,
-    learnerId: number,
+    learnerId?: number,
   ): Promise<SkillTrendData> {
+    const params: unknown[] = [tenantId, tenantCode];
+    if (learnerId !== undefined) params.push(learnerId);
     const rows: Array<{ skill: string; idx: number; level: string }> =
       await this.dataSource.query(
-        `SELECT kv.key AS skill, c."cutIndex" AS idx, kv.value::numeric AS level
+        `SELECT kv.key AS skill, c."cutIndex" AS idx, AVG(kv.value::numeric) AS level
            FROM foundational_skill_cuts c
            JOIN foundational_skill_assessments fa ON fa."cutId" = c.id AND fa.status = 'SCORED'
           CROSS JOIN LATERAL jsonb_each_text(fa."skillLevels") kv
           WHERE c.tenant_id::text IN ($1, $2)
-            AND c."userId" = $3
+            ${learnerId !== undefined ? 'AND c."userId" = $3' : ''}
             AND kv.value ~ '^[0-9]+(\\.[0-9]+)?$'
+          GROUP BY kv.key, c."cutIndex"
+          ${learnerId !== undefined ? '' : `HAVING COUNT(DISTINCT c."userId") >= ${SKILL_TREND_MIN_LEARNERS}`}
           ORDER BY c."cutIndex" ASC`,
-        [tenantId, tenantCode, learnerId],
+        params,
       );
     const bySkill = new Map<string, Array<{ slice: number; level: number }>>();
     rows.forEach((r) => {
       const list = bySkill.get(r.skill) ?? [];
-      list.push({ slice: Number(r.idx), level: Number(r.level) });
+      list.push({
+        slice: Number(r.idx),
+        level: Math.round(Number(r.level) * 10) / 10,
+      });
       bySkill.set(r.skill, list);
     });
     return {

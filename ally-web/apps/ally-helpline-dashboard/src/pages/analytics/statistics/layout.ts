@@ -1,4 +1,4 @@
-import type { StatisticsChartEntry } from "@types";
+import type { StatisticsChartEntry, StatisticsFilterKey, StatisticsFilterValues } from "@types";
 
 /**
  * Which charts a tenant admin sees on the Statistics dashboard, and in what
@@ -37,6 +37,41 @@ export const DEFAULT_LAYOUT_ORDER: readonly string[] = [
   "TSQ-027", // Sessions reviewed
 ];
 
+/** The filters a card can carry, in the order they are written. */
+export const FILTER_KEYS: readonly StatisticsFilterKey[] = ["course", "simulation", "learner"];
+
+export interface LayoutItem {
+  /** The saved string: `TSQ-020`, or `TSQ-020?course=<id>` for a card with a filter set. */
+  key: string;
+  id: string;
+  filters: StatisticsFilterValues;
+}
+
+const KEY_PATTERN = new RegExp(
+  `^(TSQ-\\d{3})((?:[?&](?:${FILTER_KEYS.join("|")})=[A-Za-z0-9-]{1,64})*)$`,
+);
+
+/** The saved string for a card and the filters set on it. */
+export const layoutKey = (id: string, filters: StatisticsFilterValues = {}): string => {
+  const parts = FILTER_KEYS.filter(k => filters[k]).map(k => `${k}=${filters[k]}`);
+  return parts.length ? `${id}?${parts.join("&")}` : id;
+};
+
+/** Reads a saved string; null when it is not one this build understands. */
+export const parseLayoutKey = (key: string): LayoutItem | null => {
+  const match = KEY_PATTERN.exec(key);
+  if (!match) return null;
+  const filters: StatisticsFilterValues = {};
+  match[2]
+    .split(/[?&]/)
+    .filter(Boolean)
+    .forEach(pair => {
+      const [k, v] = pair.split("=");
+      filters[k as StatisticsFilterKey] = v;
+    });
+  return { key, id: match[1], filters };
+};
+
 /** The most cards the default layout holds. */
 export const DEFAULT_LAYOUT_CAP = 10;
 
@@ -51,7 +86,7 @@ export const buildDefaultLayout = (charts: readonly StatisticsChartEntry[]): str
  *
  * - Nothing saved: the default layout.
  * - Saved: keep the saved order, drop ids the backend no longer offers (a stale
- *   or retired chart), drop duplicates. A chart the organisation has since lost
+ *   or retired chart), drop a filter the card no longer offers, drop duplicates (a chart appears once). A chart the organisation has since lost
  *   eligibility for is KEPT (its card says it is unavailable) rather than
  *   vanishing. Charts the admin never added are never appended.
  */
@@ -60,13 +95,21 @@ export const resolveDashboardLayout = (
   charts: readonly StatisticsChartEntry[],
 ): string[] => {
   if (!Array.isArray(saved)) return buildDefaultLayout(charts);
-  const offered = new Set(charts.map(c => c.id));
+  const offered = new Map(charts.map(c => [c.id, c]));
   const seen = new Set<string>();
   const out: string[] = [];
-  saved.forEach(id => {
-    if (typeof id !== "string" || !offered.has(id) || seen.has(id)) return;
-    seen.add(id);
-    out.push(id);
+  saved.forEach(key => {
+    const item = typeof key === "string" ? parseLayoutKey(key) : null;
+    const entry = item ? offered.get(item.id) : undefined;
+    if (!item || !entry || seen.has(item.id)) return;
+    seen.add(item.id);
+    // Keep only the filters the card still offers; the card itself stays.
+    const allowed = new Set(entry.filters.map(f => f.key));
+    const kept: StatisticsFilterValues = {};
+    FILTER_KEYS.forEach(k => {
+      if (item.filters[k] && allowed.has(k)) kept[k] = item.filters[k];
+    });
+    out.push(layoutKey(item.id, kept));
   });
   return out;
 };

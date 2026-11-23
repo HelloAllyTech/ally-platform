@@ -22,11 +22,17 @@ import { SkeletonText, logger } from "@ally-ui-mono/ui-shared";
 import { useGetUserPreferencesQuery, useUpdateUserPreferencesMutation } from "@api";
 import { ToggleButtonGroup } from "@components";
 import { OrganizationMetricsRange, ORGANIZATION_METRICS_RANGES } from "@types";
-import type { StatisticsChartEntry } from "@types";
+import type { StatisticsChartEntry, StatisticsFilterValues } from "@types";
 
 import { SortableMetricBlock } from "../SortableMetricBlock";
 import { ChartHost } from "./ChartHost";
-import { STATISTICS_LAYOUT_PREF_KEY, resolveDashboardLayout } from "./layout";
+import {
+  LayoutItem,
+  STATISTICS_LAYOUT_PREF_KEY,
+  layoutKey,
+  parseLayoutKey,
+  resolveDashboardLayout,
+} from "./layout";
 import { LibraryDrawer } from "./LibraryDrawer";
 import { CHART_RENDERERS, DashboardContext } from "./renderers";
 
@@ -64,7 +70,14 @@ export const StatisticsDashboard: FunctionComponent<StatisticsDashboardProps> = 
   );
 
   const byId = useMemo(() => new Map(charts.map(c => [c.id, c])), [charts]);
-  const entryKeys = layoutIds.filter(id => byId.has(id) && !!CHART_RENDERERS[id]);
+  // Each card is a chart id with the filters set on it. A chart appears once.
+  const items = layoutIds
+    .map(parseLayoutKey)
+    .filter(
+      (item): item is LayoutItem => !!item && byId.has(item.id) && !!CHART_RENDERERS[item.id],
+    );
+  const entryKeys = items.map(item => item.id);
+  const savedKeys = items.map(item => item.key);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -89,13 +102,17 @@ export const StatisticsDashboard: FunctionComponent<StatisticsDashboardProps> = 
     const oldIndex = entryKeys.indexOf(String(active.id));
     const newIndex = entryKeys.indexOf(String(over.id));
     if (oldIndex === -1 || newIndex === -1) return;
-    persist(arrayMove(entryKeys, oldIndex, newIndex));
+    persist(arrayMove(savedKeys, oldIndex, newIndex));
   };
 
-  const handleRemove = (key: string) => persist(entryKeys.filter(x => x !== key));
+  const handleRemove = (id: string) =>
+    persist(items.filter(item => item.id !== id).map(item => item.key));
   const handleAdd = (id: string) => {
-    if (!entryKeys.includes(id)) persist([...entryKeys, id]);
+    if (!entryKeys.includes(id)) persist([...savedKeys, id]);
   };
+  /** A card's filters are saved with the layout, so each card remembers its own. */
+  const handleFiltersChange = (id: string, filters: StatisticsFilterValues) =>
+    persist(items.map(item => (item.id === id ? layoutKey(id, filters) : item.key)));
   const finishEditing = () => {
     setEditing(false);
     setDrawerOpen(false);
@@ -198,7 +215,7 @@ export const StatisticsDashboard: FunctionComponent<StatisticsDashboardProps> = 
               >
                 <SortableContext items={entryKeys} strategy={rectSortingStrategy}>
                   <div className={gridClass} data-testid="statistics-grid">
-                    {entryKeys.map(id => {
+                    {items.map(({ id, filters }) => {
                       const entry = byId.get(id) as StatisticsChartEntry;
                       return (
                         <SortableMetricBlock key={id} id={id} wide={entry.size === "wide"}>
@@ -212,7 +229,12 @@ export const StatisticsDashboard: FunctionComponent<StatisticsDashboardProps> = 
                             >
                               &times;
                             </button>
-                            <ChartHost entry={entry} range={range} />
+                            <ChartHost
+                              entry={entry}
+                              range={range}
+                              filters={filters}
+                              onFiltersChange={next => handleFiltersChange(id, next)}
+                            />
                           </div>
                         </SortableMetricBlock>
                       );
@@ -222,11 +244,16 @@ export const StatisticsDashboard: FunctionComponent<StatisticsDashboardProps> = 
               </DndContext>
             ) : (
               <div className={gridClass} data-testid="statistics-grid">
-                {entryKeys.map(id => {
+                {items.map(({ id, filters }) => {
                   const entry = byId.get(id) as StatisticsChartEntry;
                   return (
                     <div key={id} className={spanClass(entry)}>
-                      <ChartHost entry={entry} range={range} />
+                      <ChartHost
+                        entry={entry}
+                        range={range}
+                        filters={filters}
+                        onFiltersChange={next => handleFiltersChange(id, next)}
+                      />
                     </div>
                   );
                 })}

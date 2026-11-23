@@ -28,29 +28,26 @@ const chart = (id: string, scopes: StatisticsChartEntry["scopes"]): StatisticsCh
   state: "available",
   reason: null,
   scopes,
+  filters: scopes
+    .filter(k => k !== "organisation")
+    .map(key => ({ key, required: !scopes.includes("organisation") })),
 });
 
 describe("the chart library", () => {
   const charts = [
-    chart("TSQ-003", ["organisation", "course", "learner"]),
+    chart("TSQ-003", ["organisation", "course"]),
     chart("TSQ-041", ["course"]),
-    chart("TSQ-063", ["learner"]),
+    chart("TSQ-063", ["organisation", "learner"]),
   ];
 
-  it("offers each organisation-wide chart with one Add button and nothing about a course or learner", () => {
+  it("offers each chart with one Add button, whatever filters it has", () => {
     const onAdd = vi.fn();
     render(<LibraryDrawer charts={charts} addedIds={[]} onAdd={onAdd} onClose={vi.fn()} />);
     fireEvent.click(screen.getByTestId("statistics-library-add-TSQ-003"));
     expect(onAdd).toHaveBeenCalledWith("TSQ-003");
+    expect(screen.getByTestId("statistics-library-add-TSQ-041")).toBeTruthy();
+    expect(screen.getByTestId("statistics-library-add-TSQ-063")).toBeTruthy();
     expect(screen.queryByTestId("statistics-library-add-TSQ-003-course")).toBeNull();
-    expect(screen.queryByTestId("statistics-library-add-TSQ-003-learner")).toBeNull();
-  });
-
-  it("leaves out charts that only make sense for one course or one learner", () => {
-    render(<LibraryDrawer charts={charts} addedIds={[]} onAdd={vi.fn()} onClose={vi.fn()} />);
-    expect(screen.getByTestId("statistics-library-item-TSQ-003")).toBeTruthy();
-    expect(screen.queryByTestId("statistics-library-item-TSQ-041")).toBeNull();
-    expect(screen.queryByTestId("statistics-library-item-TSQ-063")).toBeNull();
   });
 
   it("scrolls its list on its own", () => {

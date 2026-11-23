@@ -28,6 +28,12 @@ import {
 } from '../repository/tenant-scope-options.repository';
 import { ChartAvailabilityState } from '../util/tenant-chart-library.util';
 
+export class TenantChartFilterDto {
+  @ApiProperty({ enum: ['course', 'simulation', 'learner'] })
+  key!: 'course' | 'simulation' | 'learner';
+  @ApiProperty() required!: boolean;
+}
+
 export class TenantChartLibraryEntryDto {
   @ApiProperty({ description: 'Stable id, for example TSQ-001' }) id!: string;
   @ApiProperty() title!: string;
@@ -43,6 +49,12 @@ export class TenantChartLibraryEntryDto {
     description: 'What the chart can be drawn for',
   })
   scopes!: ChartScope[];
+  @ApiProperty({
+    type: () => [TenantChartFilterDto],
+    description:
+      'The filters the card offers. A required filter means the card has no unfiltered view.',
+  })
+  filters!: TenantChartFilterDto[];
   @ApiProperty({ enum: ['available', 'sparse', 'unavailable'] })
   state!: ChartAvailabilityState;
   @ApiProperty({
@@ -171,6 +183,12 @@ export class TenantChartDataResponseDto {
       'What the chart was drawn for, when it was not the whole organisation',
   })
   scope?: TenantChartScopeDto;
+  @ApiProperty({
+    required: false,
+    type: () => [TenantChartScopeDto],
+    description: 'Every filter the chart was drawn with, with names',
+  })
+  filters?: TenantChartScopeDto[];
 }
 
 export class TenantScopeOptionsQueryDto {

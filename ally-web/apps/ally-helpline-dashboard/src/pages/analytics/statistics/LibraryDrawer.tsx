@@ -48,12 +48,9 @@ export const LibraryDrawer: FunctionComponent<LibraryDrawerProps> = ({
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [group, setGroup] = useState<StatisticsChartGroup | "all">("all");
-  // Only charts this build can draw, and that describe the whole organisation,
-  // are offered. A chart about one course or one learner has no place on this page.
-  const offered = useMemo(
-    () => charts.filter(c => CHART_RENDERERS[c.id] && c.scopes.includes("organisation")),
-    [charts],
-  );
+  // Only charts this build can draw are offered. A chart that needs a filter is
+  // offered too: it asks for the choice on its card.
+  const offered = useMemo(() => charts.filter(c => CHART_RENDERERS[c.id]), [charts]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();

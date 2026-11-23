@@ -4,15 +4,36 @@ import { useTranslation } from "react-i18next";
 
 import { SkeletonPlaceholder } from "@ally-ui-mono/ui-shared";
 import { useGetStatisticsChartQuery } from "@api";
-import type { OrganizationMetricsRange, StatisticsChartEntry } from "@types";
+import type {
+  OrganizationMetricsRange,
+  StatisticsChartEntry,
+  StatisticsFilterKey,
+  StatisticsFilterValues,
+} from "@types";
 
+import { CardFilters } from "./CardFilters";
 import { CHART_RENDERERS } from "./renderers";
 import { StatCard } from "./StatCard";
 
 interface ChartHostProps {
   entry: StatisticsChartEntry;
   range: OrganizationMetricsRange;
+  /** The filters set on this card: the course, simulation or learner chosen. */
+  filters?: StatisticsFilterValues;
+  /** Called when a filter is changed. Without it the card shows its filters but cannot change them. */
+  onFiltersChange?: (filters: StatisticsFilterValues) => void;
 }
+
+/** The request fields for a card's filters. A simulation or learner id is a number. */
+const filterParams = (filters: StatisticsFilterValues) => {
+  const params: { courseId?: string; scenarioId?: number; learnerId?: number } = {};
+  if (filters.course) params.courseId = filters.course;
+  const scenarioId = Number(filters.simulation);
+  if (filters.simulation && Number.isInteger(scenarioId)) params.scenarioId = scenarioId;
+  const learnerId = Number(filters.learner);
+  if (filters.learner && Number.isInteger(learnerId)) params.learnerId = learnerId;
+  return params;
+};
 
 /**
  * One dashboard card. Fetches its own data (so only charts on the dashboard
@@ -23,7 +44,12 @@ interface ChartHostProps {
  * takeaway sentence, then the chart. A `bare` chart (the headline tiles) draws
  * its own surface; `self` charts (the tables) fetch for themselves.
  */
-export const ChartHost: FunctionComponent<ChartHostProps> = ({ entry, range }) => {
+export const ChartHost: FunctionComponent<ChartHostProps> = ({
+  entry,
+  range,
+  filters = {},
+  onFiltersChange,
+}) => {
   const { t } = useTranslation();
   const renderer = CHART_RENDERERS[entry.id];
   const unavailable = entry.state === "unavailable";
@@ -37,9 +63,19 @@ export const ChartHost: FunctionComponent<ChartHostProps> = ({ entry, range }) =
     }
   }, []);
 
-  const { data, isFetching, isError, refetch } = useGetStatisticsChartQuery(
-    { id: entry.id, range, timezone },
-    { skip: unavailable || !renderer || renderer.kind === "self" },
+  // A card with a required filter (it has no all-organisation view) waits for a choice.
+  const missing = entry.filters.find(f => f.required && !filters[f.key]);
+
+  // `currentData`, not `data`: after a filter changes the card shows loading, never
+  // the previous filter's numbers under the new filter's name.
+  const {
+    currentData: data,
+    isFetching,
+    isError,
+    refetch,
+  } = useGetStatisticsChartQuery(
+    { id: entry.id, range, timezone, ...filterParams(filters) },
+    { skip: unavailable || !renderer || renderer.kind === "self" || !!missing },
   );
 
   // An id the backend offers but this build has no renderer for: show nothing
@@ -90,11 +126,37 @@ export const ChartHost: FunctionComponent<ChartHostProps> = ({ entry, range }) =
   }
 
   const takeaway = data && renderer.takeaway ? renderer.takeaway(data.data, t) : null;
+  const labels: Partial<Record<StatisticsFilterKey, string>> = {};
+  data?.filters?.forEach(f => {
+    labels[f.kind] = f.label;
+  });
+  const controls =
+    entry.filters.length > 0 ? (
+      <CardFilters
+        filters={entry.filters}
+        values={filters}
+        labels={labels}
+        onChange={next => onFiltersChange?.(next)}
+      />
+    ) : null;
+  if (missing) {
+    return (
+      <div className="h-full" data-testid={`statistics-card-${entry.id}`}>
+        <StatCard title={entry.question} controls={controls}>
+          <p className="text-sm text-typography-600" data-testid="statistics-choose-prompt">
+            {t(`statisticsLibrary.filters.pick.${missing.key}`)}
+          </p>
+        </StatCard>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full" data-testid={`statistics-card-${entry.id}`}>
       <StatCard
         title={entry.question}
         takeaway={takeaway}
+        controls={controls}
         loading={loading}
         error={isError}
         onRetry={refetch}
