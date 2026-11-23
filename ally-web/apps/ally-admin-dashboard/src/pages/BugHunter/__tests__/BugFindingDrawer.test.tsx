@@ -7,11 +7,8 @@ import { BugFindingSource, BugFindingStatus } from "@types";
 import { BugFindingDrawer } from "../BugFindingDrawer";
 
 const startFixSession = vi.fn();
-const cancelFixSession = vi.fn();
 const mergeFinding = vi.fn();
 const releaseFinding = vi.fn();
-const editDescription = vi.fn();
-const setStage = vi.fn();
 const getBugFinding = vi.fn();
 const getFindingDecisions = vi.fn(() => ({ data: [], isError: false }));
 
@@ -20,13 +17,9 @@ vi.mock("@api", () => ({
   useGetBugFindingDecisionsQuery: () => getFindingDecisions(),
   useApproveBugFindingMutation: () => [vi.fn(), { isLoading: false }],
   useRejectBugFindingMutation: () => [vi.fn(), { isLoading: false }],
-  useAnswerBugFindingMutation: () => [vi.fn(), { isLoading: false }],
   useStartBugFixSessionMutation: () => [startFixSession, { isLoading: false }],
-  useCancelBugFixSessionMutation: () => [cancelFixSession, { isLoading: false }],
   useMergeBugFindingMutation: () => [mergeFinding, { isLoading: false }],
   useReleaseBugFindingMutation: () => [releaseFinding, { isLoading: false }],
-  useEditBugFindingDescriptionMutation: () => [editDescription, { isLoading: false }],
-  useSetBugFindingStageMutation: () => [setStage, { isLoading: false }],
 }));
 
 // The @hooks barrel reaches the real Redux store (useScenarioReportsSocket ->
@@ -439,96 +432,6 @@ describe("BugFindingDrawer — fix session", () => {
   });
 });
 
-describe("BugFindingDrawer — stop fix session", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    cancelFixSession.mockReturnValue({ unwrap: () => Promise.resolve({}) });
-  });
-
-  it("offers to stop a session that's queued", () => {
-    renderDrawer(finding({ status: BugFindingStatus.QUEUED }));
-    expect(screen.getByText("Stop fix session")).toBeInTheDocument();
-  });
-
-  it("offers to stop a session that's actively fixing", () => {
-    renderDrawer(finding({ status: BugFindingStatus.FIXING }));
-    expect(screen.getByText("Stop fix session")).toBeInTheDocument();
-  });
-
-  it("hides the stop button once nothing is running — the whole point is stopping something in flight", () => {
-    renderDrawer(finding({ status: BugFindingStatus.NEW }));
-    expect(screen.queryByText("Stop fix session")).not.toBeInTheDocument();
-  });
-
-  it("hides the stop button once the session has already settled", () => {
-    renderDrawer(finding({ status: BugFindingStatus.MERGED }));
-    expect(screen.queryByText("Stop fix session")).not.toBeInTheDocument();
-  });
-
-  it("asks for confirmation before cancelling, rather than stopping on the first click", () => {
-    renderDrawer(finding({ status: BugFindingStatus.FIXING }));
-    fireEvent.click(screen.getByText("Stop fix session"));
-
-    expect(screen.getByTestId("confirm-popup")).toBeInTheDocument();
-    expect(screen.getByText("Stop this fix session?")).toBeInTheDocument();
-    expect(cancelFixSession).not.toHaveBeenCalled();
-  });
-
-  it("cancels the session only once the confirm dialog is accepted", async () => {
-    renderDrawer(finding({ status: BugFindingStatus.FIXING }));
-    fireEvent.click(screen.getByText("Stop fix session"));
-    fireEvent.click(screen.getByText("Stop it"));
-
-    await waitFor(() => expect(cancelFixSession).toHaveBeenCalledWith("finding-1"));
-  });
-
-  it("surfaces the backend's own refusal message rather than a generic one", async () => {
-    const { toast } = await import("sonner");
-    cancelFixSession.mockReturnValue({
-      unwrap: () => Promise.reject({ data: { message: "Session already finished." } }),
-    });
-    renderDrawer(finding({ status: BugFindingStatus.QUEUED }));
-
-    fireEvent.click(screen.getByText("Stop fix session"));
-    fireEvent.click(screen.getByText("Stop it"));
-
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Session already finished."));
-  });
-
-  it("falls back to a generic failure message when the backend gives none", async () => {
-    const { toast } = await import("sonner");
-    cancelFixSession.mockReturnValue({ unwrap: () => Promise.reject({}) });
-    renderDrawer(finding({ status: BugFindingStatus.QUEUED }));
-
-    fireEvent.click(screen.getByText("Stop fix session"));
-    fireEvent.click(screen.getByText("Stop it"));
-
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Couldn't stop the fix session."));
-  });
-
-  it("offers a retry worded the same as a failed attempt once cancelled, not a fresh 'put me on it'", () => {
-    renderDrawer(finding({ status: BugFindingStatus.CANCELLED }));
-    expect(screen.getByText("Ask me to try again")).toBeInTheDocument();
-    expect(screen.queryByText("Stop fix session")).not.toBeInTheDocument();
-  });
-
-  it("credits who stopped it by name in the work log, never as a user id", () => {
-    renderDrawer(
-      finding({
-        status: BugFindingStatus.CANCELLED,
-        cancelledBy: 9,
-        cancelledByName: "Priya",
-        cancelledAt: "2026-08-19",
-      }),
-    );
-    openSection(/My work log/);
-    const log = screen.getByTestId("work-log");
-    expect(log).toHaveTextContent("Priya");
-    expect(log).toHaveTextContent("stopped the fix session");
-    expect(screen.queryByText(/user #/)).not.toBeInTheDocument();
-  });
-});
-
 describe("BugFindingDrawer — release to production", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -907,246 +810,6 @@ describe("BugFindingDrawer — a backend older than this build", () => {
   });
 });
 
-/**
- * Rewriting the brief before a fix session runs.
- *
- * The description is not a record of the bug — it is the text ally-be pastes
- * into the fix agent's prompt as the entire statement of what is wrong. So
- * these cover where the control appears (exactly where "Put me on it" does),
- * that it says nothing about approving, and that the original stays reachable
- * once it has been replaced.
- */
-describe("BugFindingDrawer — rewriting the description", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    editDescription.mockReturnValue({ unwrap: () => Promise.resolve({}) });
-  });
-
-  const openEditor = (data: Record<string, unknown>) => {
-    renderDrawer(data);
-    fireEvent.click(menu().getByText("Rewrite the description"));
-    return screen.getByRole("textbox", { name: /as you want me to understand it/i });
-  };
-
-  it("offers the rewrite on a bug that hasn't been fixed yet", () => {
-    renderDrawer(finding());
-    expect(screen.getByText("Rewrite the description")).toBeInTheDocument();
-  });
-
-  it.each([
-    BugFindingStatus.QUEUED,
-    BugFindingStatus.FIXING,
-    BugFindingStatus.MERGED,
-    BugFindingStatus.RELEASED,
-  ])("hides the rewrite while the bug is %s", status => {
-    renderDrawer(finding({ status }));
-    expect(screen.queryByText("Rewrite the description")).not.toBeInTheDocument();
-  });
-
-  it("starts the draft from the current description, not an empty box", () => {
-    const textarea = openEditor(finding());
-    expect(textarea).toHaveValue("The external emergency-services link renders unstyled.");
-  });
-
-  it("saves the trimmed rewrite", async () => {
-    const textarea = openEditor(finding());
-    fireEvent.change(textarea, {
-      target: { value: "  Tapping the terms link opens an unstyled page on Android only.  " },
-    });
-    fireEvent.click(screen.getByText("Save description"));
-
-    await waitFor(() =>
-      expect(editDescription).toHaveBeenCalledWith({
-        id: "finding-1",
-        description: "Tapping the terms link opens an unstyled page on Android only.",
-      }),
-    );
-  });
-
-  it("refuses to save an emptied description", () => {
-    const textarea = openEditor(finding());
-    fireEvent.change(textarea, { target: { value: "   " } });
-
-    // A blank brief would leave the fix agent's prompt saying "Bug:" and
-    // nothing else, so the button is closed rather than the failure deferred
-    // to a 400.
-    expect(screen.getByText("Save description")).toBeDisabled();
-  });
-
-  it("blocks and explains a brief that's too long to be one", () => {
-    const textarea = openEditor(finding());
-    fireEvent.change(textarea, { target: { value: "x".repeat(5001) } });
-
-    expect(screen.getByText(/longer than I can take as a brief/i)).toBeInTheDocument();
-    expect(screen.getByText("Save description")).toBeDisabled();
-  });
-
-  it("leaves the description alone on cancel", () => {
-    const textarea = openEditor(finding());
-    fireEvent.change(textarea, { target: { value: "a different bug entirely" } });
-    fireEvent.click(screen.getByText("Cancel"));
-
-    expect(editDescription).not.toHaveBeenCalled();
-    expect(
-      screen.getByText("The external emergency-services link renders unstyled."),
-    ).toBeInTheDocument();
-  });
-
-  it("keeps what Bug Hunter originally found reachable after a rewrite", () => {
-    renderDrawer(
-      finding({
-        description: "Tapping the terms link opens an unstyled page on Android only.",
-        originalDescription: "terms link looks wrong",
-        descriptionEditedBy: 42,
-        descriptionEditedByName: "Gayatri",
-        descriptionEditedAt: "2026-08-19",
-      }),
-    );
-
-    expect(screen.getByText(/Rewritten by Gayatri/)).toBeInTheDocument();
-    // Collapsed by default — the current brief is what matters day to day.
-    expect(screen.queryByText("terms link looks wrong")).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByText("See what I originally found"));
-    expect(screen.getByText("terms link looks wrong")).toBeInTheDocument();
-  });
-
-  it("says nothing about an original on a bug nobody has rewritten", () => {
-    renderDrawer(finding());
-    expect(screen.queryByText(/Rewritten by/)).not.toBeInTheDocument();
-    expect(screen.queryByText("See what I originally found")).not.toBeInTheDocument();
-  });
-
-  it("surfaces the backend's own refusal verbatim", async () => {
-    const { toast } = await import("sonner");
-    editDescription.mockReturnValue({
-      unwrap: () =>
-        Promise.reject({
-          data: { message: "Finding finding-1 is queued — its description can't be changed." },
-        }),
-    });
-
-    const textarea = openEditor(finding());
-    fireEvent.change(textarea, { target: { value: "a better brief" } });
-    fireEvent.click(screen.getByText("Save description"));
-
-    await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith(
-        "Finding finding-1 is queued — its description can't be changed.",
-      ),
-    );
-  });
-});
-
-/**
- * An open draft and a live "Put me on it" cannot coexist.
- *
- * Caught in the real console, not by the tests above: the fix-session button
- * sits directly under the editor, and pressing it mid-rewrite dispatched a
- * session that read the OLD description while the admin's unsaved words went
- * nowhere — briefing the agent on exactly the text that had just been judged
- * wrong. Approving has the same shape via the next sweep.
- */
-describe("BugFindingDrawer — an unsaved rewrite blocks the decisions under it", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    editDescription.mockReturnValue({ unwrap: () => Promise.resolve({}) });
-    startFixSession.mockReturnValue({ unwrap: () => Promise.resolve({}) });
-  });
-
-  it("closes 'Put me on it' while a draft is open, and says why", () => {
-    renderDrawer(finding());
-    expect(screen.getByText("Put me on it")).not.toBeDisabled();
-
-    fireEvent.click(screen.getByText("Rewrite the description"));
-
-    expect(screen.getByText("Put me on it")).toBeDisabled();
-    expect(screen.getByText(/Save or cancel your rewrite first/i)).toBeInTheDocument();
-  });
-
-  it("closes the Manual-mode decision too — the next sweep would read the old words", () => {
-    renderDrawer(finding({ status: BugFindingStatus.PENDING_APPROVAL }));
-    fireEvent.click(screen.getByText("Rewrite the description"));
-
-    expect(screen.getByText("Approve — go fix it")).toBeDisabled();
-    expect(screen.getByText("Reject")).toBeDisabled();
-  });
-
-  it("reopens them once the rewrite is settled", async () => {
-    renderDrawer(finding());
-    fireEvent.click(screen.getByText("Rewrite the description"));
-    fireEvent.click(screen.getByText("Cancel"));
-
-    await waitFor(() => expect(screen.getByText("Put me on it")).not.toBeDisabled());
-    expect(screen.queryByText(/Save or cancel your rewrite first/i)).not.toBeInTheDocument();
-  });
-});
-
-describe("BugFindingDrawer — stage", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    setStage.mockReturnValue({ unwrap: () => Promise.resolve({}) });
-  });
-
-  it("says nothing about a stage that just follows the pipeline — the rail already shows it", () => {
-    renderDrawer(finding({ stage: "under_development", stageIsAuto: true }), false);
-
-    expect(screen.queryByText("In development")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("stage-pinned")).not.toBeInTheDocument();
-    // And a read-only reader is offered no way to pin one.
-    expect(screen.queryByText("Set stage by hand")).not.toBeInTheDocument();
-  });
-
-  it("says when a stage was set by hand, since the rail and the stage then disagree", () => {
-    renderDrawer(
-      finding({
-        stage: "released",
-        stageIsAuto: false,
-        stageOverriddenBy: 7,
-        stageOverriddenByName: "Priya",
-        stageOverriddenAt: "2026-10-01",
-      }),
-    );
-    expect(screen.getByTestId("stage-pinned")).toHaveTextContent("Released");
-    expect(screen.getByTestId("stage-pinned")).toHaveTextContent("Stage set by hand by Priya");
-  });
-
-  it("offers to pin the stage from the menu, and saves the chosen value", async () => {
-    renderDrawer(finding({ stage: "new", stageIsAuto: true }));
-
-    fireEvent.click(menu().getByText("Set stage by hand"));
-    fireEvent.change(screen.getByLabelText("Stage"), { target: { value: "released" } });
-    fireEvent.click(screen.getByText("Set stage"));
-
-    await waitFor(() =>
-      expect(setStage).toHaveBeenCalledWith({ id: "finding-1", stage: "released" }),
-    );
-  });
-
-  it("offers 'Back to automatic' only once a stage is actually pinned", () => {
-    renderDrawer(
-      finding({
-        stage: "released",
-        stageIsAuto: false,
-        stageOverriddenBy: 7,
-        stageOverriddenByName: "Priya",
-      }),
-    );
-    fireEvent.click(menu().getByText("Set stage by hand"));
-
-    expect(screen.getByText("Back to automatic")).toBeInTheDocument();
-  });
-
-  it("clears the pin when 'Back to automatic' is pressed", async () => {
-    renderDrawer(finding({ stage: "released", stageIsAuto: false, stageOverriddenBy: 7 }));
-    fireEvent.click(menu().getByText("Set stage by hand"));
-
-    fireEvent.click(screen.getByText("Back to automatic"));
-
-    await waitFor(() => expect(setStage).toHaveBeenCalledWith({ id: "finding-1", stage: null }));
-  });
-});
-
 describe("BugFindingDrawer — reported bug context", () => {
   it("renders nothing extra for a sweep-found bug with no reporter", () => {
     renderDrawer(finding({ report: null }));
@@ -1473,7 +1136,6 @@ describe("BugFindingDrawer — decision first", () => {
 
   it.each([
     [BugFindingStatus.PENDING_APPROVAL, {}, "Approve — go fix it"],
-    [BugFindingStatus.NEEDS_INPUT, { escalationQuestion: "Which locale?" }, "Send answer"],
     [BugFindingStatus.PR_OPENED, { prUrl: "https://x/pull/1" }, "Merge it"],
     [BugFindingStatus.MERGED, { releasable: true, releaseTarget: "x" }, "Release to production"],
     [BugFindingStatus.RELEASE_FAILED, { releasable: true, releaseTarget: "x" }, "Retry release"],
@@ -1485,14 +1147,13 @@ describe("BugFindingDrawer — decision first", () => {
     expect(primaries().map(button => button.textContent)).toEqual([label]);
   });
 
-  it.each([BugFindingStatus.QUEUED, BugFindingStatus.FIXING])(
-    "offers no primary at %s — only the way to stop it",
-    status => {
-      renderDrawer(finding({ status }));
-      expect(primaries()).toHaveLength(0);
-      expect(decisionBlock().getByText("Stop fix session")).toBeInTheDocument();
-    },
-  );
+  // A queued or running bug is the worker's: nothing to decide, and nothing to stop
+  // (the old Bug Hunter's cancel left with its engine).
+  it.each([BugFindingStatus.QUEUED, BugFindingStatus.FIXING])("offers no primary at %s", status => {
+    renderDrawer(finding({ status }));
+    expect(primaries()).toHaveLength(0);
+    expect(screen.queryByText("Stop fix session")).not.toBeInTheDocument();
+  });
 
   it.each([
     BugFindingStatus.RELEASING,
@@ -1516,19 +1177,6 @@ describe("BugFindingDrawer — decision first", () => {
     expect(decisionBlock().queryByText("Ask me to try again")).not.toBeInTheDocument();
     fireEvent.click(menu().getByText("Ask me to try again"));
     expect(screen.getByText("Put Bug Hunter on this bug?")).toBeInTheDocument();
-  });
-
-  it("asks the open question with the answer box and Send answer together, above the rail", () => {
-    renderDrawer(
-      finding({
-        status: BugFindingStatus.NEEDS_INPUT,
-        escalationQuestion: "Skip the oversized document or fail the batch?",
-      }),
-    );
-    const block = decisionBlock();
-    expect(block.getByText("Skip the oversized document or fail the batch?")).toBeInTheDocument();
-    expect(block.getByRole("textbox", { name: "Your answer" })).toBeInTheDocument();
-    expect(block.getByText("Send answer")).toBeDisabled();
   });
 
   it("states where a bug is once, in one sentence, with no banners or spinner beside the rail", () => {
@@ -1742,5 +1390,20 @@ describe("BugFindingDrawer — tooltips stay short", () => {
   ])("%s is one sentence of at most 20 words", (_key, text) => {
     expect(text.trim().split(/\s+/).length).toBeLessThanOrEqual(20);
     expect(text.trim().replace(/[.!?]$/, "")).not.toMatch(/[.!?]\s/);
+  });
+});
+
+// Retired 2026-11-23: the old Bug Hunter's findings (uuid ids) are history to read.
+describe("BugFindingDrawer — the old Bug Hunter's history", () => {
+  it("offers no decision on an old finding, and says why", () => {
+    renderDrawer(
+      finding({
+        id: "847b420d-72cb-4937-be9e-c78143718c62",
+        status: BugFindingStatus.PENDING_APPROVAL,
+      }),
+    );
+    expect(screen.queryByRole("button", { name: /Approve/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Decline|Reject/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/retired on 23 November 2026/)).toBeInTheDocument();
   });
 });

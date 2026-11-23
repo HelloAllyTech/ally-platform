@@ -32,7 +32,7 @@ each) plus `install_timeout_s` and `pids_limit`. Root `.gitignore` now lists
   define, and what the scrubber reuses: the audit record keys (`chat_id`, `audit_id`,
   `ip`, `location`, `user_agent`, `request_id`) and the `details` keys callers pass
   (`audio_url`, `file_path`, `segment_path`, `wav_file_path`, `input_path`). The email
-  and phone regexes are ported from ally-be's `bug-hunter/util/redact-pii.util.ts` and
+  and phone regexes are ported from ally-be's `bug-hunter/util/redact-pii.util.ts` and <!-- docs-path-lint: ignore -->
   `guide/safety/redaction.ts`. Token, API-key and IP patterns are new.
 - **No CI job starts a database or queue.** All five `test-*.yml` workflows run unit tests
   with no services, so the sandbox has no sidecars. `ally-be/compose.test.yaml` serves the

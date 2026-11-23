@@ -15,7 +15,6 @@ vi.mock("@api", () => ({
   // Only consulted for the run-scope banner's wording, and skipped entirely
   // while no `?run=` is set — but the hook is still called on every render, so
   // the mock has to exist or the table throws before it draws a row.
-  useGetBugHuntRunQuery: () => ({ data: undefined }),
 }));
 
 vi.mock("@assets", () => ({ TooltipIcon: () => <svg data-testid="tooltip-icon" /> }));
@@ -459,7 +458,8 @@ describe("BugFindingsTable — tabs and the one next step", () => {
   it("offers one button per row, naming the next human step", () => {
     mount(mixed(), undefined, "/?bucket=needs_you");
     expect(screen.getByRole("button", { name: "Approve" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Answer" })).toBeInTheDocument();
+    // Bug Hunter v2 stopped on it: the step is reading its report.
+    expect(screen.getByRole("button", { name: "Review" })).toBeInTheDocument();
     // Reject and "Put me on it" are the drawer's and the bulk bar's now.
     expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Put me on it" })).not.toBeInTheDocument();
@@ -469,7 +469,7 @@ describe("BugFindingsTable — tabs and the one next step", () => {
     mount(mixed(), undefined, "/?bucket=backlog");
     expect(screen.getByText("Bug new")).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /^(Approve|Answer|Try again|Merge|Release)$/ }),
+      screen.queryByRole("button", { name: /^(Approve|Review|Try again|Merge|Release)$/ }),
     ).not.toBeInTheDocument();
   });
 
@@ -492,9 +492,9 @@ describe("BugFindingsTable — tabs and the one next step", () => {
   });
 
   // The answer box and the merge dialog's case chain live in the drawer.
-  it("opens the drawer for Answer and Merge", () => {
+  it("opens the drawer for Review and Merge", () => {
     mount(mixed(), undefined, "/?bucket=needs_you");
-    fireEvent.click(screen.getByRole("button", { name: "Answer" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review" }));
     expect(screen.getByTestId("drawer")).toHaveTextContent("asked");
   });
 

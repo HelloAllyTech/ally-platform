@@ -293,63 +293,6 @@ export class BugHunterBoardService {
     };
   }
 
-  /**
-   * One of the old Bug Hunter's findings, read-only, with its history: so a v1 row
-   * on the v2 board opens here rather than sending the reader to the old page.
-   * Plan steps are not board rows, so they are not served either.
-   */
-  async v1Detail(findingId: string) {
-    const ds = await this.db.get();
-    const [f] = await ds.query(
-      `SELECT id, source, repo, title, description, status, severity, file, evidence,
-              pr_url, escalation_question, escalation_answer, decision_reason,
-              decision_note, release_tag, "createdAt" AT TIME ZONE 'UTC' AS created_at,
-              dispatched_at AT TIME ZONE 'UTC' AS dispatched_at,
-              decided_at AT TIME ZONE 'UTC' AS decided_at,
-              released_at AT TIME ZONE 'UTC' AS released_at
-         FROM public.bug_findings
-        WHERE id = $1 AND parent_finding_id IS NULL`,
-      [findingId],
-    );
-    if (!f) throw new NotFoundException('No such bug.');
-    const events = await ds.query(
-      `SELECT stage, summary, "createdAt" AT TIME ZONE 'UTC' AS created_at
-         FROM public.bug_hunt_events
-        WHERE finding_id = $1
-        ORDER BY "createdAt" ASC
-        LIMIT 200`,
-      [findingId],
-    );
-    return {
-      origin: 'v1' as const,
-      v1FindingId: f.id,
-      source: `v1:${f.source}`,
-      app: f.repo ?? null,
-      title: f.title,
-      description: f.description ?? '',
-      status: f.status,
-      tab: V1_STATUS_TAB[f.status] ?? 'backlog',
-      severity: f.severity ?? null,
-      file: f.file ?? null,
-      evidence: f.evidence ?? null,
-      prUrl: f.pr_url ?? null,
-      escalationQuestion: f.escalation_question ?? null,
-      escalationAnswer: f.escalation_answer ?? null,
-      decisionReason: f.decision_reason ?? null,
-      decisionNote: f.decision_note ?? null,
-      releaseTag: f.release_tag ?? null,
-      createdAt: new Date(f.created_at).toISOString(),
-      startedAt: iso(f.dispatched_at),
-      decidedAt: iso(f.decided_at),
-      releasedAt: iso(f.released_at),
-      events: (events as any[]).map((e) => ({
-        stage: e.stage,
-        summary: e.summary,
-        at: new Date(e.created_at).toISOString(),
-      })),
-    };
-  }
-
   /** Start fix (backlog) or Retry (failed): queue it for the worker. */
   async start(id: number, dto: StartBugDto, userId: number) {
     const ds = await this.db.get();
@@ -403,6 +346,155 @@ export class BugHunterBoardService {
    * Bug Hunter v2 is set up in this database. The worker decides when it runs
    * (the mode); the reporter's text is scrubbed before any model sees it.
    */
+  /**
+   * A bug found by another part of the platform (today: the UX-signals scan) enters the
+   * queue, once per `key`. Returns false when the same key is already queued. The mode
+   * decides when it runs, as for any bug.
+   */
+  async enqueueSignal(input: {
+    source: 'ux_signal';
+    key: string;
+    app: string;
+    title: string;
+    description: string;
+    severity?: string | null;
+    symbol?: string | null;
+  }): Promise<boolean> {
+    const [schema] = await this.dataSource.query(
+      `SELECT to_regclass('bughunter.bugs') IS NOT NULL AS present`,
+    );
+    if (!schema?.present) return false; // Bug Hunter not set up in this database
+    // Still open in the old Bug Hunter's history under the same identity: not again.
+    const [old] = await this.dataSource.query(
+      `SELECT 1 AS hit FROM public.bug_findings
+        WHERE dedupe_key = $1 AND source = $2 AND parent_finding_id IS NULL
+          AND status NOT IN ('merged', 'released', 'dismissed', 'rejected', 'cancelled')
+        LIMIT 1`,
+      [input.key, input.source],
+    );
+    if (old) return false;
+    const rows = await this.dataSource.query(
+      `INSERT INTO bughunter.bugs
+         (source, signal_key, app, title, description, payload, reported_by)
+       VALUES ($1, $2, $3, $4, $5, $6, 'monitoring')
+       ON CONFLICT (signal_key) DO NOTHING
+       RETURNING id`,
+      [
+        input.source,
+        `${input.source}:${input.key}`,
+        input.app,
+        input.title.slice(0, 300),
+        input.description.slice(0, 20000),
+        JSON.stringify({
+          severity_hint: input.severity ?? 'medium',
+          symbol: input.symbol ?? null,
+        }),
+      ],
+    );
+    return Array.isArray(rows) && rows.length > 0;
+  }
+
+  /**
+   * Bugs from one source, newest first: v2's, then the old Bug Hunter's (read-only
+   * history), so nothing already filed is filed again. `term` narrows by title.
+   */
+  async listBySource(
+    source: 'ux_signal',
+    opts: { term?: string; take?: number; openOnly?: boolean } = {},
+  ): Promise<
+    Array<{
+      id: string;
+      title: string;
+      symbol: string | null;
+      severity: string | null;
+      status: string;
+      createdAt: Date;
+    }>
+  > {
+    const take = opts.take ?? 50;
+    const term = opts.term ? `%${opts.term}%` : null;
+    const v2: any[] = await this.dataSource
+      .query(
+        `SELECT id, title, payload->>'symbol' AS symbol,
+              payload->>'severity_hint' AS severity, status, created_at
+         FROM bughunter.bugs
+        WHERE source = $1 AND ($2::text IS NULL OR title ILIKE $2)
+          AND (NOT $3 OR status NOT IN ('done', 'merged', 'released'))
+        ORDER BY created_at DESC LIMIT $4`,
+        [source, term, Boolean(opts.openOnly), take],
+      )
+      .catch(() => []);
+    const v1 = await this.dataSource.query(
+      `SELECT id, title, symbol, severity, status, "createdAt" AS created_at
+         FROM public.bug_findings
+        WHERE source = $1 AND parent_finding_id IS NULL
+          AND ($2::text IS NULL OR title ILIKE $2)
+          AND (NOT $3 OR status NOT IN ('merged', 'released', 'dismissed', 'rejected', 'cancelled'))
+        ORDER BY "createdAt" DESC LIMIT $4`,
+      [source, term, Boolean(opts.openOnly), take],
+    );
+    return [
+      ...v2.map((r: any) => ({ ...r, id: `v2-${r.id}` })),
+      ...v1.map((r: any) => ({ ...r, id: String(r.id) })),
+    ]
+      .slice(0, take)
+      .map((r: any) => ({
+        id: r.id,
+        title: r.title,
+        symbol: r.symbol ?? null,
+        severity: r.severity ?? null,
+        status: r.status,
+        createdAt: new Date(r.created_at),
+      }));
+  }
+
+  /**
+   * What is known to be broken in an app, for the Builder's PRD evidence: v2's open bugs,
+   * then the old Bug Hunter's still-open findings (its history, read-only).
+   */
+  async openBugs(app?: string): Promise<
+    Array<{
+      id: string;
+      repo: string | null;
+      status: string;
+      title: string;
+      file: string | null;
+    }>
+  > {
+    const ds = await this.db.get();
+    const v2 = await ds.query(
+      `SELECT id, app, status, title FROM bughunter.bugs
+        WHERE status NOT IN ('done', 'merged', 'released')
+          AND ($1::text IS NULL OR app = $1)
+        ORDER BY created_at DESC LIMIT 100`,
+      [app ?? null],
+    );
+    const v1 = await ds.query(
+      `SELECT id, repo, status, title, file FROM public.bug_findings
+        WHERE parent_finding_id IS NULL
+          AND status NOT IN ('merged', 'released', 'dismissed', 'rejected', 'cancelled')
+          AND ($1::text IS NULL OR repo = $1)
+        ORDER BY "createdAt" DESC LIMIT 100`,
+      [app ?? null],
+    );
+    return [
+      ...v2.map((r: any) => ({
+        id: `v2-${r.id}`,
+        repo: r.app ?? null,
+        status: r.status,
+        title: r.title,
+        file: null,
+      })),
+      ...v1.map((r: any) => ({
+        id: String(r.id),
+        repo: r.repo ?? null,
+        status: r.status,
+        title: r.title,
+        file: r.file ?? null,
+      })),
+    ];
+  }
+
   // ── chunk 11: the old Bug Hunter's buttons ────────────────────────────
 
   private async bugOr404(id: number) {

@@ -104,7 +104,7 @@ now retry.
 The two root workflows, `bug-hunt-sweep.yml` and `bug-fix-session.yml`, are already
 disabled. To remove later:
 
-- `.github/workflows/bug-hunt-sweep.yml` and `.github/workflows/bug-fix-session.yml`,
+- `.github/workflows/bug-hunt-sweep.yml` and `.github/workflows/bug-fix-session.yml`, <!-- docs-path-lint: ignore -->
   plus their copies in `ally-be/`, `ally-web/`, `ally-ai/` and
   `ally-ai-learn/.github/workflows/`
 - `ally-be/src/bug-hunter/` (the module, constants, controllers, DTOs, entities, enums,

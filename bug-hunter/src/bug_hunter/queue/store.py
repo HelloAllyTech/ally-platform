@@ -47,7 +47,14 @@ def board_status(graph_status: str) -> str:
 
 
 # the queue's source names; "reported" is a roadmap bug filed in the product
-SOURCES = ("reported", "issue", "ci_failure", "error_log", "commit_sweep")
+SOURCES = (
+    "reported",
+    "issue",
+    "ci_failure",
+    "error_log",
+    "commit_sweep",
+    "ux_signal",  # filed by ally-be's UX-signals scan (2026-11-23)
+)
 
 
 def _now() -> datetime:
@@ -104,7 +111,8 @@ class Bug:
     def candidate(self) -> Candidate:
         """The Candidate the run path takes. A reported bug runs in issue mode at
         origin/master, like a GitHub issue."""
-        source = "issue" if self.source == "reported" else self.source
+        # a reported bug and a UX-signal bug run like an issue: a described symptom
+        source = "issue" if self.source in ("reported", "ux_signal") else self.source
         reported_by = self.reported_by
         if reported_by not in ("agent", "ci", "monitoring", "staff", "user"):
             reported_by = "user"

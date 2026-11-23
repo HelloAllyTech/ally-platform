@@ -313,3 +313,10 @@ def test_work_loop_goes_straight_on_after_a_run_and_sleeps_otherwise() -> None:
 def test_day_start_is_midnight_ist() -> None:
     start = day_start(NOW)  # 03:30 IST on the 16th
     assert start == datetime(2026, 11, 15, 18, 30, tzinfo=timezone.utc)
+
+
+def test_a_ux_signal_bug_runs_in_issue_mode() -> None:
+    b = bug("ux_signal:abc", source="ux_signal")
+    b.reported_by = "monitoring"
+    c = b.candidate()
+    assert (c.source, c.reported_by, c.app) == ("issue", "monitoring", "ally-be")

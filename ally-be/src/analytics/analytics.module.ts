@@ -19,8 +19,6 @@ import { CourseUnitsAnalyticsService } from './service/course-units-analytics.se
 import { CourseUnitsAnalyticsRepository } from './repository/course-units-analytics.repository';
 import { XpLevelReachedAnalyticsService } from './service/xp-level-reached-analytics.service';
 import { XpLevelReachedAnalyticsRepository } from './repository/xp-level-reached-analytics.repository';
-import { BugHunterVolumeAnalyticsService } from './service/bug-hunter-volume-analytics.service';
-import { BugHunterVolumeAnalyticsRepository } from './repository/bug-hunter-volume-analytics.repository';
 import { XpByTenantAnalyticsService } from './service/xp-by-tenant-analytics.service';
 import { XpByTenantAnalyticsRepository } from './repository/xp-by-tenant-analytics.repository';
 import { AnalyticsXpGoal } from './entity/analytics-xp-goal.entity';
@@ -115,10 +113,6 @@ import { CodingAgentCostAnalyticsService } from './service/coding-agent-cost-ana
 import { CodingAgentCostAnalyticsRepository } from './repository/coding-agent-cost-analytics.repository';
 import { FixSessionEngineCostAnalyticsService } from './service/fix-session-engine-cost-analytics.service';
 import { FixSessionEngineCostAnalyticsRepository } from './repository/fix-session-engine-cost-analytics.repository';
-import { BugAgentPerformanceAnalyticsService } from './service/bug-agent-performance-analytics.service';
-import { BugFindingRepository } from 'src/bug-hunter/repository/bug-finding.repository';
-import { BugHuntRunRepository } from 'src/bug-hunter/repository/bug-hunt-run.repository';
-import { BugHuntEventRepository } from 'src/bug-hunter/repository/bug-hunt-event.repository';
 import { QualitySentimentAnalyticsService } from './service/quality-sentiment-analytics.service';
 import { QualitySentimentAnalyticsRepository } from './repository/quality-sentiment-analytics.repository';
 // Roleplay Quality Index: the composite behind the "Roleplay quality" card,
@@ -237,8 +231,6 @@ import { TenantModule } from 'src/tenant/tenant.module';
     CourseUnitsAnalyticsRepository,
     XpLevelReachedAnalyticsService,
     XpLevelReachedAnalyticsRepository,
-    BugHunterVolumeAnalyticsService,
-    BugHunterVolumeAnalyticsRepository,
     XpByTenantAnalyticsService,
     XpByTenantAnalyticsRepository,
     RoleplayVolumeAnalyticsService,
@@ -327,15 +319,6 @@ import { TenantModule } from 'src/tenant/tenant.module';
     CodingAgentCostAnalyticsRepository,
     FixSessionEngineCostAnalyticsService,
     FixSessionEngineCostAnalyticsRepository,
-    // Provided directly rather than importing BugHunterModule: all three
-    // construct themselves from the DataSource alone, so this costs nothing
-    // and avoids pulling in Bug Hunter's whole service graph for three read
-    // queries — same reasoning as this week's PosthogQueryService/
-    // BugHunterRepoClassifierService additions elsewhere.
-    BugFindingRepository,
-    BugHuntRunRepository,
-    BugHuntEventRepository,
-    BugAgentPerformanceAnalyticsService,
     QualitySentimentAnalyticsService,
     QualitySentimentAnalyticsRepository,
     QualityIndexAnalyticsService,

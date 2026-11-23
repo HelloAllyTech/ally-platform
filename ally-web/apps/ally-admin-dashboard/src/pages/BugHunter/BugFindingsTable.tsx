@@ -16,6 +16,12 @@ import {
 // which reads `cellTypes` back off it at module-eval time — a test that needs
 // the real boundary while stubbing the barrel deadlocks on that cycle. Same
 // direct-path treatment as @components/action-confirmation-popup elsewhere.
+import {
+  useApproveBugFindingMutation,
+  useGetBugFindingsQuery,
+  useRejectBugFindingMutation,
+  useStartBugFixSessionMutation,
+} from "@api";
 import { TooltipIcon } from "@assets";
 import { EmptyState } from "@components";
 import { ActionConfirmationPopup } from "@components/action-confirmation-popup";
@@ -27,20 +33,12 @@ import {
   BugFindingDecisionReason,
   BugFindingSeverity,
 } from "@types";
-import { formatDateTime, formatTimestamp } from "@utils";
+import { formatTimestamp } from "@utils";
 
 import { BrailleSpinner } from "./BrailleSpinner";
 import { BugFindingDrawer } from "./BugFindingDrawer";
 import { BUG_FINDING_SEVERITY_LABELS, BUG_FINDING_SOURCE_LABELS } from "./bugFindingLabels";
 import { BugFindingStatusBadge } from "./BugFindingStatusBadge";
-import {
-  useApproveBugFindingMutation,
-  useBugHunterFeatures,
-  useGetBugFindingsQuery,
-  useGetBugHuntRunQuery,
-  useRejectBugFindingMutation,
-  useStartBugFixSessionMutation,
-} from "./bugHunterBackend";
 import { PAGE_SIZES, PageSize, useBugHunterUrlState } from "./bugHunterUrlState";
 import { BulkTriageBar } from "./BulkTriageBar";
 import { canSubmitDecline, DeclineReasonPicker } from "./DeclineReasonPicker";
@@ -255,7 +253,6 @@ const NextStepButton: FC<{ onClick: () => void; children: string }> = ({ onClick
 /** Read inside a function — see `bucketLabels` in FindingsTabs on why not at module scope. */
 const nextStepLabels = (): Record<NextStep, string> => ({
   approve: en.bugHunter.nextStepApprove,
-  answer: en.bugHunter.nextStepAnswer,
   retry: en.bugHunter.nextStepRetry,
   merge: en.bugHunter.nextStepMerge,
   review: en.bugHunter.nextStepReview,
@@ -448,7 +445,6 @@ export const BugFindingsTable: FC<BugFindingsTableProps> = ({
   canTriage,
   initialLimit = FINDINGS_BASE_LIMIT,
 }) => {
-  const backendFeatures = useBugHunterFeatures();
   const {
     bug: selectedId,
     bucket: linkedBucket,
@@ -465,7 +461,6 @@ export const BugFindingsTable: FC<BugFindingsTableProps> = ({
     setBug,
     setBucket,
     setSearch,
-    setRun,
     setRepos,
     setSeverities,
     setSources,
@@ -556,17 +551,6 @@ export const BugFindingsTable: FC<BugFindingsTableProps> = ({
     setLoadingMore(true);
     setLimit(current => (current ?? 0) + FINDINGS_LOAD_INCREMENT);
   }, []);
-
-  /**
-   * The scoped sweep, for the banner's own words.
-   *
-   * Skipped entirely when there is no scope — an admin who never clicks a count
-   * in the shift log should not pay a request for a banner that never renders.
-   * The shift log has usually already cached this entry by the time they do.
-   */
-  const { data: scopedRun } = useGetBugHuntRunQuery(run ?? "", {
-    skip: !run || !backendFeatures.sweeps,
-  });
 
   // Memoised because `data?.items ?? []` is a fresh array identity every render:
   // without it the view below (filter, sort, duplicate scan, page slice) would
@@ -944,29 +928,6 @@ export const BugFindingsTable: FC<BugFindingsTableProps> = ({
 
   return (
     <div id={BUG_FINDINGS_TABLE_ANCHOR_ID} className="scroll-mt-4">
-      {/* Above the tabs on purpose: the scope changes what every count below
-          it counts, so a reader who has not seen this line will read
-          "Backlog 7" as "seven bugs are waiting". *Making Agent
-          Trustworthiness Visible Through Transparency* is the argument for
-          spelling out the audit trail rather than quietly narrowing the view. */}
-      {run && (
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded border border-primary-200 bg-primary-50 px-3 py-2">
-          <p className="text-xs text-typography-800">
-            <span className="font-semibold">
-              {scopedRun
-                ? en.bugHunter.runScopeBanner
-                    .replace("{repo}", scopedRun.repo)
-                    .replace("{timestamp}", formatDateTime(scopedRun.createdAt))
-                : en.bugHunter.runScopeBannerLoading}
-            </span>{" "}
-            {en.bugHunter.runScopeBannerHint}
-          </p>
-          <Button size="sm" kind="ghost" onClick={() => setRun(null)}>
-            {en.bugHunter.runScopeClear}
-          </Button>
-        </div>
-      )}
-
       <FindingsTabs
         counts={tabCounts}
         value={bucket}

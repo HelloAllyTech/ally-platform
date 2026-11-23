@@ -1,7 +1,6 @@
 import { ActivationFunnelCard } from "../ActivationFunnelCard";
 import { ActiveUsersXpCard } from "../ActiveUsersXpCard";
 import { AverageRatingCard } from "../AverageRatingCard";
-import { BugHunterVolumeCard } from "../BugHunterVolumeCard";
 import { ScrollNoteContext } from "../chartKit";
 import { CourseUnitsCard } from "../CourseUnitsCard";
 import { CumulativeUsersCard } from "../CumulativeUsersCard";
@@ -51,7 +50,7 @@ import { XpPerMinuteCard } from "../XpPerMinuteCard";
  *  - `AverageRatingCard` — the mean post-session rating per period (AAQ-156),
  *    off the same `quality-distribution` ratings as the Satisfaction Mix, each
  *    point labelled with the number of ratings it averages.
- *  - `ActiveUsersXpCard`, `XpLevelReachedCard`, `BugHunterVolumeCard`,
+ *  - `ActiveUsersXpCard`, `XpLevelReachedCard`,
  *    `XpByTenantCard` — new, purpose-built for this tab's brief rather than
  *    adapted from an existing chart — see each card's own doc comment for why
  *    the existing "active users" and "levels" charts elsewhere on Highlights
@@ -79,7 +78,7 @@ import { XpPerMinuteCard } from "../XpPerMinuteCard";
  *  - `RoadmapVotingCard` — new (AAQ-254): roadmap votes cast per month by each
  *    admin with access, plus a who-voted grid that keeps non-voters visible. An
  *    adoption chart for our own team, so it sits with the other internal
- *    pace-of-the-business cards (`ShipVolumeCard`, `BugHunterVolumeCard`).
+ *    pace-of-the-business cards (`ShipVolumeCard`).
  *
  * Each relocated card lost the page-level filter its old tab offered (a
  * tenant filter for Practice minutes, a language filter for voice latency) —
@@ -106,7 +105,6 @@ export const GoalsTab = () => (
       <LevelReachCumulativeCard />
       <ShipVolumeCard />
       <RoadmapVotingCard />
-      <BugHunterVolumeCard />
       <XpByTenantCard />
       <NewUsersCard />
       <CumulativeUsersCard />

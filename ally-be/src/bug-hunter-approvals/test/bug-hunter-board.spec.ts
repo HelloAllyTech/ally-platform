@@ -371,36 +371,6 @@ describe('BugHunterBoardService', () => {
     expect(BOARD_ROWS_SQL).toContain("'reported:' || f.reported_bug_id::text");
   });
 
-  it('opens a v1 bug in v2, read-only, with its history', async () => {
-    fake.findings = [
-      finding('a', 'merged', { pr_url: 'https://example.test/pr/2' }),
-      finding('step', 'fixing', { parent_finding_id: 'a' }),
-    ];
-    fake.events = [
-      {
-        finding_id: 'a',
-        stage: 'pr_opened',
-        summary: 'Opened a PR',
-        created_at: new Date('2026-10-02T00:00:00Z'),
-      },
-    ];
-    const out = await service.v1Detail('a');
-    expect(out).toMatchObject({
-      origin: 'v1',
-      v1FindingId: 'a',
-      status: 'merged',
-      tab: 'done',
-      prUrl: 'https://example.test/pr/2',
-      events: [{ stage: 'pr_opened', summary: 'Opened a PR' }],
-    });
-    await expect(service.v1Detail('step')).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
-    await expect(service.v1Detail('nope')).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
-  });
-
   it('switches the mode with an audit entry of before and after', async () => {
     const out = await service.setMode('autonomous', 7);
     expect(out.mode).toBe('autonomous');

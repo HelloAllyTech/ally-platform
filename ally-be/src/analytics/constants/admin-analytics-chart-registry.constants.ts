@@ -1179,56 +1179,6 @@ export const ADMIN_ANALYTICS_CHART_REGISTRY: readonly AdminAnalyticsChartEntry[]
       componentFile: f('Analytics/FixSessionEngineCost.tsx'),
     },
 
-    // ---- Bug Agent ----
-    {
-      id: 'AAQ-130',
-      tab: 'Bug Agent',
-      title: 'Precision',
-      kind: 'chart',
-      chartType: 'LineChart',
-      componentFile: f('Analytics/BugAgentPerformance.tsx'),
-    },
-    {
-      id: 'AAQ-131',
-      tab: 'Bug Agent',
-      title: 'Precision by finder',
-      kind: 'chart',
-      chartType: 'SimpleBarChart',
-      componentFile: f('Analytics/BugAgentPerformance.tsx'),
-    },
-    {
-      id: 'AAQ-132',
-      tab: 'Bug Agent',
-      title: 'Fix throughput',
-      kind: 'chart',
-      chartType: 'LineChart',
-      componentFile: f('Analytics/BugAgentPerformance.tsx'),
-    },
-    {
-      id: 'AAQ-133',
-      tab: 'Bug Agent',
-      title: 'Speed',
-      kind: 'chart',
-      chartType: 'LineChart',
-      componentFile: f('Analytics/BugAgentPerformance.tsx'),
-    },
-    {
-      id: 'AAQ-134',
-      tab: 'Bug Agent',
-      title: 'Cost',
-      kind: 'chart',
-      chartType: 'LineChart',
-      componentFile: f('Analytics/BugAgentPerformance.tsx'),
-    },
-    {
-      id: 'AAQ-135',
-      tab: 'Bug Agent',
-      title: 'Reliability',
-      kind: 'chart',
-      chartType: 'LineChart',
-      componentFile: f('Analytics/BugAgentPerformance.tsx'),
-    },
-
     // ---- Scribe ----
     {
       id: 'AAQ-136',
@@ -1425,73 +1375,9 @@ export const ADMIN_ANALYTICS_CHART_REGISTRY: readonly AdminAnalyticsChartEntry[]
       componentFile: f('Analytics/RoleplaySessionCostCard.tsx'),
       note: 'Per-session delivery cost (GET /v1/analytics/roleplay-session-cost), stacked by component. Distinct from the Unit economics cost per 10 minutes, which buckets each call by when it ran rather than by its session',
     },
-    // ── Bug Agent: volume beside the rates (GET /v1/bug-hunter/metrics/operations) ──
     // Day-bucketed counts, each paired with where the cohort stands now
     // (accepted / declined / undecided). The page range is mapped to the
     // endpoint's day count; "all" and "12m" become its 365-day maximum.
-    {
-      id: 'AAQ-158',
-      tab: 'Bug Agent',
-      title: 'Bugs filed per day',
-      kind: 'chart',
-      chartType: 'StackedBarChart',
-      componentFile: f('Analytics/BugHunterOperationsCards.tsx'),
-      note: 'Distinct bugs by createdAt day (a re-discovery touches its row), stacked by current outcome',
-    },
-    {
-      id: 'AAQ-159',
-      tab: 'Bug Agent',
-      title: 'Bugs filed per day, by source',
-      kind: 'chart',
-      chartType: 'StackedBarChart',
-      componentFile: f('Analytics/BugHunterOperationsCards.tsx'),
-      note: 'Only sources present in the window are plotted; each keeps a fixed colour. Table view carries accepted share per source',
-    },
-    {
-      id: 'AAQ-160',
-      tab: 'Bug Agent',
-      title: 'How hard they were to spot',
-      kind: 'chart',
-      chartType: 'StackedBarChart',
-      componentFile: f('Analytics/BugHunterOperationsCards.tsx'),
-      note: 'Derived from proven + source: easy (tool output proved it), hard (agent-inferred, verified), reported (a person filed it)',
-    },
-    {
-      id: 'AAQ-161',
-      tab: 'Bug Agent',
-      title: 'Who raises bugs',
-      kind: 'chart',
-      chartType: 'SimpleBarChart',
-      componentFile: f('Analytics/BugHunterOperationsCards.tsx'),
-      note: "Bug Hunter vs staff vs consumers; reported_bug rows split by the linked roadmap row's source. All three always listed",
-    },
-    {
-      id: 'AAQ-162',
-      tab: 'Bug Agent',
-      title: 'Tokens spent per day, by trigger',
-      kind: 'chart',
-      chartType: 'StackedBarChart',
-      componentFile: f('Analytics/BugHunterOperationsCards.tsx'),
-      note: 'By trigger, not by phase: in AI mode one sweep finds and fixes, so a finding-vs-fixing split would be invented',
-    },
-    {
-      id: 'AAQ-163',
-      tab: 'Bug Agent',
-      title: 'Code shown to the sweeps per day',
-      kind: 'chart',
-      chartType: 'StackedBarChart',
-      componentFile: f('Analytics/BugHunterOperationsCards.tsx'),
-      note: 'Lines in scope from bug_hunt_runs.metadata.breadth; plot starts on the first recorded day (telemetry shipped 2026-09-23). Takeaway gives tokens per line',
-    },
-    {
-      id: 'AAQ-164',
-      tab: 'Bug Agent',
-      title: 'Tokens by model',
-      kind: 'chart',
-      chartType: 'SimpleBarChart',
-      componentFile: f('Analytics/BugHunterOperationsCards.tsx'),
-      note: 'From per-model llm_usage rows tagged bug_hunter, joined to runs in the window',
-    },
     {
       id: 'AAQ-165',
       tab: 'Highlights',
@@ -1544,15 +1430,6 @@ export const ADMIN_ANALYTICS_CHART_REGISTRY: readonly AdminAnalyticsChartEntry[]
     // AAQ-170 is retired (2026-10-03): "Skills moving: N up · N down" counted skills
     // past a ±0.1 band narrower than a skill's own 95% CI (~±0.2 at n=24), so it
     // headlined noise. Replaced by detectable-only counts on AAQ-174. Reserved.
-    {
-      id: 'AAQ-170',
-      tab: 'Bug Agent',
-      title: 'Spend over time',
-      kind: 'chart',
-      chartType: 'StackedBarChart',
-      componentFile: f('Analytics/BugHunterOperationsCards.tsx'),
-      note: 'Estimated cost per period by trigger (metadata.cliReportedCostUsd else totalTokenCostUsd), from GET metrics/operations days; Day / Week / Month folded client-side',
-    },
     {
       id: 'AAQ-171',
       tab: 'Highlights',
@@ -1804,44 +1681,6 @@ export const ADMIN_ANALYTICS_CHART_REGISTRY: readonly AdminAnalyticsChartEntry[]
       note: "Selected course: share of each learner's slices showing any unhelpful or potentially harmful behaviour, before vs after; down is better. /v1/analytics/course-impact?trackId= course.unhelpful",
     },
 
-    // ---- Bug Agent: the panels that moved off the Bug Hunter page's
-    // Performance tab (OPP-0749, 2026-10-05); AAQ-167..169 were already taken ----
-    {
-      id: 'AAQ-198',
-      tab: 'Bug Agent',
-      title: "How I'm doing (scorecard)",
-      kind: 'unmounted',
-      chartType: 'kpi',
-      componentFile: f('BugHunter/AgentScorecard.tsx'),
-      note: 'Four tiles plus fourteen-day sparkbars from GET /v1/bug-hunter/runs. Moved to Analytics → Bug Agent with OPP-0749 and removed from it the same day (2026-10-05, product head): the trends and operations charts already carry these figures',
-    },
-    {
-      id: 'AAQ-199',
-      tab: 'Bug Agent',
-      title: "How often I'm right (accuracy panel)",
-      kind: 'unmounted',
-      chartType: 'FunnelBars',
-      componentFile: f('BugHunter/AccuracyPanel.tsx'),
-      note: 'GET /v1/bug-hunter/metrics: funnel, accuracy by source and decision reason, stage latency, cost per landed fix. Removed from Analytics → Bug Agent on 2026-10-05 with the scorecard; the Precision trend covers the headline rate',
-    },
-    {
-      id: 'AAQ-200',
-      tab: 'Bug Agent',
-      title: 'My shift log (run history)',
-      kind: 'group',
-      chartType: 'table',
-      componentFile: f('BugHunter/RunHistoryTable.tsx'),
-      note: 'Per-run ledger: status, trigger, counts, cost and GitHub run, with the event timeline per row; the only view of a run, so it stays reachable here',
-    },
-    {
-      id: 'AAQ-201',
-      tab: 'Bug Agent',
-      title: 'Bugs found per day',
-      kind: 'chart',
-      chartType: 'LineChart',
-      componentFile: f('Analytics/BugAgentPerformance.tsx'),
-      note: 'Distinct top-level findings filed per UTC day across every repo and source, excluding any since dismissed or rejected, with a trailing 7-day mean; the one daily series on the tab, there to show the count falling. /v1/analytics/bug-agent-performance found[]',
-    },
     // ---- Effectiveness analytics (plan 2026-10-04, docs/effectiveness-analytics-plan.md).
     // Ids follow on-screen order WITHIN this batch: Highlights > Effectiveness, then
     // Helping skills, Usage and Curriculum additions; Phase 2–4 continue at AAQ-217. ----
@@ -2153,42 +1992,6 @@ export const ADMIN_ANALYTICS_CHART_REGISTRY: readonly AdminAnalyticsChartEntry[]
       chartType: 'table',
       componentFile: f('Analytics/OrgEffectivenessCard.tsx'),
       note: 'Ruler R1 + R10. Per non-test org, all time, one pass: measurable learners, own start→now composite change ± CI, share improving beyond the platform noise band, unhelpful-behaviour change, course completion, self-harm follow-up (internal: share only privately with partners), 6-month median-composite sparkline. Rows with < 20 measurable learners show counts only. Sorted by measurable learners. First candidate to expose to tenant admins later, with the same floors. /v1/analytics/effectiveness/orgs',
-    },
-    {
-      id: 'AAQ-233',
-      tab: 'Bug Agent',
-      title: 'Are we finding bugs before people do?',
-      kind: 'chart',
-      chartType: 'line',
-      componentFile: f('Analytics/BugAgentPerformance.tsx'),
-      note: "Bug Hunter's goal numbers (OPP-0778), per week: first-finder share (real bugs its senses filed over all real bugs, agent plus human) and escape rate (human reports whose repo a sweep had completed within 7 days — a bug in code it read and passed). Takeaway carries the window totals and median hours from filing to merge. Finder-error declines (not a bug, duplicate, wrong repo) are left out of both sides. /v1/analytics/bug-agent-performance goal",
-    },
-    {
-      id: 'AAQ-234',
-      tab: 'Bug Agent',
-      title: 'Why people found bugs first',
-      kind: 'chart',
-      chartType: 'bar',
-      componentFile: f('Analytics/BugAgentPerformance.tsx'),
-      note: 'Whole-window counts per miss reason from the miss classifier (OPP-0774) on human-reported bugs: no sense covers it, a sense missed it, detected and declined, detected and not fixed in time, not a miss, plus unclassified. The order the Finder gets new senses in. /v1/analytics/bug-agent-performance goal.window.missReasons',
-    },
-    {
-      id: 'AAQ-235',
-      tab: 'Bug Agent',
-      title: 'Scoreboard — which sense and model is winning where',
-      kind: 'group',
-      chartType: 'table',
-      componentFile: f('Analytics/BugHunterDecisionsPanel.tsx'),
-      note: "Per repo (picker), the last N days: filed / accepted / declined / pending and acceptance rate by sense and by finder model, plus each engine/model as a fixer (sessions, merged, failed, Verifier pass/fail). The cells the Finder's D1, D2 and the orchestrator's D6 read (OPP-0776, OPP-0783). Acceptance reads as a dash under 5 ruled on. /v1/bug-hunter/scoreboard",
-    },
-    {
-      id: 'AAQ-236',
-      tab: 'Bug Agent',
-      title: 'Decision replay — should the other owner take a point?',
-      kind: 'group',
-      chartType: 'table',
-      componentFile: f('Analytics/BugHunterDecisionsPanel.tsx'),
-      note: "Per decision point D1–D8: owner now, decisions, agreed, disagreed, owner right, shadow right, vetoes and the verdict (flip / keep / not enough cases / fixed), judged by each case's outcome. Flip once the shadow has won 30 disagreements and more than the owner; the flip is made on Settings → AI models (OPP-0783). /v1/bug-hunter/decisions/replay",
     },
     {
       id: 'AAQ-237',

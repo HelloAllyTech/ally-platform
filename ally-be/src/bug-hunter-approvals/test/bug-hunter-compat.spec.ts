@@ -1,5 +1,9 @@
 import 'reflect-metadata';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { BugFindingStatus } from 'src/bug-hunter/enum/bug-finding.enum';
 import {
   BugHunterCompatService,
@@ -78,8 +82,9 @@ describe('BugHunterCompatService (v2 in the old page shape)', () => {
   it('ids: v2 bugs never look like a v1 uuid, and a bad id is a 404', () => {
     expect(toCompatId(10)).toBe('v2-10');
     expect(fromCompatId('v2-10')).toBe(10);
+    // an old finding's id: its history is read-only now
     expect(() => fromCompatId('976eb704-4a94-43a6-a593-f1d4e09ecc98')).toThrow(
-      NotFoundException,
+      ConflictException,
     );
     expect(() => fromCompatId('v2-x')).toThrow(NotFoundException);
   });
@@ -165,6 +170,27 @@ describe('BugHunterCompatService (v2 in the old page shape)', () => {
     expect((await service.settings()).mode).toBe('ai');
     await service.setMode('ai', 7);
     expect(board.setMode).toHaveBeenCalledWith('autonomous', 7);
+  });
+
+  it('the reads are also open to roadmap viewers (the Bugs tab), the actions are not', () => {
+    const proto = BugHunterCompatController.prototype as any;
+    for (const name of ['findings', 'finding', 'decisions']) {
+      expect(
+        Reflect.getMetadata(FEATURE_TOGGLE_KEY, proto[name])?.alsoAllowedBy,
+      ).toBe(FeatureToggleKey.PRODUCT_ROADMAP);
+    }
+    for (const name of [
+      'setMode',
+      'approve',
+      'reject',
+      'start',
+      'merge',
+      'release',
+    ]) {
+      expect(
+        Reflect.getMetadata(FEATURE_TOGGLE_KEY, proto[name])?.alsoAllowedBy,
+      ).toBeUndefined();
+    }
   });
 
   it('every compat route needs the v2 toggle', () => {

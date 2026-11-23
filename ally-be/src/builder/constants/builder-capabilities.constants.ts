@@ -598,27 +598,16 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
     ],
   },
   {
-    id: 'bug-hunter',
+    id: 'bug-hunter-v2',
     name: 'Bug Hunter',
     whatItIs:
-      'A find-and-fix agent: sweeps for defects, records findings with a decision and dismissal ' +
-      'reason, and opens fix PRs.',
-    reuseWhen: 'A request concerns finding, triaging or auto-fixing bugs.',
-    modules: ['ally-be:src/bug-hunter'],
-    docs: ['ally-be:docs/bug-hunter-tools.md'],
-    adminRoute: '/bug-hunter',
-    keywords: ['bug', 'defect', 'finding', 'fix', 'triage'],
-  },
-  {
-    id: 'bug-hunter-v2',
-    name: 'Bug Hunter v2 verdicts',
-    whatItIs:
-      'The admin side of Bug Hunter v2 (the LangGraph agent in bug-hunter/ at the repo root): ' +
-      'its suggested fixes and escalations, read from its own bughunter database, and the ' +
-      'two-part verdict (diagnosis + fix) that teaches it.',
+      'A find-and-fix agent (the LangGraph agent in bug-hunter/ at the repo root): it reproduces ' +
+      'a bug with a failing test, fixes and reviews it, and leaves a suggested fix or draft PR. ' +
+      'Its admin side reads its own bughunter database, records the two-part verdict ' +
+      "(diagnosis + fix) that teaches it, and shows the old engine's findings read-only.",
     reuseWhen:
-      'A request is about judging, correcting or learning from what the new bug hunter found, ' +
-      'or about showing its suggested fixes to staff.',
+      'A request concerns finding, triaging, fixing or judging bugs, or showing suggested ' +
+      'fixes to staff.',
     modules: ['ally-be:src/bug-hunter-approvals'],
     docs: [],
     adminRoute: '/bug-hunter-v2',

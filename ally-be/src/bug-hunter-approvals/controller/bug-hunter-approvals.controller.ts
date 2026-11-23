@@ -5,7 +5,6 @@ import {
   Get,
   Param,
   ParseIntPipe,
-  ParseUUIDPipe,
   Post,
   Put,
   Query,
@@ -69,16 +68,6 @@ export class BugHunterApprovalsController {
   })
   bugs(@Query() query: ListBugsQueryDto) {
     return this.board.list(query);
-  }
-
-  @Get('bugs/v1/:findingId')
-  @RequireFeatureToggle(FeatureToggleKey.BUG_HUNTER_V2_VERDICTS)
-  @ApiOperation({
-    summary:
-      "One of the old Bug Hunter's findings, read-only, with its history",
-  })
-  v1Bug(@Param('findingId', ParseUUIDPipe) findingId: string) {
-    return this.board.v1Detail(findingId);
   }
 
   @Post('bugs/:id/start')

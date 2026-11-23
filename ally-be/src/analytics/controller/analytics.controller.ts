@@ -156,7 +156,6 @@ import {
 import { ActiveUsersXpAnalyticsService } from '../service/active-users-xp-analytics.service';
 import { CourseUnitsAnalyticsService } from '../service/course-units-analytics.service';
 import { XpLevelReachedAnalyticsService } from '../service/xp-level-reached-analytics.service';
-import { BugHunterVolumeAnalyticsService } from '../service/bug-hunter-volume-analytics.service';
 import { XpByTenantAnalyticsService } from '../service/xp-by-tenant-analytics.service';
 import { LanguageAnalyticsService } from '../service/language-analytics.service';
 import { GlossaryEffectAnalyticsService } from '../service/glossary-effect-analytics.service';
@@ -260,10 +259,6 @@ import {
   XpLevelReachedQueryDto,
   XpLevelReachedResponseDto,
 } from '../dto/xp-level-reached-analytics.dto';
-import {
-  BugHunterVolumeQueryDto,
-  BugHunterVolumeResponseDto,
-} from '../dto/bug-hunter-volume-analytics.dto';
 import {
   XpByTenantQueryDto,
   XpByTenantResponseDto,
@@ -373,10 +368,6 @@ import {
   FixSessionEngineCostResponseDto,
 } from '../dto/fix-session-engine-cost-analytics.dto';
 import {
-  BugAgentPerformanceQueryDto,
-  BugAgentPerformanceResponseDto,
-} from '../dto/bug-agent-performance-analytics.dto';
-import {
   QualitySentimentQueryDto,
   QualitySentimentResponseDto,
 } from '../dto/quality-sentiment-analytics.dto';
@@ -395,7 +386,6 @@ import {
 } from '../dto/xp-per-minute-analytics.dto';
 import { CodingAgentCostAnalyticsService } from '../service/coding-agent-cost-analytics.service';
 import { FixSessionEngineCostAnalyticsService } from '../service/fix-session-engine-cost-analytics.service';
-import { BugAgentPerformanceAnalyticsService } from '../service/bug-agent-performance-analytics.service';
 import { QualitySentimentAnalyticsService } from '../service/quality-sentiment-analytics.service';
 import { ChartPreferenceService } from '../service/chart-preference.service';
 import {
@@ -437,7 +427,6 @@ export class AnalyticsController {
     private readonly activeUsersXpAnalyticsService: ActiveUsersXpAnalyticsService,
     private readonly courseUnitsAnalyticsService: CourseUnitsAnalyticsService,
     private readonly xpLevelReachedAnalyticsService: XpLevelReachedAnalyticsService,
-    private readonly bugHunterVolumeAnalyticsService: BugHunterVolumeAnalyticsService,
     private readonly xpByTenantAnalyticsService: XpByTenantAnalyticsService,
     private readonly roleplayVolumeAnalyticsService: RoleplayVolumeAnalyticsService,
     private readonly roadmapDeliveryAnalyticsService: RoadmapDeliveryAnalyticsService,
@@ -480,7 +469,6 @@ export class AnalyticsController {
     private readonly xpPerMinuteAnalyticsService: XpPerMinuteAnalyticsService,
     private readonly codingAgentCostAnalyticsService: CodingAgentCostAnalyticsService,
     private readonly fixSessionEngineCostAnalyticsService: FixSessionEngineCostAnalyticsService,
-    private readonly bugAgentPerformanceAnalyticsService: BugAgentPerformanceAnalyticsService,
     private readonly qualitySentimentAnalyticsService: QualitySentimentAnalyticsService,
     private readonly effectivenessAnalyticsService: EffectivenessAnalyticsService,
     private readonly scenarioEffectivenessAnalyticsService: ScenarioEffectivenessAnalyticsService,
@@ -746,28 +734,6 @@ export class AnalyticsController {
     @Query() query: XpLevelReachedQueryDto,
   ): Promise<XpLevelReachedResponseDto> {
     return this.xpLevelReachedAnalyticsService.getLevelsReached(query);
-  }
-
-  @Get('bug-hunter-volume')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
-  @ApiOperation({
-    summary: 'Bug Hunter found vs. fixed volume, per period (super-admin)',
-    description:
-      '"Found" counts bugs autonomously discovered by Bug Hunter in each ' +
-      'bucket (excludes human-reported bugs filed via "Report a bug"). ' +
-      '"Fixed" counts findings that reached MERGED or later, regardless of ' +
-      'who originally filed them. Platform/internal-wide — `bug_findings` ' +
-      'carries no tenant column.',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Bug Hunter volume series retrieved successfully',
-    type: BugHunterVolumeResponseDto,
-  })
-  async getBugHunterVolume(
-    @Query() query: BugHunterVolumeQueryDto,
-  ): Promise<BugHunterVolumeResponseDto> {
-    return this.bugHunterVolumeAnalyticsService.getVolume(query);
   }
 
   @Get('xp-by-tenant')
@@ -1060,30 +1026,6 @@ export class AnalyticsController {
     return this.fixSessionEngineCostAnalyticsService.getFixSessionEngineCost(
       query,
     );
-  }
-
-  @Get('bug-agent-performance')
-  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
-  @ApiOperation({
-    summary:
-      "Bug Hunter's five headline performance trends, by calendar week (super-admin)",
-    description:
-      'Precision (accuracy/reversal rate), fix throughput (approved-to-merged, ' +
-      'escalation and fallback rates), speed (stage latencies, queue-to-start), ' +
-      'cost, and reliability (completion/fallback/regression rates) — all ' +
-      'bucketed by week regardless of the requested `bucket`, since this chart ' +
-      'is inherently a week-over-week view. Reuses the exact funnel arithmetic ' +
-      "AccuracyPanel's single-window figures already use, applied per week.",
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Bug Agent performance trends retrieved successfully',
-    type: BugAgentPerformanceResponseDto,
-  })
-  async getBugAgentPerformance(
-    @Query() query: BugAgentPerformanceQueryDto,
-  ): Promise<BugAgentPerformanceResponseDto> {
-    return this.bugAgentPerformanceAnalyticsService.getPerformance(query);
   }
 
   @Get('quality-sentiment')

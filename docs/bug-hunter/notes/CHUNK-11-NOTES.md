@@ -86,9 +86,9 @@ PR open (In progress) --Merge (ally-be, v1 GithubActionsService)--> merged (Done
 ## The exact-match page (user, 2026-11-21: "follow old bug hunter ui exact match")
 
 `/bug-hunter-v2` now renders the old Bug Hunter's page itself (`BugHunterV2Page`), not a
-copy. The old components import their data hooks from `pages/BugHunter/bugHunterBackend.tsx`,
+copy. The old components import their data hooks from `pages/BugHunter/bugHunterBackend.tsx`, <!-- docs-path-lint: ignore -->
 which calls the provider's implementation and the old hook otherwise, so `/bug-hunter`
-is unchanged. `pages/BugHunterV2/v2Backend.ts` supplies v2's:
+is unchanged. `pages/BugHunterV2/v2Backend.ts` supplies v2's: <!-- docs-path-lint: ignore -->
 
 - the list is v2's queue (ally-be `compat` routes, ids `v2-<n>`, built through v1's own
   `toFindingDto`) then the old history from the old API, a reported bug counted once;

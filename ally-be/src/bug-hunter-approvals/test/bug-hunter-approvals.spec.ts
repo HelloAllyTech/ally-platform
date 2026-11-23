@@ -326,7 +326,6 @@ describe('BugHunterApprovalsController access', () => {
     'settings',
     'setMode',
     'bugs',
-    'v1Bug',
     'start',
     'bulk',
     'dismiss',

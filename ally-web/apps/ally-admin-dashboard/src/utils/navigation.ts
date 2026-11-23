@@ -171,7 +171,6 @@ const buildNavigationItems = (): NavigationItem[] => {
       path: ROUTES.USER_INTERVIEWS,
       section: "product",
     },
-    { id: S.BUG_HUNTER, label: l.bugHunter, path: ROUTES.BUG_HUNTER, section: "product" },
     {
       id: S.BUG_HUNTER_V2,
       label: en.bugHunterV2.tabLabel,

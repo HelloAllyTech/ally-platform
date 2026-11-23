@@ -15,7 +15,6 @@ import { BuilderEvalController } from 'src/builder/eval/controller/builder-eval.
 import { RoadmapOpportunityController } from 'src/product-roadmap/controller/roadmap-opportunity.controller';
 import { RoadmapAdminController } from 'src/product-roadmap/controller/roadmap-admin.controller';
 import { RoadmapCollaborationController } from 'src/product-roadmap/controller/roadmap-collaboration.controller';
-import { BugHunterController } from 'src/bug-hunter/controller/bug-hunter.controller';
 import { UserController } from 'src/user/controller/user.controller';
 import { AuthorizationController } from 'src/authorization/controller/authorization.controller';
 import { SimulationCreditsController } from 'src/learn/controller/simulation-credits.controller';
@@ -251,19 +250,6 @@ const SURFACES: {
       'removeView',
     ],
     open: {},
-  },
-  {
-    key: FeatureToggleKey.PRODUCT_ROADMAP,
-    controller: BugHunterController,
-    gated: [],
-    // One read group, pinned open to every roadmap viewer by
-    // bug-hunter.controller.gating.spec.ts; two of them are the Bug Hunter
-    // tab's own reads, so gating only the deep link would protect nothing.
-    open: {
-      listFindings: 'Bug Hunter tab',
-      getFinding: 'Bug Hunter tab finding drawer',
-      getFindingByReportedBug: 'same finding data as getFinding',
-    },
   },
   // Users: organizations and their users. Routes behind
   // @TenantScopedPermissions / @PlatformWidePermissions (content assignment,

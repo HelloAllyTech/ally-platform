@@ -206,7 +206,7 @@ const buildTable = (): RouteMetaEntry[] => {
       fullBleed: true,
     })),
     { path: ROUTES.USER_INTERVIEWS, title: i.userInterviews, section: "product" },
-    { path: ROUTES.BUG_HUNTER, title: i.bugHunter, section: "product" },
+    { path: ROUTES.BUG_HUNTER_V2, title: i.bugHunter, section: "product" },
     { path: ROUTES.BUILDER, title: i.builder, section: "product" },
     {
       path: ROUTES.BUILDER_ALL_SESSIONS,

@@ -59,8 +59,6 @@ import {
   MobileReleases,
   BugHunter,
   BugHunterV2ReportDetail,
-  BugHunterV2V1Bug,
-  BugHunterV2Page,
   Builder,
   BuilderEval,
   BuilderKnowledge,
@@ -199,6 +197,12 @@ const PublicDirectory = lazy(() =>
 const DevAssistantHome = import.meta.env.DEV
   ? lazy(() => import("../pages/DevAssistantHome"))
   : null;
+
+/** `/bug-hunter?…` → `/bug-hunter-v2?…`, keeping the query (`?bug=`, `?bucket=`). */
+const BugHunterAddressRedirect: React.FC = () => {
+  const { search } = useLocation();
+  return <Navigate to={`${ROUTES.BUG_HUNTER_V2}${search}`} replace />;
+};
 
 export const RouteLayout: React.FC = () => {
   return (
@@ -888,28 +892,15 @@ export const RouteLayout: React.FC = () => {
               </PrivateLayout>
             }
           />
-          <Route
-            path={ROUTES.BUG_HUNTER}
-            element={
-              <PrivateLayout requiredFeature={FeatureToggleKey.BUG_HUNTER}>
-                <BugHunter />
-              </PrivateLayout>
-            }
-          />
-          {/* Bug Hunter v2: the board, the old Bug Hunter's bugs read-only, and reports. */}
+          {/* The old Bug Hunter's address (and its ?bug= links in old PRs and chats) now
+              opens Bug Hunter v2, its page since the old engine was removed (2026-11-23). */}
+          <Route path={ROUTES.BUG_HUNTER} element={<BugHunterAddressRedirect />} />
+          {/* Bug Hunter: the old page's components on v2's data, and v2's reports. */}
           <Route
             path={ROUTES.BUG_HUNTER_V2}
             element={
               <PrivateLayout requiredFeature={FeatureToggleKey.BUG_HUNTER_V2_VERDICTS}>
-                <BugHunterV2Page />
-              </PrivateLayout>
-            }
-          />
-          <Route
-            path={ROUTES.BUG_HUNTER_V2_V1_BUG(":findingId")}
-            element={
-              <PrivateLayout requiredFeature={FeatureToggleKey.BUG_HUNTER_V2_VERDICTS}>
-                <BugHunterV2V1Bug />
+                <BugHunter />
               </PrivateLayout>
             }
           />

@@ -6,41 +6,22 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { en } from "@constants";
 
+// The board, its old-finding page and their hooks were removed on 2026-11-23: v2's
+// bugs show on the Bug Hunter page (pages/BugHunter). What is left here is a run's
+// report page and its verdict form.
 const api = vi.hoisted(() => ({
   reportQuery: vi.fn(),
   record: vi.fn(),
-  settingsQuery: vi.fn(),
-  bugsQuery: vi.fn(),
-  setMode: vi.fn(),
-  start: vi.fn(),
-  v1Query: vi.fn(),
-  dismiss: vi.fn(),
-  bulk: vi.fn(),
-  openPr: vi.fn(),
-  merge: vi.fn(),
-  release: vi.fn(),
 }));
 
 vi.mock("@api", async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useGetBugHunterV2SettingsQuery: () => api.settingsQuery(),
-  useGetBugHunterV2BugsQuery: (args: unknown) => api.bugsQuery(args),
-  useSetBugHunterV2ModeMutation: () => [api.setMode, { isLoading: false }],
-  useStartBugHunterV2BugMutation: () => [api.start, { isLoading: false }],
   useGetBugHunterV2ReportQuery: (id: unknown) => api.reportQuery(id),
-  useGetBugHunterV2V1BugQuery: (id: unknown) => api.v1Query(id),
   useRecordBugHunterV2VerdictMutation: () => [api.record, { isLoading: false }],
-  useDismissBugHunterV2BugMutation: () => [api.dismiss, { isLoading: false }],
-  useBulkBugHunterV2BugsMutation: () => [api.bulk, { isLoading: false }],
-  useOpenBugHunterV2PrMutation: () => [api.openPr, { isLoading: false }],
-  useMergeBugHunterV2PrMutation: () => [api.merge, { isLoading: false }],
-  useReleaseBugHunterV2BugMutation: () => [api.release, { isLoading: false }],
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 import { BugHunterV2ReportDetail } from "../BugHunterV2ReportDetail";
-import { BugHunterV2Board } from "../BugHunterV2Board";
-import { BugHunterV2V1Bug } from "../BugHunterV2V1Bug";
 import { VerdictForm } from "../VerdictForm";
 
 const strings = en.bugHunterV2;
@@ -73,261 +54,8 @@ const detail = (overrides = {}) => ({
 
 beforeEach(() => {
   api.reportQuery.mockReset();
-  api.settingsQuery.mockReset();
-  api.bugsQuery.mockReset();
-  api.setMode.mockReset();
-  api.start.mockReset();
-  api.setMode.mockReturnValue({ unwrap: () => Promise.resolve({}) });
-  api.start.mockReturnValue({ unwrap: () => Promise.resolve({}) });
   api.record.mockReset();
   api.record.mockReturnValue({ unwrap: () => Promise.resolve({}) });
-  for (const fn of [api.dismiss, api.bulk, api.openPr, api.merge, api.release]) {
-    fn.mockReset();
-    fn.mockReturnValue({ unwrap: () => Promise.resolve({ done: 1, results: [] }) });
-  }
-});
-
-const board = strings.board;
-const counts = (c = {}) => ({
-  needs_you: 0,
-  failed: 0,
-  in_progress: 0,
-  backlog: 0,
-  done: 0,
-  ...c,
-});
-const bugRow = (overrides = {}) => ({
-  origin: "v2",
-  id: 1,
-  v1FindingId: null,
-  source: "reported",
-  app: "ally-web",
-  title: "Save does nothing",
-  description: "",
-  status: "backlog",
-  tab: "backlog",
-  reason: null,
-  severity: null,
-  prUrl: null,
-  reportId: null,
-  runId: null,
-  attempts: 0,
-  createdAt: "2026-11-16T09:00:00Z",
-  startedAt: null,
-  finishedAt: null,
-  ...overrides,
-});
-const settingsOf = (mode = "manual") => ({
-  data: { mode, dailyRunLimit: 10, startedToday: 2, updatedBy: null, updatedAt: null },
-});
-const renderBoard = () =>
-  render(
-    <MemoryRouter>
-      <BugHunterV2Board />
-    </MemoryRouter>,
-  );
-
-describe("Bug Hunter v2 board", () => {
-  it("shows the five tabs with counts, in the old Bug Hunter's order", () => {
-    api.settingsQuery.mockReturnValue(settingsOf());
-    api.bugsQuery.mockReturnValue({
-      data: { tab: "needs_you", counts: counts({ needs_you: 2, backlog: 5 }), items: [] },
-    });
-    renderBoard();
-    const tabs = screen.getAllByRole("tab").map(t => t.textContent);
-    expect(tabs).toEqual([
-      `${board.tabs.needs_you}2`,
-      `${board.tabs.failed}0`,
-      `${board.tabs.in_progress}0`,
-      `${board.tabs.backlog}5`,
-      `${board.tabs.done}0`,
-    ]);
-    fireEvent.click(screen.getByRole("tab", { name: new RegExp(board.tabs.backlog) }));
-    expect(api.bugsQuery).toHaveBeenLastCalledWith({ tab: "backlog" });
-  });
-
-  it("opens on the first tab with something in it", () => {
-    api.settingsQuery.mockReturnValue(settingsOf());
-    api.bugsQuery.mockReturnValue({
-      data: { tab: "needs_you", counts: counts({ in_progress: 1 }), items: [] },
-    });
-    renderBoard();
-    expect(api.bugsQuery).toHaveBeenLastCalledWith({ tab: "in_progress" });
-  });
-
-  it("switches mode, asking before Autonomous", () => {
-    api.settingsQuery.mockReturnValue(settingsOf("off"));
-    api.bugsQuery.mockReturnValue({ data: { tab: "needs_you", counts: counts(), items: [] } });
-    renderBoard();
-    expect(screen.getByText(board.modeHelp.off)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("radio", { name: board.modes.manual }));
-    expect(api.setMode).toHaveBeenCalledWith("manual");
-    fireEvent.click(screen.getByRole("radio", { name: board.modes.autonomous }));
-    expect(api.setMode).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: board.confirm }));
-    expect(api.setMode).toHaveBeenLastCalledWith("autonomous");
-  });
-
-  it("Start fix queues a backlog bug; Retry a failed one", () => {
-    api.settingsQuery.mockReturnValue(settingsOf());
-    api.bugsQuery.mockReturnValue({
-      data: {
-        tab: "backlog",
-        counts: counts({ backlog: 1, failed: 1 }),
-        items: [bugRow(), bugRow({ id: 2, status: "failed", reason: "sandbox died" })],
-      },
-    });
-    renderBoard();
-    fireEvent.click(screen.getByRole("button", { name: board.startFix }));
-    expect(api.start).toHaveBeenCalledWith({ id: 1, app: undefined });
-    expect(screen.getByText("sandbox died")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: board.retry }));
-    expect(api.start).toHaveBeenLastCalledWith({ id: 2, app: undefined });
-  });
-
-  it("a reported bug without an app needs one picked before Start fix", () => {
-    api.settingsQuery.mockReturnValue(settingsOf());
-    api.bugsQuery.mockReturnValue({
-      data: { tab: "backlog", counts: counts({ backlog: 1 }), items: [bugRow({ app: null })] },
-    });
-    renderBoard();
-    const button = screen.getByRole("button", { name: board.startFix });
-    expect(button).toBeDisabled();
-    fireEvent.change(screen.getByLabelText(board.pickApp), { target: { value: "ally-be" } });
-    fireEvent.click(button);
-    expect(api.start).toHaveBeenCalledWith({ id: 1, app: "ally-be" });
-  });
-
-  it("shows the old Bug Hunter's findings with their own status, opening in v1, never startable", () => {
-    api.settingsQuery.mockReturnValue(settingsOf());
-    api.bugsQuery.mockReturnValue({
-      data: {
-        tab: "backlog",
-        counts: counts({ backlog: 2 }),
-        items: [
-          bugRow(),
-          bugRow({
-            origin: "v1",
-            id: null,
-            v1FindingId: "f-1",
-            source: "v1:lint_error",
-            status: "approved",
-            title: "Old lint bug",
-          }),
-        ],
-      },
-    });
-    render(
-      <MemoryRouter initialEntries={["/bug-hunter-v2"]}>
-        <Routes>
-          <Route path="/bug-hunter-v2" element={<BugHunterV2Board />} />
-          <Route path="/bug-hunter-v2/v1/:findingId" element={<div>v1 bug page</div>} />
-        </Routes>
-      </MemoryRouter>,
-    );
-    expect(screen.getByText(board.v1Badge)).toBeInTheDocument();
-    expect(screen.getByText("Old lint bug")).toBeInTheDocument();
-    // Only the v2 row offers Start fix.
-    expect(screen.getAllByRole("button", { name: board.startFix })).toHaveLength(1);
-    fireEvent.click(screen.getByTestId("bug-row-v1-f-1"));
-    // Opens inside v2, not the old Bug Hunter.
-    expect(screen.getByText("v1 bug page")).toBeInTheDocument();
-  });
-
-  describe("chunk 11: the old Bug Hunter's buttons", () => {
-    const show = (items: unknown[], tab = "needs_you") => {
-      api.settingsQuery.mockReturnValue(settingsOf());
-      api.bugsQuery.mockReturnValue({ data: { tab, counts: counts(), items } });
-      renderBoard();
-    };
-
-    it("offers Open PR on a suggested fix, and says when it is being opened", () => {
-      show([bugRow({ status: "needs_you", reportStatus: "suggested_fix", reportId: 9 })]);
-      fireEvent.click(screen.getByRole("button", { name: board.openPr }));
-      expect(api.openPr).toHaveBeenCalledWith(1);
-    });
-
-    it("shows the request while the worker opens the PR, and why one failed", () => {
-      show([
-        bugRow({
-          status: "needs_you",
-          reportStatus: "suggested_fix",
-          lastAction: { status: "pending", result: null },
-        }),
-        bugRow({
-          id: 2,
-          status: "needs_you",
-          reportStatus: "suggested_fix",
-          lastAction: { status: "failed", result: "the patch no longer applies" },
-        }),
-      ]);
-      expect(screen.getByText(board.openingPr)).toBeInTheDocument();
-      expect(screen.getByText(/the patch no longer applies/)).toBeInTheDocument();
-    });
-
-    it("no Open PR for an escalation", () => {
-      show([bugRow({ status: "needs_you", reportStatus: "escalated" })]);
-      expect(screen.queryByRole("button", { name: board.openPr })).not.toBeInTheDocument();
-    });
-
-    it("an open PR has View PR and Merge (after a confirm)", () => {
-      vi.spyOn(window, "confirm").mockReturnValue(true);
-      show([bugRow({ status: "pr_open", prUrl: "https://github.com/o/r/pull/5" })], "in_progress");
-      expect(screen.getByRole("link", { name: board.viewPr })).toHaveAttribute(
-        "href",
-        "https://github.com/o/r/pull/5",
-      );
-      fireEvent.click(screen.getByRole("button", { name: board.merge }));
-      expect(window.confirm).toHaveBeenCalledWith(board.mergeConfirm);
-      expect(api.merge).toHaveBeenCalledWith(1);
-    });
-
-    it("a merged fix has Release; a released one shows its tag", () => {
-      vi.spyOn(window, "confirm").mockReturnValue(true);
-      show(
-        [
-          bugRow({ status: "merged", prUrl: "https://github.com/o/r/pull/5" }),
-          bugRow({ id: 2, status: "released", releaseTag: "be-v1.300.1" }),
-        ],
-        "done",
-      );
-      fireEvent.click(screen.getByRole("button", { name: board.release }));
-      expect(api.release).toHaveBeenCalledWith(1);
-      expect(screen.getByText("Released as be-v1.300.1")).toBeInTheDocument();
-    });
-
-    it("Dismiss needs a reason, and sends the note", () => {
-      show([bugRow({ status: "needs_you" })]);
-      fireEvent.click(screen.getByRole("button", { name: board.dismiss }));
-      const confirm = screen.getByRole("button", { name: board.dismissConfirm });
-      expect(confirm).toBeDisabled();
-      fireEvent.change(screen.getByLabelText(board.dismissTitle), {
-        target: { value: "not_a_bug" },
-      });
-      fireEvent.change(screen.getByLabelText(board.dismissNote), {
-        target: { value: "expected" },
-      });
-      fireEvent.click(confirm);
-      expect(api.dismiss).toHaveBeenCalledWith({ id: 1, reason: "not_a_bug", note: "expected" });
-    });
-
-    it("bulk: select rows, then Put me on them", () => {
-      show([bugRow(), bugRow({ id: 2 }), bugRow({ id: 3, status: "running" })], "backlog");
-      // select-all plus the two startable rows: a running bug has no checkbox
-      expect(screen.getAllByRole("checkbox")).toHaveLength(3);
-      fireEvent.click(screen.getByLabelText(board.selectAll));
-      fireEvent.click(screen.getByRole("button", { name: "Put me on 2" }));
-      expect(api.bulk).toHaveBeenCalledWith({ action: "start", ids: [1, 2], reason: undefined });
-    });
-  });
-
-  it("explains a missing Bug Hunter database instead of a generic error", () => {
-    api.settingsQuery.mockReturnValue({ isError: true, error: { status: 503 } });
-    api.bugsQuery.mockReturnValue({ isLoading: false, isError: true, error: { status: 503 } });
-    renderBoard();
-    expect(screen.getByRole("alert")).toHaveTextContent(strings.unavailable);
-  });
 });
 
 describe("Bug Hunter v2 report detail", () => {
@@ -400,52 +128,5 @@ describe("verdict form", () => {
     });
     expect(screen.getByText(strings.verdict.amendTitle)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: strings.verdict.amend })).toBeInTheDocument();
-  });
-});
-
-describe("Bug Hunter v2: an old Bug Hunter finding", () => {
-  it("shows it read-only inside v2, with its outcome and history", () => {
-    api.v1Query.mockReturnValue({
-      isLoading: false,
-      isError: false,
-      data: {
-        origin: "v1",
-        v1FindingId: "f-1",
-        source: "v1:reported_bug",
-        app: "ally-web",
-        title: "Old reported bug",
-        description: "Save does nothing",
-        status: "merged",
-        tab: "done",
-        severity: "high",
-        file: null,
-        evidence: null,
-        prUrl: "https://example.test/pr/3",
-        escalationQuestion: null,
-        escalationAnswer: null,
-        decisionReason: null,
-        decisionNote: null,
-        releaseTag: null,
-        createdAt: "2026-10-01T00:00:00Z",
-        startedAt: null,
-        decidedAt: null,
-        releasedAt: null,
-        events: [{ stage: "pr_opened", summary: "Opened the fix PR", at: "2026-10-02T00:00:00Z" }],
-      },
-    });
-    render(
-      <MemoryRouter initialEntries={["/bug-hunter-v2/v1/f-1"]}>
-        <Routes>
-          <Route path="/bug-hunter-v2/v1/:findingId" element={<BugHunterV2V1Bug />} />
-        </Routes>
-      </MemoryRouter>,
-    );
-    expect(api.v1Query).toHaveBeenCalledWith("f-1");
-    expect(screen.getByText("Old reported bug")).toBeInTheDocument();
-    expect(screen.getByText(en.bugHunterV2.v1Bug.readOnly)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "https://example.test/pr/3" })).toBeInTheDocument();
-    expect(screen.getByText("Opened the fix PR")).toBeInTheDocument();
-    // Nothing to act on: v2 never runs a v1 bug.
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 });

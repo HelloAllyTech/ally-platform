@@ -96,21 +96,33 @@ export class BugHunterCompatController {
   }
 
   @Get('findings')
-  @RequireFeatureToggle(FeatureToggleKey.BUG_HUNTER_V2_VERDICTS)
+  // read-only, also for the roadmap's Bugs tab (open to roadmap viewers, as the old
+  // Bug Hunter's reads were); acting on a bug still needs the v2 toggle
+  @RequireFeatureToggle(FeatureToggleKey.BUG_HUNTER_V2_VERDICTS, {
+    alsoAllowedBy: FeatureToggleKey.PRODUCT_ROADMAP,
+  })
   @ApiOperation({ summary: "v2's bugs as the old page's findings" })
   findings(@Query() q: CompatListQueryDto) {
     return this.compat.list(q.limit ?? 100, q.offset ?? 0);
   }
 
   @Get('findings/:id')
-  @RequireFeatureToggle(FeatureToggleKey.BUG_HUNTER_V2_VERDICTS)
+  // read-only, also for the roadmap's Bugs tab (open to roadmap viewers, as the old
+  // Bug Hunter's reads were); acting on a bug still needs the v2 toggle
+  @RequireFeatureToggle(FeatureToggleKey.BUG_HUNTER_V2_VERDICTS, {
+    alsoAllowedBy: FeatureToggleKey.PRODUCT_ROADMAP,
+  })
   @ApiOperation({ summary: 'One v2 bug as the old drawer shows it' })
   finding(@Param('id') id: string) {
     return this.compat.detail(id);
   }
 
   @Get('findings/:id/decisions')
-  @RequireFeatureToggle(FeatureToggleKey.BUG_HUNTER_V2_VERDICTS)
+  // read-only, also for the roadmap's Bugs tab (open to roadmap viewers, as the old
+  // Bug Hunter's reads were); acting on a bug still needs the v2 toggle
+  @RequireFeatureToggle(FeatureToggleKey.BUG_HUNTER_V2_VERDICTS, {
+    alsoAllowedBy: FeatureToggleKey.PRODUCT_ROADMAP,
+  })
   @ApiOperation({ summary: 'v2 records no decision log; always empty' })
   decisions() {
     return [];

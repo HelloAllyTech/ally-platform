@@ -1,12 +1,16 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { DataSource } from 'typeorm';
+import { BugFinding } from 'src/bug-hunter/entity/bug-finding.entity';
+import { BugHuntEvent } from 'src/bug-hunter/entity/bug-hunt-event.entity';
 import {
   toEventDto,
   toFindingDto,
-} from 'src/bug-hunter/controller/bug-hunter.controller';
+} from 'src/bug-hunter/legacy-finding.serializer';
 import { BugHuntEventStage } from 'src/bug-hunter/enum/bug-hunt-event.enum';
 import {
   BugFindingDecisionReason,
@@ -21,7 +25,12 @@ import { BughunterDbService } from './bughunter-db.service';
 /** A v2 bug's id as the old Bug Hunter's page sees it: never a v1 finding's uuid. */
 export const V2_ID_PREFIX = 'v2-';
 export const toCompatId = (id: number | string) => `${V2_ID_PREFIX}${id}`;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** The old Bug Hunter's history is read-only: its engine is gone (2026-11-23). */
+export const OLD_HISTORY_READ_ONLY =
+  "This is the old Bug Hunter's history, kept read-only. File it again to have Bug Hunter work on it.";
 export const fromCompatId = (id: string): number => {
+  if (UUID.test(id)) throw new ConflictException(OLD_HISTORY_READ_ONLY);
   const n = id.startsWith(V2_ID_PREFIX)
     ? Number(id.slice(V2_ID_PREFIX.length))
     : NaN;
@@ -135,7 +144,27 @@ export class BugHunterCompatService {
   constructor(
     private readonly db: BughunterDbService,
     private readonly board: BugHunterBoardService,
+    // the old Bug Hunter's history (its tables, read through its kept entities)
+    private readonly dataSource?: DataSource,
   ) {}
+
+  /** Old findings (top-level), newest first, except bugs v2 also has (counted once). */
+  private async oldFindings(limit: number) {
+    if (!this.dataSource) return [];
+    return this.dataSource
+      .getRepository(BugFinding)
+      .createQueryBuilder('f')
+      .where('f.parent_finding_id IS NULL')
+      .andWhere(
+        `NOT (f.reported_bug_id IS NOT NULL AND EXISTS (
+           SELECT 1 FROM bughunter.bugs b
+            WHERE b.signal_key = 'reported:' || f.reported_bug_id::text))`,
+      )
+      .orderBy('f.createdAt', 'DESC')
+      .take(limit)
+      .getMany()
+      .catch(() => []);
+  }
 
   private async rows(where = 'TRUE', params: unknown[] = []) {
     const ds = await this.db.get();
@@ -201,13 +230,42 @@ export class BugHunterCompatService {
     return toFindingDto(entity);
   }
 
+  /** v2's bugs first, then the old Bug Hunter's history, both in the old page's shape. */
   async list(limit = 100, offset = 0) {
     const rows = await this.rows();
-    const items = rows.map((r: any) => this.toFinding(r));
+    const ours = rows.map((r: any) => this.toFinding(r));
+    const old = (await this.oldFindings(offset + limit)).map((f) =>
+      toFindingDto(f),
+    );
+    const items = [...ours, ...old];
     return { items: items.slice(offset, offset + limit), count: items.length };
   }
 
+  /** One old finding, read-only, with its timeline. */
+  private async oldDetail(id: string) {
+    const finding = this.dataSource
+      ? await this.dataSource
+          .getRepository(BugFinding)
+          .findOne({ where: { id } })
+      : null;
+    if (!finding) throw new NotFoundException('No such bug.');
+    const events = await this.dataSource!.getRepository(BugHuntEvent).find({
+      where: { findingId: id },
+      order: { createdAt: 'ASC' },
+      take: 200,
+    });
+    return {
+      ...toFindingDto(finding),
+      events: events.map((e) => toEventDto(e)),
+      steps: [],
+      releasable: false,
+      releaseTarget: null,
+      releaseBlockedReason: null,
+    };
+  }
+
   async detail(compatId: string) {
+    if (UUID.test(compatId)) return this.oldDetail(compatId);
     const id = fromCompatId(compatId);
     const [r] = await this.rows('b.id = $1', [id]);
     if (!r) throw new NotFoundException('No such bug.');

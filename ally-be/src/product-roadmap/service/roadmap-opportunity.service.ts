@@ -12,22 +12,17 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { LoggerService } from 'src/logger/logger.service';
 import { User } from 'src/user/entity/user.entity';
 import { PLATFORM_TIER_ROLES } from 'src/common/constants/user.constants';
-import { BugFinding } from 'src/bug-hunter/entity/bug-finding.entity';
-import {
-  BugFindingSource,
-  BugFindingStatus,
-  BugFindingSeverity,
-} from 'src/bug-hunter/enum/bug-finding.enum';
-import { BugHunterRepoClassifierService } from 'src/bug-hunter/service/bug-hunter-repo-classifier.service';
+import { BugFindingSeverity } from 'src/bug-hunter/enum/bug-finding.enum';
 import { BugHunterBoardService } from 'src/bug-hunter-approvals/service/bug-hunter-board.service';
-import { BugHunterMissClassifierService } from 'src/bug-hunter/service/bug-hunter-miss-classifier.service';
-import { BUG_FINDING_DESCRIPTION_MAX_LENGTH } from 'src/bug-hunter/constants/bug-hunter.constants';
+import { RepoClassifierService } from 'src/bug-hunter-approvals/service/repo-classifier.service';
+
+/** The longest bug report description kept (it was the old Bug Hunter's finding limit). */
+const BUG_FINDING_DESCRIPTION_MAX_LENGTH = 5000;
 import {
   composeBugReportDescription,
   repoForSurface,
   severityForImpact,
-} from 'src/bug-hunter/util/bug-report-brief.util';
-import { truncateTitle } from 'src/bug-hunter/util/truncate-title.util';
+} from '../util/bug-report-brief.util';
 
 import { S3Service } from 'src/aws/service/s3.service';
 import { AppConfigService } from 'src/config/config.service';
@@ -111,18 +106,15 @@ export class RoadmapOpportunityService {
     private readonly vectorService: RoadmapVectorService,
     private readonly notifications: RoadmapNotificationService,
     @InjectRepository(User) private readonly userRepository: Repository<User>,
-    @InjectRepository(BugFinding)
-    private readonly bugFindingRepository: Repository<BugFinding>,
     private readonly s3Service: S3Service,
     private readonly config: AppConfigService,
     private readonly readinessToken: RoadmapReadinessTokenService,
-    private readonly repoClassifier: BugHunterRepoClassifierService,
-    private readonly missClassifier: BugHunterMissClassifierService,
     private readonly roadmapAi: RoadmapAiService,
     // Bug Hunter v2 (chunk 10): a filed bug also enters v2's queue. Optional and
     // last, so the tests that build this service by hand and any module without v2
     // work as before.
     @Optional() private readonly bugHunterV2?: BugHunterBoardService,
+    @Optional() private readonly repoClassifier?: RepoClassifierService,
   ) {}
 
   /** `title`, a blank line, then the summary: how a titled idea is stored in `description`. */
@@ -369,62 +361,22 @@ export class RoadmapOpportunityService {
     // contract as the vector index above: a model outage must not fail a committed write.
     await this.goalImpactService.assessQuietly(saved.id, userId);
 
-    // Bug Hunter's comprehensive findings table is a complete bug inbox — a human report
-    // needs a row there the moment it's filed, not only once a hunt run gets around to
-    // triaging it. Best-effort: a failure here must never fail the roadmap write that
-    // already committed. See BugHunterModule's doc for why this is a raw repository
-    // injection rather than a call into BugHunterModule (avoids a circular import).
-    if (dto.type === RoadmapOpportunityType.BUG) {
-      let v2Repo: string | null = extra?.repo ?? null;
-      try {
-        // Classified once, here, instead of leaving `repo` null: every one of
-        // Bug Hunter's 5 nightly sweeps used to independently spend a full
-        // agentic judgement on "is this clearly about my repo?" for the exact
-        // same free text (bug-hunt-sweep-prompt.ts's REPORTED BUGS finder),
-        // with only a first-write-wins race deciding whose guess stuck — up
-        // to 5x the reasoning cost for one item, and a structural source of
-        // wrong_repo decline noise. classifyRepo already swallows its own
-        // failures and returns an UNCLASSIFIED result rather than throwing,
-        // so this stays inside the same best-effort try/catch as the rest of
-        // this block, and a null result just means the row starts unfiled
-        // exactly as it always has.
-        // A reporter who named the repo has answered the question; the
-        // classifier is for the ones who did not (and it gives up on a bug
-        // that names files in two folders of one repo, which staff reports
-        // often do).
-        const repo =
-          extra?.repo ??
-          (await this.repoClassifier.classifyRepo(saved.description)).repo;
-        v2Repo = repo ?? null;
-        const finding = await this.bugFindingRepository.save(
-          this.bugFindingRepository.create({
-            source: BugFindingSource.REPORTED_BUG,
-            title: truncateTitle(saved.description),
-            description: saved.description,
-            reportedBugId: saved.id,
-            repo,
-            severity: extra?.severity ?? null,
-            status: BugFindingStatus.NEW,
-          }),
-        );
-        // Why Bug Hunter did not find this first (OPP-0774). Not awaited: the
-        // reporter's request is done once the row exists, and the record is a
-        // few seconds of a cheap model that must never delay or fail a filing.
-        // classifyAndRecord swallows its own failures.
-        void this.missClassifier.classifyAndRecord(finding.id, 'intake');
-      } catch (error) {
-        this.logger.warn(
-          `Failed to create a Bug Hunter finding for opportunity ${saved.id}: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
+    // A filed bug enters Bug Hunter's queue (bughunter.bugs); its mode decides whether and
+    // when it is worked on. Best effort: a failure here never fails the roadmap write that
+    // already committed. The app comes from the reporter, else from the repo classifier
+    // (one cheap call that gives up rather than guess; null leaves it for an admin to pick).
+    if (dto.type === RoadmapOpportunityType.BUG && this.bugHunterV2) {
+      let repo: string | null = extra?.repo ?? null;
+      if (!repo && this.repoClassifier) {
+        repo = await this.repoClassifier
+          .classifyRepo(saved.description)
+          .then((r) => r.repo)
+          .catch(() => null);
       }
-      // Bug Hunter v2's queue, independent of the v1 finding above: its mode decides
-      // whether and when the bug is worked on. Swallows its own failures.
-      await this.bugHunterV2?.enqueueReported({
+      await this.bugHunterV2.enqueueReported({
         opportunityId: saved.id,
         description: saved.description,
-        repo: v2Repo,
+        repo,
       });
     }
 

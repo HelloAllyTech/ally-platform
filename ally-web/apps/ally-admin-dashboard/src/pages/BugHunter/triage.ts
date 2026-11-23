@@ -52,7 +52,17 @@ export const canReject = (status: BugFindingStatus): boolean =>
 export const canStartFixSession = (status: BugFindingStatus): boolean =>
   BUG_FINDING_FIX_SESSION_START_STATUSES.includes(status);
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * A finding from the old Bug Hunter's history (retired 2026-11-23): its id is a uuid,
+ * where Bug Hunter v2's bugs are `v2-<n>`. ally-be serves that history read-only and
+ * refuses every action on a uuid id (409, the same test), so no control offers one.
+ */
+export const isOldHistory = (finding: Pick<BugFinding, "id">): boolean => UUID.test(finding.id);
+
 export const canAct = (action: TriageAction, finding: BugFinding): boolean => {
+  if (isOldHistory(finding)) return false;
   switch (action) {
     case "approve":
       return canApprove(finding.status);
@@ -146,21 +156,23 @@ export const showsStaleness = (finding: BugFinding): boolean => bucketOf(finding
  * Isolating the Primary Call-to-Action*).
  *
  * - `approve` — PENDING_APPROVAL. Confirmed in place, like the `a` key.
- * - `answer` — NEEDS_INPUT. The question and the answer box are in the drawer.
  * - `retry` — FAILED. A fresh fix session, confirmed in place, like the `f` key.
  * - `merge` — PR_OPENED with a PR. Opens the drawer, whose merge dialog shows
  *   the case chain before the one click that cannot be undone from here.
  * - `release` — RELEASE_FAILED. Opens the drawer: whether it can be released
  *   again is something only the detail endpoint knows.
  */
-export type NextStep = "approve" | "answer" | "retry" | "merge" | "review" | "release";
+export type NextStep = "approve" | "retry" | "merge" | "review" | "release";
 
 export const nextStep = (finding: BugFinding): NextStep | null => {
+  if (isOldHistory(finding)) return null;
   switch (finding.status) {
     case BugFindingStatus.PENDING_APPROVAL:
       return "approve";
+    // Bug Hunter v2 stopped and says why in its report: there is no question to
+    // answer (that left with the old engine), so the step is reading it.
     case BugFindingStatus.NEEDS_INPUT:
-      return "answer";
+      return "review";
     case BugFindingStatus.FAILED:
       return "retry";
     case BugFindingStatus.PR_OPENED:
