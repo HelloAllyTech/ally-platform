@@ -174,6 +174,7 @@ export const ApiEndpoints = {
     ENHANCE_FIELD: "/v1/learn/scenarios/enhance-field",
     MAP_SCENARIO_MEMORIES: "/v1/learn/scenarios/memories/map",
     GENERATE_AGENT_BUILDER_FIELD: "/v1/learn/agent-builder/generate-field",
+    AGENT_BUILDER_ROLEPLAY_DESIGN: "/v1/learn/agent-builder/roleplay-design",
     COMPETENCIES: "/v1/learn/competencies",
     COMPETENCY_BY_ID: (id: string) => `/v1/learn/competencies/${id}`,
     COMPETENCY_BEHAVIOURS: (id: string) => `/v1/learn/competencies/${id}/behaviours`,
@@ -1006,11 +1007,6 @@ export const ApiEndpoints = {
     EVAL_RUN_BY_ID: (id: string) => `/v1/builder/eval/runs/${id}`,
     EVAL_PROMPT_CANDIDATES: "/v1/builder/eval/prompt-candidates",
   },
-  ROLEPLAY_AGENT: {
-    OPTIONS: "/v1/roleplay-agent/options",
-    RUNS: "/v1/roleplay-agent/runs",
-    RUN_BY_ID: (id: string) => `/v1/roleplay-agent/runs/${id}`,
-  },
   COURSE_COPILOT: {
     SESSIONS: "/v1/course-copilot/sessions",
     SESSION_BY_ID: (id: string) => `/v1/course-copilot/sessions/${id}`,
@@ -1566,8 +1562,6 @@ export const ROUTES = {
   // Optional `?trackId=` binds the session to an existing course (EDIT mode).
   COURSE_COPILOT_NEW: "/course-copilot/new",
   COURSE_COPILOT_SESSION: (id: string) => `/course-copilot/${id}`,
-  // The roleplay agent on its own. `?run=` reopens a run in progress or finished.
-  ROLEPLAY_AGENT: "/roleplay-agent",
   // The Ally Console (ally guide admin). `?tab=` picks the tab; `?thread=` opens the Turn Inspector.
   ALLY_CONSOLE: "/ally",
   // `?view=` (library · insights · settings), `?collection=`, `?chunk=` and `?document=` open

@@ -62,7 +62,6 @@ import {
   BuilderSettings,
   CourseCopilotNew,
   CourseCopilotSession,
-  RoleplayAgentPage,
   CourseCopilotSessions,
   AgentTestCases,
   Competencies,
@@ -1063,17 +1062,6 @@ export const RouteLayout: React.FC = () => {
                 alsoRequiredFeatures={[FeatureToggleKey.CREATE_COURSES]}
               >
                 <CourseCopilotNew />
-              </PrivateLayout>
-            }
-          />
-          <Route
-            path={ROUTES.ROLEPLAY_AGENT}
-            element={
-              <PrivateLayout
-                requiredFeature={FeatureToggleKey.COURSE_COPILOT}
-                requiredPermissions={[Permissions.EDIT_COURSE_COPILOT]}
-              >
-                <RoleplayAgentPage />
               </PrivateLayout>
             }
           />

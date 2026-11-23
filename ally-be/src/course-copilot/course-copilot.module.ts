@@ -12,8 +12,6 @@ import { PromptModule } from 'src/prompt/prompt.module';
 import { ScenarioCharacterModule } from 'src/scenario-character/scenario-character.module';
 import { TrackModule } from 'src/track/track.module';
 import { CourseCopilotController } from './controller/course-copilot.controller';
-import { RoleplayAgentController } from './controller/roleplay-agent.controller';
-import { RoleplayAgentService } from './service/roleplay-agent.service';
 import { CourseCopilotEvent } from './entity/course-copilot-event.entity';
 import { CourseCopilotSource } from './entity/course-copilot-source.entity';
 import { CourseCopilotSourcesService } from './service/course-copilot-sources.service';
@@ -95,7 +93,7 @@ import { SpecialistLlmService } from './service/specialists/specialist-llm.servi
     ScenarioCharacterModule,
     TrackModule,
   ],
-  controllers: [CourseCopilotController, RoleplayAgentController],
+  controllers: [CourseCopilotController],
   providers: [
     CourseCopilotSessionRepository,
     CourseCopilotMessageRepository,
@@ -137,7 +135,6 @@ import { SpecialistLlmService } from './service/specialists/specialist-llm.servi
     ImagePromptSpecialist,
     RoleplayBriefSpecialist,
     RoleplayFitCheckSpecialist,
-    RoleplayAgentService,
     LandingPageSpecialist,
     AllyNotesSpecialist,
   ],

@@ -36,6 +36,14 @@ import {
 import { KnowledgeSourceDto } from '../dto/knowledge-source.dto';
 import { SimulationState } from '../type/simulation-state.type';
 import { buildGeneratedStates } from '../util/build-generated-states.util';
+import {
+  layOutRoleplayStates,
+  RoleplayDesignMode,
+  RoleplayModeSettings,
+  roleplaySettingsForMode,
+  stateDesignForMode,
+  STATE_AWARE_MAIN_PROMPTS,
+} from '../util/roleplay-design.util';
 import { acquireGlobalScenarioTenantLock } from '../util/global-scenario-tenant-lock.util';
 
 import { LlmModelService } from 'src/llm/service/llm-model.service';
@@ -4146,7 +4154,45 @@ export class ScenarioService {
     if (field === AgentBuilderField.LANGUAGE_VOICES) {
       return { field, value: this.parseLanguageVoices(raw, catalog) };
     }
-    return { field, value: this.parseAgentBuilderField(field, raw) };
+    const value = this.parseAgentBuilderField(field, raw);
+    // A mode picked in the wizard lays the states out the way the Course Design Manual asks: a
+    // rupture state below 0, then bands sized for the mode (the same rules Course Copilot uses).
+    if (field === AgentBuilderField.STATES && dto.roleplayMode) {
+      const laidOut = layOutRoleplayStates(
+        Array.isArray(value) ? (value as SimulationState[]) : [],
+        stateDesignForMode(dto.roleplayMode),
+      );
+      if (laidOut.length) return { field, value: laidOut };
+    }
+    return { field, value };
+  }
+
+  /**
+   * What a roleplay mode sets in Studio (Agent Builder wizard): the supports, the experience
+   * mode and the state-aware main prompt to run on — the first of STATE_AWARE_MAIN_PROMPTS that
+   * exists and still reads `{state_x_guidelines}`. No such prompt: no states, `states: false`.
+   */
+  async roleplayDesign(mode: RoleplayDesignMode): Promise<{
+    mode: RoleplayDesignMode;
+    settings: RoleplayModeSettings;
+    states: boolean;
+  }> {
+    const prompts =
+      (await this.promptSharedService
+        .getPromptsByOptions({ promptCode: STATE_AWARE_MAIN_PROMPTS })
+        .catch(() => [])) ?? [];
+    const usable = new Set(
+      (prompts as any[])
+        .filter((p) => !p?.isObsolete && this.promptReferencesStates(p))
+        .map((p) => p.promptCode),
+    );
+    const statePrompt =
+      STATE_AWARE_MAIN_PROMPTS.find((code) => usable.has(code)) ?? null;
+    return {
+      mode,
+      settings: roleplaySettingsForMode(mode, statePrompt),
+      states: Boolean(statePrompt),
+    };
   }
 
   /**

@@ -136,3 +136,87 @@ export function repairBuiltRoleplay<T extends BuiltRoleplayShape>(
   }
   return changed;
 }
+
+/**
+ * A roleplay's mode, from the Course Design Manual: learning (first try, all supports),
+ * practice (supports fading), performance and the two assessments (no supports).
+ */
+export type RoleplayDesignMode =
+  | 'learning'
+  | 'practice'
+  | 'performance'
+  | 'pre_assessment'
+  | 'post_assessment';
+
+export const ROLEPLAY_DESIGN_MODES: readonly RoleplayDesignMode[] = [
+  'learning',
+  'practice',
+  'performance',
+  'pre_assessment',
+  'post_assessment',
+];
+
+/**
+ * The main prompts that read authored states (`{state_x_guidelines}`), preferred first. States
+ * written for a roleplay only run on one of these; on the default prompt they are dead weight.
+ */
+export const STATE_AWARE_MAIN_PROMPTS = [
+  'ally_ai_learn_system_main_agent_prompt_full',
+  'ally_ai_learn_system_main_agent_prompt_working_memory_split',
+];
+
+/** Band width per mode: wider bands mean more helpful turns per state, i.e. harder (a manual dial). */
+const BAND_BY_MODE: Record<RoleplayDesignMode, number> = {
+  learning: 50,
+  practice: 70,
+  performance: 100,
+  pre_assessment: 100,
+  post_assessment: 100,
+};
+
+const RUPTURE_STATE = {
+  name: 'Pulling away',
+  guidelines:
+    'You feel judged, rushed or not listened to. Give shorter answers, change the subject or say ' +
+    'you should go. Open up again only if the helper slows down, acknowledges what went wrong ' +
+    'and listens.',
+};
+
+/** How states are laid out for a mode: a rupture state below 0, then bands of the mode's width. */
+export function stateDesignForMode(
+  mode: RoleplayDesignMode,
+): RoleplayStateDesign {
+  return { bandWidth: BAND_BY_MODE[mode] ?? 70, rupture: RUPTURE_STATE };
+}
+
+/** The roleplay settings a mode sets, by their Studio form / create-request names. */
+export interface RoleplayModeSettings {
+  experienceMode: 'FEEDBACK' | 'NONE';
+  remindersEnabled: boolean;
+  currentState: boolean;
+  supervisorNotesEnabled: boolean;
+  selectedMainPromptCode?: string;
+}
+
+/**
+ * Scaffolding for a roleplay's mode, from the Course Design Manual:
+ * - learning: everything on — reminders, the character's state visible, AI supervisor notes;
+ * - practice: one support faded (no supervisor notes), reminders and state still shown;
+ * - performance and assessment: no supports, experience mode None.
+ * Learning and practice use the Feedback experience mode for now: the Checklist mode lists a
+ * roleplay's anchor events, and neither builder creates events yet, so a checklist would be empty.
+ * `statePromptCode` is the state-aware main prompt to run on, when one exists.
+ */
+export function roleplaySettingsForMode(
+  mode: RoleplayDesignMode,
+  statePromptCode: string | null,
+): RoleplayModeSettings {
+  const supported = mode === 'learning' || mode === 'practice';
+  return {
+    experienceMode: supported ? 'FEEDBACK' : 'NONE',
+    remindersEnabled: supported,
+    currentState: supported,
+    supervisorNotesEnabled: mode === 'learning',
+    ...(statePromptCode ? { selectedMainPromptCode: statePromptCode } : {}),
+  };
+}

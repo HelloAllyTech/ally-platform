@@ -334,9 +334,7 @@ describe("useAgentBuilderGeneration — chained stages", () => {
     // should remain "active", while `spoken_languages` (also stage one, but
     // independent) should finish.
     await waitFor(() =>
-      expect(result.current.tasks.find(t => t.field === "spoken_languages")?.status).toBe(
-        "done",
-      ),
+      expect(result.current.tasks.find(t => t.field === "spoken_languages")?.status).toBe("done"),
     );
     expect(result.current.tasks.find(t => t.field === "challenge_description")?.status).toBe(
       "active",
@@ -399,5 +397,45 @@ describe("useAgentBuilderGeneration — chained stages", () => {
     expect(result.current.tasks.find(t => t.field === "title")?.status).toBe("aborted");
     await Promise.resolve();
     expect(fieldsRequested()).not.toContain("title");
+  });
+});
+
+describe("useAgentBuilderGeneration — roleplay mode", () => {
+  it("asks for states laid out for the mode, even before the prompt lookup says states", async () => {
+    const { form } = makeForm();
+    const { result } = renderHook(() => useAgentBuilderGeneration(form));
+
+    act(() => result.current.start({ ...INPUTS, roleplayMode: "learning", includeStates: true }));
+    await waitFor(() => expect(result.current.phase).toBe("done"));
+
+    const states = requests.find(r => r.field === "states");
+    expect(states).toMatchObject({ roleplayMode: "learning" });
+    // The mode rides only on the states call.
+    expect(requests.find(r => r.field === "title")?.roleplayMode).toBeUndefined();
+  });
+
+  it("switches reminders off when the mode turned them on and none were written", async () => {
+    state.responses.reminders = "";
+    const { form, store } = makeForm({ remindersEnabled: true });
+    const { result } = renderHook(() => useAgentBuilderGeneration(form));
+
+    act(() => result.current.start({ ...INPUTS, roleplayMode: "practice" }));
+    await waitFor(() => expect(result.current.phase).toBe("done"));
+
+    expect(store.remindersEnabled).toBe(false);
+    expect(result.current.checks).toEqual(["remindersHidden"]);
+  });
+
+  it("leaves reminders alone without a mode", async () => {
+    state.responses.reminders = "";
+    const { form, store } = makeForm({ remindersEnabled: true });
+    const { result } = renderHook(() => useAgentBuilderGeneration(form));
+
+    act(() => result.current.start(INPUTS));
+    await waitFor(() => expect(result.current.phase).toBe("done"));
+
+    expect(store.remindersEnabled).toBe(true);
+    expect(result.current.checks).toEqual([]);
+    expect(fieldsRequested()).not.toContain("states");
   });
 });

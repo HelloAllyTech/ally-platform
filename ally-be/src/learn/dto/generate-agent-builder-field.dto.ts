@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import {
   IsArray,
   IsEnum,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsNumber,
@@ -14,6 +15,10 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { AgentBuilderField } from '../enum/agent-builder-field.enum';
+import {
+  ROLEPLAY_DESIGN_MODES,
+  RoleplayDesignMode,
+} from '../util/roleplay-design.util';
 
 /**
  * One parallel field-generation call for Agent Builder Copilot. The frontend
@@ -97,6 +102,18 @@ export class EstablishedContextDto {
 }
 
 export class GenerateAgentBuilderFieldDto {
+  @ApiProperty({
+    description:
+      'The roleplay mode picked in the wizard. With `states`, lays them out for the mode: a ' +
+      'rupture state below 0, then bands sized for the mode (learning 50, practice 70, ' +
+      'performance and assessment 100).',
+    enum: ROLEPLAY_DESIGN_MODES,
+    required: false,
+  })
+  @IsOptional()
+  @IsIn(ROLEPLAY_DESIGN_MODES as unknown as string[])
+  roleplayMode?: RoleplayDesignMode;
+
   @ApiProperty({
     description: 'Which Basic Settings field to generate',
     enum: AgentBuilderField,

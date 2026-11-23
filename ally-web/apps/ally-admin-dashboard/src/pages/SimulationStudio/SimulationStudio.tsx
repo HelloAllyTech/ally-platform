@@ -291,14 +291,6 @@ export const SimulationStudio: React.FC = () => {
         icon: <WandStars className="w-5 h-5" />,
         onClick: () => navigate(ROUTES.COURSE_COPILOT_NEW),
       },
-
-      // One roleplay from a short request, with the agent Course Copilot uses for its roleplays.
-      {
-        id: "Roleplay with agent",
-        label: en.roleplayAgent.createOption,
-        icon: <WandStars className="w-5 h-5" />,
-        onClick: () => navigate(ROUTES.ROLEPLAY_AGENT),
-      },
     ],
     [handleNewSimulation, handleNewPathway, handleNewCase, handleNewTrack, navigate],
   );
@@ -318,9 +310,6 @@ export const SimulationStudio: React.FC = () => {
       }
       if (option.id === "New Course") {
         return hasContentAccess && canAuthorCourses;
-      }
-      if (option.id === "Roleplay with agent") {
-        return canUseCourseCopilot && canAuthorRoleplays;
       }
       if (option.id === "Course with Copilot") {
         // Already includes Create Courses.

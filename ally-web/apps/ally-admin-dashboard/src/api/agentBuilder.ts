@@ -24,6 +24,36 @@ export interface AgentBuilderEstablishedContext {
   persona?: Partial<AgentBuilderPersona>;
 }
 
+/** A roleplay's mode, from the Course Design Manual (same rules as Course Copilot). */
+export type RoleplayMode =
+  | "learning"
+  | "practice"
+  | "performance"
+  | "pre_assessment"
+  | "post_assessment";
+
+export const ROLEPLAY_MODES: RoleplayMode[] = [
+  "learning",
+  "practice",
+  "performance",
+  "pre_assessment",
+  "post_assessment",
+];
+
+/** What a mode sets on the roleplay form, by form field name. */
+export interface RoleplayDesign {
+  mode: RoleplayMode;
+  settings: {
+    experienceMode: "FEEDBACK" | "NONE";
+    remindersEnabled: boolean;
+    currentState: boolean;
+    supervisorNotesEnabled: boolean;
+    selectedMainPromptCode?: string;
+  };
+  /** False when no state-aware main prompt exists: the roleplay gets no states. */
+  states: boolean;
+}
+
 export interface GenerateAgentBuilderFieldRequest {
   field: AgentBuilderField;
   actorDescription: string;
@@ -46,6 +76,11 @@ export interface GenerateAgentBuilderFieldRequest {
    * by the first-stage fields themselves and by `spoken_languages`.
    */
   establishedContext?: AgentBuilderEstablishedContext;
+  /**
+   * `states` only: the roleplay mode picked in the wizard. The server lays the states out for it
+   * (a rupture state below 0, then bands sized for the mode).
+   */
+  roleplayMode?: RoleplayMode;
   model?: string;
   provider?: "openai" | "anthropic";
 }
@@ -138,7 +173,17 @@ const agentBuilderAPI = baseAPI.injectEndpoints({
         body,
       }),
     }),
+
+    /** What a roleplay mode sets: supports, experience mode and the state-aware main prompt. */
+    getRoleplayDesign: builder.query<RoleplayDesign, RoleplayMode>({
+      query: mode => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.AGENT_BUILDER_ROLEPLAY_DESIGN,
+        method: HttpMethod.GET,
+        params: { mode },
+      }),
+    }),
   }),
 });
 
-export const { useGenerateAgentBuilderFieldMutation } = agentBuilderAPI;
+export const { useGenerateAgentBuilderFieldMutation, useLazyGetRoleplayDesignQuery } =
+  agentBuilderAPI;

@@ -4,7 +4,14 @@ import { CheckCircle, FailIcon } from "@icons";
 import { UseFormReturn, useWatch } from "react-hook-form";
 
 import { AutoExpandableTextarea } from "@ally-ui-mono/ui-shared";
-import { useGetAgentTestCasesQuery } from "@api";
+import {
+  ROLEPLAY_MODES,
+  RoleplayDesign,
+  RoleplayMode,
+  useGetAgentTestCasesQuery,
+  useLazyGetRoleplayDesignQuery,
+} from "@api";
+import { en } from "@constants";
 
 import { Button } from "../button";
 import { Competency } from "../competency";
@@ -21,8 +28,12 @@ import {
  * Flow:
  *   1. "Describe roleplay actor"   — long free-text input
  *   2. "Select one competency"     — the shared Basic Settings competency dropdown
- *   3. "Select agent test cases" — multi-select from the live catalog
- *   4. Generation                  — on submit, the copilot combines the three
+ *   3. "Choose the roleplay's mode" — learning / practice / performance / assessment (the
+ *      Course Design Manual). Picking one puts that mode's supports, experience mode and
+ *      state-aware main prompt on the form, and the states are laid out for it (a rupture
+ *      state below 0, bands sized for the mode) — the same rules Course Copilot uses.
+ *   4. "Select agent test cases" — multi-select from the live catalog
+ *   5. Generation                  — on submit, the copilot combines the inputs
  *      inputs and fires ONE LLM call per Basic Settings field IN PARALLEL. Each
  *      result is parsed and painted into the mirrored Basic Settings form on the
  *      LEFT the moment it returns; the chat here streams per-task logs. The user
@@ -35,12 +46,26 @@ import {
  * the Basic Settings tab stay in sync automatically.
  */
 
-type WizardStepId = "describe" | "competency" | "goals" | "generate";
+type WizardStepId = "describe" | "competency" | "mode" | "goals" | "generate";
+
+const modeStrings = en.agentBuilderMode;
 
 const QUESTIONS: Record<Exclude<WizardStepId, "generate">, string> = {
   describe: "Describe roleplay actor",
   competency: "Select one competency",
+  mode: modeStrings.question,
   goals: "Select agent test cases",
+};
+
+/** The mode's supports in words, for the chat feed. */
+const describeDesign = (design: RoleplayDesign): string => {
+  const supports = [
+    design.settings.remindersEnabled && modeStrings.supports.reminders,
+    design.settings.currentState && modeStrings.supports.stateVisible,
+    design.settings.supervisorNotesEnabled && modeStrings.supports.supervisorNotes,
+    design.states && modeStrings.supports.states,
+  ].filter(Boolean) as string[];
+  return modeStrings.applied(modeStrings.labels[design.mode] ?? design.mode, supports);
 };
 
 interface ChatEntry {
@@ -87,6 +112,10 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
   const [history, setHistory] = useState<ChatEntry[]>([]);
   const [description, setDescription] = useState("");
   const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
+  const [mode, setMode] = useState<RoleplayMode>("practice");
+  const [design, setDesign] = useState<RoleplayDesign | null>(null);
+  const [modeError, setModeError] = useState(false);
+  const [fetchDesign, { isFetching: loadingDesign }] = useLazyGetRoleplayDesignQuery();
 
   const competency = useWatch({
     control: formMethods.control,
@@ -96,7 +125,7 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
   const { data: goalsData, isLoading: isLoadingGoals } = useGetAgentTestCasesQuery();
   const goalOptions = goalsData?.data ?? [];
 
-  const { phase, tasks, start, abort, reset, doneCount, appliedCount } =
+  const { phase, tasks, start, abort, reset, doneCount, appliedCount, checks } =
     useAgentBuilderGeneration(formMethods);
 
   const pushHistory = (question: string, answer: string) =>
@@ -112,7 +141,23 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
     const competency = formMethods.getValues("competency");
     if (!competency?.name) return;
     pushHistory(QUESTIONS.competency, competency.name);
-    setStep("goals");
+    setStep("mode");
+  };
+
+  // Puts the mode's settings on the form (the trainer can still change any of them on the left).
+  const handleModeNext = async () => {
+    setModeError(false);
+    try {
+      const picked = await fetchDesign(mode).unwrap();
+      Object.entries(picked.settings).forEach(([field, value]) =>
+        formMethods.setValue(field, value, { shouldDirty: true, shouldValidate: false }),
+      );
+      setDesign(picked);
+      pushHistory(QUESTIONS.mode, describeDesign(picked));
+      setStep("goals");
+    } catch {
+      setModeError(true);
+    }
   };
 
   const toggleGoal = (goalId: string) =>
@@ -135,6 +180,7 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
       actorDescription: description.trim(),
       competency: formMethods.getValues("competency")?.name,
       agentTestCases: goalTitles.join(", "),
+      ...(design ? { roleplayMode: design.mode, includeStates: design.states } : {}),
     });
   };
 
@@ -143,6 +189,9 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
     setHistory([]);
     setDescription("");
     setSelectedGoals([]);
+    setMode("practice");
+    setDesign(null);
+    setModeError(false);
     setStep("describe");
   };
 
@@ -152,7 +201,7 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
       <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-4 pb-4">
         {history.length === 0 && step === "describe" && (
           <div className="self-start max-w-[90%] rounded-lg bg-background-secondary px-4 py-2 text-sm text-typography-700">
-            Answer three quick questions and I&apos;ll generate the Basic Settings on the left in
+            Answer four quick questions and I&apos;ll generate the Basic Settings on the left in
             parallel — each field fills in as it&apos;s ready, and you can stop anytime.
           </div>
         )}
@@ -211,6 +260,15 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
               <div className="rounded-md border border-success-200 bg-success-50 p-3 text-sm text-typography-900">
                 Filled {appliedCount} of {tasks.length} fields — review them in Basic Settings on
                 the left, then Save or Publish.
+              </div>
+            )}
+            {phase === "done" && design && (!design.states || checks.length > 0) && (
+              <div
+                className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-typography-900"
+                data-testid="mode-checks"
+              >
+                {!design.states && <p>{modeStrings.noStatePrompt}</p>}
+                {checks.includes("remindersHidden") && <p>{modeStrings.remindersHidden}</p>}
               </div>
             )}
             {phase === "aborted" && (
@@ -277,6 +335,58 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
                 className="h-[40px] px-6"
               >
                 Next
+              </Button>
+            </div>
+          </>
+        )}
+
+        {step === "mode" && (
+          <>
+            <div className="min-h-0 overflow-y-auto custom-scrollbar flex flex-col gap-2">
+              <h3 className="text-base font-medium text-typography-900">{QUESTIONS.mode}</h3>
+              <p className="text-xs text-typography-600">{modeStrings.help}</p>
+              <div role="radiogroup" aria-label={QUESTIONS.mode} className="flex flex-col gap-2">
+                {ROLEPLAY_MODES.map(option => {
+                  const checked = mode === option;
+                  return (
+                    <label
+                      key={option}
+                      className={`flex items-start gap-3 rounded border px-3 py-2 cursor-pointer transition-colors ${
+                        checked
+                          ? "border-primary bg-primary-50"
+                          : "border-border-light hover:bg-background-secondary"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="roleplay-mode"
+                        value={option}
+                        checked={checked}
+                        onChange={() => setMode(option)}
+                        className="accent-primary mt-1"
+                      />
+                      <span className="flex flex-col">
+                        <span className="text-sm text-typography-900">
+                          {modeStrings.labels[option]}
+                        </span>
+                        <span className="text-xs text-typography-600">
+                          {modeStrings.descriptions[option]}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              {modeError && <p className="text-sm text-[#FE6F64]">{modeStrings.failed}</p>}
+            </div>
+            <div className="shrink-0 flex justify-end">
+              <Button
+                variant={ButtonVariant.PRIMARY}
+                onClick={handleModeNext}
+                disabled={loadingDesign}
+                className="h-[40px] px-6"
+              >
+                {loadingDesign ? modeStrings.loading : "Next"}
               </Button>
             </div>
           </>

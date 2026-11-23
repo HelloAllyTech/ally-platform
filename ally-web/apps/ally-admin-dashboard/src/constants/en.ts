@@ -15997,59 +15997,37 @@ export const en = {
     done: "Done",
   },
 
-  // The roleplay agent on its own: one roleplay from a short request, outside any course.
-  roleplayAgent: {
-    createOption: "Roleplay with agent",
-    title: "Roleplay agent",
-    subtitle:
-      "Describe one roleplay. The agent writes the brief, casts the character, sets states and supports for the mode, checks it and saves it to Studio. No learner sees it until you assign it.",
-    learners: "Who are the learners?",
-    learnersPlaceholder: "Government secondary-school teachers, new to mental health",
-    goal: "What should the learner be able to do in this roleplay?",
-    goalPlaceholder:
-      "Ask a withdrawn student directly about suicide and walk them to the counsellor",
-    competency: "Competency",
-    competencyPlaceholder: "Choose a competency",
-    mode: "Mode",
-    modeHelp: {
-      learning: "First try: reminders, the character's state shown and AI supervisor notes.",
+  // Agent Builder wizard: the roleplay's mode (Course Design Manual; same rules as Course Copilot).
+  agentBuilderMode: {
+    question: "Choose the roleplay's mode",
+    help: "The mode sets the supports, the experience mode and how hard the character's states are to move through. You can change any of it on the left afterwards.",
+    labels: {
+      learning: "Learning",
+      practice: "Practice",
+      performance: "Performance",
+      pre_assessment: "Pre-assessment",
+      post_assessment: "Post-assessment",
+    } as Record<string, string>,
+    descriptions: {
+      learning:
+        "First try: reminders, the character's state shown and AI supervisor notes. Easiest states.",
       practice: "Supports start to fade: reminders and state shown, no supervisor notes.",
-      performance: "No supports. The learner shows the skill on their own.",
+      performance: "No supports. The learner shows the skill on their own. Hardest states.",
       pre_assessment: "No supports. Measures the learner before the course.",
       post_assessment: "No supports. Measures the learner after the course.",
     } as Record<string, string>,
-    difficulty: "Difficulty",
-    difficultyOptions: {
-      EASY: "Easy: cooperative client, one concern",
-      MEDIUM: "Medium: ambivalent client, one concern",
-      HARD: "Hard: distressed client, several concerns",
-    } as Record<string, string>,
-    client: "Who is the client? (optional)",
-    clientPlaceholder:
-      "Aarav, 15, quiet and withdrawn; wrote something worrying in a notebook. Leave empty and the agent writes one.",
-    language: "Language",
-    minScore: "Pass mark (0 to 100)",
-    lengthMinutes: "Length (minutes)",
-    triggerWarnings: "Trigger warnings",
-    saveCharacter: "Keep the new character in the Character Library",
-    notes: "Anything else? (optional)",
-    start: "Build roleplay",
-    starting: "Starting…",
-    required: "Fill in the learners, the goal and a competency.",
-    steps: {
-      brief: "Writing the roleplay brief",
-      casting: "Choosing the character",
-      building: "Writing the roleplay: persona, role instruction, states, opening lines, voice",
-      saving: "Saving",
-      done: "Done",
-    } as Record<string, string>,
-    takesMinutes:
-      "This takes a few minutes. You can leave this page and come back with the same link.",
-    failed: "The roleplay could not be built.",
-    tryAgain: "Edit and try again",
-    done: "Roleplay saved. It reaches learners only once you assign it.",
-    openRoleplay: "Open in Studio",
-    buildAnother: "Build another",
-    loadFailed: "The form could not load. Refresh the page to try again.",
+    loading: "Applying the mode…",
+    failed:
+      "The mode's settings could not be loaded. Pick it again, or set the supports on the left by hand.",
+    applied: (label: string, supports: string[]) =>
+      `${label} mode: ${supports.length ? supports.join(", ") : "no supports"}.`,
+    supports: {
+      reminders: "reminders",
+      stateVisible: "character's state shown",
+      supervisorNotes: "AI supervisor notes",
+      states: 'states with a "Pulling away" state',
+    },
+    noStatePrompt: "No states: no main prompt that reads states is available.",
+    remindersHidden: "Reminders were switched off: none were written.",
   },
 };

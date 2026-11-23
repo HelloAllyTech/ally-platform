@@ -57,7 +57,6 @@ export * from "./debriefExpertReview";
 export * from "./notifications";
 export * from "./publicRoadmap";
 export * from "./courseCopilot";
-export * from "./roleplayAgent";
 export * from "./allyGuide";
 export * from "./allyGuideLearning";
 export * from "./allyGuidePipeline";

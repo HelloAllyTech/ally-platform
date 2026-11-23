@@ -6,6 +6,7 @@ import {
   AgentBuilderEstablishedContext,
   AgentBuilderField,
   AgentBuilderSpokenLanguage,
+  RoleplayMode,
   useGenerateAgentBuilderFieldMutation,
   useGetAvailableLanguageVoicesQuery,
 } from "@api";
@@ -87,6 +88,16 @@ export interface GenerationInputs {
   actorDescription: string;
   competency?: string;
   agentTestCases?: string;
+  /**
+   * The mode picked in the wizard. The server lays the states out for it, and after the batch a
+   * check repairs what the mode's settings and the generated fields disagree on.
+   */
+  roleplayMode?: RoleplayMode;
+  /**
+   * Generate states even if the form's main prompt hasn't been read as state-aware yet: the
+   * mode has just set one, and the placeholder lookup is asynchronous.
+   */
+  includeStates?: boolean;
 }
 
 /**
@@ -178,10 +189,31 @@ const toSpokenLanguages = (value: unknown): AgentBuilderSpokenLanguage[] =>
     l => typeof l?.languageId === "string" && l.languageId.trim().length > 0,
   );
 
+/**
+ * After a batch with a mode: repair what the mode's settings and the generated fields disagree on
+ * (the same rule as the roleplay agent's validator in ally-be). Reminders switched on with none
+ * written would show the learner an empty panel, so they are switched off. Returns the keys of
+ * what changed, for the feed.
+ */
+export const checkAgainstMode = (formMethods: UseFormReturn<any>): string[] => {
+  const changed: string[] = [];
+  const reminders = formMethods.getValues("reminders");
+  const hasReminders = Array.isArray(reminders)
+    ? reminders.length > 0
+    : typeof reminders === "string" && reminders.trim().length > 0;
+  if (formMethods.getValues("remindersEnabled") && !hasReminders) {
+    formMethods.setValue("remindersEnabled", false, { shouldDirty: true, shouldValidate: false });
+    changed.push("remindersHidden");
+  }
+  return changed;
+};
+
 export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
   const [trigger] = useGenerateAgentBuilderFieldMutation();
   const [phase, setPhase] = useState<GenerationPhase>("idle");
   const [tasks, setTasks] = useState<GenerationTask[]>([]);
+  // What the post-batch check changed, in words, for the feed.
+  const [checks, setChecks] = useState<string[]>([]);
 
   // Include `states` in the fan-out only when the currently-selected main-agent
   // prompt uses states — mirrors the StatesEditor's own visibility gate so we
@@ -241,8 +273,13 @@ export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
       if (runningRef.current) return;
       runningRef.current = true;
       abortedRef.current = false;
+      setChecks([]);
+      const plan =
+        inputs.includeStates && !fieldPlan.some(t => t.field === STATES_FIELD.field)
+          ? [...BASE_FIELD_PLAN, STATES_FIELD, SPOKEN_LANGUAGES_FIELD]
+          : fieldPlan;
       setTasks(
-        fieldPlan.map(t => ({
+        plan.map(t => ({
           ...t,
           key: t.field,
           status: (isStageOne(t.field) ? "active" : "waiting") as GenerationTaskStatus,
@@ -282,6 +319,9 @@ export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
           ...(task.establishedContext ? { establishedContext: task.establishedContext } : {}),
           ...(task.field === "knowledge_sources"
             ? { numKnowledgeSources: DEFAULT_KNOWLEDGE_SOURCES }
+            : {}),
+          ...(task.field === "states" && inputs.roleplayMode
+            ? { roleplayMode: inputs.roleplayMode }
             : {}),
         });
         handles.push(handle);
@@ -488,7 +528,7 @@ export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
         abortedRef.current ? undefined : readEstablishedContext(formMethods),
       );
 
-      for (const { field } of fieldPlan.filter(t => !isStageOne(t.field))) {
+      for (const { field } of plan.filter(t => !isStageOne(t.field))) {
         runsByField.set(field, runAfterFoundation({ key: field, field }));
       }
       const runs = [...runsByField.values()];
@@ -503,6 +543,7 @@ export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
           return;
         }
         setPhase("done");
+        if (inputs.roleplayMode) setChecks(checkAgainstMode(formMethods));
         // Validate once now the batch is applied, so mandatory-field state and
         // the parent autosave settle from the final values (not per keystroke).
         void formMethods.trigger();
@@ -535,6 +576,7 @@ export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
     runningRef.current = false;
     handlesRef.current = [];
     setTasks([]);
+    setChecks([]);
     setPhase("idle");
   }, []);
 
@@ -556,5 +598,5 @@ export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
   const doneCount = tasks.filter(t => t.status !== "active" && t.status !== "waiting").length;
   const appliedCount = tasks.filter(t => t.status === "done").length;
 
-  return { phase, tasks, start, abort, reset, doneCount, appliedCount };
+  return { phase, tasks, start, abort, reset, doneCount, appliedCount, checks };
 };

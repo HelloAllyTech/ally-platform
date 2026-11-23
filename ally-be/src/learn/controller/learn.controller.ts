@@ -1,4 +1,9 @@
 import {
+  ROLEPLAY_DESIGN_MODES,
+  RoleplayDesignMode,
+} from '../util/roleplay-design.util';
+import {
+  BadRequestException,
   Controller,
   Get,
   Param,
@@ -471,6 +476,22 @@ export class LearnController {
       dryRun: dto.dryRun !== false,
       onlyWithStates: dto.onlyWithStates,
     });
+  }
+
+  @ApiOperation({
+    summary:
+      'Agent Builder Copilot: what a roleplay mode sets (supports, experience mode, the ' +
+      'state-aware main prompt), from the Course Design Manual',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_SCENARIO])
+  @Get('agent-builder/roleplay-design')
+  async getAgentBuilderRoleplayDesign(@Query('mode') mode: string) {
+    if (!ROLEPLAY_DESIGN_MODES.includes(mode as RoleplayDesignMode)) {
+      throw new BadRequestException(
+        `mode must be one of ${ROLEPLAY_DESIGN_MODES.join(', ')}`,
+      );
+    }
+    return this.scenarioService.roleplayDesign(mode as RoleplayDesignMode);
   }
 
   @ApiOperation({

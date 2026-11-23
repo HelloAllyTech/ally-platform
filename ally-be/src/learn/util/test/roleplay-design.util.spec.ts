@@ -99,3 +99,38 @@ describe('checkBuiltRoleplay / repairBuiltRoleplay', () => {
     ).toEqual(['no voiced language', 'no opening lines']);
   });
 });
+
+describe('mode rules', () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const util = require('../roleplay-design.util');
+
+  it('fades supports from learning to practice to performance', () => {
+    const p = 'ally_ai_learn_system_main_agent_prompt_full';
+    expect(util.roleplaySettingsForMode('learning', p)).toEqual({
+      experienceMode: 'FEEDBACK',
+      remindersEnabled: true,
+      currentState: true,
+      supervisorNotesEnabled: true,
+      selectedMainPromptCode: p,
+    });
+    expect(util.roleplaySettingsForMode('practice', p)).toMatchObject({
+      remindersEnabled: true,
+      supervisorNotesEnabled: false,
+    });
+    expect(util.roleplaySettingsForMode('post_assessment', null)).toEqual({
+      experienceMode: 'NONE',
+      remindersEnabled: false,
+      currentState: false,
+      supervisorNotesEnabled: false,
+    });
+  });
+
+  it('widens the bands as the mode gets harder, with a rupture state', () => {
+    expect(util.stateDesignForMode('learning').bandWidth).toBe(50);
+    expect(util.stateDesignForMode('practice').bandWidth).toBe(70);
+    expect(util.stateDesignForMode('performance').bandWidth).toBe(100);
+    expect(util.stateDesignForMode('learning').rupture.name).toBe(
+      'Pulling away',
+    );
+  });
+});
