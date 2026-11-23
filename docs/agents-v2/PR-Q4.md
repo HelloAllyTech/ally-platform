@@ -106,7 +106,12 @@ Q4 built a use-case suite first (`evals/usecases/`: 13 assistants, about 300 con
 ## CI notes
 
 - **docs-guard:** the wiki's ally-ai page now documents the two endpoint changes: the crisis check on the message alone, the development-only `failed` switch, and the judge's neighbours and `max_sources`. master is merged in, so the diff holds only Q4's files (the `app.module.ts` and helpline `Analytics.tsx` failures were master's own changes after Q4 branched).
-- **dead-code-be and dead-code-web:** every new finding (33 in ally-be, 24 in ally-web) is in master's own newer code (Bug Hunter, helpline analytics), none in Q4's files. master fails the same ratchet. Q4 doesn't add them to the baseline (it only shrinks); they're for the owner of that code.
+- **dead-code-be and dead-code-web:** every finding was in master's own newer code (Bug Hunter, helpline analytics), none in Q4's files; master failed the same check. Fixed here, not baselined:
+  - declarations nothing imports are un-exported;
+  - the ones nothing uses at all are deleted, with `BugHuntStatusBadge.tsx` and `bug-hunter-model-settings.type.ts`.
+
+  No behaviour changes. The Bug Hunter and analytics tests pass unchanged.
+- **Colour literals (ally-web lint):** master's new statistics charts (`analytics/statistics/*`) added 104. They're re-baselined, as master didn't. Most are the charts' series and status palettes. The chrome colours in ChartHost, LibraryDrawer, StatCard and StatisticsDashboard should move to tokens; that's for the statistics owner.
 - **Migrations:** master added `1986500000000-GrantTenantAdminsUserPreferences`, so Q4's `MarkTemplateHelplinesUnconfirmed` moved to `1986500000100` to keep the order clear.
 
 ## Before deploying (`LAUNCH-CHECKLIST.md`, "Q4 light")
