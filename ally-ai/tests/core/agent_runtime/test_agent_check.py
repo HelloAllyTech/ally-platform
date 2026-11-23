@@ -1246,3 +1246,18 @@ def test_an_upset_message_never_gets_only_a_contact_line():
     assert result["answer"].startswith(contact)
     assert "14416" in result["answer"] and "112" in result["answer"]
     assert check(intent="decline", answer=contact)["answer"] == contact
+
+
+def test_an_assistant_that_books_never_offers_to_pass_name_and_phone():
+    """Q4 H9 (the demo build): after a booking, "Would you like me to pass your name
+    and phone to the team?" is trimmed; the booking question and other replies stay."""
+    booked = "Your session is booked for Tue 24 Nov, 7 pm."
+    offer = " Would you like me to pass your name and phone number to the team?"
+    result = check(answer=booked + offer, citations=[1], books=True)
+    assert result["answer"] == booked
+    also = " Or I can have the team call you back."
+    assert check(answer=booked + also, citations=[1], books=True)["answer"] == booked
+    # Without a list it books into (a callback-only assistant), the offer is right.
+    assert check(answer=booked + offer, citations=[1])["answer"] == booked + offer
+    ask = "Shall I book Tue 24 Nov, 7 pm for Priya Test?"
+    assert check(answer=ask, citations=[1], books=True)["answer"] == ask

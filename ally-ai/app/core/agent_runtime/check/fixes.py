@@ -185,6 +185,33 @@ _FALSE_OFFERS = re.compile(
 )
 
 
+#: An offer to pass the person's name and phone to the team (Q4 H9, the demo build:
+#: after a booking, after a move, after a first-session question).
+_PASS_DETAILS = re.compile(
+    r"\b(?:pass|share|send|give|forward|note)\b[^.?!\n]{0,30}"
+    r"\b(?:your|their)\b[^.?!\n]{0,20}"
+    r"\b(?:name|number|phone|details|contact)\b[^.?!\n]{0,40}"
+    r"\b(?:team|them|someone|counsellor|staff)\b"
+    r"|\b(?:have|ask|get)\s+(?:the|our)\s+team\s+(?:to\s+)?"
+    r"(?:call|contact|reach)\s+you\b"
+    r"|\b(?:team|someone)\b[^.?!\n]{0,20}\b(?:will|can|could)\s+"
+    r"(?:call|contact|reach)\s+you(?:\s+back)?\b",
+    re.IGNORECASE,
+)
+
+
+def _trim_details_offers(verdict: Verdict, ctx: CheckContext) -> None:
+    """An assistant with a list it books into books; it never offers to pass the
+    person's name and phone to the team instead (Q4 H9). The sentence is trimmed; if
+    nothing would be left, the reply stays."""
+    if not ctx.books or not _PASS_DETAILS.search(verdict.answer):
+        return
+    verdict.answer = (
+        without_sentences(verdict.answer, lambda s: not _PASS_DETAILS.search(s))
+        or verdict.answer
+    )
+
+
 def _trim_false_offers(verdict: Verdict, ctx: CheckContext) -> None:
     """An offer no tool makes possible is trimmed, not sent back (Q3-fast Part 2):
     "I can add it to your cart", "I can check a delivery estimate". If nothing would
@@ -490,6 +517,7 @@ WORDING_FIXES: Tuple[Callable[[Verdict, CheckContext], None], ...] = (
     _trim_repeated_crisis_wording,
     _trim_repeated_topic_list,
     _trim_booking_offers,
+    _trim_details_offers,
     _trim_false_offers,
     _trim_pass_on_promises,
     _send_back_slot_offers,

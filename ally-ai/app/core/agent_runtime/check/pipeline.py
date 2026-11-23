@@ -69,6 +69,7 @@ def check_reply(
     channel: str = "",
     crisis_line: str = "",
     upset: bool = False,
+    books: bool = False,
 ) -> Tuple[AnswerResult, Optional[Rejection]]:
     """The run's result, and the rejection reason when the check refused the draft;
     None when it went through as the model meant it.
@@ -107,6 +108,7 @@ def check_reply(
         channel=(channel or "").strip().lower(),
         crisis_line=(crisis_line or "").strip(),
         upset=upset,
+        books=books,
     )
     verdict = _read_draft(step, ctx)
     say_memory_is_off(verdict, ctx)

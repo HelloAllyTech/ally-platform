@@ -214,6 +214,15 @@ def offers_create(definitions: Optional[List[Mapping[str, Any]]]) -> bool:
     return any((d or {}).get("kind") == "create" for d in definitions or [])
 
 
+def books_into(definitions: Optional[List[Mapping[str, Any]]]) -> bool:
+    """Whether this run has a list it books into (Q4 H9): a create tool whose list's
+    playbook is booking (Slots and Appointments, Classes, Tables, Events)."""
+    return any(
+        (d or {}).get("kind") == "create" and (d or {}).get("playbook") == "booking"
+        for d in definitions or []
+    )
+
+
 def takes_details(definitions: Optional[List[Mapping[str, Any]]]) -> bool:
     """Whether this run can save the person's details for the team (chunk 6b): a
     create tool on a list with a person or phone field (Leads, Callback requests),
