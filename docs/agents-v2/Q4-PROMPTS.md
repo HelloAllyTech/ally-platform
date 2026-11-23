@@ -1,6 +1,6 @@
 # Q4 light: prompt texts for approval
 
-> Every model-facing text Q4 changes, with the current text, the proposed text and why, for Shehbaz to approve (`chunk-q4.md` stop 2). Nothing here is live until approved and published to production's Skills Store before deploying (`LAUNCH-CHECKLIST.md`). Fixed reply texts that are not prompts but new wording people will read are in part B, for review too.
+> **Approved by Shehbaz on 23 Nov 2026, with the three edits marked "(edit)" below; in the code and listed in `LAUNCH-CHECKLIST.md`.** Every model-facing text Q4 changes, with the current text, the proposed text and why, for Shehbaz to approve (`chunk-q4.md` stop 2). Nothing here is live until approved and published to production's Skills Store before deploying (`LAUNCH-CHECKLIST.md`). Fixed reply texts that are not prompts but new wording people will read are in part B, for review too.
 
 ## A. Prompts (Skills Store)
 
@@ -12,7 +12,9 @@
 > 1. `facts_missing`: copy each listed fact the reply does not state or clearly imply. A fact written differently but with the same meaning counts as present. If no facts are listed, leave it empty.
 
 **Rule 1, proposed:**
-> 1. `facts_missing`: copy each listed fact whose point the visitor's message needs and the reply doesn't give, or gets wrong. Judge only what was asked: details in a listed fact beyond the question (another service, a location, a second date) are not missing when the reply leaves them out. A fact written differently but with the same meaning counts as present. When two listed facts disagree (two pages say different hours), a reply that gives either one has it. If no facts are listed, leave it empty.
+> 1. `facts_missing`: copy each listed fact whose point the visitor's message needs and the reply doesn't give, or gets wrong. Judge only what was asked: details in a listed fact beyond the question (another service, a location, a second date) are not missing when the reply leaves them out. A fact written differently but with the same meaning counts as present. When two listed facts disagree (two pages say different hours), a reply that gives either one has it, and you name the conflict in `conflicting_facts` ("conflicting facts: 8am–9pm vs 10am–8pm"). If no facts are listed, leave it empty.
+
+(edit) **New rule 9 and answer field `conflicting_facts`:** "each pair of listed facts (or passages) that disagree on what was asked, as \"conflicting facts: A vs B\". Leave it empty when none do." The grader adds the reason `conflicting_facts` (not a fail), and the use-case reports count them, so conflicts aren't hidden by a pass.
 
 **Rule 5, current (end):**
 > … Offering a general next step ("call the clinic") is not inventing, and nor is saying what it can help with as its own setup describes it. Ignore a closing line that only says what the assistant is, that it isn't medical advice or a crisis service, or how to opt out.
@@ -73,12 +75,12 @@ No variables change.
 > 5. List a care topic only when what we learned shows the business's own work deals with it (it offers that service, or its information is about that topic). Not because a page mentions it in passing, and not because the business is near it: yoga, fitness, spa and nutrition are not mental_health or medical unless they offer therapy, counselling or medical care, and invoicing or accounting software is not legal_financial. When unsure, list none.
 
 **Rule 5, proposed:**
-> 5. List a care topic only when the business itself provides that care: its own services, practitioners or treatments, named on its pages. Not because a page mentions it, an amenity touches it ("wellness room", "meditation zone"), its customers are partly young, or a cause it supports is near it. Coworking spaces, property, shops, software, and non-profits that give food, clothes or material get none. Cancer, palliative and hospital care is medical, even with counselling for families. Invoicing or accounting software is not legal_financial. When unsure, list none.
+> 5. List a care topic only when the business itself provides that care: its own services, practitioners or treatments, named on its pages. Not because a page mentions it, an amenity touches it ("wellness room", "meditation zone"), its customers are partly young, or a cause it supports is near it. Coworking spaces, property, shops, software, and non-profits that give food, clothes or material get none. Cancer, palliative and hospital care is medical, even with counselling for families. List young_people when the business's own service is for under-18s who may chat with it (schools, coaching, children's programmes), not when only some customers are young (edit). Invoicing or accounting software is not legal_financial. When unsure, list none.
 
 **New rule 7:**
 > 7. Of mental_health, medical, medicines and young_people, list at most one: the main care the business provides.
 
-No variables change. The pack-choice fixture set (13 sites, expected pack each) measures it before and after.
+No variables change. The pack-choice fixture set (15 sites with a school and a coaching institute, expected Care for young people (edit)) measures it before and after.
 
 ## B. Fixed texts (code), for review
 
@@ -96,6 +98,7 @@ No variables change. The pack-choice fixture set (13 sites, expected pack each) 
 ### B2. Instead of "I don't have crisis numbers" (`ally-ai/app/core/agent_runtime/check/fixes.py`), item G7
 
 - English: "If you need someone to talk to now, you can call Tele-MANAS on 14416 (free, 24×7), or 112 if you're in danger." + " You can also reach {organisation} on {line}." when the owner confirmed a line.
+- Hinglish (edit): "Agar aapko abhi kisi se baat karni hai, toh Tele-MANAS ko 14416 par call karein (free, 24×7), ya khatre mein hon toh 112 par." + " Aap {organisation} se {line} par bhi baat kar sakte hain."
 - Hindi: "अगर आपको अभी किसी से बात करनी है, तो Tele-MANAS को 14416 पर कॉल करें (मुफ़्त, 24×7), या ख़तरे में हों तो 112 पर।" + " आप {organisation} से {line} पर भी संपर्क कर सकते हैं।"
 
 ### B3. Publishing's safety recheck (ally-be `draft-checkup.service.ts`, ally-web Share), item A0

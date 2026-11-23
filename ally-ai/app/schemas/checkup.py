@@ -116,6 +116,8 @@ class JudgeFindings(BaseModel):
     invents_facts: bool = False
     declines_request: bool = False
     note: str = ""
+    #: Q4 (A1): listed facts that disagree, named so they aren't hidden by a pass.
+    conflicting_facts: List[str] = Field(default_factory=list)
 
 
 class GradeResponse(BaseModel):

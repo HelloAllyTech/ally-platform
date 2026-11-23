@@ -33,7 +33,7 @@ logger = get_logger(__name__)
 
 #: Bumped whenever a rule here changes, so results graded by different rules are
 #: never compared as if they were the same.
-GRADER_VERSION = "2026-11-18.1"  # Q3-fast: a crisis reply needs a real number
+GRADER_VERSION = "2026-11-23.1"  # Q4: judges what was asked; names conflicts
 
 JUDGE_PROMPT = "checkup/judge"
 
@@ -300,6 +300,10 @@ def apply_judge(
         fail("invented_facts", is_hard=True)
     if findings.facts_missing and not findings.also_ok_matched:
         fail("facts_missing")
+    if findings.conflicting_facts:
+        # Not a fail (Q4 A1): a reply that gives either fact passes, but the conflict is
+        # named so the owner (and the eval reports) can see it.
+        reasons.append("conflicting_facts")
     if (
         case.expect == CheckupExpect.ANSWER
         and auto.outcome == CheckupOutcome.ANSWERED

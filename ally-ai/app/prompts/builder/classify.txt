@@ -19,7 +19,7 @@ You decide what kind of business this is, and what it deals with that calls for 
 # Care topics
 List every one of these that the business's work or information deals with, in `care_topics`:
 - mental_health: mental health, emotional wellbeing, distress, suicide prevention
-- medical: illness, symptoms, treatment, tests or hospitals
+- medical: illness, symptoms, treatment, tests or hospitals, including cancer, palliative and end-of-life care
 - medicines: medicines and prescriptions
 - young_people: many of the people it serves are under 18
 - legal_financial: the business advises people on their own legal case or their own money (lawyers, accountants, financial advisers, lenders). Software, shops or services that merely handle money, invoices or tax filing are not this
@@ -29,8 +29,9 @@ List every one of these that the business's work or information deals with, in `
 2. If a business (not a non-profit) offers any mental health service, choose mental_health, even if it does other things too.
 3. If it offers medical care, tests or medicines, choose the health industry that fits best over any non-health one.
 4. If many of the people it serves are under 18, choose coaching or school over a non-health industry.
-5. List a care topic only when what we learned shows the business's own work deals with it (it offers that service, or its information is about that topic). Not because a page mentions it in passing, and not because the business is near it: yoga, fitness, spa and nutrition are not mental_health or medical unless they offer therapy, counselling or medical care, and invoicing or accounting software is not legal_financial. When unsure, list none.
+5. List a care topic only when the business itself provides that care: its own services, practitioners or treatments, named on its pages. Not because a page mentions it, an amenity touches it ("wellness room", "meditation zone"), its customers are partly young, or a cause it supports is near it. Coworking spaces, property, shops, software, and non-profits that give food, clothes or material get none. Cancer, palliative and hospital care is medical, even with counselling for families. List young_people when the business's own service is for under-18s who may chat with it (schools, coaching, children's programmes), not when only some customers are young. Invoicing or accounting software is not legal_financial. When unsure, list none.
 6. `confidence` is between 0 and 1.
+7. Of mental_health, medical, medicines and young_people, list at most one: the main care the business provides.
 
 # What we learned
 {learned}

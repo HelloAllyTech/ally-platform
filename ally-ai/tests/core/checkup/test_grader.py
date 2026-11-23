@@ -346,3 +346,16 @@ async def test_a_gap_the_information_covers_after_all_is_a_pass(judge):
         seen(reply="We run monthly workshops on stress and sleep."),
     )
     assert result.verdict == CheckupVerdict.PASS
+
+
+@pytest.mark.asyncio
+async def test_a_reply_with_either_conflicting_fact_passes_and_names_it(judge):
+    """Q4 A1: two pages disagree; either answer passes, and the conflict shows."""
+    judge({"conflicting_facts": ["conflicting facts: 8am-9pm vs 10am-8pm"]})
+    result = await grader.grade(
+        case(facts=["Open 8am-9pm", "Open 10am-8pm"]),
+        seen(reply="We're open 8am to 9pm."),
+    )
+    assert result.verdict == "pass"
+    assert "conflicting_facts" in result.reasons
+    assert result.judge.conflicting_facts == ["conflicting facts: 8am-9pm vs 10am-8pm"]

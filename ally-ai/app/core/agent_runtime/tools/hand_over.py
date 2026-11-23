@@ -40,11 +40,15 @@ class HandOverInput(BaseModel):
         ).rstrip(",;:")
 
 
+#: Q4 G1 (approved in Q4-PROMPTS.md A2): only on request or after an answer left
+#: them unhappy, never because it can't answer; the run goes on and still replies.
 DESCRIPTION = (
-    "Pass this chat to a person on the team. Use it when someone asks to talk to a "
-    "person, when you can't help with what they need and the team can, or when "
-    "they're unhappy with your answers. Never for someone at risk: that is handled "
-    "before you."
+    "Pass this chat to a person on the team. Use it only when someone asks to talk "
+    "to a person, or when they're unhappy after you've answered. Not because you "
+    "can't answer: then say so and give the organisation's contact. After it, still "
+    "reply: answer whatever you can from the information, in their language. Don't "
+    "say you've passed the chat on; that line is added for you. Never for someone at "
+    "risk: that is handled before you."
 )
 
 TOOL = gateway_tool(

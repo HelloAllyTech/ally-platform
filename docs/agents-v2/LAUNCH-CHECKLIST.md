@@ -172,3 +172,10 @@ In this order, before and right after deploying. Nothing here touches a prompt: 
 - [ ] A Lighthouse mobile LCP run for the bot page (20d).
 - [ ] Hindi bot page strings marked "needs review" in `botPage/copy/hi.ts` reviewed (20d).
 - [ ] The production ally-be image builds without running out of memory in `nest build` (20d).
+
+## Q4 light (approved 23 Nov, `Q4-PROMPTS.md`)
+
+- [ ] **1. Deploy ally-ai, then ally-be.** Two migrations run with ally-be: `1986500000000-MarkTemplateHelplinesUnconfirmed` (settings only) and `1986510000000-AddCheckupRecheckTrigger` (the checkup runs' `trigger` CHECK gains `recheck`). The new `{phone_rule}` and `{numbers}` variables and the judge's `conflicting_facts` are filled and read by this code, so the prompt pushes below wait for it.
+- [ ] **2. Push and publish with the prompts CLI**, after step 1: `ally_ai_checkup_judge` (A1), `ally_ai_agent_upset` (A3), `ally_ai_agent_playbook_details`, `ally_ai_agent_purpose_answer_takes_details`, `ally_ai_agent_purpose_enquiries_can_book` (A4, `{phone_rule}`), `ally_ai_builder_classify` (A5). Check each live text matches its file in `ally-ai/app/prompts/`.
+- [ ] **3. New prompt `ally_ai_agent_upset_numbers`** (A3) is created from its seed on first sync; check its live text matches `ally-ai/app/prompts/agent/upset_numbers.txt`. The `hand_over` tool's description (A2) is in code and ships with ally-ai.
+- [ ] **4. Confirm each live assistant's own crisis line in Safety** ("Use it in crisis replies"), starting with Vandrevala. A number a template wrote isn't used in crisis replies until its owner confirms it, so until then those assistants' crisis replies carry only the national numbers (112, Tele-MANAS 14416).

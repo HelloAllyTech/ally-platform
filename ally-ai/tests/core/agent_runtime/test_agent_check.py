@@ -1227,3 +1227,12 @@ class TestCrisisNumbers:
     def test_other_replies_are_untouched(self):
         text = "Our helpline is open 9 to 6."
         assert check(answer=text, citations=[1])["answer"] == text
+
+
+def test_crisis_numbers_in_hinglish():
+    """Q4 B2: a Hinglish reply gets the Hinglish line."""
+    result = check(
+        intent="decline",
+        answer="Mujhe afsos hai aap pareshan hain. Crisis numbers nahi hain mere paas.",
+    )
+    assert "Tele-MANAS ko 14416 par call karein" in result["answer"]

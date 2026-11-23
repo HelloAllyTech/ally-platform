@@ -441,7 +441,17 @@ CRISIS_NUMBERS_HI = (
     "अगर आपको अभी किसी से बात करनी है, तो Tele-MANAS को 14416 पर कॉल करें "
     "(मुफ़्त, 24×7), या ख़तरे में हों तो 112 पर।"
 )
+CRISIS_NUMBERS_HI_LATN = (
+    "Agar aapko abhi kisi se baat karni hai, toh Tele-MANAS ko 14416 par call karein "
+    "(free, 24×7), ya khatre mein hon toh 112 par."
+)
 CRISIS_LINE_EN = " You can also reach {organisation} on {line}."
+CRISIS_LINE_HI_LATN = " Aap {organisation} se {line} par bhi baat kar sakte hain."
+#: Hinglish markers (Q4 B2): a reply written in Hinglish gets the Hinglish line.
+_HINGLISH = re.compile(
+    r"\b(aap|aapko|hai|hain|nahi|kya|mein|karein|kar|raha|rahi|yahan|abhi|toh)\b",
+    re.IGNORECASE,
+)
 CRISIS_LINE_HI = " आप {organisation} से {line} पर भी संपर्क कर सकते हैं।"
 _DEVANAGARI = re.compile(r"[\u0900-\u097F]")
 
@@ -453,13 +463,17 @@ def give_crisis_numbers(verdict: Verdict, ctx: CheckContext) -> None:
     if not any(_NO_CRISIS_NUMBERS.search(s) for s in sentences):
         return
     hindi = bool(_DEVANAGARI.search(verdict.answer))
-    numbers = CRISIS_NUMBERS_HI if hindi else CRISIS_NUMBERS_EN
+    hinglish = not hindi and len(_HINGLISH.findall(verdict.answer)) >= 2
+    if hindi:
+        numbers, line = CRISIS_NUMBERS_HI, CRISIS_LINE_HI
+    elif hinglish:
+        numbers, line = CRISIS_NUMBERS_HI_LATN, CRISIS_LINE_HI_LATN
+    else:
+        numbers, line = CRISIS_NUMBERS_EN, CRISIS_LINE_EN
     if ctx.crisis_line:
         terms = ctx.organisation.terms
         organisation = terms[0] if terms else ("टीम" if hindi else "the team")
-        numbers += (CRISIS_LINE_HI if hindi else CRISIS_LINE_EN).format(
-            organisation=organisation, line=ctx.crisis_line
-        )
+        numbers += line.format(organisation=organisation, line=ctx.crisis_line)
     kept = without_sentences(verdict.answer, lambda s: not _NO_CRISIS_NUMBERS.search(s))
     verdict.answer = f"{kept} {numbers}".strip() if kept else numbers
 

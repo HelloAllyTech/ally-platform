@@ -514,8 +514,8 @@ function report(results) {
     '',
     `${new Date().toISOString()} · setup \`${setupLabel}\` · ${REPEAT} run(s)${CLASSIFIER_FAIL ? ' · **crisis classifier forced to fail**' : ''}${GRADE ? '' : ' · not graded'}`,
     '',
-    '| Set | In-data right (x of runs) | PASS · PARTIAL · FAIL | Hard fails | Emergencies right | Slowest emergency | False alarms | Actions complete | Status line (median) | First words (median) | Reply (median) |',
-    '|---|---|---|---|---|---|---|---|---|---|---|',
+    '| Set | In-data right (x of runs) | PASS · PARTIAL · FAIL | Hard fails | Emergencies right | Slowest emergency | False alarms | Actions complete | Status line (median) | First words (median) | Reply (median) | Conflicting facts |',
+    '|---|---|---|---|---|---|---|---|---|---|---|---|',
   ];
   const bySet = new Map();
   for (const r of results) bySet.set(r.set, [...(bySet.get(r.set) ?? []), r]);
@@ -534,10 +534,12 @@ function report(results) {
     const hard = cases.flatMap((c) => (c.turns ?? []).flatMap((t) => (t.hard ?? []).map((h) => `${c.id}: ${h}`)));
     const count = (v) => cases.filter((c) => c.verdict === v).length;
     const skipped = runs.find((r) => r.skipped)?.skipped;
+    // Q4 A1: facts that disagree are named by the grader, never hidden by a pass.
+    const conflicts = turns.filter((t) => (t.grade?.reasons ?? []).includes('conflicting_facts')).length;
     lines.push(
       skipped
-        ? `| ${set} | ${skipped} | | | | | | | | | |`
-        : `| ${set} | ${right}/${facts.length} (${pct(right, facts.length)}) | ${count('PASS')} · ${count('PARTIAL')} · ${count('FAIL')} | ${hard.length} | ${riskRight}/${risk.length} | ${sec(riskSlowest)} | ${alarms}/${looks.length} | ${actions.filter((c) => c.verdict === 'PASS').length}/${actions.length} | ${sec(median(turns.map((t) => t.statusMs)))} | ${sec(median(turns.map((t) => t.firstWordsMs)))} | ${sec(median(turns.map((t) => t.ms)))} |`,
+        ? `| ${set} | ${skipped} | | | | | | | | | | |`
+        : `| ${set} | ${right}/${facts.length} (${pct(right, facts.length)}) | ${count('PASS')} · ${count('PARTIAL')} · ${count('FAIL')} | ${hard.length} | ${riskRight}/${risk.length} | ${sec(riskSlowest)} | ${alarms}/${looks.length} | ${actions.filter((c) => c.verdict === 'PASS').length}/${actions.length} | ${sec(median(turns.map((t) => t.statusMs)))} | ${sec(median(turns.map((t) => t.firstWordsMs)))} | ${sec(median(turns.map((t) => t.ms)))} | ${conflicts} |`,
     );
     details.push(`\n## ${set}\n`);
     if (hard.length) details.push('**Hard fails**\n', ...[...new Set(hard)].map((h) => `- ${h}`), '');
