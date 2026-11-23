@@ -420,7 +420,11 @@ export class ListToolsService {
         current,
         booking || Boolean(related.when),
         related,
-        forPerson,
+        // Q4 H7: who it's for, else the name typed in this chat, said back over the account's.
+        forPerson ??
+          (isRealName(String(personName ?? ''))
+            ? String(personName).trim().slice(0, 120)
+            : undefined),
       );
       const accepted = this.consent
         ? await this.consent.accepts(
@@ -470,12 +474,11 @@ export class ListToolsService {
       });
       await this.consent?.consume(ctx.chatbotId, ctx.conversationId);
       if (!dryRun && ctx.contactId && isRealName(String(personName ?? ''))) {
-        // Kept as the person's name when they have none yet: the entry, the inbox and the next
-        // chat show it.
+        // The name typed in the chat wins over the signed-in account's (Q4 H7: "I'm Priya Test"
+        // was booked under the account's name). The entry, the inbox and the next chat show it.
         await this.dataSource.query(
           `UPDATE chatbot_contacts SET display_name = $3, "updatedAt" = now()
-            WHERE id = $1 AND chatbot_id = $2
-              AND (display_name IS NULL OR btrim(display_name) = '')`,
+            WHERE id = $1 AND chatbot_id = $2`,
           [
             ctx.contactId,
             ctx.chatbotId,

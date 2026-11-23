@@ -428,6 +428,28 @@ describePg('List tools through the gateway (Postgres)', () => {
       expect(row.data.booked_for).toBe('Lakshmi Rao');
     });
 
+    it("the name typed in the chat wins over the account's (Q4 H7)", async () => {
+      const [slot] = await freeSlots(1);
+      const asked = await call(
+        'create_appointments',
+        { slot: slot.record_id, person_name: 'Priya Test' },
+        { conversationId: 'conv-typed-name' },
+      );
+      expect(asked.result!.question).toContain('for Priya Test');
+      expect(asked.result!.question).not.toContain('for Alice');
+      const booked = await write(
+        'create_appointments',
+        { slot: slot.record_id, person_name: 'Priya Test' },
+        { conversationId: 'conv-typed-name' },
+      );
+      expect(booked.ok).toBe(true);
+      const [contact] = await ds.query(
+        `SELECT display_name FROM chatbot_contacts WHERE id = $1`,
+        [alice],
+      );
+      expect(contact.display_name).toBe('Priya Test');
+    });
+
     it('a yes covers only the entry it was asked about', async () => {
       const [a, b] = await freeSlots(2);
       const conversationId = 'conv-consent-2';
