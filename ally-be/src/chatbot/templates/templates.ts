@@ -236,7 +236,7 @@ export const TEMPLATES: UseCaseTemplate[] = [
     icon: 'services',
     purpose: ANSWER,
     pack: null,
-    hand_over: true,
+    hand_over: false, // Q4 H5: off by default; the owner turns it on
     memory: false,
     instructions:
       'You answer for {name}. Explain who each service is for, what to bring and where to go, in plain words, from the Services list. Never decide whether someone qualifies: say what the service needs and that the team confirms.',
@@ -411,7 +411,7 @@ export const TEMPLATES: UseCaseTemplate[] = [
     icon: 'supporters',
     purpose: ENQUIRIES,
     pack: null,
-    hand_over: true,
+    hand_over: false, // Q4 H5: off by default; the owner turns it on
     memory: false,
     instructions:
       'You answer for {name}. Help people give and volunteer. You can’t take payments or send receipts: explain the ways to give, and take receipt questions as a donor enquiry for the team.',
@@ -661,7 +661,7 @@ export const TEMPLATES: UseCaseTemplate[] = [
     icon: 'languages',
     purpose: ANSWER,
     pack: null,
-    hand_over: true,
+    hand_over: false, // Q4 H5: off by default; the owner turns it on
     memory: false,
     instructions:
       'You answer for {name}. Reply in the language the person writes in: English, Hindi or Hinglish. Keep sentences short and plain. If someone writes in a language you can’t reply in well, say so in simple English and offer a callback.',
@@ -749,7 +749,7 @@ export const TEMPLATES: UseCaseTemplate[] = [
     icon: 'updates',
     purpose: ANSWER,
     pack: null,
-    hand_over: true,
+    hand_over: false, // Q4 H5: off by default; the owner turns it on
     memory: false,
     instructions:
       'You answer for {name}. Check the Updates list first: when an update covers the question, answer from the newest one and give its date. Older pages come second. You can’t send messages out to people.',
@@ -856,7 +856,7 @@ export const TEMPLATES: UseCaseTemplate[] = [
     icon: '🩺',
     purpose: ANSWER,
     pack: SafetyPackId.MEDICAL,
-    hand_over: true,
+    hand_over: false, // Q4 H5: off by default; the owner turns it on
     memory: false,
     instructions:
       'You answer for {name}, a clinic. Help with hours, doctors, fees and appointments. Never give medical advice, read a result or suggest a medicine: say the doctor will advise, and offer an appointment or a callback.',
@@ -1171,7 +1171,7 @@ export const TEMPLATES: UseCaseTemplate[] = [
     icon: '🏠',
     purpose: ENQUIRIES,
     pack: null,
-    hand_over: true,
+    hand_over: false, // Q4 H5: off by default; the owner turns it on
     memory: true,
     instructions:
       'You answer for {name}. Help buyers and tenants find a listing by area, size and budget, and book a site visit. Give prices only from the listings. Never promise returns, approvals or loan terms.',
@@ -1294,7 +1294,7 @@ export const TEMPLATES: UseCaseTemplate[] = [
     icon: '🛍️',
     purpose: ANSWER,
     pack: null,
-    hand_over: true,
+    hand_over: false, // Q4 H5: off by default; the owner turns it on
     memory: true,
     instructions:
       'You answer for {name}, an online store. Help with products, prices, stock and orders. You can’t take payments. A person only ever hears about their own orders.',
@@ -1400,7 +1400,7 @@ export const TEMPLATES: UseCaseTemplate[] = [
     icon: '🎓',
     purpose: ENQUIRIES,
     pack: SafetyPackId.MINORS,
-    hand_over: true,
+    hand_over: false, // Q4 H5: off by default; the owner turns it on
     memory: false,
     instructions:
       'You answer for {name}. Help parents and students with courses, batches, fees and demo classes. Take a parent’s details, never a child’s own.',
@@ -1609,7 +1609,7 @@ export const TEMPLATES: UseCaseTemplate[] = [
     icon: '🌿',
     purpose: ANSWER,
     pack: SafetyPackId.MENTAL_HEALTH,
-    hand_over: true,
+    hand_over: false, // Q4 H5: off by default; the owner turns it on
     memory: false,
     instructions:
       'You answer for {name}. Share the therapists, fees, formats and how to reach the team. You don’t counsel, diagnose or advise. Offer a callback when someone wants to talk to a person.',
@@ -1715,7 +1715,7 @@ export const TEMPLATES: UseCaseTemplate[] = [
     icon: '⚖️',
     purpose: ENQUIRIES,
     pack: SafetyPackId.LEGAL_FINANCIAL,
-    hand_over: true,
+    hand_over: false, // Q4 H5: off by default; the owner turns it on
     memory: false,
     instructions:
       'You answer for {name}. Explain the firm’s services, fees and how to start. Never give legal, tax or investment advice, and never promise an outcome or a return.',
@@ -1808,10 +1808,10 @@ export const TEMPLATES: UseCaseTemplate[] = [
     icon: '💬',
     purpose: ANSWER,
     pack: null,
-    hand_over: true,
+    hand_over: false, // Q4 H5: off by default; the owner turns it on
     memory: true,
     instructions:
-      'You answer for {name}’s customers. Answer from what the team has published. When you can’t solve it, open a ticket or hand over to a person. Don’t promise refunds or dates the team hasn’t published.',
+      'You answer for {name}’s customers. Answer from what the team has published. When you can’t solve it, open a ticket so the team can reply. Don’t promise refunds or dates the team hasn’t published.',
     lists: [
       {
         key: 'support_tickets',

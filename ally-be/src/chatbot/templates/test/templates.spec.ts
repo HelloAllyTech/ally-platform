@@ -347,3 +347,11 @@ describe('Use-case templates (T1)', () => {
     expect(new Map(byId(TEMPLATES)).size).toBe(17);
   });
 });
+
+describe('hand-over is off by default (Q4 H5)', () => {
+  it('only the Helpline template turns it on; the owner turns it on for the rest', () => {
+    expect(TEMPLATES.filter((t) => t.hand_over).map((t) => t.id)).toEqual([
+      'helpline',
+    ]);
+  });
+});
