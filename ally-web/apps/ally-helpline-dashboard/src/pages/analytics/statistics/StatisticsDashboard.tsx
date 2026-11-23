@@ -188,16 +188,6 @@ export const StatisticsDashboard: FunctionComponent<StatisticsDashboardProps> = 
           </div>
         </div>
 
-        {editing && (
-          <p
-            className="rounded bg-[#dce6f6] px-4 py-3 text-sm text-[#1c3a6e]"
-            role="status"
-            data-testid="statistics-customise-hint"
-          >
-            {t("statisticsLibrary.customiseHint")}
-          </p>
-        )}
-
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
           <div className="min-w-0 flex-1">
             {entryKeys.length === 0 ? (

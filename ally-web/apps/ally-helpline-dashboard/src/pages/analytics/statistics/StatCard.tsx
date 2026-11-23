@@ -58,7 +58,6 @@ export const StatCard: FunctionComponent<StatCardProps> = ({
             lowContrast
             hideCloseButton
             title={t("statisticsLibrary.card.couldNotLoad")}
-            subtitle={t("statisticsLibrary.card.couldNotLoadDetail")}
           />
           {onRetry && (
             <Button kind="tertiary" size="sm" onClick={onRetry}>

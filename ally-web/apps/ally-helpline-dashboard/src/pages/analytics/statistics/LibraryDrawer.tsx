@@ -85,18 +85,15 @@ export const LibraryDrawer: FunctionComponent<LibraryDrawerProps> = ({
             &times;
           </button>
         </div>
-        <p className="text-sm text-typography-600">{t("statisticsLibrary.library.description")}</p>
-        <label className="flex flex-col gap-1 text-xs text-typography-600">
-          {t("statisticsLibrary.library.search")}
-          <input
-            type="search"
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            placeholder={t("statisticsLibrary.library.searchPlaceholder")}
-            className="min-h-11 rounded border border-border-light px-3 text-sm text-typography-900"
-            data-testid="statistics-library-search"
-          />
-        </label>
+        <input
+          type="search"
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          aria-label={t("statisticsLibrary.library.search")}
+          placeholder={t("statisticsLibrary.library.searchPlaceholder")}
+          className="min-h-11 rounded border border-border-light px-3 text-sm text-typography-900"
+          data-testid="statistics-library-search"
+        />
         <div
           className="flex flex-wrap gap-2"
           role="group"
@@ -144,11 +141,6 @@ export const LibraryDrawer: FunctionComponent<LibraryDrawerProps> = ({
               <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <span className="text-sm font-semibold text-typography-900">{chart.title}</span>
                 <span className="text-sm text-typography-600">{chart.question}</span>
-                {chart.state === "sparse" && (
-                  <span className="text-xs font-medium text-[#6b4506]">
-                    {t("statisticsLibrary.library.countsOnly")}
-                  </span>
-                )}
                 {unavailable && chart.reason && (
                   <span className="text-xs font-medium text-typography-600">{chart.reason}</span>
                 )}
@@ -177,10 +169,6 @@ export const LibraryDrawer: FunctionComponent<LibraryDrawerProps> = ({
           );
         })}
       </ul>
-
-      <p className="flex-none border-t border-border-light bg-background-secondary p-4 text-sm text-typography-700">
-        {t("statisticsLibrary.library.contactTeam")}
-      </p>
     </aside>
   );
 };

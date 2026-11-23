@@ -3914,10 +3914,9 @@
     "customise": "Customise",
     "done": "Done",
     "addCharts": "Add charts",
-    "customiseHint": "Drag a card by its grip to move it. Remove a card with the cross. Changes save automatically.",
     "removeAria": "Remove {{title}} from dashboard",
     "saveFailed": "Could not save your layout. Try again.",
-    "emptyDashboard": "Your dashboard is empty. Choose Customise, then Add charts, to pick from the library.",
+    "emptyDashboard": "No charts yet. Choose Customise to add some.",
     "usage": {
       "measure": "Measure",
       "measures": {
@@ -3929,25 +3928,21 @@
     "card": {
       "unavailable": "Not available yet.",
       "couldNotLoad": "Could not load this chart",
-      "couldNotLoadDetail": "Your other charts are fine.",
       "retry": "Try again",
       "sparseNote": "Small sample: showing counts only.",
       "loading": "Loading this chart"
     },
     "library": {
       "title": "Chart library",
-      "description": "Add charts to your dashboard. Charts your organisation has no data for yet are greyed, with the reason.",
       "search": "Search charts",
-      "searchPlaceholder": "For example: sessions, courses",
+      "searchPlaceholder": "Search",
       "filterByGroup": "Filter by group",
       "close": "Close library",
       "add": "Add",
       "added": "Added",
       "unavailable": "Unavailable",
-      "countsOnly": "Counts only: the sample is small",
       "addAria": "Add {{title}} to dashboard",
       "noResults": "No charts match.",
-      "contactTeam": "Need a chart that is not here? Contact the Ally team and we will add it to your library.",
       "groups": {
         "all": "All",
         "activity": "Activity",
