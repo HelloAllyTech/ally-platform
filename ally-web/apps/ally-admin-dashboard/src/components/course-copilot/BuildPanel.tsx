@@ -143,7 +143,7 @@ const StatusIcon: React.FC<{ status: CourseCopilotJobStatus }> = ({ status }) =>
  * keeps moving is worse than none; progress and elapsed time are what we can state.
  */
 /** A new roleplay at a glance: what it is for, how it is set up, and what the checks found. */
-const RoleplayCard: React.FC<{ card: CourseCopilotRoleplayCard }> = ({ card }) => {
+export const RoleplayCard: React.FC<{ card: CourseCopilotRoleplayCard }> = ({ card }) => {
   const strings = en.courseCopilot.roleplayCard;
   const supports = [
     card.supports?.reminders && strings.reminders,

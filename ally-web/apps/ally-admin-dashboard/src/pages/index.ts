@@ -38,6 +38,7 @@ export * from "./BugHunter";
 export * from "./Builder";
 export * from "./PmAgent";
 export * from "./CourseCopilot";
+export * from "./RoleplayAgent";
 export * from "./Onboarding";
 export * from "./AgentTestCases/AgentTestCases";
 export * from "./Debriefs/DebriefConsole";

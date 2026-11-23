@@ -555,3 +555,54 @@ export interface CourseCopilotRoleplayCard {
   };
   checks: string[];
 }
+
+/** The roleplay agent on its own (`/v1/roleplay-agent`): one roleplay from a short request. */
+export type RoleplayAgentMode =
+  | "learning"
+  | "practice"
+  | "performance"
+  | "pre_assessment"
+  | "post_assessment";
+
+export interface RoleplayAgentRequest {
+  learners: string;
+  goal: string;
+  competencyIds: string[];
+  mode: RoleplayAgentMode;
+  difficulty?: "EASY" | "MEDIUM" | "HARD";
+  clientDescription?: string;
+  characterId?: string;
+  saveCharacter?: boolean;
+  languageIds?: string[];
+  minScore?: number;
+  lengthMinutes?: number;
+  triggerWarningIds?: string[];
+  notes?: string;
+}
+
+export interface RoleplayAgentOptions {
+  modes: RoleplayAgentMode[];
+  competencies: { id: string; name: string }[];
+  languages: { id: string; name: string; code: string; voiceCount: number }[];
+  triggerWarnings: { id: string; name: string }[];
+  limits: { languages: number };
+}
+
+export type RoleplayAgentStep = "brief" | "casting" | "building" | "saving" | "done";
+
+export interface RoleplayAgentRun {
+  id: string;
+  status: "running" | "done" | "failed";
+  step: RoleplayAgentStep;
+  request: RoleplayAgentRequest;
+  startedAt: string;
+  finishedAt?: string;
+  error?: string;
+  result?: {
+    scenarioId: number;
+    characterId?: string;
+    summary: string;
+    card: CourseCopilotRoleplayCard;
+    casting?: { note: string };
+  };
+}
