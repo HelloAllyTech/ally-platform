@@ -24,8 +24,12 @@ vi.mock("@store", () => ({
 }));
 
 vi.mock("@ally-ui-mono/ui-shared", () => ({
-  AutoExpandableTextarea: ({ value, onChange }: any) => (
-    <textarea aria-label="actor" value={value} onChange={e => onChange(e.target.value)} />
+  AutoExpandableTextarea: ({ value, onChange, placeholder }: any) => (
+    <textarea
+      aria-label={String(placeholder).startsWith("Describe") ? "actor" : "chat"}
+      value={value}
+      onChange={e => onChange(e.target.value)}
+    />
   ),
 }));
 
@@ -298,5 +302,75 @@ describe("AgentBuilderCopilotWizard casting from the Character Library", () => {
     fireEvent.click(screen.getByText("Generate"));
     expect(mocks.start.mock.calls[0][0].libraryCharacter).toBeUndefined();
     expect(mocks.fetchCharacter).not.toHaveBeenCalled();
+  });
+});
+
+describe("AgentBuilderCopilotWizard chat box", () => {
+  const chat = en.agentBuilderChatBox;
+
+  const send = async (text: string) => {
+    fireEvent.change(screen.getByLabelText("chat"), { target: { value: text } });
+    await act(async () => {
+      fireEvent.click(screen.getByText(chat.send));
+    });
+  };
+
+  const toModeStep = () => {
+    render(<AgentBuilderCopilotWizard formMethods={form()} />);
+    fireEvent.change(screen.getByLabelText("actor"), { target: { value: "Meera calls" } });
+    fireEvent.click(screen.getByText("Next"));
+    fireEvent.click(screen.getByText("Next"));
+  };
+
+  it("is not shown on the first step, which is already free text", () => {
+    render(<AgentBuilderCopilotWizard formMethods={form()} />);
+    expect(screen.queryByTestId("agent-chat-box")).toBeNull();
+  });
+
+  it("re-picks the mode from a note, and shows the note in the chat", async () => {
+    toModeStep();
+    expect((screen.getByDisplayValue("practice") as HTMLInputElement).checked).toBe(true);
+
+    await send("This is the final check before certification");
+
+    expect(screen.getByText("This is the final check before certification")).toBeTruthy();
+    expect((screen.getByDisplayValue("post_assessment") as HTMLInputElement).checked).toBe(true);
+  });
+
+  it("searches the library again with the note on the client step", async () => {
+    toModeStep();
+    await act(async () => {
+      fireEvent.click(screen.getByText("Next"));
+    });
+    expect(mocks.suggest).toHaveBeenCalledTimes(1);
+
+    await send("an older woman who speaks Kannada");
+
+    expect(mocks.suggest).toHaveBeenCalledTimes(2);
+    expect(mocks.suggest.mock.calls[1][0].description).toContain(
+      "an older woman who speaks Kannada",
+    );
+  });
+
+  it("puts every note on the brief, and offers to generate again after a new one", async () => {
+    toModeStep();
+    await send("No mention of family");
+    await act(async () => {
+      fireEvent.click(screen.getByText("Next"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText("Next"));
+    });
+    fireEvent.click(screen.getByText("Client deflects"));
+    fireEvent.click(screen.getByText("Generate"));
+
+    expect(mocks.start.mock.calls[0][0].actorDescription).toContain(chat.briefNotes);
+    expect(mocks.start.mock.calls[0][0].actorDescription).toContain("- No mention of family");
+
+    await send("Make her more guarded");
+    fireEvent.click(screen.getByText(chat.regenerate));
+    expect(mocks.start).toHaveBeenCalledTimes(2);
+    expect(mocks.start.mock.calls[1][0].actorDescription).toContain("- Make her more guarded");
+    expect(mocks.start.mock.calls[1][0].agentTestCases).toBe("Client deflects");
   });
 });

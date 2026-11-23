@@ -80,6 +80,10 @@ export interface SavedAgentBuilderChat {
   goalIds: string[];
   /** The Character Library character used, when one was. */
   character?: { id: string; name: string };
+  /** What the trainer told the agent in the chat box; every field follows these. */
+  notes?: string[];
+  /** The test cases' titles, to generate again with the same answers. */
+  goalTitles?: string[];
   result: { applied: number; total: number; stopped: boolean; checks: string[] };
   generatedAt: string;
 }
@@ -94,6 +98,7 @@ const modeStrings = en.agentBuilderMode;
 const suggestionStrings = en.agentBuilderSuggestions;
 const restoredStrings = en.agentBuilderRestored;
 const characterStrings = en.agentBuilderCharacter;
+const chatStrings = en.agentBuilderChatBox;
 
 /** One "what to review" line, in words. */
 const nextStepText = (step: ReturnType<typeof suggestNextSteps>[number]): string => {
@@ -177,6 +182,11 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
     profile: string;
   } | null>(null);
   const [characterError, setCharacterError] = useState(false);
+  // The chat box: anything the trainer wants the agent to know, at any step.
+  const [notes, setNotes] = useState<string[]>([]);
+  const [noteDraft, setNoteDraft] = useState("");
+  const [goalTitlesUsed, setGoalTitlesUsed] = useState<string[]>([]);
+  const [notesSinceGeneration, setNotesSinceGeneration] = useState(false);
   const [suggestCharacters, { isLoading: loadingSuggestions }] =
     useSuggestAgentBuilderCharactersMutation();
   const [fetchCharacter, { isFetching: loadingCharacter }] = useLazyGetCharacterByIdQuery();
@@ -213,6 +223,8 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
     setDescription(savedChat.description ?? "");
     if (savedChat.mode) setMode(savedChat.mode);
     setSelectedGoals(savedChat.goalIds ?? []);
+    setNotes(savedChat.notes ?? []);
+    setGoalTitlesUsed(savedChat.goalTitles ?? []);
     setStep("restored");
   }, [savedChat, step, history.length, description]);
 
@@ -229,6 +241,8 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
       ...(design ? { mode: design.mode, states: design.states } : {}),
       goalIds: selectedGoals,
       ...(character ? { character: { id: character.id, name: character.name } } : {}),
+      notes,
+      goalTitles: goalTitlesUsed,
       result: { applied: appliedCount, total: tasks.length, stopped: phase === "aborted", checks },
       generatedAt: new Date().toISOString(),
     };
@@ -288,13 +302,13 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
   };
 
   // Library characters for this description, with the fit check's pick pre-selected.
-  const loadSuggestions = async (pickedMode: RoleplayMode) => {
+  const loadSuggestions = async (pickedMode: RoleplayMode, withNotes: string[] = notes) => {
     setSuggestions(null);
     setCharacterChoice(NEW_CHARACTER);
     const competency = formMethods.getValues("competency");
     try {
       const found = await suggestCharacters({
-        description: description.trim(),
+        description: [description.trim(), ...withNotes].join("\n"),
         ...(competency?.id ? { competencyIds: [String(competency.id)] } : {}),
         mode: pickedMode,
       }).unwrap();
@@ -346,19 +360,63 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
     // scenarios.metadata.agentTestCaseIds) and steer every field prompt.
     formMethods.setValue("agentTestCaseIds", selectedGoals, { shouldDirty: true });
 
+    setGoalTitlesUsed(goalTitles);
+    runGeneration(goalTitles);
+  };
+
+  /**
+   * The brief every field is written from: the description, a library character's saved profile
+   * (so nothing contradicts who they are, as Course Copilot does) and the trainer's notes.
+   */
+  const composeBrief = (): string => {
+    const parts = [description.trim()];
+    const characterName = character?.name ?? restored?.character?.name;
+    if (characterName) {
+      const profile = String(
+        formMethods.getValues("characterProfileText") ?? character?.profile ?? "",
+      );
+      parts.push(`${characterStrings.briefNote(characterName)}\n${profile.slice(0, 2500)}`);
+    }
+    if (notes.length) {
+      parts.push(`${chatStrings.briefNotes}\n${notes.map(note => `- ${note}`).join("\n")}`);
+    }
+    return parts.join("\n\n");
+  };
+
+  const runGeneration = (goalTitles: string[]) => {
+    const runMode = design?.mode ?? restored?.mode;
+    const runStates = design?.states ?? restored?.states;
+    setNotesSinceGeneration(false);
     setStep("generate");
-    // A library character's saved profile rides on the brief, so the role instruction,
-    // challenge and opening lines are written from who they are (as Course Copilot does).
-    const actorDescription = character
-      ? `${description.trim()}\n\n${characterStrings.briefNote(character.name)}\n${character.profile.slice(0, 2500)}`
-      : description.trim();
     start({
-      actorDescription,
+      actorDescription: composeBrief(),
       competency: formMethods.getValues("competency")?.name,
       agentTestCases: goalTitles.join(", "),
-      ...(design ? { roleplayMode: design.mode, includeStates: design.states } : {}),
-      ...(character ? { libraryCharacter: true } : {}),
+      ...(runMode ? { roleplayMode: runMode, includeStates: Boolean(runStates) } : {}),
+      ...(character || restored?.character ? { libraryCharacter: true } : {}),
     });
+  };
+
+  /** The chat box: a note for the agent, which also acts on the step it is sent at. */
+  const handleSendNote = () => {
+    const note = noteDraft.trim();
+    if (!note) return;
+    const nextNotes = [...notes, note];
+    setNotes(nextNotes);
+    setNoteDraft("");
+    pushHistory("", note);
+    if (step === "mode") {
+      // "this is the final check" re-picks the mode; a note that names none leaves the pick.
+      const fromNote = recommendMode(note);
+      if (fromNote.reason !== "practice" || /\bpractice\b/i.test(note)) {
+        setRecommendation(fromNote);
+        setMode(fromNote.mode);
+      }
+    } else if (step === "character" && design) {
+      void loadSuggestions(design.mode, nextNotes);
+    } else if (step === "generate" || step === "restored") {
+      setNotesSinceGeneration(true);
+    }
   };
 
   const handleStartOver = () => {
@@ -374,6 +432,10 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
     setCharacterChoice(NEW_CHARACTER);
     setCharacter(null);
     setCharacterError(false);
+    setNotes([]);
+    setNoteDraft("");
+    setGoalTitlesUsed([]);
+    setNotesSinceGeneration(false);
     setDesign(null);
     setModeError(false);
     setStep("describe");
@@ -392,9 +454,12 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
 
         {history.map((entry, index) => (
           <div key={index} className="flex flex-col gap-2">
-            <div className="self-start max-w-[85%] break-words rounded-lg bg-background-secondary px-4 py-2 text-sm text-typography-800">
-              {entry.question}
-            </div>
+            {/* A chat-box note has no question: it is the trainer speaking first. */}
+            {entry.question && (
+              <div className="self-start max-w-[85%] break-words rounded-lg bg-background-secondary px-4 py-2 text-sm text-typography-800">
+                {entry.question}
+              </div>
+            )}
             <div className="self-end max-w-[85%] break-words rounded-lg bg-primary-50 px-4 py-2 text-sm text-typography-900 whitespace-pre-wrap">
               {entry.answer}
             </div>
@@ -518,6 +583,41 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
           push the Next / Generate button out of sight. The question scrolls
           inside the composer instead, and the button row never does. */}
       <div className="shrink min-h-0 border-t border-border-light pt-4 flex flex-col gap-3">
+        {/* The chat box: from the second step on (the first is already free text). */}
+        {step !== "describe" && (
+          <div className="shrink-0 flex flex-col gap-2" data-testid="agent-chat-box">
+            <div className="flex items-end gap-2">
+              <AutoExpandableTextarea
+                value={noteDraft}
+                onChange={setNoteDraft}
+                placeholder={chatStrings.placeholder[step] ?? chatStrings.placeholder.default}
+                minHeight={40}
+                maxLines={6}
+                className="w-full rounded border border-border-light px-3 py-2 bg-white text-sm"
+              />
+              <Button
+                variant={ButtonVariant.SECONDARY}
+                onClick={handleSendNote}
+                disabled={!noteDraft.trim() || phase === "running"}
+                className="h-[40px] px-4 shrink-0"
+              >
+                {chatStrings.send}
+              </Button>
+            </div>
+            {notesSinceGeneration && phase !== "running" && (
+              <div className="flex items-center justify-between gap-2 rounded-md border border-primary-200 bg-primary-50 px-3 py-2 text-sm">
+                <span>{chatStrings.regenerateHint}</span>
+                <Button
+                  variant={ButtonVariant.PRIMARY}
+                  onClick={() => runGeneration(goalTitlesUsed)}
+                  className="h-[36px] px-4 shrink-0"
+                >
+                  {chatStrings.regenerate}
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
         {step === "describe" && (
           <>
             <div className="min-h-0 overflow-y-auto custom-scrollbar flex flex-col gap-3">

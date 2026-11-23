@@ -16063,6 +16063,23 @@ export const en = {
     loadFailed: "That character could not be loaded. Pick it again, or write a new one.",
   },
 
+  // Agent Builder wizard: the chat box, for anything the trainer wants the agent to know.
+  agentBuilderChatBox: {
+    placeholder: {
+      default: "Tell the agent anything (e.g. she only speaks Kannada, no mention of family)…",
+      mode: "Or tell the agent how this roleplay is used (e.g. this is the final check)…",
+      character:
+        "Or describe who you want (e.g. an older woman who speaks Kannada) to search again…",
+      generate: "Ask for a change (e.g. make her more guarded), then generate again…",
+      restored: "Ask for a change (e.g. make her more guarded), then generate again…",
+    } as Record<string, string>,
+    send: "Send",
+    briefNotes: "The trainer's notes for this roleplay (follow every one):",
+    regenerateHint:
+      "Your notes are kept. Generate again to apply them: fields are rewritten on the left.",
+    regenerate: "Generate again with your notes",
+  },
+
   // Agent Builder wizard: the saved conversation, shown again when a roleplay is reopened.
   agentBuilderRestored: {
     summary: (when: string, applied: number, total: number, stopped: boolean) =>
