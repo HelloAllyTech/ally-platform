@@ -32,6 +32,21 @@ type TextKey =
   | "unsupportedMediaText"
   | "rateLimitText";
 
+/**
+ * What this screen saves (Q4 B11): never the list abilities, memory or time zone, which other
+ * screens change. The server keeps their stored values when they're left out.
+ */
+const editable = (draft: WaOrgSettings): WaOrgSettings => {
+  const { abilities, memory, timeZone, ...rest } = draft as WaOrgSettings & {
+    memory?: unknown;
+    timeZone?: unknown;
+  };
+  void abilities;
+  void memory;
+  void timeZone;
+  return rest;
+};
+
 const MESSAGE_FIELDS: { key: TextKey; label: string }[] = [
   { key: "disclaimerText", label: d.disclaimerLabel },
   { key: "crisisEscalationText", label: d.crisisReplyLabel },
@@ -99,7 +114,7 @@ export const ChatbotSettingsTab: React.FC<{
 
   const handleSave = async () => {
     try {
-      await save({ id: chatbotId, settings: draft }).unwrap();
+      await save({ id: chatbotId, settings: editable(draft) }).unwrap();
       toast.success(fill(t.saved, { org: chatbotName }));
     } catch (error) {
       toast.error(errorMessage(error, t.saveFailed));
@@ -114,7 +129,10 @@ export const ChatbotSettingsTab: React.FC<{
     !draft.helplineConfirmedAt;
   const confirmHelpline = async () => {
     try {
-      await save({ id: chatbotId, settings: { ...draft, helplineConfirm: true } }).unwrap();
+      await save({
+        id: chatbotId,
+        settings: { ...editable(draft), helplineConfirm: true },
+      }).unwrap();
       toast.success(fill(t.saved, { org: chatbotName }));
     } catch (error) {
       toast.error(errorMessage(error, t.saveFailed));

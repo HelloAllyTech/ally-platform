@@ -94,6 +94,21 @@ describe('consent for list writes (chunk H1)', () => {
     expect(offer.questions.hi).toContain('Sat 21 Nov 2026, 13:00');
   });
 
+  it('a booking for someone else says their name back (Q4 B13)', () => {
+    const offer = offerFor(
+      list,
+      'create',
+      record('new', 'Sat 21 Nov 2026, 13:00', 'Eye checkup'),
+      null,
+      true,
+      {},
+      'Lakshmi Rao',
+    );
+    expect(offer.questions.en).toBe(
+      'Shall I book Eye checkup on Sat 21 Nov 2026, 13:00 for Lakshmi Rao?',
+    );
+  });
+
   it('a move names the entry it moves; a cancel says cancel', () => {
     const before = record('a', 'Sat 21 Nov 2026, 11:00', 'Eye checkup');
     const moved = offerFor(
@@ -379,5 +394,146 @@ describe('missingChoice (chunk H1)', () => {
       options: ['Eye checkup', 'LASIK consultation'],
     });
     expect(missingChoice(list, def, { service: 'Eye checkup' })).toBeNull();
+  });
+
+  describe('the question and card name the right things (Q4 G5)', () => {
+    const registrations = {
+      key: 'registrations',
+      name: 'Registrations',
+      settings: { title_field: 'event', person_field: 'attendee' },
+      rules: [{ id: 'r1', kind: 'capacity', config: {} }],
+      fields: [
+        {
+          key: 'event',
+          label: 'Event',
+          type: ListFieldType.RELATION,
+          options: { to: 'events' },
+        },
+        {
+          key: 'attendee',
+          label: 'Attendee',
+          type: ListFieldType.RELATION,
+          options: { to: 'contact' },
+        },
+        {
+          key: 'guests',
+          label: 'Guests',
+          type: ListFieldType.NUMBER,
+          default: 0,
+        },
+        { key: 'status', label: 'Status', type: ListFieldType.SELECT },
+      ],
+    } as unknown as ListDefinitionView;
+    const registration = (guests: number, attendee = 'Sana Shaikh') =>
+      ({
+        id: 'reg-1',
+        title: 'Bandra Sunday food drive',
+        data: { event: 'ev-1', guests },
+        display: {
+          event: 'Bandra Sunday food drive',
+          attendee,
+          guests: String(guests),
+          status: 'registered',
+        },
+        contact_id: 'c1',
+      }) as unknown as ListRecordView;
+    const related = {
+      when: 'Sun 29 Nov 2026, 11:00',
+      where: 'Bandra West station, skywalk exit',
+    };
+
+    it('names the day, time, place and places, never "book 0"', () => {
+      const { questions } = offerFor(
+        registrations,
+        'create',
+        registration(0),
+        null,
+        true,
+        related,
+      );
+      expect(questions.en).toBe(
+        'Shall I register Sana Shaikh for Bandra Sunday food drive on Sun 29 Nov 2026, 11:00 at Bandra West station, skywalk exit (1 place)?',
+      );
+      expect(questions.en).not.toMatch(/\b0\b/);
+    });
+
+    it('a yes still counts when only the quantity or name was filled after the question', () => {
+      const asked = offerFor(
+        registrations,
+        'create',
+        registration(0),
+        null,
+        true,
+        related,
+      );
+      const after = offerFor(
+        registrations,
+        'create',
+        registration(1, 'Sana S.'),
+        null,
+        true,
+        related,
+      );
+      expect(after.key).toBe(asked.key);
+    });
+
+    it('the verb follows what the list is for (Q4 G5, approved 23 Nov)', () => {
+      const as = (key: string, name: string) => ({
+        ...registrations,
+        key,
+        name,
+      });
+      const ask = (l: ListDefinitionView, person?: string) =>
+        offerFor(l, 'create', registration(0, person), null, true, related)
+          .questions;
+
+      const registered = ask(registrations, 'Try it');
+      expect(registered.en).toMatch(
+        /^Shall I register you for Bandra Sunday food drive/,
+      );
+      expect(registered.hi).toMatch(
+        /^क्या मैं आपको .* के लिए रजिस्टर कर दूँ\?$/,
+      );
+
+      const callback = ask(as('callback_requests', 'Callback requests'));
+      expect(callback.en).toMatch(
+        /^Shall I request a callback for Sana Shaikh about /,
+      );
+      expect(callback.hi).toMatch(
+        /^क्या मैं Sana Shaikh के लिए कॉलबैक का अनुरोध भेज दूँ/,
+      );
+
+      const application = ask(as('applications', 'Volunteer applications'));
+      expect(application.en).toMatch(
+        /^Shall I send your application for .*\(Sana Shaikh\)\?$/,
+      );
+      expect(application.hi).toMatch(/के लिए आपका आवेदन भेज दूँ/);
+
+      const booking = ask(as('appointments', 'Appointments'));
+      expect(booking.en).toMatch(/^Shall I book .* for Sana Shaikh\?$/);
+      expect(booking.hi).toMatch(/बुक कर दूँ\?$/);
+
+      const other = offerFor(
+        as('enquiries', 'Enquiries'),
+        'create',
+        registration(0),
+        null,
+        false,
+      ).questions;
+      expect(other.en).toMatch(/^Shall I add this to Enquiries: /);
+      expect(other.hi).toMatch(/^क्या मैं इसे Enquiries में जोड़ दूँ: /);
+    });
+
+    it("never names Try it's test visitor", () => {
+      const { questions } = offerFor(
+        registrations,
+        'create',
+        registration(0, 'Try it'),
+        null,
+        true,
+        related,
+      );
+      expect(questions.en).not.toMatch(/try it/i);
+    });
   });
 });

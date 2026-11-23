@@ -17,7 +17,9 @@ loadEnv();
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../../app.module';
 import { BotDraftPublishService } from '../../bot-draft/service/bot-draft-publish.service';
-import { BotDraftService } from '../../bot-draft/service/bot-draft.service';
+import { DataSource } from 'typeorm';
+import { BotDraftEntity } from '../../bot-draft/entity/bot-draft.entity';
+import { ExecutionManager } from '../../common/execution/execution-manager';
 
 const LOCAL_ENVS = new Set(['development', 'local']);
 
@@ -59,13 +61,26 @@ async function main(): Promise<void> {
     logger: ['error', 'warn'],
   });
   try {
-    const drafts = app.get(BotDraftService, { strict: false });
     const publisher = app.get(BotDraftPublishService, { strict: false });
-    const draft = await drafts.get(draftId);
-    const result = await publisher.publish(draft, {
-      access,
-      ...(emails.length ? { emails } : {}),
-    });
+    // As the draft's owner: the publish reads the owner and tenant from the execution context.
+    const draft = await app
+      .get(DataSource)
+      .getRepository(BotDraftEntity)
+      .findOne({ where: { id: draftId } });
+    if (!draft) throw new Error('That setup was not found.');
+    const result = await ExecutionManager.runWithContext(
+      async () => {
+        ExecutionManager.setAuthContext(
+          String(draft.ownerUserId),
+          String(draft.tenantId ?? ''),
+        );
+        return publisher.publish(draft, {
+          access,
+          ...(emails.length ? { emails } : {}),
+        });
+      },
+      { path: 'usecases:local-publish' },
+    );
     console.log(JSON.stringify({ localPublish: true, ...result }));
   } finally {
     await app.close();
@@ -73,8 +88,12 @@ async function main(): Promise<void> {
 }
 
 if (require.main === module) {
-  main().catch((error) => {
-    console.error(error instanceof Error ? error.message : error);
-    process.exit(1);
-  });
+  // The app context's pollers can keep the process alive after `close`: exit once done.
+  main().then(
+    () => process.exit(0),
+    (error) => {
+      console.error(error instanceof Error ? error.message : error);
+      process.exit(1);
+    },
+  );
 }

@@ -39,6 +39,12 @@ export const MAX_LIST_TOOLS = 12;
 export const MAX_FIND_FIELDS = 10;
 export const FIND_LIMIT_MAX = 10;
 export const FIND_LIMIT_DEFAULT = 5;
+/**
+ * A find over a day or a range of times (Q4 B7, approved 23 Nov: "list every free time it shows, up
+ * to 8 for the day, then 'and N more'"): at least this many, so the reply can list them and the
+ * total says how many more.
+ */
+export const FIND_LIMIT_DAY = 8;
 /** How many field labels a find description names. */
 const DESCRIBED_FILTERS = 4;
 
@@ -312,10 +318,29 @@ function findSchema(list: ListView): ListToolInputSchema {
 export const offeredWriteFields = (list: ListView): FieldView[] =>
   writableFields(list).filter(
     (f) =>
-      f.required ||
-      f.type !== ListFieldType.SELECT ||
-      !stillExamples(selectValues(f)),
+      (f.required ||
+        f.type !== ListFieldType.SELECT ||
+        !stillExamples(selectValues(f))) &&
+      // Q4 B13: offered as for_person instead.
+      f !== bookedForField(list),
   );
+
+/**
+ * Q4 B13: the detail that holds who a booking is for when it's someone else ("Booked for",
+ * "Patient name"): an optional text detail the assistant may fill, on a list tied to the person.
+ * The entry's person stays the one who booked.
+ */
+export function bookedForField(list: ListView): FieldView | undefined {
+  if (!hasPersonField(list)) return undefined;
+  return writableFields(list).find(
+    (f) =>
+      !f.required &&
+      f.type === ListFieldType.TEXT &&
+      /booked.?for|patient|attendee|guest.?name|for.?whom/i.test(
+        `${f.key} ${f.label}`,
+      ),
+  );
+}
 
 function writeSchema(
   list: ListView,
@@ -333,8 +358,26 @@ function writeSchema(
       properties[f.key] = valueProperty(f, update, dated);
     }
   }
+  // Q4 G6 (Round 7 M1, Round 8 Vandrevala: the callback saved with no name, and the next chat
+  // didn't know it): on a list tied to the person, the name they gave, kept as theirs.
+  if (!update && hasPersonField(list) && !('person_name' in properties)) {
+    properties.person_name = text(PERSON_NAME_DESCRIPTION);
+  }
+  // Q4 B13: a booking for someone else (a mother, a child) names them, in the list's own detail
+  // for it; the person in the chat stays the one who booked.
+  if (!update && bookedForField(list) && !('for_person' in properties)) {
+    properties.for_person = text(FOR_PERSON_DESCRIPTION);
+  }
   return { type: 'object', properties };
 }
+
+/** Model-facing (Q4 B13; in Q4-PROMPTS.md for review). */
+export const FOR_PERSON_DESCRIPTION =
+  "Only when the booking is for someone else (their mother, a child): that person's name. Ask for it if they haven't said it. Leave it empty when it's for the person in this chat.";
+
+/** Model-facing (Q4 G6; in Q4-PROMPTS.md for review). */
+export const PERSON_NAME_DESCRIPTION =
+  "The person's name, if they gave it in this chat (never 'Try it' or a placeholder). Leave it empty otherwise.";
 
 // ---- descriptions -------------------------------------------------------------------------------
 
@@ -703,10 +746,21 @@ export function toListQuery(
     }
   }
   const aggregate = input.aggregate as string | undefined;
+  const asked = (input.limit as number | undefined) ?? FIND_LIMIT_DEFAULT;
+  const overTimes = filters.some(
+    (f) =>
+      (f.op === 'from' || f.op === 'to') &&
+      list.fields.some(
+        (field) =>
+          field.key === f.field &&
+          (field.type === ListFieldType.DATETIME ||
+            field.type === ListFieldType.DATE),
+      ),
+  );
   return {
     filters,
     ...(input.sort ? { sort: String(input.sort) } : {}),
-    limit: (input.limit as number | undefined) ?? FIND_LIMIT_DEFAULT,
+    limit: overTimes ? Math.max(asked, FIND_LIMIT_DAY) : asked,
     ...(aggregate
       ? {
           aggregate:

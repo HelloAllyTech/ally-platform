@@ -56,6 +56,10 @@ const ONLY = new Set((arg('only', '') || '').split(',').filter(Boolean));
 const CASES = new Set((arg('cases', '') || '').split(',').filter(Boolean));
 const CLASSIFIER_FAIL = flag('classifier-fail');
 const GRADE = !flag('no-grade');
+const REGRADE = arg('regrade');
+// With --regrade: also recompute the tool and record checks from the stored messages (a run saved
+// before the runner's time-zone fix read neither).
+const RECHECK = flag('recheck');
 
 const env = Object.fromEntries(
   readFileSync(join(root, 'ally-be', '.env'), 'utf8')
@@ -147,7 +151,7 @@ async function turnFacts({ chatbotId, messageId, conversationId, since, list, ca
   const steps = conversationId
     ? (
         await db.query(
-          `SELECT tool, status, error_code FROM tool_runs WHERE conversation_id = $1 AND "createdAt" >= $2 ORDER BY "createdAt", step`,
+          `SELECT tool, status, error_code FROM tool_runs WHERE conversation_id = $1 AND "createdAt" >= $2::timestamptz ORDER BY "createdAt", step`,
           [conversationId, since],
         )
       ).rows.map((r) => `${r.tool}: ${r.status === 'ok' ? 'ok' : r.error_code || r.status}`)
@@ -156,7 +160,7 @@ async function turnFacts({ chatbotId, messageId, conversationId, since, list, ca
   if (list) {
     const { rows } = await db.query(
       `SELECT count(*)::int AS n FROM collection_records r JOIN collections c ON c.id = r.collection_id
-        WHERE r.chatbot_id = $1 AND c.key = $2 AND r.deleted_at IS NULL AND r."createdAt" >= $3`,
+        WHERE r.chatbot_id = $1 AND c.key = $2 AND r.deleted_at IS NULL AND r."createdAt" >= $3::timestamptz`,
       [chatbotId, list, caseStart],
     );
     records = rows[0].n;
@@ -221,6 +225,13 @@ class Visitor {
       const r = await this.call('POST', '/session', {});
       if (r.status >= 300) throw new Error(`session ${r.status} ${JSON.stringify(r.data).slice(0, 200)}`);
       this.session = r.data;
+    } else if (SIGNED_IN.has(this.email)) {
+      // One code per invited address per run: the page limits codes per address (correctly), so
+      // later conversations reuse the signed-in visitor in a new chat.
+      this.cookies = new Map(SIGNED_IN.get(this.email));
+      await this.newChat();
+      this.ready = true;
+      return;
     } else {
       const since = new Date().toISOString();
       await this.call('POST', '/session', { email: this.email });
@@ -237,6 +248,7 @@ class Visitor {
       this.session = r.data;
     }
     if (this.session && this.session.intakeDone === false) await this.intake();
+    if (this.email) SIGNED_IN.set(this.email, new Map(this.cookies));
     this.ready = true;
   }
 
@@ -302,6 +314,9 @@ class Visitor {
 }
 
 /** The development-only code the server logs instead of emailing (bot-page-otp.service.ts). */
+/** Invited addresses signed in this run, with their cookies. */
+const SIGNED_IN = new Map();
+
 async function devCode(email, since) {
   const domain = email.slice(email.lastIndexOf('@'));
   for (let i = 0; i < 10; i++) {
@@ -339,9 +354,21 @@ async function seedOrders(a, s, visitors) {
     const hello = await v.say('Hi');
     const conv = hello.final?.conversationId;
     const { rows } = await db.query(`SELECT contact_id FROM chatbot_conversations WHERE id = $1`, [conv]);
-    await owner('POST', `/chatbots/${s.chatbot_id}/lists/orders/records`, {
-      data: { number: order.ref, customer: rows[0].contact_id, items: order.item, status: order.status },
-    }).catch((e) => console.warn(`   order not seeded: ${e.message}`));
+    // An order starts as placed and moves along (the list's own rules): placed → packed → sent.
+    try {
+      let rec = await owner('POST', `/chatbots/${s.chatbot_id}/lists/orders/records`, {
+        data: { number: order.ref, customer: rows[0].contact_id, items: order.item, status: 'placed' },
+      });
+      for (const next of ['packed', 'sent']) {
+        if (order.status === 'placed' || (order.status === 'packed' && next === 'sent')) break;
+        rec = await owner('PATCH', `/chatbots/${s.chatbot_id}/lists/orders/records/${rec.id}`, {
+          data: { status: next },
+          version: rec.version,
+        });
+      }
+    } catch (e) {
+      console.warn(`   order not seeded: ${e.message}`);
+    }
   }
 }
 
@@ -455,6 +482,8 @@ async function runCase(c, a, s, visitors, corpus, context) {
     turns.push({
       user: t.user,
       as: t.as,
+      messageId: said.final?.messageId ?? null,
+      observed,
       reply,
       handledBy: facts.handledBy,
       turnType: observed.turn_type,
@@ -563,8 +592,129 @@ function report(results) {
   return [...lines, ...details, ''].join('\n');
 }
 
+// ---------------------------------------------------------------- re-grade a saved run
+/**
+ * `--regrade <label>`: the same replies, graded again (the grader changed, Q4 A1). A turn saved
+ * before runs kept their grader input is matched to its stored message by reply text, within the
+ * run's time window, to recover its passages; the code's checks are kept as they were.
+ */
+async function regrade(label) {
+  const saved = JSON.parse(readFileSync(join(here, 'results', `${label}.json`), 'utf8'));
+  const caseOf = new Map();
+  for (const set of sets) for (const c of set.cases) caseOf.set(c.id, { c, set });
+  let n = 0;
+  for (const r of saved.results) {
+    const s = setup[r.assistant];
+    if (!s?.chatbot_id) continue;
+    const context = await contextOf(s.chatbot_id);
+    const corpus = RECHECK ? await corpusOf(s.chatbot_id) : '';
+    for (const c of r.cases) {
+      const def = caseOf.get(c.id)?.c;
+      if (!def) continue;
+      const history = [];
+      let caseStart = null;
+      let prevAssistant = '';
+      for (const [i, t] of (c.turns ?? []).entries()) {
+        const spec = def.turns[i];
+        if (RECHECK && spec && !t.refused) {
+          const { rows } = await db.query(
+            `SELECT m.conversation_id, m."createdAt" AS at, m.handled_by,
+                    (SELECT max(u."createdAt") FROM chatbot_messages u
+                      WHERE u.conversation_id = m.conversation_id AND u.role = 'user'
+                        AND u."createdAt" <= m."createdAt") AS asked
+               FROM chatbot_messages m JOIN chatbot_conversations v ON v.id = m.conversation_id
+              WHERE v.chatbot_id = $1 AND m.role = 'assistant' AND m.text = $2
+              ORDER BY m."createdAt" DESC LIMIT 1`,
+            [s.chatbot_id, t.reply ?? ''],
+          );
+          const m = rows[0];
+          if (m) {
+            caseStart = caseStart ?? m.asked ?? m.at;
+            const steps = (
+              await db.query(
+                `SELECT tool, status, error_code FROM tool_runs
+                  WHERE conversation_id = $1::text AND "createdAt" >= $2 AND "createdAt" <= $3
+                  ORDER BY "createdAt", step`,
+                [m.conversation_id, m.asked ?? m.at, m.at],
+              )
+            ).rows.map((r) => `${r.tool}: ${r.status === 'ok' ? 'ok' : r.error_code || r.status}`);
+            const expect = expectFor(def.kind, spec.expect ?? {});
+            let records;
+            if (expect.records?.list) {
+              const { rows: rc } = await db.query(
+                `SELECT count(*)::int AS n FROM collection_records r JOIN collections c ON c.id = r.collection_id
+                  WHERE r.chatbot_id = $1 AND c.key = $2 AND r.deleted_at IS NULL
+                    AND r."createdAt" >= $3 AND r."createdAt" <= $4`,
+                [s.chatbot_id, expect.records.list, caseStart, m.at],
+              );
+              records = rc[0].n;
+            }
+            Object.assign(t, { steps, records });
+            const turn = { reply: t.reply, handledBy: t.handledBy, steps, records, error: t.error, refused: false };
+            Object.assign(
+              t,
+              checkTurn({
+                kind: def.kind,
+                mustPass: def.mustPass,
+                user: t.user,
+                prevAssistant,
+                expect,
+                turn,
+                corpus,
+                visitorText: def.turns.map((x) => x.user).join(' '),
+              }),
+            );
+          }
+        }
+        prevAssistant = t.reply ?? '';
+        if (t.grade && spec) {
+          let observed = t.observed;
+          if (!observed) {
+            const { rows } = await db.query(
+              `SELECT m.handled_by, m.retrieval_meta, m.citations FROM chatbot_messages m
+                 JOIN chatbot_conversations v ON v.id = m.conversation_id
+                WHERE v.chatbot_id = $1 AND m.role = 'assistant' AND m.text = $2
+                ORDER BY m."createdAt" DESC LIMIT 1`,
+              [s.chatbot_id, t.reply],
+            );
+            const m = rows[0];
+            const meta = m?.retrieval_meta ?? {};
+            observed = {
+              reply: t.reply,
+              handled_by: m?.handled_by ?? t.handledBy ?? '',
+              turn_type: meta.turn_type ?? t.turnType ?? '',
+              citations: (m?.citations ?? []).map((x) => ({
+                chunk_id: String(x.chunk_id ?? x.chunkId ?? ''),
+                document_id: String(x.document_id ?? x.documentId ?? ''),
+                document_title: String(x.document_title ?? x.title ?? ''),
+                source_url: String(x.source_url ?? x.url ?? ''),
+              })),
+              passage_document_ids: (meta.passage_document_ids ?? []).map(String),
+              passage_chunk_ids: (meta.passage_chunk_ids ?? []).map(String),
+            };
+          }
+          t.grade = await grade(def, spec, { ...observed, history: [...history] }, context);
+          n += 1;
+        }
+        history.push({ role: 'user', content: t.user }, { role: 'assistant', content: t.reply ?? '' });
+      }
+      c.verdict = verdictOf(c.turns ?? []);
+    }
+    process.stdout.write('.');
+  }
+  return { saved, n };
+}
+
 // ---------------------------------------------------------------- main
 async function main() {
+  if (REGRADE) {
+    const { saved, n } = await regrade(REGRADE);
+    await db.end();
+    writeFileSync(join(here, 'results', `${LABEL}.json`), JSON.stringify({ ...saved, label: LABEL, regradedFrom: REGRADE }, null, 1));
+    writeFileSync(join(here, 'results', `${LABEL}.md`), report(saved.results).replace(`# Use-case suite: ${LABEL}`, `# Use-case suite: ${LABEL} (${REGRADE}, re-graded: ${n} turns)`));
+    console.log(`\nwrote evals/usecases/results/${LABEL}.md`);
+    return;
+  }
   const jobs = [];
   for (let run = 1; run <= REPEAT; run++) for (const set of sets) jobs.push({ set, run });
   const results = [];

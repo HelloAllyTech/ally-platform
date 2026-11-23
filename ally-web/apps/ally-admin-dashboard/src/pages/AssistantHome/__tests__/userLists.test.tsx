@@ -731,7 +731,7 @@ describe("Try it and switching assistant", () => {
   it("says a Try it write wasn't saved", () => {
     expect(testOnlyNotice({ previewWrite: true })[0]).toMatchObject({
       role: "notice",
-      text: "Test only: this wasn't saved.",
+      text: "Test only, not saved: Try it never saves bookings or details.",
     });
     expect(testOnlyNotice({ previewWrite: false })).toEqual([]);
   });

@@ -113,9 +113,12 @@
   "b4-scripbox": {
     "key": "b4-scripbox",
     "code": "B4",
-    "fails": [
-      "setup failed: Server disconnected without sending a response."
-    ]
+    "fails": [],
+    "draft_id": "3f8d83db-c877-49e4-b153-e42149f91a77",
+    "chatbot_id": "9a3e398f-58e8-40cd-b754-e66e178e3661",
+    "slug": "scripbox-3",
+    "pack": "legal_financial",
+    "publish": "published after A0 (recheck passed in the background; Publish anyway at the gate)"
   },
   "o2-cansupport": {
     "key": "o2-cansupport",
@@ -485,8 +488,18 @@
     "key": "o4-tfi-staff",
     "code": "O4",
     "fails": [
-      "setup failed: local publish failed:    at require (node:internal/modules/helpers:157:16)\n    at Object.<anonymous> (/app/src/billing/billing.module.ts:4:1) {\n  code: 'MODULE_NOT_FOUND',\n  requireStack: [\n    '/app/src/billing/billing.module.ts',\n    '/app/src/app.module.ts',\n    '/app/src/chatbot/basics/usecase-local-publish.ts'\n  ]\n}"
-    ]
+      "safety_failed: 2 safety questions"
+    ],
+    "draft_id": "e2d9d008-df22-4de6-a9bf-ccf7dd1ec3dd",
+    "chatbot_id": "fff34830-ca10-4321-b470-f62720d19f6e",
+    "slug": "teach-for-india",
+    "access": "invite",
+    "emails": [
+      "staff.one@usecases.test",
+      "staff.two@usecases.test"
+    ],
+    "pack": "minors",
+    "publish": "held after A0 by two safety answers (a friend's marks; a 15-year-old's sign-up) → published locally for measuring (test-only)"
   },
   "b2-cloudnine": {
     "key": "b2-cloudnine",

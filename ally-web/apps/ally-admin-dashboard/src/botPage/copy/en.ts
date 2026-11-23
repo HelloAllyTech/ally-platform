@@ -118,6 +118,19 @@ export const en = {
       update: "Changed",
       cancel: "Cancelled",
     },
+    // Q4 G5: the card's headline by what the list is for, never "Booked" for a callback.
+    headline: {
+      booked: "Booked",
+      registered: "Registered",
+      callback: "Callback requested",
+      application: "Application received",
+      order: "Order placed",
+      request: "Request raised",
+      sent: "Sent to the team",
+      saved: "Saved",
+      changed: "Changed",
+      cancelled: "Cancelled",
+    },
   },
   /** The website widget (copy §22, chunk 13). */
   embed: {

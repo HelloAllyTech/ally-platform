@@ -132,7 +132,17 @@ export class ChatbotSettingsService {
           new Date(),
         )
       : {};
-    const settings = cleanOverride({ ...rest, ...helpline });
+    // Q4 B11 ("Change entries: Do it" didn't stick): what a settings screen doesn't edit (the
+    // list abilities, memory, the time zone) keeps its stored value when the screen leaves it out,
+    // so saving General can't put back a copy loaded before the list wizard changed it.
+    const kept = options.byOwner
+      ? Object.fromEntries(
+          (['abilities', 'memory', 'timeZone'] as const)
+            .filter((k) => rest[k] === undefined && chatbot.settings?.[k])
+            .map((k) => [k, chatbot.settings![k]]),
+        )
+      : {};
+    const settings = cleanOverride({ ...kept, ...rest, ...helpline });
     await this.chatbotRepository.update(
       { id: chatbot.id },
       { settings, updatedBy: userId },

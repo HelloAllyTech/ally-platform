@@ -12,6 +12,15 @@ import type { ChatbotSettingsOverride } from '../type/chatbot.type';
 import { ListConsentService } from './list-consent.service';
 import { askFirstMessage, namesEntry, offerFor } from './list-consent';
 import {
+  atDefault,
+  type CardHeadline,
+  headlineFor,
+  isRealName,
+  relatedWords,
+  type RelatedWords,
+} from './entry-words';
+import {
+  bookedForField,
   datedLists,
   listToolDefinitions,
   offeredListTools,
@@ -34,8 +43,14 @@ import type {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Preview's conversation ids: nothing it does may change an owner's list. */
+/**
+ * A test chat: Try it (`preview-…`) or a checkup question (`checkup-…`, Q4 B12). Its writes are
+ * tried and rolled back, and a list tied to the person is offered with a test person standing in,
+ * so a checkup can take an application or a callback as Try it can, and saves nothing.
+ */
 export const isPreviewConversation = (conversationId: string): boolean =>
-  conversationId.startsWith('preview-');
+  conversationId.startsWith('preview-') ||
+  conversationId.startsWith('checkup-');
 
 /**
  * The agent's list tools at run time (chunk 6): which a run is offered, and each call, through 5a's
@@ -67,6 +82,8 @@ export class ListToolsService {
   ): Promise<{
     list: string;
     title: string;
+    /** What happened, by what the list is for (Q4 G5): a callback, a registration… */
+    headline: CardHeadline;
     details: { label: string; value: string }[];
   } | null> {
     if (!UUID.test(recordId)) return null;
@@ -87,7 +104,14 @@ export class ListToolsService {
         { contactId },
       );
       const titleKey = list.settings?.title_field;
-      const details = list.fields
+      const related = await this.relatedOf(
+        chatbotId,
+        list,
+        record,
+        runId,
+        contactId,
+      );
+      const fields = list.fields
         .filter(
           (f) =>
             !f.archived_at &&
@@ -100,10 +124,31 @@ export class ListToolsService {
               relationTarget(f) === 'contact'
             ),
         )
+        // Q4 G5: never "Guests 0" on a card.
+        .filter((f) => !atDefault(f, record.data?.[f.key]))
         .map((f) => ({ label: f.label, value: record.display?.[f.key] ?? '' }))
-        .filter((d) => d.value !== '')
-        .slice(0, 3);
-      return { list: list.name, title: record.title, details };
+        .filter((d) => d.value !== '');
+      // The related entry's day, time and place come first (Q4 G5: "no time on the card").
+      const details = [
+        ...(related.when ? [{ label: 'When', value: related.when }] : []),
+        ...(related.where ? [{ label: 'Where', value: related.where }] : []),
+        ...fields,
+      ].slice(0, 4);
+      // A booking points at another list's entry (a slot, an event); a callback or a lead doesn't.
+      const booking =
+        Boolean(related.when) ||
+        list.fields.some(
+          (f) =>
+            !f.archived_at &&
+            f.type === ListFieldType.RELATION &&
+            relationTarget(f) !== 'contact',
+        );
+      return {
+        list: list.name,
+        title: record.title,
+        headline: headlineFor(list, 'create', booking),
+        details,
+      };
     } catch (error) {
       if (
         error instanceof ListRefusalException ||
@@ -112,6 +157,43 @@ export class ListToolsService {
         return null;
       }
       throw error;
+    }
+  }
+
+  /**
+   * The day, time and place of the entry a record points at (Q4 G5): a registration's event, a
+   * booking's slot. Read as the agent may read it; empty when there is none or it can't be read.
+   */
+  private async relatedOf(
+    chatbotId: string,
+    list: ListDefinitionView,
+    record: ListRecordView,
+    runId: string,
+    contactId: string | null,
+  ): Promise<RelatedWords> {
+    const field = list.fields.find(
+      (f) =>
+        !f.archived_at &&
+        f.type === ListFieldType.RELATION &&
+        relationTarget(f) !== 'contact' &&
+        typeof record.data?.[f.key] === 'string',
+    );
+    if (!field) return {};
+    try {
+      const target = await this.definitions.getList(
+        chatbotId,
+        relationTarget(field),
+      );
+      const related = await this.records.get(
+        chatbotId,
+        target.key,
+        { kind: 'agent', runId },
+        String(record.data[field.key]),
+        { contactId },
+      );
+      return relatedWords(target, related.display ?? {});
+    } catch {
+      return {};
     }
   }
 
@@ -163,6 +245,12 @@ export class ListToolsService {
     const dryRun = isPreviewConversation(ctx.conversationId);
     const about = { key: list.key, name: list.name };
     const personList = Boolean(list.settings?.person_field);
+    // Q4 B4: in Try it, the slots this test chat has already test-booked.
+    const held: ReadonlySet<string> = new Set(
+      dryRun
+        ? ((await this.consent?.held(ctx.chatbotId, ctx.conversationId)) ?? [])
+        : [],
+    );
     try {
       if (def.kind === 'find') {
         let found = await this.freeOnly(
@@ -175,6 +263,7 @@ export class ListToolsService {
             toListQuery(list, input),
             scope,
           ),
+          held,
         );
         // A number with an upper bound ("seats 2 to 2") found nothing: read it as "at
         // least" (chunk 8a), since a table for 3 seats 2. Only when something comes back.
@@ -190,6 +279,7 @@ export class ListToolsService {
               toListQuery(list, atLeast),
               scope,
             ),
+            held,
           );
           if (roomier.total > 0) found = roomier;
         }
@@ -206,6 +296,8 @@ export class ListToolsService {
             actor,
             atLeast ?? input,
             scope,
+            false,
+            held,
           );
           if (!nearest.length) {
             nearest = await this.nearest(
@@ -215,6 +307,7 @@ export class ListToolsService {
               atLeast ?? input,
               scope,
               true,
+              held,
             );
             loosened = nearest.length > 0;
           }
@@ -234,11 +327,28 @@ export class ListToolsService {
           },
         };
       }
+      // Q4 G6: the name the person gave is theirs (the contact's name), not an entry detail.
+      const {
+        person_name: personName,
+        for_person: forPersonGiven,
+        ...fields
+      } = input;
+      input = fields;
+      // Q4 B13: the person a booking is for, when it's someone else.
+      const forPerson = isRealName(String(forPersonGiven ?? ''))
+        ? String(forPersonGiven).trim().slice(0, 120)
+        : undefined;
       const data = toListData(list, input);
       if (def.kind === 'create') {
         // A choice left out (the service) that the assistant's last message named, exactly one of
         // the options (chunk H1): taken from there, rather than asked again.
         await this.fillNamedChoice(ctx, list, def, data);
+        // Q4 B5 (BHIVE: asked for a phone number already given before the chat): an empty phone,
+        // email or name detail takes the person's pre-chat answer.
+        await this.fillFromIntake(ctx, list, data, personName);
+        // Q4 B13: who it's for, in the list's own detail; the entry's person is who booked.
+        const forField = bookedForField(list);
+        if (forPerson && forField) data[forField.key] = forPerson;
       }
       const booking =
         def.kind === 'create' && playbookOf(list, [def]) === 'booking';
@@ -274,6 +384,19 @@ export class ListToolsService {
           scope,
         );
       }
+      // Q4 B4: a slot this Try it chat already test-booked is taken for a second test booking.
+      const heldField = list.fields.find(
+        (f) =>
+          f.type === ListFieldType.RELATION &&
+          relationTarget(f) !== 'contact' &&
+          held.has(String(data[f.key] ?? '')),
+      );
+      if (dryRun && def.kind === 'create' && heldField) {
+        return refused(list, lists, {
+          code: 'unique_taken',
+          message: LIST_COPY.unique_taken(heldField.label),
+        });
+      }
       // 1. The write, tried and rolled back (chunk H1 Part B): a full slot or the per-person limit
       //    is refused here, before the person is asked anything; and it is exactly what the
       //    question names.
@@ -282,12 +405,22 @@ export class ListToolsService {
         personList,
       });
       // 2. Consent: a yes in a later turn to the question that named exactly this entry.
+      // Q4 G5: the question names the related entry's day, time and place.
+      const related = await this.relatedOf(
+        ctx.chatbotId,
+        list,
+        intended,
+        ctx.runId,
+        scope?.contactId ?? null,
+      );
       const offer = offerFor(
         list,
         def.kind === 'create' ? 'create' : 'update',
         intended,
         current,
-        booking,
+        booking || Boolean(related.when),
+        related,
+        forPerson,
       );
       const accepted = this.consent
         ? await this.consent.accepts(
@@ -336,6 +469,35 @@ export class ListToolsService {
         personList,
       });
       await this.consent?.consume(ctx.chatbotId, ctx.conversationId);
+      if (!dryRun && ctx.contactId && isRealName(String(personName ?? ''))) {
+        // Kept as the person's name when they have none yet: the entry, the inbox and the next
+        // chat show it.
+        await this.dataSource.query(
+          `UPDATE chatbot_contacts SET display_name = $3, "updatedAt" = now()
+            WHERE id = $1 AND chatbot_id = $2
+              AND (display_name IS NULL OR btrim(display_name) = '')`,
+          [
+            ctx.contactId,
+            ctx.chatbotId,
+            String(personName).trim().slice(0, 120),
+          ],
+        );
+      }
+      if (dryRun && def.kind === 'create') {
+        // Q4 B4: Try it's test booking holds its slot for the rest of this test chat.
+        await this.consent?.hold(
+          ctx.chatbotId,
+          ctx.conversationId,
+          list.fields
+            .filter(
+              (f) =>
+                f.type === ListFieldType.RELATION &&
+                relationTarget(f) !== 'contact' &&
+                typeof data[f.key] === 'string',
+            )
+            .map((f) => String(data[f.key])),
+        );
+      }
       return {
         ok: true,
         result: {
@@ -348,11 +510,128 @@ export class ListToolsService {
       };
     } catch (error) {
       if (error instanceof ListRefusalException) {
-        return refused(list, lists, error.refusal);
+        // Q4 B8: a full or taken time with no alternatives of its own gets the nearest free ones.
+        const nearby =
+          !error.refusal.conflict?.alternatives?.length &&
+          ['capacity_full', 'unique_taken', 'limit_exceeded'].includes(
+            error.refusal.code,
+          )
+            ? await this.nearbyFree(ctx, list, lists, input, held)
+            : null;
+        return refused(list, lists, error.refusal, nearby);
       }
       throw error;
     }
   }
+
+  /**
+   * The nearest free entries to the one a refused booking asked for (Q4 B8): the related list's
+   * dated entries around its time, free ones only. Null when the booking has no dated entry.
+   */
+  private async nearbyFree(
+    ctx: AgentToolContext,
+    list: ListDefinitionView,
+    lists: ListDefinitionView[],
+    input: Record<string, string | number>,
+    held: ReadonlySet<string>,
+  ): Promise<{ list: ListDefinitionView; records: ListRecordView[] } | null> {
+    try {
+      const field = list.fields.find(
+        (f) =>
+          !f.archived_at &&
+          f.type === ListFieldType.RELATION &&
+          relationTarget(f) !== 'contact' &&
+          typeof input[f.key] === 'string',
+      );
+      const target =
+        field && lists.find((l) => l.key === relationTarget(field));
+      const dated = target?.fields.find(
+        (f) => !f.archived_at && f.type === ListFieldType.DATETIME,
+      );
+      if (!field || !target || !dated) return null;
+      const actor: ListActor = { kind: 'agent', runId: ctx.runId };
+      const scope = { contactId: ctx.contactId };
+      const asked = await this.records.get(
+        ctx.chatbotId,
+        target.key,
+        actor,
+        String(input[field.key]),
+        scope,
+      );
+      const at = String(asked.data?.[dated.key] ?? '');
+      if (!at) return null;
+      const records = (
+        await this.nearest(
+          ctx.chatbotId,
+          target,
+          actor,
+          { [`${dated.key}_at`]: at },
+          scope,
+          true,
+          new Set([...held, asked.id]),
+        )
+      ).slice(0, 3);
+      return records.length ? { list: target, records } : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * The person's pre-chat answers (the bot page's questions before the chat), for the details a
+   * write leaves empty (Q4 B5): their phone, email and name. Never overwrites what was given.
+   */
+  private async fillFromIntake(
+    ctx: AgentToolContext,
+    list: ListDefinitionView,
+    data: Record<string, unknown>,
+    personName: unknown,
+  ): Promise<void> {
+    const empty = (key: string) =>
+      data[key] === undefined || data[key] === null || data[key] === '';
+    const writable = list.fields.filter(
+      (f) => !f.archived_at && f.agent_write && empty(f.key),
+    );
+    if (!writable.length) return;
+    let answers: { label: string; type: string; value: string }[] = [];
+    if (ctx.contactId) {
+      try {
+        const [row] = (await this.dataSource.query(
+          `SELECT metadata -> 'intake' -> 'answers' AS answers FROM chatbot_conversations
+            WHERE chatbot_id = $1 AND contact_id = $2 AND metadata ? 'intake'
+            ORDER BY "updatedAt" DESC LIMIT 1`,
+          [ctx.chatbotId, ctx.contactId],
+        )) as { answers: typeof answers | null }[];
+        answers = row?.answers ?? [];
+      } catch {
+        answers = [];
+      }
+    }
+    const answer = (type: string, label?: RegExp) =>
+      answers.find(
+        (a) =>
+          String(a.value ?? '').trim() &&
+          (a.type === type || (label ? label.test(a.label ?? '') : false)),
+      )?.value;
+    for (const f of writable) {
+      let value: string | undefined;
+      if (f.type === ListFieldType.PHONE)
+        value = answer('phone', /phone|mobile/i);
+      else if (f.type === ListFieldType.EMAIL)
+        value = answer('email', /e-?mail/i);
+      else if (
+        f.type === ListFieldType.TEXT &&
+        /(^|_)name$|^name|full.?name/i.test(f.key)
+      ) {
+        value =
+          (isRealName(String(personName ?? ''))
+            ? String(personName)
+            : undefined) ?? answer('name', /name/i);
+      }
+      if (value?.trim()) data[f.key] = value.trim();
+    }
+  }
+
   private async fillNamedChoice(
     ctx: AgentToolContext,
     list: ListDefinitionView,
@@ -415,13 +694,20 @@ export class ListToolsService {
    */
   private async freeOnly<
     T extends { records: ListRecordView[]; total: number },
-  >(chatbotId: string, list: ListDefinitionView, found: T): Promise<T> {
+  >(
+    chatbotId: string,
+    list: ListDefinitionView,
+    found: T,
+    held: ReadonlySet<string> = new Set(),
+  ): Promise<T> {
     if (!found.records.length) return found;
     const taken = await this.records.takenOf(
       chatbotId,
       list.key,
       found.records.map((r) => r.id),
     );
+    // Q4 B4: in Try it, the chat's own test bookings hold their slots too.
+    for (const id of held) taken.add(id);
     if (!taken.size) return found;
     const records = found.records.filter((r) => !taken.has(r.id));
     return {
@@ -445,6 +731,7 @@ export class ListToolsService {
     scope: { contactId: string | null },
     /** Only the time: the other details left out, open kept (chunk 8a). */
     timeOnly = false,
+    held: ReadonlySet<string> = new Set(),
   ): Promise<ListRecordView[]> {
     const field = list.fields.find(
       (f) =>
@@ -489,6 +776,7 @@ export class ListToolsService {
         chatbotId,
         list,
         await this.records.query(chatbotId, list.key, actor, query, scope),
+        held,
       );
       const at = (r: ListRecordView) => Date.parse(String(r.data[field.key]));
       const timed = records.filter((r) => !Number.isNaN(at(r)));
@@ -525,9 +813,17 @@ export class ListToolsService {
     let record: ListRecordView | undefined;
     try {
       await this.dataSource.transaction(async (m) => {
+        // Q4 B9 (91S stored "Try it" as the person): the stand-in carries the name the person
+        // gave, when the entry has one; otherwise a test name that is never said back.
+        const given = Object.entries(data).find(
+          ([key, value]) =>
+            /(^|_)name$|^name/i.test(key) &&
+            typeof value === 'string' &&
+            value.trim(),
+        )?.[1] as string | undefined;
         const [{ id }] = (await m.query(
-          `INSERT INTO chatbot_contacts (chatbot_id, display_name) VALUES ($1, 'Try it') RETURNING id`,
-          [chatbotId],
+          `INSERT INTO chatbot_contacts (chatbot_id, display_name) VALUES ($1, $2) RETURNING id`,
+          [chatbotId, given?.trim().slice(0, 120) || 'Test visitor'],
         )) as { id: string }[];
         ({ record } = await this.records.create(
           chatbotId,
@@ -617,24 +913,46 @@ export function nearestForWindow<T>(
  * A refusal the agent reads: the code (stored as the run's error code), §26's message, and any
  * alternatives as passages of the list they come from.
  */
+/**
+ * What the agent is told about a refusal (Q4 B8): plain words, and what to offer instead. Fixed
+ * text, in `Q4-PROMPTS.md` for review; the owner-facing wording stays the list's own.
+ */
+export const AGENT_REFUSAL: Partial<Record<string, string>> = {
+  unique_taken:
+    'That time is no longer free. Say so plainly and offer the free times listed here, if any.',
+  capacity_full:
+    'That one is full. Say so plainly and offer the free times listed here, if any.',
+  limit_exceeded:
+    'That would go over the limit. Say so plainly and offer the free times listed here, if any.',
+  limit_reached:
+    'They already have as many as this list allows. Say so plainly and offer to change their existing one instead.',
+  transition_not_allowed:
+    "That can't be changed or cancelled here. Say so plainly, and offer to pass it to the team if one of your tools can; never say it's done.",
+};
+
 function refused(
   list: ListDefinitionView,
   lists: ListDefinitionView[],
   refusal: ListRefusalException['refusal'],
+  nearby: { list: ListDefinitionView; records: ListRecordView[] } | null = null,
 ): AgentToolOutcome {
   const field = refusal.field
     ? list.fields.find((f) => f.key === refusal.field)
     : undefined;
   const target =
     (field && lists.find((l) => l.key === relationTarget(field))) || list;
-  const alternatives: RecordPassage[] = (
-    refusal.conflict?.alternatives ?? []
-  ).map((r) => recordPassage(target, r));
+  const alternatives: RecordPassage[] = [
+    ...(refusal.conflict?.alternatives ?? []).map((r) =>
+      recordPassage(target, r),
+    ),
+    ...(nearby?.records ?? []).map((r) => recordPassage(nearby!.list, r)),
+  ];
+  const next = AGENT_REFUSAL[refusal.code];
   return {
     ok: false,
     error: refusal.code,
     result: {
-      message: refusal.message,
+      message: next ? `${refusal.message} ${next}` : refusal.message,
       ...(refusal.field ? { field: refusal.field } : {}),
       passages: alternatives,
     },

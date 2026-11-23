@@ -35,6 +35,7 @@ import {
   SafetyLockedError,
 } from '../safety-pack/safety-lock';
 import { MIN_PACK_REASON, packFor } from '../safety-pack/safety-packs';
+import { isPlaceholder, NAME_PATHS } from '../name-placeholders';
 import { LoggerService } from '../../logger/logger.service';
 import {
   LEARNED_FACTS_CHANGED,
@@ -260,6 +261,16 @@ export class BotDraftService {
       summary?: string;
     },
   ): Promise<{ draft: BotDraftEntity; event: DraftEvent }> {
+    // Q4 N1: a placeholder ("unchanged") is never written as a name or a title.
+    ops = ops.filter(
+      (op) =>
+        !(
+          options.target === 'draft' &&
+          NAME_PATHS.has(op.path) &&
+          (op.op === 'replace' || op.op === 'add') &&
+          isPlaceholder((op as { value?: unknown }).value)
+        ),
+    );
     if (
       draft.status !== BotDraftStatus.ACTIVE &&
       actor !== BotDraftActor.SYSTEM

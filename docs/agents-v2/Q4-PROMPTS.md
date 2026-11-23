@@ -110,3 +110,96 @@ No variables change. The pack-choice fixture set (15 sites with a school and a c
 ### B4. Crisis numbers in Safety (item G7)
 
 A number a template or setup wrote is shown in Safety as "Not used in crisis replies yet (from your template's answer). Use it in crisis replies" until the owner confirms it; crisis replies meanwhile carry only the pack's national numbers. The owner's own practical-help line (new, optional) follows the at-risk reply.
+
+## C. Second group (section B and G5, G6, B13)
+
+> **Approved by Shehbaz on 23 Nov 2026 with three edits, marked "(edit)" below and in the code.**
+
+Not live until approved. All are in code, so none needs a Skills Store push; the model-facing ones (C1 to C3) change what the assistant is told, so they are here for approval as prompts are.
+
+### C1. After a refused booking (`ally-be/src/chatbot/agent-tools/list-tools.service.ts`, `AGENT_REFUSAL`), item B8
+
+**Why:** Round 8 (RHA, a full drive): the assistant was told only "Bandra Sunday food drive is full." and said "Something went wrong, try again later." Each refusal now carries one plain next step, after the refusal's own sentence, and the nearest free times come with it.
+
+| Refusal | Added after the refusal's own sentence |
+|---|---|
+| Slot taken | That time is no longer free. Say so plainly and offer the free times listed here, if any. |
+| Full | That one is full. Say so plainly and offer the free times listed here, if any. |
+| Over the limit | That would go over the limit. Say so plainly and offer the free times listed here, if any. |
+| Already has as many as allowed | They already have as many as this list allows. Say so plainly and offer to change their existing one instead. |
+| A change not allowed | That can't be changed or cancelled here. Say so plainly, and offer to pass it to the team if one of your tools can; never say it's done. |
+
+### C2. The person's name on a write tool (`list-tools.ts`, `PERSON_NAME_DESCRIPTION`), item G6
+
+**Why:** Round 7 M1 and Round 8 (Vandrevala): a callback was saved with no name, and the next chat didn't know them. Create tools on a list tied to the person get an optional `person_name`, kept as the contact's name, never as an entry detail.
+
+> The person's name, if they gave it in this chat (never 'Try it' or a placeholder). Leave it empty otherwise.
+
+### C3. Booking for someone else (`list-tools.ts`, `FOR_PERSON_DESCRIPTION`), item B13
+
+**Why:** approved on 22 Nov: ask the other person's name and say it back. Offered on a list with a "Booked for" detail; the ready-made Appointments list now has one (new installs). The entry's person stays the one who booked, and "Booked for" holds the other name.
+
+> Only when the booking is for someone else (their mother, a child): that person's name. Ask for it if they haven't said it. Leave it empty when it's for the person in this chat.
+
+Said back: "Shall I book Eye checkup on Sat 21 Nov 2026, 13:00 for Lakshmi Rao?" / "क्या मैं Lakshmi Rao के लिए Eye checkup … बुक कर दूँ?"
+
+### C4. Try it's test bookings (`ally-be/src/chatbot/service/chatbot.service.ts`, `TEST_NOT_SAVED`), item B9
+
+Added after a Try it reply that would have saved something:
+
+(edit) It also follows callbacks and applications, so it says "Test only":
+
+- English: "(Test only, not saved: Try it never saves bookings or details.)"
+- Hindi: "(सिर्फ़ टेस्ट, सेव नहीं हुआ: Try it में कुछ सेव नहीं होता।)"
+- Hinglish: "(Sirf test, save nahi hua: Try it mein kuch save nahi hota.)"
+
+The setup's Lists note reads: "Test only, not saved: Try it never saves bookings or details."
+
+### C5. The card's headline (ally-web `botPage/copy/en.ts`, `hi.ts`, `steps.headline`), item G5
+
+**Why:** Round 7 R5: a callback card titled "Booked". The headline now follows what the list is for.
+
+| List | English | Hindi |
+|---|---|---|
+| Bookings | Booked | बुक हो गया |
+| Registrations, sign-ups | Registered | रजिस्टर हो गया |
+| Callbacks | Callback requested | कॉलबैक का अनुरोध भेजा गया |
+| Applications | Application received | आवेदन मिल गया |
+| Orders | Order placed | ऑर्डर हो गया |
+| Tickets, complaints | Request raised | अनुरोध दर्ज हो गया |
+| Enquiries, leads, feedback | Sent to the team | टीम को भेज दिया |
+| Anything else | Saved | सेव हो गया |
+| A change | Changed | बदल दिया |
+| A cancel | Cancelled | रद्द कर दिया |
+
+The consent question also now names the day, time and place and the number of places, and leaves out a "0" guests detail and "Try it" as a name.
+
+(edit) Its verb follows what the list is for, as the headline does (`list-consent.ts`, `askedByKind`):
+
+| List | English | Hindi |
+|---|---|---|
+| Registrations | Shall I register you for Bandra Sunday food drive on Sun 30 Nov, 7:00 am at Carter Road (1 place)? | क्या मैं आपको … के लिए रजिस्टर कर दूँ? |
+| Callbacks | Shall I request a callback for Kiran about a desk for 10 people? | क्या मैं Kiran के लिए कॉलबैक का अनुरोध भेज दूँ (…)? |
+| Applications | Shall I send your application for Volunteer, Mumbai (Kiran)? | क्या मैं … के लिए आपका आवेदन भेज दूँ? |
+| Bookings | Shall I book Eye checkup on Sat 21 Nov 2026, 13:00 for Kiran? | क्या मैं Kiran के लिए … बुक कर दूँ? |
+| Anything else | Shall I add this to Enquiries: …? | क्या मैं इसे Enquiries में जोड़ दूँ: …? |
+
+### C6. Booking: one question, and always look up what's free (`agent/playbook_booking.txt`, `ally_ai_agent_playbook_booking`), items B6 and B7
+
+**Why:** B6, 91S: "Friday 11" got "Do you mean Friday 27 Nov at 11:00?" and then "Shall I book…?", two questions for one booking. B7, 91S declined "which slots are free?" with "I don't know, contact the team", and BHIVE's live page said Friday had none and offered Thursday, which it had just called full.
+
+**Current:**
+> - Find before you offer: never name a time, table or slot that a find didn't show as free.
+> - Before you book, confirm the exact booking in one question: the day and date, the time, and whatever applies (the service, how many, which one) — for example "Shall I book Sat 21 Nov, 20:00 for 4 at Table 1?". Picking between options isn't a yes.
+> - Book only after they say yes, then say what was booked, citing it.
+> - If it's taken or a rule says no, say so plainly and offer what is free.
+
+**Proposed:**
+> - Whenever they ask what's free, or name a day or time, look it up first with a find for that day, and list every free time it shows, up to 8 for the day, then "and N more" (edit). Never say you don't know, and never say a day is full, without looking in this turn.
+> - Find before you offer: never name a time, table or slot that a find didn't show as free.
+> - If they named a day or time loosely ("Friday 11"), don't ask which date they mean: find it, and put the exact day, date and time in your one booking question. Ask only when the find shows more than one match.
+> - Before you book, confirm the exact booking in one question: the day and date, the time, and whatever applies (the service, how many, which one) — for example "Shall I book Sat 21 Nov, 20:00 for 4 at Table 1?". Picking between options isn't a yes.
+> - Book only after they say yes, then say what was booked, citing it.
+> - If it's taken or a rule says no, say so plainly and offer what is free.
+
+No variables change. In code with it: a find over a day or a range of times returns at least 8 entries, with the total (`FIND_LIMIT_DAY`). Measured on the booking cases in the use-case suite (b5-91springboard, b5-bhive, b1-dragarwal), where an availability question without a find is a failure.

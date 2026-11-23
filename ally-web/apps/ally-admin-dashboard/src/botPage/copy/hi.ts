@@ -118,6 +118,18 @@ export const hi: BotPageCopy = {
       update: "बदल दिया",
       cancel: "रद्द कर दिया",
     },
+    headline: {
+      booked: "बुक हो गया",
+      registered: "रजिस्टर हो गया",
+      callback: "कॉलबैक का अनुरोध भेजा गया",
+      application: "आवेदन मिल गया",
+      order: "ऑर्डर हो गया",
+      request: "अनुरोध दर्ज हो गया",
+      sent: "टीम को भेज दिया",
+      saved: "सेव हो गया",
+      changed: "बदल दिया",
+      cancelled: "रद्द कर दिया",
+    },
   },
   embed: {
     close: "बंद करें",

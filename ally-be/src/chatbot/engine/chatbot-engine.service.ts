@@ -97,6 +97,8 @@ export const AGENT_PROMPT_CODES = [
   // When the crisis check finds the person upset, not at risk (Q3-fast Part 1).
   'ally_ai_agent_upset',
   'ally_ai_agent_upset_support',
+  // The numbers it may give an upset person, on every pack (Q4 G7).
+  'ally_ai_agent_upset_numbers',
   // What each kind of list tool adds, whatever the purpose (Q3-fast Part 2b).
   'ally_ai_agent_playbook_booking',
   'ally_ai_agent_playbook_details',

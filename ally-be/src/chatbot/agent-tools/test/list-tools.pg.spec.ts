@@ -279,7 +279,7 @@ describePg('List tools through the gateway (Postgres)', () => {
     );
     expect(taken.ok).toBe(false);
     expect(taken.error).toBe('unique_taken');
-    expect(taken.result!.message).toBe('That slot is already taken.');
+    expect(taken.result!.message).toMatch(/^That slot is already taken\. /);
     expect(taken.result!.passages).toHaveLength(3);
     expect(taken.result!.passages[0].title).toMatch(/^Slots: /);
     expect(
@@ -324,8 +324,8 @@ describePg('List tools through the gateway (Postgres)', () => {
     expect(cancelled.result!.passages[0].text).toContain('Status: cancelled');
     const back = await write('update_appointments', { id, status: 'booked' });
     expect(back).toMatchObject({ ok: false, error: 'transition_not_allowed' });
-    expect(back.result!.message).toBe(
-      "Appointments can't go from cancelled to booked.",
+    expect(back.result!.message).toMatch(
+      /^Appointments can't go from cancelled to booked\. /,
     );
   });
 
@@ -398,6 +398,34 @@ describePg('List tools through the gateway (Postgres)', () => {
       expect(asked.result!.question).toContain(slot.record_title);
       expect(asked.result!.question).toContain('for Alice');
       expect(await appointmentRows()).toEqual([]);
+    });
+
+    it('a booking for someone else names them and records both people (Q4 B13)', async () => {
+      const [slot] = await freeSlots(1);
+      const asked = await call(
+        'create_appointments',
+        {
+          slot: slot.record_id,
+          for_person: 'Lakshmi Rao',
+          person_name: 'Kiran',
+        },
+        { conversationId: 'conv-for-someone' },
+      );
+      expect(asked).toMatchObject({ ok: false, error: 'needs_confirmation' });
+      expect(asked.result!.question).toContain('for Lakshmi Rao');
+      const booked = await write(
+        'create_appointments',
+        {
+          slot: slot.record_id,
+          for_person: 'Lakshmi Rao',
+          person_name: 'Kiran',
+        },
+        { conversationId: 'conv-for-someone' },
+      );
+      expect(booked.ok).toBe(true);
+      const [row] = await appointmentRows();
+      expect(row.contact_id).toBe(alice);
+      expect(row.data.booked_for).toBe('Lakshmi Rao');
     });
 
     it('a yes covers only the entry it was asked about', async () => {

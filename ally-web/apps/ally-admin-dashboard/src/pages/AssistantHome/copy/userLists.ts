@@ -381,7 +381,8 @@ export const USER_LISTS = {
   },
 
   tryIt: {
-    testOnly: "Test only: this wasn't saved.",
+    // Q4 B4: the same words as the reply's own line.
+    testOnly: "Test only, not saved: Try it never saves bookings or details.",
   },
 
   purpose: {

@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 from app.core.agent_runtime.check.safety import clinical_advice
 from app.core.builder import catalogue, purposes
+from app.core.builder.flow import proposed
 from app.core.builder.grounding import sample_grounded, split_turn, ungrounded
 from app.core.builder.prompt import (
     format_answers,
@@ -174,7 +175,7 @@ async def extract(request: ExtractRequest) -> ExtractResponse:
         facts=facts,
         dropped=dropped,
         findings=findings(facts),
-        business_name=" ".join(out.business_name.split())[:120],
+        business_name=proposed(" ".join(out.business_name.split()))[:120],
     )
 
 
@@ -338,7 +339,40 @@ async def propose_purposes(
             sample=[],
         )
     )
+    if request.industry in PEOPLE_INDUSTRIES:
+        cards = [_for_people(card) for card in cards]
     return cards
+
+
+#: Health and non-profit organisations serve people, not customers (Q4 B10).
+PEOPLE_INDUSTRIES = {
+    "mental_health",
+    "gp_clinic",
+    "diagnostic_lab",
+    "pharmacy",
+    "non_profit",
+}
+_CUSTOMERS = re.compile(r"\b([Cc])ustomer(s?)\b")
+
+
+def _people(text: str) -> str:
+    return _CUSTOMERS.sub(
+        lambda m: ("P" if m.group(1) == "C" else "p")
+        + ("eople" if m.group(2) else "erson"),
+        text,
+    )
+
+
+def _for_people(card: DesignCard) -> DesignCard:
+    """The card with "people" for "customers" (Q4 B10: "Bring in people")."""
+    return card.model_copy(
+        update={
+            "title": _people(card.title),
+            "best_for": _people(card.best_for),
+            "will": [_people(line) for line in card.will],
+            "wont": [_people(line) for line in card.wont],
+        }
+    )
 
 
 #: A visitor line about risk or an emergency (Q4 3c), in English, Hindi and Hinglish.

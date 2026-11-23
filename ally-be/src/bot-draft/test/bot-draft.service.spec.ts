@@ -447,6 +447,26 @@ describe('BotDraftService', () => {
     expect(again.safetyPack).toBe(SafetyPackId.MENTAL_HEALTH);
   });
 
+  it('never writes a placeholder ("unchanged") as a name (Q4 N1)', async () => {
+    const h = harness();
+    const draft = h.draft();
+    const { draft: after } = await h.service.applyPatch(
+      draft,
+      [
+        { op: 'replace', path: '/assistantName', value: 'unchanged' },
+        { op: 'replace', path: '/name', value: 'unchanged' },
+        { op: 'replace', path: '/introduction', value: 'Hello there.' },
+      ],
+      BotDraftActor.BUILDER,
+      { target: 'draft' },
+    );
+    expect(after.draftConfig.assistantName).toBe(
+      draft.draftConfig.assistantName,
+    );
+    expect(after.draftConfig.name).toBe(draft.draftConfig.name);
+    expect(after.draftConfig.introduction).toBe('Hello there.');
+  });
+
   describe('the owner corrects the pack in setup (Q4 A3)', () => {
     const onMentalHealth = async () => {
       const h = harness();
