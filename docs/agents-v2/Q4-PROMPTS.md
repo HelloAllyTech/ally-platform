@@ -229,22 +229,26 @@ No variables change.
 - **C16:** "(see source)", "(see policy)", "(citation 7)", "(entries 4, 5, 6)", "[cite 9]", "…cited below." and a dangling "(देखें:" are removed from every reply.
 - **C19:** covered by key facts (the contact, email and fees are always in context); no separate change.
 
-## E. Fourth group, for approval (3b, G+12)
+## E. Fourth group (3b, G+12)
+
+> **Approved by Shehbaz on 23 Nov 2026 with edits (below), in the code.**
 
 ### E1. A request for a diagnosis (ally-be `caring-decline.ts`, fixed text), item 3b
 
-**Why:** "Can you tell me if I have depression?" on iCall got "I don't know the answer to that; please contact the team at 022-25521111" at the Q4 measurement. In code (done, used locally until approved): a decline to a request for a diagnosis ("do I have…", "am I depressed", "kya mujhe … hai", "क्या मुझे … है") gets this instead of the generic decline wording.
+**Why:** "Can you tell me if I have depression?" on iCall got "I don't know the answer to that; please contact the team at 022-25521111" at the Q4 measurement. A decline to a request for a diagnosis ("do I have…", "am I depressed", "kya mujhe … hai", "क्या मुझे … है") gets this instead of the generic decline wording.
 
-- English: "I can't tell you whether you have that: only a doctor or mental health professional can assess it. If you'd like to talk it through, you can reach {organisation} on {contact}. If you're struggling right now, you can call Tele-MANAS on 14416 (free, 24×7)."
-- Hindi: "मैं यह नहीं बता सकता कि आपको यह है या नहीं: इसकी जाँच सिर्फ़ डॉक्टर या मानसिक स्वास्थ्य विशेषज्ञ कर सकते हैं। अगर आप बात करना चाहें, तो {organisation} से {contact} पर संपर्क कर सकते हैं। अगर अभी मुश्किल हो रही है, तो Tele-MANAS को 14416 पर कॉल करें (मुफ़्त, 24×7)।"
-- Hinglish: "Main yeh nahi bata sakta ki aapko yeh hai ya nahi: iski jaanch sirf doctor ya mental health professional kar sakte hain. Agar aap baat karna chahein, toh {organisation} se {contact} par sampark kar sakte hain. Agar abhi mushkil ho rahi hai, toh Tele-MANAS ko 14416 par call karein (free, 24×7)."
+**As approved (edits):** on every pack, "a doctor or a qualified professional"; on a mental-health pack, "a doctor or mental health professional". The Tele-MANAS sentence only on a mental-health or young-people pack, or when the condition asked about is a mental-health one. With no contact, the "you can reach" sentence is left out.
+
+- English: "I can't tell you whether you have that: only {a doctor or a qualified professional | a doctor or mental health professional} can assess it." + " If you'd like to talk it through, you can reach {organisation} on {contact}." + " If you're struggling right now, you can call Tele-MANAS on 14416 (free, 24×7)."
+- Hindi: "मैं यह नहीं बता सकता कि आपको यह है या नहीं: इसकी जाँच सिर्फ़ {डॉक्टर या योग्य विशेषज्ञ | डॉक्टर या मानसिक स्वास्थ्य विशेषज्ञ} कर सकते हैं।" + " अगर आप बात करना चाहें, तो {organisation} से {contact} पर संपर्क कर सकते हैं।" + " अगर अभी मुश्किल हो रही है, तो Tele-MANAS को 14416 पर कॉल करें (मुफ़्त, 24×7)।"
+- Hinglish: "Main yeh nahi bata sakta ki aapko yeh hai ya nahi: iski jaanch sirf {doctor ya qualified professional | doctor ya mental health professional} kar sakte hain." + " Agar aap baat karna chahein, toh {organisation} se {contact} par sampark kar sakte hain." + " Agar abhi mushkil ho rahi hai, toh Tele-MANAS ko 14416 par call karein (free, 24×7)."
 
 ### E2. Graded urgency on medical packs (`knowledge/crisis_classify.txt` and the Medical pack's rules), item G+12
 
-**Why:** Round 8 (Jaipur Foot): a red, swollen, oozing stump got "go to the emergency department now". It needs a doctor today, not the emergency reply. Not in code until approved.
+**Why:** Round 8 (Jaipur Foot): a red, swollen, oozing stump got "go to the emergency department now". It needs a doctor today, not the emergency reply. **Approved with one guard (the last sentence of the classifier paragraph); in the code, Medical pack version 4.** Must-pass cases b2-u12a and b2-u12b.
 
 **`crisis_classify.txt`, new paragraph after the `emergency` list:**
-> Not an emergency: something that needs a doctor soon but isn't a danger right now, such as a wound or stump that is red, swollen or oozing, a mild fever, or a pain that has lasted days. Choose `upset` if they're worried, otherwise `none`.
+> Not an emergency: something that needs a doctor soon but isn't a danger right now, such as a wound or stump that is red, swollen or oozing, a mild fever, or a pain that has lasted days. Choose `upset` if they're worried, otherwise `none`. Unless it is chest pain, trouble breathing, heavy bleeding, sudden weakness or confusion, or they say it is getting rapidly worse: those stay emergency.
 
 **Medical pack, new rule (`safety-packs.ts`, the pack's version goes up):**
 > When something needs a doctor soon but isn't an emergency now (a wound that is red, swollen or oozing), say to see a doctor today, and to go to emergency or call 112 if they get a fever, the redness spreads, or they feel very unwell. Never tell them it's nothing to worry about.

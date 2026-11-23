@@ -896,6 +896,7 @@ export class ChatbotEngineService {
       language: replyLanguageOf(turn.text, turn.language),
       organisation: turn.chatbot.name,
       contact,
+      pack: turn.chatbot.safetyPack,
     });
     if (caring) {
       return { ...turn, settings: { ...turn.settings, declineText: caring } };

@@ -95,7 +95,7 @@ export const SAFETY_PACKS: Record<SafetyPackId, SafetyPack> = {
   },
   [SafetyPackId.MEDICAL]: {
     id: SafetyPackId.MEDICAL,
-    version: 3, // Q3-fast: the business's own published information may be answered
+    version: 4, // Q4 G+12 (E2): graded urgency, a doctor today when it isn't an emergency now
     name: 'Medical safety',
     industryLabel: 'healthcare providers',
     builderMessage:
@@ -114,6 +114,8 @@ export const SAFETY_PACKS: Record<SafetyPackId, SafetyPack> = {
       // 18–25 weeks") is information the business published, not advice.
       "General information the business itself publishes (its FAQs, guides and service pages), asked about in general terms, may be shared with its source. A question about the person's own result, symptom, medicine or dose is still a clinical question.",
       'If someone describes urgent symptoms, tell them to contact emergency care now.',
+      // Q4 G+12 (E2, approved 23 Nov; Jaipur Foot: a red, oozing stump got "go to emergency now").
+      "When something needs a doctor soon but isn't an emergency now (a wound that is red, swollen or oozing), say to see a doctor today, and to go to emergency or call 112 if they get a fever, the redness spreads, or they feel very unwell. Never tell them it's nothing to worry about.",
       'Refer every clinical question to the team, using the contact details you were given.',
       GROUNDING_RULE,
       ...cleanDecline('their doctor'),

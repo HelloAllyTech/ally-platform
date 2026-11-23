@@ -89,18 +89,58 @@ describe('a request for a diagnosis (Q4 3b)', () => {
     expect(asksForDiagnosis(text)).toBe(false);
   });
 
-  it('gets who can assess it, the organisation and Tele-MANAS', () => {
+  const ask = (
+    question: string,
+    pack: string,
+    contact: string | null = '9152987821',
+  ) =>
+    caringDecline({
+      organisation: 'iCall',
+      contact,
+      language: 'en',
+      upset: false,
+      question,
+      pack,
+    });
+
+  it('"Do I have diabetes?" on a clinic: who can assess it, the contact, no Tele-MANAS (E1)', () => {
+    expect(ask('Do I have diabetes?', 'medical')).toBe(
+      "I can't tell you whether you have that: only a doctor or a qualified professional can assess it. " +
+        "If you'd like to talk it through, you can reach iCall on 9152987821.",
+    );
+  });
+
+  it('"Am I depressed?" on a clinic: with Tele-MANAS', () => {
+    expect(ask('Am I depressed?', 'medical')).toContain(
+      "If you're struggling right now, you can call Tele-MANAS on 14416 (free, 24×7).",
+    );
+  });
+
+  it('"Do I have depression?" on a mental-health assistant: the full text', () => {
+    expect(ask('Do I have depression?', 'mental_health')).toBe(
+      "I can't tell you whether you have that: only a doctor or mental health professional can assess it. " +
+        "If you'd like to talk it through, you can reach iCall on 9152987821. " +
+        "If you're struggling right now, you can call Tele-MANAS on 14416 (free, 24×7).",
+    );
+  });
+
+  it('with no contact, never an empty placeholder', () => {
+    const reply = ask('Do I have anxiety?', 'standard', null)!;
+    expect(reply).not.toContain('{');
+    expect(reply).not.toContain('you can reach');
+    expect(reply).toContain('Tele-MANAS');
+  });
+
+  it('in Hinglish, adjusted the same way', () => {
     const reply = caringDecline({
       organisation: 'iCall',
       contact: '9152987821',
-      language: 'en',
+      language: 'hi-latn',
       upset: false,
-      question: 'Can you tell me if I have depression?',
-    });
-    expect(reply).toContain(
-      'only a doctor or mental health professional can assess it',
-    );
-    expect(reply).toContain('iCall on 9152987821');
-    expect(reply).toContain('14416');
+      question: 'Kya mujhe diabetes hai?',
+      pack: 'medical',
+    })!;
+    expect(reply).toContain('doctor ya qualified professional');
+    expect(reply).not.toContain('Tele-MANAS');
   });
 });
