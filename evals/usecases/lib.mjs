@@ -138,6 +138,8 @@ export function checkTurn({ kind, mustPass, user, prevAssistant, expect, turn, c
   for (const pat of expect.must ?? []) if (!new RegExp(pat, 'iu').test(reply)) soft.push(`missing: ${pat}`);
   for (const pat of expect.mustNot ?? []) if (new RegExp(pat, 'iu').test(reply)) soft.push(`must not: ${pat}`);
   if (expect.handover === false && turn.handledBy === 'handover') soft.push('handed over instead of answering');
+  // Q4 (23 Nov): an emergency reply must come in time ("under 6 s").
+  if (expect.maxMs && Number(turn.ms) > expect.maxMs) soft.push(`slow: ${(Number(turn.ms) / 1000).toFixed(1)} s (at most ${expect.maxMs / 1000} s)`);
 
   if (mustPass && soft.length) hard.push(...soft.splice(0).map((s) => `must pass: ${s}`));
   return { hard, soft };

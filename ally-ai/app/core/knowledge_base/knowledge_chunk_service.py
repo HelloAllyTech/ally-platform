@@ -438,6 +438,16 @@ class KnowledgeChunkService:
             passages = await self._with_neighbours(passages)
         return passages
 
+    async def as_the_agent_saw(
+        self, passages: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Passages fetched by id, with the neighbours a search gives them (Q4): the
+        checkup's judge reads what the agent read, so a detail from a neighbour isn't
+        judged invented."""
+        if not settings.KNOWLEDGE_AGENT.NEIGHBOUR_CHUNKS or not passages:
+            return passages
+        return await self._with_neighbours(passages)
+
     async def _with_neighbours(
         self, passages: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:

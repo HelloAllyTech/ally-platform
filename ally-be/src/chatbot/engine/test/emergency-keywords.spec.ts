@@ -1,4 +1,4 @@
-import { emergencyByKeywords } from '../emergency-keywords';
+import { emergencyByKeywords, lifeThreatening } from '../emergency-keywords';
 
 describe('emergency keywords, for when the crisis classifier fails (chunk H1)', () => {
   it.each([
@@ -93,13 +93,17 @@ describe('medical and maternity emergencies when the classifier fails (Q4 A1)', 
     ).not.toBeNull();
   });
 
-  it('only on a medical assistant; the eye rules stay on every assistant', () => {
+  it('life-threatening rules on every assistant (Q4, 23 Nov); maternity only on a medical one', () => {
     expect(
       emergencyByKeywords("He can't breathe properly", 'standard'),
-    ).toBeNull();
-    expect(emergencyByKeywords("He can't breathe properly")).toBeNull();
+    ).not.toBeNull();
+    expect(emergencyByKeywords("He can't breathe properly")).not.toBeNull();
     expect(
       emergencyByKeywords('I splashed bleach in my eye', 'standard'),
+    ).not.toBeNull();
+    expect(emergencyByKeywords('My waters have broken', 'standard')).toBeNull();
+    expect(
+      emergencyByKeywords('My waters have broken', 'medical'),
     ).not.toBeNull();
   });
 
@@ -115,5 +119,40 @@ describe('medical and maternity emergencies when the classifier fails (Q4 A1)', 
     'मैं थक के मर गया हूँ, कल सुबह क्लिनिक कितने बजे खुलता है?',
   ])('a look-alike is never an emergency: %s', (text) => {
     expect(emergencyByKeywords(text, 'medical')).toBeNull();
+  });
+});
+
+describe('life-threatening emergencies decide on their own, on every assistant (Q4, 23 Nov)', () => {
+  it.each([
+    "Someone collapsed in the hub and isn't breathing",
+    'A man just collapsed near the reception',
+    'My father is unconscious and not waking up',
+    'A child is choking on a coin',
+    'He is bleeding heavily from his head',
+    'My mother has chest pain right now',
+    'She is having a seizure',
+    'My friend took 20 sleeping pills',
+    "Her face is drooping and she can't speak properly",
+    'The kitchen is on fire',
+    'Someone was stabbed outside the centre',
+    'Koi behosh ho gaya hai, saans nahi le raha',
+    'आग लग गई है',
+  ])('an emergency: %s', (text) => {
+    expect(lifeThreatening(text)).toMatchObject({
+      is_crisis: true,
+      level: 'emergency',
+    });
+  });
+
+  it.each([
+    'The deal collapsed last week',
+    'What is a seizure?',
+    'Do you offer fire safety training?',
+    'Do you have a first-aid kit at the hub?',
+    'Our sales collapsed this quarter, can you help?',
+    'I am dying to see you',
+    'This deadline is killing me lol',
+  ])('not an emergency: %s', (text) => {
+    expect(lifeThreatening(text)).toBeNull();
   });
 });

@@ -58,7 +58,7 @@ import { businessFacts } from './business-facts';
 import { agentAnswersInstead, isGreetingReply } from './keyword-skip';
 import { buildKnowledgeRequest, NO_DOCUMENTS } from './knowledge-request';
 import { stageLine, stageRunIdFor } from './agent-stage-log';
-import { emergencyByKeywords } from './emergency-keywords';
+import { emergencyByKeywords, lifeThreatening } from './emergency-keywords';
 import { caringDecline } from './caring-decline';
 import { crisisHelplines } from './crisis-helplines';
 import { replyLanguageOf } from './reply-language';
@@ -627,14 +627,24 @@ export class ChatbotEngineService {
       }
       return verdict;
     };
-    const crisisCheck: Promise<CrisisCheckResponse | null> = classifier.then(
-      (verdict) => (verdict?.failed ? (byKeywords() ?? verdict) : verdict),
-      (error: unknown) => {
-        const verdict = byKeywords();
-        if (verdict) return verdict;
-        throw error;
-      },
-    );
+    // Q4: a life-threatening emergency by the keyword rules decides at once, on any assistant,
+    // whatever the classifier says (it missed "someone collapsed in the hub and isn't breathing").
+    const urgent = lifeThreatening(turn.text);
+    if (urgent) {
+      this.logger.warn(
+        `Life-threatening emergency rule matched for chatbot ${turn.chatbot.id}; the emergency reply goes out`,
+      );
+    }
+    const crisisCheck: Promise<CrisisCheckResponse | null> = urgent
+      ? Promise.resolve(urgent)
+      : classifier.then(
+          (verdict) => (verdict?.failed ? (byKeywords() ?? verdict) : verdict),
+          (error: unknown) => {
+            const verdict = byKeywords();
+            if (verdict) return verdict;
+            throw error;
+          },
+        );
     if (settings.crisisClassifierEnabled) {
       this.logger.info(stageLine(runKey, startedAt, 'crisis_check_start'));
       crisisCheck.then(

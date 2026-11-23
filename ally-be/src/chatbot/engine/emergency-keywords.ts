@@ -57,20 +57,68 @@ const HEAVY_BLEEDING = String.raw`(?:bleeding (?:heavily|a lot|badly|won'?t stop
 const near = (a: string, b: string) =>
   new RegExp(`${a}${NEAR}${b}|${b}${NEAR}${a}`, 'iu');
 
-/** Medical and maternity rules (Q4 A1), by what they are, for the tests and the signal. */
-export const MEDICAL_RULES: RegExp[] = [
-  near(CHEST, NOW),
+/** Someone: a person the emergency is happening to. */
+const PERSON = String.raw`(?<![\p{L}\p{M}])(?:someone|somebody|some(?:one|body) here|a (?:man|woman|lady|guy|person|child|kid|boy|girl|baby|colleague|customer|member|visitor|student|patient|volunteer|worker|staff member)|he|she|they|him|her|my (?:\w+ )?(?:father|mother|dad|mum|mom|son|daughter|wife|husband|brother|sister|friend|baby|child|grandfather|grandmother|colleague)|papa|mummy|bhai|behen|koi|dadi|dada|nani|nana|wo|woh|vo|use|unhe|uncle|aunty|bete|beta|beti|bachcha|bachche|baccha|bacche|ladka|ladki|कोई|बेटे|बेटा|बेटी|बच्चा|बच्चे|पापा|मम्मी|दादी|दादा|नानी|नाना|वो|वह|उसे|उन्हें|उनको)(?![\p{L}\p{M}])`;
+const CHOKING = String.raw`(?:choking|choked|(?:something|food|a coin|a bone) (?:is )?stuck in (?:his|her|my|their|the) throat|gale me(?:in)? (?:kuch )?atak|गले में (?:कुछ )?अटक)`;
+const FIRE = String.raw`(?:(?:is|are|caught) on fire|fire (?:in|at) (?:the|our|my)|(?:a|the) fire (?:broke out|has started)|building is burning|aag lag|आग लग)`;
+const ATTACKED = String.raw`(?:(?:being |been |was |got )?(?:attacked|stabbed|assaulted)|beaten (?:up|badly)|(?:badly|seriously|very badly) (?:injured|hurt)|hit by a (?:car|bike|bus|truck|vehicle)|maar (?:diya|rahe|raha)|chaku (?:maar|mara)|हमला|चाकू मार)`;
+
+/**
+ * Life-threatening emergencies (Q4, approved 23 Nov): on every assistant, whatever its pack, and
+ * they decide on their own (`lifeThreatening`): a coworking hub's "someone collapsed in the hub
+ * and isn't breathing" went to an answer when the classifier missed it. Each needs a person or a
+ * sign it's happening now, so "the deal collapsed" or "what is a seizure?" stays a question.
+ */
+export const LIFE_RULES: RegExp[] = [
   new RegExp(BREATHING, 'iu'),
-  new RegExp(UNCONSCIOUS, 'iu'),
-  new RegExp(SEIZURE, 'iu'),
+  near(PERSON, UNCONSCIOUS),
+  new RegExp(CHOKING, 'iu'),
+  new RegExp(HEAVY_BLEEDING, 'iu'),
+  near(CHEST, NOW),
+  near(PERSON, SEIZURE),
   new RegExp(POISON, 'iu'),
   new RegExp(STROKE, 'iu'),
   new RegExp(SEVERE_BURN, 'iu'),
-  new RegExp(HEAVY_BLEEDING, 'iu'),
+  new RegExp(FIRE, 'iu'),
+  new RegExp(ATTACKED, 'iu'),
+];
+
+/** Maternity rules (Q4 A1): only on a medical assistant. */
+export const MEDICAL_RULES: RegExp[] = [
   new RegExp(WATERS, 'iu'),
   near(PREGNANT, PREG_BLEEDING),
   new RegExp(BABY_STILL, 'iu'),
 ];
+
+function verdictFrom(
+  rules: RegExp[],
+  said: string,
+): CrisisCheckResponse | null {
+  for (const rule of rules) {
+    const match = rule.exec(said);
+    if (match) {
+      return {
+        is_crisis: true,
+        level: 'emergency',
+        signal: match[0].trim().slice(0, 200),
+        confidence: 1,
+        failed: false,
+      } as CrisisCheckResponse;
+    }
+  }
+  return null;
+}
+
+/**
+ * A life-threatening emergency by the keyword rules, on any assistant: it decides without the
+ * classifier, so the emergency reply goes out at once.
+ */
+export function lifeThreatening(
+  text: string | null | undefined,
+): CrisisCheckResponse | null {
+  const said = (text ?? '').trim();
+  return said ? verdictFrom(LIFE_RULES, said) : null;
+}
 
 /** The packs whose assistants get the medical and maternity rules (Q4 A1). */
 export const MEDICAL_PACKS = new Set(['medical', 'pharmacy']);
@@ -87,19 +135,7 @@ export function emergencyByKeywords(
   const said = (text ?? '').trim();
   if (!said) return null;
   const rules = MEDICAL_PACKS.has(String(pack ?? ''))
-    ? [...RULES, ...MEDICAL_RULES]
-    : RULES;
-  for (const rule of rules) {
-    const match = rule.exec(said);
-    if (match) {
-      return {
-        is_crisis: true,
-        level: 'emergency',
-        signal: match[0].trim().slice(0, 200),
-        confidence: 1,
-        failed: false,
-      };
-    }
-  }
-  return null;
+    ? [...RULES, ...LIFE_RULES, ...MEDICAL_RULES]
+    : [...RULES, ...LIFE_RULES];
+  return verdictFrom(rules, said);
 }

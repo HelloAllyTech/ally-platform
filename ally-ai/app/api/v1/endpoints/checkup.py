@@ -43,6 +43,8 @@ async def grade(
         found = await asyncio.gather(
             *(service.chunk_service.get(chunk_id) for chunk_id in chunk_ids)
         )
+        # With the neighbours the search gave them (Q4), as the agent read them.
+        found = await service.chunk_service.as_the_agent_saw([p for p in found if p])
         return await grade_case(
             payload.case,
             payload.observed,

@@ -71,3 +71,10 @@ async def test_off_or_failing_leaves_the_passages_as_found(service, monkeypatch)
     db.chunks_at.reset_mock()
     await svc.search("Who heads oculoplasty?", ANY_AUDIENCE)
     db.chunks_at.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_the_judge_reads_a_passage_with_its_neighbours(service):
+    svc, db = service
+    [p] = await svc.as_the_agent_saw([svc._to_passage({**chunk(74, PAGE[74])})])
+    assert p["text"].startswith("Dr Priti Udhay\nHead - Oculoplasty")
