@@ -280,3 +280,36 @@ export interface LearnerCoursesData {
     lastActivityAt: string | null;
   }>;
 }
+
+/** TSQ-042 */
+export interface CoursePerformanceData {
+  weeks: Array<{ week: string; started: number; completed: number }>;
+  enrolled: number;
+  completed: number;
+}
+
+/** TSQ-045 */
+export interface ModuleFunnelData {
+  rows: Array<{ sectionId: string; title: string; reached: number; completed: number }>;
+}
+
+/** TSQ-046 */
+export interface ModuleTimeData {
+  rows: Array<{ sectionId: string; title: string; medianMinutes: number; learners: number }>;
+}
+
+/** TSQ-053 */
+export interface RoleplayAttemptsData {
+  rows: Array<{
+    itemId: string;
+    title: string;
+    learners: number;
+    averageAttempts: number | null;
+    averageMinutes: number | null;
+  }>;
+}
+
+/** TSQ-065 */
+export interface SkillTrendData {
+  skills: Array<{ skill: string; points: Array<{ slice: number; level: number }> }>;
+}

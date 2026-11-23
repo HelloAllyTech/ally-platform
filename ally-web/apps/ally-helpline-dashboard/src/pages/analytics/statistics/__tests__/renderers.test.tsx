@@ -82,6 +82,13 @@ describe("every offered chart has a renderer", () => {
       "TSQ-043",
       "TSQ-063",
       "TSQ-064",
+      "TSQ-038",
+      "TSQ-039",
+      "TSQ-042",
+      "TSQ-045",
+      "TSQ-046",
+      "TSQ-053",
+      "TSQ-065",
       "TSQ-027",
     ].forEach(id => expect(CHART_RENDERERS[id], id).toBeDefined());
   });
@@ -112,6 +119,11 @@ describe("empty states say so plainly", () => {
     ["TSQ-024", { rows: [] }, "skills.none"],
     ["TSQ-043", { bins: [], boundsDays: [1, 3], completed: 0, medianDays: null }, "finish.none"],
     ["TSQ-064", { rows: [] }, "courses.none"],
+    ["TSQ-042", { weeks: [], enrolled: 0, completed: 0 }, "performance.none"],
+    ["TSQ-045", { rows: [] }, "modules.none"],
+    ["TSQ-046", { rows: [] }, "modules.timeNone"],
+    ["TSQ-053", { rows: [] }, "roleplay.none"],
+    ["TSQ-065", { skills: [] }, "skillTrend.none"],
   ])("%s", (id, data, key) => {
     draw(id as string, data);
     expect(screen.getByText(new RegExp(`statisticsLibrary\\.${key}`))).toBeTruthy();
@@ -359,5 +371,105 @@ describe("headline tiles", () => {
   it("shows no change line when there is nothing to compare with", () => {
     draw("TSQ-001", { ...base, previous: null });
     expect(screen.queryByTestId("statistics-headline-active-change")).toBeNull();
+  });
+});
+
+describe("the remaining release-set charts", () => {
+  it("TSQ-038 says how many courses are live", () => {
+    const data = {
+      measures: [
+        { key: "courses", value: 6, format: "count" },
+        { key: "live", value: 4, format: "count" },
+      ],
+    };
+    draw("TSQ-038", data);
+    expect(screen.getByTestId("statistics-measures")).toBeTruthy();
+    expect(takeaway("TSQ-038", data)).toContain('"live":4');
+  });
+
+  it("TSQ-039 names how many learners are on a course", () => {
+    const data = {
+      measures: [
+        { key: "learnersOnCourses", value: 12, format: "count" },
+        { key: "inProgress", value: 7, format: "count" },
+      ],
+    };
+    expect(takeaway("TSQ-039", data)).toContain('"inProgress":7');
+  });
+
+  it("TSQ-042 reports finished enrolments out of all of them", () => {
+    const data = {
+      weeks: [{ week: "2026-11-02", started: 5, completed: 2 }],
+      enrolled: 5,
+      completed: 2,
+    };
+    draw("TSQ-042", data);
+    expect(screen.getByTestId("statistics-course-performance")).toBeTruthy();
+    expect(takeaway("TSQ-042", data)).toContain('"completed":2');
+  });
+
+  it("TSQ-045 points at the module where most learners stop", () => {
+    const data = {
+      rows: [
+        { sectionId: "a", title: "Basics", reached: 10, completed: 9 },
+        { sectionId: "b", title: "Listening", reached: 9, completed: 3 },
+      ],
+    };
+    draw("TSQ-045", data);
+    expect(screen.getByTestId("statistics-module-funnel")).toBeTruthy();
+    expect(takeaway("TSQ-045", data)).toContain("Listening");
+  });
+
+  it("TSQ-045 says learners finish what they start when nobody stalls", () => {
+    const data = { rows: [{ sectionId: "a", title: "Basics", reached: 4, completed: 4 }] };
+    expect(takeaway("TSQ-045", data)).toBe("statisticsLibrary.takeaway.moduleClear");
+  });
+
+  it("TSQ-046 names the slowest module", () => {
+    const data = {
+      rows: [
+        { sectionId: "a", title: "Basics", medianMinutes: 20, learners: 5 },
+        { sectionId: "b", title: "Practice", medianMinutes: 300, learners: 4 },
+      ],
+    };
+    draw("TSQ-046", data);
+    expect(screen.getByTestId("statistics-module-time")).toBeTruthy();
+    expect(takeaway("TSQ-046", data)).toContain("Practice");
+  });
+
+  it("TSQ-053 names the roleplay that takes the most tries", () => {
+    const data = {
+      rows: [
+        { itemId: "a", title: "First call", learners: 6, averageAttempts: 1.2, averageMinutes: 8 },
+        { itemId: "b", title: "Hard call", learners: 3, averageAttempts: 3.5, averageMinutes: 11 },
+      ],
+    };
+    draw("TSQ-053", data);
+    expect(screen.getByTestId("statistics-roleplay-attempts")).toBeTruthy();
+    expect(takeaway("TSQ-053", data)).toContain("Hard call");
+  });
+
+  it("TSQ-065 reports the skill that rose the most", () => {
+    const data = {
+      skills: [
+        {
+          skill: "empathy",
+          points: [
+            { slice: 1, level: 2 },
+            { slice: 2, level: 4 },
+          ],
+        },
+        {
+          skill: "probing",
+          points: [
+            { slice: 1, level: 3 },
+            { slice: 2, level: 3 },
+          ],
+        },
+      ],
+    };
+    draw("TSQ-065", data);
+    expect(screen.getByTestId("statistics-skill-trend")).toBeTruthy();
+    expect(takeaway("TSQ-065", data)).toContain('"latest":4');
   });
 });

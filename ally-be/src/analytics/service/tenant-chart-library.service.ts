@@ -32,7 +32,10 @@ import {
   ScopeOption,
   TenantScopeOptionsRepository,
 } from '../repository/tenant-scope-options.repository';
-import { TenantScopeSummaryRepository } from '../repository/tenant-scope-summary.repository';
+import {
+  MeasuresData,
+  TenantScopeSummaryRepository,
+} from '../repository/tenant-scope-summary.repository';
 import { TenantOutcomesRepository } from '../repository/tenant-outcomes.repository';
 import {
   SESSION_LENGTH_BOUNDS_MINUTES,
@@ -318,6 +321,29 @@ export class TenantChartLibraryService {
         this.summaryRepo.getCourseFacts(tenantId, code, this.requireCourse(p)),
       'TSQ-043': (tenantId, p, code) =>
         this.summaryRepo.getTimeToFinish(tenantId, code, this.requireCourse(p)),
+      // How many courses there are, and how many are live.
+      'TSQ-038': (tenantId) => this.coursesByStatus(tenantId),
+      // How many learners are on courses right now.
+      'TSQ-039': (tenantId, _p, code) =>
+        this.summaryRepo.getCourseParticipation(tenantId, code),
+      // Enrolments begun and finished each week, for every course or one.
+      'TSQ-042': (tenantId, p, code) =>
+        this.summaryRepo.getCoursePerformance(tenantId, code, p.courseId),
+      // Where learners drop off, and how long each module takes, in one course.
+      'TSQ-045': (tenantId, p, code) =>
+        this.summaryRepo.getModuleFunnel(tenantId, code, this.requireCourse(p)),
+      'TSQ-046': (tenantId, p, code) =>
+        this.summaryRepo.getModuleTime(tenantId, code, this.requireCourse(p)),
+      // Each roleplay in a course: finishers, tries and session length.
+      'TSQ-053': (tenantId, p, code) =>
+        this.summaryRepo.getRoleplayAttempts(
+          tenantId,
+          code,
+          this.requireCourse(p),
+        ),
+      // One learner's level in each skill over time.
+      'TSQ-065': (tenantId, p, code) =>
+        this.summaryRepo.getSkillTrend(tenantId, code, this.requireLearner(p)),
       // One learner's practice and where they are in each course.
       'TSQ-063': (tenantId, p, code) => {
         const { start, endExclusive } = this.windowFor(
@@ -843,6 +869,21 @@ export class TenantChartLibraryService {
       start,
       endExclusive,
     );
+  }
+
+  /** Courses by where they stand: all, live, still in draft, archived. */
+  private async coursesByStatus(tenantId: string): Promise<MeasuresData> {
+    const { rows } = await this.allCourses(tenantId);
+    const count = (status: string) =>
+      rows.filter((c) => String(c.status).toUpperCase() === status).length;
+    return {
+      measures: [
+        { key: 'courses', value: rows.length, format: 'count' },
+        { key: 'live', value: count('ACTIVE'), format: 'count' },
+        { key: 'draft', value: count('DRAFT'), format: 'count' },
+        { key: 'archived', value: count('ARCHIVED'), format: 'count' },
+      ],
+    };
   }
 
   /** Every course for the tenant, read once. `truncated` when there are more. */

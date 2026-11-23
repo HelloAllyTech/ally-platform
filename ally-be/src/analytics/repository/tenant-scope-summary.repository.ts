@@ -33,8 +33,64 @@ export interface LearnerCourseRow {
   lastActivityAt: string | null;
 }
 
+/** TSQ-042: enrolments started and completed, week by week, since the first one. */
+export interface CoursePerformanceData {
+  weeks: Array<{ week: string; started: number; completed: number }>;
+  enrolled: number;
+  completed: number;
+}
+
+/** TSQ-045: how many learners reached and finished each module of a course. */
+export interface ModuleFunnelData {
+  rows: Array<{
+    sectionId: string;
+    title: string;
+    reached: number;
+    completed: number;
+  }>;
+}
+
+/** TSQ-046: the typical elapsed time to finish each module. */
+export interface ModuleTimeData {
+  rows: Array<{
+    sectionId: string;
+    title: string;
+    medianMinutes: number;
+    learners: number;
+  }>;
+}
+
+/** TSQ-053: for each roleplay in a course, who finished it and how many tries it took. */
+export interface RoleplayAttemptsData {
+  rows: Array<{
+    itemId: string;
+    title: string;
+    learners: number;
+    averageAttempts: number | null;
+    averageMinutes: number | null;
+  }>;
+}
+
+/** TSQ-065: one learner's level in each skill on each scored practice slice. */
+export interface SkillTrendData {
+  skills: Array<{
+    skill: string;
+    points: Array<{ slice: number; level: number }>;
+  }>;
+}
+
 export const FINISH_BOUNDS_DAYS = [1, 3, 7, 14, 30];
 const LEARNER_COURSE_LIMIT = 20;
+const MODULE_LIMIT = 30;
+const SKILL_TREND_SLICES = 12;
+
+/** Learners only, never staff or suspended accounts: the same rule every course card uses. */
+const LEARNER_ONLY = `u.status != 'SUSPENDED'
+          AND EXISTS (
+                SELECT 1 FROM user_groups ug
+                JOIN groups g ON g.id = ug."groupId"
+                WHERE ug."userId" = u.id AND g.name = 'LEARNER'
+              )`;
 
 /**
  * Facts about one course or one learner, for the cards that are about a single
@@ -246,5 +302,276 @@ export class TenantScopeSummaryRepository {
         ? new Date(r.last_activity_at).toISOString()
         : null,
     }));
+  }
+
+  /** Who is on a course right now, across the organisation. */
+  async getCourseParticipation(
+    tenantId: string,
+    tenantCode: string,
+  ): Promise<MeasuresData> {
+    const rows: Array<{
+      learners: string;
+      in_progress: string;
+      not_started: string;
+      finished: string;
+    }> = await this.dataSource.query(
+      `SELECT COUNT(DISTINCT e."userId") AS learners,
+              COUNT(DISTINCT e."userId") FILTER (
+                WHERE e."completedAt" IS NULL AND (e."startedAt" IS NOT NULL OR e."completedItems" > 0)
+              ) AS in_progress,
+              COUNT(DISTINCT e."userId") FILTER (
+                WHERE e."completedAt" IS NULL AND e."startedAt" IS NULL AND e."completedItems" = 0
+              ) AS not_started,
+              COUNT(DISTINCT e."userId") FILTER (WHERE e."completedAt" IS NOT NULL) AS finished
+         FROM track_enrollments e
+         JOIN users u ON u.id = e."userId"
+        WHERE e."tenantId"::text IN ($1, $2)
+          AND e."deletedAt" IS NULL
+          AND ${LEARNER_ONLY}`,
+      [tenantId, tenantCode],
+    );
+    const r = rows[0];
+    return {
+      measures: [
+        {
+          key: 'learnersOnCourses',
+          value: Number(r?.learners ?? 0),
+          format: 'count',
+        },
+        {
+          key: 'inProgress',
+          value: Number(r?.in_progress ?? 0),
+          format: 'count',
+        },
+        {
+          key: 'notStarted',
+          value: Number(r?.not_started ?? 0),
+          format: 'count',
+        },
+        {
+          key: 'finishedACourse',
+          value: Number(r?.finished ?? 0),
+          format: 'count',
+        },
+      ],
+    };
+  }
+
+  /** Enrolments begun and finished each week since the first one, for every course or one. */
+  async getCoursePerformance(
+    tenantId: string,
+    tenantCode: string,
+    courseId?: string,
+  ): Promise<CoursePerformanceData> {
+    const params: unknown[] = [tenantId, tenantCode];
+    let course = '';
+    if (courseId) {
+      params.push(courseId);
+      course = `AND e."trackId" = $${params.length}::uuid`;
+    }
+    const rows: Array<{ week: Date; started: string; completed: string }> =
+      await this.dataSource.query(
+        `WITH events AS (
+           SELECT date_trunc('week', COALESCE(e."startedAt", e."createdAt")) AS week,
+                  1 AS started, 0 AS completed
+             FROM track_enrollments e JOIN users u ON u.id = e."userId"
+            WHERE e."tenantId"::text IN ($1, $2) AND e."deletedAt" IS NULL
+              AND ${LEARNER_ONLY} ${course}
+           UNION ALL
+           SELECT date_trunc('week', e."completedAt"), 0, 1
+             FROM track_enrollments e JOIN users u ON u.id = e."userId"
+            WHERE e."tenantId"::text IN ($1, $2) AND e."deletedAt" IS NULL
+              AND e."completedAt" IS NOT NULL
+              AND ${LEARNER_ONLY} ${course}
+         )
+         SELECT week, SUM(started) AS started, SUM(completed) AS completed
+           FROM events GROUP BY week ORDER BY week`,
+        params,
+      );
+    const weeks = rows.map((r) => ({
+      week: new Date(r.week).toISOString().slice(0, 10),
+      started: Number(r.started),
+      completed: Number(r.completed),
+    }));
+    return {
+      weeks,
+      enrolled: weeks.reduce((n, w) => n + w.started, 0),
+      completed: weeks.reduce((n, w) => n + w.completed, 0),
+    };
+  }
+
+  /** For each module of one course in order: learners who reached it and who finished all of it. */
+  async getModuleFunnel(
+    tenantId: string,
+    tenantCode: string,
+    courseId: string,
+  ): Promise<ModuleFunnelData> {
+    const rows: Array<{
+      section_id: string;
+      title: string;
+      reached: string;
+      completed: string;
+    }> = await this.dataSource.query(
+      `WITH per AS (
+         SELECT s.id AS section_id, s.title, s."order" AS ord, e.id AS enrolment,
+                COUNT(*) FILTER (WHERE p.status IN ('UNLOCKED', 'COMPLETED')) AS reached_items,
+                COUNT(*) FILTER (WHERE p.status = 'COMPLETED') AS done_items,
+                (SELECT COUNT(*) FROM track_items i2
+                  WHERE i2."trackSectionId" = s.id AND i2."deletedAt" IS NULL) AS total_items
+           FROM track_sections s
+           JOIN track_items i ON i."trackSectionId" = s.id AND i."deletedAt" IS NULL
+           JOIN track_item_progress p ON p."trackItemId" = i.id AND p."deletedAt" IS NULL
+           JOIN track_enrollments e ON e.id = p."trackEnrollmentId" AND e."deletedAt" IS NULL
+           JOIN users u ON u.id = e."userId"
+          WHERE s."trackId" = $3::uuid AND s."deletedAt" IS NULL
+            AND e."tenantId"::text IN ($1, $2)
+            AND ${LEARNER_ONLY}
+          GROUP BY s.id, s.title, s."order", e.id
+       )
+       SELECT section_id::text, title,
+              COUNT(*) FILTER (WHERE reached_items > 0) AS reached,
+              COUNT(*) FILTER (WHERE total_items > 0 AND done_items >= total_items) AS completed
+         FROM per GROUP BY section_id, title, ord
+        ORDER BY ord
+        LIMIT ${MODULE_LIMIT}`,
+      [tenantId, tenantCode, courseId],
+    );
+    return {
+      rows: rows.map((r) => ({
+        sectionId: r.section_id,
+        title: r.title,
+        reached: Number(r.reached),
+        completed: Number(r.completed),
+      })),
+    };
+  }
+
+  /** The typical time from first start to last finish in each module, for those who finished it. */
+  async getModuleTime(
+    tenantId: string,
+    tenantCode: string,
+    courseId: string,
+  ): Promise<ModuleTimeData> {
+    const rows: Array<{
+      section_id: string;
+      title: string;
+      median_minutes: string;
+      learners: string;
+    }> = await this.dataSource.query(
+      `WITH per AS (
+         SELECT s.id AS section_id, s.title, s."order" AS ord, e.id AS enrolment,
+                EXTRACT(EPOCH FROM (MAX(p."completedAt") - MIN(p."startedAt"))) / 60.0 AS minutes,
+                COUNT(*) FILTER (WHERE p.status = 'COMPLETED') AS done_items,
+                (SELECT COUNT(*) FROM track_items i2
+                  WHERE i2."trackSectionId" = s.id AND i2."deletedAt" IS NULL) AS total_items
+           FROM track_sections s
+           JOIN track_items i ON i."trackSectionId" = s.id AND i."deletedAt" IS NULL
+           JOIN track_item_progress p ON p."trackItemId" = i.id AND p."deletedAt" IS NULL
+           JOIN track_enrollments e ON e.id = p."trackEnrollmentId" AND e."deletedAt" IS NULL
+           JOIN users u ON u.id = e."userId"
+          WHERE s."trackId" = $3::uuid AND s."deletedAt" IS NULL
+            AND e."tenantId"::text IN ($1, $2)
+            AND ${LEARNER_ONLY}
+          GROUP BY s.id, s.title, s."order", e.id
+       )
+       SELECT section_id::text, title,
+              percentile_cont(0.5) WITHIN GROUP (ORDER BY minutes) AS median_minutes,
+              COUNT(*) AS learners
+         FROM per
+        WHERE total_items > 0 AND done_items >= total_items AND minutes IS NOT NULL AND minutes >= 0
+        GROUP BY section_id, title, ord
+        ORDER BY ord
+        LIMIT ${MODULE_LIMIT}`,
+      [tenantId, tenantCode, courseId],
+    );
+    return {
+      rows: rows.map((r) => ({
+        sectionId: r.section_id,
+        title: r.title,
+        medianMinutes: Math.round(Number(r.median_minutes)),
+        learners: Number(r.learners),
+      })),
+    };
+  }
+
+  /** Each roleplay in one course: who finished it, tries it took, and how long a session ran. */
+  async getRoleplayAttempts(
+    tenantId: string,
+    tenantCode: string,
+    courseId: string,
+  ): Promise<RoleplayAttemptsData> {
+    const rows: Array<{
+      item_id: string;
+      title: string;
+      learners: string;
+      avg_attempts: string | null;
+      avg_minutes: string | null;
+    }> = await this.dataSource.query(
+      `SELECT i.id::text AS item_id, i.title,
+              COUNT(DISTINCT p.id) FILTER (WHERE p.status = 'COMPLETED') AS learners,
+              AVG(p."attemptCount") FILTER (WHERE p.status = 'COMPLETED' AND p."attemptCount" > 0) AS avg_attempts,
+              AVG(${sessionDurationMsExpr('s', 'd')}) / 60000.0 AS avg_minutes
+         FROM track_items i
+         JOIN track_item_progress p ON p."trackItemId" = i.id AND p."deletedAt" IS NULL
+         JOIN track_enrollments e ON e.id = p."trackEnrollmentId" AND e."deletedAt" IS NULL
+         JOIN users u ON u.id = e."userId"
+         LEFT JOIN scenario_sessions s ON s."trackItemProgressId" = p.id
+                                      AND s.status = 'ENDED' AND s."eventStatus" = 'COMPLETED'
+         LEFT JOIN scenario_session_details d ON d."scenarioSessionId" = s.id
+        WHERE i."trackId" = $3::uuid AND i.type = 'ROLEPLAY' AND i."deletedAt" IS NULL
+          AND e."tenantId"::text IN ($1, $2)
+          AND ${LEARNER_ONLY}
+        GROUP BY i.id, i.title, i."order"
+        ORDER BY i."order"
+        LIMIT ${MODULE_LIMIT}`,
+      [tenantId, tenantCode, courseId],
+    );
+    return {
+      rows: rows.map((r) => ({
+        itemId: r.item_id,
+        title: r.title,
+        learners: Number(r.learners),
+        averageAttempts:
+          r.avg_attempts == null
+            ? null
+            : Math.round(Number(r.avg_attempts) * 10) / 10,
+        averageMinutes:
+          r.avg_minutes == null ? null : Math.round(Number(r.avg_minutes)),
+      })),
+    };
+  }
+
+  /** A learner's level in each skill over their scored practice slices, oldest first. */
+  async getSkillTrend(
+    tenantId: string,
+    tenantCode: string,
+    learnerId: number,
+  ): Promise<SkillTrendData> {
+    const rows: Array<{ skill: string; idx: number; level: string }> =
+      await this.dataSource.query(
+        `SELECT kv.key AS skill, c."cutIndex" AS idx, kv.value::numeric AS level
+           FROM foundational_skill_cuts c
+           JOIN foundational_skill_assessments fa ON fa."cutId" = c.id AND fa.status = 'SCORED'
+          CROSS JOIN LATERAL jsonb_each_text(fa."skillLevels") kv
+          WHERE c.tenant_id::text IN ($1, $2)
+            AND c."userId" = $3
+            AND kv.value ~ '^[0-9]+(\\.[0-9]+)?$'
+          ORDER BY c."cutIndex" ASC`,
+        [tenantId, tenantCode, learnerId],
+      );
+    const bySkill = new Map<string, Array<{ slice: number; level: number }>>();
+    rows.forEach((r) => {
+      const list = bySkill.get(r.skill) ?? [];
+      list.push({ slice: Number(r.idx), level: Number(r.level) });
+      bySkill.set(r.skill, list);
+    });
+    return {
+      skills: [...bySkill.entries()]
+        .map(([skill, points]) => ({
+          skill,
+          points: points.slice(-SKILL_TREND_SLICES),
+        }))
+        .filter((s) => s.points.length >= 2),
+    };
   }
 }

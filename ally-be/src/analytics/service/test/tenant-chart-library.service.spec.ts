@@ -77,6 +77,12 @@ describe('TenantChartLibraryService', () => {
       getTimeToFinish: jest.fn(),
       getPracticeRhythm: jest.fn(),
       getLearnerCourses: jest.fn(),
+      getCourseParticipation: jest.fn(),
+      getCoursePerformance: jest.fn(),
+      getModuleFunnel: jest.fn(),
+      getModuleTime: jest.fn(),
+      getRoleplayAttempts: jest.fn(),
+      getSkillTrend: jest.fn(),
     } as unknown as jest.Mocked<TenantScopeSummaryRepository>;
     service = new TenantChartLibraryService(
       repo,
@@ -146,10 +152,17 @@ describe('TenantChartLibraryService', () => {
         'TSQ-024',
         'TSQ-026',
         'TSQ-027',
+        'TSQ-038',
+        'TSQ-039',
         'TSQ-041',
+        'TSQ-042',
         'TSQ-043',
+        'TSQ-045',
+        'TSQ-046',
+        'TSQ-053',
         'TSQ-063',
         'TSQ-064',
+        'TSQ-065',
       ]);
       const byId = Object.fromEntries(lib.charts.map((c) => [c.id, c]));
       expect(byId['TSQ-001'].state).toBe('available');
@@ -956,6 +969,96 @@ describe('TenantChartLibraryService', () => {
         learnerId: 4,
       });
       expect(out.data).toEqual({ rows: [] });
+    });
+
+    it('TSQ-038 counts courses by status', async () => {
+      ready();
+      analytics.getCourseUsage.mockResolvedValue({
+        count: 3,
+        data: [{ status: 'ACTIVE' }, { status: 'ACTIVE' }, { status: 'DRAFT' }],
+      } as never);
+      const out = await service.getChartData(TENANT, 'TSQ-038', {});
+      const values = Object.fromEntries(
+        (
+          out.data as { measures: { key: string; value: number }[] }
+        ).measures.map((m) => [m.key, m.value]),
+      );
+      expect(values).toEqual({ courses: 3, live: 2, draft: 1, archived: 0 });
+    });
+
+    it('TSQ-042 reads every course, or one when a course is chosen', async () => {
+      ready();
+      scopeOptions.describe.mockResolvedValue('Course A');
+      summary.getCoursePerformance.mockResolvedValue({
+        weeks: [],
+        enrolled: 0,
+        completed: 0,
+      });
+      await service.getChartData(TENANT, 'TSQ-042', {});
+      expect(summary.getCoursePerformance).toHaveBeenLastCalledWith(
+        TENANT,
+        'internal1',
+        undefined,
+      );
+      await service.getChartData(TENANT, 'TSQ-042', { courseId: COURSE });
+      expect(summary.getCoursePerformance).toHaveBeenLastCalledWith(
+        TENANT,
+        'internal1',
+        COURSE,
+      );
+    });
+
+    it('module and roleplay charts need a course', async () => {
+      ready();
+      repo.getCapabilities.mockResolvedValue(
+        caps({ courseEnrolments: 20, scoredSessions90: 20 }),
+      );
+      for (const id of ['TSQ-045', 'TSQ-046', 'TSQ-053']) {
+        await expect(service.getChartData(TENANT, id, {})).rejects.toThrow(
+          'Choose a course',
+        );
+      }
+      expect(summary.getModuleFunnel).not.toHaveBeenCalled();
+    });
+
+    it('module charts read the chosen course', async () => {
+      ready();
+      repo.getCapabilities.mockResolvedValue(
+        caps({ courseEnrolments: 20, scoredSessions90: 20 }),
+      );
+      scopeOptions.describe.mockResolvedValue('Course A');
+      summary.getModuleFunnel.mockResolvedValue({ rows: [] });
+      summary.getModuleTime.mockResolvedValue({ rows: [] });
+      summary.getRoleplayAttempts.mockResolvedValue({ rows: [] });
+      for (const id of ['TSQ-045', 'TSQ-046', 'TSQ-053']) {
+        await service.getChartData(TENANT, id, { courseId: COURSE });
+      }
+      expect(summary.getModuleFunnel).toHaveBeenCalledWith(
+        TENANT,
+        'internal1',
+        COURSE,
+      );
+      expect(summary.getRoleplayAttempts).toHaveBeenCalledWith(
+        TENANT,
+        'internal1',
+        COURSE,
+      );
+    });
+
+    it('TSQ-065 needs a learner and reads that one', async () => {
+      enabled();
+      repo.getCapabilities.mockResolvedValue(caps({ skillScoredCuts: 50 }));
+      await expect(service.getChartData(TENANT, 'TSQ-065', {})).rejects.toThrow(
+        'Choose a learner',
+      );
+      scopeOptions.describe.mockResolvedValue('Asha');
+      summary.getSkillTrend.mockResolvedValue({ skills: [] });
+      await service.getChartData(TENANT, 'TSQ-065', { learnerId: 4 });
+      expect(summary.getSkillTrend).toHaveBeenCalledWith(
+        TENANT,
+        'internal1',
+        4,
+      );
     });
 
     it('quiz pass rates narrow to one course', async () => {

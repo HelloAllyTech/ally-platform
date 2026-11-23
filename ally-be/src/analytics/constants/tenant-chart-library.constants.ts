@@ -620,7 +620,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     sources: ['doc'],
     scopes: ['organisation'],
     needs: [],
-    live: false,
+    live: true,
   }),
   entry({
     id: 'TSQ-039',
@@ -632,7 +632,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     sources: ['doc'],
     scopes: ['organisation'],
     needs: [{ signal: 'courseEnrolments', min: 1 }],
-    live: false,
+    live: true,
   }),
   entry({
     id: 'TSQ-040',
@@ -670,7 +670,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     sources: ['doc'],
     scopes: ['organisation', 'course'],
     needs: [{ signal: 'courseEnrolments', min: 5, sparseMin: 1 }],
-    live: false,
+    live: true,
   }),
   entry({
     id: 'TSQ-043',
@@ -705,9 +705,9 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     shape: 'stage_funnel',
     size: 'm',
     sources: ['doc'],
-    scopes: ['organisation', 'course'],
+    scopes: ['course'],
     needs: [{ signal: 'courseEnrolments', min: 5, sparseMin: 1 }],
-    live: false,
+    live: true,
   }),
   entry({
     id: 'TSQ-046',
@@ -719,7 +719,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     sources: ['doc'],
     scopes: ['course'],
     needs: [{ signal: 'courseEnrolments', min: 5, sparseMin: 1 }],
-    live: false,
+    live: true,
   }),
   entry({
     id: 'TSQ-047',
@@ -782,7 +782,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     sources: ['doc'],
     scopes: ['course'],
     needs: [{ signal: 'scoredSessions90', min: 10, sparseMin: 1 }],
-    live: false,
+    live: true,
   }),
   entry({
     id: 'TSQ-055',
@@ -872,7 +872,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     sources: ['doc'],
     scopes: ['learner'],
     needs: [{ signal: 'skillScoredCuts', min: 10, sparseMin: 1 }],
-    live: false,
+    live: true,
   }),
   entry({
     id: 'TSQ-066',
