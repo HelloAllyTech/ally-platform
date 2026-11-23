@@ -27,11 +27,32 @@ from app.core.knowledge_agent.agent import KnowledgeAgentService
 MAX_QUERY_CHARS = 300
 
 
+#: Share of a message's letters outside the Latin script above which it isn't
+#: searched as written (Q4).
+NON_LATIN_SHARE = 0.3
+
+
+def mostly_non_latin(text: str) -> bool:
+    """Whether most of a message's letters are in another script (Devanagari, Tamil,
+    Bengali...). Hinglish, written in Latin letters, is not."""
+    letters = [ch for ch in text if ch.isalpha()]
+    if not letters:
+        return False
+    other = sum(1 for ch in letters if ord(ch) > 0x024F)
+    return other / len(letters) > NON_LATIN_SHARE
+
+
 def presearch_wanted(state: AgentState) -> bool:
     if not settings.AGENT_RUNTIME.PRESEARCH:
         return False
     question = (state.get("question") or "").strip()
     if not question or is_plain_yes(question):
+        return False
+    # Q4: the documents are searched with an English query (the tool's contract). A
+    # message in Hindi, Tamil or Bengali searched as written found nothing above the
+    # decline threshold, so the agent saw no passages and said it didn't know (8 of
+    # the 17 non-English misses at the Q4 baseline). The agent writes the query.
+    if mostly_non_latin(question):
         return False
     return any(tool.name == SEARCH for tool in search_tools(state["bot"]))
 
