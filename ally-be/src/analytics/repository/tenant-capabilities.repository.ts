@@ -18,8 +18,13 @@ export interface TenantStatisticsKeys {
  * VARCHAR holding either the tenant uuid or its code, and others as a uuid, so
  * every match goes through `IN ($1, $2)` on `::text` with the uuid and the code.
  *
- * Score-based signals use `scenario_sessions.score` (the learner's own score),
- * never `scenario_session_details.compositeScore`.
+ * Score-based signals count sessions that have a judged composite score
+ * (`scenario_session_details.compositeScore`, 0 to 100). That is the score the
+ * score charts show: it is on one scale across scenarios and comparable between
+ * sessions. `scenario_sessions.score` is a running points total (prod ranges
+ * from about -210 to over 1,000) that differs by scenario, so it cannot be
+ * averaged or compared. The tenant analytics page is an analytics surface, where
+ * the composite is allowed.
  */
 @Injectable()
 export class TenantCapabilitiesRepository {
@@ -64,13 +69,15 @@ export class TenantCapabilitiesRepository {
               AND s."startedAt" > now() - interval '90 days') AS "sessions90",
           (SELECT COUNT(*)
              FROM scenario_sessions s
+             JOIN scenario_session_details d ON d."scenarioSessionId" = s.id
             WHERE s.tenant_id::text IN ($1, $2)
-              AND s.score IS NOT NULL
+              AND d."compositeScore" IS NOT NULL
               AND s."startedAt" > now() - interval '90 days') AS "scoredSessions90",
           (SELECT COUNT(*) FROM (
              SELECT s."counselorId"
                FROM scenario_sessions s
-              WHERE s.tenant_id::text IN ($1, $2) AND s.score IS NOT NULL
+               JOIN scenario_session_details d ON d."scenarioSessionId" = s.id
+              WHERE s.tenant_id::text IN ($1, $2) AND d."compositeScore" IS NOT NULL
               GROUP BY s."counselorId"
              HAVING COUNT(*) >= 2) rep) AS "learnersWithRepeatScoredSessions",
           (SELECT COUNT(*)

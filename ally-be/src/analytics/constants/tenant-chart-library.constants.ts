@@ -22,8 +22,9 @@
  *   instead of percentages or spreads); otherwise `unavailable`.
  * - `live: false` charts are planned: they hold their id but are not offered
  *   until a handler exists.
- * - Score-based charts use the learner's own score (`scenario_sessions.score`),
- *   never the judge's `compositeScore`.
+ * - Score-based charts use the judged composite score (0 to 100), which is
+ *   comparable across scenarios and sessions. `scenario_sessions.score` is a
+ *   running points total that differs by scenario, so it is not used.
  */
 
 export const CHART_GROUPS = [
