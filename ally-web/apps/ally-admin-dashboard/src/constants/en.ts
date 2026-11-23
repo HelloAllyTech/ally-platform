@@ -16086,6 +16086,14 @@ export const en = {
     describeHelp: "Who they are, why they're here, how they speak and behave.",
   },
 
+  // Agent Builder wizard: a change asked for after generating (only the fields it is about).
+  agentBuilderRevision: {
+    planning: "Working out what to change…",
+    failed: (error: string) =>
+      `That change couldn't be made${error ? ` (${error})` : ""}. Nothing was changed; try again.`,
+    kept: "Everything else is kept as it was, including your edits.",
+  },
+
   // Agent Builder wizard: the chat box, for anything the trainer wants the agent to know.
   agentBuilderChatBox: {
     placeholder: {
@@ -16093,8 +16101,8 @@ export const en = {
       mode: "Or tell the agent how this roleplay is used (e.g. this is the final check)…",
       character:
         "Or describe who you want (e.g. an older woman who speaks Kannada) to search again…",
-      generate: "Ask for a change (e.g. make her more guarded), then generate again…",
-      restored: "Ask for a change (e.g. make her more guarded), then generate again…",
+      generate: "Ask for a change (e.g. make her more guarded). Only what it's about changes…",
+      restored: "Ask for a change (e.g. make her more guarded). Only what it's about changes…",
     } as Record<string, string>,
     send: "Send",
     briefNotes: "The trainer's notes for this roleplay (follow every one):",

@@ -27,6 +27,9 @@ import {
 } from 'src/learn/util/roleplay-design.util';
 import { StructuredRoleplayBrief } from '../type/roleplay-brief.type';
 import { RoleplayFitCheckSpecialist } from '../service/specialists/roleplay-fit-check.specialist';
+import { AgentBuilderRevisionService } from '../service/agent-builder-revision.service';
+import { Type } from 'class-transformer';
+import { ValidateNested } from 'class-validator';
 
 export class AgentBuilderCharacterSuggestionsDto {
   @ApiProperty({ description: 'The wizard\'s "Describe roleplay actor" text' })
@@ -48,6 +51,39 @@ export class AgentBuilderCharacterSuggestionsDto {
   mode?: RoleplayDesignMode;
 }
 
+export class RevisableFieldDto {
+  @ApiProperty({ example: 'roleInstruction' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
+  id!: string;
+
+  @ApiProperty({ example: 'Role instruction' })
+  @IsString()
+  @MaxLength(200)
+  label!: string;
+
+  @ApiProperty()
+  @IsString()
+  @MaxLength(20000)
+  value!: string;
+}
+
+export class AgentBuilderRevisePlanDto {
+  @ApiProperty({ description: "The trainer's change request" })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(2000)
+  instruction!: string;
+
+  @ApiProperty({ type: [RevisableFieldDto] })
+  @IsArray()
+  @ArrayMaxSize(40)
+  @ValidateNested({ each: true })
+  @Type(() => RevisableFieldDto)
+  fields!: RevisableFieldDto[];
+}
+
 /**
  * Studio's Agent Builder wizard casting from the Character Library, with the same search and fit
  * check Course Copilot uses for its roleplays. Lives here because the library search and the
@@ -58,7 +94,23 @@ export class AgentBuilderCharacterSuggestionsDto {
 @ApiSecurity('access-token')
 @Controller({ path: 'learn/agent-builder', version: '1' })
 export class AgentBuilderCharacterController {
-  constructor(private readonly fitCheck: RoleplayFitCheckSpecialist) {}
+  constructor(
+    private readonly fitCheck: RoleplayFitCheckSpecialist,
+    private readonly revision: AgentBuilderRevisionService,
+  ) {}
+
+  @ApiOperation({
+    summary:
+      "Agent Builder Copilot: which fields a trainer's change request touches, and what to " +
+      'change in each (the wizard then rewrites only those)',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_SCENARIO])
+  @Post('revise-plan')
+  revisePlan(@Body() dto: AgentBuilderRevisePlanDto) {
+    return this.revision.plan(dto.instruction, dto.fields, {
+      agentBuilderRevision: true,
+    });
+  }
 
   @ApiOperation({
     summary:

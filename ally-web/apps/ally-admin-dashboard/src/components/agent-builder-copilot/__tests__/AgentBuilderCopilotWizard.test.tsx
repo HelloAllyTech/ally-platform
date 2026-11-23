@@ -17,6 +17,8 @@ const mocks = vi.hoisted(() => ({
   goals: {} as Record<string, unknown>,
   suggest: vi.fn(),
   fetchCharacter: vi.fn(),
+  revisePlan: vi.fn(),
+  enhance: vi.fn(),
   catalog: [
     {
       language_id: 1,
@@ -62,6 +64,8 @@ vi.mock("@api", () => ({
   useLazyGetRoleplayDesignQuery: () => [mocks.fetchDesign, { isFetching: false }],
   useSuggestAgentBuilderCharactersMutation: () => [mocks.suggest, { isLoading: false }],
   useLazyGetCharacterByIdQuery: () => [mocks.fetchCharacter, { isFetching: false }],
+  useRevisePlanMutation: () => [mocks.revisePlan],
+  useEnhanceFieldMutation: () => [mocks.enhance],
 }));
 
 vi.mock("../useAgentBuilderGeneration", () => ({
@@ -379,7 +383,7 @@ describe("AgentBuilderCopilotWizard chat box", () => {
     );
   });
 
-  it("puts every note on the brief, and offers to generate again after a new one", async () => {
+  it("puts every note on the brief before generating", async () => {
     toModeStep();
     await send("No mention of family");
     await act(async () => {
@@ -396,12 +400,72 @@ describe("AgentBuilderCopilotWizard chat box", () => {
 
     expect(mocks.start.mock.calls[0][0].actorDescription).toContain(chat.briefNotes);
     expect(mocks.start.mock.calls[0][0].actorDescription).toContain("- No mention of family");
+  });
 
-    await send("Make her more guarded");
-    fireEvent.click(screen.getByText(chat.regenerate));
-    expect(mocks.start).toHaveBeenCalledTimes(2);
-    expect(mocks.start.mock.calls[1][0].actorDescription).toContain("- Make her more guarded");
-    expect(mocks.start.mock.calls[1][0].agentTestCases).toBe("Client deflects");
+  it("after generating, changes only the fields the message is about", async () => {
+    mocks.generation = { phase: "done", tasks: [], checks: [] };
+    mocks.formValues = {
+      ...mocks.formValues,
+      prompt: "Be open and chatty.",
+      title: "A quiet worry",
+      openingStatements: "Hi.",
+      states: [{ id: "s1", name: "Guarded", guidelines: "Short answers." }],
+    };
+    mocks.revisePlan.mockReturnValue({
+      unwrap: () =>
+        Promise.resolve({
+          fields: [
+            { id: "roleInstruction", change: "Make him guarded." },
+            { id: "state:s1", change: "Even shorter answers." },
+          ],
+          reply: "I'll make him more guarded.",
+        }),
+    });
+    mocks.enhance.mockImplementation(({ fieldName }: any) => ({
+      unwrap: () =>
+        Promise.resolve({
+          fieldName,
+          content:
+            fieldName === "state"
+              ? JSON.stringify({ name: "Closed", guidelines: "One-word answers." })
+              : "Be guarded.",
+        }),
+    }));
+    mocks.formValues.agentBuilderChat = {
+      version: 1,
+      history: [{ question: "Describe roleplay actor", answer: "Aarav" }],
+      description: "Aarav",
+      goalIds: [],
+      result: { applied: 5, total: 5, stopped: false, checks: [] },
+      generatedAt: "2026-11-23T10:00:00.000Z",
+    };
+    render(<AgentBuilderCopilotWizard formMethods={form()} />);
+
+    await send("make him more guarded");
+    await waitFor(() => expect(screen.getByText("I'll make him more guarded.")).toBeTruthy());
+
+    const plan = mocks.revisePlan.mock.calls[0][0];
+    expect(plan.instruction).toBe("make him more guarded");
+    expect(plan.fields.map((f: any) => f.id)).toEqual([
+      "roleInstruction",
+      "title",
+      "openingStatements",
+      "state:s1",
+    ]);
+    await waitFor(() => expect(screen.getByText(en.agentBuilderRevision.kept)).toBeTruthy());
+    expect(mocks.enhance).toHaveBeenCalledTimes(2);
+    expect(mocks.enhance.mock.calls[0][0]).toMatchObject({
+      fieldName: "roleInstruction",
+      currentValue: "Be open and chatty.",
+    });
+    expect(mocks.setValue).toHaveBeenCalledWith("prompt", "Be guarded.", { shouldDirty: true });
+    expect(mocks.setValue).toHaveBeenCalledWith(
+      "states",
+      [{ id: "s1", name: "Closed", guidelines: "One-word answers." }],
+      { shouldDirty: true },
+    );
+    expect(mocks.setValue).not.toHaveBeenCalledWith("title", expect.anything(), expect.anything());
+    expect(mocks.start).not.toHaveBeenCalled();
   });
 });
 

@@ -13,6 +13,7 @@ import { ScenarioCharacterModule } from 'src/scenario-character/scenario-charact
 import { TrackModule } from 'src/track/track.module';
 import { CourseCopilotController } from './controller/course-copilot.controller';
 import { AgentBuilderCharacterController } from './controller/agent-builder-character.controller';
+import { AgentBuilderRevisionService } from './service/agent-builder-revision.service';
 import { CourseCopilotEvent } from './entity/course-copilot-event.entity';
 import { CourseCopilotSource } from './entity/course-copilot-source.entity';
 import { CourseCopilotSourcesService } from './service/course-copilot-sources.service';
@@ -136,6 +137,7 @@ import { SpecialistLlmService } from './service/specialists/specialist-llm.servi
     ImagePromptSpecialist,
     RoleplayBriefSpecialist,
     RoleplayFitCheckSpecialist,
+    AgentBuilderRevisionService,
     LandingPageSpecialist,
     AllyNotesSpecialist,
   ],

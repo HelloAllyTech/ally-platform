@@ -3347,6 +3347,22 @@ const COURSE_COPILOT_TASKS: AiTaskEntry[] = [
     promptOverride: 'course_copilot_roleplay_fit_check',
   },
   {
+    id: 'agent-builder-revise-plan',
+    task: LlmTask.AGENT_BUILDER_REVISE_PLAN,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger:
+      'A trainer asks the Agent Builder wizard for a change after the roleplay is generated',
+    detail:
+      'Picks which fields the request changes (and what to change in each); the wizard ' +
+      'then rewrites only those through enhance-field. One call per request. JSON mode.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'agent_builder_wizard_revise_plan',
+  },
+  {
     id: 'course-copilot-image-prompt',
     task: LlmTask.COURSE_COPILOT_IMAGE_PROMPT,
     runtime: LlmRuntime.ALLY_BE,

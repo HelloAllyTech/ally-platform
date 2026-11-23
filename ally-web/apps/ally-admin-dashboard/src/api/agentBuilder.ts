@@ -206,6 +206,18 @@ const agentBuilderAPI = baseAPI.injectEndpoints({
       }),
     }),
 
+    /** Which fields a trainer's change request touches, and what to change in each. */
+    revisePlan: builder.mutation<
+      { fields: { id: string; change: string }[]; reply: string },
+      { instruction: string; fields: { id: string; label: string; value: string }[] }
+    >({
+      query: body => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.AGENT_BUILDER_REVISE_PLAN,
+        method: HttpMethod.POST,
+        body,
+      }),
+    }),
+
     /** What a roleplay mode sets: supports, experience mode and the state-aware main prompt. */
     getRoleplayDesign: builder.query<RoleplayDesign, RoleplayMode>({
       query: mode => ({
@@ -221,4 +233,5 @@ export const {
   useGenerateAgentBuilderFieldMutation,
   useLazyGetRoleplayDesignQuery,
   useSuggestAgentBuilderCharactersMutation,
+  useRevisePlanMutation,
 } = agentBuilderAPI;

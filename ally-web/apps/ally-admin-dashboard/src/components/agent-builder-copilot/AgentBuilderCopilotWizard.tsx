@@ -31,6 +31,7 @@ import {
   GenerationTaskStatus,
   useAgentBuilderGeneration,
 } from "./useAgentBuilderGeneration";
+import { Revision, useAgentBuilderRevision } from "./useAgentBuilderRevision";
 
 /**
  * Chat-style wizard on the RIGHT half of the "Agent Builder Copilot" tab.
@@ -215,6 +216,45 @@ const StepTracker = ({ step }: { step: WizardStepId }) => {
   );
 };
 
+const revisionStrings = en.agentBuilderRevision;
+
+/** One change request after generating: the agent's answer and each field it rewrote. */
+const RevisionBlock = ({ revision }: { revision: Revision }) => (
+  <div
+    className="self-start w-full max-w-[90%] rounded-md border border-border-light bg-neutral-50 p-3 text-sm"
+    data-testid="revision"
+  >
+    {revision.status === "planning" ? (
+      <div className="flex items-center gap-2 text-typography-700">
+        <Spinner />
+        {revisionStrings.planning}
+      </div>
+    ) : revision.status === "failed" ? (
+      <p className="text-[#FE6F64]">{revisionStrings.failed(revision.error ?? "")}</p>
+    ) : (
+      <>
+        <p className="text-typography-900">{revision.reply}</p>
+        {revision.rows.length > 0 && (
+          <ul className="mt-2 flex flex-col gap-1">
+            {revision.rows.map(row => (
+              <li key={row.id} className="flex items-center gap-2">
+                <TaskStatusIcon status={row.status} />
+                <span className={row.status === "error" ? "text-[#FE6F64]" : "text-typography-800"}>
+                  {row.label}
+                </span>
+                {row.error && <span className="text-xs text-typography-500">· {row.error}</span>}
+              </li>
+            ))}
+          </ul>
+        )}
+        {revision.status === "done" && revision.rows.length > 0 && (
+          <p className="mt-2 text-xs text-typography-600">{revisionStrings.kept}</p>
+        )}
+      </>
+    )}
+  </div>
+);
+
 const Spinner = () => (
   <div className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-dashed border-primary-300 border-t-transparent" />
 );
@@ -306,6 +346,12 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
 
   const { phase, tasks, start, abort, reset, doneCount, appliedCount, checks } =
     useAgentBuilderGeneration(formMethods);
+  const {
+    revisions,
+    revise,
+    busy: revising,
+    resetRevisions,
+  } = useAgentBuilderRevision(formMethods);
 
   // Reopening a roleplay: the saved conversation arrives with the form's values (after the
   // fetch), so restore it the first time it appears, unless the trainer has already started.
@@ -575,8 +621,9 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
       }
     } else if (step === "character" && design) {
       void loadSuggestions(design.mode, nextNotes);
-    } else if (step === "generate" || step === "restored") {
-      setNotesSinceGeneration(true);
+    } else if ((step === "generate" && phase !== "running") || step === "restored") {
+      // After generating: change only what the message is about, keep everything else.
+      void revise(note);
     }
   };
 
@@ -597,6 +644,7 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
     setNoteDraft("");
     setGoalTitlesUsed([]);
     setNotesSinceGeneration(false);
+    resetRevisions();
     setChooseLanguages(false);
     setLanguageVoices({});
     setChosenLanguages([]);
@@ -644,9 +692,11 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
                 {entry.question}
               </div>
             )}
-            <div className="self-end max-w-[85%] break-words rounded-lg bg-primary-50 px-4 py-2 text-sm text-typography-900 whitespace-pre-wrap">
-              {entry.answer}
-            </div>
+            {entry.answer && (
+              <div className="self-end max-w-[85%] break-words rounded-lg bg-primary-50 px-4 py-2 text-sm text-typography-900 whitespace-pre-wrap">
+                {entry.answer}
+              </div>
+            )}
           </div>
         ))}
 
@@ -759,6 +809,9 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
             )}
           </div>
         )}
+        {revisions.map((revision, index) => (
+          <RevisionBlock key={index} revision={revision} />
+        ))}
       </div>
 
       {/* Bottom composer — the active question, or the generation controls.
@@ -1218,24 +1271,12 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
               <Button
                 variant={ButtonVariant.SECONDARY}
                 onClick={handleSendNote}
-                disabled={!noteDraft.trim() || phase === "running"}
+                disabled={!noteDraft.trim() || phase === "running" || revising}
                 className="h-[40px] px-4 shrink-0"
               >
                 {chatStrings.send}
               </Button>
             </div>
-            {notesSinceGeneration && phase !== "running" && (
-              <div className="flex items-center justify-between gap-2 rounded-md border border-primary-200 bg-primary-50 px-3 py-2 text-sm">
-                <span>{chatStrings.regenerateHint}</span>
-                <Button
-                  variant={ButtonVariant.PRIMARY}
-                  onClick={() => runGeneration(goalTitlesUsed)}
-                  className="h-[36px] px-4 shrink-0"
-                >
-                  {chatStrings.regenerate}
-                </Button>
-              </div>
-            )}
           </div>
         )}
       </div>
