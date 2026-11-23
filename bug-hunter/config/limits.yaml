@@ -24,7 +24,7 @@ signals:
   reports_repo: HelloAllyTech/bug-hunter-reports   # private; nothing about findings goes to ally-platform
   log_spike_factor: 3.0       # an error signature counts as spiking at 3x its 7-day daily mean
   log_min_count: 5            # ...and at least this many occurrences in the day
-  log_groups: {}              # app -> [CloudWatch log groups]; filled on the VM (read-only creds)
+  log_groups: {}              # app -> [CloudWatch log groups]: set on the VM via BUGHUNTER_LOG_GROUPS
 approval:
   expiry_days: 7
 # Pull requests (chunk 06, chunk 11). Merging is always a person's button: auto_merge off.

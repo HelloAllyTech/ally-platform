@@ -8,6 +8,7 @@ override a role's model after the files are loaded.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 from pathlib import Path
@@ -38,6 +39,8 @@ ENV_MODEL_PREFIX = "BUGHUNTER_MODEL_"
 ENV_REPO_ROOT = "BUGHUNTER_REPO_ROOT"
 ENV_CONFIG_DIR = "BUGHUNTER_CONFIG_DIR"
 ENV_PR_OUTPUT_MODE = "BUGHUNTER_PR_OUTPUT_MODE"  # overrides pr.output_mode
+# JSON {app: [log group, ...]}: the VM's CloudWatch groups, kept out of the public repo
+ENV_LOG_GROUPS = "BUGHUNTER_LOG_GROUPS"
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]  # bug-hunter/
 DEFAULT_CONFIG_DIR = PACKAGE_ROOT / "config"
@@ -482,6 +485,23 @@ def model_overrides_from_env(env: Mapping[str, str]) -> dict[str, ModelSpec]:
     return overrides
 
 
+def _log_groups(raw: str, apps: AppsConfig) -> dict[str, list[str]]:
+    """``BUGHUNTER_LOG_GROUPS``: a JSON object of known app -> list of group names."""
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ConfigError(f"{ENV_LOG_GROUPS}: not valid JSON ({exc.msg})") from None
+    if not isinstance(value, dict) or not all(
+        isinstance(v, list) and all(isinstance(g, str) and g for g in v)
+        for v in value.values()
+    ):
+        raise ConfigError(f"{ENV_LOG_GROUPS}: expected {{app: [log group, ...]}}")
+    unknown = sorted(set(value) - set(apps.apps))
+    if unknown:
+        raise ConfigError(f"{ENV_LOG_GROUPS}: unknown app(s) {', '.join(unknown)}")
+    return value
+
+
 def load_config(
     config_dir: Path | str | None = None,
     repo_root: Path | str | None = None,
@@ -511,6 +531,15 @@ def load_config(
             )
         limits = limits.model_copy(
             update={"pr": limits.pr.model_copy(update={"output_mode": mode})}
+        )
+    groups = env.get(ENV_LOG_GROUPS)
+    if groups:
+        limits = limits.model_copy(
+            update={
+                "signals": limits.signals.model_copy(
+                    update={"log_groups": _log_groups(groups, apps)}
+                )
+            }
         )
 
     return BugHunterConfig(

@@ -438,3 +438,18 @@ def test_the_output_mode_can_be_switched_by_env(monkeypatch) -> None:
     assert cfg.limits.pr.output_mode == "suggested_fix"
     with pytest.raises(ConfigError):
         load_config(env={"BUGHUNTER_PR_OUTPUT_MODE": "yolo"})
+
+
+def test_log_groups_come_from_the_vm_env_not_the_public_repo() -> None:
+    from bug_hunter.config import ConfigError, load_config
+
+    groups = '{"ally-be": ["/x/core"], "ally-ai": ["/x/ai", "/x/ai2"]}'
+    cfg = load_config(env={"BUGHUNTER_LOG_GROUPS": groups})
+    assert cfg.limits.signals.log_groups == {
+        "ally-be": ["/x/core"],
+        "ally-ai": ["/x/ai", "/x/ai2"],
+    }
+    assert load_config(env={}).limits.signals.log_groups == {}
+    for bad in ("not json", '["/x"]', '{"ally-be": "/x"}', '{"nope": ["/x"]}'):
+        with pytest.raises(ConfigError, match="BUGHUNTER_LOG_GROUPS"):
+            load_config(env={"BUGHUNTER_LOG_GROUPS": bad})
