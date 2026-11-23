@@ -1,5 +1,6 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { TenantCapabilitiesRepository } from '../../repository/tenant-capabilities.repository';
+import { TenantChartQueryRepository } from '../../repository/tenant-chart-query.repository';
 import { TenantOutcomesRepository } from '../../repository/tenant-outcomes.repository';
 import { TenantPracticeRepository } from '../../repository/tenant-practice.repository';
 import { TenantCapabilities } from '../../util/tenant-chart-library.util';
@@ -31,6 +32,7 @@ describe('TenantChartLibraryService', () => {
   let analytics: jest.Mocked<TenantAnalyticsService>;
   let outcomes: jest.Mocked<TenantOutcomesRepository>;
   let practice: jest.Mocked<TenantPracticeRepository>;
+  let chartQuery: jest.Mocked<TenantChartQueryRepository>;
   let service: TenantChartLibraryService;
 
   beforeEach(() => {
@@ -45,9 +47,7 @@ describe('TenantChartLibraryService', () => {
       getCourseUsage: jest.fn(),
     } as unknown as jest.Mocked<TenantAnalyticsService>;
     outcomes = {
-      getScoreDistribution: jest.fn(),
       getLearnerTrendCounts: jest.fn(),
-      getScenarioScores: jest.fn(),
       getRatingCounts: jest.fn(),
       getReviewCoverage: jest.fn(),
     } as unknown as jest.Mocked<TenantOutcomesRepository>;
@@ -60,11 +60,16 @@ describe('TenantChartLibraryService', () => {
       getItemFormatDropoff: jest.fn(),
       getSkillChange: jest.fn(),
     } as unknown as jest.Mocked<TenantPracticeRepository>;
+    chartQuery = {
+      ranked: jest.fn(),
+      distribution: jest.fn(),
+    } as unknown as jest.Mocked<TenantChartQueryRepository>;
     service = new TenantChartLibraryService(
       repo,
       analytics,
       outcomes,
       practice,
+      chartQuery,
     );
   });
 
@@ -481,15 +486,43 @@ describe('TenantChartLibraryService', () => {
         sessions: 320,
         median: 80,
       };
-      outcomes.getScoreDistribution.mockResolvedValue(dist);
+      chartQuery.distribution.mockResolvedValue(dist);
       const out = await service.getChartData(TENANT, 'TSQ-020', {});
       expect(out.data).toEqual(dist);
-      expect(outcomes.getScoreDistribution).toHaveBeenCalledWith(
-        TENANT,
-        'internal1',
-        expect.any(Date),
-        expect.any(Date),
+      expect(chartQuery.distribution).toHaveBeenCalledWith(
+        { source: 'sessions', result: 'distribution' },
+        expect.objectContaining({ tenantId: TENANT, tenantCode: 'internal1' }),
       );
+    });
+
+    it('TSQ-020 can be drawn for one course, simulation or learner', async () => {
+      ready();
+      chartQuery.distribution.mockResolvedValue({
+        bins: Array(10).fill(0),
+        sessions: 0,
+        median: null,
+      });
+      const courseId = '8b3f2f0e-1c0a-4d6e-9a53-3d1c0d2f4a11';
+      await service.getChartData(TENANT, 'TSQ-020', {
+        courseId,
+        scenarioId: 7,
+        learnerId: 9,
+      });
+      expect(chartQuery.distribution).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          scope: { courseId, scenarioId: 7, learnerId: 9 },
+        }),
+      );
+    });
+
+    it('refuses a scope the chart does not list', async () => {
+      ready();
+      // TSQ-022 lists organisation and course, not learner.
+      await expect(
+        service.getChartData(TENANT, 'TSQ-022', { learnerId: 9 }),
+      ).rejects.toThrow('cannot be drawn for one learner');
+      expect(chartQuery.ranked).not.toHaveBeenCalled();
     });
 
     it('TSQ-021 adds the total and the threshold to the trend counts', async () => {
@@ -509,22 +542,24 @@ describe('TenantChartLibraryService', () => {
       });
     });
 
-    it('TSQ-022 passes the minimum sessions and limit, lowest first', async () => {
+    it('TSQ-022 asks for the lowest average first, with a minimum of sessions', async () => {
       ready();
-      outcomes.getScenarioScores.mockResolvedValue([
-        { scenarioId: 1, title: 'A', averageScore: 54, sessions: 5 },
+      chartQuery.ranked.mockResolvedValue([
+        { key: '1', label: 'A', value: 54, sessions: 5 },
       ]);
       const out = await service.getChartData(TENANT, 'TSQ-022', {});
       expect(out.data).toEqual({
         rows: [{ scenarioId: 1, title: 'A', averageScore: 54, sessions: 5 }],
       });
-      expect(outcomes.getScenarioScores).toHaveBeenCalledWith(
-        TENANT,
-        'internal1',
-        expect.any(Date),
-        expect.any(Date),
-        3,
-        8,
+      expect(chartQuery.ranked).toHaveBeenCalledWith(
+        expect.objectContaining({
+          measure: 'averageScore',
+          dimension: 'scenario',
+          order: 'asc',
+          minSessions: 3,
+          limit: 8,
+        }),
+        expect.anything(),
       );
     });
 

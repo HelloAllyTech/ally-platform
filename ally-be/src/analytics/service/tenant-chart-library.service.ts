@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -6,9 +7,11 @@ import {
 import { LoggerService } from 'src/logger/logger.service';
 import { withReportingQuerySlot } from '../../common/util/reporting-query-slots.util';
 import {
+  ChartScope,
   TENANT_CHART_LIBRARY,
   TenantChartEntry,
 } from '../constants/tenant-chart-library.constants';
+import { TENANT_CHART_SPECS } from '../constants/tenant-chart-specs.constants';
 import { AnalyticsRange } from '../dto/platform-analytics.dto';
 import { LearnerUsageStatus } from '../dto/tenant-analytics.dto';
 import {
@@ -16,6 +19,10 @@ import {
   TenantChartLibraryResponseDto,
 } from '../dto/tenant-chart-library.dto';
 import { TenantCapabilitiesRepository } from '../repository/tenant-capabilities.repository';
+import {
+  RankedRow,
+  TenantChartQueryRepository,
+} from '../repository/tenant-chart-query.repository';
 import { TenantOutcomesRepository } from '../repository/tenant-outcomes.repository';
 import {
   SESSION_LENGTH_BOUNDS_MINUTES,
@@ -38,6 +45,10 @@ export interface TenantChartParams {
   search?: string;
   limit?: number;
   offset?: number;
+  /** Scope: draw the chart for one simulation, course or learner. */
+  scenarioId?: number;
+  courseId?: string;
+  learnerId?: number;
 }
 
 type ChartHandler = (
@@ -50,9 +61,6 @@ type ChartHandler = (
 const DEFAULT_CHART_RANGE: AnalyticsRange = '90d';
 /** A learner's score must move this many points (of 100) to count as up or down. */
 const TREND_THRESHOLD_POINTS = 5;
-/** A scenario needs this many scored sessions before its average is shown. */
-const SCENARIO_MIN_SESSIONS = 3;
-const SCENARIO_LIMIT = 8;
 /** A quiz needs this many attempts before its pass rate is shown. */
 const QUIZ_MIN_ATTEMPTS = 3;
 const QUIZ_LIMIT = 8;
@@ -214,6 +222,7 @@ export class TenantChartLibraryService {
     private readonly tenantAnalytics: TenantAnalyticsService,
     private readonly outcomesRepo: TenantOutcomesRepository,
     private readonly practiceRepo: TenantPracticeRepository,
+    private readonly chartQueryRepo: TenantChartQueryRepository,
   ) {
     this.handlers = {
       // Headline numbers: the summary block of organization-metrics, plus the
@@ -256,11 +265,23 @@ export class TenantChartLibraryService {
       'TSQ-017': (tenantId) => this.courseFunnel(tenantId),
       // How session scores spread, in ten bins, with the median.
       'TSQ-020': (tenantId, p, code) =>
-        this.scoreDistribution(tenantId, code, p),
+        this.runSpec('TSQ-020', tenantId, code, p),
       // Learners whose latest score is up, level or down on their first.
       'TSQ-021': (tenantId, p, code) => this.learnerTrends(tenantId, code, p),
       // Scenarios with enough scored sessions, lowest average first.
-      'TSQ-022': (tenantId, p, code) => this.scenarioScores(tenantId, code, p),
+      'TSQ-022': async (tenantId, p, code) => {
+        const rows = (await this.runSpec('TSQ-022', tenantId, code, p)) as {
+          rows: RankedRow[];
+        };
+        return {
+          rows: rows.rows.map((r) => ({
+            scenarioId: Number(r.key),
+            title: r.label,
+            averageScore: r.value,
+            sessions: r.sessions,
+          })),
+        };
+      },
       // Session ratings: how many of each star, and the average. No comments.
       'TSQ-026': (tenantId, p, code) => this.ratings(tenantId, code, p),
       // How many completed sessions have been shared for review.
@@ -368,6 +389,7 @@ export class TenantChartLibraryService {
     const entry = this.findLiveEntry(chartId, tenantId);
     const handler = this.handlers[entry.id];
     if (!handler) throw new NotFoundException('Unknown chart');
+    this.assertScopeAllowed(entry, params);
 
     let availability: ChartAvailability = { state: 'available', reason: null };
     if (entry.needs.length > 0) {
@@ -585,6 +607,53 @@ export class TenantChartLibraryService {
     return { rows: await this.practiceRepo.getSkillChange(tenantId, code) };
   }
 
+  /** A scope filter is only accepted for a chart that lists that scope. */
+  private assertScopeAllowed(
+    entry: TenantChartEntry,
+    p: TenantChartParams,
+  ): void {
+    const wanted: Array<[unknown, ChartScope]> = [
+      [p.courseId, 'course'],
+      [p.scenarioId, 'simulation'],
+      [p.learnerId, 'learner'],
+    ];
+    wanted.forEach(([value, scope]) => {
+      if (value !== undefined && !entry.scopes.includes(scope)) {
+        throw new BadRequestException(
+          `This chart cannot be drawn for one ${scope}`,
+        );
+      }
+    });
+  }
+
+  /** Runs a chart defined in {@link TENANT_CHART_SPECS}. */
+  private async runSpec(
+    chartId: string,
+    tenantId: string,
+    code: string,
+    p: TenantChartParams,
+  ): Promise<ScoreDistributionData | { rows: RankedRow[] }> {
+    const spec = TENANT_CHART_SPECS[chartId];
+    const { start, endExclusive } = this.windowFor(
+      p.range ?? DEFAULT_CHART_RANGE,
+    );
+    const window = {
+      tenantId,
+      tenantCode: code,
+      start,
+      endExclusive,
+      scope: {
+        scenarioId: p.scenarioId,
+        courseId: p.courseId,
+        learnerId: p.learnerId,
+      },
+    };
+    if (spec.result === 'distribution') {
+      return this.chartQueryRepo.distribution(spec, window);
+    }
+    return { rows: await this.chartQueryRepo.ranked(spec, window) };
+  }
+
   /** The `[start, endExclusive)` window for a range; `all` runs from the epoch. */
   private windowFor(range: AnalyticsRange): {
     start: Date;
@@ -601,22 +670,6 @@ export class TenantChartLibraryService {
       { defaultRange: DEFAULT_CHART_RANGE, defaultBucketFor: () => 'week' },
     );
     return { start, endExclusive };
-  }
-
-  private async scoreDistribution(
-    tenantId: string,
-    code: string,
-    p: TenantChartParams,
-  ): Promise<ScoreDistributionData> {
-    const { start, endExclusive } = this.windowFor(
-      p.range ?? DEFAULT_CHART_RANGE,
-    );
-    return this.outcomesRepo.getScoreDistribution(
-      tenantId,
-      code,
-      start,
-      endExclusive,
-    );
   }
 
   private async learnerTrends(
@@ -638,26 +691,6 @@ export class TenantChartLibraryService {
       ...counts,
       total: counts.improving + counts.holding + counts.declining,
       threshold: TREND_THRESHOLD_POINTS,
-    };
-  }
-
-  private async scenarioScores(
-    tenantId: string,
-    code: string,
-    p: TenantChartParams,
-  ): Promise<ScenarioScoresData> {
-    const { start, endExclusive } = this.windowFor(
-      p.range ?? DEFAULT_CHART_RANGE,
-    );
-    return {
-      rows: await this.outcomesRepo.getScenarioScores(
-        tenantId,
-        code,
-        start,
-        endExclusive,
-        SCENARIO_MIN_SESSIONS,
-        SCENARIO_LIMIT,
-      ),
     };
   }
 

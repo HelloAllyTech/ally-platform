@@ -33,7 +33,7 @@
  *   where the requirement is known: a chart with none is always selectable and is
  *   processed when chosen.
  * - `scopes` says what the chart can be drawn for: the whole `organisation`, one
- *   `course` or one `learner`. A question asked at several scopes is ONE entry.
+ *   `course`, one `simulation` or one `learner`. A question asked at several scopes is ONE entry.
  *   Only the organisation scope is built so far; course and learner scopes need
  *   a course or learner picker on the page.
  * - Score-based charts use the judged composite score (0 to 100), which is
@@ -191,7 +191,7 @@ export type ChartSize = 's' | 'm' | 'wide';
 export type ChartSource = 'doc' | 'research' | 'existing';
 
 /** What a chart is about. */
-export type ChartScope = 'organisation' | 'course' | 'learner';
+export type ChartScope = 'organisation' | 'course' | 'simulation' | 'learner';
 
 export interface TenantChartEntry {
   /** Stable id, `TSQ-001`. Never reused, never renumbered. */
@@ -450,7 +450,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     shape: 'distribution',
     size: 'm',
     sources: ['research'],
-    scopes: ['organisation', 'course'],
+    scopes: ['organisation', 'course', 'simulation', 'learner'],
     needs: [{ signal: 'scoredSessions90', min: 10, sparseMin: 1 }],
     live: true,
   }),
@@ -476,7 +476,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     shape: 'ranking',
     size: 'm',
     sources: ['research', 'doc'],
-    scopes: ['organisation'],
+    scopes: ['organisation', 'course'],
     needs: [{ signal: 'scoredSessions90', min: 10, sparseMin: 1 }],
     live: true,
   }),

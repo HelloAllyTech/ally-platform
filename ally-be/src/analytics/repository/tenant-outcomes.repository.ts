@@ -1,24 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
-export interface ScoreDistributionRow {
-  /** Ten bins: 0-9, 10-19, ... 90-100. */
-  bins: number[];
-  sessions: number;
-  median: number | null;
-}
-
 export interface LearnerTrendCounts {
   improving: number;
   holding: number;
   declining: number;
-}
-
-export interface ScenarioScoreRow {
-  scenarioId: number;
-  title: string;
-  averageScore: number;
-  sessions: number;
 }
 
 export interface RatingCounts {
@@ -50,45 +36,6 @@ export interface ReviewCoverage {
 @Injectable()
 export class TenantOutcomesRepository {
   constructor(private readonly dataSource: DataSource) {}
-
-  async getScoreDistribution(
-    tenantId: string,
-    tenantCode: string,
-    start: Date,
-    endExclusive: Date,
-  ): Promise<ScoreDistributionRow> {
-    const rows: Array<{ bin: number; n: string }> = await this.dataSource.query(
-      `SELECT LEAST(FLOOR(d."compositeScore" / 10.0), 9)::int AS bin,
-                COUNT(*) AS n
-           FROM scenario_sessions s
-           JOIN scenario_session_details d ON d."scenarioSessionId" = s.id
-          WHERE s.tenant_id::text IN ($1, $2)
-            AND d."compositeScore" IS NOT NULL
-            AND s."startedAt" >= $3 AND s."startedAt" < $4
-          GROUP BY 1`,
-      [tenantId, tenantCode, start, endExclusive],
-    );
-    const medianRows: Array<{ median: string | null }> =
-      await this.dataSource.query(
-        `SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY d."compositeScore") AS median
-           FROM scenario_sessions s
-           JOIN scenario_session_details d ON d."scenarioSessionId" = s.id
-          WHERE s.tenant_id::text IN ($1, $2)
-            AND d."compositeScore" IS NOT NULL
-            AND s."startedAt" >= $3 AND s."startedAt" < $4`,
-        [tenantId, tenantCode, start, endExclusive],
-      );
-    const bins = Array.from({ length: 10 }, () => 0);
-    rows.forEach((r) => {
-      bins[Number(r.bin)] = Number(r.n);
-    });
-    const median = medianRows[0]?.median;
-    return {
-      bins,
-      sessions: bins.reduce((a, b) => a + b, 0),
-      median: median == null ? null : Math.round(Number(median)),
-    };
-  }
 
   /**
    * For each learner with at least two scored sessions in the window, compares
@@ -134,45 +81,6 @@ export class TenantOutcomesRepository {
       holding: Number(r?.holding ?? 0),
       declining: Number(r?.declining ?? 0),
     };
-  }
-
-  /** Scenarios with at least `minSessions` scored sessions, lowest average first. */
-  async getScenarioScores(
-    tenantId: string,
-    tenantCode: string,
-    start: Date,
-    endExclusive: Date,
-    minSessions: number,
-    limit: number,
-  ): Promise<ScenarioScoreRow[]> {
-    const rows: Array<{
-      scenarioId: number;
-      title: string;
-      averageScore: string;
-      sessions: string;
-    }> = await this.dataSource.query(
-      `SELECT s."scenarioId" AS "scenarioId",
-              sc.title AS title,
-              AVG(d."compositeScore") AS "averageScore",
-              COUNT(*) AS sessions
-         FROM scenario_sessions s
-         JOIN scenario_session_details d ON d."scenarioSessionId" = s.id
-         JOIN scenarios sc ON sc.id = s."scenarioId"
-        WHERE s.tenant_id::text IN ($1, $2)
-          AND d."compositeScore" IS NOT NULL
-          AND s."startedAt" >= $3 AND s."startedAt" < $4
-        GROUP BY s."scenarioId", sc.title
-       HAVING COUNT(*) >= $5
-        ORDER BY AVG(d."compositeScore") ASC
-        LIMIT $6`,
-      [tenantId, tenantCode, start, endExclusive, minSessions, limit],
-    );
-    return rows.map((r) => ({
-      scenarioId: Number(r.scenarioId),
-      title: r.title,
-      averageScore: Math.round(Number(r.averageScore)),
-      sessions: Number(r.sessions),
-    }));
   }
 
   /** Session ratings (1 to 5 stars) given in the window. Counts only: no comments. */

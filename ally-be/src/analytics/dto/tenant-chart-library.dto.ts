@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import {
   IsIn,
   IsInt,
+  IsUUID,
   IsOptional,
   IsString,
   Matches,
@@ -87,6 +88,37 @@ export class TenantChartQueryDto {
     message: 'timezone must look like Asia/Kolkata',
   })
   timezone?: string;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Draw the chart for one simulation. Only for charts whose scopes include "simulation".',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  scenarioId?: number;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Draw the chart for one course. Only for charts whose scopes include "course".',
+  })
+  @IsOptional()
+  @IsUUID()
+  courseId?: string;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Draw the chart for one learner. Only for charts whose scopes include "learner".',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  learnerId?: number;
 
   @ApiProperty({ required: false, minimum: 1, maximum: 200 })
   @IsOptional()
