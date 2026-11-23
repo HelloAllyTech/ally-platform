@@ -25,11 +25,13 @@ The 20–23 Nov rounds and the production demo build found publishing blocked wi
 
 ## Results (like for like, 11 assistants, 1 run each)
 
+Both runs graded by the same grader, so the gain is the product's, not the grader's (the baseline's replies were re-graded with their passages rebuilt from the retrieval log):
+
 | | Baseline | Now |
 |---|---|---|
-| In-data right (grader as at the baseline) | 57% | 62% |
-| In-data right (the grader that reads everything) | see notes | 75% |
-| Not English, in-data right | 38% | 66% |
+| In-data right, same grader, the sets as at the baseline | 55% | 74% |
+| In-data right, same grader, with the hand-ruling set fixes | 60% | 75% |
+| Not English, in-data right | 34% | 66% |
 | Answers a hand-over replaced | 14 | 0 |
 | Asked back instead of answering | 18 | 12 |
 | Saves with exactly 1 confirmation | 4 of 6 | 8 of 8 |

@@ -121,6 +121,19 @@ Counts overlap: one miss can be fixed by more than one item.
 | G+15 Campaigns "Set it up" | Not started |
 | G+16 T2's three | Not started |
 
+## The measurement, three ways (`2026-11-23-after-C-1`)
+
+In-data right on the 11 like-for-like assistants. The baseline's replies were re-graded with their passages rebuilt from the retrieval log (`kb_retrievals`, matched by the message; 247 of 283 turns) and their stored citations, so both runs are judged by the same grader:
+
+| Grader and sets | Baseline | After Q4 |
+|---|---|---|
+| View 1: the grader of 23 Nov morning (8 passages, no neighbours), the old sets | 57% (graded with no passages) | 49% (it can't see key facts or neighbours, so it marks found details invented) |
+| View 2: the grader that reads all passages with neighbours, the old sets | 55% | 74% |
+| View 3: view 2 with the hand-ruling set fixes | 60% | 75% |
+| Not English (view 3) | 34% | 66% |
+
+The product gain is 19 points (view 2) or 15 (view 3); view 1 undercounts the new runs and isn't a fair measure of them.
+
 ## For Phase 3: in-data misses left after Q4 (`2026-11-23-after-C-1`, view 3)
 
 28 misses (23 on the 11 like-for-like assistants; Scripbox 3 and Teach For India 2 as new baselines), each read by hand with `misses.py` (search results, stored information, reply). Not fixed in Q4 (Shehbaz, 23 Nov: no more answer-quality rounds; 62% under the old grading and 75% under view 3 are short of 85%).
