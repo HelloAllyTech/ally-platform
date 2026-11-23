@@ -111,7 +111,8 @@ Q4 built a use-case suite first (`evals/usecases/`: 13 assistants, about 300 con
   - the ones nothing uses at all are deleted, with `BugHuntStatusBadge.tsx` and `bug-hunter-model-settings.type.ts`.
 
   No behaviour changes. The Bug Hunter and analytics tests pass unchanged.
-- **Colour literals (ally-web lint):** master's new statistics charts (`analytics/statistics/*`) added 104. They're re-baselined, as master didn't. Most are the charts' series and status palettes. The chrome colours in ChartHost, LibraryDrawer, StatCard and StatisticsDashboard should move to tokens; that's for the statistics owner.
+- **Colour literals (ally-web lint):** master's new statistics charts (`analytics/statistics/*`) added 104, plus 5 more in its card filters. They're re-baselined, as master didn't. Most are the charts' series and status palettes. The chrome colours in ChartHost, LibraryDrawer, StatCard, StatisticsDashboard and CardFilters should move to tokens; that's for the statistics owner.
+- **docs:skip label, for `ally-web-posthog-events`:** the dead-code fix un-exports `OrganizationStatistics` (it's imported by its default export). The file is in an `analytics/` folder, so the rule asks for the PostHog events list. No tracked event changes, so the list doesn't move.
 - **Migrations:** master added `1986500000000-GrantTenantAdminsUserPreferences`, so Q4's `MarkTemplateHelplinesUnconfirmed` moved to `1986500000100` to keep the order clear.
 
 ## Before deploying (`LAUNCH-CHECKLIST.md`, "Q4 light")
