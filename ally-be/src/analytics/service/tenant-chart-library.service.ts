@@ -52,14 +52,6 @@ const STATUS_COUNT_LEARNER_CAP = 200;
 const TOP_LEARNERS_LIMIT = 6;
 const COURSE_READ_CAP = 200;
 const COURSE_RANKING_LIMIT = 6;
-/** Bands for days since last activity; the last band is learners who never started. */
-const ACTIVITY_BANDS: Array<{ key: string; maxDays: number }> = [
-  { key: 'week', maxDays: 7 },
-  { key: 'fortnight', maxDays: 14 },
-  { key: 'month', maxDays: 30 },
-  { key: 'older', maxDays: Number.POSITIVE_INFINITY },
-  { key: 'never', maxDays: Number.NEGATIVE_INFINITY },
-];
 const ATTENTION_LEARNERS_LIMIT = 5;
 
 export interface LearnerStatusCountsData {
@@ -122,12 +114,6 @@ export interface CourseRankingData {
 export interface CourseFunnelData {
   truncated: boolean;
   stages: Array<{ key: string; count: number }>;
-}
-
-export interface DaysSinceActivityData {
-  total: number;
-  truncated: boolean;
-  bands: Array<{ key: string; count: number }>;
 }
 
 export interface TopLearnersData {
@@ -194,8 +180,6 @@ export class TenantChartLibraryService {
       'TSQ-008': (tenantId, p) => this.topLearners(tenantId, p),
       // Learners who practised before and then went quiet, most overdue first.
       'TSQ-023': (tenantId, p) => this.learnersNeedingAttention(tenantId, p),
-      // Days since each learner last did anything, in bands.
-      'TSQ-010': (tenantId, p) => this.daysSinceLastActivity(tenantId, p),
       // Courses someone has started versus courses nobody has.
       'TSQ-014': (tenantId) => this.coursesInUse(tenantId),
       // Courses ranked by learners stalled in them.
@@ -559,31 +543,6 @@ export class TenantChartLibraryService {
         { key: 'halfway', count: sum((c) => c.learnersAtLeast50) },
         { key: 'completed', count: sum((c) => c.learnersCompleted100) },
       ],
-    };
-  }
-
-  private async daysSinceLastActivity(
-    tenantId: string,
-    p: TenantChartParams,
-  ): Promise<DaysSinceActivityData> {
-    const usage = await this.tenantAnalytics.getLearnerUsage(tenantId, {
-      range: p.range ?? DEFAULT_CHART_RANGE,
-      limit: STATUS_COUNT_LEARNER_CAP,
-      offset: 0,
-    });
-    const bands = ACTIVITY_BANDS.map((band) => ({ key: band.key, count: 0 }));
-    usage.data.forEach((row) => {
-      const days = row.daysSinceLastActivity;
-      const index =
-        days == null
-          ? bands.length - 1
-          : ACTIVITY_BANDS.findIndex((b) => days <= b.maxDays);
-      bands[index === -1 ? bands.length - 2 : index].count += 1;
-    });
-    return {
-      total: usage.count,
-      truncated: usage.count > usage.data.length,
-      bands,
     };
   }
 

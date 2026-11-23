@@ -2,6 +2,7 @@ import {
   CAPABILITY_LABELS,
   CapabilitySignal,
   ChartRequirement,
+  RETIRED_TENANT_CHARTS,
   SHAPE_ALLOWED_CHARTS,
   TENANT_CHART_LIBRARY,
   TenantChartEntry,
@@ -81,11 +82,17 @@ export function validateChartLibrary(
     }
     if (seen.has(entry.id)) problems.push(`${entry.id}: duplicate id`);
     seen.add(entry.id);
-    const expected = `TSQ-${String(index + 1).padStart(3, '0')}`;
-    if (entry.id !== expected) {
-      problems.push(
-        `${entry.id}: ids must be sequential, expected ${expected}`,
-      );
+    // Ids only ever grow (gaps are retired charts), so the order is the history.
+    const number = Number(entry.id.slice(4));
+    const previous = index > 0 ? Number(library[index - 1].id.slice(4)) : 0;
+    if (number <= previous) {
+      problems.push(`${entry.id}: ids must be in increasing order`);
+    }
+    if (RETIRED_TENANT_CHARTS[entry.id]) {
+      problems.push(`${entry.id}: this id was retired and must not be reused`);
+    }
+    if (entry.scopes.length === 0) {
+      problems.push(`${entry.id}: needs at least one scope`);
     }
     if (!SHAPE_ALLOWED_CHARTS[entry.shape].includes(entry.chart)) {
       problems.push(

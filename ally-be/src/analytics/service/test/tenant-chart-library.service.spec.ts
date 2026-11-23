@@ -91,7 +91,6 @@ describe('TenantChartLibraryService', () => {
         'TSQ-007',
         'TSQ-008',
         'TSQ-009',
-        'TSQ-010',
         'TSQ-013',
         'TSQ-014',
         'TSQ-015',
@@ -434,27 +433,6 @@ describe('TenantChartLibraryService', () => {
           { key: 'started', count: 11 },
           { key: 'halfway', count: 6 },
           { key: 'completed', count: 3 },
-        ],
-      });
-    });
-
-    it('TSQ-010 bands learners by days since last activity', async () => {
-      enabled();
-      const row = (days: number | null) => ({ daysSinceLastActivity: days });
-      analytics.getLearnerUsage.mockResolvedValue({
-        count: 6,
-        data: [row(0), row(7), row(10), row(25), row(80), row(null)],
-      } as never);
-      const out = await service.getChartData(TENANT, 'TSQ-010', {});
-      expect(out.data).toEqual({
-        total: 6,
-        truncated: false,
-        bands: [
-          { key: 'week', count: 2 },
-          { key: 'fortnight', count: 1 },
-          { key: 'month', count: 1 },
-          { key: 'older', count: 1 },
-          { key: 'never', count: 1 },
         ],
       });
     });

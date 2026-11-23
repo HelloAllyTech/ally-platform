@@ -1,5 +1,6 @@
 import {
   CHART_SHAPES,
+  RETIRED_TENANT_CHARTS,
   SHAPE_ALLOWED_CHARTS,
   TENANT_CHART_LIBRARY,
 } from '../../constants/tenant-chart-library.constants';
@@ -32,15 +33,15 @@ describe('tenant chart library registry', () => {
     expect(validateChartLibrary()).toEqual([]);
   });
 
-  it('holds every chart from the doc and the research: 82', () => {
-    expect(TENANT_CHART_LIBRARY).toHaveLength(82);
+  it('holds the reviewed catalogue: 59 charts', () => {
+    expect(TENANT_CHART_LIBRARY).toHaveLength(59);
   });
 
   it('keeps the first-release ids 1 to 27 where they were', () => {
-    expect(TENANT_CHART_LIBRARY[0].id).toBe('TSQ-001');
-    expect(TENANT_CHART_LIBRARY[0].title).toBe('Headline numbers');
-    expect(TENANT_CHART_LIBRARY[26].id).toBe('TSQ-027');
-    expect(TENANT_CHART_LIBRARY[26].title).toBe('Sessions reviewed');
+    const byId = (id: string) => TENANT_CHART_LIBRARY.find((c) => c.id === id);
+    expect(byId('TSQ-001')?.title).toBe('Headline numbers');
+    expect(byId('TSQ-013')?.title).toBe('Course table');
+    expect(byId('TSQ-027')?.title).toBe('Sessions reviewed');
   });
 
   it('records where every chart came from', () => {
@@ -53,6 +54,34 @@ describe('tenant chart library registry', () => {
     expect(
       TENANT_CHART_LIBRARY.some((c) => c.sources.includes('research')),
     ).toBe(true);
+  });
+
+  it('never reuses a retired id, and says why each was retired', () => {
+    const ids = new Set(TENANT_CHART_LIBRARY.map((c) => c.id));
+    Object.entries(RETIRED_TENANT_CHARTS).forEach(([id, why]) => {
+      expect(ids.has(id)).toBe(false);
+      expect(why.length).toBeGreaterThan(10);
+    });
+    expect(Object.keys(RETIRED_TENANT_CHARTS)).toHaveLength(23);
+  });
+
+  it('has no two charts asking the same question', () => {
+    const questions = TENANT_CHART_LIBRARY.map((c) => c.question.toLowerCase());
+    expect(new Set(questions).size).toBe(questions.length);
+    const titles = TENANT_CHART_LIBRARY.map((c) => c.title.toLowerCase());
+    expect(new Set(titles).size).toBe(titles.length);
+  });
+
+  it('reports a reused retired id and an id out of order', () => {
+    const first = TENANT_CHART_LIBRARY[0];
+    const reused = [{ ...first, id: 'TSQ-004' }];
+    expect(validateChartLibrary(reused)).toEqual(
+      expect.arrayContaining([expect.stringContaining('retired')]),
+    );
+    const swapped = [TENANT_CHART_LIBRARY[1], TENANT_CHART_LIBRARY[0]];
+    expect(validateChartLibrary(swapped)).toEqual(
+      expect.arrayContaining([expect.stringContaining('increasing order')]),
+    );
   });
 
   it('never offers a blocked chart', () => {
@@ -83,11 +112,11 @@ describe('tenant chart library registry', () => {
     );
   });
 
-  it('reports a duplicate or out-of-sequence id', () => {
+  it('reports a duplicate id', () => {
     const dupe = [TENANT_CHART_LIBRARY[0], TENANT_CHART_LIBRARY[0]];
-    const problems = validateChartLibrary(dupe);
-    expect(problems.some((p) => p.includes('duplicate id'))).toBe(true);
-    expect(problems.some((p) => p.includes('sequential'))).toBe(true);
+    expect(
+      validateChartLibrary(dupe).some((p) => p.includes('duplicate id')),
+    ).toBe(true);
   });
 });
 
