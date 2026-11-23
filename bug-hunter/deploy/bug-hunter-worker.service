@@ -1,0 +1,22 @@
+# Bug Hunter v2 worker (chunk 10): takes bugs off bughunter.bugs by mode (off: nothing;
+# manual: only what an admin queued with "Put me on it"; autonomous: queued, then the
+# backlog). Each bug is a paid graph run (~$0.50-0.80), capped by the daily run limit
+# and the $15/day ledger. Same EnvironmentFile as the daily job (see its header).
+[Unit]
+Description=Bug Hunter v2 worker (runs queued bugs by mode)
+After=network-online.target docker.service
+Wants=network-online.target docker.service
+
+[Service]
+Type=simple
+User=bughunter
+WorkingDirectory=/opt/ally-platform/bug-hunter
+EnvironmentFile=/etc/bug-hunter/env
+ExecStart=/opt/bug-hunter/venv/bin/bug-hunter worker --interval 30
+# A crash restarts it; an abandoned run is recovered on start (chunk 10).
+Restart=on-failure
+RestartSec=60
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

@@ -40,6 +40,14 @@ def _startup() -> None:
 
     load_dotenv(PACKAGE_ROOT / ".env", override=False)
     configure()
+    # On the VM: a fresh GitHub App installation token in the environment. A failure
+    # here is reported by whichever command needs GitHub, not by every command.
+    from bug_hunter.github_app import GitHubAppError, refresh_env
+
+    try:
+        refresh_env()
+    except GitHubAppError as exc:
+        typer.echo(f"github app: {exc}", err=True)
 
 
 config_app = typer.Typer(help="Inspect and validate the configuration.")
@@ -1430,6 +1438,10 @@ def daily_sources(
     token = env.get(ENV_GITHUB_TOKEN, "")
 
     def github():
+        from bug_hunter.github_app import refresh_env
+
+        if refresh_env(env):
+            return HttpGitHubReader(env[ENV_GITHUB_TOKEN])
         if not token:
             raise RuntimeError(
                 f"no GitHub token ({ENV_GITHUB_TOKEN}); the GitHub App is not set up"

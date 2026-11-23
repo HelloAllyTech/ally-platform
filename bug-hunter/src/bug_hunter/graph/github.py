@@ -16,6 +16,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Protocol
 
+from bug_hunter.github_app import GitHubAppError, refresh_env
+
 
 class GitHubUnavailable(RuntimeError):
     pass
@@ -154,6 +156,7 @@ class GhCliGitHub:
     run: Runner = field(default=_run)
 
     def _env(self) -> dict[str, str]:
+        refresh_env()  # the App's token lasts an hour; a graph run can take most of one
         env = dict(os.environ)
         if env.get(ENV_TOKEN):
             env["GH_TOKEN"] = env[ENV_TOKEN]
@@ -169,6 +172,7 @@ class GhCliGitHub:
         return result.stdout.strip()
 
     def push_branch(self, worktree: Path, branch: str) -> None:
+        refresh_env()  # git pushes through gh's credential helper, which reads GH_TOKEN
         self.git.push(worktree, branch)
 
     def open_draft_pr(self, branch: str, title: str, body: str) -> PullRequest:
@@ -213,6 +217,10 @@ class GhCliGitHub:
 
 def gh_ready(run: Runner = _run) -> bool:
     """Whether `gh` is installed and can reach GitHub with a token or a login."""
+    try:
+        refresh_env()
+    except GitHubAppError:
+        return False
     env = dict(os.environ)
     if env.get(ENV_TOKEN):
         env["GH_TOKEN"] = env[ENV_TOKEN]

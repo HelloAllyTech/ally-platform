@@ -94,12 +94,18 @@ def test_deploy_units_share_one_lock_and_never_use_actions() -> None:
         "bug-hunter-daily.timer",
         "bug-hunter-poll.service",
         "bug-hunter-poll.timer",
+        "bug-hunter-worker.service",
+        "provision.sh",
+        "README.md",
     }
     for name in ("bug-hunter-daily.service", "bug-hunter-poll.service"):
         assert "flock -n /var/lib/bug-hunter/run.lock" in units[name]
+    for name in (n for n in units if n.endswith(".service")):
         assert "EnvironmentFile=/etc/bug-hunter/env" in units[name]
+        assert "User=bughunter" in units[name]
     assert "03:30:00 Asia/Kolkata" in units["bug-hunter-daily.timer"]
-    assert "--live" not in "".join(units.values())  # dry run until the rollout
+    systemd = "".join(v for k, v in units.items() if k.startswith("bug-hunter-"))
+    assert "--live" not in systemd  # dry run until the rollout
 
 
 def test_report_details_come_from_the_run(config, tmp_path) -> None:
