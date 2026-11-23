@@ -3,6 +3,7 @@ import { DEFAULT_WHATSAPP_SETTINGS } from '../../../whatsapp/type/whatsapp-setti
 import type { Chatbot } from '../../entity/chatbot.entity';
 import type { ChatTurn } from '../chatbot-engine.types';
 import {
+  historyBefore,
   buildAgentRunRequest,
   buildKnowledgeRequest,
   MAX_DECLINE_TEXT_CHARS,
@@ -127,5 +128,28 @@ describe('buildAgentRunRequest', () => {
     });
     expect(body.decline_text).toHaveLength(MAX_DECLINE_TEXT_CHARS);
     expect(MAX_DECLINE_TEXT_CHARS).toBe(500);
+  });
+});
+
+describe('historyBefore (Q4 H6: the live page and Try it send the same history)', () => {
+  const said = "7 pm works. I'm Priya Test, 98000 00031.";
+  const before = [
+    { role: 'user' as const, content: 'What times are free tomorrow evening?' },
+    { role: 'assistant' as const, content: '6 pm and 7 pm are free.' },
+  ];
+
+  it("drops the bot page's and WhatsApp's stored copy of the message being answered", () => {
+    expect(
+      historyBefore({
+        text: said,
+        history: [...before, { role: 'user', content: said }],
+      }),
+    ).toEqual(before);
+  });
+
+  it("leaves Try it's history, and an earlier identical message, as they are", () => {
+    expect(historyBefore({ text: said, history: before })).toEqual(before);
+    const repeated = [{ role: 'user' as const, content: said }, ...before];
+    expect(historyBefore({ text: said, history: repeated })).toEqual(repeated);
   });
 });

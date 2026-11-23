@@ -23,6 +23,24 @@ export const NO_DOCUMENTS = '00000000-0000-0000-0000-000000000000';
 export const MAX_DECLINE_TEXT_CHARS = 500;
 
 /**
+ * The conversation before the message being answered (Q4 H6). WhatsApp and the bot page store the
+ * message before answering, so their history already ends with it; Try it's doesn't. Sent as is,
+ * the live page gave the agent the person's message twice and a different window than Try it, and
+ * the two answered the same booking differently. Dropping a last entry that IS the current message
+ * makes every path send the same history (as `crisisHistory` does for the crisis check).
+ */
+export function historyBefore(
+  turn: Pick<ChatTurn, 'text' | 'history'>,
+): NonNullable<ChatTurn['history']> {
+  const turns = [...(turn.history ?? [])];
+  const last = turns[turns.length - 1];
+  if (last?.role === 'user' && last.content?.trim() === turn.text.trim()) {
+    turns.pop();
+  }
+  return turns;
+}
+
+/**
  * The ONE place the knowledge request is built. v1 sends it to `/knowledge-agent/answer` as is;
  * v2 sends it to `/agent/run` with the run's identity added (`buildAgentRunRequest`). A
  * field added here reaches both engines, so they cannot drift apart.
@@ -35,7 +53,7 @@ export function buildKnowledgeRequest(
   const { chatbot, settings } = turn;
   return {
     question: turn.text,
-    history: (turn.history ?? []).slice(-MAX_HISTORY_MESSAGES),
+    history: historyBefore(turn).slice(-MAX_HISTORY_MESSAGES),
     prompts,
     ...knowledge,
     persona: personaRequest(turn),
