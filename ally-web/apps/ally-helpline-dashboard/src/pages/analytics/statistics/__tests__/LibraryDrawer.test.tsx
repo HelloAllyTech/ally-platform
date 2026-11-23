@@ -42,7 +42,7 @@ describe("the chart library", () => {
 
   it("offers each chart with one Add button, whatever filters it has", () => {
     const onAdd = vi.fn();
-    render(<LibraryDrawer charts={charts} addedIds={[]} onAdd={onAdd} onClose={vi.fn()} />);
+    render(<LibraryDrawer charts={charts} addedIds={[]} onAdd={onAdd} />);
     fireEvent.click(screen.getByTestId("statistics-library-add-TSQ-003"));
     expect(onAdd).toHaveBeenCalledWith("TSQ-003");
     expect(screen.getByTestId("statistics-library-add-TSQ-041")).toBeTruthy();
@@ -51,7 +51,7 @@ describe("the chart library", () => {
   });
 
   it("scrolls its list on its own", () => {
-    render(<LibraryDrawer charts={charts} addedIds={[]} onAdd={vi.fn()} onClose={vi.fn()} />);
+    render(<LibraryDrawer charts={charts} addedIds={[]} onAdd={vi.fn()} />);
     expect(screen.getByTestId("statistics-library-list").className).toContain("overflow-y-auto");
   });
 });

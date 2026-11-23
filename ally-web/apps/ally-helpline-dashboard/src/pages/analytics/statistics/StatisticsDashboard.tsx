@@ -53,7 +53,6 @@ export const StatisticsDashboard: FunctionComponent<StatisticsDashboardProps> = 
   const { t } = useTranslation();
   const [range, setRange] = useState<OrganizationMetricsRange>("90d");
   const [editing, setEditing] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const { data: preferences, isLoading: preferencesLoading } = useGetUserPreferencesQuery();
   const [updateUserPreferences] = useUpdateUserPreferencesMutation();
@@ -115,7 +114,6 @@ export const StatisticsDashboard: FunctionComponent<StatisticsDashboardProps> = 
     persist(items.map(item => (item.id === id ? layoutKey(id, filters) : item.key)));
   const finishEditing = () => {
     setEditing(false);
-    setDrawerOpen(false);
   };
 
   const rangeOptions = useMemo(
@@ -152,16 +150,6 @@ export const StatisticsDashboard: FunctionComponent<StatisticsDashboardProps> = 
             />
             {editing ? (
               <>
-                {!drawerOpen && (
-                  <button
-                    type="button"
-                    onClick={() => setDrawerOpen(true)}
-                    className="min-h-11 rounded border border-[#264d8e] bg-white px-4 text-sm font-medium text-[#264d8e]"
-                    data-testid="statistics-add-charts"
-                  >
-                    {t("statisticsLibrary.addCharts")}
-                  </button>
-                )}
                 <button
                   type="button"
                   onClick={finishEditing}
@@ -174,11 +162,7 @@ export const StatisticsDashboard: FunctionComponent<StatisticsDashboardProps> = 
             ) : (
               <button
                 type="button"
-                onClick={() => {
-                  // Customising opens the chart library straight away.
-                  setEditing(true);
-                  setDrawerOpen(true);
-                }}
+                onClick={() => setEditing(true)}
                 className="min-h-11 rounded border border-[#264d8e] bg-white px-4 text-sm font-medium text-[#264d8e]"
                 data-testid="statistics-customise"
               >
@@ -251,14 +235,8 @@ export const StatisticsDashboard: FunctionComponent<StatisticsDashboardProps> = 
             )}
           </div>
 
-          {editing && drawerOpen && (
-            <LibraryDrawer
-              charts={charts}
-              addedIds={entryKeys}
-              onAdd={handleAdd}
-              onClose={() => setDrawerOpen(false)}
-            />
-          )}
+          {/* The library stays open for as long as the dashboard is being customised. */}
+          {editing && <LibraryDrawer charts={charts} addedIds={entryKeys} onAdd={handleAdd} />}
         </div>
       </div>
     </DashboardContext.Provider>

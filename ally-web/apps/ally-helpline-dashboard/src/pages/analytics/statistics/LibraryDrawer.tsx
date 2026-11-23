@@ -13,7 +13,6 @@ interface LibraryDrawerProps {
   addedIds: readonly string[];
   /** Adds a chart to the dashboard. */
   onAdd: (id: string) => void;
-  onClose: () => void;
 }
 
 const GROUP_ORDER: StatisticsChartGroup[] = [
@@ -43,7 +42,6 @@ export const LibraryDrawer: FunctionComponent<LibraryDrawerProps> = ({
   charts,
   addedIds,
   onAdd,
-  onClose,
 }) => {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
@@ -71,20 +69,9 @@ export const LibraryDrawer: FunctionComponent<LibraryDrawerProps> = ({
       data-testid="statistics-library-drawer"
     >
       <div className="flex flex-none flex-col gap-3 border-b border-border-light p-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-medium text-typography-900">
-            {t("statisticsLibrary.library.title")}
-          </h2>
-          <button
-            type="button"
-            aria-label={t("statisticsLibrary.library.close")}
-            onClick={onClose}
-            className="flex h-11 w-11 items-center justify-center text-xl text-typography-600"
-            data-testid="statistics-library-close"
-          >
-            &times;
-          </button>
-        </div>
+        <h2 className="text-xl font-medium text-typography-900">
+          {t("statisticsLibrary.library.title")}
+        </h2>
         <input
           type="search"
           value={query}
