@@ -10,6 +10,7 @@ import {
   itemsOf,
   moneyOf,
   partsOf,
+  isNegative,
   planInstall,
   resolveWhen,
   type SetupAnswers,
@@ -375,4 +376,33 @@ describe('the Campaigns template sets up with its own update (Q4 G+15)', () => {
     });
     expect(row.values.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
+});
+
+describe("a template's answer is read as written (Q4 H10)", () => {
+  it('a negative line is a rule the assistant knows, never a list entry', () => {
+    const t = TEMPLATES.find((x) => x.id === 'supporters')!;
+    const q = t.setup.find((s) => s.fills.some((f) => f.to === 'entries'))!;
+    const plan = planInstall(
+      t,
+      { [q.key]: 'UPI - scan the QR at the centre\nWe never accept cash' },
+      { zone: ZONE, now: NOW },
+    );
+    const list = q.fills.find((f) => f.to === 'entries') as { list: string };
+    const rows = plan.entries[list.list].filter((r) => !r.example);
+    expect(rows).toHaveLength(1);
+    expect(JSON.stringify(rows[0].values)).not.toMatch(/cash/i);
+    expect(plan.facts.join('\n')).toContain('We never accept cash');
+  });
+
+  it.each([
+    'We never accept cash',
+    'No walk-ins',
+    "We don't take card payments",
+    'Cash nahi lete',
+  ])('"%s" is negative', (line) => expect(isNegative(line)).toBe(true));
+  it.each([
+    'UPI - scan the QR',
+    'Bank transfer to our account',
+    'Cheque in the name of the trust',
+  ])('"%s" is not', (line) => expect(isNegative(line)).toBe(false));
 });
