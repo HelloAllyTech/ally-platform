@@ -62,6 +62,7 @@ Owned by root, group `bughunter`, mode `0640`. Never committed, never printed.
 | `OPENAI_API_KEY`, `GOOGLE_API_KEY` | Model providers |
 | `LANGSMITH_API_KEY`, `LANGSMITH_WORKSPACE_ID` | Tracing |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Read-only CloudWatch Logs (`logs:StartQuery`, `logs:GetQueryResults`, `logs:DescribeLogGroups`) |
+| `BUGHUNTER_LOG_GROUPS` | JSON `{app: [log group, ...]}` for the error-log signal; kept out of the public repo |
 | `BUGHUNTER_SPEND_BACKEND=db`, `BUGHUNTER_HOME=/var/lib/bug-hunter` | Ledger in the database; runs and caches on the container |
 
 The GitHub token is not in this file: `github_app.py` mints an installation token from
