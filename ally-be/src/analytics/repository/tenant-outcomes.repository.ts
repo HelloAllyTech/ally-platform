@@ -7,13 +7,6 @@ export interface LearnerTrendCounts {
   declining: number;
 }
 
-export interface RatingCounts {
-  /** Index 0 is one star, index 4 is five stars. */
-  stars: number[];
-  count: number;
-  average: number | null;
-}
-
 export interface ReviewCoverage {
   completedSessions: number;
   reviewedSessions: number;
@@ -80,36 +73,6 @@ export class TenantOutcomesRepository {
       improving: Number(r?.improving ?? 0),
       holding: Number(r?.holding ?? 0),
       declining: Number(r?.declining ?? 0),
-    };
-  }
-
-  /** Session ratings (1 to 5 stars) given in the window. Counts only: no comments. */
-  async getRatingCounts(
-    tenantId: string,
-    tenantCode: string,
-    start: Date,
-    endExclusive: Date,
-  ): Promise<RatingCounts> {
-    const rows: Array<{ rating: number; n: string }> =
-      await this.dataSource.query(
-        `SELECT f.rating AS rating, COUNT(*) AS n
-           FROM scenario_session_feedbacks f
-          WHERE f.tenant_id::text IN ($1, $2)
-            AND f.rating BETWEEN 1 AND 5
-            AND f."createdAt" >= $3 AND f."createdAt" < $4
-          GROUP BY f.rating`,
-        [tenantId, tenantCode, start, endExclusive],
-      );
-    const stars = [0, 0, 0, 0, 0];
-    rows.forEach((r) => {
-      stars[Number(r.rating) - 1] = Number(r.n);
-    });
-    const count = stars.reduce((a, b) => a + b, 0);
-    const total = stars.reduce((sum, n, i) => sum + n * (i + 1), 0);
-    return {
-      stars,
-      count,
-      average: count > 0 ? Math.round((total / count) * 10) / 10 : null,
     };
   }
 

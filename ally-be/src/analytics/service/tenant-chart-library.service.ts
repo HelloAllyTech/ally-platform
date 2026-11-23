@@ -290,7 +290,8 @@ export class TenantChartLibraryService {
         };
       },
       // Session ratings: how many of each star, and the average. No comments.
-      'TSQ-026': (tenantId, p, code) => this.ratings(tenantId, code, p),
+      'TSQ-026': (tenantId, p, code) =>
+        this.runSpec('TSQ-026', tenantId, code, p),
       // How many completed sessions have been shared for review.
       'TSQ-027': (tenantId, p, code) => this.reviewCoverage(tenantId, code, p),
       // When learners practise: sessions by weekday and time of day.
@@ -308,13 +309,16 @@ export class TenantChartLibraryService {
       // Average skill level, each learner's first slice against their latest.
       'TSQ-024': (tenantId, _p, code) => this.skillChange(tenantId, code),
       // Most-used simulations.
-      'TSQ-003': async (tenantId, p) =>
-        (
-          await this.tenantAnalytics.getOrganizationMetrics(
-            tenantId,
-            p.range ?? DEFAULT_CHART_RANGE,
-          )
-        ).mostUsedSimulations,
+      'TSQ-003': async (tenantId, p, code) => {
+        const out = (await this.runSpec('TSQ-003', tenantId, code, p)) as {
+          rows: RankedRow[];
+        };
+        return out.rows.map((r) => ({
+          scenarioId: Number(r.key),
+          title: r.label,
+          sessionCount: r.value,
+        }));
+      },
       // Learner table.
       'TSQ-009': (tenantId, p) =>
         this.tenantAnalytics.getLearnerUsage(tenantId, {
@@ -697,7 +701,7 @@ export class TenantChartLibraryService {
     tenantId: string,
     code: string,
     p: TenantChartParams,
-  ): Promise<ScoreDistributionData | { rows: RankedRow[] }> {
+  ): Promise<ScoreDistributionData | RatingsData | { rows: RankedRow[] }> {
     const spec = TENANT_CHART_SPECS[chartId];
     const { start, endExclusive } = this.windowFor(
       p.range ?? DEFAULT_CHART_RANGE,
@@ -716,6 +720,7 @@ export class TenantChartLibraryService {
     if (spec.result === 'distribution') {
       return this.chartQueryRepo.distribution(spec, window);
     }
+    if (spec.result === 'stars') return this.chartQueryRepo.stars(window);
     return { rows: await this.chartQueryRepo.ranked(spec, window) };
   }
 
@@ -757,22 +762,6 @@ export class TenantChartLibraryService {
       total: counts.improving + counts.holding + counts.declining,
       threshold: TREND_THRESHOLD_POINTS,
     };
-  }
-
-  private async ratings(
-    tenantId: string,
-    code: string,
-    p: TenantChartParams,
-  ): Promise<RatingsData> {
-    const { start, endExclusive } = this.windowFor(
-      p.range ?? DEFAULT_CHART_RANGE,
-    );
-    return this.outcomesRepo.getRatingCounts(
-      tenantId,
-      code,
-      start,
-      endExclusive,
-    );
   }
 
   private async reviewCoverage(

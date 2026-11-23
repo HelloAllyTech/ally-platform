@@ -12,6 +12,18 @@ export const SCENARIO_LIMIT = 8;
 export const TENANT_CHART_SPECS: Readonly<Record<string, ChartQuerySpec>> = {
   // How do session scores spread?
   'TSQ-020': { source: 'sessions', result: 'distribution' },
+  // Which simulations do learners practise most? Completed sessions, most first.
+  'TSQ-003': {
+    source: 'sessions',
+    result: 'ranked',
+    measure: 'sessions',
+    dimension: 'scenario',
+    basis: 'completed',
+    order: 'desc',
+    limit: 5,
+  },
+  // What do learners think of their sessions?
+  'TSQ-026': { source: 'feedback', result: 'stars' },
   // Which scenarios are hardest? Lowest average score first.
   'TSQ-022': {
     source: 'sessions',

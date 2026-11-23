@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import {
-  ChartScope,
+  ChartSelection,
   CompileContext,
   DistributionSessionSpec,
   RankedSessionSpec,
   compileDistributionBins,
+  compileStars,
   compileMedian,
   compileRanked,
 } from '../util/tenant-chart-query.util';
@@ -24,12 +25,19 @@ export interface DistributionResult {
   median: number | null;
 }
 
+export interface StarsResult {
+  /** Index 0 is one star, index 4 is five stars. */
+  stars: number[];
+  count: number;
+  average: number | null;
+}
+
 export interface QueryWindow {
   tenantId: string;
   tenantCode: string;
   start: Date;
   endExclusive: Date;
-  scope: ChartScope;
+  scope: ChartSelection;
 }
 
 /**
@@ -83,6 +91,23 @@ export class TenantChartQueryRepository {
       bins,
       sessions: bins.reduce((a, b) => a + b, 0),
       median: median == null ? null : Math.round(Number(median)),
+    };
+  }
+
+  async stars(w: QueryWindow): Promise<StarsResult> {
+    const q = compileStars(w as CompileContext);
+    const rows: Array<{ rating: number; n: string }> =
+      await this.dataSource.query(q.sql, q.params);
+    const stars = [0, 0, 0, 0, 0];
+    rows.forEach((r) => {
+      stars[Number(r.rating) - 1] = Number(r.n);
+    });
+    const count = stars.reduce((a, b) => a + b, 0);
+    const total = stars.reduce((sum, n, i) => sum + n * (i + 1), 0);
+    return {
+      stars,
+      count,
+      average: count > 0 ? Math.round((total / count) * 10) / 10 : null,
     };
   }
 }

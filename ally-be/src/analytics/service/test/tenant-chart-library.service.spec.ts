@@ -50,7 +50,6 @@ describe('TenantChartLibraryService', () => {
     } as unknown as jest.Mocked<TenantAnalyticsService>;
     outcomes = {
       getLearnerTrendCounts: jest.fn(),
-      getRatingCounts: jest.fn(),
       getReviewCoverage: jest.fn(),
     } as unknown as jest.Mocked<TenantOutcomesRepository>;
     practice = {
@@ -65,6 +64,7 @@ describe('TenantChartLibraryService', () => {
     chartQuery = {
       ranked: jest.fn(),
       distribution: jest.fn(),
+      stars: jest.fn(),
     } as unknown as jest.Mocked<TenantChartQueryRepository>;
     scopeOptions = {
       list: jest.fn(),
@@ -549,7 +549,7 @@ describe('TenantChartLibraryService', () => {
 
     it('offers a scope in the library only where the chart supports it', async () => {
       enabled();
-      repo.getCapabilities.mockResolvedValue(caps({ sessions: 100 }));
+      repo.getCapabilities.mockResolvedValue(caps());
       const lib = await service.getLibrary(TENANT);
       const by = Object.fromEntries(lib.charts.map((c) => [c.id, c.scopes]));
       expect(by['TSQ-020']).toEqual([
@@ -611,9 +611,48 @@ describe('TenantChartLibraryService', () => {
     it('TSQ-026 returns rating counts and no comments', async () => {
       ready();
       const ratings = { stars: [11, 5, 55, 36, 135], count: 242, average: 4.2 };
-      outcomes.getRatingCounts.mockResolvedValue(ratings);
+      chartQuery.stars.mockResolvedValue(ratings);
       const out = await service.getChartData(TENANT, 'TSQ-026', {});
       expect(out.data).toEqual(ratings);
+    });
+
+    it('TSQ-026 can be drawn for one learner', async () => {
+      ready();
+      scopeOptions.describe.mockResolvedValue('Asha');
+      chartQuery.stars.mockResolvedValue({
+        stars: [0, 0, 0, 0, 1],
+        count: 1,
+        average: 5,
+      });
+      const out = await service.getChartData(TENANT, 'TSQ-026', {
+        learnerId: 4,
+      });
+      expect(out.scope).toEqual({ kind: 'learner', id: '4', label: 'Asha' });
+      expect(chartQuery.stars).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scope: expect.objectContaining({ learnerId: 4 }),
+        }),
+      );
+    });
+
+    it('TSQ-003 lists simulations by completed sessions, in the page shape', async () => {
+      ready();
+      chartQuery.ranked.mockResolvedValue([
+        { key: '8', label: 'Confidentiality', value: 16, sessions: 16 },
+      ]);
+      const out = await service.getChartData(TENANT, 'TSQ-003', {});
+      expect(out.data).toEqual([
+        { scenarioId: 8, title: 'Confidentiality', sessionCount: 16 },
+      ]);
+      expect(chartQuery.ranked).toHaveBeenCalledWith(
+        expect.objectContaining({
+          measure: 'sessions',
+          basis: 'completed',
+          order: 'desc',
+          limit: 5,
+        }),
+        expect.anything(),
+      );
     });
 
     it('TSQ-027 returns how many completed sessions were shared for review', async () => {
@@ -631,14 +670,14 @@ describe('TenantChartLibraryService', () => {
 
     it('an organisation range of all time starts at the epoch', async () => {
       ready();
-      outcomes.getRatingCounts.mockResolvedValue({
+      chartQuery.stars.mockResolvedValue({
         stars: [0, 0, 0, 0, 0],
         count: 0,
         average: null,
       });
       await service.getChartData(TENANT, 'TSQ-026', { range: 'all' });
-      const start = outcomes.getRatingCounts.mock.calls[0][2] as Date;
-      expect(start.getTime()).toBe(0);
+      const window = chartQuery.stars.mock.calls[0][0];
+      expect(window.start.getTime()).toBe(0);
     });
 
     it('refuses a chart the organisation cannot fill yet, as before', async () => {

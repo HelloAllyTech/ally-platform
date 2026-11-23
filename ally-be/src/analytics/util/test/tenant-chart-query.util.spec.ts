@@ -1,4 +1,5 @@
 import {
+  compileStars,
   compileDistributionBins,
   compileMedian,
   compileRanked,
@@ -82,5 +83,53 @@ describe('chart query compiler', () => {
         7,
       ]);
     });
+  });
+
+  it('counts completed sessions the way the metrics page does', () => {
+    const { sql } = compileRanked(
+      {
+        ...spec,
+        measure: 'sessions',
+        basis: 'completed',
+        order: 'desc',
+        limit: 5,
+      },
+      ctx(),
+    );
+    expect(sql).toContain(
+      `s.status = 'ENDED' AND s."eventStatus" = 'COMPLETED'`,
+    );
+    expect(sql).toContain('COALESCE(s."endedAt", s."createdAt") >= $3');
+    expect(sql).not.toContain('scenario_session_details');
+    expect(sql).toContain('ORDER BY COUNT(*) DESC');
+  });
+
+  it('defaults a score measure to scored sessions and a count to completed ones', () => {
+    expect(compileRanked(spec, ctx()).sql).toContain(
+      'scenario_session_details',
+    );
+    expect(
+      compileRanked({ ...spec, measure: 'learners' }, ctx()).sql,
+    ).not.toContain('scenario_session_details');
+  });
+
+  it('counts stars for the whole organisation without touching sessions', () => {
+    const { sql, params } = compileStars(ctx());
+    expect(sql).toContain('f.tenant_id::text IN ($1, $2)');
+    expect(sql).not.toContain('scenario_sessions');
+    expect(params).toHaveLength(4);
+  });
+
+  it("reaches a rating's course, simulation and learner through its session", () => {
+    const courseId = '8b3f2f0e-1c0a-4d6e-9a53-3d1c0d2f4a11';
+    const { sql, params } = compileStars(
+      ctx({ courseId, scenarioId: 7, learnerId: 9 }),
+    );
+    expect(sql).toContain(
+      'JOIN scenario_sessions s ON s.id = f."scenarioSessionId"',
+    );
+    expect(sql).toContain('JOIN track_item_progress');
+    expect(params.slice(4)).toEqual([7, courseId, 9]);
+    expect(sql).not.toContain(courseId);
   });
 });
