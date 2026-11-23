@@ -23,12 +23,6 @@ export enum BugHuntPhase {
   PR = 'pr',
 }
 
-/** Whether the agent is opening or closing a phase — the two events a boundary can be. */
-export enum BugHuntPhaseEvent {
-  STARTED = 'started',
-  FINISHED = 'finished',
-}
-
 /**
  * Every source of context Bug Hunter hands the agent, recorded per fetch so
  * the run can say what the agent was shown and how long it took to get.

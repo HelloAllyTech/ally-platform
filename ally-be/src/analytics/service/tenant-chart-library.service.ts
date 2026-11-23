@@ -161,15 +161,6 @@ export interface LearnerTrendData {
   threshold: number;
 }
 
-export interface ScenarioScoresData {
-  rows: Array<{
-    scenarioId: number;
-    title: string;
-    averageScore: number;
-    sessions: number;
-  }>;
-}
-
 export interface RatingsData {
   /** Index 0 is one star, index 4 is five stars. */
   stars: number[];

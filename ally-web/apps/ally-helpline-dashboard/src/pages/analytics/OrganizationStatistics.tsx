@@ -19,7 +19,7 @@ const StatisticsDashboard = lazy(() =>
  * backend without the endpoint, or a failed request), so the Statistics page
  * never goes blank because of the new feature.
  */
-export const OrganizationStatistics: FunctionComponent = () => {
+const OrganizationStatistics: FunctionComponent = () => {
   const { data: library, isLoading } = useGetStatisticsChartLibraryQuery();
 
   if (isLoading) {

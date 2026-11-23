@@ -73,25 +73,6 @@ export enum BugFindingDecisionReason {
 }
 
 /**
- * Decline reasons that mean the FINDER got it wrong, as opposed to the finding
- * being real but unwanted.
- *
- * This is the distinction the precision metric turns on, and getting it
- * backwards would make a well-run triage session look like a broken agent: a
- * team that declines nine real-but-minor lint findings has not been served
- * badly by its bug hunter, whereas one that declines two hallucinated bugs
- * has. So `BugHunterMetricsService` counts only these against accuracy, and
- * `buildSweepPrompt` shows only these to the next sweep as things it should
- * not have filed — a WONT_FIX re-filed next month is arguably correct
- * behaviour, since the priority may have changed.
- */
-export const BUG_FINDING_FINDER_ERROR_REASONS: BugFindingDecisionReason[] = [
-  BugFindingDecisionReason.NOT_A_BUG,
-  BugFindingDecisionReason.WRONG_REPO,
-  BugFindingDecisionReason.DUPLICATE,
-];
-
-/**
  * Where a finding sits in the find → (approve) → fix → land pipeline.
  *
  * Transitions:
@@ -179,99 +160,6 @@ export const BUG_FINDING_PARENT_STATUSES: BugFindingStatus[] = [
   // (only a leaf step is), so it can only ever arrive here via a stuck child.
   BugFindingStatus.CANCELLED,
 ];
-
-/**
- * Statuses an admin may start a fix session from.
- *
- * Deliberately broad — a NEW human-reported bug is the headline case (the
- * whole point of the button is that a human already knows this is a real bug
- * and doesn't want to wait for a nightly sweep to rediscover it), and FAILED /
- * PR_OPENED are here so a stalled attempt can be retried without a fresh
- * discovery pass. CANCELLED is here for the same reason as FAILED: a human
- * stopped a stuck session, but the bug still needs fixing. Excluded: MERGED
- * and everything downstream of it (already fixed — releasing is the next
- * step, not fixing), DISMISSED/REJECTED (a human or the verifier already said
- * no; re-opening should be a deliberate separate act), and
- * QUEUED/FIXING/RELEASING (a session is already in flight — see
- * BugFixSessionService.start's double-dispatch guard).
- */
-/**
- * Statuses that mean "this bug is still open": recorded, not declined, and
- * not yet on master.
- *
- * The one list. It used to exist twice — in BugFindingRepository, deciding
- * whether a re-discovered bug touches an existing row or opens a new one,
- * and in BugHunterMetricsService, deciding what counts as "open" in the
- * funnel — and the two had drifted: the repository's copy lacked BLOCKED and
- * COORDINATING, so a sweep that re-found a bug whose fix was waiting its turn
- * in a multi-repo plan opened a duplicate row beside it. A plan step is as
- * open as any other bug; so is the parent coordinating it.
- *
- * RELEASING is deliberately NOT here: the fix is on master, so a
- * re-discovery during the deploy is a regression of a shipped fix, not the
- * same open bug. The metrics funnel adds it back for its own question
- * ("does the user have this yet"), and says so where it does.
- */
-export const BUG_FINDING_OPEN_STATUSES: BugFindingStatus[] = [
-  BugFindingStatus.NEW,
-  BugFindingStatus.PENDING_APPROVAL,
-  BugFindingStatus.APPROVED,
-  // A dispatched-but-not-yet-started fix session is as open as one already
-  // running — a sweep that rediscovers the bug in the meantime must touch that
-  // row, not open a second one alongside it.
-  BugFindingStatus.QUEUED,
-  BugFindingStatus.FIXING,
-  BugFindingStatus.NEEDS_INPUT,
-  BugFindingStatus.BLOCKED,
-  BugFindingStatus.COORDINATING,
-  BugFindingStatus.PR_OPENED,
-];
-
-export const BUG_FINDING_FIX_SESSION_START_STATUSES: BugFindingStatus[] = [
-  BugFindingStatus.NEW,
-  BugFindingStatus.PENDING_APPROVAL,
-  BugFindingStatus.APPROVED,
-  BugFindingStatus.NEEDS_INPUT,
-  BugFindingStatus.PR_OPENED,
-  BugFindingStatus.FAILED,
-  BugFindingStatus.CANCELLED,
-];
-
-/**
- * Statuses from which a human report may be LOCATED — sent to the Verifier to
- * name the layer at fault — and from which a verdict may act on the finding.
- * The same list as the one a fix session starts from, on purpose: locating
- * is what happens before a fix session, so wherever "Put me on it" is
- * offered, locate-first is offered too. Until 2026-10-12 only NEW and
- * PENDING_APPROVAL qualified, so a report that had already been "fixed" once
- * in the wrong layer (its PR closed, the bug back at PR_OPENED or CANCELLED)
- * went straight to a second fix session from the same symptom — the exact
- * case locate-first exists for. QUEUED and FIXING stay out (a session is
- * running), as do the terminal and released statuses (a person acted).
- */
-export const BUG_FINDING_LOCATE_STATUSES: BugFindingStatus[] =
-  BUG_FINDING_FIX_SESSION_START_STATUSES;
-
-/**
- * Statuses an admin may rewrite the description from.
- *
- * The same list as BUG_FINDING_FIX_SESSION_START_STATUSES, and deliberately
- * so: the point of editing is to improve the brief a fix session will read, so
- * the edit belongs exactly where the "Put me on it" button is offered and
- * nowhere else. Derived from that list rather than re-typed, so the two can
- * never drift apart.
- *
- * What this excludes is the interesting half. QUEUED and FIXING are out even
- * though a runner fetches the prompt fresh (see the pipeline controller's
- * `getFixPrompt`) and an edit made in that window would technically reach the
- * agent: whether it lands depends on a race with the runner starting, and a
- * field whose effect is "maybe" is worse than one that is plainly closed.
- * MERGED and everything past it are out because a fix already exists — the
- * description now documents what was fixed, and rewriting history there would
- * make the PR and the bug disagree.
- */
-export const BUG_FINDING_DESCRIPTION_EDITABLE_STATUSES: BugFindingStatus[] =
-  BUG_FINDING_FIX_SESSION_START_STATUSES;
 
 /** Statuses a client may filter the table by, plus the "show everything" option. */
 export const BUG_FINDING_STATUS_FILTERS = [
