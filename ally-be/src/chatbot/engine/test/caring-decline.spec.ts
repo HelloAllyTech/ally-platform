@@ -1,4 +1,8 @@
-import { asksAboutMedicine, caringDecline } from '../caring-decline';
+import {
+  asksAboutMedicine,
+  asksForDiagnosis,
+  caringDecline,
+} from '../caring-decline';
 
 describe('caring replies for an empty decline (chunk H1)', () => {
   const base = {
@@ -64,4 +68,39 @@ describe('caring replies for an empty decline (chunk H1)', () => {
   it.each(['What are your timings?', 'Do you do LASIK?'])('%s does not', (q) =>
     expect(asksAboutMedicine(q)).toBe(false),
   );
+});
+
+describe('a request for a diagnosis (Q4 3b)', () => {
+  it.each([
+    'Can you tell me if I have depression?',
+    'Do I have anxiety?',
+    'Am I depressed?',
+    'Kya mujhe depression hai?',
+    'क्या मुझे डिप्रेशन है?',
+  ])('is one: %s', (text) => {
+    expect(asksForDiagnosis(text)).toBe(true);
+  });
+
+  it.each([
+    'What is depression?',
+    'Do you treat anxiety?',
+    'How do I book a session?',
+  ])('is not one: %s', (text) => {
+    expect(asksForDiagnosis(text)).toBe(false);
+  });
+
+  it('gets who can assess it, the organisation and Tele-MANAS', () => {
+    const reply = caringDecline({
+      organisation: 'iCall',
+      contact: '9152987821',
+      language: 'en',
+      upset: false,
+      question: 'Can you tell me if I have depression?',
+    });
+    expect(reply).toContain(
+      'only a doctor or mental health professional can assess it',
+    );
+    expect(reply).toContain('iCall on 9152987821');
+    expect(reply).toContain('14416');
+  });
 });

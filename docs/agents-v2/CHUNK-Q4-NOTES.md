@@ -120,3 +120,16 @@ Counts overlap: one miss can be fixed by more than one item.
 | G+14 "Replace them" link | Done |
 | G+15 Campaigns "Set it up" | Not started |
 | G+16 T2's three | Not started |
+
+## For Phase 3: in-data misses left after Q4 (`2026-11-23-after-C-1`, view 3)
+
+28 misses (23 on the 11 like-for-like assistants; Scripbox 3 and Teach For India 2 as new baselines), each read by hand with `misses.py` (search results, stored information, reply). Not fixed in Q4 (Shehbaz, 23 Nov: no more answer-quality rounds; 62% under the old grading and 75% under view 3 are short of 85%).
+
+| Cause | Misses | Cases, and the likely fix |
+|---|---|---|
+| The reply had the passage but left the fact out or got it wrong | 12 | b1-f10 (a branch's enquiry number given though the main one was retrieved: the main contact from the home page, G4), b3-f03 (₹3,133 retrieved; "no product named Icy Pink co-ord set": match product names loosely), b5a-f09 (₹500 retrieved; "prices vary by hub": give what is listed), o2-f05 (cities retrieved in part; "across India"), o3-f01 (the receipt's PAN details left out), o4-f05 (the WFH limit retrieved; declined), o4-f10 (Hinglish: offered to forward the question instead of answering), o5-f04 (founding year retrieved; declined), o5-f05 and rha-L3 ("no 80G" left out after "zero-funds": a key fact phrased for both), o5-f09 (Marathi: the Join Us link left out), rha-L2 (Tamil: asked back). Likely fix: a "use what you found" rewrite when a declined or vague reply had a passage with the answer, and key facts that pair related facts |
+| Search didn't return the passage | 8 | b2-f04 (home physiotherapy, a list item beyond the neighbour reach), b3-f07 and b3-f08 (product prices in a large catalogue), b4-f05 and b4-f10 (Scripbox's financial-plan fee, English and Hinglish), o1-f10 (iCall's privacy details, Hinglish), o3-f04 (household items), rha-Q2 ("free to join, Join Us page"). Likely fix: a catalogue read as a list (one entry per product, findable by name), list-aware chunking (a list kept with its heading), and hybrid weighting tuned on the full suite |
+| Sources disagree | 3 | b3-f04 (owner's 15-day returns vs the product pages' 30 days: G+13, the owner's answer wins), b3-f10 (several oversized T-shirt prices), o3-f09 (internship types and stipends on different pages). Likely fix: G+13, and setup asking which is right when facts conflict |
+| Stray text | 2 | b5a-f04 and o1-f02: "(citations: 15, 14)", a C16 form not yet removed (with C16) |
+| The grader or the set | 2 | b5b-f01 (the reply gives "₹100 (was ₹200)", right since C15; the set's must-not forbids any ₹200: set fix), o1-f09 (the core answer right; "referral to professionals" asked as extra) |
+| A hand-over replaced the answer | 1 | b4-f06 (Scripbox): hand-over off by default (H5) |
