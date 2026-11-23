@@ -107,6 +107,13 @@ class ChunkAudience:
         return conditions
 
 
+#: Neighbour chunks (Q4): how far either way, what counts as short, and the cap.
+NEIGHBOUR_REACH = 2
+SHORT_HIT_CHARS = 200
+SHORT_NEIGHBOUR_CHARS = 150
+NEIGHBOUR_MAX_CHARS = 1500
+
+
 class KnowledgeChunkService:
     """Indexing and retrieval for ONE passage-level knowledge corpus.
 
@@ -426,7 +433,67 @@ class KnowledgeChunkService:
                 any_of=audience.to_any_of(),
             )
 
-        return [self._to_passage(hit) for hit in hits]
+        passages = [self._to_passage(hit) for hit in hits]
+        if settings.KNOWLEDGE_AGENT.NEIGHBOUR_CHUNKS and passages:
+            passages = await self._with_neighbours(passages)
+        return passages
+
+    async def _with_neighbours(
+        self, passages: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Each passage with its short neighbours on the same page (Q4).
+
+        The page reader cuts pages into fragments: "Dr Priti Udhay" is a chunk of its
+        own before "Head - Oculoplasty & Aesthetic Services", "Call Us 95949 04015"
+        sits in the navigation, a list's items are one chunk each. The question's
+        words land on one fragment and the answer is next to it. Walking up to
+        NEIGHBOUR_REACH chunks each way, a neighbour joins when the found chunk is
+        short or the neighbour is, and the walk stops at the first that doesn't.
+        Never fails a search: if the neighbours can't be read, the passages go as
+        they are.
+        """
+        chunks_at = getattr(self.vector_db, "chunks_at", None)
+        if chunks_at is None:
+            return passages
+        wanted: Dict[str, List[int]] = {}
+        for p in passages:
+            if not p["document_id"]:
+                continue
+            around = [
+                p["chunk_index"] + d
+                for d in range(-NEIGHBOUR_REACH, NEIGHBOUR_REACH + 1)
+                if d and p["chunk_index"] + d >= 0
+            ]
+            wanted.setdefault(p["document_id"], []).extend(around)
+        try:
+            found = await chunks_at(
+                collection_name=self.collection_name,
+                wanted={d: sorted(set(i)) for d, i in wanted.items()},
+            )
+        except Exception:
+            return passages
+        at = {
+            (str(c.get("document_id") or ""), int(c.get("chunk_index") or 0)): c
+            for c in found
+        }
+        out = []
+        for p in passages:
+            short = len(p["text"]) < SHORT_HIT_CHARS
+            before: List[str] = []
+            after: List[str] = []
+            for step, side in ((-1, before), (1, after)):
+                for d in range(1, NEIGHBOUR_REACH + 1):
+                    c = at.get((p["document_id"], p["chunk_index"] + step * d))
+                    text = (c or {}).get("text") or ""
+                    if not text or not (short or len(text) < SHORT_NEIGHBOUR_CHARS):
+                        break
+                    side.append(text)
+            if not before and not after:
+                out.append(p)
+                continue
+            text = "\n".join([*reversed(before), p["text"], *after])
+            out.append({**p, "text": text[:NEIGHBOUR_MAX_CHARS]})
+        return out
 
     @staticmethod
     def _to_passage(hit: Dict[str, Any]) -> Dict[str, Any]:

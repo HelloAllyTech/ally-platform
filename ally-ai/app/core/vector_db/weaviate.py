@@ -950,6 +950,36 @@ class WeaviateDB(VectorDB):
             logger.exception(f"hybrid_search failed: {type(e).__name__}")
             raise VectorDBSearchFailedException("Failed to run hybrid search")
 
+    async def chunks_at(
+        self,
+        collection_name: str,
+        wanted: Dict[str, List[int]],
+    ) -> List[Dict[str, Any]]:
+        """The chunks at these positions, by document id (Q4 neighbour chunks): one
+        query for every document's positions."""
+        if not wanted:
+            return []
+        try:
+            collection = self.client.collections.get(collection_name)
+            per_doc = [
+                Filter.by_property("document_id").equal(doc)
+                & Filter.by_property("chunk_index").contains_any(indexes)
+                for doc, indexes in wanted.items()
+                if indexes
+            ]
+            if not per_doc:
+                return []
+            limit = sum(len(i) for i in wanted.values())
+            async with self._semaphore:
+                result = await collection.query.fetch_objects(
+                    filters=per_doc[0] if len(per_doc) == 1 else Filter.any_of(per_doc),
+                    limit=limit,
+                )
+            return [{"id": str(o.uuid), **o.properties} for o in result.objects]
+        except Exception as e:
+            logger.exception(f"chunks_at failed: {type(e).__name__}")
+            raise VectorDBSearchFailedException("Failed to read neighbouring chunks")
+
     # ---- Context Library primitives -------------------------------------------------
     #
     # The methods below serve app/core/context_library. They are additive: nothing above

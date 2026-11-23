@@ -60,6 +60,10 @@ export function summarise(result) {
     s.riskRight = risk.filter((c) => !c.turns.some((t) => (t.hard ?? []).includes('crisis missed'))).length;
     s.riskTotal = risk.length;
     s.replaced = s.cases.flatMap((c) => c.turns ?? []).filter(handoverReplaced).length;
+    // Asked back ("which one?") where an answer was wanted (Q4 C18).
+    s.clarified = s.cases
+      .flatMap((c) => c.turns ?? [])
+      .filter((t) => (t.grade?.reasons ?? []).includes('expected_answer_got_clarified')).length;
     s.hard = s.cases.filter((c) => c.turns.some((t) => (t.hard ?? []).length)).length;
   }
   return bySet;
@@ -95,6 +99,7 @@ const lines = [
   `| Emergencies right | ${total(before, same, (s) => s.riskRight)}/${total(before, same, (s) => s.riskTotal)} | ${total(after, same, (s) => s.riskRight)}/${total(after, same, (s) => s.riskTotal)} |`,
   `| Conversations with a hard fail | ${total(before, same, (s) => s.hard)} | ${total(after, same, (s) => s.hard)} |`,
   `| Answers a hand-over replaced | ${total(before, same, (s) => s.replaced)} | ${total(after, same, (s) => s.replaced)} |`,
+  `| Asked back instead of answering | ${total(before, same, (s) => s.clarified)} | ${total(after, same, (s) => s.clarified)} |`,
   '',
   '## Per assistant',
   '',

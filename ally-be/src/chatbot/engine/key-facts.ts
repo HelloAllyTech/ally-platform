@@ -38,6 +38,8 @@ export interface KeyFactSource {
 
 export interface KeyFacts {
   facts: string[];
+  /** Each fact's own chunk in the "What we learned" document. */
+  chunk_ids: string[];
   document_id?: string;
   title: string;
 }
@@ -109,6 +111,42 @@ export function chooseKeyFacts(facts: KeyFactSource[]): string[] {
   return chosen;
 }
 
+/**
+ * Only facts with their own chunk (Shehbaz, 23 Nov): a key fact is always a real passage, which a
+ * citation names and the checkup's judge reads. One the owner just typed or edited waits for "What
+ * we learned" to be indexed again (on save), and search finds it meanwhile. Null when none has one.
+ */
+export function withChunks(
+  facts: string[],
+  chunks: { id: string; text: string }[],
+  documentId: string | null,
+): KeyFacts | null {
+  const kept = facts
+    .map((fact) => ({ fact, id: chunkOf(fact, chunks) }))
+    .filter((k): k is { fact: string; id: string } => k.id !== null);
+  if (!kept.length || !documentId) return null;
+  return {
+    facts: kept.map((k) => k.fact),
+    chunk_ids: kept.map((k) => k.id),
+    document_id: documentId,
+    title: 'What we learned',
+  };
+}
+
+const squash = (s: string): string =>
+  s.replace(/\s+/g, ' ').trim().toLowerCase();
+
+/** The chunk holding a fact: its text contains the fact's first 80 characters. */
+export function chunkOf(
+  fact: string,
+  chunks: { id: string; text: string }[],
+): string | null {
+  const head = squash(fact)
+    .replace(/[.!?;:]$/, '')
+    .slice(0, 80);
+  return chunks.find((c) => squash(c.text).includes(head))?.id ?? null;
+}
+
 /** The assistant's key facts from its draft. Never throws: a failure is no key facts. */
 export async function keyFactsFor(
   manager: EntityManager,
@@ -130,11 +168,15 @@ export async function keyFactsFor(
     const row = rows?.[0];
     const facts = chooseKeyFacts(row?.learned?.facts ?? []);
     if (!facts.length) return null;
-    return {
-      facts,
-      ...(row?.document_id ? { document_id: row.document_id } : {}),
-      title: 'What we learned',
-    };
+    // The facts' own chunks, so a reply cites the real passage and the checkup's judge can read
+    // it (with made-up ids it couldn't, and judged details from them invented).
+    const chunks = row?.document_id
+      ? await manager.query<{ id: string; text: string }[]>(
+          `SELECT id, text FROM kb_document_chunks WHERE document_id = $1`,
+          [row.document_id],
+        )
+      : [];
+    return withChunks(facts, chunks, row?.document_id ?? null);
   } catch {
     return null;
   }

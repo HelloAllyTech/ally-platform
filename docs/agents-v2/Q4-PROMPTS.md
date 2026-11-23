@@ -213,8 +213,8 @@ No variables change. In code with it: a find over a day or a range of times retu
 **Current (the `clarify` intent):**
 > - `clarify`: one short question to understand what they need, only about something you help with.
 
-**Proposed:**
-> - `clarify`: one short question to understand what they need, only about something you help with. Not when the passages already answer for each of a few options (branches, centres, plans, sizes): then `answer` with each option's answer in a line, and ask which they meant only if it matters.
+**Proposed (revised 23 Nov to Shehbaz's four conditions):**
+> - `clarify`: one short question to understand what they need, only about something you help with. When the passages answer for a few options (up to about four: branches, centres, plans, sizes), don't ask which one: `answer` with each option's answer in a short line, then ask which they meant only if the next step needs it. When every option has the same answer, give it once and don't ask. Ask which one first only when there are many options, or when the answer depends on something only they know (their branch, their date). This never applies to a crisis reply or to a "Shall I book…?" question.
 
 No variables change.
 

@@ -96,13 +96,16 @@ class KeyFacts(BaseModel):
     """The assistant's key facts (Q4 G3), in every run's passages."""
 
     facts: List[str] = Field(default_factory=list, max_length=10)
+    #: Each fact's chunk in "What we learned" (None where it isn't indexed yet).
+    chunk_ids: List[Optional[str]] = Field(default_factory=list, max_length=10)
     document_id: Optional[str] = Field(None, max_length=64)
     title: Optional[str] = Field(None, max_length=200)
 
     @field_validator("facts")
     @classmethod
     def _trim(cls, facts: List[str]) -> List[str]:
-        return [f.strip()[:400] for f in facts if f and f.strip()]
+        # Trimmed, never dropped: chunk_ids line up with facts by position.
+        return [(f or "").strip()[:400] for f in facts]
 
 
 class AgentRunRequest(KnowledgeAnswerRequest):

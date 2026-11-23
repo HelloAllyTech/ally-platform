@@ -14,6 +14,7 @@ FACTS = {
         "Robin Hood Army is zero-funds: it takes no money, so there is no 80G receipt.",
         "Anyone can join for free on the Join Us page or at info@robinhoodarmy.com.",
     ],
+    "chunk_ids": ["chunk-zero-funds", "chunk-join"],
     "document_id": DOC,
     "title": "What we learned",
 }
@@ -32,18 +33,33 @@ def test_each_fact_is_a_citable_passage_from_its_document():
 
 
 def test_capped_at_ten_facts_and_about_500_tokens():
-    many = {"facts": [f"Fact {i}." for i in range(15)], "document_id": DOC}
+    many = {
+        "facts": [f"Fact {i}." for i in range(15)],
+        "chunk_ids": [f"c{i}" for i in range(15)],
+        "document_id": DOC,
+    }
     assert len(key_fact_passages({"key_facts": many})) == MAX_FACTS
-    long = {"facts": ["x" * 400] * 10, "document_id": DOC}
+    long = {
+        "facts": ["x" * 400] * 10,
+        "chunk_ids": [f"c{i}" for i in range(10)],
+        "document_id": DOC,
+    }
     assert (
         sum(len(p["text"]) for p in key_fact_passages({"key_facts": long})) <= MAX_CHARS
     )
     assert key_fact_passages({}) == []
 
 
+def test_a_fact_without_its_own_chunk_is_never_sent_with_a_made_up_id():
+    block = {**FACTS, "chunk_ids": ["chunk-zero-funds", None]}
+    passages = key_fact_passages({"key_facts": block})
+    assert [p["chunk_id"] for p in passages] == ["chunk-zero-funds"]
+    assert key_fact_passages({"key_facts": {**FACTS, "chunk_ids": []}}) == []
+
+
 def test_the_request_trims_and_caps_them():
     facts = KeyFacts(facts=["  a  ", "", "b" * 500])
-    assert facts.facts == ["a", "b" * 400]
+    assert facts.facts == ["a", "", "b" * 400]
     with pytest.raises(ValueError):
         KeyFacts(facts=["f"] * 11)
 

@@ -11,14 +11,11 @@ this run's search found.
 
 from __future__ import annotations
 
-import uuid
 from typing import Any, Dict, List, Mapping
 
 #: At most this many facts, and this many characters in all (about 500 tokens).
 MAX_FACTS = 10
 MAX_CHARS = 2000
-
-_NAMESPACE = uuid.UUID("6f1c2e0a-6d55-4c7e-9a43-7b0f0c1d2e3f")
 
 
 def key_fact_passages(bot: Mapping[str, Any]) -> List[Dict[str, Any]]:
@@ -27,19 +24,24 @@ def key_fact_passages(bot: Mapping[str, Any]) -> List[Dict[str, Any]]:
     if not settings.AGENT_RUNTIME.KEY_FACTS:
         return []
     block = bot.get("key_facts") or {}
-    facts = [str(f).strip() for f in block.get("facts") or [] if str(f).strip()]
+    facts = [str(f).strip() for f in block.get("facts") or []]
+    chunk_ids = list(block.get("chunk_ids") or [])
     document_id = str(block.get("document_id") or "")
     title = str(block.get("title") or "What we learned")
     passages: List[Dict[str, Any]] = []
     used = 0
     for index, text in enumerate(facts[:MAX_FACTS]):
+        chunk_id = chunk_ids[index] if index < len(chunk_ids) else None
+        # Only a fact with its own chunk: a citation names it and the checkup's
+        # judge reads it (Shehbaz, 23 Nov: never a made-up id).
+        if not text or not chunk_id:
+            continue
         if used + len(text) > MAX_CHARS:
             break
         used += len(text)
         passages.append(
             {
-                # Stable per fact, so the same fact cited twice is one source.
-                "chunk_id": str(uuid.uuid5(_NAMESPACE, f"{document_id}:{text}")),
+                "chunk_id": str(chunk_id),
                 "document_id": document_id,
                 "document_title": title,
                 "chunk_index": index,

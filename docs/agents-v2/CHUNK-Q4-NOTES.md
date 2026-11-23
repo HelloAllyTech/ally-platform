@@ -4,8 +4,15 @@
 
 ## Decisions
 
-- **Keyword search beside vector search: added in Q4 (Shehbaz, 23 Nov),** because 28 of the 40 in-data misses at the first measurement were search misses. Weaviate hybrid in the same query, with one setting to turn it off.
-- **Keyword search measured, and off by default (23 Nov):** at weightings 0.7, 0.5 and 0.3 it found the expected fact for 2 of the 8 exact-term misses, against 4 for vector search alone, at the same speed (p50 about 340 ms with the query's embedding, every setting). The facts sit in short fragment chunks the page reader cut: "Dr Priti Udhay" (chunk 73) before "Head - Oculoplasty & Aesthetic Services…" (74); "Call Us 95949 04015" in the navigation; "Home Vaccination" as one list item. The question's words are in the chunk beside the fact, so neither search reaches it. The code and `KNOWLEDGE_AGENT__HYBRID_SEARCH` stay; the fix that fits is giving a short chunk its neighbours (asked of Shehbaz).
+- **Search misses: neighbour chunks in Q4, keyword search built but off (Shehbaz, 23 Nov).** 28 of the 40 in-data misses at the first measurement were search misses. Keyword search (Weaviate hybrid, in the same query, `KNOWLEDGE_AGENT__HYBRID_SEARCH`) was tried first: alone it found the fact for 2 of the 8 exact-term misses, against 4 for vector search. The facts sit in short fragment chunks the page reader cut ("Dr Priti Udhay" as chunk 73 before "Head - Oculoplasty & Aesthetic Services…" as 74; "Call Us 95949 04015" in the navigation; "Home Vaccination" as one list item), beside the chunk the question's words match. So a found chunk now takes its short neighbours on the same page (`KNOWLEDGE_AGENT__NEIGHBOUR_CHUNKS`, on). Shehbaz's bar: at least 6 of the 8, search within about 150 ms. The 8 misses (b3-f07, b1-f07, b2-f04, b1-f02, b1-f10, b3-f08, b5a-f10, o5-f04), found in the top 8, search time p50 with the embedding cached (it costs about 300 ms the same in every setting):
+
+  | Setting | Found | Search p50 |
+  |---|---|---|
+  | Vector only (before) | 4 of 8 | 9–16 ms |
+  | **Vector + neighbour chunks (Q4)** | **6 of 8** | 19–46 ms |
+  | Hybrid 0.5 + neighbour chunks | 7 of 8 | 69 ms |
+
+  Neighbour chunks met the bar. Hybrid stays built and off; with neighbours it adds b2-f04 for about 50 ms more, so it's one switch for Phase 3 or now. b1-f02 (the main phone number, a navigation fragment) is left to key facts.
 - **A message mostly in another script (Hindi, Tamil, Bengali) is not pre-searched as written** (23 Nov): the agent writes the English query the search tool asks for. The as-written pre-search (H1 Part C) found nothing for 8 of the 17 non-English misses; the fix alone recovered 7 of the 17 on a re-run.
 
 ## For RC1: Postgres specs that fail on master too
@@ -24,6 +31,7 @@ Run with `CHATBOT_STORE_TEST_DB` on `ally_t1_test`. Each also fails on a clean c
 - A local 12-hour owner token, signed for the use-case suite's setup.
 - The suite signs in to an invite-only page once per invited address and starts a new chat for each conversation: the page limits sign-in codes per address, which refused O4's last conversations in the first measurement (a test artefact, not a product bug).
 - A flaky ally-ai metering test passed on retry.
+- **BHIVE re-read for C15 (23 Nov):** its two day-pass pages were read again from the site with the fixed reader (81 struck prices labelled "(was ₹…)") and re-indexed. Its setup facts and "What we learned" text, written from the old reading, had their three struck prices relabelled the same way and were re-indexed, as a re-read of the site would have done. Other assistants' pages were read before the fix and keep the old text until they're read again.
 
 ## In-data misses by cause (measurement `2026-11-23-after-A-1`)
 

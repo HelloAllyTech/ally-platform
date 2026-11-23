@@ -117,6 +117,9 @@ class KnowledgeAgentSettings(BaseModel):
     # question uses; CHUNK-Q4-NOTES). ALPHA weighs the two: 1.0 is vector only.
     HYBRID_SEARCH: bool = Field(False)
     HYBRID_ALPHA: float = Field(0.5, ge=0.0, le=1.0)
+    # Q4: a found chunk takes its short neighbours on the same page (a name before
+    # its title, a number after "Call us", a list's items). False: as before.
+    NEIGHBOUR_CHUNKS: bool = Field(True)
     # Passages within this similarity of the best hit are kept; the rest are dropped
     # even if they cleared the floor. Stops one strong match from being diluted by seven
     # weak ones.

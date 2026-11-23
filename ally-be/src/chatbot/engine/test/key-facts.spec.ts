@@ -1,5 +1,7 @@
 import {
   chooseKeyFacts,
+  chunkOf,
+  withChunks,
   KEY_FACTS_MAX,
   KEY_FACTS_MAX_CHARS,
 } from '../key-facts';
@@ -91,5 +93,39 @@ describe('chooseKeyFacts (Q4 G3)', () => {
       'Contact: info@x.in.',
       'Tambaram: 94444 44134.',
     ]);
+  });
+
+  it("finds each fact's own chunk in What we learned", () => {
+    const chunks = [
+      {
+        id: 'c1',
+        text: 'Hours, from the owner\nMonday to Saturday, 8 am to 9 pm.',
+      },
+      { id: 'c2', text: 'Location and contact, Home\nCall 9152987821.' },
+    ];
+    expect(chunkOf('Call 9152987821.', chunks)).toBe('c2');
+    expect(chunkOf('Monday to Saturday,  8 am to 9 pm', chunks)).toBe('c1');
+    expect(chunkOf('Not indexed yet.', chunks)).toBeNull();
+  });
+
+  it('never sends a key fact without its own chunk (a made-up id the judge could not read)', () => {
+    const chunks = [
+      { id: 'c1', text: 'Hours\nMonday to Saturday, 8 am to 9 pm.' },
+    ];
+    const sent = withChunks(
+      ['Monday to Saturday, 8 am to 9 pm.', 'Typed by the owner a minute ago.'],
+      chunks,
+      'doc-1',
+    );
+    expect(sent).toEqual({
+      facts: ['Monday to Saturday, 8 am to 9 pm.'],
+      chunk_ids: ['c1'],
+      document_id: 'doc-1',
+      title: 'What we learned',
+    });
+    expect(withChunks(['Not indexed.'], chunks, 'doc-1')).toBeNull();
+    expect(
+      withChunks(['Monday to Saturday, 8 am to 9 pm.'], chunks, null),
+    ).toBeNull();
   });
 });
