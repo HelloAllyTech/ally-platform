@@ -135,8 +135,15 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
     name: "competency",
   });
 
-  const { data: goalsData, isLoading: isLoadingGoals } = useGetAgentTestCasesQuery();
+  const {
+    data: goalsData,
+    isLoading: isLoadingGoals,
+    isError: goalsFailed,
+  } = useGetAgentTestCasesQuery();
   const goalOptions = goalsData?.data ?? [];
+  // Test cases only steer generation. With none to pick (the Agent Test Cases feature is off for
+  // this account, or none exist yet) the wizard goes on without them rather than stopping here.
+  const canSkipGoals = !isLoadingGoals && (goalsFailed || goalOptions.length === 0);
 
   const { phase, tasks, start, abort, reset, doneCount, appliedCount, checks } =
     useAgentBuilderGeneration(formMethods);
@@ -183,10 +190,13 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
     );
 
   const handleGenerate = () => {
-    if (selectedGoals.length === 0) return;
+    if (selectedGoals.length === 0 && !canSkipGoals) return;
     const selected = goalOptions.filter(goal => selectedGoals.includes(goal.id));
     const goalTitles = selected.map(goal => goal.title);
-    pushHistory(QUESTIONS.goals, goalTitles.join(", "));
+    pushHistory(
+      QUESTIONS.goals,
+      goalTitles.length ? goalTitles.join(", ") : en.agentBuilderMode.noGoals,
+    );
 
     // Persist the selection on the scenario (rides the normal save payload →
     // scenarios.metadata.agentTestCaseIds) and steer every field prompt.
@@ -460,9 +470,14 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
             <div className="min-h-0 flex flex-col gap-2 max-h-[280px] overflow-y-auto custom-scrollbar">
               {isLoadingGoals ? (
                 <p className="text-sm text-typography-700">Loading agent test cases…</p>
+              ) : goalsFailed ? (
+                <p className="text-sm text-typography-700">
+                  {en.agentBuilderMode.goalsUnavailable}
+                </p>
               ) : goalOptions.length === 0 ? (
                 <p className="text-sm text-typography-700">
-                  No agent test cases configured yet. Add some under the Agent Test Cases tab.
+                  No agent test cases configured yet. Add some under the Agent Test Cases tab, or
+                  generate without them.
                 </p>
               ) : (
                 goalOptions.map(goal => {
@@ -495,7 +510,7 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
               <Button
                 variant={ButtonVariant.PRIMARY}
                 onClick={handleGenerate}
-                disabled={selectedGoals.length === 0}
+                disabled={selectedGoals.length === 0 && !canSkipGoals}
                 className="h-[40px] px-6"
               >
                 Generate

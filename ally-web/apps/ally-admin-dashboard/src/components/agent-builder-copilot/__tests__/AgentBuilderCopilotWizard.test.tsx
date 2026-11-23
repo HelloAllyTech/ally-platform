@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   start: vi.fn(),
   generation: { phase: "idle", tasks: [] as unknown[], checks: [] as string[] },
   fetchDesign: vi.fn(),
+  goals: {} as Record<string, unknown>,
 }));
 
 vi.mock("@store", () => ({
@@ -36,10 +37,7 @@ vi.mock("../../competency", () => ({ Competency: () => <div>competency picker</d
 
 vi.mock("@api", () => ({
   ROLEPLAY_MODES: ["learning", "practice", "performance", "pre_assessment", "post_assessment"],
-  useGetAgentTestCasesQuery: () => ({
-    data: { data: [{ id: "g1", title: "Client deflects", tags: [] }] },
-    isLoading: false,
-  }),
+  useGetAgentTestCasesQuery: () => mocks.goals,
   useLazyGetRoleplayDesignQuery: () => [mocks.fetchDesign, { isFetching: false }],
 }));
 
@@ -71,6 +69,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.formValues = { competency: { name: "Assessment of Harm & Response Planning" } };
   mocks.generation = { phase: "idle", tasks: [], checks: [] };
+  mocks.goals = {
+    data: { data: [{ id: "g1", title: "Client deflects", tags: [] }] },
+    isLoading: false,
+    isError: false,
+  };
   mocks.fetchDesign.mockReturnValue({
     unwrap: () =>
       Promise.resolve({
@@ -138,5 +141,20 @@ describe("AgentBuilderCopilotWizard suggestions", () => {
     expect(mocks.start).toHaveBeenCalledWith(
       expect.objectContaining({ roleplayMode: "learning", includeStates: true }),
     );
+  });
+
+  it("goes on without test cases when they can't be listed", async () => {
+    mocks.goals = { data: undefined, isLoading: false, isError: true };
+    render(<AgentBuilderCopilotWizard formMethods={form()} />);
+    fireEvent.change(screen.getByLabelText("actor"), { target: { value: "Meera calls" } });
+    fireEvent.click(screen.getByText("Next"));
+    fireEvent.click(screen.getByText("Next"));
+    await act(async () => {
+      fireEvent.click(screen.getByText("Next"));
+    });
+
+    expect(screen.getByText(modeStrings.goalsUnavailable)).toBeTruthy();
+    fireEvent.click(screen.getByText("Generate"));
+    expect(mocks.start).toHaveBeenCalledWith(expect.objectContaining({ agentTestCases: "" }));
   });
 });

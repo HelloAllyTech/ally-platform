@@ -16029,6 +16029,9 @@ export const en = {
     },
     noStatePrompt: "No states: no main prompt that reads states is available.",
     remindersHidden: "Reminders were switched off: none were written.",
+    goalsUnavailable:
+      "Agent test cases aren't available for your account, so the roleplay is generated without them. An administrator can switch on Agent Test Cases to use them.",
+    noGoals: "No test cases",
     recommended: "Recommended",
     reasons: {
       assessmentAfter: "Your description reads like a final check, so no supports.",
