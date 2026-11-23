@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from "react";
 
+import { KeyRound } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -21,8 +22,12 @@ import {
   useUpdateBlogMutation,
 } from "@api";
 import { ActionConfirmationPopup, BlogSidePanel, Button, ListToolbar } from "@components";
+import { BlogClaudeConnect, useBlogClaudeConnect } from "@components/blog-claude-connect";
+import { BlogPostPreview } from "@components/blog-post-preview";
+import { BlogShareReview } from "@components/blog-share-review";
 import { BlogFormValues } from "@components/blog-side-panel/BlogSidePanel";
 import { ButtonVariant } from "@components/types";
+import { en } from "@constants";
 
 const LIMIT = 30;
 
@@ -48,6 +53,9 @@ export const BlogManagement: React.FC = () => {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [selectedBlog, setSelectedBlog] = useState<BlogPost | null>(null);
   const [pendingDelete, setPendingDelete] = useState<BlogPost | null>(null);
+  const [previewBlog, setPreviewBlog] = useState<BlogPost | null>(null);
+  const [shareBlog, setShareBlog] = useState<BlogPost | null>(null);
+  const connect = useBlogClaudeConnect();
 
   // Grow the page size for "Load more" (offset stays 0) so the query stays a
   // single source of truth — no manual page accumulation to keep in sync.
@@ -94,7 +102,7 @@ export const BlogManagement: React.FC = () => {
   }, []);
 
   const handleSave = useCallback(
-    async (values: BlogFormValues, publish: boolean) => {
+    async (values: BlogFormValues, publish: boolean, keepEditing = false) => {
       const payload = {
         title: values.title.trim(),
         slug: emptyToUndefined(values.slug),
@@ -119,8 +127,10 @@ export const BlogManagement: React.FC = () => {
         return;
       }
 
-      toast.success(publish ? "Post published." : "Draft saved.");
-      closePanel();
+      toast.success(publish ? "Post saved." : "Draft saved.");
+      const saved = "data" in result ? (result.data as BlogPost | undefined) : undefined;
+      if (keepEditing && saved?.id) setSelectedBlog(saved);
+      else closePanel();
     },
     [selectedBlog, createBlog, updateBlog, closePanel],
   );
@@ -161,6 +171,16 @@ export const BlogManagement: React.FC = () => {
         onSearchChange={handleSearchChange}
         placeholder="Search posts..."
         action={{ label: "New Post", onClick: openCreate, variant: ButtonVariant.PRIMARY }}
+        secondaryAction={
+          connect.canConnect
+            ? {
+                label: en.blogClaudeConnect.button,
+                onClick: connect.openSheet,
+                variant: ButtonVariant.SECONDARY,
+                icon: <KeyRound size={16} aria-hidden />,
+              }
+            : undefined
+        }
       />
 
       <div className="flex flex-wrap items-center gap-2 mt-4">
@@ -238,6 +258,18 @@ export const BlogManagement: React.FC = () => {
                       Edit
                     </button>
                     <button
+                      onClick={() => setPreviewBlog(blog)}
+                      className="text-typography-700 hover:underline py-2 md:py-0"
+                    >
+                      {en.blogPostPreview.button}
+                    </button>
+                    <button
+                      onClick={() => setShareBlog(blog)}
+                      className="text-typography-700 hover:underline py-2 md:py-0"
+                    >
+                      {en.blogShareReview.rowAction}
+                    </button>
+                    <button
                       onClick={() => handleTogglePublish(blog)}
                       className="text-typography-700 hover:underline py-2 md:py-0"
                     >
@@ -290,6 +322,33 @@ export const BlogManagement: React.FC = () => {
         onSave={handleSave}
         isSaving={isCreating || isUpdating}
       />
+
+      {previewBlog && (
+        <BlogPostPreview
+          post={{
+            title: previewBlog.title,
+            tldr: previewBlog.tldr,
+            body: previewBlog.body,
+            tags: previewBlog.tags ?? [],
+            coverColor: previewBlog.coverColor,
+            authorName: previewBlog.authorName,
+            headerImageUrl: previewBlog.headerImageUrl,
+            status: previewBlog.status,
+            date: previewBlog.publishedAt ?? previewBlog.createdAt,
+          }}
+          saved={{ id: previewBlog.id, slug: previewBlog.slug }}
+          onClose={() => setPreviewBlog(null)}
+        />
+      )}
+
+      {shareBlog && (
+        <BlogShareReview
+          post={{ id: shareBlog.id, slug: shareBlog.slug, status: shareBlog.status }}
+          onClose={() => setShareBlog(null)}
+        />
+      )}
+
+      <BlogClaudeConnect open={connect.open} onClose={connect.closeSheet} />
 
       <ActionConfirmationPopup
         isOpen={!!pendingDelete}

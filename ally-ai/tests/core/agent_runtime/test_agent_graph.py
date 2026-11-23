@@ -335,6 +335,8 @@ class TestRevision:
         llm = FakeLLM(
             search("What is Ally?"),
             reply("decline", "The documents don't describe what Ally is."),
+            # Sent back to search again with other words (chunk 20a-2).
+            search("Ally platform overview"),
             reply("answer", "Ally is a not-for-profit platform."),  # uncited
         )
         state = await agent_run("what is ally?", llm)
@@ -498,8 +500,16 @@ class TestRetrievalLog:
         ]
         llm = FakeLLM(search("q"), search("more"), reply(citations=[1, 2]))
         await agent_run("q", llm)
-        assert retrieval_log.call_count == 1  # the first search only
-        assert retrieval_log.call_args.kwargs["disposition"] == "answered"
+        # Every search in the message is logged (chunk 6b; the first only before).
+        assert retrieval_log.call_count == 2
+        assert [c.kwargs["disposition"] for c in retrieval_log.call_args_list] == [
+            "answered",
+            "answered",
+        ]
+        assert [c.kwargs["query"] for c in retrieval_log.call_args_list] == [
+            "q",
+            "more",
+        ]
 
     async def test_once_for_a_search_that_found_nothing(
         self, agent_run, chunk_service, retrieval_log

@@ -1,5 +1,6 @@
 import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
 import {
+  ContextAudience,
   ContextBulkResult,
   ContextChunk,
   ContextChunkDetail,
@@ -21,6 +22,7 @@ import {
   ContextSearchRequest,
   ContextSearchResponse,
   ContextSource,
+  ContextSourceAudienceResult,
   ContextUseCase,
 } from "@types";
 
@@ -174,6 +176,32 @@ export const contextLibraryAPI = baseAPI.injectEndpoints({
       invalidatesTags: [TAG_TYPES.CONTEXT_LIBRARY_CHUNKS],
     }),
 
+    /** Platform admins: which organisations any Ally-owned entry reaches. */
+    setContextChunkAudience: builder.mutation<
+      ContextChunk,
+      { code: string; audience: ContextAudience }
+    >({
+      query: ({ code, audience }) => ({
+        url: ApiEndpoints.CONTEXT_LIBRARY.CHUNK_AUDIENCE(code),
+        method: HttpMethod.PUT,
+        body: audience,
+      }),
+      invalidatesTags: [TAG_TYPES.CONTEXT_LIBRARY_CHUNKS],
+    }),
+
+    /** Platform admins: a document's audience, applied to the entries distilled from it alone. */
+    setContextSourceAudience: builder.mutation<
+      ContextSourceAudienceResult,
+      { id: string; audience: ContextAudience }
+    >({
+      query: ({ id, audience }) => ({
+        url: ApiEndpoints.CONTEXT_LIBRARY.SOURCE_AUDIENCE(id),
+        method: HttpMethod.PUT,
+        body: audience,
+      }),
+      invalidatesTags: [TAG_TYPES.CONTEXT_LIBRARY_SOURCES, TAG_TYPES.CONTEXT_LIBRARY_CHUNKS],
+    }),
+
     contextChunkAction: builder.mutation<
       ContextChunk,
       { code: string; action: ChunkAction } & ContextOrgScope
@@ -193,13 +221,25 @@ export const contextLibraryAPI = baseAPI.injectEndpoints({
     /** Dry run unless `apply` is true; the same file is sent again to apply it. */
     bulkContextChunks: builder.mutation<
       ContextBulkResult,
-      { file: File; collectionId: string; apply: boolean } & ContextOrgScope
+      {
+        file: File;
+        collectionId: string;
+        apply: boolean;
+        /** Platform admins: who new rows without their own audience columns reach. */
+        defaultAudience?: ContextAudience;
+      } & ContextOrgScope
     >({
-      query: ({ file, collectionId, apply, tenantId }) => {
+      query: ({ file, collectionId, apply, defaultAudience, tenantId }) => {
         const body = new FormData();
         body.append("file", file, file.name);
         body.append("collectionId", collectionId);
         if (apply) body.append("apply", "true");
+        if (defaultAudience && !tenantId) {
+          body.append("isGlobal", String(defaultAudience.isGlobal));
+          if (!defaultAudience.isGlobal) {
+            body.append("tenantIds", JSON.stringify(defaultAudience.tenantIds));
+          }
+        }
         return {
           url: routeFor(ApiEndpoints.CONTEXT_LIBRARY.BULK, tenantId),
           method: HttpMethod.POST,
@@ -375,6 +415,8 @@ export const {
   useCreateContextChunkMutation,
   useUpdateContextChunkMutation,
   useContextChunkActionMutation,
+  useSetContextChunkAudienceMutation,
+  useSetContextSourceAudienceMutation,
   useBulkContextChunksMutation,
   useGetContextUseCasesQuery,
   useSetContextGrantMutation,

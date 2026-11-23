@@ -446,13 +446,37 @@ describe('Builder bookkeeping — a failed release that actually shipped', () =>
     expect(repository.update).not.toHaveBeenCalled();
   });
 
-  /** Three apps live in ally-web; a change spanning them names no one target. */
-  it('refuses when the files span more than one deployable', async () => {
-    const { service, repository } = build({
+  /**
+   * Both apps share one workflow, so a change to both counts as shipped only by
+   * a run that released both; a single-app run must not prove it.
+   */
+  it('accepts only an apps=both run for a change to both apps', async () => {
+    const { service, github } = build({
       listPullRequestFiles: jest.fn().mockResolvedValue({
         files: [
           'apps/ally-admin-dashboard/src/x.tsx',
           'apps/ally-helpline-dashboard/src/y.tsx',
+        ],
+        truncated: false,
+      }),
+    });
+
+    await service.reconcileFailedReleases();
+
+    expect(github.findSuccessfulRunSince).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workflow: 'production-release-frontends.yaml',
+        apps: 'both',
+      }),
+    );
+  });
+
+  it('refuses when shared code leaves the change unattributable', async () => {
+    const { service, repository } = build({
+      listPullRequestFiles: jest.fn().mockResolvedValue({
+        files: [
+          'apps/ally-admin-dashboard/src/x.tsx',
+          'libs/ui-shared/src/y.tsx',
         ],
         truncated: false,
       }),

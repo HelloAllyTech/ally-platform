@@ -1,3 +1,4 @@
+import { PlatformAdminOnly } from 'src/auth/decorators/platform-admin-only.decorator';
 import {
   Body,
   Controller,
@@ -22,6 +23,7 @@ import { RequireFeatureToggle } from '../../auth/decorators/feature-toggle.decor
 import { CallerScopedRoute } from '../../auth/decorators/caller-scoped-route.decorator';
 import { ChatbotMemberRole } from '../../chatbot/enum/chatbot.enum';
 import { ChatbotAccessService } from '../../chatbot/service/chatbot-access.service';
+import { changesPlatformAdminOnlySetting } from '../../chatbot/service/chatbot-settings.service';
 import { FeatureToggleKey } from '../../authorization/constants/admin-feature-toggle.constants';
 import { PERMISSIONS } from '../../authorization/constants/permissions.constants';
 import {
@@ -35,6 +37,7 @@ import {
 } from '../dto/whatsapp.dto';
 import { WaTemplateKind } from '../enum/whatsapp.enum';
 import { WhatsAppAdminService } from '../service/whatsapp-admin.service';
+import { AssistantScope } from '../../chatbot/access/chatbot-role.decorator';
 
 /**
  * Admin surface for the WhatsApp Q&A bot. SUPER_DUPER_ADMIN only
@@ -73,6 +76,7 @@ export class WhatsAppAdminController {
 
   @Get('templates')
   @CallerScopedRoute()
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT_TEMPLATES],
   })
@@ -97,6 +101,7 @@ export class WhatsAppAdminController {
 
   @Post('templates')
   @CallerScopedRoute()
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT_TEMPLATES],
   })
@@ -115,6 +120,7 @@ export class WhatsAppAdminController {
 
   @Post('templates/:id/customise')
   @CallerScopedRoute()
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT_TEMPLATES],
   })
@@ -139,6 +145,7 @@ export class WhatsAppAdminController {
 
   @Patch('templates/:id')
   @CallerScopedRoute()
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT_TEMPLATES],
   })
@@ -166,6 +173,7 @@ export class WhatsAppAdminController {
 
   @Post('templates/:id/archive')
   @CallerScopedRoute()
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT_TEMPLATES],
   })
@@ -187,6 +195,7 @@ export class WhatsAppAdminController {
 
   @Post('templates/reorder')
   @CallerScopedRoute()
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT_TEMPLATES],
   })
@@ -209,6 +218,7 @@ export class WhatsAppAdminController {
 
   @Post('templates/test')
   @CallerScopedRoute()
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT_TEMPLATES],
   })
@@ -232,6 +242,8 @@ export class WhatsAppAdminController {
   // ── settings ──────────────────────────────────────────────────────────
 
   @Get('settings')
+  @AssistantScope('platform')
+  @PlatformAdminOnly()
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT],
   })
@@ -241,6 +253,8 @@ export class WhatsAppAdminController {
   }
 
   @Put('settings')
+  @AssistantScope('platform')
+  @PlatformAdminOnly()
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT],
   })
@@ -250,13 +264,22 @@ export class WhatsAppAdminController {
       'Merged over what is stored, so a partial save cannot blank a field. Retrieval thresholds ' +
       'take effect on the next message — no deploy.',
   })
-  updateSettings(@Body() dto: UpdateWaSettingsDto) {
-    return this.adminService.updateSettings(
-      dto as unknown as Record<string, unknown>,
-    );
+  async updateSettings(@Body() dto: UpdateWaSettingsDto) {
+    const patch = dto as unknown as Record<string, unknown>;
+    if (
+      changesPlatformAdminOnlySetting(
+        await this.adminService.getSettings(),
+        patch,
+      )
+    ) {
+      await this.access.assertPlatformAdmin();
+    }
+    return this.adminService.updateSettings(patch);
   }
 
   @Get('settings/provider-health')
+  @AssistantScope('platform')
+  @PlatformAdminOnly()
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT],
   })
@@ -272,6 +295,8 @@ export class WhatsAppAdminController {
 
   @Post('settings/provider-check')
   @HttpCode(HttpStatus.OK)
+  @AssistantScope('platform')
+  @PlatformAdminOnly()
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT],
   })
@@ -289,6 +314,8 @@ export class WhatsAppAdminController {
 
   @Post('settings/provider-register')
   @HttpCode(HttpStatus.OK)
+  @AssistantScope('platform')
+  @PlatformAdminOnly()
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT],
   })
@@ -303,6 +330,8 @@ export class WhatsAppAdminController {
 
   @Post('settings/provider-subscribe')
   @HttpCode(HttpStatus.OK)
+  @AssistantScope('platform')
+  @PlatformAdminOnly()
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT],
   })
@@ -319,6 +348,7 @@ export class WhatsAppAdminController {
   // ── preview console ───────────────────────────────────────────────────
 
   @Post('preview/ask')
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT],
   })

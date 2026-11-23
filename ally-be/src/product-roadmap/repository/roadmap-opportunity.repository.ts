@@ -5,6 +5,7 @@ import { RoadmapEmbeddingStatus } from '../enum/roadmap-opportunity.enum';
 import {
   ROADMAP_BOARD_DEFAULTS,
   ROADMAP_EFFORT_UNSIZED,
+  ROADMAP_OWNER_UNASSIGNED,
   ROADMAP_LIST_DEFAULTS,
   ROADMAP_MULTIPLIER_WINDOW_DAYS,
 } from '../constants/product-roadmap.constants';
@@ -121,6 +122,8 @@ export interface RankContext {
     votersWeight: number;
     effortWeight: number;
     goalImpactWeight: number;
+    /** Optional: absent = the star factor is off (older callers and fixtures). */
+    starWeight?: number;
   };
   bases: { maxScore: number; maxVoters: number; totalGoals: number };
 }
@@ -143,6 +146,8 @@ export interface ListOpportunitiesOptions {
   createdBy?: number[];
   /** Only opportunities that would back a colleague the caller hasn't backed lately. */
   newToMe?: boolean;
+  /** Unowned or unsized — see NEEDS_TRIAGE_SQL. */
+  needsTriage?: boolean;
   dateFrom?: string;
   dateTo?: string;
   releasedFrom?: string;
@@ -158,7 +163,8 @@ export interface ListOpportunitiesOptions {
     | 'releasedAt'
     | 'myVotes'
     | 'description'
-    | 'plannedMonth';
+    | 'plannedMonth'
+    | 'triage';
   order?: 'ASC' | 'DESC';
   limit?: number;
   offset?: number;
@@ -247,6 +253,7 @@ interface RankPlaceholders {
   wVoters: string;
   wEffort: string;
   wGoal: string;
+  wStar: string;
   maxScore: string;
   maxVoters: string;
   totalGoals: string;
@@ -259,6 +266,7 @@ const NAMED_RANK_PLACEHOLDERS: RankPlaceholders = {
   wVoters: 'CAST(:wVoters AS numeric)',
   wEffort: 'CAST(:wEffort AS numeric)',
   wGoal: 'CAST(:wGoal AS numeric)',
+  wStar: 'CAST(:wStar AS numeric)',
   maxScore: 'CAST(:maxScore AS numeric)',
   maxVoters: 'CAST(:maxVoters AS numeric)',
   totalGoals: 'CAST(:totalGoals AS numeric)',
@@ -321,6 +329,7 @@ const queueRankSql = (p: RankPlaceholders): string => `(
              + ${p.wGoal}   * (CASE WHEN ${p.totalGoals} > 0
                                     THEN COALESCE(qg.helped, 0)::numeric / ${p.totalGoals} * 100
                                     ELSE 0 END)
+             + ${p.wStar}   * (CASE WHEN q."directorStarred" THEN 100 ELSE 0 END)
            ) / ${p.weightTotal}) DESC,
            q."createdAt" DESC, q.id ASC
          )::int AS rank
@@ -337,7 +346,7 @@ const queueRankSql = (p: RankPlaceholders): string => `(
            ON qg."opportunityId" = q.id
    WHERE q."deletedAt" IS NULL
      AND q."type" <> 'bug'
-     AND q."stage" IN ('new', 'prioritised', 'under_development')
+     AND q."stage" IN ('new', 'prioritised')
 )`;
 
 /**
@@ -394,7 +403,17 @@ const COMPOSITE_SCORE_SQL = `((
   + CAST(:wGoal AS numeric)   * (CASE WHEN CAST(:totalGoals AS numeric) > 0
                      THEN COALESCE(gimp.helped, 0)::numeric / CAST(:totalGoals AS numeric) * 100
                      ELSE 0 END)
+  + CAST(:wStar AS numeric)   * (CASE WHEN opp."directorStarred" THEN 100 ELSE 0 END)
 ) / CAST(:weightTotal AS numeric))`;
+
+/**
+ * Projected as `triageRank` only when the triage sort is asked for (see list()): a select alias
+ * is the one ordering form already proven here ("compositeScore"), where a raw CASE passed to
+ * orderBy risks TypeORM trying to parse it as alias.property.
+ */
+const NEEDS_TRIAGE_SQL = `((opp."ownerUserId" IS NULL AND COALESCE(opp."owner", '') = '')
+                   OR opp."effort" IS NULL)`;
+const TRIAGE_RANK_SQL = `(CASE WHEN ${NEEDS_TRIAGE_SQL} THEN 0 ELSE 1 END)`;
 
 const SORT_COLUMNS: Record<string, string> = {
   /**
@@ -421,6 +440,12 @@ const SORT_COLUMNS: Record<string, string> = {
    * the dated ones people asked to see.
    */
   plannedMonth: 'opp."plannedMonth"',
+  /*
+   * The triage Inbox's ordering: rows that still NEED a decision first (no owner, or never
+   * sized), the rest after. ASC puts needs-triage first; the tiebreak below follows the primary
+   * direction, so ASC is also OLDEST first within each group — what an inbox wants.
+   */
+  triage: '"triageRank"',
 };
 
 @Injectable()
@@ -467,6 +492,7 @@ export class RoadmapOpportunityRepository extends Repository<RoadmapOpportunity>
     const count = await qb.getCount();
 
     const sortColumn = SORT_COLUMNS[sortBy] ?? SORT_COLUMNS.priority;
+    if (sortBy === 'triage') qb.addSelect(TRIAGE_RANK_SQL, 'triageRank');
     /*
      * The tiebreak FOLLOWS the primary direction, so ASC is the exact reverse of DESC.
      *
@@ -718,7 +744,8 @@ export class RoadmapOpportunityRepository extends Repository<RoadmapOpportunity>
       weights.votesWeight +
       weights.votersWeight +
       weights.effortWeight +
-      weights.goalImpactWeight;
+      weights.goalImpactWeight +
+      (weights.starWeight ?? 0);
 
     // The composite is spelled out again here rather than shared with COMPOSITE_SCORE_SQL: this
     // path is positional-parameter raw SQL and that one is a named-parameter query-builder
@@ -740,6 +767,7 @@ export class RoadmapOpportunityRepository extends Repository<RoadmapOpportunity>
                 + CAST($7 AS numeric) * (CASE WHEN CAST($10 AS numeric) > 0
                              THEN COALESCE(gimp.helped, 0)::numeric / CAST($10 AS numeric) * 100
                              ELSE 0 END)
+                + CAST($12 AS numeric) * (CASE WHEN opp."directorStarred" THEN 100 ELSE 0 END)
               ) / CAST($11 AS numeric))                                                       AS "compositeScore",
               COALESCE((SELECT a.votes FROM roadmap_allocations a
                          WHERE a."opportunityId" = opp.id
@@ -780,6 +808,7 @@ export class RoadmapOpportunityRepository extends Repository<RoadmapOpportunity>
            wVoters: 'CAST($5 AS numeric)',
            wEffort: 'CAST($6 AS numeric)',
            wGoal: 'CAST($7 AS numeric)',
+           wStar: 'CAST($12 AS numeric)',
            maxScore: 'CAST($8 AS numeric)',
            maxVoters: 'CAST($9 AS numeric)',
            totalGoals: 'CAST($10 AS numeric)',
@@ -798,6 +827,7 @@ export class RoadmapOpportunityRepository extends Repository<RoadmapOpportunity>
         bases.maxVoters,
         bases.totalGoals,
         weightTotal,
+        weights.starWeight ?? 0,
       ],
     );
     return rows[0] ?? null;
@@ -880,11 +910,13 @@ export class RoadmapOpportunityRepository extends Repository<RoadmapOpportunity>
           wVoters: rank.weights.votersWeight,
           wEffort: rank.weights.effortWeight,
           wGoal: rank.weights.goalImpactWeight,
+          wStar: rank.weights.starWeight ?? 0,
           weightTotal:
             rank.weights.votesWeight +
             rank.weights.votersWeight +
             rank.weights.effortWeight +
-            rank.weights.goalImpactWeight,
+            rank.weights.goalImpactWeight +
+            (rank.weights.starWeight ?? 0),
           maxScore: rank.bases.maxScore,
           maxVoters: rank.bases.maxVoters,
           totalGoals: rank.bases.totalGoals,
@@ -989,12 +1021,28 @@ export class RoadmapOpportunityRepository extends Repository<RoadmapOpportunity>
       // NAME, and after reassignment that same person is an `ownerUserId` whose name lives in
       // `users` — checking only one column would make a migrated view stop matching the moment
       // somebody linked the owner to a real account.
+      //
+      // 'unassigned' is a sentinel, not a name: no linked user and no legacy owner text.
+      const names = o.owner.filter((n) => n !== ROADMAP_OWNER_UNASSIGNED);
+      const includeUnassigned = o.owner.includes(ROADMAP_OWNER_UNASSIGNED);
+      const clauses: string[] = [];
+      if (names.length) {
+        clauses.push(
+          '(opp."owner" IN (:...owner) OR owner_user.name IN (:...owner))',
+        );
+      }
+      if (includeUnassigned) {
+        clauses.push(
+          `(opp."ownerUserId" IS NULL AND COALESCE(opp."owner", '') = '')`,
+        );
+      }
       qb.andWhere(
-        '(opp."owner" IN (:...owner) OR owner_user.name IN (:...owner))',
-        { owner: o.owner },
+        clauses.length > 1 ? `(${clauses.join(' OR ')})` : clauses[0],
+        names.length ? { owner: names } : {},
       );
     }
     if (o.newToMe) qb.andWhere(BREADTH_NEW_SQL);
+    if (o.needsTriage) qb.andWhere(NEEDS_TRIAGE_SQL);
     if (o.createdBy?.length) {
       qb.andWhere('opp."createdBy" IN (:...createdBy)', {
         createdBy: o.createdBy,

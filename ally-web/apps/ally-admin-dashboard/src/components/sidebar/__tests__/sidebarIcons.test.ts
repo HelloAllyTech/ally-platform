@@ -40,7 +40,7 @@ describe("sidebar icons", () => {
   // Only the items actually placed in the sidebar. A SIDEBAR_ITEMS key that navigation.ts never
   // renders has nothing to draw an icon for.
   const navigableItems = declaredItems.filter(id =>
-    new RegExp(`SIDEBAR_ITEMS\\.${id}\\b`).test(navigationSource),
+    new RegExp(`\\b(?:SIDEBAR_ITEMS|S)\\.${id}\\b`).test(navigationSource),
   );
 
   it("finds the sources (guards against a regex silently matching nothing)", () => {

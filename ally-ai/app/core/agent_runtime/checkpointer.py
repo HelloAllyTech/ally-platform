@@ -4,8 +4,8 @@ The Postgres tables live in their own database and schema
 (`AGENT_RUNTIME__CHECKPOINT_DB_URL`, `AGENT_RUNTIME__CHECKPOINT_SCHEMA`). ally-ai
 never writes to ally-be's database; these tables are the only Postgres state it owns.
 
-If that database can't be reached at startup, the agent runtime stays off (the route
-answers 503) and the rest of the service starts normally; ally-be falls back to v1.
+If that database can't be reached at startup, the rest of the service starts normally
+and the chatbot agent still answers, with its runs unstored (`durable_checkpointer`).
 """
 
 from __future__ import annotations
@@ -103,6 +103,16 @@ async def _open_postgres(cfg: AgentRuntimeSettings) -> tuple[Any, BaseCheckpoint
 def checkpointer_available() -> bool:
     """False when startup tried to open Postgres and failed."""
     return not _unavailable
+
+
+def durable_checkpointer() -> Optional[BaseCheckpointSaver]:
+    """The Postgres checkpointer when startup opened one, else None.
+
+    For the chatbot agent: a run never reads an earlier run's checkpoint (every input
+    comes with the request and the working keys are cleared), so without Postgres it
+    runs unstored rather than piling every run into this process's memory.
+    """
+    return None if _saver is None or isinstance(_saver, InMemorySaver) else _saver
 
 
 def get_checkpointer() -> BaseCheckpointSaver:

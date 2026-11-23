@@ -1,15 +1,22 @@
+import { PlanService } from 'src/billing/service/plan.service';
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, Repository } from 'typeorm';
+import { In, IsNull, Not, Repository } from 'typeorm';
 import { ExecutionManager } from '../../common/execution/execution-manager';
 import { LlmRuntime } from '../../llm/constants/llm-model-registry.constants';
 import { LlmModelService } from '../../llm/service/llm-model.service';
-import type { AgentTraceStep, AgentTurnType } from '../../ai/dto/knowledge.dto';
+import type {
+  AgentRunRequest,
+  AgentTraceStep,
+  AgentTurnType,
+} from '../../ai/dto/knowledge.dto';
 import {
   CreateKbOwnedDocumentDto,
   CreateKbUploadUrlDto,
@@ -18,19 +25,19 @@ import {
 import { KnowledgeBaseService } from '../../knowledge-base/service/knowledge-base.service';
 import { LoggerService } from '../../logger/logger.service';
 import { WaHandledBy } from '../../whatsapp/enum/whatsapp.enum';
-import type { WhatsAppBotSettings } from '../../whatsapp/type/whatsapp-settings.type';
+import { dashboardReadsShared } from '../../whatsapp/type/whatsapp-settings.type';
 import { ChatbotDocument } from '../entity/chatbot-document.entity';
 import { ChatbotMember } from '../entity/chatbot-member.entity';
 import { ChatbotAudience } from '../entity/chatbot-audience.entity';
 import { Chatbot } from '../entity/chatbot.entity';
 import { Connector } from '../entity/connector.entity';
+import { ToolRunStatus } from '../entity/tool-run.entity';
 import {
   AgentRuntimeUsed,
   ChatbotAccessMode,
   ChatbotAnswerMode,
   ChatbotKnowledgeSource,
   ChatbotMemberRole,
-  ChatbotRuntime,
   ChatbotStatus,
 } from '../enum/chatbot.enum';
 import {
@@ -39,7 +46,7 @@ import {
   TestChatbotDto,
   UpdateChatbotDto,
 } from '../dto/chatbot.dto';
-import { effectiveRuntime, isFallback } from '../engine/agent-runtime';
+import { isFailedRun } from '../engine/agent-runtime';
 import { ChatbotEngineService } from '../engine/chatbot-engine.service';
 import {
   PREVIEW_CHANNEL,
@@ -76,8 +83,6 @@ export interface ChatbotSummary {
   knowledgeSource: ChatbotKnowledgeSource;
   persona: Chatbot['persona'];
   model: ChatbotModelChoice | null;
-  /** What actually answers: v1 whenever the platform's emergency switch is off. */
-  effectiveRuntime: ChatbotRuntime;
   myRole: ChatbotMemberRole;
   connectors: ConnectorView[];
   documentCount: number;
@@ -87,6 +92,10 @@ export interface ChatbotSummary {
   memberCount: number;
   stats: ChatbotStats;
   lastTestedAt: Date | null;
+  /** The caller's own unfinished onboarding for this bot (chunk 20a): "Continue setup". */
+  setupDraftId: string | null;
+  /** When it was removed: an archived bot is read-only. */
+  archivedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -103,14 +112,45 @@ export interface ChatbotTestResult {
   wouldAlert: string | null;
   latencyMs: number;
   usedDraft: boolean;
-  /** The engine that answered: v1, v2, or v1 after v2 failed. */
-  runtime: ChatbotRuntime.V1 | AgentRuntimeUsed;
+  /**
+   * The run behind this reply: v2, or `v2_fallback` when the run failed and the fixed run-failed
+   * reply went out (Q3-fast: never v1). Null when no run was involved (a keyword reply).
+   */
+  runtime: AgentRuntimeUsed | null;
   runId: string | null;
   trace: AgentTraceStep[] | null;
   fallbackReason: AgentFailureReason | null;
   turnType: AgentTurnType | null;
-  runtimeAllowed: boolean;
   conversationId: string;
+  /** The run booked or changed a list entry, checked and not saved (chunk 5b). */
+  previewWrite?: boolean;
+  /**
+   * What the run would have remembered about the person (chunk 8a): the lines it asked to add or
+   * change. Try it never saves them. Absent when nothing.
+   */
+  wouldRemember?: string[];
+}
+
+/**
+ * What a Try it run would have remembered (chunk 8a): the texts of its add and replace writes, when
+ * the reply was the agent's own, as a live chat would store them. Nothing is saved.
+ */
+export function wouldRemember(
+  decision: Pick<ChatbotDecision, 'agent' | 'handledBy'>,
+): string[] {
+  const agent = decision.agent;
+  if (agent?.runtime !== AgentRuntimeUsed.V2 || !agent.memory) return [];
+  if (
+    ![WaHandledBy.RAG, WaHandledBy.DECLINED, WaHandledBy.CLARIFIED].includes(
+      decision.handledBy,
+    )
+  ) {
+    return [];
+  }
+  return agent.memory.writes
+    .filter((w) => (w.op === 'add' || w.op === 'replace') && w.text?.trim())
+    .map((w) => w.text!.trim())
+    .slice(0, 6);
 }
 
 /** A bot's documents as the knowledge tab lists them. */
@@ -182,18 +222,43 @@ export class ChatbotService {
     private readonly engine: ChatbotEngineService,
     private readonly llmModels: LlmModelService,
     private readonly knowledgeBase: KnowledgeBaseService,
+    // CR1: going live is publishing, under the plan's limit (optional for existing specs).
+    @Optional() private readonly plans?: PlanService,
   ) {}
 
   // ───────────────────────────────────────────────────────────── read
 
   async list(): Promise<ChatbotSummary[]> {
     const ids = await this.access.accessibleChatbotIds();
-    if (ids !== null && !ids.length) return [];
+    if (!ids.length) return [];
     const bots = await this.chatbotRepository.find({
-      where: { archivedAt: IsNull(), ...(ids ? { id: In(ids) } : {}) },
+      where: { archivedAt: IsNull(), id: In(ids) },
       order: { createdAt: 'ASC' },
     });
     return this.summarise(bots);
+  }
+
+  /** Removed (archived) bots the caller can see, most recently removed first: read-only. */
+  async listArchived(): Promise<ChatbotSummary[]> {
+    const ids = await this.access.accessibleChatbotIds();
+    if (!ids.length) return [];
+    const bots = await this.chatbotRepository.find({
+      where: { archivedAt: Not(IsNull()), id: In(ids) },
+      order: { archivedAt: 'DESC' },
+      take: 200,
+    });
+    return this.summarise(bots);
+  }
+
+  /**
+   * One bot's numbers over the last 7 or 30 days (chunk 20d-2: the home's 7 days / 30 days
+   * switch). Always from the shared store (`chatbot_*`), the one the Overview's "This week" counts,
+   * so the two never disagree (Q3d; prod 18 Nov: "7 conversations" beside "People 0, Messages 0",
+   * because the bot page's chats are only in `chatbot_*`). Access is checked by the caller.
+   */
+  async statsFor(id: string, days: 7 | 30): Promise<ChatbotStats> {
+    const stats = await this.stats([id], days, true);
+    return stats.get(id) ?? { ...EMPTY_STATS };
   }
 
   async get(id: string): Promise<ChatbotSummary> {
@@ -212,7 +277,7 @@ export class ChatbotService {
       audienceCounts,
       memberCounts,
       stats,
-      defaults,
+      setups,
     ] = await Promise.all([
       this.access.rolesFor(ids),
       this.connectors.summariesForBots(ids),
@@ -221,7 +286,7 @@ export class ChatbotService {
       this.countBy(this.audienceRepository, ids),
       this.countBy(this.memberRepository, ids),
       this.stats(ids),
-      this.settingsService.get(),
+      this.setupDrafts(ids),
     ]);
     return bots.map((bot) => ({
       id: bot.id,
@@ -233,7 +298,6 @@ export class ChatbotService {
       knowledgeSource: bot.knowledgeSource,
       persona: bot.persona ?? {},
       model: bot.model ?? null,
-      effectiveRuntime: effectiveRuntime(defaults),
       myRole: roles.get(bot.id) ?? ChatbotMemberRole.VIEWER,
       connectors: connectors.get(bot.id) ?? [],
       documentCount: docCounts.get(bot.id) ?? 0,
@@ -242,9 +306,28 @@ export class ChatbotService {
       memberCount: memberCounts.get(bot.id) ?? 0,
       stats: stats.get(bot.id) ?? EMPTY_STATS,
       lastTestedAt: bot.lastTestedAt ?? null,
+      setupDraftId: setups.get(bot.id) ?? null,
+      archivedAt: bot.archivedAt ?? null,
       createdAt: bot.createdAt,
       updatedAt: bot.updatedAt,
     }));
+  }
+
+  /**
+   * The caller's own unfinished onboarding per bot. Read directly: onboarding's module imports this
+   * one, so the dependency can't run the other way. Only the person setting it up resumes it.
+   */
+  private async setupDrafts(ids: string[]): Promise<Map<string, string>> {
+    const userId = currentUserId();
+    if (!userId) return new Map();
+    const rows = await this.chatbotRepository.manager.query<
+      { chatbot_id: string; id: string }[]
+    >(
+      `SELECT chatbot_id, id FROM bot_drafts
+        WHERE chatbot_id = ANY($1::uuid[]) AND status = 'active' AND owner_user_id = $2`,
+      [ids, userId],
+    );
+    return new Map((rows ?? []).map((row) => [row.chatbot_id, row.id]));
   }
 
   /** Per bot, the documents it can answer from now: indexed and not archived. */
@@ -279,8 +362,21 @@ export class ChatbotService {
     return new Map(rows.map((r) => [r.chatbotId, Number(r.count)]));
   }
 
-  /** Last-30-day activity per bot, from the conversations stamped with it. */
-  private async stats(ids: string[]): Promise<Map<string, ChatbotStats>> {
+  /**
+   * Last-30-day activity per bot, from the conversations stamped with it. From `wa_*`, or, while
+   * the dashboard reads the shared store (chunk 12b), from `chatbot_*`: every channel, the bot page
+   * included. The two have the same shape, so one query serves both. `fromSharedStore` reads
+   * `chatbot_*` whatever the dashboard setting.
+   */
+  private async stats(
+    ids: string[],
+    days = STATS_DAYS,
+    fromSharedStore = false,
+  ): Promise<Map<string, ChatbotStats>> {
+    const shared =
+      fromSharedStore || dashboardReadsShared(await this.settingsService.get());
+    const messages = shared ? 'chatbot_messages' : 'wa_messages';
+    const conversations = shared ? 'chatbot_conversations' : 'wa_conversations';
     const rows = await this.chatbotRepository.manager.query<
       {
         chatbot_id: string;
@@ -297,19 +393,19 @@ export class ChatbotService {
               COUNT(*) FILTER (WHERE m.direction = 'outbound' AND m.handled_by = $3) AS answered,
               COUNT(*) FILTER (WHERE m.direction = 'outbound' AND m.handled_by = $4) AS declined,
               MAX(m."createdAt") AS last_at
-         FROM wa_messages m
-         JOIN wa_conversations c ON c.id = m.conversation_id
+         FROM ${messages} m
+         JOIN ${conversations} c ON c.id = m.conversation_id
         WHERE c.chatbot_id = ANY($1::uuid[])
           AND m."createdAt" >= now() - ($2 || ' days')::interval
         GROUP BY c.chatbot_id`,
-      [ids, String(STATS_DAYS), WaHandledBy.RAG, WaHandledBy.DECLINED],
+      [ids, String(days), WaHandledBy.RAG, WaHandledBy.DECLINED],
     );
     const open = await this.chatbotRepository.manager.query<
       { chatbot_id: string; open: string }[]
     >(
       `SELECT c.chatbot_id, COUNT(*) AS open
          FROM wa_unanswered_questions q
-         JOIN wa_conversations c ON c.id = q.conversation_id
+         JOIN ${conversations} c ON c.id = q.conversation_id
         WHERE c.chatbot_id = ANY($1::uuid[]) AND q.status = 'open'
         GROUP BY c.chatbot_id`,
       [ids],
@@ -334,7 +430,7 @@ export class ChatbotService {
   // ───────────────────────────────────────────────────────────── write
 
   async create(dto: CreateChatbotDto): Promise<ChatbotSummary> {
-    await this.access.assertPlatformAdmin();
+    await this.access.assertCanCreate();
     const userId = currentUserId();
     const bot = await this.chatbotRepository.save(
       this.chatbotRepository.create({
@@ -350,8 +446,7 @@ export class ChatbotService {
         updatedBy: userId,
       }),
     );
-    // The creator is its first owner, so the team list is never empty and they keep the bot if
-    // their platform-wide access is ever narrowed.
+    // The creator is its first owner: nobody else sees the bot until they are added to its team.
     if (userId) {
       await this.memberRepository.save(
         this.memberRepository.create({
@@ -399,10 +494,22 @@ export class ChatbotService {
 
   async setStatus(id: string, status: ChatbotStatus): Promise<ChatbotSummary> {
     await this.access.assert(id, ChatbotMemberRole.EDITOR);
+    if (status === ChatbotStatus.LIVE) await this.plans?.assertCanPublish(id);
     await this.chatbotRepository.update(
       { id },
       { status, updatedBy: currentUserId() },
     );
+    if (status === ChatbotStatus.LIVE) {
+      await this.plans?.ensureIncludedSeats(id).catch(() => undefined);
+    }
+    // One switch: live means people can use it, so its page (and website chat) turns on with it.
+    // Pausing leaves the page on, where visitors see that it's away rather than a missing page.
+    if (status === ChatbotStatus.LIVE) {
+      await this.chatbotRepository.manager.query(
+        `UPDATE chatbot_pages SET status = 'on', "updatedAt" = now() WHERE chatbot_id = $1`,
+        [id],
+      );
+    }
     this.logger.info(`Chatbot ${id} is now ${status}`);
     return this.get(id);
   }
@@ -413,6 +520,8 @@ export class ChatbotService {
    */
   async archive(id: string): Promise<void> {
     await this.access.assert(id, ChatbotMemberRole.OWNER);
+    // Taken first, so every document archived below is at or after it: restore() finds them so.
+    const removedAt = new Date();
     await this.connectorRepository.update(
       { chatbotId: id },
       { chatbotId: null, updatedBy: currentUserId() },
@@ -424,12 +533,72 @@ export class ChatbotService {
     await this.chatbotRepository.update(
       { id },
       {
-        archivedAt: new Date(),
+        archivedAt: removedAt,
         status: ChatbotStatus.PAUSED,
         updatedBy: currentUserId(),
       },
     );
+    // An unfinished setup goes with it, so a bot removed mid-setup isn't read or resumed again.
+    await this.chatbotRepository.manager.query(
+      `UPDATE bot_drafts SET status = 'abandoned'
+        WHERE chatbot_id = $1 AND status = 'active'`,
+      [id],
+    );
     this.logger.info(`Chatbot ${id} archived`);
+  }
+
+  /**
+   * Bring a removed bot back, paused, so nothing answers until an owner turns it on. Its own
+   * documents archived by the removal come back (not ones removed before it); a bot removed
+   * mid-setup gets its setup back. Its channels don't: a number may serve another bot by now.
+   */
+  async restore(id: string): Promise<ChatbotSummary> {
+    // Viewing is all an archived bot allows, so the owner check is made here.
+    const { chatbot, role } = await this.access.assert(id);
+    if (!chatbot.archivedAt) return this.get(id);
+    if (role !== ChatbotMemberRole.OWNER) {
+      throw new ForbiddenException("Only this chatbot's owners can do this.");
+    }
+    const documents = await this.chatbotRepository.manager.query<
+      { id: string }[]
+    >(
+      // A minute's grace for bots removed before archive() took its time first.
+      `SELECT id FROM kb_documents
+        WHERE owner_chatbot_id = $1
+          AND archived_at >= $2::timestamptz - interval '1 minute'`,
+      [id, chatbot.archivedAt],
+    );
+    for (const { id: documentId } of documents) {
+      await this.knowledgeBase.unarchiveForChatbot(id, documentId);
+    }
+    // Never live: its setup comes back, to continue where it stopped.
+    const setup = await this.chatbotRepository.manager.query<{ id: string }[]>(
+      `SELECT id FROM bot_drafts
+        WHERE chatbot_id = $1 AND status = 'abandoned'
+          AND NOT EXISTS (
+            SELECT 1 FROM bot_drafts p WHERE p.chatbot_id = $1 AND p.status = 'published'
+          )
+        ORDER BY "updatedAt" DESC LIMIT 1`,
+      [id],
+    );
+    if (setup[0]) {
+      await this.chatbotRepository.manager.query(
+        `UPDATE bot_drafts SET status = 'active' WHERE id = $1`,
+        [setup[0].id],
+      );
+    }
+    await this.chatbotRepository.update(
+      { id },
+      {
+        archivedAt: null,
+        status: setup[0] ? ChatbotStatus.DRAFT : ChatbotStatus.PAUSED,
+        updatedBy: currentUserId(),
+      },
+    );
+    this.logger.info(
+      `Chatbot ${id} restored (${documents.length} documents back)`,
+    );
+    return this.get(id);
   }
 
   /** Only models ally-ai can run, from the platform's model catalog. */
@@ -693,12 +862,41 @@ export class ChatbotService {
    * the run's status, steps and checked text are sent as they happen; the result is the same
    * either way, and it is what the streamed route sends as `final`.
    */
+  /**
+   * What a v2 answer from this assistant would send to `/agent/run`, for the owner's "How it
+   * works" (chunk 20d-2): the same Preview turn `test` builds, without a message, through the
+   * engine's own request builder. Nothing is answered, stored or sent.
+   */
+  async agentRequestFor(id: string): Promise<AgentRunRequest> {
+    const { chatbot } = await this.access.assert(id, ChatbotMemberRole.VIEWER);
+    const bot: Chatbot = { ...chatbot, accessMode: ChatbotAccessMode.ANYONE };
+    const settings = await this.settingsService.getForChatbot(bot);
+    return this.engine.agentRequestFor({
+      chatbot: bot,
+      settings,
+      // ally-ai shows its own placeholder where the visitor's message goes.
+      text: "(the visitor's message)",
+      history: [],
+      isFirstMessage: false,
+      sender: {
+        externalId: `how-it-works:${currentUserId()}`,
+        label: 'how it works',
+        userId: currentUserId() || null,
+        email: null,
+        tenantId: null,
+      },
+      channel: PREVIEW_CHANNEL,
+    });
+  }
+
   async test(
     id: string,
     dto: TestChatbotDto,
     live?: LiveReply,
   ): Promise<ChatbotTestResult> {
     const { chatbot } = await this.access.assert(id, ChatbotMemberRole.VIEWER);
+    // A removed assistant can be read, never run.
+    if (chatbot.archivedAt) throw new NotFoundException('Chatbot not found');
     const draft = dto.draft ?? {};
     if (draft.model) await this.assertModel(draft.model);
     const conversationId = dto.conversationId ?? `preview-${randomUUID()}`;
@@ -767,13 +965,36 @@ export class ChatbotService {
         })
       : decision.body;
 
-    return this.toTestResult(decision, {
+    const result = this.toTestResult(decision, {
       reply,
-      settings,
       conversationId,
       latencyMs: Date.now() - startedAt,
       usedDraft: Boolean(dto.draft),
     });
+    result.previewWrite = await this.previewWrote(decision.agent?.runId);
+    const remember = wouldRemember(decision);
+    if (remember.length) result.wouldRemember = remember;
+    return result;
+  }
+
+  /**
+   * Whether a Try it run booked or changed something in a list (chunk 5b): Preview checks the
+   * write, then rolls it back, so the console says "Test only: this wasn't saved." A failed
+   * lookup reads as no write.
+   */
+  private async previewWrote(runId: string | null | undefined) {
+    if (!runId) return false;
+    try {
+      const rows: unknown[] = await this.chatbotRepository.manager.query(
+        `SELECT 1 FROM tool_runs
+          WHERE run_id = $1 AND status = $2 AND tool ~ '^(create|update)_'
+          LIMIT 1`,
+        [runId, ToolRunStatus.OK],
+      );
+      return Array.isArray(rows) && rows.length > 0;
+    } catch {
+      return false;
+    }
   }
 
   /** One Preview test as the console shows it. */
@@ -781,13 +1002,11 @@ export class ChatbotService {
     decision: ChatbotDecision,
     {
       reply,
-      settings,
       conversationId,
       latencyMs,
       usedDraft,
     }: {
       reply: string;
-      settings: WhatsAppBotSettings;
       conversationId: string;
       latencyMs: number;
       usedDraft: boolean;
@@ -804,19 +1023,18 @@ export class ChatbotService {
       // Shown rather than sent: the console must never page anyone.
       wouldAlert: decision.alert
         ? decision.alert.type
-        : isFallback(agent)
+        : isFailedRun(agent)
           ? AGENT_RUNTIME_DEGRADED_TYPE
           : null,
       latencyMs,
       usedDraft,
       // Agents v2: which engine answered this test, and the run behind it.
-      runtime: agent?.runtime ?? ChatbotRuntime.V1,
+      runtime: agent?.runtime ?? null,
       runId: agent?.runId ?? null,
       trace: agent?.runtime === AgentRuntimeUsed.V2 ? agent.trace : null,
-      fallbackReason: isFallback(agent) ? agent.fallbackReason : null,
+      fallbackReason: isFailedRun(agent) ? agent.fallbackReason : null,
       // What the agent understood the message to be (smalltalk, about_bot, …).
       turnType: decision.turnType ?? null,
-      runtimeAllowed: settings.agentRuntimeAllowed,
       conversationId,
     };
   }

@@ -3,14 +3,32 @@
  * as served by `GET /v1/debriefs/sessions/:sessionId`.
  *
  * `not_available` means the learner's organisation isn't switched on for the
- * new debrief — callers must then keep showing the existing debrief unchanged.
+ * new debrief — callers must then keep showing the existing debrief unchanged
+ * — unless `stopped` is set: the organisation's debriefs were stopped (FR-46),
+ * and the tab says "not available" instead.
+ *
+ * `taking_longer` is a run a person is finishing without a risk cue (plan
+ * §10.3): the learner can Check again. With a risk cue it is `on_its_way`.
+ *
+ * `failed` is never sent by the server: the app sets it when the request
+ * itself failed (a 5xx or no connection), so the learner sees "Your debrief
+ * didn't load" with Try again rather than the old note (PRD §6.12).
  */
 export type LearnerDebriefState =
   | "ready"
   | "working"
+  | "taking_longer"
   | "on_its_way"
   | "too_short"
-  | "not_available";
+  | "not_available"
+  | "failed";
+
+/** The post-launch pulse (PRD §9): two yes/no questions on 1 in 10 debriefs. */
+export type DebriefPulseQuestion = "knew_next" | "fair";
+export interface DebriefPulse {
+  knew_next: boolean | null;
+  fair: boolean | null;
+}
 
 export type DebriefSkillWord = "strength" | "keep_practising" | "didnt_come_up";
 
@@ -47,10 +65,40 @@ export interface DebriefCardsData {
   important_moment?: DebriefImportantMoment | null;
   what_worked: DebriefWhatWorked[];
   work_on_this: DebriefWorkOnThis[];
-  practise_next?: { skill: string; reason: string; scenario_id?: number | null } | null;
+  /**
+   * `try_next`: a session played in a course — "Practise this again" with up
+   * to 3 things to try. `skill` can be missing when a custom competency's
+   * code was removed from an older debrief.
+   */
+  practise_next?: {
+    skill?: string;
+    reason: string;
+    scenario_id?: number | null;
+    try_next?: string[];
+  } | null;
   skill_words: Array<{ skill: string; word: DebriefSkillWord }>;
   reflective_question: string;
   progress_note?: string | null;
+  /**
+   * "Your last {n} sessions" (progress contract §2): only on the debrief where
+   * the progress card is due. Untrusted shape — read it through
+   * `parseProgressCard`, which drops anything malformed.
+   */
+  progress_card?: unknown;
+}
+
+/** How a skill has moved over the learner's recent sessions (post-veto). */
+export type DebriefProgressTrend =
+  | "more_consistent"
+  | "about_the_same"
+  | "worth_another_look"
+  | "too_early";
+
+/** `cards.progress_card`, once parsed: every line non-empty. */
+export interface DebriefProgressCardData {
+  sessions: number;
+  skills: Array<{ skill: string; trend: DebriefProgressTrend; line: string }>;
+  focus: { skill: string; line: string } | null;
 }
 
 export type DebriefFlagReason =
@@ -67,11 +115,20 @@ export interface DebriefCorrection {
   at: string;
 }
 
+/** What the Debrief agent did with a flag, and the reply the learner reads (V2_AUTONOMY F1). */
+export interface DebriefFlagAnswer {
+  action: "kept" | "corrected" | "removed";
+  reply: string;
+  at: string;
+}
+
 export interface DebriefMyFlag {
   id: string;
   section: string;
   status: "open" | "kept" | "removed" | "corrected";
   canUndoUntil: string | null;
+  /** Ally's answer, once it has answered (usually within a minute). */
+  answer?: DebriefFlagAnswer | null;
 }
 
 /** A crisis or wellbeing line: the organisation's own, else Tele-MANAS. */
@@ -95,8 +152,40 @@ export interface LearnerDebriefView {
   /** The learner stepped out of the role in distress: support comes first. */
   distress?: boolean;
   supportLines?: DebriefSupportLine[];
-  /** Roleplays the cards link to that the learner can still open. */
-  practice?: Array<{ id: number; title: string }>;
+  /**
+   * The safety reading found something in the session. The support lines then
+   * show even when the debrief has no important-moment card (a cue the
+   * Writer judged ordinary low mood or grief).
+   */
+  riskCue?: boolean;
+  /**
+   * A clear risk cue is still left out of this debrief (present, true, only then). The debrief is
+   * shown as it is, with a kind notice that it may not cover what came up, next to the support lines.
+   */
+  followUp?: boolean;
+  /** Learner features this person has (web only). Absent or false: nothing changes for them. */
+  features?: { selectionComments?: boolean };
+  /** The person's own comments on this debrief, oldest first (only with the feature). */
+  myComments?: DebriefMyComment[];
+  /**
+   * Roleplays the cards link to that the learner can still open. Inside a
+   * course only that course's roleplays, each with its course item.
+   */
+  practice?: Array<{ id: number; title: string; trackItemId?: string }>;
+  /** Present only on a debrief picked for the pulse, with the answers so far. */
+  pulse?: DebriefPulse | null;
+  /**
+   * `not_available` only: say "not available" instead of today's debrief —
+   * an emergency stop (FR-46), or today's debrief runs on a provider the
+   * organisation does not allow (`reason: "provider_not_allowed"`).
+   */
+  stopped?: boolean;
+  reason?: "provider_not_allowed";
+  /**
+   * `ready` only: Ask Ally stopped taking questions on this debrief
+   * (`session`) or for now (`month`): the reply box stays hidden.
+   */
+  askAlly?: { open: boolean; reason?: "session" | "month" };
 }
 
 /** One of the learner's flags, as a supervisor reads it (v9 FR-26). */
@@ -125,3 +214,25 @@ export type DebriefProgress =
   | { key: "reading" | "past_sessions" | "writing" | "reviewing" | "care" }
   | { key: "guidance"; topic?: string }
   | { key: "revising"; round: number };
+
+/** One comment on selected words, as the server checks it against the card. */
+export interface DebriefSelectionComment {
+  /** The card and field, e.g. `work_on_this[0].why`. */
+  section: string;
+  spanStart: number;
+  spanEnd: number;
+  quotedText: string;
+  body: string;
+}
+
+/** One of the person's own comments on this debrief, as saved. */
+export interface DebriefMyComment {
+  id: string;
+  /** The card and field, or null for a comment on the whole debrief. */
+  section: string | null;
+  quotedText: string | null;
+  spanStart: number | null;
+  spanEnd: number | null;
+  body: string;
+  createdAt: string;
+}

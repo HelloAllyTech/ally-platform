@@ -283,6 +283,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             pathId: params['pathId'] as String?,
             caseId: params['caseId'] as String?,
             languageId: params['languageId'] as int?,
+            trackId: params['trackId'] as String?,
+            trackItemId: params['trackItemId'] as String?,
+            assessmentRequiredTurns: params['assessmentRequiredTurns'] as int?,
           );
         },
       ),
@@ -295,6 +298,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => SimulationDetailsScreen(
           scenarioId: int.parse(state.pathParameters['scenarioId']!),
           initialScenario: state.extra as Scenario?,
+          // A debrief's "Practise this" inside a course keeps the course.
+          trackId: state.uri.queryParameters['trackId'],
         ),
       ),
       GoRoute(
@@ -328,9 +333,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => SimulationFeedbackScreen(
           scenarioSessionId: state.pathParameters['sessionId']!,
           fromLogs: state.uri.queryParameters['fromLogs'] == 'true',
+          ownSession: state.uri.queryParameters['own'] == 'true',
           pathId: state.uri.queryParameters['pathId'],
           caseId: state.uri.queryParameters['caseId'],
           languageId: int.tryParse(state.uri.queryParameters['languageId'] ?? ''),
+          trackId: state.uri.queryParameters['trackId'],
+          trackItemId: state.uri.queryParameters['trackItemId'],
         ),
       ),
       GoRoute(

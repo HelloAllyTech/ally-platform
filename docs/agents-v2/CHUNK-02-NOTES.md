@@ -89,7 +89,7 @@ Things to know:
 All paths are under `ally-web/apps/ally-admin-dashboard/src`.
 - **Settings:** `pages/WhatsAppBot/ChatbotSettingsTab.tsx`. A plain `useState` draft, saved with `useUpdateChatbotSettingsMutation`. Fields inherit their default until customised.
 - **Defaults:** `pages/WhatsAppBot/BotSettingsTab.tsx`. A local `Toggle` wrapping `CarbonToggle`, saved with `useUpdateWaSettingsMutation`.
-- **Preview:** `pages/WhatsAppBot/ChatbotTestTab.tsx`. It uses `useTestChatbotMutation`, keeps the thread in local state, and shows handledBy, model, latency and sources. It has a Reset button.
+- **Preview:** `pages/WhatsAppBot/ChatbotTestTab.tsx`. It uses `useTestChatbotMutation`, keeps the thread in local state, and shows handledBy, model, latency and sources. It has a Reset button. <!-- docs-path-lint: ignore -->
 - **Platform-admin signal:** `useGetChatbotsQuery().data.canCreate`. There's no role hook for this.
 - **Types:** `types/chatbots.ts` and `types/whatsappBot.ts`. The RTK slice is `api/chatbots.ts`.
 - **Tests:** none for the Settings, Defaults or Preview tabs before this chunk. The test style (Vitest, with `@api` mocked) is in `pages/WhatsAppBot/__tests__/WhatsAppBot.test.tsx`.
@@ -97,7 +97,7 @@ All paths are under `ally-web/apps/ally-admin-dashboard/src`.
 ### Latest migration
 `1980920000000-AddChatbotLastTestedAt`. This chunk adds `1980960000000`.
 
-### Where the code differs from chunk-02.md (the code wins)
+### Where the code differs from archive/chunk-02.md (the code wins)
 1. `wa_messages` has no metadata jsonb, so this chunk adds `agent_run_id` and `agent_runtime` columns.
 2. `agentRuntimeAllowed` needs no data migration. Adding it to `DEFAULT_WHATSAPP_SETTINGS` is the existing mechanism, because `merge()` fills keys missing from the stored row.
 3. A bot must not be able to turn the kill switch on for itself. Because the per-bot settings DTO doesn't validate keys, `applyOverride` forces the platform value.
@@ -130,7 +130,7 @@ All three apps are on the same branch. In review order (see section 7 for the co
 | ally-be | `DATA_SCHEMA.md`, `.env.example`, `env.validation.ts`, `config.service.ts`, `ai-task-registry.constants.ts` | Docs, the new env var, and the registry note. |
 | ally-web | `pages/WhatsAppBot/ChatbotEngineCard.tsx`, `ChatbotSettingsTab.tsx` | The Engine card in a bot's Settings, for platform admins only. *Superseded in 3a: the card is on Settings → Agent (CHUNK-03A-NOTES section 13).* | <!-- docs-path-lint: ignore -->
 | ally-web | `pages/WhatsAppBot/BotSettingsTab.tsx` | Defaults → Safety switches → **Allow the new engine**. |
-| ally-web | `pages/WhatsAppBot/ChatbotTestTab.tsx` | Preview gains:<br>• the engine badge, or "v1 (v2 failed: reason)"<br>• the run id with Copy<br>• a collapsible step list with ms per step<br>• **New thread**, which replaces "Start over" and also drops the thread id<br>• an admin-only "Engine for this test" picker *(removed in 3a: a test always uses the bot's own engine)* |
+| ally-web | `pages/WhatsAppBot/ChatbotTestTab.tsx` | Preview gains:<br>• the engine badge, or "v1 (v2 failed: reason)"<br>• the run id with Copy<br>• a collapsible step list with ms per step<br>• **New thread**, which replaces "Start over" and also drops the thread id<br>• an admin-only "Engine for this test" picker *(removed in 3a: a test always uses the bot's own engine)* <!-- docs-path-lint: ignore --> |
 
 ### Tests added
 

@@ -93,6 +93,8 @@ import {
   Save as CSave,
   Search as CSearch,
   Settings as CSettings,
+  Star as CStarOutline,
+  StarFilled as CStarFilled,
   SkillLevel as CSkillLevel,
   Subtract as CSubtract,
   Terminal as CTerminal,
@@ -303,6 +305,10 @@ export const McqBlock = createCarbonIcon(CRadioButtonChecked);
 export const Minus = createCarbonIcon(CSubtract);
 export const RefreshCw = createCarbonIcon(CRenew);
 export const RotateCcw = createCarbonIcon(CRestart);
+
+/** Carbon line star and filled star — the Prod Director's priority toggle. */
+export const StarOutline = createCarbonIcon(CStarOutline);
+export const StarSolid = createCarbonIcon(CStarFilled);
 export const UploadCloud = createCarbonIcon(CCloudUpload);
 export const Terminal = createCarbonIcon(CTerminal);
 export const Mobile = createCarbonIcon(CMobile);
@@ -433,14 +439,6 @@ export const BuilderAgentIcon = materialSymbol("auto_awesome");
  * warning about the subset is not decoration.
  */
 export const RoadmapSettingsIcon = materialSymbol("settings");
-
-/**
- * The roadmap header's quick-add glyph: a plain plus, beside the guided-interview bulb. The
- * bulb says "file an idea, with help"; the plus says "add a row" — which is exactly what quick
- * add is, so the glyph the bulb's note rejected for the interview is the right one here. Same
- * `wght 100` family as its neighbours. "add" MUST stay in index.html's `icon_names` subset.
- */
-export const QuickAddIcon = materialSymbol("add");
 
 /**
  * Standard tooltip affordance across the admin. Unlike the Carbon icons above

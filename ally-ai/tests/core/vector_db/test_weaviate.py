@@ -241,9 +241,7 @@ class TestWeaviateDB:
         vector = [0.1, 0.2, 0.3]
         document_id = str(uuid4())
 
-        mock_response = httpx.Response(
-            500, json={"error": "Internal Server Error"}
-        )
+        mock_response = httpx.Response(500, json={"error": "Internal Server Error"})
         mock_collection.data.insert.side_effect = UnexpectedStatusCodeError(
             "Invalid status code", mock_response
         )

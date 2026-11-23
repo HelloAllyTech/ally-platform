@@ -142,7 +142,7 @@ export interface ScenarioReportGenerateRequest {
 }
 
 /** One agent test case the actor is scored against (sent to the LLM judge). */
-export interface ActorGoalEvaluationGoal {
+interface ActorGoalEvaluationGoal {
   id: string;
   title: string;
   category: string;

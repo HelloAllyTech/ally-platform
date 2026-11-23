@@ -99,6 +99,10 @@ export class WaMessage extends BaseWithoutTenantEntity {
   @Column({ type: 'uuid', name: 'in_reply_to_id', nullable: true })
   inReplyToId?: string | null;
 
+  /** The team member who wrote a reply from the inbox (chunk 11a); null for the assistant's. */
+  @Column({ type: 'int', name: 'sent_by_user_id', nullable: true })
+  sentByUserId?: number | null;
+
   /**
    * The Agents v2 run behind this reply: the checkpointer's run id in ally-ai, so a reply can be
    * traced back to its run ("Why?"). Null for v1 replies.

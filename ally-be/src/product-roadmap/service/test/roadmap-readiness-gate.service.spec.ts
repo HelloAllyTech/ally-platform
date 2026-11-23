@@ -1,12 +1,13 @@
+import { ROADMAP_QUALITY_PASS_SCORE } from '../../constants/product-roadmap.constants';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { BadRequestException } from '@nestjs/common';
 
 import { User } from 'src/user/entity/user.entity';
-import { BugFinding } from 'src/bug-hunter/entity/bug-finding.entity';
 import { S3Service } from 'src/aws/service/s3.service';
 import { AppConfigService } from 'src/config/config.service';
 
+import { RoadmapAiService } from '../roadmap-ai.service';
 import { RoadmapOpportunityService } from '../roadmap-opportunity.service';
 import { RoadmapGoalImpactService } from '../roadmap-goal-impact.service';
 import { RoadmapStrategyGoalService } from '../roadmap-strategy-goal.service';
@@ -15,8 +16,6 @@ import { RoadmapNotificationService } from '../roadmap-notification.service';
 import { RoadmapReadinessTokenService } from '../roadmap-readiness-token.service';
 import { RoadmapOpportunityRepository } from '../../repository/roadmap-opportunity.repository';
 import { RoadmapAllocationRepository } from '../../repository/roadmap-allocation.repository';
-import { BugHunterRepoClassifierService } from 'src/bug-hunter/service/bug-hunter-repo-classifier.service';
-import { BugHunterMissClassifierService } from 'src/bug-hunter/service/bug-hunter-miss-classifier.service';
 import {
   RoadmapOpportunityEffort,
   RoadmapOpportunityType,
@@ -49,7 +48,8 @@ describe('RoadmapOpportunityService — readiness gate', () => {
   const givenVerdict = (
     failedCriteria: string[],
     proposedEffort: RoadmapOpportunityEffort | null = RoadmapOpportunityEffort.M,
-  ) => verify.mockReturnValue({ failedCriteria, proposedEffort });
+    qualityScore: number | null = null,
+  ) => verify.mockReturnValue({ failedCriteria, proposedEffort, qualityScore });
 
   beforeEach(async () => {
     opportunityRepository = {
@@ -71,6 +71,11 @@ describe('RoadmapOpportunityService — readiness gate', () => {
     const module = await Test.createTestingModule({
       providers: [
         RoadmapOpportunityService,
+        // A title is written for a filing that arrives without one; these suites do not test it.
+        {
+          provide: RoadmapAiService,
+          useValue: { suggestTitle: jest.fn().mockResolvedValue('A title') },
+        },
         {
           provide: RoadmapOpportunityRepository,
           useValue: opportunityRepository,
@@ -84,6 +89,7 @@ describe('RoadmapOpportunityService — readiness gate', () => {
           provide: RoadmapStrategyGoalService,
           useValue: {
             countGoals: jest.fn().mockResolvedValue(0),
+            isProdDirector: jest.fn().mockResolvedValue(false),
             getRankContext: jest.fn().mockResolvedValue({
               weights: {
                 votesWeight: 1,
@@ -108,30 +114,12 @@ describe('RoadmapOpportunityService — readiness gate', () => {
           provide: getRepositoryToken(User),
           useValue: { find: jest.fn().mockResolvedValue([]) },
         },
-        {
-          provide: getRepositoryToken(BugFinding),
-          useValue: { create: jest.fn(), save: jest.fn() },
-        },
         { provide: S3Service, useValue: { parseS3Url: jest.fn() } },
         {
           provide: AppConfigService,
           useValue: { s3: { assetsBucket: 'ally-assets' } },
         },
         { provide: RoadmapReadinessTokenService, useValue: { verify } },
-        // These tests all file type=IDEA, so the classifier never runs; this
-        // satisfies the constructor.
-        {
-          provide: BugHunterRepoClassifierService,
-          useValue: {
-            classifyRepo: jest
-              .fn()
-              .mockResolvedValue({ repo: null, rationale: '' }),
-          },
-        },
-        {
-          provide: BugHunterMissClassifierService,
-          useValue: { classifyAndRecord: jest.fn().mockResolvedValue(null) },
-        },
       ],
     }).compile();
 
@@ -158,13 +146,45 @@ describe('RoadmapOpportunityService — readiness gate', () => {
 
   const savedRow = () => opportunityRepository.create.mock.calls[0][0];
 
+  it('stores a title the filer sent above the summary, without asking the model', async () => {
+    givenVerdict([]);
+
+    await file({ title: '  Cut   assignment time  ' });
+
+    expect(savedRow().description).toBe(`Cut assignment time\n\n${DRAFT}`);
+  });
+
+  it('refuses a title and summary that together exceed what an idea can hold', async () => {
+    givenVerdict([]);
+
+    await expect(
+      file({ title: 'T'.repeat(200), description: 'D'.repeat(1001) }),
+    ).rejects.toThrow(/at most 1202 characters/);
+    expect(opportunityRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('keeps a bug report as one block, with no title written for it', async () => {
+    givenVerdict([]);
+
+    await file(
+      { type: RoadmapOpportunityType.BUG },
+      { enforceReadiness: false },
+    );
+
+    expect(savedRow().description).toBe(DRAFT);
+  });
+
   it('files a passing draft', async () => {
     givenVerdict([]);
 
     await file();
 
     expect(opportunityRepository.save).toHaveBeenCalled();
-    expect(savedRow()).toMatchObject({ description: DRAFT, productGoal: GOAL });
+    // The title is written above the draft, which becomes its Summary > Problem.
+    expect(savedRow()).toMatchObject({
+      description: `A title\n\n${DRAFT}`,
+      productGoal: GOAL,
+    });
   });
 
   /**
@@ -206,6 +226,41 @@ describe('RoadmapOpportunityService — readiness gate', () => {
     await file({ effort });
 
     expect(savedRow()).toMatchObject({ effort });
+  });
+
+  /**
+   * The quality bar. A token the interview signed carries its score; a system filing (the PM
+   * Agent) carries none and keeps the wider size rule above.
+   */
+  describe('a token carrying a quality score', () => {
+    it('files an idea at the pass mark at a single-idea size', async () => {
+      givenVerdict([], RoadmapOpportunityEffort.L, ROADMAP_QUALITY_PASS_SCORE);
+
+      await file({ effort: RoadmapOpportunityEffort.L });
+
+      expect(savedRow()).toMatchObject({ effort: RoadmapOpportunityEffort.L });
+    });
+
+    it('refuses an idea below the pass mark, whatever the client says', async () => {
+      givenVerdict(
+        [],
+        RoadmapOpportunityEffort.M,
+        ROADMAP_QUALITY_PASS_SCORE - 0.1,
+      );
+
+      await expect(
+        file({ effort: RoadmapOpportunityEffort.M }),
+      ).rejects.toThrow(/quality/);
+    });
+
+    it.each([RoadmapOpportunityEffort.XL, RoadmapOpportunityEffort.XXL])(
+      'refuses a %s idea: it has to be split first',
+      async (effort) => {
+        givenVerdict([], effort, 90);
+
+        await expect(file({ effort })).rejects.toThrow(/split_needed/);
+      },
+    );
   });
 
   it('accepts a human correction of a size the model got wrong', async () => {

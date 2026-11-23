@@ -4,7 +4,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
+import { FeatureToggleKey } from '../../authorization/constants/admin-feature-toggle.constants';
+import { FeatureToggleService } from '../../authorization/service/feature-toggle.service';
 import { TenantScopeService } from '../../authorization/service/tenant-scope.service';
 import { ExecutionManager } from '../../common/execution/execution-manager';
 import { Chatbot } from '../entity/chatbot.entity';
@@ -16,10 +18,11 @@ const currentUserId = (): number => Number(ExecutionManager.getUserId() ?? 0);
 /**
  * Who may see and manage which bot.
  *
- * A platform admin with platform-wide scope (no organisation allowlist, no single home
- * organisation) manages every bot, and is the only one who can create bots, change the defaults
- * every bot inherits, or connect numbers that belong to no bot. Everyone else sees exactly the bots
- * they are a member of, at the role they were given there.
+ * Everyone, platform admins included, sees exactly the bots they are a member of, at the role they
+ * were given there (A1: owners only; there is no view of every bot). Anyone with the Chatbots
+ * feature (WHATSAPP_BOT) may create a bot and becomes its owner. Platform-wide scope is still needed
+ * for what belongs to no bot: the defaults every bot inherits, and connectors or numbers that are
+ * not bound to a bot.
  *
  * A bot the caller cannot see answers exactly like one that does not exist (404), so ids cannot be
  * probed; a bot they can see but not change answers 403.
@@ -32,6 +35,7 @@ export class ChatbotAccessService {
     @InjectRepository(ChatbotMember)
     private readonly memberRepository: Repository<ChatbotMember>,
     private readonly tenantScope: TenantScopeService,
+    private readonly featureToggles: FeatureToggleService,
   ) {}
 
   async isPlatformAdmin(userId = currentUserId()): Promise<boolean> {
@@ -46,11 +50,23 @@ export class ChatbotAccessService {
     }
   }
 
-  /** The bots the caller can see; `null` means every bot. */
-  async accessibleChatbotIds(
-    userId = currentUserId(),
-  ): Promise<string[] | null> {
-    if (await this.isPlatformAdmin(userId)) return null;
+  /** Whether the caller may create a bot: they hold the Chatbots feature. */
+  async canCreate(userId = currentUserId()): Promise<boolean> {
+    if (!userId) return false;
+    return this.featureToggles.hasToggle(userId, FeatureToggleKey.WHATSAPP_BOT);
+  }
+
+  async assertCanCreate(userId = currentUserId()): Promise<void> {
+    if (!(await this.canCreate(userId))) {
+      throw new ForbiddenException(
+        'Creating a chatbot needs the Chatbots feature. Ask an Ally admin.',
+      );
+    }
+  }
+
+  /** The bots the caller is a member of (platform admins included). */
+  async accessibleChatbotIds(userId = currentUserId()): Promise<string[]> {
+    if (!userId) return [];
     const rows = await this.memberRepository.find({
       where: { userId },
       select: ['chatbotId'],
@@ -58,15 +74,12 @@ export class ChatbotAccessService {
     return rows.map((r) => r.chatbotId);
   }
 
-  /** The caller's role on each of the given bots (platform admins are owners everywhere). */
+  /** The caller's role on each of the given bots; a bot they are not on is absent. */
   async rolesFor(
     chatbotIds: string[],
     userId = currentUserId(),
   ): Promise<Map<string, ChatbotMemberRole>> {
-    if (await this.isPlatformAdmin(userId)) {
-      return new Map(chatbotIds.map((id) => [id, ChatbotMemberRole.OWNER]));
-    }
-    if (!chatbotIds.length) return new Map();
+    if (!chatbotIds.length || !userId) return new Map();
     const rows = await this.memberRepository.find({
       where: { userId, chatbotId: In(chatbotIds) },
     });
@@ -74,7 +87,7 @@ export class ChatbotAccessService {
   }
 
   /**
-   * Load a live (not archived) bot the caller holds at least `minRole` on.
+   * Load a bot the caller holds at least `minRole` on. An archived bot loads only for viewing.
    */
   async assert(
     chatbotId: string,
@@ -82,19 +95,21 @@ export class ChatbotAccessService {
     userId = currentUserId(),
   ): Promise<{ chatbot: Chatbot; role: ChatbotMemberRole }> {
     const chatbot = await this.chatbotRepository.findOne({
-      where: { id: chatbotId, archivedAt: IsNull() },
+      where: { id: chatbotId },
     });
-    if (!chatbot) throw new NotFoundException('Chatbot not found');
-
-    let role: ChatbotMemberRole | undefined;
-    if (await this.isPlatformAdmin(userId)) {
-      role = ChatbotMemberRole.OWNER;
-    } else {
-      const member = await this.memberRepository.findOne({
-        where: { chatbotId, userId },
-      });
-      role = member?.role;
+    // A removed (archived) bot stays readable, for the Archived list's "what happened", and is
+    // never changed: anything above viewing treats it as gone.
+    if (
+      !chatbot ||
+      (chatbot.archivedAt && minRole !== ChatbotMemberRole.VIEWER)
+    ) {
+      throw new NotFoundException('Chatbot not found');
     }
+
+    const member = userId
+      ? await this.memberRepository.findOne({ where: { chatbotId, userId } })
+      : null;
+    const role = member?.role;
     if (!role) throw new NotFoundException('Chatbot not found');
     if (CHATBOT_ROLE_RANK[role] < CHATBOT_ROLE_RANK[minRole]) {
       throw new ForbiddenException(

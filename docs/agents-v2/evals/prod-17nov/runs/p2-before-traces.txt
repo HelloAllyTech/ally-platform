@@ -1,0 +1,91 @@
+pass  tss-S2 (in data: Orbit backpack ₹3,299, no cart offer)
+      > Price of the Orbit backpack?
+      < [rag/question v2 5016ms] The TSS Originals: Orbit backpack is priced at ₹3,299. (Source: product & backpacks listing) Would you like help checking availability or placing an order?
+        · agent 1999ms agent: question, calls search_knowledge via gpt-5-mini
+        · tool 499ms search_knowledge: 8 hits, 5 new passages, best 0.50
+        · agent 2291ms agent: question, answer via gpt-5-mini
+        · check 3ms check: answer (question), 2 citations
+        = The TSS Originals: Orbit backpack is priced at ₹3,299. (Source: product & backpacks listing) Would you like help checking availability or placing an order?
+FAIL! tss-S3 (in data: 30-day returns)
+      > What's your return policy?
+      < [rag/question v2 10296ms] Our Terms say The Souled Store may (after assessment) restrict accounts with unusually high return rates or levy a reasonable return-processing fee on such acco
+      ✗ missing /30[- ]?day|30 days|thirty days/
+        · agent 1498ms agent: question, calls search_knowledge via gpt-5-mini
+        · tool 5309ms search_knowledge: 8 hits, 5 new passages, best 0.64
+        · agent 3432ms agent: question, answer via gpt-5-mini
+        · check 1ms check: answer (question), 2 citations
+        = Our Terms say The Souled Store may (after assessment) restrict accounts with unusually high return rates or levy a reasonable return-processing fee on such accounts, with prior disclosure when a return is initiated. For details, please contact grievanceofficer@thesouledstore.com.
+FAIL! tss-S6 (in data: oversized fit, size down)
+      > Your hoodies look oversized, should I size down?
+      < [clarified/question v2 2422ms] Which hoodie are you looking at—can you tell me the product name or link so I can check its fit and sizing advice?
+      ✗ missing /siz(e|ing) down|smaller size|one size (down|smaller)/
+        · agent 2257ms agent: question, clarify via gpt-5-mini
+        · check 3ms check: clarify (question), 0 citations
+        = Which hoodie are you looking at—can you tell me the product name or link so I can check its fit and sizing advice?
+pass  tss-S11 (not in data: cash on delivery, honest with contact)
+      > Do you have cash on delivery?
+      < [declined/question v2 8949ms] I don’t have information about whether The Souled Store offers cash on delivery. Please check The Souled Store website or contact their customer support for con
+        · agent 1599ms agent: question, calls search_knowledge via gpt-5-mini
+        · tool 833ms search_knowledge: 8 hits, 5 new passages, best 0.50
+        · agent 1724ms agent: question, calls search_knowledge via gpt-5-mini
+        · tool 688ms search_knowledge: 8 hits, 0 new passages, best 0.49
+        · agent 4055ms agent: question, decline via gpt-5-mini
+        · check 1ms check: decline (question), 0 citations
+        = I don’t have information about whether The Souled Store offers cash on delivery. Please check The Souled Store website or contact their customer support for confirmation — I can help you find other payment details if you’d like. Please contact our team at +91 22-68493328.
+FAIL! tss-S12 (multi-turn: Batman gift in budget, no hand-over, returns)
+      > I'm looking for a gift for my brother who loves Batman, budget 5000
+      < [clarified/question v2 6931ms] Great — I can help pick something Batman-themed. Do you prefer clothing (hoodie/jacket/t‑shirt) or accessories (caps, mugs, etc.), and what size does your broth
+      ✗ missing /4,?499/
+        · agent 1769ms agent: question, calls search_knowledge via gpt-5-mini
+        · tool 301ms search_knowledge: 8 hits, 5 new passages, best 0.57
+        · agent 1893ms agent: question, calls search_knowledge via gpt-5-mini
+        · tool 457ms search_knowledge: 8 hits, 1 new passages, best 0.57
+        · agent 2468ms agent: question, clarify via gpt-5-mini
+        · check 0ms check: clarify (question), 0 citations
+        = Great — I can help pick something Batman-themed. Do you prefer clothing (hoodie/jacket/t‑shirt) or accessories (caps, mugs, etc.), and what size does your brother wear?
+      > he's UK 9
+      < [clarified/question v2 5027ms] Thanks — noted UK 9. Would you like a Batman-themed pair of footwear (if we have them) or prefer clothing/accessories (hoodie, tee, mug, cap)?
+        · agent 2308ms agent: question, calls search_knowledge via gpt-5-mini
+        · tool 308ms search_knowledge: 8 hits, 4 new passages, best 0.53
+        · agent 2360ms agent: question, clarify via gpt-5-mini
+        · check 1ms check: clarify (question), 0 citations
+        = Thanks — noted UK 9. Would you like a Batman-themed pair of footwear (if we have them) or prefer clothing/accessories (hoodie, tee, mug, cap)?
+      > what if it doesn't fit?
+      < [declined/question v2 12601ms] I don’t have The Souled Store’s returns/exchange details. For help with a return or exchange if the item doesn’t fit, please contact their grievance officer at 
+        · agent 1732ms agent: question, calls search_knowledge via gpt-5-mini
+        · tool 424ms search_knowledge: 8 hits, 5 new passages, best 0.61
+        · agent 3326ms agent: question, answer via gpt-5-mini
+        · check 7ms check: sent back (search_again)
+        · agent 1485ms agent: question, calls search_knowledge via gpt-5-mini
+        · tool 2150ms search_knowledge: 8 hits, 0 new passages, best 0.51
+        · agent 3413ms agent: question, answer via gpt-5-mini
+        · check 1ms check: decline (question), 0 citations
+        = I don’t have The Souled Store’s returns/exchange details. For help with a return or exchange if the item doesn’t fit, please contact their grievance officer at grievanceofficer@thesouledstore.com (from the site). I can also help pick the right size or suggest alternative Batman items if you’d like—what clothing size does he wear? Please contact our team at +91 22-68493328.
+FAIL! ia-B13-dinner (in data (B13): both Mumbai dinner seatings)
+      > What are the dinner timings in Mumbai?
+      < [rag/question v2 6886ms] Dinner (second seating) in Mumbai is 9:45 pm to 12:00 am. Last order is to be placed by 10:30 pm. Would you like help with a reservation?
+      ✗ missing /(6:45|7:00)/
+        · agent 1679ms agent: question, calls search_knowledge via gpt-5-mini
+        · tool 380ms search_knowledge: 8 hits, 5 new passages, best 0.74
+        · agent 4761ms agent: question, answer via gpt-5-mini
+        · check 1ms check: answer (question), 1 citations
+        = Dinner (second seating) in Mumbai is 9:45 pm to 12:00 am. Last order is to be placed by 10:30 pm. Would you like help with a reservation?
+FAIL! sb-P1 (in data: SEBI RIA number)
+      > Are you SEBI registered? What's your number?
+      < [rag/question v2 6481ms] Yes. Scripbox offers wealth services through Wealth Managers (India) Private Limited — a Scripbox company — which is registered with SEBI as a Portfolio Manager
+      ✗ missing /INA200001041/; says /098862 ?73164/
+        · agent 2761ms agent: question, calls search_knowledge via gpt-5-mini
+        · tool 395ms search_knowledge: 8 hits, 5 new passages, best 0.73
+        · agent 3271ms agent: question, answer via gpt-5-mini
+        · check 3ms check: answer (question), 1 citations
+        = Yes. Scripbox offers wealth services through Wealth Managers (India) Private Limited — a Scripbox company — which is registered with SEBI as a Portfolio Manager (Registration No.: INP000001660). The contact listed is 098862 73164.
+pass  sb-P9 (in data: none guaranteed)
+      > Are any of your products guaranteed?
+      < [declined/question v2 10786ms] The Scripbox Plans and Pricing pages shown do not state guaranteed products—please check those pages or ask the Scripbox team for confirmation. Please call 1800
+        · agent 1359ms agent: question, calls search_knowledge via gpt-5-mini
+        · tool 339ms search_knowledge: 8 hits, 5 new passages, best 0.66
+        · agent 3267ms agent: question, calls search_knowledge via gpt-5-mini
+        · tool 283ms search_knowledge: 8 hits, 1 new passages, best 0.66
+        · agent 5479ms agent: question, answer via gpt-5-mini
+        · check 2ms check: decline (question), 0 citations
+        = The Scripbox Plans and Pricing pages shown do not state guaranteed products—please check those pages or ask the Scripbox team for confirmation. Please call 1800-102-1265.

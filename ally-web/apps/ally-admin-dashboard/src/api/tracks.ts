@@ -1,6 +1,7 @@
 import { baseAPI } from "@api";
 import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
 import {
+  AssessmentPairCompat,
   CreateTrackResponse,
   GenerateTrackCoverImageInput,
   GetTracksQueryParams,
@@ -38,6 +39,17 @@ const tracksApi = baseAPI.injectEndpoints({
       }),
     }),
 
+    /** Whether a pre and a post roleplay score the same behaviours (names listed when not). */
+    getAssessmentPairCompat: builder.query<
+      AssessmentPairCompat,
+      { preScenarioId: number; postScenarioId: number }
+    >({
+      query: ({ preScenarioId, postScenarioId }) => ({
+        url: ApiEndpoints.TRACKS.ASSESSMENT_PAIR_COMPAT(preScenarioId, postScenarioId),
+        method: HttpMethod.GET,
+      }),
+    }),
+
     createTrack: builder.mutation<CreateTrackResponse, TrackMetadataInput>({
       query: body => ({
         url: ApiEndpoints.TRACKS.LIST,
@@ -68,12 +80,12 @@ const tracksApi = baseAPI.injectEndpoints({
       invalidatesTags: [TAG_TYPES.TRACKS_V2],
     }),
 
-    updateLiveQuizSettings: builder.mutation<
+    updateLiveAttemptLimit: builder.mutation<
       { trackItemId: string; maxAttempts: number | null },
       { trackItemId: string; maxAttempts: number | null }
     >({
       query: ({ trackItemId, maxAttempts }) => ({
-        url: ApiEndpoints.TRACKS.QUIZ_SETTINGS(trackItemId),
+        url: ApiEndpoints.TRACKS.ATTEMPT_LIMIT(trackItemId),
         method: HttpMethod.PATCH,
         body: { maxAttempts },
       }),
@@ -265,10 +277,12 @@ export const {
   useGetTracksQuery,
   useGetTrackByIdQuery,
   useLazyGetTrackByIdQuery,
+  useGetAssessmentPairCompatQuery,
+  useLazyGetTracksQuery,
   useCreateTrackMutation,
   useUpdateTrackByIdMutation,
   useUpdateTrackStructureMutation,
-  useUpdateLiveQuizSettingsMutation,
+  useUpdateLiveAttemptLimitMutation,
   useDeleteTrackByIdMutation,
   useDuplicateTrackMutation,
   useAddTracksToTenantMutation,

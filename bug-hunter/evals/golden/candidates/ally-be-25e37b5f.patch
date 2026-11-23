@@ -1,0 +1,34 @@
+diff --git a/src/learn/repository/scenario-session.repository.ts b/src/learn/repository/scenario-session.repository.ts
+index 5ea7f08003..7c8c88cf59 100644
+--- a/src/learn/repository/scenario-session.repository.ts
++++ b/src/learn/repository/scenario-session.repository.ts
+@@ -161,7 +161,7 @@ export class ScenarioSessionRepository extends Repository<ScenarioSessions> {
+         'scenarioSessionEvent',
+         '"scenarioSessionEvent"."scenarioSessionId"::uuid = scenarioSession.id AND "scenarioSessionEvent"."autoTerminationStatus" = false',
+       )
+-      .leftJoinAndMapOne(
++      .innerJoinAndMapOne(
+         'scenarioSessionEvent.events',
+         SessionEvents,
+         'events',
+diff --git a/src/learn/repository/test/scenario-session.repository.spec.ts b/src/learn/repository/test/scenario-session.repository.spec.ts
+index a12b14e469..96d2cba9b7 100644
+--- a/src/learn/repository/test/scenario-session.repository.spec.ts
++++ b/src/learn/repository/test/scenario-session.repository.spec.ts
+@@ -107,6 +107,7 @@ describe('ScenarioSessionRepository', () => {
+     mockQueryBuilder = {
+       leftJoinAndMapOne: jest.fn().mockReturnThis(),
+       leftJoinAndMapMany: jest.fn().mockReturnThis(),
++      innerJoinAndMapOne: jest.fn().mockReturnThis(),
+       leftJoin: jest.fn().mockReturnThis(),
+       where: jest.fn().mockReturnThis(),
+       andWhere: jest.fn().mockReturnThis(),
+@@ -592,7 +593,7 @@ describe('ScenarioSessionRepository', () => {
+         'scenarioSessionEvent',
+         '"scenarioSessionEvent"."scenarioSessionId"::uuid = scenarioSession.id AND "scenarioSessionEvent"."autoTerminationStatus" = false',
+       );
+-      expect(mockQueryBuilder.leftJoinAndMapOne).toHaveBeenCalledWith(
++      expect(mockQueryBuilder.innerJoinAndMapOne).toHaveBeenCalledWith(
+         'scenarioSessionEvent.events',
+         SessionEvents,
+         'events',

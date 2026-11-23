@@ -1,5 +1,6 @@
 import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 import { BaseWithoutTenantEntity } from 'src/common/entity/base-without-tenant.entity';
+import type { RoadmapReleaseWindow } from 'src/product-planning/constants/product-planning.constants';
 
 /**
  * Singleton row of platform-level Builder controls (the bug_hunter_settings
@@ -125,6 +126,27 @@ export class BuilderSettings extends BaseWithoutTenantEntity {
   autoReleaseEnabled!: boolean;
 
   /**
+   * Whether the roadmap's auto-release policy (Roadmap v2, P5) may act.
+   * False: it runs in shadow, logging "would release …" to
+   * `release_policy_log` and dispatching nothing. Nothing reads it to
+   * dispatch yet — going live is a later change after at least five shadow
+   * cycles, and needs `autoReleaseEnabled` as well.
+   */
+  @Column({ type: 'boolean', default: false })
+  autoReleasePolicyLive!: boolean;
+
+  /**
+   * The policy's circuit breaker: set platform-wide after two consecutive
+   * failed or unhealthy auto-releases, cleared only by an Owner
+   * (`POST /v1/roadmap/release/resume`). Release clicks work while it is set.
+   */
+  @Column({ type: 'timestamp', nullable: true })
+  autoReleasePausedAt?: Date | null;
+
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  autoReleasePausedReason?: string | null;
+
+  /**
    * Fix runs per pull request. A fix that cannot fix it will not fix it on the
    * fourth attempt either, and the failure mode without a ceiling is a loop
    * that pushes commits until someone notices the bill.
@@ -183,6 +205,78 @@ export class BuilderSettings extends BaseWithoutTenantEntity {
    */
   @Column({ type: 'boolean', default: true })
   situationBrief!: boolean;
+
+  // ── Product planning (plans/roadmap-owns-planning rev 5.2) ────────────────
+
+  /**
+   * Master switch for the roadmap's plan flow. Off by default so unfinished
+   * phases merge safely; who may use it is decided by the two Product Planning
+   * admin toggles, not here.
+   */
+  @Column({ type: 'boolean', default: false })
+  planningEnabled!: boolean;
+
+  /**
+   * One USD ceiling per plan, covering everything from the first message to the
+   * outcome review: private drafts, the PRD, design and build runs, launch and
+   * reviews. Warns at 80%, then stops until the lead raises it.
+   */
+  @Column({ type: 'numeric', precision: 10, scale: 4, default: 100 })
+  planCeilingUsd!: string;
+
+  /**
+   * Where the private Idea stage wraps up: at 80% of this the copilot helps the
+   * author file or park instead of exploring further. Never a hard stop.
+   */
+  @Column({ type: 'numeric', precision: 10, scale: 4, default: 1 })
+  planIdeaCeilingUsd!: string;
+
+  /**
+   * Builder's own "new session" door. Turned off once plans start on the
+   * roadmap (plans/roadmap-owns-planning rev 5.2, P7): Builder then builds
+   * plans; it no longer starts its own interviews. On by default so nothing
+   * changes until someone turns it off.
+   */
+  @Column({ type: 'boolean', default: true })
+  builderDirectInterviewEnabled!: boolean;
+
+  /** Closing a plan whose idea has more votes than this needs a second Lead. */
+  @Column({ type: 'int', default: 10 })
+  planCloseConfirmVotes!: number;
+
+  // ── Roadmap v2 (plans/roadmap-builder-merge) ─────────────────────────────
+
+  /**
+   * The `roadmap_v2` flag: one Roadmap tab for ideas and builds. Off by
+   * default, and while it is off every `/v1/roadmap/*` route answers 404 and
+   * nothing built for it changes what production does. One switch at cutover
+   * (D8), no pilot.
+   */
+  @Column({ type: 'boolean', default: false })
+  roadmapV2Enabled!: boolean;
+
+  /** The most a lead may raise their idea's ceiling to; an Owner may set any amount. */
+  @Column({ type: 'numeric', precision: 10, scale: 4, default: 200 })
+  maxLeadCeilingUsd!: string;
+
+  /** Working days an idea waits for review before triage shows its age in amber. */
+  @Column({ type: 'int', default: 5 })
+  awaitingReviewAmberDays!: number;
+
+  /**
+   * When auto-release may start (RoadmapReleaseWindow). Null means any time.
+   * Read by the auto-release policy (P5), nothing before it.
+   */
+  @Column({ type: 'jsonb', nullable: true })
+  releaseWindow?: RoadmapReleaseWindow | null;
+
+  /**
+   * Globs whose change holds an auto-release for a Release click. Null means
+   * AUTO_RELEASE_HELD_PATHS_DEFAULT, so the defaults live in code with a spec
+   * pinning them. Read by the auto-release policy (P5), nothing before it.
+   */
+  @Column({ type: 'jsonb', nullable: true })
+  autoReleaseHeldPaths?: string[] | null;
 
   @Column({ type: 'int', nullable: true })
   updatedBy?: number | null;

@@ -1,0 +1,805 @@
+/* Landing page, drawn by <LandingPageView>. Every rule sits under .lp so it
+ * cannot leak into the app around it (the public site or the admin editor).
+ * Colours come from the app's design tokens when present, with fallbacks so
+ * the page looks the same in an app that does not define them. */
+.lp {
+  --lp-ink: rgb(var(--color-secondary-900, 38 36 33));
+  --lp-ink-soft: rgb(var(--color-neutral-700, 89 85 78));
+  --lp-ink-faint: rgb(var(--color-neutral-600, 120 116 108));
+  --lp-wash: rgb(var(--color-background-tertiary, 235 232 224));
+  --lp-card: rgb(var(--color-background-DEFAULT, 247 245 240));
+  --lp-line: rgb(var(--color-border-medium, 219 213 200));
+  --lp-line-soft: rgb(var(--color-border-DEFAULT, 232 227 216));
+  --lp-mark: rgb(var(--color-primary-500, 38 77 142));
+  --lp-mark-deep: rgb(var(--color-primary-700, 24 49 89));
+  --lp-mark-wash: rgb(var(--color-primary-50, 238 241 246));
+  --lp-alarm: rgb(var(--color-tone-alarm, 176 58 46));
+  --lp-display: var(--font-primary, Georgia, serif);
+  --lp-body: var(--font-secondary, Georgia, serif);
+
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  background: var(--lp-wash);
+  color: var(--lp-ink);
+  font-family: var(--lp-body);
+  line-height: 1.6;
+}
+.lp[data-fill="true"] {
+  min-height: 100vh;
+}
+.lp *,
+.lp *::before,
+.lp *::after {
+  box-sizing: border-box;
+}
+
+/* ---- header ---------------------------------------------------------------- */
+.lp .lp-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--lp-card);
+  border-bottom: 1px solid var(--lp-line-soft);
+}
+.lp .lp-logo-slot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.lp .lp-logo,
+.lp .lp-logo .lp-logo-img {
+  display: block;
+  height: 40px;
+  width: auto;
+  max-width: 200px;
+  object-fit: contain;
+}
+.lp .lp-logo-name {
+  font-family: var(--lp-display);
+  font-size: 18px;
+}
+.lp .lp-logo-hint {
+  font-size: 12px;
+  color: var(--lp-ink-faint);
+}
+.lp .lp-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.lp .lp-btn {
+  padding: 8px 16px;
+  border: 1px solid var(--lp-line);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--lp-ink);
+  font: inherit;
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.lp .lp-btn:hover:not(:disabled),
+.lp .lp-btn:focus-visible {
+  border-color: var(--lp-mark);
+}
+.lp .lp-btn:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+.lp .lp-lang {
+  width: max-content;
+  min-width: 96px;
+}
+/* The shared dropdown opens from its left edge; here it sits at the right of the header. */
+.lp .lp-lang .absolute {
+  left: auto;
+  right: 0;
+  width: max-content;
+  min-width: 150px;
+  max-width: calc(100vw - 32px);
+}
+
+/* ---- helpline strip ------------------------------------------------------------ */
+.lp .lp-helpline {
+  background: var(--lp-mark-wash);
+  color: var(--lp-mark-deep);
+  padding: 10px 16px;
+  font-size: 14px;
+  text-align: center;
+  border-bottom: 1px solid var(--lp-line-soft);
+}
+
+/* ---- main -------------------------------------------------------------------- */
+.lp .lp-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1 0 auto;
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 16px 24px;
+}
+.lp .lp-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 32px 0 16px;
+  text-align: center;
+  order: 1;
+}
+.lp .lp-hero h1 {
+  margin: 0 0 8px;
+  font-family: var(--lp-display);
+  font-size: 40px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+.lp .lp-tagline {
+  margin: 0 0 8px;
+  font-family: var(--lp-display);
+  font-size: 20px;
+  line-height: 1.4;
+}
+.lp .lp-sub {
+  margin: 0 auto;
+  max-width: 480px;
+  color: var(--lp-ink-soft);
+}
+.lp .lp-hero-image,
+.lp .lp-hero-image .lp-image,
+.lp .lp-hero-img {
+  display: block;
+  width: 100%;
+}
+.lp .lp-hero-img {
+  max-height: 340px;
+  object-fit: cover;
+  border-radius: 16px;
+}
+.lp .lp-slider-wrap {
+  order: 2;
+}
+.lp .lp-cards-wrap {
+  order: 3;
+}
+
+/* ---- cards -------------------------------------------------------------------- */
+.lp .lp-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+  padding: 16px 0;
+}
+.lp .lp-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  text-decoration: none;
+  background: var(--lp-card);
+  border: 1px solid var(--lp-line);
+  border-radius: 16px;
+  padding: 20px;
+  color: inherit;
+  cursor: pointer;
+}
+.lp a.lp-card:hover,
+.lp a.lp-card:focus-visible {
+  border-color: var(--lp-mark);
+}
+.lp .lp-card.is-hidden {
+  opacity: 0.45;
+}
+.lp .lp-card-name {
+  font-family: var(--lp-display);
+  font-size: 18px;
+}
+.lp .lp-card-body {
+  color: var(--lp-ink-soft);
+  font-size: 15px;
+}
+.lp .lp-card-tools {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+/* ---- a block's own page --------------------------------------------------------- */
+.lp .lp-crumbs {
+  padding: 20px 0 4px;
+  font-size: 14px;
+}
+.lp .lp-crumbs ol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lp .lp-crumbs li + li::before {
+  content: "/";
+  margin-right: 8px;
+  color: var(--lp-ink-faint);
+}
+.lp .lp-crumbs a {
+  color: var(--lp-mark-deep);
+}
+.lp .lp-crumbs [aria-current="page"] {
+  color: var(--lp-ink-soft);
+}
+.lp .lp-section-head {
+  padding: 8px 0 16px;
+}
+.lp .lp-section-head h1 {
+  margin: 0 0 8px;
+  font-family: var(--lp-display);
+  font-size: 32px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+.lp .lp-section-head p {
+  margin: 0;
+  max-width: 560px;
+  color: var(--lp-ink-soft);
+}
+.lp .lp-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0 0 16px;
+  list-style: none;
+}
+.lp .lp-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 20px;
+  background: var(--lp-card);
+  border: 1px solid var(--lp-line-soft);
+  border-radius: 16px;
+}
+.lp .lp-item-link {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: inherit;
+  text-decoration: none;
+}
+.lp .lp-item-name {
+  font-family: var(--lp-display);
+  font-size: 18px;
+}
+.lp .lp-item-body {
+  color: var(--lp-ink-faint);
+  font-size: 14px;
+}
+
+/* ---- quote slider ----------------------------------------------------------------- */
+.lp .lp-quotes {
+  max-width: 640px;
+  margin: 8px auto 0;
+  padding: 8px 0 4px;
+}
+.lp .lp-quotes-track {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.lp .lp-quotes-track::-webkit-scrollbar {
+  display: none;
+}
+.lp .lp-quote {
+  flex: 0 0 100%;
+  scroll-snap-align: start;
+  padding: 0 4px;
+}
+.lp .lp-quote blockquote {
+  position: relative;
+  margin: 0;
+  padding: 24px;
+  background: var(--lp-card);
+  border: 1px solid var(--lp-line-soft);
+  border-radius: 16px;
+}
+.lp .lp-quote p {
+  margin: 0 0 16px;
+  font-family: var(--lp-display);
+  font-size: 20px;
+  line-height: 1.5;
+}
+.lp .lp-quote footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.lp .lp-quote-avatar {
+  flex: 0 0 auto;
+  display: block;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--lp-mark-wash);
+  border: 1px solid var(--lp-line);
+}
+.lp .lp-quote-avatar .lp-quote-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.lp .lp-quote-who {
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.lp .lp-quote-role {
+  color: var(--lp-ink-faint);
+  font-size: 13px;
+}
+.lp .lp-quotes-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+.lp .lp-quotes-arrow {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--lp-line);
+  border-radius: 50%;
+  background: var(--lp-card);
+  color: var(--lp-ink);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.lp .lp-quotes-arrow:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.lp .lp-quotes-dots {
+  display: flex;
+  gap: 8px;
+}
+.lp .lp-quotes-dots button {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--lp-line);
+  cursor: pointer;
+}
+.lp .lp-quotes-dots button.is-on {
+  background: var(--lp-mark);
+}
+
+/* ---- footer ------------------------------------------------------------------------ */
+.lp .lp-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--lp-card);
+  border-top: 1px solid var(--lp-line-soft);
+  font-size: 12px;
+  color: var(--lp-ink-faint);
+  text-align: center;
+}
+.lp .lp-foot p {
+  margin: 0;
+}
+.lp .lp-foot-logos {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 10px;
+}
+.lp .lp-foot-left,
+.lp .lp-foot-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.lp .lp-foot-right {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.lp .lp-foot-ally {
+  width: 40px;
+  height: auto;
+  color: var(--lp-ink);
+}
+.lp .lp-foot-tenant {
+  display: block;
+  height: 24px;
+  width: auto;
+}
+.lp .lp-foot-partner {
+  display: block;
+  height: 14px;
+  width: auto;
+}
+.lp .lp-partner {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.lp .lp-partner-name {
+  font-size: 11px;
+}
+.lp .lp-foot-switches {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+}
+.lp .lp-foot-switches label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+/* While editing, the footer is part of the page rather than a bar over it: its controls
+ * (logo switches, partner logos) are tall, and a pinned copy would cover the work. */
+.lp[data-editing="true"] .lp-foot {
+  position: static;
+}
+
+/* ---- templates ------------------------------------------------------------------------ */
+/* split: headings beside a hero image, cards as rows, slider after the cards. */
+.lp[data-template="split"] .lp-hero {
+  flex-direction: row;
+  align-items: center;
+  gap: 32px;
+  text-align: left;
+}
+.lp[data-template="split"] .lp-hero-text {
+  flex: 1 1 50%;
+}
+.lp[data-template="split"] .lp-hero-image {
+  flex: 1 1 50%;
+}
+.lp[data-template="split"] .lp-sub {
+  margin: 0;
+}
+.lp[data-template="split"] .lp-cards-wrap {
+  order: 2;
+}
+.lp[data-template="split"] .lp-slider-wrap {
+  order: 3;
+}
+.lp[data-template="split"] .lp-options {
+  grid-template-columns: minmax(0, 1fr);
+}
+.lp[data-template="split"] .lp-card {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 24px;
+}
+.lp[data-template="split"] .lp-card-name {
+  flex: 0 0 220px;
+}
+.lp[data-template="split"] .lp-card-body {
+  flex: 1 1 260px;
+}
+
+/* focus: one narrow, left-aligned column; the quotes come first; cards are a plain list. */
+.lp[data-template="focus"] .lp-main {
+  max-width: 680px;
+}
+.lp[data-template="focus"] .lp-hero {
+  align-items: flex-start;
+  text-align: left;
+  padding-top: 40px;
+}
+.lp[data-template="focus"] .lp-hero h1 {
+  font-size: 44px;
+}
+.lp[data-template="focus"] .lp-sub {
+  margin: 0;
+  max-width: none;
+}
+.lp[data-template="focus"] .lp-slider-wrap {
+  order: 1;
+  margin-top: 16px;
+}
+.lp[data-template="focus"] .lp-hero {
+  order: 2;
+}
+.lp[data-template="focus"] .lp-cards-wrap {
+  order: 3;
+}
+.lp[data-template="focus"] .lp-quotes {
+  max-width: none;
+}
+.lp[data-template="focus"] .lp-quote blockquote {
+  background: var(--lp-mark-wash);
+  border-color: transparent;
+}
+.lp[data-template="focus"] .lp-options {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+.lp[data-template="focus"] .lp-card {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--lp-line);
+  border-radius: 0;
+  padding: 18px 0;
+}
+
+/* ---- editing ---------------------------------------------------------------------------- */
+.lp .lp-editable {
+  border-radius: 4px;
+  outline: 1px dashed transparent;
+  outline-offset: 3px;
+  cursor: text;
+  min-width: 2ch;
+}
+.lp .lp-editable:hover {
+  outline-color: var(--lp-line);
+}
+.lp .lp-editable:focus {
+  outline: 2px solid var(--lp-mark);
+  background: var(--lp-mark-wash);
+}
+.lp .lp-editable:empty::before {
+  content: attr(data-placeholder);
+  color: var(--lp-ink-faint);
+  font-style: italic;
+  pointer-events: none;
+}
+
+.lp .lp-image {
+  position: relative;
+  display: inline-block;
+}
+.lp .lp-image-controls {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+}
+.lp .lp-image:hover .lp-image-controls,
+.lp .lp-image:focus-within .lp-image-controls {
+  opacity: 1;
+}
+.lp .lp-image-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--lp-line);
+  border-radius: 50%;
+  background: var(--lp-card);
+  color: var(--lp-ink);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.lp .lp-image-btn:hover:not(:disabled) {
+  border-color: var(--lp-mark);
+}
+.lp .lp-image.is-empty {
+  min-width: 120px;
+}
+.lp .lp-image-add {
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px dashed var(--lp-ink-faint);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--lp-ink-soft);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.lp .lp-image-add:hover:not(:disabled) {
+  border-color: var(--lp-mark);
+  color: var(--lp-mark-deep);
+}
+.lp .lp-image[data-busy="true"] {
+  opacity: 0.6;
+}
+.lp .lp-image-error {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--lp-alarm);
+}
+.lp .lp-quote-avatar .lp-image-add {
+  padding: 0;
+  height: 100%;
+  border: none;
+  font-size: 18px;
+}
+
+.lp .lp-block {
+  position: relative;
+  outline: 1px dashed transparent;
+  outline-offset: 4px;
+}
+.lp .lp-block:hover {
+  outline-color: var(--lp-line);
+}
+.lp .lp-block.is-hidden .lp-block-body {
+  opacity: 0.4;
+}
+.lp .lp-block-toggle {
+  position: absolute;
+  top: -10px;
+  left: 8px;
+  z-index: 2;
+  padding: 2px 10px;
+  border: 1px solid var(--lp-line);
+  border-radius: 999px;
+  background: var(--lp-card);
+  color: var(--lp-ink-soft);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0;
+}
+.lp .lp-block:hover > .lp-block-toggle,
+.lp .lp-block.is-hidden > .lp-block-toggle,
+.lp .lp-block-toggle:focus-visible {
+  opacity: 1;
+}
+.lp .lp-block-note {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--lp-ink-faint);
+  font-style: italic;
+}
+
+.lp .lp-remove {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--lp-line);
+  border-radius: 50%;
+  background: var(--lp-card);
+  color: var(--lp-ink);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+}
+.lp .lp-quote blockquote:hover .lp-remove,
+.lp .lp-item:hover .lp-remove,
+.lp .lp-remove:focus-visible {
+  opacity: 1;
+}
+.lp .lp-add,
+.lp .lp-link-btn,
+.lp .lp-link-edit button {
+  border: none;
+  background: transparent;
+  color: var(--lp-mark-deep);
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 4px 0;
+}
+.lp .lp-add {
+  align-self: flex-start;
+  margin-top: 8px;
+}
+.lp .lp-link-edit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.lp .lp-link-edit input {
+  min-width: 200px;
+  padding: 4px 8px;
+  border: 1px solid var(--lp-line);
+  border-radius: 6px;
+  background: var(--lp-card);
+  color: var(--lp-ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+/* ---- small screens ------------------------------------------------------------------------- */
+@media (max-width: 600px) {
+  .lp .lp-top {
+    padding: 10px 16px;
+  }
+  .lp .lp-logo,
+  .lp .lp-logo .lp-logo-img {
+    height: 32px;
+  }
+  .lp .lp-actions {
+    gap: 8px;
+  }
+  .lp .lp-btn {
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+  .lp .lp-helpline {
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+  .lp .lp-main {
+    padding: 0 16px 16px;
+  }
+  .lp .lp-hero {
+    padding: 24px 0 8px;
+  }
+  .lp .lp-hero h1,
+  .lp[data-template="focus"] .lp-hero h1 {
+    font-size: 32px;
+  }
+  .lp .lp-tagline {
+    font-size: 18px;
+  }
+  .lp[data-template="split"] .lp-hero {
+    flex-direction: column;
+    text-align: center;
+  }
+  .lp .lp-options,
+  .lp .lp-items {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    padding: 12px 0;
+  }
+  .lp .lp-card,
+  .lp .lp-item {
+    padding: 16px;
+  }
+  .lp[data-template="split"] .lp-card-name {
+    flex-basis: 100%;
+  }
+  .lp[data-template="focus"] .lp-card {
+    padding: 14px 0;
+  }
+  .lp .lp-section-head h1 {
+    font-size: 28px;
+  }
+  .lp .lp-quote blockquote {
+    padding: 20px;
+  }
+  .lp .lp-quote p {
+    font-size: 18px;
+  }
+  .lp .lp-foot {
+    padding: 8px 16px;
+    font-size: 11px;
+  }
+  .lp .lp-foot-logos {
+    margin-top: 6px;
+  }
+  .lp .lp-foot-ally {
+    width: 34px;
+  }
+  .lp .lp-foot-partner {
+    height: 12px;
+  }
+}

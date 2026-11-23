@@ -1,5 +1,8 @@
+import { LimitsService } from 'src/billing/service/limits.service';
+import { usageContext } from 'src/billing/context/usage-context';
+import { UsageChannel, UsageKind } from 'src/billing/enum/billing.enum';
 import { createHash } from 'crypto';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { AiService } from 'src/ai/service/ai.service';
 import { KnowledgeChunkItemRequest } from 'src/ai/dto/knowledge.dto';
 import { S3Service } from 'src/aws/service/s3.service';
@@ -41,6 +44,8 @@ export class KbIngestService {
     private readonly documentTenantRepository: KbDocumentTenantRepository,
     private readonly aiService: AiService,
     private readonly s3Service: S3Service,
+    // CR1: owner-side runs and tokens (optional, so existing specs build without it).
+    @Optional() private readonly limits?: LimitsService,
   ) {}
 
   static hash(text: string): string {
@@ -75,12 +80,42 @@ export class KbIngestService {
       // reindexed PDF loses its page-level citations and falls back to document-level ones. That
       // is the deliberate cost of not depending on an S3 object that may no longer be there;
       // re-uploading the file restores page numbers.
+      //
+      // The exception is an onboarded assistant's pasted document (Agents v2 chunk 20a-2): it has
+      // no file, only the stored text, so extracting again is cheap and recovers its headings,
+      // which it keeps inside their sections (`headingAware`). Everything else reindexes as before.
       const extracted: ExtractedDocument =
-        action === 'reindex' && document.rawText
+        action === 'reindex' &&
+        document.rawText &&
+        !(await this.headingAware(document))
           ? { text: document.rawText, pages: [], sections: [] }
           : await this.extract(document);
 
-      await this.chunkAndIndex(document, extracted, action);
+      // CR1: indexing's embeddings are billed to the document's creator and, when an assistant
+      // uses it, that assistant. One run id per ingest, so a redelivered SQS message re-meters
+      // nothing it already recorded.
+      const chatbotId = await this.chatbotUsing(document.id);
+      // CR1: re-indexing an assistant's document is an owner-side run. Counted here, never
+      // refused: the request was already accepted and nobody is waiting on this queue.
+      if (action === 'reindex' && chatbotId && document.createdBy) {
+        void this.limits
+          ?.countOwnerRun(
+            document.createdBy,
+            `indexing:${document.id}:${document.updatedAt?.getTime?.() ?? 0}`,
+            'indexing',
+          )
+          .catch(() => undefined);
+      }
+      await usageContext.run(
+        {
+          runId: `${action}:${document.id}:${document.updatedAt?.getTime?.() ?? 0}`,
+          channel: UsageChannel.OWNER,
+          runKind: UsageKind.INDEXING,
+          creatorUserId: document.createdBy ?? null,
+          chatbotId,
+        },
+        () => this.chunkAndIndex(document, extracted, action),
+      );
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Unknown ingest failure';
@@ -92,6 +127,20 @@ export class KbIngestService {
       // Swallowed rather than rethrown: the failure is already recorded where the admin will see
       // it, and rethrowing would make SQS redeliver a document that will fail identically every
       // time until someone fixes the file. The Retry action re-queues it deliberately.
+    }
+  }
+
+  /** An assistant that answers from this document, if any (the first, for CR1's attribution). */
+  private async chatbotUsing(documentId: string): Promise<string | null> {
+    try {
+      const rows: Array<{ chatbot_id: string }> =
+        await this.documentRepository.manager.query(
+          `SELECT chatbot_id FROM chatbot_documents WHERE document_id = $1 ORDER BY "createdAt" LIMIT 1`,
+          [documentId],
+        );
+      return rows[0]?.chatbot_id ?? null;
+    } catch {
+      return null;
     }
   }
 
@@ -114,6 +163,7 @@ export class KbIngestService {
       buffer,
       text: document.rawText || undefined,
       sourceUrl: document.sourceUrl ?? undefined,
+      headingsInSections: await this.headingAware(document),
     });
 
     await this.documentRepository.update(
@@ -130,6 +180,59 @@ export class KbIngestService {
     );
 
     return extracted;
+  }
+
+  /**
+   * Whether a pasted document keeps its headings inside their sections (Agents v2 chunk 20a-2):
+   * only an onboarded assistant's own documents (crawled pages, Owner notes), which only the v2
+   * agent answers from. v1 can still answer for any bot (the platform switch and v2's fallback),
+   * so every other document chunks exactly as before.
+   */
+  private async headingAware(document: KbDocument): Promise<boolean> {
+    if (document.sourceType !== KbDocumentSourceType.PASTE) return false;
+    if (document.tags?.includes('onboarding')) return true;
+    if (!document.ownerChatbotId) return false;
+    const rows = await this.documentRepository.manager.query<
+      { safety_pack: string | null }[]
+    >(`SELECT safety_pack FROM chatbots WHERE id = $1`, [
+      document.ownerChatbotId,
+    ]);
+    return Boolean(rows[0]?.safety_pack);
+  }
+
+  /**
+   * A document's text with its page spans, read without writing anything (onboarding, chunk 20a,
+   * reads an upload for "What we learned"). Re-extracts the file, because page spans are never
+   * stored; for a file that's gone, falls back to the stored text with no pages.
+   */
+  async readForOnboarding(documentId: string): Promise<{
+    title: string;
+    fileName: string | null;
+    ownerChatbotId: string | null;
+    extracted: ExtractedDocument;
+  } | null> {
+    const document = await this.documentRepository.findOne({
+      where: { id: documentId },
+    });
+    if (!document || document.archivedAt) return null;
+    let extracted: ExtractedDocument;
+    try {
+      extracted = await extractDocument({
+        sourceType: document.sourceType,
+        buffer: await this.loadSourceBuffer(document),
+        text: document.rawText || undefined,
+        sourceUrl: document.sourceUrl ?? undefined,
+      });
+    } catch {
+      if (!document.rawText) throw new Error('The document could not be read');
+      extracted = { text: document.rawText, pages: [], sections: [] };
+    }
+    return {
+      title: document.title,
+      fileName: document.fileName ?? null,
+      ownerChatbotId: document.ownerChatbotId ?? null,
+      extracted,
+    };
   }
 
   private async loadSourceBuffer(

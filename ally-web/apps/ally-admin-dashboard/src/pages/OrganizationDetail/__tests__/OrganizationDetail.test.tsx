@@ -61,6 +61,10 @@ vi.mock("@api", () => {
     useAddTracksToTenantMutation: mutation,
     useRemoveTracksFromTenantMutation: mutation,
     useLazyGetTenantByIdQuery: () => mockTenantQuery,
+    useLazyGetSimulationsQuery: () => [vi.fn()],
+    useLazyGetScenarioPathsQuery: () => [vi.fn()],
+    useLazyGetScenarioCasesQuery: () => [vi.fn()],
+    useLazyGetTracksQuery: () => [vi.fn()],
   };
 });
 
@@ -77,6 +81,7 @@ vi.mock("@components", () => {
   const stub = (name: string) => () => <div data-testid={`stub-${name}`} />;
   return {
     OrganizationDetailLoader: stub("loader"),
+    BulkAccessBar: stub("bulk-access"),
     SimulationsTab: stub("simulations"),
     PathTab: stub("path"),
     ScribeSettings: stub("scribe"),

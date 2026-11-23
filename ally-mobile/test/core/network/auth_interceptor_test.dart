@@ -333,8 +333,9 @@ void main() {
     );
 
     test(
-      '401 -> refresh call itself throws -> onUnrecoverable is called and its '
-      'message replaces the propagated error',
+      '401 -> refresh call itself rejected with 401 (refresh token actually '
+      'invalid) -> onUnrecoverable is called and its message replaces the '
+      'propagated error',
       () async {
         final requestOptions = RequestOptions(path: '/v1/users/me');
         final err = DioException(
@@ -348,7 +349,12 @@ void main() {
             '/v1${ApiRoutes.authRefresh}',
             data: {'refreshToken': 'old-refresh-token'},
           ),
-        ).thenThrow(DioException(requestOptions: requestOptions));
+        ).thenThrow(
+          DioException(
+            requestOptions: requestOptions,
+            response: _response<void>(null, statusCode: 401, requestOptions: requestOptions),
+          ),
+        );
 
         final handler = _RecordingErrorHandler();
         await interceptor.onError(err, handler);
@@ -360,6 +366,87 @@ void main() {
         );
         expect(handler.resolvedWith, isNull);
         expect(unrecoverableCalls, 1);
+      },
+    );
+
+    test(
+      '401 -> refresh call fails to complete (network error, no response at '
+      'all) -> NOT treated as session-invalid; the original error just '
+      'passes through so the session survives ordinary network flakiness',
+      () async {
+        final requestOptions = RequestOptions(path: '/v1/users/me');
+        final err = DioException(
+          requestOptions: requestOptions,
+          response: _response<void>(null, statusCode: 401, requestOptions: requestOptions),
+        );
+        when(() => tokenStorage.refreshToken).thenAnswer((_) async => 'old-refresh-token');
+        when(() => tokenStorage.accessToken).thenAnswer((_) async => 'old-access-token');
+        when(
+          () => refreshDio.post<Map<String, dynamic>>(
+            '/v1${ApiRoutes.authRefresh}',
+            data: {'refreshToken': 'old-refresh-token'},
+          ),
+        ).thenThrow(
+          DioException(
+            requestOptions: requestOptions,
+            type: DioExceptionType.connectionTimeout,
+          ),
+        );
+
+        final handler = _RecordingErrorHandler();
+        await interceptor.onError(err, handler);
+
+        expect(handler.passedThroughError, same(err));
+        expect(handler.resolvedWith, isNull);
+        expect(unrecoverableCalls, 0);
+        verifyNever(
+          () => tokenStorage.storeTokens(
+            accessToken: any(named: 'accessToken'),
+            refreshToken: any(named: 'refreshToken'),
+          ),
+        );
+      },
+    );
+
+    test(
+      '401 -> refresh succeeds -> retrying the original request fails -> NOT '
+      'treated as session-invalid, since the refresh itself proved the '
+      'session is fine; the original error just passes through',
+      () async {
+        final requestOptions = RequestOptions(path: '/v1/users/me');
+        final err = DioException(
+          requestOptions: requestOptions,
+          response: _response<void>(null, statusCode: 401, requestOptions: requestOptions),
+        );
+        when(() => tokenStorage.refreshToken).thenAnswer((_) async => 'old-refresh-token');
+        when(() => tokenStorage.accessToken).thenAnswer((_) async => 'old-access-token');
+        when(
+          () => refreshDio.post<Map<String, dynamic>>(
+            '/v1${ApiRoutes.authRefresh}',
+            data: {'refreshToken': 'old-refresh-token'},
+          ),
+        ).thenAnswer(
+          (_) async => _response({
+            'accessToken': 'new-access-token',
+            'refreshToken': 'new-refresh-token',
+          }),
+        );
+        when(
+          () => tokenStorage.storeTokens(
+            accessToken: 'new-access-token',
+            refreshToken: 'new-refresh-token',
+          ),
+        ).thenAnswer((_) async {});
+        when(() => refreshDio.fetch<dynamic>(any())).thenThrow(
+          DioException(requestOptions: requestOptions, type: DioExceptionType.connectionError),
+        );
+
+        final handler = _RecordingErrorHandler();
+        await interceptor.onError(err, handler);
+
+        expect(handler.passedThroughError, same(err));
+        expect(handler.resolvedWith, isNull);
+        expect(unrecoverableCalls, 0);
       },
     );
   });

@@ -1,0 +1,53 @@
+diff --git a/ally-web/apps/ally-admin-dashboard/src/pages/Analytics/CourseUnitsCard.tsx b/ally-web/apps/ally-admin-dashboard/src/pages/Analytics/CourseUnitsCard.tsx
+index 760411b6a..6eb8fa918 100644
+--- a/ally-web/apps/ally-admin-dashboard/src/pages/Analytics/CourseUnitsCard.tsx
++++ b/ally-web/apps/ally-admin-dashboard/src/pages/Analytics/CourseUnitsCard.tsx
+@@ -42,7 +42,7 @@ const asOfStamp = (computedAt?: string): string | undefined => {
+ };
+ 
+ const UNITS_GROUP = "Course units";
+-const TARGET_GROUP = "Target (XP target ÷ 100)";
++const TARGET_GROUP = "Target";
+ const LEARNERS_GROUP = "Unique learners";
+ const AVERAGE_GROUP = "Avg units per learner";
+ 
+@@ -112,22 +112,22 @@ const CourseUnitsPlot = ({
+     () =>
+       timeBarOpts({
+         leftTitle: "Course units",
+-        bottomTitle,
++        bottomTitle: "",
+         colorScale: unitsScale,
+         legend: true,
+         height: expanded ? "340px" : "260px",
+       }),
+-    [bottomTitle, expanded],
++    [expanded],
+   );
+   const learnersOpts = useMemo(
+     () =>
+       timeBarOpts({
+         leftTitle: "Unique learners",
+-        bottomTitle,
++        bottomTitle: "",
+         colorScale: single(LEARNERS_GROUP, COURSE_UNITS_COLORS.learners),
+         height: expanded ? "260px" : "200px",
+       }),
+-    [bottomTitle, expanded],
++    [expanded],
+   );
+   const averageOpts = useMemo(
+     () =>
+diff --git a/ally-web/apps/ally-admin-dashboard/src/pages/Analytics/__tests__/CourseUnitsCard.render.test.tsx b/ally-web/apps/ally-admin-dashboard/src/pages/Analytics/__tests__/CourseUnitsCard.render.test.tsx
+index e726a1c0b..c07be9009 100644
+--- a/ally-web/apps/ally-admin-dashboard/src/pages/Analytics/__tests__/CourseUnitsCard.render.test.tsx
++++ b/ally-web/apps/ally-admin-dashboard/src/pages/Analytics/__tests__/CourseUnitsCard.render.test.tsx
+@@ -65,7 +65,7 @@ describe("CourseUnitsCard", () => {
+     expect(average.data.map((d: { value: number }) => d.value)).toEqual([2.56, 2.64]);
+     // Only September has a target (goal / 100); August has none, so no datum, not 0.
+     expect(units.data.filter((d: { group: string }) => d.group.startsWith("Target"))).toEqual([
+-      { group: "Target (XP target ÷ 100)", key: "Sep", value: 1500 },
++      { group: "Target", key: "Sep", value: 1500 },
+     ]);
+   });
+ 

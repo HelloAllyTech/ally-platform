@@ -120,6 +120,7 @@ export class ScenarioBehaviorInstructionService {
         item?.behaviorInstructions?.map((behaviorInstructionItem) => ({
           scenarioId: item.scenarioId,
           category: behaviorInstructionItem.category,
+          score: behaviorInstructionItem.score ?? null,
           stateInstructions: behaviorInstructionItem.stateInstructions,
           createdBy: userIdNumber,
           updatedBy: userIdNumber,
@@ -141,6 +142,7 @@ export class ScenarioBehaviorInstructionService {
       formattedBehaviorInstructions.map((item) => ({
         scenarioId: item?.scenarioId,
         category: item?.category,
+        score: item?.score,
         stateInstructions: item?.stateInstructions,
         createdBy: item?.createdBy,
         updatedBy: item?.updatedBy,
@@ -282,6 +284,7 @@ export class ScenarioBehaviorInstructionService {
         instructionsToCreate.map((instruction) => ({
           scenarioId,
           category: instruction.category,
+          score: instruction.score ?? null,
           stateInstructions: instruction.stateInstructions,
           createdBy: userIdNumber,
         })),
@@ -303,6 +306,9 @@ export class ScenarioBehaviorInstructionService {
         (item) => ({
           id: item.id,
           category: item.category,
+          // `?? null`, not the raw value: an omitted score must reset to the
+          // category default rather than be skipped by save() as `undefined`.
+          score: item.score ?? null,
           stateInstructions: item.stateInstructions,
           updatedBy: userIdNumber,
         }),

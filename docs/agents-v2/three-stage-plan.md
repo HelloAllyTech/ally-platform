@@ -1,5 +1,7 @@
 # Open-Source Agent Workspace: Research & Product Design
 
+> **Superseded in parts; read with `CONTEXT.md` and `v2-chunks.md`, which win.** Shadow mode and the per-bot `runtime: v1 | v2` setting were removed in chunk 3d (one platform switch now, with v1 as the fallback); forms are v3; the build order and stages are in `v2-chunks.md`.
+
 Nov 5, 2026 · @Shehbaz
 
 Users love Wati for ease, Hermes for learning and memory, and Botpress for customisation. Each one's top complaint is a gap another already solves, and none of them checks what its agent promises.

@@ -48,6 +48,7 @@ export type ChatbotSettingsOverride = Partial<
     | 'crisisClassifierEnabled'
     | 'consentRequired'
     | 'showTyping'
+    | 'handover'
   >
 > & {
   rateLimit?: Partial<WhatsAppBotSettings['rateLimit']>;
@@ -57,6 +58,23 @@ export type ChatbotSettingsOverride = Partial<
       'minSimilarity' | 'declineSimilarity' | 'topK' | 'maxPassages'
     >
   >;
+  /**
+   * What the agent may do through the tool gateway (chunk 3b), per tool: `do_it` or `never`. A
+   * tool that isn't listed is `never`. Platform admins only, and per bot only: it's read from this
+   * stored override, never from the effective or platform settings.
+   */
+  abilities?: Partial<Record<string, 'do_it' | 'never'>>;
+  /**
+   * Remember people between chats (chunk 8a), off by default, and the owner's own things never to
+   * remember (the pack's defaults are added in code and can't be removed). Per bot only, read from
+   * this stored override like `abilities`.
+   */
+  memory?: { on?: boolean; neverStore?: string[] };
+  /**
+   * Where the business is (chunk 6b): an IANA zone, Asia/Kolkata when unset. Used by lists,
+   * `{today}`, Repeat weekly and memory's dates (`assistantZone`). Per bot only, like `memory`.
+   */
+  timeZone?: string;
 };
 
 export interface ChatbotSettingsView {

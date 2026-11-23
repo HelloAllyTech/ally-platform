@@ -12,6 +12,7 @@ export const UserList: React.FC<UserListProps> = ({
   onOptionSelect,
   renderFooter,
   canEditUser,
+  selection,
 }) => {
   const [openDropdownUserId, setOpenDropdownUserId] = useState<number | null>(null);
   const [anchorElement, setAnchorElement] = useState<HTMLButtonElement | null>(null);
@@ -38,7 +39,21 @@ export const UserList: React.FC<UserListProps> = ({
   };
 
   const tableHeader = (
-    <div className="grid [grid-template-columns:repeat(48,minmax(0,1fr))] px-4 py-2 mr-[12px]  text-base text-typography-800 border-b border-border-light ">
+    <div
+      className={`grid [grid-template-columns:repeat(48,minmax(0,1fr))] px-4 py-2 mr-[12px]  text-base text-typography-800 border-b border-border-light relative ${selection ? "pl-10" : ""}`}
+    >
+      {selection && (
+        <input
+          type="checkbox"
+          aria-label={en.adminUx.bulk.selectAll}
+          className="absolute left-3 top-1/2 -translate-y-1/2"
+          checked={selection.allSelected}
+          ref={el => {
+            if (el) el.indeterminate = selection.someSelected;
+          }}
+          onChange={selection.toggleAll}
+        />
+      )}
       <div className="col-span-11">{en.userManagement.user}</div>
       <div className="col-span-6 pr-1">{en.userManagement.telephonyId}</div>
       <div className="col-span-8 pr-5">{en.userManagement.role}</div>
@@ -59,8 +74,17 @@ export const UserList: React.FC<UserListProps> = ({
           {users.map(user => (
             <div
               key={user.id}
-              className="grid [grid-template-columns:repeat(48,minmax(0,1fr))] items-center px-4 py-3 text-typography-900 border-b border-border-light hover:bg-background-secondary relative"
+              className={`grid [grid-template-columns:repeat(48,minmax(0,1fr))] items-center px-4 py-3 text-typography-900 border-b border-border-light hover:bg-background-secondary relative ${selection ? "pl-10" : ""}`}
             >
+              {selection && (
+                <input
+                  type="checkbox"
+                  aria-label={`${en.adminUx.bulk.selectRow}: ${user.name ?? user.email}`}
+                  className="absolute left-3 top-1/2 -translate-y-1/2"
+                  checked={selection.isSelected(user.id)}
+                  onChange={() => selection.toggle(user.id)}
+                />
+              )}
               <div className="col-span-11 justify-start flex items-center min-w-0 overflow-hidden ">
                 <div className="w-10 h-10 rounded-full mr-3">
                   <CustomImage

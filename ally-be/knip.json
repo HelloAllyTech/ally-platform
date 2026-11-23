@@ -1,0 +1,21 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "src/main.ts",
+    "src/database/data-source.ts",
+    "src/database/migrations/[0-9]*.ts",
+    "src/database/seeds/*.ts",
+    "src/database/scripts/*.ts",
+    "src/chatbot/basics/*.ts",
+    "src/**/entity/*.entity.ts",
+    "src/common/entities/*.entity.ts",
+    "scripts/**/*.{ts,js,mjs}",
+    "src/**/scripts/*.ts",
+    "src/**/*.e2e-spec.ts"
+  ],
+  "project": ["src/**/*.ts", "scripts/**/*.{ts,js,mjs}"],
+  "ignoreDependencies": [".*"],
+  "ignoreBinaries": [".*"],
+  "ignoreUnresolved": [".*"],
+  "ignoreExportsUsedInFile": true
+}

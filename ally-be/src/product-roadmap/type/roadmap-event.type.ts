@@ -48,6 +48,17 @@ export type RoadmapEvent =
       commentId: string;
     }
   | {
+      /**
+       * Roadmap v2 (§5.7b): an idea's fields changed through the v2 routes.
+       * Names only, never values: open queues refetch the row, so a field
+       * only some people may read (a decline reason) never rides a broadcast.
+       */
+      kind: 'ITEM_CHANGED';
+      actorId: number;
+      code: string;
+      fields: string[];
+    }
+  | {
       kind: 'ROADMAP_INVALIDATED';
       actorId: number;
       reason:

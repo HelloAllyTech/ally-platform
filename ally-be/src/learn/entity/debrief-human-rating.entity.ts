@@ -6,7 +6,7 @@ import { Column, Entity, PrimaryGeneratedColumn, Unique } from 'typeorm';
  *
  * The calibration set the independent judge is checked against: judge-vs-human
  * κ on accuracy, evidence and the missed-risk-cue hard fail is the standing
- * gate on the debrief Improver's autonomy. Raters see a redacted transcript
+ * gate on the debrief PM agent's autonomy. Raters see a redacted transcript
  * and the debrief, never the judge's scores.
  */
 @Unique('debrief_human_ratings_session_rater_uq', [

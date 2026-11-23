@@ -109,3 +109,17 @@ export function pickOnPrimary(hex: string): string {
     ? ALLY_INK
     : ALLY_BONE;
 }
+
+/**
+ * `hex` darkened toward black, in small steps, until white text on it reads at `min` (WCAG AA for
+ * body text is 4.5). Used for a bot page's accent (chunk 20d): the owner's colour is kept as chosen
+ * and this corrected copy is what buttons and bubbles use.
+ */
+export function darkenForWhiteText(hex: string, min = 4.5): string {
+  const base = hexToRgb(hex);
+  for (let t = 0; t <= 1; t += 0.02) {
+    const candidate = rgbToHex(mix(base, BLACK, t));
+    if (contrastRatio(candidate, '#FFFFFF') >= min) return candidate;
+  }
+  return '#000000';
+}

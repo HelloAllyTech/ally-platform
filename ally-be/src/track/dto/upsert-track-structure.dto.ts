@@ -16,16 +16,34 @@ import {
   ValidateNested,
   IsBoolean,
 } from 'class-validator';
-import { TrackItemType } from '../type/track.type';
+import {
+  ASSESSMENT_MAX_LEARNER_TURNS,
+  ASSESSMENT_MIN_LEARNER_TURNS,
+  AssessmentPhase,
+  TrackItemCompletionLogic,
+  TrackItemType,
+} from '../type/track.type';
 
 export class UpsertTrackItemCompletionCriteriaDto {
+  @ApiPropertyOptional({
+    enum: TrackItemCompletionLogic,
+    description:
+      'Which gates complete a ROLEPLAY item: SCORE, DURATION, SCORE_AND_DURATION (the default when absent) or PARTICIPATION (completes on launch)',
+  })
+  @IsOptional()
+  @IsEnum(TrackItemCompletionLogic)
+  completionLogic?: TrackItemCompletionLogic;
+
   @ApiPropertyOptional({ description: 'Minimum score (ROLEPLAY/CASE)' })
   @IsOptional()
   @IsNumber()
   @Min(0)
   minScore?: number;
 
-  @ApiPropertyOptional({ description: 'Minimum call duration s (ROLEPLAY)' })
+  @ApiPropertyOptional({
+    description:
+      'Minimum call duration in seconds (ROLEPLAY). 0 = no minimum; absent = the platform default',
+  })
   @IsOptional()
   @IsNumber()
   @Min(0)
@@ -38,6 +56,40 @@ export class UpsertTrackItemCompletionCriteriaDto {
   @IsOptional()
   @IsBoolean()
   assessmentMode?: boolean;
+
+  @ApiPropertyOptional({
+    description: `Assessment (ROLEPLAY): learner turns a valid attempt needs, ${ASSESSMENT_MIN_LEARNER_TURNS}–${ASSESSMENT_MAX_LEARNER_TURNS}. Absent = ${ASSESSMENT_MIN_LEARNER_TURNS}. Shorter attempts are not submitted and can be restarted`,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(ASSESSMENT_MIN_LEARNER_TURNS)
+  @Max(ASSESSMENT_MAX_LEARNER_TURNS)
+  minLearnerTurns?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Assessment (ROLEPLAY): whether the learner sees their score and debrief after submitting. Absent = true',
+  })
+  @IsOptional()
+  @IsBoolean()
+  showResultsToLearner?: boolean;
+
+  @ApiPropertyOptional({
+    enum: AssessmentPhase,
+    description:
+      'Assessment (ROLEPLAY): PRE or POST in a pre/post pair; needs assessmentPairKey',
+  })
+  @IsOptional()
+  @IsEnum(AssessmentPhase)
+  assessmentPhase?: AssessmentPhase;
+
+  @ApiPropertyOptional({
+    description:
+      'Assessment (ROLEPLAY): client-generated uuid shared by a PRE and its POST',
+  })
+  @IsOptional()
+  @IsUUID()
+  assessmentPairKey?: string;
 
   @ApiPropertyOptional({ description: 'Pass score percent (QUIZ)' })
   @IsOptional()

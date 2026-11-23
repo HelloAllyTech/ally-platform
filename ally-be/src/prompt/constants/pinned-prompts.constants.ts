@@ -32,6 +32,10 @@ export const PINNED_PROMPTS: ReadonlyMap<string, PinnedPromptReason> = new Map([
   ['recall_quality_rubric', 'judge_rubric'],
   ['feedback_groundedness_rubric', 'judge_rubric'],
   ['debrief_quality_rubric', 'judge_rubric'],
+  // The debrief-quality judge's own instructions, after the rubric: the same
+  // series label (ally-ai's DEBRIEF_QUALITY_JUDGE.PROMPT_VERSION) covers both.
+  ['debrief_quality_judge_system', 'judge_rubric'],
+  ['debrief_language_judge_rubric', 'judge_rubric'],
   ['rag_quality_rubric', 'judge_rubric'],
   ['ally_ai_learn_evaluation_actor_goal_system', 'measuring_instrument'],
   ['builder_eval_admin_system', 'measuring_instrument'],
@@ -42,6 +46,13 @@ export const PINNED_PROMPTS: ReadonlyMap<string, PinnedPromptReason> = new Map([
   // Decides whether a learner sees "an important moment"; its recall is gated
   // at 100% on the seeded safety set (ally-ai scripts/debrief_safety_recall.py).
   ['debrief_safety_reader_system', 'guard'],
+  // The one definition of a clear and a possible risk cue, read by the
+  // Safety reader, the Writer, the Reviser, the Evaluator and the judge.
+  ['debrief_risk_cue_definition', 'guard'],
+  // The Evaluator's own instructions: whether a draft reaches learners.
+  ['debrief_evaluator_system', 'guard'],
+  // The PM agent's reviewer: what a safe change is, what waits for a person.
+  ['debrief_pm_reviewer_system', 'guard'],
 ]);
 
 /** What the editor must have done before confirming, by reason. */

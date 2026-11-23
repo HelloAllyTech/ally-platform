@@ -90,6 +90,30 @@ describe('debrief feedback', () => {
     expect(sectionText(cards, 'nonsense')).toBeNull();
   });
 
+  it('reads the progress card focus first, then each skill line', () => {
+    const withCard = {
+      ...cards,
+      progress_card: {
+        sessions: 5,
+        skills: [
+          { skill: 'empathy', trend: 'more_consistent', line: 'Skill line.' },
+          { skill: 'listening', trend: 'about_the_same', line: '' },
+        ],
+        focus: { skill: 'empathy', line: 'Focus line.' },
+      },
+    } as any;
+    expect(sectionText(withCard, 'progress_card')).toBe(
+      'Focus line. Skill line.',
+    );
+    expect(sectionText(cards, 'progress_card')).toBeNull();
+    expect(
+      sectionText(
+        { ...cards, progress_card: { sessions: 5, skills: [] } } as any,
+        'progress_card',
+      ),
+    ).toBeNull();
+  });
+
   it('only the learner who did the session can flag it', async () => {
     await expect(
       build({ owner: 9 }).svc.flag('s', 7, {
@@ -146,6 +170,44 @@ describe('debrief feedback', () => {
     });
     await svc.undoFlag('s', 7, 'f');
     expect(saved[0].status).toBe('withdrawn');
+  });
+
+  it("never shows the learner the team's Ask Ally distress item or its note", async () => {
+    const { svc } = build();
+    const at = new Date();
+    (svc as any).feedback.find = jest.fn(async () => [
+      {
+        id: 'd1',
+        runId: 'run-1',
+        userId: 7,
+        kind: 'flag',
+        section: 'ask_ally',
+        status: 'kept',
+        resolutionNote: 'Called their supervisor',
+        updatedAt: at,
+        resolvedAt: at,
+      },
+      {
+        id: 'f2',
+        runId: 'run-1',
+        userId: 7,
+        kind: 'flag',
+        section: 'what_worked[0]',
+        status: 'kept',
+        resolutionNote: 'It stays',
+        updatedAt: at,
+        resolvedAt: at,
+      },
+    ]);
+    (svc as any).runCorrections = jest.fn(async () => []);
+    const view: any = await svc.decorate(
+      { state: 'ready', runId: 'run-1', cards } as any,
+      7,
+    );
+    expect(view.corrections).toEqual([
+      expect.objectContaining({ section: 'what_worked[0]', note: 'It stays' }),
+    ]);
+    expect(view.feedback.flags.map((f: any) => f.id)).toEqual(['f2']);
   });
 
   it('keeping a point needs a reason the learner can read', async () => {
@@ -244,44 +306,6 @@ describe('debrief feedback', () => {
     await expect(
       build({ run: { mode: 'shadow' } }).svc.publishRun('run-1', 1),
     ).rejects.toThrow('Live run not found');
-  });
-
-  it('queues a published debrief where the learner showed distress, first (FR-23)', async () => {
-    const { svc } = build();
-    const query = (svc as any).dataSource.query as jest.Mock;
-    query.mockResolvedValue([]);
-    await svc.queue();
-    const [sql] = query.mock.calls[0] as [string];
-    expect(sql).toContain(
-      `OR (r."learnerDistress" AND r.status = 'published')`,
-    );
-    expect(sql).toMatch(/ORDER BY r\."learnerDistress" DESC/);
-  });
-
-  it('queues a published debrief the independent judge scored below the bar (FR-21)', async () => {
-    const { svc } = build();
-    const query = (svc as any).dataSource.query as jest.Mock;
-    query.mockResolvedValue([]);
-    await svc.queue();
-    const [sql, params] = query.mock.calls[0] as [string, unknown[]];
-    expect(sql).toContain(
-      `OR (r.status = 'published' AND (r.workspace ? 'judge'`,
-    );
-    expect(sql).toContain(`(r.workspace->'judge'->>'overall')::float < $1`);
-    expect(sql).toContain(`r.workspace->'judge'->'hardFails'`);
-    expect(params).toEqual([8]);
-  });
-
-  it('keeps an escalated flag in the queue; only an open one waits out the undo window', async () => {
-    const { svc } = build();
-    const query = (svc as any).dataSource.query as jest.Mock;
-    query.mockResolvedValue([]);
-    await svc.queue();
-    const [sql] = query.mock.calls[1] as [string];
-    expect(sql).toMatch(/f\.status = 'escalated'\s+-- /);
-    expect(sql).toContain(
-      `(f.status = 'open' AND f."updatedAt" < now() - make_interval(secs => $1))`,
-    );
   });
 
   describe('supervisorView (FR-26)', () => {

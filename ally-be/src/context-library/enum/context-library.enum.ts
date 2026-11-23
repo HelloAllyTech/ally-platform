@@ -15,6 +15,8 @@ export enum ClCollectionId {
   BUILDER_LESSONS = 'builder_lessons',
   BUG_HUNTER_NOTES = 'bug_hunter_notes',
   CONTENT_CATALOGUE = 'content_catalogue',
+  /** What shipped plans achieved, written by the roadmap's outcome reviewer. */
+  PRODUCT_OUTCOMES = 'product_outcomes',
 }
 
 /**

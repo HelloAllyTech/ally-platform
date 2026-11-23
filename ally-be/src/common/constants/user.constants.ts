@@ -43,7 +43,47 @@ export enum UserRole {
   LISTENER = 'LISTENER',
   /** Text helpline supervisor: a LISTENER who can also monitor, whisper and transfer. */
   HELPLINE_SUPERVISOR = 'HELPLINE_SUPERVISOR',
+  /**
+   * The Debrief console's clinical advisor: expert verdicts with the agreement
+   * answers, comments, escalated flags, and approving pinned rules. Additive,
+   * like EVALUATOR: it carries `review:admin:debriefs` and nothing else, and is
+   * held alongside the account's normal role (usually PLATFORM_ADMIN). Gate on
+   * the permission, never on this name. Platform-managed (see
+   * PLATFORM_MANAGED_ROLES): the generic role picker can't grant it, because
+   * the advisor reads debriefs from every organisation.
+   */
+  CLINICAL_ADVISOR = 'CLINICAL_ADVISOR',
+  /**
+   * The Debrief owner (migration 1981901200000): carries
+   * `manage:admin:debrief-settings` and nothing else — Debrief settings,
+   * budgets, switching organisations on, releases, the PM agent, held debriefs
+   * and Agent logs. Additive and platform-managed like CLINICAL_ADVISOR: it
+   * reaches every organisation's debriefs, so it is granted person by person
+   * in User Management > Clinical advisors, never by the role picker.
+   */
+  DEBRIEF_OWNER = 'DEBRIEF_OWNER',
+  /**
+   * Agents v2 CR1: a "custom login" — someone Ally gives an account to build assistants. Holds
+   * only the WhatsApp-bot (assistants) permissions, never `system:access`, so it is scoped to its
+   * own organisation and is not a platform admin. What it can open is decided by its feature
+   * toggles (Chatbots, ticked by Ally) and by assistant membership. Granted only by Ally admin →
+   * Custom logins (`POST /v1/custom-logins`); platform-managed, so the role picker can't hand it out.
+   */
+  ASSISTANT_OWNER = 'ASSISTANT_OWNER',
 }
+
+/** Everything an Assistant owner (CR1) may do outside an assistant's own member routes. */
+export const ASSISTANT_OWNER_PERMISSIONS: string[] = [
+  'view:whatsapp-bot',
+  'edit:whatsapp-bot',
+  'view:whatsapp-bot:templates',
+  'edit:whatsapp-bot:templates',
+  'view:whatsapp-bot:conversations',
+  'edit:whatsapp-bot:conversations',
+  'view:whatsapp-bot:unanswered',
+  'edit:whatsapp-bot:unanswered',
+  'view:whatsapp-bot:analytics',
+];
 
 /**
  * Platform-level super-admin roles. SUPER_DUPER_ADMIN is a peer of SUPER_ADMIN:
@@ -120,8 +160,17 @@ export const PLATFORM_TIER_ROLES: UserRole[] = [
  * Only `changeUserRoles` is constrained. `assignRole` is the single-role path
  * that platform-admin.service itself calls to grant PLATFORM_ADMIN, so guarding
  * it would break the very screen this constant protects.
+ *
+ * CLINICAL_ADVISOR is here for a different reason: it isn't staff, but it
+ * reads debriefs from every organisation, so a tenant-scoped picker must never
+ * hand it out. It is granted person by person by the Ally team (user_groups).
  */
-export const PLATFORM_MANAGED_ROLES: UserRole[] = PLATFORM_TIER_ROLES;
+export const PLATFORM_MANAGED_ROLES: UserRole[] = [
+  ...PLATFORM_TIER_ROLES,
+  UserRole.CLINICAL_ADVISOR,
+  UserRole.DEBRIEF_OWNER,
+  UserRole.ASSISTANT_OWNER,
+];
 
 export enum AppType {
   APP = 'APP',
@@ -137,6 +186,17 @@ export enum PreferenceName {
   CUSTOM_FIELDS_ENABLED = 'CUSTOM_FIELDS_ENABLED',
   SCRIBE_NOTE_CREATION_ENABLED = 'SCRIBE_NOTE_CREATION_ENABLED',
   SCRIBE_VOICE_NOTE_ENABLED = 'SCRIBE_VOICE_NOTE_ENABLED',
+  /**
+   * Scribe v2: run the new note harness beside the v1 summary for this org
+   * and store its drafts for comparison (never shown). OFF when absent.
+   */
+  SCRIBE_NOTE_HARNESS_SHADOW_ENABLED = 'SCRIBE_NOTE_HARNESS_SHADOW_ENABLED',
+  /**
+   * Scribe recordings are saved as segments uploaded straight to S3 by the
+   * app (no server holds the audio), instead of over the live socket. Apps
+   * read it from GET /v1/scribe-recordings/config. OFF when absent.
+   */
+  SCRIBE_SEGMENTED_RECORDING_ENABLED = 'SCRIBE_SEGMENTED_RECORDING_ENABLED',
   /**
    * Org-level switch letting a tenant's own ADMINs reach the Character Library
    * (list + interview agent + create) for characters scoped to their tenant.

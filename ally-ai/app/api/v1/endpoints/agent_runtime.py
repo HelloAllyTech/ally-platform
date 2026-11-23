@@ -1,9 +1,11 @@
 """Agents v2 runtime endpoint — the conversational agent, run as a LangGraph loop.
 
-Dark until AGENT_RUNTIME__ENABLED: every route here answers 404 while it is off, so
-shipping this changes nothing in production, and 503 if it is on but its checkpoint
-database could not be opened at startup. Every run adds a run id, a per-step trace
-and a stored checkpoint to what /knowledge-agent/answer returns. /run and
+On unless AGENT_RUNTIME__ENABLED is set false, when every run route here answers 404
+and ally-be answers in safe mode. It doesn't need the checkpoint database: without one
+(or with one that couldn't be opened) runs are answered and simply not stored. The
+builder's /instructions routes are on `builder_router` instead and always answer: they
+make no model call and open nothing. Every run adds a run id and a per-step trace (with
+Postgres, a stored checkpoint too) to what /knowledge-agent/answer returns. /run and
 /run/stream share one runner (agent_runtime/runner.py).
 """
 
@@ -12,13 +14,25 @@ from fastapi.responses import StreamingResponse
 from langgraph.graph.state import CompiledStateGraph
 
 from app.api.v1.endpoints.knowledge_agent import knowledge_errors
-from app.core.agent_runtime.checkpointer import checkpointer_available
 from app.core.agent_runtime.graph import get_agent_graph
+from app.core.agent_runtime.instructions import check_owner_text
+from app.core.agent_runtime.instructions import describe as describe_instructions
 from app.core.agent_runtime.runner import execute, stream
 from app.core.config import settings
 from app.core.dependencies import get_knowledge_agent_service
 from app.core.knowledge_agent.agent import KnowledgeAgentService
-from app.schemas.agent_runtime import AgentRunRequest, AgentRunResponse
+from app.core.memory_lines import service as memory_lines
+from app.schemas.agent_runtime import (
+    AgentRunRequest,
+    AgentRunResponse,
+    ConversationSummaryRequest,
+    ConversationSummaryResponse,
+    InstructionsResponse,
+    MemoryCheckRequest,
+    MemoryCheckResponse,
+    OwnerTextCheckRequest,
+    OwnerTextCheckResponse,
+)
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -28,11 +42,6 @@ def require_agent_runtime() -> None:
     """404, not 403: while the runtime is off the route should not appear to exist."""
     if not settings.AGENT_RUNTIME.ENABLED:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")
-    if not checkpointer_available():
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="The agent runtime is unavailable",
-        )
 
 
 async def get_graph(
@@ -42,6 +51,9 @@ async def get_graph(
 
 
 router = APIRouter(dependencies=[Depends(require_agent_runtime)])
+# The owner's "How it works" and the instructions safety check: plain functions of the
+# request, so they don't wait for the runtime to be switched on.
+builder_router = APIRouter()
 
 
 @router.post(
@@ -76,6 +88,32 @@ async def run(
         )
 
 
+@builder_router.post(
+    "/instructions",
+    response_model=InstructionsResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["agent_runtime"],
+)
+async def instructions(payload: AgentRunRequest):
+    """
+    The instructions a run for this bot starts from, without running it (chunk 20d-2,
+    the owner's "How it works"). Built by the same code `/agent/run` uses, from the
+    same request, so what the owner reads is what the assistant follows. No model call.
+    """
+    return describe_instructions(payload.to_bot())
+
+
+@builder_router.post(
+    "/instructions/check",
+    response_model=OwnerTextCheckResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["agent_runtime"],
+)
+async def check_instructions(payload: OwnerTextCheckRequest):
+    """The builder's safety check on text an owner typed into their instructions."""
+    return check_owner_text(payload.text)
+
+
 @router.post("/run/stream", tags=["agent_runtime"])
 async def run_stream(
     payload: AgentRunRequest,
@@ -93,3 +131,46 @@ async def run_stream(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@builder_router.post(
+    "/memory-check",
+    response_model=MemoryCheckResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["agent_runtime"],
+)
+async def memory_check(payload: MemoryCheckRequest) -> MemoryCheckResponse:
+    """Which memory lines a health assistant may keep (chunk 8a). Always 200: on any
+    failure `failed` is true and nothing is kept, so ally-be fails closed."""
+    try:
+        keep = await memory_lines.check_lines(
+            payload.lines, payload.never_store, prompts=payload.prompts
+        )
+        return MemoryCheckResponse(keep=keep)
+    except Exception:
+        logger.exception("Memory check failed; keeping none of %d", len(payload.lines))
+        return MemoryCheckResponse(keep=[False] * len(payload.lines), failed=True)
+
+
+@builder_router.post(
+    "/conversation-summary",
+    response_model=ConversationSummaryResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["agent_runtime"],
+)
+async def conversation_summary(
+    payload: ConversationSummaryRequest,
+) -> ConversationSummaryResponse:
+    """A chat's new rolling summary (chunk 8a). Always 200: on failure `failed` is
+    true and ally-be keeps the old summary."""
+    try:
+        text = await memory_lines.summarize(
+            payload.summary,
+            [m.model_dump() for m in payload.messages],
+            health=payload.health,
+            prompts=payload.prompts,
+        )
+        return ConversationSummaryResponse(summary=text)
+    except Exception:
+        logger.exception("Conversation summary failed; the old one stays")
+        return ConversationSummaryResponse(failed=True)

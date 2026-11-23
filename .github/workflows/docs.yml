@@ -104,6 +104,25 @@ jobs:
             --pr-body pr-body.txt \
             --labels "$(cat pr-labels.txt)"
 
+  # wiki/platform/concepts.md maps every module, package, page and feature directory and
+  # every FeatureToggleKey to a concept card. This fails a PR that adds one without mapping
+  # it, or moves one the page still names. No path filter: a new directory anywhere counts.
+  concepts:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check the Core Concepts page covers the code
+        run: python3 scripts/concepts_lint.py
+
   docs-paths:
     runs-on: ubuntu-latest
     permissions:

@@ -1,0 +1,157 @@
+diff --git a/src/github/service/github-actions.service.ts b/src/github/service/github-actions.service.ts
+index 40750ac532..1701647df5 100644
+--- a/src/github/service/github-actions.service.ts
++++ b/src/github/service/github-actions.service.ts
+@@ -792,20 +792,51 @@ export class GithubActionsService {
+       `^${tagPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\d+)\\.(\\d+)\\.(\\d+)$`,
+     );
+     try {
+-      const { data } = await axios.get(this.url(repo, 'tags'), {
+-        headers: this.headers,
+-        params: { per_page: 100 },
+-        timeout: 15_000,
+-      });
+-      const versions = (data ?? [])
+-        .map((tag: any) => pattern.exec(tag?.name ?? ''))
+-        .filter(Boolean)
+-        .map((match: RegExpExecArray) => [
+-          Number(match[1]),
+-          Number(match[2]),
+-          Number(match[3]),
+-        ]);
+-      if (versions.length === 0) return `${tagPrefix}0.0.1`;
++      // Paged, because one page is not the repo. ally-web carries three
++      // independently-released apps in one repo, and its first 100 tags are
++      // ALL `helpline-v*` — so a single-page read found no `admin-v*` at all,
++      // fell through to the "never released" branch below, and proposed
++      // `admin-v0.0.1` for an app on 1.88. The release workflow rejected it,
++      // which is the only reason this was a failed release rather than a
++      // catastrophic one.
++      const versions: number[][] = [];
++      let sawEveryTag = false;
++      for (let page = 1; page <= 10; page += 1) {
++        const { data } = await axios.get(this.url(repo, 'tags'), {
++          headers: this.headers,
++          params: { per_page: 100, page },
++          timeout: 15_000,
++        });
++        const batch = (data ?? []) as { name?: string }[];
++        for (const tag of batch) {
++          const match = pattern.exec(tag?.name ?? '');
++          if (match) {
++            versions.push([
++              Number(match[1]),
++              Number(match[2]),
++              Number(match[3]),
++            ]);
++          }
++        }
++        if (batch.length < 100) {
++          sawEveryTag = true;
++          break;
++        }
++      }
++
++      if (versions.length === 0) {
++        // "No tag with this prefix" and "I did not look far enough" produce
++        // the same empty list and mean opposite things, so they are not
++        // allowed to share an answer. Only the first — provable because the
++        // last page came back short — is a genuine first release.
++        if (!sawEveryTag) {
++          throw new Error(
++            `Found no ${tagPrefix}* tags in ${repo} within 10 pages, and there are more to read. ` +
++              'Refusing to guess a version rather than proposing a first release for something already released.',
++          );
++        }
++        return `${tagPrefix}0.0.1`;
++      }
+ 
+       const [major, minor, patch] = versions.sort(
+         (a: number[], b: number[]) => b[0] - a[0] || b[1] - a[1] || b[2] - a[2],
+diff --git a/src/github/service/test/github-actions.service.spec.ts b/src/github/service/test/github-actions.service.spec.ts
+index 7740e0c3be..dfb57c45ed 100644
+--- a/src/github/service/test/github-actions.service.spec.ts
++++ b/src/github/service/test/github-actions.service.spec.ts
+@@ -67,3 +67,82 @@ describe('GithubActionsService.hasCommitsSince', () => {
+     expect(result).toBe(true);
+   });
+ });
++
++/**
++ * Choosing the next release tag.
++ *
++ * ally-web carries three independently-released apps in one repo, so its tags
++ * interleave three prefixes. Its first 100 — GitHub's first page — are ALL
++ * `helpline-v*`, so a single-page read found no `admin-v*` whatsoever, fell
++ * into the "never released" branch and proposed `admin-v0.0.1` for an app on
++ * 1.88. The release workflow's version validation rejected it, which is the
++ * only reason that was a failed release rather than a catastrophic one.
++ */
++describe('GithubActionsService.nextPatchTag', () => {
++  let service: GithubActionsService;
++  const configService = {
++    githubToken: 'gh-token',
++    githubOrg: 'helloallytech',
++  } as unknown as AppConfigService;
++
++  const page = (names: string[]) => ({ data: names.map((name) => ({ name })) });
++  const filler = (n: number) =>
++    Array.from({ length: n }, (_, i) => `helpline-v1.0.${i}`);
++
++  beforeEach(() => {
++    jest.clearAllMocks();
++    service = new GithubActionsService(configService);
++  });
++
++  it('bumps the patch of the highest matching tag', async () => {
++    mockedAxios.get.mockResolvedValueOnce(
++      page(['admin-v1.88.0', 'admin-v1.9.0', 'helpline-v2.0.0']) as any,
++    );
++
++    await expect(service.nextPatchTag('ally-web', 'admin-v')).resolves.toBe(
++      'admin-v1.88.1',
++    );
++  });
++
++  /** The real failure: a full first page carrying none of the prefix. */
++  it('reads past a full page of other prefixes', async () => {
++    mockedAxios.get
++      .mockResolvedValueOnce(page(filler(100)) as any)
++      .mockResolvedValueOnce(page(['admin-v1.88.0']) as any);
++
++    await expect(service.nextPatchTag('ally-web', 'admin-v')).resolves.toBe(
++      'admin-v1.88.1',
++    );
++    expect(mockedAxios.get).toHaveBeenCalledTimes(2);
++  });
++
++  /** A genuinely unreleased prefix — provable, because the page came back short. */
++  it('proposes a first release only when it has seen every tag', async () => {
++    mockedAxios.get.mockResolvedValueOnce(page(['helpline-v1.0.0']) as any);
++
++    await expect(service.nextPatchTag('ally-web', 'admin-v')).resolves.toBe(
++      'admin-v0.0.1',
++    );
++  });
++
++  /**
++   * The distinction that matters. "No tag with this prefix" and "I did not look
++   * far enough" produce the same empty list and mean opposite things, so they
++   * must not share an answer.
++   */
++  it('refuses to guess when there are still tags it has not read', async () => {
++    mockedAxios.get.mockResolvedValue(page(filler(100)) as any);
++
++    await expect(service.nextPatchTag('ally-web', 'admin-v')).rejects.toThrow(
++      /Refusing to guess/,
++    );
++  });
++
++  it('does not confuse a longer prefix for a shorter one', async () => {
++    mockedAxios.get.mockResolvedValueOnce(
++      page(['admin-v1.5.0', 'v9.9.9']) as any,
++    );
++
++    await expect(service.nextPatchTag('ally-be', 'v')).resolves.toBe('v9.9.10');
++  });
++});

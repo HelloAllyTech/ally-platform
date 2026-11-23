@@ -1,0 +1,232 @@
+diff --git a/src/auth/controller/auth.controller.ts b/src/auth/controller/auth.controller.ts
+index ad040418a1..4b3f1dc3ee 100644
+--- a/src/auth/controller/auth.controller.ts
++++ b/src/auth/controller/auth.controller.ts
+@@ -200,8 +200,14 @@ export class AuthController {
+   @AuthPermissions([PERMISSIONS.IMPERSONATE_USER])
+   @Version('1')
+   @HttpCode(HttpStatus.OK)
+-  async impersonate(@Body() ImpersonateDto: ImpersonateDto) {
+-    const data = await this.authService.impersonate(ImpersonateDto);
++  async impersonate(
++    @Body() ImpersonateDto: ImpersonateDto,
++    @Req() req: { user: { id: string | number } },
++  ) {
++    const data = await this.authService.impersonate(
++      ImpersonateDto,
++      Number(req.user.id),
++    );
+     return { message: data.message, data: data.data };
+   }
+ 
+diff --git a/src/auth/controller/test/auth-controller.spec.ts b/src/auth/controller/test/auth-controller.spec.ts
+index 79b301d572..1baf8ea801 100644
+--- a/src/auth/controller/test/auth-controller.spec.ts
++++ b/src/auth/controller/test/auth-controller.spec.ts
+@@ -134,16 +134,18 @@ describe('AuthController', () => {
+         message: 'Impersonation successful',
+         data: { accessToken: 'token', refreshToken: 'refresh' },
+       });
+-      const result = await controller.impersonate({
+-        email: 'test@example.com',
+-      } as any);
++      const result = await controller.impersonate(
++        { email: 'test@example.com' } as any,
++        { user: { id: '7' } },
++      );
+       expect(result).toEqual({
+         message: 'Impersonation successful',
+         data: { accessToken: 'token', refreshToken: 'refresh' },
+       });
+-      expect(mockAuthService.impersonate).toHaveBeenCalledWith({
+-        email: 'test@example.com',
+-      });
++      expect(mockAuthService.impersonate).toHaveBeenCalledWith(
++        { email: 'test@example.com' },
++        7,
++      );
+     });
+   });
+ });
+diff --git a/src/auth/service/auth.service.ts b/src/auth/service/auth.service.ts
+index 36d18905dc..da53f7a124 100644
+--- a/src/auth/service/auth.service.ts
++++ b/src/auth/service/auth.service.ts
+@@ -44,6 +44,7 @@ import { MagicLinkVerifyDto } from '../dto/magic-link.dto';
+ import { EmailSendFailedException } from 'src/aws/service/ses.service';
+ import { CachedAuthAttempt } from '../interface/cached-auth-attempt.interface';
+ import { PermissionsService } from 'src/authorization/service/permissions.service';
++import { TenantScopeService } from 'src/authorization/service/tenant-scope.service';
+ import { Impersonate } from '../interface/impersonate.interface';
+ import {
+   describeWait,
+@@ -77,6 +78,7 @@ export class AuthService {
+     private readonly cache: RedisService,
+     private readonly groupService: GroupService,
+     private permissionsService: PermissionsService,
++    private readonly tenantScopeService: TenantScopeService,
+   ) {
+     this.userRepository = this.dataSource.getRepository(User);
+     this.refreshTokenRepository = this.dataSource.getRepository(RefreshToken);
+@@ -100,27 +102,42 @@ export class AuthService {
+     return result;
+   }
+ 
+-  async impersonate(ImpersonateData: Impersonate) {
++  async impersonate(ImpersonateData: Impersonate, callerId: number) {
++    // PLATFORM_ADMIN carries impersonate:user, allowlisted or not. An
++    // organization allowlist cannot bound it: the session minted here carries
++    // the target's reach, not the caller's, so an admin confined to some orgs
++    // could take over any account on the platform — including an
++    // unrestricted admin's. Allowlisted admins don't impersonate at all.
++    if (await this.tenantScopeService.isRestricted(callerId)) {
++      throw new ForbiddenException(
++        'Organization-restricted admins cannot impersonate users',
++      );
++    }
++
+     const userEmail = ImpersonateData.email;
+ 
+     const user = await this.userRepository.findOne({
+       where: { email: userEmail, status: UserStatus.ACTIVE },
+-      select: ['id', 'username', 'password', 'tenantId'],
++      select: ['id', 'username', 'tenantId'],
+     });
++    if (!user) {
++      throw new NotFoundException('No active user with that email');
++    }
+ 
+     const isMultitenantAdmin = await this.permissionsService.isMultiTenantAdmin(
+-      Number(user?.id),
++      user.id,
+     );
+ 
+     if (isMultitenantAdmin)
+       return { message: 'Multi-tenant admin cannot be impersonated.' };
+ 
+-    const tokens = await this.generateTokens(user as User);
++    const tokens = await this.generateTokens(user);
+ 
+     this.auditLogger.log({
+       eventType: AUDIT_EVENTS.SUPER_ADMIN_IMPERSONATE,
+       details: {
+         purpose: 'Super admin impersonated a user',
++        impersonatedBy: callerId,
+         userDetails: user,
+       },
+     });
+diff --git a/src/auth/service/test/auth-service.spec.ts b/src/auth/service/test/auth-service.spec.ts
+index 6bbde26323..35907a4d17 100644
+--- a/src/auth/service/test/auth-service.spec.ts
++++ b/src/auth/service/test/auth-service.spec.ts
+@@ -26,6 +26,7 @@ import { LoggerService } from 'src/logger/logger.service';
+ import { GroupService } from 'src/authorization/service/group.service';
+ import { AuthProvider } from 'src/auth/type/auth.types';
+ import { PermissionsService } from 'src/authorization/service/permissions.service';
++import { TenantScopeService } from 'src/authorization/service/tenant-scope.service';
+ import { OtpRateLimitedException } from 'src/auth/exception/login.exception';
+ import {
+   OTP_LIMIT_MESSAGES,
+@@ -59,6 +60,8 @@ describe('AuthService', () => {
+   let redisService: jest.Mocked<RedisService>;
+   let dataSource: jest.Mocked<DataSource>;
+   let groupService: jest.Mocked<GroupService>;
++  let permissionsService: jest.Mocked<PermissionsService>;
++  let tenantScopeService: jest.Mocked<TenantScopeService>;
+ 
+   const mockLogger = {
+     info: jest.fn(),
+@@ -220,8 +223,13 @@ describe('AuthService', () => {
+           provide: PermissionsService,
+           useValue: {
+             hasPermission: jest.fn(),
++            isMultiTenantAdmin: jest.fn(),
+           },
+         },
++        {
++          provide: TenantScopeService,
++          useValue: { isRestricted: jest.fn() },
++        },
+       ],
+     }).compile();
+ 
+@@ -230,6 +238,8 @@ describe('AuthService', () => {
+     jwtService = module.get(JwtService);
+     redisService = module.get(RedisService);
+     groupService = module.get(GroupService);
++    permissionsService = module.get(PermissionsService);
++    tenantScopeService = module.get(TenantScopeService);
+ 
+     userRepository = dataSource.getRepository(User) as jest.Mocked<
+       Repository<User>
+@@ -1689,4 +1699,70 @@ describe('AuthService', () => {
+       });
+     });
+   });
++
++  describe('impersonate', () => {
++    const CALLER_ID = 99;
++
++    beforeEach(() => {
++      tenantScopeService.isRestricted.mockResolvedValue(false);
++      permissionsService.isMultiTenantAdmin.mockResolvedValue(false);
++      jwtService.signAsync
++        .mockResolvedValueOnce('access-token')
++        .mockResolvedValueOnce('refresh-token');
++    });
++
++    it('mints tokens for an unrestricted platform admin', async () => {
++      userRepository.findOne.mockResolvedValue({
++        id: 5,
++        username: 'learner@example.com',
++        tenantId: 'tenant-a',
++      } as User);
++
++      const result = await authService.impersonate(
++        { email: 'learner@example.com' },
++        CALLER_ID,
++      );
++
++      expect(result).toEqual({
++        message: 'Impersonation successful',
++        data: { accessToken: 'access-token', refreshToken: 'refresh-token' },
++      });
++      expect(tenantScopeService.isRestricted).toHaveBeenCalledWith(CALLER_ID);
++    });
++
++    it('refuses an organization-restricted platform admin before looking anyone up', async () => {
++      tenantScopeService.isRestricted.mockResolvedValue(true);
++
++      await expect(
++        authService.impersonate({ email: 'learner@example.com' }, CALLER_ID),
++      ).rejects.toThrow(ForbiddenException);
++      expect(userRepository.findOne).not.toHaveBeenCalled();
++      expect(jwtService.signAsync).not.toHaveBeenCalled();
++    });
++
++    it('answers 404 for an unknown email instead of signing a token for nobody', async () => {
++      userRepository.findOne.mockResolvedValue(null);
++
++      await expect(
++        authService.impersonate({ email: 'ghost@example.com' }, CALLER_ID),
++      ).rejects.toThrow(NotFoundException);
++      expect(jwtService.signAsync).not.toHaveBeenCalled();
++    });
++
++    it('never selects the password hash it would otherwise audit-log', async () => {
++      userRepository.findOne.mockResolvedValue({
++        id: 5,
++        username: 'learner@example.com',
++        tenantId: 'tenant-a',
++      } as User);
++
++      await authService.impersonate(
++        { email: 'learner@example.com' },
++        CALLER_ID,
++      );
++
++      const query = userRepository.findOne.mock.calls[0][0] as any;
++      expect(query.select).not.toContain('password');
++    });
++  });
+ });

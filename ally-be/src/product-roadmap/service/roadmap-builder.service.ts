@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { In, IsNull, Not } from 'typeorm';
+import { IsNull } from 'typeorm';
 import { LoggerService } from 'src/logger/logger.service';
 import { PermissionsService } from 'src/authorization/service/permissions.service';
 import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
@@ -16,6 +16,7 @@ import { RoadmapOpportunityRepository } from '../repository/roadmap-opportunity.
 import { OpenBuilderSessionResponseDto } from '../dto/roadmap-response.dto';
 import { BUILDER_SEED_TITLE_MAX } from '../constants/product-roadmap.constants';
 import { RoadmapOpportunity } from '../entity/roadmap-opportunity.entity';
+import { ItemReleaseService } from './item-release.service';
 import {
   BuilderHandoffSource,
   describeBuilderHandoff,
@@ -56,6 +57,7 @@ export class RoadmapBuilderService {
     private readonly builderSessionService: BuilderSessionService,
     private readonly permissionsService: PermissionsService,
     private readonly featureToggleService: FeatureToggleService,
+    private readonly itemReleaseService: ItemReleaseService,
   ) {}
 
   /**
@@ -127,19 +129,16 @@ export class RoadmapBuilderService {
       };
     }
 
-    // Handing work to Builder IS starting it, so the board should say so
-    // rather than leaving the row sitting in `new` while a build runs against
-    // it. Only forward, and only from the two stages that precede development:
-    // a row someone has already marked released or archived is not something
-    // this should reopen.
-    if (
-      opportunity.stage === RoadmapOpportunityStage.NEW ||
-      opportunity.stage === RoadmapOpportunityStage.PRIORITISED
-    ) {
+    // Handing work to Builder IS committing to it, so an Idea is accepted (Prioritised) rather
+    // than left sitting in `new` while a build runs against it. There is no "in development"
+    // stage any more (retired 2026-11): "being built" is the linked builder session, not a rung.
+    // Only forward from `new`: a Prioritised row already says it, and a row someone has marked
+    // released or archived is not something this should reopen.
+    if (opportunity.stage === RoadmapOpportunityStage.NEW) {
       await this.opportunityRepository.update(
         { id: opportunityId },
         {
-          stage: RoadmapOpportunityStage.UNDER_DEVELOPMENT,
+          stage: RoadmapOpportunityStage.PRIORITISED,
           updatedBy: userId,
         },
       );
@@ -159,6 +158,21 @@ export class RoadmapBuilderService {
    * The opportunity as Builder is handed it. The transcript is a read of its own because the
    * column is `select: false` — the board reads every card and has no use for it.
    */
+  /**
+   * The rendered hand-off for an opportunity, for a plan session filed from the roadmap: the
+   * same text "Open in Builder Agent" would attach, so a plan's PRD stage starts from what the
+   * filing interview already settled. Null when there is nothing beyond the description.
+   */
+  async handoffTextForOpportunity(
+    opportunityId: string,
+  ): Promise<string | null> {
+    const opportunity = await this.opportunityRepository.findOne({
+      where: { id: opportunityId },
+    });
+    if (!opportunity) return null;
+    return this.handoffText(await this.handoffSource(opportunity));
+  }
+
   private async handoffSource(
     opportunity: RoadmapOpportunity,
   ): Promise<BuilderHandoffSource> {
@@ -281,61 +295,22 @@ export class RoadmapBuilderService {
   }
 
   /**
-   * Move opportunities whose Builder work has shipped to `released`.
+   * Move opportunities whose work has shipped to `released`.
    *
-   * The roadmap asks Builder, rather than Builder writing here: the roadmap is
-   * allowed to depend on Builder's services (this class already does), and the
-   * reverse edge is the one the opportunity entity explicitly warns against.
-   * So this polls, on the same tick as everything else.
+   * Since Roadmap v2 P1 this is release tracking (`ItemReleaseService`): an
+   * opportunity is released when every service touched by every merged pull
+   * request linked to it — its Builder session's, any naming its code, any
+   * linked as "Built elsewhere" — is an ancestor of that service's newest
+   * successful production release tag.
    *
-   * `shipped` is stricter than "the session finished": every pull request
-   * merged AND deployed. A build can complete having written nothing, and a
-   * merged pull request whose release failed is the exact state a person needs
-   * to see rather than have marked done. `releasedAt` is stamped here because
-   * this IS the transition into RELEASED, which is the only time that column
-   * is written.
+   * It used to read `builder_pull_requests.releaseState`, which was wrong two
+   * ways: the column stays null while Builder's auto-release is off (the
+   * default), so Builder work never reached Released; and `skipped` counted as
+   * delivered, so work could reach it without being deployed.
    *
-   * Never downgrades and never touches an archived row. A stage a person set
-   * by hand is theirs; this only moves work forward to a conclusion the
-   * evidence already supports.
+   * Still never downgrades and never touches a released or archived row.
    */
   async reconcileShippedOpportunities(): Promise<void> {
-    const candidates = await this.opportunityRepository.find({
-      where: {
-        builderSessionId: Not(IsNull()),
-        stage: In([
-          RoadmapOpportunityStage.NEW,
-          RoadmapOpportunityStage.PRIORITISED,
-          RoadmapOpportunityStage.UNDER_DEVELOPMENT,
-        ]),
-      },
-      take: 100,
-    });
-
-    for (const opportunity of candidates) {
-      try {
-        const delivery = await this.builderSessionService.getDeliveryState(
-          opportunity.builderSessionId!,
-        );
-        if (!delivery?.shipped) continue;
-
-        await this.opportunityRepository.update(
-          { id: opportunity.id },
-          {
-            stage: RoadmapOpportunityStage.RELEASED,
-            releasedAt: new Date(),
-          },
-        );
-        this.logger.info(
-          `[ROADMAP] Opportunity ${opportunity.id} released: Builder session ${opportunity.builderSessionId} shipped ${delivery.pullRequestCount} pull request(s).`,
-        );
-      } catch (error) {
-        this.logger.warn(
-          `[ROADMAP] Could not settle opportunity ${opportunity.id}: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
-      }
-    }
+    await this.itemReleaseService.reconcile();
   }
 }

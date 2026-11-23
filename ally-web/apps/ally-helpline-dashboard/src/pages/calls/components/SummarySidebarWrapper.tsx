@@ -14,6 +14,7 @@ const SummarySidebarWrapper: FC<SummarySidebarWrapperProps> = ({
   tabList,
   title,
   isShortSession = false,
+  sideBySide = false,
   summaryData,
   children,
   onTabChange,
@@ -54,32 +55,48 @@ const SummarySidebarWrapper: FC<SummarySidebarWrapperProps> = ({
         <ShortSessionUI summaryData={summaryData} className="!min-w-[50vw]" />
       ) : (
         <>
-          <div className="flex h-full min-h-0 w-full sm:w-[50vw] flex-col">
-            {/* One tab is not a choice — the strip would only repeat the
-                heading the tab's own content already renders. */}
-            {(tabList?.length ?? 0) > 1 && (
-              <div className="mb-4 w-full shrink-0 border-b border-[#d6cdbe]">
-                <Tabs
-                  items={tabList?.map(tab => ({ id: String(tab.id), label: tab.label })) ?? []}
-                  activeId={String(selectedTab)}
-                  onChange={newId => setSelectedTab(Number(newId))}
-                  className="border-none w-full normal-case text-base font-primary"
-                  showCount={false}
-                />
+          {sideBySide && tabList.length >= 2 ? (
+            // The same layout as the learner's own post-roleplay screen: the
+            // debrief beside the transcript, each scrolling on its own.
+            <div
+              className="grid h-full min-h-0 w-[min(94vw,1280px)] grid-cols-[minmax(0,68ch)_minmax(0,1fr)] gap-6 px-1"
+              data-testid="summary-side-by-side"
+            >
+              <div className="flex min-h-0 min-w-0 flex-col overflow-hidden">
+                {tabList[0].content}
               </div>
-            )}
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-              {tabList?.length ? (
-                getTabContent()
-              ) : (
-                // Nothing configured to show. Say so rather than leaving a
-                // blank panel that reads as a failure to load.
-                <p className="p-4 font-primary text-base text-typography-700">
-                  {t("postSim.feedback.noData")}
-                </p>
-              )}
+              <div className="flex min-h-0 min-w-0 flex-col overflow-y-auto border-l border-gray-300 pl-4">
+                {tabList[1].content}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex h-full min-h-0 w-full sm:w-[50vw] flex-col">
+              {/* One tab is not a choice — the strip would only repeat the
+                heading the tab's own content already renders. */}
+              {(tabList?.length ?? 0) > 1 && (
+                <div className="mb-4 w-full shrink-0 border-b border-gray-300">
+                  <Tabs
+                    items={tabList?.map(tab => ({ id: String(tab.id), label: tab.label })) ?? []}
+                    activeId={String(selectedTab)}
+                    onChange={newId => setSelectedTab(Number(newId))}
+                    className="border-none w-full normal-case text-base font-primary"
+                    showCount={false}
+                  />
+                </div>
+              )}
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                {tabList?.length ? (
+                  getTabContent()
+                ) : (
+                  // Nothing configured to show. Say so rather than leaving a
+                  // blank panel that reads as a failure to load.
+                  <p className="p-4 font-primary text-base text-typography-700">
+                    {t("postSim.feedback.noData")}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
           {children}
         </>
       )}

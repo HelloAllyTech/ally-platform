@@ -59,7 +59,9 @@ import {
   BulkAssessResponseDto,
   CreateStrategyGoalDto,
   GoalImpactVerdictDto,
+  ProdDirectorResponseDto,
   RankWeightsResponseDto,
+  SetProdDirectorDto,
   RenameStrategyGoalDto,
   ReorderStrategyGoalsDto,
   RoadmapStrategyContextDto,
@@ -80,10 +82,11 @@ import { RoadmapAccessService } from '../service/roadmap-access.service';
 import { RoadmapCopilotService } from '../service/roadmap-copilot.service';
 import {
   ROADMAP_COPILOT,
-  ROADMAP_FILEABLE_EFFORTS,
+  ROADMAP_SINGLE_IDEA_EFFORTS,
   ROADMAP_READINESS_CRITERIA,
 } from '../constants/product-roadmap.constants';
 import { RoadmapOpportunityEffort } from '../enum/roadmap-opportunity.enum';
+import { PlanAccessService } from 'src/product-planning/service/plan-access.service';
 
 /** Taxonomy, research notes, release notes, AI helpers, and the vector-index repair tools. */
 @ApiTags('Product Roadmap')
@@ -103,6 +106,7 @@ export class RoadmapAdminController {
     private readonly goalImpactService: RoadmapGoalImpactService,
     private readonly strategyContextService: RoadmapStrategyContextService,
     private readonly copilotService: RoadmapCopilotService,
+    private readonly planAccess: PlanAccessService,
   ) {}
 
   // ── taxonomy ──────────────────────────────────────────────────────────────
@@ -419,6 +423,34 @@ export class RoadmapAdminController {
   @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP_MANAGE, {
     permissions: [PERMISSIONS.EDIT_PRODUCT_ROADMAP],
   })
+  @Get('prod-director')
+  @ApiOperation({
+    summary: 'The Prod Director pick and the platform admins to choose from',
+  })
+  @ApiResponse({ status: HttpStatus.OK, type: ProdDirectorResponseDto })
+  getProdDirector() {
+    return this.strategyGoalService.getProdDirector();
+  }
+
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP_MANAGE, {
+    permissions: [PERMISSIONS.EDIT_PRODUCT_ROADMAP],
+  })
+  @Put('prod-director')
+  @ApiOperation({
+    summary: 'Pick the Prod Director (a platform admin), or clear with null',
+    description:
+      'One person at a time. Only they see the star icon and can flip it; existing stars persist.',
+  })
+  setProdDirector(
+    @CurrentUser() user: TokenUser,
+    @Body() dto: SetProdDirectorDto,
+  ) {
+    return this.strategyGoalService.setProdDirector(user.id, dto.userId);
+  }
+
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP_MANAGE, {
+    permissions: [PERMISSIONS.EDIT_PRODUCT_ROADMAP],
+  })
   @Patch('rank-weights')
   @ApiOperation({
     summary: 'Retune the composite rank',
@@ -562,9 +594,10 @@ export class RoadmapAdminController {
         hint: c.hint,
       })),
       // Same reason as the criteria: the size threshold gates filing, so the client must not
-      // hold its own copy of it.
+      // hold its own copy of it. This is the size ONE idea files at through the interview;
+      // XL and XXL are split into slices first (docs/roadmap-idea-quality.md).
       fileableEfforts: [
-        ...ROADMAP_FILEABLE_EFFORTS,
+        ...ROADMAP_SINGLE_IDEA_EFFORTS,
       ] as RoadmapOpportunityEffort[],
     };
   }
@@ -637,6 +670,9 @@ export class RoadmapAdminController {
     @CurrentUser() user: TokenUser,
     @Body() dto: OpportunityInterviewTurnDto,
   ): Promise<OpportunityInterviewTurnResponseDto> {
+    // The copilot is the filing interview: the Idea role, like the
+    // door it leads to.
+    await this.planAccess.assertIdeas(user.id);
     return this.copilotService.takeTurn(
       { messages: dto.messages, brief: dto.brief },
       user.id,
@@ -668,6 +704,8 @@ export class RoadmapAdminController {
     @Body() dto: OpportunityInterviewTurnDto,
     @Res() res: Response,
   ): Promise<void> {
+    // Before the stream opens, so a refusal is an ordinary 403 response.
+    await this.planAccess.assertIdeas(user.id);
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');

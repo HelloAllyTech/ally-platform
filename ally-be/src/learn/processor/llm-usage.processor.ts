@@ -1,10 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { BaseEventProcessor } from 'src/ai/processors/base-processor.interface';
 import { PROCESSOR_EVENT_TYPES } from 'src/ai/constants/processor.constants';
 import { LoggerService } from 'src/logger/logger.service';
 import { LlmUsageService } from 'src/analytics/service/llm-usage.service';
 import { LlmUsageMessage } from '../interface/learn-message.interface';
 import { ScenarioSessionService } from '../service/scenario-session.service';
+import { UsageEventService } from 'src/billing/service/usage-event.service';
 
 /**
  * Persists token-usage rows (message_type "llm_usage") emitted by the Python
@@ -26,6 +27,7 @@ export class LlmUsageProcessor extends BaseEventProcessor {
   constructor(
     private readonly llmUsageService: LlmUsageService,
     private readonly scenarioSessionService: ScenarioSessionService,
+    @Optional() private readonly usageEvents?: UsageEventService,
   ) {
     super();
   }
@@ -42,6 +44,39 @@ export class LlmUsageProcessor extends BaseEventProcessor {
         `LLM usage payload missing model/task (room=${message?.room_id ?? 'n/a'})`,
       );
       return;
+    }
+
+    // CR1: an assistant's call (ally-ai attributed it through X-Ally-Usage) is also a usage
+    // event, priced and charged to the creator's tokens. Recorded FIRST and allowed to throw: a
+    // failure redelivers the message, the event's unique key makes that safe, and the
+    // loss-tolerant llm_usage row below is only written once this has succeeded.
+    const attribution = UsageEventService.attributionOf(usage.metadata);
+    if (attribution && this.usageEvents) {
+      const service = usage.service ?? 'llm';
+      await this.usageEvents.record({
+        ...attribution,
+        provider: usage.provider,
+        model: usage.model,
+        inputTokens: usage.prompt_tokens ?? 0,
+        cachedTokens: usage.cached_tokens ?? 0,
+        outputTokens: usage.completion_tokens ?? 0,
+        units:
+          service === 'stt' && usage.audio_ms
+            ? usage.audio_ms / 60_000
+            : service === 'tts' && usage.characters
+              ? usage.characters / 1_000_000
+              : null,
+        unit:
+          service === 'stt'
+            ? 'minute'
+            : service === 'tts'
+              ? 'million_chars'
+              : null,
+        occurredAt: message.timestamp
+          ? new Date(message.timestamp * 1000)
+          : undefined,
+        detail: { task: usage.task },
+      });
     }
 
     // Best-effort enrichment from the room (when present) — never required.

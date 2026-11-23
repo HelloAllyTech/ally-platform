@@ -1,0 +1,114 @@
+diff --git a/apps/ally-admin-dashboard/src/pages/ProductRoadmap/MonthOpportunityCard.tsx b/apps/ally-admin-dashboard/src/pages/ProductRoadmap/MonthOpportunityCard.tsx
+index 80a66b55e4..1fefd29f70 100644
+--- a/apps/ally-admin-dashboard/src/pages/ProductRoadmap/MonthOpportunityCard.tsx
++++ b/apps/ally-admin-dashboard/src/pages/ProductRoadmap/MonthOpportunityCard.tsx
+@@ -56,7 +56,12 @@ export const MonthOpportunityCard: React.FC<MonthOpportunityCardProps> = ({
+ 
+   const [heading, ...rest] = opportunity.description.split("\n");
+   const body = rest.join(" ").trim();
+-  const scorePercent = Math.round((opportunity.priorityScore / Math.max(1, maxScore)) * 100);
++  // Clamped like utils/priorityColour.ts's ratio: an unfiltered maxScore fetched before a vote
++  // burst can legitimately be lower than a freshly-boosted score elsewhere on the page.
++  const scorePercent = Math.min(
++    100,
++    Math.round((opportunity.priorityScore / Math.max(1, maxScore)) * 100),
++  );
+ 
+   const card = (
+     <div
+@@ -102,7 +107,7 @@ export const MonthOpportunityCard: React.FC<MonthOpportunityCardProps> = ({
+       {/* Priority bar, same unfiltered scale as the table's, so switching layout doesn't rescale
+           every bar and make the same two cards look differently ranked. */}
+       <div className="flex items-center gap-2">
+-        <div className="bg-background-secondary h-1.5 flex-1">
++        <div className="bg-background-secondary h-1.5 flex-1 overflow-hidden">
+           <div className="bg-primary-500 h-full" style={{ width: `${scorePercent}%` }} />
+         </div>
+         <span className="text-typography-secondary font-mono text-xs tabular-nums">
+diff --git a/apps/ally-admin-dashboard/src/pages/ProductRoadmap/__tests__/MonthOpportunityCard.test.tsx b/apps/ally-admin-dashboard/src/pages/ProductRoadmap/__tests__/MonthOpportunityCard.test.tsx
+new file mode 100644
+index 0000000000..5f1c837a52
+--- /dev/null
++++ b/apps/ally-admin-dashboard/src/pages/ProductRoadmap/__tests__/MonthOpportunityCard.test.tsx
+@@ -0,0 +1,81 @@
++import { render } from "@testing-library/react";
++import { describe, expect, it, vi } from "vitest";
++
++import {
++  RoadmapOpportunity,
++  RoadmapOpportunitySource,
++  RoadmapOpportunityStage,
++  RoadmapOpportunityType,
++} from "@types";
++
++vi.mock("@dnd-kit/sortable", () => ({
++  useSortable: () => ({
++    attributes: {},
++    listeners: {},
++    setNodeRef: vi.fn(),
++    transform: null,
++    transition: undefined,
++    isDragging: false,
++  }),
++}));
++
++vi.mock("@dnd-kit/utilities", () => ({
++  CSS: { Translate: { toString: () => undefined } },
++}));
++
++vi.mock("@ally-ui-mono/ui-shared", () => ({
++  Tooltip: ({ children }: any) => <>{children}</>,
++}));
++
++vi.mock("../VoteButton", () => ({
++  VoteButton: () => null,
++}));
++
++import { MonthOpportunityCard } from "../MonthOpportunityCard";
++
++const opportunity = (priorityScore: number): RoadmapOpportunity => ({
++  id: "opp-1",
++  description: "Some opportunity",
++  type: RoadmapOpportunityType.IDEA,
++  stage: RoadmapOpportunityStage.NEW,
++  productGoal: "Engagement & Usability",
++  owner: null,
++  prd: null,
++  claudePrompt: null,
++  releasedAt: null,
++  priorityScore,
++  myVotes: 0,
++  commentCount: 0,
++  source: RoadmapOpportunitySource.STAFF,
++  createdAt: "2026-08-01T00:00:00.000Z",
++  updatedAt: "2026-08-01T00:00:00.000Z",
++  creator: null,
++});
++
++const renderCard = (priorityScore: number, maxScore: number) => {
++  const { container } = render(
++    <MonthOpportunityCard
++      opportunity={opportunity(priorityScore)}
++      maxScore={maxScore}
++      canVote={false}
++      canDrag={false}
++      onSetVotes={vi.fn()}
++      onOpen={vi.fn()}
++    />,
++  );
++  return container.querySelector(".bg-primary-500") as HTMLElement;
++};
++
++describe("MonthOpportunityCard priority bar", () => {
++  it("fills the full width when the score matches the ceiling", () => {
++    const bar = renderCard(10, 10);
++    expect(bar).toHaveStyle({ width: "100%" });
++  });
++
++  it("clamps at 100% when a stale maxScore is lower than the card's own score", () => {
++    // Mirrors utils/priorityColour.ts's clamp: an unfiltered maxScore fetched before a vote
++    // burst can legitimately be smaller than a freshly-boosted score elsewhere on the page.
++    const bar = renderCard(15, 10);
++    expect(bar).toHaveStyle({ width: "100%" });
++  });
++});

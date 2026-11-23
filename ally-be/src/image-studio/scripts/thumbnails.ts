@@ -12,7 +12,9 @@
 import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as sharp from 'sharp';
+// sharp 0.35's package-level `types` are its ESM typings; this CommonJS build gets
+// `module.exports = sharp`, which its CJS typings describe (as in chatbot/bot-image).
+import type sharpCjs = require('sharp/dist/index.cjs');
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { ConfigService } from '@nestjs/config';
 import { AppConfigService } from 'src/config/config.service';
@@ -27,6 +29,8 @@ import {
   styleThumbnailKey,
 } from 'src/image-studio/constants/image-styles.constants';
 import { compileImagePrompt } from 'src/image-studio/util/image-prompt.compiler';
+
+const sharp: typeof sharpCjs = require('sharp');
 
 dotenv.config();
 

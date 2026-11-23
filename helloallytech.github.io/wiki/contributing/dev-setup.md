@@ -96,8 +96,7 @@ Setup, once per engineer:
    start a new agent session and approve the `context-library` server when it prompts.
 
 Never commit either value. Full rule, tools and troubleshooting:
-[Working with the Context Library](planning-with-context-library.md). This replaced the Stacks MCP
-and its `gh`-based bridge on 2026-11-09.
+[Working with the Context Library](planning-with-context-library.md).
 
 ## General Requirements
 

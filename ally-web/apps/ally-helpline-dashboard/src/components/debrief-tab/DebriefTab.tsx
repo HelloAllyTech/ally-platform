@@ -12,39 +12,20 @@ import { ChatMessagePayload, SimulationSummary as SimulationSummaryType } from "
 
 // The endpoint map alone: the `@constants` barrel loads icons at import time.
 import { DebriefCards } from "./DebriefCards";
-import { DebriefFeedback } from "./DebriefFeedback";
 import { DebriefReplyInput } from "./DebriefReplyInput";
-import { getDebriefViewState } from "./debriefViewState";
 import { ReplyBubble } from "./ReplyBubble";
 import { SupervisorNote } from "./SupervisorNote";
 import { useLearnerDebrief } from "./useLearnerDebrief";
 import { ApiEndpoints } from "../../constants/api";
 
-const NoteSkeleton = () => (
-  <div className="flex w-full gap-3">
-    <div className="mt-1 h-8 w-8 shrink-0 animate-pulse rounded-full bg-gray-200" />
-    <div className="flex flex-1 flex-col gap-2 py-1">
-      <div className="h-3 w-32 animate-pulse rounded bg-gray-200" />
-      <div className="h-3 w-full animate-pulse rounded bg-gray-200" />
-      <div className="h-3 w-11/12 animate-pulse rounded bg-gray-200" />
-      <div className="h-3 w-4/5 animate-pulse rounded bg-gray-200" />
-    </div>
-  </div>
-);
-
 interface DebriefTabProps {
   sessionId: string;
   summaryData?: SimulationSummaryType;
-  /** True once polling gave up — used to stop showing "still writing". */
-  retryMaxReached: boolean;
   onOpenMoment?: (messageId: string) => void;
-  /** Ask the polling hook to check again after it has given up. */
-  checkAgain?: () => void;
-  /** True while a manual `checkAgain` is in flight. */
-  isCheckingAgain?: boolean;
+  /** "See this moment" on a card's quote: open the transcript at that turn. */
+  onSeeQuote?: (quote: string) => void;
   /**
-   * Read-only: show the note alone, with no reply thread and no composer. Set
-   * on the Roleplay Logs surfaces, where the debrief is being read back — by
+   * Read-only: the Roleplay Logs surfaces, where the debrief is read back — by
    * the learner revisiting a past session, or by an admin reviewing someone
    * else's. An admin must not be able to type into the learner's own
    * conversation with Ally, and the thread is keyed by session id, so there is
@@ -62,21 +43,40 @@ interface DebriefTabProps {
 }
 
 /**
- * The landing surface after a practice session: Ally's debrief note, which the
- * learner can reply to. The note and the replies are one continuous thread
- * rather than a summary with a chat bolted beneath it, because the note ends by
- * inviting a reply — the conversation is the point, not a secondary feature.
- *
- * In `readOnly` mode the same note is mounted in the Roleplay Logs surfaces
- * with the thread removed entirely — see the prop for why.
+ * The landing surface after a practice session: the learner's Debrief. Sessions
+ * written before the Debrief agent may still hold an older supervisor note;
+ * that is shown read-only, with no rating and no replies. A session with
+ * neither shows one calm static line.
  */
+/**
+ * Ask Ally's composer and the supervisor line. Rendered inside DebriefCards, so its
+ * useTranslation reads the debrief's own language (PRD §9), not the app's.
+ */
+const AskAllyComposer: FC<{ onSend: (text: string) => void; disabled: boolean }> = ({
+  onSend,
+  disabled,
+}) => {
+  const { t } = useTranslation();
+  return (
+    <>
+      <DebriefReplyInput
+        onSend={onSend}
+        disabled={disabled}
+        placeholder={t("postSim.debriefCards.reply.placeholder")}
+      />
+      {/* v9 Q47: supervisors read this thread, and the learner is told. */}
+      <p className="font-primary text-xs text-typography-700">
+        {t("postSim.debriefCards.supervisor.canRead")}
+      </p>
+    </>
+  );
+};
+
 export const DebriefTab: FC<DebriefTabProps> = ({
   sessionId,
   summaryData,
-  retryMaxReached,
   onOpenMoment,
-  checkAgain,
-  isCheckingAgain = false,
+  onSeeQuote,
   readOnly = false,
   counsellorName,
   agentName,
@@ -86,22 +86,40 @@ export const DebriefTab: FC<DebriefTabProps> = ({
   const threadEndRef = useRef<HTMLDivElement>(null);
 
   const sessionExists = useSelector((state: RootState) => state.chatHistory.sessions[sessionId]);
-  // The Debrief agent's debrief replaces everything below once the learner's
-  // organisation is switched on. `null` — not switched on, request failed,
-  // or still loading — keeps today's debrief exactly as it was.
-  const learnerDebrief = useLearnerDebrief(sessionId);
+  // The learner's Debrief. `null` — not available, refused, or gave up
+  // polling — falls through to the read-only old note (or the static line); a
+  // request that failed outright shows "didn't load" with Try again.
+  const {
+    view: learnerDebrief,
+    retry: retryDebrief,
+    retrying: retryingDebrief,
+  } = useLearnerDebrief(sessionId);
   // Roleplay Logs (read-only): a supervisor reads the learner's new debrief,
-  // their flags and their Ask Ally thread (v9 FR-26). Anything else — not
-  // switched on, an older session, a refusal — keeps today's note.
+  // their flags and their Ask Ally thread (v9 FR-26). Anything else — an older
+  // session, a refusal — shows the old note read-only, if there is one.
   const { data: supervisorView } = useGetSupervisorDebriefQuery(sessionId, { skip: !readOnly });
   const askAlly = learnerDebrief?.state === "ready" && !readOnly;
-  const { messages, streamingMessage, isStreaming, error, sendMessage, retryLastMessage } =
-    useSendMessage(sessionId, askAlly ? ApiEndpoints.DEBRIEFS.REPLY_STREAM(sessionId) : undefined);
-  const { data: history, isLoading: isHistoryLoading } = useGetChatHistoryQuery(
+  const {
+    messages,
+    streamingMessage,
+    isStreaming,
+    error,
+    replyLimit,
+    sendMessage,
+    retryLastMessage,
+  } = useSendMessage(
+    sessionId,
+    askAlly ? ApiEndpoints.DEBRIEFS.REPLY_STREAM(sessionId) : undefined,
+  );
+  // Ask Ally's limit (this reply's `done.limit`, or the server's `askAlly`
+  // after a reload): the limit message stays in the thread, the box goes.
+  const askAllyClosed = Boolean(replyLimit) || learnerDebrief?.askAlly?.open === false;
+  const { data: history } = useGetChatHistoryQuery(
     { sessionId },
-    // No thread on screen, so no reason to fetch one — this also keeps an admin
-    // reading a log from pulling the learner's conversation into their store.
-    { skip: readOnly },
+    // Only Ask Ally has a thread on screen. Otherwise there is no reason to
+    // fetch one — and an admin reading a log must not pull the learner's
+    // conversation into their store.
+    { skip: !askAlly },
   );
 
   useEffect(() => {
@@ -150,11 +168,13 @@ export const DebriefTab: FC<DebriefTabProps> = ({
           agentName={agentName}
         />
       )}
+      {/* No red anywhere in learner feedback (PRD §6.3): the same calm
+          outline as "Check again". */}
       {error && (
         <div className="flex w-full justify-start">
           <button
             onClick={retryLastMessage}
-            className="flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 py-2.5 font-primary text-sm text-red-600 transition-colors hover:bg-red-100"
+            className="flex min-h-[44px] items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-4 py-2.5 font-primary text-sm text-primary-600 transition-colors hover:bg-primary-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600"
           >
             <Refresh className="h-4 w-4" />
             {t("common.somethingWentWrong")} {t("common.retry")}
@@ -165,7 +185,11 @@ export const DebriefTab: FC<DebriefTabProps> = ({
     </>
   );
 
-  if (readOnly && supervisorView?.state === "ready" && supervisorView.cards) {
+  // The learner's own session in Roleplay Logs reads as their debrief (with
+  // its "Practise this next" button), even when they can also read others'
+  // as a supervisor: the learner view answers only the session's own learner.
+  const ownReady = learnerDebrief?.state === "ready";
+  if (readOnly && !ownReady && supervisorView?.state === "ready" && supervisorView.cards) {
     const supervisorThread = supervisorView.thread ?? [];
     return (
       <DebriefCards
@@ -208,19 +232,14 @@ export const DebriefTab: FC<DebriefTabProps> = ({
       <DebriefCards
         view={learnerDebrief}
         sessionId={sessionId}
+        onSeeQuote={onSeeQuote}
+        onRetry={retryDebrief}
+        retrying={retryingDebrief}
         replyThread={
           askAlly ? (
             <div data-testid="ask-ally" className="flex flex-col gap-3">
               {thread}
-              <DebriefReplyInput
-                onSend={sendMessage}
-                disabled={isStreaming}
-                placeholder={t("postSim.debriefCards.reply.placeholder")}
-              />
-              {/* v9 Q47: supervisors read this thread, and the learner is told. */}
-              <p className="font-primary text-xs text-typography-700">
-                {t("postSim.debriefCards.supervisor.canRead")}
-              </p>
+              {!askAllyClosed && <AskAllyComposer onSend={sendMessage} disabled={isStreaming} />}
             </div>
           ) : undefined
         }
@@ -228,17 +247,11 @@ export const DebriefTab: FC<DebriefTabProps> = ({
     );
   }
 
-  const summary = summaryData?.details?.summary;
-  const note = summary?.feedback?.supervisorNote;
-  const errorMessage = summary?.errorMessage;
-  const hasFeedback = Boolean(summary?.feedback);
-  // See debriefViewState.ts for why this is a dedicated function rather than
-  // a chain of booleans: "generation failed" and "this session predates the
-  // debrief feature" used to collapse into the same permanent-looking
-  // message, and a poll timeout used to mean "failed" here while meaning
-  // "still working, ask again later" in the toast the poll itself showed.
-  const viewState = getDebriefViewState({ note, hasFeedback, errorMessage, retryMaxReached });
-  const isGenerating = viewState === "generating";
+  // The new debrief is not available (not switched on for this session, gave
+  // up, or failed to load). Sessions written before it may hold an older
+  // supervisor note: show it as it was written, read-only — no rating, no
+  // replies. Nothing is generated or polled for it any more.
+  const note = summaryData?.details?.summary?.feedback?.supervisorNote;
 
   return (
     <div className="flex w-full flex-col rounded-lg bg-gradient-to-br from-primary-500 to-primary-100 p-1">
@@ -246,77 +259,16 @@ export const DebriefTab: FC<DebriefTabProps> = ({
         <div className="w-full shrink-0 px-4 py-3 font-primary text-lg font-semibold text-white">
           {t("postSim.debrief.header")}
         </div>
-        {/* The note grows to its full length and the PAGE scrolls. It used to
-            live in its own short scroller, which showed about four lines of a
-            fifteen-line note behind a floating composer — the thing the learner
-            came back to read was the least readable thing on the screen. */}
         <div className="flex flex-col gap-5 rounded-t-lg rounded-b-md bg-white p-4 sm:p-6">
-          {isGenerating ? (
-            <div className="flex flex-col gap-3">
-              <NoteSkeleton />
-              <p className="font-primary text-sm text-typography-700">
-                {t("postSim.debrief.generating")}{" "}
-                <span className="text-typography-600">{t("postSim.debrief.generatingHint")}</span>
-              </p>
-            </div>
-          ) : viewState === "note" ? (
-            <>
-              <SupervisorNote note={note} onOpenMoment={onOpenMoment} hideClosing={readOnly} />
-              {!readOnly && <DebriefFeedback sessionId={sessionId} />}
-            </>
-          ) : viewState === "timedOut" ? (
-            // Not a failure: the summary is likely still being written for a
-            // longer session. Say so, and let the learner ask again instead
-            // of leaving them stuck behind a permanent-looking dead end.
-            <div className="flex flex-col gap-3">
-              <p className="font-primary text-base text-typography-800">
-                {t("postSim.debrief.stillWorking")}
-              </p>
-              {checkAgain && (
-                <button
-                  onClick={checkAgain}
-                  disabled={isCheckingAgain}
-                  className="flex w-fit items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-4 py-2.5 font-primary text-sm text-primary-600 transition-colors hover:bg-primary-100 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <Refresh className="h-4 w-4" />
-                  {isCheckingAgain
-                    ? t("postSim.debrief.checkingAgain")
-                    : t("postSim.debrief.checkAgain")}
-                </button>
-              )}
-            </div>
-          ) : viewState === "notAvailable" ? (
-            // Feedback generated fine — this session simply predates the
-            // debrief-note feature (or has it switched off). Nothing failed,
-            // so this must not read like "failed".
-            <p className="font-primary text-base text-typography-800">
-              {t("postSim.debrief.notAvailable")}
-            </p>
+          {note ? (
+            <SupervisorNote note={note} onOpenMoment={onOpenMoment} hideClosing />
           ) : (
-            // viewState === "failed": the backend recorded an actual error.
-            <p className="font-primary text-base text-typography-800">
-              {errorMessage || t("postSim.debrief.failed")}
+            <p
+              data-testid="debrief-none-for-session"
+              className="font-primary text-base text-typography-800"
+            >
+              {t("postSim.debrief.noneForSession")}
             </p>
-          )}
-
-          {/* Everything below the note is the conversation it opens. In
-              read-only mode there is none: no invitation, no replies, no
-              composer — just the note as it was written. */}
-          {!readOnly && (
-            <>
-              {note && !messages.length && !isHistoryLoading && (
-                <p className="font-primary text-sm text-typography-600">
-                  {t("postSim.debrief.replyPrompt")}
-                </p>
-              )}
-
-              {thread}
-              {/* Replying only makes sense once there is a note to reply to. The
-                composer sits at the end of the thread and sticks to the bottom of
-                the viewport while the card is on screen, so a long thread never
-                puts it out of reach and it never covers the note. */}
-              {note && <DebriefReplyInput onSend={sendMessage} disabled={isStreaming} />}
-            </>
           )}
         </div>
       </div>

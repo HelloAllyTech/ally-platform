@@ -25,6 +25,7 @@ import '../../../core/widgets/illustrated_modal.dart';
 import '../../../core/widgets/toast/toast_controller.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../../core/widgets/tab_screen_header.dart';
+import '../../account/data/account_repository.dart';
 import '../../scribe/data/chat_repository.dart';
 import '../data/call_log_repository.dart';
 import 'call_log_filter_sheet.dart';
@@ -1018,7 +1019,12 @@ class _SimulationLogsList extends ConsumerWidget {
                   ? '${ref.t('calls.table.sessionScore')}: ${_formatScore(log.score!)}'
                   : null,
               enabled: canViewDetails,
-              onTap: () => context.push('/simulations/feedback/${log.id}?fromLogs=true'),
+              // The learner's own session reads their debrief (learner view,
+              // read-only here); someone else's reads the supervisor view.
+              onTap: () => context.push(
+                '/simulations/feedback/${log.id}?fromLogs=true'
+                '${log.counselorId != null && log.counselorId == ref.read(currentUserProvider).value?.id ? '&own=true' : ''}',
+              ),
               ),
             );
           },

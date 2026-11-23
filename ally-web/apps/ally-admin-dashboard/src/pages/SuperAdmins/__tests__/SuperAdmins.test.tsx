@@ -6,6 +6,23 @@ import { SuperAdmins } from "../SuperAdmins";
 const mockAssignPlatformAdmin = vi.fn();
 const mockRemovePlatformAdmin = vi.fn();
 const mockSetUserFeatureToggles = vi.fn();
+const mockAddAdvisor = vi.fn(() => ({ unwrap: () => Promise.resolve({}) }));
+const mockRemoveAdvisor = vi.fn(() => ({ unwrap: () => Promise.resolve({}) }));
+const mockAddOwner = vi.fn(() => ({ unwrap: () => Promise.resolve({}) }));
+const mockRemoveOwner = vi.fn(() => ({ unwrap: () => Promise.resolve({}) }));
+// Admin 2 is a clinical advisor; admin 1 holds no Debrief role.
+const debriefPeople = [
+  {
+    userId: 2,
+    name: "Other Admin",
+    email: "other@helloally.ai",
+    organisation: null,
+    roles: ["PLATFORM_ADMIN", "CLINICAL_ADVISOR"],
+    advisor: true,
+    owner: false,
+    signOff: true,
+  },
+];
 
 // `createdAt` and `roleGrantedAt` are deliberately months apart on every
 // fixture: the "Added on" column must show the role grant, and rendering the
@@ -63,6 +80,20 @@ const toggles = [
 
 // The organizations the opened admin is restricted to; none = unrestricted.
 let adminTenantCount = 0;
+
+// Roadmap v2's role radio (§3.2): answered only for an Owner while roadmap_v2 is on.
+const mockSetRoadmapRole = vi.fn();
+let roadmapRoleEntry: Record<string, unknown> | undefined;
+let roadmapRoleList: { users: Record<string, unknown>[] } | undefined;
+const roadmapToggles = [
+  { key: "product_roadmap", label: "Product Roadmap", description: "", enabled: true },
+  { key: "builder", label: "Builder", description: "", enabled: true },
+  { key: "product_roadmap_manage", label: "Roadmap manage", description: "", enabled: false },
+];
+let allToggles: { key: string; label: string; description: string; enabled: boolean }[] = [];
+const withToggles = (extra: typeof roadmapToggles) => {
+  allToggles = [...toggles, ...extra];
+};
 
 // Mocking @components (with cellTypes) sidesteps the @constants ↔ @components
 // circular import that breaks under vitest, same as UserManagement.test.tsx.
@@ -138,10 +169,19 @@ vi.mock("@api", () => ({
   }),
   useAssignPlatformAdminMutation: () => [mockAssignPlatformAdmin],
   useRemovePlatformAdminMutation: () => [mockRemovePlatformAdmin],
-  useGetUserFeatureTogglesQuery: () => ({ data: toggles, isLoading: false }),
+  // A stable array per test: a fresh one each render would loop the page's sync effect.
+  useGetUserFeatureTogglesQuery: () => ({ data: allToggles, isLoading: false }),
+  useGetRoadmapRoleForQuery: () => ({ data: roadmapRoleEntry }),
+  useListRoadmapRolesQuery: () => ({ data: roadmapRoleList }),
+  useSetRoadmapRoleForMutation: () => [mockSetRoadmapRole, { isLoading: false }],
   useSetUserFeatureTogglesMutation: () => [mockSetUserFeatureToggles],
   useGetTenantsQuery: () => ({ data: { data: [], count: 0 } }),
   useGetAdminTenantsQuery: () => ({ data: { data: [], count: adminTenantCount } }),
+  useListClinicalAdvisorsQuery: () => ({ data: debriefPeople, isLoading: false, isError: false }),
+  useAddClinicalAdvisorMutation: () => [mockAddAdvisor],
+  useRemoveClinicalAdvisorMutation: () => [mockRemoveAdvisor],
+  useAddDebriefOwnerMutation: () => [mockAddOwner],
+  useRemoveDebriefOwnerMutation: () => [mockRemoveOwner],
 }));
 
 vi.mock("react-redux", () => ({
@@ -159,6 +199,28 @@ describe("SuperAdmins", () => {
     mockAssignPlatformAdmin.mockReturnValue(resolved);
     mockRemovePlatformAdmin.mockReturnValue(resolved);
     mockSetUserFeatureToggles.mockReturnValue(resolved);
+    mockSetRoadmapRole.mockReturnValue(resolved);
+    roadmapRoleEntry = undefined;
+    roadmapRoleList = undefined;
+    withToggles([]);
+  });
+
+  it("shows everyone's Roadmap role in one column, for an Owner only", () => {
+    const { unmount } = render(<SuperAdmins />);
+    expect(screen.queryByText("Roadmap role")).not.toBeInTheDocument();
+    unmount();
+    roadmapRoleList = {
+      users: [
+        { userId: 1, name: "Current Admin", role: "owner", restricted: false, setting: "owner" },
+        { userId: 2, name: "Other Admin", role: "builder", restricted: false, setting: "builder" },
+      ],
+    };
+    render(<SuperAdmins />);
+    expect(screen.getByText("Roadmap role")).toBeInTheDocument();
+    expect(screen.getAllByTestId("sa-roadmap-role").map(cell => cell.textContent)).toEqual([
+      "Owner",
+      "Builder",
+    ]);
   });
 
   it("renders the platform admins list", () => {
@@ -260,5 +322,94 @@ describe("SuperAdmins", () => {
 
     fireEvent.click(screen.getAllByText("Back to platform admins")[0]);
     expect(screen.getAllByTestId("sa-row")).toHaveLength(2);
+  });
+
+  it("shows each admin's Debrief roles as badges beside the name", () => {
+    render(<SuperAdmins />);
+    const badges = screen.getAllByTestId("sa-debrief-role");
+    expect(badges.map(b => b.textContent)).toEqual(["Clinical advisor"]);
+  });
+
+  it("switches an admin's Debrief roles on their page, at once", () => {
+    render(<SuperAdmins />);
+    fireEvent.click(screen.getByText("Other Admin"));
+    const advisor = screen.getByTestId("admin-debrief-role-advisor");
+    const owner = screen.getByTestId("admin-debrief-role-owner");
+    expect(advisor).toHaveTextContent("Clinical advisor");
+    expect(owner).toHaveTextContent("Debrief owner");
+    // Advisor is on, so the switch removes it; owner is off, so it grants it.
+    fireEvent.click(advisor.querySelector("button")!);
+    expect(mockRemoveAdvisor).toHaveBeenCalledWith(2);
+  });
+
+  it("grants the Debrief owner role from its switch", () => {
+    render(<SuperAdmins />);
+    fireEvent.click(screen.getByText("Current Admin"));
+    fireEvent.click(screen.getByTestId("admin-debrief-role-owner").querySelector("button")!);
+    expect(mockAddOwner).toHaveBeenCalledWith(1);
+  });
+
+  describe("Roadmap role radio (roadmap_v2 on, caller is an Owner)", () => {
+    it("is absent while the role route doesn't answer, and the three toggles stay", () => {
+      withToggles(roadmapToggles);
+      render(<SuperAdmins />);
+      fireEvent.click(screen.getByText("Other Admin"));
+      expect(screen.queryByTestId("admin-roadmap-role")).not.toBeInTheDocument();
+      expect(screen.getByRole("switch", { name: "Builder" })).toBeInTheDocument();
+    });
+
+    it("replaces the three toggles with one radio, and writes the role in one call", () => {
+      withToggles(roadmapToggles);
+      roadmapRoleEntry = {
+        userId: 2,
+        name: "Other Admin",
+        role: "builder",
+        restricted: false,
+        setting: "builder",
+      };
+      render(<SuperAdmins />);
+      fireEvent.click(screen.getByText("Other Admin"));
+      const group = screen.getByRole("radiogroup", { name: "Roadmap role" });
+      expect(group).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "Builder" })).toBeChecked();
+      // The toggles the radio writes are not offered separately.
+      expect(screen.queryByRole("switch", { name: "Builder" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("switch", { name: "Roadmap manage" })).not.toBeInTheDocument();
+      expect(screen.getByRole("switch", { name: "Manage Settings" })).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("radio", { name: "Owner" }));
+      expect(mockSetRoadmapRole).toHaveBeenCalledWith({ userId: 2, role: "owner" });
+      expect(mockSetUserFeatureToggles).not.toHaveBeenCalled();
+    });
+
+    it("can't change your own role, so the last Owner never removes themselves", () => {
+      roadmapRoleEntry = {
+        userId: 1,
+        name: "Current Admin",
+        role: "owner",
+        restricted: false,
+        setting: "owner",
+      };
+      render(<SuperAdmins />);
+      fireEvent.click(screen.getByText("Current Admin"));
+      const none = screen.getByRole("radio", { name: "None" });
+      expect(none).toBeDisabled();
+      fireEvent.click(none);
+      expect(mockSetRoadmapRole).not.toHaveBeenCalled();
+      expect(screen.getByText("You can't change your own role.")).toBeInTheDocument();
+    });
+
+    it("says an org-restricted admin stays a Viewer whatever is picked", () => {
+      roadmapRoleEntry = {
+        userId: 2,
+        name: "Other Admin",
+        role: "viewer",
+        restricted: true,
+        setting: "idea",
+      };
+      render(<SuperAdmins />);
+      fireEvent.click(screen.getByText("Other Admin"));
+      expect(screen.getByText(/a Viewer whatever is picked here/)).toBeInTheDocument();
+    });
   });
 });

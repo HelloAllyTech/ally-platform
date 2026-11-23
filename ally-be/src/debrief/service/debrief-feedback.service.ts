@@ -4,9 +4,11 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import { LoggerService } from '../../logger/logger.service';
 import { DebriefFeedback } from '../entity/debrief-feedback.entity';
 import { DebriefRun } from '../entity/debrief-run.entity';
 import {
@@ -16,9 +18,12 @@ import {
   DebriefRunMode,
   DebriefRunStatus,
 } from '../enum/debrief-run.enum';
-import { DebriefCards } from '../util/debrief-cards.util';
-import { DEBRIEF_SEED_BUNDLE } from '../constants/debrief-release.constants';
+import { DebriefCards, cardsForReader } from '../util/debrief-cards.util';
+import { checkTransition } from '../util/debrief-run-status.util';
+import { readableCards } from '../util/debrief-competencies.util';
 import { DebriefNotifier } from './debrief-notifier.service';
+import { DebriefSlackService } from './debrief-slack.service';
+import { DebriefPublishService } from './debrief-publish.service';
 import { LearnerDebriefView } from './debrief-agent.service';
 
 /** A learner can take a flag back for this long after sending it (plan §7.6). */
@@ -45,7 +50,7 @@ export type CardCorrection = Partial<
 >;
 
 /** The card object a section key names, or undefined. */
-function cardAt(
+export function cardAt(
   cards: Record<string, any> | null | undefined,
   section: string,
 ): Record<string, any> | undefined {
@@ -124,14 +129,37 @@ export function sectionText(
         : null;
     case 'opening':
       return cards.opening ?? null;
-    case 'practise_next':
-      return cards.practise_next
-        ? `${cards.practise_next.skill}. ${cards.practise_next.reason}`
-        : null;
+    case 'practise_next': {
+      if (!cards.practise_next) return null;
+      // A course session: "Try the following:" is read after the reason.
+      const tryNext = (cards.practise_next.try_next ?? []).filter(
+        (t) => typeof t === 'string' && t.trim(),
+      );
+      return [
+        cards.practise_next.skill ? `${cards.practise_next.skill}.` : '',
+        cards.practise_next.reason,
+        ...tryNext,
+      ]
+        .filter(Boolean)
+        .join(' ');
+    }
     case 'reflective_question':
       return cards.reflective_question ?? null;
     case 'progress_note':
       return cards.progress_note ?? null;
+    case 'progress_card': {
+      // "Your last {n} sessions": the progress agent's own learner lines,
+      // already in the debrief's language; the focus first, as the card shows.
+      const card = (cards as unknown as Record<string, any>).progress_card;
+      if (!card || typeof card !== 'object') return null;
+      const lines = [
+        card.focus?.line,
+        ...(Array.isArray(card.skills) ? card.skills : []).map(
+          (s: { line?: unknown }) => s?.line,
+        ),
+      ].filter((l): l is string => typeof l === 'string' && !!l.trim());
+      return lines.length ? lines.join(' ') : null;
+    }
     default:
       return null;
   }
@@ -145,6 +173,10 @@ export function sectionText(
  */
 @Injectable()
 export class DebriefFeedbackService {
+  private readonly logger = LoggerService.getInstance(
+    DebriefFeedbackService.name,
+  );
+
   constructor(
     private readonly dataSource: DataSource,
     @InjectRepository(DebriefRun)
@@ -152,7 +184,18 @@ export class DebriefFeedbackService {
     @InjectRepository(DebriefFeedback)
     private readonly feedback: Repository<DebriefFeedback>,
     private readonly notifier?: DebriefNotifier,
+    /** v9 FR-20: a debrief a person publishes or corrects is written where today's was. */
+    @Optional() private readonly publisher?: DebriefPublishService,
+    /** v2 K3: a learner in distress in Ask Ally goes to the safety contact on Slack. */
+    @Optional() private readonly slack?: DebriefSlackService,
   ) {}
+
+  private readonly flagListeners: Array<(flagId: string) => void> = [];
+
+  /** Told of each new flag (V2_AUTONOMY F1: DebriefFlagAnswerService answers it). */
+  onFlag(listener: (flagId: string) => void): void {
+    this.flagListeners.push(listener);
+  }
 
   /** The learner's own published live debrief, or a refusal. */
   /**
@@ -218,6 +261,8 @@ export class DebriefFeedbackService {
    * copied; the reviewer opens the thread.
    */
   async raiseChatDistress(run: DebriefRun, userId: number, source: string) {
+    // Posted once per debrief, whether or not a review item is already open.
+    void this.slack?.chatDistress(run).catch(() => false);
     const open = await this.feedback.findOne({
       where: {
         runId: run.id,
@@ -287,6 +332,14 @@ export class DebriefFeedbackService {
       resolutionNote: null,
     });
     const saved = await this.feedback.save(row);
+    // V2_AUTONOMY F1: the Debrief agent answers it within a minute.
+    for (const listener of this.flagListeners) {
+      try {
+        listener(saved.id);
+      } catch {
+        // An answer that cannot start is picked up by the sweep.
+      }
+    }
     return {
       id: saved.id,
       section: saved.section,
@@ -312,13 +365,77 @@ export class DebriefFeedbackService {
   }
 
   /**
+   * What the learner's most recent debrief for this roleplay asked of them:
+   * the "What to strengthen" lines they could try saying, and the
+   * "Try this in your next practice" nudge. Shown under Reminders on the
+   * roleplay call screen so the points stay in mind on the next attempt.
+   * Only the learner's own live debrief, read as they read it; points a
+   * reviewer removed are left out; nothing when there is no debrief yet.
+   */
+  async latestPoints(
+    scenarioId: number,
+    userId: number,
+  ): Promise<{
+    runId: string | null;
+    workOnThis: Array<{ lead: string; trySaying: string }>;
+    practiseNext: { skill: string; reason: string } | null;
+  }> {
+    const none = { runId: null, workOnThis: [], practiseNext: null };
+    const rows: Array<{
+      id: string;
+      cards: Record<string, any> | null;
+      recipe_key: string | null;
+    }> = await this.dataSource.query(
+      `SELECT r.id, r.cards, r."recipeKey" AS recipe_key
+           FROM debrief_runs r
+           JOIN scenario_sessions s ON s.id = r."scenarioSessionId"
+          WHERE s."counselorId" = $1 AND s."scenarioId" = $2
+            AND r.mode = 'live' AND r.status IN ('published','below_bar')
+            AND r.cards IS NOT NULL
+          ORDER BY COALESCE(s."endedAt", s."updatedAt") DESC
+          LIMIT 1`,
+      [userId, scenarioId],
+    );
+    const run = rows?.[0];
+    if (!run?.cards) return none;
+    const removed = new Set(
+      (
+        await this.feedback.find({
+          where: { runId: run.id, status: DebriefFeedbackStatus.REMOVED },
+        })
+      ).map((r) => r.section),
+    );
+    const cards = cardsForReader(
+      run.cards,
+      run.recipe_key,
+    ) as Partial<DebriefCards>;
+    const workOnThis = (cards.work_on_this ?? [])
+      .map((c, i) => ({ c, i }))
+      .filter(({ c, i }) => !removed.has(`work_on_this[${i}]`) && c.lead)
+      .map(({ c }) => ({ lead: c.lead, trySaying: c.try_saying ?? '' }));
+    const next = cards.practise_next;
+    return {
+      runId: run.id,
+      workOnThis,
+      practiseNext:
+        next && !removed.has('practise_next') && next.skill
+          ? { skill: next.skill, reason: next.reason ?? '' }
+          : null,
+    };
+  }
+
+  /**
    * The learner's view with their own feedback and the review outcomes. Cards
    * stay as stored: the apps hide a removed card by its stored index (the
    * same index its flag names) and show the outcome, so nothing shifts.
    */
   async decorate(view: LearnerDebriefView, userId: number) {
     if (view.state !== 'ready' || !view.runId || !view.cards) return view;
-    const rows = await this.feedback.find({ where: { runId: view.runId } });
+    // The Ask Ally distress item is the team's (created by the reply check,
+    // decided with a note to colleagues): never part of the learner's view.
+    const rows = (
+      await this.feedback.find({ where: { runId: view.runId } })
+    ).filter((r) => r.section !== ASK_ALLY_SECTION);
     const corrections: DebriefCorrection[] = rows
       .filter(
         (r) =>
@@ -337,6 +454,7 @@ export class DebriefFeedbackService {
         note: r.resolutionNote ?? null,
         at: (r.resolvedAt ?? r.updatedAt).toISOString(),
       }));
+    corrections.push(...(await this.runCorrections(view.runId)));
     const mine = rows.filter((r) => r.userId === userId);
     return {
       ...view,
@@ -359,6 +477,14 @@ export class DebriefFeedbackService {
               r.status === DebriefFeedbackStatus.ESCALATED
                 ? DebriefFeedbackStatus.OPEN
                 : r.status,
+            // V2_AUTONOMY F1: what the Debrief agent did, and its reply.
+            answer: r.answer
+              ? {
+                  action: r.answer.action,
+                  reply: r.answer.reply,
+                  at: r.answer.at,
+                }
+              : null,
             canUndoUntil:
               r.status === DebriefFeedbackStatus.OPEN
                 ? new Date(
@@ -431,7 +557,11 @@ export class DebriefFeedbackService {
     return {
       state: 'ready',
       readOnly: true,
-      cards: run.cards,
+      // The supervisor reads what the learner reads: no custom codes.
+      cards: await readableCards(
+        this.dataSource,
+        cardsForReader(run.cards, run.recipeKey),
+      ),
       language: run.language,
       corrections: decorated.corrections ?? [],
       flags: learner
@@ -458,59 +588,6 @@ export class DebriefFeedbackService {
     };
   }
 
-  async queue() {
-    // v9 FR-21: a published debrief the independent judge scores below the
-    // bar, or with a hard fail, goes to a person too.
-    const judgeBelow = `(r.workspace ? 'judge' AND (
-           (r.workspace->'judge'->>'overall')::float < $1
-           OR jsonb_array_length(coalesce(r.workspace->'judge'->'hardFails', '[]'::jsonb)) > 0))`;
-    const runs = await this.dataSource.query(
-      `SELECT r.id, r."scenarioSessionId", r.status, r."skipReason", r.language,
-              r."hasRiskCue", r."learnerDistress", r."evaluatorOverall",
-              (r.workspace->'judge'->>'overall')::float AS "judgeOverall",
-              r.workspace->'judge'->'hardFails' AS "judgeHardFails",
-              ${judgeBelow} AS "judgeBelowBar",
-              r."checkFailures", r."evaluatorHardFails", r."createdAt", t.name AS "tenantName",
-              r.workspace->'escalation' AS escalation
-         FROM debrief_runs r
-         LEFT JOIN tenants t ON t.id::text = r.tenant_id
-        WHERE r.mode = 'live'
-          AND NOT (r.workspace ? 'review')
-          AND (r.status IN ('needs_person','below_bar','failed')
-               -- v9 FR-23: a learner's own distress is an urgent item even
-               -- when the debrief published normally; someone checks on them.
-               OR (r."learnerDistress" AND r.status = 'published')
-               OR (r.status = 'published' AND ${judgeBelow}))
-        ORDER BY r."learnerDistress" DESC, r."hasRiskCue" DESC, r."createdAt" ASC
-        LIMIT 200`,
-      [DEBRIEF_SEED_BUNDLE.settings.passScore],
-    );
-    const flags = await this.dataSource.query(
-      `SELECT f.id, f."runId", f."scenarioSessionId", f.section, f.reason, f.note, f.urgent, f.status,
-              f."createdAt", r.cards, r.language, t.name AS "tenantName"
-         FROM debrief_run_feedback f
-         JOIN debrief_runs r ON r.id = f."runId"
-         LEFT JOIN tenants t ON t.id::text = f.tenant_id
-        WHERE f.kind = 'flag'
-          AND (f.status = 'escalated'
-               -- The undo window counts from the learner's last change; an
-               -- escalation is the team's, and must not hide the flag again.
-               OR (f.status = 'open' AND f."updatedAt" < now() - make_interval(secs => $1)))
-        ORDER BY f.urgent DESC, f."createdAt" ASC
-        LIMIT 200`,
-      // Flags still inside the learner's undo window are not work yet.
-      [Math.round(FLAG_UNDO_MS / 1000)],
-    );
-    return {
-      runs,
-      flags: flags.map(({ cards, ...f }: Record<string, any>) => ({
-        ...f,
-        cardText: sectionText(cards as DebriefCards, f.section),
-        card: correctableFields(cards as DebriefCards, f.section),
-      })),
-    };
-  }
-
   /** A person finishes a live debrief: publish the best draft as it is. */
   async publishRun(runId: string, userId: number, note?: string) {
     const run = await this.liveRun(runId);
@@ -528,6 +605,12 @@ export class DebriefFeedbackService {
     await this.review(run, userId, 'published', note, {
       status: DebriefRunStatus.PUBLISHED,
     });
+    // A below-the-bar run was already readable and written; one a person
+    // finishes is written now, with its memory update and ready event.
+    await this.publisher?.applyToSession(
+      { ...run, status: DebriefRunStatus.PUBLISHED } as DebriefRun,
+      { announce: run.status !== DebriefRunStatus.BELOW_BAR },
+    );
     // A learner waiting on "on its way" hears that it is ready (FR-28).
     if (run.status === DebriefRunStatus.NEEDS_PERSON) {
       await this.notifier?.ready({
@@ -581,8 +664,15 @@ export class DebriefFeedbackService {
           : 'Say what changed; the learner reads it',
       );
     }
+    let version: number | undefined;
     if (outcome === 'corrected') {
-      await this.correctCard(row.runId, row.section!, correction ?? {}, userId);
+      ({ version } = await this.correctCard(
+        row.runId,
+        row.section!,
+        correction ?? {},
+        userId,
+        { note: reason, flagId: row.id },
+      ));
     }
     row.status =
       outcome === 'kept'
@@ -600,26 +690,45 @@ export class DebriefFeedbackService {
       const run = await this.runs.findOne({ where: { id: row.runId } });
       if (run) await this.notifier?.reviewed(run);
     }
-    return { id: row.id, status: row.status };
+    return {
+      id: row.id,
+      status: row.status,
+      ...(version ? { version } : {}),
+    };
   }
 
   /**
    * v9 FR-31 "Correct": a reviewer rewrites a card's words. The cards become
    * a new version; the one before is kept in the workspace, so nothing a
    * learner was shown is lost. The quote never changes: it is the learner's
-   * own words.
+   * own words. `note` is the "what changed" line the learner reads; `flagId`
+   * ties the version to the flag it answers (its note is the flag's).
    */
   private async correctCard(
     runId: string,
     section: string,
     correction: CardCorrection,
-    userId: number,
-  ): Promise<void> {
+    userId: number | null,
+    meta: {
+      note?: string | null;
+      flagId?: string | null;
+      /** V2_AUTONOMY F1: the Debrief agent rewrote it, answering a flag. */
+      byAgent?: boolean;
+    } = {},
+  ): Promise<{ version: number }> {
     const run = await this.runs.findOne({ where: { id: runId } });
     if (!run?.cards) throw new NotFoundException('This debrief has no cards');
     const cards = JSON.parse(JSON.stringify(run.cards)) as Record<string, any>;
     const card = cardAt(cards, section);
     if (!card) throw new BadRequestException('That card cannot be corrected');
+    if (
+      'quote' in (correction as Record<string, unknown>) &&
+      (correction as Record<string, unknown>).quote !== card.quote
+    ) {
+      throw new BadRequestException(
+        "The quote is the learner's own words and cannot be changed",
+      );
+    }
     const changes = Object.entries(correction).filter(
       ([field, text]) =>
         (CORRECTABLE_FIELDS as readonly string[]).includes(field) &&
@@ -631,14 +740,174 @@ export class DebriefFeedbackService {
       throw new BadRequestException('Change at least one line of the card');
     }
     for (const [field, text] of changes) card[field] = (text as string).trim();
+    const previous = (run.workspace?.versions as unknown[]) ?? [];
+    // Version 1 is what the run published; each correction adds one.
+    const version = previous.length + 2;
     const versions = [
-      ...((run.workspace?.versions as unknown[]) ?? []),
-      { at: new Date().toISOString(), by: userId, section, before: run.cards },
+      ...previous,
+      {
+        version,
+        at: new Date().toISOString(),
+        by: userId,
+        section,
+        fields: changes.map(([f]) => f),
+        note: meta.note?.trim() ? meta.note.trim().slice(0, 500) : null,
+        flagId: meta.flagId ?? null,
+        ...(meta.byAgent ? { byAgent: true } : {}),
+        before: run.cards,
+      },
     ];
     await this.runs.update(run.id, {
       cards,
       workspace: { ...(run.workspace ?? {}), versions },
     } as Partial<DebriefRun>);
+    // The session's note follows the correction (v9 FR-20, FR-31).
+    await this.publisher?.applyToSession(
+      { ...run, cards } as unknown as DebriefRun,
+      { announce: false },
+    );
+    return { version };
+  }
+
+  /**
+   * V2_AUTONOMY F1: the Debrief agent's answer to a learner's flag, applied
+   * the way a person's decision is (resolveFlag): the card kept, corrected (a
+   * new card version, the quote locked) or removed, the reply as the note the
+   * learner reads, and the learner told. Stored on the flag as `answer`. An
+   * important-moment flag is never removed here: that answer is refused.
+   * Returns null when the flag was decided or withdrawn meanwhile.
+   */
+  async applyAgentAnswer(
+    flagId: string,
+    a: {
+      action: 'keep' | 'correct' | 'remove';
+      reply: string;
+      correction?: CardCorrection | null;
+      model?: string | null;
+      costUsd?: number | null;
+    },
+  ): Promise<DebriefFeedback | null> {
+    const row = await this.feedback.findOne({
+      where: { id: flagId, kind: DebriefFeedbackKind.FLAG },
+    });
+    if (
+      !row ||
+      row.answer ||
+      ![DebriefFeedbackStatus.OPEN, DebriefFeedbackStatus.ESCALATED].includes(
+        row.status,
+      )
+    ) {
+      return null;
+    }
+    const reply = (a.reply ?? '').trim().slice(0, 500);
+    if (!reply) throw new BadRequestException('The answer has no reply');
+    const important =
+      row.section === 'important_moment' ||
+      (row.section ?? '').startsWith('important_moment.');
+    if (a.action === 'remove' && important) {
+      throw new BadRequestException(
+        'An important-moment card is never removed automatically',
+      );
+    }
+    if (a.action === 'correct') {
+      await this.correctCard(
+        row.runId,
+        row.section!,
+        a.correction ?? {},
+        null,
+        {
+          note: reply,
+          flagId: row.id,
+          byAgent: true,
+        },
+      );
+    }
+    const action =
+      a.action === 'keep'
+        ? 'kept'
+        : a.action === 'correct'
+          ? 'corrected'
+          : 'removed';
+    row.status =
+      action === 'kept'
+        ? DebriefFeedbackStatus.KEPT
+        : action === 'corrected'
+          ? DebriefFeedbackStatus.CORRECTED
+          : DebriefFeedbackStatus.REMOVED;
+    row.resolvedBy = null;
+    row.resolvedAt = new Date();
+    row.resolutionNote = reply;
+    row.answer = {
+      action,
+      reply,
+      at: row.resolvedAt.toISOString(),
+      model: a.model ?? null,
+      costUsd: a.costUsd ?? null,
+    };
+    const saved = await this.feedback.save(row);
+    const run = await this.runs.findOne({ where: { id: row.runId } });
+    if (run) await this.notifier?.reviewed(run);
+    return saved;
+  }
+
+  /**
+   * Correct in place without a flag (PRD §6.7): a published debrief the judge
+   * scored below the bar, or a held one, rewritten by the Ally team. The quote
+   * stays locked, the cards become a new version, and the learner reads the
+   * "what changed" note on the card and is told their debrief was updated.
+   */
+  async correctRun(
+    runId: string,
+    section: string,
+    correction: CardCorrection,
+    note: string | null | undefined,
+    userId: number,
+  ): Promise<{ id: string; version: number; section: string }> {
+    const run = await this.liveRun(runId);
+    if (!note?.trim()) {
+      throw new BadRequestException('Say what changed; the learner reads it');
+    }
+    if (
+      ![DebriefRunStatus.PUBLISHED, DebriefRunStatus.BELOW_BAR].includes(
+        run.status,
+      )
+    ) {
+      throw new ConflictException(
+        `This debrief is ${run.status}; publish it before correcting a card`,
+      );
+    }
+    const { version } = await this.correctCard(
+      run.id,
+      section,
+      correction,
+      userId,
+      { note },
+    );
+    const fresh = await this.runs.findOne({ where: { id: run.id } });
+    if (fresh && !fresh.workspace?.review) {
+      await this.review(fresh, userId, 'corrected', note ?? undefined, {});
+    }
+    if (fresh) await this.notifier?.reviewed(fresh);
+    return { id: run.id, version, section };
+  }
+
+  /** Corrections made without a flag, as the learner reads them. */
+  async runCorrections(runId: string): Promise<DebriefCorrection[]> {
+    const run = await this.runs.findOne({ where: { id: runId } });
+    const versions = (run?.workspace?.versions ?? []) as Array<{
+      at: string;
+      section: string;
+      note?: string | null;
+      flagId?: string | null;
+    }>;
+    return versions
+      .filter((v) => !v.flagId && v.note)
+      .map((v) => ({
+        section: v.section,
+        outcome: 'corrected' as const,
+        note: v.note ?? null,
+        at: v.at,
+      }));
   }
 
   /**
@@ -701,6 +970,14 @@ export class DebriefFeedbackService {
     note: string | undefined,
     patch: Partial<DebriefRun>,
   ) {
+    if (patch.status) {
+      checkTransition(
+        run.status,
+        patch.status,
+        this.logger,
+        `a person (${action})`,
+      );
+    }
     await this.runs.update(run.id, {
       ...patch,
       workspace: {
@@ -715,7 +992,59 @@ export class DebriefFeedbackService {
     } as any);
   }
 
-  /** Counts the Improver reads: never the learners' notes. */
+  /**
+   * V2_AUTONOMY F2–F3: what the PM agent reads about flags answered, cards
+   * changed and Ask Ally replies replaced — counts, check codes and run ids,
+   * never a learner's note or anyone's words. A person's "Change it" (a card
+   * version not written by the agent) counts as a person correction.
+   */
+  async pmEvidence(windowDays: number) {
+    const answers = await this.dataSource.query(
+      `SELECT regexp_replace(section, '\\[\\d+\\]', '') AS section, reason,
+              answer->>'action' AS action, count(*)::int AS n,
+              count(*) FILTER (WHERE (answer->>'at')::timestamptz - "createdAt" <= interval '60 seconds')::int AS within_a_minute,
+              (array_agg("runId"::text ORDER BY "createdAt" DESC))[1:5] AS run_ids
+         FROM debrief_run_feedback
+        WHERE kind = 'flag' AND answer IS NOT NULL
+          AND "createdAt" >= now() - make_interval(days => $1)
+        GROUP BY 1, 2, 3`,
+      [windowDays],
+    );
+    const [unanswered] = await this.dataSource.query(
+      `SELECT count(*)::int AS n FROM debrief_run_feedback
+        WHERE kind = 'flag' AND answer IS NULL AND status IN ('open','escalated')
+          AND section <> $2 AND "createdAt" >= now() - make_interval(days => $1)`,
+      [windowDays, ASK_ALLY_SECTION],
+    );
+    const corrections = await this.dataSource.query(
+      `SELECT regexp_replace(v->>'section', '\\[\\d+\\]', '') AS section,
+              CASE WHEN (v->>'byAgent')::boolean THEN 'debrief_agent' ELSE 'person' END AS by,
+              count(*)::int AS n,
+              (array_agg(r.id::text))[1:5] AS run_ids
+         FROM debrief_runs r,
+              jsonb_array_elements(coalesce(r.workspace->'versions', '[]'::jsonb)) v
+        WHERE (v->>'at')::timestamptz >= now() - make_interval(days => $1)
+        GROUP BY 1, 2`,
+      [windowDays],
+    );
+    const replaced = await this.dataSource.query(
+      `SELECT f AS check_code, count(*)::int AS n, (array_agg(DISTINCT r.id::text))[1:5] AS run_ids
+         FROM debrief_runs r,
+              jsonb_array_elements(coalesce(r.workspace->'replacedReplies', '[]'::jsonb)) e,
+              jsonb_array_elements_text(coalesce(e->'fails', '[]'::jsonb)) f
+        WHERE (e->>'at')::timestamptz >= now() - make_interval(days => $1)
+        GROUP BY 1`,
+      [windowDays],
+    );
+    return {
+      flag_answers: answers,
+      flags_unanswered: Number(unanswered?.n ?? 0),
+      card_changes: corrections,
+      ask_ally_replaced: replaced,
+    };
+  }
+
+  /** Counts the PM agent reads: never the learners' notes. */
   async signals(windowDays: number) {
     const [h] = await this.dataSource.query(
       `SELECT count(*) FILTER (WHERE helpful)::int AS yes,
@@ -733,6 +1062,41 @@ export class DebriefFeedbackService {
       [windowDays],
     );
     const answered = Number(h?.yes ?? 0) + Number(h?.no ?? 0);
+    // The learners' own words (Gopi, 2026-11-16: the PM agent reads them, not
+    // only counts). What a learner flags may be wrong, so each flag comes with
+    // what Ally decided and why. Capped and trimmed; read only by the PM agent.
+    const read = async <T>(sql: string): Promise<T[]> => {
+      try {
+        return await this.dataSource.query(sql, [windowDays]);
+      } catch {
+        return [];
+      }
+    };
+    const flagWords = await read<Record<string, any>>(
+      `SELECT regexp_replace(section, '\\[\\d+\\]', '') AS section, reason,
+              left(note, 300) AS note, answer->>'action' AS ally_action,
+              left(answer->>'reply', 300) AS ally_reason, status
+         FROM debrief_run_feedback
+        WHERE kind = 'flag' AND status <> 'withdrawn'
+          AND "createdAt" >= now() - make_interval(days => $1)
+        ORDER BY "createdAt" DESC LIMIT 40`,
+    );
+    const notHelpful = await read<Record<string, any>>(
+      `SELECT left(note, 300) AS note
+         FROM debrief_run_feedback
+        WHERE kind = 'helpful' AND helpful = false AND coalesce(note, '') <> ''
+          AND "createdAt" >= now() - make_interval(days => $1)
+        ORDER BY "createdAt" DESC LIMIT 30`,
+    );
+    const askAlly = await read<Record<string, any>>(
+      `SELECT left(m.content, 200) AS question
+         FROM scenario_session_chat_messages m
+         JOIN scenario_session_chats c ON c.id = m."chatId"
+         JOIN debrief_runs r ON r."scenarioSessionId" = c."scenarioSessionId" AND r.mode = 'live'
+        WHERE m."senderId" = c."userId"
+          AND m."createdAt" >= now() - make_interval(days => $1)
+        ORDER BY m."createdAt" DESC LIMIT 40`,
+    );
     return {
       helpful: {
         answered,
@@ -742,6 +1106,12 @@ export class DebriefFeedbackService {
           : null,
       },
       flags,
+      /** Each flag with the learner's note and what Ally decided (kept / corrected / removed) and why. */
+      flag_words: flagWords,
+      /** What learners wrote when a debrief was not helpful. */
+      not_helpful_comments: notHelpful.map((r) => r.note),
+      /** Learners' recent Ask Ally questions: summarise what they keep asking. */
+      ask_ally_questions: askAlly.map((r) => r.question),
     };
   }
 }

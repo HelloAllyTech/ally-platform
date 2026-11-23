@@ -33,6 +33,8 @@ export interface ChatMessageProps {
    * entry, for an agent that cites them (Course Copilot).
    */
   citations?: boolean;
+  /** Question cards with less to read (see QuestionCard's `compact`). */
+  compactQuestions?: boolean;
 }
 
 /**
@@ -55,6 +57,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   strings: stringOverrides,
   formatToolNote,
   citations = false,
+  compactQuestions = false,
 }) => {
   const strings: AgentChatStrings = { ...en.agentChat.chat, ...stringOverrides };
 
@@ -66,6 +69,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
         answeredAnswer={message.answeredAnswer}
         onAnswer={onAnswerQuestion}
         disabled={disabled}
+        compact={compactQuestions}
       />
     );
   }
@@ -121,7 +125,14 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
         </div>
       )}
 
-      {showBubble && (
+      {/* Nothing written yet: a small inline "Thinking…" rather than an empty box. */}
+      {showBubble && !hasBody && message.isStreaming && !message.interrupted && (
+        <div className="px-1 py-1 text-sm text-typography-600" data-testid="agent-thinking">
+          <InlineLoading description={strings.thinking} />
+        </div>
+      )}
+
+      {showBubble && (hasBody || message.interrupted) && (
         <Tile className="w-full max-w-[92%]">
           {hasBody ? (
             <div className="prose prose-sm max-w-none break-words text-sm text-typography-900">

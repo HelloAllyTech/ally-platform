@@ -1,0 +1,26 @@
+[
+  {
+    "id": "listings-2bhk-baner",
+    "kind": "per-bot: list tools, find with ranges (chunk 6, Listings fixture)",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "any 2BHK in Baner under 85 lakh?",
+        "expect": {
+          "crisis": false,
+          "tools": ["find_listings: ok"],
+          "cites": ["^Listings · Baner 2BHK, (Pancard Club Road|Sus Road)"],
+          "must": ["Pancard Club Road|Sus Road"],
+          "mustNot": [
+            "Balewadi High Street",
+            "Wakad",
+            "Kothrud",
+            "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}",
+            "citations?:",
+            "\\[\\d+\\]"
+          ]
+        }
+      }
+    ]
+  }
+]

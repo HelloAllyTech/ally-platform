@@ -4,15 +4,15 @@ import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
-import { Tooltip } from "@ally-ui-mono/ui-shared";
-import { useCreateRoadmapIdeaDraftMutation, useTranscribeRoadmapIdeaMutation } from "@api";
-import { FeatureToggleKey, Permissions, ROUTES } from "@constants";
+import { ANALYTICS_EVENTS, ANALYTICS_PROPS, Tooltip, useAnalytics } from "@ally-ui-mono/ui-shared";
+import { ROUTES } from "@constants";
 import { useUser } from "@hooks";
 import { useSpeechCapture } from "@hooks/useSpeechCapture";
-import { IDEA_DRAFT_TEXT_MAX } from "@types";
-import { hasFeature } from "@utils";
 
 import { MicBulbIcon } from "./MicBulbIcon";
+import { useCreateRoadmapDraftMutation, useRoadmapDictateMutation } from "../../api/roadmapV2Flow";
+import { canFileIdeas } from "../../pages/Roadmap/utils/access";
+import { ROADMAP_IDEA_TEXT_MAX } from "../../types/roadmapV2Flow";
 
 const UNSENT_KEY = "ally-admin-idea-capture-unsent";
 const REVEAL_MS = 650;
@@ -46,34 +46,55 @@ const clipExtension = (type: string) =>
 const wordCount = (text: string) => (text.trim() ? text.trim().split(/\s+/).length : 0);
 
 /**
- * The global "say your idea" door: a mic-and-bulb button pinned top-right of every admin screen,
- * which opens a full-screen capture surface that grows out of the button itself.
+ * THE ONE WAY TO START AN IDEA. A mic-and-bulb button that opens a full-screen capture surface
+ * growing out of the button itself. The same component is mounted wherever an idea can begin
+ * (the nav, the Roadmap header, the phone's bottom bar), so the icon, the capture and what
+ * happens after Save are identical everywhere. There is deliberately no second door.
  *
  * WHAT IT IS FOR. Getting the raw first version of an idea out before it evaporates. It does NOT
- * file anything: Save puts a private draft in the author's "My drafts" tab on the Product
- * Roadmap, where it is later continued through the normal copilot interview (which is what
- * creates the real, readiness-checked opportunity).
+ * file anything: Save makes a private draft and opens it, to be expanded until it is mature
+ * enough to be submitted to the board (the readiness check is what puts it on the roadmap).
+ * The draft opens on its own page (`/roadmap/i/:code`) and is listed under the Roadmap's Drafts tab.
  *
  * THE MIC STARTS ITSELF. Opening is the user gesture, so recording starts inside the click
- * handler — no second "start" tap between having the thought and saying it. Pause, Stop and the
- * keyboard remain: stopping the mic leaves the screen and the text exactly where they are.
+ * handler — no second "start" tap between having the thought and saying it. The orb is the one
+ * mic control: tapping it pauses (which releases the microphone) and tapping again resumes.
+ * Save and Close stop it too, and the text stays exactly where it is.
  *
  * WORDS ARRIVE PHRASE BY PHRASE. Speech is recorded here and transcribed by the backend (see
  * useSpeechCapture for why not the browser's own recognition), so each phrase lands a moment
- * after the speaker pauses. Save waits for any phrase still being transcribed.
+ * after the speaker pauses. Until it does, an animated ellipsis sits where the next words will
+ * appear, so the lag reads as "working", not "broken". Save waits for any phrase still in flight.
  *
- * Access mirrors filing an opportunity (the VOTE permission and the roadmap toggle), because the
- * draft endpoints do; anyone else never sees the button.
+ * Access mirrors filing an opportunity (the VOTE permission and the Roadmap Idea role or
+ * above), because the draft endpoints do; anyone else never sees the button.
  */
-export const IdeaCaptureLauncher: React.FC = () => {
-  const { permissions, features } = useUser();
-  const allowed =
-    !!permissions?.includes(Permissions.VOTE_PRODUCT_ROADMAP) &&
-    hasFeature(features, FeatureToggleKey.PRODUCT_ROADMAP);
+interface IdeaCaptureLauncherProps {
+  /** `lg` is the phone bottom bar's raised 56px target; `md` is every other place. */
+  size?: "md" | "lg";
+  /** Extra classes for the trigger, e.g. to raise it above a bar. The icon never changes. */
+  className?: string;
+}
+
+export const IdeaCaptureLauncher: React.FC<IdeaCaptureLauncherProps> = ({
+  size = "md",
+  className = "",
+}) => {
+  const { permissions, features, user } = useUser();
+  // One limit end to end (audit rec. 6): what this box accepts is exactly what a draft and Submit
+  // accept, so nothing typed here is refused later.
+  const textMax = ROADMAP_IDEA_TEXT_MAX;
+  const textMaxRef = useRef(textMax);
+  textMaxRef.current = textMax;
+  // Parking an idea is filing's first step: the Idea role (or above), as ally-be checks.
+  const allowed = canFileIdeas(permissions, features, user?.restrictedTenantIds != null);
 
   const navigate = useNavigate();
+  const { track } = useAnalytics();
   const buttonRef = useRef<HTMLButtonElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  /** A copy of the text laid out behind the textarea, to place the transcribing dots after it. */
+  const mirrorRef = useRef<HTMLDivElement>(null);
 
   const [mounted, setMounted] = useState(false);
   const [revealed, setRevealed] = useState(false);
@@ -97,16 +118,18 @@ export const IdeaCaptureLauncher: React.FC = () => {
   const [finishing, setFinishing] = useState(false);
   const closeTimer = useRef<number | null>(null);
 
-  const [createDraft, { isLoading: isSaving }] = useCreateRoadmapIdeaDraftMutation();
-  const [transcribeClip] = useTranscribeRoadmapIdeaMutation();
+  const [createDraft, { isLoading: isSaving }] = useCreateRoadmapDraftMutation();
+  const [dictate] = useRoadmapDictateMutation();
 
+  // No `code`: this mic has no draft to charge yet; the server still checks the role.
   const transcribe = useCallback(
-    async (clip: Blob) => {
+    async (clip: Blob, durationMs: number) => {
       const body = new FormData();
       body.append("audio", clip, `idea.${clipExtension(clip.type)}`);
-      return (await transcribeClip(body).unwrap()).text;
+      body.append("durationMs", String(durationMs));
+      return (await dictate(body).unwrap()).text;
     },
-    [transcribeClip],
+    [dictate],
   );
 
   const onTranscribeError = useCallback(() => {
@@ -120,7 +143,7 @@ export const IdeaCaptureLauncher: React.FC = () => {
       const current = textRef.current;
       const joined =
         current && !/\s$/.test(current) ? `${current} ${phrase}` : `${current}${phrase}`;
-      setText(joined.slice(0, IDEA_DRAFT_TEXT_MAX));
+      setText(joined.slice(0, textMaxRef.current));
     },
     [setText],
   );
@@ -144,11 +167,22 @@ export const IdeaCaptureLauncher: React.FC = () => {
     if (mounted && !saved) writeUnsent(text);
   }, [text, mounted, saved]);
 
+  /** Scrolls the dots' layer with the textarea, so the dots stay after the last word. */
+  const syncMirror = useCallback(() => {
+    const field = textareaRef.current;
+    const mirror = mirrorRef.current;
+    if (!field || !mirror) return;
+    // At the bottom, the dots may have wrapped onto a line the textarea doesn't have yet.
+    const atBottom = field.scrollTop + field.clientHeight >= field.scrollHeight - 2;
+    mirror.scrollTop = atBottom ? mirror.scrollHeight : field.scrollTop;
+  }, []);
+
   // Keep the newest words in view while dictating.
   useEffect(() => {
     const el = textareaRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [text, speech.transcribing]);
+    syncMirror();
+  }, [text, speech.transcribing, finishing, syncMirror]);
 
   const open = () => {
     const rect = buttonRef.current?.getBoundingClientRect();
@@ -164,6 +198,7 @@ export const IdeaCaptureLauncher: React.FC = () => {
     setFinishing(false);
     setConfirmingClose(false);
     setMounted(true);
+    track(ANALYTICS_EVENTS.IDEA_CAPTURE_SESSION_STARTED);
     // Inside the click, so the mic opens as part of the user's gesture.
     speech.start();
     requestAnimationFrame(() => requestAnimationFrame(() => setRevealed(true)));
@@ -206,20 +241,22 @@ export const IdeaCaptureLauncher: React.FC = () => {
       toast.error("No words were caught. Try the mic again, or type your idea.");
       return;
     }
+    const captureMode = usedVoice.current ? "voice" : "typed";
     try {
-      await createDraft({ rawText, captureMode: usedVoice.current ? "voice" : "typed" }).unwrap();
+      const draft = await createDraft({
+        text: rawText.slice(0, ROADMAP_IDEA_TEXT_MAX),
+        captureMode,
+      }).unwrap();
+      const destination = ROUTES.ROADMAP_IDEA(draft.code);
+      track(ANALYTICS_EVENTS.IDEA_CAPTURE_DRAFT_SAVED, {
+        [ANALYTICS_PROPS.CAPTURE_MODE]: captureMode,
+      });
       writeUnsent("");
       setConfirmingClose(false);
       setSaved(true);
       window.setTimeout(() => {
         finishClose();
-        toast.success("Idea saved to My drafts", {
-          description: "It's private and unpublished. Pick it up whenever you're ready.",
-          action: {
-            label: "Open drafts",
-            onClick: () => navigate(`${ROUTES.PRODUCT_ROADMAP}?tab=drafts`),
-          },
-        });
+        navigate(destination);
       }, 1100);
     } catch (error) {
       const message = (error as { data?: { message?: string | string[] } })?.data?.message;
@@ -228,7 +265,7 @@ export const IdeaCaptureLauncher: React.FC = () => {
           "Could not save that idea. Your words are still here — try again.",
       );
     }
-  }, [isSaving, finishing, speech, createDraft, finishClose, navigate]);
+  }, [isSaving, finishing, speech, createDraft, finishClose, navigate, track]);
 
   // Keyboard: Esc closes (safely), Cmd/Ctrl+Enter saves.
   useEffect(() => {
@@ -275,7 +312,7 @@ export const IdeaCaptureLauncher: React.FC = () => {
     status === "listening"
       ? "Capturing the absolute first, raw version of your idea. No structure needed — just talk."
       : status === "paused"
-        ? "Take your time. Resume when the next thought arrives."
+        ? "Take your time. Tap the mic when the next thought arrives."
         : status === "denied"
           ? "Allow the microphone from your browser's address bar, or just type your idea below."
           : status === "unavailable"
@@ -289,6 +326,10 @@ export const IdeaCaptureLauncher: React.FC = () => {
   const hasText = text.trim().length > 0;
   /** Words may be on their way even before any are on screen. */
   const canSave = (hasText || isListening || speech.transcribing) && !isSaving && !finishing;
+  /** Words recorded but not on screen yet: show the dots where they will land. */
+  const showDots = speech.transcribing || finishing;
+  /** Dictated phrases are joined with a space, so the dots leave one too. */
+  const dotsGap = text && !/\s$/.test(text) ? " " : "";
 
   const overlay = mounted
     ? createPortal(
@@ -408,64 +449,58 @@ export const IdeaCaptureLauncher: React.FC = () => {
 
             {/* the words */}
             <div className="relative mt-4 flex min-h-0 flex-1 flex-col rounded-2xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur-sm md:p-5">
-              <textarea
-                ref={textareaRef}
-                value={text}
-                onChange={event => setText(event.target.value.slice(0, IDEA_DRAFT_TEXT_MAX))}
-                placeholder="Your idea appears here as you speak. You can edit it, or just type."
-                aria-label="Your idea"
-                className="min-h-0 w-full flex-1 resize-none bg-transparent text-lg leading-relaxed text-white outline-none placeholder:text-white/30 md:text-xl"
-              />
-              {(speech.transcribing || finishing) && (
-                <p className="mt-2 text-base italic text-white/45" aria-live="polite">
-                  Writing down what you said…
-                </p>
-              )}
+              <div className="relative min-h-0 flex-1">
+                {showDots && (
+                  <div
+                    ref={mirrorRef}
+                    aria-hidden="true"
+                    data-testid="idea-transcribing-dots"
+                    className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words text-lg leading-relaxed text-transparent md:text-xl"
+                  >
+                    {text}
+                    {dotsGap}
+                    <span className="idea-dots text-white/70">
+                      <span>.</span>
+                      <span>.</span>
+                      <span>.</span>
+                    </span>
+                  </div>
+                )}
+                <textarea
+                  ref={textareaRef}
+                  value={text}
+                  onChange={event => setText(event.target.value.slice(0, textMax))}
+                  onScroll={syncMirror}
+                  placeholder={
+                    showDots && !text
+                      ? ""
+                      : "Your idea appears here as you speak. You can edit it, or just type."
+                  }
+                  aria-label="Your idea"
+                  className="relative h-full w-full resize-none bg-transparent text-lg leading-relaxed text-white outline-none placeholder:text-white/30 md:text-xl"
+                />
+              </div>
+              <span className="sr-only" aria-live="polite">
+                {showDots ? "Transcribing" : ""}
+              </span>
               <span className="absolute bottom-2 right-4 text-[11px] tabular-nums text-white/25">
-                {text.length}/{IDEA_DRAFT_TEXT_MAX}
+                {text.length}/{textMax}
               </span>
             </div>
 
-            {/* controls */}
-            <div className="mt-4 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={speech.stop}
-                  disabled={status !== "listening" && status !== "paused"}
-                  className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-full border border-white/15 px-4 text-sm text-white/80 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
-                >
-                  <span className="h-2.5 w-2.5 rounded-[2px] bg-current" aria-hidden="true" />
-                  Stop mic
-                </button>
-                {canMic && status === "idle" && (
-                  <button
-                    type="button"
-                    onClick={speech.start}
-                    className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-full border border-white/15 px-4 text-sm text-white/80 transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
-                  >
-                    <MicBulbIcon size={16} /> Talk again
-                  </button>
-                )}
-                {status === "paused" && (
-                  <button
-                    type="button"
-                    onClick={speech.resume}
-                    className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-full border border-white/15 px-4 text-sm text-white/80 transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
-                  >
-                    Resume
-                  </button>
-                )}
-              </div>
-
-              <Tooltip label="Saves privately to My drafts. Nothing is published." align="top">
+            {/* save — the orb above is the only mic control */}
+            <div className="mt-4 flex items-center justify-end gap-3">
+              <Tooltip
+                label="Saves a private draft and opens it. Nothing is published."
+                align="top"
+              >
                 <button
                   type="button"
                   onClick={() => void save()}
                   disabled={!canSave}
                   className="inline-flex h-12 cursor-pointer items-center gap-2 rounded-full bg-white px-6 text-sm font-medium text-[#1a1250] shadow-lg shadow-black/30 transition hover:scale-[1.03] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
                 >
-                  {finishing ? "Finishing…" : isSaving ? "Saving…" : "Save to drafts"}
+                  {finishing ? "Finishing…" : isSaving ? "Saving…" : "Save idea"}
                   <kbd className="hidden rounded bg-black/10 px-1.5 py-0.5 text-[10px] font-normal md:inline">
                     ⌘↵
                   </kbd>
@@ -488,7 +523,7 @@ export const IdeaCaptureLauncher: React.FC = () => {
                       disabled={isSaving || finishing}
                       className="h-11 cursor-pointer rounded-full bg-white text-sm font-medium text-[#1a1250] disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {finishing ? "Finishing…" : isSaving ? "Saving…" : "Save to drafts"}
+                      {finishing ? "Finishing…" : isSaving ? "Saving…" : "Save idea"}
                     </button>
                     <button
                       type="button"
@@ -500,6 +535,11 @@ export const IdeaCaptureLauncher: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => {
+                        if (textRef.current.trim()) {
+                          track(ANALYTICS_EVENTS.IDEA_CAPTURE_SESSION_ABANDONED, {
+                            [ANALYTICS_PROPS.CAPTURE_MODE]: usedVoice.current ? "voice" : "typed",
+                          });
+                        }
                         writeUnsent("");
                         setConfirmingClose(false);
                         finishClose();
@@ -534,7 +574,7 @@ export const IdeaCaptureLauncher: React.FC = () => {
                     className="idea-check-tick"
                   />
                 </svg>
-                <p className="mt-4 text-xl font-light">Saved to your drafts</p>
+                <p className="mt-4 text-xl font-light">Saved. Opening your draft…</p>
               </div>
             )}
           </div>
@@ -545,16 +585,18 @@ export const IdeaCaptureLauncher: React.FC = () => {
 
   return (
     <>
-      <Tooltip label="Say an idea" align="bottom">
+      <Tooltip label="New idea" align="right">
         <button
           ref={buttonRef}
           type="button"
           onClick={open}
-          aria-label="Record a new idea by voice"
+          aria-label="New idea"
           data-testid="idea-capture-button"
-          className="text-typography-secondary hover:text-primary-500 inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-full transition hover:bg-background-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500"
+          className={`text-typography-secondary hover:text-primary-500 inline-flex ${
+            size === "lg" ? "h-14 w-14" : "h-11 w-11"
+          } cursor-pointer items-center justify-center rounded-full transition hover:bg-background-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500 ${className}`}
         >
-          <MicBulbIcon size={22} />
+          <MicBulbIcon size={size === "lg" ? 26 : 22} />
         </button>
       </Tooltip>
       {overlay}

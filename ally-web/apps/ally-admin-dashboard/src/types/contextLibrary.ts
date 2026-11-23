@@ -179,6 +179,10 @@ export interface ContextSource {
   costUsd: string | number;
   costCapUsd?: string | number | null;
   error?: string | null;
+  /** Who its entries reach. Absent on servers older than the audience columns. */
+  isGlobal?: boolean;
+  tenantIds?: string[];
+  ownerTenantId?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -223,8 +227,23 @@ export interface ContextUploadResult {
   outlivesTtl?: boolean;
 }
 
+/** Who an entry, or a document's entries, reaches: every organisation or only those named. */
+export interface ContextAudience {
+  isGlobal: boolean;
+  tenantIds: string[];
+}
+
+/** After re-targeting a document: entries changed, and those other documents also back. */
+export interface ContextSourceAudienceResult extends ContextAudience {
+  id: string;
+  updated: number;
+  shared: number;
+}
+
 export interface ContextUploadOptions {
   collections: string[];
+  /** Platform admins: who the distilled entries reach. Omitted is global. */
+  audience?: ContextAudience;
   titles?: Record<string, string>;
   docVersion?: string;
   year?: number;

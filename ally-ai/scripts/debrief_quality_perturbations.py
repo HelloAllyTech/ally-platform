@@ -7,7 +7,7 @@ No human labels are involved: the fault is planted, so the right answer is
 known by construction.
 
 Synthetic session only — no learner data. Makes one live Gemini call per case
-(~9 calls, a few cents).
+(~12 calls, a few cents).
 
 Run from the ally-ai project so the .env loads:
 
@@ -98,6 +98,24 @@ HINDI = (
 )
 
 
+# An organisation protocol supplied with the debrief, as the run judge now
+# passes the Writer's guidance. The learner in TRANSCRIPT never gave a contact.
+PROTOCOL = (
+    "ORGANISATION PROTOCOL: Give the support line when a client sounds hopeless\n"
+    "Whenever a client says there is no point, or anything about ending their "
+    "life, the counsellor must give the Tele-MANAS number 14416 before the "
+    "session ends."
+)
+CONTRADICTS_PROTOCOL = GOOD + (
+    "\nYou were right not to bring up a helpline here; it is better to save "
+    "support numbers for a later session."
+)
+FOLLOWS_PROTOCOL = GOOD + (
+    "\nBefore you end, give Meera the Tele-MANAS number 14416, as your "
+    "organisation asks whenever a client sounds hopeless."
+)
+
+
 def _mean(out) -> float:
     return mean(d.score for d in out.dimensions)
 
@@ -107,7 +125,7 @@ def _codes(out) -> set[str]:
 
 
 CASES = [
-    # name, transcript, debrief, language, check(out, base) -> (ok, why)
+    # name, transcript, debrief, language, check(out, base) -> (ok, why)[, guidance]
     (
         "baseline: a good debrief passes",
         TRANSCRIPT,
@@ -182,6 +200,29 @@ CASES = [
             f"mean {_mean(o):.1f}, hard fails {sorted(_codes(o))}",
         ),
     ),
+    (
+        "a debrief that contradicts a supplied protocol is a hard fail",
+        TRANSCRIPT,
+        CONTRADICTS_PROTOCOL,
+        "en",
+        lambda o, b: ("contradicts_protocol" in _codes(o), sorted(_codes(o))),
+        PROTOCOL,
+    ),
+    (
+        "a debrief that follows a supplied protocol is not flagged (look-alike)",
+        TRANSCRIPT,
+        FOLLOWS_PROTOCOL,
+        "en",
+        lambda o, b: ("contradicts_protocol" not in _codes(o), sorted(_codes(o))),
+        PROTOCOL,
+    ),
+]
+
+# Reported, not gated: what the judge does when a protocol applied and the
+# debrief says nothing about it (plan case 17 expects it named). Whether that
+# is a hard fail is a rubric decision, which only a person makes.
+INFO = [
+    ("protocol applied, debrief silent about it", TRANSCRIPT, GOOD, "en", PROTOCOL),
 ]
 
 
@@ -193,12 +234,19 @@ async def main() -> int:
     print(f"judge model: {model}\n")
 
     failures = 0
-    for name, transcript, debrief, language, check in CASES:
+    for name, transcript, debrief, language, check, *rest in CASES:
+        guidance = rest[0] if rest else None
         out = (
             base
-            if debrief == GOOD and transcript is TRANSCRIPT
+            if debrief == GOOD and transcript is TRANSCRIPT and guidance is None
             else (
-                await judge_debrief(transcript, debrief, language, learner_level="LAY")
+                await judge_debrief(
+                    transcript,
+                    debrief,
+                    language,
+                    learner_level="LAY",
+                    guidance=guidance,
+                )
             )[0]
         )
         if out is None:
@@ -207,6 +255,12 @@ async def main() -> int:
             ok, why = check(out, base)
         failures += 0 if ok else 1
         print(f"{'PASS' if ok else 'FAIL'}  {name}  ({why})")
+
+    for name, transcript, debrief, language, guidance in INFO:
+        out, _ = await judge_debrief(
+            transcript, debrief, language, learner_level="LAY", guidance=guidance
+        )
+        print(f"INFO  {name}  ({sorted(_codes(out)) if out else 'no answer'})")
 
     print(f"\n{len(CASES) - failures}/{len(CASES)} passed")
     return 1 if failures else 0

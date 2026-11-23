@@ -1,0 +1,32 @@
+[
+  {
+    "id": "helpline",
+    "title": "Helpline and crisis support",
+    "blurb": "Share your helpline details and safe next steps, at any hour."
+  },
+  {
+    "id": "services",
+    "title": "Services and eligibility",
+    "blurb": "Explain who can apply, what to bring and where to go, in plain words."
+  },
+  {
+    "id": "supporters",
+    "title": "Donors and volunteers",
+    "blurb": "Handle giving, receipts and sign-ups without tying up your team."
+  },
+  {
+    "id": "training",
+    "title": "Staff and volunteer onboarding",
+    "blurb": "New teammates get answers from your own policies and guides."
+  },
+  {
+    "id": "languages",
+    "title": "Reach more communities",
+    "blurb": "Meet people in the languages they speak, on the apps they already use."
+  },
+  {
+    "id": "updates",
+    "title": "Campaigns and urgent updates",
+    "blurb": "Keep your community informed when things change fast."
+  }
+]

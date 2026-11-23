@@ -12,11 +12,26 @@ export type BlogPost = {
   tags: string[];
   coverColor: string; // #RRGGBB, shown when there is no header image
   authorName?: string | null;
+  authorEmail?: string | null;
   headerImageUrl?: string | null;
   status: "DRAFT" | "PUBLISHED";
   publishedAt?: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type BlogReview = {
+  status: "DRAFT" | "PUBLISHED";
+  slug: string;
+  expiresAt: string;
+  post: BlogPost;
+};
+
+export type BlogSuggestionBody = {
+  name: string;
+  email?: string;
+  comment: string;
+  quote?: string;
 };
 
 type GetPublicBlogsResponse = { blogs: BlogPost[]; count: number };
@@ -48,8 +63,29 @@ const blogAPI = baseAPI.injectEndpoints({
         method: HttpMethod.GET,
       }),
     }),
+    getBlogReview: builder.query<BlogReview, { token: string }>({
+      query: ({ token }) => ({
+        url: ApiEndpoints.BLOG.GET_BLOG_REVIEW(token),
+        method: HttpMethod.GET,
+      }),
+    }),
+    createBlogReviewSuggestion: builder.mutation<
+      { success: true },
+      { token: string; body: BlogSuggestionBody }
+    >({
+      query: ({ token, body }) => ({
+        url: ApiEndpoints.BLOG.CREATE_BLOG_REVIEW_SUGGESTION(token),
+        method: HttpMethod.POST,
+        body,
+      }),
+    }),
   }),
 });
 
-export const { useGetPublicBlogsQuery, useGetPublicBlogTagsQuery, useGetPublicBlogBySlugQuery } =
-  blogAPI;
+export const {
+  useGetPublicBlogsQuery,
+  useGetPublicBlogTagsQuery,
+  useGetPublicBlogBySlugQuery,
+  useGetBlogReviewQuery,
+  useCreateBlogReviewSuggestionMutation,
+} = blogAPI;

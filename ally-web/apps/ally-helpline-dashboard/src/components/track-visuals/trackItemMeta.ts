@@ -2,6 +2,8 @@ import { TFunction } from "i18next";
 
 import { TrackDetailItem, TrackItemType } from "@types";
 
+import { formatRoleplayDuration } from "./roleplayRequirement";
+
 /**
  * Builds the small meta line under a track item title on the journey map,
  * e.g. "7 questions · pass 70%" or "4 min video".
@@ -36,6 +38,47 @@ export const getTrackItemMeta = (item: TrackDetailItem, t: TFunction): string =>
     case TrackItemType.ARTICLE:
       return t("tracks2.meta.article");
     case TrackItemType.ROLEPLAY: {
+      // The server's resolved rule, when it sends one: which gates apply and
+      // the platform-default duration filled in.
+      const gate = item.roleplayGate;
+      // Assessments carry a tag and a turn minimum; duration never applies.
+      const isAssessment =
+        gate?.roleplayType === "ASSESSMENT" ||
+        item.assessment != null ||
+        !!criteria?.assessmentMode;
+      if (isAssessment) {
+        const phase = item.assessment?.phase ?? criteria?.assessmentPhase ?? null;
+        const tag =
+          phase === "PRE"
+            ? t("tracks2.meta.assessmentPre")
+            : phase === "POST"
+              ? t("tracks2.meta.assessmentPost")
+              : t("tracks2.meta.assessment");
+        const parts = [t("tracks2.meta.roleplay"), tag];
+        const turns = item.assessment?.requiredTurns ?? gate?.minLearnerTurns;
+        if (turns != null) parts.push(t("tracks2.meta.turns", { count: turns }));
+        if (gate?.minScore != null && gate.minScore > 0) {
+          parts.push(t("tracks2.meta.minScore", { score: gate.minScore }));
+        }
+        return parts.join(" · ");
+      }
+      if (gate) {
+        if (gate.completionLogic === "PARTICIPATION") {
+          return `${t("tracks2.meta.roleplay")} · ${t("tracks2.meta.participation")}`;
+        }
+        const parts = [t("tracks2.meta.roleplay")];
+        if (gate.minScore != null) {
+          parts.push(t("tracks2.meta.minScore", { score: gate.minScore }));
+        }
+        if (gate.minDurationSeconds != null) {
+          parts.push(
+            t("tracks2.meta.minDuration", {
+              duration: formatRoleplayDuration(gate.minDurationSeconds, t),
+            }),
+          );
+        }
+        return parts.join(" · ");
+      }
       // A minScore of 0 is the unconfigured default and gates nothing (see
       // meetsMinimumScore in ally-be), so only a real threshold is shown —
       // advertising "min score 0" would read as a hurdle that isn't there.

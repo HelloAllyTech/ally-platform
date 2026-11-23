@@ -799,4 +799,112 @@ describe('SqsPollingService', () => {
       expect(mockSqsService.receiveMessage).toHaveBeenCalledTimes(2);
     });
   });
+
+  describe('how fast it asks again', () => {
+    const poller = (stopAfter: number, results: Array<unknown>) => {
+      let calls = 0;
+      const p: any = {
+        queueUrl: queueUrl1,
+        handlers: [],
+        isPolling: true,
+        pollInterval: 7777,
+      };
+      mockSqsService.receiveMessage.mockImplementation(async () => {
+        const r = results[Math.min(calls, results.length - 1)];
+        calls += 1;
+        if (calls >= stopAfter) p.isPolling = false;
+        if (r instanceof Error) throw r;
+        // A real long poll takes seconds; pretend this one did.
+        return r as Message[];
+      });
+      return p;
+    };
+    const waits = () => {
+      const delays: number[] = [];
+      jest.spyOn(global, 'setTimeout').mockImplementation(((
+        fn: () => void,
+        ms?: number,
+      ) => {
+        delays.push(Number(ms));
+        fn();
+        return 0 as any;
+      }) as any);
+      return delays;
+    };
+    afterEach(() => jest.restoreAllMocks());
+
+    it('asks again at once after a batch, without the old 5 s sleep', async () => {
+      const delays = waits();
+      const msg = { MessageId: 'm', ReceiptHandle: 'r', Body: '{}' };
+      await (service as any).pollQueue(poller(3, [[msg], [msg], [msg]]));
+      expect(mockSqsService.receiveMessage).toHaveBeenCalledTimes(3);
+      expect(delays).not.toContain(7777);
+    });
+
+    it('waits the poll interval only after a failed receive', async () => {
+      const delays = waits();
+      await (service as any).pollQueue(
+        poller(2, [new Error('boom'), [{ MessageId: 'm', Body: '{}' }]]),
+      );
+      expect(delays).toContain(7777);
+    });
+
+    it('does not spin when an empty receive returns instantly', async () => {
+      const delays = waits();
+      await (service as any).pollQueue(poller(2, [[], []]));
+      expect(delays.some((d) => d >= 1000)).toBe(true);
+    });
+
+    it('starts several independent receive loops per queue', async () => {
+      const handler = {
+        queueUrl: queueUrl1,
+        handler: jest.fn(),
+        isDlq: false,
+        target: { constructor: { name: 'T' } },
+        methodName: 'handle',
+        targetConstructor: class T {},
+      };
+      mockSqsHandlerRegistry.getHandlers.mockReturnValue([handler] as any);
+      mockModuleRef.get.mockReturnValue({ handle: jest.fn() });
+      capturedSetImmediateCallbacks = [];
+      await service.onModuleInit();
+      expect(capturedSetImmediateCallbacks.length).toBe(3);
+    });
+
+    it('a slow batch does not hold up another loop', async () => {
+      let release!: () => void;
+      const slow = new Promise<void>((r) => (release = r));
+      const handled: string[] = [];
+      const p: any = {
+        queueUrl: queueUrl1,
+        handlers: [
+          {
+            handler: async (m: Message) => {
+              if (m.MessageId === 'slow') await slow;
+              handled.push(String(m.MessageId));
+            },
+            target: { constructor: { name: 'T' } },
+            methodName: 'handle',
+          },
+        ],
+        isPolling: true,
+        pollInterval: 1,
+      };
+      const svc = service as any;
+      const slowBatch = svc.processMessage(p, {
+        MessageId: 'slow',
+        ReceiptHandle: 'r',
+        Body: '{}',
+      });
+      await svc.processMessage(p, {
+        MessageId: 'fast',
+        ReceiptHandle: 'r',
+        Body: '{}',
+      });
+      expect(handled).toEqual(['fast']);
+      release();
+      await slowBatch;
+      expect(handled).toEqual(['fast', 'slow']);
+    });
+  });
 });

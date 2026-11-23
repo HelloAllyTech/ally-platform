@@ -385,6 +385,18 @@ urllib3 = {version = ">=1.25.4,!=2.2.0,<3", markers = "python_version >= \"3.10\
 crt = ["awscrt (==0.27.6)"]
 
 [[package]]
+name = "bracex"
+version = "3.2.2"
+description = "Bash style brace expander."
+optional = false
+python-versions = ">=3.11"
+groups = ["main"]
+files = [
+    {file = "bracex-3.2.2-py3-none-any.whl", hash = "sha256:284d59c4656e5a0421ff691402074bd5847049d50410535764a2c522a47095bc"},
+    {file = "bracex-3.2.2.tar.gz", hash = "sha256:d18976160b3ba01a57d5c53a5c8c3aa2506efa9e0a3a62467251f82b8f563fde"},
+]
+
+[[package]]
 name = "certifi"
 version = "2025.8.3"
 description = "Python package for providing Mozilla's CA Bundle."
@@ -624,20 +636,6 @@ files = [
 markers = {main = "platform_system == \"Windows\"", dev = "platform_system == \"Windows\" or sys_platform == \"win32\""}
 
 [[package]]
-name = "contextvars"
-version = "2.4"
-description = "PEP 567 Backport"
-optional = false
-python-versions = "*"
-groups = ["main"]
-files = [
-    {file = "contextvars-2.4.tar.gz", hash = "sha256:f38c908aaa59c14335eeea12abea5f443646216c4e29380d7bf34d2018e2c39e"},
-]
-
-[package.dependencies]
-immutables = ">=0.9"
-
-[[package]]
 name = "coverage"
 version = "7.10.7"
 description = "Code coverage measurement for Python"
@@ -841,6 +839,32 @@ files = [
 [package.dependencies]
 marshmallow = ">=3.18.0,<4.0.0"
 typing-inspect = ">=0.4.0,<1"
+
+[[package]]
+name = "deepagents"
+version = "0.7.13"
+description = "Production-ready, extensible agent harness with a built-in filesystem and context management, sub-agent delegation, skills, and long-term memory."
+optional = false
+python-versions = "<4.0,>=3.11"
+groups = ["main"]
+files = [
+    {file = "deepagents-0.7.13-py3-none-any.whl", hash = "sha256:d717ee8ee092a91c475a6124ed578d5e4154d54120769a1081bfe1aece87c248"},
+    {file = "deepagents-0.7.13.tar.gz", hash = "sha256:99fc1855b1387c1c6e6035ba3600edbd933f59c39a4863ef3a7d5a0272ea67ab"},
+]
+
+[package.dependencies]
+langchain = ">=1.3.18,<2.0.0"
+langchain-anthropic = ">=1.7.0,<2.0.0"
+langchain-core = ">=1.6.1,<2.0.0"
+langchain-google-genai = ">=4.3.7,<5.0.0"
+langsmith = ">=0.11.2"
+packaging = ">=23.2"
+wcmatch = ">=11.0"
+
+[package.extras]
+aws = ["langchain-aws (>=1.7.4,<2.0.0)"]
+quickjs = ["langchain-quickjs (>=0.3.5)"]
+video = ["av (>=18.0.0,<19.0.0)", "pillow (>=12.3.0,<13.0.0)"]
 
 [[package]]
 name = "deepgram-sdk"
@@ -1298,6 +1322,28 @@ socks = ["socksio (==1.*)"]
 trio = ["trio (>=0.22.0,<1.0)"]
 
 [[package]]
+name = "httpcore2"
+version = "2.3.0"
+description = "A minimal low-level HTTP client."
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "httpcore2-2.3.0-py3-none-any.whl", hash = "sha256:477e9e334f74e5240dcac002e890580f36a57d40ff0fb14cc9655731d23b8415"},
+    {file = "httpcore2-2.3.0.tar.gz", hash = "sha256:07327e251560960eea8e969d92d4c6a325feb13cca39e25340731336c3baf924"},
+]
+
+[package.dependencies]
+h11 = ">=0.16"
+truststore = ">=0.10"
+
+[package.extras]
+asyncio = ["anyio (>=4.5.0,<5.0)"]
+http2 = ["h2 (>=3,<5)"]
+socks = ["socksio (==1.*)"]
+trio = ["trio (>=0.22.0,<1.0)"]
+
+[[package]]
 name = "httpx"
 version = "0.28.1"
 description = "The next generation HTTP client."
@@ -1321,6 +1367,31 @@ cli = ["click (==8.*)", "pygments (==2.*)", "rich (>=10,<14)"]
 http2 = ["h2 (>=3,<5)"]
 socks = ["socksio (==1.*)"]
 zstd = ["zstandard (>=0.18.0)"]
+
+[[package]]
+name = "httpx2"
+version = "2.3.0"
+description = "The next generation HTTP client."
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "httpx2-2.3.0-py3-none-any.whl", hash = "sha256:6f393663bdf6dbe7fe90118e3eb5b2bd024a675cae0390ac08cec9198812d8b7"},
+    {file = "httpx2-2.3.0.tar.gz", hash = "sha256:227e7c41d95a76d4077a52640564132777215fc3394e07b66a3116c33d668fa9"},
+]
+
+[package.dependencies]
+anyio = "*"
+httpcore2 = "2.3.0"
+idna = "*"
+truststore = ">=0.10"
+
+[package.extras]
+brotli = ["brotli ; platform_python_implementation == \"CPython\"", "brotlicffi ; platform_python_implementation != \"CPython\""]
+cli = ["click (==8.*)", "pygments (==2.*)", "rich (>=10,<15)"]
+http2 = ["h2 (>=3,<5)"]
+socks = ["socksio (==1.*)"]
+zstd = ["zstandard (>=0.18.0) ; python_version <= \"3.13\""]
 
 [[package]]
 name = "identify"
@@ -1351,68 +1422,6 @@ files = [
 
 [package.extras]
 all = ["flake8 (>=7.1.1)", "mypy (>=1.11.2)", "pytest (>=8.3.2)", "ruff (>=0.6.2)"]
-
-[[package]]
-name = "immutables"
-version = "0.21"
-description = "Immutable Collections"
-optional = false
-python-versions = ">=3.8.0"
-groups = ["main"]
-files = [
-    {file = "immutables-0.21-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:14cb09d4f4577ad9ab8770a340dc2158e0a5ab5775cb34c75960167a31104212"},
-    {file = "immutables-0.21-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:22ba593f95044ac60d2af463f3dc86cd0e223f8c51df85dff65d663d93e19f51"},
-    {file = "immutables-0.21-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:25afc81a7bcf26c8364f85e52a14e0095344343e79493c73b0e9a765310a0bed"},
-    {file = "immutables-0.21-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:eac6e2868567289f88c6810f296940c328a1d38c9abc841eed04963102a27d12"},
-    {file = "immutables-0.21-cp310-cp310-musllinux_1_2_aarch64.whl", hash = "sha256:ba8bca21a1d034f4577ede1e9553a681dd01199c06b563f1a8316f2623b64985"},
-    {file = "immutables-0.21-cp310-cp310-musllinux_1_2_x86_64.whl", hash = "sha256:39337bfb42f83dd787a81e2d00e90efa17c4a39a9cf1210b8a50dafe32438aae"},
-    {file = "immutables-0.21-cp310-cp310-win32.whl", hash = "sha256:b24aa98f6cdae4ba15baf3aa00e84223bafcd0d3fd7f0443474527ec951845e1"},
-    {file = "immutables-0.21-cp310-cp310-win_amd64.whl", hash = "sha256:715f8e5f8e1c35f036f9ac62eaf8b672eec1cdc2b4f9b73864cc64eccc76661c"},
-    {file = "immutables-0.21-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:5d780c38067047911a2e06a86ba063ba0055618ab5573c8198ef3f368e321303"},
-    {file = "immutables-0.21-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:9aab9d0f0016f6e0bfe7e4a4cb831ef20063da6468b1bbc71d06ef285781ee9e"},
-    {file = "immutables-0.21-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:7ff83390b05d3372acb9a0c928f6cc20c78e74ca20ed88eb941f84a63b65e444"},
-    {file = "immutables-0.21-cp311-cp311-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d01497713e71509c4481ffccdbe3a47b94969345f4e92f814d6626f7c0a4c304"},
-    {file = "immutables-0.21-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:bc7844c9fbb5bece5bfdf2bf8ea74d308f42f40b0665fd25c58abf56d7db024a"},
-    {file = "immutables-0.21-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:984106fa4345efd9f96de22e9949fc97bac8598bdebee03c20b2497a88bff3b7"},
-    {file = "immutables-0.21-cp311-cp311-win32.whl", hash = "sha256:1bdb5200518518601377e4877d5034e7c535e9ea8a9d601ed8b0eedef0c7becd"},
-    {file = "immutables-0.21-cp311-cp311-win_amd64.whl", hash = "sha256:dd00c34f431c54c95e7b84bfdbdeacb4f039a6a24eb0c1f7aa4b168bb9a6ad0a"},
-    {file = "immutables-0.21-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:ef1ed262094b755903122c3c3a83ad0e0d5c3ab7887cda12b2fe878769d1ee0d"},
-    {file = "immutables-0.21-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:ce604f81d9d8f26e60b52ebcb56bb5c0462c8ea50fb17868487d15f048a2f13e"},
-    {file = "immutables-0.21-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:b48b116aaca4500398058b5a87814857a60c4cb09417fecc12d7da0f5639b73d"},
-    {file = "immutables-0.21-cp312-cp312-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:dad7c0c74b285cc0e555ec0e97acbdc6f1862fcd16b99abd612df3243732e741"},
-    {file = "immutables-0.21-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:e44346e2221a5a676c880ca8e0e6429fa24d1a4ae562573f5c04d7f2e759b030"},
-    {file = "immutables-0.21-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:8b10139b529a460e53fe8be699ebd848c54c8a33ebe67763bcfcc809a475a26f"},
-    {file = "immutables-0.21-cp312-cp312-win32.whl", hash = "sha256:fc512d808662614feb17d2d92e98f611d69669a98c7af15910acf1dc72737038"},
-    {file = "immutables-0.21-cp312-cp312-win_amd64.whl", hash = "sha256:461dcb0f58a131045155e52a2c43de6ec2fe5ba19bdced6858a3abb63cee5111"},
-    {file = "immutables-0.21-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:79674b51aa8dd983f9ac55f7f67b433b1df84a6b4f28ab860588389a5659485b"},
-    {file = "immutables-0.21-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:93c8350f8f7d0d9693f708229d9d0578e6f3b785ce6da4bced1da97137aacfad"},
-    {file = "immutables-0.21-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:583d2a63e444ce1538cc2bda56ae1f4a1a11473dbc0377c82b516bc7eec3b81e"},
-    {file = "immutables-0.21-cp313-cp313-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:b274a52da9b106db55eceb93fc1aea858c4e6f4740189e3548e38613eafc2021"},
-    {file = "immutables-0.21-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:338bede057250b33716a3e4892e15df0bf5a5ddbf1d67ead996b3e680b49ef9e"},
-    {file = "immutables-0.21-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:8781c89583b68f604cf30f0978b722165824c3075888639fde771bf1a3e12dc0"},
-    {file = "immutables-0.21-cp313-cp313-win32.whl", hash = "sha256:e97ea83befad873712f283c0cccd630f70cba753e207b4868af28d5b85e9dc54"},
-    {file = "immutables-0.21-cp313-cp313-win_amd64.whl", hash = "sha256:cfcb23bd898f5a4ef88692b42c51f52ca7373a35ba4dcc215060a668639eb5da"},
-    {file = "immutables-0.21-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:07a37d8699255402a10784d4d45f2bcc00ca7dba8da763207a834b15767e6c62"},
-    {file = "immutables-0.21-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:9139fd80bb05501216f49c4306bb80d0c1a08c3f0f621ed2939bf52d7f762661"},
-    {file = "immutables-0.21-cp38-cp38-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:fc6fc7e917e281361ad243be1a3cb56a7633de88ee67c94cdf5651958ead30d9"},
-    {file = "immutables-0.21-cp38-cp38-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:f6a577f55eaaf763b685eef9710edbeb7ee95e2e5f54e7e5e0fd0f60ae2eb648"},
-    {file = "immutables-0.21-cp38-cp38-musllinux_1_2_aarch64.whl", hash = "sha256:ca912c1bb35615ccbe361a6bb76e6fd43827394102467967d5599d78b50dd0f4"},
-    {file = "immutables-0.21-cp38-cp38-musllinux_1_2_x86_64.whl", hash = "sha256:586e88ca7ed44b7bb2cd7b212abd2637b51bd95bdb4856ab111b44715a62071c"},
-    {file = "immutables-0.21-cp38-cp38-win32.whl", hash = "sha256:21adc6b478a58692c79c5bf316b39d3fd0552441d2b38eef1782a7555deee484"},
-    {file = "immutables-0.21-cp38-cp38-win_amd64.whl", hash = "sha256:ecff5274357dc18aae053e5e10b8eee5e9b4d6cc774d34148c992cb2eb787ec3"},
-    {file = "immutables-0.21-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:e2aadf3bdd90daa0e8cb9c3cde4070e1021036e3b57f571a007ce24f323e47a9"},
-    {file = "immutables-0.21-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:5f8f507731d4d15e0c579aa77d8482471f988dc0f451e4bf3853ec36ccd42627"},
-    {file = "immutables-0.21-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:cb9a378a4480381d7d3d63b0d201cf610eae0bf70e26a9306e3e631c9bd64010"},
-    {file = "immutables-0.21-cp39-cp39-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4a7b5920bbfcaf038894c8ce4ed2eff0b31c3559810a61806db751be8ab4d703"},
-    {file = "immutables-0.21-cp39-cp39-musllinux_1_2_aarch64.whl", hash = "sha256:8b90702d1fe313e8273ae7abb46fc0f0a87b47c1c9a83aed9a161301146e655c"},
-    {file = "immutables-0.21-cp39-cp39-musllinux_1_2_x86_64.whl", hash = "sha256:71cbbc6fbe7e7321648047ff9273f4605f8bd5ce456841a65ef151080e9d3481"},
-    {file = "immutables-0.21-cp39-cp39-win32.whl", hash = "sha256:c44f286c47dc0d4d7b5bf19fbe975e6d57c56d2878cea413e1ec7a4bfffb2727"},
-    {file = "immutables-0.21-cp39-cp39-win_amd64.whl", hash = "sha256:cf15314c39484b8947a4e20c3526021272510592fb2807b5136a2fcd6ab0151b"},
-    {file = "immutables-0.21.tar.gz", hash = "sha256:b55ffaf0449790242feb4c56ab799ea7af92801a0a43f9e2f4f8af2ab24dfc4a"},
-]
-
-[package.extras]
-test = ["flake8 (>=5.0,<6.0)", "mypy (>=1.4,<2.0)", "pycodestyle (>=2.9,<3.0)", "pytest (>=7.4,<8.0)"]
 
 [[package]]
 name = "iniconfig"
@@ -1580,6 +1589,61 @@ files = [
 ]
 
 [[package]]
+name = "langchain"
+version = "1.4.3"
+description = "Building applications with LLMs through composability"
+optional = false
+python-versions = "<4.0.0,>=3.10.0"
+groups = ["main"]
+files = [
+    {file = "langchain-1.4.3-py3-none-any.whl", hash = "sha256:0334066939dd1c7551889727ed2d09a72dea7a6aed2193ffb61817fb658d8921"},
+    {file = "langchain-1.4.3.tar.gz", hash = "sha256:aed5c1a7cd581f70ddc076b75fdbcbae8031b8373983f86efd287aa70798abc2"},
+]
+
+[package.dependencies]
+langchain-core = ">=1.6.3,<2.0.0"
+langgraph = ">=1.2.11,<1.3.0"
+pydantic = ">=2.7.4,<3.0.0"
+
+[package.extras]
+anthropic = ["langchain-anthropic"]
+aws = ["langchain-aws"]
+azure-ai = ["langchain-azure-ai"]
+baseten = ["langchain-baseten (>=0.2.0)"]
+community = ["langchain-community"]
+deepseek = ["langchain-deepseek"]
+fireworks = ["langchain-fireworks"]
+google-genai = ["langchain-google-genai"]
+google-vertexai = ["langchain-google-vertexai"]
+groq = ["langchain-groq"]
+huggingface = ["langchain-huggingface"]
+mcp = ["fastmcp (>=4.0.1,<5.0.0)"]
+meta = ["langchain-meta"]
+mistralai = ["langchain-mistralai"]
+ollama = ["langchain-ollama"]
+openai = ["langchain-openai"]
+perplexity = ["langchain-perplexity"]
+together = ["langchain-together"]
+xai = ["langchain-xai"]
+
+[[package]]
+name = "langchain-anthropic"
+version = "1.7.4"
+description = "Integration package connecting Claude (Anthropic) APIs and LangChain"
+optional = false
+python-versions = "<4.0.0,>=3.10.0"
+groups = ["main"]
+files = [
+    {file = "langchain_anthropic-1.7.4-py3-none-any.whl", hash = "sha256:eec1178389358eaa4cff4f3dd353f063746b8c61090cffe9236d9035df71e66c"},
+    {file = "langchain_anthropic-1.7.4.tar.gz", hash = "sha256:7d540300665a1c906986e505cdec41204e759f14dbd989f53f0c180d82624b94"},
+]
+
+[package.dependencies]
+anthropic = ">=0.120.0,<2.0.0"
+langchain-core = ">=1.6.4,<2.0.0"
+pydantic = ">=2.7.4,<3.0.0"
+
+[[package]]
 name = "langchain-core"
 version = "1.6.5"
 description = "Building applications with LLMs through composability"
@@ -1744,35 +1808,47 @@ websockets = ">=14"
 
 [[package]]
 name = "langsmith"
-version = "0.7.23"
+version = "0.14.17"
 description = "Client library to connect to the LangSmith Observability and Evaluation Platform."
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "langsmith-0.7.23-py3-none-any.whl", hash = "sha256:3d2ea8f973f7f01c8d89bb5f02b14a906e75ee893739bf4b19d74f7f26a510c3"},
-    {file = "langsmith-0.7.23.tar.gz", hash = "sha256:38581c4cb35794ad37df9d20912e0dd740f4ba619534971eee2e8419efede50d"},
+    {file = "langsmith-0.14.17-py3-none-any.whl", hash = "sha256:0aa2c79936c93c7cea9c55656f05e21cc5da715fecbdbda439d084adc08429be"},
+    {file = "langsmith-0.14.17.tar.gz", hash = "sha256:53efa2db8293d0a8d60efebe0945c595b635873774b302066ed0a746ddf87562"},
 ]
 
 [package.dependencies]
-httpx = ">=0.23.0,<1"
+anyio = ">=3.5.0,<5"
+distro = ">=1.7.0,<2"
+httpx2 = ">=2,<3"
 orjson = {version = ">=3.9.14", markers = "platform_python_implementation != \"PyPy\""}
 packaging = ">=23.2"
 pydantic = ">=2,<3"
 requests = ">=2.0.0"
 requests-toolbelt = ">=1.0.0"
+sniffio = "*"
+typing-extensions = ">=4.14,<5"
 uuid-utils = ">=0.12.0,<1.0"
+websockets = ">=15.0"
 xxhash = ">=3.0.0"
 zstandard = ">=0.23.0"
 
 [package.extras]
+aiohttp = ["aiohttp (>=3.14.3,<4)", "httpx-aiohttp (>=0.1.9)"]
 claude-agent-sdk = ["claude-agent-sdk (>=0.1.0) ; python_version >= \"3.10\""]
+gemini-live = ["google-genai (>=1.75)"]
 google-adk = ["google-adk (>=1.0.0)", "wrapt (>=1.16.0)"]
+google-adk-live = ["google-adk (>=2.3.0)"]
 langsmith-pyo3 = ["langsmith-pyo3 (>=0.1.0rc2)"]
+livekit = ["cachetools (>=5.0.0)", "livekit-agents (>=1.6)", "opentelemetry-api (>=1.30.0)", "opentelemetry-exporter-otlp-proto-http (>=1.30.0)", "opentelemetry-sdk (>=1.30.0)"]
 openai-agents = ["openai-agents (>=0.0.3)"]
+openai-realtime = ["openai (>=1.50)", "openai-agents (>=0.0.3)"]
 otel = ["opentelemetry-api (>=1.30.0)", "opentelemetry-exporter-otlp-proto-http (>=1.30.0)", "opentelemetry-sdk (>=1.30.0)"]
+pipecat = ["cachetools (>=5.0.0)", "opentelemetry-api (>=1.30.0)", "opentelemetry-exporter-otlp-proto-http (>=1.30.0)", "opentelemetry-sdk (>=1.30.0)", "pipecat-ai (>=1.0) ; python_version >= \"3.11\""]
 pytest = ["pytest (>=7.0.0)", "rich (>=13.9.4)", "vcrpy (>=7.0.0)"]
-sandbox = ["websockets (>=15.0)"]
+sandbox-auth = ["pyjwt[crypto] (>=2.8.0)"]
+strands-agents = ["opentelemetry-api (>=1.30.0)", "opentelemetry-exporter-otlp-proto-http (>=1.30.0)", "opentelemetry-sdk (>=1.30.0)", "strands-agents (>=0.1.0)", "strands-agents-tools (>=0.2.0)"]
 vcr = ["vcrpy (>=7.0.0)"]
 
 [[package]]
@@ -3598,6 +3674,18 @@ slack = ["slack-sdk"]
 telegram = ["requests"]
 
 [[package]]
+name = "truststore"
+version = "0.10.5"
+description = "Verify certificates using native system trust stores"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "truststore-0.10.5-py3-none-any.whl", hash = "sha256:9aaaedaefaf06d8b206278cf8b5012bc897f485a874503501e12d776df78951c"},
+    {file = "truststore-0.10.5.tar.gz", hash = "sha256:30d36967ccaded5cbb38d602c433f53600036c79d502f4533a49b60a03bbefcd"},
+]
+
+[[package]]
 name = "typing-extensions"
 version = "4.14.1"
 description = "Backported and Experimental Type Hints for Python 3.9+"
@@ -3770,6 +3858,21 @@ distlib = ">=0.3.7,<1"
 filelock = {version = ">=3.24.2,<4", markers = "python_version >= \"3.10\""}
 platformdirs = ">=3.9.1,<5"
 python-discovery = ">=1"
+
+[[package]]
+name = "wcmatch"
+version = "12.0.1"
+description = "Wildcard/glob file name matcher."
+optional = false
+python-versions = ">=3.11"
+groups = ["main"]
+files = [
+    {file = "wcmatch-12.0.1-py3-none-any.whl", hash = "sha256:0e11b0bf1700bc8222ad5e7dc79fb326d9e0304458c7e2c25419ab6d26d07d8e"},
+    {file = "wcmatch-12.0.1.tar.gz", hash = "sha256:4ea6acef75b657bf71ac8fa9520165bf5ae55120c4e655895a5b7d4c69896c5e"},
+]
+
+[package.dependencies]
+bracex = ">=3.2.2"
 
 [[package]]
 name = "weaviate-client"
@@ -4258,4 +4361,4 @@ cffi = ["cffi (>=1.17) ; python_version >= \"3.13\" and platform_python_implemen
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "fa214802af29c2d0e2e0284e8f4bf4548d5dc3ac8b682988041569cd2abbd6fb"
+content-hash = "475d56f665908f5a4af7dfd5782c078773c003c729c00045e9af4229703b0b28"

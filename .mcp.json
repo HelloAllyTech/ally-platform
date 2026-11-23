@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "ally-blog": {
+      "type": "http",
+      "url": "${ALLY_BLOG_URL}",
+      "headers": {
+        "Authorization": "Bearer ${ALLY_BLOG_KEY}"
+      }
+    }
+  }
+}

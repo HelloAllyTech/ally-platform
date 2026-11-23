@@ -19,6 +19,7 @@ import {
   Privacy,
   Blog,
   BlogPost,
+  BlogReview,
   Changelog,
   Roadmap,
   Sjt1,
@@ -26,6 +27,7 @@ import {
   SjtReport1,
   HelplineTalk,
   HomeV2,
+  LandingPublicPage,
 } from "@pages";
 
 import { PageviewTracker } from "../analytics";
@@ -50,6 +52,7 @@ const RouteLayout = () => {
           <Route path={ROUTES.PRIVACY} element={<Privacy />} />
           {/* Blog — public, accessible whether or not signed in */}
           <Route path={ROUTES.BLOG} element={<Blog />} />
+          <Route path={ROUTES.BLOG_REVIEW} element={<BlogReview />} />
           <Route path={ROUTES.BLOG_POST} element={<BlogPost />} />
           <Route path={ROUTES.CHANGELOG} element={<Changelog />} />
           <Route path={ROUTES.ROADMAP} element={<Roadmap />} />
@@ -65,6 +68,12 @@ const RouteLayout = () => {
           {/* Conversational homepage, trialled beside /login — no nav, sign-in
               happens inside the conversation */}
           <Route path={ROUTES.HOME_V2} element={<HomeV2 />} />
+          {/* An admin-designed landing page at /<tenant code>/<slug>. Not a landing page (an app
+              address, or nothing published there)? Then it is the app's own route. */}
+          <Route
+            path={ROUTES.LANDING_PAGE}
+            element={<LandingPublicPage fallback={<PrivateRouteLayout />} />}
+          />
         </Route>
 
         {/* Hybrid routes - routes which are public but have navbar upon login */}

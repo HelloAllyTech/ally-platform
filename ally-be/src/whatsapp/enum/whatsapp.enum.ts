@@ -36,6 +36,18 @@ export enum WaHandledBy {
   UNIDENTIFIED = 'unidentified',
   /** Something failed and the fallback message went out. */
   ERROR = 'error',
+  /**
+   * A team member's reply from the inbox (chunk 11a). Stored with the sender's id; the assistant
+   * didn't write it.
+   */
+  HUMAN = 'human',
+  /** The assistant told the visitor it has asked the team to join (chunk 11a). */
+  HANDOVER = 'handover',
+  /**
+   * A team member has this chat, so the assistant didn't answer (chunk 11a). A decision only:
+   * nothing is sent, and no reply row is stored.
+   */
+  HELD = 'held',
 }
 
 /**

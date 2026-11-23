@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import {
+  AssessmentPhase,
   ArticleContent,
   ArticleExperience,
   ArticleQuestion,
@@ -145,6 +146,60 @@ export function validateTrackStructure(
         seenItemIds.add(item.id);
       }
       validateTrackItem(item);
+    }
+  }
+  validateAssessmentPairs(sections);
+}
+
+/**
+ * Pre/post pairs: a key joins exactly one PRE and one POST assessment
+ * roleplay in this track, with the PRE first in course order. A phase or key
+ * on anything but an assessment roleplay is refused rather than silently
+ * ignored. Whether the two scenarios score the same behaviours is only a
+ * warning, raised in the builder (GET /tracks/assessment-pair-compat).
+ */
+function validateAssessmentPairs(sections: UpsertTrackSectionDto[]): void {
+  const ordered = sections
+    .slice()
+    .sort((a, b) => a.order - b.order)
+    .flatMap((section) =>
+      section.items.slice().sort((a, b) => a.order - b.order),
+    );
+  const pairs = new Map<
+    string,
+    { pre: number[]; post: number[]; titles: string[] }
+  >();
+  ordered.forEach((item, position) => {
+    const criteria = item.completionCriteria;
+    const phase = criteria?.assessmentPhase;
+    const key = criteria?.assessmentPairKey;
+    if (!phase && !key) return;
+    if (item.type !== TrackItemType.ROLEPLAY || !criteria?.assessmentMode) {
+      fail(
+        `"${item.title}" is marked as a pre/post assessment but is not an assessment roleplay.`,
+      );
+    }
+    if (!phase || !key) {
+      fail(
+        `"${item.title}" needs both a pre/post role and the assessment it is paired with.`,
+      );
+    }
+    const pair = pairs.get(key) ?? { pre: [], post: [], titles: [] };
+    (phase === AssessmentPhase.PRE ? pair.pre : pair.post).push(position);
+    pair.titles.push(item.title);
+    pairs.set(key, pair);
+  });
+  for (const pair of pairs.values()) {
+    const names = pair.titles.map((t) => `"${t}"`).join(' and ');
+    if (pair.pre.length !== 1 || pair.post.length !== 1) {
+      fail(
+        `A pre/post pair needs exactly one pre-assessment and one post-assessment (${names}).`,
+      );
+    }
+    if (pair.pre[0] > pair.post[0]) {
+      fail(
+        `The pre-assessment must come before its post-assessment (${names}).`,
+      );
     }
   }
 }
@@ -1382,6 +1437,41 @@ function validateOpenEnded(
 }
 
 /**
+ * A roleplay's whole rule — its type (completionLogic + assessmentMode), its
+ * gates, its assessment settings and its pre/post pairing — is left out of
+ * the structural signature, so a trainer can change it on a course learners
+ * are already enrolled in (e.g. turn a trial roleplay that is trapping
+ * learners into "Participation only"). It is safe to change live:
+ *  - the rule is read fresh when each attempt ends, and completion is never
+ *    undone;
+ *  - an assessment attempt is judged once, when it ends, and stamped on the
+ *    session (`assessmentAttemptValid`) and the progress row
+ *    (`assessmentSubmission`); the start gate and reports read those stamps,
+ *    so a later edit never re-judges or un-submits an attempt;
+ *  - a learner's stored practice-attempt reasons are re-checked against the
+ *    current rule before they are shown (TrackEnrollmentService).
+ * The builder warns before saving such an edit on a course with enrolments.
+ */
+const ROLEPLAY_LIVE_EDITABLE_CRITERIA = [
+  'completionLogic',
+  'minScore',
+  'minDurationSeconds',
+  'assessmentMode',
+  'minLearnerTurns',
+  'showResultsToLearner',
+  'assessmentPhase',
+  'assessmentPairKey',
+] as const;
+
+function signatureCriteria(item: UpsertTrackItemDto) {
+  const criteria = item.completionCriteria ?? null;
+  if (item.type !== TrackItemType.ROLEPLAY || !criteria) return criteria;
+  const locked: Record<string, unknown> = { ...criteria };
+  for (const key of ROLEPLAY_LIVE_EDITABLE_CRITERIA) delete locked[key];
+  return Object.keys(locked).length > 0 ? locked : null;
+}
+
+/**
  * Structural signature used to enforce the publish-lock rule: while a track
  * has enrollments, edits that change this signature are rejected (content-safe
  * edits — titles, article html, explanations, prompt text — do not change it).
@@ -1411,7 +1501,7 @@ export function computeStructuralSignature(
           branching: branchingStructuralSignature(item),
           bucketSort: bucketSortStructuralSignature(item),
           video: videoStructuralSignature(item),
-          completionCriteria: item.completionCriteria ?? null,
+          completionCriteria: signatureCriteria(item),
         })),
     }));
   return JSON.stringify(signature);

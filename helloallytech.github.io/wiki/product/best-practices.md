@@ -8,7 +8,7 @@ last_reconciled: 2026-11-09
 # Product Management Best Practices
 
 > [!WARNING]
-> **Deprecated — 2026-08-07. Superseded by the Stacks MCP, and since 2026-11-09 by the Context Library.**
+> **Deprecated — 2026-08-07. Superseded by the Context Library.**
 >
 > Product guidance is no longer maintained in this wiki. It is retrieved from Ally's
 > **Context Library**: *whenever a product or engineering judgement comes up — before writing an
@@ -34,7 +34,7 @@ and how it should behave for the people using it*.
 
 ## 1. Subsections
 
-All subsections are **Deprecated** as of 2026-08-07 — superseded by Stacks, and now by the Context Library. The table is kept so
+All subsections are **Deprecated** as of 2026-08-07 — superseded by the Context Library. The table is kept so
 the pages stay reachable and their inbound citations resolve.
 
 | Subsection | Covers | Maturity |

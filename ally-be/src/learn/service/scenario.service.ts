@@ -144,6 +144,7 @@ import {
   OpenAITranslationsService,
   TranslationProgressCallback,
 } from 'src/common/service/openai-translation.service';
+import { ScenarioDescriptionAudioService } from './scenario-description-audio.service';
 import { ScenarioTranslationNotificationService } from './scenario-translation-notification.service';
 import {
   ScenarioTranslationAction,
@@ -215,6 +216,8 @@ import {
   AUDIT_EVENTS,
 } from 'src/audit/constants/audit-event.constants';
 import { BehaviorInstructionDto } from '../dto/behavior-instruction.dto';
+import { BehaviorInstructionCategory } from '../enum/behavior-instruction.enum';
+import { ScenarioBehaviorInstruction } from '../entity/scenario-behavior-instruction.entity';
 
 @Injectable()
 export class ScenarioService {
@@ -255,6 +258,8 @@ export class ScenarioService {
     private readonly tenantFeatureService: TenantFeatureService,
     private readonly contentAccessService: ContentAccessService,
     @Optional() private readonly imageAssetService?: ImageAssetService,
+    @Optional()
+    private readonly descriptionAudioService?: ScenarioDescriptionAudioService,
   ) {}
 
   async getScenarios(): Promise<GetScenarioDto[]> {
@@ -526,6 +531,11 @@ export class ScenarioService {
     }
 
     if (languageCode) {
+      // The narration reads the base-language description: hide it when the
+      // learner is shown a translated one.
+      if (scenario.translations?.[languageCode]?.description) {
+        scenario.descriptionAudioUrl = null;
+      }
       applyScenarioTranslations(scenario, languageCode);
       scenario.triggerWarnings?.forEach((triggerWarning) => {
         if (
@@ -852,6 +862,7 @@ export class ScenarioService {
         // strict-bounds validator with their legacy null bounds.
         await this.pruneStatesIfPromptNotStateful(scenario);
         await this.validateCreateScenario(scenario);
+        await this.fillBehaviorInstructionsFromCompetencies(scenario);
         return mapCreateScenarioRequestToEntity(scenario, userId);
       },
     );
@@ -1043,6 +1054,10 @@ export class ScenarioService {
             savedScenarios[i].metadata,
           );
         }
+      }
+
+      for (const saved of savedScenarios) {
+        void this.descriptionAudioService?.onScenarioSaved(saved.id);
       }
 
       return savedScenarios;
@@ -1346,6 +1361,131 @@ export class ScenarioService {
       this.logger.error(JSON.stringify(invalidBehaviorInstructions));
       throw new BadRequestException('Invalid behavior instructions');
     }
+  }
+
+  /**
+   * Gives a new roleplay the behaviour rows of its competencies when the
+   * caller sent none, so it scores. Studio fills these rows in the browser
+   * (Competency.tsx), but a server-side creator such as Course Copilot never
+   * did — and with no rows, behaviour detection is skipped at runtime and the
+   * score barely moves while the course gates on a minimum score.
+   *
+   * Only an absent field is filled. Studio always sends the array, so an empty
+   * one is a trainer's deliberate choice and is kept. The rows mirror the
+   * browser's: per competency, one SHOULD_DO row of its helpful behaviours and
+   * one SHOULD_NOT_DO row of its unhelpful ones, at the category's default
+   * score, with no state instructions.
+   */
+  private async fillBehaviorInstructionsFromCompetencies(
+    dto: CreateScenarioDto,
+  ): Promise<void> {
+    if (dto.behaviorInstructions !== undefined) return;
+
+    const competencyIds = this.competencyIdsOf(dto);
+    if (competencyIds.length === 0) return;
+
+    const rows =
+      await this.deriveBehaviorInstructionsFromCompetencies(competencyIds);
+    if (rows.length === 0) {
+      this.logger.warn(
+        `Scenario "${dto.title}" created without behaviour rows: its competencies (${competencyIds.join(', ')}) map to no behaviours`,
+      );
+      return;
+    }
+    dto.behaviorInstructions = rows;
+  }
+
+  /**
+   * Gives an existing roleplay its competencies' behaviour rows when it has
+   * none, for roleplays built before the create path did this itself (see
+   * fillBehaviorInstructionsFromCompetencies). A roleplay that already has
+   * any live row is left alone, so a second run changes nothing. The caller
+   * decides which roleplays qualify: a hand-built roleplay with an empty
+   * table may be empty on purpose.
+   */
+  async addMissingBehaviorInstructions(
+    scenarioId: number,
+    options: { dryRun?: boolean } = {},
+  ): Promise<
+    | { outcome: 'added'; rows: number }
+    | { outcome: 'has-rows' | 'no-competency' | 'no-behaviours' | 'not-found' }
+  > {
+    const scenario = await this.scenariosRepository.findOne({
+      where: { id: scenarioId },
+    });
+    if (!scenario) return { outcome: 'not-found' };
+
+    const existing = await this.dataSource
+      .getRepository(ScenarioBehaviorInstruction)
+      .count({ where: { scenarioId } });
+    if (existing > 0) return { outcome: 'has-rows' };
+
+    const competencyIds = this.competencyIdsOf(scenario);
+    if (competencyIds.length === 0) return { outcome: 'no-competency' };
+
+    const rows =
+      await this.deriveBehaviorInstructionsFromCompetencies(competencyIds);
+    if (rows.length === 0) return { outcome: 'no-behaviours' };
+
+    if (!options.dryRun) {
+      await this.dataSource.transaction((manager) =>
+        this.scenarioBehaviorInstructionService.createBehaviorInstructions(
+          [{ scenarioId, behaviorInstructions: rows }],
+          manager,
+        ),
+      );
+    }
+    return { outcome: 'added', rows: rows.length };
+  }
+
+  private competencyIdsOf(source: {
+    competencyId?: string | null;
+    competencyIds?: string[] | null;
+  }): string[] {
+    return [
+      ...new Set(
+        [...(source.competencyIds ?? []), source.competencyId].filter(
+          (id): id is string => Boolean(id),
+        ),
+      ),
+    ];
+  }
+
+  /**
+   * Per competency, one SHOULD_DO row of its helpful behaviours and one
+   * SHOULD_NOT_DO row of its unhelpful ones — the rows Studio's competency
+   * picker builds in the browser. A competency with no stored mapping is
+   * seeded from its preset defaults by getCompetencyBehaviours.
+   */
+  private async deriveBehaviorInstructionsFromCompetencies(
+    competencyIds: string[],
+  ): Promise<BehaviorInstructionDto[]> {
+    const mappings = await Promise.all(
+      competencyIds.map((id) =>
+        this.competencyService.getCompetencyBehaviours(id),
+      ),
+    );
+
+    const rows: BehaviorInstructionDto[] = [];
+    for (const mapping of mappings) {
+      if (mapping.helpful.length > 0) {
+        rows.push({
+          category: BehaviorInstructionCategory.SHOULD_DO,
+          score: null,
+          behaviors: mapping.helpful.map((behaviour) => behaviour.id),
+          stateInstructions: [],
+        });
+      }
+      if (mapping.unhelpful.length > 0) {
+        rows.push({
+          category: BehaviorInstructionCategory.SHOULD_NOT_DO,
+          score: null,
+          behaviors: mapping.unhelpful.map((behaviour) => behaviour.id),
+          stateInstructions: [],
+        });
+      }
+    }
+    return rows;
   }
 
   /**
@@ -1750,6 +1890,10 @@ export class ScenarioService {
         ? await runUpdate(manager)
         : await this.dataSource.transaction(runUpdate);
 
+      if (success) {
+        void this.descriptionAudioService?.onScenarioSaved(id, manager);
+      }
+
       if (
         success &&
         (updateScenarioDto.translationOpeningStatements !== undefined ||
@@ -1954,6 +2098,7 @@ export class ScenarioService {
         const behaviorInstructionsToCreate = originalBehaviorInstructions.map(
           (instruction) => ({
             category: instruction.category,
+            score: instruction.score,
             stateInstructions: instruction.stateInstructions,
             behaviors: instruction.behaviors.map((behavior) => behavior.id),
           }),

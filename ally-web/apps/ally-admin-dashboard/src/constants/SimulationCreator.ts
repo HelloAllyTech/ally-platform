@@ -193,6 +193,7 @@ export const FORM_FIELD_TYPES = {
     COMFORT_AUDIO_TRACK: "comfort_audio_track",
     VIDEO_ACTOR_PICKER: "video_actor_picker",
     MEMORIES_EDITOR: "memories_editor",
+    DEBRIEF_RISK_CUE_OPTION: "debrief_risk_cue_option",
   },
   TOGGLE_BUTTON: "toggle_button",
   TAG_AND_DROPDOWN: "tag_and_dropdown",
@@ -989,6 +990,16 @@ export const SIMULATION_CREATOR_FIELD_GROUPS: CreatorFieldGroups[] = [
         tooltipLocation: TooltipLocation.FEEDBACK_TAB_TRANSCRIPT,
       },
       {
+        // The Debrief's per-roleplay choice, right under the Debrief/Transcript tab toggles it
+        // belongs with. Persists to scenarios.metadata.debriefRiskCueOption; null (or unset) is
+        // the default.
+        id: "debriefRiskCueOption",
+        label: "Risk cues in this roleplay",
+        type: FORM_FIELD_TYPES.CUSTOM.DEBRIEF_RISK_CUE_OPTION,
+        fullWidth: true,
+        isMandatory: false,
+      },
+      {
         id: "pauseEnabled",
         label: "Allow Pause/Resume",
         type: FORM_FIELD_TYPES.TOGGLE_BUTTON,
@@ -1693,6 +1704,17 @@ export const BEHAVIOURS_AND_STATES_INSTRUCTION_TABLE_COLUMNS = [
     dataType: cellTypes.dropdownTags,
     minWidth: 220,
     width: "18%",
+  },
+  {
+    // Points per detection: -100..100, sign follows the category. Empty = the
+    // category default (+10 / -10). Validated in BehavioursAndStatesInstruction.
+    id: "score",
+    label: "Score",
+    accessor: "score",
+    placeholder: "10",
+    dataType: cellTypes.number,
+    minWidth: 110,
+    width: "8%",
   },
   ...BEHAVIOUR_STATES.map(state => ({
     id: `stateInstruction_${state.stateId}`,

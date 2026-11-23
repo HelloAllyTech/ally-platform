@@ -9,7 +9,7 @@ import { BuilderSlackController } from './controller/builder-slack.controller';
 import { BuilderSlackService } from './service/builder-slack.service';
 import { AuthModule } from 'src/auth/auth.module';
 import { GithubModule } from 'src/github/github.module';
-import { BugHunterModule } from 'src/bug-hunter/bug-hunter.module';
+import { BugHunterApprovalsModule } from 'src/bug-hunter-approvals/bug-hunter-approvals.module';
 import { AnalyticsAgentModule } from 'src/analytics-agent/analytics-agent.module';
 import { LogsModule } from 'src/logs/logs.module';
 import { UxSignalsModule } from 'src/ux-signals/ux-signals.module';
@@ -29,6 +29,9 @@ import { BuilderSettings } from './entity/builder-settings.entity';
 import { BuilderNotification } from './entity/builder-notification.entity';
 import { BuilderRepoCatalog } from './entity/builder-repo-catalog.entity';
 import { BuilderEvidence } from './entity/builder-evidence.entity';
+import { BuilderPlanReadGuard } from './guard/builder-plan-read.guard';
+import { PermissionsGuard } from 'src/auth/guards/permissions.guard';
+import { FeatureToggleGuard } from 'src/auth/guards/feature-toggle.guard';
 import { BuilderController } from './controller/builder.controller';
 import { BuilderPrinciplesController } from './controller/builder-principles.controller';
 import { BuilderPipelineController } from './controller/builder-pipeline.controller';
@@ -67,6 +70,8 @@ import { BuilderCorrection } from './entity/builder-correction.entity';
 import { BuilderCorrectionService } from './service/builder-correction.service';
 import { BuilderCorrectionsController } from './controller/builder-corrections.controller';
 import { BuilderReadinessService } from './service/builder-readiness.service';
+import { BuilderPrdPathCheckService } from './service/builder-prd-path-check.service';
+import { BuilderPrdChecklistToolsService } from './service/builder-prd-checklist-tools.service';
 import { BuilderProductMapService } from './service/builder-product-map.service';
 import { BuilderPlatformContextService } from './service/builder-platform-context.service';
 import { BuilderNotificationService } from './service/builder-notification.service';
@@ -90,6 +95,7 @@ import { BuilderRule } from './entity/builder-rule.entity';
 import { BuilderSchedulerRegistrationService } from './service/builder-scheduler-registration.service';
 import { BuilderSessionRepository } from './repository/builder-session.repository';
 import { BuilderMessageRepository } from './repository/builder-message.repository';
+import { ProductPlanningModule } from 'src/product-planning/product-planning.module';
 import {
   BuilderPrdDocRepository,
   BuilderPrdVersionRepository,
@@ -107,6 +113,8 @@ import {
   BuilderPullRequestRepository,
   BuilderPrFeedbackRepository,
 } from './repository/builder-build.repository';
+import { BuilderPlanConversationController } from './controller/builder-plan-conversation.controller';
+import { BuilderPlanConversationService } from './service/builder-plan-conversation.service';
 
 /**
  * Builder: the admin agent that interviews an admin into a PRD and then
@@ -128,6 +136,8 @@ import {
  */
 @Module({
   imports: [
+    // Plan sessions price their interview into the plan spend ledger. Entities only: no cycle.
+    ProductPlanningModule,
     TypeOrmModule.forFeature([
       BuilderSession,
       BuilderMessage,
@@ -166,7 +176,7 @@ import {
     // For BugFindingService only: the evidence service reads open findings.
     // A domain dependency, unlike the GitHub client that used to be smuggled
     // through this same import.
-    BugHunterModule,
+    BugHunterApprovalsModule,
     // Lane A evidence sources: production numbers, production errors. Read
     // through each owner's own service rather than its HTTP surface, which is
     // gated for a logged-in human.
@@ -189,9 +199,16 @@ import {
     BuilderCorrectionsController,
     BuilderRoomController,
     BuilderPrinciplesController,
+    // Roadmap v2 P3b: answers, comments and Use this answer on a shared plan.
+    BuilderPlanConversationController,
   ],
   providers: [
+    // Roadmap v2 D2: read-only way into a shared plan session for Idea people.
+    BuilderPlanReadGuard,
+    PermissionsGuard,
+    FeatureToggleGuard,
     BuilderPrinciplesService,
+    BuilderPlanConversationService,
     BuilderSlackService,
     BuilderGateway,
     BuilderSessionService,
@@ -215,6 +232,8 @@ import {
     BuilderEvidenceLogService,
     BuilderPrdReviewService,
     BuilderReadinessService,
+    BuilderPrdPathCheckService,
+    BuilderPrdChecklistToolsService,
     BuilderEvalSandboxFactory,
     BuilderEvalRunnerService,
     BuilderEvalFixtureService,
@@ -250,6 +269,10 @@ import {
   ],
   exports: [
     BuilderSessionService,
+    // The roadmap's plan flow (product-roadmap/plan) keeps a plan in a Builder session from its
+    // first message, so it appends to the transcript and reads session rows directly.
+    BuilderSessionRepository,
+    BuilderMessageRepository,
     // The Builder tab's Up next, Start and Put back live with the roadmap
     // (which owns opportunities); they read these to gate, seed and record.
     BuilderNowService,

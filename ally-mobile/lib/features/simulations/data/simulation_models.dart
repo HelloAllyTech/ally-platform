@@ -26,6 +26,7 @@ class Scenario {
     required this.description,
     required this.coverImageUrl,
     this.coverVideoUrl,
+    this.descriptionAudioUrl,
     this.triggerWarnings = const [],
     this.availableLanguages = const [],
     this.completedAttemptCount = 0,
@@ -47,6 +48,7 @@ class Scenario {
     description: json['description'] as String?,
     coverImageUrl: json['coverImageUrl'] as String?,
     coverVideoUrl: json['coverVideoUrl'] as String?,
+    descriptionAudioUrl: json['descriptionAudioUrl'] as String?,
     triggerWarnings: (json['triggerWarnings'] as List<dynamic>? ?? [])
         .map((e) => (e as Map<String, dynamic>)['name'] as String)
         .toList(),
@@ -87,6 +89,9 @@ class Scenario {
   final String? description;
   final String? coverImageUrl;
   final String? coverVideoUrl;
+
+  /// Narration of [description]; null until it has been generated.
+  final String? descriptionAudioUrl;
   final List<String> triggerWarnings;
   final List<ScenarioLanguageOption> availableLanguages;
 
@@ -412,6 +417,7 @@ class SimulationSummary {
     this.supervisorNote,
     this.errorMessage,
     this.sessionFeedback,
+    this.resultsHidden = false,
   });
 
   factory SimulationSummary.fromJson(Map<String, dynamic> json) {
@@ -439,6 +445,7 @@ class SimulationSummary {
       hasSummaryFeedback: feedback != null,
       supervisorNote: feedback?['supervisorNote'] as String?,
       errorMessage: summary?['errorMessage'] as String?,
+      resultsHidden: json['resultsHidden'] == true,
       sessionFeedback: sessionFeedback == null
           ? null
           : (
@@ -492,6 +499,10 @@ class SimulationSummary {
   /// The learner's own rating (`sessionFeedback`), when already given.
   final ({int? rating, List<String> tags, String comment})? sessionFeedback;
 
+  /// A submitted assessment whose results are withheld from the learner: no
+  /// score, debrief or transcript, and nothing left to poll for.
+  final bool resultsHidden;
+
   /// RN `isShortSession`: 30s or less; unknown length is not short.
   bool get isShortSession => callDuration != null && callDuration! <= 30;
 
@@ -509,6 +520,7 @@ class SimulationSummary {
 /// feedback screen reads).
 class SimulationSummaryScenario {
   SimulationSummaryScenario({
+    this.id,
     this.title,
     this.description,
     this.coverImageUrl,
@@ -523,6 +535,7 @@ class SimulationSummaryScenario {
     final metadata = json['metadata'] as Map<String, dynamic>?;
     final tabs = metadata?['feedbackTabs'] as Map<String, dynamic>?;
     return SimulationSummaryScenario(
+      id: (json['id'] as num?)?.toInt(),
       title: json['title'] as String?,
       description: json['description'] as String?,
       coverImageUrl: json['coverImageUrl'] as String?,
@@ -534,6 +547,8 @@ class SimulationSummaryScenario {
     );
   }
 
+  /// The roleplay's id, when the server sends it.
+  final int? id;
   final String? title;
   final String? description;
   final String? coverImageUrl;

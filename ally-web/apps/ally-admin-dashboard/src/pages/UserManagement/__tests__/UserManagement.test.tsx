@@ -27,13 +27,47 @@ vi.mock("@api", async importOriginal => ({
   useListEligiblePlatformAdminsQuery: () => ({ data: undefined, isFetching: false }),
   useAssignPlatformAdminMutation: () => [vi.fn()],
   useRemovePlatformAdminMutation: () => [vi.fn()],
+  useListClinicalAdvisorsQuery: () => ({ data: undefined, isLoading: false }),
+  // The Ally admins list shows Roadmap roles to Owners; nobody here is one.
+  useListRoadmapRolesQuery: () => ({ data: undefined }),
   useGetUserFeatureTogglesQuery: () => ({ data: undefined, isLoading: false }),
   useSetUserFeatureTogglesMutation: () => [vi.fn()],
   useGetTenantsQuery: () => ({ data: undefined }),
+  // CR1 Part B: Users → Custom logins.
+  useListCustomLoginsQuery: () => ({
+    data: {
+      data: [
+        {
+          id: 41,
+          name: "Asha Rao",
+          email: "asha@clinic.example",
+          status: "ACTIVE",
+          createdAt: "2026-11-01T00:00:00.000Z",
+          organisation: "Sunrise",
+          features: ["whatsapp_bot"],
+          assistants: 2,
+        },
+      ],
+      count: 1,
+    },
+    isLoading: false,
+  }),
+  useRemoveCustomLoginMutation: () => [vi.fn()],
 }));
 
 // Mock components
 vi.mock("@components", () => ({
+  useConfirm: () => ({ confirm: vi.fn().mockResolvedValue(true), dialog: null }),
+  BulkActionBar: ({ count, actions }: any) =>
+    count > 0 ? (
+      <div data-testid="bulk-bar">
+        {actions.map((a: any) => (
+          <button key={a.label} onClick={a.onClick}>
+            {a.label}
+          </button>
+        ))}
+      </div>
+    ) : null,
   cellTypes: {
     editableText: "editableText",
     dropdown: "dropdown",
@@ -727,6 +761,71 @@ describe("UserManagement", () => {
     });
   });
 
+  // Debrief access (formerly Clinical advisors) moved into Ally admins as per-person switches.
+  describe("Debrief access", () => {
+    const withToggle = () =>
+      mockUserState(
+        [Permissions.EDIT_USER],
+        [FeatureToggleKey.USERS, FeatureToggleKey.ADMIN_USER_MANAGEMENT],
+      );
+
+    it("is no tab of its own: Debrief roles are switches on an Ally admin's page", () => {
+      withToggle();
+      renderUserManagement(["/"]);
+      const tabs = screen.getAllByRole("button").map(b => b.textContent ?? "");
+      expect(tabs.some(t => t.startsWith("Ally admins"))).toBe(true);
+      expect(tabs.some(t => t.startsWith("Debrief access"))).toBe(false);
+    });
+
+    it("opens Ally admins from the old Debrief access and Clinical advisors links", () => {
+      for (const id of [TabType.DEBRIEF_ACCESS, TabType.CLINICAL_ADVISORS]) {
+        withToggle();
+        const { unmount } = renderUserManagement([`/?tab=${id}`]);
+        // The open tab is the one with the underline.
+        expect(screen.getByTestId("tab-super-admins").querySelector("span")).not.toBeNull();
+        expect(screen.getByTestId("tab-users").querySelector("span")).toBeNull();
+        unmount();
+      }
+    });
+  });
+
+  // CR1 Part B: custom logins have their own tab (they are no longer platform admins), gated on
+  // Admin User Management like Ally admins; ally-be refuses its routes to everyone else.
+  describe("Custom logins", () => {
+    it("is a tab with Admin User Management, listing them and offering Create", () => {
+      mockUserState(
+        [Permissions.EDIT_USER],
+        [FeatureToggleKey.USERS, FeatureToggleKey.ADMIN_USER_MANAGEMENT],
+      );
+      renderUserManagement([`/?tab=${TabType.CUSTOM_LOGINS}`]);
+      expect(screen.getByTestId("custom-logins")).toBeInTheDocument();
+      expect(screen.getByTestId("custom-login-create")).toBeInTheDocument();
+      expect(screen.getByText("asha@clinic.example")).toBeInTheDocument();
+    });
+
+    it("is hidden from anyone without it", () => {
+      mockUserState([Permissions.EDIT_USER, Permissions.VIEW_USERS], [FeatureToggleKey.USERS]);
+      renderUserManagement([`/?tab=${TabType.CUSTOM_LOGINS}`]);
+      expect(screen.queryByTestId("custom-login-create")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("custom-logins")).not.toBeInTheDocument();
+      expect(screen.queryByText(/^Custom logins/)).not.toBeInTheDocument();
+    });
+  });
+
+  // CR1 (WA-NUMBERS-REPORT step 1): the old WhatsApp Numbers tab is off the admin screens.
+  describe("WhatsApp Numbers", () => {
+    it("is no longer a tab, and its old link opens Users", () => {
+      mockUserState(
+        [Permissions.EDIT_USER, Permissions.VIEW_USERS],
+        [FeatureToggleKey.USERS, FeatureToggleKey.WHATSAPP_BOT],
+      );
+      renderUserManagement([`/?tab=${TabType.PHONE_MAPPINGS}`]);
+      const tabs = screen.getAllByRole("button").map(b => b.textContent ?? "");
+      expect(tabs.some(t => t.startsWith("WhatsApp"))).toBe(false);
+      expect(screen.getByTestId("tab-users").querySelector("span")).not.toBeNull();
+    });
+  });
+
   // With the Users toggle off, an admin who holds Admin User Management still
   // reaches the page — for the Ally admins list — and nothing else on it.
   describe("with the Users toggle off", () => {
@@ -818,7 +917,7 @@ describe("UserManagement", () => {
       expect(roleSection).toHaveTextContent("LEARNER");
     });
 
-    it("shows no extra content for an ordinary account's change-role modal", () => {
+    it("shows the role descriptions but no platform note for an ordinary account's change-role modal", () => {
       vi.mocked(useUserManagementHook.useUserManagement).mockReturnValue({
         ...mockUserManagementHook,
         selectedOption: "Change role",
@@ -827,7 +926,8 @@ describe("UserManagement", () => {
 
       renderUserManagement();
 
-      expect(screen.queryByTestId("modal-extra-content")).not.toBeInTheDocument();
+      expect(screen.getByText("What each role can do")).toBeInTheDocument();
+      expect(screen.queryByText(/platform/i)).not.toBeInTheDocument();
     });
 
     // The picker can't show the tier, so without this note the modal reads as

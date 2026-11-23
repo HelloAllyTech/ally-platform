@@ -8,7 +8,7 @@ import {
   builderTransition,
   prefersReducedMotion,
   staggerDelayMs,
-} from "../../pages/Builder/builderMotion";
+} from "../../motion/builderMotion";
 import { ChatMessage as AgentChatMessage } from "../agent-chat/ChatMessage";
 import { AgentAnswerPayload } from "../agent-chat/QuestionCard";
 
@@ -21,10 +21,6 @@ const TOOL_LABELS: Record<string, string> = {
   github_repo_tree: "Looking through a repo",
   principles_search: "Checking principles",
   principles_get: "Reading principles",
-  // History: sessions from before 2026-11-09, when the Context Library replaced Stacks, stored
-  // these calls under their old names. Kept so those transcripts still read.
-  stacks_search: "Checking product guidance",
-  stacks_get: "Reading product guidance",
   list_repo_commands: "Checking repo commands",
   // Lookups.
   capability_lookup: "Checking what already exists",

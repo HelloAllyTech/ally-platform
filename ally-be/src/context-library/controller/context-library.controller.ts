@@ -35,6 +35,7 @@ import {
   CL_UPLOAD_MAX_FILES,
 } from '../constants/context-library.constants';
 import {
+  ContextAudienceDto,
   ContextAuthoredChunkDto,
   ContextBulkDto,
   ContextChunkListQueryDto,
@@ -262,6 +263,31 @@ export class ContextLibraryController {
     return this.uploads.retryFailed(id);
   }
 
+  @Put('sources/:id/audience')
+  @RequireFeatureToggle(FeatureToggleKey.CONTEXT_LIBRARY, EDIT)
+  @ApiOperation({
+    summary: 'Choose which organisations a document’s entries reach',
+    description:
+      'Sets the document’s audience (re-extractions inherit it) and applies it to every entry ' +
+      'distilled from this document alone. Entries other documents also back keep theirs and ' +
+      'are counted as `shared`.',
+  })
+  async setSourceAudience(
+    @CurrentUser() user: TokenUser,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() dto: ContextAudienceDto,
+  ) {
+    const { source, updated, shared } =
+      await this.chunkService.setSourceAudience(id, dto, actorFor(user));
+    return {
+      id: source.id,
+      isGlobal: source.isGlobal,
+      tenantIds: source.tenantIds,
+      updated,
+      shared,
+    };
+  }
+
   @Get('sources')
   @RequireFeatureToggle(FeatureToggleKey.CONTEXT_LIBRARY, VIEW)
   @ApiOperation({
@@ -378,6 +404,23 @@ export class ContextLibraryController {
     return this.chunkService.setPinned(code, false, actorFor(user));
   }
 
+  @Put('chunks/:code/audience')
+  @RequireFeatureToggle(FeatureToggleKey.CONTEXT_LIBRARY, EDIT)
+  @ApiOperation({
+    summary: 'Choose which organisations an entry reaches',
+    description:
+      'Every organisation, or only those named. Any entry Ally owns — written, bulk-uploaded ' +
+      'or distilled from a document; an organisation’s own entries and Studio-synced items ' +
+      'follow their owner and are refused.',
+  })
+  setChunkAudience(
+    @CurrentUser() user: TokenUser,
+    @Param('code') code: string,
+    @Body() dto: ContextAudienceDto,
+  ) {
+    return this.chunkService.setAudience(code, dto, actorFor(user));
+  }
+
   @Post('bulk')
   @RequireFeatureToggle(FeatureToggleKey.CONTEXT_LIBRARY, EDIT)
   @UseInterceptors(
@@ -400,6 +443,7 @@ export class ContextLibraryController {
       file?.buffer ?? Buffer.alloc(0),
       actorFor(user),
       dto.apply === 'true',
+      { isGlobal: dto.isGlobal, tenantIds: dto.tenantIds },
     );
   }
 

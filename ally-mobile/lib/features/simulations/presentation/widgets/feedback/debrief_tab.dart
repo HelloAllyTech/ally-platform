@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../core/localization/translate_ref.dart';
+import '../../../../../core/realtime/connectivity.dart';
 import '../../../../../core/theme/app_colors.dart';
 import '../../../../../core/theme/app_fonts.dart';
 import '../../../../../core/widgets/ask_ai_chat/ask_ai_chat.dart';
@@ -11,21 +12,17 @@ import 'debrief_cards.dart';
 import 'learner_debrief_controller.dart';
 import 'supervisor_note.dart';
 
-/// Port of RN `Debrief/DebriefTab.tsx`: the landing surface after a
-/// session. Ally's note opens one continuous thread the learner can reply
-/// to — the reply thread is the scenario-session Ask-AI chat
-/// ([AskAiChatController], RN `useAskAIChat`), absorbed here.
+/// The landing surface after a session: the Debrief agent's debrief
+/// ([DebriefCards], web helpline `DebriefTab` → `useLearnerDebrief`), which
+/// serves every organisation.
 ///
-/// While the note is still being generated (and polling hasn't given up) a
-/// skeleton + "Ally is writing your debrief…" shows; a failed or missing
-/// note says so plainly. Read-only (opened from Logs) shows the note alone.
+/// When it is not available (`not_available`, polling gave up, a refused
+/// request) a session that already holds Ally's OLD note (RN `DebriefTab`,
+/// `supervisorNote`) shows it read-only: no rating, no reply thread, no
+/// waiting. With no old note one calm line says there is no debrief.
 ///
-/// The Debrief agent's debrief ([DebriefCards], the web helpline's
-/// `DebriefTab` → `useLearnerDebrief`) replaces all of that once the
-/// learner's organisation is switched on. Until its first answer lands — and
-/// for `not_available` or any failed request — today's debrief shows exactly
-/// as before. Once it is `ready` (and not read-only), the same reply thread
-/// moves under its reflective question as Ask Ally: replies go to the Debrief
+/// Once the debrief is `ready` (and not read-only), the Ask-AI chat thread
+/// ([AskAiChatController]) moves under its reflective question as Ask Ally: replies go to the Debrief
 /// agent (`POST /debriefs/sessions/:id/reply/stream`, web `DebriefTab`'s
 /// `askAlly`) on the same history.
 ///
@@ -33,7 +30,9 @@ import 'supervisor_note.dart';
 /// (`GET /debriefs/sessions/:id/supervisor`, v9 FR-26): the same cards with
 /// no controls, the learner's flags and outcomes under each card, their
 /// "Was this helpful?" answer and their Ask Ally thread. A 403 or
-/// `not_available` keeps the note.
+/// `not_available` keeps the note. The reader's own session (the learner
+/// view answers `ready`) shows as their debrief instead, with its
+/// "Practise this next" button (web `ownReady`).
 class DebriefTab extends ConsumerStatefulWidget {
   const DebriefTab({
     super.key,
@@ -42,8 +41,14 @@ class DebriefTab extends ConsumerStatefulWidget {
     required this.summary,
     required this.retryLimitReached,
     this.onOpenMoment,
+    this.onSeeQuote,
     this.readOnly = false,
-  });
+    bool? supervisorView,
+    this.trackId,
+  }) : supervisorView = supervisorView ?? readOnly;
+
+  /// The course this session was played in: "Practise this" keeps it.
+  final String? trackId;
 
   final AskAiChatController chat;
 
@@ -52,20 +57,27 @@ class DebriefTab extends ConsumerStatefulWidget {
   final SimulationSummary? summary;
   final bool retryLimitReached;
   final ValueChanged<String>? onOpenMoment;
+
+  /// "See this moment" under a debrief card's quote: the transcript at the
+  /// turn holding those words.
+  final ValueChanged<String>? onSeeQuote;
   final bool readOnly;
+
+  /// Whose view of the debrief: the supervisor's (Roleplay Logs, someone
+  /// else's session) or the learner's own. Defaults to [readOnly].
+  final bool supervisorView;
 
   @override
   ConsumerState<DebriefTab> createState() => _DebriefTabState();
 }
 
 class _DebriefTabState extends ConsumerState<DebriefTab> {
-  final _scrollController = ScrollController();
   late final LearnerDebriefController _learnerDebrief = LearnerDebriefController(
     repository: ref.read(learnerDebriefRepositoryProvider),
     sessionId: widget.sessionId,
     // Roleplay Logs: the supervisor's view of the learner's debrief (v9
     // FR-26); a 403 (another organisation) or not_available keeps the note.
-    supervisor: widget.readOnly,
+    supervisor: widget.supervisorView,
   );
 
   @override
@@ -92,7 +104,6 @@ class _DebriefTabState extends ConsumerState<DebriefTab> {
     _learnerDebrief
       ..removeListener(_onLearnerDebrief)
       ..dispose();
-    _scrollController.dispose();
     super.dispose();
   }
 
@@ -105,9 +116,22 @@ class _DebriefTabState extends ConsumerState<DebriefTab> {
     final askAlly = !widget.readOnly && view?.state == LearnerDebriefState.ready;
     widget.chat.streamPath = askAlly ? LearnerDebriefRepository.replyStreamPath(widget.sessionId) : null;
     final showing = view != null;
-    if (!mounted || showing == _showingLearnerDebrief) return;
-    setState(() => _showingLearnerDebrief = showing);
+    final askAllyOpen = view?.askAllyOpen ?? true;
+    final settled = _learnerDebrief.settled || _learnerDebrief.gaveUp;
+    if (!mounted ||
+        (showing == _showingLearnerDebrief && askAllyOpen == _askAllyOpen && settled == _settledSeen)) {
+      return;
+    }
+    setState(() {
+      _settledSeen = settled;
+      _showingLearnerDebrief = showing;
+      _askAllyOpen = askAllyOpen;
+    });
   }
+
+  /// The learner view's `askAlly.open`, so a change rebuilds the composer.
+  bool _askAllyOpen = true;
+  bool _settledSeen = false;
 
   /// The end of Ask Ally's thread inside the cards, followed while a reply
   /// streams in.
@@ -126,15 +150,7 @@ class _DebriefTabState extends ConsumerState<DebriefTab> {
         if (!mounted || end == null) return;
         Scrollable.ensureVisible(end, alignment: 1, duration: const Duration(milliseconds: 200));
       });
-      return;
     }
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_scrollController.hasClients) return;
-      final max = _scrollController.position.maxScrollExtent;
-      if (max > 0) {
-        _scrollController.animateTo(max, duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
-      }
-    });
   }
 
   /// Ask Ally: the thread and its composer, inside the reflective-question card.
@@ -155,18 +171,27 @@ class _DebriefTabState extends ConsumerState<DebriefTab> {
           const SizedBox(height: 12),
         ],
         if (chat.error != null) ...[
-          AskAiErrorBanner(message: chat.error!, onRetry: chat.retry),
+          AskAiErrorBanner(message: chat.error!, onRetry: chat.retry, calm: true),
           const SizedBox(height: 12),
         ],
         SizedBox(key: _threadEndKey, height: 0),
-        AskAiReplyInput(
-          placeholder: ref.t('postSim.debriefCards.reply.placeholder'),
-          disabled: chat.isStreaming,
-          onSend: chat.sendMessage,
-        ),
+        // Closed by the server with no limit message in this thread: say so.
+        if (chat.limitReached == null && !(_learnerDebrief.view?.askAllyOpen ?? true)) ...[
+          Text(
+            ref.t('postSim.debriefCards.reply.closed'),
+            key: const Key('ask-ally-closed'),
+            style: const TextStyle(
+              fontFamily: AppFonts.ibmPlexSerifRegular,
+              fontSize: 13,
+              color: AppColors.mediumEmphasis,
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         // v9 Q47: supervisors read this thread, and the learner is told.
+        // The composer itself docks at the bottom of the screen ([_composer]).
         Padding(
-          padding: const EdgeInsets.only(top: 8),
+          padding: EdgeInsets.zero,
           child: Text(
             ref.t('postSim.debriefCards.supervisor.canRead'),
             key: const Key('ask-ally-supervisor-can-read'),
@@ -180,6 +205,19 @@ class _DebriefTabState extends ConsumerState<DebriefTab> {
       ],
     );
   }
+
+  /// No more questions: the reply stream said the limit was reached (its
+  /// message stays in the thread), or the learner view says Ask Ally is
+  /// closed (`askAlly.open == false`; missing reads as open).
+  bool get _askAllyClosed => widget.chat.limitReached != null || !(_learnerDebrief.view?.askAllyOpen ?? true);
+
+  /// Ask Ally's composer, docked by [DebriefCards] while the reflective
+  /// question is in view (design A5). Null once Ask Ally is closed.
+  Widget? _composer(AskAiChatController chat) => _askAllyClosed ? null : AskAiReplyInput(
+    placeholder: ref.t('postSim.debriefCards.reply.placeholder'),
+    disabled: chat.isStreaming,
+    onSend: chat.sendMessage,
+  );
 
   /// Roleplay Logs: the learner's Ask Ally thread, read-only (web
   /// `supervisor-thread`).
@@ -223,160 +261,72 @@ class _DebriefTabState extends ConsumerState<DebriefTab> {
 
   @override
   Widget build(BuildContext context) {
+    // "You're offline … It will load when you're back online": a debrief
+    // that didn't load asks again by itself on reconnecting.
+    if (!widget.readOnly) {
+      ref.listen<AsyncValue<bool>>(isOfflineProvider, (previous, next) {
+        final state = _learnerDebrief.view?.state;
+        final failed = state == LearnerDebriefState.offline || state == LearnerDebriefState.failed;
+        if (previous?.value == true && next.value == false && failed) _learnerDebrief.retry();
+      });
+    }
     final chat = widget.chat;
     if (_showingLearnerDebrief) {
       return DebriefCards(
         controller: _learnerDebrief,
         replyThread: widget.readOnly ? _supervisorThread(_learnerDebrief.view?.supervisor) : _askAlly(chat),
+        composer: widget.readOnly ? null : _composer(chat),
         readOnly: widget.readOnly,
+        onSeeQuote: widget.onSeeQuote,
+        trackId: widget.trackId,
+        thisRoleplay: widget.summary?.scenario?.id,
+      );
+    }
+    // The new debrief is not available (not_available, polling gave up, a
+    // refused or failed request): an old note stays readable, read-only; no
+    // old note says so once. Nothing here waits for, rates or replies to a
+    // note: the backend no longer writes them.
+    if (!_learnerDebrief.settled && !_learnerDebrief.gaveUp) {
+      return const AskAiGradientCard(
+        title: '',
+        child: Center(child: CircularProgressIndicator(key: Key('debrief-loading'))),
       );
     }
     final note = widget.summary?.supervisorNote;
     final hasNote = note != null && note.isNotEmpty;
-    final errorMessage = widget.summary?.errorMessage;
-    final isGenerating = !hasNote && (errorMessage == null || errorMessage.isEmpty) && !widget.retryLimitReached;
-    final messages = widget.readOnly ? const <AskAiChatMessage>[] : chat.allMessages;
-    final clientName = widget.summary?.scenario?.clientName;
-
-    final header = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (isGenerating)
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const _NoteSkeleton(),
-              const SizedBox(height: 10),
-              Text.rich(
-                TextSpan(
-                  text: '${ref.t('postSim.debrief.generating')} ',
-                  style: const TextStyle(
-                    fontFamily: AppFonts.ibmPlexSerifRegular,
-                    fontSize: 12,
-                    color: AppColors.mediumEmphasis,
-                  ),
-                  children: [
-                    TextSpan(
-                      text: ref.t('postSim.debrief.generatingHint'),
-                      style: const TextStyle(color: AppColors.lowEmphasis),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          )
-        else if (hasNote)
-          SupervisorNote(note: note, onOpenMoment: widget.onOpenMoment, hideClosing: widget.readOnly)
-        else
-          Text(
-            (errorMessage != null && errorMessage.isNotEmpty) ? errorMessage : ref.t('postSim.debrief.failed'),
-            style: const TextStyle(
-              fontFamily: AppFonts.ibmPlexSerifRegular,
-              fontSize: 13,
-              color: AppColors.highEmphasis,
-            ),
-          ),
-        if (!widget.readOnly && hasNote && chat.messages.isEmpty && chat.streamingMessage == null && !chat.isLoading)
-          Padding(
-            padding: const EdgeInsets.only(top: 16),
-            child: Text(
-              ref.t('postSim.debrief.replyPrompt'),
-              style: const TextStyle(
-                fontFamily: AppFonts.ibmPlexSerifRegular,
-                fontSize: 12,
-                color: AppColors.mediumEmphasis,
-              ),
-            ),
-          ),
-      ],
-    );
-
-    final items = <Widget>[
-      header,
-      for (final message in messages)
-        message.role == AskAiChatRole.user
-            ? AskAiLearnerBubble(key: ValueKey(message.id), message: message)
-            : AskAiAllyReply(
-                key: ValueKey(message.id),
-                message: message,
-                clientName: clientName,
-                onOpenMoment: widget.onOpenMoment,
-              ),
-      if (!widget.readOnly && chat.error != null)
-        AskAiErrorBanner(message: chat.error!, onRetry: chat.retry),
-    ];
+    if (!hasNote && widget.summary == null && !widget.retryLimitReached) {
+      return const AskAiGradientCard(
+        title: '',
+        child: Center(child: CircularProgressIndicator(key: Key('debrief-loading'))),
+      );
+    }
 
     return AskAiGradientCard(
       title: ref.t('postSim.debrief.header'),
       child: Column(
         children: [
           Expanded(
-            child: ListView.separated(
+            child: ListView(
               key: const Key('debrief-list'),
-              controller: _scrollController,
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
-              itemCount: items.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 20),
-              itemBuilder: (_, index) => items[index],
-            ),
-          ),
-          if (!widget.readOnly && hasNote)
-            AskAiReplyInput(
-              placeholder: ref.t('postSim.debrief.replyPlaceholder'),
-              disabled: chat.isStreaming,
-              onSend: chat.sendMessage,
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-/// RN `NoteSkeleton`: a grey avatar circle and four grey bars.
-class _NoteSkeleton extends StatelessWidget {
-  const _NoteSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    Widget line(double? widthFactor) => FractionallySizedBox(
-      alignment: Alignment.centerLeft,
-      widthFactor: widthFactor ?? 1,
-      child: Container(
-        height: 10,
-        decoration: BoxDecoration(
-          color: AppColors.lightGray2,
-          borderRadius: BorderRadius.circular(6),
-        ),
-      ),
-    );
-    return Row(
-      key: const Key('debrief-note-skeleton'),
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 32,
-          height: 32,
-          decoration: const BoxDecoration(color: AppColors.lightGray2, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Column(
               children: [
-                line(0.4),
-                const SizedBox(height: 8),
-                line(null),
-                const SizedBox(height: 8),
-                line(0.9),
-                const SizedBox(height: 8),
-                line(0.7),
+                if (hasNote)
+                  SupervisorNote(note: note, onOpenMoment: widget.onOpenMoment, hideClosing: true)
+                else
+                  Text(
+                    ref.t('postSim.debrief.unavailable'),
+                    key: const Key('debrief-unavailable'),
+                    style: const TextStyle(
+                      fontFamily: AppFonts.ibmPlexSerifRegular,
+                      fontSize: 13,
+                      color: AppColors.highEmphasis,
+                    ),
+                  ),
               ],
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

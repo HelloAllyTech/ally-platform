@@ -53,6 +53,12 @@ import VoiceNotePanel from "./VoiceNotePanel";
 interface CreateNoteDrawerProps {
   open: boolean;
   onClose: () => void;
+  /**
+   * Called once dictation has filled the note and it is saved. The host closes
+   * the drawer and opens that note's details, where the computed fields (call
+   * ID, duration, date, time) show their real values.
+   */
+  onNoteReady?: (chatId: number) => void;
 }
 
 /** How to turn an extracted (human-readable) value back into stored form. */
@@ -142,7 +148,7 @@ const encodeVoiceValue = (decoder: VoiceDecoder, value: string): string | null =
  * endpoint and built-in summary values go to the call-details endpoint. The note
  * is auto-named CALL-{id}-{date}.
  */
-const CreateNoteDrawer: FC<CreateNoteDrawerProps> = ({ open, onClose }) => {
+const CreateNoteDrawer: FC<CreateNoteDrawerProps> = ({ open, onClose, onNoteReady }) => {
   const { t } = useTranslation();
   const { permissions } = useUser();
   const isCounsellor = hasPermissions(permissions, Permissions.COUNSELOR_ACCESS);
@@ -530,7 +536,14 @@ const CreateNoteDrawer: FC<CreateNoteDrawerProps> = ({ open, onClose }) => {
           : spoken;
         try {
           const chatId = await ensureNote();
-          await saveNoteTranscript({ chatId, transcript: transcriptRef.current }).unwrap();
+          await saveNoteTranscript({
+            chatId,
+            transcript: transcriptRef.current,
+            // This session's own recorded length (reset to 0 only once
+            // resetRecorder() runs below) — the backend accumulates it onto
+            // the note's stored call duration.
+            durationSeconds: Math.round(recorder.durationMs / 1000),
+          }).unwrap();
         } catch {
           // Non-fatal: the note and any extracted values still saved.
         }
@@ -547,6 +560,17 @@ const CreateNoteDrawer: FC<CreateNoteDrawerProps> = ({ open, onClose }) => {
         );
       } else {
         toast(t("calls.createNote.voice.nothingExtracted"));
+      }
+      // Hand over to the note's details once something was filled: the drawer
+      // can't show computed fields (call ID, duration, date, time) for a note
+      // it is still creating. With nothing extracted, stay so they can type.
+      if (filledLabels.length > 0 && onNoteReady) {
+        try {
+          await autosave.flush();
+          onNoteReady(await ensureNote());
+        } catch {
+          // The save-error toast already fired; keep the drawer open.
+        }
       }
     } catch (error) {
       clearTimers();
@@ -574,7 +598,11 @@ const CreateNoteDrawer: FC<CreateNoteDrawerProps> = ({ open, onClose }) => {
           : partialTranscript;
         try {
           const chatId = await ensureNote();
-          await saveNoteTranscript({ chatId, transcript: transcriptRef.current }).unwrap();
+          await saveNoteTranscript({
+            chatId,
+            transcript: transcriptRef.current,
+            durationSeconds: Math.round(recorder.durationMs / 1000),
+          }).unwrap();
         } catch {
           // Best-effort: even if this save fails, don't turn a partial
           // success into a hard failure — the counsellor is already told the
@@ -685,7 +713,13 @@ const CreateNoteDrawer: FC<CreateNoteDrawerProps> = ({ open, onClose }) => {
                 <SummaryFieldInput
                   key={field.key}
                   variant="carbon"
-                  field={field}
+                  // Computed fields (call ID, duration, date, time) have no
+                  // value until the note exists; say so instead of a blank box.
+                  field={
+                    field.isEditable
+                      ? field
+                      : { ...field, placeholder: t("calls.createNote.autoFilled") }
+                  }
                   value={summaryValues[field.key] ?? null}
                   disabled={!field.isEditable || !canEditCallDetails}
                   options={field.type === FieldType.Dropdown ? (field.options ?? []) : undefined}

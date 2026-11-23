@@ -20,18 +20,90 @@ site has nothing to report:
 
 The FastAPI process has no SQS client by default, so we lazily create the
 shared singleton on first use (idempotent — reuses the worker's if present).
+
+Sending never runs on the event loop (CR1): from async code every send is handed
+to a small background thread pool, fire-and-forget, and a failed send is logged
+and dropped. Only a caller with no running loop (a sync worker thread, a test)
+that asks for ``blocking`` sends inline.
+
+Attribution (CR1): when a usage scope is active (``app.core.llm_usage.scope``,
+set from ally-be's ``X-Ally-Usage`` header), every row's ``metadata`` carries the
+scope's keys plus ``step`` and ``seq``. A caller that already added them (the
+dispatcher does, so a patched emitter sees them) is left as it is.
+
+Embeddings (CR1): ``emit_embedding_usage`` reports an embedding call's input
+tokens as an ``'llm'`` row (prompt tokens only, ``metadata.call = "embedding"``):
+ally-be stores ``service`` as 'llm' | 'stt' | 'tts' and prices tokens by model,
+so no new service value is needed for it to land and be costed. Tokens are
+counted off the event loop, with tiktoken when it can load the model's
+encoding, else estimated as characters / 4 (the row's ``metadata.token_count``
+says which).
 """
 
 import asyncio
 import json
 import time
-from typing import Any, Dict, Optional, Tuple
+from concurrent.futures import ThreadPoolExecutor
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from app.core.config import settings
+from app.core.llm_usage.scope import usage_attribution
 from app.core.queue.sqs_queue_client import SQSQueueClient
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+# Sends run here, never on the event loop. Two workers: a send is one short SQS
+# call, and a backlog only delays analytics, never a reply.
+_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="llm-usage")
+
+
+def usage_feed_on() -> bool:
+    """Whether usage rows are sent at all (the health endpoint's ``usage_feed``)."""
+    try:
+        return _enabled()
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _in_event_loop() -> bool:
+    try:
+        asyncio.get_running_loop()
+        return True
+    except RuntimeError:
+        return False
+
+
+def _run_safely(fn: Callable[..., None], *args: Any) -> None:
+    try:
+        fn(*args)
+    except Exception:  # noqa: BLE001 — usage accounting never fails anything
+        logger.debug("llm_usage background send failed (best-effort)", exc_info=True)
+
+
+def _submit(fn: Callable[..., None], *args: Any, blocking: bool = False) -> None:
+    """Run ``fn(*args)`` off the event loop. Inline only for a ``blocking`` caller
+    with no running loop. Never raises."""
+    try:
+        if blocking and not _in_event_loop():
+            _run_safely(fn, *args)
+        else:
+            _EXECUTOR.submit(_run_safely, fn, *args)
+    except Exception:  # noqa: BLE001
+        logger.debug("llm_usage submit failed (best-effort)", exc_info=True)
+
+
+def _with_attribution(
+    metadata: Optional[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    """``metadata`` plus the active scope's attribution (unless already there).
+    The caller's own keys win on a clash."""
+    if metadata and "seq" in metadata:
+        return metadata
+    attribution = usage_attribution()
+    if not attribution:
+        return metadata
+    return {**attribution, **(metadata or {})}
 
 
 def _enabled() -> bool:
@@ -133,7 +205,10 @@ def emit_ai_usage(
     metadata: Optional[Dict[str, Any]] = None,
     blocking: bool = False,
 ) -> None:
-    """Best-effort emit for any AI service ('llm' | 'stt' | 'tts'). Never raises."""
+    """Best-effort emit for any AI service ('llm' | 'stt' | 'tts').
+
+    Never raises and never blocks the event loop (see the module docstring).
+    """
     try:
         if not task or not _enabled():
             return
@@ -162,13 +237,9 @@ def emit_ai_usage(
             scenario_id=scenario_id,
             scenario_session_id=scenario_session_id,
             cached_tokens=cached_tokens,
-            metadata=metadata,
+            metadata=_with_attribution(metadata),
         )
-        if blocking:
-            _send_blocking(body)
-        else:
-            # Off the hot path: run the blocking boto3 send in a thread.
-            asyncio.create_task(asyncio.to_thread(_send_blocking, body))
+        _submit(_send_blocking, body, blocking=blocking)
     except Exception:
         logger.debug("emit_ai_usage skipped (best-effort)", exc_info=True)
 
@@ -215,7 +286,9 @@ def emit_llm_usage_blocking(
     cached_tokens: Optional[int] = None,
     metadata: Optional[Dict[str, Any]] = None,
 ) -> None:
-    """Back-compat LLM helper (sync) for non-async call sites (e.g. drift judge)."""
+    """Back-compat LLM helper, kept for its callers. Despite the name it never
+    blocks the event loop: called from async code the send goes to the background
+    pool. It sends inline only where no loop is running (a sync thread, a test)."""
     if not usage:
         return
     prompt, completion, total = usage
@@ -234,3 +307,120 @@ def emit_llm_usage_blocking(
         metadata=metadata,
         blocking=True,
     )
+
+
+# ---------------------------------------------------------------------------
+# Embeddings (CR1)
+# ---------------------------------------------------------------------------
+
+_ENCODINGS: Dict[str, Any] = {}
+
+
+def _encoding_for(model: str) -> Any:
+    """tiktoken's encoding for ``model`` (cached), or None when unavailable.
+    Called off the event loop only: a first load can fetch the encoding file."""
+    if model in _ENCODINGS:
+        return _ENCODINGS[model]
+    encoding = None
+    try:
+        import tiktoken
+
+        try:
+            encoding = tiktoken.encoding_for_model(model)
+        except KeyError:
+            encoding = tiktoken.get_encoding("cl100k_base")
+    except Exception:  # noqa: BLE001 — fall back to the estimate
+        logger.debug("tiktoken unavailable for %s; estimating", model, exc_info=True)
+        encoding = None
+    _ENCODINGS[model] = encoding
+    return encoding
+
+
+def count_embedding_tokens(model: str, texts: Sequence[str]) -> Tuple[int, str]:
+    """(tokens, method) for embedding ``texts`` with ``model``. ``method`` is
+    ``"tiktoken"`` for an exact count, ``"estimate"`` for characters / 4."""
+    encoding = _encoding_for(model)
+    if encoding is not None:
+        try:
+            return sum(len(encoding.encode(t or "")) for t in texts), "tiktoken"
+        except Exception:  # noqa: BLE001
+            logger.debug("tiktoken encode failed; estimating", exc_info=True)
+    return sum(max(1, len(t or "") // 4) for t in texts if t), "estimate"
+
+
+def _emit_embedding_blocking(
+    provider: str,
+    model: str,
+    task: str,
+    texts: List[str],
+    metadata: Optional[Dict[str, Any]],
+) -> None:
+    tokens, method = count_embedding_tokens(model, texts)
+    if not tokens:
+        return
+    body = _build_body(
+        "llm",
+        provider,
+        model,
+        task,
+        prompt_tokens=tokens,
+        completion_tokens=0,
+        total_tokens=tokens,
+        metadata={
+            **(metadata or {}),
+            "call": "embedding",
+            "token_count": method,
+            "inputs": len(texts),
+        },
+    )
+    _send_blocking(body)
+
+
+def emit_embedding_usage(
+    model: Optional[str],
+    texts: Sequence[str],
+    task: Optional[str],
+    *,
+    provider: str = "openai",
+    prompt_tokens: Optional[int] = None,
+) -> None:
+    """Report one embedding call (its input tokens). Never raises or blocks.
+
+    ``prompt_tokens`` when the provider reported them; otherwise the texts are
+    counted in the background thread. The scope's attribution is captured here,
+    in the caller's context, before the work leaves it.
+    """
+    try:
+        if not task or not _enabled():
+            return
+        texts = [t for t in texts if t]
+        if not texts and not prompt_tokens:
+            return
+        metadata = _with_attribution(None)
+        if prompt_tokens:
+            body = _build_body(
+                "llm",
+                provider,
+                model or "unknown",
+                task,
+                prompt_tokens=prompt_tokens,
+                total_tokens=prompt_tokens,
+                metadata={
+                    **(metadata or {}),
+                    "call": "embedding",
+                    "token_count": "provider",
+                    "inputs": len(texts),
+                },
+            )
+            _submit(_send_blocking, body)
+            return
+        _submit(
+            _emit_embedding_blocking,
+            provider,
+            model or "unknown",
+            task,
+            texts,
+            metadata,
+        )
+    except Exception:  # noqa: BLE001
+        logger.debug("emit_embedding_usage skipped (best-effort)", exc_info=True)

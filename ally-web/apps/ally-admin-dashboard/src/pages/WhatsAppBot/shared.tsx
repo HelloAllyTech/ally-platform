@@ -6,7 +6,6 @@ import { InlineNotification } from "@ally-ui-mono/ui-shared";
 import { Button } from "@components";
 import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
-import { ChatbotPersona } from "@types";
 import { formatRelativeTime } from "@utils";
 
 /** ally-be puts the human-readable reason (Meta's own, for the number endpoints) in `data.message`. */
@@ -50,31 +49,6 @@ export const CopyField: React.FC<{ label: string; value: string }> = ({ label, v
     </div>
   </div>
 );
-
-/** One headline number on an overview. */
-export const StatCard: React.FC<{
-  label: string;
-  value: string | number;
-  onClick?: () => void;
-}> = ({ label, value, onClick }) => {
-  const body = (
-    <>
-      <span className="text-2xl text-typography-900 tabular-nums">
-        {typeof value === "number" ? value.toLocaleString() : value}
-      </span>
-      <span className="text-xs text-typography-500">{label}</span>
-    </>
-  );
-  const className =
-    "flex flex-col gap-1 border border-border-light rounded-md p-4 text-left min-w-0";
-  return onClick ? (
-    <button type="button" onClick={onClick} className={`${className} hover:bg-neutral-50`}>
-      {body}
-    </button>
-  ) : (
-    <div className={className}>{body}</div>
-  );
-};
 
 type PillTone = "success" | "warning" | "neutral" | "danger";
 
@@ -128,18 +102,3 @@ export const LoadError: React.FC<{ title: string; onRetry: () => void }> = ({ ti
     </Button>
   </div>
 );
-
-/**
- * The Instructions fields still empty, by their labels: the name it introduces itself with, tone,
- * instructions and welcome message are all needed before the chatbot's instructions count as done.
- */
-export const missingPersonaFields = (persona: ChatbotPersona | null | undefined): string[] => {
-  const p = en.whatsappBot.bots.persona;
-  const fields: [string | undefined, string][] = [
-    [persona?.displayName, p.displayNameLabel],
-    [persona?.tone, p.toneLabel],
-    [persona?.systemPrompt, p.promptLabel],
-    [persona?.greeting, p.greetingLabel],
-  ];
-  return fields.filter(([value]) => !value?.trim()).map(([, label]) => label);
-};

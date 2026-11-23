@@ -18,10 +18,15 @@ from uuid import uuid4
 
 from langgraph.graph.state import CompiledStateGraph
 
+from app.core.agent_runtime import activity, stages
+from app.core.agent_runtime.budget import RUN_CAP_S, RUN_DEADLINE
+from app.core.agent_runtime.check.text import without_citation_marks
+from app.core.agent_runtime.gateway import AgentGatewayClient
 from app.core.agent_runtime.graph import OnEvent, run_agent
 from app.core.agent_runtime.state import AgentState
-from app.core.agent_runtime.trace import status_event
+from app.core.agent_runtime.trace import STREAMED, status_event
 from app.core.config import settings
+from app.core.llm.dispatch import SDK_RETRIES
 from app.exceptions.custom_exceptions import (
     EmbeddingFailedException,
     LLMInvocationFailedException,
@@ -55,11 +60,30 @@ def build_response(state: AgentState, run_id: str) -> AgentRunResponse:
     retrieval = {
         **result["retrieval"],
         "hit_chunk_ids": [str(hit.get("chunk_id")) for hit in state.get("hits") or []],
+        "passage_document_ids": list(
+            dict.fromkeys(
+                str(p["document_id"])
+                for p in state.get("passages") or []
+                if p.get("document_id")
+            )
+        ),
+        "passage_chunk_ids": [
+            str(p["chunk_id"]) for p in state.get("passages") or [] if p.get("chunk_id")
+        ],
+        "searches": sum(
+            1
+            for call in state.get("tool_calls") or []
+            if call.get("tool") == "search_knowledge"
+        ),
     }
+    # Sent without citation numbers (chunk H1 Part D); sources stay as chips.
+    answer = without_citation_marks(result.get("answer") or "")
     return AgentRunResponse(
-        **{**result, "retrieval": retrieval},
+        **{**result, "answer": answer, "retrieval": retrieval},
         run_id=run_id,
         trace=state.get("trace") or [],
+        memory_writes=state.get("memory_writes") or [],
+        activity=activity.done(state.get("activity") or []),
     )
 
 
@@ -74,22 +98,87 @@ async def execute(
     checkpoint keeps the steps already saved.
     """
     run_id = payload.run_id or str(uuid4())
+    # The cap ally-be named (chunk H1), never above the configured ceiling of 60 s.
+    cap_s = min(
+        payload.run_timeout_s or settings.AGENT_RUNTIME.RUN_TIMEOUT_SECONDS, 60.0
+    )
+    RUN_CAP_S.set(cap_s)
+    # Each model call gets the time left of the cap and no SDK retries (chunk H1).
+    SDK_RETRIES.set(0)
+    streamed = {"any": False}
+    STREAMED.set(streamed)
+    clock = stages.begin(run_id)
+    stages.stage(
+        "run_start",
+        streamed=bool(on_event),
+        history=len(payload.history),
+        gateway=bool(payload.gateway),
+        cap_s=cap_s,
+    )
     if on_event:
         on_event("run_started", {"run_id": run_id})
-    async with asyncio.timeout(settings.AGENT_RUNTIME.RUN_TIMEOUT_SECONDS):
-        state = await run_agent(
-            graph,
-            run_id=run_id,
-            conversation_id=payload.conversation_id,
-            chatbot_id=payload.chatbot_id,
-            question=payload.question,
-            history=[turn.model_dump() for turn in payload.history],
-            bot=payload.to_bot(),
-            on_event=on_event,
+    # ally-be's tool gateway (chunk 3b): one client for the run, closed with it.
+    gateway = (
+        AgentGatewayClient(
+            payload.gateway.url, payload.gateway.token.get_secret_value()
         )
+        if payload.gateway
+        else None
+    )
+    try:
+        async with asyncio.timeout(cap_s) as cap:
+            # A write extends the cap (chunk 8a, budget.extend_after_write).
+            RUN_DEADLINE.set(cap)
+            state = await run_agent(
+                graph,
+                run_id=run_id,
+                conversation_id=payload.conversation_id,
+                chatbot_id=payload.chatbot_id,
+                question=payload.question,
+                history=[turn.model_dump() for turn in payload.history],
+                bot=payload.to_bot(),
+                on_event=on_event,
+                gateway=gateway,
+            )
+    except TimeoutError:
+        stages.stage(
+            "run_end",
+            reason="timeout",
+            ended_by="ally-ai_run_cap",
+            cut_off=clock["active"],
+        )
+        raise
+    except asyncio.CancelledError:
+        stages.stage(
+            "run_end",
+            reason="cancelled",
+            ended_by="caller_went_away",
+            cut_off=clock["active"],
+        )
+        raise
+    except Exception as error:
+        stages.stage(
+            "run_end",
+            reason="error",
+            error=type(error).__name__,
+            cut_off=clock["active"],
+        )
+        raise
+    finally:
+        if gateway:
+            await gateway.aclose()
     response = build_response(state, run_id)
-    if on_event and response.answer:
+    stages.stage(
+        "run_end",
+        reason="finished",
+        intent=response.intent,
+        reply_chars=len(response.answer or ""),
+    )
+    # A reply that streamed as it was written (chunk H1) isn't sent again; the
+    # `final` event carries it as checked.
+    if on_event and response.answer and not streamed["any"]:
         on_event("status", status_event("writing"))
+        stages.stage("first_token")
         for piece in chunk_reply(response.answer):
             on_event("token", {"text": piece})
     return response
@@ -157,5 +246,11 @@ async def stream(
     finally:
         # The client went away (or the run ended): stop the run and wait for it, so
         # no model call outlives the request.
+        if not task.done():
+            logger.info(
+                "[AGENT STAGE] run=%s stage=stream_closed_early "
+                "ended_by=caller_went_away",
+                payload.run_id,
+            )
         task.cancel()
         await asyncio.gather(task, return_exceptions=True)

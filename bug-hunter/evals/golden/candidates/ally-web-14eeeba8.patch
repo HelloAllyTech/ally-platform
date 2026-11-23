@@ -1,0 +1,231 @@
+diff --git a/apps/ally-helpline-dashboard/src/pages/calls/components/AdminLogsTable.tsx b/apps/ally-helpline-dashboard/src/pages/calls/components/AdminLogsTable.tsx
+index 4896259e09..b4222bc860 100644
+--- a/apps/ally-helpline-dashboard/src/pages/calls/components/AdminLogsTable.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/calls/components/AdminLogsTable.tsx
+@@ -226,7 +226,17 @@ const AdminLogsTable: FC<LogsTableProps> = ({ refreshKey, sessionType, className
+   // A fetch failure must not be indistinguishable from "no calls yet" — the
+   // counsellor needs to know the difference and get a way back in, not a
+   // table that silently looks empty.
+-  if (isError && !isLoading) {
++  //
++  // Only when there is nothing left to show, though. `isLoading` is true for a
++  // cache entry's FIRST load only, so a failed *background* refetch — the
++  // refetchOnFocus that fires every time the counsellor tabs back in, or the
++  // invalidation after a custom-field save — leaves isLoading false with
++  // isError true while RTK Query still holds the last good page. Rendering the
++  // fallback there throws away rows that are on screen and correct, and turns
++  // one transient blip (an expired access token at the 15-minute boundary, a
++  // dropped connection) into a wall the counsellor can only clear by
++  // reloading. The toast above already tells them the refresh failed.
++  if (isError && !isLoading && logs.length === 0) {
+     const refetchFn = isCall ? refetchCallLogs : refetchSimulationLogs;
+     return (
+       <div className="flex justify-center items-center h-[calc(100dvh-80px)]">
+diff --git a/apps/ally-helpline-dashboard/src/pages/calls/components/UserLogsTable.tsx b/apps/ally-helpline-dashboard/src/pages/calls/components/UserLogsTable.tsx
+index 8b88049a21..ebed2c9489 100644
+--- a/apps/ally-helpline-dashboard/src/pages/calls/components/UserLogsTable.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/calls/components/UserLogsTable.tsx
+@@ -229,7 +229,17 @@ const UserLogsTable: FC<LogsTableProps> = ({ refreshKey, sessionType, className
+   // A fetch failure must not be indistinguishable from "no calls yet" — the
+   // counsellor needs to know the difference and get a way back in, not a
+   // table that silently looks empty.
+-  if (isError && !isLoading) {
++  //
++  // Only when there is nothing left to show, though. `isLoading` is true for a
++  // cache entry's FIRST load only, so a failed *background* refetch — the
++  // refetchOnFocus that fires every time the counsellor tabs back in, or the
++  // invalidation after a custom-field save — leaves isLoading false with
++  // isError true while RTK Query still holds the last good page. Rendering the
++  // fallback there throws away rows that are on screen and correct, and turns
++  // one transient blip (an expired access token at the 15-minute boundary, a
++  // dropped connection) into a wall the counsellor can only clear by
++  // reloading. The toast above already tells them the refresh failed.
++  if (isError && !isLoading && logs.length === 0) {
+     const refetchFn = isCall ? refetchCallLogs : refetchSimulationLogs;
+     return (
+       <div className="flex justify-center items-center h-[calc(100dvh-80px)]">
+diff --git a/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/AdminLogsTable.test.tsx b/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/AdminLogsTable.test.tsx
+index 60ed86330b..21e488990d 100644
+--- a/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/AdminLogsTable.test.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/AdminLogsTable.test.tsx
+@@ -1077,6 +1077,44 @@ describe("AdminLogsTable", () => {
+       });
+     });
+ 
++    // A background refetch (refetchOnFocus when the counsellor tabs back in, or
++    // the invalidation after a custom-field save) can be rejected while RTK
++    // Query still holds the last good page: isError true, isLoading false,
++    // data intact. Blanking the table there loses rows that are on screen and
++    // correct, and only a full reload brings them back.
++    it("keeps already-loaded rows when a background refetch fails", async () => {
++      mockUseGetAdminCallLogsQuery.mockReturnValue({
++        data: { data: [SCRIBE_CALL_LOG] },
++        isLoading: false,
++        isError: true,
++        refetch: vi.fn(),
++        error: { status: 401 },
++      });
++
++      renderComponent(SessionType.CALL);
++
++      await waitFor(() => {
++        expect(screen.getByTestId("table-row-0")).toBeInTheDocument();
++      });
++      expect(screen.queryByText("Unable to load call logs")).not.toBeInTheDocument();
++    });
++
++    it("shows the error fallback when the fetch fails with nothing cached", async () => {
++      mockUseGetAdminCallLogsQuery.mockReturnValue({
++        data: undefined,
++        isLoading: false,
++        isError: true,
++        refetch: vi.fn(),
++        error: { status: 500 },
++      });
++
++      renderComponent(SessionType.CALL);
++
++      await waitFor(() => {
++        expect(screen.getByText("Unable to load call logs")).toBeInTheDocument();
++      });
++    });
++
+     it("does not show toast error when there is no error", async () => {
+       const { toast } = await import("sonner");
+ 
+diff --git a/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/UserLogsTable.test.tsx b/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/UserLogsTable.test.tsx
+index 86b37a8531..9297cc5e21 100644
+--- a/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/UserLogsTable.test.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/UserLogsTable.test.tsx
+@@ -915,6 +915,40 @@ describe("UserLogsTable", () => {
+ 
+   // -------------------------------------------------------------------------
+   describe("Error handling", () => {
++    // See AdminLogsTable: a rejected background refetch leaves isError true,
++    // isLoading false and the last good page still cached. The counsellor must
++    // keep the rows they can already see.
++    it("keeps already-loaded rows when a background refetch fails", async () => {
++      mockUseGetCallLogsQuery.mockReturnValue({
++        data: { data: [SCRIBE_CALL_LOG] },
++        isLoading: false,
++        isError: true,
++        refetch: vi.fn(),
++      });
++
++      renderComponent(SessionType.CALL);
++
++      await waitFor(() => {
++        expect(screen.getByTestId("table-row-0")).toBeInTheDocument();
++      });
++      expect(screen.queryByText("Unable to load call logs")).not.toBeInTheDocument();
++    });
++
++    it("shows the error fallback when the fetch fails with nothing cached", async () => {
++      mockUseGetCallLogsQuery.mockReturnValue({
++        data: undefined,
++        isLoading: false,
++        isError: true,
++        refetch: vi.fn(),
++      });
++
++      renderComponent(SessionType.CALL);
++
++      await waitFor(() => {
++        expect(screen.getByText("Unable to load call logs")).toBeInTheDocument();
++      });
++    });
++
+     it("handles call log without details gracefully (empty display row)", async () => {
+       mockUseGetCallLogsQuery.mockReturnValue({
+         data: { data: [{ ...SCRIBE_CALL_LOG, id: 3, details: null }] },
+diff --git a/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/CallSummary.tsx b/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/CallSummary.tsx
+index 4a0ddd1d37..c43a640c24 100644
+--- a/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/CallSummary.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/CallSummary.tsx
+@@ -469,7 +469,13 @@ const CallSummary: FC<CallSummaryProps> = ({
+     );
+   }
+ 
+-  if (summaryLoadingError) {
++  // Only when the fetch left us with nothing to render. RTK Query keeps the
++  // last good `data` on a rejected refetch, so a summary already open on
++  // screen would otherwise be replaced by "Summary Not Found" the moment a
++  // background refetch blips — and every autosave triggers one, because
++  // updateCallSummary invalidates the CallSummary tag. The error is only
++  // genuinely "not found" when there is no summary to fall back on.
++  if (summaryLoadingError && !callSummary) {
+     return (
+       <div className="flex h-[90vh] items-center justify-center">
+         <FallbackUI
+diff --git a/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/__tests__/CallSummary.test.tsx b/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/__tests__/CallSummary.test.tsx
+index 9dfce51da8..0d760e2f71 100644
+--- a/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/__tests__/CallSummary.test.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/__tests__/CallSummary.test.tsx
+@@ -117,6 +117,12 @@ vi.mock("@components", () => ({
+   TextField: (props: any) => <input {...props} />,
+   Accordion: ({ children }: any) => <div>{children}</div>,
+   InfoBanner: ({ message }: any) => <div>{message}</div>,
++  FallbackUI: ({ mainMessage, description }: any) => (
++    <div data-testid="fallback-ui">
++      <div>{mainMessage}</div>
++      <div>{description}</div>
++    </div>
++  ),
+   ButtonVariant: {
+     PRIMARY: "primary",
+     SECONDARY: "secondary",
+@@ -125,6 +131,7 @@ vi.mock("@components", () => ({
+ }));
+ vi.mock("@assets", () => ({
+   ProgressLadderIcon: () => <svg data-testid="progress-ladder-icon" />,
++  PageNotFoundIllustration: () => <svg data-testid="page-not-found-illustration" />,
+   CharacterLibraryIcon: (props: any) => <svg {...props} data-testid="character-library-icon" />,
+   ManageAccount: () => <svg data-testid="manage-account-icon" />,
+   Warning: () => <div>Warning</div>,
+@@ -322,6 +329,46 @@ describe("CallSummary Component", () => {
+     expect(screen.getByText("Initial notes")).toBeInTheDocument();
+   });
+ 
++  // Every autosave invalidates the CallSummary tag, so an open summary
++  // refetches constantly. RTK Query keeps the last good `data` when one of
++  // those refetches is rejected — replacing a summary the counsellor is
++  // actively editing with "Summary Not Found" loses their place for a blip
++  // they never caused.
++  it("keeps the loaded summary when a background refetch fails", () => {
++    const loadedSummary = {
++      summaryStatus: ChatSummaryStatus.SUCCESS,
++      details: {
++        chatId: 1,
++        callDuration: 120,
++        callInfo: { notes: "Initial notes" },
++      },
++    };
++    render(
++      <CallSummary
++        chatId={1}
++        callSummary={loadedSummary}
++        isSummaryLoading={false}
++        summaryLoadingError={{ status: 401 }}
++      />,
++    );
++
++    expect(screen.queryByText("Summary Not Found")).not.toBeInTheDocument();
++    expect(screen.getByText("Initial notes")).toBeInTheDocument();
++  });
++
++  it("shows Summary Not Found when the fetch fails with nothing cached", () => {
++    render(
++      <CallSummary
++        chatId={1}
++        callSummary={undefined}
++        isSummaryLoading={false}
++        summaryLoadingError={{ status: 404 }}
++      />,
++    );
++
++    expect(screen.getByText("Summary Not Found")).toBeInTheDocument();
++  });
++
+   it("shows a Retry summary action on a failed summary and triggers retry", async () => {
+     const failedSummary = {
+       summaryStatus: ChatSummaryStatus.FAILED,

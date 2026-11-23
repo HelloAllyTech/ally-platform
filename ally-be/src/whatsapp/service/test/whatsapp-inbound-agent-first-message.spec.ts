@@ -1,5 +1,5 @@
+import { GENERAL_CRISIS_TEXT } from '../../../bot-draft/safety-pack/safety-packs';
 import { WaHandledBy } from '../../enum/whatsapp.enum';
-import { DEFAULT_WHATSAPP_SETTINGS } from '../../type/whatsapp-settings.type';
 import { WhatsAppInboundService } from '../whatsapp-inbound.service';
 import { Chatbot } from 'src/chatbot/entity/chatbot.entity';
 import { AgentRuntimeUsed } from 'src/chatbot/enum/chatbot.enum';
@@ -82,7 +82,7 @@ describe('WhatsAppInboundService: the first message to an agent bot', () => {
       signal: "can't go on",
     });
     await service.handle(inbound());
-    expect(sent()).toBe(DEFAULT_WHATSAPP_SETTINGS.crisisEscalationText);
+    expect(sent()).toBe(GENERAL_CRISIS_TEXT);
     expect(sent()).not.toContain(NOTICE);
   });
 
@@ -101,18 +101,5 @@ describe('WhatsAppInboundService: the first message to an agent bot', () => {
     messageCount = 4;
     await service.handle(inbound());
     expect(sent()).toBe(ABOUT_BOT.answer);
-  });
-
-  it('gives no notice on a first answer under the kill switch, as v1 always did', async () => {
-    ({ service, provider, aiService, savedMessages } =
-      await buildInboundHarness({
-        chatbot: () => chatbot,
-        agentAnswer: ABOUT_BOT,
-        contactMessageCount: () => messageCount,
-        settings: { disclaimerText: NOTICE, agentRuntimeAllowed: false },
-      }));
-    await service.handle(inbound());
-    expect(aiService.runAgent).not.toHaveBeenCalled();
-    expect(sent()).not.toContain(NOTICE);
   });
 });

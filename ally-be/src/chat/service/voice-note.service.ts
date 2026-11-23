@@ -19,6 +19,7 @@ import { SettingsService } from 'src/settings/service/settings.service';
 import { toPromptCode } from 'src/prompt/util/prompt-code.util';
 import { loadPromptTemplate } from 'src/common/util/prompt-template.util';
 import { audioUploadType } from 'src/common/util/audio.util';
+import { chunkWavBySeconds } from 'src/common/util/wav-chunker.util';
 import {
   GenerateNoteFromAudioResponseDto,
   VoiceNoteFieldSpec,
@@ -44,6 +45,14 @@ const EXTRACTION_MAX_TOKENS = 16384;
 const MIN_EVIDENCE_WORDS = 3;
 /** AI-task-registry row id; the key for per-task model config. */
 const AI_TASK_ID = 'voice-note-extract';
+/**
+ * Mobile dictation records WAV, and a long WAV can be chunked losslessly in
+ * memory (see wav-chunker.util.ts) before transcribing — unlike web's
+ * compressed webm/mp4, which this does not attempt to chunk. 4 minutes stays
+ * comfortably inside whatever undocumented length pushes OpenAI's
+ * transcription API into silently truncating its output.
+ */
+const WAV_CHUNK_SECONDS = 240;
 
 const VALID_FIELD_TYPES: ReadonlySet<VoiceNoteFieldType> = new Set([
   'text',
@@ -170,20 +179,49 @@ export class VoiceNoteService {
     const startedAt = Date.now();
     try {
       const { type, ext } = audioUploadType(audio.mimetype);
-      const file = await toFile(audio.buffer, `dictation.${ext}`, { type });
+      // Only WAV (mobile dictation) is split — it's raw PCM, so chunking is
+      // lossless and needs no temp files. A buffer that isn't parseable as
+      // WAV, or already short, comes back as the single original buffer
+      // unchanged (see chunkWavBySeconds's own doc comment).
+      const chunks =
+        ext === 'wav'
+          ? chunkWavBySeconds(audio.buffer, WAV_CHUNK_SECONDS)
+          : [audio.buffer];
+      if (chunks.length > 1) {
+        this.logger.info(
+          `[VOICE_NOTE] long WAV dictation split into ${chunks.length} chunks ` +
+            `of up to ${WAV_CHUNK_SECONDS}s each bytes=${audio.size}`,
+        );
+      }
 
-      const result = await this.openai.audio.transcriptions.create({
-        file,
-        model: this.transcriptionModel,
-        // Only pass a language when the client sent a hint; otherwise let the
-        // model auto-detect (Ally serves many languages).
-        ...(languageHint ? { language: languageHint } : {}),
-      });
+      // Chunks are independent, so transcribe them concurrently rather than
+      // one at a time — a sequential loop made a long dictation's total
+      // latency scale with its chunk count (each an extra full OpenAI
+      // round-trip), which pushed the whole request past the mobile
+      // client's receive timeout and surfaced as "no summary generated" for
+      // exactly the long dictations this chunking was meant to fix.
+      // `Promise.all` preserves input order in its results regardless of
+      // resolution order, so chunk order survives even though completion
+      // order doesn't.
+      const texts = await Promise.all(
+        chunks.map(async (chunkBuffer) => {
+          const file = await toFile(chunkBuffer, `dictation.${ext}`, { type });
+          const result = await this.openai.audio.transcriptions.create({
+            file,
+            model: this.transcriptionModel,
+            // Only pass a language when the client sent a hint; otherwise let the
+            // model auto-detect (Ally serves many languages).
+            ...(languageHint ? { language: languageHint } : {}),
+          });
+          return (result.text ?? '').trim();
+        }),
+      );
 
-      const text = (result.text ?? '').trim();
+      const text = texts.filter(Boolean).join(' ').trim();
       this.logger.info(
         `[VOICE_NOTE] transcribed model=${this.transcriptionModel} ` +
-          `bytes=${audio.size} chars=${text.length} elapsedMs=${Date.now() - startedAt}`,
+          `bytes=${audio.size} chunks=${chunks.length} chars=${text.length} ` +
+          `elapsedMs=${Date.now() - startedAt}`,
       );
       return text;
     } catch (error) {

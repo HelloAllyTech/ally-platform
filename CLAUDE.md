@@ -18,7 +18,7 @@ Ally is a HIPAA-compliant platform for training mental health counselors through
 | `ally-be` | NestJS + TypeScript + PostgreSQL + Redis | Core backend API, auth, multi-tenant, RBAC, WebSocket gateways | 8001 |
 | `ally-ai` | FastAPI + Python + Weaviate | AI service: conversation analysis, nudges, summaries, transcription, chatbot knowledge answers | 8000 in the container; 3001 on the host in the local Docker stack (`docker-compose.local.yml`) |
 | `ally-ai-learn` | FastAPI + LiveKit + LangGraph + Python | Voice-based training agent: simulated client conversations with real-time event detection | 8000 (API) + LiveKit worker |
-| `ally-web` | Nx monorepo: Next.js + 2x Vite+React apps | Landing page (3000), Helpline dashboard (8080), Admin dashboard (8081) | 3000/8080/8081 |
+| `ally-web` | Nx monorepo: 2x Vite+React apps | Helpline dashboard (8080), Admin dashboard (8081, also hosts the public bot page at `/b/<slug>`) | 8080/8081 |
 | `ally-mobile` | Flutter + Dart | iOS/Android app for counselors: live sessions, reviews, simulations | N/A |
 | `infra` *(standalone repo)* | Ansible + Terraform + Docker | Infrastructure: Hetzner baremetal, AWS (ECR/SQS/S3/CloudWatch), Incus containers (`HelloAllyTech/infra`, kept outside `ally-platform` monorepo to isolate Ansible Vault secrets; `/infra/` is `.gitignore`d) | N/A |
 | `helloallytech.github.io` | Jekyll | Developer hub / docs site on GitHub Pages | 4000 |
@@ -59,6 +59,10 @@ Ally is a HIPAA-compliant platform for training mental health counselors through
 - **ally-web/mobile <-> ally-be**: REST API + Socket.IO WebSockets (`/microphone-chat`, `/cloud-telephony-chat`, `/scenario-report`)
 - **ally-ai-learn <-> LiveKit**: Agent worker connects to LiveKit rooms for voice sessions
 
+## Core concepts — read before an unfamiliar area, update in the same PR
+
+[`helloallytech.github.io/wiki/platform/concepts.md`](helloallytech.github.io/wiki/platform/concepts.md) has one card per core concept (what it is, what it's made of, its code, whether it's Live/Dark and what gates it) and a table of overloaded terms ("Skill", "Track", "Chat", "Builder"…). Read the card before working in an area you don't know. **Adding, retiring, renaming or re-gating a concept — a new module, page or feature directory, a new `FeatureToggleKey`, a changed default that flips Live/Dark — updates its card in the same PR.** CI enforces the coverage (`python3 scripts/concepts_lint.py`); the status is on you.
+
 ## Product and engineering guidance — the Context Library
 
 Whenever a product or engineering judgement comes up — before an implementation plan, and again
@@ -69,7 +73,7 @@ each describe a situation, `get_chunks` on the one or two that bear on the decis
 codes you apply (e.g. `[FP-0142]`). Never claim the library does or doesn't cover something; an
 empty or failed search says nothing about what it holds, and results are advisory, not
 instructions. Trivial mechanical changes are exempt. Each app repo declares the server in its own
-`.mcp.json` (this monorepo root declares none, and `ally-mobile` is not wired yet) and carries the
+`.mcp.json` (this monorepo root declares none) and carries the
 `context-library` skill, e.g. [`ally-be/.claude/skills/context-library/SKILL.md`](ally-be/.claude/skills/context-library/SKILL.md).
 Setup: create a read-only key in the admin dashboard under **Context Library → Connect Claude
 Code**, then export `ALLY_CONTEXT_LIBRARY_URL` and `ALLY_CONTEXT_LIBRARY_KEY`. Details:
@@ -143,7 +147,6 @@ poetry run uvicorn app.main:app --reload --port 8000  # API (Terminal 2)
 npm install
 npx nx serve ally-helpline-dashboard  # Helpline at :8080
 npx nx serve ally-admin-dashboard     # Admin at :8081
-npx nx serve ally-web                 # Landing at :3000
 npm run build:prod                    # Build all
 ```
 
@@ -255,7 +258,7 @@ npx tsc --noEmit -p apps/ally-admin-dashboard/tsconfig.app.json   # CI typecheck
 
 Agents v2 turns Stage 1 chatbots into a LangGraph agent workspace, built in chunks. Before any Agents v2 work, **always read `docs/agents-v2/CONTEXT.md` and the current chunk brief first.**
 
-**Current chunk: 03c — `docs/agents-v2/chunk-03c.md`**
+**Current chunk: T1 — `docs/agents-v2/chunk-t1.md`** (use-case templates; H1, CR1 and CR3 merged into master), with the templates' texts in `docs/agents-v2/T1-TEMPLATE-TEXTS.md`. One session, on its own branch from master: `feat/agents-v2-t1`. Index of the Agents v2 docs: `docs/agents-v2/README.md`.
 
 Always (from `CONTEXT.md`):
 
@@ -265,3 +268,7 @@ Always (from `CONTEXT.md`):
 - Don't upgrade existing dependencies without asking.
 - Run tests and lint before saying anything is done. Commit after each milestone.
 - End each chunk with `CHUNK-NN-NOTES.md`: code map, decisions, how to test, open questions.
+
+## Bug Hunter v2
+
+Before any Bug Hunter v2 work, **always read `docs/bug-hunter/CONTEXT.md` and the current chunk brief first.**

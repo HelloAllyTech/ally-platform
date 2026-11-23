@@ -10,6 +10,7 @@ import type {
   CourseCopilotJob,
   CourseCopilotJobStatus,
   CourseCopilotSessionDetail,
+  CourseCopilotRoleplayCard,
 } from "@types";
 import { asAgentText } from "@utils";
 
@@ -141,6 +142,48 @@ const StatusIcon: React.FC<{ status: CourseCopilotJobStatus }> = ({ status }) =>
  * shown — jobs run four at a time with very different durations, and a guessed ETA that
  * keeps moving is worse than none; progress and elapsed time are what we can state.
  */
+/** A new roleplay at a glance: what it is for, how it is set up, and what the checks found. */
+const RoleplayCard: React.FC<{ card: CourseCopilotRoleplayCard }> = ({ card }) => {
+  const strings = en.courseCopilot.roleplayCard;
+  const supports = [
+    card.supports?.reminders && strings.reminders,
+    card.supports?.stateVisible && strings.stateVisible,
+    card.supports?.supervisorNotes && strings.supervisorNotes,
+  ].filter(Boolean) as string[];
+  const states = Array.isArray(card.states) ? card.states : [];
+  const checks = Array.isArray(card.checks) ? card.checks : [];
+  return (
+    <dl
+      aria-label={strings.label}
+      className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 rounded bg-neutral-50 px-2.5 py-2 text-xs"
+      data-testid="roleplay-card"
+    >
+      <dt className="text-typography-500">{strings.label}</dt>
+      <dd className="font-medium text-typography-800">{strings.mode[card.mode] ?? card.mode}</dd>
+      {card.learnerGoal && (
+        <>
+          <dt className="text-typography-500">{strings.goal}</dt>
+          <dd className="text-typography-800">{asAgentText(card.learnerGoal)}</dd>
+        </>
+      )}
+      <dt className="text-typography-500">{strings.states}</dt>
+      <dd className="text-typography-800">
+        {states.length ? states.join(" → ") : strings.noStates}
+      </dd>
+      <dt className="text-typography-500">{strings.supports}</dt>
+      <dd className="text-typography-800">
+        {supports.length ? supports.join(", ") : strings.noSupports}
+      </dd>
+      {checks.length > 0 && (
+        <>
+          <dt className="text-typography-500">{strings.checks}</dt>
+          <dd className="text-warning-text">{checks.join(" · ")}</dd>
+        </>
+      )}
+    </dl>
+  );
+};
+
 export const BuildPanel: React.FC<BuildPanelProps> = ({
   detail,
   flashItemIds,
@@ -450,6 +493,19 @@ export const BuildPanel: React.FC<BuildPanelProps> = ({
                             title={detailLine}
                           >
                             {detailLine}
+                          </p>
+                        )}
+                        {job.status === "done" && job.roleplayCard && (
+                          <RoleplayCard card={job.roleplayCard} />
+                        )}
+                        {/* Which of the trainer's files this item was written from, to check it
+                            against. Only on finished items: a queued job has read nothing yet. */}
+                        {job.status === "done" && (job.references?.length ?? 0) > 0 && (
+                          <p
+                            className="mt-0.5 line-clamp-2 text-xs text-typography-600"
+                            title={job.references!.join(" · ")}
+                          >
+                            {en.courseCopilot.sources.basedOn(job.references!)}
                           </p>
                         )}
                       </div>

@@ -8,6 +8,12 @@ class LLMTask(str, Enum):
     NUDGE = "nudge"
     SUMMARY = "summary"
     DYNAMIC_SUMMARY = "dynamic_summary"
+    # Scribe v2 note harness: the main pass, the per-part map step for long
+    # sessions, and the one repair rewrite.
+    SCRIBE_NOTE = "scribe_note"
+    SCRIBE_NOTE_MAP = "scribe_note_map"
+    SCRIBE_NOTE_REPAIR = "scribe_note_repair"
+    SCRIBE_NOTE_ROLES = "scribe_note_roles"
     SCENARIO_EVALUATION = "scenario_evaluation"
     # The same debrief call re-run by ally-be to regenerate a session's
     # feedback in another language, on demand, after the original debrief.
@@ -36,6 +42,7 @@ class LLMTask(str, Enum):
     # Debrief-quality judge: one call per debrief, scoring every rubric
     # dimension. Needs the matching value in ally-be's LlmTask enum.
     DEBRIEF_QUALITY_JUDGE = "debrief_quality_judge"
+    DEBRIEF_LANGUAGE_JUDGE = "debrief_language_judge"
     # Debrief agent steps, one label per step so each step's cost is visible.
     DEBRIEF_SAFETY_READER = "debrief_safety_reader"
     DEBRIEF_ANALYST = "debrief_analyst"
@@ -43,8 +50,19 @@ class LLMTask(str, Enum):
     DEBRIEF_WRITER = "debrief_writer"
     DEBRIEF_EVALUATOR = "debrief_evaluator"
     DEBRIEF_REVISER = "debrief_reviser"
-    # The Improver's own analysis; paid from the learning budget, never production.
-    DEBRIEF_IMPROVER = "debrief_improver"
+    # The orchestrated debrief (spec A5, A9): the planner that picks the
+    # analysis agents, and the prompt-only agents it can pick.
+    DEBRIEF_PLANNER = "debrief_planner"
+    DEBRIEF_PROTOCOL_CHECK = "debrief_protocol_check"
+    DEBRIEF_HISTORY_DEEP = "debrief_history_deep"
+    DEBRIEF_LANGUAGE_SPECIALIST = "debrief_language_specialist"
+    # The PM agent's own analysis; paid from the learning budget, never production.
+    DEBRIEF_PM_AGENT = "debrief_improver"
+    # The Debrief agent answering a learner's flag on one card (V2_AUTONOMY F1).
+    DEBRIEF_FLAG_ANSWER = "debrief_flag_answer"
+    # Ask Ally: one row per model pass of a learner's reply (app/core/ask_ally).
+    # Ran in ally-be until the move to the LangGraph stack; same label.
+    DEBRIEF_REPLY = "debrief_reply"
     # RAG-quality judge: one call per retrieval, labelling each returned
     # passage's relevance and the set's sufficiency. Priced separately because
     # its volume tracks retrievals rather than sessions.
@@ -60,12 +78,7 @@ class LLMTask(str, Enum):
     # the retrieved passages on the admin-selected model, the translate call is a short
     # mechanical transform on a cheap one. Merged, cost-per-question would be
     # unattributable.
-    #
-    # No embedding label yet. The corpus and query embeddings are real cost, but
-    # emitting them needs an 'embedding' branch in emitter._has_quantity plus matching
-    # handling in ally-be's consumer (see the note in KnowledgeChunkService). Adding an
-    # enum member here before ally-be has the matching one would be exactly the drift
-    # this enum's docstring warns against.
+    # Their embeddings are EMBEDDING_SEARCH / EMBEDDING_INDEX below.
     WHATSAPP_RAG_ANSWER = "whatsapp_rag_answer"
     WHATSAPP_QUERY_TRANSLATE = "whatsapp_query_translate"
     WHATSAPP_CRISIS_CLASSIFY = "whatsapp_crisis_classify"
@@ -73,12 +86,37 @@ class LLMTask(str, Enum):
     # iteration, on the bot's answer model. It reads the turn and writes its own
     # search queries, so these bots make no translate call.
     WHATSAPP_AGENT_STEP = "whatsapp_agent_step"
+    # Memory, light (chunk 8a): after the reply, never while someone waits. The
+    # check runs only for health packs; the summary once a chat passes 10 messages.
+    CHATBOT_MEMORY_CHECK = "chatbot_memory_check"
+    CHATBOT_CONVERSATION_SUMMARY = "chatbot_conversation_summary"
     # Text helpline copilot. Two labels because they differ in volume and shape: the
     # risk classifier runs on every talker message with a tiny output, the turn call
     # runs once per (debounced) talker turn and writes the suggestions. Must have the
     # matching members in ally-be's LlmTask enum, or these rows arrive unlabelled.
+    # Onboarding builder (chunk 20a): one label per sub-task, so the cost of setting
+    # up an assistant is visible step by step. Extraction runs once per batch of
+    # crawled pages and dominates; the others run about once per onboarding.
+    ONBOARDING_BUILDER_STEP = "onboarding_builder_step"
+    ONBOARDING_EXTRACT_FACTS = "onboarding_extract_facts"
+    ONBOARDING_CLASSIFY = "onboarding_classify"
+    ONBOARDING_GAPS = "onboarding_gaps"
+    ONBOARDING_PURPOSES = "onboarding_purposes"
+    ONBOARDING_DRAFT = "onboarding_draft"
+    # The checkup (chunk 20a-2): one judge call per graded question that needs a
+    # reading for meaning (the automatic checks decide the rest).
+    CHECKUP_JUDGE = "checkup_judge"
+    # Change by chat on the assistant home (chunk 20a-2): one call per request.
+    ONBOARDING_CHANGE = "onboarding_change"
+    # Writes an assistant's checkup questions from its learned details.
+    CHECKUP_QUESTIONS = "checkup_questions"
     HELPLINE_RISK_CLASSIFY = "helpline_risk_classify"
     HELPLINE_COPILOT_TURN = "helpline_copilot_turn"
+    # Knowledge embeddings (CR1): the query embedded on each knowledge search, and
+    # the passages embedded when a document is indexed. Separate because one runs
+    # per reply and the other per upload. Matching members in ally-be's LlmTask.
+    EMBEDDING_SEARCH = "embedding_search"
+    EMBEDDING_INDEX = "embedding_index"
 
 
 def resolve_model_name(model: Any) -> str:

@@ -68,6 +68,7 @@ async def search_knowledge(args: SearchKnowledgeInput, ctx: ToolContext) -> Tool
             language=ctx.language,
             retrieval=retrieval,
             log_retrieval=ctx.log_retrieval,
+            agent_selection=True,
         )
     else:
         # Nothing relevant. Logged as the decline v1 would have

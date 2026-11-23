@@ -47,6 +47,39 @@ export interface BuilderCapability {
 
 export const BUILDER_CAPABILITIES: BuilderCapability[] = [
   {
+    id: 'billing',
+    name: 'Costs, tokens, plans and seats',
+    whatItIs:
+      'What every assistant costs Ally (each AI call and WhatsApp message priced from a versioned ' +
+      'model list), token allowances for custom logins, and plans, seats and monthly limits for ' +
+      'chatbot creators, checked before each run with crisis replies always going out.',
+    reuseWhen:
+      'Something needs to know what an AI call or a WhatsApp message cost, to meter or cap usage ' +
+      'per customer or per assistant, to add a plan, a seat type or a limit, or to price a new model.',
+    extendVia:
+      'A new metered call: send it inside a usage context (billing/context/usage-context.ts) and map ' +
+      'its ally-ai endpoint in ENDPOINT_USAGE_KIND. A new limit: a counter subject in LimitsService.',
+    modules: ['ally-be:src/billing'],
+    adminRoute: '/billing/costs',
+    keywords: [
+      'cost',
+      'costs',
+      'pricing',
+      'price per token',
+      'model price',
+      'tokens',
+      'token allowance',
+      'plan',
+      'plans',
+      'seat',
+      'seats',
+      'usage limit',
+      'quota',
+      'billing',
+      'metering',
+    ],
+  },
+  {
     id: 'auto-improve',
     name: 'Auto-improve (Skills Store → Auto-improve tab)',
     whatItIs:
@@ -218,11 +251,7 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
     reuseWhen:
       'A request wants a new chart, metric or dashboard for admins. Add a chart to the registry ' +
       'and an endpoint; do not build a separate dashboard page.',
-    modules: [
-      'ally-be:src/analytics',
-      'ally-be:src/analytics-agent',
-      'ally-be:src/analytics-suggestions',
-    ],
+    modules: ['ally-be:src/analytics', 'ally-be:src/analytics-agent'],
     adminRoute: '/analytics',
     keywords: ['chart', 'dashboard', 'metric', 'report', 'analytics', 'kpi'],
   },
@@ -362,12 +391,12 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
   },
   {
     id: 'debrief-agent',
-    name: 'Debrief agent and its Improver (admin Debriefs)',
+    name: 'Debrief agent and its Debrief PM agent (admin Debriefs)',
     whatItIs:
       'Writes the debrief a learner reads after a roleplay by following a recipe of steps ' +
       '(Safety reader, Analyst, Progress reader, Guidance lookup, Writer, rule checks, Evaluator, ' +
       'Reviser) under a budget and deadline, with a fallback ladder; runs in shadow beside ' +
-      "today's debrief and live for organisations switched on. The Improver reads aggregate " +
+      "today's debrief and live for organisations switched on. The Debrief PM agent reads aggregate " +
       'signals daily, proposes prompt and setting changes, tries them on test sets built from ' +
       'real sessions, and a person approves each new release. Runs on the agent harness ' +
       '(agentKey debrief).',
@@ -384,6 +413,7 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
       'debrief',
       'feedback after roleplay',
       'post-session feedback',
+      'pm agent',
       'improver',
       'risk cue',
       'important moment',
@@ -568,16 +598,26 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
     ],
   },
   {
-    id: 'bug-hunter',
+    id: 'bug-hunter-v2',
     name: 'Bug Hunter',
     whatItIs:
-      'A find-and-fix agent: sweeps for defects, records findings with a decision and dismissal ' +
-      'reason, and opens fix PRs.',
-    reuseWhen: 'A request concerns finding, triaging or auto-fixing bugs.',
-    modules: ['ally-be:src/bug-hunter'],
-    docs: ['ally-be:docs/bug-hunter-tools.md'],
-    adminRoute: '/bug-hunter',
-    keywords: ['bug', 'defect', 'finding', 'fix', 'triage'],
+      'A find-and-fix agent (the LangGraph agent in bug-hunter/ at the repo root): it reproduces ' +
+      'a bug with a failing test, fixes and reviews it, and leaves a suggested fix or draft PR. ' +
+      'Its admin side reads its own bughunter database, records the two-part verdict ' +
+      "(diagnosis + fix) that teaches it, and shows the old engine's findings read-only.",
+    reuseWhen:
+      'A request concerns finding, triaging, fixing or judging bugs, or showing suggested ' +
+      'fixes to staff.',
+    modules: ['ally-be:src/bug-hunter-approvals'],
+    docs: [],
+    adminRoute: '/bug-hunter-v2',
+    keywords: [
+      'bug hunter v2',
+      'verdict',
+      'suggested fix',
+      'escalation',
+      'false alarm',
+    ],
   },
   {
     id: 'ux-signals',
@@ -595,10 +635,16 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
     name: 'Product roadmap, votes and the opportunity copilot',
     whatItIs:
       'Roadmap opportunities with votes, the copilot that interviews someone into a filed ' +
-      'opportunity, and the hand-off that opens a Builder session from one.',
+      'opportunity, the hand-off that opens a Builder session from one, and the plan ' +
+      'foundations (who may plan, the plan event log and the plan spend ledger).',
     reuseWhen:
-      'A request concerns filing, prioritising or voting on product work.',
-    modules: ['ally-be:src/product-roadmap', 'ally-be:src/public-roadmap'],
+      'A request concerns filing, prioritising or voting on product work, or planning an ' +
+      'idea through PRD, design and outcome.',
+    modules: [
+      'ally-be:src/product-roadmap',
+      'ally-be:src/public-roadmap',
+      'ally-be:src/product-planning',
+    ],
     adminRoute: '/product-roadmap',
     keywords: [
       'roadmap',
@@ -631,7 +677,7 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
       'A request wants a bot that answers questions from documents, or to reach users on WhatsApp ' +
       'or another messaging channel.',
     modules: ['ally-be:src/chatbot', 'ally-be:src/whatsapp'],
-    adminRoute: '/chatbots',
+    adminRoute: '/assistants',
     keywords: [
       'whatsapp',
       'chatbot',
@@ -639,6 +685,29 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
       'faq bot',
       'messaging',
       'connector',
+    ],
+  },
+  {
+    id: 'assistant-onboarding',
+    name: 'New assistant setup (onboarding)',
+    whatItIs:
+      'A guided setup that reads a business website or documents, shows what it learned with ' +
+      'sources, turns on a safety pack, asks only about gaps, offers designs, builds the assistant ' +
+      'and publishes its bot page. A builder in ally-ai proposes changes; the draft service applies them.',
+    reuseWhen:
+      'A request wants to create an assistant from a website, or a guided, step-by-step way for a ' +
+      'business owner to set one up.',
+    extendVia:
+      'The draft step machine and BotDraftService (later steps are added, not forked).',
+    modules: ['ally-be:src/bot-draft', 'ally-ai:app/core/builder'],
+    adminRoute: '/assistants/new',
+    keywords: [
+      'onboarding',
+      'new assistant',
+      'setup',
+      'website',
+      'crawl',
+      'safety pack',
     ],
   },
   {
@@ -1037,6 +1106,26 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
     keywords: ['blog', 'post', 'article', 'announcement'],
   },
   {
+    id: 'landing-pages',
+    name: 'Landing pages',
+    whatItIs:
+      'Public pages a platform admin designs for one organisation at /<tenant-code>/<slug> — ' +
+      'template, languages, headings, helpline strip, quote slider, three content cards, ' +
+      'footer logos — edited as the live page, kept as a draft until published.',
+    reuseWhen:
+      'A request wants a campaign or partner page, a public entry point for one organisation, ' +
+      'or a page visitors can reach without logging in.',
+    modules: ['ally-be:src/landing-page'],
+    adminRoute: '/landing-pages',
+    keywords: [
+      'landing page',
+      'campaign',
+      'public page',
+      'partner page',
+      'microsite',
+    ],
+  },
+  {
     id: 'reference-documents',
     name: 'Reference documents (counsellor resource library)',
     whatItIs:
@@ -1087,6 +1176,55 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
       'writing its own client.',
     modules: ['ally-be:src/github'],
     keywords: ['github', 'workflow', 'pull request', 'release tag'],
+  },
+  {
+    id: 'pm-agent',
+    name: 'PM Agent (AI product manager)',
+    whatItIs:
+      'An admin feed of at most N recommendation or question cards drafted from analytics, code ' +
+      'and strategy; accepting a recommendation compiles it into a Builder session that builds, ' +
+      'merges and releases it.',
+    reuseWhen:
+      'A request wants the platform to suggest what to build next, to queue cards for an admin ' +
+      'to accept or reject, or to hand an accepted idea to Builder automatically.',
+    extendVia:
+      'PM_AGENT_RUN_TRIGGER (the generation pipeline) and PmAgentCardRepository for new cards.',
+    modules: ['ally-be:src/pm-agent'],
+    docs: ['ally-be:docs/pm-agent.md'],
+    adminRoute: '/pm-agent',
+    keywords: [
+      'pm agent',
+      'product manager',
+      'recommendation',
+      'suggestion',
+      'what to build',
+    ],
+  },
+  {
+    id: 'resources-directory',
+    name: 'Resources directory',
+    whatItIs:
+      'A directory of mental health resources that organisations build and publish themselves: ' +
+      'anyone signed in adds entries (public or private), saves public entries and their own into ' +
+      'collections, and publishes each collection as a public page, optionally on its own domain. ' +
+      'Only an entry’s or collection’s owner can edit it.',
+    reuseWhen:
+      'A request wants a list of services, hotlines or programmes that people add to, a curated ' +
+      'shortlist with its own public web page, or a page served on an organisation’s own domain.',
+    extendVia:
+      'DirectoryService for the ownership rules; DirectoryCollectionSettings for what a public ' +
+      'page can be told to show.',
+    modules: ['ally-be:src/directory'],
+    adminRoute: '/directory',
+    keywords: [
+      'directory',
+      'resources',
+      'resource list',
+      'collection',
+      'landing page',
+      'custom domain',
+      'helpline list',
+    ],
   },
 ];
 

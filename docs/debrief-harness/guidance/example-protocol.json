@@ -1,0 +1,22 @@
+{
+  "note": "An EXAMPLE organisation protocol, used only to test plan case 17 ('protocol \"always refer\" missed'). Targeted at one organisation with no live or shadow debriefs, then archived. Real protocols come from organisations' designated people through Context Library -> Add documents.",
+  "entries": [
+    {
+      "key": "example-protocol-always-refer",
+      "statement": "Example protocol (test): always refer a client with low mood, worry or poor sleep lasting two weeks or more to a doctor or school counsellor.",
+      "body": "Organisation protocol. Whenever a client describes low mood, constant worry, or sleep problems that have lasted two weeks or more, the counsellor must suggest a referral to a doctor or the school counsellor before the session ends, and check the client is willing to go. Listening and support are still needed; the referral is in addition to them, never instead.",
+      "situations": [
+        "the client says their low mood, worry or poor sleep has gone on for weeks or months",
+        "the session ends without the counsellor suggesting a doctor or school counsellor"
+      ],
+      "exampleQueries": [
+        "learner did not refer a client with weeks of poor sleep",
+        "client has had exam worry for months; counsellor only gave study tips"
+      ],
+      "facets": { "kind": "protocol", "skills": ["referral"] },
+      "detail": "Before ending, the counsellor suggests seeing a doctor or the school counsellor, explains why, and asks if the client is willing to go.",
+      "clinical": true,
+      "tenantIds": ["1cdef3f4-1768-4d55-bc17-0c7ea961fde0"]
+    }
+  ]
+}

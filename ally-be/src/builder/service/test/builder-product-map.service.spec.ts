@@ -9,7 +9,7 @@ const ROUTING = [
   '',
   '**Generated — do not edit.** Fetch as https://tech.helloally.ai/#/wiki/<path>.',
   '',
-  '## Product practice — DEPRECATED 2026-08-07, superseded by the Stacks MCP; history only',
+  '## Product practice — DEPRECATED 2026-08-07, superseded by the Context Library; history only',
   '',
   '- `product/ui.md` (1735w) — How Ally screens should behave…',
   '',

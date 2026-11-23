@@ -3,9 +3,11 @@ import React, { useEffect, useRef, useState } from "react";
 import { ChevronDown, FilePlus2, FileUp, PenLine, Plus, Table2, UploadCloud } from "lucide-react";
 
 import { en } from "@constants";
-import { ContextCollection } from "@types";
+import { ContextAudience, ContextCollection } from "@types";
 
+import { AudiencePicker, GLOBAL_AUDIENCE, audienceBody, audienceValid } from "./AudiencePicker";
 import { splitDocuments } from "./contextLibraryFormat";
+import { useContextLibraryScope } from "./contextLibraryScope";
 import { Sheet } from "../Builder/room/Sheet";
 
 export const DOCUMENT_ACCEPT = ".pdf,.epub,application/pdf,application/epub+zip";
@@ -137,6 +139,8 @@ export interface AddDocumentsChoice {
   collections: string[];
   docVersion?: string;
   year?: number;
+  /** Who the distilled entries reach. */
+  audience?: ContextAudience;
 }
 
 export const AddDocumentsDialog: React.FC<{
@@ -151,16 +155,20 @@ export const AddDocumentsDialog: React.FC<{
   const [targets, setTargets] = useState<string[]>(initialTargets);
   const [docVersion, setDocVersion] = useState("");
   const [year, setYear] = useState("");
+  const { orgNames } = useContextLibraryScope();
+  const [audience, setAudience] = useState<ContextAudience>(GLOBAL_AUDIENCE);
+  const ready = accepted.length > 0 && targets.length > 0 && audienceValid(audience);
   const addRef = useRef<HTMLButtonElement>(null);
   useEffect(() => addRef.current?.focus(), []);
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
-    if (!accepted.length || !targets.length) return;
+    if (!ready) return;
     const parsedYear = Number(year);
     onConfirm({
       files: accepted,
       collections: targets,
+      audience: audienceBody(audience),
       docVersion: docVersion.trim() || undefined,
       year: Number.isInteger(parsedYear) && parsedYear > 0 ? parsedYear : undefined,
     });
@@ -227,6 +235,12 @@ export const AddDocumentsDialog: React.FC<{
             />
           </label>
         </div>
+        <AudiencePicker
+          value={audience}
+          onChange={setAudience}
+          orgNames={orgNames}
+          help={en.contextLibrary.audience.documentHelp}
+        />
         <p className="text-xs text-typography-600">{en.contextLibrary.firstRun.privacy}</p>
         <div className="flex justify-end gap-2 border-t border-border-light pt-3">
           <button
@@ -239,7 +253,7 @@ export const AddDocumentsDialog: React.FC<{
           <button
             ref={addRef}
             type="submit"
-            disabled={!accepted.length || !targets.length}
+            disabled={!ready}
             className="rounded bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500"
           >
             {strings.confirm}

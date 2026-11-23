@@ -1,0 +1,39 @@
+diff --git a/src/learn/service/room-metadata-store.service.ts b/src/learn/service/room-metadata-store.service.ts
+index 5ede46026b..62f528a18c 100644
+--- a/src/learn/service/room-metadata-store.service.ts
++++ b/src/learn/service/room-metadata-store.service.ts
+@@ -15,6 +15,7 @@ import { LearnRoomMetadata } from '../entity/learn-room-metadata.entity';
+  */
+ export interface SlimRoomMetadata {
+   version: string;
++  environment?: string;
+   metadataFetch: {
+     roomName: string;
+     url: string;
+@@ -96,6 +97,11 @@ export class RoomMetadataStoreService {
+     const baseUrl = (this.configService.api.baseUrl ?? '').replace(/\/$/, '');
+     return {
+       version: `${fullEnvelope.version ?? '1.0'}`,
++      // The LiveKit webhook receiver (livekit-webhook.controller.ts) filters
++      // every event on room.metadata.environment matching this env's config —
++      // the slim envelope must carry it too, or every webhook for a room
++      // created under this envelope gets silently dropped.
++      environment: fullEnvelope.environment,
+       metadataFetch: {
+         roomName,
+         // main.ts sets setGlobalPrefix('api'), so every route lives under
+diff --git a/src/learn/service/test/room-metadata-store.service.spec.ts b/src/learn/service/test/room-metadata-store.service.spec.ts
+index 2114851a10..969459139f 100644
+--- a/src/learn/service/test/room-metadata-store.service.spec.ts
++++ b/src/learn/service/test/room-metadata-store.service.spec.ts
+@@ -76,6 +76,10 @@ describe('RoomMetadataStoreService', () => {
+       );
+       expect(out.roomPayload).toEqual({
+         version: '1.0',
++        // Must be carried through: the LiveKit webhook receiver filters every
++        // event on room.metadata.environment (2026-07-24 outage — the slim
++        // envelope silently dropped every webhook by omitting this field).
++        environment: 'test',
+         metadataFetch: {
+           roomName: 'ss_abc',
+           // Must carry the setGlobalPrefix('api') segment — the agent 404s

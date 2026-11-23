@@ -1,0 +1,188 @@
+[
+  {
+    "id": "lead-1",
+    "kind": "Ledgerly: a price it can't give, then details (chunk 6b, item 29)",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "How much does Ledgerly cost?",
+        "expect": {
+          "crisis": false,
+          "noTools": [
+            "create_leads"
+          ],
+          "must": [
+            "(name|number|phone|contact details|your details)"
+          ]
+        }
+      },
+      {
+        "user": "Sure. I'm Rahul Mehta, 9876543201",
+        "expect": {
+          "crisis": false,
+          "tools": [
+            "create_leads: ok"
+          ],
+          "mustNot": [
+            "shall i save|should i save|do you want me to save"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "lead-2",
+    "kind": "Ledgerly: a price it can't give, then details (chunk 6b, item 29)",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "Ledgerly ka price kya hai?",
+        "expect": {
+          "crisis": false,
+          "noTools": [
+            "create_leads"
+          ],
+          "must": [
+            "(name|number|phone|contact details|your details)"
+          ]
+        }
+      },
+      {
+        "user": "Sure. I'm Rahul Mehta, 9876543202",
+        "expect": {
+          "crisis": false,
+          "tools": [
+            "create_leads: ok"
+          ],
+          "mustNot": [
+            "shall i save|should i save|do you want me to save"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "lead-3",
+    "kind": "Ledgerly: a price it can't give, then details (chunk 6b, item 29)",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "i want to buy it, how much is it?",
+        "expect": {
+          "crisis": false,
+          "noTools": [
+            "create_leads"
+          ],
+          "must": [
+            "(name|number|phone|contact details|your details)"
+          ]
+        }
+      },
+      {
+        "user": "Sure. I'm Rahul Mehta, 9876543203",
+        "expect": {
+          "crisis": false,
+          "tools": [
+            "create_leads: ok"
+          ],
+          "mustNot": [
+            "shall i save|should i save|do you want me to save"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "lead-4",
+    "kind": "Ledgerly: a price it can't give, then details (chunk 6b, item 29)",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "What's the price for a team of 10?",
+        "expect": {
+          "crisis": false,
+          "noTools": [
+            "create_leads"
+          ],
+          "must": [
+            "(name|number|phone|contact details|your details)"
+          ]
+        }
+      },
+      {
+        "user": "Sure. I'm Rahul Mehta, 9876543204",
+        "expect": {
+          "crisis": false,
+          "tools": [
+            "create_leads: ok"
+          ],
+          "mustNot": [
+            "shall i save|should i save|do you want me to save"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "lead-5",
+    "kind": "Ledgerly: a price it can't give, then details (chunk 6b, item 29)",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "Do you have a monthly plan? How much is it?",
+        "expect": {
+          "crisis": false,
+          "noTools": [
+            "create_leads"
+          ],
+          "must": [
+            "(name|number|phone|contact details|your details)"
+          ]
+        }
+      },
+      {
+        "user": "Sure. I'm Rahul Mehta, 9876543205",
+        "expect": {
+          "crisis": false,
+          "tools": [
+            "create_leads: ok"
+          ],
+          "mustNot": [
+            "shall i save|should i save|do you want me to save"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "id": "lead-6",
+    "kind": "Ledgerly: a price it can't give, then details (chunk 6b, item 29)",
+    "mustPass": true,
+    "turns": [
+      {
+        "user": "Can I get a quote for my firm?",
+        "expect": {
+          "crisis": false,
+          "noTools": [
+            "create_leads"
+          ],
+          "must": [
+            "(name|number|phone|contact details|your details)"
+          ]
+        }
+      },
+      {
+        "user": "Sure. I'm Rahul Mehta, 9876543206",
+        "expect": {
+          "crisis": false,
+          "tools": [
+            "create_leads: ok"
+          ],
+          "mustNot": [
+            "shall i save|should i save|do you want me to save"
+          ]
+        }
+      }
+    ]
+  }
+]

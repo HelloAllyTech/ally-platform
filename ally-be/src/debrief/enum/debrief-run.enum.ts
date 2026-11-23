@@ -59,3 +59,11 @@ export enum DebriefFeedbackStatus {
   /** A "was this helpful?" answer: nothing to review. */
   NOTED = 'noted',
 }
+
+/** An Agent logs entry (`debrief_run_logs.kind`, migration 1981901000000). */
+export enum DebriefRunLogKind {
+  /** A model call: the exact message and the full reply. */
+  MODEL = 'model',
+  /** A deciding code step: its real inputs and results. */
+  CODE = 'code',
+}

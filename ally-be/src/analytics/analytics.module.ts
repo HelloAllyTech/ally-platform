@@ -19,8 +19,6 @@ import { CourseUnitsAnalyticsService } from './service/course-units-analytics.se
 import { CourseUnitsAnalyticsRepository } from './repository/course-units-analytics.repository';
 import { XpLevelReachedAnalyticsService } from './service/xp-level-reached-analytics.service';
 import { XpLevelReachedAnalyticsRepository } from './repository/xp-level-reached-analytics.repository';
-import { BugHunterVolumeAnalyticsService } from './service/bug-hunter-volume-analytics.service';
-import { BugHunterVolumeAnalyticsRepository } from './repository/bug-hunter-volume-analytics.repository';
 import { XpByTenantAnalyticsService } from './service/xp-by-tenant-analytics.service';
 import { XpByTenantAnalyticsRepository } from './repository/xp-by-tenant-analytics.repository';
 import { AnalyticsXpGoal } from './entity/analytics-xp-goal.entity';
@@ -34,6 +32,8 @@ import { ChangelogModule } from 'src/changelog/changelog.module';
 import { RoadmapDeliveryAnalyticsRepository } from './repository/roadmap-delivery-analytics.repository';
 // Highlights → Priority "Roadmap votes cast": the same untenanted roadmap tables.
 import { RoadmapVotingAnalyticsService } from './service/roadmap-voting-analytics.service';
+import { AssessmentAttemptsAnalyticsService } from './service/assessment-attempts-analytics.service';
+import { CourseAssessmentReportService } from './service/course-assessment-report.service';
 import { RoadmapVotingAnalyticsRepository } from './repository/roadmap-voting-analytics.repository';
 // Testing-tab endpoints: candidates for the leadership Highlights tab, kept on a
 // separate admin tab until they have proved they change a decision.
@@ -113,10 +113,6 @@ import { CodingAgentCostAnalyticsService } from './service/coding-agent-cost-ana
 import { CodingAgentCostAnalyticsRepository } from './repository/coding-agent-cost-analytics.repository';
 import { FixSessionEngineCostAnalyticsService } from './service/fix-session-engine-cost-analytics.service';
 import { FixSessionEngineCostAnalyticsRepository } from './repository/fix-session-engine-cost-analytics.repository';
-import { BugAgentPerformanceAnalyticsService } from './service/bug-agent-performance-analytics.service';
-import { BugFindingRepository } from 'src/bug-hunter/repository/bug-finding.repository';
-import { BugHuntRunRepository } from 'src/bug-hunter/repository/bug-hunt-run.repository';
-import { BugHuntEventRepository } from 'src/bug-hunter/repository/bug-hunt-event.repository';
 import { QualitySentimentAnalyticsService } from './service/quality-sentiment-analytics.service';
 import { QualitySentimentAnalyticsRepository } from './repository/quality-sentiment-analytics.repository';
 // Roleplay Quality Index: the composite behind the "Roleplay quality" card,
@@ -172,8 +168,6 @@ import { FeedbackGroundednessRepository } from './repository/feedback-groundedne
 // debrief quality bar is read from.
 import { DebriefQualityJudgeService } from './service/debrief-quality-judge.service';
 import { DebriefQualityRepository } from './repository/debrief-quality.repository';
-import { DebriefCalibrationService } from './service/debrief-calibration.service';
-import { DebriefCalibrationController } from './controller/debrief-calibration.controller';
 import { RagQualityJudgeService } from './service/rag-quality-judge.service';
 import { RagQualityAnalyticsService } from './service/rag-quality-analytics.service';
 import { RagQualityAnalyticsRepository } from './repository/rag-quality-analytics.repository';
@@ -213,11 +207,7 @@ import { TenantModule } from 'src/tenant/tenant.module';
     // tenant population (RSI loop, judge-side wiring).
     LanguageModule,
   ],
-  controllers: [
-    AnalyticsController,
-    TenantAnalyticsController,
-    DebriefCalibrationController,
-  ],
+  controllers: [AnalyticsController, TenantAnalyticsController],
   providers: [
     AnalyticsService,
     WeakMetricsAnalyticsService,
@@ -226,7 +216,6 @@ import { TenantModule } from 'src/tenant/tenant.module';
     FeedbackGroundednessRepository,
     DebriefQualityJudgeService,
     DebriefQualityRepository,
-    DebriefCalibrationService,
     RagQualityJudgeService,
     RagQualityRepository,
     RagQualityAnalyticsService,
@@ -249,8 +238,6 @@ import { TenantModule } from 'src/tenant/tenant.module';
     CourseUnitsAnalyticsRepository,
     XpLevelReachedAnalyticsService,
     XpLevelReachedAnalyticsRepository,
-    BugHunterVolumeAnalyticsService,
-    BugHunterVolumeAnalyticsRepository,
     XpByTenantAnalyticsService,
     XpByTenantAnalyticsRepository,
     RoleplayVolumeAnalyticsService,
@@ -259,6 +246,8 @@ import { TenantModule } from 'src/tenant/tenant.module';
     RoadmapDeliveryAnalyticsRepository,
     RoadmapVotingAnalyticsService,
     RoadmapVotingAnalyticsRepository,
+    AssessmentAttemptsAnalyticsService,
+    CourseAssessmentReportService,
     // No repository: this one reads GitHub's statistics API, not our database.
     ShipVolumeAnalyticsService,
     ActivationAnalyticsService,
@@ -337,15 +326,6 @@ import { TenantModule } from 'src/tenant/tenant.module';
     CodingAgentCostAnalyticsRepository,
     FixSessionEngineCostAnalyticsService,
     FixSessionEngineCostAnalyticsRepository,
-    // Provided directly rather than importing BugHunterModule: all three
-    // construct themselves from the DataSource alone, so this costs nothing
-    // and avoids pulling in Bug Hunter's whole service graph for three read
-    // queries — same reasoning as this week's PosthogQueryService/
-    // BugHunterRepoClassifierService additions elsewhere.
-    BugFindingRepository,
-    BugHuntRunRepository,
-    BugHuntEventRepository,
-    BugAgentPerformanceAnalyticsService,
     QualitySentimentAnalyticsService,
     QualitySentimentAnalyticsRepository,
     QualityIndexAnalyticsService,
@@ -391,7 +371,7 @@ import { TenantModule } from 'src/tenant/tenant.module';
     DashboardRepository,
   ],
   /**
-   * The per-chart aggregate services, exported for AnalyticsSuggestionsModule.
+   * The per-chart aggregate services, exported for the PM Agent and the dashboard.
    *
    * Only the `getX(query)` read services are exported — never the repositories,
    * the judges, or the backfill schedulers. A consumer that wants a figure gets

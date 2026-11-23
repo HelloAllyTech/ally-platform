@@ -1,0 +1,51 @@
+diff --git a/ally-web/apps/ally-admin-dashboard/src/pages/WhatsAppBot/ChatbotTestTab.tsx b/ally-web/apps/ally-admin-dashboard/src/pages/WhatsAppBot/ChatbotTestTab.tsx
+index 50b02c47a..b5f3cd5d8 100644
+--- a/ally-web/apps/ally-admin-dashboard/src/pages/WhatsAppBot/ChatbotTestTab.tsx
++++ b/ally-web/apps/ally-admin-dashboard/src/pages/WhatsAppBot/ChatbotTestTab.tsx
+@@ -12,6 +12,8 @@ import { Card, copyToClipboard, errorMessage, fill } from "./shared";
+ import type { PersonaDraft } from "./PersonaTab";
+ 
+ const t = en.whatsappBot.bots.test;
++/** Messages of the thread sent with each test, most recent last (ally-be keeps the same 10). */
++const MAX_HISTORY_MESSAGES = 10;
+ const handledLabels = en.whatsappBot.conversations.handledBy as Record<string, string>;
+ 
+ type Turn =
+@@ -58,7 +60,11 @@ export const ChatbotTestTab: React.FC<{ bot: Chatbot }> = ({ bot }) => {
+   const send = async () => {
+     const text = message.trim();
+     if (!text) return;
+-    const history = turns.map(turn => ({ role: turn.role, content: turn.content }));
++    // The thread on screen keeps everything; the request carries only the most recent
++    // messages, as WhatsApp does (the API accepts at most 20).
++    const history = turns
++      .slice(-MAX_HISTORY_MESSAGES)
++      .map(turn => ({ role: turn.role, content: turn.content }));
+     setTurns(current => [...current, { role: "user", content: text }]);
+     setMessage("");
+     try {
+diff --git a/ally-web/apps/ally-admin-dashboard/src/pages/WhatsAppBot/__tests__/ChatbotTestTab.test.tsx b/ally-web/apps/ally-admin-dashboard/src/pages/WhatsAppBot/__tests__/ChatbotTestTab.test.tsx
+index a6c249e3c..b0051ddc0 100644
+--- a/ally-web/apps/ally-admin-dashboard/src/pages/WhatsAppBot/__tests__/ChatbotTestTab.test.tsx
++++ b/ally-web/apps/ally-admin-dashboard/src/pages/WhatsAppBot/__tests__/ChatbotTestTab.test.tsx
+@@ -142,6 +142,20 @@ describe("ChatbotTestTab — engine and run", () => {
+     expect(testSpy.mock.calls[2][0]).toMatchObject({ conversationId: undefined });
+   });
+ 
++  it("sends only the last 10 messages of a long thread", async () => {
++    render(<ChatbotTestTab bot={BOT} />);
++    for (let i = 0; i < 8; i++) {
++      nextResult = result({ reply: `reply ${i}` });
++      await ask(`question ${i}`);
++    }
++    // 16 messages on screen; the 9th test sends only the most recent 10.
++    await ask("question 8");
++    const history = testSpy.mock.calls[8][0].history;
++    expect(history).toHaveLength(10);
++    expect(history[0]).toEqual({ role: "user", content: "question 3" });
++    expect(history[9]).toEqual({ role: "assistant", content: "reply 7" });
++  });
++
+   it("has no engine picker and always tests the chatbot's own engine", async () => {
+     canCreate = true;
+     render(<ChatbotTestTab bot={BOT} />);

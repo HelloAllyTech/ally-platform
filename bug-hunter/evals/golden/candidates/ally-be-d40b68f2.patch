@@ -1,0 +1,67 @@
+diff --git a/ally-be/src/debrief/test/debrief-cards.util.spec.ts b/ally-be/src/debrief/test/debrief-cards.util.spec.ts
+index 292177c57..96f50c3ee 100644
+--- a/ally-be/src/debrief/test/debrief-cards.util.spec.ts
++++ b/ally-be/src/debrief/test/debrief-cards.util.spec.ts
+@@ -236,6 +236,24 @@ describe('debrief checks', () => {
+     );
+   });
+ 
++  it('ignores punctuation at the edges of a quote, never inside it', () => {
++    const said = [
++      'And you should always support the affirmative about those kind of things.',
++    ];
++    expect(
++      replyCheckFailures(
++        'You said "And you should always support the affirmative about those kind of things," which…',
++        said,
++      ),
++    ).toEqual([]);
++    expect(
++      replyCheckFailures(
++        'You said "And you should, always support the affirmative"',
++        said,
++      ),
++    ).toContain(DebriefCheckCode.QUOTE_MISMATCH);
++  });
++
+   it('lets Ask Ally quote a card by its skill name', () => {
+     const reply = 'That sits under "exploring risk." on your card.';
+     expect(replyCheckFailures(reply, [])).toContain(
+diff --git a/ally-be/src/debrief/util/debrief-cards.util.ts b/ally-be/src/debrief/util/debrief-cards.util.ts
+index e023bcaad..8fd58fa72 100644
+--- a/ally-be/src/debrief/util/debrief-cards.util.ts
++++ b/ally-be/src/debrief/util/debrief-cards.util.ts
+@@ -124,17 +124,23 @@ export const WHY_MAX_WORDS = 40;
+ export const DEBRIEF_MAX_WORDS = 220;
+ export const SHORT_DEBRIEF_MAX_WORDS = 120;
+ 
+-/** Whitespace and quote-mark differences are not a different quote; anything else is. */
++/**
++ * Whitespace, quote marks and punctuation at a quote's edges are not a
++ * different quote; anything else is.
++ */
+ export function normaliseForQuote(s: string): string {
+-  return (s ?? '')
+-    .normalize('NFC')
+-    .replace(/[‘’‛]/g, "'")
+-    .replace(/[“”‟]/g, '"')
+-    .replace(/[…]/g, '...')
+-    .replace(/\s+/g, ' ')
+-    .trim()
+-    .replace(/^["'.\s]+|["'.\s]+$/g, '')
+-    .toLowerCase();
++  return (
++    (s ?? '')
++      .normalize('NFC')
++      .replace(/[‘’‛]/g, "'")
++      .replace(/[“”‟]/g, '"')
++      .replace(/[…]/g, '...')
++      .replace(/\s+/g, ' ')
++      .trim()
++      // A quote's own edges: a comma or full stop where the sentence was cut.
++      .replace(/^[\p{P}\s]+|[\p{P}\s]+$/gu, '')
++      .toLowerCase()
++  );
+ }
+ 
+ const wordCount = (s: string | null | undefined) =>

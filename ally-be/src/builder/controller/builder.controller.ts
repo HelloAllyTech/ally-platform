@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   NotFoundException,
   Param,
@@ -10,7 +11,9 @@ import {
   Post,
   Query,
   Res,
+  UseInterceptors,
 } from '@nestjs/common';
+import { BuilderSessionVisibilityInterceptor } from '../interceptor/builder-session-visibility.interceptor';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -20,6 +23,7 @@ import {
 import { Response } from 'express';
 import { CurrentUser } from 'src/auth/decorators/user.decorator';
 import { TokenUser } from 'src/auth/type/auth.types';
+import { RequireBuilderOrPlanRead } from '../guard/builder-plan-read.guard';
 import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorator';
 import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
 import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
@@ -38,6 +42,8 @@ import {
   switchesForAutonomyLevel,
 } from '../util/builder-autonomy.util';
 import { BuilderSettingsService } from '../service/builder-settings.service';
+import { AUTO_RELEASE_HELD_PATHS_DEFAULT } from 'src/product-planning/constants/product-planning.constants';
+import { RoadmapRoleService } from 'src/product-planning/service/roadmap-role.service';
 import { BuilderNotificationService } from '../service/builder-notification.service';
 import { BuilderExemplarService } from '../service/builder-exemplar.service';
 import { BuilderMetricsService } from '../service/builder-metrics.service';
@@ -83,6 +89,8 @@ import { BuilderSessionStatus } from '../enum/builder.enum';
 @ApiTags('Builder')
 @ApiBearerAuth()
 @ApiSecurity('access-token')
+// PRIVATE sessions (unfiled plans) are their author's alone on every :sessionId route.
+@UseInterceptors(BuilderSessionVisibilityInterceptor)
 @Controller({ path: 'builder', version: '1' })
 export class BuilderController {
   private readonly logger = LoggerService.getInstance(BuilderController.name);
@@ -107,6 +115,7 @@ export class BuilderController {
     private readonly catalogService: BuilderCatalogService,
     private readonly evidenceLog: BuilderEvidenceLogService,
     private readonly decisionService: BuilderDecisionService,
+    private readonly roadmapRoles: RoadmapRoleService,
   ) {}
 
   @Post('sessions')
@@ -114,10 +123,18 @@ export class BuilderController {
     permissions: [PERMISSIONS.EDIT_BUILDER],
   })
   @ApiOperation({ summary: 'Start a Builder session (PRD interview)' })
-  createSession(
+  async createSession(
     @Body() dto: CreateBuilderSessionDto,
     @CurrentUser() user: TokenUser,
   ) {
+    // Retired once plans start on the roadmap (rev 5.2, P7): existing sessions
+    // carry on; new work starts as an idea on the roadmap.
+    const settings = await this.settingsService.get();
+    if (settings.builderDirectInterviewEnabled === false) {
+      throw new ForbiddenException(
+        'New builds now start on the Product Roadmap: file an idea there, and its plan comes here to build.',
+      );
+    }
     return this.sessionService.createSession(user.id, {
       title: dto.title,
       tenantId: user.tenantId ?? null,
@@ -152,7 +169,7 @@ export class BuilderController {
   }
 
   @Get('sessions/:sessionId')
-  @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
+  @RequireBuilderOrPlanRead({
     permissions: [PERMISSIONS.VIEW_BUILDER],
   })
   @ApiOperation({
@@ -334,7 +351,7 @@ export class BuilderController {
   }
 
   @Get('sessions/:sessionId/prd/versions')
-  @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
+  @RequireBuilderOrPlanRead({
     permissions: [PERMISSIONS.VIEW_BUILDER],
   })
   @ApiOperation({ summary: 'PRD version history, newest first' })
@@ -519,7 +536,7 @@ export class BuilderController {
   }
 
   @Get('sessions/:sessionId/runs')
-  @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
+  @RequireBuilderOrPlanRead({
     permissions: [PERMISSIONS.VIEW_BUILDER],
   })
   @ApiOperation({ summary: 'Build runs for a session, oldest first' })
@@ -529,7 +546,7 @@ export class BuilderController {
   }
 
   @Get('runs/:runId/events')
-  @RequireFeatureToggle(FeatureToggleKey.BUILDER, {
+  @RequireBuilderOrPlanRead({
     permissions: [PERMISSIONS.VIEW_BUILDER],
   })
   @ApiOperation({
@@ -702,6 +719,11 @@ export class BuilderController {
       trackRecord.unhealthyReleases === 0;
     return {
       ...settings,
+      // Null on the row means the defaults in code; the settings screen shows
+      // the list that applies, not the storage detail.
+      autoReleaseHeldPaths: settings.autoReleaseHeldPaths ?? [
+        ...AUTO_RELEASE_HELD_PATHS_DEFAULT,
+      ],
       autonomyLevel,
       trackRecord,
       suggestedLevel: earned ? nextAutonomyLevel(autonomyLevel) : null,
@@ -714,11 +736,23 @@ export class BuilderController {
     permissions: [PERMISSIONS.EDIT_BUILDER],
   })
   @ApiOperation({ summary: 'Update Builder settings' })
-  updateSettings(
+  async updateSettings(
     @Body() dto: UpdateBuilderSettingsDto,
     @CurrentUser() user: TokenUser,
   ) {
-    return this.settingsService.update(
+    // The roadmap_v2 flag moves every Roadmap and Builder user at once (D8),
+    // so it is the Owner's switch (plans/roadmap-builder-merge §3.1:
+    // configure is Owner-only), not every Builder's. The other settings keep
+    // their Builder gate.
+    if (
+      dto.roadmapV2Enabled !== undefined &&
+      (await this.roadmapRoles.roleOf(user.id)) !== 'owner'
+    ) {
+      throw new ForbiddenException(
+        'Only a Roadmap Owner (Product Roadmap — Manage) can switch Roadmap v2 on or off.',
+      );
+    }
+    const saved = await this.settingsService.update(
       {
         ...(dto.enabled !== undefined ? { enabled: dto.enabled } : {}),
         ...(dto.maxConcurrentBuilds !== undefined
@@ -773,6 +807,38 @@ export class BuilderController {
                 : null,
             }
           : {}),
+        ...(dto.planningEnabled !== undefined
+          ? { planningEnabled: dto.planningEnabled }
+          : {}),
+        ...(dto.planCeilingUsd !== undefined
+          ? { planCeilingUsd: String(dto.planCeilingUsd) }
+          : {}),
+        ...(dto.planIdeaCeilingUsd !== undefined
+          ? { planIdeaCeilingUsd: String(dto.planIdeaCeilingUsd) }
+          : {}),
+        ...(dto.planCloseConfirmVotes !== undefined
+          ? { planCloseConfirmVotes: dto.planCloseConfirmVotes }
+          : {}),
+        ...(dto.builderDirectInterviewEnabled !== undefined
+          ? {
+              builderDirectInterviewEnabled: dto.builderDirectInterviewEnabled,
+            }
+          : {}),
+        ...(dto.roadmapV2Enabled !== undefined
+          ? { roadmapV2Enabled: dto.roadmapV2Enabled }
+          : {}),
+        ...(dto.maxLeadCeilingUsd !== undefined
+          ? { maxLeadCeilingUsd: String(dto.maxLeadCeilingUsd) }
+          : {}),
+        ...(dto.awaitingReviewAmberDays !== undefined
+          ? { awaitingReviewAmberDays: dto.awaitingReviewAmberDays }
+          : {}),
+        ...(dto.releaseWindow !== undefined
+          ? { releaseWindow: dto.releaseWindow ?? null }
+          : {}),
+        ...(dto.autoReleaseHeldPaths !== undefined
+          ? { autoReleaseHeldPaths: dto.autoReleaseHeldPaths ?? null }
+          : {}),
         // The level sets the switches, and wins over any given alongside it.
         ...(dto.autonomyLevel
           ? switchesForAutonomyLevel(dto.autonomyLevel)
@@ -780,6 +846,19 @@ export class BuilderController {
       },
       user.id,
     );
+    // Switching Roadmap off is the rollback (Roadmap v2 P6): say plainly that nothing made
+    // on the Roadmap, nor anything the cutover copied, was deleted. Deletion is P7.
+    if (dto.roadmapV2Enabled === false) {
+      return {
+        ...saved,
+        roadmapV2Off: {
+          dataKept: true,
+          message:
+            'Roadmap is off. Product Roadmap and Builder are back as they were, and everything made on the Roadmap is kept for when it is switched on again.',
+        },
+      };
+    }
+    return saved;
   }
 
   @Get('notifications')
@@ -993,6 +1072,8 @@ export class BuilderController {
           }`,
         );
       }
+      // After the lock: a requester answering starts the next turn.
+      void this.sessionService.turnEnded(sessionId);
       if (!res.writableEnded) {
         res.end();
       }

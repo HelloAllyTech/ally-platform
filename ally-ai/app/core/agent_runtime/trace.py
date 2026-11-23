@@ -12,11 +12,14 @@ streamed run (`/agent/run`, a direct call in a test) emitting does nothing.
 from __future__ import annotations
 
 import functools
+import re
 import time
+from contextvars import ContextVar
 from typing import Any, Awaitable, Callable, Dict, List, Literal, Optional, Tuple, Union
 
 from langgraph.config import get_stream_writer
 
+from app.core.agent_runtime import stages
 from app.core.agent_runtime.state import AgentState
 
 Node = Callable[[AgentState], Awaitable[Dict[str, Any]]]
@@ -109,9 +112,13 @@ def traced(
                 code, detail = said if isinstance(said, tuple) else (said, None)
                 status(code, detail)
             started = time.monotonic()
+            stages.stage(f"{name}_start", active=name)
             update = await node(state)
             step = trace_step(name, started, f"{name}: {summary(state, update)}")
-            return {**update, "trace": [step]}
+            stages.stage(f"{name}_end", active="between_nodes", dur_ms=step["ms"])
+            # A node may add steps of its own first (the agent's list of tools
+            # left out, chunk 6).
+            return {**update, "trace": [*(update.get("trace") or []), step]}
 
         return wrapper
 
@@ -121,3 +128,42 @@ def traced(
 def summarise_run(trace: list) -> str:
     """`agent 820ms → tool 140ms → …`, for a log line."""
     return " → ".join(f"{step['node']} {step['ms']}ms" for step in trace)
+
+
+#: Whether this run streamed its reply as it was written (chunk H1 Part C): the
+#: runner then doesn't send the finished reply's tokens again. A dict, so a node's
+#: change is seen by the runner that set it.
+STREAMED: ContextVar[Optional[Dict[str, bool]]] = ContextVar(
+    "agent_streamed_reply", default=None
+)
+
+#: A citation marker in reply text: "[1]", "[2][3]", "[1, 4]".
+CITATION_MARKS = re.compile(r"\s*\[\d+(?:\s*,\s*\d+)*\](?:\[\d+(?:\s*,\s*\d+)*\])*")
+#: The end of a piece that may be the start of a marker, or trailing space (a marker
+#: after it would leave a double space): held for the next piece.
+_OPEN_MARK = re.compile(r"\s*\[[\d,\s\]\[]*$|\s+$")
+
+
+class ReplyTokens:
+    """The reply as the model writes it, as `token` events, without citation markers
+    (sources show as chips). The `final` event stays authoritative: a rewrite or a
+    decline replaces what streamed."""
+
+    def __init__(self) -> None:
+        self.pending = ""
+
+    def __call__(self, piece: str) -> None:
+        text = self.pending + piece
+        held = _OPEN_MARK.search(text)
+        if held:
+            self.pending = text[held.start() :]
+            text = text[: held.start()]
+        else:
+            self.pending = ""
+        text = CITATION_MARKS.sub("", text)
+        if not text:
+            return
+        flag = STREAMED.get()
+        if flag is not None:
+            flag["any"] = True
+        emit("token", {"text": text})

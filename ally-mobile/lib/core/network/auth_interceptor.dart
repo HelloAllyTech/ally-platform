@@ -34,7 +34,7 @@ class AuthInterceptor extends Interceptor {
   // Settings intermittently showed "session expired" while the rest of the
   // app, whose requests had won their own races, kept working fine. All
   // concurrent 401s now await this one shared attempt instead.
-  Future<String?>? _refreshFuture;
+  Future<_RefreshResult>? _refreshFuture;
 
   /// Clears the session and returns the (already-translated) message to
   /// show — see [_replace]'s doc comment for why the caller's own message
@@ -87,27 +87,42 @@ class AuthInterceptor extends Interceptor {
     // re-read of storage, which a concurrent caller could otherwise observe
     // mid-write or (in the no-op case this interceptor is tested against) a
     // stub that never reflects the write at all.
-    final newAccessToken = await (_refreshFuture ??= _refresh(refreshToken));
+    final refreshResult = await (_refreshFuture ??= _refresh(refreshToken));
 
-    if (newAccessToken == null) {
-      handler.next(await _replace(err));
+    if (refreshResult.accessToken == null) {
+      if (refreshResult.sessionInvalid) {
+        handler.next(await _replace(err));
+      } else {
+        // The refresh call itself didn't complete (timeout, no connectivity,
+        // a transient 5xx) — this is one failed attempt, not proof the
+        // session is dead. Logging out here, on ordinary mobile network
+        // flakiness, is what made the app sign people out repeatedly for no
+        // real reason. Tokens are untouched, so the next request just tries
+        // again on its own.
+        handler.next(err);
+      }
       return;
     }
 
     try {
       final retryOptions = err.requestOptions;
-      retryOptions.headers['authorization'] = 'Bearer $newAccessToken';
+      retryOptions.headers['authorization'] = 'Bearer ${refreshResult.accessToken}';
       final retryResponse = await _refreshDio.fetch(retryOptions);
       handler.resolve(retryResponse);
     } catch (_) {
-      handler.next(await _replace(err));
+      // The refresh itself succeeded — the session is fine. This one
+      // request's retry failing (another network blip, an unrelated error
+      // on this specific endpoint) is not a reason to sign the user out.
+      handler.next(err);
     }
   }
 
   /// Performs the actual refresh call, exactly once per shared attempt (see
-  /// `_refreshFuture`'s doc comment). Returns the new access token, or null
-  /// on any failure; never throws.
-  Future<String?> _refresh(String refreshToken) async {
+  /// `_refreshFuture`'s doc comment). Never throws — distinguishes a backend
+  /// rejection of the refresh token itself (session really is over) from
+  /// the attempt merely failing to complete (network/timeout/5xx, worth
+  /// retrying later with the same, still-valid tokens).
+  Future<_RefreshResult> _refresh(String refreshToken) async {
     try {
       // _refreshDio carries no interceptor (deliberately, to avoid recursing
       // back into this one on a 401 from the refresh call itself), so unlike
@@ -120,15 +135,25 @@ class AuthInterceptor extends Interceptor {
 
       final newAccessToken = refreshResponse.data?['accessToken'] as String?;
       final newRefreshToken = refreshResponse.data?['refreshToken'] as String?;
-      if (newAccessToken == null || newRefreshToken == null) return null;
+      if (newAccessToken == null || newRefreshToken == null) {
+        return const _RefreshResult(accessToken: null, sessionInvalid: true);
+      }
 
       await _tokenStorage.storeTokens(
         accessToken: newAccessToken,
         refreshToken: newRefreshToken,
       );
-      return newAccessToken;
+      return _RefreshResult(accessToken: newAccessToken, sessionInvalid: false);
+    } on DioException catch (e) {
+      // The backend explicitly rejected this refresh token (expired,
+      // already rotated, revoked) — only this counts as the session itself
+      // being over. Anything else DioException can carry (no response at
+      // all, a 5xx, a timeout) is the call failing, not the token being bad.
+      final status = e.response?.statusCode;
+      final sessionInvalid = status == 401 || status == 400;
+      return _RefreshResult(accessToken: null, sessionInvalid: sessionInvalid);
     } catch (_) {
-      return null;
+      return const _RefreshResult(accessToken: null, sessionInvalid: false);
     } finally {
       _refreshFuture = null;
     }
@@ -147,4 +172,14 @@ class AuthInterceptor extends Interceptor {
     final message = await _onUnrecoverable();
     return DioException(requestOptions: original.requestOptions, message: message);
   }
+}
+
+/// See `AuthInterceptor._refresh`'s doc comment: `sessionInvalid` is only
+/// ever true when the backend itself rejected the refresh token, never for
+/// a refresh attempt that simply failed to complete.
+class _RefreshResult {
+  const _RefreshResult({required this.accessToken, required this.sessionInvalid});
+
+  final String? accessToken;
+  final bool sessionInvalid;
 }

@@ -1,7 +1,3 @@
-import {
-  SCENARIO_SESSION_DEBRIEF_READY_EVENT,
-  ScenarioSessionDebriefReadyEvent,
-} from '../constants/scenario-session-events.constants';
 import { CohortVisibilityService } from 'src/cohort/service/cohort-visibility.service';
 import { CohortContentType } from 'src/cohort/constants/cohort.constants';
 import {
@@ -31,7 +27,6 @@ import { PreferenceName } from 'src/common/constants/user.constants';
 import { ErrorCode } from 'src/exception/error-code.enum';
 import { FAILURE_MESSAGES } from 'src/exception/failure-messages';
 import { ScenarioInteractionMode } from '../enum/scenario-interaction-mode.enum';
-import { LlmTask } from '../enum/llm-task.enum';
 import { LoggerService } from 'src/logger/logger.service';
 import { AddFeedbackToScenarioSessionRequestDto } from '../dto/add-feedback-to-scenario-session.dto';
 import { DataSource, IsNull, Not, Repository } from 'typeorm';
@@ -45,7 +40,6 @@ import { ScenarioSessionMessageType } from '../enum/scenario-session-message.typ
 import { AiService } from 'src/ai/service/ai.service';
 import { ScenarioSessionEvaluationService } from './scenario-session-evaluation.service';
 import { GlossaryAdherenceService } from 'src/language/service/glossary-adherence.service';
-import { ScenarioSessionDetails } from '../entity/scenario-session-details.entity';
 import { ScenarioSessionDetailsRepository } from '../repository/scenario-session-details.repository';
 import { ScenarioSessionEvents } from '../entity/scenario-session-events.entity';
 import { ScenarioSessionTurnMetrics } from '../entity/scenario-session-turn-metrics.entity';
@@ -57,10 +51,7 @@ import {
   LearnSupervisorNoteData,
   LearnTurnMetricsData,
 } from '../interface/learn-message.interface';
-import {
-  MessageRequest,
-  ScenarioEvaluationChatMessage,
-} from 'src/ai/dto/ai.request.dto';
+import { MessageRequest } from 'src/ai/dto/ai.request.dto';
 import {
   LearnBehaviorInstructionData,
   LearnEventData,
@@ -80,7 +71,6 @@ import {
   DEFAULT_FEEDBACK_LANGUAGE,
   DEFAULT_LANGUAGE_CODE,
   DEFAULT_SCENARIO_SESSION_TTL_SECONDS,
-  SESSION_SUMMARY_LOCK_TTL_SECONDS,
   STUCK_SESSION_AGE_MS,
   STUCK_SESSION_SWEEP_LIMIT,
   UNFINALISED_SESSION_GRACE_MS,
@@ -92,14 +82,10 @@ import { AppConfigService } from 'src/config/config.service';
 import {
   ChecklistItem,
   ExperienceMode,
-  FeedbackTabsConfig,
   ScenarioStatus,
   StateNames,
-  feedbackTabsNeedEvaluation,
   resolveFeedbackTabs,
 } from '../type/scenario.type';
-import { User } from 'src/user/entity/user.entity';
-import { WorkerType, resolveWorkerType } from 'src/user/enum/user.enum';
 import { LearnerSupervisorMemoryService } from './learner-supervisor-memory.service';
 import { ScenarioTenantService } from './scenario-tenant.service';
 import { ScenarioPathSessionService } from 'src/scenario-path/service/scenario-path-session.service';
@@ -119,12 +105,18 @@ import { ScenarioSessionReviewSharedService } from 'src/scenario-session-review/
 import {
   ScenarioSessionLeaderboardEvent,
   ScenarioSessionLeaderboardEndedEventParams,
+  ScenarioSessionCompletionEvent,
+  ScenarioSessionCompletedEventParams,
 } from '../type/scenario-session-leaderboard-event.type';
 import { CaseSharedService } from 'src/case/service/case-shared.service';
 import { CaseSessionService } from 'src/case/service/case-session.service';
 import { TrackProgressService } from 'src/track/service/track-progress.service';
 import { TrackMemoryService } from 'src/track/service/track-memory.service';
-import { CommonUtil } from 'src/common/util/common.util';
+import {
+  countLearnerTurnsFromSenders,
+  showsResultsToLearner,
+} from 'src/track/util/roleplay-gate.util';
+import { TrackItemCompletionCriteria } from 'src/track/type/track.type';
 import {
   ScenarioSharedService,
   promptRecordFrom,
@@ -136,7 +128,6 @@ import { BehaviorTranslationRepository } from '../repository/behavior-translatio
 import { ScenarioBehaviorInstructionTranslationRepository } from '../repository/scenario-behavior-instruction-translation.repository';
 import { ScenarioSessionEventChecklistResponseDto } from '../dto/scenario-session-event-checklist-response.dto';
 import { ScenarioEventsRepository } from '../repository/scenario-events.repository';
-import { BehaviorInstructionCategory } from '../enum/behavior-instruction.enum';
 import { ScenariosRepository } from '../repository/scenario.repository';
 import { getActiveSessionDurationSeconds } from 'src/review/util/review.util';
 import { EndScenarioSessionRequestBodyDto } from '../dto/end-scenario-session-request-body.dto';
@@ -335,7 +326,45 @@ export class ScenarioSessionService {
       delete (scenarioSession as any).scenario.translations;
     });
 
+    // The learner's own history must not leak a withheld assessment score.
+    const withheld = await this.withheldProgressIds(
+      scenarioSessions
+        .map((session) => session.trackItemProgressId)
+        .filter((id): id is string => !!id),
+    );
+    for (const session of scenarioSessions) {
+      if (
+        session.trackItemProgressId &&
+        withheld.has(session.trackItemProgressId)
+      ) {
+        session.score = undefined;
+        (session as any).resultsHidden = true;
+      }
+    }
+
     return { data: scenarioSessions };
+  }
+
+  /** Of these progress rows, the ones on an assessment that withholds results. */
+  private async withheldProgressIds(
+    trackItemProgressIds: string[],
+  ): Promise<Set<string>> {
+    if (trackItemProgressIds.length === 0) return new Set();
+    const rows: Array<{
+      id: string;
+      criteria: TrackItemCompletionCriteria | null;
+    }> = await this.dataSource.query(
+      `SELECT tip.id AS "id", ti."completionCriteria" AS "criteria"
+         FROM track_item_progress tip
+         JOIN track_items ti ON ti.id = tip."trackItemId"
+        WHERE tip.id = ANY($1::uuid[])`,
+      [Array.from(new Set(trackItemProgressIds))],
+    );
+    return new Set(
+      rows
+        .filter((row) => !showsResultsToLearner(row.criteria))
+        .map((row) => row.id),
+    );
   }
 
   /**
@@ -453,6 +482,21 @@ export class ScenarioSessionService {
       throw new BadRequestException('Scenario session not found');
     }
 
+    // An assessment whose trainer withheld results: the learner gets the
+    // session with no score and no feedback tabs. Turning both tabs off is a
+    // state every released client already renders (and stops polling on), so
+    // older apps degrade to "no report" rather than an error.
+    if (
+      await this.isAssessmentResultHidden(
+        scenarioSessionId,
+        counselorId,
+        (scenarioSession as any).counselorId,
+        (scenarioSession as any).trackItemProgressId,
+      )
+    ) {
+      return this.withheldAssessmentSession(scenarioSession, languageCode);
+    }
+
     if (scenarioSession.startedAt && scenarioSession.endedAt) {
       // Active (paused-excluded) duration so the displayed/recorded duration
       // matches what the user is billed/credited for.
@@ -488,11 +532,9 @@ export class ScenarioSessionService {
     // background re-evaluation in that language and return without feedback so
     // the client keeps polling (mirrors the initial-summary generation flow).
     if ((scenarioSession as any).details?.summary) {
-      await this.resolveSummaryLanguage(
+      this.resolveSummaryLanguage(
         (scenarioSession as any).details,
-        scenarioSessionId,
         ScenarioSessionService.normalizeLanguage(languageCode),
-        enableRecommendations,
       );
     }
 
@@ -573,6 +615,93 @@ export class ScenarioSessionService {
       reviewNote: review?.note,
       reviewStatus: review?.status,
       reviewCreatedAt: review?.createdAt,
+    };
+  }
+
+  /**
+   * Whether this session's evaluation is withheld from the viewer: they are
+   * the learner who played it, inside a course, on an assessment roleplay
+   * whose "Show results to learner" is off. Every attempt on such an item is
+   * withheld — a discarded short attempt's debrief would coach the real one.
+   * Trainers and reviewers viewing someone else's session always see it.
+   */
+  async isAssessmentResultHidden(
+    scenarioSessionId: string,
+    viewerId: number,
+    ownerId?: number,
+    trackItemProgressId?: string | null,
+  ): Promise<boolean> {
+    let owner = ownerId;
+    let progressId = trackItemProgressId;
+    if (owner === undefined || progressId === undefined) {
+      const row = await this.scenarioSessionRepository.findOne({
+        where: { id: scenarioSessionId },
+        select: { id: true, counselorId: true, trackItemProgressId: true },
+      });
+      owner = row?.counselorId;
+      progressId = row?.trackItemProgressId ?? null;
+    }
+    if (!progressId || owner !== viewerId) return false;
+    const [row]: Array<{ criteria: TrackItemCompletionCriteria | null }> =
+      await this.dataSource.query(
+        `SELECT ti."completionCriteria" AS "criteria"
+           FROM track_item_progress tip
+           JOIN track_items ti ON ti.id = tip."trackItemId"
+          WHERE tip.id = $1`,
+        [progressId],
+      );
+    return !!row && !showsResultsToLearner(row.criteria);
+  }
+
+  /** Refuse an evaluation endpoint for a withheld assessment (see above). */
+  async assertAssessmentResultVisible(
+    scenarioSessionId: string,
+    viewerId: number,
+  ): Promise<void> {
+    if (await this.isAssessmentResultHidden(scenarioSessionId, viewerId)) {
+      throw new ForbiddenException(
+        'Results for this assessment are not shared with learners.',
+      );
+    }
+  }
+
+  private withheldAssessmentSession(
+    scenarioSession: Record<string, any>,
+    languageCode?: string,
+  ) {
+    const scenario = scenarioSession.scenario;
+    const title =
+      (languageCode && scenario?.translations?.[languageCode]?.title) ||
+      scenario?.title;
+    return {
+      id: scenarioSession.id,
+      scenarioId: scenarioSession.scenarioId,
+      counselorId: scenarioSession.counselorId,
+      status: scenarioSession.status,
+      eventStatus: scenarioSession.eventStatus,
+      interactionMode: scenarioSession.interactionMode,
+      startedAt: scenarioSession.startedAt,
+      endedAt: scenarioSession.endedAt,
+      trackItemProgressId: scenarioSession.trackItemProgressId,
+      score: null,
+      details: null,
+      events: [],
+      scenario: scenario
+        ? {
+            id: scenario.id,
+            title,
+            metadata: {
+              name: scenario.metadata?.name,
+              experienceMode:
+                scenario.metadata?.experienceMode ?? ExperienceMode.FEEDBACK,
+              feedbackTabs: { debrief: false, transcript: false },
+            },
+          }
+        : null,
+      /** The learner's assessment is submitted but its results are withheld. */
+      resultsHidden: true,
+      hasFeedback: false,
+      sessionFeedback: null,
     };
   }
 
@@ -704,6 +833,20 @@ export class ScenarioSessionService {
       await this.scenarioSessionRepository.createScenarioSession(counselorId, {
         ...startScenarioSessionDtoData,
       });
+
+    if (startScenarioSessionDto.trackItemProgressId) {
+      // A "Participation only" track roleplay completes on launch. Never let
+      // progression block the session itself from starting.
+      try {
+        await this.trackProgressService.handleRoleplayLaunch(
+          startScenarioSessionDto.trackItemProgressId,
+        );
+      } catch (error) {
+        this.logger.error(
+          `Track participation completion failed for ${startScenarioSessionDto.trackItemProgressId}: ${error}`,
+        );
+      }
+    }
 
     try {
       // Best-effort: record WHICH main-agent prompt was selected and the
@@ -1511,25 +1654,37 @@ export class ScenarioSessionService {
         callDuration,
       });
     } else if (session.trackItemProgressId) {
-      // Track 2.0: roleplay played inside a track.
-      await this.trackProgressService.handleRoleplayEnd({
+      // Track 2.0: roleplay played inside a track. The turn count and the
+      // assessment verdict are stamped on the session, so the start gate and
+      // the reports judge it by the rule in force now, not a later edit.
+      const learnerTurns = await this.countLearnerTurns(session.id);
+      const result = await this.trackProgressService.handleRoleplayEnd({
         trackItemProgressId: session.trackItemProgressId,
+        scenarioSessionId: session.id,
         score,
         callDuration,
-        learnerTookPart: await this.learnerTookPart(session.id),
+        learnerTurns,
+      });
+      await this.scenarioSessionRepository.update(session.id, {
+        learnerTurns,
+        assessmentAttemptValid: result.assessmentAttemptValid,
       });
     }
   }
 
   /**
-   * Whether the learner said anything in the session (the client's turns are
-   * stored with senderId -1). An assessment roleplay only counts as submitted
-   * when they did; see TrackProgressService.assertAssessmentAttemptAvailable.
+   * How many turns the learner took: runs of consecutive learner messages, in
+   * stored order (the simulated client's messages carry senderId -1). An
+   * assessment roleplay only counts as submitted once this reaches the item's
+   * minLearnerTurns; see TrackProgressService.handleRoleplayEnd.
    */
-  private async learnerTookPart(scenarioSessionId: string): Promise<boolean> {
-    return this.scenarioSessionMessagesRepository.exists({
-      where: { scenarioSessionId, senderId: Not(-1) },
+  private async countLearnerTurns(scenarioSessionId: string): Promise<number> {
+    const messages = await this.scenarioSessionMessagesRepository.find({
+      where: { scenarioSessionId },
+      select: { id: true, senderId: true },
+      order: { id: 'ASC' },
     });
+    return countLearnerTurnsFromSenders(messages.map((m) => m.senderId));
   }
 
   /**
@@ -1543,6 +1698,16 @@ export class ScenarioSessionService {
     callDuration: number,
     endedAt: Date,
   ): void {
+    // The session is complete whatever its duration: the debrief starts from
+    // this, never from the practice minutes below (a zero-duration end would
+    // otherwise leave the learner waiting for the drain).
+    this.eventEmitter.emit(
+      ScenarioSessionCompletionEvent.SCENARIO_SESSION_COMPLETED,
+      {
+        scenarioSessionId: session.id,
+        tenantId: session.tenantId ?? null,
+      } as ScenarioSessionCompletedEventParams,
+    );
     const durationMinutes = callDuration / (1000 * 60);
     if (durationMinutes <= 0) return;
     this.eventEmitter.emit(
@@ -1561,7 +1726,10 @@ export class ScenarioSessionService {
   async endScenarioSession(
     scenarioSessionId: string,
     counselorId: number,
-    endScenarioSessionRequestBodyDto?: EndScenarioSessionRequestBodyDto,
+    // Kept for the controller's signature: its enableRecommendations /
+    // languageCode only fed the retired post-session evaluation.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _endScenarioSessionRequestBodyDto?: EndScenarioSessionRequestBodyDto,
   ) {
     const scenarioSession = await this.scenarioSessionRepository.findOne({
       where: {
@@ -1688,30 +1856,7 @@ export class ScenarioSessionService {
           : RoleplaySessionEndStatus.ABANDONED,
     });
 
-    const caseSessionItemId = scenarioSession.caseSessionItemId;
-    let previousMemory: string | null = null;
-    let needMemory: boolean = false;
-    if (caseSessionItemId) {
-      needMemory = true;
-      previousMemory =
-        await this.caseSharedService.getPreviousCaseMemory(caseSessionItemId);
-    }
-    // Intentionally not awaited: summary generation can take minutes, so the
-    // end-session response returns immediately and the client polls for the
-    // result. The method persists its own success/failure row, so the only
-    // thing left to guard here is an unexpected rejection.
-    this.getScenarioSessionSummaryFromAIOnce(
-      scenarioSessionId,
-      needMemory,
-      callDuration,
-      previousMemory,
-      endScenarioSessionRequestBodyDto?.enableRecommendations,
-      endScenarioSessionRequestBodyDto?.languageCode,
-    ).catch((error) => {
-      this.logger.error(
-        `getScenarioSessionSummaryFromAI rejected unexpectedly for ${scenarioSessionId}: ${JSON.stringify(error?.message)}`,
-      );
-    });
+    await this.recordCallDuration(scenarioSessionId, callDuration);
 
     return { message: 'Scenario session ended successfully' };
   }
@@ -1887,366 +2032,31 @@ export class ScenarioSessionService {
   }
 
   /**
-   * Everything the supervisor debrief needs about WHO practised and WHAT the
-   * roleplay is configured to show them.
+   * Records the call duration for a session that has just ended.
    *
-   * Returns null only when the session or its scenario has vanished, in which
-   * case the caller carries on with a note that has no personalisation rather
-   * than failing the whole evaluation — feedback with a generic opening beats
-   * no feedback at all.
+   * The post-session note is written by the Debrief agent
+   * (DebriefPublishService), so no evaluation runs here any more; what is left
+   * is the duration the GET handler and the cost views read.
    */
-  private async getSupervisorContextForSession(
+  private async recordCallDuration(
     scenarioSessionId: string,
-  ): Promise<{
-    counselorId: number;
-    workerType: WorkerType;
-    learnerFirstName?: string;
-    feedbackTabs: FeedbackTabsConfig;
-    helpfulBehaviours: string[];
-    unhelpfulBehaviours: string[];
-  } | null> {
-    try {
-      const scenarioSession = await this.scenarioSessionRepository.findOne({
-        where: { id: scenarioSessionId },
-        select: { id: true, counselorId: true, scenarioId: true },
-      });
-      if (!scenarioSession) return null;
-
-      const [scenario, user, behaviorInstructions] = await Promise.all([
-        this.scenariosRepository.findOne({
-          where: { id: scenarioSession.scenarioId },
-          select: { id: true, metadata: true },
-        }),
-        // Resolved off the DataSource rather than an injected UserService:
-        // pulling src/user/service/* into this graph is the documented way to
-        // break boot with a circular DI import.
-        this.dataSource.getRepository(User).findOne({
-          where: { id: scenarioSession.counselorId },
-          select: { id: true, name: true, metadata: true },
-        }),
-        // Same SHOULD_DO/SHOULD_NOT_DO instructions ai-learn already uses to
-        // guardrail the live roleplay — reused here so the debrief judges the
-        // transcript against what this scenario actually asked for.
-        this.scenarioSharedService.getBehaviorInstructionsByScenarioId(
-          scenarioSession.scenarioId,
-        ),
-      ]);
-
-      const helpfulBehaviours = (behaviorInstructions ?? [])
-        .filter((b) => b.category === BehaviorInstructionCategory.SHOULD_DO)
-        .flatMap((b) => b.behaviors.map((behavior) => behavior.name));
-      const unhelpfulBehaviours = (behaviorInstructions ?? [])
-        .filter((b) => b.category === BehaviorInstructionCategory.SHOULD_NOT_DO)
-        .flatMap((b) => b.behaviors.map((behavior) => behavior.name));
-
-      return {
-        counselorId: scenarioSession.counselorId,
-        workerType: resolveWorkerType(user?.metadata),
-        // First name only. The note greets someone the way a supervisor
-        // would, and "Nice work today, Priya Sharma" reads like a form letter.
-        learnerFirstName: user?.name?.trim().split(/\s+/)[0] || undefined,
-        feedbackTabs: resolveFeedbackTabs(scenario?.metadata),
-        helpfulBehaviours,
-        unhelpfulBehaviours,
-      };
-    } catch (error) {
-      this.logger.error(
-        `getSupervisorContextForSession failed for ${scenarioSessionId}: ${error?.message}`,
-      );
-      return null;
-    }
-  }
-
-  /**
-   * getScenarioSessionSummaryFromAI, at most one run in flight per session.
-   *
-   * endScenarioSession has several entry points — the learner's POST,
-   * auto-termination, room_finished, /end-v2v, a client retry, web and mobile
-   * both ending — and none of them waits for the evaluation. The "feedback
-   * already exists" check inside only sees a FINISHED evaluation, so two ends
-   * within the minutes one takes both paid for a full evaluation and both
-   * wrote the learner's supervisor memory. This lock is the in-flight half of
-   * that guard; the feedback check stays the finished half, and because the
-   * lock is released when the run ends, a failed summary stays retriable.
-   *
-   * A Redis lock rather than a reservation in the details row (the
-   * per-language path's approach) so the `summary` JSON that web and mobile
-   * poll keeps its shape. Fails open: if Redis is unreachable, a duplicate
-   * evaluation beats none.
-   */
-  private async getScenarioSessionSummaryFromAIOnce(
-    scenarioSessionId: string,
-    needMemory: boolean,
     callDuration?: number,
-    previousMemory?: string | null,
-    enableRecommendations?: boolean,
-    languageCode?: string,
   ): Promise<void> {
-    const lockKey = `scenario-session-summary:${scenarioSessionId}`;
-    let locked = false;
-    try {
-      locked = await this.redisService.acquireLock(
-        lockKey,
-        SESSION_SUMMARY_LOCK_TTL_SECONDS,
-      );
-      if (!locked) {
-        this.logger.info(
-          `Skipping summary generation for ${scenarioSessionId}: an evaluation is already in progress.`,
-        );
-        return;
-      }
-    } catch (error) {
-      this.logger.warn(
-        `Summary lock unavailable for ${scenarioSessionId}; evaluating unguarded: ${JSON.stringify(
-          (error as Error)?.message,
-        )}`,
-      );
-    }
-
-    try {
-      await this.getScenarioSessionSummaryFromAI(
-        scenarioSessionId,
-        needMemory,
-        callDuration,
-        previousMemory,
-        enableRecommendations,
-        languageCode,
-      );
-    } finally {
-      if (locked) {
-        await this.redisService.releaseLock(lockKey).catch((error) => {
-          // The TTL frees it; until then a retry is refused, not a run lost.
-          this.logger.warn(
-            `Failed to release summary lock for ${scenarioSessionId}: ${JSON.stringify(
-              (error as Error)?.message,
-            )}`,
-          );
-        });
-      }
-    }
-  }
-
-  private async getScenarioSessionSummaryFromAI(
-    scenarioSessionId: string,
-    needMemory: boolean,
-    callDuration?: number,
-    previousMemory?: string | null,
-    enableRecommendations?: boolean,
-    languageCode?: string,
-  ) {
     const tenantId = ExecutionManager.getTenantId();
     if (!tenantId) {
       this.logger.error(
-        'getScenarioSessionSummaryFromAI: tenantId not found in execution context',
+        'recordCallDuration: tenantId not found in execution context',
       );
       return;
     }
-
-    // Idempotency: endScenarioSession has several unguarded entry points (the
-    // learner-facing controller, the /end-v2v webhook, auto-termination), so a
-    // client retry or redelivered event would otherwise re-run a full
-    // transcript evaluation over a session that already has feedback.
-    // Only a SUCCESSFUL summary blocks a rerun — a row holding just
-    // `errorMessage` (no messages / too short / AI failed) stays retriable,
-    // which is what the "Please try again" copy promises the learner.
-    const existingDetails = await this.scenarioSessionDetailsRepository.findOne(
-      {
-        where: { scenarioSessionId, tenantId },
-        select: { id: true, summary: true },
-      },
-    );
-    if (existingDetails?.summary?.feedback) {
-      this.logger.info(
-        `Skipping summary generation for ${scenarioSessionId}: feedback already generated.`,
-      );
-      return;
-    }
-
-    // Who this session belongs to, and which post-session surfaces the roleplay
-    // actually shows. Both are needed before any LLM work: the learner drives
-    // the note's register and continuity, and a roleplay showing no feedback
-    // tabs at all must not pay for an evaluation nobody can see.
-    const sessionContext =
-      await this.getSupervisorContextForSession(scenarioSessionId);
-
-    let summary;
     try {
-      if (
-        sessionContext &&
-        !feedbackTabsNeedEvaluation(sessionContext.feedbackTabs)
-      ) {
-        this.logger.info(
-          `Skipping evaluation for ${scenarioSessionId}: roleplay shows no post-session feedback tabs.`,
-        );
-        return;
-      }
-
-      const scenarioSessionMessages =
-        await this.scenarioSessionMessagesRepository.find({
-          where: {
-            scenarioSessionId,
-            messageType: ScenarioSessionMessageType.TEXT,
-            tenantId,
-          },
-        });
-      const callDurationInSeconds = callDuration ? callDuration / 1000 : 0;
-      if (scenarioSessionMessages.length === 0) {
-        this.logger.warn(
-          `No scenario session messages found for scenario session ${scenarioSessionId}`,
-        );
-        summary = {
-          errorMessage: 'Session has no messages. No summary generated.',
-        };
-      } else if (callDurationInSeconds < 30) {
-        this.logger.warn(
-          `Scenario session ${scenarioSessionId} is too short. No evaluation will be performed.`,
-        );
-        summary = {
-          errorMessage: 'Session was too short. No summary generated.',
-        };
-      } else {
-        const useEvaluation =
-          this.configService.featureFlag.useScenarioSessionEvaluation;
-        const messages: MessageRequest[] | ScenarioEvaluationChatMessage[] =
-          scenarioSessionMessages.map((message) => ({
-            role: message.senderId > 0 ? 'COUNSELOR' : 'CLIENT',
-            content: message.content,
-            start_time: message.startSeconds,
-            end_time: message.endSeconds,
-            ...(useEvaluation ? { id: message.id.toString() } : {}),
-          }));
-
-        // What the supervisor already knows about this learner, so the note can
-        // open on continuity ("last time we worked on...") instead of meeting
-        // them fresh every session. Absent for a learner's first debrief.
-        const supervisorMemory = sessionContext
-          ? await this.learnerSupervisorMemoryService.getSupervisorMemoryPrompt(
-              sessionContext.counselorId,
-              tenantId,
-            )
-          : null;
-
-        // What the supervisor already said to the learner DURING this session,
-        // so the note can pick that thread up rather than repeat it cold. Empty
-        // whenever the scenario's live-notes toggle is off, which is the default.
-        const liveNotes = await this.getSupervisorNotes(scenarioSessionId);
-
-        const aiResult = useEvaluation
-          ? await this.aiService.getScenarioSessionEvaluation(
-              messages as ScenarioEvaluationChatMessage[],
-              needMemory,
-              previousMemory,
-              undefined,
-              enableRecommendations,
-              languageCode,
-              {
-                workerType: sessionContext?.workerType,
-                learnerName: sessionContext?.learnerFirstName,
-                supervisorMemory,
-                helpfulBehaviours: sessionContext?.helpfulBehaviours,
-                unhelpfulBehaviours: sessionContext?.unhelpfulBehaviours,
-                liveNotes,
-              },
-              scenarioSessionId,
-            )
-          : await this.aiService.getScenarioSessionSummary(
-              messages as MessageRequest[],
-              needMemory,
-              previousMemory,
-            );
-
-        // Carry this debrief forward before the response is camelCased — the
-        // learner's memory is keyed to them, not to this session, and is the
-        // one artefact here that outlives the row we are about to write.
-        if (
-          useEvaluation &&
-          sessionContext &&
-          aiResult &&
-          'memory_update' in aiResult
-        ) {
-          await this.learnerSupervisorMemoryService.recordFromEvaluation(
-            sessionContext.counselorId,
-            tenantId,
-            scenarioSessionId,
-            aiResult.memory_update,
-          );
-        }
-
-        if (useEvaluation && aiResult && 'emotional_movement' in aiResult) {
-          const messageStartSecondsByMessageId = new Map(
-            scenarioSessionMessages.map((m) => [m.id, m.startSeconds ?? 0]),
-          );
-          for (const item of aiResult.emotional_movement) {
-            const messageId = parseInt(item.message_id, 10);
-            item.start_time = messageStartSecondsByMessageId.get(messageId);
-          }
-        }
-
-        // memory_update is the supervisor's private note-to-self about the
-        // learner; it has already been persisted to their memory row above.
-        // Drop it here so it never reaches the payload the learner is served —
-        // being told how your supervisor characterises your trajectory is not
-        // the same thing as being given feedback.
-        const learnerFacingResult = { ...(aiResult as Record<string, any>) };
-        delete learnerFacingResult.memory_update;
-
-        const aiSummary = CommonUtil.convertToCamelCase(learnerFacingResult);
-        summary = {
-          feedback: aiSummary,
-          // Language this default feedback was generated in (normalized primary
-          // subtag, e.g. 'hi'). getScenarioSession() reads this to decide
-          // whether a viewer's selected UI language needs an on-demand
-          // per-language re-evaluation (cached under summary.translations).
-          // No code (auto-termination, room_finished, /end-v2v, a client that
-          // omits it) means ally-ai wrote English, so say so.
-          language:
-            ScenarioSessionService.normalizeLanguage(languageCode) ??
-            DEFAULT_FEEDBACK_LANGUAGE,
-        };
-      }
+      await this.scenarioSessionDetailsRepository.upsert(
+        { scenarioSessionId, callDuration, tenantId },
+        { conflictPaths: ['scenarioSessionId'] },
+      );
     } catch (error) {
       this.logger.error(
-        `Failed to get scenario session summary from AI: ${JSON.stringify(error.message)}`,
-      );
-      // Persist an explicit failure so the polling client renders a clear
-      // "summary failed" state instead of a completed session with no summary
-      // (e.g. when the AI call times out at the 5-minute axios limit).
-      summary = {
-        errorMessage: 'Failed to generate summary. Please try again.',
-      };
-    }
-
-    // Persist outside the AI try/catch so a row is ALWAYS written — whether the
-    // summary succeeded, was skipped (no messages / too short), or failed.
-    // Atomic upsert: the evaluation writer races this on session end, and a
-    // blind INSERT here used to create a second details row (the
-    // missing-feedback bug — see migration 1869).
-    try {
-      await this.dataSource.transaction(async (entityManager) => {
-        const scenarioSessionDetailsRepo = entityManager.getRepository(
-          ScenarioSessionDetails,
-        );
-        await scenarioSessionDetailsRepo.upsert(
-          {
-            scenarioSessionId,
-            callDuration,
-            summary: summary as Record<string, any>,
-            tenantId,
-          },
-          { conflictPaths: ['scenarioSessionId'] },
-        );
-      });
-      // After the write commits: a listener (the Ally guide's after-action
-      // review) reads the feedback back. Only a real debrief, never an error.
-      if ((summary as Record<string, any> | undefined)?.feedback) {
-        this.eventEmitter.emit(SCENARIO_SESSION_DEBRIEF_READY_EVENT, {
-          scenarioSessionId,
-          tenantId,
-        } satisfies ScenarioSessionDebriefReadyEvent);
-      }
-    } catch (error) {
-      this.logger.error(
-        `Failed to persist scenario session details for ${scenarioSessionId}: ${JSON.stringify(error.message)}`,
+        `Failed to record the call duration for ${scenarioSessionId}: ${JSON.stringify((error as Error).message)}`,
       );
     }
   }
@@ -2263,230 +2073,41 @@ export class ScenarioSessionService {
   }
 
   /**
-   * Decide which language's feedback to serve for a GET, mutating
-   * `details.summary` in place:
-   *  - no language requested / it matches the stored (default) language / there
-   *    is no base feedback yet (still generating, errored, too short) -> serve
-   *    the stored summary unchanged.
-   *  - a COMPLETED per-language copy exists -> swap it in.
-   *  - otherwise -> ensure a one-off background re-evaluation is running and
-   *    clear `feedback` so the polling client keeps waiting until it lands.
-   * Internal cache fields (`language`, `translations`) are always stripped from
-   * the response.
+   * Serve an already-written summary in the viewer's language, mutating
+   * `details.summary` in place. Old notes may carry per-language copies under
+   * `summary.translations`; a COMPLETED copy for the requested language is
+   * swapped in, otherwise the stored feedback is served as is. Nothing is ever
+   * generated here: the old per-language re-evaluation is retired. Internal
+   * cache fields (`language`, `translations`) are always stripped.
    */
-  private async resolveSummaryLanguage(
+  private resolveSummaryLanguage(
     details: { summary?: Record<string, any> },
-    scenarioSessionId: string,
     requestedLanguage: string | undefined,
-    enableRecommendations: boolean,
-  ): Promise<void> {
+  ): void {
     const summary = details.summary;
     if (!summary) return;
 
-    // A row with no stored language was evaluated without a language code,
-    // i.e. in English (rows written before end-session recorded 'en'), so an
-    // English viewer must not trigger a second evaluation of it.
     const baseLanguage =
       ScenarioSessionService.normalizeLanguage(summary.language) ??
       DEFAULT_FEEDBACK_LANGUAGE;
 
     let feedbackToServe = summary.feedback;
-
-    const needsOtherLanguage =
+    if (
+      !summary.feedback?.debriefGenerator &&
       !!requestedLanguage &&
       requestedLanguage !== baseLanguage &&
       !!summary.feedback &&
-      !summary.errorMessage;
-
-    if (needsOtherLanguage) {
-      const translations: Record<string, any> = summary.translations ?? {};
-      const cached = translations[requestedLanguage as string];
+      !summary.errorMessage
+    ) {
+      const cached = summary.translations?.[requestedLanguage];
       if (cached?.status === 'COMPLETED' && cached.feedback) {
         feedbackToServe = cached.feedback;
-      } else {
-        if (!cached || cached.status === 'FAILED') {
-          await this.triggerLanguageSummaryGeneration(
-            scenarioSessionId,
-            requestedLanguage as string,
-            enableRecommendations,
-          );
-        }
-        // Not ready yet: withhold feedback so the client polls until the
-        // requested-language copy completes.
-        feedbackToServe = undefined;
       }
     }
 
     details.summary = { ...summary, feedback: feedbackToServe };
     delete details.summary.translations;
     delete details.summary.language;
-  }
-
-  /**
-   * Atomically reserve a PENDING slot for `languageCode` and, if this caller
-   * won the race, fire-and-forget the re-evaluation. The pessimistic row lock
-   * means concurrent polls don't spawn duplicate generations.
-   */
-  private async triggerLanguageSummaryGeneration(
-    scenarioSessionId: string,
-    languageCode: string,
-    enableRecommendations: boolean,
-  ): Promise<void> {
-    const tenantId = ExecutionManager.getTenantId();
-    if (!tenantId) {
-      this.logger.error(
-        'triggerLanguageSummaryGeneration: tenantId not found in execution context',
-      );
-      return;
-    }
-
-    let shouldGenerate = false;
-    try {
-      await this.dataSource.transaction(async (entityManager) => {
-        const repo = entityManager.getRepository(ScenarioSessionDetails);
-        const row = await repo.findOne({
-          where: { scenarioSessionId, tenantId },
-          lock: { mode: 'pessimistic_write' },
-        });
-        // Only translate a successfully-generated base summary.
-        if (!row?.summary?.feedback || row.summary.errorMessage) return;
-        const translations: Record<string, any> =
-          row.summary.translations ?? {};
-        const existing = translations[languageCode];
-        if (
-          existing?.status === 'PENDING' ||
-          (existing?.status === 'COMPLETED' && existing.feedback)
-        ) {
-          return;
-        }
-        translations[languageCode] = { status: 'PENDING' };
-        row.summary = { ...row.summary, translations };
-        await repo.save(row);
-        shouldGenerate = true;
-      });
-    } catch (error) {
-      this.logger.error(
-        `Failed to reserve ${languageCode} summary slot for ${scenarioSessionId}: ${JSON.stringify(
-          (error as Error)?.message,
-        )}`,
-      );
-      return;
-    }
-
-    if (!shouldGenerate) return;
-
-    // Intentionally not awaited: a full re-evaluation can take tens of seconds;
-    // the GET returns immediately and the client polls for the cached result.
-    this.generateLanguageSummary(
-      scenarioSessionId,
-      languageCode,
-      enableRecommendations,
-      tenantId,
-    ).catch((error) => {
-      this.logger.error(
-        `generateLanguageSummary rejected for ${scenarioSessionId}/${languageCode}: ${JSON.stringify(
-          (error as Error)?.message,
-        )}`,
-      );
-    });
-  }
-
-  /**
-   * Re-run the LLM evaluation in `languageCode` and cache the result under
-   * `summary.translations[languageCode]`. Language-independent artifacts
-   * (message tags / scores already tied to message IDs, conversation memory)
-   * are NOT re-persisted — only the human-readable feedback is regenerated and
-   * stored per language.
-   */
-  private async generateLanguageSummary(
-    scenarioSessionId: string,
-    languageCode: string,
-    enableRecommendations: boolean,
-    tenantId: string,
-  ): Promise<void> {
-    const writeStatus = async (entry: Record<string, any>) => {
-      await this.dataSource.transaction(async (entityManager) => {
-        const repo = entityManager.getRepository(ScenarioSessionDetails);
-        const row = await repo.findOne({
-          where: { scenarioSessionId, tenantId },
-          lock: { mode: 'pessimistic_write' },
-        });
-        if (!row?.summary) return;
-        const translations: Record<string, any> =
-          row.summary.translations ?? {};
-        translations[languageCode] = entry;
-        row.summary = { ...row.summary, translations };
-        await repo.save(row);
-      });
-    };
-
-    try {
-      const scenarioSessionMessages =
-        await this.scenarioSessionMessagesRepository.find({
-          where: {
-            scenarioSessionId,
-            messageType: ScenarioSessionMessageType.TEXT,
-            tenantId,
-          },
-        });
-
-      if (scenarioSessionMessages.length === 0) {
-        await writeStatus({
-          status: 'FAILED',
-          errorMessage: 'No messages to evaluate.',
-        });
-        return;
-      }
-
-      const messages: ScenarioEvaluationChatMessage[] =
-        scenarioSessionMessages.map((message) => ({
-          id: message.id.toString(),
-          role: message.senderId > 0 ? 'COUNSELOR' : 'CLIENT',
-          content: message.content,
-          start_time: message.startSeconds,
-          end_time: message.endSeconds,
-        }));
-
-      // need_memory=false: memory is language-independent and already computed
-      // at end-session; this call only regenerates the feedback text. Labelled
-      // apart from the first evaluation so the cost of multilingual debriefs
-      // shows as its own line; still tagged to the session, so it is counted
-      // as that session's debrief spend.
-      const aiResult = await this.aiService.getScenarioSessionEvaluation(
-        messages,
-        false,
-        null,
-        undefined,
-        enableRecommendations,
-        languageCode,
-        undefined,
-        scenarioSessionId,
-        LlmTask.SCENARIO_EVALUATION_LANGUAGE,
-      );
-
-      if (aiResult && 'emotional_movement' in aiResult) {
-        const messageStartSecondsByMessageId = new Map(
-          scenarioSessionMessages.map((m) => [m.id, m.startSeconds ?? 0]),
-        );
-        for (const item of aiResult.emotional_movement) {
-          const messageId = parseInt(item.message_id, 10);
-          item.start_time = messageStartSecondsByMessageId.get(messageId);
-        }
-      }
-
-      const aiSummary = CommonUtil.convertToCamelCase(aiResult);
-      await writeStatus({ status: 'COMPLETED', feedback: aiSummary });
-    } catch (error) {
-      this.logger.error(
-        `Failed to generate ${languageCode} summary for ${scenarioSessionId}: ${JSON.stringify(
-          (error as Error)?.message,
-        )}`,
-      );
-      await writeStatus({
-        status: 'FAILED',
-        errorMessage: 'Failed to generate summary in the selected language.',
-      }).catch(() => undefined);
-    }
   }
 
   async generateScenarioSessionToken(roomId: string, counselorId: number) {
@@ -3033,11 +2654,17 @@ export class ScenarioSessionService {
     scenarioSession: ScenarioSessions,
     behaviorInstruction: LearnBehaviorInstructionData,
   ) {
+    // Freeze the points the agent actually applied, so a later edit to the
+    // instruction's score cannot re-score this session. Anything that is not an
+    // integer is stored as NULL, which readers treat as the category default.
+    const applied = behaviorInstruction.behavior_instruction_data.score;
+    const score = Number.isInteger(applied) ? applied : null;
     const record = this.scenarioSessionBehaviorInstructionsRepository.create({
       scenarioSessionId: scenarioSession.id,
       scenarioBehaviorInstructionId:
         behaviorInstruction.behavior_instruction_data.behaviorInstructionId,
       occurredAt: behaviorInstruction.timestamp,
+      score,
     });
     await this.scenarioSessionBehaviorInstructionsRepository.save(record);
   }

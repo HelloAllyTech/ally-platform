@@ -2,15 +2,14 @@ import { randomUUID } from 'crypto';
 import { v5 as uuidv5 } from 'uuid';
 import { AiUpstreamError } from '../../ai/exception/ai-upstream.exception';
 import { ErrorCode } from '../../exception/error-code.enum';
-import type { WhatsAppBotSettings } from '../../whatsapp/type/whatsapp-settings.type';
 import type { AgentFailureReason, AgentRunRef } from './chatbot-engine.types';
-import { AgentRuntimeUsed, ChatbotRuntime } from '../enum/chatbot.enum';
+import { AgentRuntimeUsed } from '../enum/chatbot.enum';
 
 /**
  * The namespace Agents v2 run ids are derived under. Never change it: a run id stored on a message
  * must still be the one a redelivery of that message would derive.
  */
-export const AGENT_RUN_NAMESPACE = '54b53605-2385-4d61-8b44-a7fd03b0d1e9';
+const AGENT_RUN_NAMESPACE = '54b53605-2385-4d61-8b44-a7fd03b0d1e9';
 
 /**
  * The run id for one inbound message: the same provider message id always gives the same run id,
@@ -21,16 +20,6 @@ export const agentRunIdFor = (providerMessageId?: string | null): string =>
   providerMessageId
     ? uuidv5(providerMessageId, AGENT_RUN_NAMESPACE)
     : randomUUID();
-
-/**
- * The engine that answers every chatbot: v2 with the conversational agent, unless the platform's
- * emergency switch (`agentRuntimeAllowed`, Defaults) is off — then v1, for every bot and every
- * caller, Preview included.
- */
-export const effectiveRuntime = (
-  settings: Pick<WhatsAppBotSettings, 'agentRuntimeAllowed'>,
-): ChatbotRuntime.V1 | ChatbotRuntime.V2 =>
-  settings.agentRuntimeAllowed ? ChatbotRuntime.V2 : ChatbotRuntime.V1;
 
 /** `/agent/run` answered 200 with something that is not an answer. */
 export class MalformedAgentResponseError extends Error {
@@ -51,8 +40,8 @@ export const agentFailureReason = (error: unknown): AgentFailureReason => {
   return 'unknown';
 };
 
-/** v1 answered because the v2 run failed. */
-export const isFallback = (
+/** The run failed and the fixed run-failed reply went out (Q3-fast: never v1). */
+export const isFailedRun = (
   ref: AgentRunRef | undefined,
-): ref is Extract<AgentRunRef, { runtime: AgentRuntimeUsed.V2_FALLBACK }> =>
-  ref?.runtime === AgentRuntimeUsed.V2_FALLBACK;
+): ref is Extract<AgentRunRef, { runtime: AgentRuntimeUsed.V2_FAILED }> =>
+  ref?.runtime === AgentRuntimeUsed.V2_FAILED;

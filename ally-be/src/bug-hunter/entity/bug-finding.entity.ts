@@ -25,7 +25,7 @@ import {
  * `dedupeKey` + `repo` is how re-running the same finders across nights avoids
  * spamming duplicate rows for a bug that's still open — see
  * BugFindingRepository.findOpenByDedupeKey. It stays null for reported-bug and
- * analytics-suggestion rows, which dedupe by `reportedBugId` / the backfill
+ * legacy analytics-suggestion rows, which dedupe by `reportedBugId` / the backfill
  * migration instead.
  *
  * The key is built from `file` + `source` + `symbol` (falling back to a

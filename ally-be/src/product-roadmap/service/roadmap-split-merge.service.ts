@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { LoggerService } from 'src/logger/logger.service';
 
 import { RoadmapAllocation } from '../entity/roadmap-allocation.entity';
@@ -67,6 +67,7 @@ export class RoadmapSplitMergeService {
     const weights = parts.map((p) => p.weight);
 
     const partIds = await this.dataSource.transaction(async (manager) => {
+      await this.allowReshape(manager);
       // Lock the source so two concurrent splits cannot both read the same allocations and
       // each redistribute them.
       const source = await manager.findOne(RoadmapOpportunity, {
@@ -208,6 +209,7 @@ export class RoadmapSplitMergeService {
     }
 
     await this.dataSource.transaction(async (manager) => {
+      await this.allowReshape(manager);
       const primary = await manager.findOne(RoadmapOpportunity, {
         where: { id: dto.primaryId },
         lock: { mode: 'pessimistic_write' },
@@ -334,6 +336,19 @@ export class RoadmapSplitMergeService {
       `[ROADMAP] Merged ${sourceIds.length} opportunities into ${dto.primaryId} by user ${actingUserId}`,
     );
     return { primaryId: dto.primaryId };
+  }
+
+  /**
+   * Tell the vote-grant balance trigger that this transaction only MOVES votes.
+   *
+   * The trigger treats each allocation INSERT as new spend and compares it with the voter's
+   * unspent grants. Re-inserting a voter's existing votes onto the survivor (or the parts) is not
+   * spending, but for anyone who has used most of their balance it looks like an overdraft and
+   * the trigger raised — surfacing as a 500 on every merge. `set_config(..., true)` is local to
+   * this transaction, so every other writer is still checked. Conservation is asserted below.
+   */
+  private async allowReshape(manager: EntityManager): Promise<void> {
+    await manager.query(`SELECT set_config('app.roadmap_reshape', 'on', true)`);
   }
 
   /**

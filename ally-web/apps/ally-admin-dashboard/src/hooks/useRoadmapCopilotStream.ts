@@ -10,6 +10,8 @@ import {
 } from "@types";
 import { logger } from "@utils";
 
+import { parseSse } from "./chatStream/sse";
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 /** What the copilot stream carries. `turn` or `error` always ends it; `ping` is ignored. */
@@ -27,27 +29,10 @@ export type RoadmapCopilotStreamEvent =
 export const parseCopilotSse = (
   buffer: string,
 ): { events: RoadmapCopilotStreamEvent[]; rest: string } => {
-  const events: RoadmapCopilotStreamEvent[] = [];
-  const frames = buffer.split(/\r?\n\r?\n/);
-  const rest = frames.pop() ?? "";
-  for (const frame of frames) {
-    let eventName = "";
-    const dataLines: string[] = [];
-    for (const line of frame.split(/\r?\n/)) {
-      if (line.startsWith("event:")) eventName = line.slice(6).trim();
-      else if (line.startsWith("data:")) dataLines.push(line.slice(5).trimStart());
-    }
-    if (!eventName || dataLines.length === 0) continue;
-    try {
-      events.push({
-        type: eventName,
-        data: JSON.parse(dataLines.join("\n")),
-      } as RoadmapCopilotStreamEvent);
-    } catch {
-      logger.warn(`[Roadmap copilot] Dropping malformed SSE frame for event "${eventName}"`);
-    }
-  }
-  return { events, rest };
+  const { events, rest } = parseSse(buffer, eventName =>
+    logger.warn(`[Roadmap copilot] Dropping malformed SSE frame for event "${eventName}"`),
+  );
+  return { events: events as RoadmapCopilotStreamEvent[], rest };
 };
 
 const FAILED = "That answer did not go through.";

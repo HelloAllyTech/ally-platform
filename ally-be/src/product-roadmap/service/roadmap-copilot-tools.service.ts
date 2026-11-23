@@ -106,7 +106,12 @@ export class RoadmapCopilotToolsService {
    * Research tools first, `submit_turn` last — a stable order, because the tool list sits in
    * front of the cached system prefix and any reordering invalidates it.
    */
-  getToolDefinitions(): AgentToolDefinition[] {
+  getToolDefinitions(options?: { checks?: boolean }): AgentToolDefinition[] {
+    const tools = this.baseToolDefinitions();
+    return options?.checks ? withCheckEvidence(tools) : tools;
+  }
+
+  private baseToolDefinitions(): AgentToolDefinition[] {
     return [
       {
         name: 'search_roadmap',
@@ -296,8 +301,8 @@ export class RoadmapCopilotToolsService {
         name: COPILOT_SUBMIT_TOOL,
         description:
           'End your turn. Call this exactly once, as the LAST thing you do every turn, with ' +
-          'your message to the admin, a verdict on every readiness criterion, the draft (or ' +
-          'null), and the brief as it now stands. Nothing you write outside this call reaches ' +
+          'your message to the admin, a verdict on every readiness criterion, a grade for every ' +
+          'quality dimension, the draft (or null, or slices), and the brief as it now stands. Nothing you write outside this call reaches ' +
           'the admin.',
         input_schema: {
           type: 'object',
@@ -320,12 +325,64 @@ export class RoadmapCopilotToolsService {
                 required: ['id', 'met', 'note'],
               },
             },
+            quality: {
+              type: 'array',
+              description:
+                'A grade for EVERY quality dimension in the system context, in that order, on the ' +
+                'anchored 0-4 scale. Grade what the conversation has established, not what you ' +
+                'hope is true. Do not compute a total; the server does.',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  score: { type: 'integer', minimum: 0, maximum: 4 },
+                  note: {
+                    type: 'string',
+                    description:
+                      'One short sentence: what earned this grade, or the one thing that would raise it.',
+                  },
+                },
+                required: ['id', 'score', 'note'],
+              },
+            },
+            slices: {
+              type: 'array',
+              nullable: true,
+              description:
+                'Only when the idea is too big for one filing (you would size it XL or XXL) or is ' +
+                'really two or more independent ideas: two to five slices, each one independently ' +
+                'shippable and valuable, each sized s, m or l, each with its own who, outcome and ' +
+                'scope line. Leave null otherwise. When you send slices, send draft as null.',
+              items: {
+                type: 'object',
+                properties: {
+                  title: { type: 'string' },
+                  description: {
+                    type: 'string',
+                    description:
+                      'Same shape as draft.description, for this slice alone.',
+                  },
+                  productGoal: { type: 'string', nullable: true },
+                  effort: { type: 'string', enum: ['s', 'm', 'l'] },
+                },
+                required: ['description', 'effort'],
+              },
+            },
             draft: {
               type: 'object',
               nullable: true,
-              description: 'Null while any criterion is unmet.',
+              description:
+                'Null while any criterion is unmet, while the quality bar is not reached, and ' +
+                'whenever you send slices.',
               properties: {
                 description: { type: 'string' },
+                title: {
+                  type: 'string',
+                  description:
+                    'Optional. A short title for the idea in plain words, at most 80 characters: ' +
+                    'what changes for whom, not a feature code name. Shown beside the description ' +
+                    'for the author to accept or edit.',
+                },
                 productGoal: { type: 'string', nullable: true },
                 effort: {
                   type: 'string',
@@ -406,7 +463,7 @@ export class RoadmapCopilotToolsService {
               required: ['assessment'],
             },
           },
-          required: ['reply', 'gates', 'draft', 'brief'],
+          required: ['reply', 'gates', 'quality', 'draft', 'brief'],
         },
       },
     ];
@@ -838,3 +895,56 @@ const bound = (serialised: string): string =>
   serialised.length <= ROADMAP_COPILOT.TOOL_RESULT_MAX_CHARS
     ? serialised
     : `${serialised.slice(0, ROADMAP_COPILOT.TOOL_RESULT_MAX_CHARS)}… [truncated — narrow the lookup]`;
+
+/**
+ * Roadmap v2's Check my idea (§4.13, §5.7b): the SAME `submit_turn`, asking
+ * for two more things in the same structured answer — the verbatim words
+ * that met each check, and a goal suggestion — so the draft page shows its
+ * evidence without a second model call. Only the v2 draft page passes
+ * `checks`; every other caller gets the schema exactly as before.
+ */
+function withCheckEvidence(
+  tools: AgentToolDefinition[],
+): AgentToolDefinition[] {
+  return tools.map((tool) => {
+    if (tool.name !== COPILOT_SUBMIT_TOOL) return tool;
+    const schema = tool.input_schema as {
+      properties: Record<string, any>;
+      required?: string[];
+    };
+    const gates = schema.properties.gates;
+    return {
+      ...tool,
+      input_schema: {
+        ...schema,
+        properties: {
+          ...schema.properties,
+          gates: {
+            ...gates,
+            items: {
+              ...gates.items,
+              properties: {
+                ...gates.items.properties,
+                evidence: {
+                  type: 'string',
+                  description:
+                    'For a met criterion: the exact words that meet it, copied verbatim (no ' +
+                    'paraphrase, no ellipsis) from the idea as written or from one of the ' +
+                    "admin's answers — a phrase or one sentence. Empty string when not met.",
+                },
+              },
+            },
+          },
+          suggestedGoal: {
+            type: 'string',
+            nullable: true,
+            description:
+              'The product goal this idea most likely serves — exactly one of the product goal ' +
+              'names, chosen from what is written so far even before the criteria are met — or ' +
+              'null when none fits.',
+          },
+        },
+      },
+    };
+  });
+}

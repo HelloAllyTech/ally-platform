@@ -1,0 +1,100 @@
+diff --git a/apps/ally-admin-dashboard/src/pages/ProductRoadmap/ReferenceImagesField.tsx b/apps/ally-admin-dashboard/src/pages/ProductRoadmap/ReferenceImagesField.tsx
+index 0a366048d3..44ff0617a0 100644
+--- a/apps/ally-admin-dashboard/src/pages/ProductRoadmap/ReferenceImagesField.tsx
++++ b/apps/ally-admin-dashboard/src/pages/ProductRoadmap/ReferenceImagesField.tsx
+@@ -73,6 +73,13 @@ export const ReferenceImagesField: React.FC<ReferenceImagesFieldProps> = ({
+   const [isUploading, setIsUploading] = useState(false);
+   const [getUploadUrl] = useGetRoadmapReferenceImageUploadUrlMutation();
+ 
++  // Read by handleFiles when its upload resolves, so a removal or caption edit made while that
++  // upload was in flight isn't clobbered by the batch appending to the images the upload started
++  // with. Kept current on every render rather than in an effect, so it can't lag a synchronous
++  // onChange from removeAt/setCaption that fires between renders.
++  const imagesRef = useRef(images);
++  imagesRef.current = images;
++
+   const remaining = REFERENCE_IMAGES_MAX - images.length;
+ 
+   const uploadOne = useCallback(
+@@ -123,14 +130,16 @@ export const ReferenceImagesField: React.FC<ReferenceImagesFieldProps> = ({
+         const uploaded = (await Promise.all(accepted.map(uploadOne))).filter(
+           (image): image is RoadmapReferenceImage => image !== null,
+         );
+-        // One onChange for the batch, from the CURRENT props: appending inside the loop would
+-        // make each call overwrite the last on a stale `images`.
+-        if (uploaded.length) onChange([...images, ...uploaded]);
++        // One onChange for the batch, from the CURRENT props (via the ref, not the `images` this
++        // callback closed over): appending inside the loop would make each call overwrite the
++        // last on a stale `images`, and reading the closed-over prop directly would silently
++        // discard a removal or caption edit made while this upload was in flight.
++        if (uploaded.length) onChange([...imagesRef.current, ...uploaded]);
+       } finally {
+         setIsUploading(false);
+       }
+     },
+-    [images, onChange, remaining, uploadOne],
++    [onChange, remaining, uploadOne],
+   );
+ 
+   const setCaption = (index: number, caption: string) =>
+diff --git a/apps/ally-admin-dashboard/src/pages/ProductRoadmap/__tests__/ReferenceImagesField.test.tsx b/apps/ally-admin-dashboard/src/pages/ProductRoadmap/__tests__/ReferenceImagesField.test.tsx
+index 879582125f..b6ae2d2ee1 100644
+--- a/apps/ally-admin-dashboard/src/pages/ProductRoadmap/__tests__/ReferenceImagesField.test.tsx
++++ b/apps/ally-admin-dashboard/src/pages/ProductRoadmap/__tests__/ReferenceImagesField.test.tsx
+@@ -1,3 +1,5 @@
++import { useState } from "react";
++
+ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+ import { afterEach, describe, expect, it, vi } from "vitest";
+ 
+@@ -203,4 +205,50 @@ describe("ReferenceImagesField", () => {
+ 
+     expect(screen.getByAltText("Filter row wrapping")).toBeInTheDocument();
+   });
++
++  it("keeps a removal made while a different upload is still in flight, instead of reviving the removed image once the upload resolves", async () => {
++    // The presign call is held open on purpose, so there's a real window in which the list can
++    // change under the pending upload's feet.
++    let resolvePresign: (value: { presignedUrl: string; imageUrl: string }) => void = () => {};
++    presign.mockReturnValue({
++      unwrap: () =>
++        new Promise(resolve => {
++          resolvePresign = resolve;
++        }),
++    });
++    put.mockResolvedValue({ status: 200 });
++
++    // A real controlled wrapper, not a plain mock: `onChange` has to actually feed back into
++    // `images` for a stale closure to be observable across the re-render it causes.
++    const Controlled = () => {
++      const [images, setImages] = useState([
++        { url: "https://a/roadmap/reference-images/keep.png" },
++      ]);
++      return <ReferenceImagesField images={images} onChange={setImages} canEdit />;
++    };
++    render(<Controlled />);
++
++    // Start uploading a second image; its presign promise won't settle until we resolve it below.
++    act(() => {
++      fireEvent.change(screen.getByLabelText("Add reference images"), {
++        target: { files: [file("a.png")] },
++      });
++    });
++
++    // While that upload is still pending, remove the already-attached image.
++    fireEvent.click(screen.getByRole("button", { name: /remove reference image 1/i }));
++    expect(screen.queryAllByRole("img")).toHaveLength(0);
++
++    // Now let the in-flight upload finish.
++    await act(async () => {
++      resolvePresign({ presignedUrl: "https://signed", imageUrl: OURS });
++      await Promise.resolve();
++      await Promise.resolve();
++      await Promise.resolve();
++    });
++
++    // The uploaded image lands, but the earlier removal must not be undone by it.
++    await waitFor(() => expect(screen.getAllByRole("img")).toHaveLength(1));
++    expect(screen.getByRole("img")).toHaveAttribute("src", OURS);
++  });
+ });

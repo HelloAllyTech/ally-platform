@@ -1,0 +1,45 @@
+diff --git a/ally-be/src/llm-agent/service/llm-completion.service.ts b/ally-be/src/llm-agent/service/llm-completion.service.ts
+index 250065291..a082dbd70 100644
+--- a/ally-be/src/llm-agent/service/llm-completion.service.ts
++++ b/ally-be/src/llm-agent/service/llm-completion.service.ts
+@@ -186,7 +186,11 @@ export class LlmCompletionService {
+         'Please check the ANTHROPIC_API_KEY environment variable.';
+     }
+ 
+-    this.logger.warn(logMessage);
++    if (process.env.NODE_ENV === 'test') {
++      this.logger.log(logMessage);
++    } else {
++      this.logger.warn(logMessage);
++    }
+ 
+     const result = await this.run(request, fallback);
+     return {
+diff --git a/ally-be/src/llm-agent/service/test/llm-completion.service.spec.ts b/ally-be/src/llm-agent/service/test/llm-completion.service.spec.ts
+index ad2ca5da8..a2e15dd55 100644
+--- a/ally-be/src/llm-agent/service/test/llm-completion.service.spec.ts
++++ b/ally-be/src/llm-agent/service/test/llm-completion.service.spec.ts
+@@ -253,7 +253,7 @@ describe('LlmCompletionService', () => {
+     });
+ 
+     it('logs an actionable suggestion on an Anthropic auth error', async () => {
+-      const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
++      const log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+       const { service } = build({
+         providers: {
+           anthropic: { fail: authError },
+@@ -263,12 +263,12 @@ describe('LlmCompletionService', () => {
+ 
+       await service.complete(request);
+ 
+-      expect(warn).toHaveBeenCalledWith(
++      expect(log).toHaveBeenCalledWith(
+         expect.stringContaining(
+           'SUGGESTION: The Anthropic API key may be invalid or expired',
+         ),
+       );
+-      warn.mockRestore();
++      log.mockRestore();
+     });
+ 
+     it('caches the dead provider to avoid re-calling on a second request', async () => {

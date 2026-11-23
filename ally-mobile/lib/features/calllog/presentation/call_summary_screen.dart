@@ -30,6 +30,7 @@ import '../../reviews/data/scribe_reviews_repository.dart';
 import '../data/call_log_repository.dart';
 import '../data/call_summary_fields.dart';
 import '../data/custom_fields_repository.dart';
+import '../data/custom_field_select_codec.dart';
 import '../data/summary_display_format.dart';
 import '../data/summary_form_state.dart';
 import '../../../core/chat/current_chat_provider.dart';
@@ -760,7 +761,7 @@ class _SummaryTab extends ConsumerStatefulWidget {
   ConsumerState<_SummaryTab> createState() => _SummaryTabState();
 }
 
-class _SummaryTabState extends ConsumerState<_SummaryTab> {
+class _SummaryTabState extends ConsumerState<_SummaryTab> with AutomaticKeepAliveClientMixin {
   /// Built-in field values + last-saved baseline (RN `formData` /
   /// `savedFormData`); dirty = differs from the baseline. See
   /// [SummaryFormState] for why that, not a touched-set, keeps edits made
@@ -770,6 +771,12 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
   bool _isSaving = false;
   bool _isRetrying = false;
   Timer? _notesDebounce;
+
+  // Without this, TabBarView disposes this tab's whole subtree — including
+  // VoiceNoteSection's recorder — the moment the Transcript tab is switched
+  // to, silently killing an in-progress dictation.
+  @override
+  bool get wantKeepAlive => true;
 
   int get _chatId => widget.chatId!;
 
@@ -850,7 +857,7 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
   /// `setState`, which rebuilt every section and field on each character.
   void _onFieldTyped(String fieldKey, dynamic value) {
     _form.set(fieldKey, value);
-    if (_form.hasChanges != _saveButtonShownDirty) _dirtyFlag.value++;
+    if (_hasDirtyChanges != _saveButtonShownDirty) _dirtyFlag.value++;
   }
 
   /// Mirrors RN's `SectionHeader`/`toggleSection` (`CallSummaryDetails.tsx`):
@@ -943,17 +950,47 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
   /// never clobbers an in-progress edit.
   void _seedCustomFieldsIfNeeded(List<CustomFieldValue> values) {
     final pending = _customValuesBeforeReseed;
+    var isVoiceReseed = false;
     if (pending != null && !identical(values, pending)) {
       _customFieldsSeededForChatId = null;
       _customValuesBeforeReseed = null;
+      isVoiceReseed = true;
     }
     final key = '$_chatId';
     if (_customFieldsSeededForChatId == key) return;
+    // A re-seed after voice dictation must not wipe picks the counsellor made
+    // but has not saved yet: they stay dirty and win over the dictated value
+    // (the counsellor's explicit choice is never overwritten by the AI).
+    final unsaved = isVoiceReseed
+        ? {for (final id in _dirtyCustomFieldIds) id: _customFieldValues[id]}
+        : const <String, String?>{};
     _customFieldValues
       ..clear()
-      ..addEntries(values.map((v) => MapEntry(v.fieldDefinitionId, v.value)));
-    _dirtyCustomFieldIds.clear();
+      ..addEntries(values.map((v) {
+        // Select values may be stored as ids (web) or labels (older builds);
+        // this form works in labels. See custom_field_select_codec.dart.
+        final def = _customFieldDefById(v.fieldDefinitionId);
+        return MapEntry(v.fieldDefinitionId, def == null ? v.value : selectValueFromWire(def, v.value));
+      }))
+      ..addAll(unsaved);
+    _dirtyCustomFieldIds
+      ..clear()
+      ..addAll(unsaved.keys);
     _customFieldsSeededForChatId = key;
+  }
+
+  CustomFieldDefinition? _customFieldDefById(String id) {
+    for (final d in _customFieldDefs) {
+      if (d.id == id) return d;
+    }
+    return null;
+  }
+
+  /// A custom field's value as the server stores it (select options as ids).
+  String? _wireValue(String id) {
+    final def = _customFieldDefById(id);
+    final value = _customFieldValues[id];
+    return def == null ? value : selectValueToWire(def, value);
   }
 
   /// RN `onCustomValuesApplied` (remount + re-seed): voice dictation wrote
@@ -978,6 +1015,7 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
   void _onCustomFieldTyped(String fieldDefinitionId, String? value) {
     _customFieldValues[fieldDefinitionId] = value;
     _dirtyCustomFieldIds.add(fieldDefinitionId);
+    if (_hasDirtyChanges != _saveButtonShownDirty) _dirtyFlag.value++;
   }
 
   /// Applies voice-dictated field values: merges them into the form
@@ -996,6 +1034,12 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
     });
     await ref.read(callLogRepositoryProvider).updateCallSummary(_chatId, updates);
     if (mounted) setState(() => _form.markSaved(updates));
+    // Without this, callSummaryProvider's cache for this chatId is never
+    // told the generated values exist — reopening this note from a fresh
+    // screen instance (e.g. back out to Call Log and back in) kept serving
+    // whatever it had cached from before Generate was pressed, showing an
+    // empty/stale summary until the app itself restarted.
+    ref.invalidate(callSummaryProvider(_chatId));
   }
 
   // RN's global bottom Save button only ever shows/acts on built-in-field
@@ -1007,7 +1051,12 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
   // custom fields are only ever editable inside a section's edit mode
   // (gated the same way built-in fields are), so this reverts to RN's
   // actual scope.
-  bool get _hasDirtyChanges => _form.hasChanges;
+  //
+  // Scribe v2: the global Save also saves custom fields. Counsellors picked a
+  // value (e.g. Ongoing Risk → Running Away), pressed Save instead of the
+  // section's tick, and lost it — Save must persist everything on screen.
+  bool get _hasDirtyChanges =>
+      _form.hasChanges || _dirtyCustomFieldIds.isNotEmpty;
 
   /// RN's `handleSubmit` — saves every dirty built-in field across the
   /// whole form (not scoped to one section), shared by both the global
@@ -1049,7 +1098,27 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
     try {
       await ref.read(customFieldsRepositoryProvider).upsertValues(
         _chatId,
-        [for (final id in changed) (fieldDefinitionId: id, value: _customFieldValues[id])],
+        [for (final id in changed) (fieldDefinitionId: id, value: _wireValue(id))],
+      );
+      if (mounted) setState(() => _dirtyCustomFieldIds.removeAll(changed));
+      return true;
+    } catch (_) {
+      if (mounted) {
+        showToast(ref.tr('summary.customFieldSaveFailed'), type: ToastType.error);
+      }
+      return false;
+    }
+  }
+
+  /// Saves every dirty custom field, across all sections — the global Save's
+  /// half of the custom-field write (the section tick saves one section).
+  Future<bool> _saveAllCustomFields() async {
+    final changed = _dirtyCustomFieldIds.toList();
+    if (changed.isEmpty) return true;
+    try {
+      await ref.read(customFieldsRepositoryProvider).upsertValues(
+        _chatId,
+        [for (final id in changed) (fieldDefinitionId: id, value: _wireValue(id))],
       );
       if (mounted) setState(() => _dirtyCustomFieldIds.removeAll(changed));
       return true;
@@ -1068,10 +1137,13 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
       _isSaving = true;
       _error = null;
     });
-    await _saveBuiltinFields();
+    final builtinsSaved = await _saveBuiltinFields();
+    final customSaved = await _saveAllCustomFields();
     if (mounted) {
       setState(() => _isSaving = false);
-      widget.onSaveButtonPress();
+      // Stay on the screen when something failed to save, so the counsellor
+      // sees the error and can retry instead of losing the edit.
+      if (builtinsSaved && customSaved) widget.onSaveButtonPress();
     }
   }
 
@@ -1164,6 +1236,7 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
   /// bare error text. Only a 403 (`isUnauthorized`) gets its own view.
   @override
   Widget build(BuildContext context) {
+    super.build(context); // required by AutomaticKeepAliveClientMixin
     final summaryAsync = widget.summaryAsync;
     final error = summaryAsync.error;
     if (error is DioException && error.response?.statusCode == 403) {
@@ -1199,10 +1272,16 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
     // unconditionally on every summary open.
     final customFieldsEnabled = ref.watch(customFieldsEnabledProvider).value ?? false;
     if (customFieldsEnabled) {
-      _customFieldDefs = ref.watch(customFieldDefinitionsProvider).value ?? _customFieldDefs;
+      final defsAsync = ref.watch(customFieldDefinitionsProvider);
+      _customFieldDefs = defsAsync.value ?? _customFieldDefs;
       final valuesAsync = ref.watch(customFieldValuesProvider(_chatId));
       final values = valuesAsync.value;
-      if (values != null) _seedCustomFieldsIfNeeded(values);
+      // Seed once both are in: select values are converted to labels using
+      // the definitions, and seeding happens only once per chat. A failed
+      // definitions load still seeds (unconverted) rather than never.
+      if (values != null && (defsAsync.hasValue || defsAsync.hasError)) {
+        _seedCustomFieldsIfNeeded(values);
+      }
     } else {
       _customFieldDefs = const [];
     }
@@ -1222,6 +1301,14 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
             chatId: _chatId,
             onValuesApplied: _applyVoiceValues,
             onCustomValuesApplied: _reseedCustomFields,
+            // The transcript save is also when the backend adds this
+            // recording's length to the call duration, so refresh the summary
+            // too, not just the transcript tab — otherwise Call Duration stays
+            // stale until the note is reopened.
+            onTranscriptSaved: () {
+              ref.invalidate(chatMessagesProvider(_chatId));
+              ref.invalidate(callSummaryProvider(_chatId));
+            },
             existingTranscript: summary.transcript,
           ),
         Expanded(
@@ -1238,7 +1325,7 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
                 // RN `CallSummaryDetails.tsx` `alertContainer`: the
                 // AI-generated disclaimer above the section card, with
                 // RN's goldenShield SVG in a carrotOrange ring.
-                return Container(
+                final aiBanner = Container(
                   margin: EdgeInsets.only(top: 10, left: size.s(10), right: size.s(10)),
                   padding: EdgeInsets.all(size.s(10)),
                   decoration: BoxDecoration(
@@ -1274,6 +1361,36 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
                       ),
                     ],
                   ),
+                );
+                if (!summary.isIncompleteRecording) return aiBanner;
+                // The recording's connection dropped and never resumed: say
+                // the summary only covers what was recorded, above the AI
+                // disclaimer and in the same style.
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      key: const Key('incomplete-recording-warning'),
+                      margin: EdgeInsets.only(top: 10, left: size.s(10), right: size.s(10)),
+                      padding: EdgeInsets.all(size.s(10)),
+                      decoration: BoxDecoration(
+                        color: AppColors.amber50,
+                        borderRadius: BorderRadius.circular(size.s(8)),
+                        border: Border.all(color: AppColors.orange400, width: 0.5),
+                      ),
+                      child: Text(
+                        ref.t('callSummary.incompleteRecording'),
+                        style: const TextStyle(
+                          fontFamily: AppFonts.ibmPlexSerifRegular,
+                          fontSize: 12,
+                          height: 16 / 12,
+                          letterSpacing: 0.2,
+                          color: AppColors.red700,
+                        ),
+                      ),
+                    ),
+                    aiBanner,
+                  ],
                 );
               }
               final section = sections[index - 1];
@@ -1607,6 +1724,13 @@ class _HeaderIconButton extends StatelessWidget {
   }
 }
 
+/// A shared label-column width across every `_FieldRow` in a section, so
+/// values start in a consistent vertical line regardless of how long each
+/// row's own label text is — RN's own layout had no such column and looked
+/// visibly ragged (confirmed on-device 2026-11); a label longer than this
+/// wraps onto a second line rather than overflowing.
+const _fieldRowLabelWidth = 150.0;
+
 /// RN `FieldRow` `styles.label` (+ `:`), IBM Plex Serif body.medium, low
 /// emphasis.
 const _fieldRowLabelStyle = TextStyle(
@@ -1650,10 +1774,14 @@ class _FieldRow extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.only(bottom: RnSize.of(context).vs(5)),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Text('$label:', style: _fieldRowLabelStyle),
+          SizedBox(
+            width: _fieldRowLabelWidth,
+            child: Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Text('$label:', style: _fieldRowLabelStyle),
+            ),
           ),
           edit ?? Expanded(child: Text(value, style: _fieldValueTextStyle)),
         ],
@@ -1786,7 +1914,6 @@ class _EditableField extends StatelessWidget {
     required this.onChanged,
     required this.isEditing,
     this.isEnhancing = false,
-    this.placeholder = '-',
     this.keyboardType,
   });
 
@@ -1795,25 +1922,35 @@ class _EditableField extends StatelessWidget {
   final ValueChanged<String> onChanged;
   final bool isEditing;
   final bool isEnhancing;
-  final String placeholder;
   final TextInputType? keyboardType;
 
   @override
   Widget build(BuildContext context) {
     final Widget child;
     if (isEditing) {
+      // A bordered box, not just bare text, so it's visually obvious this is
+      // a tappable input rather than a label — without it, a field blended
+      // into the surrounding read-only text with no indication of where to
+      // tap. Added 2026-11.
       child = Padding(
         padding: const EdgeInsets.only(right: 20),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 200),
-          child: _SyncedTextField(
-            key: ValueKey(fieldKey),
-            value: value ?? '',
-            onChanged: onChanged,
-            multiline: true,
-            autofocus: true,
-            keyboardType: keyboardType,
-            style: _dropdownItemTextStyle,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            border: Border.all(color: AppColors.rnGray, width: 0.5),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 200),
+            child: _SyncedTextField(
+              key: ValueKey(fieldKey),
+              value: value ?? '',
+              onChanged: onChanged,
+              multiline: true,
+              autofocus: true,
+              keyboardType: keyboardType,
+              style: _dropdownItemTextStyle,
+            ),
           ),
         ),
       );
@@ -1822,7 +1959,7 @@ class _EditableField extends StatelessWidget {
         constraints: const BoxConstraints(maxHeight: 200),
         child: SingleChildScrollView(
           child: Text(
-            value != null && value!.isNotEmpty ? value! : placeholder,
+            value != null && value!.isNotEmpty ? value! : '-',
             style: TextStyle(
               fontFamily: AppFonts.ibmPlexSerifRegular,
               fontSize: 14,
@@ -2067,6 +2204,25 @@ class _CustomFieldEditor extends ConsumerWidget {
   /// JSON-encoded array of option *labels*; a bare non-JSON string (an old
   /// single-select-shaped value, or simply malformed) is treated as a
   /// one-item selection instead of discarded.
+  /// Resolves a stored SINGLE_SELECT value to its option's label. The value
+  /// is normally already the label (see [CustomFieldValue]'s own doc
+  /// comment), but a value written as the option's id instead — confirmed
+  /// happening for at least one admin-managed field, via some path other
+  /// than this screen's own save flow (which always writes labels, see
+  /// `onSelect` below) — is resolved the same way, rather than shown as a
+  /// raw id. Falls back to the raw value when it matches neither, so
+  /// nothing is silently hidden. Added 2026-11.
+  static String? _resolveSingleSelectValue(CustomFieldDefinition def, String? value) {
+    if (value == null || value.isEmpty) return value;
+    for (final o in def.sortedOptions) {
+      if (o.label == value) return value;
+    }
+    for (final o in def.sortedOptions) {
+      if (o.id == value) return o.label;
+    }
+    return value;
+  }
+
   static List<String> _parseMultiSelect(String? value) {
     if (value == null || value.isEmpty) return const [];
     try {
@@ -2075,6 +2231,24 @@ class _CustomFieldEditor extends ConsumerWidget {
     } catch (_) {
       return [value];
     }
+  }
+
+  /// Native calendar picker for a DATE custom field — this used to be a
+  /// plain text box expecting `YYYY-MM-DD` typed by hand. Writes back that
+  /// same wire format `onChanged` expects; only the display (via
+  /// [formatCustomFieldDate]) is DD-MM-YYYY. Added 2026-11.
+  Future<void> _pickDate(BuildContext context, String? value) async {
+    final normalized = normalizeCustomFieldDate(value);
+    final initialDate = normalized != null ? DateTime.parse(normalized) : DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime(1900),
+      lastDate: DateTime(2100),
+    );
+    if (picked == null) return;
+    String pad(int n) => n.toString().padLeft(2, '0');
+    onChanged?.call(definition.id, '${picked.year}-${pad(picked.month)}-${pad(picked.day)}');
   }
 
   Future<void> _pickMultiSelect(BuildContext context, List<String> options, List<String> selected) async {
@@ -2114,19 +2288,28 @@ class _CustomFieldEditor extends ConsumerWidget {
         );
 
       case CustomFieldType.date:
+        final displayValue = formatCustomFieldDate(value);
+        final isEmpty = (value ?? '').isEmpty;
         return _FieldRow(
           label: label,
-          // RN `formatCustomFieldDate`.
-          value: formatCustomFieldDate(value),
+          value: displayValue,
           edit: canEdit
-              ? Expanded(
-                  child: _EditableField(
-                    fieldKey: def.id,
-                    // RN `normalizeCustomFieldDate` for the edited value.
-                    value: normalizeCustomFieldDate(value) ?? value,
-                    onChanged: typed,
-                    isEditing: true,
-                    placeholder: 'YYYY-MM-DD',
+              ? GestureDetector(
+                  key: ValueKey('date-field-${def.id}'),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => _pickDate(context, value),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppColors.rnGray, width: 0.5),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      isEmpty ? ref.t('common.select') : displayValue,
+                      style: isEmpty
+                          ? _fieldValueTextStyle.copyWith(color: AppColors.charcoal2.withValues(alpha: 0.5))
+                          : _fieldValueTextStyle,
+                    ),
                   ),
                 )
               : null,
@@ -2134,13 +2317,14 @@ class _CustomFieldEditor extends ConsumerWidget {
 
       case CustomFieldType.singleSelect:
         final options = def.sortedOptions.map((o) => o.label).toList();
+        final resolvedValue = _resolveSingleSelectValue(def, value);
         return _FieldRow(
           label: label,
-          value: value ?? '-',
+          value: resolvedValue ?? '-',
           edit: canEdit
               ? _SummaryDropdown(
                   key: ValueKey('dropdown-${def.id}'),
-                  value: value ?? '',
+                  value: resolvedValue ?? '',
                   options: options,
                   placeholder: ref.t('common.select'),
                   onSelect: (selected) => onChanged?.call(def.id, selected),

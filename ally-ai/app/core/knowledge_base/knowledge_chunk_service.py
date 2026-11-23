@@ -34,6 +34,8 @@ from typing import Any, Dict, List, Optional
 
 from app.core.constants import EmbeddingConstants
 from app.core.embeddings.base import BaseEmbeddingService
+from app.core.llm_usage.emitter import emit_embedding_usage
+from app.core.llm_usage.tasks import LLMTask
 from app.core.vector_db.base import VectorDB
 from app.core.vector_db.constants import VectorDBCollectionNames
 from app.exceptions.custom_exceptions import EmbeddingFailedException
@@ -132,22 +134,11 @@ class KnowledgeChunkService:
         """
         return sha256(text.encode("utf-8")).hexdigest()
 
-    # NO embedding-cost emission here, deliberately.
-    #
-    # `emit_ai_usage`'s own quantity guard (`_has_quantity`) requires a non-zero TOKEN
-    # count for service='llm' and accepts `characters` only for 'stt'/'tts'. An
-    # embedding emission carrying character counts would therefore be dropped inside the
-    # emitter, giving us a call that looks like instrumentation and reports nothing —
-    # worse than an acknowledged gap, because the dashboard would show embeddings as
-    # free rather than as unmeasured.
-    #
-    # Emitting real token counts needs a cl100k_base tokeniser this service does not
-    # have, and fabricating an estimate would put an invented number in a cost
-    # dashboard. The honest fix is an 'embedding' branch in the emitter plus matching
-    # handling in ally-be's consumer, which lands with the usage dashboard (where that
-    # consumer is being touched anyway) rather than being half-done here.
-    # `LLM_USAGE.COUNT_EMBEDDING_TOKENS` already exists and is unused for exactly this
-    # reason.
+    # Embedding cost (CR1): each successful embedding call is reported as one usage
+    # row — `embedding_index` for a batch indexed here, `embedding_search` for the
+    # query embedded on each search. The client reports no token counts, so the
+    # emitter counts the texts with tiktoken in its background thread (an estimate,
+    # flagged on the row, only if tiktoken can't load). Never blocks or fails a call.
 
     async def bulk_upsert(self, items: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
@@ -201,6 +192,9 @@ class KnowledgeChunkService:
                 for item in embeddable
             )
             return {"succeeded": succeeded, "failed": failed}
+        emit_embedding_usage(
+            EmbeddingConstants.MODEL, texts, LLMTask.EMBEDDING_INDEX.value
+        )
 
         if len(vectors) != len(embeddable):
             # Never pair mismatched lists: attaching the wrong vector to a passage
@@ -378,6 +372,9 @@ class KnowledgeChunkService:
         except Exception as e:
             logger.exception(f"Query embedding failed: {type(e).__name__}")
             raise EmbeddingFailedException("Failed to embed the query")
+        emit_embedding_usage(
+            EmbeddingConstants.MODEL, [text], LLMTask.EMBEDDING_SEARCH.value
+        )
 
         # TWO KINDS OF NARROWING, both applied by the engine before it ranks.
         #

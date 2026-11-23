@@ -201,10 +201,13 @@ const callsAPI = baseAPI.injectEndpoints({
      * @returns {Promise<{ success: boolean }>} Save confirmation
      */
     saveNoteTranscript: builder.mutation<{ success: boolean }, SaveNoteTranscriptInput>({
-      query: ({ chatId, transcript }) => ({
+      query: ({ chatId, transcript, durationSeconds }) => ({
         url: ApiEndpoints.CALLS.SAVE_NOTE_TRANSCRIPT(chatId),
         method: HttpMethod.PUT,
-        body: { transcript },
+        body: {
+          transcript,
+          ...(durationSeconds && durationSeconds > 0 ? { durationSeconds } : {}),
+        },
       }),
     }),
 

@@ -8,6 +8,7 @@ import type { InteractionMode } from "@ally-ui-mono/ui-shared";
 import { useEndSimulationMutation, useStartSimulationMutation } from "@api";
 import { LOCAL_STORAGE_KEYS } from "@constants";
 import { useUser } from "@hooks";
+import { ACTIVE_TRACK_CONTEXT_KEY } from "@types";
 
 interface StartSimulationParams {
   scenarioId: number;
@@ -41,6 +42,12 @@ interface UseStartSimulationReturn {
   }) => Promise<void>;
   isStarting: boolean;
 }
+
+/** The blocking session's id when a start was rejected for an existing ACTIVE session. */
+const getActiveSessionId = (error: unknown): string | undefined => {
+  const data = (error as { data?: { statusCode?: number; entityId?: string } } | undefined)?.data;
+  return data?.statusCode === 400 && data.entityId ? data.entityId : undefined;
+};
 
 /**
  * Custom hook for starting simulations with error handling and navigation
@@ -107,7 +114,40 @@ export const useStartSimulation = (
         dataParams.trackItemProgressId = trackItemProgressId;
       }
 
-      const { data, error } = await startSimulationMutation(dataParams);
+      // A roleplay started on its own, outside any course, path or case:
+      // forget a course it may have been launched from earlier in this tab,
+      // so its summary shows no stale course breadcrumb or Continue.
+      if (
+        !(trackItemProgressId?.length > 0) &&
+        !(caseSessionItemId?.length > 0) &&
+        !(scenarioPathSessionItemId?.length > 0)
+      ) {
+        try {
+          sessionStorage.removeItem(ACTIVE_TRACK_CONTEXT_KEY);
+        } catch {
+          // sessionStorage unavailable: nothing stored to clear.
+        }
+      }
+
+      let { data, error } = await startSimulationMutation(dataParams);
+
+      // The backend allows one ACTIVE roleplay per learner and rejects a start
+      // with a 400 carrying the blocking session's id (`entityId`) — usually a
+      // call that was never hung up, or one whose client never joined the room.
+      // End that session and retry the start exactly once, so the learner lands
+      // in the roleplay they asked for instead of having to click Start again.
+      const staleSessionId = getActiveSessionId(error);
+      if (staleSessionId) {
+        const endResult = await endSimulation({ sessionId: staleSessionId });
+        if (endResult && "error" in endResult && endResult.error) {
+          logger.error("Failed to end previous simulation");
+          toast.error("We couldn't end your previous roleplay. Please try again.");
+          onError?.(endResult.error);
+          setIsStarting(false);
+          return;
+        }
+        ({ data, error } = await startSimulationMutation(dataParams));
+      }
 
       // Handle success
       if (data) {
@@ -205,10 +245,11 @@ export const useStartSimulation = (
               ? backendMessage
               : "You are not authorized to start this simulation",
           );
-        } else if (errorData.data?.statusCode === 400 && errorData?.data?.entityId) {
-          // End previous simulation and retry
-          await endSimulation({ sessionId: errorData?.data?.entityId });
-          toast.success("Previous simulation ended. Starting new one...");
+        } else if (getActiveSessionId(error)) {
+          // Still blocked after ending the old session and retrying once (e.g.
+          // another tab started one in between). Don't loop; don't show the raw
+          // backend string with its session id.
+          toast.error("You already have a roleplay in progress. End it before starting a new one.");
         } else {
           toast.error(errorData?.data?.message || "Failed to start simulation");
         }

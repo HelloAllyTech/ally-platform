@@ -1,0 +1,64 @@
+diff --git a/src/common/common.module.ts b/src/common/common.module.ts
+index 3a14c08717..ec3bcee41c 100644
+--- a/src/common/common.module.ts
++++ b/src/common/common.module.ts
+@@ -5,10 +5,12 @@ import { OpenAITranslationsService } from './service/openai-translation.service'
+ import { PromptModule } from 'src/prompt/prompt.module';
+ import { LlmUsageModule } from 'src/analytics/llm-usage.module';
+ import { AiChatModule } from 'src/ai-chat/ai-chat.module';
++import { FaviconController } from './controller/favicon.controller';
+ 
+ @Global()
+ @Module({
+   imports: [PromptModule, LlmUsageModule, AiChatModule],
++  controllers: [FaviconController],
+   providers: [
+     CryptoService,
+     GoogleTranslationsService,
+diff --git a/src/common/controller/favicon.controller.spec.ts b/src/common/controller/favicon.controller.spec.ts
+new file mode 100644
+index 0000000000..189641161d
+--- /dev/null
++++ b/src/common/controller/favicon.controller.spec.ts
+@@ -0,0 +1,25 @@
++import { Test } from '@nestjs/testing';
++import { INestApplication } from '@nestjs/common';
++import * as request from 'supertest';
++import { FaviconController } from './favicon.controller';
++
++describe('FaviconController', () => {
++  let app: INestApplication;
++
++  beforeAll(async () => {
++    const moduleFixture = await Test.createTestingModule({
++      controllers: [FaviconController],
++    }).compile();
++
++    app = moduleFixture.createNestApplication();
++    await app.init();
++  });
++
++  afterAll(async () => {
++    await app.close();
++  });
++
++  it('should return 204 No Content for /favicon.ico', () => {
++    return request(app.getHttpServer()).get('/favicon.ico').expect(204);
++  });
++});
+diff --git a/src/common/controller/favicon.controller.ts b/src/common/controller/favicon.controller.ts
+new file mode 100644
+index 0000000000..86d7c56a05
+--- /dev/null
++++ b/src/common/controller/favicon.controller.ts
+@@ -0,0 +1,10 @@
++import { Controller, Get, Res } from '@nestjs/common';
++import { Response } from 'express';
++
++@Controller()
++export class FaviconController {
++  @Get('favicon.ico')
++  getFavicon(@Res() res: Response) {
++    res.status(204).send();
++  }
++}

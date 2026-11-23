@@ -81,15 +81,70 @@ describe('TrackProgressService — roleplay assessment mode', () => {
         tenantId: TENANT_ID,
       });
 
-    it('only counts sessions the learner spoke in and that ended properly', async () => {
+    it('only counts sessions stamped as a valid attempt when they ended', async () => {
       trackItemProgressRepository.findOne.mockResolvedValue(progress());
       trackItemRepository.findOne.mockResolvedValue(item(true));
-      dataSource.query.mockResolvedValue([{ live: 0, ended: 0 }]);
+      dataSource.query.mockResolvedValue([{ live: 0, ended: 0, pending: 0 }]);
 
       await start();
       const sql: string = dataSource.query.mock.calls[0][0];
-      expect(sql).toMatch(/m\."senderId" <> -1/);
+      expect(sql).toMatch(/"assessmentAttemptValid" IS TRUE/);
       expect(sql).toMatch(/"eventStatus" <> 'ABANDONED'/);
+    });
+
+    it('briefly refuses a restart while the last attempt is still being judged', async () => {
+      trackItemProgressRepository.findOne.mockResolvedValue(progress());
+      trackItemRepository.findOne.mockResolvedValue(item(true));
+      dataSource.query.mockResolvedValue([{ live: 0, ended: 0, pending: 1 }]);
+
+      await expect(start()).rejects.toThrow(/still being saved/);
+    });
+
+    describe('a post-assessment', () => {
+      const postItem = {
+        ...item(true),
+        completionCriteria: {
+          assessmentMode: true,
+          assessmentPhase: 'POST',
+          assessmentPairKey: '00000000-0000-4000-8000-000000000001',
+        },
+      };
+
+      it('waits for its pre-assessment to be submitted', async () => {
+        trackItemProgressRepository.findOne.mockResolvedValue(progress());
+        trackItemRepository.findOne.mockResolvedValue(postItem);
+        dataSource.query
+          .mockResolvedValueOnce([{ live: 0, ended: 0, pending: 0 }])
+          .mockResolvedValueOnce([
+            { title: 'Baseline call', submittedAt: null },
+          ]);
+
+        await expect(start()).rejects.toThrow(
+          /Complete the pre-assessment "Baseline call" first/,
+        );
+      });
+
+      it('starts once the pre-assessment is submitted', async () => {
+        trackItemProgressRepository.findOne.mockResolvedValue(progress());
+        trackItemRepository.findOne.mockResolvedValue(postItem);
+        dataSource.query
+          .mockResolvedValueOnce([{ live: 0, ended: 0, pending: 0 }])
+          .mockResolvedValueOnce([
+            { title: 'Baseline call', submittedAt: '2026-11-01T00:00:00Z' },
+          ]);
+
+        await expect(start()).resolves.toBeUndefined();
+      });
+
+      it('starts when its pre-assessment is gone', async () => {
+        trackItemProgressRepository.findOne.mockResolvedValue(progress());
+        trackItemRepository.findOne.mockResolvedValue(postItem);
+        dataSource.query
+          .mockResolvedValueOnce([{ live: 0, ended: 0, pending: 0 }])
+          .mockResolvedValueOnce([]);
+
+        await expect(start()).resolves.toBeUndefined();
+      });
     });
 
     it('allows the first attempt', async () => {
@@ -185,13 +240,17 @@ describe('TrackProgressService — roleplay assessment mode', () => {
       });
 
       expect(result.completed).toBe(true);
+      expect(result.assessmentAttemptValid).toBe(true);
       const [, update] = trackItemProgressRepository.update.mock.calls[0];
       expect(update).toEqual({
+        attemptCount: 1,
         meta: {
           assessmentReopenedAt: '2026-10-27T10:00:00.000Z',
           assessmentSubmittedAt: expect.any(String),
+          assessmentSubmission: expect.objectContaining({ score: 30 }),
         },
       });
+      expect(update).not.toHaveProperty('score');
     });
 
     it('does not submit an assessment the learner never spoke in', async () => {
@@ -206,8 +265,81 @@ describe('TrackProgressService — roleplay assessment mode', () => {
       });
 
       expect(result.completed).toBe(false);
+      expect(result.assessmentAttemptValid).toBeNull();
       const [, update] = trackItemProgressRepository.update.mock.calls[0];
+      // Not submitted and nothing to explain: it never costs the attempt.
       expect(update).toEqual({ attemptCount: 1 });
+    });
+
+    it('discards an attempt below the minimum turns, so the learner can restart', async () => {
+      trackItemProgressRepository.findOne.mockResolvedValue(
+        progress({ assessmentIncompleteStarts: 1 }),
+      );
+      trackItemRepository.findOne.mockResolvedValue({
+        ...item(true, 50),
+        completionCriteria: {
+          assessmentMode: true,
+          minScore: 50,
+          minLearnerTurns: 10,
+        },
+      });
+
+      const result = await service.handleRoleplayEnd({
+        trackItemProgressId: PROGRESS_ID,
+        scenarioSessionId: 'sess-1',
+        score: 90,
+        callDuration: 60_000,
+        learnerTurns: 4,
+      });
+
+      expect(result.assessmentAttemptValid).toBe(false);
+      expect(result.completed).toBe(false);
+      const [, update] = trackItemProgressRepository.update.mock.calls[0];
+      expect(update).not.toHaveProperty('score');
+      expect(update.meta).not.toHaveProperty('assessmentSubmittedAt');
+      expect(update.meta.assessmentIncompleteStarts).toBe(2);
+      expect(update.meta.lastRoleplayAttempt).toMatchObject({
+        failureReasons: ['INSUFFICIENT_TURNS'],
+        learnerTurns: 4,
+        requiredTurns: 10,
+      });
+    });
+
+    it('submits an attempt that reaches the minimum turns, judged by the rule then', async () => {
+      trackItemProgressRepository.findOne.mockResolvedValue(progress());
+      trackItemRepository.findOne.mockResolvedValue({
+        ...item(true, 50),
+        completionCriteria: {
+          assessmentMode: true,
+          minScore: 50,
+          minLearnerTurns: 10,
+          minDurationSeconds: 600,
+        },
+      });
+
+      const result = await service.handleRoleplayEnd({
+        trackItemProgressId: PROGRESS_ID,
+        scenarioSessionId: 'sess-1',
+        score: 20,
+        callDuration: 30_000,
+        learnerTurns: 10,
+      });
+
+      expect(result.assessmentAttemptValid).toBe(true);
+      const [, update] = trackItemProgressRepository.update.mock.calls[0];
+      expect(update.score).toBe(20);
+      expect(update.meta.assessmentSubmission).toEqual({
+        scenarioSessionId: 'sess-1',
+        learnerTurns: 10,
+        requiredTurns: 10,
+        score: 20,
+        requiredScore: 50,
+        submittedAt: expect.any(String),
+      });
+      // Short call, but duration never gates an assessment: only the pass mark.
+      expect(update.meta.lastRoleplayAttempt.failureReasons).toEqual([
+        'INSUFFICIENT_SCORE',
+      ]);
     });
 
     it('leaves a practice roleplay unstamped', async () => {
@@ -221,7 +353,31 @@ describe('TrackProgressService — roleplay assessment mode', () => {
       });
 
       const [, update] = trackItemProgressRepository.update.mock.calls[0];
-      expect(update).toEqual({ attemptCount: 1 });
+      expect(update.attemptCount).toBe(1);
+      expect(update).not.toHaveProperty('score');
+      // Not submitted; only the missed-gate record for the learner is kept.
+      expect(update.meta).not.toHaveProperty('assessmentSubmittedAt');
+      expect(update.meta.lastRoleplayAttempt.failureReasons).toEqual([
+        'INSUFFICIENT_SCORE',
+      ]);
+    });
+  });
+
+  describe('handleRoleplayLaunch', () => {
+    it('never completes an assessment on launch, even a legacy PARTICIPATION one', async () => {
+      trackItemProgressRepository.findOne.mockResolvedValue(progress());
+      trackItemRepository.findOne.mockResolvedValue({
+        ...item(true),
+        completionCriteria: {
+          assessmentMode: true,
+          completionLogic: 'PARTICIPATION',
+        },
+      });
+
+      const result = await service.handleRoleplayLaunch(PROGRESS_ID);
+
+      expect(result.completed).toBe(false);
+      expect(dataSource.transaction).not.toHaveBeenCalled();
     });
   });
 
@@ -238,6 +394,7 @@ describe('TrackProgressService — roleplay assessment mode', () => {
       const [id, update] = trackItemProgressRepository.update.mock.calls[0];
       expect(id).toBe(PROGRESS_ID);
       expect(update.meta.assessmentSubmittedAt).toBeUndefined();
+      expect(update.meta.assessmentIncompleteStarts).toBeUndefined();
       expect(typeof update.meta.assessmentReopenedAt).toBe('string');
     });
 

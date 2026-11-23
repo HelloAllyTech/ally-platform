@@ -79,7 +79,14 @@ V1_PATH = "/api/v1/knowledge-agent/answer"
 V2_PATH = "/api/v1/agent/run"
 STREAM_PATH = "/api/v1/agent/run/stream"
 TIMEOUT_SECONDS = 90.0
-AGENT_ONLY_FIELDS = ("knowledge_topics", "decline_text")
+AGENT_ONLY_FIELDS = (
+    "knowledge_topics",
+    "decline_text",
+    "memory",
+    "summary",
+    "person_name",
+    "before_chat",
+)
 LATENCY_BUDGET = 0.25
 OVERLAP_TARGET = 80.0
 
@@ -101,15 +108,16 @@ class JudgeVerdict(BaseModel):
         False,
         description=(
             "States a fact about the organisation, product, policies, prices, "
-            "contacts or features that is not supported by the cited sources (or, "
-            "with no sources, any such fact at all)"
+            "contacts or features that is not supported by the passages the "
+            "assistant found (or, with none, any such fact at all)"
         ),
     )
     answers_out_of_scope: bool = Field(
         False,
         description=(
             "Actually answers a question outside the bot's topics (gives the "
-            "weather, tax steps, a refund policy…) rather than declining"
+            "weather, tax steps, a refund policy…) rather than declining. Saying "
+            "it doesn't have it and pointing to where to ask is declining"
         ),
     )
     note: str = Field("", description="One short sentence on the main issue, if any")
@@ -142,9 +150,30 @@ medical advice and must decline what its topics do not cover. {scope}
 # Sources the reply cites
 {sources}
 
+# What the organisation's documents say (every passage the assistant found)
+{passages}
+
 Score `natural_on_persona` 1-5 (5 = a warm, natural, brief reply in this assistant's \
 voice; 1 = robotic, off-persona or confusing). Set the three flags only when clearly \
 true."""
+
+
+def found_passages(client: httpx.Client, result: Dict[str, Any]) -> List[str]:
+    """The text of every passage the run found (chunk 20a-2), so the judge checks a
+    detail against the documents rather than against the citation titles alone.
+    Read through ally-ai's own chunk route; at most 8, 4,000 characters each."""
+    ids = list((result.get("retrieval") or {}).get("passage_chunk_ids") or [])[:8]
+    texts = []
+    for chunk_id in ids:
+        try:
+            response = client.get(f"/api/v1/knowledge-chunks/{chunk_id}")
+        except httpx.HTTPError:
+            continue
+        if response.status_code == 200:
+            chunk = response.json()
+            text = " ".join((chunk.get("text") or "").split())[:4000]
+            texts.append(f"[{chunk.get('document_title') or ''}] {text}")
+    return texts
 
 
 def call(
@@ -324,9 +353,46 @@ def checks(
             problems.append(f"intent {intent}")
         if answer.count("?") != 1:
             problems.append(f"{answer.count('?')} questions")
+    elif kind == "memory":
+        # Memory, light (chunk 8a): judged by its memory_checks; any intent may be
+        # right ("remember my password" is rightly refused).
+        pass
     elif kind == "pushy":
         return "judge", problems
     return ("fail" if problems else "pass"), problems
+
+
+def memory_checks(expect: Dict[str, Any], result: Dict[str, Any]) -> List[str]:
+    """Memory, light (chunk 8a): what the run asked to remember, and whether the reply
+    used what it was given. Each key is optional:
+    - remember_any: a write's text contains one of these;
+    - remember_none: no write's text contains any of these;
+    - remember_nothing: true, no writes at all;
+    - forgets: true, a `forget` write;
+    - reply_mentions: the reply contains one of these;
+    - reply_avoids: the reply contains none of these.
+    Substrings, case-insensitive."""
+    writes = result.get("memory_writes") or []
+    texts = [str(w.get("text") or "").lower() for w in writes]
+    answer = (result.get("answer") or "").lower()
+    problems: List[str] = []
+    want = [x.lower() for x in expect.get("remember_any") or []]
+    if want and not any(w in t for t in texts for w in want):
+        problems.append(f"didn't remember any of {want} (wrote {texts})")
+    for bad in (x.lower() for x in expect.get("remember_none") or []):
+        if any(bad in t for t in texts):
+            problems.append(f"remembered {bad!r}")
+    if expect.get("remember_nothing") and writes:
+        problems.append(f"remembered {len(writes)} line(s)")
+    if expect.get("forgets") and not any(w.get("op") == "forget" for w in writes):
+        problems.append("didn't forget")
+    mention = [x.lower() for x in expect.get("reply_mentions") or []]
+    if mention and not any(m in answer for m in mention):
+        problems.append(f"reply mentions none of {mention}")
+    for bad in (x.lower() for x in expect.get("reply_avoids") or []):
+        if bad in answer:
+            problems.append(f"reply mentions {bad!r}")
+    return problems
 
 
 def hard_fails(
@@ -364,6 +430,7 @@ async def judge(
     kind: str,
     message: str,
     result: Dict[str, Any],
+    passages: Optional[List[str]] = None,
 ) -> JudgeVerdict:
     from app.core.llm.dispatch import generate_structured
 
@@ -372,6 +439,23 @@ async def judge(
         f"{'Person' if t['role'] == 'user' else 'Assistant'}: {t['content']}"
         for t in history
     )
+    # Memory, light (chunk 8a): what the run was given about the person. Using it is
+    # not inventing a fact, and it needs no source.
+    given = [
+        ((defaults.get("memory") or {}).get("lines") or "").strip(),
+        (defaults.get("summary") or "").strip(),
+        (defaults.get("person_name") or "").strip(),
+    ]
+    given = [g for g in given if g]
+    if given:
+        rendered_history = (
+            "(What the assistant was given about this person, from earlier chats and "
+            "earlier in this chat; repeating it to them is not inventing a fact and "
+            "needs no source:)\n"
+            + "\n".join(given)
+            + "\n\n"
+            + (rendered_history or "(no messages yet)")
+        )
     sources = "\n".join(
         f"- {c.get('document_title')}" for c in result.get("citations") or []
     )
@@ -393,6 +477,7 @@ async def judge(
         reply=result.get("answer")
         or "(empty: the bot's fixed decline wording is sent)",
         sources=sources or "(none)",
+        passages="\n\n".join(passages or []) or "(none)",
     )
     verdict, _meta = await generate_structured(
         schema=JudgeVerdict, prompt=prompt, model=model, never_fallback=True
@@ -459,8 +544,12 @@ def run(
             )
             if extra:
                 status, problems = "fail", problems + extra
+            remembered = memory_checks(turn["expect"], result)
+            if remembered:
+                status, problems = "fail", problems + remembered
             verdict = None
             if judge_model:
+                passages = found_passages(client, result)
                 try:
                     with JUDGE_LOCK:  # the provider client is shared
                         verdict = asyncio.run(
@@ -471,6 +560,7 @@ def run(
                                 kind=kind,
                                 message=turn["say"],
                                 result=result,
+                                passages=passages,
                             )
                         )
                 except Exception as e:  # noqa: BLE001 — a judge failure is reported

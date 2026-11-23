@@ -27,6 +27,7 @@ import {
   ClSourceStatus,
 } from '../enum/context-library.enum';
 import { requireProfile } from '../profiles';
+import { assertTenantsExist, resolveAudience } from '../util/audience.util';
 import { PreparedSegment, segmentDocument } from '../util/segment.util';
 import { ClActor } from './context-chunk.service';
 import { ContextStagingService } from './context-staging.service';
@@ -52,6 +53,9 @@ export interface UploadOptions {
   /** Overrides the default cap of 1.5× the estimate, per document. */
   costCapUsd?: number | null;
   batchId?: string | null;
+  /** Platform admins: who the distilled chunks reach (see `resolveAudience`). */
+  isGlobal?: boolean;
+  tenantIds?: string[];
 }
 
 export type UploadOutcome =
@@ -186,6 +190,11 @@ export class ContextUploadService {
       );
     }
     this.validateCollections(options.collections, actor);
+    // An organisation admin's document reaches their organisation; a platform admin chooses.
+    const audience = actor.tenantId
+      ? { isGlobal: false, tenantIds: [actor.tenantId] }
+      : resolveAudience(options);
+    await assertTenantsExist(this.sources.manager, audience.tenantIds);
     const batchId = options.batchId || randomUUID();
     const results: UploadResult[] = [];
     const seenHashes = new Set<string>();
@@ -299,6 +308,8 @@ export class ContextUploadService {
             fileHash,
             titleKey: key,
             ownerTenantId: actor.tenantId,
+            isGlobal: audience.isGlobal,
+            tenantIds: audience.tenantIds,
             pageCount: extracted.pages.length,
             extractionWarnings: extracted.sections.length
               ? []

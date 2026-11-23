@@ -151,9 +151,15 @@ const SimulationTranscriptTab: FC<SimulationTranscriptTabProps> = ({
     if (!transcriptList.length) return;
 
     handledFocusRequestRef.current = focusMessage.requestId;
-    const targetId = String(focusMessage.messageId);
-    if (transcriptList.some(message => String(message.id) === targetId)) {
-      setResolvedFocus(focusMessage);
+    // A debrief card's quote is exact words from one turn: find that turn.
+    const squash = (text: string) => text.replace(/\s+/g, " ").trim();
+    const quote = focusMessage.quote ? squash(focusMessage.quote) : "";
+    const byQuote = quote
+      ? transcriptList.find(message => squash(message.content ?? "").includes(quote))
+      : undefined;
+    const targetId = byQuote ? String(byQuote.id) : String(focusMessage.messageId ?? "");
+    if (targetId && transcriptList.some(message => String(message.id) === targetId)) {
+      setResolvedFocus({ ...focusMessage, messageId: targetId });
       return;
     }
     // Ally only anchors moments it could resolve, so landing here means the id

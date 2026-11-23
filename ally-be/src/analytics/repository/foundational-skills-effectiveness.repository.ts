@@ -10,6 +10,7 @@ import {
 import {
   countableSessionPredicate,
   sessionDurationMsExpr,
+  notV2vTestPredicate,
 } from '../util/session-eligibility.util';
 import { excludeTestTenants, scopeToTenant } from '../util/test-tenant.util';
 
@@ -24,7 +25,7 @@ function practiceSession(alias: string, tenantParam?: string): string {
     `${alias}.status = 'ENDED'`,
     `${alias}."eventStatus" = 'COMPLETED'`,
     countableSessionPredicate(alias),
-    `COALESCE((${alias}.metadata->>'v2vTest')::boolean, false) = false`,
+    notV2vTestPredicate(alias),
     excludeTestTenants(`${alias}."tenant_id"`),
     ...(tenantParam
       ? [scopeToTenant(`${alias}."tenant_id"`, tenantParam)]

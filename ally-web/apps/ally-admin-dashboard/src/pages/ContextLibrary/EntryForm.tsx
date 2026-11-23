@@ -14,6 +14,7 @@ import {
   ContextGateFinding,
 } from "@types";
 
+import { AudiencePicker, audienceBody, audienceOf, audienceValid } from "./AudiencePicker";
 import {
   EntryHint,
   findingMessage,
@@ -22,7 +23,7 @@ import {
   textHints,
 } from "./contextLibraryFormat";
 import { useContextLibraryScope } from "./contextLibraryScope";
-import { Chip } from "./ContextLibraryUi";
+import { AudienceBadge, Chip } from "./ContextLibraryUi";
 
 /** ally-be CL_BODY_MAX_CHARS. */
 export const BODY_MAX_CHARS = 6_000;
@@ -57,7 +58,11 @@ const HelpTip: React.FC<{ label: string }> = ({ label }) => (
 export const EntryForm: React.FC<EntryFormProps> = ({ collection, initial, onSaved, onCancel }) => {
   const strings = en.contextLibrary.entry;
   // An organisation's admin writes through the organisation routes: the entry is theirs.
-  const { tenantId } = useContextLibraryScope();
+  const { tenantId, orgNames } = useContextLibraryScope();
+  // A platform admin chooses who it reaches; an organisation's own entry reaches only it.
+  const choosesAudience = !tenantId;
+  const audienceLocked = Boolean(initial?.ownerTenantId);
+  const [audience, setAudience] = useState(() => audienceOf(initial));
   const [statement, setStatement] = useState(initial?.statement ?? "");
   const [body, setBody] = useState(initial?.body ?? "");
   const [facets, setFacets] = useState<FacetValues>(() =>
@@ -152,6 +157,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({ collection, initial, onSav
       facets: facetBody,
       attributes: attributeBody,
       pinned,
+      ...(choosesAudience && !audienceLocked ? audienceBody(audience) : {}),
     };
   };
 
@@ -161,6 +167,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({ collection, initial, onSav
       setFindings([{ reason: "missing_statement", field: "statement" }]);
       return;
     }
+    if (choosesAudience && !audienceLocked && !audienceValid(audience)) return;
     setFindings([]);
     try {
       const entry = buildEntry();
@@ -356,6 +363,19 @@ export const EntryForm: React.FC<EntryFormProps> = ({ collection, initial, onSav
         .filter(([, spec]) => spec.shown !== false)
         .map(([key, spec]) => renderAttribute(key, spec))}
 
+      {choosesAudience &&
+        (audienceLocked && initial ? (
+          <div className="space-y-1">
+            <p className="text-xs text-typography-700">{en.contextLibrary.audience.pickerLabel}</p>
+            <AudienceBadge chunk={initial} orgNames={orgNames} />
+            <p className="text-xs text-typography-600">
+              {en.contextLibrary.audience.ownedByOrganisation}
+            </p>
+          </div>
+        ) : (
+          <AudiencePicker value={audience} onChange={setAudience} orgNames={orgNames} />
+        ))}
+
       <div className="flex items-center gap-1">
         <Checkbox
           id="cl-entry-pinned"
@@ -376,7 +396,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({ collection, initial, onSav
         </button>
         <button
           type="submit"
-          disabled={saving}
+          disabled={saving || (choosesAudience && !audienceLocked && !audienceValid(audience))}
           className="rounded bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500"
         >
           {saving ? strings.saving : strings.save}

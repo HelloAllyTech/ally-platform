@@ -177,6 +177,80 @@ describe('validateTrackStructure', () => {
 });
 
 describe('computeStructuralSignature', () => {
+  describe('roleplay completion rule on a live course', () => {
+    const roleplay = (
+      completionCriteria: Record<string, unknown> | undefined,
+    ) =>
+      [
+        {
+          id: 's1',
+          title: 'S',
+          order: 1,
+          items: [
+            {
+              id: 'i1',
+              type: TrackItemType.ROLEPLAY,
+              order: 1,
+              title: 'Try out a roleplay',
+              scenarioId: 7,
+              completionCriteria,
+            },
+          ],
+        },
+      ] as unknown as UpsertTrackSectionDto[];
+
+    it('lets a trainer change the logic, minimum score and minimum duration', () => {
+      const before = computeStructuralSignature(
+        roleplay({
+          completionLogic: 'SCORE_AND_DURATION',
+          minScore: 60,
+          minDurationSeconds: 180,
+        }),
+      );
+      expect(
+        computeStructuralSignature(
+          roleplay({ completionLogic: 'PARTICIPATION' }),
+        ),
+      ).toEqual(before);
+      expect(
+        computeStructuralSignature(
+          roleplay({ completionLogic: 'DURATION', minDurationSeconds: 90 }),
+        ),
+      ).toEqual(before);
+      // An older client that never sends completionLogic.
+      expect(computeStructuralSignature(roleplay({ minScore: 60 }))).toEqual(
+        before,
+      );
+      expect(computeStructuralSignature(roleplay(undefined))).toEqual(before);
+    });
+
+    it('lets the roleplay type and every assessment setting change live', () => {
+      // Each attempt is stamped as it ends, so a later edit never re-judges it.
+      expect(
+        computeStructuralSignature(
+          roleplay({
+            completionLogic: 'SCORE',
+            assessmentMode: true,
+            minLearnerTurns: 10,
+            showResultsToLearner: false,
+            assessmentPhase: 'PRE',
+            assessmentPairKey: '00000000-0000-4000-8000-000000000001',
+          }),
+        ),
+      ).toEqual(
+        computeStructuralSignature(roleplay({ completionLogic: 'SCORE' })),
+      );
+    });
+
+    it('still locks swapping the simulation', () => {
+      const swapped = roleplay({ minScore: 60 });
+      (swapped[0].items[0] as { scenarioId: number }).scenarioId = 8;
+      expect(computeStructuralSignature(swapped)).not.toEqual(
+        computeStructuralSignature(roleplay({ minScore: 60 })),
+      );
+    });
+  });
+
   it('is stable across content-safe edits', () => {
     const before = baseSections();
     before[0].id = 's1';
@@ -1011,5 +1085,102 @@ describe('validateTrackStructure - question media', () => {
         ),
       ),
     ).toThrow(/https link/);
+  });
+});
+
+describe('validateTrackStructure — pre/post assessment pairs', () => {
+  const KEY = '00000000-0000-4000-8000-000000000001';
+  const assessment = (
+    order: number,
+    title: string,
+    criteria: Record<string, unknown>,
+  ) => ({
+    type: TrackItemType.ROLEPLAY,
+    order,
+    title,
+    scenarioId: order,
+    completionCriteria: { assessmentMode: true, ...criteria },
+  });
+  const course = (items: unknown[]) =>
+    [{ title: 'S', order: 1, items }] as unknown as UpsertTrackSectionDto[];
+
+  it('accepts a pre before its post', () => {
+    expect(() =>
+      validateTrackStructure(
+        course([
+          assessment(1, 'Pre', {
+            assessmentPhase: 'PRE',
+            assessmentPairKey: KEY,
+          }),
+          assessment(2, 'Post', {
+            assessmentPhase: 'POST',
+            assessmentPairKey: KEY,
+          }),
+        ]),
+      ),
+    ).not.toThrow();
+  });
+
+  it('refuses a post ordered before its pre', () => {
+    expect(() =>
+      validateTrackStructure(
+        course([
+          assessment(1, 'Post', {
+            assessmentPhase: 'POST',
+            assessmentPairKey: KEY,
+          }),
+          assessment(2, 'Pre', {
+            assessmentPhase: 'PRE',
+            assessmentPairKey: KEY,
+          }),
+        ]),
+      ),
+    ).toThrow(/must come before/);
+  });
+
+  it('refuses a pair with two pres or a missing post', () => {
+    expect(() =>
+      validateTrackStructure(
+        course([
+          assessment(1, 'A', {
+            assessmentPhase: 'PRE',
+            assessmentPairKey: KEY,
+          }),
+          assessment(2, 'B', {
+            assessmentPhase: 'PRE',
+            assessmentPairKey: KEY,
+          }),
+        ]),
+      ),
+    ).toThrow(BadRequestException);
+    expect(() =>
+      validateTrackStructure(
+        course([
+          assessment(1, 'A', {
+            assessmentPhase: 'PRE',
+            assessmentPairKey: KEY,
+          }),
+        ]),
+      ),
+    ).toThrow(/exactly one/);
+  });
+
+  it('refuses a pre/post role on a roleplay that is not an assessment', () => {
+    expect(() =>
+      validateTrackStructure(
+        course([
+          {
+            ...assessment(1, 'Practice', {
+              assessmentPhase: 'PRE',
+              assessmentPairKey: KEY,
+            }),
+            completionCriteria: {
+              assessmentPhase: 'PRE',
+              assessmentPairKey: KEY,
+            },
+          },
+        ]),
+      ),
+    ).toThrow(/not an assessment roleplay/);
   });
 });

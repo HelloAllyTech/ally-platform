@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DataSource, Repository } from 'typeorm';
 import { RoadmapStrategyGoal } from '../entity/roadmap-strategy-goal.entity';
 import { RoadmapOpportunityGoalImpact } from '../entity/roadmap-opportunity-goal-impact.entity';
+import { PLATFORM_TIER_ROLES } from 'src/common/constants/user.constants';
 import { RoadmapRankWeights } from '../entity/roadmap-rank-weights.entity';
 
 /** One opportunity's stored verdicts, as the assessment service and the drawer read them. */
@@ -51,7 +52,7 @@ export class RoadmapStrategyGoalRepository extends Repository<RoadmapStrategyGoa
          FROM roadmap_opportunities o
         WHERE o."deletedAt" IS NULL
           AND o."type" <> 'bug'
-          AND o."stage" IN ('new', 'prioritised', 'under_development')
+          AND o."stage" IN ('new', 'prioritised')
           AND NOT EXISTS (SELECT 1 FROM roadmap_opportunity_goal_impacts i
                            WHERE i."opportunityId" = o.id AND i."goalName" = $1)`,
       [name],
@@ -132,7 +133,7 @@ export class RoadmapGoalImpactRepository extends Repository<RoadmapOpportunityGo
          FROM roadmap_opportunities o
         WHERE o."deletedAt" IS NULL
           AND o."type" <> 'bug'
-          AND o."stage" IN ('new', 'prioritised', 'under_development')
+          AND o."stage" IN ('new', 'prioritised')
           AND (SELECT COUNT(*) FROM roadmap_opportunity_goal_impacts i
                 WHERE i."opportunityId" = o.id)
               < (SELECT COUNT(*) FROM roadmap_strategy_goals)
@@ -150,7 +151,7 @@ export class RoadmapGoalImpactRepository extends Repository<RoadmapOpportunityGo
          FROM roadmap_opportunities o
         WHERE o."deletedAt" IS NULL
           AND o."type" <> 'bug'
-          AND o."stage" IN ('new', 'prioritised', 'under_development')
+          AND o."stage" IN ('new', 'prioritised')
           AND (SELECT COUNT(*) FROM roadmap_opportunity_goal_impacts i
                 WHERE i."opportunityId" = o.id)
               < (SELECT COUNT(*) FROM roadmap_strategy_goals)`,
@@ -174,6 +175,23 @@ export class RoadmapRankWeightsRepository extends Repository<RoadmapRankWeights>
     const existing = await this.findOne({ where: { id: 1 } });
     if (existing) return existing;
     return this.save(this.create({ id: 1 }));
+  }
+
+  /**
+   * Every account holding a platform-tier role — the only people who can be the Prod Director.
+   * Spelled against PLATFORM_TIER_ROLES (all four names), not SUPER_ADMIN_ROLES, which would
+   * miss anyone promoted since the PLATFORM_ADMIN collapse.
+   */
+  findPlatformAdmins(): Promise<{ id: number; name: string; email: string }[]> {
+    return this.dataSource.query(
+      `SELECT DISTINCT u.id, u.name, u.email
+         FROM users u
+         JOIN user_groups ug ON ug."userId" = u.id
+         JOIN groups g ON g.id = ug."groupId"
+        WHERE g.name = ANY($1) AND u.status = 'ACTIVE'
+        ORDER BY u.name ASC`,
+      [PLATFORM_TIER_ROLES],
+    );
   }
 
   /**

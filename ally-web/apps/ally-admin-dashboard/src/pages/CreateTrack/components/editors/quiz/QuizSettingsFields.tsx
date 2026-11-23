@@ -1,4 +1,4 @@
-import { FC, useState } from "react";
+import { FC } from "react";
 
 import { Controller, useFormContext } from "react-hook-form";
 
@@ -8,6 +8,8 @@ import { ToggleSwitch } from "@components";
 import { QUIZ_SHOW_EXPLANATIONS_OPTIONS } from "@constants";
 import { useContentAuthoring } from "@hooks";
 import { QuizShowExplanations, TrackFormValues } from "@types";
+
+import { AttemptLimitField } from "../AttemptLimitField";
 
 interface QuizSettingsFieldsProps {
   sectionIndex: number;
@@ -20,48 +22,6 @@ const rowClass = "flex items-center justify-between gap-4 py-2";
 const labelClass = "text-sm text-typography-800";
 const numberInput =
   "w-24 border border-border-light rounded-md px-2 py-1 text-sm outline-none focus:border-primary-400";
-
-interface AttemptsInputProps {
-  value: number | null | undefined;
-  onChange: (value: number | null) => void;
-  min: number;
-  disabled: boolean;
-  /** Called on blur with the committed value, to enforce the live-course floor. */
-  onCommit: () => void;
-}
-
-/**
- * The number box for Max attempts. Emptying it while retyping must not read as
- * "Unlimited" (that is the checkbox's job), so an empty box is only a local
- * draft: the form keeps its last number until a new one is typed, and blur
- * restores it.
- */
-const AttemptsInput: FC<AttemptsInputProps> = ({ value, onChange, min, disabled, onCommit }) => {
-  const [draft, setDraft] = useState<string | null>(null);
-  return (
-    <input
-      type="number"
-      min={min}
-      disabled={disabled}
-      className={`${numberInput} disabled:opacity-50`}
-      value={draft ?? value ?? ""}
-      onChange={event => {
-        const text = event.target.value;
-        if (text === "") {
-          setDraft("");
-          return;
-        }
-        setDraft(null);
-        onChange(Number(text));
-      }}
-      onBlur={() => {
-        setDraft(null);
-        onCommit();
-      }}
-      onWheel={event => event.currentTarget.blur()}
-    />
-  );
-};
 
 /** Quiz-level settings. `passScore` is authoritative here; the server mirrors it. */
 export const QuizSettingsFields: FC<QuizSettingsFieldsProps> = ({
@@ -80,10 +40,6 @@ export const QuizSettingsFields: FC<QuizSettingsFieldsProps> = ({
   // load and save). Structure is locked on a live course, so index = item.
   const savedItem = defaultValues?.sections?.[sectionIndex]?.items?.[itemIndex];
   const isLive = isPublished && Boolean(savedItem?.serverId);
-  const savedMaxAttempts = savedItem?.quiz?.settings?.maxAttempts ?? null;
-  // Already unlimited: nothing is higher, so there is nothing to change.
-  const attemptsLocked = isLive && (!canAuthorCourses || savedMaxAttempts === null);
-  const minAttempts = isLive && savedMaxAttempts !== null ? savedMaxAttempts + 1 : 1;
 
   return (
     <div className="flex flex-col divide-y divide-border-light">
@@ -138,31 +94,13 @@ export const QuizSettingsFields: FC<QuizSettingsFieldsProps> = ({
           control={control}
           name={`${base}.maxAttempts`}
           render={({ field }) => (
-            <div className="flex items-center gap-2">
-              <label className="flex items-center gap-1 text-xs text-typography-600">
-                <input
-                  type="checkbox"
-                  checked={field.value == null}
-                  disabled={attemptsLocked}
-                  onChange={event =>
-                    field.onChange(event.target.checked ? null : isLive ? savedMaxAttempts : 1)
-                  }
-                />
-                Unlimited
-              </label>
-              <AttemptsInput
-                value={field.value}
-                onChange={field.onChange}
-                min={minAttempts}
-                disabled={field.value == null || attemptsLocked}
-                onCommit={() => {
-                  // `min` only constrains the spinner and validity, not typing.
-                  if (isLive && field.value != null && field.value < minAttempts) {
-                    field.onChange(savedMaxAttempts);
-                  }
-                }}
-              />
-            </div>
+            <AttemptLimitField
+              value={field.value}
+              onChange={field.onChange}
+              savedValue={savedItem?.quiz?.settings?.maxAttempts}
+              isLive={isLive}
+              canEdit={canAuthorCourses}
+            />
           )}
         />
       </div>

@@ -10,3 +10,5 @@ export * from "./GroupsTab";
 export { CohortRestrictionCell } from "./CohortRestrictionCell";
 export { useCohortRestrictions } from "./useCohortRestrictions";
 export { BrandingSettings } from "./BrandingSettings";
+export { BulkAccessBar } from "./BulkAccessBar";
+export type { BulkAccessConfig } from "./BulkAccessBar";

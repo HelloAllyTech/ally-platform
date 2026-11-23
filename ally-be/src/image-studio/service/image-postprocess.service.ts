@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import * as sharp from 'sharp';
+// sharp 0.35's package-level `types` are its ESM typings; this CommonJS build gets
+// `module.exports = sharp`, which its CJS typings describe (as in chatbot/bot-image).
+import type sharpCjs = require('sharp/dist/index.cjs');
 import { ImageSlotProfile } from '../constants/image-slots.constants';
+
+const sharp: typeof sharpCjs = require('sharp');
 
 export interface ProcessedImage {
   /** Lossless PNG of what the provider returned; used later as a reference. */

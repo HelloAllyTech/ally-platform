@@ -92,6 +92,8 @@ const mocks = vi.hoisted(() => ({
   search: vi.fn(),
   setGrant: vi.fn(),
   chunkAction: vi.fn(),
+  setChunkAudience: vi.fn(),
+  createChunk: vi.fn(),
   details: new WeakMap<object, unknown>(),
   insights: undefined as unknown,
   changes: vi.fn(),
@@ -158,7 +160,9 @@ vi.mock("@api", () => {
     useGetContextUseCasesQuery: () => query(useCases),
     useSetContextGrantMutation: mutation(mocks.setGrant),
     useContextChunkActionMutation: mutation(mocks.chunkAction),
-    useCreateContextChunkMutation: mutation(vi.fn()),
+    useSetContextChunkAudienceMutation: mutation(mocks.setChunkAudience),
+    useSetContextSourceAudienceMutation: mutation(vi.fn()),
+    useCreateContextChunkMutation: mutation(mocks.createChunk),
     useUpdateContextChunkMutation: mutation(vi.fn()),
     useBulkContextChunksMutation: mutation(vi.fn()),
     useLazyGetContextTemplateQuery: () => [vi.fn(), { isFetching: false }],
@@ -321,6 +325,53 @@ describe("ContextLibrary page", () => {
     expect(document.activeElement).toBe(
       screen.getByRole("button", { name: "Show the payoff, not the pipeline." }),
     );
+  });
+
+  it("lets a platform admin choose which organisations an entry reaches", async () => {
+    mocks.tenants = [
+      { id: "org-a", name: "Acme Helpline" },
+      { id: "org-b", name: "Bravo Care" },
+    ];
+    mocks.setChunkAudience.mockReturnValue(chunk("FP-0001", "x"));
+    renderAt("?collection=first_principles&chunk=FP-0001");
+    const dialog = screen.getByRole("dialog", { name: "FP-0001" });
+    const editor = within(dialog).getByTestId("cl-audience-editor");
+    expect(within(editor).getByText("Global")).toBeInTheDocument();
+    fireEvent.click(within(editor).getByTestId("cl-audience-change"));
+
+    fireEvent.click(within(dialog).getByTestId("cl-audience-targeted"));
+    // "Only these" with nothing ticked would reach no one, so Save waits.
+    expect(within(dialog).getByText("Choose at least one organisation.")).toBeInTheDocument();
+    expect(within(dialog).getByTestId("cl-audience-save")).toBeDisabled();
+
+    fireEvent.click(within(dialog).getByRole("checkbox", { name: "Bravo Care" }));
+    await act(async () => {
+      fireEvent.click(within(dialog).getByTestId("cl-audience-save"));
+    });
+    expect(mocks.setChunkAudience).toHaveBeenCalledWith({
+      code: "FP-0001",
+      audience: { isGlobal: false, tenantIds: ["org-b"] },
+    });
+  });
+
+  it("keeps an organisation's own entry targeted at it, with no Change", () => {
+    mocks.chunks = [
+      chunk("FP-0009", "Theirs.", {
+        isGlobal: false,
+        tenantIds: ["org-a"],
+        ownerTenantId: "org-a",
+      }),
+    ];
+    mocks.tenants = [{ id: "org-a", name: "Acme Helpline" }];
+    renderAt("?collection=first_principles&chunk=FP-0009");
+    const editor = within(screen.getByRole("dialog", { name: "FP-0009" })).getByTestId(
+      "cl-audience-editor",
+    );
+    expect(within(editor).getByText("Acme Helpline")).toBeInTheDocument();
+    expect(within(editor).queryByTestId("cl-audience-change")).not.toBeInTheDocument();
+    expect(
+      within(editor).getByText("Belongs to an organisation, so it reaches that organisation only."),
+    ).toBeInTheDocument();
   });
 
   it("settings: locked cells say Never allowed and cannot be switched; others flip with an undo", async () => {

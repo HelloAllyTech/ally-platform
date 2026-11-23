@@ -64,5 +64,12 @@ String? normalizeCustomFieldDate(String? value) {
   return '${shifted.year}-${_pad(shifted.month)}-${_pad(shifted.day)}';
 }
 
-/// RN `formatCustomFieldDate`.
-String formatCustomFieldDate(String? value) => normalizeCustomFieldDate(value) ?? (value?.trim() ?? '-');
+/// RN `formatCustomFieldDate`, shown as DD-MM-YYYY rather than the
+/// YYYY-MM-DD wire format [normalizeCustomFieldDate] (and the value sent
+/// back on edit) still use — display-only, requested 2026-11.
+String formatCustomFieldDate(String? value) {
+  final normalized = normalizeCustomFieldDate(value);
+  if (normalized == null) return value?.trim() ?? '-';
+  final parts = normalized.split('-');
+  return '${parts[2]}-${parts[1]}-${parts[0]}';
+}

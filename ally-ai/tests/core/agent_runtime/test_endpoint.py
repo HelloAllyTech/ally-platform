@@ -38,8 +38,8 @@ class TestFlag:
         monkeypatch.setattr(settings.AGENT_RUNTIME, "ENABLED", False)
         assert client.post(URL, json={}).status_code == 404
 
-    def test_off_by_default(self):
-        assert type(settings.AGENT_RUNTIME)().ENABLED is False
+    def test_on_by_default(self):
+        assert type(settings.AGENT_RUNTIME)().ENABLED is True
 
 
 @pytest.mark.usefixtures("enabled")
@@ -181,12 +181,14 @@ class TestAgentRun:
 
 
 class TestUnavailable:
-    def test_on_but_without_its_database_is_503(self, client, monkeypatch):
+    def test_on_but_without_its_database_still_answers(self, client, monkeypatch):
+        """The checkpoint database is optional: runs are answered, just not stored."""
         monkeypatch.setattr(settings.AGENT_RUNTIME, "ENABLED", True)
         monkeypatch.setattr(checkpointer_module, "_unavailable", True)
-        response = client.post(URL, json=BODY)
-        assert response.status_code == 503
-        assert response.json()["detail"] == "The agent runtime is unavailable"
+        with patch(f"{CONVERSATION}.generate_structured", FakeLLM(chat())):
+            response = client.post(URL, json=BODY)
+        assert response.status_code == 200
+        assert response.json()["turn_type"] == "smalltalk"
 
     def test_off_is_still_404_when_its_database_is_down(self, client, monkeypatch):
         monkeypatch.setattr(settings.AGENT_RUNTIME, "ENABLED", False)

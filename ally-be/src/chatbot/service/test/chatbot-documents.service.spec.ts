@@ -172,6 +172,14 @@ describe("ChatbotService and a chatbot's own documents", () => {
     expect(knowledgeBase.archiveForChatbot).toHaveBeenCalledTimes(1);
   });
 
+  it('closes an unfinished setup when the bot is archived', async () => {
+    await service.archive(BOT);
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("SET status = 'abandoned'"),
+      [BOT],
+    );
+  });
+
   it("shows one of its documents, marked as its own or the library's", async () => {
     const own = await service.getDocument(BOT, 'own-1');
     const shared = await service.getDocument(BOT, 'shared-1');

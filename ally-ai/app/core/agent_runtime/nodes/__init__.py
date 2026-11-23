@@ -5,7 +5,7 @@ from app.core.agent_runtime.nodes.agent_check import (
     make_agent_check_node,
     route_after_check,
 )
-from app.core.agent_runtime.nodes.tools import make_tools_node
+from app.core.agent_runtime.nodes.tools import make_tools_node, route_after_tools
 
 __all__ = [
     "make_agent_check_node",
@@ -13,4 +13,5 @@ __all__ = [
     "make_tools_node",
     "route_after_agent",
     "route_after_check",
+    "route_after_tools",
 ]

@@ -1,12 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import type {
-  Chatbot,
-  ChatbotAnswerMode,
-  ChatbotDraft,
-  ChatbotModelChoice,
-  ChatbotPersona,
-} from "@types";
+import type { Chatbot, ChatbotAnswerMode, ChatbotModelChoice, ChatbotPersona } from "@types";
 
 /**
  * Unsaved changes handed to Preview by "Preview these changes" on the Persona and Agent tabs. Each
@@ -35,7 +29,7 @@ const store = (botId: string, draft: PreviewDraft): void => {
 };
 
 /** Forget the draft, once it is saved or thrown away. */
-export const clearPreviewDraft = (botId: string): void => {
+const clearPreviewDraft = (botId: string): void => {
   try {
     sessionStorage.removeItem(storageKey(botId));
   } catch {
@@ -91,14 +85,6 @@ export const settlePreviewDraft = (bot: Chatbot, saved: Partial<PreviewDraft>): 
   } else {
     store(bot.id, next);
   }
-};
-
-/** The draft handed over to Preview, as the test request's `draft`. Reading leaves it in place. */
-export const readPreviewDraft = (botId: string): ChatbotDraft | undefined => {
-  const draft = readStoredDraft(botId);
-  return draft
-    ? { persona: draft.persona, answerMode: draft.answerMode, model: draft.model }
-    : undefined;
 };
 
 /**

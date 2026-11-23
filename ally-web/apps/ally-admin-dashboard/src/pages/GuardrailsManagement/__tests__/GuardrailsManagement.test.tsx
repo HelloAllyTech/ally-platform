@@ -566,7 +566,7 @@ describe("GuardrailsManagement", () => {
         fireEvent.click(selectButton);
       });
 
-      expect(screen.getByTestId("toolbar-action")).toHaveTextContent("Delete");
+      expect(screen.getByTestId("toolbar-action")).toHaveTextContent("Deactivate");
       expect(screen.getByTestId("trash-icon")).toBeInTheDocument();
     });
 
@@ -582,7 +582,7 @@ describe("GuardrailsManagement", () => {
       fireEvent.click(deleteButton);
 
       expect(screen.getByTestId("action-confirmation-popup")).toBeInTheDocument();
-      expect(screen.getByText(/Are you sure you want to delete/)).toBeInTheDocument();
+      expect(screen.getByText(/Deactivate 1 item/)).toBeInTheDocument();
     });
 
     it("deletes guardrail when confirmed", async () => {
@@ -623,7 +623,8 @@ describe("GuardrailsManagement", () => {
 
       await waitFor(() => {
         expect(mockToast.success).toHaveBeenCalledWith(
-          expect.stringContaining("Successfully deleted"),
+          expect.stringContaining("Deactivated"),
+          expect.objectContaining({ action: expect.objectContaining({ label: "Undo" }) }),
         );
       });
     });
@@ -647,7 +648,7 @@ describe("GuardrailsManagement", () => {
       fireEvent.click(confirmButton);
 
       await waitFor(() => {
-        expect(mockToast.error).toHaveBeenCalledWith("Failed to delete some guardrails");
+        expect(mockToast.error).toHaveBeenCalledWith("Failed to deactivate some guardrails");
       });
     });
 

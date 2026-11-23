@@ -14,6 +14,8 @@ import { AdminTenantService } from './service/admin-tenant.service';
 import { SuperDuperAdminController } from './controller/super-duper-admin.controller';
 import { SuperDuperAdminService } from './service/super-duper-admin.service';
 import { PlatformAdminController } from './controller/platform-admin.controller';
+import { CustomLoginController } from './custom-login/custom-login.controller';
+import { CustomLoginService } from './custom-login/custom-login.service';
 import { PlatformAdminService } from './service/platform-admin.service';
 import { UserPreferencesRepository } from './repository/user-prefernces.repository';
 import { AwsModule } from 'src/aws/aws.module';
@@ -38,11 +40,13 @@ import { AwsModule } from 'src/aws/aws.module';
     // CreatePlatformAdminRole1895000000001.
     SuperDuperAdminService,
     PlatformAdminService,
+    CustomLoginService,
   ],
   controllers: [
     UserController,
     SuperDuperAdminController,
     PlatformAdminController,
+    CustomLoginController,
   ],
   exports: [
     UserService,

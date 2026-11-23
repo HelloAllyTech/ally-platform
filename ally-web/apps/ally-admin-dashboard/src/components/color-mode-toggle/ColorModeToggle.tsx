@@ -7,7 +7,7 @@ import { en } from "@constants";
 import { useColorMode } from "@hooks/useColorMode";
 
 /**
- * One-tap light/dark switch in the top bar, beside the idea-capture mic. The icon shows what a
+ * One-tap light/dark switch in the primary sidebar, beside the idea-capture mic. The icon shows what a
  * tap will do: a moon in light mode, a sun in dark mode.
  */
 export const ColorModeToggle: React.FC = () => {
@@ -15,7 +15,7 @@ export const ColorModeToggle: React.FC = () => {
   const label = isDark ? en.colorMode.switchToLight : en.colorMode.switchToDark;
 
   return (
-    <Tooltip label={label} align="bottom">
+    <Tooltip label={label} align="right">
       <button
         type="button"
         onClick={toggle}

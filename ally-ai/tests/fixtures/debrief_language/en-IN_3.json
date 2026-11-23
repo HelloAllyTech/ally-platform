@@ -1,0 +1,126 @@
+{
+  "language": "en-IN",
+  "writer_model": "gemini-3-flash-preview",
+  "scenario": "A man lost his job two months ago and avoids his friends; he is worried about money and feels like a failure. No thoughts of self-harm.",
+  "transcript": [
+    {
+      "turn_index": 1,
+      "role": "counselor",
+      "text": "Hello. What brings you here today?"
+    },
+    {
+      "turn_index": 2,
+      "role": "client",
+      "text": "Hello. Just, nothing feels right. My job went two months ago and since then everything's been a bit off."
+    },
+    {
+      "turn_index": 3,
+      "role": "counselor",
+      "text": "So, since losing your job, things have felt 'a bit off' for you. That sounds quite difficult."
+    },
+    {
+      "turn_index": 4,
+      "role": "client",
+      "text": "Yeah. I'm not even meeting my friends. I feel quite ashamed that I'm unemployed now, you know?"
+    },
+    {
+      "turn_index": 5,
+      "role": "counselor",
+      "text": "You're feeling ashamed and staying away from friends. Can you tell me more about what that's like for you?"
+    },
+    {
+      "turn_index": 6,
+      "role": "client",
+      "text": "I just feel like a total failure. I can't even look after my family properly. And money worries are a big thing too."
+    },
+    {
+      "turn_index": 7,
+      "role": "counselor",
+      "text": "You're feeling like a failure and money worries are really bothering you. That's a very tough spot to be in."
+    },
+    {
+      "turn_index": 8,
+      "role": "client",
+      "text": "Yeah, exactly. I just keep thinking what's next. I don't know what to do, honestly."
+    },
+    {
+      "turn_index": 9,
+      "role": "counselor",
+      "text": "I think you should maybe try learning some new skills or look for online jobs. That might help you feel better."
+    },
+    {
+      "turn_index": 10,
+      "role": "client",
+      "text": "Maybe. But right now, I just don't feel like doing anything, you know? Just want to lie in bed."
+    },
+    {
+      "turn_index": 11,
+      "role": "counselor",
+      "text": "Have you tried talking to anyone about this?"
+    },
+    {
+      "turn_index": 12,
+      "role": "client",
+      "text": "No, not really. I just feel like no one would understand, honestly."
+    }
+  ],
+  "cards": {
+    "opening": "You showed great empathy in the beginning of this session by listening closely to the client's feelings of shame. It was a supportive start to a difficult conversation about job loss.",
+    "important_moment": null,
+    "what_worked": [
+      {
+        "skill": "Reflecting feelings",
+        "turn_index": 3,
+        "quote": "So, since losing your job, things have felt 'a bit off' for you. That sounds quite difficult.",
+        "lead": "Validating the client early on",
+        "body": "By reflecting the client's initial words, you showed that you were listening and that their feelings were valid. This built the trust needed for them to open up about their sense of failure and isolation later in the talk."
+      },
+      {
+        "skill": "Asking open questions",
+        "turn_index": 5,
+        "quote": "You're feeling ashamed and staying away from friends. Can you tell me more about what that's like for you?",
+        "lead": "Exploring the client's world",
+        "body": "This question allowed the client to explain their experience in their own words. It helped move the conversation from the facts of their situation to the deeper emotional impact it was having on them."
+      }
+    ],
+    "work_on_this": [
+      {
+        "skill": "Avoiding premature advice",
+        "turn_index": 9,
+        "quote": "I think you should maybe try learning some new skills or look for online jobs. That might help you feel better.",
+        "lead": "Waiting to offer solutions",
+        "why": "Suggesting solutions too early can make a client feel like their pain is being rushed or misunderstood, which often leads to them pulling away.",
+        "try_saying": "It sounds like you are carrying a lot of weight right now and things feel very uncertain.",
+        "scenario_id": null
+      }
+    ],
+    "practise_next": {
+      "skill": "Staying with the feeling",
+      "reason": "When the client expressed a desire to stay in bed and a lack of motivation, exploring that feeling further before suggesting actions would help them feel fully supported.",
+      "scenario_id": null,
+      "try_next": null
+    },
+    "skill_words": [
+      {
+        "skill": "Reflects feelings",
+        "word": "strength"
+      },
+      {
+        "skill": "Asks open questions",
+        "word": "strength"
+      },
+      {
+        "skill": "Avoids giving premature advice",
+        "word": "keep_practising"
+      },
+      {
+        "skill": "Explores client's reluctance",
+        "word": "keep_practising"
+      }
+    ],
+    "skill_labels": [],
+    "reflective_question": "How do you feel when a client seems stuck and suggests they have no energy to change their situation?",
+    "progress_note": null
+  },
+  "rule_checks": "passed"
+}

@@ -121,12 +121,14 @@ const simulationPathApi = baseAPI.injectEndpoints({
 
 export const {
   useGetScenarioPathsQuery,
+  useLazyGetScenarioPathsQuery,
   useDeleteScenarioPathByIdMutation,
   useLazyGetScenarioPathByIdQuery,
   useCreateSimulationPathMutation,
   useUpdateSimulationPathByIdMutation,
   useDuplicateScenarioPathMutation,
   useGetScenarioCasesQuery,
+  useLazyGetScenarioCasesQuery,
   useDeleteScenarioCaseByIdMutation,
   useUpdateSimulationCaseByIdMutation,
   useDuplicateScenarioCaseMutation,

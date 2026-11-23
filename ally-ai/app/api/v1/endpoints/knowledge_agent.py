@@ -145,7 +145,7 @@ async def crisis_check(
     """
     try:
         verdict = await service.classify_crisis(
-            payload.message, prompts=payload.prompts
+            payload.message, history=payload.history, prompts=payload.prompts
         )
     except Exception as e:  # noqa: BLE001
         logger.error("Crisis check failed unexpectedly: %s", e)

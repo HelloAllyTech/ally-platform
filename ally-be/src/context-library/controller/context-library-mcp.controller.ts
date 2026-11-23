@@ -17,13 +17,13 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import { createHash, timingSafeEqual } from 'crypto';
 import { Response } from 'express';
 import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorator';
 import { CurrentUser } from 'src/auth/decorators/user.decorator';
 import { TokenUser } from 'src/auth/type/auth.types';
 import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
 import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
+import { isServiceKey } from 'src/common/util/service-key';
 import { AppConfigService } from 'src/config/config.service';
 import { ClUseCase } from '../enum/context-library.enum';
 import { COLLECTION_PROFILES } from '../profiles';
@@ -59,18 +59,7 @@ const ENGINEER_TOOLS: ContextToolNames = {
 /** The session id a search made with the service key is logged under. */
 export const MCP_SERVICE_SESSION = 'mcp:service';
 
-/**
- * The platform's service-to-service key, as `ApiAuthGuard` checks it, but compared in constant
- * time (both sides hashed first, so their lengths never differ). False when no key is configured.
- */
-export function isServiceKey(
-  presented: string | string[] | undefined,
-  configured: string,
-): boolean {
-  if (typeof presented !== 'string' || !presented || !configured) return false;
-  const digest = (value: string) => createHash('sha256').update(value).digest();
-  return timingSafeEqual(digest(presented), digest(configured));
-}
+export { isServiceKey };
 
 interface JsonRpcRequest {
   jsonrpc?: string;
@@ -80,8 +69,8 @@ interface JsonRpcRequest {
 }
 
 /**
- * The Context Library as an MCP server for engineers' Claude Code (it replaced the Stacks bridge
- * script on 2026-11-09). Streamable HTTP, JSON responses only: one POST, one JSON-RPC reply.
+ * The Context Library as an MCP server for engineers' Claude Code (it replaced the third-party
+ * guidance bridge script on 2026-11-09). Streamable HTTP, JSON responses only: one POST, one JSON-RPC reply.
  *
  * Authenticated by a read-only personal key (`Authorization: Bearer clr_…`), not an admin
  * session, and it can only ever read what the `mcp_dev` use case is granted — clinical,

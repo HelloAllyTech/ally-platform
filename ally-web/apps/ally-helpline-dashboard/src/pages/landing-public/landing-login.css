@@ -1,0 +1,82 @@
+/* The login panel on a landing page. It renders inside the page's .lp wrapper,
+ * so the page's --lp-* colours apply. */
+.lp .lpl {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 8px 4px;
+  font-family: var(--lp-body);
+  color: var(--lp-ink);
+}
+.lp .lpl-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  background: var(--lp-wash);
+  border-radius: 12px;
+}
+.lp .lpl-tabs button {
+  padding: 10px 12px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--lp-ink-soft);
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+}
+.lp .lpl-tabs button.is-on {
+  background: var(--lp-card);
+  color: var(--lp-ink);
+  box-shadow: 0 0 0 1px var(--lp-line);
+}
+.lp .lpl form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.lp .lpl-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lp .lpl-field label {
+  font-size: 14px;
+  color: var(--lp-ink-soft);
+}
+.lp .lpl-mobile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.lp .lpl-prefix {
+  flex: 0 0 auto;
+  padding: 9px 12px;
+  border: 1px solid var(--lp-line);
+  border-radius: 6px;
+  color: var(--lp-ink);
+  font-size: 14px;
+}
+.lp .lpl-hint,
+.lp .lpl-legal,
+.lp .lpl-note,
+.lp .lpl-error {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.lp .lpl-hint,
+.lp .lpl-legal {
+  color: var(--lp-ink-faint);
+}
+.lp .lpl-legal a {
+  color: var(--lp-mark-deep);
+}
+.lp .lpl-note {
+  color: var(--lp-ink-soft);
+  text-align: center;
+}
+.lp .lpl-error {
+  color: var(--lp-alarm);
+}

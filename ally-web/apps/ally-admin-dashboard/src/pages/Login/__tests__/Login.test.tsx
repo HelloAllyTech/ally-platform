@@ -1,7 +1,7 @@
 import { configureStore } from "@reduxjs/toolkit";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { Provider } from "react-redux";
-import { BrowserRouter } from "react-router-dom";
+import { BrowserRouter, MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import { Login } from "../Login";
@@ -81,6 +81,8 @@ vi.mock("@api", () => ({
   useGenerateOTPMutation: () => mockUseGenerateOTPMutation(),
   useVerifyOTPMutation: () => mockUseVerifyOTPMutation(),
   useGoogleSignInMutation: () => mockGoogleSignInMutation(),
+  useGetTermsQuery: () => ({ data: { html: "<p>Terms body</p>" }, isFetching: false }),
+  useGetPrivacyQuery: () => ({ data: { html: "<p>Privacy body</p>" }, isFetching: false }),
   baseAPI: {
     injectEndpoints: vi.fn(() => ({})),
     reducerPath: "baseAPI",
@@ -179,7 +181,20 @@ vi.mock("@constants", () => ({
   ALLY_TERMS_URL: "https://ally.com/terms",
   ALLY_PRIVACY_POLICY_URL: "https://ally.com/privacy",
   ALLY_URL: "https://ally.com",
+  ROUTES: { WHATSAPP_BOT: "/assistants" },
   en: {
+    assistantsShell: {
+      login: {
+        headline: "Build and manage your own custom ",
+        headlineEmphasis: "chatbots.",
+        sendCode: "Send code",
+        googleSignIn: "Sign in using Google",
+        wordmarkName: "Ally",
+        wordmarkProduct: "chatbots",
+        useCases: [],
+        capabilities: { heading: "", items: [] },
+      },
+    },
     common: {
       or: "OR",
     },
@@ -215,7 +230,10 @@ vi.mock("@constants", () => ({
 }));
 
 // Mock utils
-vi.mock("@utils", () => ({
+vi.mock("@utils", async () => ({
+  ...(await vi.importActual<typeof import("../../../utils/loginRedirect")>(
+    "../../../utils/loginRedirect",
+  )),
   validateEmail: (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
@@ -412,11 +430,11 @@ describe("Login", () => {
       fireEvent.click(checkbox);
       fireEvent.click(nextButton);
 
-      expect(localStorage.getItem("rememberedEmail")).toBe("test@example.com");
+      expect(localStorage.getItem("adminRememberedEmail")).toBe("test@example.com");
     });
 
     it("should load remembered email on mount", () => {
-      localStorage.setItem("rememberedEmail", "remembered@example.com");
+      localStorage.setItem("adminRememberedEmail", "remembered@example.com");
 
       renderLogin();
 
@@ -426,6 +444,23 @@ describe("Login", () => {
   });
 
   describe("Generate OTP", () => {
+    it("submits the email when Enter is pressed", async () => {
+      mockGenerateOTP.mockResolvedValue({ data: { success: true } });
+      renderLogin();
+      const emailInput = screen.getByTestId("text-field-input");
+      fireEvent.change(emailInput, { target: { value: "test@example.com" } });
+      fireEvent.keyDown(emailInput, { key: "Enter" });
+      await waitFor(() =>
+        expect(mockGenerateOTP).toHaveBeenCalledWith({ email: "test@example.com" }),
+      );
+    });
+
+    it("does not submit on Enter while the email is empty", () => {
+      renderLogin();
+      fireEvent.keyDown(screen.getByTestId("text-field-input"), { key: "Enter" });
+      expect(mockGenerateOTP).not.toHaveBeenCalled();
+    });
+
     it("should call generateOTP when next button is clicked", async () => {
       mockGenerateOTP.mockResolvedValue({ data: { success: true } });
 
@@ -655,6 +690,115 @@ describe("Login", () => {
       fireEvent.click(privacyLink);
 
       expect(openLinkInNewTab).toHaveBeenCalledWith("https://ally.com/privacy");
+    });
+  });
+
+  // A1: no sign-up, and back to the link they opened.
+  describe("Login only, then back where they were (A1)", () => {
+    it("has no sign-up link or button", () => {
+      renderLogin();
+      expect(screen.queryByText(/sign\s*up/i)).toBeNull();
+      expect(screen.queryByText(/create (an )?account/i)).toBeNull();
+    });
+
+    it("goes back to the deep link in ?next once logged in", () => {
+      mockUseUser.mockReturnValue({ isAuthenticated: true, checkAuth: mockCheckAuth });
+      const loggedIn = configureStore({ reducer: { user: () => ({ user: { id: 1 } }) } });
+      render(
+        <Provider store={loggedIn}>
+          <MemoryRouter
+            initialEntries={[
+              `/login?next=${encodeURIComponent("/assistants/b1?section=lists&tool=memory")}`,
+            ]}
+          >
+            <Login />
+          </MemoryRouter>
+        </Provider>,
+      );
+      expect(mockNavigate).toHaveBeenCalledWith("/assistants/b1?section=lists&tool=memory", {
+        replace: true,
+      });
+    });
+
+    it("ignores a next that leaves the app", () => {
+      mockUseUser.mockReturnValue({ isAuthenticated: true, checkAuth: mockCheckAuth });
+      const loggedIn = configureStore({ reducer: { user: () => ({ user: { id: 1 } }) } });
+      render(
+        <Provider store={loggedIn}>
+          <MemoryRouter initialEntries={["/login?next=//evil.example"]}>
+            <Login />
+          </MemoryRouter>
+        </Provider>,
+      );
+      expect(mockNavigate).toHaveBeenCalledWith("/", { replace: true });
+    });
+  });
+
+  describe("Assistants login", () => {
+    const renderAt = (path: string) =>
+      render(
+        <Provider store={store}>
+          <MemoryRouter initialEntries={[path]}>
+            <Login />
+          </MemoryRouter>
+        </Provider>,
+      );
+
+    it.each(["/assistants", "/assistants/b1?section=lists", "/assistants/new"])(
+      "shows its own headline and layout at %s",
+      path => {
+        renderAt(path);
+        expect(screen.getByTestId("assistants-login")).toBeInTheDocument();
+        expect(screen.getByText("chatbots.")).toBeInTheDocument();
+        expect(screen.queryByText("Hey,")).toBeNull();
+        // Same sign-in form underneath.
+        expect(screen.getByTestId("text-field-input")).toBeInTheDocument();
+      },
+    );
+
+    it("shows the Ally chatbots wordmark ahead of the headline", () => {
+      renderAt("/assistants");
+      const wordmark = screen.getByTestId("assistants-login-wordmark");
+      expect(wordmark).toHaveTextContent(/Ally\s*chatbots/);
+      const headline = screen.getByRole("heading", { level: 1 });
+      expect(
+        wordmark.compareDocumentPosition(headline) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it("has no Remember Me checkbox and remembers the email by default", () => {
+      // Earlier tests leave this mock mid-request; this one needs the idle button.
+      mockUseGenerateOTPMutation.mockReturnValue([
+        mockGenerateOTP,
+        { isLoading: false, isSuccess: false, data: undefined, error: undefined },
+      ] as any);
+      renderAt("/assistants");
+      expect(screen.queryByRole("checkbox")).toBeNull();
+      fireEvent.change(screen.getByTestId("text-field-input"), {
+        target: { value: "a@b.co" },
+      });
+      fireEvent.click(screen.getByText("Send code"));
+      expect(localStorage.getItem("adminRememberedEmail")).toBe("a@b.co");
+    });
+
+    it("opens the Terms and the Privacy Policy as side drawers on the same page", () => {
+      renderAt("/assistants");
+      expect(screen.queryByTestId("legal-drawer")).toBeNull();
+      fireEvent.click(screen.getByText("Terms and Conditions"));
+      expect(screen.getByRole("dialog", { name: "Terms of Service" })).toBeInTheDocument();
+      expect(screen.getByText("Terms body")).toBeInTheDocument();
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(screen.queryByTestId("legal-drawer")).toBeNull();
+      fireEvent.click(screen.getByText("Privacy Policy."));
+      expect(screen.getByText("Privacy body")).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId("legal-drawer-overlay"));
+      expect(screen.queryByTestId("legal-drawer")).toBeNull();
+    });
+
+    it("keeps the standard login at /login and other pages", () => {
+      renderAt("/assistants-x");
+      expect(screen.queryByTestId("assistants-login")).toBeNull();
+      expect(screen.getByText("Hey,")).toBeInTheDocument();
     });
   });
 });

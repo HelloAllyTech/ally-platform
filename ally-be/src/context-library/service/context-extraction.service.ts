@@ -39,6 +39,7 @@ import {
   normaliseTag,
   requireProfile,
 } from '../profiles';
+import { ClAudienceFields, audienceCovers } from '../util/audience.util';
 import {
   GateCandidate,
   GateReason,
@@ -103,6 +104,20 @@ export type CandidateOutcome =
  * `low` confidence — ranked last within their band and first in line for the curator —
  * and anything that fails a hard check is rejected and counted by reason.
  */
+/**
+ * Who a document's chunks reach. An organisation's own document reaches that organisation even
+ * if its row predates the audience columns.
+ */
+export function sourceAudience(source: ClSource): ClAudienceFields {
+  if (source.ownerTenantId) {
+    return { isGlobal: false, tenantIds: [source.ownerTenantId] };
+  }
+  const tenantIds = source.tenantIds ?? [];
+  return source.isGlobal === false && tenantIds.length
+    ? { isGlobal: false, tenantIds: [...tenantIds] }
+    : { isGlobal: true, tenantIds: [] };
+}
+
 @Injectable()
 export class ContextExtractionService {
   private readonly logger = LoggerService.getInstance(
@@ -635,7 +650,12 @@ export class ContextExtractionService {
             status: ClChunkStatus.ACTIVE,
           },
         });
-        const byId = new Map(rows.map((r) => [r.id, r]));
+        // Only a chunk that already reaches everyone this document reaches may absorb its
+        // idea; anything narrower would hide it from some of this document's readers.
+        const audience = sourceAudience(source);
+        const byId = new Map(
+          rows.filter((r) => audienceCovers(r, audience)).map((r) => [r.id, r]),
+        );
         neighbours = hits
           .filter((h) => byId.has(h.chunk_id))
           .map((h) => ({ chunk: byId.get(h.chunk_id)!, similarity: h.score }));
@@ -744,8 +764,7 @@ export class ContextExtractionService {
         note: verdict?.note,
       },
       distillPromptVersion: source.promptVersions?.[profile.id] ?? null,
-      isGlobal: !source.ownerTenantId,
-      tenantIds: source.ownerTenantId ? [source.ownerTenantId] : [],
+      ...sourceAudience(source),
       ownerTenantId: source.ownerTenantId ?? null,
       createdBy: source.uploadedBy ?? null,
     });

@@ -239,6 +239,7 @@ export class WaAnalyticsRepository extends Repository<WaMessage> {
         WHERE m."createdAt" >= $1
           AND m."createdAt" < $2
           AND m.citations IS NOT NULL
+          AND citation->>'record_id' IS NULL
           AND ($3::uuid IS NULL OR ${conversationInBotSql('m.conversation_id').replace(/:scopeBot/g, '$3')})
         GROUP BY citation->>'document_id'
         ORDER BY citations DESC`,
@@ -258,4 +259,4 @@ export class WaAnalyticsRepository extends Repository<WaMessage> {
  * Matches the admin analytics kit's existing MIN_N_FOR_SCORE floor, for the same reason: a ratio over
  * a handful of samples reads as signal and is noise.
  */
-export const MIN_SAMPLE_FOR_RATE = 20;
+const MIN_SAMPLE_FOR_RATE = 20;

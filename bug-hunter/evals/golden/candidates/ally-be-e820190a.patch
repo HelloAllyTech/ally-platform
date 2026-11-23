@@ -1,0 +1,85 @@
+diff --git a/src/auth/middlewares/test/ws-auth.middleware.spec.ts b/src/auth/middlewares/test/ws-auth.middleware.spec.ts
+index c5d15b0090..5e297f1e2b 100644
+--- a/src/auth/middlewares/test/ws-auth.middleware.spec.ts
++++ b/src/auth/middlewares/test/ws-auth.middleware.spec.ts
+@@ -199,9 +199,8 @@ describe('WebSocketAuthMiddleware', () => {
+       const next = createMockNext();
+       const authMiddleware = middleware.webSocketMiddleware();
+ 
+-      jwtService.verifyAsync.mockRejectedValue(
+-        new Error('Token expired or invalid'),
+-      );
++      const originalError = new Error('Token expired or invalid');
++      jwtService.verifyAsync.mockRejectedValue(originalError);
+ 
+       await authMiddleware(socket, next);
+ 
+@@ -210,11 +209,7 @@ describe('WebSocketAuthMiddleware', () => {
+         secret: mockJwtSecret,
+       });
+       expect(next).toHaveBeenCalledTimes(1);
+-      expect(next).toHaveBeenCalledWith(
+-        new UnauthorizedException(
+-          'Authentication failed: Token expired or invalid',
+-        ),
+-      );
++      expect(next).toHaveBeenCalledWith(originalError);
+     });
+ 
+     // Positive test cases
+diff --git a/src/auth/middlewares/ws-auth.middleware.spec.ts b/src/auth/middlewares/ws-auth.middleware.spec.ts
+index c66191586a..e3ea2b51e3 100644
+--- a/src/auth/middlewares/ws-auth.middleware.spec.ts
++++ b/src/auth/middlewares/ws-auth.middleware.spec.ts
+@@ -4,8 +4,6 @@ import { AppConfigService } from '../../config/config.service';
+ import { PermissionsService } from 'src/authorization/service/permissions.service';
+ import { WebSocketAuthMiddleware } from './ws-auth.middleware';
+ import { Socket } from 'socket.io';
+-import { UnauthorizedException } from '../../exception/custom.exception';
+-
+ describe('WebSocketAuthMiddleware', () => {
+   let middleware: WebSocketAuthMiddleware;
+   let jwtService: jest.Mocked<JwtService>;
+@@ -64,15 +62,13 @@ describe('WebSocketAuthMiddleware', () => {
+       next = jest.fn();
+     });
+ 
+-    it('should call next with UnauthorizedException containing original error message for unexpected errors', async () => {
+-      const errorMessage = 'Internal server error';
+-      jwtService.verifyAsync.mockRejectedValue(new Error(errorMessage));
++    it('should call next with the original error when jwtService.verifyAsync throws an error', async () => {
++      const originalError = new Error('Internal server error');
++      jwtService.verifyAsync.mockRejectedValue(originalError);
+ 
+       await middleware.webSocketMiddleware()(socket, next);
+ 
+-      expect(next).toHaveBeenCalledWith(
+-        new UnauthorizedException(`Authentication failed: ${errorMessage}`),
+-      );
++      expect(next).toHaveBeenCalledWith(originalError);
+     });
+   });
+ });
+diff --git a/src/auth/middlewares/ws-auth.middleware.ts b/src/auth/middlewares/ws-auth.middleware.ts
+index b21673c017..4dd15e37c3 100644
+--- a/src/auth/middlewares/ws-auth.middleware.ts
++++ b/src/auth/middlewares/ws-auth.middleware.ts
+@@ -88,15 +88,12 @@ export class WebSocketAuthMiddleware {
+ 
+         next(); // Allow connection to proceed
+       } catch (error) {
+-        // Catch any unexpected errors
+-        const unexpectedError = new UnauthorizedException(
+-          `Authentication failed: ${error.message}`,
+-        );
+         this.logger.error(
+-          `Unexpected error during WebSocket authentication for socket ${socket.id}:`,
++          `WebSocket authentication failed for socket ${socket.id}:`,
+           error.message,
++          error.stack,
+         );
+-        next(unexpectedError);
++        next(error);
+       }
+     };
+   }

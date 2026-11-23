@@ -1,0 +1,165 @@
+diff --git a/apps/ally-helpline-dashboard/src/api/__tests__/simulationCredits.test.ts b/apps/ally-helpline-dashboard/src/api/__tests__/simulationCredits.test.ts
+new file mode 100644
+index 0000000000..07a70f5e93
+--- /dev/null
++++ b/apps/ally-helpline-dashboard/src/api/__tests__/simulationCredits.test.ts
+@@ -0,0 +1,71 @@
++import { describe, it, expect, vi } from "vitest";
++
++/**
++ * The backend exposes simulation credits at `GET /v1/simulation-credits` and
++ * reads the target user from a `userId` *query param* (optional — it falls
++ * back to the token's own user). A caller with SYSTEM_ACCESS has no implicit
++ * user, so omitting it there returns 400. Appending the id as a path segment
++ * instead (`/v1/simulation-credits/7`) hits no route at all, so these tests
++ * pin the request shape rather than just "a userId appears somewhere".
++ */
++
++const { captured } = vi.hoisted(() => ({
++  captured: {} as Record<string, { query: (arg: unknown) => unknown }>,
++}));
++
++vi.mock("../baseAPI", () => ({
++  baseAPI: {
++    injectEndpoints: ({
++      endpoints,
++    }: {
++      endpoints: (builder: unknown) => Record<string, { query: (arg: unknown) => unknown }>;
++    }) => {
++      const builder = {
++        query: (definition: unknown) => definition,
++        mutation: (definition: unknown) => definition,
++      };
++      Object.assign(captured, endpoints(builder));
++      return {};
++    },
++  },
++}));
++
++vi.mock("@constants", () => ({
++  ApiEndpoints: {
++    SIMULATION: {
++      SIMULATION_CREDITS: "/v1/simulation-credits",
++    },
++  },
++  HttpMethod: {
++    GET: "GET",
++  },
++  TAG_TYPES: {
++    SIMULATION_CREDITS: "SimulationCredits",
++  },
++}));
++
++vi.mock("@types", () => ({
++  SimulationCredits: {},
++}));
++
++import "../simulationCredits";
++
++describe("getSimulationCredits", () => {
++  it("sends the userId as a query param, not a path segment", () => {
++    const request = captured.getSimulationCredits.query(7);
++
++    expect(request).toMatchObject({
++      url: "/v1/simulation-credits",
++      method: "GET",
++      params: { userId: 7 },
++    });
++  });
++
++  it("omits params when no userId is available", () => {
++    const request = captured.getSimulationCredits.query(undefined) as {
++      params?: unknown;
++    };
++
++    expect(request.params).toBeUndefined();
++  });
++});
+diff --git a/apps/ally-helpline-dashboard/src/api/__tests__/user.test.tsx b/apps/ally-helpline-dashboard/src/api/__tests__/user.test.tsx
+index e1b16fe37d..a9047df687 100644
+--- a/apps/ally-helpline-dashboard/src/api/__tests__/user.test.tsx
++++ b/apps/ally-helpline-dashboard/src/api/__tests__/user.test.tsx
+@@ -1,15 +1,9 @@
+-import { http, HttpResponse } from "msw";
+-
+-import { server } from "@mocks/server";
+-import { waitFor } from "@testing-library/react";
+ import React from "react";
+ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+ import { renderHook } from "@testing-library/react";
+ import { Provider } from "react-redux";
+ import { configureStore } from "@reduxjs/toolkit";
+ import { baseAPI } from "../baseAPI";
+-import { useGetSimulationCreditsQuery } from "../simulationCredits";
+-
+ 
+ // Mock constants
+ vi.mock("@constants", () => ({
+@@ -18,9 +12,6 @@ vi.mock("@constants", () => ({
+       GET_USER_PREFERENCES: "/user/preferences",
+       UPDATE_USER_PREFERENCES: "/user/preferences/update",
+     },
+-    SIMULATION: {
+-      SIMULATION_CREDITS: "/v1/simulation-credits",
+-    },
+   },
+   HttpMethod: {
+     GET: "GET",
+@@ -39,11 +30,7 @@ vi.mock("@types", () => ({
+ }));
+ 
+ // Import hooks after mocks
+-import {
+-  useGetUserPreferencesQuery,
+-  useUpdateUserPreferencesMutation,
+-} from "../user";
+-import { useGetSimulationCreditsQuery } from "../simulationCredits";
++import { useGetUserPreferencesQuery, useUpdateUserPreferencesMutation } from "../user";
+ 
+ const testStore = configureStore({
+   reducer: {
+@@ -109,26 +96,4 @@ describe("User API", () => {
+       expect(() => trigger({ default_language_id: 1 })).not.toThrow();
+     });
+   });
+-  describe("useGetSimulationCreditsQuery", () => {
+-    it("fetches simulation credits correctly", async () => {
+-      const userId = 1;
+-      server.use(
+-        http.get(
+-          `${ApiEndpoints.SIMULATION.SIMULATION_CREDITS}/${userId}`,
+-          () => new HttpResponse(JSON.stringify({ credits: 10 }), { status: 200 }),
+-        ),
+-      );
+-  
+-      const { result } = renderHook(
+-        () => useGetSimulationCreditsQuery(userId),
+-        {
+-          wrapper: TestWrapper,
+-        },
+-      );
+-  
+-      await waitFor(() => {
+-        expect(result.current.isSuccess).toBe(true);
+-      });
+-    });
+-  });
+ });
+diff --git a/apps/ally-helpline-dashboard/src/api/simulationCredits.ts b/apps/ally-helpline-dashboard/src/api/simulationCredits.ts
+index 4a9fe5e345..bbd8ef2d5c 100644
+--- a/apps/ally-helpline-dashboard/src/api/simulationCredits.ts
++++ b/apps/ally-helpline-dashboard/src/api/simulationCredits.ts
+@@ -5,10 +5,11 @@ import { baseAPI } from "./baseAPI";
+ 
+ const SimulationCreditsAPI = baseAPI.injectEndpoints({
+   endpoints: builder => ({
+-    getSimulationCredits: builder.query<SimulationCredits, number>({
++    getSimulationCredits: builder.query<SimulationCredits, number | undefined>({
+       query: userId => ({
+-        url: `${ApiEndpoints.SIMULATION.SIMULATION_CREDITS}/${userId}`,
++        url: ApiEndpoints.SIMULATION.SIMULATION_CREDITS,
+         method: HttpMethod.GET,
++        params: userId ? { userId } : undefined,
+       }),
+       providesTags: [TAG_TYPES.SIMULATION_CREDITS],
+     }),

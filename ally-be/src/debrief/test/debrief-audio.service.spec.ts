@@ -42,6 +42,7 @@ function build(opts: { cached?: boolean; removed?: boolean }) {
       voicePreview: { sarvamApiKey: 'k' },
     } as any,
     usage as any,
+    {} as any,
   );
   return { svc, s3, usage };
 }
@@ -86,5 +87,91 @@ describe('DebriefAudioService (read-aloud)', () => {
       build({}).svc.audioUrl('s1', 7, 'what_worked[2]'),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(generatePreview).not.toHaveBeenCalled();
+  });
+});
+
+describe('DebriefAudioService (plan §13: a deleted session takes its audio)', () => {
+  const A = '11111111-1111-4111-8111-111111111111';
+  const B = '22222222-2222-4222-8222-222222222222';
+
+  /** An in-memory bucket with the two calls the sweep makes. */
+  function fakeStorage(keys: string[]) {
+    const objects = new Set(keys);
+    return {
+      objects,
+      listObjects: jest.fn(
+        async (p: { bucket: string; prefix: string; delimiter?: string }) => {
+          const under = [...objects].filter((k) => k.startsWith(p.prefix));
+          if (!p.delimiter) return { keys: under, prefixes: [] };
+          const prefixes = new Set(
+            under
+              .map((k) => k.slice(p.prefix.length).split(p.delimiter!)[0])
+              .map((first) => `${p.prefix}${first}${p.delimiter}`),
+          );
+          return { keys: [], prefixes: [...prefixes] };
+        },
+      ),
+      deleteObject: jest.fn(async (p: { bucket: string; key: string }) => {
+        objects.delete(p.key);
+        return {};
+      }),
+    };
+  }
+
+  function sweeper(storage: ReturnType<typeof fakeStorage>, alive: string[]) {
+    const query = jest.fn(async (_sql: string, [ids]: [string[]]) =>
+      ids.filter((id) => alive.includes(id)).map((id) => ({ id })),
+    );
+    const svc = new DebriefAudioService(
+      {} as any,
+      {} as any,
+      storage as any,
+      { s3: { audioBucket: 'audio' } } as any,
+      {} as any,
+      { query } as any,
+    );
+    return { svc, query };
+  }
+
+  it('deletes every audio file of a session that no longer exists, and only those', async () => {
+    const storage = fakeStorage([
+      `debrief-audio/${A}/aaa.mp3`,
+      `debrief-audio/${A}/bbb.mp3`,
+      `debrief-audio/${B}/ccc.mp3`,
+      'debrief-audio/not-a-session/x.mp3',
+      'other/thing.mp3',
+    ]);
+    const { svc } = sweeper(storage, [B]);
+
+    expect(await svc.sweepDeletedSessions()).toBe(1);
+    expect([...storage.objects].sort()).toEqual(
+      [
+        'debrief-audio/not-a-session/x.mp3',
+        `debrief-audio/${B}/ccc.mp3`,
+        'other/thing.mp3',
+      ].sort(),
+    );
+    expect(storage.deleteObject).toHaveBeenCalledTimes(2);
+    expect(storage.deleteObject).toHaveBeenCalledWith({
+      bucket: 'audio',
+      key: `debrief-audio/${A}/aaa.mp3`,
+    });
+  });
+
+  it('does nothing when every session with audio still exists', async () => {
+    const storage = fakeStorage([`debrief-audio/${A}/aaa.mp3`]);
+    const { svc } = sweeper(storage, [A]);
+    expect(await svc.sweepDeletedSessions()).toBe(0);
+    expect(storage.deleteObject).not.toHaveBeenCalled();
+  });
+
+  it('deleteSessionAudio removes one session’s files', async () => {
+    const storage = fakeStorage([
+      `debrief-audio/${A}/aaa.mp3`,
+      `debrief-audio/${B}/ccc.mp3`,
+    ]);
+    const { svc } = sweeper(storage, []);
+    expect(await svc.deleteSessionAudio(A)).toBe(1);
+    expect([...storage.objects]).toEqual([`debrief-audio/${B}/ccc.mp3`]);
   });
 });

@@ -38,4 +38,9 @@ void main() {
     expect(normalizeCustomFieldDate('  '), isNull);
     expect(formatCustomFieldDate('not a date'), 'not a date');
   });
+
+  test('custom DATE display is DD-MM-YYYY, distinct from the YYYY-MM-DD wire value', () {
+    expect(formatCustomFieldDate('2026-02-03'), '03-02-2026');
+    expect(normalizeCustomFieldDate('2026-02-03'), '2026-02-03');
+  });
 }

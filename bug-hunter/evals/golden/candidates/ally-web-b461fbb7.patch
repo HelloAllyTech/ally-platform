@@ -1,0 +1,74 @@
+diff --git a/apps/ally-helpline-dashboard/src/pages/calls/components/CallSummarySidebar.tsx b/apps/ally-helpline-dashboard/src/pages/calls/components/CallSummarySidebar.tsx
+index f59467be7a..3521df53ee 100644
+--- a/apps/ally-helpline-dashboard/src/pages/calls/components/CallSummarySidebar.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/calls/components/CallSummarySidebar.tsx
+@@ -4,7 +4,11 @@ import { useSelector } from "react-redux";
+ import { toast } from "sonner";
+ 
+ import { FEATURE_FLAGS_MAP, logger } from "@ally-ui-mono/ui-shared";
+-import { useLazyExportCallSummaryQuery, useArchiveCallLogMutation } from "@api";
++import {
++  useLazyExportCallSummaryQuery,
++  useArchiveCallLogMutation,
++  useGetSummaryFieldsQuery,
++} from "@api";
+ import { Archive, Delete, Download, Unarchive } from "@assets";
+ import { CallProvider, Permissions } from "@constants";
+ import { FeedbackDialog } from "@containers";
+@@ -47,6 +51,14 @@ const CallSummarySidebar: FC<CallSummarySidebarProps> = ({
+ 
+   const { exportTxtFromText } = useFileExport();
+ 
++  const { refetch: refetchSummaryFields } = useGetSummaryFieldsQuery();
++
++  useEffect(() => {
++    if (callSummary?.id) {
++      refetchSummaryFields();
++    }
++  }, [callSummary?.id, refetchSummaryFields]);
++
+   useEffect(() => {
+     if (callSummary?.details?.callInfo?.summaryName) {
+       setSummaryName(callSummary?.details?.callInfo?.summaryName);
+diff --git a/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/CallSummarySidebar.test.tsx b/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/CallSummarySidebar.test.tsx
+index 26aea64b77..a9c56d93be 100644
+--- a/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/CallSummarySidebar.test.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/CallSummarySidebar.test.tsx
+@@ -53,6 +53,7 @@ vi.mock("@api", () => ({
+   useDeleteCallSummaryMutation: vi.fn(() => [vi.fn()]),
+   useDeleteCallLogMutation: vi.fn(() => [vi.fn()]),
+   useArchiveCallLogMutation: vi.fn(() => [vi.fn(), { isLoading: false }]),
++  useGetSummaryFieldsQuery: vi.fn(() => ({ refetch: vi.fn() })),
+ }));
+ 
+ // Mock assets
+diff --git a/apps/ally-helpline-dashboard/src/pages/post-call-summary/constants.ts b/apps/ally-helpline-dashboard/src/pages/post-call-summary/constants.ts
+index f84a44ff22..708e44b3f7 100644
+--- a/apps/ally-helpline-dashboard/src/pages/post-call-summary/constants.ts
++++ b/apps/ally-helpline-dashboard/src/pages/post-call-summary/constants.ts
+@@ -220,6 +220,13 @@ export const summaryFields: SummaryField[] = [
+     sectionKey: SummarySectionKey.FeaturesAndDemographics,
+     type: FieldType.Text,
+   },
++  {
++    isEditable: true,
++    key: SummaryFieldKey.CallQuality,
++    label: "Call Quality",
++    sectionKey: SummarySectionKey.FeaturesAndDemographics,
++    type: FieldType.Text,
++  },
+   {
+     isEditable: false,
+     key: SummaryFieldKey.ClientId,
+diff --git a/apps/ally-helpline-dashboard/src/types/summary.ts b/apps/ally-helpline-dashboard/src/types/summary.ts
+index 55b2ff5552..40ec89ff84 100644
+--- a/apps/ally-helpline-dashboard/src/types/summary.ts
++++ b/apps/ally-helpline-dashboard/src/types/summary.ts
+@@ -16,6 +16,7 @@ export enum SummaryFieldKey {
+   CodeOfConcern = "codeOfConcern",
+   Counsellor = "counsellor",
+   NewCallFollowUp = "newCallFollowUp",
++  CallQuality = "callQuality",
+ 
+   // Other fields
+   SessionSummary = "sessionSummary",

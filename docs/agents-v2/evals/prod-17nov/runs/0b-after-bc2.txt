@@ -1,0 +1,39 @@
+pass  bk-free-means-free (17 Nov F5/F4: free means free; a taken table is refused in words (Q3-fast 0b))
+      > [priya] Hi, I'm Priya. Can I book table T2 for 3 on Tuesday 24 Nov at 1 pm?
+      < [clarified/question v2 16946ms] I can book Table T2 for 3 on Tuesday 24 Nov at 1:00 PM — that slot is available. What name should I save for the reservation?
+      > [priya] Yes please, book T2 for 3 people. The name is Priya Sharma.
+      < [rag/smalltalk v2 21489ms] All set — I’ve booked Table T2 for 3 people on Tuesday 24 Nov 2026 at 1:00 PM under the name Priya Sharma. (Reservation recorded.) Would you like me to pass a p
+      > [meera] Which tables are free on Tuesday 24 Nov at 1 pm?
+      < [rag/question v2 12776ms] On Tuesday 24 Nov at 1:00 PM these tables are free: T3 (3 seats) and T1 (3 seats).
+      > [meera] I'm Meera. Book T2 for 3 on Tuesday 24 Nov at 1 pm please
+      < [rag/question v2 10327ms] Thanks Meera — I’ve noted your name. T2 at 1:00 PM on Tue 24 Nov isn’t free. These are the nearest available options I can see: T2 at 12:00 PM on Tue 24 Nov (3 
+FAIL! bk-choice-is-not-yes (17 Nov F1: picking a table isn't a yes; it confirms the exact booking first (Q3-fast 0b))
+      > I'm Kabir. Table for 3 on Thursday 26 Nov at 2 pm?
+      < [error v2_fallback 20172ms] Sorry, I couldn't answer that just now. Please try again, or contact The Bombay Canteen: +91 22 64222838 / wsdindia@gmail.com.
+      > T3 please
+      < [error v2_fallback 20116ms] Sorry, I couldn't answer that just now. Please try again, or contact The Bombay Canteen: +91 22 64222838 / wsdindia@gmail.com.
+      ✗ missing /shall I|should I|do you want me to|would you like me to|confirm/
+      > yes
+      < [rag/smalltalk v2 20318ms] All set — I’ve booked a table for 3 at The Bombay Canteen: T3 on Thursday 26 Nov 2026 at 14:00, status: booked (confirmed for you). Would you like to give the n
+pass  bk-keeps-its-tools (17 Nov F2/C20: a 10-turn chat keeps its tools and never hands over on its own (Q3-fast 0b))
+      > hi
+      < [template 5ms] I am the Bombay Canteen assistant. I can help you find the right service, explain our menus, events, hours and how to contact us.
+      > what kind of food do you serve?
+      < [rag/question v2 14587ms] We’re Indian at heart — we celebrate regional and seasonal Indian cuisine, reimagining age‑old traditions and changing our seasonal menus regularly. The kitchen
+      > do you have a vegetarian menu?
+      < [rag/question v2 9440ms] Yes — we’re Indian at heart and our kitchen focuses on local, seasonal dishes with many vegetable-led plates; our menus change frequently so there’s always a st
+      > is there parking nearby?
+      < [declined/question v2 13253ms] I don’t have information about nearby parking. Please contact us and we’ll confirm: see our contact page or email reservations@thebombaycanteen.com for the quic
+      > do you take credit cards?
+      < [declined/question v2 17952ms] I’m sorry—I don’t have information in our records about whether we accept credit cards. Please contact the team and they’ll confirm: see our contact page or ema
+      > can I bring a birthday cake?
+      < [declined/question v2 10104ms] I don’t have a policy on outside birthday cakes in our records. Please contact the team to confirm — you can email reservations@thebombaycanteen.com or use our 
+      > ok. which tables are free on Friday 27 Nov at 1 pm for 3?
+      < [rag/question v2 10453ms] On Friday 27 Nov at 1:00 PM the following tables for 3 are available: T2, T1 and T3 (all open). Would you like me to book one of these for you?
+      > I'm Rohan, T2 sounds nice
+      < [error v2_fallback 20061ms] Sorry, I couldn't answer that just now. Please try again, or contact The Bombay Canteen: +91 22 64222838 / wsdindia@gmail.com.
+      > yes, book T2 for 3
+      < [rag/question v2 23783ms] All set, Rohan — I’ve booked Table T2 for 3 on Friday 27 Nov 2026 at 1:00 PM. I’ve saved the reservation for you. Would you like me to pass your phone number to
+      > thanks!
+      < [rag/smalltalk v2 6542ms] You’re welcome, Rohan — glad I could help! Would you like me to pass your phone number to the team so they can confirm the booking?
+2/3 cases passed in every run; 1 must-pass failed

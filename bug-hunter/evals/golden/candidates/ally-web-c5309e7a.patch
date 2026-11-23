@@ -1,0 +1,315 @@
+diff --git a/apps/ally-admin-dashboard/src/pages/Analytics/__tests__/WeakPerformingMetricsTab.test.tsx b/apps/ally-admin-dashboard/src/pages/Analytics/__tests__/WeakPerformingMetricsTab.test.tsx
+index c3efcb6fed..8cc3e3de87 100644
+--- a/apps/ally-admin-dashboard/src/pages/Analytics/__tests__/WeakPerformingMetricsTab.test.tsx
++++ b/apps/ally-admin-dashboard/src/pages/Analytics/__tests__/WeakPerformingMetricsTab.test.tsx
+@@ -70,8 +70,8 @@ const series = (o: Partial<WeakMetricSeries> = {}): WeakMetricSeries => ({
+   description: "Actor turns that repeat something the actor already said.",
+   caveat: null,
+   points: [
+-    { bucket: "2026-06-01", numerator: 10, denominator: 500, value: 0.02 },
+-    { bucket: "2026-07-01", numerator: 30, denominator: 500, value: 0.06 },
++    { bucket: "2026-06-01", numerator: 10, denominator: 500, value: 0.02, sparse: false },
++    { bucket: "2026-07-01", numerator: 30, denominator: 500, value: 0.06, sparse: false },
+   ],
+   latest: 0.06,
+   previous: 0.02,
+@@ -145,6 +145,77 @@ beforeEach(() => {
+ });
+ 
+ describe("WeakPerformingMetricsTab", () => {
++  describe("thin buckets", () => {
++    // Traffic per language is lumpy: Tamil ran 97 real sessions in the week of
++    // 2026-05-25 and 2 in the week of 07-06. Both were drawn with the same
++    // weight, so a swing in traffic read as a swing in quality — and the delta
++    // arrow reported "worsening" off the least reliable point on the card.
++    const withThin = () =>
++      response({
++        bucket: "week",
++        inProgressBucket: null,
++        groups: [
++          group({
++            series: [
++              series({
++                points: [
++                  {
++                    bucket: "2026-07-20",
++                    numerator: 50,
++                    denominator: 500,
++                    value: 0.1,
++                    sparse: false,
++                  },
++                  {
++                    bucket: "2026-07-27",
++                    numerator: 80,
++                    denominator: 800,
++                    value: 0.1,
++                    sparse: false,
++                  },
++                  {
++                    bucket: "2026-08-03",
++                    numerator: 5,
++                    denominator: 2,
++                    value: 2.5,
++                    sparse: true,
++                  },
++                ],
++              }),
++            ],
++          }),
++        ],
++      });
++
++    const renderThin = () => {
++      queryMock.mockReturnValue({
++        data: withThin(),
++        isFetching: false,
++        isError: false,
++        refetch: refetchMock,
++      });
++      render(<WeakPerformingMetricsTab {...filters} />);
++    };
++
++    it("leaves a thin bucket off the plot", () => {
++      renderThin();
++      expect(screen.getAllByText(/2026-07-27/).length).toBeGreaterThan(0);
++      expect(screen.queryAllByText(/2026-08-03/)).toHaveLength(0);
++    });
++
++    it("says how many buckets were withheld and why", () => {
++      // Silently dropping them means a reader comparing this against the raw
++      // counts finds buckets missing with no reason given.
++      renderThin();
++      expect(screen.getByText(/too few turns to read as a rate/i)).toBeInTheDocument();
++    });
++
++    it("says nothing when every bucket is thick enough", () => {
++      render(<WeakPerformingMetricsTab {...filters} />);
++      expect(screen.queryByText(/too few turns to read as a rate/i)).not.toBeInTheDocument();
++    });
++  });
++
+   describe("the still-accruing bucket", () => {
+     // Three days of the current week charted beside seven-day weeks reads as
+     // quality collapsing, and the reader explains that fall to themselves. It
+@@ -159,10 +230,28 @@ describe("WeakPerformingMetricsTab", () => {
+             series: [
+               series({
+                 points: [
+-                  { bucket: "2026-08-03", numerator: 20, denominator: 500, value: 0.04 },
+-                  { bucket: "2026-08-10", numerator: 25, denominator: 500, value: 0.05 },
++                  {
++                    bucket: "2026-08-03",
++                    numerator: 20,
++                    denominator: 500,
++                    value: 0.04,
++                    sparse: false,
++                  },
++                  {
++                    bucket: "2026-08-10",
++                    numerator: 25,
++                    denominator: 500,
++                    value: 0.05,
++                    sparse: false,
++                  },
+                   // 3 of 7 days in — a real value over a partial denominator.
+-                  { bucket: "2026-08-17", numerator: 1, denominator: 20, value: 0.05 },
++                  {
++                    bucket: "2026-08-17",
++                    numerator: 1,
++                    denominator: 20,
++                    value: 0.05,
++                    sparse: false,
++                  },
+                 ],
+               }),
+             ],
+@@ -324,8 +413,20 @@ describe("WeakPerformingMetricsTab", () => {
+                 label: "Too formal for spoken register, per 100 turns",
+                 unit: "per100turns",
+                 points: [
+-                  { bucket: "2026-07-01", numerator: 20, denominator: 100, value: 0.2 },
+-                  { bucket: "2026-08-01", numerator: 10, denominator: 100, value: 0.1 },
++                  {
++                    bucket: "2026-07-01",
++                    numerator: 20,
++                    denominator: 100,
++                    value: 0.2,
++                    sparse: false,
++                  },
++                  {
++                    bucket: "2026-08-01",
++                    numerator: 10,
++                    denominator: 100,
++                    value: 0.1,
++                    sparse: false,
++                  },
+                 ],
+                 latest: 0.1,
+                 previous: 0.2,
+@@ -349,6 +450,7 @@ describe("WeakPerformingMetricsTab", () => {
+       numerator: i,
+       denominator: 100,
+       value: i / 100,
++      sparse: false,
+     }));
+     queryMock.mockReturnValue({
+       data: response({
+@@ -369,7 +471,15 @@ describe("WeakPerformingMetricsTab", () => {
+           group({
+             series: [
+               series({
+-                points: [{ bucket: "2026-08-01", numerator: 5, denominator: 100, value: 0.05 }],
++                points: [
++                  {
++                    bucket: "2026-08-01",
++                    numerator: 5,
++                    denominator: 100,
++                    value: 0.05,
++                    sparse: false,
++                  },
++                ],
+                 latest: 0.05,
+                 previous: null,
+               }),
+@@ -398,8 +508,14 @@ describe("WeakPerformingMetricsTab", () => {
+                 state: "none",
+                 caveat: "Not instrumented.",
+                 points: [
+-                  { bucket: "2026-07-01", numerator: 4, denominator: 93, value: 0.043 },
+-                  { bucket: "2026-08-01", numerator: 0, denominator: 97, value: 0 },
++                  {
++                    bucket: "2026-07-01",
++                    numerator: 4,
++                    denominator: 93,
++                    value: 0.043,
++                    sparse: false,
++                  },
++                  { bucket: "2026-08-01", numerator: 0, denominator: 97, value: 0, sparse: false },
+                 ],
+               }),
+             ],
+@@ -436,8 +552,14 @@ describe("WeakPerformingMetricsTab", () => {
+                 state: "none",
+                 caveat: "Segment by model or this misleads.",
+                 points: [
+-                  { bucket: "2026-07-01", numerator: 4, denominator: 93, value: 0.043 },
+-                  { bucket: "2026-08-01", numerator: 0, denominator: 97, value: 0 },
++                  {
++                    bucket: "2026-07-01",
++                    numerator: 4,
++                    denominator: 93,
++                    value: 0.043,
++                    sparse: false,
++                  },
++                  { bucket: "2026-08-01", numerator: 0, denominator: 97, value: 0, sparse: false },
+                 ],
+               }),
+             ],
+@@ -709,8 +831,20 @@ describe("WeakPerformingMetricsTab", () => {
+             series: [
+               series({
+                 points: [
+-                  { bucket: "2026-06-01", numerator: 10, denominator: 500, value: 0.02 },
+-                  { bucket: "2026-07-01", numerator: 30, denominator: 500, value: 0.06 },
++                  {
++                    bucket: "2026-06-01",
++                    numerator: 10,
++                    denominator: 500,
++                    value: 0.02,
++                    sparse: false,
++                  },
++                  {
++                    bucket: "2026-07-01",
++                    numerator: 30,
++                    denominator: 500,
++                    value: 0.06,
++                    sparse: false,
++                  },
+                 ],
+               }),
+             ],
+@@ -800,8 +934,8 @@ describe("WeakPerformingMetricsTab", () => {
+                 label: "Over-formal speech",
+                 unit: "per100turns",
+                 points: [
+-                  { bucket: "2026-07-01", numerator: 0, denominator: 297, value: 0 },
+-                  { bucket: "2026-08-01", numerator: 0, denominator: 140, value: 0 },
++                  { bucket: "2026-07-01", numerator: 0, denominator: 297, value: 0, sparse: false },
++                  { bucket: "2026-08-01", numerator: 0, denominator: 140, value: 0, sparse: false },
+                 ],
+                 latest: 0,
+                 previous: 0,
+@@ -834,8 +968,14 @@ describe("WeakPerformingMetricsTab", () => {
+             series: [
+               series({
+                 points: [
+-                  { bucket: "2026-06-01", numerator: 0, denominator: 500, value: 0 },
+-                  { bucket: "2026-07-01", numerator: 30, denominator: 500, value: 0.06 },
++                  { bucket: "2026-06-01", numerator: 0, denominator: 500, value: 0, sparse: false },
++                  {
++                    bucket: "2026-07-01",
++                    numerator: 30,
++                    denominator: 500,
++                    value: 0.06,
++                    sparse: false,
++                  },
+                 ],
+               }),
+             ],
+diff --git a/apps/ally-admin-dashboard/src/pages/Analytics/tabs/WeakPerformingMetricsTab.tsx b/apps/ally-admin-dashboard/src/pages/Analytics/tabs/WeakPerformingMetricsTab.tsx
+index a43408a51e..ecfb039f5c 100644
+--- a/apps/ally-admin-dashboard/src/pages/Analytics/tabs/WeakPerformingMetricsTab.tsx
++++ b/apps/ally-admin-dashboard/src/pages/Analytics/tabs/WeakPerformingMetricsTab.tsx
+@@ -170,7 +170,10 @@ const SeriesCard: FC<{
+   const points = useMemo(
+     () =>
+       withoutInProgress(
+-        series.points.filter(p => p.value !== null),
++        // Thin buckets come off the plot for the same reason the accruing one
++        // does: drawn beside a bucket a hundred times their size they read as a
++        // swing in quality rather than a swing in traffic.
++        series.points.filter(p => p.value !== null && !p.sparse),
+         p => p.bucket,
+         inProgressBucket,
+       ).map(p => ({
+@@ -192,8 +195,21 @@ const SeriesCard: FC<{
+   // crowded out the number it was there to qualify. It is reference material a
+   // reader reaches for once, so it moves behind a tooltip and the caption
+   // carries the one line that says what is being counted.
++  const thinCount = series.points.filter(p => p.value !== null && p.sparse).length;
+   const caption =
+-    [series.description, inProgressCaption(bucket as never, inProgressBucket)]
++    [
++      series.description,
++      inProgressCaption(bucket as never, inProgressBucket),
++      // Named, not silently dropped — otherwise a reader comparing this chart
++      // against the raw counts finds buckets missing and no reason given.
++      thinCount
++        ? ` ${thinCount} ${bucket === "week" ? "week" : "month"}${
++            thinCount === 1 ? "" : "s"
++          } had too few turns to read as a rate and ${
++            thinCount === 1 ? "is" : "are"
++          } left off the plot; ${thinCount === 1 ? "it is" : "they are"} in the expanded view.`
++        : "",
++    ]
+       .filter(Boolean)
+       .join("") || undefined;
+ 
+diff --git a/apps/ally-admin-dashboard/src/types/auth.ts b/apps/ally-admin-dashboard/src/types/auth.ts
+index 683adb0539..664e738754 100644
+--- a/apps/ally-admin-dashboard/src/types/auth.ts
++++ b/apps/ally-admin-dashboard/src/types/auth.ts
+@@ -1144,6 +1144,13 @@ export interface WeakMetricPoint {
+   denominator: number;
+   /** null when the denominator is 0 — an empty bucket, not a clean one. */
+   value: number | null;
++  /**
++   * Denominator below the platform's thin-sample minimum. The bucket is real —
++   * it stays in tables — but it is left off the plot and never supplies the
++   * delta, because a two-session week drawn beside a ninety-seven-session one
++   * became the headline.
++   */
++  sparse: boolean;
+ }
+ 
+ export interface WeakMetricSeries {

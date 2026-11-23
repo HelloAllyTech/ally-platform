@@ -5,7 +5,10 @@ import { RedisService } from 'src/redis/service/redis.service';
 import { BuilderSession } from '../entity/builder-session.entity';
 import { BuilderPullRequest } from '../entity/builder-pull-request.entity';
 import { BuilderBuildRun } from '../entity/builder-build-run.entity';
-import { BuilderSessionRepository } from '../repository/builder-session.repository';
+import {
+  BuilderSessionRepository,
+  SHARED_SESSIONS_ONLY,
+} from '../repository/builder-session.repository';
 import {
   BuilderBuildRunRepository,
   BuilderPullRequestRepository,
@@ -210,7 +213,8 @@ export class BuilderNowService {
       this.decisionService.listPending(),
       this.settingsService.get(),
       this.sessionRepository.find({
-        where: { archivedAt: IsNull() },
+        // A private (unfiled) plan never reaches the shared Now inbox.
+        where: { ...SHARED_SESSIONS_ONLY, archivedAt: IsNull() },
         order: { createdAt: 'ASC' },
       }),
     ]);

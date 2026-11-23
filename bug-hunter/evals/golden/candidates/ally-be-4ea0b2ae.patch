@@ -1,0 +1,169 @@
+diff --git a/src/language/service/language-glossary.service.ts b/src/language/service/language-glossary.service.ts
+index 342f929c32..5a3fabd674 100644
+--- a/src/language/service/language-glossary.service.ts
++++ b/src/language/service/language-glossary.service.ts
+@@ -796,6 +796,15 @@ export class LanguageGlossaryService {
+     let autoAccepted = 0;
+     let overlayEntries = 0;
+     let skippedDuplicates = 0;
++    // Proposals that restate an ALREADY-PUBLISHED line. Recorded rather than
++    // silently dropped: a dropped proposal never consumes its annotations, so
++    // the same rule is re-derived from the same evidence and re-dropped on
++    // every cycle, forever, while those rows occupy the bounded read window.
++    // Recording them here consumes the evidence (batch findings are part of
++    // the consumed-set) and leaves the collision visible — a published rule
++    // that keeps re-deriving is a rule that is not working.
++    const redundantFindings: { summary: string; annotationIds: string[] }[] =
++      [];
+     const touched: string[] = [];
+     const batchEntries: ConsolidationBatchEntry[] = [];
+ 
+@@ -885,12 +894,27 @@ export class LanguageGlossaryService {
+         const newEntryIds: string[] = [];
+         for (const { proposal, annos } of bucket) {
+           const markdown = proposal.markdown.trim();
+-          if (dedupe.isDuplicate(markdown)) {
++          const annotationIds = annos.map((a) => a.id);
++          const duplicate = dedupe.duplicateOf(markdown);
++          if (duplicate) {
+             skippedDuplicates++;
++            // A queued sibling is still undecided, and whichever lands
++            // consumes the evidence — dropping is correct there. A published
++            // match is the deadlock case.
++            if (duplicate.source === 'published' && annotationIds.length > 0) {
++              redundantFindings.push({
++                summary: (
++                  `Re-derived an already-published rule, so the published one ` +
++                  `is not preventing these errors. Proposed: ` +
++                  `"${markdown.slice(0, 160)}" — already published: ` +
++                  `"${duplicate.line.slice(0, 160)}"`
++                ).slice(0, 500),
++                annotationIds,
++              });
++            }
+             continue;
+           }
+           dedupe.add(markdown);
+-          const annotationIds = annos.map((a) => a.id);
+           const tenantIds = [
+             ...new Set(annos.map((a) => a.tenantId).filter(Boolean)),
+           ];
+@@ -962,12 +986,15 @@ export class LanguageGlossaryService {
+ 
+     // Production-artifact clusters land on the batch as engineering findings
+     // (v3 prompt contract) — visible to engineers, never glossary content.
+-    const engineeringFindings = rawFindings.map((f) => ({
+-      summary: f.summary.slice(0, 500),
+-      annotationIds: (f.sourceAnnotationIndexes ?? [])
+-        .map((i) => annotations[i - 1]?.id)
+-        .filter((id): id is string => Boolean(id)),
+-    }));
++    const engineeringFindings = [
++      ...rawFindings.map((f) => ({
++        summary: f.summary.slice(0, 500),
++        annotationIds: (f.sourceAnnotationIndexes ?? [])
++          .map((i) => annotations[i - 1]?.id)
++          .filter((id): id is string => Boolean(id)),
++      })),
++      ...redundantFindings,
++    ];
+ 
+     const distinctTenants = new Set(
+       annotations.map((a) => a.tenantId).filter(Boolean),
+diff --git a/src/language/service/test/language-glossary.service.spec.ts b/src/language/service/test/language-glossary.service.spec.ts
+index 7c4e6944f3..c3d66958ff 100644
+--- a/src/language/service/test/language-glossary.service.spec.ts
++++ b/src/language/service/test/language-glossary.service.spec.ts
+@@ -546,6 +546,42 @@ describe('LanguageGlossaryService', () => {
+       const result = await service.consolidateGlossary(6);
+       expect(result.proposed).toBe(0);
+       expect(result.skippedDuplicates).toBe(1);
++
++      // A PUBLISHED match consumes its evidence via a batch finding. Dropping
++      // it silently would leave the annotations unconsumed, so the same rule
++      // is re-derived and re-dropped on every cycle, forever, while those rows
++      // occupy the bounded read window.
++      const batch = batchRepository.save.mock.calls.at(-1)[0];
++      const findings = batch.stats.engineeringFindings;
++      expect(findings).toHaveLength(1);
++      expect(findings[0].annotationIds).toEqual(['a1']);
++      expect(findings[0].summary).toContain('already-published');
++      expect(findings[0].summary.length).toBeLessThanOrEqual(500);
++    });
++
++    it('does NOT record a finding when the match is a queued proposal', async () => {
++      setAnnotationPool([annotation('a1')]);
++      glossaryRepository.findSection.mockResolvedValue(
++        makeSection({
++          sectionCode: 'clinical_terms',
++          content: '',
++          entries: [
++            {
++              id: 'queued-1',
++              markdown: '- anxiety: say "டென்ஷன்" (avoid: "பதட்டம்")',
++              status: GlossaryEntryStatus.PROPOSED,
++            },
++          ],
++        }),
++      );
++      getCompletion.mockResolvedValue(JSON.stringify(consolidationOutput));
++
++      const result = await service.consolidateGlossary(6);
++      expect(result.skippedDuplicates).toBe(1);
++      // The sibling is still undecided; whichever lands consumes the evidence,
++      // so there is nothing to flag and nothing to consume here.
++      const batch = batchRepository.save.mock.calls.at(-1)[0];
++      expect(batch.stats.engineeringFindings).toBeUndefined();
+     });
+ 
+     it('skips a proposal already covered by ANOTHER section of the language', async () => {
+diff --git a/src/language/util/glossary-dedupe.util.ts b/src/language/util/glossary-dedupe.util.ts
+index d052a3394f..53a7a2dfa2 100644
+Binary files a/src/language/util/glossary-dedupe.util.ts and b/src/language/util/glossary-dedupe.util.ts differ
+diff --git a/src/language/util/test/glossary-dedupe.util.spec.ts b/src/language/util/test/glossary-dedupe.util.spec.ts
+index f7106b0ddc..da6714adb8 100644
+--- a/src/language/util/test/glossary-dedupe.util.spec.ts
++++ b/src/language/util/test/glossary-dedupe.util.spec.ts
+@@ -71,4 +71,42 @@ describe('GlossaryDedupeIndex', () => {
+   it('keeps the near-duplicate bar high enough to require near-identity', () => {
+     expect(GLOSSARY_NEAR_DUPLICATE_JACCARD).toBeGreaterThanOrEqual(0.8);
+   });
++
++  // The caller's obligation differs by source: a queued sibling can simply be
++  // dropped (whichever lands consumes the evidence), while a PUBLISHED match
++  // means the rule is being re-derived because the published one isn't working.
++  describe('match source', () => {
++    it('reports a published-content match as published', () => {
++      const index = new GlossaryDedupeIndex();
++      index.addContent('- Use நீங்க, not நீங்கள்.');
++      const match = index.duplicateOf('- Use நீங்க, not நீங்கள்.');
++      expect(match?.source).toBe('published');
++    });
++
++    it('reports a queued-proposal match as a proposal', () => {
++      const index = new GlossaryDedupeIndex();
++      index.add('- Use நீங்க, not நீங்கள்.');
++      expect(index.duplicateOf('- Use நீங்க, not நீங்கள்.')?.source).toBe(
++        'proposal',
++      );
++    });
++
++    it('prefers published over proposal when both match', () => {
++      const index = new GlossaryDedupeIndex();
++      index.add('- Prefer டென்ஷன் over பதட்டம் in casual talk.');
++      index.addContent('- Prefer டென்ஷன் over பதட்டம் in casual talk!');
++      // Near-identity on both; the stricter obligation must win regardless of
++      // insertion order.
++      expect(
++        index.duplicateOf('- Prefer டென்ஷன் over பதட்டம் in casual talk')
++          ?.source,
++      ).toBe('published');
++    });
++
++    it('returns null for a genuinely new rule', () => {
++      const index = new GlossaryDedupeIndex();
++      index.addContent('- Use நீங்க, not நீங்கள்.');
++      expect(index.duplicateOf('- Mother takes she-forms: அவங்க.')).toBeNull();
++    });
++  });
+ });

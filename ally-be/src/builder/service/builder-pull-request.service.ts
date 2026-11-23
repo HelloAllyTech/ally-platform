@@ -5,9 +5,11 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  Optional,
   forwardRef,
 } from '@nestjs/common';
 import { In, IsNull, Like, MoreThan } from 'typeorm';
+import { PlanCeilingService } from 'src/product-planning/service/plan-ceiling.service';
 import { LoggerService } from 'src/logger/logger.service';
 import {
   CheckRollup,
@@ -23,6 +25,7 @@ import {
   BuilderPullRequestRepository,
 } from '../repository/builder-build.repository';
 import { BuilderSessionRepository } from '../repository/builder-session.repository';
+import { effectiveAutonomySettings } from '../util/builder-autonomy.util';
 import { BuilderNotificationService } from './builder-notification.service';
 import { BuilderSettingsService } from './builder-settings.service';
 import { BuilderBuildService } from './builder-build.service';
@@ -73,6 +76,37 @@ const ISSUE_BUILD_WORKFLOW = 'builder.yml';
 const ISSUE_BUILD_TIMEOUT_MS = 60 * 60_000;
 /** `/oc` fix requests Builder makes on red CI before failing the build. */
 const ISSUE_FIX_REQUESTS = 2;
+/** How far back a FAILED issue build is still watched for its PR going green. */
+const ISSUE_RECOVERY_WINDOW_MS = 3 * 24 * 60 * 60_000;
+
+/**
+ * The `/oc` comment asking opencode to fix red CI on its pull request.
+ *
+ * Carries each failing job's log tail, because the check's name alone does
+ * not say what is wrong, and tells opencode to follow the repository's own
+ * rules (AGENTS.md and the docs it links) rather than satisfy a guard
+ * mechanically — a guard check is a rule, not an obstacle.
+ */
+export function renderIssueFixRequest(
+  failed: string[],
+  excerpts: Record<string, string>,
+): string {
+  const parts = [
+    `/oc CI failed on this pull request: ${failed.join(', ') || 'see the checks'}. ` +
+      'Read the failing checks, fix the cause on this branch, and keep every check passing. ' +
+      'Do not change a test to make it pass unless the test itself is wrong, and say so if it is.',
+    'When a check enforces a repository rule (prompt files, docs map, AI task registry and the like), ' +
+      'read the rule in AGENTS.md and the doc it links, and do what the rule asks. ' +
+      'Do not edit unrelated files only to make the check pass.',
+  ];
+  for (const name of failed) {
+    const excerpt = excerpts[name];
+    if (!excerpt) continue;
+    parts.push(`Output of "${name}":\n\n\`\`\`\n${excerpt}\n\`\`\``);
+  }
+  return parts.join('\n\n');
+}
+
 /** How long a `/oc` request on feedback may go unanswered before it is retried. */
 const OC_FIX_TIMEOUT_MS = 60 * 60_000;
 
@@ -104,6 +138,9 @@ export class BuilderPullRequestService {
     // so this edge is one-way rather than a cycle.
     @Inject(forwardRef(() => BuilderBuildService))
     private readonly buildService: BuilderBuildService,
+    /** Roadmap v2's one ceiling per idea; a no-op while the flag is off. */
+    @Optional()
+    private readonly planCeiling?: PlanCeilingService,
   ) {}
 
   /**
@@ -398,6 +435,70 @@ export class BuilderPullRequestService {
         );
       }
     }
+    // Best-effort: a failure listing these must not stop the rest of the tick.
+    const since = new Date(Date.now() - ISSUE_RECOVERY_WINDOW_MS);
+    const recoverable = await Promise.resolve()
+      .then(() => this.buildService.listRecoverableIssueRuns(since))
+      .catch((error) => {
+        this.logger.warn(
+          `Could not list failed issue builds to re-check: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+        return [] as BuilderBuildRun[];
+      });
+    for (const run of recoverable) {
+      try {
+        await this.recoverIssueRun(run);
+      } catch (error) {
+        this.logger.warn(
+          `Could not re-check failed issue build ${run.id}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
+  }
+
+  /** The open pull request opencode raised for this run's issue, if any. */
+  private async findIssuePullRequest(githubRepo: string, issueNumber: number) {
+    const prefix = `opencode/issue${issueNumber}-`;
+    return ((await this.github.listPullRequests(githubRepo)) ?? []).find(
+      (candidate) => candidate.headRef?.startsWith(prefix),
+    );
+  }
+
+  /**
+   * A FAILED issue build whose pull request has since gone green — the PR
+   * loop kept working it after the run gave up — is a success after all.
+   * Only CI green on the current head counts; anything else leaves it failed.
+   */
+  private async recoverIssueRun(run: BuilderBuildRun): Promise<void> {
+    const repo = run.repos?.[0];
+    const githubRepo = issueRepoOf(run);
+    if (!repo || !githubRepo || !run.issueNumber) return;
+    const pr = await this.findIssuePullRequest(githubRepo, run.issueNumber);
+    if (!pr?.number || !pr.headSha) return;
+    const rollup = await this.github.getCheckRollup(githubRepo, pr.headSha);
+    if (rollup?.state !== 'success') return;
+    const revived = await this.buildService.reviveIssueRun(run);
+    if (!revived) return;
+    await this.buildService.recordIssueMilestone(
+      run,
+      `ci-pass:${pr.headSha}`,
+      `CI passed on ${pr.headSha.slice(0, 7)} after the build had given up. ${pr.htmlUrl} is ready for review.`,
+      undefined,
+      {
+        ci: {
+          repo,
+          prNumber: pr.number,
+          prUrl: pr.htmlUrl,
+          sha: pr.headSha,
+          state: 'success',
+          failed: [],
+        },
+      },
+    );
   }
 
   private async reconcileIssueRun(run: BuilderBuildRun): Promise<void> {
@@ -408,10 +509,7 @@ export class BuilderPullRequestService {
     const repo = run.repos?.[0];
     const githubRepo = issueRepoOf(run);
     if (!repo || !githubRepo || !run.issueNumber) return;
-    const prefix = `opencode/issue${run.issueNumber}-`;
-    const pr = ((await this.github.listPullRequests(githubRepo)) ?? []).find(
-      (candidate) => candidate.headRef?.startsWith(prefix),
-    );
+    const pr = await this.findIssuePullRequest(githubRepo, run.issueNumber);
 
     if (!pr?.number) {
       const workflowRun = await this.github.findRunSince({
@@ -519,12 +617,16 @@ export class BuilderPullRequestService {
       );
       return;
     }
+    // The failing step's own output, not just the check's name. Run 3 of
+    // 6ce1a354 (2026-11-17) got "CI failed: check" twice, chased Jest, and
+    // never saw that the prompt guard had rejected its `.txt` edits.
+    const excerpts = await this.github
+      .failedCheckExcerpts(githubRepo, pr.headSha)
+      .catch(() => ({}) as Record<string, string>);
     await this.github.createIssueComment(
       githubRepo,
       pr.number,
-      `/oc CI failed on this pull request: ${rollup.failed.join(', ') || 'see the checks'}. ` +
-        'Read the failing checks, fix the cause on this branch, and keep every check passing. ' +
-        'Do not change a test to make it pass unless the test itself is wrong, and say so if it is.',
+      renderIssueFixRequest(rollup.failed, excerpts),
     );
     await this.buildService.recordIssueFixRequest(run, pr.headSha);
     await this.buildService.recordIssueMilestone(
@@ -693,7 +795,7 @@ export class BuilderPullRequestService {
       headSha?: string | null;
     },
   ): Promise<boolean> {
-    const settings = await this.settingsService.get();
+    const settings = await this.settingsForSession(pullRequest.sessionId);
     if (!settings.enabled || !settings.autoMergeEnabled) return false;
     if (await this.releaseIsUnhealthy()) return false;
 
@@ -749,6 +851,28 @@ export class BuilderPullRequestService {
         }`,
       );
       return false;
+    }
+  }
+
+  /**
+   * The Builder settings that govern this pull request's session: the global row with the
+   * session's autonomy override applied (effectiveAutonomySettings). Today only PM Agent
+   * sessions carry one (`auto`); for every other session this is exactly the global row.
+   *
+   * The global kill switch still wins, and every other safeguard on the paths that read this
+   * — a review passed on the exact head, `mergeable_state` clean, nothing actionable, the
+   * post-release health hold — is unchanged. An override that cannot be read falls back to
+   * the global settings: failing closed to the stricter answer.
+   */
+  private async settingsForSession(sessionId: string) {
+    const settings = await this.settingsService.get();
+    if (!settings.enabled) return settings;
+    try {
+      const override =
+        await this.sessionRepository.findAutonomyOverride(sessionId);
+      return effectiveAutonomySettings(settings, override);
+    } catch {
+      return settings;
     }
   }
 
@@ -958,7 +1082,7 @@ export class BuilderPullRequestService {
   ): Promise<void> {
     if (pullRequest.releaseState) return;
 
-    const settings = await this.settingsService.get();
+    const settings = await this.settingsForSession(pullRequest.sessionId);
     if (!settings.enabled || !settings.autoReleaseEnabled) return;
     if (await this.releaseIsUnhealthy()) return;
 
@@ -1099,6 +1223,7 @@ export class BuilderPullRequestService {
           repo: targets[0].repo,
           workflow: targets[0].workflow,
           since: pullRequest.mergedAt,
+          apps: targets[0].inputs?.apps,
         });
         if (!run) continue;
 
@@ -1627,7 +1752,7 @@ export class BuilderPullRequestService {
     headSha: string | null,
     rollup: CheckRollup | null,
   ): Promise<boolean> {
-    const settings = await this.settingsService.get();
+    const settings = await this.settingsForSession(pullRequest.sessionId);
     if (!settings.enabled || !settings.autoReviewEnabled) return false;
 
     // Only opencode pull requests are reviewed, in their own repo's Actions.
@@ -1828,7 +1953,7 @@ export class BuilderPullRequestService {
     // Waiting on a person: a review that was already in flight must not
     // approve it behind their back.
     if (pullRequest.needsHumanAt) return;
-    const settings = await this.settingsService.get();
+    const settings = await this.settingsForSession(pullRequest.sessionId);
     if (!settings.enabled || !settings.autoApproveEnabled) return;
 
     // The approve call posts a new review every time it is made, and this now
@@ -2112,7 +2237,7 @@ export class BuilderPullRequestService {
       return;
     }
 
-    const settings = await this.settingsService.get();
+    const settings = await this.settingsForSession(pullRequest.sessionId);
     if (!settings.enabled || !settings.autoFixEnabled) return;
     const pending = await this.feedbackRepository.countPending(pullRequest.id);
     const ceiling = settings.maxFixRunsPerPr ?? 0;
@@ -2422,6 +2547,20 @@ export class BuilderPullRequestService {
    * the limit.
    */
   private async budgetSpent(pullRequest: BuilderPullRequest): Promise<boolean> {
+    // A plan's review and fix runs count against its one idea ceiling too
+    // (Roadmap v2, §5.6). Null with the flag off and for non-plan sessions.
+    const plan = await this.planCeiling?.checkAt(
+      pullRequest.sessionId,
+      'pr_automation',
+    );
+    if (plan?.exceeded) {
+      await this.escalate(
+        pullRequest,
+        `This idea has spent $${plan.spentUsd.toFixed(2)} of its $${plan.ceilingUsd.toFixed(2)} ceiling` +
+          (await this.openProblemsClause(pullRequest)),
+      );
+      return true;
+    }
     const settings = await this.settingsService.get();
     const limit = Number(settings.maxPrAutomationUsd ?? 0);
     const spent = Number(pullRequest.automationCostUsd ?? 0);

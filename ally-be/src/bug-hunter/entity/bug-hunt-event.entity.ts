@@ -45,7 +45,7 @@ export class BugHuntEvent extends BaseWithoutTenantEntity {
   @Column({ type: 'jsonb', nullable: true })
   payload?: Record<string, any> | null;
 
-  /** Set when this event corresponds to an AnalyticsSuggestion row (the PR-review track). */
+  /** Set when this event corresponds to a row of the removed analytics_suggestions queue (the PR-review track; historical). */
   @Column({ type: 'uuid', nullable: true })
   suggestionId?: string | null;
 

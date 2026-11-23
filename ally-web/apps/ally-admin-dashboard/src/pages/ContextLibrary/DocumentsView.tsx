@@ -9,11 +9,17 @@ import {
   XCircle,
   type LucideIcon,
 } from "lucide-react";
+import { toast } from "sonner";
 
-import { useGetContextSourceQuery, useGetContextSourcesQuery } from "@api";
+import {
+  useGetContextSourceQuery,
+  useGetContextSourcesQuery,
+  useSetContextSourceAudienceMutation,
+} from "@api";
 import { en } from "@constants";
 import { ContextCollection, ContextSource } from "@types";
 
+import { AudienceEditor, audienceOf } from "./AudiencePicker";
 import {
   errorReason,
   formatCost,
@@ -22,7 +28,8 @@ import {
   nounsFor,
   yieldSentence,
 } from "./contextLibraryFormat";
-import { InlineError, LoadingRows, StatusWord } from "./ContextLibraryUi";
+import { useContextLibraryScope } from "./contextLibraryScope";
+import { AudienceBadge, InlineError, LoadingRows, StatusWord } from "./ContextLibraryUi";
 import { Sheet } from "../Builder/room/Sheet";
 
 const STATUS_ICON: Record<
@@ -67,6 +74,7 @@ interface DocumentsViewProps {
 /** Every document added to the collection (or to any, under All), newest first. */
 export const DocumentsView: React.FC<DocumentsViewProps> = ({ collectionId, onOpen }) => {
   const strings = en.contextLibrary.documentsView;
+  const { orgNames } = useContextLibraryScope();
   const { data, isLoading, isError, error, refetch } = useGetContextSourcesQuery(collectionId);
 
   if (isLoading) return <LoadingRows />;
@@ -87,6 +95,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({ collectionId, onOp
         <thead className="border-b border-border-light text-xs text-typography-600">
           <tr>
             <th className="py-2 pr-3 font-medium">{strings.columns.title}</th>
+            <th className="py-2 pr-3 font-medium">{en.contextLibrary.audience.label}</th>
             <th className="py-2 pr-3 font-medium">{strings.columns.version}</th>
             <th className="py-2 pr-3 font-medium">{strings.columns.added}</th>
             <th className="py-2 pr-3 text-right font-medium">{strings.columns.kept}</th>
@@ -113,6 +122,16 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({ collectionId, onOp
                 >
                   {source.title}
                 </button>
+              </td>
+              <td className="py-2 pr-3">
+                <AudienceBadge
+                  chunk={{
+                    isGlobal: source.isGlobal !== false,
+                    tenantIds: source.tenantIds ?? [],
+                    ownerTenantId: source.ownerTenantId,
+                  }}
+                  orgNames={orgNames}
+                />
               </td>
               <td className="py-2 pr-3 text-typography-600">
                 {[source.docVersion, source.year].filter(Boolean).join(", ")}
@@ -166,10 +185,14 @@ export const YieldReport: React.FC<{ source: ContextSource; collections: Context
 export const DocumentSheet: React.FC<{
   id: string;
   collections: ContextCollection[];
+  /** A platform admin may change which organisations its entries reach. */
+  canEdit?: boolean;
   onClose: () => void;
-}> = ({ id, collections, onClose }) => {
+}> = ({ id, collections, canEdit = false, onClose }) => {
   const strings = en.contextLibrary.documentsView;
   const { data, isLoading, isError, error, refetch } = useGetContextSourceQuery(id);
+  const { orgNames } = useContextLibraryScope();
+  const [setSourceAudience] = useSetContextSourceAudienceMutation();
   return (
     <Sheet title={data?.title ?? en.contextLibrary.documents} placement="side" onClose={onClose}>
       {isLoading ? (
@@ -187,6 +210,34 @@ export const DocumentSheet: React.FC<{
             <SourceStatus status={data.status} />
             <span>{strings.cost(formatCost(data.costUsd))}</span>
           </div>
+          <AudienceEditor
+            value={audienceOf(data)}
+            badge={
+              <AudienceBadge
+                chunk={{
+                  isGlobal: data.isGlobal !== false,
+                  tenantIds: data.tenantIds ?? [],
+                  ownerTenantId: data.ownerTenantId,
+                }}
+                orgNames={orgNames}
+              />
+            }
+            orgNames={orgNames}
+            canEdit={canEdit}
+            locked={data.ownerTenantId ? en.contextLibrary.audience.ownedByOrganisation : undefined}
+            help={en.contextLibrary.audience.documentHelp}
+            onSave={async audience => {
+              try {
+                const result = await setSourceAudience({ id: data.id, audience }).unwrap();
+                toast.success(
+                  en.contextLibrary.audience.documentSaved(result.updated, result.shared),
+                );
+              } catch (failure) {
+                toast.error(errorReason(failure) || en.contextLibrary.audience.saveFailed);
+                throw failure;
+              }
+            }}
+          />
           <section>
             <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-typography-600">
               {strings.overview}

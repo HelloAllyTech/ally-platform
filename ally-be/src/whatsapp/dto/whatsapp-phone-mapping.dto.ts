@@ -24,7 +24,7 @@ import {
  * small insert rather than an account with credits and roles, and the practical ceiling is the
  * global 1 MB `express.json` limit, which a thousand of these rows is nowhere near.
  */
-export const BULK_PHONE_MAPPINGS_MAX = 1000;
+const BULK_PHONE_MAPPINGS_MAX = 1000;
 
 export class CreateWaPhoneMappingDto {
   @ApiProperty({

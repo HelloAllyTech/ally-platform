@@ -26,7 +26,7 @@ export interface AddReferenceDocumentResponse {
   tenant_id: string;
 }
 
-export interface SearchReferenceDocumentResult {
+interface SearchReferenceDocumentResult {
   id: string;
   heading: string;
   content: string;
@@ -78,7 +78,7 @@ export interface ScenarioEvaluationEmotionalMovementItem {
   start_time?: number;
 }
 
-export interface ScenarioEvaluationAreaOfImprovementItem {
+interface ScenarioEvaluationAreaOfImprovementItem {
   improvement: string;
   recommendation: string;
 }
@@ -129,7 +129,7 @@ export interface RoadmapOpportunityBulkUpsertResponse {
   failed: { opportunity_id: string; error: string }[];
 }
 
-export interface RoadmapSimilarOpportunityMatch {
+interface RoadmapSimilarOpportunityMatch {
   opportunity_id: string;
   product_goal: string;
   /** Cosine similarity in [0, 1]. */

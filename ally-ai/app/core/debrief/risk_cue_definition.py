@@ -1,0 +1,48 @@
+"""The one definition of a clear and a possible risk cue (2026-11-16).
+
+Its live text is the pinned Skills Store prompt ``debrief_risk_cue_definition``
+(ally-be ``src/prompts/debrief/risk_cue_definition.txt``); this default is the
+fallback when ally-be sends none, and must match that file. Every Debrief call
+that judges risk cues gets it as one labelled block: the Safety reader, the
+Writer, the Reviser, the Evaluator and the independent debrief-quality judge.
+"""
+
+from __future__ import annotations
+
+from typing import List, Optional
+
+PROMPT_CODE = "debrief_risk_cue_definition"
+
+LABEL = "RISK CUE DEFINITION:"
+
+DEFAULT_RISK_CUE_DEFINITION = """\
+A risk cue is something the CLIENT says. It is clear or possible.
+
+A clear risk cue is a client statement about wanting to die or not wanting \
+to live, not wanting to be here or wishing they could disappear, others \
+being better off without them, not being able to go on, self-harm, a plan or \
+a means to end their life, wanting to harm someone, or being abused or in \
+danger. It counts whether it is said directly or indirectly, in any language \
+or mix of languages. When a statement might be about death, self-harm, harm \
+to others or abuse and you cannot tell, it is a clear risk cue.
+
+A possible risk cue is low mood, stress, tiredness, burden, loneliness, \
+grief or guilt, or hopelessness about one part of life (going out, a job, an \
+exam, a relationship) or about how things feel, with none of the above. It \
+stays possible unless the client links it to dying, not wanting to live, or \
+harming themself or someone else.
+
+What each means for a debrief:
+- A clear risk cue must be covered. The most serious one is the important \
+moment: what the client said and how the trainee responded. Every other \
+clear one is listed in the important moment's others. A debrief that leaves \
+a clear risk cue out has missed it.
+- A possible risk cue is never an important moment and never a reason to \
+coach a risk assessment. Coach it as ordinary counselling: staying with the \
+feeling, reflecting it and exploring it before moving on.\
+"""
+
+
+def definition_block(text: Optional[str] = None) -> List[str]:
+    """The labelled block, with the live text or the default."""
+    return [LABEL, (text or "").strip() or DEFAULT_RISK_CUE_DEFINITION]

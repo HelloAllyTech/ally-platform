@@ -550,4 +550,52 @@ void main() {
       expect(progress.completionPct, 0);
     });
   });
+
+  group('TrackBlocker.tryParse', () {
+    Map<String, dynamic> json({List<dynamic>? reasons, String action = 'RETRY'}) => {
+          'itemId': 'p1',
+          'title': 'Prev',
+          'type': 'ROLEPLAY',
+          'reasons': reasons ??
+              [
+                {'code': 'BELOW_SCORE', 'actual': 40, 'required': 70.5},
+                {'code': 'TOO_SHORT', 'actual': 30, 'required': 180},
+              ],
+          'action': action,
+          'retryAt': '2026-12-01T00:00:00.000Z',
+        };
+
+    test('parses every field', () {
+      final b = TrackBlocker.tryParse(json())!;
+      expect(b.itemId, 'p1');
+      expect(b.title, 'Prev');
+      expect(b.type, 'ROLEPLAY');
+      expect(b.action, TrackBlockerAction.retry);
+      expect(b.retryAt, '2026-12-01T00:00:00.000Z');
+      expect(b.reasons.map((r) => r.code), [TrackBlockerReasonCode.belowScore, TrackBlockerReasonCode.tooShort]);
+      expect(b.reasons.first.actual, 40);
+      expect(b.reasons.first.required, 70.5);
+    });
+
+    test('unknown reason code reads as notFinished, unknown action as none', () {
+      final b = TrackBlocker.tryParse(json(reasons: [{'code': 'SOMETHING_NEW'}], action: 'DANCE'))!;
+      expect(b.reasons.single.code, TrackBlockerReasonCode.notFinished);
+      expect(b.reasons.single.actual, isNull);
+      expect(b.action, TrackBlockerAction.none);
+    });
+
+    test('malformed payloads parse to null', () {
+      expect(TrackBlocker.tryParse(null), isNull);
+      expect(TrackBlocker.tryParse('junk'), isNull);
+      expect(TrackBlocker.tryParse({'title': 'x', 'reasons': []}), isNull);
+      expect(TrackBlocker.tryParse(json(reasons: [])), isNull);
+    });
+
+    test('TrackDetailItem.fromJson reads blockedBy, null when absent', () {
+      TrackDetailItem item(Map<String, dynamic> extra) =>
+          TrackDetailItem.fromJson({'id': 'x', 'type': 'ARTICLE', 'title': 'x', 'status': 'LOCKED', ...extra});
+      expect(item({'blockedBy': json()}).blockedBy?.itemId, 'p1');
+      expect(item({}).blockedBy, isNull);
+    });
+  });
 }

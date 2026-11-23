@@ -30,13 +30,6 @@ export enum ChatbotMemberRole {
   OWNER = "owner",
 }
 
-export enum ChatbotAudienceKind {
-  USER = "user",
-  ORGANISATION = "organisation",
-  PHONE = "phone",
-  EMAIL = "email",
-}
-
 export interface ChatbotPersona {
   displayName?: string;
   systemPrompt?: string;
@@ -79,11 +72,12 @@ export interface ChatbotStats {
   lastMessageAt: string | null;
 }
 
-/** Which engine answers chatbots (Agents v2): v2, or v1 while the agent is off in Defaults. */
-export type ChatbotRuntime = "v1" | "v2";
-
-/** The engine that answered one Preview test; `v2_fallback` means v2 failed and v1 answered. */
-export type ChatbotRuntimeUsed = "v1" | "v2" | "v2_fallback";
+/**
+ * The run behind one Preview test: `v2`, or `v2_fallback` when the run failed and the fixed
+ * "couldn't answer that just now" reply went out (Q3-fast: never v1). Null with no run (a
+ * keyword reply).
+ */
+export type ChatbotRuntimeUsed = "v2" | "v2_fallback" | null;
 
 /** One step the new engine took, in order. */
 export interface AgentTraceStep {
@@ -105,8 +99,6 @@ export interface Chatbot {
   knowledgeSource: ChatbotKnowledgeSource;
   persona: ChatbotPersona;
   model: ChatbotModelChoice | null;
-  /** What actually answers: v2, or v1 (the backup engine) while the agent is off in Defaults. */
-  effectiveRuntime: ChatbotRuntime;
   myRole: ChatbotMemberRole;
   connectors: Connector[];
   documentCount: number;
@@ -117,6 +109,10 @@ export interface Chatbot {
   stats: ChatbotStats;
   /** When it was last tried in Preview. */
   lastTestedAt: string | null;
+  /** The caller's own unfinished onboarding for this bot (chunk 20a), if any. */
+  setupDraftId?: string | null;
+  /** When it was removed: an archived assistant is read-only. */
+  archivedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -125,14 +121,6 @@ export interface GetChatbotsResponse {
   chatbots: Chatbot[];
   /** Platform admins create bots; everyone else works on the bots they were added to. */
   canCreate: boolean;
-}
-
-export interface CreateChatbotRequest {
-  name: string;
-  description?: string;
-  persona?: ChatbotPersona;
-  answerMode?: ChatbotAnswerMode;
-  accessMode?: ChatbotAccessMode;
 }
 
 export interface UpdateChatbotRequest {
@@ -202,21 +190,6 @@ export interface CreatePrivateChatbotDocumentRequest {
   sizeBytes?: number;
   text?: string;
   sourceUrl?: string;
-}
-
-export interface ChatbotMember {
-  userId: number;
-  name: string | null;
-  email: string | null;
-  role: ChatbotMemberRole;
-}
-
-export interface ChatbotAudienceEntry {
-  id: string;
-  kind: ChatbotAudienceKind;
-  value: string;
-  label: string | null;
-  createdAt: string;
 }
 
 /** A bot's changes to the defaults (same shape organisations used to have). */
@@ -289,10 +262,12 @@ export interface TestChatbotResponse {
   runtime: ChatbotRuntimeUsed;
   runId: string | null;
   trace: AgentTraceStep[] | null;
-  /** Why the new engine failed, when v1 answered instead. */
+  /** Why the run failed, when the fixed run-failed reply went out. */
   fallbackReason: string | null;
-  /** False while the new engine is turned off in Defaults. */
-  runtimeAllowed: boolean;
+  /** The run added or changed a list entry; in Try it that was checked, then not saved (5b). */
+  previewWrite?: boolean;
+  /** What the run would have remembered about the person (chunk 8a); never saved in Try it. */
+  wouldRemember?: string[];
   conversationId: string;
   /** Agent mode: what the agent understood the message to be. */
   turnType?: AgentTurnType | null;

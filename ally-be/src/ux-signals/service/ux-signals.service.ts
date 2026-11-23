@@ -9,13 +9,10 @@ import { LessThan, Repository } from 'typeorm';
 import { LoggerService } from 'src/logger/logger.service';
 import { AppConfigService } from 'src/config/config.service';
 import { addDays, isoDate } from 'src/analytics/util/analytics-window.util';
-import { BugFindingRepository } from 'src/bug-hunter/repository/bug-finding.repository';
-import { BugFindingSource } from 'src/bug-hunter/enum/bug-finding.enum';
-import { AnalyticsSuggestion } from 'src/analytics-suggestions/entity/analytics-suggestion.entity';
-import {
-  AnalyticsSuggestionSource,
-  AnalyticsSuggestionStatus,
-} from 'src/analytics-suggestions/enum/analytics-suggestion.enum';
+import { BugHunterBoardService } from 'src/bug-hunter-approvals/service/bug-hunter-board.service';
+import { PmAgentSignal } from 'src/pm-agent/entity/pm-agent-signal.entity';
+import { PmSignalStatus } from 'src/pm-agent/enum/pm-agent.enum';
+import { UX_SIGNALS_SOURCE } from './ux-signal-writer.service';
 import { RoadmapProductGoalRepository } from 'src/product-roadmap/repository/roadmap-taxonomy.repository';
 
 import {
@@ -63,10 +60,10 @@ function isUniqueViolation(error: unknown): boolean {
 
 /**
  * Orchestrates one UX Signals scan: read PostHog, triage what crossed a
- * threshold, file it into the two human review queues, and record what happened.
+ * threshold, file bugs to Bug Hunter and improvements to the PM Agent's signals, and record what happened.
  *
  * The pipeline is deliberately an *amplifier* rather than an actor. It can create
- * a bug finding at NEW and a suggestion at PENDING, and that is the end of its
+ * a bug finding at NEW and an improvement signal at `new`, and that is the end of its
  * authority — approving a fix, dispatching a session, and filing a roadmap
  * opportunity all remain human actions behind their existing gates. Automated
  * detection is good at spotting patterns and bad at knowing which ones matter to
@@ -81,10 +78,10 @@ export class UxSignalsService {
     private readonly detector: UxSignalDetectorService,
     private readonly ai: UxSignalsAiService,
     private readonly writer: UxSignalWriterService,
-    private readonly bugFindingRepository: BugFindingRepository,
+    private readonly bugHunter: BugHunterBoardService,
     private readonly goalRepository: RoadmapProductGoalRepository,
-    @InjectRepository(AnalyticsSuggestion)
-    private readonly suggestionRepository: Repository<AnalyticsSuggestion>,
+    @InjectRepository(PmAgentSignal)
+    private readonly signalRepository: Repository<PmAgentSignal>,
     @InjectRepository(UxSignalScan)
     private readonly scanRepository: Repository<UxSignalScan>,
   ) {}
@@ -169,7 +166,6 @@ export class UxSignalsService {
    */
   private async executeScan(scan: UxSignalScan): Promise<UxScanOutcome> {
     const { windowFrom, windowTo } = scan;
-    const userId = scan.startedBy ?? null;
     let failedDetectors: UxSignalKind[] = [];
 
     try {
@@ -225,11 +221,11 @@ export class UxSignalsService {
       }
 
       const items = this.normalise(raw, goalNames);
-      const written = await this.writer.write(
-        items,
-        { windowFrom, windowTo, model: this.ai.model },
-        userId,
-      );
+      const written = await this.writer.write(items, {
+        windowFrom,
+        windowTo,
+        model: this.ai.model,
+      });
 
       return await this.finish(scan, {
         scanId: scan.id,
@@ -439,24 +435,16 @@ export class UxSignalsService {
     signals: UxSignal[],
     goalNames: string[],
   ): Promise<string> {
-    const openFindings = await this.bugFindingRepository.find({
-      where: { source: BugFindingSource.UX_SIGNAL },
-      order: { createdAt: 'DESC' },
+    const openFindings = await this.bugHunter.listBySource('ux_signal', {
       take: UX_SIGNAL_CONTEXT_LIMITS.OPEN_FINDINGS,
     });
-    const pending = await this.suggestionRepository.find({
-      where: {
-        source: AnalyticsSuggestionSource.UX_SIGNAL,
-        status: AnalyticsSuggestionStatus.PENDING,
-      },
+    const pending = await this.signalRepository.find({
+      where: { source: UX_SIGNALS_SOURCE, status: PmSignalStatus.NEW },
       order: { createdAt: 'DESC' },
       take: UX_SIGNAL_CONTEXT_LIMITS.PENDING_SUGGESTIONS,
     });
-    const rejected = await this.suggestionRepository.find({
-      where: {
-        source: AnalyticsSuggestionSource.UX_SIGNAL,
-        status: AnalyticsSuggestionStatus.REJECTED,
-      },
+    const rejected = await this.signalRepository.find({
+      where: { source: UX_SIGNALS_SOURCE, status: PmSignalStatus.DISMISSED },
       order: { createdAt: 'DESC' },
       take: UX_SIGNAL_CONTEXT_LIMITS.REJECTED_SUGGESTIONS,
     });
@@ -482,23 +470,14 @@ export class UxSignalsService {
             .join('\n')
         : '(none)',
       '',
-      'UX SUGGESTIONS AWAITING A DECISION — do not re-propose these',
+      'UX IMPROVEMENTS ALREADY FILED AND NOT YET USED — do not re-propose these',
       pending.length
         ? pending.map((s) => `- ${excerpt(s.title)}`).join('\n')
         : '(none)',
       '',
-      'UX SUGGESTIONS PREVIOUSLY REJECTED — these are standing decisions',
+      'UX IMPROVEMENTS PREVIOUSLY DISMISSED — these are standing decisions',
       rejected.length
-        ? rejected
-            .map(
-              (s) =>
-                `- ${excerpt(s.title)}${
-                  s.rejectedReason
-                    ? ` — reason: ${excerpt(s.rejectedReason)}`
-                    : ' — no reason given'
-                }`,
-            )
-            .join('\n')
+        ? rejected.map((s) => `- ${excerpt(s.title)}`).join('\n')
         : '(none)',
     ];
 

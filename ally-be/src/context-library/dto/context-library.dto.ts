@@ -40,6 +40,13 @@ const toList = ({ value }: { value: unknown }) => {
 };
 const toBool = ({ value }: { value: unknown }) =>
   value === true || value === 'true';
+/** Absent stays absent: "not chosen" and "false" mean different things for an audience. */
+const toOptionalBool = ({ value }: { value: unknown }) =>
+  value === true || value === 'true'
+    ? true
+    : value === false || value === 'false'
+      ? false
+      : undefined;
 const toJsonObject = ({ value }: { value: unknown }) => {
   if (value && typeof value === 'object') return value;
   if (typeof value !== 'string' || !value.trim()) return undefined;
@@ -101,6 +108,27 @@ export class ContextUploadDto {
   @IsOptional()
   @IsUUID()
   batchId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Platform admins: true for every organisation, false for only those in tenantIds. ' +
+      'Omitted means global unless tenantIds names organisations.',
+  })
+  @IsOptional()
+  @Transform(toOptionalBool)
+  @IsBoolean()
+  isGlobal?: boolean;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Organisations reached (JSON array or comma-separated ids)',
+  })
+  @IsOptional()
+  @Transform(toList)
+  @IsArray()
+  @ArrayMaxSize(200)
+  @IsUUID('all', { each: true })
+  tenantIds?: string[];
 }
 
 export class ContextAuthoredChunkDto {
@@ -182,6 +210,27 @@ export class ContextBulkDto {
   @IsOptional()
   @IsString()
   apply?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Platform admins: true for every organisation, false for only those in tenantIds. ' +
+      'Applies to new rows that leave is_global and tenant_ids blank.',
+  })
+  @IsOptional()
+  @Transform(toOptionalBool)
+  @IsBoolean()
+  isGlobal?: boolean;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Organisations reached (JSON array or comma-separated ids)',
+  })
+  @IsOptional()
+  @Transform(toList)
+  @IsArray()
+  @ArrayMaxSize(200)
+  @IsUUID('all', { each: true })
+  tenantIds?: string[];
 }
 
 export class ContextChunkListQueryDto {
@@ -335,4 +384,21 @@ export class ContextRetireCorpusDto {
   @IsString()
   @MaxLength(80)
   confirm!: string;
+}
+
+/** Who a chunk, or a document's chunks, reaches. Platform admins only. */
+export class ContextAudienceDto {
+  @ApiProperty({
+    description:
+      'true for every organisation; false for only those in tenantIds',
+  })
+  @IsBoolean()
+  isGlobal!: boolean;
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(200)
+  @IsUUID('all', { each: true })
+  tenantIds?: string[];
 }

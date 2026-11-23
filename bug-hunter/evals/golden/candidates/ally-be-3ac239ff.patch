@@ -1,0 +1,345 @@
+diff --git a/ally-be/src/guide/voice/guide-voice.service.ts b/ally-be/src/guide/voice/guide-voice.service.ts
+index c950367280..1231f4c630 100644
+--- a/ally-be/src/guide/voice/guide-voice.service.ts
++++ b/ally-be/src/guide/voice/guide-voice.service.ts
+@@ -7,6 +7,7 @@ import { createHash, randomBytes } from 'crypto';
+ import { TokenUser } from 'src/auth/type/auth.types';
+ import { AppConfigService } from 'src/config/config.service';
+ import { ErrorCode } from 'src/exception/error-code.enum';
++import { GUIDE_ROOM_PREFIX } from 'src/livekit/constants/livekit.constants';
+ import { LiveKitService } from 'src/livekit/service/livekit.service';
+ import { LoggerService } from 'src/logger/logger.service';
+ import { RedisService } from 'src/redis/service/redis.service';
+@@ -14,11 +15,11 @@ import { GuideThread } from '../entity/guide-thread.entity';
+ import { GuideSettingsService } from '../settings/guide-settings.service';
+ 
+ /**
+- * LiveKit room prefix for Ally's voice sessions. The roleplay webhook
+- * handlers skip rooms with this prefix (fix/livekit-webhook-guide-rooms), so
++ * LiveKit room prefix for Ally's voice sessions: the one definition in the
++ * LiveKit constants, which the webhook handlers check with isGuideRoom() so
+  * the roleplay agent is never dispatched into a guide room.
+  */
+-export const GUIDE_VOICE_ROOM_PREFIX = 'guide-';
++export const GUIDE_VOICE_ROOM_PREFIX = GUIDE_ROOM_PREFIX;
+ /** A voice session's token lives this long (plan §7.9: two hours). */
+ export const GUIDE_VOICE_SESSION_TTL_SECONDS = 2 * 60 * 60;
+ 
+diff --git a/ally-be/src/livekit/constants/livekit.constants.ts b/ally-be/src/livekit/constants/livekit.constants.ts
+index eb9e0d6e8f..0836736ded 100644
+--- a/ally-be/src/livekit/constants/livekit.constants.ts
++++ b/ally-be/src/livekit/constants/livekit.constants.ts
+@@ -1,2 +1,19 @@
+ export const DEFAULT_ROOM_TTL = 3600;
+ export const MAX_PARTICIPANTS = 5;
++
++/**
++ * Ally guide voice rooms are named `guide-…` and served by their own agent
++ * worker, never the roleplay one. The webhook handlers use this to leave them
++ * alone: no roleplay agent dispatch, no scenario-session end handling.
++ */
++export const GUIDE_ROOM_PREFIX = 'guide-';
++
++export const isGuideRoom = (roomName?: string | null): boolean =>
++  !!roomName?.startsWith(GUIDE_ROOM_PREFIX);
++
++/** Emitted (EventEmitter2) when a guide room finishes; payload `{ roomName }`. */
++export const GUIDE_VOICE_ROOM_FINISHED_EVENT = 'guide.voice.room.finished';
++
++export interface GuideVoiceRoomFinishedEventParams {
++  roomName: string;
++}
+diff --git a/ally-be/src/livekit/webhook/handlers/participant-joined.handler.ts b/ally-be/src/livekit/webhook/handlers/participant-joined.handler.ts
+index bb6391901e..3bc865a689 100644
+--- a/ally-be/src/livekit/webhook/handlers/participant-joined.handler.ts
++++ b/ally-be/src/livekit/webhook/handlers/participant-joined.handler.ts
+@@ -9,6 +9,7 @@ import { generateAudioStorageKey } from 'src/common/util/audio.util';
+ import { ScenarioSharedService } from 'src/learn/service/scenario-shared.service';
+ import { convertTimestampNsToDate } from 'src/common/util/date.util';
+ import { ScenarioInteractionMode } from 'src/learn/enum/scenario-interaction-mode.enum';
++import { isGuideRoom } from '../../constants/livekit.constants';
+ 
+ export interface ParticipantJoinedEvent {
+   event: 'participant_joined';
+@@ -81,6 +82,15 @@ export class ParticipantJoinedHandler {
+ 
+   async handle(event: ParticipantJoinedEvent): Promise<void> {
+     try {
++      // Guide rooms have their own agent worker. Never run the roleplay path
++      // for them — least of all the fallback dispatch of the roleplay agent.
++      if (isGuideRoom(event.room.name)) {
++        this.logger.debug(
++          `Ignoring participant_joined for guide room ${event.room.name}`,
++        );
++        return;
++      }
++
+       this.logger.info(
+         `Processing participant_joined event ${JSON.stringify(event)} for ${event.participant.identity} in room ${event.room.name}`,
+       );
+diff --git a/ally-be/src/livekit/webhook/handlers/room-finished.handler.ts b/ally-be/src/livekit/webhook/handlers/room-finished.handler.ts
+index a0ea2905ff..b19cbd24f5 100644
+--- a/ally-be/src/livekit/webhook/handlers/room-finished.handler.ts
++++ b/ally-be/src/livekit/webhook/handlers/room-finished.handler.ts
+@@ -1,4 +1,5 @@
+ import { Injectable } from '@nestjs/common';
++import { EventEmitter2 } from '@nestjs/event-emitter';
+ import {
+   ScenarioSessionAbandonReason,
+   ScenarioSessionStatus,
+@@ -6,6 +7,11 @@ import {
+ import { ScenarioSessionService } from 'src/learn/service/scenario-session.service';
+ import { ScenarioSessionLifecycleEventType } from 'src/learn/entity/scenario-session-lifecycle-event.entity';
+ import { LoggerService } from 'src/logger/logger.service';
++import {
++  GUIDE_VOICE_ROOM_FINISHED_EVENT,
++  GuideVoiceRoomFinishedEventParams,
++  isGuideRoom,
++} from '../../constants/livekit.constants';
+ 
+ export interface RoomFinishedEvent {
+   event: 'room_finished';
+@@ -30,6 +36,7 @@ export class RoomFinishedHandler {
+ 
+   constructor(
+     private readonly scenarioSessionService: ScenarioSessionService,
++    private readonly eventEmitter: EventEmitter2,
+   ) {}
+ 
+   async handle(event: RoomFinishedEvent): Promise<void> {
+@@ -41,6 +48,15 @@ export class RoomFinishedHandler {
+         return;
+       }
+ 
++      // Not a roleplay room: skip all scenario-session end handling and hand
++      // the finish to whichever guide module listens.
++      if (isGuideRoom(event.room.name)) {
++        this.eventEmitter.emit(GUIDE_VOICE_ROOM_FINISHED_EVENT, {
++          roomName: event.room.name,
++        } satisfies GuideVoiceRoomFinishedEventParams);
++        return;
++      }
++
+       if (event.room.name.startsWith('preview-')) {
+         await this.scenarioSessionService.endPreviewScenario(event.room.name);
+         return;
+diff --git a/ally-be/src/livekit/webhook/handlers/test/participant-joined.handler.spec.ts b/ally-be/src/livekit/webhook/handlers/test/participant-joined.handler.spec.ts
+index 391d30c416..2c3d533bcb 100644
+--- a/ally-be/src/livekit/webhook/handlers/test/participant-joined.handler.spec.ts
++++ b/ally-be/src/livekit/webhook/handlers/test/participant-joined.handler.spec.ts
+@@ -790,4 +790,104 @@ describe('ParticipantJoinedHandler', () => {
+       expect(liveKitService.agentDispatch).toHaveBeenCalled();
+     });
+   });
++
++  describe('guide rooms', () => {
++    const eventForRoom = (
++      name: string,
++      kind: number = ParticipantInfo_Kind.STANDARD,
++    ): ParticipantJoinedEvent => ({
++      ...mockParticipantJoinedEvent,
++      room: { ...mockParticipantJoinedEvent.room, name },
++      participant: { ...mockParticipantJoinedEvent.participant, kind },
++    });
++
++    const expectNoRoleplayWork = () => {
++      expect(liveKitService.listParticipants).not.toHaveBeenCalled();
++      expect(liveKitService.agentDispatch).not.toHaveBeenCalled();
++      expect(liveKitService.startRoomCompositeEgress).not.toHaveBeenCalled();
++      expect(liveKitService.clearProactiveDispatch).not.toHaveBeenCalled();
++      expect(
++        scenarioSessionService.getScenarioSessionByRoomId,
++      ).not.toHaveBeenCalled();
++      expect(
++        scenarioSessionService.updateScenarioSession,
++      ).not.toHaveBeenCalled();
++      expect(
++        scenarioSessionService.recordLifecycleEvent,
++      ).not.toHaveBeenCalled();
++    };
++
++    it('never falls back to dispatching the roleplay agent when a human joins', async () => {
++      await handler.handle(eventForRoom('guide-abc123'));
++
++      expectNoRoleplayWork();
++      expect(mockLogger.debug).toHaveBeenCalledWith(
++        'Ignoring participant_joined for guide room guide-abc123',
++      );
++    });
++
++    it('does no roleplay bookkeeping when the guide agent itself joins', async () => {
++      await handler.handle(
++        eventForRoom('guide-abc123', ParticipantInfo_Kind.AGENT),
++      );
++
++      expectNoRoleplayWork();
++    });
++
++    it('only matches the prefix, so a roleplay room that merely contains "guide-" still dispatches', async () => {
++      scenarioSessionService.getScenarioSessionByRoomId.mockResolvedValue({
++        id: 'abc',
++        startedAt: null,
++      } as any);
++      scenarioSessionService.updateScenarioSession.mockResolvedValue({} as any);
++      liveKitService.agentDispatch.mockResolvedValue(undefined);
++
++      await handler.handle(eventForRoom('ss_guide-abc'));
++
++      expect(liveKitService.agentDispatch).toHaveBeenCalledWith(
++        'ss_guide-abc',
++        mockAppConfigService.livekit.agentName,
++        expect.any(String),
++      );
++    });
++
++    it('still dispatches the roleplay agent into a normal roleplay room', async () => {
++      scenarioSessionService.getScenarioSessionByRoomId.mockResolvedValue({
++        id: 'abc',
++        startedAt: null,
++      } as any);
++      scenarioSessionService.updateScenarioSession.mockResolvedValue({} as any);
++      liveKitService.agentDispatch.mockResolvedValue(undefined);
++
++      await handler.handle(eventForRoom('ss_abc'));
++
++      expect(liveKitService.listParticipants).toHaveBeenCalledWith('ss_abc');
++      expect(
++        scenarioSessionService.getScenarioSessionByRoomId,
++      ).toHaveBeenCalledWith('ss_abc');
++      expect(liveKitService.agentDispatch).toHaveBeenCalledWith(
++        'ss_abc',
++        mockAppConfigService.livekit.agentName,
++        expect.any(String),
++      );
++      expect(mockLogger.debug).not.toHaveBeenCalledWith(
++        expect.stringContaining('guide room'),
++      );
++    });
++
++    it('still dispatches the roleplay agent into a preview room', async () => {
++      liveKitService.agentDispatch.mockResolvedValue(undefined);
++
++      await handler.handle(eventForRoom('preview-abc'));
++
++      expect(
++        scenarioSessionService.getScenarioSessionByRoomId,
++      ).not.toHaveBeenCalled();
++      expect(liveKitService.agentDispatch).toHaveBeenCalledWith(
++        'preview-abc',
++        mockAppConfigService.livekit.agentName,
++        expect.any(String),
++      );
++    });
++  });
+ });
+diff --git a/ally-be/src/livekit/webhook/handlers/test/room-finished.handler.spec.ts b/ally-be/src/livekit/webhook/handlers/test/room-finished.handler.spec.ts
+index 675f3ad9ae..3d51fdaaa4 100644
+--- a/ally-be/src/livekit/webhook/handlers/test/room-finished.handler.spec.ts
++++ b/ally-be/src/livekit/webhook/handlers/test/room-finished.handler.spec.ts
+@@ -1,4 +1,5 @@
+ import { Test, TestingModule } from '@nestjs/testing';
++import { EventEmitter2 } from '@nestjs/event-emitter';
+ import {
+   RoomFinishedHandler,
+   RoomFinishedEvent,
+@@ -14,6 +15,7 @@ import {
+ describe('RoomFinishedHandler', () => {
+   let handler: RoomFinishedHandler;
+   let scenarioSessionService: jest.Mocked<ScenarioSessionService>;
++  let eventEmitter: { emit: jest.Mock };
+   let mockLogger: jest.Mocked<LoggerService>;
+ 
+   const mockScenarioSession: ScenarioSessions = {
+@@ -55,6 +57,8 @@ describe('RoomFinishedHandler', () => {
+       recordLifecycleEvent: jest.fn(),
+     };
+ 
++    eventEmitter = { emit: jest.fn() };
++
+     mockLogger = {
+       info: jest.fn(),
+       error: jest.fn(),
+@@ -69,6 +73,7 @@ describe('RoomFinishedHandler', () => {
+           provide: ScenarioSessionService,
+           useValue: mockScenarioSessionService,
+         },
++        { provide: EventEmitter2, useValue: eventEmitter },
+       ],
+     }).compile();
+ 
+@@ -133,6 +138,75 @@ describe('RoomFinishedHandler', () => {
+       expect(scenarioSessionService.endScenarioSession).not.toHaveBeenCalled();
+     });
+ 
++    it('does not emit the guide event for roleplay or preview rooms', async () => {
++      scenarioSessionService.getScenarioSessionByRoomId.mockResolvedValue({
++        ...mockScenarioSession,
++        status: ScenarioSessionStatus.ENDED,
++      });
++      scenarioSessionService.endPreviewScenario = jest
++        .fn()
++        .mockResolvedValue(undefined);
++
++      await handler.handle(mockRoomFinishedEvent);
++      await handler.handle({
++        ...mockRoomFinishedEvent,
++        room: { ...mockRoomFinishedEvent.room, name: 'preview-abc' },
++      });
++
++      expect(eventEmitter.emit).not.toHaveBeenCalled();
++    });
++
++    describe('guide rooms', () => {
++      const guideEvent: RoomFinishedEvent = {
++        ...mockRoomFinishedEvent,
++        room: { ...mockRoomFinishedEvent.room, name: 'guide-abc123' },
++      };
++
++      it('skips all roleplay session handling and emits guide.voice.room.finished', async () => {
++        scenarioSessionService.endPreviewScenario = jest.fn();
++
++        await handler.handle(guideEvent);
++
++        expect(eventEmitter.emit).toHaveBeenCalledTimes(1);
++        expect(eventEmitter.emit).toHaveBeenCalledWith(
++          'guide.voice.room.finished',
++          { roomName: 'guide-abc123' },
++        );
++        expect(
++          scenarioSessionService.getScenarioSessionByRoomId,
++        ).not.toHaveBeenCalled();
++        expect(
++          scenarioSessionService.recordLifecycleEvent,
++        ).not.toHaveBeenCalled();
++        expect(
++          scenarioSessionService.endScenarioSession,
++        ).not.toHaveBeenCalled();
++        expect(
++          scenarioSessionService.endPreviewScenario,
++        ).not.toHaveBeenCalled();
++      });
++
++      it('only matches the prefix, so a roleplay room that merely contains "guide-" is still ended', async () => {
++        scenarioSessionService.getScenarioSessionByRoomId.mockResolvedValue(
++          mockScenarioSession,
++        );
++        scenarioSessionService.endScenarioSession.mockResolvedValue({
++          message: 'Scenario session ended successfully',
++        });
++
++        await handler.handle({
++          ...mockRoomFinishedEvent,
++          room: { ...mockRoomFinishedEvent.room, name: 'ss_guide-abc' },
++        });
++
++        expect(eventEmitter.emit).not.toHaveBeenCalled();
++        expect(scenarioSessionService.endScenarioSession).toHaveBeenCalledWith(
++          'session-123',
++          456,
++        );
++      });
++    });
++
+     it('should handle getScenarioSessionByRoomId error', async () => {
+       const error = new Error('Scenario session not found');
+       scenarioSessionService.getScenarioSessionByRoomId.mockRejectedValue(

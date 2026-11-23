@@ -49,12 +49,11 @@ vi.mock("@components", async importOriginal => {
   const actual = await importOriginal<typeof import("@components")>();
   return {
     ...actual,
-    DebriefTab: ({ sessionId, summaryData, retryMaxReached, readOnly, onOpenMoment }: any) => (
+    DebriefTab: ({ sessionId, summaryData, readOnly, onOpenMoment }: any) => (
       <div
         data-testid="debrief-tab"
         data-read-only={String(!!readOnly)}
         data-has-summary={String(!!summaryData)}
-        data-retry-max={String(retryMaxReached)}
         data-has-open-moment={String(!!onOpenMoment)}
       >
         <div data-testid="debrief-session-id">{sessionId}</div>
@@ -195,6 +194,16 @@ describe("SimulationSummarySidebar Component", () => {
 
       expect(screen.getByTestId("debrief-tab")).toHaveAttribute("data-read-only", "true");
       expect(screen.getByTestId("debrief-session-id")).toHaveTextContent("test-summary-id");
+    });
+
+    it("scrolls the debrief inside the drawer, which clips its body", () => {
+      // The drawer body is overflow-hidden; a long debrief could not be
+      // scrolled until the tab got its own scroll container (2026-11-16).
+      renderComponent();
+
+      const scroller = screen.getByTestId("debrief-tab-scroll");
+      expect(scroller).toHaveClass("overflow-y-auto", "min-h-0", "flex-1");
+      expect(scroller).toContainElement(screen.getByTestId("debrief-tab"));
     });
 
     it("should not wire transcript-focus into the debrief here", () => {

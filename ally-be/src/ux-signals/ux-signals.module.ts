@@ -4,9 +4,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppConfigModule } from 'src/config/config.module';
 import { LlmUsageModule } from 'src/analytics/llm-usage.module';
 import { PromptModule } from 'src/prompt/prompt.module';
-import { BugFinding } from 'src/bug-hunter/entity/bug-finding.entity';
-import { BugFindingRepository } from 'src/bug-hunter/repository/bug-finding.repository';
-import { AnalyticsSuggestion } from 'src/analytics-suggestions/entity/analytics-suggestion.entity';
+import { BugHunterApprovalsModule } from 'src/bug-hunter-approvals/bug-hunter-approvals.module';
+import { PmAgentSignal } from 'src/pm-agent/entity/pm-agent-signal.entity';
 import { RoadmapProductGoal } from 'src/product-roadmap/entity/roadmap-product-goal.entity';
 import { RoadmapProductGoalRepository } from 'src/product-roadmap/repository/roadmap-taxonomy.repository';
 
@@ -27,26 +26,22 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
  *
  * The platform's PostHog integration was write-only: the frontends captured
  * events and nothing ever read them back. This module is the reader, and it
- * closes the loop into the two review queues that already exist rather than
- * building a third one.
+ * closes the loop into the Bug Hunter queue and the PM Agent's signal store rather
+ * than building a review queue of its own.
  *
  * ## Why it owns no review UI
  * A scan produces two kinds of artefact and files each where its audience already
  * works: bug-shaped items become `bug_findings` rows in the Bug Hunter queue,
- * improvement-shaped ones become pending `analytics_suggestions` reviewed in the
- * Analytics Suggestions tab. Neither destination is modified — the existing
- * approve and accept/reject gates are the gates. The pipeline proposes; people
+ * improvement-shaped ones become `pm_agent_signals` rows (source `ux_signals`) that
+ * the PM Agent's ux_signals lane reads as evidence. Neither destination is
+ * modified — the existing gates are the gates. The pipeline proposes; people
  * decide, and nothing here can dispatch a fix session or file a roadmap item.
  *
- * ## Why it writes through raw repositories
- * `BugFindingRepository` and `RoadmapProductGoalRepository` are provided here
- * rather than imported from their owning modules. Both construct themselves from
- * the DataSource, so this costs nothing, and it keeps the module graph acyclic:
- * BugHunterModule registers `BugFinding` in `forFeature` precisely so other
- * domains can write findings without depending on it (see
- * RoadmapOpportunityService.create, which files a finding the same way). A graph
- * where every producer of findings imports the module that consumes them is how
- * this codebase has hit circular-import DI failures before.
+ * ## Where its bugs go
+ * A UX-signal bug is filed into Bug Hunter's queue (`bughunter.bugs`, through
+ * BugHunterApprovalsModule's BugHunterBoardService), once per route/target and wording.
+ * `RoadmapProductGoalRepository` is provided here rather than imported, since it
+ * constructs itself from the DataSource.
  *
  * ## Dependencies say what it is
  *  - AppConfigModule for the PostHog query credential;
@@ -60,16 +55,13 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([
-      UxSignalScan,
-      BugFinding,
-      AnalyticsSuggestion,
-      RoadmapProductGoal,
-    ]),
+    TypeOrmModule.forFeature([UxSignalScan, PmAgentSignal, RoadmapProductGoal]),
     AppConfigModule,
     PromptModule,
     LlmUsageModule,
     LlmAgentModule,
+    // UX-signal bugs go into Bug Hunter's queue (BugHunterBoardService.enqueueSignal)
+    BugHunterApprovalsModule,
   ],
   controllers: [UxSignalsController],
   providers: [
@@ -80,7 +72,6 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
     UxSignalWriterService,
     UxSignalsService,
     UxSignalsSchedulerRegistrationService,
-    BugFindingRepository,
     RoadmapProductGoalRepository,
   ],
   // The read side only. In-process callers ask what telemetry says is broken —

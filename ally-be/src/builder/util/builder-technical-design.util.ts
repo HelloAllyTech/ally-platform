@@ -16,7 +16,9 @@ import {
  */
 
 /** Keys that are about the document's machinery, not the product it describes. */
-const NON_PRODUCT_KEYS = new Set(['technicalDesign', 'ui']);
+// `principleMarks`: recording what became of a principle is bookkeeping about the plan, and must
+// not make an approved design stale. (The citation it points at is in a product section.)
+const NON_PRODUCT_KEYS = new Set(['technicalDesign', 'ui', 'principleMarks']);
 
 /** JSON with every object's keys sorted, so equal documents hash equally. */
 const stableStringify = (value: unknown): string => {

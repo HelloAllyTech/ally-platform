@@ -1,10 +1,14 @@
 # Which documentation covers which code across the ally-platform monorepo.
 #
-# Read by the shared docs-guard workflow on every PR, and by the weekly wiki reconciler.
-# Because helloallytech.github.io/ lives inside this monorepo, `wiki:<page>` rules can now
-# also be satisfied by directly touching `helloallytech.github.io/wiki/<page>` in the same PR!
+# Read by the shared docs-guard job in .github/workflows/docs.yml on every PR and push.
+# Spec: helloallytech.github.io/wiki/contributing/docs-system.md
 #
-# Escape hatch: add the `docs:skip` label, or a `Wiki-PR: none — <reason>` / `Docs-Skip:` trailer.
+# The wiki lives in this monorepo, so require a wiki page by its plain path
+# (`requires: helloallytech.github.io/wiki/<page>`); the PR satisfies it by touching the page.
+# The legacy `wiki:<page>` form is met only by a `Wiki-PR:` line in the PR description.
+#
+# Escape hatches: the `docs:skip` label on a PR; `Wiki-PR: none — <reason>` for wiki: rules;
+# a `Docs-Skip: <reason>` commit trailer only on a direct push to master.
 
 version: 1
 repo: ally-platform
@@ -180,6 +184,28 @@ rules:
     requires: helloallytech.github.io/wiki/repos/ally-ai.md
     why: The HTTP surface is what ally-be integrates against; the repo page documents it.
 
+  - id: debrief-harness-contract
+    watch:
+      - "ally-ai/app/core/debrief_graph/schemas.py"
+      - "ally-ai/app/core/debrief_graph/gateway.py"
+      - "ally-ai/app/core/ask_ally/schemas.py"
+      - "ally-ai/app/core/ask_ally/agent.py"
+      - "ally-ai/app/core/ask_ally/tools.py"
+      - "ally-be/src/debrief/service/debrief-run-token.service.ts"
+      - "ally-be/src/debrief/service/debrief-gateway.service.ts"
+      - "ally-be/src/debrief/service/ask-ally.client.ts"
+      - "ally-be/src/debrief/service/debrief-graph.client.ts"
+      - "ally-ai/app/core/pm_agent/schemas.py"
+      - "ally-ai/app/core/pm_agent/tools.py"
+      - "ally-be/src/debrief/service/debrief-pm-agent-tools.service.ts"
+      - "ally-be/src/debrief/service/debrief-pm-agent-run.service.ts"
+    requires: docs/debrief-harness/CONTRACT.md
+    why: >
+      The run and reply requests, the stream events, the gateway tools and the run
+      tokens are a contract between ally-be and ally-ai; each side is built and
+      deployed separately, so a change on one side without the contract moving
+      leaves the other guessing.
+
   - id: ally-ai-filler-eval-schema
     watch:
       - "ally-ai/app/core/filler_quality/**"
@@ -245,3 +271,18 @@ rules:
         - ally-mobile/docs/RELEASE.md
     why: >
       Version and build-number handling is the step people get wrong at release time.
+
+  # ── Cross-service: the Core Concepts map ───────────────────────────────
+  # scripts/concepts_lint.py (the `concepts` job) already fails on a new, moved or removed
+  # directory or toggle key. This rule covers what it cannot see: a gate whose *default* or
+  # meaning changed, which flips a concept between Live and Dark without touching a path.
+  - id: concepts-gates
+    watch:
+      - "ally-be/src/authorization/constants/admin-feature-toggle.constants.ts"
+      - "ally-be/src/*/entity/*settings*.entity.ts"
+    requires: helloallytech.github.io/wiki/platform/concepts.md
+    why: >
+      Feature toggles and settings flags decide whether a concept is Live, Dark or Partial,
+      and the Core Concepts page states that status per concept. Re-check the Status line of
+      the concept this gate belongs to; a change that moves no status (a description, a
+      reordering) can take the `docs:skip` label.

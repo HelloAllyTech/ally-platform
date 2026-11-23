@@ -1,21 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { randomUUID } from 'crypto';
+import { createHash } from 'crypto';
 
 import { LoggerService } from 'src/logger/logger.service';
-import { BugFinding } from 'src/bug-hunter/entity/bug-finding.entity';
-import { BugFindingRepository } from 'src/bug-hunter/repository/bug-finding.repository';
-import {
-  BugFindingSource,
-  BugFindingStatus,
-} from 'src/bug-hunter/enum/bug-finding.enum';
-import { AnalyticsSuggestion } from 'src/analytics-suggestions/entity/analytics-suggestion.entity';
-import {
-  AnalyticsSuggestionSource,
-  AnalyticsSuggestionStatus,
-} from 'src/analytics-suggestions/enum/analytics-suggestion.enum';
-import { RoadmapOpportunityType } from 'src/product-roadmap/enum/roadmap-opportunity.enum';
+import { BugHunterBoardService } from 'src/bug-hunter-approvals/service/bug-hunter-board.service';
+import { PmAgentSignal } from 'src/pm-agent/entity/pm-agent-signal.entity';
 
 import {
   UX_SIGNAL_FIELD_LIMITS,
@@ -24,16 +14,10 @@ import {
 import { UxSignalKind } from '../enum/ux-signal.enum';
 import { TriagedItem } from '../ux-signals.types';
 
-/**
- * Advisory-lock coordinates for filing a UX-signal suggestion.
- *
- * A fixed namespace, distinct from ScheduledTaskRunnerService's 4919, so these
- * can never collide with an interval lock. One fixed key rather than a hash of the
- * title: this path files at most a handful of rows a day, so serialising all of it
- * costs nothing and needs no argument about hash collisions to be correct.
- */
-const SUGGESTION_LOCK_NAMESPACE = 4920;
-const SUGGESTION_LOCK_KEY = 1;
+/** `pm_agent_signals.source` for everything this module files. */
+export const UX_SIGNALS_SOURCE = 'ux_signals';
+/** `pm_agent_signals.detector` for triaged improvement items (bugs go to bug_findings). */
+const TRIAGE_DETECTOR = 'ux_triage';
 
 /** What one write pass filed, and what it recognised as already known. */
 export interface WriteResult {
@@ -43,20 +27,20 @@ export interface WriteResult {
 }
 
 /**
- * Files triaged items into the two existing human review queues.
+ * Files triaged items: bugs into the Bug Hunter queue, improvements into the PM Agent's
+ * signal store.
  *
- * This service writes to `bug_findings` and `analytics_suggestions` through raw
- * repositories rather than by importing BugHunterModule or
- * AnalyticsSuggestionsModule. That is the established cross-domain pattern here
+ * This service writes to `bug_findings` and `pm_agent_signals` through raw
+ * repositories rather than by importing BugHunterModule or PmAgentModule. That is the established cross-domain pattern here
  * (see RoadmapOpportunityService.create, which inserts a bug finding the same
  * way) and it exists to avoid the circular-import DI traps that bit this codebase
  * before: a module graph where every producer of findings depends on the module
  * that consumes them does not stay acyclic for long.
  *
- * Nothing here dispatches work. A bug lands at NEW for an admin to approve, and a
- * suggestion lands PENDING for an admin to accept or reject — both queues keep
- * their existing gates, and no code path in this pipeline can start a fix session
- * or open a pull request. The scan proposes; people decide.
+ * Nothing here dispatches work. A bug lands at NEW for an admin to approve, and an
+ * improvement lands as a `new` signal the PM Agent may turn into a card — the
+ * agent's own gates decide what happens next, and no code path in this pipeline
+ * can start a fix session or open a pull request. The scan proposes; people decide.
  */
 @Injectable()
 export class UxSignalWriterService {
@@ -65,30 +49,24 @@ export class UxSignalWriterService {
   );
 
   constructor(
-    private readonly bugFindingRepository: BugFindingRepository,
-    @InjectRepository(AnalyticsSuggestion)
-    private readonly suggestionRepository: Repository<AnalyticsSuggestion>,
+    private readonly bugHunter: BugHunterBoardService,
+    @InjectRepository(PmAgentSignal)
+    private readonly signalRepository: Repository<PmAgentSignal>,
   ) {}
 
   /**
    * File every item, then report what landed.
    *
-   * One batch id for the whole scan, so the suggestions a single scan produced
-   * can be read as one decision set — the same grouping the analytics-window runs
-   * use.
-   *
    * Each item is written independently and best-effort: one malformed row must not
    * discard the rest of a scan's work. There is no transaction spanning the two
-   * tables on purpose — a bug finding and a suggestion are separate artefacts for
-   * separate queues, and rolling one back because the other failed would lose real
+   * tables on purpose — a bug finding and a signal are separate artefacts for
+   * separate consumers, and rolling one back because the other failed would lose real
    * information to preserve a consistency nobody reads.
    */
   async write(
     items: TriagedItem[],
     scan: { windowFrom: string; windowTo: string; model: string },
-    userId: number | null,
   ): Promise<WriteResult> {
-    const batchId = randomUUID();
     const result: WriteResult = {
       findingsCreated: 0,
       suggestionsCreated: 0,
@@ -100,7 +78,7 @@ export class UxSignalWriterService {
         const filed =
           item.kind === UxSignalKind.BUG
             ? await this.fileBug(item)
-            : await this.fileSuggestion(item, batchId, scan, userId);
+            : await this.fileSignal(item, scan);
 
         if (!filed) {
           result.skippedDuplicates += 1;
@@ -143,119 +121,88 @@ export class UxSignalWriterService {
     const description = item.body.slice(
       UX_SIGNAL_FIELD_LIMITS.DESCRIPTION * -1,
     );
-    const dedupeKey = BugFindingRepository.dedupeKey(
-      null,
-      BugFindingSource.UX_SIGNAL,
+    // The old Bug Hunter's identity, unchanged: one bug per route/target, whatever the
+    // wording (the model rewords freely between runs).
+    const norm = (v: string) => v.toLowerCase().replace(/\s+/g, ' ').trim();
+    const key = createHash('sha256')
+      .update(`::ux_signal::${norm(symbol)}`)
+      .digest('hex');
+    return this.bugHunter.enqueueSignal({
+      source: 'ux_signal',
+      key,
+      app: UX_SIGNAL_REPO,
+      title: item.title.slice(0, UX_SIGNAL_FIELD_LIMITS.TITLE),
+      description: `${description}\n\n${this.formatEvidence(item)}`,
+      severity: item.severity,
       symbol,
-      description,
-    );
-
-    const existing = await this.bugFindingRepository.findOpenByDedupeKey(
-      UX_SIGNAL_REPO,
-      dedupeKey,
-    );
-    if (existing) return false;
-
-    await this.bugFindingRepository.save(
-      this.bugFindingRepository.create({
-        source: BugFindingSource.UX_SIGNAL,
-        repo: UX_SIGNAL_REPO,
-        title: item.title.slice(0, UX_SIGNAL_FIELD_LIMITS.TITLE),
-        description,
-        symbol,
-        dedupeKey,
-        severity: item.severity,
-        evidence: this.formatEvidence(item),
-        proven: false,
-        status: BugFindingStatus.NEW,
-      } as Partial<BugFinding>),
-    );
-    return true;
+    });
   }
 
   /**
-   * One suggestion, or false when an equivalent one is already awaiting a decision.
+   * One improvement signal, or false when an equivalent one is already stored.
    *
-   * Written directly rather than through AnalyticsSuggestionsService.generate,
-   * which is the analytics-window product: it collects its own payload from
-   * platform analytics and drives its own prompt. Sharing the *table* and the
-   * accept/reject flow is the point; sharing the generator would mean bending a
-   * window run into something it is not.
-   *
-   * The title guard is a cheap backstop only. Real anti-repetition happens in the
-   * prompt, which is given the open findings and the pending and rejected
-   * suggestions — a rejection with a reason is a standing decision, and re-filing
-   * a reworded version of it is how a review queue loses its readers.
-   *
-   * The check and the insert run inside one transaction that first takes a
-   * transaction-level advisory lock, because on their own they are a read followed
-   * by a write and two passes can interleave between them — each seeing an empty
-   * pending queue, each filing the same card. Scans are serialised by a unique
-   * index now, but not absolutely: a scan that outlives the staleness cutoff is
-   * declared abandoned and a second one starts beside it, and that is the window
-   * this closes. A lock rather than a unique index on `analytics_suggestions`,
-   * because that table is the shared review queue — the analytics-window producer
-   * writes to it too, historical rows may already hold repeated titles, and a
-   * constraint added underneath a human queue would turn old data into a hard
-   * error nobody asked for. The lock is released when the transaction ends,
-   * including on rollback, so a failed filing cannot wedge the next one.
+   * Stored in `pm_agent_signals`, one row per (source, key), where the key is a
+   * fingerprint of route + target + normalised title. The insert is a single
+   * `ON CONFLICT (source, key)` statement, so two overlapping passes cannot file
+   * the same card twice (the unique constraint is the lock) and no advisory lock
+   * is needed. On a conflict only `lastSeenAt` moves: a signal the PM Agent has
+   * used or an admin dismissed keeps its status, so a dismissal is a standing
+   * decision rather than something the next scan quietly reverses. `xmax = 0`
+   * distinguishes a fresh insert from a refresh.
    */
-  private async fileSuggestion(
+  private async fileSignal(
     item: TriagedItem,
-    batchId: string,
     scan: { windowFrom: string; windowTo: string; model: string },
-    userId: number | null,
   ): Promise<boolean> {
     const title = item.title.slice(0, UX_SIGNAL_FIELD_LIMITS.TITLE);
-    // A scheduled scan has no acting user. 0 is ally-be's system-write
-    // convention for these audit columns.
-    const actor = userId ?? 0;
+    const key = UxSignalWriterService.signalKey(item);
+    const metrics = {
+      route: item.route,
+      target: item.target ?? null,
+      kind: item.kind,
+      body: item.body.slice(0, UX_SIGNAL_FIELD_LIMITS.BODY),
+      rationale: item.rationale.slice(0, UX_SIGNAL_FIELD_LIMITS.RATIONALE),
+      evidence: item.evidence
+        .slice(0, UX_SIGNAL_FIELD_LIMITS.EVIDENCE_ITEMS)
+        .map((line) => line.slice(0, UX_SIGNAL_FIELD_LIMITS.EVIDENCE_ITEM)),
+      suggestedGoal: item.suggestedGoal,
+      confidence: item.confidence ?? null,
+      windowFrom: scan.windowFrom,
+      windowTo: scan.windowTo,
+      windowLabel: `UX scan · ${scan.windowFrom} → ${scan.windowTo}`,
+      model: scan.model,
+    };
 
-    return this.suggestionRepository.manager.transaction(async (manager) => {
-      await manager.query('SELECT pg_advisory_xact_lock($1, $2)', [
-        SUGGESTION_LOCK_NAMESPACE,
-        SUGGESTION_LOCK_KEY,
-      ]);
+    const rows: { inserted: boolean }[] = await this.signalRepository.query(
+      `INSERT INTO "pm_agent_signals"
+         ("source", "detector", "key", "title", "summary", "metrics", "severity")
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)
+       ON CONFLICT ("source", "key")
+       DO UPDATE SET "lastSeenAt" = now(), "updatedAt" = now()
+       RETURNING (xmax = 0) AS inserted`,
+      [
+        UX_SIGNALS_SOURCE,
+        TRIAGE_DETECTOR,
+        key,
+        title,
+        metrics.body,
+        JSON.stringify(metrics),
+        item.severity,
+      ],
+    );
+    return rows[0]?.inserted === true;
+  }
 
-      const repository = manager.getRepository(AnalyticsSuggestion);
-      const duplicate = await repository
-        .createQueryBuilder('s')
-        .where('s.status = :status', {
-          status: AnalyticsSuggestionStatus.PENDING,
-        })
-        .andWhere('s.source = :source', {
-          source: AnalyticsSuggestionSource.UX_SIGNAL,
-        })
-        .andWhere('LOWER(TRIM(s.title)) = :title', {
-          title: title.toLowerCase().trim(),
-        })
-        .getOne();
-      if (duplicate) return false;
-
-      await repository.save(
-        repository.create({
-          batchId,
-          source: AnalyticsSuggestionSource.UX_SIGNAL,
-          title,
-          body: item.body.slice(0, UX_SIGNAL_FIELD_LIMITS.BODY),
-          rationale: item.rationale.slice(0, UX_SIGNAL_FIELD_LIMITS.RATIONALE),
-          evidence: item.evidence,
-          suggestedGoal: item.suggestedGoal,
-          // Always IDEA: a signal the triage classified as bug-shaped went to the
-          // bug queue instead of here, so anything reaching this method is an
-          // improvement by construction.
-          suggestedType: RoadmapOpportunityType.IDEA,
-          status: AnalyticsSuggestionStatus.PENDING,
-          windowFrom: scan.windowFrom,
-          windowTo: scan.windowTo,
-          windowLabel: `UX scan · ${scan.windowFrom} → ${scan.windowTo}`,
-          model: scan.model,
-          createdBy: actor,
-          updatedBy: actor,
-        }),
-      );
-      return true;
-    });
+  /** Stable dedupe key: the coordinate plus a hash of the normalised title. */
+  static signalKey(item: TriagedItem): string {
+    const coordinate = item.target
+      ? `${item.route}|${item.target}`
+      : item.route;
+    const hash = createHash('sha1')
+      .update(item.title.toLowerCase().replace(/\s+/g, ' ').trim())
+      .digest('hex')
+      .slice(0, 16);
+    return `${coordinate.slice(0, 130)}#${hash}`;
   }
 
   /**

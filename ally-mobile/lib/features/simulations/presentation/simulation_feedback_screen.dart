@@ -20,6 +20,7 @@ import '../../../core/widgets/ask_ai_chat/ask_ai_chat.dart';
 import '../../../core/widgets/review_type_chip.dart';
 import '../../../core/widgets/toast/toast_controller.dart';
 import '../../account/presentation/profile_settings_screen.dart' show RnCustomSwitch;
+import '../../courses/data/courses_repository.dart';
 import '../../reactions/data/reactions_repository.dart';
 import '../../reviews/data/review_models.dart';
 import '../../reviews/data/reviews_repository.dart';
@@ -41,14 +42,15 @@ enum FeedbackTab { summary, debrief, transcript }
 /// subtitle by `fromLogs`) with a Share switch, and the learner's star
 /// rating under it. Then, for CHECKLIST roleplays, the evaluation
 /// checklist; then the tabs the roleplay turned on (`feedbackTabs`):
-/// Debrief (Ally's note + the Ask-AI reply thread, see [DebriefTab]) and
+/// Debrief (the Debrief agent's cards, or an old note read-only, see [DebriefTab]) and
 /// Transcript ([SimulationTranscriptTab]); a short session (≤30s) only
 /// gets "Session Review". Off the Debrief tab a floating review button
 /// (when the review has something to see — RN `useHideReviewDetails`,
 /// threads or reactions) and "Try another simulation" float at the bottom.
 ///
-/// The session is polled every 3.5s (up to 7 retries) until Ally's
-/// feedback lands, and again whenever the learner comes back from sharing.
+/// A failed load of the session is retried every 3.5s (up to 7 retries),
+/// and the session is read again whenever the learner comes back from
+/// sharing. Nothing polls for Ally's old note any more.
 /// A fresh session (not from Logs) without a rating opens the rating
 /// popup straight away, and asks again on leaving.
 class SimulationFeedbackScreen extends ConsumerStatefulWidget {
@@ -56,9 +58,12 @@ class SimulationFeedbackScreen extends ConsumerStatefulWidget {
     super.key,
     required this.scenarioSessionId,
     this.fromLogs = false,
+    this.ownSession = false,
     this.pathId,
     this.caseId,
     this.languageId,
+    this.trackId,
+    this.trackItemId,
   });
 
   final String scenarioSessionId;
@@ -67,6 +72,10 @@ class SimulationFeedbackScreen extends ConsumerStatefulWidget {
   /// so the debrief is read-only and leaving never forces a rating.
   final bool fromLogs;
 
+  /// From the logs, the viewer's own session: their debrief comes from the
+  /// learner view (read-only here), not the supervisor's.
+  final bool ownSession;
+
   /// RN `route.params.pathId` / `caseId`: the session belongs to a path or
   /// case, so back returns to its details and "Try another" is hidden.
   final String? pathId;
@@ -74,6 +83,16 @@ class SimulationFeedbackScreen extends ConsumerStatefulWidget {
 
   /// RN `route.params.languageId` (carried; the screen itself doesn't read it).
   final int? languageId;
+
+  /// The course this roleplay was played in (web `ActiveTrackContext`):
+  /// back returns to the course, a breadcrumb names it and "Continue the
+  /// course" opens its next item. Null for a standalone roleplay, which
+  /// keeps today's behaviour.
+  final String? trackId;
+
+  /// The course item that started this roleplay, when it was one (carried;
+  /// the next item comes from the server).
+  final String? trackItemId;
 
   @override
   ConsumerState<SimulationFeedbackScreen> createState() => _SimulationFeedbackScreenState();
@@ -105,6 +124,35 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
   FeedbackValue _existingFeedback = (rating: 0, tags: const <String>[], comment: '');
 
   TranscriptFocusRequest? _momentRequest;
+
+  /// How far the title, stars and checklist have folded away (0 shown, 1
+  /// gone): follows the open tab's vertical scroll over the header's height.
+  double _headerCollapse = 0;
+  final _headerKey = GlobalKey();
+
+  /// The header's height, measured after layout (never read mid-layout).
+  double _headerHeight = 120;
+
+  bool _onContentScroll(ScrollNotification n) {
+    if (n.metrics.axis != Axis.vertical) return false;
+    // Only the tab's own list (the nearest one), not lists inside it.
+    if (n.depth > 2) return false;
+    final pixels = n.metrics.pixels;
+    // Notifications can arrive during layout (ensureVisible, a jump): settle
+    // after the frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final box = _headerKey.currentContext?.findRenderObject();
+      if (box is RenderBox && box.hasSize && _headerCollapse == 0) _headerHeight = box.size.height;
+      if (_headerHeight <= 0) return;
+      final next = (pixels / _headerHeight).clamp(0.0, 1.0);
+      if (next != _headerCollapse && ((next - _headerCollapse).abs() > 0.01 || next == 0 || next == 1)) {
+        setState(() => _headerCollapse = next);
+      }
+    });
+    return false;
+  }
+
   int _momentRequestCount = 0;
 
   /// RN `useHideReviewDetails`'s `hideReviewDetails` (starts `true`).
@@ -115,7 +163,8 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
     api: () => ref.read(askAiChatApiProvider),
     // Read-only (from Logs): no thread — it's keyed by session, so an admin
     // would otherwise be typing into the learner's own conversation.
-    sessionId: widget.fromLogs ? '' : widget.scenarioSessionId,
+    // The learner's own session from the logs keeps their thread (Ask Ally).
+    sessionId: widget.fromLogs && !widget.ownSession ? '' : widget.scenarioSessionId,
   );
 
   @override
@@ -158,10 +207,11 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
       final summary = await ref.read(simulationsRepositoryProvider).getSimulationDetails(widget.scenarioSessionId);
       if (generation != _retryGeneration || !mounted) return;
       setState(() => _summary = summary);
+      // A withheld assessment has no feedback to wait for or rate.
+      if (summary.resultsHidden) return;
       _onSummary(summary);
-      final tabsOff = (summary.scenario?.hasFeedbackTabs ?? false) && !summary.feedbackEnabled;
-      if (tabsOff || summary.hasSummaryFeedback) return;
-      scheduleRetry();
+      // Loaded: nothing more to wait for. An old note is read as it stands;
+      // the backend no longer writes one, so there is no re-polling for it.
     } catch (_) {
       scheduleRetry();
     }
@@ -239,22 +289,42 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
 
   // ── Navigation ───────────────────────────────────────────────────────
 
+  String? get _trackId {
+    final id = widget.trackId;
+    return id == null || id.isEmpty ? null : id;
+  }
+
+  /// Resets to Learn with [locations] pushed on top, in order (`push`
+  /// builds on the delegate's current stack, which `go` only replaces once
+  /// the new location is parsed — so push on the next frame).
+  void _resetToLearnThen(List<({String location, Object? extra})> locations) {
+    final router = GoRouter.of(context);
+    goToHomeTab(router, kTabLearn);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      for (final next in locations) {
+        router.push(next.location, extra: next.extra);
+      }
+    });
+  }
+
   /// RN `handleBack`: a path/case session resets to that path/case's
-  /// details; Logs go back; a fresh session returns to Learn.
+  /// details; Logs go back; a fresh session returns to Learn. A roleplay
+  /// played inside a course returns to that course (web breadcrumb).
   void _handleBack() {
     if (!mounted) return;
+    final trackId = _trackId;
+    if (trackId != null && !widget.fromLogs) {
+      _resetToLearnThen([(location: '/courses/$trackId', extra: null)]);
+      return;
+    }
     final pathId = widget.pathId;
     final caseId = widget.caseId;
     if (pathId != null || caseId != null) {
       // RN `navigation.reset` to the details screen alone; here the shell
       // stays underneath so back from the details lands on Learn, which is
       // where RN's details screen sends a back with nothing to go back to.
-      final router = GoRouter.of(context);
       final details = pathId != null ? '/simulation-paths/$pathId' : '/cases/$caseId';
-      goToHomeTab(router, kTabLearn);
-      // `push` builds on the delegate's current stack, which `go` only
-      // replaces once the new location is parsed — push on the next frame.
-      WidgetsBinding.instance.addPostFrameCallback((_) => router.push(details));
+      _resetToLearnThen([(location: details, extra: null)]);
       return;
     }
     if (widget.fromLogs) {
@@ -262,6 +332,107 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
       return;
     }
     goToHomeTab(GoRouter.of(context), kTabLearn);
+  }
+
+  bool _continuing = false;
+
+  /// "Continue the course" (web `useContinueTrack`): the server's next item,
+  /// opened over the course; the course itself once it is complete or the
+  /// lookup fails.
+  Future<void> _continueCourse() async {
+    final trackId = _trackId;
+    if (trackId == null || _continuing) return;
+    setState(() => _continuing = true);
+    final course = (location: '/courses/$trackId', extra: null as Object?);
+    var locations = [course];
+    try {
+      final result = await ref.read(coursesRepositoryProvider).getNextTrackItem(trackId);
+      final next = result.nextItem;
+      if (!result.trackCompleted && next != null) {
+        locations = [course, (location: '/courses/item/${next.id}', extra: (trackId: trackId, item: next))];
+      }
+    } catch (_) {
+      // The course itself, as the web does.
+    }
+    if (!mounted) return;
+    setState(() => _continuing = false);
+    _resetToLearnThen(locations);
+  }
+
+  /// Where leaving goes once the rating popup (asked on leave) is done with:
+  /// back by default, or on into the course.
+  VoidCallback? _afterLeave;
+
+  void _leave() {
+    final after = _afterLeave ?? _handleBack;
+    _afterLeave = null;
+    after();
+  }
+
+  /// "Continue the course", asking for a rating first as back does.
+  void _onContinuePressed() {
+    if (_popupVisible || _continuing) return;
+    if (_shouldAskOnLeave) {
+      _afterLeave = _continueCourse;
+      _popupSource = _PopupSource.leave;
+      setState(() => _popupVisible = true);
+      return;
+    }
+    _continueCourse();
+  }
+
+  /// "Your assessment is submitted": no score, tabs or rating, just a way on.
+  Widget _buildSubmittedAssessment(BuildContext context) {
+    final inCourse = _trackId != null && !widget.fromLogs;
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _handleBack();
+      },
+      child: Scaffold(
+        key: const Key('simulation-feedback-assessment-submitted'),
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SvgPicture.asset('assets/icons/tickRound.svg', width: 48, height: 48),
+                const SizedBox(height: 16),
+                Text(
+                  ref.t('postSim.assessment.submittedTitle'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontFamily: AppFonts.ibmPlexSerifMedium,
+                    fontSize: 20,
+                    color: AppColors.highEmphasis,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  ref.t('postSim.assessment.submittedBody'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontFamily: 'CupertinoSystemText',
+                    fontSize: 14,
+                    color: AppColors.mediumEmphasis,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                AppButton(
+                  key: const Key('simulation-feedback-assessment-continue'),
+                  label: ref.t('postSim.assessment.continue'),
+                  isLoading: _continuing,
+                  onPressed: inCourse ? _continueCourse : _handleBack,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   bool get _feedbackEnabled => _summary?.feedbackEnabled ?? true;
@@ -273,6 +444,7 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
   void _onBackPressed() {
     if (_popupVisible) {
       if (_popupSource == _PopupSource.leave) {
+        _afterLeave = null;
         _hidePopup();
       } else {
         setState(() => _popupVisible = false);
@@ -280,6 +452,7 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
       return;
     }
     if (_shouldAskOnLeave) {
+      _afterLeave = null;
       _popupSource = _PopupSource.leave;
       setState(() => _popupVisible = true);
       return;
@@ -296,7 +469,7 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
         _existingFeedback = (rating: 0, tags: _existingFeedback.tags, comment: _existingFeedback.comment);
       }
     });
-    if (source == _PopupSource.leave) _handleBack();
+    if (source == _PopupSource.leave) _leave();
   }
 
   Future<void> _submitFeedback(FeedbackValue feedback) async {
@@ -322,7 +495,7 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
     }
     // With feedback off the popup is the only surface, so submitting it
     // leaves the screen (mirrors the dismiss path).
-    if (source == _PopupSource.leave || !_feedbackEnabled) _handleBack();
+    if (source == _PopupSource.leave || !_feedbackEnabled) _leave();
   }
 
   void _onRatingSelected(int rating) {
@@ -336,7 +509,19 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
   void _openMoment(String messageId) {
     _momentRequestCount++;
     setState(() {
-      _momentRequest = (messageId: messageId, requestId: _momentRequestCount);
+      _momentRequest = (messageId: messageId, quote: null, requestId: _momentRequestCount);
+      _activeTab = FeedbackTab.transcript;
+    });
+    final index = _tabs.indexOf(FeedbackTab.transcript);
+    if (index != -1) _tabController?.animateTo(index);
+  }
+
+  /// "See this moment" under a debrief card's quote: the transcript at the
+  /// turn holding those words (web `handleSeeQuote`).
+  void _openQuote(String quote) {
+    _momentRequestCount++;
+    setState(() {
+      _momentRequest = (messageId: '', quote: quote, requestId: _momentRequestCount);
       _activeTab = FeedbackTab.transcript;
     });
     final index = _tabs.indexOf(FeedbackTab.transcript);
@@ -449,7 +634,13 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
     final controller = _tabController;
     if (controller == null || !mounted) return;
     final tab = _tabs[controller.index];
-    if (tab != _activeTab) setState(() => _activeTab = tab);
+    // Another tab starts with the title (and its back arrow) showing again.
+    if (tab != _activeTab) {
+      setState(() {
+        _activeTab = tab;
+        _headerCollapse = 0;
+      });
+    }
   }
 
   /// RN re-runs `fetchSimulationDetailsWithRetry` when `activeLanguageCode`
@@ -477,6 +668,8 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
     final reviewId = summary?.reviewId;
     final shortSession = summary?.isShortSession ?? false;
 
+    if (summary?.resultsHidden ?? false) return _buildSubmittedAssessment(context);
+
     final showChecklist = _feedbackEnabled && canSeeMessages && (summary?.isChecklistMode ?? false) && !shortSession;
     final showTabs = _feedbackEnabled && canSeeMessages && _tabController != null;
     final showReviewButton = _feedbackEnabled &&
@@ -490,6 +683,7 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
         !widget.fromLogs &&
         widget.pathId == null &&
         widget.caseId == null &&
+        _trackId == null &&
         summary != null;
     final bottomInset = MediaQuery.paddingOf(context).bottom;
 
@@ -511,6 +705,13 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  _CollapsingHeader(
+                    collapse: showTabs ? _headerCollapse : 0,
+                    child: Column(
+                      key: _headerKey,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
                   Padding(
                     padding: EdgeInsets.only(top: rn.vs(8), bottom: rn.vs(8), left: 10, right: 20),
                     child: Row(
@@ -536,17 +737,35 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
                       ],
                     ),
                   ),
+                  if (_trackId != null && !widget.fromLogs)
+                    Padding(
+                      padding: EdgeInsets.only(left: 20, right: 20, bottom: rn.vs(8)),
+                      child: _CourseRow(
+                        trackId: _trackId!,
+                        continuing: _continuing,
+                        onOpenCourse: _onBackPressed,
+                        onContinue: _onContinuePressed,
+                      ),
+                    ),
                   if (showChecklist)
                     Padding(
                       padding: EdgeInsets.only(left: 10, right: 10, bottom: rn.vs(8)),
                       child: EventChecklist(scenarioSessionId: widget.scenarioSessionId),
                     ),
+                      ],
+                    ),
+                  ),
                   if (showTabs) ...[
+                    // The tab bar stays; the title, stars and checklist above it fold
+                    // away as the tab's content scrolls, so the debrief gets the screen.
                     _buildTabBar(),
                     Expanded(
-                      child: TabBarView(
-                        controller: _tabController,
-                        children: [for (final tab in _tabs) _buildScene(tab)],
+                      child: NotificationListener<ScrollNotification>(
+                        onNotification: _onContentScroll,
+                        child: TabBarView(
+                          controller: _tabController,
+                          children: [for (final tab in _tabs) _buildScene(tab)],
+                        ),
                       ),
                     ),
                   ],
@@ -586,7 +805,7 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
                   title: ref.t('callFeedback.questionText'),
                   placeholder: ref.t('callFeedback.placeholderText'),
                   initialFeedback: _existingFeedback,
-                  onClose: _feedbackEnabled ? _hidePopup : _handleBack,
+                  onClose: _feedbackEnabled ? _hidePopup : _leave,
                   onSubmit: _submitFeedback,
                 ),
               ),
@@ -723,9 +942,15 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
           sessionId: widget.scenarioSessionId,
           summary: _summary,
           retryLimitReached: _retryLimitReached,
-          readOnly: widget.fromLogs,
+          // The learner's own session from the logs is the full learner view,
+          // Ask Ally included; read-only is for someone else's (supervisors).
+          readOnly: widget.fromLogs && !widget.ownSession,
+          supervisorView: widget.fromLogs && !widget.ownSession,
           // Anchors are chips only when there's a transcript to open.
           onOpenMoment: (_summary?.showTranscriptTab ?? true) ? _openMoment : null,
+          onSeeQuote: (_summary?.showTranscriptTab ?? true) ? _openQuote : null,
+          // "Practise this" inside a course keeps the course.
+          trackId: widget.fromLogs ? null : _trackId,
         );
       case FeedbackTab.transcript:
         return SimulationTranscriptTab(
@@ -734,6 +959,81 @@ class _SimulationFeedbackScreenState extends ConsumerState<SimulationFeedbackScr
           focusMessage: _momentRequest,
         );
     }
+  }
+}
+
+/// Inside a course (web `PostSimulationSummary` breadcrumb + footer): the
+/// course's name, which goes back to it, and "Continue the course", which
+/// opens its next item.
+class _CourseRow extends ConsumerWidget {
+  const _CourseRow({
+    required this.trackId,
+    required this.continuing,
+    required this.onOpenCourse,
+    required this.onContinue,
+  });
+
+  final String trackId;
+  final bool continuing;
+  final VoidCallback onOpenCourse;
+  final VoidCallback onContinue;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final title = ref.watch(trackDetailProvider(trackId)).value?.title;
+    final style = TextStyle(
+      fontFamily: AppFonts.ibmPlexSerifMedium,
+      fontSize: 13,
+      height: 18 / 13,
+      color: AppColors.primary,
+    );
+    // One row, never wrapping: the course name gives way (ellipsis) before
+    // the button does.
+    return Row(
+      key: const Key('simulation-feedback-course'),
+      children: [
+        Expanded(
+          flex: 2,
+          child: Semantics(
+            button: true,
+            label: ref.t('postSim.course.backTo', {'title': title ?? ref.t('learn.choose.course')}),
+            excludeSemantics: true,
+            child: GestureDetector(
+              key: const Key('simulation-feedback-course-name'),
+              behavior: HitTestBehavior.opaque,
+              onTap: onOpenCourse,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 44),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    title ?? ref.t('learn.choose.course'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: style,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Flexible(
+          flex: 3,
+          child: FilledButton(
+            key: const Key('simulation-feedback-continue-course'),
+            onPressed: continuing ? null : onContinue,
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(64, 44),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              backgroundColor: AppColors.primary,
+              textStyle: style,
+            ),
+            child: Text(ref.t('postSim.course.continue'), maxLines: 1, overflow: TextOverflow.ellipsis),
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -772,6 +1072,31 @@ class _ReviewButton extends StatelessWidget {
             'assets/icons/chatBubble.svg',
             colorFilter: const ColorFilter.mode(Colors.black, BlendMode.srcIn),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The screen's title block, folding up by [collapse] (0 open, 1 gone) and
+/// fading as it goes; gone from the accessibility tree once fully folded.
+class _CollapsingHeader extends StatelessWidget {
+  const _CollapsingHeader({required this.collapse, required this.child});
+
+  final double collapse;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (collapse <= 0) return child;
+    return ExcludeSemantics(
+      excluding: collapse >= 1,
+      child: ClipRect(
+        key: const Key('simulation-feedback-header'),
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          heightFactor: 1 - collapse,
+          child: Opacity(opacity: (1 - collapse).clamp(0.0, 1.0), child: child),
         ),
       ),
     );

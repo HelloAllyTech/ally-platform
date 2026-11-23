@@ -1,0 +1,223 @@
+diff --git a/src/database/migrations/1767679183507-RemoveDetectionDataFromSessionEventsTranslations.ts b/src/database/migrations/1767679183507-RemoveDetectionDataFromSessionEventsTranslations.ts
+new file mode 100644
+index 0000000000..6c81142aac
+--- /dev/null
++++ b/src/database/migrations/1767679183507-RemoveDetectionDataFromSessionEventsTranslations.ts
+@@ -0,0 +1,19 @@
++import { MigrationInterface, QueryRunner } from 'typeorm';
++
++export class RemoveDetectionDataFromSessionEventsTranslations1767679183507
++  implements MigrationInterface
++{
++  name = 'RemoveDetectionDataFromSessionEventsTranslations1767679183507';
++
++  public async up(queryRunner: QueryRunner): Promise<void> {
++    await queryRunner.query(
++      `ALTER TABLE "session_events_translations" DROP COLUMN "detectionData"`,
++    );
++  }
++
++  public async down(queryRunner: QueryRunner): Promise<void> {
++    await queryRunner.query(
++      `ALTER TABLE "session_events_translations" ADD "detectionData" jsonb`,
++    );
++  }
++}
+diff --git a/src/learn/service/scenario.service.ts b/src/learn/service/scenario.service.ts
+index fc152a1689..9f7f14a7b0 100644
+--- a/src/learn/service/scenario.service.ts
++++ b/src/learn/service/scenario.service.ts
+@@ -963,7 +963,7 @@ export class ScenarioService {
+ 
+       await scenarioEventsRepo.save(scenarioEvents);
+ 
+-      await this.createUpdateScenarioEventsTranslations(scenarioEvents);
++      this.createUpdateScenarioEventsTranslations(scenarioEvents);
+ 
+       return {
+         scenarioId,
+diff --git a/src/session-event/entity/session-event-translation.entity.ts b/src/session-event/entity/session-event-translation.entity.ts
+index da35c7f1b1..825187a1b0 100644
+--- a/src/session-event/entity/session-event-translation.entity.ts
++++ b/src/session-event/entity/session-event-translation.entity.ts
+@@ -27,7 +27,4 @@ export class SessionEventsTranslation extends BaseWithoutTenantEntity {
+ 
+   @Column({ nullable: true })
+   branchInstruction?: string;
+-
+-  @Column({ type: 'jsonb', nullable: true })
+-  detectionData?: Record<string, any>;
+ }
+diff --git a/src/session-event/interface/session-events-translation.interface.ts b/src/session-event/interface/session-events-translation.interface.ts
+index 1b08984773..8282d1fff9 100644
+--- a/src/session-event/interface/session-events-translation.interface.ts
++++ b/src/session-event/interface/session-events-translation.interface.ts
+@@ -4,7 +4,6 @@ export interface CreateSessionEventTranslation {
+   name: string;
+   message: string;
+   branchInstruction: string;
+-  detectionData?: Record<string, any>;
+ }
+ 
+ export interface UpdateSessionEventTranslation
+diff --git a/src/session-event/repository/session-event-translation.repository.ts b/src/session-event/repository/session-event-translation.repository.ts
+index 13d977809c..d4911aab9e 100644
+--- a/src/session-event/repository/session-event-translation.repository.ts
++++ b/src/session-event/repository/session-event-translation.repository.ts
+@@ -36,18 +36,12 @@ export class SessionEventTranslationsRepository extends Repository<SessionEvents
+     // Use a transaction to ensure all updates succeed or fail together
+     await this.dataSource.transaction(async (transactionalEntityManager) => {
+       for (const translation of scenarioEventTranslations) {
+-        const {
+-          sessionEventId,
+-          name,
+-          languageId,
+-          message,
+-          branchInstruction,
+-          detectionData,
+-        } = translation;
++        const { sessionEventId, name, languageId, message, branchInstruction } =
++          translation;
+         await transactionalEntityManager.update(
+           SessionEventsTranslation,
+           { sessionEventId, languageId }, // Selection criteria
+-          { message, branchInstruction, detectionData, name }, // Fields to update
++          { message, branchInstruction, name }, // Fields to update
+         );
+       }
+     });
+@@ -95,7 +89,7 @@ export class SessionEventTranslationsRepository extends Repository<SessionEvents
+       `COALESCE("sessionTranslations"."message", "sessionEvents"."message") AS "sessionEvents_message"`,
+       `COALESCE("sessionTranslations"."branchInstruction", "sessionEvents"."branchInstruction") AS "sessionEvents_branchInstruction"`,
+       `"sessionEvents"."detectionType" AS "sessionEvents_detectionType"`,
+-      `COALESCE("sessionTranslations"."detectionData", "sessionEvents"."detectionData") AS "sessionEvents_detectionData"`,
++      `"sessionEvents"."detectionData" AS "sessionEvents_detectionData"`,
+       `"sessionEvents"."visibilityType" AS "sessionEvents_visibilityType"`,
+       `"sessionEvents"."deletedAt" AS "sessionEvents_deletedAt"`,
+       `"sessionEvents"."eventCode" AS "sessionEvents_eventCode"`,
+diff --git a/src/session-event/repository/test/session-event-translation.repository.spec.ts b/src/session-event/repository/test/session-event-translation.repository.spec.ts
+index 72e92b15ef..9e2a4d46e4 100644
+--- a/src/session-event/repository/test/session-event-translation.repository.spec.ts
++++ b/src/session-event/repository/test/session-event-translation.repository.spec.ts
+@@ -17,7 +17,6 @@ describe('SessionEventTranslationsRepository', () => {
+     languageId: 1,
+     message: 'Test message',
+     branchInstruction: 'Test instruction',
+-    detectionData: { key: 'value' },
+     createdAt: new Date(),
+     updatedAt: new Date(),
+   } as unknown as SessionEventsTranslation;
+@@ -107,7 +106,6 @@ describe('SessionEventTranslationsRepository', () => {
+           name: 'New name',
+           message: 'New message',
+           branchInstruction: 'Test branch instruction',
+-          detectionData: { sentences: ['value-1', 'value-2'] },
+         },
+       ];
+ 
+@@ -136,7 +134,6 @@ describe('SessionEventTranslationsRepository', () => {
+           name: 'Updated name',
+           message: 'Updated message',
+           branchInstruction: 'Updated instruction',
+-          detectionData: { sentences: ['updated'] },
+         },
+       ];
+ 
+diff --git a/src/session-event/service/session-event-translation.service.ts b/src/session-event/service/session-event-translation.service.ts
+index bd0489c04d..87eb8ecf16 100644
+--- a/src/session-event/service/session-event-translation.service.ts
++++ b/src/session-event/service/session-event-translation.service.ts
+@@ -38,7 +38,6 @@ export class SessionEventTranslationService {
+         name: sessionEvent.name,
+         message: sessionEvent.message,
+         branchInstruction: sessionEvent.branchInstruction,
+-        detectionData: sessionEvent.detectionData,
+       }),
+       languages,
+     );
+@@ -104,7 +103,6 @@ export class SessionEventTranslationService {
+           name: rawMetadata?.name,
+           message: rawMetadata?.message,
+           branchInstruction: rawMetadata?.branchInstruction,
+-          detectionData: rawMetadata?.detectionData,
+         });
+ 
+         if (!sanitized || Object.keys(sanitized).length === 0) {
+@@ -149,7 +147,6 @@ export class SessionEventTranslationService {
+             name: translatedData.name ?? '',
+             message: translatedData.message ?? '',
+             branchInstruction: translatedData.branchInstruction ?? '',
+-            detectionData: translatedData.detectionData ?? {},
+           });
+         }
+ 
+diff --git a/src/session-event/service/test/session-event-translation.service.spec.ts b/src/session-event/service/test/session-event-translation.service.spec.ts
+index b88ba0e2ce..530fc7ba06 100644
+--- a/src/session-event/service/test/session-event-translation.service.spec.ts
++++ b/src/session-event/service/test/session-event-translation.service.spec.ts
+@@ -19,7 +19,6 @@ describe('SessionEventTranslationService', () => {
+     id: 'test-event-1',
+     message: 'Test message',
+     branchInstruction: 'Test branch instruction',
+-    detectionData: { key: 'value' },
+   } as any;
+ 
+   beforeEach(async () => {
+@@ -197,7 +196,6 @@ describe('SessionEventTranslationService', () => {
+       const metadata = {
+         message: '  Test message  ',
+         branchInstruction: '  Test branch  ',
+-        detectionData: { key: 'value' },
+       };
+ 
+       const result = (service as any).sanitizeSessionEventMetadata(metadata);
+@@ -205,7 +203,6 @@ describe('SessionEventTranslationService', () => {
+       expect(result).toEqual({
+         message: 'Test message',
+         branchInstruction: 'Test branch',
+-        detectionData: { key: 'value' },
+       });
+     });
+ 
+@@ -213,7 +210,6 @@ describe('SessionEventTranslationService', () => {
+       const metadata = {
+         message: '   ',
+         branchInstruction: null,
+-        detectionData: null,
+       };
+ 
+       const result = (service as any).sanitizeSessionEventMetadata(metadata);
+@@ -225,7 +221,6 @@ describe('SessionEventTranslationService', () => {
+       const metadata = {
+         message: undefined,
+         branchInstruction: undefined,
+-        detectionData: undefined,
+       };
+ 
+       const result = (service as any).sanitizeSessionEventMetadata(metadata);
+@@ -235,13 +230,13 @@ describe('SessionEventTranslationService', () => {
+ 
+     it('should preserve non-string metadata fields', () => {
+       const metadata = {
+-        detectionData: { foo: 'bar' },
++        branchInstruction: 'test',
+       };
+ 
+       const result = (service as any).sanitizeSessionEventMetadata(metadata);
+ 
+       expect(result).toEqual({
+-        detectionData: { foo: 'bar' },
++        branchInstruction: 'test',
+       });
+     });
+ 
+diff --git a/src/session-event/type/session-event-translation-data.type.ts b/src/session-event/type/session-event-translation-data.type.ts
+index b7264a32b2..ef9da4520b 100644
+--- a/src/session-event/type/session-event-translation-data.type.ts
++++ b/src/session-event/type/session-event-translation-data.type.ts
+@@ -2,5 +2,4 @@ export type SessionEventMetadata = {
+   name?: string | null;
+   message?: string | null;
+   branchInstruction?: string | null;
+-  detectionData?: Record<string, any> | null;
+ };

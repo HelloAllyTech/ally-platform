@@ -1,0 +1,197 @@
+diff --git a/apps/ally-helpline-dashboard/src/hooks/__tests__/useEnhance.test.tsx b/apps/ally-helpline-dashboard/src/hooks/__tests__/useEnhance.test.tsx
+index 9f326bc9f1..c819f812f6 100644
+--- a/apps/ally-helpline-dashboard/src/hooks/__tests__/useEnhance.test.tsx
++++ b/apps/ally-helpline-dashboard/src/hooks/__tests__/useEnhance.test.tsx
+@@ -1,14 +1,27 @@
+ import React from "react";
+ 
+ import { render, screen, fireEvent, act } from "@testing-library/react";
+-import { describe, it, expect, vi } from "vitest";
++import { describe, it, expect, vi, beforeEach } from "vitest";
+ 
+ import * as api from "@api";
+ 
+ import { useEnhance } from "../useEnhance";
+ 
++const mockToastError = vi.fn();
++vi.mock("sonner", () => ({ toast: { error: (...args: any[]) => mockToastError(...args) } }));
++
++vi.mock("react-i18next", () => ({
++  useTranslation: () => ({ t: (_key: string, fallback?: string) => fallback ?? _key }),
++}));
++
++// Referenced through closures: vi.mock factories are hoisted above these
++// declarations, so they must not read the bindings eagerly.
++const mockLogger = { info: vi.fn(), error: vi.fn() };
+ vi.mock("@ally-ui-mono/ui-shared", () => ({
+-  logger: { info: vi.fn() },
++  logger: {
++    info: (...args: any[]) => mockLogger.info(...args),
++    error: (...args: any[]) => mockLogger.error(...args),
++  },
+   // The hook builds a loading skeleton with SkeletonText; stub it so the hook
+   // body can create the element without pulling in the real Carbon component.
+   SkeletonText: (props: any) => <div data-testid="skeleton-text" {...props} />,
+@@ -20,6 +33,11 @@ vi.mock("@api", () => ({
+   useEnhanceContentMutation: vi.fn(() => [mockEnhanceMutation, { isLoading: false }]),
+ }));
+ 
++beforeEach(() => {
++  mockToastError.mockClear();
++  mockLogger.error.mockClear();
++});
++
+ const Harness = ({ fieldName, inputText, updateValue }: any) => {
+   const { enhancing, EnhanceButton, isEnhanceLoading } = useEnhance();
+   return (
+@@ -84,6 +102,71 @@ describe("useEnhance", () => {
+     vi.useRealTimers();
+   });
+ 
++  // The failure path used to return silently: no toast, no log, and the field
++  // left greyed out. A dead AI service was invisible to counsellors and to us.
++  it("toasts and logs when the mutation resolves with an error", async () => {
++    const updateSpy = vi.fn();
++    mockEnhanceMutation.mockResolvedValueOnce({
++      error: { status: 503, data: { message: "Content enhancement failed" } },
++    });
++
++    const { container } = render(
++      <Harness fieldName="f" inputText="orig" updateValue={updateSpy} />,
++    );
++    fireEvent.click(container.querySelector(".cursor-pointer") as HTMLElement);
++
++    await act(async () => {
++      await Promise.resolve();
++    });
++
++    expect(updateSpy).not.toHaveBeenCalled();
++    expect(mockToastError).toHaveBeenCalledWith("Couldn't enhance this text. Please try again.");
++    expect(mockLogger.error).toHaveBeenCalledWith(expect.stringContaining("503"));
++  });
++
++  it("toasts and logs when the mutation throws", async () => {
++    const updateSpy = vi.fn();
++    mockEnhanceMutation.mockRejectedValueOnce(new Error("network down"));
++
++    const { container } = render(
++      <Harness fieldName="f" inputText="orig" updateValue={updateSpy} />,
++    );
++    fireEvent.click(container.querySelector(".cursor-pointer") as HTMLElement);
++
++    await act(async () => {
++      await Promise.resolve();
++    });
++
++    expect(updateSpy).not.toHaveBeenCalled();
++    expect(mockToastError).toHaveBeenCalledWith("Couldn't enhance this text. Please try again.");
++    expect(mockLogger.error).toHaveBeenCalledWith(expect.stringContaining("network down"));
++  });
++
++  it("clears the enhancing state after a failure so the wand stays usable", async () => {
++    mockEnhanceMutation.mockResolvedValueOnce({ error: { status: 503 } });
++
++    const { container } = render(<Harness fieldName="f" inputText="orig" updateValue={vi.fn()} />);
++    fireEvent.click(container.querySelector(".cursor-pointer") as HTMLElement);
++
++    await act(async () => {
++      await Promise.resolve();
++    });
++
++    // A lingering `enhancing === fieldName` renders the button
++    // `opacity-50 pointer-events-none` — permanently unclickable until remount.
++    expect(screen.getByTestId("enhancing").textContent).toBe("");
++    expect(container.querySelector(".pointer-events-none")).toBeNull();
++
++    // ...and a retry still reaches the API.
++    const callsBeforeRetry = mockEnhanceMutation.mock.calls.length;
++    mockEnhanceMutation.mockResolvedValueOnce({ data: { enhanced_content: "ok" } });
++    fireEvent.click(container.querySelector(".cursor-pointer") as HTMLElement);
++    await act(async () => {
++      await Promise.resolve();
++    });
++    expect(mockEnhanceMutation.mock.calls.length).toBe(callsBeforeRetry + 1);
++  });
++
+   it("cleans up streaming interval on unmount", async () => {
+     vi.useFakeTimers();
+     const updateSpy = vi.fn();
+diff --git a/apps/ally-helpline-dashboard/src/hooks/useEnhance.tsx b/apps/ally-helpline-dashboard/src/hooks/useEnhance.tsx
+index ed6d88a0ed..666f0279d1 100644
+--- a/apps/ally-helpline-dashboard/src/hooks/useEnhance.tsx
++++ b/apps/ally-helpline-dashboard/src/hooks/useEnhance.tsx
+@@ -1,11 +1,15 @@
+ import { FC, useEffect, useRef, useState } from "react";
+ 
++import { useTranslation } from "react-i18next";
++import { toast } from "sonner";
++
+ import { SkeletonText, logger } from "@ally-ui-mono/ui-shared";
+ import { useEnhanceContentMutation } from "@api";
+ import { WandStars } from "@assets";
+ import { EnhanceButtonProps } from "@types";
+ 
+ export const useEnhance = () => {
++  const { t } = useTranslation();
+   const [enhancing, setEnhancing] = useState("");
+   const [streaming, setStreaming] = useState("");
+ 
+@@ -22,6 +26,20 @@ export const useEnhance = () => {
+     };
+   }, []);
+ 
++  /**
++   * Every exit from an enhance attempt has to come through here. A field left
++   * with `enhancing`/`streaming` still pointing at it stays greyed out and
++   * pointer-events-none — i.e. permanently un-enhanceable until remount.
++   */
++  const resetEnhanceState = () => {
++    setEnhancing("");
++    setStreaming("");
++    if (streamIntervalRef.current) {
++      clearInterval(streamIntervalRef.current);
++      streamIntervalRef.current = null;
++    }
++  };
++
+   /**
+    * Triggers content enhancement for a specific field with streaming effect.
+    * - Calls the enhance content API with the provided text
+@@ -42,11 +60,18 @@ export const useEnhance = () => {
+       setEnhancing(key);
+       const response = await enhanceContent({ content: inputText });
+ 
+-      // Simulating API response - replace with actual API call
+       const updatedValue = response?.data?.enhanced_content;
+ 
++      // RTK Query resolves with `{ error }` instead of throwing, so an
++      // unavailable AI service lands here rather than in the catch below. This
++      // used to `return` silently: the wand looked like a dead button, and
++      // nothing reached the counsellor or our logs.
+       if (!updatedValue) {
+-        setEnhancing("");
++        logger.error(
++          `Enhance returned no content for ${key}: ${JSON.stringify(response?.error ?? null)}`,
++        );
++        resetEnhanceState();
++        toast.error(t("summary.enhanceFailed", "Couldn't enhance this text. Please try again."));
+         return;
+       }
+ 
+@@ -74,13 +99,9 @@ export const useEnhance = () => {
+         }
+       }, 50);
+     } catch (error) {
+-      logger.info(`Error enhancing content:, ${error}`);
+-      setEnhancing("");
+-      setStreaming("");
+-      if (streamIntervalRef.current) {
+-        clearInterval(streamIntervalRef.current);
+-        streamIntervalRef.current = null;
+-      }
++      logger.error(`Error enhancing content: ${error}`);
++      resetEnhanceState();
++      toast.error(t("summary.enhanceFailed", "Couldn't enhance this text. Please try again."));
+     }
+   };
+ 

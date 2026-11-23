@@ -1,0 +1,57 @@
+diff --git a/apps/ally-admin-dashboard/src/components/main-prompt-variant-picker/MainPromptVariantPicker.tsx b/apps/ally-admin-dashboard/src/components/main-prompt-variant-picker/MainPromptVariantPicker.tsx
+index f9702e3b90..1f00bd8646 100644
+--- a/apps/ally-admin-dashboard/src/components/main-prompt-variant-picker/MainPromptVariantPicker.tsx
++++ b/apps/ally-admin-dashboard/src/components/main-prompt-variant-picker/MainPromptVariantPicker.tsx
+@@ -25,7 +25,10 @@ interface Props {
+  * language) vs MULTILINGUAL (the translated prompt body) for the selected skill
+  * version. The language list is driven by the selected main-agent prompt's
+  * translations: a language can only pick MULTILINGUAL once its translation is
+- * `ready`. Value shape: Record<languageId, Variant>; a missing entry = GENERIC.
++ * `ready`. Value shape: Record<languageId, Variant>; a missing entry =
++ * MULTILINGUAL — the backend serves the multilingual overlay (per-prompt
++ * English fallback) unless the stored value is explicitly GENERIC, so the
++ * picker must render the same default or it lies about live behavior.
+  */
+ export const MainPromptVariantPicker: React.FC<Props> = ({
+   id,
+@@ -69,7 +72,7 @@ export const MainPromptVariantPicker: React.FC<Props> = ({
+   };
+ 
+   const optionButton = (languageId: number, variant: Variant, text: string, disabled: boolean) => {
+-    const active = (value[String(languageId)] ?? "GENERIC") === variant;
++    const active = (value[String(languageId)] ?? "MULTILINGUAL") === variant;
+     return (
+       <button
+         type="button"
+diff --git a/apps/ally-admin-dashboard/src/utils/__tests__/createSimulation.test.ts b/apps/ally-admin-dashboard/src/utils/__tests__/createSimulation.test.ts
+index 5a7fbb63e3..79f7cc2806 100644
+--- a/apps/ally-admin-dashboard/src/utils/__tests__/createSimulation.test.ts
++++ b/apps/ally-admin-dashboard/src/utils/__tests__/createSimulation.test.ts
+@@ -232,7 +232,9 @@ describe("createSimulation utils", () => {
+         optGuardrails: false,
+         temperature: 0.7,
+         fillerEnabled: false,
+-        languageGlossaryEnabled: false,
++        // Absent in metadata hydrates as ON, mirroring the backend's
++        // default-ON glossary read (`!== false`).
++        languageGlossaryEnabled: true,
+         comfortAudioEnabled: false,
+         comfortAudioUrl: "",
+         comfortAudioVolume: 0.3,
+diff --git a/apps/ally-admin-dashboard/src/utils/createSimulation.ts b/apps/ally-admin-dashboard/src/utils/createSimulation.ts
+index 469ba06866..efc9ee3679 100644
+--- a/apps/ally-admin-dashboard/src/utils/createSimulation.ts
++++ b/apps/ally-admin-dashboard/src/utils/createSimulation.ts
+@@ -123,7 +123,11 @@ export const formatSimulationResponseData = (data: GetSimulationByIdResponse) =>
+     optGuardrails: data?.metadata?.optGuardrails,
+     temperature: (data?.metadata as any)?.temperature ?? TEMPERATURE_DEFAULT,
+     fillerEnabled: data?.metadata?.fillerEnabled ?? false,
+-    languageGlossaryEnabled: data?.metadata?.languageGlossaryEnabled ?? false,
++    // Absent = ON: the backend serves the glossary unless the stored value is
++    // explicitly false (default-ON rollout). Hydrating absent as false made
++    // the edit form LIE about live behavior — and a super-duper-admin saving
++    // the form would then write the explicit false back.
++    languageGlossaryEnabled: data?.metadata?.languageGlossaryEnabled ?? true,
+     comfortAudioEnabled: data?.metadata?.comfortAudioEnabled ?? false,
+     comfortAudioUrl: (data?.metadata as any)?.comfortAudioUrl ?? "",
+     comfortAudioVolume: (data?.metadata as any)?.comfortAudioVolume ?? COMFORT_AUDIO_VOLUME_DEFAULT,

@@ -25,6 +25,33 @@ class SettingsRepository {
 
   final Dio _dio;
 
+  /// Shared fetch for every bare-boolean settings endpoint below. These
+  /// endpoints return a raw JSON `true`/`false` body — not wrapped in an
+  /// object — which NestJS, lacking an object to serialize, sends via
+  /// Express's `res.send()` rather than `res.json()`. Express sets
+  /// `Content-Type: text/html` (not `application/json`) for a bare
+  /// boolean/string/number body in that path — confirmed directly against
+  /// prod (`content-type: text/html; charset=utf-8`, body `true`). Asking
+  /// Dio to decode straight to `<bool>` against that content type throws
+  /// (confirmed on-device: `DioException [unknown]`), silently read by
+  /// every caller's `?? fallback` as "disabled" — this is why Dictation
+  /// Mode and other toggle-gated features could vanish for a real,
+  /// correctly-permissioned user. Fetching as plain text and parsing the
+  /// literal `"true"`/`"false"` sidesteps the content-type mismatch
+  /// entirely, regardless of which platform's HTTP stack is stricter about
+  /// it. Fixed 2026-11.
+  Future<bool> _getBoolSetting(String path, {required bool fallback}) async {
+    final response = await _dio.get<String>(path, options: Options(responseType: ResponseType.plain));
+    switch (response.data?.trim().toLowerCase()) {
+      case 'true':
+        return true;
+      case 'false':
+        return false;
+      default:
+        return fallback;
+    }
+  }
+
   /// `GET /settings/chat-types` — the tenant's enabled chat/session types.
   /// RN's `CallLogScreen.tsx` re-fetches this on every screen *focus* (not
   /// just mount) specifically because a token-rotation race was found to
@@ -47,19 +74,15 @@ class SettingsRepository {
   /// `useScribeNoteCreationEnabled` hook, which skips the request entirely
   /// for a non-counsellor — see `call_log_screen.dart`'s gating, which
   /// mirrors that same permission check before ever calling this.
-  Future<bool> getScribeNoteCreationEnabled() async {
-    final response = await _dio.get<bool>('/settings/scribe-note-creation-enabled');
-    return response.data ?? false;
-  }
+  Future<bool> getScribeNoteCreationEnabled() =>
+      _getBoolSetting('/settings/scribe-note-creation-enabled', fallback: false);
 
   /// `GET /settings/scribe-voice-note-enabled` — gates the voice-dictation
   /// path (`VoiceNoteSection` in RN) on a manual note's Call Summary screen.
   /// Same bare-boolean, counsellor-only-authorized shape as
   /// [getScribeNoteCreationEnabled] above.
-  Future<bool> getScribeVoiceNoteEnabled() async {
-    final response = await _dio.get<bool>('/settings/scribe-voice-note-enabled');
-    return response.data ?? false;
-  }
+  Future<bool> getScribeVoiceNoteEnabled() =>
+      _getBoolSetting('/settings/scribe-voice-note-enabled', fallback: false);
 
   /// `GET /settings/custom-fields-enabled` — gates the tenant-configured
   /// custom-fields system as a whole (Call Summary display/edit + Call Log
@@ -67,10 +90,7 @@ class SettingsRepository {
   /// has no permission/skip guard — any authenticated user can call it, and
   /// `CallSummaryDetails.tsx` treats a `false` response (not just a missing
   /// one) as "off": `customFieldsEnabled !== false`.
-  Future<bool> getCustomFieldsEnabled() async {
-    final response = await _dio.get<bool>('/settings/custom-fields-enabled');
-    return response.data ?? true;
-  }
+  Future<bool> getCustomFieldsEnabled() => _getBoolSetting('/settings/custom-fields-enabled', fallback: true);
 
   /// `GET /settings/summary-fields` — the tenant's visible built-in summary
   /// field keys (RN `settingsApi.getSummaryFields`, stored in redux as
@@ -90,10 +110,7 @@ class SettingsRepository {
   /// separate nudge poll/fetch to also skip), confirmed directly in both
   /// files and in `useListeningCommon.ts`'s socket-message handler, which
   /// sets `currentNudge` with no awareness of this flag at all.
-  Future<bool> getNudgeStatus() async {
-    final response = await _dio.get<bool>('/settings/nudge-status');
-    return response.data ?? false;
-  }
+  Future<bool> getNudgeStatus() => _getBoolSetting('/settings/nudge-status', fallback: false);
 }
 
 final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {

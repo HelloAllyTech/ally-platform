@@ -9,6 +9,7 @@ import type {
   CourseCopilotBlueprintResponse,
   CourseCopilotSessionDetail,
   CourseCopilotSessionStatus,
+  CourseOutlineItem,
 } from "@types";
 
 import { BlueprintTree } from "./BlueprintTree";
@@ -16,6 +17,7 @@ import { BriefPanel } from "./BriefPanel";
 import { BuildPanel } from "./BuildPanel";
 import { asArray } from "./courseCopilotFormat";
 import { CourseOutlinePanel } from "./CourseOutlinePanel";
+import { ReferenceFiles } from "./ReferenceFiles";
 
 import type { PublishCheck } from "./PublishReadiness";
 
@@ -180,6 +182,8 @@ export const CourseCopilotWorkPane: React.FC<CourseCopilotWorkPaneProps> = ({
   }, [activeTab, draftVersion]);
   const blueprintUpdated = activeTab !== "blueprint" && draftVersion > seenBlueprintVersion;
 
+  const shownTabs = TAB_ORDER.filter(tab => available[tab]);
+
   const tabRefs = useRef<Partial<Record<PaneTab, HTMLButtonElement | null>>>({});
 
   const selectTab = (tab: PaneTab) => {
@@ -207,6 +211,11 @@ export const CourseCopilotWorkPane: React.FC<CourseCopilotWorkPaneProps> = ({
   // The copilot can only act on a finished, live course: not mid-build, not mid-turn, not archived.
   const canAskCopilot = status === "EDITING" && !isBusy;
 
+  const handleChangeItem = (item: CourseOutlineItem, reason: string) => {
+    const title = item.title || item.type;
+    onSendMessage(strings.course.changeReasons.message(title, item.id, reason));
+  };
+
   const handleAskCopilot = (check: PublishCheck) => {
     const detailText = check.detail ? ` (${check.detail})` : "";
     onSendMessage(strings.course.readiness.askCopilotMessage(check.label, detailText));
@@ -221,7 +230,21 @@ export const CourseCopilotWorkPane: React.FC<CourseCopilotWorkPaneProps> = ({
   const renderPanel = () => {
     switch (activeTab) {
       case "brief":
-        return <BriefPanel brief={brief} readiness={briefReadiness} />;
+        return (
+          <>
+            <ReferenceFiles
+              sessionId={session.id}
+              lockedReason={
+                status === "BUILDING"
+                  ? en.courseCopilot.sources.lockedBuilding
+                  : status === "ARCHIVED"
+                    ? en.courseCopilot.sources.lockedArchived
+                    : null
+              }
+            />
+            <BriefPanel brief={brief} readiness={briefReadiness} />
+          </>
+        );
       case "blueprint":
         return shownBlueprint ? (
           <BlueprintTree
@@ -264,6 +287,7 @@ export const CourseCopilotWorkPane: React.FC<CourseCopilotWorkPaneProps> = ({
             onOpenEditor={onOpenEditor}
             openEditorDisabledReason={openEditorDisabledReason}
             onAskCopilot={canAskCopilot ? handleAskCopilot : undefined}
+            onChangeItem={canAskCopilot ? handleChangeItem : undefined}
           />
         );
       default:
@@ -273,13 +297,16 @@ export const CourseCopilotWorkPane: React.FC<CourseCopilotWorkPaneProps> = ({
 
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="course-copilot-work-pane">
+      {/* Only the tabs that have something in them: a row of greyed-out tabs is four things to read
+          before there is anything to see. With one tab there is no choice, so no tab bar. */}
       <div
         role="tablist"
         aria-label={strings.paneLabel}
         onKeyDown={handleTabKeyDown}
+        hidden={shownTabs.length < 2}
         className="flex shrink-0 gap-1 overflow-x-auto border-b border-neutral-200 px-2"
       >
-        {TAB_ORDER.map(tab => {
+        {shownTabs.map(tab => {
           const isActive = tab === activeTab;
           const isEnabled = available[tab];
           return (

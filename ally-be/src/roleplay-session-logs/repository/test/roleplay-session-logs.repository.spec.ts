@@ -56,6 +56,17 @@ describe('RoleplaySessionLogsRepository', () => {
       expect(sql).toContain(`ss."roomId" NOT LIKE 'seed-room-%'`);
     });
 
+    it('filters to one scenario when scenarioId is given', async () => {
+      await repository.list({
+        scenarioId: 42,
+      } as ListRoleplaySessionLogsQueryDto);
+      expect(predicates()).toContain('ss."scenarioId" = :scenarioId');
+      expect(builder.andWhere).toHaveBeenCalledWith(
+        'ss."scenarioId" = :scenarioId',
+        { scenarioId: 42 },
+      );
+    });
+
     it('returns the count from the count query as total', async () => {
       builder.getRawOne.mockResolvedValueOnce({ count: 7 });
       const result = await repository.list(

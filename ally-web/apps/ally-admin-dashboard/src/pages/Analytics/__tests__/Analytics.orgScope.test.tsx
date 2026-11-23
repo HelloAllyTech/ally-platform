@@ -63,7 +63,7 @@ vi.mock("../tabs/AllyGuideTab", () => ({ AllyGuideTab: () => <div>ally</div> }))
 
 import { Analytics } from "../Analytics";
 
-const renderFor = (restrictedTenantIds: string[] | null) =>
+const renderFor = (restrictedTenantIds: string[] | null, url = "/") =>
   render(
     <Provider
       store={configureStore({
@@ -74,7 +74,7 @@ const renderFor = (restrictedTenantIds: string[] | null) =>
         ) => state,
       })}
     >
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[url]}>
         <Analytics />
       </MemoryRouter>
     </Provider>,
@@ -116,5 +116,40 @@ describe("Analytics for an organization-restricted admin", () => {
     expect(screen.getAllByRole("tab").length).toBeGreaterThan(2);
     expect(screen.getByText("highlights for every org")).toBeInTheDocument();
     expect(screen.getByText(/Platform-wide metrics/)).toBeInTheDocument();
+  });
+
+  it("offers an unrestricted admin an org picker on org-scoped tabs and honours ?org= from the URL", () => {
+    renderFor(null, "/?org=org-b");
+
+    expect(screen.getByText("highlights for org-b")).toBeInTheDocument();
+    expect(screen.getByText("Organisation")).toBeInTheDocument();
+  });
+
+  it("groups the tabs by audience and shows only the active group's tabs", () => {
+    renderFor(null);
+
+    expect(screen.getByRole("button", { name: "Product & learners" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Simulator quality" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Latency & reliability" })).not.toBeInTheDocument();
+  });
+
+  it("opens a group's tab straight from ?tab=, selecting its group", () => {
+    renderFor(null, "/?tab=latency");
+
+    expect(screen.getByRole("button", { name: "Simulator quality" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("tab", { name: "Latency & reliability" })).toBeInTheDocument();
+  });
+
+  it("explains the jargon and hides chart ids until asked", () => {
+    renderFor(null);
+
+    expect(screen.getByTestId("analytics-glossary")).toHaveTextContent("Role-slip");
+    expect(screen.getByLabelText("Show chart IDs")).not.toBeChecked();
   });
 });

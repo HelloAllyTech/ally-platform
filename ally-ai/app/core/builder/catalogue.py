@@ -1,0 +1,368 @@
+"""What the builder knows before it reads anything: the copy it must use word for
+word, the questions each industry needs answered, and the rules a sample or
+instruction must keep to. The purposes are in `purposes.py`.
+
+Owner-facing text here is `docs/agents-v2/ONBOARDING-COPY.md`, exactly; a test holds
+every string to the deck. What the model writes is only ever the parts the deck
+leaves open (a gap's item, a purpose's sample exchange), and code decides the rest.
+"""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass
+from typing import Dict, List, Tuple
+
+from app.schemas.builder import Industry, LearnedSection
+
+# --- Copy §2, §3, §6, §7, §8 --------------------------------------------------
+
+OPENING_MESSAGE = (
+    "Hi, I'm here to set up your assistant with you. Paste your website and I'll "
+    "start reading. You can watch what I find on the right."
+)
+OPENING_CHIPS = ["Use my website", "Upload documents", "Describe it instead"]
+DESCRIBE_PROMPT = (
+    "Tell me what your business does, who you help, and what people usually ask "
+    "you. A few sentences is plenty."
+)
+
+READING_DONE = (
+    "I've read {n} pages. Here's what I learned, and each detail links to the page "
+    "it came from. Take a quick look: if anything's wrong, tell me or edit it "
+    "directly."
+)
+LOOKS_RIGHT = "Looks right"
+
+#: Live finding lines (copy §3), by learned section.
+FINDINGS: Dict[LearnedSection, str] = {
+    LearnedSection.SERVICES: "Found your services and prices",
+    LearnedSection.HOURS: "Found your opening hours",
+    LearnedSection.TEAM: "Found {n} team members",
+    LearnedSection.FAQS: "Found {n} questions people often ask",
+    LearnedSection.LOCATION: "Found your address and contact details",
+}
+
+GAP_MESSAGE = "One thing I couldn't find: {item}. {why}"
+GAP_CHIPS = ["Add it now", "Skip for now", "We don't offer this"]
+PROGRESS_NOTE = "{n} quick questions left"
+
+AUDIENCE_QUESTION = "Who will mostly talk to your assistant?"
+AUDIENCE_CHIPS = ["Clients or customers", "My team", "Both"]
+LANGUAGE_QUESTION = "Which languages should it reply in?"
+LANGUAGE_CHIPS = ["English", "Hindi", "Marathi", "Tamil", "Other"]
+LANGUAGE_NOTE = (
+    "It replies in the language each person writes in, from the ones you choose."
+)
+DECLINE_QUESTION = "When it doesn't know something, where should it point people?"
+DECLINE_CHIPS = [
+    "Our phone number",
+    "Our email",
+    "Our front desk",
+    "Somewhere else",
+]
+
+BUILT_MESSAGE = (
+    "Your assistant is ready. Choose who can use it, and I'll create your link."
+)
+
+#: The language chips as BCP-47 tags.
+LANGUAGE_TAGS: Dict[str, str] = {
+    "english": "en",
+    "hindi": "hi",
+    "marathi": "mr",
+    "tamil": "ta",
+    "telugu": "te",
+    "kannada": "kn",
+    "bengali": "bn",
+    "gujarati": "gu",
+    "malayalam": "ml",
+    "punjabi": "pa",
+    "urdu": "ur",
+}
+
+# --- The questions every onboarding asks -------------------------------------
+
+#: Asked after the gaps, in this order (copy §6).
+FIXED_QUESTIONS: List[Tuple[str, str, List[str]]] = [
+    ("audience", AUDIENCE_QUESTION, AUDIENCE_CHIPS),
+    ("languages", LANGUAGE_QUESTION, LANGUAGE_CHIPS),
+    ("decline", DECLINE_QUESTION, DECLINE_CHIPS),
+]
+
+#: At most this many gaps are asked, so the whole set stays at six questions.
+MAX_GAPS = 3
+
+
+@dataclass(frozen=True)
+class GapCheck:
+    """One thing an industry's assistant needs to know. `item` and `why` complete
+    copy §6's pattern: "One thing I couldn't find: {item}. {why}"."""
+
+    key: str
+    item: str
+    why: str
+    sections: Tuple[LearnedSection, ...]
+
+
+_HOURS = GapCheck(
+    "hours",
+    "your opening hours",
+    "People often ask when they can visit or call.",
+    (LearnedSection.HOURS,),
+)
+_CONTACT = GapCheck(
+    "contact",
+    "how to reach you",
+    "People need a number or email when the assistant can't help.",
+    (LearnedSection.LOCATION,),
+)
+_FEES = GapCheck(
+    "fees",
+    "your fees",
+    "Price is one of the first things people ask.",
+    (LearnedSection.SERVICES,),
+)
+_CANCELLATION = GapCheck(
+    "cancellation",
+    "your cancellation policy",
+    "People often ask before they book.",
+    (LearnedSection.POLICIES,),
+)
+
+#: The checklist per industry, most important first.
+GAP_CHECKLISTS: Dict[Industry, List[GapCheck]] = {
+    Industry.MENTAL_HEALTH: [
+        _FEES,
+        _CANCELLATION,
+        GapCheck(
+            "crisis_contacts",
+            "the crisis contacts you want shared",
+            "Your assistant shares them straight away if someone may be at risk.",
+            (LearnedSection.POLICIES, LearnedSection.LOCATION),
+        ),
+        GapCheck(
+            "session_modes",
+            "whether sessions are online, in person or both",
+            "New clients usually ask this first.",
+            (LearnedSection.SERVICES,),
+        ),
+        _HOURS,
+        _CONTACT,
+    ],
+    Industry.GP_CLINIC: [
+        _HOURS,
+        GapCheck(
+            "emergency",
+            "what to do in an emergency or after hours",
+            "Your assistant points urgent symptoms there.",
+            (LearnedSection.POLICIES, LearnedSection.LOCATION),
+        ),
+        _FEES,
+        GapCheck(
+            "insurance",
+            "which insurance you accept",
+            "Patients often ask before they visit.",
+            (LearnedSection.POLICIES, LearnedSection.SERVICES),
+        ),
+        _CONTACT,
+    ],
+    Industry.DIAGNOSTIC_LAB: [
+        GapCheck(
+            "report_times",
+            "how long reports take",
+            "It's the most common question after a test.",
+            (LearnedSection.SERVICES, LearnedSection.POLICIES, LearnedSection.FAQS),
+        ),
+        GapCheck(
+            "home_collection",
+            "whether you collect samples at home",
+            "People often ask before they book a test.",
+            (LearnedSection.SERVICES,),
+        ),
+        _FEES,
+        _HOURS,
+        _CONTACT,
+    ],
+    Industry.PHARMACY: [
+        _HOURS,
+        GapCheck(
+            "delivery",
+            "whether you deliver, and where",
+            "People often ask before they order.",
+            (LearnedSection.SERVICES, LearnedSection.POLICIES),
+        ),
+        GapCheck(
+            "prescriptions",
+            "how people should send a prescription",
+            "Your assistant can't take orders yet, so it must say where to send it.",
+            (LearnedSection.POLICIES, LearnedSection.SERVICES),
+        ),
+        _CONTACT,
+    ],
+    Industry.WELLNESS: [_FEES, _HOURS, _CANCELLATION, _CONTACT],
+    Industry.D2C: [
+        GapCheck(
+            "shipping",
+            "your shipping times and charges",
+            "It's one of the first things shoppers ask.",
+            (LearnedSection.POLICIES, LearnedSection.SERVICES),
+        ),
+        GapCheck(
+            "returns",
+            "your returns policy",
+            "People often ask before they buy.",
+            (LearnedSection.POLICIES,),
+        ),
+        _CONTACT,
+    ],
+    Industry.COACHING: [
+        _FEES,
+        GapCheck(
+            "batches",
+            "your batch timings",
+            "Parents and students ask this first.",
+            (LearnedSection.HOURS, LearnedSection.SERVICES),
+        ),
+        GapCheck(
+            "admissions",
+            "how admissions work",
+            "Most enquiries are about joining.",
+            (LearnedSection.POLICIES, LearnedSection.SERVICES, LearnedSection.FAQS),
+        ),
+        _CONTACT,
+    ],
+    Industry.SCHOOL: [
+        GapCheck(
+            "admissions",
+            "how admissions work",
+            "Most enquiries are about joining.",
+            (LearnedSection.POLICIES, LearnedSection.SERVICES, LearnedSection.FAQS),
+        ),
+        _FEES,
+        _HOURS,
+        _CONTACT,
+    ],
+    Industry.REAL_ESTATE: [
+        GapCheck(
+            "site_visits",
+            "how people can arrange a site visit",
+            "Your assistant can collect details and pass them on.",
+            (LearnedSection.SERVICES, LearnedSection.POLICIES),
+        ),
+        GapCheck(
+            "prices",
+            "your price ranges",
+            "Buyers usually ask before anything else.",
+            (LearnedSection.SERVICES,),
+        ),
+        _CONTACT,
+    ],
+    Industry.SAAS: [
+        GapCheck(
+            "pricing",
+            "your plans and pricing",
+            "It's one of the first things people ask.",
+            (LearnedSection.SERVICES,),
+        ),
+        GapCheck(
+            "support_hours",
+            "when your support team is available",
+            "People want to know when a person will reply.",
+            (LearnedSection.HOURS, LearnedSection.POLICIES),
+        ),
+        _CONTACT,
+    ],
+    Industry.RESTAURANT: [
+        _HOURS,
+        GapCheck(
+            "reservations",
+            "how people can reserve a table",
+            "Your assistant can't book yet, so it needs to say how.",
+            (LearnedSection.POLICIES, LearnedSection.SERVICES),
+        ),
+        GapCheck(
+            "delivery",
+            "whether you deliver, and where",
+            "People often ask before they order.",
+            (LearnedSection.SERVICES, LearnedSection.POLICIES),
+        ),
+        _CONTACT,
+    ],
+    Industry.LEGAL_FINANCIAL: [
+        _FEES,
+        GapCheck(
+            "consultation",
+            "how a first consultation works",
+            "New clients usually ask this first.",
+            (LearnedSection.SERVICES, LearnedSection.POLICIES),
+        ),
+        _HOURS,
+        _CONTACT,
+    ],
+    Industry.NON_PROFIT: [
+        GapCheck(
+            "programmes",
+            "what your programmes are and who they're for",
+            "People want to know how you can help them.",
+            (LearnedSection.SERVICES, LearnedSection.ABOUT),
+        ),
+        GapCheck(
+            "donate",
+            "how people can donate",
+            "Supporters often ask how to give.",
+            (LearnedSection.POLICIES, LearnedSection.SERVICES, LearnedSection.FAQS),
+        ),
+        GapCheck(
+            "volunteer",
+            "how people can volunteer",
+            "Many people write in wanting to help.",
+            (LearnedSection.SERVICES, LearnedSection.FAQS),
+        ),
+        _CONTACT,
+    ],
+    Industry.OTHER: [_FEES, _HOURS, _CONTACT],
+}
+
+
+#: A sample exchange may not show the assistant doing what no purpose can do yet.
+_OVERPROMISE = re.compile(
+    r"\b(i'?ve booked|i have booked|booked (you|it)|you(?:'re| are) booked|"
+    r"booking (is )?confirmed|reserved (a|your)|order (is |has been )?"
+    r"(placed|confirmed)|placed your order|payment (is )?(received|taken|done)|"
+    r"i'?ll charge|charged your)\b",
+    re.IGNORECASE,
+)
+
+
+def overpromises(text: str) -> bool:
+    return bool(_OVERPROMISE.search(text or ""))
+
+
+#: The assistant itself booking, ordering or taking payment ("I can book a session for
+#: you"): a sentence like this is dropped from what the builder drafts.
+_DOES_BOOKING = re.compile(
+    r"\b(?:i|you|it|we|the assistant)\s+(?:can|will|could)\s+(?:also\s+)?"
+    r"(?:book|schedule|reserve|take|place|process|accept)\s+(?:an?\s+|the\s+|your\s+)?"
+    r"(?:appointments?|sessions?|consultations?|slots?|tables?|orders?|payments?|"
+    r"bookings?)\b|\b(?:book|schedule|reserve)\s+(?:it|one|a \w+)\s+for you\b",
+    re.IGNORECASE,
+)
+#: "Booking" as something it helps with, in a list: it explains how to book instead.
+_BOOKING_TOPIC = re.compile(r"\bbookings?\b(?!\s+(?:is|are)\s+not)", re.IGNORECASE)
+
+
+def honest_about_booking(text: str) -> str:
+    """`text` without the assistant claiming to book, order or take payment: a
+    sentence saying it does is dropped, and "booking" as a topic it covers becomes
+    "how to book"."""
+    sentences = re.split(r"(?<=[.!?])\s+|\n", text or "")
+    kept: List[str] = []
+    for sentence in sentences:
+        if not sentence.strip() or _DOES_BOOKING.search(sentence):
+            continue
+        if re.search(r"\b(?:help|helps|cover|covers|answer|answers)\b", sentence, re.I):
+            sentence = _BOOKING_TOPIC.sub("how to book", sentence)
+        kept.append(sentence)
+    joiner = "\n" if "\n" in (text or "") else " "
+    return joiner.join(kept).strip()

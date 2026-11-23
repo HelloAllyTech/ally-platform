@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
@@ -8,17 +9,31 @@ import '../../../core/network/api_client.dart';
 /// web helpline's `types/learnerDebrief.ts`.
 ///
 /// `notAvailable` means the learner's organisation isn't switched on for the
-/// new debrief — callers then keep showing the existing debrief unchanged.
+/// new debrief — callers then keep showing the existing debrief unchanged —
+/// unless the view is `stopped` (an emergency stop, FR-46): then the tab
+/// says "not available".
+///
+/// `failed` and `offline` are never sent by the server: the controller sets
+/// them when the request itself failed (a 5xx; no connection), so the
+/// learner sees "didn't load" / "You're offline" with Try again rather than
+/// the old note (PRD §6.12).
 enum LearnerDebriefState {
   ready,
   working,
+
+  /// A person is finishing it, no risk cue (plan §10.3): "taking longer"
+  /// with Check again. With a risk cue the server says [onItsWay].
+  takingLonger,
   onItsWay,
   tooShort,
-  notAvailable;
+  notAvailable,
+  failed,
+  offline;
 
   static LearnerDebriefState parse(Object? value) => switch (value) {
     'ready' => ready,
     'working' => working,
+    'taking_longer' => takingLonger,
     'on_its_way' => onItsWay,
     'too_short' => tooShort,
     _ => notAvailable,
@@ -52,6 +67,26 @@ enum DebriefFlagReason {
   somethingElse('something_else');
 
   const DebriefFlagReason(this.wire);
+  final String wire;
+}
+
+/// What a learner did with a debrief that only the app can see, for the
+/// experience metrics (`POST /debriefs/sessions/:id/events`). The wire value
+/// is the body's `kind`. Listening and replies are recorded by the server.
+enum DebriefLearnerEvent {
+  /// The end of the first Work-on-this point was on screen.
+  readThrough('read_through'),
+
+  /// "Practise this next" was tapped.
+  practiseNextClick('practise_next_click'),
+
+  /// The working screen (debrief still being written) was shown.
+  waited('waited'),
+
+  /// The learner left the working screen before the debrief was ready.
+  leftBeforeReady('left_before_ready');
+
+  const DebriefLearnerEvent(this.wire);
   final String wire;
 }
 
@@ -160,13 +195,18 @@ class DebriefWorkOnThis {
 }
 
 class DebriefPractiseNext {
-  const DebriefPractiseNext({required this.skill, required this.reason, this.scenarioId});
+  const DebriefPractiseNext({required this.skill, required this.reason, this.scenarioId, this.tryNext = const []});
 
+  /// Empty when a custom competency's code was removed from an older debrief.
   final String skill;
   final String reason;
 
   /// As [DebriefWorkOnThis.scenarioId], for "Practise this next".
   final int? scenarioId;
+
+  /// A session played in a course: "Try the following:", up to 3 short
+  /// things to try when practising this roleplay again, most important first.
+  final List<String> tryNext;
 }
 
 class DebriefSkillWordEntry {
@@ -174,6 +214,76 @@ class DebriefSkillWordEntry {
 
   final String skill;
   final DebriefSkillWord word;
+}
+
+/// How a skill has moved over the learner's recent sessions (post-veto). The
+/// wire value doubles as the translation-key suffix
+/// (`postSim.debriefCards.progressCard.trends.<wire>`).
+enum DebriefProgressTrend {
+  moreConsistent('more_consistent'),
+  aboutTheSame('about_the_same'),
+  worthAnotherLook('worth_another_look'),
+  tooEarly('too_early');
+
+  const DebriefProgressTrend(this.wire);
+  final String wire;
+
+  static DebriefProgressTrend? parse(Object? value) {
+    for (final trend in values) {
+      if (trend.wire == value) return trend;
+    }
+    return null;
+  }
+}
+
+class DebriefProgressSkill {
+  const DebriefProgressSkill({required this.skill, required this.trend, required this.line});
+
+  /// A foundational skill key (`empathy`, `harm`, …).
+  final String skill;
+  final DebriefProgressTrend trend;
+  final String line;
+}
+
+class DebriefProgressFocus {
+  const DebriefProgressFocus({required this.skill, required this.line});
+
+  final String skill;
+  final String line;
+}
+
+/// `cards.progress_card`, "Your last {n} sessions" (progress contract §2):
+/// only on the debrief where the card is due.
+class DebriefProgressCard {
+  const DebriefProgressCard({required this.sessions, this.skills = const [], this.focus});
+
+  /// The card, or null when it is absent or has nothing a learner can read.
+  /// Skills without a line or with an unknown trend are dropped rather than
+  /// shown half-empty.
+  static DebriefProgressCard? parse(Object? json) {
+    if (json is! Map<String, dynamic>) return null;
+    final sessions = json['sessions'];
+    if (sessions is! num || sessions != sessions.roundToDouble() || sessions < 1) return null;
+    final skills = [
+      for (final entry in _maps(json['skills']))
+        if ((_optStr(entry['skill']), _optStr(entry['line']), DebriefProgressTrend.parse(entry['trend']))
+            case (final skill?, final line?, final trend?))
+          DebriefProgressSkill(skill: skill.trim(), trend: trend, line: line.trim()),
+    ];
+    final focusJson = json['focus'];
+    final focus = focusJson is Map<String, dynamic>
+        ? switch ((_optStr(focusJson['skill']), _optStr(focusJson['line']))) {
+            (final skill?, final line?) => DebriefProgressFocus(skill: skill.trim(), line: line.trim()),
+            _ => null,
+          }
+        : null;
+    if (focus == null && skills.isEmpty) return null;
+    return DebriefProgressCard(sessions: sessions.toInt(), skills: skills, focus: focus);
+  }
+
+  final int sessions;
+  final List<DebriefProgressSkill> skills;
+  final DebriefProgressFocus? focus;
 }
 
 class DebriefCardsData {
@@ -186,6 +296,7 @@ class DebriefCardsData {
     this.skillWords = const [],
     required this.reflectiveQuestion,
     this.progressNote,
+    this.progressCard,
   });
 
   factory DebriefCardsData.fromJson(Map<String, dynamic> json) {
@@ -201,6 +312,10 @@ class DebriefCardsData {
               skill: _str(practise['skill']),
               reason: _str(practise['reason']),
               scenarioId: _optInt(practise['scenario_id']),
+              tryNext: [
+                for (final t in (practise['try_next'] is List ? practise['try_next'] as List : const []))
+                  if (t is String && t.trim().isNotEmpty) t.trim(),
+              ].take(3).toList(),
             )
           : null,
       skillWords: [
@@ -210,6 +325,7 @@ class DebriefCardsData {
       ],
       reflectiveQuestion: _str(json['reflective_question']),
       progressNote: _optStr(json['progress_note']),
+      progressCard: DebriefProgressCard.parse(json['progress_card']),
     );
   }
 
@@ -221,6 +337,9 @@ class DebriefCardsData {
   final List<DebriefSkillWordEntry> skillWords;
   final String reflectiveQuestion;
   final String? progressNote;
+
+  /// "Your last {n} sessions", when the card is due on this debrief.
+  final DebriefProgressCard? progressCard;
 }
 
 /// What the Ally team decided about a flagged card.
@@ -288,17 +407,67 @@ class DebriefProgress {
   final int? round;
 }
 
+/// What Ally did with a flag (V2_AUTONOMY F1).
+enum DebriefFlagAnswerAction {
+  kept,
+  corrected,
+  removed;
+
+  /// Lenient: the past tense the learner view sends, or the verb ally-ai
+  /// uses; anything else is no answer.
+  static DebriefFlagAnswerAction? parse(Object? value) => switch (value) {
+    'kept' || 'keep' => kept,
+    'corrected' || 'correct' => corrected,
+    'removed' || 'remove' => removed,
+    _ => null,
+  };
+}
+
+/// Ally's answer to one of the learner's flags: what it did, and its reply
+/// in the debrief's language. Absent on older servers and until answered.
+class DebriefFlagAnswer {
+  const DebriefFlagAnswer({required this.action, this.reply, this.at});
+
+  static DebriefFlagAnswer? parse(Object? json) {
+    if (json is! Map<String, dynamic>) return null;
+    final action = DebriefFlagAnswerAction.parse(json['action']);
+    if (action == null) return null;
+    return DebriefFlagAnswer(
+      action: action,
+      reply: _optStr(json['reply'])?.trim(),
+      at: json['at'] is String ? DateTime.tryParse(json['at'] as String) : null,
+    );
+  }
+
+  final DebriefFlagAnswerAction action;
+  final String? reply;
+  final DateTime? at;
+}
+
 /// One of the learner's own flags. [canUndoUntil] is null once the undo
 /// window has closed (or the flag has been reviewed).
 class DebriefMyFlag {
-  const DebriefMyFlag({required this.id, required this.section, required this.status, this.canUndoUntil});
+  const DebriefMyFlag({
+    required this.id,
+    required this.section,
+    required this.status,
+    this.canUndoUntil,
+    this.answer,
+  });
 
   factory DebriefMyFlag.fromJson(Map<String, dynamic> json) => DebriefMyFlag(
     id: '${json['id'] ?? ''}',
     section: _str(json['section']),
     status: _str(json['status']),
     canUndoUntil: json['canUndoUntil'] is String ? DateTime.tryParse(json['canUndoUntil'] as String) : null,
+    answer: DebriefFlagAnswer.parse(json['answer']),
   );
+
+  /// Ally's answer, once it has one (optional: older servers never send it).
+  final DebriefFlagAnswer? answer;
+
+  /// Still waiting on Ally (or the team): worth re-reading the debrief for.
+  bool get isOpen => status == 'open' && answer == null;
 
   final String id;
   final String section;
@@ -397,12 +566,69 @@ class DebriefSupportLine {
   Uri get telUri => Uri(scheme: 'tel', path: phone.replaceAll(RegExp(r'[^\d+]'), ''));
 }
 
+/// Which pulse question (PRD §9); the wire value is the body's `question`
+/// and the translation-key suffix (`postSim.debriefCards.pulse.<wire>`).
+enum DebriefPulseQuestion {
+  knewNext('knew_next'),
+  fair('fair');
+
+  const DebriefPulseQuestion(this.wire);
+  final String wire;
+}
+
+/// The post-launch pulse (PRD §9): on a debrief the server picked (1 in 10,
+/// for 8 weeks), two yes/no questions and the answers so far.
+class DebriefPulse {
+  const DebriefPulse({this.knewNext, this.fair});
+
+  static DebriefPulse? parse(Object? json) {
+    if (json is! Map<String, dynamic>) return null;
+    final knewNext = json['knew_next'];
+    final fair = json['fair'];
+    return DebriefPulse(knewNext: knewNext is bool ? knewNext : null, fair: fair is bool ? fair : null);
+  }
+
+  final bool? knewNext;
+  final bool? fair;
+
+  bool? answerTo(DebriefPulseQuestion question) => switch (question) {
+    DebriefPulseQuestion.knewNext => knewNext,
+    DebriefPulseQuestion.fair => fair,
+  };
+
+  DebriefPulse withAnswer(DebriefPulseQuestion question, bool answer) => switch (question) {
+    DebriefPulseQuestion.knewNext => DebriefPulse(knewNext: answer, fair: fair),
+    DebriefPulseQuestion.fair => DebriefPulse(knewNext: knewNext, fair: answer),
+  };
+}
+
 /// A roleplay the learner can still open, for "Practise this (next)".
 class DebriefPracticeScenario {
-  const DebriefPracticeScenario({required this.id, required this.title});
+  const DebriefPracticeScenario({required this.id, required this.title, this.trackItemId});
 
   final int id;
   final String title;
+
+  /// Inside a course, the course item this roleplay is (this one again, or
+  /// one the learner has already reached — the server never offers a later
+  /// item). Optional: absent for a standalone roleplay and on older servers.
+  final String? trackItemId;
+}
+
+/// Whether Ask Ally still takes questions on this debrief (optional server
+/// field `askAlly`; missing reads as open, so older servers keep working).
+class DebriefAskAlly {
+  const DebriefAskAlly({required this.open, this.reason});
+
+  static DebriefAskAlly? parse(Object? json) {
+    if (json is! Map<String, dynamic>) return null;
+    return DebriefAskAlly(open: json['open'] != false, reason: _optStr(json['reason']));
+  }
+
+  final bool open;
+
+  /// Why it is closed (`session`, `month`, …), when the server says.
+  final String? reason;
 }
 
 class LearnerDebriefView {
@@ -416,10 +642,20 @@ class LearnerDebriefView {
     this.helpful,
     this.flags = const [],
     this.distress = false,
+    this.riskCue = false,
+    this.followUp = false,
     this.supportLines = const [],
     this.practice = const [],
     this.supervisor,
+    this.pulse,
+    this.stopped = false,
+    this.reason,
+    this.askAlly,
   });
+
+  /// `reason` on a `not_available` answer: today's debrief runs on a
+  /// provider the organisation does not allow, so there is none to show.
+  static const providerNotAllowed = 'provider_not_allowed';
 
   /// `GET /debriefs/sessions/:id/supervisor` (v9 FR-26), as a read-only
   /// view: `ready` or `not_available` only, so it never polls; no distress,
@@ -456,14 +692,27 @@ class LearnerDebriefView {
           ? _maps(feedback['flags']).map(DebriefMyFlag.fromJson).toList()
           : const [],
       distress: json['distress'] == true,
+      riskCue: json['riskCue'] == true,
+      followUp: json['followUp'] == true,
       supportLines: _maps(json['supportLines'])
           .map(DebriefSupportLine.fromJson)
           .where((l) => l.phone.isNotEmpty)
           .toList(),
       practice: [
         for (final p in _maps(json['practice']))
-          if (_optInt(p['id']) case final id?) DebriefPracticeScenario(id: id, title: _str(p['title'])),
+          if (_optInt(p['id']) case final id?)
+            DebriefPracticeScenario(
+              id: id,
+              title: _str(p['title']),
+              trackItemId: _optStr(p['trackItemId']) ?? (p['trackItemId'] is num ? '${p['trackItemId']}' : null),
+            ),
       ],
+      pulse: DebriefPulse.parse(json['pulse']),
+      // A disallowed provider says "not available" too, even if `stopped`
+      // were missing: today's debrief will never come, so never a spinner.
+      stopped: json['stopped'] == true || json['reason'] == providerNotAllowed,
+      reason: _optStr(json['reason']),
+      askAlly: DebriefAskAlly.parse(json['askAlly']),
     );
   }
 
@@ -482,6 +731,14 @@ class LearnerDebriefView {
   /// The learner stepped out of the role in distress: care comes before
   /// coaching (an acknowledgement and [supportLines] first).
   final bool distress;
+
+  /// The safety reading found a risk cue: the [supportLines] show even when
+  /// the debrief has no important-moment card.
+  final bool riskCue;
+
+  /// A clear risk cue is still left out of this debrief: it is shown as it is, with a kind notice that
+  /// it may not cover what came up (the notice sits next to the support lines). Older servers never send it.
+  final bool followUp;
   final List<DebriefSupportLine> supportLines;
 
   /// The roleplays a card may link to; anything else gets no button.
@@ -491,15 +748,60 @@ class LearnerDebriefView {
   /// are read-only and show the learner's feedback instead of controls.
   final SupervisorDebriefExtras? supervisor;
 
+  /// Present only on a debrief picked for the pulse.
+  final DebriefPulse? pulse;
+
+  /// `notAvailable` only: the organisation's debriefs were stopped (FR-46),
+  /// or today's debrief runs on a provider it does not allow
+  /// ([providerNotAllowed]), so the tab says "not available" instead of
+  /// today's debrief.
+  final bool stopped;
+
+  /// `notAvailable` only: why, when the server says ([providerNotAllowed]).
+  final String? reason;
+
+  /// Ask Ally's state; null (an older server) means open.
+  final DebriefAskAlly? askAlly;
+
+  bool get askAllyOpen => askAlly?.open ?? true;
+
+  /// A flag still waiting on an answer.
+  bool get hasOpenFlag => flags.any((f) => f.isOpen);
+
+  /// Cards taken out: by the Ally team's review (a `removed` correction) or
+  /// by Ally's answer to the learner's flag.
+  Set<String> get removedSections => {
+    for (final c in corrections)
+      if (c.removed) c.section,
+    for (final f in flags)
+      if (f.answer?.action == DebriefFlagAnswerAction.removed) f.section,
+  };
+
+  /// Why [section] was taken out: the correction's note, else Ally's reply.
+  String? removalReason(String section) {
+    final note = corrections.where((c) => c.section == section && c.removed).firstOrNull?.note;
+    if (note != null) return note.trim();
+    final answer = flags.where((f) => f.section == section).firstOrNull?.answer;
+    return answer?.action == DebriefFlagAnswerAction.removed ? answer?.reply : null;
+  }
+
   DebriefPracticeScenario? practiceFor(int? scenarioId) =>
       scenarioId == null ? null : practice.where((p) => p.id == scenarioId).firstOrNull;
 
-  /// Whether this answer replaces today's debrief. False for `not_available`
-  /// and for a `ready` answer with no cards (nothing to render).
-  bool get isShowable =>
-      state != LearnerDebriefState.notAvailable && !(state == LearnerDebriefState.ready && cards == null);
+  /// "Practise this next": the card's roleplay when the learner can open
+  /// it, else this same roleplay ([thisRoleplay]) when it is on offer (the
+  /// server maps it so too, ally-be `withPractiseNextFallback`). Null when
+  /// nothing can be opened: the card then offers the roleplays list.
+  DebriefPracticeScenario? practiseNextFor(int? scenarioId, {int? thisRoleplay}) =>
+      practiceFor(scenarioId) ?? practiceFor(thisRoleplay);
 
-  LearnerDebriefView copyWith({bool? helpful, List<DebriefMyFlag>? flags}) => LearnerDebriefView(
+  /// Whether this answer replaces today's debrief. False for `not_available`
+  /// (unless [stopped]: then the tab says "not available") and for a `ready`
+  /// answer with no cards (nothing to render).
+  bool get isShowable =>
+      (state != LearnerDebriefState.notAvailable || stopped) && !(state == LearnerDebriefState.ready && cards == null);
+
+  LearnerDebriefView copyWith({bool? helpful, List<DebriefMyFlag>? flags, DebriefPulse? pulse}) => LearnerDebriefView(
     state: state,
     cards: cards,
     language: language,
@@ -509,9 +811,15 @@ class LearnerDebriefView {
     helpful: helpful ?? this.helpful,
     flags: flags ?? this.flags,
     distress: distress,
+    riskCue: riskCue,
+    followUp: followUp,
     supportLines: supportLines,
     practice: practice,
     supervisor: supervisor,
+    pulse: pulse ?? this.pulse,
+    stopped: stopped,
+    reason: reason,
+    askAlly: askAlly,
   );
 }
 
@@ -538,6 +846,14 @@ class LearnerDebriefRepository {
   /// One answer per debrief; answering again changes it.
   Future<void> setHelpful(String sessionId, {required bool helpful}) async {
     await _dio.put<void>('/debriefs/sessions/$sessionId/helpful', data: {'helpful': helpful});
+  }
+
+  /// The pulse (PRD §9): one yes/no answer per question; answering again changes it.
+  Future<void> answerPulse(String sessionId, DebriefPulseQuestion question, {required bool answer}) async {
+    await _dio.put<void>(
+      '/debriefs/sessions/$sessionId/pulse',
+      data: {'question': question.wire, 'answer': answer, 'platform': platform},
+    );
   }
 
   /// "This isn't right" on one card. A 409 (already flagged) throws like
@@ -583,7 +899,30 @@ class LearnerDebriefRepository {
   /// The learner had the ready debrief open (v9 FR-31 `openedAt`); the
   /// server records the first one only. 404 without a published debrief.
   Future<void> markOpened(String sessionId) async {
-    await _dio.post<void>('/debriefs/sessions/$sessionId/opened');
+    await _dio.post<void>('/debriefs/sessions/$sessionId/opened', data: {'platform': platform});
+  }
+
+  /// One learner event (see [DebriefLearnerEvent]); the server keeps one per
+  /// session, learner and kind. An older server answers 404/400 — callers
+  /// fire and forget.
+  Future<void> recordEvent(String sessionId, DebriefLearnerEvent kind) async {
+    await _dio.post<void>('/debriefs/sessions/$sessionId/events', data: {'kind': kind.wire, 'platform': platform});
+  }
+
+  /// The body's `platform`. `defaultTargetPlatform`, not `dart:io`'s
+  /// `Platform`, so it also answers under tests.
+  static String get platform => defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
+
+  /// The points from the learner's latest debrief for this roleplay. Never
+  /// throws: no points is the same as no debrief yet.
+  Future<LatestDebriefPoints?> getLatestPoints(int scenarioId) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>('/debriefs/scenarios/$scenarioId/latest-points');
+      final points = LatestDebriefPoints.fromJson(response.data ?? const {});
+      return points.isEmpty ? null : points;
+    } on Object {
+      return null;
+    }
   }
 
   /// Ask Ally: the debrief chat's thread, answered by the Debrief agent.
@@ -591,6 +930,35 @@ class LearnerDebriefRepository {
   static String replyStreamPath(String sessionId) => '/debriefs/sessions/$sessionId/reply/stream';
 }
 
+/// What the learner's latest debrief for a roleplay asked of them, shown
+/// under Reminders on the call screen (`GET /debriefs/scenarios/:id/latest-points`).
+class LatestDebriefPoints {
+  const LatestDebriefPoints({required this.workOnThis, this.practiseNext});
+
+  factory LatestDebriefPoints.fromJson(Map<String, dynamic> json) {
+    final next = json['practiseNext'];
+    final nextSkill = next is Map<String, dynamic> ? _optStr(next['skill']) : null;
+    return LatestDebriefPoints(
+      workOnThis: [
+        for (final m in _maps(json['workOnThis']))
+          if (_optStr(m['lead']) != null) (lead: _str(m['lead']), trySaying: _str(m['trySaying'])),
+      ],
+      practiseNext: nextSkill == null
+          ? null
+          : (skill: nextSkill, reason: _str((next as Map<String, dynamic>)['reason'])),
+    );
+  }
+
+  final List<({String lead, String trySaying})> workOnThis;
+  final ({String skill, String reason})? practiseNext;
+
+  bool get isEmpty => workOnThis.isEmpty && practiseNext == null;
+}
+
 final learnerDebriefRepositoryProvider = Provider<LearnerDebriefRepository>((ref) {
   return LearnerDebriefRepository(ref.watch(apiClientProvider));
+});
+/// The learner's latest debrief points for a roleplay (null when none).
+final latestDebriefPointsProvider = FutureProvider.autoDispose.family<LatestDebriefPoints?, int>((ref, scenarioId) {
+  return ref.watch(learnerDebriefRepositoryProvider).getLatestPoints(scenarioId);
 });

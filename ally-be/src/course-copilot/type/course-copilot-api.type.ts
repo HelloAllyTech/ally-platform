@@ -41,6 +41,21 @@ export interface CourseCopilotSessionSummary {
   trackStatus: string | null;
   createdAt: string;
   updatedAt: string;
+  /** The session list only: how its build went; null before one started. */
+  build?: CourseCopilotBuildTiming | null;
+}
+
+/** One session's build, from its first job starting to its last job settling. */
+export interface CourseCopilotBuildTiming {
+  startedAt: string | null;
+  /** Null while any job is queued or running. */
+  finishedAt: string | null;
+  /** Wall-clock build time; null until the build has settled. */
+  seconds: number | null;
+  running: boolean;
+  items: number;
+  done: number;
+  failed: number;
 }
 
 export interface CourseCopilotMessageView {
@@ -66,6 +81,8 @@ export interface CourseCopilotJobView {
   /** "8 questions", "Created roleplay #412" — set once done. */
   summary: string | null;
   skippedReason: string | null;
+  /** Reference files this item was written from ("Manual.pdf, p. 12"). */
+  references: string[];
   startedAt: string | null;
   finishedAt: string | null;
   costUsd: number | null;
@@ -111,6 +128,15 @@ export interface CourseCopilotBlueprintResponse {
   budget: CourseCopilotBudgetView;
   /** Problems that would block approval (over a limit, missing input). */
   problems: string[];
+  /** What the planner was given beyond the brief, for the build log. Absent on edits. */
+  planningContext?: CourseCopilotPlanningContext;
+}
+
+export interface CourseCopilotPlanningContext {
+  /** Title of the example course the planner followed as a pattern; null when none. */
+  exampleCourse: string | null;
+  /** Codes of the Learning Design principles the planner received. */
+  principles: string[];
 }
 
 /**
@@ -162,6 +188,21 @@ export type CourseItemPreview =
       caseTitle: string | null;
       roleplayCount: number;
       generated: boolean;
+    }
+  | {
+      type: 'BRANCHING_SCENARIO';
+      sceneCount: number;
+      endingCount: number;
+      /** null = explore (ungated). */
+      passScore: number | null;
+      intro: string | null;
+      firstScene: string | null;
+    }
+  | {
+      type: 'BUCKET_SORT';
+      itemCount: number;
+      buckets: string[];
+      intro: string | null;
     }
   | { type: 'GAME'; gameKey: string | null; intro: string | null }
   | { type: 'VIDEO'; source: string | null; url: string | null };

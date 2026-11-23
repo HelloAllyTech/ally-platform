@@ -1,9 +1,13 @@
-import * as sharp from 'sharp';
+// sharp 0.35's package-level `types` are its ESM typings; this CommonJS build gets
+// `module.exports = sharp`, which its CJS typings describe (as in chatbot/bot-image).
+import type sharpCjs = require('sharp/dist/index.cjs');
 import {
   getSlotProfile,
   ImageSlotKind,
 } from '../constants/image-slots.constants';
 import { ImagePostprocessService } from '../service/image-postprocess.service';
+
+const sharp: typeof sharpCjs = require('sharp');
 
 const providerPng = () =>
   sharp({

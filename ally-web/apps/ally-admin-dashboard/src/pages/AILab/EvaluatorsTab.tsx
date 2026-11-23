@@ -21,6 +21,7 @@ import { ActionConfirmationPopup, Button, EmptyState, ListToolbar } from "@compo
 import { ButtonVariant } from "@components/types";
 import { en, ROUTES } from "@constants";
 import { LabEvaluator } from "@types";
+import { absoluteAppUrl } from "@utils/absoluteAppUrl";
 
 import { AiLabErrorState } from "./AiLabErrorState";
 import { LabSidePanel, LabField } from "./LabSidePanel";
@@ -82,7 +83,7 @@ const PasswordModal: React.FC<{
       </div>
       <p className="text-xs text-typography-500 mb-4">
         {en.aiLab.evaluators.portalLinkLabel}{" "}
-        <span className="font-mono break-all">{`${window.location.origin}${ROUTES.EVALUATE}`}</span>
+        <span className="font-mono break-all">{absoluteAppUrl(ROUTES.EVALUATE)}</span>
       </p>
       <div className="flex justify-end">
         <Button variant={ButtonVariant.PRIMARY} onClick={onClose}>

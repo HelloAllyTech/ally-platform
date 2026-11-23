@@ -4,6 +4,19 @@ import { describe, expect, it, vi } from "vitest";
 import { BugReportForm } from "../BugReportForm";
 
 describe("BugReportForm", () => {
+  it("is a small dialog by default and takes over the viewport when fullScreen", () => {
+    const { rerender } = render(
+      <BugReportForm open onClose={vi.fn()} onSubmit={vi.fn()} onSuccess={vi.fn()} />,
+    );
+    expect(screen.queryByTestId("bug-report-form-full-screen")).not.toBeInTheDocument();
+
+    rerender(
+      <BugReportForm open fullScreen onClose={vi.fn()} onSubmit={vi.fn()} onSuccess={vi.fn()} />,
+    );
+    expect(screen.getByTestId("bug-report-form-full-screen")).toBeInTheDocument();
+    expect(document.querySelector(".cds--modal-container")?.className).toContain("!w-screen");
+  });
+
   it("disables submit until something is typed", () => {
     render(<BugReportForm open onClose={vi.fn()} onSubmit={vi.fn()} onSuccess={vi.fn()} />);
     expect(screen.getByRole("button", { name: /send report/i })).toBeDisabled();

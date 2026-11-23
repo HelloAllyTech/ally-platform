@@ -49,8 +49,8 @@ import {
 } from "@types";
 import { asAgentText } from "@utils";
 
-import { BUILDER_STATUS_TAG_TYPE } from "./builderMotion";
 import { PrinciplesInPlay } from "./PrinciplesInPlay";
+import { BUILDER_STATUS_TAG_TYPE } from "../../motion/builderMotion";
 
 /** The PRD is the build's source of truth while a run is reading it. */
 const PRD_FROZEN: BuilderSessionStatus[] = ["BUILDING", "WAITING_FOR_INPUT"];
@@ -537,6 +537,12 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
             </h1>
             <p className="truncate text-xs text-typography-500">
               {chainText ?? (session.repos?.length ? session.repos.join(", ") : strings.noReposYet)}
+              {session.requestedBy && strings.requestedFor[session.requestedBy] && (
+                <span data-testid="builder-session-requested-for">
+                  {" · "}
+                  {strings.requestedFor[session.requestedBy]}
+                </span>
+              )}
             </p>
           </div>
         </div>

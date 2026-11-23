@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 
 import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import { AnimatePresence, motion } from "framer-motion";
 import { useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { CustomImage, GoogleSignInButton } from "@ally-ui-mono/ui-shared";
@@ -16,17 +16,55 @@ import {
   ALLY_TERMS_URL,
   ALLY_PRIVACY_POLICY_URL,
   ALLY_URL,
+  ROUTES,
   en,
 } from "@constants";
 import { useUser } from "@hooks";
 import { RootState } from "@store";
-import { validateEmail, openLinkInNewTab } from "@utils";
+import { afterLoginPath, validateEmail, openLinkInNewTab } from "@utils";
+
+import { Capabilities } from "./Capabilities";
+import { HERO } from "./heroCopy";
+import { LegalDrawer, LegalKind } from "./LegalDrawer";
+import { UseCases } from "./UseCases";
+import { DIR } from "../Directory/copy";
 
 const RESEND_CODE_COUNTDOWN = 60; // 60 seconds
 const DEFAULT_EXPIRES_IN = 10; // 10 minutes
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  // Once logged in, PublicRoute already sends them on (to `next`, or through "/"). A navigate from
+  // here after this page has gone would send them back to "/" from wherever they landed: the
+  // white page at "/" after login. So this page navigates only while it is still on screen.
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const goOn = useCallback(() => {
+    if (!mounted.current) return;
+    const shownAt = `${location.pathname}${location.search}${location.hash}`;
+    navigate(afterLoginPath(location.search, shownAt), { replace: true });
+  }, [navigate, location.pathname, location.search, location.hash]);
+  // A signed-out visitor to any assistants page gets this screen drawn there, in its own words and
+  // layout. Sign-in itself (OTP, Google, `next`) is identical everywhere.
+  const isAssistantsLogin =
+    location.pathname === ROUTES.WHATSAPP_BOT ||
+    location.pathname.startsWith(`${ROUTES.WHATSAPP_BOT}/`);
+  // The resources directory has its own login in the same layout: its own words and colour.
+  const isDirectoryLogin =
+    location.pathname === ROUTES.DIRECTORY || location.pathname.startsWith(`${ROUTES.DIRECTORY}/`);
+  const hasOwnLogin = isAssistantsLogin || isDirectoryLogin;
+  // Ink on paper: the assistants login's black button on its cream page.
+  const assistantsButton = isDirectoryLogin
+    ? "!bg-[#0F766E] !text-[#FFFFFF] hover:!bg-[#0F766E]/90 disabled:!bg-[#0F766E]/30"
+    : isAssistantsLogin
+      ? "!bg-[#C4532D] !text-[#FFFDF9] hover:!bg-[#C4532D]/90 disabled:!bg-[#C4532D]/30"
+      : "";
   const { user } = useSelector((state: RootState) => state.user);
 
   const [loginSection, setLoginSection] = useState<any>(LoginSection.EMAIL);
@@ -34,7 +72,14 @@ export const Login: React.FC = () => {
   const [emailError, setEmailError] = useState<string>("");
   const [otp, setOtp] = useState<string>("");
   const [countdown, setCountdown] = useState<number>(0);
-  const [rememberMe, setRememberMe] = useState<boolean>(false);
+  // The assistants login has no checkbox: it always remembers the email (the session itself
+  // already persists). The standard login keeps the opt-in.
+  const [legalOpen, setLegalOpen] = useState<LegalKind | null>(null);
+  const closeLegal = useCallback(() => setLegalOpen(null), []);
+  const focusEmail = useCallback(() => {
+    document.querySelector<HTMLInputElement>('input[type="email"]')?.focus();
+  }, []);
+  const [rememberMe, setRememberMe] = useState<boolean>(hasOwnLogin);
 
   const [
     generateOTP,
@@ -62,7 +107,10 @@ export const Login: React.FC = () => {
   const isLoading = isGeneratingOTP || isVerifyingOTP;
 
   useEffect(() => {
-    const rememberedEmail = localStorage.getItem("rememberedEmail");
+    // Namespaced since the app moved onto the helpline dashboard's origin
+    // (app.helloally.ai/admin) - both apps used "rememberedEmail" before.
+    const rememberedEmail =
+      localStorage.getItem("adminRememberedEmail") ?? localStorage.getItem("rememberedEmail");
     if (rememberedEmail) {
       setEmail(rememberedEmail);
     }
@@ -71,7 +119,7 @@ export const Login: React.FC = () => {
   useEffect(() => {
     if (isAuthenticated && user) {
       // Route through the root so DefaultRedirect lands the user on their first tab.
-      navigate("/");
+      goOn();
     }
   }, [isAuthenticated, user, navigate]);
 
@@ -112,7 +160,7 @@ export const Login: React.FC = () => {
         localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED, "true");
         const userData = await checkAuth();
         if (userData) {
-          navigate("/");
+          goOn();
         }
       }
     })();
@@ -143,7 +191,7 @@ export const Login: React.FC = () => {
       return;
     }
     if (rememberMe) {
-      localStorage.setItem("rememberedEmail", email);
+      localStorage.setItem("adminRememberedEmail", email);
     }
     generateOTP({ email: email.trim() });
   };
@@ -165,7 +213,7 @@ export const Login: React.FC = () => {
         localStorage.setItem(LOCAL_STORAGE_KEYS.ADMIN_IS_AUTHENTICATED, "true");
         const userData = await checkAuth();
         if (userData) {
-          navigate("/");
+          goOn();
         }
       } else {
         const error = response.error as FetchBaseQueryError;
@@ -182,10 +230,132 @@ export const Login: React.FC = () => {
   };
 
   const getLoginSection = () => {
+    if (loginSection === LoginSection.EMAIL && hasOwnLogin) {
+      const copy = isDirectoryLogin
+        ? {
+            ...en.assistantsShell.login,
+            headline: DIR.login.headline,
+            headlineEmphasis: DIR.login.headlineEmphasis,
+          }
+        : en.assistantsShell.login;
+      const hasGoogle = Boolean(import.meta.env.VITE_GOOGLE_AUTH_CLIENT_ID);
+      return (
+        <motion.div
+          key="email"
+          onKeyDown={e => {
+            if (e.key === "Enter" && !isLoading && !isSubmitDisabled) handleNext();
+          }}
+          initial={{ opacity: 0, x: -50 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: 50 }}
+          transition={{ duration: 0.4, ease: "easeInOut" }}
+          className="flex flex-col gap-4"
+        >
+          <h1 className="font-secondary text-[34px] font-semibold leading-[1.05] tracking-[-0.03em] text-[#2B2520] sm:text-5xl lg:text-[56px]">
+            {copy.headline}
+            {isDirectoryLogin ? (
+              <span className="mt-2 inline-block bg-[#0F766E] px-2.5 pb-1 pt-0.5 leading-none text-[#FFFFFF]">
+                {copy.headlineEmphasis}
+              </span>
+            ) : (
+              <em className="font-semibold italic text-[#C4532D]">{copy.headlineEmphasis}</em>
+            )}
+          </h1>
+          {!isDirectoryLogin && (
+            <p className="max-w-xl text-lg leading-relaxed text-[#2B2520]/70">{HERO.blurb}</p>
+          )}
+          {!isDirectoryLogin && (
+            <ul className="m-0 flex list-none flex-wrap gap-2 p-0" data-testid="hero-proof">
+              {HERO.proof.map(item => (
+                <li
+                  key={item}
+                  className="flex items-center gap-1.5 rounded-full border border-[#2B2520]/15 px-3 py-1 text-sm text-[#2B2520]/80"
+                >
+                  <span className="text-[#C4532D]" aria-hidden="true">
+                    ✓
+                  </span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+          )}
+          {isDirectoryLogin && (
+            <p className="max-w-xl text-lg text-[#2B2520]/70">{DIR.login.blurb}</p>
+          )}
+          <TextField
+            fieldSize="medium"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            enterKeyHint="next"
+            aria-label={en.auth.email}
+            value={email}
+            onChange={handleEmailChange as any}
+            errorMessage={emailError}
+            hideError={false}
+            placeholder={en.auth.enterEmailPlaceholder}
+            className="w-full rounded-xs text-base sm:text-lg"
+          />
+          <div
+            className={`grid grid-cols-1 items-center gap-3 ${
+              hasGoogle ? "sm:grid-cols-[1fr_auto_1fr] sm:gap-4" : ""
+            }`}
+          >
+            <Button
+              type="button"
+              className={`h-12 w-full rounded-none text-base ${assistantsButton}`}
+              disabled={isLoading || isSubmitDisabled}
+              onClick={handleNext}
+            >
+              {isLoading ? (
+                <div className="flex items-center justify-center">
+                  <div className="mr-2 h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                  {en.auth.generatingOTP}
+                </div>
+              ) : (
+                copy.sendCode
+              )}
+            </Button>
+            {hasGoogle && (
+              <>
+                <span className="text-center text-base text-[#2B2520]/60">{en.common.or}</span>
+                <GoogleSignInButton
+                  onSuccess={handleGoogleSuccess}
+                  onError={handleGoogleError}
+                  text={copy.googleSignIn}
+                  className="!h-12 !w-full !px-6 [&_span]:!text-base"
+                />
+              </>
+            )}
+          </div>
+          <p className="text-sm leading-relaxed text-[#2B2520]/60">
+            {en.auth.byTappingNext}{" "}
+            <button
+              type="button"
+              className="cursor-pointer text-[#C4532D] underline underline-offset-2 hover:text-[#A8431F]"
+              onClick={() => setLegalOpen("terms")}
+            >
+              {en.auth.termsAndConditions}
+            </button>{" "}
+            {en.auth.andAcknowledge}{" "}
+            <button
+              type="button"
+              className="cursor-pointer text-[#C4532D] underline underline-offset-2 hover:text-[#A8431F]"
+              onClick={() => setLegalOpen("privacy")}
+            >
+              {en.auth.privacyPolicy}.
+            </button>
+          </p>
+        </motion.div>
+      );
+    }
     if (loginSection === LoginSection.EMAIL) {
       return (
         <motion.div
           key="email"
+          onKeyDown={e => {
+            if (e.key === "Enter" && !isLoading && !isSubmitDisabled) handleNext();
+          }}
           initial={{ opacity: 0, x: -50 }}
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: 50 }}
@@ -283,6 +453,9 @@ export const Login: React.FC = () => {
     return (
       <motion.div
         key="otp"
+        onKeyDown={e => {
+          if (e.key === "Enter" && !isLoading && !isSubmitDisabled) handleVerify();
+        }}
         initial={{ opacity: 0, x: 50 }}
         animate={{ opacity: 1, x: 0 }}
         exit={{ opacity: 0, x: -50 }}
@@ -309,7 +482,14 @@ export const Login: React.FC = () => {
           </span>
         </div>
         <div className="flex flex-col gap-2">
-          <OTP value={otp} onChange={setOtp} />
+          <OTP
+            value={otp}
+            onChange={setOtp}
+            autoFocus
+            onComplete={code => {
+              if (!isLoading) verifyOTP({ email: email.trim(), otp: code });
+            }}
+          />
           <div className="text-xs text-typography-900">
             {en.auth.codeWillExpire}{" "}
             <span className="font-[700]">{`${generateOTPData?.expiresIn ? generateOTPData?.expiresIn / 60 : DEFAULT_EXPIRES_IN} ${en.auth.minutes}`}</span>
@@ -325,7 +505,7 @@ export const Login: React.FC = () => {
         </div>
         <Button
           type="button"
-          className="w-full rounded-none mt-2 font-tertiary"
+          className={`w-full rounded-none mt-2 font-tertiary ${assistantsButton}`}
           disabled={isLoading || isSubmitDisabled}
           onClick={handleVerify}
         >
@@ -344,6 +524,75 @@ export const Login: React.FC = () => {
 
   const isSubmitDisabled =
     loginSection === LoginSection.EMAIL ? !email || !!emailError : !otp || otp.length < 4;
+
+  if (isAssistantsLogin) {
+    return (
+      <div
+        className="min-h-dvh overflow-x-hidden bg-[#FAF6EE] px-5 font-primary text-[#2B2520] sm:px-8"
+        data-testid="assistants-login"
+      >
+        <div className="mx-auto flex w-full max-w-6xl flex-col">
+          <header className="flex items-center justify-between pt-6 md:pt-8">
+            <div
+              className="flex items-baseline gap-2 font-secondary text-2xl font-semibold tracking-[-0.03em] md:text-3xl"
+              data-testid="assistants-login-wordmark"
+            >
+              <span>{en.assistantsShell.login.wordmarkName}</span>
+              <span className="rounded-full bg-[#2B2520] px-3 py-0.5 text-base font-semibold leading-snug tracking-normal text-[#FAF6EE] md:text-lg">
+                {en.assistantsShell.login.wordmarkProduct}
+              </span>
+            </div>
+            <span className="hidden text-sm text-[#2B2520]/60 sm:block">{HERO.eyebrow}</span>
+          </header>
+          <main className="py-12 lg:py-20">
+            <div className="flex max-w-3xl flex-col gap-6">
+              <AnimatePresence mode="wait">{getLoginSection()}</AnimatePresence>
+            </div>
+          </main>
+          <div className="flex flex-col gap-10 pb-16">
+            <UseCases onStart={focusEmail} />
+            <Capabilities />
+          </div>
+        </div>
+        <LegalDrawer kind={legalOpen} onClose={closeLegal} />
+      </div>
+    );
+  }
+
+  if (hasOwnLogin) {
+    return (
+      <div
+        className={`flex min-h-dvh flex-col items-center overflow-hidden px-6 font-primary text-[#2B2520] ${
+          isDirectoryLogin ? "bg-[#F2FAF8]" : "bg-[#F6F5FF]"
+        }`}
+        data-testid={isDirectoryLogin ? "directory-login" : "assistants-login"}
+      >
+        {/* Wordmark: the product name, top left of the same column as everything below it, so
+            the wordmark, headline and form share one left edge. */}
+        <div className="w-full max-w-2xl pt-6 md:pt-8">
+          <div
+            className="flex items-center gap-2 font-secondary text-2xl font-semibold tracking-[-0.03em] md:text-3xl"
+            data-testid="assistants-login-wordmark"
+          >
+            <span>
+              {isDirectoryLogin ? DIR.wordmarkName : en.assistantsShell.login.wordmarkName}
+            </span>
+            <span
+              className={`px-2 pb-0.5 leading-tight text-[#FFFFFF] ${
+                isDirectoryLogin ? "bg-[#0F766E]" : "bg-[#5B4BFF]"
+              }`}
+            >
+              {isDirectoryLogin ? DIR.product : en.assistantsShell.login.wordmarkProduct}
+            </span>
+          </div>
+        </div>
+        <div className="flex w-full max-w-2xl flex-1 flex-col justify-center gap-6 pb-8 pt-4">
+          <AnimatePresence mode="wait">{getLoginSection()}</AnimatePresence>
+        </div>
+        <LegalDrawer kind={legalOpen} onClose={closeLegal} />
+      </div>
+    );
+  }
 
   return (
     <div className="flex font-primary flex-col lg:flex-row min-h-dvh md:h-screen lg:p-8">

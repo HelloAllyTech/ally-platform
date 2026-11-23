@@ -14,7 +14,6 @@ packages = [
 python = "^3.12"
 fastapi = "^0.115.8"
 pydantic-settings = "^2.7.1"
-contextvars = "^2.4"
 uvicorn = "^0.34.0"
 weaviate-client = "^4.11.0"
 langchain-openai = "^1.1.12"
@@ -38,10 +37,17 @@ anthropic = "^0.121.0"
 # Agents v2 runtime (app/core/agent_runtime): the graph and its Postgres checkpointer.
 langgraph = "^1.2.0"
 langgraph-checkpoint-postgres = "^3.2.0"
+# The Debrief PM agent (app/core/pm_agent): one Deep Agent (planning, subagents, skills,
+# store-backed memory). 0.7.13 is the newest that keeps anthropic on ^0.121.
+deepagents = "~0.7.13"
 psycopg = {version = "^3.3.0", extras = ["binary", "pool"]}
 # Transitive (langsmith, langgraph-checkpoint-postgres), pinned here only to hold it at
 # a patch bump: the checkpointer needs >=3.11.5 and the lock was on 3.11.2.
 orjson = "~3.11.9"
+# Ask Ally (app/core/ask_ally): LangChain's create_agent tool loop on the LangGraph runtime.
+langchain = "^1.0"
+# The release may name a Claude model for the reply; create_agent needs the LangChain wrapper.
+langchain-anthropic = "^1.0"
 
 [tool.poetry.group.dev.dependencies]
 aiohttp = "^3.13.3"

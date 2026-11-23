@@ -1,5 +1,11 @@
 import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
-import { DebriefFlagReason, LearnerDebriefView, SupervisorDebriefView } from "@types";
+import {
+  DebriefFlagReason,
+  DebriefPulseQuestion,
+  DebriefSelectionComment,
+  LearnerDebriefView,
+  SupervisorDebriefView,
+} from "@types";
 
 import { baseAPI } from "./baseAPI";
 
@@ -11,6 +17,24 @@ import { baseAPI } from "./baseAPI";
 export const LEARNER_DEBRIEF_POLL_MS = 3000;
 export const LEARNER_DEBRIEF_SLOW_POLL_MS = 30_000;
 export const LEARNER_DEBRIEF_FAST_FOR_MS = 4 * 60_000;
+/**
+ * After this long waiting (working, on its way, taking longer) the app stops
+ * asking and shows today's debrief instead: the learner is never left
+ * waiting for good.
+ */
+export const LEARNER_DEBRIEF_GIVE_UP_MS = 30 * 60_000;
+/** After a flag, ask every 5 s for up to 2 minutes while it is open: Ally answers most within one. */
+export const LEARNER_DEBRIEF_FLAG_POLL_MS = 5000;
+export const LEARNER_DEBRIEF_FLAG_POLL_FOR_MS = 2 * 60_000;
+/** How long a flag can be undone (ally-be FLAG_UNDO_MS): `canUndoUntil` minus this is when it was sent. */
+export const LEARNER_DEBRIEF_FLAG_UNDO_MS = 10 * 60_000;
+
+/** The learner events only the app can see (ally-be `DEBRIEF_CLIENT_EVENT_KINDS`). */
+export type DebriefEventKind =
+  | "read_through"
+  | "practise_next_click"
+  | "waited"
+  | "left_before_ready";
 
 const learnerDebriefAPI = baseAPI.injectEndpoints({
   endpoints: builder => ({
@@ -32,6 +56,34 @@ const learnerDebriefAPI = baseAPI.injectEndpoints({
         url: ApiEndpoints.DEBRIEFS.HELPFUL(sessionId),
         method: HttpMethod.PUT,
         body: { helpful },
+      }),
+      invalidatesTags: (_r, _e, { sessionId }) => [
+        { type: TAG_TYPES.LEARNER_DEBRIEF, id: sessionId },
+      ],
+    }),
+    /** Comments on selected words, and an optional overall comment, sent together (web only). */
+    addDebriefComments: builder.mutation<
+      { saved: number },
+      { sessionId: string; overall?: string; items: DebriefSelectionComment[] }
+    >({
+      query: ({ sessionId, overall, items }) => ({
+        url: ApiEndpoints.DEBRIEFS.COMMENTS(sessionId),
+        method: HttpMethod.POST,
+        body: { ...(overall ? { overall } : {}), items },
+      }),
+      invalidatesTags: (_r, _e, { sessionId }) => [
+        { type: TAG_TYPES.LEARNER_DEBRIEF, id: sessionId },
+      ],
+    }),
+    /** The pulse (PRD §9): one yes/no answer per question; answering again changes it. */
+    answerDebriefPulse: builder.mutation<
+      unknown,
+      { sessionId: string; question: DebriefPulseQuestion; answer: boolean }
+    >({
+      query: ({ sessionId, question, answer }) => ({
+        url: ApiEndpoints.DEBRIEFS.PULSE(sessionId),
+        method: HttpMethod.PUT,
+        body: { question, answer, platform: "web" },
       }),
       invalidatesTags: (_r, _e, { sessionId }) => [
         { type: TAG_TYPES.LEARNER_DEBRIEF, id: sessionId },
@@ -79,6 +131,15 @@ const learnerDebriefAPI = baseAPI.injectEndpoints({
       query: sessionId => ({
         url: ApiEndpoints.DEBRIEFS.OPENED(sessionId),
         method: HttpMethod.POST,
+        body: { platform: "web" },
+      }),
+    }),
+    /** v9 §3.3: something the learner did that only the app can see; recorded once per kind. */
+    reportDebriefEvent: builder.mutation<unknown, { sessionId: string; kind: DebriefEventKind }>({
+      query: ({ sessionId, kind }) => ({
+        url: ApiEndpoints.DEBRIEFS.EVENTS(sessionId),
+        method: HttpMethod.POST,
+        body: { kind, platform: "web" },
       }),
     }),
     /** Read-aloud: one card's audio, made on the first request and cached. */
@@ -97,12 +158,15 @@ const learnerDebriefAPI = baseAPI.injectEndpoints({
 });
 
 export const {
+  useAnswerDebriefPulseMutation,
   useGetSupervisorDebriefQuery,
   useLazyGetDebriefCardAudioQuery,
   useMarkDebriefReadMutation,
   useMarkDebriefOpenedMutation,
+  useReportDebriefEventMutation,
   useGetLearnerDebriefQuery,
   useSetDebriefHelpfulMutation,
+  useAddDebriefCommentsMutation,
   useFlagDebriefCardMutation,
   useUndoDebriefFlagMutation,
 } = learnerDebriefAPI;

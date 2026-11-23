@@ -14,7 +14,7 @@ import {
   summarizeCompletion,
 } from "./courseCopilotFormat";
 import { getItemTypeIcon, getItemTypeLabel } from "./courseItemMeta";
-import { prefersReducedMotion } from "../../pages/Builder/builderMotion";
+import { prefersReducedMotion } from "../../motion/builderMotion";
 
 export interface ItemPreviewCardProps {
   item: CourseOutlineItem;
@@ -28,6 +28,11 @@ export interface ItemPreviewCardProps {
   flashToken?: unknown;
   /** One line (type, title, size) instead of the full preview — used while the build is still writing. */
   compact?: boolean;
+  /**
+   * Review by choosing (Course Pilot): a reason chip sends a change request for this item to the
+   * copilot. Absent while the copilot can't act (a build or a turn is running).
+   */
+  onChange?: (item: CourseOutlineItem, reason: string) => void;
 }
 
 /** How long a changed item stays highlighted. Long enough to find it, short enough to be gone before the next edit. */
@@ -221,6 +226,44 @@ const PreviewBody: React.FC<{ preview: CourseItemPreview | null | undefined }> =
       );
     }
 
+    case "BRANCHING_SCENARIO": {
+      const firstScene = text(preview.firstScene) || text(preview.intro);
+      const scenes = asNumber(preview.sceneCount);
+      const endings = asNumber(preview.endingCount);
+      const pass = asNumber(preview.passScore);
+      return (
+        <div className="space-y-1">
+          {firstScene && <p className="line-clamp-3 text-sm text-typography-800">{firstScene}</p>}
+          <div className="flex flex-wrap gap-x-3">
+            {scenes !== null && <Stat>{strings.scenes(scenes)}</Stat>}
+            {endings !== null && <Stat>{strings.endings(endings)}</Stat>}
+            <Stat>{pass !== null && pass > 0 ? strings.passMark(pass) : strings.explore}</Stat>
+          </div>
+        </div>
+      );
+    }
+
+    case "BUCKET_SORT": {
+      const intro = text(preview.intro);
+      const buckets = asArray<string>(preview.buckets).filter(
+        bucket => typeof bucket === "string" && bucket,
+      );
+      const items = asNumber(preview.itemCount);
+      return (
+        <div className="space-y-1">
+          {intro && <p className="line-clamp-2 text-sm text-typography-800">{intro}</p>}
+          {buckets.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {buckets.map(bucket => (
+                <Chip key={bucket}>{bucket}</Chip>
+              ))}
+            </div>
+          )}
+          {items !== null && <Stat>{strings.sortItems(items)}</Stat>}
+        </div>
+      );
+    }
+
     case "GAME": {
       const key = text(preview.gameKey);
       const intro = text(preview.intro);
@@ -279,6 +322,7 @@ export const ItemPreviewCard: React.FC<ItemPreviewCardProps> = ({
   flash = false,
   flashToken,
   compact = false,
+  onChange,
 }) => {
   const [highlight, setHighlight] = useState(false);
   const ref = useRef<HTMLLIElement>(null);
@@ -334,6 +378,30 @@ export const ItemPreviewCard: React.FC<ItemPreviewCardProps> = ({
       {!compact && (
         <div className="mt-2 empty:hidden">
           <PreviewBody preview={item.preview} />
+        </div>
+      )}
+
+      {!compact && onChange && (
+        <div
+          role="group"
+          aria-label={en.courseCopilotPane.course.changeReasons.label}
+          className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-neutral-100 pt-2"
+        >
+          <span className="text-xs text-typography-500">
+            {en.courseCopilotPane.course.changeReasons.label}
+          </span>
+          {Object.entries(en.courseCopilotPane.course.changeReasons.options).map(
+            ([reason, label]) => (
+              <button
+                key={reason}
+                type="button"
+                onClick={() => onChange(item, reason)}
+                className="rounded-full border border-neutral-300 px-2 py-0.5 text-xs text-typography-800 hover:border-primary-500 hover:text-primary-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500"
+              >
+                {label}
+              </button>
+            ),
+          )}
         </div>
       )}
     </li>

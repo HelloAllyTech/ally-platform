@@ -34,7 +34,9 @@ import {
   TranslationJob,
   TranslationLanguageProgress,
   TranslationProgressToast,
+  PublishBlockers,
 } from "@components";
+import { useDebriefOptionsVisible } from "@components/debrief-roleplay-options";
 import { ButtonVariant } from "@components/types";
 import {
   ADVANCED_EVENTS_LATENCY_THRESHOLD,
@@ -113,6 +115,19 @@ const getMandatoryFieldIds = () => {
   });
   return mandatoryFields;
 };
+
+const MANDATORY_FIELD_LABELS = new Map<string, string>(
+  SIMULATION_CREATOR_FIELD_GROUPS.flatMap(group =>
+    group.fields
+      .filter(
+        field => field.isMandatory && typeof (field as { label?: unknown }).label === "string",
+      )
+      .map(field => [field.id, (field as { label: string }).label] as [string, string]),
+  ),
+);
+
+const humanizeFieldId = (id: string) =>
+  id.replace(/([A-Z])/g, " $1").replace(/^./, ch => ch.toUpperCase());
 
 const isOverviewMandatoryValueFilled = (fieldId: string, value: unknown): boolean => {
   if (value instanceof FileList) {
@@ -408,6 +423,8 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
   // True while the first-switch (or "Re-map") memory mapping runs, ~20-35s.
   // Saving, previewing or publishing in that window would store or run the
   // simulation without the memories the author is waiting for.
+  // The Debrief's two choices are only in the form (and the save) where the new Debrief is on.
+  const debriefOptionsShown = useDebriefOptionsVisible(formMethods, simulationId);
   const isMappingMemories = useIsMappingMemories(formMethods.control as unknown as object);
 
   const uploadsInProgress = useSelector(selectUploadsInProgress);
@@ -469,9 +486,9 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
   const formValues = watch();
 
   // Custom validation to check if all mandatory fields are filled
-  const areAllMandatoryFieldsFilled = useMemo(() => {
+  const missingMandatoryFieldIds = useMemo(() => {
     const mandatoryFieldIds = getMandatoryFieldIds();
-    return mandatoryFieldIds.every(fieldId => {
+    const isFilled = (fieldId: string): boolean => {
       const value = formValues[fieldId];
       if (isEmpty(value)) return false;
       if (Array.isArray(value) && value.length === 0) return false;
@@ -499,8 +516,20 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
           return false;
       }
       return true;
-    });
+    };
+    return mandatoryFieldIds.filter(fieldId => !isFilled(fieldId));
   }, [formValues]);
+  const areAllMandatoryFieldsFilled = missingMandatoryFieldIds.length === 0;
+
+  // "What is blocking publish": the same check as the disabled Publish button, in words.
+  const publishBlockers = useMemo(
+    () =>
+      missingMandatoryFieldIds.map(id => ({
+        id,
+        message: `Fill in "${MANDATORY_FIELD_LABELS.get(id) ?? humanizeFieldId(id)}"`,
+      })),
+    [missingMandatoryFieldIds],
+  );
 
   const overviewMissingMandatoryLabels = useMemo(
     () => getMissingOverviewMandatoryLabels(formValues as Record<string, unknown>),
@@ -714,6 +743,8 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
         ) {
           const entry: any = {
             category: instruction.category,
+            // Explicit null (not omitted) so clearing a score resets it on the backend.
+            score: Number.isInteger(instruction.score) ? instruction.score : null,
             behaviors: uniqueBehaviorIds(instruction.behaviors),
             instructions: normalizeInstructions(instruction.instructions),
             stateInstructions: (instruction.stateInstructions ?? [])
@@ -806,6 +837,10 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
     // extractValidData turns an absent `memories` into null; never send that —
     // ally-be would read it as "clear the Stage Director prompt's memories".
     if (!Array.isArray(restForm.memories)) delete (simulationData as any).memories;
+    // Hidden Debrief choices are left out, so ally-be keeps whatever is stored.
+    if (!debriefOptionsShown) {
+      delete (simulationData as any).debriefRiskCueOption;
+    }
 
     if (Array.isArray((simulationData as any).stateNames)) {
       const filtered = ((simulationData as any).stateNames as any[]).filter(sn =>
@@ -1575,6 +1610,10 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
           )}
         </div>
       </div>
+
+      {!viewMode && publishBlockers.length > 0 && (
+        <PublishBlockers blockers={publishBlockers} className="mx-4 mt-3" />
+      )}
 
       {/* Memory mapping in progress. Page-level, not only next to the prompt
           picker, so it is seen from any tab, and it says how long and what is

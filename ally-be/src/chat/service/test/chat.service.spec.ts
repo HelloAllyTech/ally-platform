@@ -500,6 +500,50 @@ describe('ChatService', () => {
       );
       expect(messageService.replaceDictationTranscript).not.toHaveBeenCalled();
     });
+
+    it("accumulates endedAt by durationSeconds, so a manual note's call duration reflects the real dictation length", async () => {
+      // A manual note's startedAt/endedAt are both set to the instant it was
+      // created and never touched again, so updateMessageStatistics' normal
+      // endedAt-minus-startedAt duration math always computed zero here, no
+      // matter how long the counsellor actually dictated. Advancing endedAt
+      // by the just-recorded session's length lets that same existing math
+      // reflect the true accumulated total.
+      const startedAt = new Date('2026-01-01T10:00:00Z');
+      const chat = { ...mockChat, startedAt, endedAt: undefined } as any;
+      jest.spyOn(chatRepository, 'findOne').mockResolvedValue(chat);
+
+      await service.setNoteTranscript(1, 2, 'hello', 125);
+
+      expect(chatRepository.update).toHaveBeenCalledWith(1, {
+        endedAt: new Date('2026-01-01T10:02:05Z'), // startedAt + 125s
+      });
+      expect(
+        (service as any).callDetailsService.updateMessageStatistics,
+      ).toHaveBeenCalledWith(
+        expect.objectContaining({ endedAt: new Date('2026-01-01T10:02:05Z') }),
+      );
+    });
+
+    it('accumulates onto an existing endedAt, not just startedAt, across repeated dictation sessions', async () => {
+      const startedAt = new Date('2026-01-01T10:00:00Z');
+      const priorEndedAt = new Date('2026-01-01T10:02:05Z'); // a first 125s session already landed
+      const chat = { ...mockChat, startedAt, endedAt: priorEndedAt } as any;
+      jest.spyOn(chatRepository, 'findOne').mockResolvedValue(chat);
+
+      await service.setNoteTranscript(1, 2, 'hello again', 30);
+
+      expect(chatRepository.update).toHaveBeenCalledWith(1, {
+        endedAt: new Date('2026-01-01T10:02:35Z'), // priorEndedAt + 30s, not startedAt + 30s
+      });
+    });
+
+    it('does not touch endedAt when durationSeconds is omitted', async () => {
+      jest.spyOn(chatRepository, 'findOne').mockResolvedValue(mockChat as any);
+
+      await service.setNoteTranscript(1, 2, 'hello');
+
+      expect(chatRepository.update).not.toHaveBeenCalled();
+    });
   });
 
   describe('getChat', () => {

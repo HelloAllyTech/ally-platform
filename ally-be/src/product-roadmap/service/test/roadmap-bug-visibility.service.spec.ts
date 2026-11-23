@@ -1,6 +1,5 @@
 import { Repository } from 'typeorm';
 
-import { BugFinding } from 'src/bug-hunter/entity/bug-finding.entity';
 import { User } from 'src/user/entity/user.entity';
 
 import { RoadmapOpportunityRepository } from '../../repository/roadmap-opportunity.repository';
@@ -49,9 +48,9 @@ describe('RoadmapOpportunityService — bugs stay off the board', () => {
         ownerDisplay: null,
       }),
     };
-    const bugFindingRepository = {
-      create: jest.fn().mockImplementation((v) => v),
-      save: jest.fn().mockResolvedValue({ id: 'finding-1' }),
+    // Bug Hunter's queue: a filed bug enters it (BugHunterBoardService.enqueueReported)
+    const bugHunterV2 = {
+      enqueueReported: jest.fn().mockResolvedValue(undefined),
     };
     const repoClassifier = {
       classifyRepo: jest.fn().mockResolvedValue(classification),
@@ -64,6 +63,7 @@ describe('RoadmapOpportunityService — bugs stay off the board', () => {
       // getRankContext feeds the read paths.
       {
         countGoals: jest.fn().mockResolvedValue(0),
+        isProdDirector: jest.fn().mockResolvedValue(false),
         getRankContext: jest.fn().mockResolvedValue({
           weights: {
             votesWeight: 1,
@@ -80,7 +80,6 @@ describe('RoadmapOpportunityService — bugs stay off the board', () => {
       } as unknown as RoadmapVectorService,
       { emit } as unknown as RoadmapNotificationService,
       { find: jest.fn().mockResolvedValue([]) } as unknown as Repository<User>,
-      bugFindingRepository as unknown as Repository<BugFinding>,
       // Images play no part in bug visibility; these satisfy the constructor.
       { parseS3Url: jest.fn() } as never,
       { s3: { assetsBucket: 'ally-assets' } } as never,
@@ -94,11 +93,12 @@ describe('RoadmapOpportunityService — bugs stay off the board', () => {
           );
         }),
       } as never,
+      { suggestTitle: jest.fn().mockResolvedValue('A title') } as never, // roadmapAi
+      bugHunterV2 as never,
       repoClassifier as never,
-      { classifyAndRecord: jest.fn().mockResolvedValue(null) } as never, // missClassifier
     );
 
-    return { service, emit, bugFindingRepository, repoClassifier };
+    return { service, emit, bugHunterV2, repoClassifier };
   };
 
   it('does not broadcast a filed bug to the roadmap board', async () => {
@@ -136,8 +136,8 @@ describe('RoadmapOpportunityService — bugs stay off the board', () => {
    * decision; the Bug Hunter inbox row is the entire point of filing a bug, and
    * it is now the only place the bug will ever be seen.
    */
-  it('still opens the Bug Hunter finding, which is where the bug now lives', async () => {
-    const { service, bugFindingRepository } = build(RoadmapOpportunityType.BUG);
+  it('still queues the bug in Bug Hunter, which is where it now lives', async () => {
+    const { service, bugHunterV2 } = build(RoadmapOpportunityType.BUG);
 
     await service.create(1, {
       description: 'Search returns nothing after login',
@@ -145,22 +145,20 @@ describe('RoadmapOpportunityService — bugs stay off the board', () => {
       productGoal: 'Reported bugs',
     });
 
-    expect(bugFindingRepository.save).toHaveBeenCalledWith(
+    expect(bugHunterV2.enqueueReported).toHaveBeenCalledWith(
       expect.objectContaining({
-        source: 'reported_bug',
-        reportedBugId: 'opp-1',
-        status: 'new',
+        opportunityId: 'opp-1',
+        description: 'Search returns nothing after login',
       }),
     );
   });
 
   /**
-   * Classified once, here, instead of every one of Bug Hunter's 5 nightly
-   * sweeps independently guessing from the same free text — see
-   * BugHunterRepoClassifierService and BugFindingRepository.listNewReportedBugs.
+   * Classified once, here, when the reporter named no app — see
+   * RepoClassifierService (Bug Hunter's queue then knows where to look).
    */
   it('stamps the finding with the repo the classifier confidently names', async () => {
-    const { service, bugFindingRepository, repoClassifier } = build(
+    const { service, bugHunterV2, repoClassifier } = build(
       RoadmapOpportunityType.BUG,
       { repo: 'ally-web', rationale: 'mentions the admin dashboard' },
     );
@@ -174,16 +172,16 @@ describe('RoadmapOpportunityService — bugs stay off the board', () => {
     expect(repoClassifier.classifyRepo).toHaveBeenCalledWith(
       'Search returns nothing after login',
     );
-    expect(bugFindingRepository.save).toHaveBeenCalledWith(
+    expect(bugHunterV2.enqueueReported).toHaveBeenCalledWith(
       expect.objectContaining({ repo: 'ally-web' }),
     );
   });
 
   it('leaves the finding unfiled when the classifier cannot tell', async () => {
-    const { service, bugFindingRepository } = build(
-      RoadmapOpportunityType.BUG,
-      { repo: null, rationale: '' },
-    );
+    const { service, bugHunterV2 } = build(RoadmapOpportunityType.BUG, {
+      repo: null,
+      rationale: '',
+    });
 
     await service.create(1, {
       description: 'Something is broken somewhere',
@@ -191,7 +189,7 @@ describe('RoadmapOpportunityService — bugs stay off the board', () => {
       productGoal: 'Reported bugs',
     });
 
-    expect(bugFindingRepository.save).toHaveBeenCalledWith(
+    expect(bugHunterV2.enqueueReported).toHaveBeenCalledWith(
       expect.objectContaining({ repo: null }),
     );
   });

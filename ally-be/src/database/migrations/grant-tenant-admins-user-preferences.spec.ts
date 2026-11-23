@@ -1,5 +1,5 @@
 import { QueryRunner } from 'typeorm';
-import { GrantTenantAdminsUserPreferences1981001500000 } from './1981001500000-GrantTenantAdminsUserPreferences';
+import { GrantTenantAdminsUserPreferences1986500000000 } from './1986500000000-GrantTenantAdminsUserPreferences';
 import {
   ADMIN_PERMISSIONS,
   MULTI_TENANT_ADMIN_PERMISSIONS,
@@ -24,7 +24,7 @@ const makeRunner = (existingGrants = false) => {
 describe('GrantTenantAdminsUserPreferences', () => {
   it('grants both preference permissions to ADMIN and MULTI_TENANT_ADMIN', async () => {
     const { queryRunner, inserts } = makeRunner();
-    await new GrantTenantAdminsUserPreferences1981001500000().up(queryRunner);
+    await new GrantTenantAdminsUserPreferences1986500000000().up(queryRunner);
 
     expect(inserts).toEqual([
       ['group:ADMIN', 'perm:view:user:preferences'],
@@ -36,7 +36,7 @@ describe('GrantTenantAdminsUserPreferences', () => {
 
   it('is safe to run twice: an existing grant is not inserted again', async () => {
     const { queryRunner, inserts } = makeRunner(true);
-    await new GrantTenantAdminsUserPreferences1981001500000().up(queryRunner);
+    await new GrantTenantAdminsUserPreferences1986500000000().up(queryRunner);
     expect(inserts).toEqual([]);
   });
 
@@ -49,7 +49,7 @@ describe('GrantTenantAdminsUserPreferences', () => {
         return [];
       }),
     } as unknown as QueryRunner;
-    await new GrantTenantAdminsUserPreferences1981001500000().up(queryRunner);
+    await new GrantTenantAdminsUserPreferences1986500000000().up(queryRunner);
     expect(inserts).toEqual([]);
   });
 
@@ -62,7 +62,7 @@ describe('GrantTenantAdminsUserPreferences', () => {
 
   it('only removes the two groups it granted, on rollback', async () => {
     const { queryRunner, query } = makeRunner();
-    await new GrantTenantAdminsUserPreferences1981001500000().down(queryRunner);
+    await new GrantTenantAdminsUserPreferences1986500000000().down(queryRunner);
     const [sql, params] = query.mock.calls[0] as unknown as [
       string,
       unknown[][],

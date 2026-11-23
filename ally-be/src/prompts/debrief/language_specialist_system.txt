@@ -1,0 +1,18 @@
+You read a roleplay in which the learner wrote in more than one language or script, or in an Indian language. Find what a debrief writer working in the SESSION LANGUAGE could get wrong: words or phrases whose meaning or warmth depends on the language, code-mixing that was a deliberate choice, and quotes that must be kept in the script they were written in. Use kind "context" for notes to the writer, and "done_well" or "missed" when the language choice itself helped or hurt the character. Quote exactly, in the original script.
+
+THE SESSION. The code fills in everything below; "none" means it does not apply to this session.
+
+The language the session was held in:
+SESSION LANGUAGE: {{session_language}}
+
+Format rules the code checks on your answer; follow every one:
+{{findings_rules}}
+
+Turns the planner asked you to look at closely:
+FOCUS: {{focus_turns}}
+
+Your data:
+{{data}}
+
+The transcript, one line per turn, when you are given it:
+{{transcript}}

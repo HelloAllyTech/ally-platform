@@ -135,6 +135,44 @@ These keys are in `en.json` but no code in `lib/` refers to them by name. Most a
 | `conferenceListening.endSession` | End session | सत्र समाप्त करें | ಸೆಷನ್ ಕೊನೆಗೊಳಿಸಿ | सत्र थांबवा | அமர்வை முடி |
 | `conferenceListening.callEnded` | The call has ended | कॉल समाप्त हो गई है | ಕಾಲ್ ಕೊನೆಗೊಂಡಿದೆ | कॉल संपला आहे | அழைப்பு முடிந்தது |
 
-## "Your debrief" (Debrief agent) (79)
+## "Your debrief" (Debrief agent) (83)
 
-`postSim.debriefCards.*`, added 2026-10-30: one machine translation (gpt-4.1) shared by the web helpline, the React Native app and this app, written to match the words the existing Debrief tab already uses for "debrief" and "Ally" in each language. Needs a native speaker's read like the rest of this page. 2026-11-02: +17 keys (`postSim.debriefCards.{distress,practise,reply,listen}.*`) and a changed `importantMoment.support` (now ends "…you can talk to:" before the support lines), copied verbatim from the web helpline's locale files, same machine translation. 2026-11-02 (later): +11 keys (`postSim.debriefCards.working.steps.*` (8), `corrections.corrected`, `supervisor.canRead`, `ready.announce`), copied verbatim from the web helpline's locale files, same machine translation. Then +11 more (`postSim.debriefCards.supervisor.*` other than `canRead`, for the Roleplay Logs supervisor view), same source.
+`postSim.debriefCards.*`, added 2026-10-30: one machine translation (gpt-4.1) shared by the web helpline, the React Native app and this app, written to match the words the existing Debrief tab already uses for "debrief" and "Ally" in each language. Needs a native speaker's read like the rest of this page. 2026-11-02: +17 keys (`postSim.debriefCards.{distress,practise,reply,listen}.*`) and a changed `importantMoment.support` (now ends "…you can talk to:" before the support lines), copied verbatim from the web helpline's locale files, same machine translation. 2026-11-02 (later): +11 keys (`postSim.debriefCards.working.steps.*` (8), `corrections.corrected`, `supervisor.canRead`, `ready.announce`), copied verbatim from the web helpline's locale files, same machine translation. Then +11 more (`postSim.debriefCards.supervisor.*` other than `canRead`, for the Roleplay Logs supervisor view), same source. 2026-11-12: +21 keys (`postSim.debriefCards.{failed,offline,explainer,pulse}.*` — the didn't-load and offline states, the "How Ally writes your debrief" sheet, the post-launch pulse) and `onItsWay` now ends "We'll let you know." in every language; written by Claude for both this app and the web helpline (the web has the same keys except `offline.*`), not by the i18n:sync script. Needs a native speaker's read like the rest of this page. 2026-11-13: +8 keys `postSim.debriefCards.progressCard.{title,focus,showMore,showLess,trends.*}` (the "Your last {n} sessions" card), written by Claude for both apps; `progressCard.skills.*` (14) copied verbatim from the web helpline's `helplineWorkspace.skills.*`. Needs a native speaker's read.
+
+2026-11-12 (later): +3 keys for the "taking longer + Check again" state (plan §7.5, §10.3) and +1 (`notAvailable`) for an organisation whose debriefs were stopped (FR-46), written by Claude for both this app and the web helpline, same terms as `onItsWay`. Needs a native speaker's read:
+
+| Key | English | Hindi | Kannada | Marathi | Tamil |
+|---|---|---|---|---|---|
+| `postSim.debriefCards.takingLonger.body` | This is taking longer than usual. I'll let you know when it's ready. | इसमें सामान्य से ज़्यादा समय लग रहा है। तैयार होते ही मैं आपको बता दूँगा। | ಇದು ಸಾಮಾನ್ಯಕ್ಕಿಂತ ಹೆಚ್ಚು ಸಮಯ ತೆಗೆದುಕೊಳ್ಳುತ್ತಿದೆ. ಸಿದ್ಧವಾದಾಗ ನಾನು ನಿಮಗೆ ತಿಳಿಸುತ್ತೇನೆ. | याला नेहमीपेक्षा जास्त वेळ लागत आहे. ती तयार झाली की मी तुम्हाला कळवेन. | இது வழக்கத்தை விட அதிக நேரம் எடுக்கிறது. தயாரானதும் நான் உங்களுக்குத் தெரிவிக்கிறேன். |
+| `postSim.debriefCards.takingLonger.checkAgain` | Check again | फिर से देखें | ಮತ್ತೆ ಪರಿಶೀಲಿಸಿ | पुन्हा तपासा | மீண்டும் பார்க்கவும் |
+| `postSim.debriefCards.takingLonger.checking` | Checking… | देख रहे हैं… | ಪರಿಶೀಲಿಸಲಾಗುತ್ತಿದೆ… | तपासत आहे… | பார்க்கிறது… |
+| `postSim.debriefCards.notAvailable` | A debrief isn't available for this session. | इस सेशन के लिए डीब्रीफ़ उपलब्ध नहीं है। | ಈ ಸೆಷನ್‌ಗೆ ಡೀಬ್ರೀಫ್ ಲಭ್ಯವಿಲ್ಲ. | या सत्रासाठी डीब्रीफ उपलब्ध नाही. | இந்த அமர்வுக்கு டீப்ரீஃப் கிடைக்கவில்லை. |
+
+## Debrief in a course, Ally's flag answers, Ask Ally closed (7)
+
+Added 2026-11-16 for the learner Debrief fixes (back to the course, Ally's flag answers, Ask Ally closed). Written by Claude for this app only, using the words the Debrief strings above already use (डीब्रीफ़ / ಡೀಬ್ರೀಫ್ / डीब्रीफ / டீப்ரீஃப், and Ally / ಆಲಿ / अ‍ॅली / ஆலி). Needs a native speaker's read.
+
+| Key | English | Hindi | Kannada | Marathi | Tamil |
+|---|---|---|---|---|---|
+| `postSim.course.continue` | Continue the course | कोर्स जारी रखें | ಕೋರ್ಸ್ ಮುಂದುವರಿಸಿ | कोर्स पुढे सुरू ठेवा | பாடத்தைத் தொடரவும் |
+| `postSim.course.backTo` | Back to {{title}} | {{title}} पर वापस जाएं | {{title}} ಗೆ ಹಿಂತಿರುಗಿ | {{title}} वर परत जा | {{title}} க்குத் திரும்பு |
+| `postSim.debriefCards.reply.closed` | You can't ask Ally more about this debrief right now. | अभी आप इस डीब्रीफ़ के बारे में Ally से और नहीं पूछ सकते। | ಈ ಡೀಬ್ರೀಫ್ ಬಗ್ಗೆ ಈಗ ನೀವು ಆಲಿಯನ್ನು ಇನ್ನಷ್ಟು ಕೇಳಲು ಸಾಧ್ಯವಿಲ್ಲ. | या डीब्रीफबद्दल आत्ता तुम्ही अ‍ॅलीला आणखी विचारू शकत नाही. | இந்த டீப்ரீஃப் பற்றி இப்போது நீங்கள் ஆலியிடம் மேலும் கேட்க முடியாது. |
+| `postSim.debriefCards.corrections.removedWithReason` | We took out “{{card}}”: {{reason}} | हमने “{{card}}” हटा दिया: {{reason}} | ನಾವು “{{card}}” ಅನ್ನು ತೆಗೆದುಹಾಕಿದ್ದೇವೆ: {{reason}} | आम्ही “{{card}}” काढून टाकले: {{reason}} | “{{card}}” ஐ நீக்கினோம்: {{reason}} |
+| `postSim.debriefCards.flag.answer.label` | Ally's answer: | Ally का जवाब: | ಆಲಿಯ ಉತ್ತರ: | अ‍ॅलीचे उत्तर: | ஆலியின் பதில்: |
+| `postSim.debriefCards.flag.answer.kept` | Ally looked at this again and kept it. | Ally ने इसे फिर से देखा और इसे वैसा ही रखा। | ಆಲಿ ಇದನ್ನು ಮತ್ತೆ ನೋಡಿ ಹಾಗೆಯೇ ಉಳಿಸಿದೆ. | अ‍ॅलीने हे पुन्हा पाहिले आणि तसेच ठेवले. | ஆலி இதை மீண்டும் பார்த்து அப்படியே வைத்தது. |
+| `postSim.debriefCards.flag.answer.corrected` | Ally looked at this again and changed it. | Ally ने इसे फिर से देखा और इसे बदल दिया। | ಆಲಿ ಇದನ್ನು ಮತ್ತೆ ನೋಡಿ ಬದಲಾಯಿಸಿದೆ. | अ‍ॅलीने हे पुन्हा पाहिले आणि बदलले. | ஆலி இதை மீண்டும் பார்த்து மாற்றியது. |
+
+## Debrief: collapsing, retitles, breathing, Reminders (2026-11-18)
+
+Written for this app (no RN source). Needs a native speaker's read. Keys: `postSim.debriefCards.workOnThis` (retitled "What to strengthen"), `postSim.debriefCards.practiseNext` and `postSim.debriefCards.practise.next` (retitled "Try this in your next practice"), `postSim.debriefCards.working.breatheStart`, `.breatheStop`, `.breatheCalm`, and `simulationPage.fromLastDebrief`.
+
+## Debrief: "we're taking a closer look" notice (2026-11-18)
+
+Shown when a clear risk cue is still left out of a debrief (the debrief itself is shown as before). Written by Claude for this app and the web helpline (`ally-web/apps/ally-helpline-dashboard/src/i18n/locales`, same keys, same text); there is no separate machine-translation note for the web helpline, so this is the record for both. It deliberately promises no contact: it says someone from the team is checking the debrief, in the same words the `onItsWay` string uses for "the Ally team". Needs a native speaker's read.
+
+| Key | English | Hindi | Kannada | Marathi | Tamil |
+|---|---|---|---|---|---|
+| `postSim.debriefCards.followUp.title` | We're taking a closer look | हम इसे और ध्यान से देख रहे हैं | ನಾವು ಇದನ್ನು ಇನ್ನಷ್ಟು ಹತ್ತಿರದಿಂದ ನೋಡುತ್ತಿದ್ದೇವೆ | आम्ही हे अधिक काळजीपूर्वक पाहत आहोत | நாங்கள் இதை இன்னும் உன்னிப்பாகப் பார்க்கிறோம் |
+| `postSim.debriefCards.followUp.body` | Something important came up in this session, so someone from the Ally team is checking this debrief more closely. | इस सेशन में कुछ अहम बात सामने आई, इसलिए Ally टीम का कोई सदस्य इस डीब्रीफ़ को और ध्यान से देख रहा है। | ಈ ಸೆಷನ್‌ನಲ್ಲಿ ಮುಖ್ಯವಾದದ್ದೇನೋ ಬಂದ ಕಾರಣ, ಆಲಿ ತಂಡದ ಒಬ್ಬರು ಈ ಡೀಬ್ರೀಫ್ ಅನ್ನು ಇನ್ನಷ್ಟು ಹತ್ತಿರದಿಂದ ಪರಿಶೀಲಿಸುತ್ತಿದ್ದಾರೆ. | या सत्रात काहीतरी महत्त्वाचे समोर आले, म्हणून अ‍ॅली टीममधील कोणीतरी ही डीब्रीफ अधिक काळजीपूर्वक तपासत आहे. | இந்த அமர்வில் முக்கியமான ஒன்று வந்ததால், ஆலி குழுவில் ஒருவர் இந்த டீப்ரீஃப்பை இன்னும் உன்னிப்பாகச் சரிபார்க்கிறார். |
+| `postSim.debriefCards.followUp.support` | If you need support right now, the support lines in this debrief are open any time. | अगर आपको अभी सहायता चाहिए, तो इस डीब्रीफ़ में दी गई सहायता लाइनें हर समय खुली हैं। | ನಿಮಗೆ ಈಗ ಬೆಂಬಲ ಬೇಕಿದ್ದರೆ, ಈ ಡೀಬ್ರೀಫ್‌ನಲ್ಲಿರುವ ಸಹಾಯ ಸಂಖ್ಯೆಗಳು ಯಾವಾಗಲೂ ತೆರೆದಿರುತ್ತವೆ. | तुम्हाला आत्ता मदतीची गरज असल्यास, या डीब्रीफमधील मदत लाइन्स कधीही उपलब्ध आहेत. | இப்போது உங்களுக்கு ஆதரவு தேவைப்பட்டால், இந்த டீப்ரீஃப்பில் உள்ள உதவி எண்கள் எப்போதும் திறந்திருக்கும். |
+

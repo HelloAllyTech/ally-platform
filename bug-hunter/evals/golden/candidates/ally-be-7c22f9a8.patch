@@ -1,0 +1,89 @@
+diff --git a/src/language/service/language-glossary.service.ts b/src/language/service/language-glossary.service.ts
+index 5a3fabd674..69dd712e60 100644
+--- a/src/language/service/language-glossary.service.ts
++++ b/src/language/service/language-glossary.service.ts
+@@ -759,6 +759,11 @@ export class LanguageGlossaryService {
+     const { sections: consolidated, engineeringFindings: rawFindings } =
+       this.parseConsolidationOutput(raw);
+     const profileByTenant = await this.buildTenantProfileMap(languageId);
++    // Distinct variety profiles this language actually has tenants attached to
++    // — the gate on whether overlay routing can mean anything (see `target`).
++    const attachedProfileCount = new Set(
++      [...profileByTenant.values()].filter(Boolean),
++    ).size;
+     // Distributional evidence corpora for the lexical gate, scoped to the
+     // routing target: an overlay entry is judged against ITS population's
+     // corpus (the profile's attached tenants), a global entry against every
+@@ -838,7 +843,23 @@ export class LanguageGlossaryService {
+             .map((t) => profileByTenant.get(t) ?? null),
+         );
+         const soleProfile = profiles.size === 1 ? [...profiles][0] : null;
+-        const target = soleProfile ?? null;
++        // Overlay routing needs CONTRAST to carry information. When the
++        // language has fewer than two attached profiles, `profiles.size === 1`
++        // is unavoidable — it reflects which tenants happen to send traffic,
++        // not evidence that the rule is variety-specific — so an overlay would
++        // make a universal rule private to one org.
++        //
++        // Measured 2026-09-03: Tamil was the only language with a profile, it
++        // had exactly one, and 65% of its published glossary had accordingly
++        // been routed into that org's overlay — including plainly universal
++        // Tamil grammar (accusative case marking, the locative suffix). A
++        // second Tamil tenant would have inherited none of it, and the global
++        // glossary could never grow, because every rule the language learned
++        // was routed away from it.
++        //
++        // With two or more profiles the single-profile signal IS meaningful:
++        // the other populations existed and did not produce the error.
++        const target = attachedProfileCount >= 2 ? (soleProfile ?? null) : null;
+         const bucket = byTarget.get(target) ?? [];
+         bucket.push({ proposal, annos });
+         byTarget.set(target, bucket);
+diff --git a/src/language/service/test/language-glossary.service.spec.ts b/src/language/service/test/language-glossary.service.spec.ts
+index c3d66958ff..d556a010b3 100644
+--- a/src/language/service/test/language-glossary.service.spec.ts
++++ b/src/language/service/test/language-glossary.service.spec.ts
+@@ -816,6 +816,12 @@ describe('LanguageGlossaryService', () => {
+       getCompletion.mockResolvedValue(JSON.stringify(twoProposalOutput));
+       attachmentRepository.find.mockResolvedValue([
+         { tenantId: 'tenant-2', profileId: 'p1', languageId: 6 },
++        // A SECOND attached profile, contributing no annotations here. Overlay
++        // routing is gated on the language having >= 2 profiles, because with
++        // one profile "all support came from it" is a tautology rather than
++        // evidence. tenant-3 supplies the contrast without changing which
++        // tenants support which proposal.
++        { tenantId: 'tenant-3', profileId: 'p2', languageId: 6 },
+       ]);
+     });
+ 
+@@ -846,6 +852,30 @@ describe('LanguageGlossaryService', () => {
+       );
+     });
+ 
++    // The gap this closes: Tamil was the only language with a profile, had
++    // exactly one, and so every rule it ever learned — including universal
++    // grammar — was routed into that single org's overlay. A second tenant on
++    // the language would have inherited nothing, and the global glossary could
++    // never grow.
++    it('routes everything GLOBAL when the language has only one attached profile', async () => {
++      attachmentRepository.find.mockResolvedValue([
++        { tenantId: 'tenant-2', profileId: 'p1', languageId: 6 },
++      ]);
++
++      const result = await service.consolidateGlossary(6);
++
++      expect(result.proposed).toBe(2);
++      expect(result.overlayEntries).toBe(0);
++      const savedSections = glossaryRepository.save.mock.calls.map(
++        (c: any[]) => c[0],
++      );
++      expect(savedSections.some((s: any) => s.profileId)).toBe(false);
++      const global = savedSections.find((s: any) => !s.profileId);
++      expect(global.entries.map((e: any) => e.markdown).sort()).toEqual(
++        ['- global rule', '- overlay rule'].sort(),
++      );
++    });
++
+     it('does not persist a phantom overlay section when its only proposal dedupes against the just-copied global content', async () => {
+       // No overlay copy exists yet for p1, but the global section it would be
+       // seeded from already contains the one proposal routed to it.

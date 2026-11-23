@@ -62,6 +62,7 @@ export const ApiEndpoints = {
     AI_TASKS: "/v1/llm/tasks",
     LLM_MODEL_CATALOG_BY_ID: (id: string) => `/v1/llm/catalog/${id}`,
     PREVIEW_LLM_MODEL: (id: string) => `/v1/llm-preview/model/${id}`,
+    PREVIEW_PROMPT: "/v1/llm-preview/prompt",
     UPDATE_LLM_CONFIG: (id: string) => `/v1/learn/llm-configs/${id}`,
     SCENARIO_LANGUAGES: "/v1/learn/scenario-languages",
     GET_LANGUAGES: "/v1/language",
@@ -187,8 +188,11 @@ export const ApiEndpoints = {
     LIST: "/v1/learn/admin/tracks",
     BY_ID: (id: string) => `/v1/learn/admin/tracks/${id}`,
     STRUCTURE: (id: string) => `/v1/learn/admin/tracks/${id}/structure`,
-    // Raise a live quiz's attempt limit; the structure PUT is locked once learners enrol.
-    QUIZ_SETTINGS: (itemId: string) => `/v1/learn/admin/tracks/items/${itemId}/quiz/settings`,
+    // Raise a live quiz's or annotation's attempt limit; the structure PUT is locked once learners enrol.
+    ATTEMPT_LIMIT: (itemId: string) => `/v1/learn/admin/tracks/items/${itemId}/attempt-limit`,
+    // Do a pre and a post roleplay score the same behaviours? (pre/post assessment builder)
+    ASSESSMENT_PAIR_COMPAT: (preScenarioId: number, postScenarioId: number) =>
+      `/v1/tenant-analytics/assessment-pair-compat/${preScenarioId}/${postScenarioId}`,
     // The trainer's notes for Ally and per-item tension.
     GUIDE_NOTES: (id: string) => `/v1/learn/admin/tracks/${id}/guide-notes`,
     DUPLICATE: (id: string) => `/v1/learn/admin/tracks/${id}/duplicate`,
@@ -299,6 +303,16 @@ export const ApiEndpoints = {
     ASSIGN: "/v1/platform-admins",
     REMOVE: (userId: number) => `/v1/platform-admins/${userId}`,
   },
+  // User Management › Debrief access: the Clinical advisor and Debrief owner roles (gated by
+  // admin_user_management, like Ally admins).
+  CLINICAL_ADVISORS: {
+    LIST: "/v1/clinical-advisors",
+    SEARCH: "/v1/clinical-advisors/search",
+    ADD: (userId: number) => `/v1/clinical-advisors/${userId}`,
+    REMOVE: (userId: number) => `/v1/clinical-advisors/${userId}`,
+    // The Debrief owner role, on the same page and gate.
+    OWNER: (userId: number) => `/v1/clinical-advisors/${userId}/owner`,
+  },
   SUPER_DUPER_ADMINS: {
     LIST: "/v1/super-duper-admins",
     ELIGIBLE: "/v1/super-duper-admins/eligible",
@@ -347,20 +361,32 @@ export const ApiEndpoints = {
     UNPUBLISH_BLOG: (id: string) => `/v1/blog/${id}/unpublish`,
     UPLOAD_IMAGE_URL: "/v1/blog/upload-url",
   },
+  // Keys that let Claude Code write draft posts, and the MCP endpoint they unlock.
+  BLOG_AUTHORING: {
+    KEYS: "/v1/blog-authoring/keys",
+    KEY_BY_ID: (id: string) => `/v1/blog-authoring/keys/${encodeURIComponent(id)}`,
+    MCP: "/v1/blog-authoring/mcp",
+  },
+  // Review links for draft posts, and the suggestions people leave through them.
+  BLOG_REVIEW: {
+    POST: (id: string) => `/v1/blog-review/posts/${encodeURIComponent(id)}`,
+    LINK: (id: string) => `/v1/blog-review/posts/${encodeURIComponent(id)}/link`,
+    SUGGESTION: (id: string, suggestionId: string) =>
+      `/v1/blog-review/posts/${encodeURIComponent(id)}/suggestions/${encodeURIComponent(suggestionId)}`,
+  },
   PRODUCT_UPDATES: {
     LIST: "/v1/product-updates",
     STATUS: "/v1/product-updates/status",
     RUN: "/v1/product-updates/run",
+    DIGEST_RECIPIENTS: "/v1/product-updates/digest-recipients",
+    DIGEST_RECIPIENT: (id: string) => `/v1/product-updates/digest-recipients/${id}`,
     GET: (id: string) => `/v1/product-updates/${id}`,
     UPDATE: (id: string) => `/v1/product-updates/${id}`,
   },
   PRODUCT_ROADMAP: {
     OPPORTUNITIES: "/v1/product-roadmap/opportunities",
-    /**
-     * Quick add: the same filing as OPPORTUNITIES with the readiness gate off. Behind the
-     * `product_roadmap_quick_add` admin toggle server-side; a caller without it gets a 403.
-     */
-    OPPORTUNITIES_QUICK: "/v1/product-roadmap/opportunities/quick",
+    /** A one-line title suggested from an idea's text, for the Title box to prefill. */
+    TITLE_SUGGESTION: "/v1/product-roadmap/title-suggestion",
     /**
      * The same route helpline and mobile file a bug on. Not `/opportunities` with
      * type=bug: this one captures the reporter's screen/device context for triage and
@@ -400,6 +426,10 @@ export const ApiEndpoints = {
     STRATEGY_GOALS_ORDER: "/v1/product-roadmap/strategy-goals/order",
     STRATEGY_GOALS_ASSESS_MISSING: "/v1/product-roadmap/strategy-goals/assess-missing",
     RANK_WEIGHTS: "/v1/product-roadmap/rank-weights",
+    /** The Prod Director pick (GET/PUT) — a platform admin whose star boosts rank. */
+    PROD_DIRECTOR: "/v1/product-roadmap/prod-director",
+    OPPORTUNITY_DIRECTOR_STAR: (id: string) =>
+      `/v1/product-roadmap/opportunities/${id}/director-star`,
     /** The Vision & strategy page the opportunity copilot reads on every turn. */
     STRATEGY_CONTEXT: "/v1/product-roadmap/strategy-context",
     OPPORTUNITY_GOAL_IMPACT: (id: string) => `/v1/product-roadmap/opportunities/${id}/goal-impact`,
@@ -434,6 +464,95 @@ export const ApiEndpoints = {
       `/v1/product-roadmap/opportunities/${opportunityId}/builder-session`,
     ADMIN_REINDEX: "/v1/product-roadmap/admin/reindex",
   },
+  /**
+   * Roadmap v2's idea flow (P3 contract): New idea and drafts, dictation, the Owner's review and
+   * lead, and the answers and comments on a shared plan session. 404 while `roadmap_v2` is off.
+   */
+  ROADMAP_V2_FLOW: {
+    DRAFTS: "/v1/roadmap/drafts",
+    DRAFT: (code: string) => `/v1/roadmap/drafts/${encodeURIComponent(code)}`,
+    DRAFT_RESTORE: (code: string) => `/v1/roadmap/drafts/${encodeURIComponent(code)}/restore`,
+    DRAFT_TURN: (code: string) => `/v1/roadmap/drafts/${encodeURIComponent(code)}/turn`,
+    DRAFT_REOPEN_CHECK: (code: string, checkId: string) =>
+      `/v1/roadmap/drafts/${encodeURIComponent(code)}/checks/${encodeURIComponent(checkId)}/reopen`,
+    DRAFT_SPLIT: (code: string) => `/v1/roadmap/drafts/${encodeURIComponent(code)}/split`,
+    DRAFT_SELF_CHECK: (code: string) => `/v1/roadmap/drafts/${encodeURIComponent(code)}/self-check`,
+    DRAFT_SIMILAR: (code: string) => `/v1/roadmap/drafts/${encodeURIComponent(code)}/similar`,
+    DRAFT_ADD_TO: (code: string, target: string) =>
+      `/v1/roadmap/drafts/${encodeURIComponent(code)}/add-to/${encodeURIComponent(target)}`,
+    DRAFT_SUBMIT: (code: string) => `/v1/roadmap/drafts/${encodeURIComponent(code)}/submit`,
+    DICTATION: "/v1/roadmap/dictation",
+    REVIEW: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/review`,
+    REVIEW_BATCH: "/v1/roadmap/items/review:batch",
+    REVIEW_UNDO: "/v1/roadmap/items/review:undo",
+    LEAD: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/lead`,
+    LEAD_SUGGESTIONS: (code: string) =>
+      `/v1/roadmap/items/${encodeURIComponent(code)}/lead-suggestions`,
+    ITEM_SIMILAR: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/similar`,
+    START_PLANNING: (code: string) =>
+      `/v1/roadmap/items/${encodeURIComponent(code)}/start-planning`,
+    TAKE_PLANNING: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/take-planning`,
+    RELEASE_PLANNING: (code: string) =>
+      `/v1/roadmap/items/${encodeURIComponent(code)}/release-planning`,
+    ASK_OWNER_TO_PLAN: (code: string) =>
+      `/v1/roadmap/items/${encodeURIComponent(code)}/ask-owner-to-plan`,
+    OPEN_CONVERSATION: (code: string) =>
+      `/v1/roadmap/items/${encodeURIComponent(code)}/conversation`,
+    CLOSE_PLAN: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/close-plan`,
+    REOPEN_PLAN: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/reopen-plan`,
+    CLOSE_READINESS: (code: string) =>
+      `/v1/roadmap/items/${encodeURIComponent(code)}/close-readiness`,
+    PLAN_MESSAGE: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/plan-message`,
+    PLAN_CHECKS_RUN: (sessionId: string) =>
+      `/v1/product-roadmap/plans/${encodeURIComponent(sessionId)}/checks/run`,
+    BUILD_MODE: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/build-mode`,
+    MARK_RELEASED: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/mark-released`,
+    SESSION_ANSWERS: (sessionId: string) =>
+      `/v1/builder/sessions/${encodeURIComponent(sessionId)}/answers`,
+    SESSION_COMMENTS: (sessionId: string) =>
+      `/v1/builder/sessions/${encodeURIComponent(sessionId)}/comments`,
+    SESSION_USE_ANSWER: (sessionId: string, postId: string) =>
+      `/v1/builder/sessions/${encodeURIComponent(sessionId)}/answers/${encodeURIComponent(postId)}/use`,
+  },
+  /**
+   * Roadmap v2 (plans/roadmap-builder-merge §5.2, P2 contract). Every route answers 404 while the
+   * `roadmap_v2` flag is off, which is how the frontend learns the flag: `ME_ROLE` succeeding.
+   */
+  /** Roadmap v2 P4: build brief, roles, preferences; P5: the release policy. 404 while the flag is off. */
+  ROADMAP_V2_OPS: {
+    ITEM_BRIEF: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/brief`,
+    ITEM_EXTERNAL_BUILD: (code: string) =>
+      `/v1/roadmap/items/${encodeURIComponent(code)}/external-build`,
+    ROLES: "/v1/roadmap/roles",
+    ROLE: (userId: number) => `/v1/roadmap/roles/${userId}`,
+    MY_PREFERENCES: "/v1/roadmap/me/preferences",
+    RELEASE_PLAN: "/v1/roadmap/release/plan",
+    RELEASE: "/v1/roadmap/release",
+    RELEASE_RESUME: "/v1/roadmap/release/resume",
+  },
+  /** Roadmap v2 P6: Switch on Roadmap. Owner only; these two answer while the flag is off. */
+  ROADMAP_V2_CUTOVER: {
+    PREVIEW: "/v1/roadmap/cutover/preview",
+    RUN: "/v1/roadmap/cutover",
+  },
+  ROADMAP_V2: {
+    ME_ROLE: "/v1/roadmap/me/role",
+    ITEMS: "/v1/roadmap/items",
+    ITEM: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}`,
+    ITEM_READ: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/read`,
+    ITEM_WATCH: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/watch`,
+    ITEM_STAR: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/star`,
+    SEARCH: "/v1/roadmap/search",
+  },
+  /** The Owner's old-and-quiet sweep of To do (idea-to-plan audit rec 9). 403 for anyone else. */
+  ROADMAP_V2_SWEEP: {
+    LIST: "/v1/roadmap/todo-sweep",
+    KEEP: "/v1/roadmap/todo-sweep/keep",
+  },
+  /** Roadmap v2 P8: the Owner's Measures. 404 while the flag is off, 403 for anyone but an Owner. */
+  ROADMAP_V2_MEASURES: {
+    METRICS: "/v1/roadmap/metrics",
+  },
   AI_LAB: {
     SKILLS: "/v1/lab/skills",
     SKILL_BY_ID: (id: string) => `/v1/lab/skills/${id}`,
@@ -463,32 +582,103 @@ export const ApiEndpoints = {
     QUESTION_SET_PUBLISH: (id: string) => `/v1/lab/question-sets/${id}/publish`,
     QUESTION_SET_ARCHIVE: (id: string) => `/v1/lab/question-sets/${id}/archive`,
   },
+  /** Debrief Settings › Agents: recipes, models and tools of the live release. */
+  DEBRIEF_AGENTS: {
+    CONFIG: "/v1/debriefs/agents-config",
+    CHANGES: "/v1/debriefs/agents-config/changes",
+  },
+  /** Debrief choice per roleplay: is the risk conversation the skill practised. */
+  DEBRIEF_ROLEPLAY_OPTIONS: {
+    AVAILABILITY: "/v1/debriefs/roleplay-options/availability",
+  },
   DEBRIEF_CONSOLE: {
     OVERVIEW: "/v1/debriefs/console/overview",
-    RUNS: "/v1/debriefs/console/runs",
-    RUN: (id: string) => `/v1/debriefs/console/runs/${id}`,
+    SETTINGS: "/v1/debriefs/console/settings",
+    METRICS: "/v1/debriefs/console/metrics",
+    NIGHTLY: "/v1/debriefs/console/metrics/nightly",
+    /** Analytics › Debriefs › Guidance. */
+    GUIDANCE_METRICS: "/v1/debriefs/console/guidance-metrics",
+    SETTINGS_ACCEPT: "/v1/debriefs/console/settings/accept",
+    /** Settings › Schedules (engineering only). */
+    SCHEDULES: "/v1/debriefs/console/schedules",
+    SETTINGS_BASELINE: "/v1/debriefs/console/settings/baseline",
+    CLINICAL_LISTS: "/v1/debriefs/console/settings/clinical-lists",
     RUN_SESSION: (sessionId: string) => `/v1/debriefs/console/sessions/${sessionId}/run`,
-    IMPROVER: "/v1/debriefs/console/improver",
-    IMPROVER_ANALYSE: "/v1/debriefs/console/improver/analyse",
+    PM_AGENT: "/v1/debriefs/console/pm-agent",
+    PM_AGENT_ANALYSE: "/v1/debriefs/console/pm-agent/analyse",
+    PM_AGENT_REPORTS: "/v1/debriefs/console/pm-agent/reports",
+    PM_AGENT_REPORT: (kind: string, period: string) =>
+      `/v1/debriefs/console/pm-agent/reports/${kind}/${period}`,
     IDEA_ACTION: (id: string, action: "screen" | "approve" | "reject") =>
-      `/v1/debriefs/console/improver/ideas/${id}/${action}`,
-    RELEASES: "/v1/debriefs/console/releases",
+      `/v1/debriefs/console/pm-agent/ideas/${id}/${action}`,
+    /** "Hand to Builder": where the idea stands in Builder, and answering its question. */
+    IDEA_BUILDER: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/builder`,
+    IDEA_BUILDER_ANSWER: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/builder/answer`,
     MODELS: "/v1/debriefs/console/models",
     ROLLBACK: (id: string) => `/v1/debriefs/console/releases/${id}/rollback`,
     TEST_SETS_BUILD: "/v1/debriefs/console/test-sets/build",
     TENANTS: "/v1/debriefs/console/tenants",
     TENANT_LIVE: (tenantId: string) => `/v1/debriefs/console/tenants/${tenantId}/live`,
     TENANT_REGION: (tenantId: string) => `/v1/debriefs/console/tenants/${tenantId}/region`,
-    REVIEW: "/v1/debriefs/console/review",
+    TENANT_PROVIDERS: (tenantId: string) => `/v1/debriefs/console/tenants/${tenantId}/providers`,
     RUN_ACTION: (id: string, action: "publish" | "todays-debrief" | "reviewed") =>
       `/v1/debriefs/console/runs/${id}/${action}`,
     RESOLVE_FLAG: (id: string) => `/v1/debriefs/console/flags/${id}/resolve`,
     ESCALATE: (kind: "flags" | "runs", id: string) => `/v1/debriefs/console/${kind}/${id}/escalate`,
+    ME: "/v1/debriefs/console/me",
+    SESSIONS: "/v1/debriefs/console/sessions",
+    SESSION: (runId: string) => `/v1/debriefs/console/sessions/runs/${runId}`,
+    RUN_LOGS: (runId: string) => `/v1/debriefs/console/runs/${runId}/logs`,
+    ATTENTION: "/v1/debriefs/console/attention",
+    ANALYTICS: "/v1/debriefs/console/analytics",
+    CORRECT_RUN: (runId: string) => `/v1/debriefs/console/runs/${runId}/correct`,
+    COMMENTS: (runId: string) => `/v1/debriefs/console/runs/${runId}/comments`,
+    COMMENT: (id: string) => `/v1/debriefs/console/comments/${id}`,
+    COMMENT_ACTION: (id: string, action: "resolve" | "reopen" | "still-happening") =>
+      `/v1/debriefs/console/comments/${id}/${action}`,
+    IDEA_QUESTIONS: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/questions`,
+    IDEA_START_STEP: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/start-step`,
+    IDEA_APPROVE: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/approve`,
+    IDEA_REJECT: (id: string) => `/v1/debriefs/console/pm-agent/ideas/${id}/reject`,
+    PINNED_RULES: "/v1/debriefs/console/pinned-rules",
+    LEARNER_COMMENTS: "/v1/debriefs/console/learner-comments",
+    LEARNER_FEATURE: (feature: string) => `/v1/debriefs/console/learner-features/${feature}`,
+    LEARNER_FEATURE_PEOPLE: (feature: string) =>
+      `/v1/debriefs/console/learner-features/${feature}/people`,
+    LEARNER_FEATURE_PERSON: (feature: string, userId: number) =>
+      `/v1/debriefs/console/learner-features/${feature}/people/${userId}`,
+    LEARNER_FEATURE_EVERYONE: (feature: string) =>
+      `/v1/debriefs/console/learner-features/${feature}/everyone`,
+    AUTONOMY: "/v1/debriefs/console/autonomy",
+    AUTONOMY_MATRIX: "/v1/debriefs/console/autonomy/matrix",
+    AUTONOMY_ORG: (tenantId: string) => `/v1/debriefs/console/autonomy/orgs/${tenantId}`,
+    BUDGETS: "/v1/debriefs/console/budgets",
+    RELEASE_HISTORY: "/v1/debriefs/console/release-history",
+    RELEASE_HISTORY_ITEM: (id: string) => `/v1/debriefs/console/release-history/${id}`,
+    RELEASE_COMPARE: (id: string) => `/v1/debriefs/console/releases/${id}/compare`,
+    PROPOSE: "/v1/debriefs/console/pm-agent/ideas/propose",
+    PROMOTE_WAITING: (id: string) => `/v1/debriefs/console/releases/${id}/promote-waiting`,
+    DISMISS_WAITING: (id: string) => `/v1/debriefs/console/releases/${id}/dismiss-waiting`,
+    EMERGENCY_STOP: (tenantId: string) => `/v1/debriefs/console/tenants/${tenantId}/emergency-stop`,
+    /** v2 (docs/debrief-harness/V2_AUTONOMY.md): the home, the changes, the one PM agent thread, the score. */
+    HOME: "/v1/debriefs/console/home",
+    CHANGES: "/v1/debriefs/console/changes",
+    CHANGE: (id: string) => `/v1/debriefs/console/changes/${id}`,
+    CHANGE_ACTION: (id: string, action: "undo" | "stop") =>
+      `/v1/debriefs/console/changes/${id}/${action}`,
+    PM_CONVERSATION: "/v1/debriefs/console/pm-agent/conversation",
+    SCORE: "/v1/debriefs/console/metrics/score",
   },
-  DEBRIEF_CALIBRATION: {
-    SAMPLE: "/v1/analytics/debrief-quality/calibration/sample",
-    AGREEMENT: "/v1/analytics/debrief-quality/calibration/agreement",
-    ITEM: (sessionId: string) => `/v1/analytics/debrief-quality/calibration/${sessionId}`,
+  // The caller's in-app notification feed (ally-be notification-feed.controller).
+  NOTIFICATIONS: {
+    LIST: "/v1/notifications",
+    UNREAD_COUNT: "/v1/notifications/unread-count",
+    READ: (id: string) => `/v1/notifications/${id}/read`,
+    READ_ALL: "/v1/notifications/read-all",
+  },
+  // Expert review (debrief orchestrator spec Part B): the verdict, from the session's Review panel.
+  DEBRIEF_EXPERT_REVIEW: {
+    VERDICT: (runId: string) => `/v1/debriefs/expert-review/runs/${runId}/verdict`,
   },
   SKILL_EXPERIMENTS: {
     LIST: "/v1/skill-experiments",
@@ -525,7 +715,6 @@ export const ApiEndpoints = {
     XP_PER_MINUTE: "/v1/analytics/xp-per-minute",
     CODING_AGENT_COST: "/v1/analytics/coding-agent-cost",
     FIX_SESSION_ENGINE_COST: "/v1/analytics/fix-session-engine-cost",
-    BUG_AGENT_PERFORMANCE: "/v1/analytics/bug-agent-performance",
     QUALITY_SENTIMENT: "/v1/analytics/quality-sentiment",
     RAG_QUALITY: "/v1/analytics/rag-quality",
     CHART_PREFERENCES: "/v1/analytics/chart-preferences",
@@ -625,57 +814,70 @@ export const ApiEndpoints = {
   ANALYTICS_AGENT: {
     ASK: "/v1/analytics/agent/ask",
     CATALOG: "/v1/analytics/agent/catalog",
+    // The caller's own saved conversations (the sidebar), and one with its turns.
+    CONVERSATIONS: "/v1/analytics/agent/conversations",
+    CONVERSATION_BY_ID: (id: string) => `/v1/analytics/agent/conversations/${id}`,
+    // The reader's optional thumbs up / down on one saved answer (PUT; null clears it).
+    MESSAGE_FEEDBACK: (messageId: string) => `/v1/analytics/agent/messages/${messageId}/feedback`,
+    // Audit runs over the agent's recent answers: start one (POST), list past
+    // ones (GET), open one (GET by id — polled while it is running).
+    AUDITS: "/v1/analytics/agent/audits",
+    AUDIT_BY_ID: (id: string) => `/v1/analytics/agent/audits/${id}`,
+    // Weekly automation runs (scheduler-started; there is no start endpoint): list
+    // them, open one, and approve / reject the dbt agent's proposal.
+    AUTOMATION_RUNS: "/v1/analytics/agent/automation/runs",
+    AUTOMATION_RUN_BY_ID: (id: string) => `/v1/analytics/agent/automation/runs/${id}`,
+    AUTOMATION_APPROVE: (agentRunId: string) =>
+      `/v1/analytics/agent/automation/agents/${agentRunId}/approve`,
+    AUTOMATION_REJECT: (agentRunId: string) =>
+      `/v1/analytics/agent/automation/agents/${agentRunId}/reject`,
   },
-  // Analytics Suggestions — its own namespace for the same reason as the agent's:
-  // the elevated super-duper-admin tier, because accepting a suggestion writes
-  // onto the product roadmap rather than only reading a chart.
-  ANALYTICS_SUGGESTIONS: {
-    LIST: "/v1/analytics/suggestions",
-    GENERATE: "/v1/analytics/suggestions/generate",
-    ACCEPT: (id: string) => `/v1/analytics/suggestions/${id}/accept`,
-    REJECT: (id: string) => `/v1/analytics/suggestions/${id}/reject`,
-  },
-  // UX Signals — the PostHog scan that files into Bug Hunter and the Suggestions
-  // queue. Its own namespace because it is a producer for both, owned by neither.
+  // UX Signals — the PostHog scan that files bugs into Bug Hunter and improvement
+  // signals for the PM Agent. Its own namespace because it is a producer for both,
+  // owned by neither.
   UX_SIGNALS: {
     SCAN: "/v1/ux-signals/scan",
     SCANS: "/v1/ux-signals/scans",
   },
-  BUG_HUNTER: {
-    SETTINGS: "/v1/bug-hunter/settings",
-    MODEL_SETTINGS: "/v1/bug-hunter/settings/models",
-    RUNS: "/v1/bug-hunter/runs",
-    RUNS_TRIGGER: "/v1/bug-hunter/runs/trigger",
-    RUN_BY_ID: (id: string) => `/v1/bug-hunter/runs/${id}`,
-    RUN_STREAM: (id: string) => `/v1/bug-hunter/runs/${id}/stream`,
-    FINDINGS: "/v1/bug-hunter/findings",
-    FINDING_BY_ID: (id: string) => `/v1/bug-hunter/findings/${id}`,
-    FINDING_APPROVE: (id: string) => `/v1/bug-hunter/findings/${id}/approve`,
-    FINDING_REJECT: (id: string) => `/v1/bug-hunter/findings/${id}/reject`,
-    FINDING_ANSWER: (id: string) => `/v1/bug-hunter/findings/${id}/answer`,
-    FINDING_DESCRIPTION: (id: string) => `/v1/bug-hunter/findings/${id}/description`,
-    FINDING_STAGE: (id: string) => `/v1/bug-hunter/findings/${id}/stage`,
-    FINDING_BY_REPORTED_BUG: (opportunityId: string) =>
-      `/v1/bug-hunter/findings/by-reported-bug/${opportunityId}`,
-    FINDING_FIX_SESSION: (id: string) => `/v1/bug-hunter/findings/${id}/fix-session`,
-    FINDING_CANCEL_FIX_SESSION: (id: string) => `/v1/bug-hunter/findings/${id}/cancel-fix-session`,
-    FINDING_MERGE: (id: string) => `/v1/bug-hunter/findings/${id}/merge`,
-    FINDING_RELEASE: (id: string) => `/v1/bug-hunter/findings/${id}/release`,
-    TODAY: "/v1/bug-hunter/today",
-    METRICS_WRONG_FIXES: "/v1/bug-hunter/metrics/wrong-fixes",
-    METRICS_OPERATIONS: "/v1/bug-hunter/metrics/operations",
-    NOTIFICATIONS: "/v1/bug-hunter/notifications",
-    NOTIFICATION_READ: (id: string) => `/v1/bug-hunter/notifications/${id}/read`,
-    NOTIFICATIONS_READ_ALL: "/v1/bug-hunter/notifications/read-all",
-    FEATURE_MAPS: "/v1/bug-hunter/feature-maps",
-    FEATURE_MAPS_REFRESH: "/v1/bug-hunter/feature-maps/refresh",
-    FEATURE_MAP_REMOVE: (id: string) => `/v1/bug-hunter/feature-maps/${id}/remove`,
-    // The decision log, scoreboard and replay (OPP-0776, OPP-0783).
-    FINDING_DECISIONS: (id: string) => `/v1/bug-hunter/findings/${id}/decisions`,
-    RUN_DECISIONS: (id: string) => `/v1/bug-hunter/runs/${id}/decisions`,
-    SCOREBOARD: "/v1/bug-hunter/scoreboard",
-    DECISION_REPLAY: "/v1/bug-hunter/decisions/replay",
-    DECISION_OWNERS: "/v1/bug-hunter/decisions/owners",
+  // PM Agent: the daily AI product manager's card feed (ally-be `docs/pm-agent.md`). Not to be
+  // confused with DEBRIEF_CONSOLE.PM_AGENT, which is the debrief console's own idea agent.
+  PM_AGENT: {
+    STATE: "/v1/pm-agent/state",
+    CARDS: "/v1/pm-agent/cards",
+    CARD: (id: string) => `/v1/pm-agent/cards/${id}`,
+    ACCEPT: (id: string) => `/v1/pm-agent/cards/${id}/accept`,
+    UNDO: (id: string) => `/v1/pm-agent/cards/${id}/undo`,
+    REJECT: (id: string) => `/v1/pm-agent/cards/${id}/reject`,
+    REASON: (id: string) => `/v1/pm-agent/cards/${id}/reason`,
+    FEEDBACK: (id: string) => `/v1/pm-agent/cards/${id}/feedback`,
+    ANSWER: (id: string) => `/v1/pm-agent/cards/${id}/answer`,
+    SKIP: (id: string) => `/v1/pm-agent/cards/${id}/skip`,
+    RETRY: (id: string) => `/v1/pm-agent/cards/${id}/retry`,
+    FILE_ANYWAY: (id: string) => `/v1/pm-agent/cards/${id}/file-anyway`,
+    DISMISS: (id: string) => `/v1/pm-agent/cards/${id}/dismiss`,
+    TRACKING: "/v1/pm-agent/tracking",
+    RUN: "/v1/pm-agent/run",
+    RUNS: "/v1/pm-agent/runs",
+    SETTINGS: "/v1/pm-agent/settings",
+    MEMORY: "/v1/pm-agent/memory",
+    MEMORY_BY_ID: (id: string) => `/v1/pm-agent/memory/${id}`,
+    LESSON_CONFIRM: (id: string) => `/v1/pm-agent/lessons/${id}/confirm`,
+    LESSONS_RUN: "/v1/pm-agent/lessons/run",
+    HISTORY: "/v1/pm-agent/history",
+    HEALTH: "/v1/pm-agent/health",
+  },
+  // Bug Hunter v2 (bug-hunter/ at the repo root): suggested fixes, escalations and the
+  // two-part verdict that teaches it. Separate from the old Bug Hunter's endpoints.
+  BUG_HUNTER_V2: {
+    REPORTS: "/v1/bug-hunter-approvals/reports",
+    REPORT: (id: number) => `/v1/bug-hunter-approvals/reports/${id}`,
+    VERDICT: (id: number) => `/v1/bug-hunter-approvals/reports/${id}/verdict`,
+    // the old Bug Hunter's API shape over v2's queue (the exact-match page)
+    COMPAT_SETTINGS: "/v1/bug-hunter-approvals/compat/settings",
+    COMPAT_FINDINGS: "/v1/bug-hunter-approvals/compat/findings",
+    COMPAT_FINDING: (id: string) => `/v1/bug-hunter-approvals/compat/findings/${id}`,
+    COMPAT_FINDING_ACTION: (id: string, action: string) =>
+      `/v1/bug-hunter-approvals/compat/findings/${id}/${action}`,
   },
   // Context Library — ally-be src/context-library, docs/context-library/PLAN.md.
   CONTEXT_LIBRARY: {
@@ -687,10 +889,13 @@ export const ApiEndpoints = {
     QUEUE: "/v1/context-library/queue",
     SOURCES: "/v1/context-library/sources",
     SOURCE_BY_ID: (id: string) => `/v1/context-library/sources/${id}`,
+    SOURCE_AUDIENCE: (id: string) => `/v1/context-library/sources/${id}/audience`,
     SOURCE_ACTION: (id: string, action: "pause" | "resume" | "cancel" | "front" | "retry") =>
       `/v1/context-library/sources/${id}/${action}`,
     CHUNKS: "/v1/context-library/chunks",
     CHUNK_BY_CODE: (code: string) => `/v1/context-library/chunks/${encodeURIComponent(code)}`,
+    CHUNK_AUDIENCE: (code: string) =>
+      `/v1/context-library/chunks/${encodeURIComponent(code)}/audience`,
     CHUNK_ACTION: (code: string, action: "archive" | "restore" | "pin" | "unpin") =>
       `/v1/context-library/chunks/${encodeURIComponent(code)}/${action}`,
     COLLECTION_CHUNKS: (collectionId: string) =>
@@ -815,6 +1020,10 @@ export const ApiEndpoints = {
     // it authorises spend, so it is not folded into a session PATCH.
     SESSION_BUDGET: (id: string) => `/v1/course-copilot/sessions/${id}/budget`,
     SESSION_ARCHIVE: (id: string) => `/v1/course-copilot/sessions/${id}/archive`,
+    // Reference files (manuals, decks) attached to one session. One file per upload request.
+    SESSION_SOURCES: (id: string) => `/v1/course-copilot/sessions/${id}/sources`,
+    SESSION_SOURCE: (id: string, sourceId: string) =>
+      `/v1/course-copilot/sessions/${id}/sources/${sourceId}`,
     // Drafts the story fields of a SAVED course's landing page. Returns the draft; saves nothing.
     TRACK_LANDING_PAGE_DRAFT: (trackId: string) =>
       `/v1/course-copilot/tracks/${trackId}/landing-page-draft`,
@@ -827,18 +1036,185 @@ export const ApiEndpoints = {
     BY_ID: (id: string) => `/v1/chatbots/${id}`,
     STATUS: (id: string) => `/v1/chatbots/${id}/status`,
     ARCHIVE: (id: string) => `/v1/chatbots/${id}/archive`,
+    ARCHIVED: "/v1/chatbots/archived",
+    RESTORE: (id: string) => `/v1/chatbots/${id}/restore`,
     SETTINGS: (id: string) => `/v1/chatbots/${id}/settings`,
     DOCUMENTS: (id: string) => `/v1/chatbots/${id}/documents`,
     DOCUMENT_UPLOAD_URL: (id: string) => `/v1/chatbots/${id}/documents/upload-url`,
     PRIVATE_DOCUMENTS: (id: string) => `/v1/chatbots/${id}/documents/private`,
     DOCUMENT_BY_ID: (id: string, documentId: string) =>
       `/v1/chatbots/${id}/documents/${documentId}`,
-    MEMBERS: (id: string) => `/v1/chatbots/${id}/members`,
-    AUDIENCE: (id: string) => `/v1/chatbots/${id}/audience`,
-    AUDIENCE_ENTRY: (id: string, entryId: string) => `/v1/chatbots/${id}/audience/${entryId}`,
     TEST: (id: string) => `/v1/chatbots/${id}/test`,
     TEST_STREAM: (id: string) => `/v1/chatbots/${id}/test/stream`,
+    PAGE: (id: string) => `/v1/chatbots/${id}/page`,
+    PAGE_BRAND: (id: string) => `/v1/chatbots/${id}/page/brand`,
+    TEAM_NAMES: (id: string) => `/v1/chatbots/${id}/team-names`,
+    HOME: (id: string) => `/v1/chatbots/${id}/home`,
+    HOME_LIST: (id: string, list: string) => `/v1/chatbots/${id}/home/lists/${list}`,
+    RULES: (id: string) => `/v1/chatbots/${id}/rules`,
+    SAFETY_PACK: (id: string) => `/v1/chatbots/${id}/safety-pack`,
+    LISTS: (id: string) => `/v1/chatbots/${id}/lists`,
+    USER_LIST: (id: string, key: string) => `/v1/chatbots/${id}/lists/${key}`,
+    LIST_RESTORE: (id: string, listId: string) => `/v1/chatbots/${id}/lists/${listId}/restore`,
+    LIST_FIELDS: (id: string, key: string) => `/v1/chatbots/${id}/lists/${key}/fields`,
+    LIST_FIELD: (id: string, key: string, field: string) =>
+      `/v1/chatbots/${id}/lists/${key}/fields/${field}`,
+    LIST_RULES: (id: string, key: string) => `/v1/chatbots/${id}/lists/${key}/rules`,
+    LIST_RULE: (id: string, key: string, ruleId: string) =>
+      `/v1/chatbots/${id}/lists/${key}/rules/${ruleId}`,
+    LIST_ABILITIES: (id: string, key: string) => `/v1/chatbots/${id}/lists/${key}/abilities`,
+    LIST_RECORDS: (id: string, key: string) => `/v1/chatbots/${id}/lists/${key}/records`,
+    LIST_RECORDS_QUERY: (id: string, key: string) =>
+      `/v1/chatbots/${id}/lists/${key}/records/query`,
+    LIST_RECORDS_REPEAT: (id: string, key: string) =>
+      `/v1/chatbots/${id}/lists/${key}/records/repeat`,
+    LIST_RECORD: (id: string, key: string, recordId: string) =>
+      `/v1/chatbots/${id}/lists/${key}/records/${recordId}`,
+    LIST_RECORD_RESTORE: (id: string, key: string, recordId: string) =>
+      `/v1/chatbots/${id}/lists/${key}/records/${recordId}/restore`,
+    LIST_CONTACTS: (id: string) => `/v1/chatbots/${id}/lists/contacts`,
+    READY_MADE_LISTS: (id: string) => `/v1/chatbots/${id}/lists/ready-made`,
+    // Use-case templates (T1).
+    TEMPLATES: (id: string) => `/v1/chatbots/${id}/templates`,
+    TEMPLATE_ORIGIN: (id: string) => `/v1/chatbots/${id}/templates/origin`,
+    TEMPLATE: (id: string, template: string) => `/v1/chatbots/${id}/templates/${template}`,
+    READY_MADE_LIST: (id: string, name: string) => `/v1/chatbots/${id}/lists/ready-made/${name}`,
+    FACT_CORRECTION: (id: string, factId: string) =>
+      `/v1/chatbots/${id}/facts/${encodeURIComponent(factId)}/correction`,
+    IMAGES: (id: string) => `/v1/chatbots/${id}/images`,
+    IMAGE: (id: string, imageId: string) => `/v1/chatbots/${id}/images/${imageId}`,
+    IMAGE_RESTORE: (id: string, imageId: string) => `/v1/chatbots/${id}/images/${imageId}/restore`,
     CONNECTOR_BIND: (id: string) => `/v1/connectors/${id}/chatbot`,
+    CHECKUP: (id: string) => `/v1/chatbots/${id}/checkup`,
+    CHANGES: (id: string) => `/v1/chatbots/${id}/changes`,
+    HISTORY: (id: string) => `/v1/chatbots/${id}/history`,
+    HOW_IT_WORKS: (id: string) => `/v1/chatbots/${id}/how-it-works`,
+    HOME_NUMBERS: (id: string, days: 7 | 30) => `/v1/chatbots/${id}/home/numbers?days=${days}`,
+    CHANGES_PROPOSE: (id: string) => `/v1/chatbots/${id}/changes/propose`,
+    CHANGES_APPLY: (id: string) => `/v1/chatbots/${id}/changes/apply`,
+    CHANGE_UNDO: (id: string, eventId: string) => `/v1/chatbots/${id}/changes/${eventId}/undo`,
+    SOURCES: (id: string) => `/v1/chatbots/${id}/sources`,
+    SCORECARD: (id: string) => `/v1/chatbots/${id}/scorecard`,
+    SCORECARD_ANSWER: (id: string, questionId: string) =>
+      `/v1/chatbots/${id}/scorecard/unanswered/${questionId}/answer`,
+    SCORECARD_CORRECT: (id: string, feedbackId: string) =>
+      `/v1/chatbots/${id}/scorecard/feedback/${feedbackId}/correct`,
+    SCORECARD_FINE: (id: string, feedbackId: string) =>
+      `/v1/chatbots/${id}/scorecard/feedback/${feedbackId}/fine`,
+    SOURCE_PREVIEW: (id: string) => `/v1/chatbots/${id}/sources/preview`,
+    SOURCE_REMOVE: (id: string) => `/v1/chatbots/${id}/sources/remove`,
+    SOURCE_RESTORE: (id: string, eventId: string) =>
+      `/v1/chatbots/${id}/sources/${eventId}/restore`,
+    CHECKUP_RUNS: (id: string) => `/v1/chatbots/${id}/checkup/runs`,
+    CHECKUP_CASES: (id: string) => `/v1/chatbots/${id}/checkup/cases`,
+    CHECKUP_CASE: (id: string, caseId: string) => `/v1/chatbots/${id}/checkup/cases/${caseId}`,
+    CHECKUP_SUGGESTIONS: (id: string) => `/v1/chatbots/${id}/checkup/suggestions`,
+    CHECKUP_RUN: (id: string, runId: string) => `/v1/chatbots/${id}/checkup/runs/${runId}`,
+    CHECKUP_ANSWER: (id: string, caseId: string) =>
+      `/v1/chatbots/${id}/checkup/cases/${caseId}/answer`,
+    CHECKUP_NOT_OFFERED: (id: string, caseId: string) =>
+      `/v1/chatbots/${id}/checkup/cases/${caseId}/not-offered`,
+  },
+  /** Ally admin → Models and → Costs (CR1). Every route needs `manage_costs`. */
+  BILLING: {
+    MODELS: "/v1/admin/billing/models",
+    MODELS_UNKNOWN: "/v1/admin/billing/models/unknown",
+    MODEL: (id: string) => `/v1/admin/billing/models/${id}`,
+    MODEL_HISTORY: (id: string) => `/v1/admin/billing/models/${id}/history`,
+    MODEL_PRICES: (id: string) => `/v1/admin/billing/models/${id}/prices`,
+    MODEL_STATUS: (id: string) => `/v1/admin/billing/models/${id}/status`,
+    WHATSAPP_RATES: "/v1/admin/billing/whatsapp-rates",
+    WHATSAPP_RATE: (country: string, category: string) =>
+      `/v1/admin/billing/whatsapp-rates/${encodeURIComponent(country)}/${encodeURIComponent(category)}`,
+    COSTS: "/v1/admin/billing/costs",
+    COSTS_TREND: "/v1/admin/billing/costs/trend",
+    COSTS_BREAKDOWN: "/v1/admin/billing/costs/breakdown",
+    COSTS_ASSISTANT: (chatbotId: string) => `/v1/admin/billing/costs/assistants/${chatbotId}`,
+    COSTS_EXPORT: "/v1/admin/billing/costs/export",
+    COSTS_SETTINGS: "/v1/admin/billing/costs/settings",
+    FIXED_COSTS: "/v1/admin/billing/costs/fixed",
+    FIXED_COST: (id: string) => `/v1/admin/billing/costs/fixed/${id}`,
+    COSTS_PLANS: "/v1/admin/billing/costs/plans",
+    // A user's spend and plan, plans and seat types, seats on any assistant.
+    USER_SPEND: (userId: number) => `/v1/admin/billing/users/${userId}/spend`,
+    USER_SPEND_CAP: (userId: number) => `/v1/admin/billing/users/${userId}/spend/cap`,
+    USER_PLAN: (userId: number) => `/v1/admin/billing/users/${userId}/plan`,
+    PLANS: "/v1/admin/billing/plans",
+    PLAN: (id: string) => `/v1/admin/billing/plans/${id}`,
+    SEAT_TYPES: "/v1/admin/billing/seat-types",
+    SEAT_TYPE: (id: string) => `/v1/admin/billing/seat-types/${id}`,
+    ASSISTANT_SEATS: (chatbotId: string) => `/v1/admin/billing/assistants/${chatbotId}/seats`,
+    SEAT: (seatId: string) => `/v1/admin/billing/seats/${seatId}`,
+  },
+  /** The owner's own plan, seats and publish count (CR1 Part C). Counts only, never dollars. */
+  PLAN_AND_USAGE: {
+    ME: "/v1/me/plan",
+    SEATS: (chatbotId: string) => `/v1/chatbots/${chatbotId}/seats`,
+    SEAT_ASSIGNEE: (chatbotId: string, seatId: string) =>
+      `/v1/chatbots/${chatbotId}/seats/${seatId}/assignee`,
+    PUBLISH_USE: (chatbotId: string) => `/v1/chatbots/${chatbotId}/publish-use`,
+  },
+  /** Ally admin → Custom logins (CR1 Part B): the Assistant owner role. */
+  CUSTOM_LOGINS: {
+    LIST: "/v1/custom-logins",
+    ONE: (userId: number) => `/v1/custom-logins/${userId}`,
+  },
+  INBOX: {
+    CONVERSATIONS: "/v1/inbox/conversations",
+    COUNTS: "/v1/inbox/counts",
+    EVENTS: "/v1/inbox/events",
+    THREAD: (chatbotId: string, id: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/conversations/${id}`,
+    TAKE_OVER: (chatbotId: string, id: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/conversations/${id}/take-over`,
+    HAND_BACK: (chatbotId: string, id: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/conversations/${id}/hand-back`,
+    REPLY: (chatbotId: string, id: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/conversations/${id}/messages`,
+    /** What the assistant remembers about one person (chunk 8a). */
+    MEMORY: (chatbotId: string, contactId: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/contacts/${contactId}/memory`,
+    MEMORY_LINE: (chatbotId: string, entryId: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/memory/${entryId}`,
+    FORGET_LINE: (chatbotId: string, entryId: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/memory/${entryId}/forget`,
+    FORGET_PERSON: (chatbotId: string, contactId: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/contacts/${contactId}/forget`,
+  },
+  /** The mental health resources directory (ally-be src/directory). */
+  DIRECTORY: {
+    ENTRIES: "/v1/directory/entries",
+    ENTRY: (id: string) => `/v1/directory/entries/${id}`,
+    ENTRY_COLLECTIONS: (id: string) => `/v1/directory/entries/${id}/collections`,
+    COLLECTIONS: "/v1/directory/collections",
+    COLLECTION: (id: string) => `/v1/directory/collections/${id}`,
+    COLLECTION_ENTRY: (id: string, entryId: string) =>
+      `/v1/directory/collections/${id}/entries/${entryId}`,
+    COLLECTION_DOMAIN: (id: string) => `/v1/directory/collections/${id}/domain`,
+    COLLECTION_DOMAIN_VERIFY: (id: string) => `/v1/directory/collections/${id}/domain/verify`,
+    PUBLIC_COLLECTION: (slug: string) =>
+      `/v1/public/directory/collections/${encodeURIComponent(slug)}`,
+    PUBLIC_DOMAIN: (host: string) => `/v1/public/directory/domains/${encodeURIComponent(host)}`,
+  },
+  /** The use-case templates before a setup starts (T1). */
+  ASSISTANT_TEMPLATES: "/v1/assistant-templates",
+  BOT_DRAFTS: {
+    LIST: "/v1/bot-drafts",
+    TEMPLATE: (id: string) => `/v1/bot-drafts/${id}/template`,
+    CURRENT: "/v1/bot-drafts/current",
+    BY_ID: (id: string) => `/v1/bot-drafts/${id}`,
+    EVENTS: (id: string) => `/v1/bot-drafts/${id}/events`,
+    PAGES_FOUND: (id: string) => `/v1/bot-drafts/${id}/pages/found`,
+    PAGES: (id: string) => `/v1/bot-drafts/${id}/pages`,
+    PAGES_UNDO: (id: string, eventId: string) => `/v1/bot-drafts/${id}/pages/${eventId}/undo`,
+    MESSAGES_STREAM: (id: string) => `/v1/bot-drafts/${id}/messages/stream`,
+    UNDO: (id: string) => `/v1/bot-drafts/${id}/undo`,
+    BACK: (id: string) => `/v1/bot-drafts/${id}/back`,
+    DOCUMENTS: (id: string) => `/v1/bot-drafts/${id}/documents`,
+    DESCRIPTION: (id: string) => `/v1/bot-drafts/${id}/description`,
+    PUBLISH: (id: string) => `/v1/bot-drafts/${id}/publish`,
+    ABANDON: (id: string) => `/v1/bot-drafts/${id}/abandon`,
+    CHECKUP: (id: string) => `/v1/bot-drafts/${id}/checkup`,
   },
   WHATSAPP_BOT: {
     // Corpus (ally-be src/knowledge-base)
@@ -850,7 +1226,6 @@ export const ApiEndpoints = {
     DOCUMENT_REINDEX: (id: string) => `/v1/knowledge-base/documents/${id}/reindex`,
     DOCUMENT_ARCHIVE: (id: string) => `/v1/knowledge-base/documents/${id}/archive`,
     DOCUMENT_UNARCHIVE: (id: string) => `/v1/knowledge-base/documents/${id}/unarchive`,
-    CHUNK_BY_ID: (chunkId: string) => `/v1/knowledge-base/chunks/${chunkId}`,
     STATS: "/v1/knowledge-base/stats",
     // Bot (ally-be src/whatsapp)
     // Phone → organisation mappings. Surfaced under User Management, but owned by the bot:
@@ -871,17 +1246,7 @@ export const ApiEndpoints = {
     NUMBER_CHECK: (id: string) => `/v1/whatsapp/numbers/${id}/check`,
     NUMBER_SUBSCRIBE: (id: string) => `/v1/whatsapp/numbers/${id}/subscribe`,
     NUMBER_BY_ID: (id: string) => `/v1/whatsapp/numbers/${id}`,
-    // Conversations, unanswered queue and usage dashboard
-    CONVERSATIONS: "/v1/whatsapp/conversations",
-    CONVERSATION_BY_ID: (id: string) => `/v1/whatsapp/conversations/${id}`,
-    CONVERSATION_LANGUAGES: "/v1/whatsapp/conversations/languages",
-    CITATION_BY_CHUNK: (chunkId: string) => `/v1/whatsapp/citations/${chunkId}`,
-    CONTACT_REVEAL: (id: string) => `/v1/whatsapp/contacts/${id}/reveal`,
-    CONTACT_BLOCK: (id: string) => `/v1/whatsapp/contacts/${id}/block`,
-    CONTACT_UNBLOCK: (id: string) => `/v1/whatsapp/contacts/${id}/unblock`,
-    UNANSWERED: "/v1/whatsapp/unanswered",
-    UNANSWERED_BY_ID: (id: string) => `/v1/whatsapp/unanswered/${id}`,
-    UNANSWERED_CREATE_DOCUMENT: (id: string) => `/v1/whatsapp/unanswered/${id}/create-document`,
+    // All numbers on the assistant home's Overview
     ANALYTICS_OVERVIEW: "/v1/whatsapp/analytics/overview",
     ANALYTICS_TIMESERIES: "/v1/whatsapp/analytics/timeseries",
     ANALYTICS_LANGUAGES: "/v1/whatsapp/analytics/languages",
@@ -1022,8 +1387,23 @@ export const ROUTES = {
   MANAGE_STT_CONFIGS: "/manage-stt-configs",
   MANAGE_LLM_CONFIGS: "/manage-llm-configs",
   MANAGE_LLM_MODEL_CATALOG: "/manage-llm-model-catalog",
+  /** Ally admin → Models: models and WhatsApp rates with their prices (CR1, `manage_costs`). */
+  BILLING_MODELS: "/billing/models",
+  /** Ally admin → Costs: what every assistant costs Ally (CR1, `manage_costs`). */
+  BILLING_COSTS: "/billing/costs",
+  /** Ally admin → Plans: plans, seat types and renewals due (CR1, `manage_costs`). */
+  BILLING_PLANS: "/billing/plans",
+  /** The owner's Plan and usage (CR1): any signed-in user, for themselves. Never dollars. */
+  MY_PLAN: "/account/plan",
   AI_TASKS: "/ai-tasks",
   DEBRIEFS: "/debriefs",
+  DEBRIEF_SESSION: (runId: string) => `/debriefs/sessions/${runId}`,
+  DEBRIEF_SESSION_LOGS: (runId: string) => `/debriefs/sessions/${runId}/logs`,
+  /** The Changes page (the Debrief PM agent's changes, releases, reports and test sets). */
+  DEBRIEFS_CHANGES: "/debriefs/changes",
+  /** The page's old address (links, emails and notifications sent before 2026-11-18): redirects to Changes. */
+  DEBRIEFS_PM_AGENT: "/debriefs/pm-agent",
+  DEBRIEFS_SETTINGS: "/debriefs/settings",
   MANAGE_SCENARIO_LANGUAGES: "/manage-scenario-languages",
   MANAGE_LANGUAGE_GLOSSARY: (id: string | number) => `/manage-scenario-languages/${id}/glossary`,
   MANAGE_PROMPTS: "/manage-prompts",
@@ -1050,19 +1430,50 @@ export const ROUTES = {
   SETTINGS: "/settings",
   LOGS: "/logs",
   MOBILE_RELEASES: "/mobile-releases",
-  WHATSAPP_BOT: "/chatbots",
+  /** The assistants area (A1): its own space, out of Ally admin's navigation. */
+  WHATSAPP_BOT: "/assistants",
+  /** The resources directory: its own area like Assistants (no side navigation, its own login). */
+  DIRECTORY: "/directory",
+  DIRECTORY_COLLECTION: "/directory/collections/:id",
+  DIRECTORY_COLLECTION_OF: (id: string) => `/directory/collections/${id}`,
+  /** A collection's public landing page. No sign-in. */
+  DIRECTORY_PUBLIC: "/d/:slug",
+  DIRECTORY_PUBLIC_OF: (slug: string) => `/d/${slug}`,
   /** Bookmarks from before chatbots; redirected to WHATSAPP_BOT. */
   WHATSAPP_BOT_LEGACY: "/whatsapp-bot",
-  CHATBOT_DETAIL: "/chatbots/:botId",
+  /** Links from before A1 (`/chatbots`, `/chatbots/:id?section=…`); redirected to `/assistants…`. */
+  CHATBOTS_LEGACY: "/chatbots",
+  CHATBOT_DETAIL: "/assistants/:botId",
+  /** Onboarding (chunk 20a). Static, so it outranks `:botId`. */
+  CHATBOT_NEW: "/assistants/new",
+  INBOX: "/inbox",
+  CHATBOT_NEW_SESSION: (draftId: string) => `/assistants/new/${draftId}`,
+  /** There is no sign-up (A1): these redirect to the login screen. */
+  SIGN_UP: "/signup",
+  SIGN_UP_ALT: "/sign-up",
   TERMS: "/terms",
   PRIVACY: "/privacy",
   // Fully public, no-login gallery of the centralised design-system components.
   DESIGN_SYSTEM: "/designsystem",
   BLOG: "/blog",
+  /** Landing pages: the list, and one page open in the editor. */
+  LANDING_PAGES: "/landing-pages",
+  LANDING_PAGE: "/landing-pages/:id",
   PRODUCT_UPDATES: "/product-updates",
   AI_LAB: "/ai-lab",
   PRODUCT_ROADMAP: "/product-roadmap",
+  /** Roadmap v2's Queue (dark behind `roadmap_v2`; the old pages stay as they are). */
+  ROADMAP: "/roadmap",
+  /** My drafts: Roadmap's own tab (§4.4). */
+  ROADMAP_DRAFTS: "/roadmap/drafts",
+  /** New idea: an empty draft page; the draft and its code exist once there are words (§4.2). */
+  ROADMAP_NEW_IDEA: "/roadmap/new",
+  /** One idea's page, by code (OPP-388). The read model also accepts the uuid. */
+  ROADMAP_IDEA: (code: string) => `/roadmap/i/${code}`,
   BUG_HUNTER: "/bug-hunter",
+  PM_AGENT: "/pm-agent",
+  BUG_HUNTER_V2: "/bug-hunter-v2",
+  BUG_HUNTER_V2_REPORT: (id: string | number) => `/bug-hunter-v2/${id}`,
   BUILDER: "/builder",
   BUILDER_SESSION: (id: string) => `/builder/${id}`,
   BUILDER_SETTINGS: "/builder/settings",
@@ -1074,6 +1485,17 @@ export const ROUTES = {
   BUILDER_PIPELINE: "/builder/pipeline",
   BUILDER_KNOWLEDGE: "/builder/knowledge",
   BUILDER_EVAL: "/builder/eval",
+  /** Roadmap v2's Agent tab: Builder's pages, mounted under the Roadmap (§4.1). */
+  ROADMAP_AGENT: "/roadmap/agent",
+  ROADMAP_AGENT_SECTION: (section: string) => `/roadmap/agent/${section}`,
+  /** Roadmap v2's Settings tab (Owner). */
+  ROADMAP_SETTINGS: "/roadmap/settings",
+  /** Roadmap v2's Bugs tab: Bug Hunter's table, read-only. */
+  ROADMAP_BUGS: "/roadmap/bugs",
+  /** Roadmap v2's Measures (Owner, P8): funnel, stage times, review wait, releases, spend. */
+  ROADMAP_MEASURES: "/roadmap/measures",
+  /** User Interviews, out of the Roadmap into its own sidebar entry (D14). */
+  USER_INTERVIEWS: "/user-interviews",
   COURSE_COPILOT: "/course-copilot",
   // Registered before the session route in RouteLayout: "new" would otherwise match `:sessionId`.
   // Optional `?trackId=` binds the session to an existing course (EDIT mode).
@@ -1164,6 +1586,18 @@ export const TAG_TYPES = {
   STT_CONFIGS: "sttConfigs",
   LLM_CONFIGS: "llmConfigs",
   LLM_MODEL_CATALOG: "llmModelCatalog",
+  BILLING_MODELS: "billingModels",
+  BILLING_WHATSAPP_RATES: "billingWhatsAppRates",
+  BILLING_COSTS: "billingCosts",
+  BILLING_FIXED_COSTS: "billingFixedCosts",
+  BILLING_PLANS: "billingPlans",
+  BILLING_USER_SPEND: "billingUserSpend",
+  BILLING_USER_PLAN: "billingUserPlan",
+  MY_PLAN: "myPlan",
+  DIRECTORY_ENTRIES: "directoryEntries",
+  DIRECTORY_COLLECTIONS: "directoryCollections",
+  ASSISTANT_SEATS: "assistantSeats",
+  CUSTOM_LOGINS: "customLogins",
   LLM_MODELS: "llmModels",
   SCENARIO_LANGUAGES: "scenarioLanguages",
   LANGUAGE_GLOSSARY: "languageGlossary",
@@ -1209,6 +1643,11 @@ export const TAG_TYPES = {
   WHATSAPP_BOT_NUMBERS: "whatsAppBotNumbers",
   CHATBOTS: "chatbots",
   CHATBOT_DETAIL: "chatbotDetail",
+  BOT_DRAFT: "botDraft",
+  CHECKUP: "checkup",
+  SOURCES: "sources",
+  SCORECARD: "scorecard",
+  INBOX: "inbox",
   CONNECTORS: "connectors",
 
   // Cohorts (per-organization user grouping). Restrictions are a separate tag so
@@ -1225,6 +1664,12 @@ export const TAG_TYPES = {
   // Course discussion moderation. Also registered in baseApi.ts's `tagTypes`.
   COURSE_DISCUSSION: "courseDiscussion",
   BLOGS: "blogs",
+  // Landing pages. Also registered in baseApi.ts's `tagTypes`.
+  LANDING_PAGES: "landingPages",
+  // Keys for Claude Code to write blog drafts. Also registered in baseApi.ts's `tagTypes`.
+  BLOG_AUTHORING_KEYS: "blogAuthoringKeys",
+  // Review link and suggestions for one blog post. Also registered in baseApi.ts's `tagTypes`.
+  BLOG_REVIEW: "blogReview",
   // Product updates. Also registered in baseApi.ts's `tagTypes`.
   PRODUCT_UPDATES: "productUpdates",
   SUPER_DUPER_ADMINS: "superDuperAdmins",
@@ -1234,6 +1679,7 @@ export const TAG_TYPES = {
   FEATURE_TOGGLE_REGISTRY: "featureToggleRegistry",
   USER_FEATURE_TOGGLES: "userFeatureToggles",
   PLATFORM_ADMINS: "platformAdmins",
+  CLINICAL_ADVISORS: "clinicalAdvisors",
   // Product Roadmap. NOTE: every one of these must ALSO be listed in baseApi.ts's
   // `tagTypes` array — an unregistered tag makes invalidatesTags a silent no-op.
   PRODUCT_ROADMAP_OPPORTUNITIES: "productRoadmapOpportunities",
@@ -1252,9 +1698,25 @@ export const TAG_TYPES = {
   PRODUCT_ROADMAP_IDEA_DRAFTS: "productRoadmapIdeaDrafts",
   PRODUCT_ROADMAP_SAVED_VIEWS: "productRoadmapSavedViews",
   PRODUCT_ROADMAP_VIEW_ORDER: "productRoadmapViewOrder",
-  // Analytics Suggestions review queue. Also registered in baseApi.ts's `tagTypes`.
-  ANALYTICS_SUGGESTIONS: "analyticsSuggestions",
+  // Roadmap v2 (also registered in baseApi.ts's `tagTypes`).
+  ROADMAP_V2_ROLES: "roadmapV2Roles",
+  ROADMAP_V2_PREFERENCES: "roadmapV2Preferences",
+  ROADMAP_V2_RELEASE: "roadmapV2Release",
+  ROADMAP_V2_ROLE: "roadmapV2Role",
+  ROADMAP_V2_ITEMS: "roadmapV2Items",
+  // PM Agent (also registered in baseApi.ts's `tagTypes`).
+  PM_AGENT_STATE: "pmAgentState",
+  PM_AGENT_CARDS: "pmAgentCards",
+  PM_AGENT_TRACKING: "pmAgentTracking",
+  PM_AGENT_SETTINGS: "pmAgentSettings",
+  PM_AGENT_MEMORY: "pmAgentMemory",
+  PM_AGENT_HISTORY: "pmAgentHistory",
+  PM_AGENT_HEALTH: "pmAgentHealth",
+  ANALYTICS_AGENT_CONVERSATIONS: "analyticsAgentConversations",
+  ANALYTICS_AGENT_AUDITS: "analyticsAgentAudits",
+  ANALYTICS_AGENT_AUTOMATION: "analyticsAgentAutomation",
   ANALYTICS_CHART_PREFERENCES: "analyticsChartPreferences",
+  BUG_HUNTER_V2_REPORTS: "bugHunterV2Reports",
   BUG_HUNTER_SETTINGS: "bugHunterSettings",
   // Also registered in baseApi.ts's `tagTypes` — an unregistered tag is
   // silently ignored and its invalidation never fires.
@@ -1290,6 +1752,7 @@ export const TAG_TYPES = {
   // Course Copilot. Also registered in baseApi.ts's `tagTypes`.
   COURSE_COPILOT_SESSIONS: "courseCopilotSessions",
   COURSE_COPILOT_SESSION: "courseCopilotSession",
+  COURSE_COPILOT_SOURCES: "courseCopilotSources",
   // Ally Console. Also registered in baseApi.ts's `tagTypes` — an unregistered tag is silently ignored.
   ALLY_GUIDE_SETTINGS: "allyGuideSettings",
   ALLY_GUIDE_RELEASES: "allyGuideReleases",
@@ -1329,8 +1792,10 @@ export const TAG_TYPES = {
   // Skill experiments (auto-improve on Skills Store). Also registered in
   // baseApi.ts's `tagTypes` — an unregistered tag is silently ignored.
   SKILL_EXPERIMENTS: "skillExperiments",
-  DEBRIEF_CALIBRATION: "debriefCalibration",
   DEBRIEF_CONSOLE: "debriefConsole",
+  // Also registered in baseApi.ts's `tagTypes`.
+  DEBRIEF_EXPERT_REVIEW: "debriefExpertReview",
+  NOTIFICATIONS: "notifications",
   // Public roadmap cards (Settings → Roadmap). Also registered in baseApi.ts's
   // `tagTypes` — an unregistered tag is silently ignored.
   PUBLIC_ROADMAP: "publicRoadmap",

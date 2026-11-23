@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@api", () => ({
-  useGetBugHuntRunDecisionsQuery: vi.fn(),
+  useGetBugFindingDecisionsQuery: vi.fn(),
 }));
 vi.mock("@components", () => ({ cellTypes: {} }));
 vi.mock("@utils", () => ({ formatTimestamp: (d: string) => `at ${d}` }));

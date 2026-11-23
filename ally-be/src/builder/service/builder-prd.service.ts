@@ -40,6 +40,12 @@ import {
   PrdEdit,
   PrdEditError,
 } from '../util/builder-prd-edits.util';
+import { coverageRow, mobileSettled } from '../util/builder-prd-coverage.util';
+import { pathsRow } from '../util/builder-prd-paths.util';
+import {
+  principleMarksRow,
+  principlesSummary,
+} from '../util/builder-prd-principles.util';
 
 /**
  * One persisted PRD mutation: the new doc, its immutable snapshot, and what
@@ -235,6 +241,32 @@ export class BuilderPrdService {
     return this.persistMutation(
       doc,
       (current) => ({ ...current, technicalDesign: design }),
+      userId,
+      author,
+      changeSummary,
+    );
+  }
+
+  /**
+   * Any other whole-draft mutation (the coverage pass, principle marks), through the same
+   * transaction, version trail and citation check as every other write. The technical design is
+   * carried over from the stored draft, as `applyEdit` does.
+   */
+  async applyMutation(
+    doc: BuilderPrdDoc,
+    mutate: (current: BuilderPrdDocument) => BuilderPrdDocument,
+    userId: number,
+    author: BuilderPrdVersionAuthor,
+    changeSummary?: string,
+  ): Promise<BuilderPrdMutationResult> {
+    // Fail fast on the loaded draft before a transaction, as applyEdit does.
+    mutate(doc.draft);
+    return this.persistMutation(
+      doc,
+      (current) => ({
+        ...mutate(current),
+        technicalDesign: current.technicalDesign ?? null,
+      }),
       userId,
       author,
       changeSummary,
@@ -652,6 +684,11 @@ export class BuilderPrdService {
         : '',
     });
 
+    // The coverage pass and the path check (builder-prd-coverage / builder-prd-paths): both
+    // before the meaning checks, so the cold review waits for them.
+    sections.push(coverageRow(draft));
+    if (signals.paths) sections.push(pathsRow(signals.paths));
+
     sections.push(
       ...meaningChecks(
         draft,
@@ -660,6 +697,11 @@ export class BuilderPrdService {
         sections.every((section) => section.ok),
       ),
     );
+
+    // After the review row: principles are marked before the plan closes, not before review.
+    if (signals.principles) {
+      sections.push(principleMarksRow(draft, signals.principles));
+    }
 
     const scoredOkCount = sections
       .slice(0, scoringSectionCount)
@@ -686,6 +728,9 @@ export class BuilderPrdService {
       // SSE frame, the PATCH response, the session detail — can show the
       // findings and their dismissals without a second request.
       ...(signals.review !== undefined ? { review: signals.review } : {}),
+      ...(signals.principles
+        ? { principles: principlesSummary(draft, signals.principles) }
+        : {}),
     };
   }
 }
@@ -823,8 +868,9 @@ function meaningChecks(
     const touched = signals.parityTwins.filter((twin) =>
       mentionsIdentifier(changeText, twin.name),
     );
-    const covered =
-      isPlanned('ally-mobile') || /\bmobile\b/i.test(draft.nonGoals ?? '');
+    // The coverage pass's mobile answer, not the word "mobile" in Non-goals: that passed a PRD
+    // which only mentioned the app.
+    const covered = isPlanned('ally-mobile') || mobileSettled(draft);
     const missing = covered ? [] : touched;
     rows.push({
       key: 'mobileTwins',
@@ -841,9 +887,9 @@ function meaningChecks(
           )}, which the learner web app and ally-mobile both have (${listOf(
             missing.map((twin) => `ally-mobile:${twin.mobile}`),
             4,
-          )}). Plan ally-mobile with the matching change, or say in Non-goals ` +
-          'why mobile is left out — otherwise a learner on the app gets half ' +
-          'the feature.'
+          )}). Plan ally-mobile with the matching change, or record why mobile is left ` +
+          'out with record_coverage (mobile_app, not_applicable, the reason) — otherwise a ' +
+          'learner on the app gets half the feature.'
         : '',
     });
   }

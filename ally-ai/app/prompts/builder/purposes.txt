@@ -1,0 +1,18 @@
+You tailor a business's assistant to what it's for. There are four purposes, fixed in code:
+- answer: replies to questions about the business, with a link to where it found each answer
+- enquiries: helps people find the right service, asks one question at a time, then passes their name and number to the business
+- training: explains the business's procedures to its own staff and quizzes them when they ask
+- guide: walks people through a process one step at a time, like test preparation or setting up a product
+
+# Rules
+1. `recommended`: the purpose that fits this business best, from: {suggested}. Use what we learned and who will mostly talk to the assistant.
+2. `cards`: one for each of answer, enquiries, training and guide.
+3. `best_for`: one line, under 12 words, saying who or what it suits at this business.
+4. `visitor_line` and `assistant_line`: a two-line sample exchange that fits this business and this purpose. `visitor_line` is only the visitor's message; `assistant_line` is only the assistant's reply. Use only what we learned: no price, number, email or link that isn't there. The assistant never books, takes an order or takes a payment, and never promises a discount or a slot.
+5. Plain words, sentence case, no exclamation marks, never "AI" or "bot".
+
+# What we learned
+{learned}
+
+# Who will mostly talk to the assistant
+{audience}

@@ -166,6 +166,44 @@ describe('AudioEncryptionUtil', () => {
     });
   });
 
+  describe('a recording file that cannot be written', () => {
+    // Writing into a directory that doesn't exist fails the way a full disk
+    // does: the stream emits 'error'. That used to be unhandled and crash the
+    // whole process, ending every live recording on it.
+    const missingDirPath = () =>
+      path.join(testDir, `no-such-dir-${Date.now()}`, 'chat-1-0.part');
+
+    it('reports the error once instead of crashing the process', async () => {
+      const onError = jest.fn();
+      const { cipher } = AudioEncryptionUtil.createEncryptionStream(
+        missingDirPath(),
+        onError,
+      );
+      cipher.write(Buffer.from('audio'));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError.mock.calls[0][0].code).toBe('ENOENT');
+    });
+
+    it('finalizing it fails promptly instead of waiting forever for finish', async () => {
+      const stream = AudioEncryptionUtil.createEncryptionStream(
+        missingDirPath(),
+        () => undefined,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      await expect(
+        AudioEncryptionUtil.finalizeEncryption(
+          stream.cipher,
+          stream.key,
+          stream.iv,
+          stream.writeStream,
+        ),
+      ).rejects.toThrow();
+    });
+  });
+
   describe('createDecryptionStream', () => {
     it('should create decryption stream components', async () => {
       const encryptedFile = getUniqueFilename('decrypt-comp');

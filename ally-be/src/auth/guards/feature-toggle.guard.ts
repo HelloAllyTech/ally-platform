@@ -26,6 +26,7 @@ import {
   OrgScopedRouteOptions,
 } from '../decorators/org-scoped-route.decorator';
 import { CALLER_SCOPED_ROUTE_KEY } from '../decorators/caller-scoped-route.decorator';
+import { isAssistantMemberRoute } from '../decorators/assistant-member-route';
 
 /**
  * FeatureToggleGuard
@@ -71,6 +72,9 @@ export class FeatureToggleGuard implements CanActivate {
       // No @RequireFeatureToggle on this route — nothing for this guard to check.
       return true;
     }
+    // An assistant's own route: being on its team is enough (chunk 6b). ChatbotMemberGuard, which
+    // runs after this one, checks the team and the role.
+    if (isAssistantMemberRoute(this.reflector, context)) return true;
 
     const request = context.switchToHttp().getRequest();
     const user = request.user;
@@ -114,6 +118,20 @@ export class FeatureToggleGuard implements CanActivate {
       ) {
         await this.assertOrgScopedRoute(context, request, user.id);
       }
+      return true;
+    }
+
+    // Alternate-toggle branch: the route names a second toggle that also opens
+    // it. The caller is marked so the route's scope check can confine them to
+    // what that toggle is for (see FeatureToggleOptions.alsoAllowedBy).
+    if (
+      options.alsoAllowedBy &&
+      (await this.featureToggleService.hasToggle(
+        user.id,
+        options.alsoAllowedBy,
+      ))
+    ) {
+      request.viaAlternateToggle = options.alsoAllowedBy;
       return true;
     }
 

@@ -90,6 +90,7 @@ describe('BuilderBuildService', () => {
     buildFailed: jest.Mock;
     budgetReached: jest.Mock;
     automationPaused: jest.Mock;
+    planCeilingReached?: jest.Mock;
   };
   let eventService: { record: jest.Mock };
   let redisService: { acquireLock: jest.Mock; releaseLock: jest.Mock };
@@ -272,6 +273,101 @@ describe('BuilderBuildService', () => {
         { id: run.id },
         expect.objectContaining({ issueNumber: 41, status: 'RUNNING' }),
       );
+    });
+  });
+
+  describe('a retry while an earlier run’s pull request is still open', () => {
+    it('picks up that pull request instead of raising a second issue', async () => {
+      pullRequestRepository.findOne.mockResolvedValue({
+        prNumber: 277,
+        prUrl: 'https://github.com/o/ally-platform/pull/277',
+        branch: 'opencode/issue274-20261117055235',
+        repo: 'ally-be',
+        merged: false,
+        state: 'open',
+      });
+
+      const run = await service.startBuild(
+        readySession({ status: BuilderSessionStatus.FAILED }) as any,
+        1,
+      );
+
+      expect(github.createIssue).not.toHaveBeenCalled();
+      expect(runRepository.update).toHaveBeenCalledWith(
+        { id: run.id },
+        expect.objectContaining({
+          issueNumber: 274,
+          issueUrl: 'https://github.com/o/ally-platform/issues/274',
+          status: 'RUNNING',
+        }),
+      );
+    });
+
+    it('raises a new issue when nothing is open', async () => {
+      pullRequestRepository.findOne.mockResolvedValue(null);
+
+      await service.startBuild(readySession() as any, 1);
+
+      expect(github.createIssue).toHaveBeenCalled();
+    });
+  });
+
+  describe('reviving a failed issue build whose pull request went green', () => {
+    const failedRun = (overrides: Record<string, any> = {}) =>
+      ({
+        id: 'run-3',
+        sessionId: 'session-1',
+        status: 'FAILED',
+        mode: 'build',
+        issueNumber: 274,
+        milestoneId: 'm1',
+        repos: ['ally-be'],
+        dispatchedAt: new Date(),
+        ...overrides,
+      }) as any;
+
+    beforeEach(() => {
+      sessionRepository.findOne.mockResolvedValue(
+        readySession({ status: BuilderSessionStatus.FAILED }),
+      );
+      runRepository.isLatestForSession.mockResolvedValue(true);
+      epicService.listBySession.mockResolvedValue([
+        { id: 'm1', status: 'FAILED' },
+      ]);
+    });
+
+    it('reopens the session and settles the run SUCCEEDED', async () => {
+      const settle = jest.spyOn(service, 'settleRun').mockResolvedValue();
+
+      await expect(service.reviveIssueRun(failedRun())).resolves.toBe(true);
+
+      expect(sessionRepository.update).toHaveBeenCalledWith(
+        { id: 'session-1' },
+        expect.objectContaining({ status: BuilderSessionStatus.BUILDING }),
+      );
+      expect(settle).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'run-3' }),
+        'SUCCEEDED',
+        null,
+      );
+    });
+
+    it('leaves a session that has moved on alone', async () => {
+      const settle = jest.spyOn(service, 'settleRun').mockResolvedValue();
+      runRepository.isLatestForSession.mockResolvedValue(false);
+
+      await expect(service.reviveIssueRun(failedRun())).resolves.toBe(false);
+      expect(settle).not.toHaveBeenCalled();
+    });
+
+    it('leaves a session a person stopped alone', async () => {
+      const settle = jest.spyOn(service, 'settleRun').mockResolvedValue();
+      sessionRepository.findOne.mockResolvedValue(
+        readySession({ status: BuilderSessionStatus.CANCELLED }),
+      );
+
+      await expect(service.reviveIssueRun(failedRun())).resolves.toBe(false);
+      expect(settle).not.toHaveBeenCalled();
     });
   });
 
@@ -682,6 +778,35 @@ describe('BuilderBuildService', () => {
         service.startBuild(readySession() as any, 1),
       ).rejects.toThrow(/switched off/i);
       expect(github.createIssue).not.toHaveBeenCalled();
+    });
+
+    it('refuses a plan past its ceiling before touching the session (Roadmap v2)', async () => {
+      const assertWithinCeiling = jest
+        .fn()
+        .mockRejectedValue(new Error('This idea has spent $100.00'));
+      (service as any).planCeiling = { assertWithinCeiling };
+
+      await expect(
+        service.startBuild(readySession() as any, 1),
+      ).rejects.toThrow(/has spent/);
+      expect(assertWithinCeiling).toHaveBeenCalledWith(
+        'session-1',
+        'build_dispatch',
+      );
+      expect(sessionRepository.update).not.toHaveBeenCalled();
+      expect(github.createIssue).not.toHaveBeenCalled();
+    });
+
+    it('checks the ceiling again at dispatch, for every run (the chain backstop)', async () => {
+      const assertWithinCeiling = jest.fn().mockResolvedValue(undefined);
+      (service as any).planCeiling = { assertWithinCeiling };
+
+      await service.startBuild(readySession() as any, 1);
+
+      expect(assertWithinCeiling.mock.calls).toEqual([
+        ['session-1', 'build_dispatch'],
+        ['session-1', 'build_dispatch'],
+      ]);
     });
 
     it('refuses when GitHub is not configured', async () => {
@@ -1525,6 +1650,56 @@ describe('BuilderBuildService', () => {
       );
 
       expect(notificationService.budgetReached).toHaveBeenCalled();
+    });
+
+    it('tells the lead once, at the phase boundary where a plan crosses its ceiling', async () => {
+      notificationService.planCeilingReached = jest.fn();
+      runRepository.findOne.mockResolvedValue({
+        id: 'run-1',
+        sessionId: 'session-1',
+        cost: null,
+        costUsd: null,
+      });
+      sessionRepository.findOne.mockResolvedValue(
+        readySession({ totalCostUsd: '90', budgetUsd: null }),
+      );
+      const checkAt = jest.fn().mockResolvedValue({
+        exceeded: true,
+        spentUsd: 105,
+        ceilingUsd: 100,
+      });
+      (service as any).planCeiling = { checkAt };
+
+      await service.recordRunCost(
+        { id: 'run-1', sessionId: 'session-1' } as any,
+        { totalCostUsd: 15 },
+      );
+
+      expect(checkAt).toHaveBeenCalledWith('session-1', 'phase_boundary');
+      expect(notificationService.planCeilingReached!).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'session-1' }),
+        105,
+        100,
+      );
+
+      // Already past it before this phase: not said again.
+      notificationService.planCeilingReached!.mockClear();
+      checkAt.mockResolvedValue({
+        exceeded: true,
+        spentUsd: 130,
+        ceilingUsd: 100,
+      });
+      runRepository.findOne.mockResolvedValue({
+        id: 'run-1',
+        sessionId: 'session-1',
+        cost: { phases: { build: { usd: 15 } } },
+        costUsd: '15',
+      });
+      await service.recordRunCost(
+        { id: 'run-1', sessionId: 'session-1' } as any,
+        { phase: 'verify', totalCostUsd: 10 },
+      );
+      expect(notificationService.planCeilingReached!).not.toHaveBeenCalled();
     });
 
     it('bills every phase of the tiered loop, not just the coding pass', async () => {

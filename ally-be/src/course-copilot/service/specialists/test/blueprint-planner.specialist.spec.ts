@@ -118,10 +118,37 @@ describe('BlueprintPlannerSpecialist', () => {
     );
     // Slot 1 has no minScore and the roleplay is the capstone → assessment threshold.
     expect(blueprint.sections[0].items[1].completionCriteria).toEqual({
+      completionLogic: 'SCORE_AND_DURATION',
       minScore: 65,
     });
     expect(blueprint.estimatedDurationMinutes).toBe(6 + 12 + 4);
     expect(blueprint.competencyIds).toEqual(['c-1', 'c-2']);
+  });
+
+  it('adds the matched learner profile to the reference block, after the trainer files', async () => {
+    const llm = fakeLlm([goodPlan], 'Brief: {{brief_json}}');
+    await new BlueprintPlannerSpecialist(llm.service).plan({
+      ...input(),
+      brief: {
+        ...makeBrief(),
+        learnerProfileId: 'teachers',
+        skillTargets: [{ skill: 'Listening', a: 'A2', b: 'B2' }],
+      },
+      referenceMaterial: 'REFERENCE FILES\nManual.pdf, p. 1',
+    });
+    const prompt = llm.promptOf(0);
+    expect(prompt).toContain('"a": "A2"');
+    expect(prompt.indexOf('REFERENCE FILES')).toBeLessThan(
+      prompt.indexOf('LEARNER PROFILE'),
+    );
+    expect(prompt).toContain('"Teachers"');
+    expect(prompt).toContain('Draft profile');
+  });
+
+  it('adds no learner profile block when the brief names none', async () => {
+    const llm = fakeLlm([goodPlan], 'Brief: {{brief_json}}');
+    await new BlueprintPlannerSpecialist(llm.service).plan(input());
+    expect(llm.promptOf(0)).not.toContain('LEARNER PROFILE');
   });
 
   it('makes one repair call with the problems and keeps the better plan', async () => {

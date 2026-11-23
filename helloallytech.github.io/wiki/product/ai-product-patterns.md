@@ -11,7 +11,7 @@ last_reconciled: 2026-11-09
 
 > [!WARNING]
 > **Deprecated — superseded by the Context Library.** Product guidance is now retrieved from
-> Ally's Context Library (which replaced the Stacks MCP on 2026-11-09), while planning and while
+> Ally's Context Library, while planning and while
 > coding; see [Working with the Context Library](../contributing/planning-with-context-library.md). This page is kept for
 > history and because other pages cite its principles by number — do not add new principles here,
 > and treat anything that conflicts with current Context Library guidance as superseded.
@@ -117,13 +117,11 @@ the live roleplay actor, whose whole point is to be in character.
 
 ## Ally-specific notes
 
-- **Analytics → Suggestions** (`ally-be/src/analytics-suggestions`, admin
-  `pages/Analytics/tabs/suggestions/`) is the reference implementation of this page: a
-  super-duper-admin picks a window, the platform's own analytics services are read through the
-  same code the dashboard uses, and the model returns at most ten suggestions. Accept opens a
-  prefilled, editable form and files a normal roadmap opportunity; reject asks for an optional
-  reason that later runs are told to respect. Batches accumulate, and each card carries its
-  window and model.
+- **PM Agent** (`ally-be/src/pm-agent`, admin `pages/PmAgent/`) is the reference implementation of
+  this page, and it replaced the earlier Analytics → Suggestions tab: evidence-backed proposal
+  cards, a quality gate before anything reaches a reviewer, accept/reject with a recorded reason
+  that later runs respect, and every card carrying its evidence and model. See
+  `ally-be/docs/pm-agent.md`.
 - **Prompt storage** — `ally-be/src/prompts/<subdir>/<name>.txt`, synced at boot and overridable
   from Prompt Management. See [ally-be](../repos/ally-be.md).
 - **Validated classification** — `RoadmapAiService.classifyGoal` is the pattern for principle 3,

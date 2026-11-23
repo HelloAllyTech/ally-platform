@@ -5,27 +5,24 @@ import {
   InternalServerErrorException,
   NotFoundException,
   UnprocessableEntityException,
+  Optional,
 } from '@nestjs/common';
-import { In, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { LoggerService } from 'src/logger/logger.service';
 import { User } from 'src/user/entity/user.entity';
 import { PLATFORM_TIER_ROLES } from 'src/common/constants/user.constants';
-import { BugFinding } from 'src/bug-hunter/entity/bug-finding.entity';
-import {
-  BugFindingSource,
-  BugFindingStatus,
-  BugFindingSeverity,
-} from 'src/bug-hunter/enum/bug-finding.enum';
-import { BugHunterRepoClassifierService } from 'src/bug-hunter/service/bug-hunter-repo-classifier.service';
-import { BugHunterMissClassifierService } from 'src/bug-hunter/service/bug-hunter-miss-classifier.service';
-import { BUG_FINDING_DESCRIPTION_MAX_LENGTH } from 'src/bug-hunter/constants/bug-hunter.constants';
+import { BugFindingSeverity } from 'src/bug-hunter/enum/bug-finding.enum';
+import { BugHunterBoardService } from 'src/bug-hunter-approvals/service/bug-hunter-board.service';
+import { RepoClassifierService } from 'src/bug-hunter-approvals/service/repo-classifier.service';
+
+/** The longest bug report description kept (it was the old Bug Hunter's finding limit). */
+const BUG_FINDING_DESCRIPTION_MAX_LENGTH = 5000;
 import {
   composeBugReportDescription,
   repoForSurface,
   severityForImpact,
-} from 'src/bug-hunter/util/bug-report-brief.util';
-import { truncateTitle } from 'src/bug-hunter/util/truncate-title.util';
+} from '../util/bug-report-brief.util';
 
 import { S3Service } from 'src/aws/service/s3.service';
 import { AppConfigService } from 'src/config/config.service';
@@ -35,9 +32,11 @@ import {
   RoadmapReferenceImage,
 } from '../entity/roadmap-opportunity.entity';
 import {
+  PM_AGENT_AUTHOR_NAME,
   RoadmapOpportunitySource,
   RoadmapOpportunityStage,
   RoadmapOpportunityType,
+  RoadmapReviewState,
 } from '../enum/roadmap-opportunity.enum';
 import {
   RoadmapOpportunityRepository,
@@ -45,8 +44,11 @@ import {
 } from '../repository/roadmap-opportunity.repository';
 import { RoadmapAllocationRepository } from '../repository/roadmap-allocation.repository';
 import {
+  ROADMAP_LIMITS,
   BUG_REPORT_DEFAULT_PRODUCT_GOAL,
   ROADMAP_FILEABLE_EFFORTS,
+  ROADMAP_QUALITY_PASS_SCORE,
+  ROADMAP_SINGLE_IDEA_EFFORTS,
   ROADMAP_OWNER_EMAILS,
   ROADMAP_READINESS_REQUIRE_TOKEN,
   ROADMAP_REFERENCE_IMAGE_MAX_SIZE_BYTES,
@@ -76,6 +78,8 @@ import {
   normaliseFilingInterview,
   normaliseOpportunityBrief,
 } from '../util/roadmap-brief.util';
+import { RoadmapAiService } from './roadmap-ai.service';
+import { joinDescription } from '../item/roadmap-item-query.util';
 import { RoadmapGoalImpactService } from './roadmap-goal-impact.service';
 import { RoadmapStrategyGoalService } from './roadmap-strategy-goal.service';
 import { RoadmapVectorService } from './roadmap-vector.service';
@@ -102,14 +106,35 @@ export class RoadmapOpportunityService {
     private readonly vectorService: RoadmapVectorService,
     private readonly notifications: RoadmapNotificationService,
     @InjectRepository(User) private readonly userRepository: Repository<User>,
-    @InjectRepository(BugFinding)
-    private readonly bugFindingRepository: Repository<BugFinding>,
     private readonly s3Service: S3Service,
     private readonly config: AppConfigService,
     private readonly readinessToken: RoadmapReadinessTokenService,
-    private readonly repoClassifier: BugHunterRepoClassifierService,
-    private readonly missClassifier: BugHunterMissClassifierService,
+    private readonly roadmapAi: RoadmapAiService,
+    // Bug Hunter v2 (chunk 10): a filed bug also enters v2's queue. Optional and
+    // last, so the tests that build this service by hand and any module without v2
+    // work as before.
+    @Optional() private readonly bugHunterV2?: BugHunterBoardService,
+    @Optional() private readonly repoClassifier?: RepoClassifierService,
   ) {}
+
+  /** `title`, a blank line, then the summary: how a titled idea is stored in `description`. */
+  private async storedText(
+    dto: Omit<CreateOpportunityDto, 'title'> & { title?: string },
+  ): Promise<string> {
+    const body = dto.description.trim();
+    if (dto.type === RoadmapOpportunityType.BUG) return body;
+    const title =
+      (dto.title ?? '').replace(/\s+/g, ' ').trim() ||
+      (await this.roadmapAi.suggestTitle(body));
+    if (!title) throw new BadRequestException('An idea needs a title.');
+    const text = joinDescription(title, body);
+    if (text.length > ROADMAP_LIMITS.STORED_TEXT_MAX) {
+      throw new BadRequestException(
+        `The title and summary together can be at most ${ROADMAP_LIMITS.STORED_TEXT_MAX} characters.`,
+      );
+    }
+    return text;
+  }
 
   async list(
     userId: number,
@@ -125,7 +150,7 @@ export class RoadmapOpportunityService {
       rank: await this.strategyGoalService.getRankContext(),
     });
     return {
-      items: await this.toResponseList(result.items),
+      items: await this.toResponseList(result.items, userId),
       count: result.count,
       maxScore: result.maxScore,
       // The client must never derive the period itself — see SetAllocationDto.
@@ -141,7 +166,37 @@ export class RoadmapOpportunityService {
       await this.strategyGoalService.getRankContext(),
     );
     if (!row) throw new NotFoundException(`Opportunity ${id} not found`);
-    return (await this.toResponseList([row]))[0];
+    return (await this.toResponseList([row], userId))[0];
+  }
+
+  /**
+   * Set or clear the Prod Director's star. Only the configured director may; everyone else gets
+   * 403. Raises the opportunity's composite rank by the star weight, so the whole board is
+   * invalidated (other cards' queue positions move too).
+   */
+  async setDirectorStar(
+    userId: number,
+    id: string,
+    starred: boolean,
+  ): Promise<OpportunityResponseDto> {
+    if (!(await this.strategyGoalService.isProdDirector(userId))) {
+      throw new ForbiddenException(
+        'Only the Prod Director can star opportunities.',
+      );
+    }
+    const existing = await this.opportunityRepository.findOne({
+      where: { id },
+    });
+    if (!existing) throw new NotFoundException(`Opportunity ${id} not found`);
+    await this.opportunityRepository.update(id, {
+      directorStarred: starred,
+      // Who gave the star (Roadmap v2, D16). Written beside the flag so the attribution the
+      // P0 migration backfilled stays true until the Owner star replaces this route.
+      starredByUserId: starred ? userId : null,
+      updatedBy: userId,
+    });
+    this.strategyGoalService.invalidate(userId);
+    return this.findOne(userId, id);
   }
 
   /**
@@ -191,7 +246,9 @@ export class RoadmapOpportunityService {
    */
   async create(
     userId: number,
-    dto: CreateOpportunityDto,
+    // `title` is required over HTTP (CreateOpportunityDto) but optional here: a caller filing on
+    // someone's behalf may leave it out and have one written — see storedText.
+    dto: Omit<CreateOpportunityDto, 'title'> & { title?: string },
     extra?: {
       source?: RoadmapOpportunitySource;
       tenantId?: string | null;
@@ -216,6 +273,12 @@ export class RoadmapOpportunityService {
        * property of the IDEA-filing path, not of this table.
        */
       enforceReadiness?: boolean;
+      /**
+       * Roadmap v2's Submit only: the code its draft was given when New idea created it
+       * (session-first, §4.2), so the idea keeps one code for life. Allocated from the same
+       * sequence as the column default. Everyone else leaves it out and the default fires.
+       */
+      code?: string;
     },
   ): Promise<OpportunityResponseDto> {
     // Assigning at filing time is a MANAGE action on a route gated at the VOTE tier, so it is
@@ -256,9 +319,15 @@ export class RoadmapOpportunityService {
         ? normaliseFilingInterview(dto.interviewTranscript)
         : null;
 
+    // Every new IDEA has a title. The form and the draft's Submit send one; a caller that files
+    // on someone's behalf (the PM Agent) sends none, so one is written here rather than refused.
+    // A bug keeps its text as one block, as before: a bug report is a guided prompt, not a
+    // titled idea.
+    const storedText = await this.storedText(dto);
+
     const saved = await this.opportunityRepository.save(
       this.opportunityRepository.create({
-        description: dto.description.trim(),
+        description: storedText,
         type: dto.type,
         productGoal: dto.productGoal,
         // `?? null` so an omitted effort files as unsized rather than undefined — the column
@@ -274,6 +343,7 @@ export class RoadmapOpportunityService {
         referenceImages,
         brief,
         interviewTranscript,
+        ...(extra?.code ? { code: extra.code } : {}),
         createdBy: userId,
         updatedBy: userId,
         source: extra?.source ?? RoadmapOpportunitySource.STAFF,
@@ -291,54 +361,23 @@ export class RoadmapOpportunityService {
     // contract as the vector index above: a model outage must not fail a committed write.
     await this.goalImpactService.assessQuietly(saved.id, userId);
 
-    // Bug Hunter's comprehensive findings table is a complete bug inbox — a human report
-    // needs a row there the moment it's filed, not only once a hunt run gets around to
-    // triaging it. Best-effort: a failure here must never fail the roadmap write that
-    // already committed. See BugHunterModule's doc for why this is a raw repository
-    // injection rather than a call into BugHunterModule (avoids a circular import).
-    if (dto.type === RoadmapOpportunityType.BUG) {
-      try {
-        // Classified once, here, instead of leaving `repo` null: every one of
-        // Bug Hunter's 5 nightly sweeps used to independently spend a full
-        // agentic judgement on "is this clearly about my repo?" for the exact
-        // same free text (bug-hunt-sweep-prompt.ts's REPORTED BUGS finder),
-        // with only a first-write-wins race deciding whose guess stuck — up
-        // to 5x the reasoning cost for one item, and a structural source of
-        // wrong_repo decline noise. classifyRepo already swallows its own
-        // failures and returns an UNCLASSIFIED result rather than throwing,
-        // so this stays inside the same best-effort try/catch as the rest of
-        // this block, and a null result just means the row starts unfiled
-        // exactly as it always has.
-        // A reporter who named the repo has answered the question; the
-        // classifier is for the ones who did not (and it gives up on a bug
-        // that names files in two folders of one repo, which staff reports
-        // often do).
-        const repo =
-          extra?.repo ??
-          (await this.repoClassifier.classifyRepo(saved.description)).repo;
-        const finding = await this.bugFindingRepository.save(
-          this.bugFindingRepository.create({
-            source: BugFindingSource.REPORTED_BUG,
-            title: truncateTitle(saved.description),
-            description: saved.description,
-            reportedBugId: saved.id,
-            repo,
-            severity: extra?.severity ?? null,
-            status: BugFindingStatus.NEW,
-          }),
-        );
-        // Why Bug Hunter did not find this first (OPP-0774). Not awaited: the
-        // reporter's request is done once the row exists, and the record is a
-        // few seconds of a cheap model that must never delay or fail a filing.
-        // classifyAndRecord swallows its own failures.
-        void this.missClassifier.classifyAndRecord(finding.id, 'intake');
-      } catch (error) {
-        this.logger.warn(
-          `Failed to create a Bug Hunter finding for opportunity ${saved.id}: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
+    // A filed bug enters Bug Hunter's queue (bughunter.bugs); its mode decides whether and
+    // when it is worked on. Best effort: a failure here never fails the roadmap write that
+    // already committed. The app comes from the reporter, else from the repo classifier
+    // (one cheap call that gives up rather than guess; null leaves it for an admin to pick).
+    if (dto.type === RoadmapOpportunityType.BUG && this.bugHunterV2) {
+      let repo: string | null = extra?.repo ?? null;
+      if (!repo && this.repoClassifier) {
+        repo = await this.repoClassifier
+          .classifyRepo(saved.description)
+          .then((r) => r.repo)
+          .catch(() => null);
       }
+      await this.bugHunterV2.enqueueReported({
+        opportunityId: saved.id,
+        description: saved.description,
+        repo,
+      });
     }
 
     const response = await this.findOne(userId, saved.id);
@@ -351,7 +390,8 @@ export class RoadmapOpportunityService {
       this.notifications.emit({
         kind: 'OPPORTUNITY_UPSERTED',
         actorId: userId,
-        opportunity: response,
+        // Broadcast to every client: the star is the director's private view.
+        opportunity: { ...response, directorStarred: null },
       });
     }
     return response;
@@ -379,7 +419,10 @@ export class RoadmapOpportunityService {
    * hatch had nothing left to open, and a gate with no client asking to bypass it should not
    * keep the bypass.
    */
-  private assertReady(userId: number, dto: CreateOpportunityDto): void {
+  private assertReady(
+    userId: number,
+    dto: Omit<CreateOpportunityDto, 'title'> & { title?: string },
+  ): void {
     if (!dto.readinessToken) {
       if (ROADMAP_READINESS_REQUIRE_TOKEN) {
         throw new BadRequestException(
@@ -410,11 +453,99 @@ export class RoadmapOpportunityService {
       (ROADMAP_FILEABLE_EFFORTS as readonly string[]).includes(dto.effort);
     if (!effortFileable) failed.push('size');
 
+    // A token that carries a quality score came from the interview, which holds its ideas to
+    // the quality bar: the score must reach the pass mark and the size must be one an idea can
+    // be filed at on its own (XL and XXL are split first). Applied here, to the signed score and
+    // the effort being filed, so it holds whatever a client sends. System filings (the PM Agent)
+    // carry no score and keep the wider rule above.
+    if (typeof verdict.qualityScore === 'number') {
+      if (verdict.qualityScore < ROADMAP_QUALITY_PASS_SCORE) {
+        failed.push('quality');
+      }
+      if (
+        dto.effort != null &&
+        !(ROADMAP_SINGLE_IDEA_EFFORTS as readonly string[]).includes(dto.effort)
+      ) {
+        failed.push('split_needed');
+      }
+    }
+
     if (failed.length > 0) {
       throw new BadRequestException(
         `This opportunity is not ready to file yet (${failed.join(', ')}). ` +
           `Keep the interview going until every item is met.`,
       );
+    }
+  }
+
+  /**
+   * The Roadmap cutover's one filing door (Roadmap v2 P6, plans/roadmap-builder-merge §6): an
+   * idea for an in-flight direct Builder session that never had one, so every live build sits
+   * on the Roadmap from switch-on day.
+   *
+   * A labelled path of its own rather than a flag on `create()`:
+   * - it runs inside the cutover's transaction (`manager`), so the idea, its link to the
+   *   session and the flag commit or fail together;
+   * - the readiness gate does not apply, because the work is already under way and the idea
+   *   records it rather than proposing it — the row says so with
+   *   `source = 'migrated_builder_session'`;
+   * - it is already accepted (`reviewState`), Prioritised (as "Open in Builder Agent" makes a
+   *   linked idea) and linked by `builderSessionId`, the same column every other link uses.
+   *   `UQ_roadmap_opps_builder_session` is the backstop against a second idea for one session.
+   *
+   * The vector index and goal-impact assessment run after the commit, best-effort, through
+   * `afterMigratedFiling` — as `create()` runs them after its own save.
+   */
+  async fileMigratedBuilderSession(
+    manager: EntityManager,
+    input: {
+      sessionId: string;
+      description: string;
+      productGoal: string;
+      /** The session's creator: the idea's author, and its lead. */
+      creatorUserId: number;
+      /** The Owner running the cutover: the reviewer of record. */
+      actorUserId: number;
+    },
+  ): Promise<{ id: string; code: string }> {
+    const repository = manager.getRepository(RoadmapOpportunity);
+    const saved = await repository.save(
+      repository.create({
+        description: input.description,
+        type: RoadmapOpportunityType.IDEA,
+        stage: RoadmapOpportunityStage.PRIORITISED,
+        productGoal: input.productGoal,
+        effort: null,
+        ownerUserId: null,
+        referenceImages: [],
+        builderSessionId: input.sessionId,
+        reviewState: RoadmapReviewState.ACCEPTED,
+        reviewedBy: input.actorUserId,
+        reviewedAt: new Date(),
+        createdBy: input.creatorUserId,
+        updatedBy: input.actorUserId,
+        source: RoadmapOpportunitySource.MIGRATED_BUILDER_SESSION,
+        tenantId: null,
+        reporterContext: null,
+      }),
+    );
+    // `code` comes from the column default; read it back inside the same transaction.
+    const [row] = await manager.query(
+      `SELECT code FROM "roadmap_opportunities" WHERE id = $1`,
+      [saved.id],
+    );
+    return { id: saved.id, code: String(row?.code ?? saved.code ?? '') };
+  }
+
+  /**
+   * What `create()` does after its save, for ideas the cutover filed: index each one for the
+   * duplicate check and score it against the strategy. Both are best-effort and swallow their
+   * own failures, so a model outage never undoes a committed cutover.
+   */
+  async afterMigratedFiling(ids: string[], actorUserId: number): Promise<void> {
+    for (const id of ids) {
+      await this.vectorService.indexQuietly(id);
+      await this.goalImpactService.assessQuietly(id, actorUserId);
     }
   }
 
@@ -557,8 +688,10 @@ export class RoadmapOpportunityService {
     }
 
     if (dto.stage !== undefined) {
-      patch.stage = dto.stage;
-      patch.releasedAt = this.resolveReleasedAt(existing, dto.stage);
+      // A retired stage value never reaches here: the DTO's @IsEnum rejects it with a 400.
+      const nextStage = dto.stage;
+      patch.stage = nextStage;
+      patch.releasedAt = this.resolveReleasedAt(existing, nextStage);
     }
 
     if (
@@ -611,7 +744,8 @@ export class RoadmapOpportunityService {
       this.notifications.emit({
         kind: 'OPPORTUNITY_UPSERTED',
         actorId: userId,
-        opportunity: response,
+        // Broadcast to every client: the star is the director's private view.
+        opportunity: { ...response, directorStarred: null },
       });
     }
     return response;
@@ -694,12 +828,16 @@ export class RoadmapOpportunityService {
    */
   async toResponseList(
     rows: RoadmapOpportunityRow[],
+    viewerId?: number,
   ): Promise<OpportunityResponseDto[]> {
     // Both resolved ONCE for the whole page, not per row: the goal count is the same for every
     // opportunity in a response, and fetching it per row would issue a query per card.
-    const [users, goalsTotal] = await Promise.all([
+    const [users, goalsTotal, viewerIsDirector] = await Promise.all([
       this.resolveUsers(rows.map((r) => r.createdBy)),
       this.strategyGoalService.countGoals(),
+      viewerId === undefined
+        ? Promise.resolve(false)
+        : this.strategyGoalService.isProdDirector(viewerId),
     ]);
     return rows.map((row) => ({
       id: row.id,
@@ -739,6 +877,8 @@ export class RoadmapOpportunityService {
       // 63.33333333333333.
       compositeScore: Math.round(Number(row.compositeScore ?? 0) * 10) / 10,
       voterCount: Number(row.voterCount ?? 0),
+      // Only the Prod Director ever sees the flag; null for everyone else (and for the broadcast).
+      directorStarred: viewerIsDirector ? row.directorStarred === true : null,
       goalsHelped: Number(row.goalsHelped ?? 0),
       goalsAssessed: Number(row.goalsAssessed ?? 0),
       goalsTotal,
@@ -748,7 +888,12 @@ export class RoadmapOpportunityService {
       source: row.source,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
-      creator: users.get(row.createdBy) ?? this.unknownUser(row.createdBy),
+      // A PM Agent filing is authored by the agent; `createdBy` (the admin who accepted the
+      // card) stays on the row for audit but is not who the board says posted it.
+      creator:
+        row.source === RoadmapOpportunitySource.PM_AGENT
+          ? { id: row.createdBy, email: '', name: PM_AGENT_AUTHOR_NAME }
+          : (users.get(row.createdBy) ?? this.unknownUser(row.createdBy)),
     }));
   }
 
@@ -826,7 +971,7 @@ export class RoadmapOpportunityService {
    * The shared assets bucket, the same one blog headers and badge icons live in.
    *
    * Resolved per call rather than in the constructor: reading configuration at construction time
-   * is module-load-time work, and this module is imported by AnalyticsSuggestions — a missing
+   * is module-load-time work, and this module is imported by other feature modules — a missing
    * env var would take down suites that never touch an image. Failing here fails only the
    * request that actually needed a bucket.
    */

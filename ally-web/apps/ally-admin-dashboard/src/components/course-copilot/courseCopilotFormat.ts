@@ -87,8 +87,32 @@ export const summarizeCompletion = (criteria: unknown): string[] => {
   const strings = en.courseCopilotPane.completion;
   const phrases: string[] = [];
 
+  // An assessment reads turns (and an optional pass mark), never duration.
+  if (rule.assessmentMode === true) {
+    phrases.push(
+      rule.assessmentPhase === "PRE"
+        ? strings.assessmentPre
+        : rule.assessmentPhase === "POST"
+          ? strings.assessmentPost
+          : strings.assessment,
+    );
+    const turns = asNumber(rule.minLearnerTurns);
+    if (turns !== null) phrases.push(strings.minTurns(turns));
+    const pass = asNumber(rule.minScore);
+    if (pass !== null && pass > 0) phrases.push(strings.passScore(pass));
+    return phrases;
+  }
+
+  // A roleplay's logic decides which of its gates apply; show only those.
+  const logic = typeof rule.completionLogic === "string" ? rule.completionLogic : null;
+  if (logic === "PARTICIPATION") return [strings.participation];
+  const scoreApplies = logic !== "DURATION";
+  const durationApplies = logic !== "SCORE";
+  if (logic === "SCORE") phrases.push(strings.scoreOnly);
+  if (logic === "DURATION") phrases.push(strings.durationOnly);
+
   const minScore = asNumber(rule.minScore);
-  if (minScore !== null) phrases.push(strings.minScore(minScore));
+  if (minScore !== null && scoreApplies) phrases.push(strings.minScore(minScore));
   const passScore = asNumber(rule.passScore);
   if (passScore !== null) phrases.push(strings.passScore(passScore));
   const watchPct = asNumber(rule.watchPct);
@@ -97,7 +121,7 @@ export const summarizeCompletion = (criteria: unknown): string[] => {
   if (minReadSeconds !== null && minReadSeconds > 0)
     phrases.push(strings.minRead(formatSeconds(minReadSeconds)));
   const minDurationSeconds = asNumber(rule.minDurationSeconds);
-  if (minDurationSeconds !== null && minDurationSeconds > 0)
+  if (minDurationSeconds !== null && minDurationSeconds > 0 && durationApplies)
     phrases.push(strings.minDuration(formatSeconds(minDurationSeconds)));
 
   return phrases;

@@ -7,6 +7,7 @@ import { CONTENT_CATALOGUE_PROFILE } from './content-catalogue.profile';
 import { DEBRIEF_GUIDANCE_PROFILE } from './debrief-guidance.profile';
 import { FIRST_PRINCIPLES_PROFILE } from './first-principles.profile';
 import { LEARNING_DESIGN_PROFILE } from './learning-design.profile';
+import { PRODUCT_OUTCOMES_PROFILE } from './product-outcomes.profile';
 import { CollectionProfile } from './profile.types';
 
 export * from './critic-checks';
@@ -28,6 +29,7 @@ export const COLLECTION_PROFILES: Partial<
   [ClCollectionId.DEBRIEF_GUIDANCE]: DEBRIEF_GUIDANCE_PROFILE,
   [ClCollectionId.LEARNING_DESIGN]: LEARNING_DESIGN_PROFILE,
   [ClCollectionId.CONTENT_CATALOGUE]: CONTENT_CATALOGUE_PROFILE,
+  [ClCollectionId.PRODUCT_OUTCOMES]: PRODUCT_OUTCOMES_PROFILE,
 };
 
 export function getProfile(

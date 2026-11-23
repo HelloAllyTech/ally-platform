@@ -19,18 +19,25 @@ void main() {
   });
 
   group('getScribeNoteCreationEnabled', () {
-    test('GETs the bare-boolean endpoint and returns it', () async {
-      when(() => dio.get<bool>('/settings/scribe-note-creation-enabled'))
-          .thenAnswer((_) async => _response(true));
+    test('GETs the bare-boolean endpoint as plain text and parses it', () async {
+      when(() => dio.get<String>('/settings/scribe-note-creation-enabled', options: any(named: 'options')))
+          .thenAnswer((_) async => _response('true'));
 
       final result = await repository.getScribeNoteCreationEnabled();
 
       expect(result, isTrue);
-      verify(() => dio.get<bool>('/settings/scribe-note-creation-enabled')).called(1);
+      final captured = verify(
+        () => dio.get<String>('/settings/scribe-note-creation-enabled', options: captureAny(named: 'options')),
+      ).captured.single as Options;
+      // Fetched as plain text, not Dio's default JSON decode — the backend
+      // sends this bare boolean with a `text/html` content type (a NestJS/
+      // Express quirk for non-object return values), which Dio can't
+      // reliably decode straight to `<bool>` against.
+      expect(captured.responseType, ResponseType.plain);
     });
 
     test('defaults to false when the body is absent', () async {
-      when(() => dio.get<bool>('/settings/scribe-note-creation-enabled'))
+      when(() => dio.get<String>('/settings/scribe-note-creation-enabled', options: any(named: 'options')))
           .thenAnswer((_) async => _response(null));
 
       final result = await repository.getScribeNoteCreationEnabled();
@@ -40,17 +47,19 @@ void main() {
   });
 
   group('getScribeVoiceNoteEnabled', () {
-    test('GETs the bare-boolean endpoint and returns it', () async {
-      when(() => dio.get<bool>('/settings/scribe-voice-note-enabled')).thenAnswer((_) async => _response(true));
+    test('GETs the bare-boolean endpoint as plain text and parses it', () async {
+      when(() => dio.get<String>('/settings/scribe-voice-note-enabled', options: any(named: 'options')))
+          .thenAnswer((_) async => _response('true'));
 
       final result = await repository.getScribeVoiceNoteEnabled();
 
       expect(result, isTrue);
-      verify(() => dio.get<bool>('/settings/scribe-voice-note-enabled')).called(1);
+      verify(() => dio.get<String>('/settings/scribe-voice-note-enabled', options: any(named: 'options'))).called(1);
     });
 
     test('defaults to false when the body is absent', () async {
-      when(() => dio.get<bool>('/settings/scribe-voice-note-enabled')).thenAnswer((_) async => _response(null));
+      when(() => dio.get<String>('/settings/scribe-voice-note-enabled', options: any(named: 'options')))
+          .thenAnswer((_) async => _response(null));
 
       final result = await repository.getScribeVoiceNoteEnabled();
 
@@ -59,17 +68,19 @@ void main() {
   });
 
   group('getCustomFieldsEnabled', () {
-    test('GETs the bare-boolean endpoint and returns it', () async {
-      when(() => dio.get<bool>('/settings/custom-fields-enabled')).thenAnswer((_) async => _response(false));
+    test('GETs the bare-boolean endpoint as plain text and parses it', () async {
+      when(() => dio.get<String>('/settings/custom-fields-enabled', options: any(named: 'options')))
+          .thenAnswer((_) async => _response('false'));
 
       final result = await repository.getCustomFieldsEnabled();
 
       expect(result, isFalse);
-      verify(() => dio.get<bool>('/settings/custom-fields-enabled')).called(1);
+      verify(() => dio.get<String>('/settings/custom-fields-enabled', options: any(named: 'options'))).called(1);
     });
 
     test('defaults to true (active) when the body is absent, unlike the other toggles', () async {
-      when(() => dio.get<bool>('/settings/custom-fields-enabled')).thenAnswer((_) async => _response(null));
+      when(() => dio.get<String>('/settings/custom-fields-enabled', options: any(named: 'options')))
+          .thenAnswer((_) async => _response(null));
 
       final result = await repository.getCustomFieldsEnabled();
 
@@ -78,17 +89,19 @@ void main() {
   });
 
   group('getNudgeStatus', () {
-    test('GETs the bare-boolean endpoint and returns it', () async {
-      when(() => dio.get<bool>('/settings/nudge-status')).thenAnswer((_) async => _response(true));
+    test('GETs the bare-boolean endpoint as plain text and parses it', () async {
+      when(() => dio.get<String>('/settings/nudge-status', options: any(named: 'options')))
+          .thenAnswer((_) async => _response('true'));
 
       final result = await repository.getNudgeStatus();
 
       expect(result, isTrue);
-      verify(() => dio.get<bool>('/settings/nudge-status')).called(1);
+      verify(() => dio.get<String>('/settings/nudge-status', options: any(named: 'options'))).called(1);
     });
 
     test('defaults to false when the body is absent', () async {
-      when(() => dio.get<bool>('/settings/nudge-status')).thenAnswer((_) async => _response(null));
+      when(() => dio.get<String>('/settings/nudge-status', options: any(named: 'options')))
+          .thenAnswer((_) async => _response(null));
 
       final result = await repository.getNudgeStatus();
 

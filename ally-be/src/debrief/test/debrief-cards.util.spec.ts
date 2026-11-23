@@ -8,7 +8,9 @@ import {
   isTranscriptGap,
   normaliseForQuote,
   renderCards,
+  REPLY_MAX_WORDS,
   replyCheckFailures,
+  replyWordCount,
   runDebriefChecks,
   speakerRuns,
   TranscriptTurn,
@@ -307,6 +309,35 @@ describe('debrief checks', () => {
     expect(run(c)).toContain(DebriefCheckCode.RISK_CUE_UNCOVERED);
   });
 
+  it("leaves a 'possible' cue to the Writer, and still requires a clear one", () => {
+    const lowMood = {
+      turn_index: 4,
+      quote: 'Exams',
+      category: 'hopelessness',
+      learner_response: 'missed',
+      strength: 'possible' as const,
+    };
+    const c = good();
+    c.important_moment = null;
+    // Only a possible cue: no important moment is not a failure.
+    expect(
+      run(c, { safety: { risk_cues: [lowMood], learner_distress: [] } }),
+    ).not.toContain(DebriefCheckCode.RISK_CUE_UNCOVERED);
+    // A clear cue beside it still needs the card; the possible one does not
+    // need a line in `others`.
+    const clearToo = {
+      risk_cues: [
+        { ...safety.risk_cues[0], strength: 'clear' as const },
+        lowMood,
+      ],
+      learner_distress: [],
+    };
+    expect(run(c, { safety: clearToo })).toContain(
+      DebriefCheckCode.RISK_CUE_UNCOVERED,
+    );
+    expect(run(good(), { safety: clearToo })).toEqual([]);
+  });
+
   it('refuses scores, diagnoses, exclamations and unsupported progress claims', () => {
     const c = good();
     c.opening = 'You scored 7/10 today!';
@@ -366,6 +397,99 @@ describe('debrief checks', () => {
     ).toBe(true);
   });
 
+  it('a Hindi debrief of a romanised Hinglish session: verbatim Latin quotes pass, romanised prose is held', () => {
+    // GOLD-MIX-MEANS, 2026-11-12: every turn was typed in Latin letters.
+    const hinglish: TranscriptTurn[] = [
+      { turn_index: 1, role: 'counselor', text: 'Kitna loan baaki hai?' },
+      {
+        turn_index: 2,
+        role: 'client',
+        text: 'Ghar mein chuha maarne wali dawai rakhi hai. Kabhi kabhi sochta hoon wahi kha loon.',
+      },
+      {
+        turn_index: 3,
+        role: 'counselor',
+        text: 'Sarkar ki kuch schemes hain, unke baare mein pata kiya?',
+      },
+    ];
+    const cards: DebriefCards = {
+      opening:
+        'आपने किसान की परेशानी सुनी, पर एक ज़रूरी पल छूट गया जिस पर रुकना था।',
+      important_moment: {
+        turn_index: 2,
+        quote:
+          'Ghar mein chuha maarne wali dawai rakhi hai. Kabhi kabhi sochta hoon wahi kha loon.',
+        handled_well: false,
+        lead: 'यहाँ क्लाइंट ने ज़हर खाने की बात कही थी।',
+        body: 'ऐसे में सीधे और नरमी से पूछिए कि क्या वे अपनी जान लेने के बारे में सोच रहे हैं।',
+        others: [],
+      },
+      what_worked: [
+        {
+          skill: 'Open questions',
+          turn_index: 1,
+          quote: 'Kitna loan baaki hai?',
+          lead: 'आपने बातचीत शुरू करने के लिए सवाल पूछा।',
+          body: 'इससे क्लाइंट को अपनी स्थिति बताने का मौका मिला।',
+        },
+      ],
+      work_on_this: [
+        {
+          skill: 'Exploring risk',
+          turn_index: 3,
+          quote: 'Sarkar ki kuch schemes hain, unke baare mein pata kiya?',
+          lead: 'ज़हर की बात के बाद योजनाओं पर जाना जल्दी था।',
+          why: 'पहले उनकी सुरक्षा के बारे में पूछना ज़रूरी था।',
+          try_saying:
+            'Aap dawai khaane ki baat kar rahe hain, kya aap apni jaan lene ka soch rahe hain?',
+        },
+      ],
+      practise_next: null,
+      skill_words: [],
+      reflective_question:
+        'जब क्लाइंट ऐसी बात कहे, तो आपको रुककर पूछने से क्या रोकता है?',
+      progress_note: null,
+    };
+    const hiSafety = {
+      risk_cues: [
+        {
+          turn_index: 2,
+          quote: 'Ghar mein chuha maarne wali dawai rakhi hai.',
+          category: 'suicide_or_self_harm',
+          learner_response: 'missed',
+        },
+      ],
+      learner_distress: [],
+    };
+    const check = (c: DebriefCards) =>
+      run(c, { transcript: hinglish, safety: hiSafety, language: 'hi-IN' });
+    expect(check(cards)).not.toContain(DebriefCheckCode.WRONG_LANGUAGE);
+    // The same debrief written in romanised Hindi is still held: not loosened.
+    const romanised: DebriefCards = {
+      ...cards,
+      opening:
+        'Maine dekha ki aapne samasyaon ko suljhane ki koshish ki, lekin unka dukh gehra tha.',
+      important_moment: {
+        ...cards.important_moment!,
+        lead: 'Suraksha ke baare mein turant puchna zaroori tha.',
+        body: 'Seedhe suicide par baat karne se unhe mehsoos hota ki unki baat suni gayi hai.',
+      },
+      reflective_question:
+        'Jab koi client apni jaan lene ki baat kare, toh aapko salah dene ki itni jaldi kyun lagti hai?',
+    };
+    romanised.what_worked = cards.what_worked.map((w) => ({
+      ...w,
+      lead: 'Aapne baatcheet shuru karne ke liye sawal poocha.',
+      body: 'Isse client ko apni sthiti batane ka mauka mila.',
+    }));
+    romanised.work_on_this = cards.work_on_this.map((w) => ({
+      ...w,
+      lead: 'Zeher ki baat ke baad yojanaon par jaana jaldi tha.',
+      why: 'Pehle unki suraksha ke baare mein poochna zaroori tha.',
+    }));
+    expect(check(romanised)).toContain(DebriefCheckCode.WRONG_LANGUAGE);
+  });
+
   it('treats whitespace and curly quotes as the same quote', () => {
     expect(normaliseForQuote('  I don’t  see  ')).toBe("i don't see");
   });
@@ -375,5 +499,119 @@ describe('debrief checks', () => {
     expect(text).toContain('(turn 2)');
     expect(text).toContain('Try saying:');
     expect(text).toContain('One question to think about:');
+  });
+});
+
+describe('skill labels for readers', () => {
+  const { cardsForReader, withSkillLabels } = jest.requireActual(
+    '../util/debrief-cards.util',
+  );
+  const cards = {
+    opening: 'नमस्ते',
+    what_worked: [{ skill: 'Validation', lead: 'x' }],
+    work_on_this: [{ skill: 'Open questions', lead: 'y' }],
+    practise_next: { skill: 'open questions', reason: 'z' },
+    skill_words: [
+      { skill: 'Validation', word: 'strength' },
+      { skill: 'Summarising', word: 'keep_practising' },
+    ],
+    skill_labels: [
+      { skill: 'Validation', label: 'भावनाओं को मान्यता देना' },
+      { skill: 'Open questions', label: 'खुले सवाल' },
+    ],
+    reflective_question: '?',
+  };
+
+  it('shows each skill by its label, keeps unlabelled ones, drops the list', () => {
+    const out = cardsForReader(cards, 'standard');
+    expect(out.what_worked[0].skill).toBe('भावनाओं को मान्यता देना');
+    expect(out.work_on_this[0].skill).toBe('खुले सवाल');
+    // Matched without regard to case.
+    expect(out.practise_next.skill).toBe('खुले सवाल');
+    expect(out.skill_words.map((w: any) => w.skill)).toEqual([
+      'भावनाओं को मान्यता देना',
+      'Summarising',
+    ]);
+    expect(out.skill_labels).toBeUndefined();
+    // The stored cards are untouched.
+    expect(cards.what_worked[0].skill).toBe('Validation');
+  });
+
+  it('leaves English cards as they are', () => {
+    const en = { ...cards, skill_labels: [] };
+    expect(withSkillLabels(en).what_worked[0].skill).toBe('Validation');
+  });
+});
+
+describe('comparing the learner with others (compares_learner)', () => {
+  const withOpening = (opening: string) => run({ ...good(), opening });
+
+  it.each([
+    'This is a moment many find hard.',
+    'Many trainees find this moment hard, so you are not alone.',
+    'Staying with silence is a strength that is less common.',
+    'Few trainees show this, and you did.',
+    'Try another approach with the client next time.',
+    'Ask the client about other people in their life.',
+    'You stayed with the feeling longer than before.',
+  ])('passes "%s"', (text) => {
+    expect(withOpening(text)).not.toContain(DebriefCheckCode.COMPARES_LEARNER);
+  });
+
+  it.each([
+    'Only 20 percent of trainees asked about safety here.',
+    'Half of the learners missed this moment.',
+    'Most trainees did better at this moment.',
+    'Many learners handled it better.',
+    'You listened better than most.',
+    'You reflected more than your peers did.',
+    'Other learners asked about sleep here.',
+    'Compared with others, you moved on quickly.',
+    'In comparison to your group, you asked fewer questions.',
+    'You ranked near the middle on this skill.',
+    'This puts you in the top group for empathy.',
+    'You are in the bottom half for open questions.',
+    'Your reflections were above average.',
+  ])('fails "%s"', (text) => {
+    expect(withOpening(text)).toContain(DebriefCheckCode.COMPARES_LEARNER);
+  });
+
+  it('is a blocking check, so the Reviser must fix it', () => {
+    expect(ADVISORY_CHECKS.has(DebriefCheckCode.COMPARES_LEARNER)).toBe(false);
+  });
+
+  it('leaves a try-saying line alone: it is the learner speaking', () => {
+    const c = good();
+    c.work_on_this[0].try_saying =
+      'Other people in your family may have noticed this too.';
+    expect(run(c)).not.toContain(DebriefCheckCode.COMPARES_LEARNER);
+  });
+});
+
+describe('Ask Ally reply length (reply_too_long)', () => {
+  const words = (n: number) =>
+    Array.from({ length: n }, () => 'word').join(' ');
+
+  it('passes a reply at the cap and fails one over it', () => {
+    expect(REPLY_MAX_WORDS).toBe(120);
+    expect(replyCheckFailures(words(120), [])).toEqual([]);
+    expect(replyCheckFailures(words(121), [])).toEqual([
+      DebriefCheckCode.REPLY_TOO_LONG,
+    ]);
+  });
+
+  it('counts space-separated Indic scripts by their spaces', () => {
+    expect(replyWordCount('आपने अच्छा सवाल पूछा')).toBe(4);
+    expect(replyWordCount('நீங்கள் நன்றாக கேட்டீர்கள்')).toBe(3);
+  });
+
+  it('counts scripts without spaces by characters', () => {
+    // 240 Han characters at 2 per word is 120 words; two more is over.
+    expect(replyWordCount('你'.repeat(240))).toBe(120);
+    expect(replyCheckFailures('你'.repeat(242), [])).toContain(
+      DebriefCheckCode.REPLY_TOO_LONG,
+    );
+    // Thai at 4 letters per word, with an English word mixed in.
+    expect(replyWordCount(`${'ก'.repeat(8)} okay`)).toBe(3);
   });
 });

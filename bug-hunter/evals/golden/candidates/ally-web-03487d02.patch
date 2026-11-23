@@ -1,0 +1,155 @@
+diff --git a/apps/ally-admin-dashboard/src/components/character-profile-selector/CharacterProfileSelector.tsx b/apps/ally-admin-dashboard/src/components/character-profile-selector/CharacterProfileSelector.tsx
+index e0825c7216..10da07cab5 100644
+--- a/apps/ally-admin-dashboard/src/components/character-profile-selector/CharacterProfileSelector.tsx
++++ b/apps/ally-admin-dashboard/src/components/character-profile-selector/CharacterProfileSelector.tsx
+@@ -18,6 +18,7 @@ import {
+ import { useClickOutside, useIsPlaceholderUsed } from "@hooks";
+ import { CharacterData } from "@types";
+ import { camelToSnakeCase } from "@utils/common";
++import { asList } from "@utils/characterData";
+ 
+ interface CharacterProfileSelectorProps {
+   label: string;
+@@ -213,8 +214,11 @@ export const CharacterProfileSelector: React.FC<CharacterProfileSelectorProps> =
+         characterData.linguisticStyleSamples,
+       );
+ 
+-      if (characterData.knowledgeSources?.length) {
+-        const rows = characterData.knowledgeSources.map(source => ({
++      // `?.length` alone lets a non-empty string through and `.map` then
++      // throws, taking the whole page down on character select — see asList.
++      const knowledgeSources = asList(characterData.knowledgeSources);
++      if (knowledgeSources.length) {
++        const rows = knowledgeSources.map(source => ({
+           id: source.id,
+           title: source.title,
+           content: source.text ?? "",
+diff --git a/apps/ally-admin-dashboard/src/components/character-side-panel/CharacterSidePanel.tsx b/apps/ally-admin-dashboard/src/components/character-side-panel/CharacterSidePanel.tsx
+index d5277b6940..2abed48041 100644
+--- a/apps/ally-admin-dashboard/src/components/character-side-panel/CharacterSidePanel.tsx
++++ b/apps/ally-admin-dashboard/src/components/character-side-panel/CharacterSidePanel.tsx
+@@ -34,6 +34,7 @@ import { buildGroupedVoiceOptions } from "@constants/voiceProviders";
+ // load — so any consumer's test that mocks `@api` fails to load the file.
+ import { useVoicePreview } from "@hooks/useVoicePreview";
+ import { CharacterData } from "@types";
++import { asList } from "@utils/characterData";
+ 
+ import { CharacterKnowledgeSourcesField } from "./CharacterKnowledgeSourcesField";
+ import { DialectSamplesField } from "./DialectSamplesField";
+@@ -353,14 +354,13 @@ export const CharacterSidePanel: React.FC<CharacterSidePanelProps> = ({
+           Object.entries(rest.linguisticStyleSamples || {})
+             .map(([languageId, samples]) => [
+               languageId,
+-              (Array.isArray(samples) ? samples : []).filter(sample => sample.trim() !== ""),
++              asList<string>(samples).filter(sample => sample.trim() !== ""),
+             ])
+             .filter(([, samples]) => (samples as string[]).length > 0),
+         ),
+-        knowledgeSources: (Array.isArray(rest.knowledgeSources)
+-          ? rest.knowledgeSources
+-          : []
+-        ).filter(source => source.title.trim() !== ""),
++        knowledgeSources: asList(rest.knowledgeSources).filter(
++          source => source.title.trim() !== "",
++        ),
+       };
+ 
+       // If no ID exists or ID is temporary, create new character
+@@ -423,10 +423,8 @@ export const CharacterSidePanel: React.FC<CharacterSidePanelProps> = ({
+         JSON.stringify(initialData.languageCharacteristics || {}) ||
+       JSON.stringify(formData.linguisticStyleSamples || {}) !==
+         JSON.stringify(initialData.linguisticStyleSamples || {}) ||
+-      JSON.stringify(Array.isArray(formData.knowledgeSources) ? formData.knowledgeSources : []) !==
+-        JSON.stringify(
+-          Array.isArray(initialData.knowledgeSources) ? initialData.knowledgeSources : [],
+-        )
++      JSON.stringify(asList(formData.knowledgeSources)) !==
++        JSON.stringify(asList(initialData.knowledgeSources))
+     );
+   };
+ 
+@@ -650,7 +648,7 @@ export const CharacterSidePanel: React.FC<CharacterSidePanelProps> = ({
+ 
+             <Field label={en.simulation.knowledgeSources}>
+               <CharacterKnowledgeSourcesField
+-                sources={Array.isArray(formData.knowledgeSources) ? formData.knowledgeSources : []}
++                sources={asList(formData.knowledgeSources)}
+                 onChange={sources => handleFieldChange("knowledgeSources", sources)}
+               />
+             </Field>
+diff --git a/apps/ally-admin-dashboard/src/utils/__tests__/characterData.test.ts b/apps/ally-admin-dashboard/src/utils/__tests__/characterData.test.ts
+new file mode 100644
+index 0000000000..d9f847057f
+--- /dev/null
++++ b/apps/ally-admin-dashboard/src/utils/__tests__/characterData.test.ts
+@@ -0,0 +1,34 @@
++import { describe, expect, it } from "vitest";
++
++import { asList } from "../characterData";
++
++/**
++ * The crash this pins: a character whose `knowledgeSources` jsonb held a bare
++ * string instead of a list. `knowledgeSources?.length` is truthy for a
++ * non-empty string, so the guard let it through and the following `.map` threw
++ * "e.map is not a function" — which surfaced as the admin error page the
++ * moment anyone opened that character.
++ */
++describe("asList", () => {
++  it("passes an array through untouched", () => {
++    const sources = [{ id: "1", title: "A" }];
++
++    expect(asList(sources)).toBe(sources);
++  });
++
++  it("returns an empty list for a string, so `.length` no longer lies", () => {
++    expect(asList("not a list")).toEqual([]);
++    // The shape of the original bug: truthy length, no `.map`.
++    expect(asList("not a list").length).toBe(0);
++  });
++
++  it("returns an empty list for null, undefined and objects", () => {
++    expect(asList(null)).toEqual([]);
++    expect(asList(undefined)).toEqual([]);
++    expect(asList({ title: "A" })).toEqual([]);
++  });
++
++  it("keeps an empty array empty rather than substituting a new one's contents", () => {
++    expect(asList([])).toEqual([]);
++  });
++});
+diff --git a/apps/ally-admin-dashboard/src/utils/characterData.ts b/apps/ally-admin-dashboard/src/utils/characterData.ts
+new file mode 100644
+index 0000000000..a61ff05308
+--- /dev/null
++++ b/apps/ally-admin-dashboard/src/utils/characterData.ts
+@@ -0,0 +1,21 @@
++/**
++ * A scenario character's list-shaped fields live in `jsonb` columns, so what
++ * comes back from the API is whatever was written there — and characters
++ * authored through the agent paths have been seen carrying a bare string
++ * where a list belongs. Every consumer then calls `.map`/`.filter` on it and
++ * takes the whole page down with "e.map is not a function". (`?.length` is no
++ * guard: a non-empty string has one.)
++ *
++ * Reading it through this helper turns that into an empty list: the panel
++ * renders, the trainer can refill the field, and the damage stays confined to
++ * data that was already unusable.
++ *
++ * The overloads keep the element type when the caller's value is already
++ * typed as a list, so this stays a runtime guard rather than a cast that
++ * loses `T`.
++ */
++export function asList<T>(value: T[] | null | undefined): T[];
++export function asList(value: unknown): never[];
++export function asList(value: unknown): unknown[] {
++  return Array.isArray(value) ? value : [];
++}
+diff --git a/apps/ally-admin-dashboard/src/utils/index.ts b/apps/ally-admin-dashboard/src/utils/index.ts
+index 8dd8a0e043..dc1d1b2af9 100644
+--- a/apps/ally-admin-dashboard/src/utils/index.ts
++++ b/apps/ally-admin-dashboard/src/utils/index.ts
+@@ -14,3 +14,4 @@ export * from "./availableVariables";
+ export * from "./navigation";
+ export * from "./errorMessage";
+ export * from "./agentAuthored";
++export * from "./characterData";

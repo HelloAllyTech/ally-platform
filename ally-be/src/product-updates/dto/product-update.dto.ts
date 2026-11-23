@@ -4,6 +4,7 @@ import {
   ArrayNotEmpty,
   IsArray,
   IsBoolean,
+  IsEmail,
   IsIn,
   IsInt,
   IsNotEmpty,
@@ -252,4 +253,22 @@ export class ProductUpdatesStatusDto {
   running!: boolean;
   @ApiPropertyOptional({ description: 'The last pipeline pass, as recorded' })
   lastRun?: Record<string, unknown> | null;
+}
+
+export class AddDigestRecipientDto {
+  @ApiProperty({ description: 'Address to add to the daily email' })
+  @IsEmail()
+  @MaxLength(254)
+  email!: string;
+}
+
+export class ManagedDigestRecipientDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() email!: string;
+  @ApiProperty({ description: 'ISO timestamp' }) addedAt!: string;
+}
+
+export class DigestRecipientsDto {
+  @ApiProperty({ type: [ManagedDigestRecipientDto] })
+  recipients!: ManagedDigestRecipientDto[];
 }

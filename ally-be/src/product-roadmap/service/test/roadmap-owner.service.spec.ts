@@ -8,10 +8,10 @@ import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
 
 import { User } from 'src/user/entity/user.entity';
-import { BugFinding } from 'src/bug-hunter/entity/bug-finding.entity';
 import { S3Service } from 'src/aws/service/s3.service';
 import { AppConfigService } from 'src/config/config.service';
 
+import { RoadmapAiService } from '../roadmap-ai.service';
 import { RoadmapOpportunityService } from '../roadmap-opportunity.service';
 import { RoadmapOpportunityRepository } from '../../repository/roadmap-opportunity.repository';
 import { RoadmapAllocationRepository } from '../../repository/roadmap-allocation.repository';
@@ -20,8 +20,6 @@ import { RoadmapStrategyGoalService } from '../roadmap-strategy-goal.service';
 import { RoadmapGoalImpactService } from '../roadmap-goal-impact.service';
 import { RoadmapNotificationService } from '../roadmap-notification.service';
 import { RoadmapReadinessTokenService } from '../roadmap-readiness-token.service';
-import { BugHunterRepoClassifierService } from 'src/bug-hunter/service/bug-hunter-repo-classifier.service';
-import { BugHunterMissClassifierService } from 'src/bug-hunter/service/bug-hunter-miss-classifier.service';
 import {
   CreateOpportunityDto,
   ListOpportunitiesQueryDto,
@@ -84,6 +82,11 @@ describe('RoadmapOpportunityService — owners', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RoadmapOpportunityService,
+        // A title is written for a filing that arrives without one; these suites do not test it.
+        {
+          provide: RoadmapAiService,
+          useValue: { suggestTitle: jest.fn().mockResolvedValue('A title') },
+        },
         {
           provide: RoadmapOpportunityRepository,
           useValue: opportunityRepository,
@@ -104,6 +107,7 @@ describe('RoadmapOpportunityService — owners', () => {
           provide: RoadmapStrategyGoalService,
           useValue: {
             countGoals: jest.fn().mockResolvedValue(0),
+            isProdDirector: jest.fn().mockResolvedValue(false),
             getRankContext: jest.fn().mockResolvedValue({
               weights: {
                 votesWeight: 1,
@@ -120,10 +124,6 @@ describe('RoadmapOpportunityService — owners', () => {
           useValue: { assessQuietly: jest.fn() },
         },
         { provide: RoadmapNotificationService, useValue: { emit: jest.fn() } },
-        {
-          provide: getRepositoryToken(BugFinding),
-          useValue: { create: jest.fn(), save: jest.fn() },
-        },
         // Reference images play no part in owner resolution; these satisfy the constructor.
         { provide: S3Service, useValue: { parseS3Url: jest.fn() } },
         {
@@ -141,20 +141,6 @@ describe('RoadmapOpportunityService — owners', () => {
               );
             }),
           },
-        },
-        // These tests all file type=IDEA, so the classifier never runs; this
-        // satisfies the constructor.
-        {
-          provide: BugHunterRepoClassifierService,
-          useValue: {
-            classifyRepo: jest
-              .fn()
-              .mockResolvedValue({ repo: null, rationale: '' }),
-          },
-        },
-        {
-          provide: BugHunterMissClassifierService,
-          useValue: { classifyAndRecord: jest.fn().mockResolvedValue(null) },
         },
       ],
     }).compile();

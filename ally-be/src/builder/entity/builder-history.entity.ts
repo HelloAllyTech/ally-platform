@@ -23,7 +23,13 @@ export const BUILDER_HISTORY_ENTRY_TYPES: BuilderHistoryEntryType[] = [
 ];
 
 /** Where the person was when they decided. `rule` means nobody was. */
-export type BuilderHistorySurface = 'now' | 'session' | 'slack' | 'rule';
+/** `requester`: an agent that requested the session answered (plan §11.5), on nobody's behalf. */
+export type BuilderHistorySurface =
+  | 'now'
+  | 'session'
+  | 'slack'
+  | 'rule'
+  | 'requester';
 
 /** Client-reported from breakpoint and pointer, so phone answers can be told apart. */
 export type BuilderHistoryClient = 'phone' | 'tablet' | 'desktop';

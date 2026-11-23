@@ -8,11 +8,11 @@ import { GoalsXpAnalyticsService } from '../../service/goals-xp-analytics.servic
 import { ActiveUsersXpAnalyticsService } from '../../service/active-users-xp-analytics.service';
 import { CourseUnitsAnalyticsService } from '../../service/course-units-analytics.service';
 import { XpLevelReachedAnalyticsService } from '../../service/xp-level-reached-analytics.service';
-import { BugHunterVolumeAnalyticsService } from '../../service/bug-hunter-volume-analytics.service';
 import { XpByTenantAnalyticsService } from '../../service/xp-by-tenant-analytics.service';
 import { RoleplayVolumeAnalyticsService } from '../../service/roleplay-volume-analytics.service';
 import { RoadmapDeliveryAnalyticsService } from '../../service/roadmap-delivery-analytics.service';
 import { RoadmapVotingAnalyticsService } from '../../service/roadmap-voting-analytics.service';
+import { AssessmentAttemptsAnalyticsService } from '../../service/assessment-attempts-analytics.service';
 import { ShipVolumeAnalyticsService } from '../../service/ship-volume-analytics.service';
 import { HighlightsAnalyticsService } from '../../service/highlights-analytics.service';
 import { PlatformAnalyticsService } from '../../service/platform-analytics.service';
@@ -64,7 +64,6 @@ import { RoleplaySessionCostAnalyticsService } from '../../service/roleplay-sess
 import { XpPerMinuteAnalyticsService } from '../../service/xp-per-minute-analytics.service';
 import { CodingAgentCostAnalyticsService } from '../../service/coding-agent-cost-analytics.service';
 import { FixSessionEngineCostAnalyticsService } from '../../service/fix-session-engine-cost-analytics.service';
-import { BugAgentPerformanceAnalyticsService } from '../../service/bug-agent-performance-analytics.service';
 import { QualitySentimentAnalyticsService } from '../../service/quality-sentiment-analytics.service';
 import { ChartPreferenceService } from '../../service/chart-preference.service';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
@@ -165,10 +164,6 @@ describe('AnalyticsController', () => {
           useValue: { getLevelsReached: jest.fn() },
         },
         {
-          provide: BugHunterVolumeAnalyticsService,
-          useValue: { getVolume: jest.fn() },
-        },
-        {
           provide: XpByTenantAnalyticsService,
           useValue: { getXpByTenant: jest.fn() },
         },
@@ -183,6 +178,10 @@ describe('AnalyticsController', () => {
         {
           provide: RoadmapVotingAnalyticsService,
           useValue: { getRoadmapVoting: jest.fn() },
+        },
+        {
+          provide: AssessmentAttemptsAnalyticsService,
+          useValue: { getAssessmentAttempts: jest.fn() },
         },
         {
           provide: ShipVolumeAnalyticsService,
@@ -424,10 +423,6 @@ describe('AnalyticsController', () => {
         {
           provide: FixSessionEngineCostAnalyticsService,
           useValue: { getFixSessionEngineCost: jest.fn() },
-        },
-        {
-          provide: BugAgentPerformanceAnalyticsService,
-          useValue: { getPerformance: jest.fn() },
         },
         {
           provide: QualitySentimentAnalyticsService,

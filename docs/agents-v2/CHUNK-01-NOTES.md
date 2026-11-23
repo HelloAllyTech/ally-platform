@@ -86,7 +86,7 @@ ally-ai has **no Postgres access today**: no driver, no settings, no code. The o
 
 **None** for the knowledge bot. There are only unit tests (`tests/core/knowledge_agent/`, `tests/api/v1/endpoints/test_knowledge_agent.py`) and unrelated sets (judge rubrics in `scripts/jev_bakeoff/`, helpline risk cases).
 
-### Where the code differs from chunk-01.md and stage1-build.md (the code wins)
+### Where the code differs from archive/chunk-01.md and stage1-build.md (the code wins)
 
 1. The request field is `question`, not `message`. The response field is `intent`, not `decision`. `audience` is a required request field that neither doc mentions.
 2. Every route is under `/api/v1`, so the new route is `POST /api/v1/agent/run`.
@@ -162,7 +162,7 @@ All paths are under `ally-ai/`.
 
 ## 5. Parity results
 
-Report: [CHUNK-01-PARITY-REPORT.md](./CHUNK-01-PARITY-REPORT.md) (22 cases, local stack, rebuilt image, run after the decision below).
+Report: [CHUNK-01-PARITY-REPORT.md](./archive/CHUNK-01-PARITY-REPORT.md) (22 cases, local stack, rebuilt image, run after the decision below).
 
 - **0 must-match failures** (exit code 0).
   - Must-match fields: intent, decline reason, hit count, top similarity (3 dp) and passages used.

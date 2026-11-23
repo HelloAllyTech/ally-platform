@@ -55,6 +55,8 @@ export const ITEM_JOB_KINDS = new Set<CourseCopilotJobKind>([
   CourseCopilotJobKind.QUIZ,
   CourseCopilotJobKind.JOURNAL,
   CourseCopilotJobKind.ANNOTATED_ARTIFACT,
+  CourseCopilotJobKind.BRANCHING_SCENARIO,
+  CourseCopilotJobKind.BUCKET_SORT,
   CourseCopilotJobKind.GAME,
   CourseCopilotJobKind.VIDEO,
   CourseCopilotJobKind.ROLEPLAY_NEW,
@@ -663,6 +665,9 @@ export class CourseCopilotStructureService {
     switch (bpItem.type) {
       case TrackItemType.ROLEPLAY: {
         const rule = {
+          ...(criteria.completionLogic !== undefined
+            ? { completionLogic: criteria.completionLogic }
+            : {}),
           ...(criteria.minScore !== undefined
             ? { minScore: criteria.minScore }
             : {}),
@@ -689,6 +694,7 @@ export class CourseCopilotStructureService {
         };
       case TrackItemType.QUIZ:
       case TrackItemType.ANNOTATED_ARTIFACT:
+      case TrackItemType.BRANCHING_SCENARIO:
         return {
           ...base,
           content: result.content,
@@ -743,6 +749,18 @@ export class CourseCopilotStructureService {
         return `${plural(Array.isArray(content?.units) ? content.units.length : 0, 'line')} · ${plural(
           Array.isArray(content?.labels) ? content.labels.length : 0,
           'label',
+        )}`;
+      case TrackItemType.BRANCHING_SCENARIO: {
+        const nodes = Array.isArray(content?.nodes) ? content.nodes : [];
+        const endings = nodes.filter(
+          (node: any) => !Array.isArray(node?.choices) || !node.choices.length,
+        ).length;
+        return `${plural(nodes.length, 'scene')} · ${plural(endings, 'ending')}`;
+      }
+      case TrackItemType.BUCKET_SORT:
+        return `${plural(Array.isArray(content?.items) ? content.items.length : 0, 'item')} · ${plural(
+          Array.isArray(content?.buckets) ? content.buckets.length : 0,
+          'bucket',
         )}`;
       case TrackItemType.GAME:
         return String(content?.gameKey ?? 'game');
@@ -823,6 +841,37 @@ export class CourseCopilotStructureService {
           targetCount: Array.isArray(content.targets)
             ? content.targets.length
             : 0,
+          intro: content.intro ?? null,
+        };
+      case TrackItemType.BRANCHING_SCENARIO: {
+        const nodes = Array.isArray(content.nodes) ? content.nodes : [];
+        const endings = nodes.filter(
+          (node: any) => !Array.isArray(node?.choices) || !node.choices.length,
+        );
+        const start = nodes.find(
+          (node: any) => node?.id === content.startNodeId,
+        );
+        return {
+          type: 'BRANCHING_SCENARIO',
+          sceneCount: nodes.length,
+          endingCount: endings.length,
+          passScore: content.settings?.passScore || null,
+          intro: content.intro ?? null,
+          firstScene:
+            typeof start?.text === 'string'
+              ? start.text.length > 240
+                ? `${start.text.slice(0, 239)}…`
+                : start.text
+              : null,
+        };
+      }
+      case TrackItemType.BUCKET_SORT:
+        return {
+          type: 'BUCKET_SORT',
+          itemCount: Array.isArray(content.items) ? content.items.length : 0,
+          buckets: (Array.isArray(content.buckets) ? content.buckets : []).map(
+            (b: any) => String(b.label ?? ''),
+          ),
           intro: content.intro ?? null,
         };
       case TrackItemType.ROLEPLAY:

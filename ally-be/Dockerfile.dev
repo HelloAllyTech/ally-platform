@@ -20,8 +20,10 @@ COPY . .
 COPY docker-entrypoint.dev.sh ./
 
 # A cold `nest build` (no incremental cache, e.g. right after a fresh Docker
-# volume) exceeds Node's default ~2GB heap cap and OOMs.
-ENV NODE_OPTIONS=--max-old-space-size=4096
+# volume) exceeds Node's default ~2GB heap cap and OOMs. The watcher (`nest start
+# --watch`) peaks around 4.6GB on a cold compile and ran out at 4GB, so 7GB; give
+# Docker at least 10GB. Switching the build to SWC is a separate change.
+ENV NODE_OPTIONS=--max-old-space-size=7168
 RUN npm run build
 
 EXPOSE 8000

@@ -62,6 +62,7 @@ import { KnowledgeBaseService } from './service/knowledge-base.service';
     KbIngestConsumer,
     KbIngestDlqConsumer,
   ],
-  exports: [KnowledgeBaseService, KbDocumentChunkRepository],
+  // KbIngestService: onboarding (chunk 20a) reads an upload's pages for "What we learned".
+  exports: [KnowledgeBaseService, KbDocumentChunkRepository, KbIngestService],
 })
 export class KnowledgeBaseModule {}

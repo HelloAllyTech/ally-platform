@@ -54,6 +54,11 @@ export interface QuestionCardProps {
    * click, and the other kinds confirm as usual.
    */
   renderOptions?: (picker: AgentOptionPickerProps) => React.ReactNode;
+  /**
+   * Less to read (Course Copilot): the reason for asking folds behind a "Why this question?"
+   * toggle, and option descriptions shrink to one line with the full text on hover.
+   */
+  compact?: boolean;
 }
 
 /**
@@ -78,6 +83,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
   emphasised = false,
   strings: stringOverrides,
   renderOptions,
+  compact = false,
 }) => {
   const strings: AgentQuestionStrings = { ...en.agentChat.question, ...stringOverrides };
 
@@ -394,7 +400,10 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
                   )}
                 </span>
                 {option.description && (
-                  <span className="mt-0.5 block text-xs text-typography-600">
+                  <span
+                    className={`mt-0.5 block text-xs text-typography-600 ${compact ? "line-clamp-1" : ""}`}
+                    title={compact ? option.description : undefined}
+                  >
                     {option.description}
                   </span>
                 )}
@@ -490,9 +499,17 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
         <p className="text-sm font-medium text-typography-900">{question.prompt}</p>
         {/* Why this question, now — tells a clarification apart from a fresh line of enquiry,
             which is otherwise invisible to the reader. */}
-        {question.rationale && (
-          <p className="mt-1 text-xs italic text-typography-500">{question.rationale}</p>
-        )}
+        {question.rationale &&
+          (compact ? (
+            <details className="mt-1 text-xs text-typography-500">
+              <summary className="cursor-pointer select-none hover:text-typography-700">
+                {strings.whyAsked}
+              </summary>
+              <p className="mt-1">{question.rationale}</p>
+            </details>
+          ) : (
+            <p className="mt-1 text-xs italic text-typography-500">{question.rationale}</p>
+          ))}
         {renderBody()}
       </Tile>
     </div>

@@ -27,6 +27,11 @@ vi.mock("../PrivateLayout", () => ({
     return <>{props.children}</>;
   },
 }));
+// The shell (sidebar, palette) has its own suite; here it is just the layout route's outlet.
+vi.mock("../AdminShell", async () => {
+  const { Outlet } = await import("react-router-dom");
+  return { AdminShell: () => <Outlet /> };
+});
 vi.mock("../PublicRoute", () => ({
   PublicRoute: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
@@ -44,6 +49,8 @@ vi.mock("@pages", () => ({
   CreateTrack: () => <div>CreateTrackPage</div>,
   CreateCase: () => <div>CreateCasePage</div>,
   BlogManagement: () => <div>BlogManagementPage</div>,
+  LandingPages: () => <div>LandingPagesPage</div>,
+  LandingPageEditor: () => <div>LandingPageEditorPage</div>,
   ProductUpdates: () => <div>ProductUpdatesPage</div>,
   Login: () => <div>LoginPage</div>,
   MagicLinkVerify: () => <div>MagicLinkVerifyPage</div>,
@@ -69,6 +76,11 @@ vi.mock("@pages", () => ({
   TooltipManagement: () => <div>TooltipManagementPage</div>,
   AgentTestCases: () => <div>AgentTestCasesPage</div>,
   DebriefConsole: () => <div>DebriefConsolePage</div>,
+  DebriefSessionPage: () => <div>DebriefSessionPage</div>,
+  AgentLogsPage: () => <div>AgentLogsPage</div>,
+  BugHunterV2ReportDetail: () => <div>BugHunterV2ReportDetailPage</div>,
+  PmAgentPage: () => <div>PmAgentPage</div>,
+  DebriefSettingsPage: () => <div>DebriefSettingsPage</div>,
   Competencies: () => <div>CompetenciesPage</div>,
   RoleplaySessionLogs: () => <div>RoleplaySessionLogsPage</div>,
   RoleplaySessionLogDetail: () => <div>RoleplaySessionLogDetailPage</div>,
@@ -76,16 +88,30 @@ vi.mock("@pages", () => ({
   Logs: () => <div>LogsPage</div>,
   MobileReleases: () => <div>MobileReleasesPage</div>,
   WhatsAppBot: () => <div>WhatsAppBotPage</div>,
-  ChatbotPage: () => <div>ChatbotPage</div>,
   Terms: () => <div>TermsPage</div>,
   Privacy: () => <div>PrivacyPage</div>,
   AILab: () => <div>AILabPage</div>,
   ProductRoadmap: () => <div>ProductRoadmapPage</div>,
+  RoadmapGate: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  RoadmapQueuePage: () => <div>RoadmapQueuePage</div>,
+  RoadmapProductUpdatesPage: () => <div>ProductUpdatesPage</div>,
+  RoadmapIdeaPage: () => <div>RoadmapIdeaPage</div>,
+  RoadmapDraftsPage: () => <div>RoadmapDraftsPage</div>,
+  RoadmapNewIdeaPage: () => <div>RoadmapNewIdeaPage</div>,
+  RoadmapFrame: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  // Pass-through: the redirect's own mapping is covered in pages/Roadmap/__tests__.
+  RoadmapLegacyRedirect: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  RoadmapAgentPage: () => <div>RoadmapAgentPage</div>,
+  RoadmapSettingsPage: () => <div>RoadmapSettingsPage</div>,
+  RoadmapMeasuresPage: () => <div>RoadmapMeasuresPage</div>,
+  RoadmapBugsPage: () => <div>RoadmapBugsPage</div>,
+  UserInterviewsPage: () => <div>UserInterviewsPage</div>,
   EvaluateLogin: () => <div>EvaluateLoginPage</div>,
   EvaluateRecords: () => <div>EvaluateRecordsPage</div>,
   EvaluateRecordDetail: () => <div>EvaluateRecordDetailPage</div>,
   BugHunter: () => <div>BugHunterPage</div>,
   Builder: () => <div>BuilderPage</div>,
+  PmAgentFeed: () => <div>PmAgentFeedPage</div>,
   BuilderRoom: () => <div>BuilderRoomPage</div>,
   BuilderSession: () => <div>BuilderSessionPage</div>,
   BuilderSettings: () => <div>BuilderSettingsPage</div>,
@@ -99,9 +125,66 @@ vi.mock("@pages", () => ({
   CourseCopilotSession: () => <div>CourseCopilotSessionPage</div>,
 }));
 
+// Onboarding pulls in the QR-code library; the router only needs the two entry components.
+vi.mock("../../pages/Onboarding", () => ({
+  OnboardingStart: () => <div>OnboardingStartPage</div>,
+  OnboardingSession: () => <div>OnboardingSessionPage</div>,
+}));
+
+// The assistant home (chunk 20d) stands in for its real page, which needs the store.
+vi.mock("../../pages/AssistantHome", () => ({
+  AssistantHome: () => <div>AssistantHomePage</div>,
+}));
 describe("RouteLayout", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("opens an assistant on its home, and an old ?view=classic link on the home too", () => {
+    for (const path of [
+      "/chatbots/bot-1",
+      "/chatbots/bot-1?view=classic",
+      "/chatbots/bot-1?view=classic&tab=usage",
+    ]) {
+      window.history.pushState({}, "", path);
+      const { unmount } = render(<RouteLayout />);
+      expect(screen.getByText("AssistantHomePage")).toBeInTheDocument();
+      unmount();
+    }
+  });
+
+  it("redirects old chatbot links to /assistants, keeping the section and query (A1)", () => {
+    for (const [from, to] of [
+      ["/chatbots", "/assistants"],
+      ["/chatbots/bot-1?section=lists&tool=memory", "/assistants/bot-1?section=lists&tool=memory"],
+      ["/chatbots/bot-1?section=conversations", "/assistants/bot-1?section=conversations"],
+      ["/whatsapp-bot", "/assistants"],
+    ]) {
+      window.history.pushState({}, "", from);
+      const { unmount } = render(<RouteLayout />);
+      expect(`${window.location.pathname}${window.location.search}`).toBe(to);
+      unmount();
+    }
+  });
+
+  it("opens an assistant at /assistants/:id edge to edge, inside the admin sidebar", () => {
+    privateLayoutCalls.props.length = 0;
+    window.history.pushState({}, "", "/assistants/bot-1?section=lists");
+    render(<RouteLayout />);
+    expect(screen.getByText("AssistantHomePage")).toBeInTheDocument();
+    const last = privateLayoutCalls.props.at(-1) as { shell?: string; fullBleed?: boolean };
+    expect(last.fullBleed).toBe(true);
+    expect(last.shell).toBeUndefined();
+  });
+
+  it("has no sign-up: /signup and /sign-up go to the login screen (A1)", () => {
+    for (const path of ["/signup", "/sign-up"]) {
+      window.history.pushState({}, "", path);
+      const { unmount } = render(<RouteLayout />);
+      expect(screen.getByText("LoginPage")).toBeInTheDocument();
+      expect(window.location.pathname).toBe(ROUTES.LOGIN);
+      unmount();
+    }
   });
 
   it("renders Login route", () => {
@@ -120,6 +203,36 @@ describe("RouteLayout", () => {
     window.history.pushState({}, "", ROUTES.SIMULATION_STUDIO);
     render(<RouteLayout />);
     expect(screen.getByText("RolePlaysPage")).toBeInTheDocument();
+  });
+
+  it("renders the landing pages list, gated on its toggle and permission", () => {
+    privateLayoutCalls.props.length = 0;
+    window.history.pushState({}, "", ROUTES.LANDING_PAGES);
+    render(<RouteLayout />);
+    expect(screen.getByText("LandingPagesPage")).toBeInTheDocument();
+    const gate = privateLayoutCalls.props.at(-1);
+    expect(gate?.requiredFeature).toBe(FeatureToggleKey.LANDING_PAGES);
+    expect(gate?.requiredPermissions).toEqual([Permissions.VIEW_LANDING_PAGES]);
+  });
+
+  it("opens one landing page in the editor, edge to edge, behind the same gate", () => {
+    privateLayoutCalls.props.length = 0;
+    window.history.pushState({}, "", "/landing-pages/abc-123");
+    render(<RouteLayout />);
+    expect(screen.getByText("LandingPageEditorPage")).toBeInTheDocument();
+    expect(screen.queryByText("LandingPagesPage")).not.toBeInTheDocument();
+    const gate = privateLayoutCalls.props.at(-1) as { fullBleed?: boolean };
+    expect(gate?.requiredFeature).toBe(FeatureToggleKey.LANDING_PAGES);
+    expect(gate?.requiredPermissions).toEqual([Permissions.VIEW_LANDING_PAGES]);
+    expect(gate?.fullBleed).toBe(true);
+  });
+
+  it("renders PM Agent at /pm-agent, gated on the pm_agent toggle", () => {
+    privateLayoutCalls.props.length = 0;
+    window.history.pushState({}, "", ROUTES.PM_AGENT);
+    render(<RouteLayout />);
+    expect(screen.getByText("PmAgentFeedPage")).toBeInTheDocument();
+    expect(privateLayoutCalls.props.at(-1)?.requiredFeature).toBe(FeatureToggleKey.PM_AGENT);
   });
 
   it("renders the Builder tab (Now · Rules · History) at /builder", () => {
@@ -202,6 +315,52 @@ describe("RouteLayout", () => {
     window.history.pushState({}, "", ROUTES.COURSE_COPILOT_SESSION("abc-123"));
     render(<RouteLayout />);
     expect(screen.getByText("CourseCopilotSessionPage")).toBeInTheDocument();
+  });
+
+  it("gates every Bug Hunter v2 route on the bug_hunter_v2_verdicts toggle", () => {
+    for (const [path, page] of [
+      [ROUTES.BUG_HUNTER_V2, "BugHunterPage"],
+      [ROUTES.BUG_HUNTER_V2_REPORT(7), "BugHunterV2ReportDetailPage"],
+    ] as const) {
+      privateLayoutCalls.props.length = 0;
+      window.history.pushState({}, "", path);
+      render(<RouteLayout />);
+      expect(screen.getByText(page)).toBeInTheDocument();
+      expect(privateLayoutCalls.props.at(-1)?.requiredFeature).toBe(
+        FeatureToggleKey.BUG_HUNTER_V2_VERDICTS,
+      );
+    }
+  });
+
+  // The old Bug Hunter's address now opens v2's page, keeping the query (a ?bug= link).
+  it("sends /bug-hunter to the Bug Hunter v2 page, query and all", () => {
+    window.history.pushState({}, "", `${ROUTES.BUG_HUNTER}?bucket=done`);
+    render(<RouteLayout />);
+    expect(screen.getByText("BugHunterPage")).toBeInTheDocument();
+    expect(window.location.pathname + window.location.search).toBe(
+      `${ROUTES.BUG_HUNTER_V2}?bucket=done`,
+    );
+  });
+
+  it("renders a run's Agent logs at /debriefs/sessions/:runId/logs, not the session route", () => {
+    window.history.pushState({}, "", ROUTES.DEBRIEF_SESSION_LOGS("r1"));
+    render(<RouteLayout />);
+    expect(screen.getByText("AgentLogsPage")).toBeInTheDocument();
+    expect(screen.queryByText("DebriefSessionPage")).not.toBeInTheDocument();
+  });
+
+  // CONSOLE_API "Roles": the Analytics toggle or the clinical advisor's toggle opens the console,
+  // as ally-be's DebriefRead allows; an advisor has only the second.
+  it("opens the Debrief console with the Analytics or the clinical-advisor toggle", () => {
+    for (const path of [ROUTES.DEBRIEFS, ROUTES.DEBRIEF_SESSION("r1")]) {
+      privateLayoutCalls.props.length = 0;
+      window.history.pushState({}, "", path);
+      render(<RouteLayout />);
+      expect(privateLayoutCalls.props.at(-1)?.requiredFeature).toEqual([
+        FeatureToggleKey.ANALYTICS,
+        FeatureToggleKey.DEBRIEF_CLINICAL_SIGN_OFF,
+      ]);
+    }
   });
 
   describe("Ally Console route", () => {
@@ -297,9 +456,13 @@ describe("RouteLayout", () => {
     expect(screen.getByText("DefaultRedirectPage")).toBeInTheDocument();
   });
 
-  it("redirects unknown route to Simulation Studio", () => {
+  it("shows a 404 with a link home for an unknown route, instead of redirecting", () => {
     window.history.pushState({}, "", "/unknown-path");
     render(<RouteLayout />);
-    expect(screen.getByText("RolePlaysPage")).toBeInTheDocument();
+    expect(screen.queryByText("RolePlaysPage")).not.toBeInTheDocument();
+    expect(screen.getByTestId("admin-not-found")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Go to your home page" })).toHaveAttribute("href", "/");
+    expect(window.location.pathname).toBe("/unknown-path");
+    expect(document.title).toBe("Page not found · Ally Admin");
   });
 });

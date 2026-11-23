@@ -1,0 +1,134 @@
+{
+  "language": "en-IN",
+  "writer_model": "gemini-3-flash-preview",
+  "scenario": "A father is exhausted and ashamed because he shouted at his ten-year-old son; he wants to be a calmer parent but does not know how.",
+  "transcript": [
+    {
+      "turn_index": 1,
+      "role": "counselor",
+      "text": "Hello. You seem a bit troubled today. How are you feeling?"
+    },
+    {
+      "turn_index": 2,
+      "role": "client",
+      "text": "Yes, counsellor. I'm quite upset with myself. I shouted at my son again, you see."
+    },
+    {
+      "turn_index": 3,
+      "role": "counselor",
+      "text": "It sounds like you're feeling a lot of regret and self-blame after that incident. Can you tell me more about what happened?"
+    },
+    {
+      "turn_index": 4,
+      "role": "client",
+      "text": "He just wasn't listening, and I lost my temper. I feel so ashamed, he's just ten years old. What kind of father am I?"
+    },
+    {
+      "turn_index": 5,
+      "role": "counselor",
+      "text": "You're feeling a deep sense of shame and questioning your role as a father. It must be very difficult to experience that. What impact does this have on you?"
+    },
+    {
+      "turn_index": 6,
+      "role": "client",
+      "text": "I feel so exhausted, always on edge. I want to be a calmer parent, but I just don't know how to control myself in those moments."
+    },
+    {
+      "turn_index": 7,
+      "role": "counselor",
+      "text": "It's clear you're really struggling with managing your reactions and want to be calmer. Maybe you could try taking a few deep breaths when you feel your anger rising?"
+    },
+    {
+      "turn_index": 8,
+      "role": "client",
+      "text": "I've tried that, but it's like the anger just takes over. It's not that easy, you know? I just feel stuck."
+    },
+    {
+      "turn_index": 9,
+      "role": "counselor",
+      "text": "You're feeling stuck and that your efforts haven't worked. What usually happens right before you lose your temper?"
+    },
+    {
+      "turn_index": 10,
+      "role": "client",
+      "text": "He ignores me, or makes a mess, and I just snap. It's become a pattern, and I feel helpless to break it."
+    },
+    {
+      "turn_index": 11,
+      "role": "counselor",
+      "text": "So, you're feeling quite helpless about breaking this pattern, aren't you? Have you tried talking to your son about it afterwards?"
+    },
+    {
+      "turn_index": 12,
+      "role": "client",
+      "text": "Yes, we do talk, and I apologise. But it keeps happening. I just wish I knew how to stop it before it starts."
+    }
+  ],
+  "cards": {
+    "opening": "You did a good job of creating a safe space for the client to share their feelings of shame and frustration regarding their parenting. Your use of empathy and open-ended questions helped them open up about their struggles.",
+    "important_moment": null,
+    "what_worked": [
+      {
+        "skill": "Deepening empathy",
+        "turn_index": 5,
+        "quote": "You're feeling a deep sense of shame and questioning your role as a father. It must be very difficult to experience that. What impact does this have on you?",
+        "lead": "You showed a strong ability to connect with the client's emotional state.",
+        "body": "By acknowledging their shame and questioning of their role as a father, you validated their internal struggle. This deepened the conversation and encouraged the client to look at the impact their feelings have on them."
+      },
+      {
+        "skill": "Exploring triggers and patterns",
+        "turn_index": 9,
+        "quote": "What usually happens right before you lose your temper?",
+        "lead": "You moved the conversation forward effectively by asking about the sequence of events.",
+        "body": "Shifting the focus to what happens right before the anger starts allowed the client to identify a clear pattern. This is a crucial step in helping them understand the root of their reactions."
+      }
+    ],
+    "work_on_this": [
+      {
+        "skill": "Avoid giving premature advice",
+        "turn_index": 7,
+        "quote": "Maybe you could try taking a few deep breaths when you feel your anger rising?",
+        "lead": "It is tempting to offer solutions quickly, but it can sometimes feel dismissive to a client.",
+        "why": "Suggesting a technique like deep breathing before the client felt fully heard led to them rejecting the idea and feeling stuck.",
+        "try_saying": "What have you already tried when you feel that anger starting to build up?",
+        "scenario_id": null
+      }
+    ],
+    "practise_next": {
+      "skill": "Avoid giving premature advice",
+      "reason": "Staying with the client's experience a bit longer before moving to solutions can help build a deeper understanding and ensure they feel supported.",
+      "scenario_id": null,
+      "try_next": null
+    },
+    "skill_words": [
+      {
+        "skill": "Reflecting feelings",
+        "word": "strength"
+      },
+      {
+        "skill": "Asking open-ended questions",
+        "word": "strength"
+      },
+      {
+        "skill": "Deepening empathy",
+        "word": "strength"
+      },
+      {
+        "skill": "Avoid giving premature advice",
+        "word": "keep_practising"
+      },
+      {
+        "skill": "Exploring triggers and patterns",
+        "word": "strength"
+      },
+      {
+        "skill": "Summarizing",
+        "word": "strength"
+      }
+    ],
+    "skill_labels": [],
+    "reflective_question": "How can you tell when someone feels heard enough to start looking for solutions?",
+    "progress_note": null
+  },
+  "rule_checks": "passed"
+}

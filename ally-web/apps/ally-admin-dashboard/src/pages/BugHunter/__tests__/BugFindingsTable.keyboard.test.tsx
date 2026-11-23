@@ -16,7 +16,6 @@ vi.mock("@api", () => ({
   // Only consulted for the run-scope banner's wording, and skipped entirely
   // while no `?run=` is set — but the hook is still called on every render, so
   // the mock has to exist or the table throws before it draws a row.
-  useGetBugHuntRunQuery: () => ({ data: undefined }),
 }));
 
 vi.mock("@assets", () => ({ TooltipIcon: () => <svg data-testid="tooltip-icon" /> }));

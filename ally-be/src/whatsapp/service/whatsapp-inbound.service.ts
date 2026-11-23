@@ -1,4 +1,6 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { usageContext } from 'src/billing/context/usage-context';
+import { UsageChannel, UsageKind } from 'src/billing/enum/billing.enum';
+import { Injectable, Inject, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { IsNull, Repository } from 'typeorm';
@@ -32,7 +34,7 @@ import { WhatsAppRateLimitService } from './whatsapp-rate-limit.service';
 import { ChatbotSettingsService } from 'src/chatbot/service/chatbot-settings.service';
 import { ChatbotReplyService } from 'src/chatbot/service/chatbot-reply.service';
 import { Chatbot } from 'src/chatbot/entity/chatbot.entity';
-import { isFallback } from 'src/chatbot/engine/agent-runtime';
+import { isFailedRun } from 'src/chatbot/engine/agent-runtime';
 import {
   AGENT_FALLBACK_EVENT,
   type AgentFallbackEvent,
@@ -41,11 +43,16 @@ import type {
   AgentRunRef,
   ChatbotDecision,
 } from 'src/chatbot/engine/chatbot-engine.types';
-import { ChatbotStatus } from 'src/chatbot/enum/chatbot.enum';
+import { AgentRuntimeUsed, ChatbotStatus } from 'src/chatbot/enum/chatbot.enum';
+import { MemoryService } from 'src/chatbot/memory/memory.service';
+import { SummaryService } from 'src/chatbot/memory/summary.service';
 import { ChatbotEngineService } from 'src/chatbot/engine/chatbot-engine.service';
+import { HandoverService } from 'src/chatbot/handover/handover.service';
+import { ConversationService } from 'src/chatbot/service/conversation.service';
 import { ConnectorService } from 'src/chatbot/service/connector.service';
 import { withFirstMessageParts } from 'src/chatbot/engine/first-reply';
 import { MAX_HISTORY_MESSAGES } from 'src/chatbot/engine/knowledge-request';
+import { WaSharedStoreWriter } from '../shared-store/wa-shared-store.writer';
 
 /**
  * Opt-out / opt-in words, recognised in code regardless of what templates exist.
@@ -149,6 +156,20 @@ export class WhatsAppInboundService {
     @InjectRepository(Chatbot)
     private readonly chatbotRepository: Repository<Chatbot>,
     private readonly eventEmitter: EventEmitter2,
+    /**
+     * The shared conversation store's dual-write (chunk 12). Optional so a module built without it
+     * — every spec that predates it — behaves exactly as before.
+     */
+    @Optional() private readonly sharedStore?: WaSharedStoreWriter,
+    /**
+     * The inbox (chunk 11a): who holds a chat, and what happens after each decision. Optional for
+     * the same reason: without them no chat is held and nothing changes.
+     */
+    @Optional() private readonly handover?: HandoverService,
+    @Optional() private readonly conversations?: ConversationService,
+    /** Memory, light (chunk 8a): applied after the reply's copy reaches the shared store. */
+    @Optional() private readonly memory?: MemoryService,
+    @Optional() private readonly summaries?: SummaryService,
   ) {}
 
   async handle(inbound: InboundWhatsAppMessage): Promise<void> {
@@ -218,6 +239,9 @@ export class WhatsAppInboundService {
           status: WaMessageStatus.PROCESSING,
         },
       );
+      // Copied to the shared store in the background. Awaited only when history is read from
+      // there, and then for a capped time (see recentHistory).
+      const sharedCopy = this.sharedStore?.mirrorInbound(settings, inboundId);
 
       if (contact.blockedAt) {
         // Silently. Telling an abuser precisely when they were blocked mostly teaches them to
@@ -263,18 +287,24 @@ export class WhatsAppInboundService {
       );
       if (consentHandled) return;
 
-      // Every path from here replies — a keyword reply at once, the others after a model call.
-      // Placed HERE and no earlier because Meta's guidance is to show typing only when a reply is
-      // coming: the silent exits above (opted out, blocked, rate-limited) must not leave a bubble
-      // that never resolves. Not awaited, so it never delays the reply.
-      void this.showTyping(
-        inbound.providerMessageId,
-        inbound.text,
-        contact.locale,
-        chatbot.id,
-        settings,
-        number.creds,
-      );
+      // Every path from here replies — a keyword reply at once, the others after a model call —
+      // unless a team member has the chat (chunk 11a), when only a crisis reply goes out, so no
+      // typing dots. Placed HERE and no earlier because Meta's guidance is to show typing only when
+      // a reply is coming: the silent exits above (opted out, blocked, rate-limited) must not leave
+      // a bubble that never resolves. Not awaited, so it never delays the reply.
+      const heldByPerson =
+        ((await this.conversations
+          ?.holderOf(conversation.id)
+          .catch(() => null)) ?? null) !== null;
+      if (!heldByPerson)
+        void this.showTyping(
+          inbound.providerMessageId,
+          inbound.text,
+          contact.locale,
+          chatbot.id,
+          settings,
+          number.creds,
+        );
 
       // ── 6. Identity ──────────────────────────────────────────────────────
       // Who is asking, for the bot's "who can chat" list and per-organisation knowledge.
@@ -293,12 +323,16 @@ export class WhatsAppInboundService {
         });
 
       // ── 7. The bot decides ───────────────────────────────────────────────
-      const decision = await this.engine.respond({
+      let decision = await this.engine.respond({
         chatbot,
         settings,
         text: inbound.text,
         language: contact.locale,
-        history: await this.recentHistory(conversation.id),
+        history: await this.recentHistory(
+          conversation.id,
+          settings,
+          sharedCopy,
+        ),
         isFirstMessage: contact.messageCount === 1,
         sender: {
           externalId: contact.phoneE164,
@@ -314,7 +348,34 @@ export class WhatsAppInboundService {
         // The Agents v2 run's thread and the message its run id is derived from.
         conversationId: conversation.id,
         providerMessageId: inbound.providerMessageId,
+        // The shared store's contact, for the run token (chunk 6): list tools act for this person.
+        contactId:
+          (await this.sharedStore?.contactIdFor(
+            settings,
+            contact,
+            chatbot.id,
+          )) ?? null,
       });
+
+      // A team member has this chat (chunk 11a): the engine didn't answer, so nothing is sent.
+      // The message is kept for the team, and the inbox is told.
+      if (decision.held) {
+        await this.messageRepository.update(
+          { id: inboundId },
+          { status: WaMessageStatus.RECEIVED, handledBy: WaHandledBy.HELD },
+        );
+        void this.sharedStore?.sync([inboundId], inboundId);
+        await this.handover?.afterDecision(chatbot, conversation.id, decision);
+        return;
+      }
+      // Safety, Needs a person, and a second "I don't know" becoming the hand-over message.
+      if (this.handover) {
+        decision = await this.handover.afterDecision(
+          chatbot,
+          conversation.id,
+          decision,
+        );
+      }
 
       // ── 8. Send and record ───────────────────────────────────────────────
       // A person's first hello also gets the first-message notice after the welcome message.
@@ -340,7 +401,7 @@ export class WhatsAppInboundService {
           { lastLanguage: decision.language },
         );
       }
-      await this.reply(
+      const copied = await this.reply(
         identified,
         conversation,
         inboundId,
@@ -355,6 +416,7 @@ export class WhatsAppInboundService {
           agent: decision.agent,
         },
       );
+      void this.afterReply(chatbot, conversation.id, decision, copied.copied);
       if (decision.unanswered) {
         await this.recordUnanswered(
           inboundId,
@@ -378,6 +440,7 @@ export class WhatsAppInboundService {
         { id: inboundId },
         { status: WaMessageStatus.FAILED, errorMessage: message },
       );
+      void this.sharedStore?.sync([inboundId], inboundId);
     }
   }
 
@@ -547,7 +610,7 @@ export class WhatsAppInboundService {
     chatbot: Pick<Chatbot, 'id' | 'name'>,
     decision: Pick<ChatbotDecision, 'agent'>,
   ): void {
-    if (isFallback(decision.agent)) {
+    if (isFailedRun(decision.agent)) {
       this.eventEmitter.emit(AGENT_FALLBACK_EVENT, {
         chatbot: { id: chatbot.id, name: chatbot.name },
         reason: decision.agent.fallbackReason,
@@ -600,7 +663,15 @@ export class WhatsAppInboundService {
 
   private async recentHistory(
     conversationId: string,
+    settings?: WhatsAppBotSettings,
+    sharedCopy?: Promise<boolean>,
   ): Promise<{ role: string; content: string }[]> {
+    // `readHistoryFrom: shared` (chunk 12): the same history from the shared store, once this
+    // message's copy has landed; otherwise, or on any failure, from wa_messages as always.
+    if (settings && sharedCopy && this.sharedStore?.readsShared(settings)) {
+      const shared = await this.sharedStore.history(conversationId, sharedCopy);
+      if (shared) return shared;
+    }
     const rows = await this.messageRepository.find({
       where: { conversationId },
       order: { createdAt: 'DESC' },
@@ -721,7 +792,7 @@ export class WhatsAppInboundService {
       /** The Agents v2 run behind this reply; v1 replies leave the run columns unset. */
       agent?: AgentRunRef;
     } = {},
-  ): Promise<void> {
+  ): Promise<{ copied: Promise<boolean> | undefined }> {
     const outbound = await this.messageRepository.save(
       this.messageRepository.create({
         conversationId: conversation.id,
@@ -865,6 +936,54 @@ export class WhatsAppInboundService {
         },
       );
     }
+
+    // After the send, in the background: both rows' final state to the shared store. Returned so
+    // memory (chunk 8a) can wait for the copy; callers that don't need it don't await it.
+    // Wrapped, so returning it never makes this method wait for the copy.
+    return {
+      copied: this.sharedStore?.sync([inReplyToId, outbound.id], inReplyToId),
+    };
+  }
+
+  /**
+   * Memory, light (chunk 8a), once the reply's copy is in the shared store: what the run asked to
+   * remember, decided from the stored reply, and the chat's rolling summary. Never throws; nobody
+   * waits for it.
+   */
+  private async afterReply(
+    chatbot: Chatbot,
+    conversationId: string,
+    decision: Pick<ChatbotDecision, 'agent'>,
+    copied: Promise<boolean> | undefined,
+  ): Promise<void> {
+    if (!copied || (!this.memory && !this.summaries)) return;
+    const repliedAt = Date.now();
+    try {
+      if (!(await copied)) return;
+      await usageContext.run(
+        {
+          channel: UsageChannel.WHATSAPP,
+          runKind: UsageKind.CUSTOMER_REPLY,
+          chatbotId: chatbot.id,
+        },
+        () =>
+          Promise.all([
+            this.memory?.afterTurn({
+              chatbot,
+              conversationId,
+              runId: decision.agent?.runId,
+              pending:
+                decision.agent?.runtime === AgentRuntimeUsed.V2
+                  ? decision.agent.memory
+                  : undefined,
+              repliedAt,
+            }),
+            this.summaries?.afterTurn(chatbot, conversationId),
+          ]),
+      );
+    } catch {
+      // Each step logs its own failure; the reply has already gone out.
+    }
   }
 
   private async discard(messageId: string, reason: string): Promise<void> {
@@ -873,6 +992,7 @@ export class WhatsAppInboundService {
       { id: messageId },
       { status: WaMessageStatus.DISCARDED, errorMessage: reason },
     );
+    void this.sharedStore?.sync([messageId], messageId);
   }
 
   private async recordUnanswered(

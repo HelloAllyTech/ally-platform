@@ -109,7 +109,12 @@ void main() {
       builder: (context, state) {
         final extra = state.extra as Map<String, Object?>;
         return Scaffold(
-          body: TextButton(onPressed: () => context.pop(), child: Text('ROLEPLAY:${extra['scenarioSessionId']}')),
+          body: Column(
+            children: [
+              TextButton(onPressed: () => context.pop(), child: Text('ROLEPLAY:${extra['scenarioSessionId']}')),
+              Text('COURSE_CONTEXT:${extra['trackId']}:${extra['trackItemId']}'),
+            ],
+          ),
         );
       },
     ),
@@ -147,6 +152,8 @@ void main() {
 
     verify(() => sims.startScenarioSession(scenarioId: 7, trackItemProgressId: 'tip-1')).called(1);
     expect(find.text('ROLEPLAY:sess-7'), findsOneWidget);
+    // The course and item go with it, so its Feedback returns to the course.
+    expect(find.text('COURSE_CONTEXT:track-1:rp'), findsOneWidget);
 
     await tester.tap(find.text('ROLEPLAY:sess-7'));
     await tester.pumpAndSettle();
@@ -325,5 +332,87 @@ void main() {
         trackItemProgressId: any(named: 'trackItemProgressId'),
       ),
     );
+  });
+
+  StartItemPayload turnAssessmentPayload({
+    String? submittedAt,
+    Map<String, Object?> assessment = const {},
+    Map<String, Object?>? lastAttempt,
+  }) => StartItemPayload.fromJson({
+    'trackItemProgressId': 'tip-1',
+    'type': 'ROLEPLAY',
+    'scenarioId': 7,
+    'completionCriteria': {'assessmentMode': true},
+    'assessmentSubmittedAt': submittedAt,
+    'lastRoleplayAttempt': lastAttempt,
+    'assessment': {'phase': 'PRE', 'requiredTurns': 10, ...assessment},
+  });
+
+  testWidgets('turn assessment: intro names the turn minimum and launch stays enabled', (tester) async {
+    when(() => courses.startTrackItem('rp')).thenAnswer((_) async => turnAssessmentPayload());
+
+    await pumpPlayer(tester);
+
+    expect(
+      find.text("This is an assessment. You get one attempt, and it counts once you've taken at least 10 turns."),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('roleplay-assessment-notice')), findsNothing);
+    expect(find.byKey(const Key('roleplay-case-launch')), findsOneWidget);
+  });
+
+  testWidgets('turn assessment: a short attempt shows the notice and the learner can restart', (tester) async {
+    when(() => courses.startTrackItem('rp')).thenAnswer(
+      (_) async => turnAssessmentPayload(
+        lastAttempt: {'failureReasons': ['INSUFFICIENT_TURNS'], 'learnerTurns': 4, 'requiredTurns': 10},
+      ),
+    );
+
+    await pumpPlayer(tester);
+
+    expect(
+      find.text("That attempt was too short to count (4 of 10 turns). Start again when you're ready."),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('roleplay-case-launch')), findsOneWidget);
+  });
+
+  testWidgets('post assessment with an unsubmitted pre is locked and cannot launch', (tester) async {
+    when(() => courses.startTrackItem('rp')).thenAnswer(
+      (_) async => turnAssessmentPayload(
+        assessment: {
+          'phase': 'POST',
+          'preAssessment': {'title': 'Baseline', 'submitted': false},
+        },
+      ),
+    );
+
+    await pumpPlayer(tester);
+
+    expect(find.text('Complete the pre-assessment, Baseline, first.'), findsOneWidget);
+    await tester.tap(find.text('Role play item').last);
+    await tester.pumpAndSettle();
+    verifyNever(
+      () => sims.startScenarioSession(
+        scenarioId: any(named: 'scenarioId'),
+        trackItemProgressId: any(named: 'trackItemProgressId'),
+      ),
+    );
+  });
+
+  testWidgets('submitted assessment with results hidden says Submitted and shows no score', (tester) async {
+    when(() => courses.startTrackItem('rp')).thenAnswer(
+      (_) async => turnAssessmentPayload(
+        submittedAt: '2026-11-19T10:00:00Z',
+        assessment: {'resultsHidden': true, 'showResults': false},
+      ),
+    );
+
+    await pumpPlayer(tester);
+
+    expect(find.text('Submitted. Your trainer will review your results.'), findsOneWidget);
+    expect(find.byKey(const Key('roleplay-assessment-results-hidden')), findsOneWidget);
+    expect(find.byKey(const Key('roleplay-assessment-submitted')), findsNothing);
+    expect(find.byKey(const Key('roleplay-case-launch')), findsNothing);
   });
 }

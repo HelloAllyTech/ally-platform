@@ -1,0 +1,112 @@
+{
+ "issues": [
+  {
+   "file": "src/database/db.logger.ts",
+   "owners": [],
+   "binaries": [],
+   "catalog": [],
+   "catalogReferences": [],
+   "dependencies": [],
+   "devDependencies": [],
+   "duplicates": [],
+   "enumMembers": [],
+   "exports": [],
+   "files": [
+    {
+     "name": "src/database/db.logger.ts"
+    }
+   ],
+   "namespaceMembers": [],
+   "optionalPeerDependencies": [],
+   "types": [],
+   "unlisted": [],
+   "unresolved": []
+  },
+  {
+   "file": "src/bug-hunter/enum/bug-finding.enum.ts",
+   "owners": [],
+   "binaries": [],
+   "catalog": [],
+   "catalogReferences": [],
+   "dependencies": [],
+   "devDependencies": [],
+   "duplicates": [
+    [
+     {
+      "name": "BUG_FINDING_FIX_SESSION_START_STATUSES",
+      "line": 230,
+      "col": 14,
+      "pos": 10871
+     },
+     {
+      "name": "BUG_FINDING_LOCATE_STATUSES",
+      "line": 252,
+      "col": 14,
+      "pos": 11920
+     },
+     {
+      "name": "BUG_FINDING_DESCRIPTION_EDITABLE_STATUSES",
+      "line": 273,
+      "col": 14,
+      "pos": 13002
+     }
+    ]
+   ],
+   "enumMembers": [],
+   "exports": [
+    {
+     "name": "BUG_FINDING_PARENT_STATUSES",
+     "line": 169,
+     "col": 14,
+     "pos": 8030
+    }
+   ],
+   "files": [],
+   "namespaceMembers": [],
+   "optionalPeerDependencies": [],
+   "types": [
+    {
+     "name": "BugFindingStatusFilter",
+     "line": 282,
+     "col": 13,
+     "pos": 13310
+    }
+   ],
+   "unlisted": [],
+   "unresolved": []
+  },
+  {
+   "file": "src/audio-ingest/type/ozonetel.type.ts",
+   "owners": [],
+   "binaries": [],
+   "catalog": [],
+   "catalogReferences": [],
+   "dependencies": [],
+   "devDependencies": [],
+   "duplicates": [],
+   "enumMembers": [
+    {
+     "namespace": "OzonetelCallAction",
+     "name": "Calling",
+     "line": 67,
+     "col": 3,
+     "pos": 1537
+    },
+    {
+     "namespace": "OzonetelEventTypes",
+     "name": "Agent",
+     "line": 74,
+     "col": 3,
+     "pos": 1667
+    }
+   ],
+   "exports": [],
+   "files": [],
+   "namespaceMembers": [],
+   "optionalPeerDependencies": [],
+   "types": [],
+   "unlisted": [],
+   "unresolved": []
+  }
+ ]
+}

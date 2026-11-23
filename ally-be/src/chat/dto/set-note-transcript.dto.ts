@@ -1,4 +1,11 @@
-import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+  MaxLength,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 // Generous upper bound: a long dictation (or several accumulated recordings)
@@ -15,4 +22,17 @@ export class SetNoteTranscriptDto {
   @IsNotEmpty()
   @MaxLength(MAX_TRANSCRIPT_CHARS)
   transcript!: string;
+
+  @ApiProperty({
+    required: false,
+    description:
+      "Length, in seconds, of the dictation just recorded (not the note's " +
+      'accumulated total across earlier sessions) — added to the stored ' +
+      "call duration, which a manual note's startedAt/endedAt (both set to " +
+      'the instant the note was created) otherwise always compute as zero.',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  durationSeconds?: number;
 }

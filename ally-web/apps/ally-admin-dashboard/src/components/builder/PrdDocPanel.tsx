@@ -18,14 +18,12 @@ import { BuilderChatMessage, BuilderPrdDocument, BuilderPrdReadiness } from "@ty
 import { asAgentText, asAgentTextList } from "@utils";
 
 import { CitedText, citationMarkdownComponents, linkCitations } from "../context-citation";
+import { PrdCoverageList } from "./PrdCoverageList";
 import { downloadPrdMarkdown, downloadPrdPdf, PrdExportMeta } from "./prdExport";
+import { PrdPrincipleMarks } from "./PrdPrincipleMarks";
 import { PrdReviewFindings } from "./PrdReviewFindings";
 import { ReadinessRing } from "./ReadinessRing";
-import {
-  BUILDER_DURATION,
-  BUILDER_EASING,
-  prefersReducedMotion,
-} from "../../pages/Builder/builderMotion";
+import { BUILDER_DURATION, BUILDER_EASING, prefersReducedMotion } from "../../motion/builderMotion";
 
 /**
  * Every list in this panel is written by the agent, so none of it can be
@@ -352,6 +350,8 @@ export const PrdDocPanel: React.FC<PrdDocPanelProps> = ({
           editable={editable}
           onDismiss={onDismissFinding}
         />
+        <PrdCoverageList prd={prd} assessed={readinessByKey.has("coverage")} />
+        <PrdPrincipleMarks prd={prd} readiness={readiness} />
 
         {PROSE_SECTIONS.map(key => {
           const stringKey = String(key);

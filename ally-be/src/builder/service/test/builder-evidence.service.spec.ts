@@ -19,7 +19,7 @@ describe('BuilderEvidenceService', () => {
     new BuilderEvidenceService(
       (over.analytics ?? { ask: jest.fn() }) as never,
       (over.logs ?? { getLogEvents: jest.fn() }) as never,
-      (over.findings ?? { listOpenForRepo: jest.fn() }) as never,
+      (over.findings ?? { openBugs: jest.fn() }) as never,
       (over.uxSignals ?? { frictionEvidence: jest.fn() }) as never,
     );
 
@@ -140,7 +140,7 @@ describe('BuilderEvidenceService', () => {
   describe('openFindings', () => {
     it('returns a compact row per finding, not the whole entity', async () => {
       const findings = {
-        listOpenForRepo: jest.fn().mockResolvedValue([
+        openBugs: jest.fn().mockResolvedValue([
           {
             id: 'f1',
             repo: 'ally-be',
@@ -175,7 +175,7 @@ describe('BuilderEvidenceService.uxSignals', () => {
     new BuilderEvidenceService(
       { ask: jest.fn() } as never,
       { getLogEvents: jest.fn() } as never,
-      { listOpenForRepo: jest.fn() } as never,
+      { openBugs: jest.fn() } as never,
       uxSignals as never,
     );
 

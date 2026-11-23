@@ -8,6 +8,9 @@ import 'package:ally_mobile_flutter/core/permissions/permissions_repository.dart
 import 'package:ally_mobile_flutter/core/permissions/user_permissions.dart';
 import 'package:ally_mobile_flutter/core/routing/app_router.dart';
 import 'package:ally_mobile_flutter/core/widgets/ask_ai_chat/ask_ai_chat.dart';
+import 'package:ally_mobile_flutter/features/courses/data/course_models.dart';
+import 'package:ally_mobile_flutter/features/courses/data/courses_repository.dart';
+import 'package:ally_mobile_flutter/features/courses/presentation/course_item_player_screen.dart' show CourseItemPlayerArgs;
 import 'package:ally_mobile_flutter/features/reactions/data/reactions_repository.dart';
 import 'package:ally_mobile_flutter/features/reviews/data/review_models.dart';
 import 'package:ally_mobile_flutter/features/reviews/data/reviews_repository.dart';
@@ -33,6 +36,8 @@ class MockReactionsRepository extends Mock implements ReactionsRepository {}
 class MockAskAiChatApi extends Mock implements AskAiChatApi {}
 
 class MockLearnerDebriefRepository extends Mock implements LearnerDebriefRepository {}
+
+class MockCoursesRepository extends Mock implements CoursesRepository {}
 
 const allPermissions = [
   UserPermissions.viewSessionScenarioMessages,
@@ -99,8 +104,15 @@ class FeedbackHarness {
     // Roleplay Logs asks for the supervisor's view; most orgs aren't on it.
     when(() => learnerDebrief.getSupervisorDebrief(any()))
         .thenAnswer((_) async => const LearnerDebriefView(state: LearnerDebriefState.notAvailable));
+    when(() => courses.getLearnTrackDetail(any())).thenAnswer(
+      (invocation) async => TrackDetail.fromJson({
+        'id': invocation.positionalArguments.first as String,
+        'title': 'Listening skills',
+      }),
+    );
     when(() => learnerDebrief.markRead(any())).thenAnswer((_) async {});
     when(() => learnerDebrief.markOpened(any())).thenAnswer((_) async {});
+    when(() => learnerDebrief.recordEvent(any(), any())).thenAnswer((_) async {});
     when(() => simulations.getEventChecklist(any())).thenAnswer((_) async => <EventChecklistItem>[]);
     when(
       () => simulations.addSimulationFeedback(
@@ -118,6 +130,7 @@ class FeedbackHarness {
   final reactions = MockReactionsRepository();
   final chatApi = MockAskAiChatApi();
   final learnerDebrief = MockLearnerDebriefRepository();
+  final courses = MockCoursesRepository();
 
   /// `GET /scenario-session-reviews/:id` (the share switch reads it).
   void stubReview({String status = 'IN_REVIEW', String createdAt = '2026-01-01T10:10:00.000Z'}) {
@@ -140,8 +153,11 @@ class FeedbackHarness {
   Future<GoRouter> pump(
     WidgetTester tester, {
     bool fromLogs = false,
+    bool ownSession = false,
     String? pathId,
     String? caseId,
+    String? trackId,
+    String? trackItemId,
     List<String> permissions = allPermissions,
     List<Override> overrides = const [],
   }) {
@@ -155,9 +171,26 @@ class FeedbackHarness {
           builder: (context, state) => SimulationFeedbackScreen(
             scenarioSessionId: 'session-1',
             fromLogs: fromLogs,
+            ownSession: ownSession,
             pathId: pathId,
             caseId: caseId,
+            trackId: trackId,
+            trackItemId: trackItemId,
           ),
+        ),
+        GoRoute(
+          path: '/courses/item/:itemId',
+          builder: (context, state) {
+            final extra = state.extra;
+            final trackId = extra is CourseItemPlayerArgs
+                ? extra.trackId
+                : (extra as ({String trackId, TrackDetailItem item})).trackId;
+            return Text('COURSE_ITEM:$trackId:${state.pathParameters['itemId']}');
+          },
+        ),
+        GoRoute(
+          path: '/courses/:trackId',
+          builder: (context, state) => Text('COURSE:${state.pathParameters['trackId']}'),
         ),
         GoRoute(
           path: '/simulation-paths/:pathId',
@@ -171,7 +204,10 @@ class FeedbackHarness {
         GoRoute(path: '/simulations', builder: (context, state) => const Text('SIMULATIONS_LIST')),
         GoRoute(
           path: '/simulations/:scenarioId',
-          builder: (context, state) => Text('SIMULATION_DETAILS:${state.pathParameters['scenarioId']}'),
+          builder: (context, state) => Text(
+            'SIMULATION_DETAILS:${state.pathParameters['scenarioId']}'
+            '${state.uri.queryParameters['trackId'] == null ? '' : ':track=${state.uri.queryParameters['trackId']}'}',
+          ),
         ),
         GoRoute(
           path: '/reviews/:reviewId',
@@ -196,6 +232,7 @@ class FeedbackHarness {
         reactionsRepositoryProvider.overrideWithValue(reactions),
         askAiChatApiProvider.overrideWithValue(chatApi),
         learnerDebriefRepositoryProvider.overrideWithValue(learnerDebrief),
+        coursesRepositoryProvider.overrideWithValue(courses),
         userPermissionsProvider.overrideWith((ref) async => permissions),
         ...overrides,
       ],
@@ -205,4 +242,5 @@ class FeedbackHarness {
 
 void registerFeedbackFallbacks() {
   registerFallbackValue(<String>[]);
+  registerFallbackValue(DebriefLearnerEvent.waited);
 }

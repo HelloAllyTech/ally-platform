@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ProductPlanningModule } from 'src/product-planning/product-planning.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { RoadmapVotingAnalyticsRepository } from 'src/analytics/repository/roadmap-voting-analytics.repository';
@@ -10,13 +11,16 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
 import { PromptModule } from 'src/prompt/prompt.module';
 
 import { ProductUpdatesController } from './controller/product-updates.controller';
+import { ProductUpdateDigestRecipient } from './entity/product-update-digest-recipient.entity';
 import { ProductUpdateSource } from './entity/product-update-source.entity';
 import { ProductUpdate } from './entity/product-update.entity';
+import { ProductUpdateDigestRecipientRepository } from './repository/product-update-digest-recipient.repository';
 import { ProductUpdateSourceRepository } from './repository/product-update-source.repository';
 import { ProductUpdateRepository } from './repository/product-update.repository';
 import { ProductUpdateConsolidationService } from './service/product-update-consolidation.service';
 import { ProductUpdateDigestService } from './service/product-update-digest.service';
 import { ProductUpdateIngestService } from './service/product-update-ingest.service';
+import { ProductUpdateRecipientsService } from './service/product-update-recipients.service';
 import { ProductUpdateLivenessService } from './service/product-update-liveness.service';
 import { ProductUpdatePipelineService } from './service/product-update-pipeline.service';
 import { ProductUpdatesAiService } from './service/product-updates-ai.service';
@@ -33,17 +37,27 @@ import { ProductUpdatesService } from './service/product-updates.service';
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([ProductUpdate, ProductUpdateSource]),
+    TypeOrmModule.forFeature([
+      ProductUpdate,
+      ProductUpdateSource,
+      ProductUpdateDigestRecipient,
+    ]),
     ChangelogModule,
     GithubModule,
     PromptModule,
     LlmAgentModule,
     AwsModule,
+    // The weekly "Your ideas this week" email reads the Roadmap through
+    // RoadmapDigestFeedService. ProductPlanningModule depends on entities
+    // only, so this closes no cycle.
+    ProductPlanningModule,
   ],
   controllers: [ProductUpdatesController],
   providers: [
     ProductUpdateRepository,
     ProductUpdateSourceRepository,
+    ProductUpdateDigestRecipientRepository,
+    ProductUpdateRecipientsService,
     ProductUpdateIngestService,
     ProductUpdatesAiService,
     ProductUpdateConsolidationService,

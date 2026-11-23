@@ -7,6 +7,7 @@ import { en } from "@constants";
 import { BuilderHistoryItem, BuilderHistoryQuery } from "@types";
 
 import { dayLabel, formatWait, timeOfDay } from "./roomFormat";
+import { useAgentEmbed } from "../agentEmbed";
 
 const strings = en.builder.room.history;
 
@@ -32,6 +33,7 @@ const highlight = (text: string, q: string): React.ReactNode => {
 
 const byLine = (entry: BuilderHistoryItem): string => {
   if (entry.surface === "rule") return strings.by.rule;
+  if (entry.surface === "requester") return strings.by.requester;
   if (entry.surface === "slack" && !entry.actorName) return strings.by.slack;
   return entry.actorName ?? strings.by.you;
 };
@@ -41,6 +43,7 @@ const byLine = (entry: BuilderHistoryItem): string => {
  * a correction is a rule, never an edit to what happened.
  */
 export const HistoryTab: React.FC<HistoryTabProps> = ({ initial, compact, onMakeRule }) => {
+  const { readOnly } = useAgentEmbed();
   const [q, setQ] = useState(initial.q ?? "");
   const [debounced, setDebounced] = useState(q);
   const [entryType, setEntryType] = useState(initial.entryType ?? "");
@@ -248,7 +251,7 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({ initial, compact, onMake
                           {entry.applyError && (
                             <p className="text-red-700">{strings.failed(entry.applyError)}</p>
                           )}
-                          {entry.entryType === "decision" && !entry.undoneAt && (
+                          {entry.entryType === "decision" && !entry.undoneAt && !readOnly && (
                             <button
                               type="button"
                               className="w-fit underline underline-offset-2"

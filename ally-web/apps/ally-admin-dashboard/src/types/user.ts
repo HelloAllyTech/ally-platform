@@ -115,9 +115,15 @@ export enum TabType {
   ORGANIZATIONS = "organizations",
   // Super-admin-tier management tab, visible to super duper admins only.
   SUPER_ADMINS = "super-admins",
-  // Which organisation a WhatsApp number belongs to. Lives here because it is about people,
-  // gated on the WhatsApp bot's own permission because it decides whose documents answer them.
+  // Debrief access (Clinical advisor and Debrief owner roles), gated like Ally admins.
+  DEBRIEF_ACCESS = "debrief-access",
+  // The tab's id before it was renamed; old links still open it.
+  CLINICAL_ADVISORS = "clinical-advisors",
+  // Which organisation a WhatsApp number belongs to. Hidden since CR1 (WA-NUMBERS-REPORT step 1:
+  // ally-be refuses new writes with 410); an old link opens the fallback tab. Files kept.
   PHONE_MAPPINGS = "whatsapp-numbers",
+  // CR1 Part B: custom logins (the Assistant owner role), gated like Ally admins.
+  CUSTOM_LOGINS = "custom-logins",
 }
 
 export interface UserListUser {
@@ -146,6 +152,14 @@ export interface UserListProps {
   formatDate: (iso: string) => string;
   onOptionSelect?: (option: string, user: UserListUser) => void;
   canEditUser?: boolean;
+  /** Row selection for bulk actions; omit for a list with no checkboxes. */
+  selection?: {
+    isSelected: (id: number) => boolean;
+    toggle: (id: number) => void;
+    toggleAll: () => void;
+    allSelected: boolean;
+    someSelected: boolean;
+  };
 }
 
 export interface OrganizationListProps {

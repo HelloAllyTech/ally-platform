@@ -44,6 +44,8 @@ export interface LogsTableProps {
   refreshKey?: number;
   sessionType: SessionType;
   className?: string;
+  /** A note to open in the summary sidebar once the logs have refetched. */
+  openChatId?: number | null;
 }
 
 export interface ArchivesLogsTableProps {
@@ -72,6 +74,11 @@ export interface CallTranscriptTabProps {
 export interface SummarySidebarWrapperProps {
   isShortSession?: boolean;
   summaryData?: SimulationSummary;
+  /**
+   * Show the first two tabs' content in two columns, at once, instead of behind
+   * a tab strip (desktop, when both tabs exist).
+   */
+  sideBySide?: boolean;
   onSidebarClose?: () => void;
   extraHeaderList?: {
     alt: string;

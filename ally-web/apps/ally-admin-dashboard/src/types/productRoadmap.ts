@@ -30,14 +30,16 @@ export enum RoadmapOpportunityStage {
 }
 
 /**
- * Who filed it — 'staff' (somebody internal, and every pre-existing row) or 'consumer' (an
- * app user). Answers "who", not "through which client": a bug report is stamped from the
+ * Who filed it — 'staff' (somebody internal, and every pre-existing row), 'consumer' (an
+ * app user) or 'pm_agent' (the PM Agent, from a card an admin accepted). Answers "who", not "through which client": a bug report is stamped from the
  * reporter's own roles server-side, so an admin filing from helpline still reads as staff.
  * Admin-side display/filtering only, mirrors ally-be's RoadmapOpportunitySource.
  */
 export enum RoadmapOpportunitySource {
   STAFF = "staff",
   CONSUMER = "consumer",
+  /** Filed by the PM Agent from an accepted card; the creator reads "Product Manager Agent". */
+  PM_AGENT = "pm_agent",
 }
 
 /**
@@ -174,6 +176,11 @@ export interface RoadmapOpportunity {
    */
   compositeScore: number;
   /**
+   * The Prod Director's star. NON-NULL ONLY FOR THE DIRECTOR — null for everyone else, which is
+   * what keeps the icon invisible to them. The star still lifts their rank.
+   */
+  directorStarred?: boolean | null;
+  /**
    * DISTINCT admins backing this, across all periods. BREADTH, where priorityScore is
    * INTENSITY — one admin spending 40 votes and forty spending one each are the same total and
    * very different signals. Everyone who can vote is already a platform admin, so a distinct
@@ -223,6 +230,8 @@ export interface RoadmapOpportunitiesQuery {
   createdBy?: number[];
   /** Only opportunities that would back a colleague the caller hasn't backed lately. */
   newToMe?: boolean;
+  /** Unowned or unsized — the Inbox's definition of "needs a decision". */
+  needsTriage?: boolean;
   dateFrom?: string;
   dateTo?: string;
   releasedFrom?: string;
@@ -231,6 +240,7 @@ export interface RoadmapOpportunitiesQuery {
   priorityMax?: number;
   sortBy?:
     | "composite"
+    | "triage"
     | "priority"
     | "voters"
     | "createdAt"
@@ -403,12 +413,29 @@ export interface RoadmapStrategyGoalsResponse {
   needingAssessment: number;
 }
 
-/** The four composite-rank factor weights. Normalised to sum 1 server-side. */
+/** The five composite-rank factor weights. Normalised to sum 1 server-side. */
 export interface RoadmapRankWeights {
   votesWeight: number;
   votersWeight: number;
   effortWeight: number;
   goalImpactWeight: number;
+  /** The Prod Director's star as a factor: starred scores 100, unstarred 0. */
+  starWeight: number;
+  /** The platform admin acting as Prod Director, or null. */
+  prodDirectorUserId?: number | null;
+}
+
+export type RoadmapRankFactorKey =
+  | "votesWeight"
+  | "votersWeight"
+  | "effortWeight"
+  | "goalImpactWeight"
+  | "starWeight";
+
+export interface RoadmapProdDirector {
+  userId: number | null;
+  /** Every platform admin — the only people who can be picked. */
+  candidates: { id: number; name: string; email: string }[];
 }
 
 /** One stored verdict, for the drawer breakdown. Machine-derived and read-only by design. */
@@ -488,8 +515,6 @@ export type RoadmapBriefEvidenceSource =
   | "codebase"
   | "wiki"
   | "principles"
-  /** Only on briefs filed before 2026-11-09; the server writes `principles` for new ones. */
-  | "stacks"
   | "strategy";
 
 /**
@@ -588,6 +613,14 @@ export interface RoadmapViewState {
    * rather than treat undefined as a distinct third state.
    */
   layout?: RoadmapBoardLayout;
+  /** Archived rows are hidden unless this is on. Absent = hidden, so older views are unchanged. */
+  showArchived?: boolean;
+  /**
+   * Roadmap v2's Queue filters, as the URL-safe query params of `GET /v1/roadmap/items` (P2
+   * contract). Only views saved from the new Queue carry it; the old board ignores the key, and
+   * the Queue lists only views that have it.
+   */
+  queue?: Record<string, string>;
 }
 
 export interface RoadmapSavedView {

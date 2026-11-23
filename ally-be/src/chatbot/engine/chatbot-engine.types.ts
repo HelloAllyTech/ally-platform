@@ -1,5 +1,7 @@
 import type {
+  AgentActivity,
   AgentStreamEvent,
+  AgentMemoryWrite,
   AgentTraceStep,
   AgentTurnType,
 } from '../../ai/dto/knowledge.dto';
@@ -36,6 +38,11 @@ export interface ChannelCapabilities {
    * and, later, the website widget. WhatsApp can't edit a sent message, so it never streams.
    */
   streaming?: boolean;
+  /**
+   * The channel shows a reply's sources itself, from `citations` (the bot page, chunk 12b), so the
+   * reply text leaves out the plain-text "Sources:" footer WhatsApp needs. Off everywhere else.
+   */
+  showsSources?: boolean;
 }
 
 export interface ChatChannel {
@@ -83,6 +90,11 @@ export interface ChatTurn {
   /** The channel's id for this message, from which the run id is derived (WhatsApp). */
   providerMessageId?: string;
   /**
+   * The shared store's contact (chunk 3b), named in the run's gateway token. Absent in Preview and
+   * wherever the channel doesn't know it.
+   */
+  contactId?: string | null;
+  /**
    * The person's first message to this bot (WhatsApp: the contact's first message; Preview: an
    * empty chat). `history` can't say: on WhatsApp it already holds the message being answered.
    */
@@ -102,12 +114,25 @@ export type AgentFailureReason =
 
 /**
  * The Agents v2 run behind a reply, for the channel to store and Preview to show: the run that
- * answered, with its steps, or the run that failed and v1 answered instead (see `isFallback`).
+ * answered, with its steps, or the run that failed (see `isFailedRun`; the fixed reply went out).
  */
 export type AgentRunRef = { runId: string; conversationId: string } & (
-  | { runtime: AgentRuntimeUsed.V2; trace: AgentTraceStep[] }
   | {
-      runtime: AgentRuntimeUsed.V2_FALLBACK;
+      runtime: AgentRuntimeUsed.V2;
+      trace: AgentTraceStep[];
+      /**
+       * What the run asked to remember (chunk 8a), with the short ids it was shown. Applied by the
+       * channel after the reply has gone out, and only if that reply was the agent's own.
+       */
+      memory?: {
+        writes: AgentMemoryWrite[];
+        refs: Record<string, string>;
+      };
+      /** What the run did, for the bot page's "what I did" and its card (chunk 6b). */
+      activity?: AgentActivity[];
+    }
+  | {
+      runtime: AgentRuntimeUsed.V2_FAILED;
       fallbackReason: AgentFailureReason;
     }
 );
@@ -120,6 +145,13 @@ export type AgentRunRef = { runId: string; conversationId: string } & (
 export interface ChatbotDecision {
   handledBy: WaHandledBy;
   body: string;
+  /** CR1: no run started because a limit was reached; `body` is the fixed limit reply. */
+  limited?:
+    | 'customers'
+    | 'no_seat'
+    | 'seat_messages'
+    | 'owner_cap'
+    | 'owner_runs';
   templateId?: string;
   /**
    * The body greets the person rather than answering a question: the bot's welcome message (it
@@ -141,8 +173,18 @@ export interface ChatbotDecision {
   /** A human should hear about this (crisis, degraded safety net). */
   alert?: NotificationErrorType;
   /**
-   * Set when the Agents v2 runtime answered or was tried (`v2_fallback`). The channel stores it on
+   * Set when the Agents v2 runtime answered or failed (`v2_fallback`, `AgentRuntimeUsed.V2_FAILED`). The channel stores it on
    * the reply and, for a fallback, raises the throttled "agent runtime degraded" alert.
    */
   agent?: AgentRunRef;
+  /**
+   * A team member has this chat (chunk 11a): the assistant didn't answer, and the channel sends
+   * and stores no reply. Never set on a crisis reply, which always goes out.
+   */
+  held?: boolean;
+  /**
+   * The visitor asked for a person (chunk 11a), or the agent passed the chat on with its
+   * `hand_over` tool (`assistant`, chunk 3b): the body tells them the team has been asked.
+   */
+  handover?: 'asked' | 'assistant';
 }

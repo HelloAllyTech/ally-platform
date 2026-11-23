@@ -88,9 +88,11 @@ sealed class AskAiSseEvent {
       case 'citations':
         return AskAiSseCitations(_citations(json['citations']) ?? const []);
       case 'done':
+        final limit = json['limit'];
         return AskAiSseDone(
           content: json['content'] as String?,
           citations: _citations(json['citations']),
+          limit: limit is String && limit.isNotEmpty ? limit : null,
         );
       case 'error':
         return AskAiSseError(json['error'] as String? ?? '');
@@ -119,9 +121,13 @@ class AskAiSseCitations extends AskAiSseEvent {
 }
 
 class AskAiSseDone extends AskAiSseEvent {
-  const AskAiSseDone({this.content, this.citations});
+  const AskAiSseDone({this.content, this.citations, this.limit});
   final String? content;
   final List<AskAiCitation>? citations;
+
+  /// Debrief Ask Ally only: set (`session` | `month`) when this reply is the
+  /// limit message — no more questions can be asked. Absent otherwise.
+  final String? limit;
 }
 
 class AskAiSseError extends AskAiSseEvent {

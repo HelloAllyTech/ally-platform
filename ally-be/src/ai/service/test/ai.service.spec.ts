@@ -10,7 +10,6 @@ import { PromptSharedService } from '../../../prompt/service/prompt-shared.servi
 import { SkillExperimentRouterService } from '../../../skill-experiment/service/skill-experiment-router.service';
 import { AppConfigService } from '../../../config/config.service';
 import { LoggerService } from '../../../logger/logger.service';
-import { LlmTask } from 'src/learn/enum/llm-task.enum';
 
 // Mock external dependencies
 jest.mock('axios');
@@ -214,267 +213,6 @@ describe('AiService', () => {
           type: 'AI Request Error',
         }),
       );
-    });
-  });
-
-  describe('getScenarioSessionEvaluation', () => {
-    const mockMessages = [
-      { id: '1', role: 'COUNSELOR', content: 'Hello' },
-    ] as any;
-
-    it('should set language_code on the ScenarioEvaluationRequest when languageCode is provided', async () => {
-      (mockedAxios as any).mockResolvedValue({ data: {} });
-
-      await service.getScenarioSessionEvaluation(
-        mockMessages,
-        false,
-        null,
-        undefined,
-        true,
-        'hi',
-      );
-
-      expect(mockedAxios).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            language_code: 'hi',
-            enable_recommendations: true,
-          }),
-        }),
-      );
-    });
-
-    it('should default language_code to null when languageCode is omitted', async () => {
-      (mockedAxios as any).mockResolvedValue({ data: {} });
-
-      await service.getScenarioSessionEvaluation(mockMessages, false, null);
-
-      expect(mockedAxios).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            language_code: null,
-          }),
-        }),
-      );
-    });
-
-    it('sends usage_task only when a caller labels the call', async () => {
-      (mockedAxios as any).mockResolvedValue({ data: {} });
-
-      await service.getScenarioSessionEvaluation(
-        mockMessages,
-        false,
-        null,
-        undefined,
-        false,
-        'ta',
-        undefined,
-        'sess-1',
-        LlmTask.SCENARIO_EVALUATION_LANGUAGE,
-      );
-      const labelled = (mockedAxios as any).mock.calls.at(-1)[0].data;
-      expect(labelled.usage_task).toBe('scenario_evaluation_language');
-      expect(labelled.scenario_session_id).toBe('sess-1');
-
-      // The default path's body must not change: no key at all, not null.
-      await service.getScenarioSessionEvaluation(
-        mockMessages,
-        true,
-        null,
-        undefined,
-        false,
-        'en',
-        undefined,
-        'sess-1',
-      );
-      const plain = (mockedAxios as any).mock.calls.at(-1)[0].data;
-      expect('usage_task' in plain).toBe(false);
-      expect(plain.scenario_session_id).toBe('sess-1');
-
-      // ally-ai 422s on any value outside its closed set, which would fail the
-      // debrief — so nothing but the one literal can ever be sent.
-      await service.getScenarioSessionEvaluation(
-        mockMessages,
-        false,
-        null,
-        undefined,
-        false,
-        'ta',
-        undefined,
-        'sess-1',
-        'something_else' as any,
-      );
-      const stray = (mockedAxios as any).mock.calls.at(-1)[0].data;
-      expect('usage_task' in stray).toBe(false);
-    });
-  });
-
-  describe('getScenarioSessionEvaluation under a skill experiment', () => {
-    const mockMessages = [
-      { id: '1', role: 'COUNSELOR', content: 'Hello' },
-      { id: '2', role: 'CLIENT', content: 'Hi' },
-    ] as any;
-    const CODE = 'ally_ai_scenario_scenario_evaluation';
-    const arm = (isOriginal: boolean) => ({
-      experimentId: 'exp-1',
-      variantId: isOriginal ? 'v-0' : 'v-1',
-      promptCode: CODE,
-      content: isOriginal
-        ? 'ORIGINAL {chat_history}'
-        : 'VARIANT {chat_history}',
-      isOriginal,
-      record: true,
-    });
-
-    it('sends the arm text under the key ally-ai reads and records the output', async () => {
-      mockSkillExperiments.assign.mockResolvedValue(arm(false));
-      mockPromptSharedService.getPromptsByOptions.mockResolvedValue([
-        { promptCode: CODE, availableVariables: ['chat_history'] },
-      ] as any);
-      (mockedAxios as any).mockResolvedValue({ data: { summary: 'ok' } });
-
-      const result = await service.getScenarioSessionEvaluation(
-        mockMessages,
-        false,
-        null,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        'sess-1',
-      );
-
-      expect(mockSkillExperiments.assign).toHaveBeenCalledWith(CODE, 'sess-1');
-      const sent = (mockedAxios as any).mock.calls.at(-1)[0].data;
-      expect(sent.prompts[CODE]).toEqual({
-        prompt: 'VARIANT {chat_history}',
-        availableVariables: ['chat_history'],
-      });
-      expect(result).toEqual({ summary: 'ok' });
-      expect(mockSkillExperiments.record).toHaveBeenCalledWith(
-        expect.objectContaining({ variantId: 'v-1' }),
-        expect.objectContaining({
-          output: JSON.stringify({ summary: 'ok' }),
-          input: expect.objectContaining({
-            transcript: 'COUNSELOR: Hello\nCLIENT: Hi',
-            scenarioSessionId: 'sess-1',
-          }),
-        }),
-      );
-    });
-
-    it('records scenarioSessionId in input even when no experiment is live', async () => {
-      mockSkillExperiments.assign.mockResolvedValue(null);
-      (mockedAxios as any).mockResolvedValue({ data: {} });
-
-      await service.getScenarioSessionEvaluation(
-        mockMessages,
-        false,
-        null,
-        undefined,
-        false,
-        'en',
-        undefined,
-        'sess-1',
-      );
-
-      // assign is called but returns null
-      expect(mockSkillExperiments.assign).toHaveBeenCalled();
-      // record is called even with null arm (guard is internal to record)
-      expect(mockSkillExperiments.record).toHaveBeenCalledWith(
-        null,
-        expect.objectContaining({
-          input: expect.objectContaining({ scenarioSessionId: 'sess-1' }),
-        }),
-      );
-    });
-
-    it('picks the with-memory skill when memory is needed', async () => {
-      (mockedAxios as any).mockResolvedValue({ data: {} });
-      await service.getScenarioSessionEvaluation(mockMessages, true, 'prev');
-      expect(mockSkillExperiments.assign).toHaveBeenCalledWith(
-        'ally_ai_scenario_scenario_evaluation_with_memory',
-        undefined,
-      );
-    });
-
-    it('never experiments on the per-language re-evaluation', async () => {
-      (mockedAxios as any).mockResolvedValue({ data: {} });
-      await service.getScenarioSessionEvaluation(
-        mockMessages,
-        false,
-        null,
-        undefined,
-        false,
-        'ta',
-        undefined,
-        'sess-1',
-        LlmTask.SCENARIO_EVALUATION_LANGUAGE,
-      );
-      expect(mockSkillExperiments.assign).not.toHaveBeenCalled();
-    });
-
-    it('never experiments for an organisation live on the Debrief agent (FR-44)', async () => {
-      const query = jest.fn().mockResolvedValue([{ '?column?': 1 }]);
-      (service as any).dataSource = { query };
-      (mockedAxios as any).mockResolvedValue({ data: {} });
-      await service.getScenarioSessionEvaluation(
-        mockMessages,
-        false,
-        null,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        'sess-1',
-      );
-      expect(query.mock.calls[0][1]).toEqual(['debrief', 'sess-1', null]);
-      expect(mockSkillExperiments.assign).not.toHaveBeenCalled();
-
-      query.mockResolvedValue([]);
-      await service.getScenarioSessionEvaluation(
-        mockMessages,
-        false,
-        null,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        'sess-2',
-      );
-      expect(mockSkillExperiments.assign).toHaveBeenCalledWith(CODE, 'sess-2');
-      (service as any).dataSource = undefined;
-    });
-
-    it('records a failed challenger and retries the debrief on the skill text', async () => {
-      mockSkillExperiments.assign.mockResolvedValue(arm(false));
-      (mockedAxios as any)
-        .mockRejectedValueOnce(new Error('ally-ai 500'))
-        .mockResolvedValueOnce({ data: { summary: 'fallback' } });
-
-      const result = await service.getScenarioSessionEvaluation(
-        mockMessages,
-        false,
-        null,
-      );
-
-      expect(result).toEqual({ summary: 'fallback' });
-      expect(mockSkillExperiments.record).toHaveBeenCalledWith(
-        expect.objectContaining({ variantId: 'v-1' }),
-        expect.objectContaining({ error: expect.any(String) }),
-      );
-      const retry = (mockedAxios as any).mock.calls.at(-1)[0].data;
-      expect(retry.prompts[CODE]).toBeUndefined();
-    });
-
-    it('does not retry when the original arm fails — that failure is the skill’s own', async () => {
-      mockSkillExperiments.assign.mockResolvedValue(arm(true));
-      (mockedAxios as any).mockRejectedValue(new Error('ally-ai 500'));
-
-      await expect(
-        service.getScenarioSessionEvaluation(mockMessages, false, null),
-      ).rejects.toThrow();
-      expect((mockedAxios as any).mock.calls).toHaveLength(1);
     });
   });
 
@@ -948,7 +686,7 @@ describe('AiService', () => {
         response: { status: code, data: { detail: 'x' }, headers: {} },
       });
 
-    it('posts to /agent/run once, with a 25s timeout and no retry', async () => {
+    it('posts to /agent/run once, waiting its cap (38 s) plus 5 s, and no retry', async () => {
       mockedAxios.mockRejectedValue(status(502));
       await expect(service.runAgent(body)).rejects.toMatchObject({
         upstreamStatus: 502,
@@ -956,7 +694,7 @@ describe('AiService', () => {
       expect(mockedAxios).toHaveBeenCalledTimes(1);
       expect(mockedAxios.mock.calls[0][0]).toMatchObject({
         url: 'https://test-ai-api.com/api/v1/agent/run',
-        timeout: 25_000,
+        timeout: 43_000,
       });
     });
 

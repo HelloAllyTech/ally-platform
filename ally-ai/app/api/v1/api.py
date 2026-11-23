@@ -3,9 +3,13 @@ from fastapi import APIRouter
 from app.api.v1.endpoints import (
     agent_runtime,
     analytics_agent,
+    ask_ally,
+    builder,
+    checkup,
     context_chunk,
     conversation,
     debrief,
+    debrief_language,
     debrief_quality,
     drift,
     feedback_groundedness,
@@ -14,6 +18,7 @@ from app.api.v1.endpoints import (
     knowledge_agent,
     knowledge_chunk,
     language_quality,
+    pm_agent,
     rag_quality,
     recall_quality,
     reference_document,
@@ -52,6 +57,11 @@ api_router.include_router(
     tags=["knowledge_agent"],
 )
 api_router.include_router(agent_runtime.router, prefix="/agent", tags=["agent_runtime"])
+api_router.include_router(
+    agent_runtime.builder_router, prefix="/agent", tags=["agent_runtime"]
+)
+api_router.include_router(builder.router, prefix="/builder", tags=["builder"])
+api_router.include_router(checkup.router, prefix="/checkup", tags=["checkup"])
 api_router.include_router(helpline.router, prefix="/helpline", tags=["helpline"])
 api_router.include_router(drift.router, prefix="/drift", tags=["drift"])
 api_router.include_router(
@@ -60,6 +70,8 @@ api_router.include_router(
     tags=["feedback-groundedness"],
 )
 api_router.include_router(debrief.router, prefix="/debrief", tags=["debrief"])
+api_router.include_router(ask_ally.router, prefix="/ask-ally", tags=["ask-ally"])
+api_router.include_router(pm_agent.router, prefix="/pm-agent", tags=["pm-agent"])
 api_router.include_router(
     debrief_quality.router,
     prefix="/debrief-quality",
@@ -82,4 +94,9 @@ api_router.include_router(
 )
 api_router.include_router(
     round_trip.router, prefix="/round-trip-wer", tags=["language_quality"]
+)
+api_router.include_router(
+    debrief_language.router,
+    prefix="/debrief-language",
+    tags=["debrief-language"],
 )

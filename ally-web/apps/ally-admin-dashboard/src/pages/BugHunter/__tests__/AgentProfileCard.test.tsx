@@ -1,46 +1,14 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const navigate = vi.fn();
-vi.mock("react-router-dom", async () => {
-  const actual = await vi.importActual<any>("react-router-dom");
-  return {
-    ...actual,
-    useNavigate: () => navigate,
-  };
-});
-
 vi.mock("@api", () => ({
   useGetBugHunterSettingsQuery: vi.fn(),
   useUpdateBugHunterSettingsMutation: vi.fn(),
   useGetBugFindingsQuery: vi.fn(),
-  useGetBugHuntRunsQuery: vi.fn(),
-}));
-
-// The scan's own behaviour is `useUxSignalScan`'s suite; here it is only a
-// control the menu holds. Mocked at the module so the real hook's store and
-// feature-toggle imports stay out of this file.
-const uxScan = {
-  canScan: true,
-  isBusy: false,
-  lastScanLine: "Last scan 10/12/2026: 2 bugs, 1 suggestions filed.",
-  runScan: vi.fn(() => Promise.resolve()),
-};
-vi.mock("../useUxSignalScan", () => ({ useUxSignalScan: () => uxScan }));
-
-// Likewise the feature map's confirm-and-refresh, which FeatureMapPanel's
-// suite covers; the header only has to open it.
-vi.mock("../FeatureMapPanel", () => ({
-  FeatureMapRefreshDialog: ({ repo, onClose }: any) => (
-    <div data-testid="map-features-dialog" data-repo={repo ?? "all"}>
-      <button onClick={onClose}>close map dialog</button>
-    </div>
-  ),
 }));
 
 vi.mock("@icons", () => ({
   HelpIcon: () => <svg />,
-  ThreeDot: () => <svg />,
 }));
 
 // See BugFindingsTable's note: @constants reads `cellTypes` off this barrel at
@@ -81,8 +49,7 @@ vi.mock("@ally-ui-mono/ui-shared", () => ({
 }));
 
 import * as api from "@api";
-import { ROUTES } from "@constants";
-import { BugFinding, BugFindingStatus, BugHunterMode, BugHuntRunStatus } from "@types";
+import { BugFinding, BugFindingStatus, BugHunterMode } from "@types";
 
 import { AgentProfileCard } from "../AgentProfileCard";
 
@@ -107,20 +74,11 @@ const mockFindings = (items: Partial<BugFinding>[] = []) => {
   });
 };
 
-const mockRuns = (items: Record<string, unknown>[] = []) => {
-  (api.useGetBugHuntRunsQuery as any).mockReturnValue({
-    data: { items },
-    isLoading: false,
-    isError: false,
-  });
-};
-
-const mount = (canTriage = true) =>
+const mount = () =>
   render(
     <AgentProfileCard
       onShowInProgress={onShowInProgress}
       onShowHelp={onShowHelp}
-      canTriage={canTriage}
     />,
   );
 
@@ -129,16 +87,11 @@ const modeSelect = () => screen.getByTestId("bug-hunter-mode-select") as HTMLSel
 const pickMode = (mode: BugHunterMode) =>
   fireEvent.change(modeSelect(), { target: { value: mode } });
 
-const hoursAgo = (hours: number) => new Date(Date.now() - hours * 3_600_000).toISOString();
-
 describe("AgentProfileCard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    uxScan.canScan = true;
-    uxScan.isBusy = false;
     mockSettings();
     mockFindings();
-    mockRuns();
     (api.useUpdateBugHunterSettingsMutation as any).mockReturnValue([
       updateSettings,
       { isLoading: false },
@@ -156,29 +109,17 @@ describe("AgentProfileCard", () => {
   });
 
   describe("the status sentence", () => {
-    it("names the state, how many it is fixing now, and when it last swept", () => {
+    it("names the state and how many it is fixing now", () => {
       mockFindings([
         { id: "a", status: BugFindingStatus.NEEDS_INPUT },
         { id: "b", status: BugFindingStatus.FIXING },
         { id: "c", status: BugFindingStatus.QUEUED },
       ]);
-      mockRuns([
-        {
-          id: "r",
-          repo: "ally-be",
-          trigger: "scheduled",
-          status: BugHuntRunStatus.COMPLETED,
-          createdAt: hoursAgo(7),
-          finishedAt: hoursAgo(6),
-        },
-      ]);
       mount();
 
       // The spinner glyph sits just before "Fixing" — agent-working is said by
-      // it, not by a colour.
-      expect(statusLine()).toHaveTextContent(
-        /^Waiting on you · \S?Fixing 2 now · Last sweep 6h ago$/,
-      );
+      // it, not by a colour. Sweeps left with the old Bug Hunter, so no sweep line.
+      expect(statusLine()).toHaveTextContent(/^Waiting on you · \S?Fixing 2 now$/);
     });
 
     // The persona's own sentence is still there, on the state word, for whoever
@@ -197,7 +138,7 @@ describe("AgentProfileCard", () => {
       mockFindings([{ id: "b", status: BugFindingStatus.FIXING }]);
       mount();
 
-      expect(statusLine()).toHaveTextContent("Fixing 1 now · No sweep yet");
+      expect(statusLine()).toHaveTextContent(/^\S?Fixing 1 now$/);
       expect(statusLine()).not.toHaveTextContent("Working");
     });
 
@@ -207,35 +148,6 @@ describe("AgentProfileCard", () => {
 
       fireEvent.click(screen.getByRole("button", { name: /Fixing 1 now/ }));
       expect(onShowInProgress).toHaveBeenCalled();
-    });
-
-    it("reports a sweep running now by repo", () => {
-      mockRuns([
-        {
-          id: "r",
-          repo: "ally-web",
-          trigger: "scheduled",
-          status: BugHuntRunStatus.RUNNING,
-          createdAt: hoursAgo(0.1),
-        },
-      ]);
-      mount();
-      expect(statusLine()).toHaveTextContent("Sweeping ally-web now");
-    });
-
-    // A fix session is not a sweep, and "last sweep" must not claim one.
-    it("counts only sweeps as sweeps", () => {
-      mockRuns([
-        {
-          id: "r",
-          repo: "ally-be",
-          trigger: "fix_session",
-          status: BugHuntRunStatus.RUNNING,
-          createdAt: hoursAgo(0.1),
-        },
-      ]);
-      mount();
-      expect(statusLine()).toHaveTextContent("On shift · No sweep yet");
     });
 
     it("says off duty when it is", () => {
@@ -308,50 +220,6 @@ describe("AgentProfileCard", () => {
       mockSettings(BugHunterMode.OFF, { data: undefined, isError: true });
       mount();
       expect(screen.queryByTestId("bug-hunter-mode-select")).not.toBeInTheDocument();
-    });
-  });
-
-  describe("the ⋯ menu", () => {
-    it("holds Model settings", () => {
-      mount();
-      fireEvent.click(screen.getByRole("menuitem", { name: "Model settings" }));
-      expect(navigate).toHaveBeenCalledWith(`${ROUTES.SETTINGS}?tab=ai-models`);
-    });
-
-    it("holds the UX signals scan, with its last-scan line beside it", () => {
-      mount();
-      const item = screen.getByRole("menuitem", { name: /Scan UX signals now/ });
-      expect(item).toHaveTextContent("Last scan 10/12/2026: 2 bugs, 1 suggestions filed.");
-
-      fireEvent.click(item);
-      expect(uxScan.runScan).toHaveBeenCalled();
-    });
-
-    it("disables the scan while one is running", () => {
-      uxScan.isBusy = true;
-      mount();
-      expect(screen.getByRole("menuitem", { name: /Scanning telemetry/ })).toBeDisabled();
-    });
-
-    it("leaves the scan out for a reader without UX signals", () => {
-      uxScan.canScan = false;
-      mount();
-      expect(screen.queryByRole("menuitem", { name: /Scan UX signals/ })).not.toBeInTheDocument();
-    });
-
-    // A shortcut, not a second implementation: it opens the same confirm the
-    // Notebook's button does, for every repo.
-    it("opens the feature map's own confirmation, for every repo", () => {
-      mount();
-      expect(screen.queryByTestId("map-features-dialog")).not.toBeInTheDocument();
-
-      fireEvent.click(screen.getByRole("menuitem", { name: "Map features now" }));
-      expect(screen.getByTestId("map-features-dialog")).toHaveAttribute("data-repo", "all");
-    });
-
-    it("leaves Map features now out for a read-only reader", () => {
-      mount(false);
-      expect(screen.queryByRole("menuitem", { name: "Map features now" })).not.toBeInTheDocument();
     });
   });
 

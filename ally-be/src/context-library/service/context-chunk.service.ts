@@ -11,6 +11,7 @@ import { LoggerService } from 'src/logger/logger.service';
 import { CL_BODY_MAX_CHARS } from '../constants/context-library.constants';
 import { ClBulkUpload, ClChunkVersion } from '../entity/cl-chunk-links.entity';
 import { ClChunk, ClExampleQuery } from '../entity/cl-chunk.entity';
+import { ClSource } from '../entity/cl-source.entity';
 import {
   ClBulkUploadStatus,
   ClChunkConfidence,
@@ -23,6 +24,14 @@ import {
   ProfileChunkView,
   requireProfile,
 } from '../profiles';
+import {
+  ClAudienceFields,
+  ClAudienceInput,
+  asksForAudience,
+  assertTenantsExist,
+  resolveAudience,
+  sameAudience,
+} from '../util/audience.util';
 import { AuthoredChunkInput, parseBulkFile } from '../util/bulk.util';
 import { runAuthoredGate } from '../util/gate.util';
 import { returningRows } from '../util/sql.util';
@@ -257,10 +266,11 @@ export class ContextChunkService {
 
   // ── Authored entries ───────────────────────────────────────────────────────
 
-  private audienceFor(
-    input: AuthoredChunkInput,
+  private async audienceFor(
+    input: ClAudienceInput,
     profile: CollectionProfile,
     actor: ClActor,
+    fallback?: ClAudienceFields,
   ) {
     if (actor.tenantId) {
       if (!profile.allowsOrgChunks) {
@@ -275,12 +285,53 @@ export class ContextChunkService {
         ownerTenantId: actor.tenantId,
       };
     }
-    const tenantIds = input.tenantIds ?? [];
-    return {
-      isGlobal: input.isGlobal ?? tenantIds.length === 0,
-      tenantIds,
-      ownerTenantId: null,
-    };
+    // A platform admin writes on behalf of any organisations, or for every one.
+    const audience = resolveAudience(input, fallback);
+    await assertTenantsExist(this.dataSource.manager, audience.tenantIds);
+    return { ...audience, ownerTenantId: null };
+  }
+
+  /**
+   * Who a platform admin may re-target. An organisation's own entry reaches that organisation
+   * by definition, and a Studio-synced item follows its item's owner on every sync, so neither
+   * is set here.
+   */
+  private assertAudienceEditable(chunk: ClChunk): void {
+    if (chunk.ownerTenantId) {
+      throw new BadRequestException(
+        'This entry belongs to an organisation, so it reaches that organisation only.',
+      );
+    }
+    if (chunk.origin === ClChunkOrigin.SYNCED) {
+      throw new BadRequestException(
+        'This item is synced from Studio; who it reaches follows its owner there.',
+      );
+    }
+  }
+
+  /**
+   * Re-target any chunk the platform owns — written, bulk-uploaded or distilled from a
+   * document. Platform admins only: organisation admins' entries always reach their own.
+   */
+  async setAudience(
+    code: string,
+    input: ClAudienceInput,
+    actor: ClActor,
+  ): Promise<ClChunk> {
+    if (actor.tenantId) {
+      throw new ForbiddenException(
+        'Only a platform admin can choose which organisations an entry reaches.',
+      );
+    }
+    const chunk = await this.findByCode(code);
+    this.assertAudienceEditable(chunk);
+    const audience = resolveAudience(input, chunk);
+    await assertTenantsExist(this.dataSource.manager, audience.tenantIds);
+    if (sameAudience(audience, chunk)) return chunk;
+    await this.snapshot(chunk, 'audience', actor.userId);
+    chunk.isGlobal = audience.isGlobal;
+    chunk.tenantIds = audience.tenantIds;
+    return this.saveChanged(chunk, 'audience', actor.userId);
   }
 
   async createAuthored(
@@ -299,6 +350,8 @@ export class ContextChunkService {
         findings,
       });
     }
+    // Before enrichment, so a bad organisation id costs no model call.
+    const audience = await this.audienceFor(input, profile, actor);
     const enriched = await this.enrich(profile, input);
     return this.create({
       collectionId,
@@ -314,7 +367,7 @@ export class ContextChunkService {
       citation: input.citation ?? null,
       pinned: input.pinned ?? false,
       createdBy: actor.userId,
-      ...this.audienceFor(input, profile, actor),
+      ...audience,
     });
   }
 
@@ -340,6 +393,15 @@ export class ContextChunkService {
         findings,
       });
     }
+    // Checked before anything is written, so a refused audience leaves no stray version.
+    let audience: ClAudienceFields | null = null;
+    if (!actor.tenantId && asksForAudience(input)) {
+      const asked = await this.audienceFor(input, profile, actor, chunk);
+      if (!sameAudience(asked, chunk)) {
+        this.assertAudienceEditable(chunk);
+        audience = asked;
+      }
+    }
     await this.snapshot(chunk, 'edit', actor.userId);
     chunk.statement = input.statement.trim();
     chunk.body = input.body ?? null;
@@ -350,11 +412,7 @@ export class ContextChunkService {
     chunk.attributes = { ...chunk.attributes, ...input.attributes };
     if (input.pinned !== undefined) chunk.pinned = input.pinned;
     if (input.citation !== undefined) chunk.citation = input.citation;
-    if (
-      !actor.tenantId &&
-      (input.isGlobal !== undefined || input.tenantIds?.length)
-    ) {
-      const audience = this.audienceFor(input, profile, actor);
+    if (audience) {
       chunk.isGlobal = audience.isGlobal;
       chunk.tenantIds = audience.tenantIds;
     }
@@ -493,6 +551,11 @@ export class ContextChunkService {
     buffer: Buffer,
     actor: ClActor,
     apply: boolean,
+    /**
+     * Platform admins: who new rows reach when a row leaves `is_global` and `tenant_ids`
+     * blank. Rows that update an entry keep its audience unless they set one.
+     */
+    defaultAudience: ClAudienceInput = {},
   ) {
     const profile = requireProfile(collectionId);
     if (!profile.allowedOrigins.includes(ClChunkOrigin.AUTHORED)) {
@@ -516,6 +579,16 @@ export class ContextChunkService {
       : [];
     const byCode = new Map(existing.map((c) => [c.code, c]));
     const rejected = [...parsed.rejected];
+    // Organisation admins' rows are always their own organisation's; the columns are ignored.
+    const fallback = actor.tenantId ? null : resolveAudience(defaultAudience);
+    if (fallback) {
+      await assertTenantsExist(this.dataSource.manager, fallback.tenantIds);
+    }
+    const knownTenants = fallback
+      ? await this.existingTenants(
+          parsed.rows.flatMap((r) => r.input.tenantIds ?? []),
+        )
+      : new Set<string>();
     const plan: Array<{
       row: number;
       action: 'create' | 'update';
@@ -538,8 +611,30 @@ export class ContextChunkService {
           });
           continue;
         }
+        if (fallback && asksForAudience(input)) {
+          const reason =
+            this.rowAudienceProblem(input, chunk, knownTenants) ??
+            (chunk.ownerTenantId || chunk.origin === ClChunkOrigin.SYNCED
+              ? `${input.code}'s audience can't be changed here`
+              : null);
+          if (reason) {
+            rejected.push({ row, reason });
+            continue;
+          }
+        }
         plan.push({ row, action: 'update', input });
       } else {
+        if (fallback) {
+          const reason = this.rowAudienceProblem(input, fallback, knownTenants);
+          if (reason) {
+            rejected.push({ row, reason });
+            continue;
+          }
+          if (!asksForAudience(input)) {
+            input.isGlobal = fallback.isGlobal;
+            input.tenantIds = fallback.tenantIds;
+          }
+        }
         plan.push({ row, action: 'create', input });
       }
     }
@@ -598,6 +693,94 @@ export class ContextChunkService {
     };
   }
 
+  /**
+   * Re-target a document: its own audience, which later re-extractions inherit, and every
+   * chunk distilled from it alone. A chunk other documents also back keeps its audience and is
+   * counted as `shared` (re-target it on its own), so retargeting one document never narrows
+   * what another document's readers see.
+   */
+  async setSourceAudience(
+    sourceId: string,
+    input: ClAudienceInput,
+    actor: ClActor,
+  ): Promise<{ source: ClSource; updated: number; shared: number }> {
+    if (actor.tenantId) {
+      throw new ForbiddenException(
+        'Only a platform admin can choose which organisations a document reaches.',
+      );
+    }
+    const sources = this.dataSource.getRepository(ClSource);
+    const source = await sources.findOne({ where: { id: sourceId } });
+    if (!source) throw new NotFoundException('No such document.');
+    if (source.ownerTenantId) {
+      throw new BadRequestException(
+        'This document belongs to an organisation, so it reaches that organisation only.',
+      );
+    }
+    const audience = resolveAudience(input, source);
+    await assertTenantsExist(this.dataSource.manager, audience.tenantIds);
+    source.isGlobal = audience.isGlobal;
+    source.tenantIds = audience.tenantIds;
+    await sources.save(source);
+
+    const linked = await this.chunks
+      .createQueryBuilder('c')
+      .where(
+        'EXISTS (SELECT 1 FROM cl_chunk_sources s WHERE s.chunk_id = c.id AND s.source_id = :sourceId)',
+        { sourceId },
+      )
+      .andWhere('c.owner_tenant_id IS NULL')
+      .andWhere('c.origin != :synced', { synced: ClChunkOrigin.SYNCED })
+      .andWhere('c.status != :superseded', {
+        superseded: ClChunkStatus.SUPERSEDED,
+      })
+      .getMany();
+    let updated = 0;
+    let shared = 0;
+    for (const chunk of linked) {
+      if (chunk.sourceCount > 1) {
+        shared++;
+        continue;
+      }
+      if (sameAudience(audience, chunk)) continue;
+      await this.snapshot(chunk, 'audience', actor.userId);
+      chunk.isGlobal = audience.isGlobal;
+      chunk.tenantIds = audience.tenantIds;
+      await this.saveChanged(chunk, 'audience', actor.userId);
+      updated++;
+    }
+    return { source, updated, shared };
+  }
+
+  /** The ids among these that name an organisation, in one query for a whole file. */
+  private async existingTenants(ids: string[]): Promise<Set<string>> {
+    const unique = [...new Set(ids.filter(Boolean))];
+    if (!unique.length) return new Set();
+    const found: Array<{ id: string }> = await this.dataSource.query(
+      `SELECT id::text AS id FROM tenants WHERE id::text = ANY($1::text[])`,
+      [unique],
+    );
+    return new Set(found.map((r) => r.id));
+  }
+
+  /** Why a bulk row's audience can't be used, so the dry run says so beside the row. */
+  private rowAudienceProblem(
+    input: ClAudienceInput,
+    fallback: ClAudienceFields,
+    knownTenants: Set<string>,
+  ): string | null {
+    let audience: ClAudienceFields;
+    try {
+      audience = resolveAudience(input, fallback);
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error);
+    }
+    const missing = audience.tenantIds.filter((id) => !knownTenants.has(id));
+    return missing.length
+      ? `no such organisation: ${missing.join(', ')}`
+      : null;
+  }
+
   // ── Library listing (Postgres; the search box uses the retrieval pipeline) ─
 
   async list(params: {
@@ -608,8 +791,8 @@ export class ContextChunkService {
     sourceId?: string;
     q?: string;
     /**
-     * An organisation admin's scope: that organisation's own entries plus the global ones.
-     * `null` is the platform's own entries only.
+     * An organisation admin's scope: that organisation's own entries, the global ones, and
+     * those a platform admin targeted at it. `null` is the platform's own entries only.
      */
     ownerTenantId?: string | null;
     /** Only entries every learner may read. */
@@ -635,9 +818,11 @@ export class ContextChunkService {
       if (params.ownerTenantId === null)
         qb.andWhere('c.owner_tenant_id IS NULL');
       else
-        qb.andWhere('(c.owner_tenant_id = :owner OR c.is_global = true)', {
-          owner: params.ownerTenantId,
-        });
+        qb.andWhere(
+          // Two names for one id: owner_tenant_id is uuid, tenant_ids text[].
+          '(c.owner_tenant_id = :owner OR c.is_global = true OR :ownerText = ANY(c.tenant_ids))',
+          { owner: params.ownerTenantId, ownerText: params.ownerTenantId },
+        );
     }
     if (params.globalOnly) qb.andWhere('c.is_global = true');
     if (params.audienceTenantId) {

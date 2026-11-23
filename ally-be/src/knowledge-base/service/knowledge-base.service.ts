@@ -672,7 +672,13 @@ export class KnowledgeBaseService {
   async unarchive(id: string): Promise<KbDocumentResponseDto> {
     const document = await this.findOrFail(id);
     if (!document.archivedAt) return this.respond(document);
+    await this.unarchiveFound(document);
+    return this.get(id);
+  }
 
+  /** Back in the library and re-indexed. Access is the caller's to check. */
+  private async unarchiveFound(document: KbDocument): Promise<void> {
+    const { id } = document;
     await this.documentRepository.update(
       { id },
       {
@@ -686,7 +692,6 @@ export class KnowledgeBaseService {
       documentId: id,
       action: document.rawText ? 'reindex' : 'ingest',
     });
-    return this.get(id);
   }
 
   /**
@@ -790,6 +795,15 @@ export class KnowledgeBaseService {
     if (!document.archivedAt) await this.archiveFound(document);
   }
 
+  /** A chatbot's own document back, when the chatbot is restored. The chatbot check is the gate. */
+  async unarchiveForChatbot(chatbotId: string, id: string): Promise<void> {
+    const document = await this.documentRepository.findOne({ where: { id } });
+    if (!document || document.ownerChatbotId !== chatbotId) {
+      throw new NotFoundException(`Document ${id} was not found`);
+    }
+    if (document.archivedAt) await this.unarchiveFound(document);
+  }
+
   /**
    * One document with its text, for a chatbot's Knowledge tab. The caller (ChatbotService) has
    * checked the document is on that chatbot, so the library's organisation check doesn't apply.
@@ -827,7 +841,11 @@ export class KnowledgeBaseService {
     if (dto.text !== undefined) {
       const text = dto.text.trim();
       const hash = KbIngestService.hash(text);
-      if (hash !== document.contentHash) {
+      // The same text never re-indexes. Compared as text too: a pasted document's hash is only
+      // stored by its first ingest, so an update in that window would otherwise queue a second,
+      // concurrent re-index of the same text (Q3-fast: the learned facts are written at publish
+      // and again by the save that records them).
+      if (hash !== document.contentHash && text !== document.rawText?.trim()) {
         Object.assign(patch, {
           rawText: text,
           contentHash: hash,

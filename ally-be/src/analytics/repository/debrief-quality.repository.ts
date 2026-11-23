@@ -88,14 +88,29 @@ export class DebriefQualityRepository {
   constructor(private readonly dataSource: DataSource) {}
 
   /** The rubric from the Skills Store; null falls back to ally-ai's inline default. */
-  async fetchRubric(): Promise<string | null> {
+  fetchRubric(): Promise<string | null> {
+    return this.livePrompt('debrief_quality_rubric');
+  }
+
+  /** The judge's instructions from the Skills Store; null falls back to ally-ai's inline default. */
+  fetchJudgeInstructions(): Promise<string | null> {
+    return this.livePrompt('debrief_quality_judge_system');
+  }
+
+  /** The risk cue definition (pinned); null falls back to ally-ai's default. */
+  fetchRiskCueDefinition(): Promise<string | null> {
+    return this.livePrompt('debrief_risk_cue_definition');
+  }
+
+  private async livePrompt(code: string): Promise<string | null> {
     const rows = await this.dataSource.query(
       `SELECT pv.prompt
          FROM prompts p
          JOIN prompts_versions pv
            ON pv."promptId" = p.id AND pv.version = p."currentVersion"
-        WHERE p."promptCode" = 'debrief_quality_rubric'
+        WHERE p."promptCode" = $1
         LIMIT 1`,
+      [code],
     );
     return rows?.[0]?.prompt ?? null;
   }
@@ -147,6 +162,10 @@ export class DebriefQualityRepository {
          AND (d.summary->'feedback' ? 'supervisorNote'
               OR d.summary->'feedback' ? 'supervisor_note'
               OR d.summary->'feedback' ? 'positives')
+         -- A note the Debrief agent published is scored by its own
+         -- independent judge (debrief_runs.workspace.judge); scoring it here
+         -- too would judge one debrief twice (v9 FR-21).
+         AND NOT (d.summary->'feedback' ? 'debriefGenerator')
          AND ${settledEndedSessionPredicate('s')}
          AND ${excludeTestTenants('s."tenant_id"')}
          AND EXISTS (
@@ -192,6 +211,10 @@ export class DebriefQualityRepository {
   /**
    * The whole conversation, every turn numbered from 1, plus the map the
    * debrief's `[[msg:<id>]]` anchors resolve through.
+   *
+   * In the order it was spoken (`startSeconds`), the order the transcript panel shows. Turns reach
+   * the database through a queue that does not keep order, so the time a row was saved can put a
+   * later turn first; the save time only breaks ties and orders rows with no speech time.
    */
   async buildTranscript(sessionId: string): Promise<{
     turns: DebriefTranscriptTurn[];
@@ -201,7 +224,7 @@ export class DebriefQualityRepository {
       `SELECT id, "senderId" AS sender_id, content
          FROM scenario_session_messages
         WHERE "scenarioSessionId" = $1
-        ORDER BY "createdAt" ASC, id ASC`,
+        ORDER BY "startSeconds" ASC, "createdAt" ASC, id ASC`,
       [sessionId],
     );
     const turns: DebriefTranscriptTurn[] = [];

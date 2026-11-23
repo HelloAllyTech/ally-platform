@@ -4,7 +4,7 @@ import { en } from "@constants";
 import { BuilderBuildRun } from "@types";
 
 import { ISSUE_FIX_REQUEST_LIMIT, isRunActive, issueProgress } from "./issueBuild";
-import { prefersReducedMotion } from "../../pages/Builder/builderMotion";
+import { prefersReducedMotion } from "../../motion/builderMotion";
 
 interface IssueRailProps {
   run: BuilderBuildRun;

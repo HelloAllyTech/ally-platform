@@ -5,13 +5,14 @@ import { AiModule } from 'src/ai/ai.module';
 import { PromptModule } from 'src/prompt/prompt.module';
 import { LlmUsageModule } from 'src/analytics/llm-usage.module';
 import { User } from 'src/user/entity/user.entity';
-import { BugFinding } from 'src/bug-hunter/entity/bug-finding.entity';
-import { BugHuntEvent } from 'src/bug-hunter/entity/bug-hunt-event.entity';
 
 import { RoadmapAllocation } from './entity/roadmap-allocation.entity';
 import { RoadmapVoteGrant } from './entity/roadmap-vote-grant.entity';
 import { RoadmapInterviewNote } from './entity/roadmap-interview-note.entity';
 import { RoadmapIdeaDraft } from './entity/roadmap-idea-draft.entity';
+import { RoadmapCutoverLog } from './entity/roadmap-cutover-log.entity';
+import { RoadmapCutoverController } from './cutover/roadmap-cutover.controller';
+import { RoadmapCutoverService } from './cutover/roadmap-cutover.service';
 import { RoadmapIdeaDraftController } from './controller/roadmap-idea-draft.controller';
 import { RoadmapIdeaDraftService } from './service/roadmap-idea-draft.service';
 import { RoadmapIdeaTranscriptionService } from './service/roadmap-idea-transcription.service';
@@ -50,13 +51,14 @@ import { RoadmapReadinessTokenService } from './service/roadmap-readiness-token.
 import { RoadmapAiService } from './service/roadmap-ai.service';
 import { RoadmapStrategyContextService } from './service/roadmap-strategy-context.service';
 import { RoadmapCopilotToolsService } from './service/roadmap-copilot-tools.service';
+import { PlanHandoffService } from './plan/plan-handoff.service';
+import { PlanRoadmapToolsService } from './plan/plan-roadmap-tools.service';
 import { RoadmapCopilotService } from './service/roadmap-copilot.service';
 import { GlobalSettings } from 'src/settings/entity/global-settings.entity';
 import { RoadmapAllocationService } from './service/roadmap-allocation.service';
 import { RoadmapMultiplierService } from './service/roadmap-multiplier.service';
 import { RoadmapCommentService } from './service/roadmap-comment.service';
 import { RoadmapInterviewNoteService } from './service/roadmap-content.service';
-import { RoadmapNotificationService } from './service/roadmap-notification.service';
 import { RoadmapImportService } from './service/roadmap-import.service';
 import { RoadmapOpportunityService } from './service/roadmap-opportunity.service';
 import { RoadmapSavedViewService } from './service/roadmap-saved-view.service';
@@ -65,6 +67,30 @@ import { RoadmapBuilderService } from './service/roadmap-builder.service';
 import { RoadmapUpNextService } from './service/roadmap-up-next.service';
 import { RoadmapUpNextController } from './controller/roadmap-up-next.controller';
 import { BuilderModule } from 'src/builder/builder.module';
+import { ProductPlanningModule } from 'src/product-planning/product-planning.module';
+import { RoadmapPlanController } from './controller/roadmap-plan.controller';
+import { RoadmapItemController } from './item/roadmap-item.controller';
+import { RoadmapItemBuildController } from './item/roadmap-item-build.controller';
+import { RoadmapItemBuildService } from './item/roadmap-item-build.service';
+import { RoadmapPeopleController } from './item/roadmap-people.controller';
+import { RoadmapRoleAdminService } from './item/roadmap-role-admin.service';
+import { RoadmapItemLookupService } from './item/roadmap-item-lookup.service';
+import { RoadmapItemReadService } from './item/roadmap-item-read.service';
+import { RoadmapItemEditService } from './item/roadmap-item-edit.service';
+import { PlanSessionStore } from './plan/plan-session.store';
+import { PlanStageService } from './plan/plan-stage.service';
+import { PlanReadinessService } from './plan/plan-readiness.service';
+import { PlanViewService } from './plan/plan-view.service';
+import { PlanIdeaService } from './plan/plan-idea.service';
+import { PlanLeadService } from './plan/plan-lead.service';
+import { PlanCheckService } from './plan/plan-check.service';
+import { PlanAiService } from './plan/plan-ai.service';
+import { PlanOutcomeService } from './plan/plan-outcome.service';
+import { PlanLaunchService } from './plan/plan-launch.service';
+import { PlanDiscoveryService } from './plan/plan-discovery.service';
+import { PlanExportService } from './plan/plan-export.service';
+import { PlanSchedulerRegistrationService } from './plan/plan-scheduler-registration.service';
+
 import { ContextLibraryModule } from 'src/context-library/context-library.module';
 import { RoadmapBoardService } from './service/roadmap-board.service';
 import { RoadmapTaxonomyService } from './service/roadmap-taxonomy.service';
@@ -73,15 +99,47 @@ import { RoadmapGoalImpactService } from './service/roadmap-goal-impact.service'
 import { RoadmapVectorService } from './service/roadmap-vector.service';
 import { RoadmapBuilderSchedulerRegistrationService } from './service/roadmap-builder-scheduler-registration.service';
 import { RoadmapVoteGrantSchedulerRegistrationService } from './service/roadmap-vote-grant-scheduler-registration.service';
-import { BugHunterRepoClassifierService } from 'src/bug-hunter/service/bug-hunter-repo-classifier.service';
-import { BugHunterMissClassifierService } from 'src/bug-hunter/service/bug-hunter-miss-classifier.service';
 
 import { RoadmapAdminController } from './controller/roadmap-admin.controller';
 import { RoadmapCollaborationController } from './controller/roadmap-collaboration.controller';
 import { RoadmapOpportunityController } from './controller/roadmap-opportunity.controller';
 import { RoadmapGateway } from './gateway/roadmap.gateway';
+import { RoadmapItemReleaseController } from './controller/roadmap-item-release.controller';
+import { ItemReleaseService } from './service/item-release.service';
+import { ItemReleaseSchedulerRegistrationService } from './service/item-release-scheduler-registration.service';
+import { ItemLinkedPr } from './entity/item-linked-pr.entity';
+import { ItemRelease } from './entity/item-release.entity';
+import { BuilderPullRequest } from 'src/builder/entity/builder-pull-request.entity';
+import { GithubModule } from 'src/github/github.module';
+import { ReleaseModule } from 'src/release/release.module';
+import { ReleasePolicyLog } from './entity/release-policy-log.entity';
+import { RoadmapReleaseController } from './controller/roadmap-release.controller';
+import { RoadmapV2EnabledGuard } from './guard/roadmap-v2-enabled.guard';
+import { ReleasePlanService } from './service/release-plan.service';
+import { ReleasePolicyService } from './service/release-policy.service';
+import { ReleasePolicySettingsService } from './service/release-policy-settings.service';
+import { ReleasePolicyAccessService } from './service/release-policy-access.service';
+import {
+  LoggingReleasePolicyOwnerNotifier,
+  ReleasePolicyOwnerNotifier,
+} from './service/release-policy-notifier';
+import { ReleasePolicySchedulerRegistrationService } from './service/release-policy-scheduler-registration.service';
 import { AwsModule } from 'src/aws/aws.module';
 import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
+import { RoadmapDraftController } from './draft/roadmap-draft.controller';
+import { RoadmapDraftService } from './draft/roadmap-draft.service';
+import { RoadmapDictationService } from './draft/roadmap-dictation.service';
+import { RoadmapReviewController } from './review/roadmap-review.controller';
+import { RoadmapPlanGateController } from './plan/roadmap-plan-gate.controller';
+import { PlanCloseReadinessService } from './plan/plan-close-readiness.service';
+import { PlanTurnService } from './plan/plan-turn.service';
+import { RoadmapReviewService } from './review/roadmap-review.service';
+import { RoadmapSweepController } from './review/roadmap-sweep.controller';
+import { RoadmapSweepService } from './review/roadmap-sweep.service';
+import { RoadmapMetricsController } from './metrics/roadmap-metrics.controller';
+import { RoadmapMetricsService } from './metrics/roadmap-metrics.service';
+import { BugHunterApprovalsModule } from 'src/bug-hunter-approvals/bug-hunter-approvals.module';
+import { RepoClassifierService } from 'src/bug-hunter-approvals/service/repo-classifier.service';
 
 /**
  * Product Roadmap — the internal vote-based prioritisation board, rebuilt from the standalone
@@ -123,23 +181,31 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
       RoadmapOpportunityComment,
       RoadmapInterviewNote,
       RoadmapIdeaDraft,
+      RoadmapCutoverLog,
       RoadmapSavedView,
       RoadmapUserTabOrder,
       RoadmapUserMap,
       // Read-only: resolving createdBy ints to an email/name for responses. createdBy has no
       // FK, so this is a join done in the mapper rather than by the ORM.
       User,
-      // Written (not just read) by RoadmapOpportunityService.create() when type=bug — see
-      // there. Just the entity, not BugHunterModule, to avoid the circular-import trap.
-      BugFinding,
-      // Written by BugHunterMissClassifierService (below) when it records why a
-      // reported bug was not found first — a runless timeline event on the finding.
-      BugHuntEvent,
       // The Vision & strategy page is one row here (ROADMAP_STRATEGY_CONTEXT_SETTING). The
-      // entity rather than SettingsModule, for the same reason as BugFinding above: one row
+      // entity rather than SettingsModule: one row
       // read and written by one service needs no module graph behind it.
       GlobalSettings,
+      // Release tracking (ItemReleaseService): its own two tables, and Builder's pull requests
+      // read (never written) to link an opportunity's Builder work. The entity rather than a
+      // Builder repository export (just the entity, no module graph).
+      ItemLinkedPr,
+      ItemRelease,
+      BuilderPullRequest,
+      // The auto-release policy's shadow log (Roadmap v2, P5).
+      ReleasePolicyLog,
     ]),
+    // GithubActionsService — release tracking's compare / runs / tags reads, on the shared
+    // client and token. Builder imports it too but does not re-export it.
+    GithubModule,
+    // ProductionReleaseService — a Release click on the Roadmap (P5). Imports only GithubModule.
+    ReleaseModule,
     // AiService — the Weaviate client for duplicate detection.
     AiModule,
     // PromptSharedService — resolves src/prompts/roadmap/*.txt (with any dashboard override)
@@ -151,13 +217,15 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
     /**
      * BuilderSessionService — "Open in Builder Agent" on an opportunity.
      *
-     * The whole module rather than the entity (the treatment BugFinding gets above) because
+     * The whole module rather than the entity because
      * creating a session is real logic: slug allocation, the default budget ceiling and the
      * tenant caps all live in that service, and a roadmap-side INSERT would silently skip them.
-     * Safe to import: nothing in Builder's graph reaches back here — only AnalyticsSuggestions
+     * Safe to import: nothing in Builder's graph reaches back here — only PmAgentModule
      * imports ProductRoadmapModule.
      */
     BuilderModule,
+    /** PlanAccessService: every filing door needs the Idea role (RoadmapRoleService). */
+    ProductPlanningModule,
     // The opportunity copilot's principles_search/principles_get, on First Principles.
     ContextLibraryModule,
     /**
@@ -165,15 +233,71 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
      * checks a stored image really is one of our own uploads.
      */
     AwsModule,
+    /**
+     * BugHunterBoardService — a filed bug also enters Bug Hunter v2's queue (chunk 10).
+     * Safe to import: that module imports only AuditModule, nothing that reaches back here.
+     */
+    BugHunterApprovalsModule,
   ],
   controllers: [
+    // Roadmap v2 (plans/roadmap-builder-merge): 404 while roadmap_v2 is off.
+    RoadmapItemController,
+    // P6: Switch on Roadmap. The one pair that answers while roadmap_v2 is off.
+    RoadmapCutoverController,
+    // P3: New idea, drafts, dictation, review and the lead.
+    RoadmapDraftController,
+    RoadmapReviewController,
+    RoadmapPlanGateController,
+    RoadmapSweepController,
+    // P8: the Owner's Measures.
+    RoadmapMetricsController,
+    RoadmapItemBuildController,
+    RoadmapPeopleController,
     RoadmapOpportunityController,
     RoadmapCollaborationController,
     RoadmapAdminController,
     RoadmapUpNextController,
     RoadmapIdeaDraftController,
+    RoadmapPlanController,
+    RoadmapItemReleaseController,
+    RoadmapReleaseController,
   ],
   providers: [
+    // Bug Hunter's repo classifier (moved from the old Bug Hunter): picks the app of a
+    // filed bug that names none. Its prompt and LLM services are imported above.
+    RepoClassifierService,
+    RoadmapItemLookupService,
+    // Roadmap v2's read model and its inline edits (P2).
+    RoadmapItemReadService,
+    RoadmapItemEditService,
+    // Roadmap v2 P3: drafts, dictation, review and the lead.
+    RoadmapDraftService,
+    RoadmapDictationService,
+    RoadmapReviewService,
+    RoadmapSweepService,
+    RoadmapMetricsService,
+    RoadmapItemBuildService,
+    RoadmapRoleAdminService,
+    // Roadmap v2 P6: the Owner's switch-on action.
+    RoadmapCutoverService,
+    // The idea-to-outcome plan flow (plans/roadmap-owns-planning rev 5.2).
+    PlanSessionStore,
+    PlanStageService,
+    PlanReadinessService,
+    PlanViewService,
+    PlanIdeaService,
+    PlanLeadService,
+    PlanCheckService,
+    PlanCloseReadinessService,
+    PlanTurnService,
+    PlanAiService,
+    PlanOutcomeService,
+    PlanLaunchService,
+    PlanDiscoveryService,
+    PlanExportService,
+    PlanSchedulerRegistrationService,
+    PlanHandoffService,
+    PlanRoadmapToolsService,
     // repositories
     RoadmapProductGoalRepository,
     RoadmapStrategyGoalRepository,
@@ -187,8 +311,7 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
     RoadmapInterviewNoteRepository,
     RoadmapSavedViewRepository,
     RoadmapUserTabOrderRepository,
-    // services
-    RoadmapNotificationService,
+    // services (RoadmapNotificationService now comes from ProductPlanningModule)
     RoadmapAccessService,
     // Signs the readiness verdict on the way out of ai/readiness and verifies it on the way
     // into POST /opportunities — the readiness gate's server-side half.
@@ -218,22 +341,28 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
     RoadmapCopilotService,
     RoadmapVoteGrantSchedulerRegistrationService,
     RoadmapBuilderSchedulerRegistrationService,
+    // Release tracking: Released from what is actually in production (Roadmap v2, P1).
+    ItemReleaseService,
+    ItemReleaseSchedulerRegistrationService,
+    // The auto-release policy, shadow mode only (Roadmap v2, P5). The settings,
+    // access and notifier providers are the seams P0 rewires.
+    ReleasePlanService,
+    ReleasePolicyService,
+    ReleasePolicySettingsService,
+    ReleasePolicyAccessService,
+    {
+      provide: ReleasePolicyOwnerNotifier,
+      useClass: LoggingReleasePolicyOwnerNotifier,
+    },
+    ReleasePolicySchedulerRegistrationService,
+    RoadmapV2EnabledGuard,
     // Classifies a reported bug's repo at intake (RoadmapOpportunityService.create).
-    // Provided directly rather than importing BugHunterModule: it constructs
-    // itself from AppConfigService (global), PromptSharedService and
-    // LlmUsageService — both already imported above — so no heavier module
-    // import is needed, same reasoning as BugFinding being registered as just
-    // the entity above rather than the whole module.
-    BugHunterRepoClassifierService,
-    // Writes the miss record on a reported bug a moment after intake (OPP-0774).
-    // Provided directly for the same reason as the repo classifier above.
-    BugHunterMissClassifierService,
     // realtime
     RoadmapGateway,
   ],
   /**
-   * RoadmapOpportunityService is exported so AnalyticsSuggestionsModule can file
-   * an accepted suggestion through THE SAME create() path a person filing by
+   * RoadmapOpportunityService is exported so the PM Agent can file
+   * an accepted card through THE SAME create() path a person filing by
    * hand uses. Writing the row through the exported repository instead would
    * skip the vector index and the realtime notify, which is how an opportunity
    * ends up invisible to duplicate detection and absent from an open board.

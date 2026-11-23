@@ -1,0 +1,135 @@
+diff --git a/apps/ally-admin-dashboard/src/components/create-simulation-sub-section/CreateSimulationSubSection.tsx b/apps/ally-admin-dashboard/src/components/create-simulation-sub-section/CreateSimulationSubSection.tsx
+index b8c2c67386..2b545c23e8 100644
+--- a/apps/ally-admin-dashboard/src/components/create-simulation-sub-section/CreateSimulationSubSection.tsx
++++ b/apps/ally-admin-dashboard/src/components/create-simulation-sub-section/CreateSimulationSubSection.tsx
+@@ -2,7 +2,7 @@ import { FC, Fragment, useEffect, useRef } from "react";
+ 
+ import { UseFormReturn } from "react-hook-form";
+ 
+-import { ExperienceMode, ChecklistType, FORM_FIELD_IDS, SESSION_TIMER_CONFIG } from "@constants";
++import { FORM_FIELD_IDS, SESSION_TIMER_CONFIG } from "@constants";
+ import { FormFieldConfig } from "@types";
+ 
+ import { FormField } from "./FormField";
+@@ -16,21 +16,9 @@ export const CreateSimulationSubSection: FC<CreateSimulationSubSectionProps> = (
+   items,
+   formMethods,
+ }) => {
+-  const experienceMode = formMethods.watch(FORM_FIELD_IDS.EXPERIENCE_MODE);
+-  const checklistType = formMethods.watch(FORM_FIELD_IDS.CHECKLIST_TYPE);
+   const timerMode = formMethods.watch(FORM_FIELD_IDS.TIMER_MODE);
+   const checklistTypeRef = useRef<HTMLDivElement>(null);
+ 
+-  // Auto-scroll and set default checklistType when experienceMode changes to CHECKLIST
+-  useEffect(() => {
+-    if (experienceMode === ExperienceMode.CHECKLIST) {
+-      // Set default value to GUIDED if checklistType is not already set
+-      if (!checklistType) {
+-        formMethods.setValue(FORM_FIELD_IDS.CHECKLIST_TYPE, ChecklistType.GUIDED);
+-      }
+-    }
+-  }, [experienceMode, checklistType, formMethods]);
+-
+   // Auto-set default maxTimeValue when timerMode is enabled
+   useEffect(() => {
+     if (timerMode) {
+diff --git a/apps/ally-admin-dashboard/src/constants/SimulationCreator.ts b/apps/ally-admin-dashboard/src/constants/SimulationCreator.ts
+index f2ee0b0ba4..b8d1e918e1 100644
+--- a/apps/ally-admin-dashboard/src/constants/SimulationCreator.ts
++++ b/apps/ally-admin-dashboard/src/constants/SimulationCreator.ts
+@@ -1,5 +1,6 @@
+ import { FEATURE_FLAGS_MAP } from "@ally-ui-mono/ui-shared/featureFlag";
+ import { cellTypes } from "@components";
++import { ExperienceMode } from "@src/constants";
+ import { CreatorFieldGroups, FormFieldConfig } from "@types";
+ 
+ export const minInputHeight = {
+@@ -391,7 +392,7 @@ export const SIMULATION_CREATOR_FIELD_GROUPS_OLD: CreatorFieldGroups[] = [
+         options: CHECKLIST_TYPE_OPTIONS,
+         fullWidth: false,
+         dependsOn: "experienceMode",
+-        visibleWhen: (formValues: any) => formValues.experienceMode === "CHECKLIST",
++        visibleWhen: (formValues: any) => formValues.experienceMode === ExperienceMode.CHECKLIST,
+       },
+       {
+         id: "timerMode",
+@@ -613,7 +614,7 @@ export const SIMULATION_CREATOR_FIELD_GROUPS: CreatorFieldGroups[] = [
+         options: CHECKLIST_TYPE_OPTIONS,
+         fullWidth: false,
+         dependsOn: "experienceMode",
+-        visibleWhen: (formValues: any) => formValues.experienceMode === "CHECKLIST",
++        visibleWhen: (formValues: any) => formValues.experienceMode === ExperienceMode.CHECKLIST,
+       },
+       {
+         id: "timerMode",
+diff --git a/apps/ally-admin-dashboard/src/pages/CreateSimulation/CreateSimulation.tsx b/apps/ally-admin-dashboard/src/pages/CreateSimulation/CreateSimulation.tsx
+index 3340cfe35f..5f7f9abdad 100644
+--- a/apps/ally-admin-dashboard/src/pages/CreateSimulation/CreateSimulation.tsx
++++ b/apps/ally-admin-dashboard/src/pages/CreateSimulation/CreateSimulation.tsx
+@@ -30,7 +30,6 @@ import {
+   SIMULATION_CREATOR_FIELD_GROUPS,
+   SIMULATION_CREATOR_FIELD_GROUPS_OLD,
+   SIMULATION_CREATOR_STEP_IDS,
+-  ExperienceMode,
+   SESSION_TIMER_CONFIG,
+   FORM_FIELD_IDS,
+ } from "@constants";
+@@ -223,16 +222,6 @@ export const CreateSimulation: FC = () => {
+       ...(FEATURE_FLAGS_MAP.ADDITIONAL_CONFIG_FLAG && { stateInstructions }),
+     };
+ 
+-    // Default experienceMode to FEEDBACK if not selected
+-    if (!simulationData["experienceMode"]) {
+-      simulationData["experienceMode"] = ExperienceMode.FEEDBACK;
+-    }
+-
+-    // Remove checklistType if experienceMode is not "CHECKLIST"
+-    if (simulationData["experienceMode"] !== ExperienceMode.CHECKLIST) {
+-      delete simulationData["checklistType"];
+-    }
+-
+     let response;
+     if (simulationId) {
+       response = await updateSimulationByIdQuery({
+diff --git a/apps/ally-admin-dashboard/src/pages/CreateSimulation/__tests__/CreateSimulation.test.tsx b/apps/ally-admin-dashboard/src/pages/CreateSimulation/__tests__/CreateSimulation.test.tsx
+index 078a8a300c..96f3d9ae7f 100644
+--- a/apps/ally-admin-dashboard/src/pages/CreateSimulation/__tests__/CreateSimulation.test.tsx
++++ b/apps/ally-admin-dashboard/src/pages/CreateSimulation/__tests__/CreateSimulation.test.tsx
+@@ -722,37 +722,6 @@ describe("CreateSimulation", () => {
+   });
+ 
+   describe("Experience Mode and Checklist Type", () => {
+-    it("should remove checklistType when experienceMode is not CHECKLIST", async () => {
+-      mockFormMethods.getValues.mockReturnValue({
+-        title: "Test Title",
+-        description: "Test Description",
+-        experienceMode: ExperienceMode.FEEDBACK,
+-        checklistType: ChecklistType.GUIDED,
+-        triggerWarningIds: [],
+-      });
+-      mockCreateSimulation.mockResolvedValue({ data: [{ id: "new-id" }] });
+-
+-      renderCreateSimulation();
+-
+-      const saveDraftButton = screen.getByText("Save Draft");
+-      fireEvent.click(saveDraftButton);
+-
+-      await waitFor(
+-        () => {
+-          expect(mockCreateSimulation).toHaveBeenCalledWith(
+-            expect.objectContaining({
+-              scenarios: expect.arrayContaining([
+-                expect.not.objectContaining({
+-                  checklistType: ChecklistType.GUIDED,
+-                }),
+-              ]),
+-            }),
+-          );
+-        },
+-        { timeout: 500 },
+-      );
+-    });
+-
+     it("should keep checklistType when experienceMode is CHECKLIST", async () => {
+       mockFormMethods.getValues.mockReturnValue({
+         title: "Test Title",

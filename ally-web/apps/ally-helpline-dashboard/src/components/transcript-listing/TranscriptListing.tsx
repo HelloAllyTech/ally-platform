@@ -166,6 +166,38 @@ const TranscriptItem = ({
   );
 };
 
+/**
+ * Brings `el` into view inside the nearest ancestor that scrolls on its own
+ * (the transcript column beside the debrief at ≥ 1024 px), leaving the page
+ * where it is; with no such ancestor (the transcript tab) the page scrolls as
+ * `scrollIntoView` would. LW-07: "See this moment" moved the whole page.
+ */
+export const scrollIntoViewWithin = (el: HTMLElement, block: "center" | "nearest") => {
+  let box = el.parentElement;
+  while (box && box !== document.body && box !== document.documentElement) {
+    const { overflowY } = window.getComputedStyle(box);
+    if ((overflowY === "auto" || overflowY === "scroll") && box.scrollHeight > box.clientHeight) {
+      const boxRect = box.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+      const top = elRect.top - boxRect.top + box.scrollTop;
+      let target: number;
+      if (block === "center") {
+        target = top - (box.clientHeight - elRect.height) / 2;
+      } else if (elRect.top < boxRect.top) {
+        target = top;
+      } else if (elRect.bottom > boxRect.bottom) {
+        target = top - box.clientHeight + elRect.height;
+      } else {
+        return;
+      }
+      box.scrollTo?.({ top: Math.max(0, target), behavior: "smooth" });
+      return;
+    }
+    box = box.parentElement;
+  }
+  el.scrollIntoView?.({ behavior: "smooth", block });
+};
+
 const TranscriptListing: FC<TranscriptListingProps> = ({
   transcriptList,
   handleLoadMore,
@@ -300,7 +332,7 @@ const TranscriptListing: FC<TranscriptListingProps> = ({
   // ── Auto-scroll to the active transcript item ──
   useEffect(() => {
     if (activeItemRef.current) {
-      activeItemRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      scrollIntoViewWithin(activeItemRef.current, "nearest");
     }
   }, [activeIndex]);
 
@@ -320,7 +352,7 @@ const TranscriptListing: FC<TranscriptListingProps> = ({
   // then let the highlight expire on its own.
   useEffect(() => {
     if (!focusedMessage) return undefined;
-    focusedItemRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (focusedItemRef.current) scrollIntoViewWithin(focusedItemRef.current, "center");
     focusHighlightTimerRef.current = setTimeout(() => setFocusedMessage(null), FOCUS_HIGHLIGHT_MS);
     return () => {
       if (focusHighlightTimerRef.current) clearTimeout(focusHighlightTimerRef.current);

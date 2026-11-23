@@ -4,7 +4,6 @@ import {
   CreateKbUploadUrlRequest,
   CreateKbUploadUrlResponse,
   KbCorpus,
-  KbChunk,
   GetKbDocumentsParams,
   GetKbDocumentsResponse,
   KbDocument,
@@ -30,17 +29,10 @@ import {
   ConnectWaNumberRequest,
   WaTemplate,
   WaTemplateKind,
-  GetWaConversationsParams,
-  GetWaConversationsResponse,
-  GetWaUnansweredResponse,
   WaAnalyticsBucket,
   WaAnalyticsOverview,
-  WaConversationDetail,
   WaCorpusCoverageResponse,
   WaLanguageRow,
-  WaUnansweredQuestion,
-  WaUnansweredReason,
-  WaUnansweredStatus,
 } from "@types";
 
 import { baseAPI } from "./baseApi";
@@ -495,183 +487,7 @@ const whatsappBotAPI = baseAPI.injectEndpoints({
 
     // ---- Conversation log ----
 
-    getWaConversations: builder.query<GetWaConversationsResponse, GetWaConversationsParams | void>({
-      query: (params?: GetWaConversationsParams) => ({
-        url: ApiEndpoints.WHATSAPP_BOT.CONVERSATIONS,
-        method: HttpMethod.GET,
-        params: {
-          limit: params?.limit ?? 25,
-          offset: params?.offset ?? 0,
-          ...(params?.from ? { from: params.from } : {}),
-          ...(params?.to ? { to: params.to } : {}),
-          ...(params?.handledBy ? { handledBy: params.handledBy } : {}),
-          ...(params?.language ? { language: params.language } : {}),
-          ...(params?.declinedOnly ? { declinedOnly: true } : {}),
-          ...(params?.search ? { search: params.search } : {}),
-          ...(params?.sortBy ? { sortBy: params.sortBy } : {}),
-          ...(params?.sortDir ? { sortDir: params.sortDir } : {}),
-          ...bot(params?.chatbotId),
-        },
-      }),
-      providesTags: [TAG_TYPES.WHATSAPP_BOT_CONVERSATIONS],
-    }),
-
-    /**
-     * The languages present in the log, for its filter.
-     *
-     * Not the analytics language breakdown: that one is windowed and sits behind a different
-     * permission, so it would hand an empty filter to a conversations-only admin and would drop a
-     * language nobody used this month while its threads were still listed.
-     */
-    getWaConversationLanguages: builder.query<string[], WithBot | void>({
-      query: (params?: WithBot) => ({
-        url: ApiEndpoints.WHATSAPP_BOT.CONVERSATION_LANGUAGES,
-        method: HttpMethod.GET,
-        params: bot(params?.chatbotId),
-      }),
-      providesTags: [TAG_TYPES.WHATSAPP_BOT_CONVERSATIONS],
-    }),
-
-    getWaConversation: builder.query<WaConversationDetail, BotRowArg>({
-      query: arg => ({
-        url: ApiEndpoints.WHATSAPP_BOT.CONVERSATION_BY_ID(botRow(arg).id),
-        method: HttpMethod.GET,
-        params: bot(botRow(arg).chatbotId),
-      }),
-      providesTags: [TAG_TYPES.WHATSAPP_BOT_CONVERSATIONS],
-    }),
-
-    /**
-     * Resolve a citation to the exact passage that was quoted.
-     *
-     * Reads the chunk row rather than the vector index, so a document re-chunked since the answer
-     * was sent still resolves: the row holding the quoted text survives even though its vector
-     * object was replaced.
-     */
-    getWaCitation: builder.query<KbChunk, string>({
-      query: chunkId => ({
-        url: ApiEndpoints.WHATSAPP_BOT.CITATION_BY_CHUNK(chunkId),
-        method: HttpMethod.GET,
-      }),
-      providesTags: [TAG_TYPES.WHATSAPP_BOT_CONVERSATIONS],
-    }),
-
-    /**
-     * Reveal one contact's full phone number.
-     *
-     * A mutation despite being a read: it must fire only on an explicit click, and every call is
-     * logged server-side. As a query, RTK Query would refetch it on mount and on cache
-     * invalidation — quietly re-emitting identifiable data nobody asked for again.
-     */
-    revealWaContactPhone: builder.mutation<{ id: string; phoneE164: string }, BotRowArg>({
-      query: arg => ({
-        url: ApiEndpoints.WHATSAPP_BOT.CONTACT_REVEAL(botRow(arg).id),
-        method: HttpMethod.POST,
-        params: bot(botRow(arg).chatbotId),
-      }),
-    }),
-
-    blockWaContact: builder.mutation<
-      { id: string; blocked: boolean },
-      { id: string; reason?: string } & WithBot
-    >({
-      query: ({ id, reason, chatbotId }) => ({
-        url: ApiEndpoints.WHATSAPP_BOT.CONTACT_BLOCK(id),
-        method: HttpMethod.POST,
-        params: bot(chatbotId),
-        body: { reason },
-      }),
-      invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_CONVERSATIONS],
-    }),
-
-    unblockWaContact: builder.mutation<{ id: string; blocked: boolean }, BotRowArg>({
-      query: arg => ({
-        url: ApiEndpoints.WHATSAPP_BOT.CONTACT_UNBLOCK(botRow(arg).id),
-        method: HttpMethod.POST,
-        params: bot(botRow(arg).chatbotId),
-      }),
-      invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_CONVERSATIONS],
-    }),
-
     // ---- Unanswered queue ----
-
-    getWaUnanswered: builder.query<
-      GetWaUnansweredResponse,
-      {
-        limit?: number;
-        offset?: number;
-        status?: WaUnansweredStatus;
-        reason?: WaUnansweredReason;
-        sortBy?: string;
-        sortDir?: "asc" | "desc";
-        chatbotId?: string;
-      } | void
-    >({
-      query: (params?: {
-        limit?: number;
-        offset?: number;
-        status?: WaUnansweredStatus;
-        reason?: WaUnansweredReason;
-        sortBy?: string;
-        sortDir?: "asc" | "desc";
-        chatbotId?: string;
-      }) => ({
-        url: ApiEndpoints.WHATSAPP_BOT.UNANSWERED,
-        method: HttpMethod.GET,
-        params: {
-          limit: params?.limit ?? 25,
-          offset: params?.offset ?? 0,
-          ...(params?.status ? { status: params.status } : {}),
-          ...(params?.reason ? { reason: params.reason } : {}),
-          ...(params?.sortBy ? { sortBy: params.sortBy } : {}),
-          ...(params?.sortDir ? { sortDir: params.sortDir } : {}),
-          ...bot(params?.chatbotId),
-        },
-      }),
-      providesTags: [TAG_TYPES.WHATSAPP_BOT_UNANSWERED],
-    }),
-
-    updateWaUnanswered: builder.mutation<
-      WaUnansweredQuestion,
-      {
-        id: string;
-        status?: WaUnansweredStatus;
-        assignedTo?: number | null;
-        resolutionNote?: string;
-        linkedDocumentId?: string;
-      } & WithBot
-    >({
-      query: ({ id, chatbotId, ...body }) => ({
-        url: ApiEndpoints.WHATSAPP_BOT.UNANSWERED_BY_ID(id),
-        method: HttpMethod.PATCH,
-        params: bot(chatbotId),
-        body,
-      }),
-      invalidatesTags: [TAG_TYPES.WHATSAPP_BOT_UNANSWERED, TAG_TYPES.CHATBOT_DETAIL],
-    }),
-
-    /**
-     * Write the answer as a corpus document and resolve the gap in one action.
-     *
-     * Invalidates the corpus tag too: the new document must appear in the corpus list, which is
-     * where its ingest status is watched.
-     */
-    createDocumentFromWaUnanswered: builder.mutation<
-      { question: WaUnansweredQuestion; document: KbDocument },
-      { id: string; title: string; text: string; tags?: string[] } & WithBot
-    >({
-      query: ({ id, chatbotId, ...body }) => ({
-        url: ApiEndpoints.WHATSAPP_BOT.UNANSWERED_CREATE_DOCUMENT(id),
-        method: HttpMethod.POST,
-        params: bot(chatbotId),
-        body,
-      }),
-      invalidatesTags: [
-        TAG_TYPES.WHATSAPP_BOT_UNANSWERED,
-        TAG_TYPES.WHATSAPP_BOT_DOCUMENTS,
-        TAG_TYPES.CHATBOT_DETAIL,
-      ],
-    }),
 
     // ---- Usage dashboard ----
 
@@ -772,16 +588,6 @@ export const {
   useSubscribeWaNumberMutation,
   useDisconnectWaNumberMutation,
   useCustomiseWaTemplateMutation,
-  useGetWaConversationsQuery,
-  useGetWaConversationQuery,
-  useGetWaConversationLanguagesQuery,
-  useGetWaCitationQuery,
-  useRevealWaContactPhoneMutation,
-  useBlockWaContactMutation,
-  useUnblockWaContactMutation,
-  useGetWaUnansweredQuery,
-  useUpdateWaUnansweredMutation,
-  useCreateDocumentFromWaUnansweredMutation,
   useGetWaAnalyticsOverviewQuery,
   useGetWaAnalyticsTimeseriesQuery,
   useGetWaAnalyticsLanguagesQuery,

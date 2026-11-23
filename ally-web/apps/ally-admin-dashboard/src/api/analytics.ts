@@ -6,7 +6,6 @@ import {
   AnalyticsHighlightsResponse,
   AnalyticsOverviewResponse,
   AnalyticsRange,
-  BugAgentPerformanceResponse,
   ChartPreference,
   ChartPreferencesResponse,
   CoachingLoopResponse,
@@ -62,10 +61,7 @@ import {
 
 import { baseAPI } from "./baseApi";
 import { ActiveUsersXpQuery, ActiveUsersXpResponse } from "../pages/Analytics/activeUsersXpChart";
-import {
-  BugHunterVolumeQuery,
-  BugHunterVolumeResponse,
-} from "../pages/Analytics/bugHunterVolumeChart";
+import { AssessmentAttemptsResponse } from "../pages/Analytics/assessmentAttemptsChart";
 import { CourseImpactQuery, CourseImpactResponse } from "../pages/Analytics/courseImpactChart";
 import {
   KnowledgeVsSkillResponse,
@@ -247,9 +243,9 @@ const GOALS_TAB_PATHS = {
   ACTIVE_USERS_XP: "/v1/analytics/active-users-xp",
   COURSE_UNITS: "/v1/analytics/course-units",
   XP_LEVEL_REACHED: "/v1/analytics/xp-level-reached",
-  BUG_HUNTER_VOLUME: "/v1/analytics/bug-hunter-volume",
   XP_BY_TENANT: "/v1/analytics/xp-by-tenant",
   ROADMAP_VOTING: "/v1/analytics/roadmap-voting",
+  ASSESSMENT_ATTEMPTS: "/v1/analytics/assessment-attempts",
 } as const;
 
 type ConversationDriftQuery = AnalyticsWindowQuery & {
@@ -410,16 +406,6 @@ export const analyticsAPI = baseAPI.injectEndpoints({
     getFixSessionEngineCost: builder.query<FixSessionEngineCostResponse, AnalyticsWindowQuery>({
       query: (q = {}) => ({
         url: ApiEndpoints.ANALYTICS.FIX_SESSION_ENGINE_COST,
-        method: HttpMethod.GET,
-        params: windowParams(q),
-      }),
-    }),
-    // Precision, fix throughput, speed, cost and reliability — bucketed by
-    // week regardless of the requested bucket, since this chart is inherently
-    // a week-over-week view.
-    getBugAgentPerformance: builder.query<BugAgentPerformanceResponse, AnalyticsWindowQuery>({
-      query: (q = {}) => ({
-        url: ApiEndpoints.ANALYTICS.BUG_AGENT_PERFORMANCE,
         method: HttpMethod.GET,
         params: windowParams(q),
       }),
@@ -1183,14 +1169,11 @@ export const analyticsAPI = baseAPI.injectEndpoints({
         method: HttpMethod.GET,
       }),
     }),
-    // Bug Hunter found vs. fixed volume per bucket. Standard window params;
-    // `tenantId` is deliberately not offered here — `bug_findings` carries no
-    // tenant column, so it would be a no-op on the server.
-    getBugHunterVolume: builder.query<BugHunterVolumeResponse, BugHunterVolumeQuery>({
-      query: (q = {}) => ({
-        url: GOALS_TAB_PATHS.BUG_HUNTER_VOLUME,
+    // Single valid assessment attempts (AAQ-255): all-time, weekly, platform-wide.
+    getAssessmentAttempts: builder.query<AssessmentAttemptsResponse, void>({
+      query: () => ({
+        url: GOALS_TAB_PATHS.ASSESSMENT_ATTEMPTS,
         method: HttpMethod.GET,
-        params: windowParams(q),
       }),
     }),
     // Total XP within a trailing window, split by tenant (top 8 + "Other").
@@ -1295,7 +1278,6 @@ export const {
   useGetXpPerMinuteQuery,
   useGetCodingAgentCostQuery,
   useGetFixSessionEngineCostQuery,
-  useGetBugAgentPerformanceQuery,
   useGetQualitySentimentQuery,
   useGetRagQualityQuery,
   useGetXpGrowthQuery,
@@ -1305,7 +1287,7 @@ export const {
   useGetActiveUsersXpQuery,
   useGetCourseUnitsQuery,
   useGetXpLevelReachedQuery,
-  useGetBugHunterVolumeQuery,
   useGetRoadmapVotingQuery,
+  useGetAssessmentAttemptsQuery,
   useGetXpByTenantQuery,
 } = analyticsAPI;

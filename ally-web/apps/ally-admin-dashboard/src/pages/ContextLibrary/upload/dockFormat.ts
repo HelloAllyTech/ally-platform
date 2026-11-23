@@ -1,5 +1,6 @@
 import { en } from "@constants";
 import {
+  ContextAudience,
   ContextQueueItem,
   ContextSourceStatus,
   ContextUploadOutcome,
@@ -32,6 +33,8 @@ export interface DockRow {
   fileName: string;
   title: string;
   collections: string[];
+  /** Who its entries reach, so Re-extract, Add anyway and Retry send it again. */
+  audience?: ContextAudience;
   phase: DockPhase;
   /** 0–1 while uploading. */
   uploadFraction: number;

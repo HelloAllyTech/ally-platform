@@ -100,6 +100,47 @@ describe('FeatureToggleGuard', () => {
     });
   });
 
+  describe('alternate toggle (alsoAllowedBy)', () => {
+    beforeEach(() => {
+      reflector.getAllAndOverride.mockReturnValue({
+        featureKey: 'builder',
+        alsoAllowedBy: 'debrief_clinical_sign_off',
+      });
+    });
+
+    it('lets a holder of the alternate toggle in, and marks the request', async () => {
+      featureToggleService.hasToggle.mockImplementation(
+        async (_id: number, key: string) => key === 'debrief_clinical_sign_off',
+      );
+      const request: any = { user: platformAdmin, query: {} };
+      const context = {
+        switchToHttp: () => ({ getRequest: () => request }),
+        getHandler: () => undefined,
+        getClass: () => undefined,
+      } as unknown as ExecutionContext;
+      await expect(guard.canActivate(context)).resolves.toBe(true);
+      expect(request.viaAlternateToggle).toBe('debrief_clinical_sign_off');
+    });
+
+    it('still refuses a caller with neither toggle', async () => {
+      await expect(
+        guard.canActivate(contextFor(platformAdmin)),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('does not mark a holder of the primary toggle', async () => {
+      featureToggleService.hasToggle.mockResolvedValue(true);
+      const request: any = { user: platformAdmin, query: {} };
+      const context = {
+        switchToHttp: () => ({ getRequest: () => request }),
+        getHandler: () => undefined,
+        getClass: () => undefined,
+      } as unknown as ExecutionContext;
+      await expect(guard.canActivate(context)).resolves.toBe(true);
+      expect(request.viaAlternateToggle).toBeUndefined();
+    });
+  });
+
   it('passes through when the route carries no @RequireFeatureToggle', async () => {
     reflector.getAllAndOverride.mockReturnValue(undefined);
 

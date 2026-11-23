@@ -75,6 +75,47 @@ export class Chatbot extends BaseWithoutTenantEntity {
   @Column({ type: 'timestamp', name: 'last_tested_at', nullable: true })
   lastTestedAt?: Date | null;
 
+  /**
+   * The safety pack it was built with (chunk 20a onboarding), or null. The engine adds the pack's
+   * rules to every run, and a settings change that weakens it is refused.
+   */
+  @Column({ name: 'safety_pack', type: 'varchar', length: 32, nullable: true })
+  safetyPack?: string | null;
+
+  @Column({ name: 'safety_pack_version', type: 'int', nullable: true })
+  safetyPackVersion?: number | null;
+
+  /**
+   * The owner's own rules, on top of the pack: lines the assistant must never cross. `packChange`
+   * (Q3-fast Part 1) is the owner's last change of the safety pack, with their reason when the new
+   * pack is less strict; the Safety and Checkup sections show it.
+   */
+  @Column({ type: 'jsonb', default: () => `'{"never":[]}'` })
+  rules!: { never: string[]; avoid?: string[]; packChange?: PackChange };
+
+  /**
+   * What it's for (chunk 20a-2): answer, enquiries, training, guide or custom; null for bots made
+   * before purposes, which run exactly as before. Adds a short section to the agent's instructions
+   * after the owner's and before the safety rules.
+   */
+  @Column({ type: 'varchar', length: 16, nullable: true })
+  purpose?: string | null;
+
+  /** "Something else": the owner's own description of what it's for. */
+  @Column({ name: 'purpose_note', type: 'text', nullable: true })
+  purposeNote?: string | null;
+
   @Column({ type: 'timestamp', name: 'archived_at', nullable: true })
   archivedAt?: Date | null;
+}
+
+/** The owner's change of an assistant's safety pack (Q3-fast Part 1). */
+export interface PackChange {
+  from: string | null;
+  to: string;
+  /** Only for a less strict pack, where it is required. */
+  reason: string | null;
+  lessStrict: boolean;
+  at: string;
+  by: number | null;
 }

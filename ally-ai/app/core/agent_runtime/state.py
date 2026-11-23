@@ -45,6 +45,17 @@ class BotConfig(TypedDict, total=False):
     # --- conversational agent
     knowledge_topics: List[str]
     decline_text: Optional[str]
+    # --- tool gateway (chunk 3b): the names ally-be offers, never its URL or token
+    gateway_tools: List[str]
+    # --- list tools (chunk 6): their definitions, and the names left out by the cap
+    gateway_definitions: List[Dict[str, Any]]
+    gateway_omitted: List[str]
+    gateway_today: str
+    # --- memory (chunk 8a): each only when present
+    memory: Dict[str, Any]  # {lines, never_store}
+    summary: str
+    person_name: str
+    before_chat: List[Dict[str, str]]  # [{label, value}], the pre-chat's answers
 
 
 class RunInput(TypedDict, total=False):
@@ -67,6 +78,10 @@ class RunWorking(TypedDict, total=False):
     hits: List[Dict[str, Any]]  # the run's first search, best first
     retrieval: Dict[str, Any]
     passages: List[Dict[str, Any]]
+    #: List entries the previous message's run found (chunk 6b): the run starts with
+    #: them as passages, so "yes, book it" books the slot it just showed without a
+    #: find first. ally-be still checks every rule on the write.
+    carried_records: Optional[List[Dict[str, Any]]]
     turn_type: Optional[TurnType]
     # The gate verdict on the run's first search (a DeclineReason value); None when
     # it found something relevant or no search ran.
@@ -84,6 +99,11 @@ class RunWorking(TypedDict, total=False):
     # The first draft as it would have gone out, when it was sent back for something
     # that still let it go out (agent_check.py).
     fallback_result: Optional[Dict[str, Any]]
+    # What the run asked to remember (chunk 8a): returned, never stored here.
+    memory_writes: List[Dict[str, Any]]
+    #: What the run did, step by step, as the bot page shows it (chunk 6b,
+    #: activity.py): each with `ok`, and a write's record id.
+    activity: List[Dict[str, Any]]
 
     # --- output: the `/knowledge-agent/answer` response, field for field
     result: Optional[Dict[str, Any]]

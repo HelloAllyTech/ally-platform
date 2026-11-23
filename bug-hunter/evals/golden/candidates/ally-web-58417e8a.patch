@@ -1,0 +1,80 @@
+diff --git a/apps/ally-admin-dashboard/src/components/icons/__tests__/icons.test.tsx b/apps/ally-admin-dashboard/src/components/icons/__tests__/icons.test.tsx
+new file mode 100644
+index 0000000000..5a5e1a6587
+--- /dev/null
++++ b/apps/ally-admin-dashboard/src/components/icons/__tests__/icons.test.tsx
+@@ -0,0 +1,41 @@
++import type { ComponentType } from "react";
++
++import { render } from "@testing-library/react";
++import { describe, expect, it } from "vitest";
++
++import { Badge, Book, Globe, Guardrails, HappyEmoji, Mic, Users } from "@icons";
++
++/**
++ * The sidebar's glyphs have to read at one weight — a single heavier icon in the
++ * rail is the one thing the eye lands on. Guardrails used to render a Material
++ * Symbols shield: a 24-unit grid with 2-unit strokes, blown up to 21x23px, next
++ * to Carbon glyphs drawn on a 32-unit grid at 16px. That is ~2.7x the on-screen
++ * stroke width of every icon above and below it.
++ */
++const NAV_GLYPHS: [string, ComponentType][] = [
++  ["Book", Book],
++  ["Users", Users],
++  ["HappyEmoji", HappyEmoji],
++  ["Mic", Mic],
++  ["Globe", Globe],
++  ["Badge", Badge],
++  ["Guardrails", Guardrails],
++];
++
++const renderGlyph = (Icon: ComponentType) => {
++  const { container } = render(<Icon />);
++  const svg = container.querySelector("svg");
++  expect(svg).not.toBeNull();
++  return svg as SVGSVGElement;
++};
++
++describe("sidebar icon set", () => {
++  it.each(NAV_GLYPHS)("draws %s on the shared 32-unit grid", (_name, Icon) => {
++    expect(renderGlyph(Icon).getAttribute("viewBox")).toBe("0 0 32 32");
++  });
++
++  it.each(NAV_GLYPHS)("renders %s at the shared default box size", (_name, Icon) => {
++    const svg = renderGlyph(Icon);
++    expect([svg.getAttribute("width"), svg.getAttribute("height")]).toEqual(["16", "16"]);
++  });
++});
+diff --git a/apps/ally-admin-dashboard/src/components/icons/index.tsx b/apps/ally-admin-dashboard/src/components/icons/index.tsx
+index 7ec9776565..c32c7a9d72 100644
+--- a/apps/ally-admin-dashboard/src/components/icons/index.tsx
++++ b/apps/ally-admin-dashboard/src/components/icons/index.tsx
+@@ -104,6 +104,7 @@ import {
+   ZoomIn as CZoomIn,
+   MachineLearningModel as CMachineLearningModel,
+   Catalog as CCatalog,
++  Security as CSecurity,
+ } from "@carbon/icons-react";
+ import { Heading1 as LHeading1, Heading2 as LHeading2, Heading3 as LHeading3 } from "lucide-react";
+ 
+@@ -200,6 +201,12 @@ export const UserSpeaker = createCarbonIcon(CUserSpeaker);
+ export const MachineLearningModel = createCarbonIcon(CMachineLearningModel);
+ /** Model Catalog tab — the list of models, distinct from Language Model configs. */
+ export const Catalog = createCarbonIcon(CCatalog);
++/** Guardrails tab — Carbon's shield-with-a-checkmark, the same metaphor as the
++ *  Material Symbols glyph it replaces. Not left as a custom SVG: that one was
++ *  drawn on a 24-unit grid with 2-unit strokes and sized 21x23, so in the
++ *  sidebar it rendered visibly heavier than the thin-line Carbon glyphs around
++ *  it. */
++export const Guardrails = createCarbonIcon(CSecurity);
+ export const GroupBranch = createCarbonIcon(CFlowConnection);
+ export const HappyEmoji = createCarbonIcon(CFaceSatisfied);
+ export const ImageIcon = createCarbonIcon(CImage);
+@@ -305,7 +312,6 @@ export { default as CharacterLibrary } from "@assets/svg/characterLibrary.svg?re
+ export { default as Contribution } from "@assets/svg/contribution.svg?react";
+ export { default as DiamondShine } from "@assets/svg/diamond_shine.svg?react";
+ export { default as FrameSource } from "@assets/svg/frameSource.svg?react";
+-export { default as Guardrails } from "@assets/svg/guardrails.svg?react";
+ export { default as Pathway } from "@assets/svg/pathway.svg?react";
+ export { default as SemanticSimilarity } from "@assets/svg/semanticSimilarity.svg?react";
+ export { default as Simulation } from "@assets/svg/simulation.svg?react";

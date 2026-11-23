@@ -1,0 +1,68 @@
+diff --git a/ally-be/src/auth/middlewares/ws-auth.middleware.spec.ts b/ally-be/src/auth/middlewares/ws-auth.middleware.spec.ts
+index 567ca88a73..27069d230a 100644
+--- a/ally-be/src/auth/middlewares/ws-auth.middleware.spec.ts
++++ b/ally-be/src/auth/middlewares/ws-auth.middleware.spec.ts
+@@ -5,6 +5,7 @@ import { PermissionsService } from 'src/authorization/service/permissions.servic
+ import { WebSocketAuthMiddleware } from './ws-auth.middleware';
+ import { Socket } from 'socket.io';
+ import { UnauthorizedException } from '../../exception/custom.exception';
++import { TokenExpiredError, JsonWebTokenError } from 'jsonwebtoken';
+ 
+ describe('WebSocketAuthMiddleware', () => {
+   let middleware: WebSocketAuthMiddleware;
+@@ -105,5 +106,30 @@ describe('WebSocketAuthMiddleware', () => {
+ 
+       expect(next).toHaveBeenCalledWith(originalError);
+     });
++
++    it('should call next with UnauthorizedException when token is expired', async () => {
++      const tokenExpiredError = new TokenExpiredError(
++        'jwt expired',
++        new Date(),
++      );
++      jwtService.verifyAsync.mockRejectedValue(tokenExpiredError);
++
++      await middleware.webSocketMiddleware()(socket, next);
++
++      expect(next).toHaveBeenCalledWith(
++        new UnauthorizedException('Invalid or expired token'),
++      );
++    });
++
++    it('should call next with UnauthorizedException when token is malformed', async () => {
++      const jsonWebTokenError = new JsonWebTokenError('jwt malformed');
++      jwtService.verifyAsync.mockRejectedValue(jsonWebTokenError);
++
++      await middleware.webSocketMiddleware()(socket, next);
++
++      expect(next).toHaveBeenCalledWith(
++        new UnauthorizedException('Invalid or expired token'),
++      );
++    });
+   });
+ });
+diff --git a/ally-be/src/auth/middlewares/ws-auth.middleware.ts b/ally-be/src/auth/middlewares/ws-auth.middleware.ts
+index 90d26a5ea3..c3bba957a2 100644
+--- a/ally-be/src/auth/middlewares/ws-auth.middleware.ts
++++ b/ally-be/src/auth/middlewares/ws-auth.middleware.ts
+@@ -10,6 +10,7 @@ import {
+ } from '../../exception/custom.exception';
+ import { PermissionsService } from 'src/authorization/service/permissions.service';
+ import { isPlatformTokenKind } from '../util/token-kind.util';
++import { TokenExpiredError, JsonWebTokenError } from 'jsonwebtoken';
+ 
+ @Injectable()
+ export class WebSocketAuthMiddleware {
+@@ -105,6 +106,12 @@ export class WebSocketAuthMiddleware {
+           `WebSocket authentication failed for socket ${socket.id}:`,
+           error,
+         );
++        if (
++          error instanceof TokenExpiredError ||
++          error instanceof JsonWebTokenError
++        ) {
++          return next(new UnauthorizedException('Invalid or expired token'));
++        }
+         next(error);
+       }
+     };

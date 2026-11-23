@@ -15,6 +15,7 @@ import { RoadmapProductGoalRepository } from '../repository/roadmap-taxonomy.rep
 
 /** AI-task-registry row id; the key for per-task model config. */
 const AI_TASK_ID = 'roadmap-ai';
+import { fallbackTitle } from '../item/roadmap-item-query.util';
 import { RoadmapOpportunityType } from '../enum/roadmap-opportunity.enum';
 import {
   ROADMAP_DUPLICATES,
@@ -31,6 +32,7 @@ const MAX_TOKENS = {
   DUPLICATES: 1000,
   SUMMARISE: 2000,
   CLAUDE_PROMPT: 2000,
+  TITLE: 120,
   // A verdict plus a ≤200-char reason per goal, at the 12-goal ceiling, with headroom.
   GOAL_IMPACT: 1600,
 } as const;
@@ -87,6 +89,34 @@ export class RoadmapAiService {
       confidence: Number(parsed?.confidence ?? 0),
       rationale: parsed?.rationale ?? '',
     };
+  }
+
+  /**
+   * A one-line title for idea text that has none. Never throws and never returns blank for
+   * non-blank text: a failed or empty model call falls back to the text's first sentence, so
+   * a title can never be the reason an idea is not filed.
+   */
+  async suggestTitle(text: string): Promise<string> {
+    const body = (text ?? '').trim();
+    if (!body) return '';
+    try {
+      const raw = await this.runText(
+        ROADMAP_PROMPT_CODES.SUGGEST_TITLE,
+        `Idea:\n\"\"\"\n${body.slice(0, ROADMAP_LIMITS.STORED_TEXT_MAX)}\n\"\"\"`,
+        MAX_TOKENS.TITLE,
+        LlmTask.ROADMAP_IDEA_TITLE,
+        'suggest-title',
+      );
+      const title = raw.split('\n')[0].replace(/\s+/g, ' ').trim();
+      if (title) return title.slice(0, ROADMAP_LIMITS.TITLE_MAX);
+    } catch (error) {
+      this.logger.warn(
+        `[ROADMAP] Title suggestion failed, using the first sentence: ${
+          (error as Error)?.message
+        }`,
+      );
+    }
+    return fallbackTitle(body);
   }
 
   /** Summarise an interview transcript. Plain text, not JSON — multiline prose in JSON is fragile. */

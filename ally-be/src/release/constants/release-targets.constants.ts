@@ -36,7 +36,16 @@ export interface ReleaseTarget {
   tagPrefix: string;
   /** Shown to the admin in the release confirmation. */
   label: string;
+  /**
+   * Extra `workflow_dispatch` inputs beside `version_tag`. The two frontends
+   * share one workflow and one tag series, and this `apps` input is what tells
+   * their targets apart, so it is part of a target's identity.
+   */
+  inputs?: Readonly<Record<string, string>>;
 }
+
+const FRONTENDS_WORKFLOW = 'production-release-frontends.yaml';
+const FRONTENDS_TAG_PREFIX = 'frontend-v';
 
 export const RELEASE_TARGETS: Record<string, ReleaseTarget> = {
   'ally-be': {
@@ -59,30 +68,77 @@ export const RELEASE_TARGETS: Record<string, ReleaseTarget> = {
   },
   'ally-web:admin': {
     repo: 'ally-web',
-    workflow: 'production-release-admin-dashboard.yaml',
-    tagPrefix: 'admin-v',
-    label: 'Admin dashboard (CloudFront)',
+    workflow: FRONTENDS_WORKFLOW,
+    tagPrefix: FRONTENDS_TAG_PREFIX,
+    label: 'Admin dashboard',
+    inputs: { apps: 'admin' },
   },
   'ally-web:helpline': {
     repo: 'ally-web',
-    workflow: 'production-release-helpline-dashboard.yaml',
-    tagPrefix: 'helpline-v',
-    label: 'Helpline dashboard (CloudFront)',
+    workflow: FRONTENDS_WORKFLOW,
+    tagPrefix: FRONTENDS_TAG_PREFIX,
+    label: 'Helpline dashboard',
+    inputs: { apps: 'helpline' },
+  },
+  /**
+   * Never resolved from a single file. A change set that touches both apps is
+   * collapsed into this one release, because two dispatches of the shared
+   * workflow would race for the same next `frontend-v` tag.
+   */
+  'ally-web:frontends': {
+    repo: 'ally-web',
+    workflow: FRONTENDS_WORKFLOW,
+    tagPrefix: FRONTENDS_TAG_PREFIX,
+    label: 'Admin + Helpline dashboards',
+    inputs: { apps: 'both' },
   },
 };
 
 /**
+ * Whether a run of the shared frontends workflow shipped `app`, read from the
+ * `[apps=...]` marker its `run-name` puts in the title. A run with no marker
+ * predates it (the first frontend-v1.0.0 release, which shipped both) and is
+ * counted for both apps.
+ */
+export function shippedApp(title: string, app: string | undefined): boolean {
+  if (!app) return true;
+  const marker = /\[apps=([a-z]+)\]/.exec(title)?.[1];
+  return !marker || marker === 'both' || marker === app;
+}
+
+function sameTarget(a: ReleaseTarget, b: ReleaseTarget): boolean {
+  return (
+    a.repo === b.repo &&
+    a.workflow === b.workflow &&
+    (a.inputs?.apps ?? null) === (b.inputs?.apps ?? null)
+  );
+}
+
+/**
  * The key a resolved target sits under in RELEASE_TARGETS (`ally-web:admin`),
  * which is also how per-target configuration is addressed — Builder's health
- * URLs are keyed by it. A target is identified by its workflow: one deployable,
- * one release workflow, so the key is recoverable from the target alone.
+ * URLs are keyed by it. The frontends share a workflow, so a target is
+ * identified by its workflow together with its `apps` input.
  */
 export function releaseTargetKey(target: ReleaseTarget): string | null {
   return (
-    Object.entries(RELEASE_TARGETS).find(
-      ([, entry]) => entry.workflow === target.workflow,
+    Object.entries(RELEASE_TARGETS).find(([, entry]) =>
+      sameTarget(entry, target),
     )?.[0] ?? null
   );
+}
+
+/**
+ * Matched targets, de-duplicated, with admin + helpline collapsed into the
+ * single `apps=both` release (see `ally-web:frontends`).
+ */
+function collapseTargets(matched: Map<string, ReleaseTarget>): ReleaseTarget[] {
+  if (matched.has('ally-web:admin') && matched.has('ally-web:helpline')) {
+    matched.delete('ally-web:admin');
+    matched.delete('ally-web:helpline');
+    matched.set('ally-web:frontends', RELEASE_TARGETS['ally-web:frontends']);
+  }
+  return [...matched.values()];
 }
 
 /**
@@ -161,12 +217,13 @@ export function resolveReleaseTargets(
   const unresolved: string[] = [];
   for (const file of files) {
     const target = resolveReleaseTarget(repo, file);
-    if (target) matched.set(target.workflow, target);
+    if (target)
+      matched.set(releaseTargetKey(target) ?? target.workflow, target);
     else unresolved.push(file);
   }
 
   return {
-    targets: [...matched.values()],
+    targets: collapseTargets(matched),
     unresolved,
     // No targets at all is ambiguous for the obvious reason. Leftover files
     // alongside real matches is the subtler one: shared code changed, and it
@@ -197,11 +254,12 @@ export function resolveMonorepoReleaseTargets(
     const target = service
       ? resolveReleaseTarget(service, pathWithinService(file))
       : null;
-    if (target) matched.set(target.workflow, target);
+    if (target)
+      matched.set(releaseTargetKey(target) ?? target.workflow, target);
     else unresolved.push(file);
   }
   return {
-    targets: [...matched.values()],
+    targets: collapseTargets(matched),
     unresolved,
     ambiguous: matched.size === 0 || unresolved.length > 0,
   };

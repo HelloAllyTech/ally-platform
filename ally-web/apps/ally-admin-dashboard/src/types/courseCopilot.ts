@@ -4,6 +4,7 @@
  */
 
 import type { AgentTurnReceipt } from "./agentChat";
+import type { RoleplayCompletionLogic } from "./tracks";
 
 /* ── Enums ─────────────────────────────────────────────────────────────── */
 
@@ -23,6 +24,8 @@ export type CourseCopilotJobKind =
   | "quiz"
   | "journal"
   | "annotated_artifact"
+  | "branching_scenario"
+  | "bucket_sort"
   | "game"
   | "video"
   | "roleplay_new"
@@ -71,6 +74,8 @@ export type CourseBriefComponent =
   | "video"
   | "journal"
   | "annotated_artifact"
+  | "branching_scenario"
+  | "bucket_sort"
   | "game"
   | "quiz";
 
@@ -89,6 +94,18 @@ export interface CourseBriefPracticeSlot {
 
 export interface CourseBrief {
   seed?: string;
+  /** The closest learner profile in the manual's library, and its name (filled by the server). */
+  learnerProfileId?: string;
+  learnerProfileName?: string;
+  /** Per primary skill: A (how well) and B (in what situations). */
+  skillTargets?: { competencyId?: string; skill: string; a?: string; b?: string }[];
+  /** Per skill, its behaviours in the three EQUIP groups. */
+  rubric?: {
+    skill: string;
+    harmfulOrUnhelpful: string[];
+    basicHelpful: string[];
+    advancedHelpful: string[];
+  }[];
   audience?: {
     who?: string;
     priorExperience?: string;
@@ -138,11 +155,19 @@ export type CourseBlueprintItemSource =
   | { kind: "needs-input"; what: "video-url" };
 
 export interface CourseBlueprintCompletionCriteria {
+  /** Roleplay only. */
+  completionLogic?: RoleplayCompletionLogic;
   minScore?: number;
   passScore?: number;
   watchPct?: number;
   minReadSeconds?: number;
   minDurationSeconds?: number;
+  /** Roleplay assessment keys; carried through untouched. */
+  assessmentMode?: boolean;
+  minLearnerTurns?: number;
+  showResultsToLearner?: boolean;
+  assessmentPhase?: "PRE" | "POST";
+  assessmentPairKey?: string;
 }
 
 export interface CourseBlueprintItem {
@@ -227,6 +252,16 @@ export type CourseItemPreview =
       roleplayCount: number;
       generated: boolean;
     }
+  | {
+      type: "BRANCHING_SCENARIO";
+      sceneCount: number;
+      endingCount: number;
+      /** null = explore (ungated). */
+      passScore: number | null;
+      intro: string | null;
+      firstScene: string | null;
+    }
+  | { type: "BUCKET_SORT"; itemCount: number; buckets: string[]; intro: string | null }
   | { type: "GAME"; gameKey: string | null; intro: string | null }
   | { type: "VIDEO"; source: string | null; url: string | null };
 
@@ -298,6 +333,21 @@ export interface CourseCopilotSessionSummary {
   trackStatus: string | null;
   createdAt: string;
   updatedAt: string;
+  /** The sessions list only: how its build went; null before one started. */
+  build?: CourseCopilotBuildTiming | null;
+}
+
+/** One session's build, from its first item starting to its last one settling. */
+export interface CourseCopilotBuildTiming {
+  startedAt: string | null;
+  /** Null while any item is queued or running. */
+  finishedAt: string | null;
+  /** Wall-clock build time in seconds; null until the build has settled. */
+  seconds: number | null;
+  running: boolean;
+  items: number;
+  done: number;
+  failed: number;
 }
 
 export interface CourseCopilotServerMessage {
@@ -347,6 +397,10 @@ export interface CourseCopilotJob {
   error: string | null;
   summary: string | null;
   skippedReason: string | null;
+  /** Reference files this item was written from ("Manual.pdf, p. 12"). Absent on older rows. */
+  references?: string[];
+  /** New roleplays only: who, goal, mode, states, supports and what the validator found. */
+  roleplayCard?: CourseCopilotRoleplayCard | null;
   startedAt: string | null;
   finishedAt: string | null;
   costUsd: number | null;
@@ -473,4 +527,31 @@ export interface CourseCopilotFeedMessage extends CourseCopilotChatMessage {
    * the last user turn. Absent for errors a retry cannot fix (misconfigured, budget, locked).
    */
   retryable?: boolean;
+}
+
+/** A reference file (partner manual, deck, handout) attached to one Copilot session. */
+export interface CourseCopilotSource {
+  id: string;
+  fileName: string;
+  kind: "pdf" | "docx" | "pptx";
+  sizeBytes: number;
+  /** Pages (PDF) or slides (PPTX); null for Word files. */
+  pageCount: number | null;
+  passageCount: number;
+  createdAt: string;
+}
+
+export interface CourseCopilotRoleplayCard {
+  title: string;
+  mode: string;
+  learnerGoal: string | null;
+  setting: string | null;
+  states: string[];
+  supports: {
+    experienceMode: string | null;
+    reminders: boolean;
+    stateVisible: boolean;
+    supervisorNotes: boolean;
+  };
+  checks: string[];
 }

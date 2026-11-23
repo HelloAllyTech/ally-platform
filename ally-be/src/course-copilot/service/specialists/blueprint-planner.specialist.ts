@@ -3,6 +3,7 @@ import { LlmTask } from 'src/learn/enum/llm-task.enum';
 import {
   COURSE_COPILOT_AI_TASKS,
   COURSE_COPILOT_DEFAULT_ITEM_MINUTES,
+  COURSE_COPILOT_DEFAULT_DURATION_MINUTES,
   COURSE_COPILOT_LIMITS,
   COURSE_COPILOT_PROMPTS,
 } from '../../constants/course-copilot.constants';
@@ -12,14 +13,13 @@ import {
   validateBlueprint,
 } from '../../util/course-blueprint.util';
 import { SpecialistLlmService } from './specialist-llm.service';
+import { learnerProfileReference } from '../course-copilot-learner-profile.service';
+import { exampleCourseReference } from '../course-copilot-example-course.service';
 import {
   BlueprintPlannerInput,
   SpecialistValidationError,
 } from './specialist.types';
 import { briefForPrompt, SPECIALIST_MAX_TOKENS } from './specialist.util';
-
-/** Used for an hour-long course when the brief names no duration. */
-const DEFAULT_DURATION_MINUTES = 60;
 
 export interface BlueprintPlanOptions {
   /** `config.courseCopilot.maxNewRoleplays`; COURSE_COPILOT_LIMITS.newRoleplays when omitted. */
@@ -107,6 +107,19 @@ export class BlueprintPlannerSpecialist {
       maxTokens: SPECIALIST_MAX_TOKENS.BLUEPRINT,
       usageMetadata: input.usageMetadata,
       repairErrors,
+      // The matched learner profile rides in the reference block, not a new prompt variable;
+      // the skill targets and rubric are already in brief_json.
+      referenceMaterial:
+        [
+          input.referenceMaterial,
+          learnerProfileReference(brief?.learnerProfileId),
+          // A person-chosen published course of a similar size, as a pattern (not content).
+          exampleCourseReference(brief?.shape?.durationMinutes),
+          input.designGuidance,
+        ]
+          .map((part) => part?.trim())
+          .filter(Boolean)
+          .join('\n\n---\n') || null,
       variables: {
         brief_json: briefForPrompt(brief),
         objectives_list: enabling.length
@@ -137,7 +150,8 @@ export class BlueprintPlannerSpecialist {
         ),
         item_minutes_json: JSON.stringify(COURSE_COPILOT_DEFAULT_ITEM_MINUTES),
         duration_minutes: String(
-          brief?.shape?.durationMinutes ?? DEFAULT_DURATION_MINUTES,
+          brief?.shape?.durationMinutes ??
+            COURSE_COPILOT_DEFAULT_DURATION_MINUTES,
         ),
         max_new_roleplays: String(maxNewRoleplays),
         max_article_questions: String(COURSE_COPILOT_LIMITS.articleQuestions),

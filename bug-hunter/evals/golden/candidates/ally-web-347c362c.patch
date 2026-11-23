@@ -1,0 +1,96 @@
+diff --git a/apps/ally-admin-dashboard/src/pages/ProductRoadmap/CoinAllocator.tsx b/apps/ally-admin-dashboard/src/pages/ProductRoadmap/CoinAllocator.tsx
+index 5ef0b4ab78..e3bb8a9b95 100644
+--- a/apps/ally-admin-dashboard/src/pages/ProductRoadmap/CoinAllocator.tsx
++++ b/apps/ally-admin-dashboard/src/pages/ProductRoadmap/CoinAllocator.tsx
+@@ -1,7 +1,7 @@
+ import React, { useEffect, useRef, useState } from "react";
+ 
+ import { Tooltip } from "@ally-ui-mono/ui-shared";
+-import { RoadmapCoinBudget, RoadmapOpportunity } from "@types";
++import { RoadmapCoinBudget, RoadmapOpportunity, RoadmapOpportunityType } from "@types";
+ 
+ import { clampCoins, isAllocatable, remainingWithPending } from "./utils/coins";
+ 
+@@ -87,9 +87,11 @@ export const CoinAllocator: React.FC<CoinAllocatorProps> = ({
+   if (locked) {
+     const reason = isAllocatable(opportunity)
+       ? "You do not have permission to allocate coins"
+-      : `Coins can only go to new opportunities — this one is ${
+-          STAGE_LABEL[opportunity.stage] ?? opportunity.stage
+-        }. Existing votes are kept.`;
++      : opportunity.type === RoadmapOpportunityType.BUG
++        ? "Coins can't be allocated to bug reports. Existing votes are kept."
++        : `Coins can only go to new opportunities — this one is ${
++            STAGE_LABEL[opportunity.stage] ?? opportunity.stage
++          }. Existing votes are kept.`;
+     return (
+       // align="bottom" because the plain Carbon Tooltip has no autoAlign and renders inline;
+       // top-aligned it clips inside the table's scroll container.
+diff --git a/apps/ally-admin-dashboard/src/pages/ProductRoadmap/__tests__/coins.test.ts b/apps/ally-admin-dashboard/src/pages/ProductRoadmap/__tests__/coins.test.ts
+index 39781a9dc7..fe2abe213f 100644
+--- a/apps/ally-admin-dashboard/src/pages/ProductRoadmap/__tests__/coins.test.ts
++++ b/apps/ally-admin-dashboard/src/pages/ProductRoadmap/__tests__/coins.test.ts
+@@ -1,5 +1,5 @@
+ import { describe, expect, it } from "vitest";
+-import { RoadmapCoinBudget, RoadmapOpportunityStage } from "@types";
++import { RoadmapCoinBudget, RoadmapOpportunityStage, RoadmapOpportunityType } from "@types";
+ 
+ import { clampCoins, isAllocatable, maxFor, remainingWithPending } from "../utils/coins";
+ 
+@@ -69,6 +69,18 @@ describe("isAllocatable", () => {
+   it("treats a missing stage as new, so a partial row never renders as locked", () => {
+     expect(isAllocatable({})).toBe(true);
+   });
++
++  it("is false for a bug opportunity, even in the new stage", () => {
++    expect(
++      isAllocatable({ stage: RoadmapOpportunityStage.NEW, type: RoadmapOpportunityType.BUG }),
++    ).toBe(false);
++  });
++
++  it("is true for a non-bug opportunity in the new stage", () => {
++    expect(
++      isAllocatable({ stage: RoadmapOpportunityStage.NEW, type: RoadmapOpportunityType.IDEA }),
++    ).toBe(true);
++  });
+ });
+ 
+ describe("remainingWithPending", () => {
+diff --git a/apps/ally-admin-dashboard/src/pages/ProductRoadmap/utils/coins.ts b/apps/ally-admin-dashboard/src/pages/ProductRoadmap/utils/coins.ts
+index da709993d0..4a39b5bf20 100644
+--- a/apps/ally-admin-dashboard/src/pages/ProductRoadmap/utils/coins.ts
++++ b/apps/ally-admin-dashboard/src/pages/ProductRoadmap/utils/coins.ts
+@@ -1,4 +1,9 @@
+-import { RoadmapCoinBudget, RoadmapOpportunity, RoadmapOpportunityStage } from "@types";
++import {
++  RoadmapCoinBudget,
++  RoadmapOpportunity,
++  RoadmapOpportunityStage,
++  RoadmapOpportunityType,
++} from "@types";
+ 
+ /**
+  * THE SINGLE SOURCE OF TRUTH for the coin cap and the stage rule.
+@@ -28,12 +33,18 @@ export const clampCoins = (raw: unknown, budget: RoadmapCoinBudget, myCoins: num
+ };
+ 
+ /**
+- * Coins may only be allocated to a `new` opportunity. A missing stage counts as `new` so a
+- * partially-hydrated row never renders as locked.
++ * Coins may only be allocated to a `new`, non-bug opportunity. A missing stage counts as `new`
++ * so a partially-hydrated row never renders as locked. Bug reports are triaged and fixed, not
++ * coin-prioritised, so they're excluded regardless of stage — mirrors the backend gate in
++ * RoadmapAllocationService.setCoins.
+  */
+ export const isAllocatable = (
+-  opportunity: Pick<RoadmapOpportunity, "stage"> | { stage?: string },
+-): boolean => (opportunity.stage ?? RoadmapOpportunityStage.NEW) === RoadmapOpportunityStage.NEW;
++  opportunity:
++    | Pick<RoadmapOpportunity, "stage" | "type">
++    | { stage?: string; type?: string },
++): boolean =>
++  (opportunity.stage ?? RoadmapOpportunityStage.NEW) === RoadmapOpportunityStage.NEW &&
++  opportunity.type !== RoadmapOpportunityType.BUG;
+ 
+ /**
+  * Remaining coins accounting for a local, not-yet-committed edit.

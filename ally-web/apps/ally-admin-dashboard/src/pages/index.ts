@@ -26,6 +26,8 @@ export * from "./GuardrailsManagement/GuardrailsManagement";
 export * from "./TranslationManagement/TranslationManagement";
 export * from "./Tooltips/Tooltips";
 export * from "./Blog/Blog";
+export * from "./LandingPages/LandingPages";
+export * from "./LandingPages/LandingPageEditor";
 export * from "./ProductUpdates/ProductUpdates";
 export * from "./AILab";
 export * from "./Evaluate";
@@ -34,17 +36,26 @@ export * from "./Logs/Logs";
 export * from "./MobileReleases/MobileReleases";
 export * from "./BugHunter";
 export * from "./Builder";
+export * from "./PmAgent";
 export * from "./CourseCopilot";
+export * from "./Onboarding";
 export * from "./AgentTestCases/AgentTestCases";
 export * from "./Debriefs/DebriefConsole";
+export { DebriefSessionPage } from "./Debriefs/session/DebriefSessionPage";
+export { AgentLogsPage } from "./Debriefs/session/AgentLogsPage";
+export { PmAgentPage } from "./Debriefs/pm/PmAgentPage";
+export { DebriefSettingsPage } from "./Debriefs/settings/DebriefSettingsPage";
 export * from "./Competencies/Competencies";
 export * from "./RoleplaySessionLogs/RoleplaySessionLogs";
 export * from "./RoleplaySessionLogs/RoleplaySessionLogDetail";
 export * from "./Terms/Terms";
 export * from "./Privacy/Privacy";
-export * from "./ProductRoadmap";
+export * from "./Roadmap";
 export * from "./WhatsAppBot";
 // NOTE: Analytics is intentionally NOT re-exported here. It pulls in IBM Carbon
 // + Carbon Charts (+ d3) and its own scoped stylesheet; keeping it out of this
 // eagerly-imported barrel lets RouteLayout lazy-load it as a separate chunk so
 // those heavy deps load only when a super-admin opens the Analytics tab.
+export * from "./Providers/Providers";
+export * from "./Providers/PrecedenceExplainer";
+export * from "./BugHunterV2";

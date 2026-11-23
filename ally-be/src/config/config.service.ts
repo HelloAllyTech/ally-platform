@@ -102,13 +102,10 @@ export class AppConfigService {
    *   environment opts in rather than discovering it on its bill.
    * - `startAt` is the oldest journal entry turned into an update. The journal
    *   began on 2026-08-13; the default replays all of it.
-   * - `digestTo` is who gets the daily email (comma-separated). Empty means no
-   *   email, even when enabled.
    * - `digestHour` is the business-timezone (IST) hour it goes out.
-   * - `digestAllowed` is true only on the production database (`*_prd`). Env
-   *   files get copied between environments, and a staging copy that kept
-   *   `PRODUCT_UPDATES_DIGEST_TO` sent a second, differently-formatted digest
-   *   to the same people on 2026-11-05.
+   * - `digestAllowed` is true only on the production database (`*_prd`). The
+   *   recipient list lives in the database, and a staging copy of it once sent
+   *   a second, differently-formatted digest to the same people (2026-11-05).
    */
   get productUpdates() {
     const start = new Date(
@@ -128,12 +125,6 @@ export class AppConfigService {
       startAt: Number.isNaN(start.getTime())
         ? new Date('2026-08-13T00:00:00Z')
         : start,
-      digestTo: (
-        this.configService.get<string>('PRODUCT_UPDATES_DIGEST_TO') ?? ''
-      )
-        .split(',')
-        .map((address) => address.trim())
-        .filter(Boolean),
       digestHour: Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : 18,
       digestAllowed: (this.database.database ?? '').endsWith('_prd'),
     };
@@ -248,7 +239,8 @@ export class AppConfigService {
   get builderHealthUrls(): Record<string, string> {
     const defaults: Record<string, string> = {
       'ally-be': `${this.publicApiBaseUrl}/api/health`,
-      'ally-web:admin': 'https://admin.helloally.ai',
+      'ally-web:admin': 'https://app.helloally.ai/admin/',
+      'ally-web:frontends': 'https://app.helloally.ai/admin/',
     };
     try {
       const raw = this.configService.get<string>('BUILDER_HEALTH_URLS', '');
@@ -593,6 +585,11 @@ export class AppConfigService {
       // I/O). Unset → the trace service falls back to the private audio
       // bucket; never a public one.
       agentTraceBucket: this.configService.get<string>('AGENT_TRACE_S3_BUCKET'),
+      // Bot page images (chunk 20d): private. Unset → the private audio bucket, under a
+      // `bot-images/` prefix; a bucket of its own is a launch item.
+      botImagesBucket:
+        this.configService.get<string>('BOT_IMAGES_S3_BUCKET') ||
+        this.configService.get<string>('AUDIO_STORAGE_S3_BUCKET'),
     };
   }
 
@@ -856,14 +853,6 @@ export class AppConfigService {
     return {
       apiKey: this.configService.get<string>('ANTHROPIC_API_KEY'),
       autofillModel,
-      // Analytics Suggestions (admin Analytics -> Suggestions tab). Defaults to
-      // the autofill model so there is one model to upgrade, but overridable on
-      // its own: this call carries a whole analytics window in its prompt and is
-      // the one place where a larger model may be worth the latency.
-      suggestionsModel: this.configService.get<string>(
-        'ANTHROPIC_SUGGESTIONS_MODEL',
-        autofillModel,
-      ),
     };
   }
 
@@ -1018,6 +1007,29 @@ export class AppConfigService {
   }
 
   /**
+   * Optional dedicated secret for the Debrief harness's run tokens (the
+   * bearer token ally-ai's debrief graph sends to the gateway tools). Empty
+   * when unset, and that is supported: `DebriefRunTokenService` then derives
+   * one as HMAC-SHA256(JWT_ACCESS_SECRET, 'debrief-gateway-v1'), so it is
+   * never the access secret itself and a user JWT can never pass as a run
+   * token (nor the reverse). Never leaves ally-be.
+   */
+  get debriefGatewaySecret(): string {
+    return this.configService.get<string>('DEBRIEF_GATEWAY_SECRET', '');
+  }
+
+  /**
+   * Optional dedicated secret for the chatbot agent's run tokens (chunk 3b): the bearer token
+   * ally-ai sends back to the agent tool gateway. Empty when unset, and that is supported:
+   * `AgentRunTokenService` then derives one as HMAC-SHA256(JWT_ACCESS_SECRET, 'agent-gateway-v1'),
+   * a different label from Debrief's, so neither gateway accepts the other's tokens. Never leaves
+   * ally-be.
+   */
+  get agentGatewaySecret(): string {
+    return this.configService.get<string>('AGENT_GATEWAY_SECRET', '');
+  }
+
+  /**
    * User ids allowed to put a new version of a PINNED prompt live — the judge
    * rubrics, measuring instruments and guards in `PINNED_PROMPTS`.
    *
@@ -1052,6 +1064,63 @@ export class AppConfigService {
       'ADMIN_APP_BASE_URL',
       'http://localhost:8081',
     );
+  }
+
+  /**
+   * The bot page (Agents v2, chunk 12b). Its link is `<baseUrl>/b/<slug>`. The page is a second
+   * entry of the admin dashboard, so the base URL defaults to `ADMIN_APP_BASE_URL`; set
+   * `BOT_PAGE_BASE_URL` once the page has its own domain. The public API answers browsers from
+   * `origin` only. Turnstile runs on public pages only while its secret is set.
+   */
+  /**
+   * Agent-first onboarding (chunk 20a). `crawlAllowHosts` lets the crawl read hosts that resolve to
+   * private addresses (the local fixture server) and is honoured in local and development only;
+   * production always gets an empty list.
+   */
+  get botDraft() {
+    const hosts = (
+      this.configService.get<string>('BOT_DRAFT_CRAWL_ALLOW_HOSTS', '') || ''
+    )
+      .split(',')
+      .map((h) => h.trim().toLowerCase())
+      .filter(Boolean);
+    const devOrTest =
+      this.isLocal || this.isDevelopment || this.nodeEnv === 'test';
+    return {
+      crawlAllowHosts: devOrTest ? hosts : [],
+      crawlsPerDay:
+        Number(
+          this.configService.get<string>('BOT_DRAFT_CRAWLS_PER_DAY', '20'),
+        ) || 20,
+    };
+  }
+
+  get botPage() {
+    const baseUrl = (
+      this.configService.get<string>('BOT_PAGE_BASE_URL') || this.adminBaseUrl
+    ).replace(/\/+$/, '');
+    let origin = baseUrl;
+    try {
+      origin = new URL(baseUrl).origin;
+    } catch {
+      // Joi checked it is a URI; keep the raw value if URL still disagrees.
+    }
+    return {
+      baseUrl,
+      origin,
+      turnstileSiteKey: this.configService.get<string>(
+        'TURNSTILE_SITE_KEY',
+        '',
+      ),
+      turnstileSecretKey: this.configService.get<string>(
+        'TURNSTILE_SECRET_KEY',
+        '',
+      ),
+      visitorSecret: this.configService.get<string>(
+        'BOT_PAGE_VISITOR_SECRET',
+        '',
+      ),
+    };
   }
 
   get courseCopilot() {

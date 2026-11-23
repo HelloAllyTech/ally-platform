@@ -184,7 +184,9 @@ jobs:
       - validate-and-tag
       - prepare-env
     runs-on: ubuntu-22.04
-    timeout-minutes: 10
+    # The full Jest suite plus install now takes about 10 minutes, so the old 10-minute limit
+    # cancelled be-v1.253.0 and be-v1.254.0 mid-run (tests passing, no failures). 20 leaves room.
+    timeout-minutes: 20
 
     steps:
       - name: Checkout

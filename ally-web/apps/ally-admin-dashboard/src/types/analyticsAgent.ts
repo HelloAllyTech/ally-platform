@@ -1,10 +1,10 @@
 /**
  * Analytics Agent — types mirroring ally-be's `/v1/analytics/agent` DTOs.
  *
- * The conversation lives here in the browser: the server is stateless and is
- * handed the turns it should consider on every question. That is what makes
- * "Reset chat" a local act and lets a reload start clean without orphaning
- * anything server-side.
+ * The agent itself is stateless: the browser hands it the turns it should
+ * consider on every question. Each answered turn is also saved server-side, per
+ * user, so the thread can be reopened from the sidebar after a reload — the
+ * saved copy is for display only and is never what the agent reads.
  */
 
 /** What happened to a question. Each value is a different screen, not a flag. */
@@ -52,6 +52,23 @@ export interface AskAnalyticsAgentRequest {
   question: string;
   /** Prior turns, oldest first. The server keeps only the most recent few. */
   history?: AnalyticsAgentTurnInput[];
+  /** The saved conversation this question continues. Omit to start a new one. */
+  conversationId?: string;
+}
+
+/** A reader's optional rating of one answer. No rating is `null`, not a third value. */
+export type AnalyticsAgentFeedback = "up" | "down";
+
+export interface SetAnalyticsAgentFeedbackRequest {
+  /** The saved turn being rated (`messageId` on an ask response, `id` on a saved turn). */
+  messageId: string;
+  /** `null` takes a rating back. */
+  feedback: AnalyticsAgentFeedback | null;
+}
+
+export interface SetAnalyticsAgentFeedbackResponse {
+  messageId: string;
+  feedback: AnalyticsAgentFeedback | null;
 }
 
 export interface AskAnalyticsAgentResponse {
@@ -73,6 +90,36 @@ export interface AskAnalyticsAgentResponse {
   followUps: string[];
   durationMs: number;
   provenance: AnalyticsAgentProvenance;
+  /** The saved conversation this turn belongs to. Absent only if saving failed —
+   *  the answer is still valid, it just will not appear in the sidebar. */
+  conversationId?: string;
+  /** The saved turn, which is what feedback is recorded against. Absent when
+   *  saving failed — there is then nothing to rate. */
+  messageId?: string;
+}
+
+/** A saved conversation as listed in the sidebar. `title` is its first question. */
+export interface AnalyticsAgentConversationSummary {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** One saved turn: the question and the reply exactly as it was shown. */
+export interface AnalyticsAgentConversationTurn {
+  id: string;
+  question: string;
+  outcome: AnalyticsAgentOutcome;
+  response: AskAnalyticsAgentResponse;
+  /** The reader's thumbs up / down on this answer; `null` when they gave none. */
+  feedback: AnalyticsAgentFeedback | null;
+  createdAt: string;
+}
+
+export interface AnalyticsAgentConversationDetail extends AnalyticsAgentConversationSummary {
+  /** Oldest first. */
+  messages: AnalyticsAgentConversationTurn[];
 }
 
 export interface AnalyticsAgentCatalogTable {
@@ -101,4 +148,13 @@ export type AnalyticsAgentMessage =
   | { id: string; role: "user"; question: string }
   | { id: string; role: "agent"; status: "pending"; question: string }
   | { id: string; role: "agent"; status: "error"; question: string; message: string }
-  | { id: string; role: "agent"; status: "done"; response: AskAnalyticsAgentResponse };
+  | {
+      id: string;
+      role: "agent";
+      status: "done";
+      response: AskAnalyticsAgentResponse;
+      /** The saved turn, or null if it was not saved — then it cannot be rated. */
+      messageId: string | null;
+      /** The rating the turn had when it was loaded; the rating buttons own it from there. */
+      feedback: AnalyticsAgentFeedback | null;
+    };

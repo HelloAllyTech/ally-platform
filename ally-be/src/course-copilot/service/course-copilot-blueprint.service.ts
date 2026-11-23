@@ -1,3 +1,5 @@
+import { CourseCopilotExampleCourseService } from './course-copilot-example-course.service';
+import { CourseCopilotDesignGuidanceService } from './course-copilot-design-guidance.service';
 import {
   BadRequestException,
   ConflictException,
@@ -26,6 +28,7 @@ import {
 import { BlueprintPlannerSpecialist } from './specialists/blueprint-planner.specialist';
 import { CourseCopilotBriefService } from './course-copilot-brief.service';
 import { CourseCopilotCostService } from './course-copilot-cost.service';
+import { CourseCopilotSourcesService } from './course-copilot-sources.service';
 import { CourseCopilotLibraryService } from './course-copilot-library.service';
 import { CourseCopilotStructureService } from './course-copilot-structure.service';
 
@@ -55,6 +58,9 @@ export class CourseCopilotBlueprintService {
     private readonly structureService: CourseCopilotStructureService,
     private readonly trackService: TrackService,
     @Optional() private readonly citations?: ContextCitationService,
+    @Optional() private readonly sources?: CourseCopilotSourcesService,
+    @Optional()
+    private readonly designGuidance?: CourseCopilotDesignGuidanceService,
   ) {}
 
   /** Run the planner and store blueprint v(n+1). Caller has checked readiness. */
@@ -63,6 +69,19 @@ export class CourseCopilotBlueprintService {
     notes?: string,
   ): Promise<CourseCopilotBlueprintResponse> {
     const libraryPicks = await this.libraryPicks(session);
+    const reference = await this.referenceForPlan(session, notes);
+    const guidance = this.designGuidance
+      ? await this.designGuidance.referenceWithCodes({
+          sessionId: session.id,
+          tenantId: session.tenantId,
+          brief: session.brief ?? {},
+          stage: 'blueprint',
+        })
+      : { text: '', codes: [] as string[] };
+    // The same pick the planner makes (exampleCourseReference), recorded for the build log.
+    const example = new CourseCopilotExampleCourseService().closestTo(
+      session.brief?.shape?.durationMinutes,
+    );
     const planned = await this.planner.plan(
       {
         sessionId: session.id,
@@ -70,13 +89,59 @@ export class CourseCopilotBlueprintService {
         notes,
         libraryPicks,
         games: courseCopilotGameOptions(),
+        referenceMaterial: reference?.text ?? null,
+        designGuidance: guidance.text || null,
         usageMetadata: { courseCopilotSessionId: session.id },
       },
       { maxNewRoleplays: this.configService.courseCopilot.maxNewRoleplays },
     );
-    return this.store(session, planned, {
+    const response = await this.store(session, planned, {
       status: CourseCopilotSessionStatus.AWAITING_BLUEPRINT,
     });
+    return {
+      ...response,
+      planningContext: {
+        exampleCourse: example?.title ?? null,
+        principles: guidance.codes,
+      },
+    };
+  }
+
+  /**
+   * The trainer's reference passages that bear on the whole course, so the
+   * plan follows the partner's own structure and content. A lookup failure
+   * plans without them.
+   */
+  private async referenceForPlan(
+    session: CourseCopilotSession,
+    notes?: string,
+  ) {
+    if (!this.sources) return null;
+    const brief = session.brief ?? {};
+    const query = [
+      brief.seed,
+      brief.outcomes?.terminal,
+      ...(brief.outcomes?.enabling ?? []),
+      brief.audience?.who,
+      brief.audience?.applicationContext,
+      ...(brief.competencyNames ?? []),
+      notes,
+    ]
+      .filter(Boolean)
+      .join(' ');
+    try {
+      return await this.sources.referenceFor(session.id, query, {
+        limit: 10,
+        maxChars: 12_000,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Course Copilot ${session.id}: reference lookup for the plan failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
   }
 
   /** `update_blueprint` from chat: JSON patch over the current blueprint. */

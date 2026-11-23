@@ -1,4 +1,4 @@
-import { ReactNode, useMemo, useState } from "react";
+import { ReactNode, useCallback, useMemo, useState } from "react";
 
 import { useSelector } from "react-redux";
 import { useSearchParams } from "react-router-dom";
@@ -20,17 +20,26 @@ import {
 import { AnalyticsWindowQuery, useGetScenarioLanguagesQuery, useGetTenantsQuery } from "@api";
 import { en, FeatureToggleKey } from "@constants";
 import { RootState } from "@store";
-import { AnalyticsRange } from "@types";
 import { hasFeature } from "@utils";
 
 import { AnalyticsTabFilters } from "./analyticsFilters";
+import { ANALYTICS_GLOSSARY } from "./analyticsGlossary";
 import { AnalyticsOrgScopeProvider } from "./analyticsOrgScope";
-import { BugAgentPerformance } from "./BugAgentPerformance";
+import { ANALYTICS_TAB_GROUPS, groupForTab, tabsInGroup } from "./analyticsTabGroups";
+import {
+  CUSTOM_RANGE,
+  RangeChoice,
+  readAnalyticsUrlState,
+  writeAnalyticsUrlState,
+} from "./analyticsUrlState";
+import { ChartIdsVisibleContext } from "./chartKit";
 import { CodingAgentCost } from "./CodingAgentCost";
 import { FixSessionEngineCost } from "./FixSessionEngineCost";
 import { TabControlsSlotProvider } from "./tabControlsSlot";
 import { AllyGuideTab } from "./tabs/AllyGuideTab";
 import { AnalyticsAgentTab } from "./tabs/AnalyticsAgentTab";
+import { AnalyticsAuditTab } from "./tabs/AnalyticsAuditTab";
+import { AnalyticsAutomationTab } from "./tabs/AnalyticsAutomationTab";
 import { GlossaryAdherenceTab } from "./tabs/GlossaryAdherenceTab";
 import { HighlightsTab } from "./tabs/HighlightsTab";
 import { LanguageQualityTab } from "./tabs/LanguageQualityTab";
@@ -39,15 +48,18 @@ import { ProductManagementTab } from "./tabs/ProductManagementTab";
 import { RatingsCommentsTab } from "./tabs/RatingsCommentsTab";
 import { RetrievalQualityTab } from "./tabs/RetrievalQualityTab";
 import { ScribeTab } from "./tabs/ScribeTab";
-import { SuggestionsTab } from "./tabs/suggestions/SuggestionsTab";
+import { ConversationDrift } from "../ConversationDrift/ConversationDrift";
 import { WeakPerformingMetricsTab } from "./tabs/WeakPerformingMetricsTab";
 import { TokenConsumption } from "./TokenConsumption";
-import { ConversationDrift } from "../ConversationDrift/ConversationDrift";
+import { DebriefAnalytics } from "../Debriefs/metrics/DebriefAnalytics";
 
-const RANGE_ITEMS: { id: AnalyticsRange; label: string }[] = [
+const ALL_ORGS_ITEM = { id: "", label: "All organisations" };
+
+const RANGE_ITEMS: { id: RangeChoice; label: string }[] = [
   { id: "30d", label: "Last 30 days" },
   { id: "90d", label: "Last 90 days" },
   { id: "12m", label: "Last 12 months" },
+  { id: CUSTOM_RANGE, label: "Custom range…" },
 ];
 
 /**
@@ -69,7 +81,7 @@ interface TabDef {
   render: (f: AnalyticsTabFilters) => ReactNode;
   /**
    * Optional extra gate, on top of the route's analytics feature toggle. Only
-   * two tabs need it today (Analytics Agent and Suggestions), and a tab
+   * one tab needs it today (Analytics Agent), and a tab
    * without it stays visible to everyone who can reach the page — which is
    * how every other tab here already behaved.
    *
@@ -87,8 +99,8 @@ interface TabDef {
 
 /** Query-string key that selects an Analytics tab by its `TabDef.id`. */
 export const ANALYTICS_TAB_PARAM = "tab";
-/** The Bug Agent tab's id, exported so the Bug Hunter page can link to it. */
-export const ANALYTICS_BUG_AGENT_TAB_ID = "bug-agent-performance";
+/** The Debriefs tab's id, exported so the Debrief Console can send its old Metrics links here. */
+export const ANALYTICS_DEBRIEFS_TAB_ID = "debriefs";
 
 const TABS: TabDef[] = [
   // Highlights is the whole-platform picture; it absorbed the former separate
@@ -154,6 +166,19 @@ const TABS: TabDef[] = [
     render: f => <AllyGuideTab {...f} />,
   },
   {
+    // The Debrief agent's metrics: the PRD's success metrics, the pass rate (the same definition the
+    // evals use) with its breakdowns, and each agent in the debrief family. Moved here from the
+    // Debrief Console on 2026-11-11 so every agent's analytics sit together; the Console keeps the
+    // operator work. It reads the page's time range, and adds its six filters (organisation,
+    // language, learner level, debrief type, release, judge version) to the page's filter row. The
+    // page's language picker is off: debrief language is the session's own code, not a scenario
+    // language.
+    id: ANALYTICS_DEBRIEFS_TAB_ID,
+    label: "Debriefs",
+    uses: { language: false, range: true },
+    render: f => <DebriefAnalytics range={f.query.range} />,
+  },
+  {
     id: "latency",
     label: "Latency & reliability",
     uses: { language: true, range: true },
@@ -216,12 +241,6 @@ const TABS: TabDef[] = [
     ),
   },
   {
-    id: ANALYTICS_BUG_AGENT_TAB_ID,
-    label: "Bug Agent",
-    uses: { language: false, range: true },
-    render: f => <BugAgentPerformance {...f} />,
-  },
-  {
     id: "scribe",
     orgScoped: true,
     label: "Scribe",
@@ -270,21 +289,31 @@ const TABS: TabDef[] = [
     visibleTo: ({ features }) => hasFeature(features, FeatureToggleKey.ANALYTICS_AGENT),
   },
   {
-    // "What should we build next?", answered from the platform's own numbers and
-    // reviewed card by card. Visible to everyone who can reach this page, like
-    // every other tab — this used to sit on the elevated tier because accepting
-    // a suggestion WRITES onto the product roadmap, a different privilege from
-    // reading a chart, but the product decision was made to give every admin
-    // tier parity across all analytics surfaces instead.
+    // An auditor that re-checks the Analytics Agent's recent answers against the
+    // data, the dbt docs and the product code. Behind the same toggle as the
+    // agent it audits: it reads what the agent was asked, so nobody who cannot
+    // use the agent has any business opening it.
     //
-    // No page-level pickers: the period belongs to a Generate run that already
-    // happened and is stamped on every card, so a picker at the top of the page
-    // would imply it re-scopes a queue it cannot touch.
-    id: "suggestions",
-    label: en.analyticsSuggestions.tabLabel,
+    // No page-level pickers: how many messages to audit is chosen inside the tab,
+    // next to the button that starts it, and the run is not scoped by period or
+    // language.
+    id: "audit",
+    label: en.analyticsAudit.tabLabel,
     uses: { language: false, range: false },
-    render: () => <SuggestionsTab />,
-    visibleTo: ({ features }) => hasFeature(features, FeatureToggleKey.ANALYTICS_SUGGESTIONS),
+    render: () => <AnalyticsAuditTab />,
+    visibleTo: ({ features }) => hasFeature(features, FeatureToggleKey.ANALYTICS_AGENT),
+  },
+  {
+    // The weekly run of two agents (PostHog events, dbt definition changes and
+    // plan, then the dbt pull request), started only by the server's scheduler. Behind the same toggle as
+    // the agent: approving here makes the dbt agent open a pull request.
+    //
+    // No page-level pickers: a run is not scoped by period or language.
+    id: "automation",
+    label: en.analyticsAutomation.tabLabel,
+    uses: { language: false, range: false },
+    render: () => <AnalyticsAutomationTab />,
+    visibleTo: ({ features }) => hasFeature(features, FeatureToggleKey.ANALYTICS_AGENT),
   },
 ];
 
@@ -293,14 +322,21 @@ export const Analytics = () => {
   // 30-day window truncated every trend on this page to about four
   // buckets — enough to draw a line, not enough to read one. The wider
   // default costs a slower first paint on tabs that run many aggregates.
-  const [range, setRange] = useState<AnalyticsRange>("90d");
-  // Page-level filters, shared across tabs (language id "" = all). Each tab
-  // opts in via TabDef.uses; the picker only renders for tabs that use it.
-  const [language, setLanguage] = useState<string>("");
+  // Every page-level filter lives in the address (see analyticsUrlState), so a
+  // view is a link and survives a reload. Defaults are the absent value.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlState = useMemo(() => readAnalyticsUrlState(searchParams), [searchParams]);
+  const { range, language, from: customFrom, to: customTo } = urlState;
+  const patchUrl = useCallback(
+    (patch: Parameters<typeof writeAnalyticsUrlState>[1]) =>
+      setSearchParams(current => writeAnalyticsUrlState(current, patch), { replace: true }),
+    [setSearchParams],
+  );
+  const setRange = (next: RangeChoice) => patchUrl({ range: next });
+  const setLanguage = useCallback((next: string) => patchUrl({ language: next }), [patchUrl]);
   // The open tab lives in `?tab=<id>`, so "look at the Bug Agent numbers" is
   // a link — the Bug Hunter page sends its retired Performance section here
   // (OPP-0749). An unknown or absent id is the first tab, never an error.
-  const [searchParams, setSearchParams] = useSearchParams();
   const requestedTab = searchParams.get(ANALYTICS_TAB_PARAM);
 
   // Most tabs are visible to everyone who can reach this page (the route
@@ -313,19 +349,26 @@ export const Analytics = () => {
     (state: RootState) => state.user.user?.restrictedTenantIds ?? null,
   );
   const restricted = restrictedTenantIds !== null;
-  const { data: tenantData } = useGetTenantsQuery({ limit: 200 }, { skip: !restricted });
-  const orgItems = useMemo(
-    () =>
-      (restrictedTenantIds ?? [])
-        .map(id => ({
-          id,
-          label: tenantData?.data?.find(t => t.id === id)?.name ?? "Your organisation",
-        }))
-        .sort((a, b) => a.label.localeCompare(b.label)),
-    [restrictedTenantIds, tenantData],
-  );
-  const [pickedOrgId, setPickedOrgId] = useState<string>("");
-  const selectedOrg = orgItems.find(o => o.id === pickedOrgId) ?? orgItems[0];
+  const { data: tenantData } = useGetTenantsQuery({ limit: 200 });
+  const orgItems = useMemo(() => {
+    const all = tenantData?.data ?? [];
+    // A restricted admin may only pick from their own orgs; everyone else may
+    // pick any, or none ("All organisations").
+    const allowed = restricted ? (restrictedTenantIds ?? []) : all.map(t => t.id);
+    return allowed
+      .map(id => ({
+        id,
+        label: all.find(t => t.id === id)?.name ?? "Your organisation",
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [restricted, restrictedTenantIds, tenantData]);
+  const pickedOrgId = urlState.org;
+  const setPickedOrgId = (id: string) => patchUrl({ org: id });
+  // A restricted admin always has an org (the first one by default); an
+  // unrestricted admin defaults to none, i.e. the whole platform.
+  const selectedOrg = restricted
+    ? (orgItems.find(o => o.id === pickedOrgId) ?? orgItems[0])
+    : orgItems.find(o => o.id === pickedOrgId);
   const orgScope = useMemo(
     () => ({ restricted, tenantId: restricted ? selectedOrg?.id : undefined }),
     [restricted, selectedOrg],
@@ -334,23 +377,32 @@ export const Analytics = () => {
     () => TABS.filter(t => (restricted ? t.orgScoped : !t.visibleTo || t.visibleTo({ features }))),
     [features, restricted],
   );
+  // Tabs are grouped by audience: the group row picks the kind of question,
+  // the tab row inside it picks the view. The URL still carries only the tab.
+  const currentTab = tabs.find(t => t.id === requestedTab) ?? tabs[0];
+  const activeGroup = groupForTab(currentTab?.id ?? "");
+  const groupTabs = useMemo(() => tabsInGroup(activeGroup, tabs), [activeGroup, tabs]);
+  const visibleGroups = useMemo(
+    () => ANALYTICS_TAB_GROUPS.filter(g => tabsInGroup(g, tabs).length > 0),
+    [tabs],
+  );
   const tabIndex = Math.max(
     0,
-    tabs.findIndex(t => t.id === requestedTab),
+    groupTabs.findIndex(t => t.id === currentTab?.id),
   );
-  const setTabIndex = (index: number) =>
+  const selectTab = (id: string | undefined) =>
     setSearchParams(
       current => {
         const params = new URLSearchParams(current);
-        const id = tabs[index]?.id;
         // The first tab is the default, so it is the absent value and the
         // page's own address stays `/analytics`.
-        if (!id || index === 0) params.delete(ANALYTICS_TAB_PARAM);
+        if (!id || id === tabs[0]?.id) params.delete(ANALYTICS_TAB_PARAM);
         else params.set(ANALYTICS_TAB_PARAM, id);
         return params;
       },
       { replace: true },
     );
+  const setTabIndex = (index: number) => selectTab(groupTabs[index]?.id);
 
   const { data: scenarioLanguages } = useGetScenarioLanguagesQuery({ active: true });
   const languageItems = useMemo(
@@ -361,9 +413,9 @@ export const Analytics = () => {
     [scenarioLanguages],
   );
 
-  const selectedRange = RANGE_ITEMS.find(i => i.id === range) ?? RANGE_ITEMS[0];
+  const selectedRange = RANGE_ITEMS.find(i => i.id === range) ?? RANGE_ITEMS[1];
   const selectedLanguage = languageItems.find(i => i.id === language) ?? languageItems[0];
-  const activeTab = tabs[tabIndex] ?? tabs[0];
+  const activeTab = currentTab;
 
   // Callback ref into state, not a plain ref: a portal needs a re-render once
   // its target node exists, and a ref mutation does not trigger one.
@@ -371,16 +423,24 @@ export const Analytics = () => {
 
   // A tab with no range picker reads all-time data. Derived from the same flag
   // that hides the picker, so the two cannot disagree.
-  const query: AnalyticsWindowQuery = useMemo(
-    () => ({
-      range: activeTab.uses.range ? range : "all",
-      ...(orgScope.tenantId ? { tenantId: orgScope.tenantId } : {}),
-    }),
-    [range, activeTab, orgScope.tenantId],
-  );
+  // A custom range sends explicit from/to and no preset (the API lets the pair
+  // override `range`; sending both would be two answers to one question).
+  const isCustom = range === CUSTOM_RANGE && !!customFrom && !!customTo;
+  // Who the data is narrowed to: a restricted admin's picked org, or an
+  // unrestricted admin's picked org on the tabs that can honour it.
+  const tenantId =
+    orgScope.tenantId ?? (activeTab.orgScoped && selectedOrg ? selectedOrg.id : undefined);
+  const query: AnalyticsWindowQuery = useMemo(() => {
+    const window: AnalyticsWindowQuery = !activeTab.uses.range
+      ? { range: "all" }
+      : isCustom
+        ? { from: customFrom, to: customTo }
+        : { range: range === CUSTOM_RANGE ? "90d" : range };
+    return { ...window, ...(tenantId ? { tenantId } : {}) };
+  }, [range, activeTab, isCustom, customFrom, customTo, tenantId]);
   const filters: AnalyticsTabFilters = useMemo(
     () => ({ query, language, onSelectLanguage: setLanguage }),
-    [query, language],
+    [query, language, setLanguage],
   );
 
   return (
@@ -404,13 +464,38 @@ export const Analytics = () => {
                 {!activeTab.uses.range &&
                   " This tab covers all of the platform's history; each chart carries its own day/week/month/year grouping."}
               </p>
+              <div className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-1">
+                <label className="flex items-center gap-2 text-sm text-typography-700">
+                  <input
+                    type="checkbox"
+                    checked={urlState.showIds}
+                    onChange={e => patchUrl({ showIds: e.target.checked })}
+                  />
+                  Show chart IDs
+                </label>
+                <details className="text-sm text-typography-700" data-testid="analytics-glossary">
+                  <summary className="cursor-pointer select-none">Terms used here</summary>
+                  <dl className="mt-2 grid max-w-3xl gap-x-4 gap-y-1 sm:grid-cols-[10rem_1fr]">
+                    {ANALYTICS_GLOSSARY.map(g => (
+                      <div key={g.term} className="contents">
+                        <dt className="font-medium">{g.term}</dt>
+                        <dd className="text-typography-600">{g.meaning}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </details>
+              </div>
             </div>
             {/* Wraps rather than overflows: with a tab's own pickers portalled
                 in, the group is wider than a 1000px viewport, and an unwrapped
                 flex row puts the last control off-screen with no scrollbar to
                 reach it. Wrapped, it stays one contiguous block of filters. */}
             <div className="flex flex-wrap items-end gap-3">
-              {restricted && orgItems.length > 1 && (
+              {/* One organisation picker for every admin. Restricted admins choose
+                  among their own; everyone else may pick one, or none for the
+                  whole platform. Shown only on tabs that can narrow to an org
+                  (TabDef.orgScoped): a picker that changed nothing would lie. */}
+              {(restricted ? orgItems.length > 1 : activeTab.orgScoped && orgItems.length > 0) && (
                 <div className="w-full sm:w-56">
                   <Dropdown
                     id="analytics-org"
@@ -418,8 +503,8 @@ export const Analytics = () => {
                     titleText="Organisation"
                     hideLabel
                     label="Organisation"
-                    items={orgItems}
-                    selectedItem={selectedOrg}
+                    items={restricted ? orgItems : [ALL_ORGS_ITEM, ...orgItems]}
+                    selectedItem={selectedOrg ?? (restricted ? undefined : ALL_ORGS_ITEM)}
                     itemToString={item => item?.label ?? ""}
                     onChange={({ selectedItem }) => {
                       if (selectedItem) setPickedOrgId(selectedItem.id);
@@ -461,6 +546,35 @@ export const Analytics = () => {
                   />
                 </div>
               )}
+              {activeTab.uses.range && range === CUSTOM_RANGE && (
+                <div className="flex items-end gap-2">
+                  <label className="flex flex-col gap-1 text-xs text-typography-700">
+                    From
+                    <input
+                      type="date"
+                      value={customFrom ?? ""}
+                      max={customTo || undefined}
+                      onChange={e => patchUrl({ range: CUSTOM_RANGE, from: e.target.value })}
+                      className="h-10 rounded border border-border-light bg-white px-2 text-sm"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-xs text-typography-700">
+                    To
+                    <input
+                      type="date"
+                      value={customTo ?? ""}
+                      min={customFrom || undefined}
+                      onChange={e => patchUrl({ range: CUSTOM_RANGE, to: e.target.value })}
+                      className="h-10 rounded border border-border-light bg-white px-2 text-sm"
+                    />
+                  </label>
+                  {!isCustom && (
+                    <span className="pb-2 text-xs text-typography-500">
+                      Pick both dates; showing the last 90 days until then.
+                    </span>
+                  )}
+                </div>
+              )}
               {/* Tabs with slice dimensions of their own portal them here, so
                   the whole filter bar stays one row above the content it
                   scopes. Page-wide filters first, then the tab's own. Empty for
@@ -481,36 +595,65 @@ export const Analytics = () => {
             </p>
           ) : (
             <AnalyticsOrgScopeProvider value={orgScope}>
-              <Tabs
-                selectedIndex={tabIndex}
-                onChange={({ selectedIndex }) => setTabIndex(selectedIndex)}
-              >
-                <TabList aria-label="Analytics sections">
-                  {tabs.map(t => (
-                    <Tab key={t.id}>{t.label}</Tab>
-                  ))}
-                </TabList>
-                <TabPanels>
-                  {/*
+              <ChartIdsVisibleContext.Provider value={urlState.showIds}>
+                {visibleGroups.length > 1 && (
+                  <div
+                    role="group"
+                    aria-label="Analytics areas"
+                    className="mb-1 flex flex-wrap gap-2"
+                  >
+                    {visibleGroups.map(g => {
+                      const selected = g.id === activeGroup.id;
+                      return (
+                        <button
+                          key={g.id}
+                          type="button"
+                          title={g.blurb}
+                          aria-pressed={selected}
+                          onClick={() => selectTab(tabsInGroup(g, tabs)[0]?.id)}
+                          className={`rounded-full border px-3 py-1 text-sm ${
+                            selected
+                              ? "border-primary-500 bg-primary-50 font-medium text-typography-900"
+                              : "border-border-light bg-white text-typography-700 hover:bg-neutral-50"
+                          }`}
+                        >
+                          {g.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                <Tabs
+                  selectedIndex={tabIndex}
+                  onChange={({ selectedIndex }) => setTabIndex(selectedIndex)}
+                >
+                  <TabList aria-label="Analytics sections">
+                    {groupTabs.map(t => (
+                      <Tab key={t.id}>{t.label}</Tab>
+                    ))}
+                  </TabList>
+                  <TabPanels>
+                    {/*
                 Only the ACTIVE panel's component is mounted. Carbon's TabPanel
                 merely sets `hidden`, so rendering every tab's children fired one
                 query per chart across all tabs on first paint — most of them for
                 panels nobody was looking at. Depth stays available on demand; it
                 just is not all fetched up front.
               */}
-                  {tabs.map((t, i) => (
-                    // No side padding on phones: the page wrapper already has its
-                    // gutter, and Carbon's panel padding stacks on top of it.
-                    <TabPanel key={t.id} className="max-sm:!px-0">
-                      {i === tabIndex ? (
-                        <TabControlsSlotProvider value={controlsSlot}>
-                          {t.render(filters)}
-                        </TabControlsSlotProvider>
-                      ) : null}
-                    </TabPanel>
-                  ))}
-                </TabPanels>
-              </Tabs>
+                    {groupTabs.map((t, i) => (
+                      // No side padding on phones: the page wrapper already has its
+                      // gutter, and Carbon's panel padding stacks on top of it.
+                      <TabPanel key={t.id} className="max-sm:!px-0">
+                        {i === tabIndex ? (
+                          <TabControlsSlotProvider value={controlsSlot}>
+                            {t.render(filters)}
+                          </TabControlsSlotProvider>
+                        ) : null}
+                      </TabPanel>
+                    ))}
+                  </TabPanels>
+                </Tabs>
+              </ChartIdsVisibleContext.Provider>
             </AnalyticsOrgScopeProvider>
           )}
         </Section>

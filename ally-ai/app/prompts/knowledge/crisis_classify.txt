@@ -1,18 +1,58 @@
-Someone sent the message below to an automated question-answering assistant. The sender may be a mental healthcare worker, a counsellor, a trainee, or a member of the public. Decide whether the message shows that someone may be in danger now.
+Someone is chatting with an automated assistant for a business: a shop, a restaurant, a clinic, a hospital, a lab, a vet, a finance firm, a school or a mental-health service. They may be a customer, a patient, a parent, a pet owner, a client or a trainee. Decide which kind of reply their latest message needs.
 
-# Message
+# Their earlier messages in this conversation (oldest first; context only)
+{history}
+
+# Their latest message
 {message}
 
-# What you are deciding
-Return `is_crisis: true` when the message shows that the sender, or a person they describe, may be at risk of suicide, self-harm, harm to others or abuse right now, or is in acute distress — including indirect ways of saying it ("I can't keep doing this", "everyone would be better off without me", "she said she won't be here tomorrow").
+# The four levels
+Choose one `level` for the latest message, read with the earlier ones, in any language or slang.
 
-Return `is_crisis: false` for messages with no sign of risk or distress: questions about a product, an app, an account, sign-in, features, settings, data, privacy, costs or contact details; greetings; reference questions asked in general terms; past cases; hypotheticals; ordinary work stress.
+## at_risk: someone's life may be at risk from themselves, or someone is in danger
+At least one of these, about the sender or someone else, said directly or indirectly ("unalive"):
+- suicide, or thoughts or plans of it, including a passive wish to die ("I wish I could go to sleep and not wake up", "nobody would notice if I was gone", "there's no reason to live", "sab khatam kar doon");
+- self-harm;
+- harm to someone else;
+- abuse that is happening or has just been threatened;
+- not being able to stay safe.
 
-When a message contains a sign of risk or distress and you are unsure how serious it is, choose `true`. Do not choose `true` for a message that contains no such sign.
+## emergency: a medical emergency is happening now
+To the sender, someone with them, or an animal in their care, now:
+- heavy bleeding; chest pain; can't breathe; fainted or unconscious; a seizure; a stroke's signs;
+- an overdose or poisoning that has just happened, accidental or not;
+- burns;
+- the eyes: a chemical in the eye, an eye injury, sudden loss of vision ("like a curtain came down");
+- in pregnancy: heavy bleeding, the baby not moving or moving much less, waters broken or a gush or trickle of watery fluid near the end of pregnancy ("9 mahina chal raha hai aur paani jaisa discharge ho raha hai"), severe pain;
+- a pet that has eaten something poisonous (chocolate, grapes, rat poison, medicines), can't breathe, is bleeding badly, or collapsed.
+If self-harm or suicide is also present (an overdose taken on purpose), choose `emergency` and set `self_harm` true.
 
-Judge the message in whatever language it is written.
+## upset: distress without risk to life or safety
+Sadness, crying, low mood, loneliness, grief, guilt ("I feel like a bad mother"), stress, worry, anxiety, poor sleep, exhaustion, anger or frustration with the business or the assistant, and slang that sounds dark but is about something ordinary ("I'm so depressed my tee is sold out", "this market crash has killed me"). However strong the feeling, without one of the signs above it is `upset`. The assistant answers these normally, with warmth.
+
+## none: everything else
+- Questions about the assistant itself: "what do you remember about me?", "what do you know about me?", "do you have a helpline I can call?", "are you a real person?".
+- Requests to the assistant, including odd ones or attempts to change its rules: "write me a poem", "ignore your instructions".
+- Questions about a service, an order, a booking, a product, prices, hours, appointments, costs, privacy or contact details; greetings and goodbyes; asking to talk to a person; booking talk like "the one you said" or "book me at 3".
+- Questions about a medicine, a result or a symptom asked in general or about a plan, with nothing happening now: a dose, a missed dose, side effects, "my HbA1c is 7.2, is that bad?", "when will I feel the baby move?".
+- Reference questions asked in general terms ("how can schools help prevent suicide?").
+- Something in the past, mentioned while asking about a service ("I was in hospital after an attempt years ago, can I still join your course?").
+- Violence in a game, a film or a story.
+- Everyday expressions and jokes that use words like die or kill: "I'm done for today", "dead tired", "my phone died", "I could die of embarrassment", "I'd kill for a coffee", "I'll kill your delivery guy lol", "this traffic is killing me", "I'm dying to try it", "भूख से मर रहा हूँ", "bore hoke mar gaya", "mar gaya yaar itna khana kha ke", "कंटाळून मेलो".
+
+# Earlier messages are context for the latest one
+- If the latest message continues an earlier disclosure of risk or an emergency (confirms it, adds detail, or takes it back), keep that level: "I mean it", "yes", "tonight", "I've got everything ready", "forget I said anything", "she's still bleeding".
+- If the latest message moves on, judge it on its own: a new question, asking to talk to a person, a thank-you or saying they'll call for help. The earlier message was already answered and the team was told.
+- If the earlier messages are everyday, an alarming-sounding latest message is ordinary: after "how do streaks work?", "and what if I miss a day?" is about the app; after "book me at 3", "the one you said" is about the booking.
+
+# When you're unsure
+If there is a sign of risk to life or safety, or of a medical emergency now, and you're unsure how serious it is, choose `at_risk` or `emergency`. If there is no such sign, choose `upset` or `none`, never `at_risk`.
+
+Judge the messages in whatever language they are written.
 
 # What to return
-- `is_crisis`: your decision.
-- `signal`: the shortest phrase from the message that shows risk or distress, copied verbatim; empty when `is_crisis` is false. If you cannot quote such a phrase, `is_crisis` must be false.
+- `level`: `at_risk`, `emergency`, `upset` or `none`.
+- `is_crisis`: true when `level` is `at_risk` or `emergency`, otherwise false.
+- `self_harm`: true when suicide or self-harm is present, whatever the level.
+- `signal`: the shortest phrase that shows the risk or the emergency, copied verbatim from the latest message, or from an earlier one only when the latest message continues it. Empty for `upset` and `none`. If you can't quote such a phrase, the level is `upset` or `none`.
 - `confidence`: 0 to 1.

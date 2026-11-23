@@ -24,6 +24,8 @@ const FilterPopover: React.FC<FilterPopoverProps> = ({
   singleSelectedValue,
   onDateSelect,
   onNumberSelect,
+  textValue,
+  onTextChange,
   anchorOrigin,
 }) => {
   // Local min/max state for the NUMBER range filter, seeded from any existing
@@ -167,7 +169,8 @@ const FilterPopover: React.FC<FilterPopoverProps> = ({
           <div className="text-[14px]  text-[#6e6656] font-[500] m-[12px] mb-[0px]">
             {column?.header}
           </div>
-          {column?.filterType !== FilterType.DATE && column?.filterType !== FilterType.NUMBER && (
+          {(column?.filterType === FilterType.MULTISELECT ||
+            column?.filterType === FilterType.SINGLESELECT) && (
             <div className="p-[12px] pb-[8px] text-[#6e6656]">
               <TextInput
                 id="filter-popover-search"
@@ -187,19 +190,29 @@ const FilterPopover: React.FC<FilterPopoverProps> = ({
             ) : column.filterType === FilterType.DATE ? (
               <DateFilterUI
                 selectedValues={selectedValues}
-                onChange={arr => onToggleOption(JSON.stringify(arr))}
-                onDateSelect={value => onDateSelect?.(column.key as string, value)}
+                onApply={value => onDateSelect?.(column.key as string, value)}
               />
             ) : column.filterType === FilterType.NUMBER ? (
               renderNumberRange()
             ) : column.filterType === FilterType.TEXT ? (
-              <div className="flex justify-end p-2">
-                <button
-                  className="bg-primary-600 text-white px-4 py-1 mb-[4px] mr-[4px] rounded hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                  onClick={() => onSelectSingle(column.key as string, searchText)}
-                >
-                  Apply
-                </button>
+              <div className="p-[12px]">
+                <TextInput
+                  id="filter-popover-text"
+                  labelText={column.header}
+                  hideLabel
+                  size="sm"
+                  placeholder="Search..."
+                  value={textValue}
+                  onChange={e => onTextChange(e.target.value)}
+                />
+                <div className="flex justify-end pt-2">
+                  <button
+                    className="bg-primary-600 text-white px-4 py-1 mb-[4px] mr-[4px] rounded hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    onClick={() => onSelectSingle(column.key as string, textValue)}
+                  >
+                    Apply
+                  </button>
+                </div>
               </div>
             ) : (
               column.filterType === FilterType.SINGLESELECT && renderSingleSelect()

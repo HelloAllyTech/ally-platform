@@ -71,6 +71,8 @@ export enum JudgeAttemptFamily {
   RECALL_QUALITY = 'recall-quality',
   /** Per session: the subject is the session whose debrief is scored. */
   DEBRIEF_QUALITY = 'debrief-quality',
+  /** Per run: the subject is the debrief run whose text is language-checked. */
+  DEBRIEF_LANGUAGE = 'debrief-language',
 }
 
 /** Why the last attempt produced no judgment. */

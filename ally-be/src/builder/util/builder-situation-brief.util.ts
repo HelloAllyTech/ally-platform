@@ -1,6 +1,13 @@
 import { v4 as uuidv4 } from 'uuid';
-import { BUILDER_REPO_NAMES } from '../constants/builder-repos.constants';
+import {
+  BUILDER_REPO_NAMES,
+  BUILDER_WIKI_REPO as BUILDER_WIKI_READ_REPO,
+} from '../constants/builder-repos.constants';
 import { BuilderDiscovery } from './builder-discovery.util';
+import {
+  citedPathMatchesRead,
+  citedPaths,
+} from './builder-readiness-checks.util';
 
 /**
  * The situation brief (W4): Builder's first visible turn in an interview.
@@ -38,6 +45,16 @@ export interface BuilderBriefLine {
   approach?: BuilderBriefApproach;
   /** Repo lines. */
   repo?: string;
+  /**
+   * Claims about what exists (`exists`, `alreadyMet`): true when a file read this session
+   * supports the line, false when nothing read does. A search hit is not a read — it says a
+   * word appears, not what the code does. Unverified lines are shown as such rather than with
+   * a confirm box, and a confirm sent for one is recorded as unverified [FP-0490]. Absent on a
+   * brief from before the check, and on proposal and repo lines, which are decisions.
+   */
+  verified?: boolean;
+  /** The file read that verified it, `repo:path`. */
+  verifiedBy?: string;
 }
 
 export interface BuilderSituationBrief {
@@ -48,7 +65,11 @@ export interface BuilderSituationBrief {
   createdAt: string;
 }
 
-export type BuilderBriefVerdict = 'confirm' | 'correct';
+/**
+ * `unverified`: the line claims something exists and no file read this session shows it. Set by
+ * the server, never chosen: a confirm on such a line is stored as this.
+ */
+export type BuilderBriefVerdict = 'confirm' | 'correct' | 'unverified';
 
 export interface BuilderBriefResponse {
   briefId: string;
@@ -61,7 +82,8 @@ const CITES = {
   items: { type: 'string' },
   description:
     'Discovery refs (E1, E2…) or the path of a file you read this session. A line about ' +
-    'what exists with no citation is sent back.',
+    'what exists with no citation is sent back, and one no file READ supports (a search hit ' +
+    'is not a read) is shown to the admin as unverified.',
 };
 
 export const SUBMIT_SITUATION_BRIEF_TOOL = {
@@ -162,6 +184,44 @@ export interface BuilderBriefEvidence {
   discovery: BuilderDiscovery | null;
   /** Sources and findings of successful lookups (evidence log + this turn). */
   sources: string[];
+  /**
+   * `repo:path` of every file read successfully this session, this turn included. Undefined
+   * leaves lines unmarked (the check is not made), as before it existed.
+   */
+  readFiles?: string[];
+}
+
+/**
+ * The file read that supports a line, or null: a cited path that was read, a discovery hit
+ * whose file was then read, or a path the line itself names that was read.
+ */
+export function verifyingRead(
+  text: string,
+  cites: string[],
+  evidence: BuilderBriefEvidence,
+): string | null {
+  const reads = evidence.readFiles ?? [];
+  if (!reads.length) return null;
+  const candidates: string[] = [];
+  for (const cite of cites) {
+    const ref = cite.trim();
+    if (/^E\d+$/i.test(ref)) {
+      const item = evidence.discovery?.items.find(
+        (entry) => entry.ref.toUpperCase() === ref.toUpperCase(),
+      );
+      if (item?.ok)
+        candidates.push(...item.found.flatMap((found) => citedPaths(found)));
+    } else {
+      candidates.push(...citedPaths(ref), ref);
+    }
+  }
+  candidates.push(...citedPaths(text));
+  for (const candidate of candidates) {
+    if (!candidate || candidate.length < 4) continue;
+    const read = reads.find((entry) => citedPathMatchesRead(candidate, entry));
+    if (read) return read;
+  }
+  return null;
 }
 
 /**
@@ -225,12 +285,24 @@ export function normaliseSituationBrief(
     return cites;
   };
 
+  const verification = (text: string, raw: unknown) => {
+    if (!evidence.readFiles) return {};
+    const read = verifyingRead(text, asStrings(raw), evidence);
+    return read ? { verified: true, verifiedBy: read } : { verified: false };
+  };
+
   asList(input.exists).forEach((entry, index) => {
     const text = clip(entry.text, 400);
     if (!text) return;
     const cites = cited(entry.cites);
     if (!cites.length) uncited.push(text);
-    lines.push({ id: `X${index + 1}`, kind: 'exists', text, cites });
+    lines.push({
+      id: `X${index + 1}`,
+      kind: 'exists',
+      text,
+      cites,
+      ...verification(text, entry.cites),
+    });
   });
 
   asList(input.alreadyMet).forEach((entry, index) => {
@@ -238,7 +310,13 @@ export function normaliseSituationBrief(
     if (!text) return;
     const cites = cited(entry.cites);
     if (!cites.length) uncited.push(text);
-    lines.push({ id: `M${index + 1}`, kind: 'alreadyMet', text, cites });
+    lines.push({
+      id: `M${index + 1}`,
+      kind: 'alreadyMet',
+      text,
+      cites,
+      ...verification(text, entry.cites),
+    });
   });
 
   asList(input.proposals).forEach((entry, index) => {
@@ -371,12 +449,23 @@ export function normaliseBriefResponse(
 ): BuilderBriefResponse | null {
   if (!raw || typeof raw !== 'object') return null;
   const known = new Set((brief?.lines ?? []).map((line) => line.id));
+  const unverified = new Set(
+    (brief?.lines ?? [])
+      .filter((line) => line.verified === false)
+      .map((line) => line.id),
+  );
   const lines = asList(raw.lines)
     .map((entry) => {
       const id = String(entry.id ?? '').trim();
       const correction = clip(entry.correction, 1_000);
+      // A confirm cannot make an unverified claim true; an older client sends one for every
+      // line it was not told otherwise about, so the server decides.
       const verdict: BuilderBriefVerdict =
-        entry.verdict === 'correct' && correction ? 'correct' : 'confirm';
+        entry.verdict === 'correct' && correction
+          ? 'correct'
+          : unverified.has(id)
+            ? 'unverified'
+            : 'confirm';
       return {
         id,
         verdict,
@@ -406,6 +495,9 @@ export function renderBriefResponse(
     .filter((line) => line.verdict === 'confirm')
     .map((line) => line.id);
   const corrected = response.lines.filter((line) => line.verdict === 'correct');
+  const notVerified = response.lines
+    .filter((line) => line.verdict === 'unverified')
+    .map((line) => line.id);
   const unanswered = (brief?.lines ?? [])
     .map((line) => line.id)
     .filter((id) => !response.lines.some((line) => line.id === id));
@@ -418,6 +510,9 @@ export function renderBriefResponse(
         original ? ` ("${clip(original.text, 120)}")` : ''
       }: ${line.correction}`;
     }),
+    notVerified.length
+      ? `Unverified, no file read shows them: ${notVerified.join(', ')}.`
+      : '',
     unanswered.length ? `Not answered: ${unanswered.join(', ')}.` : '',
     response.note ? `Also: ${response.note}` : '',
   ]
@@ -443,7 +538,9 @@ export function renderBriefForModel(
           : ''
         : verdict.verdict === 'confirm'
           ? ' [CONFIRMED]'
-          : ` [CORRECTED: ${verdict.correction}]`;
+          : verdict.verdict === 'unverified'
+            ? ' [UNVERIFIED — no file read shows it; read one before the PRD relies on it]'
+            : ` [CORRECTED: ${verdict.correction}]`;
       const head =
         line.kind === 'proposal'
           ? `${line.id} proposal (${line.approach ?? '?'}) ${line.part ?? ''}:`
@@ -460,4 +557,30 @@ export function renderBriefForModel(
   ]
     .filter(Boolean)
     .join('\n');
+}
+
+/**
+ * `repo:path` of every file a set of tool calls read successfully — this turn's reads, which
+ * the evidence log may not hold yet when the brief is checked.
+ */
+export function filesReadIn(
+  calls: {
+    name: string;
+    input?: Record<string, any>;
+    result?: Record<string, any>;
+  }[],
+): string[] {
+  return calls
+    .filter(
+      (call) =>
+        (call.name === 'github_read_file' || call.name === 'wiki_read') &&
+        call.result &&
+        call.result.ok !== false &&
+        call.input?.path,
+    )
+    .map((call) =>
+      call.name === 'wiki_read'
+        ? `${BUILDER_WIKI_READ_REPO}:${String(call.input?.path)}`
+        : `${String(call.input?.repo ?? '')}:${String(call.input?.path)}`,
+    );
 }

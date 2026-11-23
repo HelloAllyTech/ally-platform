@@ -106,6 +106,8 @@ class KnowledgeAgentSettings(BaseModel):
     # but its cost is not. A small model is adequate — the prompt asks for one binary
     # judgement with an explicit instruction to prefer the false positive.
     CRISIS_MODEL: str = Field("gpt-4o-mini")
+    # Chunk H1: one classifier call, inside ally-be's 4 s attempt (6 s in all).
+    CRISIS_TIMEOUT_SECONDS: float = Field(3.5, gt=0, le=15)
     TOP_K: int = Field(8)
     MIN_SIMILARITY: float = Field(0.35)
     DECLINE_SIMILARITY: float = Field(0.42)
@@ -113,7 +115,7 @@ class KnowledgeAgentSettings(BaseModel):
     # even if they cleared the floor. Stops one strong match from being diluted by seven
     # weak ones.
     SIMILARITY_BAND: float = Field(0.08)
-    MAX_PASSAGES: int = Field(5)
+    MAX_PASSAGES: int = Field(8)
     MAX_CONTEXT_TOKENS: int = Field(3000)
     # Bump when the answer prompt changes in a way that could move answers; echoed back
     # to ally-be and stored per message so a behaviour change can be traced to its
@@ -124,11 +126,13 @@ class KnowledgeAgentSettings(BaseModel):
 class AgentRuntimeSettings(BaseModel):
     """Agents v2 runtime: the LangGraph agent graph behind `/agent/run`.
 
-    Dark until ENABLED: the route answers 404 and nothing is opened at startup, so
-    deploying the code changes nothing until it is switched on.
+    On by default: chatbots answer with the agent unless ENABLED is set false here
+    (the route then answers 404 and ally-be answers in safe mode) or the platform's
+    "Answer with the agent" switch is off. The checkpoint database is optional: without
+    one, chatbot runs are simply not stored (nothing reads them back to answer).
     """
 
-    ENABLED: bool = Field(False)
+    ENABLED: bool = Field(True)
     # Postgres for LangGraph's checkpoint tables, in their own database — ally-be's
     # database is never written to. Unset = in-memory checkpoints (lost on restart),
     # with a warning at startup.
@@ -145,21 +149,56 @@ class AgentRuntimeSettings(BaseModel):
     # 25-second timeout.
     MAX_TOOL_CALLS: int = Field(2, ge=0, le=8)
     # Seconds into a run after which the agent stops searching and its reply is
-    # final (no rewrite), so it answers inside ally-be's 25-second timeout rather
-    # than falling back to v1.
-    RUN_BUDGET_SECONDS: float = Field(15.0, gt=0, le=60)
-    # Hard cap on one run, model calls included: past it the run is cancelled and
-    # /agent/run answers 504 (the stream sends `error: timeout`). Below ally-be's
-    # waits (22 s streaming, 25 s otherwise) so ally-ai always ends first: ally-be
-    # gets a clean timeout to fall back on, and no run keeps spending tokens after
-    # ally-be has moved on.
-    RUN_TIMEOUT_SECONDS: float = Field(20.0, gt=0, le=60)
+    # final (no rewrite), so it answers inside the run's hard cap.
+    RUN_BUDGET_SECONDS: float = Field(30.0, gt=0, le=60)
+    # Hard cap on one run when the request names none (chunk H1: ally-be names it,
+    # 45 s streamed, 38 s for WhatsApp, and waits 5 s longer, so ally-ai always ends
+    # first and no run keeps spending tokens after ally-be has moved on).
+    RUN_TIMEOUT_SECONDS: float = Field(45.0, gt=0, le=60)
+    # The memory check (ally-be waits 5 s and fails closed); the summary gets three
+    # times this. Both run after the reply, never while someone waits (chunk 8a).
+    MEMORY_CALL_TIMEOUT_SECONDS: float = Field(4.0, gt=0, le=30)
+    # Extra seconds after a write (chunk 8a). 0 since chunk H1: the cap is the whole
+    # run, so ally-be's wait is always above it.
+    RUN_WRITE_EXTRA_SECONDS: float = Field(0.0, ge=0, le=4.5)
+    # Search the question before the first model call (chunk H1), so a plain answer
+    # takes one model call instead of two. False: the agent decides when to search.
+    PRESEARCH: bool = Field(True)
     # Conversation messages the agent reads, most recent last.
     MAX_HISTORY_MESSAGES: int = Field(10, ge=0, le=50)
     # Reasoning effort for the agent step on an OpenAI reasoning model (gpt-5 and
-    # o-series; ignored for others). Unset = the provider default ("medium"). The
-    # latency lever if the agent step is too slow; see CHUNK-03A-NOTES.md.
-    AGENT_REASONING_EFFORT: Optional[Literal["minimal", "low", "medium", "high"]] = None
+    # o-series; ignored for others). "low" by default since chunk H1: "medium" (the
+    # provider default) roughly doubled the reply call. Unset to use the provider's.
+    AGENT_REASONING_EFFORT: Optional[Literal["minimal", "low", "medium", "high"]] = (
+        "low"
+    )
+    # Test only (chunk H1): seconds to wait inside every gateway tool call, before or
+    # after ally-be does the work, to see which timeout fires first. 0 = off. Ignored
+    # outside a development environment (ENV__ENV DEV or DEVELOPMENT), even if set.
+    DEBUG_TOOL_DELAY_SECONDS: float = Field(0.0, ge=0, le=60)
+    DEBUG_TOOL_DELAY_WHEN: Literal["before", "after"] = "before"
+    # Only tools whose name starts with this ("create_", "update_"); empty = every tool.
+    DEBUG_TOOL_DELAY_ONLY: str = ""
+
+
+class BuilderSettings(BaseModel):
+    """Onboarding builder (chunk 20a): the setup guide behind `/builder/*`.
+
+    On by default: ally-be's onboarding (chat, website reading, document uploads)
+    depends on it. ENABLED=false is the kill switch: the routes then answer 404.
+    It keeps no state of its own (ally-be holds the draft), so unlike the agent
+    runtime it needs no checkpointer.
+    """
+
+    ENABLED: bool = Field(True)
+    # Hard cap on one builder step, sub-tasks included. Below ally-be's 60-second
+    # relay deadline, so ally-be always gets a clean `error: timeout`.
+    STEP_TIMEOUT_SECONDS: float = Field(45.0, gt=0, le=120)
+    # One fact-extraction call for a batch of pages, during the crawl.
+    EXTRACT_TIMEOUT_SECONDS: float = Field(40.0, gt=0, le=120)
+    # Reasoning effort for the conversation step and fact extraction on an OpenAI
+    # reasoning model; the other sub-tasks use the provider default.
+    REASONING_EFFORT: Optional[Literal["minimal", "low", "medium", "high"]] = "low"
 
 
 class HelplineSettings(BaseModel):
@@ -249,14 +288,29 @@ class FeedbackGroundednessJudgeSettings(BaseModel):
     PROMPT_VERSION: str = Field("v1")
 
 
+class DebriefLanguageJudgeSettings(BaseModel):
+    """Debrief language judge: is the debrief's own text written well in the
+    session's language? Findings only, no score. A different model FAMILY from
+    the debrief Writer (Gemini) so the writer is not graded by itself; the gate
+    (scripts/debrief_language_perturbations.py) is what says the choice holds.
+    Comparisons are valid only within one (MODEL, PROMPT_VERSION) pair."""
+
+    PROVIDER: str = Field("openai")
+    MODEL: str = Field("gpt-5-mini")
+    PROMPT_VERSION: str = Field("v2")
+
+
 class DebriefQualityJudgeSettings(BaseModel):
     """Debrief-quality judge — how good is the whole debrief, scored per rubric
     dimension? The independent judge the debrief quality bar is read from.
     Sibling of the groundedness judge: separate call, separate rubric version,
-    comparisons valid only within one (MODEL, PROMPT_VERSION) pair."""
+    comparisons valid only within one (MODEL, PROMPT_VERSION) pair.
+
+    v2 (2026-11-16): the rubric and the judge read the RISK CUE DEFINITION;
+    only a missed clear risk cue is the missed_risk_cue hard fail."""
 
     MODEL: str = Field("gemini-2.5-pro")
-    PROMPT_VERSION: str = Field("v1")
+    PROMPT_VERSION: str = Field("v2")
 
 
 class DebriefSettings(BaseModel):
@@ -270,10 +324,12 @@ class DebriefSettings(BaseModel):
     # (DEBRIEF_QUALITY_JUDGE.MODEL), so neither grades work by its own model.
     ANALYST_MODEL: str = Field("gemini-2.5-pro")
     PROGRESS_READER_MODEL: str = Field("gemini-2.5-flash")
+    # The progress agent (replaced the Progress reader on the GA path): cheap.
+    PROGRESS_AGENT_MODEL: str = Field("gemini-2.5-flash")
     WRITER_MODEL: str = Field("gemini-3-flash-preview")
     EVALUATOR_MODEL: str = Field("gemini-2.5-flash")
     REVISER_MODEL: str = Field("gemini-3-flash-preview")
-    IMPROVER_MODEL: str = Field("gemini-2.5-pro")
+    PM_AGENT_MODEL: str = Field("gemini-2.5-pro")
 
 
 class RagQualityJudgeSettings(BaseModel):
@@ -453,6 +509,7 @@ class AppSettings(BaseSettings):
         default_factory=KnowledgeAgentSettings
     )
     AGENT_RUNTIME: AgentRuntimeSettings = Field(default_factory=AgentRuntimeSettings)
+    BUILDER: BuilderSettings = Field(default_factory=BuilderSettings)
     HELPLINE: HelplineSettings = Field(default_factory=HelplineSettings)
     DRIFT_JUDGE: DriftJudgeSettings = Field(default_factory=DriftJudgeSettings)
     LANGUAGE_JUDGE: LanguageJudgeSettings = Field(default_factory=LanguageJudgeSettings)
@@ -463,6 +520,9 @@ class AppSettings(BaseSettings):
     LLM_USAGE: LLMUsageSettings = Field(default_factory=LLMUsageSettings)
     FEEDBACK_GROUNDEDNESS_JUDGE: FeedbackGroundednessJudgeSettings = Field(
         default_factory=FeedbackGroundednessJudgeSettings
+    )
+    DEBRIEF_LANGUAGE_JUDGE: DebriefLanguageJudgeSettings = Field(
+        default_factory=DebriefLanguageJudgeSettings
     )
     DEBRIEF_QUALITY_JUDGE: DebriefQualityJudgeSettings = Field(
         default_factory=DebriefQualityJudgeSettings

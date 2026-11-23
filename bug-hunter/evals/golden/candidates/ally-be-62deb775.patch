@@ -1,0 +1,182 @@
+diff --git a/src/badge/controller/badge.controller.ts b/src/badge/controller/badge.controller.ts
+index 9df2f05709..3452f55d96 100644
+--- a/src/badge/controller/badge.controller.ts
++++ b/src/badge/controller/badge.controller.ts
+@@ -103,7 +103,7 @@ export class BadgeController {
+     @CurrentUser() tokenUser: TokenUser,
+     @Query('viewedStatus') viewedStatus?: BadgeViewedStatus,
+   ): Promise<UserBadgeResponseDto> {
+-    return this.badgeService.getUserBadges(tokenUser.id, viewedStatus);
++    return this.badgeService.getUserBadges(tokenUser.id, viewedStatus, true);
+   }
+ 
+   @ApiOperation({ summary: 'Get count of badges awarded to the current user' })
+diff --git a/src/badge/repository/badge.repository.ts b/src/badge/repository/badge.repository.ts
+index 07aad7dd8b..4f7861d428 100644
+--- a/src/badge/repository/badge.repository.ts
++++ b/src/badge/repository/badge.repository.ts
+@@ -59,6 +59,7 @@ export class BadgeRepository extends Repository<Badge> {
+   async getUserBadges(
+     userId: number,
+     viewedStatus?: BadgeViewedStatus,
++    enableGroupFilter?: boolean,
+   ): Promise<UserBadgeWithDetails[]> {
+     const query = this.dataSource
+       .createQueryBuilder(BadgeUser, 'badgeUser')
+@@ -82,6 +83,17 @@ export class BadgeRepository extends Repository<Badge> {
+       .andWhere('badge.deletedAt IS NULL')
+       .andWhere('badge.status = :status', { status: BadgeStatus.ACTIVE });
+ 
++    if (enableGroupFilter) {
++      query
++        .leftJoin(BadgeGroup, 'badgeGroup', 'badgeGroup.badgeId = badge.id')
++        .innerJoin(
++          UserGroup,
++          'userGroup',
++          'userGroup.groupId = badgeGroup.groupId',
++        )
++        .andWhere('userGroup.userId = :userId', { userId });
++    }
++
+     if (viewedStatus) {
+       query.andWhere('badgeUser.viewedStatus = :viewedStatus', {
+         viewedStatus,
+@@ -124,7 +136,14 @@ export class BadgeRepository extends Repository<Badge> {
+     const query = this.dataSource
+       .createQueryBuilder(BadgeUser, 'badgeUser')
+       .innerJoin(Badge, 'badge', 'badge.id = badgeUser.badgeId')
++      .innerJoin(BadgeGroup, 'badgeGroup', 'badgeGroup.badgeId = badge.id')
++      .innerJoin(
++        UserGroup,
++        'userGroup',
++        'userGroup.groupId = badgeGroup.groupId',
++      )
+       .where('badgeUser.userId = :userId', { userId })
++      .andWhere('userGroup.userId = :userId', { userId })
+       .andWhere('badgeUser.deletedAt IS NULL')
+       .andWhere('badge.deletedAt IS NULL')
+       .andWhere('badge.status = :status', { status: BadgeStatus.ACTIVE });
+diff --git a/src/badge/service/badge-tenant.service.ts b/src/badge/service/badge-tenant.service.ts
+index 84b3a7f62f..6ca7ae0123 100644
+--- a/src/badge/service/badge-tenant.service.ts
++++ b/src/badge/service/badge-tenant.service.ts
+@@ -69,32 +69,6 @@ export class BadgeTenantService {
+     return true;
+   }
+ 
+-  async addPublicBadgesToTenant(tenantId: string): Promise<boolean> {
+-    const tenant = await this.tenantsRepository.findOne({
+-      where: { id: tenantId },
+-    });
+-    if (!tenant) {
+-      throw new NotFoundException('Tenant not found');
+-    }
+-    const publicBadges = await this.badgeRepository.find({
+-      where: {
+-        visibilityType: BadgeVisibilityType.PUBLIC,
+-        status: BadgeStatus.ACTIVE,
+-      },
+-    });
+-    if (publicBadges.length === 0) {
+-      throw new NotFoundException('No public badges found');
+-    }
+-    await this.badgeTenantRepository.save(
+-      publicBadges.map((badge) => ({
+-        badgeId: badge.id,
+-        tenantId: tenant.id,
+-      })),
+-    );
+-
+-    return true;
+-  }
+-
+   async assignBadgeToTenants(
+     badge: Badge,
+     tenantIds?: string[],
+diff --git a/src/badge/service/badge.service.ts b/src/badge/service/badge.service.ts
+index 010154c8fe..f68c8058d3 100644
+--- a/src/badge/service/badge.service.ts
++++ b/src/badge/service/badge.service.ts
+@@ -327,10 +327,12 @@ export class BadgeService {
+   async getUserBadges(
+     userId: number,
+     viewedStatus?: BadgeViewedStatus,
++    enableGroupFilter: boolean = false,
+   ): Promise<UserBadgeResponse> {
+     const badges = await this.badgeRepository.getUserBadges(
+       userId,
+       viewedStatus,
++      enableGroupFilter,
+     );
+     return {
+       data: badges,
+diff --git a/src/badge/service/test/badge-tenant.service.spec.ts b/src/badge/service/test/badge-tenant.service.spec.ts
+index 5fdd24e631..fae3b12358 100644
+--- a/src/badge/service/test/badge-tenant.service.spec.ts
++++ b/src/badge/service/test/badge-tenant.service.spec.ts
+@@ -137,65 +137,6 @@ describe('BadgeTenantService', () => {
+     });
+   });
+ 
+-  describe('addPublicBadgesToTenant', () => {
+-    it('should throw NotFoundException when tenant does not exist', async () => {
+-      mockTenantsRepository.findOne.mockResolvedValue(null);
+-
+-      await expect(service.addPublicBadgesToTenant('tenant-1')).rejects.toThrow(
+-        NotFoundException,
+-      );
+-    });
+-
+-    it('should throw NotFoundException when no public badges found', async () => {
+-      mockTenantsRepository.findOne.mockResolvedValue({
+-        id: 'tenant-1',
+-      } as any);
+-      mockBadgeRepository.find.mockResolvedValue([]);
+-
+-      await expect(service.addPublicBadgesToTenant('tenant-1')).rejects.toThrow(
+-        NotFoundException,
+-      );
+-    });
+-
+-    it('should query badges with PUBLIC visibility and ACTIVE status', async () => {
+-      mockTenantsRepository.findOne.mockResolvedValue({
+-        id: 'tenant-1',
+-      } as any);
+-      mockBadgeRepository.find.mockResolvedValue([
+-        { id: 'badge-1' },
+-      ] as Badge[]);
+-      mockBadgeTenantRepository.save.mockResolvedValue([] as any);
+-
+-      await service.addPublicBadgesToTenant('tenant-1');
+-
+-      expect(mockBadgeRepository.find).toHaveBeenCalledWith({
+-        where: {
+-          visibilityType: BadgeVisibilityType.PUBLIC,
+-          status: BadgeStatus.ACTIVE,
+-        },
+-      });
+-    });
+-
+-    it('should create correct badge-tenant mappings', async () => {
+-      mockTenantsRepository.findOne.mockResolvedValue({
+-        id: 'tenant-1',
+-      } as any);
+-      mockBadgeRepository.find.mockResolvedValue([
+-        { id: 'badge-1' },
+-        { id: 'badge-2' },
+-      ] as Badge[]);
+-      mockBadgeTenantRepository.save.mockResolvedValue([] as any);
+-
+-      const result = await service.addPublicBadgesToTenant('tenant-1');
+-
+-      expect(result).toBe(true);
+-      expect(mockBadgeTenantRepository.save).toHaveBeenCalledWith([
+-        { badgeId: 'badge-1', tenantId: 'tenant-1' },
+-        { badgeId: 'badge-2', tenantId: 'tenant-1' },
+-      ]);
+-    });
+-  });
+-
+   describe('assignBadgeToTenants', () => {
+     it('should assign to all tenants when badge is PUBLIC', async () => {
+       const badge = {

@@ -13,6 +13,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
 import '../../../core/theme/rn_scale.dart';
 import '../../../core/widgets/toast/toast.dart';
+import '../../simulations/data/learner_debrief_repository.dart';
 import '../../simulations/data/simulation_models.dart';
 import '../../simulations/data/simulations_repository.dart';
 import '../../simulations/presentation/simulation_feedback_location.dart';
@@ -99,6 +100,9 @@ class RoleplayVoiceScreen extends ConsumerStatefulWidget {
     this.pathId,
     this.caseId,
     this.languageId,
+    this.trackId,
+    this.trackItemId,
+    this.assessmentRequiredTurns,
     this.now = DateTime.now,
   });
 
@@ -118,6 +122,15 @@ class RoleplayVoiceScreen extends ConsumerStatefulWidget {
   final String? pathId;
   final String? caseId;
   final int? languageId;
+
+  /// The course this roleplay was opened from (and its item), passed on to
+  /// Feedback so the learner returns to the course.
+  final String? trackId;
+  final String? trackItemId;
+
+  /// Assessment launched from a course item: the learner-turn minimum, for
+  /// the "Turn k of n" counter. Display only; the server decides what counts.
+  final int? assessmentRequiredTurns;
 
   /// Injectable clock for the session timer, so tests can assert on a
   /// specific elapsed duration without a real wall-clock wait — the
@@ -217,6 +230,12 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
   String? _agentTurnStatus;
   bool _localSpeaking = false;
   bool _debouncedRemoteSpeaking = false;
+
+  // Assessment counter: a learner turn starts when the learner begins to
+  // speak after the agent has spoken (or at the start); consecutive learner
+  // utterances count once, as on the server.
+  int _learnerTurns = 0;
+  bool _agentSpokeSinceLearnerTurn = true;
   Timer? _remoteSpeakingDebounceTimer;
 
   // Pause/resume ledger — see `pause_resume_state.dart`.
@@ -372,8 +391,15 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
       if (_remoteLevel == null) _attachLevel(local: false);
     }
 
+    if (isRemoteSpeaking && !isLocalSpeaking) _agentSpokeSinceLearnerTurn = true;
     if (isLocalSpeaking != _localSpeaking) {
-      setState(() => _localSpeaking = isLocalSpeaking);
+      setState(() {
+        _localSpeaking = isLocalSpeaking;
+        if (isLocalSpeaking && _agentSpokeSinceLearnerTurn) {
+          _learnerTurns++;
+          _agentSpokeSinceLearnerTurn = false;
+        }
+      });
     }
 
     // Debounce remote speaking to avoid flicker on natural pauses — matches
@@ -598,6 +624,8 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
         pathId: widget.pathId,
         caseId: widget.caseId,
         languageId: widget.languageId,
+        trackId: widget.trackId,
+        trackItemId: widget.trackItemId,
       ),
     );
   }
@@ -748,7 +776,15 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
   bool _controlsMaximized = false;
 
   bool get _hasTabs =>
-      widget.scenario != null && SessionInfoTabs.hasAnyTab(widget.scenario!);
+      widget.scenario != null &&
+      SessionInfoTabs.hasAnyTab(
+        widget.scenario!,
+        hasDebriefPoints:
+            ref
+                .watch(latestDebriefPointsProvider(widget.scenario!.id))
+                .value !=
+            null,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -786,6 +822,24 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
                                   ? widget.scenario!.maxTimeValue!
                                   : defaultGoalTimerMaxTimeValue,
                               elapsed: _elapsed,
+                            ),
+                          if (inProgress && (widget.assessmentRequiredTurns ?? 0) > 0)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 6),
+                              child: Text(
+                                _learnerTurns >= widget.assessmentRequiredTurns!
+                                    ? ref.t('roleplayVoice.assessment.minimumReached')
+                                    : ref.t('roleplayVoice.assessment.turnCounter', {
+                                        'k': _learnerTurns + 1,
+                                        'n': widget.assessmentRequiredTurns,
+                                      }),
+                                key: const Key('assessment-turn-counter'),
+                                style: const TextStyle(
+                                  fontFamily: 'CupertinoSystemText',
+                                  fontSize: 13,
+                                  color: AppColors.mediumEmphasis,
+                                ),
+                              ),
                             ),
                           // RN `stateProgressWrapper`: always visible during
                           // the call, whichever info tab is active.

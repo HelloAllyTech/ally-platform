@@ -1,0 +1,38 @@
+diff --git a/apps/ally-admin-dashboard/src/components/create-simulation-sub-section/FormField.tsx b/apps/ally-admin-dashboard/src/components/create-simulation-sub-section/FormField.tsx
+index 28f31db833..93e2ded193 100644
+--- a/apps/ally-admin-dashboard/src/components/create-simulation-sub-section/FormField.tsx
++++ b/apps/ally-admin-dashboard/src/components/create-simulation-sub-section/FormField.tsx
+@@ -191,6 +191,7 @@ export const FormField: FC<FormFieldProps> = ({ config, formMethods }) => {
+                 onChange={value => formMethods.setValue(id, value)}
+                 placeholder={placeholder}
+                 disabled={false}
++                minTime="00:05:00"
+               />
+             </div>
+           </div>
+diff --git a/apps/ally-admin-dashboard/src/components/create-simulation-sub-section/__tests__/CreateSimulationSubSection.test.tsx b/apps/ally-admin-dashboard/src/components/create-simulation-sub-section/__tests__/CreateSimulationSubSection.test.tsx
+index 4af621bb00..e52eca5865 100644
+--- a/apps/ally-admin-dashboard/src/components/create-simulation-sub-section/__tests__/CreateSimulationSubSection.test.tsx
++++ b/apps/ally-admin-dashboard/src/components/create-simulation-sub-section/__tests__/CreateSimulationSubSection.test.tsx
+@@ -694,7 +694,7 @@ describe("CreateSimulationSubSection", () => {
+ 
+     it("SESSION_TIMER_CONFIG constants are within valid range", () => {
+       expect(SESSION_TIMER_CONFIG.DEFAULT_MAX_TIME).toBe("00:10:00");
+-      expect(SESSION_TIMER_CONFIG.MIN_TIME).toBe("00:05:00");
++      expect(SESSION_TIMER_CONFIG.MIN_TIME).toBe("00:00:00");
+       expect(SESSION_TIMER_CONFIG.MAX_TIME).toBe("02:00:00");
+     });
+   });
+diff --git a/apps/ally-admin-dashboard/src/constants/SimulationCreator.ts b/apps/ally-admin-dashboard/src/constants/SimulationCreator.ts
+index 749d28a538..27da8bd73e 100644
+--- a/apps/ally-admin-dashboard/src/constants/SimulationCreator.ts
++++ b/apps/ally-admin-dashboard/src/constants/SimulationCreator.ts
+@@ -10,7 +10,7 @@ export const minInputHeight = {
+ export const SESSION_TIMER_CONFIG = {
+   DEFAULT_MAX_TIME: "00:10:00",
+   MAX_TIME: "02:00:00", // 120 minutes (7200 seconds)
+-  MIN_TIME: "00:05:00", // 5 minutes (300 seconds)
++  MIN_TIME: "00:00:00", // 0 minutes (0 seconds)
+ };
+ 
+ export const DEFAULT_SIMULATION_STATUS_OPTIONS = [

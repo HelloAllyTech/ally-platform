@@ -1,0 +1,69 @@
+diff --git a/src/llm-agent/service/llm-completion.service.ts b/src/llm-agent/service/llm-completion.service.ts
+index 1e1b22ffc5..081da687bb 100644
+--- a/src/llm-agent/service/llm-completion.service.ts
++++ b/src/llm-agent/service/llm-completion.service.ts
+@@ -146,10 +146,23 @@ export class LlmCompletionService {
+       }
+ 
+       const reason = (error as Error)?.message ?? String(error);
+-      this.logger.warn(
++      let logMessage =
+         `[LLM-FALLBACK] ${request.taskId}: ${target.provider}/${target.model} ` +
+-          `failed (${reason}); retrying on ${fallback.provider}/${fallback.model}`,
+-      );
++        `failed (${reason}); retrying on ${fallback.provider}/${fallback.model}`;
++
++      // On a provider-auth failure for Anthropic, add an actionable hint. This
++      // is a recurring operational issue (an expired key is present but invalid)
++      // and the default message does not point the operator at the root cause.
++      if (
++        target.provider === 'anthropic' &&
++        (reason.includes('key') || [401, 403].includes((error as any)?.status))
++      ) {
++        logMessage +=
++          ' - SUGGESTION: The Anthropic API key may be invalid or expired. ' +
++          'Please check the ANTHROPIC_API_KEY environment variable.';
++      }
++
++      this.logger.warn(logMessage);
+ 
+       const result = await this.run(request, fallback);
+       return {
+diff --git a/src/llm-agent/service/test/llm-completion.service.spec.ts b/src/llm-agent/service/test/llm-completion.service.spec.ts
+index a48922fb54..d6cbe5e1c0 100644
+--- a/src/llm-agent/service/test/llm-completion.service.spec.ts
++++ b/src/llm-agent/service/test/llm-completion.service.spec.ts
+@@ -2,6 +2,7 @@ import { LlmTask } from 'src/learn/enum/llm-task.enum';
+ import { LlmModelTier } from 'src/llm/constants/llm-tier.constants';
+ import { LlmTargetSource } from 'src/llm/service/llm-target-resolver.service';
+ import { LlmCompletionService } from '../llm-completion.service';
++import { Logger } from '@nestjs/common';
+ 
+ /**
+  * The fallback is why this service exists.
+@@ -250,6 +251,25 @@ describe('LlmCompletionService', () => {
+       expect(streamCalls[0].request.temperature).toBe(0.9);
+       expect(streamCalls[1].request.temperature).toBeUndefined();
+     });
++
++    it('logs an actionable suggestion on an Anthropic auth error', async () => {
++      const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
++      const { service } = build({
++        providers: {
++          anthropic: { fail: authError },
++          openai: { text: 'saved' },
++        },
++      });
++
++      await service.complete(request);
++
++      expect(warn).toHaveBeenCalledWith(
++        expect.stringContaining(
++          'SUGGESTION: The Anthropic API key may be invalid or expired',
++        ),
++      );
++      warn.mockRestore();
++    });
+   });
+ 
+   describe('reading the registry row, not just the resolved target', () => {

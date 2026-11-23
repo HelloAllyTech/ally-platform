@@ -685,7 +685,33 @@
       "assessmentScore": "Score {{score}}",
       "assessmentReopen": "Give another attempt",
       "assessmentConfirm": "Give {{name}} another attempt at {{scenario}}? Their earlier attempt and its report are kept.",
-      "assessmentReopenSuccess": "Assessment reopened"
+      "assessmentReopenSuccess": "Assessment reopened",
+      "incompleteStarts": "{{count}} incomplete start",
+      "incompleteStarts_other": "{{count}} incomplete starts"
+    },
+    "courseAssessment": {
+      "title": "Pre/post assessment",
+      "action": "Assessments",
+      "actionTooltip": "Shows each learner's pre and post assessment scores for this course and the cohort's average gain.",
+      "empty": "This course has no pre/post assessments.",
+      "n": "Learners with both",
+      "avgPre": "Avg pre",
+      "avgPost": "Avg post",
+      "avgGain": "Avg gain",
+      "suppressed": "Averages appear once {{min}} learners have both",
+      "notComparable": "These scenarios score different behaviours, so the pre→post gain may not be comparable.",
+      "onlyInPre": "Only in the pre: {{list}}",
+      "onlyInPost": "Only in the post: {{list}}",
+      "reopened": "Reopened",
+      "columns": {
+        "learner": "Learner",
+        "pre": "Pre",
+        "post": "Post",
+        "gain": "Gain",
+        "incompleteStarts": "Incomplete starts"
+      },
+      "errorTitle": "Couldn't load assessments",
+      "errorSubtitle": "Something went wrong loading this course's assessments."
     },
     "learnerCourses": {
       "action": "Courses",
@@ -795,6 +821,10 @@
   },
   "postSim": {
     "titlePrefix": "Role play",
+    "assessmentSubmitted": {
+      "title": "Your assessment is submitted",
+      "body": "Your trainer will review your results."
+    },
     "skills": {
       "categories": {
         "listeningEngagement": "Listening Engagement",
@@ -879,6 +909,7 @@
       "checkAgain": "Check again",
       "checkingAgain": "Checking…",
       "notAvailable": "This session doesn't have a written debrief — it took place before Ally started writing them.",
+      "noneForSession": "Your debrief isn't available for this session.",
       "momentLabel": "See this moment",
       "momentNotFound": "We couldn't jump to that moment — here's the full transcript instead.",
       "section": {
@@ -901,8 +932,18 @@
       "aiLabel": "Written by Ally (AI)",
       "importantMoment": {
         "title": "An important moment",
+        "titleHandledWell": "You noticed an important moment",
         "support": "Moments like this are hard. If this session brought something up for you, you can talk to:",
         "others": "Other moments like this"
+      },
+      "support": {
+        "title": "Someone to talk to",
+        "lead": "If this session brought something up for you, you can talk to:"
+      },
+      "followUp": {
+        "title": "Something important came up",
+        "body": "Something important came up in this session, and this debrief may not cover it fully.",
+        "support": "If you need support right now, the support lines in this debrief are open any time."
       },
       "distress": {
         "title": "Before your debrief",
@@ -911,9 +952,12 @@
         "whenReady": "Your debrief, when you're ready"
       },
       "practise": {
-        "next": "Practise this next",
+        "next": "Try this in your next practice",
         "this": "Practise this",
-        "label": "Practise this in the roleplay \"{{title}}\""
+        "label": "Practise this in the roleplay \"{{title}}\"",
+        "roleplays": "Open my roleplays",
+        "again": "Practise this again",
+        "tryFollowing": "Try the following:"
       },
       "reply": {
         "placeholder": "Answer here, or ask Ally anything about this session…"
@@ -948,9 +992,10 @@
         "announce": "Your debrief is ready."
       },
       "whatWorked": "What worked",
-      "workOnThis": "Work on this",
+      "workOnThis": "What to strengthen",
       "trySaying": "Try saying:",
-      "practiseNext": "Practise this next",
+      "practiseNext": "Try this in your next practice",
+      "practiseAgain": "Practise this again",
       "skillWords": {
         "title": "Your skills in this session",
         "strength": "A strength today",
@@ -958,9 +1003,27 @@
         "didnt_come_up": "Didn't come up today"
       },
       "progressNote": "Your progress",
+      "progressCard": {
+        "title": "Your last {{n}} sessions",
+        "focus": "One focus for your next sessions",
+        "showMore": "Show more",
+        "showLess": "Show less",
+        "trends": {
+          "more_consistent": "Getting more consistent",
+          "about_the_same": "About the same",
+          "worth_another_look": "Worth another look",
+          "too_early": "Too early to tell"
+        }
+      },
       "reflectiveQuestion": "One question to think about",
       "working": {
         "title": "Ally is writing your debrief",
+        "breatheStart": "Take a breath while you wait",
+        "breatheStop": "Stop",
+        "breatheCalm": "Breathe in slowly, then out",
+        "breatheInhale": "Inhale",
+        "breatheHold": "Hold",
+        "breatheExhale": "Exhale",
         "defaultStep": "Reading your session…",
         "steps": {
           "reading": "Reading your session…",
@@ -973,7 +1036,13 @@
           "revising": "Making it clearer (round {{round}})…"
         }
       },
-      "onItsWay": "Your debrief needs a little more care. Someone from the Ally team will finish it, usually within a day.",
+      "takingLonger": {
+        "body": "This is taking longer than usual. I'll let you know when it's ready.",
+        "checkAgain": "Check again",
+        "checking": "Checking…"
+      },
+      "notAvailable": "A debrief isn't available for this session.",
+      "onItsWay": "Your debrief needs a little more care. Someone from the Ally team will finish it, usually within a day. We'll let you know.",
       "tooShort": "This session was too short for a debrief. Try a longer conversation next time and Ally will write you one.",
       "flag": {
         "open": "This isn't right",
@@ -992,18 +1061,59 @@
         "sent": "Thanks. Someone from the Ally team will look at this.",
         "undo": "Undo",
         "waiting": "Sent to the Ally team",
+        "allyReplied": "Ally's answer: {{reply}}",
         "failed": "That didn't send. Try again."
       },
       "corrections": {
         "kept": "Reviewed: the Ally team kept this point. {{note}}",
         "corrected": "Updated on {{date}} after a review by the Ally team: {{note}}",
-        "removed": "A point was removed after a review by the Ally team."
+        "removed": "A point was removed after a review by the Ally team.",
+        "removedBecause": "A point was removed after a review: {{reason}}"
       },
       "helpful": {
         "question": "Was this helpful?",
         "yes": "Yes",
         "no": "No",
         "thanks": "Thanks for telling us."
+      },
+      "failed": {
+        "title": "Your debrief didn't load",
+        "body": "It's safe and waiting for you. Check your connection and try again.",
+        "retry": "Try again",
+        "retrying": "Trying again…"
+      },
+      "explainer": {
+        "link": "How Ally writes your debrief",
+        "title": "How Ally writes your debrief",
+        "how": "Ally reads your session, looks up guidance, writes this debrief, then reviews and improves its own draft before you see it.",
+        "quotes": "Every quote is checked against your transcript.",
+        "wrong": "Ally can still get things wrong. If something isn't right, tap This isn't right and a person from the Ally team will look at it.",
+        "supervisor": "Your supervisor can read your debriefs, the points you flag, and your questions to Ally.",
+        "close": "Close"
+      },
+      "pulse": {
+        "intro": "Two quick questions about this debrief.",
+        "knew_next": "Did you know what to practise next?",
+        "fair": "Did this feel fair?",
+        "yes": "Yes",
+        "no": "No",
+        "thanks": "Thanks for telling us."
+      },
+      "selectionComments": {
+        "popupLabel": "Comment on the selected words",
+        "inputLabel": "Your comment",
+        "placeholder": "What do you think of this?",
+        "add": "Add",
+        "needText": "Write a comment first",
+        "note": "Added comments go into your feedback below. Nothing is sent yet.",
+        "remove": "Remove this comment",
+        "overallLabel": "Feedback on this debrief",
+        "hint": "Select words in the debrief to comment on them.",
+        "count_one": "{{count}} comment on selected words",
+        "count_other": "{{count}} comments on selected words",
+        "send": "Send",
+        "yourComments": "Your comments",
+        "onWholeDebrief": "On the whole debrief"
       }
     }
   },
@@ -1231,6 +1341,7 @@
   },
   "summary": {
     "disclaimer": "This summary has been generated by AI. Ally AI can make mistakes. Check and edit key details before saving",
+    "incompleteRecording": "Part of this recording may be missing: the connection dropped during the session, so this summary only covers what was recorded.",
     "generationFailedEditable": "Summary generation couldn't be completed. You can retry, or fill in the details manually below and save.",
     "retrySummary": "Retry summary",
     "retrySuccess": "Summary generated successfully",
@@ -1415,6 +1526,7 @@
     },
     "createNote": {
       "title": "New note",
+      "autoFilled": "Filled in automatically",
       "saving": "Saving…",
       "saved": "Saved",
       "saveError": "Couldn't save note",
@@ -1631,6 +1743,10 @@
     "exitSimulation": "Leave this session",
     "reconnecting": "Reconnecting…",
     "missedSupervisorHints": "Some supervisor hints may not have reached you",
+    "assessmentTurnCounter": {
+      "progress": "Turn {{turn}} of {{required}}",
+      "reached": "Minimum turns reached"
+    },
     "textChat": {
       "panelLabel": "Text chat",
       "inChat": "In the chat",
@@ -1930,6 +2046,20 @@
     "progress": "{{completed}} of {{total}}",
     "trackCompleted": "Track completed",
     "lockedTooltip": "Complete the previous items to unlock this",
+    "blocker": {
+      "notFinished": "Finish “{{title}}” to unlock this",
+      "belowScore": "“{{title}}”: you scored {{actual}}, need {{required}}",
+      "tooShort": "“{{title}}”: it lasted {{actual}}, needs at least {{required}}",
+      "notScored": "“{{title}}”: we couldn't score your last attempt",
+      "assessmentFailed": "“{{title}}”: your assessment didn't pass. Ask your trainer for another attempt.",
+      "gradingPending": "“{{title}}”: your answers are still being marked",
+      "outOfAttempts": "“{{title}}”: no attempts left. Ask your trainer for help.",
+      "outOfAttemptsUntil": "“{{title}}”: new attempts open {{date}}",
+      "watchMore": "“{{title}}”: you've watched {{actual}}%, need {{required}}%",
+      "keepReading": "“{{title}}”: keep reading to finish it",
+      "tryAgain": "Try again",
+      "goToItem": "Go to item"
+    },
     "notFound": "This track could not be found",
     "backToLearn": "Back to Learn",
     "viewProgress": "View progress",
@@ -1973,6 +2103,13 @@
       "prompts_other": "{{count}} prompts",
       "roleplay": "Roleplay",
       "minScore": "score {{score}}+",
+      "minDuration": "{{duration}}+",
+      "participation": "completes on start",
+      "assessment": "Assessment",
+      "assessmentPre": "Assessment · Pre",
+      "assessmentPost": "Assessment · Post",
+      "turns": "{{count}} turn",
+      "turns_other": "{{count}} turns",
       "case": "Case study",
       "annotationTranscript": "Transcript",
       "annotationDocument": "Note",
@@ -2074,11 +2211,35 @@
       "completed": "Completed",
       "completedOn": "Completed {{date}}",
       "language": "Language",
+      "assessmentIntroTurns": "This is an assessment. You get one attempt, and it counts once you've taken at least {{n}} turns.",
+      "shortAttempt": "That attempt was too short to count ({{taken}} of {{n}} turns). Start again when you're ready.",
+      "postLocked": "Complete the pre-assessment, {{title}}, first.",
+      "assessmentSubmittedHidden": "Submitted. Your trainer will review your results.",
       "assessmentIntro": "This roleplay is an assessment. Complete the scenario in a live roleplay.",
       "assessmentNotice": "You get one attempt. When you end the roleplay, your attempt is submitted and can't be retaken.",
       "assessmentSubmitted": "Submitted {{date}}",
       "assessmentNotPassed": "This attempt didn't meet the passing requirements.",
-      "assessmentLocked": "Your assessment is submitted. If you need another attempt, ask your trainer."
+      "assessmentLocked": "Your assessment is submitted. If you need another attempt, ask your trainer.",
+      "duration": {
+        "minutesSeconds": "{{minutes}} min {{seconds}} sec",
+        "minutes": "{{minutes}} min",
+        "seconds": "{{seconds}} sec"
+      },
+      "requirement": {
+        "score": "To complete it, score at least {{score}}.",
+        "duration": "To complete it, keep the roleplay going for at least {{duration}}.",
+        "scoreAndDuration": "To complete it, score at least {{score}} and keep the roleplay going for at least {{duration}}.",
+        "participation": "This completes as soon as you start the roleplay.",
+        "turns": "To count, take at least {{turns}} turns.",
+        "turnsAndScore": "To count, take at least {{turns}} turns and score at least {{score}}."
+      },
+      "lastAttempt": {
+        "title": "Your last attempt didn't complete this roleplay",
+        "duration": "It lasted {{actual}}; this roleplay needs at least {{required}}.",
+        "score": "You scored {{score}}; this roleplay needs at least {{required}}.",
+        "scoreMissing": "It didn't reach the minimum score of {{required}}.",
+        "retry": "Try again when you're ready."
+      }
     },
     "quiz": {
       "intro": {

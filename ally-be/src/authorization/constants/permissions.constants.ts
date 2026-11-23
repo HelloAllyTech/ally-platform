@@ -367,6 +367,11 @@ const PERMISSIONS = {
   EDIT_BLOG: 'edit:blog',
   DELETE_BLOG: 'delete:blog',
 
+  // === LANDING PAGES ===
+  VIEW_LANDING_PAGES: 'view:landing-pages',
+  EDIT_LANDING_PAGE: 'edit:landing-page',
+  DELETE_LANDING_PAGE: 'delete:landing-page',
+
   // === AI LAB ===
   VIEW_AI_LAB: 'view:admin:ai-lab',
   EDIT_AI_LAB: 'edit:admin:ai-lab',
@@ -400,6 +405,18 @@ const PERMISSIONS = {
   VIEW_ALLY_GUIDE: 'view:admin:ally-guide',
   EDIT_ALLY_GUIDE: 'edit:admin:ally-guide',
   REVIEW_ALLY_GUIDE_TRANSCRIPTS: 'review:admin:ally-guide-transcripts',
+  // Debrief expert review (debrief orchestrator spec B1): read a debrief run's
+  // transcript beside its cards, comment on exact lines and give a verdict.
+  // The clinical advisor's, granted person by person; no group holds it
+  // (1981900780000 revoked it from the platform groups).
+  REVIEW_DEBRIEFS: 'review:admin:debriefs',
+  // The Debrief owner (debrief-console-redesign-notes.md, "Who can act"):
+  // switching an organisation on, budgets, test thresholds and accepted
+  // proposals, autonomy unlocks, steering weights, and (with REVIEW_DEBRIEFS
+  // holders) pinned-rule sign-off. SUPER_DUPER_ADMIN by migration; otherwise
+  // granted person by person. The Ally team acts on platform access
+  // (SYSTEM_ACCESS); the clinical advisor is REVIEW_DEBRIEFS.
+  MANAGE_DEBRIEF_SETTINGS: 'manage:admin:debrief-settings',
 
   // === PRODUCT ROADMAP ===
   // Three tiers, because the roadmap is a voting board rather than a CRUD screen:
@@ -558,6 +575,9 @@ const SUPER_ADMIN_PERMISSIONS = [
   PERMISSIONS.VIEW_BLOGS,
   PERMISSIONS.EDIT_BLOG,
   PERMISSIONS.DELETE_BLOG,
+  PERMISSIONS.VIEW_LANDING_PAGES,
+  PERMISSIONS.EDIT_LANDING_PAGE,
+  PERMISSIONS.DELETE_LANDING_PAGE,
   PERMISSIONS.VIEW_AI_LAB,
   PERMISSIONS.EDIT_AI_LAB,
   PERMISSIONS.DELETE_AI_LAB,
@@ -570,6 +590,8 @@ const SUPER_ADMIN_PERMISSIONS = [
   PERMISSIONS.VIEW_ALLY_GUIDE,
   PERMISSIONS.EDIT_ALLY_GUIDE,
   PERMISSIONS.REVIEW_ALLY_GUIDE_TRANSCRIPTS,
+  // REVIEW_DEBRIEFS is the clinical advisor's, granted person by person
+  // (revoked from the platform groups in 1981900780000).
   // Product Roadmap: SUPER_ADMIN can see the board and vote on it. The management
   // surface (EDIT_PRODUCT_ROADMAP) is deliberately withheld here and granted only to
   // SUPER_DUPER_ADMIN below.
@@ -596,6 +618,8 @@ const SUPER_DUPER_ADMIN_PERMISSIONS = [
   // a Builder session, and pinning a saved view for everyone. SUPER_ADMIN gets
   // VIEW + VOTE only (see above).
   PERMISSIONS.EDIT_PRODUCT_ROADMAP,
+  // The Debrief owner: budgets, thresholds, switching an organisation on.
+  PERMISSIONS.MANAGE_DEBRIEF_SETTINGS,
   PERMISSIONS.VIEW_AWS_LOGS,
   PERMISSIONS.VIEW_MOBILE_RELEASES,
   PERMISSIONS.TRIGGER_MOBILE_RELEASES,

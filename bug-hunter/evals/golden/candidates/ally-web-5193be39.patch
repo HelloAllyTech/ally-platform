@@ -1,0 +1,83 @@
+diff --git a/apps/ally-admin-dashboard/src/App.tsx b/apps/ally-admin-dashboard/src/App.tsx
+index 715852c2e8..4ccd2867fc 100644
+--- a/apps/ally-admin-dashboard/src/App.tsx
++++ b/apps/ally-admin-dashboard/src/App.tsx
+@@ -1,6 +1,5 @@
+ import { Toaster } from "sonner";
+ 
+-import { ScenarioReportsSocketProvider } from "@components/scenario-reports-socket-provider/ScenarioReportsSocketProvider";
+ import { RouteLayout } from "@routes/RouteLayout";
+ 
+ export function App() {
+@@ -11,7 +10,7 @@ export function App() {
+     },
+   };
+   return (
+-    <ScenarioReportsSocketProvider>
++    <>
+       <RouteLayout />
+       <Toaster
+         position="bottom-right"
+@@ -19,7 +18,7 @@ export function App() {
+         toastOptions={toastOptions}
+         style={toastOptions.style}
+       />
+-    </ScenarioReportsSocketProvider>
++    </>
+   );
+ }
+ 
+diff --git a/apps/ally-admin-dashboard/src/routes/PrivateLayout.tsx b/apps/ally-admin-dashboard/src/routes/PrivateLayout.tsx
+index ca6d1c8b2f..72dcbed7a5 100644
+--- a/apps/ally-admin-dashboard/src/routes/PrivateLayout.tsx
++++ b/apps/ally-admin-dashboard/src/routes/PrivateLayout.tsx
+@@ -6,6 +6,7 @@ import { Navigate } from "react-router-dom";
+ import { useGetUserQuery, useGetPermissionsQuery } from "@api";
+ import { Sidebar, AccessDenied } from "@components";
+ import ReportUploadProgressDialog from "@components/report-upload-progress-dialog/ReportUploadProgressDialog";
++import { ScenarioReportsSocketProvider } from "@components/scenario-reports-socket-provider/ScenarioReportsSocketProvider";
+ import { LOCAL_STORAGE_KEYS, ROUTES, Permissions } from "@constants";
+ import { setUser, setPermissions } from "@reducer";
+ import { hasPermissions } from "@utils";
+@@ -48,14 +49,16 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
+   if (hasPermission && isPreview) return children;
+ 
+   return (
+-    <div className="flex h-screen bg-white">
+-      <Sidebar />
+-      <main className="flex-1 overflow-auto">
+-        <div className="p-4 lg:p-6 h-[100vh] overflow-y-hidden">
+-          {hasPermission ? children : <AccessDenied />}
+-        </div>
+-      </main>
+-      <ReportUploadProgressDialog />
+-    </div>
++    <ScenarioReportsSocketProvider>
++      <div className="flex h-screen bg-white">
++        <Sidebar />
++        <main className="flex-1 overflow-auto">
++          <div className="p-4 lg:p-6 h-[100vh] overflow-y-hidden">
++            {hasPermission ? children : <AccessDenied />}
++          </div>
++        </main>
++        <ReportUploadProgressDialog />
++      </div>
++    </ScenarioReportsSocketProvider>
+   );
+ };
+diff --git a/apps/ally-admin-dashboard/src/routes/__tests__/PrivateLayout.test.tsx b/apps/ally-admin-dashboard/src/routes/__tests__/PrivateLayout.test.tsx
+index 5145da4663..59480fb58b 100644
+--- a/apps/ally-admin-dashboard/src/routes/__tests__/PrivateLayout.test.tsx
++++ b/apps/ally-admin-dashboard/src/routes/__tests__/PrivateLayout.test.tsx
+@@ -25,6 +25,11 @@ vi.mock("@components/report-upload-progress-dialog/ReportUploadProgressDialog",
+   default: () => null,
+ }));
+ 
++// Mock ScenarioReportsSocketProvider so it doesn't use the real store (getState().reportUpload)
++vi.mock("@components/scenario-reports-socket-provider/ScenarioReportsSocketProvider", () => ({
++  ScenarioReportsSocketProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
++}));
++
+ vi.mock("@store", () => ({
+   store: {
+     dispatch: vi.fn(),

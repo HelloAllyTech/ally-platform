@@ -714,7 +714,7 @@ describe('TrackService', () => {
       expect(mockDataSource.query).not.toHaveBeenCalled();
     });
   });
-  describe('updateQuizSettings', () => {
+  describe('updateAttemptLimit', () => {
     const itemId = 'item-1';
     const quizItem = (maxAttempts: number | null | undefined) => ({
       id: itemId,
@@ -735,9 +735,54 @@ describe('TrackService', () => {
       published();
     });
 
+    const annotationItem = (maxAttempts: number | null | undefined) => ({
+      id: itemId,
+      trackId: 'track-1',
+      type: TrackItemType.ANNOTATED_ARTIFACT,
+      content: {
+        kind: 'TRANSCRIPT',
+        units: [],
+        labels: [],
+        targets: [],
+        settings: {
+          passScore: 70,
+          maxAttempts,
+          falsePositivePenalty: 1,
+          revealKey: 'after_each_attempt',
+        },
+      },
+    });
+
+    it("raises an annotation's limit and keeps the other settings", async () => {
+      mockItemRepository.findOne.mockResolvedValue(annotationItem(2));
+      const result = await service.updateAttemptLimit(itemId, {
+        maxAttempts: 4,
+      });
+      expect(result).toEqual({ trackItemId: itemId, maxAttempts: 4 });
+      expect(mockItemRepository.update).toHaveBeenCalledWith(
+        { id: itemId },
+        {
+          content: {
+            ...annotationItem(2).content,
+            settings: { ...annotationItem(2).content.settings, maxAttempts: 4 },
+          },
+        },
+      );
+    });
+
+    it('rejects lowering or repeating an annotation limit of 2', async () => {
+      mockItemRepository.findOne.mockResolvedValue(annotationItem(2));
+      for (const next of [1, 2]) {
+        await expect(
+          service.updateAttemptLimit(itemId, { maxAttempts: next }),
+        ).rejects.toThrow(BadRequestException);
+      }
+      expect(mockItemRepository.update).not.toHaveBeenCalled();
+    });
+
     it('increases maxAttempts and keeps the other settings', async () => {
       mockItemRepository.findOne.mockResolvedValue(quizItem(3));
-      const result = await service.updateQuizSettings(itemId, {
+      const result = await service.updateAttemptLimit(itemId, {
         maxAttempts: 5,
       });
       expect(result).toEqual({ trackItemId: itemId, maxAttempts: 5 });
@@ -755,14 +800,14 @@ describe('TrackService', () => {
     it.each([2, 3])('rejects %i when the limit is 3', async (next) => {
       mockItemRepository.findOne.mockResolvedValue(quizItem(3));
       await expect(
-        service.updateQuizSettings(itemId, { maxAttempts: next }),
+        service.updateAttemptLimit(itemId, { maxAttempts: next }),
       ).rejects.toThrow(BadRequestException);
       expect(mockItemRepository.update).not.toHaveBeenCalled();
     });
 
     it('changes a numeric limit to unlimited', async () => {
       mockItemRepository.findOne.mockResolvedValue(quizItem(3));
-      const result = await service.updateQuizSettings(itemId, {
+      const result = await service.updateAttemptLimit(itemId, {
         maxAttempts: null,
       });
       expect(result.maxAttempts).toBeNull();
@@ -773,10 +818,10 @@ describe('TrackService', () => {
       async (current) => {
         mockItemRepository.findOne.mockResolvedValue(quizItem(current));
         await expect(
-          service.updateQuizSettings(itemId, { maxAttempts: 9 }),
+          service.updateAttemptLimit(itemId, { maxAttempts: 9 }),
         ).rejects.toThrow(BadRequestException);
         await expect(
-          service.updateQuizSettings(itemId, { maxAttempts: null }),
+          service.updateAttemptLimit(itemId, { maxAttempts: null }),
         ).rejects.toThrow(BadRequestException);
       },
     );
@@ -784,17 +829,17 @@ describe('TrackService', () => {
     it('throws NotFoundException for an unknown item', async () => {
       mockItemRepository.findOne.mockResolvedValue(null);
       await expect(
-        service.updateQuizSettings(itemId, { maxAttempts: 5 }),
+        service.updateAttemptLimit(itemId, { maxAttempts: 5 }),
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('throws BadRequestException for a non-quiz item', async () => {
+    it('throws BadRequestException for a component without an attempt limit', async () => {
       mockItemRepository.findOne.mockResolvedValue({
         ...quizItem(3),
         type: TrackItemType.ARTICLE,
       });
       await expect(
-        service.updateQuizSettings(itemId, { maxAttempts: 5 }),
+        service.updateAttemptLimit(itemId, { maxAttempts: 5 }),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -802,7 +847,7 @@ describe('TrackService', () => {
       mockItemRepository.findOne.mockResolvedValue(quizItem(3));
       published(TrackStatus.DRAFT);
       await expect(
-        service.updateQuizSettings(itemId, { maxAttempts: 5 }),
+        service.updateAttemptLimit(itemId, { maxAttempts: 5 }),
       ).rejects.toThrow(ForbiddenException);
     });
   });

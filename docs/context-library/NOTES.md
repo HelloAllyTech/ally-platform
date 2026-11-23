@@ -43,14 +43,21 @@ why; this file says where it ended up, what changed on the way, and what is stil
   `sync_key`; unsigned clinical Debrief documents arrive archived; enrichment is a separate admin
   action that never touches the body. Organisation admins get a scoped Library under the guide
   library's existing gate (`ally_guide_org` toggle); the platform Library is platform-only.
+- **Audience is a platform admin's choice on every write path** (2026-11-10): written entries,
+  bulk files (per row, or the upload's default for new rows) and documents (`cl_sources.is_global`
+  / `tenant_ids`, copied onto what is distilled). Any platform-owned chunk, or a whole document,
+  can be re-targeted later. Organisation-owned and synced chunks follow their owner. Dedupe and
+  the curator's merges respect audience, so a document for one organisation never disappears into
+  a chunk only another can read. Organisation admins now also see, read-only, entries Ally targeted
+  at them. Every upload goes through the Add documents dialog, so a drop is never silently global.
 - **Agent lessons:** agents write candidates that are never retrieved until the hourly curator
   (fast tier, at most 10 changes a pass, never touching pinned or person-written chunks) accepts
   them. Builder's lessons block is frozen per session so the prompt cache holds.
 - **Content Catalogue:** kept in step by a debounced TypeORM subscriber plus a nightly two-way
   reconciliation that also does the first backfill. Synced items cannot be edited or archived by
   hand. `search_library` kept its name and parameters.
-- **Roadmap Copilot** moved in phase 2 with Builder, not phase 7. Briefs filed before that cite
-  `stacks`; the enum value stays so they still read, filed under principles.
+- **Roadmap Copilot** moved in phase 2 with Builder, not phase 7. Briefs filed before that had their
+  old evidence source renamed to `principles` by migration `1981900500000`.
 - **Every step after a release is automatic** (the owner's decision, 2026-11-10).
   `ContextLibraryRolloutService` replaces the manual after-deploy steps: progress in `cl_rollout_steps`, the
   same service methods the admin routes call, retirement only through the import service's own

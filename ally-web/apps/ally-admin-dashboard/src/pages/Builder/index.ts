@@ -8,6 +8,6 @@ export * from "./BuilderPipeline";
 export * from "./BuilderScoreboard";
 export * from "./BuilderSession";
 export * from "./BuilderSettings";
-export * from "./builderMotion";
+export * from "../../motion/builderMotion";
 export * from "./pipelineFormat";
 export * from "./scoreboardChart";

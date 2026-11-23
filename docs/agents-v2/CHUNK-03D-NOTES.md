@@ -1,6 +1,6 @@
 # Chunk 03d notes: v2 only, and a chatbot's own documents
 
-Brief: [chunk-03d.md](./chunk-03d.md). Built 2026-11-06 on `feat/agents-v2-chunk-01-langgraph-runtime`.
+Brief: [chunk-03d.md](./archive/chunk-03d.md). Built 2026-11-06 on `feat/agents-v2-chunk-01-langgraph-runtime`.
 
 ## Decisions
 
@@ -51,8 +51,8 @@ Brief: [chunk-03d.md](./chunk-03d.md). Built 2026-11-06 on `feat/agents-v2-chunk
 |---|---|
 | `pages/WhatsAppBot/ChatbotEngineCard.tsx` | **Deleted.** | <!-- docs-path-lint: ignore -->
 | `pages/WhatsAppBot/AgentTab.tsx` | No Engine card. Platform admins see a note when the switch is off ("…answers with the backup engine"). |
-| `pages/WhatsAppBot/ChatbotTestTab.tsx` | Badge: "Answered by the agent", "Answered by the backup engine (the agent failed: …)" or "Answered by the backup engine". |
-| `pages/WhatsAppBot/KnowledgeTab.tsx`, `KnowledgeUploadPanel.tsx` (new) | Covered in detail below. |
+| `pages/WhatsAppBot/ChatbotTestTab.tsx` | Badge: "Answered by the agent", "Answered by the backup engine (the agent failed: …)" or "Answered by the backup engine". <!-- docs-path-lint: ignore --> |
+| `pages/WhatsAppBot/KnowledgeTab.tsx`, `KnowledgeUploadPanel.tsx` (new) | Covered in detail below. <!-- docs-path-lint: ignore --> |
 | `api/chatbots.ts`, `constants/common.ts`, `types/chatbots.ts`, `constants/en.ts` | Endpoints, types (`ChatbotDocumentRow.private`; `runtime` and `features` gone from the update request) and copy. The Defaults switch now reads "Answer with the agent: turn off only in an emergency…". |
 
 The Knowledge tab:
@@ -99,7 +99,7 @@ Not run: the full ally-be suite, `build`'s e2e, ally-ai (unchanged).
 
 ## How Shehbaz tests it
 
-Follow [chunk-03d.md](./chunk-03d.md), "How Shehbaz tests it". Refresh the dashboard first: the Engine card is gone.
+Follow [chunk-03d.md](./archive/chunk-03d.md), "How Shehbaz tests it". Refresh the dashboard first: the Engine card is gone.
 
 ## Open items
 

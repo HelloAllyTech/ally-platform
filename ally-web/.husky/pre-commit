@@ -9,6 +9,11 @@
 # 16 GB machine ends up fighting the editor for memory. Projects run one at a
 # time here; CI keeps the default parallelism, where a clean runner can take it.
 # (test:coverage in package.json already pins --parallel=1 for the same reason.)
+# Stop at the first failure. Without this, a failing test run (or a suite that fails to load)
+# was followed by lint-staged, whose success became the hook's exit code, so the commit went
+# through with failing suites (10 Nov 2026: four API suites failing to load were committed).
+set -e
+
 echo "Running tests before commit..."
 npm test -- --skip-nx-cache --parallel=1
 

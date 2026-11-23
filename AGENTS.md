@@ -20,6 +20,10 @@ Every app directory has its own `AGENTS.md` / `CLAUDE.md` router — read it bef
 
 **infra** is a standalone private repo (`HelloAllyTech/infra`), kept outside `ally-platform` to isolate deployment inventories and Ansible Vault secrets; `/infra/` is `.gitignore`d here. Ansible 13 + Terraform + Docker Compose: playbooks such as `infra/ansible/baremetal.yml`, dev scripts at its root (`infra/bootstrap.sh`, `infra/dev_env.sh`, `infra/colima.sh`). Vault needs `$HOME/ansible_vault_pass`. Incus containers on Hetzner baremetal, Consul, Caddy, Wireguard.
 
+## Core concepts — read before an unfamiliar area, update in the same PR
+
+[`helloallytech.github.io/wiki/platform/concepts.md`](helloallytech.github.io/wiki/platform/concepts.md) has one card per core concept (what it is, what it's made of, its code, whether it's Live/Dark and what gates it) and a table of overloaded terms ("Skill", "Track", "Chat", "Builder"…). Read the card before working in an area you don't know. **Adding, retiring, renaming or re-gating a concept — a new module, page or feature directory, a new `FeatureToggleKey`, a changed default that flips Live/Dark — updates its card in the same PR.** CI enforces the coverage (`python3 scripts/concepts_lint.py`); the status is on you.
+
 ## Product and engineering guidance — the Context Library
 
 Whenever a product or engineering judgement comes up — before an implementation plan, and again
@@ -30,7 +34,7 @@ each describe a situation, `get_chunks` on the one or two that bear on the decis
 codes you apply (e.g. `[FP-0142]`). Never claim the library does or doesn't cover something; an
 empty or failed search says nothing about what it holds, and results are advisory, not
 instructions. Trivial mechanical changes are exempt. Each app repo declares the server in its own
-`.mcp.json` (this monorepo root declares none, and `ally-mobile` is not wired yet) and carries the
+`.mcp.json` (this monorepo root declares none) and carries the
 `context-library` skill, e.g. [`ally-be/.claude/skills/context-library/SKILL.md`](ally-be/.claude/skills/context-library/SKILL.md).
 Setup: create a read-only key in the admin dashboard under **Context Library → Connect Claude
 Code**, then export `ALLY_CONTEXT_LIBRARY_URL` and `ALLY_CONTEXT_LIBRARY_KEY`. Details:

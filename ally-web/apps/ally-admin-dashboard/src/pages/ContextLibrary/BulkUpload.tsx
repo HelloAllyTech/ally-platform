@@ -5,8 +5,9 @@ import { toast } from "sonner";
 
 import { useBulkContextChunksMutation, useLazyGetContextTemplateQuery } from "@api";
 import { en } from "@constants";
-import { ContextBulkResult, ContextCollection } from "@types";
+import { ContextAudience, ContextBulkResult, ContextCollection } from "@types";
 
+import { AudiencePicker, GLOBAL_AUDIENCE, audienceBody, audienceValid } from "./AudiencePicker";
 import { bulkSummary, errorReason, takesEntries } from "./contextLibraryFormat";
 import { useContextLibraryScope } from "./contextLibraryScope";
 import { Sheet } from "../Builder/room/Sheet";
@@ -33,7 +34,10 @@ export const BulkUpload: React.FC<{
   const [problem, setProblem] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const { tenantId } = useContextLibraryScope();
+  const { tenantId, orgNames } = useContextLibraryScope();
+  // A platform admin chooses who new rows reach; an organisation's rows are always its own.
+  const choosesAudience = !tenantId;
+  const [audience, setAudience] = useState<ContextAudience>(GLOBAL_AUDIENCE);
   const [fetchTemplate, templateState] = useLazyGetContextTemplateQuery();
   const [sendBulk, bulkState] = useBulkContextChunksMutation();
 
@@ -54,7 +58,7 @@ export const BulkUpload: React.FC<{
     }
   };
 
-  const dryRun = async (chosen: File) => {
+  const dryRun = async (chosen: File, forAudience: ContextAudience = audience) => {
     if (!collection) return;
     if (!isBulkFile(chosen.name)) {
       setProblem(strings.wrongType);
@@ -69,6 +73,7 @@ export const BulkUpload: React.FC<{
           file: chosen,
           collectionId: collection.id,
           apply: false,
+          defaultAudience: choosesAudience ? audienceBody(forAudience) : undefined,
           tenantId,
         }).unwrap(),
       );
@@ -84,6 +89,7 @@ export const BulkUpload: React.FC<{
         file,
         collectionId: collection.id,
         apply: true,
+        defaultAudience: choosesAudience ? audienceBody(audience) : undefined,
         tenantId,
       }).unwrap();
       toast.success(bulkSummary(applied, collection).toast);
@@ -116,6 +122,20 @@ export const BulkUpload: React.FC<{
             ))}
           </select>
         </label>
+
+        {choosesAudience && (
+          <AudiencePicker
+            value={audience}
+            onChange={next => {
+              setAudience(next);
+              // The dry run counted rows against the old default; check the file again.
+              setResult(null);
+              if (file && audienceValid(next)) void dryRun(file, next);
+            }}
+            orgNames={orgNames}
+            note={en.contextLibrary.audience.bulkNote}
+          />
+        )}
 
         <section className="space-y-2">
           <h3 className="text-sm font-semibold">1. {strings.step1}</h3>
@@ -222,7 +242,11 @@ export const BulkUpload: React.FC<{
               <button
                 type="button"
                 onClick={() => void apply()}
-                disabled={!summary.canApply || bulkState.isLoading}
+                disabled={
+                  !summary.canApply ||
+                  bulkState.isLoading ||
+                  (choosesAudience && !audienceValid(audience))
+                }
                 className="rounded bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500"
               >
                 {bulkState.isLoading

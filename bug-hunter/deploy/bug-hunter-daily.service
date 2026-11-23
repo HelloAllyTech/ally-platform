@@ -1,0 +1,22 @@
+# Bug Hunter v2 daily job (chunk 08). Runs on the private-network VM, never in GitHub
+# Actions (ally-platform is public). Secrets live in a root-only EnvironmentFile:
+#   BUGHUNTER_GITHUB_APP_ID + BUGHUNTER_GITHUB_APP_KEY_FILE (the App's installation
+#   token is minted from them on each run, see github_app.py), OPENAI_API_KEY,
+#   GOOGLE_API_KEY, LANGSMITH_API_KEY, LANGSMITH_WORKSPACE_ID,
+#   BUGHUNTER_CHECKPOINT_DB_URL, AWS read-only CloudWatch credentials,
+#   BUGHUNTER_SPEND_BACKEND=db, BUGHUNTER_HOME=/var/lib/bug-hunter
+[Unit]
+Description=Bug Hunter v2 daily job (dry run until the rollout says otherwise)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=bughunter
+WorkingDirectory=/opt/ally-platform/bug-hunter
+EnvironmentFile=/etc/bug-hunter/env
+ExecStartPre=/usr/bin/git -C /opt/ally-platform fetch --quiet origin master
+ExecStart=/usr/bin/flock -n /var/lib/bug-hunter/run.lock /opt/bug-hunter/venv/bin/bug-hunter daily --with-lenses --max-cost-usd 3
+ExecStartPost=/opt/bug-hunter/venv/bin/bug-hunter approvals expire
+TimeoutStartSec=6h
+Nice=10

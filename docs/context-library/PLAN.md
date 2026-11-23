@@ -6,7 +6,7 @@
 > bulk-uploaded, stored exactly as written), and **written by agents** (Builder and Bug Hunter
 > lessons). Chunks live in **collections**, and each **use case** reads only the collections
 > granted to it. Quality improves from **usage, not from people**.
-> Replaces Stacks, the Knowledge Base's character, Ally guide and Debrief corpora, the agent
+> Replaces the third-party guidance library, the Knowledge Base's character, Ally guide and Debrief corpora, the agent
 > memory notes, Builder lessons, and Course Copilot's catalogue search, **and deletes the
 > code they leave behind**.
 
@@ -14,7 +14,7 @@
 
 | Rev | What changed |
 |---|---|
-| 1–2 | Principles for the Builder PRD interview, replacing Stacks; success measures; staging without retention; probes and decision cards |
+| 1–2 | Principles for the Builder PRD interview, replacing the third-party guidance library; success measures; staging without retention; probes and decision cards |
 | 3 | RAG design review: decontextualised, grounded chunks; structure-first segmentation; three retrievers with RRF; graded re-rank; MMR; versioned flat indexes |
 | 4 | UX review: upload dock, Library, natural principle-led questions, states, copy, accessibility |
 | 5 | Context Library: profile-driven collections, use-case access, Studio and Character Library |
@@ -54,7 +54,7 @@ system has moved, its old code, tables, indexes and screens are deleted.
 | 12 | Character interview | **Switch straight away**, seeded from the existing corpus text; then retire the old corpus |
 | 13 | Ally guide and Debrief migration | **Import their existing passages word for word as authored chunks**, keeping citations and ownership; then delete the old corpora |
 | 14 | Organisations | **Organisation-owned chunks.** In collections that allow it, an organisation's admins add chunks only their learners see. Every search carries the asker's audience, enforced server-side |
-| 15 | Moved systems | Ally guide library, Debrief guidance, Bug Hunter's notes, Builder lessons, Course Copilot's catalogue search, the character corpus, Stacks |
+| 15 | Moved systems | Ally guide library, Debrief guidance, Bug Hunter's notes, Builder lessons, Course Copilot's catalogue search, the character corpus, the third-party guidance library |
 | 16 | Dead code | **Deleted in the same phase each system moves**, plus a final sweep (§12) |
 | 17 | Rights | No upload check; rights are the uploader's responsibility |
 | 18 | Naming | Code, schema, prompts and code docs say **document** (or **source** for its record), **segment**, **chunk**, **collection**, **use case**, **origin**, and no other terms for these. The UI uses each collection's noun. Build steps are **phases** |
@@ -136,7 +136,7 @@ A new collection is a profile plus a migration.
 | **ExpeL-style curator** (AGREE / EDIT / ADD / REMOVE with code guardrails; pins respected) | Builder's lesson curator and the agent-memory curator (both deleted in phase 5) | **Generalised into the agent-chunk curator** (§6.3); both originals are deleted |
 | Agent memory writes and semantic search, `appliedLessonIds` | The agent-memory module (deleted in phase 5), `ally-be/src/builder/service/builder-knowledge.service.ts` | Replaced by `writeAgentChunk()` and retrieval; applied IDs become usage events |
 | Content access rules | `ally-be/src/authorization/service/content-access.service.ts` | Rechecked at hydration for catalogue items |
-| Stacks client and tools, character `search_corpus`, character topics, Builder UI pieces, replay eval, outcomes, Skills Store, AI task registry, `DATA_SCHEMA.md`, Redis, scheduler, WebSocket gateway | As in revision 6 | As in revision 6 |
+| Third-party guidance client and tools, character `search_corpus`, character topics, Builder UI pieces, replay eval, outcomes, Skills Store, AI task registry, `DATA_SCHEMA.md`, Redis, scheduler, WebSocket gateway | As in revision 6 | As in revision 6 |
 
 **Facts to confirm in phase 1:** the production Weaviate version (named vectors, flat index,
 BM25 boosts), Redis headroom, the extractor size cap, and **the cost of extracting one real
@@ -366,8 +366,8 @@ finishes rolling out.
 ## 9. Use cases
 
 ### 9.1 Builder (phase 2, lessons in phase 5)
-- **Interview:** `principles_search` / `principles_get` replace `stacks_search` /
-  `stacks_get`. Proactive mode from day one:
+- **Interview:** `principles_search` / `principles_get` replace the old guidance
+  tools. Proactive mode from day one:
   - a guiding-principles brief at session start
   - a search for the PRD section in focus each turn
   - principle-led questions with "Guided by" chips
@@ -383,7 +383,7 @@ finishes rolling out.
 ### 9.2 Engineers' Claude Code (phase 2)
 `/context-library/mcp` (`search_context`, `get_chunks`, `list_collections`,
 `planning_context`), with read-only keys and a Connect Claude Code sheet with Test
-connection. Every repo's `.mcp.json` switches over, and `stacks-bridge.mjs` and the `stacks`
+connection. Every repo's `.mcp.json` switches over, and the old bridge script and its
 skill are removed. Builder Lessons and the Bug Hunter Notes join the engineer grants in
 phase 5.
 
@@ -504,13 +504,13 @@ As in revision 6, plus:
 | # | Phase | Done when |
 |---|---|---|
 | 1 | **Engine + First Principles ingestion**: `cl_*` tables (with audience, origin, body) and `DATA_SCHEMA.md`; profile and use-case registries; enforced grants **and audience**; upload endpoint (memory, existing extractors and chunker); Redis staging; worker; overview, extract, gate, dedupe, consolidation; **authored entries (typed + bulk CSV/JSON with dry run) and enrichment**; `CtxFirstPrinciples_v1`; ally-ai endpoints; outbox; AI-registry rows; minimal Context Library page | Seed documents extracted with no clicks; an entry typed and a bulk file applied; no file or document text in Postgres or S3; cost per document reported; prod Weaviate confirmed |
-| 2 | **Retrieval + Builder interview + engineers**: `ContextLibraryRetrievalService`; Builder tools and proactive mode; `/context-library/mcp`, keys and the Connect sheet; `.mcp.json` everywhere; replay eval check | Builder uses principles end to end with verified citations; engineers connected. **Delete:** `stacks-bridge.mjs` and the `stacks` skill in every repo; Builder's `stacks_*` tools; `BuilderStacksService` |
+| 2 | **Retrieval + Builder interview + engineers**: `ContextLibraryRetrievalService`; Builder tools and proactive mode; `/context-library/mcp`, keys and the Connect sheet; `.mcp.json` everywhere; replay eval check | Builder uses principles end to end with verified citations; engineers connected. **Delete:** the guidance bridge script and its skill in every repo; Builder's old guidance tools and service |
 | 3 | **Learning loops + Insights + Settings** | A week of loops on real usage; actions visible and undoable |
 | 4 | **Character Insights**: profile, distil from the old corpus, smoke check, switch `search_corpus` | **Delete:** `KbCorpus.CHARACTER_LIBRARY`, its chunk profile and floor, the `CharacterChunk` Weaviate collection and its ally-ai corpus entry, the corpus's documents, chunks and stored files, `CharacterCorpusPanel` and `characterTopics.ts` (vocabulary moved to the profile), and `KbRetrievalConsumer.INTERVIEW_AGENT` |
 | 5 | **Agent lessons**: Builder Lessons and Bug Hunter Notes profiles; `writeAgentChunk`; the generalised agent curator; migration of `builder_lessons` and `agent_memories`; Builder's retrieved lessons block; Bug Hunter services switched; `agent_applied` events | **Delete:** the `agent-memory` module (entity, repository, services, curator, enums), the `agent_memories` and `builder_lessons` tables (by migration), `builder-lesson-curator.service`, `bug-hunter-memory-retirement.service`, lesson repository code and `renderLessonLine` / `BUILDER_LESSONS_IN_CONTEXT`, `aiService.upsertAgentMemory` / `findSimilarAgentMemories`, ally-ai `agent_memory` core, endpoint and the `AgentMemory` Weaviate collection, and the lessons part of `BuilderKnowledge.tsx` |
 | 6 | **Organisations + Ally guide + Debrief**: organisation-admin access and the scoped Library; Ally Guide Library and Debrief Guidance profiles; passages imported word for word with citations and audiences; `guide-library.service` and the Debrief services switched; smoke checks | **Delete:** `KbCorpus.ALLY_GUIDE_LIBRARY` and `DEBRIEF_KNOWLEDGE`, their chunk profiles and floors; `searchForAudience`, the owned-document methods (`createOwned`, `createOwnedUploadUrl`, `listOwned`, `archiveOwned`, `KbOwner`, `KB_OWNED_CORPORA`); the `guide-library-admin.controller` endpoints; **clinical sign-off** (`needs_clinical_sign_off`, `clinical_signed_off_*` columns by migration, and the code that checks them); `debrief-knowledge.service` (if only the corpus uses it); the `GuideLibraryChunk` and `DebriefKnowledgeChunk` Weaviate collections and their ally-ai corpus entries; the old documents, chunks and stored files; `LibraryPanel.tsx`, the Debrief `KnowledgeTab.tsx` and their API slices and types; `KbRetrievalConsumer.ALLY_GUIDE` / `DEBRIEF` |
-| 7 | **Studio + Roadmap + catalogue**: Learning Design profile and documents; Course Copilot `design_guidance_*`; Content Catalogue sync, reconciliation and content-access rechecks; `search_library` switched; Roadmap Copilot switched | **Delete:** the `ILike` library queries in `course-copilot-library.service` (the competencies, languages, trigger warnings and cover images parts stay); `StacksClientService`, `STACKS_*` config, the Course Copilot and Roadmap `stacks` tools and constants, and `planning-with-stacks.md` (rewritten as `planning-with-context-library.md`) |
-| 8 | **Dead-code sweep** (§12) | The sweep's report is empty or every remaining item is justified; `grep -ri stacks` finds only history notes; `DATA_SCHEMA.md`, `.docs-map.yml`, the wiki and every `CLAUDE.md` / `AGENTS.md` are current |
+| 7 | **Studio + Roadmap + catalogue**: Learning Design profile and documents; Course Copilot `design_guidance_*`; Content Catalogue sync, reconciliation and content-access rechecks; `search_library` switched; Roadmap Copilot switched | **Delete:** the `ILike` library queries in `course-copilot-library.service` (the competencies, languages, trigger warnings and cover images parts stay); the third-party guidance client service and config, the Course Copilot and Roadmap guidance tools and constants, and the old planning wiki page (rewritten as `planning-with-context-library.md`) |
+| 8 | **Dead-code sweep** (§12) | The sweep's report is empty or every remaining item is justified; no reference to the third-party guidance library remains; `DATA_SCHEMA.md`, `.docs-map.yml`, the wiki and every `CLAUDE.md` / `AGENTS.md` are current |
 
 Builder works end to end in phase 2. Each phase deletes what it replaced **in the same PR
 set**, so nothing lingers half-migrated.

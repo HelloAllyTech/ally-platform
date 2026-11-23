@@ -99,9 +99,9 @@ export type KnowledgeCorpus = 'whatsapp_qa';
 
 // ── Answering agent ─────────────────────────────────────────────────────────
 
-export type KnowledgeAnswerIntent = 'answer' | 'decline' | 'clarify';
+type KnowledgeAnswerIntent = 'answer' | 'decline' | 'clarify';
 
-export type KnowledgeDeclineReason =
+type KnowledgeDeclineReason =
   | 'none'
   | 'no_hits'
   | 'below_threshold'
@@ -139,6 +139,34 @@ export interface KnowledgeAnswerRequest {
  * Mirrors ally-ai `app/schemas/agent_runtime.py::AgentRunRequest`; the limits noted here are its
  * validation (a 422 past them).
  */
+/**
+ * Where and how a run calls ally-be's tool gateway back (chunk 3b). Sent only for a bot with a
+ * tool on; `token` is a credential, signed for this run alone.
+ */
+export interface AgentGatewayBlock {
+  url: string;
+  token: string;
+  tools: string[];
+  /**
+   * The generated list tools (chunk 6), each `{ name, description, input_schema, kind }`. Sent
+   * only when the run has one; at most 12.
+   */
+  definitions?: {
+    name: string;
+    description: string;
+    input_schema: { type: 'object'; properties: Record<string, unknown> };
+    kind: 'find' | 'create' | 'update';
+    /** The list's name as the owner wrote it, for the live steps (chunk 6b). */
+    list_name?: string;
+    /** A create that saves the person's details for the team (chunk 6b). */
+    takes_details?: boolean;
+  }[];
+  /** List tools the bot has on that didn't fit under the cap; named in the run's trace. */
+  omitted?: string[];
+  /** Today where the business is, for the agent's lists section; sent with `definitions`. */
+  today?: string;
+}
+
 export interface AgentRunRequest extends KnowledgeAnswerRequest {
   /**
    * The checkpointer's thread id: the conversation, or a `preview-…` thread.
@@ -151,6 +179,21 @@ export interface AgentRunRequest extends KnowledgeAnswerRequest {
   chatbot_id?: string;
   runtime_version: 'v2';
   /**
+   * The run's hard cap in seconds (chunk H1). ally-be waits a little longer than this, so ally-ai's
+   * cap always fires first; the run token expires with it.
+   */
+  run_timeout_s?: number;
+  /**
+   * Q3-fast Part 1: the crisis check found the person upset, not at risk. The agent's reply opens
+   * warmly (and, on health and mental-health assistants, gently names the support there is).
+   * Absent otherwise.
+   */
+  mood?: 'upset';
+  /** How to reach the business, from its sources (Q3-fast Part 2), for declines. */
+  business_contact?: string;
+  /** With `mood`: the business's helplines, for the support line on health assistants. */
+  support_helplines?: string;
+  /**
    * Titles of the bot's documents, so the agent can say what it covers. At most 50; ally-ai
    * cuts each title to 200 characters.
    */
@@ -160,6 +203,56 @@ export interface AgentRunRequest extends KnowledgeAnswerRequest {
    * characters (`MAX_DECLINE_TEXT_CHARS`).
    */
   decline_text?: string;
+  /** The tool gateway, for a bot with a tool on (chunk 3b). Absent: today's run, search only. */
+  gateway?: AgentGatewayBlock;
+  /**
+   * What the assistant knows about the person (chunk 8a), when the bot's memory is on. `lines` is
+   * `renderMemory`'s text (at most 4,000 characters); `never_store` at most 60 lines.
+   */
+  memory?: { lines: string; never_store: string[] };
+  /** This chat's rolling summary of the messages before the last 10 (chunk 8a). */
+  summary?: string;
+  /** The person's name, when it's known (chunk 8a). At most 80 characters. */
+  person_name?: string;
+  /**
+   * What they told the page before the chat (chunk 8a): its choice, date and text answers other
+   * than their name, never their phone or email. At most 6, each part 120 characters.
+   */
+  before_chat?: { label: string; value: string }[];
+  /**
+   * Live steps (chunk 6b): `activity` events while it runs and `activity` in the response. Sent
+   * only for the bot page's and Try it's streamed runs; WhatsApp never asks for them.
+   */
+  activity?: boolean;
+}
+
+/** What a run did, or is doing, as the bot page shows it (chunk 6b; ally-ai `activity.py`). */
+export type AgentActivityKind =
+  | 'search'
+  | 'find'
+  | 'create'
+  | 'update'
+  | 'cancel'
+  | 'hand_over'
+  | 'writing';
+
+export interface AgentActivity {
+  kind: AgentActivityKind;
+  /** The list's name as the owner wrote it. */
+  list?: string;
+  /** A record's title: the day and time a booking is for. */
+  title?: string;
+  /** A write's record, for the confirmation card. Never shown to a visitor. */
+  record_id?: string;
+}
+
+/** One memory write a run asks for (chunk 8a); ally-be checks and applies it after the reply. */
+export interface AgentMemoryWrite {
+  op: 'add' | 'replace' | 'done' | 'forget' | 'name';
+  section?: 'preferences' | 'context' | 'open_items';
+  text?: string;
+  /** The short id of the line it changes (`m2`). */
+  id?: string;
 }
 
 /** What the conversational agent understood a message to be. */
@@ -193,12 +286,51 @@ export interface AgentRunResponse extends KnowledgeAnswerResponse {
    * grounded answer.
    */
   turn_type?: AgentTurnType;
+  /** The agent passed the chat to a person with `hand_over` (chunk 3b); the answer is empty. */
+  handover?: boolean;
+  /** What the run asked to remember (chunk 8a). Absent when nothing. */
+  memory_writes?: AgentMemoryWrite[];
+  /** What the run did, when the request asked for live steps (chunk 6b). */
+  activity?: AgentActivity[];
 }
 
-export interface KnowledgePersonaRequest {
+/** ally-ai `/agent/memory-check` (chunk 8a). */
+export interface MemoryCheckRequest {
+  lines: string[];
+  never_store?: string[];
+  prompts?: Record<string, unknown>;
+}
+export interface MemoryCheckResponse {
+  keep: boolean[];
+  failed: boolean;
+}
+
+/** ally-ai `/agent/conversation-summary` (chunk 8a). */
+export interface ConversationSummaryRequest {
+  summary?: string | null;
+  messages: { role: 'user' | 'assistant'; content: string }[];
+  health?: boolean;
+  prompts?: Record<string, unknown>;
+}
+export interface ConversationSummaryResponse {
+  summary: string;
+  failed: boolean;
+}
+
+interface KnowledgePersonaRequest {
   display_name?: string;
   system_prompt?: string;
   tone?: string;
+  /** The safety pack's rules block (chunk 20a); ally-ai renders it after the instructions. */
+  safety_rules?: string;
+  /** The pack's id; ally-ai enforces a health pack's Never rules in its check too. */
+  safety_pack?: string;
+  /** Topics the owner asked it not to talk about (chunk 20a-2). */
+  avoid_topics?: string[];
+  /** What it's for (chunk 20a-2); ally-ai adds the purpose's section before the safety rules. */
+  purpose?: string;
+  /** "Something else": the owner's own description. */
+  purpose_note?: string;
 }
 
 export interface KnowledgeCitation {
@@ -211,6 +343,11 @@ export interface KnowledgeCitation {
   section_path: string;
   source_url: string;
   similarity: number;
+  /**
+   * Set when the passage was a list record (chunk 6): `document_title` is the list's name,
+   * `section_path` the record's title, `document_id` empty and `chunk_id` the record's id.
+   */
+  record_id?: string;
 }
 
 export interface KnowledgeRetrievalMeta {
@@ -243,6 +380,11 @@ export interface KnowledgeAnswerResponse {
 
 export interface CrisisCheckRequest {
   message: string;
+  /**
+   * The person's own earlier messages in this conversation, newest last, without `message`
+   * (chunk 15a). Left out when there are none, so the request is exactly the old one.
+   */
+  history?: string[];
   prompts?: Record<string, unknown>;
 }
 
@@ -264,12 +406,31 @@ export interface CrisisCheckResponse {
    */
   confidence: number;
   failed: boolean;
+  /**
+   * Q3-fast Part 1: which reply the message needs. `at_risk` and `emergency` get a fixed reply at
+   * once (`is_crisis` is true for both); `upset` is answered by the run, warmly; `none` normally.
+   * Absent from an older ally-ai: read it with `crisisLevelOf`.
+   */
+  level?: 'at_risk' | 'emergency' | 'upset' | 'none';
+  /** Suicide or self-harm is present too: an emergency reply adds the at-risk line. */
+  self_harm?: boolean;
   provider?: string;
   model?: string;
 }
 
+/** The verdict's level, or one read from `is_crisis` when ally-ai sent none (Q3-fast Part 1). */
+export const crisisLevelOf = (
+  verdict: Pick<CrisisCheckResponse, 'is_crisis' | 'level'> | null | undefined,
+): NonNullable<CrisisCheckResponse['level']> => {
+  if (!verdict) return 'none';
+  if (verdict.is_crisis) {
+    return verdict.level === 'emergency' ? 'emergency' : 'at_risk';
+  }
+  return verdict.level === 'upset' ? 'upset' : 'none';
+};
+
 /** What a streamed run is doing now (ally-ai `trace.STATUS_LABELS`). */
-export type AgentStatusCode =
+type AgentStatusCode =
   | 'thinking'
   | 'searching'
   | 'found'
@@ -295,4 +456,5 @@ export type AgentStreamEvent =
       };
     }
   | { event: 'step'; data: AgentTraceStep }
+  | { event: 'activity'; data: AgentActivity }
   | { event: 'token'; data: { text: string } };

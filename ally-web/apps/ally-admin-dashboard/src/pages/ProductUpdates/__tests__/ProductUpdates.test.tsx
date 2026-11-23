@@ -27,6 +27,10 @@ vi.mock("@api", async importOriginal => {
     useGetProductUpdatesStatusQuery: (...args: any[]) =>
       mockUseGetProductUpdatesStatusQuery(...args),
     useGetProductUpdateQuery: (...args: any[]) => mockUseGetProductUpdateQuery(...args),
+    // The recipients panel has its own spec; here it only has to render.
+    useGetDigestRecipientsQuery: () => ({ data: { recipients: [] }, isLoading: false }),
+    useAddDigestRecipientMutation: () => [vi.fn(), { isLoading: false }],
+    useRemoveDigestRecipientMutation: () => [vi.fn()],
     useRunProductUpdatesMutation: () => [mockRun, { isLoading: false }],
     useUpdateProductUpdateMutation: () => [mockSave, { isLoading: false }],
   };

@@ -1,0 +1,130 @@
+{
+  "language": "en-IN",
+  "writer_model": "gemini-3-flash-preview",
+  "scenario": "A young woman, a final-year student, cannot sleep and is afraid of failing her exams; she feels her family's hopes are heavy. No thoughts of self-harm.",
+  "transcript": [
+    {
+      "turn_index": 1,
+      "role": "counselor",
+      "text": "Hello. Please tell me, what's on your mind today?"
+    },
+    {
+      "turn_index": 2,
+      "role": "client",
+      "text": "Hello. I'm just feeling very stressed, you know. My final exams are coming up, and I can't sleep at all."
+    },
+    {
+      "turn_index": 3,
+      "role": "counselor",
+      "text": "So, you're feeling a lot of stress and anxiety about your upcoming exams, and it's even affecting your sleep."
+    },
+    {
+      "turn_index": 4,
+      "role": "client",
+      "text": "Yes, exactly. And my family has so many hopes from me. It feels like such a heavy burden."
+    },
+    {
+      "turn_index": 5,
+      "role": "counselor",
+      "text": "It sounds like you're carrying a lot of your family's expectations. Can you tell me more about what that feels like?"
+    },
+    {
+      "turn_index": 6,
+      "role": "client",
+      "text": "It's like I cannot afford to fail. Everyone is expecting me to do well, to get a good job. I just feel so much pressure."
+    },
+    {
+      "turn_index": 7,
+      "role": "counselor",
+      "text": "You're feeling an immense pressure, almost like a fear of letting everyone down if you don't meet their high expectations."
+    },
+    {
+      "turn_index": 8,
+      "role": "client",
+      "text": "Absolutely. It's constantly on my mind, day and night. That's why I just can't switch off and sleep."
+    },
+    {
+      "turn_index": 9,
+      "role": "counselor",
+      "text": "Have you tried maybe doing some meditation or listening to calming music before bed? That often helps with sleep."
+    },
+    {
+      "turn_index": 10,
+      "role": "client",
+      "text": "I've tried a bit, but my mind just keeps racing. It's hard to focus on anything else when I'm so worried about the results."
+    },
+    {
+      "turn_index": 11,
+      "role": "counselor",
+      "text": "So, are you saying you feel completely stuck and helpless right now?"
+    },
+    {
+      "turn_index": 12,
+      "role": "client",
+      "text": "Yes, in a way. I just don't know how to handle all this pressure."
+    }
+  ],
+  "cards": {
+    "opening": "You spent time understanding the weight of the client's family expectations and how they contribute to his exam stress. I noticed how carefully you listened to his feelings of being overwhelmed.",
+    "important_moment": null,
+    "what_worked": [
+      {
+        "skill": "Reflecting feelings",
+        "turn_index": 3,
+        "quote": "So, you're feeling a lot of stress and anxiety about your upcoming exams, and it's even affecting your sleep.",
+        "lead": "You acknowledged his stress early on.",
+        "body": "By repeating back his struggle with sleep and exams, you showed him that you were truly listening and understood the immediate problem he was facing."
+      },
+      {
+        "skill": "Exploring client's core concerns",
+        "turn_index": 7,
+        "quote": "You're feeling an immense pressure, almost like a fear of letting everyone down if you don't meet their high expectations.",
+        "lead": "You uncovered the source of his burden.",
+        "body": "Moving beyond the exams to identify his fear of letting his family down helped deepen the conversation and allowed him to share more about his inner thoughts."
+      }
+    ],
+    "work_on_this": [
+      {
+        "skill": "Avoids giving premature advice",
+        "turn_index": 9,
+        "quote": "Have you tried maybe doing some meditation or listening to calming music before bed? That often helps with sleep.",
+        "lead": "Focus on staying with the feeling longer.",
+        "why": "Suggesting solutions like meditation too early can sometimes make a person feel like their deeper distress is being overlooked or fixed too quickly.",
+        "try_saying": "I can see how much these results are weighing on you, tell me more about what happens when you try to rest.",
+        "scenario_id": null
+      }
+    ],
+    "practise_next": {
+      "skill": "Avoids giving premature advice",
+      "reason": "Continuing to explore the client's feelings before moving into problem-solving helps build a stronger connection and ensures the person feels fully heard.",
+      "scenario_id": null,
+      "try_next": null
+    },
+    "skill_words": [
+      {
+        "skill": "Reflecting feelings",
+        "word": "strength"
+      },
+      {
+        "skill": "Asking open questions",
+        "word": "strength"
+      },
+      {
+        "skill": "Exploring client's core concerns",
+        "word": "strength"
+      },
+      {
+        "skill": "Avoids giving premature advice",
+        "word": "keep_practising"
+      },
+      {
+        "skill": "Exploring client's sense of helplessness",
+        "word": "keep_practising"
+      }
+    ],
+    "skill_labels": [],
+    "reflective_question": "What do you think would happen if you spent more time exploring the client's feelings of helplessness before suggesting ways to cope?",
+    "progress_note": null
+  },
+  "rule_checks": "passed"
+}

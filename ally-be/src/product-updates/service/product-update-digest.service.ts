@@ -10,6 +10,11 @@ import { RoadmapVotingAnalyticsService } from 'src/analytics/service/roadmap-vot
 import { AppConfigService } from 'src/config/config.service';
 import { LoggerService } from 'src/logger/logger.service';
 import { RedisService } from 'src/redis/service/redis.service';
+import {
+  RoadmapDigestFeedService,
+  WeeklyIdeaNews,
+} from 'src/product-planning/service/roadmap-digest-feed.service';
+import { PlanSettingsService } from 'src/product-planning/service/plan-settings.service';
 
 import { LOW_CONFIDENCE } from '../constants/product-update.constants';
 import { ProductUpdateSourceStatus } from '../entity/product-update-source.entity';
@@ -17,6 +22,7 @@ import { ProductUpdate } from '../entity/product-update.entity';
 import { ProductUpdateSourceRepository } from '../repository/product-update-source.repository';
 import { ProductUpdateRepository } from '../repository/product-update.repository';
 import { ProductUpdateLivenessService } from './product-update-liveness.service';
+import { ProductUpdateRecipientsService } from './product-update-recipients.service';
 
 /** Only updates this recent are reported; anything older (a backfill) is marked announced silently. */
 const REPORT_WINDOW_MS = 36 * 60 * 60 * 1000;
@@ -56,6 +62,26 @@ export type DigestOutcome =
   | 'sent'
   | 'failed';
 
+export type WeeklyIdeasOutcome =
+  | 'not-due'
+  | 'not-production'
+  | 'roadmap-v2-off'
+  | 'already-sent'
+  | { sent: number; skipped: number; failed: number };
+
+/** A week, less a day of slack so a late tick never skips anyone. */
+const WEEKLY_RESEND_AFTER_MS = 6 * 24 * 60 * 60 * 1000;
+
+const STAGE_WORDS: Record<WeeklyIdeaNews['stage'], string> = {
+  submitted: 'Submitted, waiting for review',
+  accepted: 'Accepted',
+  planning: 'Planning',
+  building: 'Building',
+  shipped: 'Shipped',
+  declined: 'Not going ahead',
+  closed: 'Closed',
+};
+
 export interface DigestContent {
   subject: string;
   html: string;
@@ -86,19 +112,137 @@ export class ProductUpdateDigestService {
     private readonly configService: AppConfigService,
     private readonly redisService: RedisService,
     private readonly roadmapVoting: RoadmapVotingAnalyticsService,
+    private readonly roadmapFeed: RoadmapDigestFeedService,
+    private readonly planSettings: PlanSettingsService,
+    private readonly recipients: ProductUpdateRecipientsService,
   ) {}
+
+  // ── Your ideas this week (Roadmap v2, §4.14, §5.7b) ────────────────────────
+
+  /**
+   * The hourly tick's weekly half: on Monday, in the digest hour, each person
+   * who turned "Your ideas this week" on gets one email about the ideas they
+   * filed — only if something happened to one of them. Production only, like
+   * the team digest, and never while roadmap_v2 is off (its links open the
+   * new idea page). Nobody gets it without opting in: the preference is the
+   * only way in, and it defaults to off.
+   */
+  async sendWeeklyIdeasIfDue(
+    now: Date = new Date(),
+  ): Promise<WeeklyIdeasOutcome> {
+    const { digestHour, digestAllowed } = this.configService.productUpdates;
+    const local = dayjs(now).tz(BUSINESS_TIMEZONE);
+    if (local.isoWeekday() !== 1 || local.hour() !== digestHour) {
+      return 'not-due';
+    }
+    if (!digestAllowed) return 'not-production';
+    if (!(await this.planSettings.getRoadmapV2()).enabled) {
+      return 'roadmap-v2-off';
+    }
+    const lockKey = `roadmap:weekly-ideas:${toBusinessDateString(now)}`;
+    if (!(await this.redisService.acquireLock(lockKey, 20 * 60 * 60))) {
+      return 'already-sent';
+    }
+
+    const since = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const recipients = await this.roadmapFeed.recipients(
+      new Date(now.getTime() - WEEKLY_RESEND_AFTER_MS),
+    );
+    let sent = 0;
+    let skipped = 0;
+    let failed = 0;
+    for (const person of recipients) {
+      try {
+        const ideas = await this.roadmapFeed.ideasThisWeek(
+          person.userId,
+          since,
+        );
+        if (!ideas.length) {
+          skipped += 1;
+          continue;
+        }
+        const email = this.weeklyIdeasEmail(person.name, ideas, now);
+        await this.sesService.sendEmail({
+          from: this.configService.email.sourceEmail,
+          to: [person.email],
+          subject: email.subject,
+          body: email.html,
+          isHtml: true,
+          purpose: 'roadmap weekly ideas digest',
+        });
+        await this.roadmapFeed.markSent(person.userId, now);
+        sent += 1;
+      } catch (error) {
+        failed += 1;
+        this.logger.error(
+          `[ROADMAP] Weekly ideas digest failed for user ${person.userId}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
+    return { sent, skipped, failed };
+  }
+
+  /** "Your ideas this week": the section, in the team digest's own chrome. */
+  weeklyIdeasEmail(
+    name: string,
+    ideas: WeeklyIdeaNews[],
+    now: Date,
+  ): { subject: string; html: string } {
+    const date = dayjs(now).tz(BUSINESS_TIMEZONE).format('ddd D MMM');
+    const adminBase = this.configService.adminBaseUrl.replace(/\/$/, '');
+    const ideaLink = (code: string) =>
+      `${adminBase}/roadmap/i/${encodeURIComponent(code)}`;
+    const shipped = ideas.filter((idea) => idea.shippedAt).length;
+    const subject = `Your ideas this week · ${date}${
+      shipped ? ` — ${shipped} shipped!` : ''
+    }`;
+
+    const body = section('Your ideas this week', ideas, '', (idea) => {
+      const news = [
+        idea.shippedAt
+          ? `Shipped on ${dayjs(idea.shippedAt).tz(BUSINESS_TIMEZONE).format('D MMM')}!`
+          : null,
+        idea.reviewed === 'accepted' ? 'Accepted' : null,
+        idea.reviewed === 'declined' ? 'Reviewed: not going ahead' : null,
+        idea.comments
+          ? `${idea.comments} new comment${idea.comments === 1 ? '' : 's'}`
+          : null,
+        idea.planUpdates
+          ? `${idea.planUpdates} update${idea.planUpdates === 1 ? '' : 's'} on its plan`
+          : null,
+      ].filter((line): line is string => !!line);
+      return `<div style="padding:14px 0;border-bottom:1px solid ${RULE}">
+<p style="margin:0 0 2px;font-size:17px;line-height:1.35"><a href="${escapeHtml(ideaLink(idea.code))}" style="${linkStyle}">${escapeHtml(idea.code)}</a> · ${escapeHtml(idea.title)}</p>
+<p style="margin:0;color:${MUTED};font-size:14px">${escapeHtml(STAGE_WORDS[idea.stage])} · ${escapeHtml(news.join(' · '))}</p>
+</div>`;
+    });
+
+    const html = `<div style="background:#FAF7F1;padding:24px 12px;font-family:${FONT}">
+<div style="font-family:${FONT};color:${INK};max-width:640px;margin:0 auto;background:#FFFFFF;border:1px solid ${RULE};border-radius:6px;padding:32px 36px;line-height:1.6">
+<p style="margin:0 0 6px;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:${ACCENT}">Ally · Roadmap</p>
+<h1 style="font-family:${FONT};font-size:26px;line-height:1.25;font-weight:normal;margin:0 0 6px">${escapeHtml(name ? `Hi ${name.split(' ')[0]}` : 'Hello')}</h1>
+<p style="margin:0;color:${MUTED};font-size:15px">Here is what happened to the ideas you filed in the last seven days.</p>
+${body}
+<hr style="border:none;border-top:1px solid ${RULE};margin:32px 0 16px">
+<p style="margin:0;color:${MUTED};font-size:13px;line-height:1.6">You get this because you turned on the weekly email in <a href="${escapeHtml(`${adminBase}/roadmap/queue?view=for-you`)}" style="${linkStyle}">Roadmap</a>. Turn it off there at any time.</p>
+</div>
+</div>`;
+    return { subject, html };
+  }
 
   /** The hourly tick: sends once, in the configured business hour, if there is anything to report. */
   async sendIfDue(now: Date = new Date()): Promise<DigestOutcome> {
-    const { digestTo, digestHour, digestAllowed } =
-      this.configService.productUpdates;
+    const { digestHour, digestAllowed } = this.configService.productUpdates;
+    const digestTo = await this.recipients.effective();
     if (digestTo.length === 0) return 'disabled';
     if (dayjs(now).tz(BUSINESS_TIMEZONE).hour() !== digestHour)
       return 'not-due';
     if (!digestAllowed) {
       // After the hour check, so this is one line a day, not one an hour.
       this.logger.warn(
-        '[PRODUCT-UPDATES] Digest skipped: PRODUCT_UPDATES_DIGEST_TO is set but this is not the production database (*_prd).',
+        '[PRODUCT-UPDATES] Digest skipped: recipients are set but this is not the production database (*_prd).',
       );
       return 'not-production';
     }
@@ -331,15 +475,21 @@ ${footer}
         `<td style="padding:7px ${last ? '0' : '16px'} 7px 0;border-bottom:1px solid ${RULE};text-align:right;font-size:15px;font-variant-numeric:tabular-nums">${content}</td>`;
       const rows = voters
         .map((u) => {
-          // Share of this person's votes that went to colleagues' ideas.
-          const othersShare = `${Math.round(
-            ((u.votesOnOthers ?? u.votes) / u.votes) * 100,
-          )}%`;
-          return `<tr><td style="padding:7px 16px 7px 0;border-bottom:1px solid ${RULE};font-size:15px">${escapeHtml(name(u.userId))}</td>${cell(u.votes.toLocaleString('en-IN'))}${cell(othersShare, true)}</tr>`;
+          // Where this person's votes went, as a label rather than a number:
+          // under a third on colleagues' ideas = mostly their own, over two
+          // thirds = mostly colleagues'.
+          const othersShare = (u.votesOnOthers ?? u.votes) / u.votes;
+          const balance =
+            othersShare < 1 / 3
+              ? 'Most votes to own ideas'
+              : othersShare > 2 / 3
+                ? "Most votes to other people's ideas"
+                : 'Balanced';
+          return `<tr><td style="padding:7px 16px 7px 0;border-bottom:1px solid ${RULE};font-size:15px">${escapeHtml(name(u.userId))}</td>${cell(u.votes.toLocaleString('en-IN'))}${cell(escapeHtml(balance), true)}</tr>`;
         })
         .join('');
       const table = rows
-        ? `<table style="border-collapse:collapse;width:100%;font-family:${FONT}"><tr>${th('Name', 'left')}${th('Votes cast', 'right')}${th('Voters voted others share', 'right')}</tr>${rows}</table>`
+        ? `<table style="border-collapse:collapse;width:100%;font-family:${FONT}"><tr>${th('Name', 'left')}${th('Votes cast', 'right')}${th('Balance', 'right')}</tr>${rows}</table>`
         : `<p style="margin:0;color:${MUTED}">No votes cast yet this month.</p>`;
 
       return `${heading(`Roadmap votes in ${monthName} so far:`)}

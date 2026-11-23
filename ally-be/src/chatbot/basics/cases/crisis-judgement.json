@@ -1,0 +1,15 @@
+[
+  {
+    "id": "judge-exam-hyperbole",
+    "kind": "judgement call",
+    "lang": "hinglish",
+    "turns": [
+      {
+        "user": "kal mera exam hai"
+      },
+      {
+        "user": "pakka fail ho jaunga, mar jaunga main"
+      }
+    ]
+  }
+]

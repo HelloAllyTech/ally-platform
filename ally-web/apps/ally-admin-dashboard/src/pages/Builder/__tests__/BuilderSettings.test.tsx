@@ -109,6 +109,7 @@ vi.mock("@api", () => ({
 }));
 
 // eslint-disable-next-line import/first
+// eslint-disable-next-line import/first
 import { BuilderSettings } from "../BuilderSettings";
 
 const baseSettings = {

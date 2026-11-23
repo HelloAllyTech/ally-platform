@@ -1,0 +1,144 @@
+diff --git a/src/builder/controller/builder-pipeline.controller.ts b/src/builder/controller/builder-pipeline.controller.ts
+index a39680fa11..c2ac95cb43 100644
+--- a/src/builder/controller/builder-pipeline.controller.ts
++++ b/src/builder/controller/builder-pipeline.controller.ts
+@@ -648,8 +648,19 @@ export class BuilderPipelineController {
+     // evidence, so a run that skipped it entirely still settled SUCCEEDED.
+     // Refused rather than trusted: the gate is cheap and the claim is not
+     // checkable any other way.
++    // A run that edited nothing is not claiming a fix, so there is nothing for
++    // a gate to verify. Two fix runs read their feedback, correctly found it
++    // was Builder's own approval with nothing to act on, said so on the pull
++    // request and changed no code — and were recorded FAILED, which poisoned
++    // the session and counted toward the breaker. Doing the right thing must
++    // not look like failing.
++    const changedNothing =
++      dto.outcome === 'done' &&
++      (await this.buildService.touchedNoFiles(run.id));
++
+     if (
+       dto.outcome === 'done' &&
++      !changedNothing &&
+       !(await this.buildService.hasPassingGate(run.id))
+     ) {
+       this.logger.warn(
+diff --git a/src/builder/service/builder-build.service.ts b/src/builder/service/builder-build.service.ts
+index 67e09ee7d2..208c9c6356 100644
+--- a/src/builder/service/builder-build.service.ts
++++ b/src/builder/service/builder-build.service.ts
+@@ -752,11 +752,17 @@ export class BuilderBuildService {
+ 
+     // The session goes back to BUILDING so the UI stops reading as finished
+     // while Builder is pushing commits; settleRun moves it back.
++    //
++    // `error: null` matters as much as the status. Only a build dispatch used
++    // to clear it, so a failure from three runs ago stayed on screen while
++    // newer runs came and went — a fact about history rendered as the current
++    // state, right above a banner telling you the run had failed.
+     await this.sessionRepository.update(
+       { id: session.id },
+       {
+         status: BuilderSessionStatus.BUILDING,
+         currentStage: BuilderStage.SETUP,
++        error: null,
+       },
+     );
+     await this.notificationService.fixRunStarted(
+@@ -825,6 +831,10 @@ export class BuilderBuildService {
+       return null;
+     }
+ 
++    // Same reasoning as the fix path: a review starting means the last
++    // failure is no longer what is happening, and leaving it on the session
++    // shows a stale error above a running build.
++    await this.sessionRepository.update({ id: session.id }, { error: null });
+     await this.pullRequestRepository.update(
+       { id: pullRequest.id },
+       { reviewedSha: headSha },
+@@ -1279,6 +1289,25 @@ export class BuilderBuildService {
+    * SUCCEEDED — testing was prompt-instructed and the only evidence was a
+    * string the agent chose to send.
+    */
++  /**
++   * Whether a run touched any code at all.
++   *
++   * The gate rule exists because "I fixed it" is not checkable without machine
++   * evidence. A run that changed nothing makes no such claim — and on
++   * 2026-09-16 two fix runs did exactly the right thing (read the feedback,
++   * found it was Builder's own approval, said so, changed nothing) and were
++   * recorded FAILED for it. That failure then poisoned the session status, lit
++   * a red banner, and counted toward the circuit breaker.
++   *
++   * `file_edit` is emitted by the forwarder from the engine's own output rather
++   * than asserted by the agent, so this is evidence in the same sense the gate
++   * is: a run cannot claim it changed nothing while having edited files.
++   */
++  async touchedNoFiles(runId: string): Promise<boolean> {
++    const events = await this.eventRepository.listByRun(runId, 0, 2000);
++    return !events.some((event) => event.type === BuilderEventType.FILE_EDIT);
++  }
++
+   async hasPassingGate(runId: string): Promise<boolean> {
+     const events = await this.eventRepository.listByRun(runId, 0, 2000);
+     const gateByKey = new Map<string, boolean>();
+diff --git a/src/builder/service/test/builder-no-op-run.spec.ts b/src/builder/service/test/builder-no-op-run.spec.ts
+new file mode 100644
+index 0000000000..0e2e543595
+--- /dev/null
++++ b/src/builder/service/test/builder-no-op-run.spec.ts
+@@ -0,0 +1,55 @@
++import { BuilderEventType } from '../../enum/builder.enum';
++import { BuilderBuildService } from '../builder-build.service';
++
++/**
++ * A run that changed nothing is not a run that failed.
++ *
++ * The gate rule exists because "I fixed it" cannot be checked any other way. It
++ * was applied to every `done`, including runs that made no claim at all — and on
++ * 2026-09-16 two fix runs did exactly the right thing (read the feedback, found
++ * it was Builder's own approval, said so on the pull request, changed no code)
++ * and were recorded FAILED for it. That lit a red banner on a healthy session,
++ * marked the build failed in the UI, and counted toward the circuit breaker
++ * that stops automatic work.
++ *
++ * `file_edit` is the evidence, and it is machine-emitted: the forwarder derives
++ * it from the engine's own output rather than taking the agent's word, so a run
++ * cannot claim it changed nothing while having edited files.
++ */
++describe('BuilderBuildService.touchedNoFiles', () => {
++  const build = (events: { type: BuilderEventType }[]) => {
++    const eventRepository = { listByRun: jest.fn().mockResolvedValue(events) };
++    const service = Object.create(
++      BuilderBuildService.prototype,
++    ) as BuilderBuildService;
++    (service as unknown as { eventRepository: unknown }).eventRepository =
++      eventRepository;
++    return service;
++  };
++
++  it('is true for a run that edited nothing', async () => {
++    const service = build([
++      { type: BuilderEventType.TEXT },
++      { type: BuilderEventType.TOOL_CALL },
++    ]);
++
++    await expect(service.touchedNoFiles('run-1')).resolves.toBe(true);
++  });
++
++  it('is false as soon as one file was edited', async () => {
++    const service = build([
++      { type: BuilderEventType.TEXT },
++      { type: BuilderEventType.FILE_EDIT },
++    ]);
++
++    await expect(service.touchedNoFiles('run-1')).resolves.toBe(false);
++  });
++
++  /**
++   * A run with no events at all edited nothing. Treating the empty case as
++   * "changed something" would put back exactly the failure this removes.
++   */
++  it('is true for a run with no events', async () => {
++    await expect(build([]).touchedNoFiles('run-1')).resolves.toBe(true);
++  });
++});

@@ -195,12 +195,16 @@ const SummaryFieldInput: FC<SummaryFieldInputProps> = ({
               {disabled ? (
                 // Read-only display: render the value as wrapping text. A
                 // single-line input truncates/scrolls long values (e.g. Intake
-                // notes) sideways instead of wrapping.
+                // notes) sideways instead of wrapping. Its line box matches the
+                // label's (text-lg = 28px) so, top-aligned, the two share a line
+                // instead of the smaller value riding high; pl-1 restores the
+                // gap the label's trailing space loses inside a flex row.
                 <span
-                  className="font-primary whitespace-pre-wrap break-words"
+                  className="block pl-1 font-primary whitespace-pre-wrap break-words"
                   style={{
                     color: field.isEditable ? "#29261f" : "#928b7c",
                     fontSize: "16px",
+                    lineHeight: "28px",
                     fontFamily: "IBM_Plex_Serif",
                   }}
                 >

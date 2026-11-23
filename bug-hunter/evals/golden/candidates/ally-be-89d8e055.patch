@@ -1,0 +1,46 @@
+diff --git a/ally-be/src/prompt/util/test/translation-token-guard.util.spec.ts b/ally-be/src/prompt/util/test/translation-token-guard.util.spec.ts
+index 1a282ff24..16b6389fc 100644
+--- a/ally-be/src/prompt/util/test/translation-token-guard.util.spec.ts
++++ b/ally-be/src/prompt/util/test/translation-token-guard.util.spec.ts
+@@ -109,6 +109,12 @@ describe('translation-token-guard', () => {
+         output: 'ठीक है [Laughs]',
+         ok: true,
+       },
++      {
++        name: 'zero-width spaces around tokens are tolerated',
++        source: 'Hello {name} [laughs]',
++        output: 'नमस्ते {\u200Bname\u200B} [\u200Blaughs\u200B]',
++        ok: true,
++      },
+     ];
+ 
+     cases.forEach((c) => {
+@@ -154,5 +160,13 @@ describe('translation-token-guard', () => {
+         'आप {name} हैं। [laughs]',
+       );
+     });
++
++    it('strips zero-width spaces from tokens', () => {
++      expect(
++        normaliseTranslationTokens(
++          'नमस्ते {\u200Bname\u200B} [\u200Blaughs\u200B]',
++        ),
++      ).toBe('नमस्ते {name} [laughs]');
++    });
+   });
+ });
+diff --git a/ally-be/src/prompt/util/translation-token-guard.util.ts b/ally-be/src/prompt/util/translation-token-guard.util.ts
+index a3c56be6b..51fc60c86 100644
+--- a/ally-be/src/prompt/util/translation-token-guard.util.ts
++++ b/ally-be/src/prompt/util/translation-token-guard.util.ts
+@@ -15,8 +15,8 @@
+  * source must appear N times in the output.
+  */
+ 
+-const PLACEHOLDER_RE = /\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}/g;
+-const AUDIO_TAG_RE = /\[\s*([a-z][a-z0-9_-]*)\s*\]/gi;
++const PLACEHOLDER_RE = /\{[\s\u200B]*([a-zA-Z_][a-zA-Z0-9_]*)[\s\u200B]*\}/g;
++const AUDIO_TAG_RE = /\[[\s\u200B]*([a-z][a-z0-9_-]*)[\s\u200B]*\]/gi;
+ 
+ export interface TokenDiff {
+   /** Tokens present in source but missing (or under-represented) in output. */

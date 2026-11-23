@@ -77,6 +77,22 @@ export class ClSource extends BaseWithoutTenantEntity {
   @Column({ type: 'uuid', name: 'owner_tenant_id', nullable: true })
   ownerTenantId?: string | null;
 
+  /**
+   * Who the chunks distilled from this document reach: every organisation, or only those in
+   * `tenantIds`. Chosen by a platform admin at upload and changeable later; an organisation
+   * admin's document reaches their own organisation only.
+   */
+  @Column({ type: 'boolean', name: 'is_global', default: true })
+  isGlobal!: boolean;
+
+  @Column({
+    type: 'text',
+    array: true,
+    name: 'tenant_ids',
+    default: () => "'{}'",
+  })
+  tenantIds!: string[];
+
   /** Collections whose consolidation has been claimed, so it runs exactly once each. */
   @Column({
     type: 'text',

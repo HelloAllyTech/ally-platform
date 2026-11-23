@@ -38,6 +38,19 @@ import { AuditLoggerService } from 'src/audit/service/audit-logger.service';
 import { PermissionValidator } from 'src/authorization/service/permission-validator.service';
 import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
 
+/** A recording whose socket dropped, waiting out its reconnect grace period. */
+interface PendingEnd {
+  timer: NodeJS.Timeout;
+  userId?: number;
+  tenantId?: string;
+  provider?: AudioChatProvider;
+  reason: StreamEndReason;
+  clientId: string;
+  disconnectedAt: number;
+  /** When the audio stopped: the last audio frame, or the drop if none came. */
+  audioEndedAt: number;
+}
+
 @WebSocketGateway({
   cors: { origin: '*' },
   namespace: '/microphone-chat',
@@ -63,7 +76,30 @@ export class MicrophoneChatGateway
   // in-flight recordings can't hold the process past the termination grace
   // period (best-effort: any unflushed session still falls to the janitor/
   // reprocess path on the surviving replicas).
-  private static readonly SHUTDOWN_DRAIN_TIMEOUT_MS = 20_000;
+  // Ending the recordings AND waiting for their audio to be handed off
+  // (waitForFinalized). Below the container's stop timeout (infra: 60s for
+  // ally-be), after which Docker SIGKILLs the process.
+  private static readonly SHUTDOWN_DRAIN_TIMEOUT_MS = 45_000;
+
+  // A dropped socket no longer ends the recording on the spot. A network blip
+  // (Wi-Fi, a proxy or host network reset — seen on production 2026-11-18,
+  // when every socket on the host dropped at once) used to end every live
+  // recording, and the client's reconnect then had its audio rejected as
+  // "chat is ended": the rest of each session was lost while its summary still
+  // read SUCCESS. Now the chat stays ACTIVE for a grace period; audio for it
+  // from the same counsellor's new socket resumes the recording, and only if
+  // none arrives is it ended exactly as before (flagged incomplete).
+  private pendingEnds = new Map<number, PendingEnd>();
+  private static readonly DEFAULT_RECONNECT_GRACE_MS = 60_000;
+
+  /** Read lazily (not at module load) so tests and env changes apply. */
+  static reconnectGraceMs(): number {
+    const raw = process.env.MICROPHONE_RECONNECT_GRACE_MS;
+    const parsed = raw === undefined || raw === '' ? NaN : Number(raw);
+    return Number.isFinite(parsed) && parsed >= 0
+      ? parsed
+      : MicrophoneChatGateway.DEFAULT_RECONNECT_GRACE_MS;
+  }
 
   private readonly auditLogger = AuditLoggerService.getInstance();
 
@@ -112,32 +148,20 @@ export class MicrophoneChatGateway
       // -> endCallStream completes the upload (flushing the in-memory tail) and
       // dispatches transcription. Runs on a timer, so set the auth context from
       // the session (as processAudioUpload does for its background work).
-      if (session?.chatId != null && session.chatId !== PLACEHOLDER_CHAT_ID) {
-        try {
-          ExecutionManager.setAuthContext(
-            session.userId ? String(session.userId) : '',
-            session.tenantId,
-          );
-          await this.chatService.endChat(
-            session.chatId,
-            undefined,
-            StreamEndReason.JANITOR_ORPHAN,
-          );
-          this.logger.warn(
-            `Janitor finalized orphaned recording for chat ${session.chatId} ` +
-              `(socket ${sid} gone with no disconnect event)`,
-          );
-        } catch (error) {
-          this.logger.error(
-            `Janitor failed to finalize orphaned recording for chat ${session.chatId}: ${
-              error instanceof Error ? error.message : String(error)
-            }`,
-          );
-        }
-      }
-
       delete this.sessions[sid];
       evicted++;
+      if (session?.chatId != null && session.chatId !== PLACEHOLDER_CHAT_ID) {
+        if (this.isHeldByLiveSession(session.chatId)) {
+          // The client already reconnected and resumed this chat on a new
+          // socket; ending it here would cut the resumed recording.
+          continue;
+        }
+        this.logger.warn(
+          `Janitor found orphaned recording for chat ${session.chatId} ` +
+            `(socket ${sid} gone with no disconnect event)`,
+        );
+        await this.scheduleEnd(session, StreamEndReason.JANITOR_ORPHAN, sid);
+      }
     }
     if (evicted > 0) {
       this.logger.warn(
@@ -157,10 +181,39 @@ export class MicrophoneChatGateway
     // sequentially to match the janitor (endChat relies on the per-call auth
     // context) and bounded by a timeout so a slow flush can't hang shutdown
     // past the platform's termination grace period.
-    const inFlight = Object.values(this.sessions).filter(
-      (session) =>
-        session?.chatId != null && session.chatId !== PLACEHOLDER_CHAT_ID,
-    );
+    const inFlight: Array<{
+      chatId: number;
+      userId?: number;
+      tenantId?: string;
+      reason: StreamEndReason;
+      /** Set for a recording already cut off (in its grace period). */
+      endedAt?: Date;
+    }> = Object.values(this.sessions)
+      .filter(
+        (session) =>
+          session?.chatId != null && session.chatId !== PLACEHOLDER_CHAT_ID,
+      )
+      .map((session) => ({
+        chatId: session.chatId,
+        userId: session.userId,
+        tenantId: session.tenantId,
+        reason: StreamEndReason.SHUTDOWN_DRAIN,
+      }));
+    // Recordings waiting out their reconnect grace period: their client is
+    // gone, so finalize them now (as disconnects) rather than lose the audio.
+    for (const [chatId, pending] of this.pendingEnds) {
+      clearTimeout(pending.timer);
+      if (!inFlight.some((s) => s.chatId === chatId)) {
+        inFlight.push({
+          chatId,
+          userId: pending.userId,
+          tenantId: pending.tenantId,
+          reason: pending.reason,
+          endedAt: new Date(pending.audioEndedAt),
+        });
+      }
+    }
+    this.pendingEnds.clear();
     this.sessions = {};
 
     if (inFlight.length === 0) return;
@@ -169,28 +222,53 @@ export class MicrophoneChatGateway
       `Draining ${inFlight.length} in-flight microphone recording(s) on shutdown`,
     );
 
+    const drainDeadline =
+      Date.now() + MicrophoneChatGateway.SHUTDOWN_DRAIN_TIMEOUT_MS;
     const drainAll = (async () => {
       for (const session of inFlight) {
         try {
           ExecutionManager.setAuthContext(
             session.userId ? String(session.userId) : '',
-            session.tenantId,
+            session.tenantId as string,
           );
           await this.chatService.endChat(
             session.chatId,
-            undefined,
-            StreamEndReason.SHUTDOWN_DRAIN,
+            session.endedAt,
+            session.reason,
           );
           this.logger.warn(
-            `Flushed in-flight recording for chat ${session.chatId} on shutdown`,
+            `Ended in-flight recording for chat ${session.chatId} on shutdown`,
           );
         } catch (error) {
           this.logger.error(
-            `Failed to flush recording for chat ${session.chatId} on shutdown: ${
+            `Failed to end recording for chat ${session.chatId} on shutdown: ${
               error instanceof Error ? error.message : String(error)
             }`,
           );
         }
+      }
+      // endChat only ENDS the chat: the audio is flushed and handed to
+      // transcription by the async CHAT_ENDED listener. Wait for that here —
+      // Nest kills the process as soon as the shutdown hooks return, which
+      // used to drop every live recording's audio on a deploy.
+      const chatIds = inFlight.map((s) => s.chatId);
+      const notFinalized =
+        await this.streamFileProcessorService.waitForFinalized(
+          chatIds,
+          Math.max(0, drainDeadline - Date.now()),
+        );
+      if (notFinalized.length > 0) {
+        this.logger.error(
+          `Shutdown: audio for chat(s) ${notFinalized.join(', ')} not handed ` +
+            `off before the drain timeout; those recordings may be lost`,
+        );
+      } else {
+        // Finished, not necessarily succeeded: a failed finalize marks that
+        // chat's summary FAILED with the reason (logged above).
+        this.logger.warn(
+          `Shutdown: finalize finished for ${chatIds.length} recording(s) ` +
+            `(sent for transcription, or marked failed with the reason)`,
+        );
       }
     })();
 
@@ -282,46 +360,20 @@ export class MicrophoneChatGateway
     // fails with "Chat is not active", which reads in the audit trail as a
     // failure to end a call that was in fact ended cleanly.
     delete this.sessions[clientId];
-    // only chat will be ended if valid chatId is provided
-    // this will be triggered only from the platform where the chat is started
+    // A recording in progress is not ended on the spot: the client may be
+    // reconnecting (see pendingEnds). It is ended after the grace period unless
+    // audio for it arrives again, or right away when the grace period is 0.
     if (
       session.chatId !== undefined &&
       session.chatId !== null &&
-      session.chatId !== PLACEHOLDER_CHAT_ID
+      session.chatId !== PLACEHOLDER_CHAT_ID &&
+      !this.isHeldByLiveSession(session.chatId)
     ) {
-      const { tenantId, userId, chatId, provider } = session;
-      try {
-        await this.chatService.endChat(
-          session.chatId,
-          undefined,
-          StreamEndReason.CLIENT_DISCONNECT,
-        );
-        this.auditLogger.log({
-          eventType: AUDIT_EVENTS.CALL_ENDED,
-          tenantId,
-          userId,
-          details: {
-            chatId,
-            provider,
-            reason: 'Client disconnected',
-          },
-        });
-      } catch (error) {
-        this.logger.error(
-          `Failed to end chat for client ${clientId} | session chatId: ${session.chatId} | error: ${error.message}`,
-        );
-        this.auditLogger.log({
-          eventType: AUDIT_EVENTS.CALL_END_FAILED,
-          tenantId,
-          userId,
-          details: {
-            chatId,
-            reason: error.message,
-            clientId,
-            provider,
-          },
-        });
-      }
+      await this.scheduleEnd(
+        session,
+        StreamEndReason.CLIENT_DISCONNECT,
+        clientId,
+      );
     }
     // Broadcast disconnection
     this.broadcastMessageService.broadcastUserDisconnectedMessage(
@@ -458,6 +510,10 @@ export class MicrophoneChatGateway
       return;
     }
 
+    // A previous recording of theirs still waiting out its reconnect grace
+    // period would otherwise block this start as "already has an active chat".
+    await this.endPendingForUser(session.userId);
+
     const activeChat = await this.chatService.getChatsByCouncilorId(
       session.userId,
       { status: ChatStatus.ACTIVE },
@@ -575,9 +631,38 @@ export class MicrophoneChatGateway
       });
       return;
     }
+    const pending = this.pendingEnds.get(chatId);
+    if (pending) {
+      // Only the counsellor whose recording it is may resume it.
+      if (chat.counselorId !== this.sessions[client.id].userId) {
+        this.logger.error(
+          `Audio for chat ${chatId} in its reconnect grace period came from user ` +
+            `${this.sessions[client.id].userId}, not its counsellor; ignored`,
+        );
+        return;
+      }
+      clearTimeout(pending.timer);
+      this.pendingEnds.delete(chatId);
+      this.logger.info(
+        `Recording resumed for chat ${chatId} on socket ${client.id}, ` +
+          `${Math.round((Date.now() - pending.disconnectedAt) / 1000)}s after its socket dropped`,
+      );
+      this.auditLogger.log({
+        eventType: AUDIT_EVENTS.CALL_RESUMED,
+        tenantId: this.sessions[client.id].tenantId,
+        userId: this.sessions[client.id].userId,
+        details: {
+          chatId,
+          clientId: client.id,
+          previousClientId: pending.clientId,
+          gapMs: Date.now() - pending.disconnectedAt,
+        },
+      });
+    }
     this.sessions[client.id] = {
       ...this.sessions[client.id],
       chatId,
+      lastAudioAt: Date.now(),
     };
     const session = this.sessions[client.id];
     const isChatEnded = await this.chatService.isChatEnded(chatId);
@@ -616,6 +701,153 @@ export class MicrophoneChatGateway
         );
       },
     );
+  }
+
+  /** Whether a live socket's session is currently recording this chat. */
+  private isHeldByLiveSession(chatId: number): boolean {
+    const live = this.server?.sockets?.sockets;
+    return Object.entries(this.sessions).some(
+      ([sid, s]) => s?.chatId === chatId && (!live || live.has(sid)),
+    );
+  }
+
+  /**
+   * End a recording whose socket is gone — after the reconnect grace period,
+   * or now when the grace period is 0. Replaces any earlier timer for the chat.
+   */
+  private async scheduleEnd(
+    session: UserChatSessionData,
+    reason: StreamEndReason,
+    clientId: string,
+  ): Promise<void> {
+    const chatId = session.chatId;
+    const existing = this.pendingEnds.get(chatId);
+    if (existing) clearTimeout(existing.timer);
+    this.pendingEnds.delete(chatId);
+
+    // The counsellor ended it (End, then the socket closes): a normal end,
+    // nothing to hold or finalize.
+    try {
+      if (await this.chatService.isChatEnded(chatId)) return;
+    } catch {
+      // Unknown: fall through and treat it as a drop; finalizeEnd re-checks.
+    }
+
+    // The recording's end is when its audio stopped, not when the grace period
+    // ran out: ending it at "now" counted the whole grace period as call time.
+    const disconnectedAt = Date.now();
+    const audioEndedAt = session.lastAudioAt ?? disconnectedAt;
+    const graceMs = MicrophoneChatGateway.reconnectGraceMs();
+    if (graceMs <= 0) {
+      this.pendingEnds.delete(chatId);
+      await this.finalizeEnd(
+        chatId,
+        session.userId,
+        session.tenantId,
+        reason,
+        clientId,
+        session.provider,
+        new Date(audioEndedAt),
+      );
+      return;
+    }
+    const timer = setTimeout(() => {
+      this.pendingEnds.delete(chatId);
+      void this.finalizeEnd(
+        chatId,
+        session.userId,
+        session.tenantId,
+        reason,
+        clientId,
+        session.provider,
+        new Date(audioEndedAt),
+      );
+    }, graceMs);
+    if (typeof timer.unref === 'function') timer.unref();
+    this.pendingEnds.set(chatId, {
+      timer,
+      userId: session.userId,
+      tenantId: session.tenantId,
+      provider: session.provider,
+      reason,
+      clientId,
+      disconnectedAt,
+      audioEndedAt,
+    });
+    this.logger.warn(
+      `Socket ${clientId} for chat ${chatId} dropped (${reason}); holding the ` +
+        `recording ${Math.round(graceMs / 1000)}s for the client to reconnect`,
+    );
+  }
+
+  /** End now any of this counsellor's recordings still in their grace period. */
+  private async endPendingForUser(userId: number): Promise<void> {
+    for (const [chatId, pending] of [...this.pendingEnds]) {
+      if (pending.userId !== userId) continue;
+      clearTimeout(pending.timer);
+      this.pendingEnds.delete(chatId);
+      await this.finalizeEnd(
+        chatId,
+        pending.userId,
+        pending.tenantId,
+        pending.reason,
+        pending.clientId,
+        pending.provider,
+        new Date(pending.audioEndedAt),
+      );
+    }
+  }
+
+  /** The end a disconnect used to trigger immediately; unchanged. */
+  private async finalizeEnd(
+    chatId: number,
+    userId: number | undefined,
+    tenantId: string | undefined,
+    reason: StreamEndReason,
+    clientId: string,
+    provider?: AudioChatProvider,
+    endedAt?: Date,
+  ): Promise<void> {
+    ExecutionManager.setAuthContext(
+      userId ? String(userId) : '',
+      tenantId as string,
+    );
+    try {
+      // Ended some other way meanwhile (the counsellor pressed End after
+      // reconnecting): nothing to do, and not a failure.
+      if (await this.chatService.isChatEnded(chatId)) return;
+      await this.chatService.endChat(chatId, endedAt, reason);
+      this.auditLogger.log({
+        eventType: AUDIT_EVENTS.CALL_ENDED,
+        tenantId,
+        userId,
+        details: {
+          chatId,
+          provider,
+          reason:
+            reason === StreamEndReason.JANITOR_ORPHAN
+              ? 'Socket gone without a disconnect event'
+              : 'Client disconnected',
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to end chat ${chatId} after its socket ${clientId} dropped: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      this.auditLogger.log({
+        eventType: AUDIT_EVENTS.CALL_END_FAILED,
+        tenantId,
+        userId,
+        details: {
+          chatId,
+          reason: error instanceof Error ? error.message : String(error),
+          clientId,
+          provider,
+        },
+      });
+    }
   }
 
   setAuthContext(session: UserChatSessionData) {

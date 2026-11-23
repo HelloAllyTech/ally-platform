@@ -35,6 +35,7 @@ jest.mock('typeorm', () => {
 
 import {
   MIGRATION_LOCK_KEY,
+  migrationsOnBootEnabled,
   runMigrationsExclusively,
 } from '../migration-runner';
 
@@ -96,5 +97,23 @@ describe('runMigrationsExclusively', () => {
   it('returns nothing when another runner already applied everything', async () => {
     runMigrationsImpl = async () => [];
     expect(await runMigrationsExclusively(options, quiet)).toEqual([]);
+  });
+});
+
+describe('migrationsOnBootEnabled', () => {
+  it('is on when the variable is unset, so local and test boots still migrate', () => {
+    expect(migrationsOnBootEnabled({})).toBe(true);
+  });
+
+  it.each(['false', 'FALSE', ' false '])('is off for %p', (value) => {
+    expect(migrationsOnBootEnabled({ DB_MIGRATIONS_ON_BOOT: value })).toBe(
+      false,
+    );
+  });
+
+  it.each(['true', '', '0'])('stays on for %p', (value) => {
+    expect(migrationsOnBootEnabled({ DB_MIGRATIONS_ON_BOOT: value })).toBe(
+      true,
+    );
   });
 });

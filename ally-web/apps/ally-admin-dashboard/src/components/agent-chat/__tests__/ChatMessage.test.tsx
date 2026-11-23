@@ -201,3 +201,15 @@ describe("agent-chat ChatMessage", () => {
     ).toBeInTheDocument();
   });
 });
+
+describe("ChatMessage — thinking", () => {
+  it("shows a small inline Thinking line, not an empty box, before any text arrives", () => {
+    render(
+      <ChatMessage
+        message={{ id: "m", role: "assistant", content: "", isStreaming: true } as never}
+        onAnswerQuestion={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId("agent-thinking")).toBeInTheDocument();
+  });
+});

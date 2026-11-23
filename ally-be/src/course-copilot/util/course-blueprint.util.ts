@@ -6,7 +6,11 @@ import {
   TRACK_MAX_COMPETENCIES,
 } from 'src/track/constants/track.constant';
 import { TrackGameKey } from 'src/track/type/game.type';
-import { TrackItemType, VideoSource } from 'src/track/type/track.type';
+import {
+  TrackItemCompletionLogic,
+  TrackItemType,
+  VideoSource,
+} from 'src/track/type/track.type';
 import {
   COURSE_COPILOT_DEFAULT_ITEM_MINUTES,
   COURSE_COPILOT_LIMITS,
@@ -45,7 +49,7 @@ export const COURSE_BLUEPRINT_ITEM_TYPE_LABELS: Record<TrackItemType, string> =
     [TrackItemType.JOURNAL]: 'Journal',
     [TrackItemType.ANNOTATED_ARTIFACT]: 'Annotated transcript',
     [TrackItemType.GAME]: 'Game',
-    [TrackItemType.BRANCHING_SCENARIO]: 'Branching scenario',
+    [TrackItemType.BRANCHING_SCENARIO]: 'Scenario quiz',
     [TrackItemType.BUCKET_SORT]: 'Bucket sort',
   };
 
@@ -126,6 +130,11 @@ const TYPE_ALIASES: Record<string, TrackItemType> = {
   TRANSCRIPT: TrackItemType.ANNOTATED_ARTIFACT,
   READING: TrackItemType.ARTICLE,
   REFLECTION: TrackItemType.JOURNAL,
+  SCENARIO_QUIZ: TrackItemType.BRANCHING_SCENARIO,
+  BRANCHING: TrackItemType.BRANCHING_SCENARIO,
+  SJT: TrackItemType.BRANCHING_SCENARIO,
+  SORT: TrackItemType.BUCKET_SORT,
+  SORTING: TrackItemType.BUCKET_SORT,
 };
 
 // ── Small coercions (kept local: this file must stay importable on its own) ──
@@ -551,6 +560,12 @@ function estimateMinutes(
  * slot, then — for the capstone, when the brief's assessment is a roleplay —
  * the assessment threshold, then 60. 0 is a real value ("no gate"), so every
  * fallback is `??`, never `||`.
+ *
+ * Roleplay completionLogic: kept when the planner gave a valid one, else
+ * SCORE_AND_DURATION — the rule a roleplay item has when nothing says
+ * otherwise. Keys the logic never reads are dropped (no minScore under
+ * DURATION, no minDurationSeconds under SCORE, neither under PARTICIPATION),
+ * so the blueprint shows only the rule that applies.
  */
 function applyCompletionDefaults(
   items: CourseBlueprintItem[],
@@ -578,15 +593,25 @@ function applyCompletionDefaults(
     switch (item.type) {
       case TrackItemType.ROLEPLAY: {
         const minDuration = num(given.minDurationSeconds);
-        criteria = {
-          minScore:
+        const completionLogic = blueprintCompletionLogic(given.completionLogic);
+        criteria = { completionLogic };
+        if (
+          completionLogic === TrackItemCompletionLogic.SCORE ||
+          completionLogic === TrackItemCompletionLogic.SCORE_AND_DURATION
+        ) {
+          criteria.minScore =
             score(given.minScore) ??
             score(item.spec.minScore) ??
             practiceSlotMinScore(item, brief) ??
             capstoneThreshold(item) ??
-            COURSE_COPILOT_DEFAULT_ROLEPLAY_MIN_SCORE,
-        };
-        if (minDuration !== undefined && minDuration >= 0) {
+            COURSE_COPILOT_DEFAULT_ROLEPLAY_MIN_SCORE;
+        }
+        if (
+          (completionLogic === TrackItemCompletionLogic.DURATION ||
+            completionLogic === TrackItemCompletionLogic.SCORE_AND_DURATION) &&
+          minDuration !== undefined &&
+          minDuration >= 0
+        ) {
           criteria.minDurationSeconds = Math.round(minDuration);
         }
         break;
@@ -612,6 +637,12 @@ function applyCompletionDefaults(
             TRACK_DEFAULT_ANNOTATION_PASS_SCORE,
         };
         break;
+      case TrackItemType.BRANCHING_SCENARIO:
+        // 0 = explore: the manual's default. A positive mark gates the item.
+        criteria = {
+          passScore: score(given.passScore) ?? 0,
+        };
+        break;
       case TrackItemType.VIDEO:
         criteria = {
           watchPct: score(given.watchPct) ?? TRACK_DEFAULT_VIDEO_WATCH_PCT,
@@ -626,12 +657,20 @@ function applyCompletionDefaults(
         break;
       }
       default:
-        // JOURNAL has no rule; GAME never gates (see game.type.ts).
+        // JOURNAL has no rule; GAME and BUCKET_SORT never gate (see
+        // game.type.ts, bucket-sort.type.ts).
         criteria = undefined;
     }
     if (criteria) item.completionCriteria = criteria;
     else delete item.completionCriteria;
   }
+}
+
+function blueprintCompletionLogic(raw: unknown): TrackItemCompletionLogic {
+  const value = typeof raw === 'string' ? raw.trim().toUpperCase() : '';
+  return (Object.values(TrackItemCompletionLogic) as string[]).includes(value)
+    ? (value as TrackItemCompletionLogic)
+    : TrackItemCompletionLogic.SCORE_AND_DURATION;
 }
 
 function practiceSlotMinScore(

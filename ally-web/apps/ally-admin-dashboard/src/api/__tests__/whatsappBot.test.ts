@@ -33,39 +33,39 @@ describe("whatsappBot API tag registration", () => {
 });
 
 /**
- * `@carbon/charts` must be reachable only through the lazy `UsageDashboard` boundary.
+ * The chart library (`@carbon/charts`, or the themed `@components/charts`) stays out of AI
+ * Chatbots' pages.
  *
- * The WhatsApp route loads eagerly — six of its seven tabs are light forms and tables — so the chart
- * library is code-split at the SUB-TAB. One stray top-level chart import in a sibling tab silently
- * pulls the whole library back into the eager bundle, and nothing about the page looks or behaves
- * differently, so nobody notices. This is that regression test.
+ * The AI Chatbots route loads eagerly, so one top-level chart import in any of its files pulls the
+ * whole chart library into the eager bundle, and nothing about the page looks or behaves
+ * differently, so nobody notices. The classic usage tab was its only user, behind a lazy boundary;
+ * since CL1, All numbers on the Overview draws plain bars and nothing here imports it. This is that
+ * regression test.
  */
-describe("WhatsApp bot chart bundle split", () => {
-  const chartImporters = Object.entries(
-    import.meta.glob("../../pages/WhatsAppBot/*.tsx", {
+describe("AI Chatbots stay free of the chart library", () => {
+  const sources = {
+    ...(import.meta.glob("../../pages/WhatsAppBot/*.tsx", {
       query: "?raw",
       import: "default",
       eager: true,
-    }) as Record<string, string>,
-  )
-    // Charts arrive through the themed wrapper (`@components/charts`) or Carbon directly; either
-    // one pulls the chart library in.
-    .filter(([, source]) => /from "(@carbon\/charts|@components\/charts)/.test(source))
-    .map(([path]) => path.split("/").pop());
+    }) as Record<string, string>),
+    ...(import.meta.glob("../../pages/AssistantHome/**/*.tsx", {
+      query: "?raw",
+      import: "default",
+      eager: true,
+    }) as Record<string, string>),
+  };
 
-  it("finds the WhatsAppBot sources (guards against the glob silently matching nothing)", () => {
-    expect(
-      Object.keys(
-        import.meta.glob("../../pages/WhatsAppBot/*.tsx", {
-          query: "?raw",
-          import: "default",
-          eager: true,
-        }),
-      ).length,
-    ).toBeGreaterThan(5);
+  it("finds the sources (guards against the glob silently matching nothing)", () => {
+    expect(Object.keys(sources).length).toBeGreaterThan(20);
   });
 
-  it("is imported by UsageDashboard.tsx and nothing else", () => {
-    expect(chartImporters).toEqual(["UsageDashboard.tsx"]);
+  it("imports the chart library nowhere", () => {
+    const chartImporters = Object.entries(sources)
+      // Charts arrive through the themed wrapper (`@components/charts`) or Carbon directly; either
+      // one pulls the chart library in.
+      .filter(([, source]) => /from "(@carbon\/charts|@components\/charts)/.test(source))
+      .map(([path]) => path);
+    expect(chartImporters).toEqual([]);
   });
 });

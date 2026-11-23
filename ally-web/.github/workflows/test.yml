@@ -131,6 +131,11 @@ jobs:
       - name: Colour literals
         run: npm run lint:colors
 
+      # The website widget's loader (chunk 13) runs on every page of an owner's site: it must stay
+      # under 10 KB gzipped. Builds only the loader, so this is quick.
+      - name: Widget size
+        run: npm run build:widget && node scripts/check-widget-size.mjs
+
   # NOT report-only, unlike the lint job above: the debt was 11 errors total
   # (10 admin, 1 helpline, 0 ui-shared) and this PR clears all of them, so there
   # is nothing to grandfather. Required alongside "Vitest" since 2026-09-21.

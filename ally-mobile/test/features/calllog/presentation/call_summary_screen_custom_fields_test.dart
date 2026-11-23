@@ -123,12 +123,9 @@ void main() {
       await tester.enterText(referralField, 'Walk-in');
       await tester.pumpAndSettle();
 
-      // Custom fields save exclusively through the section's own
-      // tick/checkmark — RN's global Save button never touches them
-      // (`CallSummaryDetails.tsx`'s `onSubmitButtonPress` is built-in-field
-      // `handleSubmit()` only; only `SectionWrapper`'s `onTickPress` also
-      // calls `handleCustomFieldSave`).
-      expect(find.byType(AppButton), findsNothing, reason: 'no built-in field is dirty');
+      // Scribe v2: a dirty custom field alone shows the global Save button
+      // (it now saves custom fields too). The section tick still saves them.
+      expect(find.byType(AppButton), findsOneWidget, reason: 'a custom field is dirty');
       // Invoke onPressed directly rather than a pixel-coordinate tap — like
       // this file's sibling test, focusing the text field above scrolled
       // the list to keep it visible, which can carry the tick button
@@ -150,6 +147,68 @@ void main() {
       // The tick exits edit mode — fields show as plain text again.
       expect(find.byKey(const ValueKey('cf-referral')), findsNothing);
       expect(find.text('Walk-in'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'custom fields: the global Save persists a picked value without the section tick',
+    (tester) async {
+      // The reported bug: a counsellor picked Ongoing Risk → Running Away,
+      // pressed the bottom Save (not the section tick), and the value was
+      // never sent — reopening the note showed it blank.
+      final repository = MockCallLogRepository();
+      final customFieldsRepository = MockCustomFieldsRepository();
+      final summary = CallSummaryDetails(counselorId: 7, fields: {'callId': 1001});
+
+      when(() => repository.getCallSummary(1001)).thenAnswer((_) async => summary);
+      when(() => repository.getChatMessages(1001)).thenAnswer((_) async => []);
+      when(() => customFieldsRepository.getDefinitions()).thenAnswer(
+        (_) async => [
+          const CustomFieldDefinition(
+            id: 'cf-referral',
+            name: 'Referral Source',
+            fieldType: CustomFieldType.text,
+            sectionKey: 'featuresAndDemographics',
+            editPermission: CustomFieldEditPermission.both,
+          ),
+        ],
+      );
+      when(() => customFieldsRepository.getValues(1001)).thenAnswer(
+        (_) async => const [CustomFieldValue(fieldDefinitionId: 'cf-referral', value: 'Phone')],
+      );
+      when(() => customFieldsRepository.upsertValues(1001, any())).thenAnswer((_) async {});
+
+      await pumpApp(
+        tester,
+        CallSummaryScreen(log: _log),
+        overrides: [
+          callLogRepositoryProvider.overrideWithValue(repository),
+          customFieldsRepositoryProvider.overrideWithValue(customFieldsRepository),
+          customFieldsEnabledProvider.overrideWith((ref) async => true),
+          summaryVisibleFieldsProvider.overrideWith((ref) async => [for (final f in summaryFieldDefs) f.key]),
+          userPermissionsProvider.overrideWith((ref) async => const <String>[]),
+          currentUserProvider.overrideWith((ref) async => _user(7)),
+        ],
+      );
+
+      // Bundled translations load once per file; a later test may see raw keys.
+      final header = find.text('Features & Demographics').evaluate().isNotEmpty
+          ? find.text('Features & Demographics')
+          : find.text('summary.sections.featuresAndDemographics');
+      await tester.tap(header);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('section-edit-featuresAndDemographics')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const ValueKey('cf-referral')), 'Walk-in');
+      await tester.pumpAndSettle();
+
+      final save = tester.widget<AppButton>(find.byType(AppButton));
+      save.onPressed!();
+      await tester.pumpAndSettle();
+
+      final captured = verify(() => customFieldsRepository.upsertValues(1001, captureAny())).captured.single
+          as List<({String fieldDefinitionId, String? value})>;
+      expect(captured, [(fieldDefinitionId: 'cf-referral', value: 'Walk-in')]);
     },
   );
 

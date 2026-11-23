@@ -229,7 +229,12 @@ describe('CourseCopilotOrchestratorService', () => {
           call('q1', 'ask_trainer', {
             message: "I've noted that the course is for volunteers.",
             prompt: 'How long should it take?',
-            kind: 'freeText',
+            // Course Pilot: questions are choices.
+            kind: 'singleSelect',
+            options: [
+              { id: '15', label: '15 minutes' },
+              { id: '20', label: '20 minutes', recommended: true },
+            ],
           }),
         ]),
       ];

@@ -6,7 +6,7 @@ import {
 
 /**
  * The "agent runtime degraded" alert fires at most once per bot and reason every 10 minutes, and
- * says how many messages fell back since the last one — so throttling hides the noise, not the count.
+ * says how many runs failed since the last one — so throttling hides the noise, not the count.
  */
 describe('AgentRuntimeAlertThrottle', () => {
   const BOT = { id: 'bot-1', name: 'Ally FAQ' };
@@ -19,13 +19,13 @@ describe('AgentRuntimeAlertThrottle', () => {
     throttle = new AgentRuntimeAlertThrottle({ emit } as never);
   });
 
-  it('sends the first fallback, then nothing for the same bot and reason inside the window', () => {
+  it('sends the first failed-run alert, then nothing for the same bot and reason inside the window', () => {
     const first = throttle.take(BOT, 'upstream_404', T0);
     expect(first).toMatchObject({
       type: AGENT_RUNTIME_DEGRADED_TYPE,
       path: 'chatbot/agent-runtime-degraded',
     });
-    expect(first?.message).toContain('1 message fell back to v1');
+    expect(first?.message).toContain('1 message got it');
     expect(first?.message).toContain('"Ally FAQ"');
     expect(first?.message).toContain('upstream_404');
 
@@ -46,7 +46,7 @@ describe('AgentRuntimeAlertThrottle', () => {
     ).not.toBeNull();
   });
 
-  it('sends again after the window, counting every message that fell back since', () => {
+  it('sends again after the window, counting every message whose run failed since', () => {
     throttle.take(BOT, 'upstream_404', T0);
     throttle.take(BOT, 'upstream_404', T0 + 1_000);
     throttle.take(BOT, 'upstream_404', T0 + 2_000);
@@ -58,7 +58,7 @@ describe('AgentRuntimeAlertThrottle', () => {
       T0 + AGENT_RUNTIME_ALERT_WINDOW_MS + 1,
     );
     // The three suppressed ones plus this one.
-    expect(next?.message).toContain('4 messages fell back to v1');
+    expect(next?.message).toContain('4 messages got it');
   });
 
   it('resets the count after each alert', () => {
@@ -70,7 +70,7 @@ describe('AgentRuntimeAlertThrottle', () => {
       'upstream_404',
       T0 + 2 * AGENT_RUNTIME_ALERT_WINDOW_MS + 2,
     );
-    expect(third?.message).toContain('1 message fell back to v1');
+    expect(third?.message).toContain('1 message got it');
   });
 
   it('emits through the exception path when a fallback is announced', () => {

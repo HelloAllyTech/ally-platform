@@ -1,3 +1,4 @@
+import { PlatformAdminOnly } from 'src/auth/decorators/platform-admin-only.decorator';
 import {
   Body,
   Controller,
@@ -22,6 +23,7 @@ import { FeatureToggleKey } from '../../authorization/constants/admin-feature-to
 import { PERMISSIONS } from '../../authorization/constants/permissions.constants';
 import { BindConnectorDto } from '../dto/chatbot.dto';
 import { ConnectorService } from '../service/connector.service';
+import { AssistantScope } from '../access/chatbot-role.decorator';
 
 const VIEW = { permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT] };
 const EDIT = { permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT] };
@@ -39,6 +41,8 @@ export class ConnectorController {
   constructor(private readonly connectors: ConnectorService) {}
 
   @Get('types')
+  @AssistantScope('platform')
+  @PlatformAdminOnly()
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   @ApiOperation({ summary: 'The kinds of connector this deployment supports' })
   types() {
@@ -46,6 +50,7 @@ export class ConnectorController {
   }
 
   @Get()
+  @AssistantScope('list')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   @ApiQuery({ name: 'chatbotId', required: false })
   @ApiOperation({
@@ -57,12 +62,14 @@ export class ConnectorController {
   }
 
   @Get(':id')
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
   get(@Param('id', ParseUUIDPipe) id: string) {
     return this.connectors.get(id);
   }
 
   @Patch(':id/chatbot')
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary: 'Move a connector to a bot, or free it (chatbotId null)',
@@ -75,6 +82,7 @@ export class ConnectorController {
 
   @Delete(':id')
   @HttpCode(204)
+  @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({ summary: 'Disconnect: the type wipes its credentials' })
   async disconnect(@Param('id', ParseUUIDPipe) id: string) {

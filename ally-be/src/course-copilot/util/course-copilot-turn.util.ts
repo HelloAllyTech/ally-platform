@@ -1,4 +1,6 @@
 import { ValidatedEndingVocabulary } from 'src/llm-agent/runtime/agent-turn-tools.util';
+import { AgentReplyProblem } from 'src/llm-agent/runtime/agent-turn.types';
+import { COURSE_COPILOT_QUESTION_LIMITS } from '../constants/course-copilot.constants';
 import {
   AgentReceiptCall,
   AgentReceiptVocabulary,
@@ -41,6 +43,11 @@ export const COURSE_COPILOT_LOOKUP_TOOLS = new Set([
   'get_trigger_warnings',
   'list_cover_images',
   'search_library',
+  'list_learner_profiles',
+  'get_learner_profile',
+  'list_example_courses',
+  'get_example_course',
+  'get_learner_results',
   'design_guidance_search',
   'design_guidance_get',
   'get_course_outline',
@@ -180,7 +187,10 @@ const BRIEF_LABELS: Record<string, string> = {
   outcomes: 'outcomes',
   competencyIds: 'competencies',
   competencyNames: 'competencies',
+  learnerProfileId: 'learner profile',
   behaviours: 'behaviours',
+  skillTargets: 'skill targets',
+  rubric: 'rubric',
   assessment: 'assessment',
   shape: 'shape',
   practice: 'practice',
@@ -207,6 +217,8 @@ export function describeCourseCopilotChanges(input: {
   after: CourseCopilotTurnSnapshot;
   coursePatches: string[];
   queued: string[];
+  /** What the planner had, appended to the blueprint line ("planned with example course …"). */
+  blueprintPlanning?: string | null;
 }): string[] {
   const { before, after } = input;
   const lines: string[] = [];
@@ -226,10 +238,13 @@ export function describeCourseCopilotChanges(input: {
   const wasVersion = before.blueprintVersion ?? null;
   const nowVersion = after.blueprintVersion ?? null;
   if (nowVersion !== wasVersion && nowVersion !== null) {
+    const planning = input.blueprintPlanning
+      ? ` · ${input.blueprintPlanning}`
+      : '';
     lines.push(
-      wasVersion === null || wasVersion === 0
+      (wasVersion === null || wasVersion === 0
         ? `Blueprint drafted (v${nowVersion})`
-        : `Blueprint v${wasVersion} → v${nowVersion}`,
+        : `Blueprint v${wasVersion} → v${nowVersion}`) + planning,
     );
   }
 
@@ -263,4 +278,72 @@ export function claimsBriefReady(text: string | null | undefined): boolean {
   if (!match) return false;
   const before = value.slice(Math.max(0, match.index - 30), match.index);
   return !NOT_A_CLAIM.test(before);
+}
+
+/**
+ * What a free-text question may ask for: something only the trainer can type (a link, a name,
+ * a number, their own wording). Everything else is a choice.
+ */
+const FREE_TEXT_ALLOWED =
+  /\b(link|url|youtube|video|name|title|number|how many|email|phone|wording|paste|type)\b/i;
+
+/**
+ * Course Pilot's choice-only steps, checked on the question a turn ends with (ask_trainer)
+ * before the trainer sees it. Each problem sends the question back once; a second attempt goes
+ * out whatever it looks like, so a stubborn model can never stall the interview.
+ */
+export function courseCopilotQuestionProblems(ending: {
+  name: string;
+  input: Record<string, any>;
+  message: string;
+}): AgentReplyProblem[] {
+  if (ending.name !== 'ask_trainer') return [];
+  const limits = COURSE_COPILOT_QUESTION_LIMITS;
+  const input = ending.input ?? {};
+  const prompt = String(input.prompt ?? '').trim();
+  const kind = String(input.kind ?? 'freeText');
+  const options = Array.isArray(input.options) ? input.options : [];
+  const problems: AgentReplyProblem[] = [];
+
+  if (
+    (kind === 'freeText' || options.length < limits.minOptions) &&
+    !FREE_TEXT_ALLOWED.test(prompt)
+  ) {
+    problems.push({
+      key: 'choice_only',
+      toModel:
+        `Ask this as a choice: kind "singleSelect" (or "multiSelect") with ${limits.minOptions}-` +
+        `${limits.maxOptions} short options and one recommended. The trainer can still type ` +
+        'their own answer. Free text is only for a link, a name, a number or their own wording.',
+      toUser:
+        'Course Copilot asked an open question where a choice would have been quicker.',
+    });
+  }
+  if (options.length > limits.maxOptions) {
+    problems.push({
+      key: 'too_many_options',
+      toModel: `Offer at most ${limits.maxOptions} options — keep the ${limits.maxOptions} that matter most.`,
+      toUser: 'Course Copilot offered more options than fit on one screen.',
+    });
+  }
+  if (prompt.length > limits.promptChars) {
+    problems.push({
+      key: 'question_too_long',
+      toModel:
+        `The question is ${prompt.length} characters; keep it under ${limits.promptChars}. ` +
+        'Ask one thing, plainly. Put any reason in the rationale, in one sentence.',
+      toUser: 'Course Copilot asked a long question.',
+    });
+  }
+  const message = String(ending.message ?? '').trim();
+  if (message && message !== prompt && message.length > limits.replyChars) {
+    problems.push({
+      key: 'reply_too_long',
+      toModel:
+        `Your message above the question is ${message.length} characters. Say at most one short ` +
+        "sentence, or nothing — don't describe what you looked up or which brief fields are empty.",
+      toUser: 'Course Copilot wrote more than it needed above its question.',
+    });
+  }
+  return problems;
 }

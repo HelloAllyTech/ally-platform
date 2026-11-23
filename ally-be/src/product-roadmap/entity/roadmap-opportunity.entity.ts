@@ -12,6 +12,7 @@ import {
   RoadmapOpportunitySource,
   RoadmapOpportunityStage,
   RoadmapOpportunityType,
+  RoadmapReviewState,
 } from '../enum/roadmap-opportunity.enum';
 import {
   RoadmapFilingInterviewMessage,
@@ -52,6 +53,9 @@ export interface RoadmapReferenceImage {
   where: '"deletedAt" IS NULL',
 })
 @Index('idx_roadmap_opps_source', ['source'], { where: '"deletedAt" IS NULL' })
+@Index('idx_roadmap_opps_plan_stage', ['planStage'], {
+  where: '"planStage" IS NOT NULL AND "deletedAt" IS NULL',
+})
 export class RoadmapOpportunity extends BaseWithoutTenantEntity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -211,6 +215,17 @@ export class RoadmapOpportunity extends BaseWithoutTenantEntity {
   builderSessionId?: string | null;
 
   /**
+   * The plan's stage, mirrored from its session by PlanStageService (the only
+   * writer) for the board's progress bar and the Needs a lead queue. Null when
+   * the opportunity has no plan. Never gates behaviour: that reads the facts.
+   */
+  @Column({ type: 'varchar', length: 16, nullable: true })
+  planStage?: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  planStageAt?: Date | null;
+
+  /**
    * Stamped only when the stage TRANSITIONS into RELEASED, and never re-stamped on a later
    * edit. Split copies it to new parts rather than regenerating. Note a large share of
    * migrated rows have stage=released with releasedAt NULL, because the source trigger also
@@ -247,6 +262,56 @@ export class RoadmapOpportunity extends BaseWithoutTenantEntity {
    */
   @Column({ type: 'varchar', length: 3, nullable: true })
   effort?: RoadmapOpportunityEffort | null;
+
+  /**
+   * The Prod Director's priority flag. Feeds the composite rank through roadmap_rank_weights.
+   * starWeight. NEVER serialised to anyone but the director — see toResponseList.
+   */
+  @Column({ type: 'boolean', default: false })
+  directorStarred!: boolean;
+
+  /**
+   * Who starred it (D16: any Owner can star, and the star shows who gave it). Backfilled from
+   * the Prod Director for every existing star, and kept in step with `directorStarred` by the
+   * director-star route until cutover. The rank still reads `directorStarred`.
+   */
+  @Column({ type: 'int', nullable: true })
+  starredByUserId?: number | null;
+
+  /**
+   * The Owner's review (D10). Explicit `varchar` because a nullable enum union reflects as
+   * `Object` and fails TypeORM boot. See RoadmapReviewState for what NULL means.
+   */
+  @Column({ type: 'varchar', length: 10, nullable: true })
+  reviewState?: RoadmapReviewState | null;
+
+  @Column({ type: 'int', nullable: true })
+  reviewedBy?: number | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  reviewedAt?: Date | null;
+
+  /**
+   * Why it was declined, in one line. Shown to the AUTHOR ONLY (D10, [FP-0992]); everyone
+   * else sees "Declined". Never put it on a shared response or a broadcast.
+   */
+  @Column({ type: 'text', nullable: true })
+  declineReason?: string | null;
+
+  /**
+   * The Owner kept this idea when the old-and-quiet sweep pulled it up for review (To do, idea-to-
+   * plan audit rec 9), so the sweep does not offer it again. Set only by an Owner's click; the
+   * sweep itself never changes an idea.
+   */
+  @Column({ type: 'timestamptz', nullable: true })
+  sweepKeptAt?: Date | null;
+
+  @Column({ type: 'int', nullable: true })
+  sweepKeptBy?: number | null;
+
+  /** Filed with "Fill it in yourself" rather than the copilot's check (§5.7b); shown in triage. */
+  @Column({ type: 'boolean', default: false })
+  selfChecked!: boolean;
 
   /**
    * Manual rank WITHIN a lane, ascending. Not globally meaningful — two cards in different

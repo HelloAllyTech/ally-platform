@@ -8,6 +8,7 @@ import {
   BuilderHistorySurface,
 } from '../entity/builder-history.entity';
 import { BuilderSessionRepository } from '../repository/builder-session.repository';
+import { BuilderSessionVisibility } from '../enum/builder.enum';
 import {
   BuilderDecision,
   parseDecisionId,
@@ -277,6 +278,16 @@ export class BuilderHistoryService {
     } else if (query.who === 'rule') {
       builder.andWhere('h.surface = :rule', { rule: 'rule' });
     }
+    // Decisions made inside a private (unfiled) plan stay its author's: the
+    // shared History never shows them to anyone else. Rows with no session
+    // (rules) are unaffected.
+    builder.andWhere(
+      `(h.sessionId IS NULL OR NOT EXISTS (
+        SELECT 1 FROM builder_sessions s
+        WHERE s.id = h.sessionId AND s.visibility = :privateVisibility
+          AND s."createdBy" <> :viewerId))`,
+      { privateVisibility: BuilderSessionVisibility.PRIVATE, viewerId: userId },
+    );
     if (query.before) {
       const before = new Date(query.before);
       if (!Number.isNaN(before.getTime())) {
