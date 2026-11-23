@@ -48,6 +48,28 @@ export class RepairPlaceholderNames1986530000000 implements MigrationInterface {
          AND ((d.draft_config ->> 'assistantName') ~* ${PLACEHOLDER}
            OR (d.draft_config #>> '{branding,assistantName}') ~* ${PLACEHOLDER})
     `);
+    // The draft's own name, and the title its page header shows (Q4 G+9).
+    await queryRunner.query(`
+      UPDATE bot_drafts d
+         SET draft_config = jsonb_set(d.draft_config, '{name}', to_jsonb(c.name))
+        FROM chatbots c
+       WHERE c.id = d.chatbot_id
+         AND (d.draft_config ->> 'name') ~* ${PLACEHOLDER}
+    `);
+    await queryRunner.query(`
+      UPDATE bot_drafts d
+         SET draft_config = jsonb_set(d.draft_config, '{branding,title}', to_jsonb(c.name))
+        FROM chatbots c
+       WHERE c.id = d.chatbot_id
+         AND (d.draft_config #>> '{branding,title}') ~* ${PLACEHOLDER}
+    `);
+    await queryRunner.query(`
+      UPDATE chatbot_pages p
+         SET settings = jsonb_set(p.settings, '{branding,title}', to_jsonb(c.name))
+        FROM chatbots c
+       WHERE c.id = p.chatbot_id
+         AND (p.settings #>> '{branding,title}') ~* ${PLACEHOLDER}
+    `);
     // The page's link, and the name its header shows.
     await queryRunner.query(`
       UPDATE chatbot_pages p
