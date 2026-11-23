@@ -1,4 +1,4 @@
-import React, { useId, useState } from "react";
+import React, { useId, useRef, useState } from "react";
 
 import { useSetListAbilitiesMutation } from "@api";
 import { Button } from "@components/button";
@@ -78,23 +78,28 @@ export const AssistantBlock: React.FC<{
   );
   const a = t().assistant;
 
-  const change = async (action: Action, value: ListAbility) => {
+  // Q4 B11: changes made while one is saving are queued, never dropped (the wizard's "Change
+  // entries: Do it" clicked right after "Add entries" was lost).
+  const queue = useRef<Promise<void>>(Promise.resolve());
+  const change = (action: Action, value: ListAbility) => {
     const before = abilities;
-    const next = { ...abilities, [action]: value };
-    setAbilities(next);
+    setAbilities(current => ({ ...current, [action]: value }));
     setFailed(false);
     const firstWrite =
       value === "do_it" &&
       action !== "find" &&
       before.create !== "do_it" &&
       before.update !== "do_it";
-    try {
-      await save({ id: botId, key: list.key, [action]: value }).unwrap();
-      if (firstWrite) setNote(true);
-    } catch {
-      setAbilities(before);
-      setFailed(true);
-    }
+    queue.current = queue.current.then(async () => {
+      try {
+        await save({ id: botId, key: list.key, [action]: value }).unwrap();
+        if (firstWrite) setNote(true);
+      } catch {
+        setAbilities(current => ({ ...current, [action]: before[action] }));
+        setFailed(true);
+      }
+    });
+    return queue.current;
   };
 
   const rows: { action: Action; label: string }[] = [
@@ -126,7 +131,7 @@ export const AssistantBlock: React.FC<{
                 { id: "never", label: a.never },
               ]}
               onChange={value => {
-                if (!isLoading) void change(action, value as ListAbility);
+                void change(action, value as ListAbility);
               }}
             />
           ) : (
@@ -168,14 +173,27 @@ export const AssistantBlock: React.FC<{
             id={instructionId}
             className="ally-input"
             rows={2}
-            maxLength={300}
             value={instruction}
+            aria-describedby={`${instructionId}-count`}
+            aria-invalid={instruction.trim().length > 300}
             onChange={event => setInstruction(event.target.value)}
           />
+          <p
+            id={`${instructionId}-count`}
+            className={instruction.trim().length > 300 ? "ally-error" : "ally-field__hint"}
+            role={instruction.trim().length > 300 ? "alert" : undefined}
+            data-testid="list-instruction-count"
+          >
+            {instruction.trim().length > 300
+              ? a.instructionTooLong
+              : a.instructionCount(instruction.trim().length)}
+          </p>
           <Button
             variant={ButtonVariant.TERTIARY}
             type="submit"
-            disabled={isLoading || instruction.trim() === savedLine}
+            disabled={
+              isLoading || instruction.trim() === savedLine || instruction.trim().length > 300
+            }
           >
             {instruction.trim() === savedLine && savedLine ? a.instructionSaved : a.instructionSave}
           </Button>

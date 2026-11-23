@@ -69,6 +69,21 @@ class CheckContext:
     #: The bot remembers people between chats (chunk 8a's memory on). Off, a "please
     #: remember…" gets a plain "I can't" (Q3-fast Part 2, 17 Nov M2).
     memory_on: bool = True
+    #: The channel the reply goes to ("whatsapp", "web", "preview"…; Q4 G2): talk of
+    #: another channel's rules is removed.
+    channel: str = ""
+    #: The organisation's own line the owner confirmed for crisis replies (Q4 G7),
+    #: given with the national numbers when a reply says it has none.
+    crisis_line: str = ""
+    #: The person's message read as upset (the crisis check unsure, Q4 H1): the reply
+    #: is never only a contact line, and carries 14416 and 112.
+    upset: bool = False
+    #: The assistant has a list it books into (Q4 H9): it books, so it never offers to
+    #: pass the person's name and phone to the team instead.
+    books: bool = False
+    #: The run can look up the person's own records (Q4 H8); without it, a reply never
+    #: offers to.
+    looks_up: bool = False
 
     @property
     def found(self) -> List[Dict[str, Any]]:

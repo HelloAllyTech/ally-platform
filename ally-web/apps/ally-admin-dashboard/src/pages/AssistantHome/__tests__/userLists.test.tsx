@@ -624,6 +624,26 @@ describe("details, rules and the assistant's switches", () => {
     expect(screen.getByRole("button", { name: t.assistant.instructionSaved })).toBeTruthy();
   });
 
+  it("warns at 300 characters instead of cutting the line (Q4 H12)", () => {
+    render(
+      <AssistantBlock botId="bot-1" list={APPOINTMENTS} lists={[SLOTS, APPOINTMENTS]} canEdit />,
+    );
+    const box = screen.getByLabelText(t.assistant.instructionLabel);
+    fireEvent.change(box, { target: { value: "x".repeat(120) } });
+    expect(screen.getByTestId("list-instruction-count").textContent).toBe(
+      t.assistant.instructionCount(120),
+    );
+    fireEvent.change(box, { target: { value: "x".repeat(320) } });
+    expect((box as HTMLTextAreaElement).value).toHaveLength(320);
+    expect(screen.getByTestId("list-instruction-count").textContent).toBe(
+      t.assistant.instructionTooLong,
+    );
+    expect(
+      (screen.getByRole("button", { name: t.assistant.instructionSave }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+  });
+
   it("hides Add and Change when no detail lets the assistant fill it in", () => {
     render(<AssistantBlock botId="bot-1" list={SLOTS} lists={[SLOTS]} canEdit />);
     expect(screen.queryByRole("radiogroup", { name: t.assistant.add })).toBeNull();
@@ -731,7 +751,7 @@ describe("Try it and switching assistant", () => {
   it("says a Try it write wasn't saved", () => {
     expect(testOnlyNotice({ previewWrite: true })[0]).toMatchObject({
       role: "notice",
-      text: "Test only: this wasn't saved.",
+      text: "Test only, not saved: Try it never saves bookings or details.",
     });
     expect(testOnlyNotice({ previewWrite: false })).toEqual([]);
   });

@@ -95,7 +95,7 @@ export const SAFETY_PACKS: Record<SafetyPackId, SafetyPack> = {
   },
   [SafetyPackId.MEDICAL]: {
     id: SafetyPackId.MEDICAL,
-    version: 3, // Q3-fast: the business's own published information may be answered
+    version: 4, // Q4 G+12 (E2): graded urgency, a doctor today when it isn't an emergency now
     name: 'Medical safety',
     industryLabel: 'healthcare providers',
     builderMessage:
@@ -114,6 +114,11 @@ export const SAFETY_PACKS: Record<SafetyPackId, SafetyPack> = {
       // 18–25 weeks") is information the business published, not advice.
       "General information the business itself publishes (its FAQs, guides and service pages), asked about in general terms, may be shared with its source. A question about the person's own result, symptom, medicine or dose is still a clinical question.",
       'If someone describes urgent symptoms, tell them to contact emergency care now.',
+      // Q4 G+12 (F5, approved 23 Nov): SP1 only adds lines, so this one says what "urgent" means;
+      // "red, swollen, oozing since yesterday" then gets the doctor-today rule.
+      'Urgent symptoms are an emergency happening now: chest pain, trouble breathing, heavy bleeding, unconsciousness, a seizure, poisoning or overdose, a severe burn, sudden weakness or confusion, or something getting rapidly worse. Anything else that needs a doctor gets the next rule.',
+      // Q4 G+12 (E2, approved 23 Nov; Jaipur Foot: a red, oozing stump got "go to emergency now").
+      "When something needs a doctor soon but isn't an emergency now (a wound that is red, swollen or oozing), say to see a doctor today, and to go to emergency or call 112 if they get a fever, the redness spreads, or they feel very unwell. Never tell them it's nothing to worry about.",
       'Refer every clinical question to the team, using the contact details you were given.',
       GROUNDING_RULE,
       ...cleanDecline('their doctor'),
@@ -274,6 +279,16 @@ export const PACK_FOR_INDUSTRY: Record<Industry, SafetyPackId> = {
   [Industry.OTHER]: SafetyPackId.STANDARD,
 };
 
+/** A less strict pack needs the owner's reason, at least this long (home and setup, Q4 A3). */
+export const MIN_PACK_REASON = 10;
+
+/** The packs a health industry brings (Q4 A2): its own care, never replaced by a topic. */
+const HEALTH_PACKS: ReadonlySet<string> = new Set([
+  SafetyPackId.MEDICAL,
+  SafetyPackId.PHARMACY,
+  SafetyPackId.MENTAL_HEALTH,
+]);
+
 /** Care topic → pack. */
 const PACK_FOR_TOPIC: Record<CareTopic, SafetyPackId> = {
   [CareTopic.MENTAL_HEALTH]: SafetyPackId.MENTAL_HEALTH,
@@ -291,12 +306,15 @@ export function packForBusiness(
   industry: Industry | string | null | undefined,
   topics: (CareTopic | string)[] = [],
 ): SafetyPackId {
-  const candidates = [
-    PACK_FOR_INDUSTRY[industry as Industry] ?? SafetyPackId.STANDARD,
-    ...topics
-      .map((topic) => PACK_FOR_TOPIC[topic as CareTopic])
-      .filter((id): id is SafetyPackId => Boolean(id)),
-  ];
+  const own = PACK_FOR_INDUSTRY[industry as Industry] ?? SafetyPackId.STANDARD;
+  const fromTopics = topics
+    .map((topic) => PACK_FOR_TOPIC[topic as CareTopic])
+    .filter((id): id is SafetyPackId => Boolean(id))
+    // Q4 A2 (20 Nov: Cloudnine, a maternity hospital, got Mental health from its psychology
+    // service): a health industry (medical, pharmacy, mental health) keeps its own pack: those and
+    // young people guard different risks, so a topic among them never replaces the industry's.
+    .filter((id) => !(HEALTH_PACKS.has(own) && NOT_INTERCHANGEABLE.has(id)));
+  const candidates = [own, ...fromTopics];
   return candidates.reduce((best, id) =>
     SAFETY_PACKS[id].strength > SAFETY_PACKS[best].strength ? id : best,
   );
@@ -593,4 +611,22 @@ export function emergencyReply(options: {
     organisation && number ? texts.business(organisation, number) : '',
     options.selfHarm ? texts.selfHarm : '',
   ].join('');
+}
+
+/**
+ * Q4 H4 (Mann Collective: a counselling collective's staff handbook got Mental health from its
+ * sector, then couldn't publish): an assistant for the organisation's own team ("Train my team")
+ * gets the pack for its audience, not the organisation's sector. Its readers are staff, not clients
+ * at risk, so Standard. The owner can still choose a stricter one.
+ */
+export const STAFF_PACK_REASON =
+  "This assistant is for your own team, so its safety pack follows its readers (your staff), not your organisation's sector.";
+
+export function packForStaff(): SafetyPackId {
+  return SafetyPackId.STANDARD;
+}
+
+/** A pack chosen from the organisation's sector that a staff assistant shouldn't keep. */
+export function sectorPackOnStaff(packId: string | null | undefined): boolean {
+  return NOT_INTERCHANGEABLE.has(String(packId ?? ''));
 }

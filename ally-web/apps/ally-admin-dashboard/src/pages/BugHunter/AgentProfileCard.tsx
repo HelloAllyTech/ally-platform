@@ -64,20 +64,6 @@ const STATE_STYLES: Record<AgentStatusKind, string> = {
   on_shift: "text-typography-900",
 };
 
-/**
- * "12m ago", "6h ago", "3d ago". Unit letters untranslated, like the table's
- * Age column — the admin console is English-only, and a header sentence has
- * no room for "6 hours ago".
- */
-export const formatAgo = (iso: string, now: number = Date.now()): string => {
-  const minutes = Math.max(0, Math.floor((now - new Date(iso).getTime()) / 60_000));
-  if (minutes < 1) return en.bugHunter.headerJustNow;
-  if (minutes < 60) return en.bugHunter.headerAgo.replace("{span}", `${minutes}m`);
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return en.bugHunter.headerAgo.replace("{span}", `${hours}h`);
-  return en.bugHunter.headerAgo.replace("{span}", `${Math.floor(hours / 24)}d`);
-};
-
 export interface AgentProfileCardProps {
   /** Opens the In progress tab — what "Fixing N now" links to. */
   onShowInProgress: () => void;

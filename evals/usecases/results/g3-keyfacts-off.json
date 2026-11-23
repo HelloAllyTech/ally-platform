@@ -1,0 +1,2744 @@
+{
+ "label": "g3-keyfacts-off",
+ "setup": "2026-11-22",
+ "repeat": 1,
+ "classifierFail": false,
+ "results": [
+  {
+   "set": "b2-cloudnine",
+   "assistant": "b2-cloudnine",
+   "run": 1,
+   "cases": [
+    {
+     "id": "b2-f01",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PARTIAL",
+     "turns": [
+      {
+       "user": "Do you have an emergency helpline? Is it free?",
+       "messageId": "07a921f0-3b29-4eb0-b194-0afe48121047",
+       "observed": {
+        "reply": "Yes — Cloudnine has a 24/7 emergency helpline and it is a free service. It also provides pregnancy counselling and follow-up support. Would you like me to request a callback for you?",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Maternity/Pregnancy & Pediatric Emergency Helpline |Cloudnine Hospitals",
+          "source_url": "https://www.cloudninecare.com/emergency-helpline-services-24x7"
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "What we learned",
+          "source_url": ""
+         }
+        ],
+        "passage_document_ids": [
+         "de54b49d-eb14-4bf1-9b7f-df4e714cddb9",
+         "9b751274-442d-47c0-9890-ec1641d104a9"
+        ],
+        "passage_chunk_ids": [
+         "88f69654-f0f0-478c-9d08-82280fce84ea",
+         "1de20fd7-bd1a-47be-a7da-1f9a0b9a6595",
+         "78f08b49-4e2f-4485-be8d-5369894af317",
+         "097c6620-5164-4c83-b673-32809322a5aa"
+        ],
+        "history": []
+       },
+       "reply": "Yes — Cloudnine has a 24/7 emergency helpline and it is a free service. It also provides pregnancy counselling and follow-up support. Would you like me to request a callback for you?",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 2,
+       "confirmation": null,
+       "statusMs": 336.89583300000004,
+       "firstWordsMs": 6149.067499999999,
+       "ms": 6699.573125000001,
+       "grade": {
+        "verdict": "fail",
+        "reasons": [
+         "facts_missing"
+        ],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [
+          "99724 99724"
+         ],
+         "must_not_found": [],
+         "also_ok_matched": false,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "Reply answers both questions but omits the helpline number 99724 99724.",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "b2-f02",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "Up to what age do you help children on the helpline?",
+       "messageId": "1dbdebf1-dcaf-475b-a227-0c91b72a83bd",
+       "observed": {
+        "reply": "Cloudnine’s emergency helpline supports newborns and children up to the age of 16.",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Maternity/Pregnancy & Pediatric Emergency Helpline |Cloudnine Hospitals",
+          "source_url": "https://www.cloudninecare.com/emergency-helpline-services-24x7"
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "What we learned",
+          "source_url": ""
+         }
+        ],
+        "passage_document_ids": [
+         "de54b49d-eb14-4bf1-9b7f-df4e714cddb9",
+         "9b751274-442d-47c0-9890-ec1641d104a9"
+        ],
+        "passage_chunk_ids": [
+         "6c9a7c30-bf82-48de-bfbf-1f02ef143927",
+         "88f69654-f0f0-478c-9d08-82280fce84ea",
+         "097c6620-5164-4c83-b673-32809322a5aa",
+         "1de20fd7-bd1a-47be-a7da-1f9a0b9a6595",
+         "e0f07b3f-13d0-47f9-b7c8-56f787b80f63",
+         "febc5c73-cbd3-4c24-bec0-a7f13317a502",
+         "78f08b49-4e2f-4485-be8d-5369894af317",
+         "d82fc7f5-c4fc-437b-9637-37028da07ae9"
+        ],
+        "history": []
+       },
+       "reply": "Cloudnine’s emergency helpline supports newborns and children up to the age of 16.",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 2,
+       "confirmation": null,
+       "statusMs": 30.094042000000627,
+       "firstWordsMs": 2287.170792000001,
+       "ms": 2672.681792000001,
+       "grade": {
+        "verdict": "pass",
+        "reasons": [],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": true,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "b2-f03",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "What's your general contact number and email?",
+       "messageId": "5c219c50-dd76-4004-8703-8d13d0b47b80",
+       "observed": {
+        "reply": "Our general contact email is info@cloudninecare.com and the contact number is +91 99728 99728. Would you like me to request a callback or help book an appointment?",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Success Stories & Testimonials | Cloudnine Hospitals",
+          "source_url": "https://www.cloudninecare.com/testimonial"
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Best Maternity/Pregnancy Hospital in Aurobindo Marg - Jayanagar, Bengaluru for Normal Delivery | Gynecology, Pediatric clinic, Child/Kids Vaccination Centre Near Me | Cloudnine Hospitals",
+          "source_url": "https://www.cloudninecare.com/centre/aurobindo-marg-jayanagar"
+         }
+        ],
+        "passage_document_ids": [
+         "29629a9d-1326-486e-bbb0-f9b53e8ed08d",
+         "15ff22dc-9e41-4a69-85ba-ee5444d93bc6",
+         "44ca8ef4-46ac-4e41-b1ee-179a83d3af81",
+         "b839039a-5b00-4b5d-973e-515d9a44d6c8",
+         "f57d329c-3245-4526-8dbf-5423c31cd736",
+         "bb75933c-bbb9-481d-b612-a110abb775a3",
+         "51810e58-3afd-4d1a-ae5a-2fcb543af9f8"
+        ],
+        "passage_chunk_ids": [
+         "90506117-a6f2-48d1-852a-98e3801b1e9e",
+         "399f5964-ad2a-4df4-ba48-a8dee8fd2f39",
+         "f57952b9-30af-4426-9d8d-48dbb670e756",
+         "c084de79-816d-49e8-b186-b246677973c4",
+         "7f872c71-1ddc-485a-9471-b8032eb3e233",
+         "8686f265-96eb-4b5b-a619-a67a0b7cf816",
+         "755daa6f-c9b8-404a-be7d-c649528573c7",
+         "1d61787b-0a84-4138-8799-06dde225a007"
+        ],
+        "history": []
+       },
+       "reply": "Our general contact email is info@cloudninecare.com and the contact number is +91 99728 99728. Would you like me to request a callback or help book an appointment?",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 2,
+       "confirmation": null,
+       "statusMs": 37.3784169999999,
+       "firstWordsMs": 3775.126292000001,
+       "ms": 4323.050667000003,
+       "grade": {
+        "verdict": "pass",
+        "reasons": [],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": true,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "b1-dragarwal",
+   "assistant": "b1-dragarwal",
+   "run": 1,
+   "cases": [
+    {
+     "id": "b1-f01",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "How many hospitals do you have?",
+       "messageId": "cd0bdf6a-0aa9-415e-b3f5-6f309e00b18c",
+       "observed": {
+        "reply": "We have over 325 hospitals across more than 80 cities. Would you like me to find the nearest clinic for you?",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Dr Agarwals - Best Eye Hospital In India | Eye Disease Treatment",
+          "source_url": "https://www.dragarwal.com/"
+         }
+        ],
+        "passage_document_ids": [
+         "555a7621-1dae-4284-ae47-cc3a1cc80de1",
+         "fe6e2291-bbb0-45b6-a0a9-6d0ec52427af",
+         "cb918d77-3549-4165-aa13-a5d7b9d615b8",
+         "4bb3049e-13cc-478c-ad3a-8fb11d15758c",
+         "80a5752d-42d6-4fe1-b99b-719c56af7af4"
+        ],
+        "passage_chunk_ids": [
+         "3a44ac0f-53c3-4fdc-9f49-7457238ab533",
+         "322f370c-00fd-4506-a3fe-2431adfcb753",
+         "ef3c885b-9e68-4c2a-b4a2-374025267ac8",
+         "ca2238fd-5808-4f2f-b23c-a563b51ee8a6",
+         "ecbdefc9-71bc-4c49-a55c-c372c50cd783",
+         "2956e0ae-654e-4d96-882c-878cda360251",
+         "b0a87740-e956-4825-a6ed-2f66c6bd7bec",
+         "394fbc95-d2d8-4d9e-aa19-7004254cf38d"
+        ],
+        "history": []
+       },
+       "reply": "We have over 325 hospitals across more than 80 cities. Would you like me to find the nearest clinic for you?",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 1,
+       "confirmation": null,
+       "statusMs": 348.80525000000006,
+       "firstWordsMs": 4725.779375,
+       "ms": 5141.035416,
+       "grade": {
+        "verdict": "pass",
+        "reasons": [],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": true,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "b1-f02",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PARTIAL",
+     "turns": [
+      {
+       "user": "What's your phone number?",
+       "messageId": "41b9c030-91fa-44b4-9c69-9e871e145d2d",
+       "observed": {
+        "reply": "You can call 9444444134 for assistance. Would you like a number for a specific city or department?",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "NBEMS Mandatory Disclosures - Dr Agarwals Eye Hospital",
+          "source_url": "https://www.dragarwal.com/nbems-mandatory-disclosures"
+         }
+        ],
+        "passage_document_ids": [
+         "80a5752d-42d6-4fe1-b99b-719c56af7af4",
+         "4762de87-0efe-4730-af3e-12c2ef419205",
+         "da49184c-4070-4bb5-906f-ac40059104a9",
+         "55d3a9b6-4dd6-4059-a350-e5bed5a4c760",
+         "15e37f8b-d82a-437f-9095-c4e6f2a87780",
+         "fe6e2291-bbb0-45b6-a0a9-6d0ec52427af"
+        ],
+        "passage_chunk_ids": [
+         "31a66882-d877-47f5-9973-62150149637a",
+         "32bade41-e29f-4859-9b4f-06f55efea599",
+         "1b931cbd-1a17-468b-9022-669ea85dfb98",
+         "725a1dc2-cbef-4ce4-962a-879010aef246",
+         "9fe0559f-bd2c-41c0-bb38-cc1a8d12d92a",
+         "d6f57c47-6b68-4689-8a91-305bfafb17e0",
+         "845e9200-14f2-45ca-ac7f-4d655f2425fc",
+         "29181ae9-9446-4030-be2b-c0387ca3a815"
+        ],
+        "history": []
+       },
+       "reply": "You can call 9444444134 for assistance. Would you like a number for a specific city or department?",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 1,
+       "confirmation": null,
+       "statusMs": 36.362458999999944,
+       "firstWordsMs": 4456.3681670000005,
+       "ms": 4942.7148750000015,
+       "grade": {
+        "verdict": "fail",
+        "reasons": [
+         "facts_missing",
+         "did_not_answer"
+        ],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [
+          "95949 04015"
+         ],
+         "must_not_found": [],
+         "also_ok_matched": false,
+         "answers_question": false,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "The reply gave 9444444134 instead of the required number 95949 04015.",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "b1-f03",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "What are the timings of your Chennai hospital?",
+       "messageId": "74549e98-1c11-47d1-b244-f0bfb37fadfd",
+       "observed": {
+        "reply": "Most Chennai centres are open Mon–Sat 9:00–20:00; some list Sun 10:00–14:00 (Tambaram example). The TTK Road — Center of Excellence is Sun 9:00–17:00 and Mon–Sat 9:00–20:00. Would you like the exact hours for a particular Chennai branch or help booking an appointment?",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "What we learned",
+          "source_url": ""
+         }
+        ],
+        "passage_document_ids": [
+         "f5f82ee1-0c06-4bb1-bf23-4503eb2d2e45",
+         "4a8875b2-b938-47d2-8e79-2b76c3568e4a",
+         "08c19738-ba0f-4ab0-8936-d8164604a721"
+        ],
+        "passage_chunk_ids": [
+         "31b8786a-2237-4f10-ae08-caca616397c6",
+         "3fb5d859-a992-43bb-875a-4837e8ebd264",
+         "3a34d862-216e-4707-a8d3-a0b5e36dba73",
+         "f2888a76-f188-4bc7-8de0-7f8e85e6350c",
+         "befc7f85-0c2d-41aa-86e2-bb23bc1c1d1a"
+        ],
+        "history": []
+       },
+       "reply": "Most Chennai centres are open Mon–Sat 9:00–20:00; some list Sun 10:00–14:00 (Tambaram example). The TTK Road — Center of Excellence is Sun 9:00–17:00 and Mon–Sat 9:00–20:00. Would you like the exact hours for a particular Chennai branch or help booking an appointment?",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 1,
+       "confirmation": null,
+       "statusMs": 31.48975000000064,
+       "firstWordsMs": 3232.9546249999985,
+       "ms": 3948.3067499999997,
+       "grade": {
+        "verdict": "pass",
+        "reasons": [
+         "conflicting_facts"
+        ],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": true,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "",
+         "conflicting_facts": [
+          "conflicting facts: Sun 10:00–14:00 vs Sun 9:00–17:00"
+         ]
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "b3-tss",
+   "assistant": "b3-tss",
+   "run": 1,
+   "cases": [
+    {
+     "id": "b3-f01",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "How much are the Batman high top sneakers?",
+       "messageId": "393c00aa-9914-40ea-8bd3-c252f7b904a1",
+       "observed": {
+        "reply": "Batman: Gotham Blaze Men High Top Sneakers are listed at ₹ 4,499.",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "What we learned",
+          "source_url": ""
+         }
+        ],
+        "passage_document_ids": [
+         "ae540376-7abc-4242-9d18-b0b428292074",
+         "03263ebc-c3be-4e8d-905e-7ce742a684cd"
+        ],
+        "passage_chunk_ids": [
+         "8233f914-6359-4b4a-82a4-b2b480dc1b8e",
+         "478cc6a7-e41d-4499-a306-5b7beaeaa3e9",
+         "c81da7c7-21c0-4bfe-adfb-838603ea4ead",
+         "029cde62-9a73-49bb-b124-cf06649380af"
+        ],
+        "history": []
+       },
+       "reply": "Batman: Gotham Blaze Men High Top Sneakers are listed at ₹ 4,499.",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 1,
+       "confirmation": null,
+       "statusMs": 23.58100000000195,
+       "firstWordsMs": 3747.863459000004,
+       "ms": 4117.609500000002,
+       "grade": {
+        "verdict": "pass",
+        "reasons": [
+         "conflicting_facts"
+        ],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": true,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "",
+         "conflicting_facts": [
+          "conflicting facts: ₹4,499 vs ₹3,999"
+         ]
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "b3-f02",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "Price of the Spiderman slides?",
+       "messageId": "cdb37c50-b710-4e3b-a5c8-089233052f46",
+       "observed": {
+        "reply": "Spiderman: Slides are ₹ 1299. Would you like me to check available sizes or colours?",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Online Shopping for Men & Women Clothing, Accessories at The Souled Store",
+          "source_url": "https://www.thesouledstore.com/sneakers"
+         }
+        ],
+        "passage_document_ids": [
+         "03263ebc-c3be-4e8d-905e-7ce742a684cd",
+         "077c3800-9fc6-4cf1-bf82-b964941c0695",
+         "ae540376-7abc-4242-9d18-b0b428292074"
+        ],
+        "passage_chunk_ids": [
+         "fb900e33-09d1-4420-b628-5e51e6c3f43c",
+         "d3f62ff0-700f-45c6-b351-d1c677fb705f",
+         "5ff05507-2dad-40c4-9962-7c8a0e3e8dfe",
+         "8233f914-6359-4b4a-82a4-b2b480dc1b8e",
+         "3c9b1a41-baaf-4323-acd0-f53e7dfb727e",
+         "fd72f3c6-6788-4ae2-b170-48c9a06bfb58"
+        ],
+        "history": []
+       },
+       "reply": "Spiderman: Slides are ₹ 1299. Would you like me to check available sizes or colours?",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 1,
+       "confirmation": null,
+       "statusMs": 39.467499999998836,
+       "firstWordsMs": 4507.068667,
+       "ms": 5226.191041999999,
+       "grade": {
+        "verdict": "pass",
+        "reasons": [],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": true,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "b3-f03",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "How much is the Icy Pink co-ord set?",
+       "messageId": "c8b53ebf-86cc-4ae4-8aec-9703301ea1bb",
+       "observed": {
+        "reply": "The Icy Pink co-ord set is listed at ₹3,133 (discounted from ₹3,298).",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Online Shopping for Men & Women Clothing, Accessories at The Souled Store",
+          "source_url": "https://www.thesouledstore.com/women"
+         }
+        ],
+        "passage_document_ids": [
+         "26b2a8f7-cf98-4087-ba31-0e8c610b128c",
+         "ae540376-7abc-4242-9d18-b0b428292074"
+        ],
+        "passage_chunk_ids": [
+         "22c98bbf-044b-4876-8bbc-aaa1c83655ca",
+         "f1e06120-5fa9-4544-88a3-11314f1c4d86",
+         "418672de-fb0a-4bfd-93ca-9c1d28004f3e",
+         "d97f8e89-a0fe-4f76-9afb-f1079039975b",
+         "6894ebf6-0e94-4eeb-8f64-50d5212508a8",
+         "5867233a-4bbe-47fd-8aec-6d8e1b8cbe0a",
+         "e46a193a-fa14-491e-828e-99179bdc5577"
+        ],
+        "history": []
+       },
+       "reply": "The Icy Pink co-ord set is listed at ₹3,133 (discounted from ₹3,298).",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 1,
+       "confirmation": null,
+       "statusMs": 31.69879100000253,
+       "firstWordsMs": 3660.873458000002,
+       "ms": 4488.3485,
+       "grade": {
+        "verdict": "pass",
+        "reasons": [],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": true,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "b4-scripbox",
+   "assistant": "b4-scripbox",
+   "run": 1,
+   "cases": [
+    {
+     "id": "b4-f01",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "FAIL",
+     "turns": [
+      {
+       "user": "Are you SEBI registered? What's your number?",
+       "messageId": "f7701f9e-2192-4b5e-a4c0-5409f4ef2787",
+       "observed": {
+        "reply": "Yes. Scripbox is SEBI-registered: Scripbox Wealth Managers Private Limited is a SEBI-registered Portfolio Manager (Registration No. INP000001660) and Scripbox is described as a SEBI Registered Investment Adviser/SEBI Registered service. (citations: 2, 4, 7)",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Best Mutual Funds Recommended by Scripbox",
+          "source_url": "https://mf.scripbox.com/fulfilment-partners"
+         }
+        ],
+        "passage_document_ids": [
+         "8e9b7808-de45-427e-ae7c-7222b1f68c74",
+         "0fcc376f-c5ae-4a1b-b367-60d994f77eff",
+         "ac704684-d7fb-4ce7-9d52-d6852e9001f7",
+         "5eda15d4-ad03-44a2-ab46-ede26d214e20",
+         "54b3806c-97e3-4b4e-b282-19959add60a1"
+        ],
+        "passage_chunk_ids": [
+         "93859888-e68a-41be-84d8-c37f236553e7",
+         "d5d61f05-96cb-4dd8-aac3-63cd80b51400",
+         "fdcb82d4-23dd-4e4a-9a13-5a6e2a360186",
+         "c4a4011d-1fd2-4518-b0b9-5d180a1ac0c1",
+         "131c6131-c36a-4314-a182-fb80167f5b10",
+         "bfc2e0c2-c0a8-4007-9f9f-a0d78bcba005",
+         "ef200c3c-aa57-4111-8cbb-87c0994f415d",
+         "a631af0f-81b3-4e0e-aa67-38356799851c"
+        ],
+        "history": []
+       },
+       "reply": "Yes. Scripbox is SEBI-registered: Scripbox Wealth Managers Private Limited is a SEBI-registered Portfolio Manager (Registration No. INP000001660) and Scripbox is described as a SEBI Registered Investment Adviser/SEBI Registered service. (citations: 2, 4, 7)",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 1,
+       "confirmation": null,
+       "statusMs": 20.889666999995825,
+       "firstWordsMs": 3766.2918750000026,
+       "ms": 4569.059083,
+       "grade": {
+        "verdict": "fail",
+        "reasons": [
+         "facts_missing",
+         "did_not_answer"
+        ],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [
+          "INA200001041"
+         ],
+         "must_not_found": [],
+         "also_ok_matched": false,
+         "answers_question": false,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "Reply omitted the required SEBI RIA number INA200001041 and instead gave a PMS registration number (INP000001660).",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": [
+        "stray text: \\bcitations?:\\s*\\d"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "b4-f02",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "What's your customer care number and timings?",
+       "messageId": "519f1626-f7a8-4400-a198-4d4a7a2cbe57",
+       "observed": {
+        "reply": "Our customer support is available 8:00 AM to 8:00 PM. Toll‑free number: 1800-102-1265. For overseas customers: +91 92432 00042. (Support hours: 8am–8pm; available 7 days a week.",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Scripbox Contact Details | Scripbox",
+          "source_url": "https://scripbox.com/contact-us"
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Best Pricing Plan for Regular & Direct Mutual Funds",
+          "source_url": "https://scripbox.com/pricing"
+         }
+        ],
+        "passage_document_ids": [
+         "538e7036-65cf-4340-9e2c-2a4c415c68e1",
+         "8e9b7808-de45-427e-ae7c-7222b1f68c74"
+        ],
+        "passage_chunk_ids": [
+         "10f139e6-04a1-46cf-a42b-17a47e517af6",
+         "b8380f28-6b01-41df-8579-30c5c0df599c",
+         "13485bdf-8839-4661-b588-ba8671c69967",
+         "1bc7aaa0-a2c9-4931-9d27-bc676e7a2c4c"
+        ],
+        "history": []
+       },
+       "reply": "Our customer support is available 8:00 AM to 8:00 PM. Toll‑free number: 1800-102-1265. For overseas customers: +91 92432 00042. (Support hours: 8am–8pm; available 7 days a week.",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 2,
+       "confirmation": null,
+       "statusMs": 32.93745900000067,
+       "firstWordsMs": 4862.176166999998,
+       "ms": 5598.182166999999,
+       "grade": {
+        "verdict": "pass",
+        "reasons": [],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": true,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "b4-f03",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "What's the minimum for PMS?",
+       "messageId": "1ed847a2-25f1-4770-9b22-63d5ce881892",
+       "observed": {
+        "reply": "The SEBI minimum investment for PMS in India is ₹50 lakh. PMS FAQs) Would you like a callback to discuss PMS options?",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Portfolio Management & PMS Investment: Meaning & Objectives",
+          "source_url": "https://scripbox.com/wealth/what-is-portfolio-management-services"
+         }
+        ],
+        "passage_document_ids": [
+         "9513a61d-b811-49c7-8f95-42a521694985",
+         "54b3806c-97e3-4b4e-b282-19959add60a1"
+        ],
+        "passage_chunk_ids": [
+         "28fb0883-2cca-4bd4-99bc-8761b91a3ebc",
+         "e30115b8-0a74-4162-af4a-19a42928af98",
+         "56c685e9-5214-4dad-9e48-14643a5831d2",
+         "f11f4eca-7ec6-46ee-b17c-fee36dcccdcb",
+         "7c5349ce-9d71-4aa3-8452-d5568cb232e2",
+         "362cd5fe-8363-4970-8223-fde0b79a20b4",
+         "e592d482-26eb-428b-a16b-d1799c942ddb",
+         "cdaa6885-0bb7-4e5e-9115-c5f896a6ac46"
+        ],
+        "history": []
+       },
+       "reply": "The SEBI minimum investment for PMS in India is ₹50 lakh. PMS FAQs) Would you like a callback to discuss PMS options?",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 1,
+       "confirmation": null,
+       "statusMs": 16.90908300000592,
+       "firstWordsMs": 4916.6655420000025,
+       "ms": 5203.390333000003,
+       "grade": {
+        "verdict": "pass",
+        "reasons": [],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": true,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "b5-91springboard",
+   "assistant": "b5-91springboard",
+   "run": 1,
+   "cases": [
+    {
+     "id": "b5a-f01",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "Which cities are you in?",
+       "messageId": "8a7619f4-736e-4470-ab4c-ddb80f285333",
+       "observed": {
+        "reply": "We have centres across these cities: Bengaluru, Delhi, Goa, Gurugram, Hyderabad, Mumbai, Noida, Pune and Chennai (we’re in 9 cities). Which city would you like a virtual office in?",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "What we learned",
+          "source_url": ""
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Book Springboard - 91Springboard",
+          "source_url": "https://www.91springboard.com/book-springboard"
+         }
+        ],
+        "passage_document_ids": [
+         "ec95c8d6-aa11-4ba4-828e-fdcf608a371f",
+         "dcccd7c5-1c1c-4f68-bd38-678a468b9949",
+         "90a78e0a-2305-44aa-a49c-cec7e27dd578",
+         "677ce769-bfdd-42eb-96ba-9fb78316a184"
+        ],
+        "passage_chunk_ids": [
+         "8f7baa4f-6d25-4745-89ce-c78b9b7f42f2",
+         "36982ddf-77c8-45ff-b038-4469e0735e7e",
+         "e797332c-7e34-4621-94fa-33f6dc60bf41",
+         "e28cf51a-f8a1-4b0d-9df7-308596857210",
+         "009e7624-563e-4f0b-ba77-b99677464855",
+         "62b21efa-c6d4-4efe-ad05-4d9b2c083f06",
+         "207f689a-f35c-48c0-948b-c9e00daf70f8",
+         "4db01531-7002-4ebb-8c94-2be5cbedf5b0"
+        ],
+        "history": []
+       },
+       "reply": "We have centres across these cities: Bengaluru, Delhi, Goa, Gurugram, Hyderabad, Mumbai, Noida, Pune and Chennai (we’re in 9 cities). Which city would you like a virtual office in?",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 2,
+       "confirmation": null,
+       "statusMs": 16.362999999997555,
+       "firstWordsMs": 3546.3575000000055,
+       "ms": 4223.136999999995,
+       "grade": {
+        "verdict": "pass",
+        "reasons": [],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": true,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "b5a-f02",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "What's your phone number?",
+       "messageId": "6d5710a9-3557-4417-abf8-e58a3859c92b",
+       "observed": {
+        "reply": "You can reach the team at 9597519191 — to schedule a visit, call 9597519191. 91Springboard contact information. Would you like help finding virtual office options or pricing?",
+        "handled_by": "rag",
+        "turn_type": "smalltalk",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Contact Us | 91Springboard - Reach Out for Co-working Solutions",
+          "source_url": "https://www.91springboard.com/contact"
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "What we learned",
+          "source_url": ""
+         }
+        ],
+        "passage_document_ids": [
+         "a340aaa1-a5f2-4820-b69d-4e573bae768a",
+         "677ce769-bfdd-42eb-96ba-9fb78316a184",
+         "5059b07c-a9c5-4588-aec0-37a62189d355",
+         "90a78e0a-2305-44aa-a49c-cec7e27dd578",
+         "cc5d68d4-1514-4125-8e57-06dd4b8f6262"
+        ],
+        "passage_chunk_ids": [
+         "916ff17f-3d95-4abe-bfa7-548a1e2134b3",
+         "3395610b-a40d-4024-9fab-909fc89e0e46",
+         "147b8256-efde-4708-84c2-8b1a11a04b3e",
+         "3b3bf484-149c-4402-a418-557c395cd152",
+         "6e93a487-ba67-4d7c-81eb-a015e8a267b4",
+         "da50cf74-2dd4-417e-8ad2-a5192c7630a0",
+         "b32a6afe-098e-48ef-a40b-27c4503cfd88",
+         "5ae358c8-f293-4f4f-a7bb-2f0439dfa4eb"
+        ],
+        "history": []
+       },
+       "reply": "You can reach the team at 9597519191 — to schedule a visit, call 9597519191. 91Springboard contact information. Would you like help finding virtual office options or pricing?",
+       "handledBy": "rag",
+       "turnType": "smalltalk",
+       "steps": [],
+       "sources": 2,
+       "confirmation": null,
+       "statusMs": 33.473041999997804,
+       "firstWordsMs": 5582.041209000003,
+       "ms": 6214.640874999997,
+       "grade": {
+        "verdict": "pass",
+        "reasons": [],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": true,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "b5a-f03",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "Do you have hubs in Bangalore? Which areas?",
+       "messageId": "273d9071-e779-492c-b1b2-0a4dc91fa509",
+       "observed": {
+        "reply": "Yes — we have multiple hubs across Bangalore, including Indiranagar; ITPL / Whitefield and Mahadevapura; MG Road (including 8th Block); Koramangala; JP Nagar; and Helios Business Park..\n\nWhich Bangalore area would you prefer for a virtual office or a hub tour?",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Enterprise Coworking Solutions | Flexible Enterprise Workspaces – 91Springboard",
+          "source_url": "https://www.91springboard.com/enterprise-solutions"
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "What we learned",
+          "source_url": ""
+         }
+        ],
+        "passage_document_ids": [
+         "ec95c8d6-aa11-4ba4-828e-fdcf608a371f",
+         "5059b07c-a9c5-4588-aec0-37a62189d355",
+         "916e7a66-1fa8-471a-8c37-42fa635651d4",
+         "677ce769-bfdd-42eb-96ba-9fb78316a184",
+         "b5b18269-e03a-48e9-b8a9-0219ee607167"
+        ],
+        "passage_chunk_ids": [
+         "4db01531-7002-4ebb-8c94-2be5cbedf5b0",
+         "b88b0258-74a3-4eb7-9cbe-31d64b112159",
+         "b612e262-9f9b-4f33-9478-2e6ab6665f11",
+         "3ca3ddd7-1405-4087-b287-b7dfde36d58e",
+         "6fe79743-8933-4ac8-b352-86c68ee7c713",
+         "f028476a-e1fe-4401-a748-c3f14a7c70e8"
+        ],
+        "history": []
+       },
+       "reply": "Yes — we have multiple hubs across Bangalore, including Indiranagar; ITPL / Whitefield and Mahadevapura; MG Road (including 8th Block); Koramangala; JP Nagar; and Helios Business Park..\n\nWhich Bangalore area would you prefer for a virtual office or a hub tour?",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 2,
+       "confirmation": null,
+       "statusMs": 19.93116700000246,
+       "firstWordsMs": 7352.3318750000035,
+       "ms": 9044.490875000003,
+       "grade": {
+        "verdict": "pass",
+        "reasons": [],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": false,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "b5-bhive",
+   "assistant": "b5-bhive",
+   "run": 1,
+   "cases": [
+    {
+     "id": "b5b-f01",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "FAIL",
+     "turns": [
+      {
+       "user": "How much is a day pass at BKC Mumbai?",
+       "messageId": "c559e373-e409-4bac-9151-d5bef2fce314",
+       "observed": {
+        "reply": "A day pass at BHIVE BKC (Mumbai) is ₹200 per day. A bulk option is listed as ₹800 for 10 days (₹2000 original shown, discounted to ₹800/10 days). ) Would you like help booking a day pass or details on the bulk pass?",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Book Day / Bulk Day Pass - BHIVE Workspace",
+          "source_url": "https://bhiveworkspace.com/book-day-and-bulk-day-pass"
+         }
+        ],
+        "passage_document_ids": [
+         "f4978e73-a54f-4309-889e-5cef26bbf103",
+         "84fbf947-26bf-4dee-8779-02e6bd980291"
+        ],
+        "passage_chunk_ids": [
+         "5b6200c7-b8f5-4be6-b452-310acf01572a",
+         "31b08992-5117-4539-915e-ccfb14d8f9de",
+         "c1c88a55-e384-4259-bb70-24330cb40a0b",
+         "0fc5fa3e-4e34-4ba6-8c61-be7eda58f46c",
+         "d132ebb6-9ad0-4108-86ac-267872a2b3c8",
+         "c689780c-1f16-4449-8b68-56cfa9e3e1ed",
+         "25c99601-e303-41dd-83d0-5c210e7ef73d",
+         "3d16dda7-20b5-4786-b353-65a2dbd4db0c"
+        ],
+        "history": []
+       },
+       "reply": "A day pass at BHIVE BKC (Mumbai) is ₹200 per day. A bulk option is listed as ₹800 for 10 days (₹2000 original shown, discounted to ₹800/10 days). ) Would you like help booking a day pass or details on the bulk pass?",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 1,
+       "confirmation": null,
+       "statusMs": 44.57266699998581,
+       "firstWordsMs": 6582.913541999995,
+       "ms": 7530.377874999991,
+       "grade": {
+        "verdict": "fail",
+        "reasons": [
+         "invented_facts",
+         "facts_missing",
+         "conflicting_facts"
+        ],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [
+          "₹100 a day"
+         ],
+         "must_not_found": [],
+         "also_ok_matched": false,
+         "answers_question": true,
+         "invents_facts": true,
+         "declines_request": false,
+         "note": "Reply states ₹200/day whereas the required price is ₹100/day.",
+         "conflicting_facts": [
+          "₹200/day vs ₹100/day"
+         ]
+        }
+       },
+       "hard": [],
+       "soft": [
+        "must not: ₹ ?200\\b"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "b5b-f02",
+     "kind": "fact",
+     "lang": "hinglish",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "BKC Mumbai mein day pass kitne ka hai?",
+       "messageId": "650d3b09-ce41-4391-b7e9-9ab2edafad5b",
+       "observed": {
+        "reply": "BHIVE Platinum Plus BKC, Mumbai ke liye Day Pass listed price hai: ₹200 ₹100/Day, aur Bulk Day Pass listed as ₹2000₹800 /10 Days. BHIVE listings. Kya aap ek single day pass lena chaahenge ya bulk (10 days) dekhna pasand karenge?",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "What we learned",
+          "source_url": ""
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "BHIVE Mumbai BKC - BHIVE Workspace",
+          "source_url": "https://bhiveworkspace.com/bhive-mumbai-bkc"
+         }
+        ],
+        "passage_document_ids": [
+         "f4978e73-a54f-4309-889e-5cef26bbf103",
+         "5cd20c19-807c-4ba6-bf67-b9af3fd80561"
+        ],
+        "passage_chunk_ids": [
+         "03753b0a-4790-44e4-bf6f-12a0a72d247c",
+         "03753b0a-4790-44e4-bf6f-12a0a72d247c",
+         "5b6200c7-b8f5-4be6-b452-310acf01572a",
+         "ae39fa68-e824-4b0b-aa9a-766aaa34f2c5",
+         "083c2f76-12ae-4a4b-a257-202514d1be5d",
+         "9fd50162-294f-479f-9eb4-0b2dc9e03397"
+        ],
+        "history": []
+       },
+       "reply": "BHIVE Platinum Plus BKC, Mumbai ke liye Day Pass listed price hai: ₹200 ₹100/Day, aur Bulk Day Pass listed as ₹2000₹800 /10 Days. BHIVE listings. Kya aap ek single day pass lena chaahenge ya bulk (10 days) dekhna pasand karenge?",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [
+        "find_price_list: ok",
+        "find_price_list: ok",
+        "find_price_list: ok"
+       ],
+       "sources": 2,
+       "confirmation": null,
+       "statusMs": 14.683791000003112,
+       "firstWordsMs": 21447.043791000004,
+       "ms": 22416.566458,
+       "grade": {
+        "verdict": "pass",
+        "reasons": [],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": true,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "b5b-f03",
+     "kind": "fact",
+     "lang": "hi",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "बीकेसी मुंबई में डे पास की कीमत क्या है?",
+       "messageId": "7efa20c1-69a6-45d1-aaf0-01c9b1d6a226",
+       "observed": {
+        "reply": "BHIVE Platinum Plus BKC, Mumbai के Day Pass की सूची में यह दर्ज है: “₹200 ₹100/Day” — और Bulk Day Pass के लिए: “₹2000₹800 /10 Days”. (स्रोत: 1)\n\nक्या मैं अभी आपको डे पास बुक करने में मदद करूँ?",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "What we learned",
+          "source_url": ""
+         }
+        ],
+        "passage_document_ids": [
+         "f4978e73-a54f-4309-889e-5cef26bbf103",
+         "5cd20c19-807c-4ba6-bf67-b9af3fd80561",
+         "84fbf947-26bf-4dee-8779-02e6bd980291",
+         "dfb029c7-e496-47d6-ad6c-229626e9f576",
+         "046f46fd-565a-454f-b705-1034a2a1e0b6"
+        ],
+        "passage_chunk_ids": [
+         "5b6200c7-b8f5-4be6-b452-310acf01572a",
+         "04b2090c-ddd3-4218-ada5-458010992cac",
+         "b7673170-44d4-4dfc-9e97-22eb0741cdae",
+         "7e37397a-1c40-41d3-899d-1d240755e047",
+         "9276fa65-7346-4960-b0fd-48f787059bf3",
+         "8241e394-0ac8-4c09-ba81-4286c690c941",
+         "ce0e0cad-c9f5-45e9-9f17-10d369f1c9fa"
+        ],
+        "history": []
+       },
+       "reply": "BHIVE Platinum Plus BKC, Mumbai के Day Pass की सूची में यह दर्ज है: “₹200 ₹100/Day” — और Bulk Day Pass के लिए: “₹2000₹800 /10 Days”. (स्रोत: 1)\n\nक्या मैं अभी आपको डे पास बुक करने में मदद करूँ?",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [
+        "find_price_list: ok"
+       ],
+       "sources": 1,
+       "confirmation": null,
+       "statusMs": 16.93104100000346,
+       "firstWordsMs": 11577.469124999989,
+       "ms": 12740.579249999995,
+       "grade": {
+        "verdict": "pass",
+        "reasons": [
+         "conflicting_facts"
+        ],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": true,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "",
+         "conflicting_facts": [
+          "conflicting facts: ₹200 vs ₹100/Day"
+         ]
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "o1-icall",
+   "assistant": "o1-icall",
+   "run": 1,
+   "cases": [
+    {
+     "id": "o1-f01",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PARTIAL",
+     "turns": [
+      {
+       "user": "What are your timings?",
+       "messageId": "b1ab9c48-634b-48ab-8831-42ae855c6ae9",
+       "observed": {
+        "reply": "Our hours are 8:00am to 9:00pm. iCALL information)",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "FAQs – iCALL | Free Telephone & Email based Counseling Services",
+          "source_url": "https://icallhelpline.org/faqs"
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "About the ReYou Chat-line – iCALL | Free Telephone & Email based Counseling Services",
+          "source_url": "https://icallhelpline.org/about-the-reyou-chat-line"
+         }
+        ],
+        "passage_document_ids": [
+         "28a8ff56-0433-45a7-8ad6-d5f302649e08",
+         "a798ec0b-6596-45c6-9806-56dc3d809899",
+         "8742f81c-0abf-47cb-8f8e-0e08b67d4212",
+         "0a8a9cbe-9840-4627-9344-c2017dd221c2",
+         "475ac14c-6a48-47c3-85ac-596e577b17c7",
+         "f9e067aa-a515-4aed-ad00-f47371a34c4c",
+         "7edcdbf9-2dd1-4c73-943c-113417763d79",
+         "6111086e-126f-4c59-9758-148fd9bf2b63"
+        ],
+        "passage_chunk_ids": [
+         "59a258c6-d2dc-48e9-87c3-6cf00a1d676a",
+         "80ebd475-1436-4162-96b1-0f457a450bfa",
+         "bad85c00-46c6-41e0-a63a-6023da3ea2db",
+         "2892ef4f-b1f3-48da-90b3-388866a3c614",
+         "7f45eeff-d7a9-4b1f-8308-f9ec11bdd3d0",
+         "4f68c3b4-e00c-4bb9-af36-40908e8601cb",
+         "d491924e-6c26-4687-90fe-9e6a86abb59b",
+         "b1133101-34be-4f55-8b81-7b9fb22a4722"
+        ],
+        "history": []
+       },
+       "reply": "Our hours are 8:00am to 9:00pm. iCALL information)",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 2,
+       "confirmation": null,
+       "statusMs": 25.603833000001032,
+       "firstWordsMs": 4095.8932910000003,
+       "ms": 4488.580957999991,
+       "grade": {
+        "verdict": "fail",
+        "reasons": [
+         "facts_missing",
+         "did_not_answer"
+        ],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [
+          "Monday to Saturday"
+         ],
+         "must_not_found": [],
+         "also_ok_matched": false,
+         "answers_question": false,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "The reply gives the hours but omits the days (Monday–Saturday).",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "o1-f02",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PARTIAL",
+     "turns": [
+      {
+       "user": "Is it free to talk to a counsellor?",
+       "messageId": "ad8d15f7-06bc-450f-ae61-81214a5bf0d5",
+       "observed": {
+        "reply": "Yes — iCALL’s telephone and email counselling services are free of cost. You can also reach the helpline by phone or email as listed in.",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "What we learned",
+          "source_url": ""
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Telephone Counseling – iCALL | Free Telephone & Email based Counseling Services",
+          "source_url": "https://icallhelpline.org/telephone-counseling"
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "ReYou Chat-line FAQs – iCALL | Free Telephone & Email based Counseling Services",
+          "source_url": "https://icallhelpline.org/reyou-chat-line-faqs"
+         }
+        ],
+        "passage_document_ids": [
+         "ca75dc86-e2a3-4c00-b2e3-29eb6a267823",
+         "8742f81c-0abf-47cb-8f8e-0e08b67d4212",
+         "110ab77a-47c9-497c-9885-541e4ef98717",
+         "0f7c6e6b-61d0-459e-bd30-f90e9c9733e2"
+        ],
+        "passage_chunk_ids": [
+         "a95142c4-dd86-4c9f-947b-2a73bea5a339",
+         "eda48309-9065-4921-8f9b-f8c998aeaaa3",
+         "81cab8b2-c656-44f0-88cd-fd058895c1e6",
+         "4dc325ac-d920-429a-9d76-39fc86f69760",
+         "c02c5755-f3af-4d83-8f56-0d0b9e581fbc",
+         "e85ce9e3-9937-4b53-8638-8dcc985d009f",
+         "325d0339-e9ba-4e4a-94a4-324e4e505429",
+         "704868ef-9d37-409f-af93-96b653a2d75c"
+        ],
+        "history": []
+       },
+       "reply": "Yes — iCALL’s telephone and email counselling services are free of cost. You can also reach the helpline by phone or email as listed in.",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 3,
+       "confirmation": null,
+       "statusMs": 25.752040999999736,
+       "firstWordsMs": 4124.507874999996,
+       "ms": 4686.966625000001,
+       "grade": {
+        "verdict": "fail",
+        "reasons": [
+         "facts_missing"
+        ],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [
+          "you pay your call charges"
+         ],
+         "must_not_found": [],
+         "also_ok_matched": false,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "Reply missed stating that callers must pay their own phone call charges.",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "o1-f03",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "Which languages can I speak in?",
+       "messageId": "f3842dee-ca8f-4af5-bfed-7dcabdd830b0",
+       "observed": {
+        "reply": "ICALL counsellors are listed as speaking these languages: English, Hindi, Marathi, Gujarati, Assamese, Bengali, Punjabi and Malayalam; English, Hindi, Marathi, Gujarati, Bengali, Punjabi, Konkani, Malayalam, Tamil and Telugu; and English, Hindi, Marathi, Gujarati, Bengali, Malayalam and Tamil. The pages differ on the exact list. Would you like help checking availability in a specific language?",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "What we learned",
+          "source_url": ""
+         }
+        ],
+        "passage_document_ids": [
+         "0f7c6e6b-61d0-459e-bd30-f90e9c9733e2"
+        ],
+        "passage_chunk_ids": [
+         "7bc34392-9dae-4dda-b4b2-afa19a9f7e85",
+         "b59b8a20-5c7a-49fd-9fc3-d4da787b0711",
+         "24e0416c-5cb4-454f-b174-e5f16ac35e06",
+         "d16897e2-11f6-41dc-b983-ce34555b2e2c"
+        ],
+        "history": []
+       },
+       "reply": "ICALL counsellors are listed as speaking these languages: English, Hindi, Marathi, Gujarati, Assamese, Bengali, Punjabi and Malayalam; English, Hindi, Marathi, Gujarati, Bengali, Punjabi, Konkani, Malayalam, Tamil and Telugu; and English, Hindi, Marathi, Gujarati, Bengali, Malayalam and Tamil. The pages differ on the exact list. Would you like help checking availability in a specific language?",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 1,
+       "confirmation": null,
+       "statusMs": 20.727957999988575,
+       "firstWordsMs": 3931.8446660000045,
+       "ms": 5451.1432079999795,
+       "grade": {
+        "verdict": "pass",
+        "reasons": [
+         "conflicting_facts"
+        ],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": true,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "",
+         "conflicting_facts": [
+          "conflicting facts: English, Hindi, Marathi, Gujarati, Assamese, Bengali, Punjabi, Malayalam vs English, Hindi, Marathi, Gujarati, Bengali, Punjabi, Konkani, Malayalam, Tamil, Telugu",
+          "conflicting facts: English, Hindi, Marathi, Gujarati, Assamese, Bengali, Punjabi, Malayalam vs English, Hindi, Marathi, Gujarati, Bengali, Malayalam, Tamil",
+          "conflicting facts: English, Hindi, Marathi, Gujarati, Bengali, Punjabi, Konkani, Malayalam, Tamil, Telugu vs English, Hindi, Marathi, Gujarati, Bengali, Malayalam, Tamil"
+         ]
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "o3-goonj",
+   "assistant": "o3-goonj",
+   "run": 1,
+   "cases": [
+    {
+     "id": "o3-f01",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "Will I get an 80G receipt if I donate money?",
+       "messageId": "a0de8dc0-77a0-4826-a8fb-3cc0ec3d333f",
+       "observed": {
+        "reply": "Yes. Money donations are eligible for 80G tax receipt — Goonj issues an 80G receipt for monetary donations; to get it send your name, PAN, amount, address and transfer details (and, for online contributions, a government ID may be needed for certificate 10BE).",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Owner notes",
+          "source_url": ""
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Donate Online | Rural Development | Disaster Relief | Goonj",
+          "source_url": "https://goonj.org/donate"
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Frequently Asked Questions | Goonj",
+          "source_url": "https://goonj.org/faq"
+         }
+        ],
+        "passage_document_ids": [
+         "1f8fa30c-93e6-4633-b2d7-9fb81ec4fbd2",
+         "1253d295-82b0-4de6-8974-79ee965676e4",
+         "9a97b71b-9b49-4cc1-9c13-11c2066fe136",
+         "b166a389-9656-4bd7-9011-1a41ad031c16"
+        ],
+        "passage_chunk_ids": [
+         "0d763208-611e-4968-9b61-41d137a9ae99",
+         "465ca673-7e84-486a-9aad-0cc7f48142a4",
+         "8b8a7034-8c01-40e4-8325-07704412476d",
+         "c356c505-4740-4e62-9836-c187978c3f42",
+         "1a90ddbf-650f-4e03-88d1-bb0b4b8e1223",
+         "349735ec-4615-49f4-9656-ad2ad26cbc24",
+         "bcf558f9-c18b-40c6-a7bc-336d458a1840",
+         "ff1a346c-ceaa-4dfc-bdcb-e59be31353f9"
+        ],
+        "history": []
+       },
+       "reply": "Yes. Money donations are eligible for 80G tax receipt — Goonj issues an 80G receipt for monetary donations; to get it send your name, PAN, amount, address and transfer details (and, for online contributions, a government ID may be needed for certificate 10BE).",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 3,
+       "confirmation": null,
+       "statusMs": 50.287249999993946,
+       "firstWordsMs": 3722.22645799999,
+       "ms": 4457.040374999982,
+       "grade": {
+        "verdict": "pass",
+        "reasons": [],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": true,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "o3-f02",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "I'm giving old clothes. Do I get tax exemption on that?",
+       "messageId": "7d0f7958-6669-4ac6-a977-b6a3874e5ed8",
+       "observed": {
+        "reply": "Under Indian government rules, you will not get any tax exemption for donating material (like old clothes). We do issue an acknowledgement for material received but not itemised specifics unless you provide details. Would you like to know how to find a dropping centre near you?",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "What we learned",
+          "source_url": ""
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Frequently Asked Questions | Goonj",
+          "source_url": "https://goonj.org/faq"
+         }
+        ],
+        "passage_document_ids": [
+         "9a97b71b-9b49-4cc1-9c13-11c2066fe136",
+         "dc59832b-513f-4c7a-87f9-a901fc75149c",
+         "1253d295-82b0-4de6-8974-79ee965676e4"
+        ],
+        "passage_chunk_ids": [
+         "a575bfbb-ba1f-408a-842b-7fb86538a201",
+         "59d13391-36c9-46aa-92da-ded202bf81ea",
+         "ff1a346c-ceaa-4dfc-bdcb-e59be31353f9",
+         "8d30813a-bd38-4165-9498-8db093f2d82c"
+        ],
+        "history": []
+       },
+       "reply": "Under Indian government rules, you will not get any tax exemption for donating material (like old clothes). We do issue an acknowledgement for material received but not itemised specifics unless you provide details. Would you like to know how to find a dropping centre near you?",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 2,
+       "confirmation": null,
+       "statusMs": 15.742874999996275,
+       "firstWordsMs": 3373.59487500001,
+       "ms": 4086.9673340000154,
+       "grade": {
+        "verdict": "pass",
+        "reasons": [],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": true,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "o3-f03",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "Can someone pick up the material from my house?",
+       "messageId": "d01d3135-cc92-4204-9ec5-f6ae23d43c78",
+       "observed": {
+        "reply": "We can’t pick up material from individual homes. Please use a local dropping centre or courier the material to the nearest Goonj office; for institutions (schools, colleges, corporates) we request they drop material themselves. If you need more help, you can write to Harshie (mail@goonj.org / harshie@goonj.org) or call the Delhi office numbers listed.",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "What we learned",
+          "source_url": ""
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Frequently Asked Questions | Goonj",
+          "source_url": "https://goonj.org/faq"
+         }
+        ],
+        "passage_document_ids": [
+         "9a97b71b-9b49-4cc1-9c13-11c2066fe136",
+         "1253d295-82b0-4de6-8974-79ee965676e4",
+         "6981204c-a9fe-467d-9826-988ae538bb5f"
+        ],
+        "passage_chunk_ids": [
+         "ce4f13ec-ead8-4909-9bdb-7b06f822edf5",
+         "f11f61d9-4120-4d4e-9e4f-023559480218",
+         "34b4f586-341d-4d5c-8a15-c1dc54ea441b",
+         "a3bc8173-c229-4625-8916-5032a263a847"
+        ],
+        "history": []
+       },
+       "reply": "We can’t pick up material from individual homes. Please use a local dropping centre or courier the material to the nearest Goonj office; for institutions (schools, colleges, corporates) we request they drop material themselves. If you need more help, you can write to Harshie (mail@goonj.org / harshie@goonj.org) or call the Delhi office numbers listed.",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 2,
+       "confirmation": null,
+       "statusMs": 64.88112500001444,
+       "firstWordsMs": 4355.077208000002,
+       "ms": 5322.997875000001,
+       "grade": {
+        "verdict": "pass",
+        "reasons": [],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": true,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": true,
+         "note": "",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "o2-cansupport",
+   "assistant": "o2-cansupport",
+   "run": 1,
+   "cases": [
+    {
+     "id": "o2-f01",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "Do I have to pay for your home visits?",
+       "messageId": "07519b63-2ed7-4b25-acd1-cc41765c1780",
+       "observed": {
+        "reply": "No — CanSupport’s home-based palliative care is provided free of charge. The teams support patients with pain management, nursing guidance and counselling at no cost (CanSupport). If you’d like to arrange this or want the helpline number to call, I can help — would you like that?",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Cost of Cancer Treatment in Delhi: A Realistic Breakdown by Treatment Type | CanSupport",
+          "source_url": "https://cansupport.org/cost-of-cancer-treatment-in-delhi"
+         }
+        ],
+        "passage_document_ids": [
+         "44ce79a2-6add-498b-a830-9dd661ffc4e0",
+         "584d1511-e99e-4810-8b58-61fbd17106e7",
+         "a8e5cbe6-8b75-4eac-9b7c-7ea7eb0c3749",
+         "c1713658-4c41-4702-9eb9-adca8dbd5747",
+         "cfaa1f79-3fdb-449c-8c3e-edd72c97d07c"
+        ],
+        "passage_chunk_ids": [
+         "07915798-ed08-4618-9a3d-fb7913198e4e",
+         "24da25ee-9175-4121-8e54-52b624f2f672",
+         "5ab064be-6eaf-4fad-b789-acfc90cbc443",
+         "315f96ea-aa19-4904-86c3-aa01b3a45310",
+         "08b4d506-0453-4cf5-8f2d-7037d0419f4f",
+         "5774480b-1429-4d46-8ff6-033dbbcfaacb",
+         "148d023a-a70b-492a-8bc8-f66b197b9734",
+         "0f59a2ed-5230-4145-9e5a-b08530aa68b7"
+        ],
+        "history": []
+       },
+       "reply": "No — CanSupport’s home-based palliative care is provided free of charge. The teams support patients with pain management, nursing guidance and counselling at no cost (CanSupport). If you’d like to arrange this or want the helpline number to call, I can help — would you like that?",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 1,
+       "confirmation": null,
+       "statusMs": 41.6372080000001,
+       "firstWordsMs": 5219.318957999989,
+       "ms": 6014.992415999994,
+       "grade": {
+        "verdict": "pass",
+        "reasons": [],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": true,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "o2-f02",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PARTIAL",
+     "turns": [
+      {
+       "user": "What does CanSupport do?",
+       "messageId": "fa5dba81-94f2-4d53-8d75-ad903849a0ff",
+       "observed": {
+        "reply": "CanSupport provides palliative care for people with cancer, focusing on maximising quality of life and respecting the person’s dignity. We follow a patient-centred approach where patient preferences and goals guide care.",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "What we learned",
+          "source_url": ""
+         }
+        ],
+        "passage_document_ids": [
+         "2d6f50ff-be78-4bd2-905f-e7d38fc55124",
+         "c1713658-4c41-4702-9eb9-adca8dbd5747",
+         "87e9fae1-d36f-477b-ad27-3cfeba5ebde8",
+         "048252e1-7ab9-4da4-8662-0b53315f2040",
+         "d52efb02-77e4-429f-9413-5415577c9128",
+         "c554ba30-ecfe-4c4b-9d54-3b9fff98216e",
+         "584d1511-e99e-4810-8b58-61fbd17106e7"
+        ],
+        "passage_chunk_ids": [
+         "7e84868f-552b-400d-a8c2-bfbdc9352cdc",
+         "12d92e04-1f19-41c6-9aa9-b9595c479358",
+         "f52e2b87-e1a2-42c0-9704-20bfa459cb3e",
+         "5dd19cda-614e-4bb0-8acc-9c4788252007",
+         "8b1d47fe-49e7-4798-b96b-205348072fa9",
+         "256f5a2b-5c5c-4c7b-b746-e3dfeb683ad4",
+         "81e62df0-0a43-4364-a36d-df6d3bddd761",
+         "9c4e9b30-6909-4e37-93d2-8e27de52f3b1"
+        ],
+        "history": []
+       },
+       "reply": "CanSupport provides palliative care for people with cancer, focusing on maximising quality of life and respecting the person’s dignity. We follow a patient-centred approach where patient preferences and goals guide care.",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 1,
+       "confirmation": null,
+       "statusMs": 93.18954199997825,
+       "firstWordsMs": 4448.650916999992,
+       "ms": 5056.212375000003,
+       "grade": {
+        "verdict": "fail",
+        "reasons": [
+         "facts_missing",
+         "did_not_answer"
+        ],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [
+          "at home"
+         ],
+         "must_not_found": [],
+         "also_ok_matched": false,
+         "answers_question": false,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "The reply omits that CanSupport provides home-based (at-home) palliative care.",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "o2-f03",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "Who is eligible for home care?",
+       "messageId": "e49daffd-9cf7-43aa-9907-5e7c13403a4b",
+       "observed": {
+        "reply": "Home-based palliative (home care) is for people with advanced cancer and their families. (This is what the service describes. Would you like me to check the nearest home-care team for your area?",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "CanSupport – India’s Leading Cancer Care NGO",
+          "source_url": "https://cansupport.org/"
+         }
+        ],
+        "passage_document_ids": [
+         "44ce79a2-6add-498b-a830-9dd661ffc4e0",
+         "de2eaf71-7c03-4ce5-8898-f3789d5c518c",
+         "cfaa1f79-3fdb-449c-8c3e-edd72c97d07c",
+         "584d1511-e99e-4810-8b58-61fbd17106e7"
+        ],
+        "passage_chunk_ids": [
+         "08b4d506-0453-4cf5-8f2d-7037d0419f4f",
+         "4c28b13e-054f-4dd3-8a8f-36624ca20206",
+         "0f59a2ed-5230-4145-9e5a-b08530aa68b7",
+         "5ab064be-6eaf-4fad-b789-acfc90cbc443",
+         "e6e9658d-783d-4ef0-b999-9b4de9fd8d38",
+         "79814668-98d2-4e94-b567-9de042073975",
+         "3f356100-6033-40bd-89c2-4fdbd2f5e724",
+         "7c37374c-0363-4052-9436-3b1630f965b6"
+        ],
+        "history": []
+       },
+       "reply": "Home-based palliative (home care) is for people with advanced cancer and their families. (This is what the service describes. Would you like me to check the nearest home-care team for your area?",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 1,
+       "confirmation": null,
+       "statusMs": 63.98912499999278,
+       "firstWordsMs": 5328.955125000008,
+       "ms": 6088.419458999997,
+       "grade": {
+        "verdict": "pass",
+        "reasons": [],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": false,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "o4-tfi-staff",
+   "assistant": "o4-tfi-staff",
+   "run": 1,
+   "cases": [
+    {
+     "id": "o4-f01",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "How many earned leave days do I get, and how many carry forward?",
+       "messageId": "b5ae25b7-0bcd-41ef-b91a-2e22790f8d74",
+       "observed": {
+        "reply": "You get 18 earned leave days a year (accrues 1.5 days/month). Up to 10 of those days may be carried forward to the next year; any beyond 10 lapse. (See staff handbook.",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Tfi Staff Handbook",
+          "source_url": ""
+         }
+        ],
+        "passage_document_ids": [
+         "94b431ed-2c9a-4b48-a1a7-d0391792b052",
+         "72be744f-ad94-491c-9093-aea84872b09d",
+         "79cdd0ad-b88d-40e8-a5b0-37b8644f2533"
+        ],
+        "passage_chunk_ids": [
+         "bb6a813a-68c5-44c1-8c60-b3d3442309d3",
+         "dfaeb2c8-816b-4fd9-b7e7-4672d8fb7e7a",
+         "9583062e-3d23-4b13-8d83-50ac6d4e6ef0",
+         "c628e8b0-ed6d-4e2c-8313-eafc6aecf65c"
+        ],
+        "history": []
+       },
+       "reply": "You get 18 earned leave days a year (accrues 1.5 days/month). Up to 10 of those days may be carried forward to the next year; any beyond 10 lapse. (See staff handbook.",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 1,
+       "confirmation": null,
+       "statusMs": 51.64162499998929,
+       "firstWordsMs": 2394.617707999976,
+       "ms": 4836.436874999985,
+       "grade": {
+        "verdict": "pass",
+        "reasons": [],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": true,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "o4-f02",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "Do I need a doctor's note for sick leave?",
+       "messageId": "3da2b33f-4b70-4498-aa57-86e3c746ff82",
+       "observed": {
+        "reply": "You need a doctor’s certificate only if your sick leave is for more than 2 days in a row. Apply for leave in Keka; your manager approves it. (See staff handbook.",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Tfi Staff Handbook",
+          "source_url": ""
+         }
+        ],
+        "passage_document_ids": [
+         "94b431ed-2c9a-4b48-a1a7-d0391792b052",
+         "72be744f-ad94-491c-9093-aea84872b09d",
+         "58e818a1-3b61-4a5e-bb7e-afa51ff95cf1",
+         "79cdd0ad-b88d-40e8-a5b0-37b8644f2533"
+        ],
+        "passage_chunk_ids": [
+         "bb6a813a-68c5-44c1-8c60-b3d3442309d3",
+         "9583062e-3d23-4b13-8d83-50ac6d4e6ef0",
+         "97b6c3f6-07a5-40b1-a571-f23517ac2b75",
+         "dfaeb2c8-816b-4fd9-b7e7-4672d8fb7e7a",
+         "c628e8b0-ed6d-4e2c-8313-eafc6aecf65c"
+        ],
+        "history": []
+       },
+       "reply": "You need a doctor’s certificate only if your sick leave is for more than 2 days in a row. Apply for leave in Keka; your manager approves it. (See staff handbook.",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 1,
+       "confirmation": null,
+       "statusMs": 201.79716699998244,
+       "firstWordsMs": 3108.982250000001,
+       "ms": 3799.176291999989,
+       "grade": {
+        "verdict": "pass",
+        "reasons": [],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": true,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "o4-f03",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "What's the notice period after confirmation?",
+       "messageId": "8cc76057-a7f5-48c3-9560-200825ccd0f4",
+       "observed": {
+        "reply": "After confirmation, the notice period is 60 days for staff at Manager level and above, and 30 days for everyone else. (See the staff handbook.",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Tfi Staff Handbook",
+          "source_url": ""
+         }
+        ],
+        "passage_document_ids": [
+         "94b431ed-2c9a-4b48-a1a7-d0391792b052",
+         "7dad9792-a118-4424-a516-4381b2fce76a"
+        ],
+        "passage_chunk_ids": [
+         "dfaeb2c8-816b-4fd9-b7e7-4672d8fb7e7a",
+         "9176e71f-7c27-4798-9158-802639bcc195",
+         "d4f1b542-ef04-452d-bc71-9596d51b04d9",
+         "54571b7c-f720-4d89-b3c8-bcf41b433f6a"
+        ],
+        "history": []
+       },
+       "reply": "After confirmation, the notice period is 60 days for staff at Manager level and above, and 30 days for everyone else. (See the staff handbook.",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 1,
+       "confirmation": null,
+       "statusMs": 16.31979200002388,
+       "firstWordsMs": 2758.929833000002,
+       "ms": 3162.271833000006,
+       "grade": {
+        "verdict": "pass",
+        "reasons": [],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": true,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "o5-rha",
+   "assistant": "o5-rha",
+   "run": 1,
+   "cases": [
+    {
+     "id": "o5-f01",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "Do you accept money donations?",
+       "messageId": "5176cf68-b4e5-4dd5-b224-0c25f788b26a",
+       "observed": {
+        "reply": "We do not accept money donations — Robin Hood Army is a volunteer-run, zero-funds organisation (we don’t take money). If you’d like to help, you can contribute surplus food instead (see Contribute Food).",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Owner notes",
+          "source_url": ""
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Join Us – Robin Hood Army",
+          "source_url": "https://robinhoodarmy.com/sites/main/join-us"
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Robin Hood Army – Zero Hunger, One Drive at a Time - Robin Hood Army",
+          "source_url": "https://robinhoodarmy.com/sites/main"
+         }
+        ],
+        "passage_document_ids": [
+         "b186c071-4649-4a53-9de5-e1388f7194e2",
+         "cc9aeed4-5788-46ef-95c5-9f006a89645a",
+         "641bd7f4-ebe1-4aeb-b97e-fd39e4da7249",
+         "f6cdfa4a-937d-4611-a0c0-9a0696da534f"
+        ],
+        "passage_chunk_ids": [
+         "605eb461-9533-41be-a970-63bb2c62448d",
+         "68b8c53a-9f57-4881-9bbf-0ddc8e44b647",
+         "1d60e597-9add-47ab-b755-8b22ab2f7517",
+         "6fefaa33-1a08-4eef-b10d-889021c9b693"
+        ],
+        "history": []
+       },
+       "reply": "We do not accept money donations — Robin Hood Army is a volunteer-run, zero-funds organisation (we don’t take money). If you’d like to help, you can contribute surplus food instead (see Contribute Food).",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 3,
+       "confirmation": null,
+       "statusMs": 684.5570000000007,
+       "firstWordsMs": 7624.503874999995,
+       "ms": 8256.184249999991,
+       "grade": {
+        "verdict": "pass",
+        "reasons": [],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": true,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "o5-f02",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "How much time do I need to give as a volunteer?",
+       "messageId": "05351e36-6db7-4ab5-9419-6233b461863e",
+       "observed": {
+        "reply": "All we need is 3 hours per week, at least twice a month to make a real impact. If there’s a team in your city looking to grow, a Robin will reach out to you.",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Robin Hood Army – Zero Hunger, One Drive at a Time - Robin Hood Army",
+          "source_url": "https://robinhoodarmy.com/sites/main"
+         }
+        ],
+        "passage_document_ids": [
+         "f6cdfa4a-937d-4611-a0c0-9a0696da534f",
+         "6ee3ab21-c005-43ab-9a95-a4eaafaaae2c"
+        ],
+        "passage_chunk_ids": [
+         "e3fc0be6-5995-454c-b0e3-387581402802",
+         "d3cfe9a2-541a-417e-9a36-a35e977ea55b",
+         "9684e7d3-f8a1-4909-9331-19777f083509",
+         "0d4322e1-b606-4adc-b0bd-28240b37bb67"
+        ],
+        "history": []
+       },
+       "reply": "All we need is 3 hours per week, at least twice a month to make a real impact. If there’s a team in your city looking to grow, a Robin will reach out to you.",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 1,
+       "confirmation": null,
+       "statusMs": 31.176875000004657,
+       "firstWordsMs": 3456.025457999989,
+       "ms": 4088.5872500000114,
+       "grade": {
+        "verdict": "pass",
+        "reasons": [],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": true,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "o5-f03",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PARTIAL",
+     "turns": [
+      {
+       "user": "Who do you serve food to?",
+       "messageId": "88d625df-f738-470a-87bf-1f3092a87419",
+       "observed": {
+        "reply": "We serve free meals to people facing hunger and food insecurity. Would you like to know how many meals were served last week?",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Join Us – Robin Hood Army",
+          "source_url": "https://robinhoodarmy.com/sites/main/join-us"
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "RHA - Home PageRobin Hood Army",
+          "source_url": "https://checkin.robinhoodarmy.com/home"
+         }
+        ],
+        "passage_document_ids": [
+         "cc9aeed4-5788-46ef-95c5-9f006a89645a",
+         "f6cdfa4a-937d-4611-a0c0-9a0696da534f",
+         "a6c96efc-e5e1-4eaf-8373-2f012c8d75da",
+         "6ee3ab21-c005-43ab-9a95-a4eaafaaae2c",
+         "dfa208ba-98ca-417d-b40d-2ea83a29f5dc",
+         "9a0f1b73-f9fd-477d-8fd8-49a04bba4d55"
+        ],
+        "passage_chunk_ids": [
+         "b5afbff1-29fb-496e-a2c6-79d6dc81fb2f",
+         "bdec358d-f5c9-4fc5-b2f8-d59fe8f375d7",
+         "2df62ce4-6b6b-4ff8-a479-e898dae683f8",
+         "894b0429-af02-404d-af0a-1b4ffb3a0404",
+         "0b4fa1bc-d7eb-4324-bb60-b5e9fb1132de",
+         "a8b460f1-bfde-48ae-998b-6153e5b1a935",
+         "2466e282-98a8-4595-bec9-7fe82bf856fe",
+         "f2668e0f-54da-459e-af1f-3747f458c3e8"
+        ],
+        "history": []
+       },
+       "reply": "We serve free meals to people facing hunger and food insecurity. Would you like to know how many meals were served last week?",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 2,
+       "confirmation": null,
+       "statusMs": 25.975165999989258,
+       "firstWordsMs": 4898.410875000001,
+       "ms": 5318.683874999988,
+       "grade": {
+        "verdict": "fail",
+        "reasons": [
+         "facts_missing",
+         "did_not_answer"
+        ],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [
+          "homeless",
+          "orphanages",
+          "old age homes"
+         ],
+         "must_not_found": [],
+         "also_ok_matched": false,
+         "answers_question": false,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "Reply is too vague — it says ‘people facing hunger’ but does not name homeless, orphanages, or old age homes.",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "o6-updates",
+   "assistant": "o6-updates",
+   "run": 1,
+   "cases": [
+    {
+     "id": "o6-f02",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PARTIAL",
+     "turns": [
+      {
+       "user": "Is Goonj 80G registered?",
+       "messageId": "14ca5780-4ddc-433f-99bb-c7093f2c638c",
+       "observed": {
+        "reply": "I can’t find that information in the organisation material I searched. If you’d like a definite answer, you can ask Goonj’s team via their website/contact page. Would you like me to ask the team to confirm for you? Please call 011 -41401216.",
+        "handled_by": "declined",
+        "turn_type": "question",
+        "citations": [],
+        "passage_document_ids": [
+         "d5a2a539-c894-48a4-95b0-1e28b0152c74",
+         "899c95f3-9c8d-46fa-990c-57c71d3a2c9f",
+         "8a6ac435-4865-4aa9-8010-51e9fe8ffd71"
+        ],
+        "passage_chunk_ids": [
+         "351bdd59-7e06-4e27-ab50-2409a0762015",
+         "1d961fc3-590a-43b3-8f23-9430059b1b9e",
+         "5acc63ad-8bad-4966-a0b2-4122127ddd1e",
+         "43a67d5b-bb87-4121-acb2-d15de6c8f292",
+         "2d7ded77-8e26-423b-b3a3-bd84c8981630",
+         "957b9819-7121-45b0-bb6b-ffc2708400bf",
+         "fff41567-5fac-48df-be94-93e5a12199b9",
+         "ffbf3788-5f71-4d0c-9ee4-a1180081e5ff"
+        ],
+        "history": []
+       },
+       "reply": "I can’t find that information in the organisation material I searched. If you’d like a definite answer, you can ask Goonj’s team via their website/contact page. Would you like me to ask the team to confirm for you? Please call 011 -41401216.",
+       "handledBy": "declined",
+       "turnType": "question",
+       "steps": [],
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": 17.157915999996476,
+       "firstWordsMs": 6942.926790999976,
+       "ms": 20477.41608299999,
+       "grade": {
+        "verdict": "fail",
+        "reasons": [
+         "wrong_decline"
+        ],
+        "outcome": "declined",
+        "judge": null
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "rha",
+   "assistant": "o5-rha",
+   "run": 1,
+   "cases": [
+    {
+     "id": "rha-Q1",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "What does Robin Hood Army do?",
+       "messageId": "b198423e-946e-46f7-bedd-d4fc18e87dcf",
+       "observed": {
+        "reply": "Robin Hood Army is a volunteer, zero-funds organisation that collects surplus food from restaurants and the community and distributes it to people living on streets, in slums, orphanages and old-age homes.",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "What we learned",
+          "source_url": ""
+         }
+        ],
+        "passage_document_ids": [
+         "641bd7f4-ebe1-4aeb-b97e-fd39e4da7249",
+         "a6c96efc-e5e1-4eaf-8373-2f012c8d75da"
+        ],
+        "passage_chunk_ids": [
+         "9988e026-7550-423d-807c-01deeac1de56",
+         "28832699-ce5a-454c-a136-fa29fac97e3a",
+         "b94bc512-e785-4b4e-8c5b-21bd15da9b13",
+         "788db61a-d8d3-4b51-a5f8-e597b99ac009",
+         "b19ae36d-aa52-4d5d-9563-06ee99049c6c",
+         "7afecaad-1c17-466d-99c7-157958380995"
+        ],
+        "history": []
+       },
+       "reply": "Robin Hood Army is a volunteer, zero-funds organisation that collects surplus food from restaurants and the community and distributes it to people living on streets, in slums, orphanages and old-age homes.",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 1,
+       "confirmation": null,
+       "statusMs": 14.96504099998856,
+       "firstWordsMs": 4159.60487499999,
+       "ms": 4683.951624999987,
+       "grade": {
+        "verdict": "pass",
+        "reasons": [],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": true,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": false,
+         "note": "",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "rha-Q2",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PARTIAL",
+     "turns": [
+      {
+       "user": "I want to volunteer in Delhi, how do I join?",
+       "messageId": "487ec85b-0352-4f7a-a371-7ed3079c4cef",
+       "observed": {
+        "reply": "I can help get you connected to volunteer in Delhi. Would you like the team to call you? If yes, please share your phone number and the best time to call (morning / afternoon / evening).",
+        "handled_by": "clarified",
+        "turn_type": "question",
+        "citations": [],
+        "passage_document_ids": [
+         "1c638865-825c-4047-a17b-f2833afe49db",
+         "9a0f1b73-f9fd-477d-8fd8-49a04bba4d55",
+         "dfa208ba-98ca-417d-b40d-2ea83a29f5dc",
+         "e016120f-bbef-4929-946a-2919bdce2ad9"
+        ],
+        "passage_chunk_ids": [
+         "0ba01dca-847b-433e-bec1-3b3e795ece04",
+         "9e2e1e3e-2974-457a-ae5c-c4913bc9e3f5",
+         "7a01668d-b73c-433f-a518-7f2fb8882f39",
+         "e0628a08-91ef-48d3-b1f0-882f320e2dc4",
+         "e1a624a1-8bf2-4e65-92dc-785f6912ef94",
+         "61f1a9c4-8069-459b-9055-10396f26888b",
+         "b5fab649-08f1-45ff-a34f-1e9f617cf725",
+         "14b3a555-2ecb-40d8-ba58-5a165505dda5"
+        ],
+        "history": []
+       },
+       "reply": "I can help get you connected to volunteer in Delhi. Would you like the team to call you? If yes, please share your phone number and the best time to call (morning / afternoon / evening).",
+       "handledBy": "clarified",
+       "turnType": "question",
+       "steps": [],
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": 16.010332999983802,
+       "firstWordsMs": 4734.288042,
+       "ms": 5273.182666999986,
+       "grade": {
+        "verdict": "fail",
+        "reasons": [
+         "expected_answer_got_clarified"
+        ],
+        "outcome": "clarified",
+        "judge": null
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "rha-Q3",
+     "kind": "fact",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "Can I donate money? ₹10,000, 80G receipt?",
+       "messageId": "baa275bd-711d-438c-80e5-5056acd05c1c",
+       "observed": {
+        "reply": "We don’t accept monetary donations — Robin Hood Army runs a zero‑funds model and doesn’t take money (so we can’t issue an 80G receipt). You can instead contribute meals or partner as a restaurant; see our “Contribute Food” information. Would you like help with contributing meals or connecting a restaurant?",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Owner notes",
+          "source_url": ""
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Robin Hood Army – Zero Hunger, One Drive at a Time - Robin Hood Army",
+          "source_url": "https://robinhoodarmy.com/"
+         }
+        ],
+        "passage_document_ids": [
+         "6ee3ab21-c005-43ab-9a95-a4eaafaaae2c",
+         "f6cdfa4a-937d-4611-a0c0-9a0696da534f",
+         "b186c071-4649-4a53-9de5-e1388f7194e2",
+         "5b040b55-73fb-4c1b-b635-60936a88d72f",
+         "1d63201e-f00e-40d1-a602-3452fc4bc880",
+         "77ce5204-1bd1-44ca-a36e-9b57bf754597"
+        ],
+        "passage_chunk_ids": [
+         "81a9bb10-e393-4bc5-a425-7cc1d29ef9ae",
+         "6fefaa33-1a08-4eef-b10d-889021c9b693",
+         "605eb461-9533-41be-a970-63bb2c62448d",
+         "d8aeb481-50f6-4c72-9d57-378daa14a5ce",
+         "badee0c1-d32a-4a96-a11a-d100edbce643",
+         "281805fc-cac1-4ec2-9cb4-9676d682fbd6",
+         "608bb37f-41f6-439c-9a00-4e8559555ce6",
+         "058a717f-b72c-4a23-a07f-6ca9a1049c2d"
+        ],
+        "history": []
+       },
+       "reply": "We don’t accept monetary donations — Robin Hood Army runs a zero‑funds model and doesn’t take money (so we can’t issue an 80G receipt). You can instead contribute meals or partner as a restaurant; see our “Contribute Food” information. Would you like help with contributing meals or connecting a restaurant?",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 2,
+       "confirmation": null,
+       "statusMs": 11.463833999994677,
+       "firstWordsMs": 3698.3571250000095,
+       "ms": 8409.764458999998,
+       "grade": {
+        "verdict": "pass",
+        "reasons": [],
+        "outcome": "answered",
+        "judge": {
+         "facts_missing": [],
+         "must_not_found": [],
+         "also_ok_matched": true,
+         "answers_question": true,
+         "invents_facts": false,
+         "declines_request": true,
+         "note": "",
+         "conflicting_facts": []
+        }
+       },
+       "hard": [],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

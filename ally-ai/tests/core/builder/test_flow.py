@@ -318,6 +318,38 @@ class TestPurposes:
         assert not any(c.coming_soon for c in res.designs)
 
     @pytest.mark.asyncio
+    async def test_a_sample_about_risk_or_with_clinical_advice_is_replaced(self):
+        """Q4 3c: previews show the safe pattern on sensitive packs."""
+        fake = FakeLLM(
+            PurposesOut=[
+                {
+                    "recommended": "answer",
+                    "cards": [
+                        {
+                            "id": "enquiries",
+                            "best_for": "People who need support",
+                            "visitor_line": "I don't want to live anymore",
+                            "assistant_line": "Can I take your name and number?",
+                        },
+                        {
+                            "id": "guide",
+                            "best_for": "Families",
+                            "visitor_line": "How do I manage pain at home?",
+                            "assistant_line": "Increase the morphine dose to 10 mg.",
+                        },
+                    ],
+                }
+            ]
+        )
+        res = await run(request("design", industry="mental_health"), fake)
+        cards = {c.id: c for c in res.designs}
+        for purpose_id in ("enquiries", "guide"):
+            default = purposes.PURPOSES[PurposeId(purpose_id)].default_sample
+            assert [line["text"] for line in cards[purpose_id].sample] == [
+                text for _who, text in default
+            ]
+
+    @pytest.mark.asyncio
     async def test_the_recommendation_is_one_of_the_two_best_for_the_business(self):
         fake = FakeLLM(PurposesOut=[{"recommended": "training", "cards": []}])
         res = await run(request("design", industry="diagnostic_lab"), fake)
@@ -719,3 +751,46 @@ class TestInstructionsCarryNoDetails:
         assert patches["/instructions"] == "Answer briefly."
         # The decline wording keeps its contact: ally-be sends it as written.
         assert "0000 9090" in patches["/declineText"]
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "unchanged",
+        "Unchanged",
+        '"unchanged"',
+        "(unchanged)",
+        "no change",
+        "same",
+        "N/A",
+        "none",
+        "-",
+    ],
+)
+def test_a_placeholder_is_never_a_name_or_wording(value):
+    """Q4 N1: "unchanged" became Vandrevala's name and slug (Round 8)."""
+    from app.core.builder.flow import proposal_patches, proposed
+    from app.core.builder.schemas import ConverseOut
+
+    assert proposed(value) == ""
+    out = ConverseOut(name=value, assistant_name=value, decline_text=value)
+    assert proposal_patches(out, "source") == []
+
+
+def test_a_real_name_still_changes():
+    from app.core.builder.flow import proposed
+
+    assert proposed("Vandrevala Foundation") == "Vandrevala Foundation"
+    assert proposed("Same Day Clinic") == "Same Day Clinic"
+
+
+@pytest.mark.asyncio
+async def test_health_and_ngo_cards_say_people_not_customers():
+    """Q4 B10: a helpline or an NGO brings in people, not customers."""
+    fake = FakeLLM(PurposesOut=[{"recommended": "answer", "cards": []}])
+    res = await run(request("design", industry="non_profit"), fake)
+    titles = [d.title for d in res.designs]
+    assert "Bring in people" in titles
+    assert not any(
+        "ustomer" in " ".join([d.title, d.best_for, *d.will]) for d in res.designs
+    )

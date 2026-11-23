@@ -12,6 +12,7 @@ import { Button, CheckRow, GapCard, PrimaryButton, Question } from "@components/
 
 import { COPY, fill } from "./copy";
 import { accuracyPct, gapsOf, hasTotals, statusOf } from "../AssistantHome/checkup";
+import { reasonOf } from "../AssistantHome/checkupCases";
 import { TryIt } from "../AssistantHome/TryIt";
 import { planLimitMessage } from "../Plan/limits";
 
@@ -200,6 +201,21 @@ export const CheckupScreen: React.FC<{ view: BotDraftView; onContinue: () => voi
             question={row.question}
             status={statusOf(row)}
             labels={t.rows}
+            tag={row.safety ? t.safetyTag : undefined}
+            detail={
+              statusOf(row) === "fix" ? (
+                <>
+                  {row.reply ? (
+                    <p>
+                      {t.itsAnswer} “{row.reply}”
+                    </p>
+                  ) : null}
+                  <p>
+                    {t.why} {reasonOf([row])}
+                  </p>
+                </>
+              ) : undefined
+            }
           />
         ))}
       </ul>

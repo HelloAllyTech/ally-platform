@@ -1,4 +1,5 @@
 import { BotDraftEntity } from '../entity/bot-draft.entity';
+import { safetyView } from '../home/own-rules';
 import { packFor } from '../safety-pack/safety-packs';
 import type { DraftEvent } from '../type/bot-draft.type';
 import { conversation, designCards } from './bot-draft-session.service';
@@ -67,6 +68,10 @@ export function draftView(draft: BotDraftEntity) {
           never: pack.never,
           atRisk: pack.atRisk,
           on: Boolean(draft.safetyPack),
+          // "This isn't right for my business" in setup (Q4 A3): the packs to choose from, as
+          // the home offers them, and the owner's last change.
+          choices: safetyView(pack.id, []).choices,
+          packChange: draft.draftConfig.packChange ?? null,
         }
       : null,
     conversation: {

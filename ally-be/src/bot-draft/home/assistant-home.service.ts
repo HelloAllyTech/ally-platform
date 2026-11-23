@@ -7,6 +7,7 @@ import {
   ServiceUnavailableException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { crisisHelplines } from '../../chatbot/engine/crisis-helplines';
 import { ListToolsService } from '../../chatbot/agent-tools/list-tools.service';
 import type { ListPlaybook } from '../../chatbot/agent-tools/list-tools';
 import { InjectDataSource } from '@nestjs/typeorm';
@@ -19,7 +20,11 @@ import { ChatbotService } from '../../chatbot/service/chatbot.service';
 import { LoggerService } from '../../logger/logger.service';
 import { ChatbotPage } from '../../chatbot/entity/chatbot-page.entity';
 import { Chatbot, type PackChange } from '../../chatbot/entity/chatbot.entity';
-import { crisisReply, packFor } from '../safety-pack/safety-packs';
+import {
+  crisisReply,
+  MIN_PACK_REASON,
+  packFor,
+} from '../safety-pack/safety-packs';
 import { BotPageAccess, BotPageStatus } from '../../chatbot/enum/bot-page.enum';
 import { ChatbotMemberRole } from '../../chatbot/enum/chatbot.enum';
 import { ChatbotAccessService } from '../../chatbot/service/chatbot-access.service';
@@ -49,7 +54,6 @@ import {
 import { changeOwnRules, RuleChange, safetyView } from './own-rules';
 
 /** The shortest reason the owner can give for a less strict pack (Q3-fast Part 1). */
-const MIN_PACK_REASON = 10;
 
 /** "Your instructions" refused because they'd weaken a safety rule (deck §25). */
 export const SAFETY_CONFLICT_MESSAGE =
@@ -199,7 +203,8 @@ export class AssistantHomeService {
     const effective = await this.settings.getForChatbot(chatbot);
     return crisisReply({
       pack: chatbot.safetyPack,
-      helplineNumbers: effective.helplineNumbers,
+      // Q4 G7: exactly what's sent, so only a number the owner confirmed.
+      helplineNumbers: crisisHelplines(effective),
     });
   }
 

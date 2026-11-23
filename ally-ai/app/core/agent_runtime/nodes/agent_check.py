@@ -26,10 +26,16 @@ from app.core.agent_runtime.check import (
     organisation_of,
     rejection_feedback,
 )
+from app.core.agent_runtime.key_facts import key_fact_passages
 from app.core.agent_runtime.memory import personal_context
 from app.core.agent_runtime.state import AgentState, json_safe
 from app.core.agent_runtime.tools import gateway_tools
-from app.core.agent_runtime.tools.lists import offers_create, takes_details
+from app.core.agent_runtime.tools.lists import (
+    books_into,
+    looks_up_records,
+    offers_create,
+    takes_details,
+)
 from app.core.agent_runtime.trace import Node, traced
 from app.core.knowledge_agent.agent import KnowledgeAgentService
 from app.core.knowledge_agent.schemas import is_general
@@ -116,10 +122,17 @@ def make_agent_check_node(service: KnowledgeAgentService) -> Node:
             personal=personal_context(state["bot"]),
             looked_up=bool(finds),
             can_pass_on=can_pass_on(state["bot"]),
-            carried=len(state.get("carried_records") or []),
+            # Carried entries and key facts (Q4 G3): citable, not found by this run.
+            carried=len(state.get("carried_records") or [])
+            + len(key_fact_passages(state["bot"])),
             refused=refused,
             business_contact=state["bot"].get("business_contact") or "",
             memory_on="memory" in state["bot"],
+            channel=state["bot"].get("channel") or "",
+            crisis_line=state["bot"].get("support_helplines") or "",
+            upset=bool(state["bot"].get("mood")),
+            books=books_into(state["bot"].get("gateway_definitions")),
+            looks_up=looks_up_records(state["bot"].get("gateway_definitions")),
             found_nothing=any(
                 call.get("nearest") or not (call.get("added") or call.get("aggregate"))
                 for call in finds

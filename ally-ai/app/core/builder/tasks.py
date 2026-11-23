@@ -13,7 +13,9 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, TypeVar
 
 from pydantic import BaseModel
 
+from app.core.agent_runtime.check.safety import clinical_advice
 from app.core.builder import catalogue, purposes
+from app.core.builder.flow import proposed
 from app.core.builder.grounding import sample_grounded, split_turn, ungrounded
 from app.core.builder.prompt import (
     format_answers,
@@ -173,7 +175,7 @@ async def extract(request: ExtractRequest) -> ExtractResponse:
         facts=facts,
         dropped=dropped,
         findings=findings(facts),
-        business_name=" ".join(out.business_name.split())[:120],
+        business_name=proposed(" ".join(out.business_name.split()))[:120],
     )
 
 
@@ -337,7 +339,56 @@ async def propose_purposes(
             sample=[],
         )
     )
+    if request.industry in PEOPLE_INDUSTRIES:
+        cards = [_for_people(card) for card in cards]
     return cards
+
+
+#: Health and non-profit organisations serve people, not customers (Q4 B10).
+PEOPLE_INDUSTRIES = {
+    "mental_health",
+    "gp_clinic",
+    "diagnostic_lab",
+    "pharmacy",
+    "non_profit",
+}
+_CUSTOMERS = re.compile(r"\b([Cc])ustomer(s?)\b")
+
+
+def _people(text: str) -> str:
+    return _CUSTOMERS.sub(
+        lambda m: ("P" if m.group(1) == "C" else "p")
+        + ("eople" if m.group(2) else "erson"),
+        text,
+    )
+
+
+def _for_people(card: DesignCard) -> DesignCard:
+    """The card with "people" for "customers" (Q4 B10: "Bring in people")."""
+    return card.model_copy(
+        update={
+            "title": _people(card.title),
+            "best_for": _people(card.best_for),
+            "will": [_people(line) for line in card.will],
+            "wont": [_people(line) for line in card.wont],
+        }
+    )
+
+
+#: A visitor line about risk or an emergency (Q4 3c), in English, Hindi and Hinglish.
+_RISKY = re.compile(
+    r"suicid|kill (?:my|him|her)self|end (?:it all|my life)|self[- ]harm|hurt(?:ing)? "
+    r"myself|cut(?:ting)? myself|don'?t want to (?:live|be alive)|want to die|"
+    r"no reason to live|overdose|can'?t breathe|chest pain|unconscious|bleeding "
+    r"heavily|jeene ka mann nahi|marna chahta|marna chahti|khud ko (?:nuksan|"
+    r"khatam)|जीने का मन नहीं|मरना चाहता|मरना चाहती|आत्महत्या|खुद को (?:नुकसान|खत्म)",
+    re.IGNORECASE,
+)
+
+
+def risky_sample(text: str) -> bool:
+    """Whether a sample's visitor line is about risk or an emergency (Q4 3c)."""
+    return bool(_RISKY.search(text or ""))
 
 
 def _purpose_card(
@@ -356,6 +407,11 @@ def _purpose_card(
         or not assistant
         or catalogue.overpromises(assistant)
         or not sample_grounded(f"{visitor}\n{assistant}", source)
+        # Q4 3c (NGO baseline: iCall's sample answered a self-harm message by asking
+        # for a name and number): a sample is never about risk or an emergency, and
+        # never gives clinical advice; the catalogue's safe sample is used instead.
+        or risky_sample(visitor)
+        or clinical_advice(assistant)
     ):
         sample = [{"from": who, "text": text} for who, text in purpose.default_sample]
     else:

@@ -32,6 +32,7 @@ from datetime import datetime, timezone
 from hashlib import sha256
 from typing import Any, Dict, List, Optional
 
+from app.core.config import settings
 from app.core.constants import EmbeddingConstants
 from app.core.embeddings.base import BaseEmbeddingService
 from app.core.llm_usage.emitter import emit_embedding_usage
@@ -104,6 +105,13 @@ class ChunkAudience:
                 {"property": "tenant_ids", "contains_any": [str(self.tenant_id)]}
             )
         return conditions
+
+
+#: Neighbour chunks (Q4): how far either way, what counts as short, and the cap.
+NEIGHBOUR_REACH = 2
+SHORT_HIT_CHARS = 200
+SHORT_NEIGHBOUR_CHARS = 150
+NEIGHBOUR_MAX_CHARS = 1500
 
 
 class KnowledgeChunkService:
@@ -401,16 +409,101 @@ class KnowledgeChunkService:
                 return []
             filters["document_id"] = [str(d) for d in document_ids]
 
-        hits = await self.vector_db.near_vector_search(
-            collection_name=self.collection_name,
-            vector=vector,
-            limit=limit,
-            min_similarity=min_similarity,
-            filters=filters or None,
-            any_of=audience.to_any_of(),
-        )
+        # Q4: keyword search beside vector search, in the same query, unless it is
+        # switched off (KNOWLEDGE_AGENT__HYBRID_SEARCH=false).
+        hybrid = getattr(self.vector_db, "hybrid_search", None)
+        if settings.KNOWLEDGE_AGENT.HYBRID_SEARCH and hybrid is not None:
+            hits = await hybrid(
+                collection_name=self.collection_name,
+                query=text,
+                vector=vector,
+                limit=limit,
+                min_similarity=min_similarity,
+                alpha=settings.KNOWLEDGE_AGENT.HYBRID_ALPHA,
+                filters=filters or None,
+                any_of=audience.to_any_of(),
+            )
+        else:
+            hits = await self.vector_db.near_vector_search(
+                collection_name=self.collection_name,
+                vector=vector,
+                limit=limit,
+                min_similarity=min_similarity,
+                filters=filters or None,
+                any_of=audience.to_any_of(),
+            )
 
-        return [self._to_passage(hit) for hit in hits]
+        passages = [self._to_passage(hit) for hit in hits]
+        if settings.KNOWLEDGE_AGENT.NEIGHBOUR_CHUNKS and passages:
+            passages = await self._with_neighbours(passages)
+        return passages
+
+    async def as_the_agent_saw(
+        self, passages: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Passages fetched by id, with the neighbours a search gives them (Q4): the
+        checkup's judge reads what the agent read, so a detail from a neighbour isn't
+        judged invented."""
+        if not settings.KNOWLEDGE_AGENT.NEIGHBOUR_CHUNKS or not passages:
+            return passages
+        return await self._with_neighbours(passages)
+
+    async def _with_neighbours(
+        self, passages: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Each passage with its short neighbours on the same page (Q4).
+
+        The page reader cuts pages into fragments: "Dr Priti Udhay" is a chunk of its
+        own before "Head - Oculoplasty & Aesthetic Services", "Call Us 95949 04015"
+        sits in the navigation, a list's items are one chunk each. The question's
+        words land on one fragment and the answer is next to it. Walking up to
+        NEIGHBOUR_REACH chunks each way, a neighbour joins when the found chunk is
+        short or the neighbour is, and the walk stops at the first that doesn't.
+        Never fails a search: if the neighbours can't be read, the passages go as
+        they are.
+        """
+        chunks_at = getattr(self.vector_db, "chunks_at", None)
+        if chunks_at is None:
+            return passages
+        wanted: Dict[str, List[int]] = {}
+        for p in passages:
+            if not p["document_id"]:
+                continue
+            around = [
+                p["chunk_index"] + d
+                for d in range(-NEIGHBOUR_REACH, NEIGHBOUR_REACH + 1)
+                if d and p["chunk_index"] + d >= 0
+            ]
+            wanted.setdefault(p["document_id"], []).extend(around)
+        try:
+            found = await chunks_at(
+                collection_name=self.collection_name,
+                wanted={d: sorted(set(i)) for d, i in wanted.items()},
+            )
+        except Exception:
+            return passages
+        at = {
+            (str(c.get("document_id") or ""), int(c.get("chunk_index") or 0)): c
+            for c in found
+        }
+        out = []
+        for p in passages:
+            short = len(p["text"]) < SHORT_HIT_CHARS
+            before: List[str] = []
+            after: List[str] = []
+            for step, side in ((-1, before), (1, after)):
+                for d in range(1, NEIGHBOUR_REACH + 1):
+                    c = at.get((p["document_id"], p["chunk_index"] + step * d))
+                    text = (c or {}).get("text") or ""
+                    if not text or not (short or len(text) < SHORT_NEIGHBOUR_CHARS):
+                        break
+                    side.append(text)
+            if not before and not after:
+                out.append(p)
+                continue
+            text = "\n".join([*reversed(before), p["text"], *after])
+            out.append({**p, "text": text[:NEIGHBOUR_MAX_CHARS]})
+        return out
 
     @staticmethod
     def _to_passage(hit: Dict[str, Any]) -> Dict[str, Any]:

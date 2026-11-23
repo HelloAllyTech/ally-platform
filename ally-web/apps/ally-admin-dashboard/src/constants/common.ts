@@ -1210,6 +1210,8 @@ export const ApiEndpoints = {
     MESSAGES_STREAM: (id: string) => `/v1/bot-drafts/${id}/messages/stream`,
     UNDO: (id: string) => `/v1/bot-drafts/${id}/undo`,
     BACK: (id: string) => `/v1/bot-drafts/${id}/back`,
+    /** "This isn't right for my business" in setup (Q4 A3). */
+    PACK: (id: string) => `/v1/bot-drafts/${id}/pack`,
     DOCUMENTS: (id: string) => `/v1/bot-drafts/${id}/documents`,
     DESCRIPTION: (id: string) => `/v1/bot-drafts/${id}/description`,
     PUBLISH: (id: string) => `/v1/bot-drafts/${id}/publish`,

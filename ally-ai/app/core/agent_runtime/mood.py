@@ -11,6 +11,9 @@ from app.prompts.resolver import load_and_format
 
 UPSET_PROMPT_PATH = "agent/upset"
 UPSET_SUPPORT_PROMPT_PATH = "agent/upset_support"
+UPSET_NUMBERS_PROMPT_PATH = "agent/upset_numbers"
+#: The numbers every upset person can be given (Q4 G7), whatever the pack.
+NATIONAL_NUMBERS = "Tele-MANAS on 14416 (free, 24×7), or 112 if you're in danger"
 #: Health and mental-health assistants also name the support there is.
 HEALTH_PACKS = frozenset({"mental_health", "medical", "pharmacy"})
 #: Only a mental-health assistant falls back to Tele-MANAS (stop 1): someone annoyed
@@ -42,4 +45,17 @@ def mood_section(
         ).strip()
         if support:
             text = f"{text}\n{support}"
+    # Q4 G7: on every pack, the numbers it can give, so it never says it has none.
+    # `support_helplines` is the organisation's own line, sent only when the owner
+    # confirmed it for crisis replies.
+    own = (bot.get("support_helplines") or "").strip()
+    name = (persona.get("display_name") or "").strip()
+    numbers = NATIONAL_NUMBERS + (
+        f"; or {name or 'the organisation'} on {own}" if own else ""
+    )
+    extra = load_and_format(
+        UPSET_NUMBERS_PROMPT_PATH, prompts=prompts, numbers=numbers
+    ).strip()
+    if extra:
+        text = f"{text}\n{extra}"
     return text

@@ -35,6 +35,9 @@ export type ChatbotSettingsOverride = Partial<
     WhatsAppBotSettings,
     | 'enabled'
     | 'helplineNumbers'
+    | 'helplineSource'
+    | 'helplineConfirmedAt'
+    | 'crisisPracticalLine'
     | 'disclaimerText'
     | 'crisisEscalationText'
     | 'fallbackText'
@@ -75,6 +78,11 @@ export type ChatbotSettingsOverride = Partial<
    * `{today}`, Repeat weekly and memory's dates (`assistantZone`). Per bot only, like `memory`.
    */
   timeZone?: string;
+  /**
+   * Sent by the owner's Safety screen, never stored (Q4 G7): "Use this number in crisis replies".
+   * Saving a changed number confirms it too.
+   */
+  helplineConfirm?: boolean;
 };
 
 export interface ChatbotSettingsView {

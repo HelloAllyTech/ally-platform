@@ -146,6 +146,42 @@ _SOURCE_LIST = re.compile(
 _MARKS = re.compile(r"\s*\[\d+(?:\s*,\s*\d+)*\](?:\s*\[\d+(?:\s*,\s*\d+)*\])*")
 _EMPTY_PARENS = re.compile(r"\(\s*\)")
 _STRAY_CLOSE = re.compile(r"(?<=[.!?])\)")
+# Q4 C16 (the use-case suite, BHIVE's live page): citation talk the marks above
+# miss. "[cite 9]", "(see source)", "(see policy)", "(citation 7)", "(entries 4,
+# 5, 6)", "…listed at ₹3999.product listings cited below." and a Hindi "(देखें:".
+_STRAY = [
+    re.compile(r"\s*\[\s*cite[^\]]*\]", re.IGNORECASE),
+    re.compile(r"\s*\(\s*see\s+(?:the\s+)?(?:sources?|policy|policies)\s*\)?", re.I),
+    re.compile(
+        r"\s*\(?\b(?:citations?|entries|entry)\s+\d{1,2}(?!\d)"
+        r"(?:\s*(?:,|and|&|–|-)\s*\d{1,2}(?!\d))*\s*\)?",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(?:(?<=[.!?])|(?<=^))\s*[^.!?\n]{0,40}\bcited\s+(?:below|above|here)\b"
+        r"[^.!?\n]{0,20}[.!?]?",
+        re.IGNORECASE | re.MULTILINE,
+    ),
+    re.compile(r"\s*\(\s*देखें\s*:?\s*(?=[.)]|$)\)?"),
+    # Q4 C16 and 13b (the demo build): "(citations: 15, 14)", "[Citations: 2, 6, 1, 7]",
+    # "(Cited:.".
+    re.compile(
+        r"\s*[\[(]\s*(?:citations?|cited|sources?|refs?|references?)\s*:?\s*"
+        r"(?:\d{1,2}(?:\s*,\s*\d{1,2})*)?\s*[\])]?(?=\s*[.,;!?]|\s|$)",
+        re.IGNORECASE,
+    ),
+    # A lead-in left in an unclosed bracket: "(registered and audited:.", "(figures and
+    # breakdown:.".
+    re.compile(r"\s*\((?![^()\n]*\))[^()\n]{0,60}:\s*(?=[.!?]|$)"),
+    # The model's own aside in an unclosed bracket: "(I'll only need one of these.".
+    re.compile(
+        r"\s*\((?![^()\n]*\))\s*(?:i'?ll|i will|i need|i only|i'?m|i am|note|let me)\b"
+        r"[^()\n]*?(?=[.!?])",
+        re.IGNORECASE,
+    ),
+]
+#: Any other unclosed bracket loses only the bracket: "(Please bring originals…".
+_UNCLOSED = re.compile(r"\((?![^()\n]*\))\s*")
 
 
 def without_citation_marks(text: str) -> str:
@@ -155,6 +191,9 @@ def without_citation_marks(text: str) -> str:
         text or "",
     )
     text = _MARKS.sub("", text)
+    for stray in _STRAY:
+        text = stray.sub("", text)
+    text = _UNCLOSED.sub("", text)
     text = _EMPTY_PARENS.sub("", text)
     text = _STRAY_CLOSE.sub("", text)
     text = re.sub(r"[ \t]+([.,;:!?])", r"\1", text)

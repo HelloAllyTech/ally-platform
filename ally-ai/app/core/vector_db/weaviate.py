@@ -8,9 +8,9 @@ from weaviate.collections.classes.grpc import MetadataQuery
 from weaviate.collections.classes.internal import QueryReturn
 from weaviate.exceptions import (
     AuthenticationFailedException,
+    UnexpectedStatusCodeError,
     WeaviateConnectionError,
     WeaviateInsertManyAllFailedError,
-    UnexpectedStatusCodeError,
 )
 
 from app.core.config import settings
@@ -78,6 +78,14 @@ def _build_property_filter(filters: Optional[Dict[str, Any]]):
     if not conditions:
         return None
     return conditions[0] if len(conditions) == 1 else Filter.all_of(conditions)
+
+
+def _cosine(a: List[float], b: List[float]) -> float:
+    """Cosine similarity of two vectors (0 when either is empty)."""
+    dot = sum(x * y for x, y in zip(a, b))
+    na = sum(x * x for x in a) ** 0.5
+    nb = sum(y * y for y in b) ** 0.5
+    return dot / (na * nb) if na and nb else 0.0
 
 
 class WeaviateDB(VectorDB):
@@ -860,6 +868,117 @@ class WeaviateDB(VectorDB):
         except Exception as e:
             logger.exception(f"near_vector_search failed: {type(e).__name__}")
             raise VectorDBSearchFailedException("Failed to run similarity search")
+
+    async def hybrid_search(
+        self,
+        collection_name: str,
+        query: str,
+        vector: List[float],
+        limit: int = 10,
+        min_similarity: float = 0.0,
+        alpha: float = 0.5,
+        filters: Optional[Dict[str, Any]] = None,
+        any_of: Optional[List[Dict[str, Any]]] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Keyword (BM25) and vector search in one query (Q4: 28 of 40 in-data misses
+        were search misses, many on exact names, numbers and products).
+
+        Weaviate's fused score is normalised within the result set (its best is
+        always 1.0), so it can't stand in for similarity: every threshold downstream
+        (the decline gate, the selection band) is cosine. Each hit keeps its cosine
+        similarity, from its own vector, and a strong keyword match is lifted to its
+        fused score times the set's best cosine when that is higher, so it ranks
+        and is kept beside the vector matches. The similarity floor applies as in
+        `near_vector_search`.
+        """
+        if any_of is not None and not any_of:
+            return []
+        try:
+            collection = self.client.collections.get(collection_name)
+            query_filters = _build_property_filter(filters)
+            if any_of:
+                disjunction = Filter.any_of(
+                    [self._build_condition(entry) for entry in any_of]
+                )
+                query_filters = (
+                    disjunction
+                    if query_filters is None
+                    else Filter.all_of([query_filters, disjunction])
+                )
+            async with self._semaphore:
+                result = await collection.query.hybrid(
+                    query=query,
+                    vector=vector,
+                    alpha=alpha,
+                    limit=limit,
+                    filters=query_filters,
+                    query_properties=["text", "document_title", "section_path"],
+                    fusion_type=wvc.query.HybridFusion.RELATIVE_SCORE,
+                    include_vector=True,
+                    return_metadata=MetadataQuery(score=True),
+                )
+            rows = []
+            for obj in result.objects:
+                own = (
+                    obj.vector.get("default") if isinstance(obj.vector, dict) else None
+                )
+                rows.append(
+                    (
+                        obj,
+                        _cosine(vector, own) if own else 0.0,
+                        float(getattr(obj.metadata, "score", 0.0) or 0.0),
+                    )
+                )
+            best = max((cos for _, cos, _ in rows), default=0.0)
+            hits: List[Dict[str, Any]] = []
+            for obj, cos, fused in rows:
+                similarity = max(cos, fused * best)
+                if similarity < min_similarity:
+                    continue
+                hits.append(
+                    {
+                        "id": str(obj.uuid),
+                        "similarity": similarity,
+                        "vector_similarity": cos,
+                        **obj.properties,
+                    }
+                )
+            hits.sort(key=lambda h: h["similarity"], reverse=True)
+            return hits
+        except Exception as e:
+            logger.exception(f"hybrid_search failed: {type(e).__name__}")
+            raise VectorDBSearchFailedException("Failed to run hybrid search")
+
+    async def chunks_at(
+        self,
+        collection_name: str,
+        wanted: Dict[str, List[int]],
+    ) -> List[Dict[str, Any]]:
+        """The chunks at these positions, by document id (Q4 neighbour chunks): one
+        query for every document's positions."""
+        if not wanted:
+            return []
+        try:
+            collection = self.client.collections.get(collection_name)
+            per_doc = [
+                Filter.by_property("document_id").equal(doc)
+                & Filter.by_property("chunk_index").contains_any(indexes)
+                for doc, indexes in wanted.items()
+                if indexes
+            ]
+            if not per_doc:
+                return []
+            limit = sum(len(i) for i in wanted.values())
+            async with self._semaphore:
+                result = await collection.query.fetch_objects(
+                    filters=per_doc[0] if len(per_doc) == 1 else Filter.any_of(per_doc),
+                    limit=limit,
+                )
+            return [{"id": str(o.uuid), **o.properties} for o in result.objects]
+        except Exception as e:
+            logger.exception(f"chunks_at failed: {type(e).__name__}")
+            raise VectorDBSearchFailedException("Failed to read neighbouring chunks")
 
     # ---- Context Library primitives -------------------------------------------------
     #

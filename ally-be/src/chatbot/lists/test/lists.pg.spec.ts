@@ -567,7 +567,9 @@ describePg('Lists (Postgres)', () => {
     it('round-trips an export through an import', async () => {
       await book(slots[0].id, person, { notes: '=HYPERLINK("x")' });
       const file = await csv.export(bot, 'appointments');
-      expect(file.split('\r\n')[0]).toBe('id,slot,client,service,status,notes');
+      expect(file.split('\r\n')[0]).toBe(
+        'id,slot,client,service,status,booked_for,notes',
+      );
       expect(file).toContain(`'=HYPERLINK`);
       const before = await ds.query(
         `SELECT id, data, version FROM collection_records ORDER BY id`,

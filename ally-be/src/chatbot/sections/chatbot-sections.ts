@@ -77,6 +77,7 @@ export const CHATBOT_SECTIONS: ChatbotSectionDefinition[] = [
     storage: 'settings',
     fields: [
       'helplineNumbers',
+      'crisisPracticalLine',
       'crisisEscalationText',
       'crisisClassifierEnabled',
       'consentRequired',

@@ -72,7 +72,9 @@ async def agent_step(
         prompts=prompts,
         memory=memory_section(bot, prompts),
         mood=mood_section(bot, prompts),
-        playbooks=playbooks_section(bot.get("gateway_definitions"), prompts),
+        playbooks=playbooks_section(
+            bot.get("gateway_definitions"), prompts, bot.get("channel")
+        ),
         history_lead=history_lead(bot),
         can_book=offers_create(bot.get("gateway_definitions")),
         takes_details=takes_details(bot.get("gateway_definitions")),

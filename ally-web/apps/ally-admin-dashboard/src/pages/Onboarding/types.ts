@@ -119,6 +119,14 @@ export interface BotDraftView {
     never: string[];
     atRisk: string[];
     on: boolean;
+    /** "This isn't right for my business" (Q4 A3): the packs to choose from. */
+    choices?: { id: string; name: string; summary: string; lessStrict: boolean }[];
+    packChange?: {
+      from: string | null;
+      to: string;
+      reason: string | null;
+      lessStrict: boolean;
+    } | null;
   } | null;
   conversation: {
     pending: string;

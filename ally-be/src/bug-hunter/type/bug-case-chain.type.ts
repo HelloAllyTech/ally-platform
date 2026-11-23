@@ -62,15 +62,6 @@ export const BUG_CHAIN_MERGE_LINKS: BugChainLink[] = [
   'resolved',
 ];
 
-export const BUG_CHAIN_LINK_WORDS: Record<BugChainLink, string> = {
-  observed: 'observed',
-  reproduced: 'reproduced',
-  located: 'located',
-  changed: 'changed in that mechanism',
-  resolved: 'resolved for the reporter',
-  held: 'held after release',
-};
-
 const clip = (v: unknown, max = 200): string | null => {
   const flat = String(v ?? '')
     .replace(/\s+/g, ' ')
@@ -292,14 +283,3 @@ export function buildCaseChain(f: ChainInput): BugCaseChain {
     .map((l) => l.link);
   return { links, mergeable: blocking.length === 0, blocking };
 }
-
-/** The refusal a merge gate gives, naming the links. */
-export const chainRefusal = (chain: BugCaseChain): string =>
-  `This fix's case chain is not complete: ${chain.blocking
-    .map((l) => {
-      const entry = chain.links.find((x) => x.link === l)!;
-      return `${BUG_CHAIN_LINK_WORDS[l]} is ${entry.status}${entry.evidence ? ` (${entry.evidence})` : ''}`;
-    })
-    .join(
-      '; ',
-    )}. Bug Hunter merges only a fix it can trace from the symptom to the change; a person may merge it with the force flag after reading the chain.`;

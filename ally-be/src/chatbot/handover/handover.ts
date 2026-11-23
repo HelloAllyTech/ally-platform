@@ -154,7 +154,16 @@ function clock(hhmm: string): string {
 export function openNow(
   hours: OpeningHours | null,
   now: Date,
-): { open: true } | { open: false; back: string } {
+):
+  | { open: true }
+  | {
+      open: false;
+      back: string;
+      /** The parts of `back`, for other languages (Q4 G1): "9 am", 0 today, 1 tomorrow… */
+      clock: string;
+      ahead: number;
+      weekday: number;
+    } {
   if (!hours || !hours.days.length) return { open: true };
   const { day, minutes } = localNow(now, hours.timeZone);
   const from = minutesOf(hours.from);
@@ -168,17 +177,147 @@ export function openNow(
     if (ahead === 0 && minutes >= from) continue;
     const when =
       ahead === 0 ? 'today' : ahead === 1 ? 'tomorrow' : `on ${WEEKDAYS[d]}`;
-    return { open: false, back: `${clock(hours.from)} ${when}` };
+    return {
+      open: false,
+      back: `${clock(hours.from)} ${when}`,
+      clock: clock(hours.from),
+      ahead,
+      weekday: d,
+    };
   }
   return { open: true };
 }
 
-/** The one message a visitor gets when a person is asked to join. */
-export function handoverMessage(settings: HandoverSettings, now: Date): string {
+/** The languages the hand-over lines are written in (Q4 G1): English, Hindi, Hinglish. */
+export type HandoverLanguage = 'en' | 'hi' | 'hi-latn';
+
+/**
+ * The hand-over lines in Hindi and Hinglish (Q4 G1, Round 7: "I've asked the team to join" went
+ * out in English to Hindi, Tamil and Bengali messages). Fixed text, like the crisis replies; the
+ * owner's "reply within" words are translated when they're one of the usual ones, and left out
+ * otherwise rather than put mid-sentence in English.
+ */
+export const HANDOVER_COPY_IN: Record<
+  Exclude<HandoverLanguage, 'en'>,
+  {
+    inHours: string;
+    inHoursSoon: string;
+    outOfHours: string;
+    autoHandBack: string;
+    within: Record<string, string>;
+    today: string;
+    tomorrow: string;
+    onDay: string;
+    weekdays: string[];
+  }
+> = {
+  hi: {
+    inHours:
+      'मैंने टीम से इस बातचीत में जुड़ने के लिए कह दिया है। वे आमतौर पर {hours} में जवाब देते हैं।',
+    inHoursSoon:
+      'मैंने टीम से इस बातचीत में जुड़ने के लिए कह दिया है। वे जल्द ही जवाब देंगे।',
+    outOfHours: 'टीम अभी उपलब्ध नहीं है। वे {time} वापस आकर जवाब देंगे।',
+    autoHandBack:
+      'टीम इस बार जवाब नहीं दे पाई, इसलिए मैं फिर से आपकी मदद के लिए यहाँ हूँ। आप कभी भी किसी व्यक्ति से बात करने के लिए कह सकते हैं।',
+    within: {
+      'a few hours': 'कुछ घंटों',
+      'an hour': 'एक घंटे',
+      '1 hour': 'एक घंटे',
+      'a day': 'एक दिन',
+      '24 hours': '24 घंटों',
+      '30 minutes': '30 मिनट',
+    },
+    today: 'आज {clock}',
+    tomorrow: 'कल {clock}',
+    onDay: '{day} को {clock}',
+    weekdays: [
+      'रविवार',
+      'सोमवार',
+      'मंगलवार',
+      'बुधवार',
+      'गुरुवार',
+      'शुक्रवार',
+      'शनिवार',
+    ],
+  },
+  'hi-latn': {
+    inHours:
+      'Maine team ko is chat mein judne ke liye keh diya hai. Woh aam taur par {hours} mein reply karte hain.',
+    inHoursSoon:
+      'Maine team ko is chat mein judne ke liye keh diya hai. Woh jald hi reply karenge.',
+    outOfHours:
+      'Team abhi available nahi hai. Woh {time} wapas aakar reply karenge.',
+    autoHandBack:
+      'Team is baar reply nahi kar payi, isliye main phir se aapki madad ke liye yahan hoon. Aap kabhi bhi kisi person se baat karne ke liye keh sakte hain.',
+    within: {
+      'a few hours': 'kuch ghanton',
+      'an hour': 'ek ghante',
+      '1 hour': 'ek ghante',
+      'a day': 'ek din',
+      '24 hours': '24 ghanton',
+      '30 minutes': '30 minute',
+    },
+    today: 'aaj {clock}',
+    tomorrow: 'kal {clock}',
+    onDay: '{day} ko {clock}',
+    weekdays: [
+      'Sunday',
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+    ],
+  },
+};
+
+/** The one message a visitor gets when a person is asked to join, in their language (Q4 G1). */
+export function handoverMessage(
+  settings: HandoverSettings,
+  now: Date,
+  language: HandoverLanguage = 'en',
+): string {
   const state = openNow(settings.hours, now);
-  return state.open
-    ? fill(HANDOVER_COPY.inHours, { hours: settings.replyWithin })
-    : fill(HANDOVER_COPY.outOfHours, { time: state.back });
+  if (language === 'en') {
+    return state.open
+      ? fill(HANDOVER_COPY.inHours, { hours: settings.replyWithin })
+      : fill(HANDOVER_COPY.outOfHours, { time: state.back });
+  }
+  const copy = HANDOVER_COPY_IN[language];
+  if (state.open) {
+    const hours = copy.within[settings.replyWithin.trim().toLowerCase()];
+    return hours ? fill(copy.inHours, { hours }) : copy.inHoursSoon;
+  }
+  const when =
+    state.ahead === 0
+      ? copy.today
+      : state.ahead === 1
+        ? copy.tomorrow
+        : copy.onDay;
+  const time = fill(when, {
+    clock: state.clock,
+    day: copy.weekdays[state.weekday],
+  });
+  return fill(copy.outOfHours, { time });
+}
+
+/** A stored message language ("hi", "hi-Latn", "en", "ta"…) as a hand-over line's language. */
+export function handoverLanguageOf(
+  language: string | null | undefined,
+): HandoverLanguage {
+  const value = String(language ?? '').toLowerCase();
+  if (value.startsWith('hi') && value.includes('latn')) return 'hi-latn';
+  if (value === 'hinglish') return 'hi-latn';
+  if (value.startsWith('hi')) return 'hi';
+  return 'en';
+}
+
+/** "The team couldn't reply this time…" in the conversation's language (Q4 G1). */
+export function autoHandBackMessage(language: HandoverLanguage = 'en'): string {
+  return language === 'en'
+    ? HANDOVER_COPY.autoHandBack
+    : HANDOVER_COPY_IN[language].autoHandBack;
 }
 
 /** How a team member's reply is signed to the visitor. */

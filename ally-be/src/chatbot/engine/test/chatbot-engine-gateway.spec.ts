@@ -196,6 +196,23 @@ describe('ChatbotEngineService: the tool gateway', () => {
       expect(h.aiService.answerKnowledgeQuestionWithin).not.toHaveBeenCalled();
     });
 
+    it('Q4 G1: the hand-over never replaces an answer: the answer, then the line', async () => {
+      const h = setup({
+        abilities: { hand_over: 'do_it' },
+        agentAnswer: {
+          ...AGENT_ANSWER,
+          handover: true,
+          trace: HANDED_OVER.trace,
+        },
+      });
+      const decision = await h.engine.respond(h.turn());
+      expect(decision.handledBy).toBe(WaHandledBy.HANDOVER);
+      expect(decision.handover).toBe('assistant');
+      expect(decision.body.startsWith(AGENT_ANSWER.answer)).toBe(true);
+      expect(decision.body.endsWith(HANDOVER_TEXT)).toBe(true);
+      expect(decision.citations?.length).toBe(AGENT_ANSWER.citations.length);
+    });
+
     it('a crisis still wins over a hand-over', async () => {
       const h = setup({
         abilities: { hand_over: 'do_it' },

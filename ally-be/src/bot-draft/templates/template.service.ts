@@ -367,6 +367,9 @@ export class TemplateService {
       }
       if (plan.helpline && (setup || !settings.helplineNumbers?.trim())) {
         settings.helplineNumbers = plan.helpline;
+        // Q4 G7: a template's answer isn't used in crisis replies until the owner confirms it.
+        settings.helplineSource = 'template';
+        settings.helplineConfirmedAt = null;
       }
       await m.query(`UPDATE chatbots SET settings = $2::jsonb WHERE id = $1`, [
         chatbotId,

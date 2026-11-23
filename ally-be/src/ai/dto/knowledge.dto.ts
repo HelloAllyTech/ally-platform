@@ -219,6 +219,13 @@ export interface AgentRunRequest extends KnowledgeAnswerRequest {
    * than their name, never their phone or email. At most 6, each part 120 characters.
    */
   before_chat?: { label: string; value: string }[];
+  /** Q4 G3: up to 10 facts always in the run's passages. */
+  key_facts?: {
+    facts: string[];
+    chunk_ids: string[];
+    document_id?: string;
+    title: string;
+  };
   /**
    * Live steps (chunk 6b): `activity` events while it runs and `activity` in the response. Sent
    * only for the bot page's and Try it's streamed runs; WhatsApp never asks for them.

@@ -25,6 +25,9 @@ vi.mock("@api", () => ({
   useInstallTemplateMutation: () => [vi.fn(), { isLoading: false }],
   usePatchBotDraftMutation: () => [patch],
   useBackBotDraftMutation: () => [vi.fn()],
+  // Q4 A0 and A3: the safety recheck's run and the setup pack correction.
+  useLazyGetCheckupRunQuery: () => [vi.fn()],
+  useCorrectBotDraftPackMutation: () => [vi.fn(), { isLoading: false }],
   usePublishBotDraftMutation: () => [publish, { isLoading: false }],
   useGetBotPageQuery: () => ({ data: { publicAllowed: false } }),
   useDescribeBotDraftMutation: () => [vi.fn()],

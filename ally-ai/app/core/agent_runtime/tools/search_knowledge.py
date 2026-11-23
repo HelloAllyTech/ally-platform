@@ -9,6 +9,9 @@ is logged to the retrieval log exactly as v1 logs its one search.
 
 from __future__ import annotations
 
+import asyncio
+from typing import Any, Dict, List
+
 from pydantic import BaseModel, Field
 
 from app.core.agent_runtime.state import json_safe
@@ -39,13 +42,23 @@ async def search_knowledge(args: SearchKnowledgeInput, ctx: ToolContext) -> Tool
 
     service = ctx.service
     audience = AudienceSelector(**ctx.bot["audience"]).to_chunk_audience()
-    hits, latency_ms = await service.retrieve(
-        query,
-        audience,
-        limits=ctx.limits,
-        document_ids=ctx.bot.get("document_ids"),
+    # Q4 C14: the English query, and the person's message as they wrote it when it
+    # is different, searched together; the same facts in every language.
+    written = as_written(ctx.latest, query, ctx.language)
+    searches = [query, *([written] if written else [])]
+    found = await asyncio.gather(
+        *(
+            service.retrieve(
+                text,
+                audience,
+                limits=ctx.limits,
+                document_ids=ctx.bot.get("document_ids"),
+            )
+            for text in searches
+        )
     )
-    hits = json_safe(hits)
+    hits = json_safe(merge_hits([h for h, _ in found], ctx.limits.get("top_k")))
+    latency_ms = max(ms for _, ms in found)
     retrieval = service.retrieval_meta(
         ctx.limits,
         hits,
@@ -99,6 +112,45 @@ async def search_knowledge(args: SearchKnowledgeInput, ctx: ToolContext) -> Tool
         hits=hits,
         gate=reason.value if reason is not None else None,
     )
+
+
+#: The person's message is searched as written only when it is at least this long.
+MIN_WRITTEN_CHARS = 8
+
+
+def as_written(latest: str, query: str, language: str = "en") -> str:
+    """The person's message, when it is worth a second search: not in English (the
+    query already is), not empty, not a plain yes, and not the query itself."""
+    from app.core.agent_runtime.nodes.presearch import looks_hinglish, mostly_non_latin
+    from app.core.agent_runtime.tools.confirmed import is_plain_yes
+
+    text = (latest or "").strip()[:300]
+    if len(text) < MIN_WRITTEN_CHARS or is_plain_yes(text):
+        return ""
+    english = (language or "en").lower().startswith("en")
+    if english and not (mostly_non_latin(text) or looks_hinglish(text)):
+        return ""
+    if " ".join(text.lower().split()) == " ".join(query.lower().split()):
+        return ""
+    return text
+
+
+def merge_hits(results: List[List[Dict[str, Any]]], top_k: Any) -> List[Dict[str, Any]]:
+    """One list from several searches: each chunk once, at its best similarity,
+    best first, at most `top_k` (all when unset)."""
+    best: Dict[str, Dict[str, Any]] = {}
+    for hits in results:
+        for hit in hits:
+            key = str(hit.get("chunk_id") or id(hit))
+            old = best.get(key)
+            if old is None or float(hit.get("similarity") or 0) > float(
+                old.get("similarity") or 0
+            ):
+                best[key] = hit
+    merged = sorted(
+        best.values(), key=lambda h: float(h.get("similarity") or 0), reverse=True
+    )
+    return merged[: int(top_k)] if top_k else merged
 
 
 TOOL = Tool(

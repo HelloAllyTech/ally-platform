@@ -185,6 +185,60 @@ _FALSE_OFFERS = re.compile(
 )
 
 
+#: An offer to pass the person's name and phone to the team (Q4 H9, the demo build:
+#: after a booking, after a move, after a first-session question).
+_PASS_DETAILS = re.compile(
+    r"\b(?:pass|share|send|give|forward|note)\b[^.?!\n]{0,30}"
+    r"\b(?:your|their)\b[^.?!\n]{0,20}"
+    r"\b(?:name|number|phone|details|contact)\b[^.?!\n]{0,40}"
+    r"\b(?:team|them|someone|counsellor|staff)\b"
+    r"|\b(?:have|ask|get)\s+(?:the|our)\s+team\s+(?:to\s+)?"
+    r"(?:call|contact|reach)\s+you\b"
+    r"|\b(?:team|someone)\b[^.?!\n]{0,20}\b(?:will|can|could)\s+"
+    r"(?:call|contact|reach)\s+you(?:\s+back)?\b",
+    re.IGNORECASE,
+)
+
+
+#: An offer to look a record up (Q4 H8, Haq Seva: "tell me the name so I can look it
+#: up" about a pension application it had no list for).
+_OFFERS_LOOKUP = re.compile(
+    r"\b(?:i\s+can|i'?ll|let\s+me|i\s+will|i\s+could|so\s+i\s+can|and\s+i'?ll)\s+"
+    r"(?:look\s+(?:it|that|this|them|you)?\s*up|check\s+(?:on\s+)?(?:the\s+|its\s+|"
+    r"your\s+)?(?:status|progress)|check\s+(?:it|that|this|on\s+it)|track\s+(?:it|that|"
+    r"your))\b"
+    r"|\b(?:tell|share|give|send)\s+me\s+(?:your\s+|the\s+)?(?:name|phone|number|"
+    r"application|reference|case|registration|aadhaar)\b[^.?!\n]{0,40}"
+    r"\b(?:look|check|find|track)\b",
+    re.IGNORECASE,
+)
+
+
+def _no_false_lookups(verdict: Verdict, ctx: CheckContext) -> None:
+    """With no list of the person's own records, a reply never offers to look one
+    up (Q4 H8). The offer is trimmed, and the reply is sent back once to say it
+    can't see those records and where they can check."""
+    if ctx.looks_up or not _OFFERS_LOOKUP.search(verdict.answer):
+        return
+    logger.info("Reply offers a lookup it can't do")
+    kept = without_sentences(verdict.answer, lambda s: not _OFFERS_LOOKUP.search(s))
+    verdict.answer = kept or verdict.answer
+    if verdict.rejection is None:
+        verdict.rejection, verdict.keeps_text = Rejection.NO_LOOKUP, True
+
+
+def _trim_details_offers(verdict: Verdict, ctx: CheckContext) -> None:
+    """An assistant with a list it books into books; it never offers to pass the
+    person's name and phone to the team instead (Q4 H9). The sentence is trimmed; if
+    nothing would be left, the reply stays."""
+    if not ctx.books or not _PASS_DETAILS.search(verdict.answer):
+        return
+    verdict.answer = (
+        without_sentences(verdict.answer, lambda s: not _PASS_DETAILS.search(s))
+        or verdict.answer
+    )
+
+
 def _trim_false_offers(verdict: Verdict, ctx: CheckContext) -> None:
     """An offer no tool makes possible is trimmed, not sent back (Q3-fast Part 2):
     "I can add it to your cart", "I can check a delivery estimate". If nothing would
@@ -389,6 +443,99 @@ def _decline_if_nothing_left(verdict: Verdict, ctx: CheckContext) -> None:
         verdict.intent, verdict.keeps_text = AgentIntent.DECLINE, False
 
 
+#: A sentence about another channel's rules or the assistant's own instructions
+#: (Q4 G2, Round 7 R4: "(On WhatsApp I won't ask for your phone number…" and "WhatsApp
+#: par humare paas aapka number hai" on the web page).
+#: Only the assistant's own WhatsApp rule (it has their number there), never a fact
+#: about the organisation such as "You can book on WhatsApp".
+_CHANNEL_TALK = re.compile(
+    r"\bon whatsapp,? (I|we)\b"
+    r"|\b(already|we) ha(?:ve|s) your (?:phone |mobile )?number\b"
+    r"|\bwhatsapp (?:par|pe|mein) (?:humare|hamare|hamaare) paas\b"
+    r"|\baapka (?:phone )?number (?:humare|hamare) paas\b",
+    re.IGNORECASE,
+)
+_OWN_RULES_TALK = re.compile(
+    r"\b(my|the) (instructions|system prompt|rules I follow)\b"
+    r"|\bI(?:'m| am) (told|instructed|not allowed) to\b"
+    r"|\bI (won'?t|will not|don'?t) ask for your (phone|number|mobile)\b",
+    re.IGNORECASE,
+)
+
+
+def drop_channel_talk(verdict: Verdict, ctx: CheckContext) -> None:
+    """Removed, not sent back (Q4 G2): talk of the assistant's own rules, and of
+    WhatsApp anywhere but on WhatsApp. If nothing else is left, the reply stays."""
+
+    def talks(sentence: str) -> bool:
+        if _OWN_RULES_TALK.search(sentence):
+            return True
+        return ctx.channel != "whatsapp" and bool(_CHANNEL_TALK.search(sentence))
+
+    if any(talks(s) for s in SENTENCE_END.split(verdict.answer)):
+        verdict.answer = (
+            without_sentences(verdict.answer, lambda s: not talks(s)) or verdict.answer
+        )
+
+
+#: "I don't have our crisis contact numbers here" (Q4 G7, Round 7 #6: at 2am).
+_NO_CRISIS_NUMBERS = re.compile(
+    r"\b(don'?t|do not|doesn'?t|does not)\s+have\s+(our |any |the |a )?"
+    r"(crisis|emergency|helpline|support)\s+(contact\s+)?(numbers?|lines?|details)"
+    r"|(crisis|helpline|emergency)\s+(numbers?|number)\s+(nahi|nahin|नहीं)",
+    re.IGNORECASE,
+)
+#: Fixed text (Q4 G7; in Q4-PROMPTS.md for review): the national numbers, then the
+#: organisation's own confirmed line when there is one.
+CRISIS_NUMBERS_EN = (
+    "If you need someone to talk to now, you can call Tele-MANAS on 14416 "
+    "(free, 24×7), or 112 if you're in danger."
+)
+CRISIS_NUMBERS_HI = (
+    "अगर आपको अभी किसी से बात करनी है, तो Tele-MANAS को 14416 पर कॉल करें "
+    "(मुफ़्त, 24×7), या ख़तरे में हों तो 112 पर।"
+)
+CRISIS_NUMBERS_HI_LATN = (
+    "Agar aapko abhi kisi se baat karni hai, toh Tele-MANAS ko 14416 par call karein "
+    "(free, 24×7), ya khatre mein hon toh 112 par."
+)
+CRISIS_LINE_EN = " You can also reach {organisation} on {line}."
+CRISIS_LINE_HI_LATN = " Aap {organisation} se {line} par bhi baat kar sakte hain."
+#: Hinglish markers (Q4 B2): a reply written in Hinglish gets the Hinglish line.
+_HINGLISH = re.compile(
+    r"\b(aap|aapko|hai|hain|nahi|kya|mein|karein|kar|raha|rahi|yahan|abhi|toh)\b",
+    re.IGNORECASE,
+)
+CRISIS_LINE_HI = " आप {organisation} से {line} पर भी संपर्क कर सकते हैं।"
+_DEVANAGARI = re.compile(r"[\u0900-\u097F]")
+
+
+def give_crisis_numbers(verdict: Verdict, ctx: CheckContext) -> None:
+    """A reply never says it has no crisis numbers (Q4 G7): that sentence becomes
+    the national numbers, and the organisation's own confirmed line. A reply to an
+    upset message (the crisis check unsure) always carries them (Q4 H1: Sukoon's
+    "Please contact the team at care@…" with no 112 or 14416)."""
+    sentences = SENTENCE_END.split(verdict.answer)
+    says_none = any(_NO_CRISIS_NUMBERS.search(s) for s in sentences)
+    missing = ctx.upset and "14416" not in verdict.answer
+    if not (says_none or missing):
+        return
+    hindi = bool(_DEVANAGARI.search(verdict.answer))
+    hinglish = not hindi and len(_HINGLISH.findall(verdict.answer)) >= 2
+    if hindi:
+        numbers, line = CRISIS_NUMBERS_HI, CRISIS_LINE_HI
+    elif hinglish:
+        numbers, line = CRISIS_NUMBERS_HI_LATN, CRISIS_LINE_HI_LATN
+    else:
+        numbers, line = CRISIS_NUMBERS_EN, CRISIS_LINE_EN
+    if ctx.crisis_line:
+        terms = ctx.organisation.terms
+        organisation = terms[0] if terms else ("टीम" if hindi else "the team")
+        numbers += line.format(organisation=organisation, line=ctx.crisis_line)
+    kept = without_sentences(verdict.answer, lambda s: not _NO_CRISIS_NUMBERS.search(s))
+    verdict.answer = f"{kept} {numbers}".strip() if kept else numbers
+
+
 #: Applied in this order to every reply that isn't a decline the check forced.
 WORDING_FIXES: Tuple[Callable[[Verdict, CheckContext], None], ...] = (
     _drop_record_ids,
@@ -397,6 +544,8 @@ WORDING_FIXES: Tuple[Callable[[Verdict, CheckContext], None], ...] = (
     _trim_repeated_crisis_wording,
     _trim_repeated_topic_list,
     _trim_booking_offers,
+    _trim_details_offers,
+    _no_false_lookups,
     _trim_false_offers,
     _trim_pass_on_promises,
     _send_back_slot_offers,

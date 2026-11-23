@@ -172,7 +172,11 @@ export const RepeatWeekly: React.FC<{
       <>
         <p className="ally-small">{t().repeat.nothing}</p>
         {preview.skipped > 0 && (
-          <p className="ally-small">{fill(t().repeat.skipped, { n: preview.skipped })}</p>
+          <p className="ally-small">
+            {preview.skipped === 1
+              ? t().repeat.skippedOne
+              : fill(t().repeat.skipped, { n: preview.skipped })}
+          </p>
         )}
       </>
     );
@@ -186,7 +190,9 @@ export const RepeatWeekly: React.FC<{
           {preview.skipped > 0 && (
             <span className="ally-repeat__skipped">
               {" "}
-              {fill(t().repeat.skipped, { n: preview.skipped })}
+              {preview.skipped === 1
+                ? t().repeat.skippedOne
+                : fill(t().repeat.skipped, { n: preview.skipped })}
             </span>
           )}
         </p>

@@ -367,7 +367,7 @@ Names, one-liners and order are the sign-in page's, from one shared file.
 
 - **Card:** "Answers common questions and opens a ticket for the rest." **For:** any business with after-sales questions.
 - **Sets:** Answer · no pack · hand-over on · memory on.
-- **Instructions:** "You answer for {name}'s customers. Answer from what the team has published. When you can't solve it, open a ticket or hand over to a person. Don't promise refunds or dates the team hasn't published."
+- **Instructions:** "You answer for {name}'s customers. Answer from what the team has published. When you can't solve it, open a ticket so the team can reply. (Q4 H5: hand-over is off by default.) Don't promise refunds or dates the team hasn't published."
 - **Lists:** Support tickets — Look up Do it (their own), Add **Do it**, Change Never.
   - Line: "Open a ticket when you can't solve it: a short subject, what happened, and the order number if there is one. Tell the person the team will reply."
 - **Setup questions:** 1. "What do customers ask you most?" → facts. 2. "How quickly does your team usually reply?" → a fact. 3. "When should a person take over?" → hand-over's note.

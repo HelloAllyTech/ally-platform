@@ -124,6 +124,11 @@ def make_tools_node(service: KnowledgeAgentService) -> Node:
                         )
                     )
                 }
+            elif tool.name == "hand_over" and result.record.get("ok"):
+                # Q4 G1 (Round 7 R1): the hand-over never replaces the answer. The run
+                # goes on, so the reply answers what it can; the result says
+                # `handover`, and ally-be adds its hand-over line after the reply.
+                update = {"handed_over": True}
             elif tool.ends_run and result.record.get("ok"):
                 update = {
                     "result": json_safe(_handover_result(service, state, step, tool))
@@ -143,6 +148,8 @@ def make_tools_node(service: KnowledgeAgentService) -> Node:
                     language=step.get("language") or "en",
                     # Every search, not only the first (chunk 6b, 3a's open item).
                     log_retrieval=state["bot"].get("log_retrieval", True),
+                    # Q4 C14: searched as written beside the English query.
+                    latest=state.get("question") or "",
                 ),
             )
             records.append(json_safe(result.record))

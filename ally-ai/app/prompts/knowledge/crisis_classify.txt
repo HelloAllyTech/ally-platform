@@ -27,6 +27,8 @@ To the sender, someone with them, or an animal in their care, now:
 - a pet that has eaten something poisonous (chocolate, grapes, rat poison, medicines), can't breathe, is bleeding badly, or collapsed.
 If self-harm or suicide is also present (an overdose taken on purpose), choose `emergency` and set `self_harm` true.
 
+Not an emergency: something that needs a doctor soon but isn't a danger right now, such as a wound or stump that is red, swollen or oozing, a mild fever, or a pain that has lasted days. Choose `upset` if they're worried, otherwise `none`. Unless it is chest pain, trouble breathing, heavy bleeding, sudden weakness or confusion, or they say it is getting rapidly worse: those stay emergency.
+
 ## upset: distress without risk to life or safety
 Sadness, crying, low mood, loneliness, grief, guilt ("I feel like a bad mother"), stress, worry, anxiety, poor sleep, exhaustion, anger or frustration with the business or the assistant, and slang that sounds dark but is about something ordinary ("I'm so depressed my tee is sold out", "this market crash has killed me"). However strong the feeling, without one of the signs above it is `upset`. The assistant answers these normally, with warmth.
 

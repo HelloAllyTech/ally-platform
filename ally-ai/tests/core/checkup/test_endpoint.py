@@ -20,6 +20,8 @@ def client():
             "text": "First consultation: Rs. 1,800.",
         }
     )
+    # With their neighbours, as the agent read them (Q4): none in these tests.
+    service.chunk_service.as_the_agent_saw = AsyncMock(side_effect=lambda found: found)
     app.dependency_overrides[get_knowledge_agent_service] = lambda: service
     yield TestClient(app), service
     app.dependency_overrides.pop(get_knowledge_agent_service, None)

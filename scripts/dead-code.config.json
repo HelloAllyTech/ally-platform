@@ -78,6 +78,11 @@
     {
       "path": "ally-web/apps/ally-helpline-dashboard/src/types/generated/*",
       "why": "Generated copy of the guide contract (same codegen as ally-be); the whole contract is emitted whether or not every export has a consumer yet."
+    },
+    {
+      "path": "ally-web/apps/ally-helpline-dashboard/src/pages/analytics/OrganizationStatistics.tsx",
+      "name": "OrganizationStatistics",
+      "why": "Used: Analytics.tsx lazy-loads the page through its default export; the named export is the same component. Un-exporting it means editing a file under analytics/, which makes the ally-web-posthog-events docs rule ask for the PostHog events list although no event changes."
     }
   ]
 }

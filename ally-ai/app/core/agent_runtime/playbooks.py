@@ -40,9 +40,19 @@ def playbooks_by_kind(
     return kinds
 
 
+#: Q4 G2 (Round 7 R4): the WhatsApp-only rule, given only on WhatsApp.
+PHONE_RULE = " On WhatsApp, never ask for their phone number: the team already has it."
+
+
+def phone_rule(channel: Optional[str]) -> str:
+    """The WhatsApp-only phone rule on WhatsApp, empty on every other channel."""
+    return PHONE_RULE if (channel or "").strip().lower() == "whatsapp" else ""
+
+
 def playbooks_section(
     definitions: Optional[Sequence[Mapping[str, Any]]],
     prompts: Optional[Dict[str, Any]] = None,
+    channel: Optional[str] = None,
 ) -> str:
     """The run's playbooks, or "" when its lists bring none (no list tools: the
     instructions are exactly as before)."""
@@ -56,6 +66,7 @@ def playbooks_section(
             f"agent/playbook_{kind}",
             prompts=prompts,
             lists=", ".join(name for name, _ in lists),
+            **({"phone_rule": phone_rule(channel)} if kind == "details" else {}),
         ).strip()
         if not text:
             continue

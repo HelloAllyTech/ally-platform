@@ -28,13 +28,22 @@ import {
   BotDraftStatus,
   BotDraftStep,
   LearnedSection,
+  PurposeId,
   SafetyPackId,
 } from '../enum/bot-draft.enum';
 import {
   assertDraftKeepsPack,
   SafetyLockedError,
 } from '../safety-pack/safety-lock';
-import { packFor } from '../safety-pack/safety-packs';
+import {
+  MIN_PACK_REASON,
+  packFor,
+  packForStaff,
+  sectorPackOnStaff,
+  STAFF_PACK_REASON,
+} from '../safety-pack/safety-packs';
+import { isPlaceholder, NAME_PATHS } from '../name-placeholders';
+import { LoggerService } from '../../logger/logger.service';
 import {
   LEARNED_FACTS_CHANGED,
   type LearnedFactsChanged,
@@ -259,6 +268,16 @@ export class BotDraftService {
       summary?: string;
     },
   ): Promise<{ draft: BotDraftEntity; event: DraftEvent }> {
+    // Q4 N1: a placeholder ("unchanged") is never written as a name or a title.
+    ops = ops.filter(
+      (op) =>
+        !(
+          options.target === 'draft' &&
+          NAME_PATHS.has(op.path) &&
+          (op.op === 'replace' || op.op === 'add') &&
+          isPlaceholder((op as { value?: unknown }).value)
+        ),
+    );
     if (
       draft.status !== BotDraftStatus.ACTIVE &&
       actor !== BotDraftActor.SYSTEM
@@ -332,7 +351,18 @@ export class BotDraftService {
       inverse,
       summary: options.summary ?? summarise(ops, options.target, draft.learned),
     };
-    const saved = await this.save(patched, draft.version, [event]);
+    let saved = await this.save(patched, draft.version, [event]);
+    // Q4 H4: made a staff assistant ("Train my team") after its pack was chosen from the
+    // organisation's sector: the pack follows its readers, unless the owner chose it.
+    if (
+      options.target === 'draft' &&
+      draft.draftConfig.purpose !== PurposeId.TRAINING &&
+      saved.draftConfig.purpose === PurposeId.TRAINING &&
+      sectorPackOnStaff(saved.draftConfig.safetyPackId) &&
+      !saved.draftConfig.packChange
+    ) {
+      saved = await this.correctPack(saved, packForStaff(), STAFF_PACK_REASON);
+    }
     await this.events.publish(draft.id, {
       type: 'patched',
       target: options.target,
@@ -431,6 +461,87 @@ export class BotDraftService {
     await this.events.publish(draft.id, {
       type: 'step',
       step,
+      version: saved.version,
+    });
+    return saved;
+  }
+
+  /**
+   * The owner corrects the pack in setup (Q4 A3, Round 6: "This isn't right for my business", and a
+   * typed "we're a coworking space, not mental health" that left the pack as it was). Stricter at
+   * once; less strict only with the owner's reason, recorded with the change, as on the home. The
+   * pack's disclaimer follows, and the checkup's safety questions follow the pack when it is next
+   * written.
+   */
+  async correctPack(
+    draft: BotDraftEntity,
+    packId: string,
+    reason?: string | null,
+  ): Promise<BotDraftEntity> {
+    const next = packFor(packId);
+    if (!next) {
+      throw new BadRequestException({
+        errorCode: 'invalid_pack',
+        message: "That isn't one of the safety packs.",
+      });
+    }
+    const was = packFor(draft.draftConfig.safetyPackId);
+    if (was?.id === next.id) return draft;
+    const lessStrict = Boolean(was && next.strength < was.strength);
+    const why = (reason ?? '').trim();
+    if (lessStrict && why.length < MIN_PACK_REASON) {
+      throw new BadRequestException({
+        errorCode: 'reason_required',
+        message: `${next.name} is less strict than ${was!.name}. Say why it's right for your business.`,
+      });
+    }
+    const branding = draft.draftConfig.branding;
+    const without =
+      was?.disclaimer && branding.disclaimer?.includes(was.disclaimer)
+        ? branding.disclaimer.replace(was.disclaimer, '').trim()
+        : (branding.disclaimer ?? '');
+    const disclaimer = next.disclaimer
+      ? [without, next.disclaimer].filter(Boolean).join(' ')
+      : without;
+    const packChange = {
+      from: was?.id ?? null,
+      to: next.id,
+      reason: lessStrict ? why.slice(0, 300) : null,
+      lessStrict,
+      at: new Date().toISOString(),
+      by: Number(ExecutionManager.getUserId() ?? 0) || null,
+    };
+    const event: DraftEvent = {
+      id: randomUUID(),
+      at: packChange.at,
+      actor: BotDraftActor.OWNER,
+      kind: 'safety',
+      summary: `${next.name} is on (changed by you${lessStrict ? ', less strict' : ''})`,
+    };
+    const saved = await this.save(
+      {
+        ...draft,
+        safetyPack: next.id,
+        safetyPackVersion: next.version,
+        draftConfig: {
+          ...draft.draftConfig,
+          safetyPackId: next.id,
+          packChange,
+          branding: { ...branding, disclaimer },
+        },
+      },
+      draft.version,
+      [event],
+    );
+    // The reason stays in the record; the log names only the move.
+    LoggerService.getInstance(BotDraftService.name).warn(
+      `Safety pack corrected by the owner in setup for draft ${draft.id}: ${packChange.from ?? 'none'} → ${next.id}${lessStrict ? ' (less strict, with a reason)' : ''}`,
+    );
+    await this.events.publish(draft.id, {
+      type: 'safety',
+      packId: next.id,
+      industry: saved.industry,
+      draft: saved.draftConfig,
       version: saved.version,
     });
     return saved;

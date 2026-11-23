@@ -48,6 +48,22 @@ interface Builder {
   length: number;
 }
 
+/**
+ * A struck-out old price (Q4 C15, BHIVE: `<span class="strike">₹200</span> ₹100/Day` was read as
+ * "₹200 ₹100/Day" and the assistant quoted ₹200): `<del>`, `<s>`, `<strike>`, or a struck-price
+ * class. Its text is kept, labelled "(was …)", so the price after it reads as the current one.
+ */
+const STRUCK_TAGS = new Set(['del', 's', 'strike']);
+const STRUCK_CLASS =
+  /(?:^|[\s_-])(?:strike|struck|line-through|old-price|was-price|compare-at|price--compare|original-price)(?:$|[\s_-])/i;
+
+export function isStruck(
+  name: string,
+  attribs: Record<string, string> | undefined,
+): boolean {
+  return STRUCK_TAGS.has(name) || STRUCK_CLASS.test(attribs?.class ?? '');
+}
+
 export function htmlToExtractedDocument(html: string): ExtractedDocument {
   const builder: Builder = { parts: [], length: 0 };
   /** Heading trail by depth, so an h3 under an h2 under an h1 reads "A > B > C". */
@@ -56,6 +72,8 @@ export function htmlToExtractedDocument(html: string): ExtractedDocument {
 
   let headingLevel: number | null = null;
   let headingText = '';
+  /** The struck element we're inside (Q4 C15), and how deep in same-named tags. */
+  let struck: { name: string; depth: number } | null = null;
 
   const push = (text: string) => {
     builder.parts.push(text);
@@ -68,7 +86,14 @@ export function htmlToExtractedDocument(html: string): ExtractedDocument {
     // Drop bodies that are never prose. Left in, a <style> body is extracted as text and then
     // embedded, which pollutes retrieval with CSS.
     nonTextTags: ['script', 'style', 'noscript', 'iframe', 'template', 'head'],
-    onOpenTag: (name: string) => {
+    onOpenTag: (name: string, attribs: Record<string, string>) => {
+      if (struck) {
+        if (name === struck.name) struck.depth += 1;
+      } else if (isStruck(name, attribs)) {
+        struck = { name, depth: 1 };
+        if (headingLevel === null) push(' (was ');
+        return;
+      }
       if (HEADING_LEVELS[name]) {
         headingLevel = HEADING_LEVELS[name];
         headingText = '';
@@ -77,6 +102,14 @@ export function htmlToExtractedDocument(html: string): ExtractedDocument {
       }
     },
     onCloseTag: (name: string) => {
+      if (struck && name === struck.name) {
+        struck.depth -= 1;
+        if (struck.depth === 0) {
+          struck = null;
+          if (headingLevel === null) push(') ');
+          return;
+        }
+      }
       const level = HEADING_LEVELS[name];
       if (!level || headingLevel !== level) return;
 

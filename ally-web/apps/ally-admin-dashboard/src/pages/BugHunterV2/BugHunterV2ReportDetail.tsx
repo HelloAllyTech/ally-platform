@@ -189,5 +189,3 @@ export const BugHunterV2ReportDetail: FC = () => {
     </div>
   );
 };
-
-export default BugHunterV2ReportDetail;
