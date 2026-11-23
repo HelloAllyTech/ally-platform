@@ -1,0 +1,175 @@
+diff --git a/ally-web/apps/ally-admin-dashboard/src/constants/PromptVariableCatalog.ts b/ally-web/apps/ally-admin-dashboard/src/constants/PromptVariableCatalog.ts
+index f37a3d92e..c78ba49a5 100644
+--- a/ally-web/apps/ally-admin-dashboard/src/constants/PromptVariableCatalog.ts
++++ b/ally-web/apps/ally-admin-dashboard/src/constants/PromptVariableCatalog.ts
+@@ -197,6 +197,8 @@ export const VARIABLES_USED_OUTSIDE_THE_PROMPT: Record<string, string> = {
+   name: "Used even if this prompt leaves it out: it gives context to thinking fillers, back-channel sounds and interim replies, and guardrail replies include it.",
+   profession:
+     "Used even if this prompt leaves it out: it gives context to thinking fillers, back-channel sounds and interim replies.",
++  custom_fields_text:
++    "Used even if this prompt leaves it out: event branch instructions can refer to a custom field by name, and session reports score against custom fields.",
+ };
+ 
+ /** Human-readable header for a catalog group. */
+diff --git a/ally-web/apps/ally-admin-dashboard/src/constants/SimulationCreator.ts b/ally-web/apps/ally-admin-dashboard/src/constants/SimulationCreator.ts
+index 9dcd2252d..76db755a2 100644
+--- a/ally-web/apps/ally-admin-dashboard/src/constants/SimulationCreator.ts
++++ b/ally-web/apps/ally-admin-dashboard/src/constants/SimulationCreator.ts
+@@ -526,7 +526,6 @@ export const COMFORT_AUDIO_VOLUME_MIN = 0;
+ export const COMFORT_AUDIO_VOLUME_MAX = 1;
+ export const COMFORT_AUDIO_VOLUME_STEP = 0.1;
+ 
+-export const ROLE_INSTRUCTION_PROMPT_CODE = "openai_simulation_role_instruction_default";
+ export const DEFAULT_MAIN_AGENT_PROMPT_CODE = "ally_ai_learn_system_main_agent_prompt";
+ // What a brand-new simulation starts on. Distinct from the default above, which
+ // is what a simulation with no saved selection runs on at runtime: existing
+@@ -692,11 +691,10 @@ export const SIMULATION_CREATOR_FIELD_GROUPS: CreatorFieldGroups[] = [
+         type: FORM_FIELD_TYPES.CUSTOM_FIELDS,
+         tooltipLocation: TooltipLocation.CUSTOM_FIELDS,
+         fullWidth: true,
+-        // Custom fields exist solely to render `{custom_fields_text}` in the
+-        // prompt — no other consumer reads them. Hide the editor when the
+-        // selected variant doesn't reference that placeholder.
+-        promptVariable: "custom_fields_text",
+-        hideWhenUnused: true,
++        // Always shown, whatever the selected prompt. Besides
++        // `{custom_fields_text}`, ai-learn reads custom fields directly: event
++        // branch instructions substitute them by name, and the session report
++        // scores against them as part of the character description.
+       },
+       {
+         id: "knowledgeSources",
+diff --git a/ally-web/apps/ally-admin-dashboard/src/pages/CreateSimulation/CreateSimulation.tsx b/ally-web/apps/ally-admin-dashboard/src/pages/CreateSimulation/CreateSimulation.tsx
+index 6ee2c105e..db34d24fe 100644
+--- a/ally-web/apps/ally-admin-dashboard/src/pages/CreateSimulation/CreateSimulation.tsx
++++ b/ally-web/apps/ally-admin-dashboard/src/pages/CreateSimulation/CreateSimulation.tsx
+@@ -11,7 +11,6 @@ import {
+   useDeleteCoverImageMutation,
+   useGetAvailableLanguageVoicesQuery,
+   useGetMappedScenarioEventsQuery,
+-  useGetPromptsQuery,
+   useLazyGetAdminSimulationByIdQuery,
+   useUpdateSimulationByIdMutation,
+   useUpdateScenarioVersionMutation,
+@@ -47,7 +46,7 @@ import {
+   SESSION_TIMER_CONFIG,
+   FORM_FIELD_IDS,
+   isValidStateInstructionId,
+-  ROLE_INSTRUCTION_PROMPT_CODE,
++  DEFAULT_ROLE_INSTRUCTION,
+   NEW_SIMULATION_MAIN_AGENT_PROMPT_CODE,
+   BEHAVIOUR_STATES,
+   SIMULATION_CATEGORY,
+@@ -354,12 +353,6 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
+     active: true,
+     voicesNeeded: true,
+   }) as { data: Array<{ language_id: number; value: string; label: string }> };
+-  const { data: roleInstructionPrompts = [] } = useGetPromptsQuery({
+-    searchName: ROLE_INSTRUCTION_PROMPT_CODE,
+-    limit: 20,
+-    offset: 0,
+-    includeBlocks: false,
+-  });
+ 
+   // Advanced (mapped) event count, sourced from the same RTK Query cache the
+   // Advanced Settings tab's event table uses (shared SIMULATION_EVENTS tag), so
+@@ -382,10 +375,20 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
+   // NEW_SIMULATION_MAIN_AGENT_PROMPT_CODE. Seeded here, not in the picker: the
+   // picker's own fallback is for loaded simulations with no saved selection,
+   // which must keep showing the runtime default they actually run on.
++  //
++  // It starts with the default role instruction too. The Role instruction
++  // input applies its own default only once mounted, and it sits in an
++  // accordion that starts closed, so an author who never opened it saved a
++  // blank role and the client ran with an empty "## Role" section.
+   const formDefaultValues = useMemo(
+     () => ({
+       ...buildToggleDefaultValues(SIMULATION_CREATOR_FIELD_GROUPS),
+-      ...(id ? {} : { selectedMainPromptCode: NEW_SIMULATION_MAIN_AGENT_PROMPT_CODE }),
++      ...(id
++        ? {}
++        : {
++            selectedMainPromptCode: NEW_SIMULATION_MAIN_AGENT_PROMPT_CODE,
++            prompt: DEFAULT_ROLE_INSTRUCTION,
++          }),
+     }),
+     [id],
+   );
+@@ -400,13 +403,6 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
+     defaultValues: formDefaultValues,
+   });
+ 
+-  const managedRoleInstruction = useMemo(
+-    () =>
+-      roleInstructionPrompts.find(prompt => prompt.promptCode === ROLE_INSTRUCTION_PROMPT_CODE)
+-        ?.prompt ?? "",
+-    [roleInstructionPrompts],
+-  );
+-
+   const uploadsInProgress = useSelector(selectUploadsInProgress);
+   const isReportGenerationInProgress = uploadsInProgress.some(
+     upload => simulationId != null && String(upload.scenarioId) === String(simulationId),
+@@ -437,18 +433,6 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
+     }
+   }, [adminSimulationByIdData, formMethods, activeVersionId]);
+ 
+-  useEffect(() => {
+-    if (simulationId) return;
+-    if (!isNonEmptyString(managedRoleInstruction)) return;
+-    if (isNonEmptyString(formMethods.getValues("prompt"))) return;
+-
+-    formMethods.setValue("prompt", managedRoleInstruction, {
+-      shouldDirty: false,
+-      shouldTouch: false,
+-      shouldValidate: false,
+-    });
+-  }, [simulationId, managedRoleInstruction, formMethods]);
+-
+   const {
+     formState: { dirtyFields },
+     watch,
+diff --git a/ally-web/apps/ally-admin-dashboard/src/pages/CreateSimulation/__tests__/CreateSimulation.test.tsx b/ally-web/apps/ally-admin-dashboard/src/pages/CreateSimulation/__tests__/CreateSimulation.test.tsx
+index 17b48507b..0b7e74cfc 100644
+--- a/ally-web/apps/ally-admin-dashboard/src/pages/CreateSimulation/__tests__/CreateSimulation.test.tsx
++++ b/ally-web/apps/ally-admin-dashboard/src/pages/CreateSimulation/__tests__/CreateSimulation.test.tsx
+@@ -106,7 +106,6 @@ vi.mock("@api", () => ({
+   ],
+   useDeleteCoverImageMutation: () => [mockDeleteCoverImage],
+   useGetAvailableLanguageVoicesQuery: () => ({ data: [] }),
+-  useGetPromptsQuery: () => ({ data: [] }),
+   useGetMappedScenarioEventsQuery: () => ({
+     data: { data: Array.from({ length: mockMappedEvents.count }, (_, i) => ({ id: String(i) })) },
+   }),
+@@ -219,7 +218,7 @@ vi.mock("@constants", () => ({
+   // whatever is already stored. The real preset expansion is covered in
+   // utils/__tests__/createSimulation.test.ts.
+   resolveSttConfigFromPreset: (presetId: any, existing: any) => (presetId ? existing : null),
+-  ROLE_INSTRUCTION_PROMPT_CODE: "openai_simulation_role_instruction",
++  DEFAULT_ROLE_INSTRUCTION: "You are the client.",
+   NEW_SIMULATION_MAIN_AGENT_PROMPT_CODE:
+     "ally_ai_learn_system_main_agent_prompt_working_memory_split",
+   SIMULATION_CATEGORY: { PARTNER_SIM: "PARTNER_SIM" },
+@@ -380,13 +379,19 @@ describe("CreateSimulation", () => {
+       );
+     });
+ 
+-    it("leaves an existing simulation's prompt to what it loads with", () => {
++    it("starts a new simulation with the default role instruction", () => {
++      renderCreateSimulation();
++
++      expect((useForm as any).mock.calls[0][0].defaultValues.prompt).toBe("You are the client.");
++    });
++
++    it("leaves an existing simulation's prompt and role to what it loads with", () => {
+       mockParams.id = "existing-id";
+       renderCreateSimulation();
+ 
+-      expect((useForm as any).mock.calls[0][0].defaultValues).not.toHaveProperty(
+-        "selectedMainPromptCode",
+-      );
++      const { defaultValues } = (useForm as any).mock.calls[0][0];
++      expect(defaultValues).not.toHaveProperty("selectedMainPromptCode");
++      expect(defaultValues).not.toHaveProperty("prompt");
+     });
+ 
+     it("should not render the deprecated 'Voice' standalone field", () => {

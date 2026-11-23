@@ -1,0 +1,30 @@
+diff --git a/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/__tests__/CallSummary.test.tsx b/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/__tests__/CallSummary.test.tsx
+index 91c049f85a..ad0a5b951a 100644
+--- a/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/__tests__/CallSummary.test.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/__tests__/CallSummary.test.tsx
+@@ -31,6 +31,9 @@ vi.mock("@api", () => ({
+   useGetLocationsQuery: () => ({ data: { data: [] }, isLoading: false }),
+   useLazySearchLocationsQuery: () => [mockSearchLocations, { isLoading: false }],
+   useUpdateCallSummaryNotesMutation: () => [mockUpdateCallSummaryNotes, { isLoading: false }],
++  useGetCustomFieldsEnabledQuery: vi.fn(() => ({ data: false })),
++  useGetCustomFieldValuesQuery: vi.fn(() => ({ data: [] })),
++  useUpsertCustomFieldValuesMutation: vi.fn(() => [vi.fn()]),
+ }));
+ 
+ vi.mock("@hooks", () => ({
+diff --git a/apps/ally-helpline-dashboard/vite.config.ts b/apps/ally-helpline-dashboard/vite.config.ts
+index 6d7ed9af4b..b519cd959a 100644
+--- a/apps/ally-helpline-dashboard/vite.config.ts
++++ b/apps/ally-helpline-dashboard/vite.config.ts
+@@ -106,5 +106,11 @@ export default defineConfig({
+         "**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build}.config.*",
+       ],
+     },
++    pool: 'forks',
++    poolOptions: {
++      forks: {
++        maxForks: 2,
++      },
++    },
+   },
+ });

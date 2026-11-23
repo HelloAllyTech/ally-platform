@@ -1,0 +1,180 @@
+diff --git a/src/analytics/dto/weak-metrics.dto.ts b/src/analytics/dto/weak-metrics.dto.ts
+index c10f71e835..0f8b26f432 100644
+--- a/src/analytics/dto/weak-metrics.dto.ts
++++ b/src/analytics/dto/weak-metrics.dto.ts
+@@ -86,6 +86,17 @@ export class WeakMetricPointDto {
+     description: 'numerator / denominator, or null when the denominator is 0',
+   })
+   value!: number | null;
++
++  @ApiProperty({
++    description:
++      'True when the denominator is below WEAK_METRICS_PARAMS.' +
++      'minBucketDenominator — the bucket is real but too thin to read as a ' +
++      'rate. Clients keep it in tables and leave it off plots, and it never ' +
++      "supplies the card's latest/previous delta. Traffic per language is " +
++      'lumpy enough that a two-session week was otherwise drawn beside a ' +
++      'ninety-seven-session one and became the headline.',
++  })
++  sparse!: boolean;
+ }
+ 
+ export enum WeakMetricState {
+diff --git a/src/analytics/repository/weak-metrics-analytics.repository.ts b/src/analytics/repository/weak-metrics-analytics.repository.ts
+index cce0d4fce3..088b56f136 100644
+--- a/src/analytics/repository/weak-metrics-analytics.repository.ts
++++ b/src/analytics/repository/weak-metrics-analytics.repository.ts
+@@ -147,6 +147,20 @@ export const WEAK_METRICS_PARAMS = {
+   stasisMinWordLength: 4,
+   /** A real client offers one or two solutions; above this is over-compliance. */
+   solutionOfferThreshold: 2,
++  /**
++   * Denominator a weekly bucket needs before its rate is plotted.
++   *
++   * Traffic per language is lumpy — Tamil ran 97 real sessions in the week of
++   * 2026-05-25 and 2 in the week of 07-06 — and a rate over a handful of turns
++   * was drawn with the same weight as one over hundreds, then read by the
++   * delta arrow as the headline. A thin bucket at the right-hand edge produced
++   * "worsening" out of noise.
++   *
++   * 20 matches the platform's existing `MIN_N_FOR_SCORE`, so a thin sample
++   * means the same thing on this tab as everywhere else rather than being a
++   * second, private definition.
++   */
++  minBucketDenominator: 20,
+ } as const;
+ 
+ export const WEAK_METRICS_VERSION = 'v1';
+diff --git a/src/analytics/service/test/weak-metrics-sparse-buckets.spec.ts b/src/analytics/service/test/weak-metrics-sparse-buckets.spec.ts
+new file mode 100644
+index 0000000000..072de6fb89
+--- /dev/null
++++ b/src/analytics/service/test/weak-metrics-sparse-buckets.spec.ts
+@@ -0,0 +1,98 @@
++import { WeakMetricsAnalyticsService } from '../weak-metrics-analytics.service';
++import { WEAK_METRICS_PARAMS } from '../../repository/weak-metrics-analytics.repository';
++
++/**
++ * Traffic per language is lumpy, and this tab buckets by week. Tamil ran 97 real
++ * sessions in the week of 2026-05-25 and 2 in the week of 07-06, and both weeks
++ * were drawn with the same weight — then the delta arrow read the last bucket
++ * and reported "worsening" off a handful of turns. The card led with its least
++ * reliable point.
++ *
++ * The guard flags rather than deletes: the bucket is real and belongs in the
++ * expanded view's table. What it must not do is carry the plot or the headline.
++ */
++describe('WeakMetricsAnalyticsService — sparse buckets', () => {
++  const service = new WeakMetricsAnalyticsService({} as never, {} as never);
++
++  const min = WEAK_METRICS_PARAMS.minBucketDenominator;
++
++  const build = (
++    rows: { bucket: string; numerator: number; denominator: number }[],
++  ) =>
++    (
++      service as never as {
++        series: (
++          id: string,
++          label: string,
++          unit: string,
++          state: string,
++          rows: unknown,
++          opts?: unknown,
++        ) => {
++          points: { bucket: string; sparse: boolean; value: number | null }[];
++          latest: number | null;
++          previous: number | null;
++        };
++      }
++    ).series('m', 'Metric', 'percent', 'measured', rows);
++
++  it('flags a bucket under the minimum denominator', () => {
++    const out = build([
++      { bucket: '2026-07-27', numerator: 80, denominator: 800 },
++      { bucket: '2026-08-03', numerator: 5, denominator: min - 1 },
++    ]);
++
++    expect(out.points.map((p) => p.sparse)).toEqual([false, true]);
++  });
++
++  it('keeps a bucket exactly at the minimum', () => {
++    // A threshold that excluded its own boundary would quietly raise the bar.
++    const out = build([
++      { bucket: '2026-08-03', numerator: 1, denominator: min },
++    ]);
++    expect(out.points[0].sparse).toBe(false);
++  });
++
++  it('does not flag an empty bucket as sparse', () => {
++    // Zero denominator is already "no data" and renders as null. Calling it
++    // sparse too would give one absence two different explanations.
++    const out = build([{ bucket: '2026-08-03', numerator: 0, denominator: 0 }]);
++    expect(out.points[0].sparse).toBe(false);
++    expect(out.points[0].value).toBeNull();
++  });
++
++  it('keeps the thin bucket in the series rather than dropping it', () => {
++    const out = build([
++      { bucket: '2026-07-27', numerator: 80, denominator: 800 },
++      { bucket: '2026-08-03', numerator: 5, denominator: 2 },
++    ]);
++
++    expect(out.points).toHaveLength(2);
++    expect(out.points[1].bucket).toBe('2026-08-03');
++  });
++
++  it('reads the delta past a thin trailing bucket', () => {
++    // The bug in one assertion: without the guard, latest was 2.5 off two turns
++    // and the card reported a jump. It should read the last two buckets that
++    // can actually carry a rate.
++    const out = build([
++      { bucket: '2026-07-20', numerator: 50, denominator: 500 },
++      { bucket: '2026-07-27', numerator: 80, denominator: 800 },
++      { bucket: '2026-08-03', numerator: 5, denominator: 2 },
++    ]);
++
++    expect(out.latest).toBeCloseTo(0.1);
++    expect(out.previous).toBeCloseTo(0.1);
++  });
++
++  it('reports no delta when every bucket is thin', () => {
++    // Better than inventing one from two unreliable points.
++    const out = build([
++      { bucket: '2026-07-27', numerator: 1, denominator: 3 },
++      { bucket: '2026-08-03', numerator: 2, denominator: 4 },
++    ]);
++
++    expect(out.latest).toBeNull();
++    expect(out.previous).toBeNull();
++  });
++});
+diff --git a/src/analytics/service/weak-metrics-analytics.service.ts b/src/analytics/service/weak-metrics-analytics.service.ts
+index b54c0981a5..bf58757d91 100644
+--- a/src/analytics/service/weak-metrics-analytics.service.ts
++++ b/src/analytics/service/weak-metrics-analytics.service.ts
+@@ -194,6 +194,12 @@ export class WeakMetricsAnalyticsService {
+         numerator,
+         denominator,
+         value: denominator > 0 ? numerator / denominator : null,
++        // Flagged, not dropped: the bucket is real and belongs in the expanded
++        // view's table. What it must not do is get drawn beside a bucket a
++        // hundred times its size, or become the delta the card reports.
++        sparse:
++          denominator > 0 &&
++          denominator < WEAK_METRICS_PARAMS.minBucketDenominator,
+       };
+     });
+   }
+@@ -253,7 +259,10 @@ export class WeakMetricsAnalyticsService {
+     } = {},
+   ): WeakMetricSeriesDto {
+     const points = this.toPoints(rows);
+-    const withValues = points.filter((p) => p.value !== null);
++    // The delta reads the last two buckets that can carry one. A thin bucket at
++    // the right-hand edge was reporting "worsening" off a handful of turns —
++    // the reading the card leads with, from the least reliable point in it.
++    const withValues = points.filter((p) => p.value !== null && !p.sparse);
+     return {
+       id,
+       label,

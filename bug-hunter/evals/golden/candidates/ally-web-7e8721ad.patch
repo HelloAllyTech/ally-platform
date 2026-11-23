@@ -1,0 +1,249 @@
+diff --git a/apps/ally-admin-dashboard/src/pages/Analytics/__tests__/WeakPerformingMetricsTab.test.tsx b/apps/ally-admin-dashboard/src/pages/Analytics/__tests__/WeakPerformingMetricsTab.test.tsx
+index 9469418b7c..4b38d69b15 100644
+--- a/apps/ally-admin-dashboard/src/pages/Analytics/__tests__/WeakPerformingMetricsTab.test.tsx
++++ b/apps/ally-admin-dashboard/src/pages/Analytics/__tests__/WeakPerformingMetricsTab.test.tsx
+@@ -61,6 +61,7 @@ const series = (o: Partial<WeakMetricSeries> = {}): WeakMetricSeries => ({
+   unit: "percent",
+   state: "measured",
+   lowerIsBetter: true,
++  description: "Actor turns that repeat something the actor already said.",
+   caveat: null,
+   points: [
+     { bucket: "2026-06-01", numerator: 10, denominator: 500, value: 0.02 },
+@@ -171,13 +172,20 @@ describe("WeakPerformingMetricsTab", () => {
+     expect(screen.getByText(/improving/)).toBeInTheDocument();
+   });
+ 
+-  it("renders the caveat on the card rather than hiding it", () => {
++  it("keeps the caveat reachable without putting it in the reader's way", () => {
++    // This test previously asserted the opposite — that the caveat rendered as
++    // body text on the card. That was the original intent and it did not
++    // survive contact with the live tab: four lines of weighting rules sat
++    // above a two-bar chart on every one of 22 cards. The rule it protected
++    // still holds — a reader must be able to find out how a number is
++    // weighted — so the caveat moved behind an affordance rather than away.
+     queryMock.mockReturnValue({
+       data: response({
+         groups: [
+           group({
+             series: [
+               series({
++                label: "Repeated turns",
+                 caveat: "Segment by model or this misleads.",
+               }),
+             ],
+@@ -189,7 +197,12 @@ describe("WeakPerformingMetricsTab", () => {
+       refetch: refetchMock,
+     });
+     render(<WeakPerformingMetricsTab {...filters} />);
+-    expect(screen.getByText(/Segment by model or this misleads/)).toBeInTheDocument();
++
++    // Carbon names the trigger from the tooltip's own content, so the caveat is
++    // what a screen reader announces on the help control.
++    expect(
++      screen.getByRole("button", { name: /Segment by model or this misleads/ }),
++    ).toBeInTheDocument();
+   });
+ 
+   it("marks a not-measured series so an empty line is not read as good news", () => {
+@@ -516,4 +529,85 @@ describe("WeakPerformingMetricsTab", () => {
+     expect(screen.getByText(/language gemini-2\.5-pro\/v1/)).toBeInTheDocument();
+     expect(screen.getByText(/groundedness not run/)).toBeInTheDocument();
+   });
++
++  /**
++   * Two readability failures this pins, both reported from the live tab.
++   *
++   * The caveat was the card's caption — three or four lines of weighting rules
++   * above a two-bar chart, crowding out the number it qualified. And direction
++   * only ever appeared inside the delta sentence, which needs two buckets, so a
++   * single-bucket card said nothing about whether a rise was good or bad.
++   */
++  it("captions the card with what it counts, not with the caveat", () => {
++    queryMock.mockReturnValue({
++      data: response({
++        groups: [
++          group({
++            series: [
++              series({
++                description: "Actor turns that repeat something the actor already said.",
++                caveat: "Segment by model or this misleads: repetition differs 6.6x.",
++              }),
++            ],
++          }),
++        ],
++      }),
++      isFetching: false,
++      isError: false,
++      refetch: refetchMock,
++    });
++    render(<WeakPerformingMetricsTab {...filters} />);
++
++    // The caption is the one plain line saying what is counted.
++    const caption = screen.getByText(
++      "Actor turns that repeat something the actor already said.",
++    );
++    expect(caption.tagName).toBe("P");
++
++    // The caveat is still in the document — Carbon renders tooltip content
++    // inline — but inside the popover rather than as the card's caption.
++    const caveat = screen.getByText(/Segment by model or this misleads/);
++    expect(caveat.className).toContain("tooltip-content");
++  });
++
++  it("says which direction is good, without needing two buckets", () => {
++    queryMock.mockReturnValue({
++      data: response({
++        groups: [
++          group({
++            series: [
++              series({
++                // One bucket: no delta sentence, so this is the ONLY thing on
++                // the card that can tell the reader which way is good.
++                points: [{ bucket: "2026-07-01", numerator: 3, denominator: 100, value: 0.03 }],
++                latest: 0.03,
++                previous: null,
++              }),
++            ],
++          }),
++        ],
++      }),
++      isFetching: false,
++      isError: false,
++      refetch: refetchMock,
++    });
++    render(<WeakPerformingMetricsTab {...filters} />);
++
++    expect(screen.getByText("lower is better")).toBeInTheDocument();
++    expect(screen.queryByText(/vs previous bucket/)).not.toBeInTheDocument();
++  });
++
++  it("says higher is better where that is true", () => {
++    queryMock.mockReturnValue({
++      data: response({
++        groups: [group({ series: [series({ lowerIsBetter: false })] })],
++      }),
++      isFetching: false,
++      isError: false,
++      refetch: refetchMock,
++    });
++    render(<WeakPerformingMetricsTab {...filters} />);
++
++    expect(screen.getByText("higher is better")).toBeInTheDocument();
++  });
+ });
+diff --git a/apps/ally-admin-dashboard/src/pages/Analytics/chartKit.tsx b/apps/ally-admin-dashboard/src/pages/Analytics/chartKit.tsx
+index 02ff6e9524..818ee98140 100644
+--- a/apps/ally-admin-dashboard/src/pages/Analytics/chartKit.tsx
++++ b/apps/ally-admin-dashboard/src/pages/Analytics/chartKit.tsx
+@@ -705,8 +705,12 @@ export const GroupingPicker = ({
+ 
+ interface ChartCardProps {
+   /** Neutral metric name. The finding goes in `takeaway`, computed from the
+-   *  data — a live tile whose direction changes cannot carry a fixed claim. */
+-  title?: string;
++   *  data — a live tile whose direction changes cannot carry a fixed claim.
++   *
++   *  ReactNode rather than string so a title can carry an adornment — the help
++   *  tooltip that holds a metric's measurement caveats, for instance. Plain
++   *  strings still work and remain the common case. */
++  title?: React.ReactNode;
+   /** Sub-text under the title: what the number means, caveats, denominators. */
+   caption?: string;
+   /**
+@@ -825,7 +829,12 @@ export const ChartCard = ({
+         <div className="flex items-start justify-between gap-2">
+           <div className="min-w-0">
+             {title && (
+-              <h3 className="text-sm font-medium text-typography-900 truncate" title={title}>
++              /* The native `title` attribute only accepts a string; a node
++                 title carries its own affordance (a tooltip) and needs none. */
++              <h3
++                className="text-sm font-medium text-typography-900"
++                title={typeof title === "string" ? title : undefined}
++              >
+                 {title}
+               </h3>
+             )}
+diff --git a/apps/ally-admin-dashboard/src/pages/Analytics/tabs/WeakPerformingMetricsTab.tsx b/apps/ally-admin-dashboard/src/pages/Analytics/tabs/WeakPerformingMetricsTab.tsx
+index 0516ed7989..2199560b60 100644
+--- a/apps/ally-admin-dashboard/src/pages/Analytics/tabs/WeakPerformingMetricsTab.tsx
++++ b/apps/ally-admin-dashboard/src/pages/Analytics/tabs/WeakPerformingMetricsTab.tsx
+@@ -16,8 +16,10 @@ import {
+   TableRow,
+   Tag,
+   Tile,
++  Tooltip,
+ } from "@ally-ui-mono/ui-shared";
+ import { useGetWeakPerformingMetricsQuery } from "@api";
++import { TooltipIcon } from "@assets";
+ import { ROUTES } from "@constants";
+ import { WeakMetricGroup, WeakMetricSeries, WeakMetricState } from "@types";
+ 
+@@ -149,7 +151,18 @@ const SeriesCard: FC<{ series: WeakMetricSeries; bucket: string }> = ({ series,
+   // A "none" series still renders its chart — but captioned as an
+   // instrumentation gap, so an empty or flat line is read as "we are not
+   // measuring this" rather than "this never happens".
+-  const caption = [series.caveat, series.state === "none" ? null : null].filter(Boolean).join(" ");
++  // The caveat used to be the card's caption — body text on every card, three
++  // or four lines of weighting rules and exclusions above a two-bar chart. It
++  // crowded out the number it was there to qualify. It is reference material a
++  // reader reaches for once, so it moves behind a tooltip and the caption
++  // carries the one line that says what is being counted.
++  const caption = series.description || undefined;
++
++  // Direction, stated rather than inferred. `lowerIsBetter` was only ever
++  // visible inside the delta sentence, which needs two buckets to appear — so
++  // on a single-bucket card nothing on screen said whether a rise was good or
++  // bad, and the reader had to work it out from the metric's name.
++  const direction = series.lowerIsBetter ? "lower is better" : "higher is better";
+   // A `none` series is one the reader has been told not to read: its headline
+   // is "—" and its caveat explains why. Plotting it anyway invites exactly the
+   // reading the caveat forbids — barge-in drew a 4.3% column sourced from a
+@@ -158,14 +171,30 @@ const SeriesCard: FC<{ series: WeakMetricSeries; bucket: string }> = ({ series,
+ 
+   return (
+     <ChartCard
+-      title={series.label}
+-      caption={caption || undefined}
++      title={
++        <span style={{ display: "inline-flex", alignItems: "center", gap: "0.375rem" }}>
++          {series.label}
++          {series.caveat && (
++            <Tooltip label={series.caveat} align="top">
++              <button
++                type="button"
++                className="cursor-pointer inline-flex items-center"
++                aria-label={`How ${series.label} is measured`}
++              >
++                <TooltipIcon />
++              </button>
++            </Tooltip>
++          )}
++        </span>
++      }
++      caption={caption}
+       takeaway={
+-        <span style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
++        <span style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+           <Tag type={tag.type} size="sm">
+             {tag.label}
+           </Tag>
+           <strong>{series.state === "none" ? "—" : formatValue(series.latest, series.unit)}</strong>
++          <span style={{ opacity: 0.6, fontSize: "0.75rem" }}>{direction}</span>
+           {deltaLabel(series) && <span style={{ opacity: 0.75 }}>{deltaLabel(series)}</span>}
+         </span>
+       }
+diff --git a/apps/ally-admin-dashboard/src/types/auth.ts b/apps/ally-admin-dashboard/src/types/auth.ts
+index 6145a6cbf2..b96d0727be 100644
+--- a/apps/ally-admin-dashboard/src/types/auth.ts
++++ b/apps/ally-admin-dashboard/src/types/auth.ts
+@@ -1083,6 +1083,8 @@ export interface WeakMetricPoint {
+ }
+ 
+ export interface WeakMetricSeries {
++  /** One plain line saying what this counts — the card's caption. */
++  description: string;
+   id: string;
+   label: string;
+   unit: "percent" | "per100turns" | "ratio" | "count" | string;

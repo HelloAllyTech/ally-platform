@@ -1,0 +1,16 @@
+# Bug Hunter v2: CI failures and org-member bug issues every 15 minutes (chunk 08).
+[Unit]
+Description=Bug Hunter v2 poll (CI failures, issues)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=bughunter
+WorkingDirectory=/opt/ally-platform/bug-hunter
+EnvironmentFile=/etc/bug-hunter/env
+ExecStart=/usr/bin/flock -n /var/lib/bug-hunter/run.lock /opt/bug-hunter/venv/bin/bug-hunter daily --sources ci_failures,issues
+# dashboard verdicts reach memory within 15 minutes (amendments retract first)
+ExecStartPost=/usr/bin/flock -n /var/lib/bug-hunter/run.lock /opt/bug-hunter/venv/bin/bug-hunter feedback
+TimeoutStartSec=2h
+Nice=10

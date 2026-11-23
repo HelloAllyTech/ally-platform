@@ -1,0 +1,193 @@
+diff --git a/apps/ally-helpline-dashboard/src/hooks/index.ts b/apps/ally-helpline-dashboard/src/hooks/index.ts
+index 7b625c7ef3..86d9a85ae5 100644
+--- a/apps/ally-helpline-dashboard/src/hooks/index.ts
++++ b/apps/ally-helpline-dashboard/src/hooks/index.ts
+@@ -14,3 +14,4 @@ export * from "./useScenarioLanguages";
+ export * from "./useAchievementBadgeModal";
+ export * from "./useReactionModal";
+ export * from "./useSendMessage";
++export * from "./useCustomFieldsEnabled";
+diff --git a/apps/ally-helpline-dashboard/src/hooks/useCustomFieldsEnabled.ts b/apps/ally-helpline-dashboard/src/hooks/useCustomFieldsEnabled.ts
+new file mode 100644
+index 0000000000..a87f028e76
+--- /dev/null
++++ b/apps/ally-helpline-dashboard/src/hooks/useCustomFieldsEnabled.ts
+@@ -0,0 +1,22 @@
++import { useSelector } from "react-redux";
++
++import { useGetCustomFieldsEnabledQuery } from "@api";
++import { RootState } from "@store";
++import { UserRole } from "@types";
++
++/**
++ * Wraps `useGetCustomFieldsEnabledQuery` with a role guard.
++ *
++ * The `/settings/custom-fields-enabled` endpoint is only authorized for the
++ * Counselor role; calling it with any other role returns a 403. This hook
++ * skips the request entirely unless the current user is a Counselor (and
++ * still honours an explicit caller-provided `skip`).
++ */
++export const useCustomFieldsEnabled = (options?: { skip?: boolean }) => {
++  const role = useSelector((state: RootState) => state.user.user?.role);
++  const isCounsellor = role === UserRole.COUNSELLOR;
++
++  return useGetCustomFieldsEnabledQuery(undefined, {
++    skip: Boolean(options?.skip) || !isCounsellor,
++  });
++};
+diff --git a/apps/ally-helpline-dashboard/src/pages/calls/components/AdminLogsTable.tsx b/apps/ally-helpline-dashboard/src/pages/calls/components/AdminLogsTable.tsx
+index 8ed50ab59e..1154de3bdc 100644
+--- a/apps/ally-helpline-dashboard/src/pages/calls/components/AdminLogsTable.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/calls/components/AdminLogsTable.tsx
+@@ -13,7 +13,6 @@ import {
+   useGetCallTagsQuery,
+   useGetAdminSimulationLogsQuery,
+   useGetCustomFieldDefinitionsQuery,
+-  useGetCustomFieldsEnabledQuery,
+ } from "@api";
+ import {
+   NoResults,
+@@ -33,6 +32,7 @@ import {
+ } from "@assets";
+ import { Button, Chip, FallbackUI, PermissionGuard, TagGroup } from "@components";
+ import { CallProvider, Permissions } from "@constants";
++import { useCustomFieldsEnabled } from "@hooks";
+ import { updateFilters } from "@reducer";
+ import { RootState } from "@store";
+ import {
+@@ -81,7 +81,7 @@ const AdminLogsTable: FC<LogsTableProps> = ({ refreshKey, sessionType, className
+   };
+   const { user: currentUser, permissions } = useSelector((state: RootState) => state.user);
+   const canManageCustomFields = permissions?.includes(Permissions.MANAGE_CUSTOM_FIELD_DEFINITIONS);
+-  const { data: customFieldsEnabled } = useGetCustomFieldsEnabledQuery();
++  const { data: customFieldsEnabled } = useCustomFieldsEnabled();
+   const customFieldsActive = customFieldsEnabled !== false;
+ 
+   const { data: customFieldDefs = [] } = useGetCustomFieldDefinitionsQuery(undefined, {
+diff --git a/apps/ally-helpline-dashboard/src/pages/calls/components/UserLogsTable.tsx b/apps/ally-helpline-dashboard/src/pages/calls/components/UserLogsTable.tsx
+index 9b42b45e4e..41684fd837 100644
+--- a/apps/ally-helpline-dashboard/src/pages/calls/components/UserLogsTable.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/calls/components/UserLogsTable.tsx
+@@ -11,7 +11,6 @@ import {
+   useGetCallLogsQuery,
+   useGetSimulationLogsQuery,
+   useGetCustomFieldDefinitionsQuery,
+-  useGetCustomFieldsEnabledQuery,
+ } from "@api";
+ import {
+   NoResults,
+@@ -27,6 +26,7 @@ import {
+   ScribeIcon,
+ } from "@assets";
+ import { Button, Chip, TagGroup, FallbackUI } from "@components";
++import { useCustomFieldsEnabled } from "@hooks";
+ import { updateFilters } from "@reducer";
+ import { RootState } from "@store";
+ import { CallLog, ChatSummaryStatus, SimulationLog, TagDisplay, SessionType } from "@types";
+@@ -58,7 +58,7 @@ const UserLogsTable: FC<LogsTableProps> = ({ refreshKey, sessionType, className
+   const isCall = sessionType === SessionType.CALL;
+   const isSimulation = sessionType === SessionType.SIMULATION;
+ 
+-  const { data: customFieldsEnabled } = useGetCustomFieldsEnabledQuery();
++  const { data: customFieldsEnabled } = useCustomFieldsEnabled();
+   const customFieldsActive = customFieldsEnabled !== false;
+ 
+   const { data: customFieldDefs = [] } = useGetCustomFieldDefinitionsQuery(undefined, {
+diff --git a/apps/ally-helpline-dashboard/src/pages/calls/components/custom-fields/CustomFieldValuesPanel.tsx b/apps/ally-helpline-dashboard/src/pages/calls/components/custom-fields/CustomFieldValuesPanel.tsx
+index 4537d4f9c3..ef390d1d80 100644
+--- a/apps/ally-helpline-dashboard/src/pages/calls/components/custom-fields/CustomFieldValuesPanel.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/calls/components/custom-fields/CustomFieldValuesPanel.tsx
+@@ -7,9 +7,10 @@ import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+ import { useSelector } from "react-redux";
+ 
+ import { DropdownField } from "@ally-ui-mono/ui-shared";
+-import { useGetCustomFieldValuesQuery, useGetCustomFieldsEnabledQuery } from "@api";
++import { useGetCustomFieldValuesQuery } from "@api";
+ import TextField from "@components/text-field";
+ import { Permissions } from "@constants";
++import { useCustomFieldsEnabled } from "@hooks";
+ import { RootState } from "@store";
+ import {
+   CustomFieldEditPermission,
+@@ -48,10 +49,9 @@ const CustomFieldValuesPanel: FC<CustomFieldValuesPanelProps> = ({
+     onValueChange !== undefined;
+ 
+   // Standalone mode: fetch internally
+-  const { data: customFieldsEnabled, isLoading: isFeatureLoading } = useGetCustomFieldsEnabledQuery(
+-    undefined,
+-    { skip: isControlled },
+-  );
++  const { data: customFieldsEnabled, isLoading: isFeatureLoading } = useCustomFieldsEnabled({
++    skip: isControlled,
++  });
+   const customFieldsActive = isControlled ? true : customFieldsEnabled !== false;
+   const { data: fetchedFieldValues, isLoading } = useGetCustomFieldValuesQuery(chatId, {
+     skip: isControlled || !chatId || !customFieldsActive,
+diff --git a/apps/ally-helpline-dashboard/src/pages/calls/components/custom-fields/ManageCustomFieldsDialog.tsx b/apps/ally-helpline-dashboard/src/pages/calls/components/custom-fields/ManageCustomFieldsDialog.tsx
+index 84f56a0669..2b8bfba87d 100644
+--- a/apps/ally-helpline-dashboard/src/pages/calls/components/custom-fields/ManageCustomFieldsDialog.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/calls/components/custom-fields/ManageCustomFieldsDialog.tsx
+@@ -20,13 +20,13 @@ import { toast } from "sonner";
+ 
+ import {
+   useGetCustomFieldDefinitionsQuery,
+-  useGetCustomFieldsEnabledQuery,
+   useDeleteCustomFieldDefinitionMutation,
+   useReorderCustomFieldDefinitionsMutation,
+   useUpdateCustomFieldDefinitionMutation,
+ } from "@api";
+ import { Button } from "@components";
+ import { Permissions } from "@constants";
++import { useCustomFieldsEnabled } from "@hooks";
+ import { RootState } from "@store";
+ import { CustomFieldDefinition, CustomFieldScope, CustomFieldType } from "@types";
+ 
+@@ -82,7 +82,7 @@ const ManageCustomFieldsDialog: FC<ManageCustomFieldsDialogProps> = ({ open, onC
+   const { permissions } = useSelector((state: RootState) => state.user);
+   const canManage = permissions?.includes(Permissions.MANAGE_CUSTOM_FIELD_DEFINITIONS);
+ 
+-  const { data: customFieldsEnabled } = useGetCustomFieldsEnabledQuery();
++  const { data: customFieldsEnabled } = useCustomFieldsEnabled();
+   const customFieldsActive = customFieldsEnabled !== false;
+ 
+   const { data: rawDefinitions = [], isLoading } = useGetCustomFieldDefinitionsQuery(undefined, {
+diff --git a/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/CallSummary.tsx b/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/CallSummary.tsx
+index 32e55132bd..c940e371bc 100644
+--- a/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/CallSummary.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/CallSummary.tsx
+@@ -17,13 +17,12 @@ import {
+   useUpdateCallSummaryNotesMutation,
+   useGetCustomFieldValuesQuery,
+   useUpsertCustomFieldValuesMutation,
+-  useGetCustomFieldsEnabledQuery,
+ } from "@api";
+ import { Assessment, PageNotFoundIllustration, Warning } from "@assets";
+ import { Accordion, TextField, Button, InfoBanner, FallbackUI } from "@components";
+ import { LanguageMap, Permissions, ROUTES, toolTipStyles } from "@constants";
+ import { FeedbackDialog } from "@containers";
+-import { useEnhance, useDebounce } from "@hooks";
++import { useEnhance, useDebounce, useCustomFieldsEnabled } from "@hooks";
+ import CustomFieldValuesPanel from "@pages/calls/components/custom-fields/CustomFieldValuesPanel";
+ import { RootState } from "@store";
+ import { ChatSummaryStatus, SessionType, SummaryFieldKey, Tag } from "@types";
+@@ -82,7 +81,7 @@ const CallSummary: FC<CallSummaryProps> = ({
+   const { enhancing, EnhanceButton, EnhancementLoadingSkeleton, isEnhanceLoading } = useEnhance();
+ 
+   // Custom field state
+-  const { data: customFieldsEnabled } = useGetCustomFieldsEnabledQuery();
++  const { data: customFieldsEnabled } = useCustomFieldsEnabled();
+   const customFieldsActive = customFieldsEnabled !== false;
+   const { data: customFieldValues } = useGetCustomFieldValuesQuery(chatId, {
+     skip: !chatId || !customFieldsActive,
+diff --git a/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/__tests__/CallSummary.test.tsx b/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/__tests__/CallSummary.test.tsx
+index 1c197b1bb9..b3ab412b72 100644
+--- a/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/__tests__/CallSummary.test.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/post-call-summary/components/__tests__/CallSummary.test.tsx
+@@ -88,6 +88,7 @@ vi.mock("@hooks", () => ({
+   useEnhance: () => enhanceResult,
+   useDebounce: (fn: any) => fn,
+   useUser: () => userResult,
++  useCustomFieldsEnabled: () => mockGetCustomFieldsEnabled(),
+ }));
+ 
+ vi.mock("@components", () => ({

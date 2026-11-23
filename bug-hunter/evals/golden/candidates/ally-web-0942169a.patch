@@ -1,0 +1,142 @@
+diff --git a/libs/ui-shared/src/lib/simulation/SimulationTimer.tsx b/libs/ui-shared/src/lib/simulation/SimulationTimer.tsx
+index 27f8dfcdd9..4571049f9c 100644
+--- a/libs/ui-shared/src/lib/simulation/SimulationTimer.tsx
++++ b/libs/ui-shared/src/lib/simulation/SimulationTimer.tsx
+@@ -20,6 +20,14 @@ export const SimulationTimer: FC<SimulationTimerProps> = ({
+ }) => {
+   const [timer, setTimer] = useState<number>(0);
+ 
++  const onTimeLimitRef = useRef(onTimeLimit);
++  const onWarningRef = useRef(onWarning);
++
++  useEffect(() => {
++    onTimeLimitRef.current = onTimeLimit;
++    onWarningRef.current = onWarning;
++  });
++
+   const hasWarnedRef = useRef(false);
+   // Read pause state inside the interval without restarting it on every change.
+   const isPausedRef = useRef(isPaused);
+@@ -44,18 +52,18 @@ export const SimulationTimer: FC<SimulationTimerProps> = ({
+       setTimer(timeElapsed);
+ 
+       if (timeLimit - timeElapsed <= WARNING_THRESHOLD && !hasWarnedRef.current) {
+-        onWarning?.();
++        onWarningRef.current?.();
+         hasWarnedRef.current = true;
+       }
+ 
+       if (timeElapsed >= timeLimit + CLIENT_AUTO_END_GRACE_SECONDS) {
+-        onTimeLimit?.();
++        onTimeLimitRef.current?.();
+         clearInterval(interval);
+       }
+     }, 1000);
+ 
+     return () => clearInterval(interval);
+-  }, [startTime, onTimeLimit, onWarning, timeLimit]);
++  }, [startTime, timeLimit]);
+ 
+   const formatTime = (totalSeconds: number) => {
+     const hours = Math.floor(totalSeconds / 3600);
+diff --git a/libs/ui-shared/src/lib/simulation/__tests__/SimulationTimer.test.tsx b/libs/ui-shared/src/lib/simulation/__tests__/SimulationTimer.test.tsx
+new file mode 100644
+index 0000000000..ddb95fba96
+--- /dev/null
++++ b/libs/ui-shared/src/lib/simulation/__tests__/SimulationTimer.test.tsx
+@@ -0,0 +1,94 @@
++import { render, screen } from "@testing-library/react";
++import { vi } from "vitest";
++import { SimulationTimer } from "../SimulationTimer";
++
++const mockOnTimeLimit = vi.fn();
++const mockOnWarning = vi.fn();
++
++const props = {
++  onTimeLimit: mockOnTimeLimit,
++  onWarning: mockOnWarning,
++  startTime: new Date().toISOString(),
++  timeLimit: 600,
++  translations: { sessionDuration: "Session Duration:" },
++};
++
++describe("SimulationTimer", () => {
++  beforeEach(() => {
++    vi.useFakeTimers();
++    vi.clearAllMocks();
++  });
++
++  afterEach(() => {
++    vi.useRealTimers();
++  });
++
++  it("should render the timer with the correct initial time", () => {
++    render(<SimulationTimer {...props} />);
++    const timerValue = screen.getByTestId("simulation-timer-value");
++    expect(timerValue.textContent).toBe("00:00");
++  });
++
++  it("should call onWarning when the time limit is approaching", async () => {
++    render(<SimulationTimer {...props} timeLimit={60} />);
++    await vi.advanceTimersByTimeAsync(31 * 1000);
++    expect(mockOnWarning).toHaveBeenCalled();
++  });
++
++  it("should call onTimeLimit when the time limit is reached", async () => {
++    render(<SimulationTimer {...props} timeLimit={60} />);
++    await vi.advanceTimersByTimeAsync(76 * 1000);
++    expect(mockOnTimeLimit).toHaveBeenCalled();
++  });
++
++  it("should not call onWarning or onTimeLimit when paused", async () => {
++    render(<SimulationTimer {...props} timeLimit={60} isPaused />);
++    await vi.advanceTimersByTimeAsync(76 * 1000);
++    expect(mockOnWarning).not.toHaveBeenCalled();
++    expect(mockOnTimeLimit).not.toHaveBeenCalled();
++  });
++
++  it("does not reset the interval when parent re-renders", async () => {
++    const onWarning = vi.fn();
++    const onTimeLimit = vi.fn();
++    const timeLimit = 10;
++    const startTime = new Date().toISOString();
++
++    const { rerender } = render(
++      <SimulationTimer
++        startTime={startTime}
++        timeLimit={timeLimit}
++        onWarning={onWarning}
++        onTimeLimit={onTimeLimit}
++      />,
++    );
++
++    // Re-render every 500ms for 12 seconds to simulate the parent component
++    // re-rendering frequently, creating new functions for the callbacks.
++    // The key is that `onWarning` and `onTimeLimit` are new function instances
++    // on each render.
++    for (let i = 0; i < 24; i++) {
++      await vi.advanceTimersByTimeAsync(500);
++      rerender(
++        <SimulationTimer
++          startTime={startTime}
++          timeLimit={timeLimit}
++          onWarning={() => onWarning()}
++          onTimeLimit={() => onTimeLimit()}
++        />,
++      );
++    }
++    
++    // Total time advanced in loop is 12 seconds.
++    // The warning should have been triggered when `timeLimit - timeElapsed <= 30`,
++    // which is `10 - timeElapsed <= 30`, which is true for any positive elapsed time.
++    // So the warning should be called on the first successful 1-second interval.
++    expect(onWarning).toHaveBeenCalled();
++
++    // The time limit callback should be triggered when `timeElapsed >= timeLimit + 15`,
++    // which is `timeElapsed >= 25`.
++    // We need to advance the clock further.
++    await vi.advanceTimersByTimeAsync(15 * 1000);
++    expect(onTimeLimit).toHaveBeenCalled();
++  });
++});
+\ No newline at end of file

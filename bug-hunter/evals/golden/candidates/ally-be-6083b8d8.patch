@@ -1,0 +1,225 @@
+diff --git a/src/common/constants/network.constants.ts b/src/common/constants/network.constants.ts
+new file mode 100644
+index 0000000000..d636a227a6
+--- /dev/null
++++ b/src/common/constants/network.constants.ts
+@@ -0,0 +1,18 @@
++/**
++ * Proxies between a client and this process: the value main.ts gives Express's
++ * `trust proxy`.
++ *
++ * Exactly one in every deployed environment. The API hostname resolves straight to an AWS
++ * Application Load Balancer, and the ECS task runs Node with nothing in front of it, so the
++ * TCP peer Express sees is always the load balancer. The balancer appends the address it
++ * accepted the connection from to X-Forwarded-For (its default mode). Trusting one hop makes
++ * `req.ip` that address, and anything a client wrote into the header itself sits further
++ * left and is ignored.
++ *
++ * Unset, `req.ip` was the load balancer's own address: every IP-keyed rate limit counted all
++ * clients as one, and the audit logs recorded the balancer instead of the caller. Never set
++ * `trust proxy` to `true`. That trusts the whole header, so any caller could choose its own
++ * `req.ip`, and with it a fresh rate-limit bucket per request. Change this number only when
++ * the network path in front of the service changes.
++ */
++export const TRUSTED_PROXY_HOPS = 1;
+diff --git a/src/common/constants/test/network.constants.spec.ts b/src/common/constants/test/network.constants.spec.ts
+new file mode 100644
+index 0000000000..d04b6e1086
+--- /dev/null
++++ b/src/common/constants/test/network.constants.spec.ts
+@@ -0,0 +1,72 @@
++import { Controller, Get, Req } from '@nestjs/common';
++import { NestExpressApplication } from '@nestjs/platform-express';
++import { Test } from '@nestjs/testing';
++import { Request } from 'express';
++import * as request from 'supertest';
++import { TRUSTED_PROXY_HOPS } from '../network.constants';
++
++@Controller()
++class EchoIpController {
++  @Get('ip')
++  ip(@Req() req: Request) {
++    return { ip: req.ip };
++  }
++}
++
++/**
++ * What req.ip resolves to behind the load balancer, with the `trust proxy` value main.ts sets.
++ *
++ * The test client plays the load balancer — it is the TCP peer — and X-Forwarded-For is
++ * written the way the balancer leaves it: anything the client sent, then the address the
++ * balancer accepted the connection from, appended. Addresses are from the RFC 5737
++ * documentation ranges.
++ */
++describe('TRUSTED_PROXY_HOPS', () => {
++  const LOOPBACK = /^(::ffff:)?127\.0\.0\.1$|^::1$/;
++  let app: NestExpressApplication;
++
++  async function boot(trustProxy?: number) {
++    const moduleRef = await Test.createTestingModule({
++      controllers: [EchoIpController],
++    }).compile();
++    app = moduleRef.createNestApplication<NestExpressApplication>();
++    if (trustProxy !== undefined) {
++      app.set('trust proxy', trustProxy);
++    }
++    await app.init();
++  }
++
++  async function ipFor(xForwardedFor?: string): Promise<string> {
++    const get = request(app.getHttpServer()).get('/ip');
++    if (xForwardedFor) {
++      get.set('X-Forwarded-For', xForwardedFor);
++    }
++    return (await get.expect(200)).body.ip;
++  }
++
++  afterEach(async () => {
++    await app?.close();
++  });
++
++  describe('as main.ts sets it', () => {
++    beforeEach(() => boot(TRUSTED_PROXY_HOPS));
++
++    it('resolves req.ip to the address the load balancer appended', async () => {
++      expect(await ipFor('203.0.113.7')).toBe('203.0.113.7');
++    });
++
++    it('ignores an address the client wrote into X-Forwarded-For itself', async () => {
++      expect(await ipFor('198.51.100.66, 203.0.113.7')).toBe('203.0.113.7');
++    });
++
++    it('falls back to the TCP peer when there is no X-Forwarded-For', async () => {
++      expect(await ipFor()).toMatch(LOOPBACK);
++    });
++  });
++
++  it('left unset, resolves every client to the load balancer — how production ran before', async () => {
++    await boot();
++
++    expect(await ipFor('203.0.113.7')).toMatch(LOOPBACK);
++  });
++});
+diff --git a/src/main.ts b/src/main.ts
+index 0facd05f1a..c66246d8af 100644
+--- a/src/main.ts
++++ b/src/main.ts
+@@ -12,6 +12,7 @@ import * as express from 'express';
+ import helmet from 'helmet';
+ import { AppModule } from './app.module';
+ import { AppConfigService } from './config/config.service';
++import { TRUSTED_PROXY_HOPS } from './common/constants/network.constants';
+ import { PostHog } from 'posthog-node';
+ import { PostHogInterceptor } from 'posthog-node/nestjs';
+ 
+@@ -22,6 +23,10 @@ async function bootstrap() {
+       bufferLogs: true,
+     });
+     const appConfigService = app.get(AppConfigService);
++    // Resolve req.ip to the client rather than the load balancer in front of every
++    // deployment. Rate limits keyed by IP and both audit loggers read it; see
++    // TRUSTED_PROXY_HOPS for why it is a hop count and never `true`.
++    app.set('trust proxy', TRUSTED_PROXY_HOPS);
+     app.enableCors({
+       origin: (origin: any, callback: any) => {
+         const allowedOrigins = appConfigService.cors.allowedOrigins;
+diff --git a/src/rate-limit/guard/custom-throttler.guard.ts b/src/rate-limit/guard/custom-throttler.guard.ts
+index 8ef6bf7b13..f5cd3d0543 100644
+--- a/src/rate-limit/guard/custom-throttler.guard.ts
++++ b/src/rate-limit/guard/custom-throttler.guard.ts
+@@ -58,7 +58,9 @@ export class CustomThrottlerGuard extends ThrottlerGuard {
+       return `user-${req.user.id}`;
+     }
+ 
+-    return req.ips?.[0] || req.ip || 'unknown';
++    // Already the client's address: main.ts sets `trust proxy` (TRUSTED_PROXY_HOPS). Don't
++    // read X-Forwarded-For here — its left-most entry is whatever the client sent.
++    return req.ip || 'unknown';
+   }
+ 
+   protected async getErrorMessage(
+diff --git a/src/rate-limit/guard/test/custom-throttler.guard.spec.ts b/src/rate-limit/guard/test/custom-throttler.guard.spec.ts
+index d948df19b3..b2d5cfef71 100644
+--- a/src/rate-limit/guard/test/custom-throttler.guard.spec.ts
++++ b/src/rate-limit/guard/test/custom-throttler.guard.spec.ts
+@@ -135,20 +135,20 @@ describe('CustomThrottlerGuard', () => {
+       expect(result).toBe('192.168.1.1');
+     });
+ 
+-    it('should return first IP from ips array', async () => {
++    it('should use req.ip and ignore X-Forwarded-For, which trust proxy has already resolved', async () => {
+       const req = {
+-        ips: ['10.0.0.1', '192.168.1.1'],
+-        ip: '192.168.1.1',
++        ip: '203.0.113.7',
++        headers: { 'x-forwarded-for': '198.51.100.66, 203.0.113.7' },
+         _context: mockExecutionContext,
+       };
+ 
+       mockReflector.get.mockReturnValue(null);
+ 
+       const result = await (guard as any).getTracker(req);
+-      expect(result).toBe('10.0.0.1');
++      expect(result).toBe('203.0.113.7');
+     });
+ 
+-    it('should return req.ip if no ips array', async () => {
++    it('should default to the IP tracker when the route sets no key', async () => {
+       const req = { ip: '192.168.1.1', _context: mockExecutionContext };
+       mockReflector.get.mockReturnValue(null);
+ 
+diff --git a/src/rate-limit/test/rate-limited-routes.spec.ts b/src/rate-limit/test/rate-limited-routes.spec.ts
+index cf715a9f12..c8d44ac21e 100644
+--- a/src/rate-limit/test/rate-limited-routes.spec.ts
++++ b/src/rate-limit/test/rate-limited-routes.spec.ts
+@@ -8,6 +8,7 @@ import {
+   VersioningType,
+ } from '@nestjs/common';
+ import { AuthGuard } from '@nestjs/passport';
++import { NestExpressApplication } from '@nestjs/platform-express';
+ import { Test } from '@nestjs/testing';
+ import { ThrottlerModule } from '@nestjs/throttler';
+ import { PostHog } from 'posthog-node';
+@@ -20,6 +21,7 @@ import { JwtRefreshAuthGuard } from 'src/auth/guards/jwt-refresh-auth.guard';
+ import { PermissionsGuard } from 'src/auth/guards/permissions.guard';
+ import { AuthService } from 'src/auth/service/auth.service';
+ import { PermissionsService } from 'src/authorization/service/permissions.service';
++import { TRUSTED_PROXY_HOPS } from 'src/common/constants/network.constants';
+ import { TIME } from 'src/common/constants/time.constants';
+ import { AppConfigService } from 'src/config/config.service';
+ import { ErrorCode } from 'src/exception/error-code.enum';
+@@ -92,8 +94,12 @@ async function boot(
+   for (const [guard, stub] of guardStubs) {
+     builder = builder.overrideGuard(guard).useValue(stub);
+   }
+-  const app = (await builder.compile()).createNestApplication();
+-  // As main.ts does, so the paths below are the real ones.
++  const app = (
++    await builder.compile()
++  ).createNestApplication<NestExpressApplication>();
++  // As main.ts does: the real paths, and req.ip resolved through the load balancer, which
++  // the test client plays.
++  app.set('trust proxy', TRUSTED_PROXY_HOPS);
+   app.setGlobalPrefix('api');
+   app.enableVersioning({ type: VersioningType.URI });
+   await app.init();
+@@ -252,6 +258,19 @@ describe('Rate-limited routes', () => {
+       expect(accepted.headers['x-ratelimit-limit-otp']).toBe('5');
+       expect(accepted.headers).not.toHaveProperty('x-ratelimit-limit');
+     });
++
++    // X-Forwarded-For as the load balancer leaves it; RFC 5737 documentation addresses.
++    it('counts each client behind the load balancer separately, and a spoofed address buys no fresh bucket', async () => {
++      const verifyFrom = (xForwardedFor: string) =>
++        verify().set('X-Forwarded-For', xForwardedFor);
++      for (let n = 1; n <= 5; n++) {
++        await verifyFrom('203.0.113.7').expect(200);
++      }
++      await verifyFrom('203.0.113.7').expect(429);
++
++      await verifyFrom('198.51.100.66, 203.0.113.7').expect(429);
++      await verifyFrom('203.0.113.8').expect(200);
++    });
+   });
+ 
+   describe('POST /api/v1/lab/eval/login: the otp throttler, per address', () => {

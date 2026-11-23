@@ -1,0 +1,49 @@
+diff --git a/ally-be/src/badge/service/badge-tenant.service.ts b/ally-be/src/badge/service/badge-tenant.service.ts
+index d0df1aeba7..44caaf9813 100644
+--- a/ally-be/src/badge/service/badge-tenant.service.ts
++++ b/ally-be/src/badge/service/badge-tenant.service.ts
+@@ -2,6 +2,7 @@ import { EntityManager, In, Repository } from 'typeorm';
+ import {
+   BadRequestException,
+   Injectable,
++  InternalServerErrorException,
+   Logger,
+   NotFoundException,
+ } from '@nestjs/common';
+@@ -146,7 +147,9 @@ export class BadgeTenantService {
+         `Failed to assign badge ${badge.id} to tenants`,
+         error.stack,
+       );
+-      throw error;
++      throw new InternalServerErrorException(
++        `Failed to assign badge ${badge.id} to tenants`,
++      );
+     }
+   }
+ 
+diff --git a/ally-be/src/badge/service/test/badge-tenant.service.spec.ts b/ally-be/src/badge/service/test/badge-tenant.service.spec.ts
+index 663882d371..3362872914 100644
+--- a/ally-be/src/badge/service/test/badge-tenant.service.spec.ts
++++ b/ally-be/src/badge/service/test/badge-tenant.service.spec.ts
+@@ -1,7 +1,11 @@
+ import { Test, TestingModule } from '@nestjs/testing';
+ import { getRepositoryToken } from '@nestjs/typeorm';
+ import { In, Repository } from 'typeorm';
+-import { BadRequestException, NotFoundException } from '@nestjs/common';
++import {
++  BadRequestException,
++  InternalServerErrorException,
++  NotFoundException,
++} from '@nestjs/common';
+ import { BadgeTenantService } from '../badge-tenant.service';
+ import { BadgeTenant } from '../../entity/badge-tenant.entity';
+ import { Badge } from '../../entity/badge.entity';
+@@ -284,7 +288,7 @@ describe('BadgeTenantService', () => {
+       mockTenantsRepository.find.mockRejectedValue(new Error('DB error'));
+ 
+       await expect(service.assignBadgeToTenants(badge)).rejects.toThrow(
+-        'DB error',
++        InternalServerErrorException,
+       );
+     });
+   });

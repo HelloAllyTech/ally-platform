@@ -11,6 +11,7 @@ import {
   canStartFixSession,
   eligibleFor,
   formatAge,
+  isOldHistory,
   nextStep,
   showsStaleness,
   stalenessTier,
@@ -160,7 +161,7 @@ describe("nextStep", () => {
     expect(nextStep(finding({ id: "a", status: BugFindingStatus.PENDING_APPROVAL }))).toBe(
       "approve",
     );
-    expect(nextStep(finding({ id: "a", status: BugFindingStatus.NEEDS_INPUT }))).toBe("answer");
+    expect(nextStep(finding({ id: "a", status: BugFindingStatus.NEEDS_INPUT }))).toBe("review");
     expect(nextStep(finding({ id: "a", status: BugFindingStatus.FAILED }))).toBe("retry");
     // A plan parked on a step: the step's own move, or nothing while it runs.
     const attention = { stepId: "s", stepIndex: 1, repo: "ally-ai", prUrl: "u" };
@@ -213,5 +214,21 @@ describe("nextStep", () => {
       BugFindingStatus.REJECTED,
       BugFindingStatus.CANCELLED,
     ].forEach(status => expect(nextStep(finding({ id: "a", status }))).toBeNull());
+  });
+});
+
+describe("isOldHistory", () => {
+  it("is the old engine's uuid ids, never v2's", () => {
+    expect(isOldHistory({ id: "847b420d-72cb-4937-be9e-c78143718c62" })).toBe(true);
+    expect(isOldHistory({ id: "v2-10" })).toBe(false);
+  });
+
+  it("closes every action and next step on an old finding", () => {
+    const old = finding({
+      id: "847b420d-72cb-4937-be9e-c78143718c62",
+      status: BugFindingStatus.PENDING_APPROVAL,
+    });
+    expect(canAct("approve", old)).toBe(false);
+    expect(nextStep(old)).toBeNull();
   });
 });

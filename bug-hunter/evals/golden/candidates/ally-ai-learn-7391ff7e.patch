@@ -1,0 +1,177 @@
+diff --git a/ally-ai-learn/app/core/events/factory.py b/ally-ai-learn/app/core/events/factory.py
+index 79215d455..d64019e21 100644
+--- a/ally-ai-learn/app/core/events/factory.py
++++ b/ally-ai-learn/app/core/events/factory.py
+@@ -1,5 +1,7 @@
+ from typing import Any, Dict, List, Literal, Mapping, Optional
+ 
++from pydantic import ValidationError
++
+ from app.core.branching_instructions.base import BranchingInstruction
+ from app.core.config import settings
+ from app.core.constants import DEFAULT_LANGUAGE_CODE, DetectionType, VisibilityType
+@@ -159,7 +161,7 @@ def _create_event_by_detection_type(
+ 
+             try:
+                 time_data = TimeData(**raw_data)
+-            except Exception as e:
++            except ValidationError as e:
+                 log.warning("Event '%s' (TIME) invalid data: %s", event_id, e)
+                 return None
+ 
+@@ -179,7 +181,7 @@ def _create_event_by_detection_type(
+                 return None
+             try:
+                 score_data = ScoreData(**raw_data)
+-            except Exception as e:
++            except ValidationError as e:
+                 log.warning("Event '%s' (SCORE) invalid data: %s", event_id, e)
+                 return None
+             return ScoreEvent.create(
+@@ -240,7 +242,7 @@ def _create_event_by_detection_type(
+                     dependent_events=raw_data.get("dependent_events", []),
+                     expression=expression,
+                 )
+-            except Exception as e:
++            except (ValidationError, ValueError) as e:
+                 log.warning(
+                     "Event '%s' (COMBINATION) invalid expression/data: %s", event_id, e
+                 )
+@@ -287,7 +289,7 @@ def _create_event_by_detection_type(
+ 
+             try:
+                 utterance_length_data = UtteranceLengthData(**raw_data)
+-            except Exception as e:
++            except (ValidationError, ValueError) as e:
+                 log.warning(
+                     "Event '%s' (HELPER_UTTERANCE_LENGTH) invalid data: %s", event_id, e
+                 )
+@@ -308,7 +310,7 @@ def _create_event_by_detection_type(
+                 if raw_data and isinstance(raw_data, dict):
+                     # Allow empty dict or no data for interruption events
+                     interruption_data = InterruptionData(**raw_data)
+-            except Exception as e:
++            except ValidationError as e:
+                 log.warning(
+                     "Event '%s' (HELPER_INTERRUPTED) invalid data: %s", event_id, e
+                 )
+@@ -328,7 +330,7 @@ def _create_event_by_detection_type(
+                 helper_paraphrased_data = HelperParaphrasedData()
+                 if raw_data and isinstance(raw_data, dict):
+                     helper_paraphrased_data = HelperParaphrasedData(**raw_data)
+-            except Exception as e:
++            except ValidationError as e:
+                 log.warning(
+                     "Event '%s' (HELPER_PARAPHRASED) invalid data: %s",
+                     event_id,
+@@ -408,7 +410,7 @@ def _parse_binary_classifier_data(
+             positive_examples=positive_examples,
+             negative_examples=negative_examples,
+         )
+-    except Exception as e:
++    except ValidationError as e:
+         log.warning("Event '%s' (BINARY_CLASSIFIER) invalid data: %s", event_id, e)
+         return None
+ 
+diff --git a/ally-ai-learn/tests/unit/app/core/events/test_factory.py b/ally-ai-learn/tests/unit/app/core/events/test_factory.py
+new file mode 100644
+index 000000000..3fb85ceee
+--- /dev/null
++++ b/ally-ai-learn/tests/unit/app/core/events/test_factory.py
+@@ -0,0 +1,96 @@
++from unittest.mock import MagicMock, patch
++from pydantic import ValidationError
++
++from app.core.constants import DetectionType
++from app.core.events.factory import (
++    _create_event_by_detection_type,
++    build_events_from_metadata,
++)
++
++
++@patch("app.core.events.factory.get_logger")
++def test_create_event_by_detection_type_handles_time_event_validation_error(
++    mock_get_logger,
++):
++    """
++    Test that _create_event_by_detection_type catches ValidationError for TIME events
++    and logs a specific warning.
++    """
++    # Arrange
++    mock_logger = MagicMock()
++    mock_get_logger.return_value = mock_logger
++
++    invalid_time_event_data = {
++        "id": "time-event-1",
++        "detectionType": "TIME",
++        "data": {"time": "not-a-float"},  # This should cause a ValidationError
++    }
++    detection_type = DetectionType.TIME
++
++    # Act
++    result = _create_event_by_detection_type(
++        ev=invalid_time_event_data, detection_type=detection_type, logger=mock_logger
++    )
++
++    # Assert
++    assert result is None
++    mock_logger.warning.assert_called_once()
++    call_args, _ = mock_logger.warning.call_args
++    assert call_args[0] == "Event '%s' (TIME) invalid data: %s"
++    assert call_args[1] == "time-event-1"
++    assert isinstance(call_args[2], ValidationError)
++
++
++@patch("app.core.events.factory.get_logger")
++def test_build_events_from_metadata_with_invalid_score_data(mock_get_logger):
++    """
++    Test that build_events_from_metadata gracefully handles an event with
++    invalid data that would cause a Pydantic validation error.
++    """
++    # Arrange
++    mock_logger = MagicMock()
++    mock_get_logger.return_value = mock_logger
++
++    metadata = {
++        "events": [
++            {
++                "id": "score-event-1",
++                "detectionType": "SCORE",
++                "data": {
++                    "score_type": "some_type",
++                    "min_score": "not-an-int",  # Invalid data
++                },
++            }
++        ]
++    }
++
++    # Act
++    events = build_events_from_metadata(metadata, on_unknown="warn", logger=mock_logger)
++
++    # Assert
++    assert len(events) == 0
++
++    # Check that a warning was logged about the skipped event
++    log_calls = mock_logger.warning.call_args_list
++
++    # Check for the specific validation error log inside the factory helper
++    found_invalid_data_log = False
++    for call in log_calls:
++        if (
++            call[0][0] == "Event '%s' (SCORE) invalid data: %s"
++            and call[0][1] == "score-event-1"
++        ):
++            assert isinstance(call[0][2], ValidationError)
++            found_invalid_data_log = True
++            break
++    assert found_invalid_data_log, (
++        "A specific validation error should have been logged."
++    )
++
++    # Check that the event was marked as skipped in the summary
++    found_skipped_log = False
++    for call in log_calls:
++        if call[0][0] == "Event '%s' skipped: %s" and call[0][1] == "score-event-1":
++            found_skipped_log = True
++            break
++    assert found_skipped_log, "A summary ''skipped'' message should have been logged."

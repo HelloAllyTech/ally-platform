@@ -1,0 +1,29 @@
+diff --git a/apps/ally-helpline-dashboard/src/components/comment-thread/CommentThread.tsx b/apps/ally-helpline-dashboard/src/components/comment-thread/CommentThread.tsx
+index 857077bda0..4bd0dc0405 100644
+--- a/apps/ally-helpline-dashboard/src/components/comment-thread/CommentThread.tsx
++++ b/apps/ally-helpline-dashboard/src/components/comment-thread/CommentThread.tsx
+@@ -86,7 +86,7 @@ const CommentThread = ({
+       });
+     }
+     setHasMore(nextData.length > 0);
+-  }, [threadComments]);
++  }, [threadComments, deletedCommentIds, hasMore, id, onCommentChange, setComments, threadsOffset]);
+ 
+   const handleCommentAddition = () => {
+     onCommentAddition(comment);
+diff --git a/apps/ally-helpline-dashboard/src/components/comment-thread/__tests__/CommentThread.test.tsx b/apps/ally-helpline-dashboard/src/components/comment-thread/__tests__/CommentThread.test.tsx
+index 697f13f653..350b9d94df 100644
+--- a/apps/ally-helpline-dashboard/src/components/comment-thread/__tests__/CommentThread.test.tsx
++++ b/apps/ally-helpline-dashboard/src/components/comment-thread/__tests__/CommentThread.test.tsx
+@@ -277,6 +277,11 @@ describe("CommentThread Component", () => {
+       );
+       expect(screen.queryByTestId(/comment-card-/)).not.toBeInTheDocument();
+     });
++
++    it("should render CommentThread component without crashing", () => {
++      renderWithProvider(<CommentThread {...defaultProps} />);
++      expect(screen.getByText("Comment Thread")).toBeInTheDocument();
++    });
+   });
+ 
+   // --- Comment Input Tests ---

@@ -1,0 +1,106 @@
+diff --git a/apps/ally-admin-dashboard/src/constants/SimulationCreator.ts b/apps/ally-admin-dashboard/src/constants/SimulationCreator.ts
+index 65a2a982d9..f2ee0b0ba4 100644
+--- a/apps/ally-admin-dashboard/src/constants/SimulationCreator.ts
++++ b/apps/ally-admin-dashboard/src/constants/SimulationCreator.ts
+@@ -161,6 +161,7 @@ export const FORM_FIELD_IDS = {
+   TERMINATION_MESSAGE: "terminationMessage",
+   TERMINATION_NAME: "terminationName",
+   IS_PUBLIC: "isPublic",
++  LANGUAGES_VOICES: "languageVoices",
+   EXPERIENCE_MODE: "experienceMode",
+   CHECKLIST_TYPE: "checklistType",
+   TIMER_MODE: "timerMode",
+diff --git a/apps/ally-admin-dashboard/src/pages/CreateSimulation/CreateSimulation.tsx b/apps/ally-admin-dashboard/src/pages/CreateSimulation/CreateSimulation.tsx
+index 6260bf385a..3340cfe35f 100644
+--- a/apps/ally-admin-dashboard/src/pages/CreateSimulation/CreateSimulation.tsx
++++ b/apps/ally-admin-dashboard/src/pages/CreateSimulation/CreateSimulation.tsx
+@@ -32,6 +32,7 @@ import {
+   SIMULATION_CREATOR_STEP_IDS,
+   ExperienceMode,
+   SESSION_TIMER_CONFIG,
++  FORM_FIELD_IDS,
+ } from "@constants";
+ import { useDebounce } from "@hooks";
+ import { SimulationStatus, SimulationPreviewType, triggerWarning } from "@types";
+@@ -114,6 +115,11 @@ export const CreateSimulation: FC = () => {
+       if (isEmpty(value)) return false;
+       if (Array.isArray(value) && value.length === 0) return false;
+       if (value instanceof FileList && value.length === 0) return false;
++      if (fieldId === FORM_FIELD_IDS.LANGUAGES_VOICES) {
++        const mappings = value as Record<string, string> | undefined;
++        const hasAnyVoiceSelected = !!mappings && Object.values(mappings).some(v => !!v);
++        if (!hasAnyVoiceSelected) return false;
++      }
+       return true;
+     });
+   }, [formValues]);
+diff --git a/apps/ally-admin-dashboard/src/pages/CreateSimulation/__tests__/CreateSimulation.test.tsx b/apps/ally-admin-dashboard/src/pages/CreateSimulation/__tests__/CreateSimulation.test.tsx
+index 35539f4034..078a8a300c 100644
+--- a/apps/ally-admin-dashboard/src/pages/CreateSimulation/__tests__/CreateSimulation.test.tsx
++++ b/apps/ally-admin-dashboard/src/pages/CreateSimulation/__tests__/CreateSimulation.test.tsx
+@@ -70,6 +70,14 @@ vi.mock("@hooks", () => ({
+   useDebounce: (fn: any) => fn, // Return the function immediately without debouncing
+ }));
+ 
++vi.mock("@ally-ui-mono/ui-shared/featureFlag", () => ({
++  FEATURE_FLAGS_MAP: {
++    SIMULATION_CREATOR_FLAG: true,
++    ADDITIONAL_CONFIG_FLAG: false,
++    SIMULATION_REPORT_FLAG: false,
++  },
++}));
++
+ // Mock components
+ vi.mock("@components", () => ({
+   Header: ({ onBack, onSaveDraft, onPublish, onPreview, isValid }: any) => (
+@@ -149,6 +157,10 @@ vi.mock("@constants", () => ({
+     GUIDED: "GUIDED",
+     UNGUIDED: "UNGUIDED",
+   },
++  // Provide FORM_FIELD_IDS to satisfy CreateSimulation import
++  FORM_FIELD_IDS: {
++    LANGUAGES_VOICES: "languageVoices",
++  },
+   ROUTES: {
+     SIMULATION_STUDIO: "/simulation-studio",
+     EDIT_SIMULATION: (id: string | number) => `/create-simulation/edit/${id}`,
+@@ -184,6 +196,8 @@ vi.mock("@constants", () => ({
+       fields: [
+         { id: "title", isMandatory: true },
+         { id: "description", isMandatory: true },
++        // Include language-voice mapping as mandatory to match app behavior
++        { id: "languageVoices", isMandatory: true },
+         { id: "age", isMandatory: false },
+       ],
+     },
+@@ -228,11 +242,14 @@ describe("CreateSimulation", () => {
+       title: "Test Title",
+       description: "Test Description",
+       triggerWarningIds: [],
++      // Provide at least one language->voice mapping by default so header is enabled
++      languageVoices: { "1": "voice-1" },
+     })),
+     getValues: vi.fn(() => ({
+       title: "Test Title",
+       description: "Test Description",
+       triggerWarningIds: [],
++      languageVoices: { "1": "voice-1" },
+     })) as any,
+     reset: vi.fn(),
+   };
+@@ -539,6 +556,7 @@ describe("CreateSimulation", () => {
+         title: "",
+         description: "",
+         triggerWarningIds: [],
++        languageVoices: { "1": "" },
+       });
+       renderCreateSimulation();
+ 
+@@ -551,6 +569,7 @@ describe("CreateSimulation", () => {
+         title: "Test",
+         description: "Test Description",
+         triggerWarningIds: [],
++        languageVoices: { "1": "voice-1" },
+       });
+       renderCreateSimulation();
+ 

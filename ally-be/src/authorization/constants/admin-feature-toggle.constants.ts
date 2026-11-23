@@ -121,6 +121,10 @@ export enum FeatureToggleKey {
 
   // Bug Hunter: the autonomous find-and-fix agent (formerly SUPER_DUPER_ADMIN-only)
   BUG_HUNTER = 'bug_hunter',
+  // Bug Hunter v2 (bug-hunter/ at the repo root): read its suggested fixes and
+  // escalations and give the two-part verdict (diagnosis + fix) that teaches it.
+  // Granted person by person; no backfill, so a missing row means off.
+  BUG_HUNTER_V2_VERDICTS = 'bug_hunter_v2_verdicts',
 
   // The clinical advisor: whoever holds this is notified when a debrief or a
   // flagged point is escalated to the clinical advisor (v9 FR-38). It once also
@@ -512,6 +516,17 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
     description:
       'Configure and run the autonomous find-and-fix agent, and review its run history.',
     legacyGrants: SDA_ONLY,
+  },
+  {
+    key: FeatureToggleKey.BUG_HUNTER_V2_VERDICTS,
+    label: 'Bug Hunter v2 — verdicts',
+    description:
+      'Read Bug Hunter v2’s suggested fixes and escalations (finding, failing test, patch) and record whether its diagnosis and fix were right. Your verdicts teach it what to avoid next time.',
+    // Inert, like every key added after the role-collapse cutover: no migration reads
+    // it and nobody holds it until granted from Admin User Management.
+    legacyGrants: SDA_ONLY,
+    // The agent works across every organisation's code, not one tenant's data.
+    platformOnly: true,
   },
   {
     key: FeatureToggleKey.BUILDER,

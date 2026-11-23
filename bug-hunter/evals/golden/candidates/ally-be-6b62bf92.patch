@@ -1,0 +1,151 @@
+diff --git a/src/builder/service/builder-build.service.ts b/src/builder/service/builder-build.service.ts
+index be97e6318d..ede3c88c89 100644
+--- a/src/builder/service/builder-build.service.ts
++++ b/src/builder/service/builder-build.service.ts
+@@ -1519,6 +1519,23 @@ export class BuilderBuildService {
+       body,
+       labels: ['builder'],
+     });
++    // The label is what starts the repo's workflow. GitHub drops it without
++    // an error when the token can open issues but not label them — which is
++    // how the first production issue build (ally-be#629, 2026-10-14) sat
++    // unstarted. Try once more, then fail loudly rather than leave a build
++    // that never begins.
++    if (!issue.labels.includes('builder')) {
++      const labels = await this.github.addIssueLabels(repo, issue.number, [
++        'builder',
++      ]);
++      if (!labels.includes('builder')) {
++        throw new Error(
++          `raised ${issue.htmlUrl} but could not label it \`builder\`, so its workflow ` +
++            `will not start. The ally-be GITHUB_TOKEN needs permission to label issues ` +
++            `in ${repo} (triage or write access).`,
++        );
++      }
++    }
+     await this.runRepository.update(
+       { id: run.id },
+       {
+diff --git a/src/builder/service/test/builder-build.service.spec.ts b/src/builder/service/test/builder-build.service.spec.ts
+index 77428449e6..56d7de5ec3 100644
+--- a/src/builder/service/test/builder-build.service.spec.ts
++++ b/src/builder/service/test/builder-build.service.spec.ts
+@@ -254,6 +254,7 @@ describe('BuilderBuildService', () => {
+       (github as any).createIssue = jest.fn().mockResolvedValue({
+         number: 41,
+         htmlUrl: 'https://github.com/o/ally-be/issues/41',
++        labels: ['builder'],
+       });
+       prdService.getOrCreateDoc.mockResolvedValue({
+         draft: {
+@@ -286,6 +287,47 @@ describe('BuilderBuildService', () => {
+     });
+   });
+ 
++  describe('issue dispatch — the label', () => {
++    beforeEach(() => {
++      (github as any).createIssue = jest.fn().mockResolvedValue({
++        number: 41,
++        htmlUrl: 'https://github.com/o/ally-be/issues/41',
++        // What GitHub returns when the token may open issues but not label them.
++        labels: [],
++      });
++    });
++
++    it('adds the label GitHub dropped', async () => {
++      (github as any).addIssueLabels = jest.fn().mockResolvedValue(['builder']);
++
++      await service.startBuild(readySession({ repos: ['ally-be'] }) as any, 1, {
++        dispatch: 'issue',
++      });
++
++      expect((github as any).addIssueLabels).toHaveBeenCalledWith(
++        'ally-be',
++        41,
++        ['builder'],
++      );
++      expect(runRepository.update).toHaveBeenCalledWith(
++        expect.anything(),
++        expect.objectContaining({ issueNumber: 41, status: 'RUNNING' }),
++      );
++    });
++
++    it('fails the build, naming the permission, when the label cannot be added', async () => {
++      (github as any).addIssueLabels = jest.fn().mockResolvedValue([]);
++
++      await expect(
++        service.startBuild(readySession({ repos: ['ally-be'] }) as any, 1, {
++          dispatch: 'issue',
++        }),
++      ).rejects.toThrow(
++        /could not label it `builder`.*permission to label issues/,
++      );
++    });
++  });
++
+   describe('one repo per build', () => {
+     it('dispatches the first repo milestone with its repo only, and keeps the loop for the chain', async () => {
+       epicService.nextPending.mockResolvedValue({
+diff --git a/src/github/service/github-actions.service.ts b/src/github/service/github-actions.service.ts
+index 551df17557..eefcb441fc 100644
+--- a/src/github/service/github-actions.service.ts
++++ b/src/github/service/github-actions.service.ts
+@@ -1174,7 +1174,7 @@ export class GithubActionsService {
+   async createIssue(
+     repo: string,
+     params: { title: string; body: string; labels?: string[] },
+-  ): Promise<{ number: number; htmlUrl: string }> {
++  ): Promise<{ number: number; htmlUrl: string; labels: string[] }> {
+     this.requireConfigured();
+     try {
+       const { data } = await axios.post(
+@@ -1182,13 +1182,48 @@ export class GithubActionsService {
+         { title: params.title, body: params.body, labels: params.labels ?? [] },
+         { headers: this.headers, timeout: 15_000 },
+       );
+-      return { number: Number(data.number), htmlUrl: String(data.html_url) };
++      return {
++        number: Number(data.number),
++        htmlUrl: String(data.html_url),
++        // GitHub silently drops labels on a new issue when the token may
++        // create issues but not triage them, so the caller checks these.
++        labels: ((data.labels ?? []) as { name?: string }[])
++          .map((label) => String(label?.name ?? ''))
++          .filter(Boolean),
++      };
+     } catch (error) {
+       this.noteAuthOutcome(error);
+       throw error;
+     }
+   }
+ 
++  /** Adds labels to an issue; returns the issue's labels afterwards. */
++  async addIssueLabels(
++    repo: string,
++    number: number,
++    labels: string[],
++  ): Promise<string[]> {
++    this.requireConfigured();
++    try {
++      const { data } = await axios.post(
++        this.url(repo, `issues/${number}/labels`),
++        { labels },
++        { headers: this.headers, timeout: 15_000 },
++      );
++      return ((data ?? []) as { name?: string }[])
++        .map((label) => String(label?.name ?? ''))
++        .filter(Boolean);
++    } catch (error) {
++      this.noteAuthOutcome(error);
++      this.logger.warn(
++        `Could not label ${repo}#${number}: ${
++          error instanceof Error ? error.message : String(error)
++        }`,
++      );
++      return [];
++    }
++  }
++
+   async createIssueComment(
+     repo: string,
+     number: number,

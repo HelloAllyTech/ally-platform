@@ -1,0 +1,154 @@
+diff --git a/apps/ally-admin-dashboard/src/components/main-agent-prompt-picker/MainAgentPromptPicker.tsx b/apps/ally-admin-dashboard/src/components/main-agent-prompt-picker/MainAgentPromptPicker.tsx
+index 8d82a7ff31..656c44f374 100644
+--- a/apps/ally-admin-dashboard/src/components/main-agent-prompt-picker/MainAgentPromptPicker.tsx
++++ b/apps/ally-admin-dashboard/src/components/main-agent-prompt-picker/MainAgentPromptPicker.tsx
+@@ -41,6 +41,14 @@ interface MainAgentPromptPickerProps {
+  * future-visibility switch, not a kill switch — an existing simulation must
+  * keep running on its chosen skill, and dropping the option outright would
+  * silently reassign it to a different skill the next time an author saved.
++ *
++ * The default (`DEFAULT_MAIN_AGENT_PROMPT_CODE`) is a second exception: it
++ * stays on offer even when switched off, marked "(default)", because a
++ * simulation with no selection already runs on it. It is also the ONLY
++ * version the picker fills in by itself. Falling back to the first visible
++ * option instead — the list comes back sorted by name — re-pointed every
++ * unset simulation an author opened at whichever variant sorts first, which
++ * in production was a Kannada-only template.
+  */
+ export const MainAgentPromptPicker: React.FC<MainAgentPromptPickerProps> = ({
+   id,
+@@ -67,21 +75,34 @@ export const MainAgentPromptPicker: React.FC<MainAgentPromptPickerProps> = ({
+   const options = useMemo(
+     () =>
+       (prompts ?? [])
+-        .filter(prompt => prompt.visibleInStudio !== false || prompt.promptCode === currentValue)
+-        .map(prompt => ({
+-          label: prompt.visibleInStudio === false ? `${prompt.name} (hidden)` : prompt.name,
+-          value: prompt.promptCode,
+-        })),
++        .filter(
++          prompt =>
++            prompt.visibleInStudio !== false ||
++            prompt.promptCode === currentValue ||
++            prompt.promptCode === DEFAULT_MAIN_AGENT_PROMPT_CODE,
++        )
++        .map(prompt => {
++          let optionLabel = prompt.name;
++          if (prompt.visibleInStudio === false) {
++            optionLabel =
++              prompt.promptCode === DEFAULT_MAIN_AGENT_PROMPT_CODE
++                ? `${prompt.name} (default)`
++                : `${prompt.name} (hidden)`;
++          }
++          return { label: optionLabel, value: prompt.promptCode };
++        }),
+     [prompts, currentValue],
+   );
+ 
+   // True when this simulation sits on a variant that has since been switched
+   // off — worth saying out loud, because the author needs to know the skill
+-  // still runs but is no longer on offer for anything new.
++  // still runs but is no longer on offer for anything new. Not said of the
++  // default: it is what an unset simulation runs on, switched off or not.
+   const isOnHiddenVariant = useMemo(
+     () =>
+       Boolean(
+         currentValue &&
++        currentValue !== DEFAULT_MAIN_AGENT_PROMPT_CODE &&
+         (prompts ?? []).some(
+           prompt => prompt.promptCode === currentValue && prompt.visibleInStudio === false,
+         ),
+@@ -89,13 +110,14 @@ export const MainAgentPromptPicker: React.FC<MainAgentPromptPickerProps> = ({
+     [prompts, currentValue],
+   );
+ 
+-  // Auto-select the default prompt by its stable promptCode whenever none is chosen yet.
++  // Fill in the default, by its stable promptCode, whenever none is chosen yet
++  // — that is what the runtime would use anyway, so showing it changes
++  // nothing. Never any other version: when the default isn't in the list at
++  // all, leave the field unset and let the runtime fall back.
+   useEffect(() => {
+-    if (options.length === 0) return;
+-    if (!currentValue) {
+-      const defaultOption =
+-        options.find(o => o.value === DEFAULT_MAIN_AGENT_PROMPT_CODE) ?? options[0];
+-      formMethods.setValue(id, defaultOption.value, { shouldDirty: false });
++    if (currentValue) return;
++    if (options.some(o => o.value === DEFAULT_MAIN_AGENT_PROMPT_CODE)) {
++      formMethods.setValue(id, DEFAULT_MAIN_AGENT_PROMPT_CODE, { shouldDirty: false });
+     }
+   }, [options, id, formMethods, currentValue]);
+ 
+diff --git a/apps/ally-admin-dashboard/src/components/main-agent-prompt-picker/__tests__/MainAgentPromptPicker.test.tsx b/apps/ally-admin-dashboard/src/components/main-agent-prompt-picker/__tests__/MainAgentPromptPicker.test.tsx
+index a9fe21e2d3..07f3b90092 100644
+--- a/apps/ally-admin-dashboard/src/components/main-agent-prompt-picker/__tests__/MainAgentPromptPicker.test.tsx
++++ b/apps/ally-admin-dashboard/src/components/main-agent-prompt-picker/__tests__/MainAgentPromptPicker.test.tsx
+@@ -104,23 +104,65 @@ describe("MainAgentPromptPicker — studio visibility", () => {
+     expect(screen.getByTestId("selected")).toHaveTextContent(DEFAULT_CODE);
+   });
+ 
+-  it("auto-selects the first visible version when the default is switched off", () => {
++  it("keeps the default on offer, and selected, when it is switched off", () => {
++    // The by-type list is sorted by name, so a variant can sort ahead of the
++    // default. An unset simulation runs on the default either way; filling in
++    // the first visible variant instead silently re-pointed it (production:
++    // an English roleplay onto a Kannada-only template).
+     mockPrompts = [
++      { name: "Kannada Prompt #2", promptCode: "variant_kannada", visibleInStudio: true },
+       { name: "Prompt #1", promptCode: DEFAULT_CODE, visibleInStudio: false },
+       { name: "Prompt #2", promptCode: "variant_two", visibleInStudio: true },
+     ];
+     render(<Harness />);
+-    expect(optionLabels()).toEqual(["Prompt #2"]);
++
++    expect(optionLabels()).toEqual(["Kannada Prompt #2", "Prompt #1 (default)", "Prompt #2"]);
++    expect(screen.getByTestId("selected")).toHaveTextContent(DEFAULT_CODE);
++    // It is not "switched off for new simulations" in any useful sense — it is
++    // the fallback — so the hidden-version warning stays away.
++    expect(screen.queryByText(/keeps working exactly as before/i)).not.toBeInTheDocument();
++  });
++
++  it("never fills in another version when the default is missing from the list", () => {
++    mockPrompts = [
++      { name: "Kannada Prompt #2", promptCode: "variant_kannada", visibleInStudio: true },
++      { name: "Prompt #2", promptCode: "variant_two", visibleInStudio: true },
++    ];
++    render(<Harness />);
++
++    expect(optionLabels()).toEqual(["Kannada Prompt #2", "Prompt #2"]);
++    expect(screen.getByTestId("selected")).toHaveTextContent("");
++  });
++
++  it("leaves a simulation on the version it already has", () => {
++    mockPrompts = [
++      { name: "Kannada Prompt #2", promptCode: "variant_kannada", visibleInStudio: true },
++      { name: "Prompt #1", promptCode: DEFAULT_CODE, visibleInStudio: false },
++      { name: "Prompt #2", promptCode: "variant_two", visibleInStudio: true },
++    ];
++    render(<Harness initial="variant_two" />);
+     expect(screen.getByTestId("selected")).toHaveTextContent("variant_two");
+   });
+ 
+-  it("says nothing is on offer when every version is switched off", () => {
++  it("still offers the switched-off default when every other version is switched off", () => {
+     mockPrompts = [
+       { name: "Prompt #1", promptCode: DEFAULT_CODE, visibleInStudio: false },
+       { name: "Prompt #2", promptCode: "variant_two", visibleInStudio: false },
+     ];
+     render(<Harness />);
+ 
++    expect(optionLabels()).toEqual(["Prompt #1 (default)"]);
++    expect(screen.getByTestId("selected")).toHaveTextContent(DEFAULT_CODE);
++    expect(screen.queryByText(/No skill versions are switched on/i)).not.toBeInTheDocument();
++  });
++
++  it("says nothing is on offer when every version is switched off and the default is absent", () => {
++    mockPrompts = [
++      { name: "Prompt #2", promptCode: "variant_two", visibleInStudio: false },
++      { name: "Prompt #3", promptCode: "variant_three", visibleInStudio: false },
++    ];
++    render(<Harness />);
++
+     expect(optionLabels()).toEqual([]);
+     // No selection is forced — the runtime falls back to the default prompt,
+     // and the copy says so rather than leaving an empty dropdown unexplained.

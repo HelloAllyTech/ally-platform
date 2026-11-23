@@ -1,0 +1,72 @@
+diff --git a/src/builder/service/builder-build.service.ts b/src/builder/service/builder-build.service.ts
+index 134861b094..2cb1aac582 100644
+--- a/src/builder/service/builder-build.service.ts
++++ b/src/builder/service/builder-build.service.ts
+@@ -146,6 +146,23 @@ export const BUILDER_STARTABLE_STATUSES: BuilderSessionStatus[] = [
+   BuilderSessionStatus.CANCELLED,
+ ];
+ 
++/**
++ * The provider an engine's usage row is filed under, from the model id.
++ *
++ * opencode may report usage under its own `provider/model` form
++ * (`google/gemini-2.5-pro`), which the prefix match does not recognise, and
++ * the fallback used to be a literal 'anthropic' — so Gemini spend could land
++ * under Claude. The id is read without that prefix, and an id nothing
++ * recognises is filed as 'unknown' rather than as some vendor.
++ */
++export const usageProviderFor = (model: string): string => {
++  const bare =
++    model.includes('/') && !model.startsWith('models/')
++      ? model.slice(model.indexOf('/') + 1)
++      : model;
++  return providerForModel(bare) ?? providerForModel(model) ?? 'unknown';
++};
++
+ /**
+  * The gate verdicts that describe the tree as it stands: one per (repo, kind)
+  * from the newest gate round only.
+@@ -2049,9 +2066,7 @@ export class BuilderBuildService {
+       if (!input && !output && !cacheRead && !cacheWrite) continue;
+ 
+       await this.llmUsage.record({
+-        // From the model id, not a literal: opencode runs
+-        // Gemini, so a hardcoded 'anthropic' filed Gemini spend under Claude.
+-        provider: providerForModel(String(model)) ?? 'anthropic',
++        provider: usageProviderFor(String(model)),
+         model: String(model),
+         task: LlmTask.BUILDER_BUILD,
+         promptTokens: input,
+diff --git a/src/builder/service/test/builder-usage-provider.spec.ts b/src/builder/service/test/builder-usage-provider.spec.ts
+new file mode 100644
+index 0000000000..2d1d8f4596
+--- /dev/null
++++ b/src/builder/service/test/builder-usage-provider.spec.ts
+@@ -0,0 +1,27 @@
++import { usageProviderFor } from '../builder-build.service';
++
++/**
++ * Which provider a build's usage row is filed under.
++ *
++ * Builder runs Gemini through opencode, which can report usage under its own
++ * `provider/model` form. The old fallback was a literal 'anthropic', so an id
++ * the prefix match did not recognise filed Gemini spend under Claude.
++ */
++describe('usageProviderFor', () => {
++  it('reads a bare Gemini id as gemini', () => {
++    expect(usageProviderFor('gemini-2.5-pro')).toBe('gemini');
++  });
++
++  it("reads opencode's provider-prefixed id the same way", () => {
++    expect(usageProviderFor('google/gemini-2.5-pro')).toBe('gemini');
++  });
++
++  it("keeps the Gemini SDK's models/ prefix working", () => {
++    expect(usageProviderFor('models/gemini-2.5-flash')).toBe('gemini');
++  });
++
++  it('files an id nothing recognises as unknown, never as a vendor', () => {
++    expect(usageProviderFor('some-new-model')).toBe('unknown');
++    expect(usageProviderFor('acme/some-new-model')).toBe('unknown');
++  });
++});

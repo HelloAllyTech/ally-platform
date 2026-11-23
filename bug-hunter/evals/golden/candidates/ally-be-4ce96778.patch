@@ -1,0 +1,35 @@
+diff --git a/src/learn/repository/scenario-session-messages.repository.ts b/src/learn/repository/scenario-session-messages.repository.ts
+index a14f5958bc..18fddedd0a 100644
+--- a/src/learn/repository/scenario-session-messages.repository.ts
++++ b/src/learn/repository/scenario-session-messages.repository.ts
+@@ -34,7 +34,7 @@ export class ScenarioSessionMessagesRepository extends Repository<ScenarioSessio
+     pagination: Pagination,
+   ) {
+     const sortColumn = this.getValidatedSortColumn(
+-      pagination.sortBy || 'createdAt',
++      pagination.sortBy || 'startSeconds',
+     );
+     if (sortColumn) {
+       query.orderBy(`message.${sortColumn}`, pagination.order || 'ASC');
+diff --git a/src/learn/repository/test/scenario-session-messages.repository.spec.ts b/src/learn/repository/test/scenario-session-messages.repository.spec.ts
+index 93730aaa0a..520479e9b2 100644
+--- a/src/learn/repository/test/scenario-session-messages.repository.spec.ts
++++ b/src/learn/repository/test/scenario-session-messages.repository.spec.ts
+@@ -154,7 +154,7 @@ describe('ScenarioSessionMessagesRepository', () => {
+ 
+       expect(result).toEqual([mockMessages, 1]);
+       expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
+-        'message.createdAt',
++        'message.startSeconds',
+         'DESC',
+       );
+     });
+@@ -195,7 +195,7 @@ describe('ScenarioSessionMessagesRepository', () => {
+ 
+       expect(result).toEqual([mockMessages, 1]);
+       expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
+-        'message.createdAt',
++        'message.startSeconds',
+         'ASC',
+       );
+     });

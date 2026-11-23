@@ -1,0 +1,306 @@
+diff --git a/ally-mobile/lib/features/scribe/presentation/network_disconnected.dart b/ally-mobile/lib/features/scribe/presentation/network_disconnected.dart
+index 6a306597c..8b3d0c870 100644
+--- a/ally-mobile/lib/features/scribe/presentation/network_disconnected.dart
++++ b/ally-mobile/lib/features/scribe/presentation/network_disconnected.dart
+@@ -19,8 +19,9 @@ enum DisconnectedType { socket, network, microphoneFailure }
+ /// white) for the [type], then two 60%-wide pill buttons — "Try again"
+ /// (white, black label; hidden while offline, RN reading
+ /// `useNetworkConnectivity` itself) and "Go back" (`darkGray7`, white).
+-/// "Try again" doesn't reconnect in place — the caller clears the state and
+-/// leaves, exactly as RN's `handleTryAgain` does.
++/// [onTryAgain] and [onGoBack] are the caller's own callbacks: this widget
++/// has no opinion on what either does. `ScribeRecordingScreen` retries the
++/// connection in place rather than leaving, unlike RN's own `handleTryAgain`.
+ class NetworkDisconnected extends ConsumerWidget {
+   const NetworkDisconnected({
+     super.key,
+diff --git a/ally-mobile/lib/features/scribe/presentation/scribe_recording_screen.dart b/ally-mobile/lib/features/scribe/presentation/scribe_recording_screen.dart
+index cf42e7592..5caf77834 100644
+--- a/ally-mobile/lib/features/scribe/presentation/scribe_recording_screen.dart
++++ b/ally-mobile/lib/features/scribe/presentation/scribe_recording_screen.dart
+@@ -58,12 +58,23 @@ import 'scribe_reference_search.dart';
+ ///   where waiting for the GET left a live session showing "Microphone
+ ///   failure" at 5 s), then the chat is hydrated from
+ ///   `GET /chats/counsellor-chat`.
+-/// - The session starts PAUSED with the "Resume to let it listen" tooltip
+-///   on the controls; pause/resume is debounced 500 ms.
++/// - The session starts actively listening, not paused (changed from RN —
++///   see the `_isCallPaused` field doc); pause/resume is debounced 500 ms,
++///   and pausing shows the "Resume to let it listen" tooltip.
+ /// - Offline (connectivity_plus) shows the NETWORK view; a socket drop is
+ ///   NETWORK when offline, SOCKET otherwise. The socket reconnects when the
+ ///   app returns to the foreground, which also re-checks the chat: if it
+ ///   ended meanwhile the counsellor goes to box breathing.
++/// - "Try again" reconnects in place rather than leaving the screen: a
++///   counsellor who hasn't started a chat yet gets a fresh attempt (the
++///   start-gate flags reset and the 5s chatId timeout re-arms), and one
++///   already mid-session just gets the socket back, with the existing
++///   chatId resuming audio — a reconnect that lands on a chat the gap
++///   quietly ended is caught the same way foregrounding catches it. Fixed
++///   2026-11: it used to be wired to the exact same handler as "Go back",
++///   so a transient blip forced a full manual round trip through Call Log
++///   for a brand-new connection — slow enough that a counsellor could give
++///   up mid-loop, which is what "chats sometimes not even starting" was.
+ /// - A web-microphone session (started on the web app) is shown but not
+ ///   streamed: no local audio, pause disabled, no disconnect states.
+ /// - Ending goes to box breathing whether or not `POST /chats/:id/end`
+@@ -109,7 +120,21 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> w
+   int? _chatId;
+   Chat? _chat;
+ 
+-  bool _isCallPaused = true;
++  // Starts actively listening, not paused. Consent is already confirmed on
++  // the "Start Session" modal (Call Log's own copy: "By starting, you
++  // confirm everyone being transcribed has given consent") before this
++  // screen is ever reached, so a muted start serves no consent purpose —
++  // it only risks a counsellor who doesn't notice the dismissible tooltip
++  // (or has the controls collapsed) running part or all of a real session
++  // with nothing reaching the backend, which transcribes and summarizes
++  // nothing. Fixed 2026-11 after exactly that: a session caught on video
++  // sitting "Taking Notes" for 24+s with the mute tooltip still up. RN
++  // started paused too (no comment there explaining why); not carried
++  // forward deliberately.
++  bool _isCallPaused = false;
++  // Still starts `true`: shown the first time a session (new or manually
++  // paused later) IS muted, never reset back once dismissed/resumed (see
++  // `_onPauseResumePressed`) — unrelated to the starting value above.
+   bool _isMuteTooltipOpen = true;
+   Timer? _pauseDebounceTimer;
+ 
+@@ -270,7 +295,13 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> w
+     return _socketService.connect(
+       namespacePath: AppConfig.microphoneSocketPath,
+       userId: widget.userId,
+-      onConnect: () {},
++      // A reconnect after a chat was already known: the gap may have outlived
++      // it server-side (ended by the other party, or by the disconnect itself
++      // via handleDisconnect). Same staleness check foregrounding already
++      // runs — reuse it rather than silently resuming a dead chat.
++      onConnect: () {
++        if (_chatId != null) _checkChatStillActive();
++      },
+       onDisconnect: (reason) {
+         if (!mounted || _isIntentionalDisconnect || _isWebMicrophoneMode) return;
+         setState(() => _disconnectedType = _isOffline ? DisconnectedType.network : DisconnectedType.socket);
+@@ -557,9 +588,22 @@ class _ScribeRecordingScreenState extends ConsumerState<ScribeRecordingScreen> w
+     }
+   }
+ 
++  /// Reconnects in place instead of leaving the screen (RN's own
++  /// `handleTryAgain` just left, which this deliberately no longer matches —
++  /// see the class doc comment). No chat yet: reset the start gate so a
++  /// fresh `SESSION_CREATED` emits a new `startAudioChat`, same as the first
++  /// mount. A chat already underway: leave those flags alone so reconnecting
++  /// can't double-emit `startAudioChat` for it — the socket coming back is
++  /// enough, since `_onAudioChunk` already keys every frame on `_chatId`
++  /// rather than the socket's connected state.
+   void _handleTryAgain() {
++    if (_chatId == null) {
++      _isMicrophoneModeSessionCreated = false;
++      _isAudioChatEmitted = false;
++      _armChatIdTimeout();
++    }
+     setState(() => _disconnectedType = null);
+-    _handleGoBack();
++    _connectSocket();
+   }
+ 
+   bool get _hasLiveSession => _chatId != null && _disconnectedType == null;
+diff --git a/ally-mobile/test/features/scribe/presentation/scribe_recording_screen_connected_test.dart b/ally-mobile/test/features/scribe/presentation/scribe_recording_screen_connected_test.dart
+index 787322687..1bd45a228 100644
+--- a/ally-mobile/test/features/scribe/presentation/scribe_recording_screen_connected_test.dart
++++ b/ally-mobile/test/features/scribe/presentation/scribe_recording_screen_connected_test.dart
+@@ -145,15 +145,9 @@ void main() {
+       final tiredY = tester.getTopLeft(find.textContaining('I feel tired')).dy;
+       expect(tiredY, greaterThan(helloY));
+ 
+-      // Pause starts `true` (matching RN) — resume, then push a chunk and
+-      // confirm it's actually emitted with the real RN-shaped payload.
+-      // RN starts paused with the "Resume to let it listen" tooltip up.
+-      expect(find.byKey(const ValueKey('mute-tooltip')), findsOneWidget);
+-      await tester.tap(find.byKey(const ValueKey('pause-resume-button')));
+-      // Debounced 500 ms (RN useDebounce).
+-      await tester.pump();
+-      expect(find.byKey(const ValueKey('mute-tooltip')), findsOneWidget);
+-      await tester.pump(const Duration(milliseconds: 600));
++      // Starts actively listening, not paused (no "Resume to let it
++      // listen" tooltip up front — see `_isCallPaused`'s field doc) — a
++      // chunk is emitted immediately with the real RN-shaped payload.
+       expect(find.byKey(const ValueKey('mute-tooltip')), findsNothing);
+       chunkController.add(Uint8List.fromList(List.filled(10, 0)));
+       await tester.pump();
+@@ -165,6 +159,25 @@ void main() {
+       expect(payload['chatId'], 42);
+       expect(payload['audioData'], isA<String>());
+ 
++      // Pausing (debounced 500 ms, RN useDebounce) brings the tooltip up
++      // and stops emission — toggling the other direction from the old
++      // paused-by-default start still exercises the same gate.
++      await tester.tap(find.byKey(const ValueKey('pause-resume-button')));
++      await tester.pump();
++      expect(find.byKey(const ValueKey('mute-tooltip')), findsNothing);
++      await tester.pump(const Duration(milliseconds: 600));
++      expect(find.byKey(const ValueKey('mute-tooltip')), findsOneWidget);
++      chunkController.add(Uint8List.fromList(List.filled(10, 0)));
++      await tester.pump();
++      // mocktail's verify() only counts calls not already claimed by an
++      // earlier verify — paused must add none new.
++      verifyNever(() => socketService.emit(SocketEvent.audioMessage, any()));
++
++      // Resume again so the waveform's redraw timer is active for the rest
++      // of the test, same as before this change.
++      await tester.tap(find.byKey(const ValueKey('pause-resume-button')));
++      await tester.pump(const Duration(milliseconds: 600));
++
+       // `pumpAndSettle()` is unusable from here on: resuming above started
+       // `AudioWaveformContainer`'s own 120ms `Timer.periodic` redraw loop,
+       // which (by design — see `audio_waveform.dart`) keeps scheduling new
+diff --git a/ally-mobile/test/features/scribe/presentation/scribe_recording_screen_try_again_test.dart b/ally-mobile/test/features/scribe/presentation/scribe_recording_screen_try_again_test.dart
+new file mode 100644
+index 000000000..d7399675b
+--- /dev/null
++++ b/ally-mobile/test/features/scribe/presentation/scribe_recording_screen_try_again_test.dart
+@@ -0,0 +1,129 @@
++import 'dart:async';
++import 'dart:typed_data';
++
++import 'package:flutter/widgets.dart';
++import 'package:flutter_foreground_task/flutter_foreground_task_platform_interface.dart';
++import 'package:flutter_test/flutter_test.dart';
++import 'package:mocktail/mocktail.dart';
++import 'package:permission_handler_platform_interface/permission_handler_platform_interface.dart';
++import 'package:record_platform_interface/record_platform_interface.dart';
++
++import 'package:ally_mobile_flutter/core/realtime/connectivity.dart';
++import 'package:ally_mobile_flutter/core/realtime/socket_events.dart';
++import 'package:ally_mobile_flutter/core/realtime/socket_service.dart';
++import 'package:ally_mobile_flutter/features/scribe/data/chat_models.dart';
++import 'package:ally_mobile_flutter/features/scribe/data/chat_repository.dart';
++import 'package:ally_mobile_flutter/features/scribe/presentation/scribe_recording_screen.dart';
++
++import '../../../support/fake_foreground_task_platform.dart';
++import '../../../support/fake_permission_platform.dart';
++import '../../../support/mock_record_platform.dart';
++import '../../../support/pump_app.dart';
++
++class MockSocketService extends Mock implements SocketService {}
++
++class MockChatRepository extends Mock implements ChatRepository {}
++
++// One `testWidgets` per file — see
++// scribe_recording_screen_initial_state_test.dart for why.
++void main() {
++  setUpAll(() {
++    registerFallbackValue(const RecordConfig());
++  });
++
++  testWidgets(
++    'Try again reconnects in place on a mid-session drop: the error screen '
++    'clears, the socket reconnects, and the reconnect re-checks the chat '
++    'rather than leaving via handleGoBack',
++    (tester) async {
++      PermissionHandlerPlatform.instance = FakePermissionHandlerPlatform({
++        Permission.microphone: PermissionStatus.granted,
++        Permission.notification: PermissionStatus.granted,
++      });
++      FlutterForegroundTaskPlatform.instance = FakeForegroundTaskPlatform();
++      final recordPlatform = installMockRecordPlatform();
++      when(
++        () => recordPlatform.startStream(any(), any()),
++      ).thenAnswer((_) async => const Stream<Uint8List>.empty());
++      when(() => recordPlatform.onStateChanged(any())).thenAnswer((_) => const Stream.empty());
++      when(() => recordPlatform.stop(any())).thenAnswer((_) async => null);
++
++      final socketService = MockSocketService();
++      var connectCount = 0;
++      late Map<String, void Function(dynamic data)> callbacks;
++      void Function(String? reason)? onDisconnect;
++      void Function()? onConnect;
++      when(
++        () => socketService.connect(
++          namespacePath: any(named: 'namespacePath'),
++          userId: any(named: 'userId'),
++          eventCallbacks: any(named: 'eventCallbacks'),
++          onConnect: any(named: 'onConnect'),
++          onDisconnect: any(named: 'onDisconnect'),
++          onConnectionError: any(named: 'onConnectionError'),
++        ),
++      ).thenAnswer((invocation) async {
++        connectCount++;
++        callbacks =
++            invocation.namedArguments[#eventCallbacks] as Map<String, void Function(dynamic data)>;
++        onDisconnect = invocation.namedArguments[#onDisconnect] as void Function(String?)?;
++        onConnect = invocation.namedArguments[#onConnect] as void Function()?;
++        // Only the first connect yields USER_JOINED — a reconnect should
++        // resume the same chat, not need a second one.
++        if (connectCount == 1) callbacks[SocketEvent.userJoined]!(null);
++      });
++      when(() => socketService.disconnect()).thenAnswer((_) {});
++      when(() => socketService.emit(any(), any())).thenAnswer((_) {});
++
++      final chatRepository = MockChatRepository();
++      var getChatCalls = 0;
++      when(() => chatRepository.getCounsellorChat()).thenAnswer((_) async {
++        getChatCalls++;
++        return Chat(
++          chatId: 42,
++          status: ChatStatus.active,
++          provider: ChatProvider.microphone,
++          startedAt: '2026-01-01T10:00:00.000Z',
++          messages: const [],
++        );
++      });
++
++      await pumpApp(
++        tester,
++        const ScribeRecordingScreen(userId: '7'),
++        overrides: [
++          socketServiceProvider.overrideWithValue(socketService),
++          chatRepositoryProvider.overrideWithValue(chatRepository),
++          isOfflineProvider.overrideWith((ref) => Stream.value(false)),
++        ],
++      );
++
++      expect(find.byKey(const ValueKey('audio-waveform-container')), findsOneWidget);
++      expect(connectCount, 1);
++      final getChatCallsBeforeDrop = getChatCalls;
++
++      // A transient drop mid-session — USER_JOINED already gave this a
++      // chatId, so this isn't the "never started" case.
++      onDisconnect?.call('transport close');
++      await tester.pumpAndSettle();
++      expect(find.text('Something went wrong!'), findsOneWidget);
++
++      await tester.tap(find.text('Try again'));
++      await tester.pump();
++
++      // Reconnected right here — not a round trip through handleGoBack: the
++      // error screen is gone and the live session is straight back, with a
++      // second connect() for the same chat.
++      expect(find.text('Something went wrong!'), findsNothing);
++      expect(find.byKey(const ValueKey('audio-waveform-container')), findsOneWidget);
++      expect(connectCount, 2);
++
++      // The reconnect's own onConnect re-validates the chat is still alive —
++      // the same staleness check foregrounding runs — instead of silently
++      // resuming one the gap may have already ended.
++      onConnect?.call();
++      await tester.pumpAndSettle();
++      expect(getChatCalls, greaterThan(getChatCallsBeforeDrop));
++    },
++  );
++}
+diff --git a/ally-mobile/test/features/scribe/presentation/scribe_recording_screen_user_joined_chat_id_test.dart b/ally-mobile/test/features/scribe/presentation/scribe_recording_screen_user_joined_chat_id_test.dart
+index 76a27d1f2..47830f70d 100644
+--- a/ally-mobile/test/features/scribe/presentation/scribe_recording_screen_user_joined_chat_id_test.dart
++++ b/ally-mobile/test/features/scribe/presentation/scribe_recording_screen_user_joined_chat_id_test.dart
+@@ -78,7 +78,8 @@ void main() {
+     await tester.pump(const Duration(seconds: 6));
+     expect(find.text('Microphone failure'), findsNothing);
+     expect(find.byKey(const ValueKey('audio-waveform-container')), findsOneWidget);
+-    expect(find.byKey(const ValueKey('mute-tooltip')), findsOneWidget);
++    // Starts actively listening, not paused — no mute tooltip up front.
++    expect(find.byKey(const ValueKey('mute-tooltip')), findsNothing);
+ 
+     // A socket drop while online is SOCKET ("Something went wrong!").
+     onDisconnect!('transport close');

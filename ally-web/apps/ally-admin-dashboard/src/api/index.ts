@@ -72,3 +72,4 @@ export * from "./billing";
 export * from "./plans";
 export * from "./roadmapV2Sweep";
 export * from "./directory";
+export * from "./bugHunterV2";

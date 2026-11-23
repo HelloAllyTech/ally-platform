@@ -1,0 +1,89 @@
+diff --git a/libs/ui-shared/src/lib/generic-table/GenericTable.tsx b/libs/ui-shared/src/lib/generic-table/GenericTable.tsx
+index 56a59925eb..175f96cd25 100644
+--- a/libs/ui-shared/src/lib/generic-table/GenericTable.tsx
++++ b/libs/ui-shared/src/lib/generic-table/GenericTable.tsx
+@@ -64,10 +64,7 @@ export const GenericTable = forwardRef(
+     useImperativeHandle(ref, () => scrollRef.current, []);
+ 
+     // Memoize filterable columns for performance
+-    const filterableColumns = useMemo(
+-      () => columns.filter(c => c.filterable && c.filterOptions),
+-      [columns],
+-    );
++    const filterableColumns = useMemo(() => columns.filter(c => c.filterable), [columns]);
+ 
+     /**
+      * Opens the filter popover for column selection.
+@@ -89,18 +86,16 @@ export const GenericTable = forwardRef(
+       col: Column<T> | undefined,
+       event: React.MouseEvent<HTMLElement>,
+     ) => {
+-      if (!col) return;
+-      if (col.filterable && col.filterOptions) {
+-        setSelectedColumn(col as Column<T> & { filterOptions: { label: string; value: string }[] });
+-        setOptionAnchorEl(event.currentTarget);
+-        setSearchText("");
+-        // If multiselect, prefill with current filter values
+-        if (col.filterType === "multiselect") {
+-          const existing = filter.find(f => f.key === col.key);
+-          setMultiSelectValues(Array.isArray(existing?.value) ? existing?.value : []);
+-        } else {
+-          setMultiSelectValues([]);
+-        }
++      if (!col || !col.filterable) return;
++      setSelectedColumn(col as Column<T> & { filterOptions: { label: string; value: string }[] });
++      setOptionAnchorEl(event.currentTarget);
++      setSearchText("");
++      // If multiselect, prefill with current filter values
++      if (col.filterType === "multiselect") {
++        const existing = filter.find(f => f.key === col.key);
++        setMultiSelectValues(Array.isArray(existing?.value) ? existing?.value : []);
++      } else {
++        setMultiSelectValues([]);
+       }
+     };
+ 
+diff --git a/libs/ui-shared/src/lib/generic-table/__tests__/GenericTable.test.tsx b/libs/ui-shared/src/lib/generic-table/__tests__/GenericTable.test.tsx
+index 786b0cbc9c..69e494307c 100644
+--- a/libs/ui-shared/src/lib/generic-table/__tests__/GenericTable.test.tsx
++++ b/libs/ui-shared/src/lib/generic-table/__tests__/GenericTable.test.tsx
+@@ -124,6 +124,39 @@ describe("GenericTable", () => {
+     expect(onFilterChange).toHaveBeenCalled();
+   });
+ 
++  it("lists text-only filterable columns (no filterOptions) in the add-filter picker", () => {
++    // Mirrors the counsellor call-logs "Call Name" column: filterable + text
++    // filter type, but no filterOptions. Regression test for a bug where the
++    // "+ Filter" button opened an empty column picker for such columns.
++    const columns = [
++      { key: "callName", header: "Call Name", filterable: true, filterType: "text" },
++    ];
++    const onFilterChange = vi.fn();
++    render(
++      <GenericTable
++        columns={columns as any}
++        data={[{ callName: "" }]}
++        showSelectedFilters
++        onFilterChange={onFilterChange}
++      />,
++    );
++
++    fireEvent.click(screen.getByRole("button", { name: /filter/i }));
++
++    // "Call Name" should now appear both as the table header and as an
++    // entry in the add-filter column picker.
++    const callNameEntries = screen.getAllByText("Call Name");
++    expect(callNameEntries.length).toBeGreaterThan(1);
++
++    fireEvent.click(callNameEntries[callNameEntries.length - 1]);
++    const singleButtons = screen.getAllByText("select-single");
++    fireEvent.click(singleButtons[singleButtons.length - 1]);
++
++    expect(onFilterChange).toHaveBeenCalledWith(
++      expect.objectContaining({ filter: [{ key: "callName", value: "v1" }] }),
++    );
++  });
++
+   it("renders Load More and spinner when loading", () => {
+     const handleLoadMore = vi.fn();
+     const { container } = render(

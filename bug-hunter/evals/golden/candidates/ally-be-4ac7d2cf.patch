@@ -1,0 +1,50 @@
+diff --git a/src/language/service/glossary-adjudication.service.ts b/src/language/service/glossary-adjudication.service.ts
+index 71baa64956..31ad472546 100644
+--- a/src/language/service/glossary-adjudication.service.ts
++++ b/src/language/service/glossary-adjudication.service.ts
+@@ -243,6 +243,13 @@ export class GlossaryAdjudicationService {
+             error instanceof BadRequestException
+               ? `deferred: ${(error as Error).message}`
+               : `deferred: accept failed — ${(error as Error).message}`;
++          // This branch mutates verdict away from 'accepted' after the
++          // if/else-if chain below has already been decided against the
++          // pre-mutation value, so the `apply && verdict === 'deferred'`
++          // branch that normally calls recordDeferral is never reached for
++          // this case — it has to happen here instead, or this proposal's
++          // deferral streak never advances and defer backoff never kicks in.
++          await this.recordDeferral(languageId, p, reason);
+         }
+       } else if (apply && verdict === 'rejected') {
+         // Two consecutive passes must agree before a permanent reject lands.
+diff --git a/src/language/service/test/glossary-adjudication.service.spec.ts b/src/language/service/test/glossary-adjudication.service.spec.ts
+index fe27182810..be07b2340c 100644
+--- a/src/language/service/test/glossary-adjudication.service.spec.ts
++++ b/src/language/service/test/glossary-adjudication.service.spec.ts
+@@ -372,11 +372,11 @@ describe('GlossaryAdjudicationService', () => {
+   // When the allocation is already optimal the cap still wins, and what
+   // remains (raise the cap, trim content) is a decision, not a retry.
+   it('defers when the cap still refuses after re-tiering', async () => {
+-    glossaryRepository.findAllForLanguage.mockResolvedValue([
+-      section({
+-        entries: [proposal('e1', '- yes: say `ஆமா` (avoid: `ஆமாம்`)')],
+-      }),
+-    ]);
++    const sec = section({
++      entries: [proposal('e1', '- yes: say `ஆமா` (avoid: `ஆமாம்`)')],
++    });
++    glossaryRepository.findAllForLanguage.mockResolvedValue([sec]);
++    glossaryRepository.findSection.mockResolvedValue(sec);
+     getCompletion.mockResolvedValue(
+       JSON.stringify([{ index: 1, verdict: 'accept', reason: 'good' }]),
+     );
+@@ -392,6 +392,10 @@ describe('GlossaryAdjudicationService', () => {
+     // It never loops — a cap that survives re-tiering is a decision to make.
+     expect(glossaryService.acceptProposal).toHaveBeenCalledTimes(2);
+     expect(glossaryService.retierGlossary).toHaveBeenCalledTimes(1);
++    // The bookkeeping that makes backoff possible: without it, this same
++    // stuck proposal gets re-billed to the model every hour forever.
++    const entry = sec.entries.find((e: any) => e.id === 'e1');
++    expect(entry.adjudication.deferrals).toBe(1);
+   });
+ 
+   // Silence must never read as approval.

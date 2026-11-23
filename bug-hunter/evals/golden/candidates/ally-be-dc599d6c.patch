@@ -1,0 +1,39 @@
+diff --git a/src/audio-ingest/gateway/cloud-telephony.gateway.ts b/src/audio-ingest/gateway/cloud-telephony.gateway.ts
+index bf9dde0195..f26ae3b97c 100644
+--- a/src/audio-ingest/gateway/cloud-telephony.gateway.ts
++++ b/src/audio-ingest/gateway/cloud-telephony.gateway.ts
+@@ -131,7 +131,6 @@ export class CloudTelephonyGateway
+       this.logger.info(
+         `Client disconnected from cloud telephony chat: ${client.id}`,
+       );
+-      this.handleDisconnect(client);
+     });
+   }
+ 
+diff --git a/src/audio-ingest/gateway/test/cloud-telephony.gateway.spec.ts b/src/audio-ingest/gateway/test/cloud-telephony.gateway.spec.ts
+index 60dcd4911f..25d24e9818 100644
+--- a/src/audio-ingest/gateway/test/cloud-telephony.gateway.spec.ts
++++ b/src/audio-ingest/gateway/test/cloud-telephony.gateway.spec.ts
+@@ -190,6 +190,22 @@ describe('CloudTelephonyGateway', () => {
+         expect.any(Function),
+       );
+     });
++
++    it('should not manually call handleDisconnect on disconnect event', async () => {
++      const handleDisconnectSpy = jest.spyOn(gateway, 'handleDisconnect');
++      await gateway.handleConnection(mockSocket);
++
++      // find the disconnect callback
++      const disconnectCallback = (mockSocket.on as jest.Mock).mock.calls.find(
++        (call) => call[0] === 'disconnect',
++      )[1];
++
++      // call it
++      disconnectCallback();
++
++      // We expect it NOT to have been called, because OnGatewayDisconnect should handle it.
++      expect(handleDisconnectSpy).not.toHaveBeenCalled();
++    });
+   });
+ 
+   describe('handleDisconnect', () => {

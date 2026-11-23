@@ -1,0 +1,57 @@
+diff --git a/apps/ally-admin-dashboard/src/components/notion-table/NotionTable.tsx b/apps/ally-admin-dashboard/src/components/notion-table/NotionTable.tsx
+index 2c3cae2d8d..16d30e762d 100644
+--- a/apps/ally-admin-dashboard/src/components/notion-table/NotionTable.tsx
++++ b/apps/ally-admin-dashboard/src/components/notion-table/NotionTable.tsx
+@@ -290,14 +290,17 @@ export const NotionTable = ({
+                       }),
+                 }}
+               >
+-                {onRowClick && rowClickTrigger === "hover" && cellIndex === editIndex && isEditable && (
+-                  <button
+-                    className="absolute ml-auto p-1 bg-white border-[1px] border-border-light shadow-md rounded-[3px] z-10 right-[6px] opacity-0 group-hover:opacity-100 transition-opacity"
+-                    onClick={() => onRowClick(rowIndex)}
+-                  >
+-                    <DockToRight />
+-                  </button>
+-                )}
++                {onRowClick &&
++                  rowClickTrigger === "hover" &&
++                  cellIndex === editIndex &&
++                  isEditable && (
++                    <button
++                      className="absolute ml-auto p-1 bg-white border-[1px] border-border-light shadow-md rounded-[3px] z-10 right-[6px] opacity-0 group-hover:opacity-100 transition-opacity"
++                      onClick={() => onRowClick(rowIndex)}
++                    >
++                      <DockToRight />
++                    </button>
++                  )}
+                 {renderTableCell(cell, rowIndex, row?.original, onRowChange)}
+               </div>
+             );
+diff --git a/apps/ally-admin-dashboard/src/components/notion-table/__tests__/NotionTable.lint.test.ts b/apps/ally-admin-dashboard/src/components/notion-table/__tests__/NotionTable.lint.test.ts
+new file mode 100644
+index 0000000000..b6fdc6616d
+--- /dev/null
++++ b/apps/ally-admin-dashboard/src/components/notion-table/__tests__/NotionTable.lint.test.ts
+@@ -0,0 +1,21 @@
++import path from "path";
++
++import { ESLint } from "eslint";
++import { describe, it, expect } from "vitest";
++
++// Regression test for a prettier/prettier formatting violation introduced in
++// the row-click JSX added to NotionTable.tsx (commit 29b214ce). This must
++// stay clean or `npm run lint` fails CI for anyone building on this file.
++describe("NotionTable lint formatting", () => {
++  it("has no prettier/prettier violations", async () => {
++    const eslint = new ESLint({ cwd: path.resolve(__dirname, "../../../../../../") });
++    const targetFile = path.resolve(__dirname, "../NotionTable.tsx");
++    const results = await eslint.lintFiles([targetFile]);
++
++    const prettierErrors = results.flatMap(result =>
++      result.messages.filter(message => message.ruleId === "prettier/prettier"),
++    );
++
++    expect(prettierErrors).toEqual([]);
++  });
++});

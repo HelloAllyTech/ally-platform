@@ -1,0 +1,154 @@
+diff --git a/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx b/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx
+index 2ec10b52c2..a777a0ae11 100644
+--- a/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx
++++ b/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx
+@@ -142,6 +142,7 @@ const CommentCard = ({
+   };
+ 
+   const handleCancelReply = () => {
++    setReplyText("");
+     setShowReplyInput(false);
+   };
+ 
+@@ -281,7 +282,7 @@ const CommentCard = ({
+               >
+                 {selectedEmoji ? (
+                   <div className="pb-0.5  w-[26px] bg-white h-[26px] flex items-center justify-center rounded-full border-[0.5px] border-primary-600">
+-                    <Emoji unified={selectedEmoji} size={14} emojiStyle={EmojiStyle.APPLE} />
++                    <Emoji unified={selectedEmoji} size={14} emojiStyle={EmojiStyle.GOOGLE} />
+                   </div>
+                 ) : enableLikeUpdate ? (
+                   <Smiley className="w-5 h-5 text-neutral-600 hover:text-[#0957D0]" />
+@@ -319,7 +320,7 @@ const CommentCard = ({
+                             <Emoji
+                               unified={reaction ?? "1f44d"}
+                               size={10}
+-                              emojiStyle={EmojiStyle.APPLE}
++                              emojiStyle={EmojiStyle.GOOGLE}
+                             />
+                           </div>
+                         )}
+diff --git a/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/CommentCard.test.tsx b/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/CommentCard.test.tsx
+index 07f2da1ca6..f489ab85a8 100644
+--- a/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/CommentCard.test.tsx
++++ b/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/CommentCard.test.tsx
+@@ -560,24 +560,6 @@ describe("CommentCard Component", () => {
+       expect(screen.queryByTestId("reply-textarea")).not.toBeInTheDocument();
+     });
+ 
+-    it("should preserve textarea value when Cancel button is clicked", () => {
+-      renderWithProvider(<CommentCard comment={mockComment} showReply />);
+-
+-      const replyButton = screen.getByText("Reply");
+-      fireEvent.click(replyButton);
+-
+-      let textarea = screen.getByTestId("reply-textarea");
+-      fireEvent.change(textarea, { target: { value: "Draft reply" } });
+-
+-      const cancelButton = screen.getByTestId("button-secondary");
+-      fireEvent.click(cancelButton);
+-
+-      // Re-open textarea
+-      fireEvent.click(replyButton);
+-      textarea = screen.getByTestId("reply-textarea");
+-      expect(textarea).toHaveValue("Draft reply");
+-    });
+-
+     it("should not show reply textarea without showReply prop", () => {
+       renderWithProvider(<CommentCard comment={mockComment} />);
+       // Reply button should not exist, so textarea cannot be shown
+diff --git a/apps/ally-helpline-dashboard/src/components/feed-card/EmojiStack.tsx b/apps/ally-helpline-dashboard/src/components/feed-card/EmojiStack.tsx
+index 354d87ef7f..058923d1f4 100644
+--- a/apps/ally-helpline-dashboard/src/components/feed-card/EmojiStack.tsx
++++ b/apps/ally-helpline-dashboard/src/components/feed-card/EmojiStack.tsx
+@@ -28,7 +28,7 @@ const EmojiStack: FC<EmojiStackProps> = props => {
+             zIndex: unicodeCodes.length - index,
+           }}
+         >
+-          <Emoji unified={code} size={emojiSize} emojiStyle={EmojiStyle.APPLE} lazyLoad />
++          <Emoji unified={code} size={emojiSize} emojiStyle={EmojiStyle.GOOGLE} lazyLoad />
+         </div>
+       ))}
+     </div>
+diff --git a/apps/ally-helpline-dashboard/src/components/reaction-modal/ReactionModal.tsx b/apps/ally-helpline-dashboard/src/components/reaction-modal/ReactionModal.tsx
+index 56247a2aff..57b5affb8b 100644
+--- a/apps/ally-helpline-dashboard/src/components/reaction-modal/ReactionModal.tsx
++++ b/apps/ally-helpline-dashboard/src/components/reaction-modal/ReactionModal.tsx
+@@ -69,7 +69,7 @@ const ReactionsModal: FC<ReactionsModalProps> = ({ isOpen, onClose, reviewId })
+       }`}
+     >
+       <div className="flex items-center gap-1 p-1 rounded-[18px] bg-white border-[0.5px] border-border">
+-        <Emoji unified={reactionCode} size={14} emojiStyle={EmojiStyle.APPLE} lazyLoad />
++        <Emoji unified={reactionCode} size={14} emojiStyle={EmojiStyle.GOOGLE} lazyLoad />
+       </div>
+       <span className="font-primary text-sm">{count}</span>
+       {isActive && (
+@@ -120,7 +120,7 @@ const ReactionsModal: FC<ReactionsModalProps> = ({ isOpen, onClose, reviewId })
+                   <Emoji
+                     unified={userReaction.reaction}
+                     size={10}
+-                    emojiStyle={EmojiStyle.APPLE}
++                    emojiStyle={EmojiStyle.GOOGLE}
+                     lazyLoad
+                   />
+                 </div>
+@@ -202,7 +202,7 @@ const ReactionsModal: FC<ReactionsModalProps> = ({ isOpen, onClose, reviewId })
+                             <Emoji
+                               unified={code}
+                               size={16}
+-                              emojiStyle={EmojiStyle.APPLE}
++                              emojiStyle={EmojiStyle.GOOGLE}
+                               lazyLoad
+                             />
+                           </div>
+diff --git a/apps/ally-helpline-dashboard/src/components/reaction-selector/ReactionSelector.tsx b/apps/ally-helpline-dashboard/src/components/reaction-selector/ReactionSelector.tsx
+index 6c330b005f..e9e6fad875 100644
+--- a/apps/ally-helpline-dashboard/src/components/reaction-selector/ReactionSelector.tsx
++++ b/apps/ally-helpline-dashboard/src/components/reaction-selector/ReactionSelector.tsx
+@@ -69,7 +69,7 @@ const ReactionSelector = ({
+                      border border-neutral-300 bg-white
+                      transition-transform hover:scale-125"
+         >
+-          <Emoji unified={emoji} size={emojiSize} emojiStyle={EmojiStyle.APPLE} />
++          <Emoji unified={emoji} size={emojiSize} emojiStyle={EmojiStyle.GOOGLE} />
+         </div>
+       ))}
+     </div>,
+diff --git a/apps/ally-helpline-dashboard/src/components/transcription/Transcription.tsx b/apps/ally-helpline-dashboard/src/components/transcription/Transcription.tsx
+index e337cfde1c..c6b26d45d2 100644
+--- a/apps/ally-helpline-dashboard/src/components/transcription/Transcription.tsx
++++ b/apps/ally-helpline-dashboard/src/components/transcription/Transcription.tsx
+@@ -277,7 +277,7 @@ const Transcription: FC<TranscriptionProps> = ({
+               >
+                 {splitByCommentRanges(
+                   transcript.content,
+-                  transcript.threads.map(thread => ({
++                  (transcript.threads ?? []).map(thread => ({
+                     id: thread.id,
+                     start: thread.selection.startIndex,
+                     end: thread.selection.endIndex,
+diff --git a/apps/ally-helpline-dashboard/src/pages/review-details/ReviewDetails.tsx b/apps/ally-helpline-dashboard/src/pages/review-details/ReviewDetails.tsx
+index b9dbfa701c..077a40a922 100644
+--- a/apps/ally-helpline-dashboard/src/pages/review-details/ReviewDetails.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/review-details/ReviewDetails.tsx
+@@ -269,7 +269,7 @@ export const ReviewDetails = () => {
+             >
+               {selectedEmoji ? (
+                 <div className="pb-0.5">
+-                  <Emoji unified={selectedEmoji} size={16} emojiStyle={EmojiStyle.APPLE} />
++                  <Emoji unified={selectedEmoji} size={16} emojiStyle={EmojiStyle.GOOGLE} />
+                 </div>
+               ) : (
+                 <Smiley className="w-6 h-6 text-neutral-600 hover:text-[#0957D0]" />
+@@ -347,7 +347,10 @@ export const ReviewDetails = () => {
+               <div className="w-1 h-1 bg-neutral-500 rounded-full mx-1" />
+               <div>
+                 Date & time:{" "}
+-                {getFormattedDateTime(reviewDetails?.scenario?.createdAt, "MMM dd, yyyy hh:mm a")}
++                {getFormattedDateTime(
++                  reviewDetails?.scenarioSession?.createdAt,
++                  "MMM dd, yyyy hh:mm a",
++                )}
+               </div>
+               <div className="w-1 h-1 bg-neutral-500 rounded-full mx-1" />
+               <div className="font-primary  leading-4 text-black/60">

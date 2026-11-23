@@ -1,0 +1,78 @@
+diff --git a/apps/ally-helpline-dashboard/src/pages/track-player/TrackPlayer.tsx b/apps/ally-helpline-dashboard/src/pages/track-player/TrackPlayer.tsx
+index a5d94527e6..58fb7e5aa8 100644
+--- a/apps/ally-helpline-dashboard/src/pages/track-player/TrackPlayer.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/track-player/TrackPlayer.tsx
+@@ -287,7 +287,7 @@ export const TrackPlayer: FC = () => {
+           >
+             {hasDiscussion ? (
+               <div data-testid="track-item-scroll" className="h-full min-h-0 overflow-y-auto">
+-                <div className="h-full min-h-0">
++                <div className="min-h-0">
+                   <ErrorBoundary variant="panel" resetKey={itemId}>
+                     {renderItem()}
+                   </ErrorBoundary>
+diff --git a/apps/ally-helpline-dashboard/src/pages/track-player/__tests__/TrackPlayer.test.tsx b/apps/ally-helpline-dashboard/src/pages/track-player/__tests__/TrackPlayer.test.tsx
+index da780efaf5..4139ebd4ab 100644
+--- a/apps/ally-helpline-dashboard/src/pages/track-player/__tests__/TrackPlayer.test.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/track-player/__tests__/TrackPlayer.test.tsx
+@@ -12,6 +12,7 @@ vi.mock("@api", async () => ({
+   ...(await vi.importActual<typeof api>("@api")),
+   useGetLearnTrackDetailQuery: vi.fn(),
+   useStartTrackItemMutation: vi.fn(),
++  useGetCourseDiscussionQuery: vi.fn(),
+ }));
+ 
+ const mockTrackDetail: TrackDetail = {
+@@ -99,4 +100,52 @@ describe("TrackPlayer", () => {
+       expect(screen.getByRole("button", { name: "Mark as read" })).toBeInTheDocument(),
+     );
+   });
++
++  it("shows the discussion thread below the content when hasDiscussion is true", async () => {
++    const mockTrackWithDiscussion = {
++      ...mockTrackDetail,
++      sections: [
++        {
++          ...mockTrackDetail.sections[0],
++          items: [{ ...mockTrackDetail.sections[0].items[0], hasDiscussion: true }],
++        },
++      ],
++    };
++    (api.useGetLearnTrackDetailQuery as vi.Mock).mockReturnValue({
++      data: mockTrackWithDiscussion,
++      isError: false,
++      refetch: vi.fn(),
++    });
++    (api.useStartTrackItemMutation as vi.Mock).mockReturnValue(mockStartTrackItemMutation);
++    (api.useGetCourseDiscussionQuery as vi.Mock).mockReturnValue({
++      data: {
++        enabled: true,
++        isLocked: false,
++        postCount: 0,
++        posts: [],
++        viewer: { canPost: true, maxLength: 1000, canModerate: false },
++      },
++      isLoading: false,
++      isError: false,
++      refetch: vi.fn(),
++    });
++
++    render(
++      <Provider store={store}>
++        <MemoryRouter initialEntries={["/track/track1/item1"]}>
++          <Routes>
++            <Route path="/track/:trackId/:itemId" element={<TrackPlayer />} />
++          </Routes>
++        </MemoryRouter>
++      </Provider>
++    );
++
++    await waitFor(() => {
++      expect(screen.getByTestId("discussion-thread")).toBeInTheDocument();
++    });
++
++    const scrollContainer = screen.getByTestId("track-item-scroll");
++    // The bug is that the first child of the scroll container has h-full
++    expect(scrollContainer.firstChild).not.toHaveClass("h-full");
++  });
+ });

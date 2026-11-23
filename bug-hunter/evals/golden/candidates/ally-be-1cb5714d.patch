@@ -1,0 +1,104 @@
+diff --git a/src/learn/constants/elevenlabs-voice-type.constants.ts b/src/learn/constants/elevenlabs-voice-type.constants.ts
+index 23f563f6eb..3cf7d21b9b 100644
+--- a/src/learn/constants/elevenlabs-voice-type.constants.ts
++++ b/src/learn/constants/elevenlabs-voice-type.constants.ts
+@@ -73,9 +73,17 @@ export const V3_COMPATIBLE_VOICE_TYPES: ElevenLabsVoiceType[] = [
+   ElevenLabsVoiceType.PREMADE,
+ ];
+ 
+-/** Whether a model string names an ElevenLabs v3 model. */
++/**
++ * Whether a model string names one of ElevenLabs' generative families — v3
++ * (eleven_v3, eleven_v3_conversational) or v4 (eleven_v4, eleven_v4_turbo).
++ * v4 skips a professional clone's training exactly as v3 does until ElevenLabs
++ * has retrained that voice for v4, at which point they list v4 among the
++ * voice's fine-tuned models and `getElevenLabsModelRecommendation` defers to
++ * that. The name is historical: every rule here was written for v3 and now
++ * covers both families.
++ */
+ export const isElevenLabsV3Model = (model?: string | null): boolean =>
+-  /v3/i.test(String(model ?? ''));
++  /v3|v4/i.test(String(model ?? ''));
+ 
+ /**
+  * Whether v3 is a sound choice for a voice of this type — what
+diff --git a/src/learn/constants/test/elevenlabs-voice-type.constants.spec.ts b/src/learn/constants/test/elevenlabs-voice-type.constants.spec.ts
+index 3ff369f773..2cdfcc723c 100644
+--- a/src/learn/constants/test/elevenlabs-voice-type.constants.spec.ts
++++ b/src/learn/constants/test/elevenlabs-voice-type.constants.spec.ts
+@@ -32,12 +32,18 @@ describe('ElevenLabs category mapping', () => {
+ });
+ 
+ describe('isElevenLabsV3Model', () => {
+-  it.each(['eleven_v3', 'ELEVEN_V3', 'eleven_v3_preview'])(
+-    'detects %s',
+-    (m) => {
+-      expect(isElevenLabsV3Model(m)).toBe(true);
+-    },
+-  );
++  it.each([
++    'eleven_v3',
++    'ELEVEN_V3',
++    'eleven_v3_preview',
++    'eleven_v3_conversational',
++    // v4 is the same kind of model: a custom voice's training is skipped
++    // until ElevenLabs retrains the voice for v4, so the v3 rules apply.
++    'eleven_v4',
++    'eleven_v4_turbo',
++  ])('detects %s', (m) => {
++    expect(isElevenLabsV3Model(m)).toBe(true);
++  });
+ 
+   it.each([
+     'eleven_multilingual_v2',
+@@ -125,6 +131,34 @@ describe('getElevenLabsModelRecommendation', () => {
+     ).toBe(false);
+   });
+ 
++  it('flags v4 for a PVC the same way until ElevenLabs lists v4 for it', () => {
++    expect(
++      getElevenLabsModelRecommendation(
++        'eleven_v4',
++        ElevenLabsVoiceType.PVC,
++        ['eleven_multilingual_v2'],
++        'eleven_multilingual_v2',
++      ),
++    ).toBe(false);
++    // A voice retrained for v4 shows v4 in its fine-tune list: their word wins.
++    expect(
++      getElevenLabsModelRecommendation(
++        'eleven_v4',
++        ElevenLabsVoiceType.PVC,
++        ['eleven_multilingual_v2', 'eleven_v4'],
++        'eleven_multilingual_v2',
++      ),
++    ).toBeNull();
++    expect(
++      getElevenLabsModelRecommendation(
++        'eleven_v4_turbo',
++        ElevenLabsVoiceType.IVC,
++        [],
++        null,
++      ),
++    ).toBeNull();
++  });
++
+   it('stays silent about v3 for a voice type it suits', () => {
+     expect(
+       getElevenLabsModelRecommendation(
+diff --git a/src/learn/service/elevenlabs-voice-sync.service.ts b/src/learn/service/elevenlabs-voice-sync.service.ts
+index e019ad5b20..0df5b69005 100644
+--- a/src/learn/service/elevenlabs-voice-sync.service.ts
++++ b/src/learn/service/elevenlabs-voice-sync.service.ts
+@@ -519,8 +519,9 @@ export class ElevenLabsVoiceSyncService {
+     if (listedV3.length) {
+       this.logger.warn(
+         `[ELEVENLABS_V3] ElevenLabs now lists ${listedV3.join(', ')} among the fine-tuned models for a ` +
+-          `${voiceType ?? 'unknown'} voice. v3 previously appeared for no voice at all, so the v3 advisory ` +
+-          `and V3_COMPATIBLE_VOICE_TYPES should be re-checked against their current guidance.`,
++          `${voiceType ?? 'unknown'} voice. v3 previously appeared for no voice at all (v4 is expected to, ` +
++          `once a voice is retrained for it), so the v3/v4 advisory and V3_COMPATIBLE_VOICE_TYPES should ` +
++          `be re-checked against their current guidance.`,
+       );
+     }
+ 

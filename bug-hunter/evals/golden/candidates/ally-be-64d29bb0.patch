@@ -1,0 +1,166 @@
+diff --git a/src/bug-hunter/constants/bug-pr-body.ts b/src/bug-hunter/constants/bug-pr-body.ts
+index 9563c05392..6f44ae479c 100644
+--- a/src/bug-hunter/constants/bug-pr-body.ts
++++ b/src/bug-hunter/constants/bug-pr-body.ts
+@@ -32,7 +32,7 @@ export function renderPrBody(
+ 
+   lines.push(
+     `## The bug`,
+-    clipDossierText(f.description, 1200),
++    clipDossierText(f.description, 4000),
+     ``,
+     ...[
+       f.file
+diff --git a/src/bug-hunter/constants/bug-verify-findings-prompt.ts b/src/bug-hunter/constants/bug-verify-findings-prompt.ts
+index 3ddaa14fc7..e500b6191d 100644
+--- a/src/bug-hunter/constants/bug-verify-findings-prompt.ts
++++ b/src/bug-hunter/constants/bug-verify-findings-prompt.ts
+@@ -63,7 +63,7 @@ export function buildVerifyFindingsPrompt({
+         // Up to 1,200 rather than 900: a staff report's brief is up to 1,000
+         // characters with its identifiers and impact on the LAST lines, and a
+         // verifier that never saw them judged a different bug.
+-        `   Description: ${clipDossierText(f.description, 1200)}`,
++        `   Description: ${clipDossierText(f.description, 4000)}`,
+         f.file
+           ? `   Where the finder pointed: ${f.file}${f.symbol ? ` (${f.symbol})` : ''}`
+           : '',
+@@ -162,7 +162,7 @@ function buildHeldCheckPrompt(
+       return [
+         `${i + 1}. id=${f.id}`,
+         `   Title: ${clipDossierText(f.title, 200)}`,
+-        `   Report: ${clipDossierText(f.description, 1200)}`,
++        `   Report: ${clipDossierText(f.description, 4000)}`,
+         steps ? `   The reporter's steps: ${clipDossierText(steps, 500)}` : '',
+         f.prUrl ? `   The fix that was released: ${f.prUrl}` : '',
+       ]
+diff --git a/src/bug-hunter/constants/bug-verify-fix-prompt.ts b/src/bug-hunter/constants/bug-verify-fix-prompt.ts
+index ea936f7158..a4a39376e6 100644
+--- a/src/bug-hunter/constants/bug-verify-fix-prompt.ts
++++ b/src/bug-hunter/constants/bug-verify-fix-prompt.ts
+@@ -87,7 +87,7 @@ export function buildVerifyFixPrompt({
+     `## The bug`,
+     DATA_BEGIN('bug'),
+     `Title: ${clipDossierText(finding.title, 200)}`,
+-    `Description: ${clipDossierText(finding.description, 1200)}`,
++    `Description: ${clipDossierText(finding.description, 4000)}`,
+     finding.file
+       ? `File named by the finder: ${finding.file}${finding.symbol ? ` (${finding.symbol})` : ''}`
+       : '',
+diff --git a/src/bug-hunter/service/bug-fix-study.service.ts b/src/bug-hunter/service/bug-fix-study.service.ts
+index 20efb93bc4..67e9d0852b 100644
+--- a/src/bug-hunter/service/bug-fix-study.service.ts
++++ b/src/bug-hunter/service/bug-fix-study.service.ts
+@@ -140,7 +140,7 @@ export class BugFixStudyService {
+         `Bug in ${finding.repo ?? 'an unknown repo'}${finding.file ? `, filed against ${finding.file}` : ''}:`,
+         `"""`,
+         `${finding.title}`,
+-        clipDossierText(finding.description, 1500),
++        clipDossierText(finding.description, 4000),
+         `"""`,
+         ``,
+         `The session's study:`,
+diff --git a/src/bug-hunter/service/bug-hunter-pr-review.service.ts b/src/bug-hunter/service/bug-hunter-pr-review.service.ts
+index fdc9c374bb..f5cf0da82e 100644
+--- a/src/bug-hunter/service/bug-hunter-pr-review.service.ts
++++ b/src/bug-hunter/service/bug-hunter-pr-review.service.ts
+@@ -201,7 +201,7 @@ export class BugHunterPrReviewService {
+       `### Bug Hunter: ${clipDossierText(finding.title, 160)}`,
+       `_Found reviewing this PR at ${pr.headSha.slice(0, 7)}; confirmed by an independent Verifier${confirmed?.by.engine ? ` on ${confirmed.by.engine}` : ''}. A comment, not a check: merge is your call._`,
+       ``,
+-      clipDossierText(finding.description, 1200),
++      clipDossierText(finding.description, 4000),
+       finding.evidence
+         ? `\n**Evidence**\n\`\`\`\n${clipDossierText(finding.evidence, 800)}\n\`\`\``
+         : '',
+diff --git a/src/bug-hunter/util/bug-report-brief.util.ts b/src/bug-hunter/util/bug-report-brief.util.ts
+index a0e55520db..46cfb1544e 100644
+--- a/src/bug-hunter/util/bug-report-brief.util.ts
++++ b/src/bug-hunter/util/bug-report-brief.util.ts
+@@ -150,16 +150,25 @@ export function composeBugReportDescription(
+ 
+   if (!lines.length) return happened.slice(0, max);
+   const tail = `\n\n${lines.join('\n')}`;
+-  // The reporter's own words give way last: trim the labelled lines before them.
+-  let body = happened;
+-  let out = `${body}${tail}`;
+-  if (out.length > max) {
+-    const roomForBody = Math.max(200, max - tail.length);
+-    body =
+-      happened.length > roomForBody
+-        ? `${happened.slice(0, roomForBody - 1)}…`
+-        : happened;
+-    out = `${body}${tail}`;
++  // The reporter's own words are the brief and are never shortened. When
++  // the limit is too small for words plus labelled lines, the longest line
++  // (steps, expected, identifiers) is shortened to what fits, and a line too
++  // short to shorten is dropped — so the short lines (where, when, impact)
++  // survive. In practice the finding's limit (5,000) fits everything; this
++  // path exists for a caller composing into a tighter one.
++  let out = `${happened}${tail}`;
++  while (out.length > max && lines.length) {
++    const over = out.length - max;
++    let idx = 0;
++    lines.forEach((l, i) => {
++      if (l.length > lines[idx].length) idx = i;
++    });
++    if (lines[idx].length - over > 40) {
++      lines[idx] = `${lines[idx].slice(0, lines[idx].length - over - 1)}…`;
++    } else {
++      lines.splice(idx, 1);
++    }
++    out = lines.length ? `${happened}\n\n${lines.join('\n')}` : happened;
+   }
+   return out.length > max ? `${out.slice(0, max - 1)}…` : out;
+ }
+diff --git a/src/bug-hunter/util/test/bug-report-brief.util.spec.ts b/src/bug-hunter/util/test/bug-report-brief.util.spec.ts
+index 6ec01904d7..062b5f1813 100644
+--- a/src/bug-hunter/util/test/bug-report-brief.util.spec.ts
++++ b/src/bug-hunter/util/test/bug-report-brief.util.spec.ts
+@@ -72,7 +72,9 @@ describe('bug report brief', () => {
+     expect(brief).toContain('Reported from: /bugs');
+     expect(brief).not.toContain('How often');
+     expect(brief).not.toContain('Impact');
+-    // the reporter's words were shortened to make room, but kept most of the space
++    // the reporter's words are never shortened: the longest labelled line is
++    expect(brief.startsWith('x'.repeat(900))).toBe(true);
++    expect(brief).toMatch(/Expected: y+…/);
+     expect(brief.indexOf('Expected:')).toBeGreaterThan(500);
+ 
+     expect(composeBugReportDescription('plain', null, 1000)).toBe('plain');
+diff --git a/src/product-roadmap/service/roadmap-opportunity.service.ts b/src/product-roadmap/service/roadmap-opportunity.service.ts
+index 97e623bea3..a07feea93f 100644
+--- a/src/product-roadmap/service/roadmap-opportunity.service.ts
++++ b/src/product-roadmap/service/roadmap-opportunity.service.ts
+@@ -19,6 +19,7 @@ import {
+ } from 'src/bug-hunter/enum/bug-finding.enum';
+ import { BugHunterRepoClassifierService } from 'src/bug-hunter/service/bug-hunter-repo-classifier.service';
+ import { BugHunterMissClassifierService } from 'src/bug-hunter/service/bug-hunter-miss-classifier.service';
++import { BUG_FINDING_DESCRIPTION_MAX_LENGTH } from 'src/bug-hunter/constants/bug-hunter.constants';
+ import {
+   composeBugReportDescription,
+   repoForSurface,
+@@ -50,7 +51,6 @@ import {
+   ROADMAP_READINESS_REQUIRE_TOKEN,
+   ROADMAP_REFERENCE_IMAGE_MAX_SIZE_BYTES,
+   ROADMAP_REFERENCE_IMAGE_S3_PREFIX,
+-  ROADMAP_LIMITS,
+ } from '../constants/product-roadmap.constants';
+ import {
+   CreateBugReportDto,
+@@ -396,10 +396,15 @@ export class RoadmapOpportunityService {
+     const created = await this.create(
+       userId,
+       {
++        // The form caps the reporter's own words at ROADMAP_LIMITS.DESCRIPTION_MAX;
++        // the brief adds the structured answers after them, so it is composed
++        // into the finding's limit. Composing into the form's limit clipped a
++        // long report to its first two hundred characters (2026-10-12), which
++        // is the part every stage reads first.
+         description: composeBugReportDescription(
+           dto.description,
+           dto.context ?? null,
+-          ROADMAP_LIMITS.DESCRIPTION_MAX,
++          BUG_FINDING_DESCRIPTION_MAX_LENGTH,
+         ),
+         type: RoadmapOpportunityType.BUG,
+         productGoal: BUG_REPORT_DEFAULT_PRODUCT_GOAL,

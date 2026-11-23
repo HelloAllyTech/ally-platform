@@ -375,7 +375,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
       // glyph it used to have said "bugs live here", which is what every other
       // tab's icon says about its subject — this one says who is working on
       // them.
-      case SIDEBAR_ITEMS.BUG_HUNTER:
+      case SIDEBAR_ITEMS.BUG_HUNTER_V2:
         return <AgentAvatar size="xs" label={en.bugHunter.agentName} />;
       default:
         return null;

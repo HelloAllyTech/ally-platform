@@ -1,0 +1,110 @@
+diff --git a/src/builder/controller/builder-pipeline.controller.ts b/src/builder/controller/builder-pipeline.controller.ts
+index 91072f6c33..2b5ae5edb2 100644
+--- a/src/builder/controller/builder-pipeline.controller.ts
++++ b/src/builder/controller/builder-pipeline.controller.ts
+@@ -547,6 +547,31 @@ export class BuilderPipelineController {
+     return { ok: true };
+   }
+ 
++  /**
++   * What the run looks like from the outside, for the workflow's own
++   * outcome gate to read after the engine exits.
++   *
++   * `claude -p` exits 0 whenever the agent produces a final response — including
++   * when it ends its turn mid-protocol. That makes "stopped without reporting"
++   * indistinguishable from success at the workflow level, so the workflow asks
++   * here instead of trusting its own exit code.
++   */
++  @Get('runs/:runId/status')
++  @ApiOperation({
++    summary: 'Run status, stage and PR count, for the runner outcome gate',
++  })
++  async getRunStatus(@Param('runId', ParseUUIDPipe) runId: string) {
++    const run = await this.buildService.getRunOrFail(runId);
++    const pullRequests = await this.pullRequestService.listBySession(
++      run.sessionId,
++    );
++    return {
++      runId: run.id,
++      status: run.status,
++      pullRequestCount: pullRequests.filter((pr) => pr.runId === run.id).length,
++    };
++  }
++
+   @Get('runs/:runId/budget')
+   @ApiOperation({
+     summary: 'Live spend against the session ceiling, checked between phases',
+diff --git a/src/builder/service/builder-build.service.ts b/src/builder/service/builder-build.service.ts
+index b794a9b996..5f5eb72d0f 100644
+--- a/src/builder/service/builder-build.service.ts
++++ b/src/builder/service/builder-build.service.ts
+@@ -981,10 +981,23 @@ export class BuilderBuildService {
+       if (current && !this.isActive(current.status)) return;
+ 
+       if (remote.conclusion === 'success') {
+-        // Success on GitHub without a /complete callback means the runner
+-        // finished but never reported — treat it as done rather than leaving
+-        // the session building forever.
+-        await this.settleRun(run, BuilderRunStatus.SUCCEEDED, null);
++        // A green job without a /complete callback is NOT a success. `claude -p`
++        // exits 0 whenever the agent produces a final response, including when
++        // it ends its turn mid-protocol — so "the agent stopped after CODE
++        // without committing" and "the agent finished and opened PRs" reach
++        // this branch identically. Settling SUCCEEDED here reported builds that
++        // never shipped anything, and made the scoreboard's merge rate a
++        // measure of nothing.
++        //
++        // The run reports its own outcome or it did not finish. The workflow's
++        // outcome gate normally catches this first and posts a precise error;
++        // this is the net for when the runner died before that step ran.
++        await this.failRun(
++          run,
++          'The runner finished without reporting an outcome. It stopped ' +
++            'mid-protocol, so anything it had not pushed is gone with the ' +
++            'runner. Retry the build.',
++        );
+       } else if (remote.conclusion === 'cancelled') {
+         await this.settleRun(run, BuilderRunStatus.CANCELLED, null);
+       } else {
+diff --git a/src/builder/service/test/builder-build.service.spec.ts b/src/builder/service/test/builder-build.service.spec.ts
+index 2b914647f2..60ee966316 100644
+--- a/src/builder/service/test/builder-build.service.spec.ts
++++ b/src/builder/service/test/builder-build.service.spec.ts
+@@ -427,6 +427,37 @@ describe('BuilderBuildService', () => {
+       );
+     });
+ 
++    it('fails a green job that never reported an outcome', async () => {
++      const run = {
++        id: 'run-1',
++        sessionId: 'session-1',
++        githubRunId: '99',
++        dispatchedAt: new Date(),
++        status: BuilderRunStatus.RUNNING,
++      };
++      runRepository.listActive.mockResolvedValue([run]);
++      runRepository.findOne.mockResolvedValue(run);
++      github.getRun.mockResolvedValue({
++        status: 'completed',
++        conclusion: 'success',
++      });
++
++      await service.reconcile();
++
++      // `claude -p` exits 0 whenever the agent produces a final response,
++      // including mid-protocol — so a green job proves the runner exited, not
++      // that it shipped anything. A run reports its own outcome or it did not
++      // finish. Settling SUCCEEDED here reported builds that opened no PR.
++      expect(runRepository.update).not.toHaveBeenCalledWith(
++        { id: 'run-1' },
++        expect.objectContaining({ status: BuilderRunStatus.SUCCEEDED }),
++      );
++      expect(runRepository.update).toHaveBeenCalledWith(
++        { id: 'run-1' },
++        expect.objectContaining({ status: BuilderRunStatus.FAILED }),
++      );
++    });
++
+     it('fails a dispatch GitHub never registered', async () => {
+       runRepository.listActive.mockResolvedValue([
+         {

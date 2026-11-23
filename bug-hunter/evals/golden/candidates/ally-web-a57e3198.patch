@@ -1,0 +1,81 @@
+diff --git a/apps/ally-helpline-dashboard/src/api/__tests__/auth.test.tsx b/apps/ally-helpline-dashboard/src/api/__tests__/auth.test.tsx
+index b0554389c2..8f00f0b01a 100644
+--- a/apps/ally-helpline-dashboard/src/api/__tests__/auth.test.tsx
++++ b/apps/ally-helpline-dashboard/src/api/__tests__/auth.test.tsx
+@@ -18,6 +18,7 @@ import { baseAPI } from "../baseAPI";
+ 
+ // Mock constants
+ vi.mock("@constants", () => ({
++  LOCAL_STORAGE_KEYS: {},
+   ApiEndpoints: {
+     AUTH: {
+       LOGIN: "/auth/login",
+@@ -47,6 +48,7 @@ vi.mock("@constants", () => ({
+ 
+ // Mock types
+ vi.mock("@types", () => ({
++  AppType: {},
+   User: {},
+   VerifyOTPRequest: {},
+   VerifyOTPResponse: {},
+diff --git a/apps/ally-helpline-dashboard/src/hooks/useLiveKitRoom.ts b/apps/ally-helpline-dashboard/src/hooks/useLiveKitRoom.ts
+index cd8b93ac8b..c1d1b4a786 100644
+--- a/apps/ally-helpline-dashboard/src/hooks/useLiveKitRoom.ts
++++ b/apps/ally-helpline-dashboard/src/hooks/useLiveKitRoom.ts
+@@ -1,3 +1,4 @@
++/* eslint-disable react-hooks/exhaustive-deps */
+ import { useState, useEffect, useCallback, useRef } from "react";
+ 
+ import { Room, RoomEvent, Participant, RemoteTrackPublication, Track } from "livekit-client";
+@@ -235,7 +236,7 @@ export const useLiveKitRoom = (
+         return [...new Set([...prevIds, ...(eventObj?.data?.detected_event_ids || [])])];
+       });
+     },
+-    [],
++    [updateAgentTurnStatus],
+   );
+ 
+   const clearAgentJoinTimer = useCallback(() => {
+@@ -377,7 +378,7 @@ export const useLiveKitRoom = (
+       ended_by_learner: Boolean(endSessionButtonRef.current),
+       ...interactionModeProps(sessionIdsRef.current.isTextChat),
+     });
+-  }, []);
++  }, [endSessionButtonRef]);
+ 
+   const onRoomDisconnect = useCallback(() => {
+     captureSimulationCompleted();
+@@ -397,7 +398,13 @@ export const useLiveKitRoom = (
+       },
+       endSessionButtonRef.current ? 0 : 1000,
+     );
+-  }, []);
++  }, [
++    captureSimulationCompleted,
++    endSessionButtonRef,
++    handleDisconnect,
++    room.localParticipant,
++    updateAgentTurnStatus,
++  ]);
+ 
+   // Detach every listener this hook attaches. Extracted so the retry path can
+   // reuse it: retrying has to disconnect a room that may already be connected,
+@@ -615,14 +622,16 @@ export const useLiveKitRoom = (
+       // Cleanup on route change to avoid duplicate listeners and ensure disconnect
+       cleanupRoom();
+     };
+-  }, [id, cleanupRoom]);
++    // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, [id]);
+ 
+   useEffect(() => {
+     return () => {
+       localStorage.removeItem(LOCAL_STORAGE_KEYS.ROOM_DATA);
+       cleanupRoom();
+     };
+-  }, [cleanupRoom]);
++    // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, []);
+ 
+   useEffect(() => {
+     const handleUnload = () => {

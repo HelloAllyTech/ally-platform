@@ -1,0 +1,114 @@
+diff --git a/ally-be/src/guide/context/guide-context.ts b/ally-be/src/guide/context/guide-context.ts
+index 3d4319e547..890e2b3d5f 100644
+--- a/ally-be/src/guide/context/guide-context.ts
++++ b/ally-be/src/guide/context/guide-context.ts
+@@ -253,6 +253,38 @@ const INTENT_TEXT: Record<string, string> = {
+   safe_now: 'The learner tapped "I\'m safe right now" on the crisis card.',
+ };
+ 
++/**
++ * Lines of a reply that echo the conversation's own scaffolding — an intent
++ * note, a tag — rather than speak to the learner. A model continuing the
++ * transcript instead of answering writes them; they never reach the learner.
++ */
++const ECHO_PATTERNS: RegExp[] = [
++  ...Object.values(INTENT_TEXT).map(
++    (text) =>
++      new RegExp(
++        `^\\s*${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`,
++        'i',
++      ),
++  ),
++  /^\s*<\/?(learner_message|learner_action|platform_event|situation_report|asking_about)\b/i,
++  /^\s*(learner|user|ally|assistant)\s*:/i,
++];
++
++/** The reply without echoed scaffolding lines; `stripped` says if any went. */
++export function stripEchoedScaffolding(text: string): {
++  text: string;
++  stripped: boolean;
++} {
++  const lines = text.split('\n');
++  const kept = lines.filter(
++    (line) => !ECHO_PATTERNS.some((pattern) => pattern.test(line)),
++  );
++  return {
++    text: kept.join('\n').trim(),
++    stripped: kept.length !== lines.length,
++  };
++}
++
+ export interface LearnerTurnInput {
+   text: string;
+   intent?: string | null;
+diff --git a/ally-be/src/guide/context/test/guide-context.spec.ts b/ally-be/src/guide/context/test/guide-context.spec.ts
+index 0fb2a8a60e..323b0ee6ed 100644
+--- a/ally-be/src/guide/context/test/guide-context.spec.ts
++++ b/ally-be/src/guide/context/test/guide-context.spec.ts
+@@ -16,6 +16,7 @@ import {
+   buildOrgSpan,
+   buildSystemSpans,
+   plainText,
++  stripEchoedScaffolding,
+ } from '../guide-context';
+ import { recentConversation, replayHistory } from '../guide-history';
+ 
+@@ -362,3 +363,31 @@ describe('renderSituationReport', () => {
+     expect(report({ overlay: 'pii' })).toContain('IDENTIFYING DETAILS');
+   });
+ });
++
++describe('stripEchoedScaffolding', () => {
++  it('drops a line that echoes an intent note or a tag, and keeps the reply', () => {
++    expect(
++      stripEchoedScaffolding(
++        'How are you now, after that roleplay?\nThe learner pressed Continue.',
++      ),
++    ).toEqual({
++      text: 'How are you now, after that roleplay?',
++      stripped: true,
++    });
++    expect(
++      stripEchoedScaffolding('Sure.\n<learner_message>next</learner_message>')
++        .text,
++    ).toBe('Sure.');
++    expect(stripEchoedScaffolding('Learner: what now?\nOkay.').text).toBe(
++      'Okay.',
++    );
++  });
++
++  it('leaves an ordinary reply alone, even one that mentions Continue', () => {
++    const reply = 'When you are ready, press Continue and we will go on.';
++    expect(stripEchoedScaffolding(reply)).toEqual({
++      text: reply,
++      stripped: false,
++    });
++  });
++});
+diff --git a/ally-be/src/guide/runtime/guide-turn.service.ts b/ally-be/src/guide/runtime/guide-turn.service.ts
+index c21d39d4e8..25ad0d84b1 100644
+--- a/ally-be/src/guide/runtime/guide-turn.service.ts
++++ b/ally-be/src/guide/runtime/guide-turn.service.ts
+@@ -82,6 +82,7 @@ import {
+   buildLearnerMessage,
+   buildOrgSpan,
+   buildSystemSpans,
++  stripEchoedScaffolding,
+ } from '../context/guide-context';
+ import { recentConversation, replayHistory } from '../context/guide-history';
+ import { GuideLearnerPrefs } from '../entity/guide-learner-prefs.entity';
+@@ -1477,7 +1478,13 @@ export class GuideTurnService {
+       return;
+     }
+     ctx.replyKind = 'model';
+-    ctx.replyText = output.text.trim();
++    const cleaned = stripEchoedScaffolding(output.text);
++    if (cleaned.stripped) {
++      this.logger.warn(
++        `Guide turn ${ctx.turnId}: reply echoed scaffolding; stripped`,
++      );
++    }
++    ctx.replyText = cleaned.text || output.text.trim();
+     ctx.learnerRendered = [
+       ctx.learnerMessage!,
+       { role: 'system', content: ctx.situation! },

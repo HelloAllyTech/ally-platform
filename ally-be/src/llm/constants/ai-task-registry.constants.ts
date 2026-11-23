@@ -2455,64 +2455,13 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     id: 'bug-hunter-repo-classifier',
     task: LlmTask.BUG_HUNTER,
     runtime: LlmRuntime.ALLY_BE,
-    trigger: 'Bug Hunter decides which repo a bug belongs to',
-    detail: 'The routing step before a sweep or fix session is dispatched.',
+    trigger: 'A filed bug names no app',
+    detail:
+      "Picks the app (ally-be, ally-web, …) for Bug Hunter's queue; null leaves it for an admin.",
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
     defaultModel: 'gemini-2.5-flash',
     configuredBy: 'BUG_HUNTER_CLASSIFY_REPO_MODEL (compiled in)',
-  },
-  {
-    id: 'bug-hunter-image-probe',
-    task: LlmTask.BUG_HUNTER,
-    runtime: LlmRuntime.ALLY_BE,
-    trigger:
-      'A Bug Hunter run calls the image-generation probe on a bug about the image service',
-    detail:
-      'One real image call made the way the product makes it, to see what the provider accepts today (a retired model, a refused size, a blocked prompt); the image is discarded. Quality low; capped at 20 calls an hour across every run.',
-    kind: AiTaskKind.IMAGE,
-    provider: 'openai',
-    defaultModel: 'gpt-image-1.5',
-    configuredBy:
-      "OPENAI_IMAGE_MODEL / GEMINI_IMAGE_MODEL (or the probe's model parameter)",
-    configPath: 'openai.imageModel',
-  },
-  {
-    id: 'bug-hunter-miss-classifier',
-    task: LlmTask.BUG_HUNTER,
-    runtime: LlmRuntime.ALLY_BE,
-    trigger: 'A person reports a bug, or edits its description',
-    detail:
-      'Writes why Bug Hunter did not find the bug first and which sense would have (OPP-0774). One cheap JSON answer per report, never on the request path.',
-    kind: AiTaskKind.COMPLETION,
-    provider: 'gemini',
-    defaultModel: 'gemini-2.5-flash',
-    configuredBy: 'BUG_HUNTER_CLASSIFY_MISS_MODEL (compiled in)',
-  },
-  {
-    id: 'bug-hunter-study-reviewer',
-    task: LlmTask.BUG_HUNTER,
-    runtime: LlmRuntime.ALLY_BE,
-    trigger:
-      'A fix session posts its study of the feature before changing code',
-    detail:
-      "Reads the session's study — how the feature works today, where the value lives, the planned fix — and raises the concerns it must answer first: a parallel mechanism, a header no client sends, a half-fix across repos. One cheap JSON answer per study, on the session's critical path.",
-    kind: AiTaskKind.COMPLETION,
-    provider: 'gemini',
-    defaultModel: 'gemini-2.5-flash',
-    configuredBy: 'BUG_HUNTER_REVIEW_STUDY_MODEL (compiled in)',
-  },
-  {
-    id: 'bug-hunter-decider',
-    task: LlmTask.BUG_HUNTER,
-    runtime: LlmRuntime.ALLY_BE,
-    trigger: 'Bug Hunter plans a sweep or triages a new finding',
-    detail:
-      'Picks from a closed menu over the scoreboard with a one-line reason: which senses (D1), which model (D2), verify/hold/drop a finding (D3). The rule always answers too; the pick not taken is logged (OPP-0781).',
-    kind: AiTaskKind.COMPLETION,
-    provider: 'gemini',
-    defaultModel: 'gemini-2.5-flash',
-    configuredBy: 'BUG_HUNTER_DECIDE_MODEL (compiled in)',
   },
   {
     id: 'skill-experiment-judge',
@@ -3024,57 +2973,7 @@ const BUILDER_TASKS: AiTaskEntry[] = [
  * --output-format json payload, which the pipeline attaches to the run.
  * ────────────────────────────────────────────────────────────────────────── */
 
-const BUG_HUNTER_TASKS: AiTaskEntry[] = [
-  {
-    id: 'bug-hunter-sweep',
-    task: LlmTask.BUG_HUNTER,
-    runtime: LlmRuntime.ALLY_BE,
-    trigger: 'A scheduled sweep hunts a repo for bugs',
-    kind: AiTaskKind.COMPLETION,
-    provider: 'anthropic',
-    defaultModel: 'claude-sonnet-5',
-    configuredBy:
-      'GlobalSettings (bug_hunter.models.defaultModel) via GET pipeline/models, read by .github/workflows/bug-hunt-sweep.yml',
-  },
-  {
-    id: 'bug-hunter-verify',
-    task: LlmTask.BUG_HUNTER,
-    runtime: LlmRuntime.ALLY_BE,
-    trigger: 'A finding is adversarially verified',
-    detail:
-      "Invoked twice per unproven finding and given only the finding — never the finder's " +
-      "reasoning. Runs on the sweep's own cheap model by design: it must not know more " +
-      'than the finder was told.',
-    kind: AiTaskKind.COMPLETION,
-    provider: 'anthropic',
-    defaultModel: 'claude-sonnet-5',
-    configuredBy: '.claude/agents/bug-verifier.md (inherits the session model)',
-  },
-  {
-    id: 'bug-hunter-fix',
-    task: LlmTask.BUG_HUNTER,
-    runtime: LlmRuntime.ALLY_BE,
-    trigger: 'A confirmed bug is fixed',
-    detail: 'The fix session opens the PR.',
-    kind: AiTaskKind.COMPLETION,
-    provider: 'anthropic',
-    defaultModel: 'claude-sonnet-5',
-    configuredBy:
-      'GlobalSettings (bug_hunter.models.defaultModel) via GET pipeline/models, read by .github/workflows/bug-fix-session.yml',
-  },
-  {
-    id: 'bug-hunter-escalate',
-    task: LlmTask.BUG_HUNTER,
-    runtime: LlmRuntime.ALLY_BE,
-    trigger: 'A fix is too hard and escalates',
-    detail: 'Buys a stronger model for one hard fix. Pinned per fixable repo.',
-    kind: AiTaskKind.COMPLETION,
-    provider: 'anthropic',
-    defaultModel: 'claude-opus-5',
-    configuredBy:
-      'GlobalSettings (bug_hunter.models.escalationModel) via GET pipeline/models, written into .claude/agents/bug-escalation.md (model:) at runtime',
-  },
-];
+const BUG_HUNTER_TASKS: AiTaskEntry[] = [];
 
 /**
  * Every AI call on the platform, in the order a reader should meet them: the

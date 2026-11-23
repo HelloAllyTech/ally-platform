@@ -1,0 +1,285 @@
+diff --git a/apps/ally-admin-dashboard/src/components/user-modal/UserModal.tsx b/apps/ally-admin-dashboard/src/components/user-modal/UserModal.tsx
+index 991f78a874..28e1a1fec7 100644
+--- a/apps/ally-admin-dashboard/src/components/user-modal/UserModal.tsx
++++ b/apps/ally-admin-dashboard/src/components/user-modal/UserModal.tsx
+@@ -231,10 +231,10 @@ export const UserModal: React.FC<UserModalProps> = ({
+         name={field.id}
+         control={control}
+         rules={{
+-          validate: (value: { consumedCredits: number; newCredits: number }) => {
++          validate: value => {
+             if (!value) return en.userManagement.creditRequiredError;
+-            if (value.newCredits < 0) return en.userManagement.creditNotNegativeError;
+-            if (value.newCredits > field.maxLength) return en.userManagement.creditLimitError;
++            if (value < 0) return en.userManagement.creditNotNegativeError;
++            if (value > field.maxLength) return en.userManagement.creditLimitError;
+             return true;
+           },
+         }}
+diff --git a/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx b/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx
+index 41993f70a4..f361e7ec67 100644
+--- a/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx
++++ b/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx
+@@ -234,8 +234,8 @@ const CommentCard = ({
+                 onClick={() => enableLikeUpdate && setShowEmojiPicker(prev => !prev)}
+               >
+                 {selectedEmoji ? (
+-                  <div className="w-[26px] h-[26px] pb-[5px] bg-white flex items-center justify-center rounded-full border-primary-500 border-[0.5px]">
+-                    <Emoji unified={selectedEmoji} size={14} emojiStyle={EmojiStyle.NATIVE} />
++                  <div className="pb-0.5  w-[26px] bg-white h-[26px] flex items-center justify-center rounded-full border-[0.5px]">
++                    <Emoji unified={selectedEmoji} size={14} emojiStyle={EmojiStyle.APPLE} />
+                   </div>
+                 ) : (
+                   <Smiley className="w-5 h-5 text-neutral-600 hover:text-[#0957D0]" />
+@@ -263,11 +263,11 @@ const CommentCard = ({
+                       className="w-4 overflow-visible relative"
+                     >
+                       {reaction !== "" && (
+-                        <div className="w-[26px] bg-white h-[26px] pb-[4px] flex items-center justify-center rounded-full border-[0.5px]">
++                        <div className="w-[26px] bg-white h-[26px] flex items-center justify-center rounded-full border-[0.5px]">
+                           <Emoji
+                             unified={reaction ?? "1f44d"}
+                             size={12}
+-                            emojiStyle={EmojiStyle.NATIVE}
++                            emojiStyle={EmojiStyle.APPLE}
+                           />
+                         </div>
+                       )}
+@@ -277,13 +277,13 @@ const CommentCard = ({
+               <div className="text-typography-800 text-[14px]">
+                 {Object.keys(comment.reactions).length}
+               </div>
++              {comment.replyCount > 0 && <div className="w-1 h-1 bg-[#D9D9D9] rounded-full" />}
+             </>
+           )}
+           {showReply && (
+             <>
+-              <div className="w-1 h-1 bg-[#D9D9D9] rounded-full" />
+               <div
+-                className="text-typography-800 text-[12px] cursor-pointer font-medium"
++                className="text-typography-800 text-xs cursor-pointer font-medium"
+                 onClick={handleReplyClick}
+               >
+                 Reply
+@@ -291,10 +291,7 @@ const CommentCard = ({
+             </>
+           )}
+           {comment.replyCount > 0 && (
+-            <div
+-              className={`text-typography-800 text-[${showReply ? "12px" : "14px"}] cursor-pointer`}
+-              onClick={onReplyClick}
+-            >
++            <div className={`text-typography-800 text-xs cursor-pointer`} onClick={onReplyClick}>
+               {comment.replyCount} repl{comment.replyCount > 1 ? "ies" : "y"}
+             </div>
+           )}
+diff --git a/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/CommentCard.test.tsx b/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/CommentCard.test.tsx
+index 293c8b96e5..b5aea49dfa 100644
+--- a/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/CommentCard.test.tsx
++++ b/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/CommentCard.test.tsx
+@@ -424,7 +424,7 @@ describe("CommentCard Component", () => {
+ 
+   // --- Divider Tests ---
+   describe("Dividers", () => {
+-    it("should not show divider when only reactions and reply count are present", () => {
++    it("should show divider when only reactions and reply count are present", () => {
+       const commentWithReactionsAndReplies = {
+         ...mockComment,
+         reactions: { "1f44d": 5 },
+@@ -434,13 +434,7 @@ describe("CommentCard Component", () => {
+         <CommentCard comment={commentWithReactionsAndReplies} showLike={false} />,
+       );
+       const dividers = container.querySelectorAll(".bg-\\[\\#D9D9D9\\]");
+-      expect(dividers.length).toBe(0);
+-    });
+-
+-    it("should show divider before Reply button when showReply is true", () => {
+-      const { container } = renderWithProvider(<CommentCard comment={mockComment} showReply />);
+-      const dividers = container.querySelectorAll(".bg-\\[\\#D9D9D9\\]");
+-      expect(dividers.length).toBeGreaterThan(0);
++      expect(dividers.length).toBe(1);
+     });
+   });
+ 
+diff --git a/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/__snapshots__/CommentCard.test.tsx.snap b/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/__snapshots__/CommentCard.test.tsx.snap
+index 14fb44f440..e7997da73b 100644
+--- a/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/__snapshots__/CommentCard.test.tsx.snap
++++ b/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/__snapshots__/CommentCard.test.tsx.snap
+@@ -113,7 +113,7 @@ exports[`CommentCard Component > should match snapshot with all props enabled 1`
+             style="z-index: 10;"
+           >
+             <div
+-              class="w-[26px] bg-white h-[26px] pb-[4px] flex items-center justify-center rounded-full border-[0.5px]"
++              class="w-[26px] bg-white h-[26px] flex items-center justify-center rounded-full border-[0.5px]"
+             >
+               <span
+                 data-testid="emoji-2764"
+@@ -127,7 +127,7 @@ exports[`CommentCard Component > should match snapshot with all props enabled 1`
+             style="z-index: 9;"
+           >
+             <div
+-              class="w-[26px] bg-white h-[26px] pb-[4px] flex items-center justify-center rounded-full border-[0.5px]"
++              class="w-[26px] bg-white h-[26px] flex items-center justify-center rounded-full border-[0.5px]"
+             >
+               <span
+                 data-testid="emoji-1f44d"
+@@ -141,7 +141,7 @@ exports[`CommentCard Component > should match snapshot with all props enabled 1`
+             style="z-index: 8;"
+           >
+             <div
+-              class="w-[26px] bg-white h-[26px] pb-[4px] flex items-center justify-center rounded-full border-[0.5px]"
++              class="w-[26px] bg-white h-[26px] flex items-center justify-center rounded-full border-[0.5px]"
+             >
+               <span
+                 data-testid="emoji-1f389"
+@@ -160,12 +160,12 @@ exports[`CommentCard Component > should match snapshot with all props enabled 1`
+           class="w-1 h-1 bg-[#D9D9D9] rounded-full"
+         />
+         <div
+-          class="text-typography-800 text-[12px] cursor-pointer font-medium"
++          class="text-typography-800 text-xs cursor-pointer font-medium"
+         >
+           Reply
+         </div>
+         <div
+-          class="text-typography-800 text-[12px] cursor-pointer"
++          class="text-typography-800 text-xs cursor-pointer"
+         >
+           3 replies
+         </div>
+diff --git a/apps/ally-helpline-dashboard/src/components/feed-card/FeedCard.tsx b/apps/ally-helpline-dashboard/src/components/feed-card/FeedCard.tsx
+index fc8d76eb13..9e5b11c070 100644
+--- a/apps/ally-helpline-dashboard/src/components/feed-card/FeedCard.tsx
++++ b/apps/ally-helpline-dashboard/src/components/feed-card/FeedCard.tsx
+@@ -98,7 +98,7 @@ const FeedCard: FC<FeedCardProps> = ({
+           </span>
+         </div>
+ 
+-        <div className="border rounded-[12px] overflow-hidden">
++        <div className="border-[0.5px] rounded-[12px] overflow-hidden">
+           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 p-3 sm:p-4">
+             <div className="flex-shrink-0 w-full sm:w-[200px] h-[120px] sm:h-[100px] rounded-[4px] overflow-hidden">
+               <CustomImage
+@@ -174,9 +174,12 @@ const FeedCard: FC<FeedCardProps> = ({
+ 
+           {reviewTranscriptSection()}
+ 
+-          {divider()}
+-
+-          {(totalReactionCount > 0 || commentsCount > 0) && reactionsAndCommentsCountSection()}
++          {(totalReactionCount > 0 || commentsCount > 0) && (
++            <>
++              {divider()}
++              {reactionsAndCommentsCountSection()}
++            </>
++          )}
+ 
+           {isCommentsExpanded &&
+             commentsCount > 0 &&
+diff --git a/apps/ally-helpline-dashboard/src/components/reaction-selector/ReactionSelector.tsx b/apps/ally-helpline-dashboard/src/components/reaction-selector/ReactionSelector.tsx
+index e9e6fad875..6c330b005f 100644
+--- a/apps/ally-helpline-dashboard/src/components/reaction-selector/ReactionSelector.tsx
++++ b/apps/ally-helpline-dashboard/src/components/reaction-selector/ReactionSelector.tsx
+@@ -69,7 +69,7 @@ const ReactionSelector = ({
+                      border border-neutral-300 bg-white
+                      transition-transform hover:scale-125"
+         >
+-          <Emoji unified={emoji} size={emojiSize} emojiStyle={EmojiStyle.GOOGLE} />
++          <Emoji unified={emoji} size={emojiSize} emojiStyle={EmojiStyle.APPLE} />
+         </div>
+       ))}
+     </div>,
+diff --git a/apps/ally-helpline-dashboard/src/pages/calls/components/SimulationTranscriptTab.tsx b/apps/ally-helpline-dashboard/src/pages/calls/components/SimulationTranscriptTab.tsx
+index 7d9a4a7f8f..05a9ec1d0d 100644
+--- a/apps/ally-helpline-dashboard/src/pages/calls/components/SimulationTranscriptTab.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/calls/components/SimulationTranscriptTab.tsx
+@@ -87,7 +87,7 @@ const SimulationTranscriptTab: FC<SimulationTranscriptTabProps> = ({ sessionId,
+ 
+   return (
+     <div className={`h-full ${className}`}>
+-      <div className="relative h-[calc(100%-170px)]">
++      <div className="relative h-[calc(100%-140px)] ">
+         <Transcription
+           transcriptList={transcriptList}
+           userId={user?.id}
+@@ -98,9 +98,9 @@ const SimulationTranscriptTab: FC<SimulationTranscriptTabProps> = ({ sessionId,
+         <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white to-transparent pointer-events-none" />
+       </div>
+       {FEATURE_FLAGS_MAP.PEER_REVIEW_FLAG && (
+-        <>
++        <div className="flex justify-center">
+           <div
+-            className="flex flex-row justify-center gap-2 align-center rounded-full border-[0.5px] p-2 shadow-[2.13px_2.84px_7.81px_0px_#A09E9E1A]"
++            className="flex justify-center gap-2 rounded-full border p-2 shadow-lg"
+             style={{
+               opacity: isCreateReviewLoading || isUpdateReviewLoading ? 0.5 : 1,
+             }}
+@@ -122,7 +122,7 @@ const SimulationTranscriptTab: FC<SimulationTranscriptTabProps> = ({ sessionId,
+               </Button>
+             )}
+           </div>
+-        </>
++        </div>
+       )}
+     </div>
+   );
+diff --git a/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/__snapshots__/SimulationTranscriptTab.test.tsx.snap b/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/__snapshots__/SimulationTranscriptTab.test.tsx.snap
+index 7aaf53c5dc..2607d284cd 100644
+--- a/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/__snapshots__/SimulationTranscriptTab.test.tsx.snap
++++ b/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/__snapshots__/SimulationTranscriptTab.test.tsx.snap
+@@ -6,7 +6,7 @@ exports[`SimulationTranscriptTab > should match snapshot when rendered 1`] = `
+     class="h-full undefined"
+   >
+     <div
+-      class="relative h-[calc(100%-170px)]"
++      class="relative h-[calc(100%-140px)] "
+     >
+       <div
+         data-testid="transcript-tab"
+@@ -57,18 +57,22 @@ exports[`SimulationTranscriptTab > should match snapshot when rendered 1`] = `
+       />
+     </div>
+     <div
+-      class="flex flex-row justify-center gap-2 align-center rounded-full border-[0.5px] p-2 shadow-[2.13px_2.84px_7.81px_0px_#A09E9E1A]"
+-      style="opacity: 1;"
++      class="flex justify-center"
+     >
+       <div
+-        data-testid="toggle-component"
++        class="flex justify-center gap-2 rounded-full border p-2 shadow-lg"
++        style="opacity: 1;"
+       >
+-        <button>
+-          Keep it private
+-        </button>
+-        <button>
+-          Share for review
+-        </button>
++        <div
++          data-testid="toggle-component"
++        >
++          <button>
++            Keep it private
++          </button>
++          <button>
++            Share for review
++          </button>
++        </div>
+       </div>
+     </div>
+   </div>
+diff --git a/apps/ally-helpline-dashboard/src/pages/review-details/ReviewDetails.tsx b/apps/ally-helpline-dashboard/src/pages/review-details/ReviewDetails.tsx
+index d722adcd08..1e43fd7f8a 100644
+--- a/apps/ally-helpline-dashboard/src/pages/review-details/ReviewDetails.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/review-details/ReviewDetails.tsx
+@@ -223,8 +223,8 @@ export const ReviewDetails = () => {
+               ref={selectEmojiRef}
+             >
+               {selectedEmoji ? (
+-                <div className="pb-0.5 border-primary-500">
+-                  <Emoji unified={selectedEmoji} size={16} emojiStyle={EmojiStyle.NATIVE} />
++                <div className="pb-0.5">
++                  <Emoji unified={selectedEmoji} size={16} emojiStyle={EmojiStyle.APPLE} />
+                 </div>
+               ) : (
+                 <Smiley className="w-6 h-6 text-neutral-600 hover:text-[#0957D0]" />

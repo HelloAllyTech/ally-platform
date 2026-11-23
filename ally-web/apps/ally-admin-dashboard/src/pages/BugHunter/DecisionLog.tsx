@@ -1,6 +1,5 @@
 import { FC } from "react";
 
-import { useGetBugHuntRunDecisionsQuery } from "@api";
 import { en } from "@constants";
 import { BugHuntDecision } from "@types";
 import { formatTimestamp } from "@utils";
@@ -88,17 +87,5 @@ export const DecisionLogList: FC<{ decisions: BugHuntDecision[]; emptyText?: str
         );
       })}
     </ul>
-  );
-};
-
-/** The Finder's D1, D2 and every D3 for a run, under its event timeline. */
-export const RunDecisions: FC<{ runId: string }> = ({ runId }) => {
-  const { data, isError } = useGetBugHuntRunDecisionsQuery(runId);
-  if (isError || !data || data.length === 0) return null;
-  return (
-    <div data-testid="run-decisions" className="mt-3 flex flex-col gap-1">
-      <p className="text-xs font-semibold text-typography-700">{en.bugHunter.decisions.runTitle}</p>
-      <DecisionLogList decisions={data} />
-    </div>
   );
 };

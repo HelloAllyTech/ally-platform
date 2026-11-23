@@ -1,0 +1,137 @@
+diff --git a/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx b/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx
+index a79cd349eb..16c33e7cad 100644
+--- a/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx
++++ b/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx
+@@ -39,7 +39,8 @@ const CommentCard = ({
+ }: CommentCardProps) => {
+   const user = useSelector((state: RootState) => state.user.user);
+ 
+-  const isMyComment = user?.id === comment.createdBy.id;
++  const isMyComment =
++    user?.id != null && comment?.createdBy?.id != null && user.id === comment.createdBy.id;
+ 
+   const [showReplyInput, setShowReplyInput] = useState(false);
+   const [showReplies, setShowReplies] = useState(false);
+diff --git a/apps/ally-helpline-dashboard/src/components/feed-card/types.ts b/apps/ally-helpline-dashboard/src/components/feed-card/types.ts
+index 62e6e385d5..fc106bab20 100644
+--- a/apps/ally-helpline-dashboard/src/components/feed-card/types.ts
++++ b/apps/ally-helpline-dashboard/src/components/feed-card/types.ts
+@@ -1,3 +1,5 @@
++import { ReviewUser } from "@src/types";
++
+ export interface FeedScenario {
+   createdAt: string;
+   duration: string;
+@@ -47,7 +49,7 @@ export interface Comment {
+ export interface FeedCardProps {
+   id: string;
+   createdAt: string;
+-  user: FeedUser;
++  user: ReviewUser;
+   scenario: FeedScenario;
+   reactions: Reactions;
+   commentsCount: number;
+diff --git a/apps/ally-helpline-dashboard/src/pages/learn/Learn.tsx b/apps/ally-helpline-dashboard/src/pages/learn/Learn.tsx
+index 36f81c4c6c..fabec08a96 100644
+--- a/apps/ally-helpline-dashboard/src/pages/learn/Learn.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/learn/Learn.tsx
+@@ -11,7 +11,7 @@ import {
+ } from "@api";
+ import { CreditsDisplay, ScenarioCard, TabGroup } from "@components";
+ import { Permissions } from "@constants";
+-import { useUser, useScenarioLanguages } from "@hooks";
++import { useAchievementBadgeModal, useUser, useScenarioLanguages } from "@hooks";
+ import { LanguageOption, ScenarioStatus } from "@types";
+ import { hasPermissions } from "@utils";
+ 
+@@ -33,6 +33,7 @@ export const Learn: FC = () => {
+   const { permissions, isAuthenticated } = useUser();
+   const hasPathPermissions = hasPermissions(permissions, Permissions.VIEW_SCENARIO_PATHS);
+   const [searchParams, setSearchParams] = useSearchParams();
++  const { BadgeModal } = useAchievementBadgeModal();
+ 
+   const isValidTabId = (tab: string | null): tab is LearnTabId => {
+     return LEARN_TABS.some(t => t.id === tab);
+@@ -299,6 +300,7 @@ export const Learn: FC = () => {
+     <div className="flex flex-col w-full bg-white max-h-screen overflow-y-hidden p-[10px] pl-0 sm:p-[24px] justify-center font-tertiary">
+       {renderPageHeader()}
+       <AnimatePresence mode="wait">{renderContent()}</AnimatePresence>
++      {BadgeModal}
+     </div>
+   );
+ };
+diff --git a/apps/ally-helpline-dashboard/src/pages/learn/__tests__/Learn.test.tsx b/apps/ally-helpline-dashboard/src/pages/learn/__tests__/Learn.test.tsx
+index 3e391395f7..c3f32e2e30 100644
+--- a/apps/ally-helpline-dashboard/src/pages/learn/__tests__/Learn.test.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/learn/__tests__/Learn.test.tsx
+@@ -97,11 +97,13 @@ vi.mock("@assets", () => ({
+ // Mock the useSimulationCredits hook
+ const mockUseSimulationCredits = vi.fn();
+ const mockUseUser = vi.fn();
++const mockUseAchievementBadgeModal = vi.fn();
+ vi.mock("@hooks", () => ({
+   useSimulationCredits: () => mockUseSimulationCredits(),
+   useUser: () => mockUseUser(),
+   useDebounce: (val: any) => val,
+   useScenarioLanguages: () => mockUseScenarioLanguages(),
++  useAchievementBadgeModal: () => mockUseAchievementBadgeModal(),
+ }));
+ 
+ // Import the mocked hook for use in component mock
+@@ -284,6 +286,13 @@ describe("Learn Component", () => {
+       defaultLanguage: { language_id: 1, value: "en-US", label: "English (US)" },
+       isLoading: false,
+     });
++    mockUseAchievementBadgeModal.mockReturnValue({
++      currentBadge: null,
++      closeModal: vi.fn(),
++      resetModal: vi.fn(),
++      BadgeModal: null,
++      isLoading: false,
++    });
+   });
+ 
+   /**
+diff --git a/apps/ally-helpline-dashboard/src/routes/components/NavbarWrapper.tsx b/apps/ally-helpline-dashboard/src/routes/components/NavbarWrapper.tsx
+index 72610c9e08..9306697ee6 100644
+--- a/apps/ally-helpline-dashboard/src/routes/components/NavbarWrapper.tsx
++++ b/apps/ally-helpline-dashboard/src/routes/components/NavbarWrapper.tsx
+@@ -5,7 +5,7 @@ import { matchPath, useLocation, useNavigate } from "react-router-dom";
+ 
+ import { NavSideBar } from "@components";
+ import { excludeNavBar, navBarOptions, TabId, LOCAL_STORAGE_KEYS } from "@constants";
+-import { useAchievementBadgeModal, useUser } from "@hooks";
++import { useUser } from "@hooks";
+ import { isPathExcluded } from "@utils";
+ 
+ import UploadProgressDialog from "./UploadProgressDialog";
+@@ -18,8 +18,6 @@ const NavbarWrapper: FC<{ children: React.ReactNode }> = ({ children }) => {
+ 
+   const [isSidebarOpen, setSidebarOpen] = useState<boolean>(false);
+ 
+-  const { BadgeModal } = useAchievementBadgeModal();
+-
+   useEffect(() => {
+     // checkAuth only for logged in users
+     // TODO: try to optimize this
+@@ -65,7 +63,6 @@ const NavbarWrapper: FC<{ children: React.ReactNode }> = ({ children }) => {
+           <UploadProgressDialog />
+         </div>
+       </div>
+-      {BadgeModal}
+     </div>
+   );
+ };
+diff --git a/apps/ally-helpline-dashboard/src/types/reviews.ts b/apps/ally-helpline-dashboard/src/types/reviews.ts
+index 1fd7e2cf82..4100703266 100644
+--- a/apps/ally-helpline-dashboard/src/types/reviews.ts
++++ b/apps/ally-helpline-dashboard/src/types/reviews.ts
+@@ -1,7 +1,7 @@
+ import { Comment } from "@src/components/feed-card";
+ 
+ export interface ReviewUser {
+-  id: string;
++  id: number;
+   name: string;
+   profileImage?: string;
+ }

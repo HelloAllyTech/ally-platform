@@ -1,0 +1,151 @@
+diff --git a/src/badge/consumer/badge.event.consumer.ts b/src/badge/consumer/badge.event.consumer.ts
+index f85b5eb773..740780bc2e 100644
+--- a/src/badge/consumer/badge.event.consumer.ts
++++ b/src/badge/consumer/badge.event.consumer.ts
+@@ -45,10 +45,10 @@ export class BadgeEventConsumer {
+   @OnEvent(ReviewEvents.REVIEW_COMMENT_REACTION_ADDED, { async: true })
+   async handleAddReviewCommentReaction({
+     reaction,
+-    comment,
++    review,
+   }: ReviewCommentReactionAddedEventParams) {
+     await this.badgeAwardService.awardCommentReactionBadgeByReceiverGiverId(
+-      comment.createdBy,
++      review.createdBy,
+       reaction.createdBy,
+     );
+   }
+@@ -66,11 +66,11 @@ export class BadgeEventConsumer {
+ 
+   @OnEvent(ReviewEvents.REVIEW_COMMENT_REACTION_REMOVED, { async: true })
+   async handleRemoveReviewCommentReaction({
+-    comment,
+     removedReaction,
++    review,
+   }: ReviewCommentReactionRemovedEventParams) {
+     await this.badgeAwardService.revokeInvalidReactionBadgesByReceiverGiverId(
+-      comment.createdBy,
++      review.createdBy,
+       removedReaction.createdBy,
+     );
+   }
+diff --git a/src/badge/service/badge-award.service.ts b/src/badge/service/badge-award.service.ts
+index 5d4646acc5..82d8f575cc 100644
+--- a/src/badge/service/badge-award.service.ts
++++ b/src/badge/service/badge-award.service.ts
+@@ -156,10 +156,10 @@ export class BadgeAwardService {
+         try {
+           await this.badgeUserService.deleteUserBadges(
+             receiverId,
+-            invalidBadges.map((badge) => badge.id),
++            invalidBadges.map((badge) => badge.badgeId),
+           );
+           this.logger.log(
+-            `Revoked ${invalidBadges.length} badge(s) from receiver userId=${receiverId}`,
++            `Revoked ${invalidBadges.length} badge(s) from receiver userId=${receiverId} badgeIds=[${invalidBadges.map((b) => b.id).join(', ')}] (required counts were ${invalidBadges.map((b) => b.achievementParams?.count).join(', ')}, current receivedCount=${receivedCommentsReactionsCount})`,
+           );
+         } catch (error) {
+           this.logger.error(
+@@ -193,10 +193,10 @@ export class BadgeAwardService {
+         try {
+           await this.badgeUserService.deleteUserBadges(
+             giverId,
+-            invalidBadges.map((badge) => badge.id),
++            invalidBadges.map((badge) => badge.badgeId),
+           );
+           this.logger.log(
+-            `Revoked ${invalidBadges.length} badge(s) from giver userId=${giverId}`,
++            `Revoked ${invalidBadges.length} badge(s) from giver userId=${giverId} badgeIds=[${invalidBadges.map((b) => b.id).join(', ')}] (required counts were ${invalidBadges.map((b) => b.achievementParams?.count).join(', ')}, current givenCount=${giverCommentsReactionsCount})`,
+           );
+         } catch (error) {
+           this.logger.error(
+diff --git a/src/community/consumer/test/community.event.consumer.spec.ts b/src/community/consumer/test/community.event.consumer.spec.ts
+index 08d1a1944c..b2710fccdb 100644
+--- a/src/community/consumer/test/community.event.consumer.spec.ts
++++ b/src/community/consumer/test/community.event.consumer.spec.ts
+@@ -468,6 +468,7 @@ describe('CommunityEventConsumer', () => {
+           createdBy: mockUserId,
+           tenantId: mockTenantId,
+         } as any,
++        review: { createdBy: mockReviewOwnerId } as any,
+       };
+ 
+       await consumer.handleReviewCommentReactionAdded(params);
+@@ -486,6 +487,7 @@ describe('CommunityEventConsumer', () => {
+           createdBy: mockUserId,
+           tenantId: mockTenantId,
+         } as any,
++        review: { createdBy: mockReviewOwnerId } as any,
+       };
+ 
+       await consumer.handleReviewCommentReactionAdded(params);
+@@ -506,6 +508,7 @@ describe('CommunityEventConsumer', () => {
+           createdBy: mockUserId,
+           tenantId: mockTenantId,
+         } as any,
++        review: { createdBy: mockReviewOwnerId } as any,
+       };
+ 
+       await expect(
+@@ -522,6 +525,7 @@ describe('CommunityEventConsumer', () => {
+           createdBy: mockUserId,
+           tenantId: mockTenantId,
+         } as any,
++        review: { createdBy: mockReviewOwnerId } as any,
+       };
+ 
+       await consumer.handleReviewCommentReactionRemoved(params);
+@@ -540,6 +544,7 @@ describe('CommunityEventConsumer', () => {
+           createdBy: mockUserId,
+           tenantId: mockTenantId,
+         } as any,
++        review: { createdBy: mockReviewOwnerId } as any,
+       };
+ 
+       await consumer.handleReviewCommentReactionRemoved(params);
+@@ -560,6 +565,7 @@ describe('CommunityEventConsumer', () => {
+           createdBy: mockUserId,
+           tenantId: mockTenantId,
+         } as any,
++        review: { createdBy: mockReviewOwnerId } as any,
+       };
+ 
+       await expect(
+diff --git a/src/review/service/review-comment-reaction.service.ts b/src/review/service/review-comment-reaction.service.ts
+index 4ad582e6cd..f19057b56a 100644
+--- a/src/review/service/review-comment-reaction.service.ts
++++ b/src/review/service/review-comment-reaction.service.ts
+@@ -104,6 +104,7 @@ export class ReviewCommentReactionService {
+       this.eventEmitter.emit(ReviewEvents.REVIEW_COMMENT_REACTION_ADDED, {
+         comment,
+         reaction: reviewCommentReaction,
++        review,
+       } as ReviewCommentReactionAddedEventParams);
+ 
+       return {
+@@ -136,6 +137,7 @@ export class ReviewCommentReactionService {
+       this.eventEmitter.emit(ReviewEvents.REVIEW_COMMENT_REACTION_REMOVED, {
+         comment,
+         removedReaction: reviewReaction,
++        review,
+       } as ReviewCommentReactionRemovedEventParams);
+ 
+       return { success: true };
+diff --git a/src/review/type/review-event.type.ts b/src/review/type/review-event.type.ts
+index 4cc4bf2bed..ddc0d67a22 100644
+--- a/src/review/type/review-event.type.ts
++++ b/src/review/type/review-event.type.ts
+@@ -25,11 +25,13 @@ export interface ReviewReactionAddedEventParams {
+ export interface ReviewCommentReactionAddedEventParams {
+   reaction: ReviewCommentReaction;
+   comment: ReviewComment;
++  review: Review;
+ }
+ 
+ export interface ReviewCommentReactionRemovedEventParams {
+   removedReaction: ReviewCommentReaction;
+   comment: ReviewComment;
++  review: Review;
+ }
+ 
+ export interface ReviewReactionRemovedEventParams {

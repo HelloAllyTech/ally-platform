@@ -1,0 +1,8 @@
+{
+ "/ally/prod/ally-ai": [
+  {"@message": "[2026-11-15T06:54:32+0000] [ERROR] [app.core.llm.dispatch] [dispatch.py:640] [TraceID:2db2b825-a091-432f-8218-72796142086e] - Gemini call failed for user jane.doe@example.com: 503", "count": "12"},
+  {"@message": "[2026-11-15T07:01:00+0000] [ERROR] [app.core.llm.dispatch] [dispatch.py:640] [TraceID:aaaa1111-a091-432f-8218-72796142086e] - Gemini call failed for user bob@example.com: 503", "count": "3"},
+  {"@message": "[2026-11-15T06:30:32+0000] [ERROR] [app.core.text_generations.openai_text_generation_service] [openai_text_generation_service.py:210] [TraceID:N/A] - timeout after 30s", "count": "2"},
+  {"@message": "[2026-11-15T06:00:00+0000] [ERROR] [httpx] connection reset by peer", "count": "40"}
+ ]
+}

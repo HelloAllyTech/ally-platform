@@ -1,0 +1,9 @@
+[Unit]
+Description=Bug Hunter v2 daily job at 03:30 IST
+
+[Timer]
+OnCalendar=*-*-* 03:30:00 Asia/Kolkata
+Persistent=true
+
+[Install]
+WantedBy=timers.target

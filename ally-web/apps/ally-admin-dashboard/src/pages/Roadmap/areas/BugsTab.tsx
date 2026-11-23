@@ -65,7 +65,7 @@ export const BugsTab: FC = () => {
         Every bug Bug Hunter is tracking — what it found itself and what your team reported —
         mirrored here so you can plan against it. This view is read-only; approving, rejecting and
         starting a fix happen on{" "}
-        <Link to={ROUTES.BUG_HUNTER} className="text-primary-600 underline">
+        <Link to={ROUTES.BUG_HUNTER_V2} className="text-primary-600 underline">
           Bug Hunter
         </Link>
         .

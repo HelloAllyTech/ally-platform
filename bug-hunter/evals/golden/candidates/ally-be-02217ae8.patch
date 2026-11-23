@@ -1,0 +1,116 @@
+diff --git a/src/track/service/track-structure.validator.spec.ts b/src/track/service/track-structure.validator.spec.ts
+new file mode 100644
+index 0000000000..5c257c90ae
+--- /dev/null
++++ b/src/track/service/track-structure.validator.spec.ts
+@@ -0,0 +1,83 @@
++import { computeStructuralSignature } from './track-structure.validator';
++import { UpsertTrackSectionDto } from '../dto/upsert-track-structure.dto';
++import { TrackItemType, VideoContent, VideoSource } from '../type/track.type';
++import { QuizQuestionType } from '../type/quiz.type';
++
++describe('TrackStructureValidator', () => {
++  describe('computeStructuralSignature for video interjections', () => {
++    it('should produce the same signature regardless of interjection order', () => {
++      const interjection1 = {
++        id: 'interjection-1',
++        timestampSeconds: 10,
++        question: {
++          id: 'q1',
++          type: QuizQuestionType.TRUE_FALSE,
++          prompt: 'Is this a question?',
++          correctAnswer: true,
++        },
++      };
++
++      const interjection2 = {
++        id: 'interjection-2',
++        timestampSeconds: 20,
++        question: {
++          id: 'q2',
++          type: QuizQuestionType.TRUE_FALSE,
++          prompt: 'Is this another question?',
++          correctAnswer: false,
++        },
++      };
++
++      const baseVideoContent: Omit<VideoContent, 'interjections'> = {
++        url: 'http://example.com/video.mp4',
++        source: VideoSource.S3,
++      };
++
++      const sectionsA: UpsertTrackSectionDto[] = [
++        {
++          id: 'section-1',
++          order: 1,
++          title: 'Section 1',
++          items: [
++            {
++              id: 'item-1',
++              order: 1,
++              title: 'Video Item',
++              type: TrackItemType.VIDEO,
++              content: {
++                ...baseVideoContent,
++                interjections: [interjection1, interjection2],
++              },
++            },
++          ],
++        },
++      ];
++
++      const sectionsB: UpsertTrackSectionDto[] = [
++        {
++          id: 'section-1',
++          order: 1,
++          title: 'Section 1',
++          items: [
++            {
++              id: 'item-1',
++              order: 1,
++              title: 'Video Item',
++              type: TrackItemType.VIDEO,
++              content: {
++                ...baseVideoContent,
++                interjections: [interjection2, interjection1],
++              },
++            },
++          ],
++        },
++      ];
++
++      const signatureA = computeStructuralSignature(sectionsA);
++      const signatureB = computeStructuralSignature(sectionsB);
++
++      // This will fail before the fix, and pass after.
++      expect(signatureA).toEqual(signatureB);
++    });
++  });
++});
+diff --git a/src/track/service/track-structure.validator.ts b/src/track/service/track-structure.validator.ts
+index 7fa619d9f6..b7991de96e 100644
+--- a/src/track/service/track-structure.validator.ts
++++ b/src/track/service/track-structure.validator.ts
+@@ -1048,12 +1048,18 @@ function videoStructuralSignature(item: UpsertTrackItemDto): unknown {
+   const video = item.content as VideoContent;
+   return {
+     source: video.source,
+-    interjections: (video.interjections ?? []).map(
+-      (interjection: VideoInterjection) => ({
++    interjections: (video.interjections ?? [])
++      .slice()
++      .sort((a, b) => {
++        if (a.timestampSeconds !== b.timestampSeconds) {
++          return a.timestampSeconds - b.timestampSeconds;
++        }
++        return a.id.localeCompare(b.id);
++      })
++      .map((interjection: VideoInterjection) => ({
+         id: interjection.id,
+         timestampSeconds: interjection.timestampSeconds,
+         question: quizQuestionStructuralSignature(interjection.question),
+-      }),
+-    ),
++      })),
+   };
+ }

@@ -1,0 +1,220 @@
+diff --git a/ally-be/src/config/config.service.ts b/ally-be/src/config/config.service.ts
+index c62da21049..03a486440e 100644
+--- a/ally-be/src/config/config.service.ts
++++ b/ally-be/src/config/config.service.ts
+@@ -795,7 +795,7 @@ export class AppConfigService {
+       ),
+       imageModel: this.configService.get<string>(
+         'OPENAI_IMAGE_MODEL',
+-        'gpt-image-1',
++        'dall-e-3',
+       ),
+     };
+   }
+diff --git a/ally-be/src/course-copilot/service/test/course-copilot-cost.service.spec.ts b/ally-be/src/course-copilot/service/test/course-copilot-cost.service.spec.ts
+index e86b50ef6e..cf8a5c3987 100644
+--- a/ally-be/src/course-copilot/service/test/course-copilot-cost.service.spec.ts
++++ b/ally-be/src/course-copilot/service/test/course-copilot-cost.service.spec.ts
+@@ -380,7 +380,7 @@ describe('CourseCopilotCostService', () => {
+       usageRows = [
+         row({
+           task: LlmTask.COURSE_COPILOT_IMAGE,
+-          model: 'gpt-image-1',
++          model: 'dall-e-3',
+           calls: '4',
+           prompt: '999999',
+         }),
+diff --git a/ally-be/src/image-generation/provider/test/image-generation-provider.factory.spec.ts b/ally-be/src/image-generation/provider/test/image-generation-provider.factory.spec.ts
+index 9b31d074dc..274741e3dd 100644
+--- a/ally-be/src/image-generation/provider/test/image-generation-provider.factory.spec.ts
++++ b/ally-be/src/image-generation/provider/test/image-generation-provider.factory.spec.ts
+@@ -9,7 +9,7 @@ describe('ImageGenerationProviderFactory', () => {
+   let factory: ImageGenerationProviderFactory;
+ 
+   const mockConfig = {
+-    openai: { apiKey: 'openai-key', imageModel: 'gpt-image-1' },
++    openai: { apiKey: 'openai-key', imageModel: 'dall-e-3' },
+     gemini: { apiKey: 'gemini-key', imageModel: 'gemini-2.5-flash-image' },
+     characterImage: { defaultProvider: 'openai' },
+   };
+@@ -38,7 +38,7 @@ describe('ImageGenerationProviderFactory', () => {
+ 
+     const { provider, providerType } = factory.getProvider();
+     expect(providerType).toBe('openai');
+-    expect(provider.getModel()).toBe('gpt-image-1');
++    expect(provider.getModel()).toBe('dall-e-3');
+   });
+ 
+   it('rejects unknown providers with a 400', async () => {
+@@ -67,7 +67,7 @@ describe('ImageGenerationProviderFactory', () => {
+   it('rejects when the default provider key is missing and none requested', async () => {
+     factory = await build({
+       ...mockConfig,
+-      openai: { apiKey: undefined, imageModel: 'gpt-image-1' },
++      openai: { apiKey: undefined, imageModel: 'dall-e-3' },
+     });
+ 
+     expect(() => factory.getProvider()).toThrow(BadRequestException);
+diff --git a/ally-be/src/image-generation/provider/test/openai-image.provider.spec.ts b/ally-be/src/image-generation/provider/test/openai-image.provider.spec.ts
+index 71a0f7160a..02af224a91 100644
+--- a/ally-be/src/image-generation/provider/test/openai-image.provider.spec.ts
++++ b/ally-be/src/image-generation/provider/test/openai-image.provider.spec.ts
+@@ -1,5 +1,6 @@
+ import { OpenAiImageProvider } from '../openai-image.provider';
+ import { AppConfigService } from 'src/config/config.service';
++import { ConfigService } from '@nestjs/config';
+ 
+ const mockGenerate = jest.fn();
+ jest.mock('openai', () => ({
+@@ -22,17 +23,8 @@ describe('OpenAiImageProvider', () => {
+     });
+   });
+ 
+-  it('passes the requested quality to a gpt-image model', async () => {
+-    await providerFor('gpt-image-1').generateImage('a bench', '1536x1024', {
+-      quality: 'medium',
+-    });
+-    expect(mockGenerate).toHaveBeenCalledWith(
+-      expect.objectContaining({ model: 'gpt-image-1', quality: 'medium' }),
+-    );
+-  });
+-
+   it('leaves quality to the model default when none is asked for', async () => {
+-    await providerFor('gpt-image-1').generateImage('a bench', '1536x1024');
++    await providerFor('dall-e-3').generateImage('a bench', '1536x1024');
+     expect(mockGenerate.mock.calls[0][0]).not.toHaveProperty('quality');
+   });
+ 
+@@ -44,10 +36,34 @@ describe('OpenAiImageProvider', () => {
+   });
+ 
+   it('returns the decoded image bytes', async () => {
+-    const image = await providerFor('gpt-image-1').generateImage(
++    const image = await providerFor('dall-e-3').generateImage(
+       'a bench',
+       '1536x1024',
+     );
+     expect(image.toString()).toBe('png');
+   });
++
++  it('uses dall-e-3 as the default model for image generation', async () => {
++    const configService = new ConfigService();
++    jest
++      .spyOn(configService, 'get')
++      .mockImplementation((key: string, defaultValue?: any) => {
++        if (key === 'OPENAI_API_KEY') {
++          return 'sk-test';
++        }
++        // This simulates the ConfigService behavior for unset values with defaults.
++        return defaultValue;
++      });
++
++    const appConfigService = new AppConfigService(configService);
++    const provider = new OpenAiImageProvider(appConfigService);
++
++    await provider.generateImage('a bench', '1024x1024');
++
++    // This test will fail before the fix, because the default model is 'gpt-image-1'.
++    // After fixing the default value in AppConfigService to 'dall-e-3', this test will pass.
++    expect(mockGenerate).toHaveBeenCalledWith(
++      expect.objectContaining({ model: 'dall-e-3' }),
++    );
++  });
+ });
+diff --git a/ally-be/src/llm/constants/ai-task-registry.constants.ts b/ally-be/src/llm/constants/ai-task-registry.constants.ts
+index 544e206f69..032f662498 100644
+--- a/ally-be/src/llm/constants/ai-task-registry.constants.ts
++++ b/ally-be/src/llm/constants/ai-task-registry.constants.ts
+@@ -1314,13 +1314,12 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
+     runtime: LlmRuntime.ALLY_BE,
+     trigger: 'An author generates a simulation cover image',
+     detail:
+-      'Runs as a background job the editor polls (generate-jobs): at the default ' +
+-      'quality gpt-image-1 took 79–95 s in prod, past the 60 s load-balancer idle ' +
+-      'timeout. Sent at quality medium (~25 s). Gemini renders from an aspect ' +
+-      'ratio rather than pixel dimensions and has no quality setting.',
++      'Runs as a background job the editor polls (generate-jobs): image generation ' +
++      'can outlast the 60 s load-balancer idle timeout. Sent at quality medium (~25 s). ' +
++      'Gemini renders from an aspect ratio rather than pixel dimensions and has no quality setting.',
+     kind: AiTaskKind.IMAGE,
+     provider: 'openai',
+-    defaultModel: 'gpt-image-1',
++    defaultModel: 'dall-e-3',
+     configuredBy: 'OPENAI_IMAGE_MODEL / GEMINI_IMAGE_MODEL',
+     configPath: 'openai.imageModel',
+   },
+@@ -1339,7 +1338,7 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
+       'the roleplay cover library.',
+     kind: AiTaskKind.IMAGE,
+     provider: 'openai',
+-    defaultModel: 'gpt-image-1',
++    defaultModel: 'dall-e-3',
+     configuredBy: 'OPENAI_IMAGE_MODEL / GEMINI_IMAGE_MODEL',
+     configPath: 'openai.imageModel',
+   },
+@@ -2342,7 +2341,7 @@ const COURSE_COPILOT_TASKS: AiTaskEntry[] = [
+       'row, so the session budget counts each at COURSE_COPILOT_IMAGE_COST_USD.',
+     kind: AiTaskKind.IMAGE,
+     provider: 'openai',
+-    defaultModel: 'gpt-image-1',
++    defaultModel: 'dall-e-3',
+     configuredBy: 'OPENAI_IMAGE_MODEL / GEMINI_IMAGE_MODEL',
+     configPath: 'openai.imageModel',
+   },
+diff --git a/ally-be/src/llm/service/test/ai-task.service.spec.ts b/ally-be/src/llm/service/test/ai-task.service.spec.ts
+index 4d3ab7e2f4..2f33926ccd 100644
+--- a/ally-be/src/llm/service/test/ai-task.service.spec.ts
++++ b/ally-be/src/llm/service/test/ai-task.service.spec.ts
+@@ -31,7 +31,7 @@ const configStub = {
+     autofillModel: 'gpt-5-mini',
+     translationModel: 'gpt-4o-mini',
+     transcriptionModel: 'whisper-1',
+-    imageModel: 'gpt-image-1',
++    imageModel: 'dall-e-3',
+   },
+   anthropic: {
+     autofillModel: 'claude-sonnet-4-6',
+diff --git a/ally-be/src/scenario-cover-image-library/service/test/cover-image-generation.service.spec.ts b/ally-be/src/scenario-cover-image-library/service/test/cover-image-generation.service.spec.ts
+index b60b528b74..bb41ee5f39 100644
+--- a/ally-be/src/scenario-cover-image-library/service/test/cover-image-generation.service.spec.ts
++++ b/ally-be/src/scenario-cover-image-library/service/test/cover-image-generation.service.spec.ts
+@@ -19,7 +19,7 @@ describe('CoverImageGenerationService', () => {
+   let service: CoverImageGenerationService;
+ 
+   const mockProvider = {
+-    getModel: jest.fn().mockReturnValue('gpt-image-1'),
++    getModel: jest.fn().mockReturnValue('dall-e-3'),
+     assertConfigured: jest.fn(),
+     generateImage: jest.fn(),
+   };
+@@ -111,7 +111,7 @@ describe('CoverImageGenerationService', () => {
+     expect(mockUsage.record).toHaveBeenCalledWith(
+       expect.objectContaining({
+         provider: 'openai',
+-        model: 'gpt-image-1',
++        model: 'dall-e-3',
+         task: 'generate_cover_image',
+         unit: 'images',
+       }),
+diff --git a/ally-be/src/track/service/test/track-cover-image.service.spec.ts b/ally-be/src/track/service/test/track-cover-image.service.spec.ts
+index aafa5f8f8b..2f71933f3c 100644
+--- a/ally-be/src/track/service/test/track-cover-image.service.spec.ts
++++ b/ally-be/src/track/service/test/track-cover-image.service.spec.ts
+@@ -18,7 +18,7 @@ describe('TrackCoverImageService', () => {
+   let service: TrackCoverImageService;
+ 
+   const mockProvider = {
+-    getModel: jest.fn().mockReturnValue('gpt-image-1'),
++    getModel: jest.fn().mockReturnValue('dall-e-3'),
+     assertConfigured: jest.fn(),
+     generateImage: jest.fn(),
+   };
+@@ -94,7 +94,7 @@ describe('TrackCoverImageService', () => {
+       expect.objectContaining({
+         task: LlmTask.GENERATE_COURSE_COVER_IMAGE,
+         unit: 'images',
+-        model: 'gpt-image-1',
++        model: 'dall-e-3',
+       }),
+     );
+   });

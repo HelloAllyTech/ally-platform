@@ -1,5 +1,4 @@
 import { UxSignalReadService } from '../ux-signal-read.service';
-import { BugFindingSource } from 'src/bug-hunter/enum/bug-finding.enum';
 import { PmSignalStatus } from 'src/pm-agent/enum/pm-agent.enum';
 import { UX_SIGNAL_EVIDENCE_LIMITS } from '../../constants/ux-signals.constants';
 
@@ -43,7 +42,7 @@ describe('UxSignalReadService', () => {
         findOne: jest.fn().mockResolvedValue(over.scan ?? null),
       } as never,
       {
-        listOpenBySource: jest.fn().mockResolvedValue(over.findings ?? []),
+        listBySource: jest.fn().mockResolvedValue(over.findings ?? []),
       } as never,
       { createQueryBuilder: () => suggestionBuilder } as never,
     );
@@ -52,15 +51,15 @@ describe('UxSignalReadService', () => {
 
   it('asks only for UX-sourced findings, never the whole backlog', async () => {
     const { service } = build();
-    const findingRepository = (service as any).findingRepository;
+    const bugHunter = (service as any).bugHunter;
 
     await service.frictionEvidence('scribe');
 
-    expect(findingRepository.listOpenBySource).toHaveBeenCalledWith(
-      BugFindingSource.UX_SIGNAL,
-      'scribe',
-      UX_SIGNAL_EVIDENCE_LIMITS.DEFAULT,
-    );
+    expect(bugHunter.listBySource).toHaveBeenCalledWith('ux_signal', {
+      term: 'scribe',
+      take: UX_SIGNAL_EVIDENCE_LIMITS.DEFAULT,
+      openOnly: true,
+    });
   });
 
   it('never returns a dismissed signal', async () => {
@@ -128,12 +127,9 @@ describe('UxSignalReadService', () => {
 
     await service.frictionEvidence(undefined, 10_000);
 
-    expect(
-      (service as any).findingRepository.listOpenBySource,
-    ).toHaveBeenCalledWith(
-      BugFindingSource.UX_SIGNAL,
-      undefined,
-      UX_SIGNAL_EVIDENCE_LIMITS.MAX,
+    expect((service as any).bugHunter.listBySource).toHaveBeenCalledWith(
+      'ux_signal',
+      { term: undefined, take: UX_SIGNAL_EVIDENCE_LIMITS.MAX, openOnly: true },
     );
   });
 });

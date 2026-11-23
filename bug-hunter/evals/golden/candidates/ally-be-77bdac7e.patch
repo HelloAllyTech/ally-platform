@@ -1,0 +1,199 @@
+diff --git a/src/ai-chat/provider/gemini-llm.provider.ts b/src/ai-chat/provider/gemini-llm.provider.ts
+index 9c3232b739..e88bcf1530 100644
+--- a/src/ai-chat/provider/gemini-llm.provider.ts
++++ b/src/ai-chat/provider/gemini-llm.provider.ts
+@@ -4,6 +4,7 @@ import {
+   GoogleGenAI,
+ } from '@google/genai';
+ import { AppConfigService } from 'src/config/config.service';
++import { modelSupportsTemperature } from 'src/common/util/llm-model.util';
+ import {
+   LlmProvider,
+   LlmMessage,
+@@ -25,6 +26,13 @@ const toTokenUsage = (
+   cachedTokens: usage.cachedContentTokenCount ?? undefined,
+ });
+ 
++/** Gemini 3+ deprecated custom sampling, so the temperature is sent only to
++ * models that still take it. */
++const geminiSampling = (config: LlmProviderConfig) =>
++  modelSupportsTemperature(config.model)
++    ? { temperature: config.temperature ?? 0.7 }
++    : {};
++
+ /**
+  * Gemini coaching-chat provider. Mirrors {@link OpenAiLlmProvider} against the
+  * `@google/genai` SDK so a prompt that selects a `gemini-*` model runs for real
+@@ -94,7 +102,7 @@ export class GeminiLlmProvider implements LlmProvider {
+       contents,
+       config: {
+         systemInstruction,
+-        temperature: config.temperature ?? 0.7,
++        ...geminiSampling(config),
+         maxOutputTokens: config.maxTokens ?? 1500,
+       },
+     });
+@@ -124,7 +132,7 @@ export class GeminiLlmProvider implements LlmProvider {
+       contents,
+       config: {
+         systemInstruction,
+-        temperature: config.temperature ?? 0.7,
++        ...geminiSampling(config),
+         maxOutputTokens: config.maxTokens ?? 1500,
+       },
+     });
+diff --git a/src/ai-chat/provider/test/gemini-llm.provider.spec.ts b/src/ai-chat/provider/test/gemini-llm.provider.spec.ts
+index f61eb22474..6373e344fd 100644
+--- a/src/ai-chat/provider/test/gemini-llm.provider.spec.ts
++++ b/src/ai-chat/provider/test/gemini-llm.provider.spec.ts
+@@ -54,6 +54,19 @@ describe('GeminiLlmProvider', () => {
+     ]);
+   });
+ 
++  it('omits temperature for Gemini 3+, which deprecated custom sampling', async () => {
++    mockGenerateContent.mockResolvedValue({ text: 'ok' });
++    const provider = makeProvider('key');
++
++    await provider.getCompletion(MESSAGES, {
++      model: 'gemini-3-pro-preview',
++      temperature: 0.5,
++    });
++
++    const arg = mockGenerateContent.mock.calls[0][0];
++    expect(arg.config).not.toHaveProperty('temperature');
++  });
++
+   it('streams text chunks, skipping empty ones', async () => {
+     mockGenerateContentStream.mockResolvedValue(
+       (async function* () {
+diff --git a/src/common/util/llm-model.util.ts b/src/common/util/llm-model.util.ts
+index bb0ccaf7be..d4c245a922 100644
+--- a/src/common/util/llm-model.util.ts
++++ b/src/common/util/llm-model.util.ts
+@@ -63,9 +63,28 @@ export const resolveChatProviderModel = (
+   return { providerType: 'openai', model: defaultModel };
+ };
+ 
++/**
++ * Gemini 3 onwards: Google deprecated custom sampling (`temperature`, `top_p`,
++ * `top_k`) and `thinking_budget` for this family, and models after Gemini 3
++ * reject them with a 400. The `-latest` aliases are included because they
++ * move to the newest model without the id changing.
++ */
++export const isGemini3OrLater = (model?: string | null): boolean => {
++  if (!model) return false;
++  const name = model
++    .trim()
++    .toLowerCase()
++    .replace(/^models\//, '');
++  if (!name.startsWith('gemini-')) return false;
++  if (name.endsWith('-latest')) return true;
++  const major = /^gemini-(\d+)/.exec(name)?.[1];
++  return major !== undefined && Number(major) >= 3;
++};
++
+ /**
+  * Whether a model accepts a custom `temperature`. OpenAI reasoning models
+- * (o-series, gpt-5 family) only allow the default and 400 on any other value.
++ * (o-series, gpt-5 family) only allow the default and 400 on any other value;
++ * Gemini 3+ deprecated it (see {@link isGemini3OrLater}).
+  * Unknown/empty models default to true.
+  */
+ export const modelSupportsTemperature = (model?: string | null): boolean => {
+@@ -75,7 +94,8 @@ export const modelSupportsTemperature = (model?: string | null): boolean => {
+     name.startsWith('o1') ||
+     name.startsWith('o3') ||
+     name.startsWith('o4') ||
+-    name.startsWith('gpt-5')
++    name.startsWith('gpt-5') ||
++    isGemini3OrLater(name)
+   );
+ };
+ 
+diff --git a/src/common/util/test/llm-model.util.spec.ts b/src/common/util/test/llm-model.util.spec.ts
+index 8d1ac31839..32f1bc6398 100644
+--- a/src/common/util/test/llm-model.util.spec.ts
++++ b/src/common/util/test/llm-model.util.spec.ts
+@@ -25,6 +25,11 @@ describe('llm-model.util', () => {
+       ['gpt-4o', true],
+       ['gpt-4.1', true],
+       ['gemini-2.5-pro', true],
++      ['gemini-2.5-flash', true],
++      ['gemini-3-pro-preview', false],
++      ['gemini-3.1-pro-preview', false],
++      ['models/gemini-3-flash', false],
++      ['gemini-flash-latest', false],
+       ['gpt-5', false],
+       ['gpt-5-mini', false],
+       ['o1', false],
+diff --git a/src/llm/service/llm-model.service.ts b/src/llm/service/llm-model.service.ts
+index 4ef260bcbc..04cb51b354 100644
+--- a/src/llm/service/llm-model.service.ts
++++ b/src/llm/service/llm-model.service.ts
+@@ -5,6 +5,7 @@ import {
+   NotFoundException,
+ } from '@nestjs/common';
+ import { LoggerService } from 'src/logger/logger.service';
++import { modelSupportsTemperature } from 'src/common/util/llm-model.util';
+ import {
+   canonicalProvider,
+   getLlmModels,
+@@ -70,7 +71,8 @@ export class LlmModelService {
+         model,
+         // An empty label would render as a blank picker entry.
+         label: dto.label?.trim() || model,
+-        supportsTemperature: dto.supportsTemperature ?? true,
++        supportsTemperature:
++          dto.supportsTemperature ?? modelSupportsTemperature(model),
+         active: dto.active ?? true,
+       }),
+     );
+@@ -183,7 +185,11 @@ export class LlmModelService {
+             ) as LlmModelInfo['provider'],
+             model: row.model,
+             label: row.label,
+-            supportsTemperature: row.supportsTemperature,
++            // The code rule can only narrow a stored flag: a row seeded or
++            // added before a model family dropped temperature must not
++            // re-enable a control the provider will 400 on.
++            supportsTemperature:
++              row.supportsTemperature && modelSupportsTemperature(row.model),
+             runtimes: runtimesForProvider(row.provider),
+           }))
+           // A row whose provider no runtime can execute is unusable — most likely
+diff --git a/src/llm/service/test/llm-model-crud.spec.ts b/src/llm/service/test/llm-model-crud.spec.ts
+index 4e4338e47d..125511bf95 100644
+--- a/src/llm/service/test/llm-model-crud.spec.ts
++++ b/src/llm/service/test/llm-model-crud.spec.ts
+@@ -33,12 +33,30 @@ describe('LlmModelService — catalog editing', () => {
+           provider: 'openai',
+           model: 'gpt-5.1-mini',
+           label: 'GPT-5.1 mini',
+-          supportsTemperature: true,
++          // Defaulted from the shared rule: the gpt-5 family 400s on a custom one.
++          supportsTemperature: false,
+           active: true,
+         }),
+       );
+     });
+ 
++    it('defaults supportsTemperature from the model when the caller omits it', async () => {
++      const { service, repository } = buildService();
++
++      await service.createModel({
++        provider: 'gemini',
++        model: 'gemini-2.5-pro',
++      });
++      await service.createModel({
++        provider: 'gemini',
++        model: 'gemini-3-flash-preview',
++      });
++
++      const saved = repository.save.mock.calls.map(([row]) => row);
++      expect(saved[0].supportsTemperature).toBe(true);
++      expect(saved[1].supportsTemperature).toBe(false);
++    });
++
+     // The boundary the whole catalog-in-DB decision rests on: a provider with
+     // no code branch would build a silently wrong client at runtime.
+     it('refuses a provider no runtime can execute, and says why', async () => {

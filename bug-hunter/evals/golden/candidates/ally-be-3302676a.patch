@@ -1,0 +1,148 @@
+diff --git a/src/config/config.service.ts b/src/config/config.service.ts
+index edc5def648..60698d88b3 100644
+--- a/src/config/config.service.ts
++++ b/src/config/config.service.ts
+@@ -407,10 +407,13 @@ export class AppConfigService {
+         'ROLEPLAY_COPILOT_MODEL',
+         'claude-sonnet-4-6',
+       ),
+-      // Hard cap on tool-use round-trips per copilot turn.
++      // Hard cap on tool-use round-trips per copilot turn. A substantial
++      // build/edit turn legitimately needs several sequential update_spec
++      // patches plus read/compile calls, so keep this generous; on cap-hit the
++      // orchestrator does a tool-less wrap-up rather than erroring out.
+       maxToolIterations: this.configService.get<number>(
+         'ROLEPLAY_COPILOT_MAX_TOOL_ITERATIONS',
+-        8,
++        16,
+       ),
+       // Rehearsal runs that outlive this are failed by the redis TTL timer.
+       rehearsalTimeoutMinutes: this.configService.get<number>(
+diff --git a/src/roleplay-studio/service/copilot-orchestrator.service.ts b/src/roleplay-studio/service/copilot-orchestrator.service.ts
+index 029db003df..0c97892e8b 100644
+--- a/src/roleplay-studio/service/copilot-orchestrator.service.ts
++++ b/src/roleplay-studio/service/copilot-orchestrator.service.ts
+@@ -231,17 +231,40 @@ export class CopilotOrchestratorService {
+           stopReason = 'end_turn';
+           break;
+         }
++      }
+ 
+-        if (iteration === maxIterations - 1) {
+-          // Cap reached with the model still asking for tools.
+-          yield {
+-            event: 'error',
+-            data: {
+-              code: 'max_tool_iterations',
+-              message: `Tool-use iteration cap (${maxIterations}) reached; turn truncated.`,
+-            },
+-          };
++      // We exhausted the round-trip budget while the model still wanted tools.
++      // Instead of dying with a raw error, make one final tool-less pass so the
++      // copilot summarizes what it changed and what's left — the trainer can
++      // reply "continue" to pick up (applied patches are already persisted).
++      if (stopReason === 'tool_use') {
++        this.logger.warn(
++          `Copilot session ${sessionId} hit the ${maxIterations}-iteration ` +
++            'cap; making a tool-less wrap-up pass.',
++        );
++        const wrapUpStream = this.client.messages.stream({
++          model,
++          max_tokens: COPILOT_MAX_TOKENS,
++          system,
++          messages,
++        });
++        for await (const event of wrapUpStream as AsyncIterable<any>) {
++          if (
++            event?.type === 'content_block_delta' &&
++            event?.delta?.type === 'text_delta' &&
++            event.delta.text
++          ) {
++            yield { event: 'token', data: { delta: event.delta.text } };
++          }
+         }
++        const wrapUpMessage: any = await (wrapUpStream as any).finalMessage();
++        this.recordUsage(wrapUpMessage?.usage, model, sessionId, iterations);
++        for (const block of wrapUpMessage?.content ?? []) {
++          if (block?.type === 'text' && block.text) {
++            textParts.push(block.text);
++          }
++        }
++        stopReason = wrapUpMessage?.stop_reason ?? 'end_turn';
+       }
+     } catch (error) {
+       turnErrored = true;
+diff --git a/src/roleplay-studio/service/copilot-tools.service.ts b/src/roleplay-studio/service/copilot-tools.service.ts
+index ac55caaff1..27d60e42a6 100644
+--- a/src/roleplay-studio/service/copilot-tools.service.ts
++++ b/src/roleplay-studio/service/copilot-tools.service.ts
+@@ -74,8 +74,11 @@ export class CopilotToolsService {
+         name: 'update_spec',
+         description:
+           'Apply an RFC-6902 patch (add/replace/remove only) to the current draft spec document. ' +
+-          'Use small, incremental patches — one concern per call. The result is validated; on ' +
+-          'failure you get the structured error list back and MUST self-repair with a corrected patch.',
++          'Batch related edits into ONE call — the ops array carries many operations, so group ' +
++          'everything you can decide together (all the basics, a whole persona, the full objective ' +
++          'set) into a single patch instead of one field per call; that keeps the turn within its ' +
++          'tool round-trip budget. The result is validated; on failure you get the structured error ' +
++          'list back and MUST self-repair with a corrected patch.',
+         input_schema: {
+           type: 'object',
+           properties: {
+diff --git a/src/roleplay-studio/service/test/copilot-orchestrator.service.spec.ts b/src/roleplay-studio/service/test/copilot-orchestrator.service.spec.ts
+index d7f9556e23..be2cfdcc94 100644
+--- a/src/roleplay-studio/service/test/copilot-orchestrator.service.spec.ts
++++ b/src/roleplay-studio/service/test/copilot-orchestrator.service.spec.ts
+@@ -201,27 +201,42 @@ describe('CopilotOrchestratorService', () => {
+     expect(assistantRow.metadata.testCaseSuggestions).toEqual([suggestion]);
+   });
+ 
+-  it('caps the tool loop at maxToolIterations and emits an error frame', async () => {
+-    // The model asks for a tool on every round-trip, forever.
++  it('makes a tool-less wrap-up pass when the tool loop hits the cap', async () => {
++    // The model asks for a tool on every round-trip until the budget is spent;
++    // the final tool-less pass lets it summarize instead of erroring out.
+     let counter = 0;
+-    streamMock.mockImplementation(() =>
+-      makeStream([toolUseBlock(`tu-${++counter}`)], 'tool_use'),
+-    );
++    streamMock.mockImplementation(() => {
++      counter += 1;
++      return counter <= MAX_ITERATIONS
++        ? makeStream([toolUseBlock(`tu-${counter}`)], 'tool_use')
++        : makeStream(
++            [{ type: 'text', text: 'Got most of it — reply "continue".' }],
++            'end_turn',
++          );
++    });
+ 
+     const frames = await collect();
+     const events = frames.map((frame) => frame.event);
+ 
+-    expect(streamMock).toHaveBeenCalledTimes(MAX_ITERATIONS);
++    // MAX_ITERATIONS tool round-trips + one tool-less wrap-up pass.
++    expect(streamMock).toHaveBeenCalledTimes(MAX_ITERATIONS + 1);
+     expect(toolsExecute).toHaveBeenCalledTimes(MAX_ITERATIONS);
++    // The wrap-up pass is made without tools.
++    expect(streamMock.mock.calls[MAX_ITERATIONS][0].tools).toBeUndefined();
+     expect(events.filter((event) => event === 'tool_call')).toHaveLength(
+       MAX_ITERATIONS,
+     );
+-    expect(frames.find((frame) => frame.event === 'error')?.data.code).toBe(
+-      'max_tool_iterations',
++    // No raw error frame — the model wrapped up gracefully.
++    expect(events).not.toContain('error');
++    // The wrap-up text is streamed and persisted as the assistant message.
++    expect(frames.find((frame) => frame.event === 'token')?.data.delta).toBe(
++      'Got most of it — reply "continue".',
+     );
+-    // The turn still closes cleanly and the assistant message is persisted.
+     expect(events[events.length - 1]).toBe('done');
+     expect(appendMessage).toHaveBeenCalledTimes(2);
++    expect(appendMessage.mock.calls[1][1].content).toBe(
++      'Got most of it — reply "continue".',
++    );
+     expect(appendMessage.mock.calls[1][1].toolCalls).toHaveLength(
+       MAX_ITERATIONS,
+     );

@@ -3,7 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConflictException, ServiceUnavailableException } from '@nestjs/common';
 
 import { AppConfigService } from 'src/config/config.service';
-import { BugFindingRepository } from 'src/bug-hunter/repository/bug-finding.repository';
+import { BugHunterBoardService } from 'src/bug-hunter-approvals/service/bug-hunter-board.service';
 import { BugFindingSeverity } from 'src/bug-hunter/enum/bug-finding.enum';
 import { PmAgentSignal } from 'src/pm-agent/entity/pm-agent-signal.entity';
 import { RoadmapProductGoalRepository } from 'src/product-roadmap/repository/roadmap-taxonomy.repository';
@@ -89,8 +89,8 @@ describe('UxSignalsService', () => {
         },
         { provide: UxSignalWriterService, useValue: { write } },
         {
-          provide: BugFindingRepository,
-          useValue: { find: jest.fn().mockResolvedValue([]) },
+          provide: BugHunterBoardService,
+          useValue: { listBySource: jest.fn().mockResolvedValue([]) },
         },
         {
           provide: RoadmapProductGoalRepository,

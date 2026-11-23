@@ -1,0 +1,137 @@
+diff --git a/src/builder/service/builder-interview-orchestrator.service.ts b/src/builder/service/builder-interview-orchestrator.service.ts
+index 95a00ec589..59770640b7 100644
+--- a/src/builder/service/builder-interview-orchestrator.service.ts
++++ b/src/builder/service/builder-interview-orchestrator.service.ts
+@@ -478,7 +478,11 @@ export class BuilderInterviewOrchestratorService {
+ 
+         const contentBlocks: any[] = finalMessage.content ?? [];
+         for (const block of contentBlocks) {
+-          if (block?.type === 'text' && block.text) {
++          // Whitespace is not a reply. Gemini's empty STOP arrives as a bare
++          // "\n", and counted as text it slipped past the empty-pass retry
++          // below: the turn settled blank and the admin had to type
++          // "continue" to get the interview moving again.
++          if (block?.type === 'text' && block.text?.trim()) {
+             textParts.push(block.text);
+           }
+         }
+diff --git a/src/builder/service/test/builder-interview-orchestrator.service.spec.ts b/src/builder/service/test/builder-interview-orchestrator.service.spec.ts
+index 76ffce9264..6ccf84c907 100644
+--- a/src/builder/service/test/builder-interview-orchestrator.service.spec.ts
++++ b/src/builder/service/test/builder-interview-orchestrator.service.spec.ts
+@@ -410,6 +410,22 @@ describe('BuilderInterviewOrchestratorService — turn autosave', () => {
+     expect(calls[calls.length - 1][1].content).toBe('Here on the second pass.');
+   });
+ 
++  // Gemini's empty STOP is a bare "\n", not an empty content array. Counted as
++  // text, it settled the turn blank and the admin had to type "continue".
++  it('retries a turn that came back with only whitespace', async () => {
++    streams = [
++      fakeStream([{ type: 'text', text: '\n' }], 'end_turn'),
++      fakeStream([{ type: 'text', text: 'Back on track.' }], 'end_turn'),
++    ];
++
++    const frames = await drain();
++
++    expect(provider.stream).toHaveBeenCalledTimes(2);
++    expect(frames.some((frame) => frame.event === 'error')).toBe(false);
++    const calls = messageRepository.checkpointMessage.mock.calls;
++    expect(calls[calls.length - 1][1].content).toBe('Back on track.');
++  });
++
+   it('flags a turn that came back with nothing in it, three times over', async () => {
+     streams = [
+       fakeStream([], 'end_turn'),
+diff --git a/src/llm-agent/provider/gemini-agent.provider.ts b/src/llm-agent/provider/gemini-agent.provider.ts
+index 392c83ed45..8d092168eb 100644
+--- a/src/llm-agent/provider/gemini-agent.provider.ts
++++ b/src/llm-agent/provider/gemini-agent.provider.ts
+@@ -172,8 +172,25 @@ export class GeminiAgentProvider implements IAgentLlmProvider {
+       }
+       // Gemini expects alternating turns; our tool-result turns can otherwise
+       // land next to a following user message.
++      //
++      // Except text landing after a functionResponse. Merged into one turn,
++      // gemini-2.5-pro answers it with an empty STOP — zero output tokens, a
++      // bare "\n" — and it is exactly the shape of every answered question:
++      // ask_admin's result followed by the admin's answer. Session 178e6598
++      // (2026-10-01) went blank after 7 of 7 answers and the admin had to type
++      // "continue" each time. Replayed locally, the merged turn went blank
++      // every time; the same parts as two consecutive user turns answered 7/7.
+       const last = contents[contents.length - 1];
+-      if (last?.role === role) {
++      const hasFunctionResponse = (p: any[]) =>
++        p.some((part) => part.functionResponse);
++      if (
++        last?.role === role &&
++        !(
++          role === 'user' &&
++          hasFunctionResponse(last.parts) &&
++          !hasFunctionResponse(parts)
++        )
++      ) {
+         last.parts.push(...parts);
+         return;
+       }
+diff --git a/src/llm-agent/provider/test/gemini-agent.provider.spec.ts b/src/llm-agent/provider/test/gemini-agent.provider.spec.ts
+index 15173c8e7f..e0b5a8d81c 100644
+--- a/src/llm-agent/provider/test/gemini-agent.provider.spec.ts
++++ b/src/llm-agent/provider/test/gemini-agent.provider.spec.ts
+@@ -228,6 +228,57 @@ describe('GeminiAgentProvider', () => {
+     ]);
+   });
+ 
++  it('keeps text that follows a tool result in a turn of its own', async () => {
++    // An answered question replays as ask_admin's result followed by the
++    // admin's answer. Merged into one turn, gemini-2.5-pro returns an empty
++    // STOP — the interview went silent after every answer until the admin
++    // typed "continue".
++    const captured: any[] = [];
++    const provider = new GeminiAgentProvider(
++      'key',
++      fakeClient([chunk([{ text: 'ok' }], 'STOP')], captured),
++    );
++
++    await drain(
++      provider,
++      request({
++        messages: [
++          {
++            role: 'assistant',
++            content: [
++              { type: 'tool_use', id: 't1', name: 'ask_admin', input: {} },
++            ],
++          },
++          {
++            role: 'user',
++            content: [
++              {
++                type: 'tool_result',
++                tool_use_id: 't1',
++                content: '{"ok":true}',
++              },
++            ],
++          },
++          { role: 'user', content: 'Option A' },
++        ],
++      }),
++    );
++
++    expect(captured[0].contents).toEqual([
++      {
++        role: 'model',
++        parts: [{ functionCall: { name: 'ask_admin', args: {} } }],
++      },
++      {
++        role: 'user',
++        parts: [
++          { functionResponse: { name: 'ask_admin', response: { ok: true } } },
++        ],
++      },
++      { role: 'user', parts: [{ text: 'Option A' }] },
++    ]);
++  });
++
+   it('sanitises tool schemas and omits parameters for no-argument tools', async () => {
+     const captured: any[] = [];
+     const provider = new GeminiAgentProvider(

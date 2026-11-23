@@ -547,12 +547,12 @@ out which meaning is in play before you change anything.
 
 ### Bug Hunter
 <!-- concept: bug-hunter -->
-**Is:** An autonomous find-and-fix agent: it sweeps the code for bugs, records *findings*, opens fix sessions that produce PRs, verifies and releases them.
-**Also called:** bug findings, hunt runs, sweeps, fix sessions
-**Composed of:** `bug_findings` and `bug_hunt_runs` with a policy service, PR review, held-PR watch and protection-drift checks. GitHub workflows `bug-hunt-sweep.yml` (scheduled), `bug-fix-session.yml` and `bug-hunter-evals.yml`. User reports from [Report a bug](#report-a-bug) and breakage from [UX Signals](#ux-signals) land as findings. Ships through [Releases](#releases).
-**Status:** Dark — gate: `FeatureToggleKey.BUG_HUNTER` + `bug_hunter_settings.mode` (`off` by default; `manual` | `ai`)
-**Code:** `ally-be/src/bug-hunter/` · `ally-web/apps/ally-admin-dashboard/src/pages/BugHunter/` · `.github/workflows/bug-hunt-sweep.yml`
-**Deep doc:** [Bug Hunter tools](https://github.com/HelloAllyTech/ally-platform/blob/master/ally-be/docs/bug-hunter-tools.md) · [Memory ADR](https://github.com/HelloAllyTech/ally-platform/blob/master/ally-be/docs/bug-hunter-memory-adr.md)
+**Is:** A find-and-fix agent: it takes a bug, investigates it, reproduces it with a failing test, writes a fix, verifies and reviews it, and leaves a suggested fix or a draft PR. Merge and Release are always a person's click.
+**Also called:** Bug Hunter v2, bug reports, runs; the old engine's *findings* and *sweeps* (retired 2026-11-23)
+**Composed of:** A LangGraph agent in `bug-hunter/` with its own Postgres schema `bughunter` (the `bugs` queue, run reports, verdicts) and a worker that takes bugs by mode. Sources: new commits, CI failures, production error logs, [Report a bug](#report-a-bug) and [UX Signals](#ux-signals). ally-be's `bug-hunter-approvals` module serves the admin page and its actions; the old engine's `bug_findings` history stays in ally-be as read-only data. Eval harness: `bug-hunter-evals.yml`. Ships through [Releases](#releases).
+**Status:** Dark — gate: `FeatureToggleKey.BUG_HUNTER_V2_VERDICTS` + the `bughunter` settings mode (`off` | `manual` | `autonomous`). The old engine's `FeatureToggleKey.BUG_HUNTER` gates nothing now
+**Code:** `bug-hunter/` · `ally-be/src/bug-hunter-approvals/` · `ally-be/src/bug-hunter/` (old engine's entities, read-only) · `ally-web/apps/ally-admin-dashboard/src/pages/BugHunter/` · `ally-web/apps/ally-admin-dashboard/src/pages/BugHunterV2/` (run report page)
+**Deep doc:** [Bug Hunter v2 context](https://github.com/HelloAllyTech/ally-platform/blob/master/docs/bug-hunter/CONTEXT.md)
 
 ### Report a bug
 <!-- concept: report-a-bug -->

@@ -1,0 +1,148 @@
+diff --git a/apps/ally-helpline-dashboard/src/pages/track-player/components/players/VideoItemPlayer.tsx b/apps/ally-helpline-dashboard/src/pages/track-player/components/players/VideoItemPlayer.tsx
+index 42a017bc74..63261a8967 100644
+--- a/apps/ally-helpline-dashboard/src/pages/track-player/components/players/VideoItemPlayer.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/track-player/components/players/VideoItemPlayer.tsx
+@@ -111,11 +111,6 @@ export const VideoItemPlayer: FC<VideoItemPlayerProps> = ({
+ 
+   const renderTrackedControls = () => (
+     <div className="flex flex-shrink-0 items-center justify-between gap-3 border-t border-border-light bg-white px-4 py-3">
+-      <span className="text-xs text-typography-700">
+-        {completed
+-          ? t("tracks2.video.watched")
+-          : t("tracks2.video.watchToUnlock", { pct: requiredPct })}
+-      </span>
+       {completed ? (
+         <span className="inline-flex items-center gap-2 text-sm font-medium text-success-800">
+           <TickGreenBackground className="h-4 w-4" />
+@@ -164,7 +159,6 @@ export const VideoItemPlayer: FC<VideoItemPlayerProps> = ({
+   return (
+     <ManualVideo
+       url={payload.url}
+-      requiredPct={requiredPct}
+       completed={completed}
+       onTick={recordTime}
+       onMarkWatched={() => {
+@@ -271,12 +265,11 @@ const VimeoVideo: FC<{
+ 
+ const ManualVideo: FC<{
+   url: string;
+-  requiredPct: number;
+   completed: boolean;
+   onTick: (t: number) => void;
+   onMarkWatched: () => void;
+   meetsRequirement: boolean;
+-}> = ({ url, requiredPct, completed, onTick, onMarkWatched, meetsRequirement }) => {
++}> = ({ url, completed, onTick, onMarkWatched, meetsRequirement }) => {
+   const { t } = useTranslation();
+   const elapsedRef = useRef(0);
+ 
+@@ -306,11 +299,6 @@ const ManualVideo: FC<{
+         </div>
+       </div>
+       <div className="flex flex-shrink-0 items-center justify-between gap-3 border-t border-border-light bg-white px-4 py-3">
+-        <span className="text-xs text-typography-700">
+-          {completed
+-            ? t("tracks2.video.watched")
+-            : t("tracks2.video.watchToUnlock", { pct: requiredPct })}
+-        </span>
+         {completed ? (
+           <span className="inline-flex items-center gap-2 text-sm font-medium text-success-800">
+             <TickGreenBackground className="h-4 w-4" />
+diff --git a/apps/ally-helpline-dashboard/src/pages/track-player/components/players/__tests__/VideoItemPlayer.test.tsx b/apps/ally-helpline-dashboard/src/pages/track-player/components/players/__tests__/VideoItemPlayer.test.tsx
+index 9c5b8062aa..d8b9055008 100644
+--- a/apps/ally-helpline-dashboard/src/pages/track-player/components/players/__tests__/VideoItemPlayer.test.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/track-player/components/players/__tests__/VideoItemPlayer.test.tsx
+@@ -4,14 +4,17 @@ import { describe, expect, it, vi } from "vitest";
+ import { VideoItemPlayer } from "../VideoItemPlayer";
+ import { StartVideoItemPayload, TrackItemType } from "../../../../../types/tracks";
+ 
+-const buildPayload = (requiredWatchPct: number): StartVideoItemPayload => ({
++const buildPayload = (requiredWatchPct: number, maxWatchedPct = 0): StartVideoItemPayload => ({
+   type: TrackItemType.VIDEO,
+   trackItemProgressId: "progress-1",
+-  source: "s3",
++  // "loom" hits the ManualVideo branch, whose "Mark as watched" button is
++  // the only remaining UI gated on requiredPct now that the "Watch X% to
++  // continue" label has been removed.
++  source: "loom",
+   url: "https://example.com/video.mp4",
+   durationSeconds: 300,
+   requiredWatchPct,
+-  maxWatchedPct: 0,
++  maxWatchedPct,
+ });
+ 
+ vi.mock("@assets", () => ({
+@@ -38,7 +41,7 @@ vi.mock("@hooks", async () => {
+ });
+ 
+ describe("VideoItemPlayer", () => {
+-  it("renders the required watch percentage as-is, not multiplied by 100", () => {
++  it("does not display a 'Watch X% to continue' label", () => {
+     render(
+       <VideoItemPlayer
+         payload={buildPayload(70)}
+@@ -48,20 +51,47 @@ describe("VideoItemPlayer", () => {
+       />,
+     );
+ 
+-    expect(screen.getByText("Watch 70% to continue")).toBeInTheDocument();
+-    expect(screen.queryByText(/7000%/)).not.toBeInTheDocument();
++    expect(screen.queryByText(/Watch \d+% to continue/)).not.toBeInTheDocument();
++  });
++
++  it("reads the required watch percentage as-is, not multiplied by 100", () => {
++    // 75 >= 70 unlocks "Mark as watched"; a stray *100 (7000) would keep it
++    // disabled and this assertion would fail.
++    render(
++      <VideoItemPlayer
++        payload={buildPayload(70, 75)}
++        itemId="item-1"
++        trackId="track-1"
++        alreadyCompleted={false}
++      />,
++    );
++
++    expect(screen.getByText("Mark as watched")).toBeEnabled();
+   });
+ 
+   it("treats a 100% requirement as 100, not 10000", () => {
+     render(
+       <VideoItemPlayer
+-        payload={buildPayload(100)}
++        payload={buildPayload(100, 100)}
+         itemId="item-1"
+         trackId="track-1"
+         alreadyCompleted={false}
+       />,
+     );
+ 
+-    expect(screen.getByText("Watch 100% to continue")).toBeInTheDocument();
++    expect(screen.getByText("Mark as watched")).toBeEnabled();
++  });
++
++  it("keeps 'Mark as watched' disabled below the required percentage", () => {
++    render(
++      <VideoItemPlayer
++        payload={buildPayload(70, 50)}
++        itemId="item-1"
++        trackId="track-1"
++        alreadyCompleted={false}
++      />,
++    );
++
++    expect(screen.getByText("Mark as watched")).toBeDisabled();
+   });
+ });
+diff --git a/libs/ui-shared/src/lib/progress-video/ProgressVideoPlayer.tsx b/libs/ui-shared/src/lib/progress-video/ProgressVideoPlayer.tsx
+index ab6910f148..3d7288b141 100644
+--- a/libs/ui-shared/src/lib/progress-video/ProgressVideoPlayer.tsx
++++ b/libs/ui-shared/src/lib/progress-video/ProgressVideoPlayer.tsx
+@@ -107,6 +107,7 @@ export const ProgressVideoPlayer: React.FC<ProgressVideoPlayerProps> = ({
+       src={src}
+       poster={poster}
+       controls
++      controlsList="nodownload"
+       playsInline
+       preload="metadata"
+       className={`w-full h-full bg-black ${className}`}

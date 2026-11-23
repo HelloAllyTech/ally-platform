@@ -1,6 +1,5 @@
 import { Repository } from 'typeorm';
 
-import { BugFinding } from 'src/bug-hunter/entity/bug-finding.entity';
 import { User } from 'src/user/entity/user.entity';
 import { UserRole } from 'src/common/constants/user.constants';
 
@@ -54,9 +53,9 @@ describe('RoadmapOpportunityService.createBugReport', () => {
       }),
     };
 
-    const bugFindingRepository = {
-      create: jest.fn().mockImplementation((v) => v),
-      save: jest.fn().mockResolvedValue({ id: 'finding-1' }),
+    // Bug Hunter's queue: a filed bug enters it (BugHunterBoardService.enqueueReported)
+    const bugHunterV2 = {
+      enqueueReported: jest.fn().mockResolvedValue(undefined),
     };
     // Repo classification is best-effort and unrelated to most of what these
     // tests assert — "unclassified" keeps the created finding's repo null.
@@ -88,7 +87,6 @@ describe('RoadmapOpportunityService.createBugReport', () => {
       } as unknown as RoadmapVectorService,
       { emit: jest.fn() } as unknown as RoadmapNotificationService,
       userRepository as unknown as Repository<User>,
-      bugFindingRepository as unknown as Repository<BugFinding>,
       // Images play no part in a bug report; these satisfy the constructor.
       { parseS3Url: jest.fn() } as never,
       { s3: { assetsBucket: 'ally-assets' } } as never,
@@ -102,24 +100,21 @@ describe('RoadmapOpportunityService.createBugReport', () => {
           );
         }),
       } as never,
-      // Repo classification is best-effort and unrelated to what these tests
-      // assert — a stub that resolves to "unclassified" keeps the created
-      // finding's repo null, same as before this dependency existed.
-      repoClassifier as never,
-      { classifyAndRecord: jest.fn().mockResolvedValue(null) } as never, // missClassifier,
       { suggestTitle: jest.fn().mockResolvedValue('A title') } as never, // roadmapAi
+      bugHunterV2 as never,
+      repoClassifier as never,
     );
 
     return {
       service,
       opportunityRepository,
-      bugFindingRepository,
+      bugHunterV2,
       repoClassifier,
     };
   };
 
   it('files the finding in the repo a staff reporter named, without asking the classifier', async () => {
-    const { service, bugFindingRepository, repoClassifier } = build(true);
+    const { service, bugHunterV2, repoClassifier } = build(true);
 
     await service.createBugReport(1, 'tenant-a', {
       description:
@@ -128,7 +123,7 @@ describe('RoadmapOpportunityService.createBugReport', () => {
     });
 
     expect(repoClassifier.classifyRepo).not.toHaveBeenCalled();
-    expect(bugFindingRepository.create).toHaveBeenCalledWith(
+    expect(bugHunterV2.enqueueReported).toHaveBeenCalledWith(
       expect.objectContaining({ repo: 'ally-web' }),
     );
   });
@@ -197,9 +192,9 @@ describe('RoadmapOpportunityService.createBugReport', () => {
       }),
     };
 
-    const bugFindingRepository = {
-      create: jest.fn().mockImplementation((v) => v),
-      save: jest.fn().mockResolvedValue({ id: 'finding-1' }),
+    // Bug Hunter's queue: a filed bug enters it (BugHunterBoardService.enqueueReported)
+    const bugHunterV2 = {
+      enqueueReported: jest.fn().mockResolvedValue(undefined),
     };
     // Repo classification is best-effort and unrelated to most of what these
     // tests assert — "unclassified" keeps the created finding's repo null.
@@ -231,7 +226,6 @@ describe('RoadmapOpportunityService.createBugReport', () => {
       } as unknown as RoadmapVectorService,
       { emit: jest.fn() } as unknown as RoadmapNotificationService,
       userRepository as unknown as Repository<User>,
-      bugFindingRepository as unknown as Repository<BugFinding>,
       // Images play no part in a bug report; these satisfy the constructor.
       { parseS3Url: jest.fn() } as never,
       { s3: { assetsBucket: 'ally-assets' } } as never,
@@ -245,12 +239,9 @@ describe('RoadmapOpportunityService.createBugReport', () => {
           );
         }),
       } as never,
-      // Repo classification is best-effort and unrelated to what these tests
-      // assert — a stub that resolves to "unclassified" keeps the created
-      // finding's repo null, same as before this dependency existed.
-      repoClassifier as never,
-      { classifyAndRecord: jest.fn().mockResolvedValue(null) } as never, // missClassifier,
       { suggestTitle: jest.fn().mockResolvedValue('A title') } as never, // roadmapAi
+      bugHunterV2 as never,
+      repoClassifier as never,
     );
 
     await service.createBugReport(7, 'tenant-a', {

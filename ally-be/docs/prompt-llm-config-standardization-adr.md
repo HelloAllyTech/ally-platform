@@ -433,7 +433,7 @@ providers' tool-result shapes differ. Unit fakes cannot produce a rejected tool 
   run an agent loop, deliberately not global).
 - Still constructing `new Anthropic(...)` directly, in rough order of how much they would
   benefit: `builder/service/builder-interview-orchestrator.service.ts`,
-  `copilot/`, `bug-hunter/service/bug-hunter-repo-classifier.service.ts`,
+  `copilot/`, `bug-hunter/service/bug-hunter-repo-classifier.service.ts`, <!-- docs-path-lint: ignore -->
   `ux-signals/service/ux-signals-ai.service.ts`,
   `product-roadmap/service/roadmap-ai.service.ts`,
   `track/service/track-quiz-llm-grader.service.ts`, `track/service/track-memory.service.ts`,

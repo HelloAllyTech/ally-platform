@@ -1,0 +1,66 @@
+diff --git a/apps/ally-admin-dashboard/src/components/create-simulation-sub-section/CreateSimulationSubSection.tsx b/apps/ally-admin-dashboard/src/components/create-simulation-sub-section/CreateSimulationSubSection.tsx
+index bdf04c35ca..e0051574b7 100644
+--- a/apps/ally-admin-dashboard/src/components/create-simulation-sub-section/CreateSimulationSubSection.tsx
++++ b/apps/ally-admin-dashboard/src/components/create-simulation-sub-section/CreateSimulationSubSection.tsx
+@@ -42,7 +42,7 @@ export const CreateSimulationSubSection: FC<CreateSimulationSubSectionProps> = (
+   };
+ 
+   return (
+-    <div className="flex flex-row flex-wrap gap-5 w-[60%] min-w-[500px]">
++    <div className="flex flex-row flex-wrap gap-5 w-[60%] min-w-[850px]">
+       {items?.map(item => {
+         if (!shouldRenderField(item)) {
+           return null;
+diff --git a/apps/ally-admin-dashboard/src/components/create-simulation-sub-section/__tests__/CreateSimulationSubSection.test.tsx b/apps/ally-admin-dashboard/src/components/create-simulation-sub-section/__tests__/CreateSimulationSubSection.test.tsx
+index e52eca5865..7f66601871 100644
+--- a/apps/ally-admin-dashboard/src/components/create-simulation-sub-section/__tests__/CreateSimulationSubSection.test.tsx
++++ b/apps/ally-admin-dashboard/src/components/create-simulation-sub-section/__tests__/CreateSimulationSubSection.test.tsx
+@@ -168,7 +168,7 @@ describe("CreateSimulationSubSection", () => {
+ 
+       const mainContainer = container.firstChild;
+       expect(mainContainer).toHaveClass("w-[60%]");
+-      expect(mainContainer).toHaveClass("min-w-[500px]");
++      expect(mainContainer).toHaveClass("min-w-[850px]");
+     });
+ 
+     it("uses flex-wrap layout", () => {
+@@ -452,7 +452,7 @@ describe("CreateSimulationSubSection", () => {
+ 
+       const mainContainer = container.firstChild;
+       expect(mainContainer).toHaveClass("w-[60%]");
+-      expect(mainContainer).toHaveClass("min-w-[500px]");
++      expect(mainContainer).toHaveClass("min-w-[850px]");
+     });
+   });
+ 
+diff --git a/apps/ally-admin-dashboard/src/constants/SimulationCreator.ts b/apps/ally-admin-dashboard/src/constants/SimulationCreator.ts
+index 27da8bd73e..9131dfbe4c 100644
+--- a/apps/ally-admin-dashboard/src/constants/SimulationCreator.ts
++++ b/apps/ally-admin-dashboard/src/constants/SimulationCreator.ts
+@@ -797,7 +797,7 @@ export const BEHAVIOURS_INSTRUCTION_TABLE_COLUMNS = [
+     placeholder: "Add Name",
+     dataType: cellTypes.dropdown,
+     options: BEHAVIOURS_INSTRUCTION_CATEGORIES,
+-    minWidth: 160,
++    minWidth: 200,
+     width: "21%",
+   },
+   {
+@@ -806,7 +806,7 @@ export const BEHAVIOURS_INSTRUCTION_TABLE_COLUMNS = [
+     accessor: "behaviors",
+     placeholder: "Add Instruction",
+     dataType: cellTypes.dropdownTags,
+-    minWidth: 240,
++    minWidth: 290,
+     width: "36%",
+   },
+   {
+@@ -815,7 +815,7 @@ export const BEHAVIOURS_INSTRUCTION_TABLE_COLUMNS = [
+     accessor: "instructions",
+     placeholder: "Add Response",
+     dataType: cellTypes.editableText,
+-    minWidth: 220,
++    minWidth: 310,
+     width: "36%",
+   },
+ ];

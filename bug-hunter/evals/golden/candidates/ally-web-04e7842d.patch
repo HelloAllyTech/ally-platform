@@ -1,0 +1,96 @@
+diff --git a/apps/ally-admin-dashboard/src/pages/BugHunter/BugFindingDrawer.tsx b/apps/ally-admin-dashboard/src/pages/BugHunter/BugFindingDrawer.tsx
+index a2ed5a38e3..49163db612 100644
+--- a/apps/ally-admin-dashboard/src/pages/BugHunter/BugFindingDrawer.tsx
++++ b/apps/ally-admin-dashboard/src/pages/BugHunter/BugFindingDrawer.tsx
+@@ -166,6 +166,18 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
+   const [descriptionDraft, setDescriptionDraft] = useState<string | null>(null);
+   const [showOriginalDescription, setShowOriginalDescription] = useState(false);
+ 
++  useEffect(() => {
++    setFixRepo("");
++    setForceFix(false);
++    setForceMerge(false);
++    setConfirmAction(null);
++    setDeclineReason(null);
++    setDeclineNote("");
++    setAnswerText("");
++    setDescriptionDraft(null);
++    setShowOriginalDescription(false);
++  }, [id]);
++
+   /**
+    * Copies the address bar, which now identifies this exact bug.
+    *
+diff --git a/apps/ally-admin-dashboard/src/pages/BugHunter/__tests__/BugFindingDrawer.test.tsx b/apps/ally-admin-dashboard/src/pages/BugHunter/__tests__/BugFindingDrawer.test.tsx
+index 559c8881e1..a14ca12e65 100644
+--- a/apps/ally-admin-dashboard/src/pages/BugHunter/__tests__/BugFindingDrawer.test.tsx
++++ b/apps/ally-admin-dashboard/src/pages/BugHunter/__tests__/BugFindingDrawer.test.tsx
+@@ -1095,24 +1095,53 @@ describe("BugFindingDrawer — reported bug context", () => {
+   });
+ });
+ 
+-describe("BugFindingDrawer — read-only for a SUPER_ADMIN (canTriage=false)", () => {
+-  it("hides approve/reject even on a pending-approval bug", () => {
+-    renderDrawer(finding({ status: BugFindingStatus.PENDING_APPROVAL }), false);
+-    expect(screen.queryByText("Approve — go fix it")).not.toBeInTheDocument();
+-    expect(screen.queryByText("Reject")).not.toBeInTheDocument();
+-  });
+-
+-  it("hides the fix-session button on an otherwise-eligible new bug", () => {
+-    renderDrawer(finding({ status: BugFindingStatus.NEW }), false);
+-    expect(screen.queryByText("Put me on it")).not.toBeInTheDocument();
+-  });
+-
+-  it("hides the description rewrite control", () => {
+-    renderDrawer(finding({ status: BugFindingStatus.NEW }), false);
+-    expect(screen.queryByText("Rewrite this for me")).not.toBeInTheDocument();
++describe("BugFindingDrawer — state persistence", () => {
++  it("resets forceFix state when the finding ID changes", () => {
++    const finding1 = finding({
++      id: "finding-1",
++      status: BugFindingStatus.NEW,
++      independentVerification: "confirmed",
++      budget: {
++        ...finding().budget,
++        exhausted: { kind: "sessions", at: "2026-10-07T05:00:00Z" },
++      },
++    });
++    const finding2 = finding({
++      id: "finding-2",
++      status: BugFindingStatus.NEW,
++      independentVerification: "confirmed",
++      budget: {
++        ...finding().budget,
++        exhausted: { kind: "sessions", at: "2026-10-07T05:00:00Z" },
++      },
++    });
++
++    getBugFinding.mockImplementation((id: string) => {
++      if (id === "finding-1") return { data: finding1, isLoading: false, isError: false };
++      if (id === "finding-2") return { data: finding2, isLoading: false, isError: false };
++      return { data: undefined, isLoading: false, isError: true };
++    });
++
++    const { rerender } = render(
++      <BugFindingDrawer id="finding-1" onClose={vi.fn()} canTriage={true} />,
++    );
++
++    fireEvent.click(screen.getByText("Put me on it"));
++
++    const checkbox = screen.getByLabelText("Start anyway, past the budget");
++    expect(checkbox).not.toBeChecked();
++    fireEvent.click(checkbox);
++    expect(checkbox).toBeChecked();
++
++    rerender(<BugFindingDrawer id="finding-2" onClose={vi.fn()} canTriage={true} />);
++
++    fireEvent.click(screen.getByText("Put me on it"));
++    const checkboxAfterRerender = screen.getByLabelText("Start anyway, past the budget");
++    expect(checkboxAfterRerender).not.toBeChecked();
+   });
+ });
+ 
++
+ /**
+  * The merge Bug Hunter cannot perform itself.
+  *

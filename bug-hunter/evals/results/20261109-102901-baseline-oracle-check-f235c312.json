@@ -1,0 +1,114 @@
+{
+ "meta": {
+  "agent": "baseline",
+  "mode": "oracle-check",
+  "git_sha": "f235c312f350db93ed835ab7688c14b83136cd5f",
+  "prompt_versions": "none (chunk 04)",
+  "models": {
+   "triage": "openai:gpt-5-mini",
+   "investigate": "openai:gpt-5",
+   "fix": "openai:gpt-5",
+   "review": "google_genai:gemini-2.5-pro",
+   "embeddings": "openai:text-embedding-3-small"
+  },
+  "timestamp": "2026-11-09T10:26:35+00:00",
+  "cases": 2,
+  "stopped_reason": null,
+  "free_gb_start": 14.22,
+  "free_gb_end": 13.25
+ },
+ "metrics": {
+  "total": {
+   "cases": 2,
+   "bugs": 2,
+   "clean": 0,
+   "detected": 0,
+   "missed": 0,
+   "false_alarms": 0,
+   "repro_attempted": 2,
+   "repro_valid": 2,
+   "fix_attempted": 2,
+   "fix_pass": 2,
+   "escalate_expected": 2,
+   "escalate_correct": 0,
+   "errors": 0,
+   "tokens": 0,
+   "cost_usd": 0.0,
+   "seconds": 143.89999999999998,
+   "sandbox_seconds": 20.9,
+   "rates": {
+    "detection": 0.0,
+    "false_alarm": null,
+    "reproduction": 1.0,
+    "fix_pass": 1.0,
+    "escalation_correct": 0.0,
+    "error": 0.0
+   }
+  },
+  "ally-be": {
+   "cases": 2,
+   "bugs": 2,
+   "clean": 0,
+   "detected": 0,
+   "missed": 0,
+   "false_alarms": 0,
+   "repro_attempted": 2,
+   "repro_valid": 2,
+   "fix_attempted": 2,
+   "fix_pass": 2,
+   "escalate_expected": 2,
+   "escalate_correct": 0,
+   "errors": 0,
+   "tokens": 0,
+   "cost_usd": 0.0,
+   "seconds": 143.89999999999998,
+   "sandbox_seconds": 20.9,
+   "rates": {
+    "detection": 0.0,
+    "false_alarm": null,
+    "reproduction": 1.0,
+    "fix_pass": 1.0,
+    "escalation_correct": 0.0,
+    "error": 0.0
+   }
+  }
+ },
+ "cases": [
+  {
+   "id": "ally-be-6083b8d8",
+   "app": "ally-be",
+   "kind": "bug",
+   "expected": "escalate",
+   "outcome": "oracle_proven",
+   "found": false,
+   "escalated": false,
+   "patch_applied": true,
+   "repro_valid": true,
+   "oracle_pass": true,
+   "tokens": 0,
+   "cost_usd": 0.0,
+   "seconds": 75.1,
+   "sandbox_seconds": 11.3,
+   "run_id": "run-20261109-102637-9d7e97",
+   "error": null
+  },
+  {
+   "id": "ally-be-87c6ecb8",
+   "app": "ally-be",
+   "kind": "bug",
+   "expected": "escalate",
+   "outcome": "oracle_proven",
+   "found": false,
+   "escalated": false,
+   "patch_applied": true,
+   "repro_valid": true,
+   "oracle_pass": true,
+   "tokens": 0,
+   "cost_usd": 0.0,
+   "seconds": 68.8,
+   "sandbox_seconds": 9.6,
+   "run_id": "run-20261109-102752-72cefc",
+   "error": null
+  }
+ ]
+}

@@ -1,0 +1,34 @@
+diff --git a/src/analytics/service/highlights-analytics.service.ts b/src/analytics/service/highlights-analytics.service.ts
+index 8434b7a022..af51cc7efc 100644
+--- a/src/analytics/service/highlights-analytics.service.ts
++++ b/src/analytics/service/highlights-analytics.service.ts
+@@ -89,8 +89,7 @@ export class HighlightsAnalyticsService {
+     query: AnalyticsHighlightsQueryDto,
+   ): Promise<AnalyticsHighlightsResponseDto> {
+     // The data floor is one extra cheap query, and only for an all-time range.
+-    const needsFloor =
+-      (query.range ?? '30d') === 'all' && !query.from && !query.to;
++    const needsFloor = (query.range ?? '30d') === 'all';
+     const window = resolveAnalyticsWindow(query, {
+       defaultRange: '30d',
+       defaultBucketFor,
+diff --git a/src/analytics/service/test/highlights-analytics.service.spec.ts b/src/analytics/service/test/highlights-analytics.service.spec.ts
+index 57faa8f0d9..a203736a4a 100644
+--- a/src/analytics/service/test/highlights-analytics.service.spec.ts
++++ b/src/analytics/service/test/highlights-analytics.service.spec.ts
+@@ -178,6 +178,15 @@ describe('HighlightsAnalyticsService', () => {
+       await service.getHighlights({ range: '90d' });
+       expect(repo.getDataFloor).not.toHaveBeenCalled();
+     });
++
++    it('fetches the data floor even when a "from" date is provided', async () => {
++      await service.getHighlights({
++        range: 'all',
++        from: '2024-01-01',
++        to: '2024-06-01',
++      });
++      expect(repo.getDataFloor).toHaveBeenCalled();
++    });
+   });
+ 
+   describe('bucket axis + gap-fill', () => {

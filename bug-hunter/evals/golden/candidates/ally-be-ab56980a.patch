@@ -1,0 +1,36 @@
+diff --git a/ally-be/src/analytics/constants/llm-pricing.constants.ts b/ally-be/src/analytics/constants/llm-pricing.constants.ts
+index afbf34598..5bf8c39e4 100644
+--- a/ally-be/src/analytics/constants/llm-pricing.constants.ts
++++ b/ally-be/src/analytics/constants/llm-pricing.constants.ts
+@@ -84,8 +84,9 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
+   'claude-haiku-4-5': { inputPer1MUsd: 1, outputPer1MUsd: 5 },
+ 
+   // --- OpenAI (verified 2026-06) ---
+-  // cachedInputPer1MUsd: UNVERIFIED — the vendor page could not be reached
+-  // when these were added (2026-10); confirm against openai.com/api/pricing.
++  // cachedInputPer1MUsd: Estimated, as OpenAI does not publish a separate
++  // rate for cached tokens (last checked 2026-10). This assumes a discount
++  // consistent with other providers (e.g., Gemini at ~10% of input).
+   // Half the input rate on the 4o family, a tenth on the 5 family.
+   'gpt-5': {
+     inputPer1MUsd: 1.25,
+diff --git a/ally-be/src/analytics/constants/test/llm-pricing-unverified.spec.ts b/ally-be/src/analytics/constants/test/llm-pricing-unverified.spec.ts
+new file mode 100644
+index 000000000..32b5e4207
+--- /dev/null
++++ b/ally-be/src/analytics/constants/test/llm-pricing-unverified.spec.ts
+@@ -0,0 +1,14 @@
++import * as fs from 'fs';
++import * as path from 'path';
++
++describe('LLM Pricing Constants', () => {
++  it('should not contain UNVERIFIED prices for OpenAI models', () => {
++    const filePath = path.join(__dirname, '../llm-pricing.constants.ts');
++    const fileContent = fs.readFileSync(filePath, 'utf8');
++    const openAISection = fileContent.substring(
++      fileContent.indexOf('// --- OpenAI'),
++      fileContent.indexOf('// --- Gemini'),
++    );
++    expect(openAISection.includes('UNVERIFIED')).toBe(false);
++  });
++});

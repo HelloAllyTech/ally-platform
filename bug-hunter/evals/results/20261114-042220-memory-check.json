@@ -1,0 +1,385 @@
+{
+ "meta": {
+  "kind": "memory-check",
+  "scope": "eval-memcheck-20261114-042218",
+  "semantic": true,
+  "cost_usd_total": 1.6027,
+  "cost_cap_usd": 4.0,
+  "partial": false,
+  "stopped_reason": null,
+  "timestamp": "20261114-042220"
+ },
+ "cases": {
+  "ally-ai-6e81b510": {
+   "mode": "sweep",
+   "pass1": {
+    "run_id": "run-20261114-042220-6a9091",
+    "outcome": "clean",
+    "ended_as": "no_bug",
+    "finding": "",
+    "oracle": null,
+    "recalled": [],
+    "cost_usd": 0.0016,
+    "error": null
+   },
+   "verdict": {
+    "diagnosis": "not_a_bug",
+    "fix": "none",
+    "written": [
+     "rs-988fe3b721"
+    ],
+    "applied_fix": "none",
+    "note": "pass 1 had no finding: only the run record and stats"
+   },
+   "pass2": {
+    "run_id": "run-20261114-053251-7e57ff",
+    "outcome": "clean",
+    "ended_as": "no_bug",
+    "finding": "",
+    "oracle": null,
+    "recalled": [],
+    "cost_usd": 0.0017,
+    "error": null
+   },
+   "recalled_memory": false,
+   "changes": [
+    "nothing changed"
+   ]
+  },
+  "ally-be-89d8e055": {
+   "mode": "issue",
+   "pass1": {
+    "run_id": "run-20261114-042231-5233e6",
+    "outcome": "detected",
+    "ended_as": "suggested_fix",
+    "finding": "Prompt translation token guard fails on bidi/full\u2011width tokens, falsely reporting preserved tokens missing and forcing English fallback",
+    "oracle": false,
+    "recalled": [],
+    "cost_usd": 0.4448,
+    "error": null
+   },
+   "verdict": {
+    "diagnosis": "wrong",
+    "fix": "wrong",
+    "written": [
+     "bug-2b49b0125a",
+     "wt-b706811028",
+     "fr-f2948b4749",
+     "cv-d258f37d58",
+     "rs-16fa01953f"
+    ],
+    "applied_fix": "wrong"
+   },
+   "pass2": {
+    "run_id": "run-20261114-053301-7de886",
+    "outcome": "missed",
+    "ended_as": "no_bug",
+    "finding": "",
+    "oracle": null,
+    "recalled": [
+     "bug-2b49b0125a"
+    ],
+    "cost_usd": 0.0018,
+    "error": null
+   },
+   "recalled_memory": true,
+   "changes": [
+    "finding: 'Prompt translation token guard fails on bidi/full\u2011width tokens, falsely reporting preserved tokens missing and forcing English fallback' -> ''",
+    "ended_as: 'suggested_fix' -> 'no_bug'",
+    "outcome: 'detected' -> 'missed'",
+    "oracle: False -> None"
+   ]
+  },
+  "ally-web-eebbfd01": {
+   "mode": "issue",
+   "pass1": {
+    "run_id": "run-20261114-043720-7b1950",
+    "outcome": "escalated_acceptably",
+    "ended_as": "escalated",
+    "finding": "Helpline crashes on load: shared PageviewTracker uses useLocation bound to a different Router instance",
+    "oracle": null,
+    "recalled": [],
+    "cost_usd": 0.8268,
+    "error": null
+   },
+   "verdict": {
+    "diagnosis": "wrong",
+    "fix": "none",
+    "written": [
+     "bug-fa89196268",
+     "wt-5075898f60",
+     "rs-16fa01953f"
+    ],
+    "applied_fix": "none"
+   },
+   "pass2": {
+    "run_id": "run-20261114-053314-5d4c5e",
+    "outcome": "missed",
+    "ended_as": "no_bug",
+    "finding": "",
+    "oracle": null,
+    "recalled": [
+     "bug-fa89196268",
+     "bug-bf17d6f422"
+    ],
+    "cost_usd": 0.0018,
+    "error": null
+   },
+   "recalled_memory": true,
+   "changes": [
+    "finding: 'Helpline crashes on load: shared PageviewTracker uses useLocation bound to a different Router instance' -> ''",
+    "ended_as: 'escalated' -> 'no_bug'",
+    "outcome: 'escalated_acceptably' -> 'missed'"
+   ]
+  },
+  "ally-web-9299e9aa": {
+   "mode": "issue",
+   "pass1": {
+    "run_id": "run-20261114-045445-63b4e3",
+    "outcome": "detected",
+    "ended_as": "suggested_fix",
+    "finding": "WhatsApp bot Preview Test sends full history without cap; backend rejects when >20 turns",
+    "oracle": false,
+    "recalled": [
+     "bug-fa89196268"
+    ],
+    "cost_usd": 0.3226,
+    "error": null
+   },
+   "verdict": {
+    "diagnosis": "correct",
+    "fix": "needed_edits",
+    "approved": [
+     "cv-5c388fbf39"
+    ],
+    "written": [
+     "bug-bf17d6f422",
+     "fr-6cf49d96d3",
+     "cv-5c388fbf39",
+     "rs-16fa01953f"
+    ],
+    "applied_fix": "needed_edits"
+   },
+   "pass2": {
+    "run_id": "run-20261114-053323-f52dca",
+    "outcome": "missed",
+    "ended_as": "no_bug",
+    "finding": "",
+    "oracle": null,
+    "recalled": [
+     "bug-bf17d6f422",
+     "bug-fa89196268"
+    ],
+    "cost_usd": 0.0016,
+    "error": null
+   },
+   "recalled_memory": true,
+   "changes": [
+    "finding: 'WhatsApp bot Preview Test sends full history without cap; backend rejects when >20 turns' -> ''",
+    "ended_as: 'suggested_fix' -> 'no_bug'",
+    "outcome: 'detected' -> 'missed'",
+    "oracle: False -> None"
+   ]
+  }
+ },
+ "memory": [
+  {
+   "kind": "bugs",
+   "id": "bug-2b49b0125a",
+   "app": "ally-be",
+   "text": "Prompt translation token guard fails on bidi/full\u2011width tokens, falsely reporting preserved tokens missing and forcing English fallback: Some target-language outputs (notably RTL or CJK locales) insert invisible bidi/formatting marks or use full\u2011width bracket characters while visually preserving tokens like {name} and [laughs]. The guard\u2019s ASCII\u2011only regexes fail to match those variants, so validateTranslationTokens reports the tokens missing/added even though they look present. The translation attempt is then marked FAILED and the",
+   "files": [
+    "ally-be/src/prompt/util/translation-token-guard.util.ts",
+    "ally-be/src/prompt/service/prompt-translation.service.ts"
+   ],
+   "signature": "20d66c93a5eadd99",
+   "source_run": "run-20261114-042231-5233e6",
+   "created_at": "2026-11-14T04:37:02+00:00",
+   "last_used_at": "2026-11-14T05:33:04+00:00",
+   "title": "Prompt translation token guard fails on bidi/full\u2011width tokens, falsely reporting preserved tokens missing and forcing English fallback",
+   "root_cause": "Over\u2011strict token regexes in src/prompt/util/translation-token-guard.util.ts (lines 18\u201319) that only accept ASCII {}/[] and plain ASCII identifier characters with optional whitespace, rejecting visually preserved tokens with Unicode directionality marks or full\u2011width bracket forms that some translations introduce.",
+   "fix_summary": "The guard\u2019s ASCII-only regexes failed to match tokens when translations inserted bidi marks or used full-width brackets, causing false mismatches. I extended the placeholder and audio-tag regexes to accept full-width bracket variants and ignore Unicode bidi marks, and strip those marks during extraction/normalisation.",
+   "status": "suggested_fix",
+   "diagnosis": "wrong",
+   "fix_verdict": "wrong"
+  },
+  {
+   "kind": "bugs",
+   "id": "bug-fa89196268",
+   "app": "ally-web",
+   "text": "Helpline crashes on load: shared PageviewTracker uses useLocation bound to a different Router instance: The helpline app renders PageviewTracker under <BrowserRouter>, but the PageviewTracker component is sourced from the shared ui-shared library where it imports useLocation from react-router-dom. If ui-shared brings its own react-router-dom instance (instead of a peer), useLocation reads a different Router context than the app\u2019s BrowserRouter, so at render it throws \"useLocation() may be used only ",
+   "files": [
+    "ally-web/apps/ally-helpline-dashboard/src/routes/RouteLayout.tsx",
+    "ally-web/libs/ui-shared/src/lib/analytics/PageviewTracker.tsx",
+    "ally-web/apps/ally-helpline-dashboard/src/analytics/PageviewTracker.tsx"
+   ],
+   "signature": "7ad168357683d2c7",
+   "source_run": "run-20261114-043720-7b1950",
+   "created_at": "2026-11-14T04:54:32+00:00",
+   "last_used_at": "2026-11-14T05:33:26+00:00",
+   "title": "Helpline crashes on load: shared PageviewTracker uses useLocation bound to a different Router instance",
+   "root_cause": "A duplicate react-router-dom instance between the helpline app and ui-shared causes PageviewTracker (libs/ui-shared/src/lib/analytics/PageviewTracker.tsx:3) to use a different Router context than the BrowserRouter that wraps it (apps/ally-helpline-dashboard/src/routes/RouteLayout.tsx:37-40), triggering the useLocation() outside Router error at startup.",
+   "fix_summary": "",
+   "status": "escalated",
+   "diagnosis": "wrong",
+   "fix_verdict": "none"
+  },
+  {
+   "kind": "bugs",
+   "id": "bug-bf17d6f422",
+   "app": "ally-web",
+   "text": "WhatsApp bot Preview Test sends full history without cap; backend rejects when >20 turns: The Preview/Test tab constructs the request history by sending every prior turn in the local thread. Once the conversation exceeds 20 messages, the next request includes more than 20 elements in the history array, violating the backend\u2019s schema and triggering the error 'history must contain no more than 20 elements'. The on-screen thread continues to render from local state, but new sends fail bec",
+   "files": [
+    "ally-web/apps/ally-admin-dashboard/src/pages/WhatsAppBot/ChatbotTestTab.tsx",
+    "ally-web/apps/ally-admin-dashboard/src/types/chatbots.ts"
+   ],
+   "signature": "eb0448a4f03147dd",
+   "source_run": "run-20261114-045445-63b4e3",
+   "created_at": "2026-11-14T05:32:10+00:00",
+   "last_used_at": "2026-11-14T05:33:26+00:00",
+   "title": "WhatsApp bot Preview Test sends full history without cap; backend rejects when >20 turns",
+   "root_cause": "apps/ally-admin-dashboard/src/pages/WhatsAppBot/ChatbotTestTab.tsx:61 \u2014 The history sent to the test endpoint is the entire local turns array with no size cap; it should be trimmed (e.g., last 20) before sending.",
+   "fix_summary": "The ChatbotTestTab was sending the full local turn history to the test endpoint without a cap, causing payloads with more than 20 turns to be sent and rejected by the backend. I updated the history construction to only include the last 20 turns before sending, matching the server\u2019s contract.",
+   "status": "suggested_fix",
+   "diagnosis": "correct",
+   "fix_verdict": "needed_edits"
+  },
+  {
+   "kind": "run_stats",
+   "id": "rs-988fe3b721",
+   "app": "global",
+   "text": "commit_sweep/sweep",
+   "files": [],
+   "signature": "commit_sweep/sweep",
+   "source_run": "",
+   "created_at": "2026-11-14T05:32:46+00:00",
+   "last_used_at": null,
+   "key": "commit_sweep/sweep",
+   "diagnoses": 1,
+   "diagnosis_correct": 0,
+   "not_a_bug": 1,
+   "fixes": 0,
+   "fix_worked": 0,
+   "fix_needed_edits": 0
+  },
+  {
+   "kind": "wrong_theories",
+   "id": "wt-b706811028",
+   "app": "ally-be",
+   "text": "Prompt translation fails for some languages with a token-mismatch error: the translated text is rejected because required tokens such as {name} and [laughs] are reported missing, even though the translator kept them in the output. Users of those languages then see the English prompt text instead of their selected language. | wrong theory: Prompt translation token guard fails on bidi/full\u2011width tokens, falsely reporting preserved tokens missing and forcing English fallback | why: Wrong cause: the rejected translations wrap tokens in zero-width spaces (U+200B), e.g. {\u200bname\u200b}; fullwidth brackets are not involved.",
+   "files": [
+    "ally-be/src/prompt/util/translation-token-guard.util.ts",
+    "ally-be/src/prompt/service/prompt-translation.service.ts"
+   ],
+   "signature": "",
+   "source_run": "run-20261114-042231-5233e6",
+   "created_at": "2026-11-14T05:32:47+00:00",
+   "last_used_at": null,
+   "title": "Prompt translation token guard fails on bidi/full\u2011width tokens, falsely reporting preserved tokens missing and forcing English fallback",
+   "theory": "Prompt translation token guard fails on bidi/full\u2011width tokens, falsely reporting preserved tokens missing and forcing English fallback: Some target-language outputs (notably RTL or CJK locales) insert invisible bidi/formatting marks or use full\u2011width bracket characters while visually preserving tokens like {name} and [laughs]. The guard\u2019s ASCII\u2011only regexes fail to match those variants, so validateTranslationTokens reports the token (root cause claimed: Over\u2011strict token regexes in src/prompt/util/translation-token-guard.util.ts (lines 18\u201319) that only accept ASCII {}/[] and plain ASCII identifier characters with optional whitespace, rejecting visual)",
+   "reason": "Wrong cause: the rejected translations wrap tokens in zero-width spaces (U+200B), e.g. {\u200bname\u200b}; fullwidth brackets are not involved."
+  },
+  {
+   "kind": "conventions",
+   "id": "cv-d258f37d58",
+   "app": "ally-be",
+   "text": "Wrong cause: the rejected translations wrap tokens in zero-width spaces (U+200B), e.g. {\u200bname\u200b}; fullwidth brackets are not involved.",
+   "files": [],
+   "signature": "",
+   "source_run": "run-20261114-042231-5233e6",
+   "created_at": "2026-11-14T05:32:48+00:00",
+   "last_used_at": null,
+   "status": "pending",
+   "count": 1,
+   "sources": [
+    "run-20261114-042231-5233e6"
+   ]
+  },
+  {
+   "kind": "fragile_areas",
+   "id": "fr-f2948b4749",
+   "app": "ally-be",
+   "text": "ally-be/src/prompt/util/translation-token-guard.util.ts: fix wrong",
+   "files": [
+    "ally-be/src/prompt/util/translation-token-guard.util.ts"
+   ],
+   "signature": "",
+   "source_run": "run-20261114-042231-5233e6",
+   "created_at": "2026-11-14T05:32:48+00:00",
+   "last_used_at": null,
+   "count": 1,
+   "reasons": [
+    "Wrong cause: the rejected translations wrap tokens in zero-width spaces (U+200B), e.g. {\u200bname\u200b}; fullwidth brackets are not involved."
+   ]
+  },
+  {
+   "kind": "wrong_theories",
+   "id": "wt-5075898f60",
+   "app": "ally-web",
+   "text": "helpline-v1.50.3 shows 'Sorry \u2014 this page stopped working' on every page right after load. The browser console says: useLocation() may be used only in the context of a <Router> component. The admin dashboard is unaffected. | wrong theory: Helpline crashes on load: shared PageviewTracker uses useLocation bound to a different Router instance | why: Wrong place: useLocation() is called by the helpline app's PageviewTracker, which is mounted outside the Router; the fix belongs there, not in ui-shared.",
+   "files": [
+    "ally-web/apps/ally-helpline-dashboard/src/routes/RouteLayout.tsx",
+    "ally-web/libs/ui-shared/src/lib/analytics/PageviewTracker.tsx",
+    "ally-web/apps/ally-helpline-dashboard/src/analytics/PageviewTracker.tsx"
+   ],
+   "signature": "",
+   "source_run": "run-20261114-043720-7b1950",
+   "created_at": "2026-11-14T05:32:49+00:00",
+   "last_used_at": null,
+   "title": "Helpline crashes on load: shared PageviewTracker uses useLocation bound to a different Router instance",
+   "theory": "Helpline crashes on load: shared PageviewTracker uses useLocation bound to a different Router instance: The helpline app renders PageviewTracker under <BrowserRouter>, but the PageviewTracker component is sourced from the shared ui-shared library where it imports useLocation from react-router-dom. If ui-shared brings its own react-router-dom instance (instead of a peer), useLocation reads a different  (root cause claimed: A duplicate react-router-dom instance between the helpline app and ui-shared causes PageviewTracker (libs/ui-shared/src/lib/analytics/PageviewTracker.tsx:3) to use a different Router context than the )",
+   "reason": "Wrong place: useLocation() is called by the helpline app's PageviewTracker, which is mounted outside the Router; the fix belongs there, not in ui-shared."
+  },
+  {
+   "kind": "run_stats",
+   "id": "rs-16fa01953f",
+   "app": "global",
+   "text": "issue/issue",
+   "files": [],
+   "signature": "issue/issue",
+   "source_run": "",
+   "created_at": "2026-11-14T05:32:49+00:00",
+   "last_used_at": null,
+   "key": "issue/issue",
+   "diagnoses": 3,
+   "diagnosis_correct": 1,
+   "not_a_bug": 0,
+   "fixes": 2,
+   "fix_worked": 0,
+   "fix_needed_edits": 1
+  },
+  {
+   "kind": "conventions",
+   "id": "cv-5c388fbf39",
+   "app": "ally-web",
+   "text": "Send only the most recent 10 messages, the same window ally-be keeps, in a named constant; not the API's maximum of 20.",
+   "files": [],
+   "signature": "",
+   "source_run": "run-20261114-045445-63b4e3",
+   "created_at": "2026-11-14T05:32:50+00:00",
+   "last_used_at": null,
+   "status": "approved",
+   "count": 1,
+   "sources": [
+    "run-20261114-045445-63b4e3"
+   ]
+  },
+  {
+   "kind": "fragile_areas",
+   "id": "fr-6cf49d96d3",
+   "app": "ally-web",
+   "text": "ally-web/apps/ally-admin-dashboard/src/pages/WhatsAppBot/ChatbotTestTab.tsx: fix needed edits",
+   "files": [
+    "ally-web/apps/ally-admin-dashboard/src/pages/WhatsAppBot/ChatbotTestTab.tsx"
+   ],
+   "signature": "",
+   "source_run": "run-20261114-045445-63b4e3",
+   "created_at": "2026-11-14T05:32:50+00:00",
+   "last_used_at": null,
+   "count": 1,
+   "reasons": [
+    "Send only the most recent 10 messages, the same window ally-be keeps, in a named constant; not the API's maximum of 20."
+   ]
+  }
+ ]
+}

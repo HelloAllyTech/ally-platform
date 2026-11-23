@@ -2,8 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import { BugFindingRepository } from 'src/bug-hunter/repository/bug-finding.repository';
-import { BugFindingSource } from 'src/bug-hunter/enum/bug-finding.enum';
+import { BugHunterBoardService } from 'src/bug-hunter-approvals/service/bug-hunter-board.service';
 import { PmAgentSignal } from 'src/pm-agent/entity/pm-agent-signal.entity';
 import { PmSignalStatus } from 'src/pm-agent/enum/pm-agent.enum';
 import { UX_SIGNALS_SOURCE } from './ux-signal-writer.service';
@@ -56,7 +55,7 @@ export class UxSignalReadService {
   constructor(
     @InjectRepository(UxSignalScan)
     private readonly scanRepository: Repository<UxSignalScan>,
-    private readonly findingRepository: BugFindingRepository,
+    private readonly bugHunter: BugHunterBoardService,
     @InjectRepository(PmAgentSignal)
     private readonly signalRepository: Repository<PmAgentSignal>,
   ) {}
@@ -81,11 +80,11 @@ export class UxSignalReadService {
         where: { status: UxSignalScanStatus.COMPLETED },
         order: { startedAt: 'DESC' },
       }),
-      this.findingRepository.listOpenBySource(
-        BugFindingSource.UX_SIGNAL,
+      this.bugHunter.listBySource('ux_signal', {
         term,
         take,
-      ),
+        openOnly: true,
+      }),
       this.liveSuggestions(term, take),
     ]);
 

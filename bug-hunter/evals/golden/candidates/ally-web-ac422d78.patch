@@ -1,0 +1,154 @@
+diff --git a/apps/ally-admin-dashboard/src/api/__tests__/auth.test.ts b/apps/ally-admin-dashboard/src/api/__tests__/auth.test.ts
+index abb274d03b..b3c259a8c9 100644
+--- a/apps/ally-admin-dashboard/src/api/__tests__/auth.test.ts
++++ b/apps/ally-admin-dashboard/src/api/__tests__/auth.test.ts
+@@ -1,6 +1,6 @@
+ import { describe, it, expect, vi, beforeEach } from "vitest";
+ 
+-import { ApiEndpoints, HttpMethod, UserRole } from "@constants";
++import { ADMIN_PORTAL_LOGIN_ROLES, ApiEndpoints, HttpMethod, UserRole } from "@constants";
+ 
+ // Mock the store to avoid initialization issues
+ vi.mock("@store", () => ({
+@@ -370,28 +370,29 @@ describe("auth API", () => {
+       expect(UserRole.SUPER_ADMIN).toBeDefined();
+     });
+ 
+-    it("should use correct role in OTP generation", () => {
+-      const otpRequest = {
+-        phone: "+1234567890",
+-        email: "user@example.com",
+-        allowedRoles: [UserRole.SUPER_ADMIN, UserRole.MULTI_TENANT_ADMIN],
+-      };
+-
+-      expect(otpRequest.allowedRoles).toContain(UserRole.SUPER_ADMIN);
+-      expect(otpRequest.allowedRoles).toContain(UserRole.MULTI_TENANT_ADMIN);
+-      expect(Array.isArray(otpRequest.allowedRoles)).toBe(true);
++    /**
++     * These assert the real ADMIN_PORTAL_LOGIN_ROLES that all four auth entry
++     * points send — the predecessors of these tests asserted a literal built
++     * inside the test itself, which is why nothing failed when the console
++     * started granting PLATFORM_ADMIN while login still listed only the three
++     * retired tiers, locking out every admin added after that deploy.
++     */
++    it("admits the current platform-tier role", () => {
++      expect(ADMIN_PORTAL_LOGIN_ROLES).toContain(UserRole.PLATFORM_ADMIN);
+     });
+ 
+-    it("should use correct role in OTP verification", () => {
+-      const verifyRequest = {
+-        phone: "+1234567890",
+-        email: "user@example.com",
+-        otp: "123456",
+-        allowedRoles: [UserRole.SUPER_ADMIN, UserRole.MULTI_TENANT_ADMIN],
+-      };
++    it("still admits the retired tiers, for accounts the collapse hasn't reached", () => {
++      expect(ADMIN_PORTAL_LOGIN_ROLES).toContain(UserRole.SUPER_ADMIN);
++      expect(ADMIN_PORTAL_LOGIN_ROLES).toContain(UserRole.SUPER_DUPER_ADMIN);
++      expect(ADMIN_PORTAL_LOGIN_ROLES).toContain(UserRole.MULTI_TENANT_ADMIN);
++    });
+ 
+-      expect(verifyRequest.allowedRoles).toContain(UserRole.SUPER_ADMIN);
+-      expect(verifyRequest.allowedRoles).toContain(UserRole.MULTI_TENANT_ADMIN);
++    it("admits no tenant-scoped role", () => {
++      // A filter the server intersects with real group membership — but this
++      // console is not the portal for org admins, counsellors or learners.
++      expect(ADMIN_PORTAL_LOGIN_ROLES).not.toContain(UserRole.ADMIN);
++      expect(ADMIN_PORTAL_LOGIN_ROLES).not.toContain(UserRole.COUNSELLOR);
++      expect(ADMIN_PORTAL_LOGIN_ROLES).not.toContain(UserRole.LEARNER);
+     });
+   });
+ });
+diff --git a/apps/ally-admin-dashboard/src/api/auth.ts b/apps/ally-admin-dashboard/src/api/auth.ts
+index 61d019558f..fe6bc9e233 100644
+--- a/apps/ally-admin-dashboard/src/api/auth.ts
++++ b/apps/ally-admin-dashboard/src/api/auth.ts
+@@ -7,13 +7,12 @@
+ 
+ import { baseAPI, baseQuery } from "@api";
+ import {
++  ADMIN_PORTAL_LOGIN_ROLES,
+   ApiEndpoints,
+   AppType,
+   HttpMethod,
+   Permissions,
+-  SUPER_ADMIN_ROLES,
+   TAG_TYPES,
+-  UserRole,
+   resolveAdminRole,
+ } from "@constants";
+ import {
+@@ -98,7 +97,7 @@ export const authAPI = baseAPI.injectEndpoints({
+         body: {
+           phone,
+           email,
+-          allowedRoles: [...SUPER_ADMIN_ROLES, UserRole.MULTI_TENANT_ADMIN],
++          allowedRoles: ADMIN_PORTAL_LOGIN_ROLES,
+           appType: AppType.ADMIN,
+         },
+       }),
+@@ -117,7 +116,7 @@ export const authAPI = baseAPI.injectEndpoints({
+           phone,
+           otp,
+           email,
+-          allowedRoles: [...SUPER_ADMIN_ROLES, UserRole.MULTI_TENANT_ADMIN],
++          allowedRoles: ADMIN_PORTAL_LOGIN_ROLES,
+         },
+       }),
+     }),
+@@ -130,7 +129,7 @@ export const authAPI = baseAPI.injectEndpoints({
+       query: data => ({
+         url: ApiEndpoints.AUTH.GOOGLE_SIGN_IN,
+         method: HttpMethod.POST,
+-        body: { ...data, allowedRoles: [...SUPER_ADMIN_ROLES, UserRole.MULTI_TENANT_ADMIN] },
++        body: { ...data, allowedRoles: ADMIN_PORTAL_LOGIN_ROLES },
+       }),
+     }),
+     getProfileImageUrl: builder.mutation<GetProfileUrlResponse, GetProfileUrlRequest>({
+@@ -173,7 +172,7 @@ export const authAPI = baseAPI.injectEndpoints({
+           {
+             url: ApiEndpoints.AUTH.MAGIC_LINK_VERIFY,
+             method: HttpMethod.POST,
+-            body: { token, allowedRoles: [...SUPER_ADMIN_ROLES, UserRole.MULTI_TENANT_ADMIN] },
++            body: { token, allowedRoles: ADMIN_PORTAL_LOGIN_ROLES },
+           },
+           api,
+           extraOptions,
+diff --git a/apps/ally-admin-dashboard/src/constants/user.ts b/apps/ally-admin-dashboard/src/constants/user.ts
+index 2d77a497a4..7c743429e4 100644
+--- a/apps/ally-admin-dashboard/src/constants/user.ts
++++ b/apps/ally-admin-dashboard/src/constants/user.ts
+@@ -321,6 +321,33 @@ export const SUPER_ADMIN_ROLES: UserRole[] = [UserRole.SUPER_ADMIN, UserRole.SUP
+ export const isSuperAdminRole = (role?: UserRole | string | null): boolean =>
+   role != null && (SUPER_ADMIN_ROLES as string[]).includes(role);
+ 
++/**
++ * Every role this console's login admits, sent as `allowedRoles` on all four
++ * auth entry points (OTP request, OTP verify, Google sign-in, magic link).
++ *
++ * One list, referenced everywhere, because the four call sites each hardcoding
++ * their own is exactly how PLATFORM_ADMIN got missed: the collapse shipped the
++ * Ally admins screen — which grants PLATFORM_ADMIN and *only* PLATFORM_ADMIN —
++ * while login still listed the three retired tiers, so every admin added after
++ * that deploy was created into the list and then refused at the door with
++ * "This account does not have the required role". Migrated admins never hit it,
++ * because the migration left their old `user_groups` rows in place.
++ *
++ * The retired tiers stay listed: their groups still carry live permissions for
++ * rollback safety, and `allowedRoles` is a filter the server intersects with
++ * the groups an account actually holds — a name nobody holds admits nobody, so
++ * keeping them costs nothing and dropping them would strand any account the
++ * collapse migration hasn't reached.
++ *
++ * Adding a platform-tier role? Add it here, and check whether it also belongs
++ * in ADMIN_ROLE_PRECEDENCE below.
++ */
++export const ADMIN_PORTAL_LOGIN_ROLES: UserRole[] = [
++  UserRole.PLATFORM_ADMIN,
++  ...SUPER_ADMIN_ROLES,
++  UserRole.MULTI_TENANT_ADMIN,
++];
++
+ /**
+  * The elevated super-admin tier. SUPER_DUPER_ADMIN sits above SUPER_ADMIN: gate
+  * the most privileged admin surfaces (Settings, Guardrails, Characters, Speech

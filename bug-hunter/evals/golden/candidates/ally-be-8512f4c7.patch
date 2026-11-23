@@ -1,0 +1,174 @@
+diff --git a/src/learn/entity/learner-supervisor-memory.entity.ts b/src/learn/entity/learner-supervisor-memory.entity.ts
+index 1671f587d6..a47dcacbce 100644
+--- a/src/learn/entity/learner-supervisor-memory.entity.ts
++++ b/src/learn/entity/learner-supervisor-memory.entity.ts
+@@ -39,7 +39,8 @@ export class LearnerSupervisorMemory extends BaseEntity {
+    *   focusAreas: string[],        // 1-3 skills actively being worked on
+    *   trajectory: string,          // how they're developing across sessions
+    *   nextTime: string,            // the one thing they were asked to try
+-   *   recentSessions: [{ scenarioSessionId, at }]  // shallow trail, newest first
++   *   recentSessions: [{ scenarioSessionId, at }],  // shallow trail, newest first, capped
++   *   totalSessions: number,       // uncapped running count of debriefed sessions
+    * }
+    */
+   @Column({ type: 'jsonb' })
+diff --git a/src/learn/service/learner-supervisor-memory.service.ts b/src/learn/service/learner-supervisor-memory.service.ts
+index 084bc1db36..8b7ca57771 100644
+--- a/src/learn/service/learner-supervisor-memory.service.ts
++++ b/src/learn/service/learner-supervisor-memory.service.ts
+@@ -43,7 +43,13 @@ export class LearnerSupervisorMemoryService {
+       });
+       if (!row?.memory) return null;
+ 
+-      const { focusAreas, trajectory, nextTime, recentSessions } = row.memory;
++      const {
++        focusAreas,
++        trajectory,
++        nextTime,
++        recentSessions,
++        totalSessions,
++      } = row.memory;
+       const lines: string[] = [];
+ 
+       if (Array.isArray(focusAreas) && focusAreas.length) {
+@@ -57,10 +63,16 @@ export class LearnerSupervisorMemoryService {
+           `What you asked them to try after their last session: ${nextTime.trim()}`,
+         );
+       }
+-      if (Array.isArray(recentSessions) && recentSessions.length) {
+-        lines.push(
+-          `Sessions debriefed with them so far: ${recentSessions.length}`,
+-        );
++      // `totalSessions` is the running count; `recentSessions.length` is only
++      // a fallback for rows written before that counter existed.
++      const sessionCount =
++        typeof totalSessions === 'number'
++          ? totalSessions
++          : Array.isArray(recentSessions)
++            ? recentSessions.length
++            : 0;
++      if (sessionCount > 0) {
++        lines.push(`Sessions debriefed with them so far: ${sessionCount}`);
+       }
+ 
+       return lines.length ? lines.join('\n') : null;
+@@ -100,6 +112,9 @@ export class LearnerSupervisorMemoryService {
+       const previousTrail = Array.isArray(existing?.memory?.recentSessions)
+         ? existing.memory.recentSessions
+         : [];
++      const isRedelivery = previousTrail.some(
++        (entry: any) => entry?.scenarioSessionId === scenarioSessionId,
++      );
+       // Guard against a redelivered end-of-session event stacking the same
+       // session onto the trail twice.
+       const trail = [
+@@ -109,6 +124,14 @@ export class LearnerSupervisorMemoryService {
+         ),
+       ].slice(0, MAX_RECENT_SESSIONS);
+ 
++      // The trail above is a shallow, capped preview; this counter is the
++      // uncapped running total the debrief note reports to the learner.
++      const previousTotal =
++        typeof existing?.memory?.totalSessions === 'number'
++          ? existing.memory.totalSessions
++          : previousTrail.length;
++      const totalSessions = isRedelivery ? previousTotal : previousTotal + 1;
++
+       await this.repository.upsert(
+         {
+           counselorId,
+@@ -121,6 +144,7 @@ export class LearnerSupervisorMemoryService {
+             trajectory: memoryUpdate.trajectory ?? '',
+             nextTime: memoryUpdate.next_time ?? '',
+             recentSessions: trail,
++            totalSessions,
+           } as Record<string, any>,
+         },
+         { conflictPaths: ['counselorId', 'tenantId'] },
+diff --git a/src/learn/service/test/learner-supervisor-memory.service.spec.ts b/src/learn/service/test/learner-supervisor-memory.service.spec.ts
+new file mode 100644
+index 0000000000..e2dc3a08c7
+--- /dev/null
++++ b/src/learn/service/test/learner-supervisor-memory.service.spec.ts
+@@ -0,0 +1,81 @@
++import { Test, TestingModule } from '@nestjs/testing';
++import { getRepositoryToken } from '@nestjs/typeorm';
++import { LearnerSupervisorMemory } from '../../entity/learner-supervisor-memory.entity';
++import { LearnerSupervisorMemoryService } from '../learner-supervisor-memory.service';
++
++describe('LearnerSupervisorMemoryService', () => {
++  let service: LearnerSupervisorMemoryService;
++  let repo: {
++    findOne: jest.Mock;
++    upsert: jest.Mock;
++  };
++
++  beforeEach(async () => {
++    repo = {
++      findOne: jest.fn(),
++      upsert: jest.fn(async () => undefined),
++    };
++
++    const module: TestingModule = await Test.createTestingModule({
++      providers: [
++        LearnerSupervisorMemoryService,
++        {
++          provide: getRepositoryToken(LearnerSupervisorMemory),
++          useValue: repo,
++        },
++      ],
++    }).compile();
++
++    service = module.get(LearnerSupervisorMemoryService);
++  });
++
++  describe('getSupervisorMemoryPrompt', () => {
++    it('reports the true total once a learner has more debriefed sessions than the recent trail keeps', async () => {
++      // The trail is capped at MAX_RECENT_SESSIONS (5) entries, but this
++      // learner has been debriefed 50 times.
++      repo.findOne.mockResolvedValue({
++        memory: {
++          focusAreas: ['pacing'],
++          trajectory: 'improving',
++          nextTime: 'slow down',
++          totalSessions: 50,
++          recentSessions: Array.from({ length: 5 }, (_, i) => ({
++            scenarioSessionId: `session-${i}`,
++            at: new Date().toISOString(),
++          })),
++        },
++      });
++
++      const prompt = await service.getSupervisorMemoryPrompt(1, 'tenant-1');
++
++      expect(prompt).toContain('Sessions debriefed with them so far: 50');
++    });
++  });
++
++  describe('recordFromEvaluation', () => {
++    it('keeps incrementing totalSessions past the capped recentSessions trail', async () => {
++      repo.findOne.mockResolvedValue({
++        memory: {
++          totalSessions: 50,
++          recentSessions: Array.from({ length: 5 }, (_, i) => ({
++            scenarioSessionId: `session-${i}`,
++            at: new Date().toISOString(),
++          })),
++        },
++      });
++
++      await service.recordFromEvaluation(1, 'tenant-1', 'session-new', {
++        focus_areas: [],
++        trajectory: '',
++        next_time: '',
++      });
++
++      expect(repo.upsert).toHaveBeenCalledWith(
++        expect.objectContaining({
++          memory: expect.objectContaining({ totalSessions: 51 }),
++        }),
++        expect.anything(),
++      );
++    });
++  });
++});

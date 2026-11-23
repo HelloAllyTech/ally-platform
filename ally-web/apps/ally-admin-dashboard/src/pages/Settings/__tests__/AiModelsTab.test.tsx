@@ -40,21 +40,12 @@ vi.mock("@ally-ui-mono/ui-shared", () => ({
   ),
 }));
 
-const updateBugHunterSettings = vi.fn().mockReturnValue({ unwrap: () => Promise.resolve({}) });
 const updateBuilderSettings = vi.fn().mockReturnValue({ unwrap: () => Promise.resolve({}) });
 const updateValidatedTurns = vi.fn();
 let validatedTurnsResult: any;
-let bugHunterResult: any;
 let builderResult: any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let ownersResult: any;
-const updateOwner = vi.fn();
 
 vi.mock("@api", () => ({
-  useGetBugHunterModelSettingsQuery: () => bugHunterResult,
-  useUpdateBugHunterModelSettingsMutation: () => [updateBugHunterSettings, { isLoading: false }],
-  useGetBugHunterDecisionOwnersQuery: () => ownersResult,
-  useUpdateBugHunterDecisionOwnerMutation: () => [updateOwner, { isLoading: false }],
   useGetBuilderSettingsQuery: () => builderResult,
   useUpdateBuilderSettingsMutation: () => [updateBuilderSettings, { isLoading: false }],
   useGetValidatedAgentTurnsQuery: () => validatedTurnsResult,
@@ -66,7 +57,6 @@ import { AiModelsTab } from "../AiModelsTab";
 
 describe("AiModelsTab", () => {
   beforeEach(() => {
-    updateBugHunterSettings.mockClear();
     updateBuilderSettings.mockClear();
     toastSuccess.mockClear();
     toastError.mockClear();
@@ -74,71 +64,6 @@ describe("AiModelsTab", () => {
     updateValidatedTurns.mockReturnValue({ unwrap: () => Promise.resolve({}) });
     validatedTurnsResult = {
       data: { courseCopilot: true, characterInterview: true },
-      isLoading: false,
-      isError: false,
-    };
-    bugHunterResult = {
-      data: {
-        engine: "claude-code",
-        defaultModel: "claude-sonnet-5",
-        escalationModel: "claude-opus-5",
-      },
-      isLoading: false,
-      isError: false,
-    };
-    updateOwner.mockReset();
-    updateOwner.mockReturnValue({
-      unwrap: () =>
-        Promise.resolve({
-          owners: {
-            D1: "model",
-            D2: "model",
-            D3: "model",
-            D4: "rule",
-            D5: "model",
-            D6: "model",
-            D7: "model",
-            D8: "rule",
-          },
-          defaults: {
-            D1: "model",
-            D2: "model",
-            D3: "model",
-            D4: "rule",
-            D5: "model",
-            D6: "model",
-            D7: "rule",
-            D8: "rule",
-          },
-          fixed: ["D4", "D8"],
-          overrides: { D7: "model" },
-        }),
-    });
-    ownersResult = {
-      data: {
-        owners: {
-          D1: "model",
-          D2: "model",
-          D3: "model",
-          D4: "rule",
-          D5: "model",
-          D6: "model",
-          D7: "rule",
-          D8: "rule",
-        },
-        defaults: {
-          D1: "model",
-          D2: "model",
-          D3: "model",
-          D4: "rule",
-          D5: "model",
-          D6: "model",
-          D7: "rule",
-          D8: "rule",
-        },
-        fixed: ["D4", "D8"],
-        overrides: {},
-      },
       isLoading: false,
       isError: false,
     };
@@ -157,92 +82,19 @@ describe("AiModelsTab", () => {
     };
   });
 
-  it("lists who owns each decision point, fixes D4 and D8, and hands a point over on change (OPP-0783)", async () => {
-    render(<AiModelsTab />);
-    const section = screen.getByTestId("decision-owners");
-    expect(section).toHaveTextContent("Who decides each move");
-    expect(screen.getByTestId("owner-D4")).toHaveTextContent("Fixed in code");
-    expect(screen.getByTestId("owner-D8")).toHaveTextContent("Fixed in code");
-
-    const d7 = screen.getByTestId("owner-D7").querySelector("select") as HTMLSelectElement;
-    expect(d7.value).toBe("");
-    fireEvent.change(d7, { target: { value: "model" } });
-    await waitFor(() => expect(updateOwner).toHaveBeenCalledWith({ point: "D7", owner: "model" }));
-    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith("D7 now decided by the model."));
-  });
-
-  it("shows both sections, each loaded from its own backend", () => {
+  it("shows Builder's models, loaded from its own backend", () => {
     render(<AiModelsTab />);
 
-    expect(screen.getByText("Bug Hunter")).toBeInTheDocument();
     expect(screen.getByText("Builder")).toBeInTheDocument();
-    expect(screen.getByLabelText("Default model")).toHaveValue("claude-sonnet-5");
+    expect(screen.queryByText("Bug Hunter")).toBeNull();
     expect(screen.getByLabelText("Coder model")).toHaveValue("claude-opus-5");
   });
 
-  it("saves Bug Hunter's section without touching Builder's", async () => {
-    render(<AiModelsTab />);
-
-    fireEvent.change(screen.getByLabelText("Escalation model"), {
-      target: { value: "claude-haiku-4-5" },
-    });
-    fireEvent.click(screen.getAllByText("Save")[0]);
-
-    await vi.waitFor(() => {
-      expect(updateBugHunterSettings).toHaveBeenCalledWith({
-        engine: "claude-code",
-        defaultModel: "claude-sonnet-5",
-        escalationModel: "claude-haiku-4-5",
-      });
-    });
-    expect(updateBuilderSettings).not.toHaveBeenCalled();
-  });
-
-  it("switching Bug Hunter's engine to Gemini swaps the model options and disables escalation", async () => {
-    render(<AiModelsTab />);
-
-    fireEvent.change(screen.getAllByLabelText("Engine")[0], { target: { value: "gemini" } });
-
-    // Escalation has no Gemini equivalent — its field becomes a disabled
-    // placeholder rather than a live model picker.
-    expect(screen.getByLabelText("Escalation model")).toBeDisabled();
-
-    fireEvent.click(screen.getAllByText("Save")[0]);
-
-    await vi.waitFor(() => {
-      expect(updateBugHunterSettings).toHaveBeenCalledWith(
-        expect.objectContaining({ engine: "gemini", defaultModel: "gemini-2.5-flash" }),
-      );
-    });
-  });
-
-  it("switching Bug Hunter's engine to OpenCode keeps escalation live and offers every vendor's models", async () => {
-    render(<AiModelsTab />);
-
-    fireEvent.change(screen.getAllByLabelText("Engine")[0], { target: { value: "opencode" } });
-
-    // opencode has Task-tool subagents, so the escalation tier stays a real
-    // picker — the opposite of the Gemini case above.
-    const escalation = screen.getByLabelText("Escalation model");
-    expect(escalation).not.toBeDisabled();
-    const defaultModel = screen.getByLabelText("Default model") as HTMLSelectElement;
-    const offered = Array.from(defaultModel.options).map(option => option.value);
-    expect(offered).toEqual(expect.arrayContaining(["gemini-2.5-pro", "claude-sonnet-5"]));
-
-    fireEvent.click(screen.getAllByText("Save")[0]);
-
-    await vi.waitFor(() => {
-      expect(updateBugHunterSettings).toHaveBeenCalledWith(
-        expect.objectContaining({ engine: "opencode", defaultModel: "gemini-2.5-flash" }),
-      );
-    });
-  });
-
-  it("saves Builder's section without touching Bug Hunter's, clearing a blank tier to the platform default", async () => {
+  it("saves Builder's section, clearing a blank tier to the platform default", async () => {
     render(<AiModelsTab />);
 
     fireEvent.change(screen.getByLabelText("Coder model"), { target: { value: "" } });
-    fireEvent.click(screen.getAllByText("Save")[1]);
+    fireEvent.click(screen.getByText("Save"));
 
     await vi.waitFor(() => {
       expect(updateBuilderSettings).toHaveBeenCalledWith({
@@ -251,14 +103,13 @@ describe("AiModelsTab", () => {
         verifierModel: "",
       });
     });
-    expect(updateBugHunterSettings).not.toHaveBeenCalled();
   });
 
-  // Builder runs only on opencode: the only Engine picker left is Bug Hunter's.
-  it("offers no engine picker for Builder", () => {
+  // Builder runs only on opencode, and the old Bug Hunter's engine picker left with it.
+  it("offers no engine picker", () => {
     render(<AiModelsTab />);
 
-    expect(screen.getAllByLabelText("Engine")).toHaveLength(1);
+    expect(screen.queryByLabelText("Engine")).toBeNull();
   });
 
   describe("validated turns", () => {
@@ -305,11 +156,10 @@ describe("AiModelsTab", () => {
     });
   });
 
-  it("shows an error only for the section that failed to load", () => {
+  it("shows an error when Builder's settings failed to load", () => {
     builderResult = { data: undefined, isLoading: false, isError: true };
     render(<AiModelsTab />);
 
     expect(screen.getByText("Couldn't load Builder's model settings.")).toBeInTheDocument();
-    expect(screen.queryByText("Couldn't load Bug Hunter's model settings.")).toBeNull();
   });
 });
