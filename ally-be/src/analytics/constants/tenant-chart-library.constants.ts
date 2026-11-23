@@ -193,6 +193,25 @@ export type ChartSource = 'doc' | 'research' | 'existing';
 /** What a chart is about. */
 export type ChartScope = 'organisation' | 'course' | 'simulation' | 'learner';
 
+/** A filter a card can offer: one course, one simulation or one learner. */
+export type ChartFilterKey = Exclude<ChartScope, 'organisation'>;
+
+export interface ChartFilter {
+  key: ChartFilterKey;
+  /** The card cannot be drawn without a choice, because it has no all-organisation view. */
+  required: boolean;
+}
+
+/**
+ * The filters a card offers, read from the scopes it really supports. A scope
+ * other than `organisation` is a filter; it is required when `organisation` is
+ * not among the scopes (the card has no unfiltered view).
+ */
+export const filtersOf = (scopes: readonly ChartScope[]): ChartFilter[] =>
+  scopes
+    .filter((k): k is ChartFilterKey => k !== 'organisation')
+    .map((key) => ({ key, required: !scopes.includes('organisation') }));
+
 export interface TenantChartEntry {
   /** Stable id, `TSQ-001`. Never reused, never renumbered. */
   id: string;
@@ -269,7 +288,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     shape: 'ranking',
     size: 'm',
     sources: ['existing'],
-    scopes: ['organisation', 'course', 'learner'],
+    scopes: ['organisation', 'course'],
     needs: [],
     live: true,
   }),
@@ -426,7 +445,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     shape: 'stage_funnel',
     size: 'm',
     sources: ['research'],
-    scopes: ['organisation', 'course', 'learner'],
+    scopes: ['organisation', 'course'],
     needs: [{ signal: 'courseEnrolments', min: 5, sparseMin: 1 }],
     live: true,
   }),
@@ -438,7 +457,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     shape: 'ranking',
     size: 'm',
     sources: ['research'],
-    scopes: ['organisation', 'course', 'learner'],
+    scopes: ['organisation', 'course'],
     needs: [{ signal: 'scoredQuizItems', min: 10, sparseMin: 1 }],
     live: true,
   }),
@@ -450,7 +469,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     shape: 'distribution',
     size: 'm',
     sources: ['research'],
-    scopes: ['organisation', 'course', 'simulation', 'learner'],
+    scopes: ['organisation', 'course', 'simulation'],
     needs: [{ signal: 'scoredSessions90', min: 10, sparseMin: 1 }],
     live: true,
   }),
@@ -516,7 +535,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     shape: 'free_text',
     size: 'm',
     sources: ['doc'],
-    scopes: ['organisation', 'course', 'simulation', 'learner'],
+    scopes: ['organisation', 'course', 'simulation'],
     needs: [{ signal: 'ratings', min: 10, sparseMin: 1 }],
     live: true,
   }),
@@ -620,7 +639,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     sources: ['doc'],
     scopes: ['organisation'],
     needs: [],
-    live: false,
+    live: true,
   }),
   entry({
     id: 'TSQ-039',
@@ -632,7 +651,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     sources: ['doc'],
     scopes: ['organisation'],
     needs: [{ signal: 'courseEnrolments', min: 1 }],
-    live: false,
+    live: true,
   }),
   entry({
     id: 'TSQ-040',
@@ -657,30 +676,30 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     sources: ['doc'],
     scopes: ['course'],
     needs: [{ signal: 'courseEnrolments', min: 1 }],
-    live: true,
+    live: false,
   }),
   entry({
     id: 'TSQ-042',
     title: 'Course performance since launch',
     question:
-      'How has the course performed since launch, and how many have completed?',
+      'How have courses performed since launch, and how many have completed?',
     group: 'courses',
     shape: 'rate_over_time',
     size: 'wide',
     sources: ['doc'],
     scopes: ['organisation', 'course'],
     needs: [{ signal: 'courseEnrolments', min: 5, sparseMin: 1 }],
-    live: false,
+    live: true,
   }),
   entry({
     id: 'TSQ-043',
     title: 'Time to finish a course',
-    question: 'How long does this course take to finish?',
+    question: 'How long do courses take to finish?',
     group: 'courses',
     shape: 'distribution',
     size: 'm',
     sources: ['doc', 'research'],
-    scopes: ['course'],
+    scopes: ['organisation', 'course'],
     needs: [{ signal: 'courseCompletions', min: 5, sparseMin: 1 }],
     live: true,
   }),
@@ -700,14 +719,14 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
   entry({
     id: 'TSQ-045',
     title: 'Module funnel',
-    question: 'At which module do learners drop off, in every course?',
+    question: 'At which module do learners drop off?',
     group: 'courses',
     shape: 'stage_funnel',
     size: 'm',
     sources: ['doc'],
-    scopes: ['organisation', 'course'],
+    scopes: ['course'],
     needs: [{ signal: 'courseEnrolments', min: 5, sparseMin: 1 }],
-    live: false,
+    live: true,
   }),
   entry({
     id: 'TSQ-046',
@@ -719,7 +738,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     sources: ['doc'],
     scopes: ['course'],
     needs: [{ signal: 'courseEnrolments', min: 5, sparseMin: 1 }],
-    live: false,
+    live: true,
   }),
   entry({
     id: 'TSQ-047',
@@ -780,9 +799,9 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     shape: 'ranking',
     size: 'm',
     sources: ['doc'],
-    scopes: ['course'],
+    scopes: ['organisation', 'course'],
     needs: [{ signal: 'scoredSessions90', min: 10, sparseMin: 1 }],
-    live: false,
+    live: true,
   }),
   entry({
     id: 'TSQ-055',
@@ -841,12 +860,12 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
   entry({
     id: 'TSQ-063',
     title: 'Practice rhythm',
-    question: 'How much have they practised, and how regularly?',
+    question: 'How much have learners practised, and how regularly?',
     group: 'learners',
     shape: 'multi_measure_rows',
     size: 'wide',
     sources: ['doc'],
-    scopes: ['learner'],
+    scopes: ['organisation', 'learner'],
     needs: [],
     live: true,
   }),
@@ -860,19 +879,19 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     sources: ['doc'],
     scopes: ['learner'],
     needs: [{ signal: 'courseEnrolments', min: 1 }],
-    live: true,
+    live: false,
   }),
   entry({
     id: 'TSQ-065',
     title: 'Skill trend',
-    question: 'Are they getting better at each skill?',
+    question: 'Are learners getting better at each skill?',
     group: 'outcomes',
     shape: 'value_by_step',
     size: 'wide',
     sources: ['doc'],
-    scopes: ['learner'],
+    scopes: ['organisation', 'learner'],
     needs: [{ signal: 'skillScoredCuts', min: 10, sparseMin: 1 }],
-    live: false,
+    live: true,
   }),
   entry({
     id: 'TSQ-066',

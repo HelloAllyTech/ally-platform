@@ -1,32 +1,38 @@
-import { FunctionComponent, useMemo, useState } from "react";
+import { FunctionComponent, useMemo } from "react";
 
 import { useTranslation } from "react-i18next";
 
 import { SkeletonPlaceholder } from "@ally-ui-mono/ui-shared";
 import { useGetStatisticsChartQuery } from "@api";
-import type { OrganizationMetricsRange, StatisticsChartEntry } from "@types";
+import type {
+  OrganizationMetricsRange,
+  StatisticsChartEntry,
+  StatisticsFilterKey,
+  StatisticsFilterValues,
+} from "@types";
 
-import { LayoutScope } from "./layout";
+import { CardFilters } from "./CardFilters";
 import { CHART_RENDERERS } from "./renderers";
-import { ScopeChooser } from "./ScopeChooser";
 import { StatCard } from "./StatCard";
 
 interface ChartHostProps {
   entry: StatisticsChartEntry;
   range: OrganizationMetricsRange;
-  /** The course, simulation or learner the card is drawn for. Absent: the whole organisation. */
-  scope?: LayoutScope;
-  /** While the dashboard is being customised the card's scope can be changed. */
-  onScopeChange?: (scope: LayoutScope) => void;
+  /** The filters set on this card: the course, simulation or learner chosen. */
+  filters?: StatisticsFilterValues;
+  /** Called when a filter is changed. Without it the card shows its filters but cannot change them. */
+  onFiltersChange?: (filters: StatisticsFilterValues) => void;
 }
 
-/** The request fields for a scope. A simulation or learner id is a number. */
-const scopeParams = (scope?: LayoutScope) => {
-  if (!scope) return {};
-  if (scope.kind === "course") return { courseId: scope.value };
-  const n = Number(scope.value);
-  if (!Number.isInteger(n)) return {};
-  return scope.kind === "simulation" ? { scenarioId: n } : { learnerId: n };
+/** The request fields for a card's filters. A simulation or learner id is a number. */
+const filterParams = (filters: StatisticsFilterValues) => {
+  const params: { courseId?: string; scenarioId?: number; learnerId?: number } = {};
+  if (filters.course) params.courseId = filters.course;
+  const scenarioId = Number(filters.simulation);
+  if (filters.simulation && Number.isInteger(scenarioId)) params.scenarioId = scenarioId;
+  const learnerId = Number(filters.learner);
+  if (filters.learner && Number.isInteger(learnerId)) params.learnerId = learnerId;
+  return params;
 };
 
 /**
@@ -41,11 +47,10 @@ const scopeParams = (scope?: LayoutScope) => {
 export const ChartHost: FunctionComponent<ChartHostProps> = ({
   entry,
   range,
-  scope,
-  onScopeChange,
+  filters = {},
+  onFiltersChange,
 }) => {
   const { t } = useTranslation();
-  const [changing, setChanging] = useState(false);
   const renderer = CHART_RENDERERS[entry.id];
   const unavailable = entry.state === "unavailable";
 
@@ -58,9 +63,19 @@ export const ChartHost: FunctionComponent<ChartHostProps> = ({
     }
   }, []);
 
-  const { data, isFetching, isError, refetch } = useGetStatisticsChartQuery(
-    { id: entry.id, range, timezone, ...scopeParams(scope) },
-    { skip: unavailable || !renderer || renderer.kind === "self" },
+  // A card with a required filter (it has no all-organisation view) waits for a choice.
+  const missing = entry.filters.find(f => f.required && !filters[f.key]);
+
+  // `currentData`, not `data`: after a filter changes the card shows loading, never
+  // the previous filter's numbers under the new filter's name.
+  const {
+    currentData: data,
+    isFetching,
+    isError,
+    refetch,
+  } = useGetStatisticsChartQuery(
+    { id: entry.id, range, timezone, ...filterParams(filters) },
+    { skip: unavailable || !renderer || renderer.kind === "self" || !!missing },
   );
 
   // An id the backend offers but this build has no renderer for: show nothing
@@ -111,40 +126,37 @@ export const ChartHost: FunctionComponent<ChartHostProps> = ({
   }
 
   const takeaway = data && renderer.takeaway ? renderer.takeaway(data.data, t) : null;
-  const badge = scope ? (
-    <div className="flex flex-col gap-2">
-      <button
-        type="button"
-        disabled={!onScopeChange}
-        onClick={() => setChanging(open => !open)}
-        className="inline-flex min-h-7 max-w-full items-center gap-1 self-start rounded-full bg-[#dce6f6] px-3 text-xs font-medium text-[#1c3a6e] disabled:cursor-default"
-        data-testid={`statistics-card-${entry.id}-scope`}
-      >
-        <span className="truncate">
-          {t(`statisticsLibrary.scope.badge.${scope.kind}`, {
-            name: data?.scope?.label ?? "…",
-          })}
-        </span>
-        {onScopeChange && <span aria-hidden>▾</span>}
-      </button>
-      {changing && onScopeChange && (
-        <ScopeChooser
-          kind={scope.kind}
-          onCancel={() => setChanging(false)}
-          onPick={option => {
-            setChanging(false);
-            onScopeChange({ kind: scope.kind, value: option.id });
-          }}
-        />
-      )}
-    </div>
-  ) : null;
+  const labels: Partial<Record<StatisticsFilterKey, string>> = {};
+  data?.filters?.forEach(f => {
+    labels[f.kind] = f.label;
+  });
+  const controls =
+    entry.filters.length > 0 ? (
+      <CardFilters
+        filters={entry.filters}
+        values={filters}
+        labels={labels}
+        onChange={next => onFiltersChange?.(next)}
+      />
+    ) : null;
+  if (missing) {
+    return (
+      <div className="h-full" data-testid={`statistics-card-${entry.id}`}>
+        <StatCard title={entry.question} controls={controls}>
+          <p className="text-sm text-typography-600" data-testid="statistics-choose-prompt">
+            {t(`statisticsLibrary.filters.pick.${missing.key}`)}
+          </p>
+        </StatCard>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full" data-testid={`statistics-card-${entry.id}`}>
       <StatCard
         title={entry.question}
-        badge={badge}
         takeaway={takeaway}
+        controls={controls}
         loading={loading}
         error={isError}
         onRetry={refetch}

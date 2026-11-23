@@ -22,13 +22,12 @@ import { SkeletonText, logger } from "@ally-ui-mono/ui-shared";
 import { useGetUserPreferencesQuery, useUpdateUserPreferencesMutation } from "@api";
 import { ToggleButtonGroup } from "@components";
 import { OrganizationMetricsRange, ORGANIZATION_METRICS_RANGES } from "@types";
-import type { StatisticsChartEntry } from "@types";
+import type { StatisticsChartEntry, StatisticsFilterValues } from "@types";
 
 import { SortableMetricBlock } from "../SortableMetricBlock";
 import { ChartHost } from "./ChartHost";
 import {
   LayoutItem,
-  LayoutScope,
   STATISTICS_LAYOUT_PREF_KEY,
   layoutKey,
   parseLayoutKey,
@@ -71,14 +70,14 @@ export const StatisticsDashboard: FunctionComponent<StatisticsDashboardProps> = 
   );
 
   const byId = useMemo(() => new Map(charts.map(c => [c.id, c])), [charts]);
-  // Each card is a layout key: a chart id, or a chart id with the course,
-  // simulation or learner it is drawn for. The same chart can appear more than once.
+  // Each card is a chart id with the filters set on it. A chart appears once.
   const items = layoutIds
     .map(parseLayoutKey)
     .filter(
-      (item): item is LayoutItem => !!item && !!byId.get(item.id) && !!CHART_RENDERERS[item.id],
+      (item): item is LayoutItem => !!item && byId.has(item.id) && !!CHART_RENDERERS[item.id],
     );
-  const entryKeys = items.map(item => item.key);
+  const entryKeys = items.map(item => item.id);
+  const savedKeys = items.map(item => item.key);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -103,21 +102,17 @@ export const StatisticsDashboard: FunctionComponent<StatisticsDashboardProps> = 
     const oldIndex = entryKeys.indexOf(String(active.id));
     const newIndex = entryKeys.indexOf(String(over.id));
     if (oldIndex === -1 || newIndex === -1) return;
-    persist(arrayMove(entryKeys, oldIndex, newIndex));
+    persist(arrayMove(savedKeys, oldIndex, newIndex));
   };
 
-  const handleRemove = (key: string) => persist(entryKeys.filter(x => x !== key));
-  const handleAdd = (id: string, scope?: LayoutScope) => {
-    const key = layoutKey(id, scope);
-    if (!entryKeys.includes(key)) persist([...entryKeys, key]);
+  const handleRemove = (id: string) =>
+    persist(items.filter(item => item.id !== id).map(item => item.key));
+  const handleAdd = (id: string) => {
+    if (!entryKeys.includes(id)) persist([...savedKeys, id]);
   };
-  /** Points a card at a different course, simulation or learner, keeping its place. */
-  const handleScopeChange = (oldKey: string, id: string, scope: LayoutScope) => {
-    const key = layoutKey(id, scope);
-    if (key === oldKey || entryKeys.includes(key)) return;
-    persist(entryKeys.map(k => (k === oldKey ? key : k)));
-  };
-
+  /** A card's filters are saved with the layout, so each card remembers its own. */
+  const handleFiltersChange = (id: string, filters: StatisticsFilterValues) =>
+    persist(items.map(item => (item.id === id ? layoutKey(id, filters) : item.key)));
   const finishEditing = () => {
     setEditing(false);
     setDrawerOpen(false);
@@ -157,14 +152,16 @@ export const StatisticsDashboard: FunctionComponent<StatisticsDashboardProps> = 
             />
             {editing ? (
               <>
-                <button
-                  type="button"
-                  onClick={() => setDrawerOpen(open => !open)}
-                  className="min-h-11 rounded border border-[#264d8e] bg-white px-4 text-sm font-medium text-[#264d8e]"
-                  data-testid="statistics-add-charts"
-                >
-                  {t("statisticsLibrary.addCharts")}
-                </button>
+                {!drawerOpen && (
+                  <button
+                    type="button"
+                    onClick={() => setDrawerOpen(true)}
+                    className="min-h-11 rounded border border-[#264d8e] bg-white px-4 text-sm font-medium text-[#264d8e]"
+                    data-testid="statistics-add-charts"
+                  >
+                    {t("statisticsLibrary.addCharts")}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={finishEditing}
@@ -177,7 +174,11 @@ export const StatisticsDashboard: FunctionComponent<StatisticsDashboardProps> = 
             ) : (
               <button
                 type="button"
-                onClick={() => setEditing(true)}
+                onClick={() => {
+                  // Customising opens the chart library straight away.
+                  setEditing(true);
+                  setDrawerOpen(true);
+                }}
                 className="min-h-11 rounded border border-[#264d8e] bg-white px-4 text-sm font-medium text-[#264d8e]"
                 data-testid="statistics-customise"
               >
@@ -199,7 +200,7 @@ export const StatisticsDashboard: FunctionComponent<StatisticsDashboardProps> = 
 
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
           <div className="min-w-0 flex-1">
-            {items.length === 0 ? (
+            {entryKeys.length === 0 ? (
               <p
                 className="rounded border border-dashed border-border-light p-6 text-sm text-typography-600"
                 data-testid="statistics-empty"
@@ -214,29 +215,25 @@ export const StatisticsDashboard: FunctionComponent<StatisticsDashboardProps> = 
               >
                 <SortableContext items={entryKeys} strategy={rectSortingStrategy}>
                   <div className={gridClass} data-testid="statistics-grid">
-                    {items.map(item => {
-                      const entry = byId.get(item.id) as StatisticsChartEntry;
+                    {items.map(({ id, filters }) => {
+                      const entry = byId.get(id) as StatisticsChartEntry;
                       return (
-                        <SortableMetricBlock
-                          key={item.key}
-                          id={item.key}
-                          wide={entry.size === "wide"}
-                        >
+                        <SortableMetricBlock key={id} id={id} wide={entry.size === "wide"}>
                           <div className="rounded border-2 border-dashed border-[#9db5dd]">
                             <button
                               type="button"
-                              onClick={() => handleRemove(item.key)}
+                              onClick={() => handleRemove(id)}
                               aria-label={t("statisticsLibrary.removeAria", { title: entry.title })}
                               className="absolute right-10 top-2 z-10 flex h-6 w-6 items-center justify-center rounded text-typography-500 hover:bg-background-secondary hover:text-typography-900"
-                              data-testid={`statistics-remove-${item.key}`}
+                              data-testid={`statistics-remove-${id}`}
                             >
                               &times;
                             </button>
                             <ChartHost
                               entry={entry}
                               range={range}
-                              scope={item.scope}
-                              onScopeChange={scope => handleScopeChange(item.key, item.id, scope)}
+                              filters={filters}
+                              onFiltersChange={next => handleFiltersChange(id, next)}
                             />
                           </div>
                         </SortableMetricBlock>
@@ -247,11 +244,16 @@ export const StatisticsDashboard: FunctionComponent<StatisticsDashboardProps> = 
               </DndContext>
             ) : (
               <div className={gridClass} data-testid="statistics-grid">
-                {items.map(item => {
-                  const entry = byId.get(item.id) as StatisticsChartEntry;
+                {items.map(({ id, filters }) => {
+                  const entry = byId.get(id) as StatisticsChartEntry;
                   return (
-                    <div key={item.key} className={spanClass(entry)}>
-                      <ChartHost entry={entry} range={range} scope={item.scope} />
+                    <div key={id} className={spanClass(entry)}>
+                      <ChartHost
+                        entry={entry}
+                        range={range}
+                        filters={filters}
+                        onFiltersChange={next => handleFiltersChange(id, next)}
+                      />
                     </div>
                   );
                 })}
@@ -262,7 +264,7 @@ export const StatisticsDashboard: FunctionComponent<StatisticsDashboardProps> = 
           {editing && drawerOpen && (
             <LibraryDrawer
               charts={charts}
-              addedIds={items.filter(i => !i.scope).map(i => i.id)}
+              addedIds={entryKeys}
               onAdd={handleAdd}
               onClose={() => setDrawerOpen(false)}
             />

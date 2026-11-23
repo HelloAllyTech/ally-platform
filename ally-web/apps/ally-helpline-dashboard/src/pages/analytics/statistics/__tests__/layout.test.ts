@@ -20,6 +20,7 @@ const chart = (id: string, state: StatisticsChartState = "available"): Statistic
   chart: "tile",
   size: "m",
   scopes: ["organisation"],
+  filters: [],
   state,
   reason: state === "available" ? null : "because",
 });
@@ -103,40 +104,51 @@ describe("resolveDashboardLayout", () => {
   });
 });
 
-describe("scoped cards", () => {
-  const scoped = { ...chart("TSQ-020"), scopes: ["organisation", "course"] as const };
-  const offered = [{ ...scoped, scopes: [...scoped.scopes] }, chart("TSQ-001")];
+const filtered = (id: string, filters: StatisticsChartEntry["filters"]): StatisticsChartEntry => ({
+  ...chart(id, "available"),
+  filters,
+});
 
-  it("round-trips a card for one course", () => {
-    const key = layoutKey("TSQ-020", { kind: "course", value: "8b3f-uuid" });
-    expect(key).toBe("TSQ-020@course:8b3f-uuid");
-    expect(parseLayoutKey(key)).toEqual({
-      key,
+describe("a card's filters are saved with it", () => {
+  const course = "8b3f2f0e-1c0a-4d6e-9a53-3d1c0d2f4a11";
+
+  it("round-trips a card with one or two filters", () => {
+    expect(layoutKey("TSQ-020", { course })).toBe(`TSQ-020?course=${course}`);
+    const two = layoutKey("TSQ-020", { course, simulation: "7" });
+    expect(two).toBe(`TSQ-020?course=${course}&simulation=7`);
+    expect(parseLayoutKey(two)).toEqual({
+      key: two,
       id: "TSQ-020",
-      scope: { kind: "course", value: "8b3f-uuid" },
+      filters: { course, simulation: "7" },
     });
   });
 
-  it("reads a plain id as the whole organisation", () => {
-    expect(parseLayoutKey("TSQ-001")).toEqual({ key: "TSQ-001", id: "TSQ-001" });
+  it("reads a plain id as a card with no filter", () => {
+    expect(parseLayoutKey("TSQ-020")).toEqual({ key: "TSQ-020", id: "TSQ-020", filters: {} });
+    expect(layoutKey("TSQ-020", {})).toBe("TSQ-020");
   });
 
-  it("rejects strings that are not a chart key", () => {
-    ["", "TSQ-1", "TSQ-020@team:3", "TSQ-020@course:", "x TSQ-020", "TSQ-020@course:a b"].forEach(
-      bad => expect(parseLayoutKey(bad), bad).toBeNull(),
+  it("rejects strings that are not a card key", () => {
+    ["", "TSQ-20", "TSQ-020?course=", "TSQ-020?team=1", "TSQ-020@course:1", "x?course=1"].forEach(
+      k => expect(parseLayoutKey(k), k).toBeNull(),
     );
   });
 
-  it("keeps the same chart for two courses and the whole organisation", () => {
-    const saved = ["TSQ-020", "TSQ-020@course:a", "TSQ-020@course:b", "TSQ-020@course:a"];
-    expect(resolveDashboardLayout(saved, offered)).toEqual([
-      "TSQ-020",
-      "TSQ-020@course:a",
-      "TSQ-020@course:b",
-    ]);
+  it("keeps a saved filter the card offers and drops one it does not", () => {
+    const charts = [filtered("TSQ-020", [{ key: "course", required: false }])];
+    const saved = [`TSQ-020?course=${course}&learner=4`];
+    expect(resolveDashboardLayout(saved, charts)).toEqual([`TSQ-020?course=${course}`]);
   });
 
-  it("drops a scope the chart does not support", () => {
-    expect(resolveDashboardLayout(["TSQ-020@learner:5", "TSQ-001@course:a"], offered)).toEqual([]);
+  it("keeps a card whose filter was retired, without the filter", () => {
+    const charts = [filtered("TSQ-020", [])];
+    expect(resolveDashboardLayout([`TSQ-020?course=${course}`], charts)).toEqual(["TSQ-020"]);
+  });
+
+  it("shows a chart once, the first time it is saved", () => {
+    const charts = [filtered("TSQ-020", [{ key: "course", required: false }])];
+    expect(resolveDashboardLayout(["TSQ-020", `TSQ-020?course=${course}`], charts)).toEqual([
+      "TSQ-020",
+    ]);
   });
 });

@@ -3,10 +3,10 @@ import { FunctionComponent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useGetStatisticsScopeOptionsQuery } from "@api";
-import type { StatisticsScopeKind, StatisticsScopeOption } from "@types";
+import type { StatisticsFilterKey, StatisticsScopeOption } from "@types";
 
 interface ScopeChooserProps {
-  kind: StatisticsScopeKind;
+  kind: StatisticsFilterKey;
   onPick: (option: StatisticsScopeOption) => void;
   onCancel: () => void;
 }

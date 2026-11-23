@@ -10,6 +10,7 @@ import {
   ChartScope,
   TENANT_CHART_LIBRARY,
   TenantChartEntry,
+  filtersOf,
 } from '../constants/tenant-chart-library.constants';
 import {
   SCOPE_AWARE_CHARTS,
@@ -32,7 +33,10 @@ import {
   ScopeOption,
   TenantScopeOptionsRepository,
 } from '../repository/tenant-scope-options.repository';
-import { TenantScopeSummaryRepository } from '../repository/tenant-scope-summary.repository';
+import {
+  MeasuresData,
+  TenantScopeSummaryRepository,
+} from '../repository/tenant-scope-summary.repository';
 import { TenantOutcomesRepository } from '../repository/tenant-outcomes.repository';
 import {
   SESSION_LENGTH_BOUNDS_MINUTES,
@@ -308,7 +312,26 @@ export class TenantChartLibraryService {
       'TSQ-041': (tenantId, p, code) =>
         this.summaryRepo.getCourseFacts(tenantId, code, this.requireCourse(p)),
       'TSQ-043': (tenantId, p, code) =>
-        this.summaryRepo.getTimeToFinish(tenantId, code, this.requireCourse(p)),
+        this.summaryRepo.getTimeToFinish(tenantId, code, p.courseId),
+      // How many courses there are, and how many are live.
+      'TSQ-038': (tenantId) => this.coursesByStatus(tenantId),
+      // How many learners are on courses right now.
+      'TSQ-039': (tenantId, _p, code) =>
+        this.summaryRepo.getCourseParticipation(tenantId, code),
+      // Enrolments begun and finished each week, for every course or one.
+      'TSQ-042': (tenantId, p, code) =>
+        this.summaryRepo.getCoursePerformance(tenantId, code, p.courseId),
+      // Where learners drop off, and how long each module takes, in one course.
+      'TSQ-045': (tenantId, p, code) =>
+        this.summaryRepo.getModuleFunnel(tenantId, code, this.requireCourse(p)),
+      'TSQ-046': (tenantId, p, code) =>
+        this.summaryRepo.getModuleTime(tenantId, code, this.requireCourse(p)),
+      // Each roleplay in a course: finishers, tries and session length.
+      'TSQ-053': (tenantId, p, code) =>
+        this.summaryRepo.getRoleplayAttempts(tenantId, code, p.courseId),
+      // One learner's level in each skill over time.
+      'TSQ-065': (tenantId, p, code) =>
+        this.summaryRepo.getSkillTrend(tenantId, code, p.learnerId),
       // One learner's practice and where they are in each course.
       'TSQ-063': (tenantId, p, code) => {
         const { start, endExclusive } = this.windowFor(
@@ -317,7 +340,7 @@ export class TenantChartLibraryService {
         return this.summaryRepo.getPracticeRhythm(
           tenantId,
           code,
-          this.requireLearner(p),
+          p.learnerId,
           start,
           endExclusive,
         );
@@ -390,6 +413,7 @@ export class TenantChartLibraryService {
         chart: entry.chart,
         size: entry.size,
         scopes: [...this.supportedScopes(entry)],
+        filters: filtersOf(this.supportedScopes(entry)),
         state: availability.state,
         reason: availability.reason,
       };
@@ -435,10 +459,17 @@ export class TenantChartLibraryService {
       throw new ForbiddenException(availability.reason ?? 'Chart unavailable');
     }
 
-    const scope = await this.resolveScope(tenantId, keys.code, params);
+    const filters = await this.resolveFilters(tenantId, keys.code, params);
     const data = await handler(tenantId, params, keys.code);
-    return scope
-      ? { id: entry.id, state: availability.state, data, scope }
+    return filters.length
+      ? {
+          id: entry.id,
+          state: availability.state,
+          data,
+          // `scope` is the first filter, kept for clients that read one.
+          scope: filters[0],
+          filters,
+        }
       : { id: entry.id, state: availability.state, data };
   }
 
@@ -732,27 +763,29 @@ export class TenantChartLibraryService {
    * Names what the chart is drawn for, and checks it belongs to the tenant: an
    * id from another organisation finds nothing and the chart is refused.
    */
-  private async resolveScope(
+  private async resolveFilters(
     tenantId: string,
     code: string,
     p: TenantChartParams,
-  ): Promise<TenantChartScopeDto | undefined> {
+  ): Promise<TenantChartScopeDto[]> {
     const picked: Array<[ScopeKind, string | number | undefined]> = [
       ['course', p.courseId],
       ['simulation', p.scenarioId],
       ['learner', p.learnerId],
     ];
-    const found = picked.find(([, id]) => id !== undefined);
-    if (!found) return undefined;
-    const [kind, id] = found as [ScopeKind, string | number];
-    const label = await this.scopeOptionsRepo.describe(
-      kind,
-      id,
-      tenantId,
-      code,
-    );
-    if (label === null) throw new NotFoundException(`Unknown ${kind}`);
-    return { kind, id: String(id), label };
+    const out: TenantChartScopeDto[] = [];
+    for (const [kind, id] of picked) {
+      if (id === undefined) continue;
+      const label = await this.scopeOptionsRepo.describe(
+        kind,
+        id,
+        tenantId,
+        code,
+      );
+      if (label === null) throw new NotFoundException(`Unknown ${kind}`);
+      out.push({ kind, id: String(id), label });
+    }
+    return out;
   }
 
   /** Runs a chart defined in {@link TENANT_CHART_SPECS}. */
@@ -834,6 +867,21 @@ export class TenantChartLibraryService {
       start,
       endExclusive,
     );
+  }
+
+  /** Courses by where they stand: all, live, still in draft, archived. */
+  private async coursesByStatus(tenantId: string): Promise<MeasuresData> {
+    const { rows } = await this.allCourses(tenantId);
+    const count = (status: string) =>
+      rows.filter((c) => String(c.status).toUpperCase() === status).length;
+    return {
+      measures: [
+        { key: 'courses', value: rows.length, format: 'count' },
+        { key: 'live', value: count('ACTIVE'), format: 'count' },
+        { key: 'draft', value: count('DRAFT'), format: 'count' },
+        { key: 'archived', value: count('ARCHIVED'), format: 'count' },
+      ],
+    };
   }
 
   /** Every course for the tenant, read once. `truncated` when there are more. */

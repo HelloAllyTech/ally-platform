@@ -95,9 +95,14 @@ const analyticsAPI = baseAPI.injectEndpoints({
         url: ApiEndpoints.ANALYTICS.GET_STATISTICS_CHART_LIBRARY,
         method: HttpMethod.GET,
       }),
+      // A backend older than this build sends no `filters`: read that as "none".
+      transformResponse: (library: StatisticsChartLibrary): StatisticsChartLibrary => ({
+        ...library,
+        charts: library.charts.map(chart => ({ ...chart, filters: chart.filters ?? [] })),
+      }),
     }),
 
-    /** The courses, simulations or learners a chart can be drawn for. */
+    /** The courses, simulations or learners a card can be filtered by. */
     getStatisticsScopeOptions: builder.query<
       StatisticsScopeOption[],
       GetStatisticsScopeOptionsRequest
@@ -240,6 +245,7 @@ const analyticsAPI = baseAPI.injectEndpoints({
 });
 
 export const {
+  useGetStatisticsScopeOptionsQuery,
   useLazyGetDashboardUrlQuery,
   useGetDashboardsQuery,
   useLazyGetDashboardsQuery,
@@ -247,7 +253,6 @@ export const {
   useGetOrganizationMetricsQuery,
   useGetStatisticsChartLibraryQuery,
   useGetStatisticsChartQuery,
-  useGetStatisticsScopeOptionsQuery,
   useGetLearnerUsageTableQuery,
   useGetCourseUsageTableQuery,
   useGetCourseAssessmentPairsQuery,
