@@ -12,6 +12,11 @@ import {
   useLazyGetRoleplayDesignQuery,
 } from "@api";
 import { en } from "@constants";
+import {
+  ModeRecommendation,
+  recommendMode,
+  suggestNextSteps,
+} from "@utils/agentBuilderSuggestions";
 
 import { Button } from "../button";
 import { Competency } from "../competency";
@@ -49,6 +54,13 @@ import {
 type WizardStepId = "describe" | "competency" | "mode" | "goals" | "generate";
 
 const modeStrings = en.agentBuilderMode;
+const suggestionStrings = en.agentBuilderSuggestions;
+
+/** One "what to review" line, in words. */
+const nextStepText = (step: ReturnType<typeof suggestNextSteps>[number]): string => {
+  const message = suggestionStrings.next[step.key];
+  return typeof message === "function" ? message(step.count ?? 0) : message;
+};
 
 const QUESTIONS: Record<Exclude<WizardStepId, "generate">, string> = {
   describe: "Describe roleplay actor",
@@ -115,6 +127,7 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
   const [mode, setMode] = useState<RoleplayMode>("practice");
   const [design, setDesign] = useState<RoleplayDesign | null>(null);
   const [modeError, setModeError] = useState(false);
+  const [recommendation, setRecommendation] = useState<ModeRecommendation | null>(null);
   const [fetchDesign, { isFetching: loadingDesign }] = useLazyGetRoleplayDesignQuery();
 
   const competency = useWatch({
@@ -141,6 +154,10 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
     const competency = formMethods.getValues("competency");
     if (!competency?.name) return;
     pushHistory(QUESTIONS.competency, competency.name);
+    // Pre-pick the mode the trainer's own words point to; they can choose another.
+    const recommended = recommendMode(description);
+    setRecommendation(recommended);
+    setMode(recommended.mode);
     setStep("mode");
   };
 
@@ -190,6 +207,7 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
     setDescription("");
     setSelectedGoals([]);
     setMode("practice");
+    setRecommendation(null);
     setDesign(null);
     setModeError(false);
     setStep("describe");
@@ -271,6 +289,19 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
                 {checks.includes("remindersHidden") && <p>{modeStrings.remindersHidden}</p>}
               </div>
             )}
+            {phase === "done" && (
+              <div
+                className="rounded-md border border-border-light bg-white p-3 text-sm text-typography-900"
+                data-testid="next-steps"
+              >
+                <p className="font-medium">{suggestionStrings.nextTitle}</p>
+                <ul className="mt-1 list-disc pl-5 text-typography-800">
+                  {suggestNextSteps(formMethods.getValues(), design?.mode).map(step => (
+                    <li key={step.key}>{nextStepText(step)}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {phase === "aborted" && (
               <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-typography-900">
                 Generation stopped. Fields that finished before you stopped were kept — review them
@@ -291,6 +322,24 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
           <>
             <div className="min-h-0 overflow-y-auto custom-scrollbar flex flex-col gap-3">
               <h3 className="text-base font-medium text-typography-900">{QUESTIONS.describe}</h3>
+              {!description.trim() && (
+                <div className="flex flex-col gap-1.5" data-testid="actor-ideas">
+                  <p className="text-xs text-typography-600">{suggestionStrings.ideasTitle}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {suggestionStrings.ideas.map(idea => (
+                      <button
+                        key={idea.label}
+                        type="button"
+                        title={idea.text}
+                        onClick={() => setDescription(idea.text)}
+                        className="rounded-full border border-border-light bg-white px-3 py-1 text-xs text-typography-800 hover:border-primary hover:bg-primary-50"
+                      >
+                        {idea.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <AutoExpandableTextarea
                 value={description}
                 onChange={setDescription}
@@ -345,6 +394,12 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
             <div className="min-h-0 overflow-y-auto custom-scrollbar flex flex-col gap-2">
               <h3 className="text-base font-medium text-typography-900">{QUESTIONS.mode}</h3>
               <p className="text-xs text-typography-600">{modeStrings.help}</p>
+              {recommendation && (
+                <p className="text-xs text-typography-800" data-testid="mode-reason">
+                  {modeStrings.recommended}: {modeStrings.labels[recommendation.mode]}.{" "}
+                  {modeStrings.reasons[recommendation.reason]}
+                </p>
+              )}
               <div role="radiogroup" aria-label={QUESTIONS.mode} className="flex flex-col gap-2">
                 {ROLEPLAY_MODES.map(option => {
                   const checked = mode === option;
@@ -366,8 +421,13 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
                         className="accent-primary mt-1"
                       />
                       <span className="flex flex-col">
-                        <span className="text-sm text-typography-900">
+                        <span className="flex items-center gap-2 text-sm text-typography-900">
                           {modeStrings.labels[option]}
+                          {recommendation?.mode === option && (
+                            <span className="rounded bg-primary-100 px-1.5 py-0.5 text-[11px] font-medium text-primary-700">
+                              {modeStrings.recommended}
+                            </span>
+                          )}
                         </span>
                         <span className="text-xs text-typography-600">
                           {modeStrings.descriptions[option]}

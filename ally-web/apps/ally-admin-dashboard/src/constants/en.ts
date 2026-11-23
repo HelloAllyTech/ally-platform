@@ -16029,5 +16029,53 @@ export const en = {
     },
     noStatePrompt: "No states: no main prompt that reads states is available.",
     remindersHidden: "Reminders were switched off: none were written.",
+    recommended: "Recommended",
+    reasons: {
+      assessmentAfter: "Your description reads like a final check, so no supports.",
+      assessmentBefore: "Your description reads like a baseline before the course, so no supports.",
+      performance: "The learner is meant to show the skill on their own.",
+      firstTry: "Reads like a first try, so all supports are on and the states are easiest.",
+      practice: "Most roleplays are practice: some support, fading as learners improve.",
+    } as Record<string, string>,
+  },
+
+  // Agent Builder wizard: example actor descriptions and what to review after generating.
+  agentBuilderSuggestions: {
+    ideasTitle: "Not sure where to start? Pick one and edit it:",
+    ideas: [
+      {
+        label: "Withdrawn student",
+        text: 'Aarav, 15, a Class 10 student who has been quiet and withdrawn for two weeks. His marks have dropped and he wrote "what\'s the point of anything" in his notebook. He stays after class when his teacher asks to talk. He is polite but gives short answers, avoids eye contact and changes the subject if pushed.',
+      },
+      {
+        label: "Caller in crisis",
+        text: "Meera, 32, calls a helpline late at night after an argument with her husband. She is crying, says she feels trapped and that everyone would be better off without her. She is wary of being judged and hangs up if the responder lectures her, but opens up when she feels heard.",
+      },
+      {
+        label: "Worried parent",
+        text: "Ramesh, 48, a farmer whose 19-year-old son has stopped eating and sleeps most of the day. He thinks it is laziness and wants advice on how to make him work. He is respectful but sceptical of mental health, and uses local words for stress.",
+      },
+      {
+        label: "Exhausted health worker",
+        text: "Lakshmi, 41, an ASHA worker who has looked after many families through a hard season. She says she is fine but is irritable, not sleeping and has started to dread work. She downplays her own needs and turns the conversation back to others.",
+      },
+    ],
+    nextTitle: "Suggestions before you save",
+    next: {
+      noTitle: "Add a title, so trainers can find this roleplay in Studio.",
+      noOpening: "Add an opening line: the character needs something to say first.",
+      longOpening:
+        "Shorten the first opening line. It is read aloud, and a long one keeps the learner waiting.",
+      noVoice:
+        "Pick a voice for each language in Language–Voice mapping. You can't publish without one.",
+      fewStates: (count: number) =>
+        `Only ${count} state${count === 1 ? "" : "s"}. Add one or two so the character can open up step by step.`,
+      fewReminders: (count: number) =>
+        `Only ${count} reminder${count === 1 ? "" : "s"}. Learning and practice work best with three or more short ones.`,
+      supportsInAssessment:
+        "Supports are on, but this is a performance or assessment roleplay. Switch off reminders, state shown and supervisor notes.",
+      preview:
+        "Play it once in Preview: try one helpful and one unhelpful reply and watch the state change.",
+    },
   },
 };
