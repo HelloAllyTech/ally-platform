@@ -110,6 +110,11 @@ export interface GenerationInputs {
    * already on the form (the trainer's, or a library character's) is kept.
    */
   generateCover?: boolean;
+  /**
+   * The languages the trainer chose in the wizard. Given, they replace detecting the languages
+   * from the brief; voices already on the form for them are kept, and only the rest are cast.
+   */
+  languages?: AgentBuilderSpokenLanguage[];
 }
 
 /** The cover row: not a field generator, an image job (start, then poll until it settles). */
@@ -413,14 +418,19 @@ export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
        * what was inferred from the brief — and spot a wrong guess before
        * reviewing the tabs.
        */
-      const fanOutLanguages = (languages: AgentBuilderSpokenLanguage[]): Promise<void> => {
+      const fanOutLanguages = (
+        languages: AgentBuilderSpokenLanguage[],
+        chosen = false,
+      ): Promise<void> => {
         if (languages.length === 0) {
           patchTask(SPOKEN_LANGUAGES_FIELD.field, { status: "empty" });
           return Promise.resolve();
         }
         patchTask(SPOKEN_LANGUAGES_FIELD.field, {
           status: "done",
-          label: `${SPOKEN_LANGUAGES_FIELD.label}: ${languages.map(l => l.label).join(", ")}`,
+          label: `${chosen ? "Languages you chose" : SPOKEN_LANGUAGES_FIELD.label}: ${languages
+            .map(l => l.label)
+            .join(", ")}`,
         });
         const languageTasks = languages.flatMap(language =>
           LANGUAGE_FIELD_PLAN.map(({ field, label }) => ({
@@ -557,10 +567,12 @@ export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
       runsByField.set("challenge_description", challengeDescRun);
 
       // `spoken_languages` is independent of the other foundation fields and can
-      // run in parallel with `persona`.
+      // run in parallel with `persona`. Languages the trainer chose skip the detection call.
       runsByField.set(
         SPOKEN_LANGUAGES_FIELD.field,
-        runTask({ key: SPOKEN_LANGUAGES_FIELD.field, field: SPOKEN_LANGUAGES_FIELD.field }),
+        inputs.languages?.length
+          ? fanOutLanguages(inputs.languages, true)
+          : runTask({ key: SPOKEN_LANGUAGES_FIELD.field, field: SPOKEN_LANGUAGES_FIELD.field }),
       );
 
       // The `foundation` promise resolves once both foundation fields have

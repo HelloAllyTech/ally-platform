@@ -10,6 +10,7 @@ import {
   RoleplayDesign,
   RoleplayMode,
   useGetAgentTestCasesQuery,
+  useGetAvailableLanguageVoicesQuery,
   useLazyGetCharacterByIdQuery,
   useLazyGetRoleplayDesignQuery,
   useSuggestAgentBuilderCharactersMutation,
@@ -60,6 +61,7 @@ type WizardStepId =
   | "competency"
   | "mode"
   | "character"
+  | "languages"
   | "goals"
   | "generate"
   | "restored";
@@ -80,6 +82,8 @@ export interface SavedAgentBuilderChat {
   goalIds: string[];
   /** The Character Library character used, when one was. */
   character?: { id: string; name: string };
+  /** The languages chosen in the wizard (absent: decided from the description). */
+  languages?: { languageId: string; label: string; code: string }[];
   /** What the trainer told the agent in the chat box; every field follows these. */
   notes?: string[];
   /** The test cases' titles, to generate again with the same answers. */
@@ -99,6 +103,23 @@ const suggestionStrings = en.agentBuilderSuggestions;
 const restoredStrings = en.agentBuilderRestored;
 const characterStrings = en.agentBuilderCharacter;
 const chatStrings = en.agentBuilderChatBox;
+const languageStrings = en.agentBuilderLanguages;
+/** "The agent picks a voice" in a language's voice menu. */
+const AGENT_VOICE = "";
+
+interface CatalogVoice {
+  id: string;
+  name: string;
+  provider?: string;
+  gender?: string | null;
+  age?: string | null;
+}
+interface CatalogLanguage {
+  language_id: number;
+  value: string;
+  label: string;
+  voices?: CatalogVoice[];
+}
 
 /** One "what to review" line, in words. */
 const nextStepText = (step: ReturnType<typeof suggestNextSteps>[number]): string => {
@@ -111,6 +132,7 @@ const QUESTIONS: Record<Exclude<WizardStepId, "generate" | "restored">, string> 
   competency: "Select one competency",
   mode: modeStrings.question,
   character: en.agentBuilderCharacter.question,
+  languages: en.agentBuilderLanguages.question,
   goals: "Select agent test cases",
 };
 
@@ -187,6 +209,21 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
   const [noteDraft, setNoteDraft] = useState("");
   const [goalTitlesUsed, setGoalTitlesUsed] = useState<string[]>([]);
   const [notesSinceGeneration, setNotesSinceGeneration] = useState(false);
+  // Languages and voices: decided from the description, or chosen here (language → voice id,
+  // "" = the agent picks one to match the client).
+  const [chooseLanguages, setChooseLanguages] = useState(false);
+  const [languageVoices, setLanguageVoices] = useState<Record<string, string>>({});
+  const [languagesError, setLanguagesError] = useState(false);
+  const [chosenLanguages, setChosenLanguages] = useState<
+    { languageId: string; label: string; code: string }[]
+  >([]);
+  const { data: languageCatalogData } = useGetAvailableLanguageVoicesQuery({
+    active: true,
+    voicesNeeded: true,
+  });
+  const languageCatalog = (
+    Array.isArray(languageCatalogData) ? languageCatalogData : []
+  ) as CatalogLanguage[];
   const [suggestCharacters, { isLoading: loadingSuggestions }] =
     useSuggestAgentBuilderCharactersMutation();
   const [fetchCharacter, { isFetching: loadingCharacter }] = useLazyGetCharacterByIdQuery();
@@ -243,6 +280,7 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
       ...(character ? { character: { id: character.id, name: character.name } } : {}),
       notes,
       goalTitles: goalTitlesUsed,
+      ...(chosenLanguages.length ? { languages: chosenLanguages } : {}),
       result: { applied: appliedCount, total: tasks.length, stopped: phase === "aborted", checks },
       generatedAt: new Date().toISOString(),
     };
@@ -324,7 +362,7 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
     if (characterChoice === NEW_CHARACTER) {
       setCharacter(null);
       pushHistory(QUESTIONS.character, characterStrings.newAnswer);
-      setStep("goals");
+      enterLanguages();
       return;
     }
     try {
@@ -336,10 +374,75 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
         profile: picked.characterProfileText ?? "",
       });
       pushHistory(QUESTIONS.character, characterStrings.libraryAnswer(picked.name));
-      setStep("goals");
+      enterLanguages();
     } catch {
       setCharacterError(true);
     }
+  };
+
+  /**
+   * Into the languages step. A library character who already speaks some languages (voices on
+   * the form now) starts with those chosen and their voices kept.
+   */
+  const enterLanguages = () => {
+    const onForm = (formMethods.getValues("languageVoices") ?? {}) as Record<string, string>;
+    const known = Object.fromEntries(
+      Object.entries(onForm).filter(
+        ([id, voice]) => voice && languageCatalog.some(l => String(l.language_id) === id),
+      ),
+    );
+    setLanguageVoices(known);
+    setChooseLanguages(Object.keys(known).length > 0);
+    setLanguagesError(false);
+    setStep("languages");
+  };
+
+  const toggleLanguage = (languageId: string) =>
+    setLanguageVoices(previous => {
+      const next = { ...previous };
+      if (languageId in next) delete next[languageId];
+      else next[languageId] = AGENT_VOICE;
+      return next;
+    });
+
+  const handleLanguagesNext = () => {
+    if (!chooseLanguages) {
+      setChosenLanguages([]);
+      pushHistory(QUESTIONS.languages, languageStrings.fromDescriptionAnswer);
+      setStep("goals");
+      return;
+    }
+    const picked = languageCatalog.filter(l => String(l.language_id) in languageVoices);
+    if (!picked.length) {
+      setLanguagesError(true);
+      return;
+    }
+    // Chosen voices go on the form now; the agent casts only the languages left to it.
+    const chosenVoices = Object.fromEntries(
+      Object.entries(languageVoices).filter(([, voice]) => voice !== AGENT_VOICE),
+    );
+    if (Object.keys(chosenVoices).length) {
+      const current = (formMethods.getValues("languageVoices") ?? {}) as Record<string, string>;
+      formMethods.setValue(
+        "languageVoices",
+        { ...current, ...chosenVoices },
+        { shouldDirty: true, shouldValidate: false },
+      );
+    }
+    setChosenLanguages(
+      picked.map(l => ({ languageId: String(l.language_id), label: l.label, code: l.value })),
+    );
+    pushHistory(
+      QUESTIONS.languages,
+      picked
+        .map(l => {
+          const voiceId = languageVoices[String(l.language_id)];
+          const voice = l.voices?.find(v => v.id === voiceId);
+          return `${l.label}: ${voice ? voice.name : languageStrings.agentPicks}`;
+        })
+        .join("; "),
+    );
+    setStep("goals");
   };
 
   const toggleGoal = (goalId: string) =>
@@ -394,6 +497,9 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
       agentTestCases: goalTitles.join(", "),
       ...(runMode ? { roleplayMode: runMode, includeStates: Boolean(runStates) } : {}),
       ...(character || restored?.character ? { libraryCharacter: true } : {}),
+      ...((chosenLanguages.length ? chosenLanguages : (restored?.languages ?? [])).length
+        ? { languages: chosenLanguages.length ? chosenLanguages : restored!.languages }
+        : {}),
     });
   };
 
@@ -436,6 +542,10 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
     setNoteDraft("");
     setGoalTitlesUsed([]);
     setNotesSinceGeneration(false);
+    setChooseLanguages(false);
+    setLanguageVoices({});
+    setChosenLanguages([]);
+    setLanguagesError(false);
     setDesign(null);
     setModeError(false);
     setStep("describe");
@@ -447,7 +557,7 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
       <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-4 pb-4">
         {history.length === 0 && step === "describe" && (
           <div className="self-start max-w-[90%] rounded-lg bg-background-secondary px-4 py-2 text-sm text-typography-700">
-            Answer five quick questions and I&apos;ll generate the Basic Settings on the left in
+            Answer six quick questions and I&apos;ll generate the Basic Settings on the left in
             parallel — each field fills in as it&apos;s ready, and you can stop anytime.
           </div>
         )}
@@ -855,6 +965,107 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
                 variant={ButtonVariant.PRIMARY}
                 onClick={handleCharacterNext}
                 disabled={loadingSuggestions || !suggestions || loadingCharacter}
+                className="h-[40px] px-6"
+              >
+                Next
+              </Button>
+            </div>
+          </>
+        )}
+
+        {step === "languages" && (
+          <>
+            <div className="min-h-0 overflow-y-auto custom-scrollbar flex flex-col gap-2">
+              <h3 className="text-base font-medium text-typography-900">{QUESTIONS.languages}</h3>
+              <div
+                role="radiogroup"
+                aria-label={QUESTIONS.languages}
+                className="flex flex-col gap-2"
+              >
+                {[false, true].map(choose => (
+                  <label
+                    key={String(choose)}
+                    className={`flex items-start gap-3 rounded border px-3 py-2 cursor-pointer transition-colors ${
+                      chooseLanguages === choose
+                        ? "border-primary bg-primary-50"
+                        : "border-border-light hover:bg-background-secondary"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="roleplay-languages"
+                      value={choose ? "choose" : "describe"}
+                      checked={chooseLanguages === choose}
+                      onChange={() => setChooseLanguages(choose)}
+                      className="accent-primary mt-1"
+                    />
+                    <span className="flex flex-col">
+                      <span className="text-sm text-typography-900">
+                        {choose ? languageStrings.chooseOption : languageStrings.describeOption}
+                      </span>
+                      <span className="text-xs text-typography-600">
+                        {choose ? languageStrings.chooseHelp : languageStrings.describeHelp}
+                      </span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+              {chooseLanguages && (
+                <div className="flex flex-col gap-1.5 max-h-[260px] overflow-y-auto custom-scrollbar pr-1">
+                  {languageCatalog.map(language => {
+                    const id = String(language.language_id);
+                    const checked = id in languageVoices;
+                    return (
+                      <div
+                        key={id}
+                        className={`flex flex-wrap items-center gap-2 rounded border px-3 py-2 ${
+                          checked ? "border-primary bg-primary-50" : "border-border-light"
+                        }`}
+                      >
+                        <label className="flex flex-1 min-w-[140px] items-center gap-2 cursor-pointer text-sm text-typography-900">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleLanguage(id)}
+                            className="accent-primary"
+                          />
+                          {language.label}
+                        </label>
+                        {checked && (
+                          <select
+                            aria-label={languageStrings.voiceFor(language.label)}
+                            value={languageVoices[id]}
+                            onChange={event =>
+                              setLanguageVoices(previous => ({
+                                ...previous,
+                                [id]: event.target.value,
+                              }))
+                            }
+                            className="rounded border border-border-light bg-white px-2 py-1 text-xs"
+                          >
+                            <option value={AGENT_VOICE}>{languageStrings.agentPicksOption}</option>
+                            {(language.voices ?? []).map(voice => (
+                              <option key={voice.id} value={voice.id}>
+                                {[voice.name, voice.gender, voice.provider?.toLowerCase()]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {languagesError && (
+                <p className="text-sm text-[#FE6F64]">{languageStrings.pickOne}</p>
+              )}
+            </div>
+            <div className="shrink-0 flex justify-end">
+              <Button
+                variant={ButtonVariant.PRIMARY}
+                onClick={handleLanguagesNext}
                 className="h-[40px] px-6"
               >
                 Next

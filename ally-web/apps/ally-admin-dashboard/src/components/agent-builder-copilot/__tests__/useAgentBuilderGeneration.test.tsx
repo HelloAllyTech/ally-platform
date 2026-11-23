@@ -533,4 +533,26 @@ describe("useAgentBuilderGeneration — roleplay mode", () => {
       expect(result.current.tasks.some(t => t.key === "cover_image")).toBe(false);
     });
   });
+
+  it("uses the trainer's languages instead of detecting them", async () => {
+    const { form } = makeForm();
+    const { result } = renderHook(() => useAgentBuilderGeneration(form));
+
+    act(() =>
+      result.current.start({
+        ...INPUTS,
+        generateCover: false,
+        languages: [{ languageId: "2", label: "Hindi (India)", code: "hi" }],
+      }),
+    );
+    await waitFor(() => expect(result.current.phase).toBe("done"));
+
+    expect(fieldsRequested()).not.toContain("spoken_languages");
+    expect(requests.filter(r => r.field === "opening_statements").map(r => r.languageId)).toEqual([
+      "2",
+    ]);
+    expect(result.current.tasks.find(t => t.field === "spoken_languages")?.label).toBe(
+      "Languages you chose: Hindi (India)",
+    );
+  });
 });

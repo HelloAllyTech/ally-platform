@@ -16063,6 +16063,21 @@ export const en = {
     loadFailed: "That character could not be loaded. Pick it again, or write a new one.",
   },
 
+  // Agent Builder wizard: which languages the client speaks, and the voice in each.
+  agentBuilderLanguages: {
+    question: "Choose the languages and voices",
+    describeOption: "Decide from my description",
+    describeHelp:
+      "The agent reads which languages the client speaks and picks a voice in each to match them.",
+    chooseOption: "Choose the languages and voices",
+    chooseHelp: "Pick each language, and a voice for it or let the agent pick one.",
+    agentPicksOption: "Agent picks a voice to match the client",
+    agentPicks: "agent picks the voice",
+    voiceFor: (language: string) => `Voice for ${language}`,
+    pickOne: "Choose at least one language, or let the agent decide from your description.",
+    fromDescriptionAnswer: "Decide from my description",
+  },
+
   // Agent Builder wizard: the chat box, for anything the trainer wants the agent to know.
   agentBuilderChatBox: {
     placeholder: {

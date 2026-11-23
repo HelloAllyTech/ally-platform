@@ -17,6 +17,20 @@ const mocks = vi.hoisted(() => ({
   goals: {} as Record<string, unknown>,
   suggest: vi.fn(),
   fetchCharacter: vi.fn(),
+  catalog: [
+    {
+      language_id: 1,
+      value: "en-IN",
+      label: "English (India)",
+      voices: [{ id: "v-en", name: "Anushka", gender: "female", provider: "SARVAM" }],
+    },
+    {
+      language_id: 2,
+      value: "kn-IN",
+      label: "Kannada (India)",
+      voices: [{ id: "v-kn", name: "Raju", gender: "male", provider: "ELEVENLABS" }],
+    },
+  ] as any[],
 }));
 
 vi.mock("@store", () => ({
@@ -44,6 +58,7 @@ vi.mock("../../competency", () => ({ Competency: () => <div>competency picker</d
 vi.mock("@api", () => ({
   ROLEPLAY_MODES: ["learning", "practice", "performance", "pre_assessment", "post_assessment"],
   useGetAgentTestCasesQuery: () => mocks.goals,
+  useGetAvailableLanguageVoicesQuery: () => ({ data: mocks.catalog }),
   useLazyGetRoleplayDesignQuery: () => [mocks.fetchDesign, { isFetching: false }],
   useSuggestAgentBuilderCharactersMutation: () => [mocks.suggest, { isLoading: false }],
   useLazyGetCharacterByIdQuery: () => [mocks.fetchCharacter, { isFetching: false }],
@@ -146,6 +161,9 @@ describe("AgentBuilderCopilotWizard suggestions", () => {
     await act(async () => {
       fireEvent.click(screen.getByText("Next"));
     });
+    await act(async () => {
+      fireEvent.click(screen.getByText("Next"));
+    });
     fireEvent.click(screen.getByText("Client deflects"));
     fireEvent.click(screen.getByText("Generate"));
 
@@ -171,6 +189,9 @@ describe("AgentBuilderCopilotWizard suggestions", () => {
       fireEvent.click(screen.getByText("Next"));
     });
 
+    await act(async () => {
+      fireEvent.click(screen.getByText("Next"));
+    });
     expect(screen.getByText(modeStrings.goalsUnavailable)).toBeTruthy();
     fireEvent.click(screen.getByText("Generate"));
     expect(mocks.start).toHaveBeenCalledWith(expect.objectContaining({ agentTestCases: "" }));
@@ -281,6 +302,9 @@ describe("AgentBuilderCopilotWizard casting from the Character Library", () => {
     expect(mocks.setValue).toHaveBeenCalledWith("characterProfileSelector", "c-1");
     expect(mocks.setValue).toHaveBeenCalledWith("name", "Gowramma", expect.anything());
 
+    await act(async () => {
+      fireEvent.click(screen.getByText("Next"));
+    });
     fireEvent.click(screen.getByText("Client deflects"));
     fireEvent.click(screen.getByText("Generate"));
     const inputs = mocks.start.mock.calls[0][0];
@@ -295,6 +319,9 @@ describe("AgentBuilderCopilotWizard casting from the Character Library", () => {
 
     expect(screen.getByTestId("character-note").textContent).toBe(characterStrings.searchFailed);
     expect((screen.getByDisplayValue("new") as HTMLInputElement).checked).toBe(true);
+    await act(async () => {
+      fireEvent.click(screen.getByText("Next"));
+    });
     await act(async () => {
       fireEvent.click(screen.getByText("Next"));
     });
@@ -361,6 +388,9 @@ describe("AgentBuilderCopilotWizard chat box", () => {
     await act(async () => {
       fireEvent.click(screen.getByText("Next"));
     });
+    await act(async () => {
+      fireEvent.click(screen.getByText("Next"));
+    });
     fireEvent.click(screen.getByText("Client deflects"));
     fireEvent.click(screen.getByText("Generate"));
 
@@ -372,5 +402,75 @@ describe("AgentBuilderCopilotWizard chat box", () => {
     expect(mocks.start).toHaveBeenCalledTimes(2);
     expect(mocks.start.mock.calls[1][0].actorDescription).toContain("- Make her more guarded");
     expect(mocks.start.mock.calls[1][0].agentTestCases).toBe("Client deflects");
+  });
+});
+
+describe("AgentBuilderCopilotWizard languages and voices", () => {
+  const strings = en.agentBuilderLanguages;
+
+  const toLanguagesStep = async () => {
+    render(<AgentBuilderCopilotWizard formMethods={form()} />);
+    fireEvent.change(screen.getByLabelText("actor"), { target: { value: "Meera calls" } });
+    fireEvent.click(screen.getByText("Next"));
+    fireEvent.click(screen.getByText("Next"));
+    await act(async () => {
+      fireEvent.click(screen.getByText("Next"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText("Next"));
+    });
+  };
+
+  const generate = async () => {
+    await act(async () => {
+      fireEvent.click(screen.getByText("Next"));
+    });
+    fireEvent.click(screen.getByText("Client deflects"));
+    fireEvent.click(screen.getByText("Generate"));
+  };
+
+  it("decides from the description by default", async () => {
+    await toLanguagesStep();
+    expect((screen.getByDisplayValue("describe") as HTMLInputElement).checked).toBe(true);
+    await generate();
+    expect(mocks.start.mock.calls[0][0].languages).toBeUndefined();
+  });
+
+  it("uses the chosen languages, puts a chosen voice on the form and leaves the rest to the agent", async () => {
+    await toLanguagesStep();
+    fireEvent.click(screen.getByDisplayValue("choose"));
+    fireEvent.click(screen.getByLabelText("English (India)"));
+    fireEvent.click(screen.getByLabelText("Kannada (India)"));
+    fireEvent.change(screen.getByLabelText(strings.voiceFor("Kannada (India)")), {
+      target: { value: "v-kn" },
+    });
+    await generate();
+
+    expect(mocks.setValue).toHaveBeenCalledWith(
+      "languageVoices",
+      { "2": "v-kn" },
+      expect.objectContaining({ shouldDirty: true }),
+    );
+    expect(mocks.start.mock.calls[0][0].languages).toEqual([
+      { languageId: "1", label: "English (India)", code: "en-IN" },
+      { languageId: "2", label: "Kannada (India)", code: "kn-IN" },
+    ]);
+    expect(
+      screen.getByText(`English (India): ${strings.agentPicks}; Kannada (India): Raju`),
+    ).toBeTruthy();
+  });
+
+  it("asks for at least one language when choosing", async () => {
+    await toLanguagesStep();
+    fireEvent.click(screen.getByDisplayValue("choose"));
+    fireEvent.click(screen.getByText("Next"));
+    expect(screen.getByText(strings.pickOne)).toBeTruthy();
+  });
+
+  it("starts from a library character's voices", async () => {
+    mocks.formValues.languageVoices = { "2": "v-kn" };
+    await toLanguagesStep();
+    expect((screen.getByDisplayValue("choose") as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText("Kannada (India)") as HTMLInputElement).checked).toBe(true);
   });
 });
