@@ -1,0 +1,102 @@
+import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import {
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
+import { ANALYTICS_RANGES, AnalyticsRange } from './platform-analytics.dto';
+import {
+  CHART_GROUPS,
+  CHART_SHAPES,
+  CHART_TYPES,
+  ChartGroup,
+  ChartShape,
+  ChartSize,
+  ChartType,
+} from '../constants/tenant-chart-library.constants';
+import { ChartAvailabilityState } from '../util/tenant-chart-library.util';
+
+export class TenantChartLibraryEntryDto {
+  @ApiProperty({ description: 'Stable id, for example TSQ-001' }) id!: string;
+  @ApiProperty() title!: string;
+  @ApiProperty({ description: 'The question the chart answers' })
+  question!: string;
+  @ApiProperty({ enum: CHART_GROUPS }) group!: ChartGroup;
+  @ApiProperty({ enum: CHART_SHAPES }) shape!: ChartShape;
+  @ApiProperty({ enum: CHART_TYPES }) chart!: ChartType;
+  @ApiProperty({ enum: ['s', 'm', 'wide'] }) size!: ChartSize;
+  @ApiProperty({ enum: ['available', 'sparse', 'unavailable'] })
+  state!: ChartAvailabilityState;
+  @ApiProperty({
+    nullable: true,
+    description: 'Why the chart is sparse or unavailable; null when available',
+  })
+  reason!: string | null;
+}
+
+export class TenantChartLibraryResponseDto {
+  @ApiProperty({
+    description:
+      'Whether the new Statistics page is switched on for this tenant. When false the client keeps the existing page and `charts` is empty.',
+  })
+  enabled!: boolean;
+
+  @ApiProperty({ type: [TenantChartLibraryEntryDto] })
+  charts!: TenantChartLibraryEntryDto[];
+}
+
+export class TenantCapabilitiesResponseDto {
+  @ApiProperty({ description: 'Counts that decide which charts are available' })
+  capabilities!: Record<string, number>;
+}
+
+export class TenantChartQueryDto {
+  @ApiProperty({
+    enum: ANALYTICS_RANGES,
+    default: '90d',
+    required: false,
+  })
+  @IsOptional()
+  @IsIn(ANALYTICS_RANGES)
+  range?: AnalyticsRange;
+
+  @ApiProperty({
+    required: false,
+    description: 'Table charts only: case-insensitive name filter',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  search?: string;
+
+  @ApiProperty({ required: false, minimum: 1, maximum: 200 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  limit?: number;
+
+  @ApiProperty({ required: false, minimum: 0 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  offset?: number;
+}
+
+export class TenantChartDataResponseDto {
+  @ApiProperty() id!: string;
+  @ApiProperty({ enum: ['available', 'sparse'] })
+  state!: Exclude<ChartAvailabilityState, 'unavailable'>;
+  @ApiProperty({
+    description:
+      'Chart data. Its shape depends on the chart: see the chart’s `shape` in the library.',
+  })
+  data!: unknown;
+}

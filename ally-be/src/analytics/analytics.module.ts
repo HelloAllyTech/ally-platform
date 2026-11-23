@@ -139,6 +139,8 @@ import { LanguageBackfillSchedulerRegistrationService } from './service/language
 import { PlatformAnalyticsRepository } from './repository/platform-analytics.repository';
 import { TenantAnalyticsRepository } from './repository/tenant-analytics.repository';
 import { TenantAnalyticsService } from './service/tenant-analytics.service';
+import { TenantCapabilitiesRepository } from './repository/tenant-capabilities.repository';
+import { TenantChartLibraryService } from './service/tenant-chart-library.service';
 import { ScribeAnalyticsRepository } from './repository/scribe-analytics.repository';
 import { LlmUsageRepository } from './repository/llm-usage.repository';
 import { DriftAnalyticsRepository } from './repository/drift-analytics.repository';
@@ -369,6 +371,8 @@ import { TenantModule } from 'src/tenant/tenant.module';
     PlatformAnalyticsRepository,
     TenantAnalyticsService,
     TenantAnalyticsRepository,
+    TenantCapabilitiesRepository,
+    TenantChartLibraryService,
     ScribeAnalyticsRepository,
     LlmUsageRepository,
     DriftAnalyticsRepository,
