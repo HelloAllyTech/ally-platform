@@ -57,6 +57,11 @@ const CASES = new Set((arg('cases', '') || '').split(',').filter(Boolean));
 const CLASSIFIER_FAIL = flag('classifier-fail');
 const GRADE = !flag('no-grade');
 const REGRADE = arg('regrade');
+// Q4: grade under an earlier grader and sets, so a gain from fixing the grader isn't counted as a
+// product gain. --sets results/sets-2026-11-23-before --max-sources 8 is the grader of 23 Nov
+// morning (it read 8 of a run's passages) with the sets before that day's corrections.
+const SETS_DIR = arg('sets', 'sets');
+const MAX_SOURCES = arg('max-sources') ? Number(arg('max-sources')) : undefined;
 // With --regrade: also recompute the tool and record checks from the stored messages (a run saved
 // before the runner's time-zone fix read neither).
 const RECHECK = flag('recheck');
@@ -109,9 +114,9 @@ const setupLabel =
 if (!setupLabel) refuse('no setup results: run setup.py first.');
 const setup = JSON.parse(readFileSync(join(here, 'results', `setup-${setupLabel}.json`), 'utf8'));
 
-const sets = readdirSync(join(here, 'sets'))
+const sets = readdirSync(join(here, SETS_DIR))
   .filter((f) => f.endsWith('.json'))
-  .map((f) => ({ file: f.replace(/\.json$/, ''), ...JSON.parse(readFileSync(join(here, 'sets', f), 'utf8')) }))
+  .map((f) => ({ file: f.replace(/\.json$/, ''), ...JSON.parse(readFileSync(join(here, SETS_DIR, f), 'utf8')) }))
   .filter((s) => !ONLY.size || ONLY.has(s.file) || ONLY.has(s.assistant));
 
 // ---------------------------------------------------------------- database
@@ -399,6 +404,7 @@ async function grade(c, t, observed, context) {
     },
     observed: { ...observed, decline_text: context.declineText, about: context.about },
     judge: true,
+    ...(MAX_SOURCES ? { max_sources: MAX_SOURCES } : {}),
   };
   try {
     const res = await fetch(`${AI}/api/v1/checkup/grade`, {

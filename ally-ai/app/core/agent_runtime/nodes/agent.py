@@ -20,6 +20,7 @@ from app.core.agent_runtime.budget import (
     searches,
     steps_left,
 )
+from app.core.agent_runtime.key_facts import key_fact_passages
 from app.core.agent_runtime.schemas import REPLY_ACTION
 from app.core.agent_runtime.state import AgentState, json_safe
 from app.core.agent_runtime.tools import gateway_tools, search_tools
@@ -199,7 +200,11 @@ def first_step_keys(
         "limits": service.resolve_limits(**bot.get("limits", {})),
         # The previous message's list entries (chunk 6b), so a confirmation can book
         # without looking the slot up again.
-        "passages": list(state.get("carried_records") or []),
+        # and the assistant's key facts (Q4 G3), in every run from the start.
+        "passages": [
+            *(state.get("carried_records") or []),
+            *key_fact_passages(bot),
+        ],
         "tool_calls": [],
         "activity": [],
         "revisions": 0,

@@ -42,6 +42,7 @@ import {
   type OfferQuestions,
 } from '../agent-tools/list-consent';
 import { businessFacts } from './business-facts';
+import { AGENT_KEY_FACTS_ON, keyFactsFor } from './key-facts';
 import { buildAgentRunRequest, NO_DOCUMENTS } from './knowledge-request';
 import { contactFromSources } from './run-failed-reply';
 
@@ -366,7 +367,7 @@ export class AgentRuntimeRunner {
   ): Promise<AgentRunRequest> {
     // What it knows about the person (chunk 8a): their lines with memory on, this chat's summary
     // and their name, each only when there is one. Nothing: exactly today's request.
-    const [knowledgeTopics, memory, facts] = await Promise.all([
+    const [knowledgeTopics, memory, facts, keyFacts] = await Promise.all([
       this.knowledgeTopics(knowledge),
       this.memory
         ? this.memory.forRun(
@@ -382,6 +383,10 @@ export class AgentRuntimeRunner {
       // How to reach the business, from its sources (Q3-fast Part 2): a decline gives it
       // when the owner's decline wording has no contact of its own.
       businessFacts(this.documentRepository.manager, turn.chatbot.id),
+      // Q4 G3: the facts it must always know, in every run's passages.
+      AGENT_KEY_FACTS_ON()
+        ? keyFactsFor(this.documentRepository.manager, turn.chatbot.id)
+        : Promise.resolve(null),
     ]);
     const contact = contactFromSources(facts, turn.settings.helplineNumbers);
     if (shown) shown.refs = memory.refs;
@@ -395,6 +400,7 @@ export class AgentRuntimeRunner {
       }),
       ...memory.fields,
       ...(contact ? { business_contact: contact.slice(0, 200) } : {}),
+      ...(keyFacts ? { key_facts: keyFacts } : {}),
       run_timeout_s: run.capS ?? AGENT_RUN_LIMITS.streamedCapS,
     };
     if (run.withGateway === false) return body;

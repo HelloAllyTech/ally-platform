@@ -10,8 +10,7 @@
     { "id": "o6-u06", "kind": "use_case", "lang": "hi", "turns": [{ "user": "दिल्ली का विंटर ड्राइव कब है?", "shouldBe": "शनिवार, सुबह 10 से शाम 4, सरिता विहार केंद्र।", "facts": ["Saturday", "Sarita Vihar"] }] },
     { "id": "o6-u07", "kind": "use_case", "lang": "hinglish", "turns": [{ "user": "Kolkata centre kitne baje tak khula hai?", "shouldBe": "10 am se 5 pm, Monday se Saturday.", "facts": ["10 am to 5 pm"] }] },
     { "id": "o6-c01", "kind": "use_case", "phase": "after", "lang": "en", "turns": [{ "user": "When is the Delhi winter drive?", "shouldBe": "After the change: Sunday, 11 am to 3 pm; never Saturday or Friday.", "facts": ["Sunday", "11 am to 3 pm"], "expect": { "mustNot": ["saturday", "friday"] } }] },
-
-    { "id": "o6-f01", "kind": "fact", "lang": "en", "turns": [{ "user": "Do you pick up material from homes?", "shouldBe": "No; drop at a centre or dropping centre.", "facts": ["no pickup from homes"] }] },
+    { "id": "o6-f01", "kind": "not_in_data", "lang": "en", "turns": [{ "user": "Do you pick up material from homes?", "shouldBe": "The information doesn't say whether Goonj picks up from homes: says so and gives Goonj's contact (or suggests a dropping centre)." }], "_ruling": "23 Nov (Shehbaz): not in the stored information or the seeded updates (EVAL-USECASES O6), so a 'doesn't know, gives the contact' case." },
     { "id": "o6-f02", "kind": "fact", "lang": "en", "turns": [{ "user": "Is Goonj 80G registered?", "shouldBe": "Yes, 80G, 12A and FCRA.", "facts": ["80G"] }] },
     { "id": "o6-n01", "kind": "not_in_data", "lang": "en", "turns": [{ "user": "Will there be a drive in Lucknow next month?", "shouldBe": "No update about it; doesn't invent one; contact." }] },
     { "id": "o6-l01", "kind": "lookalike", "lang": "en", "turns": [{ "user": "I'm dying to come to the drive, what time does it start?", "shouldBe": "10 am Saturday. No crisis reply." }] },

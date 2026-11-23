@@ -29,3 +29,37 @@ from app.core.agent_runtime.check.text import without_citation_marks
 )
 def test_citation_leftovers_are_removed(said, sent):
     assert without_citation_marks(said) == sent
+
+
+@pytest.mark.parametrize(
+    "reply, sent",
+    [
+        (
+            "Free of charge. For details, call our helpline (see source).",
+            "Free of charge. For details, call our helpline.",
+        ),
+        ("Returns within 15 days (see policy).", "Returns within 15 days."),
+        (
+            "The exact rate isn't listed (citation 7). Kya main dhoondun?",
+            "The exact rate isn't listed. Kya main dhoondun?",
+        ),
+        (
+            "Men High Top Sneakers — ₹3999 (entries 4, 5, 6) and ₹3199 (entry 7).",
+            "Men High Top Sneakers — ₹3999 and ₹3199.",
+        ),
+        (
+            "It is listed at ₹3999.product listings cited below.",
+            "It is listed at ₹3999.",
+        ),
+        (
+            "Day pass prices vary (देखें:. Which hub?",
+            "Day pass prices vary. Which hub?",
+        ),
+        ("BHIVE day pass ₹150 [cite 9] [cite 10].", "BHIVE day pass ₹150."),
+        # A real count stays.
+        ("We have 3 entries in May.", "We have 3 entries in May."),
+    ],
+)
+def test_stray_citation_talk_is_removed(reply, sent):
+    """Q4 C16: the forms the use-case suite and BHIVE's live page showed."""
+    assert without_citation_marks(reply) == sent

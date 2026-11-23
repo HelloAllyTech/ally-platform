@@ -32,6 +32,7 @@ from datetime import datetime, timezone
 from hashlib import sha256
 from typing import Any, Dict, List, Optional
 
+from app.core.config import settings
 from app.core.constants import EmbeddingConstants
 from app.core.embeddings.base import BaseEmbeddingService
 from app.core.llm_usage.emitter import emit_embedding_usage
@@ -401,14 +402,29 @@ class KnowledgeChunkService:
                 return []
             filters["document_id"] = [str(d) for d in document_ids]
 
-        hits = await self.vector_db.near_vector_search(
-            collection_name=self.collection_name,
-            vector=vector,
-            limit=limit,
-            min_similarity=min_similarity,
-            filters=filters or None,
-            any_of=audience.to_any_of(),
-        )
+        # Q4: keyword search beside vector search, in the same query, unless it is
+        # switched off (KNOWLEDGE_AGENT__HYBRID_SEARCH=false).
+        hybrid = getattr(self.vector_db, "hybrid_search", None)
+        if settings.KNOWLEDGE_AGENT.HYBRID_SEARCH and hybrid is not None:
+            hits = await hybrid(
+                collection_name=self.collection_name,
+                query=text,
+                vector=vector,
+                limit=limit,
+                min_similarity=min_similarity,
+                alpha=settings.KNOWLEDGE_AGENT.HYBRID_ALPHA,
+                filters=filters or None,
+                any_of=audience.to_any_of(),
+            )
+        else:
+            hits = await self.vector_db.near_vector_search(
+                collection_name=self.collection_name,
+                vector=vector,
+                limit=limit,
+                min_similarity=min_similarity,
+                filters=filters or None,
+                any_of=audience.to_any_of(),
+            )
 
         return [self._to_passage(hit) for hit in hits]
 

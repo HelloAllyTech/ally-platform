@@ -203,3 +203,26 @@ The consent question also now names the day, time and place and the number of pl
 > - If it's taken or a rule says no, say so plainly and offer what is free.
 
 No variables change. In code with it: a find over a day or a range of times returns at least 8 entries, with the total (`FIND_LIMIT_DAY`). Measured on the booking cases in the use-case suite (b5-91springboard, b5-bhive, b1-dragarwal), where an availability question without a find is a failure.
+
+## D. Third group, for approval (C18)
+
+### D1. Answer instead of "which one?" (`agent/system.txt`, `ally_ai_agent_system`), item C18
+
+**Why:** 3 of the 40 in-data misses at the first Q4 measurement asked back when the passages already answered: 91springboard's day pass ("which hub?"), Goonj's Delhi centre hours ("which Delhi centre?"), RHA in Tamil; and The Souled Store S6, S10 and S12 in Round 6.
+
+**Current (the `clarify` intent):**
+> - `clarify`: one short question to understand what they need, only about something you help with.
+
+**Proposed:**
+> - `clarify`: one short question to understand what they need, only about something you help with. Not when the passages already answer for each of a few options (branches, centres, plans, sizes): then `answer` with each option's answer in a line, and ask which they meant only if it matters.
+
+No variables change.
+
+### Not prompt text: done in code with this group
+
+- **G3 key facts:** up to 10 facts (about 500 tokens) in every run's passages, citable as "What we learned"; owner facts first, then contact, hours, policies, about. No prompt text: they arrive as passages. Switch: `AGENT_KEY_FACTS=off` in ally-be.
+- **G4:** a key fact from a privacy, terms, login, app-store or leaderboard page is never chosen; the home or contact page's contact comes first.
+- **C14:** the search tool also searches a non-English message as written beside the agent's English query, and merges the passages; a message in another script, or in Hinglish, isn't pre-searched as written.
+- **C15:** the site reader labels a struck-out price "(was ₹200) ₹100/Day".
+- **C16:** "(see source)", "(see policy)", "(citation 7)", "(entries 4, 5, 6)", "[cite 9]", "…cited below." and a dangling "(देखें:" are removed from every reply.
+- **C19:** covered by key facts (the contact, email and fees are always in context); no separate change.

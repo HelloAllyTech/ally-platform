@@ -33,7 +33,7 @@ logger = get_logger(__name__)
 
 #: Bumped whenever a rule here changes, so results graded by different rules are
 #: never compared as if they were the same.
-GRADER_VERSION = "2026-11-23.1"  # Q4: judges what was asked; names conflicts
+GRADER_VERSION = "2026-11-23.2"  # Q4: reads all 16 passages a run retrieved
 
 JUDGE_PROMPT = "checkup/judge"
 
@@ -44,8 +44,10 @@ JUDGE_DECLINED = "judge_declined"
 _PENDING = (JUDGE_ALSO_OK, JUDGE_DECLINED)
 
 #: Passages shown to the judge (cited first, then the rest the run retrieved), so
-#: a detail is judged against what the sources say, a decline's included.
-MAX_SOURCE_PASSAGES = 8
+#: a detail is judged against what the sources say, a decline's included. Every
+#: passage a run can retrieve (Q4: at 8, a detail from a run's 9th to 16th passage
+#: was judged invented, three times in one measurement).
+MAX_SOURCE_PASSAGES = 16
 MAX_SOURCE_CHARS = 4000
 
 #: ally-be's handled-by labels that mean the engine answered from the information.
@@ -314,12 +316,12 @@ def apply_judge(
     return result
 
 
-def source_chunk_ids(observed: CheckupObserved) -> List[str]:
+def source_chunk_ids(observed: CheckupObserved, cap: Optional[int] = None) -> List[str]:
     """The passages the judge reads: cited first, then every other one the run
     retrieved, without repeats, capped."""
     cited = [c.chunk_id for c in observed.citations if c.chunk_id]
     return list(dict.fromkeys([*cited, *observed.passage_chunk_ids]))[
-        :MAX_SOURCE_PASSAGES
+        : cap or MAX_SOURCE_PASSAGES
     ]
 
 

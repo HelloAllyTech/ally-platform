@@ -111,6 +111,12 @@ class KnowledgeAgentSettings(BaseModel):
     TOP_K: int = Field(8)
     MIN_SIMILARITY: float = Field(0.35)
     DECLINE_SIMILARITY: float = Field(0.42)
+    # Q4: keyword (BM25) search beside vector search, in one Weaviate hybrid query.
+    # Off by default: on the 8 exact-term misses it found 2 against vector search's 4
+    # at every weighting (the facts sit in short fragment chunks beside the words the
+    # question uses; CHUNK-Q4-NOTES). ALPHA weighs the two: 1.0 is vector only.
+    HYBRID_SEARCH: bool = Field(False)
+    HYBRID_ALPHA: float = Field(0.5, ge=0.0, le=1.0)
     # Passages within this similarity of the best hit are kept; the rest are dropped
     # even if they cleared the floor. Stops one strong match from being diluted by seven
     # weak ones.
@@ -164,6 +170,8 @@ class AgentRuntimeSettings(BaseModel):
     # Search the question before the first model call (chunk H1), so a plain answer
     # takes one model call instead of two. False: the agent decides when to search.
     PRESEARCH: bool = Field(True)
+    # Q4 G3: ally-be's key facts are in every run's passages; False ignores them.
+    KEY_FACTS: bool = Field(True)
     # Conversation messages the agent reads, most recent last.
     MAX_HISTORY_MESSAGES: int = Field(10, ge=0, le=50)
     # Reasoning effort for the agent step on an OpenAI reasoning model (gpt-5 and

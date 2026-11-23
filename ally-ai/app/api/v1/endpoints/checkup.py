@@ -39,7 +39,7 @@ async def grade(
     with knowledge_errors("Unexpected error grading a checkup question"):
         # The judge reads what the passages the run retrieved say (cited ones
         # first), so a detail taken from them is never taken for an invented one.
-        chunk_ids = source_chunk_ids(payload.observed)
+        chunk_ids = source_chunk_ids(payload.observed, payload.max_sources)
         found = await asyncio.gather(
             *(service.chunk_service.get(chunk_id) for chunk_id in chunk_ids)
         )

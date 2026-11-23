@@ -148,6 +148,8 @@ def make_tools_node(service: KnowledgeAgentService) -> Node:
                     language=step.get("language") or "en",
                     # Every search, not only the first (chunk 6b, 3a's open item).
                     log_retrieval=state["bot"].get("log_retrieval", True),
+                    # Q4 C14: searched as written beside the English query.
+                    latest=state.get("question") or "",
                 ),
             )
             records.append(json_safe(result.record))

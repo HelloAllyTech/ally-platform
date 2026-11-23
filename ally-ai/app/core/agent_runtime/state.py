@@ -56,6 +56,7 @@ class BotConfig(TypedDict, total=False):
     summary: str
     person_name: str
     before_chat: List[Dict[str, str]]  # [{label, value}], the pre-chat's answers
+    key_facts: Dict[str, Any]  # Q4 G3: {facts, document_id, title}
 
 
 class RunInput(TypedDict, total=False):

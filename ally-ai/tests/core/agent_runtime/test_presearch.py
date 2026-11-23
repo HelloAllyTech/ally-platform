@@ -111,3 +111,12 @@ def test_streamed_tokens_drop_citation_markers(monkeypatch):
         trace.STREAMED.reset(token)
     assert "".join(sent) == "Open 9 to 7 and Sunday 9 to 1."
     assert flag["any"] is True
+
+
+def test_hinglish_is_left_to_the_agents_english_query():
+    from app.core.agent_runtime.nodes.presearch import looks_hinglish
+
+    assert looks_hinglish("Delhi wale centre ka time kya hai? Visit karna hai")
+    assert looks_hinglish("paise donate kar sakte hain? 80G milega?")
+    assert not looks_hinglish("Is it free to talk to a counsellor?")
+    assert not looks_hinglish("Main road toh closed?")

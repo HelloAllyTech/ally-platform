@@ -42,6 +42,23 @@ def mostly_non_latin(text: str) -> bool:
     return other / len(letters) > NON_LATIN_SHARE
 
 
+#: Hindi written in Latin letters: common words that aren't English ones.
+HINGLISH_WORDS = frozenset(
+    "kya hai hain ka ki ke mein nahi nahin aap aapka aapke aapki karna karne kaise "
+    "kitna kitne kitni kab kahan koi sakte sakta sakti chahiye hota hoti wale wala "
+    "wali paise milega milegi batao bataiye mujhe hamare hamara toh bhi liye kaun "
+    "kyun karein karen dena lena".split()
+)
+
+
+def looks_hinglish(text: str) -> bool:
+    """At least two common Hinglish words, and a fifth of the words."""
+    words = [w.strip("?.,!'\"").lower() for w in text.split()]
+    words = [w for w in words if w]
+    hits = sum(1 for w in words if w in HINGLISH_WORDS)
+    return hits >= 2 and hits / max(len(words), 1) >= 0.2
+
+
 def presearch_wanted(state: AgentState) -> bool:
     if not settings.AGENT_RUNTIME.PRESEARCH:
         return False
@@ -52,7 +69,7 @@ def presearch_wanted(state: AgentState) -> bool:
     # message in Hindi, Tamil or Bengali searched as written found nothing above the
     # decline threshold, so the agent saw no passages and said it didn't know (8 of
     # the 17 non-English misses at the Q4 baseline). The agent writes the query.
-    if mostly_non_latin(question):
+    if mostly_non_latin(question) or looks_hinglish(question):
         return False
     return any(tool.name == SEARCH for tool in search_tools(state["bot"]))
 

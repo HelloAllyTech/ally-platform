@@ -26,6 +26,7 @@ from app.core.agent_runtime.check import (
     organisation_of,
     rejection_feedback,
 )
+from app.core.agent_runtime.key_facts import key_fact_passages
 from app.core.agent_runtime.memory import personal_context
 from app.core.agent_runtime.state import AgentState, json_safe
 from app.core.agent_runtime.tools import gateway_tools
@@ -116,7 +117,9 @@ def make_agent_check_node(service: KnowledgeAgentService) -> Node:
             personal=personal_context(state["bot"]),
             looked_up=bool(finds),
             can_pass_on=can_pass_on(state["bot"]),
-            carried=len(state.get("carried_records") or []),
+            # Carried entries and key facts (Q4 G3): citable, not found by this run.
+            carried=len(state.get("carried_records") or [])
+            + len(key_fact_passages(state["bot"])),
             refused=refused,
             business_contact=state["bot"].get("business_contact") or "",
             memory_on="memory" in state["bot"],

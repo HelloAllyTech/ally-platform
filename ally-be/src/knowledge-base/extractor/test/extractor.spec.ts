@@ -383,3 +383,23 @@ describe('htmlToExtractedDocument', () => {
     expect(extracted.text).toBe('Just prose.');
   });
 });
+
+describe('struck-out prices (Q4 C15)', () => {
+  it('labels the old price, so the one after it reads as current', () => {
+    const { text } = htmlToExtractedDocument(
+      '<p>Day Pass<br /> <span class="strike">₹200</span> <b>₹100</b>/Day</p>' +
+        '<p>Hot desk <del>₹9,000</del> ₹7,500 a month</p>' +
+        '<p>Locker <s>₹500</s> ₹400</p>',
+    );
+    expect(text).toContain('Day Pass\n(was ₹200) ₹100/Day');
+    expect(text).toContain('Hot desk (was ₹9,000) ₹7,500 a month');
+    expect(text).toContain('Locker (was ₹500) ₹400');
+  });
+
+  it('leaves other text and nested struck tags whole', () => {
+    const { text } = htmlToExtractedDocument(
+      '<p>Plan <span class="strike">₹<span>1,000</span></span> ₹800, then <em>more</em></p>',
+    );
+    expect(text).toContain('Plan (was ₹1,000) ₹800, then more');
+  });
+});
