@@ -32,6 +32,11 @@
 - Hindi strings marked "needs review": list them in one file for a native speaker (not changed here).
 - **From the NGO baseline (P2, front end):** signing in as a customer in the same browser logs the owner out (keep the two sessions separate); the stale published count ("8 of 20" vs "9 of 20") and "0 messages, last 30 days" on the assistants list after real chats; the bot page logo missing; the footer disclaimer not updated when the pack changes (BHIVE kept the mental-health line after Facts only); "Choose this" clicks in setup sometimes ignored; sources labelled with the page title, not "What we learned, Services and prices…"; setup asks about conflicting phone numbers and emails, not only hours.
 
+## 4b. Two WhatsApp platform checks (`WHATSAPP-GAPS-PLAN.md` §3)
+
+- **Usernames:** since 31 March 2026 Meta's webhooks can carry a business-scoped user ID instead of a phone number for people who adopt usernames. Contacts are keyed by phone number today. Handle the ID (store it, match on it, never drop the message), with a test using a recorded webhook.
+- **General-purpose assistants are banned on the Business API** (since 15 January 2026). Review the "Custom" purpose and any general-answer mode: every assistant on WhatsApp stays tied to one organisation's own information and declines unrelated requests. Write down what was checked.
+
 ## 5. Ready to launch
 
 - **SP1's second onboarding run** (it was 8 of 13); the hold on medical, pharmacy and young-people assistants in `LAUNCH-CHECKLIST.md` lifts only if it passes.

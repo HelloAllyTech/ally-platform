@@ -28,6 +28,7 @@ Every booking failure in rounds 5–8 was the model turning free text into a wri
 
 ## 3. WhatsApp
 
+- **The first interactive sends on WhatsApp:** today the Meta provider can only `sendText`. Add a send for list messages and reply buttons (and a delivery-status read for them), validated against Meta's limits, in the provider and the send path the Inbox's team replies use. This is the booking half of `WHATSAPP-GAPS-PLAN.md` Stage A; images, documents and voice notes come in Phase 2.
 - **Slots as a list message** (up to 10 rows), **Confirm / Change as reply buttons** (up to 3), done cards as text with Cancel and Move as buttons. Button and list replies carry the action ids; ally-be handles them exactly like bot-page taps.
 - **Inside the 24-hour window only** (interactive messages are free-form replies); outside it, or if sending fails, the same content as numbered text ("Reply 1, 2 or 3"), and a typed number counts as the choice.
 - Typing still works.
