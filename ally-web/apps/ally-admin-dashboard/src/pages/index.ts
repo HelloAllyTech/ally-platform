@@ -26,6 +26,8 @@ export * from "./GuardrailsManagement/GuardrailsManagement";
 export * from "./TranslationManagement/TranslationManagement";
 export * from "./Tooltips/Tooltips";
 export * from "./Blog/Blog";
+export * from "./LandingPages/LandingPages";
+export * from "./LandingPages/LandingPageEditor";
 export * from "./ProductUpdates/ProductUpdates";
 export * from "./AILab";
 export * from "./Evaluate";
@@ -48,7 +50,6 @@ export * from "./RoleplaySessionLogs/RoleplaySessionLogs";
 export * from "./RoleplaySessionLogs/RoleplaySessionLogDetail";
 export * from "./Terms/Terms";
 export * from "./Privacy/Privacy";
-export * from "./ProductRoadmap";
 export * from "./Roadmap";
 export * from "./WhatsAppBot";
 // NOTE: Analytics is intentionally NOT re-exported here. It pulls in IBM Carbon

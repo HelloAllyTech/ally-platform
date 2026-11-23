@@ -40,7 +40,7 @@ export const Drawer: React.FC<DrawerProps> = ({ open, title, onClose, testId, to
       {open && (
         <div className="fixed inset-0 z-50" data-testid={testId}>
           <motion.div
-            className="absolute inset-0 bg-[#1E1B4B]/40"
+            className="absolute inset-0 bg-[#2B2520]/40"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -52,7 +52,7 @@ export const Drawer: React.FC<DrawerProps> = ({ open, title, onClose, testId, to
             role="dialog"
             aria-modal="true"
             aria-label={title}
-            className="absolute inset-y-0 right-0 flex w-full max-w-xl flex-col bg-[#FFFFFF] font-primary text-[#1E1B4B] shadow-2xl"
+            className="absolute inset-y-0 right-0 flex w-full max-w-xl flex-col bg-[#FFFFFF] font-primary text-[#2B2520] shadow-2xl"
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
@@ -60,7 +60,7 @@ export const Drawer: React.FC<DrawerProps> = ({ open, title, onClose, testId, to
           >
             <div
               className={`flex items-center justify-between gap-4 px-6 py-5 ${
-                tone ? "" : "border-b border-[#1E1B4B]/15"
+                tone ? "" : "border-b border-[#2B2520]/15"
               }`}
               style={tone ? { background: tone.bg, color: tone.fg } : undefined}
             >
@@ -70,7 +70,7 @@ export const Drawer: React.FC<DrawerProps> = ({ open, title, onClose, testId, to
                 type="button"
                 onClick={onClose}
                 aria-label="Close"
-                className={`cursor-pointer px-2 text-3xl leading-none ${tone ? "hover:opacity-70" : "hover:text-[#5B4BFF]"}`}
+                className={`cursor-pointer px-2 text-3xl leading-none ${tone ? "hover:opacity-70" : "hover:text-[#C4532D]"}`}
               >
                 ×
               </button>

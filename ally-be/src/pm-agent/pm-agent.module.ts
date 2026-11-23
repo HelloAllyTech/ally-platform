@@ -8,6 +8,10 @@ import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
 import { PromptModule } from 'src/prompt/prompt.module';
 import { ProductRoadmapModule } from 'src/product-roadmap/product-roadmap.module';
 import { PmAgentController } from './controller/pm-agent.controller';
+import { PmAgentDeadCodeController } from './controller/pm-agent-dead-code.controller';
+import { PmAgentDeadCodeService } from './service/pm-agent-dead-code.service';
+import { PmSecuritySignalController } from './controller/pm-security-signal.controller';
+import { PmSecuritySignalService } from './service/pm-security-signal.service';
 import { PmAgentGateway } from './gateway/pm-agent.gateway';
 import { PmAgentSettings } from './entity/pm-agent-settings.entity';
 import { PmAgentRun } from './entity/pm-agent-run.entity';
@@ -108,7 +112,12 @@ import { PmMetricSourcesService } from './impact/pm-metric-sources.service';
     LlmAgentModule,
     LlmUsageModule,
   ],
-  controllers: [PmAgentController, PmAgentLessonsController],
+  controllers: [
+    PmAgentController,
+    PmAgentLessonsController,
+    PmAgentDeadCodeController,
+    PmSecuritySignalController,
+  ],
   providers: [
     PmAgentSettingsRepository,
     PmAgentRunRepository,
@@ -121,6 +130,8 @@ import { PmMetricSourcesService } from './impact/pm-metric-sources.service';
     PmAgentOutcomeRepository,
     PmAgentLaneStatRepository,
     PmAgentSignalRepository,
+    PmAgentDeadCodeService,
+    PmSecuritySignalService,
     PmAgentEventsService,
     PmAgentBudgetService,
     PmAgentSettingsService,

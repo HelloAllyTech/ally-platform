@@ -123,6 +123,28 @@ const moves = (
   config: { field: 'status', initial: [initial], allowed },
 });
 
+/**
+ * The builders, for the lists only a use-case template installs (T1, `templates/template-lists.ts`):
+ * the same field types and rules as the catalogue, nothing new.
+ */
+export const listBuilders = {
+  field,
+  text,
+  select,
+  examples,
+  relation,
+  status,
+  yesNo,
+  money,
+  unique,
+  perPerson,
+  capacity,
+  moves,
+  required,
+  agent,
+  NEVER_FROM_CHAT,
+};
+
 /** Leads' examples (chunk 6b): what a lead is usually about, for any business. */
 const LEAD_INTERESTS = ['A demo', 'Pricing', 'Something else'];
 /**
@@ -667,6 +689,39 @@ export const READY_MADE: ReadyMadeItem[] = [
           text('sku', 'SKU'),
         ],
         rules: [unique(['sku'])],
+      },
+    ],
+  },
+  {
+    // T1: the restaurant template's menu (`BUSINESS-TEMPLATES.md`, "New lists").
+    name: 'menu',
+    title: 'Menu',
+    group: 'Shops and orders',
+    one_liner: 'For restaurants, cafés and kitchens.',
+    examples: ['Is the paneer tikka spicy?', 'What’s vegan?'],
+    lists: [
+      {
+        key: 'menu',
+        name: 'Menu',
+        agent_read: true,
+        settings: { title_field: 'name', default_sort: 'name' },
+        fields: [
+          text('name', 'Name', required),
+          select('category', 'Category', [
+            'starters',
+            'mains',
+            'breads',
+            'rice',
+            'desserts',
+            'drinks',
+          ]),
+          money('price', 'Price'),
+          select('veg', 'Veg', ['veg', 'non-veg', 'egg', 'vegan']),
+          select('spice', 'Spice', ['mild', 'medium', 'hot']),
+          text('allergens', 'Allergens'),
+          yesNo('available_today', 'Available today'),
+        ],
+        rules: [unique(['name'])],
       },
     ],
   },

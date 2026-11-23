@@ -3,12 +3,12 @@ import React from "react";
 import { Permissions, en } from "@constants";
 import { useUser } from "@hooks";
 
-import { BugsTab } from "../ProductRoadmap/BugsTab";
-import { InterviewsTab } from "../ProductRoadmap/InterviewsTab";
+import { BugsTab } from "./areas/BugsTab";
+import { InterviewsTab } from "./areas/InterviewsTab";
 import { RoadmapAreaHeader } from "./components/RoadmapAreaHeader";
 import { RoadmapBottomBar } from "./components/RoadmapBottomBar";
 import { useRoadmapBreakpoint } from "./hooks/useRoadmapBreakpoint";
-import { canManageRoadmap } from "../ProductRoadmap/utils/access";
+import { canManageRoadmap } from "./utils/access";
 
 /** Roadmap → Bugs (§4.1): Bug Hunter's table, read-only and unchanged. */
 export const RoadmapBugsPage: React.FC = () => {

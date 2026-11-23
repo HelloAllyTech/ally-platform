@@ -76,6 +76,7 @@ const buildNavigationItems = (): NavigationItem[] => {
       section: "create",
     },
     { id: S.BLOG, label: l.blog, path: ROUTES.BLOG, section: "create" },
+    { id: S.LANDING_PAGES, label: l.landingPages, path: ROUTES.LANDING_PAGES, section: "create" },
     // Product updates is no longer a primary item: it is a tab of the Roadmap's own top menu.
     // People
     { id: S.USERS, label: l.users, path: ROUTES.USER_MANAGEMENT, section: "people" },
@@ -163,7 +164,6 @@ const buildNavigationItems = (): NavigationItem[] => {
     },
     { id: S.AI_LAB, label: l.aiLab, path: ROUTES.AI_LAB, section: "ai-languages" },
     // Product
-    { id: S.PRODUCT_ROADMAP, label: l.roadmap, path: ROUTES.PRODUCT_ROADMAP, section: "product" },
     { id: S.ROADMAP_V2, label: l.roadmapV2, path: ROUTES.ROADMAP, section: "product" },
     {
       id: S.USER_INTERVIEWS,
@@ -442,6 +442,11 @@ export const deriveNavigationItems = ({
               permissions!.includes(Permissions.VIEW_BLOGS) &&
               hasFeature(features, FeatureToggleKey.BLOG)
             );
+          case SIDEBAR_ITEMS.LANDING_PAGES:
+            return (
+              permissions!.includes(Permissions.VIEW_LANDING_PAGES) &&
+              hasFeature(features, FeatureToggleKey.LANDING_PAGES)
+            );
           // On the edit grant, unlike Blog: this page corrects and hides what
           // the automation published.
           case SIDEBAR_ITEMS.PRODUCT_UPDATES:
@@ -462,11 +467,6 @@ export const deriveNavigationItems = ({
               (permissions!.includes(Permissions.SYSTEM_ACCESS) ||
                 permissions!.includes(Permissions.REVIEW_DEBRIEFS) ||
                 permissions!.includes(Permissions.MANAGE_DEBRIEF_SETTINGS))
-            );
-          case SIDEBAR_ITEMS.PRODUCT_ROADMAP:
-            return (
-              permissions!.includes(Permissions.VIEW_PRODUCT_ROADMAP) &&
-              hasFeature(features, FeatureToggleKey.PRODUCT_ROADMAP)
             );
           // Same grant as the board, and only while the flag is on (the role read succeeded).
           case SIDEBAR_ITEMS.ROADMAP_V2:

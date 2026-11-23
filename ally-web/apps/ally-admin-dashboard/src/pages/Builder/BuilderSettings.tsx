@@ -28,7 +28,6 @@ import { BuilderAutonomyLevel, BuilderSettings as BuilderSettingsType } from "@t
 import { formatDate, formatRelativeTime } from "@utils";
 
 import { useAgentEmbed } from "./agentEmbed";
-import { RoadmapSwitchOnSection } from "../Roadmap/cutover/RoadmapSwitchOnSection";
 
 /** Local editable copy of the fields this page actually exposes. */
 type SettingsDraft = Pick<
@@ -326,10 +325,6 @@ export const BuilderSettings: React.FC = () => {
       {isError && (
         <InlineNotification kind="error" lowContrast hideCloseButton title={strings.loadFailed} />
       )}
-
-      {/* Roadmap v2 P6: the Owner's switch-on, here because the Roadmap's own pages 404 until it
-          is on. Renders nothing for anyone who isn't a Roadmap Owner. */}
-      {!embedded && <RoadmapSwitchOnSection />}
 
       {isLoading || !draft ? (
         <SkeletonText paragraph lineCount={10} />

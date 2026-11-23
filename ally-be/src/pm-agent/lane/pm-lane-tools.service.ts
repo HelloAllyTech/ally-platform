@@ -21,7 +21,12 @@ import { SkillGrowthAnalyticsService } from 'src/analytics/service/skill-growth-
 import { TrackDropoffAnalyticsService } from 'src/analytics/service/track-dropoff-analytics.service';
 import { UsageLevelAnalyticsService } from 'src/analytics/service/usage-level-analytics.service';
 import { RoadmapProductGoalRepository } from 'src/product-roadmap/repository/roadmap-taxonomy.repository';
-import { PM_PLATFORM_USER_ID } from '../constants/pm-agent.constants';
+import {
+  DEAD_CODE_SIGNAL_FRESH_DAYS,
+  DEAD_CODE_SIGNAL_SOURCE,
+  PM_PLATFORM_USER_ID,
+} from '../constants/pm-agent.constants';
+import { PmAgentSignal } from '../entity/pm-agent-signal.entity';
 import { PM_PIPELINE } from '../constants/pm-agent-pipeline.constants';
 import { PmSignalStatus } from '../enum/pm-agent.enum';
 import { PmAgentSignalRepository } from '../repository/pm-agent.repositories';
@@ -99,14 +104,33 @@ const OWN_TOOLS: Record<string, AgentToolDefinition> = {
     name: PmTool.UX_SIGNALS_LIST,
     description:
       'UX Signals findings (rage/dead clicks, abandoned routes, zero-result searches, funnel ' +
-      'drop-off), aggregated, with first/last seen dates. Each finding is its own evidence ' +
-      'item. Check the dates before stating anything in the present tense.',
+      'drop-off), aggregated, and security audit findings (source `security_audit`, with ' +
+      'severity, file and fix in `metrics`), with first/last seen dates. Each finding is its ' +
+      'own evidence item. Check the dates before stating anything in the present tense.',
     input_schema: {
       type: 'object',
       properties: {
         query: {
           type: 'string',
           description: 'Optional words over titles and summaries',
+        },
+      },
+    },
+  },
+  [PmTool.DEAD_CODE_LIST]: {
+    name: PmTool.DEAD_CODE_LIST,
+    description:
+      'Modules with unused code, from the weekly dead-code report: module path, repo, item count, ' +
+      'counts by kind and up to 40 items. Each module is its own evidence item. Static analysis ' +
+      'finds candidates, not proof: dynamic dispatch can hide real use, so read the code before ' +
+      'proposing deletion. Propose one module per card.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description:
+            'Optional words over module paths (a repo or folder name)',
         },
       },
     },
@@ -236,6 +260,8 @@ export class PmLaneToolsService implements PmToolbox {
           return await this.analyticsSection(input, ctx);
         case PmTool.UX_SIGNALS_LIST:
           return await this.uxSignals(input, ctx);
+        case PmTool.DEAD_CODE_LIST:
+          return await this.deadCode(input, ctx);
         case PmTool.LLM_USAGE_SUMMARY:
           return await this.llmUsageSummary(input, ctx);
         case PmTool.AI_TASK_REGISTRY:
@@ -373,6 +399,9 @@ export class PmLaneToolsService implements PmToolbox {
     const since = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000);
     const rows = await this.signals.find({
       where: {
+        // This table also holds dead-code evidence, which has its own tool: leave it out,
+        // or the lane would cite a code report as telemetry. UX and security-audit rows stay.
+        source: In(['ux_signals', 'security_audit']),
         status: In([PmSignalStatus.NEW, PmSignalStatus.USED]),
         lastSeenAt: MoreThan(since),
       },
@@ -418,9 +447,12 @@ export class PmLaneToolsService implements PmToolbox {
         lastSeenAt: row.lastSeenAt,
       };
       const ref = await this.record(ctx.runId, {
-        source: 'ux_signals',
+        source: row.source,
         kind: 'finding',
-        label: `UX signal: ${row.title}`,
+        label:
+          row.source === 'security_audit'
+            ? `Security audit: ${row.title}`
+            : `UX signal: ${row.title}`,
         query: { signalId: row.id, detector: row.detector, key: row.key },
         snapshot,
       });
@@ -431,6 +463,75 @@ export class PmLaneToolsService implements PmToolbox {
           { evidence_id: ref.id, source: ref.source, label: ref.label },
           JSON.stringify(snapshot),
           1500,
+        ),
+      );
+    }
+    return { ok: true, evidence: refs, modelResult: parts.join('\n') };
+  }
+
+  private async deadCode(
+    input: Record<string, any>,
+    ctx: PmToolContext,
+  ): Promise<PmToolOutcome> {
+    const since = new Date(
+      Date.now() - DEAD_CODE_SIGNAL_FRESH_DAYS * 24 * 60 * 60 * 1000,
+    );
+    // NEW only: a module the agent already turned into a card (USED) or an admin dismissed
+    // is decided, and must not come back as fresh evidence.
+    const rows = await this.signals.find({
+      where: {
+        source: DEAD_CODE_SIGNAL_SOURCE,
+        status: PmSignalStatus.NEW,
+        lastSeenAt: MoreThan(since),
+      },
+      order: { lastSeenAt: 'DESC' },
+      take: 400,
+    });
+    const query = String(input.query ?? '').trim();
+    const count = (row: PmAgentSignal) => Number(row.metrics?.count ?? 0);
+    const picked = (
+      query ? rows.filter((row) => relevance(query, row.key) > 0) : rows
+    )
+      .sort((a, b) => count(b) - count(a))
+      .slice(0, 15);
+    if (!picked.length) {
+      return {
+        ok: true,
+        evidence: [],
+        modelResult: JSON.stringify({
+          ok: true,
+          modules: [],
+          note: rows.length
+            ? 'No module matched those words.'
+            : 'No dead-code report is recorded for the last 10 days: there is nothing to cite.',
+        }),
+      };
+    }
+    const refs: PmEvidenceRef[] = [];
+    const parts: string[] = [];
+    for (const row of picked) {
+      const snapshot = {
+        module: row.key,
+        repo: row.metrics?.repo ?? null,
+        count: count(row),
+        kinds: row.metrics?.kinds ?? {},
+        items: row.metrics?.items ?? [],
+        lastSeenAt: row.lastSeenAt,
+      };
+      const ref = await this.record(ctx.runId, {
+        source: DEAD_CODE_SIGNAL_SOURCE,
+        kind: 'finding',
+        label: `Dead code: ${row.key}`,
+        query: { signalId: row.id, detector: row.detector, key: row.key },
+        snapshot,
+      });
+      refs.push(ref);
+      parts.push(
+        fence(
+          'tool_data',
+          { evidence_id: ref.id, source: ref.source, label: ref.label },
+          JSON.stringify(snapshot),
+          2500,
         ),
       );
     }

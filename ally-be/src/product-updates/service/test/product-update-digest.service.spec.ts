@@ -50,13 +50,13 @@ describe('ProductUpdateDigestService', () => {
   };
   let config: {
     productUpdates: {
-      digestTo: string[];
       digestHour: number;
       digestAllowed: boolean;
     };
     email: { sourceEmail: string };
     adminBaseUrl: string;
   };
+  let recipients: { effective: jest.Mock };
   let roadmapVoting: { getRoadmapVoting: jest.Mock };
   let roadmapFeed: {
     recipients: jest.Mock;
@@ -79,9 +79,11 @@ describe('ProductUpdateDigestService', () => {
       get: jest.fn().mockResolvedValue(null),
       set: jest.fn().mockResolvedValue(undefined),
     };
+    recipients = {
+      effective: jest.fn().mockResolvedValue(['team@example.com']),
+    };
     config = {
       productUpdates: {
-        digestTo: ['team@example.com'],
         digestHour: 18,
         digestAllowed: true,
       },
@@ -149,6 +151,7 @@ describe('ProductUpdateDigestService', () => {
       roadmapVoting as unknown as RoadmapVotingAnalyticsService,
       roadmapFeed as never,
       planSettings as never,
+      recipients as never,
     );
   });
 
@@ -161,10 +164,10 @@ describe('ProductUpdateDigestService', () => {
   });
 
   it('does nothing without recipients, or outside its business hour', async () => {
-    config.productUpdates.digestTo = [];
+    recipients.effective.mockResolvedValue([]);
     expect(await service.sendIfDue(IN_DIGEST_HOUR)).toBe('disabled');
 
-    config.productUpdates.digestTo = ['team@example.com'];
+    recipients.effective.mockResolvedValue(['team@example.com']);
     expect(await service.sendIfDue(OUTSIDE_DIGEST_HOUR)).toBe('not-due');
     expect(sesService.sendEmail).not.toHaveBeenCalled();
   });
@@ -236,9 +239,10 @@ describe('ProductUpdateDigestService', () => {
 
     const body: string = sesService.sendEmail.mock.calls[0][0].body;
     expect(body).toContain('Roadmap votes in September so far:');
-    expect(body).toContain('Voters voted others share');
-    expect(body).toContain('75%'); // Bea: 9 of 12 on colleagues' ideas
-    expect(body).toContain('100%'); // Asha: 3 of 3
+    expect(body).toContain('Balance');
+    expect(body).not.toContain('Voters voted others share');
+    // Bea: 9 of 12 and Asha: 3 of 3 on colleagues' ideas
+    expect(body).toContain('Most votes to other people&#39;s ideas');
     expect(body).not.toContain('admins have voted');
     expect(body.indexOf('Bea')).toBeLessThan(body.indexOf('Asha'));
     expect(body).not.toContain('Not voted yet');

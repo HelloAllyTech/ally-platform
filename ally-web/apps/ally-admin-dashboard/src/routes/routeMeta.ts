@@ -182,7 +182,6 @@ const buildTable = (): RouteMetaEntry[] => {
     { path: ROUTES.AGENT_TEST_CASES, title: i.agentTestCases, section: "ai-languages" },
     { path: ROUTES.AI_LAB, title: i.aiLab, section: "ai-languages" },
     // Product
-    { path: ROUTES.PRODUCT_ROADMAP, title: i.roadmap, section: "product" },
     // Roadmap v2 (dark behind roadmap_v2): its own frame and scrolling, edge to edge.
     { path: ROUTES.ROADMAP, title: i.roadmapV2, section: "product", fullBleed: true },
     {
@@ -252,6 +251,14 @@ const buildTable = (): RouteMetaEntry[] => {
       path: ROUTES.WHATSAPP_BOT,
       title: en.whatsappBot.navLabel,
       section: "product",
+      fullBleed: true,
+    },
+    { path: ROUTES.DIRECTORY, title: "Resources directory", section: "product", fullBleed: true },
+    {
+      path: ROUTES.DIRECTORY_COLLECTION,
+      title: "Collection",
+      section: "product",
+      parent: ROUTES.DIRECTORY,
       fullBleed: true,
     },
     {

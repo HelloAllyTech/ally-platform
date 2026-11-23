@@ -116,7 +116,7 @@ All paths are relative to each app.
   - `Card`, `StatusPill`, `copyToClipboard`, `errorMessage` and `fill` (`pages/WhatsAppBot/shared.tsx`).
   - `Tabs` with a `count` (`libs/ui-shared/src/lib/tabs`), `ProgressBar`, `SkeletonText`, `InlineNotification`, `TextInput`, `TextArea`, `RadioButton`, `Tag`.
   - `EmptyState`, `Button` and `ButtonVariant` (`@components`), `sonner` toasts.
-- **Motion:** framer-motion with `useReducedMotion` (`pages/ProductRoadmap/VoteButton.tsx`), `motion/builderMotion.ts` (moved from `pages/Builder/` by Roadmap v2 P2b), and the `builderFadeIn` keyframe (`styles.css:178`, switched off under reduced motion).
+- **Motion:** framer-motion with `useReducedMotion` (`pages/Roadmap/components/VoteButton.tsx`), `motion/builderMotion.ts` (moved from `pages/Builder/` by Roadmap v2 P2b), and the `builderFadeIn` keyframe (`styles.css:178`, switched off under reduced motion).
 - **Phones:**
   - The sidebar force-collapses on chosen routes (`components/sidebar/Sidebar.tsx:173`).
   - **No "canvas as a tab with a badge" pattern exists**, so 20a builds one.

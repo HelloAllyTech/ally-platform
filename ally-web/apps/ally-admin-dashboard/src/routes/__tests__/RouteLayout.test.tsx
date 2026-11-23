@@ -49,6 +49,8 @@ vi.mock("@pages", () => ({
   CreateTrack: () => <div>CreateTrackPage</div>,
   CreateCase: () => <div>CreateCasePage</div>,
   BlogManagement: () => <div>BlogManagementPage</div>,
+  LandingPages: () => <div>LandingPagesPage</div>,
+  LandingPageEditor: () => <div>LandingPageEditorPage</div>,
   ProductUpdates: () => <div>ProductUpdatesPage</div>,
   Login: () => <div>LoginPage</div>,
   MagicLinkVerify: () => <div>MagicLinkVerifyPage</div>,
@@ -203,6 +205,28 @@ describe("RouteLayout", () => {
     window.history.pushState({}, "", ROUTES.SIMULATION_STUDIO);
     render(<RouteLayout />);
     expect(screen.getByText("RolePlaysPage")).toBeInTheDocument();
+  });
+
+  it("renders the landing pages list, gated on its toggle and permission", () => {
+    privateLayoutCalls.props.length = 0;
+    window.history.pushState({}, "", ROUTES.LANDING_PAGES);
+    render(<RouteLayout />);
+    expect(screen.getByText("LandingPagesPage")).toBeInTheDocument();
+    const gate = privateLayoutCalls.props.at(-1);
+    expect(gate?.requiredFeature).toBe(FeatureToggleKey.LANDING_PAGES);
+    expect(gate?.requiredPermissions).toEqual([Permissions.VIEW_LANDING_PAGES]);
+  });
+
+  it("opens one landing page in the editor, edge to edge, behind the same gate", () => {
+    privateLayoutCalls.props.length = 0;
+    window.history.pushState({}, "", "/landing-pages/abc-123");
+    render(<RouteLayout />);
+    expect(screen.getByText("LandingPageEditorPage")).toBeInTheDocument();
+    expect(screen.queryByText("LandingPagesPage")).not.toBeInTheDocument();
+    const gate = privateLayoutCalls.props.at(-1) as { fullBleed?: boolean };
+    expect(gate?.requiredFeature).toBe(FeatureToggleKey.LANDING_PAGES);
+    expect(gate?.requiredPermissions).toEqual([Permissions.VIEW_LANDING_PAGES]);
+    expect(gate?.fullBleed).toBe(true);
   });
 
   it("renders PM Agent at /pm-agent, gated on the pm_agent toggle", () => {

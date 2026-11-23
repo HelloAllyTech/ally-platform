@@ -29,6 +29,7 @@ import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
 import { formatDate } from "@utils";
 
+import { DigestRecipients } from "./DigestRecipients";
 import { getAudienceOptions, getSurfaceOptions } from "./options";
 import { ProductUpdatePanel } from "./ProductUpdatePanel";
 import { StatusStrip } from "./StatusStrip";
@@ -131,13 +132,15 @@ export const ProductUpdates: FC = () => {
 
   return (
     // Phones scroll the whole page; the fixed-height frame with a scrolling table is md+.
-    <div className="md:h-full font-primary flex flex-col">
+    <div className="md:h-full md:overflow-y-auto custom-scrollbar font-primary flex flex-col">
       <div className="shrink-0">
         <h1 className="text-2xl text-typography-900 font-secondary">{t.title}</h1>
         <p className="text-sm text-typography-700 mt-1 max-w-3xl">{t.description}</p>
       </div>
 
       <StatusStrip status={automation} running={running} isError={isStatusError} />
+
+      <DigestRecipients />
 
       {/* Filters: search + status / audience / surface + hidden toggle. */}
       <div className="flex flex-wrap items-end gap-3 mt-4 md:mt-6 shrink-0">
@@ -222,7 +225,7 @@ export const ProductUpdates: FC = () => {
         )}
       </div>
 
-      <div className="md:flex-1 md:overflow-y-auto custom-scrollbar mt-4">
+      <div className="md:flex-1 md:min-h-[320px] md:overflow-y-auto custom-scrollbar mt-4">
         {isLoading ? (
           <p className="text-typography-700">{t.table.loading}</p>
         ) : isError ? (

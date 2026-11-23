@@ -217,6 +217,8 @@ export function describeCourseCopilotChanges(input: {
   after: CourseCopilotTurnSnapshot;
   coursePatches: string[];
   queued: string[];
+  /** What the planner had, appended to the blueprint line ("planned with example course …"). */
+  blueprintPlanning?: string | null;
 }): string[] {
   const { before, after } = input;
   const lines: string[] = [];
@@ -236,10 +238,13 @@ export function describeCourseCopilotChanges(input: {
   const wasVersion = before.blueprintVersion ?? null;
   const nowVersion = after.blueprintVersion ?? null;
   if (nowVersion !== wasVersion && nowVersion !== null) {
+    const planning = input.blueprintPlanning
+      ? ` · ${input.blueprintPlanning}`
+      : '';
     lines.push(
-      wasVersion === null || wasVersion === 0
+      (wasVersion === null || wasVersion === 0
         ? `Blueprint drafted (v${nowVersion})`
-        : `Blueprint v${wasVersion} → v${nowVersion}`,
+        : `Blueprint v${wasVersion} → v${nowVersion}`) + planning,
     );
   }
 

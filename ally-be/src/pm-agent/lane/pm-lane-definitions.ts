@@ -8,6 +8,7 @@ import {
 export enum PmTool {
   ANALYTICS_SECTION = 'analytics_section',
   UX_SIGNALS_LIST = 'ux_signals_list',
+  DEAD_CODE_LIST = 'dead_code_list',
   LLM_USAGE_SUMMARY = 'llm_usage_summary',
   AI_TASK_REGISTRY = 'ai_task_registry',
   PRODUCT_GOALS = 'product_goals',
@@ -87,13 +88,14 @@ export const PM_LANES: Record<PmLane, PmLaneDefinition> = {
     promptCode: PM_PROMPT_CODES[PmLane.CODE_HEALTH],
     taskId: PM_TASK_IDS[PmLane.CODE_HEALTH],
     tools: [
+      PmTool.DEAD_CODE_LIST,
       ...CODE_TOOLS,
       PmTool.BUG_FINDINGS_SEARCH,
       PmTool.WIKI_SEARCH,
       PmTool.WIKI_READ,
     ],
     topic:
-      'code health architecture refactor duplication test coverage module boundary dependency performance error handling',
+      'code health architecture refactor duplication dead unused code cleanup test coverage module boundary dependency performance error handling',
   },
   [PmLane.INFRA_COST]: {
     lane: PmLane.INFRA_COST,

@@ -12,7 +12,6 @@ import {
 import { en } from "@constants";
 import type { RoadmapSavedView } from "@types";
 
-import { applySavedViewOrder } from "../../ProductRoadmap/utils/views";
 import {
   QueueState,
   SAVED_VIEW_DEFAULT_SORT,
@@ -20,6 +19,7 @@ import {
   savedViewPayload,
   stateFromSavedView,
 } from "../utils/queueState";
+import { applySavedViewOrder } from "../utils/views";
 
 /** Only views saved from the new Queue carry `state.queue`; the old board's views stay there. */
 export const isQueueView = (view: RoadmapSavedView): boolean =>

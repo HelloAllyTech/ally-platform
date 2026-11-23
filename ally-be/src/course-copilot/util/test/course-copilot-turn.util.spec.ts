@@ -107,3 +107,25 @@ describe('courseCopilotQuestionProblems (Course Pilot: choice-only steps)', () =
     ).toEqual([]);
   });
 });
+
+describe('describeCourseCopilotChanges: blueprint planning', () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const {
+    describeCourseCopilotChanges,
+  } = require('../course-copilot-turn.util');
+
+  it('appends what the planner had to the blueprint line', () => {
+    expect(
+      describeCourseCopilotChanges({
+        before: { brief: {}, blueprintVersion: null },
+        after: { brief: {}, blueprintVersion: 1 },
+        coursePatches: [],
+        queued: [],
+        blueprintPlanning:
+          'planned with example course "Supportive Listening" and design principles LD-0078',
+      }),
+    ).toEqual([
+      'Blueprint drafted (v1) · planned with example course "Supportive Listening" and design principles LD-0078',
+    ]);
+  });
+});

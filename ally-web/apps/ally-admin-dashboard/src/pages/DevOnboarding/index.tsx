@@ -5,6 +5,7 @@ import { useSearchParams } from "react-router-dom";
 import { baseView, QUESTIONS, READING_FINDINGS, SAFETY_LINE, say } from "./fixtures";
 import { flowFor, PassedScreens } from "../Onboarding/flow";
 import { OnboardingView } from "../Onboarding/OnboardingSession";
+import { OnboardingStart } from "../Onboarding/OnboardingStart";
 
 import type { BrandEditor } from "../../hooks/brand/useBrandEditor";
 import type { BotDraftView, PublishResult } from "../Onboarding/types";
@@ -143,7 +144,7 @@ const staticEditor: BrandEditor = {
  * `OnboardingView`, fed by a scripted session whose every action moves to the next stage, so the
  * whole flow can be walked with the keyboard. Development builds only; nothing is sent anywhere.
  */
-const DevOnboarding: React.FC = () => {
+const DevOnboardingFlow: React.FC = () => {
   const [params, setParams] = useSearchParams();
   const requested = params.get("screen") as Stage | null;
   const [stage, setStage] = useState<Stage>(
@@ -218,6 +219,16 @@ const DevOnboarding: React.FC = () => {
       flow: flowFor(view, passed, { sending: drafting, drafting, streaming: "" }),
       pass: advance,
       backScreen: async () => undefined,
+      // T1: "Start from a template" after reading, answered with a fixed result.
+      applyTemplate: async template => ({
+        template: { id: template, name: "Clinic or doctor" },
+        added: ["Slots", "Appointments", "Callback requests"],
+        skipped: [],
+        pack: { outcome: "raised" as const, pack: "Medical safety" },
+        checkups: 7,
+        examples: 0,
+        channels: null,
+      }),
     };
     // `next` changes every render; the stage is what matters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -227,6 +238,19 @@ const DevOnboarding: React.FC = () => {
     <div style={{ height: "100vh" }}>
       <OnboardingView s={s} editor={staticEditor} onLeave={noop} onConnectWhatsApp={noop} />
     </div>
+  );
+};
+
+/**
+ * `?screen=start` (T1): the real start screen, with its ways to begin, Start from a template among
+ * them. Its requests go to the API (mocked in the browser tests).
+ */
+const DevOnboarding: React.FC = () => {
+  const [params] = useSearchParams();
+  return params.get("screen") === "start" ? (
+    <OnboardingStart onLeave={noop} />
+  ) : (
+    <DevOnboardingFlow />
   );
 };
 

@@ -1,3 +1,15 @@
+import ORGANISATION_USE_CASES from "./organisationUseCases.json";
+
+/**
+ * The sign-in page's "What organisations use it for": names and one-liners from the one file the
+ * organisation templates also read (T1; ally-be's `organisation-use-cases.json`, copied here).
+ */
+const organisationUseCase = (id: string) => {
+  const found = ORGANISATION_USE_CASES.find(c => c.id === id);
+  if (!found) throw new Error(`No organisation use case called ${id}`);
+  return found;
+};
+
 /** How "How it plays" names each kind of course item, singular then plural. Keyed by TrackItemType. */
 const LANDING_ITEM_NOUNS: Record<string, [string, string]> = {
   ROLEPLAY: ["roleplay", "roleplays"],
@@ -41,6 +53,7 @@ export const en = {
       competencies: "Competencies",
       courseCopilot: "Course Copilot",
       blog: "Blog",
+      landingPages: "Landing pages",
       productUpdates: "Product Updates",
       users: "Users",
       badges: "Badges",
@@ -66,9 +79,7 @@ export const en = {
       tooltips: "Tooltips",
       agentTestCases: "Agent Test Cases",
       aiLab: "AI Lab",
-      roadmap: "Roadmap",
-      // Roadmap v2, dark behind `roadmap_v2`. Shown beside the old entry until cutover (P6).
-      roadmapV2: "Roadmap (new)",
+      roadmapV2: "Roadmap",
       userInterviews: "User Interviews",
       bugHunter: "Bug Hunter",
       builder: "Builder",
@@ -1804,8 +1815,8 @@ export const en = {
     toAllyAdmin: "Back to Ally admin",
     /** The login screen a signed-out visitor sees on any /assistants page (its own wording and layout). */
     login: {
-      headline: "Build and manage your own custom ",
-      headlineEmphasis: "chatbots.",
+      headline: "A chatbot your community can trust, ",
+      headlineEmphasis: "built without code.",
       /** The wordmark at the top left: "Ally" and, in the orange block, "chatbots". */
       sendCode: "Send code",
       googleSignIn: "Sign in using Google",
@@ -1871,9 +1882,7 @@ export const en = {
       startBuilding: "Log in to build yours",
       useCases: [
         {
-          id: "helpline",
-          title: "Helpline and crisis support",
-          blurb: "Share your helpline details and safe next steps, at any hour.",
+          ...organisationUseCase("helpline"),
           detail: {
             intro:
               "People often reach out late at night, or when no one is free to pick up. Your assistant answers calmly and consistently from the guidance you've published, and points people to your team.",
@@ -1890,9 +1899,7 @@ export const en = {
           },
         },
         {
-          id: "services",
-          title: "Services and eligibility",
-          blurb: "Explain who can apply, what to bring and where to go, in plain words.",
+          ...organisationUseCase("services"),
           detail: {
             intro:
               "The same questions arrive every day: am I eligible, what do I bring, where do I go. Your assistant answers them from your own programme pages, so your staff can focus on people who need them most.",
@@ -1909,9 +1916,7 @@ export const en = {
           },
         },
         {
-          id: "supporters",
-          title: "Donors and volunteers",
-          blurb: "Handle giving, receipts and sign-ups without tying up your team.",
+          ...organisationUseCase("supporters"),
           detail: {
             intro:
               "Supporters want quick answers about how to give or help. Your assistant handles the everyday questions at any time, so no offer of help waits days for a reply.",
@@ -1928,9 +1933,7 @@ export const en = {
           },
         },
         {
-          id: "training",
-          title: "Staff and volunteer onboarding",
-          blurb: "New teammates get answers from your own policies and guides.",
+          ...organisationUseCase("training"),
           detail: {
             intro:
               "New staff and volunteers have a hundred small questions in their first weeks. Your assistant answers from your own handbooks and policies, so they get a consistent answer without waiting for a senior colleague.",
@@ -1947,9 +1950,7 @@ export const en = {
           },
         },
         {
-          id: "languages",
-          title: "Reach more communities",
-          blurb: "Meet people in the languages they speak, on the apps they already use.",
+          ...organisationUseCase("languages"),
           detail: {
             intro:
               "Information is only useful if people can read it. Your assistant can answer in many languages, on channels like WhatsApp that your community already uses, so language is not a barrier to getting help.",
@@ -1966,9 +1967,7 @@ export const en = {
           },
         },
         {
-          id: "updates",
-          title: "Campaigns and urgent updates",
-          blurb: "Keep your community informed when things change fast.",
+          ...organisationUseCase("updates"),
           detail: {
             intro:
               "When a camp moves, a deadline shifts or an emergency unfolds, people need the latest answer immediately. Update your pages once and your assistant gives everyone the same current information.",
@@ -10512,70 +10511,6 @@ export const en = {
       help: "Replaces movement with quick fades. Your device's reduced-motion setting does this too.",
     },
   },
-  /**
-   * Switch on Roadmap (Roadmap v2 P6): the Owner's switch-on action, on Builder settings while the
-   * flag is off and on Roadmap → Settings once it is on. Kept in one block.
-   */
-  roadmapV2Cutover: {
-    title: "Switch on Roadmap",
-    intro:
-      "Moves everyone onto one Roadmap tab for ideas and builds, at once. Check who gets which role and what moves, then switch it on.",
-    introOn:
-      "Roadmap is on. Run this again to move anything made through the old pages since: it only moves what hasn't moved yet.",
-    loading: "Checking who gets which role and what moves",
-    loadFailed: "Couldn't load the switch-on check.",
-    retry: "Try again",
-    rolesTitle: "Who gets which role",
-    rolesHelp:
-      "Builders lead ideas, start builds and merge pull requests on real code. Owners also accept ideas, assign leads and change these settings. Everyone else with Product Roadmap access gets the Idea role.",
-    owners: (n: number) => `Owners (${n})`,
-    builders: (n: number) => `Builders (${n})`,
-    nobody: "No one",
-    withoutAccess: (names: string) =>
-      `${names} will get the role but can't open the Roadmap: their Product Roadmap access is off. Give them a Roadmap role on Users.`,
-    movesTitle: "What moves",
-    drafts: (n: number) =>
-      n === 1
-        ? "1 parked idea becomes a private draft in its author's My drafts"
-        : `${n} parked ideas become private drafts in their authors' My drafts`,
-    sessions: (n: number, goal: string) =>
-      n === 1
-        ? `1 live Builder session gets an idea of its own, led by whoever started it, under ${goal}`
-        : `${n} live Builder sessions get an idea each, led by whoever started them, under ${goal}`,
-    sessionsHelp:
-      "Only sessions still running or waiting. Finished, failed, cancelled and archived sessions stay as they are and stay readable.",
-    reviews: (n: number) =>
-      n === 1
-        ? "1 idea filed before review existed is marked Accepted"
-        : `${n} ideas filed before review existed are marked Accepted`,
-    more: (n: number) => `and ${n} more`,
-    nothingToMove:
-      "Nothing to move: no parked ideas, no live Builder sessions without an idea, and every idea is reviewed.",
-    noGoal:
-      "Add a product goal in Product Roadmap settings first. Each live Builder session's idea is filed under one.",
-    switchOn: "Switch on Roadmap",
-    moveLeft: "Move what's left",
-    confirmTitle: "Switch everyone to Roadmap?",
-    confirmTitleOn: "Move what's left?",
-    confirmEveryone:
-      "Product Roadmap and Builder become one tab, Roadmap, for everyone with Roadmap access, the next time they load a page.",
-    confirmKept:
-      "Nothing is deleted. Switching Roadmap off in its settings brings Product Roadmap and Builder back with their data.",
-    confirm: "Switch on Roadmap",
-    confirmOn: "Move it",
-    cancel: "Cancel",
-    running: "Switching on…",
-    conflict: "Access changed since you looked. Review the list again.",
-    failed: "Couldn't switch Roadmap on. Nothing changed. Try again.",
-    doneTitle: "Roadmap is on",
-    doneSummary: (drafts: number, sessions: number, reviews: number) =>
-      `${drafts} ${drafts === 1 ? "draft" : "drafts"} moved, ${sessions} Builder ${
-        sessions === 1 ? "session" : "sessions"
-      } filed as ideas, ${reviews} ${reviews === 1 ? "idea" : "ideas"} marked Accepted.`,
-    openRoadmap: "Open Roadmap",
-    lastRun: (date: string, name: string | null) =>
-      name ? `Last run on ${date} by ${name}.` : `Last run on ${date}.`,
-  },
   roadmapTriage: {
     shortcutsTitle: "Keyboard shortcuts",
     shortcutsIntro:
@@ -10907,6 +10842,23 @@ export const en = {
       waitingUpdates: "Waiting on release",
       runNow: "Run now",
       loadFailed: "Could not load the automation status.",
+    },
+    recipients: {
+      title: "Daily email recipients",
+      description:
+        "Everyone here gets the daily product updates email, once a day, when something went live or is waiting on release.",
+      emailLabel: "Email address",
+      emailPlaceholder: "name@company.com",
+      add: "Add",
+      remove: (email: string) => `Remove ${email}`,
+      added: (email: string) => `${email} will get the daily email.`,
+      removed: (email: string) => `${email} will no longer get the daily email.`,
+      invalid: "Enter a valid email address.",
+      addFailed: "Could not add this address. Try again.",
+      removeFailed: "Could not remove this address. Try again.",
+      loading: "Loading…",
+      loadFailed: "Could not load the recipient list.",
+      empty: "No one is on the list, so the daily email is not being sent.",
     },
     toasts: {
       runStarted: "Run started",

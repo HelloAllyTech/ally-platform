@@ -35,7 +35,7 @@ import {
   Terminal,
   Tools,
 } from "@icons";
-import { Compass, LibraryBig, TrendingUp } from "lucide-react";
+import { Compass, LayoutTemplate, LibraryBig, TrendingUp } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -317,6 +317,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
         return <Info size={20} />;
       case SIDEBAR_ITEMS.BLOG:
         return <Document size={20} />;
+      case SIDEBAR_ITEMS.LANDING_PAGES:
+        return <LayoutTemplate size={20} strokeWidth={1.5} aria-hidden />;
       case SIDEBAR_ITEMS.PRODUCT_UPDATES:
         return <Bullhorn size={20} />;
       case SIDEBAR_ITEMS.ANALYTICS:
@@ -350,9 +352,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
       // Catalog (Component Library's) or Document (Blog's), which sit nearby in the nav.
       case SIDEBAR_ITEMS.CONTEXT_LIBRARY:
         return <LibraryBig size={20} strokeWidth={1.5} aria-hidden />;
-      case SIDEBAR_ITEMS.PRODUCT_ROADMAP:
-        return <Roadmap size={20} />;
-      // The same glyph: it is the same Roadmap, rebuilt, and replaces the entry above at cutover.
       case SIDEBAR_ITEMS.ROADMAP_V2:
         return <Roadmap size={20} />;
       case SIDEBAR_ITEMS.USER_INTERVIEWS:

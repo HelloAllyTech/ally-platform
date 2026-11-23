@@ -29,8 +29,8 @@ const unwrapped = (value: unknown) => ({ unwrap: () => Promise.resolve(value) })
 beforeEach(() => {
   state.permissions = ["edit:blog"];
   state.keys = [];
-  state.create = vi.fn(() =>
-    unwrapped({ id: "k1", label: "Laptop", key: "bga_secret123", keyPrefix: "bga_secre" }),
+  state.create = vi.fn(
+    () => unwrapped({ id: "k1", label: "Laptop", key: "bga_secret123", keyPrefix: "bga_secre" }), // gitleaks:allow (a made-up test key)
   );
   state.revoke = vi.fn(() => unwrapped(undefined));
   vi.stubGlobal("fetch", vi.fn());
@@ -60,8 +60,9 @@ describe("BlogClaudeConnectSheet", () => {
     expect(key.textContent).toBe("bga_secret123");
     expect(state.create).toHaveBeenCalledWith({ label: "Laptop" });
     expect(screen.getByTestId("blog-connect-shell").textContent).toContain(
-      'export ALLY_BLOG_KEY="bga_secret123"',
+      'export ALLY_BLOG_KEY="bga_secret123"', // gitleaks:allow (a made-up test key)
     );
+
     expect(screen.getByTestId("blog-connect-shell").textContent).toContain("ALLY_BLOG_URL=");
     fireEvent.click(screen.getByText("I've copied it"));
     expect(screen.queryByText("bga_secret123")).toBeNull();

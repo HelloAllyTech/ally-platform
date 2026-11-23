@@ -378,6 +378,8 @@ export const ApiEndpoints = {
     LIST: "/v1/product-updates",
     STATUS: "/v1/product-updates/status",
     RUN: "/v1/product-updates/run",
+    DIGEST_RECIPIENTS: "/v1/product-updates/digest-recipients",
+    DIGEST_RECIPIENT: (id: string) => `/v1/product-updates/digest-recipients/${id}`,
     GET: (id: string) => `/v1/product-updates/${id}`,
     UPDATE: (id: string) => `/v1/product-updates/${id}`,
   },
@@ -1120,6 +1122,10 @@ export const ApiEndpoints = {
       `/v1/chatbots/${id}/lists/${key}/records/${recordId}/restore`,
     LIST_CONTACTS: (id: string) => `/v1/chatbots/${id}/lists/contacts`,
     READY_MADE_LISTS: (id: string) => `/v1/chatbots/${id}/lists/ready-made`,
+    // Use-case templates (T1).
+    TEMPLATES: (id: string) => `/v1/chatbots/${id}/templates`,
+    TEMPLATE_ORIGIN: (id: string) => `/v1/chatbots/${id}/templates/origin`,
+    TEMPLATE: (id: string, template: string) => `/v1/chatbots/${id}/templates/${template}`,
     READY_MADE_LIST: (id: string, name: string) => `/v1/chatbots/${id}/lists/ready-made/${name}`,
     FACT_CORRECTION: (id: string, factId: string) =>
       `/v1/chatbots/${id}/facts/${encodeURIComponent(factId)}/correction`,
@@ -1223,8 +1229,26 @@ export const ApiEndpoints = {
     FORGET_PERSON: (chatbotId: string, contactId: string) =>
       `/v1/inbox/chatbots/${chatbotId}/contacts/${contactId}/forget`,
   },
+  /** The mental health resources directory (ally-be src/directory). */
+  DIRECTORY: {
+    ENTRIES: "/v1/directory/entries",
+    ENTRY: (id: string) => `/v1/directory/entries/${id}`,
+    ENTRY_COLLECTIONS: (id: string) => `/v1/directory/entries/${id}/collections`,
+    COLLECTIONS: "/v1/directory/collections",
+    COLLECTION: (id: string) => `/v1/directory/collections/${id}`,
+    COLLECTION_ENTRY: (id: string, entryId: string) =>
+      `/v1/directory/collections/${id}/entries/${entryId}`,
+    COLLECTION_DOMAIN: (id: string) => `/v1/directory/collections/${id}/domain`,
+    COLLECTION_DOMAIN_VERIFY: (id: string) => `/v1/directory/collections/${id}/domain/verify`,
+    PUBLIC_COLLECTION: (slug: string) =>
+      `/v1/public/directory/collections/${encodeURIComponent(slug)}`,
+    PUBLIC_DOMAIN: (host: string) => `/v1/public/directory/domains/${encodeURIComponent(host)}`,
+  },
+  /** The use-case templates before a setup starts (T1). */
+  ASSISTANT_TEMPLATES: "/v1/assistant-templates",
   BOT_DRAFTS: {
     LIST: "/v1/bot-drafts",
+    TEMPLATE: (id: string) => `/v1/bot-drafts/${id}/template`,
     CURRENT: "/v1/bot-drafts/current",
     BY_ID: (id: string) => `/v1/bot-drafts/${id}`,
     EVENTS: (id: string) => `/v1/bot-drafts/${id}/events`,
@@ -1456,6 +1480,13 @@ export const ROUTES = {
   MOBILE_RELEASES: "/mobile-releases",
   /** The assistants area (A1): its own space, out of Ally admin's navigation. */
   WHATSAPP_BOT: "/assistants",
+  /** The resources directory: its own area like Assistants (no side navigation, its own login). */
+  DIRECTORY: "/directory",
+  DIRECTORY_COLLECTION: "/directory/collections/:id",
+  DIRECTORY_COLLECTION_OF: (id: string) => `/directory/collections/${id}`,
+  /** A collection's public landing page. No sign-in. */
+  DIRECTORY_PUBLIC: "/d/:slug",
+  DIRECTORY_PUBLIC_OF: (slug: string) => `/d/${slug}`,
   /** Bookmarks from before chatbots; redirected to WHATSAPP_BOT. */
   WHATSAPP_BOT_LEGACY: "/whatsapp-bot",
   /** Links from before A1 (`/chatbots`, `/chatbots/:id?section=…`); redirected to `/assistants…`. */
@@ -1473,6 +1504,9 @@ export const ROUTES = {
   // Fully public, no-login gallery of the centralised design-system components.
   DESIGN_SYSTEM: "/designsystem",
   BLOG: "/blog",
+  /** Landing pages: the list, and one page open in the editor. */
+  LANDING_PAGES: "/landing-pages",
+  LANDING_PAGE: "/landing-pages/:id",
   PRODUCT_UPDATES: "/product-updates",
   AI_LAB: "/ai-lab",
   PRODUCT_ROADMAP: "/product-roadmap",
@@ -1609,6 +1643,8 @@ export const TAG_TYPES = {
   BILLING_USER_SPEND: "billingUserSpend",
   BILLING_USER_PLAN: "billingUserPlan",
   MY_PLAN: "myPlan",
+  DIRECTORY_ENTRIES: "directoryEntries",
+  DIRECTORY_COLLECTIONS: "directoryCollections",
   ASSISTANT_SEATS: "assistantSeats",
   CUSTOM_LOGINS: "customLogins",
   LLM_MODELS: "llmModels",
@@ -1677,6 +1713,8 @@ export const TAG_TYPES = {
   // Course discussion moderation. Also registered in baseApi.ts's `tagTypes`.
   COURSE_DISCUSSION: "courseDiscussion",
   BLOGS: "blogs",
+  // Landing pages. Also registered in baseApi.ts's `tagTypes`.
+  LANDING_PAGES: "landingPages",
   // Keys for Claude Code to write blog drafts. Also registered in baseApi.ts's `tagTypes`.
   BLOG_AUTHORING_KEYS: "blogAuthoringKeys",
   // Review link and suggestions for one blog post. Also registered in baseApi.ts's `tagTypes`.
@@ -1694,7 +1732,6 @@ export const TAG_TYPES = {
   // Product Roadmap. NOTE: every one of these must ALSO be listed in baseApi.ts's
   // `tagTypes` array — an unregistered tag makes invalidatesTags a silent no-op.
   PRODUCT_ROADMAP_OPPORTUNITIES: "productRoadmapOpportunities",
-  PRODUCT_PLANS: "productPlans",
   PRODUCT_ROADMAP_VOTE_BUDGET: "productRoadmapVoteBudget",
   PRODUCT_ROADMAP_BREADTH: "productRoadmapBreadth",
   PRODUCT_ROADMAP_FACETS: "productRoadmapFacets",

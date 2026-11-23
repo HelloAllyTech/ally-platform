@@ -154,7 +154,9 @@ type DraftEventKind =
   /** Pages taken away (Choose pages, Sources): `ops[0].value` holds what each took, for Undo. */
   | 'pages'
   /** A field saved by hand on the assistant home (chunk 20d-2), with its before and after. */
-  | 'edit';
+  | 'edit'
+  /** Set up from a use-case template (T1); not undone by Undo, like a step. */
+  | 'template';
 
 /** One entry of the append-only log; patches carry their inverse for undo. */
 export interface DraftEvent {

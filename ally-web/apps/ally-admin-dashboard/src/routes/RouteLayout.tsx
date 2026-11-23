@@ -38,8 +38,9 @@ import {
   TranslationManagement,
   TooltipManagement,
   BlogManagement,
+  LandingPageEditor,
+  LandingPages,
   AILab,
-  ProductRoadmap,
   RoadmapDraftsPage,
   RoadmapAgentPage,
   RoadmapBugsPage,
@@ -180,6 +181,21 @@ const DevV2Components = import.meta.env.DEV ? lazy(() => import("../pages/DevV2C
 // Onboarding's screens from fixtures, for review and the Playwright tests (chunk 20d).
 const DevOnboarding = import.meta.env.DEV ? lazy(() => import("../pages/DevOnboarding")) : null;
 const DevInbox = import.meta.env.DEV ? lazy(() => import("../pages/DevInbox")) : null;
+// The resources directory (its own area, like Assistants). Lazy: only its users open it.
+const Directory = lazy(() =>
+  import("../pages/Directory/Directory").then(module => ({ default: module.Directory })),
+);
+const CollectionDetail = lazy(() =>
+  import("../pages/Directory/CollectionDetail").then(module => ({
+    default: module.CollectionDetail,
+  })),
+);
+const PublicDirectory = lazy(() =>
+  import("../pages/Directory/PublicDirectory").then(module => ({
+    default: module.PublicDirectory,
+  })),
+);
+
 const DevAssistantHome = import.meta.env.DEV
   ? lazy(() => import("../pages/DevAssistantHome"))
   : null;
@@ -204,6 +220,16 @@ export const RouteLayout: React.FC = () => {
             <PublicRoute>
               <MagicLinkVerify />
             </PublicRoute>
+          }
+        />
+
+        {/* A directory collection's public page: no sign-in, outside the admin shell. */}
+        <Route
+          path={ROUTES.DIRECTORY_PUBLIC}
+          element={
+            <Suspense fallback={null}>
+              <PublicDirectory />
+            </Suspense>
           }
         />
 
@@ -612,6 +638,30 @@ export const RouteLayout: React.FC = () => {
             }
           />
           <Route
+            path={ROUTES.LANDING_PAGES}
+            element={
+              <PrivateLayout
+                requiredPermissions={[Permissions.VIEW_LANDING_PAGES]}
+                requiredFeature={FeatureToggleKey.LANDING_PAGES}
+              >
+                <LandingPages />
+              </PrivateLayout>
+            }
+          />
+          {/* The editor is the page itself, so it takes the whole width. */}
+          <Route
+            path={ROUTES.LANDING_PAGE}
+            element={
+              <PrivateLayout
+                requiredPermissions={[Permissions.VIEW_LANDING_PAGES]}
+                requiredFeature={FeatureToggleKey.LANDING_PAGES}
+                fullBleed
+              >
+                <LandingPageEditor />
+              </PrivateLayout>
+            }
+          />
+          <Route
             path={ROUTES.PRODUCT_UPDATES}
             element={
               <PrivateLayout
@@ -637,9 +687,10 @@ export const RouteLayout: React.FC = () => {
                 requiredPermissions={[Permissions.VIEW_PRODUCT_ROADMAP]}
                 requiredFeature={FeatureToggleKey.PRODUCT_ROADMAP}
               >
-                {/* With roadmap_v2 on, old links land on the Roadmap (§5.7). */}
+                {/* Old Product Roadmap links land on the Roadmap (§5.7). Someone with no Roadmap
+                    role is sent there too: the Roadmap's own gate answers them with not-found. */}
                 <RoadmapLegacyRedirect from="productRoadmap">
-                  <ProductRoadmap />
+                  <Navigate to={ROUTES.ROADMAP} replace />
                 </RoadmapLegacyRedirect>
               </PrivateLayout>
             }
@@ -1069,6 +1120,23 @@ export const RouteLayout: React.FC = () => {
             }
           />
           <Route path={ROUTES.CHATBOT_DETAIL} element={<ChatbotDetailRoute />} />
+          {/* Open to anyone signed in: ownership, not a permission, decides what they can change. */}
+          <Route
+            path={ROUTES.DIRECTORY}
+            element={
+              <PrivateLayout fullBleed>
+                <Directory />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.DIRECTORY_COLLECTION}
+            element={
+              <PrivateLayout fullBleed>
+                <CollectionDetail />
+              </PrivateLayout>
+            }
+          />
           <Route
             path={ROUTES.WHATSAPP_BOT_LEGACY}
             element={<Navigate to={ROUTES.WHATSAPP_BOT} replace />}

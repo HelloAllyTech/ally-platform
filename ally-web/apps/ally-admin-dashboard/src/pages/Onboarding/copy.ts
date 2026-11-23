@@ -23,6 +23,10 @@ export const COPY = {
         title: "Interview me",
         hint: "Answer a few questions and we'll build it from that.",
       },
+      template: {
+        title: "Start from a template",
+        hint: "Pick what your assistant is for. We set up the rest.",
+      },
     },
     websiteSubtitle: "Share your website. We'll read it and learn what you offer.",
     documentsTitle: "Upload your documents",

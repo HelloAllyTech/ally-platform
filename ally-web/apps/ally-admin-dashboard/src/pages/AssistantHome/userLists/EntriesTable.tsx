@@ -13,6 +13,7 @@ import { ButtonVariant } from "@components/types";
 import { Select, Skeleton, StatusPill } from "@components/v2";
 import type { Chatbot, ListEntry, ListField, ListFilter, ListRefusal, UserList } from "@types";
 
+import { TEMPLATE_COPY } from "../../Templates/copy";
 import { HOME, fill } from "../copy";
 import { Sheet } from "../ui/Sheet";
 import { HomeSavesContext } from "../useHomeField";
@@ -292,6 +293,7 @@ export const EntriesTable: React.FC<{
                     {index === 0 && entry.created_by?.kind === "agent" && (
                       <span className="ally-lists__by-assistant">{t().table.byAssistant}</span>
                     )}
+                    {index === 0 && entry.created_by?.example && <ExampleMark />}
                   </td>
                 ))}
                 <td className="ally-lists__row-actions">
@@ -503,6 +505,7 @@ const EntryCard: React.FC<{
         {entry.created_by?.kind === "agent" && (
           <span className="ally-lists__by-assistant">{t().table.byAssistant}</span>
         )}
+        {entry.created_by?.example && <ExampleMark />}
         <dl className="ally-lists__card-details">
           {rest.map(field => (
             <div key={field.key}>
@@ -608,4 +611,11 @@ const TrashIcon = () => (
       strokeLinejoin="round"
     />
   </svg>
+);
+
+/** A template's neutral example the owner hasn't changed yet (T1): replace it with your own. */
+const ExampleMark: React.FC = () => (
+  <span className="ally-lists__example" data-testid="entry-example">
+    {TEMPLATE_COPY.example}
+  </span>
 );
