@@ -16026,6 +16026,7 @@ export const en = {
       stateVisible: "character's state shown",
       supervisorNotes: "AI supervisor notes",
       states: 'states with a "Pulling away" state',
+      none: "none",
     },
     noStatePrompt: "No states: no main prompt that reads states is available.",
     remindersHidden: "Reminders were switched off: none were written.",
@@ -16077,6 +16078,48 @@ export const en = {
     pickOne: "Choose at least one language, or let the agent decide from your description.",
     fromDescriptionAnswer: "Decide from my description",
   },
+
+  // Roleplay interview (Agent Builder tab, Copilot-style): the brief panel and the plan card.
+  roleplayInterview: {
+    brief: {
+      title: "Roleplay brief",
+      stillNeeded: "Still needed:",
+      ready: "Ready for a plan",
+      learners: "Learners",
+      goal: "Learner's goal",
+      competency: "Competency",
+      mode: "Mode",
+      difficulty: "Difficulty",
+      client: "Client",
+      setting: "Setting",
+      languages: "Languages",
+      passMark: "Pass mark",
+      notes: "Notes",
+      libraryCharacter: (name: string) => `${name} (Character Library)`,
+    },
+    plan: {
+      heading: (version: number) => `Roleplay plan · v${version}`,
+      hides: "Hides",
+      opensUpWhen: "Opens up when",
+      speaks: "Speaks",
+      moments: "Moments the client must create",
+      states: "How the client opens up",
+      pass: (minScore: number) => `What a pass looks like (pass mark ${minScore})`,
+      helpful: "Helpful:",
+      unhelpful: "Unhelpful:",
+      opening: "Opening line:",
+      supports: "Supports:",
+      changeHint: "Want something different? Say it in the chat.",
+      approve: "Approve and build",
+      approving: "Starting…",
+      approved: "Approved: building the roleplay on the left",
+    },
+  },
+  roleplayAgentDifficulty: {
+    EASY: "Easy: cooperative client, one concern",
+    MEDIUM: "Medium: ambivalent client, one concern",
+    HARD: "Hard: distressed client, several concerns",
+  } as Record<string, string>,
 
   // Agent Builder wizard: the frame around the questions.
   agentBuilderWizard: {

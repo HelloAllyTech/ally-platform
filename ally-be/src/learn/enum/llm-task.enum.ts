@@ -276,6 +276,9 @@ export enum LlmTask {
   // Character-library interview agent: one streamed interviewer/tool-loop
   // turn building a character profile.
   CHARACTER_INTERVIEW = 'character_interview',
+  // Studio's Agent Builder Copilot chat: one streamed roleplay-interview turn
+  // (brief, plan) for a single roleplay.
+  ROLEPLAY_INTERVIEW = 'roleplay_interview',
   // Builder: one streamed PRD-interview turn (the coding half's usage is
   // reported by the runner and recorded against BUILDER_BUILD).
   BUILDER_INTERVIEW = 'builder_interview',

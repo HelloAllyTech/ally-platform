@@ -63,6 +63,16 @@ import { QuizSpecialist } from './service/specialists/quiz.specialist';
 import { RoleplayBriefSpecialist } from './service/specialists/roleplay-brief.specialist';
 import { RoleplayFitCheckSpecialist } from './service/specialists/roleplay-fit-check.specialist';
 import { SpecialistLlmService } from './service/specialists/specialist-llm.service';
+import { RoleplayInterviewSession } from './entity/roleplay-interview-session.entity';
+import { RoleplayInterviewMessage } from './entity/roleplay-interview-message.entity';
+import { RoleplayInterviewController } from './roleplay-interview/controller/roleplay-interview.controller';
+import {
+  RoleplayInterviewMessageRepository,
+  RoleplayInterviewSessionRepository,
+} from './roleplay-interview/repository/roleplay-interview.repository';
+import { RoleplayInterviewSessionService } from './roleplay-interview/service/roleplay-interview-session.service';
+import { RoleplayInterviewToolsService } from './roleplay-interview/service/roleplay-interview-tools.service';
+import { RoleplayInterviewOrchestratorService } from './roleplay-interview/service/roleplay-interview-orchestrator.service';
 
 /**
  * Course Copilot — see docs/course-copilot.md.
@@ -79,6 +89,9 @@ import { SpecialistLlmService } from './service/specialists/specialist-llm.servi
       CourseCopilotJob,
       CourseCopilotEvent,
       CourseCopilotSource,
+      // Studio's Agent Builder Copilot chat (roleplay-interview/).
+      RoleplayInterviewSession,
+      RoleplayInterviewMessage,
     ]),
     // WebSocketAuthMiddleware for the /course-copilot gateway.
     AuthModule,
@@ -95,7 +108,11 @@ import { SpecialistLlmService } from './service/specialists/specialist-llm.servi
     ScenarioCharacterModule,
     TrackModule,
   ],
-  controllers: [CourseCopilotController, AgentBuilderCharacterController],
+  controllers: [
+    CourseCopilotController,
+    AgentBuilderCharacterController,
+    RoleplayInterviewController,
+  ],
   providers: [
     CourseCopilotSessionRepository,
     CourseCopilotMessageRepository,
@@ -140,6 +157,11 @@ import { SpecialistLlmService } from './service/specialists/specialist-llm.servi
     AgentBuilderRevisionService,
     LandingPageSpecialist,
     AllyNotesSpecialist,
+    RoleplayInterviewSessionRepository,
+    RoleplayInterviewMessageRepository,
+    RoleplayInterviewSessionService,
+    RoleplayInterviewToolsService,
+    RoleplayInterviewOrchestratorService,
   ],
 })
 export class CourseCopilotModule {}

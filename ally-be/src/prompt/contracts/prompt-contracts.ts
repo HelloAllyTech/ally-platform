@@ -430,6 +430,19 @@ export const CHARACTER_INTERVIEW_INTERVIEWER_SYSTEM = definePrompt(
   },
 );
 
+/** src/prompts/roleplay_interview/interviewer_system.txt */
+export const ROLEPLAY_INTERVIEW_INTERVIEWER_SYSTEM = definePrompt(
+  'roleplay_interview_interviewer_system',
+  {},
+  {
+    name: 'Roleplay Interviewer — System',
+    description:
+      "System prompt for Studio's Agent Builder Copilot chat: interviews a trainer one choice question at a time, records a roleplay brief, looks up competencies, learner profiles, Character Library characters and languages, then proposes a roleplay plan (character sheet, moments, states, pass criteria, opening line) for the trainer to approve.",
+    category: 'Agent Builder',
+    runtimes: ['ally-be'],
+  },
+);
+
 /** src/prompts/course_copilot/ally_notes_writer.txt */
 export const COURSE_COPILOT_ALLY_NOTES_WRITER = definePrompt(
   'course_copilot_ally_notes_writer',

@@ -1810,6 +1810,30 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     configPath: 'characterInterview.model',
   },
   {
+    id: 'roleplay-interview',
+    task: LlmTask.ROLEPLAY_INTERVIEW,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      "A trainer talks to Studio's Agent Builder Copilot about a roleplay",
+    detail:
+      'Streamed interview turn through the shared validated runner (src/llm-agent/runtime): ' +
+      'a turn ends only through ask_trainer / finish_turn, checked before it is shown, so a ' +
+      'turn can take a pass or two more (at most two rejections). Tools record the brief, ' +
+      'look up competencies, learner profiles, languages, Learning Design and the Character ' +
+      'Library (search_characters runs the roleplay fit check, its own row) and propose the ' +
+      'plan. Nothing is generated here: on approval the web runs the Agent Builder rows. Runs ' +
+      'on any of the three providers through AgentLlmProviderFactory; the prompt row wins, ' +
+      'then the Course Copilot model setting.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'resolved',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'COURSE_COPILOT_MODEL / COURSE_COPILOT_PROVIDER',
+    promptOverride: 'roleplay_interview_interviewer_system',
+    // Drives AgentLlmProviderFactory directly and falls back to the Course
+    // Copilot model, so `courseCopilot.model` is what it reads — no tier.
+    configPath: 'courseCopilot.model',
+  },
+  {
     id: 'translate-scenario',
     task: LlmTask.TRANSLATE_SCENARIO,
     runtime: LlmRuntime.ALLY_BE,
