@@ -3749,109 +3749,109 @@
     "saving": "ಉಳಿಸುತ್ತಿದೆ..."
   },
   "statisticsLibrary": {
-    "tagline": "How your organisation is using Ally, and where to step in.",
-    "customise": "Customise",
-    "done": "Done",
-    "addCharts": "Add charts",
-    "customiseHint": "Drag a card by its grip to move it. Remove a card with the cross. Changes save automatically.",
-    "removeAria": "Remove {{title}} from dashboard",
-    "saveFailed": "Could not save your layout. Try again.",
-    "emptyDashboard": "Your dashboard is empty. Choose Customise, then Add charts, to pick from the library.",
+    "tagline": "ನಿಮ್ಮ ಸಂಸ್ಥೆ Ally ಅನ್ನು ಹೇಗೆ ಬಳಸುತ್ತಿದೆ, ಮತ್ತು ಎಲ್ಲಿ ಗಮನ ಹರಿಸಬೇಕು.",
+    "customise": "ಕಸ್ಟಮೈಸ್ ಮಾಡಿ",
+    "done": "ಮುಗಿಯಿತು",
+    "addCharts": "ಚಾರ್ಟ್‌ಗಳನ್ನು ಸೇರಿಸಿ",
+    "customiseHint": "ಕಾರ್ಡ್ ಅನ್ನು ಸರಿಸಲು ಅದರ ಹಿಡಿಕೆಯಿಂದ ಎಳೆಯಿರಿ. ಕಾರ್ಡ್ ತೆಗೆಯಲು ಕ್ರಾಸ್ ಒತ್ತಿ. ಬದಲಾವಣೆಗಳು ತಾನಾಗಿ ಉಳಿಯುತ್ತವೆ.",
+    "removeAria": "{{title}} ಅನ್ನು ಡ್ಯಾಶ್‌ಬೋರ್ಡ್‌ನಿಂದ ತೆಗೆಯಿರಿ",
+    "saveFailed": "ನಿಮ್ಮ ಲೇಔಟ್ ಉಳಿಸಲು ಆಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    "emptyDashboard": "ನಿಮ್ಮ ಡ್ಯಾಶ್‌ಬೋರ್ಡ್ ಖಾಲಿಯಾಗಿದೆ. ಕಸ್ಟಮೈಸ್ ಮಾಡಿ ಆಯ್ಕೆಮಾಡಿ, ನಂತರ ಚಾರ್ಟ್‌ಗಳನ್ನು ಸೇರಿಸಿ ಮೂಲಕ ಲೈಬ್ರರಿಯಿಂದ ಆರಿಸಿ.",
     "usage": {
-      "measure": "Measure",
+      "measure": "ಅಳತೆ",
       "measures": {
-        "activeUsers": "Active learners",
-        "simulationsCompleted": "Simulations completed",
-        "newLearners": "New learners"
+        "activeUsers": "ಸಕ್ರಿಯ ಕಲಿಯುವವರು",
+        "simulationsCompleted": "ಪೂರ್ಣಗೊಂಡ ಸಿಮ್ಯುಲೇಶನ್‌ಗಳು",
+        "newLearners": "ಹೊಸ ಕಲಿಯುವವರು"
       }
     },
     "card": {
-      "unavailable": "Not available yet.",
-      "couldNotLoad": "Could not load this chart",
-      "couldNotLoadDetail": "Your other charts are fine.",
-      "retry": "Try again",
-      "sparseNote": "Small sample: showing counts only.",
-      "loading": "Loading this chart"
+      "unavailable": "ಇನ್ನೂ ಲಭ್ಯವಿಲ್ಲ.",
+      "couldNotLoad": "ಈ ಚಾರ್ಟ್ ಲೋಡ್ ಆಗಲಿಲ್ಲ",
+      "couldNotLoadDetail": "ನಿಮ್ಮ ಇತರ ಚಾರ್ಟ್‌ಗಳು ಸರಿಯಾಗಿವೆ.",
+      "retry": "ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
+      "sparseNote": "ಸಣ್ಣ ಮಾದರಿ: ಎಣಿಕೆಗಳನ್ನು ಮಾತ್ರ ತೋರಿಸಲಾಗಿದೆ.",
+      "loading": "ಈ ಚಾರ್ಟ್ ಲೋಡ್ ಆಗುತ್ತಿದೆ"
     },
     "library": {
-      "title": "Chart library",
-      "description": "Add charts to your dashboard. Charts your organisation has no data for yet are greyed, with the reason.",
-      "search": "Search charts",
-      "searchPlaceholder": "For example: sessions, courses",
-      "filterByGroup": "Filter by group",
-      "close": "Close library",
-      "add": "Add",
-      "added": "Added",
-      "unavailable": "Unavailable",
-      "countsOnly": "Counts only: the sample is small",
-      "addAria": "Add {{title}} to dashboard",
-      "noResults": "No charts match.",
-      "contactTeam": "Need a chart that is not here? Contact the Ally team and we will add it to your library.",
+      "title": "ಚಾರ್ಟ್ ಲೈಬ್ರರಿ",
+      "description": "ನಿಮ್ಮ ಡ್ಯಾಶ್‌ಬೋರ್ಡ್‌ಗೆ ಚಾರ್ಟ್‌ಗಳನ್ನು ಸೇರಿಸಿ. ನಿಮ್ಮ ಸಂಸ್ಥೆಗೆ ಇನ್ನೂ ಡೇಟಾ ಇಲ್ಲದ ಚಾರ್ಟ್‌ಗಳು ಕಾರಣದೊಂದಿಗೆ ಬೂದು ಬಣ್ಣದಲ್ಲಿ ಕಾಣುತ್ತವೆ.",
+      "search": "ಚಾರ್ಟ್‌ಗಳನ್ನು ಹುಡುಕಿ",
+      "searchPlaceholder": "ಉದಾಹರಣೆ: ಸೆಷನ್‌ಗಳು, ಕೋರ್ಸ್‌ಗಳು",
+      "filterByGroup": "ಗುಂಪಿನ ಪ್ರಕಾರ ಫಿಲ್ಟರ್ ಮಾಡಿ",
+      "close": "ಲೈಬ್ರರಿ ಮುಚ್ಚಿ",
+      "add": "ಸೇರಿಸಿ",
+      "added": "ಸೇರಿಸಲಾಗಿದೆ",
+      "unavailable": "ಲಭ್ಯವಿಲ್ಲ",
+      "countsOnly": "ಎಣಿಕೆಗಳು ಮಾತ್ರ: ಮಾದರಿ ಸಣ್ಣದು",
+      "addAria": "{{title}} ಅನ್ನು ಡ್ಯಾಶ್‌ಬೋರ್ಡ್‌ಗೆ ಸೇರಿಸಿ",
+      "noResults": "ಯಾವುದೇ ಚಾರ್ಟ್ ಹೊಂದಿಕೆಯಾಗಲಿಲ್ಲ.",
+      "contactTeam": "ಇಲ್ಲಿಲ್ಲದ ಚಾರ್ಟ್ ಬೇಕೇ? Ally ತಂಡವನ್ನು ಸಂಪರ್ಕಿಸಿ, ನಾವು ಅದನ್ನು ನಿಮ್ಮ ಲೈಬ್ರರಿಗೆ ಸೇರಿಸುತ್ತೇವೆ.",
       "groups": {
-        "all": "All",
-        "activity": "Activity",
-        "learners": "Learners",
-        "courses": "Courses",
-        "outcomes": "Outcomes",
-        "learnerVoice": "Learner voice",
-        "reviews": "Reviews"
+        "all": "ಎಲ್ಲಾ",
+        "activity": "ಚಟುವಟಿಕೆ",
+        "learners": "ಕಲಿಯುವವರು",
+        "courses": "ಕೋರ್ಸ್‌ಗಳು",
+        "outcomes": "ಫಲಿತಾಂಶಗಳು",
+        "learnerVoice": "ಕಲಿಯುವವರ ಅಭಿಪ್ರಾಯ",
+        "reviews": "ವಿಮರ್ಶೆಗಳು"
       }
     },
-    "title": "Statistics",
-    "minutesShort": "min",
+    "title": "ಅಂಕಿಅಂಶಗಳು",
+    "minutesShort": "ನಿಮಿಷ",
     "headline": {
-      "activeLearners": "Active learners",
-      "registeredLearners": "Registered learners",
-      "simulationsCompleted": "Simulations completed",
-      "practiceTime": "Practice time per learner",
-      "noLearners": "No learners yet",
-      "activeShare": "{{percent}}% of registered learners",
-      "joined": "{{count}} joined in this period",
-      "perActiveLearner": "{{count}} per active learner",
-      "practiceNote": "Average over active learners"
+      "activeLearners": "ಸಕ್ರಿಯ ಕಲಿಯುವವರು",
+      "registeredLearners": "ನೋಂದಾಯಿತ ಕಲಿಯುವವರು",
+      "simulationsCompleted": "ಪೂರ್ಣಗೊಂಡ ಸಿಮ್ಯುಲೇಶನ್‌ಗಳು",
+      "practiceTime": "ಪ್ರತಿ ಕಲಿಯುವವರಿಗೆ ಅಭ್ಯಾಸದ ಸಮಯ",
+      "noLearners": "ಇನ್ನೂ ಯಾವ ಕಲಿಯುವವರೂ ಇಲ್ಲ",
+      "activeShare": "ನೋಂದಾಯಿತ ಕಲಿಯುವವರಲ್ಲಿ {{percent}}%",
+      "joined": "ಈ ಅವಧಿಯಲ್ಲಿ {{count}} ಮಂದಿ ಸೇರಿದರು",
+      "perActiveLearner": "ಪ್ರತಿ ಸಕ್ರಿಯ ಕಲಿಯುವವರಿಗೆ {{count}}",
+      "practiceNote": "ಸಕ್ರಿಯ ಕಲಿಯುವವರ ಸರಾಸರಿ"
     },
     "status": {
-      "none": "No learners yet.",
-      "truncated": "Showing the first {{count}} learners.",
-      "seeLearners": "See the {{count}} learners who have stopped or not started"
+      "none": "ಇನ್ನೂ ಯಾವ ಕಲಿಯುವವರೂ ಇಲ್ಲ.",
+      "truncated": "ಮೊದಲ {{count}} ಕಲಿಯುವವರನ್ನು ತೋರಿಸಲಾಗುತ್ತಿದೆ.",
+      "seeLearners": "ನಿಂತುಹೋದ ಅಥವಾ ಪ್ರಾರಂಭಿಸದ {{count}} ಕಲಿಯುವವರನ್ನು ನೋಡಿ"
     },
     "top": {
-      "none": "No practice in this period yet."
+      "none": "ಈ ಅವಧಿಯಲ್ಲಿ ಇನ್ನೂ ಅಭ್ಯಾಸ ಇಲ್ಲ."
     },
     "attention": {
-      "none": "No learners have gone quiet.",
-      "showing": "Showing {{shown}} of {{total}}"
+      "none": "ಯಾವ ಕಲಿಯುವವರೂ ಅಭ್ಯಾಸ ನಿಲ್ಲಿಸಿಲ್ಲ.",
+      "showing": "{{total}} ರಲ್ಲಿ {{shown}} ತೋರಿಸಲಾಗುತ್ತಿದೆ"
     },
     "mostUsed": {
-      "none": "No simulations completed in this period."
+      "none": "ಈ ಅವಧಿಯಲ್ಲಿ ಯಾವ ಸಿಮ್ಯುಲೇಶನ್ ಕೂಡ ಪೂರ್ಣಗೊಂಡಿಲ್ಲ."
     },
     "takeaway": {
-      "status": "{{active}} of {{total}} learners practised in the last 14 days. {{needNudge}} could use a nudge.",
-      "top": "{{name}} leads with {{hours}} hours of practice.",
-      "attention": "{{count}} learners have gone quiet after practising.",
-      "usageNone": "No learners practised in this period.",
-      "mostUsed": "{{title}} is the most practised, with {{count}} sessions.",
-      "learnerTable": "{{count}} learners in this organisation.",
-      "courseTable": "{{count}} courses in this organisation.",
-      "usagePeak": "Active learners peaked at {{peak}} on {{bucket}}."
+      "status": "{{total}} ಕಲಿಯುವವರಲ್ಲಿ {{active}} ಮಂದಿ ಕಳೆದ 14 ದಿನಗಳಲ್ಲಿ ಅಭ್ಯಾಸ ಮಾಡಿದರು. {{needNudge}} ಮಂದಿಗೆ ನೆನಪಿಸುವ ಅಗತ್ಯ ಇರಬಹುದು.",
+      "top": "{{name}} {{hours}} ಗಂಟೆಗಳ ಅಭ್ಯಾಸದೊಂದಿಗೆ ಮುಂದಿದ್ದಾರೆ.",
+      "attention": "{{count}} ಕಲಿಯುವವರು ಅಭ್ಯಾಸದ ನಂತರ ನಿಲ್ಲಿಸಿದ್ದಾರೆ.",
+      "usageNone": "ಈ ಅವಧಿಯಲ್ಲಿ ಯಾವ ಕಲಿಯುವವರೂ ಅಭ್ಯಾಸ ಮಾಡಲಿಲ್ಲ.",
+      "mostUsed": "{{title}} ಅತಿ ಹೆಚ್ಚು ಅಭ್ಯಾಸ ಮಾಡಲಾದದ್ದು, {{count}} ಸೆಷನ್‌ಗಳೊಂದಿಗೆ.",
+      "learnerTable": "ಈ ಸಂಸ್ಥೆಯಲ್ಲಿ {{count}} ಕಲಿಯುವವರು.",
+      "courseTable": "ಈ ಸಂಸ್ಥೆಯಲ್ಲಿ {{count}} ಕೋರ್ಸ್‌ಗಳು.",
+      "usagePeak": "ಸಕ್ರಿಯ ಕಲಿಯುವವರು {{bucket}} ರಂದು ಗರಿಷ್ಠ {{peak}} ಇದ್ದರು."
     },
     "table": {
-      "learner": "Learner",
-      "status": "Status",
-      "lastPractised": "Last practised",
-      "sessions": "Sessions",
-      "coursesCompleted": "Courses completed",
-      "course": "Course",
-      "assigned": "Assigned",
-      "started": "Started",
-      "completed": "Completed",
-      "medianDays": "Median days to finish",
-      "stalled": "Stalled",
-      "search": "Search",
-      "searchPlaceholder": "Name or email",
-      "showing": "Showing {{from}} to {{to}} of {{total}}",
-      "previous": "Previous",
-      "next": "Next"
+      "learner": "ಕಲಿಯುವವರು",
+      "status": "ಸ್ಥಿತಿ",
+      "lastPractised": "ಕೊನೆಯ ಅಭ್ಯಾಸ",
+      "sessions": "ಸೆಷನ್‌ಗಳು",
+      "coursesCompleted": "ಕೋರ್ಸ್‌ಗಳನ್ನು ಪೂರ್ಣಗೊಳಿಸಲಾಗಿದೆ",
+      "course": "ಕೋರ್ಸ್",
+      "assigned": "ನಿಯೋಜಿತ",
+      "started": "ಆರಂಭಿಸಲಾಗಿದೆ",
+      "completed": "ಪೂರ್ಣಗೊಂಡಿದೆ",
+      "medianDays": "ಮುಗಿಸಲು ಮಧ್ಯಮ ದಿನಗಳು",
+      "stalled": "ಸ್ಥಗಿತಗೊಂಡಿದೆ",
+      "search": "ಹುಡುಕಿ",
+      "searchPlaceholder": "ಹೆಸರು ಅಥವಾ ಇಮೇಲ್",
+      "showing": "{{total}} ರಲ್ಲಿ {{from}} ರಿಂದ {{to}} ತೋರಿಸಲಾಗುತ್ತಿದೆ",
+      "previous": "ಹಿಂದಿನದು",
+      "next": "ಮುಂದಿನದು"
     }
   }
 }

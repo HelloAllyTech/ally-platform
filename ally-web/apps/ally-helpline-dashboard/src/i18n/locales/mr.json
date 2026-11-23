@@ -3749,109 +3749,109 @@
     "saving": "साठवित आहे..."
   },
   "statisticsLibrary": {
-    "tagline": "How your organisation is using Ally, and where to step in.",
-    "customise": "Customise",
-    "done": "Done",
-    "addCharts": "Add charts",
-    "customiseHint": "Drag a card by its grip to move it. Remove a card with the cross. Changes save automatically.",
-    "removeAria": "Remove {{title}} from dashboard",
-    "saveFailed": "Could not save your layout. Try again.",
-    "emptyDashboard": "Your dashboard is empty. Choose Customise, then Add charts, to pick from the library.",
+    "tagline": "तुमची संस्था Ally कशी वापरत आहे आणि कुठे लक्ष द्यायचे आहे.",
+    "customise": "कस्टमाइझ करा",
+    "done": "पूर्ण",
+    "addCharts": "चार्ट जोडा",
+    "customiseHint": "कार्ड हलवण्यासाठी त्याच्या ग्रिपवरून ओढा. कार्ड काढण्यासाठी क्रॉस दाबा. बदल आपोआप जतन होतात.",
+    "removeAria": "{{title}} डॅशबोर्डवरून काढा",
+    "saveFailed": "तुमचा लेआउट जतन करता आला नाही. पुन्हा प्रयत्न करा.",
+    "emptyDashboard": "तुमचा डॅशबोर्ड रिकामा आहे. कस्टमाइझ करा निवडा, नंतर चार्ट जोडा वर जाऊन लायब्ररीतून निवडा.",
     "usage": {
-      "measure": "Measure",
+      "measure": "मापन",
       "measures": {
-        "activeUsers": "Active learners",
-        "simulationsCompleted": "Simulations completed",
-        "newLearners": "New learners"
+        "activeUsers": "सक्रिय लर्नर्स",
+        "simulationsCompleted": "पूर्ण झालेली सिम्युलेशन्स",
+        "newLearners": "नवीन लर्नर्स"
       }
     },
     "card": {
-      "unavailable": "Not available yet.",
-      "couldNotLoad": "Could not load this chart",
-      "couldNotLoadDetail": "Your other charts are fine.",
-      "retry": "Try again",
-      "sparseNote": "Small sample: showing counts only.",
-      "loading": "Loading this chart"
+      "unavailable": "अजून उपलब्ध नाही.",
+      "couldNotLoad": "हा चार्ट लोड होऊ शकला नाही",
+      "couldNotLoadDetail": "तुमचे इतर चार्ट व्यवस्थित आहेत.",
+      "retry": "पुन्हा प्रयत्न करा",
+      "sparseNote": "लहान नमुना: फक्त संख्या दाखवल्या आहेत.",
+      "loading": "हा चार्ट लोड होत आहे"
     },
     "library": {
-      "title": "Chart library",
-      "description": "Add charts to your dashboard. Charts your organisation has no data for yet are greyed, with the reason.",
-      "search": "Search charts",
-      "searchPlaceholder": "For example: sessions, courses",
-      "filterByGroup": "Filter by group",
-      "close": "Close library",
-      "add": "Add",
-      "added": "Added",
-      "unavailable": "Unavailable",
-      "countsOnly": "Counts only: the sample is small",
-      "addAria": "Add {{title}} to dashboard",
-      "noResults": "No charts match.",
-      "contactTeam": "Need a chart that is not here? Contact the Ally team and we will add it to your library.",
+      "title": "चार्ट लायब्ररी",
+      "description": "तुमच्या डॅशबोर्डमध्ये चार्ट जोडा. ज्या चार्टसाठी तुमच्या संस्थेकडे अजून डेटा नाही ते कारणासह धूसर दिसतात.",
+      "search": "चार्ट शोधा",
+      "searchPlaceholder": "उदाहरण: सत्रे, कोर्स",
+      "filterByGroup": "गटानुसार फिल्टर करा",
+      "close": "लायब्ररी बंद करा",
+      "add": "जोडा",
+      "added": "जोडले",
+      "unavailable": "उपलब्ध नाही",
+      "countsOnly": "फक्त संख्या: नमुना लहान आहे",
+      "addAria": "{{title}} डॅशबोर्डमध्ये जोडा",
+      "noResults": "कोणताही चार्ट जुळला नाही.",
+      "contactTeam": "येथे नसलेला चार्ट हवा आहे का? Ally टीमशी संपर्क साधा, आम्ही तो तुमच्या लायब्ररीत जोडू.",
       "groups": {
-        "all": "All",
-        "activity": "Activity",
-        "learners": "Learners",
-        "courses": "Courses",
-        "outcomes": "Outcomes",
-        "learnerVoice": "Learner voice",
-        "reviews": "Reviews"
+        "all": "सर्व",
+        "activity": "क्रियाकलाप",
+        "learners": "लर्नर्स",
+        "courses": "कोर्स",
+        "outcomes": "परिणाम",
+        "learnerVoice": "लर्नरचा अभिप्राय",
+        "reviews": "पुनरावलोकने"
       }
     },
-    "title": "Statistics",
-    "minutesShort": "min",
+    "title": "आकडेवारी",
+    "minutesShort": "मिनिटे",
     "headline": {
-      "activeLearners": "Active learners",
-      "registeredLearners": "Registered learners",
-      "simulationsCompleted": "Simulations completed",
-      "practiceTime": "Practice time per learner",
-      "noLearners": "No learners yet",
-      "activeShare": "{{percent}}% of registered learners",
-      "joined": "{{count}} joined in this period",
-      "perActiveLearner": "{{count}} per active learner",
-      "practiceNote": "Average over active learners"
+      "activeLearners": "सक्रिय लर्नर्स",
+      "registeredLearners": "नोंदणीकृत लर्नर्स",
+      "simulationsCompleted": "पूर्ण झालेली सिम्युलेशन्स",
+      "practiceTime": "प्रति लर्नर सराव वेळ",
+      "noLearners": "अजून कोणताही लर्नर नाही",
+      "activeShare": "नोंदणीकृत लर्नर्सपैकी {{percent}}%",
+      "joined": "या कालावधीत {{count}} सामील झाले",
+      "perActiveLearner": "प्रति सक्रिय लर्नर {{count}}",
+      "practiceNote": "सक्रिय लर्नर्सची सरासरी"
     },
     "status": {
-      "none": "No learners yet.",
-      "truncated": "Showing the first {{count}} learners.",
-      "seeLearners": "See the {{count}} learners who have stopped or not started"
+      "none": "अजून कोणताही लर्नर नाही.",
+      "truncated": "पहिले {{count}} लर्नर्स दाखवत आहे.",
+      "seeLearners": "थांबलेले किंवा सुरू न केलेले {{count}} लर्नर्स पहा"
     },
     "top": {
-      "none": "No practice in this period yet."
+      "none": "या कालावधीत अजून कोणताही सराव नाही."
     },
     "attention": {
-      "none": "No learners have gone quiet.",
-      "showing": "Showing {{shown}} of {{total}}"
+      "none": "कोणत्याही लर्नरने सराव थांबवलेला नाही.",
+      "showing": "{{total}} पैकी {{shown}} दाखवत आहे"
     },
     "mostUsed": {
-      "none": "No simulations completed in this period."
+      "none": "या कालावधीत कोणतेही सिम्युलेशन पूर्ण झाले नाही."
     },
     "takeaway": {
-      "status": "{{active}} of {{total}} learners practised in the last 14 days. {{needNudge}} could use a nudge.",
-      "top": "{{name}} leads with {{hours}} hours of practice.",
-      "attention": "{{count}} learners have gone quiet after practising.",
-      "usageNone": "No learners practised in this period.",
-      "mostUsed": "{{title}} is the most practised, with {{count}} sessions.",
-      "learnerTable": "{{count}} learners in this organisation.",
-      "courseTable": "{{count}} courses in this organisation.",
-      "usagePeak": "Active learners peaked at {{peak}} on {{bucket}}."
+      "status": "{{total}} पैकी {{active}} लर्नर्सनी गेल्या 14 दिवसांत सराव केला. {{needNudge}} जणांना आठवण करून देण्याची गरज असू शकते.",
+      "top": "{{name}} {{hours}} तासांच्या सरावासह आघाडीवर आहेत.",
+      "attention": "{{count}} लर्नर्सनी सरावानंतर सराव थांबवला आहे.",
+      "usageNone": "या कालावधीत कोणत्याही लर्नरने सराव केला नाही.",
+      "mostUsed": "{{title}} सर्वाधिक सराव केलेले आहे, {{count}} सत्रांसह.",
+      "learnerTable": "या संस्थेत {{count}} लर्नर्स.",
+      "courseTable": "या संस्थेत {{count}} कोर्स.",
+      "usagePeak": "सक्रिय लर्नर्स {{bucket}} रोजी सर्वाधिक {{peak}} होते."
     },
     "table": {
-      "learner": "Learner",
-      "status": "Status",
-      "lastPractised": "Last practised",
-      "sessions": "Sessions",
-      "coursesCompleted": "Courses completed",
-      "course": "Course",
-      "assigned": "Assigned",
-      "started": "Started",
-      "completed": "Completed",
-      "medianDays": "Median days to finish",
-      "stalled": "Stalled",
-      "search": "Search",
-      "searchPlaceholder": "Name or email",
-      "showing": "Showing {{from}} to {{to}} of {{total}}",
-      "previous": "Previous",
-      "next": "Next"
+      "learner": "लर्नर",
+      "status": "स्थिती",
+      "lastPractised": "शेवटचा सराव",
+      "sessions": "सत्रे",
+      "coursesCompleted": "कोर्स पूर्ण झाले",
+      "course": "कोर्स",
+      "assigned": "नियुक्त केलेले",
+      "started": "सुरू केले",
+      "completed": "पूर्ण झाले",
+      "medianDays": "पूर्ण करण्याचे मध्यक दिवस",
+      "stalled": "अडकलेले",
+      "search": "शोधा",
+      "searchPlaceholder": "नाव किंवा ईमेल",
+      "showing": "{{total}} पैकी {{from}} ते {{to}} दाखवत आहे",
+      "previous": "मागील",
+      "next": "पुढील"
     }
   }
 }
