@@ -112,10 +112,10 @@ class KnowledgeAgentSettings(BaseModel):
     MIN_SIMILARITY: float = Field(0.35)
     DECLINE_SIMILARITY: float = Field(0.42)
     # Q4: keyword (BM25) search beside vector search, in one Weaviate hybrid query.
-    # Off by default: on the 8 exact-term misses it found 2 against vector search's 4
-    # at every weighting (the facts sit in short fragment chunks beside the words the
-    # question uses; CHUNK-Q4-NOTES). ALPHA weighs the two: 1.0 is vector only.
-    HYBRID_SEARCH: bool = Field(False)
+    # On with neighbour chunks (Shehbaz, 23 Nov): 7 of the 8 exact-term misses found,
+    # search p50 69 ms (vector only: 4; alone, without neighbours, it found 2).
+    # ALPHA weighs the two: 1.0 is vector only.
+    HYBRID_SEARCH: bool = Field(True)
     HYBRID_ALPHA: float = Field(0.5, ge=0.0, le=1.0)
     # Q4: a found chunk takes its short neighbours on the same page (a name before
     # its title, a number after "Call us", a list's items). False: as before.

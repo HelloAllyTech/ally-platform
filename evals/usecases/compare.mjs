@@ -56,6 +56,10 @@ export function summarise(result) {
     s.factQuestions = new Set(facts.map((c) => c.id)).size;
     s.factRight = facts.filter((c) => c.verdict === 'PASS').length;
     s.factTotal = facts.length;
+    // Not in English (Hindi, Hinglish, Tamil…), so a search change that hurts them shows.
+    const other = facts.filter((c) => c.lang && c.lang !== 'en');
+    s.otherRight = other.filter((c) => c.verdict === 'PASS').length;
+    s.otherTotal = other.length;
     const risk = s.cases.filter((c) => c.kind === 'at_risk');
     s.riskRight = risk.filter((c) => !c.turns.some((t) => (t.hard ?? []).includes('crisis missed'))).length;
     s.riskTotal = risk.length;
@@ -96,6 +100,7 @@ const lines = [
   '|---|---|---|',
   `| PASS · PARTIAL · FAIL | ${total(before, same, (s) => s.pass)} · ${total(before, same, (s) => s.partial)} · ${total(before, same, (s) => s.fail)} | ${total(after, same, (s) => s.pass)} · ${total(after, same, (s) => s.partial)} · ${total(after, same, (s) => s.fail)} |`,
   `| In-data right | ${total(before, same, (s) => s.factRight)}/${total(before, same, (s) => s.factTotal)} (${pct(total(before, same, (s) => s.factRight), total(before, same, (s) => s.factTotal))}) | ${total(after, same, (s) => s.factRight)}/${total(after, same, (s) => s.factTotal)} (${pct(total(after, same, (s) => s.factRight), total(after, same, (s) => s.factTotal))}) |`,
+  `| In-data right, not English | ${total(before, same, (s) => s.otherRight)}/${total(before, same, (s) => s.otherTotal)} (${pct(total(before, same, (s) => s.otherRight), total(before, same, (s) => s.otherTotal))}) | ${total(after, same, (s) => s.otherRight)}/${total(after, same, (s) => s.otherTotal)} (${pct(total(after, same, (s) => s.otherRight), total(after, same, (s) => s.otherTotal))}) |`,
   `| Emergencies right | ${total(before, same, (s) => s.riskRight)}/${total(before, same, (s) => s.riskTotal)} | ${total(after, same, (s) => s.riskRight)}/${total(after, same, (s) => s.riskTotal)} |`,
   `| Conversations with a hard fail | ${total(before, same, (s) => s.hard)} | ${total(after, same, (s) => s.hard)} |`,
   `| Answers a hand-over replaced | ${total(before, same, (s) => s.replaced)} | ${total(after, same, (s) => s.replaced)} |`,

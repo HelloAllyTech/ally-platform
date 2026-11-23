@@ -204,7 +204,9 @@ The consent question also now names the day, time and place and the number of pl
 
 No variables change. In code with it: a find over a day or a range of times returns at least 8 entries, with the total (`FIND_LIMIT_DAY`). Measured on the booking cases in the use-case suite (b5-91springboard, b5-bhive, b1-dragarwal), where an availability question without a find is a failure.
 
-## D. Third group, for approval (C18)
+## D. Third group (C18)
+
+> **D1 approved by Shehbaz on 23 Nov 2026 with one edit (marked), in the code; publish to production's Skills Store before deploying (`LAUNCH-CHECKLIST.md`).**
 
 ### D1. Answer instead of "which one?" (`agent/system.txt`, `ally_ai_agent_system`), item C18
 
@@ -214,7 +216,7 @@ No variables change. In code with it: a find over a day or a range of times retu
 > - `clarify`: one short question to understand what they need, only about something you help with.
 
 **Proposed (revised 23 Nov to Shehbaz's four conditions):**
-> - `clarify`: one short question to understand what they need, only about something you help with. When the passages answer for a few options (up to about four: branches, centres, plans, sizes), don't ask which one: `answer` with each option's answer in a short line, then ask which they meant only if the next step needs it. When every option has the same answer, give it once and don't ask. Ask which one first only when there are many options, or when the answer depends on something only they know (their branch, their date). This never applies to a crisis reply or to a "Shall I book…?" question.
+> - `clarify`: one short question to understand what they need, only about something you help with. When the passages answer for a few options (up to about four: branches, centres, plans, sizes), don't ask which one: `answer` with each option's answer in a short line, then ask which they meant only if the next step needs it. When every option has the same answer, give it once and don't ask. Ask which one first only when there are many options, or when the answer depends on something only they know (their date, their own situation) (edit: branches stay in the few-options rule). This never applies to a crisis reply or to a "Shall I book…?" question.
 
 No variables change.
 
