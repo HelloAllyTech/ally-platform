@@ -355,3 +355,24 @@ describe('hand-over is off by default (Q4 H5)', () => {
     ]);
   });
 });
+
+describe('the Campaigns template sets up with its own update (Q4 G+15)', () => {
+  it('dates the owner\'s update today, so setup never fails with "Date is needed"', () => {
+    const updates = TEMPLATES.find((t) => t.id === 'updates')!;
+    const plan = planInstall(
+      updates,
+      {
+        latest: 'Office closed - closed on Friday for the holiday',
+        affects: 'Everyone in Delhi until Monday',
+      },
+      { zone: ZONE, now: NOW },
+    );
+    const [row] = plan.entries.updates;
+    expect(row.example).toBe(false);
+    expect(row.values).toMatchObject({
+      title: 'Office closed',
+      what_changed: 'closed on Friday for the holiday',
+    });
+    expect(row.values.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});

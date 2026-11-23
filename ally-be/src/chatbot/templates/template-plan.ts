@@ -229,6 +229,15 @@ function entriesFrom(
         ) {
           values[field.key] = parts[0];
         }
+        // Q4 G+15 (Uday Foundation's Campaigns setup did nothing; locally a 400 "Date is
+        // needed"): an update written in setup is dated today when the answer gives no date.
+        if (
+          field.required &&
+          values[field.key] === undefined &&
+          field.type === ListFieldType.DATE
+        ) {
+          values[field.key] = '@today';
+        }
       }
       return values;
     })
@@ -380,7 +389,15 @@ export function planInstall(
   for (const { use } of lists) {
     const own = fromAnswers[use.key] ?? [];
     const rows = own.length
-      ? own.map((values) => ({ values, example: false }))
+      ? own.map((values) => ({
+          values: Object.fromEntries(
+            Object.entries(values).map(([k, v]) => [
+              k,
+              resolveWhen(v, zone, now),
+            ]),
+          ),
+          example: false,
+        }))
       : (use.examples ?? []).map((values) => ({
           values: Object.fromEntries(
             Object.entries(values).map(([k, v]) => [
