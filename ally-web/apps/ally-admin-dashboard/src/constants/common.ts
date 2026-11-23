@@ -175,6 +175,7 @@ export const ApiEndpoints = {
     MAP_SCENARIO_MEMORIES: "/v1/learn/scenarios/memories/map",
     GENERATE_AGENT_BUILDER_FIELD: "/v1/learn/agent-builder/generate-field",
     AGENT_BUILDER_ROLEPLAY_DESIGN: "/v1/learn/agent-builder/roleplay-design",
+    AGENT_BUILDER_CHARACTER_SUGGESTIONS: "/v1/learn/agent-builder/character-suggestions",
     COMPETENCIES: "/v1/learn/competencies",
     COMPETENCY_BY_ID: (id: string) => `/v1/learn/competencies/${id}`,
     COMPETENCY_BEHAVIOURS: (id: string) => `/v1/learn/competencies/${id}/behaviours`,

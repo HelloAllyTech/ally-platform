@@ -16042,6 +16042,27 @@ export const en = {
     } as Record<string, string>,
   },
 
+  // Agent Builder wizard: casting from the Character Library (same search and fit check as Course Copilot).
+  agentBuilderCharacter: {
+    question: "Choose the client",
+    searching: "Looking for a matching character in the Character Library…",
+    recommendedBecause: (reason: string) =>
+      `The fit check recommends one character from the Character Library. ${reason}`.trim(),
+    noneFits: (reason: string) =>
+      `None of the closest library characters fits this roleplay, so a new one is suggested. ${reason}`.trim(),
+    noMatch: "No library character matches this description, so a new character will be written.",
+    searchFailed:
+      "The Character Library couldn't be searched just now. You can write a new character, or pick one later in Basic Settings.",
+    noVoices: "No voice yet: pick one in Language–Voice mapping.",
+    newOption: "Write a new character",
+    newOptionHelp: "From your description. It is not saved to the Character Library.",
+    newAnswer: "A new character, written from my description",
+    libraryAnswer: (name: string) => `${name}, from the Character Library`,
+    briefNote: (name: string) =>
+      `The client is the saved character ${name}. Keep every fact consistent with their saved profile:`,
+    loadFailed: "That character could not be loaded. Pick it again, or write a new one.",
+  },
+
   // Agent Builder wizard: the saved conversation, shown again when a roleplay is reopened.
   agentBuilderRestored: {
     summary: (when: string, applied: number, total: number, stopped: boolean) =>

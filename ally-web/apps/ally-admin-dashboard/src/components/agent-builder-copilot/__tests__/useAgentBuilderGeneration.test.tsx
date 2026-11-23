@@ -438,4 +438,18 @@ describe("useAgentBuilderGeneration — roleplay mode", () => {
     expect(result.current.checks).toEqual([]);
     expect(fieldsRequested()).not.toContain("states");
   });
+
+  it("keeps a library character's persona and backstory instead of generating them", async () => {
+    const { form } = makeForm({ name: "Gowramma", age: 52, gender: "female" });
+    const { result } = renderHook(() => useAgentBuilderGeneration(form));
+
+    act(() => result.current.start({ ...INPUTS, libraryCharacter: true }));
+    await waitFor(() => expect(result.current.phase).toBe("done"));
+
+    expect(fieldsRequested()).not.toContain("persona");
+    expect(fieldsRequested()).not.toContain("backstory");
+    expect(requests.find(r => r.field === "title")?.establishedContext).toMatchObject({
+      persona: { name: "Gowramma", age: 52, gender: "female" },
+    });
+  });
 });

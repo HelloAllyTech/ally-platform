@@ -1845,6 +1845,7 @@ export const {
   useGetDynamicBranchingInstructionQuery,
   useGetCharactersQuery,
   useGetCharacterByIdQuery,
+  useLazyGetCharacterByIdQuery,
   useCreateCharacterMutation,
   useUpdateCharacterMutation,
   useDeleteCharacterMutation,

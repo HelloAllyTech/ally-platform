@@ -5,13 +5,17 @@ import { UseFormReturn, useWatch } from "react-hook-form";
 
 import { AutoExpandableTextarea } from "@ally-ui-mono/ui-shared";
 import {
+  AgentBuilderCharacterSuggestions,
   ROLEPLAY_MODES,
   RoleplayDesign,
   RoleplayMode,
   useGetAgentTestCasesQuery,
+  useLazyGetCharacterByIdQuery,
   useLazyGetRoleplayDesignQuery,
+  useSuggestAgentBuilderCharactersMutation,
 } from "@api";
 import { en } from "@constants";
+import { applyCharacterToForm } from "@utils/characterApply";
 import {
   ModeRecommendation,
   recommendMode,
@@ -51,7 +55,17 @@ import {
  * the Basic Settings tab stay in sync automatically.
  */
 
-type WizardStepId = "describe" | "competency" | "mode" | "goals" | "generate" | "restored";
+type WizardStepId =
+  | "describe"
+  | "competency"
+  | "mode"
+  | "character"
+  | "goals"
+  | "generate"
+  | "restored";
+
+/** "Write a new character" in the character step. */
+const NEW_CHARACTER = "new";
 
 /**
  * The conversation as saved on the roleplay (form field `agentBuilderChat` →
@@ -64,6 +78,8 @@ export interface SavedAgentBuilderChat {
   mode?: RoleplayMode;
   states?: boolean;
   goalIds: string[];
+  /** The Character Library character used, when one was. */
+  character?: { id: string; name: string };
   result: { applied: number; total: number; stopped: boolean; checks: string[] };
   generatedAt: string;
 }
@@ -77,6 +93,7 @@ const isSavedChat = (value: unknown): value is SavedAgentBuilderChat =>
 const modeStrings = en.agentBuilderMode;
 const suggestionStrings = en.agentBuilderSuggestions;
 const restoredStrings = en.agentBuilderRestored;
+const characterStrings = en.agentBuilderCharacter;
 
 /** One "what to review" line, in words. */
 const nextStepText = (step: ReturnType<typeof suggestNextSteps>[number]): string => {
@@ -88,6 +105,7 @@ const QUESTIONS: Record<Exclude<WizardStepId, "generate" | "restored">, string> 
   describe: "Describe roleplay actor",
   competency: "Select one competency",
   mode: modeStrings.question,
+  character: en.agentBuilderCharacter.question,
   goals: "Select agent test cases",
 };
 
@@ -151,6 +169,17 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
   const [modeError, setModeError] = useState(false);
   const [recommendation, setRecommendation] = useState<ModeRecommendation | null>(null);
   const [restored, setRestored] = useState<SavedAgentBuilderChat | null>(null);
+  const [suggestions, setSuggestions] = useState<AgentBuilderCharacterSuggestions | null>(null);
+  const [characterChoice, setCharacterChoice] = useState<string>(NEW_CHARACTER);
+  const [character, setCharacter] = useState<{
+    id: string;
+    name: string;
+    profile: string;
+  } | null>(null);
+  const [characterError, setCharacterError] = useState(false);
+  const [suggestCharacters, { isLoading: loadingSuggestions }] =
+    useSuggestAgentBuilderCharactersMutation();
+  const [fetchCharacter, { isFetching: loadingCharacter }] = useLazyGetCharacterByIdQuery();
   const [fetchDesign, { isFetching: loadingDesign }] = useLazyGetRoleplayDesignQuery();
 
   const competency = useWatch({
@@ -199,6 +228,7 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
       description: description.trim(),
       ...(design ? { mode: design.mode, states: design.states } : {}),
       goalIds: selectedGoals,
+      ...(character ? { character: { id: character.id, name: character.name } } : {}),
       result: { applied: appliedCount, total: tasks.length, stopped: phase === "aborted", checks },
       generatedAt: new Date().toISOString(),
     };
@@ -250,9 +280,51 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
       );
       setDesign(picked);
       pushHistory(QUESTIONS.mode, describeDesign(picked));
-      setStep("goals");
+      setStep("character");
+      void loadSuggestions(picked.mode);
     } catch {
       setModeError(true);
+    }
+  };
+
+  // Library characters for this description, with the fit check's pick pre-selected.
+  const loadSuggestions = async (pickedMode: RoleplayMode) => {
+    setSuggestions(null);
+    setCharacterChoice(NEW_CHARACTER);
+    const competency = formMethods.getValues("competency");
+    try {
+      const found = await suggestCharacters({
+        description: description.trim(),
+        ...(competency?.id ? { competencyIds: [String(competency.id)] } : {}),
+        mode: pickedMode,
+      }).unwrap();
+      setSuggestions(found);
+      if (found.recommendedId) setCharacterChoice(found.recommendedId);
+    } catch {
+      setSuggestions({ characters: [], recommendedId: null, reason: null, searchFailed: true });
+    }
+  };
+
+  const handleCharacterNext = async () => {
+    setCharacterError(false);
+    if (characterChoice === NEW_CHARACTER) {
+      setCharacter(null);
+      pushHistory(QUESTIONS.character, characterStrings.newAnswer);
+      setStep("goals");
+      return;
+    }
+    try {
+      const picked = await fetchCharacter(characterChoice).unwrap();
+      applyCharacterToForm(formMethods, picked);
+      setCharacter({
+        id: characterChoice,
+        name: picked.name,
+        profile: picked.characterProfileText ?? "",
+      });
+      pushHistory(QUESTIONS.character, characterStrings.libraryAnswer(picked.name));
+      setStep("goals");
+    } catch {
+      setCharacterError(true);
     }
   };
 
@@ -275,11 +347,17 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
     formMethods.setValue("agentTestCaseIds", selectedGoals, { shouldDirty: true });
 
     setStep("generate");
+    // A library character's saved profile rides on the brief, so the role instruction,
+    // challenge and opening lines are written from who they are (as Course Copilot does).
+    const actorDescription = character
+      ? `${description.trim()}\n\n${characterStrings.briefNote(character.name)}\n${character.profile.slice(0, 2500)}`
+      : description.trim();
     start({
-      actorDescription: description.trim(),
+      actorDescription,
       competency: formMethods.getValues("competency")?.name,
       agentTestCases: goalTitles.join(", "),
       ...(design ? { roleplayMode: design.mode, includeStates: design.states } : {}),
+      ...(character ? { libraryCharacter: true } : {}),
     });
   };
 
@@ -292,6 +370,10 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
     setMode("practice");
     setRecommendation(null);
     setRestored(null);
+    setSuggestions(null);
+    setCharacterChoice(NEW_CHARACTER);
+    setCharacter(null);
+    setCharacterError(false);
     setDesign(null);
     setModeError(false);
     setStep("describe");
@@ -303,7 +385,7 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
       <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-4 pb-4">
         {history.length === 0 && step === "describe" && (
           <div className="self-start max-w-[90%] rounded-lg bg-background-secondary px-4 py-2 text-sm text-typography-700">
-            Answer four quick questions and I&apos;ll generate the Basic Settings on the left in
+            Answer five quick questions and I&apos;ll generate the Basic Settings on the left in
             parallel — each field fills in as it&apos;s ready, and you can stop anytime.
           </div>
         )}
@@ -565,6 +647,117 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
                 className="h-[40px] px-6"
               >
                 {loadingDesign ? modeStrings.loading : "Next"}
+              </Button>
+            </div>
+          </>
+        )}
+
+        {step === "character" && (
+          <>
+            <div className="min-h-0 overflow-y-auto custom-scrollbar flex flex-col gap-2">
+              <h3 className="text-base font-medium text-typography-900">{QUESTIONS.character}</h3>
+              {loadingSuggestions || !suggestions ? (
+                <p className="text-sm text-typography-700">{characterStrings.searching}</p>
+              ) : (
+                <>
+                  <p className="text-xs text-typography-600" data-testid="character-note">
+                    {suggestions.searchFailed
+                      ? characterStrings.searchFailed
+                      : suggestions.characters.length === 0
+                        ? characterStrings.noMatch
+                        : suggestions.recommendedId
+                          ? characterStrings.recommendedBecause(suggestions.reason ?? "")
+                          : characterStrings.noneFits(suggestions.reason ?? "")}
+                  </p>
+                  <div
+                    role="radiogroup"
+                    aria-label={QUESTIONS.character}
+                    className="flex flex-col gap-2"
+                  >
+                    {suggestions.characters.map(option => {
+                      const checked = characterChoice === option.id;
+                      return (
+                        <label
+                          key={option.id}
+                          className={`flex items-start gap-3 rounded border px-3 py-2 cursor-pointer transition-colors ${
+                            checked
+                              ? "border-primary bg-primary-50"
+                              : "border-border-light hover:bg-background-secondary"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="roleplay-character"
+                            value={option.id}
+                            checked={checked}
+                            onChange={() => setCharacterChoice(option.id)}
+                            className="accent-primary mt-1"
+                          />
+                          <span className="flex flex-col">
+                            <span className="flex items-center gap-2 text-sm text-typography-900">
+                              {option.name}
+                              {suggestions.recommendedId === option.id && (
+                                <span className="rounded bg-primary-100 px-1.5 py-0.5 text-[11px] font-medium text-primary-700">
+                                  {modeStrings.recommended}
+                                </span>
+                              )}
+                            </span>
+                            {option.summary && (
+                              <span className="text-xs text-typography-600">{option.summary}</span>
+                            )}
+                            {option.profileExcerpt && (
+                              <span className="text-xs text-typography-500 line-clamp-2">
+                                {option.profileExcerpt}
+                              </span>
+                            )}
+                            {!option.hasVoices && (
+                              <span className="text-xs text-amber-700">
+                                {characterStrings.noVoices}
+                              </span>
+                            )}
+                          </span>
+                        </label>
+                      );
+                    })}
+                    <label
+                      className={`flex items-start gap-3 rounded border px-3 py-2 cursor-pointer transition-colors ${
+                        characterChoice === NEW_CHARACTER
+                          ? "border-primary bg-primary-50"
+                          : "border-border-light hover:bg-background-secondary"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="roleplay-character"
+                        value={NEW_CHARACTER}
+                        checked={characterChoice === NEW_CHARACTER}
+                        onChange={() => setCharacterChoice(NEW_CHARACTER)}
+                        className="accent-primary mt-1"
+                      />
+                      <span className="flex flex-col">
+                        <span className="text-sm text-typography-900">
+                          {characterStrings.newOption}
+                        </span>
+                        <span className="text-xs text-typography-600">
+                          {characterStrings.newOptionHelp}
+                        </span>
+                      </span>
+                    </label>
+                  </div>
+                </>
+              )}
+              {characterError && (
+                <p className="text-sm text-[#FE6F64]">{characterStrings.loadFailed}</p>
+              )}
+            </div>
+            <div className="shrink-0 flex justify-end">
+              <Button
+                variant={ButtonVariant.PRIMARY}
+                onClick={handleCharacterNext}
+                disabled={loadingSuggestions || !suggestions || loadingCharacter}
+                className="h-[40px] px-6"
+              >
+                Next
               </Button>
             </div>
           </>

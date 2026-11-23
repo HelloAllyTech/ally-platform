@@ -108,6 +108,89 @@ export class RoleplayFitCheckSpecialist {
   }
 
   /**
+   * Studio's Agent Builder wizard: the library characters that could play this roleplay, with
+   * the fit check's verdict on the best search hit. The search ranks; the check decides whether
+   * the top hit can carry the roleplay and, if not, which of the others can (or none: write a
+   * new character). Search or check failing gives the hits without a verdict, never an error.
+   */
+  async suggest(
+    brief: StructuredRoleplayBrief,
+    scope: RoleplayCastingScope,
+  ): Promise<{
+    characters: CharacterProfile[];
+    recommendedId: string | null;
+    reason: string | null;
+    searchFailed: boolean;
+  }> {
+    const query = [brief.character.personaBrief, brief.setting]
+      .filter(Boolean)
+      .join('; ');
+    let ids: string[];
+    try {
+      const { hits } = await this.library.search(
+        'character',
+        query,
+        scope.competencyIds,
+        MAX_CANDIDATES + 1,
+        { sessionId: scope.sessionId, tenantId: scope.tenantId },
+      );
+      ids = hits.map((hit) => String(hit.id));
+    } catch (error) {
+      this.logger.warn(
+        `[AGENT_BUILDER] character search failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return {
+        characters: [],
+        recommendedId: null,
+        reason: null,
+        searchFailed: true,
+      };
+    }
+    // characterProfiles keeps only characters this trainer can open in the Character Library.
+    const byId = new Map(
+      (await this.library.characterProfiles(ids)).map((p) => [p.id, p]),
+    );
+    const characters = ids
+      .map((id) => byId.get(id))
+      .filter((p): p is CharacterProfile => Boolean(p));
+    if (!characters.length) {
+      return {
+        characters,
+        recommendedId: null,
+        reason: null,
+        searchFailed: false,
+      };
+    }
+    const [top, ...rest] = characters;
+    try {
+      const verdict = await this.check(brief, top, rest, scope);
+      const recommendedId = verdict.fits
+        ? top.id
+        : (verdict.alternatives[0]?.characterId ?? null);
+      return {
+        characters,
+        recommendedId,
+        reason: verdict.reason,
+        searchFailed: false,
+      };
+    } catch (error) {
+      this.logger.warn(
+        `[AGENT_BUILDER] fit check skipped: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return {
+        characters,
+        recommendedId: null,
+        reason: null,
+        searchFailed: false,
+      };
+    }
+  }
+
+  /**
    * Library characters that might fit better, voiced ones first (a roleplay
    * needs a voice per language). A failed search means no alternatives, not
    * a failed check.
@@ -191,6 +274,9 @@ export const describeBrief = (brief: StructuredRoleplayBrief): string =>
     `Difficulty: ${brief.condition.difficulty}${
       brief.condition.taskClass ? ` (${brief.condition.taskClass})` : ''
     }`,
+    brief.character.personaBrief
+      ? `Who the client should be: ${brief.character.personaBrief}`
+      : null,
     brief.setting ? `Setting: ${brief.setting}` : null,
     brief.learnerGoal ? `The learner's goal: ${brief.learnerGoal}` : null,
     `Moments the character must create:\n${bullets(brief.opportunities)}`,

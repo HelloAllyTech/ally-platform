@@ -15,6 +15,8 @@ const mocks = vi.hoisted(() => ({
   generation: { phase: "idle", tasks: [] as unknown[], checks: [] as string[] },
   fetchDesign: vi.fn(),
   goals: {} as Record<string, unknown>,
+  suggest: vi.fn(),
+  fetchCharacter: vi.fn(),
 }));
 
 vi.mock("@store", () => ({
@@ -39,6 +41,8 @@ vi.mock("@api", () => ({
   ROLEPLAY_MODES: ["learning", "practice", "performance", "pre_assessment", "post_assessment"],
   useGetAgentTestCasesQuery: () => mocks.goals,
   useLazyGetRoleplayDesignQuery: () => [mocks.fetchDesign, { isFetching: false }],
+  useSuggestAgentBuilderCharactersMutation: () => [mocks.suggest, { isLoading: false }],
+  useLazyGetCharacterByIdQuery: () => [mocks.fetchCharacter, { isFetching: false }],
 }));
 
 vi.mock("../useAgentBuilderGeneration", () => ({
@@ -74,6 +78,10 @@ beforeEach(() => {
     isLoading: false,
     isError: false,
   };
+  mocks.suggest.mockReturnValue({
+    unwrap: () =>
+      Promise.resolve({ characters: [], recommendedId: null, reason: null, searchFailed: false }),
+  });
   mocks.fetchDesign.mockReturnValue({
     unwrap: () =>
       Promise.resolve({
@@ -131,6 +139,9 @@ describe("AgentBuilderCopilotWizard suggestions", () => {
     await act(async () => {
       fireEvent.click(screen.getByText("Next"));
     });
+    await act(async () => {
+      fireEvent.click(screen.getByText("Next"));
+    });
     fireEvent.click(screen.getByText("Client deflects"));
     fireEvent.click(screen.getByText("Generate"));
 
@@ -149,6 +160,9 @@ describe("AgentBuilderCopilotWizard suggestions", () => {
     fireEvent.change(screen.getByLabelText("actor"), { target: { value: "Meera calls" } });
     fireEvent.click(screen.getByText("Next"));
     fireEvent.click(screen.getByText("Next"));
+    await act(async () => {
+      fireEvent.click(screen.getByText("Next"));
+    });
     await act(async () => {
       fireEvent.click(screen.getByText("Next"));
     });
@@ -199,5 +213,90 @@ describe("AgentBuilderCopilotWizard saved conversation", () => {
     const call = mocks.setValue.mock.calls.find(([field]) => field === "agentBuilderChat");
     expect(call?.[1]).toMatchObject({ version: 1, result: { total: 2, stopped: false } });
     expect(call?.[2]).toMatchObject({ shouldDirty: true });
+  });
+});
+
+describe("AgentBuilderCopilotWizard casting from the Character Library", () => {
+  const characterStrings = en.agentBuilderCharacter;
+
+  const toCharacterStep = async () => {
+    render(<AgentBuilderCopilotWizard formMethods={form()} />);
+    fireEvent.change(screen.getByLabelText("actor"), {
+      target: { value: "A 52-year-old farmer near Mandya" },
+    });
+    fireEvent.click(screen.getByText("Next"));
+    fireEvent.click(screen.getByText("Next"));
+    await act(async () => {
+      fireEvent.click(screen.getByText("Next"));
+    });
+  };
+
+  it("pre-picks the fit check's character and fills the form from it", async () => {
+    mocks.suggest.mockReturnValue({
+      unwrap: () =>
+        Promise.resolve({
+          characters: [
+            {
+              id: "c-1",
+              name: "Gowramma",
+              summary: "52, female, farmer",
+              hasVoices: true,
+              profileExcerpt: "Grew up in Mandya",
+            },
+            { id: "c-2", name: "Lakshmamma", summary: "", hasVoices: false, profileExcerpt: "" },
+          ],
+          recommendedId: "c-1",
+          reason: "She can speak from the setting.",
+          searchFailed: false,
+        }),
+    });
+    mocks.fetchCharacter.mockReturnValue({
+      unwrap: () =>
+        Promise.resolve({
+          id: "c-1",
+          name: "Gowramma",
+          age: 52,
+          gender: "female",
+          characterProfileText: "Grew up in Mandya.",
+        }),
+    });
+    await toCharacterStep();
+
+    expect(mocks.suggest).toHaveBeenCalledWith(
+      expect.objectContaining({ description: "A 52-year-old farmer near Mandya" }),
+    );
+    expect((screen.getByDisplayValue("c-1") as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByTestId("character-note").textContent).toContain(
+      "She can speak from the setting.",
+    );
+    expect(screen.getByText(characterStrings.noVoices)).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("Next"));
+    });
+    expect(mocks.setValue).toHaveBeenCalledWith("characterProfileSelector", "c-1");
+    expect(mocks.setValue).toHaveBeenCalledWith("name", "Gowramma", expect.anything());
+
+    fireEvent.click(screen.getByText("Client deflects"));
+    fireEvent.click(screen.getByText("Generate"));
+    const inputs = mocks.start.mock.calls[0][0];
+    expect(inputs.libraryCharacter).toBe(true);
+    expect(inputs.actorDescription).toContain(characterStrings.briefNote("Gowramma"));
+    expect(inputs.actorDescription).toContain("Grew up in Mandya.");
+  });
+
+  it("writes a new character when the library can't be searched", async () => {
+    mocks.suggest.mockReturnValue({ unwrap: () => Promise.reject(new Error("down")) });
+    await toCharacterStep();
+
+    expect(screen.getByTestId("character-note").textContent).toBe(characterStrings.searchFailed);
+    expect((screen.getByDisplayValue("new") as HTMLInputElement).checked).toBe(true);
+    await act(async () => {
+      fireEvent.click(screen.getByText("Next"));
+    });
+    fireEvent.click(screen.getByText("Client deflects"));
+    fireEvent.click(screen.getByText("Generate"));
+    expect(mocks.start.mock.calls[0][0].libraryCharacter).toBeUndefined();
+    expect(mocks.fetchCharacter).not.toHaveBeenCalled();
   });
 });

@@ -98,7 +98,18 @@ export interface GenerationInputs {
    * mode has just set one, and the placeholder lookup is asynchronous.
    */
   includeStates?: boolean;
+  /**
+   * A Character Library character is already on the form: its persona and backstory are kept,
+   * not generated, and every other field is written from them.
+   */
+  libraryCharacter?: boolean;
 }
+
+/** The fields a library character supplies itself. */
+const CHARACTER_FIELDS: ReadonlySet<AgentBuilderField> = new Set<AgentBuilderField>([
+  "persona",
+  "backstory",
+]);
 
 /**
  * The language-agnostic fields, in the order shown in the feed. `states` is
@@ -274,10 +285,11 @@ export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
       runningRef.current = true;
       abortedRef.current = false;
       setChecks([]);
-      const plan =
+      const plan = (
         inputs.includeStates && !fieldPlan.some(t => t.field === STATES_FIELD.field)
           ? [...BASE_FIELD_PLAN, STATES_FIELD, SPOKEN_LANGUAGES_FIELD]
-          : fieldPlan;
+          : fieldPlan
+      ).filter(t => !(inputs.libraryCharacter && CHARACTER_FIELDS.has(t.field)));
       setTasks(
         plan.map(t => ({
           ...t,
@@ -499,7 +511,10 @@ export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
       // `challenge_description` runs after `persona` completes, using its output
       // as context to ensure consistency. The final `foundation` promise for
       // stage two waits for all three to settle.
-      const personaRun = runTask({ key: "persona", field: "persona" });
+      // A library character's persona is already on the form, so there is nothing to wait for.
+      const personaRun = inputs.libraryCharacter
+        ? Promise.resolve()
+        : runTask({ key: "persona", field: "persona" });
       runsByField.set("persona", personaRun);
 
       const challengeDescRun = personaRun.then(() => {

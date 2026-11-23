@@ -54,6 +54,26 @@ export interface RoleplayDesign {
   states: boolean;
 }
 
+/** A Character Library character the fit check considered for this roleplay. */
+export interface AgentBuilderCharacterSuggestion {
+  id: string;
+  name: string;
+  /** "52, female, farmer, Mandya". */
+  summary: string;
+  hasVoices: boolean;
+  profileExcerpt: string;
+}
+
+export interface AgentBuilderCharacterSuggestions {
+  /** Search order, best first; only characters this trainer can open. */
+  characters: AgentBuilderCharacterSuggestion[];
+  /** The fit check's pick; null means none fits (write a new character) or no verdict. */
+  recommendedId: string | null;
+  reason: string | null;
+  /** The library could not be searched: says nothing about what it holds. */
+  searchFailed: boolean;
+}
+
 export interface GenerateAgentBuilderFieldRequest {
   field: AgentBuilderField;
   actorDescription: string;
@@ -174,6 +194,18 @@ const agentBuilderAPI = baseAPI.injectEndpoints({
       }),
     }),
 
+    /** Library characters that could play the roleplay, with the fit check's recommendation. */
+    suggestAgentBuilderCharacters: builder.mutation<
+      AgentBuilderCharacterSuggestions,
+      { description: string; competencyIds?: string[]; mode?: RoleplayMode }
+    >({
+      query: body => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.AGENT_BUILDER_CHARACTER_SUGGESTIONS,
+        method: HttpMethod.POST,
+        body,
+      }),
+    }),
+
     /** What a roleplay mode sets: supports, experience mode and the state-aware main prompt. */
     getRoleplayDesign: builder.query<RoleplayDesign, RoleplayMode>({
       query: mode => ({
@@ -185,5 +217,8 @@ const agentBuilderAPI = baseAPI.injectEndpoints({
   }),
 });
 
-export const { useGenerateAgentBuilderFieldMutation, useLazyGetRoleplayDesignQuery } =
-  agentBuilderAPI;
+export const {
+  useGenerateAgentBuilderFieldMutation,
+  useLazyGetRoleplayDesignQuery,
+  useSuggestAgentBuilderCharactersMutation,
+} = agentBuilderAPI;
