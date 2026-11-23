@@ -3808,12 +3808,16 @@
       "activeShare": "{{percent}}% of registered learners",
       "joined": "{{count}} joined in this period",
       "perActiveLearner": "{{count}} per active learner",
-      "practiceNote": "Average over active learners"
+      "practiceNote": "Average over active learners",
+      "changeUp": "{{count}} more than the previous period",
+      "changeDown": "{{count}} fewer than the previous period",
+      "changeSame": "Same as the previous period"
     },
     "status": {
       "none": "No learners yet.",
       "truncated": "Showing the first {{count}} learners.",
-      "seeLearners": "See the {{count}} learners who have stopped or not started"
+      "seeLearners_one": "See the learner who has stopped or not started",
+      "seeLearners_other": "See the {{count}} learners who have stopped or not started"
     },
     "top": {
       "none": "No practice in this period yet."
@@ -3828,12 +3832,25 @@
     "takeaway": {
       "status": "{{active}} of {{total}} learners practised in the last 14 days. {{needNudge}} could use a nudge.",
       "top": "{{name}} leads with {{hours}} hours of practice.",
-      "attention": "{{count}} learners have gone quiet after practising.",
       "usageNone": "No learners practised in this period.",
       "mostUsed": "{{title}} is the most practised, with {{count}} sessions.",
-      "learnerTable": "{{count}} learners in this organisation.",
-      "courseTable": "{{count}} courses in this organisation.",
-      "usagePeak": "Active learners peaked at {{peak}} on {{bucket}}."
+      "usagePeak": "Active learners peaked at {{peak}} on {{bucket}}.",
+      "coursesInUse": "{{inUse}} of {{total}} courses have been started. {{idle}} sit idle.",
+      "stalled": "{{title}} has the most stalled learners: {{count}}.",
+      "notStarted": "{{title}} has the most learners who have not started: {{count}}.",
+      "funnel": "Of {{assigned}} course assignments, {{completed}} were completed ({{percent}}%).",
+      "attention_one": "{{count}} learner has gone quiet after practising.",
+      "attention_other": "{{count}} learners have gone quiet after practising.",
+      "learnerTable_one": "{{count}} learner in this organisation.",
+      "learnerTable_other": "{{count}} learners in this organisation.",
+      "courseTable_one": "{{count}} course in this organisation.",
+      "courseTable_other": "{{count}} courses in this organisation.",
+      "scores": "The typical session scored {{median}} out of 100, across {{count}} sessions.",
+      "trends": "{{improving}} of {{total}} learners scored higher on their latest session than on their first.",
+      "scenarioOne": "{{title}} averages {{score}} out of 100.",
+      "scenarios": "{{hardest}} is the hardest, averaging {{hardScore}}. {{easiest}} is the easiest, averaging {{easyScore}}.",
+      "ratings": "Learners rate their sessions {{average}} out of 5 on average, from {{count}} ratings.",
+      "reviews": "{{reviewed}} of {{total}} completed sessions have been shared for review."
     },
     "table": {
       "learner": "Learner",
@@ -3852,6 +3869,53 @@
       "showing": "Showing {{from}} to {{to}} of {{total}}",
       "previous": "Previous",
       "next": "Next"
+    },
+    "courses": {
+      "inUse": "In use",
+      "idle": "Idle",
+      "none": "No courses yet.",
+      "truncated": "Showing the first {{count}} courses."
+    },
+    "stalled": {
+      "none": "No learners are stalled in a course."
+    },
+    "notStarted": {
+      "none": "Every assigned learner has started."
+    },
+    "funnel": {
+      "assigned": "Assigned",
+      "started": "Started",
+      "halfway": "Halfway",
+      "completed": "Completed",
+      "none": "No course enrolments yet.",
+      "ofAssigned": "{{percent}}% of assigned"
+    },
+    "scores": {
+      "none": "No scored sessions in this period."
+    },
+    "trends": {
+      "none": "No learner has two scored sessions in this period yet.",
+      "improving": "Improving",
+      "holding": "Holding",
+      "declining": "Declining",
+      "rule": "A change of {{points}} points or more between a learner's first and latest score counts as up or down."
+    },
+    "scenarios": {
+      "none": "No scenario has enough scored sessions yet.",
+      "order": "Lowest average score first. Scores are out of 100.",
+      "sessions_one": "({{count}} session)",
+      "sessions_other": "({{count}} sessions)"
+    },
+    "ratings": {
+      "none": "No session ratings in this period.",
+      "outOfFive": "out of 5",
+      "stars_one": "{{count}} star",
+      "stars_other": "{{count}} stars"
+    },
+    "reviews": {
+      "none": "No completed sessions in this period.",
+      "ofCompleted": "of {{total}} completed sessions",
+      "percent": "{{percent}}% have been shared for review"
     }
   }
 }

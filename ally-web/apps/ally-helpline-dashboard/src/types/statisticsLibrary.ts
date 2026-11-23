@@ -62,7 +62,10 @@ export interface GetStatisticsChartRequest {
 }
 
 /** TSQ-001 */
-export type HeadlineNumbersData = GetOrganizationMetricsResponse["summary"];
+export type HeadlineNumbersData = GetOrganizationMetricsResponse["summary"] & {
+  /** The period just before the selected one; null for "all time". */
+  previous: { activeUsers: number; simulationsCompleted: number } | null;
+};
 
 /** TSQ-002 */
 export interface UsageOverTimeData {
@@ -105,3 +108,62 @@ export type LearnerTableData = GetLearnerUsageTableResponse;
 
 /** TSQ-013 */
 export type CourseTableData = GetCourseUsageTableResponse;
+
+/** TSQ-020 */
+export interface ScoreDistributionData {
+  /** Ten bins: 0-9, 10-19, ... 90-100. */
+  bins: number[];
+  sessions: number;
+  median: number | null;
+}
+
+/** TSQ-021 */
+export interface LearnerTrendData {
+  improving: number;
+  holding: number;
+  declining: number;
+  /** Learners with at least two scored sessions in the period. */
+  total: number;
+  /** Points a score must move to count as up or down. */
+  threshold: number;
+}
+
+/** TSQ-022 */
+export interface ScenarioScoresData {
+  /** Lowest average first. */
+  rows: Array<{ scenarioId: number; title: string; averageScore: number; sessions: number }>;
+}
+
+/** TSQ-026 */
+export interface RatingsData {
+  /** Index 0 is one star, index 4 is five stars. */
+  stars: number[];
+  count: number;
+  average: number | null;
+}
+
+/** TSQ-027 */
+export interface ReviewCoverageData {
+  completedSessions: number;
+  reviewedSessions: number;
+}
+
+/** TSQ-014 */
+export interface CoursesInUseData {
+  total: number;
+  inUse: number;
+  idle: number;
+  truncated: boolean;
+}
+
+/** TSQ-015 and TSQ-016 */
+export interface CourseRankingData {
+  truncated: boolean;
+  rows: Array<{ id: string; title: string; count: number }>;
+}
+
+/** TSQ-017 */
+export interface CourseFunnelData {
+  truncated: boolean;
+  stages: Array<{ key: "assigned" | "started" | "halfway" | "completed"; count: number }>;
+}

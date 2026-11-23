@@ -7,12 +7,20 @@ import { useTranslation } from "react-i18next";
 import { useGetStatisticsChartQuery } from "@api";
 import type {
   AttentionLearnersData,
+  CourseFunnelData,
+  CourseRankingData,
   CourseTableData,
+  CoursesInUseData,
   HeadlineNumbersData,
   LearnerStatusCountsData,
+  LearnerTrendData,
   LearnerTableData,
   MostUsedSimulationsData,
   OrganizationMetricsRange,
+  RatingsData,
+  ReviewCoverageData,
+  ScenarioScoresData,
+  ScoreDistributionData,
   StatisticsChartEntry,
   TopLearnersData,
   UsageOverTimeData,
@@ -74,6 +82,10 @@ const scrollToLearnerTable = () =>
     .querySelector('[data-testid="statistics-card-TSQ-009"]')
     ?.scrollIntoView({ behavior: "smooth", block: "start" });
 
+/** Scenario titles can run to a full sentence; keep them short inside another sentence. */
+const shorten = (text: string, max = 40): string =>
+  text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
+
 const fmtDays = (days: number | null, t: TFunction): string => {
   if (days == null) return "—";
   if (days <= 0) return t("organizationMetrics.learnerUsage.today");
@@ -102,11 +114,29 @@ const HeadlineNumbers = ({ data }: DataRendererProps<HeadlineNumbersData>) => {
       ? Math.round((data.activeUsers / data.totalRegisteredLearners) * 100)
       : null;
 
-  const tiles: Array<{ key: string; label: string; value: string; unit?: string; note: string }> = [
+  /** "4 more than the previous period", coloured, or null when there is nothing to compare. */
+  const change = (now: number, before: number | undefined) => {
+    if (before === undefined) return null;
+    const diff = now - before;
+    if (diff === 0) return { text: t("statisticsLibrary.headline.changeSame"), tone: "same" };
+    return diff > 0
+      ? { text: t("statisticsLibrary.headline.changeUp", { count: diff }), tone: "up" }
+      : { text: t("statisticsLibrary.headline.changeDown", { count: -diff }), tone: "down" };
+  };
+
+  const tiles: Array<{
+    key: string;
+    label: string;
+    value: string;
+    unit?: string;
+    note: string;
+    change?: { text: string; tone: string } | null;
+  }> = [
     {
       key: "active",
       label: t("statisticsLibrary.headline.activeLearners"),
       value: data.activeUsers.toLocaleString(),
+      change: change(data.activeUsers, data.previous?.activeUsers),
       note:
         activeShare === null
           ? t("statisticsLibrary.headline.noLearners")
@@ -122,6 +152,7 @@ const HeadlineNumbers = ({ data }: DataRendererProps<HeadlineNumbersData>) => {
       key: "simulations",
       label: t("statisticsLibrary.headline.simulationsCompleted"),
       value: data.simulationsCompleted.toLocaleString(),
+      change: change(data.simulationsCompleted, data.previous?.simulationsCompleted),
       note:
         data.avgSessionsPerActiveLearner === null
           ? t("organizationMetrics.states.notEnoughData")
@@ -162,6 +193,22 @@ const HeadlineNumbers = ({ data }: DataRendererProps<HeadlineNumbersData>) => {
               <span className="ml-1 text-sm font-normal text-typography-600">{tile.unit}</span>
             )}
           </p>
+          {tile.change && (
+            <p
+              className="text-sm font-medium"
+              style={{
+                color:
+                  tile.change.tone === "up"
+                    ? "#1e6b3a"
+                    : tile.change.tone === "down"
+                      ? "#8a3a08"
+                      : "#5a554b",
+              }}
+              data-testid={`statistics-headline-${tile.key}-change`}
+            >
+              {tile.change.text}
+            </p>
+          )}
           <p className="text-sm text-typography-600">{tile.note}</p>
         </div>
       ))}
@@ -415,7 +462,7 @@ const MostUsedSimulations = ({ data }: DataRendererProps<MostUsedSimulationsData
 const mostUsedTakeaway = (data: MostUsedSimulationsData, t: TFunction) =>
   data[0]
     ? t("statisticsLibrary.takeaway.mostUsed", {
-        title: data[0].title,
+        title: shorten(data[0].title),
         count: data[0].sessionCount,
       })
     : null;
@@ -635,6 +682,415 @@ const CourseTable = ({ entry }: SelfRendererProps) => {
   );
 };
 
+// ── Shared bars ─────────────────────────────────────────────────
+
+const Bars = ({
+  rows,
+}: {
+  rows: Array<{ key: string; label: string; count: number; colour: string; suffix?: string }>;
+}) => {
+  const top = Math.max(1, ...rows.map(r => r.count));
+  return (
+    <ul className="flex flex-col gap-3">
+      {rows.map(row => (
+        <li key={row.key} className="flex items-center gap-3 text-sm">
+          <span className="flex-[0_0_38%] truncate text-typography-900">{row.label}</span>
+          <span className="h-3 flex-1 rounded-md bg-[#efebe0]">
+            <span
+              className="block h-3 rounded-md"
+              style={{ width: `${(row.count / top) * 100}%`, background: row.colour }}
+            />
+          </span>
+          <span className="flex-[0_0_64px] text-right font-semibold text-typography-900">
+            {row.count}
+            {row.suffix ? ` ${row.suffix}` : ""}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+};
+
+// ── TSQ-014 Courses in use and idle ────────────────────────────
+
+const CoursesInUse = ({ data }: DataRendererProps<CoursesInUseData>) => {
+  const { t } = useTranslation();
+  if (data.total === 0) {
+    return <p className="text-sm text-typography-600">{t("statisticsLibrary.courses.none")}</p>;
+  }
+  const parts = [
+    { key: "inUse", count: data.inUse, colour: "#2a5db0" },
+    { key: "idle", count: data.idle, colour: "#8f8a7e" },
+  ];
+  return (
+    <div className="flex flex-col gap-4" data-testid="statistics-courses-in-use">
+      <div
+        className="flex h-7 gap-0.5 overflow-hidden rounded-md"
+        role="img"
+        aria-label={parts
+          .map(p => `${t(`statisticsLibrary.courses.${p.key}`)} ${p.count}`)
+          .join(", ")}
+      >
+        {parts
+          .filter(p => p.count > 0)
+          .map(p => (
+            <div
+              key={p.key}
+              style={{ width: `${(p.count / data.total) * 100}%`, background: p.colour }}
+            />
+          ))}
+      </div>
+      <ul className="flex flex-wrap gap-x-8 gap-y-3 text-sm">
+        {parts.map(p => (
+          <li key={p.key} className="flex items-center gap-2">
+            <span className="inline-block h-3 w-3 rounded-sm" style={{ background: p.colour }} />
+            {t(`statisticsLibrary.courses.${p.key}`)}{" "}
+            <strong className="font-semibold">{p.count}</strong>
+          </li>
+        ))}
+      </ul>
+      {data.truncated && (
+        <p className="text-xs text-typography-500">
+          {t("statisticsLibrary.courses.truncated", { count: data.total })}
+        </p>
+      )}
+    </div>
+  );
+};
+
+const coursesInUseTakeaway = (data: CoursesInUseData, t: TFunction) =>
+  data.total > 0
+    ? t("statisticsLibrary.takeaway.coursesInUse", {
+        inUse: data.inUse,
+        total: data.total,
+        idle: data.idle,
+      })
+    : null;
+
+// ── TSQ-015 / TSQ-016 Courses ranked ───────────────────────────
+
+const makeCourseRanking = (noneKey: string, colour: string) =>
+  function CourseRanking({ data }: DataRendererProps<CourseRankingData>) {
+    const { t } = useTranslation();
+    if (data.rows.length === 0) {
+      return <p className="text-sm text-typography-600">{t(noneKey)}</p>;
+    }
+    return (
+      <div data-testid="statistics-course-ranking">
+        <Bars
+          rows={data.rows.map(r => ({
+            key: r.id,
+            label: r.title,
+            count: r.count,
+            colour,
+          }))}
+        />
+      </div>
+    );
+  };
+
+const StalledCourses = makeCourseRanking("statisticsLibrary.stalled.none", "#b4490a");
+const NotStartedCourses = makeCourseRanking("statisticsLibrary.notStarted.none", "#c98a1b");
+
+const stalledTakeaway = (data: CourseRankingData, t: TFunction) =>
+  data.rows[0]
+    ? t("statisticsLibrary.takeaway.stalled", {
+        title: data.rows[0].title,
+        count: data.rows[0].count,
+      })
+    : null;
+
+const notStartedTakeaway = (data: CourseRankingData, t: TFunction) =>
+  data.rows[0]
+    ? t("statisticsLibrary.takeaway.notStarted", {
+        title: shorten(data.rows[0].title),
+        count: data.rows[0].count,
+      })
+    : null;
+
+// ── TSQ-017 Course completion funnel ───────────────────────────
+
+const CourseFunnel = ({ data }: DataRendererProps<CourseFunnelData>) => {
+  const { t } = useTranslation();
+  const assigned = data.stages[0]?.count ?? 0;
+  if (assigned === 0) {
+    return <p className="text-sm text-typography-600">{t("statisticsLibrary.funnel.none")}</p>;
+  }
+  return (
+    <ol className="flex flex-col gap-3" data-testid="statistics-course-funnel">
+      {data.stages.map((stage, index) => {
+        const pct = Math.round((stage.count / assigned) * 100);
+        return (
+          <li key={stage.key} className="flex items-center gap-3 text-sm">
+            <span className="flex-[0_0_88px] text-typography-900">
+              {t(`statisticsLibrary.funnel.${stage.key}`)}
+            </span>
+            <span className="h-6 flex-1 rounded bg-[#efebe0]">
+              <span
+                className="block h-6 rounded"
+                style={{
+                  width: `${pct}%`,
+                  background: stage.key === "completed" ? "#1e6b3a" : "#2a5db0",
+                }}
+              />
+            </span>
+            <span className="flex-[0_0_120px] text-right">
+              <strong className="font-semibold text-typography-900">{stage.count}</strong>
+              {index > 0 && (
+                <span className="ml-1 text-typography-600">
+                  {t("statisticsLibrary.funnel.ofAssigned", { percent: pct })}
+                </span>
+              )}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+};
+
+const courseFunnelTakeaway = (data: CourseFunnelData, t: TFunction) => {
+  const assigned = data.stages[0]?.count ?? 0;
+  if (assigned === 0) return null;
+  const completed = data.stages[3]?.count ?? 0;
+  return t("statisticsLibrary.takeaway.funnel", {
+    assigned,
+    completed,
+    percent: Math.round((completed / assigned) * 100),
+  });
+};
+
+// ── TSQ-020 Session scores ─────────────────────────────────────
+
+const BIN_LABELS = ["0", "10", "20", "30", "40", "50", "60", "70", "80", "90"];
+
+const ScoreDistribution = ({ data }: DataRendererProps<ScoreDistributionData>) => {
+  const { t } = useTranslation();
+  if (data.sessions === 0) {
+    return <p className="text-sm text-typography-600">{t("statisticsLibrary.scores.none")}</p>;
+  }
+  const top = Math.max(1, ...data.bins);
+  return (
+    <div className="flex flex-col gap-1" data-testid="statistics-score-distribution">
+      <div
+        className="flex h-36 items-end gap-1.5 border-b border-[#cfc9bb]"
+        role="img"
+        aria-label={data.bins.map((n, i) => `${BIN_LABELS[i]}: ${n}`).join(", ")}
+      >
+        {data.bins.map((n, i) => (
+          <div
+            key={BIN_LABELS[i]}
+            title={`${BIN_LABELS[i]} to ${i === 9 ? 100 : Number(BIN_LABELS[i]) + 9}: ${n}`}
+            className="flex-1 rounded-t"
+            style={{
+              height: `${(n / top) * 100}%`,
+              background: i < 4 ? "#b4490a" : "#2a5db0",
+              minHeight: n > 0 ? 2 : 0,
+            }}
+          />
+        ))}
+      </div>
+      <div className="flex gap-1.5 text-[11px] text-typography-600">
+        {BIN_LABELS.map(label => (
+          <span key={label} className="flex-1 text-center">
+            {label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const scoreDistributionTakeaway = (data: ScoreDistributionData, t: TFunction) =>
+  data.sessions > 0 && data.median !== null
+    ? t("statisticsLibrary.takeaway.scores", { median: data.median, count: data.sessions })
+    : null;
+
+// ── TSQ-021 Improving, holding or declining ────────────────────
+
+const TREND_PARTS = [
+  { key: "improving", colour: "#1e6b3a" },
+  { key: "holding", colour: "#8f8a7e" },
+  { key: "declining", colour: "#b4490a" },
+] as const;
+
+const LearnerTrends = ({ data }: DataRendererProps<LearnerTrendData>) => {
+  const { t } = useTranslation();
+  if (data.total === 0) {
+    return <p className="text-sm text-typography-600">{t("statisticsLibrary.trends.none")}</p>;
+  }
+  return (
+    <div className="flex flex-col gap-4" data-testid="statistics-learner-trends">
+      <div
+        className="flex h-7 gap-0.5 overflow-hidden rounded-md"
+        role="img"
+        aria-label={TREND_PARTS.map(
+          p => `${t(`statisticsLibrary.trends.${p.key}`)} ${data[p.key]}`,
+        ).join(", ")}
+      >
+        {TREND_PARTS.filter(p => data[p.key] > 0).map(p => (
+          <div
+            key={p.key}
+            style={{ width: `${(data[p.key] / data.total) * 100}%`, background: p.colour }}
+          />
+        ))}
+      </div>
+      <ul className="flex flex-wrap gap-x-8 gap-y-3 text-sm">
+        {TREND_PARTS.map(p => (
+          <li key={p.key} className="flex items-center gap-2">
+            <span className="inline-block h-3 w-3 rounded-sm" style={{ background: p.colour }} />
+            {t(`statisticsLibrary.trends.${p.key}`)}{" "}
+            <strong className="font-semibold">{data[p.key]}</strong>
+          </li>
+        ))}
+      </ul>
+      <p className="text-xs text-typography-500">
+        {t("statisticsLibrary.trends.rule", { points: data.threshold })}
+      </p>
+    </div>
+  );
+};
+
+const learnerTrendsTakeaway = (data: LearnerTrendData, t: TFunction) =>
+  data.total > 0
+    ? t("statisticsLibrary.takeaway.trends", { improving: data.improving, total: data.total })
+    : null;
+
+// ── TSQ-022 Hardest and easiest scenarios ──────────────────────
+
+const ScenarioScores = ({ data }: DataRendererProps<ScenarioScoresData>) => {
+  const { t } = useTranslation();
+  if (data.rows.length === 0) {
+    return <p className="text-sm text-typography-600">{t("statisticsLibrary.scenarios.none")}</p>;
+  }
+  return (
+    <div className="flex flex-col gap-2" data-testid="statistics-scenario-scores">
+      <p className="text-xs text-typography-500">{t("statisticsLibrary.scenarios.order")}</p>
+      <ul className="flex flex-col gap-3">
+        {data.rows.map(row => (
+          <li key={row.scenarioId} className="flex items-center gap-3 text-sm">
+            <span className="flex-[0_0_44%] truncate text-typography-900" title={row.title}>
+              {row.title}
+            </span>
+            <span className="h-3 flex-1 rounded-md bg-[#efebe0]">
+              <span
+                className="block h-3 rounded-md"
+                style={{
+                  width: `${row.averageScore}%`,
+                  background: row.averageScore < 60 ? "#b4490a" : "#2a5db0",
+                }}
+              />
+            </span>
+            <span className="flex-[0_0_120px] whitespace-nowrap text-right text-typography-700">
+              <strong className="font-semibold text-typography-900">{row.averageScore}</strong>{" "}
+              {t("statisticsLibrary.scenarios.sessions", { count: row.sessions })}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+};
+
+const scenarioScoresTakeaway = (data: ScenarioScoresData, t: TFunction) => {
+  if (data.rows.length === 0) return null;
+  const hardest = data.rows[0];
+  const easiest = data.rows[data.rows.length - 1];
+  if (hardest.scenarioId === easiest.scenarioId) {
+    return t("statisticsLibrary.takeaway.scenarioOne", {
+      title: shorten(hardest.title),
+      score: hardest.averageScore,
+    });
+  }
+  return t("statisticsLibrary.takeaway.scenarios", {
+    hardest: shorten(hardest.title),
+    hardScore: hardest.averageScore,
+    easiest: shorten(easiest.title),
+    easyScore: easiest.averageScore,
+  });
+};
+
+// ── TSQ-026 Ratings ────────────────────────────────────────────
+
+const Ratings = ({ data }: DataRendererProps<RatingsData>) => {
+  const { t } = useTranslation();
+  if (data.count === 0) {
+    return <p className="text-sm text-typography-600">{t("statisticsLibrary.ratings.none")}</p>;
+  }
+  const top = Math.max(1, ...data.stars);
+  return (
+    <div className="flex flex-col gap-3" data-testid="statistics-ratings">
+      <p className="font-secondary text-4xl font-semibold text-typography-900">
+        {data.average?.toFixed(1)}
+        <span className="ml-1 text-sm font-normal text-typography-600">
+          {t("statisticsLibrary.ratings.outOfFive")}
+        </span>
+      </p>
+      <ul className="flex flex-col gap-2">
+        {[5, 4, 3, 2, 1].map(star => (
+          <li key={star} className="flex items-center gap-3 text-sm">
+            <span className="w-14 text-typography-700">
+              {t("statisticsLibrary.ratings.stars", { count: star })}
+            </span>
+            <span className="h-3 flex-1 rounded-md bg-[#efebe0]">
+              <span
+                className="block h-3 rounded-md bg-[#2a5db0]"
+                style={{ width: `${(data.stars[star - 1] / top) * 100}%` }}
+              />
+            </span>
+            <span className="w-10 text-right font-semibold text-typography-900">
+              {data.stars[star - 1]}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+};
+
+const ratingsTakeaway = (data: RatingsData, t: TFunction) =>
+  data.count > 0 && data.average !== null
+    ? t("statisticsLibrary.takeaway.ratings", {
+        average: data.average.toFixed(1),
+        count: data.count,
+      })
+    : null;
+
+// ── TSQ-027 Sessions reviewed ──────────────────────────────────
+
+const ReviewCoverage = ({ data }: DataRendererProps<ReviewCoverageData>) => {
+  const { t } = useTranslation();
+  if (data.completedSessions === 0) {
+    return <p className="text-sm text-typography-600">{t("statisticsLibrary.reviews.none")}</p>;
+  }
+  const pct = Math.round((data.reviewedSessions / data.completedSessions) * 100);
+  return (
+    <div className="flex flex-col gap-3" data-testid="statistics-review-coverage">
+      <p className="font-secondary text-4xl font-semibold text-typography-900">
+        {data.reviewedSessions}
+        <span className="ml-1 text-sm font-normal text-typography-600">
+          {t("statisticsLibrary.reviews.ofCompleted", { total: data.completedSessions })}
+        </span>
+      </p>
+      <span
+        className="h-3 rounded-md bg-[#efebe0]"
+        role="img"
+        aria-label={t("statisticsLibrary.reviews.percent", { percent: pct })}
+      >
+        <span className="block h-3 rounded-md bg-[#1e6b3a]" style={{ width: `${pct}%` }} />
+      </span>
+    </div>
+  );
+};
+
+const reviewCoverageTakeaway = (data: ReviewCoverageData, t: TFunction) =>
+  data.completedSessions > 0
+    ? t("statisticsLibrary.takeaway.reviews", {
+        reviewed: data.reviewedSessions,
+        total: data.completedSessions,
+      })
+    : null;
+
 export const CHART_RENDERERS: Record<string, ChartRenderer> = {
   "TSQ-001": { kind: "data", Component: HeadlineNumbers, bare: true },
   "TSQ-002": { kind: "data", Component: UsageOverTime, takeaway: usageTakeaway },
@@ -643,5 +1099,14 @@ export const CHART_RENDERERS: Record<string, ChartRenderer> = {
   "TSQ-008": { kind: "data", Component: TopLearners, takeaway: topLearnersTakeaway },
   "TSQ-009": { kind: "self", Component: LearnerTable },
   "TSQ-013": { kind: "self", Component: CourseTable },
+  "TSQ-014": { kind: "data", Component: CoursesInUse, takeaway: coursesInUseTakeaway },
+  "TSQ-015": { kind: "data", Component: StalledCourses, takeaway: stalledTakeaway },
+  "TSQ-016": { kind: "data", Component: NotStartedCourses, takeaway: notStartedTakeaway },
+  "TSQ-017": { kind: "data", Component: CourseFunnel, takeaway: courseFunnelTakeaway },
+  "TSQ-020": { kind: "data", Component: ScoreDistribution, takeaway: scoreDistributionTakeaway },
+  "TSQ-021": { kind: "data", Component: LearnerTrends, takeaway: learnerTrendsTakeaway },
+  "TSQ-022": { kind: "data", Component: ScenarioScores, takeaway: scenarioScoresTakeaway },
+  "TSQ-026": { kind: "data", Component: Ratings, takeaway: ratingsTakeaway },
+  "TSQ-027": { kind: "data", Component: ReviewCoverage, takeaway: reviewCoverageTakeaway },
   "TSQ-023": { kind: "data", Component: AttentionLearners, takeaway: attentionTakeaway },
 };
