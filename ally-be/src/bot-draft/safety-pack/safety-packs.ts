@@ -114,6 +114,9 @@ export const SAFETY_PACKS: Record<SafetyPackId, SafetyPack> = {
       // 18–25 weeks") is information the business published, not advice.
       "General information the business itself publishes (its FAQs, guides and service pages), asked about in general terms, may be shared with its source. A question about the person's own result, symptom, medicine or dose is still a clinical question.",
       'If someone describes urgent symptoms, tell them to contact emergency care now.',
+      // Q4 G+12 (F5, approved 23 Nov): SP1 only adds lines, so this one says what "urgent" means;
+      // "red, swollen, oozing since yesterday" then gets the doctor-today rule.
+      'Urgent symptoms are an emergency happening now: chest pain, trouble breathing, heavy bleeding, unconsciousness, a seizure, poisoning or overdose, a severe burn, sudden weakness or confusion, or something getting rapidly worse. Anything else that needs a doctor gets the next rule.',
       // Q4 G+12 (E2, approved 23 Nov; Jaipur Foot: a red, oozing stump got "go to emergency now").
       "When something needs a doctor soon but isn't an emergency now (a wound that is red, swollen or oozing), say to see a doctor today, and to go to emergency or call 112 if they get a fever, the redness spreads, or they feel very unwell. Never tell them it's nothing to worry about.",
       'Refer every clinical question to the team, using the contact details you were given.',

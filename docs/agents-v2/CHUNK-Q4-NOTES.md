@@ -64,6 +64,22 @@ Counts overlap: one miss can be fixed by more than one item.
 | C19 The right number | 1 | o1-f06 |
 | Set fixes | 2 | b3-f03 (check the live price), o6-f01 (check the expected answer against the updates list) |
 
+## After launch (Shehbaz, 23 Nov: Q4 is the last block before launch)
+
+Everything below moves after launch. Part 2 finishes only G+9, H5, H6, H7, H9, H8, G2, C16 and 13b, B4, B7, G+15, H10, H12 and A3.
+
+- **D, speed, and stop 3:** fewer checker rewrites (D22), reasoning effort "minimal" measured and shown before switching (D23, stop 3), the WhatsApp typing indicator (D24), cold start (D25), speed on the live page (H13) and on G8's turns.
+- **B:** B8 (refusals with what's possible, beyond what part 1 did), B10 (the callback list, and never offering what it can't do), B11 ("Change entries: Do it" sticks, re-checked in the wizard), B12 (checkups as a named test person, re-checked), B13 (booking for someone else, re-checked on the live page).
+- **G+13:** the owner's answer wins over the website when they conflict, or setup asks which is right.
+- **G+16:** T2's three: setup's quick questions skip what the template asked; a template's answers kept; the checkup after a template.
+- **H11:** setup's gap questions fit the purpose.
+- **H13:** speed on the live production path, and the gap to the local suite.
+- **H14:** the five demo assistants as `demo-*.json` sets.
+- **E25b:** setup steps under load ("Something went wrong" with several setups at once; the database pool), tested with 5 setups at once (moved by Shehbaz, 23 Nov).
+- **E26 and E27:** the grader's 95% hand-rulings agreement set; checkup counts that add up, and every pack's safety questions.
+- **Answer quality to 85%:** the 28 misses in "For Phase 3" below (75% now under the grader that reads everything).
+- **H12's two not reproduced:** Try it labelled "Your business" during setup (the placeholder name is replaced only when reading finds a business name), and the customer page's address showing /admin/b/… on production.
+
 ## Status by item (23 Nov, after the single measurement `2026-11-23-after-C-1`)
 
 | Item | Status |

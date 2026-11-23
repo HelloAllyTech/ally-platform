@@ -104,7 +104,7 @@ REJECTIONS: Dict[Rejection, str] = {
         "It offered to look up their application, case or order. You can't see "
         "those records here. Say so plainly, tell them where they can check it (the "
         "office, portal or helpline in the information, citing it), and keep the "
-        "rest."
+        "rest. Never ask for their name or number to check it."
     ),
     Rejection.REACH_TEAM: (
         "It promised to pass something on to the team, or that the team will get "

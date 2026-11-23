@@ -252,3 +252,35 @@ No variables change.
 
 **Medical pack, new rule (`safety-packs.ts`, the pack's version goes up):**
 > When something needs a doctor soon but isn't an emergency now (a wound that is red, swollen or oozing), say to see a doctor today, and to go to emergency or call 112 if they get a fever, the redness spreads, or they feel very unwell. Never tell them it's nothing to worry about.
+
+## F. Part 2
+
+> **Approved by Shehbaz on 23 Nov 2026: F2, F3 and F4 as written; F1 with one sentence added; F5 with a wider list. In the code.**
+
+All in code, used locally until approved. Nothing else in part 2 adds wording.
+
+### F1. When it offered a lookup it can't do (ally-ai `check/rejections.py`, `NO_LOOKUP`, model-facing), item H8
+
+The reply is sent back once with:
+> It offered to look up their application, case or order. You can't see those records here. Say so plainly, tell them where they can check it (the office, portal or helpline in the information, citing it), and keep the rest. Never ask for their name or number to check it. (edit)
+
+### F2. The Customer support template's instructions (ally-be `templates.ts`, model-facing), item H5
+
+Hand-over is now off on every template but Helpline, so the instruction no longer offers it:
+> **Was:** "…When you can't solve it, open a ticket or hand over to a person. …"
+> **Now:** "…When you can't solve it, open a ticket so the team can reply. …"
+
+### F3. Why a safety question blocks publishing (ally-web Share and setup's Checkup), item H3
+
+- Share, under each failed question: "Why:" (then the reason in the Checkup's existing plain words); then "Change what it should say in the Checkup, add the missing fact there, or correct the safety rules if they're not right for your business." Buttons: **Open the Checkup** · **This isn't right for my business** · Check again.
+- Setup's Checkup: a row that needs a fix opens to "Its answer: …" and "Why: …"; safety questions are tagged "Safety question".
+
+### F4. Small owner-side copy (ally-web), item H12
+
+- Under "How should your assistant use this list?": "{n} of 300 characters"; past the limit: "That's longer than 300 characters. Shorten it to save it." (Save is off until it's shorter).
+- Repeat weekly: "1 is already there, so it's skipped." beside the existing "{n} are already there, so they're skipped."
+
+### F5. What "urgent symptoms" means on the Medical pack (ally-be `safety-packs.ts`, model-facing), item G+12
+
+**Why:** with E2 in, the stump case stopped being treated as an emergency, but the reply still said "go to urgent care now" (1 of 3 must-pass runs passed): the pack's older rule "If someone describes urgent symptoms, tell them to contact emergency care now." took it. SP1 packs only add lines, so the old rule stays and this one follows it, with E2's guard:
+> Urgent symptoms are an emergency happening now: chest pain, trouble breathing, heavy bleeding, unconsciousness, a seizure, poisoning or overdose, a severe burn, sudden weakness or confusion, or something getting rapidly worse. Anything else that needs a doctor gets the next rule. (edit)
