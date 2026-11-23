@@ -21,8 +21,6 @@ import {
   GetOrganizationMetricsRequest,
   GetOrganizationMetricsResponse,
   GetStatisticsChartRequest,
-  GetStatisticsScopeOptionsRequest,
-  StatisticsScopeOption,
   StatisticsChartLibrary,
   StatisticsChartResponse,
   RemoveLearnerEnrollmentRequest,
@@ -94,18 +92,6 @@ const analyticsAPI = baseAPI.injectEndpoints({
       query: () => ({
         url: ApiEndpoints.ANALYTICS.GET_STATISTICS_CHART_LIBRARY,
         method: HttpMethod.GET,
-      }),
-    }),
-
-    /** The courses, simulations or learners a chart can be drawn for. */
-    getStatisticsScopeOptions: builder.query<
-      StatisticsScopeOption[],
-      GetStatisticsScopeOptionsRequest
-    >({
-      query: params => ({
-        url: ApiEndpoints.ANALYTICS.GET_STATISTICS_SCOPE_OPTIONS,
-        method: HttpMethod.GET,
-        params,
       }),
     }),
 
@@ -247,7 +233,6 @@ export const {
   useGetOrganizationMetricsQuery,
   useGetStatisticsChartLibraryQuery,
   useGetStatisticsChartQuery,
-  useGetStatisticsScopeOptionsQuery,
   useGetLearnerUsageTableQuery,
   useGetCourseUsageTableQuery,
   useGetCourseAssessmentPairsQuery,

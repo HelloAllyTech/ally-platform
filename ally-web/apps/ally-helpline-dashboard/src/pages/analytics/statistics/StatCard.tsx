@@ -8,7 +8,6 @@ interface StatCardProps {
   /** The question the card answers. It is the heading, not the chart's name. */
   title: string;
   /** What the chart is drawn for, when it is not the whole organisation. */
-  badge?: ReactNode;
   /** One plain-language sentence that says what the data shows. */
   takeaway?: string | null;
   loading?: boolean;
@@ -24,7 +23,6 @@ interface StatCardProps {
  */
 export const StatCard: FunctionComponent<StatCardProps> = ({
   title,
-  badge,
   takeaway,
   loading = false,
   error = false,
@@ -38,7 +36,6 @@ export const StatCard: FunctionComponent<StatCardProps> = ({
       aria-busy={loading}
     >
       <header>
-        {badge && <div className="mb-1">{badge}</div>}
         <h2 className="text-base font-semibold text-typography-900">{title}</h2>
         {takeaway && !loading && !error && (
           <p className="mt-1 text-sm text-typography-600" data-testid="statistics-takeaway">

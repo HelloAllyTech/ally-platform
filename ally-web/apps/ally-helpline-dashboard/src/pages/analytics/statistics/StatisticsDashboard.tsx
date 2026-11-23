@@ -26,14 +26,7 @@ import type { StatisticsChartEntry } from "@types";
 
 import { SortableMetricBlock } from "../SortableMetricBlock";
 import { ChartHost } from "./ChartHost";
-import {
-  LayoutItem,
-  LayoutScope,
-  STATISTICS_LAYOUT_PREF_KEY,
-  layoutKey,
-  parseLayoutKey,
-  resolveDashboardLayout,
-} from "./layout";
+import { STATISTICS_LAYOUT_PREF_KEY, resolveDashboardLayout } from "./layout";
 import { LibraryDrawer } from "./LibraryDrawer";
 import { CHART_RENDERERS, DashboardContext } from "./renderers";
 
@@ -71,14 +64,7 @@ export const StatisticsDashboard: FunctionComponent<StatisticsDashboardProps> = 
   );
 
   const byId = useMemo(() => new Map(charts.map(c => [c.id, c])), [charts]);
-  // Each card is a layout key: a chart id, or a chart id with the course,
-  // simulation or learner it is drawn for. The same chart can appear more than once.
-  const items = layoutIds
-    .map(parseLayoutKey)
-    .filter(
-      (item): item is LayoutItem => !!item && !!byId.get(item.id) && !!CHART_RENDERERS[item.id],
-    );
-  const entryKeys = items.map(item => item.key);
+  const entryKeys = layoutIds.filter(id => byId.has(id) && !!CHART_RENDERERS[id]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -107,17 +93,9 @@ export const StatisticsDashboard: FunctionComponent<StatisticsDashboardProps> = 
   };
 
   const handleRemove = (key: string) => persist(entryKeys.filter(x => x !== key));
-  const handleAdd = (id: string, scope?: LayoutScope) => {
-    const key = layoutKey(id, scope);
-    if (!entryKeys.includes(key)) persist([...entryKeys, key]);
+  const handleAdd = (id: string) => {
+    if (!entryKeys.includes(id)) persist([...entryKeys, id]);
   };
-  /** Points a card at a different course, simulation or learner, keeping its place. */
-  const handleScopeChange = (oldKey: string, id: string, scope: LayoutScope) => {
-    const key = layoutKey(id, scope);
-    if (key === oldKey || entryKeys.includes(key)) return;
-    persist(entryKeys.map(k => (k === oldKey ? key : k)));
-  };
-
   const finishEditing = () => {
     setEditing(false);
     setDrawerOpen(false);
@@ -205,7 +183,7 @@ export const StatisticsDashboard: FunctionComponent<StatisticsDashboardProps> = 
 
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
           <div className="min-w-0 flex-1">
-            {items.length === 0 ? (
+            {entryKeys.length === 0 ? (
               <p
                 className="rounded border border-dashed border-border-light p-6 text-sm text-typography-600"
                 data-testid="statistics-empty"
@@ -220,30 +198,21 @@ export const StatisticsDashboard: FunctionComponent<StatisticsDashboardProps> = 
               >
                 <SortableContext items={entryKeys} strategy={rectSortingStrategy}>
                   <div className={gridClass} data-testid="statistics-grid">
-                    {items.map(item => {
-                      const entry = byId.get(item.id) as StatisticsChartEntry;
+                    {entryKeys.map(id => {
+                      const entry = byId.get(id) as StatisticsChartEntry;
                       return (
-                        <SortableMetricBlock
-                          key={item.key}
-                          id={item.key}
-                          wide={entry.size === "wide"}
-                        >
+                        <SortableMetricBlock key={id} id={id} wide={entry.size === "wide"}>
                           <div className="rounded border-2 border-dashed border-[#9db5dd]">
                             <button
                               type="button"
-                              onClick={() => handleRemove(item.key)}
+                              onClick={() => handleRemove(id)}
                               aria-label={t("statisticsLibrary.removeAria", { title: entry.title })}
                               className="absolute right-10 top-2 z-10 flex h-6 w-6 items-center justify-center rounded text-typography-500 hover:bg-background-secondary hover:text-typography-900"
-                              data-testid={`statistics-remove-${item.key}`}
+                              data-testid={`statistics-remove-${id}`}
                             >
                               &times;
                             </button>
-                            <ChartHost
-                              entry={entry}
-                              range={range}
-                              scope={item.scope}
-                              onScopeChange={scope => handleScopeChange(item.key, item.id, scope)}
-                            />
+                            <ChartHost entry={entry} range={range} />
                           </div>
                         </SortableMetricBlock>
                       );
@@ -253,11 +222,11 @@ export const StatisticsDashboard: FunctionComponent<StatisticsDashboardProps> = 
               </DndContext>
             ) : (
               <div className={gridClass} data-testid="statistics-grid">
-                {items.map(item => {
-                  const entry = byId.get(item.id) as StatisticsChartEntry;
+                {entryKeys.map(id => {
+                  const entry = byId.get(id) as StatisticsChartEntry;
                   return (
-                    <div key={item.key} className={spanClass(entry)}>
-                      <ChartHost entry={entry} range={range} scope={item.scope} />
+                    <div key={id} className={spanClass(entry)}>
+                      <ChartHost entry={entry} range={range} />
                     </div>
                   );
                 })}
@@ -268,7 +237,7 @@ export const StatisticsDashboard: FunctionComponent<StatisticsDashboardProps> = 
           {editing && drawerOpen && (
             <LibraryDrawer
               charts={charts}
-              addedIds={items.filter(i => !i.scope).map(i => i.id)}
+              addedIds={entryKeys}
               onAdd={handleAdd}
               onClose={() => setDrawerOpen(false)}
             />

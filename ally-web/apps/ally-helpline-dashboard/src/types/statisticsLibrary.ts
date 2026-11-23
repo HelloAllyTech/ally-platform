@@ -25,17 +25,8 @@ export type StatisticsChartGroup =
 
 export type StatisticsChartSize = "s" | "m" | "wide";
 
-/** What a chart can be drawn for. The whole organisation is the default. */
+/** What a chart can be drawn for. The page only offers the whole organisation. */
 export type StatisticsChartScope = "organisation" | "course" | "simulation" | "learner";
-
-/** A scope a chart is drawn for: one course, simulation or learner. */
-export type StatisticsScopeKind = Exclude<StatisticsChartScope, "organisation">;
-
-export interface StatisticsScopeOption {
-  /** A course uuid, or a simulation or learner id as text. */
-  id: string;
-  label: string;
-}
 
 export interface StatisticsChartEntry {
   /** Stable id, for example `TSQ-001`. */
@@ -62,8 +53,6 @@ export interface StatisticsChartLibrary {
 
 export interface StatisticsChartResponse<T = unknown> {
   id: string;
-  /** What the chart was drawn for, when it was not the whole organisation. */
-  scope?: { kind: StatisticsScopeKind; id: string; label: string };
   state: Exclude<StatisticsChartState, "unavailable">;
   data: T;
 }
@@ -73,10 +62,6 @@ export interface GetStatisticsChartRequest {
   range?: OrganizationMetricsRange;
   /** IANA time zone, for charts that group by time of day. */
   timezone?: string;
-  /** Draw the chart for one simulation, course or learner. */
-  scenarioId?: number;
-  courseId?: string;
-  learnerId?: number;
   /** Table charts only. */
   search?: string;
   limit?: number;
@@ -241,11 +226,6 @@ export interface SkillChangeData {
   rows: Array<{ skill: string; first: number; latest: number; learners: number }>;
 }
 
-export interface GetStatisticsScopeOptionsRequest {
-  kind: StatisticsScopeKind;
-  search?: string;
-}
-
 /** TSQ-041 and TSQ-063: a card of named numbers. */
 export interface MeasureRow {
   key: string;
@@ -260,56 +240,9 @@ export interface MeasuresData {
   measures: MeasureRow[];
 }
 
-/** TSQ-043 */
-export interface TimeToFinishData {
-  /** Counts per band; `boundsDays` are the upper limits of every band but the last. */
-  bins: number[];
-  boundsDays: number[];
-  completed: number;
-  medianDays: number | null;
-}
-
-/** TSQ-064 */
-export interface LearnerCoursesData {
-  rows: Array<{
-    courseId: string;
-    title: string;
-    completedItems: number;
-    totalItems: number;
-    status: "completed" | "inProgress" | "notStarted";
-    lastActivityAt: string | null;
-  }>;
-}
-
 /** TSQ-042 */
 export interface CoursePerformanceData {
   weeks: Array<{ week: string; started: number; completed: number }>;
   enrolled: number;
   completed: number;
-}
-
-/** TSQ-045 */
-export interface ModuleFunnelData {
-  rows: Array<{ sectionId: string; title: string; reached: number; completed: number }>;
-}
-
-/** TSQ-046 */
-export interface ModuleTimeData {
-  rows: Array<{ sectionId: string; title: string; medianMinutes: number; learners: number }>;
-}
-
-/** TSQ-053 */
-export interface RoleplayAttemptsData {
-  rows: Array<{
-    itemId: string;
-    title: string;
-    learners: number;
-    averageAttempts: number | null;
-    averageMinutes: number | null;
-  }>;
-}
-
-/** TSQ-065 */
-export interface SkillTrendData {
-  skills: Array<{ skill: string; points: Array<{ slice: number; level: number }> }>;
 }

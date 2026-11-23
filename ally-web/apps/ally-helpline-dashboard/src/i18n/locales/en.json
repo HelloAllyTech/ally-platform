@@ -4020,23 +4020,11 @@
       "quiz": "{{title}} has the lowest pass rate: {{percent}}% over {{count}} attempts.",
       "skills": "{{weakest}} is the weakest skill, at level {{level}}. {{gain}} improved most, by {{delta}}.",
       "skillsFlat": "No skill has moved much between learners' first and latest practice.",
-      "courseFacts": "{{completed}} of {{enrolled}} learners have finished this course.",
-      "courseFactsNone": "No learner has been enrolled in this course yet.",
-      "rhythm": "Completed {{sessions}} sessions over {{weeks}} weeks of practice in this period.",
-      "rhythmNone": "No practice sessions from this learner in this period.",
-      "finish": "A typical learner takes {{median}} days to finish, across {{count}} learners.",
-      "learnerCourses": "{{done}} of {{total}} courses finished.",
       "courses": "{{live}} of {{courses}} courses are live.",
       "coursesNone": "There are no courses yet.",
       "participation": "{{learners}} learners are on a course, {{inProgress}} still in progress.",
       "participationNone": "No learner is on a course yet.",
-      "performance": "{{completed}} of {{enrolled}} enrolments have been finished since the first one.",
-      "moduleDropoff": "Most learners stall at \"{{title}}\": {{completed}} of {{reached}} finish it.",
-      "moduleClear": "Learners who start a module mostly finish it.",
-      "moduleTime": "\"{{title}}\" takes the longest: about {{time}} for a typical learner.",
-      "roleplayTries": "\"{{title}}\" takes the most tries: {{attempts}} on average.",
-      "skillTrend": "{{skill}} has risen the most: from {{first}} to {{latest}}.",
-      "skillTrendFlat": "No skill has risen yet across these slices."
+      "performance": "{{completed}} of {{enrolled}} enrolments have been finished since the first one."
     },
     "table": {
       "learner": "Learner",
@@ -4059,14 +4047,8 @@
     "courses": {
       "inUse": "In use",
       "idle": "Idle",
-      "none": "This learner has not been given a course.",
-      "truncated": "Showing the first {{count}} courses.",
-      "items": "{{done}} of {{total}} items",
-      "status": {
-        "completed": "Completed",
-        "inProgress": "In progress",
-        "notStarted": "Not started"
-      }
+      "none": "No courses yet.",
+      "truncated": "Showing the first {{count}} courses."
     },
     "stalled": {
       "none": "No learners are stalled in a course."
@@ -4180,51 +4162,10 @@
         "feedback": "Feedback"
       }
     },
-    "scope": {
-      "search": {
-        "course": "Search courses",
-        "simulation": "Search simulations",
-        "learner": "Search learners"
-      },
-      "cancel": "Cancel",
-      "error": "Could not load the list. Try again.",
-      "loading": "Loading…",
-      "none": {
-        "course": "No courses found.",
-        "simulation": "No simulations found.",
-        "learner": "No learners found."
-      },
-      "badge": {
-        "course": "Course: {{name}}",
-        "simulation": "Simulation: {{name}}",
-        "learner": "Learner: {{name}}"
-      },
-      "choose": {
-        "course": "Choose a course for \"{{title}}\"",
-        "simulation": "Choose a simulation for \"{{title}}\"",
-        "learner": "Choose a learner for \"{{title}}\""
-      },
-      "addFor": {
-        "course": "For a course…",
-        "simulation": "For a simulation…",
-        "learner": "For a learner…"
-      }
-    },
     "measures": {
-      "items": "Items in the course",
-      "enrolled": "Enrolled",
-      "started": "Started",
-      "completed": "Completed",
-      "completionRate": "Completion rate",
-      "medianDays": "Typical time to finish",
-      "sessions": "Sessions completed",
-      "averageScore": "Average score",
       "formatMinutes": "{{value}} min",
       "formatDays": "{{value}} days",
       "formatScore": "{{value}} out of 100",
-      "minutes": "Time practised",
-      "activeWeeks": "Weeks practised",
-      "lastPracticed": "Last practised",
       "courses": "Courses",
       "live": "Live",
       "draft": "In draft",
@@ -4234,40 +4175,12 @@
       "notStarted": "Not started",
       "finishedACourse": "Finished a course"
     },
-    "finish": {
-      "none": "No learner has finished this course yet.",
-      "under": "Under {{max}} day",
-      "between": "{{min}} to {{max}} days",
-      "over": "{{min}} days or more"
-    },
     "performance": {
       "started": "Started",
       "finished": "Finished",
       "axis": "Learners",
       "week": "Week",
       "none": "No one has started a course yet."
-    },
-    "modules": {
-      "none": "No learner has reached a module in this course yet.",
-      "finished": "{{completed}} of {{reached}} finished",
-      "timeNone": "No learner has finished a whole module yet.",
-      "minutes": "{{value}} min",
-      "hours": "{{value}} hours",
-      "minutesShort": "min",
-      "hoursShort": "h",
-      "timeRule": "Typical time from first start to last finish in the module, for learners who finished all of it. Breaks between sessions count."
-    },
-    "roleplay": {
-      "none": "This course has no roleplay yet, or no learner has opened one.",
-      "title": "Roleplay",
-      "finished": "Finished",
-      "tries": "Tries",
-      "length": "Session length"
-    },
-    "skillTrend": {
-      "none": "Not enough scored practice yet to draw a trend.",
-      "level": "Skill level",
-      "slice": "Practice slice"
     }
   }
 }

@@ -8,13 +8,7 @@ import { useGetStatisticsChartQuery } from "@api";
 import type {
   ActivationData,
   CoursePerformanceData,
-  ModuleFunnelData,
-  ModuleTimeData,
-  RoleplayAttemptsData,
-  SkillTrendData,
-  LearnerCoursesData,
   MeasuresData,
-  TimeToFinishData,
   AttentionLearnersData,
   CourseFunnelData,
   CourseRankingData,
@@ -1510,7 +1504,7 @@ const skillChangeTakeaway = (data: SkillChangeData, t: TFunction) => {
   });
 };
 
-// ── TSQ-041 and TSQ-063: a card of named numbers ───────────────
+// ── TSQ-038 and TSQ-039: a card of named numbers ───────────────
 
 const formatMeasure = (
   measure: MeasuresData["measures"][number],
@@ -1558,109 +1552,6 @@ const Measures = ({ data }: DataRendererProps<MeasuresData>) => {
 
 const measureValue = (data: MeasuresData, key: string) =>
   data.measures.find(m => m.key === key)?.value ?? 0;
-
-const courseFactsTakeaway = (data: MeasuresData, t: TFunction) => {
-  const enrolled = measureValue(data, "enrolled");
-  return enrolled === 0
-    ? t("statisticsLibrary.takeaway.courseFactsNone")
-    : t("statisticsLibrary.takeaway.courseFacts", {
-        completed: measureValue(data, "completed"),
-        enrolled,
-      });
-};
-
-const practiceRhythmTakeaway = (data: MeasuresData, t: TFunction) =>
-  measureValue(data, "sessions") === 0
-    ? t("statisticsLibrary.takeaway.rhythmNone")
-    : t("statisticsLibrary.takeaway.rhythm", {
-        sessions: measureValue(data, "sessions"),
-        weeks: measureValue(data, "activeWeeks"),
-      });
-
-// ── TSQ-043 Time to finish a course ────────────────────────────
-
-const TimeToFinish = ({ data }: DataRendererProps<TimeToFinishData>) => {
-  const { t } = useTranslation();
-  if (data.completed === 0) {
-    return <p className="text-sm text-typography-600">{t("statisticsLibrary.finish.none")}</p>;
-  }
-  const bounds = data.boundsDays;
-  const label = (i: number) => {
-    if (i === 0) return t("statisticsLibrary.finish.under", { max: bounds[0] });
-    if (i === bounds.length) return t("statisticsLibrary.finish.over", { min: bounds[i - 1] });
-    return t("statisticsLibrary.finish.between", { min: bounds[i - 1], max: bounds[i] });
-  };
-  return (
-    <div data-testid="statistics-time-to-finish">
-      <Bars
-        rows={data.bins.map((count, i) => ({
-          key: String(i),
-          label: label(i),
-          count,
-          colour: "#2a5db0",
-        }))}
-      />
-    </div>
-  );
-};
-
-const timeToFinishTakeaway = (data: TimeToFinishData, t: TFunction) =>
-  data.completed > 0 && data.medianDays !== null
-    ? t("statisticsLibrary.takeaway.finish", { median: data.medianDays, count: data.completed })
-    : null;
-
-// ── TSQ-064 Progress in each course ────────────────────────────
-
-const STATUS_COLOUR: Record<LearnerCoursesData["rows"][number]["status"], string> = {
-  completed: "#1e6b3a",
-  inProgress: "#2a5db0",
-  notStarted: "#8f8a7e",
-};
-
-const LearnerCourses = ({ data }: DataRendererProps<LearnerCoursesData>) => {
-  const { t } = useTranslation();
-  if (data.rows.length === 0) {
-    return <p className="text-sm text-typography-600">{t("statisticsLibrary.courses.none")}</p>;
-  }
-  return (
-    <ul className="flex flex-col gap-3" data-testid="statistics-learner-courses">
-      {data.rows.map(row => {
-        const percent =
-          row.totalItems > 0 ? Math.round((row.completedItems / row.totalItems) * 100) : 0;
-        return (
-          <li key={row.courseId} className="flex flex-col gap-1 text-sm">
-            <span className="flex items-center justify-between gap-3">
-              <span className="truncate text-typography-900" title={row.title}>
-                {row.title}
-              </span>
-              <span className="flex-none text-typography-600">
-                {t(`statisticsLibrary.courses.status.${row.status}`)} ·{" "}
-                {t("statisticsLibrary.courses.items", {
-                  done: row.completedItems,
-                  total: row.totalItems,
-                })}
-              </span>
-            </span>
-            <span className="h-3 rounded-md bg-[#efebe0]">
-              <span
-                className="block h-3 rounded-md"
-                style={{ width: `${percent}%`, background: STATUS_COLOUR[row.status] }}
-              />
-            </span>
-          </li>
-        );
-      })}
-    </ul>
-  );
-};
-
-const learnerCoursesTakeaway = (data: LearnerCoursesData, t: TFunction) =>
-  data.rows.length > 0
-    ? t("statisticsLibrary.takeaway.learnerCourses", {
-        done: data.rows.filter(r => r.status === "completed").length,
-        total: data.rows.length,
-      })
-    : null;
 
 // ── TSQ-038 and TSQ-039: counts of courses and of learners on them ──
 
@@ -1721,213 +1612,6 @@ const coursePerformanceTakeaway = (data: CoursePerformanceData, t: TFunction) =>
       })
     : null;
 
-// ── TSQ-045 Module funnel ──────────────────────────────────────
-
-const ModuleFunnel = ({ data }: DataRendererProps<ModuleFunnelData>) => {
-  const { t } = useTranslation();
-  const top = Math.max(1, ...data.rows.map(r => r.reached));
-  if (data.rows.length === 0 || (top === 1 && data.rows.every(r => r.reached === 0))) {
-    return <p className="text-sm text-typography-600">{t("statisticsLibrary.modules.none")}</p>;
-  }
-  return (
-    <ul className="flex flex-col gap-3" data-testid="statistics-module-funnel">
-      {data.rows.map(row => (
-        <li key={row.sectionId} className="flex items-center gap-3 text-sm">
-          <span className="flex-[0_0_32%] truncate text-typography-900" title={row.title}>
-            {row.title}
-          </span>
-          <span className="relative h-3 flex-1 rounded-md bg-[#efebe0]">
-            <span
-              className="absolute left-0 top-0 h-3 rounded-md bg-[#b9c8e4]"
-              style={{ width: `${(row.reached / top) * 100}%` }}
-            />
-            <span
-              className="absolute left-0 top-0 h-3 rounded-md bg-[#2a5db0]"
-              style={{ width: `${(row.completed / top) * 100}%` }}
-            />
-          </span>
-          <span className="flex-[0_0_96px] text-right text-typography-700">
-            {t("statisticsLibrary.modules.finished", {
-              completed: row.completed,
-              reached: row.reached,
-            })}
-          </span>
-        </li>
-      ))}
-    </ul>
-  );
-};
-
-const moduleFunnelTakeaway = (data: ModuleFunnelData, t: TFunction) => {
-  const stalls = data.rows
-    .filter(r => r.reached > 0 && r.completed < r.reached)
-    .sort((a, b) => a.completed / a.reached - b.completed / b.reached);
-  if (data.rows.every(r => r.reached === 0)) return null;
-  if (stalls.length === 0) return t("statisticsLibrary.takeaway.moduleClear");
-  const worst = stalls[0];
-  return t("statisticsLibrary.takeaway.moduleDropoff", {
-    title: worst.title,
-    completed: worst.completed,
-    reached: worst.reached,
-  });
-};
-
-// ── TSQ-046 Time per module ────────────────────────────────────
-
-const moduleTimeUnit = (data: ModuleTimeData) => {
-  const longest = Math.max(0, ...data.rows.map(r => r.medianMinutes));
-  return longest >= 180 ? "hours" : "minutes";
-};
-
-const writeModuleTime = (minutes: number, unit: "hours" | "minutes", t: TFunction) =>
-  unit === "hours"
-    ? t("statisticsLibrary.modules.hours", { value: Math.round((minutes / 60) * 10) / 10 })
-    : t("statisticsLibrary.modules.minutes", { value: minutes });
-
-const ModuleTime = ({ data }: DataRendererProps<ModuleTimeData>) => {
-  const { t } = useTranslation();
-  if (data.rows.length === 0) {
-    return <p className="text-sm text-typography-600">{t("statisticsLibrary.modules.timeNone")}</p>;
-  }
-  const unit = moduleTimeUnit(data);
-  return (
-    <div data-testid="statistics-module-time" className="flex flex-col gap-3">
-      <Bars
-        rows={data.rows.map(row => ({
-          key: row.sectionId,
-          label: row.title,
-          count:
-            unit === "hours" ? Math.round((row.medianMinutes / 60) * 10) / 10 : row.medianMinutes,
-          colour: "#2a5db0",
-          suffix:
-            unit === "hours"
-              ? t("statisticsLibrary.modules.hoursShort")
-              : t("statisticsLibrary.modules.minutesShort"),
-        }))}
-      />
-      <p className="text-xs text-typography-500">{t("statisticsLibrary.modules.timeRule")}</p>
-    </div>
-  );
-};
-
-const moduleTimeTakeaway = (data: ModuleTimeData, t: TFunction) => {
-  if (data.rows.length === 0) return null;
-  const longest = data.rows.reduce((a, b) => (b.medianMinutes > a.medianMinutes ? b : a));
-  return t("statisticsLibrary.takeaway.moduleTime", {
-    title: longest.title,
-    time: writeModuleTime(longest.medianMinutes, moduleTimeUnit(data), t),
-  });
-};
-
-// ── TSQ-053 Roleplay length and attempts ───────────────────────
-
-const RoleplayAttempts = ({ data }: DataRendererProps<RoleplayAttemptsData>) => {
-  const { t } = useTranslation();
-  if (data.rows.length === 0) {
-    return <p className="text-sm text-typography-600">{t("statisticsLibrary.roleplay.none")}</p>;
-  }
-  return (
-    <table className="w-full text-sm" data-testid="statistics-roleplay-attempts">
-      <thead>
-        <tr className="text-left text-xs text-typography-600">
-          <th className="pb-2 font-normal">{t("statisticsLibrary.roleplay.title")}</th>
-          <th className="pb-2 text-right font-normal">
-            {t("statisticsLibrary.roleplay.finished")}
-          </th>
-          <th className="pb-2 text-right font-normal">{t("statisticsLibrary.roleplay.tries")}</th>
-          <th className="pb-2 text-right font-normal">{t("statisticsLibrary.roleplay.length")}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {data.rows.map(row => (
-          <tr key={row.itemId} className="border-t border-[#efebe0]">
-            <td className="max-w-0 truncate py-2 pr-3 text-typography-900" title={row.title}>
-              {row.title}
-            </td>
-            <td className="py-2 text-right">{row.learners}</td>
-            <td className="py-2 text-right">{row.averageAttempts ?? "—"}</td>
-            <td className="py-2 text-right">
-              {row.averageMinutes === null
-                ? "—"
-                : t("statisticsLibrary.measures.formatMinutes", { value: row.averageMinutes })}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-};
-
-const roleplayAttemptsTakeaway = (data: RoleplayAttemptsData, t: TFunction) => {
-  const tried = data.rows.filter(r => r.averageAttempts !== null && r.learners > 0);
-  if (tried.length === 0) return null;
-  const most = tried.reduce((a, b) =>
-    (b.averageAttempts ?? 0) > (a.averageAttempts ?? 0) ? b : a,
-  );
-  return t("statisticsLibrary.takeaway.roleplayTries", {
-    title: most.title,
-    attempts: most.averageAttempts,
-  });
-};
-
-// ── TSQ-065 Skill trend ────────────────────────────────────────
-
-const SkillTrend = ({ data }: DataRendererProps<SkillTrendData>) => {
-  const { t, i18n } = useTranslation();
-  const label = (skill: string) =>
-    i18n.exists(`statisticsLibrary.skills.names.${skill}`)
-      ? t(`statisticsLibrary.skills.names.${skill}`)
-      : humaniseType(skill);
-  const rows = useMemo(
-    () =>
-      data.skills.flatMap(s =>
-        s.points.map(point => ({
-          group: label(s.skill),
-          key: String(point.slice),
-          value: point.level,
-        })),
-      ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [data, i18n.language],
-  );
-  if (data.skills.length === 0) {
-    return <p className="text-sm text-typography-600">{t("statisticsLibrary.skillTrend.none")}</p>;
-  }
-  return (
-    <div data-testid="statistics-skill-trend">
-      <LineChart
-        data={rows}
-        options={lineOpts({
-          leftTitle: t("statisticsLibrary.skillTrend.level"),
-          bottomTitle: t("statisticsLibrary.skillTrend.slice"),
-          extra: { curve: "curveLinear" },
-        })}
-      />
-    </div>
-  );
-};
-
-const skillTrendTakeaway = (data: SkillTrendData, t: TFunction) => {
-  const moved = data.skills
-    .map(s => ({
-      skill: s.skill,
-      first: s.points[0].level,
-      latest: s.points[s.points.length - 1].level,
-    }))
-    .sort((a, b) => b.latest - b.first - (a.latest - a.first));
-  if (moved.length === 0) return null;
-  const top = moved[0];
-  return top.latest > top.first
-    ? t("statisticsLibrary.takeaway.skillTrend", {
-        skill: t(`statisticsLibrary.skills.names.${top.skill}`, {
-          defaultValue: humaniseType(top.skill),
-        }),
-        first: top.first,
-        latest: top.latest,
-      })
-    : t("statisticsLibrary.takeaway.skillTrendFlat");
-};
-
 export const CHART_RENDERERS: Record<string, ChartRenderer> = {
   "TSQ-001": { kind: "data", Component: HeadlineNumbers, bare: true },
   "TSQ-002": { kind: "data", Component: UsageOverTime, takeaway: usageTakeaway },
@@ -1942,14 +1626,6 @@ export const CHART_RENDERERS: Record<string, ChartRenderer> = {
   "TSQ-038": { kind: "data", Component: Measures, takeaway: coursesByStatusTakeaway },
   "TSQ-039": { kind: "data", Component: Measures, takeaway: participationTakeaway },
   "TSQ-042": { kind: "data", Component: CoursePerformance, takeaway: coursePerformanceTakeaway },
-  "TSQ-045": { kind: "data", Component: ModuleFunnel, takeaway: moduleFunnelTakeaway },
-  "TSQ-046": { kind: "data", Component: ModuleTime, takeaway: moduleTimeTakeaway },
-  "TSQ-053": { kind: "data", Component: RoleplayAttempts, takeaway: roleplayAttemptsTakeaway },
-  "TSQ-065": { kind: "data", Component: SkillTrend, takeaway: skillTrendTakeaway },
-  "TSQ-041": { kind: "data", Component: Measures, takeaway: courseFactsTakeaway },
-  "TSQ-043": { kind: "data", Component: TimeToFinish, takeaway: timeToFinishTakeaway },
-  "TSQ-063": { kind: "data", Component: Measures, takeaway: practiceRhythmTakeaway },
-  "TSQ-064": { kind: "data", Component: LearnerCourses, takeaway: learnerCoursesTakeaway },
   "TSQ-007": { kind: "data", Component: LearnerStatus, takeaway: learnerStatusTakeaway },
   "TSQ-008": { kind: "data", Component: TopLearners, takeaway: topLearnersTakeaway },
   "TSQ-009": { kind: "self", Component: LearnerTable },
