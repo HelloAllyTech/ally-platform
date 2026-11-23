@@ -1,6 +1,7 @@
 # Bug Hunter v2 daily job (chunk 08). Runs on the private-network VM, never in GitHub
 # Actions (ally-platform is public). Secrets live in a root-only EnvironmentFile:
-#   BUGHUNTER_GITHUB_TOKEN (GitHub App installation token), OPENAI_API_KEY,
+#   BUGHUNTER_GITHUB_APP_ID + BUGHUNTER_GITHUB_APP_KEY_FILE (the App's installation
+#   token is minted from them on each run, see github_app.py), OPENAI_API_KEY,
 #   GOOGLE_API_KEY, LANGSMITH_API_KEY, LANGSMITH_WORKSPACE_ID,
 #   BUGHUNTER_CHECKPOINT_DB_URL, AWS read-only CloudWatch credentials,
 #   BUGHUNTER_SPEND_BACKEND=db, BUGHUNTER_HOME=/var/lib/bug-hunter

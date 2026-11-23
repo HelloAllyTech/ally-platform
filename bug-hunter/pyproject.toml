@@ -24,6 +24,8 @@ tiktoken = ">=0.9,<1.0"
 langgraph = "^1.2"
 langgraph-checkpoint-postgres = "^3.2"
 python-dotenv = "^1.0"
+cryptography = "^50.0"
+boto3 = {version = "^1.35", optional = true}
 
 [tool.poetry.group.dev.dependencies]
 black = "^26.3.1"
@@ -32,6 +34,10 @@ flake8 = "^7.0.0"
 pytest = "^8.0.0"
 pytest-asyncio = "^0.23.0"
 pytest-mock = "^3.12.0"
+
+# On the VM only: CloudWatch Logs for the error-log signal (`pip install ".[vm]"`).
+[tool.poetry.extras]
+vm = ["boto3"]
 
 [tool.poetry.scripts]
 bug-hunter = "bug_hunter.cli:app"
