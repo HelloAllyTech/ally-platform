@@ -1,6 +1,7 @@
 import { usageContext } from 'src/billing/context/usage-context';
 import { UsageChannel, UsageKind } from 'src/billing/enum/billing.enum';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
+import { LedgerService } from 'src/billing/service/ledger.service';
 import { DataSource } from 'typeorm';
 import { isHealthPack } from '../../bot-draft/safety-pack/safety-packs';
 import { AiService } from '../../ai/service/ai.service';
@@ -41,6 +42,8 @@ export class SummaryService {
     private readonly dataSource: DataSource,
     private readonly ai: AiService,
     private readonly redis: RedisService,
+    // Stage 6: no summary once the chatbot's budget is empty. Optional for the specs.
+    @Optional() private readonly ledger?: LedgerService,
   ) {}
 
   /** After a reply. Never throws. True when a new summary was stored. */
@@ -66,6 +69,11 @@ export class SummaryService {
     conversationId: string,
   ): Promise<boolean> {
     if (!UUID.test(conversationId)) return false;
+    // Stage 6: skipped once the budget is empty; the reply that emptied it (its reservation is
+    // still held) does not trigger one either.
+    if (this.ledger && !(await this.ledger.budgetHasRoom(chatbot.id))) {
+      return false;
+    }
     const lock = `summary:${conversationId}`;
     try {
       const fold = await this.toFold(chatbot.id, conversationId);

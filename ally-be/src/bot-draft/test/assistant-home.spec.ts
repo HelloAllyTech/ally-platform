@@ -77,12 +77,16 @@ describe('Assistant home fields', () => {
   });
 
   it('writes the disclaimer to the settings and the page together', () => {
-    const write = HOME_FIELDS.disclaimer.write(
-      'Not medical advice.',
-      stateWith(),
-    );
-    expect(write.chatbot?.settings?.disclaimerText).toBe('Not medical advice.');
-    expect(write.page?.branding?.disclaimer).toBe('Not medical advice.');
+    const notice = 'Not medical advice. An AI and our team may read this chat.';
+    const write = HOME_FIELDS.disclaimer.write(notice, stateWith());
+    expect(write.chatbot?.settings?.disclaimerText).toBe(notice);
+    expect(write.page?.branding?.disclaimer).toBe(notice);
+  });
+
+  it('refuses a notice that no longer says an AI and people may read the chat (stage 4)', () => {
+    expect(() =>
+      HOME_FIELDS.disclaimer.write('Not medical advice.', stateWith()),
+    ).toThrow('an AI and people at your organisation may read the chat');
   });
 
   it("refuses a disclaimer that drops the safety pack's", () => {
@@ -92,7 +96,7 @@ describe('Assistant home fields', () => {
     );
     expect(() =>
       HOME_FIELDS.disclaimer.write(
-        `${PACK.disclaimer} Call us any time.`,
+        `${PACK.disclaimer} An AI and our team may read this chat.`,
         state,
       ),
     ).not.toThrow();
@@ -963,7 +967,13 @@ describe('Your instructions, checked like the builder checks (chunk 20d-2)', () 
     // Exactly what's sent (Q3-fast, gaps item 10): the real numbers, then the bot's helplines;
     // never the platform's old "your local crisis line" template.
     // A helpline the reply already gives isn't repeated (chunk H1 Part D).
-    expect(home.safety.atRiskReply).toBe(GENERAL_CRISIS_TEXT);
+    // R6: the bot's own numbers first, then the findahelpline.com link; no country defaults.
+    expect(home.safety.atRiskReply).toBe(
+      GENERAL_CRISIS_TEXT.replace(
+        'you can find a helpline near you at',
+        'call 14416, or find a helpline near you at',
+      ),
+    );
     expect(home.safety.atRiskReply).not.toMatch(/your local crisis line/i);
     // Without the settings service the box just has no default.
     const bare = await harness().service.get('bot-1');

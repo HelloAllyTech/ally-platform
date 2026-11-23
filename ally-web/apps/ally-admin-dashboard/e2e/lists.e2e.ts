@@ -13,8 +13,8 @@ import type { Page } from "@playwright/test";
  */
 
 const open = async (page: Page) => {
-  await page.goto(`/dev/assistant-home/${BOT_ID}?section=lists`);
-  await expect(page.getByTestId("section-lists")).toBeVisible();
+  await page.goto(`/dev/assistant-home/${BOT_ID}?section=knowledge&part=lists`);
+  await expect(page.getByTestId("section-knowledge")).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
 };
 
@@ -129,6 +129,6 @@ test.describe("Lists", () => {
     await expect(page.getByRole("menuitem", { name: /Glow Salon/ })).toBeVisible();
     await check(page);
     await page.getByRole("menuitem", { name: /Glow Salon/ }).click();
-    await expect(page).toHaveURL(/\/dev\/assistant-home\/7a0d2b63-[^?]+\?section=lists$/);
+    await expect(page).toHaveURL(/\/dev\/assistant-home\/7a0d2b63-[^?]+\?section=knowledge$/);
   });
 });

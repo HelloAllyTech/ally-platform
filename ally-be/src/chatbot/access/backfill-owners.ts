@@ -45,7 +45,7 @@ export async function backfillOwners(
        LEFT JOIN users u ON u.id = b.created_by
       WHERE NOT EXISTS (
               SELECT 1 FROM chatbot_members m
-               WHERE m.chatbot_id = b.id AND m.role = 'owner')
+               WHERE m.chatbot_id = b.id AND 'owner' = ANY(m.roles))
       ORDER BY b."createdAt" ASC`,
   );
   const report: OwnerBackfillReport = { dryRun, assigned: [], needsOwner: [] };
@@ -62,9 +62,12 @@ export async function backfillOwners(
     }
     if (!dryRun) {
       await db.query(
-        `INSERT INTO chatbot_members (chatbot_id, user_id, role, created_by)
-         VALUES ($1, $2, 'owner', NULL)
-         ON CONFLICT (chatbot_id, user_id) DO UPDATE SET role = 'owner'`,
+        // Dual write (Stage 1b): the old single role and the set; an existing member keeps the
+        // roles they hold and gains owner.
+        `INSERT INTO chatbot_members (chatbot_id, user_id, role, roles, created_by)
+         VALUES ($1, $2, 'owner', ARRAY['owner']::text[], NULL)
+         ON CONFLICT (chatbot_id, user_id) DO UPDATE SET role = 'owner',
+           roles = ARRAY(SELECT DISTINCT unnest(chatbot_members.roles || ARRAY['owner']::text[]))`,
         [row.id, row.created_by],
       );
     }

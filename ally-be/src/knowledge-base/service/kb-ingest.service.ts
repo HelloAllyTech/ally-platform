@@ -2,6 +2,14 @@ import { LimitsService } from 'src/billing/service/limits.service';
 import { usageContext } from 'src/billing/context/usage-context';
 import { UsageChannel, UsageKind } from 'src/billing/enum/billing.enum';
 import { createHash } from 'crypto';
+import {
+  KB_PAUSED_MESSAGES,
+  KB_PAUSED_PREFIX,
+  creditPauseKind,
+} from 'src/billing/util/credit-pause';
+import { TEMPLATE_KNOWLEDGE_TAG } from '../constants/template-knowledge';
+import { KnowledgeReviewService } from '../privacy/knowledge-review.service';
+import { MIGRATION_COPY_TAG } from '../constants/migration-copy';
 import { Injectable, Optional } from '@nestjs/common';
 import { AiService } from 'src/ai/service/ai.service';
 import { KnowledgeChunkItemRequest } from 'src/ai/dto/knowledge.dto';
@@ -25,6 +33,13 @@ import { KbDocumentTenantRepository } from '../repository/kb-document-tenant.rep
 import { KbDocumentRepository } from '../repository/kb-document.repository';
 import { Chunk, chunkDocument } from '../util/chunker';
 
+/** The paused-job kind for indexing (stage 6, `credit_paused_jobs.kind`). */
+export const INDEXING_JOB = 'indexing';
+/** Stage 6: a document's status message while its indexing waits for credits. */
+export const KB_PAUSED_OUT_OF_CREDITS = KB_PAUSED_MESSAGES.out_of_credits;
+/** The resume sweep's name for documents left paused with no job row. */
+export const KB_PAUSED_SWEEP = 'paused-documents';
+
 /**
  * Runs one document from raw source to searchable passages.
  *
@@ -46,7 +61,37 @@ export class KbIngestService {
     private readonly s3Service: S3Service,
     // CR1: owner-side runs and tokens (optional, so existing specs build without it).
     @Optional() private readonly limits?: LimitsService,
-  ) {}
+    // Stage 5: personal-data review before a chatbot's own document is indexed. Optional for specs.
+    @Optional() private readonly review?: KnowledgeReviewService,
+  ) {
+    // Stage 6: indexing paused at $0 runs again once the builder has credits.
+    this.limits?.onResume(INDEXING_JOB, async (job) => {
+      const action = job.payload.action === 'reindex' ? 'reindex' : 'ingest';
+      await this.run(String(job.payload.documentId), action);
+    });
+    this.limits?.onSweep(KB_PAUSED_SWEEP, () => this.resumePausedDocuments());
+  }
+
+  /**
+   * Run again every document left waiting at a "Paused:" status message with no paused job to
+   * resume it (its job was claimed but the run failed, or the pause row was never written). Its
+   * own gate pauses it again if the reason still holds, so this is safe to repeat.
+   */
+  async resumePausedDocuments(limit = 200): Promise<number> {
+    const rows: Array<{ id: string }> = await this.documentRepository.query(
+      `SELECT d.id FROM kb_documents d
+        WHERE d.status = $1 AND d.status_message LIKE $2 AND d.archived_at IS NULL
+          AND NOT EXISTS (SELECT 1 FROM credit_paused_jobs j
+                           WHERE j.kind = $3 AND j.subject_id = d.id::text)
+        ORDER BY d."updatedAt" LIMIT $4`,
+      [KbDocumentStatus.PENDING, `${KB_PAUSED_PREFIX}%`, INDEXING_JOB, limit],
+    );
+    for (const row of rows) {
+      // A document indexed before has text to re-chunk; the gate re-checks credits either way.
+      await this.run(row.id, 'ingest');
+    }
+    return rows.length;
+  }
 
   static hash(text: string): string {
     return createHash('sha256').update(text, 'utf8').digest('hex');
@@ -91,10 +136,26 @@ export class KbIngestService {
           ? { text: document.rawText, pages: [], sections: [] }
           : await this.extract(document);
 
+      // Stage 5: a chatbot's own document with personal data waits at `needs_review` for its
+      // owner, and nothing is indexed (`extract` records when the source was read).
+      if (await this.review?.holdIfPersonal(document, extracted.text)) {
+        return;
+      }
+
       // CR1: indexing's embeddings are billed to the document's creator and, when an assistant
       // uses it, that assistant. One run id per ingest, so a redelivered SQS message re-meters
       // nothing it already recorded.
-      const chatbotId = await this.chatbotUsing(document.id);
+      // Stage 3 (R4): the first indexing of an Ally template's knowledge copied onto a chatbot is
+      // Ally's cost: its own kind, no creator, never charged to the builder. A later edit by the
+      // builder re-indexes as their own document, as below.
+      // Stage 5: the migration's per-chatbot copies of shared documents are charged to nobody yet.
+      const templateCopy =
+        action === 'ingest' &&
+        ((document.tags ?? []).includes(TEMPLATE_KNOWLEDGE_TAG) ||
+          (document.tags ?? []).includes(MIGRATION_COPY_TAG));
+      const chatbotId = templateCopy
+        ? (document.ownerChatbotId ?? (await this.chatbotUsing(document.id)))
+        : await this.chatbotUsing(document.id);
       // CR1: re-indexing an assistant's document is an owner-side run. Counted here, never
       // refused: the request was already accepted and nobody is waiting on this queue.
       if (action === 'reindex' && chatbotId && document.createdBy) {
@@ -106,13 +167,45 @@ export class KbIngestService {
           )
           .catch(() => undefined);
       }
+      // Stage 6: a builder's indexing is paid from their free balance; at $0 it is PAUSED (kept
+      // and resumed by the ledger once credits exist), never failed. Ally's template copy is not.
+      let payerAccountId: string | null = null;
+      if (chatbotId && !templateCopy && this.limits) {
+        const gate = await this.limits.backgroundGate({
+          kind: INDEXING_JOB,
+          subjectId: document.id,
+          creatorUserId: document.createdBy ?? null,
+          chatbotId,
+          runKey: `indexing:${document.id}:${document.updatedAt?.getTime?.() ?? 0}`,
+          ownerRunKind: 'indexing',
+          payload: { documentId: document.id, action },
+        });
+        if (!gate.ok && gate.paused) {
+          const kind = creditPauseKind(gate.reason);
+          this.logger.info(
+            `Indexing of document ${document.id} paused (${gate.reason})`,
+          );
+          // The visible paused state (never failed): waiting, with its real reason. The ledger's
+          // resume sweep runs it again once the reason no longer holds.
+          await this.documentRepository.update(
+            { id: document.id },
+            {
+              status: KbDocumentStatus.PENDING,
+              statusMessage: KB_PAUSED_MESSAGES[kind],
+            },
+          );
+          return;
+        }
+        if (gate.ok) payerAccountId = gate.accountId;
+      }
       await usageContext.run(
         {
           runId: `${action}:${document.id}:${document.updatedAt?.getTime?.() ?? 0}`,
           channel: UsageChannel.OWNER,
-          runKind: UsageKind.INDEXING,
-          creatorUserId: document.createdBy ?? null,
+          runKind: templateCopy ? UsageKind.TEMPLATE_INDEX : UsageKind.INDEXING,
+          creatorUserId: templateCopy ? null : (document.createdBy ?? null),
           chatbotId,
+          payerAccountId,
         },
         () => this.chunkAndIndex(document, extracted, action),
       );
@@ -171,6 +264,8 @@ export class KbIngestService {
       {
         rawText: extracted.text,
         contentHash: KbIngestService.hash(extracted.text),
+        // Stage 5: when the source was last read (staleness, "Read again").
+        lastReadAt: new Date(),
         // Only fill in a title or language the admin left blank — never overwrite what they typed.
         ...(document.title.trim()
           ? {}

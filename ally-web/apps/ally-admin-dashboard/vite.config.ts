@@ -13,13 +13,13 @@ import { testResourceLimits } from "../../vitest.resource-limits";
 const projectRoot = __dirname;
 
 /**
- * `/b/<slug>` is the bot page (b.html). The dev server and `vite preview` would otherwise answer it
+ * `/chat/<id>` (stage 7) and old `/b/<slug>` links are the bot page (b.html). The dev server and `vite preview` would otherwise answer it
  * with the dashboard's index.html. Deployed, the CDN does answer with index.html, and a script at
  * the top of it hands over to b.html in place.
  */
 function botPageRoutes(): Plugin {
   const rewrite = (req: { url?: string }, _res: unknown, next: () => void) => {
-    if (req.url && /^\/b\/[^/?#]+\/?(\?.*)?$/.test(req.url)) req.url = "/b.html";
+    if (req.url && /^\/(b|chat)\/[^/?#]+\/?(\?.*)?$/.test(req.url)) req.url = "/b.html";
     next();
   };
   return {

@@ -79,6 +79,8 @@ export const ENDPOINTS = {
   /** The instructions a run would start from, without running (chunk 20d-2). */
   AGENT_INSTRUCTIONS: 'api/v1/agent/instructions',
   AGENT_INSTRUCTIONS_CHECK: 'api/v1/agent/instructions/check',
+  /** The model judge on owner text at Apply, after the regex check. Fails closed. */
+  AGENT_INSTRUCTIONS_JUDGE: 'api/v1/agent/instructions/judge',
   /** The same run as Server-Sent Events (Preview): status and steps live, then `final`. */
   AGENT_RUN_STREAM: 'api/v1/agent/run/stream',
   /** Onboarding builder (chunk 20a). 404 while ally-ai's BUILDER__ENABLED is off. */

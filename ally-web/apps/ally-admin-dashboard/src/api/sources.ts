@@ -60,6 +60,20 @@ export const sourcesApi = baseAPI.injectEndpoints({
       }),
       invalidatesTags: [TAG_TYPES.SOURCES],
     }),
+    /** "Read again" on the Overview's staleness nudge: refetch one source, re-index if it changed. */
+    readSourceAgain: builder.mutation<
+      { documentId: string; changed: boolean; confirmed: boolean; lastReadAt: string },
+      { id: string; documentId: string }
+    >({
+      query: ({ id, documentId }) => ({
+        url: ApiEndpoints.CHATBOTS.SOURCE_READ_AGAIN(id, documentId),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: (_r, _e, { id }) => [
+        TAG_TYPES.SOURCES,
+        { type: TAG_TYPES.CHATBOT_DETAIL, id: `${id}:home` },
+      ],
+    }),
     getFoundPages: builder.query<FoundPages, string>({
       query: id => ({ url: ApiEndpoints.BOT_DRAFTS.PAGES_FOUND(id), method: HttpMethod.GET }),
     }),
@@ -84,6 +98,7 @@ export const sourcesApi = baseAPI.injectEndpoints({
 
 export const {
   useGetSourcesQuery,
+  useReadSourceAgainMutation,
   usePreviewSourceMutation,
   useRemoveSourceMutation,
   useRestoreSourceMutation,

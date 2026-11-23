@@ -5,12 +5,18 @@ import { LoggerService } from 'src/logger/logger.service';
 import { BillingModel } from '../entity/billing-model.entity';
 import { BillingModelPrice } from '../entity/billing-model-price.entity';
 import { UsageEvent } from '../entity/usage-event.entity';
-import { UsageChannel, UsageKind } from '../enum/billing.enum';
+import {
+  ALLY_PAID_USAGE_KINDS,
+  UsageChannel,
+  UsageKind,
+} from '../enum/billing.enum';
 import {
   canonicalBillingProvider,
   costMicros,
   priceAt,
 } from '../util/pricing.util';
+import { fallbackCostMicros } from '../constants/credits.constants';
+import { AI_TASK_REGISTRY } from 'src/llm/constants/ai-task-registry.constants';
 
 /** One metered call, as ally-ai reports it (an `llm_usage` SQS message with CR1's attribution). */
 export interface MeteredCall {
@@ -36,6 +42,12 @@ export interface MeteredCall {
   priceId?: string | null;
   occurredAt?: Date;
   detail?: Record<string, unknown> | null;
+  /** Stage 6: the account stamped on the run when it started (echoed back by ally-ai). */
+  payerAccountId?: string | null;
+  /** Stage 6: the end person the run was for. */
+  endPersonId?: string | null;
+  /** Stage 6: the AI task registry id, or the raw `llm_usage.task` label when it has no row. */
+  task?: string | null;
 }
 
 /**
@@ -101,6 +113,8 @@ export class UsageEventService {
     | 'draftId'
     | 'creatorUserId'
     | 'conversationId'
+    | 'payerAccountId'
+    | 'endPersonId'
   > | null {
     if (!metadata) return null;
     const runId = str(metadata.run_id);
@@ -123,7 +137,17 @@ export class UsageEventService {
       draftId,
       creatorUserId: Number.isFinite(creator) && creator > 0 ? creator : null,
       conversationId: str(metadata.conversation_id)?.slice(0, 120) ?? null,
+      payerAccountId: uuidOrNull(metadata.payer_account_id),
+      endPersonId: uuidOrNull(metadata.end_person_id),
     };
+  }
+
+  /** The AI task registry id for an `llm_usage.task` label (stage 6), else the label itself. */
+  static taskIdFor(label: unknown): string | null {
+    const text = str(label);
+    if (!text) return null;
+    const row = AI_TASK_REGISTRY.find((entry) => entry.task === text);
+    return (row?.id ?? text).slice(0, 80);
   }
 
   /** Record one call. Returns the stored event, or null when it was already recorded. */
@@ -153,6 +177,11 @@ export class UsageEventService {
         priced?.price ?? null,
       );
     }
+    // Stage 6: an unpriced call is charged a pessimistic fallback, never nothing. `costMicros`
+    // stays NULL so `reprice` still finds it; the ledger reads `chargedMicros`.
+    const charged = cost ?? fallbackCostMicros(call);
+    const task =
+      call.task ?? UsageEventService.taskIdFor(call.detail?.task ?? null);
 
     return this.dataSource.transaction(async (manager) => {
       const owner = await this.ownerOf(manager, call);
@@ -160,8 +189,9 @@ export class UsageEventService {
         `INSERT INTO usage_events
            ("createdAt", "creatorUserId", "chatbotId", "draftId", "conversationId", "channel",
             "runId", "step", "seq", "kind", "provider", "modelName", "modelId", "priceId",
-            "inputTokens", "cachedTokens", "outputTokens", "units", "unit", "costMicros", "detail")
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+            "inputTokens", "cachedTokens", "outputTokens", "units", "unit", "costMicros", "detail",
+            "payerAccountId", "endPersonId", "task", "chargedMicros")
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
          ON CONFLICT ("runId", "kind", "step", "seq") DO NOTHING
          RETURNING *`,
         [
@@ -186,6 +216,10 @@ export class UsageEventService {
           call.unit ?? null,
           cost,
           call.detail ? JSON.stringify(call.detail) : null,
+          call.payerAccountId ?? null,
+          call.endPersonId ?? null,
+          task,
+          charged,
         ],
       );
       if (!rows.length) return null;
@@ -193,6 +227,10 @@ export class UsageEventService {
         ...rows[0],
         costMicros:
           rows[0].costMicros === null ? null : Number(rows[0].costMicros),
+        chargedMicros:
+          rows[0].chargedMicros === null || rows[0].chargedMicros === undefined
+            ? null
+            : Number(rows[0].chargedMicros),
       } as Partial<UsageEvent>);
       for (const listener of this.listeners) {
         await listener.onUsageRecorded(manager, event);
@@ -240,7 +278,8 @@ export class UsageEventService {
       );
       if (cost === null) continue;
       await this.dataSource.query(
-        `UPDATE usage_events SET "costMicros" = $1, "modelId" = $2, "priceId" = $3
+        // Stage 6: the fallback charge is replaced in the ledger by the nightly rebuild.
+        `UPDATE usage_events SET "costMicros" = $1, "chargedMicros" = $1, "modelId" = $2, "priceId" = $3
           WHERE id = $4 AND "costMicros" IS NULL`,
         [cost, found!.model.id, found!.price!.id, row.id],
       );
@@ -310,6 +349,11 @@ export class UsageEventService {
   ): Promise<{ creatorUserId: number | null; chatbotId: string | null }> {
     let chatbotId = call.chatbotId ?? null;
     let creator = call.creatorUserId ?? null;
+    // Stage 3 (R4): a template's knowledge is indexed at Ally's cost. Never look a payer up for it,
+    // so it is never charged to the chatbot's builder. Stage 9: nor is the pack release suite.
+    if (ALLY_PAID_USAGE_KINDS.has(call.kind)) {
+      return { creatorUserId: null, chatbotId };
+    }
     try {
       if (chatbotId && creator === null) {
         const [row] = await manager.query(

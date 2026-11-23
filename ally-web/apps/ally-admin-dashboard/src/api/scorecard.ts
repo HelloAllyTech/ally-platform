@@ -42,11 +42,43 @@ export interface Scorecard {
   } | null;
 }
 
+/** A count the server lets the owner see: the number, or "fewer than 5" (D8). */
+export type SafeCount = number | { lessThan: number };
+
+export type OverviewRange = 7 | 30 | 90;
+
+/** ally-be `GET :id/home/overview`: counts only, with groups under 5 already held back. */
+export interface HomeOverview {
+  range: OverviewRange;
+  timeZone: string;
+  from: string;
+  to: string;
+  conversations: SafeCount;
+  people: SafeCount;
+  days: { day: string; conversations: SafeCount; people: SafeCount }[];
+  answered: { share: number | null; fewerThan5: boolean };
+  handedToPerson: { count: SafeCount; medianWaitMinutes: number | null };
+  ratings: { up: SafeCount; down: SafeCount };
+  byChannel: { key: string; count: SafeCount }[];
+  byLanguage: { key: string; count: SafeCount }[];
+  topUnanswered: (
+    | { kind: "question"; text: string; count: number }
+    | { kind: "theme"; theme: string; count: SafeCount }
+  )[];
+}
+
 /** The live scorecard on the Overview (chunk Q2a). */
 export const scorecardApi = baseAPI.injectEndpoints({
   endpoints: builder => ({
     getScorecard: builder.query<Scorecard, string>({
       query: id => ({ url: ApiEndpoints.CHATBOTS.SCORECARD(id), method: HttpMethod.GET }),
+      providesTags: [TAG_TYPES.SCORECARD],
+    }),
+    getHomeOverview: builder.query<HomeOverview, { id: string; range: OverviewRange }>({
+      query: ({ id, range }) => ({
+        url: ApiEndpoints.CHATBOTS.HOME_OVERVIEW(id, range),
+        method: HttpMethod.GET,
+      }),
       providesTags: [TAG_TYPES.SCORECARD],
     }),
     answerUnanswered: builder.mutation<
@@ -83,6 +115,7 @@ export const scorecardApi = baseAPI.injectEndpoints({
 
 export const {
   useGetScorecardQuery,
+  useGetHomeOverviewQuery,
   useAnswerUnansweredMutation,
   useCorrectFeedbackMutation,
   useMarkFeedbackFineMutation,

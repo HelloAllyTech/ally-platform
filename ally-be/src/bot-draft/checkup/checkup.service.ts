@@ -50,9 +50,6 @@ import type { PlannedCase } from './checkup-generation';
 const withoutSourcesFooter = (reply: string): string =>
   reply.replace(/\n\nSources:\n[\s\S]*$/, '');
 
-/** A checkup runs this long after the last change, so a burst of edits runs it once. */
-const AFTER_CHANGE_DELAY_MS = 2 * 60 * 1000;
-
 const CHECKUP_PROMPT_CODES = ['ally_ai_checkup_judge'] as const;
 
 export const CHECKUP_LIMITS = {
@@ -109,6 +106,8 @@ export interface CheckupResultView {
   origin: ChatbotCheckupCase['origin'];
   citations: ChatbotCheckupResult['citations'];
   ms: number;
+  /** How the engine handled the reply (`crisis`, `rag`…), for checks that read it (stage 4). */
+  handledBy?: string;
 }
 
 export interface CheckupRunView {
@@ -386,25 +385,13 @@ export class CheckupService {
     return run;
   }
 
-  private readonly pending = new Map<string, NodeJS.Timeout>();
-
   /**
-   * A checkup run after a change, 2 minutes after the last one (chunk 20a-2), within the daily
-   * limit. Nothing happens for an assistant without checkup questions.
+   * Stage 4: saved tests are no longer re-run automatically after a change (it cost a full run of
+   * model calls on every edit); they run only when the owner asks. Kept as a no-op so an old call
+   * site can't start one.
    */
-  scheduleAfterChange(
-    chatbotId: string,
-    delayMs = AFTER_CHANGE_DELAY_MS,
-  ): void {
-    clearTimeout(this.pending.get(chatbotId));
-    const timer = setTimeout(() => {
-      this.pending.delete(chatbotId);
-      void this.start(chatbotId, { trigger: 'after_change' }).catch(() => {
-        // No questions yet, or the day's runs are used up: the next change tries again.
-      });
-    }, delayMs);
-    timer.unref?.();
-    this.pending.set(chatbotId, timer);
+  scheduleAfterChange(...ignored: unknown[]): void {
+    void ignored;
   }
 
   /** Thread questions in order, one conversation each; every other question on its own. */
@@ -754,18 +741,23 @@ export class CheckupService {
     chatbotId: string,
     caseIds: string[],
     draftId: string | null,
-    trigger: 'onboarding' | 'try' = 'onboarding',
+    trigger: 'onboarding' | 'try' | 'eval' = 'onboarding',
+    /** Stage 4: the crisis suite's runs name their suite, so they never count as a checkup. */
+    suite: string | null = null,
   ): Promise<CheckupResultView[]> {
     // CR1: asking now is an owner-side run on the creator's plan.
     const [creator] = await this.runs.manager.query(
       `SELECT created_by AS "createdBy" FROM chatbots WHERE id = $1`,
       [chatbotId],
     );
-    await this.limits?.assertOwnerRun(
-      creator?.createdBy,
-      `checkup:${chatbotId}:${randomUUID()}`,
-      'checkup',
-    );
+    // Stage 9: the safety-pack release suite is Ally's cost, never the builder's.
+    if (!usageContext.current()?.allyPaidKind) {
+      await this.limits?.assertOwnerRun(
+        creator?.createdBy,
+        `checkup:${chatbotId}:${randomUUID()}`,
+        'checkup',
+      );
+    }
     const cases = await this.cases.find({
       where: { chatbotId, id: In(caseIds), deletedAt: IsNull() },
     });
@@ -774,6 +766,7 @@ export class CheckupService {
         chatbotId,
         draftId,
         trigger,
+        suite,
         status: 'running',
         total: cases.length,
         done: 0,
@@ -914,6 +907,7 @@ export class CheckupService {
             origin: item.origin,
             citations: row.citations,
             ms: row.ms,
+            handledBy: row.handledBy,
           },
         ];
       }),

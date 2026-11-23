@@ -145,7 +145,8 @@ describe('SourcesService', () => {
       expect.stringContaining('DELETE FROM chatbot_documents'),
       ['bot-1', ['doc-fees']],
     );
-    expect(h.checkup.scheduleAfterChange).toHaveBeenCalledWith('bot-1');
+    // Stage 4: no automatic re-run of saved tests after a change.
+    expect(h.checkup.scheduleAfterChange).not.toHaveBeenCalled();
     const listed = await h.service.list('bot-1');
     expect(listed[1]).toMatchObject({ removed: true, details: 2, eventId });
   });

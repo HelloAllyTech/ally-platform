@@ -1,4 +1,6 @@
+import { safetySettingsOf } from '../safety/safety-settings';
 import { packRulesBlock } from '../../bot-draft/safety-pack/safety-packs';
+import { packOverride } from '../../bot-draft/safety-pack/live-packs';
 import type {
   AgentRunRequest,
   KnowledgeAnswerRequest,
@@ -90,30 +92,35 @@ function hasCreateTool(
 
 function personaRequest(turn: ChatTurn): KnowledgeAnswerRequest['persona'] {
   const persona = turn.chatbot.persona ?? {};
+  // Stage 9: the pack is read from its current release (`packFor`); a curator's suite run on a
+  // draft release tests the draft pack on whichever chatbot it runs against.
+  const packId = packOverride()?.packId ?? turn.chatbot.safetyPack;
   const out = {
     display_name: persona.displayName?.trim() || undefined,
     system_prompt: persona.systemPrompt?.trim() || undefined,
     tone: persona.tone?.trim() || undefined,
-    // The bot's safety pack and its owner's Never rules (chunk 20a), on every run, in their own
-    // field: an editor's instructions can't remove them.
-    safety_rules:
-      packRulesBlock(
-        turn.chatbot.safetyPack,
-        [
-          ...(turn.chatbot.rules?.never ?? []),
-          // Topics the owner asked it not to talk about (chunk 20a-2).
-          ...(turn.chatbot.rules?.avoid ?? []).map(
-            (topic) => `Talk about ${topic}`,
-          ),
-        ],
-        // SP1: a health decline may name the bot's helpline, and offer booking only when it can.
-        {
-          helpline: turn.settings?.helplineNumbers,
-          hasCreateTool: hasCreateTool(turn.chatbot.settings),
-        },
-      ) ?? undefined,
+    // The base safety block (stage 4), the bot's safety pack and its owner's Never rules (chunk
+    // 20a), on every run, in their own field: an editor's instructions can't remove them.
+    safety_rules: packRulesBlock(
+      packId,
+      [
+        ...(turn.chatbot.rules?.never ?? []),
+        // Topics the owner asked it not to talk about (chunk 20a-2).
+        ...(turn.chatbot.rules?.avoid ?? []).map(
+          (topic) => `Talk about ${topic}`,
+        ),
+      ],
+      // SP1: a health decline may name the bot's helpline, and offer booking only when it can.
+      {
+        helpline: turn.settings?.helplineNumbers,
+        hasCreateTool: hasCreateTool(turn.chatbot.settings),
+        // Stage 4: the base block (every bot, pack or not) is strictest unless adults-only.
+        audienceAge: safetySettingsOf(turn.chatbot.settings as never)
+          .audienceAge,
+      },
+    ),
     // The id too: for a health pack, ally-ai's check refuses diagnosis and dosing in code.
-    safety_pack: turn.chatbot.safetyPack || undefined,
+    safety_pack: packId || undefined,
     // And for the check, which declines a reply touching one.
     avoid_topics: turn.chatbot.rules?.avoid?.length
       ? turn.chatbot.rules.avoid

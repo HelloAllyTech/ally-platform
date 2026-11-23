@@ -17,6 +17,17 @@ export type LimitReason =
   | 'owner_runs';
 
 /**
+ * Every reason a turn got no run. The stage 6 credit states are answered by the fixed notification
+ * (`blocked-notice.ts`), not by these replies.
+ */
+export type TurnBlockReason =
+  | LimitReason
+  /** Stage 6: OUT_OF_CREDITS (no payer, budget, person limit, or a stopped usage feed). */
+  | 'out_of_credits'
+  /** Stage 6: the owner testing with no free balance. */
+  | 'owner_credits';
+
+/**
  * Fixed, honest replies, in the person's language like the run-failed reply (no AI call). Never a
  * dollar or a plan price: customers and owners don't see those.
  */

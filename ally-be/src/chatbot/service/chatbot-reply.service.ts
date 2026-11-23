@@ -183,7 +183,44 @@ export class ChatbotReplyService {
         : { archivedAt: IsNull(), chatbotId: IsNull() },
       order: { priority: 'ASC', createdAt: 'ASC' },
     });
-    return ChatbotReplyService.resolve(rows, chatbotId);
+    const resolved = ChatbotReplyService.resolve(rows, chatbotId);
+    if (!chatbotId || (await this.globalFallback())) return resolved;
+    // Stage 5 (D6): once every chatbot has its own copies, a builder's chatbot answers from its
+    // copies alone. A mandatory global (crisis, STOP, START) is never dropped, so a reply added
+    // after the copy still protects every chatbot until it is copied too.
+    return resolved.filter((row) => Boolean(row.chatbotId) || row.mandatory);
+  }
+
+  private fallbackCache: { value: boolean; at: number } | null = null;
+
+  /**
+   * Whether globals without a copy still apply to a chatbot: until the quick-reply copy has run
+   * (global setting `quick_reply_copy.doneAt`), or while ASSISTANT_GLOBAL_QUICK_REPLY_FALLBACK is
+   * `true`. Cached for a minute; a failed read keeps the globals (the safe side).
+   */
+  private async globalFallback(): Promise<boolean> {
+    if (
+      String(process.env.ASSISTANT_GLOBAL_QUICK_REPLY_FALLBACK ?? '')
+        .trim()
+        .toLowerCase() === 'true'
+    ) {
+      return true;
+    }
+    const now = Date.now();
+    if (this.fallbackCache && now - this.fallbackCache.at < 60_000) {
+      return this.fallbackCache.value;
+    }
+    let value = true;
+    try {
+      const rows = (await this.templateRepository.manager.query(
+        `SELECT value->>'doneAt' AS done FROM global_settings WHERE name = 'quick_reply_copy' LIMIT 1`,
+      )) as { done: string | null }[];
+      value = !rows?.[0]?.done;
+    } catch {
+      value = true;
+    }
+    this.fallbackCache = { value, at: now };
+    return value;
   }
 
   /** Pure resolution over already-loaded rows — see `effective`. */

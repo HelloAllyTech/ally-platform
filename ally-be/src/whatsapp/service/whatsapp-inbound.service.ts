@@ -51,8 +51,16 @@ import { HandoverService } from 'src/chatbot/handover/handover.service';
 import { ConversationService } from 'src/chatbot/service/conversation.service';
 import { ConnectorService } from 'src/chatbot/service/connector.service';
 import { withFirstMessageParts } from 'src/chatbot/engine/first-reply';
+import { startNotice } from 'src/chatbot/safety/chat-notice';
+import { offReasonOf } from 'src/chatbot/safety/off-message';
+import { replyLanguageOf } from 'src/chatbot/engine/reply-language';
 import { MAX_HISTORY_MESSAGES } from 'src/chatbot/engine/knowledge-request';
 import { WaSharedStoreWriter } from '../shared-store/wa-shared-store.writer';
+import { ChatPrivacyService } from 'src/chatbot/privacy/chat-privacy.service';
+import { AnswerConflictService } from 'src/chatbot/knowledge/answer-conflict.service';
+
+/** Stage 6: the blocked states' fixed notification, at most once a day per number per chatbot. */
+const BLOCKED_NOTICE_TTL_SECONDS = 86_400;
 
 /**
  * Opt-out / opt-in words, recognised in code regardless of what templates exist.
@@ -121,8 +129,8 @@ function isRetryableSendFailure(error: unknown): boolean {
  *   6. identity      — who is asking, for the bot's "who can chat" list and per-organisation
  *                      knowledge.
  *   7. decide        — the engine: keyword replies first (so a crisis reply never depends on a
- *                      model call), then the access gate (with the crisis classifier BEFORE any
- *                      refusal), then the answer, concurrent with the crisis classifier.
+ *                      model call), then the access gate (a refusal runs only the free keyword
+ *                      crisis check, R1), then the answer, concurrent with the crisis classifier.
  *   8. send          — persisted as `queued` BEFORE the send, so a crash is visible.
  *
  * THE ONE INVARIANT: this service throws only BEFORE it has sent anything. After a send it records
@@ -170,6 +178,9 @@ export class WhatsAppInboundService {
     /** Memory, light (chunk 8a): applied after the reply's copy reaches the shared store. */
     @Optional() private readonly memory?: MemoryService,
     @Optional() private readonly summaries?: SummaryService,
+    /** Stage 5: erase in chat and memory consent; conflicts stored as owner questions. */
+    @Optional() private readonly privacy?: ChatPrivacyService,
+    @Optional() private readonly answerConflict?: AnswerConflictService,
   ) {}
 
   async handle(inbound: InboundWhatsAppMessage): Promise<void> {
@@ -218,7 +229,9 @@ export class WhatsAppInboundService {
         await this.discard(inboundId, 'the bot is disabled');
         return;
       }
-      if (chatbot.status !== ChatbotStatus.LIVE) {
+      // Stage 4: a paused or archived chatbot still answers, with its off message and the crisis
+      // information (the engine decides it, no model call); only a draft stays silent.
+      if (chatbot.status !== ChatbotStatus.LIVE && !offReasonOf(chatbot)) {
         await this.discard(inboundId, `the chatbot is ${chatbot.status}`);
         return;
       }
@@ -246,7 +259,7 @@ export class WhatsAppInboundService {
       if (contact.blockedAt) {
         // Silently. Telling an abuser precisely when they were blocked mostly teaches them to
         // switch numbers.
-        await this.discard(inboundId, 'the contact is blocked');
+        await this.discard(inboundId, 'ABUSE_BLOCKED: the contact is blocked');
         return;
       }
 
@@ -286,6 +299,55 @@ export class WhatsAppInboundService {
         chatbot.id,
       );
       if (consentHandled) return;
+
+      // The shared store's contact (chunk 3b): the run token, erase and memory consent key on it.
+      const sharedContactId =
+        (await this.sharedStore?.contactIdFor(settings, contact, chatbot.id)) ??
+        null;
+
+      // ── 5b. Erase in chat and the consent answer (stage 5) ───────────────
+      // After STOP/START, and after the free crisis keyword check: a crisis message is never read
+      // as an erase request or a consent answer. Model-free, so it works on a blocked chatbot
+      // too. On WhatsApp the number authenticates the request (R5).
+      if (this.privacy) {
+        // A lookup failure counts as a crisis: the privacy steps are skipped, the engine decides.
+        const crisisKeyword = await Promise.resolve()
+          .then(() =>
+            this.templateService.isCrisisKeyword(
+              inbound.text,
+              contact.locale,
+              chatbot.id,
+            ),
+          )
+          .catch(() => true);
+        // The shared conversation row holds the confirm question; wait for its copy (capped).
+        if (!crisisKeyword && sharedCopy) {
+          await Promise.race([
+            sharedCopy.catch(() => false),
+            new Promise((resolve) => setTimeout(resolve, 2_000).unref?.()),
+          ]);
+        }
+        const fixed = await this.privacy.beforeTurn({
+          chatbot,
+          conversationId: conversation.id,
+          contactId: sharedContactId,
+          phone: contact.phoneE164,
+          text: inbound.text,
+          language: contact.locale,
+          crisisKeyword,
+        });
+        if (fixed) {
+          await this.reply(
+            contact,
+            conversation,
+            inboundId,
+            fixed.body,
+            fixed.handledBy,
+            startedAt,
+          );
+          return;
+        }
+      }
 
       // Every path from here replies — a keyword reply at once, the others after a model call —
       // unless a team member has the chat (chunk 11a), when only a crisis reply goes out, so no
@@ -349,12 +411,7 @@ export class WhatsAppInboundService {
         conversationId: conversation.id,
         providerMessageId: inbound.providerMessageId,
         // The shared store's contact, for the run token (chunk 6): list tools act for this person.
-        contactId:
-          (await this.sharedStore?.contactIdFor(
-            settings,
-            contact,
-            chatbot.id,
-          )) ?? null,
+        contactId: sharedContactId,
       });
 
       // A team member has this chat (chunk 11a): the engine didn't answer, so nothing is sent.
@@ -377,20 +434,58 @@ export class WhatsAppInboundService {
         );
       }
 
+      // Stage 6: a blocked turn's fixed notification goes once per 24 hours per number per
+      // chatbot, then the message is stored in silence (no loop of paid replies). A crisis reply
+      // on a blocked turn always goes out.
+      if (
+        (decision.blocked || decision.off) &&
+        decision.handledBy !== WaHandledBy.CRISIS &&
+        !(await this.rateLimitService.shouldNotify(
+          `${chatbot.id}:${contact.phoneE164}`,
+          decision.blocked
+            ? `blocked:${decision.blocked}`
+            : `off:${decision.off}`,
+          BLOCKED_NOTICE_TTL_SECONDS,
+        ))
+      ) {
+        await this.discard(
+          inboundId,
+          `${decision.blocked ?? `off:${decision.off}`}: fixed notification already sent today`,
+        );
+        return;
+      }
+
       // ── 8. Send and record ───────────────────────────────────────────────
       // A person's first hello also gets the first-message notice after the welcome message.
-      const body =
+      const firstBody =
         contact.messageCount === 1
           ? withFirstMessageParts({
               body: decision.body,
               handledBy: decision.handledBy,
               bodyIsWelcome: decision.isWelcome,
-              notice: this.settingsService.renderPlaceholders(
-                settings.disclaimerText ?? '',
-                settings,
-              ),
+              // Stage 4: the fixed start notice (an AI and people may read this chat).
+              notice: startNotice({
+                disclaimer: this.settingsService.renderPlaceholders(
+                  settings.disclaimerText ?? '',
+                  settings,
+                ),
+                language: replyLanguageOf(inbound.text, contact.locale),
+                organisation: chatbot.name,
+              }),
             })
           : decision.body;
+      // Stage 5 (D7): with memory on, the one consent question follows the agent's own reply
+      // (after the start notice).
+      const consentQuestion = await this.privacy?.consentQuestion({
+        chatbot,
+        contactId: sharedContactId,
+        decision,
+        text: inbound.text,
+        language: contact.locale,
+      });
+      const body = consentQuestion
+        ? `${firstBody}\n\n${consentQuestion}`
+        : firstBody;
       if (decision.language) {
         await this.contactRepository.update(
           { id: contact.id },
@@ -417,6 +512,23 @@ export class WhatsAppInboundService {
         },
       );
       void this.afterReply(chatbot, conversation.id, decision, copied.copied);
+      // Stage 5: two sources disagreed; the owner gets a question naming them. The generic gap
+      // row below is then ignored (one row per message).
+      if (decision.conflict && this.answerConflict) {
+        await this.answerConflict
+          .recordConflict({
+            conversationId: conversation.id,
+            messageId: inboundId,
+            question: inbound.text,
+            language: decision.language ?? contact.locale,
+            result: decision.conflict,
+          })
+          .catch((error: unknown) =>
+            this.logger.warn(
+              `Could not record a source conflict: ${error instanceof Error ? error.message : 'unknown error'}`,
+            ),
+          );
+      }
       if (decision.unanswered) {
         await this.recordUnanswered(
           inboundId,
@@ -953,7 +1065,7 @@ export class WhatsAppInboundService {
   private async afterReply(
     chatbot: Chatbot,
     conversationId: string,
-    decision: Pick<ChatbotDecision, 'agent'>,
+    decision: Pick<ChatbotDecision, 'agent' | 'payer'>,
     copied: Promise<boolean> | undefined,
   ): Promise<void> {
     if (!copied || (!this.memory && !this.summaries)) return;
@@ -965,6 +1077,10 @@ export class WhatsAppInboundService {
           channel: UsageChannel.WHATSAPP,
           runKind: UsageKind.CUSTOMER_REPLY,
           chatbotId: chatbot.id,
+          creatorUserId: chatbot.createdBy ?? null,
+          // Stage 6: the payer stamped on the turn (the chatbot's budget) pays for these too.
+          payerAccountId: decision.payer?.accountId ?? null,
+          endPersonId: decision.payer?.endPersonId ?? null,
         },
         () =>
           Promise.all([

@@ -51,13 +51,12 @@ function memoryRepo<T extends { id?: string }>(rows: T[]) {
         if (op._type === 'lessThan')
           return value instanceof Date && value < (op._value as Date);
         if (op._type === 'raw') {
-          // The page's case-insensitive slug lookup.
+          // The page's case-insensitive slug lookup (whatever the parameter is called).
           const params = (
-            want as { _objectLiteralParameters?: { slug?: string } }
+            want as { _objectLiteralParameters?: Record<string, unknown> }
           )._objectLiteralParameters;
-          return (
-            String(value).toLowerCase() === String(params?.slug).toLowerCase()
-          );
+          const [param] = Object.values(params ?? {});
+          return String(value).toLowerCase() === String(param).toLowerCase();
         }
         return false;
       }
@@ -69,8 +68,14 @@ function memoryRepo<T extends { id?: string }>(rows: T[]) {
       rows.filter((r) => matches(r, where)),
     ),
     findOne: jest.fn(
-      async ({ where }: { where: Record<string, unknown> }) =>
-        rows.find((r) => matches(r, where)) ?? null,
+      async ({
+        where,
+      }: {
+        where: Record<string, unknown> | Record<string, unknown>[];
+      }) =>
+        rows.find((r) =>
+          (Array.isArray(where) ? where : [where]).some((w) => matches(r, w)),
+        ) ?? null,
     ),
     count: jest.fn(
       async ({ where }: { where: Record<string, unknown> }) =>
@@ -102,7 +107,10 @@ describe('BotImageService and the page brand (chunk 20d)', () => {
   let png: Buffer;
 
   const config = {
-    botPage: { baseUrl: 'http://localhost:8081' },
+    botPage: {
+      baseUrl: 'http://localhost:8081',
+      chatUrl: 'http://localhost:8081/chat',
+    },
     s3: { assetsBucket: 'assets', botImagesBucket: 'private-bucket' },
     publicApiBaseUrl: 'http://localhost:8001',
   };
@@ -112,6 +120,7 @@ describe('BotImageService and the page brand (chunk 20d)', () => {
       id: 'page-1',
       chatbotId: bot.id,
       slug: 'sunrise-mind',
+      publicId: 'abcd2345',
       status: BotPageStatus.ON,
       access: BotPageAccess.INVITE,
       settings: {
@@ -355,17 +364,37 @@ describe('BotImageService and the page brand (chunk 20d)', () => {
       expect(darkenForWhiteText('#17171C')).toBe('#17171C');
     });
 
-    it('creates the page, off, before its first save', async () => {
+    it('creates the page, off, with an Ally-assigned address, before its first save', async () => {
       const view = await pageService.saveBrand(bot as never, {
-        headingStyle: 'friendly',
-        theme: 'dark',
+        accent: '#C4512D',
+        welcome: '  Ask us anything about appointments.  ',
       });
       expect(pageRows).toHaveLength(1);
       expect(view.status).toBe(BotPageStatus.OFF);
-      expect(view.settings.brand).toMatchObject({
-        headingStyle: 'friendly',
-        theme: 'dark',
-      });
+      expect(view.publicId).toMatch(/^[a-z0-9]{8}$/);
+      expect(view.link).toBe(`http://localhost:8081/chat/${view.publicId}`);
+      expect(view.settings.branding.welcome).toBe(
+        'Ask us anything about appointments.',
+      );
+    });
+
+    it('refuses the retired look fields (stage 7) and changes nothing', async () => {
+      for (const body of [
+        { headingStyle: 'friendly' },
+        { theme: 'dark' },
+        { coverImage: null },
+        { shareImage: null },
+        { landingImages: { hero: null } },
+        { peoplePhotos: {} },
+        { accent: '#C4512D', theme: 'dark' },
+      ]) {
+        await expect(
+          pageService.saveBrand(bot as never, body as never),
+        ).rejects.toMatchObject({
+          response: { error: 'look_field_retired' },
+        });
+      }
+      expect(pageRows).toHaveLength(0);
     });
 
     it("refuses another bot's image, or a removed one", async () => {
@@ -383,14 +412,14 @@ describe('BotImageService and the page brand (chunk 20d)', () => {
         pageService.saveBrand(bot as never, { logo: 'other' }),
       ).rejects.toThrow(/no longer/);
       await expect(
-        pageService.saveBrand(bot as never, { coverImage: 'gone' }),
+        pageService.saveBrand(bot as never, { logo: 'gone' }),
       ).rejects.toThrow(/no longer/);
     });
 
     it('keeps the brand when the Bot page tab saves, and ignores a brand sent there', async () => {
+      livePage({ headingStyle: 'modern' });
       await pageService.saveBrand(bot as never, {
         accent: '#C4512D',
-        headingStyle: 'modern',
       });
       await pageService.save(
         bot as never,
@@ -444,7 +473,7 @@ describe('BotImageService and the page brand (chunk 20d)', () => {
         darkenForWhiteText('#F4A261'),
       );
       expect(available!.settings.branding.logoUrl).toBe(
-        `http://localhost:8001/api/v1/public/bot-images/sunrise-mind/${fileStem(images.rows[0])}-256.webp`,
+        `http://localhost:8001/api/v1/public/bot-images/abcd2345/${fileStem(images.rows[0])}-256.webp`,
       );
       expect(available!.brandImages.logo?.srcset).toContain('768w');
     });

@@ -30,7 +30,11 @@ describePg('Scorecard rollup (Postgres)', () => {
     dataSource = await openTestDataSource();
     service = new ScorecardService(
       dataSource,
-      { assert: async () => ({}) } as never,
+      {
+        assert: async () => ({}),
+        assertOrStaffView: async () => undefined,
+        mayReadCustomerText: async () => true,
+      } as never,
       { latestFor: async () => null } as never,
       {} as never,
       {} as never,
@@ -248,5 +252,173 @@ describePg('Scorecard rollup (Postgres)', () => {
       'Please book a LASIK consultation',
       'Yes go ahead.',
     ]);
+  });
+
+  describe('Overview (stage 7)', () => {
+    /** An inbound question from `contact` (new when omitted) at `at` UTC; returns ids. */
+    async function ask(
+      at: string,
+      text: string,
+      contact?: string,
+      channel = 'web',
+      language: string | null = null,
+    ) {
+      const contactId =
+        contact ??
+        (
+          await dataSource.query(
+            `INSERT INTO chatbot_contacts (chatbot_id) VALUES ($1) RETURNING id`,
+            [bot],
+          )
+        )[0].id;
+      const [conv] = await dataSource.query(
+        `INSERT INTO chatbot_conversations (chatbot_id, contact_id, channel, started_at, last_message_at)
+         VALUES ($1, $2, $3, $4, $4) RETURNING id`,
+        [bot, contactId, channel, at],
+      );
+      const [msg] = await dataSource.query(
+        `INSERT INTO chatbot_messages (conversation_id, channel, direction, role, text, language, "createdAt")
+         VALUES ($1, $2, 'inbound', 'user', $3, $4, $5) RETURNING id`,
+        [conv.id, channel, text, language, at],
+      );
+      return { contactId, conv: conv.id as string, msg: msg.id as string };
+    }
+    const unanswered = (x: { conv: string; msg: string }, text: string) =>
+      dataSource.query(
+        `INSERT INTO wa_unanswered_questions (message_id, conversation_id, question_text, reason, "createdAt")
+         VALUES ($1, $2, $3, 'no_hits', (SELECT "createdAt" FROM chatbot_messages WHERE id = $1))`,
+        [x.msg, x.conv, text],
+      );
+    const NOW = new Date('2026-11-11T12:00:00Z');
+
+    it('counts people as distinct contacts per day', async () => {
+      const first = await ask('2026-11-10T05:00:00Z', 'Hi');
+      await ask('2026-11-10T06:00:00Z', 'Hi again', first.contactId);
+      await ask('2026-11-10T07:00:00Z', 'Hello');
+      const days = (
+        await service.compute([bot], '2026-11-10', '2026-11-11')
+      ).get(bot)!;
+      expect(days[0]).toMatchObject({ conversations: 3, people: 2 });
+    });
+
+    it('median wait: from needing a person to the first person reply, per day', async () => {
+      for (const [wait, reply] of [
+        [10, true],
+        [30, true],
+        [90, true],
+        [5, false],
+      ] as const) {
+        const x = await ask('2026-11-10T05:00:00Z', 'Need help');
+        await dataSource.query(
+          `UPDATE chatbot_conversations SET needs_person_since = '2026-11-10T05:00:00Z',
+             needs_person_reason = 'asked' WHERE id = $1`,
+          [x.conv],
+        );
+        if (reply) {
+          await dataSource.query(
+            `INSERT INTO chatbot_messages (conversation_id, channel, direction, role, text, handled_by, "createdAt")
+             VALUES ($1, 'web', 'outbound', 'user', 'On it', 'human', ('2026-11-10T05:00:00Z'::timestamp + make_interval(mins => $2)))`,
+            [x.conv, wait],
+          );
+        }
+      }
+      const day = (
+        await service.compute([bot], '2026-11-10', '2026-11-11')
+      ).get(bot)![0];
+      // 10, 30, 90 answered; the fourth was never answered and is left out, not counted as 0.
+      expect(day.handoverWaitP50).toBe(30);
+    });
+
+    it('a chat flagged for a crisis counts its wait from the first flag', async () => {
+      const x = await ask('2026-11-10T05:00:00Z', 'Help');
+      await dataSource.query(
+        `UPDATE chatbot_conversations SET safety_first_at = '2026-11-10T05:00:00Z' WHERE id = $1`,
+        [x.conv],
+      );
+      await dataSource.query(
+        `INSERT INTO chatbot_messages (conversation_id, channel, direction, role, text, handled_by, "createdAt")
+         VALUES ($1, 'web', 'outbound', 'user', 'Here', 'human', '2026-11-10T05:12:00Z')`,
+        [x.conv],
+      );
+      const day = (
+        await service.compute([bot], '2026-11-10', '2026-11-11')
+      ).get(bot)![0];
+      expect(day.handoverWaitP50).toBe(12);
+    });
+
+    it("day boundaries follow the assistant's time zone, not UTC or India", async () => {
+      // 02:00 UTC on 11 Nov is 21:00 on 10 Nov in New York, 07:30 on 11 Nov in India.
+      await ask('2026-11-11T02:00:00Z', 'Hi');
+      const query = (zone: string | null) =>
+        dataSource
+          .query(
+            `UPDATE chatbots SET settings = COALESCE(settings, '{}'::jsonb) || $2::jsonb WHERE id = $1`,
+            [bot, JSON.stringify(zone ? { timeZone: zone } : {})],
+          )
+          .then(() => service.compute([bot], '2026-11-10', '2026-11-12'));
+      expect((await query(null)).get(bot)!.map((d) => d.day)).toEqual([
+        '2026-11-11',
+      ]);
+      expect(
+        (await query('America/New_York')).get(bot)!.map((d) => d.day),
+      ).toEqual(['2026-11-10']);
+      // A zone Postgres doesn't know falls back to India instead of failing.
+      expect((await query('Not/AZone')).get(bot)!.map((d) => d.day)).toEqual([
+        '2026-11-11',
+      ]);
+    });
+
+    it('the Overview holds back everything under 5 people', async () => {
+      // Six people asked the same thing; two asked others; four rated up.
+      for (let i = 0; i < 6; i++) {
+        const x = await ask(
+          '2026-11-10T05:00:00Z',
+          'Do you open on Sunday?',
+          undefined,
+          'web',
+          'en',
+        );
+        await unanswered(x, 'Do you open on Sunday?');
+      }
+      const lone = await ask(
+        '2026-11-10T06:00:00Z',
+        'My number is 98765 43210, call me',
+        undefined,
+        'whatsapp',
+        'hi',
+      );
+      await unanswered(lone, 'My number is 98765 43210, call me');
+      const view = await service.overview(bot, 7, NOW);
+      expect(view.conversations).toBe(7);
+      expect(view.people).toBe(7);
+      const day = view.days.find((d) => d.day === '2026-11-10')!;
+      expect(day.conversations).toBe(7);
+      // A day with 1 to 4 is "fewer than 5"; one with none is a plain 0.
+      expect(view.days.find((d) => d.day === '2026-11-11')!.conversations).toBe(
+        0,
+      );
+      expect(view.byChannel).toEqual([
+        { key: 'web', count: 6 },
+        { key: 'whatsapp', count: { lessThan: 5 } },
+      ]);
+      expect(view.byLanguage).toEqual([
+        { key: 'en', count: 6 },
+        { key: 'hi', count: { lessThan: 5 } },
+      ]);
+      expect(view.topUnanswered).toEqual([
+        { kind: 'question', text: 'Do you open on Sunday?', count: 6 },
+        { kind: 'theme', theme: 'no_hits', count: { lessThan: 5 } },
+      ]);
+      expect(JSON.stringify(view)).not.toContain('98765');
+    });
+
+    it('a day under 5 is "fewer than 5" in the series', async () => {
+      await ask('2026-11-10T05:00:00Z', 'Hi');
+      const view = await service.overview(bot, 7, NOW);
+      expect(view.days.find((d) => d.day === '2026-11-10')).toMatchObject({
+        conversations: { lessThan: 5 },
+        people: { lessThan: 5 },
+      });
+    });
   });
 });

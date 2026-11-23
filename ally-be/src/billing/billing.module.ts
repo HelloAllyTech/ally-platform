@@ -33,6 +33,27 @@ import { CostAlertService } from './service/cost-alert.service';
 import { CostReportService } from './service/cost-report.service';
 import { UsageEventService } from './service/usage-event.service';
 import { WhatsAppPricingService } from './service/whatsapp-pricing.service';
+import { BillingAccount } from './entity/billing-account.entity';
+import { CreditGrant } from './entity/credit-grant.entity';
+import { ChatbotBudget } from './entity/chatbot-budget.entity';
+import { CreditReservation } from './entity/credit-reservation.entity';
+import { EndPersonSpend } from './entity/end-person-spend.entity';
+import { EndPerson, EndPersonIdentity } from './entity/end-person.entity';
+import { CreditWarning } from './entity/credit-warning.entity';
+import { LedgerService } from './service/ledger.service';
+import { EndPersonService } from './service/end-person.service';
+import { CreditWarningService } from './service/credit-warning.service';
+import { CreditsCutoverService } from './service/credits-cutover.service';
+import { BlockedCrisisService } from './service/blocked-crisis.service';
+import {
+  CREDITS_STATE,
+  LedgerCreditsGate,
+  LedgerCreditsStateService,
+} from './service/credits-state.service';
+import { CREDITS_GATE } from 'src/bot-draft/working-copy/credits-gate';
+import { CreditsAdminController } from './controller/credits-admin.controller';
+import { MyCreditsController } from './controller/my-credits.controller';
+import { CreditsStaffController } from './controller/credits-staff.controller';
 
 /**
  * Agents v2 CR1: costs and models (Part A), plans and seats (Part C), and the spend cap that
@@ -62,6 +83,15 @@ import { WhatsAppPricingService } from './service/whatsapp-pricing.service';
       Subscription,
       Seat,
       UsageCounter,
+      // Stage 6: credits.
+      BillingAccount,
+      CreditGrant,
+      ChatbotBudget,
+      CreditReservation,
+      EndPersonSpend,
+      EndPerson,
+      EndPersonIdentity,
+      CreditWarning,
     ]),
   ],
   controllers: [
@@ -69,6 +99,9 @@ import { WhatsAppPricingService } from './service/whatsapp-pricing.service';
     BillingUsersController,
     BillingPlansController,
     MyPlanController,
+    CreditsAdminController,
+    MyCreditsController,
+    CreditsStaffController,
   ],
   providers: [
     BillingAuditService,
@@ -81,6 +114,16 @@ import { WhatsAppPricingService } from './service/whatsapp-pricing.service';
     PlanService,
     LimitsService,
     PlanViewService,
+    LedgerService,
+    EndPersonService,
+    CreditWarningService,
+    CreditsCutoverService,
+    BlockedCrisisService,
+    LedgerCreditsStateService,
+    LedgerCreditsGate,
+    // The stage 1b seams, bound to the ledger (stage 6).
+    { provide: CREDITS_STATE, useExisting: LedgerCreditsStateService },
+    { provide: CREDITS_GATE, useExisting: LedgerCreditsGate },
     { provide: APP_INTERCEPTOR, useClass: OwnerUsageInterceptor },
   ],
   exports: [
@@ -94,6 +137,12 @@ import { WhatsAppPricingService } from './service/whatsapp-pricing.service';
     PlanService,
     LimitsService,
     PlanViewService,
+    LedgerService,
+    EndPersonService,
+    BlockedCrisisService,
+    LedgerCreditsStateService,
+    CREDITS_STATE,
+    CREDITS_GATE,
   ],
 })
 export class BillingModule {}

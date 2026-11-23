@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { BotPageApiError, botPageApi } from "./api";
+import { BLOCKED_CODES, blockedNotice } from "./blocked";
 import { Turnstile } from "./components/Turnstile";
 import { fill, pickCopy, type BotPageCopy } from "./copy";
 import { bridge, type EmbedContext, type ToLoader } from "./embed";
@@ -12,7 +13,7 @@ import { ErrorState } from "./screens/ErrorState";
 import { Prechat } from "./screens/Prechat";
 import { surfaceProps } from "./theme";
 
-import type { PublicBotPage, PublicMessage, PublicSession } from "./types";
+import type { BlockedState, PublicBotPage, PublicMessage, PublicSession } from "./types";
 
 /** What loading the page found: the page, and where the visit picks up. */
 interface Loaded {
@@ -380,7 +381,7 @@ export function BotPageApp({
       await afterSession(session, page);
     });
 
-  const submitIntake = (answers: { id: string; value: string }[]) =>
+  const submitIntake = (answers: { id: string; value: string }[], typed = "") =>
     run(async () => {
       setErrorField(null);
       try {
@@ -392,6 +393,8 @@ export function BotPageApp({
         throw err;
       }
       await openChat();
+      // A message typed beside the questions goes into the chat box, ready to send.
+      if (typed.trim()) setReturnedDraft({ text: typed.trim() });
     });
 
   const newChat = () =>
@@ -485,6 +488,20 @@ export function BotPageApp({
         if (connectedTo.current !== final.conversationId) setStreamKey(k => k + 1);
         // A team member has this chat: no reply now; theirs arrives on the visitor stream.
         if (final.held) return;
+        if (final.blocked) {
+          // The fixed notification: shown as the reply, never rateable, no model behind it.
+          setMessages(m => [
+            ...m,
+            {
+              id: final.messageId || `blocked-${Date.now()}`,
+              role: "assistant",
+              text: blockedNotice(copy, final.blocked as BlockedState, page, final.reply),
+              citations: [],
+              rateable: false,
+            },
+          ]);
+          return;
+        }
         setMessages(m => [
           ...m,
           {
@@ -503,6 +520,20 @@ export function BotPageApp({
         live.stop();
         setPending(null);
         if (controller.signal.aborted) return;
+        const blockedState = err instanceof BotPageApiError ? BLOCKED_CODES[err.code] : undefined;
+        if (blockedState) {
+          setMessages(m => [
+            ...m,
+            {
+              id: `blocked-${Date.now()}`,
+              role: "assistant",
+              text: blockedNotice(copy, blockedState, page),
+              citations: [],
+              rateable: false,
+            },
+          ]);
+          return;
+        }
         if (err instanceof BotPageApiError && err.status > 0) {
           // An HTTP refusal comes before anything is stored, so the message goes back in the box.
           setMessages(m => m.filter(item => item.id !== local.id));
@@ -554,6 +585,7 @@ export function BotPageApp({
         <AccessEmail
           branding={page.branding}
           copy={copy}
+          crisis={page.crisis}
           onSubmit={email => void sendCode(email)}
           busy={busy}
           error={error}
@@ -583,7 +615,17 @@ export function BotPageApp({
           branding={page.branding}
           copy={copy}
           fields={page.prechat}
-          onDone={answers => void submitIntake(answers)}
+          onDone={(answers, typed) => void submitIntake(answers, typed)}
+          notice={page.notice}
+          disclaimer={page.disclaimer}
+          draft={returnedDraft?.text}
+          maxChars={page.maxMessageChars}
+          onSendMessage={text => {
+            // The questions never block a first message: go to the chat and send it. If the server
+            // asks for the answers, the catch below brings the questions back with the text kept.
+            setStage({ kind: "chat" });
+            send(text);
+          }}
           busy={busy}
           error={error}
           errorField={errorField}

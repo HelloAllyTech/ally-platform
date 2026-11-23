@@ -24,6 +24,8 @@ describe("ChatbotService and a chatbot's own documents", () => {
     archiveForChatbot: jest.Mock;
   };
   let service: ChatbotService;
+  /** Stage 5: whether the caller is Ally staff (who may still attach library documents). */
+  let staff = false;
 
   /** The two queries ChatbotService runs against kb_documents, answered from `documents`. */
   const query = jest.fn(async (sql: string, params: unknown[]) => {
@@ -31,12 +33,16 @@ describe("ChatbotService and a chatbot's own documents", () => {
       return [...attached].map((id) => ({
         id,
         title: id,
-        status: 'indexed',
+        status: id === 'own-1' ? 'paused' : 'indexed',
+        status_message: id === 'own-1' ? 'Paused: out of credits' : null,
         is_global: false,
         owner_chatbot_id: documents.get(id) ?? null,
         archived_at: null,
         updatedAt: new Date(0),
       }));
+    }
+    if (sql.includes('SELECT document_id FROM chatbot_documents')) {
+      return [...attached].map((document_id) => ({ document_id }));
     }
     if (sql.includes('WHERE owner_chatbot_id = $1')) {
       return [...documents]
@@ -90,6 +96,8 @@ describe("ChatbotService and a chatbot's own documents", () => {
       query,
       transaction: async (work: (m: unknown) => Promise<void>) =>
         work({
+          // Stage 1b: archive() locks the bot's row (SELECT … FOR UPDATE) and stamps it.
+          query: async () => [{ archived_at: null }],
           delete: async () => attached.clear(),
           insert: async (_entity: unknown, rows: { documentId: string }[]) =>
             rows.forEach((r) => attached.add(r.documentId)),
@@ -114,7 +122,10 @@ describe("ChatbotService and a chatbot's own documents", () => {
       documentRepository as never,
       {} as never,
       { update: jest.fn() } as never,
-      { assert: jest.fn(async () => ({ chatbot: { id: BOT } })) } as never,
+      {
+        assert: jest.fn(async () => ({ chatbot: { id: BOT } })),
+        isPlatformAdmin: jest.fn(async () => staff),
+      } as never,
       {} as never,
       {} as never,
       {} as never,
@@ -131,9 +142,39 @@ describe("ChatbotService and a chatbot's own documents", () => {
     ]);
   });
 
+  it('lists each document with why it is in its state (paused for credits)', async () => {
+    const list = await service.listDocuments(BOT);
+    expect(
+      query.mock.calls.some(([sql]) => sql.includes('d.status_message')),
+    ).toBe(true);
+    expect(list.find((d) => d.id === 'own-1')).toMatchObject({
+      status: 'paused',
+      statusMessage: 'Paused: out of credits',
+    });
+    expect(list.find((d) => d.id === 'shared-1')?.statusMessage).toBeNull();
+  });
+
   it('keeps its own documents attached when the library selection is replaced', async () => {
     await service.setDocuments(BOT, []);
     expect([...attached].sort()).toEqual(['own-1']);
+  });
+
+  it('stage 5: a builder cannot attach a new shared library document, but keeps the ones attached', async () => {
+    staff = false;
+    documents.set('library-new', null);
+    await expect(
+      service.setDocuments(BOT, ['shared-1', 'library-new']),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await service.setDocuments(BOT, ['shared-1']);
+    expect([...attached].sort()).toEqual(['own-1', 'shared-1']);
+  });
+
+  it('stage 5: Ally staff can still attach a shared library document', async () => {
+    staff = true;
+    documents.set('library-new', null);
+    await service.setDocuments(BOT, ['library-new']);
+    expect(attached.has('library-new')).toBe(true);
+    staff = false;
   });
 
   it("refuses another bot's own document", async () => {

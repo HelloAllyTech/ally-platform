@@ -18,6 +18,7 @@ describe('Settings moved from platform admins to owners (A1)', () => {
       ) => {
         const rank: Record<ChatbotMemberRole, number> = {
           viewer: 0,
+          responder: 0,
           editor: 1,
           owner: 2,
         };

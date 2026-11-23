@@ -11,6 +11,7 @@ import {
 } from "@constants";
 
 import { hasFeature } from "./permissions";
+import { SAFETY_PACKS_COPY } from "../pages/SafetyPacks/copy";
 
 /** The sidebar's sections, in display order. Item membership is `NavigationItem.section`. */
 export const NAV_SECTION_IDS = [
@@ -137,6 +138,19 @@ const buildNavigationItems = (): NavigationItem[] => {
       section: "ai-languages",
     },
     {
+      id: S.BILLING_CREDITS,
+      label: l.billingCredits,
+      path: ROUTES.BILLING_CREDITS,
+      section: "ai-languages",
+    },
+    // Assistants stage 9: safety pack releases, for Ally curators.
+    {
+      id: S.SAFETY_PACKS,
+      label: SAFETY_PACKS_COPY.nav,
+      path: ROUTES.SAFETY_PACKS,
+      section: "ai-languages",
+    },
+    {
       id: S.SCENARIO_VOICES,
       label: l.voices,
       path: ROUTES.MANAGE_SCENARIO_VOICES,
@@ -193,6 +207,14 @@ const buildNavigationItems = (): NavigationItem[] => {
       id: S.WHATSAPP_BOT,
       label: en.whatsappBot.navLabel,
       path: ROUTES.WHATSAPP_BOT,
+      section: "product",
+    },
+    // Staff only: the defaults, shared quick replies, library and numbers every chatbot inherits
+    // (moved out of the builder's own screens, stage 2).
+    {
+      id: S.ASSISTANT_DEFAULTS,
+      label: en.assistantDefaults.navLabel,
+      path: ROUTES.ASSISTANT_DEFAULTS,
       section: "product",
     },
     { id: S.ALLY_GUIDE, label: l.allyConsole, path: ROUTES.ALLY_CONSOLE, section: "product" },
@@ -392,6 +414,12 @@ export const deriveNavigationItems = ({
               (hasFeature(features, FeatureToggleKey.ALLY_GUIDE_ORG) &&
                 permissions!.includes(Permissions.VIEW_ALLY_GUIDE))
             );
+          // Stage 9: the safety-pack curator grant only; staff pages never depend on the Chatbots toggle.
+          case SIDEBAR_ITEMS.SAFETY_PACKS:
+            return permissions!.includes(Permissions.MANAGE_SAFETY_PACKS);
+          // Ally staff only: the system grant alone (never a tenant's own admin).
+          case SIDEBAR_ITEMS.ASSISTANT_DEFAULTS:
+            return permissions!.includes(Permissions.SYSTEM_ACCESS);
           // The Ally Console: the ally_guide toggle AND the view grant, like Course Copilot, so
           // deliberately NOT in buildSidebarItemFeatureKeyMap (which would make it toggle-only and
           // drop the permission). The permission alone shows it to every platform admin.

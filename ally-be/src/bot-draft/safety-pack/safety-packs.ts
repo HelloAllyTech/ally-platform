@@ -1,4 +1,9 @@
+import {
+  FIND_A_HELPLINE_URL,
+  fixedCrisisInformation,
+} from '../../chatbot/engine/blocked-notice';
 import { CareTopic, Industry, SafetyPackId } from '../enum/bot-draft.enum';
+import { livePack, packOverride } from './live-packs';
 
 /**
  * A safety pack: rules that are always on for an industry (chunk 20a). Packs are versioned code,
@@ -14,6 +19,8 @@ export interface SafetyPack {
   version: number;
   /** "{name} is on" (copy §5). */
   name: string;
+  /** What the staff Safety packs page calls it, when two packs share an owner-facing `name`. */
+  curatorName?: string;
   /** "These rules are always on for {industryLabel}." */
   industryLabel: string;
   /** The builder's message when the pack is turned on (copy §5). */
@@ -97,6 +104,7 @@ export const SAFETY_PACKS: Record<SafetyPackId, SafetyPack> = {
     id: SafetyPackId.MEDICAL,
     version: 3, // Q3-fast: the business's own published information may be answered
     name: 'Medical safety',
+    curatorName: 'Medical safety (clinics and labs)',
     industryLabel: 'healthcare providers',
     builderMessage:
       "You work in healthcare, so I've turned on **Medical safety**. Your assistant won't diagnose, interpret results or advise on doses. It points urgent symptoms to emergency care and everything clinical to your team.",
@@ -135,6 +143,7 @@ export const SAFETY_PACKS: Record<SafetyPackId, SafetyPack> = {
     id: SafetyPackId.PHARMACY,
     version: 2, // SP1: clean declines
     name: 'Medical safety',
+    curatorName: 'Medical safety (pharmacies)',
     industryLabel: 'healthcare providers',
     builderMessage:
       "You work in healthcare, so I've turned on **Medical safety**. Your assistant won't diagnose, interpret results or advise on doses. It points urgent symptoms to emergency care and everything clinical to your team.",
@@ -354,7 +363,23 @@ export function cantCombinePacksText(
   return `Your assistant uses the ${RULES_NAME[current.id]} safety rules. ${RULES_NAME[asked.id]} rules can't be added on top yet; tell Ally if you need both.`;
 }
 
+/**
+ * A pack as it is used now. Stage 9: the CURRENT RELEASE (`safety_pack_releases`, held in memory by
+ * `SafetyPackReleaseService`), or the code constant when there is no release (releases switched
+ * off with `ASSISTANT_PACK_RELEASES_ENABLED=false`, not loaded yet, or a pack added in code). A
+ * curator's suite run on a draft release sees the draft (`withPackOverride`).
+ */
 export function packFor(
+  id: SafetyPackId | string | null | undefined,
+): SafetyPack | null {
+  if (!id || !(id in SAFETY_PACKS)) return null;
+  const override = packOverride();
+  if (override && override.packId === id) return override.pack;
+  return livePack(id)?.pack ?? SAFETY_PACKS[id as SafetyPackId];
+}
+
+/** Stage 9: the pack as written in code, ignoring releases (the seed and the fallback). */
+export function codePackFor(
   id: SafetyPackId | string | null | undefined,
 ): SafetyPack | null {
   return id && id in SAFETY_PACKS ? SAFETY_PACKS[id as SafetyPackId] : null;
@@ -380,6 +405,39 @@ export interface PackRenderOptions {
   helpline?: string | null;
   /** The bot can create entries (a `create_*` ability on Do it): a health decline may offer it. */
   hasCreateTool?: boolean;
+  /**
+   * Stage 4: who the audience is (`audienceAge`). Unstated or including minors gets the strictest
+   * wording; only a stated adults-only audience drops the minors lines.
+   */
+  audienceAge?: 'unstated' | 'adults' | 'includes_minors' | null;
+}
+
+/**
+ * Stage 4: the base safety block every chatbot gets, with or without a pack (R6, section 4). Fixed
+ * text: an owner's instructions, persona and rules are ranked below it and cannot remove it. The
+ * crisis reply itself is fixed code (`crisisReply`), so these lines keep the model from talking
+ * around it.
+ */
+export const BASE_SAFETY_RULES: readonly string[] = [
+  'If someone may be at risk of harming themselves or others, or in danger, do not try to handle it yourself: the fixed crisis information is sent for you. Never discourage them from seeking help and never replace or remove that information.',
+  'Never give medical, legal or emergency instructions from your own knowledge (no diagnoses, doses, treatments, legal steps or first aid). Say you cannot advise on that and refer the person to a qualified professional, emergency services or the resources in your sources.',
+  'You are an AI assistant. Never say or suggest that you are a human, even when you have a name or a persona, and always answer honestly when asked whether you are a person or a bot.',
+  "Never claim that a person is reading the chat right now unless the team has joined it, and don't promise what the team will do.",
+];
+
+/** Stage 4: the strictest wording for an audience that may include under-18s (or is not stated). */
+export const MINORS_SAFETY_RULES: readonly string[] = [
+  'The person may be under 18. Keep every reply suitable for a young person, never discuss sexual content, alcohol, drugs, gambling or weapons, and never ask for personal details such as an address, school, photos or contact information.',
+  'If a young person mentions abuse, neglect or feeling unsafe at home, treat it as a crisis: the fixed crisis information is sent for you.',
+];
+
+export function baseSafetyLines(
+  audienceAge?: PackRenderOptions['audienceAge'],
+): string[] {
+  return [
+    ...BASE_SAFETY_RULES,
+    ...(audienceAge === 'adults' ? [] : MINORS_SAFETY_RULES),
+  ];
 }
 
 /** The SP1 lines that depend on the bot: only for the health packs that decline cleanly. */
@@ -407,10 +465,11 @@ export function packRulesBlock(
   id: SafetyPackId | string | null | undefined,
   ownerNever: string[] = [],
   options: PackRenderOptions = {},
-): string | null {
+): string {
   const pack = packFor(id);
-  if (!pack && !ownerNever.length) return null;
+  // Stage 4: never null. Every chatbot gets the base block, pack or not.
   const lines = [
+    ...baseSafetyLines(options.audienceAge),
     ...(pack?.rules ?? []),
     ...cleanDeclineExtras(pack, options),
     ...ownerNever.map((rule) => `Never: ${rule}`),
@@ -424,17 +483,15 @@ export function packRulesBlock(
 }
 
 /**
- * The crisis reply (chunk 6b, item 25, as Shehbaz approved it): every one carries a real number, on
- * every assistant.
- * - Every assistant, packed or not, gets the general text, which replaces the platform's
- *   ("contact a supervisor…", "your local crisis line"). Since Q3-fast a medical emergency has its
- *   own reply (`emergencyReply`), so medical and pharmacy no longer have a text of their own.
- * - A bot's own wording still wins; if it has no phone number, or says "your local crisis line",
- *   the numbers line is added after it.
- * - The bot's helpline numbers follow when it has some.
+ * The crisis reply (R6, stage 4). The default crisis information is the findahelpline.com link
+ * only, with no country's numbers: the builder's own helpline numbers come first when set, and the
+ * link always follows (`fixedCrisisInformation`, `chatbot/engine/blocked-notice.ts`).
+ * - Every assistant, packed or not, gets the general text.
+ * - A bot's own wording still wins, but the crisis information is locked: when the wording does not
+ *   carry the link, the crisis information is added after it, so an owner cannot remove it.
+ * - Curated text only in English, Hindi and Hinglish (D5); any other language gets English.
  */
-export const CRISIS_NUMBERS_LINE =
-  "If you're in danger, call 112 now. If you're thinking of harming yourself, call Tele-MANAS on 14416 (free, 24×7).";
+export const CRISIS_NUMBERS_LINE = fixedCrisisInformation(null, 'en');
 export const GENERAL_CRISIS_TEXT = `It sounds like this may be urgent. This assistant can't help in a crisis. ${CRISIS_NUMBERS_LINE}`;
 
 /** A phone number: three or more digits, spaces or dashes between them ("112", "1800-599-0019"). */
@@ -443,41 +500,21 @@ export const hasPhoneNumber = (text: string): boolean =>
 
 /**
  * The fixed crisis and emergency texts in each language a reply can go out in (Q3-fast Part 1).
- * English is 6b's approved wording; Hindi and Hinglish are fixed translations of it, never
- * generated. Languages are `ReplyLanguage` (`chatbot/engine/reply-language.ts`).
+ * Fixed translations, never generated. Languages are `ReplyLanguage`
+ * (`chatbot/engine/reply-language.ts`); any other language falls back to English (D5).
  */
 type CrisisLanguage = 'en' | 'hi' | 'hi-latn';
 
-const CRISIS_TEXTS: Record<
-  CrisisLanguage,
-  {
-    numbersLine: string;
-    general: string;
-    alsoCall: (helplines: string) => string;
-  }
-> = {
-  en: {
-    numbersLine: CRISIS_NUMBERS_LINE,
-    general: GENERAL_CRISIS_TEXT,
-    alsoCall: (helplines) => ` You can also call: ${helplines}.`,
-  },
-  hi: {
-    numbersLine:
-      'अगर आप खतरे में हैं, तो अभी 112 पर कॉल करें। अगर आप खुद को नुकसान पहुँचाने के बारे में सोच रहे हैं, तो टेली-मानस को 14416 पर कॉल करें (मुफ़्त, 24×7)।',
-    general:
-      'लगता है कि यह गंभीर स्थिति हो सकती है। यह सहायक संकट में मदद नहीं कर सकता। अगर आप खतरे में हैं, तो अभी 112 पर कॉल करें। अगर आप खुद को नुकसान पहुँचाने के बारे में सोच रहे हैं, तो टेली-मानस को 14416 पर कॉल करें (मुफ़्त, 24×7)।',
-    alsoCall: (helplines) =>
-      ` आप इन नंबरों पर भी कॉल कर सकते हैं: ${helplines}।`,
-  },
-  'hi-latn': {
-    numbersLine:
-      'Agar aap khatre mein hain, toh abhi 112 par call karein. Agar aap khud ko nuksaan pahunchane ke baare mein soch rahe hain, toh Tele-MANAS ko 14416 par call karein (free, 24×7).',
-    general:
-      'Lagta hai yeh urgent ho sakta hai. Yeh assistant crisis mein madad nahi kar sakta. Agar aap khatre mein hain, toh abhi 112 par call karein. Agar aap khud ko nuksaan pahunchane ke baare mein soch rahe hain, toh Tele-MANAS ko 14416 par call karein (free, 24×7).',
-    alsoCall: (helplines) =>
-      ` Aap in numbers par bhi call kar sakte hain: ${helplines}.`,
-  },
+// COPY: needs approval (R6 wording)
+const CRISIS_LEAD: Record<CrisisLanguage, string> = {
+  en: "It sounds like this may be urgent. This assistant can't help in a crisis.",
+  hi: 'लगता है कि यह गंभीर स्थिति हो सकती है। यह सहायक संकट में मदद नहीं कर सकता।',
+  'hi-latn':
+    'Lagta hai yeh urgent ho sakta hai. Yeh assistant crisis mein madad nahi kar sakta.',
 };
+
+const curated = (language?: string | null): CrisisLanguage =>
+  language === 'hi' || language === 'hi-latn' ? language : 'en';
 
 /**
  * The helplines (comma, semicolon, slash or line separated) whose numbers don't already appear
@@ -499,44 +536,36 @@ export function newHelplines(helplines: string, already: string): string {
     .join(', ');
 }
 
-/** The at-risk reply (6b item 25; languages Q3-fast Part 1). */
+/** The at-risk reply (6b item 25; languages Q3-fast Part 1; R6 link-only default). */
 export function crisisReply(options: {
   pack: SafetyPackId | string | null | undefined;
   helplineNumbers?: string | null;
   /** The bot's own crisis wording, placeholders filled; null for none. */
   own?: string | null;
-  /** The person's language (Q3-fast); English when not given. */
-  language?: CrisisLanguage;
+  /** The person's language (Q3-fast); English when not given or not curated. */
+  language?: CrisisLanguage | string | null;
 }): string {
-  const texts = CRISIS_TEXTS[options.language ?? 'en'];
+  const language = curated(options.language);
   const own = (options.own ?? '').trim();
-  // Chunk H1 Part D: only the helplines whose numbers the reply doesn't already give, so
-  // "…Tele-MANAS on 14416 (free, 24×7). You can also call: Tele-MANAS 14416." can't happen.
-  const helplines = newHelplines(
-    (options.helplineNumbers ?? '').trim(),
-    `${own} ${texts.general} ${texts.numbersLine}`,
-  );
-  const alsoCall = helplines ? texts.alsoCall(helplines) : '';
+  const numbers = (options.helplineNumbers ?? '').trim();
   if (own) {
-    // The owner's own wording is theirs, in whatever language they wrote it.
-    if (/your local crisis line/i.test(own) || !hasPhoneNumber(own)) {
-      const extra = helplines && !own.includes(helplines) ? alsoCall : '';
-      return `${own} ${texts.numbersLine}${extra}`;
-    }
-    return own;
+    // The owner's own wording is theirs, in whatever language they wrote it; the crisis
+    // information is locked, so it follows whenever the wording leaves the link out.
+    if (own.includes(FIND_A_HELPLINE_URL)) return own;
+    const missing = newHelplines(numbers, own);
+    return `${own} ${fixedCrisisInformation(missing || null, language)}`;
   }
-  // Q3-fast stop 1: one at-risk reply on every pack, Tele-MANAS first. A medical emergency now
-  // has its own reply (`emergencyReply`), so medical and pharmacy no longer need their own text.
-  return `${texts.general}${alsoCall}`;
+  return `${CRISIS_LEAD[language]} ${fixedCrisisInformation(numbers || null, language)}`;
 }
 
 /**
  * The medical-emergency reply (Q3-fast Part 1, C9): heavy bleeding, chest pain, can't breathe, an
  * overdose or poisoning, waters broken late in pregnancy. Sent on every assistant, whatever its
- * pack: go to the nearest emergency department or call 112 / 108, then the business's own
- * emergency number when its sources have one, then the at-risk line only when self-harm is also
- * present. Fixed text, never generated.
+ * pack: go to the nearest emergency department or call the local emergency number (R6: no
+ * country's numbers), then the business's own emergency number when its sources have one, then the
+ * crisis information only when self-harm is also present. Fixed text, never generated.
  */
+// COPY: needs approval (R6 wording)
 const EMERGENCY_TEXTS: Record<
   CrisisLanguage,
   {
@@ -544,53 +573,51 @@ const EMERGENCY_TEXTS: Record<
     /** About an animal (stop 1): the first line also names the nearest vet. */
     animal: string;
     business: (organisation: string, number: string) => string;
-    selfHarm: string;
   }
 > = {
   en: {
-    base: 'This sounds like an emergency. Please go to the nearest emergency department now, or call 112 or an ambulance on 108.',
+    base: 'This sounds like an emergency. Please go to the nearest emergency department now, or call your local emergency number.',
     animal:
-      'This sounds like an emergency. Please go to the nearest emergency department or your nearest vet now, or call 112 or an ambulance on 108.',
+      'This sounds like an emergency. Please go to the nearest emergency department or your nearest vet now, or call your local emergency number.',
     business: (organisation, number) =>
       ` You can also call ${organisation} on ${number}.`,
-    selfHarm:
-      " If you're thinking of harming yourself, call Tele-MANAS on 14416 (free, 24×7).",
   },
   hi: {
-    base: 'यह आपात स्थिति लगती है। कृपया अभी सबसे नज़दीकी इमरजेंसी विभाग जाएँ, या 112 या एम्बुलेंस के लिए 108 पर कॉल करें।',
+    base: 'यह आपात स्थिति लगती है। कृपया अभी सबसे नज़दीकी इमरजेंसी विभाग जाएँ, या अपने स्थानीय आपातकालीन नंबर पर कॉल करें।',
     animal:
-      'यह आपात स्थिति लगती है। कृपया अभी सबसे नज़दीकी इमरजेंसी विभाग या अपने नज़दीकी पशु चिकित्सक के पास जाएँ, या 112 या एम्बुलेंस के लिए 108 पर कॉल करें।',
+      'यह आपात स्थिति लगती है। कृपया अभी सबसे नज़दीकी इमरजेंसी विभाग या अपने नज़दीकी पशु चिकित्सक के पास जाएँ, या अपने स्थानीय आपातकालीन नंबर पर कॉल करें।',
     business: (organisation, number) =>
       ` आप ${organisation} को ${number} पर भी कॉल कर सकते हैं।`,
-    selfHarm:
-      ' अगर आप खुद को नुकसान पहुँचाने के बारे में सोच रहे हैं, तो टेली-मानस को 14416 पर कॉल करें (मुफ़्त, 24×7)।',
   },
   'hi-latn': {
-    base: 'Yeh emergency lagti hai. Kripya abhi sabse nazdeeki emergency department jaayein, ya 112 ya ambulance ke liye 108 par call karein.',
+    base: 'Yeh emergency lagti hai. Kripya abhi sabse nazdeeki emergency department jaayein, ya apne local emergency number par call karein.',
     animal:
-      'Yeh emergency lagti hai. Kripya abhi sabse nazdeeki emergency department ya apne nazdeeki vet ke paas jaayein, ya 112 ya ambulance ke liye 108 par call karein.',
+      'Yeh emergency lagti hai. Kripya abhi sabse nazdeeki emergency department ya apne nazdeeki vet ke paas jaayein, ya apne local emergency number par call karein.',
     business: (organisation, number) =>
       ` Aap ${organisation} ko ${number} par bhi call kar sakte hain.`,
-    selfHarm:
-      ' Agar aap khud ko nuksaan pahunchane ke baare mein soch rahe hain, toh Tele-MANAS ko 14416 par call karein (free, 24×7).',
   },
 };
 
 export function emergencyReply(options: {
-  language?: CrisisLanguage;
+  language?: CrisisLanguage | string | null;
   organisation?: string | null;
   /** The business's own emergency number, from its helplines or sources; null for none. */
   emergencyNumber?: string | null;
   selfHarm?: boolean;
   /** The message is about an animal: "or your nearest vet" (vet wording itself is cut). */
   animal?: boolean;
+  /** The builder's helpline numbers, named first in the crisis information (R6). */
+  helplineNumbers?: string | null;
 }): string {
-  const texts = EMERGENCY_TEXTS[options.language ?? 'en'];
+  const language = curated(options.language);
+  const texts = EMERGENCY_TEXTS[language];
   const organisation = (options.organisation ?? '').trim();
   const number = (options.emergencyNumber ?? '').trim();
   return [
     options.animal ? texts.animal : texts.base,
     organisation && number ? texts.business(organisation, number) : '',
-    options.selfHarm ? texts.selfHarm : '',
+    options.selfHarm
+      ? ` ${fixedCrisisInformation(options.helplineNumbers ?? null, language)}`
+      : '',
   ].join('');
 }

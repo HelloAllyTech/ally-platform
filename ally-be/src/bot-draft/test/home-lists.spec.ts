@@ -49,9 +49,10 @@ function fixture(options: { role?: ChatbotMemberRole; admin?: boolean } = {}) {
     [BOT, []],
     [OTHER, [{ id: id(), kind: 'email', value: 'x@other.test', label: null }]],
   ]);
-  const members = new Map<string, { userId: number; role: string }[]>([
-    [BOT, [{ userId: 7, role: ChatbotMemberRole.OWNER }]],
-  ]);
+  const members = new Map<
+    string,
+    { userId: number; role: string; roles?: string[] }[]
+  >([[BOT, [{ userId: 7, role: ChatbotMemberRole.OWNER }]]]);
   const documents = new Map<string, Record<string, unknown>[]>([
     [
       BOT,
@@ -126,12 +127,20 @@ function fixture(options: { role?: ChatbotMemberRole; admin?: boolean } = {}) {
     setMembers: jest.fn(
       async (
         bot: string,
-        dto: { members: { userId: number; role: string }[] },
+        dto: { members: { userId: number; role?: string; roles?: string[] }[] },
       ) => {
-        if (!dto.members.some((m) => m.role === ChatbotMemberRole.OWNER)) {
+        // Stage 1b: members carry a role set; the list also shows the old single role.
+        const withRoles = dto.members.map((m) => ({
+          userId: m.userId,
+          roles: m.roles ?? [m.role!],
+          role: (m.roles ?? [m.role!]).includes(ChatbotMemberRole.OWNER)
+            ? ChatbotMemberRole.OWNER
+            : (m.roles ?? [m.role!])[0],
+        }));
+        if (!withRoles.some((m) => m.roles.includes(ChatbotMemberRole.OWNER))) {
           throw new BadRequestException('A chatbot needs at least one owner.');
         }
-        members.set(bot, dto.members);
+        members.set(bot, withRoles);
       },
     ),
     listDocuments: jest.fn(async (bot: string) => documents.get(bot) ?? []),
@@ -331,12 +340,16 @@ describe('Home lists (chunk 20d-2)', () => {
       item: { email: 'Meera@Clinic.test', role: ChatbotMemberRole.EDITOR },
       version: team.version,
     });
-    expect(chatbots.setMembers).toHaveBeenCalledWith(BOT, {
-      members: [
-        { userId: 7, role: ChatbotMemberRole.OWNER },
-        { userId: 8, role: ChatbotMemberRole.EDITOR },
-      ],
-    });
+    expect(chatbots.setMembers).toHaveBeenCalledWith(
+      BOT,
+      {
+        members: [
+          { userId: 7, roles: [ChatbotMemberRole.OWNER] },
+          { userId: 8, roles: [ChatbotMemberRole.EDITOR] },
+        ],
+      },
+      expect.anything(),
+    );
     await expect(
       service.change(BOT, 'team', {
         op: 'add',
@@ -415,18 +428,79 @@ describe('Home lists (chunk 20d-2)', () => {
         version: added.version,
       }),
     ).rejects.toBeInstanceOf(ForbiddenException);
-    const reworded = await service.change(BOT, 'quickReplies', {
+    // Stage 5 (D6): the crisis reply is locked. Its wording is refused; numbers are kept.
+    await expect(
+      service.change(BOT, 'quickReplies', {
+        op: 'edit',
+        id: 'tpl-crisis',
+        item: { responseText: 'Please call 14416 now.' },
+        version: added.version,
+      }),
+    ).rejects.toThrow('This is a fixed safety reply.');
+    const numbered = await service.change(BOT, 'quickReplies', {
       op: 'edit',
       id: 'tpl-crisis',
-      item: { responseText: 'Please call 14416 now.' },
+      // The dashboard sends the wording back unchanged with the numbers: that is fine.
+      item: {
+        responseText: 'Please call 14416.',
+        extraNumbers: [' Tele-MANAS 14416 ', '', '+91 22 2754 6669'],
+      },
       version: added.version,
     });
     expect(replies.customiseTemplate).toHaveBeenLastCalledWith(
       'tpl-crisis',
       BOT,
-      { responseText: 'Please call 14416 now.' },
+      { extraNumbers: ['Tele-MANAS 14416', '+91 22 2754 6669'] },
     );
-    expect(reworded.items[0].responseText).toBe('Please call 14416 now.');
+    expect(numbered.items[0]).toMatchObject({
+      responseText: 'Please call 14416.',
+      locked: true,
+      extraNumbers: ['Tele-MANAS 14416', '+91 22 2754 6669'],
+    });
+  });
+
+  it('lists every quick reply with `locked` and `extraNumbers`, and rewords an unlocked one', async () => {
+    const { service, replies } = fixture();
+    const list = await service.read(BOT, 'quickReplies');
+    expect(list.items[0]).toMatchObject({ locked: true, extraNumbers: [] });
+    const added = await service.change(BOT, 'quickReplies', {
+      op: 'add',
+      item: {
+        name: 'Hours',
+        patterns: ['hours'],
+        responseText: 'Open 9 to 6.',
+      },
+      version: list.version,
+    });
+    const own = added.items.find((i) => i.name === 'Hours')!;
+    expect(own).toMatchObject({ locked: false, extraNumbers: [] });
+    await service.change(BOT, 'quickReplies', {
+      op: 'edit',
+      id: own.id,
+      item: { responseText: 'Open 9 to 7.', extraNumbers: ['123'] },
+      version: added.version,
+    });
+    // Numbers belong to locked replies only.
+    expect(replies.updateTemplate).toHaveBeenLastCalledWith(
+      own.id,
+      { responseText: 'Open 9 to 7.' },
+      BOT,
+    );
+  });
+
+  it('refuses too many regional numbers on a locked reply', async () => {
+    const { service } = fixture();
+    const list = await service.read(BOT, 'quickReplies');
+    await expect(
+      service.change(BOT, 'quickReplies', {
+        op: 'edit',
+        id: 'tpl-crisis',
+        item: {
+          extraNumbers: Array.from({ length: 11 }, (_, i) => `100${i}`),
+        },
+        version: list.version,
+      }),
+    ).rejects.toThrow('Add at most 10 numbers.');
   });
 
   it('shows a reworded default with its original wording', () => {

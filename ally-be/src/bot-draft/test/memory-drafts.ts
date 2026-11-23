@@ -91,6 +91,13 @@ export function memoryDrafts(overrides: Partial<BotDraftEntity> = {}) {
         config.knowledgeDocumentIds = row.draftConfig.knowledgeDocumentIds;
         next.draftConfig = config;
       }
+      // Stage 3: staged documents are kept from the row (as `save`'s SQL does).
+      if (typeof next.source === 'function') {
+        const source = JSON.parse(String(params.source ?? '{}'));
+        source.pendingDocumentIds =
+          row.source?.pendingDocumentIds ?? source.pendingDocumentIds ?? [];
+        next.source = source;
+      }
       row = { ...row, ...clone(next) } as BotDraftEntity;
       pending = {};
       params = {};

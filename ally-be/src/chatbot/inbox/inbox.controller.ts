@@ -37,7 +37,7 @@ import { FeatureToggleKey } from '../../authorization/constants/admin-feature-to
 import { PERMISSIONS } from '../../authorization/constants/permissions.constants';
 import { ExecutionManager } from '../../common/execution/execution-manager';
 import { SseWriter } from '../../common/sse/sse-writer';
-import { ChatbotMemberRole } from '../enum/chatbot.enum';
+import { ChatbotCapability, ChatbotMemberRole } from '../enum/chatbot.enum';
 import { ConversationChannel } from '../enum/conversation.enum';
 import { HandoverService } from '../handover/handover.service';
 import { MemoryService } from '../memory/memory.service';
@@ -48,7 +48,12 @@ import {
   type InboxChannelFilter,
   type InboxView,
 } from './inbox.service';
-import { ChatbotRole, AssistantScope } from '../access/chatbot-role.decorator';
+import {
+  ChatbotCan,
+  ChatbotRole,
+  AssistantScope,
+} from '../access/chatbot-role.decorator';
+import { ResponderAgreementService } from '../members/responder-agreement.service';
 
 const EDIT = { permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT] };
 /** How often a live inbox stream re-reads which assistants its user can see. */
@@ -77,6 +82,11 @@ export class InboxQueryDto {
   before?: string;
 }
 
+/** Stage 8: Ally staff name the one chatbot they are reading (with the owner's grant). */
+export class InboxCountsQueryDto {
+  @ApiPropertyOptional() @IsOptional() @IsUUID() chatbotId?: string;
+}
+
 export class MemoryQueryDto {
   /** The chat open beside it: its pre-chat answers and summary come too. */
   @ApiPropertyOptional() @IsOptional() @IsUUID() conversationId?: string;
@@ -99,7 +109,8 @@ const userId = (): number => Number(ExecutionManager.getUserId() ?? 0);
 
 /**
  * The inbox (chunk 11a): every channel's chats in one place, live; taking a chat over, replying on
- * its channel and handing it back. Viewers read; editors take over and reply.
+ * its channel and handing it back. Viewers read; responders, editors and owners take over and reply
+ * (Stage 1b: the `respond` capability, after accepting the responder agreement).
  */
 @ApiTags('Inbox')
 @ApiBearerAuth()
@@ -114,7 +125,20 @@ export class InboxController {
     private readonly access: ChatbotAccessService,
     @InjectDataSource() private readonly dataSource: DataSource,
     @Optional() private readonly memory?: MemoryService,
+    @Optional() private readonly agreement?: ResponderAgreementService,
   ) {}
+
+  /** Who holds the chat now (null: the assistant), for the responder-agreement checks. */
+  private async heldBy(
+    chatbotId: string,
+    conversationId: string,
+  ): Promise<number | null> {
+    const [row] = (await this.dataSource.query(
+      `SELECT handled_by_user_id FROM chatbot_conversations WHERE id = $1 AND chatbot_id = $2`,
+      [conversationId, chatbotId],
+    )) as { handled_by_user_id: number | null }[];
+    return row?.handled_by_user_id ?? null;
+  }
 
   // ──────────────────────────────── what the assistant remembers (chunk 8a)
 
@@ -226,8 +250,13 @@ export class InboxController {
   @ApiOperation({
     summary: 'Chats from every channel: Safety and Needs a person first',
   })
-  list(@Query() query: InboxQueryDto) {
-    return this.inbox.list(query);
+  async list(@Query() query: InboxQueryDto) {
+    // Stage 8: Ally staff name one chatbot; read only with the owner's live grant, logged first.
+    const staffScope = await this.access.staffListScope(query.chatbotId, {
+      key: 'InboxController.list',
+      route: 'GET /v1/inbox/conversations',
+    });
+    return this.inbox.list(query, staffScope);
   }
 
   @Get('counts')
@@ -236,8 +265,12 @@ export class InboxController {
   @ApiOperation({
     summary: 'Unread chats, Needs a person and Safety, for the nav',
   })
-  counts() {
-    return this.inbox.counts();
+  async counts(@Query() query: InboxCountsQueryDto) {
+    const staffScope = await this.access.staffListScope(query.chatbotId, {
+      key: 'InboxController.counts',
+      route: 'GET /v1/inbox/counts',
+    });
+    return this.inbox.counts(staffScope);
   }
 
   @Get('events')
@@ -251,7 +284,16 @@ export class InboxController {
   async stream(@Res() res: Response): Promise<void> {
     const sse = new SseWriter(res);
     sse.send('hello', await this.inbox.counts());
-    const forward = (event: { type: string }) => {
+    let rescopeNow: () => void = () => undefined;
+    const forward = (event: { type: string; removedUserIds?: unknown }) => {
+      if (event.type === 'members') {
+        // Stage 1b: someone taken off a team stops hearing about it at once.
+        const removed = Array.isArray(event.removedUserIds)
+          ? event.removedUserIds.map(Number)
+          : [];
+        if (removed.includes(userId())) rescopeNow();
+        return;
+      }
       const { type, ...data } = event;
       sse.send(type, data);
     };
@@ -261,6 +303,12 @@ export class InboxController {
       return this.events.listenInbox(chatbots, forward);
     };
     let stop = await subscribe();
+    rescopeNow = () => {
+      void subscribe().then((next) => {
+        stop();
+        stop = next;
+      });
+    };
     // Someone removed from an assistant stops hearing about it within RESCOPE_MS.
     const rescope = setInterval(() => {
       void subscribe().then((next) => {
@@ -284,20 +332,35 @@ export class InboxController {
     @Param('chatbotId', ParseUUIDPipe) chatbotId: string,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
+    // Stage 1b: a responder-only member reads a chat only under the current agreement, or one
+    // they already hold.
+    const { roles } = await this.access.assertCan(
+      chatbotId,
+      ChatbotCapability.VIEW,
+    );
+    await this.agreement?.assertMayRead(
+      userId(),
+      roles,
+      await this.heldBy(chatbotId, id),
+    );
     const thread = await this.inbox.thread(chatbotId, id);
     if (!thread)
       throw new NotFoundException('That conversation was not found.');
-    await this.inbox.markRead(chatbotId, id);
-    await this.events.publishInbox({
-      type: 'read',
-      chatbotId,
-      conversationId: id,
-    });
+    // Stage 8: an Ally staff view never marks a chat read (it would hide it from the owners'
+    // "nobody opened it" email).
+    if (!this.access.isStaffView(chatbotId)) {
+      await this.inbox.markRead(chatbotId, id);
+      await this.events.publishInbox({
+        type: 'read',
+        chatbotId,
+        conversationId: id,
+      });
+    }
     return thread;
   }
 
   @Post('chatbots/:chatbotId/conversations/:id/take-over')
-  @ChatbotRole(ChatbotMemberRole.EDITOR, 'chatbotId')
+  @ChatbotCan(ChatbotCapability.RESPOND, 'chatbotId')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary:
@@ -307,12 +370,17 @@ export class InboxController {
     @Param('chatbotId', ParseUUIDPipe) chatbotId: string,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    await this.access.assert(chatbotId, ChatbotMemberRole.EDITOR);
+    await this.access.assertCan(chatbotId, ChatbotCapability.RESPOND);
+    // A new agreement version blocks new take-overs only, never a chat already held.
+    await this.agreement?.assertMayTakeOver(
+      userId(),
+      await this.heldBy(chatbotId, id),
+    );
     return this.handover.takeOver(chatbotId, id, userId());
   }
 
   @Post('chatbots/:chatbotId/conversations/:id/hand-back')
-  @ChatbotRole(ChatbotMemberRole.EDITOR, 'chatbotId')
+  @ChatbotCan(ChatbotCapability.RESPOND, 'chatbotId')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary:
@@ -322,20 +390,20 @@ export class InboxController {
     @Param('chatbotId', ParseUUIDPipe) chatbotId: string,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    const { role } = await this.access.assert(
+    const { roles } = await this.access.assertCan(
       chatbotId,
-      ChatbotMemberRole.EDITOR,
+      ChatbotCapability.RESPOND,
     );
     return this.handover.handBack(
       chatbotId,
       id,
       userId(),
-      role === ChatbotMemberRole.OWNER,
+      roles.includes(ChatbotMemberRole.OWNER),
     );
   }
 
   @Post('chatbots/:chatbotId/conversations/:id/messages')
-  @ChatbotRole(ChatbotMemberRole.EDITOR, 'chatbotId')
+  @ChatbotCan(ChatbotCapability.RESPOND, 'chatbotId')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({
     summary:
@@ -346,9 +414,13 @@ export class InboxController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: InboxReplyDto,
   ) {
-    const { chatbot } = await this.access.assert(
+    const { chatbot } = await this.access.assertCan(
       chatbotId,
-      ChatbotMemberRole.EDITOR,
+      ChatbotCapability.RESPOND,
+    );
+    await this.agreement?.assertMayReply(
+      userId(),
+      await this.heldBy(chatbotId, id),
     );
     const [user] = (await this.dataSource.query(
       `SELECT id, name FROM users WHERE id = $1`,

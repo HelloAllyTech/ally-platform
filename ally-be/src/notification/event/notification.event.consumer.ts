@@ -1,9 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { NotificationService } from '../service/notification.service';
 import { NotificationErrorType } from '../type/notification.error.type';
 import { AppType } from 'src/common/constants/user.constants';
 import { LoggerService } from 'src/logger/logger.service';
+import {
+  CHATBOT_INVITE_CREATED_EVENT,
+  ChatbotInviteCreatedEvent,
+} from '../type/chatbot-invite.event';
+import { chatbotInviteEmail } from '../type/chatbot-invite.template';
+import { EmailService } from '../service/email.service';
 import {
   EMAIL_SEND_FAILED_EVENT,
   EmailSendFailedEvent,
@@ -15,7 +21,37 @@ export class NotificationEventConsumer {
     NotificationEventConsumer.name,
   );
 
-  constructor(private readonly notificationService: NotificationService) {}
+  constructor(
+    private readonly notificationService: NotificationService,
+    @Optional() private readonly emailService?: EmailService,
+  ) {}
+
+  /**
+   * A chatbot team invite (Stage 1b). Returns whether it went, as `otp.generated` does, so the
+   * invite's API answer can say "not sent" instead of throwing out of an event handler.
+   */
+  @OnEvent(CHATBOT_INVITE_CREATED_EVENT)
+  async handleChatbotInvite(
+    payload: ChatbotInviteCreatedEvent,
+  ): Promise<boolean> {
+    if (!this.emailService) return false;
+    try {
+      const { subject, body } = chatbotInviteEmail(payload);
+      return await this.emailService.sendChatbotInvite({
+        to: payload.to,
+        subject,
+        body,
+        link: payload.link,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to send a chatbot invite to a ${
+          payload.to?.split('@')[1] ?? 'unknown'
+        } address: ${error instanceof Error ? error.message : 'unknown error'}`,
+      );
+      return false;
+    }
+  }
 
   @OnEvent('exception')
   handleException(payload: NotificationErrorType) {

@@ -107,6 +107,10 @@ export class Chatbot extends BaseWithoutTenantEntity {
 
   @Column({ type: 'timestamp', name: 'archived_at', nullable: true })
   archivedAt?: Date | null;
+
+  /** Assistants stage 5 (copy, not share): the chatbot this one was duplicated from. */
+  @Column({ type: 'uuid', name: 'copied_from_chatbot_id', nullable: true })
+  copiedFromChatbotId?: string | null;
 }
 
 /** The owner's change of an assistant's safety pack (Q3-fast Part 1). */

@@ -187,11 +187,16 @@ export class WhatsAppAdminService {
       },
     });
     if (existing) {
+      this.assertLockedEdit(existing, dto);
       await this.templateRepository.update(
         { id: existing.id },
         { ...changes, updatedBy: this.userId() },
       );
       return this.findTemplateOrFail(existing.id);
+    }
+    // A first customisation of a mandatory reply makes the locked copy: numbers only.
+    if (global.mandatory) {
+      this.assertLockedEdit({ locked: true, name: global.name }, dto);
     }
     return this.templateRepository.save(
       this.templateRepository.create({
@@ -206,6 +211,8 @@ export class WhatsAppAdminService {
         terminal: global.terminal,
         active: true,
         mandatory: false,
+        // Stage 5 (D6): a chatbot's copy of a mandatory reply is locked.
+        locked: global.mandatory,
         ...changes,
         chatbotId,
         overridesTemplateId: global.id,
@@ -280,7 +287,7 @@ export class WhatsAppAdminService {
     if ((template.chatbotId ?? undefined) !== chatbotId) {
       throw new NotFoundException(`Template ${id} was not found`);
     }
-    if (template.mandatory) {
+    if (template.mandatory || template.locked) {
       throw new ForbiddenException(
         `"${template.name}" is a required safety template and cannot be removed.`,
       );
@@ -336,7 +343,36 @@ export class WhatsAppAdminService {
     if (dto.patterns !== undefined) out.patterns = dto.patterns;
     if (dto.matchType !== undefined) out.matchType = dto.matchType;
     if (dto.active !== undefined) out.active = dto.active;
+    if (dto.extraNumbers !== undefined) {
+      out.extraNumbers = dto.extraNumbers.map((n) => n.trim()).filter(Boolean);
+    }
     return out;
+  }
+
+  /**
+   * Stage 5 (D6): a chatbot's copy of a crisis, STOP or START reply is locked. Its wording,
+   * keywords and name come from Ally (staff push an update to every copy); only regional numbers
+   * may be added. Refused before anything is written.
+   */
+  private assertLockedEdit(
+    row: Pick<WaKeywordTemplate, 'locked' | 'name'> | null | undefined,
+    dto: UpdateWaTemplateDto,
+  ): void {
+    if (!row?.locked) return;
+    const wording =
+      dto.responseText !== undefined ||
+      dto.patterns !== undefined ||
+      dto.matchType !== undefined ||
+      dto.name !== undefined ||
+      dto.languageCode !== undefined ||
+      dto.priority !== undefined ||
+      dto.bypassRag !== undefined ||
+      dto.terminal !== undefined;
+    if (wording) {
+      throw new ForbiddenException(
+        `"${row.name}" is a fixed safety reply. Its wording is set by Ally; you can add regional numbers.`,
+      );
+    }
   }
 
   private assertBotKind(kind: WaTemplateKind): void {

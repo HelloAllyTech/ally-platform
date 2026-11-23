@@ -11,6 +11,20 @@ import { AiModule } from '../ai/ai.module';
 import { BotPageModule } from '../chatbot/bot-page/bot-page.module';
 import { KnowledgeBaseModule } from '../knowledge-base/knowledge-base.module';
 import { BotDraftController } from './controller/bot-draft.controller';
+import { DraftToolsController } from './controller/draft-tools.controller';
+import { WorkingCopyController } from './controller/working-copy.controller';
+import { WorkingCopyService } from './working-copy/working-copy.service';
+import { BlankChatbotService } from './blank/blank-chatbot.service';
+import { LibraryTemplateService } from './templates/library-template.service';
+import { CopilotService } from './copilot/copilot.service';
+import { SAFETY_APPLY_CHECK } from './working-copy/safety-apply-check';
+import { JudgedSafetyApplyCheck } from './working-copy/judged-safety-apply-check';
+import { CrisisSuiteService } from './checkup/crisis-suite.service';
+import { CrisisSuiteController } from './checkup/crisis-suite.controller';
+import { SafetyPackReleaseController } from './safety-pack/releases/safety-pack-release.controller';
+import { SafetyPackReleaseService } from './safety-pack/releases/safety-pack-release.service';
+import { BotDraftLikelyService } from './service/bot-draft-likely.service';
+import { DraftChangeService } from './service/draft-change.service';
 import { ChatbotChangesController } from './controller/chatbot-changes.controller';
 import { AssistantHomeController } from './home/assistant-home.controller';
 import { AssistantHomeService } from './home/assistant-home.service';
@@ -22,6 +36,7 @@ import { ScorecardController } from './scorecard/scorecard.controller';
 import { ScorecardService } from './scorecard/scorecard.service';
 import { ChatbotMessageFeedback } from '../chatbot/entity/chatbot-message-feedback.entity';
 import { CRAWL_LEARNER } from './crawl/site-crawl.service';
+import { BotDraftPreviewService } from './service/bot-draft-preview.service';
 import { BotDraftPublishService } from './service/bot-draft-publish.service';
 import { BotDraftSessionService } from './service/bot-draft-session.service';
 import { SiteCrawlService } from './crawl/site-crawl.service';
@@ -64,9 +79,16 @@ import { BotDraftService } from './service/bot-draft.service';
   ],
   controllers: [
     BotDraftController,
+    DraftToolsController,
+    // Stage 3: the working copy, templates and Copilot's sources.
+    WorkingCopyController,
     ChatbotChangesController,
     AssistantHomeController,
     CheckupController,
+    // Stage 4: the per-language crisis check the go-live gate reads.
+    CrisisSuiteController,
+    // Stage 9: safety pack releases (Ally curators).
+    SafetyPackReleaseController,
     ScorecardController,
     TemplateController,
   ],
@@ -76,6 +98,10 @@ import { BotDraftService } from './service/bot-draft.service';
     SiteCrawlService,
     BotDraftSessionService,
     BotDraftPublishService,
+    // SB1: chat with the assistant while building it.
+    BotDraftPreviewService,
+    BotDraftLikelyService,
+    DraftChangeService,
     AssistantHomeService,
     ChangeService,
     SourcesService,
@@ -84,8 +110,19 @@ import { BotDraftService } from './service/bot-draft.service';
     CheckupService,
     DraftCheckupService,
     CheckupCasesService,
+    CrisisSuiteService,
+    SafetyPackReleaseService,
     // Use-case templates (T1).
     TemplateService,
+    // Stage 3: Create and Build.
+    WorkingCopyService,
+    BlankChatbotService,
+    LibraryTemplateService,
+    CopilotService,
+    // Stage 4: patterns first, then the model judge and the crisis check, failing closed.
+    { provide: SAFETY_APPLY_CHECK, useClass: JudgedSafetyApplyCheck },
+    // CREDITS_GATE comes from the global BillingModule (LedgerCreditsGate, stage 6). Every
+    // injection is optional: without it everything is available (the stage 1 stub's answer).
     // The crawl hands each batch of pages to the builder's fact extraction.
     { provide: CRAWL_LEARNER, useExisting: BotDraftSessionService },
   ],

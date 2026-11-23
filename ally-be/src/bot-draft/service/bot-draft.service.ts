@@ -48,6 +48,7 @@ import type {
   TranscriptEntry,
 } from '../type/bot-draft.type';
 import { BotDraftEventsService } from './bot-draft-events.service';
+import { QuickReplyCopyService } from '../../chatbot/quick-replies/quick-reply-copy.service';
 import {
   applyPatch,
   PatchError,
@@ -134,6 +135,8 @@ export class BotDraftService {
     private readonly access: ChatbotAccessService,
     private readonly events: BotDraftEventsService,
     @Optional() private readonly emitter?: EventEmitter2,
+    // Stage 5 (D6): every new chatbot, blank ones included, gets its own quick-reply copies.
+    @Optional() private readonly quickReplies?: QuickReplyCopyService,
   ) {}
 
   static defaultDraft(name: string): BotDraft {
@@ -180,13 +183,15 @@ export class BotDraftService {
     website?: string | null;
     description?: string | null;
     interview?: boolean;
+    /** Stage 3: created at the click with nothing chosen yet; untouched until the first action. */
+    blank?: boolean;
   }): Promise<BotDraftEntity> {
     const userId = currentUserId();
     if (!userId) throw new ForbiddenException('Sign in first.');
     const tenantId = ExecutionManager.getTenantId() || null;
     const draftConfig = BotDraftService.defaultDraft(input.name);
 
-    return this.dataSource.transaction(async (manager) => {
+    const created = await this.dataSource.transaction(async (manager) => {
       const chatbot = await manager.save(
         manager.create(Chatbot, {
           name: draftConfig.name,
@@ -202,6 +207,8 @@ export class BotDraftService {
         chatbotId: chatbot.id,
         userId,
         role: ChatbotMemberRole.OWNER,
+        // Dual-write the role set (stage 1b) with the old single role.
+        roles: [ChatbotMemberRole.OWNER],
         createdBy: userId,
       } as Partial<ChatbotMember>);
       return manager.save(
@@ -221,9 +228,20 @@ export class BotDraftService {
           transcript: [],
           events: [],
           version: 0,
+          blank: Boolean(input.blank),
+          touchedAt: input.blank ? null : new Date(),
+          liveBase: {},
         }),
       );
     });
+    // Outside the transaction: the globals still answer for it until the copy runs (the
+    // mandatory ones always do), so a failed copy never fails the create.
+    if (created.chatbotId) {
+      await this.quickReplies
+        ?.copyGlobalsInto(created.chatbotId)
+        .catch(() => undefined);
+    }
+    return created;
   }
 
   /** The draft, if the caller started it; 404 otherwise (platform admins included). */
@@ -257,12 +275,17 @@ export class BotDraftService {
       target: 'draft' | 'learned';
       expectedVersion?: number;
       summary?: string;
+      /**
+       * Stage 3: an edit to a chatbot's working copy, which lives for the chatbot's whole life. A
+       * published setup's draft is still its working copy; only an abandoned one is closed.
+       */
+      workingCopy?: boolean;
     },
   ): Promise<{ draft: BotDraftEntity; event: DraftEvent }> {
-    if (
-      draft.status !== BotDraftStatus.ACTIVE &&
-      actor !== BotDraftActor.SYSTEM
-    ) {
+    const closed = options.workingCopy
+      ? draft.status === BotDraftStatus.ABANDONED
+      : draft.status !== BotDraftStatus.ACTIVE;
+    if (closed && actor !== BotDraftActor.SYSTEM) {
       throw new ConflictException(
         'This setup is finished. Change the assistant from its own page.',
       );
@@ -499,6 +522,29 @@ export class BotDraftService {
   }
 
   /**
+   * Add lines to the chat without a version bump (Copilot's change by chat, stage 3): a targeted
+   * append, like `touch`, so a proposal's version stays good for Apply and a concurrent edit is
+   * never refused because of a chat line. Keeps the newest 400 lines.
+   */
+  async appendTranscriptLines(
+    draftId: string,
+    entries: Omit<TranscriptEntry, 'id' | 'at'>[],
+  ): Promise<void> {
+    if (!entries.length) return;
+    const at = new Date().toISOString();
+    const lines = entries.map((entry) => ({ ...entry, id: randomUUID(), at }));
+    await this.dataSource.query(
+      `UPDATE bot_drafts SET transcript = (
+         SELECT coalesce(jsonb_agg(t.e ORDER BY t.n), '[]'::jsonb)
+           FROM jsonb_array_elements(coalesce(transcript, '[]'::jsonb) || $2::jsonb)
+                WITH ORDINALITY AS t(e, n)
+          WHERE t.n > jsonb_array_length(coalesce(transcript, '[]'::jsonb) || $2::jsonb) - 400)
+        WHERE id = $1`,
+      [draftId, JSON.stringify(lines)],
+    );
+  }
+
+  /**
    * Save the crawl's progress. A targeted update that doesn't bump the version: the crawl runs in
    * the background while the owner may be editing, and its progress must never make their edit
    * stale (or be lost to it).
@@ -511,6 +557,36 @@ export class BotDraftService {
       `UPDATE bot_drafts SET crawl = $2::jsonb, "updatedAt" = now() WHERE id = $1`,
       [draftId, JSON.stringify(crawl)],
     );
+  }
+
+  /**
+   * Stage 6: the facts of a paused crawl batch were read after a grant; the "paused: out of
+   * credits" marker goes. Only on a crawl that has finished, so a running crawl's own save wins.
+   */
+  async clearCrawlPause(draftId: string): Promise<void> {
+    await this.dataSource.query(
+      `UPDATE bot_drafts SET crawl = crawl - 'pausedOutOfCredits' - 'pausedReason', "updatedAt" = now()
+        WHERE id = $1 AND crawl ? 'pausedOutOfCredits' AND crawl->>'status' <> 'running'`,
+      [draftId],
+    );
+  }
+
+  /**
+   * The resume sweep: a finished crawl still marked paused with no paused batch left for it (the
+   * batch was resumed, or its job is gone) loses the marker. Idempotent; returns how many.
+   */
+  async clearStaleCrawlPauses(jobKind: string): Promise<number> {
+    const result = await this.dataSource.query(
+      `UPDATE bot_drafts d SET crawl = crawl - 'pausedOutOfCredits' - 'pausedReason', "updatedAt" = now()
+        WHERE crawl ? 'pausedOutOfCredits' AND crawl->>'status' <> 'running'
+          AND NOT EXISTS (SELECT 1 FROM credit_paused_jobs j
+                           WHERE j.kind = $1 AND j.subject_id = d.id::text)
+        RETURNING d.id`,
+      [jobKind],
+    );
+    const rows =
+      Array.isArray(result) && Array.isArray(result[0]) ? result[0] : result;
+    return Array.isArray(rows) ? rows.length : 0;
   }
 
   /**
@@ -543,6 +619,38 @@ export class BotDraftService {
               "updatedAt" = now()
         WHERE id = $1 AND NOT (COALESCE(draft_config->'knowledgeDocumentIds', '[]'::jsonb) ? $2)`,
       [draftId, documentId],
+    );
+  }
+
+  /**
+   * Stage 3: a document added to a live chatbot, waiting for Apply (`source.pendingDocumentIds`).
+   * Server-maintained, appended without a version bump like `addKnowledgeDocument`.
+   */
+  async addPendingDocument(draftId: string, documentId: string): Promise<void> {
+    await this.dataSource.query(
+      `UPDATE bot_drafts
+          SET source = jsonb_set(source, '{pendingDocumentIds}',
+                COALESCE(source->'pendingDocumentIds', '[]'::jsonb) || to_jsonb($2::text)),
+              "updatedAt" = now()
+        WHERE id = $1 AND NOT (COALESCE(source->'pendingDocumentIds', '[]'::jsonb) ? $2)`,
+      [draftId, documentId],
+    );
+  }
+
+  /** Stage 3: staged documents Apply attached, taken off the pending list. */
+  async removePendingDocuments(
+    draftId: string,
+    documentIds: string[],
+  ): Promise<void> {
+    if (!documentIds.length) return;
+    await this.dataSource.query(
+      `UPDATE bot_drafts
+          SET source = jsonb_set(source, '{pendingDocumentIds}',
+                COALESCE((SELECT jsonb_agg(v) FROM jsonb_array_elements_text(source->'pendingDocumentIds') v
+                           WHERE v <> ALL($2::text[])), '[]'::jsonb)),
+              "updatedAt" = now()
+        WHERE id = $1`,
+      [draftId, documentIds],
     );
   }
 
@@ -608,15 +716,23 @@ export class BotDraftService {
 
   /** Drafts whose crawl was left running (an instance restarted mid-crawl), for the sweep. */
   findStalledCrawls(olderThanSeconds: number): Promise<BotDraftEntity[]> {
-    return this.drafts
-      .createQueryBuilder('d')
-      .where(`d.status = :active`, { active: BotDraftStatus.ACTIVE })
-      .andWhere(`d.crawl->>'status' = 'running'`)
-      .andWhere(`d."updatedAt" < now() - (:seconds || ' seconds')::interval`, {
-        seconds: String(olderThanSeconds),
-      })
-      .take(20)
-      .getMany();
+    return (
+      this.drafts
+        .createQueryBuilder('d')
+        // Stage 3: a live chatbot's working copy (published) reads new sources too.
+        .where(`d.status <> :abandoned`, {
+          abandoned: BotDraftStatus.ABANDONED,
+        })
+        .andWhere(`d.crawl->>'status' = 'running'`)
+        .andWhere(
+          `d."updatedAt" < now() - (:seconds || ' seconds')::interval`,
+          {
+            seconds: String(olderThanSeconds),
+          },
+        )
+        .take(20)
+        .getMany()
+    );
   }
 
   async findById(draftId: string): Promise<BotDraftEntity | null> {
@@ -626,6 +742,89 @@ export class BotDraftService {
   /** The draft that built a chatbot, if one did. */
   findByChatbot(chatbotId: string): Promise<BotDraftEntity | null> {
     return this.drafts.findOne({ where: { chatbotId } });
+  }
+
+  // ── Stage 3: the working copy ─────────────────────────────────────────
+
+  /**
+   * The chatbot's working copy (one draft per chatbot, `uq_bot_drafts_chatbot`). A setup left
+   * abandoned comes back as the working copy: the chatbot is being built again.
+   */
+  async findWorkingCopy(chatbotId: string): Promise<BotDraftEntity | null> {
+    const draft = await this.drafts.findOne({ where: { chatbotId } });
+    if (!draft || draft.status !== BotDraftStatus.ABANDONED) return draft;
+    const [chatbot] = (await this.dataSource.query(
+      `SELECT status FROM chatbots WHERE id = $1`,
+      [chatbotId],
+    )) as { status: ChatbotStatus }[];
+    const live = Boolean(chatbot) && chatbot.status !== ChatbotStatus.DRAFT;
+    return this.update(draft, {
+      status: live ? BotDraftStatus.PUBLISHED : BotDraftStatus.ACTIVE,
+      // Nothing agreed with live yet: the merge adopts the live values first.
+      liveBase: {},
+    });
+  }
+
+  /**
+   * The first meaningful action on a chatbot (template, path, source, edit, test message). Never
+   * moves back: once touched, a blank is never swept. No version bump, so it races nothing.
+   */
+  async touch(draftId: string): Promise<void> {
+    await this.dataSource.query(
+      `UPDATE bot_drafts SET touched_at = now() WHERE id = $1 AND touched_at IS NULL`,
+      [draftId],
+    );
+  }
+
+  /** The chatbot went live: from now on its working copy waits for Apply. Set once. */
+  async markLive(draftId: string, base: Record<string, string>): Promise<void> {
+    await this.dataSource.query(
+      `UPDATE bot_drafts
+          SET live_at = COALESCE(live_at, now()),
+              live_base = $2::jsonb,
+              touched_at = COALESCE(touched_at, now())
+        WHERE id = $1`,
+      [draftId, JSON.stringify(base)],
+    );
+  }
+
+  /** The builder's last mode on this chatbot (Copilot or the form). */
+  async setBuildMode(draftId: string, mode: 'copilot' | 'form'): Promise<void> {
+    await this.dataSource.query(
+      `UPDATE bot_drafts SET build_mode = $2 WHERE id = $1`,
+      [draftId, mode],
+    );
+  }
+
+  /**
+   * A working copy for a chatbot that has none (made by hand, or its only draft was abandoned): the
+   * live chatbot as it is, owned by its creator, already in step with live.
+   */
+  async createWorkingCopy(
+    chatbot: Chatbot,
+    config: BotDraft,
+    base: Record<string, string>,
+  ): Promise<BotDraftEntity> {
+    const live = chatbot.status !== ChatbotStatus.DRAFT;
+    const saved = await this.drafts.save(
+      this.drafts.create({
+        ownerUserId: chatbot.createdBy,
+        tenantId: ExecutionManager.getTenantId() || null,
+        status: live ? BotDraftStatus.PUBLISHED : BotDraftStatus.ACTIVE,
+        step: live ? BotDraftStep.PUBLISHED : BotDraftStep.LEARNED,
+        source: { autoName: null },
+        draftConfig: config,
+        chatbotId: chatbot.id,
+        transcript: [],
+        events: [],
+        version: 0,
+        blank: false,
+        touchedAt: new Date(),
+        liveAt: live ? new Date() : null,
+        liveBase: base,
+      }),
+    );
+    return saved;
   }
 
   /** Persist a draft that changed in ways other than a patch (crawl, answers, design). */
@@ -659,7 +858,11 @@ export class BotDraftService {
       .set({
         status: next.status,
         step: next.step,
-        source: next.source,
+        // Stage 3: staged documents are kept from the row, like the documents list below: the
+        // crawl appends to them without a version bump (`addPendingDocument`), and Apply removes
+        // them with `removePendingDocuments`.
+        source: () =>
+          `jsonb_set(CAST(:source AS jsonb), '{pendingDocumentIds}', COALESCE(source->'pendingDocumentIds', CAST(:pendingIds AS jsonb)))`,
         // Never `crawl`: only the crawl writes it (`saveCrawl`), so a draft read before the
         // crawl's latest page can't roll its progress back.
         learned: next.learned,
@@ -676,9 +879,16 @@ export class BotDraftService {
         transcript: next.transcript,
         events: next.events,
         version: next.version,
+        // Stage 3: the per-field merge base moves with the working copy it describes.
+        ...(next.liveBase ? { liveBase: next.liveBase } : {}),
       } as never)
       .where('id = :id AND version = :basedOn', { id: draft.id, basedOn })
       .setParameter('draftConfig', JSON.stringify(next.draftConfig))
+      .setParameter('source', JSON.stringify(next.source ?? {}))
+      .setParameter(
+        'pendingIds',
+        JSON.stringify(next.source?.pendingDocumentIds ?? []),
+      )
       .setParameter(
         'documentIds',
         JSON.stringify(next.draftConfig.knowledgeDocumentIds ?? []),
@@ -693,7 +903,13 @@ export class BotDraftService {
     }
     // Q3-fast Part 2: once the facts are a document, it follows every save (an unchanged text is
     // a no-op there), so a removed page, a correction or a re-read reaches what the assistant knows.
-    if (next.chatbotId && next.source?.learnedFactsDocumentId) {
+    // Stage 3: on a live chatbot, facts read from a source added after go-live wait for Apply
+    // (`source.factsStaged`), like the source itself.
+    if (
+      next.chatbotId &&
+      next.source?.learnedFactsDocumentId &&
+      !next.source?.factsStaged
+    ) {
       this.emitter?.emit(LEARNED_FACTS_CHANGED, {
         chatbotId: next.chatbotId,
         documentId: next.source.learnedFactsDocumentId,

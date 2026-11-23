@@ -84,7 +84,9 @@ test("a Chatbots-only custom login lands on its assistants and sees nothing else
   await logIn(page);
   await expect(page).toHaveURL(/\/assistants$/);
   // No Sidebar: only its email and Log out (6b, item 31).
+  // One corner menu (stage 2): the email on its button, Plan and Log out inside it.
   await expect(page.getByTestId("assistant-only-header")).toContainText("asha@clinic.example");
+  await page.getByTestId("corner-menu-button").click();
   await expect(page.getByTestId("assistant-only-logout")).toBeVisible();
   await expect(page.getByTestId("admin-sidebar")).toHaveCount(0);
 

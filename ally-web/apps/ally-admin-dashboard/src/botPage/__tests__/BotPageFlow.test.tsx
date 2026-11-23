@@ -18,6 +18,7 @@ const PAGE: PublicBotPage = {
     avatarUrl: null,
     disclaimer: "Not a crisis service.",
     footerLink: { label: "Privacy", url: "https://sunrise.example/privacy" },
+    welcome: "Ask us about appointments.",
   },
   suggestedQuestions: ["What are your fees?"],
   prechat: [
@@ -94,7 +95,11 @@ describe("BotPageApp", () => {
     render(<BotPageApp slug="sunrise-mind" api={api} />);
 
     expect(await screen.findByRole("heading", { name: "Sunrise Mind" })).toBeInTheDocument();
-    expect(screen.getByText("Not a crisis service.")).toBeInTheDocument();
+    // Stage 7: the welcome line shows; the retired subtitle, disclaimer and footer link never do.
+    expect(screen.getByText("Ask us about appointments.")).toBeInTheDocument();
+    expect(screen.queryByText("Not a crisis service.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Questions about our clinic")).not.toBeInTheDocument();
+    expect(screen.queryByText("Privacy")).not.toBeInTheDocument();
     expect(screen.getByText("Only invited people can use this chat.")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Start" }));
 
@@ -117,7 +122,7 @@ describe("BotPageApp", () => {
     expect(screen.getByText("Question 1 of 2")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Next" }));
     expect(screen.getByRole("alert")).toHaveTextContent("Please answer this question.");
-    await user.type(screen.getByRole("textbox"), "Asha");
+    await user.type(screen.getByRole("textbox", { name: "Your name" }), "Asha");
     await user.click(screen.getByRole("button", { name: "Next" }));
     await screen.findByRole("heading", { name: "Reason" });
     expect(screen.getByText("Question 2 of 2")).toBeInTheDocument();

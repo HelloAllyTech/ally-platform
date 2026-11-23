@@ -59,11 +59,18 @@ describe("useBrandEditor (chunk 20d: saves as you go, with Undo)", () => {
     expect(saveBrand).not.toHaveBeenCalled();
     act(() => vi.advanceTimersByTime(BRAND_SAVE_DEBOUNCE_MS));
     expect(saveBrand).toHaveBeenCalledTimes(1);
+    // Stage 7: the retired heading style stays on screen only; ally-be would refuse it.
     expect(saveBrand).toHaveBeenCalledWith({
       id: "bot-1",
       accent: "#3B3BD9",
-      headingStyle: "modern",
     });
+  });
+
+  it("stage 7: a change only to retired fields sends nothing", () => {
+    const { result } = renderHook(() => useBrandEditor("bot-1", "failed"));
+    act(() => result.current.change({ theme: "dark", coverImage: "img-9" }));
+    act(() => vi.advanceTimersByTime(BRAND_SAVE_DEBOUNCE_MS));
+    expect(saveBrand).not.toHaveBeenCalled();
   });
 
   it("Undo puts back the brand from before the last change", () => {

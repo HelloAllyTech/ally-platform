@@ -30,6 +30,29 @@ export interface UsageContext {
   audience?: 'customer' | 'seat' | 'owner';
   /** The signed-in email on an invite or organisation bot page: whose seat it is. */
   seatEmail?: string | null;
+  /**
+   * Stage 6: the account paying for this run, stamped when the run starts (by the credits gate),
+   * and sent to ally-ai so every call it reports names its payer.
+   */
+  payerAccountId?: string | null;
+  /** Stage 6: the end person this run is for (per-user limits). */
+  endPersonId?: string | null;
+  /**
+   * Why the credits gate refused this run (the ledger's CreditBlockReason), so a builder-facing
+   * reply names the real reason. Never shown to customers.
+   */
+  creditBlockReason?: string | null;
+  /**
+   * The usage feed was not recording when this run was let through (local and dev, where a
+   * stopped feed does not block): its cost will not reach the ledger.
+   */
+  costUnrecorded?: boolean;
+  /**
+   * Stage 9: set for work Ally pays for itself (the safety-pack release suite). Every metered call
+   * inside is recorded under this kind with no creator and no payer, no credits are reserved, and
+   * nested contexts (a checkup, the engine's turn) carry it through.
+   */
+  allyPaidKind?: UsageKind;
 }
 
 const storage = new AsyncLocalStorage<UsageContext>();
@@ -63,6 +86,7 @@ export const ENDPOINT_USAGE_KIND: Record<string, UsageKind | 'run'> = {
   'api/v1/agent/memory-check': UsageKind.MEMORY_CHECK,
   'api/v1/agent/conversation-summary': UsageKind.SUMMARY,
   'api/v1/agent/instructions/check': UsageKind.INSTRUCTIONS,
+  'api/v1/agent/instructions/judge': UsageKind.INSTRUCTIONS,
   'api/v1/agent/instructions': UsageKind.INSTRUCTIONS,
   'api/v1/builder/step/stream': UsageKind.SETUP,
   'api/v1/builder/extract': UsageKind.SITE_READING,
@@ -82,7 +106,16 @@ export function usageKindFor(endpoint: string): UsageKind | null {
   if (!key) return null;
   const kind = ENDPOINT_USAGE_KIND[key];
   const context = storage.getStore();
+  // Stage 9: everything inside Ally-paid work is recorded as that kind.
+  if (context?.allyPaidKind) return context.allyPaidKind;
   if (kind === 'run') return context?.runKind ?? null;
+  // Stage 3 (R4): indexing a template's knowledge is Ally's cost, recorded as its own kind.
+  if (
+    kind === UsageKind.INDEXING &&
+    context?.runKind === UsageKind.TEMPLATE_INDEX
+  ) {
+    return UsageKind.TEMPLATE_INDEX;
+  }
   return kind;
 }
 
@@ -96,14 +129,20 @@ export function usageHeaders(endpoint: string): Record<string, string> {
   if (!context) return {};
   const kind = usageKindFor(endpoint);
   if (!kind) return {};
+  // Stage 9: Ally-paid work names no creator and no payer.
+  const allyPaid = Boolean(context.allyPaidKind);
   const payload = {
     run_id: context.runId ?? randomUUID(),
     kind,
     channel: context.channel,
     chatbot_id: context.chatbotId ?? null,
     draft_id: context.draftId ?? null,
-    creator_user_id: context.creatorUserId ?? null,
+    creator_user_id: allyPaid ? null : (context.creatorUserId ?? null),
     conversation_id: context.conversationId ?? null,
+    ...(context.payerAccountId && !allyPaid
+      ? { payer_account_id: context.payerAccountId }
+      : {}),
+    ...(context.endPersonId ? { end_person_id: context.endPersonId } : {}),
   };
   return { 'X-Ally-Usage': JSON.stringify(payload) };
 }

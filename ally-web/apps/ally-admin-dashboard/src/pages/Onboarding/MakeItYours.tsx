@@ -12,7 +12,7 @@ import {
 } from "@components/v2";
 
 import { BrandPreview } from "./BrandPreview";
-import { COPY } from "./copy";
+import { COPY, MAKE_LOOK_COPY } from "./copy";
 import { colourSwatches } from "../../utils/colourPicks";
 import { AvoidTopics } from "../AssistantHome/AvoidTopics";
 
@@ -29,14 +29,13 @@ const fileOf = (url: string | null | undefined) => {
 };
 
 /**
- * Logo, cover and colour on "Make it yours" (copy §16): the brand editor's state drawn as the
+ * Logo and colour on "Make it yours" (copy §16): the brand editor's state drawn as the
  * screenshot's controls. Uploads and saves are the editor's.
  */
 const BrandControls: React.FC<{ view: BotDraftView; editor: BrandEditor }> = ({ view, editor }) => {
   const brand = editor.brand;
   if (!brand) return null;
   const logo = editor.imageFor("logo");
-  const cover = editor.imageFor("coverImage");
   const siteLogo = fileOf(view.crawl.brand?.logoUrl);
   const logoNote = !logo
     ? COPY.make.logoInitials
@@ -69,27 +68,8 @@ const BrandControls: React.FC<{ view: BotDraftView; editor: BrandEditor }> = ({ 
             />
             <span className="ally-small">{logoNote}</span>
           </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <ImageSlot
-              name={COPY.make.coverEmpty}
-              labels={{
-                empty: COPY.make.coverEmpty,
-                replace: COPY.make.change,
-                remove: COPY.make.remove,
-              }}
-              src={cover?.urls[768]}
-              alt={cover?.alt}
-              fileName={cover?.fileName}
-              height={120}
-              disabled={editor.uploading.coverImage}
-              progress={editor.uploading.coverImage ? 60 : null}
-              error={editor.errors.coverImage}
-              onFile={file => void editor.upload("coverImage", file)}
-              onRemove={() => editor.remove("coverImage")}
-            />
-          </div>
         </div>
-        <span className="ally-field__hint">{COPY.make.imageHint}</span>
+        <span className="ally-field__hint">{MAKE_LOOK_COPY.imageHint}</span>
       </div>
       <div className="ally-field">
         <span className="ally-field__label">
@@ -128,7 +108,7 @@ const MakePreview: React.FC<{
         name={name}
         brand={editor.brand}
         logoSrc={editor.imageFor("logo")?.urls[256] ?? null}
-        coverSrc={editor.imageFor("coverImage")?.urls[768] ?? null}
+        coverSrc={null}
         screen="chat"
         introduction={opening}
         suggestedQuestions={view.draft.suggestedQuestions.slice(0, 3)}
@@ -156,7 +136,7 @@ export const MakeItYoursScreen: React.FC<{
   view: BotDraftView;
   onPatch: (target: "draft", ops: PatchOp[]) => Promise<boolean>;
   onContinue: () => void;
-  /** The page's look (logo, cover, colour) and the live phone preview. */
+  /** The page's look (logo, colour) and the live phone preview. */
   editor?: BrandEditor;
 }> = ({ view, onPatch, onContinue, editor }) => {
   const draft = view.draft;

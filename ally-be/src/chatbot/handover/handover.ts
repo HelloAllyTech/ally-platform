@@ -12,6 +12,8 @@ export const NEEDS_PERSON_REASONS = [
   'asked',
   'declined_twice',
   'assistant',
+  // A crisis was flagged (D14): keeps the conversation in the needs-a-person queue.
+  'crisis',
 ] as const;
 export type NeedsPersonReason = (typeof NEEDS_PERSON_REASONS)[number];
 
@@ -30,8 +32,14 @@ export interface HandoverSettings {
   replyWithin: string;
   /** Without hours, the visitor is always told the in-hours message. */
   hours: OpeningHours | null;
-  /** A held chat goes back to the assistant after this long with no reply from the team. */
+  /** Kept for old clients only; nothing reads it since stage 4 (`autoHandBackMinutes`). */
   autoHandBackHours: number;
+  /**
+   * Stage 4: a held chat goes back to the assistant after this many minutes with nobody writing
+   * (no message from the customer and no reply from the team). A flagged crisis chat never goes
+   * back unless the owner's `crisisResumeRule` is `after_idle`.
+   */
+  autoHandBackMinutes: number;
   /** The owners are emailed when a chat has needed a person this long with no one opening it. */
   emailAfterMinutes: number;
   /** The visitor sees "{first name} from {business}" (on) or "{business}" (off). */
@@ -42,6 +50,7 @@ export const HANDOVER_DEFAULTS: HandoverSettings = {
   replyWithin: 'a few hours',
   hours: null,
   autoHandBackHours: 12,
+  autoHandBackMinutes: 30,
   emailAfterMinutes: 15,
   showFirstName: true,
 };
@@ -49,6 +58,7 @@ export const HANDOVER_DEFAULTS: HandoverSettings = {
 export const HANDOVER_LIMITS = {
   replyWithinChars: 40,
   autoHandBackHours: { min: 1, max: 72 },
+  autoHandBackMinutes: { min: 5, max: 720 },
   emailAfterMinutes: { min: 5, max: 240 },
 };
 

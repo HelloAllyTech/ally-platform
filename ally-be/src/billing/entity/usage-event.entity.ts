@@ -96,4 +96,36 @@ export class UsageEvent {
 
   @Column({ type: 'jsonb', nullable: true })
   detail!: Record<string, unknown> | null;
+
+  /**
+   * Stage 6: the account that pays, stamped when the run started (its reservation, or the header
+   * ally-ai echoes back). Null on events from before credits, or when no payer could be found.
+   */
+  @Column({ type: 'uuid', nullable: true })
+  payerAccountId!: string | null;
+
+  /** Stage 6: the end person whose per-user limits this counts against. */
+  @Column({ type: 'uuid', nullable: true })
+  endPersonId!: string | null;
+
+  /** Stage 6: the AI task registry id of the call (`chatbot-memory-check`, …), when known. */
+  @Column({ type: 'varchar', length: 80, nullable: true })
+  task!: string | null;
+
+  /** Stage 6: which money paid: the chatbot's budget (customers) or the free balance (building). */
+  @Column({ type: 'varchar', length: 10, nullable: true })
+  funding!: 'free' | 'budget' | null;
+
+  /**
+   * Stage 6: what the ledger charged. Equal to `costMicros` when the model is priced; the
+   * pessimistic fallback when it isn't (`costMicros` stays NULL for `reprice`).
+   */
+  @Column({
+    type: 'numeric',
+    precision: 20,
+    scale: 3,
+    nullable: true,
+    transformer: numericTransformer,
+  })
+  chargedMicros!: number | null;
 }

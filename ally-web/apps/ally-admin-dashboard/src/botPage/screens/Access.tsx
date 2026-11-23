@@ -9,14 +9,52 @@ import {
 } from "../components/parts";
 import { fill, type BotPageCopy } from "../copy";
 
-import type { BotPageBranding } from "../types";
+import type { BotPageBranding, PublicBotPage } from "../types";
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const RESEND_AFTER_SECONDS = 30;
 
+/**
+ * Crisis information for every visitor, before any code is requested (stage 6): the chatbot's own
+ * numbers first when the public view has them, then the findahelpline.com link. It says nothing
+ * about who is on the invite list: "If you were invited, check your email" is the same line for
+ * everyone, and nothing here changes with the address typed.
+ */
+export function CrisisInfo({
+  copy,
+  crisis,
+}: {
+  copy: BotPageCopy;
+  crisis?: PublicBotPage["crisis"];
+}) {
+  const numbers = crisis?.numbers?.trim();
+  const url = crisis?.helplineUrl?.trim() || copy.crisis.linkUrl;
+  return (
+    <aside className="bp-stack" aria-labelledby="bp-crisis-title" data-testid="bp-crisis-info">
+      <p id="bp-crisis-title" className="ally-body" style={{ margin: 0, fontWeight: 600 }}>
+        {copy.crisis.title}
+      </p>
+      {numbers && (
+        <p className="ally-body" style={{ margin: 0 }} data-testid="bp-crisis-numbers">
+          {fill(copy.crisis.numbers, { numbers })}
+        </p>
+      )}
+      <p className="ally-body" style={{ margin: 0 }}>
+        <a href={url} target="_blank" rel="noopener noreferrer">
+          {copy.crisis.link}
+        </a>
+      </p>
+      <p className="bp-small bp-muted" style={{ margin: 0 }} data-testid="bp-invited-line">
+        {copy.crisis.invited}
+      </p>
+    </aside>
+  );
+}
+
 export function AccessEmail({
   branding,
   copy,
+  crisis,
   onSubmit,
   busy = false,
   error,
@@ -24,6 +62,7 @@ export function AccessEmail({
 }: {
   branding: BotPageBranding;
   copy: BotPageCopy;
+  crisis?: PublicBotPage["crisis"];
   onSubmit(email: string): void;
   busy?: boolean;
   error?: string | null;
@@ -45,6 +84,7 @@ export function AccessEmail({
     <div className="bp-screen">
       <PageHeader branding={branding} />
       <form onSubmit={submit} className="bp-pad bp-stack bp-grow ally-slide" noValidate>
+        <CrisisInfo copy={copy} crisis={crisis} />
         <ScreenHeading>{copy.access.emailTitle}</ScreenHeading>
         <p className="ally-body bp-muted" style={{ margin: 0 }}>
           {copy.access.emailHelp}

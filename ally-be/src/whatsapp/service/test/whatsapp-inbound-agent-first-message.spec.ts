@@ -68,7 +68,10 @@ describe('WhatsAppInboundService: the first message to an agent bot', () => {
 
     expect(aiService.runAgent).toHaveBeenCalledTimes(1);
     expect(aiService.runAgent.mock.calls[0][0]).not.toHaveProperty('features');
-    expect(sent()).toBe(`${ABOUT_BOT.answer}\n\n${NOTICE}`);
+    // Stage 4: the fixed start notice leads the notice.
+    expect(sent()).toBe(
+      `${ABOUT_BOT.answer}\n\nYou are chatting with an AI assistant. The AI and people at ${chatbot.name} may read this chat.\n${NOTICE}`,
+    );
     expect(outbound()).toMatchObject({
       handledBy: WaHandledBy.RAG,
       agentRuntime: AgentRuntimeUsed.V2,
@@ -86,7 +89,7 @@ describe('WhatsAppInboundService: the first message to an agent bot', () => {
     expect(sent()).not.toContain(NOTICE);
   });
 
-  it('answers a first question with no notice, as before', async () => {
+  it('answers a first question first, then the notice (stage 4)', async () => {
     aiService.runAgent.mockResolvedValue({
       ...ABOUT_BOT,
       answer: 'Ask your admin for an invite.',
@@ -94,7 +97,9 @@ describe('WhatsAppInboundService: the first message to an agent bot', () => {
       turn_type: 'question',
     });
     await service.handle(inbound());
-    expect(sent()).not.toContain(NOTICE);
+    expect(sent()).toMatch(/^Ask your admin for an invite\./);
+    expect(sent()).toContain(NOTICE);
+    expect(sent()).toContain('may read this chat');
   });
 
   it('adds no notice after the first message', async () => {

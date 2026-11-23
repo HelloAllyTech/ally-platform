@@ -1,1 +1,1 @@
-export * from "./WhatsAppBot";
+export * from "./AssistantDefaults";

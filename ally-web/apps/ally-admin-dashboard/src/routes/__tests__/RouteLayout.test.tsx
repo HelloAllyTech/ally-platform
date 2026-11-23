@@ -86,7 +86,8 @@ vi.mock("@pages", () => ({
   Settings: () => <div>SettingsPage</div>,
   Logs: () => <div>LogsPage</div>,
   MobileReleases: () => <div>MobileReleasesPage</div>,
-  WhatsAppBot: () => <div>WhatsAppBotPage</div>,
+  BuilderHome: () => <div>BuilderHomePage</div>,
+  AssistantDefaults: () => <div>AssistantDefaultsPage</div>,
   Terms: () => <div>TermsPage</div>,
   Privacy: () => <div>PrivacyPage</div>,
   AILab: () => <div>AILabPage</div>,
@@ -125,6 +126,10 @@ vi.mock("@pages", () => ({
 }));
 
 // Onboarding pulls in the QR-code library; the router only needs the two entry components.
+vi.mock("../../pages/ChatbotSupport/ChatbotSupport", () => ({
+  CHATBOT_SUPPORT_ROUTE: "/admin/chatbot-support",
+  ChatbotSupport: () => <div>ChatbotSupportPage</div>,
+}));
 vi.mock("../../pages/Onboarding", () => ({
   OnboardingStart: () => <div>OnboardingStartPage</div>,
   OnboardingSession: () => <div>OnboardingSessionPage</div>,
@@ -156,6 +161,7 @@ describe("RouteLayout", () => {
     for (const [from, to] of [
       ["/chatbots", "/assistants"],
       ["/chatbots/bot-1?section=lists&tool=memory", "/assistants/bot-1?section=lists&tool=memory"],
+      ["/chatbots/bot-1?section=share", "/assistants/bot-1?section=share"],
       ["/chatbots/bot-1?section=conversations", "/assistants/bot-1?section=conversations"],
       ["/whatsapp-bot", "/assistants"],
     ]) {
@@ -364,6 +370,56 @@ describe("RouteLayout", () => {
       expect(privateLayoutCalls.props.at(-1)?.requiredPermissions).not.toContain(
         Permissions.EDIT_ALLY_GUIDE,
       );
+    });
+  });
+
+  describe("assistants home (stage 2)", () => {
+    it("renders the builder home at /assistants", () => {
+      window.history.pushState({}, "", ROUTES.WHATSAPP_BOT);
+      render(<RouteLayout />);
+      expect(screen.getByText("BuilderHomePage")).toBeInTheDocument();
+    });
+
+    it("sends the old /inbox link, and any ?tab=, to the home (the Inbox tab is gone)", () => {
+      window.history.pushState({}, "", "/inbox?tab=inbox&conversation=c1");
+      render(<RouteLayout />);
+      expect(window.location.pathname).toBe("/assistants");
+      expect(window.location.search).toBe("");
+      expect(screen.getByText("BuilderHomePage")).toBeInTheDocument();
+    });
+
+    it("puts Defaults, Library and Connectors on a staff route gated on system:access", () => {
+      privateLayoutCalls.props.length = 0;
+      window.history.pushState({}, "", ROUTES.ASSISTANT_DEFAULTS);
+      render(<RouteLayout />);
+      expect(screen.getByText("AssistantDefaultsPage")).toBeInTheDocument();
+      const gate = privateLayoutCalls.props.at(-1);
+      expect(gate?.requiredPermissions).toEqual([Permissions.SYSTEM_ACCESS]);
+      // Staff pages never depend on the Chatbots toggle.
+      expect(gate?.requiredFeature).toBeUndefined();
+    });
+
+    it.each([
+      [ROUTES.SAFETY_PACKS, [Permissions.MANAGE_SAFETY_PACKS]],
+      ["/admin/chatbot-support", [Permissions.SYSTEM_ACCESS]],
+      ["/admin/chatbot-support/b1", [Permissions.SYSTEM_ACCESS]],
+    ])(
+      "gates the staff page %s on its staff permission, never the Chatbots toggle",
+      (path, perms) => {
+        privateLayoutCalls.props.length = 0;
+        window.history.pushState({}, "", path);
+        render(<RouteLayout />);
+        const gate = privateLayoutCalls.props.at(-1);
+        expect(gate?.requiredPermissions).toEqual(perms);
+        expect(gate?.requiredFeature).toBeUndefined();
+      },
+    );
+
+    it("gates Credits on manage_costs", () => {
+      privateLayoutCalls.props.length = 0;
+      window.history.pushState({}, "", ROUTES.BILLING_CREDITS);
+      render(<RouteLayout />);
+      expect(privateLayoutCalls.props.at(-1)?.requiredFeature).toBe(FeatureToggleKey.MANAGE_COSTS);
     });
   });
 

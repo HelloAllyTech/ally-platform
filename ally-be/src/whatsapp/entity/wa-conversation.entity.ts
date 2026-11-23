@@ -53,4 +53,8 @@ export class WaConversation extends BaseWithoutTenantEntity {
   /** The connector the thread came in through. Null on the platform number. */
   @Column({ type: 'uuid', name: 'connector_id', nullable: true })
   connectorId?: string | null;
+
+  /** Assistants stage 5: a thread with no chatbot, parked by the migration and hidden from builders. */
+  @Column({ type: 'boolean', default: false })
+  parked!: boolean;
 }

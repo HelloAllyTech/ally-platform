@@ -27,12 +27,17 @@ export interface InboxStreamEvent {
  * `hello` (the counts) comes first on every connect, so a reconnect redraws and nothing missed is
  * lost. Reconnects with backoff while the page is open.
  */
-export function useInboxStream(onEvent: (event: InboxStreamEvent) => void): void {
+export function useInboxStream(
+  onEvent: (event: InboxStreamEvent) => void,
+  /** False: no stream at all (Ally staff's read-only view: nothing live, nothing marked read). */
+  enabled = true,
+): void {
   const dispatch = useDispatch<AppDispatch>();
   const handler = useRef(onEvent);
   handler.current = onEvent;
 
   useEffect(() => {
+    if (!enabled) return undefined;
     let stopped = false;
     let attempt = 0;
     let controller: AbortController | null = null;
@@ -73,5 +78,5 @@ export function useInboxStream(onEvent: (event: InboxStreamEvent) => void): void
       clearTimeout(refresh);
       controller?.abort();
     };
-  }, [dispatch]);
+  }, [dispatch, enabled]);
 }

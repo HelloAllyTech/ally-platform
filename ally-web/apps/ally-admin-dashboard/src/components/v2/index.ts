@@ -4,6 +4,7 @@
  */
 import "./v2.css";
 import "./forms.css";
+import "./split.css";
 
 export * from "./core";
 export {
@@ -20,6 +21,8 @@ export type { DesignCardLabels, LearnedCardLabels } from "./Cards";
 export { CheckRow, GapCard, MeasureCard } from "./Checkup";
 export type { CheckRowLabels, CheckStatus, GapCardLabels } from "./Checkup";
 export { PhonePreview } from "./PhonePreview";
+export { SPLIT_MIN_WIDTH, SplitBuild, useWideViewport } from "./SplitBuild";
+export type { SplitBuildLabels } from "./SplitBuild";
 export { StepFrame } from "./StepFrame";
 export type { StepFrameLabels } from "./StepFrame";
 export { TellMeSomethingElse } from "./TellMeSomethingElse";

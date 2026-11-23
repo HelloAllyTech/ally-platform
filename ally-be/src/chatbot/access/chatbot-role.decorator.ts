@@ -1,12 +1,16 @@
 import { applyDecorators, SetMetadata, UseGuards } from '@nestjs/common';
-import { ChatbotMemberRole } from '../enum/chatbot.enum';
+import { ChatbotCapability, ChatbotMemberRole } from '../enum/chatbot.enum';
 import { ChatbotMemberGuard } from './chatbot-member.guard';
+import { capabilityForLegacyRole } from './chatbot-roles';
 
 export const CHATBOT_ROLE_KEY = 'chatbot:role';
 export const ASSISTANT_SCOPE_KEY = 'chatbot:assistant-scope';
 
 export interface ChatbotRoleOptions {
-  role: ChatbotMemberRole;
+  /** The OLD ladder role the route was declared with; absent on a `@ChatbotCan` route. */
+  role?: ChatbotMemberRole;
+  /** What the guard checks (Stage 1b). `@ChatbotRole(min)` stores the capability `min` meant. */
+  capability: ChatbotCapability;
   /** The route param naming the bot (`:id` on `v1/chatbots/:id/…`, `:chatbotId` in the Inbox). */
   param: string;
 }
@@ -21,7 +25,22 @@ export interface ChatbotRoleOptions {
  */
 export function ChatbotRole(role: ChatbotMemberRole, param = 'id') {
   return applyDecorators(
-    SetMetadata(CHATBOT_ROLE_KEY, { role, param } as ChatbotRoleOptions),
+    SetMetadata(CHATBOT_ROLE_KEY, {
+      role,
+      capability: capabilityForLegacyRole(role),
+      param,
+    } as ChatbotRoleOptions),
+    UseGuards(ChatbotMemberGuard),
+  );
+}
+
+/**
+ * Stage 1b: the capability on the bot named by the route's `:id` (or `param`) that this route
+ * needs. Same guard and answers as `@ChatbotRole` (404 to non-members, 403 without it).
+ */
+export function ChatbotCan(capability: ChatbotCapability, param = 'id') {
+  return applyDecorators(
+    SetMetadata(CHATBOT_ROLE_KEY, { capability, param } as ChatbotRoleOptions),
     UseGuards(ChatbotMemberGuard),
   );
 }

@@ -48,8 +48,8 @@ const shot = async (page: Page, name: string, project: string, fullPage = true) 
 };
 
 const open = async (page: Page) => {
-  await page.goto(`/dev/assistant-home/${BOT_ID}?section=lists`);
-  await expect(page.getByTestId("section-lists")).toBeVisible();
+  await page.goto(`/dev/assistant-home/${BOT_ID}?section=knowledge&part=lists`);
+  await expect(page.getByTestId("section-knowledge")).toBeVisible();
 };
 
 test("empty, ready-made picker and the guided setup", async ({ page }, info) => {

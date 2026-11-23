@@ -247,7 +247,7 @@ describe('the Inbox memory routes', () => {
   function controller(role: ChatbotMemberRole, ownContact = true) {
     const access = {
       assert: jest.fn(async (_id: string, min: ChatbotMemberRole) => {
-        const rank = { viewer: 0, editor: 1, owner: 2 } as const;
+        const rank = { viewer: 0, responder: 0, editor: 1, owner: 2 } as const;
         if (rank[role] < rank[min]) throw new ForbiddenException();
         return { chatbot, role };
       }),

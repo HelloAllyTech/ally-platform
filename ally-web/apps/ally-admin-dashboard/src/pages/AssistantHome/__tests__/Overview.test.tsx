@@ -1,20 +1,24 @@
 import React from "react";
 
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // `@constants` first: the admin app's barrel does module-load-time work.
-import "@constants";
+import { Permissions } from "@constants";
 
 /**
- * The Overview's numbers (chunk 20d-2): the last 30 days by default, the last 7 when chosen. Both
- * come from the home's numbers, counted from the store "This week" counts (Q3d), never from the
- * list's own `bot.stats`.
+ * The Overview (stage 7): how it's doing, from `GET :id/home/overview` (counts only, small groups
+ * already held back by the server), the 30-day nudge, and "See all numbers" for staff only.
  */
-const numbers = vi.fn();
+const h = vi.hoisted(() => ({
+  overview: vi.fn(),
+  readAgain: vi.fn(),
+  permissions: { current: [] as string[] },
+  access: { current: [{ id: "e1" }] as unknown[] | undefined },
+}));
+
 vi.mock("@api", async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  // T1's template hooks: no templates and no origin unless a test says so.
   useGetTemplateCatalogueQuery: () => ({ data: undefined, isLoading: false, isError: false }),
   useGetTemplateOriginQuery: () => ({ data: undefined }),
   useApplyDraftTemplateMutation: () => [vi.fn()],
@@ -22,71 +26,212 @@ vi.mock("@api", async importOriginal => ({
   useInstallTemplateMutation: () => [vi.fn(), { isLoading: false }],
   useArchiveChatbotMutation: () => [vi.fn(), { isLoading: false }],
   useSetChatbotStatusMutation: () => [vi.fn(), { isLoading: false }],
-  useGetHomeNumbersQuery: (arg: unknown) => numbers(arg),
+  useGetAccessListQuery: () => ({ data: h.access.current }),
+  useGetHomeOverviewQuery: (arg: unknown) => h.overview(arg),
+  useReadSourceAgainMutation: () => [
+    (args: unknown) => ({ unwrap: () => Promise.resolve(h.readAgain(args)) }),
+    { isLoading: false },
+  ],
+}));
+vi.mock("@hooks", async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useUser: () => ({ permissions: h.permissions.current }),
 }));
 vi.mock("react-router-dom", () => ({ useNavigate: () => vi.fn() }));
 vi.mock("../sections/Scorecard", () => ({ Scorecard: () => null }));
 vi.mock("../../Onboarding/Screens", () => ({ Qr: () => null }));
+vi.mock("../../Analytics/chartKit", () => ({
+  Sparkline: ({ values, label }: { values: number[]; label?: string }) => (
+    <svg data-testid="spark" data-values={values.join(",")} aria-label={label} />
+  ),
+}));
 vi.mock("../sections/AllNumbers", () => ({
   AllNumbers: () => <div data-testid="all-numbers" />,
 }));
 
 const { OverviewSection } = await import("../sections/Overview");
 const { HOME } = await import("../copy");
+const { OVERVIEW_COPY: o, LIVE_ACCESS_COPY: la } = await import("../copy/overview");
 const t = HOME.overview;
 
-const BOT = {
-  id: "bot-1",
-  status: "live",
-  stats: { people: 40, messages: 300, answered: 250, declined: 20, openUnanswered: 3 },
+const BOT = { id: "bot-1", status: "live" };
+const LESS = { lessThan: 5 };
+
+const DATA = {
+  range: 30,
+  timeZone: "Asia/Kolkata",
+  from: "2026-10-25",
+  to: "2026-11-23",
+  conversations: 120,
+  people: 80,
+  days: [
+    { day: "2026-11-21", conversations: 30, people: 20 },
+    { day: "2026-11-22", conversations: LESS, people: LESS },
+    { day: "2026-11-23", conversations: 12, people: 9 },
+  ],
+  answered: { share: 82, fewerThan5: false },
+  handedToPerson: { count: LESS, medianWaitMinutes: null },
+  ratings: { up: 14, down: LESS },
+  byChannel: [],
+  byLanguage: [],
+  topUnanswered: [
+    { kind: "question", text: "Do you open on Sunday?", count: 7 },
+    { kind: "theme", theme: "no_hits", count: LESS },
+  ],
 };
 
-const shown = () =>
-  [...screen.getByTestId("overview-numbers").querySelectorAll("dd")].map(dd => dd.textContent);
+const view = (home: Record<string, unknown> = {}, props: Record<string, unknown> = {}) =>
+  render(
+    <OverviewSection
+      {...({
+        bot: BOT,
+        home: { ...home },
+        canEdit: true,
+        canManage: false,
+        go: vi.fn(),
+        ...props,
+      } as never)}
+    />,
+  );
 
-describe("the Overview's numbers", () => {
-  it("shows the last 30 days, then the last 7, both from the home's numbers", () => {
-    numbers.mockImplementation(({ days }: { days: 7 | 30 }) => ({
-      data:
-        days === 7
-          ? { days: 7, people: 9, messages: 70, answered: 60, declined: 4, openUnanswered: 3 }
-          : { days: 30, people: 31, messages: 210, answered: 180, declined: 9, openUnanswered: 3 },
-    }));
-    render(
-      <OverviewSection
-        {...({ bot: BOT, page: null, canEdit: true, canManage: false, go: vi.fn() } as never)}
-      />,
-    );
-    // Not the list's own counts (40, 300, …): those came from another store.
-    expect(shown()).toEqual(["31", "210", "180", "9"]);
-    expect(numbers).toHaveBeenLastCalledWith({ id: "bot-1", days: 30 });
+beforeEach(() => {
+  h.overview.mockReset().mockReturnValue({ data: DATA, isError: false, refetch: vi.fn() });
+  h.readAgain.mockReset().mockReturnValue({ changed: false });
+  h.permissions.current = [];
+  h.access.current = [{ id: "e1" }];
+});
 
-    fireEvent.click(screen.getByRole("radio", { name: t.last7 }));
-    expect(numbers).toHaveBeenLastCalledWith({ id: "bot-1", days: 7 });
-    expect(shown()).toEqual(["9", "70", "60", "4"]);
-
-    fireEvent.click(screen.getByRole("radio", { name: t.last30 }));
-    expect(shown()).toEqual(["31", "210", "180", "9"]);
+describe("the live line", () => {
+  it("says it is live for the people on the Who may chat list, never for everyone", () => {
+    view();
+    const status = screen.getByTestId("overview-status").textContent ?? "";
+    expect(status).toContain(la.live);
+    expect(status).not.toContain("WhatsApp");
   });
 
-  it("opens All numbers in place, and an old usage link arrives with it open", () => {
-    numbers.mockReturnValue({ data: undefined });
-    const props = { bot: BOT, page: null, canEdit: true, canManage: false, go: vi.fn() };
-    const { unmount } = render(<OverviewSection {...(props as never)} />);
-    // Nothing loads until it's opened.
-    expect(screen.queryByTestId("all-numbers")).toBeNull();
-    const toggle = screen.getByRole("button", { name: t.seeAllNumbers });
-    expect(toggle.getAttribute("aria-expanded")).toBe("false");
-    fireEvent.click(toggle);
-    expect(screen.getByTestId("all-numbers")).toBeTruthy();
-    expect(
-      screen.getByRole("button", { name: HOME.allNumbers.hide }).getAttribute("aria-expanded"),
-    ).toBe("true");
-    // No link to the classic view any more.
-    expect(document.querySelector('a[href*="view=classic"]')).toBeNull();
-    unmount();
+  it("says nobody can chat yet when the list is empty, with a link to Channels", () => {
+    h.access.current = [];
+    const go = vi.fn();
+    view({}, { go });
+    expect(screen.getByTestId("overview-status").textContent).toContain(la.nobody);
+    fireEvent.click(screen.getByRole("button", { name: la.link }));
+    expect(go).toHaveBeenCalledWith("channels");
+  });
+});
 
-    render(<OverviewSection {...({ ...props, openAllNumbers: true } as never)} />);
+describe("how it's doing", () => {
+  it("shows plain totals and 'Fewer than 5' exactly as the server sent them", () => {
+    view();
+    expect(screen.getByTestId("ov-conversations").textContent).toContain("120");
+    expect(screen.getByTestId("ov-people").textContent).toContain("80");
+    expect(screen.getByTestId("ov-answered").textContent).toContain("82%");
+    // Handed to a person: under 5 and no wait time to quote.
+    const handed = screen.getByTestId("ov-handed").textContent ?? "";
+    expect(handed).toContain(o.lessThan);
+    expect(handed).toContain(o.handedWaitNone);
+    expect(screen.getByTestId("ov-ratings").textContent).toContain("14 thumbs up");
+    expect(screen.getByTestId("ov-ratings").textContent).toContain(`${o.lessThan} thumbs down`);
+  });
+
+  it("draws a day under 5 at the bottom and says so", () => {
+    view();
+    const [conversations] = screen.getAllByTestId("spark");
+    expect(conversations.getAttribute("data-values")).toBe("30,0,12");
+    expect(screen.getByText(o.lowDaysNote)).toBeTruthy();
+  });
+
+  it("quotes a question only when the server sent it, and shows small groups as a topic", () => {
+    view();
+    const list = screen.getByTestId("ov-unanswered").textContent ?? "";
+    expect(list).toContain("Do you open on Sunday?");
+    expect(list).toContain(`${o.themes.no_hits}: ${o.lessThan}`);
+    expect(list).toContain(o.themeNote);
+  });
+
+  it("is stacked cards, laid out by the phone-first class (no fixed widths in the markup)", () => {
+    view();
+    const cards = screen.getByTestId("overview-cards");
+    expect(cards.className).toContain("ally-overview__cards");
+    expect(cards.querySelectorAll(".ally-overview__card").length).toBe(4);
+    expect(cards.querySelector("[style*='width']")).toBeNull();
+  });
+
+  it("asks for the range chosen", () => {
+    view();
+    expect(h.overview).toHaveBeenLastCalledWith({ id: "bot-1", range: 30 });
+    fireEvent.click(screen.getByRole("radio", { name: o.last90 }));
+    expect(h.overview).toHaveBeenLastCalledWith({ id: "bot-1", range: 90 });
+    fireEvent.click(screen.getByRole("radio", { name: o.last7 }));
+    expect(h.overview).toHaveBeenLastCalledWith({ id: "bot-1", range: 7 });
+  });
+
+  it("says nobody has chatted yet instead of a wall of zeros", () => {
+    h.overview.mockReturnValue({
+      data: { ...DATA, conversations: 0, people: 0, days: [] },
+      isError: false,
+    });
+    view();
+    expect(screen.getByText(o.empty)).toBeTruthy();
+    expect(screen.queryByTestId("overview-cards")).toBeNull();
+  });
+
+  it("offers a retry when the numbers fail to load", () => {
+    const refetch = vi.fn();
+    h.overview.mockReturnValue({ data: undefined, isError: true, refetch });
+    view();
+    fireEvent.click(screen.getByRole("button", { name: o.retry }));
+    expect(refetch).toHaveBeenCalled();
+  });
+});
+
+describe("the 30-day nudge", () => {
+  const stale = {
+    knowledgeStaleNudge: true,
+    knowledgeStaleDays: 41,
+    knowledgeStaleDocumentId: "doc-1",
+  };
+
+  it("says when it was last read and reads again on a click", async () => {
+    view(stale);
+    expect(screen.getByTestId("overview-stale").textContent).toContain("Last read 41 days ago");
+    fireEvent.click(screen.getByRole("button", { name: o.readAgain }));
+    await waitFor(() =>
+      expect(h.readAgain).toHaveBeenCalledWith({ id: "bot-1", documentId: "doc-1" }),
+    );
+    await screen.findByText(o.readDone);
+  });
+
+  it("is not shown when sources are fresh, or to someone who can't edit", () => {
+    view({ knowledgeStaleNudge: false, knowledgeStaleDays: 3 });
+    expect(screen.queryByTestId("overview-stale")).toBeNull();
+  });
+
+  it("is hidden from a viewer", () => {
+    view(stale, { canEdit: false });
+    expect(screen.queryByTestId("overview-stale")).toBeNull();
+  });
+});
+
+describe("See all numbers", () => {
+  it("is for staff only, and opens in place", () => {
+    view();
+    expect(screen.queryByRole("button", { name: t.seeAllNumbers })).toBeNull();
+    expect(screen.queryByTestId("all-numbers")).toBeNull();
+  });
+
+  it("opens for staff, and an old usage link arrives with it open", () => {
+    h.permissions.current = [Permissions.SYSTEM_ACCESS];
+    const { unmount } = view();
+    expect(screen.queryByTestId("all-numbers")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: t.seeAllNumbers }));
     expect(screen.getByTestId("all-numbers")).toBeTruthy();
+    unmount();
+    view({}, { openAllNumbers: true });
+    expect(screen.getByTestId("all-numbers")).toBeTruthy();
+  });
+
+  it("an old usage link does not open it for a builder", () => {
+    view({}, { openAllNumbers: true });
+    expect(screen.queryByTestId("all-numbers")).toBeNull();
   });
 });

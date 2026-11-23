@@ -4,7 +4,10 @@ import {
   BotPageAccessKind,
   BotPageStatus,
 } from '../../chatbot/enum/bot-page.enum';
-import { ChatbotStatus } from '../../chatbot/enum/chatbot.enum';
+import {
+  ChatbotAccessMode,
+  ChatbotStatus,
+} from '../../chatbot/enum/chatbot.enum';
 import { DEFAULT_BOT_PAGE_LIMITS } from '../../chatbot/type/bot-page.type';
 import {
   BotDraftStatus,
@@ -19,6 +22,7 @@ import {
   BotDraftPublishService,
   OWNER_NOTES_TITLE,
   pageLanguage,
+  publishableConfig,
 } from '../service/bot-draft-publish.service';
 import { BotDraftService } from '../service/bot-draft.service';
 import { memoryDrafts } from './memory-drafts';
@@ -32,7 +36,11 @@ jest.mock('src/common/execution/execution-manager', () => ({
 }));
 
 function harness(
-  over: { publicAllowed?: boolean; settings?: Record<string, unknown> } = {},
+  over: {
+    publicAllowed?: boolean;
+    settings?: Record<string, unknown>;
+    goLive?: { enforced: () => boolean; assertCanGoLive: jest.Mock };
+  } = {},
 ) {
   const config = {
     ...BotDraftService.defaultDraft('Sunrise Mind'),
@@ -99,6 +107,8 @@ function harness(
     fakes.pageAccess as never,
     fakes.knowledge as never,
     fakes.chatbots as never,
+    undefined,
+    over.goLive as never,
   );
   const publish = (dto: Record<string, unknown>) =>
     service.publish(store.row(), dto as never);
@@ -182,6 +192,8 @@ describe('BotDraftPublishService', () => {
         fallbackText: 'Kept.',
         declineText: 'Please call us on 98200 12345.',
         crisisClassifierEnabled: true,
+        // Stage 5: the live chatbot replies only in the draft's languages.
+        enabledLanguages: ['en', 'hi'],
       },
     );
     expect(h.fakes.knowledge.createForChatbot).toHaveBeenCalledWith(
@@ -343,6 +355,31 @@ describe('BotDraftPublishService', () => {
     ]);
   });
 
+  it('invite only with no emails goes live on the access list alone (listed mode, D4)', async () => {
+    const h = harness();
+    const result = await h.publish({ access: 'invite' });
+    expect(result.access).toBe(BotPageAccess.INVITE);
+    expect(h.fakes.chatbots.update).toHaveBeenCalledWith(
+      { id: 'bot-1' },
+      expect.objectContaining({
+        status: ChatbotStatus.LIVE,
+        accessMode: ChatbotAccessMode.LISTED,
+      }),
+    );
+    // Nobody is added to the page's own list: the entries come from Who may chat only.
+    expect(h.fakes.pageAccess.add).toHaveBeenCalledWith('page-1', []);
+  });
+
+  it('an organisation page leaves the chatbot access mode as it was', async () => {
+    const h = harness();
+    await h.publish({ access: 'organisation' });
+    const [, patch] = h.fakes.chatbots.update.mock.calls[0] as unknown as [
+      unknown,
+      Record<string, unknown>,
+    ];
+    expect(patch).not.toHaveProperty('accessMode');
+  });
+
   it('won’t publish before the assistant is built', async () => {
     const h = harness();
     h.store.poke({ step: BotDraftStep.DESIGN });
@@ -357,5 +394,102 @@ describe('BotDraftPublishService', () => {
     [['en', 'ta'], 'auto'],
   ])('page language for %j is %s', (languages, expected) => {
     expect(pageLanguage(languages)).toBe(expected);
+  });
+
+  describe('with the go-live gate (Create and Build never walks the old steps)', () => {
+    const gate = (on: boolean, red = false) => ({
+      enforced: () => on,
+      assertCanGoLive: jest.fn(async () => {
+        if (red)
+          throw new ConflictException({ errorCode: 'go_live_incomplete' });
+        return { ok: true, enforced: on };
+      }),
+    });
+
+    it('publishes a templated draft still at `learned` when the gate is green', async () => {
+      const goLive = gate(true);
+      const h = harness({ goLive });
+      h.store.poke({ step: BotDraftStep.LEARNED });
+      const result = await h.publish({ access: 'invite' });
+      expect(goLive.assertCanGoLive).toHaveBeenCalledWith('bot-1', {
+        purpose: expect.anything(),
+      });
+      expect(result).toMatchObject({ chatbotId: 'bot-1', access: 'invite' });
+      expect(h.fakes.chatbots.update).toHaveBeenCalledWith(
+        { id: 'bot-1' },
+        expect.objectContaining({
+          status: ChatbotStatus.LIVE,
+          accessMode: ChatbotAccessMode.LISTED,
+        }),
+      );
+      expect(h.fakes.botPages.save).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ status: BotPageStatus.ON }),
+      );
+      expect(h.store.row()).toMatchObject({
+        status: BotDraftStatus.PUBLISHED,
+        step: BotDraftStep.PUBLISHED,
+      });
+    });
+
+    it('is refused when the gate is red, before anything is written', async () => {
+      const h = harness({ goLive: gate(true, true) });
+      h.store.poke({ step: BotDraftStep.LEARNED });
+      await expect(h.publish({ access: 'invite' })).rejects.toMatchObject({
+        response: { errorCode: 'go_live_incomplete' },
+      });
+      expect(h.fakes.chatbots.update).not.toHaveBeenCalled();
+      expect(h.fakes.botPages.save).not.toHaveBeenCalled();
+      expect(h.store.row().status).not.toBe(BotDraftStatus.PUBLISHED);
+    });
+
+    it('keeps the old step rule when the gate is switched off', async () => {
+      const h = harness({ goLive: gate(false) });
+      h.store.poke({ step: BotDraftStep.LEARNED });
+      await expect(h.publish({ access: 'invite' })).rejects.toMatchObject({
+        response: { errorCode: 'not_ready' },
+      });
+      expect(h.fakes.chatbots.update).not.toHaveBeenCalled();
+    });
+
+    it('still refuses an abandoned draft', async () => {
+      const h = harness({ goLive: gate(true) });
+      h.store.poke({ status: BotDraftStatus.ABANDONED });
+      await expect(h.publish({ access: 'invite' })).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+    });
+
+    it('fills fields the new flow never set instead of failing half-way', async () => {
+      const h = harness({ goLive: gate(true) });
+      h.store.poke({
+        step: BotDraftStep.LEARNED,
+        draftConfig: {
+          name: 'Sunrise',
+          safetyPackId: SafetyPackId.MENTAL_HEALTH,
+        } as never,
+      });
+      await expect(h.publish({ access: 'invite' })).resolves.toMatchObject({
+        chatbotId: 'bot-1',
+      });
+      expect(h.fakes.botPages.save).toHaveBeenCalled();
+      expect(h.store.row().status).toBe(BotDraftStatus.PUBLISHED);
+    });
+  });
+
+  it('publishableConfig keeps set values and fills missing ones', () => {
+    const c = publishableConfig(
+      { name: 'X', languages: ['hi'], safetyPackId: null } as never,
+      'Bot',
+    );
+    expect(c).toMatchObject({
+      name: 'X',
+      languages: ['hi'],
+      safetyPackId: null,
+      declineText: '',
+      extraNever: [],
+    });
+    expect(c.branding.title).toBe('X');
+    expect(publishableConfig(undefined, 'Bot').name).toBe('Bot');
   });
 });

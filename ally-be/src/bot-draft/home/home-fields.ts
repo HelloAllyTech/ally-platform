@@ -16,6 +16,7 @@ import {
   BotPageLanguage,
   BotPageSettings,
   BotPageWidget,
+  DEFAULT_BOT_PAGE_LIMITS,
   DEFAULT_WIDGET_LABEL,
 } from '../../chatbot/type/bot-page.type';
 import {
@@ -85,6 +86,16 @@ interface HomeWrite {
 
 /** A value that can't be saved; the message is shown under the field. */
 import {
+  humanContactOf,
+  validateHumanContact,
+  type HumanContact,
+} from '../../chatbot/safety/safety-terms';
+import {
+  NOTICE_MEANING_REFUSED,
+  noticeKeepsMeaning,
+} from '../../chatbot/safety/chat-notice';
+import {
+  HANDOVER_DEFAULTS,
   HANDOVER_LIMITS,
   handoverOf,
   type HandoverSettings,
@@ -212,6 +223,10 @@ export const HOME_FIELDS = {
       if (pack?.disclaimer && !value.includes(pack.disclaimer)) {
         throw new SafetyLockedError('disclaimer_removed');
       }
+      // Stage 4: an owner's wording must keep "an AI and people may read this chat".
+      if (value && !noticeKeepsMeaning(value)) {
+        throw new HomeFieldInvalid(NOTICE_MEANING_REFUSED);
+      }
       const settings = { ...(s.chatbot.settings ?? {}) };
       if (value) settings.disclaimerText = value;
       else delete settings.disclaimerText;
@@ -227,6 +242,49 @@ export const HOME_FIELDS = {
     1000,
     'What it says when someone may be at risk',
   ),
+
+  /**
+   * Stage 4: what customers get while the assistant is archived or paused. The crisis information
+   * is always added after it (`chatbot/safety/off-message.ts`), so it can't be removed here.
+   */
+  archivedMessage: {
+    ...overrideText('archivedMessage', 600, 'What it says while it is off'),
+    // COPY: needs approval (not in ONBOARDING-COPY.md yet, so its own wording).
+    parse: (value: unknown) => {
+      if (typeof value !== 'string') {
+        throw new HomeFieldInvalid('Write the message as text.');
+      }
+      const clean = value.trim();
+      if (clean.length > 600) {
+        throw new HomeFieldInvalid('Keep the message to 600 characters.');
+      }
+      return clean;
+    },
+  } as HomeField<string>,
+
+  /** Stage 4: how a customer reaches a person (go-live requires one). */
+  humanContact: {
+    read: (s) => humanContactOf(s.chatbot.settings as never) ?? {},
+    parse: (value) => {
+      const invalid = validateHumanContact(value ?? {});
+      if (invalid) throw new HomeFieldInvalid(invalid);
+      const v = (value ?? {}) as Record<string, unknown>;
+      const out: HumanContact = {};
+      for (const key of ['phone', 'email', 'url'] as const) {
+        const x = typeof v[key] === 'string' ? (v[key] as string).trim() : '';
+        if (x) out[key] = x;
+      }
+      return out;
+    },
+    write: (value, s) => {
+      const settings = {
+        ...(s.chatbot.settings ?? {}),
+      } as ChatbotSettingsOverride;
+      if (Object.keys(value).length) settings.humanContact = value;
+      else delete settings.humanContact;
+      return { chatbot: { settings } };
+    },
+  } as HomeField<HumanContact>,
 
   suggestedQuestions: {
     read: (s) => s.page.suggestedQuestions,
@@ -350,6 +408,10 @@ export const HOME_FIELDS = {
       const limits = checkDto(BotPageLimitsDto, value);
       return {
         messagesPerVisitorPerHour: limits.messagesPerVisitorPerHour,
+        // Stage 7: per person per day; an older client that doesn't send it keeps the default.
+        messagesPerVisitorPerDay:
+          limits.messagesPerVisitorPerDay ??
+          DEFAULT_BOT_PAGE_LIMITS.messagesPerVisitorPerDay,
         maxMessageChars: limits.maxMessageChars,
         dailyCapPerBot: limits.dailyCapPerBot,
       };
@@ -692,6 +754,15 @@ function parseHandover(value: unknown): HandoverSettings {
       HANDOVER_LIMITS.autoHandBackHours,
       'Hours before it hands back',
     ),
+    // Stage 4: minutes of idle time; a client that sends only the old hours keeps the default.
+    autoHandBackMinutes:
+      v.autoHandBackMinutes === undefined || v.autoHandBackMinutes === null
+        ? HANDOVER_DEFAULTS.autoHandBackMinutes
+        : whole(
+            v.autoHandBackMinutes,
+            HANDOVER_LIMITS.autoHandBackMinutes,
+            'Minutes before it hands back',
+          ),
     emailAfterMinutes: whole(
       v.emailAfterMinutes,
       HANDOVER_LIMITS.emailAfterMinutes,

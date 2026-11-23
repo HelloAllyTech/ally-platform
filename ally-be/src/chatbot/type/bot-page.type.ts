@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto';
 import { PrechatFieldType } from '../enum/bot-page.enum';
 
 /** How the page looks. Every string here is shown to visitors as text, never as HTML. */
@@ -16,6 +17,12 @@ export interface BotPageBranding {
   disclaimer: string;
   /** A privacy or website link in the footer. */
   footerLink: { label: string; url: string } | null;
+  /**
+   * Stage 7: one short welcome line, the only words the owner sets on the page besides its name.
+   * `subtitle`, `avatarUrl`, `disclaimer` and `footerLink` above are kept in storage but no longer
+   * accepted or shown (the fixed crisis notice owns the disclaimer). Absent on pages saved before.
+   */
+  welcome?: string;
 }
 
 /** One question asked before the first message. */
@@ -33,6 +40,8 @@ export interface PrechatField {
 
 export interface BotPageLimits {
   messagesPerVisitorPerHour: number;
+  /** Stage 7: one person's messages per day (the chatbot's day, Asia/Kolkata by default). */
+  messagesPerVisitorPerDay: number;
   maxMessageChars: number;
   dailyCapPerBot: number;
 }
@@ -131,6 +140,9 @@ export const BOT_PAGE_BOUNDS = {
   /** Hard ceiling on one message, whatever the page says. */
   maxMessageChars: 2000,
   maxMessagesPerVisitorPerHour: 200,
+  maxMessagesPerVisitorPerDay: 5000,
+  /** The page's welcome line (stage 7). */
+  maxWelcomeChars: 140,
   maxDailyCapPerBot: 20000,
   /** The longest reply the web channel shows. */
   maxReplyChars: 4000,
@@ -144,6 +156,7 @@ export const BOT_PAGE_BOUNDS = {
 
 export const DEFAULT_BOT_PAGE_LIMITS: BotPageLimits = {
   messagesPerVisitorPerHour: 30,
+  messagesPerVisitorPerDay: 300,
   maxMessageChars: 1000,
   dailyCapPerBot: 500,
 };
@@ -183,6 +196,29 @@ export const RESERVED_SLUGS = new Set([
   'terms',
 ]);
 
+/**
+ * The page's address (stage 7): `/chat/<publicId>`. 8 random lower-case letters and digits,
+ * assigned by Ally. Older rows may hold 6-12 characters, so lookups accept that range.
+ */
+export const PUBLIC_ID_PATTERN = /^[a-z0-9]{6,12}$/;
+const PUBLIC_ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
+export const PUBLIC_ID_LENGTH = 8;
+
+/** A fresh candidate address; the caller checks it against every public id and slug. */
+export function randomPublicId(
+  random: (n: number) => Buffer = randomBytes,
+): string {
+  let out = '';
+  while (out.length < PUBLIC_ID_LENGTH) {
+    // Rejection sampling over 252 = 7 × 36, so every character is equally likely.
+    for (const byte of random(PUBLIC_ID_LENGTH * 2)) {
+      if (byte < 252 && out.length < PUBLIC_ID_LENGTH)
+        out += PUBLIC_ID_ALPHABET[byte % 36];
+    }
+  }
+  return out;
+}
+
 /** A suggested slug from a bot's name: "Mehta Clinic!" → "mehta-clinic". */
 export function slugFromName(name: string): string {
   const slug = name
@@ -214,6 +250,7 @@ export function defaultBotPageSettings(bot: {
       avatarUrl: null,
       disclaimer: bot.crisisSafetyOn ? CRISIS_DISCLAIMER : '',
       footerLink: null,
+      welcome: '',
     },
     brand: {
       ...DEFAULT_BOT_PAGE_BRAND,

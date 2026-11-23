@@ -1,0 +1,414 @@
+/* The test half of split build (v2 tokens only). */
+.ally-dt {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--ally-font-ui);
+  color: var(--ally-ink);
+}
+.ally-dt--empty {
+  align-items: center;
+  justify-content: center;
+  color: var(--ally-muted);
+}
+.ally-dt__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 20px 6px;
+}
+.ally-dt__title {
+  margin: 0;
+  font: 600 16px/1.3 var(--ally-font-ui);
+}
+.ally-dt__scroll {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.ally-dt__intro {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: var(--ally-ink-2);
+}
+.ally-dt__list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ally-dt__msg {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 92%;
+}
+.ally-dt__msg p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.ally-dt__msg--user {
+  align-self: flex-end;
+  padding: 10px 14px;
+  border-radius: var(--ally-radius-md);
+  background: var(--ally-surface-2);
+}
+.ally-dt__msg--assistant {
+  align-self: flex-start;
+  padding: 10px 14px;
+  border: 1px solid var(--ally-line);
+  border-radius: var(--ally-radius-md);
+  background: var(--ally-surface);
+}
+.ally-dt__msg.is-faded {
+  opacity: 0.55;
+}
+.ally-dt__who {
+  font: 500 12px/1.2 var(--ally-font-label);
+  color: var(--ally-muted);
+}
+.ally-dt__older {
+  color: var(--ally-muted);
+}
+.ally-dt__note {
+  align-self: center;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--ally-info-bg);
+  color: var(--ally-info);
+}
+.ally-dt__status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ally-dt__why summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--ally-muted);
+}
+.ally-dt__why summary:focus-visible {
+  outline: 2px solid var(--ally-accent);
+  outline-offset: 2px;
+}
+.ally-dt__failed {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--ally-radius-sm);
+  background: var(--ally-warn-bg);
+  color: var(--ally-warn);
+}
+.ally-dt__failed p {
+  margin: 0;
+}
+.ally-dt__form {
+  display: flex;
+  gap: 8px;
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--ally-line);
+}
+.ally-dt__form .ally-input {
+  flex: 1 1 auto;
+}
+
+.ally-dt__progress {
+  margin: 0 0 6px;
+  opacity: 0.75;
+  min-height: 1.2em;
+}
+
+/* Fix this, Add a fact, Save as a test, and the unanswered list. */
+.ally-dt__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.ally-dt__fix,
+.ally-dt__addfact,
+.ally-dt__unanswered {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--ally-line);
+  border-radius: var(--ally-radius-md);
+  background: var(--ally-surface-2);
+}
+.ally-dt__fix-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ally-dt__fix-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ally-dt__choices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ally-dt__choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+}
+.ally-dt__link {
+  background: none;
+  border: 0;
+  padding: 2px 4px;
+  color: var(--ally-muted);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.ally-dt__link:focus-visible,
+.ally-dt__choice input:focus-visible {
+  outline: 2px solid var(--ally-ink);
+  outline-offset: 2px;
+}
+.ally-dt__unanswered {
+  margin: 0 20px 6px;
+  list-style: none;
+}
+.ally-dt__unanswered li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* Channel look, Try as, likely questions. These change how the same replies are drawn only. */
+.ally-dt__tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 20px 6px;
+}
+.ally-dt__menu {
+  position: relative;
+}
+.ally-dt__menu-list {
+  position: absolute;
+  z-index: 3;
+  top: 100%;
+  left: 0;
+  min-width: 240px;
+  margin: 4px 0 0;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--ally-line);
+  border-radius: var(--ally-radius-md);
+  background: var(--ally-surface);
+}
+.ally-dt__menu-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--ally-radius-sm);
+  background: none;
+  color: var(--ally-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ally-dt__menu-item:hover {
+  background: var(--ally-surface-2);
+}
+.ally-dt__menu-item:focus-visible {
+  outline: 2px solid var(--ally-ink);
+  outline-offset: -2px;
+}
+.ally-dt__playing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 0 20px 6px;
+}
+.ally-dt__likely {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--ally-line);
+  border-radius: var(--ally-radius-md);
+  background: var(--ally-surface-2);
+}
+.ally-dt__likely-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ally-dt__likely-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.ally-dt__likely-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+}
+.ally-dt__likely-toggle {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ally-dt__likely-toggle .ally-small {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--ally-muted);
+}
+.ally-dt__likely-toggle:focus-visible {
+  outline: 2px solid var(--ally-ink);
+  outline-offset: 2px;
+}
+.ally-dt__likely-body p {
+  margin: 0 0 4px;
+  white-space: pre-wrap;
+}
+.ally-dt__mark.is-check {
+  color: var(--ally-warn);
+}
+.ally-dt__mark.is-ok {
+  color: var(--ally-ink);
+}
+
+/*
+ * Channel looks. WhatsApp's soft green is not a v2 token, so it is defined here, once, as a
+ * variable. Nothing outside this pane uses it.
+ */
+.ally-dt__scroll {
+  --ally-dt-whatsapp: #dcf8c6;
+  --ally-dt-whatsapp-head: #075e54;
+}
+.ally-dt__strip {
+  padding: 8px 12px;
+  border-radius: var(--ally-radius-sm);
+  font: 500 13px/1.3 var(--ally-font-label);
+}
+.ally-dt__strip--whatsapp {
+  background: var(--ally-dt-whatsapp-head);
+  color: #fff;
+}
+.ally-dt__strip--widget {
+  border: 1px solid var(--ally-line);
+  background: var(--ally-surface-2);
+  color: var(--ally-ink);
+}
+.ally-dt__list--whatsapp .ally-dt__msg {
+  border: 0;
+  border-radius: 10px;
+}
+.ally-dt__list--whatsapp .ally-dt__msg--user {
+  background: var(--ally-dt-whatsapp);
+  color: #111;
+}
+.ally-dt__list--whatsapp .ally-dt__msg--assistant {
+  background: var(--ally-surface);
+  box-shadow: 0 1px 1px var(--ally-line);
+}
+.ally-dt__list--widget {
+  padding: 10px;
+  border: 1px solid var(--ally-line);
+  border-radius: var(--ally-radius-md);
+}
+.ally-dt__list--widget .ally-dt__msg {
+  border-radius: 16px;
+}
+.ally-dt__list--widget .ally-dt__msg--user {
+  background: var(--ally-accent);
+  color: #fff;
+}
+
+/* The build half's command line and Make it better card. */
+.ally-cbt,
+.ally-better {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 20px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--ally-line);
+  border-radius: var(--ally-radius-md);
+  background: var(--ally-surface-2);
+  color: var(--ally-ink);
+  font-family: var(--ally-font-ui);
+}
+.ally-cbt__form {
+  display: flex;
+  gap: 8px;
+}
+.ally-cbt__form .ally-input {
+  flex: 1 1 auto;
+}
+.ally-cbt__card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ally-cbt__card p,
+.ally-cbt__done {
+  margin: 0;
+}
+.ally-cbt__changes {
+  margin: 0;
+  padding-left: 18px;
+}
+.ally-cbt__done {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ally-better__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ally-better__body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}

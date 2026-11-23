@@ -138,6 +138,12 @@ export interface OnboardingSession {
 
   /** The one-screen flow (chunk 20d). Null while the draft loads. */
   flow: OnboardingScreenState | null;
+  /** Which browser-only screens have been passed (split build's "Make it better" reads it). */
+  passed?: PassedScreens | null;
+  /** Load the draft again, after a change made outside this hook (split build's change by talking). */
+  refresh?: () => Promise<void>;
+  /** Show a screen again (the safety screen), when the draft's step still allows it. */
+  reopen?: (screen: keyof PassedScreens) => void;
   /** Move past the reading result, the safety screen or "Make it yours". */
   pass: (screen: keyof PassedScreens) => void;
   /** Back from the current screen: a browser-only screen, else the server's step back. */
@@ -285,6 +291,11 @@ export const useOnboardingSession = (
     [view, stored, watched, sending, drafting, session.streaming],
   );
 
+  const passedNow = useMemo<PassedScreens | null>(
+    () => (view ? passedFromStep(view, stored, watched) : null),
+    [view, stored, watched],
+  );
+
   return {
     view,
     reading: session.reading,
@@ -321,6 +332,9 @@ export const useOnboardingSession = (
     },
     edit,
     flow,
+    passed: passedNow,
+    refresh: session.reload,
+    reopen: screen => pass(screen, false),
     pass: screen => pass(screen),
     applyTemplate: async (template, answers) => {
       if (!view) return null;

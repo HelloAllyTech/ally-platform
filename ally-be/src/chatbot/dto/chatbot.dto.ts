@@ -2,7 +2,9 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
+  ArrayMinSize,
   IsArray,
+  IsEmail,
   IsBoolean,
   IsEnum,
   IsIn,
@@ -177,14 +179,66 @@ export class SetChatbotDocumentsDto {
   documentIds!: string[];
 }
 
+/**
+ * One member as `PUT :id/members` takes it. Stage 1b: `roles` (a set) is the new field; the old
+ * single `role` is still accepted from a dashboard on the old code. Give at least one of them;
+ * `roles` wins when both are sent.
+ */
 export class ChatbotMemberInputDto {
   @ApiProperty()
   @IsInt()
   userId!: number;
 
-  @ApiProperty({ enum: ChatbotMemberRole })
+  @ApiPropertyOptional({
+    enum: ChatbotMemberRole,
+    description: 'OLD single role. Prefer `roles`.',
+  })
+  @IsOptional()
   @IsEnum(ChatbotMemberRole)
-  role!: ChatbotMemberRole;
+  role?: ChatbotMemberRole;
+
+  @ApiPropertyOptional({ enum: ChatbotMemberRole, isArray: true })
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(4)
+  @IsEnum(ChatbotMemberRole, { each: true })
+  roles?: ChatbotMemberRole[];
+}
+
+export class TransferOwnershipDto {
+  @ApiProperty({ description: 'The member who becomes the creator-owner' })
+  @IsInt()
+  userId!: number;
+}
+
+export class CreateChatbotInviteDto {
+  @ApiProperty()
+  @IsEmail()
+  @MaxLength(254)
+  email!: string;
+
+  @ApiProperty({ enum: ChatbotMemberRole, isArray: true })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(4)
+  @IsEnum(ChatbotMemberRole, { each: true })
+  roles!: ChatbotMemberRole[];
+}
+
+export class AcceptChatbotInviteDto {
+  @ApiProperty({ description: 'The token from the invite email' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
+  token!: string;
+}
+
+export class PublicAcceptChatbotInviteDto extends AcceptChatbotInviteDto {
+  @ApiProperty({ description: 'The email the invite was sent to' })
+  @IsEmail()
+  @MaxLength(254)
+  email!: string;
 }
 
 export class SetChatbotMembersDto {

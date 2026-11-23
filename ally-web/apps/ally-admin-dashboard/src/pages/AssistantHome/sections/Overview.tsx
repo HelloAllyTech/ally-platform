@@ -1,58 +1,52 @@
-import React, { useRef, useState } from "react";
+import React, { useState } from "react";
 
 import { useNavigate } from "react-router-dom";
 
-import { useGetHomeNumbersQuery, useSetChatbotStatusMutation } from "@api";
+import {
+  useGetAccessListQuery,
+  useReadSourceAgainMutation,
+  useSetChatbotStatusMutation,
+} from "@api";
 import { Button } from "@components/button";
 import { ButtonVariant } from "@components/types";
-import { Segmented } from "@components/v2";
-import { ROUTES } from "@constants";
-import { BotPageView, ChatbotStatus } from "@types";
+import { Permissions } from "@constants";
+import { useUser } from "@hooks";
+import { ChatbotStatus } from "@types";
 
 import { AllNumbers } from "./AllNumbers";
+import { HowItsDoing } from "./HowItsDoing";
 import { Scorecard } from "./Scorecard";
-import { Qr } from "../../Onboarding/Screens";
 import { TemplateOriginLine } from "../../Templates/TemplateOriginLine";
-import { copyToClipboard } from "../../WhatsAppBot/shared";
-import { HOME } from "../copy";
+import { fill, HOME } from "../copy";
+import { LIVE_ACCESS_COPY as la, OVERVIEW_COPY as o } from "../copy/overview";
 import { Group, SectionHead } from "../fields";
-import { RemoveDialog } from "../ui/RemoveDialog";
 
 import type { SectionProps } from "./props";
 
 const t = HOME.overview;
 
 /**
- * How the assistant is doing (chunk 20d): whether it's live, with the one switch; its link and QR
- * code; the last 7 or 30 days in four numbers (all of them under "All numbers", opened in place); and
- * what needs the owner. Owners can remove it here.
+ * How the assistant is doing (chunk 20d, stage 7): whether it's live, with the one switch; how it's
+ * doing over 7, 30 or 90 days (counts only, small groups held back by the server); the 30-day
+ * "read your sources again" nudge; and what needs the owner. Reply time, languages and document
+ * use stay under "See all numbers", for Ally staff only. The link and QR code moved to Channels, and Remove to Settings (stage 2).
  */
 export const OverviewSection: React.FC<
   SectionProps & {
-    page: BotPageView | null;
     /** An old link to the classic usage tab (`?tab=usage`) opens with All numbers open. */
     openAllNumbers?: boolean;
   }
-> = ({ bot, page, openAllNumbers = false, canEdit, canManage, go }) => {
+> = ({ bot, home, openAllNumbers = false, canEdit, go }) => {
   const [setStatus, statusState] = useSetChatbotStatusMutation();
-  const [removing, setRemoving] = useState(false);
-  const [days, setDays] = useState<7 | 30>(30);
-  const [allNumbers, setAllNumbers] = useState(openAllNumbers);
-  // Both periods from the store "This week" counts (Q3d; prod 18 Nov: the list's own 30 days left
-  // out the bot page's chats, so "People 0, Messages 0" sat beside "7 conversations").
-  const stats = useGetHomeNumbersQuery({ id: bot.id, days }).data;
+  const { permissions } = useUser();
+  // The full numbers (reply time, languages, document use) are for Ally staff only.
+  const isStaff = Boolean(permissions?.includes(Permissions.SYSTEM_ACCESS));
+  const [allNumbers, setAllNumbers] = useState(openAllNumbers && isStaff);
   const navigate = useNavigate();
-  const qr = useRef<HTMLDivElement>(null);
   const live = bot.status === ChatbotStatus.LIVE;
-
-  const downloadQr = () => {
-    const img = qr.current?.querySelector("img");
-    if (!img || !page) return;
-    const a = document.createElement("a");
-    a.href = img.src;
-    a.download = `${page.slug}-qr.png`;
-    a.click();
-  };
+  // The one access list decides who can chat, so the live line says so (nobody listed = nobody).
+  const access = useGetAccessListQuery(bot.id, { skip: !live });
+  const nobody = live && access.data !== undefined && access.data.length === 0;
 
   return (
     <>
@@ -65,8 +59,19 @@ export const OverviewSection: React.FC<
       <Group testId="overview-status">
         <div className="ally-home__row">
           <p className="ally-body ally-home__strong">
-            {live ? t.live : bot.status === ChatbotStatus.PAUSED ? t.paused : t.draft}
+            {live
+              ? nobody
+                ? la.nobody
+                : la.live
+              : bot.status === ChatbotStatus.PAUSED
+                ? t.paused
+                : t.draft}
           </p>
+          {live && (
+            <button type="button" className="ally-link ally-small" onClick={() => go("channels")}>
+              {la.link}
+            </button>
+          )}
           {canEdit && (
             <Button
               variant={live ? ButtonVariant.TERTIARY : ButtonVariant.PRIMARY}
@@ -85,101 +90,85 @@ export const OverviewSection: React.FC<
         </div>
         <TemplateOriginLine
           botId={bot.id}
-          onReplace={key => navigate(`?section=lists&tool=${encodeURIComponent(key)}`)}
+          onReplace={key =>
+            navigate(`?section=knowledge&part=lists&tool=${encodeURIComponent(key)}`)
+          }
         />
       </Group>
+
+      <HowItsDoing botId={bot.id} />
+
+      {canEdit && home.knowledgeStaleNudge && home.knowledgeStaleDocumentId && (
+        <StaleNudge
+          botId={bot.id}
+          days={home.knowledgeStaleDays ?? 0}
+          documentId={home.knowledgeStaleDocumentId}
+        />
+      )}
 
       <Scorecard botId={bot.id} canEdit={canEdit} go={go} />
 
-      {page?.saved && (
-        <Group title={t.link} testId="overview-link">
-          <div className="ally-home__link">
-            <div ref={qr} className="ally-home__qr">
-              <Qr link={page.link} />
-            </div>
-            <div className="ally-home__link-body">
-              <a
-                className="ally-link ally-home__url"
-                href={page.link}
-                target="_blank"
-                rel="noreferrer"
-              >
-                {page.link}
-              </a>
-              <div className="ally-btn-row">
-                <Button
-                  variant={ButtonVariant.TERTIARY}
-                  type="button"
-                  onClick={() => void copyToClipboard(page.link)}
-                >
-                  {t.copy}
-                </Button>
-                <Button variant={ButtonVariant.TERTIARY} type="button" onClick={downloadQr}>
-                  {t.qr}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </Group>
-      )}
-
-      <Group title={t.numbersTitle} testId="overview-numbers">
-        <Segmented
-          label={t.numbersPeriod}
-          options={[
-            { id: "7", label: t.last7 },
-            { id: "30", label: t.last30 },
-          ]}
-          value={String(days) as "7" | "30"}
-          onChange={id => setDays(id === "7" ? 7 : 30)}
-        />
-        <dl className="ally-home__stats" aria-busy={!stats || undefined}>
-          {(
-            [
-              [t.people, stats?.people],
-              [t.messages, stats?.messages],
-              [t.answered, stats?.answered],
-              [t.unanswered, stats?.declined],
-            ] as const
-          ).map(([label, value]) => (
-            <div key={label} className="ally-home__stat">
-              <dt className="ally-small">{label}</dt>
-              {/* Held at its final size while the 7 days load. */}
-              <dd>{value === undefined ? "–" : value.toLocaleString("en-IN")}</dd>
-            </div>
-          ))}
-        </dl>
-        <button
-          type="button"
-          className="ally-link ally-small"
-          aria-expanded={allNumbers}
-          aria-controls="all-numbers"
-          onClick={() => setAllNumbers(open => !open)}
-        >
-          {allNumbers ? HOME.allNumbers.hide : t.seeAllNumbers}
-        </button>
-        {/* Loads only once opened. */}
-        <div id="all-numbers">{allNumbers && <AllNumbers botId={bot.id} />}</div>
-      </Group>
-
-      {canManage && (
-        <div>
+      {/* Latency, languages and document use: Ally staff only. */}
+      {isStaff && (
+        <Group testId="overview-numbers">
           <button
             type="button"
-            className="ally-link ally-home__danger"
-            onClick={() => setRemoving(true)}
+            className="ally-link ally-small"
+            aria-expanded={allNumbers}
+            aria-controls="all-numbers"
+            onClick={() => setAllNumbers(open => !open)}
           >
-            {t.remove}
+            {allNumbers ? HOME.allNumbers.hide : t.seeAllNumbers}
           </button>
-          {removing && (
-            <RemoveDialog
-              bot={bot}
-              onClose={() => setRemoving(false)}
-              onRemoved={() => navigate(ROUTES.WHATSAPP_BOT)}
-            />
-          )}
-        </div>
+          {/* Loads only once opened. */}
+          <div id="all-numbers">{allNumbers && <AllNumbers botId={bot.id} />}</div>
+        </Group>
       )}
     </>
+  );
+};
+
+/** The 30-day nudge: the sources were last read a while ago; one button reads the oldest again. */
+const StaleNudge: React.FC<{ botId: string; days: number; documentId: string }> = ({
+  botId,
+  days,
+  documentId,
+}) => {
+  const [readAgain, state] = useReadSourceAgainMutation();
+  const [note, setNote] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  return (
+    <Group title={o.staleTitle} testId="overview-stale">
+      <div className="ally-home__row">
+        <p className="ally-body">{fill(o.staleBody, { n: days })}</p>
+        <Button
+          variant={ButtonVariant.SECONDARY}
+          type="button"
+          disabled={state.isLoading}
+          onClick={async () => {
+            setFailed(false);
+            setNote(null);
+            try {
+              const done = await readAgain({ id: botId, documentId }).unwrap();
+              setNote(done.changed ? o.readChanged : o.readDone);
+            } catch {
+              setFailed(true);
+            }
+          }}
+        >
+          {state.isLoading ? o.reading : o.readAgain}
+        </Button>
+      </div>
+      {note && (
+        <p className="ally-small" role="status">
+          {note}
+        </p>
+      )}
+      {failed && (
+        <p className="ally-error" role="alert">
+          {o.readFailed}
+        </p>
+      )}
+    </Group>
   );
 };

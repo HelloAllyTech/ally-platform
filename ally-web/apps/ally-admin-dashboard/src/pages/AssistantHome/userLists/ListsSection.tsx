@@ -37,14 +37,17 @@ type Mode = { kind: "lists" } | { kind: "setup" } | { kind: "scratch" } | { kind
  * assistant may do. Switching assistant remounts the home (it's keyed by bot), so the open tab
  * starts again at the first list.
  */
-export const ListsSection: React.FC<SectionProps> = ({
-  bot,
-  home,
-  canEdit,
-  canManage,
-  go,
-  tryIt,
-}) => {
+export const ListsSection: React.FC<
+  SectionProps & {
+    /**
+     * The assistant's own tools (pages, memory, hand over) ahead of the lists. Off in Knowledge,
+     * where they moved: memory and hand over to Settings, pages to Channels (stage 2).
+     */
+    withTools?: boolean;
+    /** A list to open first (`?tool=<key>`). */
+    openKey?: string | null;
+  }
+> = ({ bot, home, canEdit, canManage, go, tryIt, withTools = true, openKey = null }) => {
   const { data: lists, isLoading, isError, refetch } = useGetUserListsQuery(bot.id);
   const { data: catalogue } = useGetReadyMadeListsQuery(bot.id, { skip: !canEdit });
   const [mode, setMode] = useState<Mode>({ kind: "lists" });
@@ -52,13 +55,16 @@ export const ListsSection: React.FC<SectionProps> = ({
   // `?tool=memory` opens Memory (the Inbox's links).
   const [open, setOpen] = useState<string | null>(() => {
     // Read from the address itself, so the section needs no router of its own.
-    const tool = new URLSearchParams(window.location.search).get("tool");
-    return tool && BUILT_IN.includes(`@${tool}` as BuiltIn) ? `@${tool}` : null;
+    const tool = openKey ?? new URLSearchParams(window.location.search).get("tool");
+    if (!tool) return null;
+    if (BUILT_IN.includes(`@${tool}` as BuiltIn)) return withTools ? `@${tool}` : null;
+    return tool;
   });
   const [adding, setAdding] = useState(false);
 
   const live = useMemo(() => (lists ?? []).filter(l => !l.deleted_at), [lists]);
-  const builtIn = open && BUILT_IN.includes(open as BuiltIn) ? (open as BuiltIn) : null;
+  const builtIn =
+    withTools && open && BUILT_IN.includes(open as BuiltIn) ? (open as BuiltIn) : null;
   const current = builtIn ? null : (live.find(l => l.key === open) ?? live[0] ?? null);
 
   return (
@@ -80,7 +86,7 @@ export const ListsSection: React.FC<SectionProps> = ({
         <TemplateAdd
           bot={bot}
           onClose={() => setMode({ kind: "lists" })}
-          onRunCheckup={() => go("checkup")}
+          onRunCheckup={() => go("build", "checkup")}
         />
       ) : mode.kind === "scratch" ? (
         <NewListForm
@@ -107,6 +113,7 @@ export const ListsSection: React.FC<SectionProps> = ({
             lists={live}
             current={current}
             builtIn={builtIn}
+            withTools={withTools}
             onOpen={setOpen}
             onAdd={canEdit ? () => setAdding(true) : undefined}
           />
@@ -251,11 +258,12 @@ const ListTabs: React.FC<{
   lists: UserList[];
   current: UserList | null;
   builtIn: BuiltIn | null;
+  withTools: boolean;
   onOpen: (key: string) => void;
   onAdd?: () => void;
-}> = ({ home, lists, current, builtIn, onOpen, onAdd }) => {
+}> = ({ home, lists, current, builtIn, withTools, onOpen, onAdd }) => {
   const row = useRef<HTMLDivElement>(null);
-  const tabs: { id: string; label: string; tag?: string; domId: string }[] = [
+  const toolTabs: { id: string; label: string; tag?: string; domId: string }[] = [
     {
       id: "@pages",
       label: t().tools.pages,
@@ -272,6 +280,9 @@ const ListTabs: React.FC<{
       domId: "tool-tab-memory",
     },
     { id: "@handover", label: t().tools.handover, domId: "tool-tab-handover" },
+  ];
+  const tabs: { id: string; label: string; tag?: string; domId: string }[] = [
+    ...(withTools ? toolTabs : []),
     ...lists.map(list => ({
       id: list.key,
       label: list.name,
@@ -335,21 +346,23 @@ const ListTabs: React.FC<{
 };
 
 /** The assistant's own tools (chunk 8a): what each does, and where it's changed. */
-const BuiltInPanel: React.FC<{
+export const BuiltInPanel: React.FC<{
   tool: BuiltIn;
   bot: SectionProps["bot"];
   home: SectionProps["home"];
   canEdit: boolean;
   canManage: boolean;
   go: SectionProps["go"];
-}> = ({ tool, bot, home, canEdit, canManage, go }) => {
+  /** Settings and Channels show one tool on its own, without the tab panel semantics. */
+  standalone?: boolean;
+}> = ({ tool, bot, home, canEdit, canManage, go, standalone = false }) => {
   const { data: how } = useGetHowItWorksQuery(bot.id);
   const name = tool.slice(1);
   return (
     <div
       id={`tool-panel-${name}`}
-      role="tabpanel"
-      aria-labelledby={`tool-tab-${name}`}
+      role={standalone ? undefined : "tabpanel"}
+      aria-labelledby={standalone ? undefined : `tool-tab-${name}`}
       className="ally-lists__panel ally-tools__panel"
       data-testid={`tool-${name}`}
     >
@@ -361,7 +374,11 @@ const BuiltInPanel: React.FC<{
             <p className="ally-body">{fill(t().tools.pagesCount, { n: how.search.documents })}</p>
           )}
           <div>
-            <Button variant={ButtonVariant.TERTIARY} type="button" onClick={() => go("knows")}>
+            <Button
+              variant={ButtonVariant.TERTIARY}
+              type="button"
+              onClick={() => go("knowledge", "knows")}
+            >
               {t().tools.pagesManage}
             </Button>
           </div>
@@ -386,11 +403,13 @@ const BuiltInPanel: React.FC<{
           <h3 className="ally-home__group-title">{t().tools.handover}</h3>
           <p className="ally-small">{t().tools.handoverBody}</p>
           <HandOverAbility botId={bot.id} canManage={canManage} />
-          <div>
-            <Button variant={ButtonVariant.TERTIARY} type="button" onClick={() => go("share")}>
-              {t().tools.handoverChange}
-            </Button>
-          </div>
+          {!standalone && (
+            <div>
+              <Button variant={ButtonVariant.TERTIARY} type="button" onClick={() => go("settings")}>
+                {t().tools.handoverChange}
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>

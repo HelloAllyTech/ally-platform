@@ -8,6 +8,7 @@ import { WaMessage } from '../entity/wa-message.entity';
 import { WaUnansweredQuestion } from '../entity/wa-unanswered-question.entity';
 import { ChatbotSettingsService } from 'src/chatbot/service/chatbot-settings.service';
 import { ConversationService } from 'src/chatbot/service/conversation.service';
+import { AssistantRetentionService } from 'src/chatbot/privacy/assistant-retention.service';
 
 /** Rows blanked per pass. Bounds one run's transaction size on a large backlog. */
 const BATCH_SIZE = 500;
@@ -47,12 +48,31 @@ export class WhatsAppRetentionService {
      * without it behaves exactly as before.
      */
     @Optional() private readonly conversations?: ConversationService,
+    /**
+     * Assistants stage 5 (D11): the per-chatbot sweep. When present it replaces the global
+     * window below, so the same rows are never swept twice by two different cutoffs.
+     */
+    @Optional() private readonly assistantRetention?: AssistantRetentionService,
   ) {}
 
   /** Entry point for the daily scheduled task. */
   async runRetentionSweep(): Promise<void> {
     // Memory lines past their expiry go whatever the retention window (chunk 8a).
     await this.sweepMemory();
+    if (this.assistantRetention) {
+      // Per chatbot, flagged chats exempt, blocked until the crisis backfill is done and behind
+      // ASSISTANT_RETENTION_SWEEP_ENABLED. The global `retentionDays` below no longer applies.
+      try {
+        await this.assistantRetention.runScheduled();
+      } catch (error) {
+        this.logger.error(
+          `Assistant retention sweep failed; the next run retries: ${
+            error instanceof Error ? error.message : 'unknown error'
+          }`,
+        );
+      }
+      return;
+    }
     const settings = await this.settingsService.get();
     const days = settings.retentionDays;
 

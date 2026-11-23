@@ -26,6 +26,8 @@ export enum ChatbotKnowledgeSource {
 
 export enum ChatbotMemberRole {
   VIEWER = "viewer",
+  /** Replies to and takes over conversations; sees nothing else (roles ship from the API as a set). */
+  RESPONDER = "responder",
   EDITOR = "editor",
   OWNER = "owner",
 }
@@ -100,6 +102,15 @@ export interface Chatbot {
   persona: ChatbotPersona;
   model: ChatbotModelChoice | null;
   myRole: ChatbotMemberRole;
+  /**
+   * Every role the caller holds on this chatbot, once the API sends the set. Absent until then:
+   * read it through `chatbotAccess`, which falls back to `myRole`.
+   */
+  myRoles?: ChatbotMemberRole[];
+  /** Conversations waiting for a person to reply. Absent until the API sends it. */
+  waitingForPerson?: number;
+  /** True for a draft nobody has touched (a blank created at the click). Absent until the API sends it. */
+  blank?: boolean;
   connectors: Connector[];
   documentCount: number;
   /** Documents it can answer from now: indexed and not archived. */
@@ -142,6 +153,8 @@ export interface ChatbotDocumentRow {
   archived: boolean;
   /** True when the document belongs to this chatbot only (uploaded on its Knowledge tab). */
   private: boolean;
+  /** Set while indexing waits for credits ("Paused: out of credits..."). Needs ally-be listDocuments to return it. */
+  statusMessage?: string | null;
   updatedAt: string;
 }
 

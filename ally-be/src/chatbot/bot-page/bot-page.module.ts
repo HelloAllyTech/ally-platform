@@ -12,6 +12,14 @@ import { ChatbotModule } from '../chatbot.module';
 import { ChatbotPageAccess } from '../entity/chatbot-page-access.entity';
 import { ChatbotPage } from '../entity/chatbot-page.entity';
 import { Chatbot } from '../entity/chatbot.entity';
+import { ChatbotDomain } from '../entity/chatbot-domain.entity';
+import { WidgetSite } from '../entity/widget-site.entity';
+import {
+  BotPageDomainController,
+  BotPageDomainPublicController,
+} from './bot-page-domain.controller';
+import { BotPageDomainService } from './bot-page-domain.service';
+import { WidgetSitesService } from './widget-sites.service';
 import { BotPageAccessService } from './bot-page-access.service';
 import { BotPageAdminController } from './bot-page-admin.controller';
 import { BotPageGuardMiddleware } from './bot-page-guard.middleware';
@@ -41,6 +49,8 @@ import { TurnstileService } from './turnstile.service';
       Chatbot,
       WaUnansweredQuestion,
       BotImage,
+      WidgetSite,
+      ChatbotDomain,
     ]),
     JwtModule.register({}),
     ChatbotModule,
@@ -53,6 +63,8 @@ import { TurnstileService } from './turnstile.service';
     WidgetPublicController,
     BotImageController,
     BotImagePublicController,
+    BotPageDomainController,
+    BotPageDomainPublicController,
   ],
   providers: [
     BotPageService,
@@ -64,6 +76,8 @@ import { TurnstileService } from './turnstile.service';
     BotPagePublicService,
     BotImageService,
     LeadAlertService,
+    WidgetSitesService,
+    BotPageDomainService,
   ],
   // The access service too: onboarding's publish (chunk 20a) writes the page's list through it.
   // The image service: onboarding stores the logo it found through it (chunk 20d).

@@ -131,7 +131,7 @@ describe('ChangeService (change by chat)', () => {
     });
   });
 
-  it('applies through the home field saves, records it and schedules a checkup', async () => {
+  it('applies through the home field saves, records it and starts no checkup', async () => {
     const h = build();
     const { eventId } = await h.service.apply('bot', [
       { field: 'tone', before: 'warm', after: 'formal' },
@@ -147,7 +147,8 @@ describe('ChangeService (change by chat)', () => {
       { record: false },
     );
     expect(h.draft.events.map((e) => e.id)).toContain(eventId);
-    expect(h.checkup.scheduleAfterChange).toHaveBeenCalledWith('bot');
+    // Stage 4: no automatic re-run of saved tests after a change.
+    expect(h.checkup.scheduleAfterChange).not.toHaveBeenCalled();
   });
 
   it('refuses as stale when the value changed since the proposal', async () => {
@@ -187,7 +188,7 @@ describe('CheckupService.scheduleAfterChange', () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => jest.useRealTimers());
 
-  it('runs once, 2 minutes after the last change', () => {
+  it('never starts a run on its own any more (stage 4: saved tests run only on request)', () => {
     const service = new CheckupService(
       {} as never,
       {} as never,
@@ -198,12 +199,7 @@ describe('CheckupService.scheduleAfterChange', () => {
     );
     const start = jest.spyOn(service, 'start').mockResolvedValue({} as never);
     service.scheduleAfterChange('bot');
-    jest.advanceTimersByTime(60_000);
-    service.scheduleAfterChange('bot');
-    jest.advanceTimersByTime(119_000);
+    jest.advanceTimersByTime(10 * 60_000);
     expect(start).not.toHaveBeenCalled();
-    jest.advanceTimersByTime(1_000);
-    expect(start).toHaveBeenCalledTimes(1);
-    expect(start).toHaveBeenCalledWith('bot', { trigger: 'after_change' });
   });
 });

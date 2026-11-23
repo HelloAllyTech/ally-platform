@@ -57,6 +57,7 @@ function availableFor(access: BotPageAccess, prechat = false) {
       id: 'page-1',
       chatbotId: BOT_ID,
       slug: 'sunrise',
+      publicId: 'k7m2p9qa',
       status: BotPageStatus.ON,
       access,
       settings,
@@ -70,6 +71,8 @@ function availableFor(access: BotPageAccess, prechat = false) {
     },
   };
 }
+
+const DEFAULT_NOTICE = DEFAULT_WHATSAPP_SETTINGS.disclaimerText;
 
 const DECISION = {
   handledBy: WaHandledBy.RAG,
@@ -192,7 +195,7 @@ function harness(
   const service = new BotPagePublicService(
     {
       findAvailable: jest.fn().mockResolvedValue(available),
-      link: (slug: string) => `https://chat.ally.test/b/${slug}`,
+      link: (publicId: string) => `https://chat.ally.test/chat/${publicId}`,
     } as never,
     pageAccess as never,
     visitors as never,
@@ -265,9 +268,13 @@ describe('BotPagePublicService', () => {
         [
           'access',
           'branding',
+          'crisis',
+          'disclaimer',
           'language',
           'maxMessageChars',
+          'notice',
           'prechat',
+          'publicId',
           'slug',
           'suggestedQuestions',
           'turnstileSiteKey',
@@ -276,6 +283,61 @@ describe('BotPagePublicService', () => {
       expect(JSON.stringify(view)).not.toMatch(
         /bot-1|page-1|systemPrompt|retrieval/,
       );
+      // R6: the link always; no platform numbers when the builder set none.
+      expect(view.crisis).toEqual({
+        numbers: null,
+        helplineUrl: 'https://findahelpline.com',
+      });
+    });
+  });
+
+  describe('safety notices on the page (never removable)', () => {
+    const HEALTH =
+      'This is an automated assistant. It is not a crisis service or medical advice: in an emergency, contact your local emergency number.';
+
+    function packed(safetyPack: string | null, stored = '') {
+      const h = harness();
+      Object.assign(h.available, {
+        chatbot: { ...chatbot, safetyPack },
+      });
+      h.available.settings.branding.disclaimer = stored;
+      return h;
+    }
+
+    it('always shows the fixed AI / people-may-read notice', () => {
+      const { service, available } = packed(null);
+      const view = service.view(available as never);
+      expect(view.notice).toContain(
+        'You are chatting with an AI assistant. The AI and people at Sunrise Mind may read this chat.',
+      );
+      // No pack: the retired free-text disclaimer stays hidden.
+      expect(view.disclaimer).toBeNull();
+    });
+
+    it("shows a health pack's required disclaimer even though the free-text one is retired", () => {
+      const { service, available } = packed('mental_health', 'Old disclaimer');
+      const view = service.view(available as never);
+      expect(view.disclaimer).toBe(HEALTH);
+      expect(JSON.stringify(view)).not.toContain('Old disclaimer');
+    });
+
+    it("shows the owner's longer wording when it still contains the pack's", () => {
+      const own = `${HEALTH} Bookings only.`;
+      const { service, available } = packed('medical', own);
+      expect(service.view(available as never).disclaimer).toBe(own);
+    });
+
+    it('does not repeat the disclaimer when the notice already carries it', () => {
+      const { service, available } = packed('mental_health');
+      available.botSettings.disclaimerText = `You are chatting with an AI bot; our team may read this chat. ${HEALTH}`;
+      const view = service.view(available as never);
+      expect(view.notice).toContain(HEALTH);
+      expect(view.disclaimer).toBeNull();
+    });
+
+    it('a pack without a disclaimer adds none', () => {
+      const { service, available } = packed('standard', 'Old disclaimer');
+      expect(service.view(available as never).disclaimer).toBeNull();
     });
   });
 
@@ -325,6 +387,28 @@ describe('BotPagePublicService', () => {
       expect(h.otp.send).toHaveBeenCalledTimes(1);
       expect(h.otp.send.mock.calls[0][1]).toBe('asha@example.com');
     });
+
+    it.each(['too_many', 'failed'])(
+      'invite: a listed email whose code was not sent (%s) still answers like an unlisted one (D4)',
+      async (outcome) => {
+        const h = harness();
+        const stranger = await h.service.session(
+          'sunrise',
+          { email: 'who@example.com' },
+          h.req,
+          h.res,
+        );
+        h.pageAccess.eligibility.mockResolvedValue({ eligible: true });
+        h.otp.send.mockResolvedValue(outcome);
+        const invited = await h.service.session(
+          'sunrise',
+          { email: 'asha@example.com' },
+          h.req,
+          h.res,
+        );
+        expect(invited).toEqual(stranger);
+      },
+    );
 
     it('invite: a visitor verified recently, and still invited, goes straight in', async () => {
       const h = harness();
@@ -411,7 +495,7 @@ describe('BotPagePublicService', () => {
       h.pageAccess.eligibility.mockResolvedValue({ eligible: false });
       expect(
         await errorCodeOf(h.service.admit('sunrise', 'hi', h.req, h.res)),
-      ).toBe(ErrorCode.BOT_PAGE_NOT_ALLOWED);
+      ).toBe(ErrorCode.BOT_PAGE_NOT_ON_LIST);
     });
 
     it('refuses an unverified visitor on an invite page', async () => {
@@ -473,6 +557,37 @@ describe('BotPagePublicService', () => {
         h.service.admit('sunrise', 'hi', h.req, h.res),
       ).resolves.toMatchObject({ text: 'hi' });
     });
+
+    it('R1: a crisis message is accepted with the pre-chat questions unanswered, and gets the crisis reply', async () => {
+      const h = harness(BotPageAccess.PUBLIC, { prechat: true });
+      h.setVisitor({});
+      Object.assign(h.engine, {
+        isCrisisKeyword: jest.fn(async (text: string) => /end it/.test(text)),
+      });
+      // An ordinary message is still asked for the answers first.
+      expect(
+        await errorCodeOf(h.service.admit('sunrise', 'hi', h.req, h.res)),
+      ).toBe(ErrorCode.BOT_PAGE_INTAKE_REQUIRED);
+      const admitted = await h.service.admit(
+        'sunrise',
+        'I want to end it',
+        h.req,
+        h.res,
+      );
+      expect(admitted.text).toBe('I want to end it');
+      h.engine.respond.mockResolvedValueOnce({
+        handledBy: WaHandledBy.CRISIS,
+        body: 'Please reach out now: https://findahelpline.com',
+      });
+      const final = await h.service.respond(admitted);
+      expect(final.reply).toContain('https://findahelpline.com');
+      expect(final.rateable).toBe(false);
+      expect(h.engine.respond.mock.calls[0][0].text).toBe('I want to end it');
+      // The questions still apply to the next ordinary message.
+      expect(
+        await errorCodeOf(h.service.admit('sunrise', 'thanks', h.req, h.res)),
+      ).toBe(ErrorCode.BOT_PAGE_INTAKE_REQUIRED);
+    });
   });
 
   describe('respond', () => {
@@ -486,6 +601,56 @@ describe('BotPagePublicService', () => {
       );
       return h.service.respond(admitted, live);
     }
+
+    it('stage 6: a blocked turn returns its state with the fixed notification', async () => {
+      const h = harness(BotPageAccess.PUBLIC);
+      h.engine.respond.mockResolvedValueOnce({
+        handledBy: WaHandledBy.RATE_LIMITED,
+        body: 'This assistant is not available right now.',
+        limited: 'out_of_credits',
+        blocked: 'OUT_OF_CREDITS',
+      });
+      const final = await answer(h);
+      expect(final.blocked).toBe('OUT_OF_CREDITS');
+      expect(final.rateable).toBe(false);
+    });
+
+    it('stage 5: an erase step answers with its fixed reply for the signed-in visitor; no engine run', async () => {
+      const h = harness(BotPageAccess.PUBLIC);
+      const privacy = {
+        beforeTurn: jest.fn().mockResolvedValue({
+          kind: 'erase_confirm',
+          body: 'Do you want me to erase…',
+          handledBy: WaHandledBy.TEMPLATE,
+        }),
+        consentQuestion: jest.fn().mockResolvedValue(null),
+      };
+      Object.assign(h.service, { privacy });
+      Object.assign(h.engine, {
+        isCrisisKeyword: jest.fn().mockResolvedValue(false),
+      });
+      const final = await answer(h);
+      expect(h.engine.respond).not.toHaveBeenCalled();
+      expect(privacy.beforeTurn).toHaveBeenCalledWith(
+        expect.objectContaining({ crisisKeyword: false, text: 'how much?' }),
+      );
+      expect(final.reply).toContain('Do you want me to erase…');
+      expect(final.rateable).toBe(false);
+    });
+
+    it('stage 5: the consent question follows the agent’s own reply', async () => {
+      const h = harness(BotPageAccess.PUBLIC);
+      const privacy = {
+        beforeTurn: jest.fn().mockResolvedValue(null),
+        consentQuestion: jest.fn().mockResolvedValue('Can I remember?'),
+      };
+      Object.assign(h.service, { privacy });
+      Object.assign(h.engine, {
+        isCrisisKeyword: jest.fn().mockResolvedValue(false),
+      });
+      const final = await answer(h);
+      expect(final.reply).toMatch(/Can I remember\?$/);
+    });
 
     it('stores no reply while a team member holds the chat (chunk 11a)', async () => {
       const h = harness(BotPageAccess.PUBLIC);
@@ -525,6 +690,8 @@ describe('BotPagePublicService', () => {
     it('stores the message and the reply on the web channel, with the run behind it', async () => {
       const h = harness(BotPageAccess.PUBLIC);
       const final = await answer(h);
+      // Stage 4: the conversation's first reply carries the fixed start notice.
+      const first = `${DECISION.body}\n\nYou are chatting with an AI assistant. The AI and people at ${chatbot.name} may read this chat.\n${DEFAULT_NOTICE}`;
       expect(h.stored).toHaveLength(2);
       expect(h.stored[0]).toMatchObject({
         channel: 'web',
@@ -536,7 +703,7 @@ describe('BotPagePublicService', () => {
         channel: 'web',
         direction: 'outbound',
         role: 'assistant',
-        text: DECISION.body,
+        text: first,
         handledBy: WaHandledBy.RAG,
         agentRunId: 'run-1',
         agentRuntime: AgentRuntimeUsed.V2,
@@ -545,7 +712,7 @@ describe('BotPagePublicService', () => {
         inReplyToId: 'msg-1',
       });
       expect(final).toEqual({
-        reply: DECISION.body,
+        reply: first,
         citations: [{ title: 'Fees', url: 'https://sunrise.example/fees' }],
         messageId: 'msg-2',
         conversationId: 'conv-1',
@@ -879,13 +1046,25 @@ describe('BotPagePublicService', () => {
       });
     });
 
-    it('refuses any other website, a missing host, and localhost in production', async () => {
+    it('stage 7: opens on any website, whatever the stored list says', async () => {
       for (const host of [
         'https://evil-sunrisemind.in',
         'https://other.wixsite.com',
         'http://localhost:5500',
-        undefined,
       ]) {
+        const h = widget();
+        await h.service.session(
+          'sunrise',
+          { embed: { host } },
+          embedReq(),
+          h.res,
+        );
+        expect(h.issued[0].embed?.host).toBe(new URL(host).origin);
+      }
+    });
+
+    it('refuses a missing host or one that is not a web page', async () => {
+      for (const host of [undefined, 'javascript:alert(1)', 'not a url']) {
         const h = widget();
         expect(
           await errorCodeOf(
@@ -953,14 +1132,14 @@ describe('BotPagePublicService', () => {
       expect(page.visitorToken).toBeUndefined();
     });
 
-    it('taking the website off the list refuses the next message at once', async () => {
+    it('stage 7: emptying the stored website list no longer stops a chat', async () => {
       const h = widget();
       h.setVisitor({ embed: { host: SITE, page: null } });
       await h.service.admit('sunrise', 'hi', embedReq(), h.res);
       h.available.settings.widget.allowedDomains = [];
-      expect(
-        await errorCodeOf(h.service.admit('sunrise', 'hi', embedReq(), h.res)),
-      ).toBe(ErrorCode.BOT_PAGE_HOST_NOT_ALLOWED);
+      await expect(
+        h.service.admit('sunrise', 'hi', embedReq(), h.res),
+      ).resolves.toMatchObject({ text: 'hi' });
     });
 
     it('marks the chat as from the website, with the page', async () => {
@@ -1019,7 +1198,7 @@ describe('BotPagePublicService', () => {
       });
     });
 
-    it("gives the loader the bubble's settings only on an allowed website", async () => {
+    it("gives the loader the bubble's settings on any website, with the new address", async () => {
       const h = widget();
       h.available.settings.widget.label = 'Talk to us';
       expect(await h.service.widgetConfig('sunrise', SITE, h.req)).toEqual({
@@ -1030,21 +1209,120 @@ describe('BotPagePublicService', () => {
         accent: h.available.settings.branding.accentColour,
         logo: null,
         title: 'Sunrise Mind',
-        pageUrl: 'https://chat.ally.test/b/sunrise',
+        pageUrl: 'https://chat.ally.test/chat/k7m2p9qa',
       });
-      for (const origin of ['https://elsewhere.com', undefined]) {
-        expect(
-          await errorCodeOf(h.service.widgetConfig('sunrise', origin, h.req)),
-        ).toBe(ErrorCode.BOT_PAGE_HOST_NOT_ALLOWED);
-      }
+      await expect(
+        h.service.widgetConfig('sunrise', 'https://elsewhere.com', h.req),
+      ).resolves.toMatchObject({
+        pageUrl: 'https://chat.ally.test/chat/k7m2p9qa',
+      });
+      expect(
+        await errorCodeOf(h.service.widgetConfig('sunrise', undefined, h.req)),
+      ).toBe(ErrorCode.BOT_PAGE_HOST_NOT_ALLOWED);
     });
 
     it('states the frame-ancestors for infra', async () => {
       const h = widget();
+      // Stage 7: the widget may load on any site.
       expect(await h.service.framePolicy('sunrise')).toEqual({
-        frameAncestors:
-          "frame-ancestors 'self' https://chat.ally.test https://sunrisemind.in https://*.sunrisemind.in",
+        frameAncestors: 'frame-ancestors *',
       });
+    });
+  });
+
+  describe('stage 7: per-person limits and the crisis exemption (R1)', () => {
+    const limited = (perHour: number, perDay = 300) => {
+      const h = harness(BotPageAccess.PUBLIC);
+      h.available.settings.limits.messagesPerVisitorPerHour = perHour;
+      h.available.settings.limits.messagesPerVisitorPerDay = perDay;
+      h.setVisitor({});
+      const isCrisisKeyword = jest.fn(async (text: string) =>
+        /end it/.test(text),
+      );
+      Object.assign(h.engine, { isCrisisKeyword });
+      return { ...h, isCrisisKeyword };
+    };
+
+    it('a crisis keyword message is never throttled by the hourly limit', async () => {
+      const h = limited(1);
+      await h.service.admit('sunrise', 'hello', h.req, h.res);
+      expect(
+        await errorCodeOf(
+          h.service.admit('sunrise', 'hello again', h.req, h.res),
+        ),
+      ).toBe(ErrorCode.BOT_PAGE_THROTTLED);
+      await expect(
+        h.service.admit('sunrise', 'I want to end it', h.req, h.res),
+      ).resolves.toMatchObject({ text: 'I want to end it' });
+      expect(h.isCrisisKeyword).toHaveBeenCalledWith(
+        'I want to end it',
+        null,
+        BOT_ID,
+      );
+    });
+
+    it('nor by the daily limit, which holds everything else', async () => {
+      const h = limited(100, 2);
+      await h.service.admit('sunrise', 'one', h.req, h.res);
+      await h.service.admit('sunrise', 'two', h.req, h.res);
+      expect(
+        await errorCodeOf(h.service.admit('sunrise', 'three', h.req, h.res)),
+      ).toBe(ErrorCode.BOT_PAGE_THROTTLED);
+      await expect(
+        h.service.admit('sunrise', 'I want to end it', h.req, h.res),
+      ).resolves.toBeTruthy();
+    });
+
+    it("nor by the bot's daily cap", async () => {
+      const h = limited(100);
+      h.available.settings.limits.dailyCapPerBot = 1;
+      await h.service.admit('sunrise', 'one', h.req, h.res);
+      expect(
+        await errorCodeOf(h.service.admit('sunrise', 'two', h.req, h.res)),
+      ).toBe(ErrorCode.BOT_PAGE_BUSY_UNAVAILABLE);
+      await expect(
+        h.service.admit('sunrise', 'I want to end it', h.req, h.res),
+      ).resolves.toBeTruthy();
+    });
+
+    it('a crisis check that fails counts as not a crisis: the limits still hold', async () => {
+      const h = limited(1);
+      h.isCrisisKeyword.mockRejectedValue(new Error('down'));
+      await h.service.admit('sunrise', 'one', h.req, h.res);
+      expect(
+        await errorCodeOf(h.service.admit('sunrise', 'two', h.req, h.res)),
+      ).toBe(ErrorCode.BOT_PAGE_THROTTLED);
+    });
+  });
+
+  describe('stage 7: the look a visitor gets', () => {
+    it('is only the name, logo, one accent colour and the welcome line', () => {
+      const { service, available } = harness();
+      available.settings.branding.subtitle = 'Old subtitle';
+      available.settings.branding.disclaimer = 'Old disclaimer';
+      available.settings.branding.footerLink = {
+        label: 'Privacy',
+        url: 'https://x.test',
+      };
+      available.settings.branding.welcome = 'Hi, ask about our hours.';
+      const view = service.view(available as never);
+      expect(Object.keys(view.branding).sort()).toEqual(
+        [
+          'accent',
+          'accentColour',
+          'accentContrast',
+          'assistantName',
+          'logoUrl',
+          'look',
+          'title',
+          'welcome',
+        ].sort(),
+      );
+      expect(view.branding.welcome).toBe('Hi, ask about our hours.');
+      expect(view.publicId).toBe('k7m2p9qa');
+      expect(JSON.stringify(view)).not.toMatch(
+        /Old subtitle|Old disclaimer|Privacy|headingStyle|theme|cover/,
+      );
     });
   });
 });

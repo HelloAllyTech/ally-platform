@@ -15,6 +15,7 @@ import {
   ApiSecurity,
   ApiTags,
 } from '@nestjs/swagger';
+import { StaffOnly } from '../../auth/decorators/staff-only.decorator';
 import { RequireFeatureToggle } from '../../auth/decorators/feature-toggle.decorator';
 import { CallerScopedRoute } from '../../auth/decorators/caller-scoped-route.decorator';
 import { FeatureToggleKey } from '../../authorization/constants/admin-feature-toggle.constants';
@@ -305,6 +306,7 @@ export class WhatsAppConversationController {
 
   @Get('analytics/overview')
   @AssistantScope('list')
+  @StaffOnly({ unlessQuery: 'chatbotId' })
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT_ANALYTICS],
   })
@@ -329,6 +331,7 @@ export class WhatsAppConversationController {
 
   @Get('analytics/timeseries')
   @AssistantScope('list')
+  @StaffOnly({ unlessQuery: 'chatbotId' })
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT_ANALYTICS],
   })
@@ -348,6 +351,7 @@ export class WhatsAppConversationController {
 
   @Get('analytics/languages')
   @AssistantScope('list')
+  @StaffOnly({ unlessQuery: 'chatbotId' })
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT_ANALYTICS],
   })
@@ -373,6 +377,7 @@ export class WhatsAppConversationController {
 
   @Get('analytics/corpus-coverage')
   @AssistantScope('list')
+  @StaffOnly({ unlessQuery: 'chatbotId' })
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT_ANALYTICS],
   })

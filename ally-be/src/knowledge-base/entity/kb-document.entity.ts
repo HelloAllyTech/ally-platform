@@ -188,4 +188,27 @@ export class KbDocument extends BaseWithoutTenantEntity {
 
   @Column({ name: 'updated_by', type: 'int', nullable: true })
   updatedBy?: number | null;
+
+  /** Assistants stage 5: when the source was last read (upload, crawl or ingest). */
+  @Column({ type: 'timestamp', name: 'last_read_at', nullable: true })
+  lastReadAt?: Date | null;
+
+  /**
+   * Assistants stage 5: personal-data review. `needs_review` holds indexing until the owner
+   * approves (`approved`) or excludes the document (`excluded`). Null: nothing found or not scanned.
+   */
+  @Column({ type: 'varchar', length: 16, name: 'pii_review', nullable: true })
+  piiReview?: 'needs_review' | 'approved' | 'excluded' | null;
+
+  /** What the scan found (kinds and masked samples, never the full values). */
+  @Column({ type: 'jsonb', name: 'pii_findings', nullable: true })
+  piiFindings?: Record<string, any> | null;
+
+  /** Assistants stage 5: in the curated pool builders copy from (not `is_global`). */
+  @Column({ type: 'boolean', default: false })
+  curated!: boolean;
+
+  /** Assistants stage 5 (copy, not share): the document this one was copied from. */
+  @Column({ type: 'uuid', name: 'copied_from_document_id', nullable: true })
+  copiedFromDocumentId?: string | null;
 }

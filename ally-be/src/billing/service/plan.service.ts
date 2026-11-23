@@ -488,7 +488,7 @@ export class PlanService implements OnModuleInit {
         `SELECT lower(u.email) AS email, u.id AS "userId", m.role FROM chatbot_members m
          JOIN users u ON u.id = m.user_id
         WHERE m.chatbot_id = $1 AND u.email IS NOT NULL
-        ORDER BY CASE m.role WHEN 'owner' THEN 0 WHEN 'editor' THEN 1 ELSE 2 END, m."createdAt"`,
+        ORDER BY CASE WHEN 'owner' = ANY(m.roles) THEN 0 WHEN 'editor' = ANY(m.roles) THEN 1 ELSE 2 END, m."createdAt"`,
         [chatbotId],
       );
     const invited: Array<{ email: string }> = await db

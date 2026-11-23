@@ -719,3 +719,36 @@ body {
     background: var(--brand-accent);
   }
 }
+
+.bp-safety {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--brand-border, #e7e5e4);
+  background: var(--brand-surface-2, #fafaf9);
+  font: 400 13px/1.45 var(--ally-font-ui);
+  color: var(--brand-ink);
+}
+.bp-safety p {
+  margin: 0;
+}
+.bp-safety p + p {
+  margin-top: 6px;
+}
+.bp-prechat-compose {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--brand-border, #e7e5e4);
+}
+.bp-prechat-compose textarea {
+  width: 100%;
+  min-height: 64px;
+  resize: vertical;
+  font: inherit;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--brand-border, #d6d3d1);
+}

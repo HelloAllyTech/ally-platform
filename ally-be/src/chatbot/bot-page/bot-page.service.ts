@@ -1,3 +1,4 @@
+import { offReasonOf, type OffReason } from '../safety/off-message';
 import {
   BadRequestException,
   ConflictException,
@@ -15,9 +16,16 @@ import { darkenForWhiteText } from '../../tenant/util/brand-colour.util';
 import type { WhatsAppBotSettings } from '../../whatsapp/type/whatsapp-settings.type';
 import { BotImage, BotImageStatus } from '../entity/bot-image.entity';
 import { PublicImage, publicImage } from '../bot-image/urls';
-import { UpdateBotPageBrandDto } from '../dto/bot-image.dto';
+import {
+  RETIRED_BRAND_FIELDS,
+  UpdateBotPageBrandDto,
+} from '../dto/bot-image.dto';
 import { BotPageLogoUrlDto, UpdateBotPageDto } from '../dto/bot-page.dto';
 import { ChatbotPage } from '../entity/chatbot-page.entity';
+import {
+  ChatbotDomain,
+  ChatbotDomainStatus,
+} from '../entity/chatbot-domain.entity';
 import { Chatbot } from '../entity/chatbot.entity';
 import {
   BotPageAccess,
@@ -27,11 +35,15 @@ import {
 import { ChatbotStatus } from '../enum/chatbot.enum';
 import { ChatbotSettingsService } from '../service/chatbot-settings.service';
 import {
+  BOT_PAGE_BOUNDS,
   BotPageBrand,
+  BotPageBranding,
   BotPageSettings,
-  brandImageIds,
+  DEFAULT_BOT_PAGE_LIMITS,
   defaultBotPageSettings,
   mergeBotPageSettings,
+  PUBLIC_ID_PATTERN,
+  randomPublicId,
   RESERVED_SLUGS,
   SLUG_PATTERN,
   slugFromName,
@@ -42,9 +54,13 @@ export interface BotPageView {
   /** False until the page is first saved. */
   saved: boolean;
   status: BotPageStatus;
+  /** The legacy link's key; kept for older clients. Never shown or editable (stage 7). */
   slug: string;
+  /** The page's address key (`/chat/<publicId>`), assigned by Ally. Null until the first save. */
+  publicId: string | null;
   access: BotPageAccess;
   settings: BotPageSettings;
+  /** `<chatUrl>/<publicId>`; empty until the page is first saved (it has no address yet). */
   link: string;
   /** Whether "Anyone with the link" can be chosen (the platform's `botPagePublicAllowed`). */
   publicAllowed: boolean;
@@ -90,10 +106,66 @@ export class BotPageService {
     @Optional()
     @InjectRepository(BotImage)
     private readonly imageRepository?: Repository<BotImage>,
+    // Stage 7: verified custom domains resolve to their page. Optional for older test wiring.
+    @Optional()
+    @InjectRepository(ChatbotDomain)
+    private readonly domainRepository?: Repository<ChatbotDomain>,
   ) {}
 
-  link(slug: string): string {
-    return `${this.config.botPage.baseUrl}/b/${slug}`;
+  /** The page's address (stage 7): `<chatUrl>/<publicId>`, never the owner-chosen slug. */
+  link(publicId: string): string {
+    return `${this.config.botPage.chatUrl}/${publicId}`;
+  }
+
+  /**
+   * A fresh address: random, and equal to no page's public id or legacy slug, so `/chat/<id>` and
+   * `/b/<slug>` can never name two pages.
+   */
+  async newPublicId(): Promise<string> {
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const candidate = randomPublicId();
+      const taken = await this.pageRepository.findOne({
+        where: [
+          { publicId: candidate },
+          {
+            slug: Raw((alias) => `lower(${alias}) = :candidate`, { candidate }),
+          },
+        ],
+      });
+      if (!taken) return candidate;
+    }
+    throw new ConflictException('Could not assign an address. Try again.');
+  }
+
+  /**
+   * The page a public key names (stage 7): its address (`public_id`), its legacy slug (old
+   * `/b/<slug>` links and widget embeds), or a verified custom domain's host. Null when none.
+   */
+  async findByKey(raw: string): Promise<ChatbotPage | null> {
+    const key = (raw ?? '').trim().toLowerCase().replace(/\.$/, '');
+    if (!key || key.length > 253) return null;
+    if (key.includes('.')) {
+      if (!this.domainRepository) return null;
+      const domain = await this.domainRepository.findOne({
+        where: {
+          host: Raw((alias) => `lower(${alias}) = :key`, { key }),
+          status: ChatbotDomainStatus.VERIFIED,
+        },
+      });
+      return domain ? this.findForChatbot(domain.chatbotId) : null;
+    }
+    if (PUBLIC_ID_PATTERN.test(key)) {
+      const page = await this.pageRepository.findOne({
+        where: { publicId: key },
+      });
+      if (page) return page;
+    }
+    if (!SLUG_PATTERN.test(key)) return null;
+    return this.pageRepository.findOne({
+      where: {
+        slug: Raw((alias) => `lower(${alias}) = lower(:key)`, { key }),
+      },
+    });
   }
 
   findForChatbot(chatbotId: string): Promise<ChatbotPage | null> {
@@ -112,21 +184,30 @@ export class BotPageService {
     const slug = page?.slug ?? (await this.suggestSlug(chatbot));
     const access = page?.access ?? BotPageAccess.INVITE;
     const status = page?.status ?? BotPageStatus.OFF;
+    const publicId = page?.publicId ?? null;
     return {
       saved: Boolean(page),
       status,
       slug,
+      publicId,
       access,
       settings,
-      link: this.link(slug),
+      link: publicId ? this.link(publicId) : '',
       publicAllowed: botSettings.botPagePublicAllowed,
       live: BotPageService.liveness({ status, access }, chatbot, botSettings),
     };
   }
 
-  /** Create or replace the page. Public needs the platform's permission; slugs are unique. */
+  /**
+   * Create or replace the page. Public needs the platform's permission.
+   *
+   * Stage 7: the address is Ally's (`publicId`, set on the first save) and `dto.slug` is ignored:
+   * the stored legacy slug never changes. The look's retired words (subtitle, avatar, disclaimer,
+   * footer link) are ignored too and the stored values kept, inert; only the name, the welcome
+   * line and the colour and logo through `saveBrand` change how the page looks. Pre-chat questions
+   * stay functional: without `prechat` in the body the stored ones are kept.
+   */
   async save(chatbot: Chatbot, dto: UpdateBotPageDto): Promise<BotPageView> {
-    const slug = BotPageService.checkSlug(dto.slug);
     const botSettings = await this.settingsService.getForChatbot(chatbot);
     if (
       dto.access === BotPageAccess.PUBLIC &&
@@ -136,13 +217,18 @@ export class BotPageService {
         'Public links are turned off for now. Choose organisation or specific people.',
       );
     }
-    BotPageService.checkPrechat(dto.settings.prechat);
-    if (!(await this.slugAvailable(slug, chatbot.id))) {
-      throw new ConflictException(`The link "${slug}" is already taken.`);
-    }
-
     const userId = Number(ExecutionManager.getUserId() ?? 0) || null;
     const existing = await this.findForChatbot(chatbot.id);
+    const prechatIn = dto.settings.prechat ?? existing?.settings?.prechat ?? [];
+    BotPageService.checkPrechat(prechatIn);
+    const slug = existing?.slug ?? (await this.suggestSlug(chatbot));
+    const publicId = existing?.publicId ?? (await this.newPublicId());
+    const defaults = this.defaults(chatbot, botSettings).branding;
+    const storedBranding: Partial<BotPageBranding> =
+      existing?.settings?.branding ?? {};
+    const retired = (
+      key: 'subtitle' | 'avatarUrl' | 'disclaimer' | 'footerLink',
+    ) => (key in storedBranding ? storedBranding[key] : defaults[key]);
     // The look is changed only through `saveBrand`, and the website widget (chunk 13) only through
     // its home field: either sent here is ignored and the stored one kept, so the Bot page tab and
     // onboarding's publish can't drop or forge them.
@@ -159,13 +245,25 @@ export class BotPageService {
         ? { widget: existing.settings.widget }
         : {}),
       branding: {
-        ...dto.settings.branding,
         logoUrl: dto.settings.branding.logoUrl || null,
-        avatarUrl: dto.settings.branding.avatarUrl || null,
-        footerLink: dto.settings.branding.footerLink ?? null,
+        accentColour: dto.settings.branding.accentColour,
+        title: dto.settings.branding.title,
+        assistantName: dto.settings.branding.assistantName,
+        subtitle: retired('subtitle'),
+        avatarUrl: retired('avatarUrl'),
+        disclaimer: retired('disclaimer'),
+        footerLink: retired('footerLink'),
+        welcome: (dto.settings.branding.welcome ?? storedBranding.welcome ?? '')
+          .trim()
+          .slice(0, BOT_PAGE_BOUNDS.maxWelcomeChars),
       },
       suggestedQuestions: dto.settings.suggestedQuestions.map((q) => q.trim()),
-      prechat: dto.settings.prechat.map((field) => ({
+      limits: {
+        ...DEFAULT_BOT_PAGE_LIMITS,
+        ...(existing?.settings?.limits ?? {}),
+        ...dto.settings.limits,
+      },
+      prechat: prechatIn.map((field) => ({
         id: field.id,
         label: field.label.trim(),
         type: field.type,
@@ -184,6 +282,7 @@ export class BotPageService {
         ...(existing ?? {}),
         chatbotId: chatbot.id,
         slug,
+        publicId,
         status: dto.status,
         access: dto.access,
         settings,
@@ -191,9 +290,11 @@ export class BotPageService {
         updatedBy: userId,
       });
     } catch (error) {
-      // The unique index decides a race between two saves of the same slug.
+      // The unique indexes decide a race between two first saves.
       if ((error as { code?: string }).code === '23505') {
-        throw new ConflictException(`The link "${slug}" is already taken.`);
+        throw new ConflictException(
+          'The page changed at the same time. Try again.',
+        );
       }
       throw error;
     }
@@ -209,43 +310,29 @@ export class BotPageService {
     chatbot: Chatbot,
     dto: UpdateBotPageBrandDto,
   ): Promise<BotPageView> {
+    BotPageService.rejectRetiredLook(dto);
     const existing = await this.findForChatbot(chatbot.id);
     const botSettings = await this.settingsService.getForChatbot(chatbot);
     const current = mergeBotPageSettings(
       this.defaults(chatbot, botSettings),
       existing?.settings,
     ).brand;
+    // Stage 7: only the logo and the accent change here; the retired look fields keep their stored
+    // values, inert.
     const next: BotPageBrand = {
       ...current,
       ...(dto.logo !== undefined ? { logo: dto.logo } : {}),
-      ...(dto.coverImage !== undefined ? { coverImage: dto.coverImage } : {}),
-      ...(dto.shareImage !== undefined ? { shareImage: dto.shareImage } : {}),
-      ...(dto.headingStyle ? { headingStyle: dto.headingStyle } : {}),
-      ...(dto.theme ? { theme: dto.theme } : {}),
-      ...(dto.peoplePhotos ? { peoplePhotos: dto.peoplePhotos } : {}),
-      landingImages: {
-        hero:
-          dto.landingImages?.hero !== undefined
-            ? dto.landingImages.hero
-            : current.landingImages.hero,
-        gallery: dto.landingImages?.gallery ?? current.landingImages.gallery,
-      },
     };
     if (dto.accent !== undefined) {
       next.accent = dto.accent ? dto.accent.toUpperCase() : null;
       next.accentContrast = dto.accent ? darkenForWhiteText(dto.accent) : null;
     }
-    const people = Object.entries(next.peoplePhotos);
-    if (
-      people.length > 50 ||
-      people.some(
-        ([name, id]) =>
-          !name.trim() || name.length > 120 || typeof id !== 'string',
-      )
-    ) {
-      throw new BadRequestException('Team photos need a name and an image.');
-    }
-    const ids = [...new Set(brandImageIds(next))];
+    const welcome =
+      dto.welcome !== undefined
+        ? dto.welcome.trim().slice(0, BOT_PAGE_BOUNDS.maxWelcomeChars)
+        : undefined;
+    // Only a newly chosen logo is checked: stored images that were removed since stay inert.
+    const ids = dto.logo ? [dto.logo] : [];
     if (ids.length) {
       const found = await this.imageRepository!.count({
         where: {
@@ -265,16 +352,33 @@ export class BotPageService {
     if (existing) {
       await this.pageRepository.save({
         ...existing,
-        settings: { ...existing.settings, brand: next },
+        settings: {
+          ...existing.settings,
+          brand: next,
+          ...(welcome !== undefined
+            ? {
+                branding: {
+                  ...(existing.settings?.branding ?? {}),
+                  welcome,
+                } as BotPageBranding,
+              }
+            : {}),
+        },
         updatedBy: userId,
       });
     } else {
       await this.pageRepository.save({
         chatbotId: chatbot.id,
         slug: await this.suggestSlug(chatbot),
+        publicId: await this.newPublicId(),
         status: BotPageStatus.OFF,
         access: BotPageAccess.INVITE,
-        settings: { brand: next } as BotPageSettings,
+        settings: {
+          brand: next,
+          ...(welcome !== undefined
+            ? { branding: { welcome } as BotPageBranding }
+            : {}),
+        } as BotPageSettings,
         createdBy: userId,
         updatedBy: userId,
       });
@@ -319,13 +423,25 @@ export class BotPageService {
    * whatever the reason, so a link that is off, draft or blocked looks the same as one that never
    * existed.
    */
-  async findAvailable(slug: string): Promise<AvailableBotPage | null> {
-    if (!SLUG_PATTERN.test(slug.toLowerCase())) return null;
-    const page = await this.pageRepository.findOne({
-      where: {
-        slug: Raw((alias) => `lower(${alias}) = lower(:slug)`, { slug }),
-      },
+  /**
+   * Stage 4: the chatbot behind a page that is archived or paused (by its team or the go-live gate),
+   * so the page can show its off message with the crisis information instead of "not found".
+   */
+  async findOff(
+    key: string,
+  ): Promise<{ chatbot: Chatbot; reason: OffReason } | null> {
+    const page = await this.findByKey(key);
+    if (!page) return null;
+    const chatbot = await this.chatbotRepository.findOne({
+      where: { id: page.chatbotId },
     });
+    const reason = chatbot ? offReasonOf(chatbot) : null;
+    return chatbot && reason ? { chatbot, reason } : null;
+  }
+
+  /** `key`: the page's address, its legacy slug, or a verified custom domain (`findByKey`). */
+  async findAvailable(key: string): Promise<AvailableBotPage | null> {
+    const page = await this.findByKey(key);
     if (!page) return null;
     const chatbot = await this.chatbotRepository.findOne({
       where: { id: page.chatbotId, archivedAt: IsNull() },
@@ -340,7 +456,7 @@ export class BotPageService {
     // Young people (Q3-fast Part 1): no name or contact questions before the chat.
     settings.prechat = prechatFor(settings.prechat, chatbot.safetyPack);
     const brandImages = await this.resolveBrand(
-      page.slug,
+      page.publicId ?? page.slug,
       chatbot.id,
       settings,
     );
@@ -353,7 +469,7 @@ export class BotPageService {
    * follow the brand where it sets them, so the OTP email and older clients match the page.
    */
   private async resolveBrand(
-    slug: string,
+    key: string,
     chatbotId: string,
     settings: BotPageSettings,
   ): Promise<AvailableBotPage['brandImages']> {
@@ -361,9 +477,8 @@ export class BotPageService {
     const none = { logo: null, cover: null, share: null };
     if (brand.accentContrast)
       settings.branding.accentColour = brand.accentContrast;
-    const ids = [brand.logo, brand.coverImage, brand.shareImage].filter(
-      (id): id is string => Boolean(id),
-    );
+    // Stage 7: the logo is the only image a page shows; a stored cover or share image is inert.
+    const ids = [brand.logo].filter((id): id is string => Boolean(id));
     if (!ids.length || !this.imageRepository) return none;
     const rows = await this.imageRepository.find({
       where: { chatbotId, id: In(ids), status: BotImageStatus.ATTACHED },
@@ -371,13 +486,9 @@ export class BotPageService {
     const base = this.config.publicApiBaseUrl;
     const pick = (id: string | null, size: 256 | 768 | 1600) => {
       const row = id ? rows.find((r) => r.id === id) : undefined;
-      return row ? publicImage(base, slug, row, size) : null;
+      return row ? publicImage(base, key, row, size) : null;
     };
-    const resolved = {
-      logo: pick(brand.logo, 256),
-      cover: pick(brand.coverImage, 1600),
-      share: pick(brand.shareImage, 1600),
-    };
+    const resolved = { logo: pick(brand.logo, 256), cover: null, share: null };
     if (resolved.logo) settings.branding.logoUrl = resolved.logo.src;
     return resolved;
   }
@@ -399,6 +510,19 @@ export class BotPageService {
       return { ok: false, reason: 'public_blocked' };
     }
     return { ok: true };
+  }
+
+  /** Stage 7: a look change that sends a retired field is refused, never half-applied. */
+  static rejectRetiredLook(dto: object): void {
+    const sent = RETIRED_BRAND_FIELDS.filter((key) => key in (dto ?? {}));
+    if (sent.length) {
+      throw new BadRequestException({
+        statusCode: 400,
+        error: 'look_field_retired',
+        message: `These can no longer be changed: ${sent.join(', ')}. The page shows its name, logo, one colour and a welcome line.`,
+        fields: sent,
+      });
+    }
   }
 
   static checkSlug(raw: string): string {

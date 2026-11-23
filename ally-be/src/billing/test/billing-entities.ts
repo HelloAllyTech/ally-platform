@@ -14,6 +14,13 @@ import { Seat } from '../entity/seat.entity';
 import { SeatType } from '../entity/seat-type.entity';
 import { Subscription } from '../entity/subscription.entity';
 import { UsageCounter } from '../entity/usage-counter.entity';
+import { BillingAccount } from '../entity/billing-account.entity';
+import { CreditGrant } from '../entity/credit-grant.entity';
+import { ChatbotBudget } from '../entity/chatbot-budget.entity';
+import { CreditReservation } from '../entity/credit-reservation.entity';
+import { EndPersonSpend } from '../entity/end-person-spend.entity';
+import { EndPerson, EndPersonIdentity } from '../entity/end-person.entity';
+import { CreditWarning } from '../entity/credit-warning.entity';
 
 /** Every CR1 entity, for the Postgres specs' data source. */
 export const BILLING_ENTITIES = [
@@ -33,4 +40,12 @@ export const BILLING_ENTITIES = [
   Subscription,
   Seat,
   UsageCounter,
+  BillingAccount,
+  CreditGrant,
+  ChatbotBudget,
+  CreditReservation,
+  EndPersonSpend,
+  EndPerson,
+  EndPersonIdentity,
+  CreditWarning,
 ];

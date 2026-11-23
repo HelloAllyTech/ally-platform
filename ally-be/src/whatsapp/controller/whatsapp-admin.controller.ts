@@ -37,6 +37,7 @@ import {
 } from '../dto/whatsapp.dto';
 import { WaTemplateKind } from '../enum/whatsapp.enum';
 import { WhatsAppAdminService } from '../service/whatsapp-admin.service';
+import { StaffOnly } from '../../auth/decorators/staff-only.decorator';
 import { AssistantScope } from '../../chatbot/access/chatbot-role.decorator';
 
 /**
@@ -77,6 +78,7 @@ export class WhatsAppAdminController {
   @Get('templates')
   @CallerScopedRoute()
   @AssistantScope('service')
+  @StaffOnly({ unlessQuery: 'chatbotId' })
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT_TEMPLATES],
   })
@@ -102,6 +104,7 @@ export class WhatsAppAdminController {
   @Post('templates')
   @CallerScopedRoute()
   @AssistantScope('service')
+  @StaffOnly({ unlessQuery: 'chatbotId' })
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT_TEMPLATES],
   })
@@ -121,6 +124,7 @@ export class WhatsAppAdminController {
   @Post('templates/:id/customise')
   @CallerScopedRoute()
   @AssistantScope('service')
+  @StaffOnly({ unlessQuery: 'chatbotId' })
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT_TEMPLATES],
   })
@@ -146,6 +150,7 @@ export class WhatsAppAdminController {
   @Patch('templates/:id')
   @CallerScopedRoute()
   @AssistantScope('service')
+  @StaffOnly({ unlessQuery: 'chatbotId' })
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT_TEMPLATES],
   })
@@ -174,6 +179,7 @@ export class WhatsAppAdminController {
   @Post('templates/:id/archive')
   @CallerScopedRoute()
   @AssistantScope('service')
+  @StaffOnly({ unlessQuery: 'chatbotId' })
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT_TEMPLATES],
   })
@@ -196,6 +202,7 @@ export class WhatsAppAdminController {
   @Post('templates/reorder')
   @CallerScopedRoute()
   @AssistantScope('service')
+  @StaffOnly({ unlessQuery: 'chatbotId' })
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT_TEMPLATES],
   })
@@ -219,6 +226,7 @@ export class WhatsAppAdminController {
   @Post('templates/test')
   @CallerScopedRoute()
   @AssistantScope('service')
+  @StaffOnly({ unlessQuery: 'chatbotId' })
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT_TEMPLATES],
   })
@@ -243,7 +251,7 @@ export class WhatsAppAdminController {
 
   @Get('settings')
   @AssistantScope('platform')
-  @PlatformAdminOnly()
+  @StaffOnly()
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT],
   })
@@ -254,7 +262,7 @@ export class WhatsAppAdminController {
 
   @Put('settings')
   @AssistantScope('platform')
-  @PlatformAdminOnly()
+  @StaffOnly()
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, {
     permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT],
   })

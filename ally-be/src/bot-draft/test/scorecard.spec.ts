@@ -19,6 +19,8 @@ jest.mock('src/common/execution/execution-manager', () => ({
 const day = (d: string, over: Partial<DayStats> = {}): DayStats => ({
   day: d,
   conversations: 0,
+  people: 0,
+  handoverWaitP50: null,
   answers: 0,
   answeredWithSource: 0,
   declined: 0,
@@ -90,7 +92,7 @@ function harness() {
   };
   const query = jest.fn(async (sql: string, params: unknown[] = []) => {
     if (sql.includes('FROM chatbot_daily_stats')) return stored;
-    if (sql.includes('WITH msg AS')) return [today];
+    if (sql.includes('WITH bots AS')) return [today];
     if (
       sql.includes('FROM wa_unanswered_questions q') &&
       sql.includes('LIMIT')
@@ -123,7 +125,11 @@ function harness() {
     ),
     update: jest.fn(),
   };
-  const access = { assert: jest.fn(async () => ({})) };
+  const access = {
+    assert: jest.fn(async () => ({})),
+    assertOrStaffView: jest.fn(async () => undefined),
+    mayReadCustomerText: jest.fn(async () => true),
+  };
   const checkup = { latestFor: jest.fn(async () => null) };
   const draftCheckup = { addOwnerAnswer: jest.fn(async () => ({ ok: true })) };
   const service = new ScorecardService(
@@ -190,7 +196,7 @@ describe('ScorecardService', () => {
     const h = harness();
     await h.service.view('bot-1', NOW);
     const live = h.query.mock.calls.filter(([sql]) =>
-      String(sql).includes('WITH msg AS'),
+      String(sql).includes('WITH bots AS'),
     );
     // Nothing stored: the window (from last Monday, 2 Nov) is worked out live, in one query.
     expect(live).toHaveLength(1);

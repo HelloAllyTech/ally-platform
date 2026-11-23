@@ -1,112 +1,98 @@
-import React, { useRef } from "react";
+import React, { useEffect, useId, useState } from "react";
 
-import { useGetBotPageQuery, useGetChatbotTeamNamesQuery } from "@api";
-import { ColourPicker, ImageSlot, PhonePreview, Segmented, Toast } from "@components/v2";
+import { useGetBotPageQuery, useUpdateBotPageBrandMutation } from "@api";
+import { ColourPicker, ImageSlot, PhonePreview, Toast } from "@components/v2";
 import type { Chatbot } from "@types";
 
 import { BrandEditor, useBrandEditor } from "../../hooks/brand/useBrandEditor";
 import { colourSwatches } from "../../utils/colourPicks";
+import { CHANNELS_COPY } from "../AssistantHome/copy/channels";
 import { BrandPreview } from "../Onboarding/BrandPreview";
 import { COPY } from "../Onboarding/copy";
 
-import type { BotPageBrand, HeadingStyle } from "../../types/botPage";
+/** ally-be's limit on the welcome line (`BOT_PAGE_BOUNDS.maxWelcomeChars`). */
+export const MAX_WELCOME_CHARS = 140;
 
-const HEADINGS: { id: HeadingStyle; label: string; font: string; weight: number }[] = [
-  {
-    id: "classic",
-    label: COPY.look.headingStyles.classic,
-    font: "var(--ally-font-display)",
-    weight: 400,
-  },
-  { id: "modern", label: COPY.look.headingStyles.modern, font: "var(--ally-font-ui)", weight: 600 },
-  {
-    id: "friendly",
-    label: COPY.look.headingStyles.friendly,
-    font: "var(--ally-font-friendly)",
-    weight: 700,
-  },
-];
-
-/** A team member's row: their photo (or initials), name, and Add photo / Replace. */
-const TeamRow: React.FC<{
-  name: string;
-  photo: string | null;
-  busy: boolean;
-  disabled: boolean;
-  error: string | null;
-  onFile: (file: File) => void;
-}> = ({ name, photo, busy, disabled, error, onFile }) => {
-  const input = useRef<HTMLInputElement>(null);
+/**
+ * The welcome line (stage 7): one short line under the name. Saved when it loses focus or on Enter,
+ * through the look's PATCH, so it is the same change the logo and colour make.
+ */
+const WelcomeField: React.FC<{ botId: string; value: string; canEdit: boolean }> = ({
+  botId,
+  value,
+  canEdit,
+}) => {
+  const id = useId();
+  const [text, setText] = useState(value);
+  const [error, setError] = useState<string | null>(null);
+  const [save, { isLoading }] = useUpdateBotPageBrandMutation();
+  useEffect(() => setText(value), [value]);
+  const commit = () => {
+    const next = text.trim();
+    if (!canEdit || next === value.trim()) return;
+    setError(null);
+    save({ id: botId, welcome: next })
+      .unwrap()
+      .catch(() => setError(COPY.look.errors.failed));
+  };
   return (
-    <li className="ally-look__person">
-      {photo ? (
-        <img src={photo} alt="" width={44} height={44} />
-      ) : (
-        <span className="ally-look__avatar" aria-hidden="true">
-          {name
-            .split(/\s+/)
-            .filter(w => !/^(dr|mr|ms|mrs)\.?$/i.test(w))
-            .slice(0, 2)
-            .map(w => w[0])
-            .join("")}
-        </span>
-      )}
-      <span style={{ flex: 1 }}>{name}</span>
-      <button
-        type="button"
-        className="ally-link"
-        disabled={disabled || busy}
-        aria-label={`${photo ? COPY.look.teamActions.replace : COPY.look.teamActions.add}: ${name}`}
-        onClick={() => input.current?.click()}
-      >
-        {photo ? COPY.look.teamActions.replace : COPY.look.teamActions.add}
-      </button>
+    <section className="ally-field">
+      <label className="ally-heading" htmlFor={`${id}-welcome`}>
+        {CHANNELS_COPY.look.welcome}
+      </label>
       <input
-        ref={input}
-        type="file"
-        hidden
-        accept="image/png,image/jpeg,image/webp"
-        onChange={event => {
-          const file = event.target.files?.[0];
-          event.target.value = "";
-          if (file) onFile(file);
+        id={`${id}-welcome`}
+        className="ally-input"
+        value={text}
+        maxLength={MAX_WELCOME_CHARS}
+        disabled={!canEdit || isLoading}
+        aria-describedby={`${id}-welcome-hint`}
+        onChange={event => setText(event.target.value)}
+        onBlur={commit}
+        onKeyDown={event => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            commit();
+          }
         }}
       />
+      <span id={`${id}-welcome-hint`} className="ally-field__hint">
+        {CHANNELS_COPY.look.welcomeHint}
+      </span>
       {error && (
-        <p className="ally-error" role="alert" style={{ flexBasis: "100%" }}>
+        <p className="ally-error" role="alert">
           {error}
         </p>
       )}
-    </li>
+    </section>
   );
 };
 
 /**
- * Look and feel (chunk 20d §5, screenshot 06-look-and-feel): the page's logo, images, team photos
- * and style on the left, a live preview on the right. Every change saves as you go, with
- * "Changed · Undo". Presentation only: the state and saving are `useBrandEditor`.
+ * Look and feel. Since stage 7 the page shows its name (the Name field above), the logo, one
+ * accent colour and a short welcome line, with a live preview. Heading style, theme, cover, share
+ * and team images are retired: ally-be keeps what was stored but no longer accepts or shows it.
+ * Every change saves as you go, with "Changed · Undo". Presentation only: the state and saving are
+ * `useBrandEditor`.
  */
 export const LookAndFeel: React.FC<{
   name: string;
   editor: BrandEditor;
   canEdit: boolean;
-  teamNames: string[];
   live: boolean;
-  subtitle?: string;
-  disclaimer?: string;
-}> = ({ name, editor, canEdit, teamNames, live, subtitle, disclaimer }) => {
+  /** The bot, for the welcome line's save. Without it the welcome line is not drawn. */
+  botId?: string;
+  welcome?: string;
+  /** Retired in stage 7; ignored. */
+  teamNames?: string[];
+}> = ({ name, editor, canEdit, live, botId, welcome = "" }) => {
   const brand = editor.brand;
   if (!brand) return null;
 
   const logo = editor.imageFor("logo");
-  const cover = editor.imageFor("coverImage");
-  const share = editor.imageFor("shareImage");
   const swatches = colourSwatches(brand.accent);
-  const set = (patch: Partial<BotPageBrand>) => {
-    if (canEdit) editor.change(patch);
-  };
   const slotLabels = {
-    empty: COPY.look.slotEmpty,
+    empty: COPY.make.upload,
     replace: COPY.make.change,
     remove: COPY.make.remove,
   };
@@ -122,6 +108,9 @@ export const LookAndFeel: React.FC<{
             {editor.saved && editor.changed && live ? COPY.look.savedLive : COPY.look.savesAsYouGo}
           </span>
         </div>
+        <p className="ally-small" style={{ margin: 0 }}>
+          {CHANNELS_COPY.look.lookNote}
+        </p>
 
         <section className="ally-field">
           <h3 className="ally-heading">{COPY.look.sections.logo}</h3>
@@ -129,7 +118,7 @@ export const LookAndFeel: React.FC<{
             <div style={{ width: 96, flex: "none" }}>
               <ImageSlot
                 name={COPY.look.sections.logo}
-                labels={{ ...slotLabels, empty: COPY.make.upload }}
+                labels={slotLabels}
                 src={logo?.urls[256]}
                 alt={logo?.alt}
                 accept="image/png,image/jpeg,image/webp,image/svg+xml"
@@ -153,115 +142,30 @@ export const LookAndFeel: React.FC<{
         </section>
 
         <section className="ally-field">
-          <h3 className="ally-heading">{COPY.look.sections.images}</h3>
-          <p className="ally-small" style={{ margin: 0 }}>
-            {COPY.look.imagesHint}
-          </p>
-          <div className="ally-look__slots">
-            {(
-              [
-                ["coverImage", COPY.look.slots.cover, cover],
-                ["shareImage", COPY.look.slots.share, share],
-              ] as const
-            ).map(([slot, label, image]) => (
-              <div key={slot} className="ally-field">
-                <span className="ally-field__label">{label}</span>
-                <ImageSlot
-                  name={label}
-                  labels={slotLabels}
-                  src={image?.urls[768]}
-                  alt={image?.alt}
-                  fileName={image?.fileName}
-                  disabled={!canEdit || editor.uploading[slot]}
-                  progress={editor.uploading[slot] ? 60 : null}
-                  error={editor.errors[slot]}
-                  onFile={file => void editor.upload(slot, file)}
-                  onRemove={() => editor.remove(slot)}
-                />
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {teamNames.length > 0 && (
-          <section className="ally-field">
-            <h3 className="ally-heading">{COPY.look.sections.team}</h3>
-            <ul className="ally-look__team">
-              {teamNames.map(person => {
-                const id = brand.peoplePhotos[person];
-                return (
-                  <TeamRow
-                    key={person}
-                    name={person}
-                    photo={id ? (editor.images[id]?.urls[256] ?? null) : null}
-                    busy={editor.personUploading === person}
-                    disabled={!canEdit}
-                    error={editor.personError?.name === person ? editor.personError.message : null}
-                    onFile={file => void editor.uploadPerson(person, file)}
-                  />
-                );
-              })}
-            </ul>
-            <p className="ally-small" style={{ margin: 0 }}>
-              {COPY.look.teamHint}
-            </p>
-          </section>
-        )}
-
-        <section className="ally-field">
-          <h3 className="ally-heading">{COPY.look.sections.style}</h3>
-          <div
-            className="ally-look__headings"
-            role="radiogroup"
-            aria-label={COPY.look.sections.style}
-          >
-            {HEADINGS.map(h => (
-              <button
-                key={h.id}
-                type="button"
-                role="radio"
-                aria-checked={brand.headingStyle === h.id}
-                className="ally-option ally-press"
-                disabled={!canEdit}
-                onClick={() => set({ headingStyle: h.id })}
-              >
-                <span style={{ fontFamily: h.font, fontSize: 30, fontWeight: h.weight }}>Aa</span>
-                <span className="ally-small">{h.label}</span>
-              </button>
-            ))}
-          </div>
           <ColourPicker
             label={COPY.make.colour}
             value={brand.accent ?? swatches[0]}
             swatches={swatches}
             customLabel={COPY.make.colour}
-            onChange={hex => set({ accent: hex.toUpperCase() })}
-          />
-          <Segmented
-            label={COPY.look.themeLabel}
-            value={brand.theme}
-            options={[
-              { id: "light", label: COPY.look.themes.light },
-              { id: "dark", label: COPY.look.themes.dark },
-              { id: "auto", label: COPY.look.themes.auto },
-            ]}
-            onChange={theme => set({ theme })}
+            onChange={hex => {
+              if (canEdit) editor.change({ accent: hex.toUpperCase() });
+            }}
           />
         </section>
+
+        {botId && <WelcomeField botId={botId} value={welcome} canEdit={canEdit} />}
       </div>
 
       <div className="ally-look__preview">
-        {/* The Landing page preview arrives with chunk 20e. */}
         <span className="ally-label">{COPY.look.previewSwitch.bot}</span>
         <PhonePreview label={COPY.look.previewSwitch.bot}>
           <BrandPreview
             name={name}
             brand={brand}
             logoSrc={logo?.urls[256] ?? null}
-            coverSrc={cover?.urls[768] ?? null}
+            coverSrc={null}
             screen="cover"
-            introduction={subtitle}
-            disclaimer={disclaimer}
+            introduction={welcome}
           />
         </PhonePreview>
       </div>
@@ -278,23 +182,21 @@ export const LookAndFeel: React.FC<{
   );
 };
 
-/** Settings → Look and feel: the bot's page, its brand editor and its team, for `LookAndFeel`. */
+/** Channels → Look and feel: the bot's page and its brand editor, for `LookAndFeel`. */
 export const LookAndFeelSection: React.FC<{ bot: Chatbot; canEdit: boolean }> = ({
   bot,
   canEdit,
 }) => {
   const editor = useBrandEditor(bot.id, COPY.look.errors.failed);
   const { data: page } = useGetBotPageQuery(bot.id);
-  const { data: team } = useGetChatbotTeamNamesQuery(bot.id);
   return (
     <LookAndFeel
       name={page?.settings.branding.title || bot.name}
       editor={editor}
       canEdit={canEdit}
-      teamNames={team?.names ?? []}
       live={Boolean(page?.live.ok)}
-      subtitle={page?.settings.branding.subtitle}
-      disclaimer={page?.settings.branding.disclaimer}
+      botId={bot.id}
+      welcome={page?.settings.branding.welcome ?? ""}
     />
   );
 };

@@ -16,6 +16,19 @@ export class ChatbotTemplateInstall {
   @Column({ name: 'template_id', type: 'varchar', length: 40 })
   templateId!: string;
 
+  /** An Ally library template's version (stage 3); null for the code templates (T1). */
+  @Column({ name: 'template_version', type: 'int', nullable: true })
+  templateVersion?: number | null;
+
+  /** `code` (T1's lists-and-questions templates) or `library` (Ally template chatbots, stage 3). */
+  @Column({
+    name: 'template_kind',
+    type: 'varchar',
+    length: 16,
+    default: 'code',
+  })
+  templateKind!: 'code' | 'library';
+
   @Column({ name: 'setup_answers', type: 'jsonb', default: () => "'{}'" })
   setupAnswers!: Record<string, unknown>;
 

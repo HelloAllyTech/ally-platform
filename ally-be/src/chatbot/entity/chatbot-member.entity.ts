@@ -16,8 +16,19 @@ export class ChatbotMember extends BaseWithoutTenantEntity {
   @Column({ type: 'int', name: 'user_id' })
   userId!: number;
 
+  /**
+   * OLD single role, still written (dual write, Stage 1b): the highest of `roles` on the old
+   * ladder, `viewer` for a responder-only member. Read `roles`. Dropped in a later release.
+   */
   @Column({ type: 'varchar', length: 16 })
   role!: ChatbotMemberRole;
+
+  /**
+   * The member's roles, a non-empty set of owner, editor, responder, viewer (CHECK constraint).
+   * A trigger keeps it and `role` in step when an instance on the old code writes only `role`.
+   */
+  @Column({ type: 'text', array: true })
+  roles!: ChatbotMemberRole[];
 
   @Column({ name: 'created_by', type: 'int', nullable: true })
   createdBy?: number | null;

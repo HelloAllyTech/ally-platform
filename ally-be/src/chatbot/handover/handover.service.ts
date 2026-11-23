@@ -4,6 +4,7 @@ import {
   NotFoundException,
   OnModuleInit,
 } from '@nestjs/common';
+import { Optional } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
@@ -25,6 +26,13 @@ import {
 import { InboxEventsService } from '../inbox/inbox-events.service';
 import { ChatbotSettingsService } from '../service/chatbot-settings.service';
 import { ConversationService } from '../service/conversation.service';
+import { AlertOutboxService } from '../safety/alert-outbox.service';
+import { ALERT_COPY } from '../safety/crisis-copy';
+import { CrisisAlertService } from '../safety/crisis-alert.service';
+import { crisisOf } from '../safety/crisis-flag';
+import { safetySettingsOf } from '../safety/safety-settings';
+import { personJoinedNotice } from '../safety/chat-notice';
+import { replyLanguageOf } from '../engine/reply-language';
 import {
   fill,
   HANDOVER_COPY,
@@ -85,16 +93,17 @@ export class HandoverService implements OnModuleInit {
     private readonly emitter: EventEmitter2,
     private readonly email: EmailService,
     private readonly config: AppConfigService,
+    // Crisis flags and the alert outbox (stage 1b). Optional so older call sites and tests that
+    // build the service by hand keep working; the module always provides them.
+    @Optional() private readonly crisis?: CrisisAlertService,
+    @Optional() private readonly outbox?: AlertOutboxService,
   ) {}
 
   onModuleInit(): void {
-    scheduledTaskRegistry.register(
-      '15min',
-      'inbox-auto-hand-back',
-      async () => {
-        await this.autoHandBack();
-      },
-    );
+    // Stage 4: by minutes of idle time, so checked every minute.
+    scheduledTaskRegistry.register('1min', 'inbox-auto-hand-back', async () => {
+      await this.autoHandBack();
+    });
     scheduledTaskRegistry.register(
       '5min',
       'inbox-needs-person-email',
@@ -126,6 +135,12 @@ export class HandoverService implements OnModuleInit {
           `UPDATE chatbot_conversations SET safety_at = now() WHERE id = $1`,
           [conversationId],
         );
+        // D14: first-flag time, level, retention and the needs-a-person queue, then the alerts.
+        // The classifier, keyword and hand-over paths all arrive here.
+        const flag = crisisOf(decision);
+        if (flag && this.crisis) {
+          await this.crisis.flag(chatbot, conversationId, flag, now);
+        }
         await this.events.publishInbox({
           type: 'safety',
           chatbotId: chatbot.id,
@@ -218,8 +233,84 @@ export class HandoverService implements OnModuleInit {
         details: { name: holder?.name ?? null },
       });
     }
+    await this.crisis
+      ?.markTaken(conversationId)
+      .catch((error: unknown) =>
+        this.logger.warn(
+          `Could not mark the flag taken on ${conversationId}: ${
+            error instanceof Error ? error.message : 'unknown'
+          }`,
+        ),
+      );
     await this.announce(chatbotId, conversationId, 'person');
+    await this.remindPersonJoined(chatbotId, conversationId);
     return { ok: true as const };
+  }
+
+  /**
+   * Stage 4: when a person takes over, the customer is reminded, on the chat's own channel, that a
+   * person from the organisation and the AI can read the chat. Stored like any reply; on the web it
+   * also reaches the page live. Never blocks the take-over.
+   */
+  private async remindPersonJoined(
+    chatbotId: string,
+    conversationId: string,
+  ): Promise<void> {
+    try {
+      const [row] = (await this.dataSource.query(
+        `SELECT c.channel, b.name,
+                (SELECT m.text FROM chatbot_messages m
+                  WHERE m.conversation_id = c.id AND m.direction = 'inbound'
+                  ORDER BY m."createdAt" DESC LIMIT 1) AS "lastText"
+           FROM chatbot_conversations c JOIN chatbots b ON b.id = c.chatbot_id
+          WHERE c.id = $1 AND c.chatbot_id = $2`,
+        [conversationId, chatbotId],
+      )) as {
+        channel: ConversationChannel;
+        lastText?: string | null;
+        name: string;
+      }[];
+      if (!row) return;
+      const language = replyLanguageOf(row.lastText ?? '');
+      const text = personJoinedNotice(language, row.name);
+      if (row.channel === ConversationChannel.WHATSAPP) {
+        if (
+          !whatsappWindowOpen(
+            await this.lastInboundAt(conversationId),
+            new Date(),
+          )
+        )
+          return;
+        await this.sendWhatsApp({
+          conversationId,
+          text,
+          handledBy: WaHandledBy.HANDOVER,
+          sentByUserId: null,
+        });
+        return;
+      }
+      const stored = await this.conversations.appendMessage(conversationId, {
+        channel: row.channel,
+        direction: WaMessageDirection.OUTBOUND,
+        role: ConversationMessageRole.ASSISTANT,
+        text,
+        status: WaMessageStatus.SENT,
+        handledBy: WaHandledBy.HANDOVER,
+      });
+      await this.events.publishVisitor(conversationId, {
+        type: 'message',
+        id: stored.id,
+        role: 'assistant',
+        text,
+        createdAt: stored.createdAt.toISOString(),
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Person-joined reminder not sent for ${conversationId}: ${
+          error instanceof Error ? error.message : 'unknown'
+        }`,
+      );
+    }
   }
 
   /** Back to the assistant: by the person holding it, or by an owner (`force`). */
@@ -389,13 +480,21 @@ export class HandoverService implements OnModuleInit {
   // ── the jobs ──────────────────────────────────────────────────────────
 
   /**
-   * A chat held for the owner's hours with no reply from the team goes back to the assistant,
+   * A chat held with nobody writing for the owner's minutes (stage 4) goes back to the assistant,
    * which tells the visitor so (on WhatsApp only while the 24-hour window is open).
    */
   async autoHandBack(now = new Date()): Promise<number> {
     const held = (await this.dataSource.query(
+      // Idle since the last message either way: the customer's last message, the team's last
+      // reply, or the take-over itself, whichever is latest (stage 4: minutes, not hours).
       `SELECT c.id, c.chatbot_id, c.channel,
-              COALESCE(c.last_human_reply_at, c.handled_since) AS since
+              GREATEST(
+                COALESCE(c.last_human_reply_at, c.handled_since),
+                c.handled_since,
+                (SELECT MAX(m."createdAt") FROM chatbot_messages m
+                  WHERE m.conversation_id = c.id AND m.direction = 'inbound')
+              ) AS since,
+              c.safety_first_at
          FROM chatbot_conversations c
         WHERE c.handled_by_user_id IS NOT NULL`,
     )) as {
@@ -403,13 +502,20 @@ export class HandoverService implements OnModuleInit {
       chatbot_id: string;
       channel: ConversationChannel;
       since: Date;
+      safety_first_at?: Date | null;
     }[];
     let handedBack = 0;
     for (const chat of held) {
-      const settings = await this.settings.getForChatbot(
-        await this.chatbotRow(chat.chatbot_id),
-      );
-      const limitMs = handoverOf(settings).autoHandBackHours * 3600_000;
+      const row = await this.chatbotRow(chat.chatbot_id);
+      const settings = await this.settings.getForChatbot(row);
+      // A flagged crisis chat never goes back to the assistant unless the owner allowed it.
+      if (
+        chat.safety_first_at &&
+        safetySettingsOf(row?.settings as never).crisisResumeRule !==
+          'after_idle'
+      )
+        continue;
+      const limitMs = handoverOf(settings).autoHandBackMinutes * 60_000;
       if (now.getTime() - new Date(chat.since).getTime() < limitMs) continue;
       const rows = await this.dataSource.query(
         `UPDATE chatbot_conversations
@@ -472,8 +578,11 @@ export class HandoverService implements OnModuleInit {
   }
 
   /**
-   * The owners hear about a chat that has needed a person for the owner's minutes with nobody
-   * opening it: once, with no message text (the subject and body name only the assistant).
+   * Whoever holds Owner or Responder hears about a chat that has needed a person for the owner's
+   * minutes with nobody opening it: once, with no message text (the subject and body name only the
+   * assistant). The email goes through the alert outbox, so a send that fails is retried and is
+   * marked sent only when it went. A bot whose alert policy is `digest` gets one email per hour.
+   * Returns how many chats were queued.
    */
   async emailUnopened(now = new Date()): Promise<number> {
     const waiting = (await this.dataSource.query(
@@ -493,41 +602,60 @@ export class HandoverService implements OnModuleInit {
       needs_person_since: Date;
       assistant: string;
     }[];
-    let sent = 0;
+    if (!this.outbox || !this.crisis) return 0;
+    let queued = 0;
     for (const chat of waiting) {
-      const settings = await this.settings.getForChatbot(
-        await this.chatbotRow(chat.chatbot_id),
-      );
+      const row = await this.chatbotRow(chat.chatbot_id);
+      const settings = await this.settings.getForChatbot(row);
       const wait = handoverOf(settings).emailAfterMinutes * 60_000;
       if (now.getTime() - new Date(chat.needs_person_since).getTime() < wait)
         continue;
+      const policy = safetySettingsOf(row?.settings as never).alertPolicy;
+      const emails = await this.crisis.recipientEmails(
+        chat.chatbot_id,
+        policy.recipients,
+      );
+      const link = `${this.config.adminBaseUrl.replace(/\/$/, '')}/chatbots?tab=inbox&conversation=${chat.id}&bot=${chat.chatbot_id}`;
+      const digest = policy.mode === 'digest';
+      const hour = Math.floor(now.getTime() / 3_600_000);
+      for (const to of emails) {
+        await this.outbox.enqueue({
+          chatbotId: chat.chatbot_id,
+          conversationId: digest ? null : chat.id,
+          kind: digest ? 'needs_person_digest' : 'needs_person',
+          recipient: to,
+          channel: 'email',
+          payload: digest
+            ? {
+                subject: ALERT_COPY.digestSubject,
+                body: fill(ALERT_COPY.digestBody, {
+                  assistant: chat.assistant,
+                  link: link.replace(/&conversation=[^&]*/, ''),
+                }),
+              }
+            : {
+                subject: HANDOVER_COPY.emailSubject,
+                body: fill(HANDOVER_COPY.emailBody, {
+                  assistant: chat.assistant,
+                  link,
+                }),
+              },
+          dedupeKey: digest
+            ? `digest:${hour}:${to}`
+            : `needs_person:${chat.id}:${to}`,
+          // A digest goes at the next hour, so one email carries the whole hour.
+          notBefore: digest ? new Date((hour + 1) * 3_600_000) : undefined,
+        });
+      }
+      // Only after the rows are queued: a failure above leaves the chat to be picked up again.
       await this.conversations.setMetadata(chat.id, {
         handoverEmailedAt: now.toISOString(),
       });
-      const owners = (await this.dataSource.query(
-        `SELECT DISTINCT u.email FROM chatbot_members m
-           JOIN users u ON u.id = m.user_id
-          WHERE m.chatbot_id = $1 AND m.role = 'owner' AND u.email IS NOT NULL`,
-        [chat.chatbot_id],
-      )) as { email: string }[];
-      const link = `${this.config.adminBaseUrl.replace(/\/$/, '')}/chatbots?tab=inbox&conversation=${chat.id}&bot=${chat.chatbot_id}`;
-      for (const { email } of owners) {
-        await this.email
-          .sendHandoverAlert({
-            to: email,
-            subject: HANDOVER_COPY.emailSubject,
-            body: fill(HANDOVER_COPY.emailBody, {
-              assistant: chat.assistant,
-              link,
-            }),
-          })
-          .catch(() => false);
-      }
-      sent += 1;
+      queued += 1;
     }
-    if (sent)
-      this.logger.info(`[INBOX] emailed owners about ${sent} waiting chat(s)`);
-    return sent;
+    if (queued)
+      this.logger.info(`[INBOX] queued emails about ${queued} waiting chat(s)`);
+    return queued;
   }
 
   private async chatbotRow(id: string): Promise<Chatbot> {

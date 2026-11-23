@@ -20,6 +20,7 @@ import {
   BotPageStatus,
 } from '../../chatbot/enum/bot-page.enum';
 import {
+  ChatbotAccessMode,
   ChatbotAnswerMode,
   ChatbotMemberRole,
   ChatbotStatus,
@@ -43,6 +44,7 @@ import {
   purposeOf,
 } from '../enum/bot-draft.enum';
 import { packFor } from '../safety-pack/safety-packs';
+import { GoLiveGateService } from '../../chatbot/safety/go-live-gate.service';
 import type { BotDraft, DraftEvent } from '../type/bot-draft.type';
 import { BotDraftEventsService } from './bot-draft-events.service';
 import { BotDraftService } from './bot-draft.service';
@@ -90,13 +92,20 @@ export class BotDraftPublishService {
     private readonly chatbots: Repository<Chatbot>,
     // CR1: the plan's publish limit and the included seats (optional for existing specs).
     @Optional() private readonly plans?: PlanService,
+    // Stage 4: the go-live gate (D10), on publish like every other path. Optional for specs.
+    @Optional() private readonly goLive?: GoLiveGateService,
   ) {}
 
   async publish(
     draft: BotDraftEntity,
     dto: PublishBotDraftDto,
   ): Promise<PublishResult> {
+    // The old onboarding walked READING → … → SHARE and publish waited for SHARE. Create and Build
+    // never walks those steps (a templated or form-built draft stays at `learned`), so with the
+    // go-live gate enforced (D10) the gate below is the readiness check and the step is not read.
+    // With ASSISTANT_GO_LIVE_GATE_ENABLED=false (or no gate service) the old rule holds.
     if (
+      !this.goLive?.enforced?.() &&
       draft.step !== BotDraftStep.SHARE &&
       draft.step !== BotDraftStep.PUBLISHED
     ) {
@@ -112,9 +121,15 @@ export class BotDraftPublishService {
       draft.chatbotId,
       ChatbotMemberRole.EDITOR,
     );
+    // A draft the new flow built may lack fields the old steps always filled: defaults, so nothing
+    // below throws part-way and leaves the chatbot live without its page.
+    const config = publishableConfig(draft.draftConfig, chatbot.name);
+    // Stage 4: the go-live gate, read as the chatbot will be once the draft's purpose is written.
+    await this.goLive?.assertCanGoLive(chatbot.id, {
+      purpose: purposeOf(config),
+    });
     // CR1: refused before anything is written ("Free publishes up to 3 assistants…").
     await this.plans?.assertCanPublish(chatbot.id);
-    const config = draft.draftConfig;
     const pageAccess = dto.access as BotPageAccess;
 
     // Refused before anything is written, so a refusal never leaves half a publish.
@@ -137,7 +152,18 @@ export class BotDraftPublishService {
     }
 
     const pack = packFor(config.safetyPackId);
-    const updated = await this.updateChatbot(chatbot, config, draft);
+    // D4: invite only means the chatbot's own access list ("Who may chat", listed mode) on every
+    // channel; the web page's invite gate reads that list too. An empty list is allowed: nobody can
+    // chat until the owner adds people.
+    const updated = await this.updateChatbot(
+      chatbot,
+      config,
+      draft,
+      ChatbotStatus.LIVE,
+      pageAccess === BotPageAccess.INVITE
+        ? ChatbotAccessMode.LISTED
+        : undefined,
+    );
     await this.settings.updateChatbotSettings(
       { id: chatbot.id, safetyPack: updated.safetyPack },
       {
@@ -148,6 +174,8 @@ export class BotDraftPublishService {
         ...(pack?.requiredSettings.crisisClassifierEnabled
           ? { crisisClassifierEnabled: true }
           : {}),
+        // Stage 5: the live chatbot replies only in its enabled languages.
+        ...enabledLanguagesPatch(config.languages),
       },
     );
     const ownerNotesDocumentId = await this.ownerNotes(draft, config);
@@ -261,7 +289,7 @@ export class BotDraftPublishService {
       draft.chatbotId,
       ChatbotMemberRole.EDITOR,
     );
-    const config = draft.draftConfig;
+    const config = publishableConfig(draft.draftConfig, chatbot.name);
     const pack = packFor(config.safetyPackId);
     const updated = await this.updateChatbot(
       chatbot,
@@ -279,6 +307,8 @@ export class BotDraftPublishService {
         ...(pack?.requiredSettings.crisisClassifierEnabled
           ? { crisisClassifierEnabled: true }
           : {}),
+        // Stage 5: the live chatbot replies only in its enabled languages.
+        ...enabledLanguagesPatch(config.languages),
       },
     );
     const ownerNotesDocumentId = await this.ownerNotes(draft, config);
@@ -304,6 +334,7 @@ export class BotDraftPublishService {
     config: BotDraft,
     draft: BotDraftEntity,
     status: ChatbotStatus = ChatbotStatus.LIVE,
+    accessMode?: ChatbotAccessMode,
   ): Promise<Chatbot> {
     const pack = packFor(config.safetyPackId);
     const patch: Partial<Chatbot> = {
@@ -327,6 +358,7 @@ export class BotDraftPublishService {
           ? config.purposeNote?.trim() || null
           : null,
       status,
+      ...(accessMode ? { accessMode } : {}),
       updatedBy: Number(ExecutionManager.getUserId() ?? 0) || null,
     } as Partial<Chatbot>;
     await this.chatbots.update({ id: chatbot.id }, patch as never);
@@ -418,11 +450,75 @@ export class BotDraftPublishService {
   }
 }
 
+/**
+ * The draft's config with every field publish reads present: a draft from Create and Build (a
+ * template, the form) may never have been through the steps that filled them. Keeps every value
+ * the draft has; only fills what is missing or of the wrong shape.
+ */
+export function publishableConfig(
+  config: Partial<BotDraft> | null | undefined,
+  fallbackName = 'Your assistant',
+): BotDraft {
+  const c = (config ?? {}) as Partial<BotDraft>;
+  const base = BotDraftService.defaultDraft(
+    typeof c.name === 'string' && c.name.trim() ? c.name : fallbackName,
+  );
+  const str = (v: unknown, d: string) => (typeof v === 'string' ? v : d);
+  const list = <T>(v: unknown, d: T[]): T[] =>
+    Array.isArray(v) ? (v as T[]) : d;
+  const filled = (v: unknown, d: string) =>
+    typeof v === 'string' && v.trim() ? v : d;
+  const branding = { ...base.branding, ...(c.branding ?? {}) };
+  return {
+    ...base,
+    ...c,
+    name: filled(c.name, base.name),
+    assistantName: filled(c.assistantName, base.assistantName),
+    introduction: str(c.introduction, ''),
+    instructions: str(c.instructions, ''),
+    ownerNotes: str(c.ownerNotes, ''),
+    declineText: str(c.declineText, ''),
+    purposeNote: str(c.purposeNote, ''),
+    languages: list<string>(c.languages, []).length
+      ? list<string>(c.languages, [])
+      : base.languages,
+    topics: list(c.topics, base.topics),
+    suggestedQuestions: list<string>(c.suggestedQuestions, []),
+    prechat: list(c.prechat, base.prechat),
+    extraNever: list<string>(c.extraNever, []),
+    knowledgeDocumentIds: list<string>(c.knowledgeDocumentIds, []),
+    // An explicit null (no pack) is kept as it was; only a missing key gets the default.
+    safetyPackId:
+      'safetyPackId' in c ? (c.safetyPackId as never) : base.safetyPackId,
+    branding: {
+      ...branding,
+      title: str(branding.title, ''),
+      assistantName: str(branding.assistantName, ''),
+    },
+  } as BotDraft;
+}
+
 function unique(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))];
 }
 
 /** One language: that one; several: each person's own, from the page's choice of two. */
+/** Stage 5: the draft's languages as the live chatbot's `enabledLanguages`, when there are any. */
+export function enabledLanguagesPatch(languages: string[] | null | undefined): {
+  enabledLanguages?: string[];
+} {
+  const tags = [
+    ...new Set(
+      (languages ?? []).filter(
+        (l) =>
+          typeof l === 'string' &&
+          /^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(l),
+      ),
+    ),
+  ].slice(0, 30);
+  return tags.length ? { enabledLanguages: tags } : {};
+}
+
 export function pageLanguage(languages: string[]): BotPageLanguage {
   if (languages.length > 1) return 'auto';
   return languages[0] === 'hi' ? 'hi' : 'en';

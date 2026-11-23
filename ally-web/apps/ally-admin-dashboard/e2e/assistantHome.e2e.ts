@@ -6,21 +6,28 @@ import { mockInbox } from "./inbox.fixture";
 import { mockLists } from "./lists.fixture";
 
 /** The assistant home (chunk 20d) from fixtures: every section's baseline, axe, Try it, saving. */
+// Stage 2: six sections replace the ten. Build and Knowledge have two parts each (`part`).
+// Screenshot baselines are named after these ids and must be regenerated (`--update-snapshots`).
 const SECTIONS = [
   "overview",
-  "knows",
-  "lists",
-  "personality",
-  "safety",
-  "how",
-  "page",
-  "checkup",
+  "build",
+  "build-checkup",
   "conversations",
-  "share",
+  "channels",
+  "knowledge",
+  "knowledge-lists",
+  "settings",
 ];
 
-const open = async (page: import("@playwright/test").Page, section: string) => {
-  await page.goto(`/dev/assistant-home/${BOT_ID}?section=${section}`);
+/** "build-checkup" is the Build section's Check-up part. */
+const split = (id: string): { section: string; part?: string } => {
+  const [section, part] = id.split("-");
+  return { section, part };
+};
+
+const open = async (page: import("@playwright/test").Page, id: string) => {
+  const { section, part } = split(id);
+  await page.goto(`/dev/assistant-home/${BOT_ID}?section=${section}${part ? `&part=${part}` : ""}`);
   await expect(page.getByTestId(`section-${section}`)).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
 };
@@ -31,11 +38,14 @@ test.describe("assistant home sections", () => {
       // The Inbox section is this assistant's inbox (chunk 11a), so it needs the inbox's chats too.
       await (section === "conversations" ? mockInbox(page) : mockAssistantHome(page));
       // Lists (chunk 5b) answers from its own fixture, with Slots and Appointments.
-      if (section === "lists") await mockLists(page, { start: "booked" });
+      if (section === "knowledge-lists") await mockLists(page, { start: "booked" });
       await open(page, section);
       if (section === "conversations") await expect(page.getByTestId("inbox-list")).toBeVisible();
-      if (section === "overview") await expect(page.getByTestId("share-qr")).toBeVisible();
-      if (section === "page") await expect(page.getByTestId("phone-preview")).toBeVisible();
+      // The link and QR code moved from Overview to Channels, with the page's phone preview.
+      if (section === "channels") {
+        await expect(page.getByTestId("share-qr")).toBeVisible();
+        await expect(page.getByTestId("phone-preview")).toBeVisible();
+      }
       await expect(page).toHaveScreenshot(`home-${section}.png`, { fullPage: true });
       await expectNoSeriousA11yIssues(page);
     });
@@ -68,7 +78,7 @@ test("change your assistant: a proposal as before and after", async ({ page }) =
 
 test("Try it draws the bot page chat in the page's brand", async ({ page }) => {
   await mockAssistantHome(page);
-  await open(page, "personality");
+  await open(page, "build");
   await page.getByRole("button", { name: "Try it" }).click();
   const panel = page.getByTestId("try-it");
   await expect(panel.getByText("What are your fees?")).toBeVisible();

@@ -1,0 +1,208 @@
+/* The Create and Build screen (stage 3). v2 tokens only. */
+.ally-build {
+  height: 100%;
+  min-height: 0;
+  font-family: var(--ally-font-ui);
+  color: var(--ally-ink);
+}
+.ally-build--loading {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 12px;
+}
+.ally-build__left {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 20px 24px;
+  overflow-y: auto;
+  min-height: 0;
+  height: 100%;
+}
+.ally-build__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ally-build__head .ally-heading {
+  margin: 0;
+}
+.ally-build__modes {
+  display: inline-flex;
+  border: 1px solid var(--ally-line);
+}
+.ally-build__mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--ally-surface);
+  border: 0;
+  color: var(--ally-muted);
+  cursor: pointer;
+}
+.ally-build__mode[aria-pressed="true"] {
+  background: var(--ally-accent-soft);
+  color: var(--ally-ink);
+}
+.ally-build__mode-label {
+  font-size: 13px;
+}
+.ally-build__credits,
+.ally-build__pending {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--ally-line);
+  background: var(--ally-warn-bg);
+}
+.ally-build__pending {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--ally-info-bg);
+}
+.ally-build__pending p {
+  margin: 0;
+}
+.ally-build__start,
+.ally-build__templates,
+.ally-build__template,
+.ally-build__form,
+.ally-build__sources,
+.ally-build__golive {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ally-build__start > .ally-btn--ghost,
+.ally-build__templates > .ally-btn--ghost,
+.ally-build__template > .ally-btn--ghost {
+  align-self: flex-start;
+}
+.ally-build__cards,
+.ally-build__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ally-build__list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--ally-line);
+}
+.ally-build__section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 0;
+  border-top: 1px solid var(--ally-line);
+}
+.ally-build__section-title {
+  margin: 0;
+  font: 600 15px/1.3 var(--ally-font-ui);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ally-build__tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--ally-sunken);
+  color: var(--ally-muted);
+}
+.ally-build__field {
+  gap: 6px;
+}
+.ally-build__status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 0;
+  color: var(--ally-muted);
+}
+.ally-build__status--bad {
+  color: var(--ally-danger);
+}
+.ally-build__choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.ally-build__choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ally-build__row {
+  display: flex;
+  gap: 8px;
+}
+.ally-build__row .ally-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ally-build__ideas ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+.ally-build__copilot {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 420px;
+}
+.ally-build__chat {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.ally-build__narration {
+  color: var(--ally-muted);
+  font-style: italic;
+}
+.ally-build__proposal,
+.ally-build__confirm {
+  padding: 10px 12px;
+  border: 1px solid var(--ally-line-strong);
+  background: var(--ally-surface);
+}
+.ally-build__proposal dl {
+  margin: 6px 0;
+}
+.ally-build__proposal dt {
+  font-weight: 600;
+}
+.ally-build__proposal dd {
+  margin: 0 0 4px;
+}
+.ally-build__home {
+  height: min(860px, calc(100vh - 220px));
+  min-height: 560px;
+}
+.ally-build__terms {
+  white-space: pre-wrap;
+}

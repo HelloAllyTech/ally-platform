@@ -14,7 +14,7 @@ import "../AssistantHome/ui/scale.css";
 import "../WhatsAppBot/list-page.css";
 
 const shareLink = (chatbotId: string) =>
-  `${ROUTES.CHATBOT_DETAIL.replace(":botId", chatbotId)}?section=share`;
+  `${ROUTES.CHATBOT_DETAIL.replace(":botId", chatbotId)}?section=settings`;
 
 /** "Ask Ally to upgrade": Ally sets plans for now, so it says how, rather than inventing a flow. */
 const AskToUpgrade: React.FC = () => {

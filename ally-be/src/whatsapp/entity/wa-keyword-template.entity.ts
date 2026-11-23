@@ -103,6 +103,22 @@ export class WaKeywordTemplate extends BaseWithoutTenantEntity {
   @Column({ type: 'uuid', name: 'overrides_template_id', nullable: true })
   overridesTemplateId?: string | null;
 
+  /**
+   * Assistants stage 5 (D6): a chatbot's copy of a crisis, STOP or START reply. Its wording is
+   * not editable by the builder; Ally staff push wording changes to every copy.
+   */
+  @Column({ type: 'boolean', default: false })
+  locked!: boolean;
+
+  /** Regional numbers a builder adds to a locked reply, substituted after the fixed wording. */
+  @Column({
+    type: 'text',
+    array: true,
+    name: 'extra_numbers',
+    default: () => "'{}'",
+  })
+  extraNumbers!: string[];
+
   @Column({ type: 'int', name: 'created_by', nullable: true })
   createdBy?: number | null;
 

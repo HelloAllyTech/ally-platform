@@ -353,7 +353,7 @@ export const chatbotsApi = baseAPI.injectEndpoints({
 
     updateBotPageBrand: builder.mutation<
       BotPageView,
-      { id: string } & Partial<Omit<BotPageBrand, "accentContrast">>
+      { id: string } & Partial<Omit<BotPageBrand, "accentContrast">> & { welcome?: string }
     >({
       query: ({ id, ...body }) => ({
         url: ApiEndpoints.CHATBOTS.PAGE_BRAND(id),

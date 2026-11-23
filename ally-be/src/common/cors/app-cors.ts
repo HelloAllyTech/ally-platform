@@ -29,6 +29,36 @@ export function isDirectoryPublicRoute(url: string | undefined): boolean {
 }
 
 /**
+ * Stage 7: the bot page's public routes (`/api/v1/public/bots/<key>/...`) also answer the page's
+ * own verified custom domain. The check lives in BotPageDomainService, which registers it here on
+ * start, so this file needs no database and main.ts no wiring. Unregistered: nothing extra passes.
+ */
+type PublicBotOriginCheck = (
+  origin: string,
+  key: string | null,
+) => Promise<boolean>;
+let publicBotOriginCheck: PublicBotOriginCheck | null = null;
+
+export function registerPublicBotOriginCheck(
+  check: PublicBotOriginCheck | null,
+): void {
+  publicBotOriginCheck = check;
+}
+
+const PUBLIC_BOT_ROUTE = /^\/api\/v1\/public\/bots\/([^/?#]+)/;
+
+/** The page key in a public bot-page URL, or null when the URL is not one. */
+export function publicBotKey(url: string | undefined): string | null {
+  const match = PUBLIC_BOT_ROUTE.exec(url ?? '');
+  if (!match) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * The app's CORS: the `ALLOWED_ORIGINS` list, with credentials, for every route but the widget's.
  * Leaving the widget's routes out only removes this layer's headers (`origin: false`); it never
  * allows anything, so a path that matched by mistake would fail closed.
@@ -47,10 +77,25 @@ export function appCorsDelegate(allowedOrigins: () => string[]) {
     exposedHeaders: ['Content-Disposition'],
   };
   return (
-    req: { url?: string },
+    req: { url?: string; headers?: { origin?: string } },
     callback: (error: Error | null, options: CorsOptions) => void,
   ): void => {
     if (isWidgetRoute(req.url)) return callback(null, { origin: false });
+    const origin = req.headers?.origin;
+    const key = publicBotKey(req.url);
+    if (
+      key &&
+      origin &&
+      publicBotOriginCheck &&
+      !allowedOrigins().includes(origin)
+    ) {
+      publicBotOriginCheck(origin, key)
+        .then((ok) =>
+          callback(null, ok ? { ...options, origin: [origin] } : options),
+        )
+        .catch(() => callback(null, options));
+      return;
+    }
     if (isDirectoryPublicRoute(req.url)) {
       return callback(null, {
         origin: '*',

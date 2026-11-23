@@ -144,7 +144,7 @@ async function importOne(
       ],
     );
     await db.query(
-      `INSERT INTO chatbot_members (chatbot_id, user_id, role, created_by) VALUES ($1, $2, 'owner', $2)`,
+      `INSERT INTO chatbot_members (chatbot_id, user_id, role, roles, created_by) VALUES ($1, $2, 'owner', ARRAY['owner']::text[], $2)`,
       [id, owner],
     );
 

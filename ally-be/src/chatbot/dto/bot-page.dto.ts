@@ -56,10 +56,18 @@ export class BotPageBrandingDto {
   @MaxLength(80)
   title!: string;
 
-  @ApiProperty()
+  /** Retired in stage 7 (the welcome line replaces it); refused by the PUT when sent. */
+  @ApiPropertyOptional({ deprecated: true })
+  @IsOptional()
   @IsString()
   @MaxLength(200)
-  subtitle!: string;
+  subtitle?: string;
+
+  @ApiPropertyOptional({ description: 'One short welcome line (stage 7)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(BOT_PAGE_BOUNDS.maxWelcomeChars)
+  welcome?: string;
 
   @ApiProperty()
   @IsString()
@@ -67,18 +75,26 @@ export class BotPageBrandingDto {
   @MaxLength(60)
   assistantName!: string;
 
-  @ApiPropertyOptional({ nullable: true })
+  /** Retired in stage 7; refused by the PUT when sent. */
+  @ApiPropertyOptional({ nullable: true, deprecated: true })
   @IsOptional()
   @Matches(HTTPS_URL, { message: 'The avatar must be an https link' })
   @MaxLength(1000)
   avatarUrl?: string | null;
 
-  @ApiProperty()
+  /** Retired in stage 7 (the fixed crisis notice owns it); refused by the PUT when sent. */
+  @ApiPropertyOptional({ deprecated: true })
+  @IsOptional()
   @IsString()
   @MaxLength(300)
-  disclaimer!: string;
+  disclaimer?: string;
 
-  @ApiPropertyOptional({ type: BotPageFooterLinkDto, nullable: true })
+  /** Retired in stage 7; refused by the PUT when sent. */
+  @ApiPropertyOptional({
+    type: BotPageFooterLinkDto,
+    nullable: true,
+    deprecated: true,
+  })
   @IsOptional()
   @ValidateNested()
   @Type(() => BotPageFooterLinkDto)
@@ -125,6 +141,14 @@ export class BotPageLimitsDto {
   @Min(1)
   @Max(BOT_PAGE_BOUNDS.maxMessagesPerVisitorPerHour)
   messagesPerVisitorPerHour!: number;
+
+  /** Stage 7: one person's messages per day. Absent: the stored value, or the default. */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(BOT_PAGE_BOUNDS.maxMessagesPerVisitorPerDay)
+  messagesPerVisitorPerDay?: number;
 
   @ApiProperty()
   @IsInt()
@@ -176,10 +200,15 @@ export class UpdateBotPageDto {
   @IsEnum(BotPageStatus)
   status!: BotPageStatus;
 
-  @ApiProperty({ example: 'mehta-clinic' })
+  /**
+   * Retired in stage 7: the address is assigned by Ally. Ignored by the service; the PUT refuses
+   * a value that differs from the stored link (400 `address_not_editable`).
+   */
+  @ApiPropertyOptional({ deprecated: true })
+  @IsOptional()
   @IsString()
   @MaxLength(48)
-  slug!: string;
+  slug?: string;
 
   @ApiProperty({ enum: BotPageAccess })
   @IsEnum(BotPageAccess)

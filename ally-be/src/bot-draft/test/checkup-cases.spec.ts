@@ -379,7 +379,8 @@ describe('CheckupCasesService (chunk 20d-2)', () => {
       badge: 'you',
       safety: false,
     });
-    expect(checkup.scheduleAfterChange).toHaveBeenCalledWith('bot-1');
+    // Stage 4: no automatic re-run of saved tests after a change.
+    expect(checkup.scheduleAfterChange).not.toHaveBeenCalled();
   });
 
   it('edits with the version it started from, and refuses a stale one with the current question', async () => {

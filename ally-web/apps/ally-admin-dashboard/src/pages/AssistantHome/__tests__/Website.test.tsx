@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import type { WidgetSettings } from "@types";
 
 import { HOME } from "../copy";
+import { LIVE_ACCESS_COPY } from "../copy/overview";
 import { WebsiteGroup, widgetSnippet } from "../sections/Website";
 
 import type { HomeField } from "../useHomeField";
@@ -51,18 +52,11 @@ describe("On your website (chunk 13)", () => {
     expect(screen.getByRole("button", { name: t.copy })).toBeInTheDocument();
   });
 
-  it("adds a website with Add or Enter (not as you type), and removes one", () => {
-    const field = setup();
-    const input = screen.getByLabelText(t.address);
-    fireEvent.change(input, { target: { value: "book.sunrisemind.in" } });
-    expect(field.set).not.toHaveBeenCalled();
-    fireEvent.keyDown(input, { key: "Enter" });
-    expect(field.set).toHaveBeenLastCalledWith(
-      { ...VALUE, allowedDomains: ["sunrisemind.in", "book.sunrisemind.in"] },
-      { now: true },
-    );
-    fireEvent.click(screen.getByRole("button", { name: `${t.remove}: sunrisemind.in` }));
-    expect(field.set).toHaveBeenLastCalledWith({ ...VALUE, allowedDomains: [] }, { now: true });
+  it("stage 7: has no list of allowed websites to keep (the bubble may appear anywhere)", () => {
+    setup({ value: { ...VALUE, allowedDomains: [] } });
+    expect(screen.queryByLabelText(t.address)).not.toBeInTheDocument();
+    expect(screen.queryByText(t.none)).not.toBeInTheDocument();
+    expect(screen.queryByText(t.allowed)).not.toBeInTheDocument();
   });
 
   it("shows ally-be's reason when a website is refused", () => {
@@ -71,11 +65,6 @@ describe("On your website (chunk 13)", () => {
         "wixsite.com is shared by many websites, so the bubble could appear on sites that aren't yours. Add your own address on it, for example yourclinic.wixsite.com.",
     });
     expect(screen.getByRole("alert")).toHaveTextContent("wixsite.com is shared by many websites");
-  });
-
-  it("says nothing appears until a website is added", () => {
-    setup({ value: { ...VALUE, allowedDomains: [] } });
-    expect(screen.getByText(t.none)).toBeInTheDocument();
   });
 
   it("saves the bubble's position, opening on its own and phones", () => {
@@ -90,12 +79,12 @@ describe("On your website (chunk 13)", () => {
 
   it("notes public chat is coming while public links are off", () => {
     setup();
-    expect(screen.getByText(t.publicNote)).toBeInTheDocument();
+    expect(screen.getByText(LIVE_ACCESS_COPY.widgetNote)).toBeInTheDocument();
   });
 
   it("helps with sites that set a Content-Security-Policy", () => {
     setup({}, true);
-    expect(screen.queryByText(t.publicNote)).not.toBeInTheDocument();
+    expect(screen.queryByText(LIVE_ACCESS_COPY.widgetNote)).not.toBeInTheDocument();
     expect(
       screen.getByText(/allow https:\/\/chat\.ally\.test in script-src and frame-src/),
     ).toBeInTheDocument();

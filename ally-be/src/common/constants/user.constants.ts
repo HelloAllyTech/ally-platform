@@ -70,6 +70,13 @@ export enum UserRole {
    * Custom logins (`POST /v1/custom-logins`); platform-managed, so the role picker can't hand it out.
    */
   ASSISTANT_OWNER = 'ASSISTANT_OWNER',
+  /**
+   * Stage 1b (D9): someone invited to a chatbot's team who had no Ally account, made in the
+   * inviter's organisation when they accept (migration 1986500000100). Signs in to the admin
+   * portal; reaches only the chatbots they are a member of. No Chatbots toggle, so it can't create
+   * one; never a platform admin. Platform-managed: only an accepted invite grants it.
+   */
+  ASSISTANT_MEMBER = 'ASSISTANT_MEMBER',
 }
 
 /** Everything an Assistant owner (CR1) may do outside an assistant's own member routes. */
@@ -83,6 +90,13 @@ export const ASSISTANT_OWNER_PERMISSIONS: string[] = [
   'view:whatsapp-bot:unanswered',
   'edit:whatsapp-bot:unanswered',
   'view:whatsapp-bot:analytics',
+];
+
+/** What an invited Assistant member (Stage 1b) holds: reading and replying, nothing else. */
+export const ASSISTANT_MEMBER_PERMISSIONS: string[] = [
+  'view:whatsapp-bot',
+  'view:whatsapp-bot:conversations',
+  'edit:whatsapp-bot:conversations',
 ];
 
 /**
@@ -170,6 +184,7 @@ export const PLATFORM_MANAGED_ROLES: UserRole[] = [
   UserRole.CLINICAL_ADVISOR,
   UserRole.DEBRIEF_OWNER,
   UserRole.ASSISTANT_OWNER,
+  UserRole.ASSISTANT_MEMBER,
 ];
 
 export enum AppType {

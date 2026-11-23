@@ -17,6 +17,7 @@ import {
   ApiSecurity,
   ApiTags,
 } from '@nestjs/swagger';
+import { StaffOnly } from '../../auth/decorators/staff-only.decorator';
 import { RequireFeatureToggle } from '../../auth/decorators/feature-toggle.decorator';
 import { OrgScopedRoute } from '../../auth/decorators/org-scoped-route.decorator';
 import { FeatureToggleKey } from '../../authorization/constants/admin-feature-toggle.constants';
@@ -46,6 +47,7 @@ import { KnowledgeBaseService } from '../service/knowledge-base.service';
 @ApiTags('Knowledge Base')
 @ApiBearerAuth()
 @ApiSecurity('access-token')
+@StaffOnly()
 @Controller('v1/knowledge-base')
 export class KnowledgeBaseController {
   constructor(private readonly knowledgeBaseService: KnowledgeBaseService) {}

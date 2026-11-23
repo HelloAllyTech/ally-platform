@@ -132,6 +132,7 @@ export const buildSidebarItemFeatureKeyMap = (
     [sidebarItems.BILLING_MODELS, FeatureToggleKey.MANAGE_COSTS],
     [sidebarItems.BILLING_COSTS, FeatureToggleKey.MANAGE_COSTS],
     [sidebarItems.BILLING_PLANS, FeatureToggleKey.MANAGE_COSTS],
+    [sidebarItems.BILLING_CREDITS, FeatureToggleKey.MANAGE_COSTS],
     [sidebarItems.AI_TASKS, FeatureToggleKey.AI_TASKS],
     [sidebarItems.MANAGE_GUARDRAILS, FeatureToggleKey.MANAGE_GUARDRAILS],
     [sidebarItems.TOOLTIPS, FeatureToggleKey.MANAGE_TOOLTIPS],

@@ -129,7 +129,7 @@
       "summary": "",
       "tags": [],
       "last_reconciled": "",
-      "words": 871,
+      "words": 950,
       "url": "https://tech.helloally.ai/#/wiki/index.md",
       "skip_reason": "human navigation catalog — ROUTING.md supersedes it for agents"
     },
@@ -142,7 +142,7 @@
         "log"
       ],
       "last_reconciled": "",
-      "words": 14306,
+      "words": 14326,
       "url": "https://tech.helloally.ai/#/wiki/log.md",
       "skip_reason": "append-only history — read only when auditing what changed"
     },
@@ -241,6 +241,59 @@
       "skip_reason": ""
     },
     {
+      "path": "platform/assistants-build.md",
+      "title": "Assistants — Builder Home, Create and Build, Channels",
+      "summary": "How a builder creates and runs an Assistant after the Assistants build (stages 2, 3, 7): the two-option home, the six sections, the one-screen Create and Build with working copy versus live and Apply, the bot page address, widget, custom domain, and where the cutover runbook lives.",
+      "tags": [
+        "platform",
+        "assistants",
+        "chatbot",
+        "admin",
+        "onboarding",
+        "channels"
+      ],
+      "last_reconciled": "2026-11-23",
+      "words": 670,
+      "url": "https://tech.helloally.ai/#/wiki/platform/assistants-build.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "platform/assistants-credits-and-access.md",
+      "title": "Assistants — Credits, Budgets, Access, Roles",
+      "summary": "The credits ledger and per-chatbot budgets, the blocked state and its kill switch, invite-only access and sign-in, roles as a set, and the responder agreement.",
+      "tags": [
+        "platform",
+        "assistants",
+        "billing",
+        "credits",
+        "access",
+        "roles",
+        "auth"
+      ],
+      "last_reconciled": "2026-11-23",
+      "words": 551,
+      "url": "https://tech.helloally.ai/#/wiki/platform/assistants-credits-and-access.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "platform/assistants-safety-and-data.md",
+      "title": "Assistants — Safety Core, Customer Data, Staff View, Safety Packs",
+      "summary": "The go-live gate, fixed crisis text, alerts and holding message, retention and erase, memory consent, the staff read-only view and safety pack releases.",
+      "tags": [
+        "platform",
+        "assistants",
+        "safety",
+        "crisis",
+        "privacy",
+        "retention",
+        "staff"
+      ],
+      "last_reconciled": "2026-11-23",
+      "words": 393,
+      "url": "https://tech.helloally.ai/#/wiki/platform/assistants-safety-and-data.md",
+      "skip_reason": ""
+    },
+    {
       "path": "platform/auto-improve.md",
       "title": "Auto-improve — Rubric-Judged Testing for System Skills",
       "summary": "How System Skills' Auto-improve works — which skills can run it, the loop (designer drafts a challenger, the router splits live traffic, an LLM judge scores against an admin's rubric), what the target means, why a loop pauses, what Apply does, and the limits to know before trusting a winner.",
@@ -290,7 +343,7 @@
         "reference"
       ],
       "last_reconciled": "2026-11-18",
-      "words": 10726,
+      "words": 10750,
       "url": "https://tech.helloally.ai/#/wiki/platform/concepts.md",
       "skip_reason": ""
     },

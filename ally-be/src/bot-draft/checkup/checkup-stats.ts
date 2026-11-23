@@ -122,9 +122,16 @@ export interface DayStats {
   thumbsDown: number;
   replyMsP50: number | null;
   replyMsP90: number | null;
+  /** Distinct people (contacts) who wrote that day. Not additive across days. */
+  people: number;
+  /** Median minutes from needing a person to the first reply from one; null with none. */
+  handoverWaitP50: number | null;
 }
 
-export type WeekStats = Omit<DayStats, 'day' | 'replyMsP50' | 'replyMsP90'> & {
+export type WeekStats = Omit<
+  DayStats,
+  'day' | 'replyMsP50' | 'replyMsP90' | 'people' | 'handoverWaitP50'
+> & {
   /** Answers with a source, of all answers, rounded (0 with no answers). */
   answeredPct: number;
   /** Thumbs up, of all thumbs, rounded; null with none. */
@@ -161,10 +168,10 @@ export function sumDays(days: DayStats[]): WeekStats {
 /** Days are India's (the business's) days; weeks start on Monday. */
 const SCORECARD_TIME_ZONE = 'Asia/Kolkata';
 
-/** `YYYY-MM-DD` in India for an instant. */
-export function dayOf(at: Date): string {
+/** `YYYY-MM-DD` in the business's zone (India unless its setting says otherwise) for an instant. */
+export function dayOf(at: Date, zone: string = SCORECARD_TIME_ZONE): string {
   return new Intl.DateTimeFormat('en-CA', {
-    timeZone: SCORECARD_TIME_ZONE,
+    timeZone: zone,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',

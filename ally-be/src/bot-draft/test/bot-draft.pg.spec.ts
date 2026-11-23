@@ -74,7 +74,12 @@ describePg('Onboarding drafts (Postgres)', () => {
       dataSource.getRepository(Chatbot),
       settings,
       {} as never,
-      { botPage: { baseUrl: 'https://ally.example' } } as never,
+      {
+        botPage: {
+          baseUrl: 'https://ally.example',
+          chatUrl: 'https://ally.example/chat',
+        },
+      } as never,
     );
     publisher = new BotDraftPublishService(
       drafts,
@@ -205,7 +210,8 @@ describePg('Onboarding drafts (Postgres)', () => {
     );
 
     expect(again.link).toBe(first.link);
-    expect(first.link).toBe(`https://ally.example/b/${first.slug}`);
+    // Stage 7: the link is Ally's address, `/chat/<publicId>`; the legacy slug stays stored.
+    expect(first.link).toMatch(/^https:\/\/ally\.example\/chat\/[a-z0-9]+$/);
     const pages = await dataSource.query(
       `SELECT id, status, access, settings FROM chatbot_pages WHERE chatbot_id = $1`,
       [bot],
@@ -227,7 +233,7 @@ describePg('Onboarding drafts (Postgres)', () => {
     expect(chatbot).toMatchObject({
       status: 'live',
       safety_pack: 'mental_health',
-      safety_pack_version: 1,
+      safety_pack_version: 2, // SP1 moved mental health to version 2
       rules: { never: ['Quote prices for group sessions'] },
     });
     expect(chatbot.persona.systemPrompt).toBe(

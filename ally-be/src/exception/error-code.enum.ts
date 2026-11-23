@@ -180,6 +180,10 @@ export enum ErrorCode {
   BOT_PAGE_START_AGAIN = 'BOT_PAGE_START_AGAIN',
   /** 403. The verified email may no longer use this page. */
   BOT_PAGE_NOT_ALLOWED = 'BOT_PAGE_NOT_ALLOWED',
+  /** 403. Stage 6: a verified visitor was taken off the access list; the page shows the fixed notification. */
+  BOT_PAGE_NOT_ON_LIST = 'BOT_PAGE_NOT_ON_LIST',
+  /** 402. Stage 6: the assistant is out of credits; the page shows the fixed notification. */
+  BOT_PAGE_OUT_OF_CREDITS = 'BOT_PAGE_OUT_OF_CREDITS',
   /** 400. The code doesn't match; tries remain. */
   BOT_PAGE_CODE_WRONG = 'BOT_PAGE_CODE_WRONG',
   /** 400. No live code for this address (expired, used, or never sent). */

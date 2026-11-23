@@ -218,7 +218,6 @@ export class SourcesService {
         `DELETE FROM chatbot_documents WHERE chatbot_id = $1 AND document_id = ANY($2::uuid[])`,
         [draft.chatbotId, documentIds],
       );
-      this.checkup.scheduleAfterChange(draft.chatbotId);
     }
     return { event, next };
   }
@@ -270,7 +269,6 @@ export class SourcesService {
           [draft.chatbotId, documentId],
         );
       }
-      this.checkup.scheduleAfterChange(draft.chatbotId);
     }
     return { restored: taken.length };
   }

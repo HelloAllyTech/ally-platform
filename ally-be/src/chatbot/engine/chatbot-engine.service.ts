@@ -1,6 +1,13 @@
-import { LimitReason, limitReply } from './limit-reply';
+import { LimitReason, TurnBlockReason, limitReply } from './limit-reply';
+import {
+  BlockedState,
+  blockedNotice,
+  ownerCreditsText,
+} from './blocked-notice';
+import { BlockedCrisisService } from 'src/billing/service/blocked-crisis.service';
 import { LimitsService } from 'src/billing/service/limits.service';
 import { usageContextFor } from './engine-usage';
+import { offMessage, offReasonOf } from '../safety/off-message';
 import { usageContext } from 'src/billing/context/usage-context';
 import { Injectable, Optional } from '@nestjs/common';
 import {
@@ -35,7 +42,10 @@ import {
 } from '../handover/handover';
 import { ChatbotAudienceService } from '../service/chatbot-audience.service';
 import { ChatbotReplyService } from '../service/chatbot-reply.service';
-import { ChatbotSettingsService } from '../service/chatbot-settings.service';
+import {
+  ChatbotSettingsService,
+  DEFAULT_HELPLINE_PLACEHOLDER,
+} from '../service/chatbot-settings.service';
 import { ConversationService } from '../service/conversation.service';
 import {
   AgentActedError,
@@ -61,6 +71,19 @@ import { stageLine, stageRunIdFor } from './agent-stage-log';
 import { emergencyByKeywords } from './emergency-keywords';
 import { caringDecline } from './caring-decline';
 import { replyLanguageOf } from './reply-language';
+import { helplineNumbersWithExtras } from '../quick-replies/quick-reply-copy.service';
+import {
+  curatedLanguageOf,
+  SafetyTranslationsService,
+} from '../languages/safety-translations.service';
+import { replyLanguageFor } from '../languages/reply-language-for';
+import {
+  AnswerConflictService,
+  type ConflictPassage,
+} from '../knowledge/answer-conflict.service';
+import { noAnswerReply } from '../knowledge/no-answer-reply';
+import { safetySettingsOf } from '../safety/safety-settings';
+import { CONFLICT_NOT_SURE_COPY } from './conflict-reply';
 import {
   aboutAnAnimal,
   type ContactSource,
@@ -112,22 +135,33 @@ const ANSWER_PROMPT_CODE = 'ally_ai_knowledge_whatsapp_answer';
 export function crisisTextFor(
   turn: Pick<ChatTurn, 'chatbot' | 'settings'> &
     Partial<Pick<ChatTurn, 'text' | 'language'>>,
-  template?: { chatbotId?: string | null; responseText?: string | null } | null,
+  template?: {
+    chatbotId?: string | null;
+    responseText?: string | null;
+    /** Stage 5: regional numbers a builder added to its locked crisis reply. */
+    extraNumbers?: string[] | null;
+  } | null,
 ): string {
+  const own_ = Boolean(
+    template?.chatbotId && template.chatbotId === turn.chatbot.id,
+  );
+  // Stage 5 (D6): the chatbot's own numbers, then its copy's regional ones.
+  const numbers =
+    helplineNumbersWithExtras(
+      turn.settings.helplineNumbers,
+      own_ ? template?.extraNumbers : null,
+    ) || turn.settings.helplineNumbers;
   const fill = (text: string) =>
     text.replace(
       /\{helpline_numbers\}/g,
-      turn.settings.helplineNumbers || 'your local crisis line',
+      numbers || DEFAULT_HELPLINE_PLACEHOLDER,
     );
-  const ownTemplate =
-    template?.chatbotId && template.chatbotId === turn.chatbot.id
-      ? template.responseText?.trim()
-      : '';
+  const ownTemplate = own_ ? template?.responseText?.trim() : '';
   const ownText = turn.chatbot.settings?.crisisEscalationText?.trim();
   const own = ownTemplate || ownText;
   return crisisReply({
     pack: turn.chatbot.safetyPack,
-    helplineNumbers: turn.settings.helplineNumbers,
+    helplineNumbers: numbers,
     own: own ? fill(own) : null,
     // In the person's language (Q3-fast Part 1, B3): fixed English, Hindi or Hinglish text.
     language: replyLanguageOf(turn.text ?? '', turn.language),
@@ -185,6 +219,12 @@ const isUrgent = (
 ): verdict is PromiseFulfilledResult<CrisisCheckResponse> =>
   verdict.status === 'fulfilled' && Boolean(verdict.value?.is_crisis);
 
+/** A decision reached with no model call: a keyword or template reply, or a refusal. */
+const modelFree = (decision: ChatbotDecision): boolean =>
+  decision.handledBy === WaHandledBy.TEMPLATE ||
+  decision.handledBy === WaHandledBy.UNIDENTIFIED ||
+  (decision.handledBy === WaHandledBy.CRISIS && Boolean(decision.templateId));
+
 /** Store version and content hash of each knowledge prompt sent to ally-ai, by code. */
 type PromptsRan = {
   prompt_versions: Record<string, number | null>;
@@ -230,6 +270,11 @@ export class ChatbotEngineService {
     @Optional() private readonly conversations?: ConversationService,
     // CR1: plans, seats and tokens. Optional so the engine's own specs build it without them.
     @Optional() private readonly limits?: LimitsService,
+    // Stage 6 (R1): records a keyword crisis on a blocked turn. Optional for the engine's specs.
+    @Optional() private readonly blockedCrisis?: BlockedCrisisService,
+    // Stage 5: reviewed crisis translations and conflict handling. Optional for the engine's specs.
+    @Optional() private readonly safetyTranslations?: SafetyTranslationsService,
+    @Optional() private readonly answerConflict?: AnswerConflictService,
   ) {}
 
   /**
@@ -239,33 +284,198 @@ export class ChatbotEngineService {
   async respond(turn: ChatTurn, live?: LiveReply): Promise<ChatbotDecision> {
     // CR1: every model call this message causes (crisis check, the run, memory, summary) is
     // attributed to this assistant, conversation and run. Recording happens elsewhere, after.
-    return usageContext.run(usageContextFor(turn), () =>
-      this.respondInContext(turn, live),
-    );
+    return usageContext.run(usageContextFor(turn), async () => {
+      const decision = await this.withTranslatedCrisisHelp(
+        turn,
+        await this.respondInContext(turn, live),
+      );
+      // Stage 6: the payer stamped on this run when it started, for the channel's background
+      // work after the reply (memory, summary), which runs outside this context.
+      const context = usageContext.current();
+      return context?.payerAccountId
+        ? {
+            ...decision,
+            payer: {
+              accountId: context.payerAccountId,
+              endPersonId: context.endPersonId ?? null,
+            },
+          }
+        : decision;
+    });
+  }
+
+  /**
+   * The free crisis keyword check alone (no model), as the engine reads it: a crisis template
+   * that is not inside an everyday idiom. A channel runs it before the stage 5 privacy steps, so
+   * a crisis message is never read as an erase request or a consent answer. A lookup failure
+   * counts as a crisis (the privacy steps are skipped and the engine decides).
+   */
+  async isCrisisKeyword(
+    text: string,
+    language: string | null | undefined,
+    chatbotId: string,
+  ): Promise<boolean> {
+    try {
+      const match = await this.replyService.match(text, language, chatbotId);
+      return (
+        match?.template.kind === WaTemplateKind.CRISIS && !isEverydayIdiom(text)
+      );
+    } catch {
+      return true;
+    }
+  }
+
+  /**
+   * Stage 5 (D5): a crisis reply to a person writing in an enabled language with no curated text
+   * (anything but English and Hindi) also carries the reviewed translation of the help line, when
+   * one is stored. The curated reply is never replaced, and an unreviewed text is never used.
+   */
+  private async withTranslatedCrisisHelp(
+    turn: ChatTurn,
+    decision: ChatbotDecision,
+  ): Promise<ChatbotDecision> {
+    if (decision.handledBy !== WaHandledBy.CRISIS || !this.safetyTranslations)
+      return decision;
+    const language = replyLanguageFor(turn.chatbot, turn.language);
+    if (!turn.language || curatedLanguageOf(language)) return decision;
+    try {
+      const help = await this.safetyTranslations.crisisHelpFor(
+        turn.chatbot.id,
+        language,
+        // The builder's own numbers only (R6), as on the fixed notifications.
+        turn.chatbot.settings?.helplineNumbers ?? null,
+      );
+      if (curatedLanguageOf(help.language) || !help.reviewed) return decision;
+      return { ...decision, body: `${decision.body}\n\n${help.text}` };
+    } catch {
+      return decision;
+    }
   }
 
   private async respondInContext(
     turn: ChatTurn,
     live?: LiveReply,
   ): Promise<ChatbotDecision> {
-    // CR1: at any limit, no run starts. The crisis check still runs first and its reply always
-    // goes out; otherwise the person gets a fixed, honest reply (no AI call, no dollars).
+    // Stage 4: an archived or paused chatbot (by its team or by the go-live gate, D10) answers
+    // with its off message and the crisis information, never silence and never a model call. The
+    // free keyword crisis check still runs first (R1). The test pane is the team's, so it answers.
+    const off =
+      turn.channel?.type === 'test' ? null : offReasonOf(turn.chatbot);
+    if (off) {
+      const crisis = await this.keywordCrisisOnly(
+        turn,
+        `OFF_${off.toUpperCase()}`,
+      );
+      if (crisis) return { ...crisis, off };
+      return {
+        handledBy: WaHandledBy.RATE_LIMITED,
+        body: offMessage(
+          turn.chatbot as never,
+          replyLanguageOf(turn.text, turn.language),
+        ),
+        off,
+      };
+    }
+    // At any limit no run starts and NO model is called (stage 6, D3 as amended by R1): the free
+    // keyword crisis check runs first and its reply always goes out (the channel flags it);
+    // otherwise the person gets the fixed notification. Stage 6 also reserves the turn's money
+    // here, from the chatbot's budget or (testing) the builder's free balance.
     const limited = await this.limits?.checkTurn({
       chatbotId: turn.chatbot.id,
       creatorUserId: turn.chatbot.createdBy,
       conversationKey: turn.conversationId ?? turn.sender?.externalId,
       context: usageContext.current(),
+      sender: {
+        phone: turn.sender?.phone ?? null,
+        email: turn.sender?.email ?? null,
+        label: turn.sender?.label ?? null,
+      },
+      userLimits: turn.chatbot.settings?.userLimits ?? null,
+      timeZone: turn.chatbot.settings?.timeZone ?? null,
     });
-    if (limited) {
-      return (
-        (await this.crisisOnly(turn)) ?? {
-          handledBy: WaHandledBy.RATE_LIMITED,
-          body: await this.limitText(turn, limited),
-          limited,
-        }
-      );
+    if (limited) return this.blockedDecision(turn, limited);
+    const decision = await this.respondUnlimited(turn, live);
+    // A reply that needed no model (a keyword reply, a refusal) gives its reservation back now
+    // rather than holding the budget until the reservation expires.
+    if (!decision.agent && modelFree(decision)) {
+      void this.limits
+        ?.releaseTurn(usageContext.current())
+        .catch(() => undefined);
     }
-    return this.respondUnlimited(turn, live);
+    return decision;
+  }
+
+  /**
+   * A blocked turn (R1): the free keyword crisis match, then the fixed notification. Never a model
+   * call: neither the agent nor the crisis classifier runs.
+   */
+  private async blockedDecision(
+    turn: ChatTurn,
+    limited: TurnBlockReason,
+  ): Promise<ChatbotDecision> {
+    const state: BlockedState | undefined =
+      limited === 'out_of_credits' ? 'OUT_OF_CREDITS' : undefined;
+    const crisis = await this.keywordCrisisOnly(turn, state ?? 'LIMITED');
+    if (crisis) return { ...crisis, ...(state ? { blocked: state } : {}) };
+    if (limited === 'out_of_credits') {
+      return {
+        handledBy: WaHandledBy.RATE_LIMITED,
+        body: this.blockedText(turn, 'OUT_OF_CREDITS'),
+        limited,
+        blocked: 'OUT_OF_CREDITS',
+      };
+    }
+    if (limited === 'owner_credits') {
+      return {
+        handledBy: WaHandledBy.RATE_LIMITED,
+        body: ownerCreditsText(usageContext.current()?.creditBlockReason),
+        limited,
+      };
+    }
+    return {
+      handledBy: WaHandledBy.RATE_LIMITED,
+      body: await this.limitText(turn, limited),
+      limited,
+    };
+  }
+
+  /** The fixed notification for a blocked state, in the person's language. */
+  private blockedText(turn: ChatTurn, state: BlockedState): string {
+    return blockedNotice(state, {
+      // The builder's own numbers only (R6): never the platform's defaults.
+      ownNumbers: turn.chatbot.settings?.helplineNumbers ?? null,
+      language: replyLanguageOf(turn.text, turn.language),
+    });
+  }
+
+  /**
+   * The keyword layer's crisis reply alone (R1), or null: no model. A match on a blocked turn is
+   * recorded through `markBlockedCrisis`; the channel flags the conversation from the decision.
+   */
+  private async keywordCrisisOnly(
+    turn: ChatTurn,
+    state: string,
+  ): Promise<ChatbotDecision | null> {
+    const match = await this.replyService.match(
+      turn.text,
+      turn.language,
+      turn.chatbot.id,
+    );
+    if (
+      !match ||
+      match.template.kind !== WaTemplateKind.CRISIS ||
+      isEverydayIdiom(turn.text)
+    ) {
+      return null;
+    }
+    await this.blockedCrisis
+      ?.markBlockedCrisis(
+        turn.chatbot.id,
+        turn.conversationId ?? turn.sender?.externalId,
+        state,
+      )
+      .catch(() => undefined);
+    return this.keywordCrisis(turn, match.template);
   }
 
   /** The fixed reply at a limit, in the person's language, naming the business or its owner. */
@@ -288,7 +498,7 @@ export class ChatbotEngineService {
       const [row] = await this.documentRepository.manager
         .query(
           `SELECT u.name FROM chatbot_members m JOIN users u ON u.id = m.user_id
-            WHERE m.chatbot_id = $1 AND m.role = 'owner' ORDER BY m."createdAt" LIMIT 1`,
+            WHERE m.chatbot_id = $1 AND 'owner' = ANY(m.roles) ORDER BY m."createdAt" LIMIT 1`,
           [turn.chatbot.id],
         )
         .catch(() => []);
@@ -405,6 +615,7 @@ export class ChatbotEngineService {
       id: string;
       responseText?: string | null;
       chatbotId?: string | null;
+      extraNumbers?: string[] | null;
     },
   ): ChatbotDecision {
     const { chatbot, sender } = turn;
@@ -412,6 +623,8 @@ export class ChatbotEngineService {
       handledBy: WaHandledBy.CRISIS,
       body: crisisTextFor(turn, template),
       templateId: template.id,
+      // Stage 4: the flag service reads the level and path from here, never infers them.
+      crisis: { level: 1, path: 'keyword' },
       alert: this.alert(
         200,
         'crisis',
@@ -479,7 +692,7 @@ export class ChatbotEngineService {
       chatbot.knowledgeSource === ChatbotKnowledgeSource.ORGANISATION &&
       !sender.tenantId;
     if (!allowed || needsOrganisation) {
-      return this.refuse(turn);
+      return this.refuse(turn, { organisationOnly: needsOrganisation });
     }
 
     // ── 3. Answer ────────────────────────────────────────────────────────
@@ -518,40 +731,34 @@ export class ChatbotEngineService {
   }
 
   /**
-   * Tell a sender this bot is not for them — but check for a crisis first. The keyword rules that
-   * already ran are only the first layer of the safety net; skipping the classifier here would
-   * remove the second for precisely the people we know least about.
+   * Tell a sender this bot is not for them (REMOVED_FROM_LIST), with no model call (R1): the free
+   * keyword crisis check runs (a match gets the crisis reply, and the channel flags it); the model
+   * classifier does not. An assistant's refusal is the fixed notification (the crisis information
+   * and that access is by invitation, D4); the platform number, which scopes its answers by
+   * organisation, keeps its own unrecognised-number text.
    *
    * Nothing is filed as unanswered: that queue records what the KNOWLEDGE failed to cover.
    */
-  private async refuse(turn: ChatTurn): Promise<ChatbotDecision> {
-    const { settings, sender } = turn;
-    if (settings.crisisClassifierEnabled) {
-      try {
-        const { prompts, ran } = await this.loadPromptOverrides(turn);
-        const crisis = await this.aiService.checkWhatsAppCrisis(
-          crisisRequest(turn, prompts),
-        );
-        if (crisis?.is_crisis) {
-          return await this.crisisDecision(turn, crisis, ran, {
-            notOnList: true,
-          });
-        }
-      } catch (error) {
-        // Swallowed on purpose: the refusal still has to go out.
-        this.logger.warn(
-          `Crisis classifier did not run for a refused sender (${sender.label}): ${
-            error instanceof Error ? error.message : 'unknown error'
-          }`,
-        );
-      }
+  private async refuse(
+    turn: ChatTurn,
+    { organisationOnly = false }: { organisationOnly?: boolean } = {},
+  ): Promise<ChatbotDecision> {
+    const { settings } = turn;
+    const crisis = await this.keywordCrisisOnly(turn, 'REMOVED_FROM_LIST');
+    if (crisis) return { ...crisis, blocked: 'REMOVED_FROM_LIST' };
+    if (organisationOnly) {
+      return {
+        handledBy: WaHandledBy.UNIDENTIFIED,
+        body: this.settingsService.renderPlaceholders(
+          settings.unrecognisedNumberText,
+          settings,
+        ),
+      };
     }
     return {
       handledBy: WaHandledBy.UNIDENTIFIED,
-      body: this.settingsService.renderPlaceholders(
-        settings.unrecognisedNumberText,
-        settings,
-      ),
+      body: this.blockedText(turn, 'REMOVED_FROM_LIST'),
+      blocked: 'REMOVED_FROM_LIST',
     };
   }
 
@@ -787,17 +994,107 @@ export class ChatbotEngineService {
 
     const { response: answer } = answerResult.value;
     const decision = this.toDecision(
-      await this.withDeclineContact(
-        turn,
+      this.withNoAnswerReply(
+        await this.withDeclineContact(
+          turn,
+          answer,
+          crisisLevelOf(crisis) === 'upset' || mood === 'upset',
+        ),
         answer,
-        crisisLevelOf(crisis) === 'upset' || mood === 'upset',
       ),
       answer,
       ran,
       degradedAlert,
     );
     if (agent) decision.agent = agent;
-    return decision;
+    return this.withConflictCheck(turn, answer, decision);
+  }
+
+  /**
+   * Stage 5, the no-answer setting: when nothing was found (no passages, or none close enough)
+   * and the owner chose how to answer that (`settings.noAnswerMode`), the fixed reply for that
+   * choice, ending with the crisis information. Without a stored choice the owner's decline
+   * wording stays, as before.
+   */
+  private withNoAnswerReply(turn: ChatTurn, answer: EngineAnswer): ChatTurn {
+    const stored = (turn.chatbot.settings as Record<string, unknown> | null)
+      ?.noAnswerMode;
+    if (
+      !stored ||
+      answer.intent !== 'decline' ||
+      answer.answer?.trim() ||
+      (answer.decline_reason !== 'no_hits' &&
+        answer.decline_reason !== 'below_threshold')
+    ) {
+      return turn;
+    }
+    const mode = safetySettingsOf(turn.chatbot.settings as never).noAnswerMode;
+    return {
+      ...turn,
+      settings: {
+        ...turn.settings,
+        declineText: noAnswerReply(
+          mode,
+          replyLanguageOf(turn.text, turn.language),
+          { helplineNumbers: turn.chatbot.settings?.helplineNumbers ?? null },
+        ),
+      },
+    };
+  }
+
+  /**
+   * Stage 5, conflict handling at answer time: an answer grounded in passages from two documents
+   * that give different phone numbers, emails or amounts is replaced by the fixed "not sure"
+   * reply, and the owner is asked to fix the sources (the channel records `conflict`). The free
+   * heuristic only: no model call. A lookup failure leaves the answer as it was.
+   */
+  private async withConflictCheck(
+    turn: ChatTurn,
+    answer: EngineAnswer,
+    decision: ChatbotDecision,
+  ): Promise<ChatbotDecision> {
+    if (!this.answerConflict || answer.intent !== 'answer') return decision;
+    const cited = (answer.citations ?? []).filter(
+      (c) => c.chunk_id && c.document_id && !c.record_id,
+    );
+    if (new Set(cited.map((c) => c.document_id)).size < 2) return decision;
+    try {
+      const rows = (await this.documentRepository.manager.query(
+        `SELECT id::text AS id, document_id::text AS document_id, text FROM kb_document_chunks WHERE id::text = ANY($1::text[])`,
+        [cited.map((c) => c.chunk_id)],
+      )) as { id: string; document_id: string; text: string }[];
+      const byId = new Map(rows.map((r) => [r.id, r]));
+      const passages: ConflictPassage[] = cited.flatMap((c) => {
+        const row = byId.get(c.chunk_id);
+        return row
+          ? [
+              {
+                documentId: row.document_id,
+                text: row.text,
+                title: c.document_title,
+              },
+            ]
+          : [];
+      });
+      const result = await this.answerConflict.detect(turn.text, passages);
+      if (!result.conflict) return decision;
+      return {
+        ...decision,
+        handledBy: WaHandledBy.DECLINED,
+        body: CONFLICT_NOT_SURE_COPY[replyLanguageOf(turn.text, turn.language)],
+        conflict: result,
+        unanswered: {
+          reason: WaUnansweredReason.CONFLICT,
+          topSimilarity: answer.retrieval?.top_similarity ?? null,
+          hitCount: answer.retrieval?.hit_count ?? 0,
+        },
+      };
+    } catch (error) {
+      this.logger.warn(
+        `Conflict check skipped: ${error instanceof Error ? error.message : 'unknown error'}`,
+      );
+      return decision;
+    }
   }
 
   /**
@@ -872,8 +1169,10 @@ export class ChatbotEngineService {
             ),
             selfHarm: Boolean(crisis.self_harm),
             animal: aboutAnAnimal(turn.text),
+            helplineNumbers: turn.settings.helplineNumbers,
           })
         : crisisTextFor(turn),
+      crisis: { level: emergency ? 2 : 1, path: 'classifier' },
       retrievalMeta: { ...ran },
       alert: this.alert(
         200,

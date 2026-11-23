@@ -13,7 +13,11 @@ import { ButtonVariant } from "@components/types";
 
 import { channelLabel, fill, INBOX } from "./copy";
 import { MemoryPanel } from "./MemoryPanel";
+import { useAgreementGate } from "../AssistantHome/agreement/context";
+import { PEOPLE } from "../AssistantHome/copy/people";
+import { useReadOnly } from "../AssistantHome/readOnly";
 import { CheckupCaseEditor } from "../AssistantHome/sections/CheckupCaseEditor";
+import { needsAgreement } from "../AssistantHome/teamErrors";
 import { Sheet } from "../AssistantHome/ui/Sheet";
 
 const errorText = (error: unknown): string =>
@@ -81,9 +85,15 @@ export const ChatView: React.FC<{
   canAddToCheckup?: boolean;
   /** Opens another chat of this person's, for a memory line that came from it (chunk 8a). */
   onOpenConversation?: (conversationId: string) => void;
-}> = ({ chatbotId, id, me, canAddToCheckup = false, onOpenConversation }) => {
-  const { data: thread, isLoading } = useGetInboxThreadQuery({ chatbotId, id });
+  /** Read-only (Ally staff): the thread answered 403, the owner's grant has ended. */
+  onForbidden?: () => void;
+}> = ({ chatbotId, id, me, canAddToCheckup: canAdd = false, onOpenConversation, onForbidden }) => {
+  // Ally staff's read-only view: read the chat and memory, never act on them.
+  const readOnly = useReadOnly();
+  const canAddToCheckup = canAdd && !readOnly;
+  const { data: thread, isLoading, error: threadError } = useGetInboxThreadQuery({ chatbotId, id });
   const [takeOver, taking] = useTakeOverMutation();
+  const agreement = useAgreementGate();
   const [handBack, handing] = useHandBackMutation();
   const [reply, replying] = useReplyInInboxMutation();
   const [text, setText] = useState("");
@@ -101,6 +111,10 @@ export const ChatView: React.FC<{
     end.current?.scrollIntoView?.({ block: "end" });
   }, [thread?.messages.length]);
   useEffect(() => setError(null), [id]);
+  useEffect(() => {
+    const status = (threadError as { status?: unknown } | undefined)?.status;
+    if (readOnly && status === 403) onForbidden?.();
+  }, [readOnly, threadError, onForbidden]);
 
   if (isLoading || !thread) return <div className="ally-inbox__chat" aria-busy="true" />;
 
@@ -114,7 +128,13 @@ export const ChatView: React.FC<{
       await action();
       return true;
     } catch (failure) {
-      setError(errorText(failure));
+      // Stage 1b: refused until the responder agreement is accepted: show it.
+      if (needsAgreement(failure)) {
+        agreement.require();
+        setError(PEOPLE.agreement.required);
+      } else {
+        setError(errorText(failure));
+      }
       return false;
     }
   };
@@ -147,8 +167,8 @@ export const ChatView: React.FC<{
       <header className="ally-inbox__chat-head">
         <div className="ally-inbox__chat-name">
           <h2 className="ally-heading">{thread.visitor}</h2>
-          {/* On the name's line, right-aligned (chunk 20d-2). */}
-          {!thread.heldBy ? (
+          {/* On the name's line, right-aligned (chunk 20d-2). Never in the read-only view. */}
+          {readOnly ? null : !thread.heldBy ? (
             <Button
               variant={ButtonVariant.TERTIARY}
               size="sm"
@@ -303,7 +323,7 @@ export const ChatView: React.FC<{
         </p>
       )}
 
-      {mine && (
+      {mine && !readOnly && (
         <form
           className="ally-inbox__reply"
           onSubmit={async event => {

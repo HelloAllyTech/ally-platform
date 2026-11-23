@@ -1105,9 +1105,30 @@ export class AppConfigService {
     } catch {
       // Joi checked it is a URI; keep the raw value if URL still disagrees.
     }
+    // Stage 7: the page's address is `<chatUrl>/<publicId>`. `BOT_PAGE_CHAT_URL` sets it (e.g.
+    // https://app.helloally.ai/chat once the proxy routes /chat/* to the page); it defaults to
+    // `<baseUrl>/chat`, which the admin app serves today. `BOT_PAGE_DOMAIN_TARGET` is the host an
+    // owner's custom domain points its CNAME at (default: the page's own host).
+    const chatUrl = (
+      this.configService.get<string>('BOT_PAGE_CHAT_URL') || `${baseUrl}/chat`
+    ).replace(/\/+$/, '');
+    let ownHost = '';
+    try {
+      ownHost = new URL(baseUrl).hostname;
+    } catch {
+      ownHost = '';
+    }
+    const domainTarget = (
+      this.configService.get<string>('BOT_PAGE_DOMAIN_TARGET') || ownHost
+    )
+      .trim()
+      .toLowerCase()
+      .replace(/\.$/, '');
     return {
       baseUrl,
       origin,
+      chatUrl,
+      domainTarget,
       turnstileSiteKey: this.configService.get<string>(
         'TURNSTILE_SITE_KEY',
         '',

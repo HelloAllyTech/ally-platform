@@ -138,7 +138,6 @@ export class CheckupCasesService {
         createdBy: Number(ExecutionManager.getUserId() ?? 0) || null,
       }),
     );
-    this.checkup.scheduleAfterChange(chatbotId);
     return this.view(saved);
   }
 
@@ -152,7 +151,6 @@ export class CheckupCasesService {
     this.fresh(item, edit.version);
     const changes = locked(() => applyEdit(item, edit));
     const saved = await this.cases.save({ ...item, ...changes });
-    this.checkup.scheduleAfterChange(chatbotId);
     return this.view(saved, (await this.historyOf([saved.id])).get(saved.id));
   }
 

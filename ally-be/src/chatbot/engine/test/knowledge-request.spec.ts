@@ -42,11 +42,13 @@ describe('buildKnowledgeRequest', () => {
       persona: { displayName: ' Ally ', systemPrompt: '   ', tone: 'warm' },
     } as Partial<Chatbot>);
     const body = buildKnowledgeRequest(turn({ chatbot }), {}, KNOWLEDGE);
-    expect(body.persona).toEqual({
+    expect(body.persona).toMatchObject({
       display_name: 'Ally',
       system_prompt: undefined,
       tone: 'warm',
     });
+    // Stage 4: the base safety block always rides along.
+    expect(body.persona?.safety_rules).toMatch(/^<safety_rules fixed="true">/);
   });
 
   it('sends the purpose, and the note only as written (chunk 20a-2)', () => {
@@ -75,12 +77,16 @@ describe('buildKnowledgeRequest', () => {
     expect(purposePromptCodes('anything')).toEqual([]);
   });
 
-  it('sends no persona at all when every part is blank', () => {
+  it('sends only the base safety block when every other part is blank (stage 4)', () => {
     const chatbot = chatbotFixture({
       persona: { displayName: ' ' },
     } as Partial<Chatbot>);
     const body = buildKnowledgeRequest(turn({ chatbot }), {}, KNOWLEDGE);
-    expect(body.persona).toBeUndefined();
+    expect(body.persona?.display_name).toBeUndefined();
+    expect(body.persona?.system_prompt).toBeUndefined();
+    expect(body.persona?.safety_rules).toContain(
+      'Never say or suggest that you are a human',
+    );
   });
 });
 

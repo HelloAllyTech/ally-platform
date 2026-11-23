@@ -115,6 +115,27 @@ const HOME_FIELDS = {
   facts: [],
 };
 
+/** What the draft's test route answers in the harness; the stream is refused so this is used. */
+export const DRAFT_TEST_REPLY = {
+  reply: "A first consultation is 1,500 rupees and lasts 50 minutes.",
+  handledBy: "rag",
+  citations: [
+    { passage_number: 1, document_title: "Fees", page_from: 1, section_path: "Consultations" },
+  ],
+  retrieval: null,
+  language: "en",
+  wouldFileUnanswered: null,
+  wouldAlert: null,
+  latencyMs: 1800,
+  usedDraft: true,
+  runtime: "agent",
+  runId: null,
+  trace: null,
+  fallbackReason: null,
+  conversationId: "preview-dev",
+  preview: { pendingDocuments: 0 },
+};
+
 export async function mockOnboardingApi(page: Page): Promise<void> {
   await page.route("**/api/v1/**", async route => {
     const path = new URL(route.request().url()).pathname.replace(/^.*\/api\/v1/, "");
@@ -124,6 +145,13 @@ export async function mockOnboardingApi(page: Page): Promise<void> {
     }
     if (path === "/chatbots/dev-bot/checkup/runs/run-1") return json(route, CHECKUP_RUN);
     if (/^\/bot-drafts\/[^/]+\/pages\/found$/.test(path)) return json(route, FOUND);
+    // Split build: the draft's assistant answering (non-streamed, so the harness needs no SSE).
+    if (/^\/bot-drafts\/[^/]+\/test\/stream$/.test(path) && method === "POST") {
+      return json(route, { message: "stream not mocked" }, 404);
+    }
+    if (/^\/bot-drafts\/[^/]+\/test$/.test(path) && method === "POST") {
+      return json(route, DRAFT_TEST_REPLY);
+    }
     if (path === "/chatbots/dev-bot/home") return json(route, HOME_FIELDS);
     return json(route, { message: "not mocked" }, 404);
   });

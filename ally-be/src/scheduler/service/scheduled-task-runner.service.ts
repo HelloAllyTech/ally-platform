@@ -16,6 +16,13 @@ export class ScheduledTaskRunnerService {
 
   constructor(private readonly dataSource: DataSource) {}
 
+  // Every minute, for the safety alert outbox and the "no one is available" timer (D12). Same
+  // advisory-lock path as the rest, so only one replica runs a tick.
+  @Cron(`0 * * * * *`)
+  async runOneMinuteTasks(): Promise<void> {
+    await this.runTasksForInterval('1min');
+  }
+
   @Cron(`0 */5 * * * *`)
   async runFiveMinuteTasks(): Promise<void> {
     await this.runTasksForInterval('5min');

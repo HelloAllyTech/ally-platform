@@ -92,36 +92,65 @@ export class DraftCheckupService {
   async generate(draft: BotDraftEntity): Promise<void> {
     const facts = askableFacts(draft.learned?.facts ?? []);
     const state = conversation(draft);
-    let written: { question: string; fact_ids: string[] }[] = [];
-    if (facts.length) {
-      try {
-        const prompts = await this.prompts();
-        const out = await this.ai.writeCheckupQuestions({
-          business: draft.draftConfig.name,
-          audience: audienceOf(state.values),
-          language: draft.draftConfig.languages[0] ?? 'en',
-          count: ANSWER_QUESTIONS,
-          facts: facts.map((f) => ({
-            id: f.id,
-            section: f.section,
-            text: f.correction?.text ?? f.text,
-          })),
-          ...(prompts ? { prompts } : {}),
-        });
-        written = out.questions;
-      } catch (error) {
-        // The platform's and the pack's questions still run; the owner sees fewer.
-        this.logger.warn(
-          `Checkup questions for draft ${draft.id} couldn't be written: ${error instanceof Error ? error.name : 'error'}`,
-        );
-      }
-    }
+    const written = await this.writeAnswerQuestions(
+      draft,
+      facts,
+      ANSWER_QUESTIONS,
+    );
     await this.checkup.generate(draft.chatbotId!, [
       ...answerCases(written, facts, draft.crawl?.pages ?? []),
       ...gapCases(state.gaps, state.values),
       ...outOfScopeCases(),
       ...safetyCases(packFor(draft.draftConfig.safetyPackId)),
     ]);
+  }
+
+  /**
+   * The answer questions ally-ai writes from what we learned. A failure is logged and reads as no
+   * questions (the platform's and the pack's still run). Writes nothing.
+   */
+  private async writeAnswerQuestions(
+    draft: BotDraftEntity,
+    facts: ReturnType<typeof askableFacts>,
+    count: number,
+  ): Promise<{ question: string; fact_ids: string[] }[]> {
+    if (!facts.length) return [];
+    const state = conversation(draft);
+    try {
+      const prompts = await this.prompts();
+      const out = await this.ai.writeCheckupQuestions({
+        business: draft.draftConfig.name,
+        audience: audienceOf(state.values),
+        language: draft.draftConfig.languages[0] ?? 'en',
+        count,
+        facts: facts.map((f) => ({
+          id: f.id,
+          section: f.section,
+          text: f.correction?.text ?? f.text,
+        })),
+        ...(prompts ? { prompts } : {}),
+      });
+      return out.questions;
+    } catch (error) {
+      this.logger.warn(
+        `Checkup questions for draft ${draft.id} couldn't be written: ${error instanceof Error ? error.name : 'error'}`,
+      );
+      return [];
+    }
+  }
+
+  /**
+   * "Run 10 likely questions" (SB1): questions written from what we learned, as the checkup
+   * writes them, returned and never saved (no checkup case, no run).
+   */
+  async likelyQuestions(draft: BotDraftEntity, count: number) {
+    const facts = askableFacts(draft.learned?.facts ?? []);
+    if (!facts.length) return [];
+    const written = await this.writeAnswerQuestions(draft, facts, count);
+    return answerCases(written, facts, draft.crawl?.pages ?? []).slice(
+      0,
+      count,
+    );
   }
 
   /** The Checkup section, with where it points people when it doesn't know and who asks. */
@@ -193,7 +222,6 @@ export class DraftCheckupService {
         tier: 'must_pass',
       }),
     );
-    this.checkup.scheduleAfterChange(chatbotId);
     return { ok: true as const };
   }
 
@@ -278,7 +306,6 @@ export class DraftCheckupService {
         }),
       );
     if (rows.length) await this.cases.save(rows);
-    this.checkup.scheduleAfterChange(chatbotId);
     return { added: rows.length };
   }
 

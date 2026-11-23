@@ -22,6 +22,8 @@ import { KbDocumentRepository } from './repository/kb-document.repository';
 import { KbRetrievalRepository } from './repository/kb-retrieval.repository';
 import { KbIngestService } from './service/kb-ingest.service';
 import { KnowledgeBaseService } from './service/knowledge-base.service';
+import { LlmAgentModule } from '../llm-agent/llm-agent.module';
+import { KnowledgeReviewService } from './privacy/knowledge-review.service';
 
 /**
  * The knowledge corpora — the WhatsApp Q&A bot's, and the character library's.
@@ -49,6 +51,8 @@ import { KnowledgeBaseService } from './service/knowledge-base.service';
     ]),
     AwsModule,
     AiModule,
+    // Stage 5: the personal-data names scan.
+    LlmAgentModule,
   ],
   controllers: [KnowledgeBaseController],
   providers: [
@@ -61,8 +65,16 @@ import { KnowledgeBaseService } from './service/knowledge-base.service';
     KnowledgeBaseService,
     KbIngestConsumer,
     KbIngestDlqConsumer,
+    KnowledgeReviewService,
   ],
   // KbIngestService: onboarding (chunk 20a) reads an upload's pages for "What we learned".
-  exports: [KnowledgeBaseService, KbDocumentChunkRepository, KbIngestService],
+  exports: [
+    KnowledgeBaseService,
+    KbDocumentChunkRepository,
+    KbIngestService,
+    // Stage 5: the owner's approve/exclude endpoints on a chatbot.
+    KnowledgeReviewService,
+    KbIngestProducer,
+  ],
 })
 export class KnowledgeBaseModule {}

@@ -101,6 +101,8 @@ export enum KbDocumentStatus {
   INDEXING = 'indexing',
   INDEXED = 'indexed',
   FAILED = 'failed',
+  /** Assistants stage 5: personal data found; indexing waits for the owner's approval. */
+  NEEDS_REVIEW = 'needs_review',
 }
 
 /**

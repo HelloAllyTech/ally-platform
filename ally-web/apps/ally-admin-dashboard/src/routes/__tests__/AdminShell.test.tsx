@@ -84,6 +84,7 @@ const renderShell = (path: string) =>
           <Route path="/assistants" element={<div>assistants</div>} />
           <Route path="/assistants/new" element={<div>new assistant</div>} />
           <Route path="/account/plan" element={<div>plan and usage</div>} />
+          <Route path="/account/credits" element={<div>plan and credits</div>} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>
@@ -224,6 +225,13 @@ describe("AdminShell", () => {
     it("can open Plan and usage, which has no other way in without the Sidebar", () => {
       renderShell("/account/plan");
       expect(screen.getByText("plan and usage")).toBeInTheDocument();
+      expect(screen.getByTestId("assistant-only-header")).toBeInTheDocument();
+    });
+
+    it("can open Credits, where the corner menu's Plan and credits leads", () => {
+      renderShell("/account/credits");
+      expect(screen.getByText("plan and credits")).toBeInTheDocument();
+      expect(screen.queryByText("assistants")).not.toBeInTheDocument();
       expect(screen.getByTestId("assistant-only-header")).toBeInTheDocument();
     });
 

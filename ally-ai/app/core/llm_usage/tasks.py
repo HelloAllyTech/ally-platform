@@ -89,6 +89,8 @@ class LLMTask(str, Enum):
     # Memory, light (chunk 8a): after the reply, never while someone waits. The
     # check runs only for health packs; the summary once a chat passes 10 messages.
     CHATBOT_MEMORY_CHECK = "chatbot_memory_check"
+    # Customer setup spend: the model judge on owner text at Apply.
+    APPLY_SAFETY_JUDGE = "apply_safety_judge"
     CHATBOT_CONVERSATION_SUMMARY = "chatbot_conversation_summary"
     # Text helpline copilot. Two labels because they differ in volume and shape: the
     # risk classifier runs on every talker message with a tiny output, the turn call

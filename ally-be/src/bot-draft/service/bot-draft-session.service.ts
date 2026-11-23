@@ -1,11 +1,13 @@
 import { LimitsService } from 'src/billing/service/limits.service';
+import { usageContext } from 'src/billing/context/usage-context';
+import { UsageChannel, UsageKind } from 'src/billing/enum/billing.enum';
 import {
   BadRequestException,
   ConflictException,
   Injectable,
   Optional,
 } from '@nestjs/common';
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import type {
   BuilderDesignCard,
   BuilderGap,
@@ -16,7 +18,13 @@ import { AiService } from '../../ai/service/ai.service';
 import { KbIngestService } from '../../knowledge-base/service/kb-ingest.service';
 import { LoggerService } from '../../logger/logger.service';
 import { ONBOARDING_COPY, fill } from '../copy/onboarding-copy';
-import type { CrawlLearner, LearnablePage } from '../crawl/site-crawl.service';
+import {
+  pausedReasonOf,
+  type CrawlLearner,
+  type LearnOutcome,
+  type LearnablePage,
+} from '../crawl/site-crawl.service';
+import { creditPauseKind } from '../../billing/util/credit-pause';
 import { BotDraftEntity } from '../entity/bot-draft.entity';
 import {
   BotDraftActor,
@@ -39,6 +47,7 @@ import type {
   TranscriptEntry,
 } from '../type/bot-draft.type';
 import { BotDraftEventsService } from './bot-draft-events.service';
+import { starterOps } from './starter-bot';
 import {
   BotDraftService,
   DraftPatchRefused,
@@ -81,6 +90,9 @@ export interface TurnResult {
   draft: BotDraftEntity;
 }
 
+/** The paused-job kind for site reading (stage 6, `credit_paused_jobs.kind`). */
+export const SITE_READING_JOB = 'site_reading';
+
 /**
  * The builder conversation (chunk 20a): sends one owner message to ally-ai's builder, relays its
  * live events, and applies what it proposes through `BotDraftService` — which checks every patch
@@ -102,7 +114,22 @@ export class BotDraftSessionService implements CrawlLearner {
     private readonly documents: KbIngestService,
     // CR1: owner-side runs and tokens (optional, so existing specs build without it).
     @Optional() private readonly limits?: LimitsService,
-  ) {}
+  ) {
+    // Stage 6: a site-reading batch paused at $0 is read when the builder has credits again.
+    this.limits?.onResume(SITE_READING_JOB, async (job) => {
+      const pages = (job.payload.pages ?? []) as LearnablePage[];
+      if (!pages.length) return;
+      const outcome = await this.learnFrom(job.subjectId, pages);
+      // Read at last: the paused state goes, unless the crawl is still writing.
+      if (!pausedReasonOf(outcome)) {
+        await this.drafts.clearCrawlPause(job.subjectId).catch(() => undefined);
+      }
+    });
+    // A finished crawl still marked paused with no batch left to resume: the marker is stale.
+    this.limits?.onSweep('paused-crawls', () =>
+      this.drafts.clearStaleCrawlPauses(SITE_READING_JOB),
+    );
+  }
 
   // ── the conversation ──────────────────────────────────────────────────
 
@@ -386,32 +413,64 @@ export class BotDraftSessionService implements CrawlLearner {
   // ── the crawl's learner ───────────────────────────────────────────────
 
   /** Facts from a batch of pages, into "What we learned", each sourced to its page. */
-  async learnFrom(draftId: string, pages: LearnablePage[]): Promise<void> {
+  async learnFrom(
+    draftId: string,
+    pages: LearnablePage[],
+  ): Promise<LearnOutcome> {
     if (!pages.length) return;
+    // SB1: the greeting needs no model, so the starter assistant greets as soon as the first pages
+    // are in, not after their facts are extracted. The facts add the question chips afterwards.
+    await this.starterBot(draftId);
     const draft = await this.fresh(draftId);
     // CR1: reading a site is one owner-side run a day per draft, however many batches it takes.
-    // At the limit the pages are skipped (the reader is in the background; nothing to refuse to).
-    try {
-      await this.limits?.assertOwnerRun(
-        draft.ownerUserId,
-        `site_reading:${draftId}:${new Date().toISOString().slice(0, 10)}`,
-        'site_reading',
-      );
-    } catch {
-      return;
+    // Stage 6: paid from the builder's free balance; at $0 the batch is PAUSED (kept, and resumed
+    // by the ledger once credits exist), never dropped. With credits off, CR1's count as before.
+    const gate = this.limits
+      ? await this.limits.backgroundGate({
+          kind: SITE_READING_JOB,
+          subjectId: draftId,
+          creatorUserId: draft.ownerUserId,
+          chatbotId: draft.chatbotId ?? null,
+          draftId,
+          runKey: `site_reading:${draftId}:${new Date().toISOString().slice(0, 10)}`,
+          ownerRunKind: 'site_reading',
+          payload: { pages },
+        })
+      : null;
+    if (gate && !gate.ok) {
+      return gate.paused
+        ? `paused:${creditPauseKind(gate.reason === 'plan_limit' ? null : gate.reason)}`
+        : undefined;
     }
-    const result = await this.ai.extractOnboardingFacts({
-      draft_id: draftId,
-      pages: pages.map((page) => ({
-        url: page.url,
-        title: (page.title ?? '').slice(0, 300),
-        text: page.text.slice(0, 12_000),
-      })),
-      known: draft.learned.facts
-        .slice(-KNOWN_FACTS)
-        .map((fact) => fact.text.slice(0, 500)),
-      prompts: await this.promptMap(),
-    });
+    const batchKey = createHash('sha1')
+      .update(pages.map((page) => page.url).join('\n'))
+      .digest('hex')
+      .slice(0, 16);
+    // Attributed to the paying account, even in the background (no request is open here).
+    const result = await usageContext.run(
+      {
+        runId: `site_reading:${draftId}:${batchKey}`,
+        channel: UsageChannel.OWNER,
+        runKind: UsageKind.SITE_READING,
+        draftId,
+        chatbotId: draft.chatbotId ?? null,
+        creatorUserId: draft.ownerUserId,
+        payerAccountId: gate && gate.ok ? gate.accountId : null,
+      },
+      async () =>
+        this.ai.extractOnboardingFacts({
+          draft_id: draftId,
+          pages: pages.map((page) => ({
+            url: page.url,
+            title: (page.title ?? '').slice(0, 300),
+            text: page.text.slice(0, 12_000),
+          })),
+          known: draft.learned.facts
+            .slice(-KNOWN_FACTS)
+            .map((fact) => fact.text.slice(0, 500)),
+          prompts: await this.promptMap(),
+        }),
+    );
     // The builder may only cite a page we read; ally-ai checks, and so do we.
     const urls = new Set(pages.map((page) => page.url));
     // A description the owner wrote is read like a page, and its details are theirs.
@@ -460,6 +519,7 @@ export class BotDraftSessionService implements CrawlLearner {
     });
     if (result.business_name)
       await this.nameFromSource(draftId, result.business_name);
+    await this.starterBot(draftId);
     // Running totals over everything learned so far, not this batch's own counts.
     for (const text of findingLines(
       (await this.fresh(draftId)).learned.facts,
@@ -585,6 +645,28 @@ export class BotDraftSessionService implements CrawlLearner {
    * started with ("Thelivelovelaughfoundation", "Your business"). Once only, and never over a
    * name the owner chose.
    */
+  /**
+   * SB1: once something is learned, the assistant greets by name and offers questions it can
+   * answer, so the owner can chat while the rest is still being read. Fills only what is empty.
+   * Never fails the learning it follows.
+   */
+  private async starterBot(draftId: string): Promise<void> {
+    try {
+      await this.withRetry(draftId, async (draft) => {
+        const ops = starterOps(draft.draftConfig, draft.learned.facts);
+        if (!ops.length) return;
+        await this.drafts.applyPatch(draft, ops, BotDraftActor.BUILDER, {
+          target: 'draft',
+          summary: 'Starter assistant',
+        });
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Starter assistant not set for draft ${draftId}: ${error instanceof Error ? error.message : 'unknown'}`,
+      );
+    }
+  }
+
   private async nameFromSource(draftId: string, name: string): Promise<void> {
     const clean = name.trim().slice(0, 120);
     await this.withRetry(draftId, async (draft) => {

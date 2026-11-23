@@ -13,6 +13,8 @@ import type {
 import type { WhatsAppBotSettings } from '../../whatsapp/type/whatsapp-settings.type';
 import type { Chatbot } from '../entity/chatbot.entity';
 import type { AgentRuntimeUsed } from '../enum/chatbot.enum';
+import type { BlockedState } from './blocked-notice';
+import type { ConflictResult } from '../knowledge/answer-conflict.service';
 
 /**
  * Who sent a message, as far as the channel can tell. Every field but `externalId` is optional:
@@ -151,7 +153,21 @@ export interface ChatbotDecision {
     | 'no_seat'
     | 'seat_messages'
     | 'owner_cap'
-    | 'owner_runs';
+    | 'owner_runs'
+    | 'out_of_credits'
+    | 'owner_credits';
+  /**
+   * Stage 6: the turn was blocked (`OUT_OF_CREDITS` or `REMOVED_FROM_LIST`) and got the fixed
+   * notification, or, on a crisis keyword, the crisis reply. A channel sends the fixed
+   * notification at most once per 24 hours per number per chatbot; a crisis reply always goes out.
+   */
+  blocked?: BlockedState;
+  /**
+   * Stage 4: the chatbot is archived or paused, so `body` is its off message with the crisis
+   * information (or, on a crisis keyword, the crisis reply). Sent at most once per 24 hours per
+   * number on WhatsApp, like a blocked notification.
+   */
+  off?: 'archived' | 'paused';
   templateId?: string;
   /**
    * The body greets the person rather than answering a question: the bot's welcome message (it
@@ -170,6 +186,12 @@ export interface ChatbotDecision {
     topSimilarity: number | null;
     hitCount: number;
   };
+  /**
+   * Stage 4: set on every crisis decision by the engine (`handledBy` CRISIS): 1 at risk, 2 a
+   * medical emergency, and which layer decided (keyword templates, the classifier, or a hand-over).
+   * The crisis flag service reads it as is (`chatbot/safety/crisis-flag.ts`).
+   */
+  crisis?: { level: 1 | 2; path: 'keyword' | 'classifier' | 'handover' };
   /** A human should hear about this (crisis, degraded safety net). */
   alert?: NotificationErrorType;
   /**
@@ -187,4 +209,15 @@ export interface ChatbotDecision {
    * `hand_over` tool (`assistant`, chunk 3b): the body tells them the team has been asked.
    */
   handover?: 'asked' | 'assistant';
+  /**
+   * Stage 5: two sources gave different facts, so `body` is the fixed "not sure" reply. The
+   * channel stores it as an owner question (`AnswerConflictService.recordConflict`).
+   */
+  conflict?: ConflictResult;
+  /**
+   * Stage 6: the account (and end person) the credits gate stamped on this run. The channel
+   * passes it to the work it does after the reply (memory, summary), so those calls name the same
+   * payer. Absent when credits are off or nothing was reserved.
+   */
+  payer?: { accountId: string; endPersonId: string | null };
 }

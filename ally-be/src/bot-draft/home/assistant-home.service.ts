@@ -1,3 +1,5 @@
+import { knowledgeStalenessOf } from '../../chatbot/knowledge/knowledge-freshness.service';
+import { GoLiveGateService } from '../../chatbot/safety/go-live-gate.service';
 import {
   BadRequestException,
   ConflictException,
@@ -89,6 +91,8 @@ export class AssistantHomeService {
     private readonly settings?: ChatbotSettingsService,
     // Q3-fast Part 2b: How it works names each list's playbook.
     @Optional() private readonly listToolsService?: ListToolsService,
+    // Stage 4: the go-live gate on the page toggle (D10). Optional for the specs.
+    @Optional() private readonly goLive?: GoLiveGateService,
   ) {}
 
   private readonly logger = LoggerService.getInstance(
@@ -97,10 +101,15 @@ export class AssistantHomeService {
 
   async get(chatbotId: string) {
     const { chatbot, role } = await this.access.assert(chatbotId);
-    const [state, draft, atRiskReply] = await Promise.all([
+    const [state, draft, atRiskReply, staleness] = await Promise.all([
       this.state(chatbot),
       this.drafts.findByChatbot(chatbotId),
       this.atRiskReply(chatbot),
+      // Stage 5: days since the oldest source was read, and the nudge past 30.
+      knowledgeStalenessOf(this.dataSource, chatbotId).catch(() => ({
+        knowledgeStaleDays: null,
+        knowledgeStaleNudge: false,
+      })),
     ]);
     const facts = (draft?.learned.facts ?? []).map((fact) => ({
       ...fact,
@@ -119,6 +128,7 @@ export class AssistantHomeService {
         atRiskReply,
       },
       facts,
+      ...staleness,
     };
   }
 
@@ -129,7 +139,14 @@ export class AssistantHomeService {
   async saveField(
     chatbotId: string,
     dto: { field: string; value: unknown; version: string },
-    options: { record?: boolean } = {},
+    options: {
+      record?: boolean;
+      /**
+       * Stage 3 Apply: the staged change already passed the Apply safety check (which fails
+       * closed), so the instruction check is not run, and paid for, a second time.
+       */
+      checked?: boolean;
+    } = {},
   ) {
     const field = homeField(dto.field);
     if (!field) {
@@ -140,8 +157,14 @@ export class AssistantHomeService {
     }
     await this.access.assert(chatbotId, ChatbotMemberRole.EDITOR);
     const value = refusals(dto.field, () => field.parse(dto.value));
+    // Stage 4: turning the page on makes the assistant live, so it passes the go-live gate first.
+    if (dto.field === 'pageStatus' && value === BotPageStatus.ON) {
+      await this.goLive?.assertCanGoLive(chatbotId);
+    }
     const warning =
-      dto.field === 'instructions' ? await this.checkInstructions(value) : null;
+      dto.field === 'instructions' && !options.checked
+        ? await this.checkInstructions(value)
+        : null;
 
     let before: unknown;
     const saved = await this.dataSource.transaction(async (manager) => {
@@ -190,8 +213,8 @@ export class AssistantHomeService {
    */
   /**
    * The reply someone who may be at risk gets when the owner hasn't written their own, exactly as
-   * the engine sends it (`crisisReply`): the real numbers (112, Tele-MANAS) and this bot's
-   * helplines. Q3-fast (gaps item 10): it showed the platform's old template, "your local crisis
+   * the engine sends it (`crisisReply`): this bot's own helpline numbers first, then the
+   * findahelpline.com link (R6, stage 4). Q3-fast (gaps item 10): it showed the platform's old template, "your local crisis
    * line", while customers got the numbers.
    */
   private async atRiskReply(chatbot: Chatbot): Promise<string | null> {

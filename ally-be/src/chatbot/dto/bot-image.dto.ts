@@ -1,24 +1,17 @@
 import { ApiPropertyOptional, ApiProperty } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
   IsEnum,
-  IsIn,
-  IsObject,
   IsOptional,
   IsString,
   IsUUID,
   Matches,
   MaxLength,
-  ValidateNested,
 } from 'class-validator';
 import { BotImageKind } from '../entity/bot-image.entity';
 import {
-  BRAND_THEMES,
-  BrandTheme,
-  HEADING_STYLES,
-  HeadingStyle,
+  BOT_PAGE_BOUNDS,
   HEX_COLOUR,
   MAX_GALLERY_IMAGES,
 } from '../type/bot-page.type';
@@ -59,8 +52,22 @@ export class BotPageLandingImagesDto {
 }
 
 /**
- * A change to the page's look (chunk 20d): only the fields sent change. Image fields are
- * `bot_images` ids of this bot (null removes). `accentContrast` is computed, never accepted.
+ * Look fields retired in stage 7. Stored values stay (inert); a request that sends any of them is
+ * refused (400 `look_field_retired`), so a stale client can't silently think it changed them.
+ */
+export const RETIRED_BRAND_FIELDS = [
+  'headingStyle',
+  'theme',
+  'coverImage',
+  'shareImage',
+  'landingImages',
+  'peoplePhotos',
+] as const;
+
+/**
+ * A change to the page's look: only the fields sent change. Since stage 7 the look is the name
+ * (the assistant's name field), the logo, one accent colour and a short welcome line. `logo` is a
+ * `bot_images` id of this bot (null removes). `accentContrast` is computed, never accepted.
  */
 export class UpdateBotPageBrandDto {
   @ApiPropertyOptional({ nullable: true })
@@ -73,34 +80,9 @@ export class UpdateBotPageBrandDto {
   @Matches(HEX_COLOUR, { message: 'The colour must look like #264D8E' })
   accent?: string | null;
 
-  @ApiPropertyOptional({ enum: HEADING_STYLES })
+  @ApiPropertyOptional({ description: 'One short welcome line (stage 7)' })
   @IsOptional()
-  @IsIn(HEADING_STYLES as unknown as string[])
-  headingStyle?: HeadingStyle;
-
-  @ApiPropertyOptional({ enum: BRAND_THEMES })
-  @IsOptional()
-  @IsIn(BRAND_THEMES as unknown as string[])
-  theme?: BrandTheme;
-
-  @ApiPropertyOptional({ nullable: true })
-  @IsOptional()
-  @IsUUID()
-  coverImage?: string | null;
-
-  @ApiPropertyOptional({ nullable: true })
-  @IsOptional()
-  @IsUUID()
-  shareImage?: string | null;
-
-  @ApiPropertyOptional({ type: BotPageLandingImagesDto })
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => BotPageLandingImagesDto)
-  landingImages?: BotPageLandingImagesDto;
-
-  @ApiPropertyOptional({ description: "A team member's name → image id" })
-  @IsOptional()
-  @IsObject()
-  peoplePhotos?: Record<string, string>;
+  @IsString()
+  @MaxLength(BOT_PAGE_BOUNDS.maxWelcomeChars)
+  welcome?: string;
 }

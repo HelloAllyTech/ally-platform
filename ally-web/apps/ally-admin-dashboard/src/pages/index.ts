@@ -52,6 +52,7 @@ export * from "./Terms/Terms";
 export * from "./Privacy/Privacy";
 export * from "./ProductRoadmap";
 export * from "./Roadmap";
+export * from "./BuilderHome";
 export * from "./WhatsAppBot";
 // NOTE: Analytics is intentionally NOT re-exported here. It pulls in IBM Carbon
 // + Carbon Charts (+ d3) and its own scoped stylesheet; keeping it out of this

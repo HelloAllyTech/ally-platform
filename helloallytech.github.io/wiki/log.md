@@ -9,6 +9,8 @@ summary: A chronological log tracking all wiki updates and modifications.
 This is an append-only log of modifications, updates, and indexing runs performed on the wiki. All logs use the parseable prefix format: `## [YYYY-MM-DD] action | description`.
 
 
+## [2026-11-23] create | `platform/assistants-build.md`, `assistants-credits-and-access.md`, `assistants-safety-and-data.md`: the Assistants build (stages 1 to 10), uncommitted on feat/agents-v2-sb1; concepts card updated.
+
 ## [2026-11-20] create | `contributing/dead-code.md`: dead-code scan, baseline ratchet and weekly report (`scripts/dead_code.py`).
 
 ## [2026-11-20] update | Dead code now feeds the PM Agent: weekly module report → `pm_agent_signals` (`dead_code`) → `code_health` lane card → roadmap ticket on accept.

@@ -9,6 +9,8 @@ Postgres, a stored checkpoint too) to what /knowledge-agent/answer returns. /run
 /run/stream share one runner (agent_runtime/runner.py).
 """
 
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from langgraph.graph.state import CompiledStateGraph
@@ -17,6 +19,7 @@ from app.api.v1.endpoints.knowledge_agent import knowledge_errors
 from app.core.agent_runtime.graph import get_agent_graph
 from app.core.agent_runtime.instructions import check_owner_text
 from app.core.agent_runtime.instructions import describe as describe_instructions
+from app.core.agent_runtime.instructions_judge import judge_owner_text
 from app.core.agent_runtime.runner import execute, stream
 from app.core.config import settings
 from app.core.dependencies import get_knowledge_agent_service
@@ -32,6 +35,8 @@ from app.schemas.agent_runtime import (
     MemoryCheckResponse,
     OwnerTextCheckRequest,
     OwnerTextCheckResponse,
+    OwnerTextJudgeRequest,
+    OwnerTextJudgeResponse,
 )
 from app.utils.logger import get_logger
 
@@ -112,6 +117,26 @@ async def instructions(payload: AgentRunRequest):
 async def check_instructions(payload: OwnerTextCheckRequest):
     """The builder's safety check on text an owner typed into their instructions."""
     return check_owner_text(payload.text)
+
+
+@builder_router.post(
+    "/instructions/judge",
+    response_model=OwnerTextJudgeResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["agent_runtime"],
+)
+async def judge_instructions(payload: OwnerTextJudgeRequest) -> OwnerTextJudgeResponse:
+    """The model judge on owner text at Apply. Always 200: on any failure or timeout
+    `failed` and `conflict` are both true, so ally-be fails closed."""
+    try:
+        verdict = await asyncio.wait_for(
+            judge_owner_text(payload.text, payload.rules, prompts=payload.prompts),
+            timeout=settings.AGENT_RUNTIME.MEMORY_CALL_TIMEOUT_SECONDS * 2 + 2,
+        )
+        return OwnerTextJudgeResponse(**verdict)
+    except Exception:
+        logger.exception("Instructions judge failed; refusing the text")
+        return OwnerTextJudgeResponse(conflict=True, failed=True)
 
 
 @router.post("/run/stream", tags=["agent_runtime"])

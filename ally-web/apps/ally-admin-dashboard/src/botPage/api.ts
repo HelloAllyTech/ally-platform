@@ -12,7 +12,12 @@ import type {
   VisitorEvent,
 } from "./types";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
+let API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? "";
+
+/** Stage 7: on a custom domain the API is proxied on the page's own origin. */
+export function setApiBase(origin: string): void {
+  API_BASE_URL = origin.replace(/\/+$/, "");
+}
 
 /** A refusal or failure the page explains in its own words. */
 export class BotPageApiError extends Error {

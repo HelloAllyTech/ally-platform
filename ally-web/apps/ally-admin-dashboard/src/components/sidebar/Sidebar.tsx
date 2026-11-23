@@ -35,7 +35,7 @@ import {
   Terminal,
   Tools,
 } from "@icons";
-import { Compass, LayoutTemplate, LibraryBig, TrendingUp } from "lucide-react";
+import { Compass, LayoutTemplate, LibraryBig, ShieldCheck, TrendingUp } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -301,6 +301,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
         return <BarChart3 size={20} />;
       case SIDEBAR_ITEMS.BILLING_PLANS:
         return <Catalog size={20} />;
+      case SIDEBAR_ITEMS.BILLING_CREDITS:
+        return <Currency size={20} />;
+      case SIDEBAR_ITEMS.SAFETY_PACKS:
+        return <ShieldCheck size={20} strokeWidth={1.5} aria-hidden />;
       case SIDEBAR_ITEMS.AI_TASKS:
         return <Catalog size={20} />;
       case SIDEBAR_ITEMS.SCENARIO_LANGUAGES:
@@ -371,6 +375,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
       case SIDEBAR_ITEMS.MOBILE_RELEASES:
         return <Mobile size={20} />;
       case SIDEBAR_ITEMS.WHATSAPP_BOT:
+      case SIDEBAR_ITEMS.ASSISTANT_DEFAULTS:
         return <Chat size={20} />;
       // Bug Hunter is the one tab that is a *someone* rather than a section:
       // its own page presents it as a test engineer on the team, and the nav

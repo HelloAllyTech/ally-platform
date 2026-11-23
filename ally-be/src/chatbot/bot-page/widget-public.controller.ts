@@ -5,9 +5,11 @@ import { Public } from '../../auth/decorators/auth.metadata';
 import { BotPagePublicService } from './bot-page-public.service';
 
 /**
- * The website widget's loader (chunk 13) reads its settings from here, on the owner's own site. So
- * this sits outside the bot page's Origin guard and the app's CORS list (`common/cors/app-cors.ts`
- * leaves exactly these two routes out): it answers CORS itself, only to the bot's allowed websites, without credentials.
+ * The website widget's loader (chunk 13) reads its settings from here, on whatever site it is
+ * embedded in. So this sits outside the bot page's Origin guard and the app's CORS list
+ * (`common/cors/app-cors.ts` leaves exactly these two routes out): it answers CORS itself, to any
+ * origin, without credentials (stage 7: the widget may load anywhere; chatting needs sign-in).
+ * `:slug` is the page's address or its legacy slug, so embeds made before stage 7 keep working.
  */
 @ApiTags('Bot page (public)')
 @Controller('v1/public/widget')
@@ -17,9 +19,9 @@ export class WidgetPublicController {
   @Public()
   @Get(':slug')
   @ApiOperation({
-    summary: "The chat bubble's settings, for the owner's allowed websites",
+    summary: "The chat bubble's settings, for any website it is embedded in",
     description:
-      "Answers only a browser on one of the bot's allowed websites (its `Origin`), with CORS for that origin. Anywhere else: 403 `host_not_allowed`, and the loader draws nothing.",
+      'Answers any http(s) `Origin`, with CORS for that origin and no credentials, and notes the site for the owner\'s "Sites it has loaded on" list. No or a non-web Origin: 403 `host_not_allowed`.',
   })
   async config(
     @Param('slug') slug: string,

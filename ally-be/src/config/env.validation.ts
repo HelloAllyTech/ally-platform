@@ -120,6 +120,8 @@ export const validationSchema = Joi.object({
   // page; Turnstile is off while its secret is empty; the visitor-token secret is derived from the
   // access secret when unset.
   BOT_PAGE_BASE_URL: Joi.string().uri().optional().allow(''),
+  BOT_PAGE_CHAT_URL: Joi.string().uri().optional().allow(''),
+  BOT_PAGE_DOMAIN_TARGET: Joi.string().hostname().optional().allow(''),
   TURNSTILE_SITE_KEY: Joi.string().optional().allow(''),
   TURNSTILE_SECRET_KEY: Joi.string().optional().allow(''),
   BOT_PAGE_VISITOR_SECRET: Joi.string().optional().allow(''),

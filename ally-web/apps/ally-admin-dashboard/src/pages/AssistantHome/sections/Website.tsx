@@ -6,6 +6,7 @@ import type { WidgetSettings } from "@types";
 
 import { fill } from "../../Onboarding/copy";
 import { HOME } from "../copy";
+import { LIVE_ACCESS_COPY } from "../copy/overview";
 import { Collapsed, Group } from "../fields";
 
 import type { HomeField } from "../useHomeField";
@@ -24,9 +25,8 @@ export const widgetSnippet = (pageLink: string, slug: string): string =>
   `<script src="${new URL(pageLink).origin}/widget.js" data-assistant="${slug}" async></script>`;
 
 /**
- * On your website (chunk 13): the line to copy, the websites where the bubble may appear, and how
- * it looks. A website is added with Add (not as you type, since a half-typed address isn't one);
- * ally-be normalises it and refuses shared hosts with a reason, shown under the list.
+ * On your website (chunk 13): the line to copy and how the bubble looks. Since stage 7 it may
+ * appear on any website; the sites it has appeared on are listed in Channels (WidgetSites).
  */
 export const WebsiteGroup: React.FC<{
   field: HomeField<WidgetSettings>;
@@ -37,7 +37,6 @@ export const WebsiteGroup: React.FC<{
 }> = ({ field, slug, pageLink, publicAllowed, disabled }) => {
   const id = useId();
   const [copied, setCopied] = useState(false);
-  const [draft, setDraft] = useState("");
   const value = field.value;
   const set = (patch: Partial<WidgetSettings>, now = false) =>
     field.set({ ...value, ...patch }, { now });
@@ -50,13 +49,6 @@ export const WebsiteGroup: React.FC<{
       setTimeout(() => setCopied(false), 2000);
     });
   };
-  const add = () => {
-    const domain = draft.trim();
-    if (!domain) return;
-    set({ allowedDomains: [...value.allowedDomains, domain] }, true);
-    setDraft("");
-  };
-
   return (
     <Group title={t.title} hint={t.body} testId="share-website">
       <div className="ally-home__snippet">
@@ -70,59 +62,10 @@ export const WebsiteGroup: React.FC<{
           {copied ? t.copied : t.copy}
         </Button>
       </div>
-      {!publicAllowed && <p className="ally-field__hint">{t.publicNote}</p>}
+      {!publicAllowed && <p className="ally-field__hint">{LIVE_ACCESS_COPY.widgetNote}</p>}
 
-      <fieldset className="ally-field" disabled={disabled} aria-describedby={`${id}-hint`}>
-        <legend className="ally-field__label">{t.allowed}</legend>
-        <span id={`${id}-hint`} className="ally-field__hint">
-          {t.allowedHint}
-        </span>
-        {value.allowedDomains.length ? (
-          <ul className="ally-home__domains">
-            {value.allowedDomains.map(domain => (
-              <li key={domain}>
-                <span>{domain}</span>
-                <button
-                  type="button"
-                  className="ally-link"
-                  aria-label={`${t.remove}: ${domain}`}
-                  onClick={() =>
-                    set({ allowedDomains: value.allowedDomains.filter(d => d !== domain) }, true)
-                  }
-                >
-                  {t.remove}
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="ally-field__hint">{t.none}</p>
-        )}
-        <div className="ally-home__line">
-          <input
-            className="ally-input"
-            aria-label={t.address}
-            placeholder="yourclinic.in"
-            value={draft}
-            maxLength={253}
-            onChange={event => setDraft(event.target.value)}
-            onKeyDown={event => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                add();
-              }
-            }}
-          />
-          <Button
-            variant={ButtonVariant.TERTIARY}
-            type="button"
-            onClick={add}
-            disabled={!draft.trim()}
-          >
-            {t.add}
-          </Button>
-        </div>
-      </fieldset>
+      {/* Stage 7: the bubble may appear on any website ("Sites it has loaded on" lists them), so
+          there is no list of allowed websites to keep. Chatting still needs sign-in. */}
 
       <fieldset className="ally-field" disabled={disabled}>
         <legend className="ally-field__label">{t.position}</legend>

@@ -1,3 +1,4 @@
+import { LedgerService } from 'src/billing/service/ledger.service';
 import { PlanService } from 'src/billing/service/plan.service';
 import {
   BadRequestException,
@@ -8,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, Not, Repository } from 'typeorm';
+import { EntityManager, In, IsNull, Not, Repository } from 'typeorm';
 import { ExecutionManager } from '../../common/execution/execution-manager';
 import { LlmRuntime } from '../../llm/constants/llm-model-registry.constants';
 import { LlmModelService } from '../../llm/service/llm-model.service';
@@ -55,11 +56,20 @@ import {
   type LiveReply,
 } from '../engine/chatbot-engine.types';
 import { withFirstMessageParts } from '../engine/first-reply';
+import { startNotice } from '../safety/chat-notice';
+import { GoLiveGateService } from '../safety/go-live-gate.service';
+import { replyLanguageOf } from '../engine/reply-language';
 import type { ChatbotModelChoice } from '../type/chatbot.type';
 import { AGENT_RUNTIME_DEGRADED_TYPE } from './agent-runtime-alert-throttle.service';
+import { QuickReplyCopyService } from '../quick-replies/quick-reply-copy.service';
 import { ChatbotAccessService } from './chatbot-access.service';
 import { ChatbotSettingsService } from './chatbot-settings.service';
 import { ConnectorService, ConnectorView } from './connector.service';
+import { legacyRole } from '../access/chatbot-roles';
+import {
+  ChatbotMembersService,
+  type ChatbotMemberView,
+} from '../members/chatbot-members.service';
 
 const currentUserId = (): number => Number(ExecutionManager.getUserId() ?? 0);
 const STATS_DAYS = 30;
@@ -83,7 +93,10 @@ export interface ChatbotSummary {
   knowledgeSource: ChatbotKnowledgeSource;
   persona: Chatbot['persona'];
   model: ChatbotModelChoice | null;
+  /** OLD single role (highest of `myRoles` on the old ladder). Kept for old dashboards. */
   myRole: ChatbotMemberRole;
+  /** Stage 1b: the caller's roles on it, a set. */
+  myRoles: ChatbotMemberRole[];
   connectors: ConnectorView[];
   documentCount: number;
   /** Documents it can answer from now: indexed and not archived. */
@@ -91,9 +104,19 @@ export interface ChatbotSummary {
   audienceCount: number;
   memberCount: number;
   stats: ChatbotStats;
+  /**
+   * Conversations waiting for a person (needs-a-person set, nobody has taken them). Counted only
+   * for members who can respond, edit or own; zero for everyone else.
+   */
+  waitingForPerson: number;
   lastTestedAt: Date | null;
   /** The caller's own unfinished onboarding for this bot (chunk 20a): "Continue setup". */
   setupDraftId: string | null;
+  /**
+   * Stage 3: created at the click and not touched yet (no template, path, source, edit or test).
+   * The home leaves these out of the grid and the counts.
+   */
+  blank: boolean;
   /** When it was removed: an archived bot is read-only. */
   archivedAt: Date | null;
   createdAt: Date;
@@ -101,6 +124,22 @@ export interface ChatbotSummary {
 }
 
 /** What Preview shows for one test message. Nothing is sent or stored. */
+/**
+ * Stage 3: a server-side override for a Preview test, built from a live chatbot's working copy so
+ * the builder tries their pending changes without anything reaching customers. Only ally-be code
+ * builds one; a client-sent `draft` is a different, separately validated input.
+ */
+export interface ChatbotTestOverride {
+  name?: string;
+  persona?: Partial<Chatbot['persona']>;
+  settings?: Chatbot['settings'];
+  rules?: Chatbot['rules'];
+  /** The documents to answer from (live ones plus staged sources). */
+  documentIds?: string[];
+  /** Write nothing to the chatbot row, not even `lastTestedAt`. */
+  readOnly?: boolean;
+}
+
 export interface ChatbotTestResult {
   reply: string;
   handledBy: WaHandledBy;
@@ -158,6 +197,8 @@ export interface ChatbotDocumentView {
   id: string;
   title: string;
   status: string;
+  /** Why it is in that state, when there is a reason (e.g. paused: out of credits). */
+  statusMessage?: string | null;
   isGlobal: boolean;
   /** The bot's own document, uploaded on its Knowledge tab; false for a library document. */
   private: boolean;
@@ -179,12 +220,7 @@ export interface ChatbotDocumentDetail {
   rawText: string;
 }
 
-export interface ChatbotMemberView {
-  userId: number;
-  name: string | null;
-  email: string | null;
-  role: ChatbotMemberRole;
-}
+export type { ChatbotMemberView };
 
 const EMPTY_STATS: ChatbotStats = {
   messages: 0,
@@ -224,6 +260,14 @@ export class ChatbotService {
     private readonly knowledgeBase: KnowledgeBaseService,
     // CR1: going live is publishing, under the plan's limit (optional for existing specs).
     @Optional() private readonly plans?: PlanService,
+    // Stage 1b: the team (roles as a set, last owner, creator). Optional for existing specs.
+    @Optional() private readonly members?: ChatbotMembersService,
+    // Stage 6: archiving returns the unspent budget to the free balance. Optional for specs.
+    @Optional() private readonly ledger?: LedgerService,
+    // Stage 5 (D6): every new chatbot gets its own copy of the quick replies. Optional for specs.
+    @Optional() private readonly quickReplies?: QuickReplyCopyService,
+    // Stage 4: the go-live gate on the status switch (D10). Optional for specs.
+    @Optional() private readonly goLive?: GoLiveGateService,
   ) {}
 
   // ───────────────────────────────────────────────────────────── read
@@ -278,8 +322,10 @@ export class ChatbotService {
       memberCounts,
       stats,
       setups,
+      waiting,
+      blanks,
     ] = await Promise.all([
-      this.access.rolesFor(ids),
+      this.access.roleSetsFor(ids),
       this.connectors.summariesForBots(ids),
       this.countBy(this.documentRepository, ids),
       this.readyDocumentCounts(ids),
@@ -287,6 +333,8 @@ export class ChatbotService {
       this.countBy(this.memberRepository, ids),
       this.stats(ids),
       this.setupDrafts(ids),
+      this.waitingCounts(ids),
+      this.untouchedBlanks(ids),
     ]);
     return bots.map((bot) => ({
       id: bot.id,
@@ -298,19 +346,54 @@ export class ChatbotService {
       knowledgeSource: bot.knowledgeSource,
       persona: bot.persona ?? {},
       model: bot.model ?? null,
-      myRole: roles.get(bot.id) ?? ChatbotMemberRole.VIEWER,
+      myRole: legacyRole(roles.get(bot.id) ?? [ChatbotMemberRole.VIEWER]),
+      myRoles: roles.get(bot.id) ?? [],
       connectors: connectors.get(bot.id) ?? [],
       documentCount: docCounts.get(bot.id) ?? 0,
       readyDocumentCount: readyDocCounts.get(bot.id) ?? 0,
       audienceCount: audienceCounts.get(bot.id) ?? 0,
       memberCount: memberCounts.get(bot.id) ?? 0,
       stats: stats.get(bot.id) ?? EMPTY_STATS,
+      waitingForPerson: waiting.get(bot.id) ?? 0,
       lastTestedAt: bot.lastTestedAt ?? null,
       setupDraftId: setups.get(bot.id) ?? null,
+      blank: blanks.has(bot.id),
       archivedAt: bot.archivedAt ?? null,
       createdAt: bot.createdAt,
       updatedAt: bot.updatedAt,
     }));
+  }
+
+  /**
+   * Per bot, the conversations waiting for a person, for the bots where the caller can respond:
+   * an Editor or Owner, or a member holding Responder (read from the `roles` column when the
+   * roles migration has run). Everywhere else the count is left out, so it reads as zero.
+   */
+  private async waitingCounts(ids: string[]): Promise<Map<string, number>> {
+    const userId = currentUserId();
+    if (!userId || !ids.length) return new Map();
+    const manager = this.chatbotRepository.manager;
+    const hasRoles =
+      (
+        (await manager.query(
+          `SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'chatbot_members' AND column_name = 'roles' LIMIT 1`,
+        )) ?? []
+      ).length > 0;
+    const responder = hasRoles
+      ? ` OR to_jsonb(m."roles") ? 'responder' OR to_jsonb(m."roles") ? 'editor' OR to_jsonb(m."roles") ? 'owner'`
+      : '';
+    const rows = ((await manager.query(
+      `SELECT c.chatbot_id, COUNT(*) AS count
+         FROM chatbot_conversations c
+         JOIN chatbot_members m ON m.chatbot_id = c.chatbot_id AND m.user_id = $2
+        WHERE c.chatbot_id = ANY($1::uuid[])
+          AND c.needs_person_since IS NOT NULL AND c.handled_by_user_id IS NULL
+          AND (m.role IN ('editor', 'owner')${responder})
+        GROUP BY c.chatbot_id`,
+      [ids, userId],
+    )) ?? []) as { chatbot_id: string; count: string }[];
+    return new Map(rows.map((r) => [r.chatbot_id, Number(r.count)]));
   }
 
   /**
@@ -328,6 +411,23 @@ export class ChatbotService {
       [ids, userId],
     );
     return new Map((rows ?? []).map((row) => [row.chatbot_id, row.id]));
+  }
+
+  /** Stage 3: the bots that are still untouched blanks (created at the click, nothing chosen). */
+  private async untouchedBlanks(ids: string[]): Promise<Set<string>> {
+    try {
+      const rows = await this.chatbotRepository.manager.query<
+        { chatbot_id: string }[]
+      >(
+        `SELECT chatbot_id FROM bot_drafts
+          WHERE chatbot_id = ANY($1::uuid[]) AND blank = true AND touched_at IS NULL`,
+        [ids],
+      );
+      return new Set((rows ?? []).map((row) => row.chatbot_id));
+    } catch {
+      // Before the stage 3 migration: nothing is a blank.
+      return new Set();
+    }
   }
 
   /** Per bot, the documents it can answer from now: indexed and not archived. */
@@ -453,10 +553,19 @@ export class ChatbotService {
           chatbotId: bot.id,
           userId,
           role: ChatbotMemberRole.OWNER,
+          roles: [ChatbotMemberRole.OWNER],
           createdBy: userId,
         }),
       );
     }
+    await this.quickReplies?.copyGlobalsInto(bot.id).catch((error: unknown) =>
+      // The globals still answer for it until the copy runs (mandatory ones always do).
+      this.logger.warn(
+        `Quick replies not copied into chatbot ${bot.id}: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      ),
+    );
     this.logger.info(`Chatbot ${bot.id} created`);
     return this.get(bot.id);
   }
@@ -494,7 +603,11 @@ export class ChatbotService {
 
   async setStatus(id: string, status: ChatbotStatus): Promise<ChatbotSummary> {
     await this.access.assert(id, ChatbotMemberRole.EDITOR);
-    if (status === ChatbotStatus.LIVE) await this.plans?.assertCanPublish(id);
+    if (status === ChatbotStatus.LIVE) {
+      // Stage 4: the one go-live check, refused before anything is written.
+      await this.goLive?.assertCanGoLive(id);
+      await this.plans?.assertCanPublish(id);
+    }
     await this.chatbotRepository.update(
       { id },
       { status, updatedBy: currentUserId() },
@@ -522,6 +635,21 @@ export class ChatbotService {
     await this.access.assert(id, ChatbotMemberRole.OWNER);
     // Taken first, so every document archived below is at or after it: restore() finds them so.
     const removedAt = new Date();
+    // Stage 1b: under the bot's row lock, so a member change can't interleave with removing it,
+    // and a second archive of the same bot stops here.
+    await this.chatbotRepository.manager.transaction(async (m) => {
+      const [row] = await m.query<{ archived_at: Date | null }[]>(
+        `SELECT archived_at FROM chatbots WHERE id = $1 FOR UPDATE`,
+        [id],
+      );
+      if (!row || row.archived_at) {
+        throw new NotFoundException('Chatbot not found');
+      }
+      await m.query(
+        `UPDATE chatbots SET archived_at = $2, status = $3, updated_by = $4, "updatedAt" = now() WHERE id = $1`,
+        [id, removedAt, ChatbotStatus.PAUSED, currentUserId() || null],
+      );
+    });
     await this.connectorRepository.update(
       { chatbotId: id },
       { chatbotId: null, updatedBy: currentUserId() },
@@ -544,6 +672,16 @@ export class ChatbotService {
         WHERE chatbot_id = $1 AND status = 'active'`,
       [id],
     );
+    // Stage 6 (Ledger edges): what its budget had not spent goes back to the free balance.
+    await this.ledger
+      ?.archiveBudget(id)
+      .catch((error: unknown) =>
+        this.logger.warn(
+          `Budget of archived chatbot ${id} not returned yet (the nightly rebuild will not do it): ${
+            error instanceof Error ? error.message : 'unknown error'
+          }`,
+        ),
+      );
     this.logger.info(`Chatbot ${id} archived`);
   }
 
@@ -623,13 +761,14 @@ export class ChatbotService {
         id: string;
         title: string;
         status: string;
+        status_message: string | null;
         is_global: boolean;
         owner_chatbot_id: string | null;
         archived_at: Date | null;
         updatedAt: Date;
       }[]
     >(
-      `SELECT d.id, d.title, d.status, d.is_global, d.owner_chatbot_id, d.archived_at, d."updatedAt"
+      `SELECT d.id, d.title, d.status, d.status_message, d.is_global, d.owner_chatbot_id, d.archived_at, d."updatedAt"
          FROM chatbot_documents cd
          JOIN kb_documents d ON d.id = cd.document_id
         WHERE cd.chatbot_id = $1
@@ -640,6 +779,8 @@ export class ChatbotService {
       id: r.id,
       title: r.title,
       status: r.status,
+      // Why it is in that state (e.g. paused: out of credits), for the documents list.
+      statusMessage: r.status_message ?? null,
       isGlobal: r.is_global,
       private: r.owner_chatbot_id === id,
       archived: Boolean(r.archived_at),
@@ -658,6 +799,26 @@ export class ChatbotService {
     await this.access.assert(id, ChatbotMemberRole.EDITOR);
     const own = await this.ownDocumentIds(id);
     const unique = [...new Set([...documentIds, ...own])];
+    // Stage 5 (copy, not share): a builder can no longer attach a shared library document; they
+    // copy it instead (Copy knowledge, the curated pool). What is attached already stays allowed,
+    // so saving the list unchanged never fails. Ally staff can still attach.
+    if (!(await this.access.isPlatformAdmin())) {
+      const attached = new Set(
+        (
+          await this.chatbotRepository.manager.query<{ document_id: string }[]>(
+            `SELECT document_id FROM chatbot_documents WHERE chatbot_id = $1`,
+            [id],
+          )
+        ).map((r) => r.document_id),
+      );
+      const ownSet = new Set(own);
+      if (unique.some((d) => !ownSet.has(d) && !attached.has(d))) {
+        throw new BadRequestException(
+          // COPY: needs approval
+          'Shared documents can no longer be added. Copy the document to this chatbot instead.',
+        );
+      }
+    }
     const existing = unique.length
       ? await this.chatbotRepository.manager.query<{ id: string }[]>(
           `SELECT id FROM kb_documents
@@ -788,64 +949,25 @@ export class ChatbotService {
   // ───────────────────────────────────────────────────────────── team
 
   async listMembers(id: string): Promise<ChatbotMemberView[]> {
-    await this.access.assert(id);
-    const rows = await this.chatbotRepository.manager.query<
-      {
-        user_id: number;
-        role: ChatbotMemberRole;
-        name: string | null;
-        email: string | null;
-      }[]
-    >(
-      `SELECT m.user_id, m.role, u.name, u.email
-         FROM chatbot_members m
-         LEFT JOIN users u ON u.id = m.user_id
-        WHERE m.chatbot_id = $1
-        ORDER BY u.name NULLS LAST`,
-      [id],
-    );
-    return rows.map((r) => ({
-      userId: r.user_id,
-      name: r.name,
-      email: r.email,
-      role: r.role,
-    }));
+    return this.team().list(id);
   }
 
+  /**
+   * Replace the team. Each member gives `roles` (a set) or the old single `role`. Locks the bot's
+   * row; refuses a team with no owner, or one that drops the creator (`creator_must_transfer`).
+   * `manager`: run inside the caller's transaction (the home's team list holds the row lock).
+   */
   async setMembers(
     id: string,
     dto: SetChatbotMembersDto,
+    manager?: EntityManager,
   ): Promise<ChatbotMemberView[]> {
-    await this.access.assert(id, ChatbotMemberRole.OWNER);
-    const byUser = new Map(dto.members.map((m) => [m.userId, m.role]));
-    const userIds = [...byUser.keys()];
-    if (userIds.length) {
-      const found = await this.chatbotRepository.manager.query<
-        { id: number }[]
-      >(`SELECT id FROM users WHERE id = ANY($1::int[])`, [userIds]);
-      if (found.length !== userIds.length) {
-        throw new BadRequestException(
-          'Some of those people are not Ally users.',
-        );
-      }
-    }
-    if (![...byUser.values()].includes(ChatbotMemberRole.OWNER)) {
-      throw new BadRequestException('A chatbot needs at least one owner.');
-    }
-    const userId = currentUserId();
-    await this.memberRepository.manager.transaction(async (manager) => {
-      await manager.delete(ChatbotMember, { chatbotId: id });
-      await manager.insert(
-        ChatbotMember,
-        [...byUser].map(([memberId, role]) => ({
-          chatbotId: id,
-          userId: memberId,
-          role,
-          createdBy: userId,
-        })),
-      );
-    });
-    return this.listMembers(id);
+    return this.team().set(id, dto.members, manager);
+  }
+
+  private team(): ChatbotMembersService {
+    if (!this.members) throw new Error('ChatbotMembersService not provided');
+    return this.members;
   }
 
   // ───────────────────────────────────────────────────────────── test
@@ -893,6 +1015,7 @@ export class ChatbotService {
     id: string,
     dto: TestChatbotDto,
     live?: LiveReply,
+    server?: ChatbotTestOverride,
   ): Promise<ChatbotTestResult> {
     const { chatbot } = await this.access.assert(id, ChatbotMemberRole.VIEWER);
     // A removed assistant can be read, never run.
@@ -917,6 +1040,15 @@ export class ChatbotService {
       accessMode: dto.checkAccess
         ? chatbot.accessMode
         : ChatbotAccessMode.ANYONE,
+      // Stage 3: a live chatbot's working copy, built on the server (never from the request).
+      ...(server?.name !== undefined ? { name: server.name } : {}),
+      ...(server?.persona
+        ? { persona: { ...chatbot.persona, ...server.persona } }
+        : {}),
+      ...(server?.settings
+        ? { settings: { ...(chatbot.settings ?? {}), ...server.settings } }
+        : {}),
+      ...(server?.rules ? { rules: server.rules } : {}),
     };
     const settings = await this.settingsService.getForChatbot(bot);
     const me = await this.chatbotRepository.manager.query<
@@ -944,24 +1076,32 @@ export class ChatbotService {
           tenantId: dto.asTenantId ?? me[0]?.tenant_id ?? null,
         },
         channel: PREVIEW_CHANNEL,
-        documentIds: draft.documentIds,
+        documentIds: server?.documentIds ?? draft.documentIds,
         conversationId,
       },
       live,
     );
 
     // Remembered so the setup checklist can show the bot has been tried; Preview stores nothing else.
-    await this.chatbotRepository.update({ id }, { lastTestedAt: new Date() });
+    // A live chatbot's working-copy test writes nothing to the live row (stage 3).
+    if (!server?.readOnly) {
+      await this.chatbotRepository.update({ id }, { lastTestedAt: new Date() });
+    }
 
     const reply = isFirstMessage
       ? withFirstMessageParts({
           body: decision.body,
           handledBy: decision.handledBy,
           bodyIsWelcome: decision.isWelcome,
-          notice: this.settingsService.renderPlaceholders(
-            settings.disclaimerText ?? '',
-            settings,
-          ),
+          // Stage 4: the fixed start notice, exactly as a new person receives it.
+          notice: startNotice({
+            disclaimer: this.settingsService.renderPlaceholders(
+              settings.disclaimerText ?? '',
+              settings,
+            ),
+            language: replyLanguageOf(dto.message ?? ''),
+            organisation: bot.name,
+          }),
         })
       : decision.body;
 

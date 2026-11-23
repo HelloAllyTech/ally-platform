@@ -15,7 +15,16 @@ import type {
   ChatbotSettingsView,
 } from '../type/chatbot.type';
 import { packFor } from '../../bot-draft/safety-pack/safety-packs';
+import {
+  loosensSafetySetting,
+  validateSafetySettings,
+} from '../safety/safety-settings';
 import { ABILITY_VALUES } from '../agent-tools/tools';
+import { validateHumanContact } from '../safety/safety-terms';
+import {
+  NOTICE_MEANING_REFUSED,
+  noticeKeepsMeaning,
+} from '../safety/chat-notice';
 import {
   SafetyLockedError,
   assertSettingsKeepPack,
@@ -118,6 +127,27 @@ export class ChatbotSettingsService {
         `abilities maps each tool to one of: ${ABILITY_VALUES.join(', ')}`,
       );
     }
+    const invalid =
+      validateSafetySettings(overrides) ??
+      validateHumanContact(
+        (overrides as { humanContact?: unknown })?.humanContact,
+      );
+    if (invalid) throw new BadRequestException(invalid);
+    // Stage 4: a changed start notice must keep "an AI and people may read this chat". Wording
+    // stored before the rule is left alone until it is changed.
+    const disclaimer = overrides?.disclaimerText?.trim();
+    if (disclaimer && !noticeKeepsMeaning(disclaimer)) {
+      const stored = await this.chatbotRepository
+        .findOne({ where: { id: chatbot.id }, select: ['id', 'settings'] })
+        .catch(() => null);
+      if ((stored?.settings?.disclaimerText ?? '').trim() !== disclaimer) {
+        throw new BadRequestException({
+          errorCode: 'notice_meaning',
+          message: NOTICE_MEANING_REFUSED,
+          details: { field: 'disclaimerText' },
+        });
+      }
+    }
     const userId = Number(ExecutionManager.getUserId() ?? 0);
     const settings = cleanOverride(overrides);
     await this.chatbotRepository.update(
@@ -155,9 +185,28 @@ export class ChatbotSettingsService {
     if (!override || !Object.keys(override).length) return global;
     // `abilities` stays on the bot's stored override, where the gateway reads it (chunk 3b), and so
     // do `memory` (chunk 8a) and `timeZone` (chunk 6b).
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { rateLimit, retrieval, abilities, memory, timeZone, ...plain } =
-      override;
+    /* eslint-disable @typescript-eslint/no-unused-vars */
+    const {
+      rateLimit,
+      retrieval,
+      abilities,
+      memory,
+      timeZone,
+      audienceAge,
+      retentionDays,
+      noAnswerMode,
+      enabledLanguages,
+      alertPolicy,
+      waitBeforeNoOneAvailableMinutes,
+      crisisResumeRule,
+      archivedMessage,
+      // Stage 6: per-user dollar limits, read by the credits gate from the stored override.
+      userLimits,
+      // Stage 4: read from the stored override by the go-live gate.
+      humanContact,
+      ...plain
+    } = override;
+    /* eslint-enable @typescript-eslint/no-unused-vars */
     const tighter = (base: number, value: number | undefined) =>
       typeof value === 'number' && value > 0 ? Math.min(base, value) : base;
     return {
@@ -256,10 +305,17 @@ export class ChatbotSettingsService {
   renderPlaceholders(text: string, settings: WhatsAppBotSettings): string {
     return text.replace(
       /\{helpline_numbers\}/g,
-      settings.helplineNumbers || 'your local crisis line',
+      settings.helplineNumbers || DEFAULT_HELPLINE_PLACEHOLDER,
     );
   }
 }
+
+/**
+ * What `{helpline_numbers}` becomes when the bot has none (R6): the findahelpline.com link, never
+ * a country's numbers and never the vague "your local crisis line".
+ */
+export const DEFAULT_HELPLINE_PLACEHOLDER =
+  'a helpline listed at https://findahelpline.com';
 
 /**
  * Whether a settings write changes a key only the bot's owners may set (A1; platform admins before):
@@ -273,7 +329,9 @@ export function changesAdminOnlySetting(
 ): boolean {
   return (
     (stored?.showTyping ?? null) !== (next?.showTyping ?? null) ||
-    stableJson(stored?.abilities) !== stableJson(next?.abilities)
+    stableJson(stored?.abilities) !== stableJson(next?.abilities) ||
+    // Loosening a safety setting (adults-only, longer retention, digest alerts…) is the owner's.
+    loosensSafetySetting(stored, next)
   );
 }
 
@@ -316,6 +374,11 @@ export function cleanOverride(
   for (const [key, value] of Object.entries(override ?? {})) {
     if (value === undefined || value === null) continue;
     if (typeof value === 'string' && !value.trim()) continue;
+    if (Array.isArray(value)) {
+      // Lists (enabledLanguages) stay lists; an empty one means "follow the default".
+      if (value.length) out[key] = value;
+      continue;
+    }
     if (typeof value === 'object') {
       const nested = Object.fromEntries(
         Object.entries(value as Record<string, unknown>).filter(

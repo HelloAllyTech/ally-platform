@@ -30,6 +30,14 @@ import { ChatbotService } from './service/chatbot.service';
 import { KnowledgeBaseModule } from '../knowledge-base/knowledge-base.module';
 import { ConnectorService } from './service/connector.service';
 import { ConversationService } from './service/conversation.service';
+import { AlertOutboxService } from './safety/alert-outbox.service';
+import { AssistantsMonitoringService } from './safety/assistants-monitoring.service';
+import { CrisisAlertService } from './safety/crisis-alert.service';
+import { GoLiveController } from './safety/go-live.controller';
+import { GoLiveGateService } from './safety/go-live-gate.service';
+import { GoLiveBackfillService } from './safety/go-live-backfill.service';
+import { SafetyStateService } from './safety/safety-state.service';
+import { CrisisBackfillService } from './safety/crisis-backfill.service';
 import { HandoverService } from './handover/handover.service';
 import { InboxEventsService } from './inbox/inbox-events.service';
 import { InboxController } from './inbox/inbox.controller';
@@ -57,6 +65,39 @@ import { ListCsvService } from './lists/list-csv.service';
 import { ListDefinitionsService } from './lists/list-definitions.service';
 import { ListOwnerService } from './lists/list-owner.service';
 import { ListRecordsService } from './lists/list-records.service';
+import { ChatbotInvite } from './entity/chatbot-invite.entity';
+import { ResponderAgreement } from './entity/responder-agreement.entity';
+import { ChatbotMembersService } from './members/chatbot-members.service';
+import { ChatbotInvitesService } from './members/chatbot-invites.service';
+import { ResponderAgreementService } from './members/responder-agreement.service';
+import {
+  AssistantMembersController,
+  ChatbotTeamController,
+  PublicAssistantInvitesController,
+} from './members/chatbot-team.controller';
+
+import { AssistantRetentionService } from './privacy/assistant-retention.service';
+import { CustomerErasureService } from './privacy/customer-erasure.service';
+import { ChatPrivacyService } from './privacy/chat-privacy.service';
+import { MemoryConsentService } from './privacy/memory-consent.service';
+import { AnswerConflictService } from './knowledge/answer-conflict.service';
+import { KnowledgeFreshnessService } from './knowledge/knowledge-freshness.service';
+import { SafetyTranslationsService } from './languages/safety-translations.service';
+import { QuickReplyCopyService } from './quick-replies/quick-reply-copy.service';
+import { ChatbotSharingService } from './sharing/chatbot-sharing.service';
+import {
+  ChatbotKnowledgeController,
+  KnowledgePoolController,
+} from './sharing/chatbot-knowledge.controller';
+import { StaffAssistantsController } from './sharing/staff-assistants.controller';
+import { LlmAgentModule } from '../llm-agent/llm-agent.module';
+import { ChatbotAccessGrant } from './entity/chatbot-access-grant.entity';
+import { ChatbotStaffView } from './entity/chatbot-staff-view.entity';
+import { ChatbotStaffAccessService } from './staff/chatbot-staff-access.service';
+import {
+  ChatbotStaffAccessController,
+  StaffChatbotsController,
+} from './staff/chatbot-staff-access.controller';
 
 /**
  * Chatbots: configurable bots reached through connectors.
@@ -92,6 +133,12 @@ import { ListRecordsService } from './lists/list-records.service';
       RecordEvent,
       WaKeywordTemplate,
       GlobalSettings,
+      // Team invites and the responder agreement (Stage 1b).
+      ChatbotInvite,
+      ResponderAgreement,
+      // Stage 8: owners' grants to Ally staff, and the staff view log.
+      ChatbotAccessGrant,
+      ChatbotStaffView,
     ]),
     AiModule,
     PromptModule,
@@ -99,6 +146,8 @@ import { ListRecordsService } from './lists/list-records.service';
     KnowledgeBaseModule,
     // The inbox's "nobody opened it" email (chunk 11a).
     NotificationModule,
+    // Stage 5: the knowledge conflict judge.
+    LlmAgentModule,
   ],
   controllers: [
     AssistantSeatsController,
@@ -107,6 +156,19 @@ import { ListRecordsService } from './lists/list-records.service';
     InboxController,
     AgentGatewayController,
     ListController,
+    // The team: remove, leave, transfer, invites, responder agreement (Stage 1b).
+    ChatbotTeamController,
+    AssistantMembersController,
+    PublicAssistantInvitesController,
+    // Customer data, knowledge and sharing (stage 5).
+    ChatbotKnowledgeController,
+    KnowledgePoolController,
+    StaffAssistantsController,
+    // Stage 8: staff read-only view (owner grants + who looked; staff search).
+    ChatbotStaffAccessController,
+    StaffChatbotsController,
+    // Safety core (stage 4): go-live checklist, safety terms, unpublish backfill.
+    GoLiveController,
   ],
   providers: [
     GlobalSettingsRepository,
@@ -124,6 +186,15 @@ import { ListRecordsService } from './lists/list-records.service';
     InboxEventsService,
     InboxService,
     HandoverService,
+    // Crisis flags, the alert outbox and the one-minute job (assistants build, stage 1b).
+    AlertOutboxService,
+    AssistantsMonitoringService,
+    CrisisAlertService,
+    CrisisBackfillService,
+    // Safety core (stage 4): the go-live gate on every path, and the D10 backfill.
+    SafetyStateService,
+    GoLiveGateService,
+    GoLiveBackfillService,
     // The agent's tool gateway (chunk 3b). A new tool is one provider here, listed below.
     AgentRunTokenService,
     AgentGatewayService,
@@ -145,6 +216,22 @@ import { ListRecordsService } from './lists/list-records.service';
     // Memory, light (chunk 8a): what it remembers about each person, and the rolling summary.
     MemoryService,
     SummaryService,
+    // The team (Stage 1b).
+    ChatbotMembersService,
+    ChatbotInvitesService,
+    ResponderAgreementService,
+    // Customer data, knowledge and sharing (stage 5).
+    AssistantRetentionService,
+    CustomerErasureService,
+    ChatPrivacyService,
+    MemoryConsentService,
+    AnswerConflictService,
+    KnowledgeFreshnessService,
+    SafetyTranslationsService,
+    QuickReplyCopyService,
+    ChatbotSharingService,
+    // Stage 8: the staff read-only view (ChatbotAccessService takes it optionally).
+    ChatbotStaffAccessService,
   ],
   exports: [
     // The Checkup (chunk 20a-2) asks questions through Preview's path.
@@ -159,7 +246,12 @@ import { ListRecordsService } from './lists/list-records.service';
     ConversationService,
     // Channels report each decision and deliver the team's replies (chunk 11a).
     HandoverService,
+    CrisisAlertService,
+    AlertOutboxService,
     InboxEventsService,
+    // Stage 4: publish and the page toggle go through the same go-live gate.
+    GoLiveGateService,
+    SafetyStateService,
     // The assistant home's WhatsApp audience list (chunk 20d-2).
     ChatbotAudienceService,
     // Lists (chunk 5a).
@@ -172,6 +264,18 @@ import { ListRecordsService } from './lists/list-records.service';
     // Channels apply memory after a reply (chunk 8a).
     MemoryService,
     SummaryService,
+    // The home's team list replaces the team through it (Stage 1b).
+    ChatbotMembersService,
+    // Stage 5: the WhatsApp retention task delegates to the per-chatbot sweep; the engine, the bot
+    // page and WhatsApp inbound reach erase, consent, conflicts and languages through these.
+    AssistantRetentionService,
+    CustomerErasureService,
+    ChatPrivacyService,
+    MemoryConsentService,
+    AnswerConflictService,
+    KnowledgeFreshnessService,
+    SafetyTranslationsService,
+    QuickReplyCopyService,
   ],
 })
 export class ChatbotModule {}
