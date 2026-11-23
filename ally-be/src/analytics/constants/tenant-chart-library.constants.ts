@@ -426,7 +426,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     shape: 'stage_funnel',
     size: 'm',
     sources: ['research'],
-    scopes: ['organisation'],
+    scopes: ['organisation', 'course', 'learner'],
     needs: [{ signal: 'courseEnrolments', min: 5, sparseMin: 1 }],
     live: true,
   }),
@@ -438,7 +438,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     shape: 'ranking',
     size: 'm',
     sources: ['research'],
-    scopes: ['organisation'],
+    scopes: ['organisation', 'course', 'learner'],
     needs: [{ signal: 'scoredQuizItems', min: 10, sparseMin: 1 }],
     live: true,
   }),
@@ -501,7 +501,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     shape: 'before_after',
     size: 'm',
     sources: ['doc'],
-    scopes: ['organisation', 'course'],
+    scopes: ['organisation', 'learner'],
     needs: [
       { signal: 'skillScoredCuts', min: 10, sparseMin: 1 },
       { signal: 'skillScoredLearners', min: 5, sparseMin: 1 },
@@ -657,7 +657,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     sources: ['doc'],
     scopes: ['course'],
     needs: [{ signal: 'courseEnrolments', min: 1 }],
-    live: false,
+    live: true,
   }),
   entry({
     id: 'TSQ-042',
@@ -682,7 +682,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     sources: ['doc', 'research'],
     scopes: ['course'],
     needs: [{ signal: 'courseCompletions', min: 5, sparseMin: 1 }],
-    live: false,
+    live: true,
   }),
   entry({
     id: 'TSQ-044',
@@ -848,7 +848,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     sources: ['doc'],
     scopes: ['learner'],
     needs: [],
-    live: false,
+    live: true,
   }),
   entry({
     id: 'TSQ-064',
@@ -860,7 +860,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     sources: ['doc'],
     scopes: ['learner'],
     needs: [{ signal: 'courseEnrolments', min: 1 }],
-    live: false,
+    live: true,
   }),
   entry({
     id: 'TSQ-065',

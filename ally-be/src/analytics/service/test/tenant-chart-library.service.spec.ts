@@ -1,5 +1,6 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { TenantCapabilitiesRepository } from '../../repository/tenant-capabilities.repository';
+import { TenantScopeSummaryRepository } from '../../repository/tenant-scope-summary.repository';
 import { TenantScopeOptionsRepository } from '../../repository/tenant-scope-options.repository';
 import { TenantChartQueryRepository } from '../../repository/tenant-chart-query.repository';
 import { TenantOutcomesRepository } from '../../repository/tenant-outcomes.repository';
@@ -35,6 +36,7 @@ describe('TenantChartLibraryService', () => {
   let practice: jest.Mocked<TenantPracticeRepository>;
   let chartQuery: jest.Mocked<TenantChartQueryRepository>;
   let scopeOptions: jest.Mocked<TenantScopeOptionsRepository>;
+  let summary: jest.Mocked<TenantScopeSummaryRepository>;
   let service: TenantChartLibraryService;
 
   beforeEach(() => {
@@ -70,6 +72,12 @@ describe('TenantChartLibraryService', () => {
       list: jest.fn(),
       describe: jest.fn(),
     } as unknown as jest.Mocked<TenantScopeOptionsRepository>;
+    summary = {
+      getCourseFacts: jest.fn(),
+      getTimeToFinish: jest.fn(),
+      getPracticeRhythm: jest.fn(),
+      getLearnerCourses: jest.fn(),
+    } as unknown as jest.Mocked<TenantScopeSummaryRepository>;
     service = new TenantChartLibraryService(
       repo,
       analytics,
@@ -77,6 +85,7 @@ describe('TenantChartLibraryService', () => {
       practice,
       chartQuery,
       scopeOptions,
+      summary,
     );
   });
 
@@ -137,6 +146,10 @@ describe('TenantChartLibraryService', () => {
         'TSQ-024',
         'TSQ-026',
         'TSQ-027',
+        'TSQ-041',
+        'TSQ-043',
+        'TSQ-063',
+        'TSQ-064',
       ]);
       const byId = Object.fromEntries(lib.charts.map((c) => [c.id, c]));
       expect(byId['TSQ-001'].state).toBe('available');
@@ -558,7 +571,8 @@ describe('TenantChartLibraryService', () => {
         'simulation',
         'learner',
       ]);
-      expect(by['TSQ-024']).toEqual(['organisation']);
+      expect(by['TSQ-024']).toEqual(['organisation', 'learner']);
+      expect(by['TSQ-009']).toEqual(['organisation']);
     });
 
     it('refuses a scope the chart does not list', async () => {
@@ -844,6 +858,7 @@ describe('TenantChartLibraryService', () => {
         expect.any(Date),
         3,
         8,
+        expect.any(Object),
       );
     });
 
@@ -862,6 +877,110 @@ describe('TenantChartLibraryService', () => {
       await expect(service.getCapabilities(TENANT)).rejects.toBeInstanceOf(
         NotFoundException,
       );
+    });
+  });
+
+  describe('course and learner charts', () => {
+    const COURSE = '8b3f2f0e-1c0a-4d6e-9a53-3d1c0d2f4a11';
+    const ready = () => {
+      enabled();
+      repo.getCapabilities.mockResolvedValue(
+        caps({ courseEnrolments: 20, courseCompletions: 12 }),
+      );
+    };
+
+    it('TSQ-041 describes one course', async () => {
+      ready();
+      scopeOptions.describe.mockResolvedValue('Course A');
+      summary.getCourseFacts.mockResolvedValue({ measures: [] });
+      const out = await service.getChartData(TENANT, 'TSQ-041', {
+        courseId: COURSE,
+      });
+      expect(out.data).toEqual({ measures: [] });
+      expect(out.scope?.label).toBe('Course A');
+      expect(summary.getCourseFacts).toHaveBeenCalledWith(
+        TENANT,
+        'internal1',
+        COURSE,
+      );
+    });
+
+    it('a course chart asked for without a course is refused', async () => {
+      ready();
+      await expect(service.getChartData(TENANT, 'TSQ-041', {})).rejects.toThrow(
+        'Choose a course',
+      );
+      expect(summary.getCourseFacts).not.toHaveBeenCalled();
+    });
+
+    it('a learner chart asked for without a learner is refused', async () => {
+      enabled();
+      await expect(service.getChartData(TENANT, 'TSQ-063', {})).rejects.toThrow(
+        'Choose a learner',
+      );
+    });
+
+    it('TSQ-043 reads one course', async () => {
+      ready();
+      scopeOptions.describe.mockResolvedValue('Course A');
+      summary.getTimeToFinish.mockResolvedValue({
+        bins: [0, 1, 2, 0, 0, 0],
+        boundsDays: [1, 3, 7, 14, 30],
+        completed: 3,
+        medianDays: 4,
+      });
+      const out = await service.getChartData(TENANT, 'TSQ-043', {
+        courseId: COURSE,
+      });
+      expect((out.data as { completed: number }).completed).toBe(3);
+    });
+
+    it('TSQ-063 uses the window for one learner', async () => {
+      enabled();
+      scopeOptions.describe.mockResolvedValue('Asha');
+      summary.getPracticeRhythm.mockResolvedValue({ measures: [] });
+      await service.getChartData(TENANT, 'TSQ-063', {
+        learnerId: 4,
+        range: 'all',
+      });
+      const call = summary.getPracticeRhythm.mock.calls[0];
+      expect(call[2]).toBe(4);
+      expect((call[3] as Date).getTime()).toBe(0);
+    });
+
+    it('TSQ-064 lists the learner courses', async () => {
+      ready();
+      scopeOptions.describe.mockResolvedValue('Asha');
+      summary.getLearnerCourses.mockResolvedValue([]);
+      const out = await service.getChartData(TENANT, 'TSQ-064', {
+        learnerId: 4,
+      });
+      expect(out.data).toEqual({ rows: [] });
+    });
+
+    it('quiz pass rates narrow to one course', async () => {
+      ready();
+      repo.getCapabilities.mockResolvedValue(caps({ scoredQuizItems: 30 }));
+      scopeOptions.describe.mockResolvedValue('Course A');
+      practice.getQuizPassRates.mockResolvedValue([]);
+      await service.getChartData(TENANT, 'TSQ-019', { courseId: COURSE });
+      expect(practice.getQuizPassRates).toHaveBeenCalledWith(
+        TENANT,
+        'internal1',
+        expect.any(Date),
+        expect.any(Date),
+        expect.any(Number),
+        expect.any(Number),
+        expect.objectContaining({ courseId: COURSE }),
+      );
+    });
+
+    it('the skills chart no longer claims a course scope it cannot honour', async () => {
+      enabled();
+      repo.getCapabilities.mockResolvedValue(caps({ skillScoredCuts: 50 }));
+      const lib = await service.getLibrary(TENANT);
+      const skills = lib.charts.find((c) => c.id === 'TSQ-024');
+      expect(skills?.scopes).toEqual(['organisation', 'learner']);
     });
   });
 

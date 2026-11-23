@@ -245,3 +245,38 @@ export interface GetStatisticsScopeOptionsRequest {
   kind: StatisticsScopeKind;
   search?: string;
 }
+
+/** TSQ-041 and TSQ-063: a card of named numbers. */
+export interface MeasureRow {
+  key: string;
+  value: number | null;
+  /** How the page writes the number. */
+  format: "count" | "days" | "minutes" | "score" | "percent" | "date";
+  /** A `date` is ISO text; `value` is then null. */
+  text?: string | null;
+}
+
+export interface MeasuresData {
+  measures: MeasureRow[];
+}
+
+/** TSQ-043 */
+export interface TimeToFinishData {
+  /** Counts per band; `boundsDays` are the upper limits of every band but the last. */
+  bins: number[];
+  boundsDays: number[];
+  completed: number;
+  medianDays: number | null;
+}
+
+/** TSQ-064 */
+export interface LearnerCoursesData {
+  rows: Array<{
+    courseId: string;
+    title: string;
+    completedItems: number;
+    totalItems: number;
+    status: "completed" | "inProgress" | "notStarted";
+    lastActivityAt: string | null;
+  }>;
+}

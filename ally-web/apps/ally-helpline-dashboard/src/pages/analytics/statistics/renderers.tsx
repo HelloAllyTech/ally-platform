@@ -7,6 +7,9 @@ import { useTranslation } from "react-i18next";
 import { useGetStatisticsChartQuery } from "@api";
 import type {
   ActivationData,
+  LearnerCoursesData,
+  MeasuresData,
+  TimeToFinishData,
   AttentionLearnersData,
   CourseFunnelData,
   CourseRankingData,
@@ -1502,6 +1505,158 @@ const skillChangeTakeaway = (data: SkillChangeData, t: TFunction) => {
   });
 };
 
+// ── TSQ-041 and TSQ-063: a card of named numbers ───────────────
+
+const formatMeasure = (
+  measure: MeasuresData["measures"][number],
+  t: TFunction,
+  language: string,
+): string => {
+  if (measure.format === "date") {
+    return measure.text ? new Date(measure.text).toLocaleDateString(language) : "—";
+  }
+  if (measure.value === null) return "—";
+  switch (measure.format) {
+    case "days":
+      return t("statisticsLibrary.measures.formatDays", { value: measure.value });
+    case "minutes":
+      return t("statisticsLibrary.measures.formatMinutes", { value: measure.value });
+    case "score":
+      return t("statisticsLibrary.measures.formatScore", { value: measure.value });
+    case "percent":
+      return `${measure.value}%`;
+    default:
+      return String(measure.value);
+  }
+};
+
+const Measures = ({ data }: DataRendererProps<MeasuresData>) => {
+  const { t, i18n } = useTranslation();
+  return (
+    <dl
+      className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3"
+      data-testid="statistics-measures"
+    >
+      {data.measures.map(measure => (
+        <div key={measure.key} className="flex flex-col gap-1">
+          <dt className="text-xs text-typography-600">
+            {t(`statisticsLibrary.measures.${measure.key}`)}
+          </dt>
+          <dd className="text-2xl font-semibold text-typography-900">
+            {formatMeasure(measure, t, i18n.language)}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+};
+
+const measureValue = (data: MeasuresData, key: string) =>
+  data.measures.find(m => m.key === key)?.value ?? 0;
+
+const courseFactsTakeaway = (data: MeasuresData, t: TFunction) => {
+  const enrolled = measureValue(data, "enrolled");
+  return enrolled === 0
+    ? t("statisticsLibrary.takeaway.courseFactsNone")
+    : t("statisticsLibrary.takeaway.courseFacts", {
+        completed: measureValue(data, "completed"),
+        enrolled,
+      });
+};
+
+const practiceRhythmTakeaway = (data: MeasuresData, t: TFunction) =>
+  measureValue(data, "sessions") === 0
+    ? t("statisticsLibrary.takeaway.rhythmNone")
+    : t("statisticsLibrary.takeaway.rhythm", {
+        sessions: measureValue(data, "sessions"),
+        weeks: measureValue(data, "activeWeeks"),
+      });
+
+// ── TSQ-043 Time to finish a course ────────────────────────────
+
+const TimeToFinish = ({ data }: DataRendererProps<TimeToFinishData>) => {
+  const { t } = useTranslation();
+  if (data.completed === 0) {
+    return <p className="text-sm text-typography-600">{t("statisticsLibrary.finish.none")}</p>;
+  }
+  const bounds = data.boundsDays;
+  const label = (i: number) => {
+    if (i === 0) return t("statisticsLibrary.finish.under", { max: bounds[0] });
+    if (i === bounds.length) return t("statisticsLibrary.finish.over", { min: bounds[i - 1] });
+    return t("statisticsLibrary.finish.between", { min: bounds[i - 1], max: bounds[i] });
+  };
+  return (
+    <div data-testid="statistics-time-to-finish">
+      <Bars
+        rows={data.bins.map((count, i) => ({
+          key: String(i),
+          label: label(i),
+          count,
+          colour: "#2a5db0",
+        }))}
+      />
+    </div>
+  );
+};
+
+const timeToFinishTakeaway = (data: TimeToFinishData, t: TFunction) =>
+  data.completed > 0 && data.medianDays !== null
+    ? t("statisticsLibrary.takeaway.finish", { median: data.medianDays, count: data.completed })
+    : null;
+
+// ── TSQ-064 Progress in each course ────────────────────────────
+
+const STATUS_COLOUR: Record<LearnerCoursesData["rows"][number]["status"], string> = {
+  completed: "#1e6b3a",
+  inProgress: "#2a5db0",
+  notStarted: "#8f8a7e",
+};
+
+const LearnerCourses = ({ data }: DataRendererProps<LearnerCoursesData>) => {
+  const { t } = useTranslation();
+  if (data.rows.length === 0) {
+    return <p className="text-sm text-typography-600">{t("statisticsLibrary.courses.none")}</p>;
+  }
+  return (
+    <ul className="flex flex-col gap-3" data-testid="statistics-learner-courses">
+      {data.rows.map(row => {
+        const percent =
+          row.totalItems > 0 ? Math.round((row.completedItems / row.totalItems) * 100) : 0;
+        return (
+          <li key={row.courseId} className="flex flex-col gap-1 text-sm">
+            <span className="flex items-center justify-between gap-3">
+              <span className="truncate text-typography-900" title={row.title}>
+                {row.title}
+              </span>
+              <span className="flex-none text-typography-600">
+                {t(`statisticsLibrary.courses.status.${row.status}`)} ·{" "}
+                {t("statisticsLibrary.courses.items", {
+                  done: row.completedItems,
+                  total: row.totalItems,
+                })}
+              </span>
+            </span>
+            <span className="h-3 rounded-md bg-[#efebe0]">
+              <span
+                className="block h-3 rounded-md"
+                style={{ width: `${percent}%`, background: STATUS_COLOUR[row.status] }}
+              />
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+};
+
+const learnerCoursesTakeaway = (data: LearnerCoursesData, t: TFunction) =>
+  data.rows.length > 0
+    ? t("statisticsLibrary.takeaway.learnerCourses", {
+        done: data.rows.filter(r => r.status === "completed").length,
+        total: data.rows.length,
+      })
+    : null;
+
 export const CHART_RENDERERS: Record<string, ChartRenderer> = {
   "TSQ-001": { kind: "data", Component: HeadlineNumbers, bare: true },
   "TSQ-002": { kind: "data", Component: UsageOverTime, takeaway: usageTakeaway },
@@ -1513,6 +1668,10 @@ export const CHART_RENDERERS: Record<string, ChartRenderer> = {
   "TSQ-018": { kind: "data", Component: ItemFormats, takeaway: makeItemFormatsTakeaway() },
   "TSQ-019": { kind: "data", Component: QuizPass, takeaway: quizPassTakeaway },
   "TSQ-024": { kind: "data", Component: SkillChange, takeaway: skillChangeTakeaway },
+  "TSQ-041": { kind: "data", Component: Measures, takeaway: courseFactsTakeaway },
+  "TSQ-043": { kind: "data", Component: TimeToFinish, takeaway: timeToFinishTakeaway },
+  "TSQ-063": { kind: "data", Component: Measures, takeaway: practiceRhythmTakeaway },
+  "TSQ-064": { kind: "data", Component: LearnerCourses, takeaway: learnerCoursesTakeaway },
   "TSQ-007": { kind: "data", Component: LearnerStatus, takeaway: learnerStatusTakeaway },
   "TSQ-008": { kind: "data", Component: TopLearners, takeaway: topLearnersTakeaway },
   "TSQ-009": { kind: "self", Component: LearnerTable },

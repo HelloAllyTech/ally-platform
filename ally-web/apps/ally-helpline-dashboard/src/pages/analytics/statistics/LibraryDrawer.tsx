@@ -190,26 +190,28 @@ export const LibraryDrawer: FunctionComponent<LibraryDrawerProps> = ({
                   </div>
                 )}
               </div>
-              <button
-                type="button"
-                disabled={unavailable || isAdded}
-                onClick={() => onAdd(chart.id)}
-                aria-label={t("statisticsLibrary.library.addAria", { title: chart.title })}
-                className={`min-h-11 min-w-[76px] self-center rounded border px-3 text-sm font-medium ${
-                  isAdded
-                    ? "border-[#b7d9c4] bg-white text-[#1e6b3a]"
+              {chart.scopes.includes("organisation") && (
+                <button
+                  type="button"
+                  disabled={unavailable || isAdded}
+                  onClick={() => onAdd(chart.id)}
+                  aria-label={t("statisticsLibrary.library.addAria", { title: chart.title })}
+                  className={`min-h-11 min-w-[76px] self-center rounded border px-3 text-sm font-medium ${
+                    isAdded
+                      ? "border-[#b7d9c4] bg-white text-[#1e6b3a]"
+                      : unavailable
+                        ? "cursor-not-allowed border-border-light bg-background-secondary text-typography-600"
+                        : "border-[#264d8e] bg-[#264d8e] text-white"
+                  }`}
+                  data-testid={`statistics-library-add-${chart.id}`}
+                >
+                  {isAdded
+                    ? t("statisticsLibrary.library.added")
                     : unavailable
-                      ? "cursor-not-allowed border-border-light bg-background-secondary text-typography-600"
-                      : "border-[#264d8e] bg-[#264d8e] text-white"
-                }`}
-                data-testid={`statistics-library-add-${chart.id}`}
-              >
-                {isAdded
-                  ? t("statisticsLibrary.library.added")
-                  : unavailable
-                    ? t("statisticsLibrary.library.unavailable")
-                    : t("statisticsLibrary.library.add")}
-              </button>
+                      ? t("statisticsLibrary.library.unavailable")
+                      : t("statisticsLibrary.library.add")}
+                </button>
+              )}
             </li>
           );
         })}

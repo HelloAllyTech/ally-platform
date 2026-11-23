@@ -3858,7 +3858,13 @@
       "formats": "{{type}} items lose the most learners: {{percent}}% are finished.",
       "quiz": "{{title}} has the lowest pass rate: {{percent}}% over {{count}} attempts.",
       "skills": "{{weakest}} is the weakest skill, at level {{level}}. {{gain}} improved most, by {{delta}}.",
-      "skillsFlat": "No skill has moved much between learners' first and latest practice."
+      "skillsFlat": "No skill has moved much between learners' first and latest practice.",
+      "courseFacts": "{{completed}} of {{enrolled}} learners have finished this course.",
+      "courseFactsNone": "No learner has been enrolled in this course yet.",
+      "rhythm": "Completed {{sessions}} sessions over {{weeks}} weeks of practice in this period.",
+      "rhythmNone": "No practice sessions from this learner in this period.",
+      "finish": "A typical learner takes {{median}} days to finish, across {{count}} learners.",
+      "learnerCourses": "{{done}} of {{total}} courses finished."
     },
     "table": {
       "learner": "Learner",
@@ -3881,8 +3887,14 @@
     "courses": {
       "inUse": "In use",
       "idle": "Idle",
-      "none": "No courses yet.",
-      "truncated": "Showing the first {{count}} courses."
+      "none": "This learner has not been given a course.",
+      "truncated": "Showing the first {{count}} courses.",
+      "items": "{{done}} of {{total}} items",
+      "status": {
+        "completed": "Completed",
+        "inProgress": "In progress",
+        "notStarted": "Not started"
+      }
     },
     "stalled": {
       "none": "No learners are stalled in a course."
@@ -4025,6 +4037,28 @@
         "simulation": "For a simulation…",
         "learner": "For a learner…"
       }
+    },
+    "measures": {
+      "items": "Items in the course",
+      "enrolled": "Enrolled",
+      "started": "Started",
+      "completed": "Completed",
+      "completionRate": "Completion rate",
+      "medianDays": "Typical time to finish",
+      "sessions": "Sessions completed",
+      "averageScore": "Average score",
+      "formatMinutes": "{{value}} min",
+      "formatDays": "{{value}} days",
+      "formatScore": "{{value}} out of 100",
+      "minutes": "Time practised",
+      "activeWeeks": "Weeks practised",
+      "lastPracticed": "Last practised"
+    },
+    "finish": {
+      "none": "No learner has finished this course yet.",
+      "under": "Under {{max}} day",
+      "between": "{{min}} to {{max}} days",
+      "over": "{{min}} days or more"
     }
   }
 }

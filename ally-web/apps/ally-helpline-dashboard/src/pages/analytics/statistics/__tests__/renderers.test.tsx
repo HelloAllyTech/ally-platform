@@ -78,6 +78,10 @@ describe("every offered chart has a renderer", () => {
       "TSQ-023",
       "TSQ-024",
       "TSQ-026",
+      "TSQ-041",
+      "TSQ-043",
+      "TSQ-063",
+      "TSQ-064",
       "TSQ-027",
     ].forEach(id => expect(CHART_RENDERERS[id], id).toBeDefined());
   });
@@ -106,6 +110,8 @@ describe("empty states say so plainly", () => {
     ["TSQ-018", { rows: [] }, "formats.none"],
     ["TSQ-019", { rows: [] }, "quiz.none"],
     ["TSQ-024", { rows: [] }, "skills.none"],
+    ["TSQ-043", { bins: [], boundsDays: [1, 3], completed: 0, medianDays: null }, "finish.none"],
+    ["TSQ-064", { rows: [] }, "courses.none"],
   ])("%s", (id, data, key) => {
     draw(id as string, data);
     expect(screen.getByText(new RegExp(`statisticsLibrary\\.${key}`))).toBeTruthy();
@@ -249,6 +255,82 @@ describe("practice-habit and skill charts", () => {
     draw("TSQ-024", data);
     expect(screen.getByTestId("statistics-skill-change")).toBeTruthy();
     expect(takeaway("TSQ-024", data)).toContain('"delta":1.5');
+  });
+});
+
+describe("course and learner charts", () => {
+  const measures = (rows: Array<[string, number | null, string]>) => ({
+    measures: rows.map(([key, value, format]) => ({ key, value, format })),
+  });
+
+  it("TSQ-041 shows each number with its label and says how many finished", () => {
+    const data = measures([
+      ["enrolled", 20, "count"],
+      ["completed", 12, "count"],
+      ["completionRate", 60, "percent"],
+      ["medianDays", 4.5, "days"],
+    ]);
+    draw("TSQ-041", data);
+    expect(screen.getByTestId("statistics-measures")).toBeTruthy();
+    expect(screen.getByText("60%")).toBeTruthy();
+    expect(takeaway("TSQ-041", data)).toContain('"completed":12');
+  });
+
+  it("TSQ-041 says plainly when nobody is enrolled", () => {
+    expect(takeaway("TSQ-041", measures([["enrolled", 0, "count"]]))).toContain("courseFactsNone");
+  });
+
+  it("a number with no value is shown as a dash, not zero", () => {
+    draw("TSQ-041", measures([["medianDays", null, "days"]]));
+    expect(screen.getByText("—")).toBeTruthy();
+  });
+
+  it("TSQ-063 reports sessions over weeks of practice", () => {
+    const data = measures([
+      ["sessions", 96, "count"],
+      ["activeWeeks", 7, "count"],
+    ]);
+    expect(takeaway("TSQ-063", data)).toContain('"sessions":96');
+    expect(takeaway("TSQ-063", measures([["sessions", 0, "count"]]))).toContain("rhythmNone");
+  });
+
+  it("TSQ-043 reports the typical days to finish", () => {
+    const data = {
+      bins: [0, 1, 2, 0, 0, 0],
+      boundsDays: [1, 3, 7, 14, 30],
+      completed: 3,
+      medianDays: 4,
+    };
+    draw("TSQ-043", data);
+    expect(screen.getByTestId("statistics-time-to-finish")).toBeTruthy();
+    expect(takeaway("TSQ-043", data)).toContain('"median":4');
+  });
+
+  it("TSQ-064 lists each course with its progress and counts finished ones", () => {
+    const data = {
+      rows: [
+        {
+          courseId: "a",
+          title: "Course A",
+          completedItems: 1,
+          totalItems: 1,
+          status: "completed",
+          lastActivityAt: null,
+        },
+        {
+          courseId: "b",
+          title: "Course B",
+          completedItems: 0,
+          totalItems: 4,
+          status: "inProgress",
+          lastActivityAt: null,
+        },
+      ],
+    };
+    draw("TSQ-064", data);
+    expect(screen.getByTestId("statistics-learner-courses")).toBeTruthy();
+    expect(screen.getByText("Course B")).toBeTruthy();
+    expect(takeaway("TSQ-064", data)).toContain('"done":1');
   });
 });
 

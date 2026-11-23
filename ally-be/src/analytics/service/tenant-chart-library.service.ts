@@ -11,7 +11,10 @@ import {
   TENANT_CHART_LIBRARY,
   TenantChartEntry,
 } from '../constants/tenant-chart-library.constants';
-import { TENANT_CHART_SPECS } from '../constants/tenant-chart-specs.constants';
+import {
+  SCOPE_AWARE_CHARTS,
+  TENANT_CHART_SPECS,
+} from '../constants/tenant-chart-specs.constants';
 import { AnalyticsRange } from '../dto/platform-analytics.dto';
 import { LearnerUsageStatus } from '../dto/tenant-analytics.dto';
 import {
@@ -29,6 +32,7 @@ import {
   ScopeOption,
   TenantScopeOptionsRepository,
 } from '../repository/tenant-scope-options.repository';
+import { TenantScopeSummaryRepository } from '../repository/tenant-scope-summary.repository';
 import { TenantOutcomesRepository } from '../repository/tenant-outcomes.repository';
 import {
   SESSION_LENGTH_BOUNDS_MINUTES,
@@ -230,6 +234,7 @@ export class TenantChartLibraryService {
     private readonly practiceRepo: TenantPracticeRepository,
     private readonly chartQueryRepo: TenantChartQueryRepository,
     private readonly scopeOptionsRepo: TenantScopeOptionsRepository,
+    private readonly summaryRepo: TenantScopeSummaryRepository,
   ) {
     this.handlers = {
       // Headline numbers: the summary block of organization-metrics, plus the
@@ -303,11 +308,36 @@ export class TenantChartLibraryService {
       // Learners by how many of the period's weeks they practised in.
       'TSQ-012': (tenantId, p, code) => this.regularity(tenantId, code, p),
       // For each kind of course item, how many reached it and finished it.
-      'TSQ-018': (tenantId, _p, code) => this.itemFormats(tenantId, code),
+      'TSQ-018': (tenantId, p, code) => this.itemFormats(tenantId, code, p),
       // Quizzes with a few attempts, lowest pass rate first.
       'TSQ-019': (tenantId, p, code) => this.quizPassRates(tenantId, code, p),
       // Average skill level, each learner's first slice against their latest.
-      'TSQ-024': (tenantId, _p, code) => this.skillChange(tenantId, code),
+      'TSQ-024': (tenantId, p, code) => this.skillChange(tenantId, code, p),
+      // Facts about one course: who has taken it and how long it takes.
+      'TSQ-041': (tenantId, p, code) =>
+        this.summaryRepo.getCourseFacts(tenantId, code, this.requireCourse(p)),
+      'TSQ-043': (tenantId, p, code) =>
+        this.summaryRepo.getTimeToFinish(tenantId, code, this.requireCourse(p)),
+      // One learner's practice and where they are in each course.
+      'TSQ-063': (tenantId, p, code) => {
+        const { start, endExclusive } = this.windowFor(
+          p.range ?? DEFAULT_CHART_RANGE,
+        );
+        return this.summaryRepo.getPracticeRhythm(
+          tenantId,
+          code,
+          this.requireLearner(p),
+          start,
+          endExclusive,
+        );
+      },
+      'TSQ-064': async (tenantId, p, code) => ({
+        rows: await this.summaryRepo.getLearnerCourses(
+          tenantId,
+          code,
+          this.requireLearner(p),
+        ),
+      }),
       // Most-used simulations.
       'TSQ-003': async (tenantId, p, code) => {
         const out = (await this.runSpec('TSQ-003', tenantId, code, p)) as {
@@ -584,8 +614,13 @@ export class TenantChartLibraryService {
   private async itemFormats(
     tenantId: string,
     code: string,
+    p: TenantChartParams,
   ): Promise<ItemFormatData> {
-    const rows = await this.practiceRepo.getItemFormatDropoff(tenantId, code);
+    const rows = await this.practiceRepo.getItemFormatDropoff(
+      tenantId,
+      code,
+      this.selectionOf(p),
+    );
     return {
       rows: rows.map((r) => ({
         ...r,
@@ -611,6 +646,7 @@ export class TenantChartLibraryService {
         endExclusive,
         QUIZ_MIN_ATTEMPTS,
         QUIZ_LIMIT,
+        this.selectionOf(p),
       ),
     };
   }
@@ -618,8 +654,15 @@ export class TenantChartLibraryService {
   private async skillChange(
     tenantId: string,
     code: string,
+    p: TenantChartParams,
   ): Promise<SkillChangeData> {
-    return { rows: await this.practiceRepo.getSkillChange(tenantId, code) };
+    return {
+      rows: await this.practiceRepo.getSkillChange(
+        tenantId,
+        code,
+        this.selectionOf(p),
+      ),
+    };
   }
 
   /**
@@ -646,7 +689,33 @@ export class TenantChartLibraryService {
    * it never claims a scope it would ignore.
    */
   private supportedScopes(entry: TenantChartEntry): readonly ChartScope[] {
-    return TENANT_CHART_SPECS[entry.id] ? entry.scopes : ['organisation'];
+    return TENANT_CHART_SPECS[entry.id] || SCOPE_AWARE_CHARTS.has(entry.id)
+      ? entry.scopes
+      : ['organisation'];
+  }
+
+  /** The scope fields of a request, as the query layer takes them. */
+  private selectionOf(p: TenantChartParams) {
+    return {
+      scenarioId: p.scenarioId,
+      courseId: p.courseId,
+      learnerId: p.learnerId,
+    };
+  }
+
+  /** A course-only chart needs a course; asking without one is a mistake in the request. */
+  private requireCourse(p: TenantChartParams): string {
+    if (!p.courseId) {
+      throw new BadRequestException('Choose a course for this chart');
+    }
+    return p.courseId;
+  }
+
+  private requireLearner(p: TenantChartParams): number {
+    if (p.learnerId === undefined) {
+      throw new BadRequestException('Choose a learner for this chart');
+    }
+    return p.learnerId;
   }
 
   /** A scope filter is only accepted for a chart that supports that scope. */
@@ -711,11 +780,7 @@ export class TenantChartLibraryService {
       tenantCode: code,
       start,
       endExclusive,
-      scope: {
-        scenarioId: p.scenarioId,
-        courseId: p.courseId,
-        learnerId: p.learnerId,
-      },
+      scope: this.selectionOf(p),
     };
     if (spec.result === 'distribution') {
       return this.chartQueryRepo.distribution(spec, window);

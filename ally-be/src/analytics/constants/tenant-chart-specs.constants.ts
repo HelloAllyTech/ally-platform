@@ -35,3 +35,19 @@ export const TENANT_CHART_SPECS: Readonly<Record<string, ChartQuerySpec>> = {
     limit: SCENARIO_LIMIT,
   },
 };
+
+/**
+ * Charts with their own handler that still apply a course, simulation or
+ * learner filter. A chart not in this set or in {@link TENANT_CHART_SPECS} is
+ * organisation-wide, whatever its registry row lists, so it never claims a scope
+ * it would ignore.
+ */
+export const SCOPE_AWARE_CHARTS: ReadonlySet<string> = new Set([
+  'TSQ-018', // Drop-off by item format
+  'TSQ-019', // Quiz pass rate
+  'TSQ-024', // Skills before and after
+  'TSQ-041', // Course facts
+  'TSQ-043', // Time to finish a course
+  'TSQ-063', // Practice rhythm
+  'TSQ-064', // Progress in each course
+]);

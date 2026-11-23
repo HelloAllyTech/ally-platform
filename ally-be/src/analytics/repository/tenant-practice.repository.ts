@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { sessionDurationMsExpr } from '../util/session-eligibility.util';
+import { ChartSelection } from '../util/tenant-chart-query.util';
 
 export interface PracticeHeatmap {
   /** Seven rows, Monday first; eight columns of three hours, midnight first. */
@@ -238,7 +239,25 @@ export class TenantPracticeRepository {
     endExclusive: Date,
     minAttempts: number,
     limit: number,
+    scope: ChartSelection = {},
   ): Promise<QuizPassRow[]> {
+    const params: unknown[] = [
+      tenantId,
+      tenantCode,
+      start,
+      endExclusive,
+      minAttempts,
+      limit,
+    ];
+    const extra: string[] = [];
+    if (scope.courseId !== undefined) {
+      params.push(scope.courseId);
+      extra.push(`AND i."trackId" = $${params.length}::uuid`);
+    }
+    if (scope.learnerId !== undefined) {
+      params.push(scope.learnerId);
+      extra.push(`AND a."userId" = $${params.length}`);
+    }
     const rows: Array<{ title: string; attempts: string; passed: string }> =
       await this.dataSource.query(
         `SELECT i.title AS title,
@@ -250,11 +269,12 @@ export class TenantPracticeRepository {
           WHERE u.tenant_id::text IN ($1, $2)
             AND a."deletedAt" IS NULL
             AND a."createdAt" >= $3 AND a."createdAt" < $4
+            ${extra.join('\n            ')}
           GROUP BY i.id, i.title
          HAVING COUNT(*) >= $5
           ORDER BY COUNT(*) FILTER (WHERE a.passed)::numeric / COUNT(*) ASC, COUNT(*) DESC
           LIMIT $6`,
-        [tenantId, tenantCode, start, endExclusive, minAttempts, limit],
+        params,
       );
     return rows.map((r) => ({
       title: r.title,
@@ -269,7 +289,18 @@ export class TenantPracticeRepository {
   async getItemFormatDropoff(
     tenantId: string,
     tenantCode: string,
+    scope: ChartSelection = {},
   ): Promise<ItemFormatRow[]> {
+    const params: unknown[] = [tenantId, tenantCode];
+    const extra: string[] = [];
+    if (scope.courseId !== undefined) {
+      params.push(scope.courseId);
+      extra.push(`AND i."trackId" = $${params.length}::uuid`);
+    }
+    if (scope.learnerId !== undefined) {
+      params.push(scope.learnerId);
+      extra.push(`AND p."userId" = $${params.length}`);
+    }
     const rows: Array<{ type: string; reached: string; completed: string }> =
       await this.dataSource.query(
         `SELECT i.type AS type,
@@ -280,11 +311,12 @@ export class TenantPracticeRepository {
            JOIN track_items i ON i.id = p."trackItemId"
           WHERE e."tenantId"::text IN ($1, $2)
             AND e."deletedAt" IS NULL AND p."deletedAt" IS NULL
+            ${extra.join('\n            ')}
           GROUP BY i.type
          HAVING COUNT(*) FILTER (WHERE p.status IN ('UNLOCKED', 'COMPLETED')) > 0
           ORDER BY COUNT(*) FILTER (WHERE p.status = 'COMPLETED')::numeric
                    / COUNT(*) FILTER (WHERE p.status IN ('UNLOCKED', 'COMPLETED')) ASC`,
-        [tenantId, tenantCode],
+        params,
       );
     return rows.map((r) => ({
       type: r.type,
@@ -301,7 +333,14 @@ export class TenantPracticeRepository {
   async getSkillChange(
     tenantId: string,
     tenantCode: string,
+    scope: ChartSelection = {},
   ): Promise<SkillChangeRow[]> {
+    const params: unknown[] = [tenantId, tenantCode];
+    const extra: string[] = [];
+    if (scope.learnerId !== undefined) {
+      params.push(scope.learnerId);
+      extra.push(`AND c."userId" = $${params.length}`);
+    }
     const rows: Array<{
       skill: string;
       first: string;
@@ -315,6 +354,7 @@ export class TenantPracticeRepository {
           CROSS JOIN LATERAL jsonb_each_text(fa."skillLevels") kv
           WHERE c.tenant_id::text IN ($1, $2)
             AND kv.value ~ '^[0-9]+(\\.[0-9]+)?$'
+            ${extra.join('\n            ')}
        ),
        ends AS (
          SELECT learner, skill,
@@ -329,7 +369,7 @@ export class TenantPracticeRepository {
          FROM ends
         GROUP BY skill
         ORDER BY AVG(latest_level) ASC`,
-      [tenantId, tenantCode],
+      params,
     );
     return rows.map((r) => ({
       skill: r.skill,
