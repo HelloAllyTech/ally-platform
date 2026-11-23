@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { UseFormReturn } from "react-hook-form";
 
@@ -70,13 +70,26 @@ const mocks = vi.hoisted(() => {
         ),
     };
   });
-  return { state, requests, aborts, trigger };
+  const cover = {
+    start: vi.fn(() => ({
+      abort: vi.fn(),
+      unwrap: () =>
+        Promise.resolve({ jobId: "job-1", status: "succeeded", imageUrl: "https://img/fast.png" }),
+    })),
+    poll: vi.fn(() => ({
+      unwrap: () =>
+        Promise.resolve({ jobId: "job-1", status: "succeeded", imageUrl: "https://img/cover.png" }),
+    })),
+  };
+  return { state, requests, aborts, trigger, cover };
 });
 
 const { state, requests, aborts, trigger } = mocks;
 
 vi.mock("@api", () => ({
   useGenerateAgentBuilderFieldMutation: () => [mocks.trigger],
+  useStartCoverImageJobMutation: () => [mocks.cover.start],
+  useLazyGetCoverImageJobQuery: () => [mocks.cover.poll],
   useGetAvailableLanguageVoicesQuery: () => ({ data: CATALOG_FOR_MOCK, isLoading: false }),
 }));
 
@@ -450,6 +463,74 @@ describe("useAgentBuilderGeneration — roleplay mode", () => {
     expect(fieldsRequested()).not.toContain("backstory");
     expect(requests.find(r => r.field === "title")?.establishedContext).toMatchObject({
       persona: { name: "Gowramma", age: 52, gender: "female" },
+    });
+  });
+
+  describe("cover image", () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      mocks.cover.start.mockClear();
+      mocks.cover.poll.mockClear();
+    });
+    afterEach(() => vi.useRealTimers());
+
+    it("generates a cover from the title and persona once they are in, polling the job", async () => {
+      mocks.cover.start.mockReturnValueOnce({
+        abort: vi.fn(),
+        unwrap: () => Promise.resolve({ jobId: "job-1", status: "running" }),
+      } as any);
+      const { form, store } = makeForm();
+      const { result } = renderHook(() => useAgentBuilderGeneration(form));
+
+      act(() => result.current.start(INPUTS));
+      await waitFor(() => expect(mocks.cover.start).toHaveBeenCalled());
+      expect(mocks.cover.start.mock.calls[0][0]).toMatchObject({
+        title: "A tired daughter-in-law",
+        name: "Suchi",
+        age: 34,
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3500);
+      });
+      await waitFor(() => expect(result.current.phase).toBe("done"));
+      expect(mocks.cover.poll).toHaveBeenCalledWith("job-1");
+      expect(store.coverImageUrl).toBe("https://img/cover.png");
+      expect(result.current.tasks.find(t => t.key === "cover_image")?.status).toBe("done");
+    });
+
+    it("keeps a cover that is already on the form", async () => {
+      const { form, store } = makeForm({ coverImageUrl: "https://img/mine.png" });
+      const { result } = renderHook(() => useAgentBuilderGeneration(form));
+
+      act(() => result.current.start(INPUTS));
+      await waitFor(() => expect(result.current.phase).toBe("done"));
+      expect(mocks.cover.start).not.toHaveBeenCalled();
+      expect(store.coverImageUrl).toBe("https://img/mine.png");
+    });
+
+    it("notes a refused cover without failing the batch", async () => {
+      mocks.cover.start.mockReturnValueOnce({
+        abort: vi.fn(),
+        unwrap: () => Promise.reject({ status: 403 }),
+      } as any);
+      const { form } = makeForm();
+      const { result } = renderHook(() => useAgentBuilderGeneration(form));
+
+      act(() => result.current.start(INPUTS));
+      await waitFor(() => expect(result.current.phase).toBe("done"));
+      expect(result.current.tasks.find(t => t.key === "cover_image")).toMatchObject({
+        status: "error",
+        error: "you don't have permission to generate cover images",
+      });
+      expect(result.current.tasks.find(t => t.field === "title")?.status).toBe("done");
+    });
+
+    it("skips the cover when asked", async () => {
+      const { form } = makeForm();
+      const { result } = renderHook(() => useAgentBuilderGeneration(form));
+      act(() => result.current.start({ ...INPUTS, generateCover: false }));
+      await waitFor(() => expect(result.current.phase).toBe("done"));
+      expect(result.current.tasks.some(t => t.key === "cover_image")).toBe(false);
     });
   });
 });

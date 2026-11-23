@@ -8,6 +8,8 @@ import {
   AgentBuilderSpokenLanguage,
   RoleplayMode,
   useGenerateAgentBuilderFieldMutation,
+  useLazyGetCoverImageJobQuery,
+  useStartCoverImageJobMutation,
   useGetAvailableLanguageVoicesQuery,
 } from "@api";
 import type { LanguageOption } from "@components/linguistic-style-samples/scenarioLanguageUtils";
@@ -103,7 +105,27 @@ export interface GenerationInputs {
    * not generated, and every other field is written from them.
    */
   libraryCharacter?: boolean;
+  /**
+   * Generate a cover image once the title, challenge and persona are in (default on). A cover
+   * already on the form (the trainer's, or a library character's) is kept.
+   */
+  generateCover?: boolean;
 }
+
+/** The cover row: not a field generator, an image job (start, then poll until it settles). */
+const COVER_TASK = { key: "cover_image", label: "Cover image" };
+const COVER_POLL_MS = 3000;
+/** Image generation can take a minute or two; past this the row gives up, the job may still land. */
+const COVER_MAX_WAIT_MS = 4 * 60 * 1000;
+
+const plainText = (value: unknown, max: number): string =>
+  String(value ?? "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, max);
+
+const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 
 /** The fields a library character supplies itself. */
 const CHARACTER_FIELDS: ReadonlySet<AgentBuilderField> = new Set<AgentBuilderField>([
@@ -221,6 +243,8 @@ export const checkAgainstMode = (formMethods: UseFormReturn<any>): string[] => {
 
 export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
   const [trigger] = useGenerateAgentBuilderFieldMutation();
+  const [startCoverJob] = useStartCoverImageJobMutation();
+  const [pollCoverJob] = useLazyGetCoverImageJobQuery();
   const [phase, setPhase] = useState<GenerationPhase>("idle");
   const [tasks, setTasks] = useState<GenerationTask[]>([]);
   // What the post-batch check changed, in words, for the feed.
@@ -290,13 +314,15 @@ export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
           ? [...BASE_FIELD_PLAN, STATES_FIELD, SPOKEN_LANGUAGES_FIELD]
           : fieldPlan
       ).filter(t => !(inputs.libraryCharacter && CHARACTER_FIELDS.has(t.field)));
-      setTasks(
-        plan.map(t => ({
+      const withCover = inputs.generateCover !== false;
+      setTasks([
+        ...plan.map(t => ({
           ...t,
           key: t.field,
           status: (isStageOne(t.field) ? "active" : "waiting") as GenerationTaskStatus,
         })),
-      );
+        ...(withCover ? [{ ...COVER_TASK, status: "waiting" as GenerationTaskStatus }] : []),
+      ]);
       setPhase("running");
 
       const handles: { abort: () => void }[] = [];
@@ -546,6 +572,81 @@ export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
       for (const { field } of plan.filter(t => !isStageOne(t.field))) {
         runsByField.set(field, runAfterFoundation({ key: field, field }));
       }
+
+      /**
+       * The cover, once the title exists (and the challenge and persona it is drawn from). Never
+       * rejects: a cover that can't be made (no permission, moderation, timeout) is one row's
+       * note, not a failed batch.
+       */
+      const makeCover = async (): Promise<void> => {
+        await Promise.allSettled([foundation, runsByField.get("title")]);
+        if (abortedRef.current) return;
+        if (String(formMethods.getValues("coverImageUrl") ?? "").trim()) {
+          patchTask(COVER_TASK.key, {
+            status: "empty",
+            label: `${COVER_TASK.label}: kept the existing one`,
+          });
+          return;
+        }
+        const title = plainText(formMethods.getValues("title"), 300);
+        if (!title) {
+          patchTask(COVER_TASK.key, {
+            status: "empty",
+            label: `${COVER_TASK.label}: needs a title first`,
+          });
+          return;
+        }
+        patchTask(COVER_TASK.key, { status: "active" });
+        const age = Number(formMethods.getValues("age"));
+        try {
+          const started = startCoverJob({
+            title,
+            description: plainText(formMethods.getValues("description"), 2000) || undefined,
+            name: plainText(formMethods.getValues("name"), 200) || undefined,
+            ...(Number.isInteger(age) && age > 0 && age <= 120 ? { age } : {}),
+            gender: plainText(formMethods.getValues("gender"), 100) || undefined,
+            profession: plainText(formMethods.getValues("profession"), 200) || undefined,
+            currentLocation: plainText(formMethods.getValues("currentLocation"), 300) || undefined,
+          });
+          handles.push(started);
+          const job = await started.unwrap();
+          const deadline = Date.now() + COVER_MAX_WAIT_MS;
+          let status = job;
+          while (status.status === "running" && Date.now() < deadline) {
+            await sleep(COVER_POLL_MS);
+            if (abortedRef.current) return;
+            status = await pollCoverJob(job.jobId).unwrap();
+          }
+          if (abortedRef.current) return;
+          if (status.status === "succeeded" && status.imageUrl) {
+            formMethods.setValue("coverImageUrl", status.imageUrl, {
+              shouldDirty: true,
+              shouldValidate: false,
+            });
+            patchTask(COVER_TASK.key, { status: "done" });
+          } else if (status.status === "running") {
+            patchTask(COVER_TASK.key, {
+              status: "error",
+              error: "still generating; pick it later from the image library",
+            });
+          } else {
+            patchTask(COVER_TASK.key, {
+              status: "error",
+              error: status.error || "generation failed",
+            });
+          }
+        } catch (err) {
+          if (abortedRef.current) return;
+          const forbidden = (err as { status?: number })?.status === 403;
+          patchTask(COVER_TASK.key, {
+            status: "error",
+            error: forbidden
+              ? "you don't have permission to generate cover images"
+              : errorMessage(err),
+          });
+        }
+      };
+      if (withCover) runsByField.set("cover_image" as AgentBuilderField, makeCover());
       const runs = [...runsByField.values()];
       // Same array the per-language calls push into later, so Stop cancels
       // them too even though they don't exist yet at this point.
@@ -564,7 +665,7 @@ export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
         void formMethods.trigger();
       });
     },
-    [trigger, formMethods, patchTask, fieldPlan],
+    [trigger, startCoverJob, pollCoverJob, formMethods, patchTask, fieldPlan],
   );
 
   const abort = useCallback(() => {
