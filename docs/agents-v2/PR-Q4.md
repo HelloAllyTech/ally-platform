@@ -103,10 +103,16 @@ Q4 built a use-case suite first (`evals/usecases/`: 13 assistants, about 300 con
   - `node evals/usecases/run.mjs --label <label> --setup 2026-11-22`, then `compare.mjs` and `confirmations.mjs`;
   - `tryit-vs-live.mjs` checks that Try it and the live page ask the same booking question.
 
+## CI notes
+
+- **docs-guard:** the wiki's ally-ai page now documents the two endpoint changes: the crisis check on the message alone, the development-only `failed` switch, and the judge's neighbours and `max_sources`. master is merged in, so the diff holds only Q4's files (the `app.module.ts` and helpline `Analytics.tsx` failures were master's own changes after Q4 branched).
+- **dead-code-be and dead-code-web:** every new finding (33 in ally-be, 24 in ally-web) is in master's own newer code (Bug Hunter, helpline analytics), none in Q4's files. master fails the same ratchet. Q4 doesn't add them to the baseline (it only shrinks); they're for the owner of that code.
+- **Migrations:** master added `1986500000000-GrantTenantAdminsUserPreferences`, so Q4's `MarkTemplateHelplinesUnconfirmed` moved to `1986500000100` to keep the order clear.
+
 ## Before deploying (`LAUNCH-CHECKLIST.md`, "Q4 light")
 
 1. **Deploy ally-ai, then ally-be.** Four migrations run with ally-be:
-   - `1986500000000-MarkTemplateHelplinesUnconfirmed`
+   - `1986500000100-MarkTemplateHelplinesUnconfirmed`
    - `1986510000000-AddCheckupRecheckTrigger`
    - `1986520000000-ReclassifyOldSafetyRechecks`
    - `1986530000000-RepairPlaceholderNames`

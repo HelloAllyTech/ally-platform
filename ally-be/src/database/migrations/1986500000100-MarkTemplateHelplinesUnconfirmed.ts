@@ -10,8 +10,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * Settings only (jsonb keys), no schema change. Down removes the marker, which makes those numbers
  * count as the owner's again.
  */
-export class MarkTemplateHelplinesUnconfirmed1986500000000 implements MigrationInterface {
-  name = 'MarkTemplateHelplinesUnconfirmed1986500000000';
+export class MarkTemplateHelplinesUnconfirmed1986500000100 implements MigrationInterface {
+  name = 'MarkTemplateHelplinesUnconfirmed1986500000100';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
