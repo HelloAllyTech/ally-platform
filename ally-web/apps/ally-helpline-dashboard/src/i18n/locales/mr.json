@@ -3850,7 +3850,15 @@
       "scenarioOne": "{{title}} ची सरासरी 100 पैकी {{score}} आहे.",
       "scenarios": "{{hardest}} सर्वात अवघड आहे, सरासरी {{hardScore}}. {{easiest}} सर्वात सोपे आहे, सरासरी {{easyScore}}.",
       "ratings": "लर्नर्स त्यांच्या सत्रांना सरासरी 5 पैकी {{average}} रेटिंग देतात, {{count}} रेटिंगवरून.",
-      "reviews": "{{total}} पूर्ण सत्रांपैकी {{reviewed}} पुनरावलोकनासाठी शेअर केली आहेत."
+      "reviews": "{{total}} पूर्ण सत्रांपैकी {{reviewed}} पुनरावलोकनासाठी शेअर केली आहेत.",
+      "heatmap": "बहुतेक सत्रे {{day}} रोजी {{from}}:00 ते {{to}}:00 दरम्यान सुरू होतात.",
+      "length": "सामान्य सत्र {{median}} मिनिटांचे असते, {{count}} सत्रांमध्ये.",
+      "activation": "{{registered}} पैकी {{started}} लर्नर्सनी सराव सुरू केला आहे. {{recent}} गेल्या 14 दिवसांत सक्रिय होते.",
+      "regularity": "{{total}} पैकी {{regular}} लर्नर्स नियमित सराव करतात. {{bursty}} थांबून थांबून करतात.",
+      "formats": "{{type}} घटकांत सर्वाधिक लर्नर्स गळतात: {{percent}}% पूर्ण होतात.",
+      "quiz": "{{title}} चा उत्तीर्ण दर सर्वात कमी आहे: {{count}} प्रयत्नांमध्ये {{percent}}%.",
+      "skills": "{{weakest}} हे सर्वात कमकुवत कौशल्य आहे, पातळी {{level}}. {{gain}} मध्ये सर्वाधिक सुधारणा झाली, {{delta}} ने.",
+      "skillsFlat": "लर्नर्सच्या पहिल्या आणि ताज्या सरावात कोणत्याही कौशल्यात फारसा बदल झालेला नाही."
     },
     "table": {
       "learner": "लर्नर",
@@ -3916,6 +3924,77 @@
       "none": "या कालावधीत कोणतेही पूर्ण सत्र नाही.",
       "ofCompleted": "{{total}} पूर्ण सत्रांपैकी",
       "percent": "{{percent}}% पुनरावलोकनासाठी शेअर केले आहेत"
+    },
+    "heatmap": {
+      "none": "या कालावधीत कोणतेही सराव सत्र नाही.",
+      "timezone": "वेळा {{timezone}} मध्ये आहेत.",
+      "fewer": "कमी",
+      "more": "जास्त",
+      "cell_one": "{{day}}, {{from}}:00 ते {{to}}:00: {{count}} सत्र",
+      "cell_other": "{{day}}, {{from}}:00 ते {{to}}:00: {{count}} सत्रे"
+    },
+    "length": {
+      "none": "या कालावधीत कोणतेही पूर्ण सत्र नाही.",
+      "under": "{{max}} मिनिटांपेक्षा कमी",
+      "between": "{{min}} ते {{max}} मिनिटे",
+      "over": "{{min}} मिनिटे किंवा जास्त"
+    },
+    "activation": {
+      "none": "अजून कोणताही लर्नर नाही.",
+      "registered": "नोंदणीकृत",
+      "started": "एकदा सराव केला",
+      "practisedThreeTimes": "3 वेळा सराव केला",
+      "activeRecently": "गेल्या 14 दिवसांत सक्रिय"
+    },
+    "regularity": {
+      "none": "या कालावधीत कोणत्याही लर्नरने सराव केला नाही.",
+      "regular": "नियमित",
+      "occasional": "अधूनमधून",
+      "bursty": "थांबून थांबून",
+      "rule": "नियमित: {{weeks}} पैकी किमान अर्ध्या आठवड्यांत सराव केला. अधूनमधून: पाचव्या भागापासून अर्ध्यापेक्षा कमी आठवड्यांत. थांबून थांबून: पाचव्या भागापेक्षा कमी आठवड्यांत."
+    },
+    "formats": {
+      "none": "अजून कोणत्याही कोर्स घटकापर्यंत कोणी पोहोचलेले नाही.",
+      "finished": "{{percent}}% पूर्ण ({{reached}} पैकी {{completed}})"
+    },
+    "itemTypes": {
+      "ARTICLE": "लेख",
+      "QUIZ": "क्विझ",
+      "ROLEPLAY": "रोलप्ले",
+      "JOURNAL": "जर्नल",
+      "GAME": "गेम",
+      "ANNOTATED_ARTIFACT": "टिपणीसह उदाहरण",
+      "VIDEO": "व्हिडिओ",
+      "BRANCHING_SCENARIO": "शाखांचे परिस्थिती-चित्र",
+      "BUCKET_SORT": "वर्गीकरण सराव",
+      "CASE": "केस"
+    },
+    "quiz": {
+      "none": "अजून कोणत्याही क्विझचे पुरेसे प्रयत्न नाहीत.",
+      "passed_one": "{{percent}}% उत्तीर्ण, {{count}} प्रयत्न",
+      "passed_other": "{{percent}}% उत्तीर्ण, {{count}} प्रयत्न"
+    },
+    "skills": {
+      "none": "अजून कोणत्याही लर्नरचे दोन स्कोअर असलेले सराव भाग नाहीत.",
+      "first": "पहिला",
+      "latest": "ताजा",
+      "scale": "कौशल्य पातळी, 1 ते 5",
+      "names": {
+        "verbal": "Verbal",
+        "confidentiality": "Confidentiality",
+        "rapport": "Rapport",
+        "feelings": "Feelings",
+        "empathy": "Empathy",
+        "harm": "Harm",
+        "functioning": "Functioning",
+        "explanation": "Explanation",
+        "family": "Family",
+        "goals": "Goals",
+        "hope": "Hope",
+        "coping": "Coping",
+        "psychoeducation": "Psychoeducation",
+        "feedback": "Feedback"
+      }
     }
   }
 }

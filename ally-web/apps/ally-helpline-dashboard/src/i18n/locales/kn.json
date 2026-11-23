@@ -3850,7 +3850,15 @@
       "scenarioOne": "{{title}} ನ ಸರಾಸರಿ 100ರಲ್ಲಿ {{score}}.",
       "scenarios": "{{hardest}} ಅತಿ ಕಠಿಣ, ಸರಾಸರಿ {{hardScore}}. {{easiest}} ಅತಿ ಸುಲಭ, ಸರಾಸರಿ {{easyScore}}.",
       "ratings": "ಕಲಿಯುವವರು ತಮ್ಮ ಸೆಷನ್‌ಗಳಿಗೆ ಸರಾಸರಿ 5ರಲ್ಲಿ {{average}} ರೇಟಿಂಗ್ ನೀಡುತ್ತಾರೆ, {{count}} ರೇಟಿಂಗ್‌ಗಳಿಂದ.",
-      "reviews": "{{total}} ಪೂರ್ಣಗೊಂಡ ಸೆಷನ್‌ಗಳಲ್ಲಿ {{reviewed}} ವಿಮರ್ಶೆಗೆ ಹಂಚಿಕೊಳ್ಳಲಾಗಿದೆ."
+      "reviews": "{{total}} ಪೂರ್ಣಗೊಂಡ ಸೆಷನ್‌ಗಳಲ್ಲಿ {{reviewed}} ವಿಮರ್ಶೆಗೆ ಹಂಚಿಕೊಳ್ಳಲಾಗಿದೆ.",
+      "heatmap": "ಹೆಚ್ಚಿನ ಸೆಷನ್‌ಗಳು {{day}} ರಂದು {{from}}:00 ರಿಂದ {{to}}:00 ರ ನಡುವೆ ಆರಂಭವಾಗುತ್ತವೆ.",
+      "length": "ಸಾಮಾನ್ಯ ಸೆಷನ್ {{median}} ನಿಮಿಷ ಇರುತ್ತದೆ, {{count}} ಸೆಷನ್‌ಗಳಲ್ಲಿ.",
+      "activation": "{{registered}} ಕಲಿಯುವವರಲ್ಲಿ {{started}} ಮಂದಿ ಅಭ್ಯಾಸ ಆರಂಭಿಸಿದ್ದಾರೆ. {{recent}} ಮಂದಿ ಕಳೆದ 14 ದಿನಗಳಲ್ಲಿ ಸಕ್ರಿಯರಾಗಿದ್ದರು.",
+      "regularity": "{{total}} ಕಲಿಯುವವರಲ್ಲಿ {{regular}} ಮಂದಿ ನಿಯಮಿತವಾಗಿ ಅಭ್ಯಾಸ ಮಾಡುತ್ತಾರೆ. {{bursty}} ಮಂದಿ ಒಮ್ಮೆಲೇ ಹೆಚ್ಚು ಮಾಡುತ್ತಾರೆ.",
+      "formats": "{{type}} ಅಂಶಗಳಲ್ಲಿ ಅತಿ ಹೆಚ್ಚು ಕಲಿಯುವವರು ಬಿಟ್ಟುಹೋಗುತ್ತಾರೆ: {{percent}}% ಮುಗಿಯುತ್ತವೆ.",
+      "quiz": "{{title}} ನ ಪಾಸ್ ದರ ಅತಿ ಕಡಿಮೆ: {{count}} ಪ್ರಯತ್ನಗಳಲ್ಲಿ {{percent}}%.",
+      "skills": "{{weakest}} ಅತಿ ದುರ್ಬಲ ಕೌಶಲ, ಮಟ್ಟ {{level}}. {{gain}} ಅತಿ ಹೆಚ್ಚು ಸುಧಾರಿಸಿದೆ, {{delta}} ರಷ್ಟು.",
+      "skillsFlat": "ಕಲಿಯುವವರ ಮೊದಲ ಮತ್ತು ಇತ್ತೀಚಿನ ಅಭ್ಯಾಸದ ನಡುವೆ ಯಾವ ಕೌಶಲವೂ ಹೆಚ್ಚು ಬದಲಾಗಿಲ್ಲ."
     },
     "table": {
       "learner": "ಕಲಿಯುವವರು",
@@ -3916,6 +3924,77 @@
       "none": "ಈ ಅವಧಿಯಲ್ಲಿ ಯಾವ ಪೂರ್ಣಗೊಂಡ ಸೆಷನ್ ಕೂಡ ಇಲ್ಲ.",
       "ofCompleted": "{{total}} ಪೂರ್ಣಗೊಂಡ ಸೆಷನ್‌ಗಳಲ್ಲಿ",
       "percent": "{{percent}}% ವಿಮರ್ಶೆಗೆ ಹಂಚಿಕೊಳ್ಳಲಾಗಿದೆ"
+    },
+    "heatmap": {
+      "none": "ಈ ಅವಧಿಯಲ್ಲಿ ಯಾವ ಅಭ್ಯಾಸ ಸೆಷನ್ ಕೂಡ ಇಲ್ಲ.",
+      "timezone": "ಸಮಯಗಳು {{timezone}} ನಲ್ಲಿವೆ.",
+      "fewer": "ಕಡಿಮೆ",
+      "more": "ಹೆಚ್ಚು",
+      "cell_one": "{{day}}, {{from}}:00 ರಿಂದ {{to}}:00: {{count}} ಸೆಷನ್",
+      "cell_other": "{{day}}, {{from}}:00 ರಿಂದ {{to}}:00: {{count}} ಸೆಷನ್‌ಗಳು"
+    },
+    "length": {
+      "none": "ಈ ಅವಧಿಯಲ್ಲಿ ಯಾವ ಪೂರ್ಣಗೊಂಡ ಸೆಷನ್ ಕೂಡ ಇಲ್ಲ.",
+      "under": "{{max}} ನಿಮಿಷಕ್ಕಿಂತ ಕಡಿಮೆ",
+      "between": "{{min}} ರಿಂದ {{max}} ನಿಮಿಷ",
+      "over": "{{min}} ನಿಮಿಷ ಅಥವಾ ಹೆಚ್ಚು"
+    },
+    "activation": {
+      "none": "ಇನ್ನೂ ಯಾವ ಕಲಿಯುವವರೂ ಇಲ್ಲ.",
+      "registered": "ನೋಂದಾಯಿತ",
+      "started": "ಒಮ್ಮೆ ಅಭ್ಯಾಸ ಮಾಡಿದ್ದಾರೆ",
+      "practisedThreeTimes": "3 ಬಾರಿ ಅಭ್ಯಾಸ ಮಾಡಿದ್ದಾರೆ",
+      "activeRecently": "ಕಳೆದ 14 ದಿನಗಳಲ್ಲಿ ಸಕ್ರಿಯ"
+    },
+    "regularity": {
+      "none": "ಈ ಅವಧಿಯಲ್ಲಿ ಯಾವ ಕಲಿಯುವವರೂ ಅಭ್ಯಾಸ ಮಾಡಲಿಲ್ಲ.",
+      "regular": "ನಿಯಮಿತ",
+      "occasional": "ಆಗಾಗ",
+      "bursty": "ಒಮ್ಮೆಲೇ ಹೆಚ್ಚು",
+      "rule": "ನಿಯಮಿತ: {{weeks}} ವಾರಗಳಲ್ಲಿ ಕನಿಷ್ಠ ಅರ್ಧದಲ್ಲಿ ಅಭ್ಯಾಸ ಮಾಡಿದ್ದಾರೆ. ಆಗಾಗ: ಐದನೇ ಒಂದು ಭಾಗದಿಂದ ಅರ್ಧಕ್ಕಿಂತ ಕಡಿಮೆ. ಒಮ್ಮೆಲೇ ಹೆಚ್ಚು: ಐದನೇ ಒಂದು ಭಾಗಕ್ಕಿಂತ ಕಡಿಮೆ."
+    },
+    "formats": {
+      "none": "ಇನ್ನೂ ಯಾರೂ ಯಾವ ಕೋರ್ಸ್ ಅಂಶವನ್ನೂ ತಲುಪಿಲ್ಲ.",
+      "finished": "{{percent}}% ಮುಗಿಸಿದ್ದಾರೆ ({{reached}} ರಲ್ಲಿ {{completed}})"
+    },
+    "itemTypes": {
+      "ARTICLE": "ಲೇಖನ",
+      "QUIZ": "ಕ್ವಿಜ್",
+      "ROLEPLAY": "ರೋಲ್‌ಪ್ಲೇ",
+      "JOURNAL": "ಜರ್ನಲ್",
+      "GAME": "ಆಟ",
+      "ANNOTATED_ARTIFACT": "ಟಿಪ್ಪಣಿಯೊಂದಿಗೆ ಉದಾಹರಣೆ",
+      "VIDEO": "ವೀಡಿಯೊ",
+      "BRANCHING_SCENARIO": "ಕವಲೊಡೆಯುವ ಸನ್ನಿವೇಶ",
+      "BUCKET_SORT": "ವಿಂಗಡಣೆ ಅಭ್ಯಾಸ",
+      "CASE": "ಪ್ರಕರಣ"
+    },
+    "quiz": {
+      "none": "ಇನ್ನೂ ಯಾವ ಕ್ವಿಜ್‌ಗೂ ಸಾಕಷ್ಟು ಪ್ರಯತ್ನಗಳಿಲ್ಲ.",
+      "passed_one": "{{percent}}% ಪಾಸ್, {{count}} ಪ್ರಯತ್ನ",
+      "passed_other": "{{percent}}% ಪಾಸ್, {{count}} ಪ್ರಯತ್ನಗಳು"
+    },
+    "skills": {
+      "none": "ಇನ್ನೂ ಯಾವ ಕಲಿಯುವವರಿಗೂ ಎರಡು ಅಂಕ ಇರುವ ಅಭ್ಯಾಸ ಭಾಗಗಳಿಲ್ಲ.",
+      "first": "ಮೊದಲ",
+      "latest": "ಇತ್ತೀಚಿನ",
+      "scale": "ಕೌಶಲ ಮಟ್ಟ, 1 ರಿಂದ 5",
+      "names": {
+        "verbal": "Verbal",
+        "confidentiality": "Confidentiality",
+        "rapport": "Rapport",
+        "feelings": "Feelings",
+        "empathy": "Empathy",
+        "harm": "Harm",
+        "functioning": "Functioning",
+        "explanation": "Explanation",
+        "family": "Family",
+        "goals": "Goals",
+        "hope": "Hope",
+        "coping": "Coping",
+        "psychoeducation": "Psychoeducation",
+        "feedback": "Feedback"
+      }
     }
   }
 }

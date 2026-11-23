@@ -55,6 +55,8 @@ export interface StatisticsChartResponse<T = unknown> {
 export interface GetStatisticsChartRequest {
   id: string;
   range?: OrganizationMetricsRange;
+  /** IANA time zone, for charts that group by time of day. */
+  timezone?: string;
   /** Table charts only. */
   search?: string;
   limit?: number;
@@ -166,4 +168,55 @@ export interface CourseRankingData {
 export interface CourseFunnelData {
   truncated: boolean;
   stages: Array<{ key: "assigned" | "started" | "halfway" | "completed"; count: number }>;
+}
+
+/** TSQ-005 */
+export interface PracticeHeatmapData {
+  /** Seven rows, Monday first; eight columns of three hours, midnight first. */
+  cells: number[][];
+  sessions: number;
+  /** The time zone the hours are in. */
+  timezone: string;
+}
+
+/** TSQ-006 */
+export interface SessionLengthData {
+  /** Counts per band; `boundsMinutes` are the upper limits of every band but the last. */
+  bins: number[];
+  boundsMinutes: number[];
+  sessions: number;
+  medianMinutes: number | null;
+}
+
+/** TSQ-011 */
+export interface ActivationData {
+  stages: Array<{
+    key: "registered" | "started" | "practisedThreeTimes" | "activeRecently";
+    count: number;
+  }>;
+}
+
+/** TSQ-012 */
+export interface RegularityData {
+  regular: number;
+  occasional: number;
+  bursty: number;
+  total: number;
+  weeks: number;
+}
+
+/** TSQ-018 */
+export interface ItemFormatData {
+  rows: Array<{ type: string; reached: number; completed: number; completedPercent: number }>;
+}
+
+/** TSQ-019 */
+export interface QuizPassData {
+  rows: Array<{ title: string; attempts: number; passRatePercent: number }>;
+}
+
+/** TSQ-024 */
+export interface SkillChangeData {
+  /** Weakest latest level first. */
+  rows: Array<{ skill: string; first: number; latest: number; learners: number }>;
 }

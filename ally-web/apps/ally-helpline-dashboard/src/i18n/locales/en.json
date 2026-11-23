@@ -3850,7 +3850,15 @@
       "scenarioOne": "{{title}} averages {{score}} out of 100.",
       "scenarios": "{{hardest}} is the hardest, averaging {{hardScore}}. {{easiest}} is the easiest, averaging {{easyScore}}.",
       "ratings": "Learners rate their sessions {{average}} out of 5 on average, from {{count}} ratings.",
-      "reviews": "{{reviewed}} of {{total}} completed sessions have been shared for review."
+      "reviews": "{{reviewed}} of {{total}} completed sessions have been shared for review.",
+      "heatmap": "Most sessions start on {{day}} between {{from}}:00 and {{to}}:00.",
+      "length": "The typical session lasts {{median}} minutes, across {{count}} sessions.",
+      "activation": "{{started}} of {{registered}} learners have started practising. {{recent}} were active in the last 14 days.",
+      "regularity": "{{regular}} of {{total}} learners practise regularly. {{bursty}} practise in bursts.",
+      "formats": "{{type}} items lose the most learners: {{percent}}% are finished.",
+      "quiz": "{{title}} has the lowest pass rate: {{percent}}% over {{count}} attempts.",
+      "skills": "{{weakest}} is the weakest skill, at level {{level}}. {{gain}} improved most, by {{delta}}.",
+      "skillsFlat": "No skill has moved much between learners' first and latest practice."
     },
     "table": {
       "learner": "Learner",
@@ -3916,6 +3924,77 @@
       "none": "No completed sessions in this period.",
       "ofCompleted": "of {{total}} completed sessions",
       "percent": "{{percent}}% have been shared for review"
+    },
+    "heatmap": {
+      "none": "No practice sessions in this period.",
+      "timezone": "Times are in {{timezone}}.",
+      "fewer": "Fewer",
+      "more": "More",
+      "cell_one": "{{day}}, {{from}}:00 to {{to}}:00: {{count}} session",
+      "cell_other": "{{day}}, {{from}}:00 to {{to}}:00: {{count}} sessions"
+    },
+    "length": {
+      "none": "No completed sessions in this period.",
+      "under": "Under {{max}} min",
+      "between": "{{min}} to {{max}} min",
+      "over": "{{min}} min or more"
+    },
+    "activation": {
+      "none": "No learners yet.",
+      "registered": "Registered",
+      "started": "Practised once",
+      "practisedThreeTimes": "Practised 3 times",
+      "activeRecently": "Active in the last 14 days"
+    },
+    "regularity": {
+      "none": "No learner practised in this period.",
+      "regular": "Regular",
+      "occasional": "Occasional",
+      "bursty": "In bursts",
+      "rule": "Regular: practised in at least half of the {{weeks}} weeks. Occasional: in a fifth to under half. In bursts: in under a fifth."
+    },
+    "formats": {
+      "none": "No course items have been reached yet.",
+      "finished": "{{percent}}% finished ({{completed}} of {{reached}})"
+    },
+    "itemTypes": {
+      "ARTICLE": "Article",
+      "QUIZ": "Quiz",
+      "ROLEPLAY": "Roleplay",
+      "JOURNAL": "Journal",
+      "GAME": "Game",
+      "ANNOTATED_ARTIFACT": "Annotated example",
+      "VIDEO": "Video",
+      "BRANCHING_SCENARIO": "Branching scenario",
+      "BUCKET_SORT": "Sorting exercise",
+      "CASE": "Case"
+    },
+    "quiz": {
+      "none": "No quiz has enough attempts yet.",
+      "passed_one": "{{percent}}% passed, {{count}} attempt",
+      "passed_other": "{{percent}}% passed, {{count}} attempts"
+    },
+    "skills": {
+      "none": "No learner has two scored practice slices yet.",
+      "first": "First",
+      "latest": "Latest",
+      "scale": "Skill level, 1 to 5",
+      "names": {
+        "verbal": "Verbal",
+        "confidentiality": "Confidentiality",
+        "rapport": "Rapport",
+        "feelings": "Feelings",
+        "empathy": "Empathy",
+        "harm": "Harm",
+        "functioning": "Functioning",
+        "explanation": "Explanation",
+        "family": "Family",
+        "goals": "Goals",
+        "hope": "Hope",
+        "coping": "Coping",
+        "psychoeducation": "Psychoeducation",
+        "feedback": "Feedback"
+      }
     }
   }
 }

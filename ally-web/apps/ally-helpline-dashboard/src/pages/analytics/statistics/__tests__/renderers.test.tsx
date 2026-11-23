@@ -10,6 +10,7 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string, options?: Record<string, unknown>) =>
       options ? `${key} ${JSON.stringify(options)}` : key,
+    i18n: { language: "en", exists: () => false },
   }),
 }));
 
@@ -57,18 +58,25 @@ describe("every offered chart has a renderer", () => {
       "TSQ-001",
       "TSQ-002",
       "TSQ-003",
+      "TSQ-005",
+      "TSQ-006",
       "TSQ-007",
       "TSQ-008",
       "TSQ-009",
+      "TSQ-011",
+      "TSQ-012",
       "TSQ-013",
       "TSQ-014",
       "TSQ-015",
       "TSQ-016",
       "TSQ-017",
+      "TSQ-018",
+      "TSQ-019",
       "TSQ-020",
       "TSQ-021",
       "TSQ-022",
       "TSQ-023",
+      "TSQ-024",
       "TSQ-026",
       "TSQ-027",
     ].forEach(id => expect(CHART_RENDERERS[id], id).toBeDefined());
@@ -82,15 +90,22 @@ describe("every offered chart has a renderer", () => {
 describe("empty states say so plainly", () => {
   it.each([
     ["TSQ-020", { bins: Array(10).fill(0), sessions: 0, median: null }, "scores.none"],
-    [
-      "TSQ-021",
-      { improving: 0, holding: 0, declining: 0, total: 0, threshold: 5 },
-      "trends.none",
-    ],
+    ["TSQ-021", { improving: 0, holding: 0, declining: 0, total: 0, threshold: 5 }, "trends.none"],
     ["TSQ-022", { rows: [] }, "scenarios.none"],
     ["TSQ-026", { stars: [0, 0, 0, 0, 0], count: 0, average: null }, "ratings.none"],
     ["TSQ-027", { completedSessions: 0, reviewedSessions: 0 }, "reviews.none"],
     ["TSQ-017", { truncated: false, stages: [{ key: "assigned", count: 0 }] }, "funnel.none"],
+    ["TSQ-005", { cells: [], sessions: 0, timezone: "UTC" }, "heatmap.none"],
+    [
+      "TSQ-006",
+      { bins: [], boundsMinutes: [2, 5], sessions: 0, medianMinutes: null },
+      "length.none",
+    ],
+    ["TSQ-011", { stages: [{ key: "registered", count: 0 }] }, "activation.none"],
+    ["TSQ-012", { regular: 0, occasional: 0, bursty: 0, total: 0, weeks: 12 }, "regularity.none"],
+    ["TSQ-018", { rows: [] }, "formats.none"],
+    ["TSQ-019", { rows: [] }, "quiz.none"],
+    ["TSQ-024", { rows: [] }, "skills.none"],
   ])("%s", (id, data, key) => {
     draw(id as string, data);
     expect(screen.getByText(new RegExp(`statisticsLibrary\\.${key}`))).toBeTruthy();
@@ -162,6 +177,78 @@ describe("charts with data", () => {
     });
     expect(screen.getByTestId("statistics-course-funnel")).toBeTruthy();
     expect(screen.getAllByText(/"percent":50/).length).toBeGreaterThan(0);
+  });
+});
+
+describe("practice-habit and skill charts", () => {
+  it("TSQ-005 names the busiest day and hour band", () => {
+    const cells = Array.from({ length: 7 }, () => Array(8).fill(0));
+    cells[1][4] = 9;
+    const data = { cells, sessions: 9, timezone: "Asia/Kolkata" };
+    draw("TSQ-005", data);
+    expect(screen.getByTestId("statistics-practice-heatmap")).toBeTruthy();
+    expect(takeaway("TSQ-005", data)).toContain('"from":12');
+  });
+
+  it("TSQ-006 reports the median session length", () => {
+    const data = {
+      bins: [1, 4, 6, 3, 1, 0, 0],
+      boundsMinutes: [2, 5, 10, 15, 20, 30],
+      sessions: 15,
+      medianMinutes: 7,
+    };
+    draw("TSQ-006", data);
+    expect(screen.getByTestId("statistics-session-length")).toBeTruthy();
+    expect(takeaway("TSQ-006", data)).toContain('"median":7');
+  });
+
+  it("TSQ-011 shows each stage against those registered", () => {
+    const data = {
+      stages: [
+        { key: "registered", count: 10 },
+        { key: "started", count: 6 },
+        { key: "completed", count: 4 },
+        { key: "recent", count: 3 },
+      ],
+    };
+    draw("TSQ-011", data);
+    expect(screen.getByTestId("statistics-activation")).toBeTruthy();
+    expect(takeaway("TSQ-011", data)).toContain('"started":6');
+  });
+
+  it("TSQ-012 splits learners into regular, occasional and bursty", () => {
+    const data = { regular: 3, occasional: 4, bursty: 5, total: 12, weeks: 12 };
+    draw("TSQ-012", data);
+    expect(screen.getByTestId("statistics-regularity")).toBeTruthy();
+    expect(takeaway("TSQ-012", data)).toContain('"bursty":5');
+  });
+
+  it("TSQ-018 leads with the item format fewest people finish", () => {
+    const data = {
+      rows: [{ type: "ROLEPLAY_SIMULATION", reached: 20, completed: 8, completedPercent: 40 }],
+    };
+    draw("TSQ-018", data);
+    expect(screen.getByTestId("statistics-item-formats")).toBeTruthy();
+    expect(takeaway("TSQ-018", data)).toContain('"percent":40');
+  });
+
+  it("TSQ-019 names the quiz with the lowest pass rate", () => {
+    const data = { rows: [{ title: "Hard quiz", attempts: 9, passRatePercent: 33 }] };
+    draw("TSQ-019", data);
+    expect(screen.getByTestId("statistics-quiz-pass")).toBeTruthy();
+    expect(takeaway("TSQ-019", data)).toContain("Hard quiz");
+  });
+
+  it("TSQ-024 shows first and latest level per skill", () => {
+    const data = {
+      rows: [
+        { skill: "EMPATHY", first: 2, latest: 3.5 },
+        { skill: "LISTENING", first: 3, latest: 3 },
+      ],
+    };
+    draw("TSQ-024", data);
+    expect(screen.getByTestId("statistics-skill-change")).toBeTruthy();
+    expect(takeaway("TSQ-024", data)).toContain('"delta":1.5');
   });
 });
 

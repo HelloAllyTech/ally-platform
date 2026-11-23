@@ -6,21 +6,28 @@ import { useTranslation } from "react-i18next";
 
 import { useGetStatisticsChartQuery } from "@api";
 import type {
+  ActivationData,
   AttentionLearnersData,
   CourseFunnelData,
   CourseRankingData,
   CourseTableData,
   CoursesInUseData,
   HeadlineNumbersData,
+  ItemFormatData,
   LearnerStatusCountsData,
   LearnerTrendData,
   LearnerTableData,
   MostUsedSimulationsData,
+  PracticeHeatmapData,
+  QuizPassData,
+  RegularityData,
   OrganizationMetricsRange,
   RatingsData,
   ReviewCoverageData,
   ScenarioScoresData,
   ScoreDistributionData,
+  SessionLengthData,
+  SkillChangeData,
   StatisticsChartEntry,
   TopLearnersData,
   UsageOverTimeData,
@@ -1091,10 +1098,421 @@ const reviewCoverageTakeaway = (data: ReviewCoverageData, t: TFunction) =>
       })
     : null;
 
+// ── TSQ-005 Practice by weekday and hour ───────────────────────
+
+const HOUR_BANDS = [0, 3, 6, 9, 12, 15, 18, 21];
+const HEAT_RAMP = ["#eaf0fa", "#bcd0ee", "#7fa3d9", "#3f73c2", "#1d4a94"];
+
+/** Short weekday names in the page language: 1 January 2024 was a Monday. */
+const weekdayNames = (language: string): string[] =>
+  Array.from({ length: 7 }, (_, i) =>
+    new Date(2024, 0, 1 + i).toLocaleDateString(language, { weekday: "short" }),
+  );
+
+const PracticeHeatmap = ({ data }: DataRendererProps<PracticeHeatmapData>) => {
+  const { t, i18n } = useTranslation();
+  if (data.sessions === 0) {
+    return <p className="text-sm text-typography-600">{t("statisticsLibrary.heatmap.none")}</p>;
+  }
+  const days = weekdayNames(i18n.language);
+  const top = Math.max(1, ...data.cells.flat());
+  const level = (n: number) => (n === 0 ? 0 : Math.min(4, Math.ceil((n / top) * 4)));
+  return (
+    <div className="flex flex-col gap-2" data-testid="statistics-practice-heatmap">
+      <div className="grid grid-cols-[56px_repeat(8,minmax(0,1fr))] gap-1 text-[11px] text-typography-600">
+        <span />
+        {HOUR_BANDS.map(h => (
+          <span key={h} className="text-center">
+            {h}
+          </span>
+        ))}
+        {data.cells.map((row, d) => (
+          <div key={days[d]} className="contents">
+            <span className="self-center text-xs text-typography-700">{days[d]}</span>
+            {row.map((n, b) => (
+              <span
+                key={HOUR_BANDS[b]}
+                title={t("statisticsLibrary.heatmap.cell", {
+                  day: days[d],
+                  from: HOUR_BANDS[b],
+                  to: HOUR_BANDS[b] + 3,
+                  count: n,
+                })}
+                className="h-7 rounded"
+                style={{ background: HEAT_RAMP[level(n)] }}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center gap-2 text-xs text-typography-600">
+        {t("statisticsLibrary.heatmap.fewer")}
+        {HEAT_RAMP.map(colour => (
+          <span key={colour} className="h-3.5 w-3.5 rounded-sm" style={{ background: colour }} />
+        ))}
+        {t("statisticsLibrary.heatmap.more")}
+      </div>
+      <p className="text-xs text-typography-500">
+        {t("statisticsLibrary.heatmap.timezone", { timezone: data.timezone })}
+      </p>
+    </div>
+  );
+};
+
+const practiceHeatmapTakeaway = (data: PracticeHeatmapData, t: TFunction) => {
+  if (data.sessions === 0) return null;
+  let best = { d: 0, b: 0, n: -1 };
+  data.cells.forEach((row, d) =>
+    row.forEach((n, b) => {
+      if (n > best.n) best = { d, b, n };
+    }),
+  );
+  const language =
+    typeof document !== "undefined" ? document.documentElement.lang || undefined : undefined;
+  const day = new Date(2024, 0, 1 + best.d).toLocaleDateString(language, { weekday: "long" });
+  return t("statisticsLibrary.takeaway.heatmap", {
+    day,
+    from: HOUR_BANDS[best.b],
+    to: HOUR_BANDS[best.b] + 3,
+  });
+};
+
+// ── TSQ-006 Session length ─────────────────────────────────────
+
+const SessionLength = ({ data }: DataRendererProps<SessionLengthData>) => {
+  const { t } = useTranslation();
+  if (data.sessions === 0) {
+    return <p className="text-sm text-typography-600">{t("statisticsLibrary.length.none")}</p>;
+  }
+  const bounds = data.boundsMinutes;
+  const label = (i: number) => {
+    if (i === 0) return t("statisticsLibrary.length.under", { max: bounds[0] });
+    if (i === bounds.length) return t("statisticsLibrary.length.over", { min: bounds[i - 1] });
+    return t("statisticsLibrary.length.between", { min: bounds[i - 1], max: bounds[i] });
+  };
+  return (
+    <div data-testid="statistics-session-length">
+      <Bars
+        rows={data.bins.map((count, i) => ({
+          key: String(i),
+          label: label(i),
+          count,
+          colour: "#2a5db0",
+        }))}
+      />
+    </div>
+  );
+};
+
+const sessionLengthTakeaway = (data: SessionLengthData, t: TFunction) =>
+  data.sessions > 0 && data.medianMinutes !== null
+    ? t("statisticsLibrary.takeaway.length", {
+        median: data.medianMinutes,
+        count: data.sessions,
+      })
+    : null;
+
+// ── TSQ-011 Activation funnel ──────────────────────────────────
+
+const Activation = ({ data }: DataRendererProps<ActivationData>) => {
+  const { t } = useTranslation();
+  const registered = data.stages[0]?.count ?? 0;
+  if (registered === 0) {
+    return <p className="text-sm text-typography-600">{t("statisticsLibrary.activation.none")}</p>;
+  }
+  return (
+    <ol className="flex flex-col gap-3" data-testid="statistics-activation">
+      {data.stages.map((stage, index) => {
+        const pct = Math.round((stage.count / registered) * 100);
+        return (
+          <li key={stage.key} className="flex items-center gap-3 text-sm">
+            <span className="flex-[0_0_42%] text-typography-900">
+              {t(`statisticsLibrary.activation.${stage.key}`)}
+            </span>
+            <span className="h-6 flex-1 rounded bg-[#efebe0]">
+              <span
+                className="block h-6 rounded"
+                style={{
+                  width: `${pct}%`,
+                  background: index === data.stages.length - 1 ? "#1e6b3a" : "#2a5db0",
+                }}
+              />
+            </span>
+            <span className="flex-[0_0_56px] text-right font-semibold text-typography-900">
+              {stage.count}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+};
+
+const activationTakeaway = (data: ActivationData, t: TFunction) => {
+  const registered = data.stages[0]?.count ?? 0;
+  if (registered === 0) return null;
+  return t("statisticsLibrary.takeaway.activation", {
+    started: data.stages[1]?.count ?? 0,
+    registered,
+    recent: data.stages[3]?.count ?? 0,
+  });
+};
+
+// ── TSQ-012 Regular and bursty practice ────────────────────────
+
+const REGULARITY_PARTS = [
+  { key: "regular", colour: "#2a5db0" },
+  { key: "occasional", colour: "#c98a1b" },
+  { key: "bursty", colour: "#8f8a7e" },
+] as const;
+
+const Regularity = ({ data }: DataRendererProps<RegularityData>) => {
+  const { t } = useTranslation();
+  if (data.total === 0) {
+    return <p className="text-sm text-typography-600">{t("statisticsLibrary.regularity.none")}</p>;
+  }
+  return (
+    <div className="flex flex-col gap-4" data-testid="statistics-regularity">
+      <div
+        className="flex h-7 gap-0.5 overflow-hidden rounded-md"
+        role="img"
+        aria-label={REGULARITY_PARTS.map(
+          p => `${t(`statisticsLibrary.regularity.${p.key}`)} ${data[p.key]}`,
+        ).join(", ")}
+      >
+        {REGULARITY_PARTS.filter(p => data[p.key] > 0).map(p => (
+          <div
+            key={p.key}
+            style={{ width: `${(data[p.key] / data.total) * 100}%`, background: p.colour }}
+          />
+        ))}
+      </div>
+      <ul className="flex flex-wrap gap-x-8 gap-y-3 text-sm">
+        {REGULARITY_PARTS.map(p => (
+          <li key={p.key} className="flex items-center gap-2">
+            <span className="inline-block h-3 w-3 rounded-sm" style={{ background: p.colour }} />
+            {t(`statisticsLibrary.regularity.${p.key}`)}{" "}
+            <strong className="font-semibold">{data[p.key]}</strong>
+          </li>
+        ))}
+      </ul>
+      <p className="text-xs text-typography-500">
+        {t("statisticsLibrary.regularity.rule", { weeks: data.weeks })}
+      </p>
+    </div>
+  );
+};
+
+const regularityTakeaway = (data: RegularityData, t: TFunction) =>
+  data.total > 0
+    ? t("statisticsLibrary.takeaway.regularity", {
+        regular: data.regular,
+        total: data.total,
+        bursty: data.bursty,
+      })
+    : null;
+
+// ── TSQ-018 Drop-off by item format ────────────────────────────
+
+/** A readable fallback for a kind of item this build has no translation for. */
+const humaniseType = (type: string) =>
+  type.charAt(0) + type.slice(1).toLowerCase().replace(/_/g, " ");
+
+const useItemTypeLabel = () => {
+  const { t, i18n } = useTranslation();
+  return (type: string) =>
+    i18n.exists(`statisticsLibrary.itemTypes.${type}`)
+      ? t(`statisticsLibrary.itemTypes.${type}`)
+      : humaniseType(type);
+};
+
+const ItemFormats = ({ data }: DataRendererProps<ItemFormatData>) => {
+  const { t } = useTranslation();
+  const typeLabel = useItemTypeLabel();
+  if (data.rows.length === 0) {
+    return <p className="text-sm text-typography-600">{t("statisticsLibrary.formats.none")}</p>;
+  }
+  return (
+    <ul className="flex flex-col gap-3" data-testid="statistics-item-formats">
+      {data.rows.map(row => (
+        <li key={row.type} className="flex flex-col gap-1 text-sm">
+          <span className="flex items-center justify-between gap-3">
+            <span className="text-typography-900">{typeLabel(row.type)}</span>
+            <span className="text-typography-600">
+              {t("statisticsLibrary.formats.finished", {
+                percent: row.completedPercent,
+                completed: row.completed,
+                reached: row.reached,
+              })}
+            </span>
+          </span>
+          <span className="h-3 rounded-md bg-[#efebe0]">
+            <span
+              className="block h-3 rounded-md"
+              style={{
+                width: `${row.completedPercent}%`,
+                background: row.completedPercent < 80 ? "#b4490a" : "#1e6b3a",
+              }}
+            />
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+};
+
+const makeItemFormatsTakeaway = () =>
+  function itemFormatsTakeaway(data: ItemFormatData, t: TFunction) {
+    const worst = data.rows[0];
+    if (!worst) return null;
+    return t("statisticsLibrary.takeaway.formats", {
+      type: t(`statisticsLibrary.itemTypes.${worst.type}`, {
+        defaultValue: humaniseType(worst.type),
+      }),
+      percent: worst.completedPercent,
+    });
+  };
+
+// ── TSQ-019 Quiz pass rate ─────────────────────────────────────
+
+const QuizPass = ({ data }: DataRendererProps<QuizPassData>) => {
+  const { t } = useTranslation();
+  if (data.rows.length === 0) {
+    return <p className="text-sm text-typography-600">{t("statisticsLibrary.quiz.none")}</p>;
+  }
+  return (
+    <ul className="flex flex-col gap-3" data-testid="statistics-quiz-pass">
+      {data.rows.map(row => (
+        <li key={row.title} className="flex flex-col gap-1 text-sm">
+          <span className="flex items-center justify-between gap-3">
+            <span className="truncate text-typography-900" title={row.title}>
+              {row.title}
+            </span>
+            <span className="flex-none text-typography-600">
+              {t("statisticsLibrary.quiz.passed", {
+                percent: row.passRatePercent,
+                count: row.attempts,
+              })}
+            </span>
+          </span>
+          <span className="h-3 rounded-md bg-[#efebe0]">
+            <span
+              className="block h-3 rounded-md"
+              style={{
+                width: `${row.passRatePercent}%`,
+                background: row.passRatePercent < 50 ? "#b4490a" : "#2a5db0",
+              }}
+            />
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+};
+
+const quizPassTakeaway = (data: QuizPassData, t: TFunction) =>
+  data.rows[0]
+    ? t("statisticsLibrary.takeaway.quiz", {
+        title: shorten(data.rows[0].title),
+        percent: data.rows[0].passRatePercent,
+        count: data.rows[0].attempts,
+      })
+    : null;
+
+// ── TSQ-024 Skills before and after ────────────────────────────
+
+/** Skill levels run from 1 to 5. */
+const levelPercent = (level: number) => ((level - 1) / 4) * 100;
+
+const SkillChange = ({ data }: DataRendererProps<SkillChangeData>) => {
+  const { t, i18n } = useTranslation();
+  if (data.rows.length === 0) {
+    return <p className="text-sm text-typography-600">{t("statisticsLibrary.skills.none")}</p>;
+  }
+  const label = (skill: string) =>
+    i18n.exists(`statisticsLibrary.skills.names.${skill}`)
+      ? t(`statisticsLibrary.skills.names.${skill}`)
+      : humaniseType(skill);
+  return (
+    <div className="flex flex-col gap-3" data-testid="statistics-skill-change">
+      <div className="flex flex-wrap gap-4 text-xs text-typography-600">
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-3 w-3 rounded-full border-2 border-[#2a5db0] bg-white" />
+          {t("statisticsLibrary.skills.first")}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-3 w-3 rounded-full bg-[#2a5db0]" />
+          {t("statisticsLibrary.skills.latest")}
+        </span>
+        <span>{t("statisticsLibrary.skills.scale")}</span>
+      </div>
+      <ul className="flex flex-col gap-3">
+        {data.rows.map(row => {
+          const from = Math.min(levelPercent(row.first), levelPercent(row.latest));
+          const width = Math.abs(levelPercent(row.latest) - levelPercent(row.first));
+          const delta = Math.round((row.latest - row.first) * 10) / 10;
+          return (
+            <li key={row.skill} className="flex items-center gap-3 text-sm">
+              <span className="flex-[0_0_120px] truncate text-typography-900">
+                {label(row.skill)}
+              </span>
+              <span className="relative h-4 flex-1">
+                <span className="absolute left-0 right-0 top-[7px] h-0.5 bg-[#efebe0]" />
+                <span
+                  className="absolute top-[7px] h-0.5 bg-[#2a5db0]"
+                  style={{ left: `${from}%`, width: `${width}%` }}
+                />
+                <span
+                  className="absolute top-0.5 -ml-1.5 h-3 w-3 rounded-full border-2 border-[#2a5db0] bg-white"
+                  style={{ left: `${levelPercent(row.first)}%` }}
+                />
+                <span
+                  className="absolute top-0.5 -ml-1.5 h-3 w-3 rounded-full bg-[#2a5db0]"
+                  style={{ left: `${levelPercent(row.latest)}%` }}
+                />
+              </span>
+              <span className="flex-[0_0_48px] text-right font-semibold text-typography-900">
+                {delta > 0 ? `+${delta}` : delta}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+};
+
+const skillChangeTakeaway = (data: SkillChangeData, t: TFunction) => {
+  if (data.rows.length === 0) return null;
+  const weakest = data.rows[0];
+  const gainer = data.rows.reduce((best, r) =>
+    r.latest - r.first > best.latest - best.first ? r : best,
+  );
+  const delta = Math.round((gainer.latest - gainer.first) * 10) / 10;
+  if (delta < 0.1) return t("statisticsLibrary.takeaway.skillsFlat");
+  return t("statisticsLibrary.takeaway.skills", {
+    weakest: t(`statisticsLibrary.skills.names.${weakest.skill}`, {
+      defaultValue: humaniseType(weakest.skill),
+    }),
+    level: weakest.latest,
+    gain: t(`statisticsLibrary.skills.names.${gainer.skill}`, {
+      defaultValue: humaniseType(gainer.skill),
+    }),
+    delta,
+  });
+};
+
 export const CHART_RENDERERS: Record<string, ChartRenderer> = {
   "TSQ-001": { kind: "data", Component: HeadlineNumbers, bare: true },
   "TSQ-002": { kind: "data", Component: UsageOverTime, takeaway: usageTakeaway },
   "TSQ-003": { kind: "data", Component: MostUsedSimulations, takeaway: mostUsedTakeaway },
+  "TSQ-005": { kind: "data", Component: PracticeHeatmap, takeaway: practiceHeatmapTakeaway },
+  "TSQ-006": { kind: "data", Component: SessionLength, takeaway: sessionLengthTakeaway },
+  "TSQ-011": { kind: "data", Component: Activation, takeaway: activationTakeaway },
+  "TSQ-012": { kind: "data", Component: Regularity, takeaway: regularityTakeaway },
+  "TSQ-018": { kind: "data", Component: ItemFormats, takeaway: makeItemFormatsTakeaway() },
+  "TSQ-019": { kind: "data", Component: QuizPass, takeaway: quizPassTakeaway },
+  "TSQ-024": { kind: "data", Component: SkillChange, takeaway: skillChangeTakeaway },
   "TSQ-007": { kind: "data", Component: LearnerStatus, takeaway: learnerStatusTakeaway },
   "TSQ-008": { kind: "data", Component: TopLearners, takeaway: topLearnersTakeaway },
   "TSQ-009": { kind: "self", Component: LearnerTable },

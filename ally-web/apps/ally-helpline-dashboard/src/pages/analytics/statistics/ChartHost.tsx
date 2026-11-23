@@ -1,4 +1,4 @@
-import { FunctionComponent } from "react";
+import { FunctionComponent, useMemo } from "react";
 
 import { useTranslation } from "react-i18next";
 
@@ -28,8 +28,17 @@ export const ChartHost: FunctionComponent<ChartHostProps> = ({ entry, range }) =
   const renderer = CHART_RENDERERS[entry.id];
   const unavailable = entry.state === "unavailable";
 
+  // The viewer's own time zone, so charts that group by time of day match their clock.
+  const timezone = useMemo(() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
+    } catch {
+      return undefined;
+    }
+  }, []);
+
   const { data, isFetching, isError, refetch } = useGetStatisticsChartQuery(
-    { id: entry.id, range },
+    { id: entry.id, range, timezone },
     { skip: unavailable || !renderer || renderer.kind === "self" },
   );
 
