@@ -45,4 +45,16 @@ export class UpdateUserPreferencesDto {
   @IsString({ each: true })
   @ArrayUnique()
   org_metrics_layout?: string[];
+
+  // Per-user layout of the Statistics dashboard chart library
+  // (ally-helpline-dashboard Statistics page, Org tab): an ordered list of
+  // chart ids from the tenant chart library (`TSQ-###`). Absent means "never
+  // customised", so the default layout applies; an empty list means the admin
+  // removed every chart. Validated loosely (array of strings) so adding or
+  // retiring a chart needs no backend deploy: the frontend drops unknown ids.
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @ArrayUnique()
+  statistics_dashboard?: string[];
 }

@@ -78,8 +78,11 @@ describe('TenantChartLibraryService', () => {
         'TSQ-001',
         'TSQ-002',
         'TSQ-003',
+        'TSQ-007',
+        'TSQ-008',
         'TSQ-009',
         'TSQ-013',
+        'TSQ-023',
       ]);
       const byId = Object.fromEntries(lib.charts.map((c) => [c.id, c]));
       expect(byId['TSQ-001'].state).toBe('available');
@@ -119,9 +122,9 @@ describe('TenantChartLibraryService', () => {
       await expect(
         service.getChartData(TENANT, 'TSQ-999', {}),
       ).rejects.toBeInstanceOf(NotFoundException);
-      // TSQ-007 (learner status) is reserved but has no handler yet.
+      // TSQ-010 (days since last activity) is reserved but has no handler yet.
       await expect(
-        service.getChartData(TENANT, 'TSQ-007', {}),
+        service.getChartData(TENANT, 'TSQ-010', {}),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
 
@@ -194,6 +197,115 @@ describe('TenantChartLibraryService', () => {
         search: undefined,
         limit: 5,
         offset: 5,
+      });
+    });
+  });
+
+  describe('learner charts', () => {
+    const row = (over: Record<string, unknown>) => ({
+      id: 1,
+      name: 'A',
+      status: 'active',
+      totalPracticeMinutes: 0,
+      daysSinceLastActivity: 0,
+      ...over,
+    });
+
+    it('TSQ-007 counts learners by status and says when it was cut short', async () => {
+      enabled();
+      analytics.getLearnerUsage.mockResolvedValue({
+        count: 5,
+        data: [
+          row({ status: 'active' }),
+          row({ status: 'active' }),
+          row({ status: 'at_risk' }),
+          row({ status: 'dormant' }),
+          row({ status: 'never_started' }),
+        ],
+      } as never);
+      const out = await service.getChartData(TENANT, 'TSQ-007', {});
+      expect(out.data).toEqual({
+        total: 5,
+        truncated: false,
+        counts: { active: 2, at_risk: 1, dormant: 1, never_started: 1 },
+      });
+      expect(analytics.getLearnerUsage).toHaveBeenCalledWith(TENANT, {
+        range: '90d',
+        limit: 200,
+        offset: 0,
+      });
+    });
+
+    it('TSQ-007 flags truncation when there are more learners than were read', async () => {
+      enabled();
+      analytics.getLearnerUsage.mockResolvedValue({
+        count: 250,
+        data: [row({})],
+      } as never);
+      const out = await service.getChartData(TENANT, 'TSQ-007', {});
+      expect((out.data as { truncated: boolean }).truncated).toBe(true);
+    });
+
+    it('TSQ-008 ranks by practice minutes and drops learners with none', async () => {
+      enabled();
+      analytics.getLearnerUsage.mockResolvedValue({
+        count: 3,
+        data: [
+          row({ id: 1, name: 'Priya', totalPracticeMinutes: 90 }),
+          row({ id: 2, name: 'Arjun', totalPracticeMinutes: 40 }),
+          row({ id: 3, name: 'Zero', totalPracticeMinutes: 0 }),
+        ],
+      } as never);
+      const out = await service.getChartData(TENANT, 'TSQ-008', {
+        range: '30d',
+      });
+      expect(out.data).toEqual({
+        rows: [
+          { id: 1, name: 'Priya', practiceMinutes: 90 },
+          { id: 2, name: 'Arjun', practiceMinutes: 40 },
+        ],
+      });
+      expect(analytics.getLearnerUsage).toHaveBeenCalledWith(TENANT, {
+        range: '30d',
+        sortBy: 'totalPracticeMinutes',
+        order: 'DESC',
+        limit: 6,
+        offset: 0,
+      });
+    });
+
+    it('TSQ-023 lists at-risk and dormant learners, longest quiet first', async () => {
+      enabled();
+      analytics.getLearnerUsage.mockResolvedValue({
+        count: 11,
+        data: [
+          row({
+            id: 9,
+            name: 'Quiet',
+            status: 'dormant',
+            daysSinceLastActivity: 41,
+          }),
+        ],
+      } as never);
+      const out = await service.getChartData(TENANT, 'TSQ-023', {});
+      expect(out.data).toEqual({
+        total: 11,
+        rows: [
+          {
+            id: 9,
+            name: 'Quiet',
+            status: 'dormant',
+            daysSinceLastActivity: 41,
+          },
+        ],
+      });
+      expect(analytics.getLearnerUsage).toHaveBeenCalledWith(TENANT, {
+        range: '90d',
+        status: ['at_risk', 'dormant'],
+        sortBy: 'lastActivityAt',
+        order: 'ASC',
+        limit: 5,
+        offset: 0,
       });
     });
   });

@@ -10,6 +10,7 @@ import {
   TenantChartEntry,
 } from '../constants/tenant-chart-library.constants';
 import { AnalyticsRange } from '../dto/platform-analytics.dto';
+import { LearnerUsageStatus } from '../dto/tenant-analytics.dto';
 import {
   TenantChartDataResponseDto,
   TenantChartLibraryResponseDto,
@@ -37,6 +38,32 @@ type ChartHandler = (
 ) => Promise<unknown>;
 
 const DEFAULT_CHART_RANGE: AnalyticsRange = '90d';
+/** The learner-usage page limit: the most learners a status count reads. */
+const STATUS_COUNT_LEARNER_CAP = 200;
+const TOP_LEARNERS_LIMIT = 6;
+const ATTENTION_LEARNERS_LIMIT = 5;
+
+export interface LearnerStatusCountsData {
+  total: number;
+  /** True when the organisation has more learners than were counted. */
+  truncated: boolean;
+  counts: Record<LearnerUsageStatus, number>;
+}
+
+export interface TopLearnersData {
+  rows: Array<{ id: number; name: string; practiceMinutes: number }>;
+}
+
+export interface AttentionLearnersData {
+  /** All learners who qualify, of which `rows` shows the longest quiet. */
+  total: number;
+  rows: Array<{
+    id: number;
+    name: string;
+    status: LearnerUsageStatus;
+    daysSinceLastActivity: number | null;
+  }>;
+}
 
 @Injectable()
 export class TenantChartLibraryService {
@@ -77,6 +104,13 @@ export class TenantChartLibraryService {
           newLearners: m.newLearnersOnboardedTrend,
         };
       },
+      // Learner status: how many learners are active, at risk, dormant or
+      // never started, from the same status the learner table uses.
+      'TSQ-007': (tenantId, p) => this.learnerStatusCounts(tenantId, p),
+      // Top learners by practice minutes in the period.
+      'TSQ-008': (tenantId, p) => this.topLearners(tenantId, p),
+      // Learners who practised before and then went quiet, most overdue first.
+      'TSQ-023': (tenantId, p) => this.learnersNeedingAttention(tenantId, p),
       // Most-used simulations.
       'TSQ-003': async (tenantId, p) =>
         (
@@ -180,6 +214,86 @@ export class TenantChartLibraryService {
 
     const data = await handler(tenantId, params);
     return { id: entry.id, state: availability.state, data };
+  }
+
+  /**
+   * Counts learners by status. Reads at most {@link STATUS_COUNT_LEARNER_CAP}
+   * learners (the learner-usage page limit) and says so when there are more,
+   * rather than silently undercounting.
+   */
+  private async learnerStatusCounts(
+    tenantId: string,
+    p: TenantChartParams,
+  ): Promise<LearnerStatusCountsData> {
+    const usage = await this.tenantAnalytics.getLearnerUsage(tenantId, {
+      range: p.range ?? DEFAULT_CHART_RANGE,
+      limit: STATUS_COUNT_LEARNER_CAP,
+      offset: 0,
+    });
+    const counts: Record<LearnerUsageStatus, number> = {
+      active: 0,
+      at_risk: 0,
+      dormant: 0,
+      never_started: 0,
+    };
+    usage.data.forEach((row) => {
+      counts[row.status] += 1;
+    });
+    return {
+      total: usage.count,
+      truncated: usage.count > usage.data.length,
+      counts,
+    };
+  }
+
+  private async topLearners(
+    tenantId: string,
+    p: TenantChartParams,
+  ): Promise<TopLearnersData> {
+    const usage = await this.tenantAnalytics.getLearnerUsage(tenantId, {
+      range: p.range ?? DEFAULT_CHART_RANGE,
+      sortBy: 'totalPracticeMinutes',
+      order: 'DESC',
+      limit: TOP_LEARNERS_LIMIT,
+      offset: 0,
+    });
+    return {
+      rows: usage.data
+        .filter((row) => row.totalPracticeMinutes > 0)
+        .map((row) => ({
+          id: row.id,
+          name: row.name,
+          practiceMinutes: row.totalPracticeMinutes,
+        })),
+    };
+  }
+
+  /**
+   * Learners with a status of at risk or dormant (they have practised, then
+   * stopped), longest quiet first. `never_started` is a different problem and
+   * is shown by the status chart.
+   */
+  private async learnersNeedingAttention(
+    tenantId: string,
+    p: TenantChartParams,
+  ): Promise<AttentionLearnersData> {
+    const usage = await this.tenantAnalytics.getLearnerUsage(tenantId, {
+      range: p.range ?? DEFAULT_CHART_RANGE,
+      status: ['at_risk', 'dormant'],
+      sortBy: 'lastActivityAt',
+      order: 'ASC',
+      limit: ATTENTION_LEARNERS_LIMIT,
+      offset: 0,
+    });
+    return {
+      total: usage.count,
+      rows: usage.data.map((row) => ({
+        id: row.id,
+        name: row.name,
+        status: row.status,
+        daysSinceLastActivity: row.daysSinceLastActivity,
+      })),
+    };
   }
 
   private findLiveEntry(chartId: string, tenantId: string): TenantChartEntry {
