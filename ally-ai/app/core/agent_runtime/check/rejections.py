@@ -24,6 +24,8 @@ class Rejection(StrEnum):
     OFFERS_SLOT = "offers_slot"
     UNFOUND_SLOT = "unfound_slot"
     REACH_TEAM = "reach_team"
+    #: Q4 H8: it offered to look up a record it has no list for (wording for review).
+    NO_LOOKUP = "no_lookup"
 
 
 def rejection_feedback(
@@ -97,6 +99,12 @@ REJECTIONS: Dict[Rejection, str] = {
         "find_ or create_ tool returned. Look it up with find first and offer only "
         "what it shows, citing it; say something is booked only after create or "
         "update did it, citing that."
+    ),
+    Rejection.NO_LOOKUP: (
+        "It offered to look up their application, case or order. You can't see "
+        "those records here. Say so plainly, tell them where they can check it (the "
+        "office, portal or helpline in the information, citing it), and keep the "
+        "rest."
     ),
     Rejection.REACH_TEAM: (
         "It promised to pass something on to the team, or that the team will get "

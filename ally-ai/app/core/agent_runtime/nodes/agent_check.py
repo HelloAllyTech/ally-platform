@@ -30,7 +30,12 @@ from app.core.agent_runtime.key_facts import key_fact_passages
 from app.core.agent_runtime.memory import personal_context
 from app.core.agent_runtime.state import AgentState, json_safe
 from app.core.agent_runtime.tools import gateway_tools
-from app.core.agent_runtime.tools.lists import books_into, offers_create, takes_details
+from app.core.agent_runtime.tools.lists import (
+    books_into,
+    looks_up_records,
+    offers_create,
+    takes_details,
+)
 from app.core.agent_runtime.trace import Node, traced
 from app.core.knowledge_agent.agent import KnowledgeAgentService
 from app.core.knowledge_agent.schemas import is_general
@@ -127,6 +132,7 @@ def make_agent_check_node(service: KnowledgeAgentService) -> Node:
             crisis_line=state["bot"].get("support_helplines") or "",
             upset=bool(state["bot"].get("mood")),
             books=books_into(state["bot"].get("gateway_definitions")),
+            looks_up=looks_up_records(state["bot"].get("gateway_definitions")),
             found_nothing=any(
                 call.get("nearest") or not (call.get("added") or call.get("aggregate"))
                 for call in finds

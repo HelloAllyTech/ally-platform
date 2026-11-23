@@ -223,6 +223,16 @@ def books_into(definitions: Optional[List[Mapping[str, Any]]]) -> bool:
     )
 
 
+def looks_up_records(definitions: Optional[List[Mapping[str, Any]]]) -> bool:
+    """Whether this run can look up the person's own records (Q4 H8): a find tool on
+    an orders or details list (orders, applications, tickets, callbacks)."""
+    return any(
+        (d or {}).get("kind") == "find"
+        and (d or {}).get("playbook") in ("orders", "details")
+        for d in definitions or []
+    )
+
+
 def takes_details(definitions: Optional[List[Mapping[str, Any]]]) -> bool:
     """Whether this run can save the person's details for the team (chunk 6b): a
     create tool on a list with a person or phone field (Leads, Callback requests),

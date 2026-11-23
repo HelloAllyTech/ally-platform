@@ -200,6 +200,33 @@ _PASS_DETAILS = re.compile(
 )
 
 
+#: An offer to look a record up (Q4 H8, Haq Seva: "tell me the name so I can look it
+#: up" about a pension application it had no list for).
+_OFFERS_LOOKUP = re.compile(
+    r"\b(?:i\s+can|i'?ll|let\s+me|i\s+will|i\s+could|so\s+i\s+can|and\s+i'?ll)\s+"
+    r"(?:look\s+(?:it|that|this|them|you)?\s*up|check\s+(?:on\s+)?(?:the\s+|its\s+|"
+    r"your\s+)?(?:status|progress)|check\s+(?:it|that|this|on\s+it)|track\s+(?:it|that|"
+    r"your))\b"
+    r"|\b(?:tell|share|give|send)\s+me\s+(?:your\s+|the\s+)?(?:name|phone|number|"
+    r"application|reference|case|registration|aadhaar)\b[^.?!\n]{0,40}"
+    r"\b(?:look|check|find|track)\b",
+    re.IGNORECASE,
+)
+
+
+def _no_false_lookups(verdict: Verdict, ctx: CheckContext) -> None:
+    """With no list of the person's own records, a reply never offers to look one
+    up (Q4 H8). The offer is trimmed, and the reply is sent back once to say it
+    can't see those records and where they can check."""
+    if ctx.looks_up or not _OFFERS_LOOKUP.search(verdict.answer):
+        return
+    logger.info("Reply offers a lookup it can't do")
+    kept = without_sentences(verdict.answer, lambda s: not _OFFERS_LOOKUP.search(s))
+    verdict.answer = kept or verdict.answer
+    if verdict.rejection is None:
+        verdict.rejection, verdict.keeps_text = Rejection.NO_LOOKUP, True
+
+
 def _trim_details_offers(verdict: Verdict, ctx: CheckContext) -> None:
     """An assistant with a list it books into books; it never offers to pass the
     person's name and phone to the team instead (Q4 H9). The sentence is trimmed; if
@@ -518,6 +545,7 @@ WORDING_FIXES: Tuple[Callable[[Verdict, CheckContext], None], ...] = (
     _trim_repeated_topic_list,
     _trim_booking_offers,
     _trim_details_offers,
+    _no_false_lookups,
     _trim_false_offers,
     _trim_pass_on_promises,
     _send_back_slot_offers,

@@ -1261,3 +1261,17 @@ def test_an_assistant_that_books_never_offers_to_pass_name_and_phone():
     assert check(answer=booked + offer, citations=[1])["answer"] == booked + offer
     ask = "Shall I book Tue 24 Nov, 7 pm for Priya Test?"
     assert check(answer=ask, citations=[1], books=True)["answer"] == ask
+
+
+def test_never_offers_a_lookup_it_cannot_do():
+    """Q4 H8 (Haq Seva): "Status of my pension application from March?" never gets
+    "tell me the name so I can look it up" without a list of the person's records;
+    the offer goes and the reply is sent back to say where they can check."""
+    said = "Pension applications are handled by the district social welfare office."
+    offer = " Tell me your name and application number so I can look it up."
+    result, rejection = review(answer=said + offer, citations=[1])
+    assert result["answer"] == said
+    assert rejection == "no_lookup"
+    # With a list of their own records (orders, applications), the offer stands.
+    kept, none = review(answer=said + offer, citations=[1], looks_up=True)
+    assert kept["answer"] == said + offer and none is None

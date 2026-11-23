@@ -81,6 +81,9 @@ class CheckContext:
     #: The assistant has a list it books into (Q4 H9): it books, so it never offers to
     #: pass the person's name and phone to the team instead.
     books: bool = False
+    #: The run can look up the person's own records (Q4 H8); without it, a reply never
+    #: offers to.
+    looks_up: bool = False
 
     @property
     def found(self) -> List[Dict[str, Any]]:
