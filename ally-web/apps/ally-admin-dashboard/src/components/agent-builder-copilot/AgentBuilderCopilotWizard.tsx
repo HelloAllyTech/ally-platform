@@ -441,18 +441,12 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
   };
 
   /**
-   * Into the languages step. A library character who already speaks some languages (voices on
-   * the form now) starts with those chosen and their voices kept.
+   * Into the languages step, with nothing chosen: the trainer picks, or leaves it to the
+   * description. Voices already on the form (e.g. a library character's) stay there either way.
    */
   const enterLanguages = () => {
-    const onForm = (formMethods.getValues("languageVoices") ?? {}) as Record<string, string>;
-    const known = Object.fromEntries(
-      Object.entries(onForm).filter(
-        ([id, voice]) => voice && languageCatalog.some(l => String(l.language_id) === id),
-      ),
-    );
-    setLanguageVoices(known);
-    setChooseLanguages(Object.keys(known).length > 0);
+    setLanguageVoices({});
+    setChooseLanguages(false);
     setLanguagesError(false);
     setStep("languages");
   };

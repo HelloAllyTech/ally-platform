@@ -467,11 +467,13 @@ describe("AgentBuilderCopilotWizard languages and voices", () => {
     expect(screen.getByText(strings.pickOne)).toBeTruthy();
   });
 
-  it("starts from a library character's voices", async () => {
+  it("pre-selects nothing, even when voices are already on the form", async () => {
     mocks.formValues.languageVoices = { "2": "v-kn" };
     await toLanguagesStep();
-    expect((screen.getByDisplayValue("choose") as HTMLInputElement).checked).toBe(true);
-    expect((screen.getByLabelText("Kannada (India)") as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByDisplayValue("describe") as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(screen.getByDisplayValue("choose"));
+    expect((screen.getByLabelText("English (India)") as HTMLInputElement).checked).toBe(false);
+    expect((screen.getByLabelText("Kannada (India)") as HTMLInputElement).checked).toBe(false);
   });
 });
 
