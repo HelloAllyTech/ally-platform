@@ -6,6 +6,8 @@ import {
   DEFAULT_LAYOUT_CAP,
   DEFAULT_LAYOUT_ORDER,
   buildDefaultLayout,
+  layoutKey,
+  parseLayoutKey,
   resolveDashboardLayout,
 } from "../layout";
 
@@ -17,6 +19,7 @@ const chart = (id: string, state: StatisticsChartState = "available"): Statistic
   shape: "single_number",
   chart: "tile",
   size: "m",
+  scopes: ["organisation"],
   state,
   reason: state === "available" ? null : "because",
 });
@@ -80,9 +83,10 @@ describe("resolveDashboardLayout", () => {
   });
 
   it("drops ids the backend no longer offers and duplicates", () => {
-    expect(
-      resolveDashboardLayout(["TSQ-001", "TSQ-777", "TSQ-001", "TSQ-002"], offered),
-    ).toEqual(["TSQ-001", "TSQ-002"]);
+    expect(resolveDashboardLayout(["TSQ-001", "TSQ-777", "TSQ-001", "TSQ-002"], offered)).toEqual([
+      "TSQ-001",
+      "TSQ-002",
+    ]);
   });
 
   it("keeps a chart that has become unavailable, so it does not vanish silently", () => {
@@ -96,5 +100,43 @@ describe("resolveDashboardLayout", () => {
   it("ignores non-string entries and a non-array value", () => {
     expect(resolveDashboardLayout(["TSQ-001", 5, null], offered)).toEqual(["TSQ-001"]);
     expect(resolveDashboardLayout("TSQ-001", offered)).toEqual(buildDefaultLayout(offered));
+  });
+});
+
+describe("scoped cards", () => {
+  const scoped = { ...chart("TSQ-020"), scopes: ["organisation", "course"] as const };
+  const offered = [{ ...scoped, scopes: [...scoped.scopes] }, chart("TSQ-001")];
+
+  it("round-trips a card for one course", () => {
+    const key = layoutKey("TSQ-020", { kind: "course", value: "8b3f-uuid" });
+    expect(key).toBe("TSQ-020@course:8b3f-uuid");
+    expect(parseLayoutKey(key)).toEqual({
+      key,
+      id: "TSQ-020",
+      scope: { kind: "course", value: "8b3f-uuid" },
+    });
+  });
+
+  it("reads a plain id as the whole organisation", () => {
+    expect(parseLayoutKey("TSQ-001")).toEqual({ key: "TSQ-001", id: "TSQ-001" });
+  });
+
+  it("rejects strings that are not a chart key", () => {
+    ["", "TSQ-1", "TSQ-020@team:3", "TSQ-020@course:", "x TSQ-020", "TSQ-020@course:a b"].forEach(
+      bad => expect(parseLayoutKey(bad), bad).toBeNull(),
+    );
+  });
+
+  it("keeps the same chart for two courses and the whole organisation", () => {
+    const saved = ["TSQ-020", "TSQ-020@course:a", "TSQ-020@course:b", "TSQ-020@course:a"];
+    expect(resolveDashboardLayout(saved, offered)).toEqual([
+      "TSQ-020",
+      "TSQ-020@course:a",
+      "TSQ-020@course:b",
+    ]);
+  });
+
+  it("drops a scope the chart does not support", () => {
+    expect(resolveDashboardLayout(["TSQ-020@learner:5", "TSQ-001@course:a"], offered)).toEqual([]);
   });
 });

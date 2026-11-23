@@ -17,10 +17,15 @@ import {
   CHART_SHAPES,
   CHART_TYPES,
   ChartGroup,
+  ChartScope,
   ChartShape,
   ChartSize,
   ChartType,
 } from '../constants/tenant-chart-library.constants';
+import {
+  SCOPE_KINDS,
+  ScopeKind,
+} from '../repository/tenant-scope-options.repository';
 import { ChartAvailabilityState } from '../util/tenant-chart-library.util';
 
 export class TenantChartLibraryEntryDto {
@@ -32,6 +37,12 @@ export class TenantChartLibraryEntryDto {
   @ApiProperty({ enum: CHART_SHAPES }) shape!: ChartShape;
   @ApiProperty({ enum: CHART_TYPES }) chart!: ChartType;
   @ApiProperty({ enum: ['s', 'm', 'wide'] }) size!: ChartSize;
+  @ApiProperty({
+    isArray: true,
+    enum: ['organisation', 'course', 'simulation', 'learner'],
+    description: 'What the chart can be drawn for',
+  })
+  scopes!: ChartScope[];
   @ApiProperty({ enum: ['available', 'sparse', 'unavailable'] })
   state!: ChartAvailabilityState;
   @ApiProperty({
@@ -136,6 +147,13 @@ export class TenantChartQueryDto {
   offset?: number;
 }
 
+export class TenantChartScopeDto {
+  @ApiProperty({ enum: SCOPE_KINDS }) kind!: ScopeKind;
+  @ApiProperty() id!: string;
+  @ApiProperty({ description: 'The course, simulation or learner name' })
+  label!: string;
+}
+
 export class TenantChartDataResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty({ enum: ['available', 'sparse'] })
@@ -145,4 +163,29 @@ export class TenantChartDataResponseDto {
       'Chart data. Its shape depends on the chart: see the chart’s `shape` in the library.',
   })
   data!: unknown;
+
+  @ApiProperty({
+    required: false,
+    type: TenantChartScopeDto,
+    description:
+      'What the chart was drawn for, when it was not the whole organisation',
+  })
+  scope?: TenantChartScopeDto;
+}
+
+export class TenantScopeOptionsQueryDto {
+  @ApiProperty({ enum: SCOPE_KINDS })
+  @IsIn(SCOPE_KINDS)
+  kind!: ScopeKind;
+
+  @ApiProperty({ required: false, description: 'Case-insensitive name filter' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  search?: string;
+}
+
+export class TenantScopeOptionDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() label!: string;
 }

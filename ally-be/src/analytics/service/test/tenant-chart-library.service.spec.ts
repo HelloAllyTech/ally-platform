@@ -1,5 +1,6 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { TenantCapabilitiesRepository } from '../../repository/tenant-capabilities.repository';
+import { TenantScopeOptionsRepository } from '../../repository/tenant-scope-options.repository';
 import { TenantChartQueryRepository } from '../../repository/tenant-chart-query.repository';
 import { TenantOutcomesRepository } from '../../repository/tenant-outcomes.repository';
 import { TenantPracticeRepository } from '../../repository/tenant-practice.repository';
@@ -33,6 +34,7 @@ describe('TenantChartLibraryService', () => {
   let outcomes: jest.Mocked<TenantOutcomesRepository>;
   let practice: jest.Mocked<TenantPracticeRepository>;
   let chartQuery: jest.Mocked<TenantChartQueryRepository>;
+  let scopeOptions: jest.Mocked<TenantScopeOptionsRepository>;
   let service: TenantChartLibraryService;
 
   beforeEach(() => {
@@ -64,12 +66,17 @@ describe('TenantChartLibraryService', () => {
       ranked: jest.fn(),
       distribution: jest.fn(),
     } as unknown as jest.Mocked<TenantChartQueryRepository>;
+    scopeOptions = {
+      list: jest.fn(),
+      describe: jest.fn(),
+    } as unknown as jest.Mocked<TenantScopeOptionsRepository>;
     service = new TenantChartLibraryService(
       repo,
       analytics,
       outcomes,
       practice,
       chartQuery,
+      scopeOptions,
     );
   });
 
@@ -502,11 +509,18 @@ describe('TenantChartLibraryService', () => {
         sessions: 0,
         median: null,
       });
+      scopeOptions.describe.mockResolvedValue('Course A');
       const courseId = '8b3f2f0e-1c0a-4d6e-9a53-3d1c0d2f4a11';
-      await service.getChartData(TENANT, 'TSQ-020', {
+      const out = await service.getChartData(TENANT, 'TSQ-020', {
         courseId,
         scenarioId: 7,
         learnerId: 9,
+      });
+      // The name comes back with the chart, for the card header.
+      expect(out.scope).toEqual({
+        kind: 'course',
+        id: courseId,
+        label: 'Course A',
       });
       expect(chartQuery.distribution).toHaveBeenCalledWith(
         expect.anything(),
@@ -514,6 +528,37 @@ describe('TenantChartLibraryService', () => {
           scope: { courseId, scenarioId: 7, learnerId: 9 },
         }),
       );
+    });
+
+    it('refuses a scope for a chart that would ignore it', async () => {
+      ready();
+      // TSQ-024 lists the course scope in the registry but has no spec yet.
+      await expect(
+        service.getChartData(TENANT, 'TSQ-024', { courseId: 'x' }),
+      ).rejects.toThrow('cannot be drawn for one course');
+    });
+
+    it('refuses a course, simulation or learner from another organisation', async () => {
+      ready();
+      scopeOptions.describe.mockResolvedValue(null);
+      await expect(
+        service.getChartData(TENANT, 'TSQ-020', { scenarioId: 99 }),
+      ).rejects.toThrow('Unknown simulation');
+      expect(chartQuery.distribution).not.toHaveBeenCalled();
+    });
+
+    it('offers a scope in the library only where the chart supports it', async () => {
+      enabled();
+      repo.getCapabilities.mockResolvedValue(caps({ sessions: 100 }));
+      const lib = await service.getLibrary(TENANT);
+      const by = Object.fromEntries(lib.charts.map((c) => [c.id, c.scopes]));
+      expect(by['TSQ-020']).toEqual([
+        'organisation',
+        'course',
+        'simulation',
+        'learner',
+      ]);
+      expect(by['TSQ-024']).toEqual(['organisation']);
     });
 
     it('refuses a scope the chart does not list', async () => {
@@ -777,6 +822,33 @@ describe('TenantChartLibraryService', () => {
       repo.getTenantKeys.mockResolvedValue(null);
       await expect(service.getCapabilities(TENANT)).rejects.toBeInstanceOf(
         NotFoundException,
+      );
+    });
+  });
+
+  describe('getScopeOptions', () => {
+    it('refuses when the page is off for the tenant', async () => {
+      repo.getTenantKeys.mockResolvedValue({
+        code: 'internal1',
+        statisticsDashboardEnabled: false,
+      });
+      await expect(
+        service.getScopeOptions(TENANT, 'course', undefined),
+      ).rejects.toThrow('not enabled');
+      expect(scopeOptions.list).not.toHaveBeenCalled();
+    });
+
+    it('lists for the caller tenant with both id spellings', async () => {
+      enabled();
+      scopeOptions.list.mockResolvedValue([{ id: '1', label: 'Course A' }]);
+      const out = await service.getScopeOptions(TENANT, 'course', 'cou', 20);
+      expect(out).toEqual([{ id: '1', label: 'Course A' }]);
+      expect(scopeOptions.list).toHaveBeenCalledWith(
+        'course',
+        TENANT,
+        'internal1',
+        'cou',
+        20,
       );
     });
   });

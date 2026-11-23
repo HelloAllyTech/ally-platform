@@ -25,6 +25,18 @@ export type StatisticsChartGroup =
 
 export type StatisticsChartSize = "s" | "m" | "wide";
 
+/** What a chart can be drawn for. The whole organisation is the default. */
+export type StatisticsChartScope = "organisation" | "course" | "simulation" | "learner";
+
+/** A scope a chart is drawn for: one course, simulation or learner. */
+export type StatisticsScopeKind = Exclude<StatisticsChartScope, "organisation">;
+
+export interface StatisticsScopeOption {
+  /** A course uuid, or a simulation or learner id as text. */
+  id: string;
+  label: string;
+}
+
 export interface StatisticsChartEntry {
   /** Stable id, for example `TSQ-001`. */
   id: string;
@@ -35,6 +47,8 @@ export interface StatisticsChartEntry {
   shape: string;
   chart: string;
   size: StatisticsChartSize;
+  /** What the chart can be drawn for; always lists the whole organisation. */
+  scopes: StatisticsChartScope[];
   state: StatisticsChartState;
   /** Why the chart is sparse or unavailable; null when available. */
   reason: string | null;
@@ -48,6 +62,8 @@ export interface StatisticsChartLibrary {
 
 export interface StatisticsChartResponse<T = unknown> {
   id: string;
+  /** What the chart was drawn for, when it was not the whole organisation. */
+  scope?: { kind: StatisticsScopeKind; id: string; label: string };
   state: Exclude<StatisticsChartState, "unavailable">;
   data: T;
 }
@@ -57,6 +73,10 @@ export interface GetStatisticsChartRequest {
   range?: OrganizationMetricsRange;
   /** IANA time zone, for charts that group by time of day. */
   timezone?: string;
+  /** Draw the chart for one simulation, course or learner. */
+  scenarioId?: number;
+  courseId?: string;
+  learnerId?: number;
   /** Table charts only. */
   search?: string;
   limit?: number;
@@ -219,4 +239,9 @@ export interface QuizPassData {
 export interface SkillChangeData {
   /** Weakest latest level first. */
   rows: Array<{ skill: string; first: number; latest: number; learners: number }>;
+}
+
+export interface GetStatisticsScopeOptionsRequest {
+  kind: StatisticsScopeKind;
+  search?: string;
 }

@@ -1,10 +1,12 @@
 import {
+  ArrayMaxSize,
   ArrayUnique,
   IsArray,
   IsBoolean,
   IsInt,
   IsOptional,
   IsString,
+  MaxLength,
 } from 'class-validator';
 
 export class UpdateUserPreferencesDto {
@@ -54,7 +56,9 @@ export class UpdateUserPreferencesDto {
   // retiring a chart needs no backend deploy: the frontend drops unknown ids.
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(60)
   @IsString({ each: true })
+  @MaxLength(80, { each: true })
   @ArrayUnique()
   statistics_dashboard?: string[];
 }

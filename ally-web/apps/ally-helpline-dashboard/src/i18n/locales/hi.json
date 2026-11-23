@@ -3995,6 +3995,36 @@
         "psychoeducation": "Psychoeducation",
         "feedback": "Feedback"
       }
+    },
+    "scope": {
+      "search": {
+        "course": "कोर्स खोजें",
+        "simulation": "सिमुलेशन खोजें",
+        "learner": "लर्नर खोजें"
+      },
+      "cancel": "रद्द करें",
+      "error": "सूची लोड नहीं हो सकी। फिर कोशिश करें।",
+      "loading": "लोड हो रहा है…",
+      "none": {
+        "course": "कोई कोर्स नहीं मिला।",
+        "simulation": "कोई सिमुलेशन नहीं मिला।",
+        "learner": "कोई लर्नर नहीं मिला।"
+      },
+      "badge": {
+        "course": "कोर्स: {{name}}",
+        "simulation": "सिमुलेशन: {{name}}",
+        "learner": "लर्नर: {{name}}"
+      },
+      "choose": {
+        "course": "\"{{title}}\" के लिए कोर्स चुनें",
+        "simulation": "\"{{title}}\" के लिए सिमुलेशन चुनें",
+        "learner": "\"{{title}}\" के लिए लर्नर चुनें"
+      },
+      "addFor": {
+        "course": "किसी कोर्स के लिए…",
+        "simulation": "किसी सिमुलेशन के लिए…",
+        "learner": "किसी लर्नर के लिए…"
+      }
     }
   }
 }

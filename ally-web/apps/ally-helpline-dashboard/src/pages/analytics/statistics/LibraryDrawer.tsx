@@ -2,16 +2,19 @@ import { FunctionComponent, useMemo, useState } from "react";
 
 import { useTranslation } from "react-i18next";
 
-import type { StatisticsChartEntry, StatisticsChartGroup } from "@types";
+import type { StatisticsChartEntry, StatisticsChartGroup, StatisticsScopeKind } from "@types";
 
+import { LayoutScope } from "./layout";
 import { CHART_RENDERERS } from "./renderers";
+import { ScopeChooser } from "./ScopeChooser";
 
 interface LibraryDrawerProps {
   /** Every chart the backend offers this tenant. */
   charts: readonly StatisticsChartEntry[];
-  /** Ids already on the dashboard. */
+  /** Ids already on the dashboard for the whole organisation. */
   addedIds: readonly string[];
-  onAdd: (id: string) => void;
+  /** Adds a chart, for the whole organisation or for one course, simulation or learner. */
+  onAdd: (id: string, scope?: LayoutScope) => void;
   onClose: () => void;
 }
 
@@ -47,6 +50,11 @@ export const LibraryDrawer: FunctionComponent<LibraryDrawerProps> = ({
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [group, setGroup] = useState<StatisticsChartGroup | "all">("all");
+  // The chart being added for a course, simulation or learner, until one is chosen.
+  const [choosing, setChoosing] = useState<{
+    chart: StatisticsChartEntry;
+    kind: StatisticsScopeKind;
+  } | null>(null);
 
   // Only charts this build can draw are offered.
   const offered = useMemo(() => charts.filter(c => CHART_RENDERERS[c.id]), [charts]);
@@ -122,6 +130,22 @@ export const LibraryDrawer: FunctionComponent<LibraryDrawerProps> = ({
         </div>
       </div>
 
+      {choosing && (
+        <div className="flex flex-col gap-3 border-b border-border-light p-4">
+          <h3 className="text-sm font-semibold text-typography-900">
+            {t(`statisticsLibrary.scope.choose.${choosing.kind}`, { title: choosing.chart.title })}
+          </h3>
+          <ScopeChooser
+            kind={choosing.kind}
+            onCancel={() => setChoosing(null)}
+            onPick={option => {
+              onAdd(choosing.chart.id, { kind: choosing.kind, value: option.id });
+              setChoosing(null);
+            }}
+          />
+        </div>
+      )}
+
       <ul className="flex flex-col px-4" data-testid="statistics-library-list">
         {visible.length === 0 && (
           <li className="py-6 text-sm text-typography-600">
@@ -147,6 +171,23 @@ export const LibraryDrawer: FunctionComponent<LibraryDrawerProps> = ({
                 )}
                 {unavailable && chart.reason && (
                   <span className="text-xs font-medium text-typography-600">{chart.reason}</span>
+                )}
+                {!unavailable && (
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    {chart.scopes
+                      .filter((k): k is StatisticsScopeKind => k !== "organisation")
+                      .map(kind => (
+                        <button
+                          key={kind}
+                          type="button"
+                          onClick={() => setChoosing({ chart, kind })}
+                          className="min-h-9 rounded-full border border-[#264d8e] bg-white px-3 text-xs font-medium text-[#264d8e]"
+                          data-testid={`statistics-library-add-${chart.id}-${kind}`}
+                        >
+                          {t(`statisticsLibrary.scope.addFor.${kind}`)}
+                        </button>
+                      ))}
+                  </div>
                 )}
               </div>
               <button

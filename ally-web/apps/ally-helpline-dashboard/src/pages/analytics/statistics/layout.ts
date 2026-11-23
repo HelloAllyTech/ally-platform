@@ -1,4 +1,4 @@
-import type { StatisticsChartEntry } from "@types";
+import type { StatisticsChartEntry, StatisticsScopeKind } from "@types";
 
 /**
  * Which charts a tenant admin sees on the Statistics dashboard, and in what
@@ -37,6 +37,36 @@ export const DEFAULT_LAYOUT_ORDER: readonly string[] = [
   "TSQ-027", // Sessions reviewed
 ];
 
+/** A chart drawn for one course, simulation or learner. */
+export interface LayoutScope {
+  kind: StatisticsScopeKind;
+  value: string;
+}
+
+export interface LayoutItem {
+  /** The saved string: `TSQ-020`, or `TSQ-020@course:<id>` for a scoped card. */
+  key: string;
+  id: string;
+  scope?: LayoutScope;
+}
+
+const SCOPE_KINDS: readonly StatisticsScopeKind[] = ["course", "simulation", "learner"];
+const KEY_PATTERN = /^(TSQ-\d{3})(?:@(course|simulation|learner):([A-Za-z0-9-]{1,64}))?$/;
+
+/** The saved string for a card. The same chart may appear for several scopes. */
+export const layoutKey = (id: string, scope?: LayoutScope): string =>
+  scope ? `${id}@${scope.kind}:${scope.value}` : id;
+
+/** Reads a saved string; null when it is not one this build understands. */
+export const parseLayoutKey = (key: string): LayoutItem | null => {
+  const match = KEY_PATTERN.exec(key);
+  if (!match) return null;
+  const [, id, kind, value] = match;
+  return kind && SCOPE_KINDS.includes(kind as StatisticsScopeKind)
+    ? { key, id, scope: { kind: kind as StatisticsScopeKind, value } }
+    : { key, id };
+};
+
 /** The most cards the default layout holds. */
 export const DEFAULT_LAYOUT_CAP = 10;
 
@@ -51,7 +81,7 @@ export const buildDefaultLayout = (charts: readonly StatisticsChartEntry[]): str
  *
  * - Nothing saved: the default layout.
  * - Saved: keep the saved order, drop ids the backend no longer offers (a stale
- *   or retired chart), drop duplicates. A chart the organisation has since lost
+ *   or retired chart), drop a scope the chart no longer supports, drop duplicates. A chart the organisation has since lost
  *   eligibility for is KEPT (its card says it is unavailable) rather than
  *   vanishing. Charts the admin never added are never appended.
  */
@@ -60,14 +90,16 @@ export const resolveDashboardLayout = (
   charts: readonly StatisticsChartEntry[],
 ): string[] => {
   if (!Array.isArray(saved)) return buildDefaultLayout(charts);
-  const offered = new Set(charts.map(c => c.id));
+  const offered = new Map(charts.map(c => [c.id, c]));
   const seen = new Set<string>();
   const out: string[] = [];
-  saved.forEach(id => {
-    if (typeof id === "string" && offered.has(id) && !seen.has(id)) {
-      seen.add(id);
-      out.push(id);
-    }
+  saved.forEach(key => {
+    const item = typeof key === "string" ? parseLayoutKey(key) : null;
+    const entry = item ? offered.get(item.id) : undefined;
+    if (!item || !entry || seen.has(item.key)) return;
+    if (item.scope && !entry.scopes.includes(item.scope.kind)) return;
+    seen.add(item.key);
+    out.push(item.key);
   });
   return out;
 };

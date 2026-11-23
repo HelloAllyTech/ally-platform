@@ -142,6 +142,7 @@ import { TenantAnalyticsService } from './service/tenant-analytics.service';
 import { TenantCapabilitiesRepository } from './repository/tenant-capabilities.repository';
 import { TenantOutcomesRepository } from './repository/tenant-outcomes.repository';
 import { TenantChartQueryRepository } from './repository/tenant-chart-query.repository';
+import { TenantScopeOptionsRepository } from './repository/tenant-scope-options.repository';
 import { TenantPracticeRepository } from './repository/tenant-practice.repository';
 import { TenantChartLibraryService } from './service/tenant-chart-library.service';
 import { ScribeAnalyticsRepository } from './repository/scribe-analytics.repository';
@@ -378,6 +379,7 @@ import { TenantModule } from 'src/tenant/tenant.module';
     TenantOutcomesRepository,
     TenantPracticeRepository,
     TenantChartQueryRepository,
+    TenantScopeOptionsRepository,
     TenantChartLibraryService,
     ScribeAnalyticsRepository,
     LlmUsageRepository,

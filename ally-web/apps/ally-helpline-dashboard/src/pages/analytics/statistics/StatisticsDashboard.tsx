@@ -26,7 +26,14 @@ import type { StatisticsChartEntry } from "@types";
 
 import { SortableMetricBlock } from "../SortableMetricBlock";
 import { ChartHost } from "./ChartHost";
-import { STATISTICS_LAYOUT_PREF_KEY, resolveDashboardLayout } from "./layout";
+import {
+  LayoutItem,
+  LayoutScope,
+  STATISTICS_LAYOUT_PREF_KEY,
+  layoutKey,
+  parseLayoutKey,
+  resolveDashboardLayout,
+} from "./layout";
 import { LibraryDrawer } from "./LibraryDrawer";
 import { CHART_RENDERERS, DashboardContext } from "./renderers";
 
@@ -64,10 +71,14 @@ export const StatisticsDashboard: FunctionComponent<StatisticsDashboardProps> = 
   );
 
   const byId = useMemo(() => new Map(charts.map(c => [c.id, c])), [charts]);
-  const entries = layoutIds
-    .map(id => byId.get(id))
-    .filter((c): c is StatisticsChartEntry => !!c && !!CHART_RENDERERS[c.id]);
-  const entryIds = entries.map(e => e.id);
+  // Each card is a layout key: a chart id, or a chart id with the course,
+  // simulation or learner it is drawn for. The same chart can appear more than once.
+  const items = layoutIds
+    .map(parseLayoutKey)
+    .filter(
+      (item): item is LayoutItem => !!item && !!byId.get(item.id) && !!CHART_RENDERERS[item.id],
+    );
+  const entryKeys = items.map(item => item.key);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -89,15 +100,22 @@ export const StatisticsDashboard: FunctionComponent<StatisticsDashboardProps> = 
 
   const handleDragEnd = ({ active, over }: DragEndEvent) => {
     if (!over || active.id === over.id) return;
-    const oldIndex = entryIds.indexOf(String(active.id));
-    const newIndex = entryIds.indexOf(String(over.id));
+    const oldIndex = entryKeys.indexOf(String(active.id));
+    const newIndex = entryKeys.indexOf(String(over.id));
     if (oldIndex === -1 || newIndex === -1) return;
-    persist(arrayMove(entryIds, oldIndex, newIndex));
+    persist(arrayMove(entryKeys, oldIndex, newIndex));
   };
 
-  const handleRemove = (id: string) => persist(entryIds.filter(x => x !== id));
-  const handleAdd = (id: string) => {
-    if (!entryIds.includes(id)) persist([...entryIds, id]);
+  const handleRemove = (key: string) => persist(entryKeys.filter(x => x !== key));
+  const handleAdd = (id: string, scope?: LayoutScope) => {
+    const key = layoutKey(id, scope);
+    if (!entryKeys.includes(key)) persist([...entryKeys, key]);
+  };
+  /** Points a card at a different course, simulation or learner, keeping its place. */
+  const handleScopeChange = (oldKey: string, id: string, scope: LayoutScope) => {
+    const key = layoutKey(id, scope);
+    if (key === oldKey || entryKeys.includes(key)) return;
+    persist(entryKeys.map(k => (k === oldKey ? key : k)));
   };
 
   const finishEditing = () => {
@@ -126,7 +144,7 @@ export const StatisticsDashboard: FunctionComponent<StatisticsDashboardProps> = 
   const spanClass = (e: StatisticsChartEntry) => (e.size === "wide" ? "xl:col-span-2" : "");
 
   return (
-    <DashboardContext.Provider value={{ learnerTableOnPage: entryIds.includes("TSQ-009") }}>
+    <DashboardContext.Provider value={{ learnerTableOnPage: entryKeys.includes("TSQ-009") }}>
       <div className="flex flex-col gap-4 py-4" data-testid="statistics-dashboard">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <p className="text-sm text-typography-600">{t("statisticsLibrary.tagline")}</p>
@@ -181,7 +199,7 @@ export const StatisticsDashboard: FunctionComponent<StatisticsDashboardProps> = 
 
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
           <div className="min-w-0 flex-1">
-            {entries.length === 0 ? (
+            {items.length === 0 ? (
               <p
                 className="rounded border border-dashed border-border-light p-6 text-sm text-typography-600"
                 data-testid="statistics-empty"
@@ -194,38 +212,49 @@ export const StatisticsDashboard: FunctionComponent<StatisticsDashboardProps> = 
                 collisionDetection={closestCenter}
                 onDragEnd={handleDragEnd}
               >
-                <SortableContext items={entryIds} strategy={rectSortingStrategy}>
+                <SortableContext items={entryKeys} strategy={rectSortingStrategy}>
                   <div className={gridClass} data-testid="statistics-grid">
-                    {entries.map(entry => (
-                      <SortableMetricBlock
-                        key={entry.id}
-                        id={entry.id}
-                        wide={entry.size === "wide"}
-                      >
-                        <div className="rounded border-2 border-dashed border-[#9db5dd]">
-                          <button
-                            type="button"
-                            onClick={() => handleRemove(entry.id)}
-                            aria-label={t("statisticsLibrary.removeAria", { title: entry.title })}
-                            className="absolute right-10 top-2 z-10 flex h-6 w-6 items-center justify-center rounded text-typography-500 hover:bg-background-secondary hover:text-typography-900"
-                            data-testid={`statistics-remove-${entry.id}`}
-                          >
-                            &times;
-                          </button>
-                          <ChartHost entry={entry} range={range} />
-                        </div>
-                      </SortableMetricBlock>
-                    ))}
+                    {items.map(item => {
+                      const entry = byId.get(item.id) as StatisticsChartEntry;
+                      return (
+                        <SortableMetricBlock
+                          key={item.key}
+                          id={item.key}
+                          wide={entry.size === "wide"}
+                        >
+                          <div className="rounded border-2 border-dashed border-[#9db5dd]">
+                            <button
+                              type="button"
+                              onClick={() => handleRemove(item.key)}
+                              aria-label={t("statisticsLibrary.removeAria", { title: entry.title })}
+                              className="absolute right-10 top-2 z-10 flex h-6 w-6 items-center justify-center rounded text-typography-500 hover:bg-background-secondary hover:text-typography-900"
+                              data-testid={`statistics-remove-${item.key}`}
+                            >
+                              &times;
+                            </button>
+                            <ChartHost
+                              entry={entry}
+                              range={range}
+                              scope={item.scope}
+                              onScopeChange={scope => handleScopeChange(item.key, item.id, scope)}
+                            />
+                          </div>
+                        </SortableMetricBlock>
+                      );
+                    })}
                   </div>
                 </SortableContext>
               </DndContext>
             ) : (
               <div className={gridClass} data-testid="statistics-grid">
-                {entries.map(entry => (
-                  <div key={entry.id} className={spanClass(entry)}>
-                    <ChartHost entry={entry} range={range} />
-                  </div>
-                ))}
+                {items.map(item => {
+                  const entry = byId.get(item.id) as StatisticsChartEntry;
+                  return (
+                    <div key={item.key} className={spanClass(entry)}>
+                      <ChartHost entry={entry} range={range} scope={item.scope} />
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -233,7 +262,7 @@ export const StatisticsDashboard: FunctionComponent<StatisticsDashboardProps> = 
           {editing && drawerOpen && (
             <LibraryDrawer
               charts={charts}
-              addedIds={entryIds}
+              addedIds={items.filter(i => !i.scope).map(i => i.id)}
               onAdd={handleAdd}
               onClose={() => setDrawerOpen(false)}
             />

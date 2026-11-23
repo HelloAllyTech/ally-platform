@@ -3995,6 +3995,36 @@
         "psychoeducation": "Psychoeducation",
         "feedback": "Feedback"
       }
+    },
+    "scope": {
+      "search": {
+        "course": "Search courses",
+        "simulation": "Search simulations",
+        "learner": "Search learners"
+      },
+      "cancel": "Cancel",
+      "error": "Could not load the list. Try again.",
+      "loading": "Loading…",
+      "none": {
+        "course": "No courses found.",
+        "simulation": "No simulations found.",
+        "learner": "No learners found."
+      },
+      "badge": {
+        "course": "Course: {{name}}",
+        "simulation": "Simulation: {{name}}",
+        "learner": "Learner: {{name}}"
+      },
+      "choose": {
+        "course": "Choose a course for \"{{title}}\"",
+        "simulation": "Choose a simulation for \"{{title}}\"",
+        "learner": "Choose a learner for \"{{title}}\""
+      },
+      "addFor": {
+        "course": "For a course…",
+        "simulation": "For a simulation…",
+        "learner": "For a learner…"
+      }
     }
   }
 }

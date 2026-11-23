@@ -16,6 +16,7 @@ import { AnalyticsRange } from '../dto/platform-analytics.dto';
 import { LearnerUsageStatus } from '../dto/tenant-analytics.dto';
 import {
   TenantChartDataResponseDto,
+  TenantChartScopeDto,
   TenantChartLibraryResponseDto,
 } from '../dto/tenant-chart-library.dto';
 import { TenantCapabilitiesRepository } from '../repository/tenant-capabilities.repository';
@@ -23,6 +24,11 @@ import {
   RankedRow,
   TenantChartQueryRepository,
 } from '../repository/tenant-chart-query.repository';
+import {
+  ScopeKind,
+  ScopeOption,
+  TenantScopeOptionsRepository,
+} from '../repository/tenant-scope-options.repository';
 import { TenantOutcomesRepository } from '../repository/tenant-outcomes.repository';
 import {
   SESSION_LENGTH_BOUNDS_MINUTES,
@@ -223,6 +229,7 @@ export class TenantChartLibraryService {
     private readonly outcomesRepo: TenantOutcomesRepository,
     private readonly practiceRepo: TenantPracticeRepository,
     private readonly chartQueryRepo: TenantChartQueryRepository,
+    private readonly scopeOptionsRepo: TenantScopeOptionsRepository,
   ) {
     this.handlers = {
       // Headline numbers: the summary block of organization-metrics, plus the
@@ -357,6 +364,7 @@ export class TenantChartLibraryService {
         shape: entry.shape,
         chart: entry.chart,
         size: entry.size,
+        scopes: [...this.supportedScopes(entry)],
         state: availability.state,
         reason: availability.reason,
       };
@@ -402,8 +410,11 @@ export class TenantChartLibraryService {
       throw new ForbiddenException(availability.reason ?? 'Chart unavailable');
     }
 
+    const scope = await this.resolveScope(tenantId, keys.code, params);
     const data = await handler(tenantId, params, keys.code);
-    return { id: entry.id, state: availability.state, data };
+    return scope
+      ? { id: entry.id, state: availability.state, data, scope }
+      : { id: entry.id, state: availability.state, data };
   }
 
   /**
@@ -607,7 +618,34 @@ export class TenantChartLibraryService {
     return { rows: await this.practiceRepo.getSkillChange(tenantId, code) };
   }
 
-  /** A scope filter is only accepted for a chart that lists that scope. */
+  /**
+   * The courses, simulations or learners a chart can be drawn for. Refused when
+   * the page is off for the tenant, like the charts themselves.
+   */
+  async getScopeOptions(
+    tenantId: string,
+    kind: ScopeKind,
+    search: string | undefined,
+    limit = 50,
+  ): Promise<ScopeOption[]> {
+    const keys = await this.capabilitiesRepo.getTenantKeys(tenantId);
+    if (!keys?.statisticsDashboardEnabled) {
+      throw new ForbiddenException('Statistics page is not enabled');
+    }
+    return this.scopeOptionsRepo.list(kind, tenantId, keys.code, search, limit);
+  }
+
+  /**
+   * What a chart can really be drawn for today: the scopes its registry row
+   * lists, but only when it runs from a spec (which applies the filters). A chart
+   * with its own handler is organisation-wide until it is moved onto a spec, so
+   * it never claims a scope it would ignore.
+   */
+  private supportedScopes(entry: TenantChartEntry): readonly ChartScope[] {
+    return TENANT_CHART_SPECS[entry.id] ? entry.scopes : ['organisation'];
+  }
+
+  /** A scope filter is only accepted for a chart that supports that scope. */
   private assertScopeAllowed(
     entry: TenantChartEntry,
     p: TenantChartParams,
@@ -618,12 +656,39 @@ export class TenantChartLibraryService {
       [p.learnerId, 'learner'],
     ];
     wanted.forEach(([value, scope]) => {
-      if (value !== undefined && !entry.scopes.includes(scope)) {
+      if (value !== undefined && !this.supportedScopes(entry).includes(scope)) {
         throw new BadRequestException(
           `This chart cannot be drawn for one ${scope}`,
         );
       }
     });
+  }
+
+  /**
+   * Names what the chart is drawn for, and checks it belongs to the tenant: an
+   * id from another organisation finds nothing and the chart is refused.
+   */
+  private async resolveScope(
+    tenantId: string,
+    code: string,
+    p: TenantChartParams,
+  ): Promise<TenantChartScopeDto | undefined> {
+    const picked: Array<[ScopeKind, string | number | undefined]> = [
+      ['course', p.courseId],
+      ['simulation', p.scenarioId],
+      ['learner', p.learnerId],
+    ];
+    const found = picked.find(([, id]) => id !== undefined);
+    if (!found) return undefined;
+    const [kind, id] = found as [ScopeKind, string | number];
+    const label = await this.scopeOptionsRepo.describe(
+      kind,
+      id,
+      tenantId,
+      code,
+    );
+    if (label === null) throw new NotFoundException(`Unknown ${kind}`);
+    return { kind, id: String(id), label };
   }
 
   /** Runs a chart defined in {@link TENANT_CHART_SPECS}. */

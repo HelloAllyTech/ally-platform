@@ -33,6 +33,8 @@ import {
   TenantChartDataResponseDto,
   TenantChartLibraryResponseDto,
   TenantChartQueryDto,
+  TenantScopeOptionDto,
+  TenantScopeOptionsQueryDto,
 } from '../dto/tenant-chart-library.dto';
 import { AnalyticsService } from '../service/analytics.service';
 import { TenantAnalyticsService } from '../service/tenant-analytics.service';
@@ -157,6 +159,21 @@ export class TenantAnalyticsController {
       this.requireTenantId(),
       chartId,
       query,
+    );
+  }
+
+  /** The courses, simulations or learners a chart can be drawn for. */
+  @Get('chart-scope-options')
+  @ApiOperation({ summary: 'List what a statistics chart can be drawn for' })
+  @ApiResponse({ status: 200, type: [TenantScopeOptionDto] })
+  @AuthPermissions([PERMISSIONS.VIEW_ORGANIZATION_METRICS])
+  async getScopeOptions(
+    @Query() query: TenantScopeOptionsQueryDto,
+  ): Promise<TenantScopeOptionDto[]> {
+    return this.chartLibraryService.getScopeOptions(
+      this.requireTenantId(),
+      query.kind,
+      query.search,
     );
   }
 
