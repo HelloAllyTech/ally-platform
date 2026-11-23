@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { isUUID } from 'class-validator';
+import { STATE_AWARE_MAIN_PROMPTS } from '../util/roleplay-mode-design.util';
 import { DataSource, ILike, In, IsNull } from 'typeorm';
 import { LoggerService } from 'src/logger/logger.service';
 import { Competency } from 'src/learn/entity/competency.entity';
@@ -317,6 +318,22 @@ export class CourseCopilotLibraryService {
     if (ids.character.length) add(await this.characterHits(ids.character));
     if (ids.template.length) add(await this.templateHits(ids.template));
     return out;
+  }
+
+  /**
+   * The first state-aware main prompt (see STATE_AWARE_MAIN_PROMPTS) that exists here and still
+   * declares `{state_x_guidelines}`; null when none does, and then roleplays get no states.
+   */
+  async stateAwareMainPrompt(): Promise<string | null> {
+    const rows: { promptCode: string }[] = await this.dataSource.query(
+      `SELECT "promptCode" FROM prompts
+        WHERE "promptCode" = ANY($1)
+          AND COALESCE("isObsolete", false) = false
+          AND "availableVariables"::text LIKE '%state_x_guidelines%'`,
+      [STATE_AWARE_MAIN_PROMPTS],
+    );
+    const found = new Set(rows.map((row) => row.promptCode));
+    return STATE_AWARE_MAIN_PROMPTS.find((code) => found.has(code)) ?? null;
   }
 
   /*
