@@ -158,3 +158,46 @@ describe("AgentBuilderCopilotWizard suggestions", () => {
     expect(mocks.start).toHaveBeenCalledWith(expect.objectContaining({ agentTestCases: "" }));
   });
 });
+
+describe("AgentBuilderCopilotWizard saved conversation", () => {
+  const saved = {
+    version: 1,
+    history: [
+      { question: "Describe roleplay actor", answer: "Aarav, 15" },
+      { question: "Choose the roleplay's mode", answer: "Learning mode: reminders." },
+    ],
+    description: "Aarav, 15",
+    mode: "learning",
+    states: true,
+    goalIds: ["g1"],
+    result: { applied: 12, total: 14, stopped: false, checks: ["remindersHidden"] },
+    generatedAt: "2026-11-23T10:00:00.000Z",
+  };
+
+  beforeEach(() => {
+    mocks.goals = { data: { data: [] }, isLoading: false, isError: false };
+  });
+
+  it("shows the earlier conversation when a roleplay is reopened", () => {
+    mocks.formValues.agentBuilderChat = saved;
+    render(<AgentBuilderCopilotWizard formMethods={form()} />);
+
+    expect(screen.getByTestId("restored-chat").textContent).toContain("12 of 14 fields");
+    expect(screen.getByText("Aarav, 15")).toBeTruthy();
+    expect(screen.getByText(en.agentBuilderMode.remindersHidden)).toBeTruthy();
+    expect(screen.getByTestId("next-steps")).toBeTruthy();
+    expect(screen.queryByTestId("actor-ideas")).toBeNull();
+
+    fireEvent.click(screen.getByText(en.agentBuilderRestored.startOver));
+    expect((screen.getByLabelText("actor") as HTMLTextAreaElement).value).toBe("Aarav, 15");
+  });
+
+  it("saves the conversation on the form when generation finishes", () => {
+    mocks.generation = { phase: "done", tasks: [{}, {}], checks: [] };
+    render(<AgentBuilderCopilotWizard formMethods={form()} />);
+
+    const call = mocks.setValue.mock.calls.find(([field]) => field === "agentBuilderChat");
+    expect(call?.[1]).toMatchObject({ version: 1, result: { total: 2, stopped: false } });
+    expect(call?.[2]).toMatchObject({ shouldDirty: true });
+  });
+});

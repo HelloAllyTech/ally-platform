@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { CheckCircle, FailIcon } from "@icons";
 import { UseFormReturn, useWatch } from "react-hook-form";
@@ -51,10 +51,32 @@ import {
  * the Basic Settings tab stay in sync automatically.
  */
 
-type WizardStepId = "describe" | "competency" | "mode" | "goals" | "generate";
+type WizardStepId = "describe" | "competency" | "mode" | "goals" | "generate" | "restored";
+
+/**
+ * The conversation as saved on the roleplay (form field `agentBuilderChat` →
+ * scenarios.metadata.agentBuilderChat), so reopening the roleplay shows it again.
+ */
+export interface SavedAgentBuilderChat {
+  version: 1;
+  history: { question: string; answer: string }[];
+  description: string;
+  mode?: RoleplayMode;
+  states?: boolean;
+  goalIds: string[];
+  result: { applied: number; total: number; stopped: boolean; checks: string[] };
+  generatedAt: string;
+}
+
+const isSavedChat = (value: unknown): value is SavedAgentBuilderChat =>
+  Boolean(value) &&
+  typeof value === "object" &&
+  Array.isArray((value as SavedAgentBuilderChat).history) &&
+  (value as SavedAgentBuilderChat).history.length > 0;
 
 const modeStrings = en.agentBuilderMode;
 const suggestionStrings = en.agentBuilderSuggestions;
+const restoredStrings = en.agentBuilderRestored;
 
 /** One "what to review" line, in words. */
 const nextStepText = (step: ReturnType<typeof suggestNextSteps>[number]): string => {
@@ -62,7 +84,7 @@ const nextStepText = (step: ReturnType<typeof suggestNextSteps>[number]): string
   return typeof message === "function" ? message(step.count ?? 0) : message;
 };
 
-const QUESTIONS: Record<Exclude<WizardStepId, "generate">, string> = {
+const QUESTIONS: Record<Exclude<WizardStepId, "generate" | "restored">, string> = {
   describe: "Describe roleplay actor",
   competency: "Select one competency",
   mode: modeStrings.question,
@@ -128,6 +150,7 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
   const [design, setDesign] = useState<RoleplayDesign | null>(null);
   const [modeError, setModeError] = useState(false);
   const [recommendation, setRecommendation] = useState<ModeRecommendation | null>(null);
+  const [restored, setRestored] = useState<SavedAgentBuilderChat | null>(null);
   const [fetchDesign, { isFetching: loadingDesign }] = useLazyGetRoleplayDesignQuery();
 
   const competency = useWatch({
@@ -147,6 +170,55 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
 
   const { phase, tasks, start, abort, reset, doneCount, appliedCount, checks } =
     useAgentBuilderGeneration(formMethods);
+
+  // Reopening a roleplay: the saved conversation arrives with the form's values (after the
+  // fetch), so restore it the first time it appears, unless the trainer has already started.
+  const savedChat = useWatch({ control: formMethods.control, name: "agentBuilderChat" });
+  const restoreCheckedRef = useRef(false);
+  useEffect(() => {
+    if (restoreCheckedRef.current || !isSavedChat(savedChat)) return;
+    restoreCheckedRef.current = true;
+    if (step !== "describe" || history.length > 0 || description.trim()) return;
+    setRestored(savedChat);
+    setHistory(savedChat.history);
+    setDescription(savedChat.description ?? "");
+    if (savedChat.mode) setMode(savedChat.mode);
+    setSelectedGoals(savedChat.goalIds ?? []);
+    setStep("restored");
+  }, [savedChat, step, history.length, description]);
+
+  // A finished (or stopped) run is saved on the roleplay with the form, by the page's autosave.
+  const savedPhaseRef = useRef<string>("idle");
+  useEffect(() => {
+    if (phase === savedPhaseRef.current) return;
+    savedPhaseRef.current = phase;
+    if (phase !== "done" && phase !== "aborted") return;
+    const chat: SavedAgentBuilderChat = {
+      version: 1,
+      history,
+      description: description.trim(),
+      ...(design ? { mode: design.mode, states: design.states } : {}),
+      goalIds: selectedGoals,
+      result: { applied: appliedCount, total: tasks.length, stopped: phase === "aborted", checks },
+      generatedAt: new Date().toISOString(),
+    };
+    restoreCheckedRef.current = true;
+    formMethods.setValue("agentBuilderChat", chat, { shouldDirty: true, shouldValidate: false });
+    formMethods.setValue("agentBuilderDescription", chat.description, {
+      shouldDirty: true,
+      shouldValidate: false,
+    });
+  }, [
+    phase,
+    history,
+    description,
+    design,
+    selectedGoals,
+    appliedCount,
+    tasks.length,
+    checks,
+    formMethods,
+  ]);
 
   const pushHistory = (question: string, answer: string) =>
     setHistory(prev => [...prev, { question, answer }]);
@@ -214,10 +286,12 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
   const handleStartOver = () => {
     reset();
     setHistory([]);
-    setDescription("");
+    // From a saved conversation, keep its description to edit rather than retype.
+    setDescription(restored?.description ?? "");
     setSelectedGoals([]);
     setMode("practice");
     setRecommendation(null);
+    setRestored(null);
     setDesign(null);
     setModeError(false);
     setStep("describe");
@@ -244,6 +318,40 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
             </div>
           </div>
         ))}
+
+        {step === "restored" && restored && (
+          <div className="flex flex-col gap-3" data-testid="restored-chat">
+            <div className="rounded-md border border-border-light bg-neutral-50 p-3 text-sm text-typography-900">
+              {restoredStrings.summary(
+                new Date(restored.generatedAt).toLocaleString(),
+                restored.result.applied,
+                restored.result.total,
+                restored.result.stopped,
+              )}
+            </div>
+            {restored.mode && restored.states === false && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-typography-900">
+                {modeStrings.noStatePrompt}
+              </div>
+            )}
+            {restored.result.checks.includes("remindersHidden") && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-typography-900">
+                {modeStrings.remindersHidden}
+              </div>
+            )}
+            <div
+              className="rounded-md border border-border-light bg-white p-3 text-sm text-typography-900"
+              data-testid="next-steps"
+            >
+              <p className="font-medium">{suggestionStrings.nextTitle}</p>
+              <ul className="mt-1 list-disc pl-5 text-typography-800">
+                {suggestNextSteps(formMethods.getValues(), restored.mode).map(next => (
+                  <li key={next.key}>{nextStepText(next)}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
 
         {step === "generate" && (
           <div className="flex flex-col gap-3">
@@ -517,6 +625,18 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
               </Button>
             </div>
           </>
+        )}
+
+        {step === "restored" && (
+          <div className="flex justify-end">
+            <Button
+              variant={ButtonVariant.SECONDARY}
+              onClick={handleStartOver}
+              className="h-[40px] px-6"
+            >
+              {restoredStrings.startOver}
+            </Button>
+          </div>
         )}
 
         {step === "generate" && (

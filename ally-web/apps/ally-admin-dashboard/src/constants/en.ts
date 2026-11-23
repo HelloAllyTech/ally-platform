@@ -16042,6 +16042,15 @@ export const en = {
     } as Record<string, string>,
   },
 
+  // Agent Builder wizard: the saved conversation, shown again when a roleplay is reopened.
+  agentBuilderRestored: {
+    summary: (when: string, applied: number, total: number, stopped: boolean) =>
+      stopped
+        ? `Generated on ${when}, stopped early: ${applied} of ${total} fields filled. Your edits on the left since then are kept.`
+        : `Generated on ${when}: ${applied} of ${total} fields filled. Your edits on the left since then are kept.`,
+    startOver: "Start a new generation",
+  },
+
   // Agent Builder wizard: example actor descriptions and what to review after generating.
   agentBuilderSuggestions: {
     ideasTitle: "Not sure where to start? Pick one and edit it:",
