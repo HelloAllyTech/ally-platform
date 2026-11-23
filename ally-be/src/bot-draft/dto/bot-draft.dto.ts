@@ -103,6 +103,15 @@ export class BotDraftDto {
   @IsEnum(SafetyPackId)
   safetyPackId!: SafetyPackId;
 
+  /**
+   * The owner's correction of the pack in setup (Q4 A3), set by `correctPack`, never by an edit
+   * (its path isn't allow-listed). Declared so a draft that carries one still validates on the next
+   * edit (it was refused as "invalid_draft").
+   */
+  @IsOptional()
+  @IsObject()
+  packChange?: Record<string, unknown> | null;
+
   @IsArray()
   @ArrayMaxSize(20)
   @IsString({ each: true })

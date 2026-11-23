@@ -75,6 +75,9 @@ class CheckContext:
     #: The organisation's own line the owner confirmed for crisis replies (Q4 G7),
     #: given with the national numbers when a reply says it has none.
     crisis_line: str = ""
+    #: The person's message read as upset (the crisis check unsure, Q4 H1): the reply
+    #: is never only a contact line, and carries 14416 and 112.
+    upset: bool = False
 
     @property
     def found(self) -> List[Dict[str, Any]]:

@@ -135,7 +135,7 @@ export interface OnboardingSession {
     message: string;
     done: number;
     total: number;
-    questions: { question: string; reply?: string }[];
+    questions: { question: string; reply?: string; reasons?: string[] }[];
   } | null;
   /** "Check again" after a failed safety recheck. */
   checkSafetyAgain: () => void;
@@ -159,7 +159,8 @@ export interface OnboardingSession {
   /** The one-screen flow (chunk 20d). Null while the draft loads. */
   flow: OnboardingScreenState | null;
   /** Move past the reading result, the safety screen or "Make it yours". */
-  pass: (screen: keyof PassedScreens) => void;
+  /** Marks a browser-only screen done, or not done (`false`) to go back to it (Q4 H3). */
+  pass: (screen: keyof PassedScreens, done?: boolean) => void;
   /** Back from the current screen: a browser-only screen, else the server's step back. */
   backScreen: () => Promise<void>;
   /** "Start from a template" after the site was read (T1): what it did, or null if refused. */
@@ -464,7 +465,7 @@ export const useOnboardingSession = (
     },
     edit,
     flow,
-    pass: screen => pass(screen),
+    pass: (screen, done = true) => pass(screen, done),
     applyTemplate: async (template, answers) => {
       if (!view) return null;
       try {

@@ -1,4 +1,9 @@
-import { emergencyByKeywords, lifeThreatening } from '../emergency-keywords';
+import {
+  atRiskByKeywords,
+  emergencyByKeywords,
+  lifeThreatening,
+  moreSevere,
+} from '../emergency-keywords';
 
 describe('emergency keywords, for when the crisis classifier fails (chunk H1)', () => {
   it.each([
@@ -154,5 +159,61 @@ describe('life-threatening emergencies decide on their own, on every assistant (
     'This deadline is killing me lol',
   ])('not an emergency: %s', (text) => {
     expect(lifeThreatening(text)).toBeNull();
+  });
+});
+
+describe('indirect hopelessness on a mental-health assistant (Q4 H1)', () => {
+  it.each([
+    "Honestly some days I feel there's no point to anything",
+    "what's the point of anything anymore, I'm just tired of everything",
+    "I don't want to wake up tomorrow",
+    'sach mein ab kisi cheez ka koi matlab nahi lagta, roz uthne ka mann nahi karta',
+    'मुझे अब जीने का मन नहीं करता',
+  ])('at risk: %s', (text) => {
+    expect(atRiskByKeywords(text, 'mental_health')).toMatchObject({
+      is_crisis: true,
+      level: 'at_risk',
+    });
+  });
+
+  it('only on a mental-health assistant, and never on ordinary questions', () => {
+    expect(
+      atRiskByKeywords("what's the point of a day pass?", 'standard'),
+    ).toBeNull();
+    expect(
+      atRiskByKeywords('Is there any point in booking early?', 'mental_health'),
+    ).toBeNull();
+    expect(
+      atRiskByKeywords('What are your timings?', 'mental_health'),
+    ).toBeNull();
+  });
+});
+
+describe('the more severe verdict wins (Q4 H1)', () => {
+  const base = { signal: '', confidence: 0 };
+  const none = {
+    ...base,
+    is_crisis: false,
+    level: 'none' as const,
+    failed: false,
+  };
+  const atRisk = {
+    ...base,
+    is_crisis: true,
+    level: 'at_risk' as const,
+    failed: false,
+  };
+  const failed = {
+    ...base,
+    is_crisis: false,
+    level: 'none' as const,
+    failed: true,
+  };
+  it('at risk alone beats none with history; a failed one never wins', () => {
+    expect(moreSevere(none, atRisk)).toBe(atRisk);
+    expect(moreSevere(atRisk, none)).toBe(atRisk);
+    expect(moreSevere(failed, none)).toBe(none);
+    expect(moreSevere(none, failed)).toBe(none);
+    expect(moreSevere(null, atRisk)).toBe(atRisk);
   });
 });

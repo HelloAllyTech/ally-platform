@@ -607,3 +607,21 @@ export function emergencyReply(options: {
     options.selfHarm ? texts.selfHarm : '',
   ].join('');
 }
+
+/**
+ * Q4 H4 (Mann Collective: a counselling collective's staff handbook got Mental health from its
+ * sector, then couldn't publish): an assistant for the organisation's own team ("Train my team")
+ * gets the pack for its audience, not the organisation's sector. Its readers are staff, not clients
+ * at risk, so Standard. The owner can still choose a stricter one.
+ */
+export const STAFF_PACK_REASON =
+  "This assistant is for your own team, so its safety pack follows its readers (your staff), not your organisation's sector.";
+
+export function packForStaff(): SafetyPackId {
+  return SafetyPackId.STANDARD;
+}
+
+/** A pack chosen from the organisation's sector that a staff assistant shouldn't keep. */
+export function sectorPackOnStaff(packId: string | null | undefined): boolean {
+  return NOT_INTERCHANGEABLE.has(String(packId ?? ''));
+}

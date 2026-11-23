@@ -391,7 +391,9 @@ async function changeUpdate(a, s) {
 // ---------------------------------------------------------------- grading
 async function grade(c, t, observed, context) {
   const expect = gradeExpect(c.kind);
-  if (!GRADE || !expect || !AI_KEY) return null;
+  // A set-up turn with no "should be" (the turns before an at-risk message, Q4 H1) is checked in
+  // code only.
+  if (!GRADE || !expect || !AI_KEY || !t.shouldBe) return null;
   const body = {
     case: {
       id: c.id,

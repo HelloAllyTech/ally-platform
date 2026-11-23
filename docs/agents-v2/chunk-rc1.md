@@ -32,6 +32,9 @@
 - Hindi strings marked "needs review": list them in one file for a native speaker (not changed here).
 - **From the NGO baseline (P2, front end):** signing in as a customer in the same browser logs the owner out (keep the two sessions separate); the stale published count ("8 of 20" vs "9 of 20") and "0 messages, last 30 days" on the assistants list after real chats; the bot page logo missing; the footer disclaimer not updated when the pack changes (BHIVE kept the mental-health line after Facts only); "Choose this" clicks in setup sometimes ignored; sources labelled with the page title, not "What we learned, Services and prices…"; setup asks about conflicting phone numbers and emails, not only hours.
 
+- **From the demo build (`DEMO-FINDINGS-23NOV.md`, 23 Nov):** "Bring in customers" turns pre-chat questions on without asking (ask first, off by default; P1-16); Tools → Add from a template suggests the helpline template for a food bank (suggest by purpose and sector; P1-22); an owner can't add a booking for someone who hasn't chatted (let the owner type a name and phone for a new person; P1-24); the Appointments list's "Practitioner" can be renamed in setup (Therapist, Centre, Counsellor; P1-26); saving an entry closes the edit panel (P2-2).
+- **`WHATSAPP_CREDENTIALS_ENCRYPTION_KEY`** is in `launch:check`: without it no WhatsApp number can be connected (production lacked it on 23 Nov).
+
 ## 4b. Two WhatsApp platform checks (`WHATSAPP-GAPS-PLAN.md` §3)
 
 - **Usernames:** since 31 March 2026 Meta's webhooks can carry a business-scoped user ID instead of a phone number for people who adopt usernames. Contacts are keyed by phone number today. Handle the ID (store it, match on it, never drop the message), with a test using a recorded webhook.

@@ -7,7 +7,7 @@ import {
   LearnedSection,
   SafetyPackId,
 } from '../enum/bot-draft.enum';
-import { SAFETY_PACKS } from '../safety-pack/safety-packs';
+import { STAFF_PACK_REASON, SAFETY_PACKS } from '../safety-pack/safety-packs';
 import { LEARNED_FACTS_CHANGED } from '../service/learned-facts-document';
 import {
   BotDraftService,
@@ -517,6 +517,44 @@ describe('BotDraftService', () => {
       await expect(
         h.service.correctPack(h.draft(), 'magic'),
       ).rejects.toMatchObject({ response: { errorCode: 'invalid_pack' } });
+    });
+  });
+
+  describe("a staff assistant's pack follows its readers (Q4 H4)", () => {
+    it('made "Train my team" after a sector pack was chosen: Standard, with the reason', async () => {
+      const h = harness();
+      const draft = await h.service.setSafety(
+        h.draft(),
+        Industry.MENTAL_HEALTH,
+        SafetyPackId.MENTAL_HEALTH,
+      );
+      const { draft: saved } = await h.service.applyPatch(
+        draft,
+        [{ op: 'replace', path: '/purpose', value: 'training' }],
+        BotDraftActor.OWNER,
+        { target: 'draft' },
+      );
+      expect(saved.draftConfig.safetyPackId).toBe(SafetyPackId.STANDARD);
+      expect(saved.draftConfig.packChange).toMatchObject({
+        from: 'mental_health',
+        to: 'standard',
+        reason: STAFF_PACK_REASON,
+      });
+    });
+
+    it('never undoes a pack the owner chose', async () => {
+      const h = harness();
+      const chosen = await h.service.correctPack(
+        h.draft(),
+        SafetyPackId.MENTAL_HEALTH,
+      );
+      const { draft: saved } = await h.service.applyPatch(
+        chosen,
+        [{ op: 'replace', path: '/purpose', value: 'training' }],
+        BotDraftActor.OWNER,
+        { target: 'draft' },
+      );
+      expect(saved.draftConfig.safetyPackId).toBe(SafetyPackId.MENTAL_HEALTH);
     });
   });
 });

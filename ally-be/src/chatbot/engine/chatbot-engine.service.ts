@@ -58,7 +58,12 @@ import { businessFacts } from './business-facts';
 import { agentAnswersInstead, isGreetingReply } from './keyword-skip';
 import { buildKnowledgeRequest, NO_DOCUMENTS } from './knowledge-request';
 import { stageLine, stageRunIdFor } from './agent-stage-log';
-import { emergencyByKeywords, lifeThreatening } from './emergency-keywords';
+import {
+  atRiskByKeywords,
+  emergencyByKeywords,
+  lifeThreatening,
+  moreSevere,
+} from './emergency-keywords';
 import { caringDecline } from './caring-decline';
 import { crisisHelplines } from './crisis-helplines';
 import { replyLanguageOf } from './reply-language';
@@ -611,8 +616,28 @@ export class ChatbotEngineService {
 
     // One fast check beside the run (Q3-fast Part 1). It never depends on the run: a failed run
     // still gets its verdict, and a rejected check never takes down an answer.
+    // Q4 H1: with history, the latest message is also judged on its own, in parallel, and the more
+    // severe verdict wins, so a message at risk on its own is never cleared by its context (8
+    // booking turns before "some days I feel there's no point to anything").
+    const crisisAsk = crisisRequest(turn, prompts);
     const classifier = settings.crisisClassifierEnabled
-      ? this.aiService.checkWhatsAppCrisis(crisisRequest(turn, prompts))
+      ? crisisAsk.history?.length
+        ? Promise.allSettled([
+            this.aiService.checkWhatsAppCrisis(crisisAsk),
+            this.aiService.checkWhatsAppCrisis({ message: turn.text, prompts }),
+          ]).then(([withHistory, alone]) => {
+            const value = (
+              r: PromiseSettledResult<CrisisCheckResponse | null>,
+            ) => (r.status === 'fulfilled' ? r.value : null);
+            if (
+              withHistory.status === 'rejected' &&
+              alone.status === 'rejected'
+            ) {
+              throw withHistory.reason;
+            }
+            return moreSevere(value(withHistory), value(alone));
+          })
+        : this.aiService.checkWhatsAppCrisis(crisisAsk)
       : Promise.resolve(null);
     const classified = settle(classifier);
     // When the classifier fails (chunk H1): the emergency keyword rules decide. A match is an
@@ -629,7 +654,10 @@ export class ChatbotEngineService {
     };
     // Q4: a life-threatening emergency by the keyword rules decides at once, on any assistant,
     // whatever the classifier says (it missed "someone collapsed in the hub and isn't breathing").
-    const urgent = lifeThreatening(turn.text);
+    const urgent =
+      lifeThreatening(turn.text) ??
+      // Q4 H1: indirect hopelessness on a mental-health assistant.
+      atRiskByKeywords(turn.text, turn.chatbot.safetyPack);
     if (urgent) {
       this.logger.warn(
         `Life-threatening emergency rule matched for chatbot ${turn.chatbot.id}; the emergency reply goes out`,

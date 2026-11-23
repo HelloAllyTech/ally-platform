@@ -28,13 +28,20 @@ import {
   BotDraftStatus,
   BotDraftStep,
   LearnedSection,
+  PurposeId,
   SafetyPackId,
 } from '../enum/bot-draft.enum';
 import {
   assertDraftKeepsPack,
   SafetyLockedError,
 } from '../safety-pack/safety-lock';
-import { MIN_PACK_REASON, packFor } from '../safety-pack/safety-packs';
+import {
+  MIN_PACK_REASON,
+  packFor,
+  packForStaff,
+  sectorPackOnStaff,
+  STAFF_PACK_REASON,
+} from '../safety-pack/safety-packs';
 import { isPlaceholder, NAME_PATHS } from '../name-placeholders';
 import { LoggerService } from '../../logger/logger.service';
 import {
@@ -344,7 +351,18 @@ export class BotDraftService {
       inverse,
       summary: options.summary ?? summarise(ops, options.target, draft.learned),
     };
-    const saved = await this.save(patched, draft.version, [event]);
+    let saved = await this.save(patched, draft.version, [event]);
+    // Q4 H4: made a staff assistant ("Train my team") after its pack was chosen from the
+    // organisation's sector: the pack follows its readers, unless the owner chose it.
+    if (
+      options.target === 'draft' &&
+      draft.draftConfig.purpose !== PurposeId.TRAINING &&
+      saved.draftConfig.purpose === PurposeId.TRAINING &&
+      sectorPackOnStaff(saved.draftConfig.safetyPackId) &&
+      !saved.draftConfig.packChange
+    ) {
+      saved = await this.correctPack(saved, packForStaff(), STAFF_PACK_REASON);
+    }
     await this.events.publish(draft.id, {
       type: 'patched',
       target: options.target,

@@ -125,6 +125,7 @@ def make_agent_check_node(service: KnowledgeAgentService) -> Node:
             memory_on="memory" in state["bot"],
             channel=state["bot"].get("channel") or "",
             crisis_line=state["bot"].get("support_helplines") or "",
+            upset=bool(state["bot"].get("mood")),
             found_nothing=any(
                 call.get("nearest") or not (call.get("added") or call.get("aggregate"))
                 for call in finds

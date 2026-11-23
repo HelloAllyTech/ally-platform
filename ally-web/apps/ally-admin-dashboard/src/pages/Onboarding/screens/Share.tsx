@@ -6,11 +6,13 @@ import type { PublishUse } from "@api";
 import { AssistantLine, Button, PrimaryButton, Question, useEnterToSubmit } from "@components/v2";
 import type { TemplateOrigin } from "@types";
 
+import { reasonOf } from "../../AssistantHome/checkupCases";
 import { PLAN } from "../../Plan/copy";
 import { TEMPLATE_COPY } from "../../Templates/copy";
 import { COPY } from "../copy";
 import { parseEmails } from "../flow";
 
+import type { CheckupResult } from "../../../types/checkup";
 import type { BotDraftView } from "../types";
 
 // ── Who can use it? ───────────────────────────────────────────────────────
@@ -42,9 +44,12 @@ export const ShareScreen: React.FC<{
     message: string;
     done: number;
     total: number;
-    questions: { question: string; reply?: string }[];
+    questions: { question: string; reply?: string; reasons?: string[] }[];
   } | null;
   onCheckAgain?: () => void;
+  /** Q4 H3: back to the Checkup to fix the answer, or to Safety to correct the pack. */
+  onOpenCheckup?: () => void;
+  onCorrectPack?: () => void;
   onPublish: (access: Access, emails: string[]) => void;
 }> = ({
   view,
@@ -57,6 +62,8 @@ export const ShareScreen: React.FC<{
   examplesLeft,
   safety,
   onCheckAgain,
+  onOpenCheckup,
+  onCorrectPack,
 }) => {
   const [access, setAccess] = useState<Access>(view.draft.access.mode ?? "invite");
   const [emails, setEmails] = useState(view.draft.access.emails.join(", "));
@@ -146,14 +153,40 @@ export const ShareScreen: React.FC<{
                         {COPY.share.safetyAnswer} “{q.reply}”
                       </>
                     )}
+                    {q.reasons?.length ? (
+                      <>
+                        <br />
+                        {COPY.share.safetyWhy}{" "}
+                        {reasonOf([{ verdict: "fail", reasons: q.reasons } as CheckupResult])}
+                      </>
+                    ) : null}
                   </li>
                 ))}
               </ul>
             )}
-            {safety.status === "failed" && onCheckAgain && (
-              <Button disabled={publishing} onClick={onCheckAgain}>
-                {COPY.share.checkAgain}
-              </Button>
+            {safety.status === "failed" && (
+              <p className="ally-small" data-testid="publish-safety-fixes">
+                {COPY.share.safetyFixes}
+              </p>
+            )}
+            {safety.status === "failed" && (
+              <div className="ally-btn-row">
+                {onOpenCheckup && (
+                  <Button disabled={publishing} onClick={onOpenCheckup}>
+                    {COPY.share.openCheckup}
+                  </Button>
+                )}
+                {onCorrectPack && (
+                  <Button disabled={publishing} onClick={onCorrectPack}>
+                    {COPY.share.wrongPack}
+                  </Button>
+                )}
+                {onCheckAgain && (
+                  <Button disabled={publishing} onClick={onCheckAgain}>
+                    {COPY.share.checkAgain}
+                  </Button>
+                )}
+              </div>
             )}
           </div>
         )}

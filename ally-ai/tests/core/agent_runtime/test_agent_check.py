@@ -1236,3 +1236,13 @@ def test_crisis_numbers_in_hinglish():
         answer="Mujhe afsos hai aap pareshan hain. Crisis numbers nahi hain mere paas.",
     )
     assert "Tele-MANAS ko 14416 par call karein" in result["answer"]
+
+
+def test_an_upset_message_never_gets_only_a_contact_line():
+    """Q4 H1 (Sukoon live): "Please contact the team at care@…" to an upset message
+    gets 14416 and 112; when not upset, it stays as written."""
+    contact = "I hear you. Please contact our team for help with that."
+    result = check(intent="decline", answer=contact, upset=True)
+    assert result["answer"].startswith(contact)
+    assert "14416" in result["answer"] and "112" in result["answer"]
+    assert check(intent="decline", answer=contact)["answer"] == contact

@@ -199,6 +199,8 @@ export const OnboardingView: React.FC<{
             onPublish={(access, emails) => void s.publish(access, emails)}
             safety={s.safety}
             onCheckAgain={s.checkSafetyAgain}
+            onOpenCheckup={() => s.pass("checkup", false)}
+            onCorrectPack={() => s.pass("safety", false)}
             mustPass={
               s.mustPass && {
                 message: s.mustPass.message,

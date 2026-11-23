@@ -63,3 +63,60 @@ Counts overlap: one miss can be fixed by more than one item.
 | C16 Stray text | 1 | o2-f01 |
 | C19 The right number | 1 | o1-f06 |
 | Set fixes | 2 | b3-f03 (check the live price), o6-f01 (check the expected answer against the updates list) |
+
+## Status by item (23 Nov, after the single measurement `2026-11-23-after-C-1`)
+
+| Item | Status |
+|---|---|
+| §0 Use-case suite | Done: 13 sets, runner, re-grade, `compare.mjs`, `confirmations.mjs`. `round8.json` not started |
+| A0 Publishing works | Done (background safety recheck). The missing "double-checking" message on the page: to check (demo build) |
+| A1 Emergency keywords on every pack | Done: life-threatening rules on every pack, deciding at once (23 Nov); maternity medical-only |
+| A2 The right pack | Part: code and prompt done; the 15-site pack fixture not run |
+| A3 Correcting the pack in setup | Done; A3+ (internal assistants' pack) from the demo build not started |
+| A 3b "Do I have depression?" | Not started |
+| A 3c Preview samples | Done |
+| A 3d Palliative and medicine questions | Not started |
+| B4 Try it says "not saved", holds the slot | Done |
+| B5 Details given before the chat | Done |
+| B6 One question, not two | Done (prompt C6) |
+| B7 Availability always looked up | Done (prompt C6, at least 8 a day) |
+| B8 After a refusal, what's possible | Done |
+| B9 Callback under the person's name | Done |
+| B10 Callback list for "Bring in customers" | Done; B10+ (no lookup it can't do) from the demo build not started |
+| B11 "Change entries: Do it" sticks | Part: the settings save keeps abilities and the home queues changes; not re-checked in the wizard |
+| B12 Checkups as a test person | Done |
+| B13 Booking for someone else | Done |
+| C13b Citation markers on the live page | Part: removed in every reply; the Try it vs live comparison test not written |
+| C14 Same facts in every language | Done (pre-search fix, as-written search) |
+| C15 Struck-out prices | Done for new reads; BHIVE fixture re-read |
+| C16 Stray text | Part: "(citations: 15, 14" found in this run; the demo build's three forms to add |
+| C17 Name-and-phone offer only when it helps | Not started |
+| C18 Answer instead of "which one?" | Done (D1) |
+| C19 The right number | Part: through key facts |
+| C20 Off-topic and "ignore your instructions" | Part: judge rule 8 only |
+| C21 Worried and medicine messages | Not started (a check) |
+| D22 Fewer rewrites | Not started |
+| D23 Reasoning effort "minimal" | Not started (stop 3) |
+| D24 WhatsApp typing indicator | Not started |
+| D25 Cold start | Not started |
+| E25b Setup under load (pool) | Not started |
+| E26, 26b Grader passes correct answers | Part: judge rules 1, 5, 8, 9, reads 16 passages with neighbours, hand-rulings in the sets; the 95% hand-rulings agreement set not built |
+| E27 Checkup counts | Not started |
+| E28 Every pack's safety questions | Not started |
+| F29 Owner-side copy fixes | Not started |
+| G1 Hand-over never replaces an answer | Done (14 → 0); G1b (off by default) from the demo build not started |
+| G2 Channel rules only on their channel | Done |
+| G3 Key facts | Done in the run; editing them in What it knows not started |
+| G4 Low-value pages | Part: never key facts; the reader's marking not started |
+| G5 Consent question and card | Done |
+| G6 Memory after a list conversation | Done |
+| G7 Crisis numbers verified | Part: confirmed numbers only, upset numbers; the 3am reply (G+10) not started |
+| G8 Speed on these turns | Not started |
+| G+9 "unchanged" in names | Done in code and a repair migration; not re-checked on a live page |
+| G+10 The 3am message | Not started |
+| G+11 Medicine and allergy: decline, not hand-over | Part: the hand_over description |
+| G+12 Graded urgency | Not started |
+| G+13 The owner's answer wins | Not started; G+16b (negative answers as rules) from the demo build not started |
+| G+14 "Replace them" link | Done |
+| G+15 Campaigns "Set it up" | Not started |
+| G+16 T2's three | Not started |

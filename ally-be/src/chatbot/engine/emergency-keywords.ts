@@ -139,3 +139,54 @@ export function emergencyByKeywords(
     : [...RULES, ...LIFE_RULES];
   return verdictFrom(rules, said);
 }
+
+/*
+ * Indirect hopelessness (Q4 H1, Sukoon live: "Honestly some days I feel there's no point to
+ * anything" after a booking got "Please contact the team"). On a mental-health assistant these are
+ * at risk, and decide at once like the life-threatening rules.
+ */
+const HOPELESS = String.raw`(?:no point (?:to|in) (?:anything|everything|living|life|going on|trying)|what'?s the point(?: of (?:anything|living|life|it all|going on|trying)(?: anymore)?| anymore|(?=\s*(?:[.?!,…]|$)))|(?:don'?t|do not) want to (?:wake up|be here|exist|live|go on)(?: anymore)?|tired of (?:everything|living|life|being alive)|no reason to (?:live|go on|keep going)|better off without me|can'?t (?:go on|do this) anymore|(?:kisi cheez|kuch bhi|zindagi) ka koi matlab nahi|koi matlab nahi (?:lagta|hai)|(?:uthne|jeene) ka (?:mann|man|dil) nahi|jeena nahi (?:chahta|chahti)|sab khatam karna|कोई मतलब नहीं|जीने का मन नहीं|उठने का मन नहीं|जीना नहीं चाहता|जीना नहीं चाहती)`;
+
+/** The packs whose assistants treat indirect hopelessness as at risk (Q4 H1). */
+export const HOPELESS_PACKS = new Set(['mental_health']);
+
+export function atRiskByKeywords(
+  text: string | null | undefined,
+  pack?: string | null,
+): CrisisCheckResponse | null {
+  const said = (text ?? '').trim();
+  if (!said || !HOPELESS_PACKS.has(String(pack ?? ''))) return null;
+  const match = new RegExp(HOPELESS, 'iu').exec(said);
+  return match
+    ? ({
+        is_crisis: true,
+        level: 'at_risk',
+        signal: match[0].trim().slice(0, 200),
+        confidence: 1,
+        failed: false,
+      } as CrisisCheckResponse)
+    : null;
+}
+
+const SEVERITY: Record<string, number> = {
+  emergency: 3,
+  at_risk: 2,
+  upset: 1,
+  none: 0,
+};
+
+/**
+ * The more severe of two verdicts (Q4 H1: the latest message judged with its history and on its
+ * own; a message at risk on its own is never cleared by its context). A failed one never wins over
+ * one that answered.
+ */
+export function moreSevere(
+  a: CrisisCheckResponse | null,
+  b: CrisisCheckResponse | null,
+): CrisisCheckResponse | null {
+  if (!a || a.failed) return b && !b.failed ? b : (a ?? b);
+  if (!b || b.failed) return a;
+  const level = (v: CrisisCheckResponse) =>
+    SEVERITY[v.level ?? (v.is_crisis ? 'at_risk' : 'none')] ?? 0;
+  return level(b) > level(a) ? b : a;
+}

@@ -458,9 +458,13 @@ _DEVANAGARI = re.compile(r"[\u0900-\u097F]")
 
 def give_crisis_numbers(verdict: Verdict, ctx: CheckContext) -> None:
     """A reply never says it has no crisis numbers (Q4 G7): that sentence becomes
-    the national numbers, and the organisation's own confirmed line."""
+    the national numbers, and the organisation's own confirmed line. A reply to an
+    upset message (the crisis check unsure) always carries them (Q4 H1: Sukoon's
+    "Please contact the team at care@…" with no 112 or 14416)."""
     sentences = SENTENCE_END.split(verdict.answer)
-    if not any(_NO_CRISIS_NUMBERS.search(s) for s in sentences):
+    says_none = any(_NO_CRISIS_NUMBERS.search(s) for s in sentences)
+    missing = ctx.upset and "14416" not in verdict.answer
+    if not (says_none or missing):
         return
     hindi = bool(_DEVANAGARI.search(verdict.answer))
     hinglish = not hindi and len(_HINGLISH.findall(verdict.answer)) >= 2

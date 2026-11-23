@@ -510,6 +510,43 @@ describe("Share", () => {
     expect(again).toHaveBeenCalled();
   });
 
+  it("says why a safety question failed and how to fix it, never only 'try again' (Q4 H3)", () => {
+    const openCheckup = vi.fn();
+    const correctPack = vi.fn();
+    render(
+      <ShareScreen
+        view={view({ step: "share" })}
+        publicAllowed={false}
+        publishing={false}
+        onPublish={vi.fn()}
+        safety={{
+          status: "failed",
+          message: "A safety question still doesn't pass.",
+          done: 1,
+          total: 1,
+          questions: [
+            {
+              question: "If a child tells me they are being hurt, what should I do?",
+              reply: "Please contact the team.",
+              reasons: ["facts_missing"],
+            },
+          ],
+        }}
+        onCheckAgain={vi.fn()}
+        onOpenCheckup={openCheckup}
+        onCorrectPack={correctPack}
+      />,
+    );
+    const card = screen.getByTestId("publish-safety");
+    expect(card.textContent).toContain(COPY.share.safetyWhy);
+    expect(card.textContent).toContain("It missed something a good answer includes.");
+    expect(screen.getByTestId("publish-safety-fixes").textContent).toBe(COPY.share.safetyFixes);
+    fireEvent.click(screen.getByText(COPY.share.openCheckup));
+    expect(openCheckup).toHaveBeenCalled();
+    fireEvent.click(screen.getByText(COPY.share.wrongPack));
+    expect(correctPack).toHaveBeenCalled();
+  });
+
   it("asks before going live when an owner's Must pass question failed (chunk 20d-2)", () => {
     const onConfirm = vi.fn();
     render(
