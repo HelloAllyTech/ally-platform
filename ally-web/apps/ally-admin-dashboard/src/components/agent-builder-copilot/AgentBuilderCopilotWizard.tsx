@@ -103,6 +103,7 @@ const suggestionStrings = en.agentBuilderSuggestions;
 const restoredStrings = en.agentBuilderRestored;
 const characterStrings = en.agentBuilderCharacter;
 const chatStrings = en.agentBuilderChatBox;
+const wizardStrings = en.agentBuilderWizard;
 const languageStrings = en.agentBuilderLanguages;
 /** "The agent picks a voice" in a language's voice menu. */
 const AGENT_VOICE = "";
@@ -156,7 +157,63 @@ interface AgentBuilderCopilotWizardProps {
   // Shared react-hook-form instance — the competency pick + generated values
   // all write here, keeping the Basic Settings tab in sync.
   formMethods: UseFormReturn<any>;
+  /**
+   * "focus": the wizard has the whole tab (nothing generated yet) and offers a link to show the
+   * form; "split" (default): the form is beside it.
+   */
+  layout?: "focus" | "split";
+  /** Show the form beside the wizard (the "Show the form" link in focus layout). */
+  onShowForm?: () => void;
+  /** Called as generation starts, so the page can bring the form in to fill live. */
+  onGenerationStart?: () => void;
 }
+
+/** The questions in order, for the step tracker. */
+const TRACKER_STEPS: { id: WizardStepId; label: string }[] = [
+  { id: "describe", label: "Client" },
+  { id: "competency", label: "Skill" },
+  { id: "mode", label: "Mode" },
+  { id: "character", label: "Character" },
+  { id: "languages", label: "Languages" },
+  { id: "goals", label: "Test cases" },
+];
+
+const StepTracker = ({ step }: { step: WizardStepId }) => {
+  const current = TRACKER_STEPS.findIndex(s => s.id === step);
+  if (current < 0) return null;
+  return (
+    <div className="shrink-0 flex flex-col gap-2 pb-3" data-testid="step-tracker">
+      <ol className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs">
+        {TRACKER_STEPS.map((s, index) => (
+          <li key={s.id} className="flex items-center gap-1.5">
+            <span
+              className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-medium ${
+                index < current
+                  ? "bg-primary text-white"
+                  : index === current
+                    ? "border-2 border-primary text-primary"
+                    : "border border-border-light text-typography-500"
+              }`}
+            >
+              {index < current ? "✓" : index + 1}
+            </span>
+            <span
+              className={
+                index === current ? "font-medium text-typography-900" : "text-typography-500"
+              }
+            >
+              {s.label}
+            </span>
+            {index < TRACKER_STEPS.length - 1 && <span className="text-typography-300">·</span>}
+          </li>
+        ))}
+      </ol>
+      <p className="text-xs text-typography-600">
+        Step {current + 1} of {TRACKER_STEPS.length}
+      </p>
+    </div>
+  );
+};
 
 const Spinner = () => (
   <div className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-dashed border-primary-300 border-t-transparent" />
@@ -186,6 +243,9 @@ const taskNote = (task: GenerationTask): string | null => {
 
 export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps> = ({
   formMethods,
+  layout = "split",
+  onShowForm,
+  onGenerationStart,
 }) => {
   const [step, setStep] = useState<WizardStepId>("describe");
   const [history, setHistory] = useState<ChatEntry[]>([]);
@@ -491,6 +551,7 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
     const runStates = design?.states ?? restored?.states;
     setNotesSinceGeneration(false);
     setStep("generate");
+    onGenerationStart?.();
     start({
       actorDescription: composeBrief(),
       competency: formMethods.getValues("competency")?.name,
@@ -553,12 +614,31 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      {/* Conversation area — answered questions + live generation logs. */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-4 pb-4">
-        {history.length === 0 && step === "describe" && (
+      {layout === "focus" && (
+        <div className="shrink-0 flex items-start justify-between gap-3 pb-3">
+          <div>
+            <h2 className="text-lg font-medium text-typography-900">{wizardStrings.title}</h2>
+            <p className="text-sm text-typography-600">{wizardStrings.subtitle}</p>
+          </div>
+          {onShowForm && (
+            <button
+              type="button"
+              onClick={onShowForm}
+              className="shrink-0 text-sm text-primary-600 hover:underline"
+            >
+              {wizardStrings.showForm}
+            </button>
+          )}
+        </div>
+      )}
+      <StepTracker step={step} />
+      {/* Conversation area — answered questions + live generation logs. It takes only the
+          room it needs, so the current question sits right under it (no empty gap), and
+          scrolls once it is longer than the panel. */}
+      <div className="min-h-0 shrink overflow-y-auto custom-scrollbar flex flex-col gap-4 pb-4">
+        {history.length === 0 && step === "describe" && layout !== "focus" && (
           <div className="self-start max-w-[90%] rounded-lg bg-background-secondary px-4 py-2 text-sm text-typography-700">
-            Answer six quick questions and I&apos;ll generate the Basic Settings on the left in
-            parallel — each field fills in as it&apos;s ready, and you can stop anytime.
+            {wizardStrings.subtitle}
           </div>
         )}
 
@@ -692,46 +772,20 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
           overflow, so a long description or a long list of test cases used to
           push the Next / Generate button out of sight. The question scrolls
           inside the composer instead, and the button row never does. */}
-      <div className="shrink min-h-0 border-t border-border-light pt-4 flex flex-col gap-3">
-        {/* The chat box: from the second step on (the first is already free text). */}
-        {step !== "describe" && (
-          <div className="shrink-0 flex flex-col gap-2" data-testid="agent-chat-box">
-            <div className="flex items-end gap-2">
-              <AutoExpandableTextarea
-                value={noteDraft}
-                onChange={setNoteDraft}
-                placeholder={chatStrings.placeholder[step] ?? chatStrings.placeholder.default}
-                minHeight={40}
-                maxLines={6}
-                className="w-full rounded border border-border-light px-3 py-2 bg-white text-sm"
-              />
-              <Button
-                variant={ButtonVariant.SECONDARY}
-                onClick={handleSendNote}
-                disabled={!noteDraft.trim() || phase === "running"}
-                className="h-[40px] px-4 shrink-0"
-              >
-                {chatStrings.send}
-              </Button>
-            </div>
-            {notesSinceGeneration && phase !== "running" && (
-              <div className="flex items-center justify-between gap-2 rounded-md border border-primary-200 bg-primary-50 px-3 py-2 text-sm">
-                <span>{chatStrings.regenerateHint}</span>
-                <Button
-                  variant={ButtonVariant.PRIMARY}
-                  onClick={() => runGeneration(goalTitlesUsed)}
-                  className="h-[36px] px-4 shrink-0"
-                >
-                  {chatStrings.regenerate}
-                </Button>
-              </div>
-            )}
-          </div>
-        )}
+      <div className="shrink-0 border-t border-border-light pt-4 flex flex-col gap-3">
         {step === "describe" && (
           <>
             <div className="min-h-0 overflow-y-auto custom-scrollbar flex flex-col gap-3">
               <h3 className="text-base font-medium text-typography-900">{QUESTIONS.describe}</h3>
+              <p className="-mt-2 text-xs text-typography-600">{wizardStrings.describeHelp}</p>
+              <AutoExpandableTextarea
+                value={description}
+                onChange={setDescription}
+                placeholder="Describe the client, e.g. Aarav, 15, quiet and withdrawn for two weeks…"
+                minHeight={96}
+                maxLines={24}
+                className="w-full rounded border border-border-light px-3 py-2 bg-white text-base"
+              />
               {!description.trim() && (
                 <div className="flex flex-col gap-1.5" data-testid="actor-ideas">
                   <p className="text-xs text-typography-600">{suggestionStrings.ideasTitle}</p>
@@ -750,14 +804,6 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
                   </div>
                 </div>
               )}
-              <AutoExpandableTextarea
-                value={description}
-                onChange={setDescription}
-                placeholder="Describe the person the AI should role-play — who they are, their background, what's bringing them to this session, how they speak and behave..."
-                minHeight={96}
-                maxLines={24}
-                className="w-full rounded border border-border-light px-3 py-2 bg-white text-base"
-              />
             </div>
             <div className="shrink-0 flex justify-end">
               <Button
@@ -1160,7 +1206,46 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
             )}
           </div>
         )}
+        {/* The chat box: from the second step on (the first is already free text). */}
+        {step !== "describe" && (
+          <div
+            className="shrink-0 flex flex-col gap-2 border-t border-border-light pt-3"
+            data-testid="agent-chat-box"
+          >
+            <div className="flex items-end gap-2">
+              <AutoExpandableTextarea
+                value={noteDraft}
+                onChange={setNoteDraft}
+                placeholder={chatStrings.placeholder[step] ?? chatStrings.placeholder.default}
+                minHeight={40}
+                maxLines={6}
+                className="w-full rounded border border-border-light px-3 py-2 bg-white text-sm"
+              />
+              <Button
+                variant={ButtonVariant.SECONDARY}
+                onClick={handleSendNote}
+                disabled={!noteDraft.trim() || phase === "running"}
+                className="h-[40px] px-4 shrink-0"
+              >
+                {chatStrings.send}
+              </Button>
+            </div>
+            {notesSinceGeneration && phase !== "running" && (
+              <div className="flex items-center justify-between gap-2 rounded-md border border-primary-200 bg-primary-50 px-3 py-2 text-sm">
+                <span>{chatStrings.regenerateHint}</span>
+                <Button
+                  variant={ButtonVariant.PRIMARY}
+                  onClick={() => runGeneration(goalTitlesUsed)}
+                  className="h-[36px] px-4 shrink-0"
+                >
+                  {chatStrings.regenerate}
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
+      <div className="flex-1" aria-hidden />
     </div>
   );
 };

@@ -420,6 +420,11 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
     reValidateMode: "onChange",
     defaultValues: formDefaultValues,
   });
+  // Agent Builder Copilot tab, chat first: the form joins the wizard once there is something in
+  // it (a role instruction, a saved wizard conversation), generation starts, or the trainer asks.
+  const [showCopilotForm, setShowCopilotForm] = useState(false);
+  const watchedRoleInstruction = formMethods.watch("prompt");
+  const watchedAgentBuilderChat = formMethods.watch("agentBuilderChat");
   // True while the first-switch (or "Re-map") memory mapping runs, ~20-35s.
   // Saving, previewing or publishing in that window would store or run the
   // simulation without the memories the author is waiting for.
@@ -1258,6 +1263,28 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
         // View mode hands the whole canvas to the (inert) Basic Settings
         // mirror — the Copilot is an editing tool, so it's never shown there.
         const copilotCollapsed = viewMode || isCopilotCollapsed;
+        // Chat first: until there is something to look at, the wizard has the whole tab and the
+        // technical form stays out of the way. A roleplay that already has a role instruction or
+        // a saved wizard conversation opens split, as does one the trainer asked to see.
+        const copilotFocus =
+          !copilotCollapsed &&
+          !showCopilotForm &&
+          !String(watchedRoleInstruction ?? "").trim() &&
+          !watchedAgentBuilderChat;
+        if (copilotFocus) {
+          return renderStep(
+            <div className="lg:h-full min-h-0 flex justify-center">
+              <div className="w-full max-w-2xl h-[80dvh] lg:h-full min-h-0 flex flex-col pt-2">
+                <AgentBuilderCopilotWizard
+                  formMethods={formMethods}
+                  layout="focus"
+                  onShowForm={() => setShowCopilotForm(true)}
+                  onGenerationStart={() => setShowCopilotForm(true)}
+                />
+              </div>
+            </div>,
+          );
+        }
         return renderStep(
           <div
             className={`grid ${
@@ -1305,7 +1332,10 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
                   </button>
                 </div>
                 <div className="flex-1 min-h-0">
-                  <AgentBuilderCopilotWizard formMethods={formMethods} />
+                  <AgentBuilderCopilotWizard
+                    formMethods={formMethods}
+                    onGenerationStart={() => setShowCopilotForm(true)}
+                  />
                 </div>
               </div>
             )}

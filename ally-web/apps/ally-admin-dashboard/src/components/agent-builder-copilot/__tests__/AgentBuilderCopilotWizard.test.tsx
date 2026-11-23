@@ -474,3 +474,45 @@ describe("AgentBuilderCopilotWizard languages and voices", () => {
     expect((screen.getByLabelText("Kannada (India)") as HTMLInputElement).checked).toBe(true);
   });
 });
+
+describe("AgentBuilderCopilotWizard layout", () => {
+  it("shows where the trainer is in the six steps", () => {
+    render(<AgentBuilderCopilotWizard formMethods={form()} />);
+    expect(screen.getByTestId("step-tracker").textContent).toContain("Step 1 of 6");
+    fireEvent.change(screen.getByLabelText("actor"), { target: { value: "Meera calls" } });
+    fireEvent.click(screen.getByText("Next"));
+    expect(screen.getByTestId("step-tracker").textContent).toContain("Step 2 of 6");
+  });
+
+  it("in focus layout, titles the tab and offers the form", () => {
+    const onShowForm = vi.fn();
+    render(
+      <AgentBuilderCopilotWizard formMethods={form()} layout="focus" onShowForm={onShowForm} />,
+    );
+    expect(screen.getByText(en.agentBuilderWizard.title)).toBeTruthy();
+    fireEvent.click(screen.getByText(en.agentBuilderWizard.showForm));
+    expect(onShowForm).toHaveBeenCalled();
+  });
+
+  it("tells the page when generation starts, so the form can come in", async () => {
+    const onGenerationStart = vi.fn();
+    render(
+      <AgentBuilderCopilotWizard
+        formMethods={form()}
+        layout="focus"
+        onGenerationStart={onGenerationStart}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText("actor"), { target: { value: "Meera calls" } });
+    fireEvent.click(screen.getByText("Next"));
+    fireEvent.click(screen.getByText("Next"));
+    for (let i = 0; i < 3; i++) {
+      await act(async () => {
+        fireEvent.click(screen.getByText("Next"));
+      });
+    }
+    fireEvent.click(screen.getByText("Client deflects"));
+    fireEvent.click(screen.getByText("Generate"));
+    expect(onGenerationStart).toHaveBeenCalledTimes(1);
+  });
+});

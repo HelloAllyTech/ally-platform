@@ -16078,6 +16078,14 @@ export const en = {
     fromDescriptionAnswer: "Decide from my description",
   },
 
+  // Agent Builder wizard: the frame around the questions.
+  agentBuilderWizard: {
+    title: "Build a roleplay with the agent",
+    subtitle: "Answer 6 short questions. I'll fill in the roleplay; you review it and save.",
+    showForm: "Show the form",
+    describeHelp: "Who they are, why they're here, how they speak and behave.",
+  },
+
   // Agent Builder wizard: the chat box, for anything the trainer wants the agent to know.
   agentBuilderChatBox: {
     placeholder: {
