@@ -1,0 +1,83 @@
+diff --git a/ally-be/src/scenario-character/service/character-interview-tools.service.ts b/ally-be/src/scenario-character/service/character-interview-tools.service.ts
+index f7ee1c84e..acbf39f31 100644
+--- a/ally-be/src/scenario-character/service/character-interview-tools.service.ts
++++ b/ally-be/src/scenario-character/service/character-interview-tools.service.ts
+@@ -543,7 +543,12 @@ export class CharacterInterviewToolsService {
+     }
+ 
+     return (key: string): string => {
+-      const raw = String(key ?? '').trim();
++      // Models sometimes quote the key itself ({ "'14'": … }); the create
++      // endpoint's numeric-key constraint then 400s at the trainer's save.
++      const raw = String(key ?? '')
++        .trim()
++        .replace(/^['"'""`]+|['"'""`]+$/g, '')
++        .trim();
+       if (!raw) return raw;
+       if (/^\d+$/.test(raw)) return raw;
+       const exact = byCode.get(raw.toLowerCase());
+@@ -872,6 +877,24 @@ export class CharacterInterviewToolsService {
+       );
+     }
+ 
++    // The character create/update endpoint accepts only numeric languageId
++    // keys, so a key the resolver could not place (a misspelt locale, an
++    // invented name) must bounce back to the agent now — passing it through
++    // 400s at the trainer when the reviewed character is finally saved.
++    for (const [field, map] of [
++      ['languageCharacteristics', languageCharacteristics],
++      ['linguisticStyleSamples', samplesByLanguage],
++    ] as const) {
++      for (const key of Object.keys(map)) {
++        if (!/^\d+$/.test(key)) {
++          errors.push(
++            `${field}["${key}"] is not a language — key every entry by the ` +
++              'numeric languageId from get_voices',
++          );
++        }
++      }
++    }
++
+     const knowledgeSources = (
+       Array.isArray(input?.knowledgeSources) ? input.knowledgeSources : []
+     )
+diff --git a/ally-be/src/scenario-character/service/test/character-interview-draft-shape.spec.ts b/ally-be/src/scenario-character/service/test/character-interview-draft-shape.spec.ts
+index aca18b2e0..c6047f775 100644
+--- a/ally-be/src/scenario-character/service/test/character-interview-draft-shape.spec.ts
++++ b/ally-be/src/scenario-character/service/test/character-interview-draft-shape.spec.ts
+@@ -196,13 +196,30 @@ describe('save_character_draft — per-language shapes', () => {
+     );
+   });
+ 
+-  it('leaves an unrecognisable key alone rather than guessing', async () => {
+-    const { draft } = await run({
++  it('rejects a key that resolves to no language rather than passing it through', async () => {
++    // Pass-through used to seem harmless, but the character create endpoint
++    // accepts only numeric languageId keys — the bad key 400ed at the trainer.
++    const { outcome } = await run({
+       languageCharacteristics: { klingon: 'nope' },
+     });
+-    expect(Object.keys(draft.languageCharacteristics ?? {})).toEqual([
+-      'klingon',
+-    ]);
++    expect(outcome.modelResult.ok).toBe(false);
++    expect(JSON.stringify(outcome.modelResult.errors)).toMatch(
++      /languageCharacteristics\[\\"klingon\\"\] is not a language/,
++    );
++  });
++
++  it('strips the quotes a model wraps around a key, as seen in production', async () => {
++    // The exact prod payload shape: { "'14'": … } → 400 "not a valid
++    // language id" when the reviewed character was saved.
++    const { outcome, draft } = await run({
++      languageCharacteristics: { "'1'": 'Measured, formal English.' },
++      linguisticStyleSamples: { '"2"': ['मैं ठीक हूँ।'] },
++    });
++    expect(outcome.modelResult.ok).toBe(true);
++    expect(draft.languageCharacteristics).toEqual({
++      '1': 'Measured, formal English.',
++    });
++    expect(draft.linguisticStyleSamples).toEqual({ '2': ['मैं ठीक हूँ।'] });
+   });
+ 
+   it('rejects a draft with no language style, so the agent fills it and retries', async () => {

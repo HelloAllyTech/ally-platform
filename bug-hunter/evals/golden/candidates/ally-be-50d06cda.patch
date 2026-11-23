@@ -1,0 +1,50 @@
+diff --git a/src/database/migrations/1944200000000-FoldEnableFeedbackIntoFeedbackTabs.ts b/src/database/migrations/1944200000000-FoldEnableFeedbackIntoFeedbackTabs.ts
+index e64ad52789..4d9c6c908e 100644
+--- a/src/database/migrations/1944200000000-FoldEnableFeedbackIntoFeedbackTabs.ts
++++ b/src/database/migrations/1944200000000-FoldEnableFeedbackIntoFeedbackTabs.ts
+@@ -47,9 +47,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
+  * back as `false`, matching the platform-wide default it had before removal
+  * rather than guessing at a per-roleplay value that is no longer recorded.
+  */
+-export class FoldEnableFeedbackIntoFeedbackTabs1944200000000
+-  implements MigrationInterface
+-{
++export class FoldEnableFeedbackIntoFeedbackTabs1944200000000 implements MigrationInterface {
+   name = 'FoldEnableFeedbackIntoFeedbackTabs1944200000000';
+ 
+   public async up(queryRunner: QueryRunner): Promise<void> {
+diff --git a/src/learn/type/test/scenario.type.spec.ts b/src/learn/type/test/scenario.type.spec.ts
+index 40a3e101a1..90ba76f6d8 100644
+--- a/src/learn/type/test/scenario.type.spec.ts
++++ b/src/learn/type/test/scenario.type.spec.ts
+@@ -33,9 +33,10 @@ describe('resolveFeedbackTabs', () => {
+   });
+ 
+   it('honours each tab independently', () => {
+-    expect(
+-      resolveFeedbackTabs({ feedbackTabs: { debrief: false } }),
+-    ).toEqual({ debrief: false, transcript: true });
++    expect(resolveFeedbackTabs({ feedbackTabs: { debrief: false } })).toEqual({
++      debrief: false,
++      transcript: true,
++    });
+ 
+     expect(
+       resolveFeedbackTabs({ feedbackTabs: { transcript: false } }),
+diff --git a/src/learn/util/test/scenario.util.spec.ts b/src/learn/util/test/scenario.util.spec.ts
+index ab290b2785..045581d042 100644
+--- a/src/learn/util/test/scenario.util.spec.ts
++++ b/src/learn/util/test/scenario.util.spec.ts
+@@ -522,7 +522,11 @@ describe('Scenario Util', () => {
+         feedbackTabs: { debrief: false, transcript: false },
+       } as any;
+ 
+-      const result = mapUpdateScenarioRequestToEntity(dto, existingScenario, 505);
++      const result = mapUpdateScenarioRequestToEntity(
++        dto,
++        existingScenario,
++        505,
++      );
+ 
+       expect(result.metadata).not.toHaveProperty('enableFeedback');
+       expect(result.metadata).toEqual({

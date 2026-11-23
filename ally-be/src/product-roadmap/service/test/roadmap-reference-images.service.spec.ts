@@ -4,7 +4,6 @@ import { validateSync } from 'class-validator';
 import { Repository } from 'typeorm';
 
 import { User } from 'src/user/entity/user.entity';
-import { BugFinding } from 'src/bug-hunter/entity/bug-finding.entity';
 import { S3Service } from 'src/aws/service/s3.service';
 
 import { RoadmapOpportunityService } from '../roadmap-opportunity.service';
@@ -84,10 +83,6 @@ describe('RoadmapOpportunityService — reference images', () => {
       } as unknown as RoadmapVectorService,
       { emit: jest.fn() } as unknown as RoadmapNotificationService,
       { find: jest.fn().mockResolvedValue([]) } as unknown as Repository<User>,
-      {
-        create: jest.fn(),
-        save: jest.fn(),
-      } as unknown as Repository<BugFinding>,
       s3Service as unknown as S3Service,
       { s3: { assetsBucket: BUCKET } } as never,
       // Never consulted here: the readiness gate applies only to the /opportunities
@@ -99,15 +94,6 @@ describe('RoadmapOpportunityService — reference images', () => {
           );
         }),
       } as never,
-      // Repo classification is best-effort and unrelated to what these tests
-      // assert — a stub that resolves to "unclassified" keeps the created
-      // finding's repo null, same as before this dependency existed.
-      {
-        classifyRepo: jest
-          .fn()
-          .mockResolvedValue({ repo: null, rationale: '' }),
-      } as never,
-      { classifyAndRecord: jest.fn().mockResolvedValue(null) } as never, // missClassifier,
       { suggestTitle: jest.fn().mockResolvedValue('A title') } as never, // roadmapAi
     );
 

@@ -138,6 +138,7 @@ export const SIDEBAR_ITEMS = {
   WHATSAPP_BOT: "whatsapp-bot",
   BUG_HUNTER: "bug-hunter",
   PM_AGENT: "pm-agent",
+  BUG_HUNTER_V2: "bug-hunter-v2",
   BUILDER: "builder",
   CONTEXT_LIBRARY: "context-library",
   COURSE_COPILOT: "course-copilot",

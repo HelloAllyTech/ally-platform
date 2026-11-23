@@ -1,0 +1,132 @@
+diff --git a/apps/ally-admin-dashboard/src/components/roleplay-studio/copilot/ImprovementLiveCard.tsx b/apps/ally-admin-dashboard/src/components/roleplay-studio/copilot/ImprovementLiveCard.tsx
+index 0c2fcb3cda..e3ba682753 100644
+--- a/apps/ally-admin-dashboard/src/components/roleplay-studio/copilot/ImprovementLiveCard.tsx
++++ b/apps/ally-admin-dashboard/src/components/roleplay-studio/copilot/ImprovementLiveCard.tsx
+@@ -8,9 +8,6 @@ import {
+   RoleplayRehearsal,
+ } from "@src/types/roleplayStudio";
+ 
+-const strings = en.roleplayStudio.improvement;
+-const live = strings.live;
+-
+ const Spinner: React.FC<{ className?: string }> = ({ className }) => (
+   <span
+     className={`inline-block shrink-0 animate-spin rounded-full border-2 border-dashed border-primary-300 border-t-transparent ${className ?? "h-3.5 w-3.5"}`}
+@@ -28,8 +25,10 @@ const DeltaChip: React.FC<{ delta: number | null }> = ({ delta }) => {
+   );
+ };
+ 
+-const kindLabel = (kind: string | undefined): string =>
+-  (kind && strings.kind[kind as keyof typeof strings.kind]) || kind || "";
++const kindLabel = (kind: string | undefined): string => {
++  const strings = en.roleplayStudio.improvement;
++  return (kind && strings.kind[kind as keyof typeof strings.kind]) || kind || "";
++};
+ 
+ const overallOf = (round: RoleplayImprovementRound | undefined): number | null => {
+   const value = round?.scores?.overall;
+@@ -48,10 +47,10 @@ const testsLabel = (round: RoleplayImprovementRound | undefined): string | null
+ // The three backend round phases, in order. "Scoring" is folded into Rehearse
+ // because judging happens inside the rehearsal — there is no separate event.
+ const PHASES = [
+-  { key: "REHEARSING", label: live.phaseRehearse },
+-  { key: "CRITIQUING", label: live.phaseCritique },
+-  { key: "APPLYING", label: live.phaseApply },
+-];
++  { key: "REHEARSING", labelKey: "phaseRehearse" },
++  { key: "CRITIQUING", labelKey: "phaseCritique" },
++  { key: "APPLYING", labelKey: "phaseApply" },
++] as const;
+ 
+ interface ImprovementLiveCardProps {
+   run: RoleplayImprovementRun;
+@@ -79,6 +78,9 @@ export const ImprovementLiveCard: React.FC<ImprovementLiveCardProps> = ({
+ }) => {
+   const [confirmingCancel, setConfirmingCancel] = useState(false);
+ 
++  const strings = en.roleplayStudio.improvement;
++  const live = strings.live;
++
+   const maxRounds = run.config?.maxRounds ?? 3;
+   const targetOverall = run.config?.targets?.minOverall ?? null;
+   const rounds = detail?.rounds ?? [];
+@@ -201,7 +203,7 @@ export const ImprovementLiveCard: React.FC<ImprovementLiveCardProps> = ({
+                   ) : (
+                     <span className="text-typography-300">○</span>
+                   )}
+-                  {phase.label}
++                  {live[phase.labelKey]}
+                 </span>
+               </React.Fragment>
+             );
+diff --git a/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/SimulationTranscriptTab.test.tsx b/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/SimulationTranscriptTab.test.tsx
+index 7833ffd09f..42ec6e9b2d 100644
+--- a/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/SimulationTranscriptTab.test.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/SimulationTranscriptTab.test.tsx
+@@ -97,6 +97,16 @@ vi.mock("@ally-ui-mono/ui-shared/index", () => ({
+       </button>
+     </div>
+   ),
++  DropdownField: ({ value, onChange, options }: any) => (
++    <div data-testid="dropdown-field">
++      <span>{value}</span>
++      {options?.map((option: string) => (
++        <button key={option} onClick={() => onChange(option)}>
++          {option}
++        </button>
++      ))}
++    </div>
++  ),
+ }));
+ 
+ // Mock constants - partially mock to keep other exports
+diff --git a/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/__snapshots__/SimulationTranscriptTab.test.tsx.snap b/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/__snapshots__/SimulationTranscriptTab.test.tsx.snap
+index c9d4b87bb3..b4117a7f64 100644
+--- a/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/__snapshots__/SimulationTranscriptTab.test.tsx.snap
++++ b/apps/ally-helpline-dashboard/src/pages/calls/components/__tests__/__snapshots__/SimulationTranscriptTab.test.tsx.snap
+@@ -5,11 +5,41 @@ exports[`SimulationTranscriptTab > should match snapshot when rendered 1`] = `
+   <div
+     class="relative flex h-full min-h-0 flex-col border border-gray-200 rounded-md p-2 custom-scrollbar undefined"
+   >
+-    <span
+-      class="text-typography-900 font-primary text-base font-medium"
++    <div
++      class="flex items-center justify-between gap-2"
+     >
+-      Annotated Transcript
+-    </span>
++      <span
++        class="text-typography-900 font-primary text-base font-medium"
++      >
++        Annotated Transcript
++      </span>
++      <div
++        class="w-full max-w-[200px] min-w-[140px]"
++      >
++        <div
++          data-testid="dropdown-field"
++        >
++          <span>
++            English (Original)
++          </span>
++          <button>
++            English (Original)
++          </button>
++          <button>
++            हिंदी
++          </button>
++          <button>
++            मराठी
++          </button>
++          <button>
++            தமிழ்
++          </button>
++          <button>
++            ಕನ್ನಡ
++          </button>
++        </div>
++      </div>
++    </div>
+     <hr
+       class="mb-5 mt-2 border-border-light"
+     />

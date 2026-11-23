@@ -11,13 +11,9 @@ import {
   Select,
   SelectItem,
   SidePanel,
-  TextArea,
 } from "@ally-ui-mono/ui-shared";
 import {
-  useAnswerBugFindingMutation,
   useApproveBugFindingMutation,
-  useCancelBugFixSessionMutation,
-  useEditBugFindingDescriptionMutation,
   useGetBugFindingDecisionsQuery,
   useGetBugFindingQuery,
   useMergeBugFindingMutation,
@@ -29,8 +25,6 @@ import { ActionConfirmationPopup } from "@components/action-confirmation-popup";
 import { AgentAvatar } from "@components/agent-avatar";
 import { en } from "@constants";
 import {
-  BUG_FINDING_DESCRIPTION_EDITABLE_STATUSES,
-  BUG_FINDING_DESCRIPTION_MAX_LENGTH,
   BUG_FINDING_FIX_SESSION_START_STATUSES,
   BugFindingDecisionReason,
   BugFindingDetail,
@@ -48,7 +42,6 @@ import {
   BUG_FINDING_STAGE_LABELS,
   engineModelLabel,
 } from "./bugFindingLabels";
-import { BugFindingStageEditor } from "./BugFindingStageEditor";
 import { BugFindingStatusBadge } from "./BugFindingStatusBadge";
 import { DecisionLogList } from "./DecisionLog";
 import { canSubmitDecline, DeclineReasonPicker } from "./DeclineReasonPicker";
@@ -60,7 +53,7 @@ import { PipelineRail } from "./PipelineRail";
 import { stageFromFindingStatus } from "./pipelineStage";
 import { ReportedBugPanel } from "./ReportedBugPanel";
 import { BUG_HUNTER_REPOS } from "./repos";
-import { ageInDays, formatAge } from "./triage";
+import { ageInDays, formatAge, isOldHistory } from "./triage";
 
 interface BugFindingDrawerProps {
   id: string;
@@ -279,7 +272,6 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
   const { data: decisions } = useGetBugFindingDecisionsQuery(id);
   const [approve, { isLoading: isApproving }] = useApproveBugFindingMutation();
   const [reject, { isLoading: isRejecting }] = useRejectBugFindingMutation();
-  const [answer, { isLoading: isAnswering }] = useAnswerBugFindingMutation();
   const [startFixSession, { isLoading: isStartingSession }] = useStartBugFixSessionMutation();
   // The codebase an admin names for a bug that has none, or "" to let Bug
   // Hunter classify it. The API has always taken the override; the dialog
@@ -303,26 +295,17 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
     finding?.source === BugFindingSource.REPORTED_BUG &&
     finding?.independentVerification !== "confirmed";
   const willLocate = needsLocating && !skipLocating;
-  const [cancelFixSession, { isLoading: isCancellingSession }] = useCancelBugFixSessionMutation();
   const [merge, { isLoading: isMerging }] = useMergeBugFindingMutation();
   const [forceMerge, setForceMerge] = useState(false);
   const [release, { isLoading: isReleasing }] = useReleaseBugFindingMutation();
-  const [editDescription, { isLoading: isSavingDescription }] =
-    useEditBugFindingDescriptionMutation();
 
   const [confirmAction, setConfirmAction] = useState<
-    "approve" | "reject" | "fixSession" | "stopFixSession" | "merge" | "release" | null
+    "approve" | "reject" | "fixSession" | "merge" | "release" | null
   >(null);
   /** The decline reason and note, held here so cancelling the dialog does not lose a typed note. */
   const [declineReason, setDeclineReason] = useState<BugFindingDecisionReason | null>(null);
   const [declineNote, setDeclineNote] = useState("");
-  const [answerText, setAnswerText] = useState("");
-  // `null` is not editing. A string is the draft, which starts as the current
-  // description rather than empty: this is a rewrite of an existing brief, and
-  // an empty box would invite retyping what is already there.
-  const [descriptionDraft, setDescriptionDraft] = useState<string | null>(null);
   const [showOriginalDescription, setShowOriginalDescription] = useState(false);
-  const [stageEditorOpen, setStageEditorOpen] = useState(false);
 
   useEffect(() => {
     setFixRepo("");
@@ -332,10 +315,7 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
     setConfirmAction(null);
     setDeclineReason(null);
     setDeclineNote("");
-    setAnswerText("");
-    setDescriptionDraft(null);
     setShowOriginalDescription(false);
-    setStageEditorOpen(false);
   }, [id]);
 
   /**
@@ -383,48 +363,13 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
   // `canTriage` gates every mutating control in this drawer: false for a
   // SUPER_ADMIN, who can read a bug's whole history here but not act on it —
   // see BugHunter.tsx's doc on why the tiers differ.
+  // The old Bug Hunter's history is read-only (ally-be answers 409), so nothing on it
+  // is offered either.
+  const oldHistory = finding ? isOldHistory(finding) : false;
+  const canActHere = canTriage && !oldHistory;
   const canStartSession = finding
-    ? canTriage && BUG_FINDING_FIX_SESSION_START_STATUSES.includes(finding.status)
+    ? canActHere && BUG_FINDING_FIX_SESSION_START_STATUSES.includes(finding.status)
     : false;
-
-  // Mirrors the backend's own gate (QUEUED or FIXING) so a stale click never
-  // makes a round trip just to be told 403.
-  const canStopSession = finding
-    ? canTriage &&
-      (finding.status === BugFindingStatus.QUEUED || finding.status === BugFindingStatus.FIXING)
-    : false;
-
-  // The description is the fix agent's whole brief (see ally-be's
-  // `buildFixSessionPrompt`), so the edit is offered exactly where a fix
-  // session can still start from it, mirroring the backend's own gate.
-  const canEditDescription = finding
-    ? canTriage && BUG_FINDING_DESCRIPTION_EDITABLE_STATUSES.includes(finding.status)
-    : false;
-
-  const draftTooLong = (descriptionDraft?.trim().length ?? 0) > BUG_FINDING_DESCRIPTION_MAX_LENGTH;
-
-  // An open draft closes the decisions. "Put me on it" would dispatch a
-  // session reading the OLD description while the admin's rewrite sat unsaved
-  // — the fix briefed on the text they had just decided was wrong. Approving
-  // has the same shape: the next sweep would pick up the old words.
-  const isDraftingDescription = descriptionDraft !== null;
-
-  const handleSaveDescription = async () => {
-    const next = descriptionDraft?.trim();
-    if (!next || draftTooLong) return;
-    try {
-      await editDescription({ id, description: next }).unwrap();
-      setDescriptionDraft(null);
-    } catch (error) {
-      // The backend's own refusal is the useful one — "is queued, its
-      // description can't be changed from there" names the reason a generic
-      // line would hide. The draft stays put so nothing typed is lost.
-      toast.error(
-        (error as { data?: { message?: string } })?.data?.message ??
-          en.bugHunter.drawerDescriptionEditFailed,
-      );
-    }
-  };
 
   const handleDecision = async () => {
     if (!confirmAction) return;
@@ -496,20 +441,6 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
     }
   };
 
-  const handleStopFixSession = async () => {
-    try {
-      await cancelFixSession(id).unwrap();
-      setConfirmAction(null);
-    } catch (error) {
-      // Same reasoning as handleStartFixSession: the backend's own refusal
-      // (e.g. the session already finished) is more useful than a generic line.
-      toast.error(
-        (error as { data?: { message?: string } })?.data?.message ??
-          en.bugHunter.drawerStopFixSessionFailed,
-      );
-    }
-  };
-
   const handleRelease = async () => {
     try {
       await release(id).unwrap();
@@ -519,16 +450,6 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
         (error as { data?: { message?: string } })?.data?.message ??
           en.bugHunter.drawerReleaseFailed,
       );
-    }
-  };
-
-  const handleSubmitAnswer = async () => {
-    if (!answerText.trim()) return;
-    try {
-      await answer({ id, answer: answerText.trim() }).unwrap();
-      setAnswerText("");
-    } catch {
-      toast.error(en.bugHunter.drawerAnswerFailed);
     }
   };
 
@@ -586,22 +507,10 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
             itemText={en.bugHunter.drawerCopyLink}
             onClick={() => void copyLink()}
           />
-          {canEditDescription && !isDraftingDescription && (
-            <OverflowMenuItem
-              itemText={en.bugHunter.drawerDescriptionEdit}
-              onClick={() => setDescriptionDraft(finding.description)}
-            />
-          )}
-          {canTriage && (
-            <OverflowMenuItem
-              itemText={en.bugHunter.stageEditLabel}
-              onClick={() => setStageEditorOpen(true)}
-            />
-          )}
           {canStartSession && FIX_SESSION_MENU_STATUSES.includes(finding.status) && (
             <OverflowMenuItem
               itemText={en.bugHunter.drawerRetryFixSession}
-              disabled={isStartingSession || isDraftingDescription}
+              disabled={isStartingSession}
               onClick={() => setConfirmAction("fixSession")}
             />
           )}
@@ -699,16 +608,6 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
                   <p className="text-sm text-typography-700 whitespace-pre-wrap break-words border-l-2 border-border-light pl-3">
                     {finding.escalationAnswer}
                   </p>
-                ) : canTriage ? (
-                  <TextArea
-                    id={`bug-finding-answer-${finding.id}`}
-                    labelText={en.bugHunter.drawerAnswerLabel}
-                    hideLabel
-                    placeholder={en.bugHunter.drawerAnswerPlaceholder}
-                    value={answerText}
-                    onChange={e => setAnswerText(e.target.value)}
-                    rows={3}
-                  />
                 ) : null}
               </div>
             )}
@@ -734,13 +633,17 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
               <p className="text-xs text-destructive-600">{en.bugHunter.drawerGuardedPathNotice}</p>
             )}
 
+            {oldHistory && (
+              <p className="text-xs text-typography-700">{en.bugHunter.drawerOldHistoryNotice}</p>
+            )}
+
             <DecisionActions>
-              {canTriage && finding.status === BugFindingStatus.PENDING_APPROVAL && (
+              {canActHere && finding.status === BugFindingStatus.PENDING_APPROVAL && (
                 <>
                   <Button
                     size="sm"
                     kind="primary"
-                    disabled={isApproving || isDraftingDescription}
+                    disabled={isApproving}
                     onClick={() => setConfirmAction("approve")}
                   >
                     {en.bugHunter.drawerApprove}
@@ -748,7 +651,7 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
                   <Button
                     size="sm"
                     kind="danger--tertiary"
-                    disabled={isRejecting || isDraftingDescription}
+                    disabled={isRejecting}
                     onClick={() => setConfirmAction("reject")}
                   >
                     {en.bugHunter.drawerReject}
@@ -756,36 +659,22 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
                 </>
               )}
 
-              {canTriage &&
-                finding.status === BugFindingStatus.NEEDS_INPUT &&
-                finding.escalationQuestion &&
-                !finding.escalationAnswer && (
-                  <Button
-                    size="sm"
-                    kind="primary"
-                    disabled={isAnswering || !answerText.trim()}
-                    onClick={handleSubmitAnswer}
-                  >
-                    {en.bugHunter.drawerAnswerSubmit}
-                  </Button>
-                )}
-
               {/* The merge Bug Hunter cannot do itself on a protected repo.
                   The backend re-checks the PR's own CI and refuses a red one,
                   so this is a shortcut past a trip to GitHub, not past a gate. */}
-              {canTriage &&
+              {canActHere &&
                 ((finding.status === BugFindingStatus.PR_OPENED && finding.prUrl) || mergeStep) && (
                   <Button
                     size="sm"
                     kind="primary"
-                    disabled={isMerging || isDraftingDescription}
+                    disabled={isMerging}
                     onClick={() => setConfirmAction("merge")}
                   >
                     {en.bugHunter.drawerMerge}
                   </Button>
                 )}
 
-              {canTriage && finding.releasable && (
+              {canActHere && finding.releasable && (
                 <Button
                   size="sm"
                   kind="primary"
@@ -802,7 +691,7 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
                 <Button
                   size="sm"
                   kind="primary"
-                  disabled={isStartingSession || isDraftingDescription}
+                  disabled={isStartingSession}
                   onClick={() => setConfirmAction("fixSession")}
                 >
                   {/* CANCELLED reads as a retry too — same story as FAILED,
@@ -813,24 +702,7 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
                     : en.bugHunter.drawerStartFixSession}
                 </Button>
               )}
-
-              {canStopSession && (
-                <Button
-                  size="sm"
-                  kind="danger--tertiary"
-                  disabled={isCancellingSession}
-                  onClick={() => setConfirmAction("stopFixSession")}
-                >
-                  {en.bugHunter.drawerStopFixSession}
-                </Button>
-              )}
             </DecisionActions>
-
-            {isDraftingDescription && !SETTLED_STATUSES.includes(finding.status) && (
-              <p className="text-xs text-typography-600">
-                {en.bugHunter.drawerDescriptionSettleFirst}
-              </p>
-            )}
           </div>
 
           {/* ── 2. Where it is ──────────────────────────────────────────────
@@ -853,18 +725,6 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
                     finding.stageOverriddenAt ? formatDateTime(finding.stageOverriddenAt) : "—",
                   )}
               </p>
-            )}
-            {stageEditorOpen && (
-              <BugFindingStageEditor
-                id={finding.id}
-                stage={finding.stage}
-                isAuto={finding.stageIsAuto}
-                pinnedByName={finding.stageOverriddenByName}
-                pinnedAt={finding.stageOverriddenAt}
-                canEdit={canTriage}
-                startEditing
-                onDone={() => setStageEditorOpen(false)}
-              />
             )}
 
             {/* The plan, when this bug needs more than one repo. */}
@@ -954,58 +814,21 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
             )}
           </div>
 
-          {/* ── 3. The brief, and who reported it ───────────────────────────
-              Editable, because this text is not a record of the bug — it is
-              the instruction a fix session runs on. See ally-be's
-              BugFindingService.editDescription. */}
+          {/* ── 3. The brief, and who reported it ─────────────────────────── */}
           <div>
             <h3 className="text-xs font-semibold text-typography-700 mb-1">
               {en.bugHunter.drawerDescriptionTitle}
             </h3>
 
-            {descriptionDraft === null ? (
-              <p className="text-sm text-typography-900 whitespace-pre-wrap break-words">
-                {finding.description}
-              </p>
-            ) : (
-              <div className="flex flex-col gap-2">
-                <TextArea
-                  id={`bug-finding-description-${finding.id}`}
-                  labelText={en.bugHunter.drawerDescriptionEditLabel}
-                  helperText={en.bugHunter.drawerDescriptionEditHelp}
-                  placeholder={en.bugHunter.drawerDescriptionEditPlaceholder}
-                  value={descriptionDraft}
-                  onChange={e => setDescriptionDraft(e.target.value)}
-                  rows={8}
-                  // Opened from the header menu, so the field is usually
-                  // below the fold: focusing it brings it into view.
-                  autoFocus
-                  invalid={draftTooLong}
-                  invalidText={en.bugHunter.drawerDescriptionEditTooLong
-                    .replace("{length}", String(descriptionDraft.trim().length))
-                    .replace("{max}", String(BUG_FINDING_DESCRIPTION_MAX_LENGTH))}
-                />
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    size="sm"
-                    kind="primary"
-                    disabled={isSavingDescription || !descriptionDraft.trim() || draftTooLong}
-                    onClick={handleSaveDescription}
-                  >
-                    {en.bugHunter.drawerDescriptionEditSave}
-                  </Button>
-                  <Button size="sm" kind="ghost" onClick={() => setDescriptionDraft(null)}>
-                    {en.bugHunter.drawerDescriptionEditCancel}
-                  </Button>
-                </div>
-              </div>
-            )}
+            <p className="text-sm text-typography-900 whitespace-pre-wrap break-words">
+              {finding.description}
+            </p>
 
             {/* What Bug Hunter originally found stays reachable once an admin
                 has rewritten it: when a fix goes wrong the first question is
                 whether the agent misread the bug or was handed a different
                 one. */}
-            {finding.originalDescription && descriptionDraft === null && (
+            {finding.originalDescription && (
               <div className="mt-2">
                 <p className="text-xs text-typography-500">
                   {en.bugHunter.drawerDescriptionEditedBy.replace(
@@ -1270,21 +1093,6 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
             </div>
           )}
         </ActionConfirmationPopup>
-      )}
-
-      {confirmAction === "stopFixSession" && (
-        <ActionConfirmationPopup
-          isOpen
-          onClose={() => setConfirmAction(null)}
-          title={en.bugHunter.drawerStopFixSessionConfirmTitle}
-          description={en.bugHunter.drawerStopFixSessionConfirmBody}
-          primaryButton={{
-            label: en.bugHunter.drawerStopFixSessionConfirm,
-            onClick: handleStopFixSession,
-            disabled: isCancellingSession,
-          }}
-          secondaryButton={{ label: en.bugHunter.cancel, onClick: () => setConfirmAction(null) }}
-        />
       )}
 
       {confirmAction === "release" && (

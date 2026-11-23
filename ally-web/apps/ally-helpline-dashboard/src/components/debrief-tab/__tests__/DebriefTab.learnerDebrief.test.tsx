@@ -96,8 +96,7 @@ vi.mock("../DebriefReplyInput", () => ({
 const NOTE = "You opened well and stayed with her silence.";
 const summaryWithNote = { details: { summary: { feedback: { supervisorNote: NOTE } } } } as any;
 
-const renderTab = () =>
-  render(<DebriefTab sessionId="s-1" summaryData={summaryWithNote} />);
+const renderTab = () => render(<DebriefTab sessionId="s-1" summaryData={summaryWithNote} />);
 
 const CARDS = {
   opening: "You stayed calm when Meena went quiet.",
@@ -429,14 +428,7 @@ describe("DebriefTab — learner debrief (Debrief agent)", () => {
   it("gives each quote a See this moment that opens the transcript at that quote (PRD §6.3)", () => {
     mockLearnerDebriefQuery.mockReturnValue({ data: { state: "ready", cards: CARDS } });
     const onSeeQuote = vi.fn();
-    render(
-      <DebriefTab
-        sessionId="s-1"
-        summaryData={summaryWithNote}
-       
-        onSeeQuote={onSeeQuote}
-      />,
-    );
+    render(<DebriefTab sessionId="s-1" summaryData={summaryWithNote} onSeeQuote={onSeeQuote} />);
     const buttons = screen.getAllByRole("button", { name: "postSim.debrief.momentLabel" });
     expect(buttons.length).toBeGreaterThan(0);
     fireEvent.click(buttons[0]);

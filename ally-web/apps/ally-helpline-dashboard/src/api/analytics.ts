@@ -20,6 +20,11 @@ import {
   LearnerScenarioAttempt,
   GetOrganizationMetricsRequest,
   GetOrganizationMetricsResponse,
+  GetStatisticsChartRequest,
+  GetStatisticsScopeOptionsRequest,
+  StatisticsScopeOption,
+  StatisticsChartLibrary,
+  StatisticsChartResponse,
   RemoveLearnerEnrollmentRequest,
   ResetBranchingAttemptsRequest,
 } from "@types";
@@ -74,6 +79,43 @@ const analyticsAPI = baseAPI.injectEndpoints({
     >({
       query: params => ({
         url: ApiEndpoints.ANALYTICS.GET_ORGANIZATION_METRICS,
+        method: HttpMethod.GET,
+        params,
+      }),
+    }),
+
+    /**
+     * The charts this tenant may add to its Statistics dashboard, each with
+     * whether it can fill them. `enabled: false` means the new page is off for
+     * the tenant and the existing Organization Metrics view stays.
+     * Tenant-scoped on the backend via the caller's JWT.
+     */
+    getStatisticsChartLibrary: builder.query<StatisticsChartLibrary, void>({
+      query: () => ({
+        url: ApiEndpoints.ANALYTICS.GET_STATISTICS_CHART_LIBRARY,
+        method: HttpMethod.GET,
+      }),
+    }),
+
+    /** The courses, simulations or learners a chart can be drawn for. */
+    getStatisticsScopeOptions: builder.query<
+      StatisticsScopeOption[],
+      GetStatisticsScopeOptionsRequest
+    >({
+      query: params => ({
+        url: ApiEndpoints.ANALYTICS.GET_STATISTICS_SCOPE_OPTIONS,
+        method: HttpMethod.GET,
+        params,
+      }),
+    }),
+
+    /**
+     * One library chart's data. Each chart on the dashboard fetches for itself,
+     * so only the charts the admin has added are loaded.
+     */
+    getStatisticsChart: builder.query<StatisticsChartResponse, GetStatisticsChartRequest>({
+      query: ({ id, ...params }) => ({
+        url: ApiEndpoints.ANALYTICS.STATISTICS_CHART(id),
         method: HttpMethod.GET,
         params,
       }),
@@ -203,6 +245,9 @@ export const {
   useLazyGetDashboardsQuery,
   useLazyGetCounsellorStatsQuery,
   useGetOrganizationMetricsQuery,
+  useGetStatisticsChartLibraryQuery,
+  useGetStatisticsChartQuery,
+  useGetStatisticsScopeOptionsQuery,
   useGetLearnerUsageTableQuery,
   useGetCourseUsageTableQuery,
   useGetCourseAssessmentPairsQuery,

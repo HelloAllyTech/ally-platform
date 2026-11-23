@@ -1,0 +1,44 @@
+diff --git a/src/roleplay-studio/service/roleplay-session.service.ts b/src/roleplay-studio/service/roleplay-session.service.ts
+index f7a2229514..68d562dcca 100644
+--- a/src/roleplay-studio/service/roleplay-session.service.ts
++++ b/src/roleplay-studio/service/roleplay-session.service.ts
+@@ -303,6 +303,13 @@ export class RoleplaySessionService {
+     const baseUrl = (this.configService.api.baseUrl ?? '').replace(/\/$/, '');
+     return {
+       engine: 'roleplay_v2',
++      // The LiveKit webhook receiver (livekit-webhook.controller.ts) filters
++      // every event on room.metadata.environment matching this env's config —
++      // without this field every webhook for v2 rooms is silently dropped
++      // (room_finished never ends abandoned sessions). Same bug as the v1
++      // slim envelope, fixed there in 2ab4daaf. Additive to the FROZEN
++      // envelope contract: the agent's pydantic model ignores unknown fields.
++      environment: this.configService.livekit.environment,
+       specSchemaVersion: document.specSchemaVersion ?? null,
+       spec: inline ? compiled : null,
+       specFetch: inline
+diff --git a/src/roleplay-studio/service/test/roleplay-session.service.spec.ts b/src/roleplay-studio/service/test/roleplay-session.service.spec.ts
+index e4cbee04f4..df4c3893bb 100644
+--- a/src/roleplay-studio/service/test/roleplay-session.service.spec.ts
++++ b/src/roleplay-studio/service/test/roleplay-session.service.spec.ts
+@@ -112,6 +112,7 @@ describe('RoleplaySessionService — room-metadata specFetch URL', () => {
+     };
+     const configService = {
+       api: { baseUrl: 'https://api.example/' },
++      livekit: { environment: 'unit-test-env' },
+     } as unknown as AppConfigService;
+     return new RoleplaySessionService(
+       {} as any,
+@@ -152,4 +153,13 @@ describe('RoleplaySessionService — room-metadata specFetch URL', () => {
+     expect(metadata.spec).toEqual({ title: 'spec' });
+     expect(metadata.specFetch).toBeNull();
+   });
++
++  // The LiveKit webhook receiver drops any event whose
++  // room.metadata.environment doesn't match this deployment — without this
++  // field every v2 webhook is silently discarded (same bug as the v1 slim
++  // envelope, 2ab4daaf).
++  it('carries the livekit environment so webhooks are not dropped', () => {
++    const metadata = build(makeService({ inline: true }));
++    expect(metadata.environment).toBe('unit-test-env');
++  });
+ });

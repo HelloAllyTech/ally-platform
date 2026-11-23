@@ -1,0 +1,112 @@
+diff --git a/src/auth/middlewares/test/ws-auth.middleware.spec.ts b/src/auth/middlewares/test/ws-auth.middleware.spec.ts
+index 4dcb2a8211..c5d15b0090 100644
+--- a/src/auth/middlewares/test/ws-auth.middleware.spec.ts
++++ b/src/auth/middlewares/test/ws-auth.middleware.spec.ts
+@@ -211,7 +211,9 @@ describe('WebSocketAuthMiddleware', () => {
+       });
+       expect(next).toHaveBeenCalledTimes(1);
+       expect(next).toHaveBeenCalledWith(
+-        new UnauthorizedException('Authentication failed'),
++        new UnauthorizedException(
++          'Authentication failed: Token expired or invalid',
++        ),
+       );
+     });
+ 
+diff --git a/src/auth/middlewares/ws-auth.middleware.spec.ts b/src/auth/middlewares/ws-auth.middleware.spec.ts
+new file mode 100644
+index 0000000000..c66191586a
+--- /dev/null
++++ b/src/auth/middlewares/ws-auth.middleware.spec.ts
+@@ -0,0 +1,78 @@
++import { Test, TestingModule } from '@nestjs/testing';
++import { JwtService } from '@nestjs/jwt';
++import { AppConfigService } from '../../config/config.service';
++import { PermissionsService } from 'src/authorization/service/permissions.service';
++import { WebSocketAuthMiddleware } from './ws-auth.middleware';
++import { Socket } from 'socket.io';
++import { UnauthorizedException } from '../../exception/custom.exception';
++
++describe('WebSocketAuthMiddleware', () => {
++  let middleware: WebSocketAuthMiddleware;
++  let jwtService: jest.Mocked<JwtService>;
++
++  beforeEach(async () => {
++    const module: TestingModule = await Test.createTestingModule({
++      providers: [
++        WebSocketAuthMiddleware,
++        {
++          provide: JwtService,
++          useValue: {
++            verifyAsync: jest.fn(),
++          },
++        },
++        {
++          provide: AppConfigService,
++          useValue: {
++            jwt: {
++              accessToken: {
++                secret: 'test-secret',
++              },
++            },
++          },
++        },
++        {
++          provide: PermissionsService,
++          useValue: {
++            getUserPermissions: jest.fn(),
++          },
++        },
++      ],
++    }).compile();
++
++    middleware = module.get<WebSocketAuthMiddleware>(WebSocketAuthMiddleware);
++    jwtService = module.get(JwtService);
++  });
++
++  it('should be defined', () => {
++    expect(middleware).toBeDefined();
++  });
++
++  describe('webSocketMiddleware', () => {
++    let socket: jest.Mocked<Socket>;
++    let next: jest.Mock;
++
++    beforeEach(() => {
++      socket = {
++        id: 'test-socket-id',
++        handshake: {
++          auth: {
++            token: 'test-token',
++          },
++        },
++        data: {},
++      } as any;
++      next = jest.fn();
++    });
++
++    it('should call next with UnauthorizedException containing original error message for unexpected errors', async () => {
++      const errorMessage = 'Internal server error';
++      jwtService.verifyAsync.mockRejectedValue(new Error(errorMessage));
++
++      await middleware.webSocketMiddleware()(socket, next);
++
++      expect(next).toHaveBeenCalledWith(
++        new UnauthorizedException(`Authentication failed: ${errorMessage}`),
++      );
++    });
++  });
++});
+diff --git a/src/auth/middlewares/ws-auth.middleware.ts b/src/auth/middlewares/ws-auth.middleware.ts
+index eac58e0c08..b21673c017 100644
+--- a/src/auth/middlewares/ws-auth.middleware.ts
++++ b/src/auth/middlewares/ws-auth.middleware.ts
+@@ -90,7 +90,7 @@ export class WebSocketAuthMiddleware {
+       } catch (error) {
+         // Catch any unexpected errors
+         const unexpectedError = new UnauthorizedException(
+-          'Authentication failed',
++          `Authentication failed: ${error.message}`,
+         );
+         this.logger.error(
+           `Unexpected error during WebSocket authentication for socket ${socket.id}:`,

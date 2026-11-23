@@ -153,13 +153,6 @@ export const AGENT_BUILDER_TITLE = definePrompt(
   { output: 'structured' },
 );
 
-/** src/prompts/bug_hunter/classify_miss.txt */
-export const BUG_HUNTER_CLASSIFY_MISS = definePrompt(
-  'bug_hunter_classify_miss',
-  {},
-  { output: 'structured' },
-);
-
 /** src/prompts/bug_hunter/classify_repo.txt */
 export const BUG_HUNTER_CLASSIFY_REPO = definePrompt(
   'bug_hunter_classify_repo',
@@ -168,26 +161,6 @@ export const BUG_HUNTER_CLASSIFY_REPO = definePrompt(
     name: 'Bug Hunter — Classify Repo',
     description:
       'Triages a human-reported bug (no repo attached yet) to the codebase whose fix session should run it.',
-    category: 'Bug Hunter',
-    output: 'structured',
-  },
-);
-
-/** src/prompts/bug_hunter/decide.txt */
-export const BUG_HUNTER_DECIDE = definePrompt(
-  'bug_hunter_decide',
-  {},
-  { output: 'structured' },
-);
-
-/** src/prompts/bug_hunter/review_study.txt */
-export const BUG_HUNTER_REVIEW_STUDY = definePrompt(
-  'bug_hunter_review_study',
-  {},
-  {
-    name: 'Bug Hunter — Review Study',
-    description:
-      "Reads a fix session's study (how the feature works today, where the value lives, the planned fix) before any code changes, and raises the concerns the session must answer — a parallel mechanism, a header nobody sends, a half-fix across repos.",
     category: 'Bug Hunter',
     output: 'structured',
   },

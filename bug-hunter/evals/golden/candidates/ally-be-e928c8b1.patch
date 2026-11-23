@@ -1,0 +1,82 @@
+diff --git a/src/dynamic-i18n/service/dynamic-i18n.service.ts b/src/dynamic-i18n/service/dynamic-i18n.service.ts
+index f4bd9be631..9d3de8deab 100644
+--- a/src/dynamic-i18n/service/dynamic-i18n.service.ts
++++ b/src/dynamic-i18n/service/dynamic-i18n.service.ts
+@@ -447,6 +447,16 @@ export class DynamicI18nService {
+     const LEGACY_NAMESPACE = 'translation';
+     let anyUpdates = false;
+ 
++    // English reference for the squatting repair below. The release pipeline
++    // posts ONE language per request (five locales in one body once crossed
++    // the 1mb JSON limit), so `locales.en` is usually absent — fall back to
++    // the stored English draft, which the pipeline syncs first.
++    const englishSource = async (): Promise<Record<string, unknown>> =>
++      this.isObject(locales.en)
++        ? locales.en
++        : await this.readDraftLanguageOrEmpty('en');
++    let englishLanguage: Record<string, unknown> | null = null;
++
+     for (const [language, localeContent] of Object.entries(locales)) {
+       if (!SAFE_SEGMENT.test(language)) continue;
+       if (!this.isObject(localeContent)) continue;
+@@ -491,16 +501,17 @@ export class DynamicI18nService {
+         // English value, the draft is seeding debris, not an author's choice —
+         // replace it. A deliberate English-looking translation ("OK") is safe:
+         // its repo value equals English too, so it never matches.
+-        const englishValues =
+-          language === 'en'
+-            ? null
+-            : new Map(
+-                this.flattenStrings(
+-                  this.isObject(locales.en?.[namespace])
+-                    ? (locales.en[namespace] as TranslationValue)
+-                    : {},
+-                ).map((e) => [e.key, e.value]),
+-              );
++        let englishValues: Map<string, string> | null = null;
++        if (language !== 'en') {
++          englishLanguage ??= await englishSource();
++          englishValues = new Map(
++            this.flattenStrings(
++              this.isObject(englishLanguage[namespace])
++                ? (englishLanguage[namespace] as TranslationValue)
++                : {},
++            ).map((e) => [e.key, e.value]),
++          );
++        }
+ 
+         const newEntries = this.flattenStrings(content).filter((e) => {
+           if (e.value.trim() === '') return false;
+diff --git a/src/dynamic-i18n/service/test/dynamic-i18n.service.spec.ts b/src/dynamic-i18n/service/test/dynamic-i18n.service.spec.ts
+index 36102678b8..9d1c8cfeb4 100644
+--- a/src/dynamic-i18n/service/test/dynamic-i18n.service.spec.ts
++++ b/src/dynamic-i18n/service/test/dynamic-i18n.service.spec.ts
+@@ -446,6 +446,28 @@ describe('DynamicI18nService', () => {
+     expect(secondRun).toBeNull();
+   });
+ 
++  it('ciSync repairs English-squatting from a single-language request using the stored en draft', async () => {
++    // The release pipeline posts one language per ci-sync request, so the
++    // English reference must come from the drafts, not the payload.
++    await writeJson(path.join(rootDir, '.drafts', 'en.json'), {
++      review: { filter: { read: 'Read', unread: 'Unread' } },
++    });
++    await writeJson(path.join(rootDir, '.drafts', 'mr.json'), {
++      review: { filter: { read: 'Read', unread: 'Unread' } },
++    });
++
++    const manifest = await service.ciSync({
++      mr: { review: { filter: { read: 'वाचलेले', unread: 'न वाचलेले' } } },
++    });
++
++    expect(manifest).toMatchObject({ currentVersion: 'v1' });
++    const draft = await readJson<{
++      review: { filter: { read: string; unread: string } };
++    }>(path.join(rootDir, '.drafts', 'mr.json'));
++    expect(draft.review.filter.read).toBe('वाचलेले');
++    expect(draft.review.filter.unread).toBe('न वाचलेले');
++  });
++
+   it('returns compact i18n audit log entries with resolved user names', async () => {
+     const loggedAt = new Date('2026-04-29T04:31:45.000Z');
+     auditLogService.listByEventTypes.mockResolvedValue([

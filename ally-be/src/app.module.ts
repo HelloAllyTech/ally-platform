@@ -22,7 +22,7 @@ import { RateLimitModule } from './rate-limit/rate-limit.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { AnalyticsAgentModule } from './analytics-agent/analytics-agent.module';
 import { PmAgentModule } from './pm-agent/pm-agent.module';
-import { BugHunterModule } from './bug-hunter/bug-hunter.module';
+import { BugHunterApprovalsModule } from './bug-hunter-approvals/bug-hunter-approvals.module';
 import { BuilderModule } from './builder/builder.module';
 import { ContextLibraryModule } from './context-library/context-library.module';
 import { CourseCopilotModule } from './course-copilot/course-copilot.module';
@@ -116,7 +116,7 @@ import { DebriefFeedbackModule } from './debrief-feedback/debrief-feedback.modul
     AnalyticsModule,
     AnalyticsAgentModule,
     PmAgentModule,
-    BugHunterModule,
+    BugHunterApprovalsModule,
     BuilderModule,
     ContextLibraryModule,
     CourseCopilotModule,

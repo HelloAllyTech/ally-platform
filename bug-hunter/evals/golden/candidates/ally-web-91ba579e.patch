@@ -1,0 +1,202 @@
+diff --git a/apps/ally-helpline-dashboard/src/api/auth.ts b/apps/ally-helpline-dashboard/src/api/auth.ts
+index d0586c5b02..45f6d78d41 100644
+--- a/apps/ally-helpline-dashboard/src/api/auth.ts
++++ b/apps/ally-helpline-dashboard/src/api/auth.ts
+@@ -21,7 +21,7 @@ import {
+ 
+ import { baseAPI } from "./baseAPI";
+ 
+-const ALLOWED_ROLES = [UserRole.COUNSELLOR, UserRole.ADMIN, UserRole.LEARNER];
++const ALLOWED_ROLES = [UserRole.COUNSELLOR, UserRole.ADMIN, UserRole.LEARNER, UserRole.LEARNER];
+ 
+ const authAPI = baseAPI.injectEndpoints({
+   endpoints: builder => ({
+diff --git a/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx b/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx
+index 183db649d6..2e9ac9c093 100644
+--- a/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx
++++ b/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx
+@@ -1,4 +1,4 @@
+-import { useMemo, useRef, useState } from "react";
++import { useEffect, useMemo, useRef, useState } from "react";
+ 
+ import { Emoji, EmojiStyle } from "emoji-picker-react";
+ import { useSelector } from "react-redux";
+@@ -47,6 +47,10 @@ const CommentCard = ({
+   const [deleteComment] = useDeleteCommentMutation();
+   const likeRef = useRef<HTMLDivElement>(null);
+ 
++  useEffect(() => {
++    if (comment?.myReaction) setSelectedEmoji(comment.myReaction);
++  }, [comment?.myReaction]);
++
+   const handleReplyClick = (e: React.MouseEvent) => {
+     e.stopPropagation();
+     setShowReplyInput(true);
+@@ -228,7 +232,7 @@ const CommentCard = ({
+                 onClick={() => setShowEmojiPicker(prev => !prev)}
+               >
+                 {selectedEmoji ? (
+-                  <div className="pb-0.5">
++                  <div className="pb-0.5  w-[26px] bg-white h-[26px] flex items-center justify-center rounded-full border-[0.5px]">
+                     <Emoji unified={selectedEmoji} size={14} emojiStyle={EmojiStyle.NATIVE} />
+                   </div>
+                 ) : (
+@@ -245,7 +249,7 @@ const CommentCard = ({
+               )}
+             </div>
+           )}
+-          {!showLike && comment.reactions && Object.keys(comment.reactions).length > 0 && (
++          {comment?.reactions && Object.keys(comment?.reactions).length > 0 && (
+             <>
+               <div className="flex pr-2 items-center">
+                 {Object.keys(comment.reactions)
+@@ -271,7 +275,6 @@ const CommentCard = ({
+               <div className="text-typography-800 text-[14px]">
+                 {Object.keys(comment.reactions).length}
+               </div>
+-              {comment.replyCount > 0 && <div className="w-1 h-1 bg-[#D9D9D9] rounded-full" />}
+             </>
+           )}
+           {showReply && (
+diff --git a/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/CommentCard.test.tsx b/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/CommentCard.test.tsx
+index 4ba3d4cb49..2ff7963d11 100644
+--- a/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/CommentCard.test.tsx
++++ b/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/CommentCard.test.tsx
+@@ -206,13 +206,13 @@ describe("CommentCard Component", () => {
+       expect(screen.getByText("2")).toBeInTheDocument(); // Number of unique reactions
+     });
+ 
+-    it("should not display reactions when showLike is true", () => {
++    it("should display reactions even when showLike is true", () => {
+       const commentWithReactions = {
+         ...mockComment,
+         reactions: { "1f44d": 5 },
+       };
+       renderWithProvider(<CommentCard comment={commentWithReactions} showLike />);
+-      expect(screen.queryByTestId("emoji-1f44d")).not.toBeInTheDocument();
++      expect(screen.getByTestId("emoji-1f44d")).toBeInTheDocument();
+     });
+ 
+     it("should display maximum 3 reaction emojis", () => {
+@@ -335,7 +335,7 @@ describe("CommentCard Component", () => {
+ 
+   // --- Divider Tests ---
+   describe("Dividers", () => {
+-    it("should show divider between reactions and reply count", () => {
++    it("should not show divider when only reactions and reply count are present", () => {
+       const commentWithReactionsAndReplies = {
+         ...mockComment,
+         reactions: { "1f44d": 5 },
+@@ -345,7 +345,7 @@ describe("CommentCard Component", () => {
+         <CommentCard comment={commentWithReactionsAndReplies} showLike={false} />,
+       );
+       const dividers = container.querySelectorAll(".bg-\\[\\#D9D9D9\\]");
+-      expect(dividers.length).toBeGreaterThan(0);
++      expect(dividers.length).toBe(0);
+     });
+ 
+     it("should show divider before Reply button when showReply is true", () => {
+diff --git a/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/__snapshots__/CommentCard.test.tsx.snap b/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/__snapshots__/CommentCard.test.tsx.snap
+index beb7df89c6..714acedfba 100644
+--- a/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/__snapshots__/CommentCard.test.tsx.snap
++++ b/apps/ally-helpline-dashboard/src/components/comment-card/__tests__/__snapshots__/CommentCard.test.tsx.snap
+@@ -114,6 +114,57 @@ exports[`CommentCard Component > should match snapshot with all props enabled 1`
+             </svg>
+           </div>
+         </div>
++        <div
++          class="flex pr-2 items-center"
++        >
++          <div
++            class="w-4 overflow-visible relative"
++            style="z-index: 10;"
++          >
++            <div
++              class="w-[26px] bg-white h-[26px] pr-0.5 pb-1.5 flex items-center justify-center rounded-full border-[0.5px]"
++            >
++              <span
++                data-testid="emoji-2764"
++              >
++                2764
++              </span>
++            </div>
++          </div>
++          <div
++            class="w-4 overflow-visible relative"
++            style="z-index: 9;"
++          >
++            <div
++              class="w-[26px] bg-white h-[26px] pr-0.5 pb-1.5 flex items-center justify-center rounded-full border-[0.5px]"
++            >
++              <span
++                data-testid="emoji-1f44d"
++              >
++                1f44d
++              </span>
++            </div>
++          </div>
++          <div
++            class="w-4 overflow-visible relative"
++            style="z-index: 8;"
++          >
++            <div
++              class="w-[26px] bg-white h-[26px] pr-0.5 pb-1.5 flex items-center justify-center rounded-full border-[0.5px]"
++            >
++              <span
++                data-testid="emoji-1f389"
++              >
++                1f389
++              </span>
++            </div>
++          </div>
++        </div>
++        <div
++          class="text-typography-800 text-[14px]"
++        >
++          3
++        </div>
+         <div
+           class="w-1 h-1 bg-[#D9D9D9] rounded-full"
+         />
+diff --git a/apps/ally-helpline-dashboard/src/components/transcription/Transcription.tsx b/apps/ally-helpline-dashboard/src/components/transcription/Transcription.tsx
+index 59e52c7310..391151adcb 100644
+--- a/apps/ally-helpline-dashboard/src/components/transcription/Transcription.tsx
++++ b/apps/ally-helpline-dashboard/src/components/transcription/Transcription.tsx
+@@ -375,7 +375,7 @@ const Transcription: FC<TranscriptionProps> = ({
+                             segment.isComment &&
+                             selectedThreadId !== segment.threadId &&
+                             selectedMessageId !== String(transcript.id) &&
+-                            selectedStartIndex !== segment.selection?.startIndex &&
++                            // selectedStartIndex !== segment.selection?.startIndex && //TODO: Uncomment this when the bug is fixed
+                             selectedEndIndex !== segment.selection?.endIndex
+                           ) {
+                             handleCommentClick?.({
+diff --git a/apps/ally-helpline-dashboard/src/pages/review-details/ReviewDetails.tsx b/apps/ally-helpline-dashboard/src/pages/review-details/ReviewDetails.tsx
+index 004b63bc63..bf52319583 100644
+--- a/apps/ally-helpline-dashboard/src/pages/review-details/ReviewDetails.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/review-details/ReviewDetails.tsx
+@@ -93,7 +93,11 @@ export const ReviewDetails = () => {
+ 
+   const displayTotalReactionCount: string | number = useMemo(() => {
+     if (!reviewReactions) return 0;
+-    const reactionsCount = reviewReactions.length;
++    const reactionsCount: number =
++      (Object.values(reviewDetails?.reactions || {}) as number[])?.reduce(
++        (acc: number, curr: number) => acc + curr,
++        0,
++      ) || 0;
+     if (reactionsCount > 999) {
+       const count = Number((reactionsCount / 1000).toFixed(1));
+       return `${count}k`;
+diff --git a/apps/ally-helpline-dashboard/src/types/reviews.ts b/apps/ally-helpline-dashboard/src/types/reviews.ts
+index b281f89313..dd5bfb80ed 100644
+--- a/apps/ally-helpline-dashboard/src/types/reviews.ts
++++ b/apps/ally-helpline-dashboard/src/types/reviews.ts
+@@ -97,6 +97,7 @@ export interface CommentItem {
+   };
+   replyCount: number;
+   hidden?: boolean;
++  myReaction?: string;
+ }
+ export interface Thread {
+   id: string;

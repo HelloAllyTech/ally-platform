@@ -103,27 +103,13 @@ describe("DebriefTab — readOnly (revisit)", () => {
   });
 
   it("shows the note", () => {
-    render(
-      <DebriefTab
-        sessionId="s-1"
-        summaryData={summaryWithNote()}
-       
-        readOnly
-      />,
-    );
+    render(<DebriefTab sessionId="s-1" summaryData={summaryWithNote()} readOnly />);
 
     expect(screen.getByTestId("supervisor-note")).toHaveTextContent(NOTE);
   });
 
   it("hides the past conversation, not merely the composer", () => {
-    render(
-      <DebriefTab
-        sessionId="s-1"
-        summaryData={summaryWithNote()}
-       
-        readOnly
-      />,
-    );
+    render(<DebriefTab sessionId="s-1" summaryData={summaryWithNote()} readOnly />);
 
     expect(screen.queryByText("Why was that a miss?")).not.toBeInTheDocument();
     expect(screen.queryByText(/you moved on/)).not.toBeInTheDocument();
@@ -134,27 +120,13 @@ describe("DebriefTab — readOnly (revisit)", () => {
     // The privacy point: an org admin opening a learner's session must not
     // pull that learner's coaching thread into the store, whether or not it
     // would have been painted.
-    render(
-      <DebriefTab
-        sessionId="s-1"
-        summaryData={summaryWithNote()}
-       
-        readOnly
-      />,
-    );
+    render(<DebriefTab sessionId="s-1" summaryData={summaryWithNote()} readOnly />);
 
     expect(mockChatHistoryQuery).toHaveBeenCalledWith({ sessionId: "s-1" }, { skip: true });
   });
 
   it("does not invite a reply", () => {
-    render(
-      <DebriefTab
-        sessionId="s-1"
-        summaryData={summaryWithNote()}
-       
-        readOnly
-      />,
-    );
+    render(<DebriefTab sessionId="s-1" summaryData={summaryWithNote()} readOnly />);
 
     expect(screen.queryByText("postSim.debrief.replyPrompt")).not.toBeInTheDocument();
   });
@@ -239,14 +211,7 @@ describe("DebriefTab — a supervisor on Roleplay Logs (FR-26)", () => {
         ],
       },
     } as never);
-    render(
-      <DebriefTab
-        sessionId="s-1"
-        summaryData={undefined as never}
-       
-        readOnly
-      />,
-    );
+    render(<DebriefTab sessionId="s-1" summaryData={undefined as never} readOnly />);
 
     expect(screen.getByTestId("debrief-cards")).toBeInTheDocument();
     expect(screen.getByTestId("debrief-supervisor-flag")).toHaveTextContent(
@@ -270,14 +235,7 @@ describe("DebriefTab — a supervisor on Roleplay Logs (FR-26)", () => {
     mockSupervisorQuery.mockReturnValue({
       data: { state: "ready", readOnly: true, cards: PRACTISE, language: "en", flags: [] },
     } as never);
-    render(
-      <DebriefTab
-        sessionId="s-1"
-        summaryData={undefined as never}
-       
-        readOnly
-      />,
-    );
+    render(<DebriefTab sessionId="s-1" summaryData={undefined as never} readOnly />);
     const card = screen.getByTestId("debrief-card-practise-next");
     expect(card).toHaveTextContent("Boundaries");
     expect(within(card).queryByRole("link")).toBeNull();
@@ -296,14 +254,7 @@ describe("DebriefTab — a supervisor on Roleplay Logs (FR-26)", () => {
       },
     });
     try {
-      render(
-        <DebriefTab
-          sessionId="s-1"
-          summaryData={undefined as never}
-         
-          readOnly
-        />,
-      );
+      render(<DebriefTab sessionId="s-1" summaryData={undefined as never} readOnly />);
       expect(screen.getByTestId("debrief-practise-next")).toHaveAttribute("href", "/scenario/41");
       expect(screen.queryByTestId("supervisor-thread")).toBeNull();
       expect(screen.queryByTestId("reply-input")).not.toBeInTheDocument();

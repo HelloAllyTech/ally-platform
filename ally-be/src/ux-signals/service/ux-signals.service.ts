@@ -9,8 +9,7 @@ import { LessThan, Repository } from 'typeorm';
 import { LoggerService } from 'src/logger/logger.service';
 import { AppConfigService } from 'src/config/config.service';
 import { addDays, isoDate } from 'src/analytics/util/analytics-window.util';
-import { BugFindingRepository } from 'src/bug-hunter/repository/bug-finding.repository';
-import { BugFindingSource } from 'src/bug-hunter/enum/bug-finding.enum';
+import { BugHunterBoardService } from 'src/bug-hunter-approvals/service/bug-hunter-board.service';
 import { PmAgentSignal } from 'src/pm-agent/entity/pm-agent-signal.entity';
 import { PmSignalStatus } from 'src/pm-agent/enum/pm-agent.enum';
 import { UX_SIGNALS_SOURCE } from './ux-signal-writer.service';
@@ -79,7 +78,7 @@ export class UxSignalsService {
     private readonly detector: UxSignalDetectorService,
     private readonly ai: UxSignalsAiService,
     private readonly writer: UxSignalWriterService,
-    private readonly bugFindingRepository: BugFindingRepository,
+    private readonly bugHunter: BugHunterBoardService,
     private readonly goalRepository: RoadmapProductGoalRepository,
     @InjectRepository(PmAgentSignal)
     private readonly signalRepository: Repository<PmAgentSignal>,
@@ -436,9 +435,7 @@ export class UxSignalsService {
     signals: UxSignal[],
     goalNames: string[],
   ): Promise<string> {
-    const openFindings = await this.bugFindingRepository.find({
-      where: { source: BugFindingSource.UX_SIGNAL },
-      order: { createdAt: 'DESC' },
+    const openFindings = await this.bugHunter.listBySource('ux_signal', {
       take: UX_SIGNAL_CONTEXT_LIMITS.OPEN_FINDINGS,
     });
     const pending = await this.signalRepository.find({

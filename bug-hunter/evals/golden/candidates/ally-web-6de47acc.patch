@@ -1,0 +1,132 @@
+diff --git a/apps/ally-admin-dashboard/src/hooks/__tests__/useBuilderStream.test.tsx b/apps/ally-admin-dashboard/src/hooks/__tests__/useBuilderStream.test.tsx
+index de236a3300..3e3dbd1882 100644
+--- a/apps/ally-admin-dashboard/src/hooks/__tests__/useBuilderStream.test.tsx
++++ b/apps/ally-admin-dashboard/src/hooks/__tests__/useBuilderStream.test.tsx
+@@ -44,4 +44,44 @@ describe("mapServerMessagesToFeed", () => {
+ 
+     expect(feed).toHaveLength(0);
+   });
++
++  it("draws an answer once, on the card it answers", () => {
++    // It used to be drawn twice — as the card's "Answered — …" state and again
++    // as a bubble directly under it — which reads exactly like a click that
++    // double-fired, right next to the answer it was meant to confirm.
++    const feed = mapServerMessagesToFeed([
++      message({
++        id: "a1",
++        content: "How should the generated content be presented?",
++        metadata: {
++          questions: [{ id: "q1", prompt: "How should it be presented?" } as never],
++        },
++      }),
++      message({
++        id: "u1",
++        role: "user",
++        content: "[answers question q1] Fill the form directly",
++        metadata: { questionId: "q1" },
++      }),
++    ]);
++
++    expect(feed.filter(entry => entry.role === "user")).toHaveLength(0);
++    const card = feed.find(entry => entry.question);
++    expect(card?.answeredWith).toBe("Fill the form directly");
++  });
++
++  it("keeps an answer whose question is not in the feed", () => {
++    // "We could not render the card" must never read the same as "the admin
++    // said nothing" — dropping the row on that basis would lose their words.
++    const feed = mapServerMessagesToFeed([
++      message({
++        id: "u1",
++        role: "user",
++        content: "[answers question q9] continue",
++        metadata: { questionId: "q9" },
++      }),
++    ]);
++
++    expect(feed).toEqual([{ id: "srv_u1", role: "user", content: "continue" }]);
++  });
+ });
+diff --git a/apps/ally-admin-dashboard/src/hooks/useBuilderStream.ts b/apps/ally-admin-dashboard/src/hooks/useBuilderStream.ts
+index b60c688bc8..33219461bb 100644
+--- a/apps/ally-admin-dashboard/src/hooks/useBuilderStream.ts
++++ b/apps/ally-admin-dashboard/src/hooks/useBuilderStream.ts
+@@ -77,6 +77,8 @@ export const mapServerMessagesToFeed = (
+ ): BuilderChatMessage[] => {
+   const feed: BuilderChatMessage[] = [];
+   const answersByQuestionId = new Map<string, { text: string; answer?: BuilderStructuredAnswer }>();
++  /** Questions that will be rendered as their own card further down the feed. */
++  const questionIds = new Set<string>();
+ 
+   for (const message of serverMessages) {
+     const questionId = message.metadata?.questionId;
+@@ -86,13 +88,30 @@ export const mapServerMessagesToFeed = (
+         answer: message.metadata?.answer,
+       });
+     }
++    for (const question of message.metadata?.questions ?? []) {
++      questionIds.add(question.id);
++    }
+   }
+ 
+   for (const message of serverMessages) {
+     const content = (message.content ?? "").replace(ANSWER_PREFIX_RE, "");
+ 
+     if (message.role === "user") {
+-      if (content) {
++      // An answer is drawn once, on the card it answers.
++      //
++      // It used to be drawn twice: the card renders "Answered — Fill the form
++      // directly" from the loop below, and the same row was pushed again as a
++      // bubble immediately under it. On screen that reads as the admin having
++      // said the same thing twice, which is exactly what it looks like when a
++      // click double-fires — so the feed was reporting a bug that had not
++      // happened, next to the answer it was meant to confirm.
++      //
++      // Only when the card is actually in this feed. A questionId whose
++      // question is not here has nothing to render the text, and dropping it
++      // would lose what the admin said.
++      const answersARenderedCard =
++        Boolean(message.metadata?.questionId) && questionIds.has(message.metadata!.questionId!);
++      if (content && !answersARenderedCard) {
+         feed.push({ id: `srv_${message.id}`, role: "user", content });
+       }
+       continue;
+@@ -441,11 +460,32 @@ export const useBuilderStream = ({
+       currentAssistantIdRef.current = assistantId;
+       pendingTokensRef.current = "";
+ 
+-      setMessages(prev => [
+-        ...prev,
+-        { id: userMsgId, role: "user", content: trimmed },
+-        { id: assistantId, role: "assistant", content: "", isStreaming: true },
+-      ]);
++      setMessages(prev => {
++        // An answer belongs on the card it answers, and the card is already in
++        // the feed — so mark it rather than appending a bubble saying the same
++        // thing. Two effects, both of which were wrong before: the card kept
++        // its buttons live after it had been answered (so a second click sent
++        // the same answer again, and two identical bubbles appeared), and a
++        // reload re-rendered the answer in both places at once.
++        const card = options?.questionId
++          ? prev.find(message => message.question?.id === options.questionId)
++          : undefined;
++        if (card) {
++          return [
++            ...prev.map(message =>
++              message === card
++                ? { ...message, answeredWith: trimmed, answeredAnswer: options?.answer }
++                : message,
++            ),
++            { id: assistantId, role: "assistant" as const, content: "", isStreaming: true },
++          ];
++        }
++        return [
++          ...prev,
++          { id: userMsgId, role: "user" as const, content: trimmed },
++          { id: assistantId, role: "assistant" as const, content: "", isStreaming: true },
++        ];
++      });
+       setIsStreaming(true);
+ 
+       const first = await runStream(sessionId, trimmed, options, userMsgId, assistantId);

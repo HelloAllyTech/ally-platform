@@ -1,0 +1,35 @@
+diff --git a/src/learn/util/scenario.util.ts b/src/learn/util/scenario.util.ts
+index 66f8390203..fb000b4bff 100644
+--- a/src/learn/util/scenario.util.ts
++++ b/src/learn/util/scenario.util.ts
+@@ -19,8 +19,7 @@ export const mapCreateScenarioRequestToEntity = (
+     coverImageUrl: scenario.coverImageUrl,
+     coverVideoUrl: scenario.coverVideoUrl,
+     status: scenario.status,
+-    // TODO: Will remove this optional boolean once public/private scenario feature is live
+-    isPublic: scenario.isPublic || true,
++    isPublic: scenario.isPublic,
+     prompt: scenario.prompt,
+     isGlobal: scenario.isGlobal,
+     difficultyLevel: scenario.difficultyLevel,
+diff --git a/src/learn/util/test/scenario.util.spec.ts b/src/learn/util/test/scenario.util.spec.ts
+index c4d4c7b7ba..8612b921f4 100644
+--- a/src/learn/util/test/scenario.util.spec.ts
++++ b/src/learn/util/test/scenario.util.spec.ts
+@@ -28,7 +28,6 @@ describe('Scenario Util', () => {
+         coverVideoUrl: 'https://example.com/video.mp4',
+         status: ScenarioStatus.DRAFT,
+         prompt: 'You are a counselor',
+-        isGlobal: true,
+         voiceId: 'voice-123',
+         name: 'John Doe',
+         age: 30,
+@@ -54,7 +53,7 @@ describe('Scenario Util', () => {
+         updatedBy: userId,
+         title: scenario.title,
+         scenario: '',
+-        isPublic: true,
++        isPublic: scenario.isPublic,
+         description: scenario.description,
+         coverImageUrl: scenario.coverImageUrl,
+         coverVideoUrl: scenario.coverVideoUrl,

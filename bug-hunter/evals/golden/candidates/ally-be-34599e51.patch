@@ -1,0 +1,191 @@
+diff --git a/src/learn/repository/scenario-session.repository.ts b/src/learn/repository/scenario-session.repository.ts
+index b214cf1da8..26fa68b41f 100644
+--- a/src/learn/repository/scenario-session.repository.ts
++++ b/src/learn/repository/scenario-session.repository.ts
+@@ -310,15 +310,38 @@ export class ScenarioSessionRepository extends Repository<ScenarioSessions> {
+    * tenant's concurrent-simulation ceiling and read, on every operational view,
+    * as a roleplay still in progress days later.
+    *
+-   * `startedAt IS NOT NULL` is required rather than incidental: a row with no
+-   * `startedAt` never began, and its age says nothing about whether it is stuck.
++   * A row that never began is IN SCOPE, aged by `createdAt`. This used to be
++   * excluded on the reasoning that "a row with no `startedAt` never began, so
++   * its age says nothing about whether it is stuck", and that reasoning had the
++   * blind spot backwards. `startedAt` is written from exactly one place —
++   * `participant-joined.handler`, and only for a non-AGENT participant — so a
++   * start where the learner's own client never made it into the room leaves the
++   * row ACTIVE with `startedAt` NULL forever. Nothing can ever set it later: the
++   * room is gone, and LiveKit's empty-timeout never fires it either, because the
++   * proactively-dispatched agent is in the room keeping it non-empty, so no
++   * `room_finished` webhook arrives to end the session. That row then blocks the
++   * learner out of the product entirely — `validateStartScenarioSession` refuses
++   * any new start while ANY ACTIVE row exists for them — and it was the one
++   * shape of stuck row this sweep could never see.
++   *
++   * The same six-hour margin covers it, and must: `startedAt` NULL is also what
++   * a genuinely live session looks like when its participant-joined webhook was
++   * merely lost, and reaping one of those mid-roleplay is the outcome
++   * `STUCK_SESSION_AGE_MS` exists to make impossible. `createdAt` is only ever
++   * EARLIER than the `startedAt` it stands in for, so nothing that used to be
++   * out of scope moves in ahead of its old cutoff.
++   *
+    * Preview and seeded rooms are excluded, matching `countableSessionPredicate`.
+    *
+    * Runs from the scheduler, outside any request context, so this deliberately
+    * spans tenants — it is not a tenant-scoped read.
+    */
+   async findSessionsStuckActive(params: {
+-    startedBefore: Date;
++    /**
++     * Cutoff for the row's ACTIVE age: `startedAt` where the session started,
++     * else `createdAt`.
++     */
++    activeBefore: Date;
+     limit: number;
+   }): Promise<ScenarioSessions[]> {
+     return (
+@@ -326,15 +349,21 @@ export class ScenarioSessionRepository extends Repository<ScenarioSessions> {
+         .where('session.status = :status', {
+           status: ScenarioSessionStatus.ACTIVE,
+         })
+-        .andWhere('session.startedAt IS NOT NULL')
+-        .andWhere('session.startedAt < :startedBefore', {
+-          startedBefore: params.startedBefore,
+-        })
++        // `scenario_sessions_active_started_idx` (partial on status = 'ACTIVE')
++        // is still the access path: the live set it indexes is a tiny fraction
++        // of the table, so the coalesced age applies as a filter over it.
++        .andWhere(
++          'COALESCE(session.startedAt, session.createdAt) < :activeBefore',
++          { activeBefore: params.activeBefore },
++        )
+         .andWhere("session.roomId NOT LIKE 'preview-%'")
+         .andWhere("session.roomId NOT LIKE 'seed-room-%'")
+         // Oldest first: if the limit bites, the most stuck rows are cleared first
+-        // and the rest are picked up on the next tick.
+-        .orderBy('session.startedAt', 'ASC')
++        // and the rest are picked up on the next tick. Coalesced for the same
++        // reason as the cutoff — ordering on `startedAt` alone would sort every
++        // never-started row last (ASC is NULLS LAST) and starve exactly the rows
++        // that block a learner.
++        .orderBy('COALESCE(session.startedAt, session.createdAt)', 'ASC')
+         .limit(params.limit)
+         .getMany()
+     );
+diff --git a/src/learn/repository/test/scenario-session.repository.spec.ts b/src/learn/repository/test/scenario-session.repository.spec.ts
+index 4343a21e3f..b37d05aa40 100644
+--- a/src/learn/repository/test/scenario-session.repository.spec.ts
++++ b/src/learn/repository/test/scenario-session.repository.spec.ts
+@@ -839,4 +839,77 @@ describe('ScenarioSessionRepository', () => {
+       },
+     );
+   });
++
++  describe('findSessionsStuckActive', () => {
++    const activeBefore = new Date('2026-08-31T00:00:00Z');
++
++    /** Every predicate the query was built with, as [sql, params]. */
++    const predicates = () =>
++      [
++        ...(mockQueryBuilder.where as jest.Mock).mock.calls,
++        ...(mockQueryBuilder.andWhere as jest.Mock).mock.calls,
++      ].map(([sql, params]) => [String(sql), params] as const);
++
++    const callWith = async (limit = 50) => {
++      mockQueryBuilder.getMany.mockResolvedValue([]);
++      return repository.findSessionsStuckActive({ activeBefore, limit });
++    };
++
++    it('looks only at ACTIVE rows, bounded by the sweep limit', async () => {
++      await callWith(50);
++
++      expect(repository.createQueryBuilder).toHaveBeenCalledWith('session');
++      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
++        'session.status = :status',
++        { status: ScenarioSessionStatus.ACTIVE },
++      );
++      expect(mockQueryBuilder.limit).toHaveBeenCalledWith(50);
++    });
++
++    // Regression: a start where the learner's client never joined the room
++    // leaves an ACTIVE row with `startedAt` NULL, and nothing can ever set it
++    // afterwards. Requiring `startedAt IS NOT NULL` hid exactly those rows from
++    // the sweep forever, and each one permanently blocks its learner from
++    // starting ANY new session ("You already have an active scenario session").
++    it('ages a session that never started by createdAt rather than skipping it', async () => {
++      await callWith();
++
++      expect(
++        predicates().some(([sql]) => /startedAt\s+IS\s+NOT\s+NULL/i.test(sql)),
++      ).toBe(false);
++
++      const cutoff = predicates().find(([sql]) =>
++        sql.includes(':activeBefore'),
++      );
++      expect(cutoff).toBeDefined();
++      const [cutoffSql, cutoffParams] = cutoff!;
++      // The cutoff compares the row's ACTIVE age — `startedAt` when it started,
++      // `createdAt` when it never did — against the caller's instant.
++      expect(cutoffSql).toContain('session.startedAt');
++      expect(cutoffSql).toContain('session.createdAt');
++      expect(cutoffSql.replace(/\s+/g, ' ')).toContain('< :activeBefore');
++      expect(cutoffParams).toEqual({ activeBefore });
++    });
++
++    it('orders on the same coalesced age, so never-started rows are not starved when the limit bites', async () => {
++      await callWith();
++
++      const [[orderBySql, direction]] = (mockQueryBuilder.orderBy as jest.Mock)
++        .mock.calls;
++      // Ordering on `startedAt` alone sorts every never-started row last
++      // (Postgres ASC is NULLS LAST), which would push the blocking rows past
++      // the limit on a backlogged tick.
++      expect(String(orderBySql)).toContain('session.startedAt');
++      expect(String(orderBySql)).toContain('session.createdAt');
++      expect(direction).toBe('ASC');
++    });
++
++    it('still excludes preview and seed rooms', async () => {
++      await callWith();
++
++      const sql = predicates().map(([predicate]) => predicate);
++      expect(sql.some((s) => s.includes("NOT LIKE 'preview-%'"))).toBe(true);
++      expect(sql.some((s) => s.includes("NOT LIKE 'seed-room-%'"))).toBe(true);
++    });
++  });
+ });
+diff --git a/src/learn/service/scenario-session.service.ts b/src/learn/service/scenario-session.service.ts
+index 188e5640b7..2655f7b056 100644
+--- a/src/learn/service/scenario-session.service.ts
++++ b/src/learn/service/scenario-session.service.ts
+@@ -2981,15 +2981,19 @@ export class ScenarioSessionService {
+    * charging credits or awarding practice minutes for a session that never
+    * happened would be worse than leaving it unrecorded.
+    *
++   * Includes sessions that never started at all — see `findSessionsStuckActive`
++   * for why those are the ones that matter most: while such a row survives, its
++   * learner cannot start ANY new session.
++   *
+    * Returns what it found and what it changed so the scheduler can log it.
+    */
+   async sweepStuckActiveSessions(): Promise<{
+     found: number;
+     abandoned: number;
+   }> {
+-    const startedBefore = new Date(Date.now() - STUCK_SESSION_AGE_MS);
++    const activeBefore = new Date(Date.now() - STUCK_SESSION_AGE_MS);
+     const stuck = await this.scenarioSessionRepository.findSessionsStuckActive({
+-      startedBefore,
++      activeBefore,
+       limit: STUCK_SESSION_SWEEP_LIMIT,
+     });
+     if (!stuck.length) return { found: 0, abandoned: 0 };
+@@ -3017,7 +3021,7 @@ export class ScenarioSessionService {
+ 
+     this.logger.warn(
+       `Stuck-session sweep: ${stuck.length} session(s) had been ACTIVE since ` +
+-        `before ${startedBefore.toISOString()}; ${abandoned} marked ABANDONED`,
++        `before ${activeBefore.toISOString()}; ${abandoned} marked ABANDONED`,
+     );
+     return { found: stuck.length, abandoned };
+   }

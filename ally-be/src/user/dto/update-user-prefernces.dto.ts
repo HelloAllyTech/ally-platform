@@ -1,4 +1,5 @@
 import {
+  ArrayMaxSize,
   ArrayUnique,
   IsArray,
   IsBoolean,
@@ -6,6 +7,7 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  MaxLength,
 } from 'class-validator';
 
 export class UpdateUserPreferencesDto {
@@ -47,6 +49,19 @@ export class UpdateUserPreferencesDto {
   @ArrayUnique()
   org_metrics_layout?: string[];
 
+  // Per-user layout of the Statistics dashboard chart library
+  // (ally-helpline-dashboard Statistics page, Org tab): an ordered list of
+  // chart ids from the tenant chart library (`TSQ-###`). Absent means "never
+  // customised", so the default layout applies; an empty list means the admin
+  // removed every chart. Validated loosely (array of strings) so adding or
+  // retiring a chart needs no backend deploy: the frontend drops unknown ids.
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(60)
+  @IsString({ each: true })
+  @MaxLength(80, { each: true })
+  @ArrayUnique()
+  statistics_dashboard?: string[];
   // Per-user order of the Roadmap Queue's built-in tabs (admin-dashboard Roadmap → Queue), as view
   // ids: 'to-triage' | 'all' | 'leading' | 'for-you'. Loose like the other keys: the frontend drops
   // an id the person's role no longer offers and appends any it doesn't find, in the default order.

@@ -1,0 +1,81 @@
+diff --git a/src/learn/service/scenario-session.service.ts b/src/learn/service/scenario-session.service.ts
+index 4566b67aea..0ba229997d 100644
+--- a/src/learn/service/scenario-session.service.ts
++++ b/src/learn/service/scenario-session.service.ts
+@@ -1116,6 +1116,24 @@ export class ScenarioSessionService {
+       callDuration,
+     );
+ 
++    // Consume credits here too, for the same reason persistCallDuration is
++    // called above rather than left to endScenarioSession: this handler sets
++    // status=ENDED, which makes the later room_finished webhook skip
++    // endScenarioSession (see RoomFinishedHandler) — the only other place
++    // consumeSimulationCredits is called. Without this, a roleplay that ends
++    // naturally (learner never clicks "End") uses minutes without ever
++    // deducting credits.
++    try {
++      await this.consumeSimulationCredits(
++        scenarioSession.counselorId,
++        callDuration,
++      );
++    } catch (err) {
++      this.logger.error(
++        `consumeSimulationCredits failed for session ${scenarioSessionId}; continuing without deducting credits: ${err?.message}`,
++      );
++    }
++
+     if (scenarioSession.scenarioPathSessionItemId)
+       await this.scenarioPathSessionService.handleEndScenarioPathSession({
+         scenarioPathSessionItemId: scenarioSession.scenarioPathSessionItemId,
+diff --git a/src/learn/service/test/scenario-session.service.spec.ts b/src/learn/service/test/scenario-session.service.spec.ts
+index 789ca5a6d4..21669f5b0d 100644
+--- a/src/learn/service/test/scenario-session.service.spec.ts
++++ b/src/learn/service/test/scenario-session.service.spec.ts
+@@ -2006,6 +2006,47 @@ describe('ScenarioSessionService', () => {
+       );
+     });
+ 
++    it('handleEndScenarioSessionEvent consumes credits for the duration it computes', async () => {
++      // 274s active -> 4 full credits + 34s (>=30) -> 5 credits
++      scenarioSessionRepository.update.mockResolvedValue({
++        affected: 1,
++      } as any);
++      simulationCreditsService.consumeCredits.mockResolvedValue(true);
++
++      await service.handleEndScenarioSessionEvent(
++        { ...mockScenarioSession, startedAt, endedAt } as any,
++        { event_data: { id: 'end-of-session', totalScore: 0 } } as any,
++      );
++
++      expect(simulationCreditsService.consumeCredits).toHaveBeenCalledWith(
++        mockCounselorId,
++        5,
++      );
++    });
++
++    it('still completes session end when credit consumption fails', async () => {
++      scenarioSessionRepository.update.mockResolvedValue({
++        affected: 1,
++      } as any);
++      simulationCreditsService.consumeCredits.mockRejectedValueOnce(
++        new Error('credits service unavailable'),
++      );
++
++      await expect(
++        service.handleEndScenarioSessionEvent(
++          { ...mockScenarioSession, startedAt, endedAt } as any,
++          { event_data: { id: 'end-of-session', totalScore: 0 } } as any,
++        ),
++      ).resolves.not.toThrow();
++
++      expect(scenarioSessionRepository.update).toHaveBeenCalledWith(
++        mockScenarioSessionId,
++        expect.objectContaining({
++          eventStatus: ScenarioSessionEventStatus.COMPLETED,
++        }),
++      );
++    });
++
+     it('endScenarioSession persists the duration without waiting on the summary writer', async () => {
+       scenarioSessionRepository.findOne.mockResolvedValue({
+         ...mockScenarioSession,

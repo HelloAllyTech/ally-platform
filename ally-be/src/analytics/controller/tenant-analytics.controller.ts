@@ -31,8 +31,17 @@ import {
   OrganizationMetricsQueryDto,
   OrganizationMetricsResponseDto,
 } from '../dto/tenant-analytics.dto';
+import {
+  TenantCapabilitiesResponseDto,
+  TenantChartDataResponseDto,
+  TenantChartLibraryResponseDto,
+  TenantChartQueryDto,
+  TenantScopeOptionDto,
+  TenantScopeOptionsQueryDto,
+} from '../dto/tenant-chart-library.dto';
 import { AnalyticsService } from '../service/analytics.service';
 import { TenantAnalyticsService } from '../service/tenant-analytics.service';
+import { TenantChartLibraryService } from '../service/tenant-chart-library.service';
 import { CourseAssessmentReportService } from '../service/course-assessment-report.service';
 import { compareScenarioBehaviours } from 'src/track/util/assessment-compat.util';
 
@@ -44,6 +53,7 @@ export class TenantAnalyticsController {
   constructor(
     private readonly analyticsService: AnalyticsService,
     private readonly tenantAnalyticsService: TenantAnalyticsService,
+    private readonly chartLibraryService: TenantChartLibraryService,
     private readonly courseAssessmentReportService: CourseAssessmentReportService,
     private readonly dataSource: DataSource,
   ) {}
@@ -156,6 +166,72 @@ export class TenantAnalyticsController {
       throw new ForbiddenException('No tenant in the auth context');
     }
     return this.tenantAnalyticsService.getCourseUsage(tenantId, query);
+  }
+
+  /**
+   * The charts the caller's tenant may add to its Statistics dashboard, and
+   * whether it can fill each. `enabled: false` until the new page is switched
+   * on for the tenant (`tenants.settings.statisticsDashboard.enabled`).
+   */
+  @Get('chart-library')
+  @ApiOperation({
+    summary: "Chart library for the caller's tenant, with availability",
+  })
+  @ApiResponse({ status: 200, type: TenantChartLibraryResponseDto })
+  @AuthPermissions([PERMISSIONS.VIEW_ORGANIZATION_METRICS])
+  async getChartLibrary(): Promise<TenantChartLibraryResponseDto> {
+    return this.chartLibraryService.getLibrary(this.requireTenantId());
+  }
+
+  /** The counts that decide which charts the caller's tenant can fill. */
+  @Get('capabilities')
+  @ApiOperation({ summary: 'Data counts that decide chart availability' })
+  @ApiResponse({ status: 200, type: TenantCapabilitiesResponseDto })
+  @AuthPermissions([PERMISSIONS.VIEW_ORGANIZATION_METRICS])
+  async getCapabilities(): Promise<TenantCapabilitiesResponseDto> {
+    const capabilities = await this.chartLibraryService.getCapabilities(
+      this.requireTenantId(),
+    );
+    return { capabilities };
+  }
+
+  /** One library chart's data for the caller's tenant. */
+  @Get('charts/:chartId')
+  @ApiOperation({ summary: "One chart's data for the caller's tenant" })
+  @ApiResponse({ status: 200, type: TenantChartDataResponseDto })
+  @AuthPermissions([PERMISSIONS.VIEW_ORGANIZATION_METRICS])
+  async getChart(
+    @Param('chartId') chartId: string,
+    @Query() query: TenantChartQueryDto,
+  ): Promise<TenantChartDataResponseDto> {
+    return this.chartLibraryService.getChartData(
+      this.requireTenantId(),
+      chartId,
+      query,
+    );
+  }
+
+  /** The courses, simulations or learners a chart can be drawn for. */
+  @Get('chart-scope-options')
+  @ApiOperation({ summary: 'List what a statistics chart can be drawn for' })
+  @ApiResponse({ status: 200, type: [TenantScopeOptionDto] })
+  @AuthPermissions([PERMISSIONS.VIEW_ORGANIZATION_METRICS])
+  async getScopeOptions(
+    @Query() query: TenantScopeOptionsQueryDto,
+  ): Promise<TenantScopeOptionDto[]> {
+    return this.chartLibraryService.getScopeOptions(
+      this.requireTenantId(),
+      query.kind,
+      query.search,
+    );
+  }
+
+  private requireTenantId(): string {
+    const tenantId = ExecutionManager.getTenantId();
+    if (!tenantId) {
+      throw new ForbiddenException('No tenant in the auth context');
+    }
+    return tenantId;
   }
 
   @Patch('dashboards')

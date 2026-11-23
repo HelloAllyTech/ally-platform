@@ -1,0 +1,149 @@
+diff --git a/src/learn/interface/session.interface.ts b/src/learn/interface/session.interface.ts
+index e2e0983b69..b5956e0b62 100644
+--- a/src/learn/interface/session.interface.ts
++++ b/src/learn/interface/session.interface.ts
+@@ -9,4 +9,8 @@ export interface GetScenarioResponse extends Scenarios {
+    * includeCompletion); absent on the @Public() endpoint.
+    */
+   completion?: ScenarioCompletionSummary | null;
++  /**
++   * The number of simulation states (units/components) defined for this scenario.
++   */
++  simulationCount?: number;
+ }
+diff --git a/src/learn/service/scenario.service.ts b/src/learn/service/scenario.service.ts
+index 7fe10a732f..f39e115799 100644
+--- a/src/learn/service/scenario.service.ts
++++ b/src/learn/service/scenario.service.ts
+@@ -503,6 +503,10 @@ export class ScenarioService {
+       scenario.completion = completions.get(scenario.id) ?? null;
+     }
+ 
++    scenario.simulationCount = Array.isArray(scenario.metadata?.states)
++      ? scenario.metadata.states.length
++      : 0;
++
+     return scenario;
+   }
+ 
+diff --git a/src/learn/service/test/scenario.service.spec.ts b/src/learn/service/test/scenario.service.spec.ts
+index f7104129fd..a79731645e 100644
+--- a/src/learn/service/test/scenario.service.spec.ts
++++ b/src/learn/service/test/scenario.service.spec.ts
+@@ -1787,6 +1787,116 @@ describe('ScenarioService', () => {
+   });
+ 
+   describe('getScenario', () => {
++    it('should return scenario with correct simulationCount when states are present', async () => {
++      const mockScenarioWithStates = {
++        ...mockScenario,
++        metadata: {
++          ...mockScenario.metadata,
++          states: [
++            {
++              id: '1',
++              name: 'State 1',
++              guidelines: 'guidelines 1',
++              scoreLower: 0,
++              scoreUpper: 100,
++              ragEnabled: true,
++            },
++            {
++              id: '2',
++              name: 'State 2',
++              guidelines: 'guidelines 2',
++              scoreLower: 100,
++              scoreUpper: 200,
++              ragEnabled: true,
++            },
++            {
++              id: '3',
++              name: 'State 3',
++              guidelines: 'guidelines 3',
++              scoreLower: 200,
++              scoreUpper: 300,
++              ragEnabled: true,
++            },
++          ],
++        },
++      };
++      scenariosRepository.getScenarioById.mockResolvedValue(
++        mockScenarioWithStates,
++      );
++
++      const result = await service.getScenario(1);
++
++      expect(result).toEqual(
++        expect.objectContaining({
++          ...mockScenarioWithStates,
++          simulationCount: 3,
++        }),
++      );
++    });
++
++    it('should return scenario with simulationCount of 0 when no states are present', async () => {
++      const mockScenarioWithoutStates = {
++        ...mockScenario,
++        metadata: {
++          ...mockScenario.metadata,
++          states: [],
++        },
++      };
++      scenariosRepository.getScenarioById.mockResolvedValue(
++        mockScenarioWithoutStates,
++      );
++
++      const result = await service.getScenario(1);
++
++      expect(result).toEqual(
++        expect.objectContaining({
++          ...mockScenarioWithoutStates,
++          simulationCount: 0,
++        }),
++      );
++    });
++
++    it('should return scenario with simulationCount of 0 when metadata is null', async () => {
++      const mockScenarioWithNullMetadata = {
++        ...mockScenario,
++        metadata: undefined,
++      };
++      scenariosRepository.getScenarioById.mockResolvedValue(
++        mockScenarioWithNullMetadata,
++      );
++
++      const result = await service.getScenario(1);
++
++      expect(result).toEqual(
++        expect.objectContaining({
++          ...mockScenarioWithNullMetadata,
++          simulationCount: 0,
++        }),
++      );
++    });
++
++    it('should return scenario with simulationCount of 0 when metadata.states is undefined', async () => {
++      const mockScenarioWithUndefinedStates = {
++        ...mockScenario,
++        metadata: {
++          ...mockScenario.metadata,
++          states: undefined,
++        },
++      };
++      scenariosRepository.getScenarioById.mockResolvedValue(
++        mockScenarioWithUndefinedStates,
++      );
++
++      const result = await service.getScenario(1);
++
++      expect(result).toEqual(
++        expect.objectContaining({
++          ...mockScenarioWithUndefinedStates,
++          simulationCount: 0,
++        }),
++      );
++    });
++
+     it('should return scenario when found', async () => {
+       scenariosRepository.getScenarioById.mockResolvedValue(mockScenario);
+ 

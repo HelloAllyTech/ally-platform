@@ -1,0 +1,17 @@
+# Paths Bug Hunter v2's notes, chunk briefs and prompt examples name on purpose:
+# placeholders (CHUNK-NN), run artefacts kept outside the repo, files the old
+# Bug Hunter or earlier chunks removed, and example paths inside prompts.
+./test/jest-e2e.json
+.claude/workflows/bug-hunt.mjs
+.github/workflows/bug-hunter-v2.yml
+ally-ai/app/x.py
+ally-web/apps/ally-admin-dashboard/src/pages/BugHunterV2/BugHunterV2Board.tsx
+bug-hunter/evals/results/20261114-174523-memory-check.md
+docs/bug-hunter/notes/CHUNK-NN-NOTES.md
+runs/cache/map-stats.json
+runs/integration-timings.json
+runs/spend.json
+src/user/x.ts
+tools/github.py
+tools/logs.py
+utils/permission(s).ts

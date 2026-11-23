@@ -1,0 +1,35 @@
+diff --git a/apps/ally-admin-dashboard/src/pages/CharacterLibrary/CharacterLibrary.tsx b/apps/ally-admin-dashboard/src/pages/CharacterLibrary/CharacterLibrary.tsx
+index fab0e5f1fc..a69d6e09f5 100644
+--- a/apps/ally-admin-dashboard/src/pages/CharacterLibrary/CharacterLibrary.tsx
++++ b/apps/ally-admin-dashboard/src/pages/CharacterLibrary/CharacterLibrary.tsx
+@@ -103,6 +103,10 @@ export const CharacterLibrary: React.FC = () => {
+       currentLocation: "",
+       genderIdentity: "",
+       sexualOrientation: "",
++      voices: {},
++      languageCharacteristics: {},
++      linguisticStyleSamples: {},
++      knowledgeSources: [],
+     };
+     setSelectedCharacter(newCharacter);
+     setIsNewCharacter(true);
+diff --git a/apps/ally-admin-dashboard/src/pages/CharacterLibrary/__test__/CharacterLibrary.test.tsx b/apps/ally-admin-dashboard/src/pages/CharacterLibrary/__test__/CharacterLibrary.test.tsx
+index 57cd208c22..469e18714e 100644
+--- a/apps/ally-admin-dashboard/src/pages/CharacterLibrary/__test__/CharacterLibrary.test.tsx
++++ b/apps/ally-admin-dashboard/src/pages/CharacterLibrary/__test__/CharacterLibrary.test.tsx
+@@ -309,6 +309,15 @@ describe("CharacterLibrary", () => {
+     });
+   });
+ 
++  it("does not crash when creating a new character", async () => {
++    renderCharacterLibrary();
++    fireEvent.click(screen.getByTestId("toolbar-action"));
++
++    await waitFor(() => {
++      expect(screen.getByTestId("character-side-panel")).toBeInTheDocument();
++    });
++  });
++
+   it("renders character table with data from API", () => {
+     renderCharacterLibrary();
+     expect(screen.getByTestId("notion-table")).toBeInTheDocument();

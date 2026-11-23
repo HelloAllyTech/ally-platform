@@ -1,0 +1,85 @@
+diff --git a/ally-be/src/analytics/constants/ship-volume.constants.ts b/ally-be/src/analytics/constants/ship-volume.constants.ts
+index 2aac9a7166..fee88877e8 100644
+--- a/ally-be/src/analytics/constants/ship-volume.constants.ts
++++ b/ally-be/src/analytics/constants/ship-volume.constants.ts
+@@ -16,7 +16,6 @@ export const SHIP_VOLUME_REPOS = [
+   'ally-ai',
+   'ally-ai-learn',
+   'ally-mobile',
+-  'infra',
+   'helloallytech.github.io',
+ ] as const;
+ 
+diff --git a/ally-be/src/analytics/service/test/ship-volume-analytics.service.spec.ts b/ally-be/src/analytics/service/test/ship-volume-analytics.service.spec.ts
+index 8e7cbfad01..40966b0007 100644
+--- a/ally-be/src/analytics/service/test/ship-volume-analytics.service.spec.ts
++++ b/ally-be/src/analytics/service/test/ship-volume-analytics.service.spec.ts
+@@ -246,6 +246,33 @@ describe('ShipVolumeAnalyticsService', () => {
+     });
+   });
+ 
++  describe('when a repository is unreachable', () => {
++    it('does not report infra as unavailable since it is no longer tracked', async () => {
++      const infraUrl = '/repos/HelloAllyTech/infra/';
++      mockedAxios.get.mockImplementation((url: string) => {
++        if (url.includes(infraUrl)) {
++          return Promise.reject(new Error('404 Not Found'));
++        }
++        return Promise.resolve({
++          data: [week('2026-08-30', 10, 0)],
++          status: 200,
++        });
++      });
++
++      const result = await service.getShipVolume({ weeks: 12 });
++
++      const getCalls = mockedAxios.get.mock.calls;
++      const infraCall = getCalls.find((call) => call[0].includes(infraUrl));
++      expect(infraCall).toBeUndefined();
++
++      expect(result.unavailableRepos).not.toContainEqual({
++        repo: 'infra',
++        reason: 'unreachable',
++        servedFromCache: false,
++      });
++    });
++  });
++
+   it('reports every repo as not_configured when there is no token, without calling GitHub', async () => {
+     const module = await Test.createTestingModule({
+       providers: [
+diff --git a/ally-be/src/changelog/service/test/code-activity.monorepo.spec.ts b/ally-be/src/changelog/service/test/code-activity.monorepo.spec.ts
+index 0f87bba8a0..fdfdf5bf21 100644
+--- a/ally-be/src/changelog/service/test/code-activity.monorepo.spec.ts
++++ b/ally-be/src/changelog/service/test/code-activity.monorepo.spec.ts
+@@ -102,8 +102,6 @@ describe('CodeActivityService across the monorepo cutover', () => {
+       since: '2026-10-01T00:00:00Z',
+       until: '2026-10-23T05:21:16Z',
+     });
+-    // infra did not move: read whole months on both sides.
+-    expect(calls.filter((v) => v.name === 'infra')).toHaveLength(2);
+   });
+ 
+   it('counts each monorepo commit once, under the repo whose folder it touched', async () => {
+diff --git a/ally-be/src/changelog/service/test/code-activity.service.spec.ts b/ally-be/src/changelog/service/test/code-activity.service.spec.ts
+index e9c0d13643..febb422aa9 100644
+--- a/ally-be/src/changelog/service/test/code-activity.service.spec.ts
++++ b/ally-be/src/changelog/service/test/code-activity.service.spec.ts
+@@ -256,7 +256,7 @@ describe('CodeActivityService', () => {
+       'ally-be': () => ({
+         data: { errors: [{ message: 'Something went wrong' }] },
+       }),
+-      infra: () => ({ data: { data: { repository: null } } }),
++      'ally-web': () => ({ data: { data: { repository: null } } }),
+     });
+ 
+     const result = await service.getActivity();
+@@ -264,7 +264,7 @@ describe('CodeActivityService', () => {
+     expect(result.incomplete).toBe(true);
+     const logged = mockLogger.error.mock.calls.map(([m]) => m).join('\n');
+     expect(logged).toContain('Something went wrong');
+-    expect(logged).toContain('HelloAllyTech/infra');
++    expect(logged).toContain('HelloAllyTech/ally-web');
+     expect(redis.set).not.toHaveBeenCalledWith(
+       'changelog:code-activity:v1:ally-be:2026-09',
+       expect.anything(),

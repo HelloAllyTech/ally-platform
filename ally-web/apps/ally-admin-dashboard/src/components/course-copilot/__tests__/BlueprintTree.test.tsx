@@ -163,7 +163,11 @@ describe("BlueprintTree — editing", () => {
   it("offers only the inline types as switch targets, and locks roleplays", () => {
     const { container } = setup();
     const select = within(row(container, "a")).getByLabelText(/Change type of/);
-    expect(within(select).getAllByRole("option").map(o => o.textContent)).toEqual([
+    expect(
+      within(select)
+        .getAllByRole("option")
+        .map(o => o.textContent),
+    ).toEqual([
       "Article",
       "Quiz",
       "Journal",
@@ -227,7 +231,10 @@ describe("BlueprintTree — editing", () => {
     drag(1, "a", "q");
     await advanceDebounce();
 
-    expect(itemIds(onSave.mock.calls[0][0])).toEqual([["q", "a"], ["r", "v"]]);
+    expect(itemIds(onSave.mock.calls[0][0])).toEqual([
+      ["q", "a"],
+      ["r", "v"],
+    ]);
   });
 
   it("renames a section and an item inline", async () => {
@@ -248,7 +255,11 @@ describe("BlueprintTree — editing", () => {
   it("adds an item from the type picker, and a video asks for its link", async () => {
     const { container, onSave } = setup();
 
-    fireEvent.click(within(container.querySelector('[data-section-id="s2"]') as HTMLElement).getByRole("button", { name: "Add item" }));
+    fireEvent.click(
+      within(container.querySelector('[data-section-id="s2"]') as HTMLElement).getByRole("button", {
+        name: "Add item",
+      }),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Video" }));
 
     // Two videos now need a link: the planned one and the one just added.
@@ -310,7 +321,10 @@ describe("BlueprintTree — editing", () => {
     const { onSave } = setup({
       blueprint: {
         ...base,
-        sections: [...base.sections, { id: "s3", title: "Wrap-up", description: "", purpose: "", items: [] }],
+        sections: [
+          ...base.sections,
+          { id: "s3", title: "Wrap-up", description: "", purpose: "", items: [] },
+        ],
       },
     });
 
@@ -420,7 +434,10 @@ describe("BlueprintTree — saving", () => {
   });
 
   it("keeps the edit and offers a retry when a save fails", async () => {
-    const onSave = vi.fn().mockResolvedValueOnce(null).mockImplementation(async (b: CourseBlueprint) => reply(b));
+    const onSave = vi
+      .fn()
+      .mockResolvedValueOnce(null)
+      .mockImplementation(async (b: CourseBlueprint) => reply(b));
     setup({ onSave });
 
     fireEvent.change(screen.getByDisplayValue("What listening is"), { target: { value: "X" } });
@@ -504,7 +521,9 @@ describe("BlueprintTree — approving", () => {
     });
 
     expect(screen.getByRole("button", { name: "Approve & build" })).toBeDisabled();
-    expect(screen.getByText(/The estimate \(\$2\.40\) is more than the budget left \(\$1\.00\)/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/The estimate \(\$2\.40\) is more than the budget left \(\$1\.00\)/),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getAllByRole("button", { name: "Raise budget" })[0]);
     expect(screen.getByRole("dialog")).toBeInTheDocument();

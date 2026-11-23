@@ -1,0 +1,71 @@
+diff --git a/apps/ally-helpline-dashboard/src/hooks/useAchievementBadgeModal.tsx b/apps/ally-helpline-dashboard/src/hooks/useAchievementBadgeModal.tsx
+index 5407d7bbb2..fb25dc1321 100644
+--- a/apps/ally-helpline-dashboard/src/hooks/useAchievementBadgeModal.tsx
++++ b/apps/ally-helpline-dashboard/src/hooks/useAchievementBadgeModal.tsx
+@@ -5,7 +5,6 @@ import { toast } from "sonner";
+ 
+ import { useGetMyBadgesQuery, useUpdateBadgeViewStatusMutation } from "@api";
+ import { AchievementBadgeModal } from "@components";
+-import { useUser } from "@hooks";
+ import { UserBadge, ViewedStatus } from "@types";
+ 
+ interface UseAchievementBadgeModalReturn {
+@@ -20,7 +19,6 @@ export const useAchievementBadgeModal = (): UseAchievementBadgeModalReturn => {
+   const [currentBadgeIndex, setCurrentBadgeIndex] = useState<number | null>(null);
+   const hasInitialized = useRef(false);
+   const confettiTriggered = useRef(false);
+-  const { isAuthenticated } = useUser();
+ 
+   const {
+     data: badgesResponse,
+diff --git a/apps/ally-helpline-dashboard/src/pages/achievements-view-all/__tests__/AchievementsViewAll.test.tsx b/apps/ally-helpline-dashboard/src/pages/achievements-view-all/__tests__/AchievementsViewAll.test.tsx
+index e00c5b047d..3be47e09be 100644
+--- a/apps/ally-helpline-dashboard/src/pages/achievements-view-all/__tests__/AchievementsViewAll.test.tsx
++++ b/apps/ally-helpline-dashboard/src/pages/achievements-view-all/__tests__/AchievementsViewAll.test.tsx
+@@ -29,6 +29,7 @@ const {
+   mockUseGetProfileImageUrlMutation,
+   mockUseDeleteProfileImageMutation,
+   mockUseUploadProfileImageMutation,
++  mockUseUser,
+ } = vi.hoisted(() => ({
+   mockUseGetAvailableBadgesQuery: vi.fn(),
+   mockNavigate: vi.fn(),
+@@ -42,6 +43,7 @@ const {
+   mockUseGetProfileImageUrlMutation: vi.fn(),
+   mockUseDeleteProfileImageMutation: vi.fn(),
+   mockUseUploadProfileImageMutation: vi.fn(),
++  mockUseUser: vi.fn(),
+ }));
+ 
+ // Mock API
+@@ -70,6 +72,18 @@ vi.mock("react-router-dom", async () => {
+   };
+ });
+ 
++// Mock hooks
++vi.mock("@hooks", () => ({
++  useUser: () => mockUseUser(),
++  useAchievementBadgeModal: () => ({
++    currentBadge: null,
++    closeModal: vi.fn(),
++    resetModal: vi.fn(),
++    BadgeModal: null,
++    isLoading: false,
++  }),
++}));
++
+ // Mock assets
+ vi.mock("@assets", () => ({
+   ArrowLeft: ({ className }: { className?: string }) => (
+@@ -250,6 +264,11 @@ describe("AchievementsViewAll Component", () => {
+     mockUseGetProfileImageUrlMutation.mockReturnValue([vi.fn()]);
+     mockUseDeleteProfileImageMutation.mockReturnValue([vi.fn()]);
+     mockUseUploadProfileImageMutation.mockReturnValue([vi.fn()]);
++    mockUseUser.mockReturnValue({
++      user: { id: "1", name: "Test User" },
++      permissions: [],
++      isAuthenticated: true,
++    });
+     mockFeatureFlags.LEADERBOARD_FLAG = true;
+   });
+ 

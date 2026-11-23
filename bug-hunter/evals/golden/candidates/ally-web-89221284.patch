@@ -1,0 +1,96 @@
+diff --git a/apps/ally-admin-dashboard/src/components/rich-text-editor/__tests__/articleQuestionNode.test.ts b/apps/ally-admin-dashboard/src/components/rich-text-editor/__tests__/articleQuestionNode.test.ts
+index a31210ca33..7c04467720 100644
+--- a/apps/ally-admin-dashboard/src/components/rich-text-editor/__tests__/articleQuestionNode.test.ts
++++ b/apps/ally-admin-dashboard/src/components/rich-text-editor/__tests__/articleQuestionNode.test.ts
+@@ -12,12 +12,19 @@ import { sanitizeHtml } from "../richTextSanitizer";
+  * placeholder the server validates and the learner's player splits on, and
+  * has to survive being read back in when the author reopens the article.
+  */
+-const makeEditor = (content = "") =>
++const makeEditor = (content = "", mounted = false) =>
+   new Editor({
++    ...(mounted ? { element: document.createElement("div") } : {}),
+     extensions: [StarterKit, ArticleQuestionNode],
+     content,
+   });
+ 
++/** The chip labels the author sees, in document order. */
++const chipLabels = (editor: Editor): string[] =>
++  [...editor.view.dom.querySelectorAll(".border-dashed")].map(
++    el => el.firstElementChild?.textContent ?? "",
++  );
++
+ describe("ArticleQuestionNode", () => {
+   it("serialises an inserted question to the placeholder the server expects", () => {
+     const editor = makeEditor("<p>Body</p>");
+@@ -71,4 +78,39 @@ describe("ArticleQuestionNode", () => {
+     expect(editor.getHTML()).not.toContain("data-ally-question");
+     editor.destroy();
+   });
++
++  /**
++   * A chip's number depends on what is before it, so deleting an earlier
++   * question has to renumber the ones after. ProseMirror never calls the
++   * surviving node view's `update` for a change outside its own node, which
++   * is why the view listens for transactions instead — without that, the
++   * chip kept claiming a number that belonged to nobody, and stopped
++   * matching the question fields below the editor.
++   */
++  it("renumbers the chips when an earlier question is deleted", () => {
++    const editor = makeEditor(
++      '<div data-ally-question="q1"></div><p>x</p><div data-ally-question="q2"></div>',
++      true,
++    );
++    expect(chipLabels(editor)).toEqual(["Question 1", "Question 2"]);
++
++    let firstPos: number | null = null;
++    editor.state.doc.descendants((node, pos) => {
++      if (firstPos === null && node.type.name === "articleQuestion") firstPos = pos;
++      return true;
++    });
++    editor.chain().setNodeSelection(firstPos!).deleteSelection().run();
++
++    expect(chipLabels(editor)).toEqual(["Question 1"]);
++    editor.destroy();
++  });
++
++  it("numbers a question inserted above the others as the first", () => {
++    const editor = makeEditor('<p>x</p><div data-ally-question="q2"></div>', true);
++    editor.chain().focus("start").insertArticleQuestion("q9").run();
++
++    expect(chipLabels(editor)).toEqual(["Question 1", "Question 2"]);
++    expect(editor.getHTML().indexOf("q9")).toBeLessThan(editor.getHTML().indexOf("q2"));
++    editor.destroy();
++  });
+ });
+diff --git a/apps/ally-admin-dashboard/src/components/rich-text-editor/articleQuestionNode.ts b/apps/ally-admin-dashboard/src/components/rich-text-editor/articleQuestionNode.ts
+index 6acd52c1a5..52d3d8508e 100644
+--- a/apps/ally-admin-dashboard/src/components/rich-text-editor/articleQuestionNode.ts
++++ b/apps/ally-admin-dashboard/src/components/rich-text-editor/articleQuestionNode.ts
+@@ -100,13 +100,25 @@ export const ArticleQuestionNode = Node.create({
+       };
+       renderLabel();
+ 
++      /**
++       * The number depends on what is *before* this chip, so it has to be
++       * recomputed on every transaction, not only when this node is
++       * re-rendered: deleting an earlier question leaves this node view
++       * untouched, and ProseMirror would never call `update` — the chip would
++       * go on claiming a number that now belongs to nobody.
++       */
++      const onTransaction = () => renderLabel();
++      editor.on("transaction", onTransaction);
++
+       return {
+         dom,
+-        // Re-number when anything before this chip moves.
+         update: () => {
+           renderLabel();
+           return true;
+         },
++        destroy: () => {
++          editor.off("transaction", onTransaction);
++        },
+       };
+     };
+   },

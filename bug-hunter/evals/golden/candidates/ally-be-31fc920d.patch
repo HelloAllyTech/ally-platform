@@ -1,0 +1,53 @@
+diff --git a/src/custom-fields/service/custom-fields.service.ts b/src/custom-fields/service/custom-fields.service.ts
+index 0d7c10d678..22c6d33852 100644
+--- a/src/custom-fields/service/custom-fields.service.ts
++++ b/src/custom-fields/service/custom-fields.service.ts
+@@ -93,16 +93,18 @@ export class CustomFieldsService {
+     const tenantId =
+       await this.resolveTenantIdWithSystemCheck(overrideTenantId);
+ 
+-    // Scope split: scribe-settings traffic (super admin path; identified by
+-    // overrideTenantId being supplied) sees SUPER_ADMIN-managed definitions;
+-    // in-app traffic (org admin / counsellor) sees ORG_ADMIN ones. The two
+-    // surfaces never see each other's fields.
+-    const scope = overrideTenantId
+-      ? CustomFieldScope.SUPER_ADMIN
+-      : CustomFieldScope.ORG_ADMIN;
+-
++    // Scribe settings (super admin path; identified by overrideTenantId) sees
++    // only SUPER_ADMIN-scoped fields — those are what they manage there.
++    // The in-app path returns BOTH scopes: counsellors and admins need to see
++    // every field on the calls table and call-detail page so that values for
++    // super-admin-managed fields render too. The frontend hides SUPER_ADMIN
++    // entries from the in-app "Manage custom fields" dialog itself.
++    const where: Record<string, unknown> = { tenantId, isActive: true };
++    if (overrideTenantId) {
++      where.scope = CustomFieldScope.SUPER_ADMIN;
++    }
+     return this.definitionRepo.find({
+-      where: { tenantId, isActive: true, scope },
++      where,
+       order: { displayOrder: 'ASC', createdAt: 'ASC' },
+     });
+   }
+diff --git a/src/custom-fields/service/test/custom-fields.service.spec.ts b/src/custom-fields/service/test/custom-fields.service.spec.ts
+index 6a991177e8..7a3dd1ae9d 100644
+--- a/src/custom-fields/service/test/custom-fields.service.spec.ts
++++ b/src/custom-fields/service/test/custom-fields.service.spec.ts
+@@ -121,7 +121,7 @@ describe('CustomFieldsService', () => {
+   // ─── getDefinitions ───────────────────────────────────────────────────────
+ 
+   describe('getDefinitions', () => {
+-    it('should return only ORG_ADMIN-scoped definitions on the in-app path', async () => {
++    it('should return all definitions on the in-app path (no scope filter)', async () => {
+       definitionRepo.find.mockResolvedValue([mockDefinition]);
+ 
+       const result = await service.getDefinitions();
+@@ -130,7 +130,6 @@ describe('CustomFieldsService', () => {
+         where: {
+           tenantId: mockTenantId,
+           isActive: true,
+-          scope: CustomFieldScope.ORG_ADMIN,
+         },
+         order: { displayOrder: 'ASC', createdAt: 'ASC' },
+       });

@@ -110,10 +110,7 @@ vi.mock("@components", async importOriginal => {
   return {
     ...actual,
     DebriefTab: ({ sessionId, summaryData, onOpenMoment }: any) => (
-      <div
-        data-testid="debrief-tab"
-        data-has-summary={String(!!summaryData)}
-      >
+      <div data-testid="debrief-tab" data-has-summary={String(!!summaryData)}>
         <div data-testid="debrief-session-id">{sessionId}</div>
         {onOpenMoment && (
           <>

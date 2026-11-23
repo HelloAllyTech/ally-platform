@@ -1,0 +1,139 @@
+diff --git a/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx b/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx
+index 4be142e42a..2ec10b52c2 100644
+--- a/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx
++++ b/apps/ally-helpline-dashboard/src/components/comment-card/CommentCard.tsx
+@@ -92,6 +92,20 @@ const CommentCard = ({
+   const handleReplySubmit = () => {
+     if (replyText.trim()) {
+       onReply?.(replyText);
++      const newReply = {
++        id: comment.id,
++        content: replyText,
++        createdBy: {
++          id: user?.id,
++          name: user?.name,
++          profileImage: user?.profileImageUrl,
++        },
++        createdAt: new Date().toISOString(),
++        reactions: {},
++        replyCount: 0,
++        myReaction: null,
++      };
++      setReplies(prev => [...prev, newReply]);
+       setReplyText("");
+       setShowReplyInput(false);
+     }
+diff --git a/apps/ally-helpline-dashboard/src/components/selectable-text/SelectableText.tsx b/apps/ally-helpline-dashboard/src/components/selectable-text/SelectableText.tsx
+index 05cb256b44..7dd1f56585 100644
+--- a/apps/ally-helpline-dashboard/src/components/selectable-text/SelectableText.tsx
++++ b/apps/ally-helpline-dashboard/src/components/selectable-text/SelectableText.tsx
+@@ -1,6 +1,4 @@
+-import { useCallback, useEffect, useRef, useState } from "react";
+-
+-import { toast } from "sonner";
++import { useCallback, useRef, useState } from "react";
+ 
+ import { AddComment } from "@ally-ui-mono/ui-shared/assets";
+ import CommentAdditionDialog from "@src/components/comment-addition-dialog/CommentAdditionDialog";
+@@ -48,7 +46,6 @@ interface SelectableTextProps {
+     endIndex: number;
+     threadId: string;
+   }) => void;
+-  isCreateCommentSuccess: boolean;
+   setNewCommentSelection: (
+     value: {
+       startIndex: number;
+@@ -78,7 +75,6 @@ const SelectableText = ({
+   isLoading,
+   handleCreateComment,
+   commentsList,
+-  isCreateCommentSuccess,
+   onCancelComment,
+ }: SelectableTextProps) => {
+   const addCommentDialogRef = useRef<HTMLDivElement | null>(null);
+@@ -93,12 +89,6 @@ const SelectableText = ({
+     left: number;
+   }>({ top: 0, left: 0 });
+ 
+-  useEffect(() => {
+-    if (isCreateCommentSuccess) {
+-      toast.success("Comment created successfully");
+-      setAddCommentDialogOpen(null);
+-    }
+-  }, [isCreateCommentSuccess]);
+   const setPositionRef = useCallback((element: HTMLDivElement | null) => {
+     addCommentDialogRef.current = element;
+     if (element) {
+diff --git a/apps/ally-helpline-dashboard/src/components/selectable-text/__tests__/SelectableText.test.tsx b/apps/ally-helpline-dashboard/src/components/selectable-text/__tests__/SelectableText.test.tsx
+index 49b563a536..904ed710ee 100644
+--- a/apps/ally-helpline-dashboard/src/components/selectable-text/__tests__/SelectableText.test.tsx
++++ b/apps/ally-helpline-dashboard/src/components/selectable-text/__tests__/SelectableText.test.tsx
+@@ -482,35 +482,6 @@ describe("SelectableText Component", () => {
+     });
+   });
+ 
+-  // --- Success Toast Tests ---
+-  describe("Success Toast", () => {
+-    it("should show success toast and close dialog when comment is created successfully", async () => {
+-      const { toast } = await import("sonner");
+-      const { rerender } = render(
+-        <SelectableText
+-          {...defaultProps}
+-          newCommentSelection={{ startIndex: 0, endIndex: 23, transcriptId: 101 }}
+-          addCommentDialogOpen="0-0"
+-          isCreateCommentSuccess={false}
+-        />,
+-      );
+-
+-      rerender(
+-        <SelectableText
+-          {...defaultProps}
+-          newCommentSelection={{ startIndex: 0, endIndex: 23, transcriptId: 101 }}
+-          addCommentDialogOpen="0-0"
+-          isCreateCommentSuccess={true}
+-        />,
+-      );
+-
+-      await waitFor(() => {
+-        expect(toast.success).toHaveBeenCalledWith("Comment created successfully");
+-        expect(mockSetAddCommentDialogOpen).toHaveBeenCalledWith(null);
+-      });
+-    });
+-  });
+-
+   // --- Ref Tests ---
+   describe("Refs", () => {
+     it("should assign selectedCommentRef when isSelectedComment is true", () => {
+diff --git a/apps/ally-helpline-dashboard/src/components/transcription/Transcription.tsx b/apps/ally-helpline-dashboard/src/components/transcription/Transcription.tsx
+index 7d4f350579..4f68cee3d1 100644
+--- a/apps/ally-helpline-dashboard/src/components/transcription/Transcription.tsx
++++ b/apps/ally-helpline-dashboard/src/components/transcription/Transcription.tsx
+@@ -2,6 +2,7 @@ import { FC, useEffect, useRef, useState, useCallback } from "react";
+ 
+ import "./styles.css";
+ import { useParams } from "react-router-dom";
++import { toast } from "sonner";
+ 
+ import { InfiniteScroll } from "@ally-ui-mono/ui-shared/index";
+ import SelectableText from "@src/components/selectable-text/SelectableText";
+@@ -71,6 +72,12 @@ const Transcription: FC<TranscriptionProps> = ({
+   const [transcriptions, setTranscriptions] = useState<SimulationTranscriptMessage[]>([]);
+   const [addCommentDialogOpen, setAddCommentDialogOpen] = useState<string | null>(null);
+ 
++  useEffect(() => {
++    if (isCreateCommentSuccess) {
++      toast.success("Comment created successfully");
++      setAddCommentDialogOpen(null);
++    }
++  }, [isCreateCommentSuccess]);
+   const [newCommentSelection, setNewCommentSelection] = useState<{
+     startIndex: number;
+     endIndex: number;
+@@ -285,7 +292,6 @@ const Transcription: FC<TranscriptionProps> = ({
+                       setAddCommentDialogOpen={setAddCommentDialogOpen}
+                       addCommentDialogOpen={addCommentDialogOpen}
+                       onCloseSelectedComment={onCloseSelectedComment}
+-                      isCreateCommentSuccess={isCreateCommentSuccess}
+                       segment={segment}
+                       segIdx={segIdx}
+                       isFeedOwner={isFeedOwner}

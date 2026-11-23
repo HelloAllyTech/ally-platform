@@ -1,0 +1,281 @@
+diff --git a/ally-be/src/learn/service/scenario.service.ts b/ally-be/src/learn/service/scenario.service.ts
+index 0b5d8b800..bde3a0749 100644
+--- a/ally-be/src/learn/service/scenario.service.ts
++++ b/ally-be/src/learn/service/scenario.service.ts
+@@ -107,6 +107,8 @@ import { ScenarioCompletionSummary } from '../interface/scenario-completion.inte
+ import { ScenarioSessionRepository } from '../repository/scenario-session.repository';
+ import { TriggerWarningsService } from './trigger-warnings.service';
+ import { ScenarioTranslationsRepository } from '../repository/scenario-translations.repository';
++import { ScenarioTranslations } from '../entity/scenario-translation.entity';
++import { ScenarioEventsTranslation } from '../entity/scenario-events-translation.entity';
+ import { GoogleTranslationsService } from 'src/common/service/google-translation.service';
+ import { SharedLanguageService } from '../../language/service/shared-language.service';
+ import { ScenarioSharedService } from './scenario-shared.service';
+@@ -1931,6 +1933,8 @@ export class ScenarioService {
+         }
+       }
+ 
++      await this.copyScenarioTranslations(manager, id, newScenarioData.id);
++
+       // Copy behavior instructions from the original scenario
+       if (
+         originalBehaviorInstructions &&
+@@ -1975,6 +1979,56 @@ export class ScenarioService {
+     });
+   }
+ 
++  /**
++   * Copy a scenario's per-language text to its duplicate: opening statements,
++   * description, state names and Knowledge Sources (`scenario_translations`),
++   * and its events' messages (`scenario_events_translations`). Without them a
++   * copy plays its English opening statement in a Hindi session and shows
++   * English text in every other language until each field is edited again.
++   *
++   * The translated title is left behind: the copy's own title is "Copy of …",
++   * and a translation of the source's title would hide that it is a copy.
++   */
++  private async copyScenarioTranslations(
++    manager: EntityManager,
++    sourceId: number,
++    copyId: number,
++  ): Promise<void> {
++    const scenarioRepo = manager.getRepository(ScenarioTranslations);
++    const rows = await scenarioRepo.find({ where: { scenarioId: sourceId } });
++    if (rows.length > 0) {
++      await scenarioRepo.save(
++        rows.map(({ languageId, metadata }) => {
++          const rest = { ...(metadata ?? {}) };
++          delete rest.title;
++          return scenarioRepo.create({
++            scenarioId: copyId,
++            languageId,
++            metadata: rest,
++          });
++        }),
++      );
++    }
++
++    const eventRepo = manager.getRepository(ScenarioEventsTranslation);
++    const eventRows = await eventRepo.find({
++      where: { scenarioId: sourceId },
++    });
++    if (eventRows.length > 0) {
++      await eventRepo.save(
++        eventRows.map(({ eventId, languageId, message, branchInstruction }) =>
++          eventRepo.create({
++            scenarioId: copyId,
++            eventId,
++            languageId,
++            message,
++            branchInstruction,
++          }),
++        ),
++      );
++    }
++  }
++
+   async validateUpdateScenario(
+     id: number,
+     updateScenarioDto: UpdateScenarioDto,
+diff --git a/ally-be/src/learn/service/test/scenario.service.spec.ts b/ally-be/src/learn/service/test/scenario.service.spec.ts
+index 9b9ccc8fd..e49e3b29e 100644
+--- a/ally-be/src/learn/service/test/scenario.service.spec.ts
++++ b/ally-be/src/learn/service/test/scenario.service.spec.ts
+@@ -42,6 +42,8 @@ import { ScenarioSessionRepository } from 'src/learn/repository/scenario-session
+ import { ScenarioService } from '../scenario.service';
+ import { ScenarioTranslationNotificationService } from '../scenario-translation-notification.service';
+ import { ScenarioTenants } from 'src/learn/entity/scenario-tenants.entity';
++import { ScenarioTranslations } from 'src/learn/entity/scenario-translation.entity';
++import { ScenarioEventsTranslation } from 'src/learn/entity/scenario-events-translation.entity';
+ import { ScenarioPathSharedService } from 'src/scenario-path/service/scenario-path-shared.service';
+ import { TriggerWarningsService } from '../trigger-warnings.service';
+ import { ScenarioTriggerWarnings } from 'src/learn/entity/scenario-trigger-warnings.entity';
+@@ -4643,11 +4645,98 @@ describe('ScenarioService', () => {
+     describe('duplicateScenario', () => {
+       const scenarioId = 1;
+       const mockUserId = 123;
++      // Translation tables read through the transaction; no rows unless a
++      // test says otherwise.
++      const emptyTranslationRepo = () => ({
++        find: jest.fn().mockResolvedValue([]),
++        create: jest.fn((data) => data),
++        save: jest.fn().mockResolvedValue([]),
++      });
+ 
+       beforeEach(() => {
+         (ExecutionManager.getUserId as jest.Mock).mockReturnValue(mockUserId);
+       });
+ 
++      it('copies translations, minus the translated title, to the copy', async () => {
++        scenarioSharedService.getAdminScenario.mockResolvedValue({
++          ...mockScenario,
++          isGlobal: false,
++        } as any);
++        scenarioEventsRepository.find.mockResolvedValue([]);
++        triggerWarningsService.getTriggerWarningsByScenarioId.mockResolvedValue(
++          [],
++        );
++        scenarioSharedService.getBehaviorInstructionsByScenarioId.mockResolvedValue(
++          [],
++        );
++        const scenarioTranslations = {
++          ...emptyTranslationRepo(),
++          find: jest.fn().mockResolvedValue([
++            {
++              id: 't-hi',
++              scenarioId,
++              languageId: 2,
++              metadata: {
++                title: 'मनोज',
++                openingStatements: ['तो, जैसा मैंने पिछली बार भी कहा था…'],
++                description: 'विवरण',
++              },
++            },
++          ]),
++        };
++        const eventTranslations = {
++          ...emptyTranslationRepo(),
++          find: jest.fn().mockResolvedValue([
++            {
++              id: 'e-hi',
++              scenarioId,
++              eventId: 'event-1',
++              languageId: 2,
++              message: 'शाबाश',
++              branchInstruction: null,
++            },
++          ]),
++        };
++        const manager = {
++          query: jest.fn().mockResolvedValue([]),
++          getRepository: jest.fn((entity) => {
++            if (entity === Scenarios)
++              return { save: jest.fn().mockResolvedValue({ id: 99 }) };
++            if (entity === ScenarioTranslations) return scenarioTranslations;
++            if (entity === ScenarioEventsTranslation) return eventTranslations;
++            return emptyTranslationRepo();
++          }),
++        };
++        (dataSource.transaction as jest.Mock).mockImplementation(async (cb) =>
++          cb(manager),
++        );
++
++        await service.duplicateScenario(scenarioId);
++
++        expect(scenarioTranslations.find).toHaveBeenCalledWith({
++          where: { scenarioId },
++        });
++        expect(scenarioTranslations.save).toHaveBeenCalledWith([
++          {
++            scenarioId: 99,
++            languageId: 2,
++            metadata: {
++              openingStatements: ['तो, जैसा मैंने पिछली बार भी कहा था…'],
++              description: 'विवरण',
++            },
++          },
++        ]);
++        expect(eventTranslations.save).toHaveBeenCalledWith([
++          {
++            scenarioId: 99,
++            eventId: 'event-1',
++            languageId: 2,
++            message: 'शाबाश',
++            branchInstruction: null,
++          },
++        ]);
++      });
++
+       it('should successfully duplicate a scenario with all related data', async () => {
+         const mockScenarioEvents = [
+           {
+@@ -4796,7 +4885,7 @@ describe('ScenarioService', () => {
+               return mockTriggerWarningsRepo;
+             if (entity === ScenarioTenants) return mockScenarioTenantRepo;
+             if (entity === Tenant) return mockTenantRepo;
+-            return {};
++            return emptyTranslationRepo();
+           }),
+         };
+ 
+@@ -4994,7 +5083,7 @@ describe('ScenarioService', () => {
+                 save: jest.fn().mockResolvedValue([]),
+                 find: jest.fn().mockResolvedValue([]),
+               };
+-            return {};
++            return emptyTranslationRepo();
+           }),
+         };
+ 
+@@ -5049,7 +5138,7 @@ describe('ScenarioService', () => {
+                 save: jest.fn().mockResolvedValue([]),
+                 find: jest.fn().mockResolvedValue([]),
+               };
+-            return {};
++            return emptyTranslationRepo();
+           }),
+         };
+ 
+@@ -5098,7 +5187,7 @@ describe('ScenarioService', () => {
+           getRepository: jest.fn((entity) => {
+             if (entity === Scenarios) return mockScenarioRepo;
+             if (entity === ScenarioTenants) return mockScenarioTenantRepo;
+-            return {};
++            return emptyTranslationRepo();
+           }),
+         };
+ 
+@@ -5159,7 +5248,7 @@ describe('ScenarioService', () => {
+           getRepository: jest.fn((entity) => {
+             if (entity === Scenarios) return mockScenarioRepo;
+             if (entity === ScenarioTenants) return mockScenarioTenantRepo;
+-            return {};
++            return emptyTranslationRepo();
+           }),
+         };
+ 
+@@ -5237,7 +5326,7 @@ describe('ScenarioService', () => {
+           getRepository: jest.fn((entity) => {
+             if (entity === Scenarios) return mockScenarioRepo;
+             if (entity === ScenarioTenants) return mockScenarioTenantRepo;
+-            return {};
++            return emptyTranslationRepo();
+           }),
+         };
+ 
+@@ -5484,7 +5573,7 @@ describe('ScenarioService', () => {
+                 save: jest.fn().mockResolvedValue([]),
+                 find: jest.fn().mockResolvedValue([]),
+               };
+-            return {};
++            return { find: jest.fn().mockResolvedValue([]) };
+           }),
+         };
+ 
+@@ -5536,7 +5625,7 @@ describe('ScenarioService', () => {
+                 save: jest.fn().mockResolvedValue([]),
+                 find: jest.fn().mockResolvedValue([]),
+               };
+-            return {};
++            return { find: jest.fn().mockResolvedValue([]) };
+           }),
+         };
+ 
+@@ -5588,7 +5677,7 @@ describe('ScenarioService', () => {
+                 save: jest.fn().mockResolvedValue([]),
+                 find: jest.fn().mockResolvedValue([]),
+               };
+-            return {};
++            return { find: jest.fn().mockResolvedValue([]) };
+           }),
+         };
+ 
+@@ -5633,7 +5722,7 @@ describe('ScenarioService', () => {
+                 save: jest.fn().mockResolvedValue([]),
+                 find: jest.fn().mockResolvedValue([]),
+               };
+-            return {};
++            return { find: jest.fn().mockResolvedValue([]) };
+           }),
+         };
+ 
