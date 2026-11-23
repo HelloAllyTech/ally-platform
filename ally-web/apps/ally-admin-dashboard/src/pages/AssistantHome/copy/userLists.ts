@@ -288,6 +288,9 @@ export const USER_LISTS = {
     instructionHint:
       'Optional. For example: "Always mention the size chart". It can\'t change your safety rules.',
     instructionSave: "Save",
+    // Q4 H12 (P1-25): a warning at the limit instead of cutting the text silently.
+    instructionCount: (n: number) => `${n} of 300 characters`,
+    instructionTooLong: "That's longer than 300 characters. Shorten it to save it.",
     instructionSaved: "Saved",
   },
 

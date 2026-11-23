@@ -173,14 +173,27 @@ export const AssistantBlock: React.FC<{
             id={instructionId}
             className="ally-input"
             rows={2}
-            maxLength={300}
             value={instruction}
+            aria-describedby={`${instructionId}-count`}
+            aria-invalid={instruction.trim().length > 300}
             onChange={event => setInstruction(event.target.value)}
           />
+          <p
+            id={`${instructionId}-count`}
+            className={instruction.trim().length > 300 ? "ally-error" : "ally-field__hint"}
+            role={instruction.trim().length > 300 ? "alert" : undefined}
+            data-testid="list-instruction-count"
+          >
+            {instruction.trim().length > 300
+              ? a.instructionTooLong
+              : a.instructionCount(instruction.trim().length)}
+          </p>
           <Button
             variant={ButtonVariant.TERTIARY}
             type="submit"
-            disabled={isLoading || instruction.trim() === savedLine}
+            disabled={
+              isLoading || instruction.trim() === savedLine || instruction.trim().length > 300
+            }
           >
             {instruction.trim() === savedLine && savedLine ? a.instructionSaved : a.instructionSave}
           </Button>

@@ -1109,6 +1109,7 @@ says when a save can't be made. More lines for the home's sections are added her
 **Try it:**
 
 - Test only, not saved: Try it never saves bookings or details. (Q4 B4; was "Test only: this wasn't saved.")
+- Under "How should your assistant use this list?" (Q4 H12): {n} of 300 characters · That's longer than 300 characters. Shorten it to save it.
 
 **The purpose's honest limit (How it works):**
 
