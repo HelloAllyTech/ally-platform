@@ -75,10 +75,11 @@ def test_approved_prompts_are_registered(config) -> None:
     from bug_hunter.graph.prompts import load_prompt
 
     prompts = config.models.prompts
-    # chunk 12 (user, 2026-11-21): investigate v5, reproduce v6, review v6
-    assert prompts["triage"] == "v4" and prompts["investigate"] == "v5"
-    assert prompts["review"] == "v6" and prompts["falsifier"] == "v2"
-    assert prompts["reproduce"] == "v6"
+    # chunk 12 round 2 (user, 2026-11-23):
+    # investigate v6, reproduce v7, fix v3, review v7
+    assert prompts["triage"] == "v4" and prompts["investigate"] == "v6"
+    assert prompts["review"] == "v7" and prompts["falsifier"] == "v2"
+    assert prompts["reproduce"] == "v7" and prompts["fix"] == "v3"
     assert all(prompts[n] == "v1" for n in LENS_NODES)
     for node in (
         *LENS_NODES,
@@ -87,6 +88,7 @@ def test_approved_prompts_are_registered(config) -> None:
         "investigate",
         "review",
         "reproduce",
+        "fix",
     ):
         load_prompt(config, node)  # loads and has its inputs header
     assert config.model_for("lens").model == "gpt-5-mini"
@@ -122,3 +124,25 @@ def test_chunk12_approved_wording() -> None:
     )
     assert "or only a test mock produces it" in review
     assert "write it as a counterexample," in review
+
+
+def test_chunk12_round2_approved_wording() -> None:
+    """Round 2 (user, 2026-11-23): failure patterns of the 2026-11-21 re-run."""
+    investigate = (PROMPTS_DIR / "investigate.v6.md").read_text()
+    assert "rejecting input that our code builds or ships is our" in investigate
+    assert (
+        "One\n  correct path is not proof that the others are correct." in investigate
+    )
+    assert "which version of the package this app resolves" in investigate
+    reproduce = (PROMPTS_DIR / "reproduce.v7.md").read_text()
+    assert "at the scale the report describes" in reproduce
+    assert "Drop speculative variants" in reproduce
+    fix = (PROMPTS_DIR / "fix.v3.md").read_text()
+    assert "choose\n  it from the codebase, not from the test" in fix
+    assert '"what did this line do before that it no\n  longer does?"' in fix
+    review = (PROMPTS_DIR / "review.v7.md").read_text()
+    assert "list what the original code did on each changed line" in review
+    assert '"regression: <input> — <what changes>"' in review
+    # the earlier versions stay for evals to compare against
+    for old in ("investigate.v5", "reproduce.v6", "fix.v2", "review.v6"):
+        assert (PROMPTS_DIR / f"{old}.md").exists()
