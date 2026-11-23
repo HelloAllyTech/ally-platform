@@ -49,6 +49,7 @@ describe('TenantAnalyticsController', () => {
             getChartData: jest.fn(),
           },
         },
+        {
           provide: CourseAssessmentReportService,
           useValue: { getCoursePairs: jest.fn() },
         },
