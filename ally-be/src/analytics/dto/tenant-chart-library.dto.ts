@@ -64,12 +64,52 @@ export class TenantChartLibraryEntryDto {
   reason!: string | null;
 }
 
+export class TenantStatisticsViewSectionDto {
+  @ApiProperty({
+    description: 'Translation key under statisticsLibrary.sections',
+  })
+  key!: string;
+  @ApiProperty({
+    description:
+      'Drawn for the course or learner chosen on the view, not the whole organisation',
+  })
+  subject!: boolean;
+  @ApiProperty({ isArray: true, type: String }) charts!: string[];
+}
+
+export class TenantStatisticsViewDto {
+  @ApiProperty({ enum: ['organisation', 'course', 'learner'] })
+  id!: 'organisation' | 'course' | 'learner';
+  @ApiProperty({
+    enum: ['course', 'learner'],
+    nullable: true,
+    description:
+      'What the view asks you to choose; null for the whole organisation',
+  })
+  subject!: 'course' | 'learner' | null;
+  @ApiProperty({ type: () => [TenantStatisticsViewSectionDto] })
+  sections!: TenantStatisticsViewSectionDto[];
+  @ApiProperty({
+    isArray: true,
+    type: String,
+    description: 'The layout before a person customises, in section order',
+  })
+  defaultLayout!: string[];
+}
+
 export class TenantChartLibraryResponseDto {
   @ApiProperty({
     description:
       'Whether the new Statistics page is switched on for this tenant. When false the client keeps the existing page and `charts` is empty.',
   })
   enabled!: boolean;
+  @ApiProperty({
+    type: () => [TenantStatisticsViewDto],
+    required: false,
+    description:
+      'The tabs that show charts, with their sections and default layouts',
+  })
+  views?: TenantStatisticsViewDto[];
 
   @ApiProperty({ type: [TenantChartLibraryEntryDto] })
   charts!: TenantChartLibraryEntryDto[];
@@ -201,6 +241,16 @@ export class TenantScopeOptionsQueryDto {
   @IsString()
   @MaxLength(100)
   search?: string;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Describe this one course, simulation or learner instead of listing: the answer is empty when it is not in the organisation',
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(/^[A-Za-z0-9-]{1,64}$/)
+  id?: string;
 }
 
 export class TenantScopeOptionDto {

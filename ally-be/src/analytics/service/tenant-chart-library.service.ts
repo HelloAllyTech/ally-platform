@@ -12,6 +12,7 @@ import {
   TenantChartEntry,
   filtersOf,
 } from '../constants/tenant-chart-library.constants';
+import { STATISTICS_VIEWS } from '../constants/tenant-statistics-views.constants';
 import {
   SCOPE_AWARE_CHARTS,
   TENANT_CHART_SPECS,
@@ -418,7 +419,7 @@ export class TenantChartLibraryService {
         reason: availability.reason,
       };
     });
-    return { enabled: true, charts };
+    return { enabled: true, charts, views: STATISTICS_VIEWS.map(cloneView) };
   }
 
   async getCapabilities(tenantId: string): Promise<TenantCapabilities> {
@@ -696,10 +697,25 @@ export class TenantChartLibraryService {
     kind: ScopeKind,
     search: string | undefined,
     limit = 50,
+    id?: string,
   ): Promise<ScopeOption[]> {
     const keys = await this.capabilitiesRepo.getTenantKeys(tenantId);
     if (!keys?.statisticsDashboardEnabled) {
       throw new ForbiddenException('Statistics page is not enabled');
+    }
+    if (id !== undefined) {
+      // One named option, so a remembered choice can be labelled after a reload.
+      // An id that is not in this organisation (or is the wrong shape for the
+      // kind) describes to nothing, and the answer is empty.
+      const parsed = kind === 'course' ? id : Number(id);
+      if (kind !== 'course' && !Number.isInteger(parsed)) return [];
+      const label = await this.scopeOptionsRepo.describe(
+        kind,
+        parsed,
+        tenantId,
+        keys.code,
+      );
+      return label === null ? [] : [{ id, label }];
     }
     return this.scopeOptionsRepo.list(kind, tenantId, keys.code, search, limit);
   }
@@ -946,3 +962,15 @@ export class TenantChartLibraryService {
     return entry;
   }
 }
+
+/** A plain copy of a view, so the shared configuration can never be changed through a response. */
+const cloneView = (view: (typeof STATISTICS_VIEWS)[number]) => ({
+  id: view.id,
+  subject: view.subject as 'course' | 'learner' | null,
+  sections: view.sections.map((section) => ({
+    key: section.key,
+    subject: section.subject,
+    charts: [...section.charts],
+  })),
+  defaultLayout: [...view.defaultLayout],
+});
