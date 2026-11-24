@@ -9,6 +9,7 @@ import {
   Repository,
 } from 'typeorm';
 import { PmAgentCard } from '../entity/pm-agent-card.entity';
+import { customerTenantNames } from '../util/scrub.util';
 import { PmAgentCardEvent } from '../entity/pm-agent-card-event.entity';
 import { PmCardKind, PmCardStatus } from '../enum/pm-agent.enum';
 import {
@@ -265,6 +266,8 @@ export class PmAgentCardRepository extends Repository<PmAgentCard> {
     const rows: { name: string | null }[] = await this.dataSource.query(
       `SELECT DISTINCT name FROM tenants WHERE name IS NOT NULL`,
     );
-    return rows.map((row) => String(row.name ?? '')).filter(Boolean);
+    return customerTenantNames(
+      rows.map((row) => String(row.name ?? '')).filter(Boolean),
+    );
   }
 }

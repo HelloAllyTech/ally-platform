@@ -73,6 +73,22 @@ export interface ScrubOptions {
   tenantNames?: string[];
 }
 
+/**
+ * The platform's own names. Ally's own organisation is a row in `tenants`, so without this every
+ * repo name and path (`ally-be`, `ally-web/apps/ally-admin-dashboard/…`) and every mention of the
+ * product was redacted as a customer name, and the PM Agent's gate refused every recommendation
+ * (prod 2026-11-24). The product's name is public; it is never a tenant to hide.
+ */
+const PLATFORM_OWN_NAMES = new Set(['ally', 'helloally', 'hello ally']);
+
+/** Tenant names to redact: every tenant except the platform's own organisation. */
+export function customerTenantNames(names: readonly string[]): string[] {
+  return names.filter(
+    (name) =>
+      !PLATFORM_OWN_NAMES.has(name.trim().toLowerCase().replace(/\s+/g, ' ')),
+  );
+}
+
 /** Scrub one string for a public repo. */
 export function scrubForPublic(
   text: string,
