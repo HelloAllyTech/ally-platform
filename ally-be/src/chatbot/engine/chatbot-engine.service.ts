@@ -762,6 +762,10 @@ export class ChatbotEngineService {
     if (turn.tap) {
       const tapped = await this.actions?.perform(turn);
       if (tapped) return tapped;
+    } else {
+      // TF1 F2: a typed yes to the card just shown confirms that card, as its tap would.
+      const typed = await this.actions?.typedYes?.(turn);
+      if (typed) return typed;
     }
 
     // ── 4. Answer ────────────────────────────────────────────────────────

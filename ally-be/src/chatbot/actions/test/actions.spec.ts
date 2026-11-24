@@ -271,6 +271,62 @@ describe('ActionsService (BT1: taps answered in code)', () => {
   });
 });
 
+// TF1 F2: on WhatsApp a typed "Yes" looped: each yes got a new card with the number re-spelled.
+describe('ActionsService.typedYes: a typed yes to the card just shown is its Confirm', () => {
+  const setup = (stored: WriteOffer | null) => {
+    const gateway = {
+      confirmOffer: jest.fn().mockResolvedValue({
+        ok: true,
+        replayed: false,
+        result: { passages: [{ record_id: 'r-1' }] },
+      }),
+    };
+    const listTools = { confirmation: jest.fn().mockResolvedValue(null) };
+    const consent = { current: jest.fn().mockResolvedValue(stored) };
+    const service = new ActionsService(
+      gateway as never,
+      listTools as never,
+      {} as never,
+      consent as never,
+    );
+    return { service, gateway };
+  };
+  const typed = (text: string, previous: string) =>
+    ({
+      chatbot: { id: BOT_A },
+      conversationId: CONV_A,
+      contactId: CONTACT,
+      text,
+      history: [
+        { role: 'assistant', content: previous },
+        { role: 'user', content: text },
+      ],
+    }) as never;
+  const asked = 'Shall I register you for Sun 29 Nov 2026, 11:00?';
+
+  it('writes the stored offer, as the tap would, with no model call', async () => {
+    const shown = offer();
+    const { service, gateway } = setup(shown);
+    const decision = await service.typedYes(typed('Yes', asked));
+    expect(gateway.confirmOffer).toHaveBeenCalledWith(where, shown);
+    expect(decision).toMatchObject({ handledBy: WaHandledBy.TAP });
+  });
+
+  it.each([
+    ['not a plain yes', 'Yes but make it 1pm', asked],
+    ["a yes to a message that didn't show the card", 'Yes', 'Anything else?'],
+  ])('leaves it to the agent: %s', async (_why, text, previous) => {
+    const { service, gateway } = setup(offer());
+    expect(await service.typedYes(typed(text, previous))).toBeNull();
+    expect(gateway.confirmOffer).not.toHaveBeenCalled();
+  });
+
+  it('an offer stored before BT1 (nothing to replay) goes to the agent', async () => {
+    const { service } = setup(offer({ input: undefined }));
+    expect(await service.typedYes(typed('Yes', asked))).toBeNull();
+  });
+});
+
 describe('ActionPartsService (BT1: chips and cards from tool results, never from text)', () => {
   const LIST = {
     key: 'registrations',
