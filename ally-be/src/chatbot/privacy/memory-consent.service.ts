@@ -19,6 +19,10 @@ export interface ConsentView {
   wordingVersion: string | null;
 }
 
+/** The consent question's own ending, in each language (`memory-consent-copy.ts`). */
+const CONSENT_QUESTION_MARK =
+  /Reply YES or NO\.|HAAN ya NAHIN likhein\.|हाँ या नहीं लिखें।/;
+
 /** The memory cutover's state row (D7). */
 export const MEMORY_CUTOVER_STATE = 'memory_consent_cutover';
 
@@ -101,6 +105,25 @@ export class MemoryConsentService {
       subjectKey: subject.key,
       wordingVersion: row?.wording_version ?? null,
     };
+  }
+
+  /**
+   * TF1: whether the assistant's last message in this chat asked the consent question. A "yes" is
+   * a consent answer only then: Kiran's yes to "Shall I book you…?" was taken as memory consent
+   * because an old question was still open. A failed lookup reads as not asked.
+   */
+  async askedLast(conversationId: string): Promise<boolean> {
+    try {
+      const [row] = (await this.dataSource.query(
+        `SELECT text FROM chatbot_messages
+          WHERE conversation_id = $1 AND role = 'assistant'
+          ORDER BY "createdAt" DESC LIMIT 1`,
+        [conversationId],
+      )) as { text: string | null }[];
+      return CONSENT_QUESTION_MARK.test(row?.text ?? '');
+    } catch {
+      return false;
+    }
   }
 
   /** Whether memory may be written for this contact. */
