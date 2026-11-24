@@ -193,6 +193,8 @@ export const botPageApi = {
       onActivity?(step: PublicStep): void;
     },
     signal?: AbortSignal,
+    /** BT1: a tap's token; `message` is then the label tapped. */
+    action?: string,
   ): Promise<PublicFinal> {
     let response: Response;
     try {
@@ -204,7 +206,7 @@ export const botPageApi = {
           Accept: "text/event-stream",
           ...embedHeaders(),
         },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify(action ? { message, action } : { message }),
         signal,
       });
     } catch {
