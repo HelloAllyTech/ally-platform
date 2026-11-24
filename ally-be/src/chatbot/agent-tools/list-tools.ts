@@ -469,6 +469,12 @@ function findDescription(list: ListView): string {
     (summable ? ` or to add up ${lower(summable.label)}.` : '.') +
     (exact
       ? ` When the person named a time, use ${exact.key}_at to find exactly that time.`
+      : '') +
+    // TF1 F9: "what did I book?" in a new chat asked for their name instead of looking.
+    (hasPersonField(list)
+      ? ' It returns only the entries of the person in this chat, so when they ask about their own ' +
+        '("what did I book?", "my request", "cancel that"), call it first, with memory on or off; ' +
+        'never ask for their name or phone to find them.'
       : '')
   ).replace(/\.\s+returns/, '. Returns');
 }

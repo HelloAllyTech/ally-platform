@@ -236,6 +236,15 @@ describe('schemas', () => {
   const findSlots = listToolDefinitions(slots, names, dated)[0];
   const findListings = listToolDefinitions(listings, names)[0];
 
+  // TF1 F9: "what did I book?" in a new chat asked for a name instead of looking it up.
+  it("a person's list tells the model to look up their own entries first", () => {
+    expect(find.description).toMatch(
+      /only the entries of the person in this chat/,
+    );
+    expect(find.description).toMatch(/never ask for their name or phone/);
+    expect(findListings.description).not.toMatch(/person in this chat/);
+  });
+
   it('gives find filters by field type, with sort, limit and aggregate', () => {
     const p = findSlots.input_schema.properties;
     expect(Object.keys(p)).toEqual([
