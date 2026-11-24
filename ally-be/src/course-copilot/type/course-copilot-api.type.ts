@@ -1,3 +1,4 @@
+import { CourseCopilotRoleplayCard } from './course-copilot.type';
 import {
   CourseCopilotEventType,
   CourseCopilotJobKind,
@@ -83,6 +84,8 @@ export interface CourseCopilotJobView {
   skippedReason: string | null;
   /** Reference files this item was written from ("Manual.pdf, p. 12"). */
   references: string[];
+  /** New roleplays only: the summary card. */
+  roleplayCard: CourseCopilotRoleplayCard | null;
   startedAt: string | null;
   finishedAt: string | null;
   costUsd: number | null;

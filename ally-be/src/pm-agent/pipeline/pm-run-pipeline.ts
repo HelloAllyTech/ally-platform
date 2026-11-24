@@ -809,6 +809,9 @@ export class PmRunPipeline {
       candidates: result.candidates.length,
       discarded: result.discarded.length,
       repaired: result.repaired,
+      ...(result.repairErrors.length
+        ? { repairErrors: result.repairErrors }
+        : {}),
       passes: result.passes,
       toolCalls: result.toolCalls,
       costUsd: ledger.laneSpentUsd(lane),

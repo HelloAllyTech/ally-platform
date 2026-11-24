@@ -1,4 +1,10 @@
+import { AgentBuilderTranslateDto } from '../dto/agent-builder-translate.dto';
 import {
+  ROLEPLAY_DESIGN_MODES,
+  RoleplayDesignMode,
+} from '../util/roleplay-design.util';
+import {
+  BadRequestException,
   Controller,
   Get,
   Param,
@@ -471,6 +477,32 @@ export class LearnController {
       dryRun: dto.dryRun !== false,
       onlyWithStates: dto.onlyWithStates,
     });
+  }
+
+  @ApiOperation({
+    summary:
+      'Agent Builder Copilot: what a roleplay mode sets (supports, experience mode, the ' +
+      'state-aware main prompt), from the Course Design Manual',
+  })
+  @ApiOperation({
+    summary:
+      'Agent Builder Copilot: translate a generated field into the roleplay’s other languages',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_SCENARIO])
+  @Post('agent-builder/translate')
+  async translateForAgentBuilder(@Body() dto: AgentBuilderTranslateDto) {
+    return this.scenarioService.translateForAgentBuilder(dto.text, dto.targets);
+  }
+
+  @AuthPermissions([PERMISSIONS.EDIT_SCENARIO])
+  @Get('agent-builder/roleplay-design')
+  async getAgentBuilderRoleplayDesign(@Query('mode') mode: string) {
+    if (!ROLEPLAY_DESIGN_MODES.includes(mode as RoleplayDesignMode)) {
+      throw new BadRequestException(
+        `mode must be one of ${ROLEPLAY_DESIGN_MODES.join(', ')}`,
+      );
+    }
+    return this.scenarioService.roleplayDesign(mode as RoleplayDesignMode);
   }
 
   @ApiOperation({

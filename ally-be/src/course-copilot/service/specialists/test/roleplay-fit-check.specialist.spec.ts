@@ -85,6 +85,59 @@ describe('RoleplayFitCheckSpecialist', () => {
     );
   });
 
+  describe('suggest (Agent Builder wizard)', () => {
+    const wizardBrief = brief({
+      character: { personaBrief: 'A 52-year-old farmer near Mandya' },
+    });
+
+    it('recommends the top hit when it fits, and says who the client should be', async () => {
+      const result = await specialist.suggest(wizardBrief, scope);
+
+      expect(result.characters.map((c) => c.id)).toEqual([
+        'gowramma',
+        'silent',
+        'lakshmamma',
+      ]);
+      expect(result).toMatchObject({ recommendedId: 'gowramma', reason: 'ok' });
+      expect(complete.mock.calls[0][0].prompt).toContain(
+        'Who the client should be: A 52-year-old farmer near Mandya',
+      );
+    });
+
+    it('recommends the best alternative, or none, when the top hit does not fit', async () => {
+      complete.mockResolvedValueOnce({
+        text: JSON.stringify({
+          fits: false,
+          reason: 'never discloses',
+          alternativeIds: ['lakshmamma'],
+        }),
+      });
+      expect((await specialist.suggest(wizardBrief, scope)).recommendedId).toBe(
+        'lakshmamma',
+      );
+
+      complete.mockResolvedValueOnce({
+        text: JSON.stringify({ fits: false, reason: 'no', alternativeIds: [] }),
+      });
+      expect(
+        (await specialist.suggest(wizardBrief, scope)).recommendedId,
+      ).toBeNull();
+    });
+
+    it('reports a failed search, and gives hits without a verdict when the check fails', async () => {
+      search.mockRejectedValueOnce(new Error('index down'));
+      expect(await specialist.suggest(wizardBrief, scope)).toMatchObject({
+        characters: [],
+        searchFailed: true,
+      });
+
+      complete.mockRejectedValueOnce(new Error('rate limited'));
+      const result = await specialist.suggest(wizardBrief, scope);
+      expect(result.characters).toHaveLength(3);
+      expect(result.recommendedId).toBeNull();
+    });
+  });
+
   it('skips the check for a generated persona', async () => {
     const result = await specialist.cast(
       brief({ character: { personaBrief: 'An older farmer' } }),

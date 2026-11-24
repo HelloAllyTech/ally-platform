@@ -18,6 +18,13 @@ import { AgentBuilderField } from '../enum/agent-builder-field.enum';
 import { Gender, GenderIdentity, SexualOrientation } from '../enum/gender.enum';
 import { ScenarioCategory } from '../enum/scenario-category.enum';
 import { ScenarioDifficultyLevel, ScenarioStatus } from '../type/scenario.type';
+import { SimulationState } from '../type/simulation-state.type';
+import {
+  checkBuiltRoleplay,
+  layOutRoleplayStates,
+  repairBuiltRoleplay,
+  RoleplayStateDesign,
+} from '../util/roleplay-design.util';
 import { ScenarioService } from './scenario.service';
 import { ScenarioSharedService } from './scenario-shared.service';
 
@@ -146,6 +153,25 @@ export interface AgentBuilderChainInput {
    * field the studio keeps for the Agent Builder's brief.
    */
   provenance: string;
+  /**
+   * Course Pilot's roleplay design, all optional (Studio's wizard sends none of it):
+   * states laid out with a rupture state and bands sized by mode, and the scaffolding and
+   * runtime settings for the roleplay's mode, copied onto the create request.
+   */
+  design?: {
+    states?: RoleplayStateDesign;
+    settings?: Partial<
+      Pick<
+        CreateScenarioDto,
+        | 'experienceMode'
+        | 'checklistType'
+        | 'remindersEnabled'
+        | 'currentState'
+        | 'supervisorNotesEnabled'
+        | 'selectedMainPromptCode'
+      >
+    >;
+  };
 }
 
 export interface AgentBuilderChainContext {
@@ -168,6 +194,14 @@ export interface AgentBuilderChainResult {
   summary: string;
   /** The library character reused or saved, when there was one. */
   characterId?: string;
+  /** The states saved, by name and band (empty when none). */
+  states?: {
+    name: string;
+    scoreLower: number | null;
+    scoreUpper: number | null;
+  }[];
+  /** What the validator repaired or could not, in words, for the summary card. */
+  checks?: string[];
 }
 
 /**
@@ -388,7 +422,12 @@ export class AgentBuilderChainService {
       : undefined;
 
     const shared: SharedFieldInputs = {
-      actorDescription: this.composeBrief(input),
+      // A reused character's saved profile rides on the brief, so the role instruction, challenge,
+      // opening lines and reminders are written from who they are and can't contradict it.
+      actorDescription: this.withCharacterProfile(
+        this.composeBrief(input),
+        character,
+      ),
       competency: input.competencyName?.trim() || undefined,
       agentTestCases: input.agentTestCases?.trim() || undefined,
     };
@@ -554,6 +593,8 @@ export class AgentBuilderChainService {
       character,
     });
 
+    const checks = await this.applyDesign(dto, input, shared, ctx);
+
     const [scenario] = await this.scenarioService.createScenarios(
       { scenarios: [dto] },
       ctx.userId,
@@ -582,7 +623,63 @@ export class AgentBuilderChainService {
       languageIds: finalLanguages.map((l) => l.languageId),
       summary: this.summarise(dto, persona, finalLanguages, notes),
       ...(characterId ? { characterId } : {}),
+      states: (dto.states ?? []).map((s) => ({
+        name: s.name,
+        scoreLower: s.scoreLower ?? null,
+        scoreUpper: s.scoreUpper ?? null,
+      })),
+      ...(checks.length ? { checks } : {}),
     };
+  }
+
+  /**
+   * Course Pilot's design on top of the wizard's fields: states for the mode, the mode's
+   * scaffolding, then the validator, which repairs what it can before the roleplay is saved.
+   * A states call that fails leaves the roleplay without states rather than failing it.
+   */
+  private async applyDesign(
+    dto: CreateScenarioDto,
+    input: AgentBuilderChainInput,
+    shared: SharedFieldInputs,
+    ctx: AgentBuilderChainContext,
+  ): Promise<string[]> {
+    const design = input.design;
+    if (!design) return [];
+    Object.assign(dto, design.settings ?? {});
+
+    if (design.states) {
+      const generated = await this.generateField<SimulationState[]>(
+        { field: AgentBuilderField.STATES },
+        shared,
+        ctx,
+        {
+          required: false,
+          usable: (v) => Array.isArray(v) && v.length > 0,
+        },
+      ).catch(() => undefined);
+      const states = layOutRoleplayStates(generated ?? [], design.states);
+      if (states.length) dto.states = states as any;
+    }
+
+    const { fixable, reported } = checkBuiltRoleplay(dto as any);
+    const repaired = repairBuiltRoleplay(dto as any, fixable);
+    if (!dto.states?.length && dto.selectedMainPromptCode) {
+      // Without states there is no reason to move off the default main prompt.
+      delete dto.selectedMainPromptCode;
+    }
+    return [...repaired, ...reported.map((r) => `check: ${r}`)];
+  }
+
+  private withCharacterProfile(
+    brief: string,
+    character: ScenarioCharacter | undefined,
+  ): string {
+    const profile = character?.characterProfileText?.trim();
+    if (!profile) return brief;
+    return (
+      `${brief}\n\nThe client is the saved character ${character!.name}. Their saved profile — ` +
+      `keep every fact consistent with it:\n${profile.slice(0, 2500)}`
+    );
   }
 
   // ── Field calls ───────────────────────────────────────────────────────

@@ -174,6 +174,18 @@ export const ApiEndpoints = {
     ENHANCE_FIELD: "/v1/learn/scenarios/enhance-field",
     MAP_SCENARIO_MEMORIES: "/v1/learn/scenarios/memories/map",
     GENERATE_AGENT_BUILDER_FIELD: "/v1/learn/agent-builder/generate-field",
+    AGENT_BUILDER_ROLEPLAY_DESIGN: "/v1/learn/agent-builder/roleplay-design",
+    AGENT_BUILDER_CHARACTER_SUGGESTIONS: "/v1/learn/agent-builder/character-suggestions",
+    AGENT_BUILDER_REVISE_PLAN: "/v1/learn/agent-builder/revise-plan",
+    AGENT_BUILDER_TRANSLATE: "/v1/learn/agent-builder/translate",
+    ROLEPLAY_INTERVIEW_SESSIONS: "/v1/learn/roleplay-interview/sessions",
+    ROLEPLAY_INTERVIEW_SESSION: (id: string) => `/v1/learn/roleplay-interview/sessions/${id}`,
+    ROLEPLAY_INTERVIEW_STREAM: (id: string) =>
+      `/v1/learn/roleplay-interview/sessions/${id}/messages/stream`,
+    ROLEPLAY_INTERVIEW_APPROVE: (id: string) =>
+      `/v1/learn/roleplay-interview/sessions/${id}/approve`,
+    ROLEPLAY_INTERVIEW_ABANDON: (id: string) =>
+      `/v1/learn/roleplay-interview/sessions/${id}/abandon`,
     COMPETENCIES: "/v1/learn/competencies",
     COMPETENCY_BY_ID: (id: string) => `/v1/learn/competencies/${id}`,
     COMPETENCY_BEHAVIOURS: (id: string) => `/v1/learn/competencies/${id}/behaviours`,

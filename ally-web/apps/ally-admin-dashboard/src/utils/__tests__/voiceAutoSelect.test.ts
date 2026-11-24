@@ -135,6 +135,31 @@ describe("resolveAutoCast", () => {
     expect(cast?.next).toEqual({ "1": "en-young-f", "2": "hi-male" });
   });
 
+  it("leaves a cast trimmed to the chosen languages alone, even when the persona changes", () => {
+    const own = { "1": "en-young-f", "2": "hi-male" };
+    expect(
+      resolveAutoCast({
+        languages,
+        current: { "2": "hi-male" },
+        alreadyCast: own,
+        dismissed: nothingDismissed,
+        persona: { gender: "male" as const, age: 40 },
+      }),
+    ).toBeNull();
+  });
+
+  it("still re-casts the rest after a row's own remove (recorded as dismissed)", () => {
+    const own = { "1": "en-young-f", "2": "hi-male" };
+    const cast = resolveAutoCast({
+      languages,
+      current: { "2": "hi-male" },
+      alreadyCast: own,
+      dismissed: new Set(["1"]),
+      persona: { gender: "male" as const, age: 40 },
+    });
+    expect(cast === null || !("1" in (cast?.next ?? {}))).toBe(true);
+  });
+
   it("stops once its own cast is in place, so it cannot re-enter", () => {
     const next = { "1": "en-young-f", "2": "hi-male" };
     expect(

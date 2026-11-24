@@ -17,7 +17,12 @@ import {
 } from "@constants";
 import { useClickOutside, useIsPlaceholderUsed } from "@hooks";
 import { CharacterData } from "@types";
-import { asList } from "@utils/characterData";
+import {
+  applyCharacterComplexFields,
+  applyCharacterScalarFields,
+  CHARACTER_FORM_FIELD_IDS,
+  CHARACTER_MEDIA_FIELD_IDS,
+} from "@utils/characterApply";
 import { camelToSnakeCase } from "@utils/common";
 
 interface CharacterProfileSelectorProps {
@@ -29,18 +34,7 @@ interface CharacterProfileSelectorProps {
 
 const PAGE_SIZE = 100;
 
-const formFieldIds = {
-  NAME: "name",
-  AGE: "age",
-  GENDER: "gender",
-  PROFESSION: "profession",
-  CURRENT_LOCATION: "currentLocation",
-  GENDER_IDENTITY: "genderIdentity",
-  SEXUAL_ORIENTATION: "sexualOrientation",
-  COVER_IMAGE_URL: "coverImageUrl",
-  COVER_VIDEO_URL: "coverVideoUrl",
-  CHARACTER_PROFILE_TEXT: "characterProfileText",
-};
+const formFieldIds = CHARACTER_FORM_FIELD_IDS;
 
 const formFieldNames = {
   NAME: "Name",
@@ -57,7 +51,7 @@ const formFieldNames = {
 
 // Media fields are intentionally excluded from character comparison:
 // they can differ between the simulation and character (simulation-level overrides)
-const mediaFieldIds = [formFieldIds.COVER_IMAGE_URL, formFieldIds.COVER_VIDEO_URL];
+const mediaFieldIds = CHARACTER_MEDIA_FIELD_IDS;
 const comparableFieldIds = Object.values(formFieldIds).filter(
   fieldId => !mediaFieldIds.includes(fieldId),
 );
@@ -158,56 +152,8 @@ export const CharacterProfileSelector: React.FC<CharacterProfileSelectorProps> =
   // which does scalar string equality and cannot meaningfully compare
   // language-keyed objects and arrays.
   const applyComplexCharacterFields = useCallback(
-    (characterData: CharacterData) => {
-      /**
-       * Merge the character's per-language maps into the simulation's, which
-       * are keyed the same way.
-       *
-       * These used to be written into the English slot whatever they
-       * actually were, because a character held one voice, one
-       * style note and one flat list of samples. That filled exactly one of
-       * the simulation's language slots and mis-filed anything that was not
-       * English — a character voiced in Marathi became the simulation's
-       * English voice, dispatching Marathi TTS to an English session with
-       * nothing to catch it. Keyed maps on both sides make that unexpressible.
-       *
-       * Merging, not replacing: a trainer may have already filled languages
-       * this character says nothing about, and picking a character should not
-       * wipe them.
-       */
-      const mergeByLanguage = <T,>(field: string, incoming?: Record<string, T>) => {
-        const entries = Object.entries(incoming ?? {}).filter(
-          ([languageId, value]) =>
-            /^\d+$/.test(languageId) && value !== undefined && value !== null && value !== "",
-        );
-        if (entries.length === 0) return;
-        const current = (getValues(field) ?? {}) as Record<string, T>;
-        setValue(
-          field,
-          { ...current, ...Object.fromEntries(entries) },
-          { shouldDirty: true, shouldTouch: true },
-        );
-      };
-
-      mergeByLanguage(FORM_FIELD_IDS.LANGUAGES_VOICES, characterData.voices);
-      mergeByLanguage("languageCharacteristics", characterData.languageCharacteristics);
-      mergeByLanguage(
-        FORM_FIELD_IDS.LINGUISTIC_STYLE_SAMPLES,
-        characterData.linguisticStyleSamples,
-      );
-
-      // `?.length` alone lets a non-empty string through and `.map` then
-      // throws, taking the whole page down on character select — see asList.
-      const knowledgeSources = asList(characterData.knowledgeSources);
-      if (knowledgeSources.length) {
-        const rows = knowledgeSources.map(source => ({
-          id: source.id,
-          title: source.title,
-          content: source.text ?? "",
-        }));
-        setValue(FORM_FIELD_IDS.KNOWLEDGE_SOURCE, rows, { shouldDirty: true, shouldTouch: true });
-      }
-    },
+    (characterData: CharacterData) =>
+      applyCharacterComplexFields({ getValues, setValue }, characterData),
     [getValues, setValue],
   );
 
@@ -225,22 +171,7 @@ export const CharacterProfileSelector: React.FC<CharacterProfileSelectorProps> =
         });
       } else if (characterData) {
         // Prefill form fields using existing field IDs
-        Object.values(formFieldIds).forEach(fieldId => {
-          const value = characterData[fieldId as keyof CharacterData];
-
-          // For media fields, only update if the character has a non-empty value.
-          // Otherwise keep the simulation's existing media as a fallback.
-          if (mediaFieldIds.includes(fieldId) && !value) {
-            return;
-          }
-
-          // Ensure we never set null or undefined - always use empty string as fallback
-          setValue(fieldId, value ?? "", {
-            shouldValidate: true,
-            shouldDirty: true,
-            shouldTouch: true,
-          });
-        });
+        applyCharacterScalarFields({ getValues, setValue }, characterData);
 
         applyComplexCharacterFields(characterData);
       }
@@ -249,7 +180,7 @@ export const CharacterProfileSelector: React.FC<CharacterProfileSelectorProps> =
       setIsCharacterDropdownOpen(false);
       setSearchQuery("");
     },
-    [id, setValue, applyComplexCharacterFields],
+    [id, getValues, setValue, applyComplexCharacterFields],
   );
 
   // Get selected character

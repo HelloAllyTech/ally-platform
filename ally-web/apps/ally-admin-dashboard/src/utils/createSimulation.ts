@@ -273,6 +273,8 @@ export const formatSimulationResponseData = (data: GetSimulationByIdResponse) =>
     characterProfileText: data?.metadata?.characterProfileText,
     helperAgentPrompt: (data?.metadata as any)?.helperAgentPrompt,
     agentBuilderDescription: (data?.metadata as any)?.agentBuilderDescription,
+    // The Agent Builder wizard's conversation, so it is there again on edit.
+    agentBuilderChat: (data?.metadata as any)?.agentBuilderChat,
     agentBuilderPrompt: (data?.metadata as any)?.agentBuilderPrompt,
     competency: data?.competency,
     // Multi-competency selection. A roleplay saved before it existed carries

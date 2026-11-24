@@ -15996,4 +15996,253 @@ export const en = {
     reopen: "Reopen",
     done: "Done",
   },
+
+  // Agent Builder wizard: the roleplay's mode (Course Design Manual; same rules as Course Copilot).
+  agentBuilderMode: {
+    question: "Choose the roleplay's mode",
+    help: "The mode sets the supports, the experience mode and how hard the character's states are to move through. You can change any of it on the left afterwards.",
+    labels: {
+      learning: "Learning",
+      practice: "Practice",
+      performance: "Performance",
+      pre_assessment: "Pre-assessment",
+      post_assessment: "Post-assessment",
+    } as Record<string, string>,
+    descriptions: {
+      learning:
+        "First try: reminders, the character's state shown and AI supervisor notes. Easiest states.",
+      practice: "Supports start to fade: reminders and state shown, no supervisor notes.",
+      performance: "No supports. The learner shows the skill on their own. Hardest states.",
+      pre_assessment: "No supports. Measures the learner before the course.",
+      post_assessment: "No supports. Measures the learner after the course.",
+    } as Record<string, string>,
+    loading: "Applying the mode…",
+    failed:
+      "The mode's settings could not be loaded. Pick it again, or set the supports on the left by hand.",
+    applied: (label: string, supports: string[]) =>
+      `${label} mode: ${supports.length ? supports.join(", ") : "no supports"}.`,
+    supports: {
+      reminders: "reminders",
+      stateVisible: "character's state shown",
+      supervisorNotes: "AI supervisor notes",
+      states: 'states with a "Pulling away" state',
+      none: "none",
+    },
+    noStatePrompt: "No states: no main prompt that reads states is available.",
+    remindersHidden: "Reminders were switched off: none were written.",
+    goalsUnavailable:
+      "Agent test cases aren't available for your account, so the roleplay is generated without them. An administrator can switch on Agent Test Cases to use them.",
+    noGoals: "No test cases",
+    recommended: "Recommended",
+    reasons: {
+      assessmentAfter: "Your description reads like a final check, so no supports.",
+      assessmentBefore: "Your description reads like a baseline before the course, so no supports.",
+      performance: "The learner is meant to show the skill on their own.",
+      firstTry: "Reads like a first try, so all supports are on and the states are easiest.",
+      practice: "Most roleplays are practice: some support, fading as learners improve.",
+    } as Record<string, string>,
+  },
+
+  // Agent Builder wizard: casting from the Character Library (same search and fit check as Course Copilot).
+  agentBuilderCharacter: {
+    question: "Choose the client",
+    searching: "Looking for a matching character in the Character Library…",
+    recommendedBecause: (reason: string) =>
+      `The fit check recommends one character from the Character Library. ${reason}`.trim(),
+    noneFits: (reason: string) =>
+      `None of the closest library characters fits this roleplay, so a new one is suggested. ${reason}`.trim(),
+    noMatch: "No library character matches this description, so a new character will be written.",
+    searchFailed:
+      "The Character Library couldn't be searched just now. You can write a new character, or pick one later in Basic Settings.",
+    noVoices: "No voice yet: pick one in Language–Voice mapping.",
+    newOption: "Write a new character",
+    newOptionHelp: "From your description. It is not saved to the Character Library.",
+    newAnswer: "A new character, written from my description",
+    libraryAnswer: (name: string) => `${name}, from the Character Library`,
+    briefNote: (name: string) =>
+      `The client is the saved character ${name}. Keep every fact consistent with their saved profile:`,
+    loadFailed: "That character could not be loaded. Pick it again, or write a new one.",
+  },
+
+  // Agent Builder wizard: which languages the client speaks, and the voice in each.
+  agentBuilderLanguages: {
+    question: "Choose the languages and voices",
+    describeOption: "Decide from my description",
+    describeHelp:
+      "The agent reads which languages the client speaks and picks a voice in each to match them.",
+    chooseOption: "Choose the languages and voices",
+    chooseHelp: "Pick each language, and a voice for it or let the agent pick one.",
+    agentPicksOption: "Agent picks a voice to match the client",
+    agentPicks: "agent picks the voice",
+    voiceFor: (language: string) => `Voice for ${language}`,
+    pickOne: "Choose at least one language, or let the agent decide from your description.",
+    fromDescriptionAnswer: "Decide from my description",
+  },
+
+  // Roleplay interview (Agent Builder tab, Copilot-style): the brief panel and the plan card.
+  roleplayInterview: {
+    welcome:
+      "Tell me about the roleplay you want: who the learners are, the skill, and the client. I'll ask a few short questions, fill in the brief on the right and propose a plan for you to approve.",
+    firstPlaceholder:
+      "e.g. A practice roleplay for teachers talking to a withdrawn 15-year-old student…",
+    placeholder: "Answer, or tell me anything else…",
+    useSteps: "Use the quick steps instead",
+    voices: {
+      title: "Languages and voices",
+      help: "Tick each language the client speaks. Pick a voice and listen to it, or let the agent pick one that matches the client.",
+      agentPicks: "Agent picks a voice",
+      voiceFor: (language: string) => `Voice for ${language}`,
+      play: "Play",
+      stop: "Stop",
+      loading: "Loading…",
+      chooseLink: "Choose voices",
+      confirm: "Confirm languages and voices",
+      confirmed: "Languages and voices chosen. You can change them in the Brief tab.",
+      pickOne: "Tick at least one language.",
+      pickedCount: (n: number) => (n === 1 ? "1 language" : `${n} languages`),
+      otherIds: (ids: string[]) => `also language ids ${ids.join(", ")}`,
+    },
+    tabs: {
+      label: "Roleplay agent",
+      build: "Build",
+      brief: "Brief",
+      updated: "Updated",
+      neededCount: (n: number) => `${n} needed`,
+      noPlanYet: "The plan appears here once nothing is still needed.",
+      planReady: (title: string) => `The plan is ready: ${title}.`,
+      planApproved: "Plan approved: building the roleplay.",
+      reviewPlan: "Review in Brief",
+    },
+    subtitle:
+      "Describe the roleplay you want. I'll ask a few short questions, fill in the brief and propose a plan; approve it and I'll build the roleplay for you to review.",
+    historyQuestion: "Roleplay interview",
+    historyAnswer: (competency: string, mode: string) =>
+      `Plan approved: ${mode} roleplay for ${competency}. Building it now.`,
+    startOver: "Start over",
+    openFailed: "The interview couldn't be opened. Refresh the page to try again.",
+    failed: "That turn didn't go through. Your answers are kept; send it again.",
+    busy: "Still working on the last message. Wait for it to finish, then send again.",
+    planChanged: "The brief changed since this plan. Ask for the plan again in the chat.",
+    approveFailed: "The plan couldn't be approved. Try again.",
+    brief: {
+      title: "Roleplay brief",
+      stillNeeded: "Still needed:",
+      ready: "Ready for a plan",
+      learners: "Learners",
+      goal: "Learner's goal",
+      competency: "Competency",
+      mode: "Mode",
+      difficulty: "Difficulty",
+      client: "Client",
+      setting: "Setting",
+      languages: "Languages",
+      passMark: "Pass mark",
+      notes: "Notes",
+      libraryCharacter: (name: string) => `${name} (Character Library)`,
+    },
+    plan: {
+      heading: (version: number) => `Roleplay plan · v${version}`,
+      hides: "Hides",
+      opensUpWhen: "Opens up when",
+      speaks: "Speaks",
+      moments: "Moments the client must create",
+      states: "How the client opens up",
+      pass: (minScore: number) => `What a pass looks like (pass mark ${minScore})`,
+      helpful: "Helpful:",
+      unhelpful: "Unhelpful:",
+      opening: "Opening line:",
+      supports: "Supports:",
+      changeHint: "Want something different? Say it in the chat.",
+      approve: "Approve and build",
+      approving: "Starting…",
+      approved: "Approved: building the roleplay on the left",
+    },
+  },
+  roleplayAgentDifficulty: {
+    EASY: "Easy: cooperative client, one concern",
+    MEDIUM: "Medium: ambivalent client, one concern",
+    HARD: "Hard: distressed client, several concerns",
+  } as Record<string, string>,
+
+  // Agent Builder wizard: the frame around the questions.
+  agentBuilderWizard: {
+    title: "Build a roleplay with the agent",
+    subtitle: "Answer 6 short questions. I'll fill in the roleplay; you review it and save.",
+    showForm: "Show the form",
+    describeHelp: "Who they are, why they're here, how they speak and behave.",
+  },
+
+  // Agent Builder wizard: a change asked for after generating (only the fields it is about).
+  agentBuilderRevision: {
+    planning: "Working out what to change…",
+    failed: (error: string) =>
+      `That change couldn't be made${error ? ` (${error})` : ""}. Nothing was changed; try again.`,
+    kept: "Everything else is kept as it was, including your edits.",
+  },
+
+  // Agent Builder wizard: the chat box, for anything the trainer wants the agent to know.
+  agentBuilderChatBox: {
+    placeholder: {
+      default: "Tell the agent anything (e.g. she only speaks Kannada, no mention of family)…",
+      mode: "Or tell the agent how this roleplay is used (e.g. this is the final check)…",
+      character:
+        "Or describe who you want (e.g. an older woman who speaks Kannada) to search again…",
+      generate: "Ask for a change (e.g. make her more guarded). Only what it's about changes…",
+      restored: "Ask for a change (e.g. make her more guarded). Only what it's about changes…",
+    } as Record<string, string>,
+    send: "Send",
+    briefNotes: "The trainer's notes for this roleplay (follow every one):",
+    regenerateHint:
+      "Your notes are kept. Generate again to apply them: fields are rewritten on the left.",
+    regenerate: "Generate again with your notes",
+  },
+
+  // Agent Builder wizard: the saved conversation, shown again when a roleplay is reopened.
+  agentBuilderRestored: {
+    summary: (when: string, applied: number, total: number, stopped: boolean) =>
+      stopped
+        ? `Generated on ${when}, stopped early: ${applied} of ${total} fields filled. Your edits on the left since then are kept.`
+        : `Generated on ${when}: ${applied} of ${total} fields filled. Your edits on the left since then are kept.`,
+    startOver: "Start a new generation",
+  },
+
+  // Agent Builder wizard: example actor descriptions and what to review after generating.
+  agentBuilderSuggestions: {
+    ideasTitle: "Not sure where to start? Pick one and edit it:",
+    ideas: [
+      {
+        label: "Withdrawn student",
+        text: 'Aarav, 15, a Class 10 student who has been quiet and withdrawn for two weeks. His marks have dropped and he wrote "what\'s the point of anything" in his notebook. He stays after class when his teacher asks to talk. He is polite but gives short answers, avoids eye contact and changes the subject if pushed.',
+      },
+      {
+        label: "Caller in crisis",
+        text: "Meera, 32, calls a helpline late at night after an argument with her husband. She is crying, says she feels trapped and that everyone would be better off without her. She is wary of being judged and hangs up if the responder lectures her, but opens up when she feels heard.",
+      },
+      {
+        label: "Worried parent",
+        text: "Ramesh, 48, a farmer whose 19-year-old son has stopped eating and sleeps most of the day. He thinks it is laziness and wants advice on how to make him work. He is respectful but sceptical of mental health, and uses local words for stress.",
+      },
+      {
+        label: "Exhausted health worker",
+        text: "Lakshmi, 41, an ASHA worker who has looked after many families through a hard season. She says she is fine but is irritable, not sleeping and has started to dread work. She downplays her own needs and turns the conversation back to others.",
+      },
+    ],
+    nextTitle: "Suggestions before you save",
+    next: {
+      noTitle: "Add a title, so trainers can find this roleplay in Studio.",
+      noOpening: "Add an opening line: the character needs something to say first.",
+      longOpening:
+        "Shorten the first opening line. It is read aloud, and a long one keeps the learner waiting.",
+      noVoice:
+        "Pick a voice for each language in Language–Voice mapping. You can't publish without one.",
+      fewStates: (count: number) =>
+        `Only ${count} state${count === 1 ? "" : "s"}. Add one or two so the character can open up step by step.`,
+      fewReminders: (count: number) =>
+        `Only ${count} reminder${count === 1 ? "" : "s"}. Learning and practice work best with three or more short ones.`,
+      supportsInAssessment:
+        "Supports are on, but this is a performance or assessment roleplay. Switch off reminders, state shown and supervisor notes.",
+      preview:
+        "Play it once in Preview: try one helpful and one unhelpful reply and watch the state change.",
+    },
+  },
 };

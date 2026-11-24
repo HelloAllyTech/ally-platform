@@ -7,7 +7,8 @@ describe("isCustomDirectoryHost", () => {
     "treats %s as Ally's own",
     host => expect(isCustomDirectoryHost(host)).toBe(false),
   );
-  it.each(["resources.example.org", "Directory.Example.ORG"])("treats %s as a custom domain", host =>
-    expect(isCustomDirectoryHost(host)).toBe(true),
+  it.each(["resources.example.org", "Directory.Example.ORG"])(
+    "treats %s as a custom domain",
+    host => expect(isCustomDirectoryHost(host)).toBe(true),
   );
 });

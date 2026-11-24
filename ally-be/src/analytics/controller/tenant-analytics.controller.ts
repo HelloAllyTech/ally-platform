@@ -3,10 +3,12 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  HttpCode,
   Param,
   ParseIntPipe,
   ParseUUIDPipe,
   Patch,
+  Post,
   Query,
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
@@ -41,6 +43,11 @@ import {
 } from '../dto/tenant-chart-library.dto';
 import { AnalyticsService } from '../service/analytics.service';
 import { TenantAnalyticsService } from '../service/tenant-analytics.service';
+import {
+  TenantInsightStateBodyDto,
+  TenantInsightsResponseDto,
+} from '../dto/tenant-insights.dto';
+import { TenantInsightsService } from '../service/tenant-insights.service';
 import { TenantChartLibraryService } from '../service/tenant-chart-library.service';
 import { CourseAssessmentReportService } from '../service/course-assessment-report.service';
 import { compareScenarioBehaviours } from 'src/track/util/assessment-compat.util';
@@ -56,6 +63,7 @@ export class TenantAnalyticsController {
     private readonly chartLibraryService: TenantChartLibraryService,
     private readonly courseAssessmentReportService: CourseAssessmentReportService,
     private readonly dataSource: DataSource,
+    private readonly insightsService: TenantInsightsService,
   ) {}
 
   /**
@@ -223,7 +231,51 @@ export class TenantAnalyticsController {
       this.requireTenantId(),
       query.kind,
       query.search,
+      undefined,
+      query.id,
     );
+  }
+
+  /**
+   * What is worth a look today and what is worth celebrating, for the caller's
+   * organisation, minus what the caller has already put away.
+   */
+  @Get('insights')
+  @ApiOperation({ summary: 'Insights for the For you tab' })
+  @ApiResponse({ status: 200, type: TenantInsightsResponseDto })
+  @AuthPermissions([PERMISSIONS.VIEW_ORGANIZATION_METRICS])
+  async getInsights(): Promise<TenantInsightsResponseDto> {
+    return this.insightsService.getInsights(
+      this.requireTenantId(),
+      this.requireUserId(),
+    );
+  }
+
+  /** Marks one insight done, or asks to be reminded later. Only the caller's own state changes. */
+  @Post('insights/state')
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Mark an insight done, or snooze it' })
+  @ApiBody({ type: TenantInsightStateBodyDto })
+  @ApiResponse({ status: 204 })
+  @AuthPermissions([PERMISSIONS.VIEW_ORGANIZATION_METRICS])
+  async setInsightState(
+    @Body() body: TenantInsightStateBodyDto,
+  ): Promise<void> {
+    await this.insightsService.setState(
+      this.requireTenantId(),
+      this.requireUserId(),
+      body.fingerprint,
+      body.state,
+      body.days,
+    );
+  }
+
+  private requireUserId(): number {
+    const userId = Number(ExecutionManager.getUserId());
+    if (!Number.isInteger(userId)) {
+      throw new ForbiddenException('No user in the auth context');
+    }
+    return userId;
   }
 
   private requireTenantId(): string {

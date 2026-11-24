@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { useGetStatisticsChartQuery } from "@api";
 import type {
   ActivationData,
+  LearnerCoursesData,
   ModuleFunnelData,
   ModuleTimeData,
   RoleplayAttemptsData,
@@ -57,6 +58,18 @@ import { STATUS_ORDER, STATUS_STYLE } from "./statusStyle";
  * An id offered by the backend with no renderer here is not shown.
  */
 
+/** A chart reduced to what a pinned card shows. */
+export interface PinSummary {
+  /** What the number is ("Active learners"). */
+  label: string;
+  /** The number, already written. */
+  value: string;
+  caption?: string | null;
+  change?: { text: string; tone: "good" | "bad" | "same" } | null;
+  /** Recent values for a small trend line. */
+  series?: number[];
+}
+
 export interface DataRendererProps<T> {
   entry: StatisticsChartEntry;
   data: T;
@@ -83,6 +96,12 @@ export type ChartRenderer =
       /** One sentence that says what the data shows. Null when there is nothing to say. */
 
       takeaway?: (data: any, t: TFunction) => string | null;
+      /**
+       * How the chart is drawn as a pinned card on For you: one number, a note and,
+       * where the chart has something to compare with, the change. Absent: the chart
+       * cannot be pinned.
+       */
+      pin?: (data: any, t: TFunction) => PinSummary | null;
     }
   | { kind: "self"; Component: ComponentType<SelfRendererProps> };
 
@@ -1870,9 +1889,182 @@ const skillTrendTakeaway = (data: SkillTrendData, t: TFunction) => {
     : t("statisticsLibrary.takeaway.skillTrendFlat");
 };
 
+// ── TSQ-041 Course facts ───────────────────────────────────────
+
+const courseFactsTakeaway = (data: MeasuresData, t: TFunction) => {
+  const enrolled = measureValue(data, "enrolled");
+  return enrolled === 0
+    ? t("statisticsLibrary.takeaway.courseFactsNone")
+    : t("statisticsLibrary.takeaway.courseFacts", {
+        completed: measureValue(data, "completed"),
+        enrolled,
+      });
+};
+
+// ── TSQ-064 Progress in each course ────────────────────────────
+
+const STATUS_COLOUR: Record<LearnerCoursesData["rows"][number]["status"], string> = {
+  completed: "#1e6b3a",
+  inProgress: "#2a5db0",
+  notStarted: "#8f8a7e",
+};
+
+const LearnerCourses = ({ data }: DataRendererProps<LearnerCoursesData>) => {
+  const { t } = useTranslation();
+  if (data.rows.length === 0) {
+    return (
+      <p className="text-sm text-typography-600">{t("statisticsLibrary.learnerCourses.none")}</p>
+    );
+  }
+  return (
+    <ul className="flex flex-col gap-3" data-testid="statistics-learner-courses">
+      {data.rows.map(row => {
+        const percent =
+          row.totalItems > 0 ? Math.round((row.completedItems / row.totalItems) * 100) : 0;
+        return (
+          <li key={row.courseId} className="flex flex-col gap-1 text-sm">
+            <span className="flex items-center justify-between gap-3">
+              <span className="truncate text-typography-900" title={row.title}>
+                {row.title}
+              </span>
+              <span className="flex-none text-typography-600">
+                {t(`statisticsLibrary.learnerCourses.status.${row.status}`)} ·{" "}
+                {t("statisticsLibrary.learnerCourses.items", {
+                  done: row.completedItems,
+                  total: row.totalItems,
+                })}
+              </span>
+            </span>
+            <span className="h-3 rounded-md bg-[#efebe0]">
+              <span
+                className="block h-3 rounded-md"
+                style={{ width: `${percent}%`, background: STATUS_COLOUR[row.status] }}
+              />
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+};
+
+const learnerCoursesTakeaway = (data: LearnerCoursesData, t: TFunction) =>
+  data.rows.length > 0
+    ? t("statisticsLibrary.takeaway.learnerCourses", {
+        done: data.rows.filter(r => r.status === "completed").length,
+        total: data.rows.length,
+      })
+    : null;
+
+// ── Pinned cards ───────────────────────────────────────────────
+
+/** "9 more than the previous period", with whether that is good news. */
+const pinChange = (
+  now: number,
+  before: number | undefined,
+  higherIsBetter: boolean,
+  t: TFunction,
+): PinSummary["change"] => {
+  if (before === undefined) return null;
+  const diff = now - before;
+  if (diff === 0) return { text: t("statisticsLibrary.headline.changeSame"), tone: "same" };
+  const good = higherIsBetter ? diff > 0 : diff < 0;
+  return {
+    text:
+      diff > 0
+        ? t("statisticsLibrary.headline.changeUp", { count: diff })
+        : t("statisticsLibrary.headline.changeDown", { count: -diff }),
+    tone: good ? "good" : "bad",
+  };
+};
+
+const pinHeadline = (data: HeadlineNumbersData, t: TFunction): PinSummary => ({
+  label: t("statisticsLibrary.pins.labels.activeLearners"),
+  value: data.activeUsers.toLocaleString(),
+  caption: t("statisticsLibrary.pins.captions.ofLearners", { total: data.totalRegisteredLearners }),
+  change: data.previous ? pinChange(data.activeUsers, data.previous.activeUsers, true, t) : null,
+});
+
+const pinUsage = (data: UsageOverTimeData, t: TFunction): PinSummary | null => {
+  const series = data.activeUsers.map(point => point.count);
+  if (series.length === 0) return null;
+  const last = series[series.length - 1];
+  return {
+    label: t("statisticsLibrary.pins.labels.activeLearners"),
+    value: last.toLocaleString(),
+    caption: t("statisticsLibrary.pins.captions.thisWeek"),
+    change: series.length > 1 ? pinChange(last, series[series.length - 2], true, t) : null,
+    series,
+  };
+};
+
+const pinLearnerStatus = (data: LearnerStatusCountsData, t: TFunction): PinSummary => ({
+  label: t("statisticsLibrary.pins.labels.activeNow"),
+  value: data.counts.active.toLocaleString(),
+  caption: t("statisticsLibrary.pins.captions.ofLearners", { total: data.total }),
+});
+
+const pinAttention = (data: AttentionLearnersData, t: TFunction): PinSummary => ({
+  label: t("statisticsLibrary.pins.labels.needAttention"),
+  value: data.total.toLocaleString(),
+  caption: t("statisticsLibrary.pins.captions.learners"),
+});
+
+const pinReviews = (data: ReviewCoverageData, t: TFunction): PinSummary | null =>
+  data.completedSessions === 0
+    ? null
+    : {
+        label: t("statisticsLibrary.pins.labels.sessionsReviewed"),
+        value: `${Math.round((data.reviewedSessions / data.completedSessions) * 100)}%`,
+        caption: t("statisticsLibrary.pins.captions.reviewed", {
+          reviewed: data.reviewedSessions,
+          completed: data.completedSessions,
+        }),
+      };
+
+const pinRatings = (data: RatingsData, t: TFunction): PinSummary | null =>
+  data.average === null
+    ? null
+    : {
+        label: t("statisticsLibrary.pins.labels.averageRating"),
+        value: data.average.toFixed(1),
+        caption: t("statisticsLibrary.pins.captions.ratings", { count: data.count }),
+      };
+
+const pinScores = (data: ScoreDistributionData, t: TFunction): PinSummary | null =>
+  data.median === null
+    ? null
+    : {
+        label: t("statisticsLibrary.pins.labels.typicalScore"),
+        value: String(data.median),
+        caption: t("statisticsLibrary.pins.captions.sessions", { count: data.sessions }),
+      };
+
+const pinCoursesLive = (data: MeasuresData, t: TFunction): PinSummary => ({
+  label: t("statisticsLibrary.pins.labels.liveCourses"),
+  value: String(measureValue(data, "live")),
+  caption: t("statisticsLibrary.pins.captions.ofCourses", {
+    courses: measureValue(data, "courses"),
+  }),
+});
+
+const pinLearnersOnCourses = (data: MeasuresData, t: TFunction): PinSummary => ({
+  label: t("statisticsLibrary.pins.labels.learnersOnCourses"),
+  value: String(measureValue(data, "learnersOnCourses")),
+  caption: t("statisticsLibrary.pins.captions.inProgress", {
+    count: measureValue(data, "inProgress"),
+  }),
+});
+
+const pinCoursesInUse = (data: CoursesInUseData, t: TFunction): PinSummary => ({
+  label: t("statisticsLibrary.pins.labels.coursesInUse"),
+  value: String(data.inUse),
+  caption: t("statisticsLibrary.pins.captions.ofCourses", { courses: data.total }),
+});
+
 export const CHART_RENDERERS: Record<string, ChartRenderer> = {
-  "TSQ-001": { kind: "data", Component: HeadlineNumbers, bare: true },
-  "TSQ-002": { kind: "data", Component: UsageOverTime, takeaway: usageTakeaway },
+  "TSQ-001": { kind: "data", Component: HeadlineNumbers, bare: true, pin: pinHeadline },
+  "TSQ-002": { kind: "data", Component: UsageOverTime, takeaway: usageTakeaway, pin: pinUsage },
   "TSQ-003": { kind: "data", Component: MostUsedSimulations, takeaway: mostUsedTakeaway },
   "TSQ-005": { kind: "data", Component: PracticeHeatmap, takeaway: practiceHeatmapTakeaway },
   "TSQ-006": { kind: "data", Component: SessionLength, takeaway: sessionLengthTakeaway },
@@ -1881,27 +2073,64 @@ export const CHART_RENDERERS: Record<string, ChartRenderer> = {
   "TSQ-018": { kind: "data", Component: ItemFormats, takeaway: makeItemFormatsTakeaway() },
   "TSQ-019": { kind: "data", Component: QuizPass, takeaway: quizPassTakeaway },
   "TSQ-024": { kind: "data", Component: SkillChange, takeaway: skillChangeTakeaway },
+  "TSQ-041": { kind: "data", Component: Measures, takeaway: courseFactsTakeaway },
+  "TSQ-064": { kind: "data", Component: LearnerCourses, takeaway: learnerCoursesTakeaway },
   "TSQ-043": { kind: "data", Component: TimeToFinish, takeaway: timeToFinishTakeaway },
   "TSQ-045": { kind: "data", Component: ModuleFunnel, takeaway: moduleFunnelTakeaway },
   "TSQ-046": { kind: "data", Component: ModuleTime, takeaway: moduleTimeTakeaway },
   "TSQ-053": { kind: "data", Component: RoleplayAttempts, takeaway: roleplayAttemptsTakeaway },
   "TSQ-063": { kind: "data", Component: Measures, takeaway: practiceRhythmTakeaway },
   "TSQ-065": { kind: "data", Component: SkillTrend, takeaway: skillTrendTakeaway },
-  "TSQ-038": { kind: "data", Component: Measures, takeaway: coursesByStatusTakeaway },
-  "TSQ-039": { kind: "data", Component: Measures, takeaway: participationTakeaway },
+  "TSQ-038": {
+    kind: "data",
+    Component: Measures,
+    takeaway: coursesByStatusTakeaway,
+    pin: pinCoursesLive,
+  },
+  "TSQ-039": {
+    kind: "data",
+    Component: Measures,
+    takeaway: participationTakeaway,
+    pin: pinLearnersOnCourses,
+  },
   "TSQ-042": { kind: "data", Component: CoursePerformance, takeaway: coursePerformanceTakeaway },
-  "TSQ-007": { kind: "data", Component: LearnerStatus, takeaway: learnerStatusTakeaway },
+  "TSQ-007": {
+    kind: "data",
+    Component: LearnerStatus,
+    takeaway: learnerStatusTakeaway,
+    pin: pinLearnerStatus,
+  },
   "TSQ-008": { kind: "data", Component: TopLearners, takeaway: topLearnersTakeaway },
   "TSQ-009": { kind: "self", Component: LearnerTable },
   "TSQ-013": { kind: "self", Component: CourseTable },
-  "TSQ-014": { kind: "data", Component: CoursesInUse, takeaway: coursesInUseTakeaway },
+  "TSQ-014": {
+    kind: "data",
+    Component: CoursesInUse,
+    takeaway: coursesInUseTakeaway,
+    pin: pinCoursesInUse,
+  },
   "TSQ-015": { kind: "data", Component: StalledCourses, takeaway: stalledTakeaway },
   "TSQ-016": { kind: "data", Component: NotStartedCourses, takeaway: notStartedTakeaway },
   "TSQ-017": { kind: "data", Component: CourseFunnel, takeaway: courseFunnelTakeaway },
-  "TSQ-020": { kind: "data", Component: ScoreDistribution, takeaway: scoreDistributionTakeaway },
+  "TSQ-020": {
+    kind: "data",
+    Component: ScoreDistribution,
+    takeaway: scoreDistributionTakeaway,
+    pin: pinScores,
+  },
   "TSQ-021": { kind: "data", Component: LearnerTrends, takeaway: learnerTrendsTakeaway },
   "TSQ-022": { kind: "data", Component: ScenarioScores, takeaway: scenarioScoresTakeaway },
-  "TSQ-026": { kind: "data", Component: Ratings, takeaway: ratingsTakeaway },
-  "TSQ-027": { kind: "data", Component: ReviewCoverage, takeaway: reviewCoverageTakeaway },
-  "TSQ-023": { kind: "data", Component: AttentionLearners, takeaway: attentionTakeaway },
+  "TSQ-026": { kind: "data", Component: Ratings, takeaway: ratingsTakeaway, pin: pinRatings },
+  "TSQ-027": {
+    kind: "data",
+    Component: ReviewCoverage,
+    takeaway: reviewCoverageTakeaway,
+    pin: pinReviews,
+  },
+  "TSQ-023": {
+    kind: "data",
+    Component: AttentionLearners,
+    takeaway: attentionTakeaway,
+    pin: pinAttention,
+  },
 };

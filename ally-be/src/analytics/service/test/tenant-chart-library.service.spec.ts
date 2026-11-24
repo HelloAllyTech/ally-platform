@@ -155,12 +155,14 @@ describe('TenantChartLibraryService', () => {
         'TSQ-027',
         'TSQ-038',
         'TSQ-039',
+        'TSQ-041',
         'TSQ-042',
         'TSQ-043',
         'TSQ-045',
         'TSQ-046',
         'TSQ-053',
         'TSQ-063',
+        'TSQ-064',
         'TSQ-065',
       ]);
       const byId = Object.fromEntries(lib.charts.map((c) => [c.id, c]));
@@ -581,6 +583,49 @@ describe('TenantChartLibraryService', () => {
       expect(by['TSQ-020']).toEqual(['organisation', 'course', 'simulation']);
       expect(by['TSQ-024']).toEqual(['organisation', 'learner']);
       expect(by['TSQ-009']).toEqual(['organisation']);
+    });
+
+    it('sends the views with the library, as plain copies', async () => {
+      enabled();
+      repo.getCapabilities.mockResolvedValue(caps());
+      const lib = await service.getLibrary(TENANT);
+      expect(lib.views?.map((v) => v.id)).toEqual([
+        'organisation',
+        'course',
+        'learner',
+      ]);
+      const course = lib.views?.find((v) => v.id === 'course');
+      expect(course?.subject).toBe('course');
+      expect(
+        course?.sections.find((s) => s.key === 'allCourses')?.subject,
+      ).toBe(false);
+      // Changing a response must not change the shared configuration.
+      course?.defaultLayout.push('TSQ-999');
+      const again = await service.getLibrary(TENANT);
+      expect(
+        again.views?.find((v) => v.id === 'course')?.defaultLayout,
+      ).not.toContain('TSQ-999');
+    });
+
+    it('sends no views while the page is off for the tenant', async () => {
+      repo.getTenantKeys.mockResolvedValue({
+        code: 'internal1',
+        statisticsDashboardEnabled: false,
+      });
+      expect(await service.getLibrary(TENANT)).toEqual({
+        enabled: false,
+        charts: [],
+      });
+    });
+
+    it('says which tab each chart belongs on', async () => {
+      enabled();
+      repo.getCapabilities.mockResolvedValue(caps());
+      const lib = await service.getLibrary(TENANT);
+      const home = Object.fromEntries(lib.charts.map((c) => [c.id, c.home]));
+      expect(home['TSQ-001']).toBe('organisation');
+      expect(home['TSQ-008']).toBe('learner');
+      expect(home['TSQ-045']).toBe('course');
     });
 
     it('describes each card filter, required only where there is no all-organisation view', async () => {
@@ -1117,6 +1162,28 @@ describe('TenantChartLibraryService', () => {
   });
 
   describe('getScopeOptions', () => {
+    it("describes one option by id, and answers empty for one that is not the organisation's", async () => {
+      enabled();
+      scopeOptions.describe.mockResolvedValueOnce('Asha');
+      expect(
+        await service.getScopeOptions(TENANT, 'learner', undefined, 50, '4'),
+      ).toEqual([{ id: '4', label: 'Asha' }]);
+      expect(scopeOptions.describe).toHaveBeenCalledWith(
+        'learner',
+        4,
+        TENANT,
+        'internal1',
+      );
+      scopeOptions.describe.mockResolvedValueOnce(null);
+      expect(
+        await service.getScopeOptions(TENANT, 'learner', undefined, 50, '99'),
+      ).toEqual([]);
+      expect(
+        await service.getScopeOptions(TENANT, 'learner', undefined, 50, 'abc'),
+      ).toEqual([]);
+      expect(scopeOptions.list).not.toHaveBeenCalled();
+    });
+
     it('refuses when the page is off for the tenant', async () => {
       repo.getTenantKeys.mockResolvedValue({
         code: 'internal1',

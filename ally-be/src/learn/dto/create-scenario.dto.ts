@@ -667,6 +667,16 @@ export class CreateScenarioDto {
 
   @ApiProperty({
     description:
+      'Agent Builder Copilot: the wizard conversation (answers, mode, result) so it is there ' +
+      'again when the roleplay is reopened. Display only; never read by the runtime.',
+    required: false,
+  })
+  @IsOptional()
+  @IsObject()
+  agentBuilderChat?: Record<string, unknown>;
+
+  @ApiProperty({
+    description:
       'Agent Builder Copilot: generated/edited comprehensive system prompt for the roleplay actor',
     required: false,
   })

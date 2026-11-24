@@ -430,6 +430,19 @@ export const CHARACTER_INTERVIEW_INTERVIEWER_SYSTEM = definePrompt(
   },
 );
 
+/** src/prompts/roleplay_interview/interviewer_system.txt */
+export const ROLEPLAY_INTERVIEW_INTERVIEWER_SYSTEM = definePrompt(
+  'roleplay_interview_interviewer_system',
+  {},
+  {
+    name: 'Roleplay Interviewer — System',
+    description:
+      "System prompt for Studio's Agent Builder Copilot chat: interviews a trainer one choice question at a time, records a roleplay brief, looks up competencies, learner profiles, Character Library characters and languages, then proposes a roleplay plan (character sheet, moments, states, pass criteria, opening line) for the trainer to approve.",
+    category: 'Agent Builder',
+    runtimes: ['ally-be'],
+  },
+);
+
 /** src/prompts/course_copilot/ally_notes_writer.txt */
 export const COURSE_COPILOT_ALLY_NOTES_WRITER = definePrompt(
   'course_copilot_ally_notes_writer',
@@ -737,6 +750,23 @@ export const COURSE_COPILOT_ROLEPLAY_BRIEF = definePrompt(
 );
 
 /** src/prompts/course_copilot/roleplay_fit_check.txt */
+/** src/prompts/agent_builder_wizard/revise_plan.txt */
+export const AGENT_BUILDER_WIZARD_REVISE_PLAN = definePrompt(
+  'agent_builder_wizard_revise_plan',
+  {
+    instruction: 'required',
+    fields: 'required',
+  },
+  {
+    name: 'Agent Builder — Revise Plan',
+    description:
+      "Studio's Agent Builder wizard, after a roleplay is generated: reads the trainer's change request and the roleplay's current fields, and picks only the fields that must change, each with what to change. The wizard then rewrites just those through enhance-field; every other field is kept. JSON mode.",
+    category: 'Agent Builder',
+    runtimes: ['ally-be'],
+    output: 'structured',
+  },
+);
+
 export const COURSE_COPILOT_ROLEPLAY_FIT_CHECK = definePrompt(
   'course_copilot_roleplay_fit_check',
   {

@@ -54,6 +54,7 @@ export * from "./debriefExpertReview";
 export * from "./debriefSchedules";
 export * from "./debriefV2";
 export * from "./courseCopilot";
+export * from "./roleplayInterview";
 export * from "./agentChat";
 export * from "./allyGuide";
 export * from "./allyGuideLearning";

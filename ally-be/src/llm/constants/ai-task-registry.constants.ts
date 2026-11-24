@@ -1810,6 +1810,30 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     configPath: 'characterInterview.model',
   },
   {
+    id: 'roleplay-interview',
+    task: LlmTask.ROLEPLAY_INTERVIEW,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      "A trainer talks to Studio's Agent Builder Copilot about a roleplay",
+    detail:
+      'Streamed interview turn through the shared validated runner (src/llm-agent/runtime): ' +
+      'a turn ends only through ask_trainer / finish_turn, checked before it is shown, so a ' +
+      'turn can take a pass or two more (at most two rejections). Tools record the brief, ' +
+      'look up competencies, learner profiles, languages, Learning Design and the Character ' +
+      'Library (search_characters runs the roleplay fit check, its own row) and propose the ' +
+      'plan. Nothing is generated here: on approval the web runs the Agent Builder rows. Runs ' +
+      'on any of the three providers through AgentLlmProviderFactory; the prompt row wins, ' +
+      'then the Course Copilot model setting.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'resolved',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'COURSE_COPILOT_MODEL / COURSE_COPILOT_PROVIDER',
+    promptOverride: 'roleplay_interview_interviewer_system',
+    // Drives AgentLlmProviderFactory directly and falls back to the Course
+    // Copilot model, so `courseCopilot.model` is what it reads — no tier.
+    configPath: 'courseCopilot.model',
+  },
+  {
     id: 'translate-scenario',
     task: LlmTask.TRANSLATE_SCENARIO,
     runtime: LlmRuntime.ALLY_BE,
@@ -2175,7 +2199,7 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
         'and has free queue slots',
       detail:
         `PM Agent ${lane} lane: a read-only tool loop over ${reads}, at most 6 passes of ` +
-        '4,000 output tokens, ending in one submit_candidates call (one repair retry). ' +
+        '12,000 output tokens, ending in one submit_candidates call of at most 2 candidates (one repair retry). ' +
         'Mandate, strategy page, product map, the roadmap filing checklist and a digest of what ' +
         'the roadmap already holds ride in a cached system block. It proposes; an accepted card ' +
         'is filed to the roadmap, never built.',
@@ -3345,6 +3369,22 @@ const COURSE_COPILOT_TASKS: AiTaskEntry[] = [
     defaultModel: 'gpt-5-mini',
     configuredBy: 'LLM_REASONING_MODEL',
     promptOverride: 'course_copilot_roleplay_fit_check',
+  },
+  {
+    id: 'agent-builder-revise-plan',
+    task: LlmTask.AGENT_BUILDER_REVISE_PLAN,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger:
+      'A trainer asks the Agent Builder wizard for a change after the roleplay is generated',
+    detail:
+      'Picks which fields the request changes (and what to change in each); the wizard ' +
+      'then rewrites only those through enhance-field. One call per request. JSON mode.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'agent_builder_wizard_revise_plan',
   },
   {
     id: 'course-copilot-image-prompt',

@@ -24,6 +24,56 @@ export interface AgentBuilderEstablishedContext {
   persona?: Partial<AgentBuilderPersona>;
 }
 
+/** A roleplay's mode, from the Course Design Manual (same rules as Course Copilot). */
+export type RoleplayMode =
+  | "learning"
+  | "practice"
+  | "performance"
+  | "pre_assessment"
+  | "post_assessment";
+
+export const ROLEPLAY_MODES: RoleplayMode[] = [
+  "learning",
+  "practice",
+  "performance",
+  "pre_assessment",
+  "post_assessment",
+];
+
+/** What a mode sets on the roleplay form, by form field name. */
+export interface RoleplayDesign {
+  mode: RoleplayMode;
+  settings: {
+    experienceMode: "FEEDBACK" | "NONE";
+    remindersEnabled: boolean;
+    currentState: boolean;
+    supervisorNotesEnabled: boolean;
+    selectedMainPromptCode?: string;
+  };
+  /** False when no state-aware main prompt exists: the roleplay gets no states. */
+  states: boolean;
+}
+
+/** A Character Library character the fit check considered for this roleplay. */
+export interface AgentBuilderCharacterSuggestion {
+  id: string;
+  name: string;
+  /** "52, female, farmer, Mandya". */
+  summary: string;
+  hasVoices: boolean;
+  profileExcerpt: string;
+}
+
+export interface AgentBuilderCharacterSuggestions {
+  /** Search order, best first; only characters this trainer can open. */
+  characters: AgentBuilderCharacterSuggestion[];
+  /** The fit check's pick; null means none fits (write a new character) or no verdict. */
+  recommendedId: string | null;
+  reason: string | null;
+  /** The library could not be searched: says nothing about what it holds. */
+  searchFailed: boolean;
+}
+
 export interface GenerateAgentBuilderFieldRequest {
   field: AgentBuilderField;
   actorDescription: string;
@@ -46,6 +96,11 @@ export interface GenerateAgentBuilderFieldRequest {
    * by the first-stage fields themselves and by `spoken_languages`.
    */
   establishedContext?: AgentBuilderEstablishedContext;
+  /**
+   * `states` only: the roleplay mode picked in the wizard. The server lays the states out for it
+   * (a rupture state below 0, then bands sized for the mode).
+   */
+  roleplayMode?: RoleplayMode;
   model?: string;
   provider?: "openai" | "anthropic";
 }
@@ -138,7 +193,58 @@ const agentBuilderAPI = baseAPI.injectEndpoints({
         body,
       }),
     }),
+
+    /** Library characters that could play the roleplay, with the fit check's recommendation. */
+    suggestAgentBuilderCharacters: builder.mutation<
+      AgentBuilderCharacterSuggestions,
+      { description: string; competencyIds?: string[]; mode?: RoleplayMode }
+    >({
+      query: body => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.AGENT_BUILDER_CHARACTER_SUGGESTIONS,
+        method: HttpMethod.POST,
+        body,
+      }),
+    }),
+
+    /** A generated field's text in the roleplay's other languages, keyed by languageId. */
+    translateForAgentBuilder: builder.mutation<
+      { translations: Record<string, string> },
+      { text: string; targets: { languageId: string; languageCode: string }[] }
+    >({
+      query: body => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.AGENT_BUILDER_TRANSLATE,
+        method: HttpMethod.POST,
+        body,
+      }),
+    }),
+
+    /** Which fields a trainer's change request touches, and what to change in each. */
+    revisePlan: builder.mutation<
+      { fields: { id: string; change: string }[]; reply: string },
+      { instruction: string; fields: { id: string; label: string; value: string }[] }
+    >({
+      query: body => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.AGENT_BUILDER_REVISE_PLAN,
+        method: HttpMethod.POST,
+        body,
+      }),
+    }),
+
+    /** What a roleplay mode sets: supports, experience mode and the state-aware main prompt. */
+    getRoleplayDesign: builder.query<RoleplayDesign, RoleplayMode>({
+      query: mode => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.AGENT_BUILDER_ROLEPLAY_DESIGN,
+        method: HttpMethod.GET,
+        params: { mode },
+      }),
+    }),
   }),
 });
 
-export const { useGenerateAgentBuilderFieldMutation } = agentBuilderAPI;
+export const {
+  useGenerateAgentBuilderFieldMutation,
+  useLazyGetRoleplayDesignQuery,
+  useSuggestAgentBuilderCharactersMutation,
+  useRevisePlanMutation,
+  useTranslateForAgentBuilderMutation,
+} = agentBuilderAPI;

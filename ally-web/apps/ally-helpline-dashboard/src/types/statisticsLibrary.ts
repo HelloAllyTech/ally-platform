@@ -52,6 +52,8 @@ export interface StatisticsChartEntry {
   /** The question the chart answers. */
   question: string;
   group: StatisticsChartGroup;
+  /** The tab the chart belongs on. */
+  home: StatisticsViewId;
   shape: string;
   chart: string;
   size: StatisticsChartSize;
@@ -64,10 +66,32 @@ export interface StatisticsChartEntry {
   reason: string | null;
 }
 
+/** The tabs of the page that show charts. */
+export type StatisticsViewId = "organisation" | "course" | "learner";
+
+export interface StatisticsViewSection {
+  /** Translation key under `statisticsLibrary.sections`. */
+  key: string;
+  /** Drawn for the course or learner chosen on the view rather than the whole organisation. */
+  subject: boolean;
+  charts: string[];
+}
+
+export interface StatisticsViewConfig {
+  id: StatisticsViewId;
+  /** What the view asks you to choose, or null when it is about the whole organisation. */
+  subject: StatisticsFilterKey | null;
+  sections: StatisticsViewSection[];
+  /** The layout before a person customises, in section order. */
+  defaultLayout: string[];
+}
+
 export interface StatisticsChartLibrary {
   /** Whether the new page is switched on for this tenant. */
   enabled: boolean;
   charts: StatisticsChartEntry[];
+  /** The tabs that show charts. Absent from a backend older than the tabs. */
+  views?: StatisticsViewConfig[];
 }
 
 export interface StatisticsChartResponse<T = unknown> {
@@ -275,6 +299,8 @@ export interface CoursePerformanceData {
 export interface GetStatisticsScopeOptionsRequest {
   kind: StatisticsFilterKey;
   search?: string;
+  /** Describe this one option instead of listing. */
+  id?: string;
 }
 
 /** TSQ-043 */
@@ -310,4 +336,45 @@ export interface RoleplayAttemptsData {
 /** TSQ-065 */
 export interface SkillTrendData {
   skills: Array<{ skill: string; points: Array<{ slice: number; level: number }> }>;
+}
+
+/** One finding on For you: what a rule found in the organisation's own charts. */
+export interface StatisticsInsight {
+  /** Names the finding and the week it was found in; used to put it away. */
+  fingerprint: string;
+  /** The rule. The sentence is written from it, in the reader's language. */
+  ruleId: string;
+  polarity: "attention" | "celebrate";
+  severity: number;
+  /** The numbers and names the sentence is written from. */
+  params: Record<string, string | number>;
+  /** The chart the finding comes from, and the tab it is on. */
+  chartId: string;
+  view: StatisticsViewId;
+  /** The course or learner that shows the finding, when it is about one. */
+  filters?: Partial<Record<StatisticsFilterKey, string>>;
+}
+
+export interface StatisticsInsights {
+  attention: StatisticsInsight[];
+  celebrate: StatisticsInsight[];
+}
+
+export interface UpdateStatisticsInsightStateRequest {
+  fingerprint: string;
+  state: "done" | "snoozed";
+  /** How many days "snoozed" hides it. */
+  days?: number;
+}
+
+/** TSQ-064 */
+export interface LearnerCoursesData {
+  rows: Array<{
+    courseId: string;
+    title: string;
+    completedItems: number;
+    totalItems: number;
+    status: "completed" | "inProgress" | "notStarted";
+    lastActivityAt: string | null;
+  }>;
 }

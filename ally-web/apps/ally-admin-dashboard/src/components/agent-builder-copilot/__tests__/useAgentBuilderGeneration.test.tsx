@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { UseFormReturn } from "react-hook-form";
 
@@ -70,13 +70,36 @@ const mocks = vi.hoisted(() => {
         ),
     };
   });
-  return { state, requests, aborts, trigger };
+  const cover = {
+    start: vi.fn(() => ({
+      abort: vi.fn(),
+      unwrap: () =>
+        Promise.resolve({ jobId: "job-1", status: "succeeded", imageUrl: "https://img/fast.png" }),
+    })),
+    poll: vi.fn(() => ({
+      unwrap: () =>
+        Promise.resolve({ jobId: "job-1", status: "succeeded", imageUrl: "https://img/cover.png" }),
+    })),
+  };
+  const translate = vi.fn((body: { targets: { languageId: string }[] }) => ({
+    abort: vi.fn(),
+    unwrap: () =>
+      Promise.resolve({
+        translations: Object.fromEntries(
+          body.targets.map(t => [t.languageId, `translated ${t.languageId}`]),
+        ),
+      }),
+  }));
+  return { state, requests, aborts, trigger, cover, translate };
 });
 
 const { state, requests, aborts, trigger } = mocks;
 
 vi.mock("@api", () => ({
   useGenerateAgentBuilderFieldMutation: () => [mocks.trigger],
+  useStartCoverImageJobMutation: () => [mocks.cover.start],
+  useLazyGetCoverImageJobQuery: () => [mocks.cover.poll],
+  useTranslateForAgentBuilderMutation: () => [mocks.translate],
   useGetAvailableLanguageVoicesQuery: () => ({ data: CATALOG_FOR_MOCK, isLoading: false }),
 }));
 
@@ -334,9 +357,7 @@ describe("useAgentBuilderGeneration — chained stages", () => {
     // should remain "active", while `spoken_languages` (also stage one, but
     // independent) should finish.
     await waitFor(() =>
-      expect(result.current.tasks.find(t => t.field === "spoken_languages")?.status).toBe(
-        "done",
-      ),
+      expect(result.current.tasks.find(t => t.field === "spoken_languages")?.status).toBe("done"),
     );
     expect(result.current.tasks.find(t => t.field === "challenge_description")?.status).toBe(
       "active",
@@ -399,5 +420,206 @@ describe("useAgentBuilderGeneration — chained stages", () => {
     expect(result.current.tasks.find(t => t.field === "title")?.status).toBe("aborted");
     await Promise.resolve();
     expect(fieldsRequested()).not.toContain("title");
+  });
+});
+
+describe("useAgentBuilderGeneration — roleplay mode", () => {
+  it("asks for states laid out for the mode, even before the prompt lookup says states", async () => {
+    const { form } = makeForm();
+    const { result } = renderHook(() => useAgentBuilderGeneration(form));
+
+    act(() => result.current.start({ ...INPUTS, roleplayMode: "learning", includeStates: true }));
+    await waitFor(() => expect(result.current.phase).toBe("done"));
+
+    const states = requests.find(r => r.field === "states");
+    expect(states).toMatchObject({ roleplayMode: "learning" });
+    // The mode rides only on the states call.
+    expect(requests.find(r => r.field === "title")?.roleplayMode).toBeUndefined();
+  });
+
+  it("switches reminders off when the mode turned them on and none were written", async () => {
+    state.responses.reminders = "";
+    const { form, store } = makeForm({ remindersEnabled: true });
+    const { result } = renderHook(() => useAgentBuilderGeneration(form));
+
+    act(() => result.current.start({ ...INPUTS, roleplayMode: "practice" }));
+    await waitFor(() => expect(result.current.phase).toBe("done"));
+
+    expect(store.remindersEnabled).toBe(false);
+    expect(result.current.checks).toEqual(["remindersHidden"]);
+  });
+
+  it("leaves reminders alone without a mode", async () => {
+    state.responses.reminders = "";
+    const { form, store } = makeForm({ remindersEnabled: true });
+    const { result } = renderHook(() => useAgentBuilderGeneration(form));
+
+    act(() => result.current.start(INPUTS));
+    await waitFor(() => expect(result.current.phase).toBe("done"));
+
+    expect(store.remindersEnabled).toBe(true);
+    expect(result.current.checks).toEqual([]);
+    expect(fieldsRequested()).not.toContain("states");
+  });
+
+  it("keeps a library character's persona and backstory instead of generating them", async () => {
+    const { form } = makeForm({ name: "Gowramma", age: 52, gender: "female" });
+    const { result } = renderHook(() => useAgentBuilderGeneration(form));
+
+    act(() => result.current.start({ ...INPUTS, libraryCharacter: true }));
+    await waitFor(() => expect(result.current.phase).toBe("done"));
+
+    expect(fieldsRequested()).not.toContain("persona");
+    expect(fieldsRequested()).not.toContain("backstory");
+    expect(requests.find(r => r.field === "title")?.establishedContext).toMatchObject({
+      persona: { name: "Gowramma", age: 52, gender: "female" },
+    });
+  });
+
+  describe("cover image", () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      mocks.cover.start.mockClear();
+      mocks.cover.poll.mockClear();
+    });
+    afterEach(() => vi.useRealTimers());
+
+    it("generates a cover from the title and persona once they are in, polling the job", async () => {
+      mocks.cover.start.mockReturnValueOnce({
+        abort: vi.fn(),
+        unwrap: () => Promise.resolve({ jobId: "job-1", status: "running" }),
+      } as any);
+      const { form, store } = makeForm();
+      const { result } = renderHook(() => useAgentBuilderGeneration(form));
+
+      act(() => result.current.start(INPUTS));
+      await waitFor(() => expect(mocks.cover.start).toHaveBeenCalled());
+      expect(mocks.cover.start.mock.calls[0][0]).toMatchObject({
+        title: "A tired daughter-in-law",
+        name: "Suchi",
+        age: 34,
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3500);
+      });
+      await waitFor(() => expect(result.current.phase).toBe("done"));
+      expect(mocks.cover.poll).toHaveBeenCalledWith("job-1");
+      expect(store.coverImageUrl).toBe("https://img/cover.png");
+      expect(result.current.tasks.find(t => t.key === "cover_image")?.status).toBe("done");
+    });
+
+    it("keeps a cover that is already on the form", async () => {
+      const { form, store } = makeForm({ coverImageUrl: "https://img/mine.png" });
+      const { result } = renderHook(() => useAgentBuilderGeneration(form));
+
+      act(() => result.current.start(INPUTS));
+      await waitFor(() => expect(result.current.phase).toBe("done"));
+      expect(mocks.cover.start).not.toHaveBeenCalled();
+      expect(store.coverImageUrl).toBe("https://img/mine.png");
+    });
+
+    it("notes a refused cover without failing the batch", async () => {
+      mocks.cover.start.mockReturnValueOnce({
+        abort: vi.fn(),
+        unwrap: () => Promise.reject({ status: 403 }),
+      } as any);
+      const { form } = makeForm();
+      const { result } = renderHook(() => useAgentBuilderGeneration(form));
+
+      act(() => result.current.start(INPUTS));
+      await waitFor(() => expect(result.current.phase).toBe("done"));
+      expect(result.current.tasks.find(t => t.key === "cover_image")).toMatchObject({
+        status: "error",
+        error: "you don't have permission to generate cover images",
+      });
+      expect(result.current.tasks.find(t => t.field === "title")?.status).toBe("done");
+    });
+
+    it("skips the cover when asked", async () => {
+      const { form } = makeForm();
+      const { result } = renderHook(() => useAgentBuilderGeneration(form));
+      act(() => result.current.start({ ...INPUTS, generateCover: false }));
+      await waitFor(() => expect(result.current.phase).toBe("done"));
+      expect(result.current.tasks.some(t => t.key === "cover_image")).toBe(false);
+    });
+  });
+
+  it("uses the trainer's languages instead of detecting them", async () => {
+    const { form } = makeForm();
+    const { result } = renderHook(() => useAgentBuilderGeneration(form));
+
+    act(() =>
+      result.current.start({
+        ...INPUTS,
+        generateCover: false,
+        languages: [{ languageId: "2", label: "Hindi (India)", code: "hi" }],
+      }),
+    );
+    await waitFor(() => expect(result.current.phase).toBe("done"));
+
+    expect(fieldsRequested()).not.toContain("spoken_languages");
+    expect(requests.filter(r => r.field === "opening_statements").map(r => r.languageId)).toEqual([
+      "2",
+    ]);
+    expect(result.current.tasks.find(t => t.field === "spoken_languages")?.label).toBe(
+      "Languages you chose: Hindi (India)",
+    );
+  });
+
+  it("translates the challenge description into the other voiced languages, last", async () => {
+    mocks.translate.mockClear();
+    const { form, store } = makeForm();
+    const { result } = renderHook(() => useAgentBuilderGeneration(form));
+
+    act(() => result.current.start({ ...INPUTS, generateCover: false }));
+    await waitFor(() => expect(result.current.phase).toBe("done"));
+
+    // The title, the description and the reminders, each into the other selected languages.
+    expect(mocks.translate).toHaveBeenCalledTimes(3);
+    expect(mocks.translate.mock.calls.map(c => c[0].text)).toEqual([
+      "A tired daughter-in-law",
+      "She minimises.",
+      "Slow down",
+    ]);
+    expect(store.translationTitle).toEqual({ "2": "translated 2" });
+    expect(store.translationReminders).toEqual({ "2": "translated 2" });
+    expect(requests.find(r => r.field === "reminders")?.languageId).toBe("1");
+    const body = mocks.translate.mock.calls[0][0];
+    // Hindi got a voice in this batch; English is the main language and is not translated.
+    expect(body.targets).toEqual([{ languageId: "2", languageCode: "hi-IN" }]);
+    expect(store.translationDescription).toEqual({ "2": "translated 2" });
+    expect(
+      result.current.tasks.find(t => t.key === "challenge_description_translations")?.status,
+    ).toBe("done");
+  });
+
+  it("keeps the roleplay to the selected languages only", async () => {
+    mocks.translate.mockClear();
+    // A roleplay that starts with voices and leftovers for languages nobody chose.
+    const { form, store } = makeForm({
+      languageVoices: { "1": "en-f", "2": "hi-m", "7": "ta-f", "9": "ml-m" },
+      translationDescription: { "7": "old Tamil text" },
+      linguisticStyleSamples: { "9": ["old Malayalam"] },
+    });
+    const { result } = renderHook(() => useAgentBuilderGeneration(form));
+
+    act(() =>
+      result.current.start({
+        ...INPUTS,
+        generateCover: false,
+        languages: [{ languageId: "2", label: "Hindi (India)", code: "hi" }],
+      }),
+    );
+    await waitFor(() => expect(result.current.phase).toBe("done"));
+
+    // Only Hindi is playable; English stays as the main (base) tab's language.
+    expect(Object.keys(store.languageVoices as object)).toEqual(["2"]);
+    expect(store.translationDescription).toEqual({ "2": "translated 2" });
+    expect(Object.keys(store.linguisticStyleSamples as object)).toEqual(["2"]);
+    expect(
+      mocks.translate.mock.calls.every(
+        c => c[0].targets.map((t: any) => t.languageId).join() === "2",
+      ),
+    ).toBe(true);
   });
 });

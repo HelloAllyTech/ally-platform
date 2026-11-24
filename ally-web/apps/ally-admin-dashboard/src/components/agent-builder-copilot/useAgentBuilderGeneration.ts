@@ -6,7 +6,11 @@ import {
   AgentBuilderEstablishedContext,
   AgentBuilderField,
   AgentBuilderSpokenLanguage,
+  RoleplayMode,
   useGenerateAgentBuilderFieldMutation,
+  useLazyGetCoverImageJobQuery,
+  useStartCoverImageJobMutation,
+  useTranslateForAgentBuilderMutation,
   useGetAvailableLanguageVoicesQuery,
 } from "@api";
 import type { LanguageOption } from "@components/linguistic-style-samples/scenarioLanguageUtils";
@@ -87,7 +91,64 @@ export interface GenerationInputs {
   actorDescription: string;
   competency?: string;
   agentTestCases?: string;
+  /**
+   * The mode picked in the wizard. The server lays the states out for it, and after the batch a
+   * check repairs what the mode's settings and the generated fields disagree on.
+   */
+  roleplayMode?: RoleplayMode;
+  /**
+   * Generate states even if the form's main prompt hasn't been read as state-aware yet: the
+   * mode has just set one, and the placeholder lookup is asynchronous.
+   */
+  includeStates?: boolean;
+  /**
+   * A Character Library character is already on the form: its persona and backstory are kept,
+   * not generated, and every other field is written from them.
+   */
+  libraryCharacter?: boolean;
+  /**
+   * Generate a cover image once the title, challenge and persona are in (default on). A cover
+   * already on the form (the trainer's, or a library character's) is kept.
+   */
+  generateCover?: boolean;
+  /**
+   * The languages the trainer chose in the wizard. Given, they replace detecting the languages
+   * from the brief; voices already on the form for them are kept, and only the rest are cast.
+   */
+  languages?: AgentBuilderSpokenLanguage[];
+  /**
+   * The states are already on the form (an approved interview plan): they are not generated
+   * again, so the roleplay keeps the states the trainer approved.
+   */
+  statesOnForm?: boolean;
 }
+
+/** The challenge description's other language tabs, translated once the batch is in. */
+const TRANSLATE_TASK = {
+  key: "challenge_description_translations",
+  label: "Title, challenge description and reminders in the other languages",
+};
+
+/** The cover row: not a field generator, an image job (start, then poll until it settles). */
+const COVER_TASK = { key: "cover_image", label: "Cover image" };
+const COVER_POLL_MS = 3000;
+/** Image generation can take a minute or two; past this the row gives up, the job may still land. */
+const COVER_MAX_WAIT_MS = 4 * 60 * 1000;
+
+const plainText = (value: unknown, max: number): string =>
+  String(value ?? "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, max);
+
+const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+
+/** The fields a library character supplies itself. */
+const CHARACTER_FIELDS: ReadonlySet<AgentBuilderField> = new Set<AgentBuilderField>([
+  "persona",
+  "backstory",
+]);
 
 /**
  * The language-agnostic fields, in the order shown in the feed. `states` is
@@ -178,10 +239,34 @@ const toSpokenLanguages = (value: unknown): AgentBuilderSpokenLanguage[] =>
     l => typeof l?.languageId === "string" && l.languageId.trim().length > 0,
   );
 
+/**
+ * After a batch with a mode: repair what the mode's settings and the generated fields disagree on
+ * (the same rule as the roleplay agent's validator in ally-be). Reminders switched on with none
+ * written would show the learner an empty panel, so they are switched off. Returns the keys of
+ * what changed, for the feed.
+ */
+export const checkAgainstMode = (formMethods: UseFormReturn<any>): string[] => {
+  const changed: string[] = [];
+  const reminders = formMethods.getValues("reminders");
+  const hasReminders = Array.isArray(reminders)
+    ? reminders.length > 0
+    : typeof reminders === "string" && reminders.trim().length > 0;
+  if (formMethods.getValues("remindersEnabled") && !hasReminders) {
+    formMethods.setValue("remindersEnabled", false, { shouldDirty: true, shouldValidate: false });
+    changed.push("remindersHidden");
+  }
+  return changed;
+};
+
 export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
   const [trigger] = useGenerateAgentBuilderFieldMutation();
+  const [startCoverJob] = useStartCoverImageJobMutation();
+  const [pollCoverJob] = useLazyGetCoverImageJobQuery();
+  const [translateField] = useTranslateForAgentBuilderMutation();
   const [phase, setPhase] = useState<GenerationPhase>("idle");
   const [tasks, setTasks] = useState<GenerationTask[]>([]);
+  // What the post-batch check changed, in words, for the feed.
+  const [checks, setChecks] = useState<string[]>([]);
 
   // Include `states` in the fan-out only when the currently-selected main-agent
   // prompt uses states — mirrors the StatesEditor's own visibility gate so we
@@ -241,16 +326,28 @@ export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
       if (runningRef.current) return;
       runningRef.current = true;
       abortedRef.current = false;
-      setTasks(
-        fieldPlan.map(t => ({
+      setChecks([]);
+      const plan = (
+        inputs.includeStates && !fieldPlan.some(t => t.field === STATES_FIELD.field)
+          ? [...BASE_FIELD_PLAN, STATES_FIELD, SPOKEN_LANGUAGES_FIELD]
+          : fieldPlan
+      )
+        .filter(t => !(inputs.libraryCharacter && CHARACTER_FIELDS.has(t.field)))
+        .filter(t => !(inputs.statesOnForm && t.field === STATES_FIELD.field));
+      const withCover = inputs.generateCover !== false;
+      setTasks([
+        ...plan.map(t => ({
           ...t,
           key: t.field,
           status: (isStageOne(t.field) ? "active" : "waiting") as GenerationTaskStatus,
         })),
-      );
+        ...(withCover ? [{ ...COVER_TASK, status: "waiting" as GenerationTaskStatus }] : []),
+      ]);
       setPhase("running");
 
       const handles: { abort: () => void }[] = [];
+      // The languages this batch writes in (chosen, or read from the brief), set by the fan-out.
+      let batchLanguages: AgentBuilderSpokenLanguage[] = inputs.languages ?? [];
       // Per-field promises, so the voice pick can wait on `persona` alone
       // rather than on the whole batch — it needs the gender, nothing else.
       const runsByField = new Map<AgentBuilderField, Promise<void>>();
@@ -282,6 +379,14 @@ export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
           ...(task.establishedContext ? { establishedContext: task.establishedContext } : {}),
           ...(task.field === "knowledge_sources"
             ? { numKnowledgeSources: DEFAULT_KNOWLEDGE_SOURCES }
+            : {}),
+          ...(task.field === "states" && inputs.roleplayMode
+            ? { roleplayMode: inputs.roleplayMode }
+            : {}),
+          // Reminders fill the main language's tab: say which, or the writer follows the brief's
+          // language (Hindi reminders in the English tab when the client speaks Hindi).
+          ...(task.field === "reminders" && primaryLanguageIdRef.current != null
+            ? { languageId: String(primaryLanguageIdRef.current) }
             : {}),
         });
         handles.push(handle);
@@ -335,14 +440,20 @@ export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
        * what was inferred from the brief — and spot a wrong guess before
        * reviewing the tabs.
        */
-      const fanOutLanguages = (languages: AgentBuilderSpokenLanguage[]): Promise<void> => {
+      const fanOutLanguages = (
+        languages: AgentBuilderSpokenLanguage[],
+        chosen = false,
+      ): Promise<void> => {
+        batchLanguages = languages;
         if (languages.length === 0) {
           patchTask(SPOKEN_LANGUAGES_FIELD.field, { status: "empty" });
           return Promise.resolve();
         }
         patchTask(SPOKEN_LANGUAGES_FIELD.field, {
           status: "done",
-          label: `${SPOKEN_LANGUAGES_FIELD.label}: ${languages.map(l => l.label).join(", ")}`,
+          label: `${chosen ? "Languages you chose" : SPOKEN_LANGUAGES_FIELD.label}: ${languages
+            .map(l => l.label)
+            .join(", ")}`,
         });
         const languageTasks = languages.flatMap(language =>
           LANGUAGE_FIELD_PLAN.map(({ field, label }) => ({
@@ -459,7 +570,10 @@ export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
       // `challenge_description` runs after `persona` completes, using its output
       // as context to ensure consistency. The final `foundation` promise for
       // stage two waits for all three to settle.
-      const personaRun = runTask({ key: "persona", field: "persona" });
+      // A library character's persona is already on the form, so there is nothing to wait for.
+      const personaRun = inputs.libraryCharacter
+        ? Promise.resolve()
+        : runTask({ key: "persona", field: "persona" });
       runsByField.set("persona", personaRun);
 
       const challengeDescRun = personaRun.then(() => {
@@ -476,10 +590,12 @@ export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
       runsByField.set("challenge_description", challengeDescRun);
 
       // `spoken_languages` is independent of the other foundation fields and can
-      // run in parallel with `persona`.
+      // run in parallel with `persona`. Languages the trainer chose skip the detection call.
       runsByField.set(
         SPOKEN_LANGUAGES_FIELD.field,
-        runTask({ key: SPOKEN_LANGUAGES_FIELD.field, field: SPOKEN_LANGUAGES_FIELD.field }),
+        inputs.languages?.length
+          ? fanOutLanguages(inputs.languages, true)
+          : runTask({ key: SPOKEN_LANGUAGES_FIELD.field, field: SPOKEN_LANGUAGES_FIELD.field }),
       );
 
       // The `foundation` promise resolves once both foundation fields have
@@ -488,27 +604,194 @@ export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
         abortedRef.current ? undefined : readEstablishedContext(formMethods),
       );
 
-      for (const { field } of fieldPlan.filter(t => !isStageOne(t.field))) {
+      for (const { field } of plan.filter(t => !isStageOne(t.field))) {
         runsByField.set(field, runAfterFoundation({ key: field, field }));
       }
+
+      /**
+       * The cover, once the title exists (and the challenge and persona it is drawn from). Never
+       * rejects: a cover that can't be made (no permission, moderation, timeout) is one row's
+       * note, not a failed batch.
+       */
+      const makeCover = async (): Promise<void> => {
+        await Promise.allSettled([foundation, runsByField.get("title")]);
+        if (abortedRef.current) return;
+        if (String(formMethods.getValues("coverImageUrl") ?? "").trim()) {
+          patchTask(COVER_TASK.key, {
+            status: "empty",
+            label: `${COVER_TASK.label}: kept the existing one`,
+          });
+          return;
+        }
+        const title = plainText(formMethods.getValues("title"), 300);
+        if (!title) {
+          patchTask(COVER_TASK.key, {
+            status: "empty",
+            label: `${COVER_TASK.label}: needs a title first`,
+          });
+          return;
+        }
+        patchTask(COVER_TASK.key, { status: "active" });
+        const age = Number(formMethods.getValues("age"));
+        try {
+          const started = startCoverJob({
+            title,
+            description: plainText(formMethods.getValues("description"), 2000) || undefined,
+            name: plainText(formMethods.getValues("name"), 200) || undefined,
+            ...(Number.isInteger(age) && age > 0 && age <= 120 ? { age } : {}),
+            gender: plainText(formMethods.getValues("gender"), 100) || undefined,
+            profession: plainText(formMethods.getValues("profession"), 200) || undefined,
+            currentLocation: plainText(formMethods.getValues("currentLocation"), 300) || undefined,
+          });
+          handles.push(started);
+          const job = await started.unwrap();
+          const deadline = Date.now() + COVER_MAX_WAIT_MS;
+          let status = job;
+          while (status.status === "running" && Date.now() < deadline) {
+            await sleep(COVER_POLL_MS);
+            if (abortedRef.current) return;
+            status = await pollCoverJob(job.jobId).unwrap();
+          }
+          if (abortedRef.current) return;
+          if (status.status === "succeeded" && status.imageUrl) {
+            formMethods.setValue("coverImageUrl", status.imageUrl, {
+              shouldDirty: true,
+              shouldValidate: false,
+            });
+            patchTask(COVER_TASK.key, { status: "done" });
+          } else if (status.status === "running") {
+            patchTask(COVER_TASK.key, {
+              status: "error",
+              error: "still generating; pick it later from the image library",
+            });
+          } else {
+            patchTask(COVER_TASK.key, {
+              status: "error",
+              error: status.error || "generation failed",
+            });
+          }
+        } catch (err) {
+          if (abortedRef.current) return;
+          const forbidden = (err as { status?: number })?.status === 403;
+          patchTask(COVER_TASK.key, {
+            status: "error",
+            error: forbidden
+              ? "you don't have permission to generate cover images"
+              : errorMessage(err),
+          });
+        }
+      };
+      if (withCover) runsByField.set("cover_image" as AgentBuilderField, makeCover());
       const runs = [...runsByField.values()];
       // Same array the per-language calls push into later, so Stop cancels
       // them too even though they don't exist yet at this point.
       handlesRef.current = handles;
 
-      void Promise.allSettled(runs).then(() => {
+      /**
+       * The challenge description in the roleplay's other languages: every catalog language with
+       * a voice on the form (the languages a learner can play in), apart from the main one whose
+       * text was just generated. Runs last, once the description and the voices are both in.
+       */
+      /**
+       * Drop every language outside `selected` (and the main language, whose tab is the base
+       * text) from the per-language fields and the voice mapping, so a roleplay never keeps a
+       * language the trainer did not choose, including one left from an earlier generation.
+       */
+      const keepOnlyLanguages = (selected: Set<string>, primary: string) => {
+        const keep = (id: string) => selected.has(id) || id === primary;
+        for (const field of [
+          "languageVoices",
+          "translationTitle",
+          "translationDescription",
+          "translationReminders",
+          "translationOpeningStatements",
+          "linguisticStyleSamples",
+          "allowedFillerWords",
+          "languageCharacteristics",
+        ]) {
+          const current = formMethods.getValues(field);
+          if (!current || typeof current !== "object" || Array.isArray(current)) continue;
+          const entries = Object.entries(current as Record<string, unknown>);
+          const kept = entries.filter(([id]) =>
+            field === "languageVoices" ? selected.has(id) : keep(id),
+          );
+          if (kept.length !== entries.length) {
+            formMethods.setValue(field, Object.fromEntries(kept), {
+              shouldDirty: true,
+              shouldValidate: false,
+            });
+          }
+        }
+      };
+
+      const translateDescription = async (): Promise<void> => {
+        const primary = String(primaryLanguageIdRef.current ?? "");
+        const selected = new Set(batchLanguages.map(l => String(l.languageId)));
+        // The roleplay exists only in the languages selected (chosen by the trainer, or read from
+        // the brief): learners can play only those, and no other language keeps content.
+        if (selected.size && !abortedRef.current) keepOnlyLanguages(selected, primary);
+        const voices = (formMethods.getValues("languageVoices") ?? {}) as Record<string, string>;
+        const targets = catalogLanguagesRef.current
+          .filter(l => String(l.language_id) !== primary)
+          .filter(l =>
+            selected.size ? selected.has(String(l.language_id)) : voices[String(l.language_id)],
+          )
+          .map(l => ({ languageId: String(l.language_id), languageCode: l.value }));
+        // The main-language fields with a tab per language: the title, the challenge
+        // description, and the reminders the learner reads during the session.
+        const fields = [
+          { source: "title", target: "translationTitle" },
+          { source: "description", target: "translationDescription" },
+          { source: "reminders", target: "translationReminders" },
+        ]
+          .map(f => ({ ...f, text: String(formMethods.getValues(f.source) ?? "").trim() }))
+          .filter(f => f.text);
+        if (!fields.length || !targets.length || abortedRef.current) return;
+        setTasks(prev => [...prev, { ...TRANSLATE_TASK, status: "active" }]);
+        const results = await Promise.allSettled(
+          fields.map(async f => {
+            const handle = translateField({ text: f.text, targets });
+            handles.push(handle);
+            const { translations } = await handle.unwrap();
+            if (abortedRef.current) return;
+            const current = (formMethods.getValues(f.target) ?? {}) as Record<string, string>;
+            formMethods.setValue(
+              f.target,
+              { ...current, ...translations },
+              { shouldDirty: true, shouldValidate: false },
+            );
+          }),
+        );
+        if (abortedRef.current) {
+          patchTask(TRANSLATE_TASK.key, { status: "aborted" });
+          return;
+        }
+        const failed = results.find(r => r.status === "rejected") as
+          | PromiseRejectedResult
+          | undefined;
+        patchTask(
+          TRANSLATE_TASK.key,
+          failed
+            ? { status: "error", error: errorMessage(failed.reason) }
+            : { status: "done", label: `${TRANSLATE_TASK.label} (${targets.length})` },
+        );
+      };
+
+      void Promise.allSettled(runs).then(async () => {
+        await translateDescription();
         runningRef.current = false;
         if (abortedRef.current) {
           setPhase("aborted");
           return;
         }
         setPhase("done");
+        if (inputs.roleplayMode) setChecks(checkAgainstMode(formMethods));
         // Validate once now the batch is applied, so mandatory-field state and
         // the parent autosave settle from the final values (not per keystroke).
         void formMethods.trigger();
       });
     },
-    [trigger, formMethods, patchTask, fieldPlan],
+    [trigger, startCoverJob, pollCoverJob, translateField, formMethods, patchTask, fieldPlan],
   );
 
   const abort = useCallback(() => {
@@ -535,6 +818,7 @@ export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
     runningRef.current = false;
     handlesRef.current = [];
     setTasks([]);
+    setChecks([]);
     setPhase("idle");
   }, []);
 
@@ -556,5 +840,5 @@ export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
   const doneCount = tasks.filter(t => t.status !== "active" && t.status !== "waiting").length;
   const appliedCount = tasks.filter(t => t.status === "done").length;
 
-  return { phase, tasks, start, abort, reset, doneCount, appliedCount };
+  return { phase, tasks, start, abort, reset, doneCount, appliedCount, checks };
 };

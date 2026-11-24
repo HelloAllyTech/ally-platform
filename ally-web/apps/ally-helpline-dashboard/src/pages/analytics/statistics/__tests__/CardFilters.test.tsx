@@ -121,4 +121,34 @@ describe("a card's filter row", () => {
     fireEvent.click(screen.getByTestId("statistics-filter-course"));
     expect(screen.queryByTestId("statistics-filter-clear")).toBeNull();
   });
+
+  it("does not offer a filter the page supplies for the whole tab", () => {
+    render(
+      <CardFilters
+        filters={[
+          { key: "course", required: false },
+          { key: "simulation", required: false },
+        ]}
+        values={{ course: "c1" }}
+        hidden={["course"]}
+        labels={{}}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(screen.queryByTestId("statistics-filter-course")).toBeNull();
+    expect(screen.getByTestId("statistics-filter-simulation")).toBeTruthy();
+  });
+
+  it("draws nothing when every filter is supplied by the page", () => {
+    const { container } = render(
+      <CardFilters
+        filters={[{ key: "course", required: true }]}
+        values={{ course: "c1" }}
+        hidden={["course"]}
+        labels={{}}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(container.firstChild).toBeNull();
+  });
 });

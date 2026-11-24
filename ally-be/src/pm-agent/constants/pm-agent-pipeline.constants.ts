@@ -18,16 +18,25 @@ export const PM_PIPELINE = {
   LANE_MAX_SHARE: 0.5,
   /** Over-generate: ask lanes for about this many candidates per free slot. */
   CANDIDATE_MULTIPLIER: 3,
-  /** Candidates one lane may submit, whatever the slot count. */
-  MAX_CANDIDATES_PER_LANE: 6,
+  /**
+   * Candidates one lane may submit, whatever the slot count. Every candidate is a full
+   * recommendation (plan, opportunity…) in ONE submit call: at 5 per lane, gpt-5-mini's submit
+   * hit LANE_MAX_TOKENS (12000) and was discarded (prod 2026-11-24). 2 fits with reasoning room;
+   * 3–4 lanes still give the critic more candidates than the queue has slots.
+   */
+  MAX_CANDIDATES_PER_LANE: 2,
   /** Lanes one run may select (revisions excluded). */
   MAX_LANES_PER_RUN: 4,
   /** Tool-loop passes per lane, the forced-submit pass included. */
   MAX_PASSES: 6,
   /** Tool calls a single pass may make (extra calls are refused, not run). */
   MAX_TOOL_CALLS_PER_PASS: 6,
-  /** Output cap per lane pass and per critic call. */
-  LANE_MAX_TOKENS: 4000,
+  /**
+   * Output cap per lane pass and per critic call. Reasoning models (gpt-5-mini) spend part of
+   * it thinking: at 4000, prod submits were cut off at max_tokens and discarded (2026-11-24,
+   * infra_cost). 12000 leaves room for a full recommendation; the ledger still reserves per pass.
+   */
+  LANE_MAX_TOKENS: 12000,
   CRITIC_MAX_TOKENS: 3000,
   /** Per-call SDK deadline (passed to the provider, so a hung call stops billing). */
   CALL_TIMEOUT_MS: 90_000,

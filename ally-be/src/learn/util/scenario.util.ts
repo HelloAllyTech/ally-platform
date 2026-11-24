@@ -54,6 +54,7 @@ export const SCENARIO_METADATA_FIELDS: (keyof UpdateScenarioDto)[] = [
   'characterProfileText',
   'helperAgentPrompt',
   'agentBuilderDescription',
+  'agentBuilderChat',
   'agentBuilderPrompt',
   'showScoreMeter',
   'feedbackTabs',
@@ -257,6 +258,7 @@ export const mapCreateScenarioRequestToEntity = (
       characterProfileText: scenario.characterProfileText,
       helperAgentPrompt: scenario.helperAgentPrompt,
       agentBuilderDescription: scenario.agentBuilderDescription,
+      agentBuilderChat: scenario.agentBuilderChat,
       agentBuilderPrompt: scenario.agentBuilderPrompt,
       showScoreMeter: scenario.showScoreMeter,
       // `enableFeedback` is deliberately not persisted any more (retired

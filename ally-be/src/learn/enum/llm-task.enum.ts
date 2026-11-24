@@ -276,6 +276,9 @@ export enum LlmTask {
   // Character-library interview agent: one streamed interviewer/tool-loop
   // turn building a character profile.
   CHARACTER_INTERVIEW = 'character_interview',
+  // Studio's Agent Builder Copilot chat: one streamed roleplay-interview turn
+  // (brief, plan) for a single roleplay.
+  ROLEPLAY_INTERVIEW = 'roleplay_interview',
   // Builder: one streamed PRD-interview turn (the coding half's usage is
   // reported by the runner and recorded against BUILDER_BUILD).
   BUILDER_INTERVIEW = 'builder_interview',
@@ -393,6 +396,7 @@ export enum LlmTask {
   COURSE_COPILOT_SUMMARY = 'course_copilot_summary',
   COURSE_COPILOT_ROLEPLAY_BRIEF = 'course_copilot_roleplay_brief',
   COURSE_COPILOT_ROLEPLAY_FIT_CHECK = 'course_copilot_roleplay_fit_check',
+  AGENT_BUILDER_REVISE_PLAN = 'agent_builder_revise_plan',
   COURSE_COPILOT_IMAGE_PROMPT = 'course_copilot_image_prompt',
   COURSE_COPILOT_IMAGE = 'course_copilot_image',
   // The one Course Copilot call made outside a session: an admin's click on the

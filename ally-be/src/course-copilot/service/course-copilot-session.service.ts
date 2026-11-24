@@ -501,6 +501,7 @@ export class CourseCopilotSessionService {
       references: Array.isArray(job.result?.references)
         ? job.result.references
         : [],
+      roleplayCard: job.result?.roleplayCard ?? null,
       startedAt: iso(job.startedAt),
       finishedAt: iso(job.finishedAt),
       costUsd:

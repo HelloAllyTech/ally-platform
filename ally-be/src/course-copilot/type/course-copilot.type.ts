@@ -296,6 +296,8 @@ export interface CourseCopilotJobResult {
    * ("Manual.pdf, p. 12"), shown on the build panel for the trainer to check.
    */
   references?: string[];
+  /** A new roleplay's summary card (Course Pilot): who, goal, mode, states, supports, checks. */
+  roleplayCard?: CourseCopilotRoleplayCard;
   /** Article only: what an illustration should show, for the image job. */
   imageBrief?: string;
   /** Reviewer findings (course_review). */
@@ -313,4 +315,22 @@ export interface CourseReviewFinding {
   itemId?: string;
   note: string;
   suggestedAction?: { tool: string; input: Record<string, any> };
+}
+
+/** What the trainer sees about one roleplay Course Copilot built. */
+export interface CourseCopilotRoleplayCard {
+  title: string;
+  mode: string;
+  learnerGoal: string | null;
+  setting: string | null;
+  /** State names from rupture to most open; empty when the roleplay has none. */
+  states: string[];
+  supports: {
+    experienceMode: string | null;
+    reminders: boolean;
+    stateVisible: boolean;
+    supervisorNotes: boolean;
+  };
+  /** What the validator repaired or found, in words. */
+  checks: string[];
 }

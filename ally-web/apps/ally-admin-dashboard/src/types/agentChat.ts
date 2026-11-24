@@ -17,9 +17,13 @@ export interface AgentQuestionOption {
   description?: string;
   /** At most one per question; sorted first, marked, and focused for one-key answering. */
   recommended?: boolean;
+  /** The roleplay interview: what picking this option records in the question's brief field. */
+  value?: string;
 }
 
 export interface AgentQuestionEvent {
+  /** The roleplay interview: the brief field the answer fills (e.g. `languageIds`). */
+  field?: string;
   id: string;
   prompt: string;
   kind: AgentQuestionKind;

@@ -78,11 +78,13 @@ describe("every offered chart has a renderer", () => {
       "TSQ-023",
       "TSQ-024",
       "TSQ-026",
+      "TSQ-041",
       "TSQ-043",
       "TSQ-045",
       "TSQ-046",
       "TSQ-053",
       "TSQ-063",
+      "TSQ-064",
       "TSQ-065",
       "TSQ-038",
       "TSQ-039",
@@ -117,6 +119,7 @@ describe("empty states say so plainly", () => {
     ["TSQ-024", { rows: [] }, "skills.none"],
     ["TSQ-042", { weeks: [], enrolled: 0, completed: 0 }, "performance.none"],
     ["TSQ-043", { bins: [], boundsDays: [1, 3], completed: 0, medianDays: null }, "finish.none"],
+    ["TSQ-064", { rows: [] }, "learnerCourses.none"],
     ["TSQ-045", { rows: [] }, "modules.none"],
     ["TSQ-046", { rows: [] }, "modules.timeNone"],
     ["TSQ-053", { rows: [] }, "roleplay.none"],
@@ -422,5 +425,126 @@ describe("the remaining release-set charts", () => {
     draw("TSQ-065", data);
     expect(screen.getByTestId("statistics-skill-trend")).toBeTruthy();
     expect(takeaway("TSQ-065", data)).toContain('"latest":4');
+  });
+});
+
+describe("the course and learner overviews", () => {
+  it("TSQ-041 says how many of those enrolled have finished, or that nobody is enrolled", () => {
+    const facts = (enrolled: number, completed: number) => ({
+      measures: [
+        { key: "enrolled", value: enrolled, format: "count" },
+        { key: "completed", value: completed, format: "count" },
+      ],
+    });
+    expect(takeaway("TSQ-041", facts(20, 12))).toContain('"completed":12');
+    expect(takeaway("TSQ-041", facts(0, 0))).toBe("statisticsLibrary.takeaway.courseFactsNone");
+    draw("TSQ-041", facts(20, 12));
+    expect(screen.getByTestId("statistics-measures")).toBeTruthy();
+  });
+
+  it("TSQ-064 lists each course with its progress and counts finished ones", () => {
+    const data = {
+      rows: [
+        {
+          courseId: "a",
+          title: "Basics",
+          completedItems: 5,
+          totalItems: 5,
+          status: "completed",
+          lastActivityAt: null,
+        },
+        {
+          courseId: "b",
+          title: "Advanced",
+          completedItems: 2,
+          totalItems: 6,
+          status: "inProgress",
+          lastActivityAt: null,
+        },
+      ],
+    };
+    draw("TSQ-064", data);
+    expect(screen.getByTestId("statistics-learner-courses")).toBeTruthy();
+    expect(screen.getByText("Advanced")).toBeTruthy();
+    expect(takeaway("TSQ-064", data)).toContain('"done":1');
+    expect(takeaway("TSQ-064", { rows: [] })).toBeNull();
+  });
+});
+
+describe("pinned cards", () => {
+  const t = ((key: string, options?: Record<string, unknown>) =>
+    options ? `${key} ${JSON.stringify(options)}` : key) as never;
+  const pin = (id: string, data: unknown) => {
+    const renderer = CHART_RENDERERS[id];
+    if (renderer.kind !== "data" || !renderer.pin) throw new Error(`${id} cannot be pinned`);
+    return renderer.pin(data, t);
+  };
+
+  it("pins the headline active learners, with the change on the previous period", () => {
+    const summary = pin("TSQ-001", {
+      activeUsers: 86,
+      totalRegisteredLearners: 142,
+      previous: { activeUsers: 77, simulationsCompleted: 10 },
+    });
+    expect(summary?.value).toBe("86");
+    expect(summary?.change).toEqual({
+      text: 'statisticsLibrary.headline.changeUp {"count":9}',
+      tone: "good",
+    });
+  });
+
+  it("has no change for all time, where there is nothing to compare with", () => {
+    const summary = pin("TSQ-001", { activeUsers: 5, totalRegisteredLearners: 9, previous: null });
+    expect(summary?.change).toBeNull();
+  });
+
+  it("pins the latest week of usage with its trend, and reads a fall as bad news", () => {
+    const summary = pin("TSQ-002", {
+      activeUsers: [
+        { bucket: "a", count: 10 },
+        { bucket: "b", count: 7 },
+      ],
+    });
+    expect(summary?.series).toEqual([10, 7]);
+    expect(summary?.value).toBe("7");
+    expect(summary?.change?.tone).toBe("bad");
+  });
+
+  it("reads more learners needing attention as a number, not a change", () => {
+    expect(pin("TSQ-023", { total: 24, rows: [] })?.value).toBe("24");
+  });
+
+  it("pins the share of sessions reviewed, and nothing when there are none", () => {
+    expect(pin("TSQ-027", { completedSessions: 200, reviewedSessions: 50 })?.value).toBe("25%");
+    expect(pin("TSQ-027", { completedSessions: 0, reviewedSessions: 0 })).toBeNull();
+  });
+
+  it("pins the average rating to one decimal, and nothing before there are ratings", () => {
+    expect(pin("TSQ-026", { stars: [0, 0, 0, 1, 2], count: 3, average: 4.666 })?.value).toBe("4.7");
+    expect(pin("TSQ-026", { stars: [0, 0, 0, 0, 0], count: 0, average: null })).toBeNull();
+  });
+
+  it("pins the typical session score, and nothing without sessions", () => {
+    expect(pin("TSQ-020", { bins: [], sessions: 63, median: 69 })?.value).toBe("69");
+    expect(pin("TSQ-020", { bins: [], sessions: 0, median: null })).toBeNull();
+  });
+
+  it("pins courses live and learners on courses from their facts cards", () => {
+    const courses = {
+      measures: [
+        { key: "courses", value: 12, format: "count" },
+        { key: "live", value: 9, format: "count" },
+      ],
+    };
+    expect(pin("TSQ-038", courses)?.value).toBe("9");
+    const participation = { measures: [{ key: "learnersOnCourses", value: 30, format: "count" }] };
+    expect(pin("TSQ-039", participation)?.value).toBe("30");
+  });
+
+  it("does not let a table be pinned", () => {
+    ["TSQ-009", "TSQ-013"].forEach(id => {
+      const renderer = CHART_RENDERERS[id];
+      expect(renderer.kind === "data" && "pin" in renderer && renderer.pin).toBeFalsy();
+    });
   });
 });

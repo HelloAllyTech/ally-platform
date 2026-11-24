@@ -47,7 +47,10 @@ describe("reordering", () => {
 
   it("ignores an out-of-range move instead of corrupting the tree", () => {
     const blueprint = makeBlueprint();
-    expect(reorderItems(blueprint, "s1", 0, 9).sections[0].items.map(i => i.id)).toEqual(["a", "q"]);
+    expect(reorderItems(blueprint, "s1", 0, 9).sections[0].items.map(i => i.id)).toEqual([
+      "a",
+      "q",
+    ]);
     expect(reorderSections(blueprint, -1, 0)).toMatchObject({ sections: blueprint.sections });
   });
 
@@ -163,11 +166,7 @@ describe("video links", () => {
   });
 
   it("fills spec.url and spec.source and clears the needs-input marker", () => {
-    const { blueprint, valid } = setVideoUrl(
-      makeBlueprint(),
-      "v",
-      " https://youtu.be/abc123 ",
-    );
+    const { blueprint, valid } = setVideoUrl(makeBlueprint(), "v", " https://youtu.be/abc123 ");
     expect(valid).toBe(true);
     expect(blueprint.sections[1].items[1]).toMatchObject({
       source: { kind: "new" },

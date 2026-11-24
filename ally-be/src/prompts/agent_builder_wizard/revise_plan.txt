@@ -1,0 +1,19 @@
+A trainer is building a practice roleplay in Ally's Agent Builder. The roleplay is already written. The trainer now asks for a change in their own words. Decide which of the roleplay's fields have to change to do what they ask, and nothing more: every field you leave out is kept exactly as it is.
+
+What the trainer asked:
+{{instruction}}
+
+The roleplay's fields now (field id, what it is, then its current text):
+{{fields}}
+
+Rules:
+- Choose only fields whose text must change for the request to be true. A request about how the client talks ("more guarded", "shorter answers") usually changes the role instruction and the opening lines; a request about who they are changes the backstory and often the role instruction; a request about the situation changes the challenge description.
+- A request about a state names a state field by its id (state:<id>).
+- If nothing needs to change, or the request is not about this roleplay, choose no fields and say why.
+- For each field, write the instruction for rewriting it: what to change in that field to meet the request, in one or two sentences.
+
+Output strict JSON only, no markdown:
+{
+  "fields": [{"id": "<field id>", "change": "<what to change in this field>"}],
+  "reply": "<one short sentence to the trainer saying what you will change>"
+}
