@@ -200,5 +200,3 @@ export const OverviewPanel: React.FC = () => {
     </div>
   );
 };
-
-export default OverviewPanel;

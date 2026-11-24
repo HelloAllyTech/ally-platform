@@ -367,5 +367,3 @@ export const StaffCredits: React.FC<{ embedded?: boolean }> = ({ embedded = fals
     </div>
   );
 };
-
-export default StaffCredits;

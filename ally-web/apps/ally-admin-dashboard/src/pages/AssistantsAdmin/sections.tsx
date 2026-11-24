@@ -39,24 +39,35 @@ export interface AdminSection {
   note?: { text: string; linkLabel: string; to: { section: SectionId; view?: string } };
 }
 
-const lazyNamed = (load: () => Promise<Record<string, unknown>>, name: string) =>
-  lazy(() => load().then(m => ({ default: m[name] as React.ComponentType })));
-
-const Overview = lazyNamed(() => import("./OverviewPanel"), "OverviewPanel");
-const StaffCredits = lazyNamed(() => import("./panels/embedded"), "CreditsPanel");
-const Costs = lazyNamed(() => import("./panels/embedded"), "CostsPanel");
-const ModelPrices = lazyNamed(() => import("./panels/embedded"), "ModelPricesPanel");
-const WhatsAppRates = lazyNamed(() => import("./panels/embedded"), "WhatsAppRatesPanel");
-const Plans = lazyNamed(() => import("./panels/embedded"), "PlansPanel");
-const Packs = lazyNamed(() => import("./panels/embedded"), "SafetyPacksPanel");
-const StartingSettings = lazyNamed(() => import("./panels/embedded"), "StartingSettingsView");
-const QuickReplies = lazyNamed(() => import("./panels/embedded"), "QuickRepliesView");
-const Library = lazyNamed(() => import("./panels/embedded"), "KnowledgeLibraryView");
-const Channels = lazyNamed(() => import("./panels/embedded"), "ChannelsView");
-const Support = lazyNamed(() => import("./panels/embedded"), "SupportPanel");
-const Switches = lazyNamed(() => import("./LaunchPanels"), "SwitchesPanel");
-const Checklist = lazyNamed(() => import("./LaunchPanels"), "ChecklistPanel");
-const DataCleanup = lazyNamed(() => import("./LaunchPanels"), "DataPanel");
+// One explicit `import().then(m => m.X)` per panel, not a lookup by name: the dead-code scan
+// follows named property access on a dynamic import, and a string key would hide every panel.
+const Overview = lazy(() => import("./OverviewPanel").then(m => ({ default: m.OverviewPanel })));
+const StaffCredits = lazy(() =>
+  import("./panels/embedded").then(m => ({ default: m.CreditsPanel })),
+);
+const Costs = lazy(() => import("./panels/embedded").then(m => ({ default: m.CostsPanel })));
+const ModelPrices = lazy(() =>
+  import("./panels/embedded").then(m => ({ default: m.ModelPricesPanel })),
+);
+const WhatsAppRates = lazy(() =>
+  import("./panels/embedded").then(m => ({ default: m.WhatsAppRatesPanel })),
+);
+const Plans = lazy(() => import("./panels/embedded").then(m => ({ default: m.PlansPanel })));
+const Packs = lazy(() => import("./panels/embedded").then(m => ({ default: m.SafetyPacksPanel })));
+const StartingSettings = lazy(() =>
+  import("./panels/embedded").then(m => ({ default: m.StartingSettingsView })),
+);
+const QuickReplies = lazy(() =>
+  import("./panels/embedded").then(m => ({ default: m.QuickRepliesView })),
+);
+const Library = lazy(() =>
+  import("./panels/embedded").then(m => ({ default: m.KnowledgeLibraryView })),
+);
+const Channels = lazy(() => import("./panels/embedded").then(m => ({ default: m.ChannelsView })));
+const Support = lazy(() => import("./panels/embedded").then(m => ({ default: m.SupportPanel })));
+const Switches = lazy(() => import("./LaunchPanels").then(m => ({ default: m.SwitchesPanel })));
+const Checklist = lazy(() => import("./LaunchPanels").then(m => ({ default: m.ChecklistPanel })));
+const DataCleanup = lazy(() => import("./LaunchPanels").then(m => ({ default: m.DataPanel })));
 
 const S = COPY.sections;
 

@@ -472,5 +472,3 @@ export const SafetyPacks: React.FC<{ embedded?: boolean }> = ({ embedded = false
     </div>
   );
 };
-
-export default SafetyPacks;

@@ -148,5 +148,3 @@ const SectionHeader: React.FC<{ section: AdminSection; sections: AdminSection[] 
     </div>
   );
 };
-
-export default AssistantsAdmin;
