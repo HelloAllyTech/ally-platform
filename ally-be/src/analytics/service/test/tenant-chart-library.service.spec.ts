@@ -4,6 +4,8 @@ import { TENANT_CHART_LIBRARY } from '../../constants/tenant-chart-library.const
 import { TenantScopeSummaryRepository } from '../../repository/tenant-scope-summary.repository';
 import { TenantScopeOptionsRepository } from '../../repository/tenant-scope-options.repository';
 import { TenantChartQueryRepository } from '../../repository/tenant-chart-query.repository';
+import { TenantBehaviourRepository } from '../../repository/tenant-behaviour.repository';
+import { FoundationalSkillsTransferRepository } from '../../repository/foundational-skills-transfer.repository';
 import { TenantOutcomesRepository } from '../../repository/tenant-outcomes.repository';
 import { TenantPracticeRepository } from '../../repository/tenant-practice.repository';
 import { TenantCapabilities } from '../../util/tenant-chart-library.util';
@@ -38,6 +40,8 @@ describe('TenantChartLibraryService', () => {
   let chartQuery: jest.Mocked<TenantChartQueryRepository>;
   let scopeOptions: jest.Mocked<TenantScopeOptionsRepository>;
   let summary: jest.Mocked<TenantScopeSummaryRepository>;
+  let behaviour: jest.Mocked<TenantBehaviourRepository>;
+  let transfer: jest.Mocked<FoundationalSkillsTransferRepository>;
   let service: TenantChartLibraryService;
 
   beforeEach(() => {
@@ -85,6 +89,14 @@ describe('TenantChartLibraryService', () => {
       getRoleplayAttempts: jest.fn(),
       getSkillTrend: jest.fn(),
     } as unknown as jest.Mocked<TenantScopeSummaryRepository>;
+    behaviour = {
+      getHelpfulBehaviours: jest.fn(),
+      getUnhelpfulTrend: jest.fn(),
+      getScoreByAttempt: jest.fn(),
+    } as unknown as jest.Mocked<TenantBehaviourRepository>;
+    transfer = {
+      getCutScenarios: jest.fn(),
+    } as unknown as jest.Mocked<FoundationalSkillsTransferRepository>;
     service = new TenantChartLibraryService(
       repo,
       analytics,
@@ -93,6 +105,8 @@ describe('TenantChartLibraryService', () => {
       chartQuery,
       scopeOptions,
       summary,
+      behaviour,
+      transfer,
     );
   });
 
@@ -160,7 +174,11 @@ describe('TenantChartLibraryService', () => {
         'TSQ-043',
         'TSQ-045',
         'TSQ-046',
+        'TSQ-049',
+        'TSQ-050',
+        'TSQ-051',
         'TSQ-053',
+        'TSQ-055',
         'TSQ-063',
         'TSQ-064',
         'TSQ-065',
@@ -605,6 +623,13 @@ describe('TenantChartLibraryService', () => {
       expect(
         again.views?.find((v) => v.id === 'course')?.defaultLayout,
       ).not.toContain('TSQ-999');
+    });
+
+    it('sends the cards pinned to For you until a person pins their own', async () => {
+      enabled();
+      repo.getCapabilities.mockResolvedValue(caps());
+      const lib = await service.getLibrary(TENANT);
+      expect(lib.defaultPins).toEqual(['TSQ-001', 'TSQ-007']);
     });
 
     it('sends no views while the page is off for the tenant', async () => {
@@ -1133,6 +1158,57 @@ describe('TenantChartLibraryService', () => {
         'internal1',
         4,
       );
+    });
+
+    it('behaviour charts read the course or learner they are asked for', async () => {
+      enabled();
+      repo.getCapabilities.mockResolvedValue(caps({ skillScoredCuts: 50 }));
+      scopeOptions.describe.mockResolvedValue('Course A');
+      behaviour.getHelpfulBehaviours.mockResolvedValue({
+        learners: 0,
+        rows: [],
+      });
+      behaviour.getUnhelpfulTrend.mockResolvedValue({ points: [] });
+      await service.getChartData(TENANT, 'TSQ-050', { courseId: COURSE });
+      await service.getChartData(TENANT, 'TSQ-051', { learnerId: 4 });
+      expect(behaviour.getHelpfulBehaviours).toHaveBeenCalledWith(
+        TENANT,
+        'internal1',
+        { courseId: COURSE },
+      );
+      expect(behaviour.getUnhelpfulTrend).toHaveBeenCalledWith(
+        TENANT,
+        'internal1',
+        { courseId: undefined, learnerId: 4 },
+      );
+    });
+
+    it('TSQ-055 reads the organisation, and TSQ-049 says nothing under its floor', async () => {
+      enabled();
+      repo.getCapabilities.mockResolvedValue(
+        caps({
+          skillScoredCuts: 50,
+          scoredSessions90: 50,
+          learnersWithRepeatScoredSessions: 9,
+        }),
+      );
+      behaviour.getScoreByAttempt.mockResolvedValue({ steps: [] });
+      transfer.getCutScenarios.mockResolvedValue([]);
+      await service.getChartData(TENANT, 'TSQ-055', {});
+      const res = await service.getChartData(TENANT, 'TSQ-049', {});
+      expect(behaviour.getScoreByAttempt).toHaveBeenCalledWith(
+        TENANT,
+        'internal1',
+      );
+      expect(transfer.getCutScenarios).toHaveBeenCalledWith(
+        expect.any(String),
+        TENANT,
+      );
+      expect(res.data).toMatchObject({
+        learners: 0,
+        familiar: null,
+        unfamiliar: null,
+      });
     });
 
     it('quiz pass rates narrow to one course', async () => {

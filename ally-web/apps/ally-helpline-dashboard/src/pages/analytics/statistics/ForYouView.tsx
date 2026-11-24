@@ -17,9 +17,14 @@ import {
 } from "@dnd-kit/sortable";
 import { useTranslation } from "react-i18next";
 
-import { useGetStatisticsChartQuery } from "@api";
+import { useGetStatisticsChartQuery, useGetStatisticsInsightsQuery } from "@api";
 import { useUser } from "@hooks";
-import type { StatisticsChartEntry, StatisticsInsight, StatisticsViewConfig } from "@types";
+import type {
+  HeadlineNumbersData,
+  StatisticsChartEntry,
+  StatisticsInsight,
+  StatisticsViewConfig,
+} from "@types";
 
 import { SortableMetricBlock } from "../SortableMetricBlock";
 import { filterParams } from "./ChartHost";
@@ -48,6 +53,51 @@ const TONE_CLASS = {
   bad: "text-[#7a3205]",
   same: "text-typography-600",
 } as const;
+
+/**
+ * Two plain lines under the greeting: how the last month went, and whether
+ * anything needs a look today. Written here from numbers the page already reads
+ * (the headline chart and the findings), so it can never disagree with them. A
+ * line whose numbers could not be read is left out.
+ */
+const Summary: FunctionComponent<{ headlineAvailable: boolean }> = ({ headlineAvailable }) => {
+  const { t } = useTranslation();
+  const headline = useGetStatisticsChartQuery(
+    { id: "TSQ-001", range: PIN_RANGE },
+    { skip: !headlineAvailable },
+  );
+  const insights = useGetStatisticsInsightsQuery();
+
+  const totals = headline.currentData?.data as HeadlineNumbersData | undefined;
+  const activity =
+    totals && totals.totalRegisteredLearners > 0
+      ? t("statisticsLibrary.forYou.summary.activity", {
+          active: totals.activeUsers,
+          registered: totals.totalRegisteredLearners,
+          count: totals.simulationsCompleted,
+        })
+      : null;
+
+  const found = insights.data;
+  const focus = !found
+    ? null
+    : found.attention.length > 0
+      ? t("statisticsLibrary.forYou.summary.needsLook", { count: found.attention.length })
+      : found.celebrate.length > 0
+        ? t("statisticsLibrary.forYou.summary.celebrateOnly")
+        : t("statisticsLibrary.forYou.summary.nothingNeedsLook");
+
+  if (!activity && !focus) return null;
+  return (
+    <div
+      className="flex flex-col gap-1 text-base text-typography-700"
+      data-testid="statistics-summary"
+    >
+      {activity && <p>{activity}</p>}
+      {focus && <p>{focus}</p>}
+    </div>
+  );
+};
 
 /** A small trend line for a series of values. */
 const Sparkline: FunctionComponent<{ series: number[] }> = ({ series }) => {
@@ -209,6 +259,10 @@ export const ForYouView: FunctionComponent<ForYouViewProps> = ({
           ? t(`statisticsLibrary.forYou.greeting.${part}`, { name: firstName })
           : t(`statisticsLibrary.forYou.greetingNoName.${part}`)}
       </h2>
+
+      <Summary
+        headlineAvailable={byId.get("TSQ-001")?.state !== "unavailable" && byId.has("TSQ-001")}
+      />
 
       <InsightsSection onOpen={onOpenInsight} />
 

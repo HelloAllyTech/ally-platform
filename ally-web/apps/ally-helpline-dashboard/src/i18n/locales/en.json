@@ -4029,7 +4029,16 @@
       "skillTrendFlat": "No skill has risen yet across these slices.",
       "courseFacts": "{{completed}} of {{enrolled}} learners have finished this course.",
       "courseFactsNone": "No learner has been enrolled in this course yet.",
-      "learnerCourses": "{{done}} of {{total}} courses finished."
+      "learnerCourses": "{{done}} of {{total}} courses finished.",
+      "newCharacter": "Skills held up with a new character: {{familiar}} with a familiar one, {{unfamiliar}} with a new one (out of 4).",
+      "newCharacterDip": "Skills dipped with a new character: {{familiar}} with a familiar one, {{unfamiliar}} with a new one (out of 4).",
+      "behaviours": "“{{text}}” rose from {{from}}% to {{to}}% of learners.",
+      "behavioursFlat": "No helpful behaviour has become clearly more common yet.",
+      "unhelpfulDown": "Unhelpful responses fell from {{first}}% to {{latest}}% of practices.",
+      "unhelpfulUp": "Unhelpful responses rose from {{first}}% to {{latest}}% of practices.",
+      "unhelpfulFlat": "Unhelpful responses stayed at about {{latest}}% of practices.",
+      "attempts": "Learners who tried a roleplay again scored {{first}} the first time and {{latest}} by the latest attempt.",
+      "attemptsFlat": "Scores did not rise with repeat attempts: {{first}} the first time, {{latest}} by the latest."
     },
     "table": {
       "learner": "Learner",
@@ -4278,7 +4287,8 @@
       "roleplays": "Roleplays",
       "learning": "Learning",
       "progress": "Progress",
-      "allLearners": "All learners"
+      "allLearners": "All learners",
+      "acrossCourses": "Across courses"
     },
     "subject": {
       "label": {
@@ -4308,6 +4318,14 @@
         "morning": "Good morning.",
         "afternoon": "Good afternoon.",
         "evening": "Good evening."
+      },
+      "summary": {
+        "activity_one": "In the last 30 days, {{active}} of {{registered}} learners practised and {{count}} session was completed.",
+        "activity_other": "In the last 30 days, {{active}} of {{registered}} learners practised and {{count}} sessions were completed.",
+        "needsLook_one": "{{count}} thing needs a look today. It is listed below.",
+        "needsLook_other": "{{count}} things need a look today. They are listed below.",
+        "nothingNeedsLook": "Nothing needs a look today.",
+        "celebrateOnly": "Nothing needs a look today, and there is good news below."
       }
     },
     "pins": {
@@ -4424,6 +4442,36 @@
         "inProgress": "In progress",
         "notStarted": "Not started"
       }
+    },
+    "newCharacter": {
+      "none": "Not enough learners have moved from a familiar character to a new one yet.",
+      "familiar": "With a familiar character",
+      "unfamiliar": "The first time with a new character",
+      "value": "{{value}} of 4",
+      "learners_one": "Based on {{count}} learner",
+      "learners_other": "Based on {{count}} learners"
+    },
+    "behaviours": {
+      "none": "Not enough learners have two scored practices to compare yet.",
+      "first": "First practice",
+      "latest": "Latest practice",
+      "learners_one": "Share of {{count}} learner seen doing it",
+      "learners_other": "Share of {{count}} learners seen doing it"
+    },
+    "unhelpful": {
+      "none": "Not enough scored practice yet to draw a trend.",
+      "share": "Practices with an unhelpful response (%)",
+      "slice": "Practice slice"
+    },
+    "attempts": {
+      "none": "Not enough repeat attempts to compare yet.",
+      "step1": "1st attempt",
+      "step2": "2nd attempt",
+      "step3": "3rd attempt",
+      "step4": "4th attempt or later",
+      "score": "Average score {{score}}",
+      "learners_one": "{{count}} learner",
+      "learners_other": "{{count}} learners"
     }
   }
 }

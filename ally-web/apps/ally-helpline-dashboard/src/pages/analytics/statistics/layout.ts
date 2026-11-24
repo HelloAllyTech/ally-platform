@@ -130,12 +130,17 @@ export const resolvePins = (
   saved: unknown,
   charts: readonly StatisticsChartEntry[],
   canPin: (chartId: string) => boolean,
+  /** Pinned when the person has never saved a list (not when they saved an empty one). */
+  defaults: readonly string[] = [],
 ): string[] => {
-  if (!Array.isArray(saved)) return [];
-  const offered = new Set(charts.map(c => c.id));
+  const fromDefaults = !Array.isArray(saved);
+  const list: unknown[] = Array.isArray(saved) ? saved : [...defaults];
+  const offered = new Set(
+    charts.filter(c => !fromDefaults || c.state !== "unavailable").map(c => c.id),
+  );
   const seen = new Set<string>();
   const out: string[] = [];
-  saved.forEach(key => {
+  list.forEach(key => {
     const item = typeof key === "string" ? parseLayoutKey(key) : null;
     if (!item || !offered.has(item.id) || !canPin(item.id) || seen.has(item.id)) return;
     seen.add(item.id);

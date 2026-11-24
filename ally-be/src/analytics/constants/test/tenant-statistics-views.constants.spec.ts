@@ -1,10 +1,22 @@
 import { TENANT_CHART_LIBRARY } from '../tenant-chart-library.constants';
 import {
   STATISTICS_DEFAULT_LAYOUT_CAP,
+  STATISTICS_DEFAULT_PINS,
   STATISTICS_VIEWS,
 } from '../tenant-statistics-views.constants';
 
 const entry = (id: string) => TENANT_CHART_LIBRARY.find((c) => c.id === id);
+
+describe('STATISTICS_DEFAULT_PINS', () => {
+  it('is two live, organisation-wide charts, each once', () => {
+    expect(STATISTICS_DEFAULT_PINS).toHaveLength(2);
+    expect(new Set(STATISTICS_DEFAULT_PINS).size).toBe(2);
+    STATISTICS_DEFAULT_PINS.forEach((id) => {
+      expect(entry(id)?.live).toBe(true);
+      expect(entry(id)?.scopes).toContain('organisation');
+    });
+  });
+});
 
 describe('STATISTICS_VIEWS', () => {
   it('has one view for each of the organisation, course and learner tabs', () => {

@@ -152,6 +152,27 @@ describe("the Statistics page", () => {
     expect(screen.getByTestId("view-organisation")).toBeTruthy();
   });
 
+  it("opens on For you with the default pins until the person pins their own", () => {
+    const withDefaults = { ...library, defaultPins: ["TSQ-001"] } as StatisticsChartLibrary;
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <StatisticsPage library={withDefaults} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId("for-you").textContent).toContain("TSQ-001");
+  });
+
+  it("does not bring the defaults back after the person removed every pin", () => {
+    prefs.data = { statistics_layouts: { pins: [] } };
+    const withDefaults = { ...library, defaultPins: ["TSQ-001"] } as StatisticsChartLibrary;
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <StatisticsPage library={withDefaults} />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByTestId("for-you")).toBeNull();
+  });
+
   it("opens on For you for a person with pins", () => {
     prefs.data = { statistics_layouts: { pins: ["TSQ-001"] } };
     renderPage();
