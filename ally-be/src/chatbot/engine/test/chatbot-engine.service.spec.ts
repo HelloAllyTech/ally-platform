@@ -424,6 +424,69 @@ describe('ChatbotEngineService', () => {
         turn({ text: 'Do you have parking at the Chennai hospital?' }),
       );
       expect(decision.handledBy).not.toBe(WaHandledBy.CRISIS);
+      expect(decision.body).not.toMatch(/14416|findahelpline/);
+    });
+
+    describe('a check that times out on a message that may be at risk ("unsure")', () => {
+      const contactOnly = {
+        ...AGENT_ANSWER,
+        answer:
+          "I'm sorry you're feeling this way. Please contact the team at care@example.org.",
+      };
+      const timedOut = () => {
+        engine.levelWaitMs = 0;
+        // Both checks (with history, and the message alone) time out.
+        aiService.checkWhatsAppCrisis.mockRejectedValue(
+          upstream(504, ErrorCode.AI_SERVICE_TIMEOUT),
+        );
+        aiService.runAgent.mockResolvedValueOnce(contactOnly);
+      };
+
+      it('adds 112 and Tele-MANAS 14416 after a reply that gave only a contact line (India)', async () => {
+        timedOut();
+        const decision = await engine.respond(
+          turn({
+            text: "Nothing matters anymore, I just want to disappear for good. I'm so hopeless",
+          }),
+        );
+        expect(decision.handledBy).not.toBe(WaHandledBy.CRISIS);
+        expect(decision.body).toContain('care@example.org');
+        expect(decision.body).toMatch(/call 112 now/);
+        expect(decision.body).toContain('Tele-MANAS on 14416');
+        expect(decision.body).toContain('https://findahelpline.com');
+      });
+
+      it('in Hinglish', async () => {
+        timedOut();
+        const decision = await engine.respond(
+          turn({
+            text: 'Raat ke 2 baje hain, ro raha hoon, kuch samajh nahi aa raha',
+            language: 'hi-latn',
+          }),
+        );
+        expect(decision.body).toContain('abhi 112 par call karein');
+        expect(decision.body).toContain('Tele-MANAS ko 14416 par call karein');
+      });
+
+      it('adds the link only outside India', async () => {
+        timedOut();
+        const decision = await engine.respond(
+          turn({
+            chatbot: bot({ settings: { timeZone: 'Europe/London' } } as never),
+            text: 'I feel hopeless and alone',
+          }),
+        );
+        expect(decision.body).toContain('https://findahelpline.com');
+        expect(decision.body).not.toMatch(/112|14416/);
+      });
+
+      it('leaves an ordinary question alone', async () => {
+        timedOut();
+        const decision = await engine.respond(
+          turn({ text: 'What are your opening hours?' }),
+        );
+        expect(decision.body).not.toMatch(/14416|findahelpline/);
+      });
     });
 
     it('still gives the crisis reply when the run fails before a late verdict', async () => {

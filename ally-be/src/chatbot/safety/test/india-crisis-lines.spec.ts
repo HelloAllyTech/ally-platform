@@ -1,3 +1,4 @@
+import { indiaEmergencyWording } from '../../bot-page/bot-page-public.service';
 import { emergencyReply } from '../../../bot-draft/safety-pack/safety-packs';
 import { isIndiaAssistant } from '../../agent-tools/list-tools';
 import {
@@ -86,5 +87,20 @@ describe('every fixed crisis surface in India carries 112 and 14416', () => {
       expect(text).toContain(LINK);
     }
     expect(holdingMessage('en', null)).not.toMatch(/112|14416/);
+  });
+});
+
+describe('the bot page first screen in India', () => {
+  it('says call 112 instead of the local emergency number', () => {
+    expect(
+      indiaEmergencyWording(
+        'This is an automated assistant. It is not a crisis service or medical advice: in an emergency, contact your local emergency number.',
+      ),
+    ).toBe(
+      'This is an automated assistant. It is not a crisis service or medical advice: in an emergency, call 112.',
+    );
+    expect(indiaEmergencyWording('Opening hours are 9 to 5.')).toBe(
+      'Opening hours are 9 to 5.',
+    );
   });
 });
