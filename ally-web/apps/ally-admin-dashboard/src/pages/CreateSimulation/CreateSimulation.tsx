@@ -425,6 +425,9 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
   const [showCopilotForm, setShowCopilotForm] = useState(false);
   // Set once an Agent Builder build starts on this page (see the first save below).
   const agentBuilderBuildStartedRef = useRef(false);
+  // Set when this page created the roleplay: the form is then the source of truth, never reset to
+  // the copy fetched back from the server.
+  const createdOnThisPageRef = useRef(false);
   const handleAgentBuilderBuildStart = useCallback(() => {
     agentBuilderBuildStartedRef.current = true;
     setShowCopilotForm(true);
@@ -465,6 +468,11 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
     // When a draft version is loaded into the form, don't let a refetch of the
     // live scenario clobber the in-editor draft.
     if (activeVersionId) return;
+    // Nor when the form is already ahead of the saved copy: a roleplay created on this page (its
+    // first save just returned it), or one an Agent Builder build is writing into. Resetting to
+    // the fetched copy then wiped every field generated after that save (opening lines, reminders,
+    // per-language samples, translations), depending on timing.
+    if (createdOnThisPageRef.current || agentBuilderBuildStartedRef.current) return;
     if (adminSimulationByIdData) {
       formMethods.reset(formatSimulationResponseData(adminSimulationByIdData));
     }
@@ -969,6 +977,7 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
           scenarios: [simulationData],
         });
         const createdId = response?.data?.[0]?.id;
+        createdOnThisPageRef.current = true;
         if (agentBuilderBuildStartedRef.current) {
           // The create and edit routes are separate <Route>s, so navigating remounts this page,
           // which would cut off an Agent Builder build running in the browser. The id is already
