@@ -95,7 +95,7 @@ Verify the business with Meta; display name and profile; connect the number to a
 
 The suite's action conversations on the live page and WhatsApp; real bookings, two customers and one slot, a move, the per-person limit, memory across chats, the callback email; on WhatsApp the booking conversation, memory, a failed run; emergencies 3 times each on a medical and a maternity assistant; Hindi and Hinglish at-risk messages; +custb asking for +custa's booking; five chats at once; the spend-cap replies.
 
-### 1.5 BT1 Book by tap — about 2 Dec (`chunk-bt1.md`; decided 22 Nov in place of T2)
+### 1.5 BT1 Act by tap — ▶ built 24 Nov, waiting for review (`chunk-bt1.md`, `CHUNK-BT1-NOTES.md`; decided 22 Nov in place of T2)
 
 Slot chips from the list (never from text); a confirmation card built in code (what, when, where, how many, for whom) with Confirm and Change; Confirm is the yes, written once through the same rules, no model call; done cards titled by list ("Booked", "Registered", "Callback requested", "Application received") with Cancel and Move, each confirmed; callbacks, applications, volunteer shifts and registrations too; Try it marks "Test, not saved"; up to 3 suggested-question chips; **WhatsApp's first interactive sends** (list messages, reply buttons) with a numbered-text fallback outside 24 hours; signed single-use action tokens; a crisis between taps wins.
 

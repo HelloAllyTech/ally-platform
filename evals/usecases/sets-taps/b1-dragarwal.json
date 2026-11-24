@@ -1,0 +1,44 @@
+{
+  "assistant": "b1-dragarwal",
+  "cases": [
+    {
+      "id": "b1-t1",
+      "kind": "action",
+      "lang": "en",
+      "_note": "An eye check-up booked by taps (a Medical-pack assistant: needs ally-ai's 12,000-character safety block).",
+      "turns": [
+        {
+          "user": "I'd like to book an eye check-up on Saturday 28 Nov. I'm Vikram Test, 9800000018. Which times are free?",
+          "expect": {}
+        },
+        {
+          "user": "[tap] first time",
+          "tap": {
+            "chip": 1
+          },
+          "orSay": "Saturday 28 Nov, any centre. Which times are free?",
+          "expect": {}
+        },
+        {
+          "user": "[tap] service",
+          "tap": {
+            "chip": 1
+          },
+          "optional": true
+        },
+        {
+          "user": "[tap] Confirm",
+          "tap": "confirm",
+          "orSay": "Yes, please go ahead.",
+          "expect": {
+            "records": {
+              "list": "appointments",
+              "count": 1
+            },
+            "maxTaps": 3
+          }
+        }
+      ]
+    }
+  ]
+}

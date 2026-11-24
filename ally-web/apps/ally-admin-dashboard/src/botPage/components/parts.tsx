@@ -386,7 +386,7 @@ export function ConfirmationCard({
 }
 
 /**
- * The buttons a card carries (BT1): the first (Confirm) is the primary one. Every label is the
+ * The buttons a card carries (BT1): Confirm is the primary one. Every label is the
  * server's fixed text; a tap sends the label as the person's message with the button's token.
  */
 export function TapButtons({
@@ -406,7 +406,8 @@ export function TapButtons({
           key={b.token}
           type="button"
           className={
-            i === 0 && (b.kind === "confirm" || b.kind === "cancel")
+            // Only Confirm is the main button; Cancel is never pushed.
+            i === 0 && b.kind === "confirm"
               ? "ally-btn ally-btn--primary ally-press"
               : "bp-pill ally-press"
           }
