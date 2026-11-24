@@ -1,3 +1,4 @@
+import { syncDraftPack } from '../safety-pack/sync-draft-pack';
 import { knowledgeStalenessOf } from '../../chatbot/knowledge/knowledge-freshness.service';
 import { GoLiveGateService } from '../../chatbot/safety/go-live-gate.service';
 import {
@@ -524,6 +525,7 @@ export class AssistantHomeService {
           updatedBy: userId(),
         },
       );
+      await syncDraftPack(manager, chatbotId, next.id, change);
       return safetyView(next.id, chatbot.rules?.never ?? [], change);
     });
     if (change) {

@@ -1,3 +1,4 @@
+import { syncDraftPack } from '../safety-pack/sync-draft-pack';
 import {
   BadRequestException,
   Injectable,
@@ -377,21 +378,21 @@ export class TemplateService {
       ]);
       if (!setup && pack.outcome === 'raised' && plan.pack) {
         const next = packFor(plan.pack)!;
+        const packChange = {
+          from: current ?? null,
+          to: next.id,
+          reason: null,
+          lessStrict: false,
+          at: new Date().toISOString(),
+          by: userId,
+        };
         await m.getRepository(Chatbot).update({ id: chatbotId }, {
           safetyPack: next.id,
           safetyPackVersion: next.version,
-          rules: {
-            ...(row.rules ?? { never: [] }),
-            packChange: {
-              from: current ?? null,
-              to: next.id,
-              reason: null,
-              lessStrict: false,
-              at: new Date().toISOString(),
-              by: userId,
-            },
-          },
+          rules: { ...(row.rules ?? { never: [] }), packChange },
         } as never);
+        // TF1 S3: publishing writes the working copy's pack, so it carries this one too.
+        await syncDraftPack(m, chatbotId, next.id, packChange as never);
       }
 
       // Starter checkup questions: the assistant's own, kept when questions are generated again.

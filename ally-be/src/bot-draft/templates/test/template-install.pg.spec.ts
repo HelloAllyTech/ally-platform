@@ -81,7 +81,7 @@ describePg('Use-case templates: install (Postgres)', () => {
   beforeEach(async () => {
     await resetTables(ds);
     await ds.query(
-      `TRUNCATE chatbot_template_installs, chatbot_checkup_cases CASCADE`,
+      `TRUNCATE chatbot_template_installs, chatbot_checkup_cases, bot_drafts CASCADE`,
     );
     bot = await seedChatbot(ds, 'T1 bot');
     await ds.query(`UPDATE chatbots SET status = 'draft' WHERE id = $1`, [bot]);
@@ -241,6 +241,31 @@ describePg('Use-case templates: install (Postgres)', () => {
     expect(stored.settings.helplineNumbers).toBe(
       '1800-123-4567, open 24 hours',
     );
+  });
+
+  // TF1 S3: publishing writes the working copy's pack; the raised one was lost at Go live.
+  it('a raised pack reaches the working copy too, so publishing keeps it', async () => {
+    await ds.query(
+      `UPDATE chatbots SET safety_pack = 'standard' WHERE id = $1`,
+      [bot],
+    );
+    await ds.query(
+      `INSERT INTO bot_drafts (owner_user_id, chatbot_id, draft_config)
+       VALUES (1, $1, '{"safetyPackId": "standard"}'::jsonb)`,
+      [bot],
+    );
+    await service.installOnAssistant(bot, 'helpline', {
+      helpline: '1800-123-4567, open 24 hours',
+    });
+    const [draft] = await ds.query(
+      `SELECT draft_config FROM bot_drafts WHERE chatbot_id = $1`,
+      [bot],
+    );
+    expect(draft.draft_config.safetyPackId).toBe(SafetyPackId.MENTAL_HEALTH);
+    expect(draft.draft_config.packChange).toMatchObject({
+      from: 'standard',
+      to: 'mental_health',
+    });
   });
 
   it('keeps an existing assistant’s own helpline number and memory', async () => {
