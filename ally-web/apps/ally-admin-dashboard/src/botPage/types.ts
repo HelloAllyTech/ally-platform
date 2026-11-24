@@ -73,6 +73,8 @@ export interface PublicBotPage {
   access: BotPageAccess;
   branding: BotPageBranding;
   suggestedQuestions: string[];
+  /** BT1: English / हिंदी / Hinglish at the start; a tap sends its fixed request. */
+  languageChoice?: { label: string; text: string }[];
   prechat: PrechatField[];
   maxMessageChars: number;
   language: BotPageLanguage;

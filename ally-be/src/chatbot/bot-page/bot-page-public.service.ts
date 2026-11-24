@@ -3,6 +3,8 @@ import { withFirstMessageParts } from '../engine/first-reply';
 import { startNotice } from '../safety/chat-notice';
 import { offMessage } from '../safety/off-message';
 import { ActionsService } from '../actions/actions.service';
+import { LANGUAGE_CHOICE } from '../actions/action-copy';
+import { enabledLanguagesOf } from '../languages/reply-language-for';
 import {
   ActionPartsService,
   type ReplyParts,
@@ -117,6 +119,11 @@ export interface PublicBotPage {
   /** Stage 7: the look is the name, the logo, one accent colour and a short welcome line. */
   branding: PublicBranding;
   suggestedQuestions: string[];
+  /**
+   * BT1 ("Reach more communities"): the language choice at the start, as quick replies, when the
+   * assistant speaks English and Hindi. Each tap sends its fixed request in that language.
+   */
+  languageChoice?: { label: string; text: string }[];
   prechat: PrechatField[];
   maxMessageChars: number;
   language: AvailableBotPage['settings']['language'];
@@ -417,6 +424,9 @@ export class BotPagePublicService {
         look: { accent: paint, logo: available.brandImages?.logo ?? null },
       },
       suggestedQuestions: settings.suggestedQuestions,
+      ...(speaksEnglishAndHindi(available.chatbot)
+        ? { languageChoice: LANGUAGE_CHOICE }
+        : {}),
       prechat: settings.prechat,
       maxMessageChars: Math.min(
         settings.limits.maxMessageChars,
@@ -1564,4 +1574,18 @@ function maskEmail(email: string): string {
   const at = email.lastIndexOf('@');
   if (at < 1) return '***';
   return `${email[0]}***${email.slice(at)}`;
+}
+
+/** BT1: whether to offer the language choice: English and Hindi (or Hinglish) both enabled. */
+function speaksEnglishAndHindi(chatbot: {
+  settings?: Record<string, unknown> | null;
+  persona?: {
+    defaultLanguage?: string | null;
+    languages?: string[] | null;
+  } | null;
+}): boolean {
+  const bases = enabledLanguagesOf(chatbot as never).map(
+    (l) => l.trim().toLowerCase().split('-')[0],
+  );
+  return bases.includes('en') && bases.includes('hi');
 }

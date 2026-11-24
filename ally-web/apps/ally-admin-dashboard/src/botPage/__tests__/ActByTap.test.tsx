@@ -92,7 +92,7 @@ const DONE: PublicFinal = {
   },
 };
 
-function fakeApi(finals: PublicFinal[]) {
+function fakeApi(finals: PublicFinal[], page: PublicBotPage = PAGE) {
   const queue = [...finals];
   const send = vi.fn(
     async (_slug: string, _text: string, handlers: { onToken(t: string): void }) => {
@@ -102,7 +102,7 @@ function fakeApi(finals: PublicFinal[]) {
     },
   );
   const api = {
-    page: vi.fn().mockResolvedValue(PAGE),
+    page: vi.fn().mockResolvedValue(page),
     session: vi.fn().mockResolvedValue({ state: "ready", intakeDone: true, signedInAs: null }),
     conversation: vi.fn().mockResolvedValue({ conversationId: "c1", messages: [] }),
     newConversation: vi.fn(),
@@ -191,5 +191,25 @@ describe("act by tap on the bot page", () => {
     const next = await screen.findByTestId("suggestions");
     await user.click(within(next).getByRole("button", { name: "How do I volunteer?" }));
     expect(await screen.findByTestId("test-only")).toHaveTextContent("Test only, not saved");
+  });
+
+  it("offers English / हिंदी / Hinglish at the start when the assistant speaks both", async () => {
+    const user = userEvent.setup();
+    const { api, send } = fakeApi(
+      [{ reply: "ज़रूर।", citations: [], messageId: "m1", conversationId: "c1" }],
+      {
+        ...PAGE,
+        languageChoice: [
+          { label: "English", text: "Please reply in English." },
+          { label: "हिंदी", text: "कृपया हिंदी में जवाब दें।" },
+          { label: "Hinglish", text: "Please Hinglish mein jawab dein." },
+        ],
+      } as PublicBotPage,
+    );
+    render(<BotPageApp slug="rha" api={api} />);
+    await user.click(await screen.findByRole("button", { name: "Start" }));
+    const choice = await screen.findByTestId("language-choice");
+    await user.click(within(choice).getByRole("button", { name: "हिंदी" }));
+    expect(send.mock.calls[0][1]).toBe("कृपया हिंदी में जवाब दें।");
   });
 });

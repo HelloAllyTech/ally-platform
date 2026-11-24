@@ -259,6 +259,24 @@ export function Chat({
           (pending && !pending.text && pending.status ? copy.chat.status[pending.status] : "")}
       </p>
 
+      {!messages.length && !pending && (page.languageChoice?.length ?? 0) > 0 && (
+        <div className="bp-suggested" data-testid="language-choice">
+          <div className="ally-chips">
+            {page.languageChoice!.map(c => (
+              <button
+                key={c.label}
+                type="button"
+                className="ally-chip ally-press"
+                lang={c.label === "हिंदी" ? "hi" : "en"}
+                onClick={() => send(c.text)}
+                disabled={busy}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       {!messages.length && !pending && page.suggestedQuestions.length > 0 && (
         <div className="bp-suggested">
           <p className="ally-sr-only">{copy.chat.suggested}</p>
