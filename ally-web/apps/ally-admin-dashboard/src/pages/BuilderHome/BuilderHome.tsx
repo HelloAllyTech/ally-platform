@@ -19,6 +19,7 @@ import { RemoveDialog } from "../AssistantHome/ui/RemoveDialog";
 import { useRestoreAssistant } from "../AssistantHome/ui/useRestoreAssistant";
 import { useMedia } from "../AssistantHome/userLists/useMedia";
 import { COPY as ONBOARDING_COPY } from "../Onboarding/copy";
+import { TF1_COPY } from "../AssistantHome/copy/tf1";
 import { PlanAlertsBanner } from "../Plan/ui";
 import { fill, LoadError } from "../WhatsAppBot/shared";
 
@@ -293,6 +294,17 @@ const ChatbotGrid: React.FC<{ bots: Chatbot[]; canCreate: boolean; onCreate: () 
                 </span>
               </span>
             </button>
+            {/* TF1 F5: before go-live, the home (Knowledge, Lists, Settings) is one click away. */}
+            {bot.status === ChatbotStatus.DRAFT && bot.setupDraftId && (
+              <button
+                type="button"
+                className="ally-link ally-small"
+                data-testid={`open-home-${bot.id}`}
+                onClick={() => navigate(ROUTES.CHATBOT_DETAIL.replace(":botId", bot.id))}
+              >
+                {TF1_COPY.list.openHome}
+              </button>
+            )}
             {access.manage && (
               <div className="ally-list-page__menu">
                 <MoreMenu

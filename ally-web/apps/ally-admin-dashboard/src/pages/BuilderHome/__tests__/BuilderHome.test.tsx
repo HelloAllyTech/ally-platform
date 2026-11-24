@@ -212,6 +212,20 @@ describe("BuilderHome", () => {
     expect(screen.getByTestId("where").textContent).toBe("/assistants/new/draft-1");
   });
 
+  // TF1 F5: before go-live the home was reachable only by URL.
+  it("a draft's card also opens its home (knowledge, lists, settings)", () => {
+    mockList = {
+      chatbots: [
+        bot({ id: "b9", status: ChatbotStatus.DRAFT, setupDraftId: "draft-1", documentCount: 2 }),
+        bot({ id: "bot-2", name: "Second" }),
+      ],
+      canCreate: true,
+    };
+    renderHome();
+    fireEvent.click(screen.getByTestId("open-home-b9"));
+    expect(screen.getByTestId("where").textContent).toBe("/assistants/b9");
+  });
+
   it("does not show a blank draft's card", () => {
     mockList = {
       chatbots: [

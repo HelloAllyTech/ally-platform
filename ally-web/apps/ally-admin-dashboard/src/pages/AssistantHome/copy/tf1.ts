@@ -42,4 +42,8 @@ export const TF1_COPY = {
     /** F4: a file held for personal details, where it was added (was a raw "needs_review"). */
     held: "Waiting for you: check it for personal details below",
   },
+  list: {
+    /** F5: a card for an assistant still in setup also opens its home. */
+    openHome: "Knowledge, lists and settings",
+  },
 } as const;

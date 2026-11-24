@@ -32,3 +32,4 @@ Every new line a person or an owner can see, from the TF1 fixes. In code each on
 | F19 | the same in Hindi and Hinglish | in `ally-be/src/bot-draft/safety-pack/safety-packs.ts` (`KIND_FIRST`) |
 | F19 | holding line after an emergency (was the self-harm help line), India | Someone from the team will reply to you. If anyone is in danger, call 112 now. |
 | F19 | the same outside India, Hindi and Hinglish | in `ally-be/src/chatbot/safety/crisis-copy.ts` (`EMERGENCY_HOLDING_COPY`) |
+| F5 | Chatbots list, a card for an assistant still in setup | Knowledge, lists and settings |
