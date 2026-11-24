@@ -1662,9 +1662,13 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
         </div>
       </div>
 
-      {!viewMode && publishBlockers.length > 0 && (
-        <PublishBlockers blockers={publishBlockers} className="mx-4 mt-3" />
-      )}
+      {/* One quiet line, and none at all on a brand-new roleplay nobody has touched yet, where
+          "everything is missing" says nothing (the Agent Builder fills these in). */}
+      {!viewMode &&
+        publishBlockers.length > 0 &&
+        (Boolean(simulationId) || Boolean(String(watchedTitle ?? "").trim())) && (
+          <PublishBlockers blockers={publishBlockers} className="mx-4 mt-2" compact />
+        )}
 
       {/* Memory mapping in progress. Page-level, not only next to the prompt
           picker, so it is seen from any tab, and it says how long and what is
