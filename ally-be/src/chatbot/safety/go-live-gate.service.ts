@@ -16,6 +16,7 @@ import {
 import { SafetyStateService } from './safety-state.service';
 import { enabledLanguagesOf } from '../languages/reply-language-for';
 import { SWITCHES, switchOn } from './switches';
+import { purposeOf } from '../../bot-draft/enum/bot-draft.enum';
 
 interface GateChatbotRow {
   id: string;
@@ -73,6 +74,24 @@ export class GoLiveGateService {
       state,
       enforced: this.enforced(),
     });
+  }
+
+  /**
+   * The checklist the owner sees beside Go live (TF1 S1). Go live publishes the working copy, and
+   * publishing writes the working copy's purpose, so the purpose chosen in the form counts here
+   * before it reaches the live row. Without a working copy, or one without a purpose, the live row's.
+   */
+  async checklist(chatbotId: string): Promise<GoLiveCheck> {
+    const [draft] = (await this.dataSource.query(
+      `SELECT draft_config FROM bot_drafts
+        WHERE chatbot_id = $1 AND status <> 'abandoned'
+        ORDER BY "updatedAt" DESC LIMIT 1`,
+      [chatbotId],
+    )) as { draft_config: Record<string, unknown> | null }[];
+    const purpose = draft?.draft_config
+      ? purposeOf(draft.draft_config as Parameters<typeof purposeOf>[0])
+      : null;
+    return this.check(chatbotId, purpose ? { purpose } : {});
   }
 
   /** Refuses with the missing items, before anything is written. Clears a gate pause on success. */

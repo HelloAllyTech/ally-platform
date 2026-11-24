@@ -187,6 +187,46 @@ describe('GoLiveGateService', () => {
     expect(safety.clearPausedByGate).toHaveBeenCalledWith('bot-1');
   });
 
+  // TF1 S1: the form saves the purpose to the working copy; Go live stayed disabled.
+  it("the owner's checklist reads the purpose saved in the working copy", async () => {
+    const query = jest.fn(async (sql: string) =>
+      sql.includes('FROM bot_drafts')
+        ? [{ draft_config: { purpose: 'answer' } }]
+        : [{ ...ready, id: 'bot-1', purpose: null }],
+    );
+    const gate = new GoLiveGateService(
+      { query } as never,
+      { get: jest.fn().mockResolvedValue(state()) } as never,
+      { get: jest.fn(() => 'true') } as never,
+    );
+    await expect(gate.checklist('bot-1')).resolves.toMatchObject({
+      ok: true,
+      missing: [],
+    });
+    // The status switch still reads the live row: no purpose there, still refused.
+    await expect(gate.assertCanGoLive('bot-1')).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+  });
+
+  it('without a working copy the checklist reads the live row', async () => {
+    const query = jest.fn(async (sql: string) =>
+      sql.includes('FROM bot_drafts')
+        ? []
+        : [{ ...ready, id: 'bot-1', purpose: null }],
+    );
+    const gate = new GoLiveGateService(
+      { query } as never,
+      { get: jest.fn().mockResolvedValue(state()) } as never,
+      { get: jest.fn(() => 'true') } as never,
+    );
+    const check = await gate.checklist('bot-1');
+    expect(check.ok).toBe(false);
+    expect(check.missing).toEqual([
+      expect.objectContaining({ item: 'purpose' }),
+    ]);
+  });
+
   it('the kill switch stops enforcing, never the checklist', async () => {
     const { gate } = service(
       { ...ready, id: 'bot-1', purpose: null },
