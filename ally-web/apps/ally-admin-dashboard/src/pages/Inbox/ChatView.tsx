@@ -13,6 +13,7 @@ import { ButtonVariant } from "@components/types";
 
 import { channelLabel, fill, INBOX } from "./copy";
 import { MemoryPanel } from "./MemoryPanel";
+import { TF1_COPY } from "../AssistantHome/copy/tf1";
 import { useAgreementGate } from "../AssistantHome/agreement/context";
 import { PEOPLE } from "../AssistantHome/copy/people";
 import { useReadOnly } from "../AssistantHome/readOnly";
@@ -226,6 +227,25 @@ export const ChatView: React.FC<{
         </dl>
       )}
 
+      {(thread.otherChats?.length ?? 0) > 0 && (
+        <details className="ally-small" data-testid="inbox-other-chats">
+          <summary>{TF1_COPY.inbox.otherChats}</summary>
+          <ul>
+            {thread.otherChats!.map(other => (
+              <li key={other.id}>
+                <button
+                  type="button"
+                  className="ally-link"
+                  onClick={() => onOpenConversation?.(other.id)}
+                >
+                  {time(other.lastMessageAt)}
+                </button>{" "}
+                {other.preview}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
       <ol className="ally-inbox__thread" aria-live="polite">
         {thread.messages.map((m, index) => {
           const before = thread.messages[index - 1];
@@ -323,7 +343,19 @@ export const ChatView: React.FC<{
         </p>
       )}
 
-      {mine && !readOnly && (
+      {thread.newerChatId && !readOnly && (
+        <p className="ally-small" role="note" data-testid="inbox-newer-chat">
+          {TF1_COPY.inbox.newerChat}{" "}
+          <button
+            type="button"
+            className="ally-link"
+            onClick={() => onOpenConversation?.(thread.newerChatId!)}
+          >
+            {TF1_COPY.inbox.openNewer}
+          </button>
+        </p>
+      )}
+      {mine && !readOnly && !thread.newerChatId && (
         <form
           className="ally-inbox__reply"
           onSubmit={async event => {

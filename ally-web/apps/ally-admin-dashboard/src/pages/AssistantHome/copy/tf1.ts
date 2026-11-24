@@ -29,4 +29,13 @@ export const TF1_COPY = {
     /** S6: Create's Pick a template shows the use-case templates; the older starting points below. */
     moreStartingPoints: "More starting points",
   },
+  inbox: {
+    /** S5: one row per person. */
+    chats: "{n} chats",
+    otherChats: "Their other chats",
+    newerChat: "They've started a newer chat. Reply there so they see it.",
+    openNewer: "Open their latest chat",
+    /** A chat the crisis check flagged showed "Needs a person · undefined". */
+    crisisReason: "May be at risk",
+  },
 } as const;

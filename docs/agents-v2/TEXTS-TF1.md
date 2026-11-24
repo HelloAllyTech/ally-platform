@@ -20,3 +20,8 @@ Every new line a person or an owner can see, from the TF1 fixes. In code each on
 | S7 | the same, outside India | If a child is in danger right now, call your local emergency number. |
 | S7 | the same, outside India, in Hindi | अगर किसी बच्चे को अभी खतरा है, तो अपने यहाँ के आपातकालीन नंबर पर कॉल करें। |
 | S6 | Create → Pick a template, below the use-case templates | More starting points |
+| S5 | Inbox row, a person with more than one chat | {n} chats |
+| S5 | Inbox chat, the person's other chats | Their other chats |
+| S5 | Inbox, an older chat when they have a newer one | They've started a newer chat. Reply there so they see it. |
+| S5 | the same, its link | Open their latest chat |
+| S5 | Inbox badge for a chat the crisis check flagged (was "Needs a person · undefined") | Needs a person · May be at risk |
