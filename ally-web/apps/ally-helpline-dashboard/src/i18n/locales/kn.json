@@ -4248,6 +4248,89 @@
         "simulation": "ಈ ಚಾರ್ಟ್ ನೋಡಲು ಮೇಲೆ ಒಂದು ಸಿಮ್ಯುಲೇಶನ್ ಆಯ್ಕೆಮಾಡಿ.",
         "learner": "ಈ ಚಾರ್ಟ್ ನೋಡಲು ಮೇಲೆ ಒಬ್ಬ ಕಲಿಯುವವರನ್ನು ಆಯ್ಕೆಮಾಡಿ."
       }
+    },
+    "tabs": {
+      "foryou": "ನಿಮಗಾಗಿ",
+      "organisation": "ಸಂಸ್ಥೆ",
+      "course": "ಕೋರ್ಸ್",
+      "learner": "ಕಲಿಯುವವರು"
+    },
+    "sections": {
+      "learners": "ಕಲಿಯುವವರು",
+      "practice": "ಅಭ್ಯಾಸ",
+      "courses": "ಕೋರ್ಸ್‌ಗಳು",
+      "results": "ಫಲಿತಾಂಶಗಳು",
+      "reviews": "ವಿಮರ್ಶೆಗಳು",
+      "skills": "ಕೌಶಲ್ಯಗಳು",
+      "feedback": "ಕಲಿಯುವವರ ಪ್ರತಿಕ್ರಿಯೆ",
+      "allCourses": "ಎಲ್ಲಾ ಕೋರ್ಸ್‌ಗಳು",
+      "courseFacts": "ಈ ಕೋರ್ಸ್ ಬಗ್ಗೆ",
+      "useOverTime": "ಕಾಲಕ್ರಮೇಣ ಬಳಕೆ",
+      "roleplays": "ರೋಲ್‌ಪ್ಲೇಗಳು",
+      "learning": "ಕಲಿಕೆ",
+      "progress": "ಪ್ರಗತಿ"
+    },
+    "subject": {
+      "label": {
+        "course": "ಕೋರ್ಸ್",
+        "learner": "ಕಲಿಯುವವರು"
+      },
+      "choose": {
+        "course": "ಕೋರ್ಸ್ ಆಯ್ಕೆಮಾಡಿ",
+        "learner": "ಕಲಿಯುವವರನ್ನು ಆಯ್ಕೆಮಾಡಿ"
+      },
+      "pick": {
+        "course": "ಕೋರ್ಸ್ ಹೇಗೆ ನಡೆಯುತ್ತಿದೆ ಎಂದು ನೋಡಲು ಒಂದು ಕೋರ್ಸ್ ಆಯ್ಕೆಮಾಡಿ.",
+        "learner": "ಕಲಿಯುವವರ ದಾಖಲೆಯನ್ನು ನೋಡಲು ಅವರನ್ನು ಆಯ್ಕೆಮಾಡಿ."
+      },
+      "heading": {
+        "course": "ಒಂದು ಕೋರ್ಸ್ ವಿವರವಾಗಿ"
+      }
+    },
+    "forYou": {
+      "greeting": {
+        "morning": "ಶುಭೋದಯ, {{name}}.",
+        "afternoon": "ಶುಭ ಮಧ್ಯಾಹ್ನ, {{name}}.",
+        "evening": "ಶುಭ ಸಂಜೆ, {{name}}."
+      },
+      "greetingNoName": {
+        "morning": "ಶುಭೋದಯ.",
+        "afternoon": "ಶುಭ ಮಧ್ಯಾಹ್ನ.",
+        "evening": "ಶುಭ ಸಂಜೆ."
+      }
+    },
+    "pins": {
+      "heading": "ನೀವು ಪಿನ್ ಮಾಡಿದವು",
+      "empty": "ಇನ್ನೂ ಏನನ್ನೂ ಪಿನ್ ಮಾಡಿಲ್ಲ. ಯಾವುದೇ ಟ್ಯಾಬ್‌ನಿಂದ ಚಾರ್ಟ್ ಪಿನ್ ಮಾಡಿ.",
+      "noData": "ಇನ್ನೂ ಡೇಟಾ ಇಲ್ಲ",
+      "title": "ಚಾರ್ಟ್‌ಗಳನ್ನು ಪಿನ್ ಮಾಡಿ",
+      "add": "ಪಿನ್ ಮಾಡಿ",
+      "added": "ಪಿನ್ ಮಾಡಲಾಗಿದೆ",
+      "addAria": "{{title}} ಅನ್ನು ನಿಮಗಾಗಿಗೆ ಪಿನ್ ಮಾಡಿ",
+      "pinAria": "{{title}} ಅನ್ನು ನಿಮಗಾಗಿಗೆ ಪಿನ್ ಮಾಡಿ",
+      "unpinAria": "{{title}} ಅನ್ನು ಅನ್‌ಪಿನ್ ಮಾಡಿ",
+      "limit": "ನೀವು ಗರಿಷ್ಠ {{count}} ಚಾರ್ಟ್‌ಗಳನ್ನು ಪಿನ್ ಮಾಡಬಹುದು.",
+      "labels": {
+        "activeLearners": "ಸಕ್ರಿಯ ಕಲಿಯುವವರು",
+        "activeNow": "ಈಗ ಸಕ್ರಿಯ",
+        "needAttention": "ಗಮನ ಬೇಕಾದ ಕಲಿಯುವವರು",
+        "sessionsReviewed": "ವಿಮರ್ಶಿಸಿದ ಸೆಷನ್‌ಗಳು",
+        "averageRating": "ಸರಾಸರಿ ರೇಟಿಂಗ್",
+        "typicalScore": "ಸಾಮಾನ್ಯ ಸೆಷನ್ ಸ್ಕೋರ್",
+        "liveCourses": "ಲೈವ್ ಕೋರ್ಸ್‌ಗಳು",
+        "learnersOnCourses": "ಕೋರ್ಸ್‌ನಲ್ಲಿರುವ ಕಲಿಯುವವರು",
+        "coursesInUse": "ಬಳಕೆಯಲ್ಲಿರುವ ಕೋರ್ಸ್‌ಗಳು"
+      },
+      "captions": {
+        "ofLearners": "{{total}} ಕಲಿಯುವವರಲ್ಲಿ",
+        "thisWeek": "ಈ ವಾರ",
+        "learners": "ಕಲಿಯುವವರು",
+        "reviewed": "{{completed}} ಸೆಷನ್‌ಗಳಲ್ಲಿ {{reviewed}} ವಿಮರ್ಶಿಸಲಾಗಿದೆ",
+        "ratings": "{{count}} ರೇಟಿಂಗ್‌ಗಳಿಂದ",
+        "sessions": "{{count}} ಸೆಷನ್‌ಗಳಲ್ಲಿ",
+        "ofCourses": "{{courses}} ಕೋರ್ಸ್‌ಗಳಲ್ಲಿ",
+        "inProgress": "{{count}} ಪ್ರಗತಿಯಲ್ಲಿವೆ"
+      }
     }
   }
 }
