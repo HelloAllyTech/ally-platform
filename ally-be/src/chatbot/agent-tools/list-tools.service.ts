@@ -252,6 +252,28 @@ export class ListToolsService {
           );
           if (roomier.total > 0) found = roomier;
         }
+        // TF1 F16: a text filter in another script ("कंबल") against entries written in English
+        // finds nothing; without those filters, the newest entries, for the agent to read.
+        let otherLanguage = false;
+        const latinOnly = withoutOtherScriptText(input);
+        if (found.total === 0 && !found.aggregate && latinOnly) {
+          const wider = await this.freeOnly(
+            ctx.chatbotId,
+            list,
+            await this.records.query(
+              ctx.chatbotId,
+              list.key,
+              actor,
+              toListQuery(list, latinOnly),
+              scope,
+            ),
+            held,
+          );
+          if (wider.total > 0) {
+            found = wider;
+            otherLanguage = true;
+          }
+        }
         // Nothing at the time asked for (chunk 8a): the nearest times there are, so the agent
         // offers them instead of passing the booking to the team.
         // When nothing near then fits the other details either (a party of 5, every table
@@ -293,6 +315,7 @@ export class ListToolsService {
               ? { nearest: loosened ? 'other_details' : true }
               : {}),
             ...(found.aggregate ? { aggregate: found.aggregate } : {}),
+            ...(otherLanguage ? { searched_without_text: true } : {}),
           },
         };
       }
@@ -929,6 +952,25 @@ export function nearestForWindow<T>(
  * A refusal the agent reads: the code (stored as the run's error code), §26's message, and any
  * alternatives as passages of the list they come from.
  */
+/**
+ * TF1 F16: the find input without its text filters written in a non-Latin script (Devanagari and
+ * the like), or null when it has none. Entries are mostly written in English.
+ */
+export function withoutOtherScriptText(
+  input: Record<string, string | number>,
+): Record<string, string | number> | null {
+  const other = Object.entries(input).filter(
+    ([key, value]) =>
+      key.endsWith('_contains') &&
+      typeof value === 'string' &&
+      /[^\u0000-\u024f\s\d\p{P}]/u.test(value),
+  );
+  if (!other.length) return null;
+  const rest = { ...input };
+  for (const [key] of other) delete rest[key];
+  return rest;
+}
+
 /**
  * What the agent is told about a refusal (Q4 B8): plain words, and what to offer instead. Fixed
  * text, in `Q4-PROMPTS.md` for review; the owner-facing wording stays the list's own.
