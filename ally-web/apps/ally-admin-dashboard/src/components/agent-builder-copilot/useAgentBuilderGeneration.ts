@@ -126,7 +126,7 @@ export interface GenerationInputs {
 /** The challenge description's other language tabs, translated once the batch is in. */
 const TRANSLATE_TASK = {
   key: "challenge_description_translations",
-  label: "Challenge description and reminders in other languages",
+  label: "Title, challenge description and reminders in the other languages",
 };
 
 /** The cover row: not a field generator, an image job (start, then poll until it settles). */
@@ -346,6 +346,8 @@ export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
       setPhase("running");
 
       const handles: { abort: () => void }[] = [];
+      // The languages this batch writes in (chosen, or read from the brief), set by the fan-out.
+      let batchLanguages: AgentBuilderSpokenLanguage[] = inputs.languages ?? [];
       // Per-field promises, so the voice pick can wait on `persona` alone
       // rather than on the whole batch — it needs the gender, nothing else.
       const runsByField = new Map<AgentBuilderField, Promise<void>>();
@@ -442,6 +444,7 @@ export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
         languages: AgentBuilderSpokenLanguage[],
         chosen = false,
       ): Promise<void> => {
+        batchLanguages = languages;
         if (languages.length === 0) {
           patchTask(SPOKEN_LANGUAGES_FIELD.field, { status: "empty" });
           return Promise.resolve();
@@ -689,15 +692,55 @@ export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
        * a voice on the form (the languages a learner can play in), apart from the main one whose
        * text was just generated. Runs last, once the description and the voices are both in.
        */
+      /**
+       * Drop every language outside `selected` (and the main language, whose tab is the base
+       * text) from the per-language fields and the voice mapping, so a roleplay never keeps a
+       * language the trainer did not choose, including one left from an earlier generation.
+       */
+      const keepOnlyLanguages = (selected: Set<string>, primary: string) => {
+        const keep = (id: string) => selected.has(id) || id === primary;
+        for (const field of [
+          "languageVoices",
+          "translationTitle",
+          "translationDescription",
+          "translationReminders",
+          "translationOpeningStatements",
+          "linguisticStyleSamples",
+          "allowedFillerWords",
+          "languageCharacteristics",
+        ]) {
+          const current = formMethods.getValues(field);
+          if (!current || typeof current !== "object" || Array.isArray(current)) continue;
+          const entries = Object.entries(current as Record<string, unknown>);
+          const kept = entries.filter(([id]) =>
+            field === "languageVoices" ? selected.has(id) : keep(id),
+          );
+          if (kept.length !== entries.length) {
+            formMethods.setValue(field, Object.fromEntries(kept), {
+              shouldDirty: true,
+              shouldValidate: false,
+            });
+          }
+        }
+      };
+
       const translateDescription = async (): Promise<void> => {
-        const voices = (formMethods.getValues("languageVoices") ?? {}) as Record<string, string>;
         const primary = String(primaryLanguageIdRef.current ?? "");
+        const selected = new Set(batchLanguages.map(l => String(l.languageId)));
+        // The roleplay exists only in the languages selected (chosen by the trainer, or read from
+        // the brief): learners can play only those, and no other language keeps content.
+        if (selected.size && !abortedRef.current) keepOnlyLanguages(selected, primary);
+        const voices = (formMethods.getValues("languageVoices") ?? {}) as Record<string, string>;
         const targets = catalogLanguagesRef.current
-          .filter(l => voices[String(l.language_id)] && String(l.language_id) !== primary)
+          .filter(l => String(l.language_id) !== primary)
+          .filter(l =>
+            selected.size ? selected.has(String(l.language_id)) : voices[String(l.language_id)],
+          )
           .map(l => ({ languageId: String(l.language_id), languageCode: l.value }));
-        // The main-language fields with a tab per language: the challenge description, and the
-        // reminders the learner reads during the session.
+        // The main-language fields with a tab per language: the title, the challenge
+        // description, and the reminders the learner reads during the session.
         const fields = [
+          { source: "title", target: "translationTitle" },
           { source: "description", target: "translationDescription" },
           { source: "reminders", target: "translationReminders" },
         ]

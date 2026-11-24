@@ -231,6 +231,16 @@ export const resolveAutoCast = ({
     ([languageId, voiceId]) => voiceId && alreadyCast[languageId] !== voiceId,
   );
   if (isAuthored) return null;
+  // Languages taken out of this cast by something other than the row's own remove (which
+  // records them in `dismissed`): the Agent Builder keeping a roleplay to the languages the
+  // trainer chose. The map is deliberate now; filling the gaps again would offer learners
+  // languages the trainer had just left out.
+  const trimmedElsewhere =
+    Object.keys(current).length > 0 &&
+    Object.keys(alreadyCast).some(
+      languageId => alreadyCast[languageId] && !current[languageId] && !dismissed.has(languageId),
+    );
+  if (trimmedElsewhere) return null;
 
   const picks = autoSelectLanguageVoices({ languages, persona }).filter(
     pick => !dismissed.has(pick.languageId),

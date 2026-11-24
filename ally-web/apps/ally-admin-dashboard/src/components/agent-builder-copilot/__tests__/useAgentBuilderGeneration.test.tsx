@@ -574,9 +574,14 @@ describe("useAgentBuilderGeneration — roleplay mode", () => {
     act(() => result.current.start({ ...INPUTS, generateCover: false }));
     await waitFor(() => expect(result.current.phase).toBe("done"));
 
-    // The description and the reminders, each into the other voiced languages.
-    expect(mocks.translate).toHaveBeenCalledTimes(2);
-    expect(mocks.translate.mock.calls.map(c => c[0].text)).toEqual(["She minimises.", "Slow down"]);
+    // The title, the description and the reminders, each into the other selected languages.
+    expect(mocks.translate).toHaveBeenCalledTimes(3);
+    expect(mocks.translate.mock.calls.map(c => c[0].text)).toEqual([
+      "A tired daughter-in-law",
+      "She minimises.",
+      "Slow down",
+    ]);
+    expect(store.translationTitle).toEqual({ "2": "translated 2" });
     expect(store.translationReminders).toEqual({ "2": "translated 2" });
     expect(requests.find(r => r.field === "reminders")?.languageId).toBe("1");
     const body = mocks.translate.mock.calls[0][0];
@@ -586,5 +591,35 @@ describe("useAgentBuilderGeneration — roleplay mode", () => {
     expect(
       result.current.tasks.find(t => t.key === "challenge_description_translations")?.status,
     ).toBe("done");
+  });
+
+  it("keeps the roleplay to the selected languages only", async () => {
+    mocks.translate.mockClear();
+    // A roleplay that starts with voices and leftovers for languages nobody chose.
+    const { form, store } = makeForm({
+      languageVoices: { "1": "en-f", "2": "hi-m", "7": "ta-f", "9": "ml-m" },
+      translationDescription: { "7": "old Tamil text" },
+      linguisticStyleSamples: { "9": ["old Malayalam"] },
+    });
+    const { result } = renderHook(() => useAgentBuilderGeneration(form));
+
+    act(() =>
+      result.current.start({
+        ...INPUTS,
+        generateCover: false,
+        languages: [{ languageId: "2", label: "Hindi (India)", code: "hi" }],
+      }),
+    );
+    await waitFor(() => expect(result.current.phase).toBe("done"));
+
+    // Only Hindi is playable; English stays as the main (base) tab's language.
+    expect(Object.keys(store.languageVoices as object)).toEqual(["2"]);
+    expect(store.translationDescription).toEqual({ "2": "translated 2" });
+    expect(Object.keys(store.linguisticStyleSamples as object)).toEqual(["2"]);
+    expect(
+      mocks.translate.mock.calls.every(
+        c => c[0].targets.map((t: any) => t.languageId).join() === "2",
+      ),
+    ).toBe(true);
   });
 });
