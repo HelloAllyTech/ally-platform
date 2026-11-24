@@ -1,4 +1,4 @@
-# Chunk BT1 — Book by tap
+# Chunk BT1 — Act by tap (was Book by tap)
 
 > Brief for Claude Code. Read `CONTEXT.md`, `ROADMAP.md`, `chunk-ui1.md` (§2 structured replies), `CHUNK-06B-NOTES.md` (live steps, confirmation cards), `CHUNK-H1-NOTES.md` (consent in the gateway, the confirm path), `CHUNK-Q4-NOTES.md` (G5: the consent question and cards), `FIXES-22NOV.md` (R5), then this file. Plan briefly. <!-- docs-path-lint: planned -->
 > Branch: `feat/agents-v2-bt1` from master **after Q4 light is merged**. Tag commits `[BT1]`. Repos: ally-be (most), ally-web (bot page, bubble, Try it), ally-ai (the parts the agent returns).
@@ -8,6 +8,22 @@
 
 Every booking failure in rounds 5–8 was the model turning free text into a write: "Shall I book 0 on…", asking for a yes twice, the wrong free slots, "1pm then" taken as a yes, "for Try it" in the question, the name or date dropped. Tapping takes the model out of those steps: the choices come from the list, the confirmation is built in code from the entry, and the yes is a tap tied to exactly that entry. Typing still works as today (Q4 fixed that path); taps are the main path on the bot page, the bubble and WhatsApp.
 
+## 0. Built around the templates' use cases, not only booking (decided 23 Nov)
+
+BT1 is **act by tap** for every template, with three building blocks used everywhere: **choices** (chips or a WhatsApp list, from any list lookup: services, centres, shifts, slots, ways to give, updates), a **confirmation card** for any add or change (applications, callbacks, volunteer sign-ups, donor enquiries, questions for the team, support tickets, bookings), and **quick replies** (the starter questions, a language choice, yes/no). Each template's own use case is a test:
+
+| Template | What people tap |
+|---|---|
+| **Helpline and crisis support** | Starters as chips ("Is the helpline open now?", "Talk to a counsellor"); a **Callback request** card (name, number, when to call) → Confirm. A crisis reply carries no chips or cards, ever |
+| **Services and eligibility** | Service chips → the service's card (who it's for, documents, where, hours, cost); centre chips from Service locations; an **Application** card (name, phone, service, centre) → Confirm |
+| **Donors and volunteers** | Volunteer shift chips with date and time → **Shift booking** card → Confirm; **Volunteer sign-up** card; **Ways to give** chips → each way's card; a **Donor enquiry** card (a missing receipt) |
+| **Staff and volunteer onboarding** | Topic chips from the starters; a **Question for the team** card when the guides don't answer |
+| **Reach more communities** | A language choice at the start (English / हिंदी / Hinglish) as quick replies; a **Callback request** card |
+| **Campaigns and urgent updates** | The latest update as a card (title, date, what changed, who it affects, until when); chips for other current updates |
+| **Business templates** | Slots, tables, classes, site visits → booking cards; an **Order** lookup card; **Support ticket** and **Lead** cards |
+
+On WhatsApp the same blocks become list messages (up to 10 rows), reply buttons (up to 3) and text cards, with numbered text outside the 24-hour window. The use-case suite's template conversations (O1–O6 and the business sets) are each done by taps at the end of the block.
+
 ## 1. What the visitor sees (bot page, bubble, Try it)
 
 - **Slot chips.** When the assistant offers times (any `find_*` on a list people book into: slots, shifts, event places), the reply carries chips built **from the tool result, never from the reply text**: "Sun 29 Nov · 10:00", "11:00"… with the venue once above them. Up to 8, then "More times". Full slots never appear. Every chip, and every linked chooser in the owner's list screens, shows the date and time, never only the slot's name (the demo build showed four identical "Saturday kitchen shift · Andheri kitchen" options).
@@ -16,7 +32,7 @@ Every booking failure in rounds 5–8 was the model turning free text into a wri
 - **Done cards** (the 6b cards, titled by list kind from Q4 G5: "Booked", "Registered", "Callback requested", "Application received") show date, time and venue, and carry **Cancel** and **Move** where the list allows them. Cancel shows its own confirmation card ("Cancel your registration for Sun 29 Nov at 11:00?" → Confirm / Keep it); Move shows chips, then a confirmation card naming both times.
 - **Details lists** (callbacks, applications, volunteer sign-ups): when the agent has the details, it offers the card ("Callback request: Asha Test, Mon 23 Nov, evening, 98000 00007" → Confirm / Change). Change lets the person correct a field inline or by typing.
 - **Try it:** the same cards, marked "Test, not saved".
-- **Suggested next questions:** up to 3 chips after an answer, from the starter questions and what the assistant can do (small; drop if it slows the block).
+- **Suggested next questions:** up to 3 chips after an answer, from the template's starter questions and what the assistant can do.
 
 ## 2. How it works (no model in the write)
 

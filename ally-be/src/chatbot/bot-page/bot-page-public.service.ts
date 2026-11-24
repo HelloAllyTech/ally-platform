@@ -2,6 +2,13 @@ import { usageContext } from 'src/billing/context/usage-context';
 import { withFirstMessageParts } from '../engine/first-reply';
 import { startNotice } from '../safety/chat-notice';
 import { offMessage } from '../safety/off-message';
+import { ActionsService } from '../actions/actions.service';
+import { LANGUAGE_CHOICE } from '../actions/action-copy';
+import { enabledLanguagesOf } from '../languages/reply-language-for';
+import {
+  ActionPartsService,
+  type ReplyParts,
+} from '../actions/action-parts.service';
 import { isIndiaAssistant } from '../agent-tools/list-tools';
 import { replyLanguageOf } from '../engine/reply-language';
 import { UsageChannel, UsageKind } from 'src/billing/enum/billing.enum';
@@ -113,6 +120,11 @@ export interface PublicBotPage {
   /** Stage 7: the look is the name, the logo, one accent colour and a short welcome line. */
   branding: PublicBranding;
   suggestedQuestions: string[];
+  /**
+   * BT1 ("Reach more communities"): the language choice at the start, as quick replies, when the
+   * assistant speaks English and Hindi. Each tap sends its fixed request in that language.
+   */
+  languageChoice?: { label: string; text: string }[];
   prechat: PrechatField[];
   maxMessageChars: number;
   language: AvailableBotPage['settings']['language'];
@@ -251,6 +263,8 @@ export interface PublicFinal {
   steps?: PublicStep[];
   /** A booking or change made in this reply, from the stored record (chunk 6b). */
   confirmation?: PublicConfirmation;
+  /** BT1: chips and cards built from what the run's tools did; each button carries its token. */
+  parts?: ReplyParts;
   /**
    * Stage 6: the turn was blocked and `reply` is the fixed notification (no model call), or on a
    * crisis keyword the crisis reply. The page shows it with the crisis information.
@@ -375,6 +389,9 @@ export class BotPagePublicService {
     @Optional() private readonly answerConflict?: AnswerConflictService,
     // Stage 7: "Sites it has loaded on". Optional for older test wiring.
     @Optional() private readonly widgetSites?: WidgetSitesService,
+    // BT1: taps and a reply's chips and cards. Optional for older test wiring.
+    @Optional() private readonly actions?: ActionsService,
+    @Optional() private readonly parts?: ActionPartsService,
   ) {}
 
   async page(slug: string): Promise<AvailableBotPage> {
@@ -416,6 +433,9 @@ export class BotPagePublicService {
         look: { accent: paint, logo: available.brandImages?.logo ?? null },
       },
       suggestedQuestions: settings.suggestedQuestions,
+      ...(speaksEnglishAndHindi(available.chatbot)
+        ? { languageChoice: LANGUAGE_CHOICE }
+        : {}),
       prechat: settings.prechat,
       maxMessageChars: Math.min(
         settings.limits.maxMessageChars,
@@ -820,13 +840,26 @@ export class BotPagePublicService {
       available: AvailableBotPage;
       ready: ReadyVisitor;
       text: string;
+      /** BT1: a tap's token; `text` is then the label tapped. */
+      action?: string;
     },
     live?: LiveReply,
   ): Promise<PublicFinal> {
-    const { available, ready, text } = admitted;
+    const { available, ready } = admitted;
     const { chatbot, botSettings } = available;
     const contact = (await this.contactOf(available, ready, true))!;
     const conversation = await this.openWithIntake(available, contact, ready);
+    // BT1: a tap counts only in its own conversation, for its own person; the message stored and
+    // answered is what it stands for ("Confirmed: Sun 29 Nov 2026, 11:00").
+    const tap =
+      admitted.action && this.actions
+        ? await this.actions.redeem(admitted.action, {
+            chatbotId: chatbot.id,
+            conversationId: conversation.id,
+            contactId: contact.id,
+          })
+        : undefined;
+    const text = tap?.ok ? tap.claims.text : admitted.text;
 
     const inbound = await this.conversations.appendMessage(conversation.id, {
       channel: ConversationChannel.WEB,
@@ -895,6 +928,7 @@ export class BotPagePublicService {
                   conversationId: conversation.id,
                   providerMessageId: inbound.id,
                   contactId: contact.id,
+                  ...(tap ? { tap } : {}),
                 },
                 live,
               ),
@@ -1048,6 +1082,25 @@ export class BotPagePublicService {
       contact.id,
       decision,
     );
+    // BT1: chips and cards from what this run's tools did, never from the reply's words; none on
+    // a crisis, blocked or fixed reply.
+    const parts = await this.parts?.partsFor({
+      chatbotId: chatbot.id,
+      conversationId: conversation.id,
+      contactId: contact.id,
+      runId: decision.agent?.runId,
+      language: replyLanguageOf(text, decision.language),
+      suppressed:
+        Boolean(fixed) ||
+        decision.handledBy === WaHandledBy.CRISIS ||
+        Boolean(decision.blocked) ||
+        Boolean(decision.off),
+      answered: decision.handledBy === WaHandledBy.RAG,
+      starters: available.settings.suggestedQuestions ?? [],
+      asked: (await this.conversations.recentHistory(conversation.id))
+        .filter((m) => m.role === 'user')
+        .map((m) => m.content),
+    });
     return {
       reply: decision.body,
       citations: publicCitations(decision.citations),
@@ -1056,6 +1109,7 @@ export class BotPagePublicService {
       rateable: RATEABLE.has(decision.handledBy),
       ...(steps.length ? { steps } : {}),
       ...(confirmation ? { confirmation } : {}),
+      ...(parts && Object.keys(parts).length ? { parts } : {}),
       ...(decision.blocked === 'OUT_OF_CREDITS' ||
       decision.blocked === 'REMOVED_FROM_LIST'
         ? { blocked: decision.blocked }
@@ -1537,4 +1591,18 @@ function maskEmail(email: string): string {
   const at = email.lastIndexOf('@');
   if (at < 1) return '***';
   return `${email[0]}***${email.slice(at)}`;
+}
+
+/** BT1: whether to offer the language choice: English and Hindi (or Hinglish) both enabled. */
+function speaksEnglishAndHindi(chatbot: {
+  settings?: Record<string, unknown> | null;
+  persona?: {
+    defaultLanguage?: string | null;
+    languages?: string[] | null;
+  } | null;
+}): boolean {
+  const bases = enabledLanguagesOf(chatbot as never).map(
+    (l) => l.trim().toLowerCase().split('-')[0],
+  );
+  return bases.includes('en') && bases.includes('hi');
 }

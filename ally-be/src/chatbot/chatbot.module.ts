@@ -45,6 +45,9 @@ import { InboxService } from './inbox/inbox.service';
 import { NotificationModule } from '../notification/notification.module';
 import { AgentGatewayController } from './agent-tools/agent-gateway.controller';
 import { AgentGatewayService } from './agent-tools/agent-gateway.service';
+import { ActionPartsService } from './actions/action-parts.service';
+import { ActionTokenService } from './actions/action-token.service';
+import { ActionsService } from './actions/actions.service';
 import { AgentRunTokenService } from './agent-tools/agent-run-token.service';
 import { HandOverTool } from './agent-tools/hand-over.tool';
 import { ListConsentService } from './agent-tools/list-consent.service';
@@ -207,6 +210,10 @@ import {
     AgentToolRegistry,
     ListToolsService,
     ListConsentService,
+    // Act by tap (BT1): tokens, the parts a reply carries, and taps answered in code.
+    ActionTokenService,
+    ActionPartsService,
+    ActionsService,
     // Lists (chunk 5a): the engine 6's tools and 5b's screens use.
     ListRecordsService,
     ListDefinitionsService,
@@ -261,6 +268,9 @@ import {
     ListOwnerService,
     // The bot page's confirmation card reads the record a reply booked (chunk 6b).
     ListToolsService,
+    // Channels redeem taps and build a reply's chips and cards (BT1).
+    ActionsService,
+    ActionPartsService,
     // Channels apply memory after a reply (chunk 8a).
     MemoryService,
     SummaryService,

@@ -135,6 +135,8 @@ export class ListConsentService {
     key: string,
     list: string,
     questions: OfferQuestions,
+    /** BT1: what a Confirm tap replays, and the card it confirms. */
+    tap?: Pick<WriteOffer, 'input' | 'card'>,
   ): Promise<WriteOffer> {
     const offer: WriteOffer = {
       id: randomUUID(),
@@ -144,6 +146,8 @@ export class ListConsentService {
       list,
       questions,
       createdAt: Date.now(),
+      ...(tap?.input ? { input: tap.input } : {}),
+      ...(tap?.card ? { card: tap.card } : {}),
     };
     try {
       await this.redis.set(

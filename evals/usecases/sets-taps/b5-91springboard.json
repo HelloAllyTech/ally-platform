@@ -1,0 +1,44 @@
+{
+  "assistant": "b5-91springboard",
+  "cases": [
+    {
+      "id": "b5a-t1",
+      "kind": "action",
+      "lang": "en",
+      "_note": "A visit booked by taps.",
+      "turns": [
+        {
+          "user": "I'd like to book a visit to your Bengaluru hub on Saturday 28 Nov. I'm Tara Test, 9800000016. Which times are free?",
+          "expect": {}
+        },
+        {
+          "user": "[tap] first time",
+          "tap": {
+            "chip": 1
+          },
+          "expect": {},
+          "orSay": "Any Bengaluru hub on Saturday 28 Nov. Which times are free?"
+        },
+        {
+          "user": "[tap] service",
+          "tap": {
+            "chip": 1
+          },
+          "optional": true
+        },
+        {
+          "user": "[tap] Confirm",
+          "tap": "confirm",
+          "orSay": "Yes, please go ahead.",
+          "expect": {
+            "records": {
+              "list": "appointments",
+              "count": 1
+            },
+            "maxTaps": 3
+          }
+        }
+      ]
+    }
+  ]
+}

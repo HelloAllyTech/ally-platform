@@ -212,7 +212,7 @@ export const TryIt: React.FC<{
   const { data: home } = useGetAssistantHomeQuery(bot.id);
   const topics = (home?.fields.avoidTopics?.value as string[] | undefined) ?? [];
 
-  const send = async (text: string) => {
+  const send = async (text: string, action?: string) => {
     const history = messages
       .filter(m => m.role === "user" || m.role === "assistant")
       .slice(-MAX_HISTORY)
@@ -221,7 +221,13 @@ export const TryIt: React.FC<{
     setPending({ status: "thinking", text: "" });
     live.start();
     setError(null);
-    const request = { id: bot.id, message: text, history, conversationId: conversation.current };
+    const request = {
+      id: bot.id,
+      message: text,
+      history,
+      conversationId: conversation.current,
+      ...(action ? { action } : {}),
+    };
     let arrived = "";
     try {
       let result: TestChatbotResponse;
@@ -264,6 +270,9 @@ export const TryIt: React.FC<{
           citations: citationsOf(result),
           // As on the page: the thumbs show under the assistant's own answers (chunk Q2a).
           rateable: ["rag", "declined", "clarified"].includes(String(result.handledBy)),
+          // BT1: the same chips and cards as the page; a Confirm's done card says "Test only".
+          ...(result.confirmation ? { confirmation: result.confirmation } : {}),
+          ...(result.parts ? { parts: result.parts } : {}),
         },
         ...testOnlyNotice(result),
       ]);
@@ -316,6 +325,7 @@ export const TryIt: React.FC<{
               busy={pending !== null}
               error={error}
               onSend={text => void send(text)}
+              onTap={button => void send(button.label, button.token)}
               onNewChat={() => {
                 setMessages([]);
                 setWhys([]);

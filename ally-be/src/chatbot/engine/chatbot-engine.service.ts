@@ -68,6 +68,7 @@ import { crisisRequest } from './crisis-history';
 import { holdTextUntilCleared } from './live-reply';
 import { isEverydayIdiom } from './everyday-idiom';
 import { looksEmotional } from './looks-emotional';
+import { ActionsService } from '../actions/actions.service';
 import { businessFacts } from './business-facts';
 import { agentAnswersInstead, isGreetingReply } from './keyword-skip';
 import { buildKnowledgeRequest, NO_DOCUMENTS } from './knowledge-request';
@@ -322,6 +323,8 @@ export class ChatbotEngineService {
     // Stage 5: reviewed crisis translations and conflict handling. Optional for the engine's specs.
     @Optional() private readonly safetyTranslations?: SafetyTranslationsService,
     @Optional() private readonly answerConflict?: AnswerConflictService,
+    // BT1: a Confirm or Keep it tap is answered in code. Optional for the engine's specs.
+    @Optional() private readonly actions?: ActionsService,
   ) {}
 
   /**
@@ -336,6 +339,11 @@ export class ChatbotEngineService {
         turn,
         await this.respondInContext(turn, live),
       );
+      // BT1: a crisis between taps wins. The write a card was waiting on is dropped, so no button
+      // shown before the crisis can still write.
+      if (decision.handledBy === WaHandledBy.CRISIS && turn.conversationId) {
+        await this.actions?.forgetOffer(turn.chatbot.id, turn.conversationId);
+      }
       // Stage 6: the payer stamped on this run when it started, for the channel's background
       // work after the reply (memory, summary), which runs outside this context.
       const context = usageContext.current();
@@ -747,7 +755,15 @@ export class ChatbotEngineService {
       return this.refuse(turn, { organisationOnly: needsOrganisation });
     }
 
-    // ── 3. Answer ────────────────────────────────────────────────────────
+    // ── 3. A tap (BT1) ───────────────────────────────────────────────────
+    // After every gate a typed message passes: a Confirm writes with no model call; any other tap
+    // is answered like the words it stands for.
+    if (turn.tap) {
+      const tapped = await this.actions?.perform(turn);
+      if (tapped) return tapped;
+    }
+
+    // ── 4. Answer ────────────────────────────────────────────────────────
     return this.answerLogged(turn, live);
   }
 

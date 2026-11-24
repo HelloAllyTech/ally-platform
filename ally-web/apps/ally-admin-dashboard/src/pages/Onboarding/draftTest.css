@@ -412,3 +412,15 @@
   flex-direction: column;
   gap: 6px;
 }
+
+/* BT1: the bot page's cards and chips under a test reply, in the page's own look. */
+.ally-dt__parts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: transparent;
+  padding: 0;
+}
+.ally-dt__parts p {
+  white-space: normal;
+}

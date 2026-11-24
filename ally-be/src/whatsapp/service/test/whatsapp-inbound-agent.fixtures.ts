@@ -1,6 +1,7 @@
 import { HandoverService } from '../../../chatbot/handover/handover.service';
 import { ConversationService } from '../../../chatbot/service/conversation.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import type { Provider } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { AiService } from '../../../ai/service/ai.service';
@@ -116,6 +117,7 @@ export async function buildInboundHarness({
   documents = { find: async () => [{ documentId: 'doc-1' }] },
   replies = {},
   holder,
+  extraProviders = [],
 }: {
   chatbot: () => Chatbot;
   /** What `/agent/run` answers. */
@@ -131,6 +133,8 @@ export async function buildInboundHarness({
    * inbox isn't wired, as before it existed.
    */
   holder?: number | null;
+  /** More providers (BT1: the tap services, faked). */
+  extraProviders?: Provider[];
 }): Promise<InboundHarness> {
   const savedMessages: Record<string, unknown>[] = [];
   const provider = {
@@ -298,6 +302,7 @@ export async function buildInboundHarness({
             },
             { provide: HandoverService, useValue: handover },
           ]),
+      ...extraProviders,
     ],
   }).compile();
 

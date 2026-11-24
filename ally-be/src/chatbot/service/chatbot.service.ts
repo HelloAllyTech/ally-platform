@@ -1,3 +1,9 @@
+import { ActionsService } from '../actions/actions.service';
+import {
+  ActionPartsService,
+  type ReplyParts,
+} from '../actions/action-parts.service';
+import { TEST_ONLY } from '../actions/action-copy';
 import { LedgerService } from 'src/billing/service/ledger.service';
 import { PlanService } from 'src/billing/service/plan.service';
 import { replyLanguageOf } from '../engine/reply-language';
@@ -168,6 +174,12 @@ export interface ChatbotTestResult {
    * change. Try it never saves them. Absent when nothing.
    */
   wouldRemember?: string[];
+  /** BT1: chips and cards, as on the bot page; each button's token is sent back as `action`. */
+  parts?: ReplyParts;
+  /** BT1: a Confirm tap's done card, marked "Test only, not saved". */
+  confirmation?: ChatbotDecision['tapDone'] & { testOnly?: string };
+  /** BT1: what the tap stood for, shown as the person's message. */
+  tapped?: string;
 }
 
 /**
@@ -275,6 +287,9 @@ export class ChatbotService {
     @Optional() private readonly quickReplies?: QuickReplyCopyService,
     // Stage 4: the go-live gate on the status switch (D10). Optional for specs.
     @Optional() private readonly goLive?: GoLiveGateService,
+    // BT1: taps and a reply's chips and cards in Try it. Optional for specs.
+    @Optional() private readonly actions?: ActionsService,
+    @Optional() private readonly parts?: ActionPartsService,
   ) {}
 
   // ───────────────────────────────────────────────────────────── read
@@ -1030,6 +1045,16 @@ export class ChatbotService {
     const draft = dto.draft ?? {};
     if (draft.model) await this.assertModel(draft.model);
     const conversationId = dto.conversationId ?? `preview-${randomUUID()}`;
+    // BT1: a tap in Try it counts only in its own test chat; nothing it confirms is saved.
+    const tap =
+      dto.action && this.actions
+        ? await this.actions.redeem(dto.action, {
+            chatbotId: id,
+            conversationId,
+            contactId: null,
+          })
+        : undefined;
+    const said = tap?.ok ? tap.claims.text : dto.message;
 
     const bot: Chatbot = {
       ...chatbot,
@@ -1072,9 +1097,10 @@ export class ChatbotService {
       {
         chatbot: bot,
         settings,
-        text: dto.message,
+        text: said,
         history: dto.history ?? [],
         isFirstMessage,
+        ...(tap ? { tap } : {}),
         sender: {
           externalId: `test:${currentUserId()}`,
           label: 'test console',
@@ -1128,6 +1154,28 @@ export class ChatbotService {
     }
     const remember = wouldRemember(decision);
     if (remember.length) result.wouldRemember = remember;
+    // BT1: the same chips and cards as the bot page, built from this run's tool results.
+    const language = replyLanguageOf(said ?? '', decision.language);
+    const parts = await this.parts?.partsFor({
+      chatbotId: id,
+      conversationId,
+      contactId: null,
+      runId: decision.agent?.runId,
+      language,
+      suppressed:
+        decision.handledBy === WaHandledBy.CRISIS ||
+        Boolean(decision.blocked) ||
+        Boolean(decision.off),
+      answered: false,
+    });
+    if (parts && Object.keys(parts).length) result.parts = parts;
+    if (decision.tapDone) {
+      result.confirmation = {
+        ...decision.tapDone,
+        testOnly: TEST_ONLY[language],
+      };
+    }
+    if (tap) result.tapped = said;
     return result;
   }
 

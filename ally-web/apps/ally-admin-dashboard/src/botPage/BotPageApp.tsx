@@ -420,7 +420,7 @@ export function BotPageApp({
       }
     })();
 
-  const send = (text: string) => {
+  const send = (text: string, action?: string) => {
     const controller = new AbortController();
     abortRef.current?.abort();
     abortRef.current = controller;
@@ -480,6 +480,7 @@ export function BotPageApp({
             onActivity: step => live.push(step),
           },
           controller.signal,
+          action,
         );
         await finishReveal();
         clearInterval(timer);
@@ -512,6 +513,7 @@ export function BotPageApp({
             rateable: final.rateable,
             steps: final.steps,
             confirmation: final.confirmation,
+            parts: final.parts,
           },
         ]);
       } catch (err) {
@@ -639,7 +641,8 @@ export function BotPageApp({
           copy={copy}
           messages={messages}
           pending={pending ? { ...pending, step: live.current, slow: live.slow } : null}
-          onSend={send}
+          onSend={text => send(text)}
+          onTap={button => send(button.label, button.token)}
           onNewChat={() => void newChat()}
           busy={busy}
           error={error}

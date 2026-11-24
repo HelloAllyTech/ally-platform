@@ -1,0 +1,44 @@
+{
+  "assistant": "b5-bhive",
+  "cases": [
+    {
+      "id": "b5b-t1",
+      "kind": "action",
+      "lang": "en",
+      "_note": "A tour booked by taps: a slot chip, then Confirm.",
+      "turns": [
+        {
+          "user": "I'd like to book a tour of the Whitefield campus on Saturday 28 Nov. I'm Rohan Test, 9800000012. Which times are free?",
+          "expect": {}
+        },
+        {
+          "user": "[tap] first time",
+          "tap": {
+            "chip": 1
+          },
+          "expect": {},
+          "orSay": "Saturday 28 Nov at the Whitefield campus. Which times are free?"
+        },
+        {
+          "user": "[tap] service",
+          "tap": {
+            "chip": 1
+          },
+          "optional": true
+        },
+        {
+          "user": "[tap] Confirm",
+          "tap": "confirm",
+          "orSay": "Yes, please go ahead.",
+          "expect": {
+            "records": {
+              "list": "appointments",
+              "count": 1
+            },
+            "maxTaps": 3
+          }
+        }
+      ]
+    }
+  ]
+}

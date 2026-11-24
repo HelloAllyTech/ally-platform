@@ -11,13 +11,20 @@ import { BUILD_COPY } from "./create/copy";
 import { AddFactBox, FixPanel, SaveAsTest } from "./FixThis";
 import { LikelyQuestions } from "./LikelyQuestions";
 import { PERSONA_SCRIPTS } from "./personaScripts";
+import { ConfirmationCard, ReplyPartsView, TestOnly } from "../../botPage/components/parts";
+import { pickCopy } from "../../botPage/copy";
 
 import type { FixTools } from "./FixThis";
 import type { PersonaScript } from "./personaScripts";
 import type { SplitBridge } from "./splitBridge";
 import type { BotDraftView } from "./types";
+import type { PublicConfirmation, ReplyParts } from "../../botPage/types";
 
 import "./draftTest.css";
+import "../../botPage/page.css";
+
+/** The bot page's words for its cards (BT1), in English: the owner's test pane. */
+const pageCopy = pickCopy("en", "en");
 
 const T = SPLIT_COPY.pane;
 const T_FIX = SPLIT_COPY.fix;
@@ -76,6 +83,10 @@ type Item =
       unanswered: boolean;
       /** Asked again straight after a fix from this pane. */
       afterFix: boolean;
+      /** BT1: chips and cards, as on the bot page (taps are test-only here). */
+      parts?: ReplyParts;
+      /** BT1: a Confirm tap's done card, marked "Test only, not saved". */
+      confirmation?: PublicConfirmation & { testOnly?: string };
     }
   | { kind: "note"; id: string }
   | { kind: "info"; id: string; text: string };
@@ -309,7 +320,12 @@ export const DraftTestPane: React.FC<{
   }, [items.length, pending?.text]);
 
   const send = useCallback(
-    async (question: string, mode: "new" | "again" | "retry"): Promise<boolean> => {
+    async (
+      question: string,
+      mode: "new" | "again" | "retry",
+      /** BT1: a tap's token; `question` is then the label tapped. */
+      action?: string,
+    ): Promise<boolean> => {
       const current = itemsRef.current;
       const history = historyOf(current, mode !== "new");
       const version = versionRef.current;
@@ -336,6 +352,7 @@ export const DraftTestPane: React.FC<{
         message: question,
         history,
         conversationId: conversation.current,
+        ...(action ? { action } : {}),
       };
       let arrived = "";
       try {
@@ -384,6 +401,8 @@ export const DraftTestPane: React.FC<{
             unanswered:
               String(result.handledBy) === "declined" && result.wouldFileUnanswered != null,
             afterFix,
+            ...(result.parts ? { parts: result.parts } : {}),
+            ...(result.confirmation ? { confirmation: result.confirmation } : {}),
           },
         ]);
         return true;
@@ -694,6 +713,27 @@ export const DraftTestPane: React.FC<{
                   {olderThanNow(item) && <span className="ally-dt__older"> · {T.older}</span>}
                 </span>
                 <p>{item.text}</p>
+                {(item.parts || item.confirmation) && (
+                  // BT1: the bot page's own cards and chips, in its look.
+                  <div className="brand-surface ally-dt__parts">
+                    {item.confirmation && (
+                      <ConfirmationCard
+                        confirmation={item.confirmation}
+                        copy={pageCopy}
+                        when={item.confirmation.title}
+                      >
+                        <TestOnly text={item.confirmation.testOnly} />
+                      </ConfirmationCard>
+                    )}
+                    {item.parts && (
+                      <ReplyPartsView
+                        parts={item.parts}
+                        active={isLast && !pending}
+                        onTap={button => void send(button.label, "new", button.token)}
+                      />
+                    )}
+                  </div>
+                )}
                 {item.starter && (
                   <p className="ally-small" data-testid="draft-test-starter">
                     {BUILD_COPY.starter}

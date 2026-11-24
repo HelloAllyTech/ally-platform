@@ -693,6 +693,41 @@ body {
   font-size: 1.0625rem;
   font-weight: 600;
 }
+/* BT1: a card's buttons, Try it's mark, and chips under a reply. */
+.bp-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.bp-card__actions .ally-btn {
+  min-height: 40px;
+}
+.bp-card__test {
+  margin: 8px 0 0;
+  font-size: 0.8125rem;
+  color: var(--brand-muted);
+}
+.bp-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 100%;
+}
+.bp-next .ally-chip {
+  border-color: var(--brand-accent);
+  color: var(--brand-accent);
+  background: transparent;
+  min-height: 40px;
+  padding: 8px 14px;
+  text-align: left;
+}
+.bp-choices .bp-pill:focus-visible,
+.bp-card__actions button:focus-visible,
+.bp-next .ally-chip:focus-visible {
+  outline: 2px solid var(--brand-accent);
+  outline-offset: 2px;
+}
 .bp-card__details {
   display: grid;
   gap: 2px;

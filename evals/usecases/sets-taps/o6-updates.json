@@ -1,0 +1,22 @@
+{
+  "assistant": "o6-updates",
+  "cases": [
+    {
+      "id": "o6-t1",
+      "kind": "action",
+      "lang": "en",
+      "_note": "Updates: the latest update as a card or chips.",
+      "turns": [
+        {
+          "user": "What's the latest update?",
+          "expect": {
+            "partsAny": [
+              "entry",
+              "choices"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
