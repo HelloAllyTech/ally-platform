@@ -1,0 +1,80 @@
+{
+  "assistant": "o3-goonj",
+  "cases": [
+    {
+      "id": "o3-t1",
+      "kind": "action",
+      "lang": "en",
+      "_note": "Volunteers: a shift booking by tap.",
+      "turns": [
+        {
+          "user": "Which volunteer shifts can I sign up for?",
+          "expect": {
+            "partsAny": [
+              "entry",
+              "choices"
+            ]
+          }
+        },
+        {
+          "user": "Please book me on that shift. I'm Meera Test, 9800000009.",
+          "expect": {
+            "partsAny": [
+              "offer"
+            ]
+          }
+        },
+        {
+          "user": "[tap] Confirm",
+          "tap": "confirm",
+          "orSay": "Yes, please go ahead.",
+          "expect": {
+            "records": {
+              "list": "shift_bookings",
+              "count": 1
+            },
+            "maxTaps": 3
+          }
+        }
+      ]
+    },
+    {
+      "id": "o3-t2",
+      "kind": "action",
+      "lang": "en",
+      "_note": "Donors: ways to give as a card, then a donor enquiry by tap.",
+      "turns": [
+        {
+          "user": "How can I donate?",
+          "expect": {
+            "partsAny": [
+              "entry",
+              "choices",
+              "suggestions"
+            ]
+          }
+        },
+        {
+          "user": "I donated last month but never got my 80G receipt. I'm Kabir Test, 9800000010, kabir@example.com.",
+          "expect": {
+            "partsAny": [
+              "offer"
+            ]
+          }
+        },
+        {
+          "user": "[tap] Confirm",
+          "tap": "confirm",
+          "orSay": "Yes, please go ahead.",
+          "expect": {
+            "records": {
+              "list": "donor_enquiries",
+              "count": 1
+            },
+            "maxTaps": 3
+          }
+        }
+      ]
+    }
+  ]
+}

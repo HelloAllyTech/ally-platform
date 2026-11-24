@@ -404,7 +404,7 @@ describe('ActionPartsService (BT1: chips and cards from tool results, never from
     ];
     const many = await setup(found(12)).parts.partsFor(input());
     expect(many.choices?.options).toHaveLength(8);
-    expect(many.choices?.options[0].label).toBe('Sun 29 Nov 2026, 10:00');
+    expect(many.choices?.options[0].label).toBe('Sun 29 Nov · 10:00');
     const one = await setup(found(1)).parts.partsFor(input());
     expect(one.entry).toEqual({
       list: 'Food drives',
@@ -413,6 +413,36 @@ describe('ActionPartsService (BT1: chips and cards from tool results, never from
         { label: 'Venue', value: 'Bandra West station' },
         { label: 'Places left', value: '4' },
       ],
+    });
+  });
+
+  it('entries named alike show their day and time; the tap says name, time and place', async () => {
+    const { parts, tokens } = setup([
+      {
+        tool: 'find_events',
+        status: 'ok',
+        error_code: null,
+        result: {
+          list: { key: 'events', name: 'Food drives' },
+          passages: [10, 12].map((h) => ({
+            record_id: `e-${h}`,
+            record_title: 'Bandra Sunday food drive',
+            text: `id: e-${h}\nStarts at: Sun 29 Nov 2026, ${h}:00\nVenue: Bandra West station`,
+          })),
+        },
+      },
+    ]);
+    const out = await parts.partsFor(input());
+    expect(out.choices?.options.map((o) => o.label)).toEqual([
+      'Sun 29 Nov · 10:00',
+      'Sun 29 Nov · 12:00',
+    ]);
+    const tapped = await tokens.redeem(out.choices!.options[1].token, where);
+    expect(tapped).toMatchObject({
+      ok: true,
+      claims: {
+        text: 'Bandra Sunday food drive, Sun 29 Nov 2026, 12:00, Bandra West station',
+      },
     });
   });
 

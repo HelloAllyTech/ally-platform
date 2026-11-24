@@ -1,0 +1,33 @@
+{
+  "assistant": "o4-tfi-staff",
+  "cases": [
+    {
+      "id": "o4-t1",
+      "kind": "action",
+      "lang": "en",
+      "_note": "Staff onboarding: a question for the team by tap.",
+      "turns": [
+        {
+          "user": "I have a question for the team: can I carry over unused leave to next year? I'm Nisha Test, nisha@example.com.",
+          "expect": {
+            "partsAny": [
+              "offer"
+            ]
+          }
+        },
+        {
+          "user": "[tap] Confirm",
+          "tap": "confirm",
+          "orSay": "Yes, please go ahead.",
+          "expect": {
+            "records": {
+              "list": "team_questions",
+              "count": 1
+            },
+            "maxTaps": 3
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "assistant": "b2-cloudnine",
+  "cases": [
+    {
+      "id": "b2-t1",
+      "kind": "action",
+      "lang": "en",
+      "_note": "An appointment booked by taps.",
+      "turns": [
+        {
+          "user": "I'd like to book an appointment. I'm Anita Test, 9800000013. Which times are free?",
+          "expect": {
+            "partsAny": [
+              "choices"
+            ]
+          }
+        },
+        {
+          "user": "[tap] first time",
+          "tap": {
+            "chip": 1
+          },
+          "expect": {
+            "partsAny": [
+              "offer"
+            ]
+          }
+        },
+        {
+          "user": "[tap] Confirm",
+          "tap": "confirm",
+          "orSay": "Yes, please go ahead.",
+          "expect": {
+            "records": {
+              "list": "appointments",
+              "count": 1
+            },
+            "maxTaps": 3
+          }
+        }
+      ]
+    }
+  ]
+}

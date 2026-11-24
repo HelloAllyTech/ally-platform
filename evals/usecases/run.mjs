@@ -278,12 +278,13 @@ class Visitor {
   }
 
   /** One message through the SSE stream, timed. */
-  async say(message) {
+  /** BT1: `action` is a tap's token; `message` is then the label tapped. */
+  async say(message, action) {
     const t0 = performance.now();
     const res = await fetch(`${API}/api/v1/public/bots/${this.slug}/messages/stream`, {
       method: 'POST',
       headers: this.headers(),
-      body: JSON.stringify({ message }),
+      body: JSON.stringify(action ? { message, action } : { message }),
       signal: AbortSignal.timeout(90_000),
     });
     this.keep(res);
@@ -423,6 +424,27 @@ async function grade(c, t, observed, context) {
   }
 }
 
+// ---------------------------------------------------------------- taps (BT1)
+/**
+ * The button a `tap` turn presses on the last reply: a kind or label ("confirm", "Cancel"), or
+ * `{ chip: n }` for the nth chip (or next question). Null when the reply has no such button.
+ */
+function buttonFor(parts, tap) {
+  if (!parts) return null;
+  const all = [
+    ...(parts.offer?.buttons ?? []),
+    ...(parts.done?.buttons ?? []),
+    ...(parts.choices?.options ?? []),
+    ...(parts.suggestions ?? []),
+  ];
+  if (typeof tap === 'object' && tap.chip) {
+    const chips = parts.choices?.options ?? parts.suggestions ?? [];
+    return chips[tap.chip - 1] ?? null;
+  }
+  const want = String(tap).toLowerCase();
+  return all.find((b) => b.kind === want || b.label.toLowerCase() === want) ?? null;
+}
+
 // ---------------------------------------------------------------- one case
 async function runCase(c, a, s, visitors, corpus, context) {
   const caseStart = new Date();
@@ -442,6 +464,10 @@ async function runCase(c, a, s, visitors, corpus, context) {
   const turns = [];
   let prevAssistant = '';
   const history = [];
+  // BT1: the last reply's chips and cards, which a `tap` turn presses.
+  let lastParts = null;
+  const allParts = [];
+  let taps = 0;
   for (const t of c.turns) {
     const v = visitorFor(t.as);
     const expect = expectFor(c.kind, t.expect ?? {});
@@ -458,7 +484,30 @@ async function runCase(c, a, s, visitors, corpus, context) {
     }
     if (t.newChat) await v.newChat();
     const since = new Date(Date.now() - 1000);
-    const said = await v.say(t.user);
+    let pressed = null;
+    if (t.tap) {
+      const tap = typeof t.tap === 'object' && !t.tap.chip ? t.tap.kind : t.tap;
+      // `earlier`: a button from a reply before the last one (a crisis between taps).
+      pressed = t.tap.earlier
+        ? [...allParts].reverse().map((p) => buttonFor(p, tap)).find(Boolean) ?? null
+        : buttonFor(lastParts, tap);
+      // The model asked for a detail first: type it, then look for the button once more.
+      if (!pressed && t.orSay) {
+        const asked = await v.say(t.orSay);
+        history.push({ role: 'user', content: t.orSay }, { role: 'assistant', content: asked.final?.reply ?? '' });
+        lastParts = asked.final?.parts ?? null;
+        if (lastParts) allParts.push(lastParts);
+        pressed = buttonFor(lastParts, tap);
+      }
+      if (!pressed) {
+        turns.push({ user: `[tap] ${JSON.stringify(t.tap)}`, error: 'no such button', hard: [`tap: no ${JSON.stringify(t.tap)} on the last reply`], soft: [] });
+        break;
+      }
+      taps += 1;
+    }
+    const said = pressed ? await v.say(pressed.label, pressed.token) : await v.say(t.user);
+    lastParts = said.final?.parts ?? null;
+    if (lastParts) allParts.push(lastParts);
     const reply = said.final?.reply ?? '';
     const facts = await turnFacts({
       chatbotId: s.chatbot_id,
@@ -468,7 +517,7 @@ async function runCase(c, a, s, visitors, corpus, context) {
       list: expect.records?.list,
       caseStart,
     });
-    const turn = { reply, error: said.error, handledBy: facts.handledBy, steps: facts.steps, records: facts.records, refused: false };
+    const turn = { reply, error: said.error, handledBy: facts.handledBy, steps: facts.steps, records: facts.records, refused: false, tap: pressed?.kind };
     const visitorText = c.turns.map((x) => x.user).join(' ');
     const checked = checkTurn({ kind: c.kind, mustPass: c.mustPass, user: t.user, prevAssistant, expect, turn, corpus, visitorText });
     const citations = (said.final?.citations ?? []).map((x) => ({
@@ -487,9 +536,25 @@ async function runCase(c, a, s, visitors, corpus, context) {
       history: [...history],
     };
     const g = said.error ? null : await grade(c, t, observed, context);
+    if (t.expect?.maxTaps != null && taps > t.expect.maxTaps) {
+      checked.hard.push(`${taps} taps (at most ${t.expect.maxTaps})`);
+    }
+    if (t.expect?.parts) {
+      for (const want of [].concat(t.expect.parts)) {
+        if (!lastParts?.[want]) checked.hard.push(`no ${want} on the reply`);
+      }
+    }
+    if (t.expect?.partsAny && !t.expect.partsAny.some((want) => lastParts?.[want])) {
+      checked.hard.push(`none of ${t.expect.partsAny.join(', ')} on the reply`);
+    }
+    if (t.expect?.noParts && lastParts && Object.keys(lastParts).length) {
+      checked.hard.push(`parts on a reply that must have none: ${Object.keys(lastParts).join(', ')}`);
+    }
     turns.push({
-      user: t.user,
+      user: pressed ? `[tap] ${pressed.label}` : t.user,
       as: t.as,
+      tap: pressed ? pressed.kind : undefined,
+      parts: lastParts ? Object.keys(lastParts) : [],
       messageId: said.final?.messageId ?? null,
       observed,
       reply,
@@ -505,7 +570,7 @@ async function runCase(c, a, s, visitors, corpus, context) {
       grade: g,
       ...checked,
     });
-    history.push({ role: 'user', content: t.user }, { role: 'assistant', content: reply });
+    history.push({ role: 'user', content: pressed ? pressed.label : t.user }, { role: 'assistant', content: reply });
     prevAssistant = reply;
   }
   return { id: c.id, kind: c.kind, lang: c.lang, mustPass: Boolean(c.mustPass), verdict: verdictOf(turns), turns };

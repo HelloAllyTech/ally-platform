@@ -1,0 +1,33 @@
+{
+  "assistant": "b3-tss",
+  "cases": [
+    {
+      "id": "b3-t1",
+      "kind": "action",
+      "lang": "en",
+      "_note": "A support ticket by tap.",
+      "turns": [
+        {
+          "user": "My order arrived damaged and I'd like to raise a support ticket. I'm Sam Test, 9800000014, the order is TSS-1001.",
+          "expect": {
+            "partsAny": [
+              "offer"
+            ]
+          }
+        },
+        {
+          "user": "[tap] Confirm",
+          "tap": "confirm",
+          "orSay": "Yes, please go ahead.",
+          "expect": {
+            "records": {
+              "list": "support_tickets",
+              "count": 1
+            },
+            "maxTaps": 3
+          }
+        }
+      ]
+    }
+  ]
+}

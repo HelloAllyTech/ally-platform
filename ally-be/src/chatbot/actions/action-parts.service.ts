@@ -287,13 +287,30 @@ export class ActionPartsService {
       return { entry: entryCard(listName, passages[0]) };
     }
     if (passages.length < 2) return null;
+    // Every chip names its day and time, never only the entry's name (BT1: four identical
+    // "Saturday kitchen shift" options); the name too only when the options' names differ.
+    const shown = passages.slice(0, MAX_CHOICES).map((p) => {
+      const title = p.record_title!;
+      const when = DATED.test(title) ? title : dateIn(p.text);
+      return { p, title, when, where: detailOf(p.text, PLACE) };
+    });
+    const oneName = new Set(shown.map((x) => x.title)).size === 1;
     const options: TapButton[] = [];
-    for (const p of passages.slice(0, MAX_CHOICES)) {
-      const where = detailOf(p.text, PLACE);
-      const label = p.record_title!;
+    for (const { p, title, when, where } of shown) {
+      const label = !when
+        ? title
+        : when === title || oneName
+          ? shortWhen(when)
+          : `${title} · ${shortWhen(when)}`;
+      // What the tap stands for: the entry's name, its day and time, and its place.
+      const text = [title, when, where]
+        .filter(
+          (x, i): x is string => Boolean(x) && (i === 0 || !title.includes(x!)),
+        )
+        .join(', ');
       const b = await this.button(input, label, {
         kind: 'choose',
-        text: where && !label.includes(where) ? `${label}, ${where}` : label,
+        text,
         entryId: p.record_id,
       });
       if (b) options.push(b);
@@ -326,6 +343,27 @@ export class ActionPartsService {
 }
 
 const PLACE = /venue|location|place|address|where|centre|center|branch|hub/i;
+
+/** A day and time as the lists display them: "Sun 29 Nov 2026, 10:00". */
+const DATED = /\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\w*\s+\d{1,2}\s+\w{3}/;
+
+/** The first detail in a passage that is a day and time. */
+function dateIn(text: string | undefined): string | undefined {
+  for (const line of (text ?? '').split('\n')) {
+    const at = line.indexOf(': ');
+    if (at > 0 && DATED.test(line.slice(at + 2)))
+      return line.slice(at + 2).trim();
+  }
+  return undefined;
+}
+
+/** "Sun 29 Nov 2026, 10:00" → "Sun 29 Nov · 10:00" (the year goes; the page's own short form). */
+export function shortWhen(when: string): string {
+  return when
+    .replace(/\s+\d{4},?\s*/, ' · ')
+    .replace(/\s+·\s+$/, '')
+    .trim();
+}
 
 const norm = (text: string): string =>
   text
