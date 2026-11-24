@@ -55,6 +55,10 @@ const STREAM_BACKOFF_MS = [1_000, 2_000, 5_000, 10_000, 30_000];
 /** A refusal or failure in the visitor's language. */
 export function errorText(copy: BotPageCopy, error: unknown, page?: PublicBotPage | null): string {
   if (!(error instanceof BotPageApiError)) return copy.errors.INTERNAL;
+  // TF1 F11: a paused or archived assistant's link shows its off message, which always carries
+  // the crisis information, not a bare "isn't available".
+  const off = error.details?.offMessage;
+  if (typeof off === "string" && off.trim()) return off.trim();
   const text = copy.errors[error.code] ?? copy.errors.INTERNAL;
   return fill(text, {
     minutes: Math.max(1, Math.ceil((error.retryAfterSeconds ?? 60) / 60)),
