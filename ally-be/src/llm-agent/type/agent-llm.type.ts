@@ -242,8 +242,12 @@ export interface AgentStreamRequest {
    * request. A closing pass needs exactly that: removing the tools would
    * change the request's prefix and invalidate earlier thinking blocks,
    * while `tool_choice` is outside the prefix. Ignored in JSON mode.
+   *
+   * 'required' forces a tool call (a submit-only pass). Only OpenAI honours it;
+   * Anthropic and Gemini ignore it, since Claude rejects a forced `tool_choice`
+   * with thinking on, so there "forced" still means "the only tool offered".
    */
-  toolChoice?: 'auto' | 'none';
+  toolChoice?: 'auto' | 'none' | 'required';
   /**
    * Gemini 2.x's thinking budget in tokens; 0 turns thinking off where the
    * model allows it, for a reply whose first words must be fast and whose

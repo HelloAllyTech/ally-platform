@@ -46,6 +46,8 @@ export interface PmLlmStepRequest {
   tools: AgentToolDefinition[];
   maxTokens: number;
   timeoutMs: number;
+  /** 'required' on a submit-only pass: OpenAI then must call the one tool offered. */
+  toolChoice?: 'required';
   ledger: PmRunLedger;
   /**
    * Skip the `pm_agent_run_steps` row: set by callers with no `pm_agent_runs` row (the weekly
@@ -235,6 +237,7 @@ export class PmAgentLlmService implements PmLlmPort {
         tools: request.tools,
         maxTokens: request.maxTokens,
         timeoutMs: request.timeoutMs,
+        ...(request.toolChoice ? { toolChoice: request.toolChoice } : {}),
       })) {
         if (event.type === 'final') turn = event.message;
       }

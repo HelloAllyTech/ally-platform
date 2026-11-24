@@ -128,7 +128,10 @@ export class AnthropicAgentProvider implements IAgentLlmProvider {
         // blocks (replayed verbatim) and mid-conversation `system` messages,
         // which the SDK's MessageParam does not type yet.
         messages: request.messages as any,
-        ...(request.tools?.length && request.toolChoice && !jsonTool
+        ...(request.tools?.length &&
+        request.toolChoice &&
+        request.toolChoice !== 'required' &&
+        !jsonTool
           ? { tool_choice: { type: request.toolChoice } }
           : {}),
         ...(request.tools?.length
