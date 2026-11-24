@@ -108,6 +108,15 @@ describe("a chart tab", () => {
     expect(screen.getAllByTestId("statistics-subject-heading")).toHaveLength(1);
   });
 
+  it("keeps each heading in the same grid as its cards, so a card cannot be packed up past another section's heading", () => {
+    renderView();
+    const heading = screen.getByTestId("statistics-section-allCourses");
+    const run = screen.getByTestId("statistics-run-allCourses");
+    expect(heading.parentElement).toBe(run);
+    expect(within(run).getAllByTestId(/^statistics-card-/).length).toBeGreaterThan(0);
+    expect(within(run).queryByTestId("statistics-section-useOverTime")).toBeNull();
+  });
+
   it("draws no subject heading on a tab that has no overview above it", () => {
     renderView({
       view: {
