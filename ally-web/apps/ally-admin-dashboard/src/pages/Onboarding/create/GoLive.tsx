@@ -157,7 +157,9 @@ export const GoLiveSection: React.FC<{
   onCreditsOut: () => void;
   /** The form's field wiring, for the purpose field (a working-copy field). */
   field?: (name: string) => Omit<FieldCommon, "label">;
-}> = ({ draftId, chatbotId, live, disabled, onLive, onCreditsOut, field }) => {
+  /** TF1 B2: the working copy's access; organisation-only goes live as that, else invite only. */
+  accessMode?: "public" | "organisation" | "invite";
+}> = ({ draftId, chatbotId, live, disabled, onLive, onCreditsOut, field, accessMode }) => {
   const checklist = useGetGoLiveChecklistQuery(chatbotId ?? "", { skip: !chatbotId });
   const [publish, { isLoading }] = usePublishBotDraftMutation();
   const accessList = useGetAccessListQuery(chatbotId ?? "", { skip: !chatbotId });
@@ -176,7 +178,8 @@ export const GoLiveSection: React.FC<{
     try {
       const result = await publish({
         id: draftId,
-        access: "invite",
+        // Public stays off (B2): anything but organisation-only goes live invite only.
+        access: accessMode === "organisation" ? "organisation" : "invite",
         ...(confirmMustPass ? { confirmMustPass: true } : {}),
         ...(publishAnyway ? { publishAnyway: true } : {}),
       }).unwrap();

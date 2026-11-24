@@ -109,4 +109,26 @@ describe("GoLiveSection", () => {
     rerender(<GoLiveSection {...props} live onLive={onLive} />);
     expect(screen.getByTestId("golive-budget").textContent).toBe(line);
   });
+
+  // TF1 B2: Staff onboarding sets organisation-only, but Go live always published invite only.
+  it("goes live organisation-only when the working copy says so; never public", async () => {
+    const props = {
+      draftId: "draft-1",
+      chatbotId: "bot-1",
+      onCreditsOut: vi.fn(),
+      onLive: vi.fn(),
+    };
+    const { unmount } = render(<GoLiveSection {...props} live={false} accessMode="organisation" />);
+    fireEvent.click(screen.getByRole("button", { name: BUILD_COPY.goLive.publish }));
+    await waitFor(() =>
+      expect(h.publish).toHaveBeenCalledWith({ id: "draft-1", access: "organisation" }),
+    );
+    unmount();
+    h.publish.mockClear();
+    render(<GoLiveSection {...props} live={false} accessMode="public" />);
+    fireEvent.click(screen.getByRole("button", { name: BUILD_COPY.goLive.publish }));
+    await waitFor(() =>
+      expect(h.publish).toHaveBeenCalledWith({ id: "draft-1", access: "invite" }),
+    );
+  });
 });

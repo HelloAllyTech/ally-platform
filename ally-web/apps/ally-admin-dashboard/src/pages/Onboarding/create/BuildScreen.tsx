@@ -368,6 +368,7 @@ export const BuildScreen: React.FC<{
               addAddress={sources.addAddress}
               addFiles={sources.addFiles}
               goLive={surface === "create" || !copy.live}
+              accessMode={draft.data?.draft?.access?.mode}
             />
           </div>
         </>
