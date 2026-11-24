@@ -19,10 +19,11 @@ import { useTranslation } from "react-i18next";
 
 import { useGetStatisticsChartQuery } from "@api";
 import { useUser } from "@hooks";
-import type { StatisticsChartEntry, StatisticsViewConfig } from "@types";
+import type { StatisticsChartEntry, StatisticsInsight, StatisticsViewConfig } from "@types";
 
 import { SortableMetricBlock } from "../SortableMetricBlock";
 import { filterParams } from "./ChartHost";
+import { InsightsSection } from "./InsightsSection";
 import { LayoutItem, layoutKey, parseLayoutKey, viewChartIds } from "./layout";
 import { LibraryDrawer } from "./LibraryDrawer";
 import { CHART_RENDERERS, PinSummary } from "./renderers";
@@ -38,6 +39,8 @@ interface ForYouViewProps {
   onPinsChange: (keys: string[]) => void;
   /** Opens the chart a pinned card is about, on the tab it lives on. */
   onOpen: (item: LayoutItem) => void;
+  /** Opens the chart a finding comes from. */
+  onOpenInsight: (insight: StatisticsInsight) => void;
 }
 
 const TONE_CLASS = {
@@ -149,6 +152,7 @@ export const ForYouView: FunctionComponent<ForYouViewProps> = ({
   pinKeys,
   onPinsChange,
   onOpen,
+  onOpenInsight,
 }) => {
   const { t } = useTranslation();
   const { user } = useUser();
@@ -205,6 +209,8 @@ export const ForYouView: FunctionComponent<ForYouViewProps> = ({
           ? t(`statisticsLibrary.forYou.greeting.${part}`, { name: firstName })
           : t(`statisticsLibrary.forYou.greetingNoName.${part}`)}
       </h2>
+
+      <InsightsSection onOpen={onOpenInsight} />
 
       <section className="flex flex-col gap-3" aria-label={t("statisticsLibrary.pins.heading")}>
         <div className="flex flex-wrap items-center justify-between gap-3">

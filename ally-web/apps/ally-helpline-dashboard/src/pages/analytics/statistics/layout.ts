@@ -171,6 +171,33 @@ export const groupBySection = (view: StatisticsViewConfig, keys: readonly string
     .map(entry => entry.key);
 };
 
+/**
+ * A chart put into a layout at the end of its own section, leaving the rest of
+ * the person's arrangement as it is. Used to show a chart a link points at when
+ * they have not put it on the tab.
+ */
+export const insertIntoSection = (
+  view: StatisticsViewConfig,
+  keys: readonly string[],
+  chartId: string,
+): string[] => {
+  const sections = view.sections.map(s => s.charts);
+  const own = sections.findIndex(charts => charts.includes(chartId));
+  if (own === -1 || keys.some(k => parseLayoutKey(k)?.id === chartId)) return [...keys];
+  const rank = (key: string) => {
+    const item = parseLayoutKey(key);
+    return item ? sections.findIndex(charts => charts.includes(item.id)) : -1;
+  };
+  let at = keys.length;
+  for (let i = 0; i < keys.length; i += 1) {
+    if (rank(keys[i]) > own) {
+      at = i;
+      break;
+    }
+  }
+  return [...keys.slice(0, at), chartId, ...keys.slice(at)];
+};
+
 /** True when a tab's layout comes from the older single list rather than one saved for the tab. */
 export const isLegacyLayout = (
   prefs: Record<string, unknown> | null | undefined,

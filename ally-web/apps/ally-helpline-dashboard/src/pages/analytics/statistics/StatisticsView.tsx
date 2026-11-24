@@ -1,4 +1,4 @@
-import { FunctionComponent, ReactNode, useMemo, useState } from "react";
+import { FunctionComponent, ReactNode, useEffect, useMemo, useState } from "react";
 
 import {
   DndContext,
@@ -28,7 +28,14 @@ import type {
 
 import { SortableMetricBlock } from "../SortableMetricBlock";
 import { ChartHost } from "./ChartHost";
-import { LayoutItem, layoutKey, parseLayoutKey, sectionRuns, viewChartIds } from "./layout";
+import {
+  LayoutItem,
+  insertIntoSection,
+  layoutKey,
+  parseLayoutKey,
+  sectionRuns,
+  viewChartIds,
+} from "./layout";
 import { LibraryDrawer } from "./LibraryDrawer";
 import { CHART_RENDERERS, DashboardContext } from "./renderers";
 import { SubjectSelector } from "./SubjectSelector";
@@ -49,6 +56,8 @@ interface StatisticsViewProps {
   /** Chart ids pinned to For you, and the pin or unpin of a card. */
   pinnedIds: ReadonlySet<string>;
   onTogglePin: (chartId: string, key: string) => void;
+  /** A chart to bring into view when the tab opens, from a link. */
+  focusChart?: string;
 }
 
 /**
@@ -68,6 +77,7 @@ export const StatisticsView: FunctionComponent<StatisticsViewProps> = ({
   onSubjectChange,
   pinnedIds,
   onTogglePin,
+  focusChart,
 }) => {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
@@ -76,7 +86,9 @@ export const StatisticsView: FunctionComponent<StatisticsViewProps> = ({
   const listed = useMemo(() => new Set(viewChartIds(view)), [view]);
 
   // Each card is a chart id with the filters set on it. A chart appears once.
-  const items = layoutKeys
+  // A chart a link points at is shown even if the person has not put it on this tab.
+  const shownKeys = focusChart ? insertIntoSection(view, layoutKeys, focusChart) : layoutKeys;
+  const items = shownKeys
     .map(parseLayoutKey)
     .filter(
       (item): item is LayoutItem =>
@@ -85,6 +97,14 @@ export const StatisticsView: FunctionComponent<StatisticsViewProps> = ({
   const ids = items.map(item => item.id);
   const keys = items.map(item => item.key);
   const runs = sectionRuns(view, items);
+
+  // A link from For you names a chart: bring its card into view once the tab has drawn.
+  useEffect(() => {
+    if (!focusChart) return;
+    document
+      .querySelector(`[data-testid="statistics-card-${focusChart}"]`)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [focusChart, subjectId]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),

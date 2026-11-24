@@ -7,6 +7,7 @@ import {
   DEFAULT_LAYOUT_FLOOR,
   buildDefaultLayout,
   groupBySection,
+  insertIntoSection,
   isLegacyLayout,
   layoutKey,
   parseLayoutKey,
@@ -263,5 +264,30 @@ describe("an older single-list layout", () => {
       ),
     ).toBe(false);
     expect(isLegacyLayout({}, "organisation")).toBe(false);
+  });
+});
+
+describe("insertIntoSection", () => {
+  it("puts a chart at the end of its own section and leaves the rest as arranged", () => {
+    expect(insertIntoSection(view, ["TSQ-001", "TSQ-038", "TSQ-024"], "TSQ-008")).toEqual([
+      "TSQ-001",
+      "TSQ-008",
+      "TSQ-038",
+      "TSQ-024",
+    ]);
+  });
+
+  it("goes before the first chart of a later section", () => {
+    expect(insertIntoSection(view, ["TSQ-001", "TSQ-038", "TSQ-024"], "TSQ-007")).toEqual([
+      "TSQ-001",
+      "TSQ-007",
+      "TSQ-038",
+      "TSQ-024",
+    ]);
+  });
+
+  it("does not add a chart that is already there, or one the view does not list", () => {
+    expect(insertIntoSection(view, ["TSQ-001"], "TSQ-001")).toEqual(["TSQ-001"]);
+    expect(insertIntoSection(view, ["TSQ-001"], "TSQ-999")).toEqual(["TSQ-001"]);
   });
 });

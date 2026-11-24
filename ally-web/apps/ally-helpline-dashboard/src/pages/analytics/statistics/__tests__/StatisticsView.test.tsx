@@ -34,22 +34,24 @@ vi.mock("../ChartHost", () => ({
     onFiltersChange?: (f: Record<string, string>) => void;
     pinned?: boolean;
   }) => (
-    <div data-testid={`card-${props.entry.id}`}>
-      <span data-testid={`filters-${props.entry.id}`}>{JSON.stringify(props.filters)}</span>
-      <span data-testid={`locked-${props.entry.id}`}>
-        {JSON.stringify(props.lockedFilters ?? [])}
-      </span>
-      <span data-testid={`pinned-${props.entry.id}`}>{String(props.pinned)}</span>
-      <span data-testid={`canpin-${props.entry.id}`}>{String(!!props.onTogglePin)}</span>
-      <button type="button" onClick={() => props.onTogglePin?.()}>
-        pin-{props.entry.id}
-      </button>
-      <button
-        type="button"
-        onClick={() => props.onFiltersChange?.({ course: "c1", simulation: "9" })}
-      >
-        filter-{props.entry.id}
-      </button>
+    <div data-testid={`statistics-card-${props.entry.id}`}>
+      <div data-testid={`card-${props.entry.id}`}>
+        <span data-testid={`filters-${props.entry.id}`}>{JSON.stringify(props.filters)}</span>
+        <span data-testid={`locked-${props.entry.id}`}>
+          {JSON.stringify(props.lockedFilters ?? [])}
+        </span>
+        <span data-testid={`pinned-${props.entry.id}`}>{String(props.pinned)}</span>
+        <span data-testid={`canpin-${props.entry.id}`}>{String(!!props.onTogglePin)}</span>
+        <button type="button" onClick={() => props.onTogglePin?.()}>
+          pin-{props.entry.id}
+        </button>
+        <button
+          type="button"
+          onClick={() => props.onFiltersChange?.({ course: "c1", simulation: "9" })}
+        >
+          filter-{props.entry.id}
+        </button>
+      </div>
     </div>
   ),
 }));
@@ -168,6 +170,27 @@ describe("a chart tab", () => {
   it("shows the empty message when nothing is on the tab", () => {
     renderView({ layoutKeys: [] });
     expect(screen.getByTestId("statistics-empty")).toBeTruthy();
+  });
+});
+
+describe("a link that names a chart", () => {
+  it("brings that chart's card into view", () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    renderView({ focusChart: "TSQ-043" });
+    expect(scroll).toHaveBeenCalled();
+  });
+
+  it("shows that chart even when the person has not put it on the tab", () => {
+    renderView({ layoutKeys: ["TSQ-038"], focusChart: "TSQ-043" });
+    expect(screen.getByTestId("card-TSQ-043")).toBeTruthy();
+  });
+
+  it("does nothing without one", () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    renderView();
+    expect(scroll).not.toHaveBeenCalled();
   });
 });
 

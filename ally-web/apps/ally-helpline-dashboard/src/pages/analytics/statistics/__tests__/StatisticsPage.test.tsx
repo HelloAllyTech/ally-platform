@@ -30,6 +30,7 @@ vi.mock("../ForYouView", () => ({
     pinKeys: string[];
     onPinsChange: (k: string[]) => void;
     onOpen: (i: unknown) => void;
+    onOpenInsight: (i: unknown) => void;
   }) => (
     <div data-testid="for-you">
       {JSON.stringify(props.pinKeys)}
@@ -44,6 +45,18 @@ vi.mock("../ForYouView", () => ({
       >
         open-pin
       </button>
+      <button
+        type="button"
+        onClick={() =>
+          props.onOpenInsight({
+            chartId: "TSQ-041",
+            view: "course",
+            filters: { course: "c7" },
+          })
+        }
+      >
+        open-insight
+      </button>
     </div>
   ),
 }));
@@ -52,6 +65,7 @@ vi.mock("../StatisticsView", () => ({
     view: { id: string };
     layoutKeys: string[];
     subjectId?: string;
+    focusChart?: string;
     onLayoutChange: (k: string[]) => void;
     onSubjectChange: (id: string) => void;
     onTogglePin: (id: string, key: string) => void;
@@ -59,6 +73,7 @@ vi.mock("../StatisticsView", () => ({
     <div data-testid={`view-${props.view.id}`}>
       <span data-testid="layout">{JSON.stringify(props.layoutKeys)}</span>
       <span data-testid="subject">{props.subjectId ?? "none"}</span>
+      <span data-testid="focus">{props.focusChart ?? "none"}</span>
       <button type="button" onClick={() => props.onLayoutChange(["TSQ-001"])}>
         save-layout
       </button>
@@ -224,5 +239,23 @@ describe("the Statistics page", () => {
     fireEvent.click(screen.getByText("open-pin"));
     expect(screen.getByTestId("where").textContent).toContain("tab=course");
     expect(screen.getByTestId("where").textContent).toContain("course=c9");
+  });
+
+  it("opens a finding on its tab and chart, for the course it is about", () => {
+    prefs.data = { statistics_layouts: { pins: ["TSQ-001"] } };
+    renderPage("/?tab=foryou&learner=9");
+    fireEvent.click(screen.getByText("open-insight"));
+    const where = screen.getByTestId("where").textContent ?? "";
+    expect(where).toContain("tab=course");
+    expect(where).toContain("course=c7");
+    expect(where).toContain("chart=TSQ-041");
+    expect(where).not.toContain("learner=");
+    expect(screen.getByTestId("focus").textContent).toBe("TSQ-041");
+  });
+
+  it("forgets the chart to look at when another tab is chosen", () => {
+    renderPage("/?tab=course&chart=TSQ-041");
+    fireEvent.click(screen.getByTestId("statistics-tab-organisation"));
+    expect(screen.getByTestId("where").textContent).not.toContain("chart=");
   });
 });

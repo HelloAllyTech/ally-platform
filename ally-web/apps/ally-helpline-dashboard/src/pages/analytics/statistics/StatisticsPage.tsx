@@ -10,6 +10,7 @@ import type {
   OrganizationMetricsRange,
   StatisticsChartLibrary,
   StatisticsFilterKey,
+  StatisticsInsight,
   StatisticsViewConfig,
   StatisticsViewId,
 } from "@types";
@@ -97,6 +98,7 @@ export const StatisticsPage: FunctionComponent<StatisticsPageProps> = ({ library
     // The subject belongs to the tab it was chosen on; it is remembered in preferences.
     nextParams.delete("course");
     nextParams.delete("learner");
+    nextParams.delete("chart");
     setParams(nextParams, { replace: true });
   };
 
@@ -151,6 +153,21 @@ export const StatisticsPage: FunctionComponent<StatisticsPageProps> = ({ library
     setParams(nextParams, { replace: true });
   };
 
+  /** Opens the tab and chart a finding comes from, on the course or learner it is about. */
+  const openInsight = (insight: StatisticsInsight) => {
+    const home = views.find(view => view.id === insight.view);
+    if (!home) return;
+    const nextParams = new URLSearchParams(params);
+    nextParams.set("tab", home.id);
+    nextParams.delete("course");
+    nextParams.delete("learner");
+    if (home.subject && insight.filters?.[home.subject]) {
+      nextParams.set(home.subject, insight.filters[home.subject] as string);
+    }
+    nextParams.set("chart", insight.chartId);
+    setParams(nextParams, { replace: true });
+  };
+
   if (isLoading) {
     return (
       <div className="py-4" data-testid="statistics-dashboard-loading">
@@ -196,6 +213,7 @@ export const StatisticsPage: FunctionComponent<StatisticsPageProps> = ({ library
           pinKeys={pinKeys}
           onPinsChange={keys => persistLayout("pins", keys)}
           onOpen={openPinned}
+          onOpenInsight={openInsight}
         />
       ) : (
         <StatisticsView
@@ -219,6 +237,7 @@ export const StatisticsPage: FunctionComponent<StatisticsPageProps> = ({ library
           onSubjectChange={id => activeView.subject && chooseSubject(activeView.subject, id)}
           pinnedIds={pinnedIds}
           onTogglePin={togglePin}
+          focusChart={params.get("chart") ?? undefined}
         />
       )}
     </div>

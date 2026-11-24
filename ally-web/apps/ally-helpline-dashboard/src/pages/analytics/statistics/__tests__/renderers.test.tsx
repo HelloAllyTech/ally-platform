@@ -78,11 +78,13 @@ describe("every offered chart has a renderer", () => {
       "TSQ-023",
       "TSQ-024",
       "TSQ-026",
+      "TSQ-041",
       "TSQ-043",
       "TSQ-045",
       "TSQ-046",
       "TSQ-053",
       "TSQ-063",
+      "TSQ-064",
       "TSQ-065",
       "TSQ-038",
       "TSQ-039",
@@ -117,6 +119,7 @@ describe("empty states say so plainly", () => {
     ["TSQ-024", { rows: [] }, "skills.none"],
     ["TSQ-042", { weeks: [], enrolled: 0, completed: 0 }, "performance.none"],
     ["TSQ-043", { bins: [], boundsDays: [1, 3], completed: 0, medianDays: null }, "finish.none"],
+    ["TSQ-064", { rows: [] }, "learnerCourses.none"],
     ["TSQ-045", { rows: [] }, "modules.none"],
     ["TSQ-046", { rows: [] }, "modules.timeNone"],
     ["TSQ-053", { rows: [] }, "roleplay.none"],
@@ -422,6 +425,49 @@ describe("the remaining release-set charts", () => {
     draw("TSQ-065", data);
     expect(screen.getByTestId("statistics-skill-trend")).toBeTruthy();
     expect(takeaway("TSQ-065", data)).toContain('"latest":4');
+  });
+});
+
+describe("the course and learner overviews", () => {
+  it("TSQ-041 says how many of those enrolled have finished, or that nobody is enrolled", () => {
+    const facts = (enrolled: number, completed: number) => ({
+      measures: [
+        { key: "enrolled", value: enrolled, format: "count" },
+        { key: "completed", value: completed, format: "count" },
+      ],
+    });
+    expect(takeaway("TSQ-041", facts(20, 12))).toContain('"completed":12');
+    expect(takeaway("TSQ-041", facts(0, 0))).toBe("statisticsLibrary.takeaway.courseFactsNone");
+    draw("TSQ-041", facts(20, 12));
+    expect(screen.getByTestId("statistics-measures")).toBeTruthy();
+  });
+
+  it("TSQ-064 lists each course with its progress and counts finished ones", () => {
+    const data = {
+      rows: [
+        {
+          courseId: "a",
+          title: "Basics",
+          completedItems: 5,
+          totalItems: 5,
+          status: "completed",
+          lastActivityAt: null,
+        },
+        {
+          courseId: "b",
+          title: "Advanced",
+          completedItems: 2,
+          totalItems: 6,
+          status: "inProgress",
+          lastActivityAt: null,
+        },
+      ],
+    };
+    draw("TSQ-064", data);
+    expect(screen.getByTestId("statistics-learner-courses")).toBeTruthy();
+    expect(screen.getByText("Advanced")).toBeTruthy();
+    expect(takeaway("TSQ-064", data)).toContain('"done":1');
+    expect(takeaway("TSQ-064", { rows: [] })).toBeNull();
   });
 });
 
