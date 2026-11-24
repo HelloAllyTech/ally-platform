@@ -343,11 +343,22 @@ export class BotPageIntakeDto {
 }
 
 export class BotPageMessageDto {
-  @ApiProperty()
+  @ApiProperty({
+    description: 'What the person typed, or the label of what they tapped.',
+  })
   @IsString()
   @IsNotEmpty()
   @MaxLength(BOT_PAGE_BOUNDS.maxMessageChars)
   message!: string;
+
+  @ApiPropertyOptional({
+    description:
+      "BT1: a tap's token (from a reply's parts). The reply answers what the tap stands for; a Confirm writes with no model call.",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  action?: string;
 }
 
 /** "Was this helpful?" on one answer (chunk Q2a). A reason and note only with a thumbs down. */

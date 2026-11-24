@@ -10,6 +10,7 @@ import {
   placesFor,
   placesWords,
   placesWordsHi,
+  type CardHeadline,
   type RelatedWords,
 } from './entry-words';
 /**
@@ -41,6 +42,22 @@ export interface WriteOffer {
   list: string;
   questions: OfferQuestions;
   createdAt: number;
+  /**
+   * BT1: the tool's input as the agent sent it, so a Confirm tap writes exactly this entry through
+   * the same tool, with no model call; and the card the tap confirms, built from the dry-run entry.
+   * Absent on offers stored before BT1 (those are confirmed by a typed yes only).
+   */
+  input?: Record<string, string | number>;
+  card?: OfferCard;
+}
+
+/** What a confirmation card shows (BT1): built in code from the dry-run entry, never from text. */
+export interface OfferCard {
+  action: 'create' | 'update' | 'cancel';
+  list: string;
+  title: string;
+  headline: CardHeadline;
+  details: { label: string; value: string }[];
 }
 
 export interface OfferQuestions {
@@ -194,6 +211,18 @@ const said = (d: Described, fallback: string): string =>
 
 /** Whether a change ends the entry ("cancelled", "no show"…): then the question says cancel. */
 const ENDS = /cancel|withdraw|no.?show|rejected|declined/i;
+
+/** Whether an update ends the entry (BT1: its card says cancel, its done card "Cancelled"). */
+export function endsEntry(
+  list: ListDefinitionView,
+  after: ListRecordView,
+  before: ListRecordView | null,
+): boolean {
+  if (!before) return false;
+  const a = describe(list, after).status;
+  const b = describe(list, before).status;
+  return Boolean(a && ENDS.test(a) && !(b && ENDS.test(b)));
+}
 
 /**
  * What exactly a write would do, as a key (the same key or no write) and the question that names

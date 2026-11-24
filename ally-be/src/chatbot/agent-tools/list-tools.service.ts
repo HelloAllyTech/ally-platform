@@ -10,7 +10,12 @@ import { LIST_COPY, ListRefusalException } from '../lists/list-refusals';
 import type { ListActor, ListRecordView } from '../lists/list-types';
 import type { ChatbotSettingsOverride } from '../type/chatbot.type';
 import { ListConsentService } from './list-consent.service';
-import { askFirstMessage, namesEntry, offerFor } from './list-consent';
+import {
+  askFirstMessage,
+  endsEntry,
+  namesEntry,
+  offerFor,
+} from './list-consent';
 import {
   atDefault,
   type CardHeadline,
@@ -103,7 +108,6 @@ export class ListToolsService {
         recordId,
         { contactId },
       );
-      const titleKey = list.settings?.title_field;
       const related = await this.relatedOf(
         chatbotId,
         list,
@@ -111,44 +115,7 @@ export class ListToolsService {
         runId,
         contactId,
       );
-      const fields = list.fields
-        .filter(
-          (f) =>
-            !f.archived_at &&
-            f.agent_read &&
-            !f.privacy?.masked &&
-            f.key !== titleKey &&
-            f.key !== list.settings?.person_field &&
-            !(
-              f.type === ListFieldType.RELATION &&
-              relationTarget(f) === 'contact'
-            ),
-        )
-        // Q4 G5: never "Guests 0" on a card.
-        .filter((f) => !atDefault(f, record.data?.[f.key]))
-        .map((f) => ({ label: f.label, value: record.display?.[f.key] ?? '' }))
-        .filter((d) => d.value !== '');
-      // The related entry's day, time and place come first (Q4 G5: "no time on the card").
-      const details = [
-        ...(related.when ? [{ label: 'When', value: related.when }] : []),
-        ...(related.where ? [{ label: 'Where', value: related.where }] : []),
-        ...fields,
-      ].slice(0, 4);
-      // A booking points at another list's entry (a slot, an event); a callback or a lead doesn't.
-      const booking =
-        Boolean(related.when) ||
-        list.fields.some(
-          (f) =>
-            !f.archived_at &&
-            f.type === ListFieldType.RELATION &&
-            relationTarget(f) !== 'contact',
-        );
-      return {
-        list: list.name,
-        title: record.title,
-        headline: headlineFor(list, 'create', booking),
-        details,
-      };
+      return cardOf(list, record, related, 'create');
     } catch (error) {
       if (
         error instanceof ListRefusalException ||
@@ -243,6 +210,8 @@ export class ListToolsService {
     const actor: ListActor = { kind: 'agent', runId: ctx.runId };
     const scope = { contactId: ctx.contactId };
     const dryRun = isPreviewConversation(ctx.conversationId);
+    // BT1: the input as sent, for a Confirm tap to replay exactly this write.
+    const sent = { ...input };
     const about = { key: list.key, name: list.name };
     const personList = Boolean(list.settings?.person_field);
     // Q4 B4: in Try it, the slots this test chat has already test-booked.
@@ -437,6 +406,17 @@ export class ListToolsService {
           )
         : null;
       if (!accepted) {
+        // BT1: the card a Confirm tap confirms, from the dry-run entry, and what it replays.
+        const action =
+          def.kind === 'create'
+            ? 'create'
+            : endsEntry(list, intended, current)
+              ? 'cancel'
+              : 'update';
+        const card = {
+          action,
+          ...cardOf(list, intended, related, action),
+        } as const;
         const asked = this.consent
           ? await this.consent.offer(
               ctx,
@@ -444,6 +424,7 @@ export class ListToolsService {
               offer.key,
               list.name,
               offer.questions,
+              { input: sent, card },
             )
           : { questions: offer.questions };
         return {
@@ -986,4 +967,56 @@ export function missingChoice(
     return { key: f.key, label: f.label, options };
   }
   return null;
+}
+
+/**
+ * A card for one entry (6b, Q4 G5; BT1): the entry's title (the day and time), the related
+ * entry's day, time and place first, then up to four details the agent may read. Never the person
+ * field, a contact, a masked value or a value left at its default ("Guests 0").
+ */
+export function cardOf(
+  list: ListDefinitionView,
+  record: ListRecordView,
+  related: RelatedWords,
+  action: 'create' | 'update' | 'cancel',
+): {
+  list: string;
+  title: string;
+  headline: CardHeadline;
+  details: { label: string; value: string }[];
+} {
+  const titleKey = list.settings?.title_field;
+  const fields = list.fields
+    .filter(
+      (f) =>
+        !f.archived_at &&
+        f.agent_read &&
+        !f.privacy?.masked &&
+        f.key !== titleKey &&
+        f.key !== list.settings?.person_field &&
+        !(f.type === ListFieldType.RELATION && relationTarget(f) === 'contact'),
+    )
+    .filter((f) => !atDefault(f, record.data?.[f.key]))
+    .map((f) => ({ label: f.label, value: record.display?.[f.key] ?? '' }))
+    .filter((d) => d.value !== '');
+  const details = [
+    ...(related.when ? [{ label: 'When', value: related.when }] : []),
+    ...(related.where ? [{ label: 'Where', value: related.where }] : []),
+    ...fields,
+  ].slice(0, 4);
+  // A booking points at another list's entry (a slot, an event); a callback or a lead doesn't.
+  const booking =
+    Boolean(related.when) ||
+    list.fields.some(
+      (f) =>
+        !f.archived_at &&
+        f.type === ListFieldType.RELATION &&
+        relationTarget(f) !== 'contact',
+    );
+  return {
+    list: list.name,
+    title: record.title,
+    headline: headlineFor(list, action, booking),
+    details,
+  };
 }

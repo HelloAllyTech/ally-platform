@@ -184,7 +184,7 @@ export class BotPagePublicController {
   @ApiOperation({
     summary: 'Send a message and stream the reply (SSE)',
     description:
-      'Events: status {code}, activity {kind, label?} (a live step: what the assistant is doing, as a kind the page words, with at most a list name or a day and time; only once the crisis check has cleared the message), token {text} (only once the checks have cleared it), then final {reply, citations, messageId, conversationId, steps?, confirmation?}, or error {code}. Refusals before the reply starts (rate limit, busy, pre-chat questions unanswered) are plain HTTP errors with a `code`. The run, its trace, tool names, ids and queries never reach the page.',
+      'Events: status {code}, activity {kind, label?} (a live step: what the assistant is doing, as a kind the page words, with at most a list name or a day and time; only once the crisis check has cleared the message), token {text} (only once the checks have cleared it), then final {reply, citations, messageId, conversationId, steps?, confirmation?, parts?} (BT1: parts are chips and cards whose buttons carry an `action` token to send back with the tapped label as `message`), or error {code}. Refusals before the reply starts (rate limit, busy, pre-chat questions unanswered) are plain HTTP errors with a `code`. The run, its trace, tool names, ids and queries never reach the page.',
   })
   async stream(
     @Param('slug') slug: string,
@@ -193,7 +193,10 @@ export class BotPagePublicController {
     @Res() res: Response,
   ): Promise<void> {
     // Everything that can refuse runs first, so a refusal is a plain HTTP error the page can read.
-    const admitted = await this.service.admit(slug, dto.message, req, res);
+    const admitted = {
+      ...(await this.service.admit(slug, dto.message, req, res)),
+      action: dto.action,
+    };
 
     const stop = new AbortController();
     let heartbeat: NodeJS.Timeout | undefined;

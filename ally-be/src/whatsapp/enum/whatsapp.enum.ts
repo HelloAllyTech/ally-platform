@@ -37,6 +37,11 @@ export enum WaHandledBy {
   /** Something failed and the fallback message went out. */
   ERROR = 'error',
   /**
+   * BT1: a tap answered in code with no model call (a Confirm, Keep it, or a button that no longer
+   * works). Counted on its own: it is neither an answer from the corpus nor a decline.
+   */
+  TAP = 'tap',
+  /**
    * A team member's reply from the inbox (chunk 11a). Stored with the sender's id; the assistant
    * didn't write it.
    */

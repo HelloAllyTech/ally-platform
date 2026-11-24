@@ -7,6 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
+import { v5 as uuidv5 } from 'uuid';
 import { DataSource } from 'typeorm';
 import { isServiceKey } from '../../common/util/service-key';
 import { AppConfigService } from '../../config/config.service';
@@ -15,6 +16,7 @@ import { ToolRunStatus } from '../entity/tool-run.entity';
 import type { ChatbotSettingsOverride } from '../type/chatbot.type';
 import { AgentRunTokenService } from './agent-run-token.service';
 import { abilityFor } from './list-tools';
+import type { WriteOffer } from './list-consent';
 import { ListToolsService } from './list-tools.service';
 import {
   AgentToolOutcome,
@@ -112,6 +114,20 @@ export class AgentGatewayService {
       contactId: claims.contactId,
       consentOfferId: claims.consent ?? null,
     };
+    return this.execute(ctx, step, name, input, () => tool.run(ctx, parsed));
+  }
+
+  /**
+   * Claim the step, run the tool once, record what it did (chunk 3b). A step already done is
+   * replayed, never run again: the agent's retries and BT1's double taps write once.
+   */
+  private async execute(
+    ctx: AgentToolContext,
+    step: number,
+    name: string,
+    input: Record<string, unknown>,
+    run: () => Promise<AgentToolOutcome>,
+  ): Promise<AgentGatewayResponse> {
     const claimed = await this.claim(ctx, step, name, input);
     if ('replay' in claimed) {
       this.logger.info(
@@ -123,7 +139,7 @@ export class AgentGatewayService {
     const startedAt = Date.now();
     let outcome: AgentToolOutcome;
     try {
-      outcome = await tool.run(ctx, parsed);
+      outcome = await run();
     } catch (error) {
       this.logger.warn(
         `[AGENT TOOL] ${name} threw ${error instanceof Error ? error.name : 'an error'}`,
@@ -148,6 +164,40 @@ export class AgentGatewayService {
         (outcome.ok ? '' : ` error=${outcome.error}`),
     );
     return { ...outcome, replayed: false };
+  }
+
+  /**
+   * BT1: a Confirm tap. The offer the person tapped is written through the same tool, list rules,
+   * per-person scope and consent check as the agent's own write, with no model call: the tap is
+   * the yes (the offer's id is the consent), and the run id comes from the offer, so a second tap
+   * replays the first one's result instead of writing again. The tool must still be on ("Do it").
+   */
+  async confirmOffer(
+    ctx: Pick<AgentToolContext, 'chatbotId' | 'conversationId' | 'contactId'>,
+    offer: WriteOffer,
+  ): Promise<AgentGatewayResponse> {
+    if (!offer.input) {
+      return { ok: false, error: 'not_tappable', replayed: false };
+    }
+    const tool =
+      this.registry.get(offer.tool) ??
+      (await this.listTools.resolve(ctx.chatbotId, offer.tool));
+    if (!tool) return { ok: false, error: 'not_found', replayed: false };
+    if (
+      abilityFor(await this.storedSettings(ctx.chatbotId), offer.tool) !==
+      'do_it'
+    ) {
+      return { ok: false, error: 'tool_off', replayed: false };
+    }
+    const runCtx: AgentToolContext = {
+      ...ctx,
+      runId: tapRunIdFor(offer.id),
+      consentOfferId: offer.id,
+    };
+    const parsed = tool.parse(offer.input);
+    return this.execute(runCtx, 0, offer.tool, offer.input, () =>
+      tool.run(runCtx, parsed),
+    );
   }
 
   /** The bot's own stored overrides: where `abilities` lives. A missing bot has nothing on. */
@@ -278,3 +328,9 @@ export class AgentGatewayService {
     });
   }
 }
+
+/** BT1: a Confirm tap's run id, the same for every tap on one offer (the replay key). */
+export function tapRunIdFor(offerId: string): string {
+  return uuidv5(`tap:${offerId}`, TAP_RUN_NAMESPACE);
+}
+const TAP_RUN_NAMESPACE = '4c3f7d61-6b0e-4b8f-9a55-2f1f7e0bd3a1';
