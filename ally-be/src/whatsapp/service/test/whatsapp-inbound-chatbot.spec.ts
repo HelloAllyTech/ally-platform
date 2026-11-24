@@ -1,4 +1,4 @@
-import { GENERAL_CRISIS_TEXT } from '../../../bot-draft/safety-pack/safety-packs';
+import { INDIA_GENERAL_CRISIS_TEXT } from '../../../bot-draft/safety-pack/safety-packs';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -418,7 +418,7 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
 
     await service.handle(inbound('I want to hurt myself'));
 
-    expect(sentBody()).toBe(GENERAL_CRISIS_TEXT);
+    expect(sentBody()).toBe(INDIA_GENERAL_CRISIS_TEXT);
     expect(handledBy()).toBe(WaHandledBy.CRISIS);
   });
 
@@ -802,7 +802,7 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
 
       await onNumber();
 
-      expect(sentBody()).toBe(GENERAL_CRISIS_TEXT);
+      expect(sentBody()).toBe(INDIA_GENERAL_CRISIS_TEXT);
     });
 
     it('does not reply while the bot is paused', async () => {

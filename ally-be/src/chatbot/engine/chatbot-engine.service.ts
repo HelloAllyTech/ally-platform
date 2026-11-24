@@ -8,6 +8,7 @@ import { BlockedCrisisService } from 'src/billing/service/blocked-crisis.service
 import { LimitsService } from 'src/billing/service/limits.service';
 import { usageContextFor } from './engine-usage';
 import { offMessage, offReasonOf } from '../safety/off-message';
+import { isIndiaAssistant } from '../agent-tools/list-tools';
 import { usageContext } from 'src/billing/context/usage-context';
 import { Injectable, Optional } from '@nestjs/common';
 import {
@@ -173,6 +174,8 @@ export function crisisTextFor(
     own: own ? fill(own) : null,
     // In the person's language (Q3-fast Part 1, B3): fixed English, Hindi or Hinglish text.
     language: replyLanguageOf(turn.text ?? '', turn.language),
+    // 112 and Tele-MANAS 14416 for an assistant in India (by its time zone).
+    india: isIndiaAssistant(turn.chatbot.settings),
   });
   // Q4 G7: the owner's one approved practical-help line, after the fixed reply.
   const practical = turn.settings.crisisPracticalLine?.trim();
@@ -456,6 +459,7 @@ export class ChatbotEngineService {
       // The builder's own numbers only (R6): never the platform's defaults. Q4 G7: confirmed ones.
       ownNumbers: crisisHelplines(turn.chatbot.settings) || null,
       language: replyLanguageOf(turn.text, turn.language),
+      india: isIndiaAssistant(turn.chatbot.settings),
     });
   }
 
@@ -1242,6 +1246,7 @@ export class ChatbotEngineService {
             selfHarm: Boolean(crisis.self_harm),
             animal: aboutAnAnimal(turn.text),
             helplineNumbers: crisisHelplines(turn.settings) || null,
+            india: isIndiaAssistant(chatbot.settings),
           })
         : crisisTextFor(turn),
       crisis: { level: emergency ? 2 : 1, path: 'classifier' },

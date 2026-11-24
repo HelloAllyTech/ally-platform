@@ -1,4 +1,4 @@
-import { GENERAL_CRISIS_TEXT } from '../../../bot-draft/safety-pack/safety-packs';
+import { INDIA_GENERAL_CRISIS_TEXT } from '../../../bot-draft/safety-pack/safety-packs';
 import type { AgentRunResponse } from '../../../ai/dto/knowledge.dto';
 import { AiUpstreamError } from '../../../ai/exception/ai-upstream.exception';
 import { ErrorCode } from '../../../exception/error-code.enum';
@@ -394,7 +394,7 @@ describe('ChatbotEngineService', () => {
       });
       const decision = await engine.respond(whatsapp());
       expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
-      expect(decision.body).toBe(GENERAL_CRISIS_TEXT);
+      expect(decision.body).toBe(INDIA_GENERAL_CRISIS_TEXT);
       expect(decision.alert?.type).toBe('Chatbot Crisis Classifier');
       expect(aiService.runAgent).not.toHaveBeenCalled();
     });
@@ -408,9 +408,9 @@ describe('ChatbotEngineService', () => {
       );
       expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
       expect(decision.body).toMatch(/emergency/i);
-      // R6: no country numbers in the default.
-      expect(decision.body).toMatch(/local emergency number/);
-      expect(decision.body).not.toMatch(/112|108/);
+      // An assistant in India (no time zone set): call 112 (R6 stands elsewhere).
+      expect(decision.body).toMatch(/or call 112\./);
+      expect(decision.body).not.toMatch(/local emergency number|108/);
     });
 
     it('a failed classifier with no emergency keyword sends the answer as usual (H1)', async () => {
@@ -443,7 +443,7 @@ describe('ChatbotEngineService', () => {
       );
       const decision = await engine.respond(whatsapp());
       expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
-      expect(decision.body).toBe(GENERAL_CRISIS_TEXT);
+      expect(decision.body).toBe(INDIA_GENERAL_CRISIS_TEXT);
       expect(decision.agent?.runtime).toBe(AgentRuntimeUsed.V2_FAILED);
     });
 
@@ -476,7 +476,7 @@ describe('ChatbotEngineService', () => {
       );
       expect(emergency.body).toBe(
         'This sounds like an emergency. Please go to the nearest emergency department now, ' +
-          'or call your local emergency number. You can also call Cloudnine on 99724 99724.',
+          'or call 112. You can also call Cloudnine on 99724 99724.',
       );
       expect(emergency.alert?.message).toContain('a medical emergency');
     });
