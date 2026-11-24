@@ -90,7 +90,7 @@ export const hi: BotPageCopy = {
     linkLabel: "findahelpline.com",
     linkUrl: "https://findahelpline.com",
     numbers: "आप {numbers} पर कॉल कर सकते हैं।",
-    invited: "अगर आपको आमंत्रित किया गया था, तो अपना ईमेल देखें।",
+    invited: "अगर आपको आमंत्रित किया गया था, तो वही ईमेल पता लिखें जो टीम ने आपके लिए जोड़ा था।",
   },
   blocked: {
     OUT_OF_CREDITS: "यह सहायक अभी जवाब नहीं दे सकता।",

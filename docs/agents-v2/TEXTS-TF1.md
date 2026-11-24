@@ -38,3 +38,8 @@ Every new line a person or an owner can see, from the TF1 fixes. In code each on
 | B1 | the same, Staff and volunteer onboarding | I remember your name and the questions you’ve sent the team. Say ‘forget me’ any time. |
 | B1 | the same, in Hindi (every template) | मैं आपका नाम और आपकी बताई ज़रूरी बातें याद रख सकता हूँ, ताकि आपको दोबारा न बताना पड़े। कभी भी ‘मुझे भूल जाओ’ लिखें। |
 | B1 | the same, in Hinglish | Main aapka naam aur aapki batayi zaroori baatein yaad rakh sakta hoon, taaki aapko dobara na batana pade. Kabhi bhi ‘mujhe bhool jao’ likhein. |
+| F17 | bot page sign-in, under the crisis information (was "If you were invited, check your email.") | If you were invited, use the email address the team added for you. |
+| F17 | the same, in Hindi | अगर आपको आमंत्रित किया गया था, तो वही ईमेल पता लिखें जो टीम ने आपके लिए जोड़ा था। |
+| B2 / F17 | Channels → Who may chat, invite only (was "Invite only is the one option for now.") | Who can chat: only the people on this list. Share the link with them yourself. |
+| B2 | the same, organisation-only | Who can chat: people in your organisation, after they confirm their work email. |
+| B2 | the same, public (off for now) | Who can chat: anyone with the link. |

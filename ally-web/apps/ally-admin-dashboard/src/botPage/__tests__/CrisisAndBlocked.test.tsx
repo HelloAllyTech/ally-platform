@@ -53,7 +53,8 @@ function chatApi(send: unknown, page: PublicBotPage = PAGE) {
 }
 
 describe("sign-in screen crisis information", () => {
-  it("shows the helpline link and 'If you were invited, check your email' before any code is asked for", () => {
+  // TF1 F17: no invitation email is sent, so the line no longer says to check one.
+  it("shows the helpline link and the invited line before any code is asked for", () => {
     render(<AccessEmail branding={PAGE.branding} copy={en} onSubmit={vi.fn()} />);
     const info = screen.getByTestId("bp-crisis-info");
     expect(info).toHaveTextContent("If you need support now");
@@ -62,7 +63,7 @@ describe("sign-in screen crisis information", () => {
       "https://findahelpline.com",
     );
     expect(screen.getByTestId("bp-invited-line")).toHaveTextContent(
-      "If you were invited, check your email.",
+      "If you were invited, use the email address the team added for you.",
     );
     expect(screen.queryByTestId("bp-crisis-numbers")).toBeNull();
   });
