@@ -2199,7 +2199,7 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
         'and has free queue slots',
       detail:
         `PM Agent ${lane} lane: a read-only tool loop over ${reads}, at most 6 passes of ` +
-        '4,000 output tokens, ending in one submit_candidates call (one repair retry). ' +
+        '12,000 output tokens, ending in one submit_candidates call of at most 2 candidates (one repair retry). ' +
         'Mandate, strategy page, product map, the roadmap filing checklist and a digest of what ' +
         'the roadmap already holds ride in a cached system block. It proposes; an accepted card ' +
         'is filed to the roadmap, never built.',
