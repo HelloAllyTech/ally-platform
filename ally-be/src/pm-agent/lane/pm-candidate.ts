@@ -1,5 +1,8 @@
 import { AgentToolDefinition } from 'src/llm-agent/type/agent-llm.type';
-import { validateCardPayload } from '../dto/pm-card-payload.dto';
+import {
+  PM_CARD_LIMITS,
+  validateCardPayload,
+} from '../dto/pm-card-payload.dto';
 import {
   PmCardCategory,
   PmCardKind,
@@ -175,17 +178,67 @@ export function hoistMisplacedPlanFields(
 ): Record<string, any> {
   const plan = body.plan;
   if (!plan || typeof plan !== 'object' || Array.isArray(plan)) return body;
-  const misplaced = PLAN_SIBLING_KEYS.filter(
-    (key) => key in plan && !(key in body),
-  );
-  if (!misplaced.length) return body;
+  const nested = PLAN_SIBLING_KEYS.filter((key) => key in plan);
+  if (!nested.length) return body;
   const nextPlan = { ...plan };
   const hoisted: Record<string, any> = {};
-  for (const key of misplaced) {
-    hoisted[key] = nextPlan[key];
+  for (const key of nested) {
+    // The top level wins when the model wrote the field in both places (prod 2026-11-24:
+    // `size` beside AND inside plan); the copy inside plan is dropped, never merged.
+    if (!(key in body)) hoisted[key] = nextPlan[key];
     delete nextPlan[key];
   }
   return { ...body, ...hoisted, plan: nextPlan };
+}
+
+/** Recommendation lists the model sometimes sends as one string (prod: alternativesDropped). */
+const TOP_LEVEL_LISTS = [
+  'change',
+  'alternativesDropped',
+  'repos',
+  'evidenceIds',
+] as const;
+const PLAN_LISTS = Object.keys(
+  RECOMMENDATION_SCHEMA.properties.plan.properties,
+);
+/**
+ * Supporting lists only: trimmed to the contract's LIST_MAX instead of failing the whole card.
+ * `change` (the card's 1–3 bullets), `repos` and `evidenceIds` are never trimmed: an extra
+ * bullet or citation is a real error the repair round should fix.
+ */
+const TRIMMABLE_LISTS = new Set(['alternativesDropped', ...PLAN_LISTS]);
+const LIST_MAX = PM_CARD_LIMITS.LIST_MAX;
+
+function asList(value: unknown, trim: boolean): unknown {
+  const list =
+    typeof value === 'string' && value.trim() ? [value.trim()] : value;
+  return trim && Array.isArray(list) && list.length > LIST_MAX
+    ? list.slice(0, LIST_MAX)
+    : list;
+}
+
+/**
+ * Lossless or near-lossless repairs of shape slips gpt-5-mini makes on a full recommendation,
+ * applied before validation so one slip does not discard an otherwise valid card: fields nested
+ * inside `plan` (see hoistMisplacedPlanFields), a list sent as one string, and a supporting list
+ * over LIST_MAX. Meaning-bearing limits (title words, description length, enums) are untouched
+ * and still go to the repair round.
+ */
+export function normaliseRecommendation(
+  body: Record<string, any>,
+): Record<string, any> {
+  const out: Record<string, any> = { ...hoistMisplacedPlanFields(body) };
+  for (const key of TOP_LEVEL_LISTS) {
+    if (key in out) out[key] = asList(out[key], TRIMMABLE_LISTS.has(key));
+  }
+  if (out.plan && typeof out.plan === 'object' && !Array.isArray(out.plan)) {
+    const plan = { ...out.plan };
+    for (const key of PLAN_LISTS) {
+      if (key in plan) plan[key] = asList(plan[key], true);
+    }
+    out.plan = plan;
+  }
+  return out;
 }
 
 const QUESTION_SCHEMA = {
@@ -296,7 +349,7 @@ export function checkCandidate(
   }
   const payload: Record<string, any> = {
     ...(kind === PmCardKind.RECOMMENDATION
-      ? hoistMisplacedPlanFields(body)
+      ? normaliseRecommendation(body)
       : body),
     schemaVersion: 1,
   };
