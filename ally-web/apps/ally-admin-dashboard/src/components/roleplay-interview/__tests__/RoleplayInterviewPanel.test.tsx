@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
     scenarioId: null,
   },
   approve: vi.fn(),
+  play: vi.fn(),
 }));
 
 vi.mock("@store", () => ({
@@ -29,6 +30,30 @@ vi.mock("@api", () => ({
   useApproveRoleplayInterviewMutation: () => [mocks.approve, { isLoading: false }],
   useLinkRoleplayInterviewMutation: () => [vi.fn()],
   useAbandonRoleplayInterviewMutation: () => [vi.fn()],
+  useGetAvailableLanguageVoicesQuery: () => ({
+    data: [
+      {
+        language_id: 1,
+        value: "en-IN",
+        label: "English (India)",
+        voices: [{ id: "v-en", name: "Anushka", gender: "female" }],
+      },
+      {
+        language_id: 2,
+        value: "hi-IN",
+        label: "Hindi (India)",
+        voices: [{ id: "v-hi", name: "Raju" }],
+      },
+    ],
+  }),
+}));
+vi.mock("@hooks/useVoicePreview", () => ({
+  useVoicePreview: () => ({
+    playingVoiceId: null,
+    isLoading: false,
+    play: mocks.play,
+    pause: vi.fn(),
+  }),
 }));
 vi.mock("../../../hooks/useRoleplayInterviewStream", () => ({
   useRoleplayInterviewStream: () => ({
@@ -112,6 +137,37 @@ describe("RoleplayInterviewPanel tabs", () => {
       fireEvent.click(screen.getByText(en.roleplayInterview.plan.approve));
     });
     expect(mocks.approve).toHaveBeenCalledWith({ id: "s1", planVersion: 1 });
-    expect(onApproved).toHaveBeenCalledWith({ mode: "learning" }, "s1");
+    expect(onApproved).toHaveBeenCalledWith({ mode: "learning" }, "s1", {});
+  });
+});
+
+describe("RoleplayInterviewPanel languages and voices", () => {
+  it("starts from the agent's languages and hands the trainer's voices to the build", async () => {
+    (mocks.session.brief as any).languages = [
+      { languageId: "1", label: "English (India)", code: "en-IN" },
+    ];
+    mocks.session.plan = plan;
+    mocks.session.planVersion = 1;
+    mocks.session.status = "PLAN_READY";
+    mocks.approve.mockReturnValue({
+      unwrap: () => Promise.resolve({ session: mocks.session, generation: { mode: "learning" } }),
+    });
+    const onApproved = vi.fn();
+    await act(async () => {
+      render(<RoleplayInterviewPanel onApproved={onApproved} />);
+    });
+    fireEvent.click(screen.getByRole("tab", { name: /Brief/ }));
+    expect((screen.getByLabelText("English (India)") as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(screen.getByLabelText("Hindi (India)"));
+    fireEvent.change(screen.getByLabelText(en.roleplayInterview.voices.voiceFor("Hindi (India)")), {
+      target: { value: "v-hi" },
+    });
+    fireEvent.click(screen.getByText(en.roleplayInterview.voices.play));
+    expect(mocks.play).toHaveBeenCalledWith("v-hi");
+    await act(async () => {
+      fireEvent.click(screen.getByText(en.roleplayInterview.plan.approve));
+    });
+    expect(onApproved).toHaveBeenCalledWith({ mode: "learning" }, "s1", { "1": "", "2": "v-hi" });
+    delete (mocks.session.brief as any).languages;
   });
 });

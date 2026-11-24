@@ -16087,6 +16087,16 @@ export const en = {
       "e.g. A practice roleplay for teachers talking to a withdrawn 15-year-old student…",
     placeholder: "Answer, or tell me anything else…",
     useSteps: "Use the quick steps instead",
+    voices: {
+      title: "Languages and voices",
+      help: "Tick each language the client speaks. Pick a voice and listen to it, or let the agent pick one that matches the client.",
+      agentPicks: "Agent picks a voice",
+      voiceFor: (language: string) => `Voice for ${language}`,
+      play: "Play",
+      stop: "Stop",
+      loading: "Loading…",
+      chooseLink: "Choose voices",
+    },
     tabs: {
       label: "Roleplay agent",
       build: "Build",

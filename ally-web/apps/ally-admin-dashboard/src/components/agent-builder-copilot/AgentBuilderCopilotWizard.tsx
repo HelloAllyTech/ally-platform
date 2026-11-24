@@ -634,7 +634,29 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
    * the mode, and the generation writes everything else. Values are passed straight in: the
    * wizard's state set here is not read until the next render.
    */
-  const runFromInterview = async (generation: RoleplayInterviewGeneration) => {
+  const runFromInterview = async (
+    generation: RoleplayInterviewGeneration,
+    voiceChoice: Record<string, string> = {},
+  ) => {
+    // The trainer's languages from the Brief tab win over the agent's; voices they picked go on
+    // the form now, and the generation casts only the languages left to it.
+    const chosenIds = Object.keys(voiceChoice);
+    const catalog = languageCatalog;
+    const languages = chosenIds.length
+      ? chosenIds
+          .map(id => catalog.find(l => String(l.language_id) === id))
+          .filter((l): l is NonNullable<typeof l> => Boolean(l))
+          .map(l => ({ languageId: String(l.language_id), label: l.label, code: l.value }))
+      : (generation.languages ?? []);
+    const pickedVoices = Object.fromEntries(Object.entries(voiceChoice).filter(([, v]) => v));
+    if (Object.keys(pickedVoices).length) {
+      const current = (formMethods.getValues("languageVoices") ?? {}) as Record<string, string>;
+      formMethods.setValue(
+        "languageVoices",
+        { ...current, ...pickedVoices },
+        { shouldDirty: true, shouldValidate: false },
+      );
+    }
     formMethods.setValue(
       "competency",
       { id: generation.competencyId, name: generation.competencyName },
@@ -674,7 +696,7 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
       ? `${generation.actorDescription}\n\n${characterStrings.briefNote(libraryCharacter.name)}\n${libraryCharacter.profile.slice(0, 2500)}`
       : generation.actorDescription;
     setDescription(generation.actorDescription);
-    setChosenLanguages(generation.languages ?? []);
+    setChosenLanguages(languages);
     setGoalTitlesUsed([generation.agentTestCases]);
     setHistory(previous => [
       ...previous,
@@ -696,7 +718,7 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
       includeStates: Boolean(picked?.states) && !states.length,
       statesOnForm: states.length > 0,
       ...(libraryCharacter ? { libraryCharacter: true } : {}),
-      ...(generation.languages?.length ? { languages: generation.languages } : {}),
+      ...(languages.length ? { languages } : {}),
     });
   };
 
@@ -773,9 +795,9 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
         <div className="flex-1 min-h-0">
           <RoleplayInterviewPanel
             scenarioId={scenarioId}
-            onApproved={(generation, sessionId) => {
+            onApproved={(generation, sessionId, voiceChoice) => {
               setInterviewSessionId(sessionId);
-              void runFromInterview(generation);
+              void runFromInterview(generation, voiceChoice);
             }}
             onUseSteps={() => setFlow("steps")}
             compact={layout !== "focus"}

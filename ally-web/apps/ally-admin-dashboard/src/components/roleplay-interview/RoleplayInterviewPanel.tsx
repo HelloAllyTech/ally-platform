@@ -19,6 +19,7 @@ import {
 
 import { useRoleplayInterviewStream } from "../../hooks/useRoleplayInterviewStream";
 import { AgentAnswerPayload, AgentReceipt, ChatComposer, ChatMessage } from "../agent-chat";
+import { LanguageVoiceChoice, LanguageVoicePicker } from "./LanguageVoicePicker";
 import { RoleplayBriefPanel } from "./RoleplayBriefPanel";
 import { RoleplayPlanCard } from "./RoleplayPlanCard";
 
@@ -29,7 +30,12 @@ interface RoleplayInterviewPanelProps {
   /** The roleplay being edited, once it has been saved: the interview is kept with it. */
   scenarioId?: number | null;
   /** The plan was approved: build the roleplay from these inputs. */
-  onApproved: (generation: RoleplayInterviewGeneration, sessionId: string) => void;
+  onApproved: (
+    generation: RoleplayInterviewGeneration,
+    sessionId: string,
+    /** The trainer's languages and voices from the Brief tab (languageId → voiceId, "" = agent). */
+    languageVoices: LanguageVoiceChoice,
+  ) => void;
   /** Use the six quick steps instead. */
   onUseSteps?: () => void;
   /** Kept for callers; the tabs work the same beside the form. */
@@ -59,6 +65,17 @@ export const RoleplayInterviewPanel: React.FC<RoleplayInterviewPanelProps> = ({
   const [abandon] = useAbandonRoleplayInterviewMutation();
   const feedEndRef = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<PanelTab>("build");
+  // Languages and voices: start from what the agent recorded, until the trainer changes them.
+  const [languageVoices, setLanguageVoices] = useState<LanguageVoiceChoice>({});
+  const [languagesTouched, setLanguagesTouched] = useState(false);
+  useEffect(() => {
+    if (languagesTouched) return;
+    setLanguageVoices(previous =>
+      Object.fromEntries(
+        (brief.languages ?? []).map(l => [l.languageId, previous[l.languageId] ?? ""]),
+      ),
+    );
+  }, [brief.languages, languagesTouched]);
   // The brief changed while the trainer was in the chat: a dot on the Brief tab.
   const [briefUnseen, setBriefUnseen] = useState(false);
   const tabRefs = useRef<Partial<Record<PanelTab, HTMLButtonElement | null>>>({});
@@ -131,7 +148,7 @@ export const RoleplayInterviewPanel: React.FC<RoleplayInterviewPanelProps> = ({
     try {
       const approved = await approve({ id: session.id, planVersion: plan.version }).unwrap();
       adopt(approved.session);
-      onApproved(approved.generation, approved.session.id);
+      onApproved(approved.generation, approved.session.id, languageVoices);
     } catch (caught) {
       const status = (caught as { status?: number })?.status;
       toast.error(status === 409 ? strings.planChanged : strings.approveFailed);
@@ -204,6 +221,13 @@ export const RoleplayInterviewPanel: React.FC<RoleplayInterviewPanelProps> = ({
                 className="text-primary-700 underline"
               >
                 {strings.tabs.reviewPlan}
+              </button>
+              <button
+                type="button"
+                onClick={() => selectTab("brief")}
+                className="text-primary-700 underline"
+              >
+                {strings.voices.chooseLink}
               </button>
               {!approved && (
                 <button
@@ -333,6 +357,14 @@ export const RoleplayInterviewPanel: React.FC<RoleplayInterviewPanelProps> = ({
         ) : (
           <div className="flex flex-col gap-4 pb-4">
             <RoleplayBriefPanel brief={brief} stillNeeded={stillNeeded} />
+            <LanguageVoicePicker
+              value={languageVoices}
+              disabled={approved}
+              onChange={next => {
+                setLanguagesTouched(true);
+                setLanguageVoices(next);
+              }}
+            />
             {plan ? (
               <RoleplayPlanCard
                 plan={plan.plan}
