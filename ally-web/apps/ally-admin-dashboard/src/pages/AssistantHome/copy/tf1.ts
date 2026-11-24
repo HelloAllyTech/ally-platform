@@ -25,4 +25,8 @@ export const TF1_COPY = {
     confirmed: "Crisis replies now give {numbers} beside the national numbers.",
     failed: "Couldn't confirm it. Try again.",
   },
+  create: {
+    /** S6: Create's Pick a template shows the use-case templates; the older starting points below. */
+    moreStartingPoints: "More starting points",
+  },
 } as const;

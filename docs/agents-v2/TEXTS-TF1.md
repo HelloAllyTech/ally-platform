@@ -19,3 +19,4 @@ Every new line a person or an owner can see, from the TF1 fixes. In code each on
 | S7 | the same, in Hindi | अगर किसी बच्चे को अभी खतरा है, तो 112 पर कॉल करें। चाइल्डलाइन: 1098, मुफ़्त, किसी भी समय। |
 | S7 | the same, outside India | If a child is in danger right now, call your local emergency number. |
 | S7 | the same, outside India, in Hindi | अगर किसी बच्चे को अभी खतरा है, तो अपने यहाँ के आपातकालीन नंबर पर कॉल करें। |
+| S6 | Create → Pick a template, below the use-case templates | More starting points |
