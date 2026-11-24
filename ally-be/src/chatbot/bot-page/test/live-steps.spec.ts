@@ -76,4 +76,9 @@ describe('the bot page live steps (chunk 6b)', () => {
   it('the card is for the last write with a record', () => {
     expect(confirmedWrite(decision(WaHandledBy.RAG))?.record_id).toBe(BOOKING);
   });
+
+  // TF1 F20: after a Confirm tap only "Done: …" showed, with no card and no Cancel or Move.
+  it('a Confirm tap’s write has its card too', () => {
+    expect(confirmedWrite(decision(WaHandledBy.TAP))?.record_id).toBe(BOOKING);
+  });
 });

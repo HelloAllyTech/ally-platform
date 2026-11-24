@@ -98,7 +98,12 @@ export function confirmedWrite(
 ): (AgentActivity & { record_id: string }) | null {
   const agent = decision.agent;
   if (!agent || agent.runtime !== AgentRuntimeUsed.V2) return null;
-  if (!SHOWS_STEPS.has(decision.handledBy)) return null;
+  // TF1 F20: a Confirm tap's write has its card too, so its Cancel and Move (drawn inside it) show.
+  if (
+    !SHOWS_STEPS.has(decision.handledBy) &&
+    decision.handledBy !== WaHandledBy.TAP
+  )
+    return null;
   const writes = (agent.activity ?? []).filter(
     (a): a is AgentActivity & { record_id: string } =>
       ['create', 'update', 'cancel'].includes(a.kind) && Boolean(a.record_id),
